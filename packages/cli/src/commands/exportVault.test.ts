@@ -144,9 +144,31 @@ describe("comando `export-vault` (SPEC-17 — local, sem servidor)", () => {
     expect(linhaUri).toContain("vault=Meu+Vault");
   });
 
-  it("--abrir chama o launcher do SO com a URI", async () => {
-    await exportVault(["--dir", dirVault, "--abrir"]);
-    expect(execMock).toHaveBeenCalledTimes(1);
-    expect(String(execMock.mock.calls[0][0])).toContain("obsidian://open?vault=vault");
+  it("--abrir chama o launcher do SO com a URI (Windows)", async () => {
+    // Achado real: o CI roda em Ubuntu — `abrirNoSistema` só chama `exec` em
+    // win32, senão só imprime. Força a plataforma pra testar o ramo que
+    // dispara o launcher, independente do SO que roda a suíte.
+    const plataformaOriginal = process.platform;
+    Object.defineProperty(process, "platform", { value: "win32" });
+    try {
+      await exportVault(["--dir", dirVault, "--abrir"]);
+      expect(execMock).toHaveBeenCalledTimes(1);
+      expect(String(execMock.mock.calls[0][0])).toContain("obsidian://open?vault=vault");
+    } finally {
+      Object.defineProperty(process, "platform", { value: plataformaOriginal });
+    }
+  });
+
+  it("--abrir fora do Windows não chama exec, só avisa que precisa abrir manualmente", async () => {
+    const plataformaOriginal = process.platform;
+    Object.defineProperty(process, "platform", { value: "linux" });
+    const spy = vi.spyOn(console, "log");
+    try {
+      await exportVault(["--dir", dirVault, "--abrir"]);
+      expect(execMock).not.toHaveBeenCalled();
+      expect(spy.mock.calls.map((c) => String(c[0])).some((l) => l.includes("Abra manualmente"))).toBe(true);
+    } finally {
+      Object.defineProperty(process, "platform", { value: plataformaOriginal });
+    }
   });
 });
