@@ -2,7 +2,7 @@
 
 **Depende de/relacionado a:** SPEC-16 (base de conhecimento, JOURNEY §32), Fase A (JOURNEY §20, decisão original de ir pra banco de verdade), CONTEXTO-E-ARQUITETURA.md §2/§5.1 (decisão original v1 de cortar banco/multi-tenant/auth, agora parcialmente revertida de novo). Reabre o rumo geral do produto — não corrige uma peça, decide entre dois modelos de distribuição.
 
-**Status: implementado (fatia 1, JOURNEY §34) + fatia 2 em andamento (publicação pública no npm, JOURNEY §35).**
+**Status: implementado (fatia 1, JOURNEY §34) + fatia 2 (publicação no npm + GitHub, JOURNEY §35/§36) em andamento — falta só a publicação real no npm (bloqueada em 2FA, decisão do usuário sobre automatizar via CI em curso).**
 
 ---
 
@@ -63,6 +63,14 @@ Confirmado com o usuário via `AskUserQuestion`: **público, igual ao Graphify**
 - `private: true` removido de `packages/cli/package.json`; `license: "MIT"` + `LICENSE` novos; `keywords` adicionados.
 - `npm publish --dry-run` validado limpo (11 arquivos, `LICENSE`/`README.md`/`dist/`/`templates/` inclusos) — achado no caminho: `"bin": {"gerador": "./dist/cli.js"}` com o prefixo `./` é inválido pro publish do npm (auto-corrigido/removido silenciosamente, o que quebraria o comando `gerador` pra quem instalasse do registry); corrigido pra `"dist/cli.js"` sem prefixo via `npm pkg fix`.
 - **Login no npm é do usuário, não automatizável aqui** — esta sessão não roda prompts interativos (`npm login` pede navegador/OTP), e não é apropriado eu manusear um token de conta pessoal. O pacote fica pronto pra publicar (`npm publish` dentro de `packages/cli`) assim que o usuário estiver logado nesta máquina.
+
+## 7.2. Decisão final de visibilidade: GitHub privado, npm público
+
+Depois de empurrar o repositório pro GitHub como público (JOURNEY §36), o usuário reabriu a decisão: repositório privado (código-fonte, histórico, JOURNEY.md e as SPECs — a parte "processo interno"), mas o pacote publicado no npm continua público (é "só a ferramenta pronta", não o desenvolvimento). Não é meio-termo incoerente — os dois são jornais diferentes: o registry do npm hospeda o artefato compilado (`dist/cli.js`, legível mas sem o histórico/racional por trás), o GitHub hospeda o processo.
+
+**Consequência técnica real, corrigida antes de virar erro:** `--provenance` no `npm publish` (adicionado em 7.1 pensando em repositório público) **exige repositório público** — a atestação de proveniência depende de um log de transparência público. Com o repositório privado, publicar com essa flag falharia. Removida de `publish.yml`; `id-token: write` também removido (só existia pra provenance).
+
+Consequência colateral aceita, não corrigida: os campos `homepage`/`bugs`/`repository` em `packages/cli/package.json` continuam apontando pro repositório no GitHub — agora um link que só quem tem acesso consegue abrir. Comportamento esperado da escolha, não um bug.
 
 ## 8. Limitação conhecida: `gerador open` ainda não funciona fora do monorepo
 
