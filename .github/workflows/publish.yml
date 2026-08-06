@@ -1,0 +1,36 @@
+name: Publish CLI
+
+# SPEC-17: caminho de distribuição padrão agora é o pacote npm, não a imagem
+# Docker (ver deploy.yml, que virou manual/opcional). Dispara numa tag de
+# versão (ex.: v0.1.1) — o push da tag já dispara CI (ver ci.yml, "on: push"
+# cobre tags também) rodando a suíte completa dos 4 workspaces; este workflow
+# não reroda tudo de novo, só valida+builda o pacote que de fato vai publicar.
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # necessário pra provenance attestation do npm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          registry-url: "https://registry.npmjs.org"
+
+      - run: npm ci
+
+      - run: npm test --workspace=packages/cli
+
+      - run: npm run build --workspace=packages/cli
+
+      - run: npm publish --workspace=packages/cli --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

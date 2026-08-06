@@ -1,24 +1,21 @@
 name: Deploy
 
-# Só a main, e só depois do CI passar pro mesmo commit — nunca builda/publica
-# a partir de um push que ainda não foi validado (ver SPEC-15 §4).
+# SPEC-17: modo hospedado (Docker/GCP) virou dormente, não é mais o caminho
+# padrão de distribuição (ver publish.yml) — disparo manual em vez de
+# automático a cada push na main, pra não tentar deploy contra uma VM que
+# pode nem existir (terraform apply nunca rodou, ver SPEC-15). Rodar via aba
+# Actions do GitHub ("Run workflow") quando o modo hospedado for de fato usado.
 on:
-  workflow_run:
-    workflows: ["CI"]
-    branches: [main]
-    types: [completed]
+  workflow_dispatch:
 
 jobs:
   build-and-push:
-    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
 
       - uses: docker/login-action@v3
         with:
@@ -51,8 +48,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
 
       # Copia só o que a VM precisa pra subir a stack — nunca o repositório
       # inteiro (nem config/, que já vai dentro da imagem web via Dockerfile).

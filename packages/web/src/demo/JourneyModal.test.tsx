@@ -160,6 +160,8 @@ describe("JourneyModal", () => {
     expect(screen.getAllByText(/gerador implementar/).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText(/gerador open/).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText(/gerador import-graphify/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/gerador export-vault/).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText(/npm install -g gerador-de-itens/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/skill do Claude Code/)).toBeInTheDocument();
   });
 

@@ -3,6 +3,13 @@
   "version": "0.1.0",
   "description": "Quebra técnica derivada deterministicamente de um diagrama de arquitetura — CLI local, sem servidor.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/silvioAL/gerador-de-itens.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/silvioAL/gerador-de-itens#readme",
+  "bugs": "https://github.com/silvioAL/gerador-de-itens/issues",
   "type": "module",
   "bin": {
     "gerador": "dist/cli.js"

@@ -200,8 +200,10 @@ function NovaReferenciaForm({
         </button>
       </div>
       <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>
-        Grava direto no servidor. Caminhos de código só precisam bater com o repositório — a checagem contra o grafo
-        real acontece quando alguém roda <code>gerador export-vault</code>.
+        Grava direto no servidor deste app (modo hospedado, SPEC-17 §3). O caminho padrão agora é a CLI, sem
+        servidor: edite/crie um arquivo em <code>config/referencias/&lt;slug&gt;.json</code> com esses mesmos campos.
+        Nos dois casos, caminhos de código só precisam bater com o repositório — a checagem contra o grafo real
+        acontece quando alguém roda <code>gerador export-vault</code>.
       </p>
     </div>
   );
