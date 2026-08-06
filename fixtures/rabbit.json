@@ -1,0 +1,217 @@
+{
+  "nome": "rabbit — condicionalidade e prontidão",
+  "descricao": "Fixture compartilhada entre a implementação Java (engine/spec) e TypeScript (frontend/src/spec). As duas suítes DEVEM ler este arquivo. Ver §5.2 do documento de arquitetura.",
+  "specDoTipo": [
+    { "key": "topic", "label": "Nome da fila", "type": "text", "required": true },
+    { "key": "durable", "label": "Durable", "type": "boolean", "default": true, "required": true },
+    { "key": "dlq", "label": "Possui DLQ?", "type": "boolean", "default": true, "required": true,
+      "when": { "hasIncomingEdge": ["consumes", "pubsub"] } },
+    { "key": "dlxName", "label": "Nome da DLX", "type": "text", "default": "{{topic}}.dlx", "required": true,
+      "when": { "field": "dlq", "equals": true } },
+    { "key": "retryStrategy", "label": "Estratégia de retry", "type": "select",
+      "options": ["backoff", "delay-queue", "sem-retry"], "required": true,
+      "when": { "field": "dlq", "equals": true } },
+    { "key": "retries", "label": "Tentativas", "type": "number", "default": 3, "required": true,
+      "when": { "field": "retryStrategy", "notEquals": "sem-retry" } },
+    { "key": "ack", "label": "Ack", "type": "select", "options": ["manual", "auto"],
+      "default": "manual", "required": true, "permiteNA": false },
+    { "key": "prefetch", "label": "Prefetch", "type": "number", "required": false,
+      "when": { "allOf": [
+        { "hasIncomingEdge": ["consumes"] },
+        { "field": "ack", "equals": "manual" }
+      ] } },
+    { "key": "ordenacao", "label": "Exige ordem estrita?", "type": "boolean", "required": true,
+      "when": { "hasIncomingEdge": ["consumes", "pubsub"] } },
+    { "key": "migracao", "label": "Plano de migração", "type": "text", "required": true,
+      "when": { "not": { "nodeStatus": "novo" } } }
+  ],
+  "casos": [
+    {
+      "nome": "fila sem consumo — só campos base ficam visíveis",
+      "contexto": {
+        "no": { "id": "n1", "type": "rabbit", "status": "novo",
+                "spec": { "topic": { "valor": "proposta.aprovada.q", "origem": "manual" } },
+                "specNA": {} },
+        "arestas": []
+      },
+      "esperado": {
+        "camposVisiveis": ["topic", "durable", "ack"],
+        "obrigatoriosEmAberto": ["durable", "ack"],
+        "prontidao": "vermelho"
+      }
+    },
+    {
+      "nome": "aresta de consumo faz aparecer dlq e ordenacao",
+      "contexto": {
+        "no": { "id": "n1", "type": "rabbit", "status": "novo",
+                "spec": { "topic": { "valor": "proposta.aprovada.q", "origem": "manual" } },
+                "specNA": {} },
+        "arestas": [ { "id": "e1", "source": "n2", "target": "n1", "type": "consumes" } ]
+      },
+      "esperado": {
+        "camposVisiveis": ["topic", "durable", "dlq", "ack", "ordenacao"],
+        "obrigatoriosEmAberto": ["durable", "dlq", "ack", "ordenacao"],
+        "prontidao": "vermelho"
+      }
+    },
+    {
+      "nome": "aresta de saída NÃO satisfaz hasIncomingEdge",
+      "contexto": {
+        "no": { "id": "n1", "type": "rabbit", "status": "novo",
+                "spec": { "topic": { "valor": "q", "origem": "manual" } }, "specNA": {} },
+        "arestas": [ { "id": "e1", "source": "n1", "target": "n9", "type": "consumes" } ]
+      },
+      "esperado": {
+        "camposVisiveis": ["topic", "durable", "ack"],
+        "obrigatoriosEmAberto": ["durable", "ack"],
+        "prontidao": "vermelho"
+      }
+    },
+    {
+      "nome": "dlq=true encadeia dlxName e retryStrategy; default com template resolvido",
+      "contexto": {
+        "no": { "id": "n1", "type": "rabbit", "status": "novo",
+                "spec": {
+                  "topic":   { "valor": "proposta.aprovada.q", "origem": "manual" },
+                  "durable": { "valor": true, "origem": "manual" },
+                  "dlq":     { "valor": true, "origem": "manual" },
+                  "ack":     { "valor": "manual", "origem": "manual" },
+                  "ordenacao": { "valor": false, "origem": "manual" }
+                }, "specNA": {} },
+        "arestas": [ { "id": "e1", "source": "n2", "target": "n1", "type": "consumes" } ]
+      },
+      "esperado": {
+        "camposVisiveis": ["topic", "durable", "dlq", "dlxName", "retryStrategy", "ack", "prefetch", "ordenacao"],
+        "obrigatoriosEmAberto": ["dlxName", "retryStrategy"],
+        "defaultsResolvidos": { "dlxName": "proposta.aprovada.q.dlx" },
+        "prontidao": "vermelho"
+      }
+    },
+    {
+      "nome": "retryStrategy=sem-retry esconde retries",
+      "contexto": {
+        "no": { "id": "n1", "type": "rabbit", "status": "novo",
+                "spec": {
+                  "topic":   { "valor": "q", "origem": "manual" },
+                  "durable": { "valor": true, "origem": "manual" },
+                  "dlq":     { "valor": true, "origem": "manual" },
+                  "dlxName": { "valor": "q.dlx", "origem": "manual" },
+                  "retryStrategy": { "valor": "sem-retry", "origem": "manual" },
+                  "ack":     { "valor": "auto", "origem": "manual" },
+                  "ordenacao": { "valor": false, "origem": "manual" }
+                }, "specNA": {} },
+        "arestas": [ { "id": "e1", "source": "n2", "target": "n1", "type": "consumes" } ]
+      },
+      "esperado": {
+        "camposVisiveis": ["topic", "durable", "dlq", "dlxName", "retryStrategy", "ack", "ordenacao"],
+        "obrigatoriosEmAberto": [],
+        "prontidao": "verde",
+        "comentario": "prefetch some porque ack=auto quebra o allOf"
+      }
+    },
+    {
+      "nome": "valor inferido não confirmado deixa o nó amarelo, não vermelho",
+      "contexto": {
+        "no": { "id": "n1", "type": "rabbit", "status": "novo",
+                "spec": {
+                  "topic":   { "valor": "q", "origem": "manual" },
+                  "durable": { "valor": true, "origem": "manual" },
+                  "dlq":     { "valor": true, "origem": "extraido", "evidencia": "RabbitConfig.java:31" },
+                  "dlxName": { "valor": "q.dlx", "origem": "inferido", "confianca": 0.6, "confirmado": false },
+                  "retryStrategy": { "valor": "backoff", "origem": "manual" },
+                  "retries": { "valor": 3, "origem": "manual" },
+                  "ack":     { "valor": "auto", "origem": "manual" },
+                  "ordenacao": { "valor": false, "origem": "manual" }
+                }, "specNA": {} },
+        "arestas": [ { "id": "e1", "source": "n2", "target": "n1", "type": "consumes" } ]
+      },
+      "esperado": {
+        "obrigatoriosEmAberto": [],
+        "prontidao": "amarelo",
+        "inferidosPendentes": ["dlxName"]
+      }
+    },
+    {
+      "nome": "N/A com justificativa resolve campo opcional",
+      "contexto": {
+        "no": { "id": "n1", "type": "rabbit", "status": "novo",
+                "spec": {
+                  "topic":   { "valor": "q", "origem": "manual" },
+                  "durable": { "valor": true, "origem": "manual" },
+                  "dlq":     { "valor": true, "origem": "manual" },
+                  "dlxName": { "valor": "q.dlx", "origem": "manual" },
+                  "retryStrategy": { "valor": "backoff", "origem": "manual" },
+                  "retries": { "valor": 3, "origem": "manual" },
+                  "ack":     { "valor": "manual", "origem": "manual" },
+                  "ordenacao": { "valor": false, "origem": "manual" }
+                },
+                "specNA": { "prefetch": { "motivo": "baixo volume, default do broker basta" } } },
+        "arestas": [ { "id": "e1", "source": "n2", "target": "n1", "type": "consumes" } ]
+      },
+      "esperado": { "obrigatoriosEmAberto": [], "prontidao": "verde" }
+    },
+    {
+      "nome": "N/A sem motivo é inválido e não resolve o campo",
+      "contexto": {
+        "no": { "id": "n1", "type": "rabbit", "status": "novo",
+                "spec": { "topic": { "valor": "q", "origem": "manual" },
+                          "durable": { "valor": true, "origem": "manual" } },
+                "specNA": { "ack": { "motivo": "" } } },
+        "arestas": []
+      },
+      "esperado": {
+        "obrigatoriosEmAberto": ["ack"],
+        "prontidao": "vermelho",
+        "erros": [ { "campo": "ack", "codigo": "NA_SEM_MOTIVO" } ]
+      }
+    },
+    {
+      "nome": "campo com permiteNA=false rejeita N/A mesmo com motivo",
+      "contexto": {
+        "no": { "id": "n1", "type": "rabbit", "status": "novo",
+                "spec": { "topic": { "valor": "q", "origem": "manual" },
+                          "durable": { "valor": true, "origem": "manual" } },
+                "specNA": { "ack": { "motivo": "irrelevante para este caso" } } },
+        "arestas": []
+      },
+      "esperado": {
+        "obrigatoriosEmAberto": ["ack"],
+        "prontidao": "vermelho",
+        "erros": [ { "campo": "ack", "codigo": "NA_NAO_PERMITIDO" } ]
+      }
+    },
+    {
+      "nome": "nó existente exige plano de migração (operador not)",
+      "contexto": {
+        "no": { "id": "n1", "type": "rabbit", "status": "existente", "time": "time-pagamentos",
+                "spec": { "topic": { "valor": "q", "origem": "extraido", "evidencia": "RabbitConfig.java:12" },
+                          "durable": { "valor": true, "origem": "manual" },
+                          "ack": { "valor": "manual", "origem": "manual" } },
+                "specNA": {} },
+        "arestas": []
+      },
+      "esperado": {
+        "camposVisiveis": ["topic", "durable", "ack", "migracao"],
+        "obrigatoriosEmAberto": ["migracao"],
+        "prontidao": "vermelho"
+      }
+    },
+    {
+      "nome": "valor sugerido pelo copiloto não conta para prontidão",
+      "contexto": {
+        "no": { "id": "n1", "type": "rabbit", "status": "novo",
+                "spec": {
+                  "topic":   { "valor": "q", "origem": "sugerido" },
+                  "durable": { "valor": true, "origem": "sugerido" },
+                  "ack":     { "valor": "manual", "origem": "sugerido" }
+                }, "specNA": {} },
+        "arestas": []
+      },
+      "esperado": {
+        "obrigatoriosEmAberto": ["topic", "durable", "ack"],
+        "prontidao": "vermelho",
+        "comentario": "§4.3 — nada sugerido conta até ser confirmado nó a nó"
+      }
+    }
+  ]
+}

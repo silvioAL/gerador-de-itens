@@ -1,0 +1,106 @@
+{
+  "nome": "serviço novo com dois endpoints publicando em fila nova consumida por serviço existente",
+  "descricao": "Fixture de derivação. Asserções são sobre campos estruturais; a descrição é verificada por conter fragmentos, nunca por igualdade exata — texto é a parte que legitimamente muda.",
+  "quebra": {
+    "demandInfo": "Nova esteira de portabilidade com notificação assíncrona",
+    "diagrama": {
+      "nodes": [
+        {
+          "id": "n1", "type": "service", "status": "novo", "label": "srv-portabilidade",
+          "x": 100, "y": 100,
+          "spec": {},
+          "endpoints": [
+            { "method": "POST", "path": "/v1/propostas", "action": "novo" },
+            { "method": "GET",  "path": "/v1/propostas/{id}", "action": "novo" }
+          ]
+        },
+        {
+          "id": "n2", "type": "rabbit", "status": "novo", "label": "proposta.aprovada.q",
+          "x": 400, "y": 100,
+          "spec": {
+            "topic":   { "valor": "proposta.aprovada.q", "origem": "manual" },
+            "durable": { "valor": true, "origem": "manual" },
+            "dlq":     { "valor": true, "origem": "manual" },
+            "dlxName": { "valor": "proposta.aprovada.q.dlx", "origem": "manual" },
+            "retryStrategy": { "valor": "backoff", "origem": "manual" },
+            "retries": { "valor": 3, "origem": "manual" },
+            "ack":     { "valor": "manual", "origem": "manual" },
+            "ordenacao": { "valor": false, "origem": "manual" }
+          },
+          "specNA": { "prefetch": { "motivo": "baixo volume" } }
+        },
+        {
+          "id": "n3", "type": "service", "status": "existente", "label": "srv-notificacao",
+          "time": "time-pagamentos",
+          "x": 700, "y": 100,
+          "spec": {}, "endpoints": []
+        }
+      ],
+      "edges": [
+        { "id": "e1", "source": "n1", "target": "n2", "type": "publishes" },
+        { "id": "e2", "source": "n3", "target": "n2", "type": "consumes" }
+      ]
+    }
+  },
+  "esperado": {
+    "atividades": [
+      {
+        "chave": "n1::setup",
+        "tipo": "História", "tamanho": "M",
+        "techs": ["Backend"], "contextos": [],
+        "descricaoContem": ["srv-portabilidade"],
+        "dependencias": [{ "type": "enabler" }],
+        "origem": { "nodeId": "n1" },
+        "timesEnvolvidos": []
+      },
+      {
+        "chave": "n1::ep0",
+        "tipo": "História", "tamanho": "M",
+        "techs": ["Backend"], "contextos": ["Backend-chamadas http"],
+        "descricaoContem": ["POST", "/v1/propostas"],
+        "dependencias": [{ "type": "dependent", "alvoChave": "n1::setup" }],
+        "origem": { "nodeId": "n1" }
+      },
+      {
+        "chave": "n1::ep1",
+        "tipo": "História", "tamanho": "M",
+        "descricaoContem": ["GET", "/v1/propostas/{id}"],
+        "dependencias": [{ "type": "dependent", "alvoChave": "n1::setup" }]
+      },
+      {
+        "chave": "n2::criacao",
+        "tipo": "Task", "tamanho": "PP",
+        "techs": ["Backend"], "contextos": ["Backend-mensagens rabbitmq"],
+        "descricaoContem": ["proposta.aprovada.q"],
+        "dependencias": [{ "type": "enabler" }],
+        "origem": { "nodeId": "n2" },
+        "specResumo": { "dlq": true, "retries": 3, "ack": "manual" }
+      },
+      {
+        "chave": "e1::publish",
+        "tipo": "História", "tamanho": "P",
+        "techs": ["Backend"], "contextos": ["Backend-mensagens rabbitmq"],
+        "descricaoContem": ["srv-portabilidade", "proposta.aprovada.q"],
+        "dependencias": [
+          { "type": "dependent", "alvoChave": "n1::setup" },
+          { "type": "dependent", "alvoChave": "n2::criacao" }
+        ],
+        "origem": { "nodeId": "n1", "edgeId": "e1" }
+      },
+      {
+        "chave": "e2::consume",
+        "tipo": "História", "tamanho": "M",
+        "techs": ["Backend"], "contextos": ["Backend-mensagens rabbitmq"],
+        "descricaoContem": ["srv-notificacao", "proposta.aprovada.q"],
+        "dependencias": [{ "type": "dependent", "alvoChave": "n2::criacao" }],
+        "origem": { "nodeId": "n3", "edgeId": "e2" },
+        "timesEnvolvidos": ["time-pagamentos"],
+        "specResumo": { "ack": "manual", "retryStrategy": "backoff", "retries": 3 }
+      }
+    ],
+    "validacoes": { "ciclos": [], "conflitos": [] },
+    "totalAtividades": 6,
+    "rotulosSequenciais": { "n1::setup": "01", "n1::ep0": "02", "n1::ep1": "03",
+                            "n2::criacao": "04", "e1::publish": "05", "e2::consume": "06" }
+  }
+}

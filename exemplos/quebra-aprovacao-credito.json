@@ -1,0 +1,132 @@
+{
+  "produto": "Crédito",
+  "time": "time-credito",
+  "demandInfo": "Novo fluxo de aprovação de crédito: orquestração do processo, decisão de score, consulta a bureau externo, persistência da solicitação, trilha de auditoria e reprocessamento de pendências.",
+  "diagrama": {
+    "nodes": [
+      {
+        "id": "n1", "type": "service", "status": "novo", "label": "srv-credito-api",
+        "x": 100, "y": 100,
+        "spec": { "nome": { "valor": "srv-credito-api", "origem": "manual" } },
+        "specNA": {},
+        "endpoints": [
+          { "method": "POST", "path": "/v1/credito/solicitacoes", "action": "novo" }
+        ]
+      },
+      {
+        "id": "n2", "type": "camunda", "status": "novo", "label": "processo-aprovacao-credito",
+        "x": 400, "y": 100,
+        "spec": {
+          "processName": { "valor": "processo-aprovacao-credito", "origem": "manual" },
+          "framework": { "valor": "Camunda 8", "origem": "manual" },
+          "compensacao": { "valor": true, "origem": "manual" },
+          "tempoLimite": {
+            "valor": "SLA de 24h para decisão completa, com timer boundary de 24h que escala para análise manual",
+            "origem": "manual"
+          },
+          "descricao": {
+            "valor": "Orquestra a jornada de aprovação de crédito, da solicitação até a decisão final.",
+            "origem": "manual"
+          }
+        },
+        "specNA": {}
+      },
+      {
+        "id": "n3", "type": "fico", "status": "novo", "label": "decisao-score-credito",
+        "x": 700, "y": 100,
+        "spec": {
+          "nome": { "valor": "decisao-score-credito", "origem": "manual" },
+          "motorPadrao": { "valor": "FICO Blaze Advisor", "origem": "manual" },
+          "auditoria": { "valor": true, "origem": "manual" },
+          "fallback": {
+            "valor": "Se o motor não decidir em 5s, a solicitação é encaminhada para análise manual e o cliente é notificado do atraso.",
+            "origem": "manual"
+          },
+          "descricao": { "valor": "Decide o score de crédito e elegibilidade com base nas regras vigentes.", "origem": "manual" }
+        },
+        "specNA": {}
+      },
+      {
+        "id": "n4", "type": "external", "status": "existente", "label": "bureau-credito-nacional",
+        "time": "time-integracoes",
+        "x": 1000, "y": 100,
+        "spec": {
+          "nome": { "valor": "bureau-credito-nacional", "origem": "manual" },
+          "autenticacao": { "valor": "mtls", "origem": "manual" },
+          "timeoutMs": { "valor": 3000, "origem": "manual" },
+          "rateLimitConhecido": { "valor": true, "origem": "manual" },
+          "slaContratado": { "valor": "99,5% uptime, resposta em até 2s conforme contrato vigente", "origem": "manual" },
+          "migracao": {
+            "valor": "Nenhuma migração de tráfego — reaproveitamos a integração existente, só passamos a chamá-la a partir do novo fluxo de aprovação.",
+            "origem": "manual"
+          }
+        },
+        "specNA": {
+          "baseUrl": { "motivo": "URL varia por ambiente, gerenciada via service discovery" }
+        }
+      },
+      {
+        "id": "n5", "type": "sql", "status": "novo", "label": "solicitacoes_credito",
+        "x": 400, "y": 320,
+        "spec": {
+          "tabela": { "valor": "solicitacoes_credito", "origem": "manual" },
+          "chavePrimaria": { "valor": "id (uuid)", "origem": "manual" },
+          "indices": { "valor": "idx_cliente_id, idx_status_criado_em (fila de pendentes)", "origem": "manual" },
+          "ferramentaMigracao": { "valor": "flyway", "origem": "manual" },
+          "volumeEsperado": { "valor": "medio", "origem": "manual" }
+        },
+        "specNA": {}
+      },
+      {
+        "id": "n6", "type": "mongo", "status": "novo", "label": "decisoes_auditoria",
+        "x": 700, "y": 320,
+        "spec": {
+          "collection": { "valor": "decisoes_auditoria", "origem": "manual" },
+          "indices": { "valor": "solicitacaoId, criadoEm", "origem": "manual" },
+          "ttlDias": { "valor": 2555, "origem": "manual" },
+          "writeConcern": { "valor": "majority", "origem": "manual" }
+        },
+        "specNA": {}
+      },
+      {
+        "id": "n7", "type": "job", "status": "novo", "label": "reprocessar-decisoes-pendentes",
+        "x": 100, "y": 320,
+        "spec": {
+          "nome": { "valor": "reprocessar-decisoes-pendentes", "origem": "manual" },
+          "cron": { "valor": "*/15 * * * *", "origem": "manual" },
+          "idempotente": { "valor": true, "origem": "manual" },
+          "concorrencia": { "valor": "execução exclusiva (fila)", "origem": "manual" },
+          "timeoutMinutos": { "valor": 10, "origem": "manual" },
+          "alerta": { "valor": true, "origem": "manual" },
+          "descricao": {
+            "valor": "Reprocessa solicitações pendentes por falha temporária do motor ou timeout de integração externa.",
+            "origem": "manual"
+          }
+        },
+        "specNA": {}
+      },
+      {
+        "id": "n8", "type": "rule", "status": "novo", "label": "regra-limite-endividamento",
+        "x": 1000, "y": 320,
+        "spec": {
+          "nome": { "valor": "regra-limite-endividamento", "origem": "manual" },
+          "gatilho": { "valor": "bloqueia a operação", "origem": "manual" },
+          "auditoria": { "valor": true, "origem": "manual" },
+          "descricao": {
+            "valor": "Valida se o comprometimento de renda do cliente excede o limite regulatório permitido.",
+            "origem": "manual"
+          }
+        },
+        "specNA": {}
+      }
+    ],
+    "edges": [
+      { "id": "e1", "source": "n1", "target": "n2", "type": "orchestrates" },
+      { "id": "e2", "source": "n2", "target": "n3", "type": "orchestrates" },
+      { "id": "e3", "source": "n3", "target": "n4", "type": "http" },
+      { "id": "e4", "source": "n1", "target": "n5", "type": "writes" },
+      { "id": "e5", "source": "n3", "target": "n6", "type": "writes" },
+      { "id": "e6", "source": "n1", "target": "n8", "type": "validates" }
+    ]
+  }
+}

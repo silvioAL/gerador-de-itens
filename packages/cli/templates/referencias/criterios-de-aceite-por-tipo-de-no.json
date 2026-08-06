@@ -1,0 +1,7 @@
+{
+  "titulo": "Critérios de aceite por tipo de nó: o motor direciona a mecânica técnica, nunca a regra de negócio",
+  "racional": "REST sempre tem 2xx/4xx/5xx, Kafka sempre tem publish/consume/DLQ — isso é conhecimento genérico e replicável, então o motor pode gerar o scaffold Gherkin correspondente sem alucinar. O que o motor nunca inventa é a regra de negócio em si (o \"Dado\" específico do domínio) — o scaffold fica editável pelo usuário, nunca é a especificação final. Mesmo mecanismo de override do specResumo: o nó ALVO decide, com precedência por tipo de aresta.",
+  "designPatterns": ["Motor determinístico não alucina regra de negócio", "Resolução por precedência (aresta > nó > genérico)"],
+  "codigoRelacionado": ["packages/engine/src/especificacao/gerarEspecificacaoEntrega.ts", "config/diagrama.example.json"],
+  "linkExterno": null
+}

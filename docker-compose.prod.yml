@@ -1,0 +1,64 @@
+# Fase D (SPEC-15) — variante de produção do docker-compose.yml: imagens já
+# publicadas pelo CI (não builda na VM), volume do Postgres no disco de dados
+# do Terraform (/mnt/pgdata, não o disco de boot), e Caddy na frente — só ele
+# publica porta pra fora, o resto conversa dentro da rede do compose.
+#
+# Uso na VM (depois de infra/secrets/ já de pé, ver infra/README.md):
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.secrets.yml pull
+#   docker compose -f docker-compose.prod.yml -f docker-compose.secrets.yml up -d
+#
+# GITHUB_REPOSITORY_OWNER e DOMAIN vêm do ambiente de quem roda o compose
+# (o workflow de deploy exporta os dois antes de chamar `docker compose`).
+
+services:
+  gerador:
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER}/gerador-web:latest
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: gerador
+      POSTGRES_PASSWORD: gerador
+      POSTGRES_DB: gerador
+    volumes:
+      - /mnt/pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gerador -d gerador"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+
+  server:
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER}/gerador-server:latest
+    environment:
+      DATABASE_URL: postgres://gerador:gerador@db:5432/gerador
+      CONFIG_DIR: /app/config
+      ORIGEM_WEB: https://${DOMAIN}
+      NODE_ENV: production
+      # AUTH_MODE=oidc + os segredos reais (OIDC_CLIENT_SECRET, SESSAO_SEGREDO)
+      # vêm do overlay docker-compose.secrets.yml (SPEC-12) — não duplicado aqui.
+    volumes:
+      - ./config:/app/config:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - gerador
+      - server
+
+volumes:
+  caddy-data:
+  caddy-config:

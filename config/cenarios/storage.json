@@ -1,0 +1,48 @@
+{
+  "id": "storage",
+  "titulo": "Storage de Objeto (S3/Blob)",
+  "descricao": "Upload de arquivo — bucket, política de acesso e ciclo de vida.",
+  "tipos": ["service", "storage"],
+  "categoria": "demo",
+  "designPatterns": [],
+  "quebra": {
+    "demandInfo": "Emitir e armazenar o comprovante fiscal de cada pedido concluído, com retenção mínima de 5 anos por exigência legal.",
+    "diagrama": {
+      "nodes": [
+        {
+          "id": "n1", "type": "service", "status": "novo", "label": "srv-comprovantes-fiscais",
+          "x": 100, "y": 120,
+          "spec": {
+            "nome": { "valor": "srv-comprovantes-fiscais", "origem": "manual" },
+            "linguagem": { "valor": "Java", "origem": "manual" },
+            "framework": { "valor": "Spring Boot", "origem": "manual" }
+          },
+          "specNA": {},
+          "endpoints": [
+            { "method": "POST", "path": "/v1/comprovantes", "action": "novo" }
+          ]
+        },
+        {
+          "id": "n2", "type": "storage", "status": "novo", "label": "comprovantes-fiscais",
+          "x": 420, "y": 120,
+          "spec": {
+            "bucket": { "valor": "comprovantes-fiscais-prod", "origem": "manual" },
+            "prefixoChave": { "valor": "comprovantes/{ano}/{mes}/{pedidoId}.pdf", "origem": "manual" },
+            "politicaAcesso": { "valor": "URL pré-assinada (presigned)", "origem": "manual" },
+            "criptografiaEmRepouso": { "valor": true, "origem": "manual" },
+            "tamanhoMaximoMb": { "valor": 5, "origem": "manual" },
+            "cicloDeVida": { "valor": "Retenção mínima de 5 anos por exigência fiscal — sem exclusão automática antes disso.", "origem": "manual" },
+            "contratoObjeto": {
+              "valor": "PDF gerado a partir do template de nota fiscal. Metadados: pedidoId, emitidoEm, valorTotalCentavos.",
+              "origem": "manual"
+            }
+          },
+          "specNA": {}
+        }
+      ],
+      "edges": [
+        { "id": "e1", "source": "n1", "target": "n2", "type": "writes" }
+      ]
+    }
+  }
+}

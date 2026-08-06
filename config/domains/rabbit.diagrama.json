@@ -1,0 +1,120 @@
+{
+  "nodeTypes": {
+    "rabbit": {
+      "label": "Fila Rabbit",
+      "derives": "queue",
+      "techs": ["Backend"],
+      "contextos": ["Backend-mensagens rabbitmq"],
+      "spec": [
+        { "key": "topic", "label": "Nome da fila", "type": "text", "required": true,
+          "ajuda": "Nome completo, no padrão do time." },
+
+        { "key": "routingKey", "label": "Routing key da binding", "type": "text", "required": true,
+          "when": { "hasIncomingEdge": ["publishes", "pubsub", "binding"] },
+          "ajuda": "Chave usada na binding entre a exchange e esta fila. Publicação direto na fila (exchange padrão) usa o nome da fila como routing key." },
+
+        { "key": "durable", "label": "Durable", "type": "boolean",
+          "default": true, "required": true,
+          "ajuda": "Fila não durable some quando o broker reinicia." },
+
+        { "key": "queueType", "label": "Tipo de fila", "type": "select",
+          "options": ["quorum", "classic"], "default": "quorum", "required": true,
+          "ajuda": "Quorum é o recomendado para alta disponibilidade desde o RabbitMQ 3.8 — replica entre nós via consenso. Classic é o legado (inclusive mirrored classic, hoje desencorajado)." },
+
+        { "key": "dlq", "label": "Possui DLQ?", "type": "boolean",
+          "default": true, "required": true,
+          "when": { "hasIncomingEdge": ["consumes", "pubsub"] },
+          "ajuda": "Sem DLQ, mensagem que falha repetidamente é perdida ou trava a fila." },
+
+        { "key": "dlxName", "label": "Nome da DLX", "type": "text",
+          "default": "{{topic}}.dlx", "required": true,
+          "when": { "field": "dlq", "equals": true } },
+
+        { "key": "dlqRoutingKey", "label": "Routing key da DLX", "type": "text",
+          "default": "{{topic}}.dlq", "required": true,
+          "when": { "field": "dlq", "equals": true } },
+
+        { "key": "retryStrategy", "label": "Estratégia de retry", "type": "select",
+          "options": ["backoff", "delay-queue", "sem-retry"], "required": true,
+          "when": { "field": "dlq", "equals": true },
+          "ajuda": "backoff = retry do listener; delay-queue = fila de espera com TTL + DLX de volta. São incompatíveis; ver padrões." },
+
+        { "key": "retries", "label": "Tentativas", "type": "number",
+          "default": 3, "required": true,
+          "when": { "field": "retryStrategy", "notEquals": "sem-retry" } },
+
+        { "key": "backoffInicialMs", "label": "Intervalo inicial (ms)", "type": "number",
+          "default": 1000, "required": true,
+          "when": { "field": "retryStrategy", "equals": "backoff" } },
+
+        { "key": "backoffMultiplicador", "label": "Multiplicador", "type": "number",
+          "default": 2, "required": true,
+          "when": { "field": "retryStrategy", "equals": "backoff" } },
+
+        { "key": "delayTtlMs", "label": "TTL da fila de espera (ms)", "type": "number",
+          "required": true,
+          "when": { "field": "retryStrategy", "equals": "delay-queue" } },
+
+        { "key": "ttl", "label": "TTL da mensagem (ms)", "type": "number",
+          "required": true, "permiteNA": true,
+          "ajuda": "Sem TTL, mensagem antiga é processada muito depois de perder o sentido." },
+
+        { "key": "maxLength", "label": "Tamanho máximo da fila", "type": "number",
+          "required": false, "permiteNA": true,
+          "ajuda": "Sem limite, um consumidor lento ou parado deixa a fila crescer sem controle até estourar memória/disco do broker." },
+
+        { "key": "overflowBehavior", "label": "Comportamento ao atingir o limite", "type": "select",
+          "options": ["reject-publish", "drop-head"], "required": true,
+          "when": { "field": "maxLength", "preenchido": true },
+          "ajuda": "reject-publish devolve erro para quem publica; drop-head descarta a mensagem mais antiga da fila." },
+
+        { "key": "ack", "label": "Ack", "type": "select",
+          "options": ["manual", "auto"], "default": "manual",
+          "required": true, "permiteNA": false,
+          "ajuda": "auto confirma antes de processar — perda de mensagem em caso de falha." },
+
+        { "key": "prefetch", "label": "Prefetch", "type": "number",
+          "required": false,
+          "when": { "allOf": [
+            { "hasIncomingEdge": ["consumes"] },
+            { "field": "ack", "equals": "manual" } ] } },
+
+        { "key": "concorrencia", "label": "Consumidores concorrentes", "type": "number",
+          "default": 1, "required": true,
+          "when": { "hasIncomingEdge": ["consumes"] } },
+
+        { "key": "ordenacao", "label": "Exige ordem estrita?", "type": "boolean",
+          "required": true,
+          "when": { "hasIncomingEdge": ["consumes", "pubsub"] },
+          "ajuda": "Incompatível com concorrência > 1, a menos que 'consumidor ativo único' esteja habilitado — nesse caso a ordem é preservada com failover rápido." },
+
+        { "key": "consumidorAtivoUnico", "label": "Consumidor ativo único?", "type": "boolean",
+          "required": true, "permiteNA": true,
+          "when": { "allOf": [
+            { "field": "ordenacao", "equals": true },
+            { "field": "concorrencia", "notEquals": 1 } ] },
+          "ajuda": "Registra múltiplos consumidores mas mantém só um ativo por vez (x-single-active-consumer) — resolve ordem estrita com concorrência > 1 registrada para failover." },
+
+        { "key": "idempotencia", "label": "Consumo é idempotente?", "type": "boolean",
+          "required": true,
+          "when": { "hasIncomingEdge": ["consumes", "pubsub"] },
+          "ajuda": "Com retry, a mesma mensagem chega mais de uma vez. Se não for idempotente, precisa de dedupe." },
+
+        { "key": "chaveDedupe", "label": "Chave de deduplicação", "type": "text",
+          "required": true,
+          "when": { "allOf": [
+            { "field": "idempotencia", "equals": false },
+            { "hasIncomingEdge": ["consumes", "pubsub"] } ] } },
+
+        { "key": "migracao", "label": "Plano de migração", "type": "text",
+          "required": true,
+          "when": { "not": { "nodeStatus": "novo" } },
+          "ajuda": "Fila que já existe: como conviver com o consumo atual durante a mudança." }
+      ],
+      "specResumo": ["queueType", "dlq", "retryStrategy", "ack"],
+      "specResumoPorAresta": {
+        "consumes": ["ack", "concorrencia", "ordenacao", "idempotencia"]
+      }
+    }
+  }
+}

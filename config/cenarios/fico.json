@@ -1,0 +1,44 @@
+{
+  "id": "fico",
+  "titulo": "Motor de decisão",
+  "descricao": "Fluxo de decisão automatizada (regras/score) com auditoria e fallback definidos.",
+  "tipos": ["service", "fico"],
+  "categoria": "demo",
+  "designPatterns": [],
+  "quebra": {
+    "demandInfo": "Motor de decisão automatizada para aprovação de crédito consignado.",
+    "diagrama": {
+      "nodes": [
+        {
+          "id": "n1", "type": "service", "status": "novo", "label": "srv-motor-decisao",
+          "x": 100, "y": 120,
+          "spec": {
+            "nome": { "valor": "srv-motor-decisao", "origem": "manual" },
+            "linguagem": { "valor": "Java", "origem": "manual" }
+          },
+          "specNA": {
+            "framework": { "motivo": "framework ainda não definido" }
+          },
+          "endpoints": [
+            { "method": "POST", "path": "/v1/decisoes/credito", "action": "novo" }
+          ]
+        },
+        {
+          "id": "n2", "type": "fico", "status": "novo", "label": "aprovacao-credito-fico",
+          "x": 420, "y": 120,
+          "spec": {
+            "nome": { "valor": "aprovacao-credito-fico", "origem": "manual" },
+            "motorPadrao": { "valor": "Drools", "origem": "manual" },
+            "auditoria": { "valor": true, "origem": "manual" },
+            "fallback": { "valor": "Timeout do motor: negar por padrão (fail-safe) e escalar para análise manual.", "origem": "manual" },
+            "descricao": { "valor": "Decide aprovação/reprovação de crédito com base em score e renda declarada.", "origem": "manual" }
+          },
+          "specNA": {}
+        }
+      ],
+      "edges": [
+        { "id": "e1", "source": "n1", "target": "n2", "type": "http" }
+      ]
+    }
+  }
+}

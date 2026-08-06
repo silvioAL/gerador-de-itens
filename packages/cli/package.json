@@ -1,0 +1,31 @@
+{
+  "name": "@gerador/cli",
+  "version": "0.1.0",
+  "description": "Quebra técnica derivada deterministicamente de um diagrama de arquitetura — CLI local, sem servidor.",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "gerador": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "@gerador/engine": "*",
+    "typescript": "^5.6.3",
+    "tsup": "^8.3.5",
+    "vitest": "^2.1.4",
+    "eslint": "^9.14.0",
+    "@typescript-eslint/parser": "^8.13.0",
+    "@types/node": "^22.9.0"
+  }
+}

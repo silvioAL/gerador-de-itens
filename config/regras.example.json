@@ -1,0 +1,68 @@
+{
+  "tipos": ["História", "Task", "Débito Técnico"],
+  "tamanhos": ["PP", "P", "M", "G"],
+  "porTech": {
+    "Backend": {
+      "requisitos": [
+        { "texto": "Nome segue o padrão de nomenclatura do time", "tipo": "checklist", "contextos": [] },
+        { "texto": "Logs relevantes emitidos em pontos de decisão/erro", "tipo": "checklist", "contextos": [] },
+
+        { "texto": "Estratégia de retry e DLQ definidas", "tipo": "checklist", "contextos": ["Backend-mensagens"] },
+        { "texto": "Consumo é idempotente ou tem chave de dedupe", "tipo": "checklist", "contextos": ["Backend-mensagens"] },
+        { "texto": "Ordem de processamento documentada (importa ou não)", "tipo": "checklist", "contextos": ["Backend-mensagens"] },
+
+        { "texto": "Prefetch dimensionado para o volume esperado", "tipo": "checklist", "contextos": ["Backend-mensagens rabbitmq"] },
+
+        { "texto": "Estratégia de particionamento e chave definidas", "tipo": "checklist", "contextos": ["Backend-mensagens kafka"] },
+        { "texto": "Consumer group e política de offset (earliest/latest) definidos", "tipo": "checklist", "contextos": ["Backend-mensagens kafka"] },
+
+        { "texto": "Índices criados para as queries novas", "tipo": "checklist", "contextos": ["Backend-dados"] },
+        { "texto": "Plano de migração/rollback do schema", "tipo": "checklist", "contextos": ["Backend-dados"] },
+        { "texto": "Volume e retenção de dados esperados", "tipo": "fill-now", "contextos": ["Backend-dados"] },
+
+        { "texto": "Timeout e política de retry definidos", "tipo": "checklist", "contextos": ["Backend-chamadas http"] },
+        { "texto": "Autenticação/autorização da chamada definida", "tipo": "checklist", "contextos": ["Backend-chamadas http"] },
+        { "texto": "Circuit breaker ou fallback para indisponibilidade", "tipo": "checklist", "contextos": ["Backend-chamadas http"] },
+
+        { "texto": "Estratégia de compensação (rollback) do processo definida", "tipo": "checklist", "contextos": ["Backend-orquestracao"] },
+        { "texto": "Versionamento do processo considerado (instâncias em voo na migração)", "tipo": "checklist", "contextos": ["Backend-orquestracao"] },
+
+        { "texto": "Decisão é auditável (rastreabilidade de por que decidiu X)", "tipo": "checklist", "contextos": ["Backend-regras"] },
+        { "texto": "Versionamento das regras de negócio considerado", "tipo": "checklist", "contextos": ["Backend-regras"] },
+
+        { "texto": "Estratégia de invalidação definida (TTL, ativa no write, ou ambas)", "tipo": "checklist", "contextos": ["Backend-cache"] },
+        { "texto": "Comportamento com cache indisponível considerado (fail-open vs. fail-closed)", "tipo": "checklist", "contextos": ["Backend-cache"] },
+
+        { "texto": "Política de acesso ao objeto revisada (não fica público sem necessidade)", "tipo": "checklist", "contextos": ["Backend-storage"] },
+        { "texto": "Ciclo de vida do objeto definido (expiração/arquivamento)", "tipo": "checklist", "contextos": ["Backend-storage"] },
+
+        { "texto": "Job é restartável a partir do checkpoint, sem reprocessar tudo", "tipo": "checklist", "contextos": ["Backend-processamento em lote"] },
+        { "texto": "Política de skip/retry por item definida", "tipo": "checklist", "contextos": ["Backend-processamento em lote"] },
+        { "texto": "Chunk size dimensionado para o volume esperado", "tipo": "checklist", "contextos": ["Backend-processamento em lote"] }
+      ],
+      "testes": [
+        { "tipo": "Teste de contrato", "validacao": "Payload publicado/recebido bate com o schema acordado", "contextos": ["Backend-mensagens"], "dev": true, "hlg": true },
+        { "tipo": "Teste de retry/DLQ", "validacao": "Mensagem malformada ou que falha repetidamente vai para a DLQ", "contextos": ["Backend-mensagens"], "dev": true, "hlg": false },
+
+        { "tipo": "Teste de carga", "validacao": "Fila absorve pico de 2x o volume médio sem atraso relevante", "contextos": ["Backend-mensagens rabbitmq"], "dev": false, "hlg": true },
+
+        { "tipo": "Teste de rebalanceamento", "validacao": "Consumer group rebalanceia sem perda ou duplicação de mensagem", "contextos": ["Backend-mensagens kafka"], "dev": false, "hlg": true },
+
+        { "tipo": "Teste de migração", "validacao": "Migration roda limpo numa base com dados existentes", "contextos": ["Backend-dados"], "dev": true, "hlg": true },
+
+        { "tipo": "Teste de timeout", "validacao": "Chamada expira dentro do limite configurado e é tratada", "contextos": ["Backend-chamadas http"], "dev": true, "hlg": false },
+        { "tipo": "Teste de contrato", "validacao": "Request/response batem com o contrato da API externa", "contextos": ["Backend-chamadas http"], "dev": true, "hlg": true },
+
+        { "tipo": "Teste de compensação", "validacao": "Rollback funciona quando uma etapa do processo falha", "contextos": ["Backend-orquestracao"], "dev": false, "hlg": true },
+
+        { "tipo": "Teste de regressão de regras", "validacao": "Casos conhecidos continuam decidindo da mesma forma após a mudança", "contextos": ["Backend-regras"], "dev": true, "hlg": true },
+
+        { "tipo": "Teste de cache miss/hit", "validacao": "Valor é recalculado corretamente em cache miss e servido do cache em hit", "contextos": ["Backend-cache"], "dev": true, "hlg": false },
+
+        { "tipo": "Teste de upload/download", "validacao": "Objeto enviado é recuperável com o mesmo conteúdo e metadados", "contextos": ["Backend-storage"], "dev": true, "hlg": true },
+
+        { "tipo": "Teste de restart", "validacao": "Job retomado após falha no meio continua do checkpoint, sem duplicar itens já processados", "contextos": ["Backend-processamento em lote"], "dev": false, "hlg": true }
+      ]
+    }
+  }
+}

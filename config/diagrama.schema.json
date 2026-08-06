@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gerador.local/diagrama.schema.json",
+  "title": "DiagramaConfig",
+  "description": "Contrato de genericidade: todo tipo de nó/aresta do editor vem daqui, nunca hardcoded no engine.",
+  "type": "object",
+  "required": ["nodeTypes", "edgeTypes", "edgeRules"],
+  "additionalProperties": false,
+  "properties": {
+    "nodeTypes": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/nodeType" }
+    },
+    "edgeTypes": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/edgeType" }
+    },
+    "edgeRules": {
+      "type": "object",
+      "description": "Regras de conexão válida por tipo de nó de DESTINO. A chave \"_fallback\" é permitida e não precisa existir em nodeTypes.",
+      "additionalProperties": { "$ref": "#/$defs/edgeRule" }
+    }
+  },
+  "$defs": {
+    "nodeType": {
+      "type": "object",
+      "required": ["label", "derives", "techs", "contextos", "spec"],
+      "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string" },
+        "derives": {
+          "type": "string",
+          "description": "Kind estrutural que o motor de derivação sabe interpretar (ex.: service, queue, job, datastore)."
+        },
+        "techs": { "type": "array", "items": { "type": "string" } },
+        "contextos": { "type": "array", "items": { "type": "string" } },
+        "color": { "type": "string" },
+        "icon": { "type": "string" },
+        "spec": { "type": "array", "items": { "$ref": "#/$defs/fieldSpec" } }
+      }
+    },
+    "fieldSpec": {
+      "type": "object",
+      "required": ["key", "label", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "key": { "type": "string" },
+        "label": { "type": "string" },
+        "type": { "enum": ["text", "number", "boolean", "select"] },
+        "required": { "type": "boolean" },
+        "default": {},
+        "when": { "$ref": "#/$defs/condicao" },
+        "ajuda": { "type": "string" },
+        "permiteNA": { "type": "boolean" },
+        "options": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "condicao": {
+      "description": "Sete operadores, nada além disso — ver SPEC-01 §6.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["field", "equals"],
+          "additionalProperties": false,
+          "properties": { "field": { "type": "string" }, "equals": {} }
+        },
+        {
+          "type": "object",
+          "required": ["field", "notEquals"],
+          "additionalProperties": false,
+          "properties": { "field": { "type": "string" }, "notEquals": {} }
+        },
+        {
+          "type": "object",
+          "required": ["field", "preenchido"],
+          "additionalProperties": false,
+          "properties": { "field": { "type": "string" }, "preenchido": { "type": "boolean" } }
+        },
+        {
+          "type": "object",
+          "required": ["hasIncomingEdge"],
+          "additionalProperties": false,
+          "properties": { "hasIncomingEdge": { "type": "array", "items": { "type": "string" } } }
+        },
+        {
+          "type": "object",
+          "required": ["hasOutgoingEdge"],
+          "additionalProperties": false,
+          "properties": { "hasOutgoingEdge": { "type": "array", "items": { "type": "string" } } }
+        },
+        {
+          "type": "object",
+          "required": ["nodeStatus"],
+          "additionalProperties": false,
+          "properties": { "nodeStatus": { "enum": ["novo", "existente"] } }
+        },
+        {
+          "type": "object",
+          "required": ["allOf"],
+          "additionalProperties": false,
+          "properties": { "allOf": { "type": "array", "items": { "$ref": "#/$defs/condicao" } } }
+        },
+        {
+          "type": "object",
+          "required": ["anyOf"],
+          "additionalProperties": false,
+          "properties": { "anyOf": { "type": "array", "items": { "$ref": "#/$defs/condicao" } } }
+        },
+        {
+          "type": "object",
+          "required": ["not"],
+          "additionalProperties": false,
+          "properties": { "not": { "$ref": "#/$defs/condicao" } }
+        }
+      ]
+    },
+    "edgeType": {
+      "type": "object",
+      "required": ["label"],
+      "additionalProperties": false,
+      "properties": { "label": { "type": "string" }, "color": { "type": "string" } }
+    },
+    "edgeRule": {
+      "type": "object",
+      "required": ["valid"],
+      "additionalProperties": false,
+      "properties": {
+        "valid": { "type": "array", "items": { "type": "string" } },
+        "default": { "type": "string" }
+      }
+    }
+  }
+}

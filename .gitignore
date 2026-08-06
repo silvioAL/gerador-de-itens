@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+graphify-out/
+test-results/
+playwright-report/
+packages/web/e2e/screenshots/
+.env
+infra/secrets/.env
+.idea/
+.vscode/

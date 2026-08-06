@@ -1,0 +1,44 @@
+{
+  "id": "sql",
+  "titulo": "Dados relacionais",
+  "descricao": "Tabela SQL nova: chave, índices e ferramenta de migração de schema.",
+  "tipos": ["service", "sql"],
+  "categoria": "demo",
+  "designPatterns": [],
+  "quebra": {
+    "demandInfo": "Nova tabela relacional para controlar assinaturas recorrentes.",
+    "diagrama": {
+      "nodes": [
+        {
+          "id": "n1", "type": "service", "status": "novo", "label": "srv-assinaturas",
+          "x": 100, "y": 120,
+          "spec": {
+            "nome": { "valor": "srv-assinaturas", "origem": "manual" },
+            "linguagem": { "valor": "Java", "origem": "manual" }
+          },
+          "specNA": {
+            "framework": { "motivo": "framework ainda não definido" }
+          },
+          "endpoints": [
+            { "method": "POST", "path": "/v1/assinaturas", "action": "novo" }
+          ]
+        },
+        {
+          "id": "n2", "type": "sql", "status": "novo", "label": "assinaturas",
+          "x": 420, "y": 120,
+          "spec": {
+            "tabela": { "valor": "assinaturas", "origem": "manual" },
+            "chavePrimaria": { "valor": "id (uuid v4)", "origem": "manual" },
+            "indices": { "valor": "usuario_id, status_assinatura", "origem": "manual" },
+            "ferramentaMigracao": { "valor": "flyway", "origem": "manual" },
+            "volumeEsperado": { "valor": "medio", "origem": "manual" }
+          },
+          "specNA": {}
+        }
+      ],
+      "edges": [
+        { "id": "e1", "source": "n1", "target": "n2", "type": "writes" }
+      ]
+    }
+  }
+}

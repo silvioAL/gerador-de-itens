@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # packages/server/src/app.test.ts roda contra Postgres real (migrações
+    # próprias no beforeAll), não mock — mesmas credenciais do docker-compose.yml
+    # de dev, só pra este job efêmero do CI.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: gerador
+          POSTGRES_PASSWORD: gerador
+          POSTGRES_DB: gerador
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gerador -d gerador"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - run: npm ci
+
+      - run: npm run build --workspaces --if-present
+
+      - run: npm test --workspaces --if-present
+        env:
+          DATABASE_URL: postgres://gerador:gerador@localhost:5432/gerador
+
+      - run: npm run lint --workspaces --if-present

@@ -1,0 +1,41 @@
+#cloud-config
+# Fase D (SPEC-15): prepara a VM pra rodar a stack via Docker Compose — o
+# conteúdo de /opt/gerador (docker-compose.prod.yml, Caddyfile) é copiado
+# pelo workflow de deploy (.github/workflows/deploy.yml), não por aqui.
+
+package_update: true
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+
+runcmd:
+  # Docker Engine + plugin do Compose (repositório oficial, não o pacote
+  # desatualizado do apt padrão do Debian).
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  - >
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc]
+    https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable"
+    > /etc/apt/sources.list.d/docker.list
+  - apt-get update
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+  - usermod -aG docker ${ssh_user}
+
+  # Disco de dados (attached_disk "pgdata" no main.tf) — formata só se ainda
+  # não tiver filesystem (idempotente entre re-runs do cloud-init).
+  - >
+    if [ "$(blkid -o value -s TYPE /dev/disk/by-id/google-pgdata || true)" != "ext4" ]; then
+      mkfs.ext4 -F /dev/disk/by-id/google-pgdata;
+    fi
+  - mkdir -p /mnt/pgdata
+  - mount /dev/disk/by-id/google-pgdata /mnt/pgdata
+  - >
+    grep -q pgdata /etc/fstab ||
+    echo "/dev/disk/by-id/google-pgdata /mnt/pgdata ext4 defaults 0 2" >> /etc/fstab
+
+  # Destino dos arquivos de deploy (docker-compose.prod.yml, Caddyfile),
+  # dono do usuário SSH pra scp sem sudo no workflow de deploy.
+  - mkdir -p /opt/gerador
+  - chown ${ssh_user}:${ssh_user} /opt/gerador

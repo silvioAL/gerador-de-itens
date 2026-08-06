@@ -1,0 +1,89 @@
+{
+  "nome": "ciclo e conflito lógico de dependências",
+  "descricao": "Casos negativos. O engine deve detectar e reportar sem lançar exceção — a UI precisa listar os problemas, não receber um stack trace.",
+  "casos": [
+    {
+      "nome": "ciclo direto entre duas atividades",
+      "atividades": [
+        { "chave": "a", "dependencias": [{ "type": "dependent", "alvoChave": "b" }] },
+        { "chave": "b", "dependencias": [{ "type": "dependent", "alvoChave": "a" }] }
+      ],
+      "esperado": {
+        "ciclos": [ { "caminho": ["a", "b", "a"] } ],
+        "podeDerivar": false
+      }
+    },
+    {
+      "nome": "ciclo indireto de três",
+      "atividades": [
+        { "chave": "a", "dependencias": [{ "type": "dependent", "alvoChave": "b" }] },
+        { "chave": "b", "dependencias": [{ "type": "dependent", "alvoChave": "c" }] },
+        { "chave": "c", "dependencias": [{ "type": "dependent", "alvoChave": "a" }] }
+      ],
+      "esperado": {
+        "ciclos": [ { "caminho": ["a", "b", "c", "a"] } ],
+        "podeDerivar": false
+      }
+    },
+    {
+      "nome": "conflito lógico: atividade é enabler e dependent da mesma",
+      "atividades": [
+        { "chave": "a", "dependencias": [
+            { "type": "enabler",   "alvoChave": "b" },
+            { "type": "dependent", "alvoChave": "b" } ] },
+        { "chave": "b", "dependencias": [] }
+      ],
+      "esperado": {
+        "conflitos": [ { "codigo": "ENABLER_E_DEPENDENT", "atividades": ["a", "b"] } ],
+        "podeDerivar": false
+      }
+    },
+    {
+      "nome": "conflito lógico: independent com dependência declarada",
+      "atividades": [
+        { "chave": "a", "dependencias": [
+            { "type": "independent" },
+            { "type": "dependent", "alvoChave": "b" } ] },
+        { "chave": "b", "dependencias": [] }
+      ],
+      "esperado": {
+        "conflitos": [ { "codigo": "INDEPENDENT_COM_DEPENDENCIA", "atividades": ["a"] } ],
+        "podeDerivar": false
+      }
+    },
+    {
+      "nome": "referência a atividade inexistente",
+      "atividades": [
+        { "chave": "a", "dependencias": [{ "type": "dependent", "alvoChave": "zz" }] }
+      ],
+      "esperado": {
+        "conflitos": [ { "codigo": "ALVO_INEXISTENTE", "atividades": ["a"], "alvo": "zz" } ],
+        "podeDerivar": false
+      }
+    },
+    {
+      "nome": "grafo válido em cadeia — sem ciclo, ordem topológica definida",
+      "atividades": [
+        { "chave": "a", "dependencias": [{ "type": "enabler", "alvoChave": "b" }] },
+        { "chave": "b", "dependencias": [{ "type": "dependent", "alvoChave": "a" },
+                                          { "type": "enabler",   "alvoChave": "c" }] },
+        { "chave": "c", "dependencias": [{ "type": "dependent", "alvoChave": "b" }] }
+      ],
+      "esperado": {
+        "ciclos": [], "conflitos": [],
+        "ordemTopologica": ["a", "b", "c"],
+        "podeDerivar": true
+      }
+    },
+    {
+      "nome": "auto-dependência",
+      "atividades": [
+        { "chave": "a", "dependencias": [{ "type": "dependent", "alvoChave": "a" }] }
+      ],
+      "esperado": {
+        "ciclos": [ { "caminho": ["a", "a"] } ],
+        "podeDerivar": false
+      }
+    }
+  ]
+}

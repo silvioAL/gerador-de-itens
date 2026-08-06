@@ -1,0 +1,148 @@
+/**
+ * Modelo de domínio do engine. TS puro — nenhuma dependência de framework,
+ * de Node (`fs`/`http`) ou de browser. Ver packages/engine/README para a regra de fronteira.
+ */
+
+export type StatusNo = "novo" | "existente";
+
+export type Origem = "manual" | "extraido" | "inferido" | "sugerido";
+
+export interface ValorSpec {
+  valor: unknown;
+  origem: Origem;
+  evidencia?: string; // origem = extraido
+  confianca?: number; // origem = inferido
+  confirmado?: boolean; // origem = inferido ou sugerido
+  padrao?: string; // id do padrão que preencheu, se houver
+}
+
+export interface JustificativaNA {
+  motivo: string;
+}
+
+export interface Endpoint {
+  method: string;
+  path: string;
+  action: string;
+}
+
+export interface Ponto {
+  x: number;
+  y: number;
+}
+
+export interface No {
+  id: string;
+  type: string;
+  x: number;
+  y: number;
+  label: string;
+  status: StatusNo;
+  time?: string;
+  spec: Record<string, ValorSpec>;
+  specNA: Record<string, JustificativaNA>;
+  /** Só para nós cujo `derives` seja "service": endpoints HTTP expostos. */
+  endpoints?: Endpoint[];
+  /** Coleções estruturadas de outros domínios (ex.: stages de um processo Camunda) — genérico de propósito. */
+  data?: Record<string, unknown>;
+  knownInfo?: string;
+}
+
+export interface Aresta {
+  id: string;
+  source: string;
+  target: string;
+  type: string;
+  /** Lado do nó de onde a conexão foi arrastada/chega (ex.: "source-right", "target-left") —
+   * sem isso o canvas sempre renderiza a partir do primeiro handle declarado no nó. */
+  sourceHandle?: string;
+  targetHandle?: string;
+  note?: string;
+  reversed?: boolean;
+  routingMode?: string;
+  waypoints?: Ponto[];
+  labelOffset?: Ponto;
+}
+
+export interface Diagrama {
+  nodes: No[];
+  edges: Aresta[];
+}
+
+export interface Quebra {
+  demandInfo?: string;
+  time?: string;
+  diagrama: Diagrama;
+}
+
+export type TipoItem = "História" | "Task" | "Débito Técnico";
+
+export type Tamanho = "PP" | "P" | "M" | "G";
+
+export type TipoDependencia = "independent" | "enabler" | "dependent";
+
+export interface Dependencia {
+  type: TipoDependencia;
+  alvoChave?: string;
+  detalhe?: string;
+}
+
+export interface OrigemAtividade {
+  nodeId?: string;
+  edgeId?: string;
+}
+
+export interface Atividade {
+  /** Estável: deriva da origem, nunca muda quando um nó é inserido no meio. */
+  chave: string;
+  /** Sequencial de exibição, recalculado a cada derivação. */
+  rotulo: string;
+  tipo: TipoItem;
+  tamanho: Tamanho;
+  descricao: string;
+  techs: string[];
+  contextos: string[];
+  dependencias: Dependencia[];
+  origem: OrigemAtividade;
+  specResumo?: Record<string, unknown>;
+  timesEnvolvidos?: string[];
+}
+
+export type NivelProntidao = "vermelho" | "amarelo" | "verde";
+
+export type CodigoErroSpec = "NA_SEM_MOTIVO" | "NA_NAO_PERMITIDO";
+
+export interface ErroSpec {
+  campo: string;
+  codigo: CodigoErroSpec;
+}
+
+export interface Prontidao {
+  nivel: NivelProntidao;
+  obrigatoriosEmAberto: string[];
+  inferidosPendentes: string[];
+  erros: ErroSpec[];
+}
+
+export interface Ciclo {
+  caminho: string[];
+}
+
+export type CodigoConflito =
+  | "ENABLER_E_DEPENDENT"
+  | "INDEPENDENT_COM_DEPENDENCIA"
+  | "ALVO_INEXISTENTE";
+
+export interface Conflito {
+  codigo: CodigoConflito;
+  atividades: string[];
+  alvo?: string;
+}
+
+export interface ResultadoDependencias {
+  atividades: Atividade[];
+  ciclos: Ciclo[];
+  conflitos: Conflito[];
+  ordemTopologica: string[];
+  podeDerivar: boolean;
+}

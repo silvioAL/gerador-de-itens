@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1754350000000,
+      "tag": "0000_init",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1754360000000,
+      "tag": "0001_auth_e_campos_no",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1754370000000,
+      "tag": "0002_convites_e_auditoria",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1754380000000,
+      "tag": "0003_organizacoes_e_times",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1754400000000,
+      "tag": "0004_especificacao_templates",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1754410000000,
+      "tag": "0005_referencias_codigo_e_link_externo",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1754420000000,
+      "tag": "0006_dados_demo",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+services:
+  gerador:
+    build: .
+    ports:
+      - "8080:80"
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: gerador
+      POSTGRES_PASSWORD: gerador
+      POSTGRES_DB: gerador
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gerador -d gerador"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+
+  server:
+    build:
+      context: .
+      dockerfile: packages/server/Dockerfile
+    environment:
+      DATABASE_URL: postgres://gerador:gerador@db:5432/gerador
+      CONFIG_DIR: /app/config
+      ORIGEM_WEB: http://localhost:8080
+      # AUTH_MODE=dev (padrão local/E2E) — sem IdP corporativo disponível aqui;
+      # login aceita { email, timeId } direto, validado contra usuario_time
+      # (ver SPEC-08 §2.1). Produção troca pra AUTH_MODE=oidc + OIDC_ISSUER_URL/
+      # OIDC_CLIENT_ID/OIDC_CLIENT_SECRET/OIDC_REDIRECT_URI e um SESSAO_SEGREDO
+      # de verdade (o default do código nunca deve rodar fora de dev/E2E).
+      AUTH_MODE: dev
+    volumes:
+      - ./config:/app/config:ro
+    ports:
+      - "4000:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db-data:

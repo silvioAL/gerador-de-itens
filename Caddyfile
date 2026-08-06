@@ -1,0 +1,12 @@
+# Fase D (SPEC-15) — TLS automático (Let's Encrypt) + reverse proxy por path,
+# não por subdomínio: mantém front e API no mesmo domínio, então o cookie de
+# sessão (sameSite: "lax", packages/server/src/auth/sessao.ts) continua
+# funcionando sem precisar virar sameSite:"none" (ver SPEC-15 §3).
+{$DOMAIN:localhost} {
+	handle_path /api/* {
+		reverse_proxy server:4000
+	}
+	handle {
+		reverse_proxy gerador:80
+	}
+}

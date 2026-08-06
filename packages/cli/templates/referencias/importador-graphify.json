@@ -1,0 +1,7 @@
+{
+  "titulo": "Import Graphify -> nós tipados (mapeamento por regra, sem inferência)",
+  "racional": "Como este próprio projeto traduz o graph.json que o Graphify produz (que não tem \"tipo de entidade\" nenhum, só rótulo + arquivo-fonte) em nós tipados do diagrama. É um exemplo real do padrão \"tabela de regras\": uma lista ordenada de (regex de caminho → tipo), percorrida em ordem, primeira que bate vence. O ponto que faz isso valer como referência não é a mecânica da regex, é a decisão ao redor dela: todo arquivo que não bate com regra nenhuma vai para naoMapeados, explícito e visível — nunca um tipo adivinhado por heurística. Ver packages/engine/src/adapters/graphify/importarGrafo.ts.",
+  "designPatterns": ["Rule table / strategy", "Anti-corruption layer", "Fail loud sobre inferência"],
+  "codigoRelacionado": ["packages/engine/src/adapters/graphify/importarGrafo.ts"],
+  "linkExterno": null
+}

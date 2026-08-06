@@ -1,0 +1,19 @@
+{
+  "nodeTypes": {
+    "job": {
+      "label": "Job/Scheduler",
+      "derives": "job",
+      "techs": ["Backend"],
+      "contextos": [],
+      "spec": [
+        { "key": "nome", "label": "Nome do job", "type": "text", "required": true },
+        { "key": "cron", "label": "Expressão cron", "type": "text", "required": true,
+          "ajuda": "Padrão cron do agendador." },
+        { "key": "idempotente", "label": "Execução é idempotente?", "type": "boolean", "required": true,
+          "ajuda": "Job que roda de novo (retry, deploy) não pode duplicar efeito." },
+        { "key": "alerta", "label": "Alerta de falha configurado?", "type": "boolean", "required": true,
+          "when": { "nodeStatus": "novo" } }
+      ]
+    }
+  }
+}

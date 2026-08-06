@@ -1,0 +1,11 @@
+{
+  "regras": [
+    { "padrao": "\\.bpmn$", "tipo": "camunda" },
+    { "padrao": "rabbit|amqp", "tipo": "rabbit" },
+    { "padrao": "kafka", "tipo": "kafka" },
+    { "padrao": "mongo", "tipo": "mongo" },
+    { "padrao": "migrations?/.*\\.sql$", "tipo": "sql" },
+    { "padrao": "(scheduler|cron|job)s?/", "tipo": "job" },
+    { "padrao": "controllers?/|resources?/|routes?/", "tipo": "service" }
+  ]
+}

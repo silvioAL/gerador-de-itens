@@ -1,0 +1,88 @@
+{
+  "id": "rabbit",
+  "titulo": "Mensageria RabbitMQ",
+  "descricao": "Exchange + fila com DLQ, retry e binding — a topologia completa de mensageria de nível sênior.",
+  "tipos": ["service", "rabbit-exchange", "rabbit"],
+  "categoria": "demo",
+  "designPatterns": [],
+  "quebra": {
+    "time": "time-pagamentos",
+    "demandInfo": "Notificar o time de antifraude de forma assíncrona quando um pagamento for aprovado, com trilha de auditoria via DLQ.",
+    "diagrama": {
+      "nodes": [
+        {
+          "id": "n1", "type": "service", "status": "novo", "label": "srv-pagamentos-aprovacao",
+          "x": 100, "y": 120,
+          "spec": {
+            "nome": { "valor": "srv-pagamentos-aprovacao", "origem": "manual" },
+            "linguagem": { "valor": "Java", "origem": "manual" },
+            "framework": { "valor": "Spring Boot", "origem": "manual" }
+          },
+          "specNA": {},
+          "endpoints": [
+            { "method": "POST", "path": "/v1/pagamentos/{id}/aprovar", "action": "novo" }
+          ]
+        },
+        {
+          "id": "n2", "type": "rabbit-exchange", "status": "novo", "label": "pagamentos.eventos",
+          "x": 400, "y": 120,
+          "spec": {
+            "exchangeName": { "valor": "pagamentos.eventos", "origem": "manual" },
+            "exchangeType": { "valor": "topic", "origem": "manual" },
+            "durable": { "valor": true, "origem": "manual" }
+          },
+          "specNA": {}
+        },
+        {
+          "id": "n3", "type": "rabbit", "status": "novo", "label": "pagamento.aprovado.q",
+          "x": 700, "y": 120,
+          "spec": {
+            "topic": { "valor": "pagamento.aprovado.q", "origem": "manual" },
+            "routingKey": { "valor": "pagamento.aprovado", "origem": "manual" },
+            "durable": { "valor": true, "origem": "manual" },
+            "queueType": { "valor": "quorum", "origem": "manual" },
+            "dlq": { "valor": true, "origem": "manual" },
+            "dlxName": { "valor": "pagamento.aprovado.q.dlx", "origem": "manual" },
+            "dlqRoutingKey": { "valor": "pagamento.aprovado.q.dlq", "origem": "manual" },
+            "retryStrategy": { "valor": "backoff", "origem": "manual" },
+            "retries": { "valor": 3, "origem": "manual" },
+            "backoffInicialMs": { "valor": 1000, "origem": "manual" },
+            "backoffMultiplicador": { "valor": 2, "origem": "manual" },
+            "ttl": { "valor": 86400000, "origem": "manual" },
+            "ack": { "valor": "manual", "origem": "manual" },
+            "prefetch": { "valor": 10, "origem": "manual" },
+            "concorrencia": { "valor": 3, "origem": "manual" },
+            "ordenacao": { "valor": true, "origem": "manual" },
+            "consumidorAtivoUnico": { "valor": true, "origem": "manual" },
+            "idempotencia": { "valor": false, "origem": "manual" },
+            "chaveDedupe": { "valor": "pagamentoId", "origem": "manual" }
+          },
+          "specNA": {
+            "maxLength": { "motivo": "volume baixo (centenas/dia) — sem risco de esgotar memória no curto prazo" }
+          }
+        },
+        {
+          "id": "n4", "type": "service", "status": "existente", "label": "srv-antifraude",
+          "time": "time-risco",
+          "x": 700, "y": 340,
+          "spec": {
+            "nome": { "valor": "srv-antifraude", "origem": "manual" },
+            "migracao": {
+              "valor": "Não existe migração de tráfego — é o primeiro binding deste serviço a este evento, só adição de um consumidor novo.",
+              "origem": "manual"
+            }
+          },
+          "specNA": {
+            "linguagem": { "motivo": "serviço existente, stack não verificada nesta quebra" }
+          },
+          "endpoints": []
+        }
+      ],
+      "edges": [
+        { "id": "e1", "source": "n1", "target": "n2", "type": "publishes" },
+        { "id": "e2", "source": "n2", "target": "n3", "type": "binding" },
+        { "id": "e3", "source": "n4", "target": "n3", "type": "consumes" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "produto": "Port",
+  "time": "time-portabilidade",
+  "demandInfo": "Nova esteira de portabilidade com trilha de eventos assíncrona para auditoria/compliance.",
+  "diagrama": {
+    "nodes": [
+      {
+        "id": "n1", "type": "service", "status": "novo", "label": "srv-portabilidade",
+        "x": 100, "y": 120,
+        "spec": {
+          "nome": { "valor": "srv-portabilidade", "origem": "manual" },
+          "linguagem": { "valor": "Node", "origem": "manual" }
+        },
+        "specNA": {
+          "framework": { "motivo": "POC inicial, framework ainda não definido" }
+        },
+        "endpoints": [
+          { "method": "POST", "path": "/v1/portabilidade/solicitacoes", "action": "novo" }
+        ]
+      },
+      {
+        "id": "n2", "type": "kafka", "status": "novo", "label": "portabilidade.solicitada.v1",
+        "x": 420, "y": 120,
+        "spec": {
+          "topic": { "valor": "portabilidade.solicitada.v1", "origem": "manual" },
+          "particoes": { "valor": 6, "origem": "manual" },
+          "chaveParticionamento": { "valor": "portabilidadeId", "origem": "manual" },
+          "politicaRetencao": { "valor": "tempo", "origem": "manual" },
+          "retencaoMs": { "valor": 604800000, "origem": "manual" },
+          "consumerGroup": { "valor": "auditoria-eventos-portabilidade", "origem": "manual" },
+          "offsetReset": { "valor": "earliest", "origem": "manual" },
+          "ordenacao": { "valor": true, "origem": "manual" },
+          "idempotencia": { "valor": false, "origem": "manual" },
+          "chaveDedupe": { "valor": "eventId", "origem": "manual" },
+          "topicoDlq": { "valor": "portabilidade.solicitada.v1.dlq", "origem": "manual" },
+          "schemaRegistry": { "valor": true, "origem": "manual" }
+        },
+        "specNA": {
+          "fatorReplicacao": { "motivo": "cluster de dev tem só 1 broker — sem replicação possível ainda" }
+        }
+      },
+      {
+        "id": "n3", "type": "service", "status": "existente", "label": "srv-auditoria-eventos",
+        "time": "time-dados",
+        "x": 420, "y": 340,
+        "spec": {
+          "nome": { "valor": "srv-auditoria-eventos", "origem": "manual" },
+          "migracao": {
+            "valor": "Nenhuma migração de tráfego — é a primeira assinatura deste serviço a este tópico.",
+            "origem": "manual"
+          }
+        },
+        "specNA": {
+          "linguagem": { "motivo": "serviço existente, stack não verificada nesta quebra" }
+        },
+        "endpoints": []
+      }
+    ],
+    "edges": [
+      { "id": "e1", "source": "n1", "target": "n2", "type": "publishes" },
+      { "id": "e2", "source": "n3", "target": "n2", "type": "consumes" }
+    ]
+  }
+}
