@@ -11,16 +11,12 @@ O caminho padrão é o CLI local — instala com um comando, sem servidor, sem l
 ### 1. CLI local (recomendado)
 
 ```powershell
-npm install
-npm run build --workspace=packages/cli
-npm pack --workspace=packages/cli
-npm install -g gerador-cli-0.1.0.tgz   # ou: npm link --workspace=packages/cli
-
+npm install -g gerador-de-itens
 gerador init                            # em qualquer diretório de projeto
 gerador derive quebra.json --out backlog.md
 ```
 
-Veja [`packages/cli/README.md`](packages/cli/README.md) pra detalhes de instalação e a seção [Comandos da CLI](#comandos-da-cli) abaixo pro resto. Também dá pra usar via skill do Claude Code — ver [`skill/gerador-de-itens/SKILL.md`](skill/gerador-de-itens/SKILL.md).
+Publicado no [npm](https://www.npmjs.com/package/gerador-de-itens), mesmo mecanismo de instalação do Graphify — sem clonar este repositório. Veja [`packages/cli/README.md`](packages/cli/README.md) pra instalar a partir do código (contribuindo/testando) e a seção [Comandos da CLI](#comandos-da-cli) abaixo pro resto. Também dá pra usar via skill do Claude Code — ver [`skill/gerador-de-itens/SKILL.md`](skill/gerador-de-itens/SKILL.md).
 
 ### 2. Docker (modo hospedado, opcional — canvas visual + Postgres + login)
 

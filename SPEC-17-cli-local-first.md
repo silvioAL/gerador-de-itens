@@ -2,7 +2,7 @@
 
 **Depende de/relacionado a:** SPEC-16 (base de conhecimento, JOURNEY §32), Fase A (JOURNEY §20, decisão original de ir pra banco de verdade), CONTEXTO-E-ARQUITETURA.md §2/§5.1 (decisão original v1 de cortar banco/multi-tenant/auth, agora parcialmente revertida de novo). Reabre o rumo geral do produto — não corrige uma peça, decide entre dois modelos de distribuição.
 
-**Status: implementado (fatia 1) — ver JOURNEY §34.**
+**Status: implementado (fatia 1, JOURNEY §34) + fatia 2 em andamento (publicação pública no npm, JOURNEY §35).**
 
 ---
 
@@ -22,6 +22,8 @@ Decidido via `AskUserQuestion` (três perguntas, sem ambiguidade):
 ## 3. O que fica dormente, não é apagado
 
 `packages/server`, `docker-compose*.yml`, `infra/` (Terraform), `.github/workflows/deploy.yml` — nada disso foi removido. Continua código válido, testado, documentado (SPEC-08 a SPEC-15), só deixa de ser o caminho padrão/recomendado. `packages/web` também não mudou nesta rodada — continua funcionando contra o server, pra quem já estiver nesse caminho.
+
+**Observação do usuário, registrada aqui (não implementada ainda):** com o produto identificado como ferramenta local publicada num registry público — como o Graphify, não como serviço hospedado multi-time — a autenticação (Fase B/B.1/B.2 inteiras: OIDC, organização, times, membros) pode simplesmente parar de fazer sentido por padrão. Um CLI que roda na máquina de cada pessoa não tem "quem logar" nele. Isso é uma razão mais forte do que a que já estava escrita aqui pra eventualmente descontinuar `packages/server` (§9) — mas continua sendo uma decisão separada, não decidida nem implementada nesta rodada. Não removido sem confirmação explícita.
 
 ## 4. `config/referencias/*.json` — formato revivido
 
@@ -49,8 +51,18 @@ Depois de materializar as notas, `export-vault` imprime `obsidian://open?vault=<
 
 ## 7. Empacotamento e skill do Claude Code
 
-- `packages/cli`: `files`/`README.md` novos, dependência de `@gerador/engine` movida pra `devDependencies` (já é bundlada no `dist/cli.js` via `tsup.noExternal` — como `dependencies` quebraria a instalação de um pacote empacotado fora do monorepo, tentando resolver um pacote workspace-only do registry). `private: true` mantido de propósito — instalação é local (`npm link`/`npm pack` + `npm install -g`), não publicação num registry.
+- `packages/cli`: `files`/`README.md` novos, dependência de `@gerador/engine` movida pra `devDependencies` (já é bundlada no `dist/cli.js` via `tsup.noExternal` — como `dependencies` quebraria a instalação de um pacote empacotado fora do monorepo, tentando resolver um pacote workspace-only do registry).
 - `skill/gerador-de-itens/SKILL.md`: corrigidos dois bugs reais achados na auditoria (exemplo de `quebra.json` ainda tinha `produto`, removido na Fase B; `implementar` ainda documentava `<chave-ou-rótulo>`, removido no redesenho SPEC-14 v3) e adicionada a seção de `export-vault` (ausente até aqui). `scripts/gerador.ps1` simplificado: prefere `gerador` do PATH (instalação global) e só cai pro build de desenvolvimento do repositório como fallback.
+
+## 7.1. Fatia 2 — publicação pública no npm (JOURNEY §35)
+
+Pergunta direta do usuário sobre como o Graphify instala (`pip install graphifyy` / `npm install -g @sentropic/graphify`) revelou que a fatia 1 tinha ficado num meio-termo: `private: true` + `npm pack`/`npm link` local exige clonar o repositório, o que não é "funcionar como o Graphify" de verdade — o mecanismo real do Graphify é baixar um artefato já compilado de um registry público, com dependências resolvidas, sem tocar no código-fonte.
+
+Confirmado com o usuário via `AskUserQuestion`: **público, igual ao Graphify** (não uma alternativa privada tipo GitHub Packages). Decisões resultantes:
+- Nome do pacote: `gerador-de-itens` (sem escopo `@algo/`) — `gerador` sozinho já estava ocupado no npm por um pacote não relacionado ("Gerador de dados brasileiros"); `@gerador/cli` exigiria criar uma organização no npm primeiro. Sem escopo é o caminho mais simples, sem pré-requisito de conta além do login.
+- `private: true` removido de `packages/cli/package.json`; `license: "MIT"` + `LICENSE` novos; `keywords` adicionados.
+- `npm publish --dry-run` validado limpo (11 arquivos, `LICENSE`/`README.md`/`dist/`/`templates/` inclusos) — achado no caminho: `"bin": {"gerador": "./dist/cli.js"}` com o prefixo `./` é inválido pro publish do npm (auto-corrigido/removido silenciosamente, o que quebraria o comando `gerador` pra quem instalasse do registry); corrigido pra `"dist/cli.js"` sem prefixo via `npm pkg fix`.
+- **Login no npm é do usuário, não automatizável aqui** — esta sessão não roda prompts interativos (`npm login` pede navegador/OTP), e não é apropriado eu manusear um token de conta pessoal. O pacote fica pronto pra publicar (`npm publish` dentro de `packages/cli`) assim que o usuário estiver logado nesta máquina.
 
 ## 8. Limitação conhecida: `gerador open` ainda não funciona fora do monorepo
 
@@ -60,7 +72,7 @@ Depois de materializar as notas, `export-vault` imprime `obsidian://open?vault=<
 
 - **Canvas web sem Postgres/login.** Fazer `gerador open` ganhar leitura/escrita local (quebras, perfis-time, campos-no, especificacao-template como arquivo) — a peça que faltaria pra `packages/web` funcionar inteiro sem servidor, não só o CLI/skill.
 - **Empacotar `packages/web/dist` dentro de `@gerador/cli`** — resolveria a limitação do §8.
-- **Wire-up automático do Graphify** (hook de post-commit, pedido pelo usuário "pra não precisar ficar pedindo"): bloqueado porque este repositório não é um repositório git (`git init` nunca rodou aqui) — um hook de post-commit não tem onde pendurar. `git init` não foi feito nesta rodada sem confirmação explícita do usuário — muda o estado do projeto de um jeito que é decisão dele, não default.
+- ~~**Wire-up automático do Graphify**~~ — feito na mesma sessão, com confirmação explícita do usuário ("pode fazer"): Git não estava instalado nesta máquina (instalado via `winget`, confirmado com o usuário antes), `git init` + commit inicial, `graphify hook install` (post-commit/post-checkout + driver de merge) e `graphify claude install` (`CLAUDE.md` + hooks `PreToolUse`). Detalhes em JOURNEY §34.
 - **Descontinuar/remover de fato `packages/server`/Docker/Terraform** — decisão separada, não urgente.
 
 ## 10. Verificação
@@ -69,3 +81,4 @@ Depois de materializar as notas, `export-vault` imprime `obsidian://open?vault=<
 - Regressão completa dos 4 workspaces.
 - Validação real: instalar o CLI globalmente de verdade (`npm pack` + `npm install -g`) numa sessão de terminal, confirmar `gerador --help`/`gerador export-vault` funcionam fora do diretório do repo.
 - `graphify update .` + `JOURNEY.md` documentando o resultado real da validação.
+- Fatia 2: `npm publish --dry-run` limpo (bin corrigido, conteúdo do tarball conferido); publicação de verdade pendente do login npm do usuário — quando publicado, validar `npm install -g gerador-de-itens` numa máquina/sessão sem o repositório clonado.
