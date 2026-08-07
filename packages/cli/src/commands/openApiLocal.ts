@@ -15,10 +15,11 @@ const CAMPO_GLOBAL = "__global__";
  * existe no modo CLI). Sessão é sempre a mesma, fixa, sem conceito de time
  * (a decisão de simplificar auth fora do modelo CLI já estava registrada em
  * SPEC-17 antes desta rodada). Dados que hoje moram no Postgres do modo
- * hospedado viram arquivo local: `quebra.json` na raiz do projeto (o mesmo
- * arquivo que `gerador derive`/`implementar` já esperam — fecha o ciclo
- * entre editar no canvas e rodar via terminal), `config/perfis-time.json` e
- * `config/referencias/*.json` (já existentes, reaproveitados como estão), e
+ * hospedado viram arquivo local: `quebras/<id>.json` na raiz do projeto (uma
+ * quebra por arquivo, mesmo formato que `gerador derive`/`implementar`
+ * esperam como argumento — achado real: um arquivo fixo único fazia "Nova
+ * quebra" + salvar sobrescrever a anterior sempre), `config/perfis-time.json`
+ * e `config/referencias/*.json` (já existentes, reaproveitados como estão), e
  * `config/campos-no.json` (novo — mesma regra de merge global/por-time do
  * modo hospedado, achado real: o usuário queria configurar convenção de
  * nomenclatura por essa tela mesmo sem servidor nenhum).
@@ -62,42 +63,75 @@ async function existeArquivo(caminho: string): Promise<boolean> {
   );
 }
 
-// --- quebra.json — a mesma quebra única que gerador derive/implementar consomem ---
+// --- quebras/<id>.json — uma quebra por arquivo. Achado real: um único
+// `quebra.json` fixo fazia "Nova quebra" + salvar sobrescrever a anterior
+// sempre (não só "no mesmo dia" — todo segundo save perdia o primeiro). O
+// cliente web já gera um id novo no primeiro POST e reusa via PUT no resto —
+// só faltava o servidor local respeitar isso em vez de um id fixo "local".
+
+async function listarQuebras(dirQuebras: string): Promise<{ id: string; arquivo: string }[]> {
+  let nomes: string[];
+  try {
+    nomes = await readdir(dirQuebras);
+  } catch {
+    return [];
+  }
+  return nomes
+    .filter((n) => n.endsWith(".json"))
+    .map((n) => ({ id: n.slice(0, -".json".length), arquivo: resolve(dirQuebras, n) }));
+}
+
+async function comoQuebraSalva(id: string, arquivo: string) {
+  const info = await stat(arquivo);
+  const quebra = await lerJsonOpcional<Quebra>(arquivo);
+  return {
+    id,
+    time: quebra?.time ?? null,
+    diagrama: quebra?.diagrama ?? { nodes: [], edges: [] },
+    criadoEm: info.birthtime.toISOString(),
+    atualizadoEm: info.mtime.toISOString(),
+  };
+}
 
 async function tratarQuebras(req: IncomingMessage, res: ServerResponse, metodo: string, caminho: string, dirProjeto: string): Promise<void> {
-  const arquivoQuebra = resolve(dirProjeto, "quebra.json");
+  const dirQuebras = resolve(dirProjeto, "quebras");
 
   if (metodo === "GET" && caminho === "/quebras") {
-    if (!(await existeArquivo(arquivoQuebra))) return enviarJson(res, 200, []);
-    const info = await stat(arquivoQuebra);
-    const quebra = await lerJsonOpcional<Quebra>(arquivoQuebra);
-    return enviarJson(res, 200, [{ id: "local", time: quebra?.time ?? null, atualizadoEm: info.mtime.toISOString() }]);
+    const todas = await listarQuebras(dirQuebras);
+    const salvas = await Promise.all(todas.map(({ id, arquivo }) => comoQuebraSalva(id, arquivo)));
+    salvas.sort((a, b) => b.atualizadoEm.localeCompare(a.atualizadoEm));
+    return enviarJson(
+      res,
+      200,
+      salvas.map(({ id, time, atualizadoEm }) => ({ id, time, atualizadoEm }))
+    );
   }
 
-  if (metodo === "GET" && caminho === "/quebras/local") {
-    if (!(await existeArquivo(arquivoQuebra))) return enviarJson(res, 404, { erro: "quebra não encontrada" });
-    const info = await stat(arquivoQuebra);
-    const quebra = await lerJsonOpcional<Quebra>(arquivoQuebra);
-    return enviarJson(res, 200, {
-      id: "local",
-      time: quebra?.time ?? null,
-      diagrama: quebra?.diagrama ?? { nodes: [], edges: [] },
-      criadoEm: info.birthtime.toISOString(),
-      atualizadoEm: info.mtime.toISOString(),
-    });
+  const matchGet = metodo === "GET" && caminho.match(/^\/quebras\/([^/]+)$/);
+  if (matchGet) {
+    const id = decodeURIComponent(matchGet[1]);
+    const arquivo = resolve(dirQuebras, `${id}.json`);
+    if (!(await existeArquivo(arquivo))) return enviarJson(res, 404, { erro: "quebra não encontrada" });
+    return enviarJson(res, 200, await comoQuebraSalva(id, arquivo));
   }
 
-  if ((metodo === "POST" && caminho === "/quebras") || (metodo === "PUT" && caminho === "/quebras/local")) {
+  if (metodo === "POST" && caminho === "/quebras") {
     const quebra = await lerCorpoJson<Quebra>(req);
-    await writeFile(arquivoQuebra, JSON.stringify(quebra, null, 2), "utf-8");
-    const info = await stat(arquivoQuebra);
-    return enviarJson(res, metodo === "POST" ? 201 : 200, {
-      id: "local",
-      time: quebra.time ?? null,
-      diagrama: quebra.diagrama,
-      criadoEm: info.birthtime.toISOString(),
-      atualizadoEm: info.mtime.toISOString(),
-    });
+    const id = randomUUID();
+    await mkdir(dirQuebras, { recursive: true });
+    const arquivo = resolve(dirQuebras, `${id}.json`);
+    await writeFile(arquivo, JSON.stringify(quebra, null, 2), "utf-8");
+    return enviarJson(res, 201, await comoQuebraSalva(id, arquivo));
+  }
+
+  const matchPut = metodo === "PUT" && caminho.match(/^\/quebras\/([^/]+)$/);
+  if (matchPut) {
+    const id = decodeURIComponent(matchPut[1]);
+    const arquivo = resolve(dirQuebras, `${id}.json`);
+    if (!(await existeArquivo(arquivo))) return enviarJson(res, 404, { erro: "quebra não encontrada" });
+    const quebra = await lerCorpoJson<Quebra>(req);
+    await writeFile(arquivo, JSON.stringify(quebra, null, 2), "utf-8");
+    return enviarJson(res, 200, await comoQuebraSalva(id, arquivo));
   }
 
   enviarJson(res, 404, { erro: "não encontrado" });

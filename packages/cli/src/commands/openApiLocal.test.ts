@@ -40,43 +40,73 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     expect(me).toEqual({ email: "local", timeIds: ["local"] });
   });
 
-  it("GET /quebras sem quebra.json ainda devolve lista vazia, não erro", async () => {
+  it("GET /quebras sem quebras/ ainda devolve lista vazia, não erro", async () => {
     const resposta = await fetch(`${base}/quebras`);
     expect(resposta.status).toBe(200);
     expect(await resposta.json()).toEqual([]);
   });
 
-  it("POST /quebras grava quebra.json no diretório do projeto, e GET /quebras/local lê de volta", async () => {
+  it("POST /quebras cria um arquivo com id novo em quebras/, e GET /quebras/:id lê de volta", async () => {
     const quebra = { time: "time-x", diagrama: { nodes: [{ id: "n1", type: "service" }], edges: [] } };
     const criada = await fetch(`${base}/quebras`, {
       method: "POST",
       body: JSON.stringify(quebra),
     }).then((r) => r.json());
 
-    expect(criada.id).toBe("local");
+    expect(criada.id).toEqual(expect.any(String));
+    expect(criada.id.length).toBeGreaterThan(0);
     expect(criada.time).toBe("time-x");
     expect(criada.diagrama).toEqual(quebra.diagrama);
 
-    const lida = await fetch(`${base}/quebras/local`).then((r) => r.json());
+    const lida = await fetch(`${base}/quebras/${criada.id}`).then((r) => r.json());
     expect(lida.diagrama).toEqual(quebra.diagrama);
 
     const lista = await fetch(`${base}/quebras`).then((r) => r.json());
-    expect(lista).toEqual([{ id: "local", time: "time-x", atualizadoEm: expect.any(String) }]);
+    expect(lista).toEqual([{ id: criada.id, time: "time-x", atualizadoEm: expect.any(String) }]);
   });
 
-  it("PUT /quebras/local sobrescreve a quebra existente", async () => {
-    await fetch(`${base}/quebras`, {
+  it("duas quebras salvas em sequência (ex.: 'Nova quebra' + salvar) não se sobrescrevem — achado real", async () => {
+    const primeira = await fetch(`${base}/quebras`, {
+      method: "POST",
+      body: JSON.stringify({ time: "a", diagrama: { nodes: [{ id: "n1", type: "service" }], edges: [] } }),
+    }).then((r) => r.json());
+
+    const segunda = await fetch(`${base}/quebras`, {
+      method: "POST",
+      body: JSON.stringify({ time: "b", diagrama: { nodes: [{ id: "n2", type: "service" }], edges: [] } }),
+    }).then((r) => r.json());
+
+    expect(primeira.id).not.toBe(segunda.id);
+
+    const lista = await fetch(`${base}/quebras`).then((r) => r.json());
+    expect(lista).toHaveLength(2);
+
+    const primeiraAindaIntacta = await fetch(`${base}/quebras/${primeira.id}`).then((r) => r.json());
+    expect(primeiraAindaIntacta.time).toBe("a");
+  });
+
+  it("PUT /quebras/:id sobrescreve só aquela quebra específica", async () => {
+    const criada = await fetch(`${base}/quebras`, {
       method: "POST",
       body: JSON.stringify({ time: "a", diagrama: { nodes: [], edges: [] } }),
-    });
+    }).then((r) => r.json());
 
-    const atualizada = await fetch(`${base}/quebras/local`, {
+    const atualizada = await fetch(`${base}/quebras/${criada.id}`, {
       method: "PUT",
       body: JSON.stringify({ time: "b", diagrama: { nodes: [{ id: "n1", type: "service" }], edges: [] } }),
     }).then((r) => r.json());
 
+    expect(atualizada.id).toBe(criada.id);
     expect(atualizada.time).toBe("b");
     expect(atualizada.diagrama.nodes).toHaveLength(1);
+  });
+
+  it("PUT numa quebra inexistente devolve 404", async () => {
+    const resposta = await fetch(`${base}/quebras/nao-existe`, {
+      method: "PUT",
+      body: JSON.stringify({ time: "a", diagrama: { nodes: [], edges: [] } }),
+    });
+    expect(resposta.status).toBe(404);
   });
 
   it("GET /perfis-time sem config/perfis-time.json devolve objeto vazio", async () => {
