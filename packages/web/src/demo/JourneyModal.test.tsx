@@ -167,7 +167,7 @@ describe("JourneyModal", () => {
     expect(screen.getAllByText(/gerador import-graphify/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/gerador export-vault/).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText(/npm install -g gerador-de-itens/).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/skill do Claude Code/)).toBeInTheDocument();
+    expect(screen.getByText(/também roda sem abrir o browser/)).toBeInTheDocument();
   });
 
   it("troca para a aba Importar do Graphify e mostra a explicação do fluxo", async () => {

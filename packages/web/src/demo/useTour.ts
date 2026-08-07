@@ -97,12 +97,6 @@ export function useTour(opts: UseTourOpts) {
     },
     {
       selector: null,
-      titulo: "Skill do Claude Code",
-      texto:
-        '`gerador skill-install` instala a skill num projeto qualquer, sem precisar deste repositório. A partir daí, uma sessão do Claude Code nesse projeto já reconhece pedidos como "quebrar essa mudança em backlog": lê o config/diagrama.json do projeto alvo, monta um rascunho de quebra.json (inclusive a partir do código existente, via import do Graphify), roda derive/implementar, e oferece uma revisão crítica antes de fechar a quebra.',
-    },
-    {
-      selector: null,
       titulo: "Fim do tour",
       texto: "Você pode reabrir isso, ou carregar outro cenário, pelo botão ✦ Como funciona & cenários.",
       onEnter: () => opts.fecharConfig(),

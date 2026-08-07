@@ -1,6 +1,8 @@
 # SPEC-06 — CLI, skill do Claude Code e empacotamento
 
-**Depende de CONTEXTO-E-ARQUITETURA.md** · §2 a §5 registram mecanismo já implementado (`packages/cli/`, `skill/gerador-de-itens/`, `Dockerfile`, import do Graphify) — ver "status" no início de cada seção.
+**A skill do Claude Code (§3) foi removida.** Decisão registrada em SPEC-17 §11: o fluxo mudou pra dois subagentes externos (um deles com MCP) em vez de uma skill instalável — `skill/gerador-de-itens/` não existe mais no repositório. §3 abaixo fica como registro histórico do que foi construído e por quê, não como estado atual.
+
+**Depende de CONTEXTO-E-ARQUITETURA.md** · §2 a §5 registram mecanismo já implementado (`packages/cli/`, `Dockerfile`, import do Graphify) — ver "status" no início de cada seção.
 
 ---
 

@@ -49,7 +49,7 @@ Removida a flag `--server-url`/`fetch()` — o comando lê `config/referencias/*
 
 Depois de materializar as notas, `export-vault` imprime `obsidian://open?vault=<nome>&file=<primeira-referencia>`. Nova flag `--vault-nome` (nome do vault registrado no Obsidian pode divergir do nome da pasta) e `--abrir` (lança a URI via `start` no Windows). Resolve o "visualização dos docs ficou ruim" não com um visualizador melhor, mas sem visualizador nenhum — abre onde já é bonito.
 
-## 7. Empacotamento e skill do Claude Code
+## 7. Empacotamento e skill do Claude Code (skill revertida, ver §11)
 
 - `packages/cli`: `files`/`README.md` novos, dependência de `@gerador/engine` movida pra `devDependencies` (já é bundlada no `dist/cli.js` via `tsup.noExternal` — como `dependencies` quebraria a instalação de um pacote empacotado fora do monorepo, tentando resolver um pacote workspace-only do registry).
 - `skill/gerador-de-itens/SKILL.md`: corrigidos dois bugs reais achados na auditoria (exemplo de `quebra.json` ainda tinha `produto`, removido na Fase B; `implementar` ainda documentava `<chave-ou-rótulo>`, removido no redesenho SPEC-14 v3) e adicionada a seção de `export-vault` (ausente até aqui). `scripts/gerador.ps1` simplificado: prefere `gerador` do PATH (instalação global) e só cai pro build de desenvolvimento do repositório como fallback.
@@ -134,9 +134,11 @@ Cogitou-se resolver com Docker de novo (o pedido original de "modo hospedado, ma
 
 **Validado de verdade** (não só "arquivo responde 200" como da vez passada): rodando `dist/cli.js` fora do repositório, batendo em cada rota via HTTP real — `/auth/modo` → `{modo:"local"}`, `/auth/me` → sessão fixa, `POST /quebras` grava `quebra.json` no formato exato que `gerador derive` lê, `GET /quebras` lista de volta, `/perfis-time` e `/referencias` fazem round-trip completo, o bundle JS não contém mais `localhost:4000`. **Limitação da validação:** sem browser disponível neste ambiente, não foi possível confirmar visualmente que o canvas renderiza — só que toda chamada de rede que o boot do app faz responde com o formato certo. Pendente confirmação visual do usuário. 17 testes novos em `openApiLocal.test.ts` (servidor HTTP real numa porta efêmera, sem mock).
 
-## 8.2. Skill do Claude Code empacotada no pacote npm (`gerador skill-install`)
+## 8.2. Skill do Claude Code empacotada no pacote npm (`gerador skill-install`) — revertido, ver §11
 
 A skill (`skill/gerador-de-itens/SKILL.md`) só existia neste repositório — que é privado — então quem só tinha o pacote npm não tinha como pegá-la. `packages/cli/templates/skill/SKILL.md` é uma variante distribuível (mesmo conteúdo de regras/comandos, mas chamando `gerador` direto em vez do wrapper `.ps1` específico de desenvolvimento deste monorepo). Comando novo `gerador skill-install [destino]` (default `.claude/skills/gerador-de-itens`) copia esse arquivo pro projeto atual — sempre sobrescreve (é conteúdo mantido pela ferramenta, não editável pelo usuário, diferente de `config/` que `init` nunca sobrescreve).
+
+**Revertido pouco depois (mesma sessão) — ver §11: a skill inteira foi cortada**, `gerador skill-install` removido. O plano de produto mudou de direção antes desse comando chegar a ser usado de verdade.
 
 ## 9. Fora de escopo nesta rodada (Fase H, registrada, não implementada)
 
@@ -152,3 +154,17 @@ A skill (`skill/gerador-de-itens/SKILL.md`) só existia neste repositório — q
 - Validação real: instalar o CLI globalmente de verdade (`npm pack` + `npm install -g`) numa sessão de terminal, confirmar `gerador --help`/`gerador export-vault` funcionam fora do diretório do repo.
 - `graphify update .` + `JOURNEY.md` documentando o resultado real da validação.
 - Fatia 2: `npm publish --dry-run` limpo (bin corrigido, conteúdo do tarball conferido); publicação de verdade pendente do login npm do usuário — quando publicado, validar `npm install -g gerador-de-itens` numa máquina/sessão sem o repositório clonado.
+
+## 11. Skill removida — direção muda pra dois subagentes externos, um deles com MCP
+
+Testando `gerador skill-install` de verdade, o usuário parou e reconsiderou: o valor que a skill entregava (conversa em texto que monta `quebra.json`, roda `derive`/`implementar`, revisão crítica) não é o fluxo que faz sentido pro objetivo final, que é terminar com os itens **de fato publicados** em algum sistema de tracking (Jira, citado como exemplo). Decisão: **cortar a skill inteiramente** — `gerador skill-install`, `packages/cli/templates/skill/`, `skill/gerador-de-itens/` removidos, junto com toda referência em README/tour/JourneyModal.
+
+**Desenho da direção nova** (ainda não implementado — este parágrafo registra a intenção, não o resultado):
+- **Interface de interação continua sendo o canvas existente** (`gerador open`, já funcionando sem login desde §8.1) — não uma UI nova. Confirmado explicitamente pelo usuário: a skill cortada não tira a necessidade do canvas visual, só a camada de skill-conversacional por cima dele.
+- **Dois subagentes** (Claude Code `Agent` tool, não mais uma skill instalada em `.claude/skills/`), cada um com um prompt próprio:
+  1. **Agente 1** — recebe o markdown já gerado (backlog ou especificação de entrega, saída de `gerador derive`/`implementar`) e monta os itens a partir dele.
+  2. **Agente 2** — tem MCP habilitado (ex.: MCP do Jira), começa perguntando o link do épico onde os itens devem entrar (assim resolve projeto + épico de destino) e faz o upload de verdade.
+- Um terceiro prompt, do **agente principal/orquestrador**, coordena a passagem do output do Agente 1 pro Agente 2.
+- **Os textos/prompts desses agentes não vão pro pacote do `gerador`** — ficam como arquivos deste repositório (a serem criados), não como algo que `gerador` instala ou distribui. Diferente da skill (que era pra rodar em qualquer projeto via `gerador skill-install`), esse fluxo de subagentes é operado diretamente pelo usuário na sua própria sessão do Claude Code.
+
+**Não implementado ainda** — os três prompts (agente 1, agente 2, orquestrador) ficam para uma rodada futura, quando o usuário validar o desenho acima.

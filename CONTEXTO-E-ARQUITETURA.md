@@ -51,7 +51,8 @@ gerador/
 │   │             derive, dependency (ciclos/conflitos), refinamento, export
 │   ├── web/      Vite + React + React Flow — canvas, painel de propriedades,
 │   │             revisão, persistência via File System Access API
-│   └── cli/      bundle único (tsup) — init / derive / open, é o que a skill chama
+│   └── cli/      bundle único (tsup) — init / derive / implementar / open /
+│                 import-graphify / export-vault (SPEC-17, publicado no npm)
 ├── config/       diagrama.json (tipos de nó/aresta), app.json (vocabulário
 │   │             techs/contextos), regras.json (refinamento técnico por tech),
 │   │             perfis-time.json (stack conhecida por time),
@@ -59,7 +60,6 @@ gerador/
 │   │             referencias/ (trechos de código real guardados como referência,
 │   │             mesmo carregamento em runtime)
 ├── fixtures/     casos compartilhados entre as suítes do engine e do web
-├── skill/gerador-de-itens/   SKILL.md + wrapper — empacota o CLI pro Claude Code
 ├── Dockerfile, docker-compose.yml
 └── gerador_de_itens-2.html  legado, mantido só como referência de regras a minerar
 ```

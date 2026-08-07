@@ -158,8 +158,8 @@ function LinhaComando() {
   return (
     <div>
       <p style={{ fontSize: 13, color: "#475569", lineHeight: 1.5, marginTop: 0, maxWidth: 640 }}>
-        Tudo isso também roda sem abrir o browser — direto no terminal, ou como skill do Claude Code numa sessão de
-        planejamento. O app web é uma forma de usar a ferramenta, não a única. Instala uma vez com{" "}
+        Tudo isso também roda sem abrir o browser — direto no terminal. O app web é uma forma de usar a ferramenta,
+        não a única. Instala uma vez com{" "}
         <code>npm install -g gerador-de-itens</code> (publicado no npm, mesmo mecanismo do Graphify — sem precisar
         clonar repositório nenhum) e o comando <code>gerador</code> fica disponível em qualquer projeto.
       </p>

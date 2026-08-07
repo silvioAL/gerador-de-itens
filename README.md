@@ -17,7 +17,7 @@ gerador derive quebra.json --out backlog.md
 gerador open                            # editor visual, http://localhost:4321 — já vem empacotado, sem build extra
 ```
 
-Publicado no [npm](https://www.npmjs.com/package/gerador-de-itens), mesmo mecanismo de instalação do Graphify — sem clonar este repositório. Veja [`packages/cli/README.md`](packages/cli/README.md) pra instalar a partir do código (contribuindo/testando), [Comandos da CLI](#comandos-da-cli) abaixo pra lista completa, e [Claude Code](#claude-code) pra usar via skill (`gerador skill-install`) em vez de linha de comando pura.
+Publicado no [npm](https://www.npmjs.com/package/gerador-de-itens), mesmo mecanismo de instalação do Graphify — sem clonar este repositório. Veja [`packages/cli/README.md`](packages/cli/README.md) pra instalar a partir do código (contribuindo/testando), e [Comandos da CLI](#comandos-da-cli) abaixo pra lista completa.
 
 ### 2. Docker (modo hospedado, opcional — canvas visual + Postgres + login)
 
@@ -83,25 +83,8 @@ Também dá pra ver a jornada de linha de comando dentro do próprio app web: bo
 | `gerador open [--port]` | Abrir o editor visual — já vem empacotado dentro do pacote npm, sem depender de `npm run dev` nem de clonar o repositório. Serve o `config/` do diretório onde foi chamado. |
 | `gerador import-graphify <graph.json> [--out arquivo]` | Rascunhar nós `existente`/`extraído` a partir de um projeto já mapeado pelo Graphify. Precisa de `config/graphify-mapping.json` (mapeamento de padrão de arquivo → tipo de nó); `gerador init` cria um exemplo. |
 | `gerador export-vault [--dir vault] [--abrir]` | Materializar `config/referencias/*.json` + padrões default como notas Obsidian, ao lado do grafo que `graphify export obsidian` já gerou. 100% local, sem servidor. |
-| `gerador skill-install [destino]` | Instalar a skill do Claude Code no projeto atual (padrão: `.claude/skills/gerador-de-itens`). |
 
 Todo comando lê `config/*.json` do **diretório atual**, nunca deste repositório — o mesmo pacote serve qualquer projeto.
-
-## Claude Code
-
-Este projeto é pensado pra ser usado como skill do Claude Code numa sessão de planejamento — ver [`skill/gerador-de-itens/SKILL.md`](skill/gerador-de-itens/SKILL.md) para o fluxo completo (incluindo montar contexto de um projeto existente e o modo "revisor crítico").
-
-### Instalar a skill noutro projeto
-
-A skill não depende deste repositório (que é privado) — ela vai empacotada dentro do próprio pacote npm:
-
-```powershell
-npm install -g gerador-de-itens   # se ainda não tiver
-cd algum-outro-projeto
-gerador skill-install
-```
-
-Cria (ou atualiza) `.claude/skills/gerador-de-itens/SKILL.md` no projeto atual. A partir daí, uma sessão do Claude Code nesse projeto já reconhece pedidos como "quebrar essa mudança em backlog" — a skill sabe ler o `config/diagrama.json` do projeto alvo, montar um rascunho de `quebra.json` (inclusive lendo o código existente via `import-graphify`, se o Graphify já tiver mapeado o projeto), rodar `derive`/`implementar`, e oferecer uma revisão crítica antes de fechar a quebra. Não precisa copiar nada manualmente nem ter acesso a este repositório.
 
 ## Desenvolvimento
 
@@ -120,7 +103,6 @@ packages/engine/   TS puro, zero I/O — modelo, derivação, prontidão, depend
 packages/web/      Vite + React + React Flow — o editor visual
 packages/cli/      bin `gerador` — init | derive | implementar | open | import-graphify
 config/            Config de exemplo deste repositório (diagrama.json, app.json, regras.json, cenários...)
-skill/             Skill do Claude Code
 fixtures/          Casos de teste do engine, compartilhados entre implementações
 exemplos/          Quebras reais usadas pra validar os schemas de cada domínio
 ```
