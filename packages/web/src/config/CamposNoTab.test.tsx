@@ -100,6 +100,37 @@ describe("CamposNoTab", () => {
     await user.click(screen.getByRole("button", { name: "+ Adicionar campo" }));
 
     expect(screen.getByLabelText("Escopo")).toBeInTheDocument();
-    expect(screen.getByLabelText("Chave")).toHaveValue("");
+    expect(screen.queryByLabelText("Chave")).not.toBeInTheDocument();
+  });
+
+  it("a chave (key) é gerada sozinha a partir do Rótulo — usuário comum nunca precisa preenchê-la", async () => {
+    const user = userEvent.setup();
+    const onCriar = vi.fn();
+    render(
+      <CamposNoTab config={config} camposNo={[]} timeAtivo="time-x" onCriar={onCriar} onAtualizar={vi.fn()} onExcluir={vi.fn()} />
+    );
+
+    await user.click(screen.getByRole("button", { name: "+ Adicionar campo" }));
+    await user.type(screen.getByLabelText("Rótulo"), "Motor padrão");
+    await user.click(screen.getByRole("button", { name: "Salvar" }));
+
+    expect(onCriar).toHaveBeenCalledWith(expect.objectContaining({ key: "motorPadrao", label: "Motor padrão" }));
+  });
+
+  it("modo avançado revela a chave técnica e permite ajustá-la manualmente", async () => {
+    const user = userEvent.setup();
+    render(
+      <CamposNoTab config={config} camposNo={[]} timeAtivo="time-x" onCriar={vi.fn()} onAtualizar={vi.fn()} onExcluir={vi.fn()} />
+    );
+
+    await user.click(screen.getByRole("button", { name: "+ Adicionar campo" }));
+    await user.type(screen.getByLabelText("Rótulo"), "Motor padrão");
+    await user.click(screen.getByRole("button", { name: "avançado: ver/editar a chave técnica" }));
+
+    expect(screen.getByLabelText("Chave")).toHaveValue("motorPadrao");
+    await user.clear(screen.getByLabelText("Chave"));
+    await user.type(screen.getByLabelText("Chave"), "motorCustom");
+
+    expect(screen.getByLabelText("Chave")).toHaveValue("motorCustom");
   });
 });

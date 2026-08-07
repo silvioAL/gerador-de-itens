@@ -62,6 +62,23 @@
 
         { "tipo": "Teste de restart", "validacao": "Job retomado após falha no meio continua do checkpoint, sem duplicar itens já processados", "contextos": ["Backend-processamento em lote"], "dev": false, "hlg": true }
       ]
+    },
+    "Mobile": {
+      "requisitos": [
+        { "texto": "Dados sensíveis não persistidos em texto puro no dispositivo", "tipo": "checklist", "contextos": [] },
+        { "texto": "Comportamento sem rede (offline) definido, não só o caminho feliz online", "tipo": "checklist", "contextos": [] },
+
+        { "texto": "Permissões pedidas em runtime, com fluxo definido se o usuário negar", "tipo": "checklist", "contextos": ["Mobile-android"] },
+        { "texto": "Compatibilidade testada na versão mínima de SDK/API level suportada", "tipo": "checklist", "contextos": ["Mobile-android"] },
+
+        { "texto": "Permissões pedidas em runtime, com fluxo definido se o usuário negar", "tipo": "checklist", "contextos": ["Mobile-ios"] },
+        { "texto": "Compatibilidade testada na versão mínima de iOS suportada", "tipo": "checklist", "contextos": ["Mobile-ios"] },
+        { "texto": "Mudança revisada contra as App Store Review Guidelines relevantes", "tipo": "checklist", "contextos": ["Mobile-ios"] }
+      ],
+      "testes": [
+        { "tipo": "Teste em dispositivo real", "validacao": "Fluxo principal funciona em ao menos um dispositivo físico Android, não só emulador", "contextos": ["Mobile-android"], "dev": true, "hlg": false },
+        { "tipo": "Teste em dispositivo real", "validacao": "Fluxo principal funciona em ao menos um dispositivo físico iOS, não só simulador", "contextos": ["Mobile-ios"], "dev": true, "hlg": false }
+      ]
     }
   }
 }

@@ -10,6 +10,8 @@
     "Backend-regras",
     "Backend-cache",
     "Backend-storage",
-    "Backend-processamento em lote"
+    "Backend-processamento em lote",
+    "Mobile-android",
+    "Mobile-ios"
   ]
 }

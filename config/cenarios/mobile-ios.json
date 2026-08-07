@@ -1,0 +1,62 @@
+{
+  "id": "mobile-ios",
+  "titulo": "App iOS consumindo API do backend",
+  "descricao": "Tela nova do app iOS chama uma API já existente do backend — contrato consumido, autenticação biométrica, comportamento offline e push, diferente de uma integração server-to-server.",
+  "tipos": ["mobile-ios"],
+  "categoria": "demo",
+  "designPatterns": [],
+  "quebra": {
+    "demandInfo": "App iOS precisa permitir que o cliente solicite aumento de limite do cartão, chamando a API já existente do backend de crédito.",
+    "diagrama": {
+      "nodes": [
+        {
+          "id": "n1", "type": "mobile-ios", "status": "novo", "label": "app-cliente-ios",
+          "x": 100, "y": 120,
+          "spec": {
+            "nome": { "valor": "app-cliente-ios", "origem": "manual" },
+            "versaoMinimaIos": { "valor": "iOS 15", "origem": "manual" },
+            "autenticacao": { "valor": "Face ID/Touch ID + token", "origem": "manual" },
+            "contratoConsumido": {
+              "valor": "POST /v1/credito/solicitar-aumento\nRequest: { \"clienteId\": \"string\", \"valorSolicitado\": number }\nResponse 200: { \"protocolo\": \"string\", \"status\": \"em_analise\" }\nResponse 422: { \"motivo\": \"string\" } — rejeição imediata (ex.: sem elegibilidade)",
+              "origem": "manual"
+            },
+            "comportamentoOffline": {
+              "valor": "Solicitação não é enviada offline — tela mostra aviso e mantém o formulário preenchido até a rede voltar.",
+              "origem": "manual"
+            },
+            "notificacoesPush": {
+              "valor": "Push via APNs quando o status da solicitação muda (aprovado/negado) — toque abre a tela de acompanhamento.",
+              "origem": "manual"
+            },
+            "deepLinks": {
+              "valor": "Universal Link app://credito/acompanhar/{protocolo} abre a tela de acompanhamento a partir do push.",
+              "origem": "manual"
+            },
+            "distribuicao": { "valor": "App Store", "origem": "manual" }
+          }
+        },
+        {
+          "id": "n2", "type": "service", "status": "existente", "label": "srv-credito-api",
+          "x": 420, "y": 120,
+          "spec": {
+            "nome": { "valor": "srv-credito-api", "origem": "manual" },
+            "contratoEndpoints": {
+              "valor": "POST /v1/credito/solicitar-aumento\nRequest: { \"clienteId\": \"string\", \"valorSolicitado\": number }\nResponse 200: { \"protocolo\": \"string\", \"status\": \"em_analise\" }\nResponse 422: { \"motivo\": \"string\" }",
+              "origem": "manual"
+            },
+            "migracao": {
+              "valor": "Endpoint novo — reaproveita autenticação e rate limit já existentes deste serviço.",
+              "origem": "manual"
+            }
+          },
+          "specNA": {
+            "linguagem": { "motivo": "serviço existente, stack não verificada nesta quebra" }
+          }
+        }
+      ],
+      "edges": [
+        { "id": "e1", "source": "n1", "target": "n2", "type": "http" }
+      ]
+    }
+  }
+}

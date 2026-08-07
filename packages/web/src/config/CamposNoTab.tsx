@@ -18,6 +18,15 @@ interface FormularioCampo {
   escopo: "global" | "time";
   tipoNo: string;
   key: string;
+  /** true quando a key não pode mudar (editando um campo existente, ou
+   * sobrescrevendo um campo padrão — nos dois casos a key É o que liga este
+   * registro ao original). false só pra "+ Adicionar campo": aí a key é uma
+   * variável técnica interna, gerada sozinha a partir do Rótulo — o usuário
+   * só a edita entrando no modo avançado. */
+  chaveFixa: boolean;
+  /** true assim que o usuário edita a key manualmente no modo avançado —
+   * a partir daí para de regenerar a key sozinha a cada letra do Rótulo. */
+  keyEditadaManualmente: boolean;
   label: string;
   type: CampoNo["type"];
   required: boolean;
@@ -26,11 +35,31 @@ interface FormularioCampo {
   ajuda: string;
 }
 
+/** Gera uma key técnica (camelCase, sem acento/espaço) a partir do Rótulo
+ * digitado — mesma convenção já usada nas keys existentes (ex.: "topic",
+ * "motorPadrao"). O usuário comum nunca precisa pensar em "key"; só quem
+ * abrir o modo avançado vê e pode ajustar. */
+function gerarChaveDoRotulo(rotulo: string): string {
+  const semAcento = rotulo
+    .normalize("NFD")
+    .split("")
+    .filter((c) => c.codePointAt(0)! < 128)
+    .join("");
+  return semAcento
+    .trim()
+    .split(/[^a-zA-Z0-9]+/)
+    .filter(Boolean)
+    .map((palavra, i) => (i === 0 ? palavra.toLowerCase() : palavra[0].toUpperCase() + palavra.slice(1).toLowerCase()))
+    .join("");
+}
+
 function formularioVazio(tipoNo: string): FormularioCampo {
   return {
     escopo: "time",
     tipoNo,
     key: "",
+    chaveFixa: false,
+    keyEditadaManualmente: false,
     label: "",
     type: "text",
     required: false,
@@ -46,6 +75,8 @@ function formularioDeCampo(campo: CampoNo): FormularioCampo {
     escopo: campo.timeId === "__global__" ? "global" : "time",
     tipoNo: campo.tipoNo,
     key: campo.key,
+    chaveFixa: true,
+    keyEditadaManualmente: true,
     label: campo.label,
     type: campo.type,
     required: campo.required,
@@ -65,6 +96,8 @@ function formularioDeFieldSpec(tipoNo: string, campo: FieldSpec): FormularioCamp
     escopo: "time",
     tipoNo,
     key: campo.key,
+    chaveFixa: true,
+    keyEditadaManualmente: true,
     label: campo.label,
     type: campo.type,
     required: campo.required ?? false,
@@ -83,17 +116,21 @@ export function CamposNoTab({ config, camposNo, timeAtivo, onCriar, onAtualizar,
   const tiposDeNo = Object.keys(config.nodeTypes);
   const [formulario, setFormulario] = useState<FormularioCampo | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [mostrarChave, setMostrarChave] = useState(false);
 
   function abrirNovo() {
     setFormulario(formularioVazio(tiposDeNo[0] ?? ""));
+    setMostrarChave(false);
   }
 
   function abrirEdicao(campo: CampoNo) {
     setFormulario(formularioDeCampo(campo));
+    setMostrarChave(false);
   }
 
   function abrirSobrescrita(tipoNo: string, campo: FieldSpec) {
     setFormulario(formularioDeFieldSpec(tipoNo, campo));
+    setMostrarChave(false);
   }
 
   async function salvar() {
@@ -151,6 +188,8 @@ export function CamposNoTab({ config, camposNo, timeAtivo, onCriar, onAtualizar,
           onSalvar={salvar}
           onCancelar={() => setFormulario(null)}
           salvando={salvando}
+          mostrarChave={mostrarChave}
+          onAlternarChave={() => setMostrarChave((v) => !v)}
         />
       ) : (
         <button onClick={abrirNovo} style={botaoAdicionarEstilo}>
@@ -227,6 +266,8 @@ function FormularioCampoNo({
   onSalvar,
   onCancelar,
   salvando,
+  mostrarChave,
+  onAlternarChave,
 }: {
   formulario: FormularioCampo;
   tiposDeNo: string[];
@@ -234,6 +275,8 @@ function FormularioCampoNo({
   onSalvar: () => void;
   onCancelar: () => void;
   salvando: boolean;
+  mostrarChave: boolean;
+  onAlternarChave: () => void;
 }) {
   const podeSalvar = formulario.tipoNo !== "" && formulario.key.trim() !== "" && formulario.label.trim() !== "";
 
@@ -269,24 +312,42 @@ function FormularioCampoNo({
         ))}
       </select>
 
-      <label style={labelFormEstilo}>Chave (key)</label>
-      <input
-        aria-label="Chave"
-        value={formulario.key}
-        onChange={(e) => setFormulario({ ...formulario, key: e.target.value })}
-        placeholder="ex.: motorPadrao"
-        style={inputFormEstilo}
-        disabled={!!formulario.id}
-      />
-
       <label style={labelFormEstilo}>Rótulo</label>
       <input
         aria-label="Rótulo"
         value={formulario.label}
-        onChange={(e) => setFormulario({ ...formulario, label: e.target.value })}
+        onChange={(e) => {
+          const label = e.target.value;
+          const key =
+            !formulario.chaveFixa && !formulario.keyEditadaManualmente ? gerarChaveDoRotulo(label) : formulario.key;
+          setFormulario({ ...formulario, label, key });
+        }}
         placeholder="ex.: Motor padrão"
         style={inputFormEstilo}
       />
+
+      <button type="button" onClick={onAlternarChave} style={{ ...linkBotaoEstilo, marginTop: 8, alignSelf: "flex-start" }}>
+        {mostrarChave ? "ocultar" : "avançado: ver/editar a chave técnica"}
+      </button>
+
+      {mostrarChave && (
+        <>
+          <label style={labelFormEstilo}>Chave (key)</label>
+          <input
+            aria-label="Chave"
+            value={formulario.key}
+            onChange={(e) => setFormulario({ ...formulario, key: e.target.value, keyEditadaManualmente: true })}
+            placeholder="ex.: motorPadrao"
+            style={inputFormEstilo}
+            disabled={formulario.chaveFixa}
+          />
+          {formulario.chaveFixa && (
+            <span style={{ fontSize: 10.5, color: "#94a3b8" }}>
+              Fixa — é o que liga este campo ao original, não dá pra mudar.
+            </span>
+          )}
+        </>
+      )}
 
       <label style={labelFormEstilo}>Tipo de campo</label>
       <select

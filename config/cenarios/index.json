@@ -14,5 +14,7 @@
   "batch.json",
   "grpc.json",
   "graphql.json",
-  "credito-completo.json"
+  "credito-completo.json",
+  "mobile-android.json",
+  "mobile-ios.json"
 ]

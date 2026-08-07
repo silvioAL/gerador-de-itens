@@ -83,8 +83,16 @@
               "valor": "Nenhuma migração de tráfego — reaproveitamos a integração existente, só passamos a chamá-la a partir do novo fluxo de aprovação.",
               "origem": "manual"
             },
-            "contratoApi": {
-              "valor": "POST /score\nRequest: { \"cpf\": \"string\", \"valorSolicitado\": number }\nResponse 200: { \"score\": 0-1000, \"restricoes\": string[] }\nResponse 429: rate limit — respeitar o rateLimitConhecido antes de reter.",
+            "contratoEndpointsChamados": {
+              "valor": "POST /score — único endpoint chamado por este fluxo.",
+              "origem": "manual"
+            },
+            "contratoRequest": {
+              "valor": "{ \"cpf\": \"string\", \"valorSolicitado\": number }",
+              "origem": "manual"
+            },
+            "contratoResponse": {
+              "valor": "200: { \"score\": 0-1000, \"restricoes\": string[] }\n429: rate limit — respeitar o rateLimitConhecido antes de reter.",
               "origem": "manual"
             }
           },

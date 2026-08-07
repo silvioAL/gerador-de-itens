@@ -1,0 +1,62 @@
+{
+  "id": "mobile-android",
+  "titulo": "App Android consumindo API do backend",
+  "descricao": "Tela nova do app Android chama uma API já existente do backend — contrato consumido, autenticação, comportamento offline e push, diferente de uma integração server-to-server.",
+  "tipos": ["mobile-android"],
+  "categoria": "demo",
+  "designPatterns": [],
+  "quebra": {
+    "demandInfo": "App Android precisa exibir o extrato de pontos de fidelidade do cliente, consumindo a API já existente do backend de fidelidade.",
+    "diagrama": {
+      "nodes": [
+        {
+          "id": "n1", "type": "mobile-android", "status": "novo", "label": "app-cliente-android",
+          "x": 100, "y": 120,
+          "spec": {
+            "nome": { "valor": "app-cliente-android", "origem": "manual" },
+            "versaoMinimaSdk": { "valor": "API 26 (Android 8.0)", "origem": "manual" },
+            "autenticacao": { "valor": "oauth2", "origem": "manual" },
+            "contratoConsumido": {
+              "valor": "GET /v1/fidelidade/extrato/{clienteId}\nResponse 200: { \"saldoPontos\": number, \"historico\": [{ \"data\": \"string\", \"pontos\": number, \"motivo\": \"string\" }] }",
+              "origem": "manual"
+            },
+            "comportamentoOffline": {
+              "valor": "Extrato mostrado a partir do cache local (Room) se não houver rede; sincroniza silenciosamente quando a conexão volta, sem bloquear a tela.",
+              "origem": "manual"
+            },
+            "notificacoesPush": {
+              "valor": "Push quando o saldo de pontos muda (crédito ou resgate) — toque abre a tela de extrato direto.",
+              "origem": "manual"
+            },
+            "deepLinks": {
+              "valor": "gerador://extrato abre a tela de extrato a partir do push ou de outro app.",
+              "origem": "manual"
+            },
+            "distribuicao": { "valor": "Play Store", "origem": "manual" }
+          }
+        },
+        {
+          "id": "n2", "type": "service", "status": "existente", "label": "srv-fidelidade",
+          "x": 420, "y": 120,
+          "spec": {
+            "nome": { "valor": "srv-fidelidade", "origem": "manual" },
+            "contratoEndpoints": {
+              "valor": "GET /v1/fidelidade/extrato/{clienteId}\nResponse 200: { \"saldoPontos\": number, \"historico\": [{ \"data\": \"string\", \"pontos\": number, \"motivo\": \"string\" }] }",
+              "origem": "manual"
+            },
+            "migracao": {
+              "valor": "Endpoint novo — não impacta os consumidores já existentes deste serviço.",
+              "origem": "manual"
+            }
+          },
+          "specNA": {
+            "linguagem": { "motivo": "serviço existente, stack não verificada nesta quebra" }
+          }
+        }
+      ],
+      "edges": [
+        { "id": "e1", "source": "n1", "target": "n2", "type": "http" }
+      ]
+    }
+  }
+}

@@ -14,6 +14,7 @@ import {
   Scale,
   Server,
   Shield,
+  Smartphone,
   Split,
   Table,
   Users,
@@ -55,4 +56,5 @@ export const MAPA_ICONES: Record<string, LucideIcon> = {
   Cloud,
   Lock,
   Users,
+  Smartphone,
 };
