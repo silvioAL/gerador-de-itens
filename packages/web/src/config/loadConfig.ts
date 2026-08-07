@@ -105,7 +105,13 @@ export async function carregarConfig(timeAtivo?: string): Promise<ConfigCarregad
     buscarJson<AppConfig>("/config/app.json"),
     buscarJsonOpcional<RegrasConfig>("/config/regras.json"),
     apiCamposNo.listar(timeAtivo),
-    apiCamposAresta.listar(timeAtivo),
+    // /campos-aresta só existe no modo local (openApiLocal.ts) — packages/server
+    // fica dormente de propósito, sem essa rota (SPEC-21 §2). Achado real: sem
+    // esse catch, o 404 no modo hospedado rejeitava o Promise.all inteiro e
+    // quebrava o carregamento da config pra todo mundo, não só quem usaria o
+    // editor de campos de aresta. Ausência da rota = "nenhum campo customizado
+    // de aresta", nunca um erro fatal.
+    apiCamposAresta.listar(timeAtivo).catch(() => []),
   ]);
   const comCamposNo = mesclarCamposCustomizados(diagramaConfig, camposCustomizados);
   const comCamposAresta = mesclarCamposCustomizadosAresta(comCamposNo, camposArestaCustomizados);

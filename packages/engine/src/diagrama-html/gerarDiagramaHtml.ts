@@ -108,6 +108,25 @@ export function gerarDiagramaHtml(
     if (cfg?.color) legendaEntradas.set(cfg.color, cfg.label);
   }
 
+  // viewBox calculado a partir da posição real dos nós (No.x/y são livres —
+  // o usuário arrasta no canvas sem limite algum) — achado real: um viewBox
+  // fixo deixava o diagrama parecendo em branco sempre que o desenho não
+  // cabia por acaso dentro dele (qualquer coisa fora de [0,1000]x[0,700]
+  // ficava invisível até o usuário arrastar/dar zoom manualmente, sem pista
+  // nenhuma de que havia algo lá). Margem de 80px, e um box mínimo padrão
+  // pra diagrama vazio (sem nó nenhum).
+  const PADDING_VIEWBOX = 80;
+  const viewBox =
+    nos.length > 0
+      ? (() => {
+          const minX = Math.min(...nos.map((n) => n.x));
+          const minY = Math.min(...nos.map((n) => n.y));
+          const maxX = Math.max(...nos.map((n) => n.x + n.w));
+          const maxY = Math.max(...nos.map((n) => n.y + n.h));
+          return `${minX - PADDING_VIEWBOX} ${minY - PADDING_VIEWBOX} ${maxX - minX + PADDING_VIEWBOX * 2} ${maxY - minY + PADDING_VIEWBOX * 2}`;
+        })()
+      : "0 0 800 500";
+
   const dados = {
     nos,
     arestas,
@@ -156,7 +175,7 @@ ${CSS_DIAGRAMA}
       <button id="btn-seq-sair">✕ modo livre</button>
     </div>
     <div id="svg-wrap">
-      <svg id="svg-diagrama" viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid meet"></svg>
+      <svg id="svg-diagrama" viewBox="${viewBox}" preserveAspectRatio="xMidYMid meet"></svg>
       <div id="zoom-controles">
         <button id="btn-zoom-in" title="Aumentar zoom">+</button>
         <button id="btn-zoom-out" title="Diminuir zoom">−</button>

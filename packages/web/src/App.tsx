@@ -166,7 +166,10 @@ function AppComSessao({
       carregarCenarios(),
       apiPerfisTime.listar(),
       apiCamposNo.listar(timeAtivo),
-      apiCamposAresta.listar(timeAtivo),
+      // Mesmo motivo do catch em loadConfig.ts: /campos-aresta não existe no
+      // modo hospedado (packages/server fica dormente, SPEC-21 §2) — ausência
+      // da rota vira "sem campos customizados", nunca erro fatal de carregamento.
+      apiCamposAresta.listar(timeAtivo).catch(() => []),
       apiEspecificacaoTemplate.buscar(timeAtivo),
     ])
       .then(([config, cenarios, perfisTime, camposNo, camposAresta, especificacaoTemplate]) => {
@@ -636,6 +639,7 @@ function AppCarregado({
           especificacaoTemplate={especificacaoTemplate}
           timeAtivo={timeAtivo}
           mostrarMembros={modo !== "local"}
+          mostrarCamposAresta={modo === "local"}
           onEditarValorPerfilTime={editarValorPerfilTime}
           onSalvarEspecificacaoTemplate={salvarEspecificacaoTemplate}
           onCriarCampoNo={criarCampoNo}

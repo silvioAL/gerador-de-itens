@@ -77,7 +77,15 @@ Interatividade sem framework: um único blob JSON (`nodeIdParaItens`) + um liste
 - **`type: "lista"`/`itemSpec` em campo de aresta** — removido do escopo de `CamposArestaTab`/persistência local; ninguém pediu campo repetível numa conexão.
 - **`packages/server` não recebe as duas features** — dormente por decisão do usuário, sem escopo nesta rodada nem planejado.
 
-## 6. Validação
+## 6. Correções pós-publish (achados reais, mesma sessão)
+
+Dois bugs reais, achados só ao usar a feature de verdade (não pelos testes automatizados, que mockavam demais pra pegar os dois):
+
+1. **Modo hospedado quebrava no carregamento inteiro da config.** `loadConfig.ts`/`App.tsx` passaram a chamar `apiCamposAresta.listar(timeAtivo)` incondicionalmente — mas `packages/server` nunca ganhou a rota `/campos-aresta` (decisão deliberada, §2). Um 404 ali rejeitava o `Promise.all` inteiro, e qualquer pessoa no modo hospedado via só "Não foi possível carregar a configuração", sem nunca chegar no canvas. Corrigido com `.catch(() => [])` nos dois pontos de chamada (ausência da rota = "sem campos customizados de aresta", nunca erro fatal) — mesmo espírito de `buscarJsonOpcional` já usado pra `regras.json`. A aba "Campos por tipo de conexão" também ganhou um `mostrarCamposAresta={modo === "local"}` (inverso de `mostrarMembros`), pra não expor uma tela que sempre falharia ao salvar no modo hospedado. Achado via `packages/web/e2e/derivar-e-revisar.spec.ts` rodando contra o server de verdade (Postgres via Docker) — o teste, que já existia, começou a falhar sozinho ao testar de verdade.
+
+2. **Diagrama animado renderizava em branco com dados reais.** `gerarDiagramaHtml()` usava um `viewBox` fixo (`"0 0 1000 700"`), mas `No.x`/`No.y` são livres (o usuário arrasta sem limite no canvas React Flow) — qualquer diagrama cujos nós não coubessem por acaso nessa caixa ficava com o SVG tecnicamente correto (dados certos, sem erro de JS) mas **visualmente vazio**, sem nenhuma pista de que havia algo fora da vista. Reportado pelo usuário como "clico no ícone de play [Reproduzir em sequência] pra expandir um item e vai pra uma página em branco". Corrigido calculando o `viewBox` a partir do bounding box real de todos os nós (+80px de margem) em vez de um valor chutado — validado contra o cenário `credito-completo` de verdade (nós até x=1000, que ultrapassavam a caixa antiga) via Playwright, screenshot confirmando os 8 nós visíveis e o modo sequencial funcionando ponta a ponta.
+
+## 7. Validação
 
 - Testes novos: `camposVisiveisAresta` (2), validator edge-spec-default (1), `EdgePanel` renderizando/editando campo de aresta (3), `CamposArestaTab` (6), `openApiLocal` `/campos-aresta` CRUD (3), `gerarDiagramaHtml` (7 — posição/cor, direção de fluxo por `fluxo`, `nodeIdParaItens`, nível de prontidão, legenda, diagrama vazio), `ReviewScreen` diagrama animado (3), CLI par `.html`/`.md` (2). Regressão completa: engine 115, web 126, cli 29 — 270 testes verdes.
 - Validação real: `gerador implementar` sobre o cenário `credito-completo` (8 nós, 6 arestas, 14 atividades) gerando `diagrama-real.html` de verdade, aberto no navegador — animação, pan/zoom, clique em nó e modo sequencial conferidos contra dado real, não só teste automatizado.
