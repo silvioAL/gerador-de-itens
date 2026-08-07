@@ -2,7 +2,7 @@
 
 **Depende de** SPEC-07 (correção de escopo, JOURNEY §14), Fase A (`referencias`, JOURNEY §20) · Reabre uma decisão de escopo da Fase A à luz de uma peça que não existia na época: o Graphify já sabe exportar o grafo deste projeto como vault Obsidian (`graphify export obsidian`).
 
-**Status: implementado e validado — ver JOURNEY §32.**
+**Status: revertido — ver JOURNEY (rodada de "vamos remover completamente a parte de referências de código").** Decisão do usuário: pra guardar racional/decisão de arquitetura ligado a código real, é melhor o próprio Claude Code (skills/MCP de projeto) do que uma base de conhecimento paralela mantida por esta ferramenta. `referencias` (tabela, rota, aba web) e `gerador export-vault` foram removidos por completo — o markdown único da especificação de solução (SPEC-14) passou a ser a única saída de verdade. Fica como registro histórico da decisão anterior, não como spec ativa.
 
 ---
 

@@ -92,7 +92,7 @@ describe("gerarEspecificacaoEntrega", () => {
     // Contexto e Visão geral aparecem uma vez só, não por atividade.
     expect(doc.match(/## Contexto/g)).toHaveLength(1);
     expect(doc.match(/## Visão geral/g)).toHaveLength(1);
-    expect(doc).toContain("# Especificação de entrega");
+    expect(doc).toContain("# Especificação de solução");
     expect(doc).toContain("## Itens");
     expect(doc).toContain("### 1.");
     expect(doc).toContain("### 2.");
@@ -188,7 +188,7 @@ describe("gerarEspecificacaoEntrega", () => {
       template: "TÍTULO: {{titulo}}\nDOD: {{definitionOfDone}}",
     });
 
-    expect(doc.startsWith("TÍTULO: Especificação de entrega\nDOD: - [ ] Código revisado")).toBe(true);
+    expect(doc.startsWith("TÍTULO: Especificação de solução\nDOD: - [ ] Código revisado")).toBe(true);
     expect(doc).not.toContain("{{");
     expect(doc).not.toContain("## Itens");
   });

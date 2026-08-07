@@ -3,7 +3,6 @@ interface Etapa {
   cor: string;
   titulo: string;
   texto: string;
-  saida?: { rotulo: string; paraQue: string }[];
 }
 
 const ETAPAS: Etapa[] = [
@@ -26,25 +25,21 @@ const ETAPAS: Etapa[] = [
     cor: "#6366f1",
     titulo: "Derivar",
     texto:
-      "Um motor determinístico — não um LLM — transforma o diagrama em atividades reais. O mesmo diagrama sempre produz o mesmo backlog. Dependências entre atividades são calculadas automaticamente a partir das arestas, não digitadas à mão.",
+      "Um motor determinístico — não um LLM — transforma o diagrama em itens de trabalho reais. O mesmo diagrama sempre produz os mesmos itens. Dependências entre eles são calculadas automaticamente a partir das arestas, não digitadas à mão.",
   },
   {
     numero: 4,
     cor: "#ef4444",
     titulo: "Revisão",
     texto:
-      "Antes de qualquer coisa virar backlog, ciclos de dependência e conflitos são detectados e mostrados explicitamente — nunca escondidos ou \"resolvidos\" silenciosamente por trás das cenas.",
+      "Antes de qualquer coisa virar item de trabalho, ciclos de dependência e conflitos são detectados e mostrados explicitamente — nunca escondidos ou \"resolvidos\" silenciosamente por trás das cenas.",
   },
   {
     numero: 5,
     cor: "#15803d",
-    titulo: "Saídas",
-    texto: "A revisão vira artefato de verdade, cada formato para um uso diferente:",
-    saida: [
-      { rotulo: ".md", paraQue: "backlog pronto para colar num documento de planejamento ou abrir tickets manualmente." },
-      { rotulo: "Especificação de entrega", paraQue: "documento único da quebra inteira — contexto, cada item com spec técnica completa, refinamento, critérios de aceite em Gherkin, DoR/DoD." },
-      { rotulo: "Obsidian", paraQue: "gerador export-vault materializa referências e padrões default como notas, ao lado do grafo que o Graphify já extrai — abre direto no Obsidian, sem visualizador próprio." },
-    ],
+    titulo: "Especificação de solução",
+    texto:
+      "Revisão e especificação são uma coisa só: expanda cada item pra ver a spec técnica completa, o refinamento, os critérios de aceite em Gherkin — sem precisar copiar nada à parte. Quando estiver pronta, um clique gera um único markdown com tudo, pronto pra ser o input de outro agente (ex.: o que sobe os itens pro sistema de tracking do time).",
   },
 ];
 
@@ -84,28 +79,6 @@ export function Jornada() {
             <div style={{ fontSize: 13, color: "#475569", marginTop: 4, lineHeight: 1.5, maxWidth: 640 }}>
               {etapa.texto}
             </div>
-            {etapa.saida && (
-              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
-                {etapa.saida.map((s) => (
-                  <div key={s.rotulo} style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        padding: "2px 8px",
-                        borderRadius: 999,
-                        background: "#dcfce7",
-                        color: "#15803d",
-                        flexShrink: 0,
-                      }}
-                    >
-                      {s.rotulo}
-                    </span>
-                    <span style={{ fontSize: 12.5, color: "#475569" }}>{s.paraQue}</span>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       ))}

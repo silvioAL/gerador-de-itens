@@ -13,19 +13,15 @@ export const COMANDOS: LinhaTerminal[] = [
   {
     comando: "gerador init",
     saida:
-      "+ config/app.json criado.\n+ config/diagrama.json criado.\n+ config/regras.json criado.\n+ config/perfis-time.json criado.\n+ config/graphify-mapping.json criado.\n+ config/referencias/importador-graphify.json criado.\n+ config/referencias/criterios-de-aceite-por-tipo-de-no.json criado.",
+      "+ config/app.json criado.\n+ config/diagrama.json criado.\n+ config/regras.json criado.\n+ config/perfis-time.json criado.\n+ config/graphify-mapping.json criado.",
   },
   {
-    comando: "gerador derive quebra.json --out backlog.md",
-    saida: "Backlog gravado em backlog.md (4 atividades).",
+    comando: "gerador derive quebra.json --out itens.md",
+    saida: "Itens gravados em itens.md (4 atividades).",
   },
   {
     comando: "gerador implementar quebra.json --out especificacao.md",
-    saida: "Especificação de entrega gravada em especificacao.md (4 itens).",
-  },
-  {
-    comando: "gerador export-vault --dir graphify-out/obsidian --abrir",
-    saida: "Vault atualizado em graphify-out/obsidian: 2 referência(s) em referencias/, 14 padrão(ões) em patterns/.\nAbrir no Obsidian: obsidian://open?vault=obsidian&file=referencias%2Fimportador-graphify",
+    saida: "Especificação de solução gravada em especificacao.md (4 itens).",
   },
   {
     comando: "gerador open --port 4321",

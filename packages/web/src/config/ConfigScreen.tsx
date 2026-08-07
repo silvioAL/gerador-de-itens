@@ -1,24 +1,23 @@
 import { useEffect, useState } from "react";
 import type { DiagramaConfig, PerfisConfig } from "@gerador/engine";
-import type { CampoNo, DadosCampoNo, EspecificacaoTemplate, Referencia } from "../api/client";
+import type { CampoNo, DadosCampoNo, EspecificacaoTemplate } from "../api/client";
 import { PerfisTimeTab } from "../demo/PerfisTimeTab";
-import { ReferenciasTab } from "../demo/ReferenciasTab";
 import { CamposNoTab } from "./CamposNoTab";
 import { MembrosTab } from "./MembrosTab";
 import { EspecificacaoTemplateTab } from "./EspecificacaoTemplateTab";
 
-export type AbaConfig = "perfis" | "campos" | "referencias" | "membros" | "especificacao";
+export type AbaConfig = "perfis" | "campos" | "membros" | "especificacao";
 
 export interface ConfigScreenProps {
   config: DiagramaConfig;
   perfisTime: PerfisConfig;
-  referencias: Referencia[];
   camposNo: CampoNo[];
   especificacaoTemplate: EspecificacaoTemplate;
   timeAtivo: string;
+  /** false no modo local (CLI) — sem servidor não existe conceito de outros
+   * membros pra administrar; a aba não faz sentido. */
+  mostrarMembros: boolean;
   onEditarValorPerfilTime: (timeId: string, tipoNo: string, campo: string, valor: string) => void;
-  onCriarReferencia: (dados: { titulo: string; racional: string; designPatterns: string[]; codigoRelacionado: string[] }) => Promise<void>;
-  onAtualizarLinkExternoReferencia: (id: string, linkExterno: string) => Promise<void>;
   onCriarCampoNo: (dados: DadosCampoNo) => Promise<void>;
   onAtualizarCampoNo: (id: string, dados: Partial<DadosCampoNo>) => Promise<void>;
   onExcluirCampoNo: (id: string) => Promise<void>;
@@ -32,18 +31,16 @@ export interface ConfigScreenProps {
  * Tela cheia (mesmo padrão de ReviewScreen.tsx), não mais aba dentro da
  * JourneyModal — o editor de campos por tipo de nó não cabe na densidade de
  * uma aba de onboarding (SPEC-08 §3.5). Reúne o que é config recorrente de
- * time: perfis de stack, campos de formulário, referências de código.
+ * time: perfis de stack, campos de formulário.
  */
 export function ConfigScreen({
   config,
   perfisTime,
-  referencias,
   camposNo,
   especificacaoTemplate,
   timeAtivo,
+  mostrarMembros,
   onEditarValorPerfilTime,
-  onCriarReferencia,
-  onAtualizarLinkExternoReferencia,
   onCriarCampoNo,
   onAtualizarCampoNo,
   onExcluirCampoNo,
@@ -94,14 +91,13 @@ export function ConfigScreen({
         <button onClick={() => setAba("campos")} style={aba === "campos" ? abaAtivaEstilo : abaEstilo}>
           Campos por tipo de nó ({camposNo.length})
         </button>
-        <button onClick={() => setAba("referencias")} style={aba === "referencias" ? abaAtivaEstilo : abaEstilo}>
-          Referências de código ({referencias.length})
-        </button>
-        <button onClick={() => setAba("membros")} style={aba === "membros" ? abaAtivaEstilo : abaEstilo}>
-          Membros
-        </button>
+        {mostrarMembros && (
+          <button onClick={() => setAba("membros")} style={aba === "membros" ? abaAtivaEstilo : abaEstilo}>
+            Membros
+          </button>
+        )}
         <button onClick={() => setAba("especificacao")} style={aba === "especificacao" ? abaAtivaEstilo : abaEstilo}>
-          Especificação de entrega
+          Especificação de solução
         </button>
       </div>
 
@@ -119,14 +115,7 @@ export function ConfigScreen({
             onExcluir={onExcluirCampoNo}
           />
         )}
-        {aba === "referencias" && (
-          <ReferenciasTab
-            referencias={referencias}
-            onCriar={onCriarReferencia}
-            onAtualizarLinkExterno={onAtualizarLinkExternoReferencia}
-          />
-        )}
-        {aba === "membros" && <MembrosTab timeAtivo={timeAtivo} />}
+        {aba === "membros" && mostrarMembros && <MembrosTab timeAtivo={timeAtivo} />}
         {aba === "especificacao" && (
           <EspecificacaoTemplateTab
             template={especificacaoTemplate}

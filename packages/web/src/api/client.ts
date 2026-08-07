@@ -141,36 +141,6 @@ export const apiPerfisTime = {
     }),
 };
 
-export interface ReferenciaSalva {
-  id: string;
-  timeId: string | null;
-  titulo: string;
-  racional: string;
-  designPatterns: string[];
-  /** Caminhos de arquivo relativos ao repo — nunca o código em si (SPEC-16). Usado
-   * pelo `gerador export-vault` (CLI) pra linkar a referência à nota real que o
-   * Graphify já gera pro arquivo. */
-  codigoRelacionado: string[];
-  linkExterno: string | null;
-  criadoEm: string;
-}
-
-/** Alias estável — o resto do app (ReferenciasTab, JourneyModal) sempre chamou
- * isso de `Referencia`; a forma mudou (era arquivo local, agora é o server), o
- * nome não precisa mudar em todo lugar por causa disso. */
-export type Referencia = ReferenciaSalva;
-
-export const apiReferencias = {
-  listar: () => requisitar<ReferenciaSalva[]>("/referencias"),
-  criar: (dados: { timeId?: string; titulo: string; racional: string; designPatterns: string[]; codigoRelacionado: string[] }) =>
-    requisitar<ReferenciaSalva>("/referencias", { method: "POST", body: JSON.stringify(dados) }),
-  atualizarLinkExterno: (id: string, linkExterno: string) =>
-    requisitar<ReferenciaSalva>(`/referencias/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ linkExterno }),
-    }),
-};
-
 export interface EspecificacaoTemplate {
   id: string;
   timeId: string;

@@ -145,47 +145,6 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     expect(todos).toEqual({ "time-x": { service: { linguagem: "Java", framework: "Spring" } } });
   });
 
-  it("GET /referencias sem config/referencias/ devolve lista vazia", async () => {
-    expect(await fetch(`${base}/referencias`).then((r) => r.json())).toEqual([]);
-  });
-
-  it("POST /referencias cria um arquivo em config/referencias/, e GET /referencias lista de volta", async () => {
-    const criada = await fetch(`${base}/referencias`, {
-      method: "POST",
-      body: JSON.stringify({ titulo: "Retry com backoff", racional: "evita martelar o broker", designPatterns: ["retry"] }),
-    }).then((r) => r.json());
-
-    expect(criada.id).toBe("retry-com-backoff");
-    expect(criada.titulo).toBe("Retry com backoff");
-    expect(criada.linkExterno).toBeNull();
-
-    const lista = await fetch(`${base}/referencias`).then((r) => r.json());
-    expect(lista).toHaveLength(1);
-    expect(lista[0].titulo).toBe("Retry com backoff");
-  });
-
-  it("PATCH /referencias/:id atualiza o linkExterno de uma referência existente", async () => {
-    await fetch(`${base}/referencias`, {
-      method: "POST",
-      body: JSON.stringify({ titulo: "Circuit breaker", racional: "..." }),
-    });
-
-    const atualizada = await fetch(`${base}/referencias/circuit-breaker`, {
-      method: "PATCH",
-      body: JSON.stringify({ linkExterno: "obsidian://open?vault=x" }),
-    }).then((r) => r.json());
-
-    expect(atualizada.linkExterno).toBe("obsidian://open?vault=x");
-  });
-
-  it("PATCH numa referência inexistente devolve 404", async () => {
-    const resposta = await fetch(`${base}/referencias/nao-existe`, {
-      method: "PATCH",
-      body: JSON.stringify({ linkExterno: "x" }),
-    });
-    expect(resposta.status).toBe(404);
-  });
-
   it("GET /campos-no sem config/campos-no.json ainda devolve lista vazia, não erro", async () => {
     expect(await fetch(`${base}/campos-no`).then((r) => r.json())).toEqual([]);
   });

@@ -1,8 +1,8 @@
 # Gerador de Itens
 
-Ferramenta de quebra técnica: desenhe um diagrama de arquitetura (serviços, filas, bancos, processos de negócio, regras...) num canvas visual, preencha um painel de propriedades dirigido por config, e derive **deterministicamente** um backlog de atividades com dependências reais. Nada aqui é gerado por um LLM adivinhando a partir de uma descrição solta — sempre por regras explícitas em `config/diagrama.json`.
+Ferramenta de quebra técnica: desenhe um diagrama de arquitetura (serviços, filas, bancos, processos de negócio, regras...) num canvas visual, preencha um painel de propriedades dirigido por config, e derive **deterministicamente** itens de trabalho com dependências reais — agnóstico de qual sistema de tracking recebe isso depois. Nada aqui é gerado por um LLM adivinhando a partir de uma descrição solta — sempre por regras explícitas em `config/diagrama.json`.
 
-Não é um gerador de prompt de IA. O mesmo diagrama sempre produz o mesmo backlog.
+Não é um gerador de prompt de IA. O mesmo diagrama sempre produz os mesmos itens.
 
 ## Início rápido
 
@@ -13,7 +13,7 @@ O caminho padrão é o CLI local — instala com um comando, sem servidor, sem l
 ```powershell
 npm install -g gerador-de-itens
 gerador init                            # em qualquer diretório de projeto
-gerador derive quebra.json --out backlog.md
+gerador derive quebra.json --out itens.md
 gerador open                            # editor visual, http://localhost:4321 — já vem empacotado, sem build extra
 ```
 
@@ -69,20 +69,18 @@ Também dá pra ver a jornada de linha de comando dentro do próprio app web: bo
 - **Carregar ou compor cenários prontos** — 11 exemplos validados (um por tipo de nó, mais um fluxo completo de 8 nós) via o modal "✦ Como funciona & cenários"; "Adicionar ao canvas" injeta um cenário no diagrama atual sem substituir o que já existe.
 - **Importar de um projeto existente** — se o [Graphify](https://github.com/Graphify-Labs/graphify) já extraiu a estrutura do seu código (`/graphify .`), a aba "Importar do Graphify" lê o `graph.json` e rascunha nós `existente`/`extraído` no canvas, sem inventar tipo pra arquivo nenhum.
 - **Capturar a stack do time direto do uso** — preencheu campos manualmente num nó (linguagem, framework...) com o time da quebra definido? Um botão no painel salva esses valores como padrão do time em `perfis-time.json` — próximo nó do mesmo tipo já sugere o valor conhecido, sem reconfigurar do zero.
-- **Guardar referências de código real** — um arquivo por referência em `config/referencias/*.json` (racional + padrões de design + caminhos de código relacionado, texto editável à mão — `gerador init` já cria dois exemplos). `gerador export-vault` materializa essas referências como notas Obsidian, ao lado do grafo de código que o [Graphify](https://github.com/Graphify-Labs/graphify) já extrai (`graphify export obsidian`), com wikilink resolvido pro código real e redirect direto pro Obsidian — nunca um visualizador próprio na ferramenta.
-- **Derivar o backlog** — motor determinístico que calcula dependências a partir das arestas do diagrama, detecta ciclos e conflitos antes de deixar você seguir.
-- **Exportar** — `.md` (backlog resumido, colar num doc ou abrir tickets à mão) e a **especificação de entrega** (documento único da quebra inteira: contexto, visão geral, cada item com especificação técnica completa + refinamento + critérios de aceite, DoR/DoD no fim) — pronta pra refinar (ex.: num subagente Claude Code) e enviar pra quem faz o upload.
+- **Derivar os itens** — motor determinístico que calcula dependências a partir das arestas do diagrama, detecta ciclos e conflitos antes de deixar você seguir.
+- **Revisar e exportar** — depois de derivar, expanda cada item pra ver a especificação técnica completa, o refinamento e os critérios de aceite em Gherkin, sem precisar copiar nada à parte. Um clique gera um único markdown — a **especificação de solução** da quebra inteira (contexto, visão geral, cada item completo, DoR/DoD no fim) — pronto pra ser o input de outro agente (ex.: o que sobe os itens pro sistema de tracking do time).
 
 ## Comandos da CLI
 
 | Comando | Quando usar |
 |---|---|
 | `gerador init [diretório]` | Começar um projeto novo — cria `config/` de exemplo, nunca sobrescreve o que já existir. |
-| `gerador derive <quebra.json> [--out arquivo]` | Gerar o backlog resumido (Markdown) a partir de um diagrama já pronto, sem abrir o browser. |
-| `gerador implementar <quebra.json> [--out arquivo]` | Gerar a especificação de entrega da quebra inteira — um documento com todos os itens, especificação técnica completa e refinamento — pronto pra refinar e enviar pra quem faz o upload. |
+| `gerador derive <quebra.json> [--out arquivo]` | Gerar os itens (Markdown) a partir de um diagrama já pronto, sem abrir o browser. |
+| `gerador implementar <quebra.json> [--out arquivo]` | Gerar a especificação de solução da quebra inteira — um documento com todos os itens, especificação técnica completa e refinamento — pronto pra ser o input de outro agente. |
 | `gerador open [--port]` | Abrir o editor visual — já vem empacotado dentro do pacote npm, sem depender de `npm run dev` nem de clonar o repositório. Serve o `config/` do diretório onde foi chamado. |
 | `gerador import-graphify <graph.json> [--out arquivo]` | Rascunhar nós `existente`/`extraído` a partir de um projeto já mapeado pelo Graphify. Precisa de `config/graphify-mapping.json` (mapeamento de padrão de arquivo → tipo de nó); `gerador init` cria um exemplo. |
-| `gerador export-vault [--dir vault] [--abrir]` | Materializar `config/referencias/*.json` + padrões default como notas Obsidian, ao lado do grafo que `graphify export obsidian` já gerou. 100% local, sem servidor. |
 
 Todo comando lê `config/*.json` do **diretório atual**, nunca deste repositório — o mesmo pacote serve qualquer projeto.
 

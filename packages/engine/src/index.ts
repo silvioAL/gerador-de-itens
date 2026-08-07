@@ -14,6 +14,7 @@ export { paraMarkdown, paraCsv } from "./export/exportar.js";
 export { gerarChecklistTecnico, gerarCiclosDeTeste } from "./refinamento/gerarRefinamento.js";
 export {
   gerarEspecificacaoEntrega,
+  renderizarItemEspecificacao,
   extrairVariaveis,
   validarTemplate,
   VARIAVEIS_ESPECIFICACAO,

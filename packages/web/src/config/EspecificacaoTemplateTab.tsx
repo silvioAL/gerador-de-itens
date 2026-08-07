@@ -49,8 +49,8 @@ export function EspecificacaoTemplateTab({ template, timeAtivo, onSalvar }: Espe
   return (
     <div>
       <p style={introTextoEstilo}>
-        A especificação de entrega da quebra (botão "Especificação de entrega" na revisão) é um documento só, montado
-        a partir deste template. Placeholders válidos:{" "}
+        A especificação de solução da quebra (botão "Gerar especificação de solução" na revisão) é um documento só,
+        montado a partir deste template. Placeholders válidos:{" "}
         {VARIAVEIS_ESPECIFICACAO.map((v) => (
           <code key={v} style={codigoEstilo}>{`{{${v}}}`}</code>
         ))}

@@ -37,28 +37,6 @@ export const perfisTime = pgTable(
   (t) => [uniqueIndex("perfis_time_chave_unica").on(t.timeId, t.tipoNo, t.campo)]
 );
 
-/**
- * Substitui o armazenamento de trecho de código local (config/referencias/*.json)
- * por metadado + ponteiro — a fonte da verdade do conteúdo publicado é um
- * destino externo (Obsidian local via `gerador export-vault`, ou Confluence),
- * não este banco. `codigoRelacionado` é só o caminho — nunca o código em si
- * (mesma disciplina da Fase A) — usado pra linkar a referência à nota real
- * que o Graphify já gera pro arquivo (SPEC-16). `linkExterno` (era
- * `linkConfluence`) é genérico de propósito: Obsidian local não tem URL
- * (é arquivo), então continua opcional mesmo com a referência "existindo"
- * no vault.
- */
-export const referencias = pgTable("referencias", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  timeId: text("time_id"),
-  titulo: text("titulo").notNull(),
-  racional: text("racional").notNull(),
-  designPatterns: jsonb("design_patterns").$type<string[]>().notNull().default([]),
-  codigoRelacionado: jsonb("codigo_relacionado").$type<string[]>().notNull().default([]),
-  linkExterno: text("link_externo"),
-  criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
-});
-
 /** Sentinela usada em `campos_no.time_id` pra campo compartilhado por todo mundo —
  * nunca NULL, porque Postgres trata NULL≠NULL em índice único (duas linhas
  * globais do mesmo tipoNo/key colidiriam sem ser barradas). */

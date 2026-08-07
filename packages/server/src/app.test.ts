@@ -12,7 +12,6 @@ import {
   organizacoes,
   perfisTime,
   quebras,
-  referencias,
   times,
   usuarioTime,
 } from "./db/schema.js";
@@ -67,7 +66,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await db.execute(
-    sql`truncate table ${quebras}, ${perfisTime}, ${referencias}, ${camposNo}, ${convitesTime}, ${auditoria}`
+    sql`truncate table ${quebras}, ${perfisTime}, ${camposNo}, ${convitesTime}, ${auditoria}`
   );
 });
 
@@ -300,83 +299,6 @@ describe("/perfis-time", () => {
       payload: { tipoNo: "service", valores: { linguagem: "Java" } },
     });
     expect(outroTime.statusCode).toBe(403);
-  });
-});
-
-describe("/referencias", () => {
-  it("cria uma referência global (sem timeId) com código relacionado e depois grava o link externo via PATCH", async () => {
-    const cookie = await logarComo(EMAIL_DEV);
-    const criar = await app.inject({
-      method: "POST",
-      url: "/referencias",
-      cookies: { gerador_sessao: cookie },
-      payload: {
-        titulo: "Retry com backoff",
-        racional: "Motivo real",
-        designPatterns: ["retry"],
-        codigoRelacionado: ["packages/engine/src/derive/derivar.ts"],
-      },
-    });
-    expect(criar.statusCode).toBe(201);
-    const { id } = criar.json();
-    expect(criar.json().linkExterno).toBeNull();
-    expect(criar.json().codigoRelacionado).toEqual(["packages/engine/src/derive/derivar.ts"]);
-
-    const atualizar = await app.inject({
-      method: "PATCH",
-      url: `/referencias/${id}`,
-      cookies: { gerador_sessao: cookie },
-      payload: { linkExterno: "https://empresa.atlassian.net/wiki/pages/123" },
-    });
-    expect(atualizar.statusCode).toBe(200);
-    expect(atualizar.json().linkExterno).toBe("https://empresa.atlassian.net/wiki/pages/123");
-  });
-
-  it("rejeita link que não é uma URL válida", async () => {
-    const cookie = await logarComo(EMAIL_DEV);
-    const criar = await app.inject({
-      method: "POST",
-      url: "/referencias",
-      cookies: { gerador_sessao: cookie },
-      payload: { titulo: "X", racional: "Y" },
-    });
-    const { id } = criar.json();
-    expect(criar.json().codigoRelacionado).toEqual([]);
-
-    const atualizar = await app.inject({
-      method: "PATCH",
-      url: `/referencias/${id}`,
-      cookies: { gerador_sessao: cookie },
-      payload: { linkExterno: "não é url" },
-    });
-    expect(atualizar.statusCode).toBe(400);
-  });
-
-  it("recusa POST sem sessão (401) e PATCH de referência de outro time (403)", async () => {
-    const semSessao = await app.inject({
-      method: "POST",
-      url: "/referencias",
-      payload: { titulo: "X", racional: "Y" },
-    });
-    expect(semSessao.statusCode).toBe(401);
-
-    const cookieDev = await logarComo(EMAIL_DEV);
-    const criar = await app.inject({
-      method: "POST",
-      url: "/referencias",
-      cookies: { gerador_sessao: cookieDev },
-      payload: { timeId: TIME_A, titulo: "X", racional: "Y" },
-    });
-    const { id } = criar.json();
-
-    const cookieOutro = await logarComo(EMAIL_OUTRO);
-    const patchDeOutroTime = await app.inject({
-      method: "PATCH",
-      url: `/referencias/${id}`,
-      cookies: { gerador_sessao: cookieOutro },
-      payload: { linkExterno: "https://empresa.atlassian.net/wiki/pages/999" },
-    });
-    expect(patchDeOutroTime.statusCode).toBe(403);
   });
 });
 

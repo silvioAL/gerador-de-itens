@@ -14,3 +14,20 @@ body,
 button {
   font-family: inherit;
 }
+
+/* Expansão suave do item na revisão (ReviewScreen) — anima sozinha ao
+   montar, sem precisar de JS medindo altura. */
+@keyframes expandir-item {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.review-item-expandido {
+  animation: expandir-item 160ms ease-out;
+}

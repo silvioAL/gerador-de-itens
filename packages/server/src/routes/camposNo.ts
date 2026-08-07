@@ -35,7 +35,7 @@ async function buscarPorId(db: OpcoesApp["db"], id: string) {
 }
 
 export async function registrarRotasCamposNo(app: FastifyInstance, { db }: OpcoesApp) {
-  // Leitura é aberta (sem sessão) — mesma régua de perfis-time/referencias: times
+  // Leitura é aberta (sem sessão) — mesma régua de perfis-time: times
   // se beneficiam de ver a config uns dos outros, só a escrita é restrita.
   app.get("/campos-no", async (req) => {
     const { timeId } = req.query as { timeId?: string };

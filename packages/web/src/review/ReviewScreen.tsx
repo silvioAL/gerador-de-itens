@@ -1,6 +1,7 @@
-import { Fragment, useState } from "react";
+import { useState } from "react";
 import {
   gerarEspecificacaoEntrega,
+  renderizarItemEspecificacao,
   type Atividade,
   type Diagrama,
   type DiagramaConfig,
@@ -8,6 +9,7 @@ import {
   type ResultadoDependenciasDe,
 } from "@gerador/engine";
 import type { EspecificacaoTemplate } from "../api/client";
+import { baixarArquivoTexto } from "../persistence/baixarArquivo";
 
 export interface ReviewScreenProps {
   resultado: ResultadoDependenciasDe<Atividade>;
@@ -24,22 +26,24 @@ export interface ReviewScreenProps {
   time?: string;
   onFechar: () => void;
   onSelecionarNo: (id: string) => void;
-  onExportarMarkdown: () => void;
 }
 
 function descreverDependencia(a: Atividade): string {
-  return a.dependencias
-    .map((d) => (d.alvoChave ? `${d.type}→${d.alvoChave}` : d.type))
-    .join(", ");
+  return a.dependencias.map((d) => (d.alvoChave ? `${d.type}→${d.alvoChave}` : d.type)).join(", ");
 }
 
-function descreverSpecResumo(a: Atividade): string {
-  if (!a.specResumo) return "";
-  return Object.entries(a.specResumo)
-    .map(([chave, valor]) => `${chave}=${valor}`)
-    .join(", ");
-}
-
+/**
+ * Revisão e especificação de solução são uma coisa só (achado do usuário: o
+ * fluxo anterior — tabela resumida + botão separado "Especificação de
+ * entrega" com preview em texto puro + "copiar" — não fazia sentido; ninguém
+ * precisa copiar nada à mão). Cada item expande inline (grid-template-rows
+ * 0fr→1fr, transição suave) mostrando o mesmo texto que vai pro documento
+ * final — nunca duas fontes de verdade pro mesmo conteúdo, sempre
+ * `renderizarItemEspecificacao` do engine. Só existe UM export: o markdown
+ * completo (`gerarEspecificacaoEntrega`), pensado pra ser o input de outro
+ * agente (ex.: o que sobe os itens pro sistema de tracking do time) — não
+ * mais um `.md` resumido e um documento à parte.
+ */
 export function ReviewScreen({
   resultado,
   diagrama,
@@ -50,9 +54,8 @@ export function ReviewScreen({
   time,
   onFechar,
   onSelecionarNo,
-  onExportarMarkdown,
 }: ReviewScreenProps) {
-  const [mostrarEspecificacao, setMostrarEspecificacao] = useState(false);
+  const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
 
   const chaveParaNodeId = Object.fromEntries(
     resultado.atividades.filter((a) => a.origem.nodeId).map((a) => [a.chave, a.origem.nodeId!])
@@ -68,6 +71,25 @@ export function ReviewScreen({
       onSelecionarNo(nodeId);
       onFechar();
     }
+  }
+
+  function alternarExpandido(chave: string) {
+    setExpandidos((atual) => {
+      const novo = new Set(atual);
+      if (novo.has(chave)) novo.delete(chave);
+      else novo.add(chave);
+      return novo;
+    });
+  }
+
+  function baixarEspecificacao() {
+    const documento = gerarEspecificacaoEntrega(resultado.atividades, diagrama, config, {
+      regras,
+      demandInfo,
+      template: especificacaoTemplate.conteudo,
+      time,
+    });
+    baixarArquivoTexto(documento, "especificacao-de-solucao.md", "text/markdown");
   }
 
   return (
@@ -92,17 +114,14 @@ export function ReviewScreen({
         }}
       >
         <strong style={{ fontSize: 14 }}>Revisão da quebra</strong>
-        <span style={{ fontSize: 12, color: "#64748b" }}>{resultado.atividades.length} atividades</span>
+        <span style={{ fontSize: 12, color: "#64748b" }}>{resultado.atividades.length} itens</span>
         <div style={{ flex: 1 }} />
-        <div data-tour="export-buttons" style={{ display: "flex", gap: 10 }}>
-          <button onClick={onExportarMarkdown} style={botaoEstilo}>
-            Exportar .md
-          </button>
-          <button onClick={() => setMostrarEspecificacao((v) => !v)} style={botaoEstilo}>
-            {mostrarEspecificacao ? "fechar especificação" : "Especificação de entrega"}
+        <div data-tour="export-buttons">
+          <button onClick={baixarEspecificacao} style={{ ...botaoEstilo, ...botaoPrimarioEstilo }}>
+            Gerar especificação de solução
           </button>
         </div>
-        <button onClick={onFechar} style={{ ...botaoEstilo, ...botaoPrimarioEstilo }}>
+        <button onClick={onFechar} style={botaoEstilo}>
           Voltar ao canvas
         </button>
       </header>
@@ -151,134 +170,78 @@ export function ReviewScreen({
           </div>
         )}
 
-        {mostrarEspecificacao && (
-          <EspecificacaoGerada
-            atividades={resultado.atividades}
-            diagrama={diagrama}
-            config={config}
-            regras={regras}
-            template={especificacaoTemplate.conteudo}
-            demandInfo={demandInfo}
-            time={time}
-          />
-        )}
-
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-          <thead>
-            <tr style={{ textAlign: "left", borderBottom: "2px solid #e2e8f0" }}>
-              {["#", "Tipo", "Tamanho", "Descrição", "Techs", "Contextos", "Dependências", "Times", "Detalhes"].map(
-                (h) => (
-                  <th key={h} style={{ padding: "8px 6px", color: "#475569" }}>
-                    {h}
-                  </th>
-                )
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {resultado.atividades.map((a) => {
-              const cruzaOutroTime = outrosTimes(a).length > 0;
-              return (
-                <Fragment key={a.chave}>
-                  <tr style={{ borderBottom: "1px solid #f1f5f9", background: cruzaOutroTime ? "#fffbeb" : undefined }}>
-                    <td style={celulaEstilo}>
-                      {chaveParaNodeId[a.chave] ? (
-                        <button style={linkEstilo} onClick={() => irParaChave(a.chave)}>
-                          {a.rotulo}
-                        </button>
-                      ) : (
-                        a.rotulo
-                      )}
-                    </td>
-                    <td style={celulaEstilo}>{a.tipo}</td>
-                    <td style={celulaEstilo}>{a.tamanho}</td>
-                    <td style={celulaEstilo}>{a.descricao}</td>
-                    <td style={celulaEstilo}>{a.techs.join(", ")}</td>
-                    <td style={celulaEstilo}>{a.contextos.join(", ")}</td>
-                    <td style={celulaEstilo}>{descreverDependencia(a)}</td>
-                    <td style={celulaEstilo}>
-                      {a.timesEnvolvidos?.length ? (
-                        chaveParaNodeId[a.chave] ? (
-                          <button
-                            style={{
-                              ...linkEstilo,
-                              color: cruzaOutroTime ? "#92400e" : "#64748b",
-                              fontWeight: cruzaOutroTime ? 600 : 400,
-                            }}
-                            onClick={() => irParaChave(a.chave)}
-                            title="Editar o time responsável no nó, no canvas"
-                          >
-                            {a.timesEnvolvidos.join(", ")}
-                          </button>
-                        ) : (
-                          <span style={{ color: cruzaOutroTime ? "#92400e" : "#64748b", fontWeight: cruzaOutroTime ? 600 : 400 }}>
-                            {a.timesEnvolvidos.join(", ")}
-                          </span>
-                        )
-                      ) : (
-                        ""
-                      )}
-                    </td>
-                    <td style={{ ...celulaEstilo, color: "#64748b" }}>{descreverSpecResumo(a)}</td>
-                  </tr>
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {resultado.atividades.map((a, i) => {
+            const cruzaOutroTime = outrosTimes(a).length > 0;
+            const temNo = !!chaveParaNodeId[a.chave];
+            const expandido = expandidos.has(a.chave);
+            return (
+              <div key={a.chave} data-testid={`item-${a.chave}`} style={{ ...cardEstilo, background: cruzaOutroTime ? "#fffbeb" : "#fff" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <button
+                    onClick={() => alternarExpandido(a.chave)}
+                    aria-label={expandido ? `recolher ${a.rotulo}` : `expandir ${a.rotulo}`}
+                    aria-expanded={expandido}
+                    style={chevronEstilo}
+                  >
+                    {expandido ? "▾" : "▸"}
+                  </button>
+                  {temNo ? (
+                    <button style={{ ...linkEstilo, fontWeight: 600, fontSize: 13 }} onClick={() => irParaChave(a.chave)}>
+                      {a.rotulo}
+                    </button>
+                  ) : (
+                    <strong style={{ fontSize: 13 }}>{a.rotulo}</strong>
+                  )}
+                  <span style={metaEstilo}>
+                    {a.tipo} · {a.tamanho}
+                    {a.dependencias.length > 0 && ` · depende de ${descreverDependencia(a)}`}
+                  </span>
+                  <div style={{ flex: 1 }} />
+                  {a.timesEnvolvidos?.length ? (
+                    temNo ? (
+                      <button
+                        style={{
+                          ...linkEstilo,
+                          color: cruzaOutroTime ? "#92400e" : "#64748b",
+                          fontWeight: cruzaOutroTime ? 600 : 400,
+                        }}
+                        onClick={() => irParaChave(a.chave)}
+                        title="Editar o time responsável no nó, no canvas"
+                      >
+                        {a.timesEnvolvidos.join(", ")}
+                      </button>
+                    ) : (
+                      <span
+                        style={{ fontSize: 12, color: cruzaOutroTime ? "#92400e" : "#64748b", fontWeight: cruzaOutroTime ? 600 : 400 }}
+                      >
+                        {a.timesEnvolvidos.join(", ")}
+                      </span>
+                    )
+                  ) : null}
+                </div>
+                {expandido && (
+                  <div className="review-item-expandido">
+                    <pre style={preItemEstilo}>{renderizarItemEspecificacao(i + 1, a, diagrama, config, regras)}</pre>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
 }
 
-/**
- * Documento único da quebra inteira (SPEC-14) — não mais um artefato por
- * atividade: Contexto/Visão geral aparecem uma vez, cada atividade vira uma
- * seção numerada dentro do mesmo texto.
- */
-function EspecificacaoGerada({
-  atividades,
-  diagrama,
-  config,
-  regras,
-  template,
-  demandInfo,
-  time,
-}: {
-  atividades: Atividade[];
-  diagrama: Diagrama;
-  config: DiagramaConfig;
-  regras?: RegrasConfig;
-  template: string;
-  demandInfo?: string;
-  time?: string;
-}) {
-  const documento = gerarEspecificacaoEntrega(atividades, diagrama, config, { regras, demandInfo, template, time });
-
-  return (
-    <div style={{ marginBottom: 16, border: "1px solid #e2e8f0", borderRadius: 10, padding: 14, background: "#f8fafc" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, gap: 10 }}>
-        <strong style={{ fontSize: 11, color: "#475569" }}>
-          Especificação de entrega — documento único da quebra, pronto pra refinar (ex.: num subagente Claude Code) e
-          enviar pra quem faz o upload
-        </strong>
-        <button style={linkEstilo} onClick={() => void navigator.clipboard.writeText(documento)}>
-          copiar
-        </button>
-      </div>
-      <pre style={preEstilo}>{documento}</pre>
-    </div>
-  );
-}
-
-const preEstilo: React.CSSProperties = {
+const preItemEstilo: React.CSSProperties = {
   whiteSpace: "pre-wrap",
   fontFamily: "inherit",
   fontSize: 12,
-  margin: "4px 0 0",
+  margin: "10px 0 2px",
   color: "#334155",
-  maxHeight: 480,
-  overflow: "auto",
+  paddingTop: 10,
+  borderTop: "1px solid #e2e8f0",
 };
 
 const botaoEstilo: React.CSSProperties = {
@@ -306,9 +269,26 @@ const linkEstilo: React.CSSProperties = {
   textDecoration: "underline",
 };
 
-const celulaEstilo: React.CSSProperties = {
-  padding: "8px 6px",
-  verticalAlign: "top",
+const chevronEstilo: React.CSSProperties = {
+  background: "none",
+  border: "none",
+  cursor: "pointer",
+  color: "#64748b",
+  padding: 0,
+  fontSize: 13,
+  width: 16,
+  flexShrink: 0,
+};
+
+const metaEstilo: React.CSSProperties = {
+  fontSize: 12,
+  color: "#64748b",
+};
+
+const cardEstilo: React.CSSProperties = {
+  border: "1px solid #e2e8f0",
+  borderRadius: 10,
+  padding: "10px 12px",
 };
 
 const avisoEstilo: React.CSSProperties = {

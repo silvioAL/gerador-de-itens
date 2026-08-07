@@ -31,21 +31,19 @@ export async function init(args: string[]): Promise<void> {
     console.log(`+ config/${nome} criado.`);
   }
 
-  // config/referencias/ (SPEC-17) e config/cenarios/ (exemplos ilustrativos dos
-  // 16 tipos de nó deste template, mesmo conjunto que domina config/diagrama.json
-  // — sem eles, "Cenários prontos" fica vazio num projeto recém-criado) — mesma
-  // regra de sempre: nunca sobrescreve o que já existir.
-  for (const subpasta of ["referencias", "cenarios"]) {
-    const alvoSubpasta = join(alvo, subpasta);
-    await mkdir(alvoSubpasta, { recursive: true });
-    for (const nome of await readdir(join(TEMPLATES, subpasta))) {
-      const destino = join(alvoSubpasta, nome);
-      if (await existe(destino)) {
-        console.log(`- config/${subpasta}/${nome} já existe, mantido.`);
-        continue;
-      }
-      await copyFile(join(TEMPLATES, subpasta, nome), destino);
-      console.log(`+ config/${subpasta}/${nome} criado.`);
+  // config/cenarios/ (exemplos ilustrativos dos tipos de nó deste template,
+  // mesmo conjunto que domina config/diagrama.json — sem eles, "Cenários
+  // prontos" fica vazio num projeto recém-criado) — mesma regra de sempre:
+  // nunca sobrescreve o que já existir.
+  const alvoCenarios = join(alvo, "cenarios");
+  await mkdir(alvoCenarios, { recursive: true });
+  for (const nome of await readdir(join(TEMPLATES, "cenarios"))) {
+    const destino = join(alvoCenarios, nome);
+    if (await existe(destino)) {
+      console.log(`- config/cenarios/${nome} já existe, mantido.`);
+      continue;
     }
+    await copyFile(join(TEMPLATES, "cenarios", nome), destino);
+    console.log(`+ config/cenarios/${nome} criado.`);
   }
 }

@@ -54,10 +54,10 @@ async function capturarStdout(fn: () => Promise<void>): Promise<string> {
 }
 
 describe("comando `implementar` (SPEC-14 — documento único por quebra)", () => {
-  it("gera a especificação de entrega da quebra inteira, com os 6 itens da fixture numerados", async () => {
+  it("gera a especificação de solução da quebra inteira, com os 6 itens da fixture numerados", async () => {
     const saida = await capturarStdout(() => implementar(["quebra.json"]));
 
-    expect(saida).toContain("# Especificação de entrega");
+    expect(saida).toContain("# Especificação de solução");
     // Contexto (demandInfo) aparece uma vez só, não repetido por item.
     expect(saida.match(/Nova esteira de portabilidade com notificação assíncrona/g)).toHaveLength(1);
     for (const n of [1, 2, 3, 4, 5, 6]) {

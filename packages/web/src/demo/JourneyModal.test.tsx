@@ -58,9 +58,9 @@ describe("JourneyModal", () => {
     expect(screen.getByText("Prontidão")).toBeInTheDocument();
     expect(screen.getByText("Derivar")).toBeInTheDocument();
     expect(screen.getByText("Revisão")).toBeInTheDocument();
-    expect(screen.getByText("Saídas")).toBeInTheDocument();
-    expect(screen.getByText(/backlog pronto para colar/)).toBeInTheDocument();
-    expect(screen.getByText(/mecanismo determinístico/)).toBeInTheDocument();
+    expect(screen.getByText("Especificação de solução")).toBeInTheDocument();
+    expect(screen.getByText(/gera um único markdown com tudo/)).toBeInTheDocument();
+    expect(screen.getByText(/motor determinístico/)).toBeInTheDocument();
   });
 
   it("troca para a aba de cenários e lista todos os cenários recebidos, com categoria e design patterns quando houver", async () => {
@@ -165,7 +165,6 @@ describe("JourneyModal", () => {
     expect(screen.getAllByText(/gerador implementar/).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText(/gerador open/).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText(/gerador import-graphify/).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/gerador export-vault/).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText(/npm install -g gerador-de-itens/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/também roda sem abrir o browser/)).toBeInTheDocument();
   });

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   derivar,
@@ -12,6 +12,9 @@ import {
 import { ReviewScreen } from "./ReviewScreen";
 import { readFixture } from "../test-support/fixtures";
 import type { EspecificacaoTemplate } from "../api/client";
+
+const baixarArquivoTextoMock = vi.hoisted(() => vi.fn());
+vi.mock("../persistence/baixarArquivo", () => ({ baixarArquivoTexto: baixarArquivoTextoMock }));
 
 interface Fixture01 {
   quebra: { diagrama: Diagrama };
@@ -60,7 +63,6 @@ describe("ReviewScreen — fixture 01 (sem ciclos/conflitos)", () => {
         especificacaoTemplate={templateFixture}
         onFechar={vi.fn()}
         onSelecionarNo={vi.fn()}
-        onExportarMarkdown={vi.fn()}
       />
     );
 
@@ -84,7 +86,6 @@ describe("ReviewScreen — fixture 01 (sem ciclos/conflitos)", () => {
         especificacaoTemplate={templateFixture}
         onFechar={onFechar}
         onSelecionarNo={onSelecionarNo}
-        onExportarMarkdown={vi.fn()}
       />
     );
 
@@ -95,10 +96,10 @@ describe("ReviewScreen — fixture 01 (sem ciclos/conflitos)", () => {
     expect(onFechar).toHaveBeenCalled();
   });
 
-  it("botão de export chama o callback recebido", async () => {
+  it("botão 'Gerar especificação de solução' baixa um único markdown com tudo", async () => {
     const resultado = resultadoFixture01();
-    const onExportarMarkdown = vi.fn();
     const user = userEvent.setup();
+    baixarArquivoTextoMock.mockClear();
 
     render(
       <ReviewScreen
@@ -108,17 +109,23 @@ describe("ReviewScreen — fixture 01 (sem ciclos/conflitos)", () => {
         especificacaoTemplate={templateFixture}
         onFechar={vi.fn()}
         onSelecionarNo={vi.fn()}
-        onExportarMarkdown={onExportarMarkdown}
       />
     );
 
-    await user.click(screen.getByRole("button", { name: "Exportar .md" }));
+    await user.click(screen.getByRole("button", { name: "Gerar especificação de solução" }));
 
-    expect(onExportarMarkdown).toHaveBeenCalledOnce();
+    expect(baixarArquivoTextoMock).toHaveBeenCalledOnce();
+    const [conteudo, nomeArquivo, mime] = baixarArquivoTextoMock.mock.calls[0];
+    expect(nomeArquivo).toBe("especificacao-de-solucao.md");
+    expect(mime).toBe("text/markdown");
+    expect(conteudo).toContain("## Itens");
+    for (const a of resultado.atividades) {
+      expect(conteudo).toContain(a.rotulo);
+    }
   });
 });
 
-describe("ReviewScreen — especificação de entrega (SPEC-14, documento único)", () => {
+describe("ReviewScreen — revisão e especificação unificadas (expandir por item, sem copiar)", () => {
   const regras: RegrasConfig = {
     tipos: ["História", "Task", "Débito Técnico"],
     tamanhos: ["PP", "P", "M", "G"],
@@ -132,32 +139,10 @@ describe("ReviewScreen — especificação de entrega (SPEC-14, documento único
     },
   };
 
-  it("não mostra o documento até o botão do cabeçalho ser clicado", () => {
-    const resultado = resultadoFixture01();
-    render(
-      <ReviewScreen
-        resultado={resultado}
-        diagrama={fixture.quebra.diagrama}
-        config={config}
-        especificacaoTemplate={templateFixture}
-        onFechar={vi.fn()}
-        onSelecionarNo={vi.fn()}
-        onExportarMarkdown={vi.fn()}
-      />
-    );
-
-    expect(screen.queryByText("## Itens", { exact: false })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Especificação de entrega" })).toBeInTheDocument();
-  });
-
-  it("clicar no botão gera um documento único com todas as atividades e o refinamento técnico; copiar leva tudo junto", async () => {
+  it("item começa recolhido — especificação técnica só aparece depois de expandir", async () => {
     const resultado = resultadoFixture01();
     const user = userEvent.setup();
-    const escreverNaAreaDeTransferencia = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, "clipboard", {
-      value: { writeText: escreverNaAreaDeTransferencia },
-      configurable: true,
-    });
+    const atividade = resultado.atividades[0];
 
     render(
       <ReviewScreen
@@ -169,19 +154,33 @@ describe("ReviewScreen — especificação de entrega (SPEC-14, documento único
         demandInfo="Nova esteira de portabilidade."
         onFechar={vi.fn()}
         onSelecionarNo={vi.fn()}
-        onExportarMarkdown={vi.fn()}
       />
     );
 
-    await user.click(screen.getByRole("button", { name: "Especificação de entrega" }));
+    const card = screen.getByTestId(`item-${atividade.chave}`);
+    expect(within(card).queryByText(/Especificação técnica/)).not.toBeInTheDocument();
 
-    expect(screen.getByText(/Nova esteira de portabilidade\./)).toBeInTheDocument();
-    expect(screen.getByText(/#### Especificação técnica/)).toBeInTheDocument();
-    expect(screen.getByText(/DLQ configurada e monitorada/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: `expandir ${atividade.rotulo}` }));
 
-    await user.click(screen.getByText("copiar"));
-    expect(escreverNaAreaDeTransferencia).toHaveBeenCalledWith(expect.stringContaining("DLQ configurada"));
-    expect(escreverNaAreaDeTransferencia).toHaveBeenCalledWith(expect.stringContaining("## Itens"));
+    expect(within(card).getByText(/Especificação técnica/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: `recolher ${atividade.rotulo}` })).toBeInTheDocument();
+  });
+
+  it("não existe botão de copiar — a única saída é o download do documento completo", () => {
+    const resultado = resultadoFixture01();
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        regras={regras}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByText("copiar")).not.toBeInTheDocument();
   });
 });
 
@@ -199,20 +198,19 @@ describe("ReviewScreen — coluna Times (default pro time da quebra, editável n
         time="time-portabilidade"
         onFechar={vi.fn()}
         onSelecionarNo={vi.fn()}
-        onExportarMarkdown={vi.fn()}
       />
     );
 
     // n3 (srv-notificacao) é existente com time-pagamentos — a atividade e2::consume
     // cruza outro time de verdade; as demais só carregam o time da própria quebra.
     const atividadeSetup = resultado.atividades.find((a) => a.chave === "n1::setup")!;
-    const linhaSetup = screen.getByText(atividadeSetup.rotulo).closest("tr")!;
-    expect(linhaSetup.style.background).not.toBe("rgb(255, 251, 235)");
+    const cardSetup = screen.getByTestId(`item-${atividadeSetup.chave}`);
+    expect(cardSetup.style.background).not.toBe("rgb(255, 251, 235)");
 
     const botaoTimePagamentos = screen.getByRole("button", { name: /time-pagamentos/ });
     expect(botaoTimePagamentos).toBeInTheDocument();
-    const linhaComOutroTime = botaoTimePagamentos.closest("tr")!;
-    expect(linhaComOutroTime.style.background).toBe("rgb(255, 251, 235)");
+    const cardComOutroTime = botaoTimePagamentos.closest('[data-testid^="item-"]') as HTMLElement;
+    expect(cardComOutroTime.style.background).toBe("rgb(255, 251, 235)");
   });
 
   it("clicar no time de um item leva pro nó de origem, igual clicar no rótulo", async () => {
@@ -230,7 +228,6 @@ describe("ReviewScreen — coluna Times (default pro time da quebra, editável n
         time="time-portabilidade"
         onFechar={vi.fn()}
         onSelecionarNo={onSelecionarNo}
-        onExportarMarkdown={vi.fn()}
       />
     );
 
@@ -275,7 +272,6 @@ describe("ReviewScreen — ciclo detectado", () => {
         especificacaoTemplate={templateFixture}
         onFechar={vi.fn()}
         onSelecionarNo={vi.fn()}
-        onExportarMarkdown={vi.fn()}
       />
     );
 

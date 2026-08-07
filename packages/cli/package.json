@@ -1,6 +1,6 @@
 {
   "name": "gerador-de-itens",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "Quebra técnica derivada deterministicamente de um diagrama de arquitetura — CLI local, sem servidor.",
   "license": "MIT",
   "repository": {
@@ -20,11 +20,9 @@
     "web-dist"
   ],
   "keywords": [
-    "backlog",
     "architecture-diagram",
     "technical-breakdown",
-    "cli",
-    "obsidian"
+    "cli"
   ],
   "engines": {
     "node": ">=18"

@@ -3,7 +3,6 @@ import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { TEMPLATE_ESPECIFICACAO_PADRAO, type PerfisConfig, type Quebra } from "@gerador/engine";
-import { slugify } from "./exportVault.js";
 
 const CAMPO_GLOBAL = "__global__";
 
@@ -19,22 +18,13 @@ const CAMPO_GLOBAL = "__global__";
  * quebra por arquivo, mesmo formato que `gerador derive`/`implementar`
  * esperam como argumento — achado real: um arquivo fixo único fazia "Nova
  * quebra" + salvar sobrescrever a anterior sempre), `config/perfis-time.json`
- * e `config/referencias/*.json` (já existentes, reaproveitados como estão), e
- * `config/campos-no.json` (novo — mesma regra de merge global/por-time do
- * modo hospedado, achado real: o usuário queria configurar convenção de
- * nomenclatura por essa tela mesmo sem servidor nenhum).
+ * (já existente, reaproveitado como está), e `config/campos-no.json` (novo —
+ * mesma regra de merge global/por-time do modo hospedado, achado real: o
+ * usuário queria configurar convenção de nomenclatura por essa tela mesmo
+ * sem servidor nenhum).
  */
 
 const SESSAO_LOCAL = { email: "local", timeIds: ["local"] };
-
-interface ReferenciaLocal {
-  titulo: string;
-  racional: string;
-  designPatterns?: string[];
-  codigoRelacionado?: string[];
-  linkExterno?: string | null;
-  criadoEm?: string;
-}
 
 function enviarJson(res: ServerResponse, status: number, corpo: unknown): void {
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-cache" });
@@ -157,70 +147,6 @@ async function tratarPerfisTime(req: IncomingMessage, res: ServerResponse, metod
     await mkdir(resolve(dirProjeto, "config"), { recursive: true });
     await writeFile(arquivo, JSON.stringify(perfis, null, 2), "utf-8");
     return enviarJson(res, 200, perfis[timeId][tipoNo]);
-  }
-
-  enviarJson(res, 404, { erro: "não encontrado" });
-}
-
-// --- config/referencias/*.json — mesmo formato que gerador init/export-vault usam ---
-
-async function listarReferencias(dirReferencias: string): Promise<{ id: string; arquivo: string; dados: ReferenciaLocal }[]> {
-  let nomes: string[];
-  try {
-    nomes = await readdir(dirReferencias);
-  } catch {
-    return [];
-  }
-  const resultado = [];
-  for (const nome of nomes) {
-    if (!nome.endsWith(".json")) continue;
-    const arquivo = resolve(dirReferencias, nome);
-    const dados = await lerJsonOpcional<ReferenciaLocal>(arquivo);
-    if (dados) resultado.push({ id: nome.slice(0, -".json".length), arquivo, dados });
-  }
-  return resultado;
-}
-
-function comoReferenciaSalva(id: string, dados: ReferenciaLocal) {
-  return {
-    id,
-    timeId: null,
-    titulo: dados.titulo,
-    racional: dados.racional,
-    designPatterns: dados.designPatterns ?? [],
-    codigoRelacionado: dados.codigoRelacionado ?? [],
-    linkExterno: dados.linkExterno ?? null,
-    criadoEm: dados.criadoEm ?? new Date().toISOString(),
-  };
-}
-
-async function tratarReferencias(req: IncomingMessage, res: ServerResponse, metodo: string, caminho: string, dirProjeto: string): Promise<void> {
-  const dirReferencias = resolve(dirProjeto, "config", "referencias");
-
-  if (metodo === "GET" && caminho === "/referencias") {
-    const todas = await listarReferencias(dirReferencias);
-    return enviarJson(res, 200, todas.map((r) => comoReferenciaSalva(r.id, r.dados)));
-  }
-
-  if (metodo === "POST" && caminho === "/referencias") {
-    const corpo = await lerCorpoJson<{ titulo: string; racional: string; designPatterns?: string[]; codigoRelacionado?: string[] }>(req);
-    const dados: ReferenciaLocal = { ...corpo, linkExterno: null, criadoEm: new Date().toISOString() };
-    const id = slugify(corpo.titulo);
-    await mkdir(dirReferencias, { recursive: true });
-    await writeFile(resolve(dirReferencias, `${id}.json`), JSON.stringify(dados, null, 2), "utf-8");
-    return enviarJson(res, 201, comoReferenciaSalva(id, dados));
-  }
-
-  const matchPatch = metodo === "PATCH" && caminho.match(/^\/referencias\/([^/]+)$/);
-  if (matchPatch) {
-    const id = decodeURIComponent(matchPatch[1]);
-    const { linkExterno } = await lerCorpoJson<{ linkExterno: string }>(req);
-    const todas = await listarReferencias(dirReferencias);
-    const alvo = todas.find((r) => r.id === id);
-    if (!alvo) return enviarJson(res, 404, { erro: "referência não encontrada" });
-    const dados: ReferenciaLocal = { ...alvo.dados, linkExterno };
-    await writeFile(alvo.arquivo, JSON.stringify(dados, null, 2), "utf-8");
-    return enviarJson(res, 200, comoReferenciaSalva(id, dados));
   }
 
   enviarJson(res, 404, { erro: "não encontrado" });
@@ -371,10 +297,6 @@ export async function tratarApiLocal(req: IncomingMessage, res: ServerResponse, 
   }
   if (caminho.startsWith("/perfis-time")) {
     await tratarPerfisTime(req, res, metodo, caminho, dirProjeto);
-    return true;
-  }
-  if (caminho.startsWith("/referencias")) {
-    await tratarReferencias(req, res, metodo, caminho, dirProjeto);
     return true;
   }
   if (caminho.startsWith("/campos-no")) {

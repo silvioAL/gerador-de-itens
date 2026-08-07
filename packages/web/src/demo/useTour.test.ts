@@ -79,7 +79,7 @@ describe("useTour", () => {
     expect(result.current.passoAtual?.selector).toBe("[data-tour=review-table]");
   });
 
-  it("passa pelas abas Perfis de time e Referências de código antes do fim, abrindo a tela de config na aba certa", () => {
+  it("passa pela aba Perfis de time antes do fim, abrindo a tela de config na aba certa", () => {
     const opts = montarOpts();
     const { result } = renderHook(() => useTour(opts));
 
@@ -89,11 +89,22 @@ describe("useTour", () => {
     expect(result.current.passoAtual?.titulo).toBe("Perfis de time");
     expect(result.current.passoAtual?.selector).toBe("[data-tour=config-screen-content]");
     expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("perfis");
+  });
 
-    act(() => result.current.proximo()); // -> passo 8 (Referências de código)
+  it("passa por Campos por tipo de nó e Modelo da especificação de solução, abrindo a aba certa em cada um", () => {
+    const opts = montarOpts();
+    const { result } = renderHook(() => useTour(opts));
 
-    expect(result.current.passoAtual?.titulo).toBe("Referências de código");
-    expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("referencias");
+    act(() => result.current.iniciar());
+    for (let i = 0; i < 8; i++) act(() => result.current.proximo()); // -> passo 8 (Campos por tipo de nó)
+
+    expect(result.current.passoAtual?.titulo).toBe("Campos por tipo de nó");
+    expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("campos");
+
+    act(() => result.current.proximo()); // -> passo 9 (Modelo da especificação de solução)
+
+    expect(result.current.passoAtual?.titulo).toBe("Modelo da especificação de solução");
+    expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("especificacao");
   });
 
   it("chegar ao último passo marca ultimo=true, fecha a tela de config, e avançar dele encerra o tour e fecha a revisão", () => {

@@ -5,9 +5,8 @@ import { ImportarGraphify } from "./ImportarGraphify";
 import { FakeTerminal } from "./FakeTerminal";
 import { Jornada } from "./Jornada";
 
-// "perfis"/"referencias" saíram daqui pra ConfigScreen.tsx — são config recorrente
-// de time, não onboarding/demo (ver SPEC-08 §3.5). O tipo continua com essas duas
-// chaves comentadas como referência histórica pro tour guiado, que só usa as que restam.
+// "perfis" saiu daqui pra ConfigScreen.tsx — é config recorrente de time, não
+// onboarding/demo (ver SPEC-08 §3.5).
 export type AbaJornada = "jornada" | "cenarios" | "graphify" | "cli";
 
 export interface JourneyModalProps {
@@ -87,7 +86,7 @@ export function JourneyModal({
           <div>
             <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Como funciona o Gerador de Itens</div>
             <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
-              Não é um gerador de prompt de IA — é um mecanismo determinístico, do diagrama ao backlog.
+              Não é um gerador de prompt de IA — é um mecanismo determinístico, do diagrama à especificação de solução.
             </div>
           </div>
           <div style={{ flex: 1 }} />
@@ -138,19 +137,15 @@ interface ComandoCli {
 
 const COMANDOS_CLI: ComandoCli[] = [
   { comando: "gerador init", quando: "Começar um projeto novo — cria config/ de exemplo, nunca sobrescreve o que já existir." },
-  { comando: "gerador derive <quebra.json>", quando: "Gerar o backlog a partir de um diagrama já pronto, sem abrir o browser." },
+  { comando: "gerador derive <quebra.json>", quando: "Gerar os itens a partir de um diagrama já pronto, sem abrir o browser." },
   {
     comando: "gerador implementar <quebra.json>",
-    quando: "Gerar a especificação de entrega da quebra inteira — documento único com todos os itens, especificação técnica e refinamento — pronto pra refinar e enviar pra quem faz o upload.",
+    quando: "Gerar a especificação de solução da quebra inteira — documento único com todos os itens, especificação técnica e refinamento — pronto pra ser o input de outro agente.",
   },
   { comando: "gerador open", quando: "Abrir o editor visual servindo o build já pronto, sem depender de npm run dev." },
   {
     comando: "gerador import-graphify <graph.json>",
     quando: "Rascunhar nós existente/extraído a partir de um projeto já mapeado pelo Graphify.",
-  },
-  {
-    comando: "gerador export-vault",
-    quando: "Materializar config/referencias/*.json + padrões default como notas Obsidian, com redirect direto pra abrir lá.",
   },
 ];
 

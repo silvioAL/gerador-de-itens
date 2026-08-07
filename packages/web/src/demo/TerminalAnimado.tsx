@@ -5,6 +5,16 @@ const VELOCIDADE_DIGITACAO_MS = 28;
 const PAUSA_ANTES_DA_SAIDA_MS = 250;
 const PAUSA_DEPOIS_DA_SAIDA_MS = 900;
 
+/** Tempo total pra digitar + revelar a saída de todos os comandos, um atrás do
+ * outro — achado real: a demonstração automática (useAutoDemo.ts) avançava pro
+ * próximo passo antes do terminal terminar de digitar tudo, cortando a
+ * demonstração no meio. Exportado pra o passo "Linha de comando" do tour usar
+ * como piso de duração, em vez de duas constantes desincronizadas. */
+export const DURACAO_TOTAL_TERMINAL_MS = COMANDOS.reduce(
+  (total, c) => total + c.comando.length * VELOCIDADE_DIGITACAO_MS + PAUSA_ANTES_DA_SAIDA_MS + PAUSA_DEPOIS_DA_SAIDA_MS,
+  0
+);
+
 /**
  * Variante animada do FakeTerminal — digita cada comando caractere a
  * caractere, revela a saída, pausa, e avança pro próximo. Usado só nos

@@ -4,6 +4,8 @@
 
 **Status: completo. `gerador-de-itens` publicado no npm, Trusted Publisher configurado e validado de ponta a ponta — `v0.1.2` publicada sozinha via `git push --tags`, sem OTP/token nenhum (JOURNEY §35-§38).**
 
+**Revisão posterior:** a decisão §1.3 ("Obsidian obrigatório") e o formato de `config/referencias/*.json` (§4) foram revertidos numa rodada seguinte — `referencias` e `gerador export-vault` foram removidos por completo (ver JOURNEY, rodada "vamos remover completamente a parte de referências de código" — o usuário decidiu que registrar racional/decisão de arquitetura é papel do próprio Claude Code via skills/MCP de projeto, não desta ferramenta). O resto deste SPEC (CLI local-first, sem servidor, sem login) continua valendo.
+
 ---
 
 ## 1. Por que agora

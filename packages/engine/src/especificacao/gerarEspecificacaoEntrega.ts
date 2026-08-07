@@ -160,9 +160,12 @@ export function validarTemplate(template: string): string[] {
  * template editável pelo usuário, só a estrutura de fora é (título/contexto/
  * visão geral/DoR/DoD). Especificação técnica, refinamento e critérios de
  * aceite são legitimamente por-atividade, então vivem aqui, não como
- * variável de topo repetida por item.
+ * variável de topo repetida por item. Exportado (não só usado internamente
+ * por `gerarEspecificacaoEntrega`) pra a revisão web renderizar o mesmo
+ * conteúdo por item, expandido inline — nunca duas fontes de verdade pro
+ * mesmo texto.
  */
-function renderizarItem(
+export function renderizarItemEspecificacao(
   numero: number,
   atividade: Atividade,
   diagrama: Diagrama,
@@ -208,7 +211,7 @@ export interface OpcoesGerarEspecificacao {
   regras?: RegrasConfig;
   /** `quebra.demandInfo` — de onde vem a demanda, pra seção "Contexto" (SPEC-14 §4). */
   demandInfo?: string;
-  /** Título do documento — default "Especificação de entrega" (não é mais o rótulo de uma atividade, SPEC-14 §2). */
+  /** Título do documento — default "Especificação de solução" (não é mais o rótulo de uma atividade, SPEC-14 §2). */
   titulo?: string;
   /** Template com placeholders `{{variavel}}` — sem isso, usa `TEMPLATE_ESPECIFICACAO_PADRAO`. */
   template?: string;
@@ -233,7 +236,7 @@ export function gerarEspecificacaoEntrega(
   opcoes: OpcoesGerarEspecificacao = {}
 ): string {
   const template = opcoes.template ?? TEMPLATE_ESPECIFICACAO_PADRAO;
-  const titulo = opcoes.titulo ?? "Especificação de entrega";
+  const titulo = opcoes.titulo ?? "Especificação de solução";
 
   const todosOsTimes = new Set<string>();
   for (const a of atividades) {
@@ -253,7 +256,7 @@ export function gerarEspecificacaoEntrega(
 
   const itens =
     atividades.length > 0
-      ? atividades.map((a, i) => renderizarItem(i + 1, a, diagrama, config, opcoes.regras)).join("\n\n---\n\n")
+      ? atividades.map((a, i) => renderizarItemEspecificacao(i + 1, a, diagrama, config, opcoes.regras)).join("\n\n---\n\n")
       : "_Nenhum item nesta quebra._";
 
   // DoR/DoD são contextuais (achado do usuário, SPEC-14 §5) — o motor

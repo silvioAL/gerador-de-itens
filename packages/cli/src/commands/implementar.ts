@@ -60,7 +60,7 @@ export async function implementar(args: string[]): Promise<void> {
 
   if (caminhoOut) {
     await writeFile(resolve(caminhoOut), documento, "utf-8");
-    console.log(`Especificação de entrega gravada em ${caminhoOut} (${resultado.atividades.length} itens).`);
+    console.log(`Especificação de solução gravada em ${caminhoOut} (${resultado.atividades.length} itens).`);
   } else {
     process.stdout.write(documento);
   }

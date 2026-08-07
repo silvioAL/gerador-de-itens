@@ -2,12 +2,17 @@ import { useState } from "react";
 import type { Quebra } from "@gerador/engine";
 import type { Cenario } from "./scenarios";
 import type { AbaConfig } from "../config/ConfigScreen";
+import { DURACAO_TOTAL_TERMINAL_MS } from "./TerminalAnimado";
 
 export interface PassoTour {
   selector: string | null;
   titulo: string;
   texto: string;
   onEnter?: () => void;
+  /** Piso de duração (ms) pra demonstração automática (useAutoDemo.ts) — usado
+   * quando o passo hospeda uma animação própria (ex.: o terminal digitando)
+   * que pode levar mais tempo que o cálculo padrão baseado no tamanho do texto. */
+  duracaoMinima?: number;
 }
 
 export interface UseTourOpts {
@@ -30,7 +35,7 @@ export function useTour(opts: UseTourOpts) {
       selector: null,
       titulo: "Bem-vindo",
       texto:
-        "Este tour usa um cenário pronto (Catálogo) para mostrar o fluxo completo: diagrama → prontidão → derivação → revisão → exportação. São 8 passos rápidos.",
+        "Este tour usa um cenário pronto (Catálogo) para mostrar o fluxo completo: diagrama → prontidão → derivação → revisão → especificação de solução → configurações. São 12 passos rápidos.",
       onEnter: () => {
         opts.fecharRevisao();
         opts.selecionarNo(null);
@@ -41,7 +46,7 @@ export function useTour(opts: UseTourOpts) {
       selector: ".react-flow",
       titulo: "O diagrama",
       texto:
-        "Um serviço novo escrevendo numa coleção Mongo nova. Cada nó já foi preenchido e ficou verde — pronto para virar backlog.",
+        "Um serviço novo escrevendo numa coleção Mongo nova. Cada nó já foi preenchido e ficou verde — pronto para virar item de trabalho.",
     },
     {
       selector: "[data-tour=readiness-summary]",
@@ -60,20 +65,20 @@ export function useTour(opts: UseTourOpts) {
       selector: "[data-tour=derivar-button]",
       titulo: "Derivar",
       texto:
-        "Com tudo verde, o botão libera. Ele roda um motor determinístico — não uma IA — que sempre produz o mesmo backlog para o mesmo diagrama.",
+        "Com tudo verde, o botão libera. Ele roda um motor determinístico — não uma IA — que sempre produz os mesmos itens para o mesmo diagrama.",
     },
     {
       selector: "[data-tour=review-table]",
       titulo: "Revisão",
       texto:
-        "As atividades chegam com dependências reais, calculadas a partir das arestas. Qualquer ciclo ou conflito apareceria aqui, nunca escondido.",
+        "Os itens chegam com dependências reais, calculadas a partir das arestas. Qualquer ciclo ou conflito apareceria aqui, nunca escondido.",
       onEnter: () => opts.derivarQuebra(),
     },
     {
       selector: "[data-tour=export-buttons]",
-      titulo: "Saídas",
+      titulo: "Especificação de solução",
       texto:
-        'Cada formato serve para algo diferente: .md pra colar num doc de planejamento, e "Especificação de entrega" gera o documento único da quebra inteira — spec técnica completa de cada item, refinamento, critérios de aceite em Gherkin, DoR/DoD.',
+        "Expanda qualquer item da lista pra ver a spec técnica completa, o refinamento e os critérios de aceite em Gherkin — sem precisar copiar nada. Quando estiver pronto, um clique gera um único markdown com tudo, pensado pra ser o input de outro agente (ex.: o que sobe os itens pro sistema de tracking do time).",
     },
     {
       selector: "[data-tour=config-screen-content]",
@@ -84,16 +89,24 @@ export function useTour(opts: UseTourOpts) {
     },
     {
       selector: "[data-tour=config-screen-content]",
-      titulo: "Referências de código",
+      titulo: "Campos por tipo de nó",
       texto:
-        "Uma biblioteca de trechos de código reais guardados como referência — não é extraído automaticamente, é você que decide o que entra e escreve por quê. Alimenta o vocabulário de padrões que a ferramenta usa.",
-      onEnter: () => opts.abrirConfigNaAba("referencias"),
+        'Cada tipo de nó já vem com campos padrão (ex.: nome do tópico, DLQ) — "sobrescrever" cria uma versão específica pro seu time (ex.: um sufixo obrigatório de nomenclatura), e "+ Adicionar campo" cria um campo novo do zero.',
+      onEnter: () => opts.abrirConfigNaAba("campos"),
+    },
+    {
+      selector: "[data-tour=config-screen-content]",
+      titulo: "Modelo da especificação de solução",
+      texto:
+        "O documento final segue um modelo com seções fixas (Contexto, Visão geral, Itens, Definition of Ready/Done) — customize o texto ao redor dos itens aqui, global ou só pro seu time.",
+      onEnter: () => opts.abrirConfigNaAba("especificacao"),
     },
     {
       selector: null,
       titulo: "Linha de comando",
       texto:
-        "Tudo isso também roda fora do browser: `npm install -g gerador-de-itens` instala o CLI; `gerador init` cria um config/ de exemplo; `gerador derive quebra.json --out backlog.md` gera o backlog; `gerador implementar quebra.json --out especificacao.md` gera a especificação de entrega inteira; `gerador export-vault --abrir` materializa referências e padrões como notas Obsidian. Todo comando é 100% local, sem servidor.",
+        "Tudo isso também roda fora do browser: `npm install -g gerador-de-itens` instala o CLI; `gerador init` cria um config/ de exemplo; `gerador derive quebra.json --out itens.md` deriva os itens; `gerador implementar quebra.json --out especificacao.md` gera a especificação de solução inteira. Todo comando é 100% local, sem servidor.",
+      duracaoMinima: DURACAO_TOTAL_TERMINAL_MS,
     },
     {
       selector: null,

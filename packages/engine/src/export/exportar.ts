@@ -16,10 +16,11 @@ function descreverSpecResumo(a: Atividade): string {
 }
 
 /**
- * Backlog derivado em Markdown — o artefato que uma skill de planejamento consome depois.
- * Quando `regras` é passado, cada atividade ganha seu checklist de refinamento
- * técnico e ciclos de teste (DEV/HLG), filtrados pelos techs/contextos dela —
- * o mesmo "preview do prompt" que o protótipo HTML gerava por história.
+ * Itens derivados em Markdown — tabela resumida, agnóstica de qual sistema de
+ * tracking recebe isso depois. Quando `regras` é passado, cada atividade
+ * ganha seu checklist de refinamento técnico e ciclos de teste (DEV/HLG),
+ * filtrados pelos techs/contextos dela — o mesmo "preview do prompt" que o
+ * protótipo HTML gerava por história.
  */
 export function paraMarkdown(
   atividades: Atividade[],
@@ -28,7 +29,7 @@ export function paraMarkdown(
   regras?: RegrasConfig,
   timeDaQuebra?: string
 ): string {
-  const linhas: string[] = ["# Backlog derivado", ""];
+  const linhas: string[] = ["# Itens derivados", ""];
   linhas.push("| # | Tipo | Tamanho | Descrição | Techs | Contextos | Dependências | Detalhes |");
   linhas.push("|---|---|---|---|---|---|---|---|");
   for (const a of atividades) {

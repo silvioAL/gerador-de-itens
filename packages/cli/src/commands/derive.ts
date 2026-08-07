@@ -53,7 +53,7 @@ export async function derive(args: string[]): Promise<void> {
 
   if (resultado.ciclos.length > 0 || resultado.conflitos.length > 0) {
     console.error(
-      `atenção: ${resultado.ciclos.length} ciclo(s) e ${resultado.conflitos.length} conflito(s) detectado(s) — revise antes de usar o backlog.`
+      `atenção: ${resultado.ciclos.length} ciclo(s) e ${resultado.conflitos.length} conflito(s) detectado(s) — revise antes de usar os itens.`
     );
   }
 
@@ -65,7 +65,7 @@ export async function derive(args: string[]): Promise<void> {
 
   if (caminhoOut) {
     await writeFile(resolve(caminhoOut), conteudo, "utf-8");
-    console.log(`Backlog gravado em ${caminhoOut} (${resultado.atividades.length} atividades).`);
+    console.log(`Itens gravados em ${caminhoOut} (${resultado.atividades.length} atividades).`);
   } else {
     process.stdout.write(conteudo);
   }

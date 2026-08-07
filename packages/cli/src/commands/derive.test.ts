@@ -39,11 +39,11 @@ afterEach(() => {
 });
 
 describe("comando `derive`", () => {
-  it("grava o backlog em Markdown com as 6 atividades da fixture 01", async () => {
-    await derive(["quebra.json", "--out", "backlog.md"]);
+  it("grava os itens em Markdown com as 6 atividades da fixture 01", async () => {
+    await derive(["quebra.json", "--out", "itens.md"]);
 
-    const md = readFileSync(join(dirTemp, "backlog.md"), "utf-8");
-    expect(md).toContain("# Backlog derivado");
+    const md = readFileSync(join(dirTemp, "itens.md"), "utf-8");
+    expect(md).toContain("# Itens derivados");
     expect(md).toContain("srv-portabilidade");
     for (const rotulo of ["01", "02", "03", "04", "05", "06"]) {
       expect(md).toContain(`| ${rotulo} |`);
@@ -51,8 +51,8 @@ describe("comando `derive`", () => {
   });
 
   it("grava CSV quando --out termina em .csv", async () => {
-    await derive(["quebra.json", "--out", "backlog.csv"]);
-    const csv = readFileSync(join(dirTemp, "backlog.csv"), "utf-8");
+    await derive(["quebra.json", "--out", "itens.csv"]);
+    const csv = readFileSync(join(dirTemp, "itens.csv"), "utf-8");
     expect(csv.split("\n")[0]).toBe("rotulo,tipo,tamanho,descricao,techs,contextos,dependencias,times,detalhes");
   });
 
@@ -70,7 +70,7 @@ describe("comando `derive`", () => {
       process.stdout.write = original;
     }
 
-    expect(escreveu.join("")).toContain("# Backlog derivado");
+    expect(escreveu.join("")).toContain("# Itens derivados");
   });
 
   it("rejeita sem argumento de quebra", async () => {

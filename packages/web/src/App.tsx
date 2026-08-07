@@ -3,7 +3,6 @@ import { ReactFlowProvider } from "@xyflow/react";
 import {
   derivar,
   resolverDependencias,
-  paraMarkdown,
   type Atividade,
   type DiagramaConfig,
   type No,
@@ -17,12 +16,10 @@ import {
   apiCamposNo,
   apiEspecificacaoTemplate,
   apiPerfisTime,
-  apiReferencias,
   apiTimes,
   type CampoNo,
   type DadosCampoNo,
   type EspecificacaoTemplate,
-  type Referencia,
   type SessaoUsuario,
 } from "./api/client";
 import { useSessao } from "./auth/useSessao";
@@ -31,7 +28,6 @@ import { useQuebra } from "./state/useQuebra";
 import { quebraVazia, mesclarDiagrama } from "./state/factory";
 import { usePersistencia } from "./persistence/usePersistencia";
 import { AbrirQuebraScreen } from "./persistence/AbrirQuebraScreen";
-import { baixarArquivoTexto } from "./persistence/baixarArquivo";
 import { Canvas } from "./canvas/Canvas";
 import { PropertiesPanel } from "./panel/PropertiesPanel";
 import { EdgePanel } from "./panel/EdgePanel";
@@ -127,12 +123,11 @@ export function App() {
   if (sessao.timeIds.length > 1 && !timeEscolhido) {
     return <EscolherTimeScreen timeIds={sessao.timeIds} onEscolher={setTimeEscolhido} onSair={sair} />;
   }
-  return <AppComSessao sessao={sessao} onSair={sair} timeInicial={timeEscolhido} />;
+  return <AppComSessao sessao={sessao} modo={modo} onSair={sair} timeInicial={timeEscolhido} />;
 }
 
 interface DadosCarregados extends ConfigCarregada {
   cenarios: Cenario[];
-  referencias: Referencia[];
   perfisTime: PerfisConfig;
   camposNo: CampoNo[];
   especificacaoTemplate: EspecificacaoTemplate;
@@ -147,10 +142,12 @@ interface DadosCarregados extends ConfigCarregada {
  */
 function AppComSessao({
   sessao,
+  modo,
   onSair,
   timeInicial,
 }: {
   sessao: SessaoUsuario;
+  modo: "dev" | "oidc" | "local" | undefined;
   onSair: () => Promise<void>;
   timeInicial?: string;
 }) {
@@ -163,13 +160,12 @@ function AppComSessao({
     Promise.all([
       carregarConfig(timeAtivo),
       carregarCenarios(),
-      apiReferencias.listar(),
       apiPerfisTime.listar(),
       apiCamposNo.listar(timeAtivo),
       apiEspecificacaoTemplate.buscar(timeAtivo),
     ])
-      .then(([config, cenarios, referencias, perfisTime, camposNo, especificacaoTemplate]) => {
-        setDados({ ...config, cenarios, referencias, perfisTime, camposNo, especificacaoTemplate });
+      .then(([config, cenarios, perfisTime, camposNo, especificacaoTemplate]) => {
+        setDados({ ...config, cenarios, perfisTime, camposNo, especificacaoTemplate });
       })
       .catch((e: unknown) => setErroConfig(e instanceof Error ? e.message : String(e)));
   }, [timeAtivo]);
@@ -194,6 +190,7 @@ function AppComSessao({
       key={timeAtivo}
       {...dados}
       sessao={sessao}
+      modo={modo}
       timeAtivo={timeAtivo}
       onTrocarTimeAtivo={setTimeAtivo}
       onSair={onSair}
@@ -205,28 +202,27 @@ function AppCarregado({
   diagramaConfig: diagramaConfigInicial,
   regrasConfig,
   cenarios,
-  referencias: referenciasIniciais,
   perfisTime: perfisTimeInicial,
   camposNo: camposNoInicial,
   especificacaoTemplate: especificacaoTemplateInicial,
   sessao,
+  modo,
   timeAtivo,
   onTrocarTimeAtivo,
   onSair,
 }: ConfigCarregada & {
   cenarios: Cenario[];
-  referencias: Referencia[];
   perfisTime: PerfisConfig;
   camposNo: CampoNo[];
   especificacaoTemplate: EspecificacaoTemplate;
   sessao: SessaoUsuario;
+  modo: "dev" | "oidc" | "local" | undefined;
   timeAtivo: string;
   onTrocarTimeAtivo: (timeId: string) => void;
   onSair: () => Promise<void>;
 }) {
   const [diagramaConfig, setDiagramaConfig] = useState<DiagramaConfig>(diagramaConfigInicial);
   const [perfisTime, setPerfisTime] = useState(perfisTimeInicial);
-  const [referencias, setReferencias] = useState(referenciasIniciais);
   const [camposNo, setCamposNo] = useState(camposNoInicial);
   const [especificacaoTemplate, setEspecificacaoTemplate] = useState(especificacaoTemplateInicial);
   const quebraState = useQuebra(quebraVazia(timeAtivo), diagramaConfig);
@@ -343,16 +339,6 @@ function AppCarregado({
    * campo novo, só edita um que já existe porque alguém o capturou de um nó real antes. */
   function editarValorPerfilTime(timeId: string, tipoNo: string, campo: string, valor: string) {
     void atualizarPerfisTime(timeId, tipoNo, { [campo]: valor });
-  }
-
-  async function criarReferencia(dados: { titulo: string; racional: string; designPatterns: string[]; codigoRelacionado: string[] }) {
-    const criada = await apiReferencias.criar({ ...dados, timeId: quebra.time });
-    setReferencias((atual) => [...atual, criada]);
-  }
-
-  async function atualizarLinkExternoReferencia(id: string, linkExterno: string) {
-    const atualizada = await apiReferencias.atualizarLinkExterno(id, linkExterno);
-    setReferencias((atual) => atual.map((r) => (r.id === id ? atualizada : r)));
   }
 
   /** Depois de qualquer CRUD de campo customizado, recarrega a config mesclada
@@ -505,7 +491,7 @@ function AppCarregado({
           title={
             vermelhos.length > 0
               ? `Faltam resolver: ${vermelhos.map((v) => v.no.label).join(", ")}`
-              : "Deriva o backlog a partir do diagrama atual"
+              : "Deriva os itens a partir do diagrama atual"
           }
           style={{
             ...botaoEstilo,
@@ -569,13 +555,6 @@ function AppCarregado({
           time={quebra.time}
           onFechar={() => setResultado(null)}
           onSelecionarNo={setSelecionadoId}
-          onExportarMarkdown={() =>
-            baixarArquivoTexto(
-              paraMarkdown(resultado.atividades, resultado.ciclos, resultado.conflitos, regrasConfig, quebra.time),
-              "backlog.md",
-              "text/markdown"
-            )
-          }
         />
       )}
 
@@ -597,14 +576,12 @@ function AppCarregado({
         <ConfigScreen
           config={diagramaConfig}
           perfisTime={perfisTime}
-          referencias={referencias}
           camposNo={camposNo}
           especificacaoTemplate={especificacaoTemplate}
           timeAtivo={timeAtivo}
+          mostrarMembros={modo !== "local"}
           onEditarValorPerfilTime={editarValorPerfilTime}
           onSalvarEspecificacaoTemplate={salvarEspecificacaoTemplate}
-          onCriarReferencia={criarReferencia}
-          onAtualizarLinkExternoReferencia={atualizarLinkExternoReferencia}
           onCriarCampoNo={criarCampoNo}
           onAtualizarCampoNo={atualizarCampoNo}
           onExcluirCampoNo={excluirCampoNo}

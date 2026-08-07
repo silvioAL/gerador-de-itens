@@ -35,27 +35,26 @@ test("derivar quebra abre a revisão com a atividade esperada e exporta", async 
   await expect(botaoDerivar).toBeEnabled();
   await botaoDerivar.click();
 
-  await expect(page.getByText("1 atividades")).toBeVisible();
-  await expect(page.getByRole("cell", { name: "01" })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "Task" })).toBeVisible();
+  await expect(page.getByText("1 itens")).toBeVisible();
+  await expect(page.getByRole("button", { name: "01" })).toBeVisible();
   await expect(page.getByText("Não é possível derivar ainda")).not.toBeVisible();
 
   await page.screenshot({ path: "e2e/screenshots/revisao.png", fullPage: true });
 
-  // Pacote de implementação: a especificação completa do nó (não só o
-  // specResumo da linha), pronta pra copiar numa sessão de dev.
-  await page.getByRole("button", { name: "pacote de implementação" }).click();
-  await expect(page.getByText("## Especificação")).toBeVisible();
+  // Expandir o item mostra a especificação técnica completa inline — sem
+  // precisar de um botão de "copiar" separado (revisão e especificação são
+  // uma coisa só).
+  await page.getByRole("button", { name: "expandir 01" }).click();
+  await expect(page.getByText("Especificação técnica")).toBeVisible();
   await expect(page.getByText(/Nome da fila.*proposta\.aprovada\.q.*manual/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "fechar" })).toBeVisible();
 
   const downloadMd = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Exportar .md" }).click();
+  await page.getByRole("button", { name: "Gerar especificação de solução" }).click();
   const md = await downloadMd;
-  expect(md.suggestedFilename()).toBe("backlog.md");
+  expect(md.suggestedFilename()).toBe("especificacao-de-solucao.md");
 
   await page.getByRole("button", { name: "Voltar ao canvas" }).click();
-  await expect(page.getByText("1 atividades")).not.toBeVisible();
+  await expect(page.getByText("1 itens")).not.toBeVisible();
   await expect(page.locator(".react-flow__node")).toBeVisible();
 
   expect(erros, `Erros no console do browser:\n${erros.join("\n")}`).toEqual([]);
