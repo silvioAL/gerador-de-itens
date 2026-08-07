@@ -1,11 +1,84 @@
 {
   "regras": [
-    { "padrao": "\\.bpmn$", "tipo": "camunda" },
-    { "padrao": "rabbit|amqp", "tipo": "rabbit" },
-    { "padrao": "kafka", "tipo": "kafka" },
-    { "padrao": "mongo", "tipo": "mongo" },
-    { "padrao": "migrations?/.*\\.sql$", "tipo": "sql" },
-    { "padrao": "(scheduler|cron|job)s?/", "tipo": "job" },
-    { "padrao": "controllers?/|resources?/|routes?/", "tipo": "service" }
+    {
+      "padrao": "\\.bpmn$",
+      "padraoLabel": "Delegate$",
+      "padraoImporta": "JavaDelegate|ExecutionListener|TaskListener|DelegateExecution|org\\.camunda",
+      "tipo": "camunda"
+    },
+    {
+      "padrao": "kafka",
+      "padraoLabel": "KafkaProducer$|KafkaConsumer$|KafkaListener$",
+      "padraoImporta": "KafkaTemplate|KafkaListener|ConsumerRecord|ProducerRecord|org\\.apache\\.kafka",
+      "tipo": "kafka"
+    },
+    {
+      "padrao": "rabbit|amqp",
+      "padraoLabel": "RabbitProducer$|RabbitConsumer$|RabbitListener$|AmqpListener$",
+      "padraoImporta": "RabbitTemplate|RabbitListener|AmqpTemplate|org\\.springframework\\.amqp|com\\.rabbitmq",
+      "tipo": "rabbit"
+    },
+    {
+      "padrao": "mongo",
+      "padraoLabel": "MongoRepository$",
+      "padraoImporta": "MongoRepository|MongoTemplate|org\\.springframework\\.data\\.mongodb|com\\.mongodb",
+      "tipo": "mongo"
+    },
+    {
+      "padrao": "migrations?/.*\\.sql$",
+      "padraoLabel": "Repository$|Dao$|DAO$",
+      "padraoImporta": "JpaRepository|CrudRepository|EntityManager|org\\.springframework\\.data\\.jpa|javax\\.persistence|jakarta\\.persistence",
+      "tipo": "sql"
+    },
+    {
+      "padraoLabel": "CacheConfig$|CacheService$",
+      "padraoImporta": "RedisTemplate|Caffeine|redis\\.clients|org\\.springframework\\.cache|Jedis|Lettuce",
+      "tipo": "cache"
+    },
+    {
+      "padraoLabel": "StorageService$|BlobService$|S3Service$",
+      "padraoImporta": "AmazonS3|S3Client|BlobServiceClient|software\\.amazon\\.awssdk\\.s3|com\\.azure\\.storage",
+      "tipo": "storage"
+    },
+    {
+      "padraoLabel": "BatchConfig$|Tasklet$|ItemReader$|ItemWriter$|ItemProcessor$",
+      "padraoImporta": "org\\.springframework\\.batch|ItemReader|ItemWriter|ItemProcessor|Tasklet",
+      "tipo": "batch"
+    },
+    {
+      "padrao": "(scheduler|cron|job)s?/",
+      "padraoLabel": "Job$|Scheduler$|CronTask$",
+      "padraoImporta": "@Scheduled|org\\.quartz|ScheduledExecutorService",
+      "tipo": "job"
+    },
+    {
+      "padraoLabel": "Client$|Gateway$|ApiClient$",
+      "padraoImporta": "RestTemplate|WebClient|HttpClient|Retrofit|OkHttp|feign\\.|FeignClient",
+      "tipo": "external"
+    },
+    {
+      "padraoLabel": "Rule$|Validator$|Policy$",
+      "padraoImporta": "org\\.kie|KieSession|drools|Drools",
+      "tipo": "rule"
+    },
+    {
+      "padraoLabel": "Fico$|BlazeAdvisor$",
+      "padraoImporta": "[Bb]laze",
+      "tipo": "fico"
+    },
+    {
+      "padrao": "controllers?/|resources?/|routes?/",
+      "padraoLabel": "Controller$|Resource$|RestController$|Router$|Handler$|Endpoint$",
+      "padraoImporta": "RestController|@RestController|@Controller|@RequestMapping|express\\.Router",
+      "tipo": "service"
+    },
+    {
+      "padrao": "\\.kt$|/android/",
+      "tipo": "mobile-android"
+    },
+    {
+      "padrao": "\\.swift$|/ios/",
+      "tipo": "mobile-ios"
+    }
   ]
 }
