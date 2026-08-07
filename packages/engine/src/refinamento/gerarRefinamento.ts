@@ -47,7 +47,13 @@ export function gerarChecklistTecnico(
   for (const tech of techs) {
     const porTech = regras.porTech[tech];
     if (!porTech) continue;
-    const relevantes = requisitosRelevantes(porTech.checklistTecnico, contextos).filter((r) =>
+    // `regras.json` é editado à mão, sem UI nem validação no caminho do app web
+    // (só packages/cli valida via validateRegras) — achado real: um tech sem
+    // checklistTecnico preenchido derrubava a tela de revisão inteira num
+    // TypeError não tratado (nenhum ErrorBoundary existia pra conter isso).
+    // `?? []` trata "faltando" como "nenhum item técnico pra essa tech", nunca
+    // como erro fatal de renderização.
+    const relevantes = requisitosRelevantes(porTech.checklistTecnico ?? [], contextos).filter((r) =>
       condicaoBate(r, nos, arestas)
     );
     if (relevantes.length === 0) continue;
@@ -129,7 +135,7 @@ export function gerarCiclosDeTeste(regras: RegrasConfig, techs: string[], contex
   for (const tech of techs) {
     const porTech = regras.porTech[tech];
     if (!porTech) continue;
-    const relevantes = testesRelevantes(porTech.testes, contextos);
+    const relevantes = testesRelevantes(porTech.testes ?? [], contextos);
     if (relevantes.length === 0) continue;
 
     const linhas = [`**${tech.toUpperCase()}:**`];
