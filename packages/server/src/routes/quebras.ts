@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
@@ -16,6 +16,7 @@ import { exigirSessao } from "../auth/middleware.js";
 import { quebras } from "../db/schema.js";
 
 const corpoQuebra = z.object({
+  titulo: z.string().optional(),
   time: z.string().optional(),
   diagrama: z.object({ nodes: z.array(z.record(z.unknown())), edges: z.array(z.record(z.unknown())) }),
 });
@@ -38,8 +39,15 @@ async function lerJsonDeConfig<T>(diretorioConfig: string, nomeArquivo: string):
 export async function registrarRotasQuebras(app: FastifyInstance, { db, diretorioConfig }: OpcoesApp) {
   app.get("/quebras", async () => {
     const linhas = await db
-      .select({ id: quebras.id, time: quebras.time, atualizadoEm: quebras.atualizadoEm })
-      .from(quebras);
+      .select({
+        id: quebras.id,
+        titulo: quebras.titulo,
+        time: quebras.time,
+        criadoEm: quebras.criadoEm,
+        atualizadoEm: quebras.atualizadoEm,
+      })
+      .from(quebras)
+      .orderBy(desc(quebras.atualizadoEm));
     return linhas;
   });
 
@@ -58,7 +66,7 @@ export async function registrarRotasQuebras(app: FastifyInstance, { db, diretori
 
     const [criada] = await db
       .insert(quebras)
-      .values({ time: corpo.data.time, diagrama: corpo.data.diagrama })
+      .values({ titulo: corpo.data.titulo, time: corpo.data.time, diagrama: corpo.data.diagrama })
       .returning();
     return reply.code(201).send(criada);
   });
@@ -71,6 +79,7 @@ export async function registrarRotasQuebras(app: FastifyInstance, { db, diretori
     const [atualizada] = await db
       .update(quebras)
       .set({
+        titulo: corpo.data.titulo,
         time: corpo.data.time,
         diagrama: corpo.data.diagrama,
         atualizadoEm: new Date(),

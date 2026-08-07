@@ -47,7 +47,11 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
   });
 
   it("POST /quebras cria um arquivo com id novo em quebras/, e GET /quebras/:id lê de volta", async () => {
-    const quebra = { time: "time-x", diagrama: { nodes: [{ id: "n1", type: "service" }], edges: [] } };
+    const quebra = {
+      titulo: "Aprovação de crédito v2",
+      time: "time-x",
+      diagrama: { nodes: [{ id: "n1", type: "service" }], edges: [] },
+    };
     const criada = await fetch(`${base}/quebras`, {
       method: "POST",
       body: JSON.stringify(quebra),
@@ -55,14 +59,24 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
 
     expect(criada.id).toEqual(expect.any(String));
     expect(criada.id.length).toBeGreaterThan(0);
+    expect(criada.titulo).toBe("Aprovação de crédito v2");
     expect(criada.time).toBe("time-x");
     expect(criada.diagrama).toEqual(quebra.diagrama);
 
     const lida = await fetch(`${base}/quebras/${criada.id}`).then((r) => r.json());
     expect(lida.diagrama).toEqual(quebra.diagrama);
+    expect(lida.titulo).toBe("Aprovação de crédito v2");
 
     const lista = await fetch(`${base}/quebras`).then((r) => r.json());
-    expect(lista).toEqual([{ id: criada.id, time: "time-x", atualizadoEm: expect.any(String) }]);
+    expect(lista).toEqual([
+      {
+        id: criada.id,
+        titulo: "Aprovação de crédito v2",
+        time: "time-x",
+        criadoEm: expect.any(String),
+        atualizadoEm: expect.any(String),
+      },
+    ]);
   });
 
   it("duas quebras salvas em sequência (ex.: 'Nova quebra' + salvar) não se sobrescrevem — achado real", async () => {

@@ -70,6 +70,10 @@ export interface Diagrama {
 }
 
 export interface Quebra {
+  /** Curto, pra achar essa quebra depois numa lista/busca — diferente de
+   * `demandInfo` (a descrição longa do contexto). Não é chave: duas quebras
+   * podem ter o mesmo título, cada uma com seu próprio id de persistência. */
+  titulo?: string;
   demandInfo?: string;
   time?: string;
   diagrama: Diagrama;

@@ -137,17 +137,34 @@ describe("/quebras", () => {
       method: "POST",
       url: "/quebras",
       cookies: { gerador_sessao: cookie },
-      payload: { time: TIME_A, diagrama: { nodes: [], edges: [] } },
+      payload: { titulo: "Aprovação de crédito v2", time: TIME_A, diagrama: { nodes: [], edges: [] } },
     });
     expect(criar.statusCode).toBe(201);
     const criada = criar.json();
     expect(criada.time).toBe(TIME_A);
+    expect(criada.titulo).toBe("Aprovação de crédito v2");
 
     const listar = await app.inject({ method: "GET", url: "/quebras" });
-    expect(listar.json()).toHaveLength(1);
+    const lista = listar.json();
+    expect(lista).toHaveLength(1);
+    expect(lista[0].titulo).toBe("Aprovação de crédito v2");
+    expect(lista[0].criadoEm).toEqual(expect.any(String));
 
     const buscar = await app.inject({ method: "GET", url: `/quebras/${criada.id}` });
     expect(buscar.json().diagrama).toEqual({ nodes: [], edges: [] });
+    expect(buscar.json().titulo).toBe("Aprovação de crédito v2");
+  });
+
+  it("titulo é opcional na criação (quebra pode existir sem título ainda)", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const criar = await app.inject({
+      method: "POST",
+      url: "/quebras",
+      cookies: { gerador_sessao: cookie },
+      payload: { diagrama: { nodes: [], edges: [] } },
+    });
+    expect(criar.statusCode).toBe(201);
+    expect(criar.json().titulo).toBeNull();
   });
 
   it("recusa POST sem sessão com 401", async () => {

@@ -30,6 +30,7 @@ import { LoginScreen } from "./auth/LoginScreen";
 import { useQuebra } from "./state/useQuebra";
 import { quebraVazia, mesclarDiagrama } from "./state/factory";
 import { usePersistencia } from "./persistence/usePersistencia";
+import { AbrirQuebraScreen } from "./persistence/AbrirQuebraScreen";
 import { baixarArquivoTexto } from "./persistence/baixarArquivo";
 import { Canvas } from "./canvas/Canvas";
 import { PropertiesPanel } from "./panel/PropertiesPanel";
@@ -253,6 +254,7 @@ function AppCarregado({
   const [mostrarJornada, setMostrarJornada] = useState(false);
   const [abaJornadaAlvo, setAbaJornadaAlvo] = useState<AbaJornada | undefined>(undefined);
   const [mostrarConfig, setMostrarConfig] = useState(false);
+  const [mostrarAbrir, setMostrarAbrir] = useState(false);
   const [abaConfigAlvo, setAbaConfigAlvo] = useState<AbaConfig | undefined>(undefined);
   useEffect(() => {
     if (!localStorage.getItem(CHAVE_JORNADA_VISTA)) setMostrarJornada(true);
@@ -412,6 +414,17 @@ function AppCarregado({
 
         <div style={{ width: 1, height: 20, background: "#e2e8f0" }} />
 
+        <input
+          aria-label="Título da quebra"
+          value={quebra.titulo ?? ""}
+          onChange={(e) => setQuebra((q) => ({ ...q, titulo: e.target.value }))}
+          placeholder="Título (obrigatório pra salvar)"
+          title="Curto, pra achar esta quebra depois na busca de 'Abrir…'."
+          style={{ fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 220 }}
+        />
+
+        <div style={{ width: 1, height: 20, background: "#e2e8f0" }} />
+
         <select
           aria-label="Time (stack conhecida)"
           value={quebra.time ?? timeAtivo}
@@ -463,30 +476,26 @@ function AppCarregado({
             salvo: "salva",
             salvando: "salvando…",
             "nao-salvo": "alterações pendentes",
+            "sem-titulo": "dê um título antes de salvar",
             erro: "erro ao salvar",
           }[persistencia.status]}
         </span>
         <button onClick={() => persistencia.nova(quebraVazia(timeAtivo))} style={botaoEstilo}>
           Nova
         </button>
-        <select
-          value=""
-          onChange={(e) => {
-            if (e.target.value) void persistencia.abrirPorId(e.target.value);
+        <button onClick={() => setMostrarAbrir(true)} style={botaoEstilo} title="Buscar e abrir uma quebra já salva">
+          Abrir…
+        </button>
+        <button
+          onClick={() => void persistencia.salvar()}
+          disabled={!(quebra.titulo ?? "").trim()}
+          title={(quebra.titulo ?? "").trim() ? undefined : "Dê um título à quebra antes de salvar"}
+          style={{
+            ...botaoEstilo,
+            ...botaoPrimarioEstilo,
+            ...((quebra.titulo ?? "").trim() ? {} : botaoDesabilitadoEstilo),
           }}
-          style={{ ...botaoEstilo, maxWidth: 160 }}
-          title="Abrir uma quebra já salva no servidor"
         >
-          <option value="" disabled>
-            Abrir…
-          </option>
-          {persistencia.lista.map((q) => (
-            <option key={q.id} value={q.id}>
-              {q.time ?? "sem time"} · {new Date(q.atualizadoEm).toLocaleDateString("pt-BR")}
-            </option>
-          ))}
-        </select>
-        <button onClick={() => void persistencia.salvar()} style={{ ...botaoEstilo, ...botaoPrimarioEstilo }}>
           Salvar
         </button>
         <button
@@ -601,6 +610,17 @@ function AppCarregado({
           onExcluirCampoNo={excluirCampoNo}
           onFechar={() => setMostrarConfig(false)}
           abaForcada={abaConfigAlvo}
+        />
+      )}
+
+      {mostrarAbrir && (
+        <AbrirQuebraScreen
+          lista={persistencia.lista}
+          onAbrir={(id) => {
+            void persistencia.abrirPorId(id);
+            setMostrarAbrir(false);
+          }}
+          onFechar={() => setMostrarAbrir(false)}
         />
       )}
 

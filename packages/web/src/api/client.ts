@@ -38,12 +38,15 @@ async function requisitar<T>(caminho: string, opcoes?: RequestInit): Promise<T> 
 
 export interface QuebraResumo {
   id: string;
+  titulo: string | null;
   time: string | null;
+  criadoEm: string;
   atualizadoEm: string;
 }
 
 export interface QuebraSalva {
   id: string;
+  titulo: string | null;
   time: string | null;
   diagrama: Diagrama;
   criadoEm: string;

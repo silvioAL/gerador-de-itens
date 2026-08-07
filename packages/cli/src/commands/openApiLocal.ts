@@ -86,6 +86,7 @@ async function comoQuebraSalva(id: string, arquivo: string) {
   const quebra = await lerJsonOpcional<Quebra>(arquivo);
   return {
     id,
+    titulo: quebra?.titulo ?? null,
     time: quebra?.time ?? null,
     diagrama: quebra?.diagrama ?? { nodes: [], edges: [] },
     criadoEm: info.birthtime.toISOString(),
@@ -103,7 +104,7 @@ async function tratarQuebras(req: IncomingMessage, res: ServerResponse, metodo: 
     return enviarJson(
       res,
       200,
-      salvas.map(({ id, time, atualizadoEm }) => ({ id, time, atualizadoEm }))
+      salvas.map(({ id, titulo, time, criadoEm, atualizadoEm }) => ({ id, titulo, time, criadoEm, atualizadoEm }))
     );
   }
 

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Quebra } from "@gerador/engine";
 import { apiQuebras, type QuebraResumo } from "../api/client";
 
-export type StatusPersistencia = "sem-arquivo" | "salvo" | "salvando" | "nao-salvo" | "erro";
+export type StatusPersistencia = "sem-arquivo" | "salvo" | "salvando" | "nao-salvo" | "sem-titulo" | "erro";
 
 /**
  * Substitui o File System Access API (arquivo local) por chamadas ao
@@ -29,8 +29,15 @@ export function usePersistencia(quebra: Quebra, aoAbrir: (q: Quebra) => void) {
     void carregarLista();
   }, [carregarLista]);
 
+  // Sem título, a quebra fica impossível de reconhecer depois numa lista —
+  // nem chega a chamar a API (mesmo motivo que barra "Derivar Quebra" com
+  // vermelho pendente: recusa alto, não silencioso).
   const salvar = useCallback(
     async (q: Quebra) => {
+      if (!q.titulo?.trim()) {
+        setStatus("sem-titulo");
+        return;
+      }
       setStatus("salvando");
       try {
         if (quebraId) {
@@ -53,7 +60,7 @@ export function usePersistencia(quebra: Quebra, aoAbrir: (q: Quebra) => void) {
       setStatus("salvando");
       try {
         const salva = await apiQuebras.buscar(id);
-        aoAbrir({ time: salva.time ?? undefined, diagrama: salva.diagrama });
+        aoAbrir({ titulo: salva.titulo ?? undefined, time: salva.time ?? undefined, diagrama: salva.diagrama });
         setQuebraId(salva.id);
         setStatus("salvo");
       } catch {

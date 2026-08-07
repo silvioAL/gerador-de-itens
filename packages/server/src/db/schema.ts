@@ -8,6 +8,7 @@ import { boolean, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } 
  */
 export const quebras = pgTable("quebras", {
   id: uuid("id").primaryKey().defaultRandom(),
+  titulo: text("titulo"),
   time: text("time"),
   diagrama: jsonb("diagrama").notNull(),
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
