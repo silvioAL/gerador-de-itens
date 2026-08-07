@@ -1,0 +1,57 @@
+{
+  "id": "internal",
+  "titulo": "Integração interna entre serviços",
+  "descricao": "Chamada síncrona entre dois serviços do próprio time — contrato, timeout e autenticação de uma API interna, diferente de uma API de terceiro.",
+  "tipos": ["service"],
+  "categoria": "demo",
+  "designPatterns": [],
+  "quebra": {
+    "demandInfo": "Checkout precisa confirmar o saldo de pontos de fidelidade do cliente antes de fechar o pedido, chamando o serviço de fidelidade do próprio time.",
+    "diagrama": {
+      "nodes": [
+        {
+          "id": "n1", "type": "service", "status": "novo", "label": "srv-checkout",
+          "x": 100, "y": 120,
+          "spec": {
+            "nome": { "valor": "srv-checkout", "origem": "manual" },
+            "linguagem": { "valor": "Node", "origem": "manual" },
+            "contratoEndpoints": {
+              "valor": "POST /v1/checkout/fechar → { pedidoId, itens[], enderecoEntrega } / 201 { pedidoId, status }",
+              "origem": "manual"
+            }
+          },
+          "specNA": {
+            "framework": { "motivo": "framework ainda não definido" }
+          },
+          "endpoints": [
+            { "method": "POST", "path": "/v1/checkout/fechar", "action": "novo" }
+          ]
+        },
+        {
+          "id": "n2", "type": "service", "status": "existente", "label": "srv-fidelidade",
+          "x": 420, "y": 120,
+          "spec": {
+            "nome": { "valor": "srv-fidelidade", "origem": "manual" },
+            "contratoEndpoints": {
+              "valor": "GET /v1/fidelidade/saldo/{clienteId} → 200 { saldoPontos: number, elegivelParaResgate: boolean }",
+              "origem": "manual"
+            },
+            "migracao": {
+              "valor": "Endpoint novo — não impacta o contrato já usado pelos outros consumidores existentes deste serviço.",
+              "origem": "manual"
+            }
+          },
+          "specNA": {
+            "linguagem": { "motivo": "serviço existente, stack não verificada nesta quebra" }
+          },
+          "endpoints": [
+            { "method": "GET", "path": "/v1/fidelidade/saldo/{clienteId}", "action": "novo" }
+          ]
+        }
+      ],
+      "edges": [
+        { "id": "e1", "source": "n1", "target": "n2", "type": "http" }
+      ]
+    }
+  }
+}

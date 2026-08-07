@@ -1,0 +1,18 @@
+[
+  "internal.json",
+  "rabbit.json",
+  "kafka.json",
+  "mongo.json",
+  "sql.json",
+  "camunda.json",
+  "fico.json",
+  "external.json",
+  "job.json",
+  "rule.json",
+  "cache.json",
+  "storage.json",
+  "batch.json",
+  "grpc.json",
+  "graphql.json",
+  "credito-completo.json"
+]

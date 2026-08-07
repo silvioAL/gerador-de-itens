@@ -84,7 +84,7 @@ gerador export-vault --dir <vault> --abrir
 
 ### Iniciar um projeto novo
 
-Cria `config/{app,diagrama,regras,perfis-time}.json` + `config/referencias/*.json` de exemplo no diretório indicado — nunca sobrescreve arquivo que já existir:
+Cria `config/{app,diagrama,regras,perfis-time}.json` + `config/referencias/*.json` + `config/cenarios/*.json` de exemplo no diretório indicado — nunca sobrescreve arquivo que já existir:
 
 ```
 gerador init <diretório-do-projeto>

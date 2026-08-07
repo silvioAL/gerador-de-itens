@@ -1,0 +1,45 @@
+{
+  "id": "external",
+  "titulo": "Integração externa",
+  "descricao": "Chamada a uma API de terceiro: autenticação, timeout e rate limit — antes de escrever a primeira linha.",
+  "tipos": ["service", "external"],
+  "categoria": "demo",
+  "designPatterns": [],
+  "quebra": {
+    "demandInfo": "Integração com bureau de crédito externo para consulta de score.",
+    "diagrama": {
+      "nodes": [
+        {
+          "id": "n1", "type": "service", "status": "novo", "label": "srv-consulta-bureau",
+          "x": 100, "y": 120,
+          "spec": {
+            "nome": { "valor": "srv-consulta-bureau", "origem": "manual" },
+            "linguagem": { "valor": "Java", "origem": "manual" }
+          },
+          "specNA": {
+            "framework": { "motivo": "framework ainda não definido" }
+          },
+          "endpoints": [
+            { "method": "GET", "path": "/v1/bureau/score", "action": "novo" }
+          ]
+        },
+        {
+          "id": "n2", "type": "external", "status": "novo", "label": "serasa-api",
+          "x": 420, "y": 120,
+          "spec": {
+            "nome": { "valor": "Serasa Experian API", "origem": "manual" },
+            "baseUrl": { "valor": "https://api.serasaexperian.com.br/v2", "origem": "manual" },
+            "autenticacao": { "valor": "oauth2", "origem": "manual" },
+            "timeoutMs": { "valor": 3000, "origem": "manual" },
+            "rateLimitConhecido": { "valor": true, "origem": "manual" },
+            "slaContratado": { "valor": "99.5% uptime, resposta <2s p95", "origem": "manual" }
+          },
+          "specNA": {}
+        }
+      ],
+      "edges": [
+        { "id": "e1", "source": "n1", "target": "n2", "type": "http" }
+      ]
+    }
+  }
+}

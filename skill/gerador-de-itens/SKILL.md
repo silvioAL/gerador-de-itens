@@ -90,7 +90,7 @@ Depois de `graphify export obsidian` já ter gerado o vault de código deste pro
 
 ### Iniciar um projeto novo
 
-Cria `config/{app,diagrama,regras,perfis-time}.json` + `config/referencias/*.json` de exemplo no diretório indicado — nunca sobrescreve arquivo que já existir:
+Cria `config/{app,diagrama,regras,perfis-time}.json` + `config/referencias/*.json` + `config/cenarios/*.json` de exemplo no diretório indicado — nunca sobrescreve arquivo que já existir:
 
 ```powershell
 & $GERADOR init <diretório-do-projeto>

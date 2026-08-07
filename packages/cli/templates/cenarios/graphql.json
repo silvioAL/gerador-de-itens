@@ -1,0 +1,47 @@
+{
+  "id": "graphql",
+  "titulo": "API GraphQL",
+  "descricao": "Consulta a dados aninhados via GraphQL — schema, queries/mutations, diferente do REST simples de \"Serviço\".",
+  "tipos": ["service"],
+  "categoria": "demo",
+  "designPatterns": [],
+  "quebra": {
+    "demandInfo": "Painel administrativo precisa montar telas com dados aninhados de pedido (itens, cliente, status) sem multiplicar chamadas REST — expor uma API GraphQL no serviço de pedidos pra consultas flexíveis.",
+    "diagrama": {
+      "nodes": [
+        {
+          "id": "n1", "type": "service", "status": "novo", "label": "srv-painel-admin",
+          "x": 100, "y": 120,
+          "spec": {
+            "nome": { "valor": "srv-painel-admin", "origem": "manual" },
+            "linguagem": { "valor": "Node", "origem": "manual" },
+            "framework": { "valor": "Next.js", "origem": "manual" }
+          },
+          "specNA": {
+            "contratoEndpoints": { "motivo": "não expõe REST nesta quebra, só consome GraphQL" }
+          },
+          "endpoints": []
+        },
+        {
+          "id": "n2", "type": "service", "status": "existente", "label": "srv-pedidos",
+          "x": 420, "y": 120,
+          "spec": {
+            "nome": { "valor": "srv-pedidos", "origem": "manual" },
+            "migracao": { "valor": "Endpoint GraphQL novo ao lado do REST já existente — não substitui nem quebra os consumidores REST atuais.", "origem": "manual" },
+            "contratoGraphql": {
+              "valor": "type Query { pedido(id: ID!): Pedido pedidosPorCliente(clienteId: ID!, status: StatusPedido): [Pedido!]! } type Pedido { id: ID! status: StatusPedido! itens: [ItemPedido!]! cliente: Cliente! } enum StatusPedido { PENDENTE PAGO ENVIADO CANCELADO }",
+              "origem": "manual"
+            }
+          },
+          "specNA": {
+            "linguagem": { "motivo": "serviço existente, stack não verificada nesta quebra" }
+          },
+          "endpoints": []
+        }
+      ],
+      "edges": [
+        { "id": "e1", "source": "n1", "target": "n2", "type": "graphql" }
+      ]
+    }
+  }
+}
