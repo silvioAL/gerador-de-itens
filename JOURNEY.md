@@ -794,3 +794,19 @@ Publicada a v0.1.19, o usuário reportou dois novos problemas na tela de revisã
 **Conclusão comunicada ao usuário:** os dois bugs relatados muito provavelmente eram sintoma de cache de browser sobre uma versão anterior (`npm install` tinha rodado, mas a aba já estava aberta com o `index.html` velho em cache) — não uma regressão nova em v0.1.19. O indicador de versão visível deixa isso verificável na hora, e o `Cache-Control: no-cache` em `index.html` remove a causa raiz de qualquer futuro caso desse tipo, sem exigir hard-refresh manual do usuário depois de cada upgrade.
 
 Testes novos: `openApiLocal.test.ts` (`GET /versao` devolve semver válido). Regressão completa: engine 120, web 129, cli 30.
+
+## 57. A causa real da "tela branca": o app web nunca validava `regras.json`, e um tech incompleto derrubava o React inteiro
+
+Com o indicador de versão em mãos (§56), o usuário confirmou versão certa e continuou testando — e desta vez trouxe o console real do navegador: `TypeError: Cannot read properties of undefined (reading 'filter')`, com a stack apontando pro bundle minificado publicado (`index-B7zUFPdk.js`).
+
+**Diagnóstico direto, sem achismo:** o hash do bundle no erro batia exatamente com um build local já feito nesta sessão — dava pra abrir o arquivo minificado de verdade e ler a linha/coluna do stack trace. Achado: `T4` é `requisitosRelevantes()`, chamada de dentro de `I4` (`gerarChecklistTecnico`) como `T4(a.checklistTecnico, n)`, onde `a = regras.porTech[tech]`. `a.checklistTecnico` estava `undefined` — `.filter` num `undefined` é o `TypeError` relatado, ponto a ponto.
+
+**A causa raiz, mais profunda que o `TypeError` em si:** `config/regras.json` é editado à mão (sem UI nenhuma, achado já registrado na §53) — e **`packages/web` nunca chamou `validateRegras()`/`validateConfig()`**, diferente de `packages/cli` (`derive.ts`/`implementar.ts`), que valida antes de gerar qualquer coisa. Um tech com `checklistTecnico` faltando (campo obrigatório no tipo TS, mas nada garante isso em runtime contra um arquivo editado à mão) carregava sem erro nenhum na hora do boot, e só explodia depois, ao expandir um item cujas `techs` incluíssem esse tech incompleto — momento em que **não havia nenhum `ErrorBoundary`** pra conter o crash, e o React inteiro desmontava pra uma tela branca.
+
+**Correção em duas camadas, deliberadamente:**
+1. **Pontual**: `gerarChecklistTecnico()`/`gerarCiclosDeTeste()` (`packages/engine/src/refinamento/gerarRefinamento.ts`) passam a tratar `checklistTecnico`/`testes` faltando como lista vazia (`?? []`) — resolve o crash relatado exatamente.
+2. **Sistêmica**: novo `ErrorBoundary.tsx` (único componente de classe do app — `componentDidCatch`/`getDerivedStateFromError` não têm equivalente de hook) envolvendo `<App/>` em `main.tsx`. Qualquer exceção de render futura, desse tipo ou de qualquer outro, mostra uma tela de erro recuperável ("Algo deu errado" + botão Recarregar) em vez de branco sem explicação nenhuma — a proteção que devia ter existido desde o início, e que a investigação de uma rodada anterior (§56) já tinha sinalizado como ausente.
+
+**Validação com o bug real reproduzido, não hipotético:** recriei o cenário exato — `gerador init`, removi `checklistTecnico` de `Backend` em `config/regras.json` de propósito, carreguei o mesmo cenário "Fluxo completo: aprovação de crédito", derivei, expandi o item 01. Antes da correção isso é exatamente o `TypeError` relatado; depois, o item expande normal, mostrando "_Nenhum requisito técnico específico para esta combinação de tech/contexto._" em vez de quebrar — zero erros de console, confirmado via Playwright com `page.on("pageerror"/"console")`.
+
+Testes novos: `gerarRefinamento.test.ts` (dois casos — tech sem `checklistTecnico`, tech sem `testes` — nenhum lança), `ErrorBoundary.test.tsx` (captura erro e mostra fallback; sem erro, renderiza os filhos normalmente). Regressão completa: engine 122, web 131, cli 30.

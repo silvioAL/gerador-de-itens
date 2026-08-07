@@ -110,6 +110,33 @@ describe("gerarChecklistTecnico", () => {
     const md = gerarChecklistTecnico(regrasComMigracao, ["Backend"], [], [], semArestasTecnico);
     expect(md).toBe("");
   });
+
+  it("achado real: config/regras.json é editado à mão sem validação no app web — tech sem checklistTecnico não pode derrubar a tela inteira (TypeError em .filter de undefined)", () => {
+    const regrasIncompletas = {
+      tipos: [], tamanhos: [],
+      porTech: {
+        // Simula um regras.json real faltando o campo — nada no runtime do app
+        // web valida isso (só packages/cli chama validateRegras), então o
+        // engine precisa ser resiliente aqui, não assumir o formato correto.
+        Backend: { testes: [] },
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any as RegrasConfig;
+
+    expect(() => gerarChecklistTecnico(regrasIncompletas, ["Backend"], [], [noTecnico()], semArestasTecnico)).not.toThrow();
+    expect(gerarChecklistTecnico(regrasIncompletas, ["Backend"], [], [noTecnico()], semArestasTecnico)).toBe("");
+  });
+
+  it("achado real: mesma resiliência pra tech sem 'testes' em gerarCiclosDeTeste", () => {
+    const regrasIncompletas = {
+      tipos: [], tamanhos: [],
+      porTech: { Backend: { checklistTecnico: [] } },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any as RegrasConfig;
+
+    expect(() => gerarCiclosDeTeste(regrasIncompletas, ["Backend"], [])).not.toThrow();
+    expect(gerarCiclosDeTeste(regrasIncompletas, ["Backend"], [])).toBe("");
+  });
 });
 
 describe("gerarCiclosDeTeste", () => {
