@@ -2,7 +2,7 @@
 
 **Depende de/relacionado a:** SPEC-16 (base de conhecimento, JOURNEY §32), Fase A (JOURNEY §20, decisão original de ir pra banco de verdade), CONTEXTO-E-ARQUITETURA.md §2/§5.1 (decisão original v1 de cortar banco/multi-tenant/auth, agora parcialmente revertida de novo). Reabre o rumo geral do produto — não corrige uma peça, decide entre dois modelos de distribuição.
 
-**Status: implementado (fatia 1, JOURNEY §34) + fatia 2 (publicação no npm + GitHub, JOURNEY §35/§36) em andamento — falta só a publicação real no npm (bloqueada em 2FA, decisão do usuário sobre automatizar via CI em curso).**
+**Status: implementado — `gerador-de-itens@0.1.0` publicado de verdade no npm, instalação validada de fora do repositório (JOURNEY §35-§37). Falta só configurar o Trusted Publisher pra tags futuras não precisarem mais de OTP manual.**
 
 ---
 
@@ -86,6 +86,16 @@ A resposta certa é **Trusted Publishing (OIDC)**, GA desde jul/2025: o GitHub A
 1. `npmjs.com` → página do pacote `gerador-de-itens` → **Settings** → **Trusted Publisher** → GitHub Actions.
 2. Preencher exatamente: organização/usuário `silvioAL`, repositório `gerador-de-itens`, nome do arquivo de workflow `publish.yml` (só o nome do arquivo, não o caminho completo), ação permitida `npm publish`.
 3. Dali em diante, `git tag vX.Y.Z && git push --tags` publica sozinho, sem token, sem OTP, sem nada pra rotacionar.
+
+## 7.4. Causa raiz real do 403 persistente: 2FA nunca tinha sido ativado na conta
+
+Depois de três tentativas falhas com a mesma mensagem (OTP digitado à mão, token granular com bypass configurado corretamente por dois nomes diferentes), a hipótese de "bug conhecido do npm" (`npm/cli#9268`, ainda parecia plausível — pesquisada e citada aqui como descoberta real, não descartada por estar errada, só superada por uma causa mais simples) foi substituída por uma mais direta ao checar `npmjs.com` → **Account Settings** → **Two-Factor Authentication**: o botão dizia **"Enable 2FA"**, não "Manage" — a conta nunca tinha 2FA configurado de verdade. Isso explica os dois sintomas de uma vez: o "código OTP" fornecido não podia ser válido (não existia nenhum autenticador gerando código nenhum pra essa conta), e o token de bypass provavelmente é rejeitado pelo registry quando não há fator nenhum pra "bypassar" — bypassar algo que nunca existiu não é uma operação que o npm aceita como bem-formada.
+
+**Resolvido de verdade:** usuário ativou 2FA (QR code + app autenticador). `npm publish` sem nenhuma flag então caiu num fluxo diferente e correto — `EOTP` com uma URL de autorização via browser (`npm auth/cli/...`), não mais um código de 6 dígitos. A URL vem mascarada (`***`) em qualquer saída não interativa (stdout redirecionado/logs) — precisou rodar no terminal de verdade do usuário pra ele ver e abrir o link. Depois de autorizar no browser, `npm publish` completou sozinho.
+
+**Validação real:** `npm view gerador-de-itens` confirmou a versão `0.1.0` no registry; `npm install -g gerador-de-itens` rodado de um diretório temporário fora do repositório (mesma disciplina de sempre — nunca confiar sem testar) instalou e `gerador --help` funcionou, comando publicado de verdade, baixado do registry público, não de um tarball local. Pacote de teste desinstalado depois.
+
+**Próximo passo real, não implementado (é configuração no site do npm, fora do alcance desta sessão):** com `v0.1.0` agora existindo, configurar o Trusted Publisher em `npmjs.com` → página do pacote → Settings → Trusted Publisher → GitHub Actions, com `silvioAL` / `gerador-de-itens` / `publish.yml` (passo a passo em §7.3) — depois disso, toda versão futura publica sozinha via tag, sem OTP nunca mais.
 
 ## 8. Limitação conhecida: `gerador open` ainda não funciona fora do monorepo
 
