@@ -72,6 +72,21 @@ Depois de empurrar o repositório pro GitHub como público (JOURNEY §36), o usu
 
 Consequência colateral aceita, não corrigida: os campos `homepage`/`bugs`/`repository` em `packages/cli/package.json` continuam apontando pro repositório no GitHub — agora um link que só quem tem acesso consegue abrir. Comportamento esperado da escolha, não um bug.
 
+## 7.3. Publicação sem segredo nenhum: Trusted Publishing (OIDC), não token
+
+Pergunta do usuário sobre o token de automação ("teria que trocar a cada deploy?") levou a verificar a documentação oficial do npm em vez de responder de memória (a política do npm mudou bastante recentemente). Achado real, confirmado em `docs.npmjs.com/trusted-publishers` e no changelog do GitHub: **o npm revogou todos os tokens clássicos sem expiração em dez/2025** — hoje qualquer token novo com permissão de escrita é limitado a no máximo 90 dias. A preocupação do usuário era legítima e o plano original (token de automação) já não é mais viável do jeito que foi desenhado em §7.1.
+
+A resposta certa é **Trusted Publishing (OIDC)**, GA desde jul/2025: o GitHub Actions se autentica direto com o npm via identidade do próprio workflow run, sem segredo nenhum armazenado — nunca expira, nunca precisa trocar. Confirmado que funciona com repositório privado (a limitação de repositório público é só da atestação de proveniência, um recurso separado).
+
+**Pré-requisito real, não contornável:** o pacote precisa **já existir** no registry pra configurar isso — a primeira publicação (`v0.1.0`) continua exigindo o fluxo manual com 2FA (§7.1), sem alternativa. Trusted Publishing só cobre as publicações seguintes.
+
+`.github/workflows/publish.yml` atualizado: `node-version: "22"` (Trusted Publishing exige npm ≥ 11.5.1, que o Node 20 não traz por padrão), `permissions.id-token: write` de volta (necessário pro OIDC, diferente da vez anterior em que só servia pra provenance), `npm publish --no-provenance` (a atestação de proveniência vem ligada por padrão no Trusted Publishing, mas não funciona em repositório privado — teria falhado o publish inteiro se deixada ligada), e o `NODE_AUTH_TOKEN`/`secrets.NPM_TOKEN` removidos por completo — não há segredo nenhum pra cadastrar.
+
+**Passo a passo pra ativar, depois que `v0.1.0` existir no registry** (fica registrado aqui pra não se perder, é a próxima ação real):
+1. `npmjs.com` → página do pacote `gerador-de-itens` → **Settings** → **Trusted Publisher** → GitHub Actions.
+2. Preencher exatamente: organização/usuário `silvioAL`, repositório `gerador-de-itens`, nome do arquivo de workflow `publish.yml` (só o nome do arquivo, não o caminho completo), ação permitida `npm publish`.
+3. Dali em diante, `git tag vX.Y.Z && git push --tags` publica sozinho, sem token, sem OTP, sem nada pra rotacionar.
+
 ## 8. Limitação conhecida: `gerador open` ainda não funciona fora do monorepo
 
 `open` serve o build de `packages/web` a partir de um caminho relativo (`../../web/dist`, dentro do monorepo) — uma instalação global de `@gerador/cli` fora do checkout não encontra esse build. Os demais comandos (`derive`, `implementar`, `init`, `import-graphify`, `export-vault`) não têm essa limitação. Empacotar o editor visual junto ao CLI fica pra Fase H.

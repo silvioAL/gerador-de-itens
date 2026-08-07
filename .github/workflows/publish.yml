@@ -15,12 +15,13 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write # OIDC — Trusted Publishing do npm, sem NPM_TOKEN nenhum
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22" # Trusted Publishing exige npm >= 11.5.1, que node 20 não traz por padrão
           cache: "npm"
           registry-url: "https://registry.npmjs.org"
 
@@ -30,10 +31,10 @@ jobs:
 
       - run: npm run build --workspace=packages/cli
 
-      # Sem --provenance: a atestação de proveniência do npm exige repositório
-      # público (o log de transparência é público por natureza) — este
-      # repositório é privado de propósito (SPEC-17), só o pacote publicado é
-      # público. Usar --provenance aqui falharia o publish.
-      - run: npm publish --workspace=packages/cli
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # Trusted Publishing (OIDC): precisa estar configurado antes em
+      # npmjs.com → settings do pacote → Trusted Publisher (org/repo/workflow
+      # exatos, ver SPEC-17 §7.3) — sem isso, este passo falha por falta de
+      # auth (não há NODE_AUTH_TOKEN aqui de propósito). --no-provenance
+      # porque a atestação de proveniência não funciona em repositório
+      # privado, e o Trusted Publishing liga provenance por padrão.
+      - run: npm publish --workspace=packages/cli --no-provenance
