@@ -25,7 +25,7 @@ Ou crie um `terraform.tfvars` (nunca commitado — já coberto pelo `.gitignore`
 1. `terraform output instance_ip` — aponte o DNS do domínio pra esse IP.
 2. SSH na VM, `docker network create gerador-secrets-net`, suba `infra/secrets/` (SPEC-12) e configure a Machine Identity — mesmo passo a passo do onboarding local, agora na VM.
 3. Cadastre `GCP_VM_HOST` (o IP acima), `GCP_VM_SSH_USER`, `GCP_VM_SSH_KEY` e `DOMAIN` (o domínio público que você apontou pro IP, ex. `gerador.suaempresa.com`) como secrets do repositório no GitHub — o workflow `.github/workflows/deploy.yml` usa os quatro.
-4. `git push` na `main` — primeiro deploy automático copia `docker-compose.prod.yml`/`Caddyfile` pra `/opt/gerador` e sobe a stack.
+4. Dispare o deploy manualmente: aba **Actions** do repositório → workflow **Deploy** → **Run workflow** (não é mais automático em `git push` — desde a Fase G/SPEC-17 o modo hospedado é dormente, não o caminho padrão, então o deploy só roda quando alguém pede). Copia `docker-compose.prod.yml`/`Caddyfile` pra `/opt/gerador` e sobe a stack.
 
 ## Por que separado do resto do repo
 

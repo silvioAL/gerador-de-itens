@@ -38,6 +38,11 @@ jobs:
 
       - run: npm test --workspace=packages/cli
 
+      # packages/cli/scripts/copy-web-dist.mjs empacota este build dentro do
+      # próprio pacote (packages/cli/web-dist) — sem isso, "gerador open"
+      # fica sem editor visual pra quem instala via npm fora do monorepo.
+      - run: npm run build --workspace=packages/web
+
       - run: npm run build --workspace=packages/cli
 
       # Trusted Publishing (OIDC): precisa estar configurado antes em

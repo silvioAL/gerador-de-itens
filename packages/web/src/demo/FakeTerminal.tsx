@@ -1,9 +1,11 @@
-interface LinhaTerminal {
+export interface LinhaTerminal {
   comando: string;
   saida: string;
 }
 
-const COMANDOS: LinhaTerminal[] = [
+// Exportado pra TerminalAnimado.tsx reaproveitar os mesmos comandos/saídas —
+// uma lista só, não duas versões (estática e animada) que podem dessincronizar.
+export const COMANDOS: LinhaTerminal[] = [
   {
     comando: "npm install -g gerador-de-itens",
     saida: "added 1 package in 1s",

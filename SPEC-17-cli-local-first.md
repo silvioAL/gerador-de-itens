@@ -105,14 +105,24 @@ Corrigido com um passo explícito `npm install -g npm@latest` logo depois do `se
 
 Lição reforçada pela terceira vez nesta sessão (SPEC-14, `gerador export-vault`, agora CI/CD): **"parece que devia funcionar" não é validação — só rodar de verdade contra o ambiente real (aqui, o runner do GitHub Actions, diferente da máquina de dev) encontra esse tipo de gap.**
 
-## 8. Limitação conhecida: `gerador open` ainda não funciona fora do monorepo
+## 8. `gerador open` funciona fora do monorepo (resolvido, Fase I)
 
-`open` serve o build de `packages/web` a partir de um caminho relativo (`../../web/dist`, dentro do monorepo) — uma instalação global de `@gerador/cli` fora do checkout não encontra esse build. Os demais comandos (`derive`, `implementar`, `init`, `import-graphify`, `export-vault`) não têm essa limitação. Empacotar o editor visual junto ao CLI fica pra Fase H.
+Limitação original: `open` servia o build de `packages/web` a partir de um caminho relativo (`../../web/dist`, só existente dentro do monorepo) — instalação global via npm não encontrava esse build.
+
+**Correção:** `packages/cli/scripts/copy-web-dist.mjs`, rodado como parte de `npm run build --workspace=packages/cli` (`"build": "tsup && node scripts/copy-web-dist.mjs"`), copia `packages/web/dist` pra `packages/cli/web-dist` — incluído em `files` do `package.json`, então vai junto no pacote publicado. `open.ts` procura primeiro `web-dist` (bundlado), caindo pro caminho de monorepo (`../../web/dist`) só como fallback de dev. `.github/workflows/publish.yml` builda `packages/web` antes de `packages/cli`, pra a cópia não sair vazia em produção.
+
+Cogitou-se resolver isso com Docker (volumes) — descartado: o problema que volume resolve (dado escrito dentro de um container sobreviver a recriação) não existe aqui, já que `config/*.json` já vive direto no disco do usuário, fora de qualquer container; Docker só adicionaria uma dependência pesada sem necessidade.
+
+Validado de ponta a ponta rodando `dist/cli.js` a partir de um diretório temporário fora do repositório: `gerador init` + `gerador open` respondem 200 em `/`, `/config/diagrama.json` e nos assets do bundle.
+
+## 8.1. Skill do Claude Code empacotada no pacote npm (`gerador skill-install`)
+
+A skill (`skill/gerador-de-itens/SKILL.md`) só existia neste repositório — que é privado — então quem só tinha o pacote npm não tinha como pegá-la. `packages/cli/templates/skill/SKILL.md` é uma variante distribuível (mesmo conteúdo de regras/comandos, mas chamando `gerador` direto em vez do wrapper `.ps1` específico de desenvolvimento deste monorepo). Comando novo `gerador skill-install [destino]` (default `.claude/skills/gerador-de-itens`) copia esse arquivo pro projeto atual — sempre sobrescreve (é conteúdo mantido pela ferramenta, não editável pelo usuário, diferente de `config/` que `init` nunca sobrescreve).
 
 ## 9. Fora de escopo nesta rodada (Fase H, registrada, não implementada)
 
-- **Canvas web sem Postgres/login.** Fazer `gerador open` ganhar leitura/escrita local (quebras, perfis-time, campos-no, especificacao-template como arquivo) — a peça que faltaria pra `packages/web` funcionar inteiro sem servidor, não só o CLI/skill.
-- **Empacotar `packages/web/dist` dentro de `@gerador/cli`** — resolveria a limitação do §8.
+- **Canvas web sem Postgres/login.** Fazer `gerador open` ganhar leitura/escrita local (quebras, perfis-time, campos-no, especificacao-template como arquivo) — a peça que faltaria pra `packages/web` funcionar inteiro sem servidor pro caso de uso hospedado, não pro CLI/skill (isso já foi resolvido no §8).
+- **Instalar o modo hospedado via `gerador` CLI** (ex.: um `gerador hosted-init` que baixasse `docker-compose.yml` + imagens publicadas) — hoje o único caminho é clonar o repositório e rodar `docker compose up --build`; como o repositório é privado, isso já filtra pra quem tem acesso de colaborador, consistente com "npm é o artefato público, repositório é o caminho interno".
 - ~~**Wire-up automático do Graphify**~~ — feito na mesma sessão, com confirmação explícita do usuário ("pode fazer"): Git não estava instalado nesta máquina (instalado via `winget`, confirmado com o usuário antes), `git init` + commit inicial, `graphify hook install` (post-commit/post-checkout + driver de merge) e `graphify claude install` (`CLAUDE.md` + hooks `PreToolUse`). Detalhes em JOURNEY §34.
 - **Descontinuar/remover de fato `packages/server`/Docker/Terraform** — decisão separada, não urgente.
 

@@ -6,7 +6,7 @@ Não é um gerador de prompt de IA. O mesmo diagrama sempre produz o mesmo backl
 
 ## Início rápido
 
-O caminho padrão é o CLI local — instala com um comando, sem servidor, sem login (SPEC-17). Docker/login real continuam existindo (modo hospedado, pra quem já usa esse caminho), mas deixaram de ser o recomendado por padrão.
+O caminho padrão é o CLI local — instala com um comando, sem servidor, sem login (SPEC-17). Além de mais simples, isso evita depender de um domínio novo hospedado (VM+DNS próprio) que times corporativos costumam bloquear até serem categorizados/liberados no firewall — o CLI local não sai do `localhost`, só `npm install` contra `registry.npmjs.org` (já confiável na maioria dos ambientes). Docker/login real continuam existindo (modo hospedado, pra quem já usa esse caminho e não tem essa restrição), mas deixaram de ser o recomendado por padrão.
 
 ### 1. CLI local (recomendado)
 
@@ -14,9 +14,10 @@ O caminho padrão é o CLI local — instala com um comando, sem servidor, sem l
 npm install -g gerador-de-itens
 gerador init                            # em qualquer diretório de projeto
 gerador derive quebra.json --out backlog.md
+gerador open                            # editor visual, http://localhost:4321 — já vem empacotado, sem build extra
 ```
 
-Publicado no [npm](https://www.npmjs.com/package/gerador-de-itens), mesmo mecanismo de instalação do Graphify — sem clonar este repositório. Veja [`packages/cli/README.md`](packages/cli/README.md) pra instalar a partir do código (contribuindo/testando) e a seção [Comandos da CLI](#comandos-da-cli) abaixo pro resto. Também dá pra usar via skill do Claude Code — ver [`skill/gerador-de-itens/SKILL.md`](skill/gerador-de-itens/SKILL.md).
+Publicado no [npm](https://www.npmjs.com/package/gerador-de-itens), mesmo mecanismo de instalação do Graphify — sem clonar este repositório. Veja [`packages/cli/README.md`](packages/cli/README.md) pra instalar a partir do código (contribuindo/testando), [Comandos da CLI](#comandos-da-cli) abaixo pra lista completa, e [Claude Code](#claude-code) pra usar via skill (`gerador skill-install`) em vez de linha de comando pura.
 
 ### 2. Docker (modo hospedado, opcional — canvas visual + Postgres + login)
 
@@ -26,9 +27,15 @@ docker compose up --build
 
 Abra `http://localhost:8080`. Usa o config de exemplo deste repositório (rabbit, kafka, mongo, sql, camunda, fico, api externa, job, regra, cache, storage, batch — 14 tipos de nó, mais gRPC/GraphQL como tipos de conexão sobre "Serviço"). Sobe em `AUTH_MODE=dev` (login só com e-mail, sem senha — ver SPEC-08 §2.1), nunca precisa de segredo nenhum.
 
-#### Produção (login Google real, numa máquina nova)
+#### Produção (VM na nuvem + login Google real)
 
-`docker compose up` sozinho **não muda** — continua em modo `dev`. Pra login Google de verdade, os segredos (`OIDC_CLIENT_SECRET` etc.) vêm de um vault self-hosted (Infisical), não de um `.env` colado à mão a cada máquina (ver SPEC-12-gerenciamento-de-segredos.md):
+Hospedar de verdade (não só `docker compose up` local) é uma sequência de três passos:
+
+1. **Provisionar a VM** — siga [`infra/README.md`](infra/README.md) até o fim (Terraform, GCP; gera o IP, aponta o DNS, cadastra os 4 secrets do GitHub que o deploy usa).
+2. **Configurar login Google de verdade** — os segredos (`OIDC_CLIENT_SECRET` etc.) vêm de um vault self-hosted (Infisical), não de um `.env` colado à mão a cada máquina (ver SPEC-12-gerenciamento-de-segredos.md). Roda na própria VM, mesmo passo a passo abaixo:
+3. **Disparar o deploy** — manualmente pela aba Actions do GitHub (workflow **Deploy** → **Run workflow**, ver `infra/README.md` passo 4; não é mais automático em `git push`, SPEC-17).
+
+`docker compose up` sozinho **não muda** — continua em modo `dev`. Comandos do passo 2:
 
 ```powershell
 # Uma vez por máquina:
@@ -73,15 +80,28 @@ Também dá pra ver a jornada de linha de comando dentro do próprio app web: bo
 | `gerador init [diretório]` | Começar um projeto novo — cria `config/` de exemplo, nunca sobrescreve o que já existir. |
 | `gerador derive <quebra.json> [--out arquivo]` | Gerar o backlog resumido (Markdown) a partir de um diagrama já pronto, sem abrir o browser. |
 | `gerador implementar <quebra.json> [--out arquivo]` | Gerar a especificação de entrega da quebra inteira — um documento com todos os itens, especificação técnica completa e refinamento — pronto pra refinar e enviar pra quem faz o upload. |
-| `gerador open [--port]` | Abrir o editor visual servindo o build já pronto (`packages/web/dist`), sem depender de `npm run dev`. Serve o `config/` do diretório onde foi chamado. |
+| `gerador open [--port]` | Abrir o editor visual — já vem empacotado dentro do pacote npm, sem depender de `npm run dev` nem de clonar o repositório. Serve o `config/` do diretório onde foi chamado. |
 | `gerador import-graphify <graph.json> [--out arquivo]` | Rascunhar nós `existente`/`extraído` a partir de um projeto já mapeado pelo Graphify. Precisa de `config/graphify-mapping.json` (mapeamento de padrão de arquivo → tipo de nó); `gerador init` cria um exemplo. |
 | `gerador export-vault [--dir vault] [--abrir]` | Materializar `config/referencias/*.json` + padrões default como notas Obsidian, ao lado do grafo que `graphify export obsidian` já gerou. 100% local, sem servidor. |
+| `gerador skill-install [destino]` | Instalar a skill do Claude Code no projeto atual (padrão: `.claude/skills/gerador-de-itens`). |
 
-Todo comando lê `config/*.json` do **diretório atual**, nunca deste repositório — o mesmo `dist/` serve qualquer projeto.
+Todo comando lê `config/*.json` do **diretório atual**, nunca deste repositório — o mesmo pacote serve qualquer projeto.
 
 ## Claude Code
 
 Este projeto é pensado pra ser usado como skill do Claude Code numa sessão de planejamento — ver [`skill/gerador-de-itens/SKILL.md`](skill/gerador-de-itens/SKILL.md) para o fluxo completo (incluindo montar contexto de um projeto existente e o modo "revisor crítico").
+
+### Instalar a skill noutro projeto
+
+A skill não depende deste repositório (que é privado) — ela vai empacotada dentro do próprio pacote npm:
+
+```powershell
+npm install -g gerador-de-itens   # se ainda não tiver
+cd algum-outro-projeto
+gerador skill-install
+```
+
+Cria (ou atualiza) `.claude/skills/gerador-de-itens/SKILL.md` no projeto atual. A partir daí, uma sessão do Claude Code nesse projeto já reconhece pedidos como "quebrar essa mudança em backlog" — a skill sabe ler o `config/diagrama.json` do projeto alvo, montar um rascunho de `quebra.json` (inclusive lendo o código existente via `import-graphify`, se o Graphify já tiver mapeado o projeto), rodar `derive`/`implementar`, e oferecer uma revisão crítica antes de fechar a quebra. Não precisa copiar nada manualmente nem ter acesso a este repositório.
 
 ## Desenvolvimento
 

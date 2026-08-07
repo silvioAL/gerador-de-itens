@@ -1,11 +1,17 @@
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// dist/cli.js -> ../../web/dist (packages/cli/dist -> packages/cli -> packages -> packages/web/dist)
 const AQUI = dirname(fileURLToPath(import.meta.url));
-const DIST_WEB = resolve(AQUI, "../../web/dist");
+// Empacotado dentro do próprio pacote (packages/cli/web-dist, copiado no build
+// por scripts/copy-web-dist.mjs) — é o caminho real de quem instalou via npm.
+const DIST_WEB_BUNDLADO = resolve(AQUI, "../web-dist");
+// Fallback pro build direto do monorepo (packages/web/dist), útil rodando a
+// CLI de dentro do repositório antes/sem o passo de empacotamento.
+const DIST_WEB_MONOREPO = resolve(AQUI, "../../web/dist");
+const DIST_WEB = existsSync(DIST_WEB_BUNDLADO) ? DIST_WEB_BUNDLADO : DIST_WEB_MONOREPO;
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -27,9 +33,10 @@ export async function open(args: string[]): Promise<void> {
   const porta = idxPorta >= 0 ? Number(args[idxPorta + 1]) : 4321;
 
   if (!(await ehDiretorio(DIST_WEB))) {
-    throw new Error(
-      `build do app não encontrado em ${DIST_WEB} — rode "npm run build --workspace=packages/web" primeiro.`
-    );
+    const dicaMonorepo = existsSync(resolve(AQUI, "../../web"))
+      ? ' Rodando de dentro do repositório clonado: "npm run build --workspace=packages/web".'
+      : ' Atualize o pacote: "npm install -g gerador-de-itens@latest" (versões antes do empacotamento do editor visual não têm isso).';
+    throw new Error(`build do app não encontrado em ${DIST_WEB}.${dicaMonorepo}`);
   }
 
   // config/ vem sempre do diretório onde `gerador open` foi chamado (process.cwd()),

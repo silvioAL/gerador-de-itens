@@ -7,7 +7,7 @@ description: "Use when the user wants to break a feature or architecture change 
 
 Ferramenta de quebra técnica: um diagrama de arquitetura (serviços, filas, bancos, processos de negócio...) node por node, com painel de propriedades dirigido por config (campos condicionais, proveniência de cada valor, semáforo de prontidão), que deriva **deterministicamente** um backlog de atividades com dependências. O backlog nunca é gerado por um LLM adivinhando a partir de uma descrição solta — sempre por regras explícitas em `config/diagrama.json` do projeto.
 
-A skill usa o `gerador` instalado globalmente na máquina (SPEC-17 — instalação em `packages/cli/README.md` do repositório) quando disponível; se não estiver instalado, cai pro build de desenvolvimento do repositório em `C:\Users\silvi\Documents\gerador` (ajustável via `$env:GERADOR_REPO`).
+A skill usa o `gerador` instalado globalmente na máquina (SPEC-17 — instalação em `packages/cli/README.md` do repositório) quando disponível; se não estiver instalado, o wrapper (`scripts/gerador.ps1`) cai pro build de desenvolvimento deste próprio repositório (resolvido a partir do caminho do script, ajustável via `$env:GERADOR_REPO`). Fora deste monorepo — via `gerador skill-install`, que empacota uma variante desta skill sem o wrapper — não tem fallback: assume o `gerador` global.
 
 ## Quando usar
 

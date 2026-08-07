@@ -4,6 +4,7 @@ import { open } from "./commands/open.js";
 import { importGraphify } from "./commands/importGraphify.js";
 import { implementar } from "./commands/implementar.js";
 import { exportVault } from "./commands/exportVault.js";
+import { skillInstall } from "./commands/skillInstall.js";
 
 const AJUDA = `Uso: gerador <comando> [opções]
 
@@ -24,6 +25,8 @@ Comandos:
     --dir <vault>          Padrão: graphify-out/obsidian
     --vault-nome <nome>    Nome do vault registrado no Obsidian. Padrão: nome da pasta de --dir
     --abrir                Abre o vault direto no Obsidian depois de gerar as notas
+  skill-install [destino]  Instala a skill do Claude Code no projeto atual
+                            Padrão: .claude/skills/gerador-de-itens
 `;
 
 async function main(): Promise<void> {
@@ -47,6 +50,9 @@ async function main(): Promise<void> {
       return;
     case "export-vault":
       await exportVault(resto);
+      return;
+    case "skill-install":
+      await skillInstall(resto);
       return;
     case "help":
     case "--help":

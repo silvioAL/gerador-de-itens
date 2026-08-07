@@ -36,13 +36,12 @@ Veja `gerador --help` para a lista completa e atualizada. Resumo:
 | `init [diretório]` | Cria `config/` de exemplo (nunca sobrescreve) |
 | `derive <quebra.json>` | Deriva o backlog a partir da quebra + `config/` do diretório atual |
 | `implementar <quebra.json>` | Especificação de entrega da quebra inteira (SPEC-14) |
-| `open` | Sobe o editor visual local, servindo `config/` do diretório atual |
+| `open` | Sobe o editor visual local (empacotado no próprio pacote), servindo `config/` do diretório atual |
 | `import-graphify <graph.json>` | Rascunho de `quebra.json` a partir de um grafo já extraído pelo Graphify |
 | `export-vault` | Materializa `config/referencias/*.json` + padrões default como notas Obsidian (SPEC-16/17) |
+| `skill-install [destino]` | Instala a skill do Claude Code no projeto atual (`.claude/skills/gerador-de-itens` por padrão) |
 
-Todos os comandos são locais — nenhum depende de rede ou de um servidor rodando.
-
-**Limitação conhecida do `open`:** ele serve o build estático de `packages/web` a partir de um caminho relativo dentro do monorepo (`../../web/dist`, ao lado de `packages/cli`) — funciona rodando o CLI de dentro do repositório clonado, mas ainda não funciona a partir do pacote publicado (o build do editor visual não está empacotado dentro de `gerador-de-itens`). `derive`/`implementar`/`init`/`import-graphify`/`export-vault` não têm essa limitação. Empacotar o editor visual junto fica pra uma rodada futura (Fase H do plano).
+Todos os comandos são locais — nenhum depende de rede ou de um servidor rodando. `open` funciona a partir do pacote instalado via npm, em qualquer diretório — o build do editor visual (`packages/web/dist`) vai empacotado dentro de `gerador-de-itens` (`web-dist/`), não é um build separado que precisa existir no monorepo.
 
 ## Licença
 

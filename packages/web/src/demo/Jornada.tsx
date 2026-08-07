@@ -42,7 +42,8 @@ const ETAPAS: Etapa[] = [
     texto: "A revisão vira artefato de verdade, cada formato para um uso diferente:",
     saida: [
       { rotulo: ".md", paraQue: "backlog pronto para colar num documento de planejamento ou abrir tickets manualmente." },
-      { rotulo: "Refinamento técnico", paraQue: "checklist e ciclos de teste por atividade, para copiar direto no card antes do dev pegar." },
+      { rotulo: "Especificação de entrega", paraQue: "documento único da quebra inteira — contexto, cada item com spec técnica completa, refinamento, critérios de aceite em Gherkin, DoR/DoD." },
+      { rotulo: "Obsidian", paraQue: "gerador export-vault materializa referências e padrões default como notas, ao lado do grafo que o Graphify já extrai — abre direto no Obsidian, sem visualizador próprio." },
     ],
   },
 ];

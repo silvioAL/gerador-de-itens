@@ -73,7 +73,7 @@ export function useTour(opts: UseTourOpts) {
       selector: "[data-tour=export-buttons]",
       titulo: "Saídas",
       texto:
-        'Cada formato serve para algo diferente: .md para colar num doc, e "refinamento técnico" abre um checklist técnico por atividade.',
+        'Cada formato serve para algo diferente: .md pra colar num doc de planejamento, e "Especificação de entrega" gera o documento único da quebra inteira — spec técnica completa de cada item, refinamento, critérios de aceite em Gherkin, DoR/DoD.',
     },
     {
       selector: "[data-tour=config-screen-content]",
@@ -88,6 +88,18 @@ export function useTour(opts: UseTourOpts) {
       texto:
         "Uma biblioteca de trechos de código reais guardados como referência — não é extraído automaticamente, é você que decide o que entra e escreve por quê. Alimenta o vocabulário de padrões que a ferramenta usa.",
       onEnter: () => opts.abrirConfigNaAba("referencias"),
+    },
+    {
+      selector: null,
+      titulo: "Linha de comando",
+      texto:
+        "Tudo isso também roda fora do browser: `npm install -g gerador-de-itens` instala o CLI; `gerador init` cria um config/ de exemplo; `gerador derive quebra.json --out backlog.md` gera o backlog; `gerador implementar quebra.json --out especificacao.md` gera a especificação de entrega inteira; `gerador export-vault --abrir` materializa referências e padrões como notas Obsidian. Todo comando é 100% local, sem servidor.",
+    },
+    {
+      selector: null,
+      titulo: "Skill do Claude Code",
+      texto:
+        '`gerador skill-install` instala a skill num projeto qualquer, sem precisar deste repositório. A partir daí, uma sessão do Claude Code nesse projeto já reconhece pedidos como "quebrar essa mudança em backlog": lê o config/diagrama.json do projeto alvo, monta um rascunho de quebra.json (inclusive a partir do código existente, via import do Graphify), roda derive/implementar, e oferece uma revisão crítica antes de fechar a quebra.',
     },
     {
       selector: null,
