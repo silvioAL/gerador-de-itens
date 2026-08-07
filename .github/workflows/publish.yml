@@ -21,9 +21,18 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22" # Trusted Publishing exige npm >= 11.5.1, que node 20 não traz por padrão
+          node-version: "22"
           cache: "npm"
           registry-url: "https://registry.npmjs.org"
+
+      # Achado real (run #1 falhou com 404 em vez de erro de auth): Node 22
+      # do runner do GitHub Actions vem com npm 10.9.8 por padrão — abaixo do
+      # 11.5.1 que o Trusted Publishing exige. Sem OIDC de verdade, o publish
+      # vira uma chamada sem autenticação nenhuma, e o registry responde 404
+      # (não confirma se o pacote existe pra quem não está autenticado) em
+      # vez de um erro de permissão claro — por isso a causa não era óbvia
+      # só pelo log de erro.
+      - run: npm install -g npm@latest
 
       - run: npm ci
 
