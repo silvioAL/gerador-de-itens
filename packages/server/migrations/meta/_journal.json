@@ -50,6 +50,27 @@
       "when": 1754420000000,
       "tag": "0006_dados_demo",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1754430000000,
+      "tag": "0007_quebras_titulo",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1754440000000,
+      "tag": "0008_remove_referencias",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1754450000000,
+      "tag": "0009_campos_no_item_spec",
+      "breakpoints": true
     }
   ]
 }
