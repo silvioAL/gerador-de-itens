@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { DiagramaConfig, FieldSpec } from "@gerador/engine";
 import type { CampoNo, DadosCampoNo, ItemSpecCampo } from "../api/client";
 
@@ -137,20 +137,28 @@ export function CamposNoTab({ config, camposNo, timeAtivo, onCriar, onAtualizar,
   const [formulario, setFormulario] = useState<FormularioCampo | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [mostrarChave, setMostrarChave] = useState(false);
+  // O formulário sempre abre no topo da aba, mas "sobrescrever"/"editar" ficam na lista
+  // logo abaixo — se a pessoa já rolou pra ver um tipo mais pra baixo, o formulário abre
+  // fora da vista e o clique parece não ter feito nada. Rola de volta pro formulário toda
+  // vez que ele abre, pra sempre ficar visível.
+  const formRef = useRef<HTMLDivElement>(null);
 
   function abrirNovo() {
     setFormulario(formularioVazio(tiposDeNo[0] ?? ""));
     setMostrarChave(false);
+    formRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }
 
   function abrirEdicao(campo: CampoNo) {
     setFormulario(formularioDeCampo(campo));
     setMostrarChave(false);
+    formRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }
 
   function abrirSobrescrita(tipoNo: string, campo: FieldSpec) {
     setFormulario(formularioDeFieldSpec(tipoNo, campo));
     setMostrarChave(false);
+    formRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }
 
   async function salvar() {
@@ -204,22 +212,24 @@ export function CamposNoTab({ config, camposNo, timeAtivo, onCriar, onAtualizar,
         mundo; "+ Adicionar campo" cria um campo novo, que não existia antes.
       </p>
 
-      {formulario ? (
-        <FormularioCampoNo
-          formulario={formulario}
-          tiposDeNo={tiposDeNo}
-          setFormulario={setFormulario}
-          onSalvar={salvar}
-          onCancelar={() => setFormulario(null)}
-          salvando={salvando}
-          mostrarChave={mostrarChave}
-          onAlternarChave={() => setMostrarChave((v) => !v)}
-        />
-      ) : (
-        <button onClick={abrirNovo} style={botaoAdicionarEstilo}>
-          + Adicionar campo
-        </button>
-      )}
+      <div ref={formRef}>
+        {formulario ? (
+          <FormularioCampoNo
+            formulario={formulario}
+            tiposDeNo={tiposDeNo}
+            setFormulario={setFormulario}
+            onSalvar={salvar}
+            onCancelar={() => setFormulario(null)}
+            salvando={salvando}
+            mostrarChave={mostrarChave}
+            onAlternarChave={() => setMostrarChave((v) => !v)}
+          />
+        ) : (
+          <button onClick={abrirNovo} style={botaoAdicionarEstilo}>
+            + Adicionar campo
+          </button>
+        )}
+      </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 16 }}>
         {tiposDeNo.map((tipoNo) => {
@@ -408,6 +418,9 @@ function FormularioCampoNo({
       )}
 
       <label style={labelFormEstilo}>Valor padrão (opcional)</label>
+      <p style={captionFormEstilo}>
+        Preenche o campo sozinho quando alguém cria um nó desse tipo — a pessoa ainda pode trocar depois.
+      </p>
       <input
         aria-label="Valor padrão"
         value={formulario.valorPadrao}
@@ -416,6 +429,10 @@ function FormularioCampoNo({
       />
 
       <label style={labelFormEstilo}>Ajuda (opcional)</label>
+      <p style={captionFormEstilo}>
+        Texto curto que aparece abaixo do rótulo "{formulario.label || "..."}" na hora de preencher esse campo — não
+        é o rótulo em si (isso é o campo "Rótulo" acima).
+      </p>
       <input
         aria-label="Ajuda"
         value={formulario.ajuda}
@@ -589,6 +606,13 @@ const labelFormEstilo: React.CSSProperties = {
   fontWeight: 600,
   color: "#334155",
   marginTop: 8,
+};
+
+const captionFormEstilo: React.CSSProperties = {
+  fontSize: 10.5,
+  color: "#94a3b8",
+  margin: "1px 0 3px",
+  lineHeight: 1.4,
 };
 
 const inputFormEstilo: React.CSSProperties = {
