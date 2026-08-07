@@ -1,13 +1,19 @@
 import { describe, expect, it } from "vitest";
 import type { RegrasConfig } from "../config/types.js";
-import { gerarChecklistTecnico, gerarCiclosDeTeste, gerarVolumetria } from "./gerarRefinamento.js";
+import type { Aresta, No } from "../model/types.js";
+import {
+  gerarChecklistProcesso,
+  gerarChecklistTecnico,
+  gerarCiclosDeTeste,
+  gerarVolumetria,
+} from "./gerarRefinamento.js";
 
 const regras: RegrasConfig = {
   tipos: ["História", "Task", "Débito Técnico"],
   tamanhos: ["PP", "P", "M", "G"],
   porTech: {
     Backend: {
-      requisitos: [
+      checklistTecnico: [
         { texto: "DLQ configurada e monitorada", contextos: ["Backend-mensagens"] },
         { texto: "Índice criado para as queries novas", contextos: ["Backend-dados"] },
         { texto: "Nome do serviço segue o padrão do time", contextos: [] },
@@ -95,5 +101,86 @@ describe("gerarVolumetria", () => {
 
   it("tech sem volumetria configurada nunca gera bloco", () => {
     expect(gerarVolumetria(regras, ["Mobile"], ["Backend-chamadas http"])).toBe("");
+  });
+});
+
+describe("gerarChecklistProcesso", () => {
+  function no(parcial: Partial<No> = {}): No {
+    return {
+      id: "n1", type: "service", x: 0, y: 0, label: "srv", status: "novo",
+      spec: {}, specNA: {}, ...parcial,
+    };
+  }
+  const semArestas: Aresta[] = [];
+
+  const regrasProcesso: RegrasConfig = {
+    tipos: [], tamanhos: [],
+    porTech: {
+      Backend: {
+        checklistTecnico: [],
+        checklistProcesso: [
+          { texto: "Levantar massa de HLG", contextos: [] },
+          { texto: "Configurar mock", contextos: ["Backend-chamadas http"] },
+          { texto: "Publicar contrato do endpoint novo", contextos: [],
+            when: { allOf: [
+              { nodeType: ["service"] },
+              { listaContem: { field: "endpoints", sub: "action", equals: "novo" } } ] } },
+          { texto: "Confirmar ambiente de teste do provedor", contextos: [], when: { nodeType: ["external"] } },
+        ],
+        testes: [],
+      },
+    },
+  };
+
+  it("usa '- [ ]', não o marcador do técnico — é coisa pra marcar como feita, não pra especificar", () => {
+    const md = gerarChecklistProcesso(regrasProcesso, ["Backend"], [], [no()], semArestas);
+    expect(md).toContain("- [ ] Levantar massa de HLG");
+    expect(md).not.toContain("✍️");
+  });
+
+  it("item sem when aparece sempre que tech+contexto baterem", () => {
+    const md = gerarChecklistProcesso(regrasProcesso, ["Backend"], ["Backend-chamadas http"], [no()], semArestas);
+    expect(md).toContain("Configurar mock");
+  });
+
+  it("nodeType: item de external não aparece num nó service, e vice-versa", () => {
+    const emService = gerarChecklistProcesso(regrasProcesso, ["Backend"], [], [no()], semArestas);
+    expect(emService).not.toContain("ambiente de teste do provedor");
+
+    const emExternal = gerarChecklistProcesso(regrasProcesso, ["Backend"], [], [no({ type: "external" })], semArestas);
+    expect(emExternal).toContain("ambiente de teste do provedor");
+  });
+
+  it("listaContem: só aparece quando algum item da lista tem o sub-campo com o valor pedido", () => {
+    const semEndpointNovo = no({
+      spec: { endpoints: { valor: [{ method: "GET", path: "/x", action: "alterar" }], origem: "manual" } },
+    });
+    expect(gerarChecklistProcesso(regrasProcesso, ["Backend"], [], [semEndpointNovo], semArestas))
+      .not.toContain("Publicar contrato");
+
+    const comEndpointNovo = no({
+      spec: { endpoints: { valor: [
+        { method: "GET", path: "/x", action: "alterar" },
+        { method: "POST", path: "/y", action: "novo" },
+      ], origem: "manual" } },
+    });
+    expect(gerarChecklistProcesso(regrasProcesso, ["Backend"], [], [comEndpointNovo], semArestas))
+      .toContain("Publicar contrato");
+  });
+
+  it("atividade de aresta: basta UM dos nós de origem satisfazer (source ou target)", () => {
+    const nos = [no({ id: "n1", type: "service" }), no({ id: "n2", type: "external" })];
+    const md = gerarChecklistProcesso(regrasProcesso, ["Backend"], [], nos, semArestas);
+    expect(md).toContain("ambiente de teste do provedor");
+  });
+
+  it("sem nó de origem, item condicionado não aparece — condição que não dá pra avaliar não é assumida verdadeira", () => {
+    const md = gerarChecklistProcesso(regrasProcesso, ["Backend"], [], [], semArestas);
+    expect(md).toContain("Levantar massa de HLG");
+    expect(md).not.toContain("ambiente de teste do provedor");
+  });
+
+  it("tech sem checklistProcesso não gera bloco (nem quebra)", () => {
+    expect(gerarChecklistProcesso(regras, ["Backend"], [], [no()], semArestas)).toBe("");
   });
 });

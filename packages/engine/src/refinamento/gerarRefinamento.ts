@@ -1,4 +1,6 @@
-import type { RegrasConfig, Requisito, TesteAutomatizado } from "../config/types.js";
+import type { Aresta, No } from "../model/types.js";
+import type { ItemProcesso, RegrasConfig, Requisito, TesteAutomatizado } from "../config/types.js";
+import { avaliarCondicao } from "../spec/condicoes.js";
 
 /**
  * Casamento parcial e sem case, igual ao legado: um requisito com
@@ -33,7 +35,7 @@ export function gerarChecklistTecnico(regras: RegrasConfig, techs: string[], con
   for (const tech of techs) {
     const porTech = regras.porTech[tech];
     if (!porTech) continue;
-    const relevantes = requisitosRelevantes(porTech.requisitos, contextos);
+    const relevantes = requisitosRelevantes(porTech.checklistTecnico, contextos);
     if (relevantes.length === 0) continue;
 
     const linhas = [`**${tech.toUpperCase()}:**`];
@@ -41,6 +43,50 @@ export function gerarChecklistTecnico(regras: RegrasConfig, techs: string[], con
     blocos.push(linhas.join("\n"));
   }
   return blocos.join("\n\n");
+}
+
+/**
+ * Checklist de **processo** — o que o time precisa fazer pra executar/testar,
+ * separado do técnico (que é o que precisa ser decidido no desenho). Além de
+ * tech+contexto, cada item pode ter um `when` avaliado contra os **nós de
+ * origem** da atividade: satisfaz se **algum** deles bater, mesma régua de
+ * `.some()` do casamento de contexto — numa atividade de aresta há dois nós
+ * (quem chama e o que é usado), e exigir os dois perderia caso legítimo.
+ *
+ * Formato `- [ ]`, não o `<- ✍️ especificar` do técnico: são coisas a marcar
+ * como feitas, e o padrão do agente validador reserva o marcador pra seção
+ * "Requisitos de refinamento" — que, pelo próprio padrão, não deve conter
+ * atividade de teste (ver SPEC-20).
+ */
+export function gerarChecklistProcesso(
+  regras: RegrasConfig,
+  techs: string[],
+  contextos: string[],
+  nos: No[],
+  arestas: Aresta[]
+): string {
+  const blocos: string[] = [];
+  for (const tech of techs) {
+    const porTech = regras.porTech[tech];
+    if (!porTech?.checklistProcesso) continue;
+    const relevantes = porTech.checklistProcesso.filter(
+      (item) => contextoBate(item.contextos, contextos) && condicaoBate(item, nos, arestas)
+    );
+    if (relevantes.length === 0) continue;
+
+    const linhas = [`**${tech.toUpperCase()}:**`];
+    for (const item of relevantes) linhas.push(`- [ ] ${item.texto}`);
+    blocos.push(linhas.join("\n"));
+  }
+  return blocos.join("\n\n");
+}
+
+/** Sem `when`, o item vale sempre. Sem nó de origem (atividade solta), um item
+ * condicionado não aparece — condição que não dá pra avaliar não é assumida
+ * como verdadeira, mesma disciplina de "nunca verde sem alguém olhar". */
+function condicaoBate(item: ItemProcesso, nos: No[], arestas: Aresta[]): boolean {
+  if (!item.when) return true;
+  return nos.some((no) => avaliarCondicao(item.when!, no, arestas));
 }
 
 /** Campos fixos do bloco de volumetria — nome e ordem exigidos pelo agente de

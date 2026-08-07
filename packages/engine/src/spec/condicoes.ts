@@ -43,6 +43,16 @@ export function avaliarCondicao(
   if ("nodeStatus" in condicao) {
     return no.status === condicao.nodeStatus;
   }
+  if ("nodeType" in condicao) {
+    return condicao.nodeType.includes(no.type);
+  }
+  if ("listaContem" in condicao) {
+    // Campo `type: "lista"` (SPEC-18): satisfaz se ALGUM item tiver o
+    // sub-campo com o valor pedido — ex.: "algum endpoint é novo".
+    const { field, sub, equals } = condicao.listaContem;
+    const valor = valorDoCampo(no, field);
+    return Array.isArray(valor) && valor.some((item) => (item as Record<string, unknown>)?.[sub] === equals);
+  }
   if ("allOf" in condicao) {
     return condicao.allOf.every((c) => avaliarCondicao(c, no, arestasDoDiagrama));
   }

@@ -127,7 +127,7 @@ describe("validateRegras — config/regras.example.json + config/app.example.jso
   it("recusa tech em porTech que não existe em app.json", () => {
     const quebrada: RegrasConfig = {
       ...regras,
-      porTech: { ...regras.porTech, TechFantasma: { requisitos: [], testes: [] } },
+      porTech: { ...regras.porTech, TechFantasma: { checklistTecnico: [], testes: [] } },
     };
     const erros = validateRegras(quebrada, app);
     expect(erros).toContainEqual({
@@ -142,8 +142,8 @@ describe("validateRegras — config/regras.example.json + config/app.example.jso
       porTech: {
         Backend: {
           ...regras.porTech.Backend,
-          requisitos: [
-            ...regras.porTech.Backend.requisitos,
+          checklistTecnico: [
+            ...regras.porTech.Backend.checklistTecnico,
             { texto: "x", contextos: ["contexto-fantasma"] },
           ],
         },

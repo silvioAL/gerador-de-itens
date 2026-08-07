@@ -1,8 +1,15 @@
 import type { StatusNo, Tamanho } from "../model/types.js";
 
 /**
- * Condição de visibilidade de campo (`when`). Sete operadores, nada mais —
- * ver SPEC-01 §6. `field/preenchido` aceita `true` (preenchido) ou `false` (vazio).
+ * Condição de visibilidade (`when`) — de campo (`FieldSpec.when`) ou de item de
+ * checklist de processo (`ItemProcesso.when`). Ver SPEC-01 §6 e SPEC-20.
+ * `field/preenchido` aceita `true` (preenchido) ou `false` (vazio).
+ *
+ * Eram sete operadores; `nodeType` e `listaContem` entraram com o checklist de
+ * processo (SPEC-20), que precisa condicionar por coisas que campo de nó nunca
+ * precisou: "se o componente é serviço" (num campo de `spec`, o tipo de nó já é
+ * implícito — num item de processo, não) e "se algum endpoint é novo" (olhar
+ * dentro de um campo `type: "lista"`).
  */
 export type Condicao =
   | { field: string; equals: unknown }
@@ -11,6 +18,8 @@ export type Condicao =
   | { hasIncomingEdge: string[] }
   | { hasOutgoingEdge: string[] }
   | { nodeStatus: StatusNo }
+  | { nodeType: string[] }
+  | { listaContem: { field: string; sub: string; equals: unknown } }
   | { allOf: Condicao[] }
   | { anyOf: Condicao[] }
   | { not: Condicao };
@@ -158,8 +167,33 @@ export interface TesteAutomatizado {
   hlg: boolean;
 }
 
+/**
+ * Item de checklist de **processo** — o que o time precisa *fazer* pra
+ * conseguir executar e testar (configurar mock, levantar massa, repontar
+ * serviço), diferente do checklist técnico (`Requisito`), que é o que precisa
+ * ser *decidido/especificado* no desenho.
+ *
+ * Achado real (SPEC-20): os dois estavam misturados numa lista só, e isso
+ * violava o próprio padrão do agente validador, que lista "atividades de
+ * teste" entre o que **não** é requisito de refinamento. Separar não é só
+ * organização — é o que deixa a seção "Requisitos de refinamento" correta.
+ */
+export interface ItemProcesso {
+  texto: string;
+  /** Mesmo casamento parcial de contexto do checklist técnico. */
+  contextos: string[];
+  /** Avaliada contra os nós de origem da atividade — o item aparece se
+   * **algum** deles satisfizer (mesma régua de `.some()` do casamento de
+   * contexto). Sem `when`, basta tech + contexto baterem. */
+  when?: Condicao;
+}
+
 export interface RegrasPorTech {
-  requisitos: Requisito[];
+  /** Checklist técnico: o que precisa ser decidido/especificado no desenho.
+   * Renderizado como "Requisitos de refinamento técnico". */
+  checklistTecnico: Requisito[];
+  /** Checklist de processo: o que o time precisa fazer pra executar/testar. */
+  checklistProcesso?: ItemProcesso[];
   testes: TesteAutomatizado[];
   /** Quando presente, ativa o bloco fixo "Requisitos de volumetria" (Response
    * time/Max error/RPS/Test duration, sempre em branco pra preenchimento

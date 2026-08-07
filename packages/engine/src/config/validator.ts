@@ -130,11 +130,25 @@ export function validateRegras(regras: RegrasConfig, app: AppConfig): ErroValida
     if (!app.techs.includes(tech)) {
       erros.push({ campo: `porTech.${tech}`, mensagem: `tech "${tech}" não existe em app.json` });
     }
-    for (const [i, req] of porTech.requisitos.entries()) {
+    for (const [i, req] of porTech.checklistTecnico.entries()) {
       for (const contexto of req.contextos) {
         if (!app.contextos.some((c) => c.includes(contexto) || c.toLowerCase().includes(contexto.toLowerCase()))) {
           erros.push({
-            campo: `porTech.${tech}.requisitos[${i}].contextos`,
+            campo: `porTech.${tech}.checklistTecnico[${i}].contextos`,
+            mensagem: `contexto "${contexto}" não bate com nenhum contexto de app.json`,
+          });
+        }
+      }
+    }
+    // `when` do item de processo não é validado aqui: diferente de `FieldSpec.when`
+    // (que vive dentro de um tipo de nó e tem as chaves do spec pra conferir), um
+    // item de processo se aplica a vários tipos — não há um conjunto de chaves
+    // único contra o qual validar `field`. Contexto continua validado.
+    for (const [i, item] of (porTech.checklistProcesso ?? []).entries()) {
+      for (const contexto of item.contextos) {
+        if (!app.contextos.some((c) => c.includes(contexto) || c.toLowerCase().includes(contexto.toLowerCase()))) {
+          erros.push({
+            campo: `porTech.${tech}.checklistProcesso[${i}].contextos`,
             mensagem: `contexto "${contexto}" não bate com nenhum contexto de app.json`,
           });
         }
