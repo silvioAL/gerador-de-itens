@@ -578,11 +578,31 @@
         { "key": "timeoutMs", "label": "Timeout (ms)", "type": "number", "ajuda": "Timeout da chamada, em milissegundos — usado no diagrama exportável e na especificação, quando preenchido." }
       ]
     },
-    "grpc": { "label": "gRPC", "color": "#2563eb", "verbo": "chama via gRPC", "tamanhoPadrao": "P" },
+    "grpc": {
+      "label": "gRPC", "color": "#2563eb", "verbo": "chama via gRPC", "tamanhoPadrao": "P",
+      "spec": [
+        { "key": "timeoutMs", "label": "Timeout (ms)", "type": "number", "ajuda": "Timeout da chamada, em milissegundos — usado no diagrama exportável e na especificação, quando preenchido." }
+      ]
+    },
     "graphql": { "label": "GraphQL", "color": "#e10098", "verbo": "consulta via GraphQL", "tamanhoPadrao": "P" },
-    "publishes": { "label": "publica", "color": "#f97316", "verbo": "publica em", "tamanhoPadrao": "P" },
-    "consumes": { "label": "consome", "color": "#0891b2", "verbo": "consome de", "tamanhoPadrao": "M", "fluxo": "reverse" },
-    "pubsub": { "label": "publica+consome", "color": "#7c3aed", "verbo": "publica e consome de", "tamanhoPadrao": "M", "fluxo": "bidirectional" },
+    "publishes": {
+      "label": "publica", "color": "#f97316", "verbo": "publica em", "tamanhoPadrao": "P",
+      "spec": [
+        { "key": "chaveRoteamento", "label": "Chave de roteamento", "type": "text", "ajuda": "Routing key ou nome do tópico/fila de destino, quando relevante — usado no diagrama exportável e na especificação, quando preenchido." }
+      ]
+    },
+    "consumes": {
+      "label": "consome", "color": "#0891b2", "verbo": "consome de", "tamanhoPadrao": "M", "fluxo": "reverse",
+      "spec": [
+        { "key": "sincrono", "label": "Processamento síncrono?", "type": "boolean", "ajuda": "Se o consumo bloqueia até processar (síncrono) ou processa em background (assíncrono) — usado no diagrama exportável e na especificação, quando preenchido." }
+      ]
+    },
+    "pubsub": {
+      "label": "publica+consome", "color": "#7c3aed", "verbo": "publica e consome de", "tamanhoPadrao": "M", "fluxo": "bidirectional",
+      "spec": [
+        { "key": "chaveRoteamento", "label": "Chave de roteamento", "type": "text", "ajuda": "Routing key ou nome do tópico/fila, quando relevante — usado no diagrama exportável e na especificação, quando preenchido." }
+      ]
+    },
     "reads": { "label": "lê", "color": "#10b981", "verbo": "lê de", "tamanhoPadrao": "P", "fluxo": "reverse" },
     "writes": { "label": "escreve", "color": "#0ea5e9", "verbo": "escreve em", "tamanhoPadrao": "P" },
     "readwrite": { "label": "lê e escreve", "color": "#0d9488", "verbo": "lê e escreve em", "tamanhoPadrao": "P", "fluxo": "bidirectional" },
