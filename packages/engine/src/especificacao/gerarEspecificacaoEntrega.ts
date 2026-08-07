@@ -1,7 +1,7 @@
 import type { Atividade, Aresta, Diagrama, No, ValorSpec } from "../model/types.js";
 import type { DiagramaConfig, FieldSpec, RegrasConfig } from "../config/types.js";
 import { camposVisiveis } from "../spec/campos.js";
-import { gerarChecklistTecnico, gerarCiclosDeTeste } from "../refinamento/gerarRefinamento.js";
+import { gerarChecklistTecnico, gerarCiclosDeTeste, gerarVolumetria } from "../refinamento/gerarRefinamento.js";
 
 function nodeById(diagrama: Diagrama, id: string): No | undefined {
   return diagrama.nodes.find((n) => n.id === id);
@@ -220,6 +220,8 @@ export function renderizarItemEspecificacao(
     [checklist, ciclosTeste ? `**Ciclos de teste:**\n\n${ciclosTeste}` : ""].filter((b) => b.length > 0).join("\n\n") ||
     "_Nenhum requisito técnico específico para esta combinação de tech/contexto._";
 
+  const volumetria = regras ? gerarVolumetria(regras, atividade.techs, atividade.contextos) : "";
+
   const criteriosAceite = resolverCenarioGherkin(atividade, diagrama, config);
 
   return [
@@ -236,6 +238,7 @@ export function renderizarItemEspecificacao(
     "#### Requisitos de refinamento técnico",
     "",
     refinamentoTecnico,
+    ...(volumetria ? ["", "#### Requisitos de volumetria", "", volumetria] : []),
     "",
     "#### Critérios de aceite (Gherkin)",
     "",

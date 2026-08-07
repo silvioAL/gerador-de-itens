@@ -132,7 +132,7 @@ describe("ReviewScreen — revisão e especificação unificadas (expandir por i
     porTech: {
       Backend: {
         requisitos: [
-          { texto: "DLQ configurada e monitorada", tipo: "checklist", contextos: ["Backend-mensagens"] },
+          { texto: "DLQ configurada e monitorada", contextos: ["Backend-mensagens"] },
         ],
         testes: [],
       },

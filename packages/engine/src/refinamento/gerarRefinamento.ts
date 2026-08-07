@@ -22,6 +22,11 @@ function testesRelevantes(testes: TesteAutomatizado[], contextos: string[]): Tes
   return testes.filter((t) => contextoBate(t.contextos, contextos));
 }
 
+/** Marcador exigido pelo agente de IA que valida os itens (padrão documentado
+ * em Confluence, ver SPEC-19) — toda linha de "Requisitos de refinamento"
+ * termina assim, sem exceção. Nunca remover/alterar. */
+const MARCADOR_ESPECIFICAR = "<- ✍️ especificar";
+
 /** Checklist de refinamento técnico em Markdown, filtrado por techs+contextos da atividade. */
 export function gerarChecklistTecnico(regras: RegrasConfig, techs: string[], contextos: string[]): string {
   const blocos: string[] = [];
@@ -32,12 +37,27 @@ export function gerarChecklistTecnico(regras: RegrasConfig, techs: string[], con
     if (relevantes.length === 0) continue;
 
     const linhas = [`**${tech.toUpperCase()}:**`];
-    for (const r of relevantes) {
-      linhas.push(r.tipo === "checklist" ? `- [ ] ${r.texto}` : `${r.texto} <- especificar`);
-    }
+    for (const r of relevantes) linhas.push(`- ${r.texto} ${MARCADOR_ESPECIFICAR}`);
     blocos.push(linhas.join("\n"));
   }
   return blocos.join("\n\n");
+}
+
+/** Campos fixos do bloco de volumetria — nome e ordem exigidos pelo agente de
+ * validação, nunca preenchidos automaticamente (sempre `___`, pra completar
+ * na mão). */
+const CAMPOS_VOLUMETRIA = ["Response time", "Max error", "RPS (Requisições por segundo)", "Test duration"];
+
+/** Bloco "Requisitos de volumetria" quando alguma tech relevante o exige pro
+ * conjunto de contextos da atividade — formato fixo, nunca gerado por
+ * dedução (ver `RegrasPorTech.volumetria`). */
+export function gerarVolumetria(regras: RegrasConfig, techs: string[], contextos: string[]): string {
+  const aplica = techs.some((tech) => {
+    const volumetria = regras.porTech[tech]?.volumetria;
+    return volumetria ? contextoBate(volumetria.contextos, contextos) : false;
+  });
+  if (!aplica) return "";
+  return CAMPOS_VOLUMETRIA.map((campo) => `- ${campo}: ___ ${MARCADOR_ESPECIFICAR}`).join("\n");
 }
 
 /** Ciclos de teste automatizados (DEV/HLG) em Markdown, filtrados por techs+contextos. */

@@ -90,7 +90,7 @@ describe("export — fixture 01 (sem ciclos/conflitos)", () => {
       porTech: {
         Backend: {
           requisitos: [
-            { texto: "DLQ configurada e monitorada", tipo: "checklist", contextos: ["Backend-mensagens"] },
+            { texto: "DLQ configurada e monitorada", contextos: ["Backend-mensagens"] },
           ],
           testes: [],
         },

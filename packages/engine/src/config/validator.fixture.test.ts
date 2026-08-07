@@ -144,7 +144,7 @@ describe("validateRegras — config/regras.example.json + config/app.example.jso
           ...regras.porTech.Backend,
           requisitos: [
             ...regras.porTech.Backend.requisitos,
-            { texto: "x", tipo: "checklist", contextos: ["contexto-fantasma"] },
+            { texto: "x", contextos: ["contexto-fantasma"] },
           ],
         },
       },

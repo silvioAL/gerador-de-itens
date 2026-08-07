@@ -131,17 +131,22 @@ export interface AppConfig {
   contextos: string[];
 }
 
-export type TipoRequisito = "checklist" | "fill-now" | "texto";
-
 /**
  * Item de refinamento técnico por tech. `contextos: []` aplica sempre que a tech
  * estiver presente; caso contrário, só aparece quando um dos contextos da
  * atividade contém (ou é contido por) algum destes — mesmo casamento parcial
  * do legado, deliberado: "Backend-mensagens" bate com "Backend-mensagens rabbitmq".
+ *
+ * Achado real: existia um `tipo: "checklist" | "fill-now" | "texto"` que
+ * mudava a renderização (`- [ ] texto` vs `texto <- especificar`) — mas o
+ * agente de IA que valida os itens (documentação em Confluence) exige que
+ * **toda** linha de "Requisitos de refinamento" termine com o mesmo marcador
+ * `<- ✍️ especificar`, sem formato de checklist. Removido — todo requisito
+ * renderiza igual agora, o campo não tinha mais efeito nenhum que fizesse
+ * sentido manter.
  */
 export interface Requisito {
   texto: string;
-  tipo: TipoRequisito;
   contextos: string[];
 }
 
@@ -156,6 +161,12 @@ export interface TesteAutomatizado {
 export interface RegrasPorTech {
   requisitos: Requisito[];
   testes: TesteAutomatizado[];
+  /** Quando presente, ativa o bloco fixo "Requisitos de volumetria" (Response
+   * time/Max error/RPS/Test duration, sempre em branco pra preenchimento
+   * manual — formato exigido pelo agente de validação, nunca inventado aqui).
+   * `contextos: []` = sempre que a tech estiver presente; mesmo casamento
+   * parcial de `Requisito.contextos`. */
+  volumetria?: { contextos: string[] };
 }
 
 export interface RegrasConfig {

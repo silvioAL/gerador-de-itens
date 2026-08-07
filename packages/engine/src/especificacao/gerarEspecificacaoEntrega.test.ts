@@ -48,8 +48,9 @@ const config: DiagramaConfig = {
 const regras: RegrasConfig = {
   porTech: {
     Backend: {
-      requisitos: [{ texto: "Logs relevantes emitidos", tipo: "checklist", contextos: ["Backend-dados"] }],
+      requisitos: [{ texto: "Logs relevantes emitidos", contextos: ["Backend-dados"] }],
       testes: [{ tipo: "Teste de migração", validacao: "roda limpo", dev: true, hlg: false, contextos: ["Backend-dados"] }],
+      volumetria: { contextos: ["Backend-dados"] },
     },
   },
 };
@@ -131,6 +132,39 @@ describe("gerarEspecificacaoEntrega", () => {
 
     expect(doc).toContain("Logs relevantes emitidos");
     expect(doc).toContain("Teste de migração");
+  });
+
+  it("com regras que ativam volumetria: documento inclui a seção 'Requisitos de volumetria' com o formato fixo", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, config, { regras });
+
+    expect(doc).toContain("#### Requisitos de volumetria");
+    expect(doc).toContain("- Response time: ___ <- ✍️ especificar");
+    expect(doc).toContain("- RPS (Requisições por segundo): ___ <- ✍️ especificar");
+  });
+
+  it("sem regras que ativem volumetria pro contexto: seção nem aparece", () => {
+    const diagramaSemContexto: Diagrama = {
+      nodes: [
+        {
+          id: "n1",
+          type: "service",
+          status: "novo",
+          label: "srv-x",
+          x: 0,
+          y: 0,
+          spec: { nome: { valor: "srv-x", origem: "manual" } },
+          specNA: { linguagem: { motivo: "não decidido" } },
+        },
+      ],
+      edges: [],
+    };
+    const atividades = derivar(diagramaSemContexto, config, {});
+    const doc = gerarEspecificacaoEntrega(atividades, diagramaSemContexto, config, { regras });
+
+    expect(doc).not.toContain("Requisitos de volumetria");
   });
 
   it("sem atividades: itens mostra mensagem clara, não quebra", () => {

@@ -4,40 +4,40 @@
   "porTech": {
     "Backend": {
       "requisitos": [
-        { "texto": "Logs relevantes emitidos em pontos de decisão/erro", "tipo": "checklist", "contextos": [] },
+        { "texto": "Logs relevantes emitidos em pontos de decisão/erro", "contextos": [] },
 
-        { "texto": "Estratégia de retry e DLQ definidas", "tipo": "checklist", "contextos": ["Backend-mensagens"] },
-        { "texto": "Consumo é idempotente ou tem chave de dedupe", "tipo": "checklist", "contextos": ["Backend-mensagens"] },
-        { "texto": "Ordem de processamento documentada (importa ou não)", "tipo": "checklist", "contextos": ["Backend-mensagens"] },
+        { "texto": "Estratégia de retry e DLQ definidas", "contextos": ["Backend-mensagens"] },
+        { "texto": "Consumo é idempotente ou tem chave de dedupe", "contextos": ["Backend-mensagens"] },
+        { "texto": "Ordem de processamento documentada (importa ou não)", "contextos": ["Backend-mensagens"] },
 
-        { "texto": "Prefetch dimensionado para o volume esperado", "tipo": "checklist", "contextos": ["Backend-mensagens rabbitmq"] },
+        { "texto": "Prefetch dimensionado para o volume esperado", "contextos": ["Backend-mensagens rabbitmq"] },
 
-        { "texto": "Estratégia de particionamento e chave definidas", "tipo": "checklist", "contextos": ["Backend-mensagens kafka"] },
-        { "texto": "Consumer group e política de offset (earliest/latest) definidos", "tipo": "checklist", "contextos": ["Backend-mensagens kafka"] },
+        { "texto": "Estratégia de particionamento e chave definidas", "contextos": ["Backend-mensagens kafka"] },
+        { "texto": "Consumer group e política de offset (earliest/latest) definidos", "contextos": ["Backend-mensagens kafka"] },
 
-        { "texto": "Índices criados para as queries novas", "tipo": "checklist", "contextos": ["Backend-dados"] },
-        { "texto": "Plano de migração/rollback do schema", "tipo": "checklist", "contextos": ["Backend-dados"] },
-        { "texto": "Volume e retenção de dados esperados", "tipo": "fill-now", "contextos": ["Backend-dados"] },
+        { "texto": "Índices criados para as queries novas", "contextos": ["Backend-dados"] },
+        { "texto": "Plano de migração/rollback do schema", "contextos": ["Backend-dados"] },
+        { "texto": "Volume e retenção de dados esperados", "contextos": ["Backend-dados"] },
 
-        { "texto": "Timeout e política de retry definidos", "tipo": "checklist", "contextos": ["Backend-chamadas http"] },
-        { "texto": "Autenticação/autorização da chamada definida", "tipo": "checklist", "contextos": ["Backend-chamadas http"] },
-        { "texto": "Circuit breaker ou fallback para indisponibilidade", "tipo": "checklist", "contextos": ["Backend-chamadas http"] },
+        { "texto": "Timeout e política de retry definidos", "contextos": ["Backend-chamadas http"] },
+        { "texto": "Autenticação/autorização da chamada definida", "contextos": ["Backend-chamadas http"] },
+        { "texto": "Circuit breaker ou fallback para indisponibilidade", "contextos": ["Backend-chamadas http"] },
 
-        { "texto": "Estratégia de compensação (rollback) do processo definida", "tipo": "checklist", "contextos": ["Backend-orquestracao"] },
-        { "texto": "Versionamento do processo considerado (instâncias em voo na migração)", "tipo": "checklist", "contextos": ["Backend-orquestracao"] },
+        { "texto": "Estratégia de compensação (rollback) do processo definida", "contextos": ["Backend-orquestracao"] },
+        { "texto": "Versionamento do processo considerado (instâncias em voo na migração)", "contextos": ["Backend-orquestracao"] },
 
-        { "texto": "Decisão é auditável (rastreabilidade de por que decidiu X)", "tipo": "checklist", "contextos": ["Backend-regras"] },
-        { "texto": "Versionamento das regras de negócio considerado", "tipo": "checklist", "contextos": ["Backend-regras"] },
+        { "texto": "Decisão é auditável (rastreabilidade de por que decidiu X)", "contextos": ["Backend-regras"] },
+        { "texto": "Versionamento das regras de negócio considerado", "contextos": ["Backend-regras"] },
 
-        { "texto": "Estratégia de invalidação definida (TTL, ativa no write, ou ambas)", "tipo": "checklist", "contextos": ["Backend-cache"] },
-        { "texto": "Comportamento com cache indisponível considerado (fail-open vs. fail-closed)", "tipo": "checklist", "contextos": ["Backend-cache"] },
+        { "texto": "Estratégia de invalidação definida (TTL, ativa no write, ou ambas)", "contextos": ["Backend-cache"] },
+        { "texto": "Comportamento com cache indisponível considerado (fail-open vs. fail-closed)", "contextos": ["Backend-cache"] },
 
-        { "texto": "Política de acesso ao objeto revisada (não fica público sem necessidade)", "tipo": "checklist", "contextos": ["Backend-storage"] },
-        { "texto": "Ciclo de vida do objeto definido (expiração/arquivamento)", "tipo": "checklist", "contextos": ["Backend-storage"] },
+        { "texto": "Política de acesso ao objeto revisada (não fica público sem necessidade)", "contextos": ["Backend-storage"] },
+        { "texto": "Ciclo de vida do objeto definido (expiração/arquivamento)", "contextos": ["Backend-storage"] },
 
-        { "texto": "Job é restartável a partir do checkpoint, sem reprocessar tudo", "tipo": "checklist", "contextos": ["Backend-processamento em lote"] },
-        { "texto": "Política de skip/retry por item definida", "tipo": "checklist", "contextos": ["Backend-processamento em lote"] },
-        { "texto": "Chunk size dimensionado para o volume esperado", "tipo": "checklist", "contextos": ["Backend-processamento em lote"] }
+        { "texto": "Job é restartável a partir do checkpoint, sem reprocessar tudo", "contextos": ["Backend-processamento em lote"] },
+        { "texto": "Política de skip/retry por item definida", "contextos": ["Backend-processamento em lote"] },
+        { "texto": "Chunk size dimensionado para o volume esperado", "contextos": ["Backend-processamento em lote"] }
       ],
       "testes": [
         { "tipo": "Teste de contrato", "validacao": "Payload publicado/recebido bate com o schema acordado", "contextos": ["Backend-mensagens"], "dev": true, "hlg": true },
@@ -61,19 +61,20 @@
         { "tipo": "Teste de upload/download", "validacao": "Objeto enviado é recuperável com o mesmo conteúdo e metadados", "contextos": ["Backend-storage"], "dev": true, "hlg": true },
 
         { "tipo": "Teste de restart", "validacao": "Job retomado após falha no meio continua do checkpoint, sem duplicar itens já processados", "contextos": ["Backend-processamento em lote"], "dev": false, "hlg": true }
-      ]
+      ],
+      "volumetria": { "contextos": ["Backend-chamadas http"] }
     },
     "Mobile": {
       "requisitos": [
-        { "texto": "Dados sensíveis não persistidos em texto puro no dispositivo", "tipo": "checklist", "contextos": [] },
-        { "texto": "Comportamento sem rede (offline) definido, não só o caminho feliz online", "tipo": "checklist", "contextos": [] },
+        { "texto": "Dados sensíveis não persistidos em texto puro no dispositivo", "contextos": [] },
+        { "texto": "Comportamento sem rede (offline) definido, não só o caminho feliz online", "contextos": [] },
 
-        { "texto": "Permissões pedidas em runtime, com fluxo definido se o usuário negar", "tipo": "checklist", "contextos": ["Mobile-android"] },
-        { "texto": "Compatibilidade testada na versão mínima de SDK/API level suportada", "tipo": "checklist", "contextos": ["Mobile-android"] },
+        { "texto": "Permissões pedidas em runtime, com fluxo definido se o usuário negar", "contextos": ["Mobile-android"] },
+        { "texto": "Compatibilidade testada na versão mínima de SDK/API level suportada", "contextos": ["Mobile-android"] },
 
-        { "texto": "Permissões pedidas em runtime, com fluxo definido se o usuário negar", "tipo": "checklist", "contextos": ["Mobile-ios"] },
-        { "texto": "Compatibilidade testada na versão mínima de iOS suportada", "tipo": "checklist", "contextos": ["Mobile-ios"] },
-        { "texto": "Mudança revisada contra as App Store Review Guidelines relevantes", "tipo": "checklist", "contextos": ["Mobile-ios"] }
+        { "texto": "Permissões pedidas em runtime, com fluxo definido se o usuário negar", "contextos": ["Mobile-ios"] },
+        { "texto": "Compatibilidade testada na versão mínima de iOS suportada", "contextos": ["Mobile-ios"] },
+        { "texto": "Mudança revisada contra as App Store Review Guidelines relevantes", "contextos": ["Mobile-ios"] }
       ],
       "testes": [
         { "tipo": "Teste em dispositivo real", "validacao": "Fluxo principal funciona em ao menos um dispositivo físico Android, não só emulador", "contextos": ["Mobile-android"], "dev": true, "hlg": false },
