@@ -1,7 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { TEMPLATE_ESPECIFICACAO_PADRAO, type PerfisConfig, type Quebra } from "@gerador/engine";
 
 const CAMPO_GLOBAL = "__global__";
@@ -25,6 +26,35 @@ const CAMPO_GLOBAL = "__global__";
  */
 
 const SESSAO_LOCAL = { email: "local", timeIds: ["local"] };
+
+// Achado real: sem isso, o usuário não tinha como saber, olhando o app, se
+// `npm install -g gerador-de-itens@latest` de fato pegou a versão nova — a
+// única forma era comparar a tag do GitHub com o que ele lembrava de ter
+// instalado. `package.json` fica ao lado de `dist/cli.js` tanto no pacote
+// publicado quanto no build local (mesmo layout que `open.ts` já assume pra
+// achar `web-dist`), então ler daqui é a mesma versão que "npm view
+// gerador-de-itens version" reportaria depois de instalada.
+let versaoCli: string | undefined;
+async function versaoDoPacote(): Promise<string | undefined> {
+  if (versaoCli !== undefined) return versaoCli;
+  const aqui = dirname(fileURLToPath(import.meta.url));
+  // Dois layouts possíveis: bundlado (tsup junta tudo em dist/cli.js, um nível
+  // acima de dist/ é a raiz do pacote) ou rodando direto de src/commands/ (dois
+  // níveis acima) — mesma dualidade que DIST_WEB_BUNDLADO/DIST_WEB_MONOREPO em
+  // open.ts já trata pro build web.
+  for (const candidato of [resolve(aqui, "../package.json"), resolve(aqui, "../../package.json")]) {
+    try {
+      const pkg = JSON.parse(await readFile(candidato, "utf-8")) as { version?: string };
+      if (pkg.version) {
+        versaoCli = pkg.version;
+        return versaoCli;
+      }
+    } catch {
+      // tenta o próximo candidato
+    }
+  }
+  return undefined;
+}
 
 function enviarJson(res: ServerResponse, status: number, corpo: unknown): void {
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-cache" });
@@ -383,6 +413,10 @@ export async function tratarApiLocal(req: IncomingMessage, res: ServerResponse, 
 
   if (caminho === "/auth/modo" && metodo === "GET") {
     enviarJson(res, 200, { modo: "local" });
+    return true;
+  }
+  if (caminho === "/versao" && metodo === "GET") {
+    enviarJson(res, 200, { versao: await versaoDoPacote() });
     return true;
   }
   if (caminho === "/auth/me" && metodo === "GET") {

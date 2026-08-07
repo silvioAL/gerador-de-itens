@@ -74,15 +74,26 @@ export async function open(args: string[]): Promise<void> {
         caminhoArquivo = join(caminhoArquivo, "index.html");
       }
 
+      // index.html nunca é cacheado pelo browser (achado real: os assets em
+      // /assets/*.js|css têm hash de conteúdo no nome — cache normal é seguro
+      // e desejável ali — mas index.html referencia esses nomes; se o browser
+      // guardar um index.html velho depois de "npm install -g ...@latest" +
+      // reiniciar `gerador open`, ele aponta pra um JS com hash que não existe
+      // mais no disco, e a tela fica em branco sem erro visível pro usuário).
+      const semCache = extname(caminhoArquivo) === ".html";
+
       try {
         const conteudo = await readFile(caminhoArquivo);
-        res.writeHead(200, { "Content-Type": MIME[extname(caminhoArquivo)] ?? "application/octet-stream" });
+        res.writeHead(200, {
+          "Content-Type": MIME[extname(caminhoArquivo)] ?? "application/octet-stream",
+          ...(semCache ? { "Cache-Control": "no-cache" } : {}),
+        });
         res.end(conteudo);
       } catch {
         // SPA sem essa rota estática — cai para index.html.
         try {
           const conteudo = await readFile(join(DIST_WEB, "index.html"));
-          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
           res.end(conteudo);
         } catch {
           res.writeHead(404);
