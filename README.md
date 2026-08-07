@@ -84,6 +84,22 @@ Também dá pra ver a jornada de linha de comando dentro do próprio app web: bo
 
 Todo comando lê `config/*.json` do **diretório atual**, nunca deste repositório — o mesmo pacote serve qualquer projeto.
 
+## Solução de problemas
+
+**`gerador` não é reconhecido como comando depois do `npm install -g`.** O `npm` instalou o binário, mas a pasta global de binários do `npm` não está no `PATH` do Windows — comum em instalações novas do Node, principalmente sem reiniciar o terminal depois. Confirme rodando `npm config get prefix` (é essa pasta que precisa estar no `PATH`); se `gerador --help` ainda falhar depois disso, feche e reabra o terminal.
+
+```powershell
+$npmPath = npm config get prefix
+$userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+
+if ($userPath -split ';' -notcontains $npmPath) {
+    [Environment]::SetEnvironmentVariable('Path', "$userPath;$npmPath", 'User')
+    Write-Host "Adicionado ao PATH: $npmPath" -ForegroundColor Green
+} else {
+    Write-Host "Ja esta no PATH: $npmPath" -ForegroundColor Yellow
+}
+```
+
 ## Desenvolvimento
 
 ```powershell
