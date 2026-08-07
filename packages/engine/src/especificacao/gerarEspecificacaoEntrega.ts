@@ -221,7 +221,7 @@ export function renderizarItemEspecificacao(
       ? nos.map((no) => descreverEspecificacaoNo(no, config, diagrama.edges)).join("\n\n")
       : "_Nenhum nó de origem associado a esta atividade._";
 
-  const checklist = regras ? gerarChecklistTecnico(regras, atividade.techs, atividade.contextos) : "";
+  const checklist = regras ? gerarChecklistTecnico(regras, atividade.techs, atividade.contextos, nos, diagrama.edges) : "";
   const ciclosTeste = regras ? gerarCiclosDeTeste(regras, atividade.techs, atividade.contextos) : "";
   const refinamentoTecnico =
     [checklist, ciclosTeste ? `**Ciclos de teste:**\n\n${ciclosTeste}` : ""].filter((b) => b.length > 0).join("\n\n") ||

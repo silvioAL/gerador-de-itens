@@ -39,30 +39,76 @@ const regras: RegrasConfig = {
   },
 };
 
+function noTecnico(parcial: Partial<No> = {}): No {
+  return {
+    id: "n1", type: "mongo", x: 0, y: 0, label: "db", status: "novo",
+    spec: {}, specNA: {}, ...parcial,
+  };
+}
+const semArestasTecnico: Aresta[] = [];
+
 describe("gerarChecklistTecnico", () => {
   it("inclui requisitos sem contexto sempre, e com contexto só quando bate (casamento parcial)", () => {
-    const md = gerarChecklistTecnico(regras, ["Backend"], ["Backend-mensagens rabbitmq"]);
+    const md = gerarChecklistTecnico(regras, ["Backend"], ["Backend-mensagens rabbitmq"], [noTecnico()], semArestasTecnico);
     expect(md).toContain("DLQ configurada e monitorada");
     expect(md).toContain("Nome do serviço segue o padrão do time");
     expect(md).not.toContain("Índice criado");
   });
 
   it("achado real: agente de IA que valida os itens (Confluence) exige o marcador '<- ✍️ especificar' em toda linha, sem formato de checklist ([ ])", () => {
-    const md = gerarChecklistTecnico(regras, ["Backend"], ["Backend-mensagens rabbitmq"]);
+    const md = gerarChecklistTecnico(regras, ["Backend"], ["Backend-mensagens rabbitmq"], [noTecnico()], semArestasTecnico);
     expect(md).toContain("- DLQ configurada e monitorada <- ✍️ especificar");
     expect(md).toContain("- Nome do serviço segue o padrão do time <- ✍️ especificar");
     expect(md).not.toContain("- [ ]");
   });
 
   it("tech sem entrada em porTech não gera bloco (nem quebra)", () => {
-    const md = gerarChecklistTecnico(regras, ["Mobile"], ["qualquer"]);
+    const md = gerarChecklistTecnico(regras, ["Mobile"], ["qualquer"], [noTecnico()], semArestasTecnico);
     expect(md).toBe("");
   });
 
   it("contexto de dados só traz o requisito de dados", () => {
-    const md = gerarChecklistTecnico(regras, ["Backend"], ["Backend-dados"]);
+    const md = gerarChecklistTecnico(regras, ["Backend"], ["Backend-dados"], [noTecnico()], semArestasTecnico);
     expect(md).toContain("Índice criado");
     expect(md).not.toContain("DLQ configurada");
+  });
+
+  it("achado real: item de migração só faz sentido pra recurso que já existe — não aparece pra um mongo novo", () => {
+    const regrasComMigracao: RegrasConfig = {
+      tipos: [], tamanhos: [],
+      porTech: {
+        Backend: {
+          checklistTecnico: [
+            { texto: "Verificar índice para as queries novas", contextos: ["Backend-dados"] },
+            { texto: "Definir plano de migração e rollback do schema", contextos: ["Backend-dados"], when: { nodeStatus: "existente" } },
+          ],
+          testes: [],
+        },
+      },
+    };
+    const mdNovo = gerarChecklistTecnico(regrasComMigracao, ["Backend"], ["Backend-dados"], [noTecnico({ status: "novo" })], semArestasTecnico);
+    expect(mdNovo).toContain("Verificar índice");
+    expect(mdNovo).not.toContain("plano de migração");
+
+    const mdExistente = gerarChecklistTecnico(regrasComMigracao, ["Backend"], ["Backend-dados"], [noTecnico({ status: "existente" })], semArestasTecnico);
+    expect(mdExistente).toContain("Verificar índice");
+    expect(mdExistente).toContain("plano de migração");
+  });
+
+  it("sem nó de origem, item condicionado por status não aparece — mesma disciplina do checklist de processo", () => {
+    const regrasComMigracao: RegrasConfig = {
+      tipos: [], tamanhos: [],
+      porTech: {
+        Backend: {
+          checklistTecnico: [
+            { texto: "Definir plano de migração", contextos: [], when: { nodeStatus: "existente" } },
+          ],
+          testes: [],
+        },
+      },
+    };
+    const md = gerarChecklistTecnico(regrasComMigracao, ["Backend"], [], [], semArestasTecnico);
+    expect(md).toBe("");
   });
 });
 

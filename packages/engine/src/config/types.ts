@@ -172,6 +172,14 @@ export interface AppConfig {
 export interface Requisito {
   texto: string;
   contextos: string[];
+  /** Avaliada contra os nós de origem da atividade — o item aparece se
+   * **algum** deles satisfizer (mesma régua de `.some()` do casamento de
+   * contexto e do `when` de `ItemProcesso`). Sem `when`, basta tech + contexto
+   * baterem. Existe pra diferenciar decisão de desenho do zero ("definir
+   * schema") de decisão só cabível quando o recurso já existe ("definir plano
+   * de migração") — achado real: os dois apareciam juntos pra todo nó do
+   * contexto, novo ou existente. */
+  when?: Condicao;
 }
 
 export interface TesteAutomatizado {

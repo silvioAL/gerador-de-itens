@@ -100,6 +100,41 @@ describe("export — fixture 01 (sem ciclos/conflitos)", () => {
     expect(mdComRegras).toContain("## Refinamento técnico");
     expect(mdComRegras).toContain("DLQ configurada e monitorada");
   });
+
+  it("achado real: item condicionado por nodeStatus respeita o status do nó quando o diagrama é passado, e não aparece sem ele", () => {
+    const regras: RegrasConfig = {
+      tipos: ["História", "Task", "Débito Técnico"],
+      tamanhos: ["PP", "P", "M", "G"],
+      porTech: {
+        Backend: {
+          checklistTecnico: [
+            // n2 (rabbit, fixture 01) é "novo".
+            { texto: "Dimensionar prefetch (fila nova)", contextos: ["Backend-mensagens"], when: { nodeStatus: "novo" } },
+            { texto: "Definir plano de migração da fila", contextos: ["Backend-mensagens"], when: { nodeStatus: "existente" } },
+          ],
+          testes: [],
+        },
+      },
+    };
+
+    // Sem `diagrama`: nenhum nó de origem disponível — condição não avaliável não aparece.
+    const semDiagrama = paraMarkdown(resultado.atividades, resultado.ciclos, resultado.conflitos, regras);
+    expect(semDiagrama).not.toContain("Dimensionar prefetch");
+    expect(semDiagrama).not.toContain("plano de migração da fila");
+
+    // Com `diagrama`: a atividade de CRIAÇÃO da fila (n2, "novo") só tem [n2] como
+    // nó de origem — isolada aqui porque outra atividade da fixture (o consumo,
+    // que tem dois nós de origem) envolve um segundo nó "existente" (srv-notificacao)
+    // e dispararia o item de "existente" também, pela mesma régua de `.some()`
+    // já usada no checklist de processo — comportamento correto, não o que este
+    // teste quer isolar.
+    const comDiagrama = paraMarkdown(
+      resultado.atividades, resultado.ciclos, resultado.conflitos, regras, undefined, fixture.quebra.diagrama
+    );
+    const secaoCriacaoFila = comDiagrama.split("## Refinamento técnico — 04")[1].split("## Refinamento técnico — 05")[0];
+    expect(secaoCriacaoFila).toContain("Dimensionar prefetch");
+    expect(secaoCriacaoFila).not.toContain("plano de migração da fila");
+  });
 });
 
 describe("export — fixture 02 (ciclo direto, via derivação sintética)", () => {
