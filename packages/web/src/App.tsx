@@ -18,6 +18,7 @@ import {
   apiEspecificacaoTemplate,
   apiPerfisTime,
   apiTimes,
+  apiVersao,
   type CampoAresta,
   type CampoNo,
   type DadosCampoAresta,
@@ -236,6 +237,15 @@ function AppCarregado({
   const [camposNo, setCamposNo] = useState(camposNoInicial);
   const [camposAresta, setCamposAresta] = useState(camposArestaInicial);
   const [especificacaoTemplate, setEspecificacaoTemplate] = useState(especificacaoTemplateInicial);
+
+  // Só o modo local (`gerador open`) tem a rota — hospedado/dev não têm nada
+  // aqui, o que é esperado, não some/quebra a tela. Achado real: sem isso
+  // visível, o usuário não tinha como confirmar que "npm install -g
+  // gerador-de-itens@latest" trouxe a versão nova.
+  const [versao, setVersao] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    void apiVersao.buscar().then(setVersao);
+  }, []);
   const quebraState = useQuebra(quebraVazia(timeAtivo), diagramaConfig);
   const {
     quebra,
@@ -427,7 +437,22 @@ function AppCarregado({
           background: "#ffffff",
         }}
       >
-        <strong style={{ fontSize: 14, color: "#0f172a", marginRight: 8 }}>Gerador de Itens</strong>
+        <strong style={{ fontSize: 14, color: "#0f172a" }}>Gerador de Itens</strong>
+        {versao && (
+          <span
+            title="Versão do pacote gerador-de-itens instalado — mesma versão da tag no GitHub"
+            style={{
+              fontSize: 10.5,
+              color: "#64748b",
+              background: "#f1f5f9",
+              borderRadius: 999,
+              padding: "1px 7px",
+              marginRight: 8,
+            }}
+          >
+            v{versao}
+          </span>
+        )}
 
         <button onClick={() => setMostrarJornada(true)} style={{ ...botaoEstilo, ...botaoJornadaEstilo }}>
           ✦ Como funciona &amp; cenários

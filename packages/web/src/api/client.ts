@@ -87,6 +87,24 @@ export const apiAuth = {
   sair: () => requisitar<{ ok: boolean }>("/auth/logout", { method: "POST" }),
 };
 
+/** Só o modo local (`gerador open`) tem essa rota — hospedado e `npm run dev`
+ * não têm nada aqui, o que é esperado (não é um erro, mesma disciplina de
+ * `.catch(() => [])` já usada pra recursos opcionais). Achado real: sem isso
+ * visível na tela, o usuário não tinha como confirmar que `npm install -g
+ * gerador-de-itens@latest` de fato trouxe a versão nova. */
+export const apiVersao = {
+  async buscar(): Promise<string | undefined> {
+    try {
+      const resposta = await fetch(`${BASE_URL}/versao`, { credentials: "include" });
+      if (!resposta.ok) return undefined;
+      const corpo = (await resposta.json()) as { versao?: string };
+      return corpo.versao;
+    } catch {
+      return undefined;
+    }
+  },
+};
+
 /** Forma de um sub-campo dentro de um campo `type: "lista"` (ex.: method/path/
  * request/response de um endpoint) — deliberadamente mais simples que
  * `FieldSpec` completo (sem `when`/`permiteNA`/`itemSpec` aninhado): é a

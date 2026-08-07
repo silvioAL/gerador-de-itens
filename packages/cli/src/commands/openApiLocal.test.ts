@@ -40,6 +40,13 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     expect(me).toEqual({ email: "local", timeIds: ["local"] });
   });
 
+  it("achado real: GET /versao devolve a versão de package.json — usuário não tinha como saber se o npm install pegou a versão nova", async () => {
+    const resposta = await fetch(`${base}/versao`);
+    expect(resposta.status).toBe(200);
+    const corpo = await resposta.json();
+    expect(corpo.versao).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+
   it("GET /quebras sem quebras/ ainda devolve lista vazia, não erro", async () => {
     const resposta = await fetch(`${base}/quebras`);
     expect(resposta.status).toBe(200);
