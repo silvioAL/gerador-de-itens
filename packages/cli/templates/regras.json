@@ -16,7 +16,7 @@
         { "texto": "Definir consumer group e política de offset (earliest/latest)", "contextos": ["Backend-mensagens kafka"] },
 
         { "texto": "Verificar se as queries novas exigem índice e especificar quais — se aplicável", "contextos": ["Backend-dados"] },
-        { "texto": "Definir plano de migração e rollback do schema", "contextos": ["Backend-dados"] },
+        { "texto": "Definir plano de migração e rollback do schema", "contextos": ["Backend-dados"], "when": { "nodeStatus": "existente" } },
         { "texto": "Estimar volume e definir retenção dos dados", "contextos": ["Backend-dados"] },
 
         { "texto": "Definir timeout e política de retry", "contextos": ["Backend-chamadas http"] },
@@ -25,11 +25,11 @@
 
         { "texto": "Descrever as alterações no processo (etapas, gateways, listeners afetados)", "contextos": ["Backend-orquestracao"] },
         { "texto": "Definir estratégia de compensação (rollback) do processo", "contextos": ["Backend-orquestracao"] },
-        { "texto": "Definir o que acontece com instâncias em voo na migração (migrar ou deixar terminar na versão anterior)", "contextos": ["Backend-orquestracao"] },
+        { "texto": "Definir o que acontece com instâncias em voo na migração (migrar ou deixar terminar na versão anterior)", "contextos": ["Backend-orquestracao"], "when": { "nodeStatus": "existente" } },
 
         { "texto": "Descrever os motores, rulesets ou fluxos de decisão modificados", "contextos": ["Backend-regras"] },
         { "texto": "Definir a trilha de auditoria da decisão (o que registrar para reconstruir por que decidiu X)", "contextos": ["Backend-regras"] },
-        { "texto": "Definir versionamento das regras (o que acontece com decisões já tomadas na versão anterior)", "contextos": ["Backend-regras"] },
+        { "texto": "Definir versionamento das regras (o que acontece com decisões já tomadas na versão anterior)", "contextos": ["Backend-regras"], "when": { "nodeStatus": "existente" } },
 
         { "texto": "Definir estratégia de invalidação (TTL, ativa no write, ou ambas)", "contextos": ["Backend-cache"] },
         { "texto": "Definir comportamento com cache indisponível (fail-open ou fail-closed)", "contextos": ["Backend-cache"] },

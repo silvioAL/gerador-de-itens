@@ -1,5 +1,5 @@
 import type { Aresta, No } from "../model/types.js";
-import type { ItemProcesso, RegrasConfig, Requisito, TesteAutomatizado } from "../config/types.js";
+import type { Condicao, ItemProcesso, RegrasConfig, Requisito, TesteAutomatizado } from "../config/types.js";
 import { avaliarCondicao } from "../spec/condicoes.js";
 
 /**
@@ -29,13 +29,27 @@ function testesRelevantes(testes: TesteAutomatizado[], contextos: string[]): Tes
  * termina assim, sem exceção. Nunca remover/alterar. */
 const MARCADOR_ESPECIFICAR = "<- ✍️ especificar";
 
-/** Checklist de refinamento técnico em Markdown, filtrado por techs+contextos da atividade. */
-export function gerarChecklistTecnico(regras: RegrasConfig, techs: string[], contextos: string[]): string {
+/**
+ * Checklist de refinamento técnico em Markdown, filtrado por techs+contextos
+ * da atividade e por `when` (ver `condicaoBate`) — ex.: "definir plano de
+ * migração do schema" só faz sentido se o recurso já existir, não pra um
+ * criado do zero. Achado real: antes desse filtro, os mesmos itens apareciam
+ * pra um Mongo novo e pra um já existente, sem diferença nenhuma.
+ */
+export function gerarChecklistTecnico(
+  regras: RegrasConfig,
+  techs: string[],
+  contextos: string[],
+  nos: No[],
+  arestas: Aresta[]
+): string {
   const blocos: string[] = [];
   for (const tech of techs) {
     const porTech = regras.porTech[tech];
     if (!porTech) continue;
-    const relevantes = requisitosRelevantes(porTech.checklistTecnico, contextos);
+    const relevantes = requisitosRelevantes(porTech.checklistTecnico, contextos).filter((r) =>
+      condicaoBate(r, nos, arestas)
+    );
     if (relevantes.length === 0) continue;
 
     const linhas = [`**${tech.toUpperCase()}:**`];
@@ -83,8 +97,11 @@ export function gerarChecklistProcesso(
 
 /** Sem `when`, o item vale sempre. Sem nó de origem (atividade solta), um item
  * condicionado não aparece — condição que não dá pra avaliar não é assumida
- * como verdadeira, mesma disciplina de "nunca verde sem alguém olhar". */
-function condicaoBate(item: ItemProcesso, nos: No[], arestas: Aresta[]): boolean {
+ * como verdadeira, mesma disciplina de "nunca verde sem alguém olhar".
+ * Compartilhado entre checklist técnico (`Requisito`) e de processo
+ * (`ItemProcesso`) — os dois só diferem no `texto`/`contextos`, a regra de
+ * avaliação do `when` é idêntica. */
+function condicaoBate(item: { when?: Condicao }, nos: No[], arestas: Aresta[]): boolean {
   if (!item.when) return true;
   return nos.some((no) => avaliarCondicao(item.when!, no, arestas));
 }

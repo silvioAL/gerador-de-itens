@@ -1,6 +1,7 @@
-import type { Atividade, Ciclo, Conflito } from "../model/types.js";
+import type { Atividade, Ciclo, Conflito, Diagrama } from "../model/types.js";
 import type { RegrasConfig } from "../config/types.js";
 import { gerarChecklistTecnico, gerarCiclosDeTeste } from "../refinamento/gerarRefinamento.js";
+import { nosDeOrigem } from "../especificacao/gerarEspecificacaoEntrega.js";
 
 function descreverDependencia(a: Atividade): string {
   return a.dependencias
@@ -27,7 +28,8 @@ export function paraMarkdown(
   ciclos: Ciclo[],
   conflitos: Conflito[],
   regras?: RegrasConfig,
-  timeDaQuebra?: string
+  timeDaQuebra?: string,
+  diagrama?: Diagrama
 ): string {
   const linhas: string[] = ["# Itens derivados", ""];
   linhas.push("| # | Tipo | Tamanho | Descrição | Techs | Contextos | Dependências | Detalhes |");
@@ -66,7 +68,12 @@ export function paraMarkdown(
 
   if (regras) {
     for (const a of atividades) {
-      const checklist = gerarChecklistTecnico(regras, a.techs, a.contextos);
+      // Sem `diagrama`, não há como saber os nós de origem — itens condicionados
+      // por `nodeStatus` (ex.: "plano de migração" só faz sentido pra recurso
+      // existente) simplesmente não aparecem, mesma disciplina de "condição que
+      // não dá pra avaliar não é assumida verdadeira".
+      const nos = diagrama ? nosDeOrigem(a, diagrama) : [];
+      const checklist = gerarChecklistTecnico(regras, a.techs, a.contextos, nos, diagrama?.edges ?? []);
       const ciclosTeste = gerarCiclosDeTeste(regras, a.techs, a.contextos);
       if (!checklist && !ciclosTeste) continue;
       linhas.push("", `## Refinamento técnico — ${a.rotulo} ${a.descricao}`);
