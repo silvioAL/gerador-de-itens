@@ -152,6 +152,29 @@ export function useQuebra(inicial: Quebra, config: DiagramaConfig) {
     }));
   }, []);
 
+  const atualizarAresta = useCallback((id: string, updater: (a: Aresta) => Aresta) => {
+    setQuebra((q) => ({
+      ...q,
+      diagrama: {
+        ...q.diagrama,
+        edges: q.diagrama.edges.map((e) => (e.id === id ? updater(e) : e)),
+      },
+    }));
+  }, []);
+
+  /** Valor de campo de `EdgeTypeConfig.spec` numa conexão específica (SPEC-21)
+   * — mesma forma de `definirValorSpec` pro nó, mas sem N/A/confirmar/descartar:
+   * arestas não têm prontidão calculada no engine (ninguém pediu o semáforo
+   * pra conexão ainda), então o mecanismo fica no essencial por ora. */
+  const definirValorSpecAresta = useCallback(
+    (arestaId: string, campoKey: string, valor: unknown) =>
+      atualizarAresta(arestaId, (a) => ({
+        ...a,
+        spec: { ...(a.spec ?? {}), [campoKey]: { valor, origem: "manual" } },
+      })),
+    [atualizarAresta]
+  );
+
   const removerAresta = useCallback((edgeId: string) => {
     setQuebra((q) => ({
       ...q,
@@ -182,6 +205,7 @@ export function useQuebra(inicial: Quebra, config: DiagramaConfig) {
     removerNo,
     tentarConectar,
     definirTipoAresta,
+    definirValorSpecAresta,
     removerAresta,
   };
 }

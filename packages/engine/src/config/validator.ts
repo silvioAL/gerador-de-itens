@@ -96,6 +96,27 @@ export function validateConfig(diagrama: DiagramaConfig, app: AppConfig): ErroVa
     }
   }
 
+  for (const [tipo, cfg] of Object.entries(diagrama.edgeTypes)) {
+    // `when` de campo de aresta não é validado aqui (mesma razão do `when` de
+    // ItemProcesso, SPEC-20): os operadores de Condicao pressupõem um `No`
+    // (nodeType, hasIncomingEdge...) — sem um `No` pra avaliar contra, ainda
+    // não há semântica decidida pro `when` numa aresta (ver SPEC-21). Chave
+    // referenciada em `default` continua validada normalmente.
+    const chavesDoTipo = new Set((cfg.spec ?? []).map((f) => f.key));
+    for (const campo of cfg.spec ?? []) {
+      if (typeof campo.default === "string") {
+        for (const ref of extrairReferenciasTemplate(campo.default)) {
+          if (!chavesDoTipo.has(ref)) {
+            erros.push({
+              campo: `edgeTypes.${tipo}.spec.${campo.key}.default`,
+              mensagem: `default referencia "{{${ref}}}", que não existe no spec de "${tipo}"`,
+            });
+          }
+        }
+      }
+    }
+  }
+
   for (const [tipoDestino, regra] of Object.entries(diagrama.edgeRules)) {
     if (tipoDestino !== "_fallback" && !tiposDeNo.includes(tipoDestino)) {
       erros.push({

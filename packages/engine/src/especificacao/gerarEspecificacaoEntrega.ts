@@ -122,8 +122,10 @@ function descreverDependencias(atividade: Atividade): string {
 
 /** Nós de origem de uma atividade — para atividade de aresta, source e target
  * (nessa ordem: quem chama, depois o recurso usado/afetado), não só o nó que
- * `origem.nodeId` guarda (que pra aresta é sempre a origem, nunca o alvo). */
-function nosDeOrigem(atividade: Atividade, diagrama: Diagrama): No[] {
+ * `origem.nodeId` guarda (que pra aresta é sempre a origem, nunca o alvo).
+ * Exportada pra `gerarDiagramaHtml` (SPEC-21) reusar o mesmo mapeamento
+ * atividade→nós, sem duplicar a lógica de resolução de origem. */
+export function nosDeOrigem(atividade: Atividade, diagrama: Diagrama): No[] {
   if (atividade.origem.edgeId) {
     const edge = diagrama.edges.find((e) => e.id === atividade.origem.edgeId);
     if (edge) {

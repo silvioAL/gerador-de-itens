@@ -120,6 +120,21 @@ export interface EdgeTypeConfig {
   tamanhoPadrao?: Tamanho;
   /** `false` para arestas puramente topológicas (ex.: `binding`) que não viram atividade própria — o padrão é gerar. */
   gerarAtividade?: boolean;
+  /**
+   * Campos customizáveis por conexão deste tipo (SPEC-21) — mesmo mecanismo
+   * de `NodeTypeConfig.spec`, mas pro tipo de aresta. Sem isso, `[]`: nem toda
+   * conexão precisa de campo próprio (ex.: `binding` é só topologia).
+   */
+  spec?: FieldSpec[];
+  /**
+   * Direção do fluxo de dados representado por este tipo de aresta, usada só
+   * pra animação do diagrama exportável (SPEC-21) — nunca pelo motor de
+   * derivação. "forward" (default, `source`→`target`, ex.: chama/publica),
+   * "reverse" (`target`→`source` — o dado sai do recurso em direção ao nó, ex.:
+   * `consumes`/`reads`: quem consome/lê recebe de quem guarda) ou
+   * "bidirectional" (as duas direções ao mesmo tempo, ex.: `readwrite`/`pubsub`).
+   */
+  fluxo?: "forward" | "reverse" | "bidirectional";
 }
 
 export interface EdgeRule {

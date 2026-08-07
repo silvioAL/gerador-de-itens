@@ -13,3 +13,4 @@ packages/web/e2e/screenshots/
 infra/secrets/.env
 .idea/
 .vscode/
+_prototipos/

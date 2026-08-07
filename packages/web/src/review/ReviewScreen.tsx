@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
+  gerarDiagramaHtml,
   gerarEspecificacaoEntrega,
   renderizarItemEspecificacao,
   type Atividade,
@@ -56,6 +57,21 @@ export function ReviewScreen({
   onSelecionarNo,
 }: ReviewScreenProps) {
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
+  const [mostrarDiagrama, setMostrarDiagrama] = useState(false);
+
+  // Mesma função gera o preview ao vivo (iframe) e o arquivo baixado — nunca
+  // duas fontes de verdade pro mesmo diagrama (mesma disciplina de
+  // renderizarItemEspecificacao pro texto). Memoizado: é pura, mas gerar HTML
+  // com SVG+script pra cada re-render (ex. digitar em outro campo) é
+  // desperdício sem necessidade.
+  const diagramaHtml = useMemo(
+    () => gerarDiagramaHtml(resultado.atividades, diagrama, config),
+    [resultado.atividades, diagrama, config]
+  );
+
+  function baixarDiagrama() {
+    baixarArquivoTexto(diagramaHtml, "diagrama-da-solucao.html", "text/html");
+  }
 
   const chaveParaNodeId = Object.fromEntries(
     resultado.atividades.filter((a) => a.origem.nodeId).map((a) => [a.chave, a.origem.nodeId!])
@@ -116,16 +132,32 @@ export function ReviewScreen({
         <strong style={{ fontSize: 14 }}>Revisão da quebra</strong>
         <span style={{ fontSize: 12, color: "#64748b" }}>{resultado.atividades.length} itens</span>
         <div style={{ flex: 1 }} />
+        <button onClick={() => setMostrarDiagrama((v) => !v)} style={botaoEstilo}>
+          {mostrarDiagrama ? "Voltar à lista" : "🔀 Ver diagrama animado"}
+        </button>
         <div data-tour="export-buttons">
-          <button onClick={baixarEspecificacao} style={{ ...botaoEstilo, ...botaoPrimarioEstilo }}>
-            Gerar especificação de solução
-          </button>
+          {mostrarDiagrama ? (
+            <button onClick={baixarDiagrama} style={{ ...botaoEstilo, ...botaoPrimarioEstilo }}>
+              Baixar diagrama (.html)
+            </button>
+          ) : (
+            <button onClick={baixarEspecificacao} style={{ ...botaoEstilo, ...botaoPrimarioEstilo }}>
+              Gerar especificação de solução
+            </button>
+          )}
         </div>
         <button onClick={onFechar} style={botaoEstilo}>
           Voltar ao canvas
         </button>
       </header>
 
+      {mostrarDiagrama ? (
+        <iframe
+          title="Diagrama animado da solução"
+          srcDoc={diagramaHtml}
+          style={{ flex: 1, border: "none" }}
+        />
+      ) : (
       <div data-tour="review-table" style={{ flex: 1, overflow: "auto", padding: 16 }}>
         {(resultado.ciclos.length > 0 || resultado.conflitos.length > 0) && (
           <div style={avisoEstilo}>
@@ -230,6 +262,7 @@ export function ReviewScreen({
           })}
         </div>
       </div>
+      )}
     </div>
   );
 }

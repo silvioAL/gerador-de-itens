@@ -194,6 +194,55 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     expect(await fetch(`${base}/campos-no`).then((r) => r.json())).toEqual([]);
   });
 
+  it("GET /campos-aresta sem config/campos-aresta.json ainda devolve lista vazia, não erro (SPEC-21)", async () => {
+    expect(await fetch(`${base}/campos-aresta`).then((r) => r.json())).toEqual([]);
+  });
+
+  it("POST /campos-aresta grava em config/campos-aresta.json, e GET /campos-aresta?timeId= devolve global + o do time", async () => {
+    const global = await fetch(`${base}/campos-aresta`, {
+      method: "POST",
+      body: JSON.stringify({ tipoAresta: "http", key: "timeoutMs", label: "Timeout (ms)", type: "number" }),
+    }).then((r) => r.json());
+    expect(global.timeId).toBe("__global__");
+
+    await fetch(`${base}/campos-aresta`, {
+      method: "POST",
+      body: JSON.stringify({
+        timeId: "time-x",
+        tipoAresta: "http",
+        key: "timeoutMs",
+        label: "Timeout (ms)",
+        type: "number",
+        valorPadrao: "3000",
+      }),
+    });
+
+    const efetivos = await fetch(`${base}/campos-aresta?timeId=time-x`).then((r) => r.json());
+    expect(efetivos).toHaveLength(1); // time sobrescreve o global de mesma (tipoAresta, key)
+    expect(efetivos[0].valorPadrao).toBe("3000");
+
+    const semTime = await fetch(`${base}/campos-aresta`).then((r) => r.json());
+    expect(semTime).toHaveLength(1);
+    expect(semTime[0].timeId).toBe("__global__");
+  });
+
+  it("PUT /campos-aresta/:id atualiza um campo existente, DELETE remove", async () => {
+    const criado = await fetch(`${base}/campos-aresta`, {
+      method: "POST",
+      body: JSON.stringify({ tipoAresta: "http", key: "timeoutMs", label: "Timeout (ms)", type: "number" }),
+    }).then((r) => r.json());
+
+    const atualizado = await fetch(`${base}/campos-aresta/${criado.id}`, {
+      method: "PUT",
+      body: JSON.stringify({ valorPadrao: "5000" }),
+    }).then((r) => r.json());
+    expect(atualizado.valorPadrao).toBe("5000");
+
+    const respostaDelete = await fetch(`${base}/campos-aresta/${criado.id}`, { method: "DELETE" });
+    expect(respostaDelete.status).toBe(204);
+    expect(await fetch(`${base}/campos-aresta`).then((r) => r.json())).toEqual([]);
+  });
+
   it("GET /especificacao-template sem arquivo local devolve o template padrão do engine", async () => {
     const resposta = await fetch(`${base}/especificacao-template`).then((r) => r.json());
     expect(resposta.conteudo).toContain("{{titulo}}");

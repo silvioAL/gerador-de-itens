@@ -259,6 +259,98 @@ async function tratarCamposNo(req: IncomingMessage, res: ServerResponse, metodo:
   enviarJson(res, 404, { erro: "não encontrado" });
 }
 
+// --- config/campos-aresta.json — campos por tipo de aresta (SPEC-21), mesmo
+// modelo/merge de campos-no.json acima, sem type: "lista"/itemSpec (campo
+// repetível numa conexão é caso hipotético que ninguém pediu ainda).
+
+interface CampoArestaLocal {
+  id: string;
+  timeId: string;
+  tipoAresta: string;
+  key: string;
+  label: string;
+  type: "text" | "textarea" | "number" | "boolean" | "select";
+  required: boolean;
+  valorPadrao: string | null;
+  opcoes: string[] | null;
+  ajuda: string | null;
+  ordem: number;
+}
+
+async function lerCamposAresta(dirProjeto: string): Promise<CampoArestaLocal[]> {
+  return (await lerJsonOpcional<CampoArestaLocal[]>(resolve(dirProjeto, "config", "campos-aresta.json"))) ?? [];
+}
+
+async function salvarCamposAresta(dirProjeto: string, campos: CampoArestaLocal[]): Promise<void> {
+  await mkdir(resolve(dirProjeto, "config"), { recursive: true });
+  await writeFile(resolve(dirProjeto, "config", "campos-aresta.json"), JSON.stringify(campos, null, 2), "utf-8");
+}
+
+function camposArestaEfetivos(campos: CampoArestaLocal[], timeId?: string): CampoArestaLocal[] {
+  const relevantes = campos.filter((c) => c.timeId === CAMPO_GLOBAL || c.timeId === timeId);
+  const porChave = new Map<string, CampoArestaLocal>();
+  for (const c of [...relevantes].sort((a, b) => (a.timeId === CAMPO_GLOBAL ? -1 : 1))) {
+    porChave.set(`${c.tipoAresta}::${c.key}`, c);
+  }
+  return [...porChave.values()].sort((a, b) => a.ordem - b.ordem);
+}
+
+async function tratarCamposAresta(req: IncomingMessage, res: ServerResponse, metodo: string, caminho: string, query: URLSearchParams, dirProjeto: string): Promise<void> {
+  if (metodo === "GET" && caminho === "/campos-aresta") {
+    const campos = await lerCamposAresta(dirProjeto);
+    return enviarJson(res, 200, camposArestaEfetivos(campos, query.get("timeId") ?? undefined));
+  }
+
+  if (metodo === "POST" && caminho === "/campos-aresta") {
+    const corpo = await lerCorpoJson<Partial<CampoArestaLocal>>(req);
+    if (!corpo.tipoAresta || !corpo.key || !corpo.label || !corpo.type) {
+      return enviarJson(res, 400, { erro: "tipoAresta, key, label e type são obrigatórios" });
+    }
+    const campos = await lerCamposAresta(dirProjeto);
+    const timeId = corpo.timeId ?? CAMPO_GLOBAL;
+    const existente = campos.find((c) => c.timeId === timeId && c.tipoAresta === corpo.tipoAresta && c.key === corpo.key);
+    const novo: CampoArestaLocal = {
+      id: existente?.id ?? randomUUID(),
+      timeId,
+      tipoAresta: corpo.tipoAresta,
+      key: corpo.key,
+      label: corpo.label,
+      type: corpo.type,
+      required: corpo.required ?? false,
+      valorPadrao: corpo.valorPadrao ?? null,
+      opcoes: corpo.opcoes ?? null,
+      ajuda: corpo.ajuda ?? null,
+      ordem: corpo.ordem ?? 0,
+    };
+    const restantes = campos.filter((c) => c.id !== novo.id);
+    await salvarCamposAresta(dirProjeto, [...restantes, novo]);
+    return enviarJson(res, 201, novo);
+  }
+
+  const matchPut = metodo === "PUT" && caminho.match(/^\/campos-aresta\/([^/]+)$/);
+  if (matchPut) {
+    const id = decodeURIComponent(matchPut[1]);
+    const campos = await lerCamposAresta(dirProjeto);
+    const alvo = campos.find((c) => c.id === id);
+    if (!alvo) return enviarJson(res, 404, { erro: "campo não encontrado" });
+    const corpo = await lerCorpoJson<Partial<CampoArestaLocal>>(req);
+    const atualizado: CampoArestaLocal = { ...alvo, ...corpo, id: alvo.id, timeId: alvo.timeId, tipoAresta: alvo.tipoAresta, key: alvo.key };
+    await salvarCamposAresta(dirProjeto, campos.map((c) => (c.id === id ? atualizado : c)));
+    return enviarJson(res, 200, atualizado);
+  }
+
+  const matchDelete = metodo === "DELETE" && caminho.match(/^\/campos-aresta\/([^/]+)$/);
+  if (matchDelete) {
+    const id = decodeURIComponent(matchDelete[1]);
+    const campos = await lerCamposAresta(dirProjeto);
+    await salvarCamposAresta(dirProjeto, campos.filter((c) => c.id !== id));
+    res.writeHead(204);
+    return res.end();
+  }
+
+  enviarJson(res, 404, { erro: "não encontrado" });
+}
+
 // --- especificação de entrega: template customizável opcional, default do engine ---
 
 async function tratarEspecificacaoTemplate(req: IncomingMessage, res: ServerResponse, metodo: string, dirProjeto: string): Promise<void> {
@@ -311,6 +403,10 @@ export async function tratarApiLocal(req: IncomingMessage, res: ServerResponse, 
   }
   if (caminho.startsWith("/campos-no")) {
     await tratarCamposNo(req, res, metodo, caminho, query, dirProjeto);
+    return true;
+  }
+  if (caminho.startsWith("/campos-aresta")) {
+    await tratarCamposAresta(req, res, metodo, caminho, query, dirProjeto);
     return true;
   }
   if (caminho === "/especificacao-template") {

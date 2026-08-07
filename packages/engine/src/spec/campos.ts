@@ -15,6 +15,16 @@ export function camposVisiveis(
   );
 }
 
+/** Campos visíveis do tipo de aresta (SPEC-21) — sem avaliação de `when`
+ * ainda: `avaliarCondicao` espera um `No`, e os operadores de hoje
+ * (`nodeType`, `nodeStatus`, `hasIncomingEdge`...) são conceitos de nó, não de
+ * aresta. Limitação conhecida, não definitiva — resolve-se quando aparecer um
+ * caso real de campo de aresta condicional (mesma disciplina do `when` não
+ * avaliado em `ItemProcesso`, SPEC-20). Por ora todo campo do tipo é visível. */
+export function camposVisiveisAresta(specDoTipo: FieldSpec[]): FieldSpec[] {
+  return specDoTipo;
+}
+
 /**
  * Resolve `default` contra outros campos do mesmo nó via `{{campo}}`.
  * Se o campo referenciado estiver vazio, o resultado fica vazio — nunca o literal `{{campo}}`.
