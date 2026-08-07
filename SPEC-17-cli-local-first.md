@@ -2,7 +2,7 @@
 
 **Depende de/relacionado a:** SPEC-16 (base de conhecimento, JOURNEY §32), Fase A (JOURNEY §20, decisão original de ir pra banco de verdade), CONTEXTO-E-ARQUITETURA.md §2/§5.1 (decisão original v1 de cortar banco/multi-tenant/auth, agora parcialmente revertida de novo). Reabre o rumo geral do produto — não corrige uma peça, decide entre dois modelos de distribuição.
 
-**Status: implementado — `gerador-de-itens@0.1.0` publicado de verdade no npm, instalação validada de fora do repositório (JOURNEY §35-§37). Falta só configurar o Trusted Publisher pra tags futuras não precisarem mais de OTP manual.**
+**Status: completo. `gerador-de-itens` publicado no npm, Trusted Publisher configurado e validado de ponta a ponta — `v0.1.2` publicada sozinha via `git push --tags`, sem OTP/token nenhum (JOURNEY §35-§38).**
 
 ---
 
@@ -96,6 +96,14 @@ Depois de três tentativas falhas com a mesma mensagem (OTP digitado à mão, to
 **Validação real:** `npm view gerador-de-itens` confirmou a versão `0.1.0` no registry; `npm install -g gerador-de-itens` rodado de um diretório temporário fora do repositório (mesma disciplina de sempre — nunca confiar sem testar) instalou e `gerador --help` funcionou, comando publicado de verdade, baixado do registry público, não de um tarball local. Pacote de teste desinstalado depois.
 
 **Próximo passo real, não implementado (é configuração no site do npm, fora do alcance desta sessão):** com `v0.1.0` agora existindo, configurar o Trusted Publisher em `npmjs.com` → página do pacote → Settings → Trusted Publisher → GitHub Actions, com `silvioAL` / `gerador-de-itens` / `publish.yml` (passo a passo em §7.3) — depois disso, toda versão futura publica sozinha via tag, sem OTP nunca mais.
+
+## 7.5. Trusted Publisher configurado e testado de verdade — achado real, segundo bug de infra no caminho
+
+Usuário configurou o Trusted Publisher no site do npm e pediu pra testar de verdade, não só confiar que ia funcionar. Teste real: bump pra `v0.1.1`, tag, push — **falhou**, mas de um jeito enganoso: `npm error 404 'gerador-de-itens@0.1.1' is not in this registry`, não um erro de autenticação/permissão. Investigado o log completo do job (não só o erro final): `actions/setup-node@v4` com `node-version: "22"` instala **Node 22.23.1 com npm 10.9.8** — abaixo do `>= 11.5.1` que o Trusted Publishing exige. Sem suporte a OIDC nessa versão do npm, `npm publish` virou uma chamada sem nenhuma autenticação; o registry, por não vazar se um pacote existe pra quem não está autenticado, respondeu 404 em vez de um 401/403 mais direto — o que tornou a causa raiz não óbvia só pelo texto do erro.
+
+Corrigido com um passo explícito `npm install -g npm@latest` logo depois do `setup-node`, antes de qualquer outro comando — `node-version` sozinho não garante a versão do npm bundled ser recente o bastante. Testado de novo com `v0.1.2`: sucesso, confirmado via `npm view gerador-de-itens version` (`0.1.2`) e `dist-tags` (`latest: 0.1.2`) — publicado inteiramente por `git tag v0.1.2 && git push origin v0.1.2`, sem nenhuma intervenção manual, sem OTP, sem token.
+
+Lição reforçada pela terceira vez nesta sessão (SPEC-14, `gerador export-vault`, agora CI/CD): **"parece que devia funcionar" não é validação — só rodar de verdade contra o ambiente real (aqui, o runner do GitHub Actions, diferente da máquina de dev) encontra esse tipo de gap.**
 
 ## 8. Limitação conhecida: `gerador open` ainda não funciona fora do monorepo
 

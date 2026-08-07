@@ -514,3 +514,13 @@ Regressão: build + suíte do CLI (17/17) reconfirmados depois do rename do paco
 **Validação real, mesmo padrão de sempre — não bastou "o comando não deu erro":** `npm view gerador-de-itens` confirmou `0.1.0` no registry público; `npm install -g gerador-de-itens` rodado de um diretório temporário fora do repositório, `gerador --help` funcionando — comando publicado de verdade, baixado do registry, não de um tarball local. Pacote de teste desinstalado, diretório temporário limpo.
 
 Fica em aberto, registrado, não implementado: configurar o Trusted Publisher em `npmjs.com` (agora possível, já que `v0.1.0` existe) — depois disso, `git tag vX.Y.Z && git push --tags` publica sozinho, sem OTP, pra sempre.
+
+## 37. Trusted Publisher configurado — e testado de verdade, não só confiado
+
+Usuário configurou o Trusted Publisher no site do npm e pediu explicitamente pra testar, não assumir que ia funcionar — mesma disciplina de sempre, aplicada a uma peça de infra em vez de código de produto. Bump de versão real (`v0.1.1`), tag, push: **falhou**, com um erro enganoso — `404 'gerador-de-itens@0.1.1' is not in this registry`, parecendo um problema de configuração do Trusted Publisher em si, não de autenticação.
+
+Investigação do log completo (não só a última linha de erro) achou a causa real: `actions/setup-node@v4` com `node-version: "22"` instala Node 22.23.1, que vem com **npm 10.9.8** — abaixo do 11.5.1 que o Trusted Publishing exige. Sem OIDC suportado nessa versão, `npm publish` virou uma chamada sem autenticação nenhuma; o registry devolveu 404 (não confirma existência de pacote pra quem não está autenticado) em vez de um erro mais direto — por isso o sintoma não apontava pra causa óbvia.
+
+Corrigido com `npm install -g npm@latest` explícito logo após o `setup-node` (a versão do Node não garante a versão do npm bundled ser recente o bastante). Testado de novo com `v0.1.2`: sucesso — `npm view gerador-de-itens version` confirmou `0.1.2`, `dist-tags` confirmou `latest: 0.1.2`. Publicado inteiramente por `git tag v0.1.2 && git push origin v0.1.2`, zero intervenção manual, zero OTP, zero token.
+
+Terceira vez nesta sessão que "parece que devia funcionar" não bastou como validação (SPEC-14 v1→v2→v3, `gerador export-vault` com o CRLF do Graphify, agora o pipeline de CI/CD) — só rodar de verdade contra o ambiente real (aqui, o runner do GitHub Actions, que não é a máquina de dev) encontrou o gap. SPEC-17 fecha completo: `gerador-de-itens` publicado, instalável por qualquer pessoa com `npm install -g gerador-de-itens`, e toda versão futura publica sozinha numa tag.
