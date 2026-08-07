@@ -3,14 +3,12 @@
   "tamanhos": ["PP", "P", "M", "G"],
   "porTech": {
     "Backend": {
-      "requisitos": [
+      "checklistTecnico": [
         { "texto": "Definir pontos de log (decisão, erro, correlação) e o que não pode ser logado", "contextos": [] },
-        { "texto": "Levantar massa de teste para HLG (dados, contas, cenários) — quem provê e quando", "contextos": [] },
 
         { "texto": "Definir estratégia de retry e DLQ (tentativas, backoff, destino da mensagem morta)", "contextos": ["Backend-mensagens"] },
         { "texto": "Definir se o consumo é idempotente; se não, especificar a chave de deduplicação", "contextos": ["Backend-mensagens"] },
         { "texto": "Documentar se a ordem de processamento importa e como é garantida", "contextos": ["Backend-mensagens"] },
-        { "texto": "Especificar as filas/exchanges/tópicos a criar ou alterar (nomes, bindings, por ambiente)", "contextos": ["Backend-mensagens"] },
 
         { "texto": "Dimensionar prefetch para o volume esperado", "contextos": ["Backend-mensagens rabbitmq"] },
 
@@ -24,18 +22,12 @@
         { "texto": "Definir timeout e política de retry", "contextos": ["Backend-chamadas http"] },
         { "texto": "Definir autenticação/autorização da chamada", "contextos": ["Backend-chamadas http"] },
         { "texto": "Definir circuit breaker ou fallback para indisponibilidade", "contextos": ["Backend-chamadas http"] },
-        { "texto": "Anexar snippet curl da chamada a ser realizada", "contextos": ["Backend-chamadas http"] },
-
-        { "texto": "Configurar mock (Mockoon ou equivalente) com os cenários de sucesso e erro — massa de teste de DEV", "contextos": ["Backend-chamadas http", "Backend-orquestracao"] },
-        { "texto": "Especificar quais serviços precisam ter o apontamento alterado durante o teste, e para quais rotas", "contextos": ["Backend-chamadas http", "Backend-orquestracao"] },
 
         { "texto": "Descrever as alterações no processo (etapas, gateways, listeners afetados)", "contextos": ["Backend-orquestracao"] },
-        { "texto": "Anexar snippet curl da chamada que inicializa o processo", "contextos": ["Backend-orquestracao"] },
         { "texto": "Definir estratégia de compensação (rollback) do processo", "contextos": ["Backend-orquestracao"] },
         { "texto": "Definir o que acontece com instâncias em voo na migração (migrar ou deixar terminar na versão anterior)", "contextos": ["Backend-orquestracao"] },
 
         { "texto": "Descrever os motores, rulesets ou fluxos de decisão modificados", "contextos": ["Backend-regras"] },
-        { "texto": "Anexar a documentação das políticas aplicáveis (regras, funções, parâmetros)", "contextos": ["Backend-regras"] },
         { "texto": "Definir a trilha de auditoria da decisão (o que registrar para reconstruir por que decidiu X)", "contextos": ["Backend-regras"] },
         { "texto": "Definir versionamento das regras (o que acontece com decisões já tomadas na versão anterior)", "contextos": ["Backend-regras"] },
 
@@ -49,6 +41,39 @@
         { "texto": "Definir política de skip/retry por item (e o limite de itens pulados)", "contextos": ["Backend-processamento em lote"] },
         { "texto": "Dimensionar chunk size para o volume esperado", "contextos": ["Backend-processamento em lote"] },
         { "texto": "Se a origem ou o destino for arquivo, especificar o layout (posicional/CSV, delimitador, encoding, header) — se aplicável", "contextos": ["Backend-processamento em lote"] }
+      ],
+      "checklistProcesso": [
+        { "texto": "Levantar massa de teste para HLG (dados, contas, cenários) — quem provê e quando", "contextos": [] },
+
+        { "texto": "Especificar as filas/exchanges/tópicos a criar ou alterar (nomes, bindings, por ambiente)", "contextos": ["Backend-mensagens"] },
+
+        { "texto": "Anexar snippet curl da chamada a ser realizada", "contextos": ["Backend-chamadas http"] },
+        { "texto": "Configurar mock (Mockoon ou equivalente) com os cenários de sucesso e erro — massa de teste de DEV", "contextos": ["Backend-chamadas http", "Backend-orquestracao"] },
+        { "texto": "Especificar quais serviços precisam ter o apontamento alterado durante o teste, e para quais rotas", "contextos": ["Backend-chamadas http", "Backend-orquestracao"] },
+
+        { "texto": "Anexar snippet curl da chamada que inicializa o processo", "contextos": ["Backend-orquestracao"] },
+
+        { "texto": "Anexar a documentação das políticas aplicáveis (regras, funções, parâmetros)", "contextos": ["Backend-regras"] },
+
+        { "texto": "Publicar o contrato do endpoint novo (OpenAPI/Swagger) para os consumidores",
+          "contextos": [],
+          "when": { "allOf": [
+            { "nodeType": ["service"] },
+            { "listaContem": { "field": "endpoints", "sub": "action", "equals": "novo" } } ] } },
+
+        { "texto": "Avisar os consumidores atuais do endpoint alterado e combinar a janela de mudança",
+          "contextos": [],
+          "when": { "allOf": [
+            { "nodeType": ["service"] },
+            { "listaContem": { "field": "endpoints", "sub": "action", "equals": "alterar" } } ] } },
+
+        { "texto": "Confirmar se o provedor tem ambiente de teste; sem ele, o teste integrado depende de mock",
+          "contextos": [],
+          "when": { "nodeType": ["external"] } },
+
+        { "texto": "Abrir a demanda de configuração do parâmetro nos ambientes (DEV/HLG/PROD) e quem executa",
+          "contextos": [],
+          "when": { "nodeType": ["rule", "fico"] } }
       ],
       "testes": [
         { "tipo": "Teste de contrato", "validacao": "Payload publicado/recebido bate com o schema acordado", "contextos": ["Backend-mensagens"], "dev": true, "hlg": true },
@@ -79,7 +104,7 @@
       }
     },
     "Mobile": {
-      "requisitos": [
+      "checklistTecnico": [
         { "texto": "Definir o que é persistido no dispositivo e como (nada sensível em texto puro)", "contextos": [] },
         { "texto": "Definir comportamento sem rede (offline), não só o caminho feliz online", "contextos": [] },
 
@@ -89,6 +114,9 @@
         { "texto": "Definir permissões pedidas em runtime e o fluxo quando o usuário negar", "contextos": ["Mobile-ios"] },
         { "texto": "Definir a versão mínima de iOS suportada e como validar a compatibilidade", "contextos": ["Mobile-ios"] },
         { "texto": "Revisar a mudança contra as App Store Review Guidelines relevantes", "contextos": ["Mobile-ios"] }
+      ],
+      "checklistProcesso": [
+        { "texto": "Reservar dispositivo físico para o teste, ou confirmar que emulador/simulador basta", "contextos": [] }
       ],
       "testes": [
         { "tipo": "Teste em dispositivo real", "validacao": "Fluxo principal funciona em ao menos um dispositivo físico Android, não só emulador", "contextos": ["Mobile-android"], "dev": true, "hlg": false },

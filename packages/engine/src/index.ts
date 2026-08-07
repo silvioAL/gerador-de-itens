@@ -11,7 +11,12 @@ export {
   type ResultadoDependenciasDe,
 } from "./dependency/dependencias.js";
 export { paraMarkdown, paraCsv } from "./export/exportar.js";
-export { gerarChecklistTecnico, gerarCiclosDeTeste } from "./refinamento/gerarRefinamento.js";
+export {
+  gerarChecklistTecnico,
+  gerarChecklistProcesso,
+  gerarCiclosDeTeste,
+  gerarVolumetria,
+} from "./refinamento/gerarRefinamento.js";
 export {
   gerarEspecificacaoEntrega,
   renderizarItemEspecificacao,

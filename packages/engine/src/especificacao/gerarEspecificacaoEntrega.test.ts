@@ -48,7 +48,7 @@ const config: DiagramaConfig = {
 const regras: RegrasConfig = {
   porTech: {
     Backend: {
-      requisitos: [{ texto: "Logs relevantes emitidos", contextos: ["Backend-dados"] }],
+      checklistTecnico: [{ texto: "Logs relevantes emitidos", contextos: ["Backend-dados"] }],
       testes: [{ tipo: "Teste de migração", validacao: "roda limpo", dev: true, hlg: false, contextos: ["Backend-dados"] }],
       volumetria: { contextos: ["Backend-dados"] },
     },
