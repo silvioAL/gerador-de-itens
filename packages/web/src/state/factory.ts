@@ -25,7 +25,6 @@ export function criarNo(tipo: string, config: DiagramaConfig, existentes: No[], 
     status: "novo",
     spec: {},
     specNA: {},
-    endpoints: cfg?.derives === "service" ? [] : undefined,
   };
 }
 

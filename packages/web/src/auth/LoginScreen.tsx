@@ -5,8 +5,11 @@ export interface LoginScreenProps {
   onEntrar: (email: string) => Promise<void>;
   erro: string | null;
   /** `undefined` enquanto `GET /auth/modo` não respondeu — mesmo card, sem
-   * nenhuma das duas UIs, pra não piscar um formulário errado por um instante. */
-  modo: "dev" | "oidc" | undefined;
+   * nenhuma das duas UIs, pra não piscar um formulário errado por um instante.
+   * `"local"` existe no tipo só por completude (CLI local nunca chega a
+   * renderizar esta tela — `/auth/me` sempre devolve sessão) — cai no mesmo
+   * "nenhuma UI" de `undefined`. */
+  modo: "dev" | "oidc" | "local" | undefined;
   /** Só muda a mensagem — um convite pendente na URL (SPEC-09 §3) não muda
    * qual UI de login aparece, só o texto. */
   aceitandoConvite?: boolean;

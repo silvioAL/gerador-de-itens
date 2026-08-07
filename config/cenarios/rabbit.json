@@ -16,12 +16,13 @@
           "spec": {
             "nome": { "valor": "srv-pagamentos-aprovacao", "origem": "manual" },
             "linguagem": { "valor": "Java", "origem": "manual" },
-            "framework": { "valor": "Spring Boot", "origem": "manual" }
+            "framework": { "valor": "Spring Boot", "origem": "manual" },
+            "endpoints": {
+              "valor": [{ "method": "POST", "path": "/v1/pagamentos/{id}/aprovar", "action": "novo" }],
+              "origem": "manual"
+            }
           },
-          "specNA": {},
-          "endpoints": [
-            { "method": "POST", "path": "/v1/pagamentos/{id}/aprovar", "action": "novo" }
-          ]
+          "specNA": {}
         },
         {
           "id": "n2", "type": "rabbit-exchange", "status": "novo", "label": "pagamentos.eventos",
@@ -74,8 +75,7 @@
           },
           "specNA": {
             "linguagem": { "motivo": "serviço existente, stack não verificada nesta quebra" }
-          },
-          "endpoints": []
+          }
         }
       ],
       "edges": [

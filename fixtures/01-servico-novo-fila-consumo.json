@@ -8,11 +8,15 @@
         {
           "id": "n1", "type": "service", "status": "novo", "label": "srv-portabilidade",
           "x": 100, "y": 100,
-          "spec": {},
-          "endpoints": [
-            { "method": "POST", "path": "/v1/propostas", "action": "novo" },
-            { "method": "GET",  "path": "/v1/propostas/{id}", "action": "novo" }
-          ]
+          "spec": {
+            "endpoints": {
+              "valor": [
+                { "method": "POST", "path": "/v1/propostas", "action": "novo" },
+                { "method": "GET",  "path": "/v1/propostas/{id}", "action": "novo" }
+              ],
+              "origem": "manual"
+            }
+          }
         },
         {
           "id": "n2", "type": "rabbit", "status": "novo", "label": "proposta.aprovada.q",
@@ -33,7 +37,7 @@
           "id": "n3", "type": "service", "status": "existente", "label": "srv-notificacao",
           "time": "time-pagamentos",
           "x": 700, "y": 100,
-          "spec": {}, "endpoints": []
+          "spec": {}
         }
       ],
       "edges": [

@@ -64,6 +64,10 @@ export const camposNo = pgTable(
     ajuda: text("ajuda"),
     permiteNA: boolean("permite_na").notNull().default(false),
     ordem: integer("ordem").notNull().default(0),
+    /** Só quando `type === "lista"` — a forma de cada item (ex.: os
+     * sub-campos method/path/request/response de um endpoint). Nulo pros
+     * outros tipos de campo. */
+    itemSpec: jsonb("item_spec").$type<{ key: string; label: string; type: string; options?: string[] }[]>(),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("campos_no_chave_unica").on(t.timeId, t.tipoNo, t.key)]

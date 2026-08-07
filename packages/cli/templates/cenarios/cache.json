@@ -18,8 +18,7 @@
           },
           "specNA": {
             "linguagem": { "motivo": "serviço existente, stack não verificada nesta quebra" }
-          },
-          "endpoints": []
+          }
         },
         {
           "id": "n2", "type": "cache", "status": "novo", "label": "cache-cotacao-frete",

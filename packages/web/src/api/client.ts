@@ -67,11 +67,13 @@ export const apiAuth = {
     return (await resposta.json()) as SessaoUsuario;
   },
   /** Qual UI de login mostrar — achado real: LoginScreen sempre renderizou o
-   * formulário de e-mail do modo dev, mesmo com AUTH_MODE=oidc no servidor. */
-  async modo(): Promise<"dev" | "oidc"> {
+   * formulário de e-mail do modo dev, mesmo com AUTH_MODE=oidc no servidor.
+   * "local" é o CLI (openApiLocal.ts) — nunca mostra tela de login nenhuma,
+   * mas o tipo precisa incluir o valor real que o servidor local devolve. */
+  async modo(): Promise<"dev" | "oidc" | "local"> {
     const resposta = await fetch(`${BASE_URL}/auth/modo`, { credentials: "include" });
     if (!resposta.ok) return "dev";
-    const corpo = (await resposta.json()) as { modo: "dev" | "oidc" };
+    const corpo = (await resposta.json()) as { modo: "dev" | "oidc" | "local" };
     return corpo.modo;
   },
   /** Modo oidc: nunca um fetch — navegação de página inteira, o servidor
@@ -85,19 +87,32 @@ export const apiAuth = {
   sair: () => requisitar<{ ok: boolean }>("/auth/logout", { method: "POST" }),
 };
 
+/** Forma de um sub-campo dentro de um campo `type: "lista"` (ex.: method/path/
+ * request/response de um endpoint) — deliberadamente mais simples que
+ * `FieldSpec` completo (sem `when`/`permiteNA`/`itemSpec` aninhado): é a
+ * autoria de uma linha repetível, não outro nível de condicional. */
+export interface ItemSpecCampo {
+  key: string;
+  label: string;
+  type: "text" | "textarea" | "number" | "boolean" | "select";
+  options?: string[];
+}
+
 export interface CampoNo {
   id: string;
   timeId: string;
   tipoNo: string;
   key: string;
   label: string;
-  type: "text" | "textarea" | "number" | "boolean" | "select";
+  type: "text" | "textarea" | "number" | "boolean" | "select" | "lista";
   required: boolean;
   valorPadrao: string | null;
   opcoes: string[] | null;
   ajuda: string | null;
   permiteNA: boolean;
   ordem: number;
+  /** Só quando `type === "lista"` — a forma de cada item. */
+  itemSpec: ItemSpecCampo[] | null;
 }
 
 export interface DadosCampoNo {
@@ -112,6 +127,7 @@ export interface DadosCampoNo {
   ajuda?: string;
   permiteNA?: boolean;
   ordem?: number;
+  itemSpec?: ItemSpecCampo[];
 }
 
 export const apiCamposNo = {

@@ -7,7 +7,7 @@ export interface EstadoSessao {
   /** `undefined` enquanto verifica — LoginScreen decide qual UI mostrar a
    * partir disto (achado real: antes ela sempre mostrava o formulário de
    * e-mail do modo dev, mesmo com AUTH_MODE=oidc no servidor). */
-  modo: "dev" | "oidc" | undefined;
+  modo: "dev" | "oidc" | "local" | undefined;
   erro: string | null;
   /** Só e-mail — login não escolhe time, ver LoginScreen.tsx. Só existe (e só
    * é chamado) em modo dev; em oidc o login é navegação de página inteira. */
@@ -19,7 +19,7 @@ export interface EstadoSessao {
  * sessão válida sem checar (o cookie pode ter expirado desde a última visita). */
 export function useSessao(): EstadoSessao {
   const [sessao, setSessao] = useState<SessaoUsuario | null | undefined>(undefined);
-  const [modo, setModo] = useState<"dev" | "oidc" | undefined>(undefined);
+  const [modo, setModo] = useState<"dev" | "oidc" | "local" | undefined>(undefined);
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {

@@ -14,14 +14,15 @@
           "x": 100, "y": 120,
           "spec": {
             "nome": { "valor": "srv-catalogo", "origem": "manual" },
-            "linguagem": { "valor": "Node", "origem": "manual" }
+            "linguagem": { "valor": "Node", "origem": "manual" },
+            "endpoints": {
+              "valor": [{ "method": "GET", "path": "/v1/produtos", "action": "novo" }],
+              "origem": "manual"
+            }
           },
           "specNA": {
             "framework": { "motivo": "POC inicial, framework ainda não definido" }
-          },
-          "endpoints": [
-            { "method": "GET", "path": "/v1/produtos", "action": "novo" }
-          ]
+          }
         },
         {
           "id": "n2", "type": "mongo", "status": "novo", "label": "produtos",

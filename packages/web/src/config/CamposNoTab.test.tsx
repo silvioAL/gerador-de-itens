@@ -82,6 +82,7 @@ describe("CamposNoTab", () => {
         ajuda: "Sufixo .queue obrigatório",
         permiteNA: false,
         ordem: 0,
+        itemSpec: null,
       },
     ];
     render(
@@ -132,5 +133,55 @@ describe("CamposNoTab", () => {
     await user.type(screen.getByLabelText("Chave"), "motorCustom");
 
     expect(screen.getByLabelText("Chave")).toHaveValue("motorCustom");
+  });
+
+  it("achado real: campo tipo 'lista' (ex.: Endpoints) é autorável pela UI — sub-campos do itemSpec vão no payload de criação", async () => {
+    const user = userEvent.setup();
+    const onCriar = vi.fn();
+    render(
+      <CamposNoTab config={config} camposNo={[]} timeAtivo="time-x" onCriar={onCriar} onAtualizar={vi.fn()} onExcluir={vi.fn()} />
+    );
+
+    await user.click(screen.getByRole("button", { name: "+ Adicionar campo" }));
+    await user.type(screen.getByLabelText("Rótulo"), "Endpoints");
+    await user.selectOptions(screen.getByLabelText("Tipo de campo"), "lista");
+
+    await user.click(screen.getByRole("button", { name: "+ sub-campo" }));
+    await user.type(screen.getByLabelText("Chave do sub-campo 1"), "method");
+    await user.type(screen.getByLabelText("Rótulo do sub-campo 1"), "Method");
+
+    await user.click(screen.getByRole("button", { name: "+ sub-campo" }));
+    await user.type(screen.getByLabelText("Chave do sub-campo 2"), "path");
+    await user.type(screen.getByLabelText("Rótulo do sub-campo 2"), "Path");
+
+    await user.click(screen.getByRole("button", { name: "Salvar" }));
+
+    expect(onCriar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "lista",
+        itemSpec: [
+          { key: "method", label: "Method", type: "text", options: undefined },
+          { key: "path", label: "Path", type: "text", options: undefined },
+        ],
+      })
+    );
+  });
+
+  it("sub-campo sem chave/rótulo não entra no itemSpec salvo (linha em branco descartada)", async () => {
+    const user = userEvent.setup();
+    const onCriar = vi.fn();
+    render(
+      <CamposNoTab config={config} camposNo={[]} timeAtivo="time-x" onCriar={onCriar} onAtualizar={vi.fn()} onExcluir={vi.fn()} />
+    );
+
+    await user.click(screen.getByRole("button", { name: "+ Adicionar campo" }));
+    await user.type(screen.getByLabelText("Rótulo"), "Endpoints");
+    await user.selectOptions(screen.getByLabelText("Tipo de campo"), "lista");
+    await user.click(screen.getByRole("button", { name: "+ sub-campo" }));
+    // sub-campo fica em branco de propósito
+
+    await user.click(screen.getByRole("button", { name: "Salvar" }));
+
+    expect(onCriar).toHaveBeenCalledWith(expect.objectContaining({ itemSpec: [] }));
   });
 });

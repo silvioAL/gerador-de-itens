@@ -37,6 +37,7 @@ function comoFieldSpec(campo: CampoNo): FieldSpec {
     options: campo.opcoes ?? undefined,
     ajuda: campo.ajuda ?? undefined,
     permiteNA: campo.permiteNA || undefined,
+    itemSpec: campo.itemSpec ?? undefined,
   };
 }
 

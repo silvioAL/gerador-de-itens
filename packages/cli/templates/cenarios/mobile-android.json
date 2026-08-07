@@ -40,8 +40,14 @@
           "x": 420, "y": 120,
           "spec": {
             "nome": { "valor": "srv-fidelidade", "origem": "manual" },
-            "contratoEndpoints": {
-              "valor": "GET /v1/fidelidade/extrato/{clienteId}\nResponse 200: { \"saldoPontos\": number, \"historico\": [{ \"data\": \"string\", \"pontos\": number, \"motivo\": \"string\" }] }",
+            "endpoints": {
+              "valor": [
+                {
+                  "method": "GET", "path": "/v1/fidelidade/extrato/{clienteId}", "action": "novo",
+                  "request": "sem corpo (GET, parâmetro na URL: clienteId)",
+                  "response": "200: { \"saldoPontos\": number, \"historico\": [{ \"data\": \"string\", \"pontos\": number, \"motivo\": \"string\" }] }"
+                }
+              ],
               "origem": "manual"
             },
             "migracao": {

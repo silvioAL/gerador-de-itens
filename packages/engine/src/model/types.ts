@@ -20,10 +20,17 @@ export interface JustificativaNA {
   motivo: string;
 }
 
+/** Forma de cada item de um campo `spec` do tipo "lista" chamado `endpoints`
+ * (ex.: `service.spec` em `diagrama.json`) — não mais um campo especial do
+ * `No`, é só um `ValorSpec.valor: Endpoint[]` como qualquer outro campo
+ * `type: "lista"`. `request`/`response` opcionais: nem todo endpoint precisa
+ * documentar payload (ex.: um DELETE sem corpo). */
 export interface Endpoint {
   method: string;
   path: string;
   action: string;
+  request?: string;
+  response?: string;
 }
 
 export interface Ponto {
@@ -41,8 +48,6 @@ export interface No {
   time?: string;
   spec: Record<string, ValorSpec>;
   specNA: Record<string, JustificativaNA>;
-  /** Só para nós cujo `derives` seja "service": endpoints HTTP expostos. */
-  endpoints?: Endpoint[];
   /** Coleções estruturadas de outros domínios (ex.: stages de um processo Camunda) — genérico de propósito. */
   data?: Record<string, unknown>;
   knownInfo?: string;

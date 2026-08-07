@@ -18,15 +18,18 @@
             "nome": { "valor": "srv-credito-api", "origem": "manual" },
             "linguagem": { "valor": "Java", "origem": "manual" },
             "framework": { "valor": "Spring Boot", "origem": "manual" },
-            "contratoEndpoints": {
-              "valor": "POST /v1/credito/solicitacoes\nRequest: { \"clienteId\": \"uuid\", \"valorSolicitado\": 15000.00, \"prazoMeses\": 24 }\nResponse 201: { \"solicitacaoId\": \"uuid\", \"status\": \"em_analise\" }",
+            "endpoints": {
+              "valor": [
+                {
+                  "method": "POST", "path": "/v1/credito/solicitacoes", "action": "novo",
+                  "request": "{ \"clienteId\": \"uuid\", \"valorSolicitado\": 15000.00, \"prazoMeses\": 24 }",
+                  "response": "201: { \"solicitacaoId\": \"uuid\", \"status\": \"em_analise\" }"
+                }
+              ],
               "origem": "manual"
             }
           },
-          "specNA": {},
-          "endpoints": [
-            { "method": "POST", "path": "/v1/credito/solicitacoes", "action": "novo" }
-          ]
+          "specNA": {}
         },
         {
           "id": "n2", "type": "camunda", "status": "novo", "label": "processo-aprovacao-credito",

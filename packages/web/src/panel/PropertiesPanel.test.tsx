@@ -101,7 +101,10 @@ describe("PropertiesPanel — perfil de stack do time", () => {
         derives: "service",
         techs: ["Backend"],
         contextos: [],
-        spec: [{ key: "linguagem", label: "Linguagem/Stack", type: "text", required: false }],
+        spec: [
+          { key: "nome", label: "Nome do serviço", type: "text", required: true, identificador: true },
+          { key: "linguagem", label: "Linguagem/Stack", type: "text", required: false },
+        ],
       },
     },
     edgeTypes: {},
@@ -180,6 +183,99 @@ describe("PropertiesPanel — perfil de stack do time", () => {
     await user.click(botao);
 
     expect(onSalvarPerfilDoTime).toHaveBeenCalledWith("service", { linguagem: "Kotlin" });
+  });
+
+  it("achado real: campo de identidade (nome do serviço) preenchido manualmente não entra na captura — cada instância precisa do seu próprio nome", async () => {
+    const user = userEvent.setup();
+    const onSalvarPerfilDoTime = vi.fn();
+    render(<HarnessServico time="time-x" onSalvarPerfilDoTime={onSalvarPerfilDoTime} />);
+
+    await user.type(screen.getByRole("textbox", { name: "Nome do serviço" }), "srv-checkout");
+    await user.type(screen.getByRole("textbox", { name: "Linguagem/Stack" }), "Kotlin");
+
+    await user.click(screen.getByText("💾 salvar estes valores como padrão do time «time-x»"));
+
+    expect(onSalvarPerfilDoTime).toHaveBeenCalledWith("service", { linguagem: "Kotlin" });
+  });
+});
+
+describe("PropertiesPanel — campo tipo lista (ex.: Endpoints, achado real: editor que faltava)", () => {
+  const configLista: DiagramaConfig = {
+    nodeTypes: {
+      service: {
+        label: "Serviço",
+        derives: "service",
+        techs: ["Backend"],
+        contextos: [],
+        spec: [
+          {
+            key: "endpoints",
+            label: "Endpoints",
+            type: "lista",
+            required: false,
+            permiteNA: true,
+            itemSpec: [
+              { key: "method", label: "Method", type: "select", options: ["GET", "POST"] },
+              { key: "path", label: "Path", type: "text" },
+            ],
+          },
+        ],
+      },
+    },
+    edgeTypes: {},
+    edgeRules: {},
+  };
+
+  function HarnessLista() {
+    const quebraState = useQuebra(
+      {
+        diagrama: {
+          nodes: [{ id: "n1", type: "service", x: 0, y: 0, label: "srv", status: "novo", spec: {}, specNA: {} }],
+          edges: [],
+        },
+      },
+      configLista
+    );
+    const no = quebraState.quebra.diagrama.nodes[0];
+    return <PropertiesPanel no={no} arestas={[]} config={configLista} quebraState={quebraState} />;
+  }
+
+  it("sem itens, mostra 'Nenhum item ainda' e um botão + item", () => {
+    render(<HarnessLista />);
+    expect(screen.getByText("Nenhum item ainda.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "+ item" })).toBeInTheDocument();
+  });
+
+  it("+ item adiciona uma linha com os sub-campos do itemSpec, editáveis por item", async () => {
+    const user = userEvent.setup();
+    render(<HarnessLista />);
+
+    await user.click(screen.getByRole("button", { name: "+ item" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: /Method — item 1/ }), "POST");
+    await user.type(screen.getByRole("textbox", { name: /Path — item 1/ }), "/v1/checkout");
+
+    await user.click(screen.getByRole("button", { name: "+ item" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: /Method — item 2/ }), "GET");
+    await user.type(screen.getByRole("textbox", { name: /Path — item 2/ }), "/v1/status");
+
+    // cada item tem seu próprio input, sem colidir aria-label entre linhas
+    expect(screen.getByRole("textbox", { name: /Path — item 1/ })).toHaveValue("/v1/checkout");
+    expect(screen.getByRole("textbox", { name: /Path — item 2/ })).toHaveValue("/v1/status");
+  });
+
+  it("remover item tira só aquela linha, preservando as demais", async () => {
+    const user = userEvent.setup();
+    render(<HarnessLista />);
+
+    await user.click(screen.getByRole("button", { name: "+ item" }));
+    await user.type(screen.getByRole("textbox", { name: /Path — item 1/ }), "/v1/a");
+    await user.click(screen.getByRole("button", { name: "+ item" }));
+    await user.type(screen.getByRole("textbox", { name: /Path — item 2/ }), "/v1/b");
+
+    await user.click(screen.getByRole("button", { name: "Remover item 1 de Endpoints" }));
+
+    expect(screen.queryByDisplayValue("/v1/a")).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /Path — item 1/ })).toHaveValue("/v1/b");
   });
 });
 

@@ -156,19 +156,28 @@ async function tratarPerfisTime(req: IncomingMessage, res: ServerResponse, metod
 // mesmo modelo (e mesma regra de merge) que packages/server/src/routes/camposNo.ts
 // já usa no modo hospedado: time sobrescreve global de mesma (tipoNo, key).
 
+interface ItemSpecCampoLocal {
+  key: string;
+  label: string;
+  type: "text" | "textarea" | "number" | "boolean" | "select";
+  options?: string[];
+}
+
 interface CampoNoLocal {
   id: string;
   timeId: string;
   tipoNo: string;
   key: string;
   label: string;
-  type: "text" | "textarea" | "number" | "boolean" | "select";
+  type: "text" | "textarea" | "number" | "boolean" | "select" | "lista";
   required: boolean;
   valorPadrao: string | null;
   opcoes: string[] | null;
   ajuda: string | null;
   permiteNA: boolean;
   ordem: number;
+  /** Só quando `type === "lista"` — a forma de cada item. */
+  itemSpec: ItemSpecCampoLocal[] | null;
 }
 
 async function lerCamposNo(dirProjeto: string): Promise<CampoNoLocal[]> {
@@ -219,6 +228,7 @@ async function tratarCamposNo(req: IncomingMessage, res: ServerResponse, metodo:
       ajuda: corpo.ajuda ?? null,
       permiteNA: corpo.permiteNA ?? false,
       ordem: corpo.ordem ?? 0,
+      itemSpec: corpo.itemSpec ?? null,
     };
     const restantes = campos.filter((c) => c.id !== novo.id);
     await salvarCamposNo(dirProjeto, [...restantes, novo]);

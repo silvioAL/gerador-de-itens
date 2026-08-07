@@ -18,8 +18,14 @@ export type Condicao =
 /** "textarea": mesmo valor string que "text", só que a UI reserva mais espaço
  * vertical e oferece expandir pra uma área maior — pra campos de conteúdo
  * longo (contrato de payload, schema de documento), onde uma linha só
- * esconde o que a pessoa escreveu. */
-export type TipoCampo = "text" | "textarea" | "number" | "boolean" | "select";
+ * esconde o que a pessoa escreveu. "lista": repetível — zero ou mais itens,
+ * cada um com a forma de `FieldSpec.itemSpec` (ex.: os endpoints de um
+ * serviço, cada um com method/path/request/response). Achado real: o
+ * protótipo original tinha várias dessas listas hardcoded (endpoints, stages
+ * de Camunda, motores/rulesets do FICO, regras de negócio) — cada uma com seu
+ * próprio HTML/JS de repetição. Aqui é um mecanismo genérico só, configurável
+ * em `diagrama.json`/`campos-no.json`, não um componente por domínio. */
+export type TipoCampo = "text" | "textarea" | "number" | "boolean" | "select" | "lista";
 
 export interface FieldSpec {
   key: string;
@@ -31,6 +37,20 @@ export interface FieldSpec {
   ajuda?: string;
   permiteNA?: boolean;
   options?: string[];
+  /** Identifica a instância (ex.: nome do serviço, tópico, tabela) em vez de
+   * descrever uma característica compartilhada de stack — todo tipo de nó tem
+   * um. Marcado pra excluir da sugestão de perfil de time (`PerfisTimeTab`,
+   * "salvar como padrão do time"): um valor fixo sugerido pra esse campo em
+   * todo nó novo do tipo não faz sentido, já que cada instância precisa do
+   * seu próprio nome único — achado real (usuário tentou e "não aconteceu
+   * nada" de útil). Não afeta exibição/edição de valores já salvos. */
+  identificador?: boolean;
+  /** Só relevante quando `type === "lista"` — a forma de cada item da lista
+   * (sem `type: "lista"` aninhado; não suporta lista-de-lista, complexidade
+   * que ninguém pediu). O valor do campo (`ValorSpec.valor`) é
+   * `Record<string, unknown>[]`, um objeto por item, chaveado por
+   * `itemSpec[].key`. */
+  itemSpec?: FieldSpec[];
 }
 
 export interface NodeTypeConfig {

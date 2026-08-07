@@ -7,6 +7,18 @@ export interface PerfisTimeTabProps {
   onEditarValor: (timeId: string, tipoNo: string, campo: string, valor: string) => void;
 }
 
+/** Campos sugeríveis por time excluem o campo de identidade (`identificador:
+ * true` — nome do serviço, tópico, tabela...) de cada tipo: um valor fixo
+ * sugerido pra esse campo em todo nó novo não faz sentido, já que cada
+ * instância precisa do seu próprio nome único (achado real — ver FieldSpec). */
+function camposSugeriveis(config: DiagramaConfig, tipoNo: string) {
+  return (config.nodeTypes[tipoNo]?.spec ?? []).filter((c) => !c.identificador);
+}
+
+function primeiroCampoSugerivel(config: DiagramaConfig, tipoNo: string): string {
+  return camposSugeriveis(config, tipoNo)[0]?.key ?? "";
+}
+
 export function PerfisTimeTab({ perfisTime, config, onEditarValor }: PerfisTimeTabProps) {
   const times = Object.entries(perfisTime);
   const [formulario, setFormulario] = useState<FormularioValor | null>(null);
@@ -16,7 +28,7 @@ export function PerfisTimeTab({ perfisTime, config, onEditarValor }: PerfisTimeT
     setFormulario({
       timeId: times[0]?.[0] ?? "",
       tipoNo: primeiroTipo,
-      campo: config.nodeTypes[primeiroTipo]?.spec[0]?.key ?? "",
+      campo: primeiroCampoSugerivel(config, primeiroTipo),
       valor: "",
     });
   }
@@ -127,7 +139,7 @@ function FormularioEditarValor({
   onSalvar: () => void;
   onCancelar: () => void;
 }) {
-  const camposDoTipo = config.nodeTypes[formulario.tipoNo]?.spec ?? [];
+  const camposDoTipo = camposSugeriveis(config, formulario.tipoNo);
   const podeSalvar =
     formulario.timeId.trim() !== "" && formulario.tipoNo !== "" && formulario.campo.trim() !== "" && formulario.valor.trim() !== "";
 
@@ -154,7 +166,7 @@ function FormularioEditarValor({
         value={formulario.tipoNo}
         onChange={(e) => {
           const novoTipo = e.target.value;
-          setFormulario({ ...formulario, tipoNo: novoTipo, campo: config.nodeTypes[novoTipo]?.spec[0]?.key ?? "" });
+          setFormulario({ ...formulario, tipoNo: novoTipo, campo: primeiroCampoSugerivel(config, novoTipo) });
         }}
         style={inputFormEstilo}
       >

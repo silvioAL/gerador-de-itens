@@ -14,14 +14,15 @@
           "x": 100, "y": 120,
           "spec": {
             "nome": { "valor": "srv-assinaturas", "origem": "manual" },
-            "linguagem": { "valor": "Java", "origem": "manual" }
+            "linguagem": { "valor": "Java", "origem": "manual" },
+            "endpoints": {
+              "valor": [{ "method": "POST", "path": "/v1/assinaturas", "action": "novo" }],
+              "origem": "manual"
+            }
           },
           "specNA": {
             "framework": { "motivo": "framework ainda não definido" }
-          },
-          "endpoints": [
-            { "method": "POST", "path": "/v1/assinaturas", "action": "novo" }
-          ]
+          }
         },
         {
           "id": "n2", "type": "sql", "status": "novo", "label": "assinaturas",

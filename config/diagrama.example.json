@@ -8,17 +8,24 @@
       "color": "#3b82f6",
       "icon": "Server",
       "spec": [
-        { "key": "nome", "label": "Nome do serviço", "type": "text", "required": true },
+        { "key": "nome", "label": "Nome do serviço", "type": "text", "required": true, "identificador": true },
         { "key": "linguagem", "label": "Linguagem/Stack", "type": "select",
           "options": ["Java", "Node", "Python"], "required": false, "permiteNA": true,
           "ajuda": "Sugerido automaticamente a partir do perfil de stack do time, quando configurado." },
         { "key": "framework", "label": "Framework", "type": "text", "required": false, "permiteNA": true },
-        { "key": "contratoEndpoints", "label": "Contrato dos endpoints novos (request/response)", "type": "textarea",
+        { "key": "endpoints", "label": "Endpoints", "type": "lista",
           "required": false, "permiteNA": true,
-          "ajuda": "Formato do corpo de cada endpoint novo — cole um exemplo de JSON ou descreva os campos. Sem isso, quem for implementar só sabe método+path, não o payload." },
+          "ajuda": "Um item por endpoint novo — method, path e o contrato de request/response de cada um. Sem isso, quem for implementar só sabe que o serviço existe, não o que ele expõe.",
+          "itemSpec": [
+            { "key": "method", "label": "Method", "type": "select", "options": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
+            { "key": "path", "label": "Path", "type": "text" },
+            { "key": "action", "label": "Ação", "type": "select", "options": ["novo", "alterar", "nova-versao", "leitura"] },
+            { "key": "request", "label": "Contrato de request", "type": "textarea" },
+            { "key": "response", "label": "Contrato de response", "type": "textarea" }
+          ] },
         { "key": "contratoGrpc", "label": "Contrato gRPC (serviço e mensagens)", "type": "textarea",
           "required": false, "permiteNA": true, "when": { "hasIncomingEdge": ["grpc"] },
-          "ajuda": "Definição do serviço/mensagens — cole o .proto ou descreva. contratoEndpoints é REST; isto é o contrato binário/protobuf." },
+          "ajuda": "Definição do serviço/mensagens — cole o .proto ou descreva. \"Endpoints\" é REST; isto é o contrato binário/protobuf." },
         { "key": "contratoGraphql", "label": "Schema GraphQL (queries/mutations/tipos)", "type": "textarea",
           "required": false, "permiteNA": true, "when": { "hasIncomingEdge": ["graphql"] },
           "ajuda": "Queries/mutations/tipos expostos — cole o SDL ou descreva." }
@@ -38,7 +45,7 @@
       "color": "#f97316",
       "icon": "Radio",
       "spec": [
-        { "key": "topic", "label": "Nome do tópico", "type": "text", "required": true },
+        { "key": "topic", "label": "Nome do tópico", "type": "text", "required": true, "identificador": true },
         { "key": "particoes", "label": "Número de partições", "type": "number", "default": 3, "required": true,
           "ajuda": "Define o paralelismo máximo de consumo — não dá pra diminuir depois sem recriar o tópico." },
         { "key": "chaveParticionamento", "label": "Chave de particionamento", "type": "text", "required": true,
@@ -93,7 +100,7 @@
       "color": "#dc2626",
       "icon": "Rabbit",
       "spec": [
-        { "key": "topic", "label": "Nome da fila", "type": "text", "required": true,
+        { "key": "topic", "label": "Nome da fila", "type": "text", "required": true, "identificador": true,
           "ajuda": "Nome completo, no padrão do time." },
 
         { "key": "routingKey", "label": "Routing key da binding", "type": "text", "required": true,
@@ -213,7 +220,7 @@
       "color": "#dc2626",
       "icon": "Split",
       "spec": [
-        { "key": "exchangeName", "label": "Nome da exchange", "type": "text", "required": true },
+        { "key": "exchangeName", "label": "Nome da exchange", "type": "text", "required": true, "identificador": true },
         { "key": "exchangeType", "label": "Tipo", "type": "select",
           "options": ["topic", "direct", "fanout", "headers"], "default": "topic", "required": true },
         { "key": "durable", "label": "Durable", "type": "boolean", "default": true, "required": true }
@@ -229,7 +236,7 @@
       "color": "#10b981",
       "icon": "Database",
       "spec": [
-        { "key": "collection", "label": "Nome da coleção", "type": "text", "required": true },
+        { "key": "collection", "label": "Nome da coleção", "type": "text", "required": true, "identificador": true },
         { "key": "indices", "label": "Índices", "type": "text", "required": false, "permiteNA": true,
           "ajuda": "Liste os campos indexados, se já souber. Sem índice, queries novas fazem scan completo da coleção." },
         { "key": "chaveDeSharding", "label": "Chave de sharding", "type": "text", "required": false,
@@ -255,7 +262,7 @@
       "color": "#0ea5e9",
       "icon": "Table",
       "spec": [
-        { "key": "tabela", "label": "Nome da tabela", "type": "text", "required": true },
+        { "key": "tabela", "label": "Nome da tabela", "type": "text", "required": true, "identificador": true },
         { "key": "chavePrimaria", "label": "Chave primária", "type": "text", "required": true },
         { "key": "indices", "label": "Índices adicionais", "type": "text", "required": false, "permiteNA": true },
         { "key": "ferramentaMigracao", "label": "Ferramenta de migração", "type": "select",
@@ -280,7 +287,7 @@
       "color": "#a855f7",
       "icon": "Workflow",
       "spec": [
-        { "key": "processName", "label": "Nome do processo", "type": "text", "required": true },
+        { "key": "processName", "label": "Nome do processo", "type": "text", "required": true, "identificador": true },
         { "key": "framework", "label": "Versão do Camunda", "type": "select",
           "options": ["Camunda 7", "Camunda 8"], "required": false, "permiteNA": true },
         { "key": "compensacao", "label": "Precisa de compensação (rollback)?", "type": "boolean", "required": true,
@@ -307,7 +314,7 @@
       "color": "#d97706",
       "icon": "GitBranch",
       "spec": [
-        { "key": "nome", "label": "Nome do fluxo", "type": "text", "required": true },
+        { "key": "nome", "label": "Nome do fluxo", "type": "text", "required": true, "identificador": true },
         { "key": "motorPadrao", "label": "Motor de regras", "type": "text", "required": false, "permiteNA": true },
         { "key": "auditoria", "label": "Decisão precisa ser auditável?", "type": "boolean", "required": true,
           "ajuda": "Rastreabilidade de quem/quando/por que o fluxo decidiu X — comum em decisão de crédito/risco." },
@@ -332,7 +339,7 @@
       "color": "#475569",
       "icon": "Globe",
       "spec": [
-        { "key": "nome", "label": "Nome da API", "type": "text", "required": true },
+        { "key": "nome", "label": "Nome da API", "type": "text", "required": true, "identificador": true },
         { "key": "baseUrl", "label": "URL base", "type": "text", "required": false, "permiteNA": true },
         { "key": "autenticacao", "label": "Autenticação", "type": "select",
           "options": ["nenhuma", "api-key", "oauth2", "mtls"], "required": true },
@@ -364,7 +371,7 @@
       "color": "#6b7280",
       "icon": "Clock",
       "spec": [
-        { "key": "nome", "label": "Nome do job", "type": "text", "required": true },
+        { "key": "nome", "label": "Nome do job", "type": "text", "required": true, "identificador": true },
         { "key": "cron", "label": "Expressão cron", "type": "text", "required": true },
         { "key": "idempotente", "label": "Execução é idempotente?", "type": "boolean", "required": true },
         { "key": "concorrencia", "label": "Se a execução anterior ainda estiver rodando", "type": "select",
@@ -389,7 +396,7 @@
       "color": "#8b5cf6",
       "icon": "Scale",
       "spec": [
-        { "key": "nome", "label": "Nome da regra", "type": "text", "required": true },
+        { "key": "nome", "label": "Nome da regra", "type": "text", "required": true, "identificador": true },
         { "key": "gatilho", "label": "Quando a regra falha", "type": "select",
           "options": ["bloqueia a operação", "só alerta/loga"], "required": true },
         { "key": "auditoria", "label": "Resultado precisa ficar registrado?", "type": "boolean", "required": true },
@@ -412,7 +419,7 @@
       "color": "#ef4444",
       "icon": "Zap",
       "spec": [
-        { "key": "nome", "label": "Nome/namespace da chave", "type": "text", "required": true,
+        { "key": "nome", "label": "Nome/namespace da chave", "type": "text", "required": true, "identificador": true,
           "ajuda": "Prefixo usado nas chaves deste cache, ex.: \"usuario:perfil:{id}\"." },
         { "key": "tecnologia", "label": "Tecnologia", "type": "select",
           "options": ["Redis", "Caffeine (em memória local)"], "required": true },
@@ -445,7 +452,7 @@
       "color": "#0891b2",
       "icon": "Cloud",
       "spec": [
-        { "key": "bucket", "label": "Bucket/container", "type": "text", "required": true },
+        { "key": "bucket", "label": "Bucket/container", "type": "text", "required": true, "identificador": true },
         { "key": "prefixoChave", "label": "Prefixo/padrão de chave do objeto", "type": "text", "required": false,
           "permiteNA": true, "ajuda": "Ex.: \"comprovantes/{ano}/{mes}/{id}.pdf\"." },
         { "key": "politicaAcesso", "label": "Política de acesso", "type": "select",
@@ -472,7 +479,7 @@
       "color": "#65a30d",
       "icon": "Boxes",
       "spec": [
-        { "key": "nomeJob", "label": "Nome do Job", "type": "text", "required": true },
+        { "key": "nomeJob", "label": "Nome do Job", "type": "text", "required": true, "identificador": true },
         { "key": "origemDados", "label": "Origem dos dados (reader)", "type": "text", "required": true,
           "ajuda": "De onde o job lê — arquivo, tabela, fila. O contrato do dado em si fica no nó de origem (Mongo/SQL/arquivo), não aqui." },
         { "key": "destinoDados", "label": "Destino dos dados (writer)", "type": "text", "required": true },
@@ -505,7 +512,7 @@
       "color": "#3ddc84",
       "icon": "Smartphone",
       "spec": [
-        { "key": "nome", "label": "Nome do app", "type": "text", "required": true },
+        { "key": "nome", "label": "Nome do app", "type": "text", "required": true, "identificador": true },
         { "key": "versaoMinimaSdk", "label": "Versão mínima do Android (API level)", "type": "text",
           "required": false, "permiteNA": true,
           "ajuda": "Ex.: API 26 (Android 8.0). Define o que dá pra usar de API do sistema e o alcance de dispositivos." },
@@ -538,7 +545,7 @@
       "color": "#a3a3a3",
       "icon": "Smartphone",
       "spec": [
-        { "key": "nome", "label": "Nome do app", "type": "text", "required": true },
+        { "key": "nome", "label": "Nome do app", "type": "text", "required": true, "identificador": true },
         { "key": "versaoMinimaIos", "label": "Versão mínima do iOS", "type": "text",
           "required": false, "permiteNA": true,
           "ajuda": "Ex.: iOS 15. Define o que dá pra usar de API do sistema e o alcance de dispositivos." },

@@ -2,6 +2,7 @@ import type {
   Atividade,
   Dependencia,
   Diagrama,
+  Endpoint,
   No,
   Tamanho,
   TipoItem,
@@ -71,7 +72,8 @@ function derivarService(no: No, cfg: NodeTypeConfig, quebra: ContextoQuebra): At
   }
 
   const contextoHttp = cfg.techs.length > 0 ? [`${cfg.techs[0]}-chamadas http`] : [];
-  (no.endpoints ?? []).forEach((ep, idx) => {
+  const endpoints = (no.spec.endpoints?.valor as Endpoint[] | undefined) ?? [];
+  endpoints.forEach((ep, idx) => {
     const dependencias: Dependencia[] =
       no.status === "novo" ? [{ type: "dependent", alvoChave: `${no.id}::setup` }] : [];
     atividades.push({

@@ -341,6 +341,15 @@ function AppCarregado({
     void atualizarPerfisTime(timeId, tipoNo, { [campo]: valor });
   }
 
+  /** Compartilhado entre o <select> (sessão hospedada) e o <input> de texto
+   * livre (modo local) do campo "Time" do header — trocar sempre atualiza os
+   * dois: o time da quebra em si e o timeAtivo (que dirige sugestões e campos
+   * customizados carregados). */
+  function aoMudarTime(novoTime: string) {
+    setQuebra((q) => ({ ...q, time: novoTime }));
+    onTrocarTimeAtivo(novoTime);
+  }
+
   /** Depois de qualquer CRUD de campo customizado, recarrega a config mesclada
    * (loadConfig.ts) em vez de duplicar a lógica de merge aqui — o servidor é a
    * única fonte de verdade de como global+time se combinam (SPEC-08 §3.3). */
@@ -411,23 +420,43 @@ function AppCarregado({
 
         <div style={{ width: 1, height: 20, background: "#e2e8f0" }} />
 
-        <select
-          aria-label="Time (stack conhecida)"
-          value={quebra.time ?? timeAtivo}
-          onChange={(e) => {
-            const novoTime = e.target.value;
-            setQuebra((q) => ({ ...q, time: novoTime }));
-            onTrocarTimeAtivo(novoTime);
-          }}
-          title="Times aos quais sua sessão pertence — pré-preenchem sugestões de stack e os campos customizados desse time."
-          style={{ fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 170 }}
-        >
-          {sessao.timeIds.map((time) => (
-            <option key={time} value={time}>
-              {time}
-            </option>
-          ))}
-        </select>
+        {modo === "local" ? (
+          <>
+            {/* Achado real: no modo local a "sessão" é sempre um único time falso
+             * (SESSAO_LOCAL em openApiLocal.ts) — travar este campo em
+             * sessao.timeIds tornava impossível selecionar qualquer time real já
+             * configurado em perfis-time.json. Sem login pra isolar, texto livre
+             * (com sugestão dos times já conhecidos) é o comportamento certo aqui. */}
+            <input
+              aria-label="Time (stack conhecida)"
+              list="times-conhecidos-local"
+              value={quebra.time ?? timeAtivo}
+              onChange={(e) => aoMudarTime(e.target.value)}
+              placeholder="ex.: time-pagamentos"
+              title="Nome livre — pré-preenche sugestões de stack e os campos customizados desse time (config/perfis-time.json e config/campos-no.json)."
+              style={{ fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 170 }}
+            />
+            <datalist id="times-conhecidos-local">
+              {Object.keys(perfisTime).map((time) => (
+                <option key={time} value={time} />
+              ))}
+            </datalist>
+          </>
+        ) : (
+          <select
+            aria-label="Time (stack conhecida)"
+            value={quebra.time ?? timeAtivo}
+            onChange={(e) => aoMudarTime(e.target.value)}
+            title="Times aos quais sua sessão pertence — pré-preenchem sugestões de stack e os campos customizados desse time."
+            style={{ fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 170 }}
+          >
+            {sessao.timeIds.map((time) => (
+              <option key={time} value={time}>
+                {time}
+              </option>
+            ))}
+          </select>
+        )}
 
         <div style={{ width: 1, height: 20, background: "#e2e8f0" }} />
 

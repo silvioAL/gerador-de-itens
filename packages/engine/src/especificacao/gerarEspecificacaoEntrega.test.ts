@@ -194,6 +194,105 @@ describe("gerarEspecificacaoEntrega", () => {
   });
 });
 
+describe("campo tipo lista (ex.: Endpoints) na especificação técnica", () => {
+  const configComLista: DiagramaConfig = {
+    nodeTypes: {
+      service: {
+        label: "Serviço",
+        derives: "service",
+        techs: ["Backend"],
+        contextos: [],
+        spec: [
+          { key: "nome", label: "Nome do serviço", type: "text", required: true },
+          {
+            key: "endpoints",
+            label: "Endpoints",
+            type: "lista",
+            required: false,
+            permiteNA: true,
+            itemSpec: [
+              { key: "method", label: "Method", type: "select", options: ["GET", "POST"] },
+              { key: "path", label: "Path", type: "text" },
+              { key: "request", label: "Contrato de request", type: "textarea" },
+            ],
+          },
+        ],
+      },
+    },
+    edgeTypes: {},
+    edgeRules: {},
+  };
+
+  function diagramaComEndpoints(valorEndpoints: unknown, comNA = false): Diagrama {
+    return {
+      nodes: [
+        {
+          id: "n1",
+          type: "service",
+          status: "novo",
+          label: "srv-checkout",
+          x: 0,
+          y: 0,
+          spec: {
+            nome: { valor: "srv-checkout", origem: "manual" },
+            ...(comNA ? {} : { endpoints: { valor: valorEndpoints, origem: "manual" } }),
+          },
+          specNA: comNA ? { endpoints: { motivo: "ainda não expõe REST" } } : {},
+        },
+      ],
+      edges: [],
+    };
+  }
+
+  it("um item por linha numerada, campos curtos resumidos e textarea em linha própria", () => {
+    const diagrama = diagramaComEndpoints([
+      { method: "POST", path: "/v1/checkout/fechar", request: "{ pedidoId, itens[] }" },
+    ]);
+    const atividades = derivar(diagrama, configComLista, {});
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, configComLista);
+
+    expect(doc).toContain("**Endpoints:**");
+    expect(doc).toContain("1. Method: POST · Path: /v1/checkout/fechar");
+    expect(doc).toContain("   Contrato de request: { pedidoId, itens[] }");
+  });
+
+  it("múltiplos itens ficam numerados em sequência", () => {
+    const diagrama = diagramaComEndpoints([
+      { method: "GET", path: "/v1/a", request: "" },
+      { method: "POST", path: "/v1/b", request: "" },
+    ]);
+    const atividades = derivar(diagrama, configComLista, {});
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, configComLista);
+
+    expect(doc).toContain("1. Method: GET · Path: /v1/a");
+    expect(doc).toContain("2. Method: POST · Path: /v1/b");
+  });
+
+  it("lista vazia mostra '(nenhum item)', nunca quebra", () => {
+    const diagrama = diagramaComEndpoints([]);
+    const atividades = derivar(diagrama, configComLista, {});
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, configComLista);
+
+    expect(doc).toContain("**Endpoints:** (nenhum item)");
+  });
+
+  it("campo lista marcado N/A mostra o motivo, fora da tabela de campos escalares", () => {
+    const diagrama = diagramaComEndpoints(undefined, true);
+    const atividades = derivar(diagrama, configComLista, {});
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, configComLista);
+
+    expect(doc).toContain("**Endpoints:** N/A — ainda não expõe REST");
+  });
+
+  it("campo lista nunca aparece como linha da tabela de campos escalares", () => {
+    const diagrama = diagramaComEndpoints([{ method: "GET", path: "/v1/a", request: "" }]);
+    const atividades = derivar(diagrama, configComLista, {});
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, configComLista);
+
+    expect(doc).not.toMatch(/\| Endpoints \|/);
+  });
+});
+
 describe("extrairVariaveis / validarTemplate", () => {
   it("template padrão só usa variáveis válidas", () => {
     expect(validarTemplate(TEMPLATE_ESPECIFICACAO_PADRAO)).toEqual([]);

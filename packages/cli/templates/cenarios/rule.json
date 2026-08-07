@@ -14,14 +14,15 @@
           "x": 100, "y": 120,
           "spec": {
             "nome": { "valor": "srv-checkout", "origem": "manual" },
-            "linguagem": { "valor": "Node", "origem": "manual" }
+            "linguagem": { "valor": "Node", "origem": "manual" },
+            "endpoints": {
+              "valor": [{ "method": "POST", "path": "/v1/checkout/cupom", "action": "novo" }],
+              "origem": "manual"
+            }
           },
           "specNA": {
             "framework": { "motivo": "framework ainda não definido" }
-          },
-          "endpoints": [
-            { "method": "POST", "path": "/v1/checkout/cupom", "action": "novo" }
-          ]
+          }
         },
         {
           "id": "n2", "type": "rule", "status": "novo", "label": "elegibilidade-desconto-checkout",

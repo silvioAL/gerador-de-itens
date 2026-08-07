@@ -15,25 +15,34 @@
           "spec": {
             "nome": { "valor": "srv-checkout", "origem": "manual" },
             "linguagem": { "valor": "Node", "origem": "manual" },
-            "contratoEndpoints": {
-              "valor": "POST /v1/checkout/fechar → { pedidoId, itens[], enderecoEntrega } / 201 { pedidoId, status }",
+            "endpoints": {
+              "valor": [
+                {
+                  "method": "POST", "path": "/v1/checkout/fechar", "action": "novo",
+                  "request": "{ pedidoId, itens[], enderecoEntrega }",
+                  "response": "201 { pedidoId, status }"
+                }
+              ],
               "origem": "manual"
             }
           },
           "specNA": {
             "framework": { "motivo": "framework ainda não definido" }
-          },
-          "endpoints": [
-            { "method": "POST", "path": "/v1/checkout/fechar", "action": "novo" }
-          ]
+          }
         },
         {
           "id": "n2", "type": "service", "status": "existente", "label": "srv-fidelidade",
           "x": 420, "y": 120,
           "spec": {
             "nome": { "valor": "srv-fidelidade", "origem": "manual" },
-            "contratoEndpoints": {
-              "valor": "GET /v1/fidelidade/saldo/{clienteId} → 200 { saldoPontos: number, elegivelParaResgate: boolean }",
+            "endpoints": {
+              "valor": [
+                {
+                  "method": "GET", "path": "/v1/fidelidade/saldo/{clienteId}", "action": "novo",
+                  "request": "sem corpo (GET, parâmetro na URL: clienteId)",
+                  "response": "200 { saldoPontos: number, elegivelParaResgate: boolean }"
+                }
+              ],
               "origem": "manual"
             },
             "migracao": {
@@ -43,10 +52,7 @@
           },
           "specNA": {
             "linguagem": { "motivo": "serviço existente, stack não verificada nesta quebra" }
-          },
-          "endpoints": [
-            { "method": "GET", "path": "/v1/fidelidade/saldo/{clienteId}", "action": "novo" }
-          ]
+          }
         }
       ],
       "edges": [

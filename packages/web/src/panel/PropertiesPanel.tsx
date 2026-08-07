@@ -56,9 +56,13 @@ export function PropertiesPanel({
   const prontidao = calcularProntidao(cfg.spec, no, arestas);
   const { renomearNo, alternarStatus, definirTime, removerNo } = quebraState;
 
+  // Exclui o campo de identidade (nome do serviço, tópico, tabela...) da
+  // captura de "padrão do time" — sugerir o mesmo valor fixo pra todo nó novo
+  // desse tipo não faz sentido, cada instância precisa do seu próprio nome
+  // único (achado real, ver FieldSpec.identificador).
   const valoresManuais = Object.fromEntries(
     Object.entries(no.spec)
-      .filter(([, v]) => v.origem === "manual")
+      .filter(([chave, v]) => v.origem === "manual" && !cfg.spec.find((c) => c.key === chave)?.identificador)
       .map(([chave, v]) => [chave, v.valor])
   );
   const podeSalvarPerfil = Boolean(time) && Boolean(onSalvarPerfilDoTime) && Object.keys(valoresManuais).length > 0;
@@ -248,20 +252,29 @@ function FieldControl({
   valor,
   sugestao,
   onChange,
+  ariaLabel,
 }: {
   campo: FieldSpec;
   valor: unknown;
   sugestao: unknown;
   onChange: (v: unknown) => void;
+  /** Sobrescreve o aria-label (default: `campo.label`) — necessário dentro de
+   * `ListaControl`, onde o mesmo `itemSpec` se repete por item e `campo.label`
+   * sozinho colidiria entre linhas (ex.: dois inputs "Method" indistinguíveis). */
+  ariaLabel?: string;
 }) {
+  const rotulo = ariaLabel ?? campo.label;
   const placeholder = sugestao !== undefined && sugestao !== "" ? `sugestão: ${sugestao}` : undefined;
 
+  if (campo.type === "lista") {
+    return <ListaControl campo={campo} valor={valor} onChange={onChange} />;
+  }
   if (campo.type === "boolean") {
     return (
       <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
         <input
           type="checkbox"
-          aria-label={campo.label}
+          aria-label={rotulo}
           checked={valor === true}
           onChange={(e) => onChange(e.target.checked)}
         />
@@ -272,7 +285,7 @@ function FieldControl({
   if (campo.type === "select") {
     return (
       <select
-        aria-label={campo.label}
+        aria-label={rotulo}
         value={typeof valor === "string" ? valor : ""}
         onChange={(e) => onChange(e.target.value)}
         style={inputEstilo}
@@ -292,7 +305,7 @@ function FieldControl({
     return (
       <input
         type="number"
-        aria-label={campo.label}
+        aria-label={rotulo}
         value={typeof valor === "number" ? valor : ""}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))}
@@ -301,17 +314,78 @@ function FieldControl({
     );
   }
   if (campo.type === "textarea") {
-    return <TextareaComExpandir campo={campo} valor={valor} placeholder={placeholder} onChange={onChange} />;
+    return <TextareaComExpandir campo={campo} valor={valor} placeholder={placeholder} onChange={onChange} ariaLabel={rotulo} />;
   }
   return (
     <input
       type="text"
-      aria-label={campo.label}
+      aria-label={rotulo}
       value={typeof valor === "string" ? valor : ""}
       placeholder={placeholder}
       onChange={(e) => onChange(e.target.value)}
       style={inputEstilo}
     />
+  );
+}
+
+/** Repetível — zero ou mais itens com a forma de `campo.itemSpec`, cada
+ * sub-campo renderizado via `FieldControl` recursivo (sem sugestão/N/A por
+ * item — provenance e sugestão de perfil de time continuam só no nível do
+ * campo "lista" inteiro, não por item; granularidade que ninguém pediu). */
+function ListaControl({
+  campo,
+  valor,
+  onChange,
+}: {
+  campo: FieldSpec;
+  valor: unknown;
+  onChange: (v: unknown) => void;
+}) {
+  const itens = Array.isArray(valor) ? (valor as Record<string, unknown>[]) : [];
+  const itemSpec = campo.itemSpec ?? [];
+
+  function atualizarItem(idx: number, chave: string, v: unknown) {
+    onChange(itens.map((item, i) => (i === idx ? { ...item, [chave]: v } : item)));
+  }
+
+  function removerItem(idx: number) {
+    onChange(itens.filter((_, i) => i !== idx));
+  }
+
+  return (
+    <div>
+      {itens.length === 0 && <p style={{ fontSize: 11, color: "#94a3b8", margin: "2px 0" }}>Nenhum item ainda.</p>}
+      {itens.map((item, idx) => (
+        <div key={idx} style={itemListaEstilo}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <strong style={{ fontSize: 11, color: "#64748b" }}>#{idx + 1}</strong>
+            <button
+              type="button"
+              style={linkBotaoEstilo}
+              onClick={() => removerItem(idx)}
+              aria-label={`Remover item ${idx + 1} de ${campo.label}`}
+            >
+              ✕ remover
+            </button>
+          </div>
+          {itemSpec.map((sub) => (
+            <div key={sub.key} style={{ marginTop: 4 }}>
+              <label style={{ fontSize: 11, color: "#334155", display: "block", marginBottom: 2 }}>{sub.label}</label>
+              <FieldControl
+                campo={sub}
+                valor={item[sub.key]}
+                sugestao={undefined}
+                onChange={(v) => atualizarItem(idx, sub.key, v)}
+                ariaLabel={`${sub.label} — item ${idx + 1} de ${campo.label}`}
+              />
+            </div>
+          ))}
+        </div>
+      ))}
+      <button type="button" style={{ ...linkBotaoEstilo, marginTop: 6 }} onClick={() => onChange([...itens, {}])}>
+        + item
+      </button>
+    </div>
   );
 }
 
@@ -323,20 +397,23 @@ function TextareaComExpandir({
   valor,
   placeholder,
   onChange,
+  ariaLabel,
 }: {
   campo: FieldSpec;
   valor: unknown;
   placeholder: string | undefined;
   onChange: (v: unknown) => void;
+  ariaLabel?: string;
 }) {
   const [expandido, setExpandido] = useState(false);
   const valorTexto = typeof valor === "string" ? valor : "";
+  const rotulo = ariaLabel ?? campo.label;
 
   return (
     <>
       <div style={{ position: "relative" }}>
         <textarea
-          aria-label={campo.label}
+          aria-label={rotulo}
           value={valorTexto}
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
@@ -347,7 +424,7 @@ function TextareaComExpandir({
           type="button"
           onClick={() => setExpandido(true)}
           style={botaoExpandirEstilo}
-          aria-label={`Expandir ${campo.label}`}
+          aria-label={`Expandir ${rotulo}`}
           title="Expandir para editar numa área maior"
         >
           ⤢
@@ -358,19 +435,19 @@ function TextareaComExpandir({
           <div
             role="dialog"
             aria-modal="true"
-            aria-label={campo.label}
+            aria-label={rotulo}
             style={modalExpandidoEstilo}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <strong style={{ fontSize: 13, color: "#0f172a" }}>{campo.label}</strong>
+              <strong style={{ fontSize: 13, color: "#0f172a" }}>{rotulo}</strong>
               <button onClick={() => setExpandido(false)} style={fecharExpandidoEstilo} aria-label="Fechar">
                 ×
               </button>
             </div>
             <textarea
               autoFocus
-              aria-label={`${campo.label} (expandido)`}
+              aria-label={`${rotulo} (expandido)`}
               value={valorTexto}
               placeholder={placeholder}
               onChange={(e) => onChange(e.target.value)}
@@ -420,6 +497,14 @@ const linkBotaoEstilo: React.CSSProperties = {
   cursor: "pointer",
   padding: 0,
   marginTop: 4,
+};
+
+const itemListaEstilo: React.CSSProperties = {
+  border: "1px solid #e2e8f0",
+  borderRadius: 8,
+  padding: 8,
+  marginBottom: 8,
+  background: "#f8fafc",
 };
 
 const naBoxEstilo: React.CSSProperties = {

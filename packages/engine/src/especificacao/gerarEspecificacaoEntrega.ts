@@ -1,5 +1,5 @@
-import type { Atividade, Aresta, Diagrama, No } from "../model/types.js";
-import type { DiagramaConfig, RegrasConfig } from "../config/types.js";
+import type { Atividade, Aresta, Diagrama, No, ValorSpec } from "../model/types.js";
+import type { DiagramaConfig, FieldSpec, RegrasConfig } from "../config/types.js";
 import { camposVisiveis } from "../spec/campos.js";
 import { gerarChecklistTecnico, gerarCiclosDeTeste } from "../refinamento/gerarRefinamento.js";
 
@@ -11,6 +11,28 @@ function formatarValor(valor: unknown): string {
   if (valor === undefined || valor === null || valor === "") return "(não preenchido)";
   if (typeof valor === "boolean") return valor ? "sim" : "não";
   return String(valor);
+}
+
+/** Sub-campos de conteúdo longo (textarea) ficam em linha própria, indentados
+ * — o resumo (method/path/ação) numa linha só fica ilegível se um contrato de
+ * request/response JSON de várias linhas for espremido junto. */
+function descreverItemLista(item: Record<string, unknown>, itemSpec: FieldSpec[]): string {
+  const curtos = itemSpec.filter((s) => s.type !== "textarea");
+  const longos = itemSpec.filter((s) => s.type === "textarea");
+  const resumo = curtos.map((s) => `${s.label}: ${formatarValor(item[s.key])}`).join(" · ");
+  const detalhes = longos
+    .filter((s) => item[s.key] !== undefined && item[s.key] !== "")
+    .map((s) => `   ${s.label}: ${formatarValor(item[s.key])}`);
+  return [resumo, ...detalhes].join("\n");
+}
+
+/** Campo `type: "lista"` (ex.: Endpoints) não cabe numa célula de tabela — um
+ * item por linha numerada, fora da tabela de campos escalares. */
+function descreverCampoLista(campo: FieldSpec, valorSpec: ValorSpec | undefined): string {
+  const itens = Array.isArray(valorSpec?.valor) ? (valorSpec.valor as Record<string, unknown>[]) : [];
+  if (itens.length === 0) return `**${campo.label}:** (nenhum item)`;
+  const linhas = itens.map((item, i) => `${i + 1}. ${descreverItemLista(item, campo.itemSpec ?? [])}`);
+  return [`**${campo.label}:**`, "", ...linhas].join("\n");
 }
 
 function descreverEspecificacaoNo(no: No, config: DiagramaConfig, arestas: Aresta[]): string {
@@ -28,20 +50,34 @@ function descreverEspecificacaoNo(no: No, config: DiagramaConfig, arestas: Arest
     return linhas.join("\n");
   }
 
-  linhas.push("| Campo | Valor | Proveniência |", "|---|---|---|");
-  for (const campo of visiveis) {
-    const na = no.specNA?.[campo.key];
-    if (na) {
-      linhas.push(`| ${campo.label} | N/A — ${na.motivo || "(sem motivo)"} | — |`);
-      continue;
+  const camposEscalares = visiveis.filter((c) => c.type !== "lista");
+  const camposLista = visiveis.filter((c) => c.type === "lista");
+
+  if (camposEscalares.length > 0) {
+    linhas.push("| Campo | Valor | Proveniência |", "|---|---|---|");
+    for (const campo of camposEscalares) {
+      const na = no.specNA?.[campo.key];
+      if (na) {
+        linhas.push(`| ${campo.label} | N/A — ${na.motivo || "(sem motivo)"} | — |`);
+        continue;
+      }
+      const valorSpec = no.spec[campo.key];
+      if (!valorSpec) {
+        linhas.push(`| ${campo.label} | (não preenchido) | — |`);
+        continue;
+      }
+      linhas.push(`| ${campo.label} | ${formatarValor(valorSpec.valor)} | ${valorSpec.origem} |`);
     }
-    const valorSpec = no.spec[campo.key];
-    if (!valorSpec) {
-      linhas.push(`| ${campo.label} | (não preenchido) | — |`);
-      continue;
-    }
-    linhas.push(`| ${campo.label} | ${formatarValor(valorSpec.valor)} | ${valorSpec.origem} |`);
   }
+
+  for (const campo of camposLista) {
+    const na = no.specNA?.[campo.key];
+    linhas.push(
+      "",
+      na ? `**${campo.label}:** N/A — ${na.motivo || "(sem motivo)"}` : descreverCampoLista(campo, no.spec[campo.key])
+    );
+  }
+
   return linhas.join("\n");
 }
 

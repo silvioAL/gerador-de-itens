@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { DiagramaConfig, PerfisConfig } from "@gerador/engine";
 import { PerfisTimeTab } from "./PerfisTimeTab";
@@ -13,6 +13,7 @@ const config: DiagramaConfig = {
       contextos: [],
       color: "#3b82f6",
       spec: [
+        { key: "nome", label: "Nome do serviço", type: "text", required: true, identificador: true },
         { key: "linguagem", label: "Linguagem/Stack", type: "select", options: ["Java", "Node"], required: false },
         { key: "framework", label: "Framework", type: "text", required: false },
       ],
@@ -67,6 +68,21 @@ describe("PerfisTimeTab", () => {
     await user.click(screen.getByRole("button", { name: "Salvar" }));
 
     expect(onEditarValor).toHaveBeenCalledWith("time-x", "service", "linguagem", "Kotlin");
+  });
+
+  it("achado real: campo de identidade (nome do serviço) nunca é sugerido — nem como default, nem como opção no seletor de Campo", async () => {
+    const user = userEvent.setup();
+    render(<PerfisTimeTab perfisTime={{}} config={config} onEditarValor={vi.fn()} />);
+
+    await user.click(screen.getByText("+ Adicionar ou corrigir um valor de stack"));
+
+    // Default já abre em "linguagem" (primeiro campo não-identidade), não em "nome"
+    expect(screen.getByDisplayValue("Linguagem/Stack (linguagem)")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("Nome do serviço (nome)")).not.toBeInTheDocument();
+
+    // "Nome do serviço" nem aparece como opção selecionável
+    const seletorCampo = screen.getByLabelText("Campo");
+    expect(within(seletorCampo).queryByText("Nome do serviço (nome)")).not.toBeInTheDocument();
   });
 
   it("botão Salvar fica desabilitado sem time ou sem valor preenchido", async () => {

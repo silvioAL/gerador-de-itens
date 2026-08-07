@@ -18,9 +18,8 @@
             "framework": { "valor": "Spring Boot", "origem": "manual" }
           },
           "specNA": {
-            "contratoEndpoints": { "motivo": "não expõe REST nesta quebra, só consome gRPC" }
-          },
-          "endpoints": []
+            "endpoints": { "motivo": "não expõe REST nesta quebra, só consome gRPC" }
+          }
         },
         {
           "id": "n2", "type": "service", "status": "existente", "label": "srv-catalogo",
@@ -35,8 +34,7 @@
           },
           "specNA": {
             "linguagem": { "motivo": "serviço existente, stack não verificada nesta quebra" }
-          },
-          "endpoints": []
+          }
         }
       ],
       "edges": [

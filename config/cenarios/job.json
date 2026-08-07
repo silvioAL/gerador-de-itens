@@ -18,8 +18,7 @@
           },
           "specNA": {
             "linguagem": { "motivo": "serviço existente, stack não verificada nesta quebra" }
-          },
-          "endpoints": []
+          }
         },
         {
           "id": "n2", "type": "job", "status": "novo", "label": "conciliacao-noturna",

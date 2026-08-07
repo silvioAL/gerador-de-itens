@@ -40,8 +40,14 @@
           "x": 420, "y": 120,
           "spec": {
             "nome": { "valor": "srv-credito-api", "origem": "manual" },
-            "contratoEndpoints": {
-              "valor": "POST /v1/credito/solicitar-aumento\nRequest: { \"clienteId\": \"string\", \"valorSolicitado\": number }\nResponse 200: { \"protocolo\": \"string\", \"status\": \"em_analise\" }\nResponse 422: { \"motivo\": \"string\" }",
+            "endpoints": {
+              "valor": [
+                {
+                  "method": "POST", "path": "/v1/credito/solicitar-aumento", "action": "novo",
+                  "request": "{ \"clienteId\": \"string\", \"valorSolicitado\": number }",
+                  "response": "200: { \"protocolo\": \"string\", \"status\": \"em_analise\" }\n422: { \"motivo\": \"string\" }"
+                }
+              ],
               "origem": "manual"
             },
             "migracao": {

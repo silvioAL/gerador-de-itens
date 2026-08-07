@@ -15,14 +15,15 @@
           "x": 100, "y": 120,
           "spec": {
             "nome": { "valor": "srv-portabilidade", "origem": "manual" },
-            "linguagem": { "valor": "Node", "origem": "manual" }
+            "linguagem": { "valor": "Node", "origem": "manual" },
+            "endpoints": {
+              "valor": [{ "method": "POST", "path": "/v1/portabilidade/solicitacoes", "action": "novo" }],
+              "origem": "manual"
+            }
           },
           "specNA": {
             "framework": { "motivo": "POC inicial, framework ainda não definido" }
-          },
-          "endpoints": [
-            { "method": "POST", "path": "/v1/portabilidade/solicitacoes", "action": "novo" }
-          ]
+          }
         },
         {
           "id": "n2", "type": "kafka", "status": "novo", "label": "portabilidade.solicitada.v1",
@@ -62,8 +63,7 @@
           },
           "specNA": {
             "linguagem": { "motivo": "serviço existente, stack não verificada nesta quebra" }
-          },
-          "endpoints": []
+          }
         }
       ],
       "edges": [

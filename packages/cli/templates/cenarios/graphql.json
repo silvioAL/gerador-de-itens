@@ -18,9 +18,8 @@
             "framework": { "valor": "Next.js", "origem": "manual" }
           },
           "specNA": {
-            "contratoEndpoints": { "motivo": "não expõe REST nesta quebra, só consome GraphQL" }
-          },
-          "endpoints": []
+            "endpoints": { "motivo": "não expõe REST nesta quebra, só consome GraphQL" }
+          }
         },
         {
           "id": "n2", "type": "service", "status": "existente", "label": "srv-pedidos",
@@ -35,8 +34,7 @@
           },
           "specNA": {
             "linguagem": { "motivo": "serviço existente, stack não verificada nesta quebra" }
-          },
-          "endpoints": []
+          }
         }
       ],
       "edges": [

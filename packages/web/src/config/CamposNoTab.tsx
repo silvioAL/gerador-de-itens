@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { DiagramaConfig, FieldSpec } from "@gerador/engine";
-import type { CampoNo, DadosCampoNo } from "../api/client";
+import type { CampoNo, DadosCampoNo, ItemSpecCampo } from "../api/client";
 
 export interface CamposNoTabProps {
   config: DiagramaConfig;
@@ -11,7 +11,14 @@ export interface CamposNoTabProps {
   onExcluir: (id: string) => Promise<void>;
 }
 
-const TIPOS_CAMPO: CampoNo["type"][] = ["text", "textarea", "number", "boolean", "select"];
+const TIPOS_CAMPO: CampoNo["type"][] = ["text", "textarea", "number", "boolean", "select", "lista"];
+/** Tipos válidos pra um sub-campo dentro de "lista" — sem "lista" aninhada
+ * (lista-de-lista é complexidade que ninguém pediu, ver FieldSpec.itemSpec). */
+const TIPOS_ITEM: ItemSpecCampo["type"][] = ["text", "textarea", "number", "boolean", "select"];
+
+function subCampoVazio(): ItemSpecCampo {
+  return { key: "", label: "", type: "text" };
+}
 
 interface FormularioCampo {
   id?: string;
@@ -33,6 +40,8 @@ interface FormularioCampo {
   valorPadrao: string;
   opcoes: string;
   ajuda: string;
+  /** Só usado quando `type === "lista"` — a forma de cada item. */
+  itemSpec: ItemSpecCampo[];
 }
 
 /** Gera uma key técnica (camelCase, sem acento/espaço) a partir do Rótulo
@@ -66,6 +75,7 @@ function formularioVazio(tipoNo: string): FormularioCampo {
     valorPadrao: "",
     opcoes: "",
     ajuda: "",
+    itemSpec: [],
   };
 }
 
@@ -83,6 +93,7 @@ function formularioDeCampo(campo: CampoNo): FormularioCampo {
     valorPadrao: campo.valorPadrao ?? "",
     opcoes: (campo.opcoes ?? []).join(", "),
     ajuda: campo.ajuda ?? "",
+    itemSpec: campo.itemSpec ?? [],
   };
 }
 
@@ -104,6 +115,15 @@ function formularioDeFieldSpec(tipoNo: string, campo: FieldSpec): FormularioCamp
     valorPadrao: campo.default !== undefined ? String(campo.default) : "",
     opcoes: (campo.options ?? []).join(", "),
     ajuda: campo.ajuda ?? "",
+    // "lista" aninhada nunca é esperada aqui (diagrama.json não deveria ter —
+    // ver FieldSpec.itemSpec), mas o tipo do engine não impede; cai pra "text"
+    // em vez de propagar um valor que ItemSpecCampo não aceita.
+    itemSpec: (campo.itemSpec ?? []).map((s) => ({
+      key: s.key,
+      label: s.label,
+      type: s.type === "lista" ? "text" : s.type,
+      options: s.options,
+    })),
   };
 }
 
@@ -146,6 +166,10 @@ export function CamposNoTab({ config, camposNo, timeAtivo, onCriar, onAtualizar,
       valorPadrao: formulario.valorPadrao.trim() || undefined,
       opcoes: formulario.type === "select" ? formulario.opcoes.split(",").map((o) => o.trim()).filter(Boolean) : undefined,
       ajuda: formulario.ajuda.trim() || undefined,
+      itemSpec:
+        formulario.type === "lista"
+          ? formulario.itemSpec.filter((s) => s.key.trim() && s.label.trim())
+          : undefined,
     };
 
     setSalvando(true);
@@ -376,6 +400,13 @@ function FormularioCampoNo({
         </>
       )}
 
+      {formulario.type === "lista" && (
+        <ItemSpecEditor
+          itemSpec={formulario.itemSpec}
+          onMudar={(itemSpec) => setFormulario({ ...formulario, itemSpec })}
+        />
+      )}
+
       <label style={labelFormEstilo}>Valor padrão (opcional)</label>
       <input
         aria-label="Valor padrão"
@@ -413,6 +444,92 @@ function FormularioCampoNo({
           cancelar
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Desenha a forma de cada item de um campo "lista" (ex.: os sub-campos
+ * method/path/request/response de um endpoint) — não o dado em si, o
+ * schema. Quem usa a lista de verdade (`PropertiesPanel`) recebe isso pronto
+ * e monta uma linha repetível por item a partir daqui.
+ */
+function ItemSpecEditor({
+  itemSpec,
+  onMudar,
+}: {
+  itemSpec: ItemSpecCampo[];
+  onMudar: (itemSpec: ItemSpecCampo[]) => void;
+}) {
+  function atualizar(idx: number, patch: Partial<ItemSpecCampo>) {
+    onMudar(itemSpec.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
+  }
+
+  function remover(idx: number) {
+    onMudar(itemSpec.filter((_, i) => i !== idx));
+  }
+
+  return (
+    <div style={{ marginTop: 4 }}>
+      <label style={labelFormEstilo}>Sub-campos de cada item</label>
+      <p style={{ fontSize: 11, color: "#94a3b8", margin: "0 0 6px" }}>
+        Ex.: pra "Endpoints", um item por endpoint — sub-campos method, path, request, response.
+      </p>
+      {itemSpec.length === 0 && (
+        <p style={{ fontSize: 11, color: "#94a3b8", margin: "0 0 6px" }}>Nenhum sub-campo ainda.</p>
+      )}
+      {itemSpec.map((sub, idx) => (
+        <div key={idx} style={subCampoLinhaEstilo}>
+          <input
+            aria-label={`Chave do sub-campo ${idx + 1}`}
+            value={sub.key}
+            onChange={(e) => atualizar(idx, { key: e.target.value })}
+            placeholder="chave (ex.: method)"
+            style={{ ...inputFormEstilo, flex: 1 }}
+          />
+          <input
+            aria-label={`Rótulo do sub-campo ${idx + 1}`}
+            value={sub.label}
+            onChange={(e) => atualizar(idx, { label: e.target.value })}
+            placeholder="rótulo (ex.: Method)"
+            style={{ ...inputFormEstilo, flex: 1 }}
+          />
+          <select
+            aria-label={`Tipo do sub-campo ${idx + 1}`}
+            value={sub.type}
+            onChange={(e) => atualizar(idx, { type: e.target.value as ItemSpecCampo["type"] })}
+            style={{ ...inputFormEstilo, width: 100 }}
+          >
+            {TIPOS_ITEM.map((tipo) => (
+              <option key={tipo} value={tipo}>
+                {tipo}
+              </option>
+            ))}
+          </select>
+          {sub.type === "select" && (
+            <input
+              aria-label={`Opções do sub-campo ${idx + 1}`}
+              value={(sub.options ?? []).join(", ")}
+              onChange={(e) =>
+                atualizar(idx, { options: e.target.value.split(",").map((o) => o.trim()).filter(Boolean) })
+              }
+              placeholder="opções (vírgula)"
+              style={{ ...inputFormEstilo, flex: 1 }}
+            />
+          )}
+          <button
+            type="button"
+            onClick={() => remover(idx)}
+            style={linkBotaoEstilo}
+            aria-label={`Remover sub-campo ${idx + 1}`}
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+      <button type="button" style={{ ...linkBotaoEstilo, marginTop: 4 }} onClick={() => onMudar([...itemSpec, subCampoVazio()])}>
+        + sub-campo
+      </button>
     </div>
   );
 }
@@ -481,6 +598,13 @@ const inputFormEstilo: React.CSSProperties = {
   border: "1px solid #cbd5e1",
   outline: "none",
   boxSizing: "border-box",
+};
+
+const subCampoLinhaEstilo: React.CSSProperties = {
+  display: "flex",
+  gap: 6,
+  alignItems: "center",
+  marginBottom: 6,
 };
 
 const botaoSalvarEstilo: React.CSSProperties = {

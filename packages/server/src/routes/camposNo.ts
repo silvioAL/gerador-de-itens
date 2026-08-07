@@ -6,7 +6,14 @@ import { exigirTime } from "../auth/middleware.js";
 import { registrarAuditoria } from "../auditoria.js";
 import { CAMPO_GLOBAL, camposNo } from "../db/schema.js";
 
-const tipoCampo = z.enum(["text", "textarea", "number", "boolean", "select"]);
+const tipoCampo = z.enum(["text", "textarea", "number", "boolean", "select", "lista"]);
+/** Sub-campo dentro de um `type: "lista"` — sem "lista" aninhada. */
+const tipoItemSpec = z.object({
+  key: z.string().min(1),
+  label: z.string().min(1),
+  type: z.enum(["text", "textarea", "number", "boolean", "select"]),
+  options: z.array(z.string()).optional(),
+});
 
 const corpoCampoNo = z.object({
   timeId: z.string().min(1).default(CAMPO_GLOBAL),
@@ -20,6 +27,7 @@ const corpoCampoNo = z.object({
   ajuda: z.string().optional(),
   permiteNA: z.boolean().default(false),
   ordem: z.number().int().default(0),
+  itemSpec: z.array(tipoItemSpec).optional(),
 });
 
 const corpoAtualizarCampoNo = corpoCampoNo.partial().omit({ timeId: true, tipoNo: true, key: true });

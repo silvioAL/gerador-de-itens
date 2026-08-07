@@ -14,14 +14,15 @@
           "x": 100, "y": 120,
           "spec": {
             "nome": { "valor": "srv-consulta-bureau", "origem": "manual" },
-            "linguagem": { "valor": "Java", "origem": "manual" }
+            "linguagem": { "valor": "Java", "origem": "manual" },
+            "endpoints": {
+              "valor": [{ "method": "GET", "path": "/v1/bureau/score", "action": "novo" }],
+              "origem": "manual"
+            }
           },
           "specNA": {
             "framework": { "motivo": "framework ainda não definido" }
-          },
-          "endpoints": [
-            { "method": "GET", "path": "/v1/bureau/score", "action": "novo" }
-          ]
+          }
         },
         {
           "id": "n2", "type": "external", "status": "novo", "label": "serasa-api",
