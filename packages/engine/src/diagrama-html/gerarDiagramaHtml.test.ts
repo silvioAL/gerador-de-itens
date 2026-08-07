@@ -137,4 +137,29 @@ describe("gerarDiagramaHtml (SPEC-21)", () => {
     expect(dados.nos).toEqual([]);
     expect(dados.arestas).toEqual([]);
   });
+
+  it("viewBox acompanha a posição real dos nós — achado real: viewBox fixo deixava o diagrama em branco quando os nós ficavam fora dele", () => {
+    const diagrama: Diagrama = {
+      nodes: [
+        { id: "svc", type: "service", status: "novo", label: "srv-longe", x: 1000, y: 900, spec: { nome: { valor: "x", origem: "manual" } }, specNA: {} },
+      ],
+      edges: [],
+    };
+    const html = gerarDiagramaHtml([], diagrama, config);
+    const m = html.match(/<svg id="svg-diagrama" viewBox="([^"]+)"/);
+    expect(m).not.toBeNull();
+    const [minX, minY, largura, altura] = m![1].split(" ").map(Number);
+    // o nó (x=1000..~1220, y=900..958) precisa estar contido no viewBox
+    expect(minX).toBeLessThanOrEqual(1000);
+    expect(minY).toBeLessThanOrEqual(900);
+    expect(minX + largura).toBeGreaterThanOrEqual(1000 + 220); // largura mínima do card
+    expect(minY + altura).toBeGreaterThanOrEqual(900 + 58);
+  });
+
+  it("diagrama vazio usa um viewBox padrão sensato, sem NaN", () => {
+    const html = gerarDiagramaHtml([], { nodes: [], edges: [] }, config);
+    const m = html.match(/<svg id="svg-diagrama" viewBox="([^"]+)"/);
+    expect(m![1]).not.toContain("NaN");
+    expect(m![1].split(" ")).toHaveLength(4);
+  });
 });

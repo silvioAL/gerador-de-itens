@@ -19,6 +19,10 @@ export interface ConfigScreenProps {
   /** false no modo local (CLI) — sem servidor não existe conceito de outros
    * membros pra administrar; a aba não faz sentido. */
   mostrarMembros: boolean;
+  /** true só no modo local — `/campos-aresta` não existe no servidor hospedado
+   * (SPEC-21 §2, dormente de propósito); mostrar a aba lá levaria a salvar e
+   * sempre falhar. Inverso de `mostrarMembros`. */
+  mostrarCamposAresta: boolean;
   onEditarValorPerfilTime: (timeId: string, tipoNo: string, campo: string, valor: string) => void;
   onCriarCampoNo: (dados: DadosCampoNo) => Promise<void>;
   onAtualizarCampoNo: (id: string, dados: Partial<DadosCampoNo>) => Promise<void>;
@@ -46,6 +50,7 @@ export function ConfigScreen({
   especificacaoTemplate,
   timeAtivo,
   mostrarMembros,
+  mostrarCamposAresta,
   onEditarValorPerfilTime,
   onCriarCampoNo,
   onAtualizarCampoNo,
@@ -100,9 +105,11 @@ export function ConfigScreen({
         <button onClick={() => setAba("campos")} style={aba === "campos" ? abaAtivaEstilo : abaEstilo}>
           Campos por tipo de nó ({camposNo.length})
         </button>
-        <button onClick={() => setAba("camposAresta")} style={aba === "camposAresta" ? abaAtivaEstilo : abaEstilo}>
-          Campos por tipo de conexão ({camposAresta.length})
-        </button>
+        {mostrarCamposAresta && (
+          <button onClick={() => setAba("camposAresta")} style={aba === "camposAresta" ? abaAtivaEstilo : abaEstilo}>
+            Campos por tipo de conexão ({camposAresta.length})
+          </button>
+        )}
         {mostrarMembros && (
           <button onClick={() => setAba("membros")} style={aba === "membros" ? abaAtivaEstilo : abaEstilo}>
             Membros
@@ -127,7 +134,7 @@ export function ConfigScreen({
             onExcluir={onExcluirCampoNo}
           />
         )}
-        {aba === "camposAresta" && (
+        {aba === "camposAresta" && mostrarCamposAresta && (
           <CamposArestaTab
             config={config}
             camposAresta={camposAresta}
