@@ -41,7 +41,7 @@ Veja `gerador --help` para a lista completa e atualizada. Resumo:
 | `export-vault` | Materializa `config/referencias/*.json` + padrões default como notas Obsidian (SPEC-16/17) |
 | `skill-install [destino]` | Instala a skill do Claude Code no projeto atual (`.claude/skills/gerador-de-itens` por padrão) |
 
-Todos os comandos são locais — nenhum depende de rede ou de um servidor rodando. `open` funciona a partir do pacote instalado via npm, em qualquer diretório — o build do editor visual (`packages/web/dist`) vai empacotado dentro de `gerador-de-itens` (`web-dist/`), não é um build separado que precisa existir no monorepo.
+Todos os comandos são locais — nenhum depende de rede ou de um servidor externo. `open` funciona a partir do pacote instalado via npm, em qualquer diretório: o editor visual vai empacotado dentro de `gerador-de-itens` (`web-dist/`), e o próprio `gerador open` sobe uma API mínima sem login (sessão fixa, sem conceito de time) que persiste a quebra em `quebra.json` na raiz do projeto — o mesmo arquivo que `derive`/`implementar` esperam como argumento, então dá pra desenhar no canvas e rodar o resto pelo terminal sem converter nada. Perfis de time e referências lidos/escritos ali vão direto pra `config/perfis-time.json`/`config/referencias/*.json`.
 
 ## Licença
 

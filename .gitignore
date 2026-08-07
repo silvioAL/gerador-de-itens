@@ -1,6 +1,7 @@
 node_modules/
 dist/
 packages/cli/web-dist/
+packages/web/dist-cli-local/
 coverage/
 *.log
 .DS_Store

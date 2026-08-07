@@ -3,6 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { tratarApiLocal } from "./openApiLocal.js";
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 // Empacotado dentro do próprio pacote (packages/cli/web-dist, copiado no build
@@ -47,6 +48,10 @@ export async function open(args: string[]): Promise<void> {
   const servidor = createServer((req, res) => {
     void (async () => {
       const caminhoLimpo = (req.url ?? "/").split("?")[0];
+
+      // API local (sessão fixa, sem login, sem servidor — SPEC-17): faz o
+      // mesmo build do modo hospedado funcionar sem packages/server nenhum.
+      if (await tratarApiLocal(req, res, process.cwd())) return;
 
       if (caminhoLimpo.startsWith("/config/") && caminhoLimpo.endsWith(".json")) {
         try {

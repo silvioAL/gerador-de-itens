@@ -41,6 +41,9 @@ import { JourneyModal, type AbaJornada } from "./demo/JourneyModal";
 import { ConfigScreen, type AbaConfig } from "./config/ConfigScreen";
 import { TourOverlay } from "./demo/TourOverlay";
 import { useTour } from "./demo/useTour";
+import { useAutoDemo } from "./demo/useAutoDemo";
+import { CursorFantasma } from "./demo/CursorFantasma";
+import { TerminalAnimado } from "./demo/TerminalAnimado";
 import { LandingPage } from "./demo/LandingPage";
 import { EscolherTimeScreen } from "./auth/EscolherTimeScreen";
 import { SemTimeScreen } from "./auth/SemTimeScreen";
@@ -278,20 +281,30 @@ function AppCarregado({
     setResultado(resolverDependencias(atividades));
   }
 
-  const tour = useTour({
+  const opcoesTour = {
     cenarios,
-    carregarCenario: (q) => aoAbrir(q),
+    carregarCenario: (q: Quebra) => aoAbrir(q),
     selecionarNo: setSelecionadoId,
     derivarQuebra,
     fecharRevisao: () => setResultado(null),
     abrirConfigNaAba,
     fecharJornada,
     fecharConfig: () => setMostrarConfig(false),
-  });
+  };
+
+  const tour = useTour(opcoesTour);
+  // Demonstração automática (aditiva ao tour clicável) — mesma lista de passos,
+  // mesmos onEnter, só avança sozinha em vez de esperar clique (SPEC-17 Fase I).
+  const demoAutomatica = useAutoDemo(opcoesTour);
 
   function iniciarTour() {
     fecharJornada();
     tour.iniciar();
+  }
+
+  function iniciarDemoAutomatica() {
+    fecharJornada();
+    demoAutomatica.play();
   }
 
   function adicionarCenario(q: Quebra) {
@@ -565,6 +578,7 @@ function AppCarregado({
           onAdicionarCenario={adicionarCenario}
           onImportarGraphify={importarGraphify}
           onIniciarTour={iniciarTour}
+          onIniciarDemoAutomatica={iniciarDemoAutomatica}
           abaForcada={abaJornadaAlvo}
         />
       )}
@@ -599,9 +613,48 @@ function AppCarregado({
           onPular={tour.pular}
         />
       )}
+
+      {demoAutomatica.ativo && demoAutomatica.passoAtual && (
+        <>
+          <TourOverlay
+            passo={demoAutomatica.passoAtual}
+            indice={demoAutomatica.indice}
+            total={demoAutomatica.total}
+            ultimo={demoAutomatica.ultimo}
+            onProximo={demoAutomatica.proximo}
+            onPular={demoAutomatica.pularPraFim}
+          />
+          <CursorFantasma selector={demoAutomatica.passoAtual.selector} />
+          {demoAutomatica.passoAtual.titulo === "Linha de comando" && (
+            <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", width: "min(520px, 90vw)", zIndex: 82 }}>
+              <TerminalAnimado />
+            </div>
+          )}
+          <div style={{ position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)", zIndex: 82, display: "flex", gap: 8 }}>
+            <button onClick={demoAutomatica.rodando ? demoAutomatica.pausar : demoAutomatica.play} style={botaoDemoEstilo}>
+              {demoAutomatica.rodando ? "⏸ Pausar" : "▶ Continuar"}
+            </button>
+            <button onClick={demoAutomatica.pularPraFim} style={botaoDemoEstilo}>
+              Encerrar demo
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
+
+const botaoDemoEstilo: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 600,
+  padding: "7px 14px",
+  borderRadius: 999,
+  border: "1px solid #e2e8f0",
+  background: "#fff",
+  color: "#0f172a",
+  cursor: "pointer",
+  boxShadow: "0 4px 12px rgba(15, 23, 42, 0.15)",
+};
 
 const telaCentralizadaEstilo: React.CSSProperties = {
   display: "flex",

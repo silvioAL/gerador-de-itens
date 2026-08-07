@@ -18,6 +18,8 @@ export interface JourneyModalProps {
   onAdicionarCenario: (quebra: Quebra) => void;
   onImportarGraphify: (nodes: No[]) => void;
   onIniciarTour: () => void;
+  /** Demo autoplay (SPEC-17 Fase I) — aditiva ao tour clicável, mesma lista de passos. */
+  onIniciarDemoAutomatica: () => void;
   /** Troca a aba ativa de fora (usado pelo tour guiado pra abrir/navegar entre abas sem fechar e reabrir a modal). */
   abaForcada?: AbaJornada;
 }
@@ -30,6 +32,7 @@ export function JourneyModal({
   onAdicionarCenario,
   onImportarGraphify,
   onIniciarTour,
+  onIniciarDemoAutomatica,
   abaForcada,
 }: JourneyModalProps) {
   const [aba, setAba] = useState<AbaJornada>(abaForcada ?? "jornada");
@@ -88,6 +91,9 @@ export function JourneyModal({
             </div>
           </div>
           <div style={{ flex: 1 }} />
+          <button onClick={onIniciarDemoAutomatica} style={botaoDemoAutomaticaEstilo}>
+            ▶ Demonstração automática
+          </button>
           <button onClick={onIniciarTour} style={botaoTourEstilo}>
             ▶ Iniciar tour guiado
           </button>
@@ -333,6 +339,18 @@ const abaAtivaEstilo: React.CSSProperties = {
   ...abaEstilo,
   color: "#4f46e5",
   borderBottom: "2px solid #4f46e5",
+};
+
+const botaoDemoAutomaticaEstilo: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 700,
+  padding: "8px 14px",
+  borderRadius: 8,
+  border: "1px solid #e2e8f0",
+  background: "#fff",
+  color: "#4f46e5",
+  cursor: "pointer",
+  whiteSpace: "nowrap",
 };
 
 const botaoTourEstilo: React.CSSProperties = {

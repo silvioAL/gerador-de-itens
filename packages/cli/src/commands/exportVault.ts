@@ -90,7 +90,9 @@ function resolverNotaDoArquivo(notas: NotaVault[], caminhoRepo: string): NotaVau
   return candidatas.find((n) => n.titulo === base) ?? candidatas[0];
 }
 
-function slugify(texto: string): string {
+/** Exportado pra openApiLocal.ts (SPEC-17 Fase H-lite) gerar o mesmo nome de
+ * arquivo em config/referencias/ — uma regra só, os dois lados concordam. */
+export function slugify(texto: string): string {
   return (
     texto
       .toLowerCase()

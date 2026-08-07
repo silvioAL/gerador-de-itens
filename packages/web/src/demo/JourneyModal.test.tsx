@@ -50,6 +50,7 @@ describe("JourneyModal", () => {
         onAdicionarCenario={vi.fn()}
         onImportarGraphify={vi.fn()}
         onIniciarTour={vi.fn()}
+        onIniciarDemoAutomatica={vi.fn()}
       />
     );
 
@@ -73,6 +74,7 @@ describe("JourneyModal", () => {
         onAdicionarCenario={vi.fn()}
         onImportarGraphify={vi.fn()}
         onIniciarTour={vi.fn()}
+        onIniciarDemoAutomatica={vi.fn()}
       />
     );
 
@@ -99,6 +101,7 @@ describe("JourneyModal", () => {
         onAdicionarCenario={vi.fn()}
         onImportarGraphify={vi.fn()}
         onIniciarTour={vi.fn()}
+        onIniciarDemoAutomatica={vi.fn()}
       />
     );
 
@@ -124,6 +127,7 @@ describe("JourneyModal", () => {
         onAdicionarCenario={onAdicionarCenario}
         onImportarGraphify={vi.fn()}
         onIniciarTour={vi.fn()}
+        onIniciarDemoAutomatica={vi.fn()}
       />
     );
 
@@ -148,6 +152,7 @@ describe("JourneyModal", () => {
         onAdicionarCenario={vi.fn()}
         onImportarGraphify={vi.fn()}
         onIniciarTour={vi.fn()}
+        onIniciarDemoAutomatica={vi.fn()}
       />
     );
 
@@ -176,6 +181,7 @@ describe("JourneyModal", () => {
         onAdicionarCenario={vi.fn()}
         onImportarGraphify={vi.fn()}
         onIniciarTour={vi.fn()}
+        onIniciarDemoAutomatica={vi.fn()}
       />
     );
 
@@ -197,11 +203,32 @@ describe("JourneyModal", () => {
         onAdicionarCenario={vi.fn()}
         onImportarGraphify={vi.fn()}
         onIniciarTour={onIniciarTour}
+        onIniciarDemoAutomatica={vi.fn()}
       />
     );
 
     await user.click(screen.getByRole("button", { name: "▶ Iniciar tour guiado" }));
     expect(onIniciarTour).toHaveBeenCalled();
+  });
+
+  it("clicar em Demonstração automática chama onIniciarDemoAutomatica", async () => {
+    const user = userEvent.setup();
+    const onIniciarDemoAutomatica = vi.fn();
+    render(
+      <JourneyModal
+        config={config}
+        cenarios={cenarios}
+        onFechar={vi.fn()}
+        onCarregarCenario={vi.fn()}
+        onAdicionarCenario={vi.fn()}
+        onImportarGraphify={vi.fn()}
+        onIniciarTour={vi.fn()}
+        onIniciarDemoAutomatica={onIniciarDemoAutomatica}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "▶ Demonstração automática" }));
+    expect(onIniciarDemoAutomatica).toHaveBeenCalled();
   });
 
   it("fechar pelo X chama onFechar", async () => {
@@ -216,6 +243,7 @@ describe("JourneyModal", () => {
         onAdicionarCenario={vi.fn()}
         onImportarGraphify={vi.fn()}
         onIniciarTour={vi.fn()}
+        onIniciarDemoAutomatica={vi.fn()}
       />
     );
 

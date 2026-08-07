@@ -1,0 +1,197 @@
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { createServer, type Server } from "node:http";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { tratarApiLocal } from "./openApiLocal.js";
+
+let servidor: Server;
+let base: string;
+let dirTemp: string;
+
+beforeEach(async () => {
+  dirTemp = mkdtempSync(join(tmpdir(), "gerador-cli-api-local-"));
+  servidor = createServer((req, res) => {
+    void tratarApiLocal(req, res, dirTemp).then((tratado) => {
+      if (!tratado) {
+        res.writeHead(404);
+        res.end();
+      }
+    });
+  });
+  await new Promise<void>((resolvePromise) => servidor.listen(0, resolvePromise));
+  const endereco = servidor.address();
+  const porta = typeof endereco === "object" && endereco ? endereco.port : 0;
+  base = `http://127.0.0.1:${porta}`;
+});
+
+afterEach(async () => {
+  await new Promise<void>((resolvePromise) => servidor.close(() => resolvePromise()));
+  rmSync(dirTemp, { recursive: true, force: true });
+});
+
+describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador open)", () => {
+  it("GET /auth/modo devolve local, e /auth/me sempre devolve uma sessão fixa (sem login nenhum)", async () => {
+    const modo = await fetch(`${base}/auth/modo`).then((r) => r.json());
+    expect(modo).toEqual({ modo: "local" });
+
+    const me = await fetch(`${base}/auth/me`).then((r) => r.json());
+    expect(me).toEqual({ email: "local", timeIds: ["local"] });
+  });
+
+  it("GET /quebras sem quebra.json ainda devolve lista vazia, não erro", async () => {
+    const resposta = await fetch(`${base}/quebras`);
+    expect(resposta.status).toBe(200);
+    expect(await resposta.json()).toEqual([]);
+  });
+
+  it("POST /quebras grava quebra.json no diretório do projeto, e GET /quebras/local lê de volta", async () => {
+    const quebra = { time: "time-x", diagrama: { nodes: [{ id: "n1", type: "service" }], edges: [] } };
+    const criada = await fetch(`${base}/quebras`, {
+      method: "POST",
+      body: JSON.stringify(quebra),
+    }).then((r) => r.json());
+
+    expect(criada.id).toBe("local");
+    expect(criada.time).toBe("time-x");
+    expect(criada.diagrama).toEqual(quebra.diagrama);
+
+    const lida = await fetch(`${base}/quebras/local`).then((r) => r.json());
+    expect(lida.diagrama).toEqual(quebra.diagrama);
+
+    const lista = await fetch(`${base}/quebras`).then((r) => r.json());
+    expect(lista).toEqual([{ id: "local", time: "time-x", atualizadoEm: expect.any(String) }]);
+  });
+
+  it("PUT /quebras/local sobrescreve a quebra existente", async () => {
+    await fetch(`${base}/quebras`, {
+      method: "POST",
+      body: JSON.stringify({ time: "a", diagrama: { nodes: [], edges: [] } }),
+    });
+
+    const atualizada = await fetch(`${base}/quebras/local`, {
+      method: "PUT",
+      body: JSON.stringify({ time: "b", diagrama: { nodes: [{ id: "n1", type: "service" }], edges: [] } }),
+    }).then((r) => r.json());
+
+    expect(atualizada.time).toBe("b");
+    expect(atualizada.diagrama.nodes).toHaveLength(1);
+  });
+
+  it("GET /perfis-time sem config/perfis-time.json devolve objeto vazio", async () => {
+    const resposta = await fetch(`${base}/perfis-time`);
+    expect(await resposta.json()).toEqual({});
+  });
+
+  it("PUT /perfis-time/:timeId cria/mescla valores e persiste em config/perfis-time.json", async () => {
+    const bucket = await fetch(`${base}/perfis-time/time-x`, {
+      method: "PUT",
+      body: JSON.stringify({ tipoNo: "service", valores: { linguagem: "Java" } }),
+    }).then((r) => r.json());
+    expect(bucket).toEqual({ linguagem: "Java" });
+
+    const bucket2 = await fetch(`${base}/perfis-time/time-x`, {
+      method: "PUT",
+      body: JSON.stringify({ tipoNo: "service", valores: { framework: "Spring" } }),
+    }).then((r) => r.json());
+    expect(bucket2).toEqual({ linguagem: "Java", framework: "Spring" });
+
+    const todos = await fetch(`${base}/perfis-time`).then((r) => r.json());
+    expect(todos).toEqual({ "time-x": { service: { linguagem: "Java", framework: "Spring" } } });
+  });
+
+  it("GET /referencias sem config/referencias/ devolve lista vazia", async () => {
+    expect(await fetch(`${base}/referencias`).then((r) => r.json())).toEqual([]);
+  });
+
+  it("POST /referencias cria um arquivo em config/referencias/, e GET /referencias lista de volta", async () => {
+    const criada = await fetch(`${base}/referencias`, {
+      method: "POST",
+      body: JSON.stringify({ titulo: "Retry com backoff", racional: "evita martelar o broker", designPatterns: ["retry"] }),
+    }).then((r) => r.json());
+
+    expect(criada.id).toBe("retry-com-backoff");
+    expect(criada.titulo).toBe("Retry com backoff");
+    expect(criada.linkExterno).toBeNull();
+
+    const lista = await fetch(`${base}/referencias`).then((r) => r.json());
+    expect(lista).toHaveLength(1);
+    expect(lista[0].titulo).toBe("Retry com backoff");
+  });
+
+  it("PATCH /referencias/:id atualiza o linkExterno de uma referência existente", async () => {
+    await fetch(`${base}/referencias`, {
+      method: "POST",
+      body: JSON.stringify({ titulo: "Circuit breaker", racional: "..." }),
+    });
+
+    const atualizada = await fetch(`${base}/referencias/circuit-breaker`, {
+      method: "PATCH",
+      body: JSON.stringify({ linkExterno: "obsidian://open?vault=x" }),
+    }).then((r) => r.json());
+
+    expect(atualizada.linkExterno).toBe("obsidian://open?vault=x");
+  });
+
+  it("PATCH numa referência inexistente devolve 404", async () => {
+    const resposta = await fetch(`${base}/referencias/nao-existe`, {
+      method: "PATCH",
+      body: JSON.stringify({ linkExterno: "x" }),
+    });
+    expect(resposta.status).toBe(404);
+  });
+
+  it("GET /campos-no sempre devolve lista vazia — sem campo customizado por time no modo local", async () => {
+    expect(await fetch(`${base}/campos-no`).then((r) => r.json())).toEqual([]);
+  });
+
+  it("POST /campos-no devolve 501 — não suportado no modo local", async () => {
+    const resposta = await fetch(`${base}/campos-no`, { method: "POST", body: JSON.stringify({}) });
+    expect(resposta.status).toBe(501);
+  });
+
+  it("GET /especificacao-template sem arquivo local devolve o template padrão do engine", async () => {
+    const resposta = await fetch(`${base}/especificacao-template`).then((r) => r.json());
+    expect(resposta.conteudo).toContain("{{titulo}}");
+  });
+
+  it("PUT /especificacao-template grava config/especificacao-template.md, e GET lê de volta", async () => {
+    await fetch(`${base}/especificacao-template`, {
+      method: "PUT",
+      body: JSON.stringify({ conteudo: "# {{titulo}} customizado" }),
+    });
+
+    const resposta = await fetch(`${base}/especificacao-template`).then((r) => r.json());
+    expect(resposta.conteudo).toBe("# {{titulo}} customizado");
+  });
+
+  it("/times e /convites devolvem 501 — sem conceito de múltiplos times no modo local", async () => {
+    expect((await fetch(`${base}/times`, { method: "POST", body: "{}" })).status).toBe(501);
+    expect((await fetch(`${base}/convites/abc/aceitar`, { method: "POST" })).status).toBe(501);
+  });
+
+  it("uma rota fora da API conhecida (ex.: uma rota de página do app) não é tratada — cai no fallback estático de open.ts", async () => {
+    const resposta = await fetch(`${base}/alguma-rota-da-spa`);
+    expect(resposta.status).toBe(404); // 404 vem do fallback do teste (sem tratarApiLocal, não do open.ts real)
+  });
+
+  it("perfis-time preservam times já existentes ao atualizar outro time", async () => {
+    mkdirSync(join(dirTemp, "config"), { recursive: true });
+    writeFileSync(
+      join(dirTemp, "config", "perfis-time.json"),
+      JSON.stringify({ "time-a": { service: { linguagem: "Go" } } })
+    );
+
+    await fetch(`${base}/perfis-time/time-b`, {
+      method: "PUT",
+      body: JSON.stringify({ tipoNo: "service", valores: { linguagem: "Python" } }),
+    });
+
+    const todos = await fetch(`${base}/perfis-time`).then((r) => r.json());
+    expect(todos).toEqual({
+      "time-a": { service: { linguagem: "Go" } },
+      "time-b": { service: { linguagem: "Python" } },
+    });
+  });
+});
