@@ -67,6 +67,11 @@ export interface Aresta {
   routingMode?: string;
   waypoints?: Ponto[];
   labelOffset?: Ponto;
+  /** Valores dos campos de `EdgeTypeConfig.spec` desta conexão (SPEC-21) —
+   * mesma forma de `No.spec`/`No.specNA`, um `Aresta` a mais que pode carregar
+   * dado próprio em vez de só ligar dois nós. */
+  spec?: Record<string, ValorSpec>;
+  specNA?: Record<string, JustificativaNA>;
 }
 
 export interface Diagrama {

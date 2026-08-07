@@ -1,5 +1,5 @@
 import type { AppConfig, DiagramaConfig, FieldSpec, RegrasConfig } from "@gerador/engine";
-import { apiCamposNo, type CampoNo } from "../api/client";
+import { apiCamposAresta, apiCamposNo, type CampoAresta, type CampoNo } from "../api/client";
 
 export interface ConfigCarregada {
   diagramaConfig: DiagramaConfig;
@@ -41,6 +41,18 @@ function comoFieldSpec(campo: CampoNo): FieldSpec {
   };
 }
 
+function comoFieldSpecAresta(campo: CampoAresta): FieldSpec {
+  return {
+    key: campo.key,
+    label: campo.label,
+    type: campo.type,
+    required: campo.required || undefined,
+    default: campo.valorPadrao ?? undefined,
+    options: campo.opcoes ?? undefined,
+    ajuda: campo.ajuda ?? undefined,
+  };
+}
+
 /**
  * Campos globais + do time ativo (`campos_no` no @gerador/server, SPEC-08 §3)
  * se sobrepõem ao `spec` estático de `diagrama.json` por `key` — mesma regra de
@@ -60,6 +72,21 @@ function mesclarCamposCustomizados(diagramaConfig: DiagramaConfig, campos: Campo
   return { ...diagramaConfig, nodeTypes };
 }
 
+/** Mesma regra de override de `mesclarCamposCustomizados`, pra `edgeTypes` (SPEC-21). */
+function mesclarCamposCustomizadosAresta(diagramaConfig: DiagramaConfig, campos: CampoAresta[]): DiagramaConfig {
+  const edgeTypes = { ...diagramaConfig.edgeTypes };
+  for (const campo of campos) {
+    const cfg = edgeTypes[campo.tipoAresta];
+    if (!cfg) continue;
+    const fieldSpec = comoFieldSpecAresta(campo);
+    const specAtual = cfg.spec ?? [];
+    const idx = specAtual.findIndex((f) => f.key === campo.key);
+    const spec = idx >= 0 ? specAtual.map((f, i) => (i === idx ? fieldSpec : f)) : [...specAtual, fieldSpec];
+    edgeTypes[campo.tipoAresta] = { ...cfg, spec };
+  }
+  return { ...diagramaConfig, edgeTypes };
+}
+
 /**
  * Carrega config/ em runtime (fetch, nunca import estático) — o mesmo bundle
  * de `packages/web/dist` precisa servir qualquer projeto que rode `gerador open`
@@ -73,11 +100,14 @@ function mesclarCamposCustomizados(diagramaConfig: DiagramaConfig, campos: Campo
  * troca de time ativo (App.tsx chama de novo quando isso muda).
  */
 export async function carregarConfig(timeAtivo?: string): Promise<ConfigCarregada> {
-  const [diagramaConfig, appConfig, regrasConfig, camposCustomizados] = await Promise.all([
+  const [diagramaConfig, appConfig, regrasConfig, camposCustomizados, camposArestaCustomizados] = await Promise.all([
     buscarJson<DiagramaConfig>("/config/diagrama.json"),
     buscarJson<AppConfig>("/config/app.json"),
     buscarJsonOpcional<RegrasConfig>("/config/regras.json"),
     apiCamposNo.listar(timeAtivo),
+    apiCamposAresta.listar(timeAtivo),
   ]);
-  return { diagramaConfig: mesclarCamposCustomizados(diagramaConfig, camposCustomizados), appConfig, regrasConfig };
+  const comCamposNo = mesclarCamposCustomizados(diagramaConfig, camposCustomizados);
+  const comCamposAresta = mesclarCamposCustomizadosAresta(comCamposNo, camposArestaCustomizados);
+  return { diagramaConfig: comCamposAresta, appConfig, regrasConfig };
 }

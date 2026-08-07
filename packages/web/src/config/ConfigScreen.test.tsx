@@ -23,6 +23,7 @@ function renderTela(mostrarMembros: boolean) {
       config={config}
       perfisTime={{}}
       camposNo={[]}
+      camposAresta={[]}
       especificacaoTemplate={especificacaoTemplate}
       timeAtivo="time-x"
       mostrarMembros={mostrarMembros}
@@ -30,6 +31,9 @@ function renderTela(mostrarMembros: boolean) {
       onCriarCampoNo={vi.fn()}
       onAtualizarCampoNo={vi.fn()}
       onExcluirCampoNo={vi.fn()}
+      onCriarCampoAresta={vi.fn()}
+      onAtualizarCampoAresta={vi.fn()}
+      onExcluirCampoAresta={vi.fn()}
       onSalvarEspecificacaoTemplate={vi.fn()}
       onFechar={vi.fn()}
     />

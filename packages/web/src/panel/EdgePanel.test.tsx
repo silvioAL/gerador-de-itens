@@ -53,3 +53,51 @@ describe("EdgePanel", () => {
     expect(screen.getByRole("combobox")).toHaveValue("consumes");
   });
 });
+
+describe("EdgePanel — campos de EdgeTypeConfig.spec (SPEC-21)", () => {
+  const configComCampo: DiagramaConfig = {
+    ...config,
+    edgeTypes: {
+      ...config.edgeTypes,
+      publishes: {
+        label: "publica",
+        spec: [{ key: "roteamento", label: "Chave de roteamento", type: "text" }],
+      },
+    },
+  };
+
+  function HarnessComCampo() {
+    const quebraState = useQuebra(
+      {
+        diagrama: {
+          nodes: [
+            { id: "n1", type: "service", x: 0, y: 0, label: "srv", status: "novo", spec: {}, specNA: {} },
+            { id: "n2", type: "kafka", x: 100, y: 0, label: "topico", status: "novo", spec: {}, specNA: {} },
+          ],
+          edges: [{ id: "e1", source: "n1", target: "n2", type: "publishes" }],
+        },
+      },
+      configComCampo
+    );
+    const aresta = quebraState.quebra.diagrama.edges[0];
+    return <EdgePanel aresta={aresta} config={configComCampo} quebraState={quebraState} />;
+  }
+
+  it("renderiza o campo customizado do tipo de aresta atual", () => {
+    render(<HarnessComCampo />);
+    expect(screen.getByText("Chave de roteamento")).toBeInTheDocument();
+  });
+
+  it("editar o campo grava o valor com origem manual (visível ao reabrir com o mesmo estado)", async () => {
+    const user = userEvent.setup();
+    render(<HarnessComCampo />);
+
+    await user.type(screen.getByRole("textbox", { name: "Chave de roteamento" }), "pedido.criado");
+    expect(screen.getByRole("textbox", { name: "Chave de roteamento" })).toHaveValue("pedido.criado");
+  });
+
+  it("tipo de aresta sem spec configurado não renderiza nenhum campo extra", () => {
+    render(<Harness />);
+    expect(screen.queryByText("Chave de roteamento")).not.toBeInTheDocument();
+  });
+});

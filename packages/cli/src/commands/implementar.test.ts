@@ -72,6 +72,18 @@ describe("comando `implementar` (SPEC-14 — documento único por quebra)", () =
     expect(conteudo).toContain("#### Especificação técnica");
   });
 
+  it("--out também grava o diagrama animado pareado (mesmo nome-base, .html — SPEC-21)", async () => {
+    await implementar(["quebra.json", "--out", "especificacao.md"]);
+    const html = readFileSync(join(dirTemp, "especificacao.html"), "utf-8");
+    expect(html).toContain("<!DOCTYPE html>");
+    expect(html).toContain("srv-portabilidade");
+  });
+
+  it("sem --out (stdout), não gera nenhum arquivo .html — html só existe pareado com --out", async () => {
+    await capturarStdout(() => implementar(["quebra.json"]));
+    expect(() => readFileSync(join(dirTemp, "especificacao.html"), "utf-8")).toThrow();
+  });
+
   it("atividade de aresta: mostra origem e destino, e o refinamento técnico do item", async () => {
     const saida = await capturarStdout(() => implementar(["quebra.json"]));
     expect(saida).toContain("##### srv-portabilidade");

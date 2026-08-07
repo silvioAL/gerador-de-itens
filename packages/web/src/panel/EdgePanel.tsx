@@ -1,5 +1,7 @@
+import { camposVisiveisAresta } from "@gerador/engine";
 import type { Aresta, DiagramaConfig } from "@gerador/engine";
 import type { UseQuebra } from "../state/useQuebra";
+import { FieldControl } from "./PropertiesPanel";
 
 export interface EdgePanelProps {
   aresta: Aresta;
@@ -8,11 +10,12 @@ export interface EdgePanelProps {
 }
 
 export function EdgePanel({ aresta, config, quebraState }: EdgePanelProps) {
-  const { quebra, definirTipoAresta, removerAresta, setArestaSelecionadaId } = quebraState;
+  const { quebra, definirTipoAresta, definirValorSpecAresta, removerAresta, setArestaSelecionadaId } = quebraState;
   const origem = quebra.diagrama.nodes.find((n) => n.id === aresta.source);
   const destino = quebra.diagrama.nodes.find((n) => n.id === aresta.target);
   const regra = destino ? (config.edgeRules[destino.type] ?? config.edgeRules._fallback) : undefined;
   const opcoesValidas = regra?.valid ?? [];
+  const camposDoTipo = camposVisiveisAresta(config.edgeTypes[aresta.type]?.spec ?? []);
 
   return (
     <aside style={painelEstilo}>
@@ -40,6 +43,27 @@ export function EdgePanel({ aresta, config, quebraState }: EdgePanelProps) {
         <p style={{ fontSize: 12, color: "#94a3b8" }}>
           {config.edgeTypes[aresta.type]?.label ?? aresta.type} (sem outras opções válidas para este destino)
         </p>
+      )}
+
+      {camposDoTipo.length > 0 && (
+        <>
+          <hr style={{ margin: "14px 0", border: "none", borderTop: "1px solid #e2e8f0" }} />
+          {camposDoTipo.map((campo) => (
+            <div key={campo.key} style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#334155", display: "block", marginBottom: 4 }}>
+                {campo.label}
+                {campo.required && <span style={{ color: "#ef4444" }}> *</span>}
+              </label>
+              {campo.ajuda && <p style={{ fontSize: 11, color: "#94a3b8", margin: "0 0 6px" }}>{campo.ajuda}</p>}
+              <FieldControl
+                campo={campo}
+                valor={aresta.spec?.[campo.key]?.valor}
+                sugestao={undefined}
+                onChange={(v) => definirValorSpecAresta(aresta.id, campo.key, v)}
+              />
+            </div>
+          ))}
+        </>
       )}
 
       <hr style={{ margin: "14px 0", border: "none", borderTop: "1px solid #e2e8f0" }} />

@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
 import type { DiagramaConfig, PerfisConfig } from "@gerador/engine";
-import type { CampoNo, DadosCampoNo, EspecificacaoTemplate } from "../api/client";
+import type { CampoAresta, CampoNo, DadosCampoAresta, DadosCampoNo, EspecificacaoTemplate } from "../api/client";
 import { PerfisTimeTab } from "../demo/PerfisTimeTab";
 import { CamposNoTab } from "./CamposNoTab";
+import { CamposArestaTab } from "./CamposArestaTab";
 import { MembrosTab } from "./MembrosTab";
 import { EspecificacaoTemplateTab } from "./EspecificacaoTemplateTab";
 
-export type AbaConfig = "perfis" | "campos" | "membros" | "especificacao";
+export type AbaConfig = "perfis" | "campos" | "camposAresta" | "membros" | "especificacao";
 
 export interface ConfigScreenProps {
   config: DiagramaConfig;
   perfisTime: PerfisConfig;
   camposNo: CampoNo[];
+  camposAresta: CampoAresta[];
   especificacaoTemplate: EspecificacaoTemplate;
   timeAtivo: string;
   /** false no modo local (CLI) — sem servidor não existe conceito de outros
@@ -21,6 +23,9 @@ export interface ConfigScreenProps {
   onCriarCampoNo: (dados: DadosCampoNo) => Promise<void>;
   onAtualizarCampoNo: (id: string, dados: Partial<DadosCampoNo>) => Promise<void>;
   onExcluirCampoNo: (id: string) => Promise<void>;
+  onCriarCampoAresta: (dados: DadosCampoAresta) => Promise<void>;
+  onAtualizarCampoAresta: (id: string, dados: Partial<DadosCampoAresta>) => Promise<void>;
+  onExcluirCampoAresta: (id: string) => Promise<void>;
   onSalvarEspecificacaoTemplate: (dados: { timeId?: string; conteudo: string }) => Promise<void>;
   onFechar: () => void;
   /** Troca a aba ativa de fora (tour guiado) sem fechar/reabrir a tela. */
@@ -37,6 +42,7 @@ export function ConfigScreen({
   config,
   perfisTime,
   camposNo,
+  camposAresta,
   especificacaoTemplate,
   timeAtivo,
   mostrarMembros,
@@ -44,6 +50,9 @@ export function ConfigScreen({
   onCriarCampoNo,
   onAtualizarCampoNo,
   onExcluirCampoNo,
+  onCriarCampoAresta,
+  onAtualizarCampoAresta,
+  onExcluirCampoAresta,
   onSalvarEspecificacaoTemplate,
   onFechar,
   abaForcada,
@@ -91,6 +100,9 @@ export function ConfigScreen({
         <button onClick={() => setAba("campos")} style={aba === "campos" ? abaAtivaEstilo : abaEstilo}>
           Campos por tipo de nó ({camposNo.length})
         </button>
+        <button onClick={() => setAba("camposAresta")} style={aba === "camposAresta" ? abaAtivaEstilo : abaEstilo}>
+          Campos por tipo de conexão ({camposAresta.length})
+        </button>
         {mostrarMembros && (
           <button onClick={() => setAba("membros")} style={aba === "membros" ? abaAtivaEstilo : abaEstilo}>
             Membros
@@ -113,6 +125,16 @@ export function ConfigScreen({
             onCriar={onCriarCampoNo}
             onAtualizar={onAtualizarCampoNo}
             onExcluir={onExcluirCampoNo}
+          />
+        )}
+        {aba === "camposAresta" && (
+          <CamposArestaTab
+            config={config}
+            camposAresta={camposAresta}
+            timeAtivo={timeAtivo}
+            onCriar={onCriarCampoAresta}
+            onAtualizar={onAtualizarCampoAresta}
+            onExcluir={onExcluirCampoAresta}
           />
         )}
         {aba === "membros" && mostrarMembros && <MembrosTab timeAtivo={timeAtivo} />}

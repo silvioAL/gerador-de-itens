@@ -117,6 +117,24 @@ describe("validateConfig — config/diagrama.example.json + config/app.example.j
       mensagem: 'when.field referencia "campoFantasma", que não existe no spec deste tipo de nó',
     });
   });
+
+  it("recusa default de campo de aresta (EdgeTypeConfig.spec, SPEC-21) referenciando chave inexistente", () => {
+    const quebrada: DiagramaConfig = {
+      ...diagrama,
+      edgeTypes: {
+        ...diagrama.edgeTypes,
+        http: {
+          ...diagrama.edgeTypes.http,
+          spec: [{ key: "timeoutMs", label: "Timeout (ms)", type: "text", default: "{{campoFantasma}}" }],
+        },
+      },
+    };
+    const erros = validateConfig(quebrada, app);
+    expect(erros).toContainEqual({
+      campo: "edgeTypes.http.spec.timeoutMs.default",
+      mensagem: 'default referencia "{{campoFantasma}}", que não existe no spec de "http"',
+    });
+  });
 });
 
 describe("validateRegras — config/regras.example.json + config/app.example.json", () => {

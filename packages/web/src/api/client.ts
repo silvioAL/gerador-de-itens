@@ -139,6 +139,50 @@ export const apiCamposNo = {
   excluir: (id: string) => requisitar<void>(`/campos-no/${id}`, { method: "DELETE" }),
 };
 
+/**
+ * Campo customizado por tipo de aresta (SPEC-21) — mesmo modelo de `CampoNo`
+ * (global vs. por time, sobrescrita de campo padrão), mas deliberadamente sem
+ * `type: "lista"`/`itemSpec`: campo repetível numa conexão é caso hipotético
+ * que ninguém pediu ainda; se aparecer, resolve-se então, mesma disciplina do
+ * `when` de aresta não avaliado (ver SPEC-21).
+ */
+export interface CampoAresta {
+  id: string;
+  timeId: string;
+  tipoAresta: string;
+  key: string;
+  label: string;
+  type: "text" | "textarea" | "number" | "boolean" | "select";
+  required: boolean;
+  valorPadrao: string | null;
+  opcoes: string[] | null;
+  ajuda: string | null;
+  ordem: number;
+}
+
+export interface DadosCampoAresta {
+  timeId?: string;
+  tipoAresta: string;
+  key: string;
+  label: string;
+  type: CampoAresta["type"];
+  required?: boolean;
+  valorPadrao?: string;
+  opcoes?: string[];
+  ajuda?: string;
+  ordem?: number;
+}
+
+export const apiCamposAresta = {
+  listar: (timeId?: string) =>
+    requisitar<CampoAresta[]>(`/campos-aresta${timeId ? `?timeId=${encodeURIComponent(timeId)}` : ""}`),
+  criar: (dados: DadosCampoAresta) =>
+    requisitar<CampoAresta>("/campos-aresta", { method: "POST", body: JSON.stringify(dados) }),
+  atualizar: (id: string, dados: Partial<DadosCampoAresta>) =>
+    requisitar<CampoAresta>(`/campos-aresta/${id}`, { method: "PUT", body: JSON.stringify(dados) }),
+  excluir: (id: string) => requisitar<void>(`/campos-aresta/${id}`, { method: "DELETE" }),
+};
+
 export const apiQuebras = {
   listar: () => requisitar<QuebraResumo[]>("/quebras"),
   buscar: (id: string) => requisitar<QuebraSalva>(`/quebras/${id}`),

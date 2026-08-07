@@ -2,6 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
   derivar,
+  gerarDiagramaHtml,
   gerarEspecificacaoEntrega,
   resolverDependencias,
   validateConfig,
@@ -21,6 +22,12 @@ async function lerJsonOpcional<T>(caminho: string): Promise<T | undefined> {
   } catch {
     return undefined;
   }
+}
+
+/** Troca a extensão de um caminho (ex.: "especificacao.md" -> "especificacao.html").
+ * Sem extensão nenhuma, só acrescenta — nunca inventa um separador duplicado. */
+function comExtensao(caminho: string, novaExt: string): string {
+  return /\.\w+$/.test(caminho) ? caminho.replace(/\.\w+$/, novaExt) : caminho + novaExt;
 }
 
 /** Gera a especificação de entrega da quebra inteira (SPEC-14) — não pede
@@ -60,8 +67,18 @@ export async function implementar(args: string[]): Promise<void> {
 
   if (caminhoOut) {
     await writeFile(resolve(caminhoOut), documento, "utf-8");
-    console.log(`Especificação de solução gravada em ${caminhoOut} (${resultado.atividades.length} itens).`);
+    // Sempre emite o diagrama animado pareado com a especificação — os dois
+    // são o par de entrega (SPEC-21), não uma flag opcional fácil de esquecer.
+    const caminhoHtml = comExtensao(caminhoOut, ".html");
+    const diagramaHtml = gerarDiagramaHtml(resultado.atividades, quebra.diagrama, diagrama);
+    await writeFile(resolve(caminhoHtml), diagramaHtml, "utf-8");
+    console.log(
+      `Especificação de solução gravada em ${caminhoOut}, diagrama animado em ${caminhoHtml} (${resultado.atividades.length} itens).`
+    );
   } else {
     process.stdout.write(documento);
+    // Sem --out, stdout é só o markdown (pra não misturar HTML no meio de um
+    // pipe que espera texto puro) — o diagrama animado só sai com --out.
+    console.error("\n(use --out <arquivo.md> para também gerar o diagrama animado pareado, <arquivo>.html)");
   }
 }

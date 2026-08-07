@@ -236,6 +236,82 @@ describe("ReviewScreen — coluna Times (default pro time da quebra, editável n
   });
 });
 
+describe("ReviewScreen — diagrama animado (SPEC-21)", () => {
+  it("botão 'Ver diagrama animado' troca a lista por um iframe com o HTML gerado, e some a lista", async () => {
+    const resultado = resultadoFixture01();
+    const user = userEvent.setup();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "🔀 Ver diagrama animado" }));
+
+    const iframe = screen.getByTitle("Diagrama animado da solução") as HTMLIFrameElement;
+    expect(iframe).toBeInTheDocument();
+    expect(iframe.srcdoc).toContain("<!DOCTYPE html>");
+    expect(screen.queryByText(resultado.atividades[0].rotulo)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Voltar à lista" })).toBeInTheDocument();
+  });
+
+  it("no modo diagrama, o botão de export vira 'Baixar diagrama (.html)' e baixa o mesmo HTML do iframe", async () => {
+    const resultado = resultadoFixture01();
+    const user = userEvent.setup();
+    baixarArquivoTextoMock.mockClear();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "🔀 Ver diagrama animado" }));
+    expect(screen.queryByRole("button", { name: "Gerar especificação de solução" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Baixar diagrama (.html)" }));
+
+    expect(baixarArquivoTextoMock).toHaveBeenCalledOnce();
+    const [conteudo, nomeArquivo, mime] = baixarArquivoTextoMock.mock.calls[0];
+    expect(nomeArquivo).toBe("diagrama-da-solucao.html");
+    expect(mime).toBe("text/html");
+    expect(conteudo).toContain("<!DOCTYPE html>");
+  });
+
+  it("'Voltar à lista' restaura a visão de itens", async () => {
+    const resultado = resultadoFixture01();
+    const user = userEvent.setup();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "🔀 Ver diagrama animado" }));
+    await user.click(screen.getByRole("button", { name: "Voltar à lista" }));
+
+    expect(screen.getByText(resultado.atividades[0].rotulo)).toBeInTheDocument();
+    expect(screen.queryByTitle("Diagrama animado da solução")).not.toBeInTheDocument();
+  });
+});
+
 describe("ReviewScreen — ciclo detectado", () => {
   it("mostra o caminho do ciclo e não permite derivar", () => {
     const atividadesCiclicas = [

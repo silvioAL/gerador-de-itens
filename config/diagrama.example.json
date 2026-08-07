@@ -572,15 +572,20 @@
     }
   },
   "edgeTypes": {
-    "http": { "label": "HTTP", "color": "#475569", "verbo": "chama via HTTP", "tamanhoPadrao": "P" },
+    "http": {
+      "label": "HTTP", "color": "#475569", "verbo": "chama via HTTP", "tamanhoPadrao": "P",
+      "spec": [
+        { "key": "timeoutMs", "label": "Timeout (ms)", "type": "number", "ajuda": "Timeout da chamada, em milissegundos — usado no diagrama exportável e na especificação, quando preenchido." }
+      ]
+    },
     "grpc": { "label": "gRPC", "color": "#2563eb", "verbo": "chama via gRPC", "tamanhoPadrao": "P" },
     "graphql": { "label": "GraphQL", "color": "#e10098", "verbo": "consulta via GraphQL", "tamanhoPadrao": "P" },
     "publishes": { "label": "publica", "color": "#f97316", "verbo": "publica em", "tamanhoPadrao": "P" },
-    "consumes": { "label": "consome", "color": "#0891b2", "verbo": "consome de", "tamanhoPadrao": "M" },
-    "pubsub": { "label": "publica+consome", "color": "#7c3aed", "verbo": "publica e consome de", "tamanhoPadrao": "M" },
-    "reads": { "label": "lê", "color": "#10b981", "verbo": "lê de", "tamanhoPadrao": "P" },
+    "consumes": { "label": "consome", "color": "#0891b2", "verbo": "consome de", "tamanhoPadrao": "M", "fluxo": "reverse" },
+    "pubsub": { "label": "publica+consome", "color": "#7c3aed", "verbo": "publica e consome de", "tamanhoPadrao": "M", "fluxo": "bidirectional" },
+    "reads": { "label": "lê", "color": "#10b981", "verbo": "lê de", "tamanhoPadrao": "P", "fluxo": "reverse" },
     "writes": { "label": "escreve", "color": "#0ea5e9", "verbo": "escreve em", "tamanhoPadrao": "P" },
-    "readwrite": { "label": "lê e escreve", "color": "#0d9488", "verbo": "lê e escreve em", "tamanhoPadrao": "P" },
+    "readwrite": { "label": "lê e escreve", "color": "#0d9488", "verbo": "lê e escreve em", "tamanhoPadrao": "P", "fluxo": "bidirectional" },
     "orchestrates": { "label": "orquestra", "color": "#a855f7", "verbo": "orquestra", "tamanhoPadrao": "M" },
     "binding": { "label": "binding", "color": "#f43f5e", "gerarAtividade": false },
     "triggers": { "label": "dispara", "color": "#6b7280", "verbo": "dispara", "tamanhoPadrao": "P" },

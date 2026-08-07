@@ -247,7 +247,10 @@ function FieldRow({ no, campo, prontidao, quebraState, perfilDoTime }: FieldRowP
   );
 }
 
-function FieldControl({
+/** Exportado pra ser reusado fora de `PropertiesPanel` — ex. `EdgePanel.tsx`
+ * (SPEC-21), que renderiza campos de `EdgeTypeConfig.spec` com o mesmo
+ * dispatcher, sem duplicar o `switch` por `TipoCampo`. */
+export function FieldControl({
   campo,
   valor,
   sugestao,

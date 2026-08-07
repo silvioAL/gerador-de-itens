@@ -1,11 +1,25 @@
 import { describe, expect, it } from "vitest";
 import type { No } from "../model/types.js";
 import type { FieldSpec, PerfilTime } from "../config/types.js";
-import { resolverDefault } from "./campos.js";
+import { camposVisiveisAresta, resolverDefault } from "./campos.js";
 
 function no(overrides: Partial<No> = {}): No {
   return { id: "n1", type: "service", x: 0, y: 0, label: "srv", status: "novo", spec: {}, specNA: {}, ...overrides };
 }
+
+describe("camposVisiveisAresta (SPEC-21)", () => {
+  it("devolve todos os campos do tipo — sem avaliação de `when` ainda (limitação conhecida)", () => {
+    const spec: FieldSpec[] = [
+      { key: "sincrono", label: "Síncrono?", type: "boolean" },
+      { key: "retry", label: "Retry", type: "number", when: { field: "sincrono", equals: false } },
+    ];
+    expect(camposVisiveisAresta(spec)).toEqual(spec);
+  });
+
+  it("lista vazia devolve lista vazia", () => {
+    expect(camposVisiveisAresta([])).toEqual([]);
+  });
+});
 
 describe("resolverDefault — perfil de stack do time", () => {
   const campoSemDefault: FieldSpec = { key: "linguagem", label: "Linguagem", type: "text" };

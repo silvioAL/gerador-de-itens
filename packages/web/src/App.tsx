@@ -13,11 +13,14 @@ import {
 import { carregarConfig, type ConfigCarregada } from "./config/loadConfig";
 import { carregarCenarios, type Cenario } from "./demo/scenarios";
 import {
+  apiCamposAresta,
   apiCamposNo,
   apiEspecificacaoTemplate,
   apiPerfisTime,
   apiTimes,
+  type CampoAresta,
   type CampoNo,
+  type DadosCampoAresta,
   type DadosCampoNo,
   type EspecificacaoTemplate,
   type SessaoUsuario,
@@ -130,6 +133,7 @@ interface DadosCarregados extends ConfigCarregada {
   cenarios: Cenario[];
   perfisTime: PerfisConfig;
   camposNo: CampoNo[];
+  camposAresta: CampoAresta[];
   especificacaoTemplate: EspecificacaoTemplate;
 }
 
@@ -162,10 +166,11 @@ function AppComSessao({
       carregarCenarios(),
       apiPerfisTime.listar(),
       apiCamposNo.listar(timeAtivo),
+      apiCamposAresta.listar(timeAtivo),
       apiEspecificacaoTemplate.buscar(timeAtivo),
     ])
-      .then(([config, cenarios, perfisTime, camposNo, especificacaoTemplate]) => {
-        setDados({ ...config, cenarios, perfisTime, camposNo, especificacaoTemplate });
+      .then(([config, cenarios, perfisTime, camposNo, camposAresta, especificacaoTemplate]) => {
+        setDados({ ...config, cenarios, perfisTime, camposNo, camposAresta, especificacaoTemplate });
       })
       .catch((e: unknown) => setErroConfig(e instanceof Error ? e.message : String(e)));
   }, [timeAtivo]);
@@ -204,6 +209,7 @@ function AppCarregado({
   cenarios,
   perfisTime: perfisTimeInicial,
   camposNo: camposNoInicial,
+  camposAresta: camposArestaInicial,
   especificacaoTemplate: especificacaoTemplateInicial,
   sessao,
   modo,
@@ -214,6 +220,7 @@ function AppCarregado({
   cenarios: Cenario[];
   perfisTime: PerfisConfig;
   camposNo: CampoNo[];
+  camposAresta: CampoAresta[];
   especificacaoTemplate: EspecificacaoTemplate;
   sessao: SessaoUsuario;
   modo: "dev" | "oidc" | "local" | undefined;
@@ -224,6 +231,7 @@ function AppCarregado({
   const [diagramaConfig, setDiagramaConfig] = useState<DiagramaConfig>(diagramaConfigInicial);
   const [perfisTime, setPerfisTime] = useState(perfisTimeInicial);
   const [camposNo, setCamposNo] = useState(camposNoInicial);
+  const [camposAresta, setCamposAresta] = useState(camposArestaInicial);
   const [especificacaoTemplate, setEspecificacaoTemplate] = useState(especificacaoTemplateInicial);
   const quebraState = useQuebra(quebraVazia(timeAtivo), diagramaConfig);
   const {
@@ -373,6 +381,24 @@ function AppCarregado({
   async function excluirCampoNo(id: string) {
     await apiCamposNo.excluir(id);
     setCamposNo((atual) => atual.filter((c) => c.id !== id));
+    await recarregarConfig();
+  }
+
+  async function criarCampoAresta(dadosCampo: DadosCampoAresta) {
+    const criado = await apiCamposAresta.criar(dadosCampo);
+    setCamposAresta((atual) => [...atual, criado]);
+    await recarregarConfig();
+  }
+
+  async function atualizarCampoAresta(id: string, dadosCampo: Partial<DadosCampoAresta>) {
+    const atualizado = await apiCamposAresta.atualizar(id, dadosCampo);
+    setCamposAresta((atual) => atual.map((c) => (c.id === id ? atualizado : c)));
+    await recarregarConfig();
+  }
+
+  async function excluirCampoAresta(id: string) {
+    await apiCamposAresta.excluir(id);
+    setCamposAresta((atual) => atual.filter((c) => c.id !== id));
     await recarregarConfig();
   }
 
@@ -606,6 +632,7 @@ function AppCarregado({
           config={diagramaConfig}
           perfisTime={perfisTime}
           camposNo={camposNo}
+          camposAresta={camposAresta}
           especificacaoTemplate={especificacaoTemplate}
           timeAtivo={timeAtivo}
           mostrarMembros={modo !== "local"}
@@ -614,6 +641,9 @@ function AppCarregado({
           onCriarCampoNo={criarCampoNo}
           onAtualizarCampoNo={atualizarCampoNo}
           onExcluirCampoNo={excluirCampoNo}
+          onCriarCampoAresta={criarCampoAresta}
+          onAtualizarCampoAresta={atualizarCampoAresta}
+          onExcluirCampoAresta={excluirCampoAresta}
           onFechar={() => setMostrarConfig(false)}
           abaForcada={abaConfigAlvo}
         />
