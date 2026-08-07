@@ -557,11 +557,12 @@ function AppCarregado({
           regras={regrasConfig}
           especificacaoTemplate={especificacaoTemplate}
           demandInfo={quebra.demandInfo}
+          time={quebra.time}
           onFechar={() => setResultado(null)}
           onSelecionarNo={setSelecionadoId}
           onExportarMarkdown={() =>
             baixarArquivoTexto(
-              paraMarkdown(resultado.atividades, resultado.ciclos, resultado.conflitos, regrasConfig),
+              paraMarkdown(resultado.atividades, resultado.ciclos, resultado.conflitos, regrasConfig, quebra.time),
               "backlog.md",
               "text/markdown"
             )

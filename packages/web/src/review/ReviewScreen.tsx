@@ -18,6 +18,10 @@ export interface ReviewScreenProps {
   especificacaoTemplate: EspecificacaoTemplate;
   /** `quebra.demandInfo` — de onde vem a demanda, pra seção "Contexto" do documento (SPEC-14 §4). */
   demandInfo?: string;
+  /** `quebra.time` — toda atividade já carrega esse time em `timesEnvolvidos` por padrão
+   * (achado do usuário: só aparecer no item excepcional lia como dado quebrado); usado aqui
+   * só pra filtrar o que já é óbvio e destacar de verdade quando é outro time. */
+  time?: string;
   onFechar: () => void;
   onSelecionarNo: (id: string) => void;
   onExportarMarkdown: () => void;
@@ -43,6 +47,7 @@ export function ReviewScreen({
   regras,
   especificacaoTemplate,
   demandInfo,
+  time,
   onFechar,
   onSelecionarNo,
   onExportarMarkdown,
@@ -52,6 +57,10 @@ export function ReviewScreen({
   const chaveParaNodeId = Object.fromEntries(
     resultado.atividades.filter((a) => a.origem.nodeId).map((a) => [a.chave, a.origem.nodeId!])
   );
+
+  function outrosTimes(a: Atividade): string[] {
+    return (a.timesEnvolvidos ?? []).filter((t) => t !== time);
+  }
 
   function irParaChave(chave: string) {
     const nodeId = chaveParaNodeId[chave];
@@ -150,6 +159,7 @@ export function ReviewScreen({
             regras={regras}
             template={especificacaoTemplate.conteudo}
             demandInfo={demandInfo}
+            time={time}
           />
         )}
 
@@ -166,35 +176,54 @@ export function ReviewScreen({
             </tr>
           </thead>
           <tbody>
-            {resultado.atividades.map((a) => (
-              <Fragment key={a.chave}>
-                <tr style={{ borderBottom: "1px solid #f1f5f9", background: a.timesEnvolvidos?.length ? "#fffbeb" : undefined }}>
-                  <td style={celulaEstilo}>
-                    {chaveParaNodeId[a.chave] ? (
-                      <button style={linkEstilo} onClick={() => irParaChave(a.chave)}>
-                        {a.rotulo}
-                      </button>
-                    ) : (
-                      a.rotulo
-                    )}
-                  </td>
-                  <td style={celulaEstilo}>{a.tipo}</td>
-                  <td style={celulaEstilo}>{a.tamanho}</td>
-                  <td style={celulaEstilo}>{a.descricao}</td>
-                  <td style={celulaEstilo}>{a.techs.join(", ")}</td>
-                  <td style={celulaEstilo}>{a.contextos.join(", ")}</td>
-                  <td style={celulaEstilo}>{descreverDependencia(a)}</td>
-                  <td style={celulaEstilo}>
-                    {a.timesEnvolvidos?.length ? (
-                      <span style={{ color: "#92400e", fontWeight: 600 }}>{a.timesEnvolvidos.join(", ")}</span>
-                    ) : (
-                      ""
-                    )}
-                  </td>
-                  <td style={{ ...celulaEstilo, color: "#64748b" }}>{descreverSpecResumo(a)}</td>
-                </tr>
-              </Fragment>
-            ))}
+            {resultado.atividades.map((a) => {
+              const cruzaOutroTime = outrosTimes(a).length > 0;
+              return (
+                <Fragment key={a.chave}>
+                  <tr style={{ borderBottom: "1px solid #f1f5f9", background: cruzaOutroTime ? "#fffbeb" : undefined }}>
+                    <td style={celulaEstilo}>
+                      {chaveParaNodeId[a.chave] ? (
+                        <button style={linkEstilo} onClick={() => irParaChave(a.chave)}>
+                          {a.rotulo}
+                        </button>
+                      ) : (
+                        a.rotulo
+                      )}
+                    </td>
+                    <td style={celulaEstilo}>{a.tipo}</td>
+                    <td style={celulaEstilo}>{a.tamanho}</td>
+                    <td style={celulaEstilo}>{a.descricao}</td>
+                    <td style={celulaEstilo}>{a.techs.join(", ")}</td>
+                    <td style={celulaEstilo}>{a.contextos.join(", ")}</td>
+                    <td style={celulaEstilo}>{descreverDependencia(a)}</td>
+                    <td style={celulaEstilo}>
+                      {a.timesEnvolvidos?.length ? (
+                        chaveParaNodeId[a.chave] ? (
+                          <button
+                            style={{
+                              ...linkEstilo,
+                              color: cruzaOutroTime ? "#92400e" : "#64748b",
+                              fontWeight: cruzaOutroTime ? 600 : 400,
+                            }}
+                            onClick={() => irParaChave(a.chave)}
+                            title="Editar o time responsável no nó, no canvas"
+                          >
+                            {a.timesEnvolvidos.join(", ")}
+                          </button>
+                        ) : (
+                          <span style={{ color: cruzaOutroTime ? "#92400e" : "#64748b", fontWeight: cruzaOutroTime ? 600 : 400 }}>
+                            {a.timesEnvolvidos.join(", ")}
+                          </span>
+                        )
+                      ) : (
+                        ""
+                      )}
+                    </td>
+                    <td style={{ ...celulaEstilo, color: "#64748b" }}>{descreverSpecResumo(a)}</td>
+                  </tr>
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -214,6 +243,7 @@ function EspecificacaoGerada({
   regras,
   template,
   demandInfo,
+  time,
 }: {
   atividades: Atividade[];
   diagrama: Diagrama;
@@ -221,8 +251,9 @@ function EspecificacaoGerada({
   regras?: RegrasConfig;
   template: string;
   demandInfo?: string;
+  time?: string;
 }) {
-  const documento = gerarEspecificacaoEntrega(atividades, diagrama, config, { regras, demandInfo, template });
+  const documento = gerarEspecificacaoEntrega(atividades, diagrama, config, { regras, demandInfo, template, time });
 
   return (
     <div style={{ marginBottom: 16, border: "1px solid #e2e8f0", borderRadius: 10, padding: 14, background: "#f8fafc" }}>

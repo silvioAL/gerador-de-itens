@@ -80,14 +80,13 @@ export function PropertiesPanel({
         <button style={statusBotaoEstilo} onClick={() => alternarStatus(no.id)}>
           {no.status === "novo" ? "novo" : "existente"} · trocar
         </button>
-        {no.status === "existente" && (
-          <input
-            placeholder="time responsável"
-            defaultValue={no.time ?? ""}
-            onBlur={(e) => definirTime(no.id, e.target.value)}
-            style={{ ...inputEstilo, fontSize: 12, padding: "4px 8px" }}
-          />
-        )}
+        <input
+          placeholder={`time responsável (default: ${time ?? "o da quebra"})`}
+          defaultValue={no.time ?? ""}
+          onBlur={(e) => definirTime(no.id, e.target.value)}
+          title="Deixe em branco pra herdar o time da quebra. Preencha só se esse nó específico for de outro time — vira o time-tag na tela de revisão."
+          style={{ ...inputEstilo, fontSize: 12, padding: "4px 8px" }}
+        />
       </div>
 
       {podeSalvarPerfil && (

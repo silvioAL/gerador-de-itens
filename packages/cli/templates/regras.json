@@ -4,7 +4,6 @@
   "porTech": {
     "Backend": {
       "requisitos": [
-        { "texto": "Nome segue o padrão de nomenclatura do time", "tipo": "checklist", "contextos": [] },
         { "texto": "Logs relevantes emitidos em pontos de decisão/erro", "tipo": "checklist", "contextos": [] },
 
         { "texto": "Estratégia de retry e DLQ definidas", "tipo": "checklist", "contextos": ["Backend-mensagens"] },

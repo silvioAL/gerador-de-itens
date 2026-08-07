@@ -25,7 +25,8 @@ export function paraMarkdown(
   atividades: Atividade[],
   ciclos: Ciclo[],
   conflitos: Conflito[],
-  regras?: RegrasConfig
+  regras?: RegrasConfig,
+  timeDaQuebra?: string
 ): string {
   const linhas: string[] = ["# Backlog derivado", ""];
   linhas.push("| # | Tipo | Tamanho | Descrição | Techs | Contextos | Dependências | Detalhes |");
@@ -38,13 +39,16 @@ export function paraMarkdown(
 
   // Seção própria em vez de coluna esparsa na tabela — só aparece quando há
   // alguma atividade que esbarra num sistema existente de outro time (achado
-  // do usuário: uma coluna vazia na maioria das linhas lê como dado quebrado,
-  // não como sinal intencional).
-  const atividadesComOutroTime = atividades.filter((a) => (a.timesEnvolvidos ?? []).length > 0);
+  // do usuário: uma coluna vazia na maioria das linhas lia como dado quebrado,
+  // não como sinal intencional). `timesEnvolvidos` agora sempre inclui o time
+  // da própria quebra por padrão (outro achado do usuário) — o filtro aqui
+  // ignora esse time "óbvio", listando só o que é de fato outro time.
+  const outrosTimes = (a: Atividade) => (a.timesEnvolvidos ?? []).filter((t) => t !== timeDaQuebra);
+  const atividadesComOutroTime = atividades.filter((a) => outrosTimes(a).length > 0);
   if (atividadesComOutroTime.length > 0) {
     linhas.push("", "## Atenção: toca sistemas de outros times");
     for (const a of atividadesComOutroTime) {
-      linhas.push(`- **${a.rotulo}** (${a.descricao}) — ${a.timesEnvolvidos!.join(", ")}`);
+      linhas.push(`- **${a.rotulo}** (${a.descricao}) — ${outrosTimes(a).join(", ")}`);
     }
   }
 

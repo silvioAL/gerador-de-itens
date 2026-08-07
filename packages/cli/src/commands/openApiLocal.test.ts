@@ -142,13 +142,53 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     expect(resposta.status).toBe(404);
   });
 
-  it("GET /campos-no sempre devolve lista vazia — sem campo customizado por time no modo local", async () => {
+  it("GET /campos-no sem config/campos-no.json ainda devolve lista vazia, não erro", async () => {
     expect(await fetch(`${base}/campos-no`).then((r) => r.json())).toEqual([]);
   });
 
-  it("POST /campos-no devolve 501 — não suportado no modo local", async () => {
-    const resposta = await fetch(`${base}/campos-no`, { method: "POST", body: JSON.stringify({}) });
-    expect(resposta.status).toBe(501);
+  it("POST /campos-no grava em config/campos-no.json, e GET /campos-no?timeId= devolve global + o do time", async () => {
+    const global = await fetch(`${base}/campos-no`, {
+      method: "POST",
+      body: JSON.stringify({ tipoNo: "rabbit", key: "topic", label: "Nome do tópico", type: "text" }),
+    }).then((r) => r.json());
+    expect(global.timeId).toBe("__global__");
+
+    await fetch(`${base}/campos-no`, {
+      method: "POST",
+      body: JSON.stringify({
+        timeId: "time-x",
+        tipoNo: "rabbit",
+        key: "topic",
+        label: "Nome do tópico",
+        type: "text",
+        ajuda: "Sufixo .queue obrigatório",
+      }),
+    });
+
+    const efetivos = await fetch(`${base}/campos-no?timeId=time-x`).then((r) => r.json());
+    expect(efetivos).toHaveLength(1); // time sobrescreve o global de mesma (tipoNo, key)
+    expect(efetivos[0].ajuda).toBe("Sufixo .queue obrigatório");
+
+    const semTime = await fetch(`${base}/campos-no`).then((r) => r.json());
+    expect(semTime).toHaveLength(1);
+    expect(semTime[0].timeId).toBe("__global__");
+  });
+
+  it("PUT /campos-no/:id atualiza um campo existente, DELETE remove", async () => {
+    const criado = await fetch(`${base}/campos-no`, {
+      method: "POST",
+      body: JSON.stringify({ tipoNo: "rabbit", key: "topic", label: "Nome do tópico", type: "text" }),
+    }).then((r) => r.json());
+
+    const atualizado = await fetch(`${base}/campos-no/${criado.id}`, {
+      method: "PUT",
+      body: JSON.stringify({ ajuda: "Sufixo .queue" }),
+    }).then((r) => r.json());
+    expect(atualizado.ajuda).toBe("Sufixo .queue");
+
+    const respostaDelete = await fetch(`${base}/campos-no/${criado.id}`, { method: "DELETE" });
+    expect(respostaDelete.status).toBe(204);
+    expect(await fetch(`${base}/campos-no`).then((r) => r.json())).toEqual([]);
   });
 
   it("GET /especificacao-template sem arquivo local devolve o template padrão do engine", async () => {

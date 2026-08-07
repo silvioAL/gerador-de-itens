@@ -212,6 +212,11 @@ export interface OpcoesGerarEspecificacao {
   titulo?: string;
   /** Template com placeholders `{{variavel}}` — sem isso, usa `TEMPLATE_ESPECIFICACAO_PADRAO`. */
   template?: string;
+  /** `quebra.time` — filtra "Times envolvidos" pra só listar os DIFERENTES do
+   * time da própria quebra (timesEnvolvidos sempre inclui o time da quebra
+   * por padrão desde a derivação; sem isso, a seção sempre listaria o próprio
+   * time da quebra, redundante). */
+  time?: string;
 }
 
 /**
@@ -232,7 +237,9 @@ export function gerarEspecificacaoEntrega(
 
   const todosOsTimes = new Set<string>();
   for (const a of atividades) {
-    for (const t of a.timesEnvolvidos ?? []) todosOsTimes.add(t);
+    for (const t of a.timesEnvolvidos ?? []) {
+      if (t !== opcoes.time) todosOsTimes.add(t);
+    }
   }
   const partesContexto: string[] = [];
   if (opcoes.demandInfo) partesContexto.push(opcoes.demandInfo);

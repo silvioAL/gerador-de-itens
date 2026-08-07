@@ -55,6 +55,7 @@ export async function implementar(args: string[]): Promise<void> {
   const documento = gerarEspecificacaoEntrega(resultado.atividades, quebra.diagrama, diagrama, {
     regras,
     demandInfo: quebra.demandInfo,
+    time: quebra.time,
   });
 
   if (caminhoOut) {

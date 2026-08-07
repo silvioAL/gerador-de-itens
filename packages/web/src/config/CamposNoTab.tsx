@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { DiagramaConfig } from "@gerador/engine";
+import type { DiagramaConfig, FieldSpec } from "@gerador/engine";
 import type { CampoNo, DadosCampoNo } from "../api/client";
 
 export interface CamposNoTabProps {
@@ -55,6 +55,25 @@ function formularioDeCampo(campo: CampoNo): FormularioCampo {
   };
 }
 
+/** Pré-preenche a partir de um campo padrão (`config/diagrama.json`) — "sobrescrever"
+ * cria/edita um campos_no com a mesma key, que o merge de loadConfig.ts já resolve por
+ * cima do padrão (mesma regra de override que perfis-time usa). Nunca edita o arquivo
+ * de config direto — isso continua sendo "diagrama.json é a fonte", só ganha uma camada
+ * de override por cima, visível e editável aqui. */
+function formularioDeFieldSpec(tipoNo: string, campo: FieldSpec): FormularioCampo {
+  return {
+    escopo: "time",
+    tipoNo,
+    key: campo.key,
+    label: campo.label,
+    type: campo.type,
+    required: campo.required ?? false,
+    valorPadrao: campo.default !== undefined ? String(campo.default) : "",
+    opcoes: (campo.options ?? []).join(", "),
+    ajuda: campo.ajuda ?? "",
+  };
+}
+
 /**
  * Editor de `campos_no` — adiciona/edita/exclui campos de formulário por tipo
  * de nó, global (visível pra todos) ou só do time ativo (SPEC-08 §3). Antes só
@@ -71,6 +90,10 @@ export function CamposNoTab({ config, camposNo, timeAtivo, onCriar, onAtualizar,
 
   function abrirEdicao(campo: CampoNo) {
     setFormulario(formularioDeCampo(campo));
+  }
+
+  function abrirSobrescrita(tipoNo: string, campo: FieldSpec) {
+    setFormulario(formularioDeFieldSpec(tipoNo, campo));
   }
 
   async function salvar() {
@@ -114,9 +137,10 @@ export function CamposNoTab({ config, camposNo, timeAtivo, onCriar, onAtualizar,
   return (
     <div>
       <p style={introTextoEstilo}>
-        Cada tipo de nó (Serviço, Fila Rabbit...) tem um conjunto de campos de formulário. Um campo "global" aparece
-        pra todo mundo; um campo do time <strong>{timeAtivo}</strong> aparece só quando esse time é o ativo, e
-        sobrescreve um global de mesma chave.
+        Cada tipo de nó (Serviço, Fila Rabbit...) já vem com um conjunto de campos base — "sobrescrever" cria uma
+        versão específica pro time <strong>{timeAtivo}</strong> (ex.: a convenção de nomenclatura da fila, um sufixo
+        obrigatório) que passa a valer no lugar do original, só aqui. Um campo "global" muda o original pra todo
+        mundo; "+ Adicionar campo" cria um campo novo, que não existia antes.
       </p>
 
       {formulario ? (
@@ -135,41 +159,62 @@ export function CamposNoTab({ config, camposNo, timeAtivo, onCriar, onAtualizar,
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 16 }}>
-        {[...porTipo.entries()].map(([tipoNo, campos]) => (
-          <div key={tipoNo} style={cardEstilo}>
-            <strong style={{ fontSize: 13, color: "#0f172a" }}>{config.nodeTypes[tipoNo]?.label ?? tipoNo}</strong>
-            <ul style={{ margin: "8px 0 0", paddingLeft: 0, listStyle: "none" }}>
-              {campos.map((campo) => (
-                <li
-                  key={campo.id}
-                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: 12.5 }}
-                >
-                  <span
-                    style={{
-                      ...tagOrigemEstilo,
-                      ...(campo.timeId === "__global__" ? tagGlobalEstilo : tagTimeEstilo),
-                    }}
+        {tiposDeNo.map((tipoNo) => {
+          const camposCustom = porTipo.get(tipoNo) ?? [];
+          const chavesSobrescritas = new Set(camposCustom.map((c) => c.key));
+          const camposPadrao = config.nodeTypes[tipoNo]?.spec ?? [];
+
+          return (
+            <div key={tipoNo} style={cardEstilo}>
+              <strong style={{ fontSize: 13, color: "#0f172a" }}>{config.nodeTypes[tipoNo]?.label ?? tipoNo}</strong>
+              <ul style={{ margin: "8px 0 0", paddingLeft: 0, listStyle: "none" }}>
+                {camposPadrao.map((campo) => (
+                  <li
+                    key={`padrao-${campo.key}`}
+                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: 12.5 }}
                   >
-                    {campo.timeId === "__global__" ? "global" : campo.timeId}
-                  </span>
-                  <span style={{ color: "#334155" }}>
-                    {campo.label} <span style={{ color: "#94a3b8" }}>({campo.key}, {campo.type})</span>
-                  </span>
-                  <div style={{ flex: 1 }} />
-                  <button onClick={() => abrirEdicao(campo)} style={linkBotaoEstilo}>
-                    editar
-                  </button>
-                  <button onClick={() => void onExcluir(campo.id)} style={{ ...linkBotaoEstilo, color: "#b91c1c" }}>
-                    excluir
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-        {camposNo.length === 0 && (
-          <p style={{ fontSize: 12, color: "#94a3b8" }}>Nenhum campo customizado ainda — os tipos de nó usam só o spec padrão.</p>
-        )}
+                    <span style={{ ...tagOrigemEstilo, ...tagPadraoEstilo }}>padrão</span>
+                    <span style={{ color: "#334155" }}>
+                      {campo.label} <span style={{ color: "#94a3b8" }}>({campo.key}, {campo.type})</span>
+                    </span>
+                    {chavesSobrescritas.has(campo.key) && (
+                      <span style={{ fontSize: 10.5, color: "#15803d" }}>sobrescrito abaixo pro seu time</span>
+                    )}
+                    <div style={{ flex: 1 }} />
+                    <button onClick={() => abrirSobrescrita(tipoNo, campo)} style={linkBotaoEstilo}>
+                      sobrescrever
+                    </button>
+                  </li>
+                ))}
+                {camposCustom.map((campo) => (
+                  <li
+                    key={campo.id}
+                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: 12.5 }}
+                  >
+                    <span
+                      style={{
+                        ...tagOrigemEstilo,
+                        ...(campo.timeId === "__global__" ? tagGlobalEstilo : tagTimeEstilo),
+                      }}
+                    >
+                      {campo.timeId === "__global__" ? "global" : campo.timeId}
+                    </span>
+                    <span style={{ color: "#334155" }}>
+                      {campo.label} <span style={{ color: "#94a3b8" }}>({campo.key}, {campo.type})</span>
+                    </span>
+                    <div style={{ flex: 1 }} />
+                    <button onClick={() => abrirEdicao(campo)} style={linkBotaoEstilo}>
+                      editar
+                    </button>
+                    <button onClick={() => void onExcluir(campo.id)} style={{ ...linkBotaoEstilo, color: "#b91c1c" }}>
+                      excluir
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -336,6 +381,7 @@ const tagOrigemEstilo: React.CSSProperties = {
 
 const tagGlobalEstilo: React.CSSProperties = { background: "#e0e7ff", color: "#4338ca" };
 const tagTimeEstilo: React.CSSProperties = { background: "#dcfce7", color: "#15803d" };
+const tagPadraoEstilo: React.CSSProperties = { background: "#f1f5f9", color: "#64748b" };
 
 const botaoAdicionarEstilo: React.CSSProperties = {
   fontSize: 12,

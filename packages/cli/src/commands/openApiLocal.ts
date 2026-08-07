@@ -1,8 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { TEMPLATE_ESPECIFICACAO_PADRAO, type PerfisConfig, type Quebra } from "@gerador/engine";
 import { slugify } from "./exportVault.js";
+
+const CAMPO_GLOBAL = "__global__";
 
 /**
  * API local mínima que faz `packages/web` (o mesmo build do modo hospedado)
@@ -15,7 +18,10 @@ import { slugify } from "./exportVault.js";
  * hospedado viram arquivo local: `quebra.json` na raiz do projeto (o mesmo
  * arquivo que `gerador derive`/`implementar` já esperam — fecha o ciclo
  * entre editar no canvas e rodar via terminal), `config/perfis-time.json` e
- * `config/referencias/*.json` (já existentes, reaproveitados como estão).
+ * `config/referencias/*.json` (já existentes, reaproveitados como estão), e
+ * `config/campos-no.json` (novo — mesma regra de merge global/por-time do
+ * modo hospedado, achado real: o usuário queria configurar convenção de
+ * nomenclatura por essa tela mesmo sem servidor nenhum).
  */
 
 const SESSAO_LOCAL = { email: "local", timeIds: ["local"] };
@@ -185,6 +191,103 @@ async function tratarReferencias(req: IncomingMessage, res: ServerResponse, meto
   enviarJson(res, 404, { erro: "não encontrado" });
 }
 
+// --- config/campos-no.json — campos por tipo de nó, global ou por time,
+// mesmo modelo (e mesma regra de merge) que packages/server/src/routes/camposNo.ts
+// já usa no modo hospedado: time sobrescreve global de mesma (tipoNo, key).
+
+interface CampoNoLocal {
+  id: string;
+  timeId: string;
+  tipoNo: string;
+  key: string;
+  label: string;
+  type: "text" | "textarea" | "number" | "boolean" | "select";
+  required: boolean;
+  valorPadrao: string | null;
+  opcoes: string[] | null;
+  ajuda: string | null;
+  permiteNA: boolean;
+  ordem: number;
+}
+
+async function lerCamposNo(dirProjeto: string): Promise<CampoNoLocal[]> {
+  return (await lerJsonOpcional<CampoNoLocal[]>(resolve(dirProjeto, "config", "campos-no.json"))) ?? [];
+}
+
+async function salvarCamposNo(dirProjeto: string, campos: CampoNoLocal[]): Promise<void> {
+  await mkdir(resolve(dirProjeto, "config"), { recursive: true });
+  await writeFile(resolve(dirProjeto, "config", "campos-no.json"), JSON.stringify(campos, null, 2), "utf-8");
+}
+
+/** Efetivo: todo campo global + os do `timeId` pedido, time sobrescrevendo
+ * global de mesma (tipoNo, key) — idêntico ao GET /campos-no do modo hospedado. */
+function camposEfetivos(campos: CampoNoLocal[], timeId?: string): CampoNoLocal[] {
+  const relevantes = campos.filter((c) => c.timeId === CAMPO_GLOBAL || c.timeId === timeId);
+  const porChave = new Map<string, CampoNoLocal>();
+  for (const c of [...relevantes].sort((a, b) => (a.timeId === CAMPO_GLOBAL ? -1 : 1))) {
+    porChave.set(`${c.tipoNo}::${c.key}`, c);
+  }
+  return [...porChave.values()].sort((a, b) => a.ordem - b.ordem);
+}
+
+async function tratarCamposNo(req: IncomingMessage, res: ServerResponse, metodo: string, caminho: string, query: URLSearchParams, dirProjeto: string): Promise<void> {
+  if (metodo === "GET" && caminho === "/campos-no") {
+    const campos = await lerCamposNo(dirProjeto);
+    return enviarJson(res, 200, camposEfetivos(campos, query.get("timeId") ?? undefined));
+  }
+
+  if (metodo === "POST" && caminho === "/campos-no") {
+    const corpo = await lerCorpoJson<Partial<CampoNoLocal>>(req);
+    if (!corpo.tipoNo || !corpo.key || !corpo.label || !corpo.type) {
+      return enviarJson(res, 400, { erro: "tipoNo, key, label e type são obrigatórios" });
+    }
+    const campos = await lerCamposNo(dirProjeto);
+    const timeId = corpo.timeId ?? CAMPO_GLOBAL;
+    // Mesma key+tipoNo+timeId já existente vira upsert, não duplicata.
+    const existente = campos.find((c) => c.timeId === timeId && c.tipoNo === corpo.tipoNo && c.key === corpo.key);
+    const novo: CampoNoLocal = {
+      id: existente?.id ?? randomUUID(),
+      timeId,
+      tipoNo: corpo.tipoNo,
+      key: corpo.key,
+      label: corpo.label,
+      type: corpo.type,
+      required: corpo.required ?? false,
+      valorPadrao: corpo.valorPadrao ?? null,
+      opcoes: corpo.opcoes ?? null,
+      ajuda: corpo.ajuda ?? null,
+      permiteNA: corpo.permiteNA ?? false,
+      ordem: corpo.ordem ?? 0,
+    };
+    const restantes = campos.filter((c) => c.id !== novo.id);
+    await salvarCamposNo(dirProjeto, [...restantes, novo]);
+    return enviarJson(res, 201, novo);
+  }
+
+  const matchPut = metodo === "PUT" && caminho.match(/^\/campos-no\/([^/]+)$/);
+  if (matchPut) {
+    const id = decodeURIComponent(matchPut[1]);
+    const campos = await lerCamposNo(dirProjeto);
+    const alvo = campos.find((c) => c.id === id);
+    if (!alvo) return enviarJson(res, 404, { erro: "campo não encontrado" });
+    const corpo = await lerCorpoJson<Partial<CampoNoLocal>>(req);
+    const atualizado: CampoNoLocal = { ...alvo, ...corpo, id: alvo.id, timeId: alvo.timeId, tipoNo: alvo.tipoNo, key: alvo.key };
+    await salvarCamposNo(dirProjeto, campos.map((c) => (c.id === id ? atualizado : c)));
+    return enviarJson(res, 200, atualizado);
+  }
+
+  const matchDelete = metodo === "DELETE" && caminho.match(/^\/campos-no\/([^/]+)$/);
+  if (matchDelete) {
+    const id = decodeURIComponent(matchDelete[1]);
+    const campos = await lerCamposNo(dirProjeto);
+    await salvarCamposNo(dirProjeto, campos.filter((c) => c.id !== id));
+    res.writeHead(204);
+    return res.end();
+  }
+
+  enviarJson(res, 404, { erro: "não encontrado" });
+}
+
 // --- especificação de entrega: template customizável opcional, default do engine ---
 
 async function tratarEspecificacaoTemplate(req: IncomingMessage, res: ServerResponse, metodo: string, dirProjeto: string): Promise<void> {
@@ -212,7 +315,8 @@ async function tratarEspecificacaoTemplate(req: IncomingMessage, res: ServerResp
  */
 export async function tratarApiLocal(req: IncomingMessage, res: ServerResponse, dirProjeto: string): Promise<boolean> {
   const metodo = req.method ?? "GET";
-  const caminho = (req.url ?? "/").split("?")[0];
+  const [caminho, queryString] = (req.url ?? "/").split("?");
+  const query = new URLSearchParams(queryString ?? "");
 
   if (caminho === "/auth/modo" && metodo === "GET") {
     enviarJson(res, 200, { modo: "local" });
@@ -238,15 +342,8 @@ export async function tratarApiLocal(req: IncomingMessage, res: ServerResponse, 
     await tratarReferencias(req, res, metodo, caminho, dirProjeto);
     return true;
   }
-  if (caminho === "/campos-no" && metodo === "GET") {
-    // Sem conceito de campo customizado por time no modo local — o spec de
-    // cada tipo de nó é só o que config/diagrama.json já define (edição é
-    // direto no arquivo, não por uma tela — SPEC-17).
-    enviarJson(res, 200, []);
-    return true;
-  }
   if (caminho.startsWith("/campos-no")) {
-    enviarJson(res, 501, { erro: "campos customizados por time não são suportados no modo local — edite config/diagrama.json diretamente." });
+    await tratarCamposNo(req, res, metodo, caminho, query, dirProjeto);
     return true;
   }
   if (caminho === "/especificacao-template") {

@@ -61,7 +61,7 @@ export async function derive(args: string[]): Promise<void> {
   const conteudo =
     formato === "csv"
       ? paraCsv(resultado.atividades)
-      : paraMarkdown(resultado.atividades, resultado.ciclos, resultado.conflitos, regras);
+      : paraMarkdown(resultado.atividades, resultado.ciclos, resultado.conflitos, regras, quebra.time);
 
   if (caminhoOut) {
     await writeFile(resolve(caminhoOut), conteudo, "utf-8");

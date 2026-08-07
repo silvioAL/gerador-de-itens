@@ -185,6 +185,60 @@ describe("ReviewScreen — especificação de entrega (SPEC-14, documento único
   });
 });
 
+describe("ReviewScreen — coluna Times (default pro time da quebra, editável no nó)", () => {
+  it("toda atividade mostra o time da quebra por padrão, sem destaque; só a que cruza outro time some com o destaque amarelo", () => {
+    const atividades = derivar(fixture.quebra.diagrama, config, { time: "time-portabilidade" });
+    const resultado = resolverDependencias(atividades);
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        time="time-portabilidade"
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+        onExportarMarkdown={vi.fn()}
+      />
+    );
+
+    // n3 (srv-notificacao) é existente com time-pagamentos — a atividade e2::consume
+    // cruza outro time de verdade; as demais só carregam o time da própria quebra.
+    const atividadeSetup = resultado.atividades.find((a) => a.chave === "n1::setup")!;
+    const linhaSetup = screen.getByText(atividadeSetup.rotulo).closest("tr")!;
+    expect(linhaSetup.style.background).not.toBe("rgb(255, 251, 235)");
+
+    const botaoTimePagamentos = screen.getByRole("button", { name: /time-pagamentos/ });
+    expect(botaoTimePagamentos).toBeInTheDocument();
+    const linhaComOutroTime = botaoTimePagamentos.closest("tr")!;
+    expect(linhaComOutroTime.style.background).toBe("rgb(255, 251, 235)");
+  });
+
+  it("clicar no time de um item leva pro nó de origem, igual clicar no rótulo", async () => {
+    const atividades = derivar(fixture.quebra.diagrama, config, { time: "time-portabilidade" });
+    const resultado = resolverDependencias(atividades);
+    const onSelecionarNo = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        time="time-portabilidade"
+        onFechar={vi.fn()}
+        onSelecionarNo={onSelecionarNo}
+        onExportarMarkdown={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /time-pagamentos/ }));
+    expect(onSelecionarNo).toHaveBeenCalledWith("n3");
+  });
+});
+
 describe("ReviewScreen — ciclo detectado", () => {
   it("mostra o caminho do ciclo e não permite derivar", () => {
     const atividadesCiclicas = [

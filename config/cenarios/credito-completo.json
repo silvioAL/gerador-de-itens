@@ -14,7 +14,15 @@
         {
           "id": "n1", "type": "service", "status": "novo", "label": "srv-credito-api",
           "x": 100, "y": 100,
-          "spec": { "nome": { "valor": "srv-credito-api", "origem": "manual" } },
+          "spec": {
+            "nome": { "valor": "srv-credito-api", "origem": "manual" },
+            "linguagem": { "valor": "Java", "origem": "manual" },
+            "framework": { "valor": "Spring Boot", "origem": "manual" },
+            "contratoEndpoints": {
+              "valor": "POST /v1/credito/solicitacoes\nRequest: { \"clienteId\": \"uuid\", \"valorSolicitado\": 15000.00, \"prazoMeses\": 24 }\nResponse 201: { \"solicitacaoId\": \"uuid\", \"status\": \"em_analise\" }",
+              "origem": "manual"
+            }
+          },
           "specNA": {},
           "endpoints": [
             { "method": "POST", "path": "/v1/credito/solicitacoes", "action": "novo" }
@@ -34,6 +42,10 @@
             "descricao": {
               "valor": "Orquestra a jornada de aprovação de crédito, da solicitação até a decisão final.",
               "origem": "manual"
+            },
+            "passosProcesso": {
+              "valor": "1. Recebe solicitação (start). 2. Chama decisao-score-credito (service task). 3. Gateway exclusivo: aprovado/reprovado/análise manual (timeout do FICO). 4. Aprovado: notifica cliente e encerra. Reprovado: notifica cliente com motivo e encerra. Análise manual: cria task humana, aguarda decisão de um analista, segue pro gateway de novo.",
+              "origem": "manual"
             }
           },
           "specNA": {}
@@ -49,7 +61,11 @@
               "valor": "Se o motor não decidir em 5s, a solicitação é encaminhada para análise manual e o cliente é notificado do atraso.",
               "origem": "manual"
             },
-            "descricao": { "valor": "Decide o score de crédito e elegibilidade com base nas regras vigentes.", "origem": "manual" }
+            "descricao": { "valor": "Decide o score de crédito e elegibilidade com base nas regras vigentes.", "origem": "manual" },
+            "logicaDecisao": {
+              "valor": "Entrada: score do bureau (0-1000), renda declarada, valor solicitado, histórico interno (se cliente existente). Saída: aprovado | reprovado | analise_manual. Regra: score < 400 reprova direto; score >= 700 e comprometimento de renda dentro do limite aprova direto; entre 400-699, ou dado de bureau indisponível, vai pra análise manual.",
+              "origem": "manual"
+            }
           },
           "specNA": {}
         },
@@ -66,6 +82,10 @@
             "migracao": {
               "valor": "Nenhuma migração de tráfego — reaproveitamos a integração existente, só passamos a chamá-la a partir do novo fluxo de aprovação.",
               "origem": "manual"
+            },
+            "contratoApi": {
+              "valor": "POST /score\nRequest: { \"cpf\": \"string\", \"valorSolicitado\": number }\nResponse 200: { \"score\": 0-1000, \"restricoes\": string[] }\nResponse 429: rate limit — respeitar o rateLimitConhecido antes de reter.",
+              "origem": "manual"
             }
           },
           "specNA": {
@@ -80,7 +100,11 @@
             "chavePrimaria": { "valor": "id (uuid)", "origem": "manual" },
             "indices": { "valor": "idx_cliente_id, idx_status_criado_em (fila de pendentes)", "origem": "manual" },
             "ferramentaMigracao": { "valor": "flyway", "origem": "manual" },
-            "volumeEsperado": { "valor": "medio", "origem": "manual" }
+            "volumeEsperado": { "valor": "medio", "origem": "manual" },
+            "schemaColunas": {
+              "valor": "id uuid PK, cliente_id uuid NOT NULL, valor_solicitado numeric(12,2) NOT NULL, prazo_meses int NOT NULL, status varchar(20) NOT NULL DEFAULT 'em_analise', criado_em timestamptz NOT NULL DEFAULT now(), atualizado_em timestamptz NOT NULL DEFAULT now()",
+              "origem": "manual"
+            }
           },
           "specNA": {}
         },
@@ -91,9 +115,15 @@
             "collection": { "valor": "decisoes_auditoria", "origem": "manual" },
             "indices": { "valor": "solicitacaoId, criadoEm", "origem": "manual" },
             "ttlDias": { "valor": 2555, "origem": "manual" },
-            "writeConcern": { "valor": "majority", "origem": "manual" }
+            "writeConcern": { "valor": "majority", "origem": "manual" },
+            "schemaDocumento": {
+              "valor": "{ solicitacaoId: uuid, score: number, entradaDecisao: object (variáveis avaliadas), decisao: 'aprovado'|'reprovado'|'analise_manual', regrasAplicadas: string[], criadoEm: datetime }",
+              "origem": "manual"
+            }
           },
-          "specNA": {}
+          "specNA": {
+            "chaveDeSharding": { "motivo": "volume de auditoria não justifica sharding — TTL de 7 anos já limita o crescimento" }
+          }
         },
         {
           "id": "n7", "type": "job", "status": "novo", "label": "reprocessar-decisoes-pendentes",
@@ -121,6 +151,10 @@
             "auditoria": { "valor": true, "origem": "manual" },
             "descricao": {
               "valor": "Valida se o comprometimento de renda do cliente excede o limite regulatório permitido.",
+              "origem": "manual"
+            },
+            "logicaRegra": {
+              "valor": "(soma das parcelas mensais já assumidas + parcela da nova solicitação) / renda_mensal_declarada > 0.35 → bloqueia. Limite de 35% definido pela política de crédito vigente (regulatório, não configurável por código).",
               "origem": "manual"
             }
           },

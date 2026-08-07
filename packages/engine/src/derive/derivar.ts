@@ -27,10 +27,19 @@ function pickSpec(no: No, chaves: string[]): Record<string, unknown> | undefined
   return Object.keys(resumo).length > 0 ? resumo : undefined;
 }
 
+/** Sempre inclui o time da própria quebra (default pra toda atividade — achado
+ * do usuário: só aparecer no item que toca outro time lia como dado quebrado
+ * no resto), mais o `time` de qualquer nó que tenha um explícito e diferente
+ * do time da quebra — não só nós `existente` (achado: um nó `novo` que outro
+ * time vai implementar é tão válido quanto um sistema `existente` de outro
+ * time). Editável por item hoje só indiretamente, via o campo "time
+ * responsável" do nó no canvas (PropertiesPanel) — atividade derivada não é
+ * editável direto, só o diagrama. */
 function temposEnvolvidos(nos: No[], quebra: ContextoQuebra): string[] {
   const times = new Set<string>();
+  if (quebra.time) times.add(quebra.time);
   for (const no of nos) {
-    if (no.status === "existente" && no.time && no.time !== quebra.time) {
+    if (no.time && no.time !== quebra.time) {
       times.add(no.time);
     }
   }
