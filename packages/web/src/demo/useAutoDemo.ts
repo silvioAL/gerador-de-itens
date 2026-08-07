@@ -38,7 +38,6 @@ export function useAutoDemo(opts: UseTourOpts) {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rodando, tour.ativo, tour.indice]);
 
   function play() {
