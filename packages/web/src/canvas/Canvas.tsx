@@ -85,8 +85,9 @@ export function Canvas({ quebraState, config }: CanvasProps) {
           targetHandle: e.targetHandle ?? padrao?.targetHandle,
           selected: e.id === arestaSelecionadaId,
           label: config.edgeTypes[e.type]?.label ?? e.type,
-          style: { stroke: config.edgeTypes[e.type]?.color ?? "#94a3b8" },
-          labelStyle: { fontSize: 11, fill: "#475569" },
+          style: { stroke: config.edgeTypes[e.type]?.color ?? "#5c6a7e" },
+          labelStyle: { fontSize: 11, fill: "#c5ceda" },
+          labelBgStyle: { fill: "#101823" },
         };
       }),
     [quebra.diagrama.nodes, quebra.diagrama.edges, config.edgeTypes, arestaSelecionadaId]
@@ -138,16 +139,20 @@ export function Canvas({ quebraState, config }: CanvasProps) {
       }}
       fitView
     >
-      <Background />
+      {/* Mesmos pontos do fundo do DiagramaCompacto (protótipo) — cor e
+          espaçamento iguais pro canvas e a revisão lerem como um sistema só. */}
+      <Background color="#1B2533" gap={26} size={1.4} />
       <Controls />
       <MiniMap
         pannable
         zoomable
+        bgColor="#101823"
+        maskColor="rgba(12, 17, 26, 0.72)"
+        nodeColor="#263344"
         style={{
-          background: "#ffffff",
-          border: "1px solid #e2e8f0",
+          border: "1px solid #263344",
           borderRadius: 8,
-          boxShadow: "0 4px 14px rgba(15,23,42,.12)",
+          boxShadow: "0 4px 14px rgba(0,0,0,.4)",
         }}
       />
     </ReactFlow>

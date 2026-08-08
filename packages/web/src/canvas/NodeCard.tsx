@@ -19,8 +19,8 @@ const CORES_NIVEL: Record<string, string> = {
 const handleEstilo: React.CSSProperties = {
   width: 9,
   height: 9,
-  background: "#cbd5e1",
-  border: "1.5px solid #64748b",
+  background: "var(--borda-forte)",
+  border: "1.5px solid var(--texto-mudo)",
 };
 
 /** Um ponto de conexão por lado, cada um servindo como origem E destino — permite
@@ -40,13 +40,13 @@ export function NodeCard({ data, selected }: NodeProps & { data: NodeCardData })
     <div
       style={{
         borderRadius: 10,
-        borderTop: selected ? "2px solid #6366f1" : "1px solid #cbd5e1",
-        borderRight: selected ? "2px solid #6366f1" : "1px solid #cbd5e1",
-        borderBottom: selected ? "2px solid #6366f1" : "1px solid #cbd5e1",
+        borderTop: selected ? "2px solid var(--acento-indigo)" : "1px solid var(--borda-forte)",
+        borderRight: selected ? "2px solid var(--acento-indigo)" : "1px solid var(--borda-forte)",
+        borderBottom: selected ? "2px solid var(--acento-indigo)" : "1px solid var(--borda-forte)",
         borderLeft: `4px solid ${corTipo}`,
-        background: "#ffffff",
+        background: "var(--painel-alto)",
         minWidth: 190,
-        boxShadow: selected ? "0 4px 14px rgba(99,102,241,.25)" : "0 1px 3px rgba(0,0,0,.08)",
+        boxShadow: selected ? "0 4px 14px rgba(99,102,241,.35)" : "0 1px 3px rgba(0,0,0,.35)",
         overflow: "visible",
         fontFamily: "system-ui, sans-serif",
       }}
@@ -64,11 +64,11 @@ export function NodeCard({ data, selected }: NodeProps & { data: NodeCardData })
           alignItems: "center",
           gap: 6,
           padding: "6px 10px",
-          background: `${corTipo}1a`,
-          borderBottom: "1px solid #e2e8f0",
+          background: `${corTipo}22`,
+          borderBottom: "1px solid var(--borda)",
           fontSize: 11,
           fontWeight: 600,
-          color: "#475569",
+          color: "var(--texto-2)",
           textTransform: "uppercase",
           letterSpacing: 0.4,
         }}
@@ -113,8 +113,8 @@ export function NodeCard({ data, selected }: NodeProps & { data: NodeCardData })
             fontSize: 10,
             padding: "1px 6px",
             borderRadius: 999,
-            background: no.status === "novo" ? "#dbeafe" : "#f1f5f9",
-            color: no.status === "novo" ? "#1d4ed8" : "#475569",
+            background: no.status === "novo" ? "rgba(56, 189, 248, 0.16)" : "var(--painel)",
+            color: no.status === "novo" ? "var(--acento)" : "var(--texto-fraco)",
           }}
         >
           {no.status}
@@ -122,7 +122,7 @@ export function NodeCard({ data, selected }: NodeProps & { data: NodeCardData })
       </div>
 
       <div style={{ padding: "8px 10px" }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{no.label}</div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: "var(--texto)", fontFamily: "ui-monospace, 'Cascadia Mono', monospace" }}>{no.label}</div>
         {mostrarBadgeTime && (
           <div
             style={{
@@ -131,8 +131,8 @@ export function NodeCard({ data, selected }: NodeProps & { data: NodeCardData })
               fontSize: 10,
               padding: "1px 6px",
               borderRadius: 999,
-              background: "#fef3c7",
-              color: "#92400e",
+              background: "rgba(251, 191, 36, 0.14)",
+              color: "var(--amarelo)",
             }}
           >
             time: {no.time}

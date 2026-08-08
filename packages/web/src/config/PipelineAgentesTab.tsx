@@ -48,8 +48,8 @@ export function PipelineAgentesTab({ config, onSalvar }: PipelineAgentesTabProps
             style={{ marginTop: 3 }}
           />
           <span>
-            <strong style={{ fontSize: 13, color: "#0f172a", display: "block" }}>Confirmação obrigatória</strong>
-            <span style={{ fontSize: 12.5, color: "#475569", lineHeight: 1.6 }}>
+            <strong style={{ fontSize: 13, color: "var(--texto)", display: "block" }}>Confirmação obrigatória</strong>
+            <span style={{ fontSize: 12.5, color: "var(--texto-2)", lineHeight: 1.6 }}>
               {confirmacaoObrigatoria
                 ? "Ligado — cada campo sugerido pela IA fica pendente até você revisar e confirmar, um a um."
                 : "Desligado — a esteira aplica cada campo direto, sem pausa, avançando sozinha até o fim. Você ainda pode revisar e editar qualquer campo depois."}
@@ -64,23 +64,23 @@ export function PipelineAgentesTab({ config, onSalvar }: PipelineAgentesTabProps
 
 const introTextoEstilo: React.CSSProperties = {
   fontSize: 13,
-  color: "#475569",
+  color: "var(--texto-2)",
   lineHeight: 1.6,
   marginTop: 0,
   maxWidth: 680,
 };
 
 const cardEstilo: React.CSSProperties = {
-  border: "1px solid #e2e8f0",
+  border: "1px solid var(--borda)",
   borderRadius: 12,
   padding: 14,
-  background: "#fff",
+  background: "var(--painel)",
   maxWidth: 680,
 };
 
 const erroEstilo: React.CSSProperties = {
   fontSize: 12,
-  color: "#b91c1c",
+  color: "var(--vermelho)",
   marginTop: 8,
   marginBottom: 0,
 };

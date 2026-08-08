@@ -45,7 +45,7 @@ export function AbrirQuebraScreen({ lista, onAbrir, onFechar }: AbrirQuebraScree
       style={{
         position: "fixed",
         inset: 0,
-        background: "#ffffff",
+        background: "var(--painel)",
         zIndex: 55,
         display: "flex",
         flexDirection: "column",
@@ -58,7 +58,7 @@ export function AbrirQuebraScreen({ lista, onAbrir, onFechar }: AbrirQuebraScree
           alignItems: "center",
           gap: 10,
           padding: "12px 16px",
-          borderBottom: "1px solid #e2e8f0",
+          borderBottom: "1px solid var(--borda)",
         }}
       >
         <strong style={{ fontSize: 18 }}>Abrir quebra</strong>
@@ -74,7 +74,7 @@ export function AbrirQuebraScreen({ lista, onAbrir, onFechar }: AbrirQuebraScree
           flexWrap: "wrap",
           gap: 12,
           padding: "16px 24px",
-          borderBottom: "1px solid #e2e8f0",
+          borderBottom: "1px solid var(--borda)",
           alignItems: "flex-end",
         }}
       >
@@ -157,8 +157,8 @@ const botaoEstilo: React.CSSProperties = {
   fontSize: 13,
   padding: "7px 12px",
   borderRadius: 6,
-  border: "1px solid #cbd5e1",
-  background: "#f8fafc",
+  border: "1px solid var(--borda-forte)",
+  background: "var(--painel)",
   cursor: "pointer",
   whiteSpace: "nowrap",
 };
@@ -172,14 +172,14 @@ const botaoPrimarioEstilo: React.CSSProperties = {
 const labelEstilo: React.CSSProperties = {
   fontSize: 13,
   fontWeight: 600,
-  color: "#334155",
+  color: "var(--texto-2)",
 };
 
 const inputBuscaEstilo: React.CSSProperties = {
   fontSize: 16,
   padding: "10px 14px",
   borderRadius: 8,
-  border: "1px solid #cbd5e1",
+  border: "1px solid var(--borda-forte)",
   outline: "none",
 };
 
@@ -187,13 +187,13 @@ const inputDataEstilo: React.CSSProperties = {
   fontSize: 14,
   padding: "9px 10px",
   borderRadius: 8,
-  border: "1px solid #cbd5e1",
+  border: "1px solid var(--borda-forte)",
   outline: "none",
 };
 
 const linkLimparEstilo: React.CSSProperties = {
   fontSize: 12,
-  color: "#4f46e5",
+  color: "#a5b4fc",
   background: "none",
   border: "none",
   cursor: "pointer",
@@ -202,7 +202,7 @@ const linkLimparEstilo: React.CSSProperties = {
 
 const vazioEstilo: React.CSSProperties = {
   fontSize: 15,
-  color: "#64748b",
+  color: "var(--texto-fraco)",
   marginTop: 24,
   textAlign: "center",
 };
@@ -215,18 +215,18 @@ const linhaEstilo: React.CSSProperties = {
   gap: 4,
   padding: "14px 18px",
   borderRadius: 10,
-  border: "1px solid #e2e8f0",
-  background: "#fff",
+  border: "1px solid var(--borda)",
+  background: "var(--painel)",
   cursor: "pointer",
 };
 
 const tituloEstilo: React.CSSProperties = {
   fontSize: 17,
   fontWeight: 600,
-  color: "#0f172a",
+  color: "var(--texto)",
 };
 
 const metaEstilo: React.CSSProperties = {
   fontSize: 13,
-  color: "#64748b",
+  color: "var(--texto-fraco)",
 };

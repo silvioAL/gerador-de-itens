@@ -2,17 +2,91 @@
   box-sizing: border-box;
 }
 
+/* Paleta única do sistema — a mesma que a tela de revisão (SPEC-24) já usa.
+   A tela inicial era clara (slate/branco) e parecia OUTRO sistema ao lado da
+   revisão escura (achado real do usuário); agora todo mundo lê destas
+   variáveis. Os hexes são os extraídos da ReviewScreen/DiagramaCompacto. */
+:root {
+  --fundo: #0c111a;
+  --painel: #101823;
+  --painel-alto: #15202d;
+  --borda: #1b2533;
+  --borda-forte: #263344;
+  --texto: #e8eef8;
+  --texto-2: #c5ceda;
+  --texto-fraco: #8d9bb0;
+  --texto-mudo: #5c6a7e;
+  --acento: #38bdf8;
+  --acento-indigo: #6366f1;
+  --verde: #3ecf8e;
+  --vermelho: #f87171;
+  --amarelo: #fbbf24;
+}
+
 html,
 body,
 #root {
   margin: 0;
   height: 100%;
-  background: #f1f5f9;
-  color: #0f172a;
+  background: var(--fundo);
+  color: var(--texto);
 }
 
 button {
   font-family: inherit;
+}
+
+/* Campos sem estilo inline próprio herdavam o default claro do browser e
+   viravam retângulos brancos no tema escuro. Estilos inline específicos de
+   cada componente continuam vencendo estas regras. */
+input,
+textarea,
+select {
+  background: var(--fundo);
+  color: var(--texto);
+  border: 1px solid var(--borda-forte);
+  border-radius: 6px;
+  color-scheme: dark;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--texto-mudo);
+}
+
+/* React Flow (canvas da tela inicial) no tema escuro — o pacote traz tema
+   claro por default; sobrescrever aqui evita tocar em props do componente. */
+.react-flow {
+  background: var(--fundo);
+}
+.react-flow__controls {
+  box-shadow: none;
+  border: 1px solid var(--borda-forte);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.react-flow__controls-button {
+  background: var(--painel);
+  border-bottom: 1px solid var(--borda);
+  color: var(--texto-2);
+}
+.react-flow__controls-button:hover {
+  background: var(--painel-alto);
+}
+.react-flow__controls-button svg {
+  fill: var(--texto-2);
+}
+.react-flow__attribution {
+  background: transparent;
+  color: var(--texto-mudo);
+}
+.react-flow__edge-path {
+  stroke: var(--texto-mudo);
+}
+.react-flow__edge-text {
+  fill: var(--texto-2);
+}
+.react-flow__edge-textbg {
+  fill: var(--painel);
 }
 
 /* Expansão suave do item na revisão (ReviewScreen) — anima sozinha ao

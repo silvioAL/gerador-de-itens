@@ -49,8 +49,8 @@ export function LoginScreen({ onEntrar, erro, modo, aceitandoConvite = false }: 
   return (
     <div style={containerEstilo}>
       <div style={cardEstilo}>
-        <strong style={{ fontSize: 15, color: "#0f172a" }}>Gerador de Itens</strong>
-        <p style={{ fontSize: 12.5, color: "#64748b", marginTop: 4, marginBottom: 16 }}>
+        <strong style={{ fontSize: 15, color: "var(--texto)" }}>Gerador de Itens</strong>
+        <p style={{ fontSize: 12.5, color: "var(--texto-fraco)", marginTop: 4, marginBottom: 16 }}>
           {aceitandoConvite
             ? "Você recebeu um convite pra um time — entre pra aceitar."
             : "Entre pra continuar. O time é escolhido depois, entre os que você já pertence."}
@@ -75,7 +75,7 @@ export function LoginScreen({ onEntrar, erro, modo, aceitandoConvite = false }: 
               style={inputEstilo}
             />
 
-            {erro && <p style={{ fontSize: 12, color: "#b91c1c", marginTop: 10, marginBottom: 0 }}>{erro}</p>}
+            {erro && <p style={{ fontSize: 12, color: "var(--vermelho)", marginTop: 10, marginBottom: 0 }}>{erro}</p>}
 
             <button
               type="submit"
@@ -88,7 +88,7 @@ export function LoginScreen({ onEntrar, erro, modo, aceitandoConvite = false }: 
         )}
 
         {modo === "oidc" && erro && (
-          <p style={{ fontSize: 12, color: "#b91c1c", marginTop: 12, marginBottom: 0 }}>{erro}</p>
+          <p style={{ fontSize: 12, color: "var(--vermelho)", marginTop: 12, marginBottom: 0 }}>{erro}</p>
         )}
       </div>
     </div>
@@ -120,7 +120,7 @@ const containerEstilo: React.CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   height: "100vh",
-  background: "#f8fafc",
+  background: "var(--painel)",
   fontFamily: "system-ui, sans-serif",
 };
 
@@ -128,8 +128,8 @@ const cardEstilo: React.CSSProperties = {
   width: 320,
   padding: 24,
   borderRadius: 12,
-  border: "1px solid #e2e8f0",
-  background: "#fff",
+  border: "1px solid var(--borda)",
+  background: "var(--painel)",
   boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
 };
 
@@ -137,7 +137,7 @@ const labelEstilo: React.CSSProperties = {
   display: "block",
   fontSize: 11,
   fontWeight: 600,
-  color: "#334155",
+  color: "var(--texto-2)",
   marginTop: 10,
   marginBottom: 4,
 };
@@ -147,7 +147,7 @@ const inputEstilo: React.CSSProperties = {
   fontSize: 13,
   padding: "7px 10px",
   borderRadius: 6,
-  border: "1px solid #cbd5e1",
+  border: "1px solid var(--borda-forte)",
   boxSizing: "border-box",
 };
 
@@ -174,7 +174,7 @@ const botaoGoogleEstilo: React.CSSProperties = {
   padding: "9px 12px",
   borderRadius: 7,
   border: "1px solid #dadce0",
-  background: "#fff",
+  background: "var(--painel)",
   color: "#3c4043",
   textDecoration: "none",
   boxSizing: "border-box",

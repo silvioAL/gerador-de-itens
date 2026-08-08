@@ -191,7 +191,7 @@ function AppComSessao({
       <div style={telaCentralizadaEstilo}>
         <div style={{ maxWidth: 480, textAlign: "center" }}>
           <strong style={{ fontSize: 15, color: "#b91c1c" }}>Não foi possível carregar a configuração</strong>
-          <p style={{ fontSize: 13, color: "#475569", marginTop: 8 }}>{erroConfig}</p>
+          <p style={{ fontSize: 13, color: "var(--texto-2)", marginTop: 8 }}>{erroConfig}</p>
         </div>
       </div>
     );
@@ -449,18 +449,18 @@ function AppCarregado({
           gap: 10,
           rowGap: 8,
           padding: "10px 16px",
-          borderBottom: "1px solid #e2e8f0",
-          background: "#ffffff",
+          borderBottom: "1px solid var(--borda)",
+          background: "var(--painel)",
         }}
       >
-        <strong style={{ fontSize: 14, color: "#0f172a" }}>Gerador de Itens</strong>
+        <strong style={{ fontSize: 14, color: "var(--texto)" }}>Gerador de Itens</strong>
         {versao && (
           <span
             title="Versão do pacote gerador-de-itens instalado — mesma versão da tag no GitHub"
             style={{
               fontSize: 10.5,
-              color: "#64748b",
-              background: "#f1f5f9",
+              color: "var(--texto-fraco)",
+              background: "var(--painel-alto)",
               borderRadius: 999,
               padding: "1px 7px",
               marginRight: 8,
@@ -477,7 +477,7 @@ function AppCarregado({
           ⚙ Configurações
         </button>
 
-        <div style={{ width: 1, height: 20, background: "#e2e8f0" }} />
+        <div style={{ width: 1, height: 20, background: "var(--borda-forte)" }} />
 
         <input
           aria-label="Título da quebra"
@@ -485,10 +485,10 @@ function AppCarregado({
           onChange={(e) => setQuebra((q) => ({ ...q, titulo: e.target.value }))}
           placeholder="Título (obrigatório pra salvar)"
           title="Curto, pra achar esta quebra depois na busca de 'Abrir…'."
-          style={{ fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 220 }}
+          style={{ fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid var(--borda-forte)", background: "var(--fundo)", color: "var(--texto)", width: 220 }}
         />
 
-        <div style={{ width: 1, height: 20, background: "#e2e8f0" }} />
+        <div style={{ width: 1, height: 20, background: "var(--borda-forte)" }} />
 
         {modo === "local" ? (
           <>
@@ -504,7 +504,7 @@ function AppCarregado({
               onChange={(e) => aoMudarTime(e.target.value)}
               placeholder="ex.: time-pagamentos"
               title="Nome livre — pré-preenche sugestões de stack e os campos customizados desse time (config/perfis-time.json e config/campos-no.json)."
-              style={{ fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 170 }}
+              style={{ fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid var(--borda-forte)", background: "var(--fundo)", color: "var(--texto)", width: 170 }}
             />
             <datalist id="times-conhecidos-local">
               {Object.keys(perfisTime).map((time) => (
@@ -518,7 +518,7 @@ function AppCarregado({
             value={quebra.time ?? timeAtivo}
             onChange={(e) => aoMudarTime(e.target.value)}
             title="Times aos quais sua sessão pertence — pré-preenchem sugestões de stack e os campos customizados desse time."
-            style={{ fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 170 }}
+            style={{ fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid var(--borda-forte)", background: "var(--fundo)", color: "var(--texto)", width: 170 }}
           >
             {sessao.timeIds.map((time) => (
               <option key={time} value={time}>
@@ -528,7 +528,7 @@ function AppCarregado({
           </select>
         )}
 
-        <div style={{ width: 1, height: 20, background: "#e2e8f0" }} />
+        <div style={{ width: 1, height: 20, background: "var(--borda-forte)" }} />
 
         {tiposDeNo.map(([tipo, cfg]) => (
           <button
@@ -547,14 +547,14 @@ function AppCarregado({
 
         <div style={{ flex: 1 }} />
 
-        <span style={{ fontSize: 11, color: "#94a3b8", whiteSpace: "nowrap" }}>{sessao.email}</span>
+        <span style={{ fontSize: 11, color: "var(--texto-mudo)", whiteSpace: "nowrap" }}>{sessao.email}</span>
         <button onClick={() => void onSair()} style={botaoEstilo}>
           Sair
         </button>
 
-        <div style={{ width: 1, height: 20, background: "#e2e8f0" }} />
+        <div style={{ width: 1, height: 20, background: "var(--borda-forte)" }} />
 
-        <span style={{ fontSize: 11, color: "#94a3b8", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: 11, color: "var(--texto-mudo)", whiteSpace: "nowrap" }}>
           {persistencia.quebraId ? quebra.time ?? "sem time" : "nova quebra"} ·{" "}
           {{
             "sem-arquivo": "não salva",
@@ -613,15 +613,15 @@ function AppCarregado({
         <div
           style={{
             padding: "6px 16px",
-            background: "#fef2f2",
-            color: "#b91c1c",
+            background: "#3a1d1d",
+            color: "var(--vermelho)",
             fontSize: 12,
             display: "flex",
             justifyContent: "space-between",
           }}
         >
           <span>{edgeRejeitada.motivo}</span>
-          <button onClick={limparEdgeRejeitada} style={{ ...linkEstilo, color: "#b91c1c" }}>
+          <button onClick={limparEdgeRejeitada} style={{ ...linkEstilo, color: "var(--vermelho)" }}>
             fechar
           </button>
         </div>
@@ -772,11 +772,11 @@ const botaoDemoEstilo: React.CSSProperties = {
   fontWeight: 600,
   padding: "7px 14px",
   borderRadius: 999,
-  border: "1px solid #e2e8f0",
-  background: "#fff",
-  color: "#0f172a",
+  border: "1px solid var(--borda-forte)",
+  background: "var(--painel)",
+  color: "var(--texto)",
   cursor: "pointer",
-  boxShadow: "0 4px 12px rgba(15, 23, 42, 0.15)",
+  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.45)",
 };
 
 const telaCentralizadaEstilo: React.CSSProperties = {
@@ -786,7 +786,7 @@ const telaCentralizadaEstilo: React.CSSProperties = {
   height: "100vh",
   fontFamily: "system-ui, sans-serif",
   fontSize: 14,
-  color: "#64748b",
+  color: "var(--texto-fraco)",
   padding: 24,
 };
 
@@ -794,28 +794,30 @@ const botaoEstilo: React.CSSProperties = {
   fontSize: 12,
   padding: "6px 10px",
   borderRadius: 6,
-  border: "1px solid #cbd5e1",
-  background: "#f8fafc",
+  border: "1px solid var(--borda-forte)",
+  background: "var(--painel)",
+  color: "var(--texto-2)",
   cursor: "pointer",
   whiteSpace: "nowrap",
 };
 
 const botaoPrimarioEstilo: React.CSSProperties = {
-  background: "#4f46e5",
+  background: "var(--acento-indigo)",
   color: "#fff",
-  border: "1px solid #4f46e5",
+  border: "1px solid var(--acento-indigo)",
 };
 
 const botaoJornadaEstilo: React.CSSProperties = {
-  background: "#f5f5ff",
-  color: "#4f46e5",
-  border: "1px solid #c7d2fe",
+  background: "rgba(99, 102, 241, 0.14)",
+  color: "#a5b4fc",
+  border: "1px solid rgba(99, 102, 241, 0.45)",
   fontWeight: 600,
 };
 
 const botaoDesabilitadoEstilo: React.CSSProperties = {
-  background: "#c7d2fe",
-  border: "1px solid #c7d2fe",
+  background: "var(--painel-alto)",
+  border: "1px solid var(--borda-forte)",
+  color: "var(--texto-mudo)",
   cursor: "not-allowed",
 };
 

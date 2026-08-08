@@ -59,7 +59,7 @@ export function EspecificacaoTemplateTab({ template, timeAtivo, onSalvar }: Espe
 
       <div style={cardEstilo}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <strong style={{ fontSize: 13, color: "#0f172a" }}>Template</strong>
+          <strong style={{ fontSize: 13, color: "var(--texto)" }}>Template</strong>
           <span
             style={{
               ...tagOrigemEstilo,
@@ -132,7 +132,7 @@ export function EspecificacaoTemplateTab({ template, timeAtivo, onSalvar }: Espe
 
 const introTextoEstilo: React.CSSProperties = {
   fontSize: 13,
-  color: "#475569",
+  color: "var(--texto-2)",
   lineHeight: 1.6,
   marginTop: 0,
   maxWidth: 680,
@@ -140,17 +140,17 @@ const introTextoEstilo: React.CSSProperties = {
 
 const codigoEstilo: React.CSSProperties = {
   fontSize: 11.5,
-  background: "#f1f5f9",
+  background: "var(--painel-alto)",
   padding: "1px 5px",
   borderRadius: 4,
   marginRight: 4,
 };
 
 const cardEstilo: React.CSSProperties = {
-  border: "1px solid #e2e8f0",
+  border: "1px solid var(--borda)",
   borderRadius: 12,
   padding: 14,
-  background: "#fff",
+  background: "var(--painel)",
   maxWidth: 680,
 };
 
@@ -158,8 +158,8 @@ const preEstilo: React.CSSProperties = {
   whiteSpace: "pre-wrap",
   fontFamily: "inherit",
   fontSize: 11.5,
-  color: "#475569",
-  background: "#f8fafc",
+  color: "var(--texto-2)",
+  background: "var(--painel)",
   borderRadius: 8,
   padding: 10,
   marginTop: 8,
@@ -175,13 +175,13 @@ const tagOrigemEstilo: React.CSSProperties = {
   flexShrink: 0,
 };
 
-const tagGlobalEstilo: React.CSSProperties = { background: "#e0e7ff", color: "#4338ca" };
-const tagTimeEstilo: React.CSSProperties = { background: "#dcfce7", color: "#15803d" };
+const tagGlobalEstilo: React.CSSProperties = { background: "rgba(99, 102, 241, 0.16)", color: "#a5b4fc" };
+const tagTimeEstilo: React.CSSProperties = { background: "rgba(62, 207, 142, 0.16)", color: "var(--verde)" };
 
 const labelFormEstilo: React.CSSProperties = {
   fontSize: 11,
   fontWeight: 600,
-  color: "#334155",
+  color: "var(--texto-2)",
   marginTop: 8,
   display: "block",
 };
@@ -190,7 +190,7 @@ const inputFormEstilo: React.CSSProperties = {
   fontSize: 13,
   padding: "6px 10px",
   borderRadius: 6,
-  border: "1px solid #cbd5e1",
+  border: "1px solid var(--borda-forte)",
   outline: "none",
   boxSizing: "border-box",
   width: "100%",
@@ -207,7 +207,7 @@ const textareaFormEstilo: React.CSSProperties = {
 
 const erroEstilo: React.CSSProperties = {
   fontSize: 12,
-  color: "#b91c1c",
+  color: "var(--vermelho)",
   marginTop: 8,
   marginBottom: 0,
 };
@@ -226,15 +226,15 @@ const botaoCancelarEstilo: React.CSSProperties = {
   fontSize: 12,
   padding: "7px 12px",
   borderRadius: 7,
-  border: "1px solid #cbd5e1",
-  background: "#fff",
-  color: "#475569",
+  border: "1px solid var(--borda-forte)",
+  background: "var(--painel)",
+  color: "var(--texto-2)",
   cursor: "pointer",
 };
 
 const linkBotaoEstilo: React.CSSProperties = {
   fontSize: 11,
-  color: "#4f46e5",
+  color: "#a5b4fc",
   background: "none",
   border: "none",
   cursor: "pointer",

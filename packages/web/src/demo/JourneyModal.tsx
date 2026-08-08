@@ -63,7 +63,7 @@ export function JourneyModal({
       <div
         data-tour="journey-modal-content"
         style={{
-          background: "#ffffff",
+          background: "var(--painel)",
           borderRadius: 16,
           width: "min(920px, 100%)",
           maxHeight: "88vh",
@@ -77,15 +77,15 @@ export function JourneyModal({
         <header
           style={{
             padding: "18px 24px",
-            borderBottom: "1px solid #e2e8f0",
+            borderBottom: "1px solid var(--borda)",
             display: "flex",
             alignItems: "center",
             gap: 12,
           }}
         >
           <div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Como funciona o Gerador de Itens</div>
-            <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "var(--texto)" }}>Como funciona o Gerador de Itens</div>
+            <div style={{ fontSize: 12, color: "var(--texto-fraco)", marginTop: 2 }}>
               Não é um gerador de prompt de IA — é um mecanismo determinístico, do diagrama à especificação de solução.
             </div>
           </div>
@@ -152,7 +152,7 @@ const COMANDOS_CLI: ComandoCli[] = [
 function LinhaComando() {
   return (
     <div>
-      <p style={{ fontSize: 13, color: "#475569", lineHeight: 1.5, marginTop: 0, maxWidth: 640 }}>
+      <p style={{ fontSize: 13, color: "var(--texto-2)", lineHeight: 1.5, marginTop: 0, maxWidth: 640 }}>
         Tudo isso também roda sem abrir o browser — direto no terminal. O app web é uma forma de usar a ferramenta,
         não a única. Instala uma vez com{" "}
         <code>npm install -g gerador-de-itens</code> (publicado no npm, mesmo mecanismo do Graphify — sem precisar
@@ -163,18 +163,18 @@ function LinhaComando() {
 
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, marginTop: 18 }}>
         <thead>
-          <tr style={{ textAlign: "left", borderBottom: "2px solid #e2e8f0" }}>
-            <th style={{ padding: "6px 8px", color: "#475569" }}>Comando</th>
-            <th style={{ padding: "6px 8px", color: "#475569" }}>Quando usar</th>
+          <tr style={{ textAlign: "left", borderBottom: "2px solid var(--borda)" }}>
+            <th style={{ padding: "6px 8px", color: "var(--texto-2)" }}>Comando</th>
+            <th style={{ padding: "6px 8px", color: "var(--texto-2)" }}>Quando usar</th>
           </tr>
         </thead>
         <tbody>
           {COMANDOS_CLI.map((c) => (
-            <tr key={c.comando} style={{ borderBottom: "1px solid #f1f5f9" }}>
+            <tr key={c.comando} style={{ borderBottom: "1px solid var(--borda)" }}>
               <td style={{ padding: "8px", fontFamily: "ui-monospace, Menlo, Consolas, monospace", whiteSpace: "nowrap" }}>
                 {c.comando}
               </td>
-              <td style={{ padding: "8px", color: "#475569" }}>{c.quando}</td>
+              <td style={{ padding: "8px", color: "var(--texto-2)" }}>{c.quando}</td>
             </tr>
           ))}
         </tbody>
@@ -220,13 +220,13 @@ function Cenarios({
         <div
           key={cenario.id}
           style={{
-            border: cenario.destaque ? "1.5px solid #4f46e5" : "1px solid #e2e8f0",
+            border: cenario.destaque ? "1.5px solid #4f46e5" : "1px solid var(--borda)",
             borderRadius: 12,
             padding: 14,
             display: "flex",
             flexDirection: "column",
             gap: 8,
-            background: cenario.destaque ? "#f5f5ff" : "#fff",
+            background: cenario.destaque ? "rgba(99, 102, 241, 0.14)" : "var(--painel)",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
@@ -251,16 +251,16 @@ function Cenarios({
                   fontWeight: 700,
                   padding: "1px 7px",
                   borderRadius: 999,
-                  background: "#dcfce7",
-                  color: "#15803d",
+                  background: "rgba(62, 207, 142, 0.16)",
+                  color: "var(--verde)",
                 }}
               >
                 {ROTULO_CATEGORIA[cenario.categoria]}
               </span>
             )}
-            <strong style={{ fontSize: 13, color: "#0f172a" }}>{cenario.titulo}</strong>
+            <strong style={{ fontSize: 13, color: "var(--texto)" }}>{cenario.titulo}</strong>
           </div>
-          <p style={{ fontSize: 12, color: "#64748b", margin: 0, lineHeight: 1.45, flex: 1 }}>{cenario.descricao}</p>
+          <p style={{ fontSize: 12, color: "var(--texto-fraco)", margin: 0, lineHeight: 1.45, flex: 1 }}>{cenario.descricao}</p>
           {cenario.designPatterns.length > 0 && (
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
               {cenario.designPatterns.map((padrao) => (
@@ -271,7 +271,7 @@ function Cenarios({
                     fontWeight: 600,
                     padding: "1px 7px",
                     borderRadius: 999,
-                    background: "#ede9fe",
+                    background: "rgba(99, 102, 241, 0.16)",
                     color: "#6d28d9",
                   }}
                 >
@@ -326,13 +326,13 @@ const abaEstilo: React.CSSProperties = {
   border: "none",
   borderBottom: "2px solid transparent",
   background: "none",
-  color: "#64748b",
+  color: "var(--texto-fraco)",
   cursor: "pointer",
 };
 
 const abaAtivaEstilo: React.CSSProperties = {
   ...abaEstilo,
-  color: "#4f46e5",
+  color: "#a5b4fc",
   borderBottom: "2px solid #4f46e5",
 };
 
@@ -341,9 +341,9 @@ const botaoDemoAutomaticaEstilo: React.CSSProperties = {
   fontWeight: 700,
   padding: "8px 14px",
   borderRadius: 8,
-  border: "1px solid #e2e8f0",
-  background: "#fff",
-  color: "#4f46e5",
+  border: "1px solid var(--borda)",
+  background: "var(--painel)",
+  color: "#a5b4fc",
   cursor: "pointer",
   whiteSpace: "nowrap",
 };
@@ -366,9 +366,9 @@ const botaoFecharEstilo: React.CSSProperties = {
   width: 30,
   height: 30,
   borderRadius: 8,
-  border: "1px solid #e2e8f0",
-  background: "#fff",
-  color: "#64748b",
+  border: "1px solid var(--borda)",
+  background: "var(--painel)",
+  color: "var(--texto-fraco)",
   cursor: "pointer",
 };
 
@@ -388,8 +388,8 @@ const botaoAdicionarEstilo: React.CSSProperties = {
   fontWeight: 600,
   padding: "7px 10px",
   borderRadius: 7,
-  border: "1px solid #c7d2fe",
-  background: "#fff",
-  color: "#4f46e5",
+  border: "1px solid rgba(99, 102, 241, 0.45)",
+  background: "var(--painel)",
+  color: "#a5b4fc",
   cursor: "pointer",
 };

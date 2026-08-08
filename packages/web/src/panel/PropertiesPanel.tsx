@@ -36,7 +36,7 @@ export function PropertiesPanel({
   if (!no) {
     return (
       <aside data-tour="properties-panel" style={painelEstilo}>
-        <p style={{ color: "#64748b", fontSize: 13 }}>Selecione um nó para editar as propriedades.</p>
+        <p style={{ color: "var(--texto-fraco)", fontSize: 13 }}>Selecione um nó para editar as propriedades.</p>
       </aside>
     );
   }
@@ -45,7 +45,7 @@ export function PropertiesPanel({
   if (!cfg) {
     return (
       <aside data-tour="properties-panel" style={painelEstilo}>
-        <p style={{ color: "#b91c1c", fontSize: 13 }}>
+        <p style={{ color: "var(--vermelho)", fontSize: 13 }}>
           Tipo de nó "{no.type}" não existe na configuração carregada.
         </p>
       </aside>
@@ -70,7 +70,7 @@ export function PropertiesPanel({
   return (
     <aside data-tour="properties-panel" style={painelEstilo}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <h2 style={{ fontSize: 13, fontWeight: 700, color: "#334155", margin: 0 }}>{cfg.label}</h2>
+        <h2 style={{ fontSize: 13, fontWeight: 700, color: "var(--texto-2)", margin: 0 }}>{cfg.label}</h2>
         <ReadinessBadge nivel={prontidao.nivel} />
       </div>
 
@@ -103,16 +103,16 @@ export function PropertiesPanel({
         </button>
       )}
       {!time && (
-        <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 6 }}>
+        <p style={{ fontSize: 11, color: "var(--texto-mudo)", marginTop: 6 }}>
           Sem time definido nesta quebra (campo no topo da tela) — por isso não há sugestão de stack nem como capturar
           uma.
         </p>
       )}
 
-      <hr style={{ margin: "14px 0", border: "none", borderTop: "1px solid #e2e8f0" }} />
+      <hr style={{ margin: "14px 0", border: "none", borderTop: "1px solid var(--borda)" }} />
 
       {visiveis.length === 0 && (
-        <p style={{ color: "#94a3b8", fontSize: 12 }}>Nenhum campo aplicável (ainda).</p>
+        <p style={{ color: "var(--texto-mudo)", fontSize: 12 }}>Nenhum campo aplicável (ainda).</p>
       )}
 
       {visiveis.map((campo) => (
@@ -126,10 +126,10 @@ export function PropertiesPanel({
         />
       ))}
 
-      <hr style={{ margin: "14px 0", border: "none", borderTop: "1px solid #e2e8f0" }} />
+      <hr style={{ margin: "14px 0", border: "none", borderTop: "1px solid var(--borda)" }} />
       <button
         onClick={() => removerNo(no.id)}
-        style={{ ...statusBotaoEstilo, color: "#b91c1c", borderColor: "#fecaca" }}
+        style={{ ...statusBotaoEstilo, color: "var(--vermelho)", borderColor: "#fecaca" }}
       >
         Excluir nó
       </button>
@@ -160,13 +160,13 @@ function FieldRow({ no, campo, prontidao, quebraState, perfilDoTime }: FieldRowP
   return (
     <div style={{ marginBottom: 14 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-        <label style={{ fontSize: 12, fontWeight: 600, color: "#334155" }}>
+        <label style={{ fontSize: 12, fontWeight: 600, color: "var(--texto-2)" }}>
           {campo.label}
           {campo.required && <span style={{ color: "#ef4444" }}> *</span>}
         </label>
         {valorSpec && <ProvenanceBadge valorSpec={valorSpec} />}
       </div>
-      {campo.ajuda && <p style={{ fontSize: 11, color: "#94a3b8", margin: "2px 0 6px" }}>{campo.ajuda}</p>}
+      {campo.ajuda && <p style={{ fontSize: 11, color: "var(--texto-mudo)", margin: "2px 0 6px" }}>{campo.ajuda}</p>}
 
       {na ? (
         <div style={naBoxEstilo}>
@@ -210,7 +210,7 @@ function FieldRow({ no, campo, prontidao, quebraState, perfilDoTime }: FieldRowP
       )}
 
       {erro && (
-        <p style={{ fontSize: 11, color: "#b91c1c", marginTop: 4 }}>
+        <p style={{ fontSize: 11, color: "var(--vermelho)", marginTop: 4 }}>
           {erro.codigo === "NA_SEM_MOTIVO" ? "N/A precisa de um motivo." : "Este campo não aceita N/A."}
         </p>
       )}
@@ -357,11 +357,11 @@ function ListaControl({
 
   return (
     <div>
-      {itens.length === 0 && <p style={{ fontSize: 11, color: "#94a3b8", margin: "2px 0" }}>Nenhum item ainda.</p>}
+      {itens.length === 0 && <p style={{ fontSize: 11, color: "var(--texto-mudo)", margin: "2px 0" }}>Nenhum item ainda.</p>}
       {itens.map((item, idx) => (
         <div key={idx} style={itemListaEstilo}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <strong style={{ fontSize: 11, color: "#64748b" }}>#{idx + 1}</strong>
+            <strong style={{ fontSize: 11, color: "var(--texto-fraco)" }}>#{idx + 1}</strong>
             <button
               type="button"
               style={linkBotaoEstilo}
@@ -373,7 +373,7 @@ function ListaControl({
           </div>
           {itemSpec.map((sub) => (
             <div key={sub.key} style={{ marginTop: 4 }}>
-              <label style={{ fontSize: 11, color: "#334155", display: "block", marginBottom: 2 }}>{sub.label}</label>
+              <label style={{ fontSize: 11, color: "var(--texto-2)", display: "block", marginBottom: 2 }}>{sub.label}</label>
               <FieldControl
                 campo={sub}
                 valor={item[sub.key]}
@@ -443,7 +443,7 @@ function TextareaComExpandir({
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <strong style={{ fontSize: 13, color: "#0f172a" }}>{rotulo}</strong>
+              <strong style={{ fontSize: 13, color: "var(--texto)" }}>{rotulo}</strong>
               <button onClick={() => setExpandido(false)} style={fecharExpandidoEstilo} aria-label="Fechar">
                 ×
               </button>
@@ -466,10 +466,10 @@ function TextareaComExpandir({
 const painelEstilo: React.CSSProperties = {
   width: 320,
   flexShrink: 0,
-  borderLeft: "1px solid #e2e8f0",
+  borderLeft: "1px solid var(--borda)",
   padding: 16,
   overflowY: "auto",
-  background: "#ffffff",
+  background: "var(--painel)",
   fontFamily: "system-ui, sans-serif",
 };
 
@@ -478,7 +478,7 @@ const inputEstilo: React.CSSProperties = {
   padding: "6px 10px",
   fontSize: 13,
   borderRadius: 6,
-  border: "1px solid #cbd5e1",
+  border: "1px solid var(--borda-forte)",
   outline: "none",
   boxSizing: "border-box",
 };
@@ -487,14 +487,14 @@ const statusBotaoEstilo: React.CSSProperties = {
   fontSize: 11,
   padding: "4px 8px",
   borderRadius: 6,
-  border: "1px solid #cbd5e1",
-  background: "#f8fafc",
+  border: "1px solid var(--borda-forte)",
+  background: "var(--painel)",
   cursor: "pointer",
 };
 
 const linkBotaoEstilo: React.CSSProperties = {
   fontSize: 11,
-  color: "#4f46e5",
+  color: "#a5b4fc",
   background: "none",
   border: "none",
   cursor: "pointer",
@@ -503,18 +503,18 @@ const linkBotaoEstilo: React.CSSProperties = {
 };
 
 const itemListaEstilo: React.CSSProperties = {
-  border: "1px solid #e2e8f0",
+  border: "1px solid var(--borda)",
   borderRadius: 8,
   padding: 8,
   marginBottom: 8,
-  background: "#f8fafc",
+  background: "var(--painel)",
 };
 
 const naBoxEstilo: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  background: "#fffbeb",
+  background: "rgba(251, 191, 36, 0.10)",
   border: "1px solid #fde68a",
   borderRadius: 6,
   padding: "6px 8px",
@@ -523,8 +523,8 @@ const naBoxEstilo: React.CSSProperties = {
 const pendenteBoxEstilo: React.CSSProperties = {
   marginTop: 4,
   fontSize: 11,
-  color: "#92400e",
-  background: "#fffbeb",
+  color: "var(--amarelo)",
+  background: "rgba(251, 191, 36, 0.10)",
   border: "1px solid #fde68a",
   borderRadius: 6,
   padding: "6px 8px",
@@ -535,7 +535,7 @@ const textareaEstilo: React.CSSProperties = {
   padding: "6px 30px 6px 10px",
   fontSize: 12.5,
   borderRadius: 6,
-  border: "1px solid #cbd5e1",
+  border: "1px solid var(--borda-forte)",
   outline: "none",
   boxSizing: "border-box",
   fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
@@ -551,9 +551,9 @@ const botaoExpandirEstilo: React.CSSProperties = {
   lineHeight: 1,
   padding: "3px 5px",
   borderRadius: 4,
-  border: "1px solid #cbd5e1",
-  background: "#f8fafc",
-  color: "#64748b",
+  border: "1px solid var(--borda-forte)",
+  background: "var(--painel)",
+  color: "var(--texto-fraco)",
   cursor: "pointer",
 };
 
@@ -569,7 +569,7 @@ const overlayExpandidoEstilo: React.CSSProperties = {
 };
 
 const modalExpandidoEstilo: React.CSSProperties = {
-  background: "#ffffff",
+  background: "var(--painel)",
   borderRadius: 12,
   width: "min(640px, 100%)",
   padding: 18,
@@ -582,9 +582,9 @@ const fecharExpandidoEstilo: React.CSSProperties = {
   width: 26,
   height: 26,
   borderRadius: 6,
-  border: "1px solid #e2e8f0",
-  background: "#fff",
-  color: "#64748b",
+  border: "1px solid var(--borda)",
+  background: "var(--painel)",
+  color: "var(--texto-fraco)",
   cursor: "pointer",
 };
 
@@ -594,7 +594,7 @@ const textareaExpandidoEstilo: React.CSSProperties = {
   padding: 10,
   fontSize: 13,
   borderRadius: 8,
-  border: "1px solid #cbd5e1",
+  border: "1px solid var(--borda-forte)",
   outline: "none",
   boxSizing: "border-box",
   fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",

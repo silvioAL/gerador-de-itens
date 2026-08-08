@@ -58,8 +58,8 @@ export function SemTimeScreen({ onAceitarToken, onCriarTime, onSair, erro }: Sem
   return (
     <div style={containerEstilo}>
       <div style={cardEstilo}>
-        <strong style={{ fontSize: 15, color: "#0f172a" }}>Você ainda não pertence a nenhum time</strong>
-        <p style={{ fontSize: 12.5, color: "#64748b", marginTop: 4, marginBottom: 16 }}>
+        <strong style={{ fontSize: 15, color: "var(--texto)" }}>Você ainda não pertence a nenhum time</strong>
+        <p style={{ fontSize: 12.5, color: "var(--texto-fraco)", marginTop: 4, marginBottom: 16 }}>
           Cole aqui o link (ou só o código) do convite que alguém de um time já existente te mandou.
         </p>
 
@@ -70,7 +70,7 @@ export function SemTimeScreen({ onAceitarToken, onCriarTime, onSair, erro }: Sem
           style={inputEstilo}
         />
 
-        {erro && <p style={{ fontSize: 12, color: "#b91c1c", marginTop: 10, marginBottom: 0 }}>{erro}</p>}
+        {erro && <p style={{ fontSize: 12, color: "var(--vermelho)", marginTop: 10, marginBottom: 0 }}>{erro}</p>}
 
         <button
           onClick={() => void aceitar()}
@@ -82,11 +82,11 @@ export function SemTimeScreen({ onAceitarToken, onCriarTime, onSair, erro }: Sem
 
         <div style={separadorEstilo}>
           <div style={linhaSeparadorEstilo} />
-          <span style={{ fontSize: 11, color: "#94a3b8" }}>ou</span>
+          <span style={{ fontSize: 11, color: "var(--texto-mudo)" }}>ou</span>
           <div style={linhaSeparadorEstilo} />
         </div>
 
-        <p style={{ fontSize: 12.5, color: "#64748b", marginTop: 0, marginBottom: 8 }}>
+        <p style={{ fontSize: 12.5, color: "var(--texto-fraco)", marginTop: 0, marginBottom: 8 }}>
           Ninguém te convidou ainda? Crie um time novo — você vira o primeiro membro dele.
         </p>
         <input
@@ -95,7 +95,7 @@ export function SemTimeScreen({ onAceitarToken, onCriarTime, onSair, erro }: Sem
           placeholder="nome do time (ex.: time-pagamentos)"
           style={inputEstilo}
         />
-        {erroCriar && <p style={{ fontSize: 12, color: "#b91c1c", marginTop: 10, marginBottom: 0 }}>{erroCriar}</p>}
+        {erroCriar && <p style={{ fontSize: 12, color: "var(--vermelho)", marginTop: 10, marginBottom: 0 }}>{erroCriar}</p>}
         <button
           onClick={() => void criar()}
           disabled={!nomeTime.trim() || criando}
@@ -117,7 +117,7 @@ const containerEstilo: React.CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   height: "100vh",
-  background: "#f8fafc",
+  background: "var(--painel)",
   fontFamily: "system-ui, sans-serif",
 };
 
@@ -125,8 +125,8 @@ const cardEstilo: React.CSSProperties = {
   width: 340,
   padding: 24,
   borderRadius: 12,
-  border: "1px solid #e2e8f0",
-  background: "#fff",
+  border: "1px solid var(--borda)",
+  background: "var(--painel)",
   boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
 };
 
@@ -135,7 +135,7 @@ const inputEstilo: React.CSSProperties = {
   fontSize: 13,
   padding: "7px 10px",
   borderRadius: 6,
-  border: "1px solid #cbd5e1",
+  border: "1px solid var(--borda-forte)",
   boxSizing: "border-box",
 };
 
@@ -161,7 +161,7 @@ const separadorEstilo: React.CSSProperties = {
 const linhaSeparadorEstilo: React.CSSProperties = {
   flex: 1,
   height: 1,
-  background: "#e2e8f0",
+  background: "var(--borda)",
 };
 
 const botaoSecundarioEstilo: React.CSSProperties = {
@@ -170,9 +170,9 @@ const botaoSecundarioEstilo: React.CSSProperties = {
   fontWeight: 600,
   padding: "9px 12px",
   borderRadius: 7,
-  border: "1px solid #c7d2fe",
-  background: "#fff",
-  color: "#4f46e5",
+  border: "1px solid rgba(99, 102, 241, 0.45)",
+  background: "var(--painel)",
+  color: "#a5b4fc",
   cursor: "pointer",
 };
 
@@ -181,9 +181,9 @@ const botaoSairEstilo: React.CSSProperties = {
   fontSize: 12,
   padding: "8px 12px",
   borderRadius: 7,
-  border: "1px solid #cbd5e1",
-  background: "#fff",
-  color: "#475569",
+  border: "1px solid var(--borda-forte)",
+  background: "var(--painel)",
+  color: "var(--texto-2)",
   cursor: "pointer",
   marginTop: 10,
 };

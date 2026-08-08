@@ -92,7 +92,7 @@ export function TourOverlay({ passo, indice, total, ultimo, onProximo, onPular }
         style={{
           ...cardStyle,
           zIndex: 81,
-          background: "#fff",
+          background: "var(--painel)",
           borderRadius: 12,
           boxShadow: "0 12px 30px rgba(15, 23, 42, 0.35)",
           padding: 16,
@@ -100,11 +100,11 @@ export function TourOverlay({ passo, indice, total, ultimo, onProximo, onPular }
           fontFamily: "system-ui, sans-serif",
         }}
       >
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#4f46e5", letterSpacing: 0.3 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#a5b4fc", letterSpacing: 0.3 }}>
           PASSO {indice + 1} DE {total}
         </div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", margin: "4px 0 6px" }}>{passo.titulo}</div>
-        <p style={{ fontSize: 12.5, color: "#475569", lineHeight: 1.5, margin: 0 }}>{passo.texto}</p>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--texto)", margin: "4px 0 6px" }}>{passo.titulo}</div>
+        <p style={{ fontSize: 12.5, color: "var(--texto-2)", lineHeight: 1.5, margin: 0 }}>{passo.texto}</p>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14 }}>
           <button onClick={onPular} style={linkEstilo}>
             Pular tour
@@ -131,7 +131,7 @@ const botaoEstilo: React.CSSProperties = {
 
 const linkEstilo: React.CSSProperties = {
   fontSize: 12,
-  color: "#64748b",
+  color: "var(--texto-fraco)",
   background: "none",
   border: "none",
   cursor: "pointer",

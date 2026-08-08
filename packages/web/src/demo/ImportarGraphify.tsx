@@ -72,7 +72,7 @@ export function ImportarGraphify({ onImportar }: ImportarGraphifyProps) {
 
   return (
     <div style={{ maxWidth: 640 }}>
-      <p style={{ fontSize: 13, color: "#475569", lineHeight: 1.5, marginTop: 0 }}>
+      <p style={{ fontSize: 13, color: "var(--texto-2)", lineHeight: 1.5, marginTop: 0 }}>
         Já rodou <code>/graphify .</code> no seu projeto? Selecione o <code>graph.json</code> gerado — os arquivos
         mapeados em <code>config/graphify-mapping.json</code> viram nós <strong>existente</strong>/
         <strong>extraído</strong> no canvas. Nenhuma aresta é inferida (o grafo do Graphify descreve estrutura de
@@ -89,7 +89,7 @@ export function ImportarGraphify({ onImportar }: ImportarGraphifyProps) {
         />
       </label>
 
-      {estado.tipo === "processando" && <p style={{ fontSize: 12, color: "#64748b", marginTop: 10 }}>Lendo…</p>}
+      {estado.tipo === "processando" && <p style={{ fontSize: 12, color: "var(--texto-fraco)", marginTop: 10 }}>Lendo…</p>}
 
       {estado.tipo === "erro" && (
         <div style={avisoEstilo}>
@@ -100,11 +100,11 @@ export function ImportarGraphify({ onImportar }: ImportarGraphifyProps) {
 
       {estado.tipo === "resultado" && (
         <div style={{ marginTop: 14 }}>
-          <p style={{ fontSize: 13, color: "#0f172a" }}>
+          <p style={{ fontSize: 13, color: "var(--texto)" }}>
             <strong>{estado.resultado.nodes.length}</strong> nó(s) existente(s)/extraído(s) encontrado(s).
           </p>
           {estado.resultado.naoMapeados.length > 0 && (
-            <details style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>
+            <details style={{ fontSize: 12, color: "var(--texto-fraco)", marginTop: 6 }}>
               <summary style={{ cursor: "pointer" }}>
                 {estado.resultado.naoMapeados.length} arquivo(s) sem regra de mapeamento (não viraram nó)
               </summary>
@@ -122,7 +122,7 @@ export function ImportarGraphify({ onImportar }: ImportarGraphifyProps) {
           >
             {adicionado ? "✓ Adicionado" : "+ Adicionar ao canvas"}
           </button>
-          <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>
+          <p style={{ fontSize: 11, color: "var(--texto-mudo)", marginTop: 8 }}>
             Revise antes de derivar — nada aqui deveria virar prontidão verde sem alguém olhar.
           </p>
         </div>
@@ -149,13 +149,13 @@ const botaoAdicionarEstilo: React.CSSProperties = {
   padding: "7px 12px",
   borderRadius: 7,
   border: "1px solid #4f46e5",
-  background: "#fff",
-  color: "#4f46e5",
+  background: "var(--painel)",
+  color: "#a5b4fc",
   cursor: "pointer",
 };
 
 const avisoEstilo: React.CSSProperties = {
-  background: "#fef2f2",
+  background: "#3a1d1d",
   border: "1px solid #fecaca",
   borderRadius: 8,
   padding: "10px 12px",
