@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { Diagrama, DiagramaConfig } from "@gerador/engine";
 import { DiagramaCompacto } from "./DiagramaCompacto";
 
@@ -27,12 +27,46 @@ describe("DiagramaCompacto (Fase 1d, SPEC-23)", () => {
     expect(screen.getByText("fila-pedidos")).toBeInTheDocument();
   });
 
-  it("destaca (stroke diferente) o nó ativo — o restante fica no traço padrão", () => {
+  it("nó ativo ganha borda e halo NA COR DO PRÓPRIO TIPO, não num azul fixo (Fase E, fiel ao protótipo)", () => {
     render(<DiagramaCompacto diagrama={diagrama} config={config} noAtivoId="n2" />);
-    const ativo = screen.getByTestId("diagrama-compacto-no-n2").querySelector("rect");
+    const grupoAtivo = screen.getByTestId("diagrama-compacto-no-n2");
+    const ativo = grupoAtivo.querySelector("rect");
     const inativo = screen.getByTestId("diagrama-compacto-no-n1").querySelector("rect");
-    expect(ativo?.getAttribute("stroke")).toBe("#38bdf8");
-    expect(inativo?.getAttribute("stroke")).toBe("#334155");
+    // n2 é rabbit (#f59e0b) — a borda e o drop-shadow herdam essa cor.
+    expect(ativo?.getAttribute("stroke")).toBe("#f59e0b");
+    expect(grupoAtivo.style.filter).toContain("#f59e0b");
+    expect(inativo?.getAttribute("stroke")).toBe("#263344");
+  });
+
+  it("card mostra o TIPO do nó (e a marca EXISTENTE quando for o caso), como no protótipo", () => {
+    render(<DiagramaCompacto diagrama={diagrama} config={config} />);
+    // Escopado no card (`within`): a legenda embaixo repete os nomes dos
+    // tipos, então texto solto seria ambíguo.
+    const n1 = within(screen.getByTestId("diagrama-compacto-no-n1"));
+    expect(n1.getByText(/SERVIÇO/)).toBeInTheDocument();
+    expect(n1.getByText("EXISTENTE")).toBeInTheDocument();
+    expect(within(screen.getByTestId("diagrama-compacto-no-n2")).getByText("FILA RABBIT")).toBeInTheDocument();
+  });
+
+  it("aresta colorida pela cor do nó de origem, com o rótulo da conexão em caps no meio", () => {
+    render(<DiagramaCompacto diagrama={diagrama} config={config} />);
+    const aresta = screen.getByTestId("diagrama-aresta-e1");
+    expect(aresta.getAttribute("stroke")).toBe("#38bdf8"); // cor de n1 (service), a origem
+    expect(screen.getByText("PUBLICA")).toBeInTheDocument();
+  });
+
+  it("badge de contagem aparece só nos nós com itens derivados", () => {
+    render(<DiagramaCompacto diagrama={diagrama} config={config} contagemPorNo={{ n1: 3 }} />);
+    expect(screen.getByTestId("diagrama-contagem-n1")).toHaveTextContent("3");
+    expect(screen.queryByTestId("diagrama-contagem-n2")).not.toBeInTheDocument();
+  });
+
+  it("legenda lista cada tipo presente no diagrama (a barra de fluxo informacional do protótipo)", () => {
+    render(<DiagramaCompacto diagrama={diagrama} config={config} onClickNo={vi.fn()} />);
+    const legenda = within(screen.getByTestId("diagrama-legenda"));
+    expect(legenda.getByText("SERVIÇO")).toBeInTheDocument();
+    expect(legenda.getByText("FILA RABBIT")).toBeInTheDocument();
+    expect(screen.getByText("Clique num nó pra filtrar os itens")).toBeInTheDocument();
   });
 
   it("diagrama sem nós não quebra, cai num viewBox default", () => {
@@ -60,6 +94,6 @@ describe("DiagramaCompacto (Fase 1d, SPEC-23)", () => {
   it("com filtro ativo, o nó filtrado fica opaco e os demais esmaecidos (Fase D, SPEC-24)", () => {
     render(<DiagramaCompacto diagrama={diagrama} config={config} noFiltradoId="n1" />);
     expect(screen.getByTestId("diagrama-compacto-no-n1")).toHaveAttribute("opacity", "1");
-    expect(screen.getByTestId("diagrama-compacto-no-n2")).toHaveAttribute("opacity", "0.35");
+    expect(screen.getByTestId("diagrama-compacto-no-n2")).toHaveAttribute("opacity", "0.25");
   });
 });

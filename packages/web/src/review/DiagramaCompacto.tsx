@@ -4,8 +4,8 @@ export interface DiagramaCompactoProps {
   diagrama: Diagrama;
   config: DiagramaConfig;
   /** Id do nó em processamento agora (Fase 1d, SPEC-23) ou do item
-   * selecionado manualmente (Fase D, SPEC-24) — destacado com um anel de
-   * foco. `undefined` quando nenhum dos dois se aplica. */
+   * selecionado manualmente (Fase D, SPEC-24) — destacado com um halo da
+   * cor do próprio tipo. `undefined` quando nenhum dos dois se aplica. */
   noAtivoId?: string;
   /** Id do nó usado como filtro (Fase D, SPEC-24) — os demais nós ficam
    * esmaecidos. `undefined` quando nenhum filtro está ativo. */
@@ -13,35 +13,78 @@ export interface DiagramaCompactoProps {
   /** Clique num nó — a `ReviewScreen` decide se isso ativa/desativa o
    * filtro (segundo clique no mesmo nó limpa). */
   onClickNo?: (id: string) => void;
+  /** Itens derivados por nó — vira o badge de contagem no canto do card,
+   * como o `.cnt` do protótipo. */
+  contagemPorNo?: Record<string, number>;
 }
 
-const LARGURA_NO = 128;
-const ALTURA_NO = 44;
-const PADDING = 30;
+// Proporções do protótipo (nó 210-240×64 num palco de 1200×430): aqui a
+// largura é fixa porque as coordenadas vêm do canvas real, onde os nós têm
+// tamanho uniforme — 200×64 preserva a mesma razão largura/altura.
+const LARGURA_NO = 200;
+const ALTURA_NO = 64;
+const PADDING = 40;
+
+interface Ponto {
+  x: number;
+  y: number;
+}
+
+/** Caminho de uma aresta no estilo do protótipo: reta de borda a borda
+ * entre nós da mesma linha, curva cúbica (descendo/subindo pela vertical
+ * média) entre linhas diferentes. Devolve também o ponto médio real do
+ * caminho, onde o rótulo é ancorado. */
+function caminhoAresta(a: Ponto, b: Ponto): { d: string; meio: Ponto } {
+  if (Math.abs(a.y - b.y) < 10) {
+    const esquerda = a.x < b.x ? a : b;
+    const direita = a.x < b.x ? b : a;
+    const x1 = esquerda.x + LARGURA_NO;
+    const x2 = direita.x;
+    const y = a.y + ALTURA_NO / 2;
+    return { d: `M ${x1},${y} L ${x2},${y}`, meio: { x: (x1 + x2) / 2, y } };
+  }
+  const de = { x: a.x + LARGURA_NO / 2, y: a.y < b.y ? a.y + ALTURA_NO : a.y };
+  const ate = { x: b.x + LARGURA_NO / 2, y: a.y < b.y ? b.y : b.y + ALTURA_NO };
+  const meioY = (de.y + ate.y) / 2;
+  const d = `M ${de.x},${de.y} C ${de.x},${meioY} ${ate.x},${meioY} ${ate.x},${ate.y}`;
+  // Ponto da cúbica em t=0.5: B(0.5) = (p0 + 3·p1 + 3·p2 + p3) / 8.
+  const meio = {
+    x: (de.x + 3 * de.x + 3 * ate.x + ate.x) / 8,
+    y: (de.y + 3 * meioY + 3 * meioY + ate.y) / 8,
+  };
+  return { d, meio };
+}
 
 /**
- * Faixa de diagrama simplificada, só leitura pro propósito de edição — sem
- * zoom/pan/drag (isso já existe na versão completa, `gerarDiagramaHtml`,
- * atrás do botão "🔍 Ver diagrama completo"). Existe pra ficar sempre visível
- * durante a geração ao vivo (Fase 1d, SPEC-23), destacando o nó de verdade
- * sendo processado, e pra filtrar a lista de itens por nó via clique (Fase D,
- * SPEC-24) — não uma sequência decorativa como o protótipo de referência,
- * que anima sem IA real por trás.
+ * Faixa de diagrama fiel ao protótipo de referência (SPEC-24 Fase E —
+ * achado real: "as conexões são parecidas com as do canvas, mas coloridas
+ * e animadas... falta a animação na volta dos componentes sendo
+ * construídos, a barra do fluxo informacional abaixo do diagrama"):
+ * cards com tipo + nome + badge de contagem, arestas curvas na cor do nó
+ * de origem com rótulo da conexão, halo no nó ativo, fundo pontilhado,
+ * legenda de tipos e dica de filtro. Sem zoom/pan/drag (isso mora no
+ * diagrama completo, `gerarDiagramaHtml`) — clique filtra os itens.
  */
-export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, onClickNo }: DiagramaCompactoProps) {
+export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, onClickNo, contagemPorNo }: DiagramaCompactoProps) {
   const nos = diagrama.nodes.map((no) => ({
     id: no.id,
     label: no.label,
+    tipo: config.nodeTypes[no.type]?.label ?? no.type,
+    existente: no.status === "existente",
     x: no.x,
     y: no.y,
     cor: config.nodeTypes[no.type]?.color ?? "#64748b",
   }));
 
-  const centro = (n: { x: number; y: number }) => ({ x: n.x + LARGURA_NO / 2, y: n.y + ALTURA_NO / 2 });
   const noPorId = (id: string) => nos.find((n) => n.id === id);
 
   const arestas = diagrama.edges
-    .map((e) => ({ ...e, a: noPorId(e.source), b: noPorId(e.target), cor: config.edgeTypes[e.type]?.color ?? "#475569" }))
+    .map((e) => ({
+      ...e,
+      a: noPorId(e.source),
+      b: noPorId(e.target),
+      rotulo: (config.edgeTypes[e.type]?.label ?? e.type).toUpperCase(),
+    }))
     .filter((e): e is typeof e & { a: NonNullable<typeof e.a>; b: NonNullable<typeof e.b> } => !!e.a && !!e.b);
 
   const viewBox =
@@ -51,83 +94,225 @@ export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, on
           const minY = Math.min(...nos.map((n) => n.y));
           const maxX = Math.max(...nos.map((n) => n.x + LARGURA_NO));
           const maxY = Math.max(...nos.map((n) => n.y + ALTURA_NO));
-          return `${minX - PADDING} ${minY - PADDING} ${maxX - minX + PADDING * 2} ${maxY - minY + PADDING * 2}`;
+          // Respiro extra embaixo: a legenda flutua sobre o canto inferior
+          // esquerdo e não pode cobrir a última linha de cards.
+          return `${minX - PADDING} ${minY - PADDING} ${maxX - minX + PADDING * 2} ${maxY - minY + PADDING + 90}`;
         })()
       : "0 0 400 150";
 
+  const tiposPresentes = [...new Map(nos.map((n) => [n.tipo, n.cor])).entries()];
+
   return (
-    <svg
-      role="img"
-      aria-label="Diagrama compacto da solução"
-      viewBox={viewBox}
-      preserveAspectRatio="xMidYMid meet"
-      style={{ width: "100%", height: 150, display: "block", background: "#0C111A" }}
-    >
-      {arestas.map((e) => {
-        const p1 = centro(e.a);
-        const p2 = centro(e.b);
-        // Aresta tocando o nó ativo ganha destaque + fluxo animado (Fase E —
-        // "animação das conexões" era o gap visual mais citado em relação ao
-        // protótipo) — puramente visual, não muda o mecanismo por trás.
-        const tocaAtivo = !!noAtivoId && (e.source === noAtivoId || e.target === noAtivoId);
-        return (
-          <g key={e.id}>
-            <line
-              x1={p1.x}
-              y1={p1.y}
-              x2={p2.x}
-              y2={p2.y}
-              stroke={tocaAtivo ? "#38bdf8" : e.cor}
-              strokeWidth={tocaAtivo ? 2.2 : 1.4}
-              opacity={tocaAtivo ? 0.95 : 0.6}
-              className={tocaAtivo ? "diagrama-aresta-ativa" : undefined}
-            />
-            {tocaAtivo && (
-              <line
-                data-testid={`diagrama-cometa-${e.id}`}
-                x1={p1.x}
-                y1={p1.y}
-                x2={p2.x}
-                y2={p2.y}
+    <div style={palcoEstilo}>
+      <svg
+        role="img"
+        aria-label="Diagrama compacto da solução"
+        viewBox={viewBox}
+        preserveAspectRatio="xMidYMid meet"
+        style={{ width: "100%", height: "100%", display: "block" }}
+      >
+        <defs>
+          <pattern id="diagrama-pontos" width={26} height={26} patternUnits="userSpaceOnUse">
+            <circle cx={1} cy={1} r={1} fill="#1B2533" opacity={0.55} />
+          </pattern>
+        </defs>
+        <rect x="-5000" y="-5000" width="10000" height="10000" fill="url(#diagrama-pontos)" />
+
+        {arestas.map((e) => {
+          const { d, meio } = caminhoAresta(e.a, e.b);
+          const tocaAtivo = !!noAtivoId && (e.source === noAtivoId || e.target === noAtivoId);
+          // Cor do nó de ORIGEM, como no protótipo (a aresta "pertence" a
+          // quem inicia a comunicação).
+          const cor = e.a.cor;
+          const larguraRotulo = e.rotulo.length * 5.6 + 12;
+          return (
+            <g key={e.id}>
+              <path
+                data-testid={`diagrama-aresta-${e.id}`}
+                d={d}
                 pathLength={100}
-                stroke="#e0f2fe"
-                strokeWidth={2.6}
+                fill="none"
+                stroke={cor}
+                strokeWidth={tocaAtivo ? 2.2 : 1.5}
                 strokeLinecap="round"
-                className="diagrama-cometa"
+                opacity={tocaAtivo ? 0.95 : 0.7}
+                className={tocaAtivo ? "diagrama-aresta-ativa" : "diagrama-aresta-entrando"}
               />
-            )}
-          </g>
-        );
-      })}
-      {nos.map((n) => {
-        const ativo = n.id === noAtivoId;
-        const esmaecido = !!noFiltradoId && n.id !== noFiltradoId;
-        return (
-          <g
-            key={n.id}
-            data-testid={`diagrama-compacto-no-${n.id}`}
-            className={ativo ? "diagrama-no-ativo" : undefined}
-            onClick={onClickNo ? () => onClickNo(n.id) : undefined}
-            style={onClickNo ? { cursor: "pointer" } : undefined}
-            opacity={esmaecido ? 0.35 : 1}
-          >
-            <rect
-              x={n.x}
-              y={n.y}
-              width={LARGURA_NO}
-              height={ALTURA_NO}
-              rx={8}
-              fill="#151b28"
-              stroke={ativo ? "#38bdf8" : "#334155"}
-              strokeWidth={ativo ? 2.5 : 1.5}
-            />
-            <rect x={n.x} y={n.y} width={4} height={ALTURA_NO} fill={n.cor} rx={2} />
-            <text x={n.x + 12} y={n.y + ALTURA_NO / 2 + 4} fontSize={11} fontWeight={600} fill="#e2e8f0">
-              {n.label.length > 16 ? `${n.label.slice(0, 15)}…` : n.label}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
+              {tocaAtivo && (
+                <path
+                  data-testid={`diagrama-cometa-${e.id}`}
+                  d={d}
+                  pathLength={100}
+                  fill="none"
+                  stroke="#e0f2fe"
+                  strokeWidth={2.6}
+                  strokeLinecap="round"
+                  className="diagrama-cometa"
+                />
+              )}
+              <rect
+                x={meio.x - larguraRotulo / 2}
+                y={meio.y - 8}
+                width={larguraRotulo}
+                height={16}
+                rx={4}
+                fill="#0C111A"
+              />
+              <text x={meio.x} y={meio.y + 3.5} textAnchor="middle" style={rotuloArestaEstilo}>
+                {e.rotulo}
+              </text>
+            </g>
+          );
+        })}
+
+        {nos.map((n, i) => {
+          const ativo = n.id === noAtivoId;
+          const esmaecido = !!noFiltradoId && n.id !== noFiltradoId;
+          const contagem = contagemPorNo?.[n.id] ?? 0;
+          return (
+            <g
+              key={n.id}
+              data-testid={`diagrama-compacto-no-${n.id}`}
+              className="diagrama-no-entrando"
+              onClick={onClickNo ? () => onClickNo(n.id) : undefined}
+              style={{
+                cursor: onClickNo ? "pointer" : undefined,
+                animationDelay: `${i * 90}ms`,
+                // Halo da cor do próprio tipo, como o `.node.sel` do
+                // protótipo — não um azul fixo.
+                filter: ativo ? `drop-shadow(0 0 9px ${n.cor})` : undefined,
+              }}
+              opacity={esmaecido ? 0.25 : 1}
+            >
+              <rect
+                x={n.x}
+                y={n.y}
+                width={LARGURA_NO}
+                height={ALTURA_NO}
+                rx={10}
+                fill="#151b28"
+                stroke={ativo ? n.cor : "#263344"}
+                strokeWidth={ativo ? 1.6 : 1}
+                className={ativo ? "diagrama-no-ativo" : undefined}
+              />
+              <rect x={n.x} y={n.y + 6} width={3} height={ALTURA_NO - 12} fill={n.cor} rx={1.5} />
+              <text x={n.x + 14} y={n.y + 22} style={tipoNoEstilo} fill={n.cor}>
+                {n.tipo.toUpperCase()}
+                {n.existente && (
+                  <tspan dx={8} fill="#5C6A7E">
+                    EXISTENTE
+                  </tspan>
+                )}
+              </text>
+              <text x={n.x + 14} y={n.y + 44} style={nomeNoEstilo}>
+                {n.label.length > 24 ? `${n.label.slice(0, 23)}…` : n.label}
+              </text>
+              {contagem > 0 && (
+                <>
+                  <rect x={n.x + LARGURA_NO - 26} y={n.y + 8} width={18} height={18} rx={5} fill={`${n.cor}29`} />
+                  <text
+                    data-testid={`diagrama-contagem-${n.id}`}
+                    x={n.x + LARGURA_NO - 17}
+                    y={n.y + 21}
+                    textAnchor="middle"
+                    style={contagemEstilo}
+                    fill={n.cor}
+                  >
+                    {contagem}
+                  </text>
+                </>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+
+      {/* Barra do fluxo informacional (a `.legend` do protótipo): um traço
+          na cor de cada tipo presente no diagrama. */}
+      <div data-testid="diagrama-legenda" style={legendaEstilo}>
+        {tiposPresentes.map(([tipo, cor]) => (
+          <span key={tipo} style={legendaItemEstilo}>
+            <i style={{ ...legendaTracoEstilo, background: cor }} />
+            {tipo.toUpperCase()}
+          </span>
+        ))}
+      </div>
+      {onClickNo && <div style={dicaEstilo}>Clique num nó pra filtrar os itens</div>}
+    </div>
   );
 }
+
+const palcoEstilo: React.CSSProperties = {
+  position: "relative",
+  height: "30vh",
+  minHeight: 180,
+  flexShrink: 0,
+  borderBottom: "1px solid #1B2533",
+  background: "radial-gradient(1100px 340px at 50% -8%, rgba(56, 189, 248, 0.09), transparent 70%), #0C111A",
+  overflow: "hidden",
+};
+
+const rotuloArestaEstilo: React.CSSProperties = {
+  fontFamily: "system-ui, sans-serif",
+  fontSize: 10,
+  fontWeight: 600,
+  letterSpacing: "0.1em",
+  fill: "#5C6A7E",
+};
+
+const tipoNoEstilo: React.CSSProperties = {
+  fontFamily: "system-ui, sans-serif",
+  fontSize: 9.5,
+  fontWeight: 700,
+  letterSpacing: "0.14em",
+};
+
+const nomeNoEstilo: React.CSSProperties = {
+  fontFamily: "ui-monospace, monospace",
+  fontSize: 12.5,
+  fill: "#E8EEF8",
+};
+
+const contagemEstilo: React.CSSProperties = {
+  fontFamily: "ui-monospace, monospace",
+  fontSize: 10,
+  fontWeight: 600,
+};
+
+const legendaEstilo: React.CSSProperties = {
+  position: "absolute",
+  left: 16,
+  bottom: 10,
+  display: "flex",
+  gap: 14,
+  flexWrap: "wrap",
+  padding: "6px 11px",
+  borderRadius: 10,
+  background: "rgba(12, 17, 26, 0.7)",
+  border: "1px solid #1B2533",
+  backdropFilter: "blur(6px)",
+};
+
+const legendaItemEstilo: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  fontSize: 10,
+  fontWeight: 600,
+  letterSpacing: "0.1em",
+  color: "#8D9BB0",
+};
+
+const legendaTracoEstilo: React.CSSProperties = {
+  width: 8,
+  height: 2,
+  borderRadius: 2,
+};
+
+const dicaEstilo: React.CSSProperties = {
+  position: "absolute",
+  right: 16,
+  bottom: 12,
+  fontSize: 11.5,
+  color: "#5C6A7E",
+};

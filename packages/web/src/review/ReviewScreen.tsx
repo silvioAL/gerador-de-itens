@@ -297,6 +297,13 @@ export function ReviewScreen({
     resultado.atividades.filter((a) => a.origem.nodeId).map((a) => [a.chave, a.origem.nodeId!])
   );
 
+  // Badge de contagem por card do diagrama (o `.cnt` do protótipo): quantos
+  // itens cada nó originou — derivado da mesma origem que o filtro usa.
+  const contagemPorNo: Record<string, number> = {};
+  for (const nodeId of Object.values(chaveParaNodeId)) {
+    contagemPorNo[nodeId] = (contagemPorNo[nodeId] ?? 0) + 1;
+  }
+
   function outrosTimes(a: Atividade): string[] {
     return (a.timesEnvolvidos ?? []).filter((t) => t !== time);
   }
@@ -455,6 +462,7 @@ export function ReviewScreen({
             }
             noFiltradoId={filtroNoId ?? undefined}
             onClickNo={clicarNoDiagrama}
+            contagemPorNo={contagemPorNo}
           />
           <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
           <section data-tour="review-table" className="review-lista" style={listaEstilo}>
