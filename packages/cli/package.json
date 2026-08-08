@@ -1,6 +1,6 @@
 {
   "name": "gerador-de-itens",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "description": "Quebra técnica derivada deterministicamente de um diagrama de arquitetura — CLI local, sem servidor.",
   "license": "MIT",
   "repository": {
@@ -25,15 +25,19 @@
     "cli"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "scripts": {
     "build": "tsup && node scripts/copy-web-dist.mjs",
     "test": "vitest run",
     "lint": "eslint src"
   },
+  "dependencies": {
+    "node-llama-cpp": "^3.19.1"
+  },
   "devDependencies": {
     "@gerador/engine": "*",
+    "@gerador/llm": "*",
     "typescript": "^5.6.3",
     "tsup": "^8.3.5",
     "vitest": "^2.1.4",

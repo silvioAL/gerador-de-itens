@@ -2,7 +2,7 @@
 
 **Depende de/relacionado a:** SPEC-01 (`FieldSpec`, `ValorSpec`, proveniência), SPEC-04 (semáforo de prontidão), SPEC-17 (CLI local-first — princípio que este desenho segue), SPEC-20 (checklist de processo, `Condicao`), SPEC-21 (forms de conexão, `EdgePanel`), SPEC-22 (checklist técnico por status do nó).
 
-**Status: arquitetura registrada, implementação não iniciada.**
+**Status: Fase 0 (infra) implementada. Fases 1-5 não iniciadas.**
 
 ---
 
@@ -111,6 +111,28 @@ Registrado aqui como plano — **nenhuma fase foi implementada nesta rodada**.
 ### 6.1 Regra de processo pra cada fase: especificar antes de implementar
 
 Pedido explícito do usuário: ir gradualmente, especificando cada fluxo antes de implementar agentes/interfaces — mesma disciplina já usada na rodada do diagrama animado (protótipo/desenho validado antes de código real, SPEC-21 §3.1). Aplicado aqui: **o resumo de um parágrafo por fluxo na §4.5 não é suficiente pra começar a codar uma fase.** Antes de implementar qualquer fase do roteiro acima, a fase ganha sua própria seção de detalhe (neste documento ou numa spec-filha) cobrindo, no mínimo: forma exata dos dados de entrada/saída do LLM pra aquele fluxo (schema JSON completo, não só o nome do tipo), os pontos exatos da UI que mudam (arquivo:linha, não só o nome do componente), e o critério de "pronto" (que teste automatizado + que validação manual prova que funciona). Só depois disso o código começa — a mesma ordem que evitou retrabalho na rodada do diagrama animado.
+
+## 6.2 Fase 0 — implementada
+
+Pacote novo `packages/llm` (workspace, TS, dependência real `node-llama-cpp`) com quatro módulos:
+
+- **`modelos.ts`** — registro único dos dois modelos (`MODELO_CHAT`/`MODELO_EMBEDDING`, repositório Hugging Face + nome de arquivo GGUF Q4_K_M/Q8_0), fonte de verdade pro download e pro status.
+- **`cache.ts`** — resolve `~/.gerador/models` (`os.homedir()`, funciona nas 3 plataformas), fora do pacote npm de propósito (modelos são GB, não fazem sentido reinstalados a cada `npm install`). Aceita `baseDir` opcional só pra teste, mesmo padrão de `dirProjeto` já usado em `openApiLocal.ts`.
+- **`download.ts`** — baixa pro cache com retomada simples via `.part` (só renomeia pro nome final quando termina por completo, pra `verificarStatus()` nunca enxergar um download pela metade como "instalado"). Integridade verificada por tamanho (`Content-Length` batendo com o que foi escrito), não por hash — decisão explícita pra não hardcodar um sha256 sem forma confiável de verificá-lo nesta rodada; registrado como evolução possível, não bloqueante.
+- **`status.ts`** — `verificarStatus()` checa se os dois arquivos existem e não estão vazios, devolve `{chatInstalado, embeddingInstalado, pronto, caminhoModelos}`.
+- **`motor.ts`** — wrapper fino sobre `node-llama-cpp` (`getLlama`, `loadModel`, `createContext`/`createEmbeddingContext`, `LlamaChatSession`, `llama.createGrammarForJsonSchema` pra saída GBNF-constrained). Sem cache/singleton escondido — quem chama decide se guarda o resultado entre chamadas. Sem teste automatizado (única forma real de testar é com o binário nativo + modelo GGUF de verdade — contradiria "nunca baixar modelo real em CI"); validado manualmente.
+
+**Wiring:** `packages/cli` ganhou `gerador ia instalar`/`gerador ia status` (`commands/ia.ts`) e a rota `GET /ia/status` em `openApiLocal.ts`. `node-llama-cpp` entrou como dependência real (não dev) de `packages/cli`, e `@gerador/llm` foi adicionado ao `noExternal` do `tsup.config.ts` (mesmo motivo de `@gerador/engine`: workspace TS-fonte sem build próprio) — `node-llama-cpp` continua de fora do bundle de propósito, pra manter o binário nativo resolvível em `node_modules` de verdade.
+
+**Achado real, decisão confirmada com o usuário antes de implementar:** `node-llama-cpp` baixa binários nativos pré-compilados no `npm install` — deixa a instalação mais pesada mesmo pra quem nunca usa IA. Confirmado explicitamente: `@gerador/llm` fica como dependência direta do `packages/cli` nesta primeira versão (mais simples de implementar/testar); um pacote separado com instalação sob demanda fica registrado como opção se o peso incomodar depois — não é decisão irreversível.
+
+**Achado técnico:** `node-llama-cpp` exige Node ≥20 — `packages/cli` teve `engines.node` atualizado de `>=18` pra `>=20` (Node 18 já estava fora de suporte, bump razoável).
+
+**Validação real:** `npm install` na raiz baixou e compilou `node-llama-cpp` de verdade (binário nativo `.node` confirmado em `node_modules/@node-llama-cpp/win-x64`), `npm run build --workspace=packages/cli` produziu um `dist/cli.js` que roda e resolve `node-llama-cpp` corretamente (`gerador ia status` funcionando contra o binário real).
+
+`gerador ia instalar` de verdade encontrou dois problemas reais no caminho (nenhum deles previsível por teste com fake): a primeira tentativa foi interrompida no meio do download (terminal aberto interferindo), e a tentativa seguinte falhou com HTTP 404 no modelo de embedding — nome de arquivo errado em `modelos.ts` (`qwen3-embedding-0.6b-q8_0.gguf`, minúsculo, por analogia ao nome do modelo de chat). Consulta direta à API da Hugging Face revelou o nome real, com maiúsculas: `Qwen3-Embedding-0.6B-Q8_0.gguf`. Corrigido, documentado em comentário no código. Depois da correção, os dois modelos (~3,15GB) baixaram com sucesso e `gerador ia status` confirmou os dois instalados.
+
+Validação foi além do status: `motor.ts` (único módulo sem teste automatizado, por depender do binário nativo + modelo real) foi exercitado ponta a ponta contra os modelos de verdade — completar texto livre, completar com JSON Schema obrigatório via GBNF (saída estruturada válida), e gerar embedding (vetor de 1024 dimensões) — os três funcionaram corretamente. Regressão completa: engine 122, llm 11, web 131, cli 35.
 
 ## 7. Verificação
 

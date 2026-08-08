@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "workspaces": [
     "packages/engine",
+    "packages/llm",
     "packages/web",
     "packages/cli",
     "packages/server"
@@ -15,5 +16,8 @@
   },
   "devDependencies": {
     "typescript": "^5.6.3"
+  },
+  "allowScripts": {
+    "node-llama-cpp@3.19.1": true
   }
 }

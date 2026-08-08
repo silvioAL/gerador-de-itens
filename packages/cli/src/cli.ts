@@ -3,6 +3,7 @@ import { derive } from "./commands/derive.js";
 import { open } from "./commands/open.js";
 import { importGraphify } from "./commands/importGraphify.js";
 import { implementar } from "./commands/implementar.js";
+import { ia } from "./commands/ia.js";
 
 const AJUDA = `Uso: gerador <comando> [opções]
 
@@ -17,6 +18,8 @@ Comandos:
     --port <porta>         Padrão: 4321
   import-graphify <graph.json>   Rascunho de quebra.json a partir de um grafo já extraído pelo Graphify
     --out <arquivo>        Padrão: quebra-rascunho.json
+  ia instalar               Baixa os modelos de IA local (Qwen3-4B + embeddings) — só na primeira vez
+  ia status                 Mostra se a IA local está instalada e pronta pra uso
 `;
 
 async function main(): Promise<void> {
@@ -37,6 +40,9 @@ async function main(): Promise<void> {
       return;
     case "import-graphify":
       await importGraphify(resto);
+      return;
+    case "ia":
+      await ia(resto);
       return;
     case "help":
     case "--help":
