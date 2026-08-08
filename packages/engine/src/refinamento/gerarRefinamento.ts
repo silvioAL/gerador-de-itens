@@ -1,4 +1,4 @@
-import type { Aresta, No } from "../model/types.js";
+import type { Aresta, No, ValorSpec } from "../model/types.js";
 import type { Condicao, ItemProcesso, RegrasConfig, Requisito, TesteAutomatizado } from "../config/types.js";
 import { avaliarCondicao } from "../spec/condicoes.js";
 
@@ -29,6 +29,26 @@ function testesRelevantes(testes: TesteAutomatizado[], contextos: string[]): Tes
  * termina assim, sem exceção. Nunca remover/alterar. */
 const MARCADOR_ESPECIFICAR = "<- ✍️ especificar";
 
+/** Chave de um placeholder de checklist técnico — namespaced por tech pra
+ * nunca colidir entre techs da mesma atividade (Fase 1, SPEC-23). */
+function chaveChecklistTecnico(tech: string, texto: string): string {
+  return `${tech}::${texto}`;
+}
+
+/** Chave de um placeholder de volumetria — mesmo raciocínio, mais o campo. */
+function chaveVolumetria(tech: string, campo: string): string {
+  return `${tech}::volumetria::${campo}`;
+}
+
+/** Só entra no documento se veio de resposta humana OU de sugestão já
+ * confirmada — sugestão não confirmada fica só no painel interativo, nunca
+ * no texto final (mesma disciplina "nada sugerido conta até confirmado" de
+ * `calcularProntidao`, aplicada por convenção aqui — este texto não passa
+ * pelo cálculo de prontidão). */
+function respostaVisivel(resp: ValorSpec | undefined): resp is ValorSpec {
+  return !!resp && (resp.origem === "manual" || resp.confirmado === true);
+}
+
 /**
  * Checklist de refinamento técnico em Markdown, filtrado por techs+contextos
  * da atividade e por `when` (ver `condicaoBate`) — ex.: "definir plano de
@@ -41,7 +61,8 @@ export function gerarChecklistTecnico(
   techs: string[],
   contextos: string[],
   nos: No[],
-  arestas: Aresta[]
+  arestas: Aresta[],
+  respostas?: Record<string, ValorSpec>
 ): string {
   const blocos: string[] = [];
   for (const tech of techs) {
@@ -59,7 +80,11 @@ export function gerarChecklistTecnico(
     if (relevantes.length === 0) continue;
 
     const linhas = [`**${tech.toUpperCase()}:**`];
-    for (const r of relevantes) linhas.push(`- ${r.texto} ${MARCADOR_ESPECIFICAR}`);
+    for (const r of relevantes) {
+      const resp = respostas?.[chaveChecklistTecnico(tech, r.texto)];
+      const sufixo = respostaVisivel(resp) ? `: ${String(resp.valor)}` : "";
+      linhas.push(`- ${r.texto}${sufixo} ${MARCADOR_ESPECIFICAR}`);
+    }
     blocos.push(linhas.join("\n"));
   }
   return blocos.join("\n\n");
@@ -120,13 +145,27 @@ const CAMPOS_VOLUMETRIA = ["Response time", "Max error", "RPS (Requisições por
 /** Bloco "Requisitos de volumetria" quando alguma tech relevante o exige pro
  * conjunto de contextos da atividade — formato fixo, nunca gerado por
  * dedução (ver `RegrasPorTech.volumetria`). */
-export function gerarVolumetria(regras: RegrasConfig, techs: string[], contextos: string[]): string {
-  const aplica = techs.some((tech) => {
+export function gerarVolumetria(
+  regras: RegrasConfig,
+  techs: string[],
+  contextos: string[],
+  respostas?: Record<string, ValorSpec>
+): string {
+  const techsAplicaveis = techs.filter((tech) => {
     const volumetria = regras.porTech[tech]?.volumetria;
     return volumetria ? contextoBate(volumetria.contextos, contextos) : false;
   });
-  if (!aplica) return "";
-  return CAMPOS_VOLUMETRIA.map((campo) => `- ${campo}: ___ ${MARCADOR_ESPECIFICAR}`).join("\n");
+  if (techsAplicaveis.length === 0) return "";
+  // Achado real ao adicionar respostas: sem tech pra namespacear a chave, o
+  // bloco de volumetria seria ambíguo se duas techs da mesma atividade
+  // exigirem volumetria — usa a primeira tech aplicável, mesma convenção
+  // de "um bloco só, não um por tech" que o bloco de volumetria já tinha.
+  const tech = techsAplicaveis[0];
+  return CAMPOS_VOLUMETRIA.map((campo) => {
+    const resp = respostas?.[chaveVolumetria(tech, campo)];
+    const valor = respostaVisivel(resp) ? String(resp.valor) : "___";
+    return `- ${campo}: ${valor} ${MARCADOR_ESPECIFICAR}`;
+  }).join("\n");
 }
 
 /** Ciclos de teste automatizados (DEV/HLG) em Markdown, filtrados por techs+contextos. */
@@ -152,4 +191,55 @@ export function gerarCiclosDeTeste(regras: RegrasConfig, techs: string[], contex
     blocos.push(linhas.join("\n"));
   }
   return blocos.join("\n\n");
+}
+
+/** Um placeholder "<- ✍️ especificar" (checklist técnico ou volumetria)
+ * ainda sem resposta pra essa atividade — o que a UI mostra num painel de
+ * "sugerir com IA" e o que `gerarChecklistTecnico`/`gerarVolumetria` sabem
+ * interpolar de volta via a mesma `chave` (Fase 1, SPEC-23). */
+export interface PlaceholderRefinamento {
+  chave: string;
+  tech: string;
+  secao: "checklistTecnico" | "volumetria";
+  rotulo: string;
+}
+
+/**
+ * Enumera os placeholders aplicáveis a uma atividade — mesma filtragem
+ * (tech/contexto/`when`) que `gerarChecklistTecnico`/`gerarVolumetria` já
+ * usam pra decidir o que renderizar, extraída aqui pra não duplicar a lógica
+ * de "esse item se aplica a essa atividade" entre o texto final e o painel
+ * interativo que oferece a sugestão.
+ */
+export function listarPlaceholders(
+  regras: RegrasConfig,
+  techs: string[],
+  contextos: string[],
+  nos: No[],
+  arestas: Aresta[]
+): PlaceholderRefinamento[] {
+  const placeholders: PlaceholderRefinamento[] = [];
+
+  for (const tech of techs) {
+    const porTech = regras.porTech[tech];
+    if (!porTech) continue;
+    const relevantes = requisitosRelevantes(porTech.checklistTecnico ?? [], contextos).filter((r) =>
+      condicaoBate(r, nos, arestas)
+    );
+    for (const r of relevantes) {
+      placeholders.push({ chave: chaveChecklistTecnico(tech, r.texto), tech, secao: "checklistTecnico", rotulo: r.texto });
+    }
+  }
+
+  const techVolumetria = techs.find((tech) => {
+    const volumetria = regras.porTech[tech]?.volumetria;
+    return volumetria ? contextoBate(volumetria.contextos, contextos) : false;
+  });
+  if (techVolumetria) {
+    for (const campo of CAMPOS_VOLUMETRIA) {
+      placeholders.push({ chave: chaveVolumetria(techVolumetria, campo), tech: techVolumetria, secao: "volumetria", rotulo: campo });
+    }
+  }
+
+  return placeholders;
 }

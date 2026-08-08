@@ -1,16 +1,44 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createServer, type Server } from "node:http";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { tratarApiLocal } from "./openApiLocal.js";
+// Mockado pra /ia/sugerir não depender do binário nativo + modelo real em CI
+// (mesma disciplina de ia.test.ts) — e pra poder testar o caminho 503 (modelos
+// não instalados) de forma determinística, sem depender do estado real da
+// máquina que roda o teste.
+const verificarStatusMock = vi.fn(async () => ({
+  chatInstalado: false,
+  embeddingInstalado: false,
+  pronto: false,
+  caminhoModelos: "/fake/models",
+}));
+const carregarModeloChatMock = vi.fn(async () => ({
+  completar: vi.fn(async () => "resposta livre"),
+  completarComSchema: vi.fn(async () => ({ valor: "sugestão de teste" })),
+  descartar: vi.fn(async () => {}),
+}));
+vi.mock("@gerador/llm", async () => {
+  const real = await vi.importActual<typeof import("@gerador/llm")>("@gerador/llm");
+  return { ...real, verificarStatus: verificarStatusMock, carregarModeloChat: carregarModeloChatMock };
+});
+
+const { tratarApiLocal } = await import("./openApiLocal.js");
 
 let servidor: Server;
 let base: string;
 let dirTemp: string;
 
 beforeEach(async () => {
+  verificarStatusMock.mockClear();
+  carregarModeloChatMock.mockClear();
+  verificarStatusMock.mockResolvedValue({
+    chatInstalado: false,
+    embeddingInstalado: false,
+    pronto: false,
+    caminhoModelos: "/fake/models",
+  });
   dirTemp = mkdtempSync(join(tmpdir(), "gerador-cli-api-local-"));
   servidor = createServer((req, res) => {
     void tratarApiLocal(req, res, dirTemp).then((tratado) => {
@@ -48,10 +76,6 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
   });
 
   it("GET /ia/status devolve o mesmo formato de verificarStatus() (SPEC-23 Fase 0)", async () => {
-    // achado: a rota usa sempre o diretório real de modelos (~/.gerador/models,
-    // igual em produção) — não dá pra afirmar chatInstalado/pronto aqui, porque
-    // depende de a máquina que roda o teste já ter baixado o modelo de verdade
-    // ou não. O contrato testável é a forma da resposta, não o valor.
     const resposta = await fetch(`${base}/ia/status`);
     expect(resposta.status).toBe(200);
     const corpo = await resposta.json();
@@ -59,6 +83,42 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     expect(typeof corpo.embeddingInstalado).toBe("boolean");
     expect(typeof corpo.pronto).toBe("boolean");
     expect(typeof corpo.caminhoModelos).toBe("string");
+  });
+
+  it("POST /ia/sugerir sem modelos instalados devolve 503, não tenta carregar o modelo (Fase 1, SPEC-23)", async () => {
+    const resposta = await fetch(`${base}/ia/sugerir`, {
+      method: "POST",
+      body: JSON.stringify({ tech: "Backend", rotulo: "DLQ configurada e monitorada", contextoNo: "fila rabbitmq" }),
+    });
+    expect(resposta.status).toBe(503);
+    expect(carregarModeloChatMock).not.toHaveBeenCalled();
+  });
+
+  it("POST /ia/sugerir com modelos instalados devolve {valor} do motor, e reusa o mesmo motor entre chamadas (singleton por processo)", async () => {
+    // As duas asserções de singleton (não carrega no 503, carrega só 1x pra N
+    // chamadas de sucesso) precisam estar no MESMO teste: `motorChatSingleton`
+    // é estado de módulo, não resetado entre `it()` — testar em blocos
+    // separados dependeria da ordem de execução dos testes, frágil.
+    verificarStatusMock.mockResolvedValue({
+      chatInstalado: true,
+      embeddingInstalado: true,
+      pronto: true,
+      caminhoModelos: "/fake/models",
+    });
+
+    const primeira = await fetch(`${base}/ia/sugerir`, {
+      method: "POST",
+      body: JSON.stringify({ tech: "Backend", rotulo: "DLQ configurada e monitorada", contextoNo: "fila rabbitmq" }),
+    });
+    expect(primeira.status).toBe(200);
+    expect(await primeira.json()).toEqual({ valor: "sugestão de teste" });
+
+    await fetch(`${base}/ia/sugerir`, {
+      method: "POST",
+      body: JSON.stringify({ tech: "Backend", rotulo: "outro requisito", contextoNo: "" }),
+    });
+
+    expect(carregarModeloChatMock).toHaveBeenCalledTimes(1);
   });
 
   it("GET /quebras sem quebras/ ainda devolve lista vazia, não erro", async () => {

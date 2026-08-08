@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { TEMPLATE_ESPECIFICACAO_PADRAO, type PerfisConfig, type Quebra } from "@gerador/engine";
-import { verificarStatus } from "@gerador/llm";
+import { caminhoDoModelo, carregarModeloChat, MODELO_CHAT, verificarStatus, type MotorChat } from "@gerador/llm";
 
 const CAMPO_GLOBAL = "__global__";
 
@@ -110,6 +110,10 @@ async function comoQuebraSalva(id: string, arquivo: string) {
     titulo: quebra?.titulo ?? null,
     time: quebra?.time ?? null,
     diagrama: quebra?.diagrama ?? { nodes: [], edges: [] },
+    // Achado real: campo persistido no arquivo (JSON.stringify(quebra) grava
+    // a quebra inteira) mas nunca devolvido aqui — GET /quebras/:id nunca
+    // mostrava respostasItens salvo, mesmo já estando no disco (Fase 1, SPEC-23).
+    respostasItens: quebra?.respostasItens ?? {},
     criadoEm: info.birthtime.toISOString(),
     atualizadoEm: info.mtime.toISOString(),
   };
@@ -402,6 +406,53 @@ async function tratarEspecificacaoTemplate(req: IncomingMessage, res: ServerResp
   enviarJson(res, 404, { erro: "não encontrado" });
 }
 
+// --- POST /ia/sugerir — fluxo 3 (Fase 1, SPEC-23): sugestão de texto pra um
+// placeholder "<- ✍️ especificar" do checklist técnico/volumetria ---
+
+const SCHEMA_SUGESTAO = {
+  type: "object",
+  properties: { valor: { type: "string" } },
+  required: ["valor"],
+} as const;
+
+interface RespostaSugerida {
+  valor: string;
+}
+
+// Carrega o modelo de chat UMA VEZ por processo (lazy, no primeiro POST) —
+// não por requisição, o que custaria segundos por sugestão. Sem cache de
+// resposta entre chamadas diferentes: reiniciar `gerador open` descarrega o
+// modelo, é o único "cache" que existe aqui (mesma decisão de `motor.ts`,
+// que não guarda estado escondido — quem chama decide).
+let motorChatSingleton: Promise<MotorChat> | undefined;
+function obterMotorChat(): Promise<MotorChat> {
+  motorChatSingleton ??= carregarModeloChat(caminhoDoModelo(MODELO_CHAT));
+  return motorChatSingleton;
+}
+
+async function tratarIaSugerir(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const status = await verificarStatus();
+  if (!status.pronto) {
+    enviarJson(res, 503, { erro: "modelos de IA não instalados — rode `gerador ia instalar`" });
+    return;
+  }
+
+  const { tech, rotulo, contextoNo } = await lerCorpoJson<{ tech: string; rotulo: string; contextoNo: string }>(req);
+  const prompt = [
+    `Você ajuda a especificar um requisito técnico de refinamento de software.`,
+    `Tecnologia: ${tech}`,
+    `Requisito a especificar: "${rotulo}"`,
+    `Contexto do(s) nó(s) de arquitetura envolvidos:`,
+    contextoNo || "(sem contexto adicional)",
+    ``,
+    `Responda de forma curta, específica e em português, com uma decisão concreta pra esse requisito nesse contexto. Não repita o requisito, só a resposta.`,
+  ].join("\n");
+
+  const motor = await obterMotorChat();
+  const resultado = (await motor.completarComSchema(prompt, SCHEMA_SUGESTAO)) as RespostaSugerida;
+  enviarJson(res, 200, { valor: resultado.valor });
+}
+
 /**
  * Roteador da API local — devolve `true` se tratou a requisição (`gerador
  * open` não deve cair pro fallback de arquivo estático nesse caso), `false`
@@ -422,6 +473,10 @@ export async function tratarApiLocal(req: IncomingMessage, res: ServerResponse, 
   }
   if (caminho === "/ia/status" && metodo === "GET") {
     enviarJson(res, 200, await verificarStatus());
+    return true;
+  }
+  if (caminho === "/ia/sugerir" && metodo === "POST") {
+    await tratarIaSugerir(req, res);
     return true;
   }
   if (caminho === "/auth/me" && metodo === "GET") {

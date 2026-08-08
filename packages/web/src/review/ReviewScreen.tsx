@@ -2,14 +2,17 @@ import { useMemo, useState } from "react";
 import {
   gerarDiagramaHtml,
   gerarEspecificacaoEntrega,
+  listarPlaceholders,
+  nosDeOrigem,
   renderizarItemEspecificacao,
   type Atividade,
   type Diagrama,
   type DiagramaConfig,
   type RegrasConfig,
+  type ValorSpec,
   type ResultadoDependenciasDe,
 } from "@gerador/engine";
-import type { EspecificacaoTemplate } from "../api/client";
+import { apiIa, type EspecificacaoTemplate } from "../api/client";
 import { baixarArquivoTexto } from "../persistence/baixarArquivo";
 
 export interface ReviewScreenProps {
@@ -25,12 +28,120 @@ export interface ReviewScreenProps {
    * (achado do usuário: só aparecer no item excepcional lia como dado quebrado); usado aqui
    * só pra filtrar o que já é óbvio e destacar de verdade quando é outro time. */
   time?: string;
+  /** `quebra.respostasItens` — respostas já salvas aos placeholders de
+   * refinamento (Fase 1, SPEC-23), pra saber o que já está confirmado e não
+   * precisa mais aparecer no painel de sugestão. */
+  respostasItens?: Record<string, Record<string, ValorSpec>>;
+  onResponderItem?: (atividadeChave: string, chavePlaceholder: string, resposta: ValorSpec) => void;
   onFechar: () => void;
   onSelecionarNo: (id: string) => void;
 }
 
 function descreverDependencia(a: Atividade): string {
   return a.dependencias.map((d) => (d.alvoChave ? `${d.type}→${d.alvoChave}` : d.type)).join(", ");
+}
+
+/** Só entra no documento (via `renderizarItemEspecificacao`) resposta manual
+ * ou sugestão já confirmada — mesma régua do engine (`gerarRefinamento.ts`),
+ * repetida aqui só pra decidir o que ainda mostrar no painel de sugestão. */
+function respostaConfirmada(resp: ValorSpec | undefined): boolean {
+  return !!resp && (resp.origem === "manual" || resp.confirmado === true);
+}
+
+/** Contexto compacto do(s) nó(s) de origem da atividade, mandado ao LLM junto
+ * com o requisito — sem isso a sugestão seria genérica demais pra ser útil
+ * (Fase 1, SPEC-23). */
+function contextoDoPlaceholder(atividade: Atividade, diagrama: Diagrama, config: DiagramaConfig): string {
+  return nosDeOrigem(atividade, diagrama)
+    .map((no) => {
+      const cfg = config.nodeTypes[no.type];
+      const campos = Object.entries(no.spec)
+        .filter(([, v]) => v.valor !== undefined && v.valor !== "")
+        .map(([k, v]) => `${k}: ${String(v.valor)}`)
+        .join(", ");
+      return `${no.label} (${cfg?.label ?? no.type}, ${no.status})${campos ? ` — ${campos}` : ""}`;
+    })
+    .join(" | ");
+}
+
+interface PainelSugestoesProps {
+  atividade: Atividade;
+  diagrama: Diagrama;
+  config: DiagramaConfig;
+  regras?: RegrasConfig;
+  respostas?: Record<string, ValorSpec>;
+  onResponder?: (chavePlaceholder: string, resposta: ValorSpec) => void;
+}
+
+/**
+ * Painel dos requisitos de refinamento técnico/volumetria ainda sem resposta
+ * confirmada (fluxo 3, Fase 1, SPEC-23) — cada um pode ser respondido à mão
+ * ou via "✨ Sugerir" (chama o modelo local). Sugestão fica com
+ * `origem: "sugerido", confirmado: false` até o usuário clicar "Confirmar" —
+ * só aí ela sai deste painel e passa a aparecer no texto final (mesma
+ * disciplina de "nada sugerido conta até confirmado" já usada pro semáforo
+ * de prontidão dos campos de nó, aplicada aqui por convenção).
+ */
+function PainelSugestoes({ atividade, diagrama, config, regras, respostas, onResponder }: PainelSugestoesProps) {
+  const [rascunhos, setRascunhos] = useState<Record<string, string>>({});
+  const [carregando, setCarregando] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+
+  if (!regras) return null;
+  const nos = nosDeOrigem(atividade, diagrama);
+  const placeholders = listarPlaceholders(regras, atividade.techs, atividade.contextos, nos, diagrama.edges);
+  const pendentes = placeholders.filter((p) => !respostaConfirmada(respostas?.[p.chave]));
+  if (pendentes.length === 0) return null;
+
+  async function sugerir(chave: string, tech: string, rotulo: string) {
+    setErro(null);
+    setCarregando(chave);
+    try {
+      const { valor } = await apiIa.sugerir({ tech, rotulo, contextoNo: contextoDoPlaceholder(atividade, diagrama, config) });
+      setRascunhos((r) => ({ ...r, [chave]: valor }));
+      onResponder?.(chave, { valor, origem: "sugerido", confirmado: false });
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não foi possível gerar a sugestão.");
+    } finally {
+      setCarregando(null);
+    }
+  }
+
+  function confirmar(chave: string) {
+    const valor = rascunhos[chave] ?? respostas?.[chave]?.valor;
+    if (typeof valor !== "string" || valor.trim() === "") return;
+    onResponder?.(chave, { valor, origem: "manual" });
+  }
+
+  return (
+    <div style={painelSugestoesEstilo}>
+      <strong style={{ fontSize: 12 }}>Requisitos ainda sem resposta</strong>
+      {erro && <div style={{ fontSize: 11, color: "#b91c1c", marginTop: 4 }}>{erro}</div>}
+      {pendentes.map((p) => {
+        const respAtual = respostas?.[p.chave];
+        const valor = rascunhos[p.chave] ?? (typeof respAtual?.valor === "string" ? respAtual.valor : "");
+        return (
+          <div key={p.chave} style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 600 }}>{p.rotulo}</span>
+            <div style={{ display: "flex", gap: 6 }}>
+              <input
+                value={valor}
+                onChange={(e) => setRascunhos((r) => ({ ...r, [p.chave]: e.target.value }))}
+                placeholder="Resposta manual, ou clique em Sugerir"
+                style={{ flex: 1, fontSize: 12, padding: "4px 6px", borderRadius: 4, border: "1px solid #cbd5e1" }}
+              />
+              <button onClick={() => sugerir(p.chave, p.tech, p.rotulo)} disabled={carregando === p.chave} style={botaoEstilo}>
+                {carregando === p.chave ? "Gerando..." : "✨ Sugerir"}
+              </button>
+              <button onClick={() => confirmar(p.chave)} disabled={!valor.trim()} style={botaoEstilo}>
+                Confirmar
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 /**
@@ -53,6 +164,8 @@ export function ReviewScreen({
   especificacaoTemplate,
   demandInfo,
   time,
+  respostasItens,
+  onResponderItem,
   onFechar,
   onSelecionarNo,
 }: ReviewScreenProps) {
@@ -104,6 +217,7 @@ export function ReviewScreen({
       demandInfo,
       template: especificacaoTemplate.conteudo,
       time,
+      respostasItens,
     });
     baixarArquivoTexto(documento, "especificacao-de-solucao.md", "text/markdown");
   }
@@ -254,7 +368,17 @@ export function ReviewScreen({
                 </div>
                 {expandido && (
                   <div className="review-item-expandido">
-                    <pre style={preItemEstilo}>{renderizarItemEspecificacao(i + 1, a, diagrama, config, regras)}</pre>
+                    <pre style={preItemEstilo}>
+                      {renderizarItemEspecificacao(i + 1, a, diagrama, config, regras, respostasItens?.[a.chave])}
+                    </pre>
+                    <PainelSugestoes
+                      atividade={a}
+                      diagrama={diagrama}
+                      config={config}
+                      regras={regras}
+                      respostas={respostasItens?.[a.chave]}
+                      onResponder={(chave, resposta) => onResponderItem?.(a.chave, chave, resposta)}
+                    />
                   </div>
                 )}
               </div>
@@ -275,6 +399,14 @@ const preItemEstilo: React.CSSProperties = {
   color: "#334155",
   paddingTop: 10,
   borderTop: "1px solid #e2e8f0",
+};
+
+const painelSugestoesEstilo: React.CSSProperties = {
+  marginTop: 10,
+  padding: "8px 10px",
+  borderRadius: 8,
+  background: "#fffbeb",
+  border: "1px solid #fde68a",
 };
 
 const botaoEstilo: React.CSSProperties = {

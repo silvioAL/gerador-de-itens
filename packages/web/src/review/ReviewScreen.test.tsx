@@ -16,6 +16,12 @@ import type { EspecificacaoTemplate } from "../api/client";
 const baixarArquivoTextoMock = vi.hoisted(() => vi.fn());
 vi.mock("../persistence/baixarArquivo", () => ({ baixarArquivoTexto: baixarArquivoTextoMock }));
 
+// Mockado pra não depender do modelo real (mesma disciplina do resto do
+// projeto) — testa só o contrato: o que o painel manda pra apiIa.sugerir e o
+// que faz com a resposta (Fase 1, SPEC-23).
+const apiIaSugerirMock = vi.hoisted(() => vi.fn());
+vi.mock("../api/client", () => ({ apiIa: { sugerir: apiIaSugerirMock } }));
+
 interface Fixture01 {
   quebra: { diagrama: Diagrama };
 }
@@ -353,5 +359,141 @@ describe("ReviewScreen — ciclo detectado", () => {
 
     expect(screen.getByText("Não é possível derivar ainda")).toBeInTheDocument();
     expect(screen.getByText(/Ciclo:/)).toBeInTheDocument();
+  });
+});
+
+describe("ReviewScreen — painel de sugestões IA (Fase 1, SPEC-23)", () => {
+  const regras: RegrasConfig = {
+    tipos: [],
+    tamanhos: [],
+    porTech: {
+      Backend: {
+        checklistTecnico: [{ texto: "DLQ configurada e monitorada", contextos: ["Backend-mensagens"] }],
+        testes: [],
+      },
+    },
+  };
+
+  function atividadeComPlaceholder(resultado: ReturnType<typeof resultadoFixture01>) {
+    return resultado.atividades.find(
+      (a) => a.techs.includes("Backend") && a.contextos.some((c) => c.includes("Backend-mensagens"))
+    )!;
+  }
+
+  it("painel lista o requisito sem resposta, com botão de sugerir", async () => {
+    const resultado = resultadoFixture01();
+    const atividade = atividadeComPlaceholder(resultado);
+    const user = userEvent.setup();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        regras={regras}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: `expandir ${atividade.rotulo}` }));
+
+    expect(screen.getByText("Requisitos ainda sem resposta")).toBeInTheDocument();
+    expect(screen.getByText("DLQ configurada e monitorada")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "✨ Sugerir" })).toBeInTheDocument();
+  });
+
+  it("clicar Sugerir chama apiIa.sugerir com o contexto do nó, preenche o campo e avisa via onResponderItem (sugerido, não confirmado)", async () => {
+    apiIaSugerirMock.mockResolvedValueOnce({ valor: "sim, via política X no tópico Y" });
+    const resultado = resultadoFixture01();
+    const atividade = atividadeComPlaceholder(resultado);
+    const onResponderItem = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        regras={regras}
+        especificacaoTemplate={templateFixture}
+        onResponderItem={onResponderItem}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: `expandir ${atividade.rotulo}` }));
+    await user.click(screen.getByRole("button", { name: "✨ Sugerir" }));
+
+    expect(apiIaSugerirMock).toHaveBeenCalledWith(
+      expect.objectContaining({ tech: "Backend", rotulo: "DLQ configurada e monitorada" })
+    );
+    expect(await screen.findByDisplayValue("sim, via política X no tópico Y")).toBeInTheDocument();
+    expect(onResponderItem).toHaveBeenCalledWith(
+      atividade.chave,
+      "Backend::DLQ configurada e monitorada",
+      { valor: "sim, via política X no tópico Y", origem: "sugerido", confirmado: false }
+    );
+  });
+
+  it("clicar Confirmar chama onResponderItem com origem manual", async () => {
+    const resultado = resultadoFixture01();
+    const atividade = atividadeComPlaceholder(resultado);
+    const onResponderItem = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        regras={regras}
+        especificacaoTemplate={templateFixture}
+        onResponderItem={onResponderItem}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: `expandir ${atividade.rotulo}` }));
+    await user.type(screen.getByPlaceholderText("Resposta manual, ou clique em Sugerir"), "sim, via TTL de 7 dias");
+    await user.click(screen.getByRole("button", { name: "Confirmar" }));
+
+    expect(onResponderItem).toHaveBeenCalledWith(
+      atividade.chave,
+      "Backend::DLQ configurada e monitorada",
+      { valor: "sim, via TTL de 7 dias", origem: "manual" }
+    );
+  });
+
+  it("achado real: resposta já confirmada some do painel — não pede sugestão pra algo já respondido", async () => {
+    const resultado = resultadoFixture01();
+    const atividade = atividadeComPlaceholder(resultado);
+    const user = userEvent.setup();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        regras={regras}
+        especificacaoTemplate={templateFixture}
+        respostasItens={{
+          [atividade.chave]: {
+            "Backend::DLQ configurada e monitorada": { valor: "sim, via TTL de 7 dias", origem: "manual" },
+          },
+        }}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: `expandir ${atividade.rotulo}` }));
+
+    expect(screen.queryByText("Requisitos ainda sem resposta")).not.toBeInTheDocument();
+    const card = screen.getByTestId(`item-${atividade.chave}`);
+    expect(within(card).getByText(/sim, via TTL de 7 dias/)).toBeInTheDocument();
   });
 });

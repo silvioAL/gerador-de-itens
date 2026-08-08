@@ -213,7 +213,8 @@ export function renderizarItemEspecificacao(
   atividade: Atividade,
   diagrama: Diagrama,
   config: DiagramaConfig,
-  regras?: RegrasConfig
+  regras?: RegrasConfig,
+  respostas?: Record<string, ValorSpec>
 ): string {
   const nos = nosDeOrigem(atividade, diagrama);
   const especificacaoTecnica =
@@ -221,13 +222,15 @@ export function renderizarItemEspecificacao(
       ? nos.map((no) => descreverEspecificacaoNo(no, config, diagrama.edges)).join("\n\n")
       : "_Nenhum nó de origem associado a esta atividade._";
 
-  const checklist = regras ? gerarChecklistTecnico(regras, atividade.techs, atividade.contextos, nos, diagrama.edges) : "";
+  const checklist = regras
+    ? gerarChecklistTecnico(regras, atividade.techs, atividade.contextos, nos, diagrama.edges, respostas)
+    : "";
   const ciclosTeste = regras ? gerarCiclosDeTeste(regras, atividade.techs, atividade.contextos) : "";
   const refinamentoTecnico =
     [checklist, ciclosTeste ? `**Ciclos de teste:**\n\n${ciclosTeste}` : ""].filter((b) => b.length > 0).join("\n\n") ||
     "_Nenhum requisito técnico específico para esta combinação de tech/contexto._";
 
-  const volumetria = regras ? gerarVolumetria(regras, atividade.techs, atividade.contextos) : "";
+  const volumetria = regras ? gerarVolumetria(regras, atividade.techs, atividade.contextos, respostas) : "";
   const checklistProcesso = regras
     ? gerarChecklistProcesso(regras, atividade.techs, atividade.contextos, nos, diagrama.edges)
     : "";
@@ -270,6 +273,10 @@ export interface OpcoesGerarEspecificacao {
    * por padrão desde a derivação; sem isso, a seção sempre listaria o próprio
    * time da quebra, redundante). */
   time?: string;
+  /** `quebra.respostasItens` — respostas (humanas ou IA confirmada) aos
+   * placeholders "<- ✍️ especificar" de cada atividade, chaveadas por
+   * `Atividade.chave` (Fase 1, SPEC-23). */
+  respostasItens?: Record<string, Record<string, ValorSpec>>;
 }
 
 /**
@@ -306,7 +313,11 @@ export function gerarEspecificacaoEntrega(
 
   const itens =
     atividades.length > 0
-      ? atividades.map((a, i) => renderizarItemEspecificacao(i + 1, a, diagrama, config, opcoes.regras)).join("\n\n---\n\n")
+      ? atividades
+          .map((a, i) =>
+            renderizarItemEspecificacao(i + 1, a, diagrama, config, opcoes.regras, opcoes.respostasItens?.[a.chave])
+          )
+          .join("\n\n---\n\n")
       : "_Nenhum item nesta quebra._";
 
   // DoR/DoD são contextuais (achado do usuário, SPEC-14 §5) — o motor
