@@ -198,6 +198,81 @@ describe("ReviewScreen — fixture 01 (sem ciclos/conflitos)", () => {
   });
 });
 
+describe("ReviewScreen — filtro por nó no diagrama compacto (Fase D, SPEC-24)", () => {
+  it("clicar num nó filtra a lista pros itens daquele nó só; segundo clique limpa o filtro", async () => {
+    const resultado = resultadoFixture01();
+    const user = userEvent.setup();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    // n2 (a fila) só tem uma atividade própria: n2::criacao.
+    await user.click(screen.getByTestId("diagrama-compacto-no-n2"));
+
+    expect(screen.getByTestId("item-n2::criacao")).toBeInTheDocument();
+    expect(screen.queryByTestId("item-n1::setup")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("item-e1::publish")).not.toBeInTheDocument();
+    expect(screen.getByTestId("contagem-itens").textContent).toContain("1 de 6 itens");
+
+    await user.click(screen.getByTestId("diagrama-compacto-no-n2"));
+
+    expect(screen.getByTestId("item-n1::setup")).toBeInTheDocument();
+    expect(screen.getByTestId("contagem-itens").textContent).toBe(`${resultado.atividades.length} itens`);
+  });
+
+  it("botão '× limpar filtro' também limpa, sem precisar clicar de novo no nó", async () => {
+    const resultado = resultadoFixture01();
+    const user = userEvent.setup();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByTestId("diagrama-compacto-no-n2"));
+    await user.click(screen.getByRole("button", { name: /limpar filtro/ }));
+
+    expect(screen.getByTestId("item-n1::setup")).toBeInTheDocument();
+    expect(screen.getByTestId("contagem-itens").textContent).toBe(`${resultado.atividades.length} itens`);
+  });
+
+  it("selecionar um item destaca o nó correspondente no diagrama compacto", async () => {
+    const resultado = resultadoFixture01();
+    const user = userEvent.setup();
+    const atividadeDoN3 = resultado.atividades.find((a) => a.origem.nodeId === "n3")!;
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByTestId(`item-${atividadeDoN3.chave}`));
+
+    const noAtivo = screen.getByTestId("diagrama-compacto-no-n3").querySelector("rect");
+    expect(noAtivo?.getAttribute("stroke")).toBe("#38bdf8");
+  });
+});
+
 describe("ReviewScreen — abas da ficha (Fase 1d-i, SPEC-23 — dado estruturado, montarFichaItem)", () => {
   const regras: RegrasConfig = {
     tipos: ["História", "Task", "Débito Técnico"],

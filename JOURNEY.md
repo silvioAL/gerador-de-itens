@@ -989,3 +989,17 @@ Achado real durante os testes do hook: um teste que verificava o handoff PO→Ar
 Regressão completa: engine 145, cli 45 (-3 dos testes obsoletos de `/ia/sugerir-item` removidos, +6 da rota nova), web 162 (+2, hook novo com 7 testes próprios substituindo os 8 do hook antigo removido — net -1 mas cobertura equivalente), llm 11. Build/lint limpos nos quatro pacotes tocados.
 
 Próximo passo do roteiro: Fase D (canvas somente-leitura com filtro por nó) e Fase E (funil unificado de proposta, absorvendo a 1e do SPEC-23) — ainda sem pedido explícito do usuário pra seguir, aguardando.
+
+## 71. SPEC-24 Fase D: canvas somente-leitura com filtro por nó
+
+Usuário deu "pode seguir" pra continuar o roteiro; no meio da implementação, fez uma ressalva importante mas já coberta: "eu já disse que o funil é configurável, pode escolher e configurar os agentes e ordem, criar agentes contextuais, etc" — reafirmando o que já está registrado em SPEC-24 §4.6 como Fase F (prompts/ordem/agentes contextuais editáveis via canvas em Configurações). Fase D não toca nisso — é só filtro de visualização na tela de revisão, ortogonal à configurabilidade do pipeline.
+
+Implementação: `DiagramaCompacto.tsx` ganhou duas props novas e opcionais, `onClickNo`/`noFiltradoId` — clique num `<g>` de nó dispara o callback; nós fora do filtro ficam com `opacity: 0.35`. `ReviewScreen.tsx` ganhou estado `filtroNoId`: clique num nó do diagrama filtra `resultado.atividades` (reusando `chaveParaNodeId`, já existente desde a Fase 1d) pra só os itens daquele nó; segundo clique no mesmo nó limpa (toggle); um indicador textual "N de M itens · rótulo do nó" com botão "× limpar filtro" complementa o toggle por clique, pra não depender de acertar o mesmo nó de novo. `noAtivoId` (que já destacava o nó em geração da esteira) ganhou um segundo uso: fora da esteira rodando, destaca o nó do item selecionado manualmente na lista — reaproveitamento direto do mecanismo existente, sem estado novo, exatamente como o §4.5 da spec previa.
+
+Testes novos: `DiagramaCompacto.test.tsx` (clique chama `onClickNo`, opacidade correta com/sem filtro) e `ReviewScreen.test.tsx` (filtro reduz a lista e o segundo clique restaura, botão "limpar filtro" funciona, seleção de item destaca o nó). Usei `data-testid="contagem-itens"` no indicador pra evitar a mesma armadilha de matching de texto ambíguo já corrigida na rodada anterior (texto quebrado por múltiplos nós/filhos faz `getByText` casar mais de um elemento).
+
+Validação real: rebuild do CLI local, `gerador open` com o modelo Qwen3-4B já instalado nesta máquina (a esteira dispara sozinha), cenário "Mensageria RabbitMQ" (4 nós, 6 itens). Script Playwright clicou no último nó do diagrama compacto (`srv-antifraude`): lista caiu de 6 pra 1 item, os outros 3 nós ficaram visivelmente esmaecidos no screenshot, o nó filtrado manteve opacidade plena. Segundo clique restaurou os 6 itens. Confirmado que o filtro convive sem conflito com a esteira rodando ao vivo (handoff na fase bar continuou normal durante o teste) — não é um modo exclusivo.
+
+Regressão completa: engine 145, web 167 (+5: 2 no `DiagramaCompacto`, 3 no `ReviewScreen`), cli 45, llm 11 (server segue precisando de Postgres local pra rodar, falha pré-existente e não relacionada a esta rodada).
+
+Próximo passo do roteiro: Fase E (funil unificado de proposta, absorvendo a 1e do SPEC-23) — ainda sem pedido explícito do usuário pra seguir, aguardando.

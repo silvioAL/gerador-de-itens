@@ -3,9 +3,16 @@ import type { Diagrama, DiagramaConfig } from "@gerador/engine";
 export interface DiagramaCompactoProps {
   diagrama: Diagrama;
   config: DiagramaConfig;
-  /** Id do nó em processamento agora (Fase 1d, SPEC-23) — destacado com um
-   * anel de foco. `undefined` quando a geração não está rodando. */
+  /** Id do nó em processamento agora (Fase 1d, SPEC-23) ou do item
+   * selecionado manualmente (Fase D, SPEC-24) — destacado com um anel de
+   * foco. `undefined` quando nenhum dos dois se aplica. */
   noAtivoId?: string;
+  /** Id do nó usado como filtro (Fase D, SPEC-24) — os demais nós ficam
+   * esmaecidos. `undefined` quando nenhum filtro está ativo. */
+  noFiltradoId?: string;
+  /** Clique num nó — a `ReviewScreen` decide se isso ativa/desativa o
+   * filtro (segundo clique no mesmo nó limpa). */
+  onClickNo?: (id: string) => void;
 }
 
 const LARGURA_NO = 128;
@@ -13,14 +20,15 @@ const ALTURA_NO = 44;
 const PADDING = 30;
 
 /**
- * Faixa de diagrama simplificada, só leitura — sem zoom/pan/clique (isso já
- * existe na versão completa, `gerarDiagramaHtml`, atrás do botão "🔍 Ver
- * diagrama completo"). Existe só pra ficar sempre visível durante a geração
- * ao vivo (Fase 1d, SPEC-23) e destacar o nó de verdade sendo processado —
- * não uma sequência decorativa como o protótipo de referência, que anima sem
- * IA real por trás.
+ * Faixa de diagrama simplificada, só leitura pro propósito de edição — sem
+ * zoom/pan/drag (isso já existe na versão completa, `gerarDiagramaHtml`,
+ * atrás do botão "🔍 Ver diagrama completo"). Existe pra ficar sempre visível
+ * durante a geração ao vivo (Fase 1d, SPEC-23), destacando o nó de verdade
+ * sendo processado, e pra filtrar a lista de itens por nó via clique (Fase D,
+ * SPEC-24) — não uma sequência decorativa como o protótipo de referência,
+ * que anima sem IA real por trás.
  */
-export function DiagramaCompacto({ diagrama, config, noAtivoId }: DiagramaCompactoProps) {
+export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, onClickNo }: DiagramaCompactoProps) {
   const nos = diagrama.nodes.map((no) => ({
     id: no.id,
     label: no.label,
@@ -73,8 +81,15 @@ export function DiagramaCompacto({ diagrama, config, noAtivoId }: DiagramaCompac
       })}
       {nos.map((n) => {
         const ativo = n.id === noAtivoId;
+        const esmaecido = !!noFiltradoId && n.id !== noFiltradoId;
         return (
-          <g key={n.id} data-testid={`diagrama-compacto-no-${n.id}`}>
+          <g
+            key={n.id}
+            data-testid={`diagrama-compacto-no-${n.id}`}
+            onClick={onClickNo ? () => onClickNo(n.id) : undefined}
+            style={onClickNo ? { cursor: "pointer" } : undefined}
+            opacity={esmaecido ? 0.35 : 1}
+          >
             <rect
               x={n.x}
               y={n.y}

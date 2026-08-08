@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { Diagrama, DiagramaConfig } from "@gerador/engine";
 import { DiagramaCompacto } from "./DiagramaCompacto";
 
@@ -38,5 +38,18 @@ describe("DiagramaCompacto (Fase 1d, SPEC-23)", () => {
   it("diagrama sem nós não quebra, cai num viewBox default", () => {
     render(<DiagramaCompacto diagrama={{ nodes: [], edges: [] }} config={config} />);
     expect(screen.getByRole("img", { name: "Diagrama compacto da solução" })).toBeInTheDocument();
+  });
+
+  it("clique num nó chama onClickNo com o id do nó (Fase D, SPEC-24)", () => {
+    const onClickNo = vi.fn();
+    render(<DiagramaCompacto diagrama={diagrama} config={config} onClickNo={onClickNo} />);
+    fireEvent.click(screen.getByTestId("diagrama-compacto-no-n1"));
+    expect(onClickNo).toHaveBeenCalledWith("n1");
+  });
+
+  it("com filtro ativo, o nó filtrado fica opaco e os demais esmaecidos (Fase D, SPEC-24)", () => {
+    render(<DiagramaCompacto diagrama={diagrama} config={config} noFiltradoId="n1" />);
+    expect(screen.getByTestId("diagrama-compacto-no-n1")).toHaveAttribute("opacity", "1");
+    expect(screen.getByTestId("diagrama-compacto-no-n2")).toHaveAttribute("opacity", "0.35");
   });
 });
