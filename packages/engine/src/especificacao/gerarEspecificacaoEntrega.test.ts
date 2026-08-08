@@ -7,6 +7,9 @@ import {
   extrairVariaveis,
   validarTemplate,
   TEMPLATE_ESPECIFICACAO_PADRAO,
+  estruturarEspecificacaoNo,
+  montarFichaItem,
+  nosDeOrigem,
 } from "./gerarEspecificacaoEntrega.js";
 
 const config: DiagramaConfig = {
@@ -341,6 +344,103 @@ describe("campo tipo lista (ex.: Endpoints) na especificação técnica", () => 
     const doc = gerarEspecificacaoEntrega(atividades, diagrama, configComLista);
 
     expect(doc).not.toMatch(/\| Endpoints \|/);
+  });
+});
+
+describe("estruturarEspecificacaoNo / montarFichaItem (Fase 1a, SPEC-23 — dado estruturado por atividade)", () => {
+  it("estruturarEspecificacaoNo: campo escalar preenchido e campo N/A, tipoConhecido true", () => {
+    const diagrama = diagramaBase();
+    const ficha = estruturarEspecificacaoNo(diagrama.nodes[0], config, diagrama.edges);
+
+    expect(ficha.tipoConhecido).toBe(true);
+    expect(ficha.label).toBe("srv-catalogo");
+    expect(ficha.tipoLabel).toBe("Serviço");
+    expect(ficha.status).toBe("novo");
+
+    const nome = ficha.camposEscalares.find((c) => c.key === "nome")!;
+    expect(nome).toEqual({ key: "nome", label: "Nome do serviço", valor: "srv-catalogo", origem: "manual", na: undefined });
+
+    const linguagem = ficha.camposEscalares.find((c) => c.key === "linguagem")!;
+    expect(linguagem.na).toBe("ainda não decidido");
+  });
+
+  it("estruturarEspecificacaoNo: tipo de nó desconhecido — tipoConhecido false, campos vazios (nunca lança)", () => {
+    const no = { ...diagramaBase().nodes[0], type: "tipo-nao-existe" };
+    const ficha = estruturarEspecificacaoNo(no, config, []);
+
+    expect(ficha.tipoConhecido).toBe(false);
+    expect(ficha.tipoLabel).toBe("tipo-nao-existe");
+    expect(ficha.camposEscalares).toEqual([]);
+    expect(ficha.camposLista).toEqual([]);
+  });
+
+  it("estruturarEspecificacaoNo: campo tipo lista guarda os itens brutos, não texto pré-formatado", () => {
+    const configComLista: DiagramaConfig = {
+      nodeTypes: {
+        service: {
+          label: "Serviço", derives: "service", techs: ["Backend"], contextos: [],
+          spec: [{
+            key: "endpoints", label: "Endpoints", type: "lista", required: false, permiteNA: true,
+            itemSpec: [{ key: "method", label: "Method", type: "text" }],
+          }],
+        },
+      },
+      edgeTypes: {}, edgeRules: {},
+    };
+    const no = {
+      id: "n1", type: "service", status: "novo" as const, label: "srv-x", x: 0, y: 0,
+      spec: { endpoints: { valor: [{ method: "GET" }, { method: "POST" }], origem: "manual" as const } },
+      specNA: {},
+    };
+    const ficha = estruturarEspecificacaoNo(no, configComLista, []);
+
+    expect(ficha.camposLista).toHaveLength(1);
+    expect(ficha.camposLista[0].itens).toEqual([{ method: "GET" }, { method: "POST" }]);
+    expect(ficha.camposLista[0].itemSpec).toEqual([{ key: "method", label: "Method", type: "text" }]);
+  });
+
+  it("montarFichaItem: agrega os nós de origem estruturados + checklist técnico/volumetria via listarPlaceholders, sem resposta", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+    const criacaoMongo = atividades.find((a) => a.chave.startsWith("n2"))!;
+
+    const ficha = montarFichaItem(1, criacaoMongo, diagrama, config, regras);
+
+    expect(ficha.chave).toBe(criacaoMongo.chave);
+    expect(ficha.especificacaoTecnica.map((n) => n.noId)).toEqual(
+      nosDeOrigem(criacaoMongo, diagrama).map((n) => n.id)
+    );
+    expect(ficha.checklistTecnico).toEqual([
+      { chave: "Backend::Logs relevantes emitidos", tech: "Backend", rotulo: "Logs relevantes emitidos", resposta: undefined },
+    ]);
+    expect(ficha.volumetria.map((v) => v.rotulo)).toEqual([
+      "Response time", "Max error", "RPS (Requisições por segundo)", "Test duration",
+    ]);
+  });
+
+  it("montarFichaItem: resposta confirmada aparece anexada ao placeholder certo", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+    const criacaoMongo = atividades.find((a) => a.chave.startsWith("n2"))!;
+    const resposta = { valor: "sim, via Winston", origem: "manual" as const };
+
+    const ficha = montarFichaItem(1, criacaoMongo, diagrama, config, regras, {
+      "Backend::Logs relevantes emitidos": resposta,
+    });
+
+    expect(ficha.checklistTecnico[0].resposta).toEqual(resposta);
+  });
+
+  it("montarFichaItem: sem regras, checklist/volumetria ficam vazios e os campos markdown-only ficam vazios (nunca lança)", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+    const ficha = montarFichaItem(1, atividades[0], diagrama, config);
+
+    expect(ficha.checklistTecnico).toEqual([]);
+    expect(ficha.volumetria).toEqual([]);
+    expect(ficha.checklistProcessoMarkdown).toBe("");
+    expect(ficha.ciclosTesteMarkdown).toBe("");
+    expect(ficha.criteriosAceiteMarkdown).not.toBe("");
   });
 });
 
