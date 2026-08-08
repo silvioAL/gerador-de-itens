@@ -17,6 +17,10 @@ export {
   gerarCiclosDeTeste,
   gerarVolumetria,
   listarPlaceholders,
+  respostaVisivel,
+  CHAVE_HISTORIA_USUARIO,
+  CHAVE_CRITERIOS_ACEITE,
+  MARCADOR_ESPECIFICAR,
   type PlaceholderRefinamento,
 } from "./refinamento/gerarRefinamento.js";
 export {

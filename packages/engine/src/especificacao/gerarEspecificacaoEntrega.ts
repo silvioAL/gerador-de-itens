@@ -2,11 +2,16 @@ import type { Atividade, Aresta, Diagrama, No, Origem, StatusNo, ValorSpec } fro
 import type { DiagramaConfig, FieldSpec, RegrasConfig } from "../config/types.js";
 import { camposVisiveis } from "../spec/campos.js";
 import {
+  CHAVE_CRITERIOS_ACEITE,
+  CHAVE_HISTORIA_USUARIO,
+  MARCADOR_ESPECIFICAR,
   gerarChecklistProcesso,
   gerarChecklistTecnico,
   gerarCiclosDeTeste,
   gerarVolumetria,
   listarPlaceholders,
+  respostaVisivel,
+  type PlaceholderRefinamento,
 } from "../refinamento/gerarRefinamento.js";
 
 function nodeById(diagrama: Diagrama, id: string): No | undefined {
@@ -312,12 +317,25 @@ export function renderizarItemEspecificacao(
 
   const criteriosAceite = resolverCenarioGherkin(atividade, diagrama, config);
 
+  // Fase 1d-ii, SPEC-23: os dois únicos campos que a IA sempre pode escrever
+  // pra qualquer item, independente de `regras` — história de usuário real
+  // (não a frase mecânica de `atividade.descricao`) e cenários de teste
+  // contextuais além do scaffold determinístico.
+  const historiaResp = respostas?.[CHAVE_HISTORIA_USUARIO];
+  const historiaUsuario = respostaVisivel(historiaResp) ? String(historiaResp.valor) : `_(sem história definida)_ ${MARCADOR_ESPECIFICAR}`;
+  const criteriosContextuaisResp = respostas?.[CHAVE_CRITERIOS_ACEITE];
+  const criteriosContextuais = respostaVisivel(criteriosContextuaisResp) ? String(criteriosContextuaisResp.valor) : undefined;
+
   return [
     `### ${numero}. ${atividade.rotulo} — ${atividade.descricao}`,
     "",
     `**Tipo:** ${atividade.tipo} · **Tamanho:** ${atividade.tamanho}`,
     `**Techs:** ${atividade.techs.join(", ") || "—"} · **Contextos:** ${atividade.contextos.join(", ") || "—"}`,
     `**Dependências:** ${descreverDependencias(atividade)}`,
+    "",
+    "#### História de usuário",
+    "",
+    historiaUsuario,
     "",
     "#### Especificação técnica",
     "",
@@ -332,6 +350,7 @@ export function renderizarItemEspecificacao(
     "#### Critérios de aceite (Gherkin)",
     "",
     criteriosAceite,
+    ...(criteriosContextuais ? ["", "_Cenários adicionais (contextuais):_", "", criteriosContextuais] : []),
   ].join("\n");
 }
 
@@ -369,6 +388,11 @@ export interface FichaItem {
   dependencias: Atividade["dependencias"];
   timesEnvolvidos?: string[];
   especificacaoTecnica: FichaEspecificacaoNo[];
+  /** Fase 1d-ii, SPEC-23 — sempre presente (independente de `regras`), pra
+   * cobrir o pedido original: a IA escreve a história do item, não só
+   * responde checklist técnico. */
+  historiaUsuario: FichaPlaceholder;
+  criteriosAceiteContextual: FichaPlaceholder;
   checklistTecnico: FichaPlaceholder[];
   volumetria: FichaPlaceholder[];
   checklistProcessoMarkdown: string;
@@ -394,10 +418,18 @@ export function montarFichaItem(
   const nos = nosDeOrigem(atividade, diagrama);
   const especificacaoTecnica = nos.map((no) => estruturarEspecificacaoNo(no, config, diagrama.edges));
 
-  const placeholders = regras
-    ? listarPlaceholders(regras, atividade.techs, atividade.contextos, nos, diagrama.edges)
-    : [];
-  const paraFicha = (secao: "checklistTecnico" | "volumetria"): FichaPlaceholder[] =>
+  // `regras` opcional na assinatura pública, mas história/critérios de
+  // aceite sempre existem (Fase 1d-ii, SPEC-23) — `listarPlaceholders` já
+  // trata `porTech[tech]` ausente sem erro, então um `RegrasConfig` vazio
+  // basta pra só obter os 2 placeholders fixos quando não há `regras` real.
+  const placeholders = listarPlaceholders(
+    regras ?? { tipos: [], tamanhos: [], porTech: {} },
+    atividade.techs,
+    atividade.contextos,
+    nos,
+    diagrama.edges
+  );
+  const paraFicha = (secao: PlaceholderRefinamento["secao"]): FichaPlaceholder[] =>
     placeholders
       .filter((p) => p.secao === secao)
       .map((p) => ({ chave: p.chave, tech: p.tech, rotulo: p.rotulo, resposta: respostas?.[p.chave] }));
@@ -414,6 +446,8 @@ export function montarFichaItem(
     dependencias: atividade.dependencias,
     timesEnvolvidos: atividade.timesEnvolvidos,
     especificacaoTecnica,
+    historiaUsuario: paraFicha("historiaUsuario")[0],
+    criteriosAceiteContextual: paraFicha("criteriosAceite")[0],
     checklistTecnico: paraFicha("checklistTecnico"),
     volumetria: paraFicha("volumetria"),
     checklistProcessoMarkdown: regras

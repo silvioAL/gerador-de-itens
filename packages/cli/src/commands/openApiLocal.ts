@@ -5,6 +5,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { TEMPLATE_ESPECIFICACAO_PADRAO, type PerfisConfig, type Quebra } from "@gerador/engine";
 import { caminhoDoModelo, carregarModeloChat, MODELO_CHAT, verificarStatus, type MotorChat } from "@gerador/llm";
+import type { GbnfJsonSchema } from "node-llama-cpp";
 
 const CAMPO_GLOBAL = "__global__";
 
@@ -481,6 +482,76 @@ async function tratarIaSugerir(req: IncomingMessage, res: ServerResponse): Promi
   }
 }
 
+// --- POST /ia/sugerir-item — Fase 1d-ii (SPEC-23): a IA escreve a ficha
+// inteira do item numa chamada só (história de usuário + critérios de
+// aceite contextuais + checklist técnico/volumetria), não campo por campo —
+// é a correção de rumo depois de 1d: a fila de geração ao vivo passa a
+// disparar isso por atividade, não por placeholder. Schema JSON monta em
+// runtime a partir de `placeholders[]` (as chaves variam por item — cada
+// atividade tem um conjunto diferente de requisitos técnicos aplicáveis),
+// então GBNF/saída estruturada volta a fazer sentido aqui (ao contrário de
+// `/ia/sugerir`, que É de propósito texto livre desde 1c: lá o schema
+// sempre foi um único campo). `/ia/sugerir` continua intocado — é o que o
+// botão manual "✨ Sugerir" por placeholder ainda usa.
+async function tratarIaSugerirItem(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  try {
+    const status = await verificarStatus();
+    if (!status.pronto) {
+      enviarJson(res, 503, { erro: "modelos de IA não instalados — rode `gerador ia instalar`" });
+      return;
+    }
+
+    const { atividadeRotulo, contextoNo, contextoEpico, placeholders } = await lerCorpoJson<{
+      atividadeRotulo: string;
+      contextoNo: string;
+      contextoEpico?: string;
+      placeholders: { chave: string; tech: string; rotulo: string }[];
+    }>(req);
+
+    if (!Array.isArray(placeholders) || placeholders.length === 0) {
+      enviarJson(res, 400, { erro: "nenhum placeholder informado pra gerar" });
+      return;
+    }
+
+    const schema: GbnfJsonSchema = {
+      type: "object",
+      properties: Object.fromEntries(placeholders.map((p) => [p.chave, { type: "string" }])),
+      required: placeholders.map((p) => p.chave),
+    };
+
+    const listaRequisitos = placeholders
+      .map((p) => `- (chave "${p.chave}") ${p.tech ? `[${p.tech}] ` : ""}${p.rotulo}`)
+      .join("\n");
+
+    const prompt = [
+      `Você ajuda a especificar tecnicamente um item de trabalho de software.`,
+      ...(contextoEpico ? [`Contexto geral da demanda/épico:`, contextoEpico, ``] : []),
+      `Item: "${atividadeRotulo}"`,
+      `Contexto do(s) nó(s) de arquitetura envolvidos:`,
+      contextoNo || "(sem contexto adicional)",
+      ``,
+      `Responda TODOS os campos abaixo, em português, cada um com uma decisão`,
+      `concreta pra esse item nesse contexto — nunca genérica, nunca repetindo`,
+      `o requisito. Pro campo "_historiaUsuario", escreva uma história de`,
+      `usuário no formato "Como <papel>, quero <ação> para que <benefício>".`,
+      `Pro campo "_criteriosAceite", escreva 1 ou 2 cenários de teste`,
+      `adicionais específicos desse contexto (não repita cenários óbvios de`,
+      `erro genérico, que já existem em outro lugar).`,
+      ``,
+      `Campos a responder (responda pela chave entre aspas):`,
+      listaRequisitos,
+    ].join("\n");
+
+    const motor = await obterMotorChat();
+    const resultado = await motor.completarComSchema(prompt, schema);
+    enviarJson(res, 200, resultado);
+  } catch (erro) {
+    motorChatSingleton = undefined;
+    const mensagem = erro instanceof Error ? erro.message : "Falha desconhecida ao gerar a ficha.";
+    enviarJson(res, 500, { erro: `Não foi possível gerar a ficha: ${mensagem}` });
+  }
+}
+
 /**
  * Roteador da API local — devolve `true` se tratou a requisição (`gerador
  * open` não deve cair pro fallback de arquivo estático nesse caso), `false`
@@ -505,6 +576,10 @@ export async function tratarApiLocal(req: IncomingMessage, res: ServerResponse, 
   }
   if (caminho === "/ia/sugerir" && metodo === "POST") {
     await tratarIaSugerir(req, res);
+    return true;
+  }
+  if (caminho === "/ia/sugerir-item" && metodo === "POST") {
+    await tratarIaSugerirItem(req, res);
     return true;
   }
   if (caminho === "/auth/me" && metodo === "GET") {
