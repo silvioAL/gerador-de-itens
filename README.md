@@ -21,6 +21,17 @@ gerador open                            # editor visual, http://localhost:4321 �
 
 Publicado no [npm](https://www.npmjs.com/package/gerador-de-itens), mesmo mecanismo de instalação do Graphify — sem clonar este repositório. Veja [`packages/cli/README.md`](packages/cli/README.md) pra instalar a partir do código (contribuindo/testando), e [Comandos da CLI](#comandos-da-cli) abaixo pra lista completa.
 
+#### Atualizar pra versão mais nova
+
+```powershell
+npm uninstall -g gerador-de-itens
+npm install -g gerador-de-itens --allow-scripts=node-llama-cpp
+```
+
+Desinstalar antes é o caminho mais garantido — evita herdar um estado de instalação anterior incompleto (ex.: binário nativo baixado sem a flag `--allow-scripts`, ver [Solução de problemas](#solução-de-problemas)). `npm install -g gerador-de-itens@latest --allow-scripts=node-llama-cpp` sozinho também funciona no dia a dia (o `npm` sobrescreve a instalação anterior), mas depois de qualquer problema de instalação vale desinstalar primeiro.
+
+Confirme a versão instalada com `npm list -g gerador-de-itens` (ou `npm view gerador-de-itens version` pra ver a versão mais recente publicada, sem instalar) — o próprio app (`gerador open`) também mostra a versão rodando no canto da tela.
+
 ### 2. Docker (modo hospedado, opcional — canvas visual + Postgres + login)
 
 ```powershell
