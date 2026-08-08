@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { TEMPLATE_ESPECIFICACAO_PADRAO, type PerfisConfig, type Quebra } from "@gerador/engine";
+import { verificarStatus } from "@gerador/llm";
 
 const CAMPO_GLOBAL = "__global__";
 
@@ -417,6 +418,10 @@ export async function tratarApiLocal(req: IncomingMessage, res: ServerResponse, 
   }
   if (caminho === "/versao" && metodo === "GET") {
     enviarJson(res, 200, { versao: await versaoDoPacote() });
+    return true;
+  }
+  if (caminho === "/ia/status" && metodo === "GET") {
+    enviarJson(res, 200, await verificarStatus());
     return true;
   }
   if (caminho === "/auth/me" && metodo === "GET") {

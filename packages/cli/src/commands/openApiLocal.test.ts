@@ -47,6 +47,20 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     expect(corpo.versao).toMatch(/^\d+\.\d+\.\d+$/);
   });
 
+  it("GET /ia/status devolve o mesmo formato de verificarStatus() (SPEC-23 Fase 0)", async () => {
+    // achado: a rota usa sempre o diretório real de modelos (~/.gerador/models,
+    // igual em produção) — não dá pra afirmar chatInstalado/pronto aqui, porque
+    // depende de a máquina que roda o teste já ter baixado o modelo de verdade
+    // ou não. O contrato testável é a forma da resposta, não o valor.
+    const resposta = await fetch(`${base}/ia/status`);
+    expect(resposta.status).toBe(200);
+    const corpo = await resposta.json();
+    expect(typeof corpo.chatInstalado).toBe("boolean");
+    expect(typeof corpo.embeddingInstalado).toBe("boolean");
+    expect(typeof corpo.pronto).toBe("boolean");
+    expect(typeof corpo.caminhoModelos).toBe("string");
+  });
+
   it("GET /quebras sem quebras/ ainda devolve lista vazia, não erro", async () => {
     const resposta = await fetch(`${base}/quebras`);
     expect(resposta.status).toBe(200);
