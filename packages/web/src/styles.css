@@ -78,8 +78,45 @@ button {
     stroke-opacity: 0.4;
   }
 }
-.diagrama-no-ativo rect:first-of-type {
+.diagrama-no-ativo {
   animation: diagrama-no-pulso 1.3s ease-in-out infinite;
+}
+
+/* Aresta se desenhando na entrada (o `.edge.on` do protótipo). Depende de
+   `pathLength="100"` no elemento: o traço vira porcentagem do comprimento e
+   a mesma animação serve pra qualquer aresta. */
+@keyframes diagrama-aresta-desenhar {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.diagrama-aresta-entrando {
+  stroke-dasharray: 100 100;
+  animation: diagrama-aresta-desenhar 750ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+/* Nó "pousando" na entrada (o `.node.on` do protótipo) — precisa de
+   transform-box pro translate funcionar em <g> de SVG. */
+@keyframes diagrama-no-pousar {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.diagrama-no-entrando {
+  transform-box: fill-box;
+  /* `backwards`, não `both`: com `both`, o `opacity: 1` do keyframe final
+     ficaria aplicado pra sempre e venceria o atributo opacity do filtro
+     (nó esmaecido nunca esmaeceria). `backwards` segura o estado inicial
+     durante o delay escalonado e SOLTA a propriedade quando termina. */
+  animation: diagrama-no-pousar 450ms cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
 }
 
 @keyframes diagrama-aresta-fluxo {
