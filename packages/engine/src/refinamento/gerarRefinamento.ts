@@ -27,7 +27,7 @@ function testesRelevantes(testes: TesteAutomatizado[], contextos: string[]): Tes
 /** Marcador exigido pelo agente de IA que valida os itens (padrão documentado
  * em Confluence, ver SPEC-19) — toda linha de "Requisitos de refinamento"
  * termina assim, sem exceção. Nunca remover/alterar. */
-const MARCADOR_ESPECIFICAR = "<- ✍️ especificar";
+export const MARCADOR_ESPECIFICAR = "<- ✍️ especificar";
 
 /** Chave de um placeholder de checklist técnico — namespaced por tech pra
  * nunca colidir entre techs da mesma atividade (Fase 1, SPEC-23). */
@@ -44,10 +44,20 @@ function chaveVolumetria(tech: string, campo: string): string {
  * confirmada — sugestão não confirmada fica só no painel interativo, nunca
  * no texto final (mesma disciplina "nada sugerido conta até confirmado" de
  * `calcularProntidao`, aplicada por convenção aqui — este texto não passa
- * pelo cálculo de prontidão). */
-function respostaVisivel(resp: ValorSpec | undefined): resp is ValorSpec {
+ * pelo cálculo de prontidão). Exportada: `gerarEspecificacaoEntrega.ts`
+ * reusa pra história de usuário/critérios de aceite contextuais (Fase 1d-ii,
+ * SPEC-23), mesma regra, evita duplicar a checagem. */
+export function respostaVisivel(resp: ValorSpec | undefined): resp is ValorSpec {
   return !!resp && (resp.origem === "manual" || resp.confirmado === true);
 }
+
+/** Chaves fixas dos dois placeholders que toda atividade tem, independente
+ * de tech/regras.json (Fase 1d-ii, SPEC-23) — achado real: o usuário queria
+ * que a IA escrevesse a história do item e cenários de teste contextuais, não
+ * só respondesse checklist técnico. Prefixo `_` pra nunca colidir com uma
+ * chave `${tech}::...`. */
+export const CHAVE_HISTORIA_USUARIO = "_historiaUsuario";
+export const CHAVE_CRITERIOS_ACEITE = "_criteriosAceite";
 
 /**
  * Checklist de refinamento técnico em Markdown, filtrado por techs+contextos
@@ -200,7 +210,7 @@ export function gerarCiclosDeTeste(regras: RegrasConfig, techs: string[], contex
 export interface PlaceholderRefinamento {
   chave: string;
   tech: string;
-  secao: "checklistTecnico" | "volumetria";
+  secao: "historiaUsuario" | "criteriosAceite" | "checklistTecnico" | "volumetria";
   rotulo: string;
 }
 
@@ -218,7 +228,14 @@ export function listarPlaceholders(
   nos: No[],
   arestas: Aresta[]
 ): PlaceholderRefinamento[] {
-  const placeholders: PlaceholderRefinamento[] = [];
+  // Toda atividade precisa de história + critérios de aceite, independente
+  // de ter regra técnica configurada pra sua tech (Fase 1d-ii, SPEC-23) — o
+  // pedido original era a IA escrever isso pra cada item, não só responder
+  // checklist. `tech: ""` porque não tem uma tech específica associada.
+  const placeholders: PlaceholderRefinamento[] = [
+    { chave: CHAVE_HISTORIA_USUARIO, tech: "", secao: "historiaUsuario", rotulo: "História de usuário" },
+    { chave: CHAVE_CRITERIOS_ACEITE, tech: "", secao: "criteriosAceite", rotulo: "Critérios de aceite (cenários contextuais)" },
+  ];
 
   for (const tech of techs) {
     const porTech = regras.porTech[tech];

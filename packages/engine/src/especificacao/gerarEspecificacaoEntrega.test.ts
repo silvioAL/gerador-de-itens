@@ -154,6 +154,45 @@ describe("gerarEspecificacaoEntrega", () => {
     expect(doc).toContain("Logs relevantes emitidos: sim, via Winston + correlationId <- ✍️ especificar");
   });
 
+  it("história de usuário: marcador quando não respondida, texto confirmado quando presente (Fase 1d-ii, SPEC-23)", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+    const chaveMongo = atividades.find((a) => a.chave.startsWith("n2"))!.chave;
+
+    const semResposta = gerarEspecificacaoEntrega(atividades, diagrama, config, {});
+    expect(semResposta).toContain("#### História de usuário");
+    expect(semResposta).toContain("_(sem história definida)_ <- ✍️ especificar");
+
+    const comResposta = gerarEspecificacaoEntrega(atividades, diagrama, config, {
+      respostasItens: {
+        [chaveMongo]: {
+          _historiaUsuario: { valor: "Como analista, quero ver o catálogo atualizado.", origem: "manual" },
+        },
+      },
+    });
+    expect(comResposta).toContain("Como analista, quero ver o catálogo atualizado.");
+    // Não presente também é sempre gerado independente de `regras` (item sem regra nenhuma continua com o placeholder).
+    expect(comResposta.match(/#### História de usuário/g)?.length).toBe(atividades.length);
+  });
+
+  it("critérios de aceite contextuais confirmados aparecem depois do scaffold Gherkin, sem substituí-lo", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+    const chaveMongo = atividades.find((a) => a.chave.startsWith("n2"))!.chave;
+
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, config, {
+      respostasItens: {
+        [chaveMongo]: {
+          _criteriosAceite: { valor: "Cenário: catálogo vazio não quebra a tela", origem: "manual" },
+        },
+      },
+    });
+
+    expect(doc).toContain("Dado um documento válido"); // scaffold determinístico continua presente
+    expect(doc).toContain("_Cenários adicionais (contextuais):_");
+    expect(doc).toContain("Cenário: catálogo vazio não quebra a tela");
+  });
+
   it("com regras que ativam volumetria: documento inclui a seção 'Requisitos de volumetria' com o formato fixo", () => {
     const diagrama = diagramaBase();
     const atividades = derivar(diagrama, config, {});
@@ -441,6 +480,19 @@ describe("estruturarEspecificacaoNo / montarFichaItem (Fase 1a, SPEC-23 — dado
     expect(ficha.checklistProcessoMarkdown).toBe("");
     expect(ficha.ciclosTesteMarkdown).toBe("");
     expect(ficha.criteriosAceiteMarkdown).not.toBe("");
+  });
+
+  it("montarFichaItem: historiaUsuario/criteriosAceiteContextual sempre presentes, mesmo sem regras (Fase 1d-ii, SPEC-23)", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+
+    const semRegras = montarFichaItem(1, atividades[0], diagrama, config);
+    expect(semRegras.historiaUsuario).toEqual({ chave: "_historiaUsuario", tech: "", rotulo: "História de usuário", resposta: undefined });
+    expect(semRegras.criteriosAceiteContextual.chave).toBe("_criteriosAceite");
+
+    const resposta = { valor: "Como PO, quero X.", origem: "manual" as const };
+    const comRegras = montarFichaItem(1, atividades[0], diagrama, config, regras, { _historiaUsuario: resposta });
+    expect(comRegras.historiaUsuario.resposta).toEqual(resposta);
   });
 });
 

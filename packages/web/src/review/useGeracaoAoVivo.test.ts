@@ -2,20 +2,30 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { useGeracaoAoVivo, type ItemFilaGeracao } from "./useGeracaoAoVivo";
 
-const apiIaSugerirMock = vi.hoisted(() => vi.fn());
-vi.mock("../api/client", () => ({ apiIa: { sugerir: apiIaSugerirMock } }));
+const apiIaSugerirItemMock = vi.hoisted(() => vi.fn());
+vi.mock("../api/client", () => ({ apiIa: { sugerirItem: apiIaSugerirItemMock } }));
 
 beforeEach(() => {
-  apiIaSugerirMock.mockReset();
+  apiIaSugerirItemMock.mockReset();
 });
 
 function item(n: number): ItemFilaGeracao {
-  return { atividadeChave: `a${n}`, chavePlaceholder: `p${n}`, tech: "Backend", rotulo: `Requisito ${n}`, contextoNo: "" };
+  return {
+    atividadeChave: `a${n}`,
+    atividadeRotulo: `Atividade ${n}`,
+    contextoNo: "",
+    placeholders: [
+      { chave: "_historiaUsuario", tech: "", rotulo: "História de usuário" },
+      { chave: `Backend::req${n}`, tech: "Backend", rotulo: `Requisito ${n}` },
+    ],
+  };
 }
 
-describe("useGeracaoAoVivo (Fase 1d, SPEC-23 — orquestração real sobre o streaming de 1c)", () => {
-  it("processa a fila em sequência, chamando onResponderItem (sugerido, não confirmado) a cada item", async () => {
-    apiIaSugerirMock.mockImplementation(async (pedido: { rotulo: string }) => ({ valor: `resposta pra ${pedido.rotulo}` }));
+describe("useGeracaoAoVivo (Fase 1d-ii, SPEC-23 — orquestração por item via /ia/sugerir-item)", () => {
+  it("processa a fila em sequência, chamando onResponderItem (sugerido, não confirmado) uma vez por placeholder devolvido", async () => {
+    apiIaSugerirItemMock.mockImplementation(async (pedido: { atividadeRotulo: string; placeholders: { chave: string }[] }) =>
+      Object.fromEntries(pedido.placeholders.map((p) => [p.chave, `resposta pra ${pedido.atividadeRotulo}/${p.chave}`]))
+    );
     const onResponderItem = vi.fn();
     const { result } = renderHook(() => useGeracaoAoVivo({ onResponderItem }));
 
@@ -23,17 +33,23 @@ describe("useGeracaoAoVivo (Fase 1d, SPEC-23 — orquestração real sobre o str
 
     await waitFor(() => expect(result.current.rodando).toBe(false));
 
-    expect(apiIaSugerirMock).toHaveBeenCalledTimes(2);
-    expect(onResponderItem).toHaveBeenNthCalledWith(1, "a1", "p1", {
-      valor: "resposta pra Requisito 1",
+    expect(apiIaSugerirItemMock).toHaveBeenCalledTimes(2);
+    expect(onResponderItem).toHaveBeenCalledWith("a1", "_historiaUsuario", {
+      valor: "resposta pra Atividade 1/_historiaUsuario",
       origem: "sugerido",
       confirmado: false,
     });
-    expect(onResponderItem).toHaveBeenNthCalledWith(2, "a2", "p2", {
-      valor: "resposta pra Requisito 2",
+    expect(onResponderItem).toHaveBeenCalledWith("a1", "Backend::req1", {
+      valor: "resposta pra Atividade 1/Backend::req1",
       origem: "sugerido",
       confirmado: false,
     });
+    expect(onResponderItem).toHaveBeenCalledWith("a2", "_historiaUsuario", {
+      valor: "resposta pra Atividade 2/_historiaUsuario",
+      origem: "sugerido",
+      confirmado: false,
+    });
+    expect(onResponderItem).toHaveBeenCalledTimes(4); // 2 placeholders x 2 itens
     expect(result.current.progresso).toEqual({ feito: 2, total: 2 });
   });
 
@@ -41,13 +57,13 @@ describe("useGeracaoAoVivo (Fase 1d, SPEC-23 — orquestração real sobre o str
     let resolvidas = 0;
     let emVooSimultaneo = 0;
     let maxSimultaneo = 0;
-    apiIaSugerirMock.mockImplementation(async () => {
+    apiIaSugerirItemMock.mockImplementation(async () => {
       emVooSimultaneo++;
       maxSimultaneo = Math.max(maxSimultaneo, emVooSimultaneo);
       await new Promise((r) => setTimeout(r, 10));
       emVooSimultaneo--;
       resolvidas++;
-      return { valor: "ok" };
+      return {};
     });
     const { result } = renderHook(() => useGeracaoAoVivo({}));
     act(() => result.current.iniciar([item(1), item(2), item(3)]));
@@ -56,47 +72,52 @@ describe("useGeracaoAoVivo (Fase 1d, SPEC-23 — orquestração real sobre o str
     expect(maxSimultaneo).toBe(1);
   });
 
-  it("atual reflete o item em processamento, e o texto parcial cresce a cada pedaço do streaming", async () => {
+  it("atual reflete o item (atividade) em processamento", async () => {
     let liberar!: () => void;
-    apiIaSugerirMock.mockImplementationOnce((_pedido: unknown, onPedaco?: (p: string) => void) => {
-      onPedaco?.("resposta");
-      return new Promise((resolve) => {
-        liberar = () => resolve({ valor: "resposta completa" });
-      });
-    });
+    apiIaSugerirItemMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          liberar = () => resolve({});
+        })
+    );
     const { result } = renderHook(() => useGeracaoAoVivo({}));
     act(() => result.current.iniciar([item(1)]));
 
     await waitFor(() => expect(result.current.atual?.atividadeChave).toBe("a1"));
-    await waitFor(() => expect(result.current.textoParcial).toBe("resposta"));
 
     act(() => liberar());
     await waitFor(() => expect(result.current.rodando).toBe(false));
   });
 
   it("falha isolada num item não trava a fila — segue pro próximo", async () => {
-    apiIaSugerirMock.mockRejectedValueOnce(new Error("modelo travou")).mockResolvedValueOnce({ valor: "ok no segundo" });
+    apiIaSugerirItemMock
+      .mockRejectedValueOnce(new Error("modelo travou"))
+      .mockResolvedValueOnce({ _historiaUsuario: "ok no segundo" });
     const onResponderItem = vi.fn();
     const { result } = renderHook(() => useGeracaoAoVivo({ onResponderItem }));
 
     act(() => result.current.iniciar([item(1), item(2)]));
     await waitFor(() => expect(result.current.rodando).toBe(false));
 
-    expect(apiIaSugerirMock).toHaveBeenCalledTimes(2);
+    expect(apiIaSugerirItemMock).toHaveBeenCalledTimes(2);
     expect(onResponderItem).toHaveBeenCalledTimes(1);
-    expect(onResponderItem).toHaveBeenCalledWith("a2", "p2", { valor: "ok no segundo", origem: "sugerido", confirmado: false });
+    expect(onResponderItem).toHaveBeenCalledWith("a2", "_historiaUsuario", {
+      valor: "ok no segundo",
+      origem: "sugerido",
+      confirmado: false,
+    });
   });
 
   it("pausar interrompe antes da próxima chamada de rede — não corta uma em andamento", async () => {
     let liberarPrimeira!: () => void;
-    apiIaSugerirMock
+    apiIaSugerirItemMock
       .mockImplementationOnce(
         () =>
           new Promise((resolve) => {
-            liberarPrimeira = () => resolve({ valor: "primeira" });
+            liberarPrimeira = () => resolve({});
           })
       )
-      .mockResolvedValueOnce({ valor: "segunda" });
+      .mockResolvedValueOnce({});
     const { result } = renderHook(() => useGeracaoAoVivo({}));
 
     act(() => result.current.iniciar([item(1), item(2)]));
@@ -106,22 +127,22 @@ describe("useGeracaoAoVivo (Fase 1d, SPEC-23 — orquestração real sobre o str
     act(() => liberarPrimeira());
     // Mesmo depois da primeira resolver, a segunda não dispara enquanto pausado.
     await new Promise((r) => setTimeout(r, 250));
-    expect(apiIaSugerirMock).toHaveBeenCalledTimes(1);
+    expect(apiIaSugerirItemMock).toHaveBeenCalledTimes(1);
 
     act(() => result.current.continuar());
-    await waitFor(() => expect(apiIaSugerirMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(apiIaSugerirItemMock).toHaveBeenCalledTimes(2));
   });
 
   it("iniciar de novo (Gerar de novo) reinicia do zero, mesmo com uma execução anterior ainda em voo", async () => {
     let liberarAntiga!: () => void;
-    apiIaSugerirMock
+    apiIaSugerirItemMock
       .mockImplementationOnce(
         () =>
           new Promise((resolve) => {
-            liberarAntiga = () => resolve({ valor: "antiga, deveria ser ignorada" });
+            liberarAntiga = () => resolve({ _historiaUsuario: "antiga, deveria ser ignorada" });
           })
       )
-      .mockResolvedValue({ valor: "nova" });
+      .mockResolvedValue({ _historiaUsuario: "nova" });
     const onResponderItem = vi.fn();
     const { result } = renderHook(() => useGeracaoAoVivo({ onResponderItem }));
 
@@ -133,6 +154,6 @@ describe("useGeracaoAoVivo (Fase 1d, SPEC-23 — orquestração real sobre o str
 
     // Só a resposta da fila NOVA conta — a antiga (token invalidado) nunca chama onResponderItem.
     expect(onResponderItem).toHaveBeenCalledTimes(1);
-    expect(onResponderItem).toHaveBeenCalledWith("a2", "p2", { valor: "nova", origem: "sugerido", confirmado: false });
+    expect(onResponderItem).toHaveBeenCalledWith("a2", "_historiaUsuario", { valor: "nova", origem: "sugerido", confirmado: false });
   });
 });

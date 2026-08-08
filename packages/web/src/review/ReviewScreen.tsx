@@ -63,7 +63,7 @@ type StatusItem = "rascunho" | "revisar" | "refinado";
  * sugerida e ainda não confirmada) já é "revisar", não fica preso em
  * "rascunho" pra sempre. */
 function statusDoItem(ficha: FichaItem): StatusItem {
-  const placeholders = [...ficha.checklistTecnico, ...ficha.volumetria];
+  const placeholders = [ficha.historiaUsuario, ficha.criteriosAceiteContextual, ...ficha.checklistTecnico, ...ficha.volumetria];
   if (placeholders.length === 0) return "refinado";
   const pendentes = placeholders.filter((p) => !respostaConfirmada(p.resposta));
   if (pendentes.length === 0) return "refinado";
@@ -189,8 +189,10 @@ export function ReviewScreen({
 
   const contextoEpico = contextoEpicoCompleto(demandInfo, anexosContexto);
 
-  // Fase 1d (SPEC-23): fila de trabalho pra orquestração real — `apenasPendentes`
-  // false é usado por "Gerar de novo" (regenera tudo, inclusive já confirmado).
+  // Fase 1d-ii (SPEC-23): fila de trabalho pra orquestração real — um item por
+  // ATIVIDADE (não mais por placeholder), a IA responde a ficha inteira numa
+  // chamada só. `apenasPendentes` false é usado por "Gerar de novo" (regenera
+  // tudo, inclusive já confirmado).
   const montarFila = useCallback(
     (apenasPendentes: boolean): ItemFilaGeracao[] => {
       const filaNova: ItemFilaGeracao[] = [];
@@ -198,11 +200,15 @@ export function ReviewScreen({
         const ficha = fichas.get(a.chave);
         if (!ficha) continue;
         const contextoNo = contextoDoPlaceholder(ficha.especificacaoTecnica);
-        for (const p of [...ficha.checklistTecnico, ...ficha.volumetria]) {
-          if (!apenasPendentes || !respostaConfirmada(p.resposta)) {
-            filaNova.push({ atividadeChave: a.chave, chavePlaceholder: p.chave, tech: p.tech, rotulo: p.rotulo, contextoNo });
-          }
-        }
+        const todos = [ficha.historiaUsuario, ficha.criteriosAceiteContextual, ...ficha.checklistTecnico, ...ficha.volumetria];
+        const relevantes = apenasPendentes ? todos.filter((p) => !respostaConfirmada(p.resposta)) : todos;
+        if (relevantes.length === 0) continue;
+        filaNova.push({
+          atividadeChave: a.chave,
+          atividadeRotulo: a.rotulo,
+          contextoNo,
+          placeholders: relevantes.map((p) => ({ chave: p.chave, tech: p.tech, rotulo: p.rotulo })),
+        });
       }
       return filaNova;
     },
@@ -287,9 +293,6 @@ export function ReviewScreen({
 
   const atividadeSelecionada = selecionada ? resultado.atividades.find((a) => a.chave === selecionada) : undefined;
   const fichaSelecionada = selecionada ? fichas.get(selecionada) : undefined;
-  const atividadeEmGeracao = geracao.atual
-    ? resultado.atividades.find((a) => a.chave === geracao.atual!.atividadeChave)
-    : undefined;
 
   return (
     <div style={telaEstilo}>
@@ -298,7 +301,7 @@ export function ReviewScreen({
         {geracao.rodando && geracao.atual ? (
           <div style={faseBarraEstilo} role="status" aria-live="polite">
             <span style={{ fontSize: 12 }}>
-              {`${geracao.pausado ? "Pausado — " : "Escrevendo "}requisito ${geracao.progresso.feito + 1} de ${geracao.progresso.total}${atividadeEmGeracao ? ` · ${atividadeEmGeracao.rotulo}` : ""}`}
+              {`${geracao.pausado ? "Pausado — " : "Escrevendo "}item ${geracao.progresso.feito + 1} de ${geracao.progresso.total} · ${geracao.atual.atividadeRotulo}`}
             </span>
             <div style={progressoTrilhoEstilo}>
               <div
@@ -364,7 +367,7 @@ export function ReviewScreen({
           <DiagramaCompacto
             diagrama={diagrama}
             config={config}
-            noAtivoId={atividadeEmGeracao ? chaveParaNodeId[atividadeEmGeracao.chave] : undefined}
+            noAtivoId={geracao.atual ? chaveParaNodeId[geracao.atual.atividadeChave] : undefined}
           />
           <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
           <section data-tour="review-table" style={listaEstilo}>
@@ -476,11 +479,7 @@ export function ReviewScreen({
                       ficha={fichaSelecionada}
                       contextoEpico={contextoEpico}
                       onResponder={(chave, resposta) => onResponderItem?.(atividadeSelecionada.chave, chave, resposta)}
-                      geracaoAoVivo={
-                        geracao.rodando && geracao.atual?.atividadeChave === atividadeSelecionada.chave
-                          ? { chavePlaceholder: geracao.atual.chavePlaceholder, texto: geracao.textoParcial }
-                          : undefined
-                      }
+                      emGeracaoAoVivo={geracao.rodando && geracao.atual?.atividadeChave === atividadeSelecionada.chave}
                     />
                   )}
                   {aba === "testes" && <AbaTestes ficha={fichaSelecionada} />}
@@ -608,29 +607,30 @@ interface AbaRefinamentoProps {
   /** Contexto do épico/demanda (Fase 1b, SPEC-23) — mandado junto no `/ia/sugerir` real. */
   contextoEpico?: string;
   onResponder?: (chavePlaceholder: string, resposta: ValorSpec) => void;
-  /** Fase 1d, SPEC-23: quando a orquestração ao vivo está processando um
-   * placeholder desta ficha (não um clique manual em "✨ Sugerir"), mostra o
-   * texto parcial em tempo real — sem isso o usuário só veria o card mudar
-   * quando a resposta já estivesse pronta. */
-  geracaoAoVivo?: { chavePlaceholder: string; texto: string };
+  /** Fase 1d-ii, SPEC-23: a orquestração ao vivo está gerando A FICHA INTEIRA
+   * desta atividade agora (não mais um placeholder por vez — a resposta
+   * chega tudo de uma vez via `/ia/sugerir-item`, sem streaming campo a
+   * campo). Usado só pra decidir o placeholder de "gerando…" nos campos
+   * ainda sem resposta; assim que `onResponderItem` preenche cada um, o
+   * card vira o estado normal de rascunho/confirmação. */
+  emGeracaoAoVivo?: boolean;
 }
 
 /**
- * Requisitos de refinamento técnico/volumetria (fluxo 3, Fase 1, SPEC-23) —
- * cada um respondido à mão ou via "✨ Sugerir" (modelo local). Sugestão fica
+ * Requisitos de refinamento (fluxo 3, Fase 1, SPEC-23) — história de usuário
+ * e critérios de aceite contextuais (Fase 1d-ii) sempre aparecem primeiro,
+ * seguidos do checklist técnico/volumetria filtrado por tech/contexto. Cada
+ * um respondido à mão ou via "✨ Sugerir" (modelo local). Sugestão fica
  * `origem: "sugerido", confirmado: false` até o usuário clicar "Confirmar" —
  * só aí passa a valer pro documento final (mesma disciplina "nada sugerido
  * conta até confirmado" já usada pro semáforo de prontidão dos nós).
  */
-function AbaRefinamento({ ficha, contextoEpico, onResponder, geracaoAoVivo }: AbaRefinamentoProps) {
+function AbaRefinamento({ ficha, contextoEpico, onResponder, emGeracaoAoVivo }: AbaRefinamentoProps) {
   const [rascunhos, setRascunhos] = useState<Record<string, string>>({});
   const [carregando, setCarregando] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
-  const placeholders = [...ficha.checklistTecnico, ...ficha.volumetria];
-  if (placeholders.length === 0) {
-    return <p style={proseEstilo}>Nenhum requisito técnico específico para esta combinação de tech/contexto.</p>;
-  }
+  const placeholders = [ficha.historiaUsuario, ficha.criteriosAceiteContextual, ...ficha.checklistTecnico, ...ficha.volumetria];
 
   async function sugerir(p: FichaPlaceholder) {
     setErro(null);
@@ -669,23 +669,21 @@ function AbaRefinamento({ ficha, contextoEpico, onResponder, geracaoAoVivo }: Ab
       {erro && <div style={{ fontSize: 11, color: "#f87171" }}>{erro}</div>}
       {placeholders.map((p) => {
         const confirmada = respostaConfirmada(p.resposta);
-        const emGeracaoAoVivo = geracaoAoVivo?.chavePlaceholder === p.chave;
-        const rascunho = emGeracaoAoVivo
-          ? geracaoAoVivo!.texto
-          : (rascunhos[p.chave] ?? (typeof p.resposta?.valor === "string" ? p.resposta.valor : ""));
+        const aguardandoGeracaoAoVivo = !!emGeracaoAoVivo && p.resposta === undefined;
+        const rascunho = rascunhos[p.chave] ?? (typeof p.resposta?.valor === "string" ? p.resposta.valor : "");
         return (
-          <div key={p.chave} style={{ ...reqEstilo, ...(confirmada ? reqPreenchidoEstilo : {}) }}>
+          <div key={p.chave} data-testid={`placeholder-${p.chave}`} style={{ ...reqEstilo, ...(confirmada ? reqPreenchidoEstilo : {}) }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
               <span style={{ ...marcaEstilo, ...(confirmada ? marcaOnEstilo : {}) }}>{confirmada ? "✓" : ""}</span>
               <span style={{ flex: 1, fontSize: 13 }}>{p.rotulo}</span>
-              <span style={origemEstilo}>{p.tech}</span>
+              <span style={origemEstilo}>{p.tech || "Geral"}</span>
             </div>
             {confirmada ? (
               <pre style={{ ...preEstilo, marginTop: 8 }}>{String(p.resposta?.valor)}</pre>
-            ) : emGeracaoAoVivo ? (
+            ) : aguardandoGeracaoAoVivo ? (
               <div style={{ marginTop: 8 }}>
-                <pre style={preEstilo}>{rascunho || "…"}</pre>
-                <span style={{ fontSize: 10.5, color: "#38bdf8" }}>✨ gerando…</span>
+                <pre style={preEstilo}>…</pre>
+                <span style={{ fontSize: 10.5, color: "#38bdf8" }}>✨ gerando a ficha inteira…</span>
               </div>
             ) : (
               <div style={{ display: "flex", gap: 6, marginTop: 8 }}>

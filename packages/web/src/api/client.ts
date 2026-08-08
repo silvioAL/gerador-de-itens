@@ -230,6 +230,21 @@ export interface StatusIa {
   caminhoModelos: string;
 }
 
+/** Fase 1d-ii (SPEC-23) — um placeholder a resolver dentro da ficha de um
+ * item (chave namespaced por tech, ou `_historiaUsuario`/`_criteriosAceite`). */
+export interface PlaceholderPedidoItemIa {
+  chave: string;
+  tech: string;
+  rotulo: string;
+}
+
+export interface PedidoSugestaoItemIa {
+  atividadeRotulo: string;
+  contextoNo: string;
+  contextoEpico?: string;
+  placeholders: PlaceholderPedidoItemIa[];
+}
+
 export const apiIa = {
   /** Se o modelo local está instalado e pronto pra uso — usado antes de
    * disparar a geração ao vivo (Fase 1d, SPEC-23) sem forçar IA em quem não
@@ -277,6 +292,16 @@ export const apiIa = {
     }
     return { valor };
   },
+  /** Fase 1d-ii (SPEC-23) — correção de rumo depois de 1d: a IA escreve a
+   * ficha inteira do item numa chamada só (história de usuário + critérios
+   * de aceite contextuais + checklist técnico/volumetria juntos), não mais
+   * placeholder por placeholder. Resposta é JSON estruturado (schema
+   * dinâmico montado no servidor a partir de `placeholders[]`), então usa
+   * `requisitar()` normalmente — sem streaming aqui (contraste deliberado
+   * com `sugerir()` acima: múltiplos campos de uma vez não dá pra mostrar
+   * crescendo caractere a caractere sem parecer JSON quebrado no meio). */
+  sugerirItem: (pedido: PedidoSugestaoItemIa) =>
+    requisitar<Record<string, string>>("/ia/sugerir-item", { method: "POST", body: JSON.stringify(pedido) }),
 };
 
 export const apiPerfisTime = {

@@ -234,7 +234,11 @@ describe("listarPlaceholders (Fase 1, SPEC-23)", () => {
     expect(chaves).toContain("Backend::DLQ configurada e monitorada");
     expect(chaves).toContain("Backend::Nome do serviço segue o padrão do time");
     expect(chaves).not.toContain("Backend::Índice criado para as queries novas");
-    expect(placeholders.every((p) => p.secao === "checklistTecnico")).toBe(true);
+    // Fase 1d-ii, SPEC-23: história de usuário e critérios de aceite estão
+    // sempre presentes, além do checklist técnico da tech/contexto.
+    expect(chaves).toContain("_historiaUsuario");
+    expect(chaves).toContain("_criteriosAceite");
+    expect(placeholders.filter((p) => p.secao === "checklistTecnico").length).toBeGreaterThan(0);
   });
 
   it("inclui os 4 campos fixos de volumetria quando aplicável, chave namespaced", () => {
@@ -258,11 +262,22 @@ describe("listarPlaceholders (Fase 1, SPEC-23)", () => {
         },
       },
     };
+    // Fase 1d-ii, SPEC-23: história de usuário e critérios de aceite sempre
+    // aparecem (2 placeholders fixos), independente do `when` do checklist técnico.
     const semNo = listarPlaceholders(regrasComMigracao, ["Backend"], [], [noTecnico({ status: "novo" })], semArestasTecnico);
-    expect(semNo).toHaveLength(0);
+    expect(semNo.filter((p) => p.secao === "checklistTecnico")).toHaveLength(0);
+    expect(semNo).toHaveLength(2);
 
     const comNoExistente = listarPlaceholders(regrasComMigracao, ["Backend"], [], [noTecnico({ status: "existente" })], semArestasTecnico);
-    expect(comNoExistente).toHaveLength(1);
+    expect(comNoExistente.filter((p) => p.secao === "checklistTecnico")).toHaveLength(1);
+    expect(comNoExistente).toHaveLength(3);
+  });
+
+  it("história de usuário e critérios de aceite aparecem mesmo sem nenhuma tech/regra configurada (Fase 1d-ii, SPEC-23)", () => {
+    const placeholders = listarPlaceholders(regras, [], [], [], []);
+    expect(placeholders).toHaveLength(2);
+    expect(placeholders.map((p) => p.secao).sort()).toEqual(["criteriosAceite", "historiaUsuario"]);
+    expect(placeholders.map((p) => p.chave)).toEqual(["_historiaUsuario", "_criteriosAceite"]);
   });
 });
 

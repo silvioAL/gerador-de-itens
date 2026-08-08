@@ -32,9 +32,17 @@ const completarMock = vi.fn(async (_prompt: string, opcoes?: { onTexto?: (p: str
   }
   return PEDACOS_SUGESTAO.join("");
 });
+// Fase 1d-ii (SPEC-23) — /ia/sugerir-item usa completarComSchema (GBNF), não
+// completar (texto livre): mock devolve um valor por chave recebida no
+// schema, pra simular o comportamento real de "resposta sempre bate com o
+// schema pedido" sem depender do binário nativo em CI.
+const completarComSchemaMock = vi.fn(async (_prompt: string, schema: { properties?: Record<string, unknown> }) => {
+  const chaves = Object.keys(schema.properties ?? {});
+  return Object.fromEntries(chaves.map((chave) => [chave, `resposta gerada pra ${chave}`]));
+});
 const carregarModeloChatMock = vi.fn(async () => ({
   completar: completarMock,
-  completarComSchema: vi.fn(async () => ({})),
+  completarComSchema: completarComSchemaMock,
   descartar: vi.fn(async () => {}),
 }));
 vi.mock("@gerador/llm", async () => {
@@ -52,6 +60,7 @@ beforeEach(async () => {
   verificarStatusMock.mockClear();
   carregarModeloChatMock.mockClear();
   completarMock.mockClear();
+  completarComSchemaMock.mockClear();
   verificarStatusMock.mockResolvedValue({
     chatInstalado: false,
     embeddingInstalado: false,
@@ -217,6 +226,76 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     // prova real de streaming, não só um corpo JSON completo de uma vez.
     expect(pedacosRecebidos.length).toBeGreaterThan(1);
     expect(pedacosRecebidos.join("")).toBe("sugestão de teste");
+  });
+
+  it("POST /ia/sugerir-item sem modelos instalados devolve 503, não tenta carregar o modelo (Fase 1d-ii, SPEC-23)", async () => {
+    const resposta = await fetch(`${base}/ia/sugerir-item`, {
+      method: "POST",
+      body: JSON.stringify({
+        atividadeRotulo: "srv-checkout publica em fila-pedidos",
+        contextoNo: "fila rabbitmq",
+        placeholders: [{ chave: "_historiaUsuario", tech: "", rotulo: "História de usuário" }],
+      }),
+    });
+    expect(resposta.status).toBe(503);
+    expect(carregarModeloChatMock).not.toHaveBeenCalled();
+  });
+
+  it("POST /ia/sugerir-item sem placeholders devolve 400 (Fase 1d-ii, SPEC-23)", async () => {
+    verificarStatusMock.mockResolvedValue({
+      chatInstalado: true,
+      embeddingInstalado: true,
+      pronto: true,
+      caminhoModelos: "/fake/models",
+    });
+
+    const resposta = await fetch(`${base}/ia/sugerir-item`, {
+      method: "POST",
+      body: JSON.stringify({ atividadeRotulo: "x", contextoNo: "", placeholders: [] }),
+    });
+    expect(resposta.status).toBe(400);
+    expect(carregarModeloChatMock).not.toHaveBeenCalled();
+  });
+
+  it("POST /ia/sugerir-item monta schema dinâmico a partir das chaves recebidas e devolve Record<chave,string> (Fase 1d-ii, SPEC-23)", async () => {
+    verificarStatusMock.mockResolvedValue({
+      chatInstalado: true,
+      embeddingInstalado: true,
+      pronto: true,
+      caminhoModelos: "/fake/models",
+    });
+
+    const resposta = await fetch(`${base}/ia/sugerir-item`, {
+      method: "POST",
+      body: JSON.stringify({
+        atividadeRotulo: "srv-checkout publica em fila-pedidos",
+        contextoNo: "fila rabbitmq",
+        contextoEpico: "Épico: reduzir tempo de aprovação de crédito de 3 dias pra 1 hora.",
+        placeholders: [
+          { chave: "_historiaUsuario", tech: "", rotulo: "História de usuário" },
+          { chave: "_criteriosAceite", tech: "", rotulo: "Critérios de aceite" },
+          { chave: "Backend::DLQ configurada e monitorada", tech: "Backend", rotulo: "DLQ configurada e monitorada" },
+        ],
+      }),
+    });
+
+    expect(resposta.status).toBe(200);
+    expect(resposta.headers.get("content-type")).toContain("application/json");
+    expect(await resposta.json()).toEqual({
+      _historiaUsuario: "resposta gerada pra _historiaUsuario",
+      _criteriosAceite: "resposta gerada pra _criteriosAceite",
+      "Backend::DLQ configurada e monitorada": "resposta gerada pra Backend::DLQ configurada e monitorada",
+    });
+
+    const [prompt, schema] = completarComSchemaMock.mock.calls.at(-1) as [string, { properties: Record<string, unknown>; required: string[] }];
+    expect(prompt).toContain("Épico: reduzir tempo de aprovação de crédito de 3 dias pra 1 hora.");
+    expect(prompt).toContain("srv-checkout publica em fila-pedidos");
+    expect(Object.keys(schema.properties)).toEqual([
+      "_historiaUsuario",
+      "_criteriosAceite",
+      "Backend::DLQ configurada e monitorada",
+    ]);
+    expect(schema.required).toEqual(Object.keys(schema.properties));
   });
 
   it("GET /quebras sem quebras/ ainda devolve lista vazia, não erro", async () => {

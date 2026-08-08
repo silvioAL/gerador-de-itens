@@ -1,13 +1,18 @@
 import { useCallback, useRef, useState } from "react";
 import type { ValorSpec } from "@gerador/engine";
-import { apiIa } from "../api/client";
+import { apiIa, type PlaceholderPedidoItemIa } from "../api/client";
 
+/** Fase 1d-ii (SPEC-23) — um item da fila agora é uma ATIVIDADE inteira, não
+ * mais um placeholder isolado: a IA responde a ficha inteira (história de
+ * usuário + critérios de aceite contextuais + checklist técnico/volumetria)
+ * numa chamada só a `/ia/sugerir-item`, correção de rumo depois de 1d (a
+ * versão placeholder-por-placeholder nunca gerava história/cenário
+ * contextual, só respostas de checklist soltas). */
 export interface ItemFilaGeracao {
   atividadeChave: string;
-  chavePlaceholder: string;
-  tech: string;
-  rotulo: string;
+  atividadeRotulo: string;
   contextoNo: string;
+  placeholders: PlaceholderPedidoItemIa[];
 }
 
 export interface UseGeracaoAoVivoParams {
@@ -20,18 +25,23 @@ export interface EstadoGeracaoAoVivo {
   pausado: boolean;
   atual: ItemFilaGeracao | null;
   progresso: { feito: number; total: number };
-  textoParcial: string;
   iniciar: (fila: ItemFilaGeracao[]) => void;
   pausar: () => void;
   continuar: () => void;
 }
 
 /**
- * Orquestra chamadas reais de `/ia/sugerir` (streaming, Fase 1c) em
- * sequência sobre uma fila de placeholders pendentes — nunca em paralelo (um
- * modelo local, uma sessão só; chamadas concorrentes disputariam o mesmo
- * contexto). "Reiniciar/Gerar de novo" é só chamar `iniciar()` de novo com
- * uma fila nova — recomeça do zero (Fase 1d, SPEC-23).
+ * Orquestra chamadas reais de `/ia/sugerir-item` (schema dinâmico via GBNF,
+ * Fase 1d-ii) em sequência sobre uma fila de atividades pendentes — nunca em
+ * paralelo (um modelo local, uma sessão só; chamadas concorrentes
+ * disputariam o mesmo contexto). "Reiniciar/Gerar de novo" é só chamar
+ * `iniciar()` de novo com uma fila nova — recomeça do zero (Fase 1d,
+ * SPEC-23).
+ *
+ * Sem `textoParcial` (existia na versão 1d, placeholder-por-placeholder,
+ * streamada): a chamada por item devolve todos os campos de uma vez via
+ * GBNF, não streamada — quem chama mostra um indicador estático ("gerando a
+ * ficha inteira...") em vez de texto crescendo caractere a caractere.
  *
  * A fila é um snapshot passado em `iniciar()`, não um valor reativo — evita
  * reconstruir/reiniciar a cada re-render de quem chama (fichas/atividades
@@ -42,7 +52,6 @@ export function useGeracaoAoVivo({ contextoEpico, onResponderItem }: UseGeracaoA
   const [indice, setIndice] = useState(0);
   const [rodando, setRodando] = useState(false);
   const [pausado, setPausado] = useState(false);
-  const [textoParcial, setTextoParcial] = useState("");
 
   // Refs pra loop assíncrono ler o estado mais recente sem depender de
   // closures presas no valor de quando o loop começou.
@@ -60,17 +69,20 @@ export function useGeracaoAoVivo({ contextoEpico, onResponderItem }: UseGeracaoA
         }
 
         setIndice(i);
-        setTextoParcial("");
         const item = filaNova[i];
         try {
-          const { valor } = await apiIa.sugerir(
-            { tech: item.tech, rotulo: item.rotulo, contextoNo: item.contextoNo, contextoEpico },
-            (pedaco) => {
-              if (tokenRef.current === token) setTextoParcial((t) => t + pedaco);
-            }
-          );
+          const respostas = await apiIa.sugerirItem({
+            atividadeRotulo: item.atividadeRotulo,
+            contextoNo: item.contextoNo,
+            contextoEpico,
+            placeholders: item.placeholders,
+          });
           if (tokenRef.current !== token) return;
-          onResponderItem?.(item.atividadeChave, item.chavePlaceholder, { valor, origem: "sugerido", confirmado: false });
+          for (const placeholder of item.placeholders) {
+            const valor = respostas[placeholder.chave];
+            if (valor === undefined) continue;
+            onResponderItem?.(item.atividadeChave, placeholder.chave, { valor, origem: "sugerido", confirmado: false });
+          }
         } catch {
           // Achado esperado: falha isolada (ex.: modelo travou num item) não
           // trava a fila inteira — segue pro próximo. O item que falhou fica
@@ -89,7 +101,6 @@ export function useGeracaoAoVivo({ contextoEpico, onResponderItem }: UseGeracaoA
       setPausado(false);
       setFila(filaNova);
       setIndice(0);
-      setTextoParcial("");
       setRodando(filaNova.length > 0);
       if (filaNova.length > 0) void processarFila(filaNova, token);
     },
@@ -111,7 +122,6 @@ export function useGeracaoAoVivo({ contextoEpico, onResponderItem }: UseGeracaoA
     pausado,
     atual: rodando ? (fila[indice] ?? null) : null,
     progresso: { feito: rodando ? indice : fila.length, total: fila.length },
-    textoParcial,
     iniciar,
     pausar,
     continuar,
