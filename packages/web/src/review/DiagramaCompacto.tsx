@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import type { Diagrama, DiagramaConfig } from "@gerador/engine";
 
 export interface DiagramaCompactoProps {
@@ -16,6 +17,9 @@ export interface DiagramaCompactoProps {
   /** Itens derivados por nó — vira o badge de contagem no canto do card,
    * como o `.cnt` do protótipo. */
   contagemPorNo?: Record<string, number>;
+  /** Altura em px, quando a divisória arrastável (ReviewScreen) já mediu uma
+   * — `undefined` cai no default proporcional de 30vh. */
+  altura?: number;
 }
 
 // Proporções do protótipo (nó 210-240×64 num palco de 1200×430): aqui a
@@ -65,7 +69,19 @@ function caminhoAresta(a: Ponto, b: Ponto): { d: string; meio: Ponto } {
  * legenda de tipos e dica de filtro. Sem zoom/pan/drag (isso mora no
  * diagrama completo, `gerarDiagramaHtml`) — clique filtra os itens.
  */
-export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, onClickNo, contagemPorNo }: DiagramaCompactoProps) {
+export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, onClickNo, contagemPorNo, altura }: DiagramaCompactoProps) {
+  // Pan/zoom (SPEC-24 Fase E — "deve ser possível clicar no quadro do canvas
+  // e movimentá-lo, tal como no outro canvas do projeto, também ampliar,
+  // reduzir"): a vista é um viewBox alternativo; `null` = enquadramento
+  // automático. Arrastar o fundo move, roda do mouse amplia/reduz ancorado
+  // no cursor, duplo clique volta ao enquadramento automático.
+  const [vista, setVista] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const arrastoRef = useRef<{ x: number; y: number; vista: { x: number; y: number; w: number; h: number } } | null>(null);
+  // Distingue arrasto de clique: depois de mover além do limiar, o clique
+  // que o browser dispara ao soltar NÃO pode virar filtro por nó.
+  const arrastouRef = useRef(false);
+
   const nos = diagrama.nodes.map((no) => ({
     id: no.id,
     label: no.label,
@@ -87,7 +103,7 @@ export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, on
     }))
     .filter((e): e is typeof e & { a: NonNullable<typeof e.a>; b: NonNullable<typeof e.b> } => !!e.a && !!e.b);
 
-  const viewBox =
+  const vistaBase =
     nos.length > 0
       ? (() => {
           const minX = Math.min(...nos.map((n) => n.x));
@@ -96,20 +112,83 @@ export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, on
           const maxY = Math.max(...nos.map((n) => n.y + ALTURA_NO));
           // Respiro extra embaixo: a legenda flutua sobre o canto inferior
           // esquerdo e não pode cobrir a última linha de cards.
-          return `${minX - PADDING} ${minY - PADDING} ${maxX - minX + PADDING * 2} ${maxY - minY + PADDING + 90}`;
+          return { x: minX - PADDING, y: minY - PADDING, w: maxX - minX + PADDING * 2, h: maxY - minY + PADDING + 90 };
         })()
-      : "0 0 400 150";
+      : { x: 0, y: 0, w: 400, h: 150 };
+
+  const vistaEfetiva = vista ?? vistaBase;
+  const viewBox = `${vistaEfetiva.x} ${vistaEfetiva.y} ${vistaEfetiva.w} ${vistaEfetiva.h}`;
+
+  /** Converte um delta em pixels de tela pra unidades do viewBox. */
+  function escalaPorPixel(): number {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0) return 1;
+    return vistaEfetiva.w / rect.width;
+  }
+
+  function aoPressionar(e: React.PointerEvent<SVGSVGElement>) {
+    // `!= null`: eventos sintetizados sem MouseEvent (jsdom) não têm button.
+    if (e.button != null && e.button !== 0) return;
+    arrastoRef.current = { x: e.clientX ?? 0, y: e.clientY ?? 0, vista: vistaEfetiva };
+    arrastouRef.current = false;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // jsdom não implementa pointer capture — o arrasto ainda funciona
+      // enquanto o ponteiro estiver sobre o svg.
+    }
+  }
+
+  function aoMover(e: React.PointerEvent<SVGSVGElement>) {
+    const inicio = arrastoRef.current;
+    if (!inicio) return;
+    const dx = (e.clientX ?? 0) - inicio.x;
+    const dy = (e.clientY ?? 0) - inicio.y;
+    if (!arrastouRef.current && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+    arrastouRef.current = true;
+    const k = escalaPorPixel();
+    setVista({ ...inicio.vista, x: inicio.vista.x - dx * k, y: inicio.vista.y - dy * k });
+  }
+
+  function aoSoltar() {
+    arrastoRef.current = null;
+  }
+
+  function aoRodar(e: React.WheelEvent<SVGSVGElement>) {
+    const fator = e.deltaY > 0 ? 1.15 : 1 / 1.15;
+    const rect = svgRef.current?.getBoundingClientRect();
+    const v = vistaEfetiva;
+    // Zoom ancorado no cursor: o ponto sob o mouse continua sob o mouse.
+    const px = rect && rect.width > 0 ? (e.clientX - rect.left) / rect.width : 0.5;
+    const py = rect && rect.height > 0 ? (e.clientY - rect.top) / rect.height : 0.5;
+    const w = Math.min(Math.max(v.w * fator, 200), vistaBase.w * 4);
+    const h = (w / v.w) * v.h;
+    setVista({ x: v.x + (v.w - w) * px, y: v.y + (v.h - h) * py, w, h });
+  }
 
   const tiposPresentes = [...new Map(nos.map((n) => [n.tipo, n.cor])).entries()];
 
   return (
-    <div style={palcoEstilo}>
+    <div style={{ ...palcoEstilo, ...(altura !== undefined ? { height: altura, minHeight: 120 } : {}) }}>
       <svg
+        ref={svgRef}
         role="img"
         aria-label="Diagrama compacto da solução"
         viewBox={viewBox}
         preserveAspectRatio="xMidYMid meet"
-        style={{ width: "100%", height: "100%", display: "block" }}
+        onPointerDown={aoPressionar}
+        onPointerMove={aoMover}
+        onPointerUp={aoSoltar}
+        onPointerCancel={aoSoltar}
+        onWheel={aoRodar}
+        onDoubleClick={() => setVista(null)}
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "block",
+          touchAction: "none",
+          cursor: arrastoRef.current ? "grabbing" : "grab",
+        }}
       >
         <defs>
           <pattern id="diagrama-pontos" width={26} height={26} patternUnits="userSpaceOnUse">
@@ -174,7 +253,15 @@ export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, on
               key={n.id}
               data-testid={`diagrama-compacto-no-${n.id}`}
               className="diagrama-no-entrando"
-              onClick={onClickNo ? () => onClickNo(n.id) : undefined}
+              onClick={
+                onClickNo
+                  ? () => {
+                      // O clique que o browser dispara ao soltar um arrasto de
+                      // pan não pode virar filtro por nó.
+                      if (!arrastouRef.current) onClickNo(n.id);
+                    }
+                  : undefined
+              }
               style={{
                 cursor: onClickNo ? "pointer" : undefined,
                 animationDelay: `${i * 90}ms`,

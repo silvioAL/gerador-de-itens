@@ -307,11 +307,43 @@ export const apiIa = {
    * papel) é quem chama, não esta função. Substitui o mecanismo de item
    * único da Fase 1d-ii (`/ia/sugerir-item`, removido — a esteira processa
    * por papel, não por item inteiro de uma vez). */
-  sugerirPipeline: (papel: PapelPipeline, pedido: PedidoSugestaoItemIa) =>
-    requisitar<Record<string, string>>(`/ia/pipeline/${encodeURIComponent(papel)}`, {
+  sugerirPipeline: async (
+    papel: PapelPipeline,
+    pedido: PedidoSugestaoItemIa,
+    onTexto?: (acumulado: string) => void
+  ): Promise<Record<string, string>> => {
+    // SPEC-24 Fase E — a rota streama o texto CRU do JSON restrito por GBNF
+    // conforme o modelo escreve ("mostrar o que está rodando no modelo, tal
+    // como a experiência que existe com o Claude"). Acumula os pedaços,
+    // repassa o acumulado pra UI mostrar ao vivo, e parseia no final — o
+    // corpo completo é sempre JSON válido (a grammar garante).
+    const resposta = await fetch(`${BASE_URL}/ia/pipeline/${encodeURIComponent(papel)}`, {
       method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(pedido),
-    }),
+    });
+    if (!resposta.ok) {
+      const corpo = await resposta.json().catch(() => ({}));
+      const mensagem = typeof corpo.erro === "string" ? corpo.erro : "Não foi possível gerar a ficha.";
+      throw new Error(mensagem);
+    }
+    let acumulado = "";
+    const leitor = resposta.body?.getReader();
+    if (leitor) {
+      const decodificador = new TextDecoder();
+      for (;;) {
+        const { done, value } = await leitor.read();
+        if (done) break;
+        acumulado += decodificador.decode(value, { stream: true });
+        onTexto?.(acumulado);
+      }
+      acumulado += decodificador.decode();
+    } else {
+      acumulado = await resposta.text();
+    }
+    return JSON.parse(acumulado) as Record<string, string>;
+  },
 };
 
 export const apiPerfisTime = {

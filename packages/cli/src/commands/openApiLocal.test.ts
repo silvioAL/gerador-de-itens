@@ -35,11 +35,25 @@ const completarMock = vi.fn(async (_prompt: string, opcoes?: { onTexto?: (p: str
 // SPEC-24 — /ia/pipeline/:papel usa completarComSchema (GBNF), não completar
 // (texto livre): mock devolve um valor por chave recebida no schema, pra
 // simular o comportamento real de "resposta sempre bate com o schema
-// pedido" sem depender do binário nativo em CI.
-const completarComSchemaMock = vi.fn(async (_prompt: string, schema: { properties?: Record<string, unknown> }) => {
-  const chaves = Object.keys(schema.properties ?? {});
-  return Object.fromEntries(chaves.map((chave) => [chave, `resposta gerada pra ${chave}`]));
-});
+// pedido" sem depender do binário nativo em CI. Desde a Fase E a rota
+// STREAMA o texto cru do JSON restrito — o mock emite o mesmo JSON em dois
+// pedaços via onTexto (como o motor real faria token a token), e o corpo
+// acumulado é o que o cliente parseia.
+const completarComSchemaMock = vi.fn(
+  async (
+    _prompt: string,
+    schema: { properties?: Record<string, unknown> },
+    opcoes?: { onTexto?: (pedaco: string) => void }
+  ) => {
+    const chaves = Object.keys(schema.properties ?? {});
+    const resultado = Object.fromEntries(chaves.map((chave) => [chave, `resposta gerada pra ${chave}`]));
+    const texto = JSON.stringify(resultado);
+    opcoes?.onTexto?.(texto.slice(0, 10));
+    await new Promise((r) => setTimeout(r, 5));
+    opcoes?.onTexto?.(texto.slice(10));
+    return resultado;
+  }
+);
 const carregarModeloChatMock = vi.fn(async () => ({
   completar: completarMock,
   completarComSchema: completarComSchemaMock,

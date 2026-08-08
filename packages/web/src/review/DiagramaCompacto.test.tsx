@@ -3,6 +3,15 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { Diagrama, DiagramaConfig } from "@gerador/engine";
 import { DiagramaCompacto } from "./DiagramaCompacto";
 
+/** jsdom (25) não implementa PointerEvent — o fireEvent.pointerDown cai num
+ * Event genérico que DESCARTA clientX/button do init. Este helper cria o
+ * Event e atribui as propriedades à mão, que é o que o handler lê. */
+function eventoPonteiro(tipo: string, props: Record<string, unknown>) {
+  const ev = new Event(tipo, { bubbles: true, cancelable: true });
+  Object.assign(ev, props);
+  return ev;
+}
+
 const config: DiagramaConfig = {
   nodeTypes: {
     service: { label: "Serviço", derives: "service", techs: [], contextos: [], spec: [], color: "#38bdf8" },
@@ -89,6 +98,42 @@ describe("DiagramaCompacto (Fase 1d, SPEC-23)", () => {
     // Sem nó ativo nenhum, nenhuma aresta anima — o diagrama fica em repouso.
     rerender(<DiagramaCompacto diagrama={diagrama} config={config} />);
     expect(screen.queryByTestId("diagrama-cometa-e1")).not.toBeInTheDocument();
+  });
+
+  it("arrastar o fundo faz pan (viewBox muda) e duplo clique volta ao enquadramento automático (Fase E)", () => {
+    render(<DiagramaCompacto diagrama={diagrama} config={config} />);
+    const svg = screen.getByRole("img", { name: "Diagrama compacto da solução" });
+    const viewBoxInicial = svg.getAttribute("viewBox");
+
+    fireEvent(svg, eventoPonteiro("pointerdown", { clientX: 100, clientY: 100, button: 0, pointerId: 1 }));
+    fireEvent(svg, eventoPonteiro("pointermove", { clientX: 160, clientY: 130, pointerId: 1 }));
+    fireEvent(svg, eventoPonteiro("pointerup", { pointerId: 1 }));
+    expect(svg.getAttribute("viewBox")).not.toBe(viewBoxInicial);
+
+    fireEvent.doubleClick(svg);
+    expect(svg.getAttribute("viewBox")).toBe(viewBoxInicial);
+  });
+
+  it("roda do mouse dá zoom (viewBox encolhe ao aproximar)", () => {
+    render(<DiagramaCompacto diagrama={diagrama} config={config} />);
+    const svg = screen.getByRole("img", { name: "Diagrama compacto da solução" });
+    const larguraInicial = Number(svg.getAttribute("viewBox")!.split(" ")[2]);
+
+    fireEvent.wheel(svg, { deltaY: -100, clientX: 100, clientY: 60 });
+    const larguraDepois = Number(svg.getAttribute("viewBox")!.split(" ")[2]);
+    expect(larguraDepois).toBeLessThan(larguraInicial);
+  });
+
+  it("depois de um arrasto de pan, o clique de soltar NÃO vira filtro por nó", () => {
+    const onClickNo = vi.fn();
+    render(<DiagramaCompacto diagrama={diagrama} config={config} onClickNo={onClickNo} />);
+    const svg = screen.getByRole("img", { name: "Diagrama compacto da solução" });
+
+    fireEvent(svg, eventoPonteiro("pointerdown", { clientX: 10, clientY: 10, button: 0, pointerId: 1 }));
+    fireEvent(svg, eventoPonteiro("pointermove", { clientX: 80, clientY: 40, pointerId: 1 }));
+    fireEvent(svg, eventoPonteiro("pointerup", { pointerId: 1 }));
+    fireEvent.click(screen.getByTestId("diagrama-compacto-no-n1"));
+    expect(onClickNo).not.toHaveBeenCalled();
   });
 
   it("com filtro ativo, o nó filtrado fica opaco e os demais esmaecidos (Fase D, SPEC-24)", () => {

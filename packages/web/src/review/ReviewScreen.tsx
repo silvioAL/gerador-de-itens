@@ -190,6 +190,30 @@ export function ReviewScreen({
   // SPEC-24 Fase D: clique num nó do DiagramaCompacto filtra a lista de
   // itens por aquele nó; segundo clique no mesmo nó limpa (toggle).
   const [filtroNoId, setFiltroNoId] = useState<string | null>(null);
+  // SPEC-24 Fase E: altura do diagrama controlada pela divisória arrastável
+  // ("usuário pode clicar e arrastar pra cima e pra baixo, assim ganha mais
+  // espaço pra ver melhor o conteúdo"). `null` = default proporcional (30vh).
+  const [alturaDiagrama, setAlturaDiagrama] = useState<number | null>(null);
+
+  function iniciarArrastoDivisoria(e: React.PointerEvent<HTMLDivElement>) {
+    e.preventDefault();
+    const alvo = e.currentTarget;
+    try {
+      alvo.setPointerCapture(e.pointerId);
+    } catch {
+      // jsdom não implementa pointer capture — os listeners abaixo já bastam.
+    }
+    const inicioY = e.clientY ?? 0;
+    const alturaInicial = (alvo.previousElementSibling as HTMLElement | null)?.getBoundingClientRect().height ?? 200;
+    const aoMover = (ev: PointerEvent) => {
+      const y = ev.clientY ?? 0;
+      setAlturaDiagrama(Math.min(Math.max(alturaInicial + (y - inicioY), 120), window.innerHeight * 0.7));
+    };
+    const aoSoltar = () => alvo.removeEventListener("pointermove", aoMover);
+    alvo.addEventListener("pointermove", aoMover);
+    alvo.addEventListener("pointerup", aoSoltar, { once: true });
+    alvo.addEventListener("pointercancel", aoSoltar, { once: true });
+  }
   // SPEC-24 Fase E: default seguro (pausa pra confirmação manual) até o
   // valor real carregar — nunca aplica direto sem saber a config de verdade.
   const [confirmacaoObrigatoria, setConfirmacaoObrigatoria] = useState(true);
@@ -463,7 +487,18 @@ export function ReviewScreen({
             noFiltradoId={filtroNoId ?? undefined}
             onClickNo={clicarNoDiagrama}
             contagemPorNo={contagemPorNo}
+            altura={alturaDiagrama ?? undefined}
           />
+          <div
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label="Ajustar altura do diagrama"
+            data-testid="divisoria-diagrama"
+            onPointerDown={iniciarArrastoDivisoria}
+            style={divisoriaEstilo}
+          >
+            <span style={divisoriaGripEstilo} />
+          </div>
           <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
           <section data-tour="review-table" className="review-lista" style={listaEstilo}>
             {(resultado.ciclos.length > 0 || resultado.conflitos.length > 0) && (
@@ -617,6 +652,9 @@ export function ReviewScreen({
                       papelEmGeracao={
                         esteira.rodando && esteira.atual?.atividadeChave === atividadeSelecionada.chave ? esteira.papelAtual ?? undefined : undefined
                       }
+                      respostasAoVivo={
+                        esteira.rodando && esteira.atual?.atividadeChave === atividadeSelecionada.chave ? esteira.respostasAoVivo : undefined
+                      }
                     />
                   )}
                   {aba === "testes" && <AbaTestes ficha={fichaSelecionada} />}
@@ -751,6 +789,13 @@ interface AbaRefinamentoProps {
    * chamada só, "gerando a ficha inteira" valia pra tudo de uma vez), agora
    * cada papel tem seu próprio momento. */
   papelEmGeracao?: PapelPipeline;
+  /** SPEC-24 Fase E — o que o modelo está ESCREVENDO agora, por chave
+   * (extraído do JSON parcial streamado). O campo em geração mostra esse
+   * texto digitando com um caret, em vez de "…" parado — achado real do
+   * usuário: "fica só o ícone de gerando e 3 pontos, é um tanto pobre...
+   * mostrar o que está rodando no modelo, tal como a experiência do
+   * Claude". */
+  respostasAoVivo?: Record<string, string>;
 }
 
 /**
@@ -764,7 +809,7 @@ interface AbaRefinamentoProps {
  * "nada sugerido conta até confirmado" já usada pro semáforo de prontidão
  * dos nós).
  */
-function AbaRefinamento({ ficha, contextoEpico, onResponder, papelEmGeracao }: AbaRefinamentoProps) {
+function AbaRefinamento({ ficha, contextoEpico, onResponder, papelEmGeracao, respostasAoVivo }: AbaRefinamentoProps) {
   const [rascunhos, setRascunhos] = useState<Record<string, string>>({});
   const [carregando, setCarregando] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -828,8 +873,19 @@ function AbaRefinamento({ ficha, contextoEpico, onResponder, papelEmGeracao }: A
                       <pre style={{ ...preEstilo, marginTop: 8 }}>{String(p.resposta?.valor)}</pre>
                     ) : aguardandoGeracao ? (
                       <div style={{ marginTop: 8 }}>
-                        <pre style={preEstilo}>…</pre>
-                        <span style={{ fontSize: 10.5, color: "#38bdf8" }}>✨ {ROTULO_PAPEL[papel]} gerando…</span>
+                        {/* O texto do modelo digitando em tempo real, com caret —
+                            não mais "…" parado. Antes do primeiro token desse
+                            campo chegar, um indicador pulsante de pensamento. */}
+                        {respostasAoVivo?.[p.chave] !== undefined ? (
+                          <pre data-testid={`ao-vivo-${p.chave}`} className="texto-ao-vivo" style={preEstilo}>
+                            {respostasAoVivo[p.chave]}
+                          </pre>
+                        ) : (
+                          <pre className="pensando-ao-vivo" style={preEstilo}>
+                            ●●●
+                          </pre>
+                        )}
+                        <span style={{ fontSize: 10.5, color: "#38bdf8" }}>✨ {ROTULO_PAPEL[papel]} escrevendo…</span>
                       </div>
                     ) : (
                       <div style={{ marginTop: 8 }}>
@@ -959,6 +1015,26 @@ const listaEstilo: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 8,
+};
+
+// Divisória arrastável entre o diagrama e a metade de baixo (Fase E) —
+// área de 10px com um grip central, cursor de redimensionar.
+const divisoriaEstilo: React.CSSProperties = {
+  height: 10,
+  flexShrink: 0,
+  display: "grid",
+  placeItems: "center",
+  cursor: "ns-resize",
+  background: "#0C111A",
+  borderBottom: "1px solid #1B2533",
+  touchAction: "none",
+};
+
+const divisoriaGripEstilo: React.CSSProperties = {
+  width: 44,
+  height: 3,
+  borderRadius: 2,
+  background: "#263344",
 };
 
 const railEstilo: React.CSSProperties = {
