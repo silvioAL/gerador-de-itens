@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ValorSpec } from "@gerador/engine";
 import { apiIa, type PapelPipeline, type PlaceholderPedidoItemIa } from "../api/client";
 
@@ -29,6 +29,12 @@ export interface ItemFilaEsteira {
 
 export interface UseEsteiraDeAgentesParams {
   contextoEpico?: string;
+  /** SPEC-24 Fase E — achado real do usuário: "pode avançar sozinho até o
+   * fim, ou ir parando conforme está hoje". `true` (default) preserva o
+   * comportamento atual — cada resposta fica `confirmado: false`, pendente
+   * de revisão manual. `false` aplica direto (`confirmado: true`), sem
+   * pausa, igual ao protótipo de referência. */
+  confirmacaoObrigatoria?: boolean;
   onResponderItem?: (atividadeChave: string, chavePlaceholder: string, resposta: ValorSpec) => void;
 }
 
@@ -56,7 +62,11 @@ export interface EstadoEsteiraDeAgentes {
  * só). Falha isolada num item não trava a esteira, mesma disciplina de
  * `useGeracaoAoVivo`.
  */
-export function useEsteiraDeAgentes({ contextoEpico, onResponderItem }: UseEsteiraDeAgentesParams): EstadoEsteiraDeAgentes {
+export function useEsteiraDeAgentes({
+  contextoEpico,
+  confirmacaoObrigatoria = true,
+  onResponderItem,
+}: UseEsteiraDeAgentesParams): EstadoEsteiraDeAgentes {
   const [fila, setFila] = useState<ItemFilaEsteira[]>([]);
   const [papelIndice, setPapelIndice] = useState(0);
   const [itemIndice, setItemIndice] = useState(0);
@@ -65,6 +75,17 @@ export function useEsteiraDeAgentes({ contextoEpico, onResponderItem }: UseEstei
 
   const pausadoRef = useRef(false);
   const tokenRef = useRef(0);
+  // Lido dentro de `processarEsteira`, não capturado por fechamento — o
+  // efeito de auto-start em `ReviewScreen` chama `esteira.iniciar` só na
+  // montagem (deps `[]`), preso ao `iniciar` da primeira renderização; sem o
+  // ref, a config carregada depois (achado real: `/config/pipeline-agentes`
+  // resolve depois de `/ia/status`) nunca seria enxergada por esse fechamento
+  // já antigo. Ref sempre reflete o valor mais recente, mesmo lido de dentro
+  // de uma função presa a uma renderização passada.
+  const confirmacaoObrigatoriaRef = useRef(confirmacaoObrigatoria);
+  useEffect(() => {
+    confirmacaoObrigatoriaRef.current = confirmacaoObrigatoria;
+  }, [confirmacaoObrigatoria]);
 
   const processarEsteira = useCallback(
     async (filaNova: ItemFilaEsteira[], token: number) => {
@@ -95,7 +116,11 @@ export function useEsteiraDeAgentes({ contextoEpico, onResponderItem }: UseEstei
             for (const placeholder of item.placeholdersPorPapel[papel]) {
               const valor = respostas[placeholder.chave];
               if (valor === undefined) continue;
-              onResponderItem?.(item.atividadeChave, placeholder.chave, { valor, origem: "sugerido", confirmado: false });
+              onResponderItem?.(item.atividadeChave, placeholder.chave, {
+                valor,
+                origem: "sugerido",
+                confirmado: !confirmacaoObrigatoriaRef.current,
+              });
             }
           } catch {
             // Falha isolada (ex.: modelo travou nesse item/papel) não trava a

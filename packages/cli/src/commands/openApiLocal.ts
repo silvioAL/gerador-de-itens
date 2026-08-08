@@ -411,6 +411,38 @@ async function tratarEspecificacaoTemplate(req: IncomingMessage, res: ServerResp
   enviarJson(res, 404, { erro: "não encontrado" });
 }
 
+// --- GET/PUT /config/pipeline-agentes — SPEC-24 Fase E: se a esteira pausa
+// pra confirmação manual campo a campo (`confirmacaoObrigatoria: true`,
+// default — comportamento de hoje) ou avança sozinha até o fim aplicando
+// direto (`false`, achado real do usuário: "pode avançar sozinho até o fim,
+// ou ir parando conforme está hoje" — o mesmo protótipo de referência sempre
+// aplicou direto, sem funil de aprovação). Mesmo arquivo que a Fase F
+// (configurabilidade do pipeline — prompts/ordem/agentes contextuais, ainda
+// não implementada) vai estender, não um arquivo novo por campo.
+interface ConfigPipelineAgentesLocal {
+  confirmacaoObrigatoria: boolean;
+}
+const CONFIG_PIPELINE_AGENTES_PADRAO: ConfigPipelineAgentesLocal = { confirmacaoObrigatoria: true };
+
+async function tratarPipelineAgentes(req: IncomingMessage, res: ServerResponse, metodo: string, dirProjeto: string): Promise<void> {
+  const arquivo = resolve(dirProjeto, "config", "pipeline-agentes.json");
+
+  if (metodo === "GET") {
+    const config = await lerJsonOpcional<ConfigPipelineAgentesLocal>(arquivo);
+    return enviarJson(res, 200, config ?? CONFIG_PIPELINE_AGENTES_PADRAO);
+  }
+
+  if (metodo === "PUT") {
+    const { confirmacaoObrigatoria } = await lerCorpoJson<{ confirmacaoObrigatoria: boolean }>(req);
+    const config: ConfigPipelineAgentesLocal = { confirmacaoObrigatoria: !!confirmacaoObrigatoria };
+    await mkdir(resolve(dirProjeto, "config"), { recursive: true });
+    await writeFile(arquivo, JSON.stringify(config, null, 2), "utf-8");
+    return enviarJson(res, 200, config);
+  }
+
+  enviarJson(res, 404, { erro: "não encontrado" });
+}
+
 // --- POST /ia/sugerir — fluxo 3 (Fase 1, SPEC-23): sugestão de texto pra um
 // placeholder "<- ✍️ especificar" do checklist técnico/volumetria ---
 
@@ -600,6 +632,10 @@ export async function tratarApiLocal(req: IncomingMessage, res: ServerResponse, 
   }
   if (caminho === "/ia/sugerir" && metodo === "POST") {
     await tratarIaSugerir(req, res);
+    return true;
+  }
+  if (caminho === "/config/pipeline-agentes" && (metodo === "GET" || metodo === "PUT")) {
+    await tratarPipelineAgentes(req, res, metodo, dirProjeto);
     return true;
   }
   const matchPipeline = metodo === "POST" && caminho.match(/^\/ia\/pipeline\/([^/]+)$/);

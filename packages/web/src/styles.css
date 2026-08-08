@@ -31,3 +31,72 @@ button {
 .review-item-expandido {
   animation: expandir-item 160ms ease-out;
 }
+
+/* Riqueza visual da esteira de agentes (SPEC-24 Fase E — achado real: "a
+   experiência ainda está bem distante do protótipo... animações, feedback
+   visual onde os agentes estão trabalhando, alternância dos itens, animação
+   das conexões"). Só CSS puro (sem lib de animação nova) — mesma disciplina
+   de `expandir-item` acima. */
+
+@keyframes handoff-girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.handoff-tick-ativo {
+  animation: handoff-girar 900ms linear infinite;
+}
+
+@keyframes handoff-hop {
+  0% {
+    opacity: 0;
+    transform: translateX(-6px) scale(0.6);
+  }
+  30% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  70% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(6px) scale(0.6);
+  }
+}
+.handoff-hop-token {
+  animation: handoff-hop 1.1s ease-out;
+}
+
+@keyframes diagrama-no-pulso {
+  0%,
+  100% {
+    stroke-opacity: 1;
+  }
+  50% {
+    stroke-opacity: 0.4;
+  }
+}
+.diagrama-no-ativo rect:first-of-type {
+  animation: diagrama-no-pulso 1.3s ease-in-out infinite;
+}
+
+@keyframes diagrama-aresta-fluxo {
+  to {
+    stroke-dashoffset: -16;
+  }
+}
+.diagrama-aresta-ativa {
+  stroke-dasharray: 5 4;
+  animation: diagrama-aresta-fluxo 550ms linear infinite;
+}
+
+@keyframes pip-pulso {
+  50% {
+    opacity: 0.35;
+  }
+}
+.pip-pulsando {
+  animation: pip-pulso 900ms ease-in-out infinite;
+}

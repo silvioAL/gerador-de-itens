@@ -27,8 +27,13 @@ const apiIaSugerirPipelineMock = vi.hoisted(() => vi.fn().mockResolvedValue({}))
 const apiIaStatusMock = vi.hoisted(() =>
   vi.fn().mockResolvedValue({ chatInstalado: false, embeddingInstalado: false, pronto: false, caminhoModelos: "" })
 );
+// SPEC-24 Fase E — default true (mesma segurança do valor inicial real):
+// nenhum teste desta suíte testa o modo "aplica direto", então mantém o
+// comportamento pausado de sempre em todos os outros.
+const apiPipelineAgentesObterMock = vi.hoisted(() => vi.fn().mockResolvedValue({ confirmacaoObrigatoria: true }));
 vi.mock("../api/client", () => ({
   apiIa: { sugerir: apiIaSugerirMock, sugerirPipeline: apiIaSugerirPipelineMock, status: apiIaStatusMock },
+  apiPipelineAgentes: { obter: apiPipelineAgentesObterMock },
 }));
 
 interface Fixture01 {
@@ -601,6 +606,37 @@ describe("ReviewScreen — esteira de agentes (SPEC-24 — orquestração real p
 
     liberar();
     await waitFor(() => expect(apiIaSugerirPipelineMock).toHaveBeenCalledWith("po", expect.anything()));
+  });
+
+  it("confirmacaoObrigatoria: false (config carregada) aplica as respostas direto, confirmado: true — SPEC-24 Fase E, achado real do usuário", async () => {
+    apiIaStatusMock.mockResolvedValueOnce({ chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "" });
+    apiPipelineAgentesObterMock.mockResolvedValueOnce({ confirmacaoObrigatoria: false });
+    apiIaSugerirPipelineMock.mockImplementation(async (_papel: string, pedido: { placeholders: { chave: string }[] }) =>
+      Object.fromEntries(pedido.placeholders.map((p) => [p.chave, "resposta gerada"]))
+    );
+    const resultado = resultadoFixture01();
+    const onResponderItem = vi.fn();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        regras={regrasUmPlaceholder}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+        onResponderItem={onResponderItem}
+      />
+    );
+
+    await waitFor(() =>
+      expect(onResponderItem).toHaveBeenCalledWith(
+        expect.any(String),
+        "_historiaUsuario",
+        expect.objectContaining({ confirmado: true })
+      )
+    );
   });
 
   it("modelo não pronto: não dispara sozinha, tela fica no comportamento manual de sempre", async () => {

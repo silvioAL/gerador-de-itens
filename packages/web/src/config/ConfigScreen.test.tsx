@@ -25,6 +25,7 @@ function renderTela(mostrarMembros: boolean, mostrarCamposAresta = true) {
       camposNo={[]}
       camposAresta={[]}
       especificacaoTemplate={especificacaoTemplate}
+      pipelineAgentes={{ confirmacaoObrigatoria: true }}
       timeAtivo="time-x"
       mostrarMembros={mostrarMembros}
       mostrarCamposAresta={mostrarCamposAresta}
@@ -36,6 +37,7 @@ function renderTela(mostrarMembros: boolean, mostrarCamposAresta = true) {
       onAtualizarCampoAresta={vi.fn()}
       onExcluirCampoAresta={vi.fn()}
       onSalvarEspecificacaoTemplate={vi.fn()}
+      onSalvarPipelineAgentes={vi.fn()}
       onFechar={vi.fn()}
     />
   );
