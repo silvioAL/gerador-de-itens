@@ -193,6 +193,45 @@ describe("gerarEspecificacaoEntrega", () => {
     expect(doc).toContain("Cenário: catálogo vazio não quebra a tela");
   });
 
+  it("contrato de arquitetura: sem resposta nenhuma, seção nem aparece; com pelo menos um campo confirmado, mostra só os preenchidos (SPEC-24)", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+    const chaveMongo = atividades.find((a) => a.chave.startsWith("n2"))!.chave;
+
+    const semResposta = gerarEspecificacaoEntrega(atividades, diagrama, config, {});
+    expect(semResposta).not.toContain("Nó vinculado");
+
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, config, {
+      respostasItens: {
+        [chaveMongo]: {
+          _contratoRequest: { valor: "POST /v1/produtos {nome, preco}", origem: "manual" },
+          _contratoResponse: { valor: "201 {id}", origem: "sugerido", confirmado: true },
+        },
+      },
+    });
+    expect(doc).toContain("**Request:** POST /v1/produtos {nome, preco}");
+    expect(doc).toContain("**Response:** 201 {id}");
+    // Só os campos confirmados aparecem — Erros/Dependências/Nó vinculado ficam de fora, não "(não preenchido)".
+    expect(doc).not.toContain("**Erros:**");
+  });
+
+  it("regras de teste e cenário Gherkin (papel QA, SPEC-24) só aparecem quando confirmados", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+    const chaveMongo = atividades.find((a) => a.chave.startsWith("n2"))!.chave;
+
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, config, {
+      respostasItens: {
+        [chaveMongo]: {
+          _regrasTeste: { valor: "Teste de contrato valida schema do payload", origem: "manual" },
+          _cenarioFeature: { valor: "Cenário: publicação com payload inválido rejeita a mensagem", origem: "manual" },
+        },
+      },
+    });
+    expect(doc).toContain("Teste de contrato valida schema do payload");
+    expect(doc).toContain("Cenário: publicação com payload inválido rejeita a mensagem");
+  });
+
   it("com regras que ativam volumetria: documento inclui a seção 'Requisitos de volumetria' com o formato fixo", () => {
     const diagrama = diagramaBase();
     const atividades = derivar(diagrama, config, {});
@@ -493,6 +532,25 @@ describe("estruturarEspecificacaoNo / montarFichaItem (Fase 1a, SPEC-23 — dado
     const resposta = { valor: "Como PO, quero X.", origem: "manual" as const };
     const comRegras = montarFichaItem(1, atividades[0], diagrama, config, regras, { _historiaUsuario: resposta });
     expect(comRegras.historiaUsuario.resposta).toEqual(resposta);
+  });
+
+  it("montarFichaItem: contrato (5 campos)/regrasTeste/cenarioFeature sempre presentes, mesmo sem regras (SPEC-24)", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+
+    const semRegras = montarFichaItem(1, atividades[0], diagrama, config);
+    expect(semRegras.contrato.noVinculado).toEqual({ chave: "_contratoNoVinculado", tech: "", rotulo: "Nó vinculado", resposta: undefined });
+    expect(semRegras.contrato.request.chave).toBe("_contratoRequest");
+    expect(semRegras.contrato.response.chave).toBe("_contratoResponse");
+    expect(semRegras.contrato.erros.chave).toBe("_contratoErros");
+    expect(semRegras.contrato.dependencias.chave).toBe("_contratoDependencias");
+    expect(semRegras.regrasTeste.chave).toBe("_regrasTeste");
+    expect(semRegras.cenarioFeature.chave).toBe("_cenarioFeature");
+
+    const respostaRequest = { valor: "POST /v1/produtos", origem: "manual" as const };
+    const comResposta = montarFichaItem(1, atividades[0], diagrama, config, regras, { _contratoRequest: respostaRequest });
+    expect(comResposta.contrato.request.resposta).toEqual(respostaRequest);
+    expect(comResposta.contrato.response.resposta).toBeUndefined();
   });
 });
 

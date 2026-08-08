@@ -235,9 +235,13 @@ describe("listarPlaceholders (Fase 1, SPEC-23)", () => {
     expect(chaves).toContain("Backend::Nome do serviço segue o padrão do time");
     expect(chaves).not.toContain("Backend::Índice criado para as queries novas");
     // Fase 1d-ii, SPEC-23: história de usuário e critérios de aceite estão
-    // sempre presentes, além do checklist técnico da tech/contexto.
+    // sempre presentes, além do checklist técnico da tech/contexto. SPEC-24:
+    // contrato/regras de teste/cenário Gherkin também.
     expect(chaves).toContain("_historiaUsuario");
     expect(chaves).toContain("_criteriosAceite");
+    expect(chaves).toContain("_contratoRequest");
+    expect(chaves).toContain("_regrasTeste");
+    expect(chaves).toContain("_cenarioFeature");
     expect(placeholders.filter((p) => p.secao === "checklistTecnico").length).toBeGreaterThan(0);
   });
 
@@ -262,22 +266,35 @@ describe("listarPlaceholders (Fase 1, SPEC-23)", () => {
         },
       },
     };
-    // Fase 1d-ii, SPEC-23: história de usuário e critérios de aceite sempre
-    // aparecem (2 placeholders fixos), independente do `when` do checklist técnico.
+    // Fase 1d-ii/SPEC-24: história de usuário, critérios de aceite, contrato
+    // (5 campos), regras de teste e cenário Gherkin sempre aparecem (9
+    // placeholders fixos), independente do `when` do checklist técnico.
     const semNo = listarPlaceholders(regrasComMigracao, ["Backend"], [], [noTecnico({ status: "novo" })], semArestasTecnico);
     expect(semNo.filter((p) => p.secao === "checklistTecnico")).toHaveLength(0);
-    expect(semNo).toHaveLength(2);
+    expect(semNo).toHaveLength(9);
 
     const comNoExistente = listarPlaceholders(regrasComMigracao, ["Backend"], [], [noTecnico({ status: "existente" })], semArestasTecnico);
     expect(comNoExistente.filter((p) => p.secao === "checklistTecnico")).toHaveLength(1);
-    expect(comNoExistente).toHaveLength(3);
+    expect(comNoExistente).toHaveLength(10);
   });
 
-  it("história de usuário e critérios de aceite aparecem mesmo sem nenhuma tech/regra configurada (Fase 1d-ii, SPEC-23)", () => {
+  it("história de usuário, critérios de aceite, contrato, regras de teste e cenário Gherkin aparecem mesmo sem nenhuma tech/regra configurada (Fase 1d-ii/SPEC-24)", () => {
     const placeholders = listarPlaceholders(regras, [], [], [], []);
-    expect(placeholders).toHaveLength(2);
-    expect(placeholders.map((p) => p.secao).sort()).toEqual(["criteriosAceite", "historiaUsuario"]);
-    expect(placeholders.map((p) => p.chave)).toEqual(["_historiaUsuario", "_criteriosAceite"]);
+    expect(placeholders).toHaveLength(9);
+    expect(placeholders.map((p) => p.secao).sort()).toEqual([
+      "cenarioFeature", "contrato", "contrato", "contrato", "contrato", "contrato", "criteriosAceite", "historiaUsuario", "regrasTeste",
+    ]);
+    expect(placeholders.map((p) => p.chave)).toEqual([
+      "_historiaUsuario",
+      "_criteriosAceite",
+      "_contratoNoVinculado",
+      "_contratoRequest",
+      "_contratoResponse",
+      "_contratoErros",
+      "_contratoDependencias",
+      "_regrasTeste",
+      "_cenarioFeature",
+    ]);
   });
 });
 
