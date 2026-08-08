@@ -557,6 +557,21 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     expect(resposta.conteudo).toBe("# {{titulo}} customizado");
   });
 
+  it("GET /config/pipeline-agentes sem arquivo local devolve o default (confirmacaoObrigatoria: true) — SPEC-24 Fase E", async () => {
+    const resposta = await fetch(`${base}/config/pipeline-agentes`).then((r) => r.json());
+    expect(resposta).toEqual({ confirmacaoObrigatoria: true });
+  });
+
+  it("PUT /config/pipeline-agentes grava config/pipeline-agentes.json, e GET lê de volta", async () => {
+    await fetch(`${base}/config/pipeline-agentes`, {
+      method: "PUT",
+      body: JSON.stringify({ confirmacaoObrigatoria: false }),
+    });
+
+    const resposta = await fetch(`${base}/config/pipeline-agentes`).then((r) => r.json());
+    expect(resposta).toEqual({ confirmacaoObrigatoria: false });
+  });
+
   it("/times e /convites devolvem 501 — sem conceito de múltiplos times no modo local", async () => {
     expect((await fetch(`${base}/times`, { method: "POST", body: "{}" })).status).toBe(501);
     expect((await fetch(`${base}/convites/abc/aceitar`, { method: "POST" })).status).toBe(501);

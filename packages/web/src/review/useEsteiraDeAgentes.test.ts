@@ -73,6 +73,21 @@ describe("useEsteiraDeAgentes (SPEC-24 — orquestração por papel × todos os 
     });
   });
 
+  it("confirmacaoObrigatoria: false aplica direto (confirmado: true), sem pausa — SPEC-24 Fase E, achado real do usuário", async () => {
+    apiIaSugerirPipelineMock.mockImplementation(async (papel: string, pedido: { placeholders: { chave: string }[] }) =>
+      Object.fromEntries(pedido.placeholders.map((p) => [p.chave, `resposta ${papel}/${p.chave}`]))
+    );
+    const onResponderItem = vi.fn();
+    const { result } = renderHook(() => useEsteiraDeAgentes({ confirmacaoObrigatoria: false, onResponderItem }));
+
+    act(() => result.current.iniciar([item(1)]));
+    await waitFor(() => expect(result.current.rodando).toBe(false));
+
+    expect(onResponderItem).toHaveBeenCalledWith("a1", "_historiaUsuario", {
+      valor: "resposta po/_historiaUsuario", origem: "sugerido", confirmado: true,
+    });
+  });
+
   it("item sem nada pra um papel é pulado nesse papel, sem quebrar a esteira", async () => {
     const chamadas: string[] = [];
     apiIaSugerirPipelineMock.mockImplementation(async (papel: string, pedido: { atividadeRotulo: string }) => {

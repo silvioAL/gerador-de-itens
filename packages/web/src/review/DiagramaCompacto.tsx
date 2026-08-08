@@ -66,6 +66,10 @@ export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, on
       {arestas.map((e) => {
         const p1 = centro(e.a);
         const p2 = centro(e.b);
+        // Aresta tocando o nó ativo ganha destaque + fluxo animado (Fase E —
+        // "animação das conexões" era o gap visual mais citado em relação ao
+        // protótipo) — puramente visual, não muda o mecanismo por trás.
+        const tocaAtivo = !!noAtivoId && (e.source === noAtivoId || e.target === noAtivoId);
         return (
           <line
             key={e.id}
@@ -73,9 +77,10 @@ export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, on
             y1={p1.y}
             x2={p2.x}
             y2={p2.y}
-            stroke={e.cor}
-            strokeWidth={1.4}
-            opacity={0.6}
+            stroke={tocaAtivo ? "#38bdf8" : e.cor}
+            strokeWidth={tocaAtivo ? 2.2 : 1.4}
+            opacity={tocaAtivo ? 0.95 : 0.6}
+            className={tocaAtivo ? "diagrama-aresta-ativa" : undefined}
           />
         );
       })}
@@ -86,6 +91,7 @@ export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, on
           <g
             key={n.id}
             data-testid={`diagrama-compacto-no-${n.id}`}
+            className={ativo ? "diagrama-no-ativo" : undefined}
             onClick={onClickNo ? () => onClickNo(n.id) : undefined}
             style={onClickNo ? { cursor: "pointer" } : undefined}
             opacity={esmaecido ? 0.35 : 1}

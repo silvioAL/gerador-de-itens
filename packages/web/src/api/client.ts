@@ -341,6 +341,21 @@ export const apiEspecificacaoTemplate = {
     requisitar<EspecificacaoTemplate>("/especificacao-template", { method: "PUT", body: JSON.stringify(dados) }),
 };
 
+export interface ConfigPipelineAgentes {
+  confirmacaoObrigatoria: boolean;
+}
+
+/** SPEC-24 Fase E — achado real do usuário: "pode avançar sozinho até o fim,
+ * ou ir parando conforme está hoje". `confirmacaoObrigatoria: true` (default)
+ * é o comportamento de hoje — cada campo sugerido pela IA fica pendente até o
+ * usuário confirmar. `false` faz a esteira aplicar direto, sem pausa, como o
+ * protótipo de referência sempre fez. */
+export const apiPipelineAgentes = {
+  obter: () => requisitar<ConfigPipelineAgentes>("/config/pipeline-agentes"),
+  salvar: (dados: ConfigPipelineAgentes) =>
+    requisitar<ConfigPipelineAgentes>("/config/pipeline-agentes", { method: "PUT", body: JSON.stringify(dados) }),
+};
+
 export interface ConviteTime {
   token: string;
   timeId: string;

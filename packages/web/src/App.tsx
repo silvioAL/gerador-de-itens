@@ -17,10 +17,12 @@ import {
   apiCamposNo,
   apiEspecificacaoTemplate,
   apiPerfisTime,
+  apiPipelineAgentes,
   apiTimes,
   apiVersao,
   type CampoAresta,
   type CampoNo,
+  type ConfigPipelineAgentes,
   type DadosCampoAresta,
   type DadosCampoNo,
   type EspecificacaoTemplate,
@@ -137,6 +139,7 @@ interface DadosCarregados extends ConfigCarregada {
   camposNo: CampoNo[];
   camposAresta: CampoAresta[];
   especificacaoTemplate: EspecificacaoTemplate;
+  pipelineAgentes: ConfigPipelineAgentes;
 }
 
 /**
@@ -173,9 +176,12 @@ function AppComSessao({
       // da rota vira "sem campos customizados", nunca erro fatal de carregamento.
       apiCamposAresta.listar(timeAtivo).catch(() => []),
       apiEspecificacaoTemplate.buscar(timeAtivo),
+      // Mesmo motivo do catch de campos-aresta acima — rota só existe no modo
+      // local (SPEC-24 Fase E); no hospedado cai no default seguro.
+      apiPipelineAgentes.obter().catch(() => ({ confirmacaoObrigatoria: true })),
     ])
-      .then(([config, cenarios, perfisTime, camposNo, camposAresta, especificacaoTemplate]) => {
-        setDados({ ...config, cenarios, perfisTime, camposNo, camposAresta, especificacaoTemplate });
+      .then(([config, cenarios, perfisTime, camposNo, camposAresta, especificacaoTemplate, pipelineAgentes]) => {
+        setDados({ ...config, cenarios, perfisTime, camposNo, camposAresta, especificacaoTemplate, pipelineAgentes });
       })
       .catch((e: unknown) => setErroConfig(e instanceof Error ? e.message : String(e)));
   }, [timeAtivo]);
@@ -216,6 +222,7 @@ function AppCarregado({
   camposNo: camposNoInicial,
   camposAresta: camposArestaInicial,
   especificacaoTemplate: especificacaoTemplateInicial,
+  pipelineAgentes: pipelineAgentesInicial,
   sessao,
   modo,
   timeAtivo,
@@ -227,6 +234,7 @@ function AppCarregado({
   camposNo: CampoNo[];
   camposAresta: CampoAresta[];
   especificacaoTemplate: EspecificacaoTemplate;
+  pipelineAgentes: ConfigPipelineAgentes;
   sessao: SessaoUsuario;
   modo: "dev" | "oidc" | "local" | undefined;
   timeAtivo: string;
@@ -238,6 +246,7 @@ function AppCarregado({
   const [camposNo, setCamposNo] = useState(camposNoInicial);
   const [camposAresta, setCamposAresta] = useState(camposArestaInicial);
   const [especificacaoTemplate, setEspecificacaoTemplate] = useState(especificacaoTemplateInicial);
+  const [pipelineAgentes, setPipelineAgentes] = useState(pipelineAgentesInicial);
 
   // Só o modo local (`gerador open`) tem a rota — hospedado/dev não têm nada
   // aqui, o que é esperado, não some/quebra a tela. Achado real: sem isso
@@ -424,6 +433,10 @@ function AppCarregado({
   async function salvarEspecificacaoTemplate(dados: { timeId?: string; conteudo: string }) {
     await apiEspecificacaoTemplate.salvar(dados);
     setEspecificacaoTemplate(await apiEspecificacaoTemplate.buscar(timeAtivo));
+  }
+
+  async function salvarPipelineAgentes(dados: ConfigPipelineAgentes) {
+    setPipelineAgentes(await apiPipelineAgentes.salvar(dados));
   }
 
   return (
@@ -675,11 +688,13 @@ function AppCarregado({
           camposNo={camposNo}
           camposAresta={camposAresta}
           especificacaoTemplate={especificacaoTemplate}
+          pipelineAgentes={pipelineAgentes}
           timeAtivo={timeAtivo}
           mostrarMembros={modo !== "local"}
           mostrarCamposAresta={modo === "local"}
           onEditarValorPerfilTime={editarValorPerfilTime}
           onSalvarEspecificacaoTemplate={salvarEspecificacaoTemplate}
+          onSalvarPipelineAgentes={salvarPipelineAgentes}
           onCriarCampoNo={criarCampoNo}
           onAtualizarCampoNo={atualizarCampoNo}
           onExcluirCampoNo={excluirCampoNo}

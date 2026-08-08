@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import type { DiagramaConfig, PerfisConfig } from "@gerador/engine";
-import type { CampoAresta, CampoNo, DadosCampoAresta, DadosCampoNo, EspecificacaoTemplate } from "../api/client";
+import type { CampoAresta, CampoNo, ConfigPipelineAgentes, DadosCampoAresta, DadosCampoNo, EspecificacaoTemplate } from "../api/client";
 import { PerfisTimeTab } from "../demo/PerfisTimeTab";
 import { CamposNoTab } from "./CamposNoTab";
 import { CamposArestaTab } from "./CamposArestaTab";
 import { MembrosTab } from "./MembrosTab";
 import { EspecificacaoTemplateTab } from "./EspecificacaoTemplateTab";
+import { PipelineAgentesTab } from "./PipelineAgentesTab";
 
-export type AbaConfig = "perfis" | "campos" | "camposAresta" | "membros" | "especificacao";
+export type AbaConfig = "perfis" | "campos" | "camposAresta" | "membros" | "especificacao" | "pipeline";
 
 export interface ConfigScreenProps {
   config: DiagramaConfig;
@@ -15,6 +16,7 @@ export interface ConfigScreenProps {
   camposNo: CampoNo[];
   camposAresta: CampoAresta[];
   especificacaoTemplate: EspecificacaoTemplate;
+  pipelineAgentes: ConfigPipelineAgentes;
   timeAtivo: string;
   /** false no modo local (CLI) — sem servidor não existe conceito de outros
    * membros pra administrar; a aba não faz sentido. */
@@ -31,6 +33,7 @@ export interface ConfigScreenProps {
   onAtualizarCampoAresta: (id: string, dados: Partial<DadosCampoAresta>) => Promise<void>;
   onExcluirCampoAresta: (id: string) => Promise<void>;
   onSalvarEspecificacaoTemplate: (dados: { timeId?: string; conteudo: string }) => Promise<void>;
+  onSalvarPipelineAgentes: (dados: ConfigPipelineAgentes) => Promise<void>;
   onFechar: () => void;
   /** Troca a aba ativa de fora (tour guiado) sem fechar/reabrir a tela. */
   abaForcada?: AbaConfig;
@@ -48,6 +51,7 @@ export function ConfigScreen({
   camposNo,
   camposAresta,
   especificacaoTemplate,
+  pipelineAgentes,
   timeAtivo,
   mostrarMembros,
   mostrarCamposAresta,
@@ -59,6 +63,7 @@ export function ConfigScreen({
   onAtualizarCampoAresta,
   onExcluirCampoAresta,
   onSalvarEspecificacaoTemplate,
+  onSalvarPipelineAgentes,
   onFechar,
   abaForcada,
 }: ConfigScreenProps) {
@@ -118,6 +123,9 @@ export function ConfigScreen({
         <button onClick={() => setAba("especificacao")} style={aba === "especificacao" ? abaAtivaEstilo : abaEstilo}>
           Especificação de solução
         </button>
+        <button onClick={() => setAba("pipeline")} style={aba === "pipeline" ? abaAtivaEstilo : abaEstilo}>
+          Pipeline de IA
+        </button>
       </div>
 
       <div style={{ flex: 1, overflow: "auto", padding: 24 }}>
@@ -152,6 +160,7 @@ export function ConfigScreen({
             onSalvar={onSalvarEspecificacaoTemplate}
           />
         )}
+        {aba === "pipeline" && <PipelineAgentesTab config={pipelineAgentes} onSalvar={onSalvarPipelineAgentes} />}
       </div>
     </div>
   );

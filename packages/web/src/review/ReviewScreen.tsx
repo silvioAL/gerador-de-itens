@@ -13,7 +13,7 @@ import {
   type ValorSpec,
   type ResultadoDependenciasDe,
 } from "@gerador/engine";
-import { apiIa, type EspecificacaoTemplate, type PapelPipeline, type PlaceholderPedidoItemIa } from "../api/client";
+import { apiIa, apiPipelineAgentes, type EspecificacaoTemplate, type PapelPipeline, type PlaceholderPedidoItemIa } from "../api/client";
 import { baixarArquivoTexto } from "../persistence/baixarArquivo";
 import { DiagramaCompacto } from "./DiagramaCompacto";
 import { PAPEIS_PIPELINE, ROTULO_PAPEL, useEsteiraDeAgentes, type ItemFilaEsteira } from "./useEsteiraDeAgentes";
@@ -189,6 +189,25 @@ export function ReviewScreen({
   // SPEC-24 Fase D: clique num nó do DiagramaCompacto filtra a lista de
   // itens por aquele nó; segundo clique no mesmo nó limpa (toggle).
   const [filtroNoId, setFiltroNoId] = useState<string | null>(null);
+  // SPEC-24 Fase E: default seguro (pausa pra confirmação manual) até o
+  // valor real carregar — nunca aplica direto sem saber a config de verdade.
+  const [confirmacaoObrigatoria, setConfirmacaoObrigatoria] = useState(true);
+
+  useEffect(() => {
+    let cancelado = false;
+    apiPipelineAgentes
+      .obter()
+      .then((config) => {
+        if (!cancelado) setConfirmacaoObrigatoria(config.confirmacaoObrigatoria);
+      })
+      .catch(() => {
+        // Servidor sem essa rota ainda, ou indisponível — mantém o default
+        // seguro (confirmação obrigatória).
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, []);
 
   const diagramaHtml = useMemo(
     () => gerarDiagramaHtml(resultado.atividades, diagrama, config),
@@ -241,6 +260,7 @@ export function ReviewScreen({
 
   const esteira = useEsteiraDeAgentes({
     contextoEpico,
+    confirmacaoObrigatoria,
     onResponderItem: (atividadeChave, chavePlaceholder, resposta) => onResponderItem?.(atividadeChave, chavePlaceholder, resposta),
   });
 
@@ -334,18 +354,41 @@ export function ReviewScreen({
         {esteira.rodando && esteira.atual && esteira.papelAtual ? (
           <div style={faseBarraEstilo} role="status" aria-live="polite">
             <div style={handoffEstilo}>
-              {PAPEIS_PIPELINE.map((papel, i) => (
-                <span key={papel} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  {i > 0 && <span style={{ color: "#5C6A7E" }}>→</span>}
-                  <span
-                    data-testid={`handoff-${papel}`}
-                    aria-current={papel === esteira.papelAtual ? "step" : undefined}
-                    style={papel === esteira.papelAtual ? handoffPapelAtivoEstilo : handoffPapelEstilo}
-                  >
-                    {ROTULO_PAPEL[papel]}
+              {PAPEIS_PIPELINE.map((papel, i) => {
+                const indicePapel = PAPEIS_PIPELINE.indexOf(papel);
+                const indiceAtual = PAPEIS_PIPELINE.indexOf(esteira.papelAtual!);
+                const feito = indicePapel < indiceAtual;
+                const ativo = papel === esteira.papelAtual;
+                return (
+                  <span key={papel} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    {i > 0 && (
+                      <span style={hopEstilo}>
+                        →
+                        {/* `key={indiceAtual}` remonta o token a cada handoff, retriggerando
+                            a animação CSS — só aparece na seta que acabou de ser cruzada. */}
+                        {ativo && (
+                          <span key={indiceAtual} className="handoff-hop-token" style={hopTokenEstilo}>
+                            {esteira.atual!.atividadeRotulo}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                    <span
+                      data-testid={`handoff-${papel}`}
+                      aria-current={ativo ? "step" : undefined}
+                      style={{ display: "flex", alignItems: "center", gap: 5 }}
+                    >
+                      <span
+                        className={ativo ? "handoff-tick-ativo" : undefined}
+                        style={feito ? handoffTickFeitoEstilo : ativo ? handoffTickAtivoEstilo : handoffTickPendenteEstilo}
+                      >
+                        {feito ? "✓" : i + 1}
+                      </span>
+                      <span style={ativo ? handoffPapelAtivoEstilo : handoffPapelEstilo}>{ROTULO_PAPEL[papel]}</span>
+                    </span>
                   </span>
-                </span>
-              ))}
+                );
+              })}
             </div>
             <span style={{ fontSize: 12 }}>
               {`${esteira.pausado ? "Pausado — " : ""}item ${esteira.progresso.feito + 1} de ${esteira.progresso.total} · ${esteira.atual.atividadeRotulo}`}
@@ -517,12 +560,19 @@ export function ReviewScreen({
                     {PAPEIS_PIPELINE.map((papel) => {
                       const placeholders = porPapel[papel];
                       const passou = placeholders.length > 0 && placeholders.every((p) => p.resposta !== undefined);
+                      // Pip do papel/item em processamento agora pulsa — o
+                      // resto do card já mostra estático (Fase E: "faltava
+                      // efeito de alternância conforme os itens são
+                      // preenchidos").
+                      const emProcessamento =
+                        esteira.rodando && esteira.papelAtual === papel && esteira.atual?.atividadeChave === a.chave;
                       return (
                         <i
                           key={papel}
                           data-testid={`pip-${a.chave}-${papel}`}
                           title={ROTULO_PAPEL[papel]}
-                          style={{ ...pipEstilo, ...(passou ? pipOnEstilo : {}) }}
+                          className={emProcessamento ? "pip-pulsando" : undefined}
+                          style={{ ...pipEstilo, ...(passou || emProcessamento ? pipOnEstilo : {}) }}
                         />
                       );
                     })}
@@ -901,6 +951,62 @@ const handoffEstilo: React.CSSProperties = {
   alignItems: "center",
   gap: 6,
   fontSize: 10.5,
+};
+
+// Seta entre dois agentes + posição relativa pro token de handoff que
+// desliza sobre ela (Fase E — "faltava o feedback visual de onde os
+// agentes estão trabalhando, com efeitos de alternância").
+const hopEstilo: React.CSSProperties = {
+  position: "relative",
+  color: "#5C6A7E",
+};
+
+const hopTokenEstilo: React.CSSProperties = {
+  position: "absolute",
+  top: -14,
+  left: "50%",
+  transform: "translateX(-50%)",
+  whiteSpace: "nowrap",
+  fontSize: 9,
+  color: "#38bdf8",
+  background: "#101823",
+  border: "1px solid #263344",
+  borderRadius: 20,
+  padding: "1px 6px",
+  maxWidth: 120,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+};
+
+const handoffTickBaseEstilo: React.CSSProperties = {
+  width: 15,
+  height: 15,
+  borderRadius: "50%",
+  display: "grid",
+  placeItems: "center",
+  fontSize: 9,
+  fontWeight: 700,
+  flexShrink: 0,
+};
+
+const handoffTickPendenteEstilo: React.CSSProperties = {
+  ...handoffTickBaseEstilo,
+  border: "1px solid #263344",
+  color: "#5C6A7E",
+};
+
+const handoffTickAtivoEstilo: React.CSSProperties = {
+  ...handoffTickBaseEstilo,
+  border: "1.5px solid #38bdf8",
+  borderTopColor: "transparent",
+  color: "#38bdf8",
+};
+
+const handoffTickFeitoEstilo: React.CSSProperties = {
+  ...handoffTickBaseEstilo,
+  border: "1px solid #3ecf8e",
+  background: "rgba(62, 207, 142, 0.16)",
+  color: "#3ecf8e",
 };
 
 const handoffPapelEstilo: React.CSSProperties = {
