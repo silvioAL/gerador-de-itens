@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { Aresta, DiagramaConfig, No, Quebra } from "@gerador/engine";
+import type { Aresta, DiagramaConfig, No, Quebra, ValorSpec } from "@gerador/engine";
 import { criarAresta, criarNo } from "./factory";
 
 export interface EdgeRejeitada {
@@ -183,6 +183,20 @@ export function useQuebra(inicial: Quebra, config: DiagramaConfig) {
     setArestaSelecionadaId((sel) => (sel === edgeId ? null : sel));
   }, []);
 
+  /** Resposta (manual ou sugerida por IA) a um placeholder "<- ✍️ especificar"
+   * do refinamento técnico/volumetria de uma atividade (Fase 1, SPEC-23) —
+   * chaveada por `Atividade.chave` (estável) + a chave do próprio placeholder,
+   * mesmo padrão de `definirValorSpec` pra campos de nó. */
+  const responderItem = useCallback((atividadeChave: string, chavePlaceholder: string, resposta: ValorSpec) => {
+    setQuebra((q) => ({
+      ...q,
+      respostasItens: {
+        ...q.respostasItens,
+        [atividadeChave]: { ...q.respostasItens?.[atividadeChave], [chavePlaceholder]: resposta },
+      },
+    }));
+  }, []);
+
   return {
     quebra,
     setQuebra,
@@ -207,6 +221,7 @@ export function useQuebra(inicial: Quebra, config: DiagramaConfig) {
     definirTipoAresta,
     definirValorSpecAresta,
     removerAresta,
+    responderItem,
   };
 }
 

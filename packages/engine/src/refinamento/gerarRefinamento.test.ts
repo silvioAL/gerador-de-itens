@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { RegrasConfig } from "../config/types.js";
-import type { Aresta, No } from "../model/types.js";
+import type { Aresta, No, ValorSpec } from "../model/types.js";
 import {
   gerarChecklistProcesso,
   gerarChecklistTecnico,
   gerarCiclosDeTeste,
   gerarVolumetria,
+  listarPlaceholders,
 } from "./gerarRefinamento.js";
 
 const regras: RegrasConfig = {
@@ -137,6 +138,42 @@ describe("gerarChecklistTecnico", () => {
     expect(() => gerarCiclosDeTeste(regrasIncompletas, ["Backend"], [])).not.toThrow();
     expect(gerarCiclosDeTeste(regrasIncompletas, ["Backend"], [])).toBe("");
   });
+
+  describe("respostas (Fase 1, SPEC-23)", () => {
+    const respostaSugeridaNaoConfirmada: ValorSpec = { valor: "sim, via política X", origem: "sugerido", confirmado: false };
+    const respostaSugeridaConfirmada: ValorSpec = { valor: "sim, via política X", origem: "sugerido", confirmado: true };
+    const respostaManual: ValorSpec = { valor: "sim, via TTL de 7 dias", origem: "manual" };
+
+    it("sem respostas, comportamento idêntico a antes (marcador sozinho)", () => {
+      const md = gerarChecklistTecnico(regras, ["Backend"], ["Backend-mensagens rabbitmq"], [noTecnico()], semArestasTecnico);
+      expect(md).toContain("- DLQ configurada e monitorada <- ✍️ especificar");
+    });
+
+    it("sugestão não confirmada não aparece na linha — só resposta manual ou sugerida+confirmada", () => {
+      const md = gerarChecklistTecnico(
+        regras, ["Backend"], ["Backend-mensagens rabbitmq"], [noTecnico()], semArestasTecnico,
+        { "Backend::DLQ configurada e monitorada": respostaSugeridaNaoConfirmada }
+      );
+      expect(md).toContain("- DLQ configurada e monitorada <- ✍️ especificar");
+      expect(md).not.toContain("política X");
+    });
+
+    it("resposta manual aparece interpolada na linha, marcador continua no fim", () => {
+      const md = gerarChecklistTecnico(
+        regras, ["Backend"], ["Backend-mensagens rabbitmq"], [noTecnico()], semArestasTecnico,
+        { "Backend::DLQ configurada e monitorada": respostaManual }
+      );
+      expect(md).toContain("- DLQ configurada e monitorada: sim, via TTL de 7 dias <- ✍️ especificar");
+    });
+
+    it("sugestão confirmada aparece interpolada, mesma régua da manual", () => {
+      const md = gerarChecklistTecnico(
+        regras, ["Backend"], ["Backend-mensagens rabbitmq"], [noTecnico()], semArestasTecnico,
+        { "Backend::DLQ configurada e monitorada": respostaSugeridaConfirmada }
+      );
+      expect(md).toContain("- DLQ configurada e monitorada: sim, via política X <- ✍️ especificar");
+    });
+  });
 });
 
 describe("gerarCiclosDeTeste", () => {
@@ -174,6 +211,58 @@ describe("gerarVolumetria", () => {
 
   it("tech sem volumetria configurada nunca gera bloco", () => {
     expect(gerarVolumetria(regras, ["Mobile"], ["Backend-chamadas http"])).toBe("");
+  });
+
+  it("resposta confirmada substitui o '___' do campo, marcador continua no fim (Fase 1, SPEC-23)", () => {
+    const respostas = { "Backend::volumetria::Response time": { valor: "200ms p95", origem: "manual" as const } };
+    const md = gerarVolumetria(regras, ["Backend"], ["Backend-chamadas http"], respostas);
+    expect(md).toContain("- Response time: 200ms p95 <- ✍️ especificar");
+    expect(md).toContain("- Max error: ___ <- ✍️ especificar");
+  });
+
+  it("resposta sugerida não confirmada não substitui o '___'", () => {
+    const respostas = { "Backend::volumetria::Response time": { valor: "200ms p95", origem: "sugerido" as const, confirmado: false } };
+    const md = gerarVolumetria(regras, ["Backend"], ["Backend-chamadas http"], respostas);
+    expect(md).toContain("- Response time: ___ <- ✍️ especificar");
+  });
+});
+
+describe("listarPlaceholders (Fase 1, SPEC-23)", () => {
+  it("lista os itens de checklist técnico aplicáveis, com chave namespaced por tech", () => {
+    const placeholders = listarPlaceholders(regras, ["Backend"], ["Backend-mensagens rabbitmq"], [noTecnico()], semArestasTecnico);
+    const chaves = placeholders.map((p) => p.chave);
+    expect(chaves).toContain("Backend::DLQ configurada e monitorada");
+    expect(chaves).toContain("Backend::Nome do serviço segue o padrão do time");
+    expect(chaves).not.toContain("Backend::Índice criado para as queries novas");
+    expect(placeholders.every((p) => p.secao === "checklistTecnico")).toBe(true);
+  });
+
+  it("inclui os 4 campos fixos de volumetria quando aplicável, chave namespaced", () => {
+    const placeholders = listarPlaceholders(regras, ["Backend"], ["Backend-chamadas http"], [noTecnico()], semArestasTecnico);
+    const volumetria = placeholders.filter((p) => p.secao === "volumetria");
+    expect(volumetria.map((p) => p.rotulo)).toEqual([
+      "Response time", "Max error", "RPS (Requisições por segundo)", "Test duration",
+    ]);
+    expect(volumetria.every((p) => p.chave.startsWith("Backend::volumetria::"))).toBe(true);
+  });
+
+  it("mesma filtragem por when/contexto do checklist técnico — item de migração só aparece pra nó existente", () => {
+    const regrasComMigracao: RegrasConfig = {
+      tipos: [], tamanhos: [],
+      porTech: {
+        Backend: {
+          checklistTecnico: [
+            { texto: "Definir plano de migração", contextos: [], when: { nodeStatus: "existente" } },
+          ],
+          testes: [],
+        },
+      },
+    };
+    const semNo = listarPlaceholders(regrasComMigracao, ["Backend"], [], [noTecnico({ status: "novo" })], semArestasTecnico);
+    expect(semNo).toHaveLength(0);
+
+    const comNoExistente = listarPlaceholders(regrasComMigracao, ["Backend"], [], [noTecnico({ status: "existente" })], semArestasTecnico);
+    expect(comNoExistente).toHaveLength(1);
   });
 });
 

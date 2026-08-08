@@ -1,4 +1,4 @@
-import type { Diagrama, PerfisConfig, Quebra } from "@gerador/engine";
+import type { Diagrama, PerfisConfig, Quebra, ValorSpec } from "@gerador/engine";
 
 /**
  * Base do @gerador/server — configurável em runtime via `VITE_API_URL`
@@ -49,6 +49,9 @@ export interface QuebraSalva {
   titulo: string | null;
   time: string | null;
   diagrama: Diagrama;
+  /** Respostas (humanas ou IA confirmada) aos placeholders "<- ✍️ especificar"
+   * do refinamento técnico/volumetria (Fase 1, SPEC-23). */
+  respostasItens?: Record<string, Record<string, ValorSpec>>;
   criadoEm: string;
   atualizadoEm: string;
 }
@@ -208,6 +211,21 @@ export const apiQuebras = {
     requisitar<QuebraSalva>("/quebras", { method: "POST", body: JSON.stringify(quebra) }),
   atualizar: (id: string, quebra: Quebra) =>
     requisitar<QuebraSalva>(`/quebras/${id}`, { method: "PUT", body: JSON.stringify(quebra) }),
+};
+
+export interface PedidoSugestaoIa {
+  tech: string;
+  rotulo: string;
+  contextoNo: string;
+}
+
+export const apiIa = {
+  /** Fluxo 3 (Fase 1, SPEC-23) — pede ao modelo local uma sugestão de texto
+   * pra um placeholder "<- ✍️ especificar". Lança (via `requisitar`) se os
+   * modelos não estiverem instalados (HTTP 503) — quem chama trata isso como
+   * qualquer outro erro de rede, mostrando a mensagem pro usuário. */
+  sugerir: (pedido: PedidoSugestaoIa) =>
+    requisitar<{ valor: string }>("/ia/sugerir", { method: "POST", body: JSON.stringify(pedido) }),
 };
 
 export const apiPerfisTime = {

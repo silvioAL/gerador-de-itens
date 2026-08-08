@@ -134,6 +134,23 @@ describe("gerarEspecificacaoEntrega", () => {
     expect(doc).toContain("Teste de migração");
   });
 
+  it("respostasItens: resposta confirmada da atividade certa aparece interpolada, sem vazar pra outra atividade (Fase 1, SPEC-23)", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+    const chaveMongo = atividades.find((a) => a.chave.startsWith("n2"))!.chave;
+
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, config, {
+      regras,
+      respostasItens: {
+        [chaveMongo]: {
+          "Backend::Logs relevantes emitidos": { valor: "sim, via Winston + correlationId", origem: "manual" },
+        },
+      },
+    });
+
+    expect(doc).toContain("Logs relevantes emitidos: sim, via Winston + correlationId <- ✍️ especificar");
+  });
+
   it("com regras que ativam volumetria: documento inclui a seção 'Requisitos de volumetria' com o formato fixo", () => {
     const diagrama = diagramaBase();
     const atividades = derivar(diagrama, config, {});

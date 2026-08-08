@@ -256,6 +256,7 @@ function AppCarregado({
     adicionarNo,
     edgeRejeitada,
     limparEdgeRejeitada,
+    responderItem,
   } = quebraState;
 
   const aoAbrir = useCallback(
@@ -636,6 +637,8 @@ function AppCarregado({
           especificacaoTemplate={especificacaoTemplate}
           demandInfo={quebra.demandInfo}
           time={quebra.time}
+          respostasItens={quebra.respostasItens}
+          onResponderItem={responderItem}
           onFechar={() => setResultado(null)}
           onSelecionarNo={setSelecionadoId}
         />

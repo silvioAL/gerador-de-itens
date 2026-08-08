@@ -16,6 +16,8 @@ export {
   gerarChecklistProcesso,
   gerarCiclosDeTeste,
   gerarVolumetria,
+  listarPlaceholders,
+  type PlaceholderRefinamento,
 } from "./refinamento/gerarRefinamento.js";
 export {
   gerarEspecificacaoEntrega,

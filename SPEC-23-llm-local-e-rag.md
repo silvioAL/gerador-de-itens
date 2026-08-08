@@ -2,7 +2,7 @@
 
 **Depende de/relacionado a:** SPEC-01 (`FieldSpec`, `ValorSpec`, proveniência), SPEC-04 (semáforo de prontidão), SPEC-17 (CLI local-first — princípio que este desenho segue), SPEC-20 (checklist de processo, `Condicao`), SPEC-21 (forms de conexão, `EdgePanel`), SPEC-22 (checklist técnico por status do nó).
 
-**Status: Fase 0 (infra) implementada. Fases 1-5 não iniciadas.**
+**Status: Fase 0 (infra) e Fase 1 (fluxo 3 — checklist técnico/volumetria) implementadas. Fases 2-5 não iniciadas.**
 
 ---
 
@@ -134,6 +134,93 @@ Pacote novo `packages/llm` (workspace, TS, dependência real `node-llama-cpp`) c
 
 Validação foi além do status: `motor.ts` (único módulo sem teste automatizado, por depender do binário nativo + modelo real) foi exercitado ponta a ponta contra os modelos de verdade — completar texto livre, completar com JSON Schema obrigatório via GBNF (saída estruturada válida), e gerar embedding (vetor de 1024 dimensões) — os três funcionaram corretamente. Regressão completa: engine 122, llm 11, web 131, cli 35.
 
+## 6.3 Fase 1 — detalhamento (fluxo 3: apoio na construção dos itens completos)
+
+Escopo real investigado direto no código (não assumido): os placeholders marcados hoje NÃO são um campo genérico `campo -> valor` uniforme — são três formas heterogêneas, todas em `packages/engine/src/refinamento/gerarRefinamento.ts` e `especificacao/gerarEspecificacaoEntrega.ts`:
+
+1. **Checklist técnico** (`gerarChecklistTecnico`, linha por `Requisito.texto`, uma por tech aplicável) — termina em `<- ✍️ especificar` (`MARCADOR_ESPECIFICAR`, linha 30). Sem id próprio no `Requisito`; a única identidade estável disponível é o próprio `texto` (curado à mão em `regras.json`, sem duplicata dentro do mesmo `porTech`).
+2. **Volumetria** (`gerarVolumetria`) — 4 campos fixos e nomeados (`CAMPOS_VOLUMETRIA`: Response time/Max error/RPS/Test duration), um bloco por tech que declara `volumetria`.
+3. **`historiaPo`/`definitionOfReady`/`definitionOfDone`** (`gerarEspecificacaoEntrega.ts`) — esqueletos de **documento inteiro** (não por atividade), preenchidos por texto livre.
+
+**Achado importante, corrige a investigação original do SPEC-23:** essas três formas nunca passam por `calcularProntidao()` — são texto markdown, fora do sistema de prontidão do `No.spec`. Reusar `ValorSpec{valor, origem, confirmado}` aqui é reuso de **forma** e da disciplina "nada sugerido conta até confirmado", não reuso do semáforo em si (não existe hoje um semáforo pra esses itens, e esta fase não cria um).
+
+**Decisão de escopo desta fase:** cobrir só (1) e (2) — checklist técnico e volumetria, ambos por-atividade, ambos já convergem no mesmo `renderizarItemEspecificacao`. `historiaPo`/DoR/DoD (documento inteiro) ficam fora — não têm hoje nenhum widget na UI da revisão (`ReviewScreen.tsx` só expande o texto de `renderizarItemEspecificacao`; o resto do documento só existe no `.md` baixado), então dar suporte a eles exigiria desenhar uma seção de UI nova que não existe — escopo maior, registrado como extensão natural de Fase 1 (usar exatamente o mesmo mecanismo abaixo, chave nova no nível do documento em vez de por-atividade), não como parte desta rodada.
+
+### Modelo de dados (engine)
+
+```ts
+// model/types.ts — Quebra ganha um campo novo, opcional
+export interface Quebra {
+  // ...campos existentes...
+  /** Respostas (humanas ou sugeridas por IA) aos placeholders "<- ✍️ especificar"
+   * do refinamento técnico/volumetria (Fase 1, SPEC-23). Sobrevive a uma nova
+   * derivação porque mora na quebra, chaveada por Atividade.chave (estável) +
+   * a chave do próprio placeholder — nunca pelo índice/posição. */
+  respostasItens?: Record<string, Record<string, ValorSpec>>;
+}
+```
+
+Chave do placeholder (segundo nível do map): `${tech}::${requisito.texto}` pro checklist técnico, `${tech}::volumetria::${campo}` pra volumetria — namespaced por tech de propósito (evita colisão entre techs na mesma atividade, mesmo padrão de blocos já usado na renderização).
+
+### Engine: nova função de enumeração + assinaturas estendidas
+
+```ts
+// refinamento/gerarRefinamento.ts
+export interface PlaceholderRefinamento {
+  chave: string;
+  tech: string;
+  secao: "checklistTecnico" | "volumetria";
+  rotulo: string; // texto do requisito, ou nome do campo de volumetria — o que mostrar na UI e mandar pro LLM
+}
+
+export function listarPlaceholders(
+  regras: RegrasConfig, techs: string[], contextos: string[], nos: No[], arestas: Aresta[]
+): PlaceholderRefinamento[];
+```
+
+Reusa a MESMA filtragem (`contextoBate`/`condicaoBate`) já usada dentro de `gerarChecklistTecnico`/`gerarVolumetria` — sem duplicar a lógica de "esse item se aplica a essa atividade", só extraída pra uma função compartilhada.
+
+`gerarChecklistTecnico`/`gerarVolumetria` ganham um 6º/4º parâmetro opcional `respostas?: Record<string, ValorSpec>` (mapa já escopado pra UMA atividade, isto é, `quebra.respostasItens?.[atividade.chave]`). Regra de interpolação: só entra na linha renderizada se `resp.origem === "manual" || resp.confirmado === true` — sugestão não confirmada não aparece no documento, só no painel interativo (mesma disciplina "nunca verde sem alguém olhar" já usada em `calcularProntidao`, aplicada aqui por convenção, não pelo mesmo código). O marcador `<- ✍️ especificar` **nunca** é removido, respondida ou não — contrato do agente validador (Confluence) é imutável:
+
+```
+- DLQ configurada e monitorada <- ✍️ especificar                          (sem resposta confirmada)
+- DLQ configurada e monitorada: sim, via política X no tópico Y <- ✍️ especificar   (respondida)
+```
+
+`renderizarItemEspecificacao` ganha um parâmetro opcional a mais (`respostas?: Record<string, ValorSpec>`) repassado pra `gerarChecklistTecnico`/`gerarVolumetria`. `gerarEspecificacaoEntrega`'s `OpcoesGerarEspecificacao` ganha `respostasItens?: Record<string, Record<string, ValorSpec>>` (chave = `atividade.chave`), repassado por-atividade na hora de chamar `renderizarItemEspecificacao` dentro do loop de itens.
+
+### CLI (`packages/cli/src/commands/openApiLocal.ts`)
+
+**Correção de bug real encontrada durante a investigação, não relacionada a IA:** `comoQuebraSalva()` (usada tanto por `GET /quebras/:id` quanto pela listagem) só devolve `{id, titulo, time, diagrama, criadoEm, atualizadoEm}` — **qualquer campo novo em `Quebra`, incluindo `respostasItens`, seria persistido no arquivo mas nunca devolvido por `GET /quebras/:id`**, então o cliente web nunca veria a resposta salva ao recarregar a quebra. Corrigir isso é pré-requisito, não opcional: `comoQuebraSalva` passa a incluir `respostasItens: quebra?.respostasItens ?? {}`.
+
+**Nova rota `POST /ia/sugerir`:**
+- Request: `{ tech: string, rotulo: string, contextoNo: string }` (`contextoNo` = descrição compacta da spec do(s) nó(s) de origem da atividade, já disponível via `descreverEspecificacaoNo` — dá ao modelo o contexto mínimo pra sugerir algo específico, não genérico).
+- Response: `{ valor: string }`, gerado via `completarComSchema` de `packages/llm` com schema GBNF fixo `{type:"object", properties:{valor:{type:"string"}}, required:["valor"]}`.
+- Prompt fixo no handler (não configurável nesta fase): instrui o modelo a responder curto, em português, específico ao `rotulo`+`contextoNo` recebidos.
+- **Decisão de wiring:** o handler mantém um `MotorChat` carregado **uma vez por processo** (módulo-level, lazy — carrega no primeiro `POST /ia/sugerir`, não no boot do `gerador open`), não um por requisição — carregar o GGUF a cada chamada custaria segundos por sugestão. Sem cache de resposta entre chamadas diferentes (`motor.ts` já não tem cache escondido, por design de Fase 0; o processo local é o único "cache" — reiniciar `gerador open` descarrega o modelo).
+- Se `verificarStatus().pronto` for `false`, responde `503 { erro: "modelos de IA não instalados — rode `gerador ia instalar`" }` antes de tentar carregar.
+
+### Web (`packages/web`)
+
+- `api/client.ts`: `QuebraSalva`/`Quebra`-shape ganham `respostasItens` (repassa o tipo do engine, sem duplicar). Novo `apiIa.sugerir({tech, rotulo, contextoNo}): Promise<{valor: string}>`.
+- `state/useQuebra.ts`: novo updater `responderItem(atividadeChave: string, chavePlaceholder: string, resposta: ValorSpec)` seguindo o mesmo padrão de spread já usado pelos outros updaters do hook (linha ~96-179 hoje).
+- `review/ReviewScreen.tsx`: dentro do bloco `{expandido && ...}` (linha 255-259 hoje), abaixo do `<pre>` existente, novo painel listando `listarPlaceholders(...)` filtrado aos que AINDA não têm resposta confirmada pra aquela atividade — cada linha com: rótulo, campo de texto (edição manual), botão "✨ Sugerir" (chama `apiIa.sugerir`, preenche o campo com `origem: "sugerido", confirmado: false`), botão "Confirmar" (seta `confirmado: true`, o texto passa a aparecer no `<pre>` acima na próxima renderização — sem re-fetch, é o mesmo `renderizarItemEspecificacao` sendo chamado de novo com o `respostasItens` atualizado). Mesmo padrão visual de destaque "sugerido, não confirmado" já usado alhures na revisão de spec (cor de aviso), sem inventar um novo.
+
+### Critério de pronto (§6.1)
+
+- Automatizado: `listarPlaceholders` (casos de filtragem tech/contexto/`when`, espelhando os testes existentes de `gerarChecklistTecnico`/`gerarVolumetria`); `gerarChecklistTecnico`/`gerarVolumetria`/`renderizarItemEspecificacao`/`gerarEspecificacaoEntrega` com `respostas` (não confirmada não aparece; `origem: "manual"` aparece; `origem: "sugerido", confirmado: true` aparece; marcador nunca some); `comoQuebraSalva` devolve `respostasItens`; rota `/ia/sugerir` com `@gerador/llm` mockado (padrão de `ia.test.ts`) cobrindo 503 sem modelo instalado e o formato de request/response; painel novo em `ReviewScreen` com `apiIa.sugerir` mockado.
+- Manual, com o modelo real (mesma disciplina de `motor.ts` na Fase 0, nunca só mock): rodar `gerador open`, abrir uma quebra com pelo menos um requisito de checklist técnico aplicável, clicar "✨ Sugerir", conferir que a resposta volta em poucos segundos e faz sentido pro contexto do nó, confirmar, conferir que o texto aparece no documento final (`<pre>` e no `.md` baixado) mantendo o marcador.
+
+## 6.4 Fase 1 — implementada
+
+Seguiu exatamente o desenho da §6.3, sem desvio: `listarPlaceholders()` novo em `gerarRefinamento.ts` (reusa a mesma filtragem tech/contexto/`when` de `gerarChecklistTecnico`/`gerarVolumetria`, extraída pra função compartilhada); as duas funções ganharam parâmetro `respostas?: Record<string, ValorSpec>` e interpolam a resposta na linha (marcador `<- ✍️ especificar` nunca removido); `renderizarItemEspecificacao`/`gerarEspecificacaoEntrega` repassam `respostasItens` por atividade; `Quebra.respostasItens?: Record<atividadeChave, Record<chavePlaceholder, ValorSpec>>` novo no model.
+
+**Achado real, fora do escopo de IA, encontrado investigando a persistência:** `comoQuebraSalva()` em `openApiLocal.ts` só devolvia `{id, titulo, time, diagrama, criadoEm, atualizadoEm}` pro `GET /quebras/:id` — qualquer campo novo em `Quebra` seria persistido no arquivo mas nunca devolvido de volta ao recarregar. Corrigido antes de implementar `respostasItens`, senão a resposta salva sumiria ao reabrir a quebra. Validado com `curl` real (POST com `respostasItens` → arquivo em disco → GET devolve o mesmo objeto de volta).
+
+Rota `POST /ia/sugerir`: schema fixo `{valor: string}` via GBNF, motor de chat carregado como singleton por processo (lazy, primeiro request), 503 se `verificarStatus().pronto` for falso. Web: `apiIa.sugerir`, `useQuebra.responderItem`, e um painel novo em `ReviewScreen` (dentro do item expandido) listando placeholders sem resposta confirmada, com "✨ Sugerir" + confirmação manual — sugestão não confirmada nunca entra no documento final, só no painel (mesma disciplina "nada sugerido conta até confirmado").
+
+**Validação real, não só testes:** com `gerador open` rodando de verdade contra os modelos já instalados (Fase 0), `POST /ia/sugerir` com um requisito real (`"DLQ configurada e monitorada"`, tech Backend, contexto de uma fila Rabbit) devolveu uma sugestão coerente e específica em português, via GBNF/JSON Schema, em poucos segundos. Regressão completa: engine 132, llm 11, web 135, cli 37.
+
 ## 7. Verificação
 
-Esta rodada não gera código, então não há teste automatizado a rodar. Verificação = revisão deste documento pelo usuário, confirmando se o roteiro faseado bate com a expectativa antes da Fase 0 começar. Quando a implementação começar (qualquer fase), a disciplina já estabelecida no projeto se aplica sem exceção: testes automatizados com fake determinístico do modelo (nunca baixar o modelo real em CI) + validação manual com o modelo de verdade contra um cenário real antes de considerar a fase pronta.
+Fase 0 e Fase 1: testes automatizados com fake determinístico do modelo/HTTP (nunca modelo real em CI) + validação manual contra o modelo de verdade, seguindo a disciplina já estabelecida no projeto — nenhuma exceção nas duas fases implementadas até aqui. Fases 2-5 seguem a mesma regra (§6.1) quando começarem: detalhamento nesta spec antes de qualquer código.

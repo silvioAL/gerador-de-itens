@@ -87,6 +87,14 @@ export interface Quebra {
   demandInfo?: string;
   time?: string;
   diagrama: Diagrama;
+  /** Respostas (humanas ou sugeridas por IA) aos placeholders "<- ✍️ especificar"
+   * do refinamento técnico/volumetria (Fase 1, SPEC-23) — chave externa é
+   * `Atividade.chave` (estável entre derivações), chave interna é
+   * `${tech}::${texto do requisito}` ou `${tech}::volumetria::${campo}`.
+   * Sobrevive a uma nova derivação porque mora na quebra, não na atividade
+   * recalculada. Não passa por `calcularProntidao()` — é reuso da FORMA de
+   * `ValorSpec`/`Origem`, não do semáforo de prontidão em si. */
+  respostasItens?: Record<string, Record<string, ValorSpec>>;
 }
 
 export type TipoItem = "História" | "Task" | "Débito Técnico";
