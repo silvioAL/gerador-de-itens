@@ -18,18 +18,17 @@ vi.mock("../persistence/baixarArquivo", () => ({ baixarArquivoTexto: baixarArqui
 
 // Mockado pra não depender do modelo real (mesma disciplina do resto do
 // projeto) — testa só o contrato: o que a aba Refinamento manda pra
-// apiIa.sugerir (botão manual, por placeholder) / apiIa.sugerirItem
-// (orquestração ao vivo, por item — Fase 1d-ii) e o que faz com a resposta.
-// `status` default "não pronto" — sem isso a orquestração ao vivo (Fase 1d)
-// dispararia sozinha em todo teste que não testa exatamente esse
-// comportamento.
+// apiIa.sugerir (botão manual, por placeholder) / apiIa.sugerirPipeline
+// (esteira de agentes, por papel — SPEC-24) e o que faz com a resposta.
+// `status` default "não pronto" — sem isso a esteira dispararia sozinha em
+// todo teste que não testa exatamente esse comportamento.
 const apiIaSugerirMock = vi.hoisted(() => vi.fn());
-const apiIaSugerirItemMock = vi.hoisted(() => vi.fn().mockResolvedValue({}));
+const apiIaSugerirPipelineMock = vi.hoisted(() => vi.fn().mockResolvedValue({}));
 const apiIaStatusMock = vi.hoisted(() =>
   vi.fn().mockResolvedValue({ chatInstalado: false, embeddingInstalado: false, pronto: false, caminhoModelos: "" })
 );
 vi.mock("../api/client", () => ({
-  apiIa: { sugerir: apiIaSugerirMock, sugerirItem: apiIaSugerirItemMock, status: apiIaStatusMock },
+  apiIa: { sugerir: apiIaSugerirMock, sugerirPipeline: apiIaSugerirPipelineMock, status: apiIaStatusMock },
 }));
 
 interface Fixture01 {
@@ -460,19 +459,19 @@ describe("ReviewScreen — abas da ficha (Fase 1d-i, SPEC-23 — dado estruturad
   });
 });
 
-describe("ReviewScreen — geração ao vivo (Fase 1d-ii, SPEC-23 — orquestração real por item via /ia/sugerir-item)", () => {
+describe("ReviewScreen — esteira de agentes (SPEC-24 — orquestração real por papel via /ia/pipeline/:papel)", () => {
   beforeEach(() => {
     apiIaStatusMock.mockReset();
     apiIaStatusMock.mockResolvedValue({ chatInstalado: false, embeddingInstalado: false, pronto: false, caminhoModelos: "" });
-    apiIaSugerirItemMock.mockReset();
-    apiIaSugerirItemMock.mockResolvedValue({});
+    apiIaSugerirPipelineMock.mockReset();
+    apiIaSugerirPipelineMock.mockResolvedValue({});
   });
 
   // Fixture 01 tem 3 atividades cujo tech/contexto batem com essa regra
-  // (n2::criacao, e1::publish, e2::consume — todas Backend + Backend-mensagens),
-  // o suficiente pra fila ter mais de um item mesmo com uma regra só (Fase
-  // 1d-ii: a fila agora é por ATIVIDADE, não por placeholder — cada item já
-  // bundla história de usuário + critérios de aceite + esse checklist junto).
+  // (n2::criacao, e1::publish, e2::consume — todas Backend + Backend-mensagens).
+  // Como história/critérios/contrato/regras de teste são SEMPRE presentes
+  // (SPEC-24 Fase A), as 6 atividades da fixture têm trabalho pro PO —
+  // primeiro papel a rodar — mesmo as 3 que não batem essa regra técnica.
   const regrasUmPlaceholder: RegrasConfig = {
     tipos: [],
     tamanhos: [],
@@ -490,10 +489,10 @@ describe("ReviewScreen — geração ao vivo (Fase 1d-ii, SPEC-23 — orquestra�
     )!;
   }
 
-  it("modelo pronto: dispara sozinho, mostra a barra de fase, segue o item automaticamente e mostra 'gerando a ficha inteira'", async () => {
+  it("modelo pronto: dispara sozinha, mostra a barra de fase com o papel atual, segue o item automaticamente e mostra 'gerando a ficha inteira'", async () => {
     apiIaStatusMock.mockResolvedValueOnce({ chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "" });
     let liberar!: () => void;
-    apiIaSugerirItemMock.mockImplementationOnce(
+    apiIaSugerirPipelineMock.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
           liberar = () => resolve({});
@@ -513,22 +512,23 @@ describe("ReviewScreen — geração ao vivo (Fase 1d-ii, SPEC-23 — orquestra�
       />
     );
 
-    expect(await screen.findByText(/Escrevendo item 1 de \d+/)).toBeInTheDocument();
+    expect(await screen.findByText(/item 1 de \d+/)).toBeInTheDocument();
+    expect(await screen.findByTestId("handoff-po")).toHaveAttribute("aria-current", "step");
     // Segue o item automaticamente pra aba Refinamento, sem clique nenhum do usuário
     // (o auto-follow reage num efeito separado, após o commit que liga a
-    // orquestração — por isso `findByText`, não `getByText`, dá tempo pro
-    // segundo render acontecer mesmo numa máquina de CI mais lenta).
+    // esteira — por isso `findByText`, não `getByText`, dá tempo pro segundo
+    // render acontecer mesmo numa máquina de CI mais lenta).
     expect(await screen.findByText("● Seguindo a geração")).toBeInTheDocument();
-    // Sem streaming campo a campo (Fase 1d-ii: a resposta chega tudo de uma
-    // vez via GBNF) — enquanto pendente, mostra um indicador estático, não
-    // texto crescendo caractere a caractere.
-    expect(await screen.findAllByText("✨ gerando a ficha inteira…")).not.toHaveLength(0);
+    // Sem streaming campo a campo (a resposta de um papel chega tudo de uma
+    // vez via GBNF) — enquanto o PO ainda não respondeu, mostra um indicador
+    // estático nos campos dele.
+    expect(await screen.findAllByText(/PO gerando…/)).not.toHaveLength(0);
 
     liberar();
-    await waitFor(() => expect(screen.queryByText(/Escrevendo item/)).not.toBeInTheDocument());
+    await waitFor(() => expect(apiIaSugerirPipelineMock).toHaveBeenCalledWith("po", expect.anything()));
   });
 
-  it("modelo não pronto: não dispara sozinho, tela fica no comportamento manual de sempre", async () => {
+  it("modelo não pronto: não dispara sozinha, tela fica no comportamento manual de sempre", async () => {
     apiIaStatusMock.mockResolvedValueOnce({ chatInstalado: false, embeddingInstalado: false, pronto: false, caminhoModelos: "" });
     const resultado = resultadoFixture01();
 
@@ -545,23 +545,61 @@ describe("ReviewScreen — geração ao vivo (Fase 1d-ii, SPEC-23 — orquestra�
     );
 
     await waitFor(() => expect(apiIaStatusMock).toHaveBeenCalled());
-    expect(screen.queryByText(/Escrevendo item/)).not.toBeInTheDocument();
-    expect(apiIaSugerirItemMock).not.toHaveBeenCalled();
+    expect(screen.queryByText(/item \d+ de/)).not.toBeInTheDocument();
+    expect(apiIaSugerirPipelineMock).not.toHaveBeenCalled();
+  });
+
+  it("handoff: quando o PO termina todos os itens, a barra passa a mostrar o Arquiteto", async () => {
+    apiIaStatusMock.mockResolvedValueOnce({ chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "" });
+    // Primeira chamada do PO fica pendente até o teste observar "po" ativo —
+    // sem isso, como as chamadas seguintes do PO resolvem rápido demais, a
+    // esteira já teria avançado pro Arquiteto antes do primeiro render ser
+    // capturado. Arquiteto/Especialista/QA nunca resolvem — só interessa
+    // provar que o handoff PO→Arquiteto aconteceu.
+    let liberarPrimeiraPo!: () => void;
+    let jaLiberouPrimeira = false;
+    apiIaSugerirPipelineMock.mockImplementation(async (papel: string) => {
+      if (papel !== "po") return new Promise(() => {});
+      if (!jaLiberouPrimeira) {
+        jaLiberouPrimeira = true;
+        return new Promise((resolve) => {
+          liberarPrimeiraPo = () => resolve({});
+        });
+      }
+      return {};
+    });
+    const resultado = resultadoFixture01();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        regras={regrasUmPlaceholder}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    expect(await screen.findByTestId("handoff-po")).toHaveAttribute("aria-current", "step");
+    liberarPrimeiraPo();
+    await waitFor(() => expect(screen.getByTestId("handoff-arquiteto")).toHaveAttribute("aria-current", "step"));
   });
 
   it("Pausar interrompe antes da próxima chamada; Continuar retoma", async () => {
     apiIaStatusMock.mockResolvedValueOnce({ chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "" });
     let liberarPrimeira!: () => void;
-    apiIaSugerirItemMock
+    apiIaSugerirPipelineMock
       .mockImplementationOnce(
         () =>
           new Promise((resolve) => {
             liberarPrimeira = () => resolve({});
           })
       )
-      // A partir do 2º item, nunca resolve — evita que a fila inteira corra
-      // sozinha depois do Continuar; só interessa provar que a 2ª chamada foi
-      // disparada.
+      // Segunda chamada em diante nunca resolve — evita que a esteira inteira
+      // corra sozinha depois do Continuar; só interessa provar que a 2ª
+      // chamada foi disparada.
       .mockImplementation(() => new Promise(() => {}));
     const resultado = resultadoFixture01();
     const user = userEvent.setup();
@@ -578,21 +616,21 @@ describe("ReviewScreen — geração ao vivo (Fase 1d-ii, SPEC-23 — orquestra�
       />
     );
 
-    await waitFor(() => expect(apiIaSugerirItemMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(apiIaSugerirPipelineMock).toHaveBeenCalledTimes(1));
     await user.click(screen.getByRole("button", { name: "⏸ Pausar" }));
     expect(await screen.findByText(/Pausado/)).toBeInTheDocument();
 
     liberarPrimeira();
     await new Promise((r) => setTimeout(r, 250));
-    expect(apiIaSugerirItemMock).toHaveBeenCalledTimes(1);
+    expect(apiIaSugerirPipelineMock).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole("button", { name: "▶ Continuar" }));
-    await waitFor(() => expect(apiIaSugerirItemMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(apiIaSugerirPipelineMock).toHaveBeenCalledTimes(2));
   });
 
   it("clicar manualmente num item quebra o auto-follow — badge 'Seguindo a geração' some", async () => {
     apiIaStatusMock.mockResolvedValueOnce({ chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "" });
-    apiIaSugerirItemMock.mockImplementationOnce(() => new Promise(() => {})); // nunca resolve nesse teste
+    apiIaSugerirPipelineMock.mockImplementationOnce(() => new Promise(() => {})); // nunca resolve nesse teste
     const resultado = resultadoFixture01();
     const outraAtividade = resultado.atividades.find((a) => a.chave !== atividadeComPlaceholder(resultado).chave)!;
     const user = userEvent.setup();
@@ -614,9 +652,9 @@ describe("ReviewScreen — geração ao vivo (Fase 1d-ii, SPEC-23 — orquestra�
     expect(screen.queryByText("● Seguindo a geração")).not.toBeInTheDocument();
   });
 
-  it("'Gerar de novo' aparece quando não está rodando, e reinicia a orquestração", async () => {
+  it("'Gerar de novo' aparece quando não está rodando, e reinicia a esteira", async () => {
     apiIaStatusMock.mockResolvedValueOnce({ chatInstalado: false, embeddingInstalado: false, pronto: false, caminhoModelos: "" });
-    apiIaSugerirItemMock.mockResolvedValue({});
+    apiIaSugerirPipelineMock.mockResolvedValue({});
     const resultado = resultadoFixture01();
     const user = userEvent.setup();
 
@@ -635,7 +673,7 @@ describe("ReviewScreen — geração ao vivo (Fase 1d-ii, SPEC-23 — orquestra�
     const botaoGerar = await screen.findByRole("button", { name: "🔄 Gerar de novo" });
     await user.click(botaoGerar);
 
-    await waitFor(() => expect(apiIaSugerirItemMock).toHaveBeenCalled());
+    await waitFor(() => expect(apiIaSugerirPipelineMock).toHaveBeenCalled());
   });
 });
 
