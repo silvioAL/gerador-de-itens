@@ -27,7 +27,14 @@ export {
   VARIAVEIS_ESPECIFICACAO,
   TEMPLATE_ESPECIFICACAO_PADRAO,
   nosDeOrigem,
+  estruturarEspecificacaoNo,
+  montarFichaItem,
   type OpcoesGerarEspecificacao,
+  type FichaCampoEscalar,
+  type FichaCampoLista,
+  type FichaEspecificacaoNo,
+  type FichaPlaceholder,
+  type FichaItem,
 } from "./especificacao/gerarEspecificacaoEntrega.js";
 export { gerarDiagramaHtml, type OpcoesGerarDiagramaHtml } from "./diagrama-html/gerarDiagramaHtml.js";
 export {

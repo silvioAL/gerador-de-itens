@@ -1,4 +1,4 @@
-import type { Atividade, Aresta, Diagrama, No, ValorSpec } from "../model/types.js";
+import type { Atividade, Aresta, Diagrama, No, Origem, StatusNo, ValorSpec } from "../model/types.js";
 import type { DiagramaConfig, FieldSpec, RegrasConfig } from "../config/types.js";
 import { camposVisiveis } from "../spec/campos.js";
 import {
@@ -6,6 +6,7 @@ import {
   gerarChecklistTecnico,
   gerarCiclosDeTeste,
   gerarVolumetria,
+  listarPlaceholders,
 } from "../refinamento/gerarRefinamento.js";
 
 function nodeById(diagrama: Diagrama, id: string): No | undefined {
@@ -33,53 +34,127 @@ function descreverItemLista(item: Record<string, unknown>, itemSpec: FieldSpec[]
 
 /** Campo `type: "lista"` (ex.: Endpoints) não cabe numa célula de tabela — um
  * item por linha numerada, fora da tabela de campos escalares. */
-function descreverCampoLista(campo: FieldSpec, valorSpec: ValorSpec | undefined): string {
-  const itens = Array.isArray(valorSpec?.valor) ? (valorSpec.valor as Record<string, unknown>[]) : [];
-  if (itens.length === 0) return `**${campo.label}:** (nenhum item)`;
-  const linhas = itens.map((item, i) => `${i + 1}. ${descreverItemLista(item, campo.itemSpec ?? [])}`);
+function descreverCampoLista(campo: FichaCampoLista): string {
+  if (campo.itens.length === 0) return `**${campo.label}:** (nenhum item)`;
+  const linhas = campo.itens.map((item, i) => `${i + 1}. ${descreverItemLista(item, campo.itemSpec)}`);
   return [`**${campo.label}:**`, "", ...linhas].join("\n");
 }
 
-function descreverEspecificacaoNo(no: No, config: DiagramaConfig, arestas: Aresta[]): string {
-  const cfg = config.nodeTypes[no.type];
-  const linhas: string[] = [`##### ${no.label} (${cfg?.label ?? no.type}, ${no.status})`, ""];
+/** Campo escalar de `No.spec` já resolvido — dado bruto (não texto), pra
+ * servir tanto o formatador de markdown quanto uma UI estruturada futura
+ * (Fase 1a, SPEC-23). `origem`/`valor` ausentes juntos = campo nunca
+ * preenchido; `na` presente = marcado como N/A (os dois nunca coexistem). */
+export interface FichaCampoEscalar {
+  key: string;
+  label: string;
+  valor?: unknown;
+  origem?: Origem;
+  na?: string;
+}
 
+/** Campo `type: "lista"` já resolvido — itens brutos (não pré-formatados),
+ * pra uma UI conseguir editar item a item sem reparsear markdown. */
+export interface FichaCampoLista {
+  key: string;
+  label: string;
+  itemSpec: FieldSpec[];
+  itens: Record<string, unknown>[];
+  na?: string;
+}
+
+/** Especificação técnica de um nó de origem, como dado estruturado — o que
+ * `descreverEspecificacaoNo` (abaixo) formata em markdown, e o que uma ficha
+ * rica (Fase 1d, SPEC-23) vai renderizar/editar diretamente, sem precisar
+ * reparsear a tabela markdown. */
+export interface FichaEspecificacaoNo {
+  noId: string;
+  label: string;
+  tipoLabel: string;
+  status: StatusNo;
+  /** `false` quando o tipo do nó não existe na config carregada — nesse caso
+   * `camposEscalares`/`camposLista` ficam vazios de propósito, não é erro. */
+  tipoConhecido: boolean;
+  camposEscalares: FichaCampoEscalar[];
+  camposLista: FichaCampoLista[];
+}
+
+/** Resolve a especificação técnica de um nó pra dado estruturado — mesma
+ * fonte (`camposVisiveis`, `No.spec`/`specNA`) que antes ia direto pro
+ * markdown; agora fica disponível como objeto pra quem precisar (Fase 1a). */
+export function estruturarEspecificacaoNo(no: No, config: DiagramaConfig, arestas: Aresta[]): FichaEspecificacaoNo {
+  const cfg = config.nodeTypes[no.type];
   if (!cfg) {
-    linhas.push(`_Tipo "${no.type}" não encontrado na config carregada._`);
-    return linhas.join("\n");
+    return {
+      noId: no.id, label: no.label, tipoLabel: no.type, status: no.status,
+      tipoConhecido: false, camposEscalares: [], camposLista: [],
+    };
   }
 
   const visiveis = camposVisiveis(cfg.spec, no, arestas);
-  if (visiveis.length === 0) {
+  const camposEscalares: FichaCampoEscalar[] = [];
+  const camposLista: FichaCampoLista[] = [];
+
+  for (const campo of visiveis) {
+    const na = no.specNA?.[campo.key];
+    if (campo.type === "lista") {
+      const valorSpec = no.spec[campo.key];
+      camposLista.push({
+        key: campo.key,
+        label: campo.label,
+        itemSpec: campo.itemSpec ?? [],
+        itens: Array.isArray(valorSpec?.valor) ? (valorSpec.valor as Record<string, unknown>[]) : [],
+        na: na?.motivo,
+      });
+    } else {
+      const valorSpec = no.spec[campo.key];
+      camposEscalares.push({
+        key: campo.key,
+        label: campo.label,
+        valor: valorSpec?.valor,
+        origem: valorSpec?.origem,
+        na: na?.motivo,
+      });
+    }
+  }
+
+  return { noId: no.id, label: no.label, tipoLabel: cfg.label, status: no.status, tipoConhecido: true, camposEscalares, camposLista };
+}
+
+/** Formata a especificação estruturada de um nó em markdown — mesmo texto
+ * que a versão anterior gerava direto de `No`, agora derivado do dado
+ * estruturado (`estruturarEspecificacaoNo`), não recalculado do zero. */
+function descreverEspecificacaoNo(ficha: FichaEspecificacaoNo): string {
+  const linhas: string[] = [`##### ${ficha.label} (${ficha.tipoLabel}, ${ficha.status})`, ""];
+
+  if (!ficha.tipoConhecido) {
+    linhas.push(`_Tipo "${ficha.tipoLabel}" não encontrado na config carregada._`);
+    return linhas.join("\n");
+  }
+
+  if (ficha.camposEscalares.length === 0 && ficha.camposLista.length === 0) {
     linhas.push("_Nenhum campo aplicável._");
     return linhas.join("\n");
   }
 
-  const camposEscalares = visiveis.filter((c) => c.type !== "lista");
-  const camposLista = visiveis.filter((c) => c.type === "lista");
-
-  if (camposEscalares.length > 0) {
+  if (ficha.camposEscalares.length > 0) {
     linhas.push("| Campo | Valor | Proveniência |", "|---|---|---|");
-    for (const campo of camposEscalares) {
-      const na = no.specNA?.[campo.key];
-      if (na) {
-        linhas.push(`| ${campo.label} | N/A — ${na.motivo || "(sem motivo)"} | — |`);
+    for (const campo of ficha.camposEscalares) {
+      if (campo.na !== undefined) {
+        linhas.push(`| ${campo.label} | N/A — ${campo.na || "(sem motivo)"} | — |`);
         continue;
       }
-      const valorSpec = no.spec[campo.key];
-      if (!valorSpec) {
+      if (campo.origem === undefined) {
         linhas.push(`| ${campo.label} | (não preenchido) | — |`);
         continue;
       }
-      linhas.push(`| ${campo.label} | ${formatarValor(valorSpec.valor)} | ${valorSpec.origem} |`);
+      linhas.push(`| ${campo.label} | ${formatarValor(campo.valor)} | ${campo.origem} |`);
     }
   }
 
-  for (const campo of camposLista) {
-    const na = no.specNA?.[campo.key];
+  for (const campo of ficha.camposLista) {
     linhas.push(
       "",
-      na ? `**${campo.label}:** N/A — ${na.motivo || "(sem motivo)"}` : descreverCampoLista(campo, no.spec[campo.key])
+      campo.na !== undefined ? `**${campo.label}:** N/A — ${campo.na || "(sem motivo)"}` : descreverCampoLista(campo)
     );
   }
 
@@ -219,7 +294,7 @@ export function renderizarItemEspecificacao(
   const nos = nosDeOrigem(atividade, diagrama);
   const especificacaoTecnica =
     nos.length > 0
-      ? nos.map((no) => descreverEspecificacaoNo(no, config, diagrama.edges)).join("\n\n")
+      ? nos.map((no) => descreverEspecificacaoNo(estruturarEspecificacaoNo(no, config, diagrama.edges))).join("\n\n")
       : "_Nenhum nó de origem associado a esta atividade._";
 
   const checklist = regras
@@ -258,6 +333,95 @@ export function renderizarItemEspecificacao(
     "",
     criteriosAceite,
   ].join("\n");
+}
+
+/** Um placeholder de checklist técnico/volumetria já resolvido pra uma
+ * atividade específica — mesma `chave`/`tech`/`rotulo` de
+ * `PlaceholderRefinamento` (`listarPlaceholders`), com a resposta (se
+ * houver) já anexada, pronto pra uma UI ler direto sem juntar as duas
+ * fontes ela mesma. */
+export interface FichaPlaceholder {
+  chave: string;
+  tech: string;
+  rotulo: string;
+  resposta?: ValorSpec;
+}
+
+/**
+ * Representação estruturada de uma atividade (Fase 1a, SPEC-23) — o que
+ * `renderizarItemEspecificacao` formata em markdown hoje, disponível como
+ * dado pra uma UI editável renderizar/editar direto, sem reparsear texto.
+ * `checklistProcessoMarkdown`/`ciclosTesteMarkdown`/`criteriosAceiteMarkdown`
+ * ficam como markdown puro de propósito — nenhum consumidor de UI precisa
+ * editar essas três seções ainda (são geradas por regra, não por resposta
+ * humana/IA como o checklist técnico/volumetria); estruturá-las agora seria
+ * especulativo. Revisitar quando a ficha rica (Fase 1d) precisar delas.
+ */
+export interface FichaItem {
+  numero: number;
+  chave: string;
+  rotulo: string;
+  descricao: string;
+  tipo: Atividade["tipo"];
+  tamanho: Atividade["tamanho"];
+  techs: string[];
+  contextos: string[];
+  dependencias: Atividade["dependencias"];
+  timesEnvolvidos?: string[];
+  especificacaoTecnica: FichaEspecificacaoNo[];
+  checklistTecnico: FichaPlaceholder[];
+  volumetria: FichaPlaceholder[];
+  checklistProcessoMarkdown: string;
+  ciclosTesteMarkdown: string;
+  criteriosAceiteMarkdown: string;
+}
+
+/**
+ * Monta a ficha estruturada de uma atividade — reusa `estruturarEspecificacaoNo`
+ * pros nós de origem e `listarPlaceholders` pro checklist técnico/volumetria
+ * (mesma fonte que `renderizarItemEspecificacao` usa pra gerar o markdown,
+ * nunca uma segunda lógica de derivação). `respostas` é o mesmo mapa de
+ * `quebra.respostasItens?.[atividade.chave]` já usado em `renderizarItemEspecificacao`.
+ */
+export function montarFichaItem(
+  numero: number,
+  atividade: Atividade,
+  diagrama: Diagrama,
+  config: DiagramaConfig,
+  regras?: RegrasConfig,
+  respostas?: Record<string, ValorSpec>
+): FichaItem {
+  const nos = nosDeOrigem(atividade, diagrama);
+  const especificacaoTecnica = nos.map((no) => estruturarEspecificacaoNo(no, config, diagrama.edges));
+
+  const placeholders = regras
+    ? listarPlaceholders(regras, atividade.techs, atividade.contextos, nos, diagrama.edges)
+    : [];
+  const paraFicha = (secao: "checklistTecnico" | "volumetria"): FichaPlaceholder[] =>
+    placeholders
+      .filter((p) => p.secao === secao)
+      .map((p) => ({ chave: p.chave, tech: p.tech, rotulo: p.rotulo, resposta: respostas?.[p.chave] }));
+
+  return {
+    numero,
+    chave: atividade.chave,
+    rotulo: atividade.rotulo,
+    descricao: atividade.descricao,
+    tipo: atividade.tipo,
+    tamanho: atividade.tamanho,
+    techs: atividade.techs,
+    contextos: atividade.contextos,
+    dependencias: atividade.dependencias,
+    timesEnvolvidos: atividade.timesEnvolvidos,
+    especificacaoTecnica,
+    checklistTecnico: paraFicha("checklistTecnico"),
+    volumetria: paraFicha("volumetria"),
+    checklistProcessoMarkdown: regras
+      ? gerarChecklistProcesso(regras, atividade.techs, atividade.contextos, nos, diagrama.edges)
+      : "",
+    ciclosTesteMarkdown: regras ? gerarCiclosDeTeste(regras, atividade.techs, atividade.contextos) : "",
+    criteriosAceiteMarkdown: resolverCenarioGherkin(atividade, diagrama, config),
+  };
 }
 
 export interface OpcoesGerarEspecificacao {
