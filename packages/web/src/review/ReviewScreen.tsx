@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   gerarDiagramaHtml,
   gerarEspecificacaoEntrega,
@@ -15,6 +15,8 @@ import {
 } from "@gerador/engine";
 import { apiIa, type EspecificacaoTemplate } from "../api/client";
 import { baixarArquivoTexto } from "../persistence/baixarArquivo";
+import { DiagramaCompacto } from "./DiagramaCompacto";
+import { useGeracaoAoVivo, type ItemFilaGeracao } from "./useGeracaoAoVivo";
 
 export interface ReviewScreenProps {
   resultado: ResultadoDependenciasDe<Atividade>;
@@ -129,13 +131,22 @@ const ABAS: { id: Aba; rotulo: string }[] = [
  * fornecida pelo usuário: tema escuro, lista de itens à esquerda, ficha à
  * direita com abas (Especificação/Contrato/Refinamento/Testes), montada a
  * partir do dado estruturado do engine (`montarFichaItem`, Fase 1a) em vez
- * de um bloco de markdown único. Sem a animação de geração do protótipo (não
- * existe processo de geração real pra narrar ainda — fica pra quando 1c
- * existir) e sem o chat livre (1e) — Refinamento continua usando o mesmo
- * mecanismo de sugestão/confirmação já validado, só com o visual novo.
- * Diagrama continua atrás do botão de alternar: `gerarDiagramaHtml` gera uma
- * página própria completa (cabeçalho, seletor de sequência, painel lateral),
- * embutir só o SVG cortaria esse chrome.
+ * de um bloco de markdown único.
+ *
+ * Geração ao vivo (Fase 1d, SPEC-23): assim que a tela monta, se o modelo
+ * local estiver instalado, dispara sozinha uma orquestração real
+ * (`useGeracaoAoVivo`) sobre todos os placeholders pendentes, em sequência,
+ * usando o streaming de verdade da Fase 1c — a ficha do item em andamento
+ * segue automaticamente ("Seguindo a geração"), quebrando o auto-follow só
+ * quando o usuário clica manualmente noutro item. Diferença deliberada do
+ * protótipo de referência (que anima itens "pousando" um a um): os itens já
+ * existem TODOS de verdade assim que `derivar()` roda (síncrono,
+ * determinístico) — não tem processo real de "descobrir itens" pra narrar, só
+ * o preenchimento do refinamento via IA. `DiagramaCompacto` fica sempre
+ * visível no topo (substitui o antigo atrás-de-alternância da 1d-i, que não
+ * tinha processo real pra sincronizar); o diagrama completo (`gerarDiagramaHtml`,
+ * SPEC-21, com seletor de sequência e painel lateral próprios) continua
+ * acessível via "🔍 Ver diagrama completo".
  */
 export function ReviewScreen({
   resultado,
@@ -154,6 +165,7 @@ export function ReviewScreen({
   const [mostrarDiagrama, setMostrarDiagrama] = useState(false);
   const [selecionada, setSelecionada] = useState<string | null>(null);
   const [aba, setAba] = useState<Aba>("especificacao");
+  const [seguindoGeracao, setSeguindoGeracao] = useState(true);
 
   const diagramaHtml = useMemo(
     () => gerarDiagramaHtml(resultado.atividades, diagrama, config),
@@ -175,6 +187,62 @@ export function ReviewScreen({
     baixarArquivoTexto(diagramaHtml, "diagrama-da-solucao.html", "text/html");
   }
 
+  const contextoEpico = contextoEpicoCompleto(demandInfo, anexosContexto);
+
+  // Fase 1d (SPEC-23): fila de trabalho pra orquestração real — `apenasPendentes`
+  // false é usado por "Gerar de novo" (regenera tudo, inclusive já confirmado).
+  const montarFila = useCallback(
+    (apenasPendentes: boolean): ItemFilaGeracao[] => {
+      const filaNova: ItemFilaGeracao[] = [];
+      for (const a of resultado.atividades) {
+        const ficha = fichas.get(a.chave);
+        if (!ficha) continue;
+        const contextoNo = contextoDoPlaceholder(ficha.especificacaoTecnica);
+        for (const p of [...ficha.checklistTecnico, ...ficha.volumetria]) {
+          if (!apenasPendentes || !respostaConfirmada(p.resposta)) {
+            filaNova.push({ atividadeChave: a.chave, chavePlaceholder: p.chave, tech: p.tech, rotulo: p.rotulo, contextoNo });
+          }
+        }
+      }
+      return filaNova;
+    },
+    [resultado.atividades, fichas]
+  );
+
+  const geracao = useGeracaoAoVivo({
+    contextoEpico,
+    onResponderItem: (atividadeChave, chavePlaceholder, resposta) => onResponderItem?.(atividadeChave, chavePlaceholder, resposta),
+  });
+
+  useEffect(() => {
+    // Só na montagem: dispara sozinho quando o modelo já está instalado E há
+    // placeholder pendente — sem modelo, cai no comportamento manual de
+    // sempre (botão "✨ Sugerir" continua funcionando igual). Reagir a
+    // fichas/resultado mudando de novo a cada resposta reiniciaria a
+    // orquestração sem sentido — "Gerar de novo" já cobre o caso de refazer.
+    let cancelado = false;
+    apiIa
+      .status()
+      .then((status) => {
+        if (cancelado || !status.pronto) return;
+        const filaInicial = montarFila(true);
+        if (filaInicial.length > 0) geracao.iniciar(filaInicial);
+      })
+      .catch(() => {
+        // Servidor sem essa rota ainda, ou indisponível — sem geração automática.
+      });
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!seguindoGeracao || !geracao.atual) return;
+    setSelecionada(geracao.atual.atividadeChave);
+    setAba("refinamento");
+  }, [geracao.atual, seguindoGeracao]);
+
   const chaveParaNodeId = Object.fromEntries(
     resultado.atividades.filter((a) => a.origem.nodeId).map((a) => [a.chave, a.origem.nodeId!])
   );
@@ -192,6 +260,7 @@ export function ReviewScreen({
   }
 
   function selecionar(chave: string) {
+    setSeguindoGeracao(false);
     setSelecionada(chave);
     setAba("especificacao");
   }
@@ -219,13 +288,31 @@ export function ReviewScreen({
 
   const atividadeSelecionada = selecionada ? resultado.atividades.find((a) => a.chave === selecionada) : undefined;
   const fichaSelecionada = selecionada ? fichas.get(selecionada) : undefined;
-  const contextoEpico = contextoEpicoCompleto(demandInfo, anexosContexto);
+  const atividadeEmGeracao = geracao.atual
+    ? resultado.atividades.find((a) => a.chave === geracao.atual!.atividadeChave)
+    : undefined;
 
   return (
     <div style={telaEstilo}>
       <header style={headerEstilo}>
         <strong style={{ fontSize: 14 }}>Revisão da quebra</strong>
-        <span style={{ fontSize: 12, color: "var(--dim, #8D9BB0)" }}>{resultado.atividades.length} itens</span>
+        {geracao.rodando && geracao.atual ? (
+          <div style={faseBarraEstilo} role="status" aria-live="polite">
+            <span style={{ fontSize: 12 }}>
+              {`${geracao.pausado ? "Pausado — " : "Escrevendo "}requisito ${geracao.progresso.feito + 1} de ${geracao.progresso.total}${atividadeEmGeracao ? ` · ${atividadeEmGeracao.rotulo}` : ""}`}
+            </span>
+            <div style={progressoTrilhoEstilo}>
+              <div
+                style={{
+                  ...progressoBarraEstilo,
+                  width: `${(geracao.progresso.feito / Math.max(1, geracao.progresso.total)) * 100}%`,
+                }}
+              />
+            </div>
+          </div>
+        ) : (
+          <span style={{ fontSize: 12, color: "var(--dim, #8D9BB0)" }}>{resultado.atividades.length} itens</span>
+        )}
         {contagens && (
           <div role="status" aria-live="polite" style={contadoresEstilo}>
             {(Object.keys(contagens) as StatusItem[]).map((s) => (
@@ -236,9 +323,24 @@ export function ReviewScreen({
             ))}
           </div>
         )}
+        {geracao.rodando ? (
+          <button onClick={geracao.pausado ? geracao.continuar : geracao.pausar} style={botaoEstilo}>
+            {geracao.pausado ? "▶ Continuar" : "⏸ Pausar"}
+          </button>
+        ) : (
+          <button
+            onClick={() => {
+              setSeguindoGeracao(true);
+              geracao.iniciar(montarFila(false));
+            }}
+            style={botaoEstilo}
+          >
+            🔄 Gerar de novo
+          </button>
+        )}
         <div style={{ flex: 1 }} />
         <button onClick={() => setMostrarDiagrama((v) => !v)} style={botaoEstilo}>
-          {mostrarDiagrama ? "Voltar à lista" : "🔀 Ver diagrama animado"}
+          {mostrarDiagrama ? "Voltar à lista" : "🔍 Ver diagrama completo"}
         </button>
         <div data-tour="export-buttons">
           {mostrarDiagrama ? (
@@ -259,7 +361,13 @@ export function ReviewScreen({
       {mostrarDiagrama ? (
         <iframe title="Diagrama animado da solução" srcDoc={diagramaHtml} style={{ flex: 1, border: "none" }} />
       ) : (
-        <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+        <>
+          <DiagramaCompacto
+            diagrama={diagrama}
+            config={config}
+            noAtivoId={atividadeEmGeracao ? chaveParaNodeId[atividadeEmGeracao.chave] : undefined}
+          />
+          <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
           <section data-tour="review-table" style={listaEstilo}>
             {(resultado.ciclos.length > 0 || resultado.conflitos.length > 0) && (
               <div style={avisoEstilo}>
@@ -345,6 +453,9 @@ export function ReviewScreen({
                     <button style={{ ...linkEstilo, fontSize: 16, fontWeight: 600 }} onClick={() => irParaChave(atividadeSelecionada.chave)} disabled={!chaveParaNodeId[atividadeSelecionada.chave]}>
                       {atividadeSelecionada.rotulo}
                     </button>
+                    {seguindoGeracao && geracao.rodando && (
+                      <span style={seguindoBadgeEstilo}>● Seguindo a geração</span>
+                    )}
                   </div>
                   <nav style={{ display: "flex", gap: 4, marginTop: 10 }}>
                     {ABAS.map((t) => (
@@ -366,6 +477,11 @@ export function ReviewScreen({
                       ficha={fichaSelecionada}
                       contextoEpico={contextoEpico}
                       onResponder={(chave, resposta) => onResponderItem?.(atividadeSelecionada.chave, chave, resposta)}
+                      geracaoAoVivo={
+                        geracao.rodando && geracao.atual?.atividadeChave === atividadeSelecionada.chave
+                          ? { chavePlaceholder: geracao.atual.chavePlaceholder, texto: geracao.textoParcial }
+                          : undefined
+                      }
                     />
                   )}
                   {aba === "testes" && <AbaTestes ficha={fichaSelecionada} />}
@@ -373,7 +489,8 @@ export function ReviewScreen({
               </>
             )}
           </section>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );
@@ -492,6 +609,11 @@ interface AbaRefinamentoProps {
   /** Contexto do épico/demanda (Fase 1b, SPEC-23) — mandado junto no `/ia/sugerir` real. */
   contextoEpico?: string;
   onResponder?: (chavePlaceholder: string, resposta: ValorSpec) => void;
+  /** Fase 1d, SPEC-23: quando a orquestração ao vivo está processando um
+   * placeholder desta ficha (não um clique manual em "✨ Sugerir"), mostra o
+   * texto parcial em tempo real — sem isso o usuário só veria o card mudar
+   * quando a resposta já estivesse pronta. */
+  geracaoAoVivo?: { chavePlaceholder: string; texto: string };
 }
 
 /**
@@ -501,7 +623,7 @@ interface AbaRefinamentoProps {
  * só aí passa a valer pro documento final (mesma disciplina "nada sugerido
  * conta até confirmado" já usada pro semáforo de prontidão dos nós).
  */
-function AbaRefinamento({ ficha, contextoEpico, onResponder }: AbaRefinamentoProps) {
+function AbaRefinamento({ ficha, contextoEpico, onResponder, geracaoAoVivo }: AbaRefinamentoProps) {
   const [rascunhos, setRascunhos] = useState<Record<string, string>>({});
   const [carregando, setCarregando] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -514,13 +636,20 @@ function AbaRefinamento({ ficha, contextoEpico, onResponder }: AbaRefinamentoPro
   async function sugerir(p: FichaPlaceholder) {
     setErro(null);
     setCarregando(p.chave);
+    setRascunhos((r) => ({ ...r, [p.chave]: "" }));
     try {
-      const { valor } = await apiIa.sugerir({
-        tech: p.tech,
-        rotulo: p.rotulo,
-        contextoNo: contextoDoPlaceholder(ficha.especificacaoTecnica),
-        contextoEpico,
-      });
+      // Fase 1c (SPEC-23): onPedaco atualiza o campo a cada pedaço que chega
+      // — o texto aparece sendo escrito em tempo real, não "Gerando..." e
+      // depois um pop-in do texto inteiro.
+      const { valor } = await apiIa.sugerir(
+        {
+          tech: p.tech,
+          rotulo: p.rotulo,
+          contextoNo: contextoDoPlaceholder(ficha.especificacaoTecnica),
+          contextoEpico,
+        },
+        (pedaco) => setRascunhos((r) => ({ ...r, [p.chave]: (r[p.chave] ?? "") + pedaco }))
+      );
       setRascunhos((r) => ({ ...r, [p.chave]: valor }));
       onResponder?.(p.chave, { valor, origem: "sugerido", confirmado: false });
     } catch (e) {
@@ -541,7 +670,10 @@ function AbaRefinamento({ ficha, contextoEpico, onResponder }: AbaRefinamentoPro
       {erro && <div style={{ fontSize: 11, color: "#f87171" }}>{erro}</div>}
       {placeholders.map((p) => {
         const confirmada = respostaConfirmada(p.resposta);
-        const rascunho = rascunhos[p.chave] ?? (typeof p.resposta?.valor === "string" ? p.resposta.valor : "");
+        const emGeracaoAoVivo = geracaoAoVivo?.chavePlaceholder === p.chave;
+        const rascunho = emGeracaoAoVivo
+          ? geracaoAoVivo!.texto
+          : (rascunhos[p.chave] ?? (typeof p.resposta?.valor === "string" ? p.resposta.valor : ""));
         return (
           <div key={p.chave} style={{ ...reqEstilo, ...(confirmada ? reqPreenchidoEstilo : {}) }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
@@ -551,6 +683,11 @@ function AbaRefinamento({ ficha, contextoEpico, onResponder }: AbaRefinamentoPro
             </div>
             {confirmada ? (
               <pre style={{ ...preEstilo, marginTop: 8 }}>{String(p.resposta?.valor)}</pre>
+            ) : emGeracaoAoVivo ? (
+              <div style={{ marginTop: 8 }}>
+                <pre style={preEstilo}>{rascunho || "…"}</pre>
+                <span style={{ fontSize: 10.5, color: "#38bdf8" }}>✨ gerando…</span>
+              </div>
             ) : (
               <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                 <input
@@ -624,6 +761,32 @@ const contadoresEstilo: React.CSSProperties = {
   border: "1px solid #1B2533",
   borderRadius: 8,
   padding: "4px 10px",
+};
+
+const faseBarraEstilo: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+  minWidth: 220,
+};
+
+const progressoTrilhoEstilo: React.CSSProperties = {
+  height: 4,
+  borderRadius: 2,
+  background: "#1B2533",
+  overflow: "hidden",
+};
+
+const progressoBarraEstilo: React.CSSProperties = {
+  height: "100%",
+  background: "#38bdf8",
+  transition: "width 200ms ease",
+};
+
+const seguindoBadgeEstilo: React.CSSProperties = {
+  fontSize: 10.5,
+  color: "#38bdf8",
+  fontWeight: 600,
 };
 
 const listaEstilo: React.CSSProperties = {

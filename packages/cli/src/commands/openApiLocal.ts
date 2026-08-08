@@ -413,16 +413,6 @@ async function tratarEspecificacaoTemplate(req: IncomingMessage, res: ServerResp
 // --- POST /ia/sugerir — fluxo 3 (Fase 1, SPEC-23): sugestão de texto pra um
 // placeholder "<- ✍️ especificar" do checklist técnico/volumetria ---
 
-const SCHEMA_SUGESTAO = {
-  type: "object",
-  properties: { valor: { type: "string" } },
-  required: ["valor"],
-} as const;
-
-interface RespostaSugerida {
-  valor: string;
-}
-
 // Carrega o modelo de chat UMA VEZ por processo (lazy, no primeiro POST) —
 // não por requisição, o que custaria segundos por sugestão. Sem cache de
 // resposta entre chamadas diferentes: reiniciar `gerador open` descarrega o
@@ -460,8 +450,16 @@ async function tratarIaSugerir(req: IncomingMessage, res: ServerResponse): Promi
     ].join("\n");
 
     const motor = await obterMotorChat();
-    const resultado = (await motor.completarComSchema(prompt, SCHEMA_SUGESTAO)) as RespostaSugerida;
-    enviarJson(res, 200, { valor: resultado.valor });
+
+    // Fase 1c (SPEC-23): texto livre (sem GBNF) — o schema de sugestão sempre
+    // foi um único campo string (`valor`), então "estrutura" era decorativa;
+    // streamar um JSON sendo montado mostraria pontuação aparecendo antes do
+    // texto de verdade (`{`, `"`, `v`, `a`, `l`...). Resposta vira texto puro
+    // em pedaços — `res.write()` várias vezes faz o Node fazer chunked
+    // transfer sozinho, sem precisar setar o header à mão.
+    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" });
+    await motor.completar(prompt, { onTexto: (pedaco) => res.write(pedaco) });
+    res.end();
   } catch (erro) {
     // Achado real: sem este catch, uma falha no motor de IA (binário nativo
     // bloqueado pelo Windows Defender, modelo corrompido, etc.) virava
@@ -471,7 +469,15 @@ async function tratarIaSugerir(req: IncomingMessage, res: ServerResponse): Promi
     // na próxima chamada, sem precisar reiniciar o servidor.
     motorChatSingleton = undefined;
     const mensagem = erro instanceof Error ? erro.message : "Falha desconhecida ao gerar sugestão.";
-    enviarJson(res, 500, { erro: `Não foi possível gerar a sugestão: ${mensagem}` });
+    // Achado real (Fase 1c): se o streaming já começou, `res.writeHead` já
+    // rodou — não dá mais pra trocar o status code. Falha nessa janela é rara
+    // (o modelo já carregou e estava respondendo); só encerra a conexão, o
+    // cliente trata resposta incompleta como falha.
+    if (res.headersSent) {
+      res.end();
+    } else {
+      enviarJson(res, 500, { erro: `Não foi possível gerar a sugestão: ${mensagem}` });
+    }
   }
 }
 

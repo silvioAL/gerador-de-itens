@@ -15,12 +15,26 @@ const verificarStatusMock = vi.fn(async () => ({
   caminhoModelos: "/fake/models",
 }));
 // Instância única (não recriada a cada chamada de carregarModeloChatMock) pra
-// dar pra inspecionar o prompt de verdade recebido em `completarComSchema`
-// (Fase 1b, SPEC-23 — assert de que o contexto do épico chega no prompt).
-const completarComSchemaMock = vi.fn(async () => ({ valor: "sugestão de teste" }));
+// dar pra inspecionar o prompt de verdade recebido em `completar` (Fase 1b,
+// SPEC-23 — assert de que o contexto do épico chega no prompt) e simular
+// streaming de verdade via `onTexto` (Fase 1c — /ia/sugerir virou texto
+// livre em pedaços, não mais JSON via completarComSchema).
+const PEDACOS_SUGESTAO = ["sugestão", " de", " teste"];
+const completarMock = vi.fn(async (_prompt: string, opcoes?: { onTexto?: (p: string) => void }) => {
+  for (const pedaco of PEDACOS_SUGESTAO) {
+    opcoes?.onTexto?.(pedaco);
+    // Achado real: sem um yield entre os `res.write()`, o socket local
+    // coalesce os pedaços num único read() do lado do cliente (localhost sem
+    // I/O real entre eles) — o teste de streaming (abaixo) precisava disso
+    // pra provar mais de um pedaço chegando de verdade, não só um corpo
+    // inteiro escrito de uma vez.
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  return PEDACOS_SUGESTAO.join("");
+});
 const carregarModeloChatMock = vi.fn(async () => ({
-  completar: vi.fn(async () => "resposta livre"),
-  completarComSchema: completarComSchemaMock,
+  completar: completarMock,
+  completarComSchema: vi.fn(async () => ({})),
   descartar: vi.fn(async () => {}),
 }));
 vi.mock("@gerador/llm", async () => {
@@ -37,7 +51,7 @@ let dirTemp: string;
 beforeEach(async () => {
   verificarStatusMock.mockClear();
   carregarModeloChatMock.mockClear();
-  completarComSchemaMock.mockClear();
+  completarMock.mockClear();
   verificarStatusMock.mockResolvedValue({
     chatInstalado: false,
     embeddingInstalado: false,
@@ -134,7 +148,8 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       body: JSON.stringify({ tech: "Backend", rotulo: "DLQ configurada e monitorada", contextoNo: "fila rabbitmq" }),
     });
     expect(primeira.status).toBe(200);
-    expect(await primeira.json()).toEqual({ valor: "sugestão de teste" });
+    expect(primeira.headers.get("content-type")).toContain("text/plain");
+    expect(await primeira.text()).toBe("sugestão de teste");
 
     // 4) Chamada seguinte reusa o motor já carregado — nenhuma chamada nova a carregarModeloChat.
     await fetch(`${base}/ia/sugerir`, {
@@ -164,7 +179,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       }),
     });
 
-    const prompt = completarComSchemaMock.mock.calls.at(-1)?.[0] as string;
+    const prompt = completarMock.mock.calls.at(-1)?.[0] as string;
     expect(prompt).toContain("Épico: reduzir tempo de aprovação de crédito de 3 dias pra 1 hora.");
 
     // Sem contextoEpico, o prompt não menciona a seção — não inventa contexto vazio.
@@ -172,8 +187,36 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       method: "POST",
       body: JSON.stringify({ tech: "Backend", rotulo: "outro requisito", contextoNo: "" }),
     });
-    const promptSemEpico = completarComSchemaMock.mock.calls.at(-1)?.[0] as string;
+    const promptSemEpico = completarMock.mock.calls.at(-1)?.[0] as string;
     expect(promptSemEpico).not.toContain("Contexto geral da demanda/épico");
+  });
+
+  it("POST /ia/sugerir transmite em pedaços de verdade, não um JSON de uma vez só (Fase 1c, SPEC-23)", async () => {
+    verificarStatusMock.mockResolvedValue({
+      chatInstalado: true,
+      embeddingInstalado: true,
+      pronto: true,
+      caminhoModelos: "/fake/models",
+    });
+
+    const resposta = await fetch(`${base}/ia/sugerir`, {
+      method: "POST",
+      body: JSON.stringify({ tech: "Backend", rotulo: "DLQ configurada e monitorada", contextoNo: "fila rabbitmq" }),
+    });
+    expect(resposta.headers.get("content-type")).toContain("text/plain");
+
+    const leitor = resposta.body!.getReader();
+    const decoder = new TextDecoder();
+    const pedacosRecebidos: string[] = [];
+    for (;;) {
+      const { done, value } = await leitor.read();
+      if (done) break;
+      pedacosRecebidos.push(decoder.decode(value));
+    }
+    // Mais de um `res.write()` chegou como mais de um pedaço no cliente —
+    // prova real de streaming, não só um corpo JSON completo de uma vez.
+    expect(pedacosRecebidos.length).toBeGreaterThan(1);
+    expect(pedacosRecebidos.join("")).toBe("sugestão de teste");
   });
 
   it("GET /quebras sem quebras/ ainda devolve lista vazia, não erro", async () => {
