@@ -431,26 +431,38 @@ function obterMotorChat(): Promise<MotorChat> {
 }
 
 async function tratarIaSugerir(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const status = await verificarStatus();
-  if (!status.pronto) {
-    enviarJson(res, 503, { erro: "modelos de IA não instalados — rode `gerador ia instalar`" });
-    return;
+  try {
+    const status = await verificarStatus();
+    if (!status.pronto) {
+      enviarJson(res, 503, { erro: "modelos de IA não instalados — rode `gerador ia instalar`" });
+      return;
+    }
+
+    const { tech, rotulo, contextoNo } = await lerCorpoJson<{ tech: string; rotulo: string; contextoNo: string }>(req);
+    const prompt = [
+      `Você ajuda a especificar um requisito técnico de refinamento de software.`,
+      `Tecnologia: ${tech}`,
+      `Requisito a especificar: "${rotulo}"`,
+      `Contexto do(s) nó(s) de arquitetura envolvidos:`,
+      contextoNo || "(sem contexto adicional)",
+      ``,
+      `Responda de forma curta, específica e em português, com uma decisão concreta pra esse requisito nesse contexto. Não repita o requisito, só a resposta.`,
+    ].join("\n");
+
+    const motor = await obterMotorChat();
+    const resultado = (await motor.completarComSchema(prompt, SCHEMA_SUGESTAO)) as RespostaSugerida;
+    enviarJson(res, 200, { valor: resultado.valor });
+  } catch (erro) {
+    // Achado real: sem este catch, uma falha no motor de IA (binário nativo
+    // bloqueado pelo Windows Defender, modelo corrompido, etc.) virava
+    // rejeição não tratada e derrubava o processo INTEIRO do `gerador open`
+    // — não só essa requisição (open.ts chama tratarApiLocal sem try/catch
+    // no request handler). Descarta o singleton pra tentar carregar de novo
+    // na próxima chamada, sem precisar reiniciar o servidor.
+    motorChatSingleton = undefined;
+    const mensagem = erro instanceof Error ? erro.message : "Falha desconhecida ao gerar sugestão.";
+    enviarJson(res, 500, { erro: `Não foi possível gerar a sugestão: ${mensagem}` });
   }
-
-  const { tech, rotulo, contextoNo } = await lerCorpoJson<{ tech: string; rotulo: string; contextoNo: string }>(req);
-  const prompt = [
-    `Você ajuda a especificar um requisito técnico de refinamento de software.`,
-    `Tecnologia: ${tech}`,
-    `Requisito a especificar: "${rotulo}"`,
-    `Contexto do(s) nó(s) de arquitetura envolvidos:`,
-    contextoNo || "(sem contexto adicional)",
-    ``,
-    `Responda de forma curta, específica e em português, com uma decisão concreta pra esse requisito nesse contexto. Não repita o requisito, só a resposta.`,
-  ].join("\n");
-
-  const motor = await obterMotorChat();
-  const resultado = (await motor.completarComSchema(prompt, SCHEMA_SUGESTAO)) as RespostaSugerida;
-  enviarJson(res, 200, { valor: resultado.valor });
 }
 
 /**

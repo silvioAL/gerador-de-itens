@@ -11,11 +11,13 @@ O caminho padrão é o CLI local — instala com um comando, sem servidor, sem l
 ### 1. CLI local (recomendado)
 
 ```powershell
-npm install -g gerador-de-itens
+npm install -g gerador-de-itens --allow-scripts=node-llama-cpp
 gerador init                            # em qualquer diretório de projeto
 gerador derive quebra.json --out itens.md
 gerador open                            # editor visual, http://localhost:4321 — já vem empacotado, sem build extra
 ```
+
+`--allow-scripts=node-llama-cpp` é necessário porque o CLI depende do [node-llama-cpp](https://github.com/withcatai/node-llama-cpp) (motor de IA local, SPEC-23) — sem essa flag, o `npm` (versões recentes) pula o postinstall dele por padrão, e os binários nativos ficam num estado incompleto/incorreto que o Windows Defender pode sinalizar como "app bloqueado" ao tentar carregar (ver [Solução de problemas](#solução-de-problemas)).
 
 Publicado no [npm](https://www.npmjs.com/package/gerador-de-itens), mesmo mecanismo de instalação do Graphify — sem clonar este repositório. Veja [`packages/cli/README.md`](packages/cli/README.md) pra instalar a partir do código (contribuindo/testando), e [Comandos da CLI](#comandos-da-cli) abaixo pra lista completa.
 
@@ -87,6 +89,15 @@ Todo comando lê `config/*.json` do **diretório atual**, nunca deste repositór
 ## Solução de problemas
 
 **`gerador` não é reconhecido como comando depois do `npm install -g`.** O `npm` instalou o binário, mas a pasta global de binários do `npm` não está no `PATH` do Windows — comum em instalações novas do Node, principalmente sem reiniciar o terminal depois. Confirme rodando `npm config get prefix` (é essa pasta que precisa estar no `PATH`); se `gerador --help` ainda falhar depois disso, feche e reabra o terminal.
+
+**Windows mostra "Parte deste aplicativo foi bloqueado" ao rodar `gerador ia instalar`/`status`/`open`.** Sintoma de ter instalado sem `--allow-scripts=node-llama-cpp` (ver comando acima) — sem o postinstall dele rodar, os binários nativos de IA ficam num estado que o Windows Defender não reconhece. Corrija reinstalando com a flag:
+
+```powershell
+npm uninstall -g gerador-de-itens
+npm install -g gerador-de-itens --allow-scripts=node-llama-cpp
+```
+
+Se preferir não rodar postinstall de dependência nenhuma por princípio, tudo bem — todo o resto da ferramenta (`init`/`derive`/`implementar`/`open`/`import-graphify`, incluindo `gerador ia instalar`/`status`, que só baixam/checam arquivo) funciona normalmente; só a chamada de verdade ao modelo — botão "✨ Sugerir" na revisão — fica indisponível, com erro claro em vez de travar o resto do app.
 
 ```powershell
 $npmPath = npm config get prefix

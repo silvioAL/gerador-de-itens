@@ -94,11 +94,11 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     expect(carregarModeloChatMock).not.toHaveBeenCalled();
   });
 
-  it("POST /ia/sugerir com modelos instalados devolve {valor} do motor, e reusa o mesmo motor entre chamadas (singleton por processo)", async () => {
-    // As duas asserções de singleton (não carrega no 503, carrega só 1x pra N
-    // chamadas de sucesso) precisam estar no MESMO teste: `motorChatSingleton`
-    // é estado de módulo, não resetado entre `it()` — testar em blocos
-    // separados dependeria da ordem de execução dos testes, frágil.
+  it("POST /ia/sugerir: falha do motor devolve 500 tratado e reseta o singleton; sucesso seguinte carrega e reusa (Fase 1, SPEC-23)", async () => {
+    // Tudo num teste só, nessa ordem — `motorChatSingleton` é estado de
+    // módulo, não resetado entre `it()`; testar essas fases em blocos
+    // separados dependeria da ordem de execução e quebraria uma dependendo
+    // do estado deixado pela outra.
     verificarStatusMock.mockResolvedValue({
       chatInstalado: true,
       embeddingInstalado: true,
@@ -106,6 +106,24 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       caminhoModelos: "/fake/models",
     });
 
+    // 1) Achado real: sem try/catch em tratarIaSugerir, essa rejeição virava
+    // rejeição não tratada e derrubava o processo INTEIRO do `gerador open`
+    // (open.ts chama tratarApiLocal sem try/catch no request handler) — não
+    // só essa requisição.
+    carregarModeloChatMock.mockRejectedValueOnce(new Error("binário nativo bloqueado"));
+    const falha = await fetch(`${base}/ia/sugerir`, {
+      method: "POST",
+      body: JSON.stringify({ tech: "Backend", rotulo: "DLQ configurada e monitorada", contextoNo: "fila rabbitmq" }),
+    });
+    expect(falha.status).toBe(500);
+    expect((await falha.json()).erro).toContain("binário nativo bloqueado");
+
+    // 2) Servidor continua respondendo normalmente depois da falha — processo sobreviveu.
+    expect((await fetch(`${base}/ia/status`)).status).toBe(200);
+
+    // 3) Singleton foi descartado na falha: a chamada seguinte tenta carregar
+    // de novo (sem precisar reiniciar `gerador open` pra tentar depois de
+    // corrigir o ambiente) — e dessa vez o mock resolve normalmente.
     const primeira = await fetch(`${base}/ia/sugerir`, {
       method: "POST",
       body: JSON.stringify({ tech: "Backend", rotulo: "DLQ configurada e monitorada", contextoNo: "fila rabbitmq" }),
@@ -113,12 +131,14 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     expect(primeira.status).toBe(200);
     expect(await primeira.json()).toEqual({ valor: "sugestão de teste" });
 
+    // 4) Chamada seguinte reusa o motor já carregado — nenhuma chamada nova a carregarModeloChat.
     await fetch(`${base}/ia/sugerir`, {
       method: "POST",
       body: JSON.stringify({ tech: "Backend", rotulo: "outro requisito", contextoNo: "" }),
     });
 
-    expect(carregarModeloChatMock).toHaveBeenCalledTimes(1);
+    // 2 chamadas totais a carregarModeloChat: a que falhou (passo 1) + a que carregou de verdade (passo 3).
+    expect(carregarModeloChatMock).toHaveBeenCalledTimes(2);
   });
 
   it("GET /quebras sem quebras/ ainda devolve lista vazia, não erro", async () => {

@@ -5,10 +5,12 @@ CLI do Gerador de Itens — 100% local, sem servidor (SPEC-17). Deriva itens de 
 ## Instalar
 
 ```powershell
-npm install -g gerador-de-itens
+npm install -g gerador-de-itens --allow-scripts=node-llama-cpp
 ```
 
 Publicado no [npm](https://www.npmjs.com/package/gerador-de-itens) — mesmo mecanismo do Graphify (`npm install -g @sentropic/graphify` / `pip install graphifyy`): o comando baixa o pacote já compilado direto do registry, com as dependências resolvidas, sem precisar clonar o repositório. Comando fica disponível como `gerador` em qualquer diretório.
+
+`--allow-scripts=node-llama-cpp` deixa o `npm` (versões recentes bloqueiam postinstall por padrão) rodar o postinstall do [node-llama-cpp](https://github.com/withcatai/node-llama-cpp) (motor de IA local, SPEC-23), que instala corretamente o binário nativo pra sua plataforma. Sem essa flag, o binário fica num estado que o Windows Defender pode sinalizar como "app bloqueado" ao ser carregado — todo o resto da ferramenta (`init`/`derive`/`implementar`/`open`/`import-graphify`, incluindo `gerador ia instalar`/`status`, que só baixam/checam arquivo) continua funcionando normalmente; só a chamada de verdade ao modelo (botão "✨ Sugerir" na revisão) fica indisponível.
 
 ### Instalar a partir do código (contribuindo ou testando uma mudança local)
 
