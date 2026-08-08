@@ -561,41 +561,63 @@ async function tratarIaPipeline(req: IncomingMessage, res: ServerResponse, papel
       return;
     }
 
-    const { atividadeRotulo, contextoNo, contextoEpico, placeholders } = await lerCorpoJson<{
-      atividadeRotulo: string;
-      contextoNo: string;
+    // SPEC-24 Fase E (achado real: "os itens são gerados com chamadas
+    // individuais... está muito lento; a ideia é passar todo o material em
+    // uma chamada única para cada agente"): o pedido virou um LOTE de itens.
+    // Quem decide o tamanho do lote é o cliente (`TAM_LOTE_ESTEIRA`) — a
+    // rota aceita quantos vierem. O schema GBNF vira aninhado: um objeto por
+    // item (chave = atividadeChave), cada um com um campo string por
+    // placeholder — a resposta continua garantida pela grammar.
+    const { contextoEpico, itens } = await lerCorpoJson<{
       contextoEpico?: string;
-      placeholders: { chave: string; tech: string; rotulo: string }[];
+      itens: {
+        chave: string;
+        rotulo: string;
+        contextoNo: string;
+        placeholders: { chave: string; tech: string; rotulo: string }[];
+      }[];
     }>(req);
 
-    if (!Array.isArray(placeholders) || placeholders.length === 0) {
-      enviarJson(res, 400, { erro: "nenhum placeholder informado pra gerar" });
+    if (!Array.isArray(itens) || itens.length === 0 || itens.every((i) => i.placeholders.length === 0)) {
+      enviarJson(res, 400, { erro: "nenhum item com placeholder informado pra gerar" });
       return;
     }
 
     const schema: GbnfJsonSchema = {
       type: "object",
-      properties: Object.fromEntries(placeholders.map((p) => [p.chave, { type: "string" }])),
-      required: placeholders.map((p) => p.chave),
-    };
+      properties: Object.fromEntries(
+        itens.map((item) => [
+          item.chave,
+          {
+            type: "object",
+            properties: Object.fromEntries(item.placeholders.map((p) => [p.chave, { type: "string" }])),
+            required: item.placeholders.map((p) => p.chave),
+          },
+        ])
+      ),
+      required: itens.map((item) => item.chave),
+    } as GbnfJsonSchema;
 
-    const listaRequisitos = placeholders
-      .map((p) => `- (chave "${p.chave}") ${p.tech ? `[${p.tech}] ` : ""}${p.rotulo}`)
-      .join("\n");
+    const blocosItens = itens.map((item) =>
+      [
+        `### Item "${item.rotulo}" (chave "${item.chave}")`,
+        `Contexto do(s) nó(s) de arquitetura envolvidos:`,
+        item.contextoNo || "(sem contexto adicional)",
+        `Campos a responder (responda pela chave entre aspas):`,
+        ...item.placeholders.map((p) => `- (chave "${p.chave}") ${p.tech ? `[${p.tech}] ` : ""}${p.rotulo}`),
+      ].join("\n")
+    );
 
     const prompt = [
       PREAMBULO_PADRAO_POR_PAPEL[papel] ?? PREAMBULO_GENERICO,
       ...(contextoEpico ? [`Contexto geral da demanda/épico:`, contextoEpico, ``] : []),
-      `Item: "${atividadeRotulo}"`,
-      `Contexto do(s) nó(s) de arquitetura envolvidos:`,
-      contextoNo || "(sem contexto adicional)",
+      `Você vai responder um LOTE de ${itens.length} item(ns) de uma vez.`,
+      `Responda TODOS os campos de TODOS os itens, em português, cada um com`,
+      `uma decisão concreta pro item específico naquele contexto — nunca`,
+      `genérica, nunca repetindo o requisito, nunca copiando a resposta de um`,
+      `item pro outro.`,
       ``,
-      `Responda TODOS os campos abaixo, em português, cada um com uma decisão`,
-      `concreta pra esse item nesse contexto — nunca genérica, nunca repetindo`,
-      `o requisito.`,
-      ``,
-      `Campos a responder (responda pela chave entre aspas):`,
-      listaRequisitos,
+      ...blocosItens,
     ].join("\n");
 
     const motor = await obterMotorChat();

@@ -238,11 +238,19 @@ export interface PlaceholderPedidoItemIa {
   rotulo: string;
 }
 
-export interface PedidoSugestaoItemIa {
-  atividadeRotulo: string;
+/** SPEC-24 Fase E — um item dentro do LOTE mandado pra um papel da esteira
+ * (achado real do usuário: chamada por item era lento demais; agora todo o
+ * material de um grupo de itens vai numa chamada só por agente). */
+export interface ItemPedidoPipelineIa {
+  chave: string;
+  rotulo: string;
   contextoNo: string;
-  contextoEpico?: string;
   placeholders: PlaceholderPedidoItemIa[];
+}
+
+export interface PedidoPipelineIa {
+  contextoEpico?: string;
+  itens: ItemPedidoPipelineIa[];
 }
 
 /** SPEC-24 — os 4 papéis da esteira, em ordem fixa (default configurável na
@@ -297,21 +305,17 @@ export const apiIa = {
     }
     return { valor };
   },
-  /** SPEC-24 Fase B/C — esteira de agentes (PO → Arquiteto → Especialista
-   * técnico → QA): a IA escreve os campos de um papel numa chamada só
-   * (resposta é JSON estruturado, schema dinâmico montado no servidor a
-   * partir de `placeholders[]` — sem streaming aqui, múltiplos campos de
-   * uma vez não dá pra mostrar crescendo caractere a caractere sem parecer
-   * JSON quebrado no meio). O servidor troca o preâmbulo do prompt conforme
-   * `papel`; quem decide QUAIS placeholders mandar (só os da seção daquele
-   * papel) é quem chama, não esta função. Substitui o mecanismo de item
-   * único da Fase 1d-ii (`/ia/sugerir-item`, removido — a esteira processa
-   * por papel, não por item inteiro de uma vez). */
+  /** SPEC-24 Fase B/C/E — esteira de agentes (PO → Arquiteto → Especialista
+   * técnico → QA): a IA escreve os campos de um LOTE de itens de um papel
+   * numa chamada só (schema aninhado item→campos, montado no servidor).
+   * O servidor troca o preâmbulo do prompt conforme `papel`; quem decide
+   * QUAIS itens/placeholders mandar (só os da seção daquele papel, em
+   * grupos de `TAM_LOTE_ESTEIRA`) é quem chama, não esta função. */
   sugerirPipeline: async (
     papel: PapelPipeline,
-    pedido: PedidoSugestaoItemIa,
+    pedido: PedidoPipelineIa,
     onTexto?: (acumulado: string) => void
-  ): Promise<Record<string, string>> => {
+  ): Promise<Record<string, Record<string, string>>> => {
     // SPEC-24 Fase E — a rota streama o texto CRU do JSON restrito por GBNF
     // conforme o modelo escreve ("mostrar o que está rodando no modelo, tal
     // como a experiência que existe com o Claude"). Acumula os pedaços,
@@ -342,7 +346,7 @@ export const apiIa = {
     } else {
       acumulado = await resposta.text();
     }
-    return JSON.parse(acumulado) as Record<string, string>;
+    return JSON.parse(acumulado) as Record<string, Record<string, string>>;
   },
 };
 

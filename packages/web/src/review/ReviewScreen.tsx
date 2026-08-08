@@ -463,7 +463,9 @@ export function ReviewScreen({
           papelAtual={esteira.rodando ? esteira.papelAtual : null}
           atividadeAtual={
             esteira.rodando && esteira.atual
-              ? `item ${esteira.progresso.feito + 1} de ${esteira.progresso.total} · ${esteira.atual.atividadeRotulo}`
+              ? esteira.escrevendoChaves.length > 1
+                ? `itens ${esteira.progresso.feito + 1}–${esteira.progresso.feito + esteira.escrevendoChaves.length} de ${esteira.progresso.total} · ${esteira.atual.atividadeRotulo}`
+                : `item ${esteira.progresso.feito + 1} de ${esteira.progresso.total} · ${esteira.atual.atividadeRotulo}`
               : undefined
           }
           pausado={esteira.pausado}
@@ -488,6 +490,7 @@ export function ReviewScreen({
             onClickNo={clicarNoDiagrama}
             contagemPorNo={contagemPorNo}
             altura={alturaDiagrama ?? undefined}
+            animado={esteira.rodando}
           />
           <div
             role="separator"
@@ -558,7 +561,7 @@ export function ReviewScreen({
               const cruzaOutroTime = outrosTimes(a).length > 0;
               const sel = a.chave === selecionada;
               const porPapel = placeholdersPorPapel(ficha);
-              const escrevendo = esteira.rodando && esteira.atual?.atividadeChave === a.chave;
+              const escrevendo = esteira.rodando && esteira.escrevendoChaves.includes(a.chave);
               return (
                 <button
                   key={a.chave}
@@ -595,9 +598,10 @@ export function ReviewScreen({
                       // Pip do papel/item em processamento agora pulsa — o
                       // resto do card já mostra estático (Fase E: "faltava
                       // efeito de alternância conforme os itens são
-                      // preenchidos").
+                      // preenchidos"). Com o lote, o grupo INTEIRO em
+                      // geração pulsa, não um item só.
                       const emProcessamento =
-                        esteira.rodando && esteira.papelAtual === papel && esteira.atual?.atividadeChave === a.chave;
+                        esteira.rodando && esteira.papelAtual === papel && esteira.escrevendoChaves.includes(a.chave);
                       return (
                         <i
                           key={papel}
@@ -650,10 +654,12 @@ export function ReviewScreen({
                       contextoEpico={contextoEpico}
                       onResponder={(chave, resposta) => onResponderItem?.(atividadeSelecionada.chave, chave, resposta)}
                       papelEmGeracao={
-                        esteira.rodando && esteira.atual?.atividadeChave === atividadeSelecionada.chave ? esteira.papelAtual ?? undefined : undefined
+                        esteira.rodando && esteira.escrevendoChaves.includes(atividadeSelecionada.chave) ? esteira.papelAtual ?? undefined : undefined
                       }
                       respostasAoVivo={
-                        esteira.rodando && esteira.atual?.atividadeChave === atividadeSelecionada.chave ? esteira.respostasAoVivo : undefined
+                        esteira.rodando && esteira.escrevendoChaves.includes(atividadeSelecionada.chave)
+                          ? esteira.respostasAoVivoPorItem[atividadeSelecionada.chave]
+                          : undefined
                       }
                     />
                   )}
@@ -842,10 +848,13 @@ function AbaRefinamento({ ficha, contextoEpico, onResponder, papelEmGeracao, res
     }
   }
 
-  function confirmar(chave: string) {
-    const valor = rascunhos[chave];
+  function confirmar(p: FichaPlaceholder) {
+    // O textarea mostra o rascunho digitado OU a resposta sugerida pela IA
+    // (fallback). O handler precisa do MESMO fallback: sem ele, confirmar uma
+    // sugestão da esteira que o usuário não editou virava um no-op silencioso.
+    const valor = rascunhos[p.chave] ?? (typeof p.resposta?.valor === "string" ? p.resposta.valor : undefined);
     if (typeof valor !== "string" || valor.trim() === "") return;
-    onResponder?.(chave, { valor, origem: "manual" });
+    onResponder?.(p.chave, { valor, origem: "manual" });
   }
 
   return (
@@ -900,7 +909,7 @@ function AbaRefinamento({ ficha, contextoEpico, onResponder, papelEmGeracao, res
                           <button onClick={() => sugerir(p)} disabled={carregando === p.chave} style={botaoEstilo}>
                             {carregando === p.chave ? "Gerando..." : "✨ Sugerir"}
                           </button>
-                          <button onClick={() => confirmar(p.chave)} disabled={!rascunho.trim()} style={botaoEstilo}>
+                          <button onClick={() => confirmar(p)} disabled={!rascunho.trim()} style={botaoEstilo}>
                             Confirmar
                           </button>
                         </div>

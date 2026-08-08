@@ -23,6 +23,16 @@ export const DESCRICAO_PAPEL: Record<PapelPipeline, string> = {
   qa: "Deriva as regras de teste e escreve os cenários",
 };
 
+/** Quantos itens vão numa chamada só ao modelo (SPEC-24 Fase E — achado real
+ * do usuário: "uma chamada por item está muito lento; passe todo o material
+ * em uma chamada única por agente, e com 20-30 itens rode em grupos de 5-10
+ * com recuperação do contexto"). 5, não 10: a resposta do lote inteiro tem
+ * que caber na janela de saída do modelo local sem truncar — com os campos
+ * do Especialista (checklist inteiro por item) 10 itens estouram fácil.
+ * Cada lote recebe o prompt completo de novo (contexto do épico + contexto
+ * de nós por item) — é a "recuperação do contexto" entre grupos. */
+export const TAM_LOTE_ESTEIRA = 5;
+
 /** Um item da fila carrega os placeholders JÁ separados por papel — quem
  * monta isso (`ReviewScreen.montarFilaEsteira`) decide, a partir da ficha,
  * quais chaves pertencem a qual papel (história/critérios → PO, contrato →
@@ -52,34 +62,84 @@ export interface EstadoEsteiraDeAgentes {
   rodando: boolean;
   pausado: boolean;
   papelAtual: PapelPipeline | null;
-  /** Item em processamento dentro do papel atual. */
+  /** O item que o modelo está ESCREVENDO agora (derivado do streaming do
+   * lote — a última chave de item aberta no JSON parcial), com fallback pro
+   * primeiro item do lote corrente enquanto nada chegou. */
   atual: ItemFilaEsteira | null;
-  /** Progresso DENTRO do papel atual — reseta a cada handoff. */
+  /** Chaves de TODOS os itens do lote em geração agora — os pips/timeline
+   * marcam o lote inteiro como "em escrita", não um item só. */
+  escrevendoChaves: string[];
+  /** Progresso DENTRO do papel atual (itens concluídos) — reseta a cada
+   * handoff. */
   progresso: { feito: number; total: number };
-  /** O que o modelo está ESCREVENDO agora, por chave de placeholder do item
-   * atual (SPEC-24 Fase E — extraído ao vivo do JSON parcial que a rota
-   * streama). Vazio fora de uma chamada em andamento. */
-  respostasAoVivo: Record<string, string>;
+  /** O que o modelo está escrevendo agora, por item → por chave de
+   * placeholder (SPEC-24 Fase E — extraído ao vivo do JSON aninhado parcial
+   * que a rota streama). Vazio fora de uma chamada em andamento. */
+  respostasAoVivoPorItem: Record<string, Record<string, string>>;
   iniciar: (fila: ItemFilaEsteira[]) => void;
   pausar: () => void;
   continuar: () => void;
 }
 
 /**
- * Extrai os pares chave→valor de um JSON de strings possivelmente
- * INCOMPLETO — o texto cru que o modelo ainda está escrevendo. Todos os
- * valores do schema do pipeline são strings planas, então uma varredura de
- * pares `"chave": "valor..."` basta (o último valor pode não ter fechado a
- * aspa ainda — capturado até o fim do texto). Não é um parser de JSON
- * geral, e não precisa ser: é só pra exibição ao vivo; o parse de verdade
- * acontece no final, sobre o corpo completo garantido pela grammar.
+ * Extrai a estrutura item→campo→valor de um JSON aninhado possivelmente
+ * INCOMPLETO — o texto cru que o modelo ainda está escrevendo num lote.
+ * Todos os valores são strings planas em dois níveis fixos (garantido pelo
+ * schema GBNF), então um mini-scanner que acompanha profundidade e o último
+ * par chave/valor aberto basta. O último valor pode não ter fechado a aspa
+ * ainda — vem até onde chegou. Não é um parser de JSON geral, e não precisa
+ * ser: é só pra exibição ao vivo; o parse de verdade acontece no final,
+ * sobre o corpo completo garantido pela grammar.
  */
-export function extrairRespostasParciais(texto: string): Record<string, string> {
-  const parciais: Record<string, string> = {};
-  const par = /"((?:[^"\\]|\\.)*)"\s*:\s*"((?:[^"\\]|\\.)*)(?:"|$)/g;
-  let m: RegExpExecArray | null;
-  while ((m = par.exec(texto))) {
-    parciais[desescapar(m[1])] = desescapar(m[2]);
+export function extrairRespostasParciaisAninhadas(texto: string): Record<string, Record<string, string>> {
+  const parciais: Record<string, Record<string, string>> = {};
+  let profundidade = 0;
+  let chaveItem: string | null = null;
+  let chaveCampo: string | null = null;
+  let i = 0;
+  while (i < texto.length) {
+    const c = texto[i];
+    if (c === '"') {
+      // Lê a string (mantendo escapes crus pra desescapar de uma vez no fim).
+      let j = i + 1;
+      let cru = "";
+      while (j < texto.length && texto[j] !== '"') {
+        if (texto[j] === "\\") {
+          cru += texto[j] + (texto[j + 1] ?? "");
+          j += 2;
+        } else {
+          cru += texto[j];
+          j++;
+        }
+      }
+      const fechada = j < texto.length;
+      let k = j + 1;
+      while (k < texto.length && /\s/.test(texto[k])) k++;
+      const eChave = fechada && texto[k] === ":";
+      const valor = desescapar(cru);
+      if (eChave) {
+        if (profundidade === 1) {
+          chaveItem = valor;
+          parciais[chaveItem] ??= {};
+        } else if (profundidade === 2) {
+          chaveCampo = valor;
+        }
+        i = k + 1;
+      } else {
+        if (profundidade === 2 && chaveItem && chaveCampo) {
+          parciais[chaveItem][chaveCampo] = valor;
+          if (fechada) chaveCampo = null;
+        }
+        i = fechada ? j + 1 : texto.length;
+      }
+      continue;
+    }
+    if (c === "{") profundidade++;
+    if (c === "}") {
+      profundidade--;
+      if (profundidade === 1) chaveItem = null;
+    }
+    i++;
   }
   return parciais;
 }
@@ -89,15 +149,14 @@ function desescapar(s: string): string {
 }
 
 /**
- * Orquestra a esteira de 4 papéis (SPEC-24) — muda de eixo em relação a
- * `useGeracaoAoVivo` (Fase 1d/1d-ii, que processa um ITEM por vez, do início
- * ao fim): aqui processa um PAPEL por vez, em TODOS os itens, só então passa
- * pro próximo papel — "PO termina todos os itens, depois Arquiteto começa em
- * todos os itens...", fiel à divisão de responsabilidade real de um time
- * (um PO não pensa contrato de API, um Arquiteto não escreve critério de
- * aceite). Sequencial sempre (nunca paralelo — um modelo local, uma sessão
- * só). Falha isolada num item não trava a esteira, mesma disciplina de
- * `useGeracaoAoVivo`.
+ * Orquestra a esteira de 4 papéis (SPEC-24): processa um PAPEL por vez, em
+ * TODOS os itens, só então passa pro próximo papel — fiel à divisão de
+ * responsabilidade real de um time. Desde a Fase E, dentro de um papel os
+ * itens vão em LOTES de `TAM_LOTE_ESTEIRA` numa chamada só ao modelo (era
+ * uma chamada POR ITEM — 4×N chamadas pra N itens, lento demais; agora são
+ * 4×⌈N/5⌉). Sequencial sempre (nunca paralelo — um modelo local, uma sessão
+ * só). Falha isolada num lote não trava a esteira — os itens daquele lote
+ * ficam sem os campos daquele papel, editáveis manualmente depois.
  */
 export function useEsteiraDeAgentes({
   contextoEpico,
@@ -106,10 +165,11 @@ export function useEsteiraDeAgentes({
 }: UseEsteiraDeAgentesParams): EstadoEsteiraDeAgentes {
   const [fila, setFila] = useState<ItemFilaEsteira[]>([]);
   const [papelIndice, setPapelIndice] = useState(0);
-  const [itemIndice, setItemIndice] = useState(0);
+  const [itensFeitos, setItensFeitos] = useState(0);
+  const [loteChaves, setLoteChaves] = useState<string[]>([]);
   const [rodando, setRodando] = useState(false);
   const [pausado, setPausado] = useState(false);
-  const [respostasAoVivo, setRespostasAoVivo] = useState<Record<string, string>>({});
+  const [aoVivoPorItem, setAoVivoPorItem] = useState<Record<string, Record<string, string>>>({});
 
   const pausadoRef = useRef(false);
   const tokenRef = useRef(0);
@@ -132,8 +192,9 @@ export function useEsteiraDeAgentes({
         const papel = PAPEIS_PIPELINE[p];
         const itensDoPapel = filaNova.filter((item) => item.placeholdersPorPapel[papel].length > 0);
         setPapelIndice(p);
+        setItensFeitos(0);
 
-        for (let i = 0; i < itensDoPapel.length; i++) {
+        for (let i = 0; i < itensDoPapel.length; i += TAM_LOTE_ESTEIRA) {
           if (tokenRef.current !== token) return;
 
           while (pausadoRef.current) {
@@ -141,44 +202,51 @@ export function useEsteiraDeAgentes({
             if (tokenRef.current !== token) return;
           }
 
-          setItemIndice(i);
-          const item = itensDoPapel[i];
-          setRespostasAoVivo({});
+          const lote = itensDoPapel.slice(i, i + TAM_LOTE_ESTEIRA);
+          setLoteChaves(lote.map((item) => item.atividadeChave));
+          setAoVivoPorItem({});
           try {
             const respostas = await apiIa.sugerirPipeline(
               papel,
               {
-                atividadeRotulo: item.atividadeRotulo,
-                contextoNo: item.contextoNo,
                 contextoEpico,
-                placeholders: item.placeholdersPorPapel[papel],
+                itens: lote.map((item) => ({
+                  chave: item.atividadeChave,
+                  rotulo: item.atividadeRotulo,
+                  contextoNo: item.contextoNo,
+                  placeholders: item.placeholdersPorPapel[papel],
+                })),
               },
               (acumulado) => {
-                // O que o modelo escreveu até agora, quebrado por chave —
-                // guardado só se essa execução ainda é a corrente.
-                if (tokenRef.current === token) setRespostasAoVivo(extrairRespostasParciais(acumulado));
+                if (tokenRef.current === token) setAoVivoPorItem(extrairRespostasParciaisAninhadas(acumulado));
               }
             );
             if (tokenRef.current !== token) return;
-            for (const placeholder of item.placeholdersPorPapel[papel]) {
-              const valor = respostas[placeholder.chave];
-              if (valor === undefined) continue;
-              onResponderItem?.(item.atividadeChave, placeholder.chave, {
-                valor,
-                origem: "sugerido",
-                confirmado: !confirmacaoObrigatoriaRef.current,
-              });
+            for (const item of lote) {
+              for (const placeholder of item.placeholdersPorPapel[papel]) {
+                const valor = respostas[item.atividadeChave]?.[placeholder.chave];
+                if (valor === undefined) continue;
+                onResponderItem?.(item.atividadeChave, placeholder.chave, {
+                  valor,
+                  origem: "sugerido",
+                  confirmado: !confirmacaoObrigatoriaRef.current,
+                });
+              }
             }
           } catch {
-            // Falha isolada (ex.: modelo travou nesse item/papel) não trava a
-            // esteira — segue pro próximo item do mesmo papel. Item fica sem
-            // aquele campo, editável manualmente depois.
+            // Falha isolada (ex.: modelo travou nesse lote/papel) não trava a
+            // esteira — segue pro próximo lote do mesmo papel. Os itens do
+            // lote ficam sem os campos desse papel, editáveis manualmente.
           } finally {
-            if (tokenRef.current === token) setRespostasAoVivo({});
+            if (tokenRef.current === token) setAoVivoPorItem({});
           }
+          if (tokenRef.current === token) setItensFeitos(i + lote.length);
         }
       }
-      if (tokenRef.current === token) setRodando(false);
+      if (tokenRef.current === token) {
+        setRodando(false);
+        setLoteChaves([]);
+      }
     },
     [contextoEpico, onResponderItem]
   );
@@ -190,7 +258,8 @@ export function useEsteiraDeAgentes({
       setPausado(false);
       setFila(filaNova);
       setPapelIndice(0);
-      setItemIndice(0);
+      setItensFeitos(0);
+      setLoteChaves([]);
       const temTrabalho = filaNova.some((item) => PAPEIS_PIPELINE.some((papel) => item.placeholdersPorPapel[papel].length > 0));
       setRodando(temTrabalho);
       if (temTrabalho) void processarEsteira(filaNova, token);
@@ -210,14 +279,20 @@ export function useEsteiraDeAgentes({
 
   const papelAtual = rodando ? (PAPEIS_PIPELINE[papelIndice] ?? null) : null;
   const itensDoPapelAtual = papelAtual ? fila.filter((item) => item.placeholdersPorPapel[papelAtual].length > 0) : [];
+  // O item "sendo escrito": a ÚLTIMA chave de item aberta no JSON parcial
+  // (objetos preservam ordem de inserção); antes do primeiro token do lote,
+  // o primeiro item do lote.
+  const chaveEscrevendo = Object.keys(aoVivoPorItem).at(-1) ?? loteChaves[0];
+  const atual = rodando ? (fila.find((item) => item.atividadeChave === chaveEscrevendo) ?? null) : null;
 
   return {
     rodando,
     pausado,
     papelAtual,
-    atual: rodando ? (itensDoPapelAtual[itemIndice] ?? null) : null,
-    progresso: { feito: rodando ? itemIndice : itensDoPapelAtual.length, total: itensDoPapelAtual.length },
-    respostasAoVivo,
+    atual,
+    escrevendoChaves: rodando ? loteChaves : [],
+    progresso: { feito: itensFeitos, total: itensDoPapelAtual.length },
+    respostasAoVivoPorItem: aoVivoPorItem,
     iniciar,
     pausar,
     continuar,

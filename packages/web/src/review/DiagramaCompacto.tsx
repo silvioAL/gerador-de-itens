@@ -20,6 +20,12 @@ export interface DiagramaCompactoProps {
   /** Altura em px, quando a divisória arrastável (ReviewScreen) já mediu uma
    * — `undefined` cai no default proporcional de 30vh. */
   altura?: number;
+  /** Esteira rodando agora. As animações de "trabalho" (pulso do nó ativo,
+   * cometa e fluxo tracejado nas arestas) só rodam com isso ligado — sem
+   * isso, um item selecionado manualmente mantinha a tela "trabalhando"
+   * mesmo depois da esteira (ou do próprio servidor) encerrar. O destaque
+   * estático (halo, espessura) continua independente. */
+  animado?: boolean;
 }
 
 // Proporções do protótipo (nó 210-240×64 num palco de 1200×430): aqui a
@@ -69,7 +75,7 @@ function caminhoAresta(a: Ponto, b: Ponto): { d: string; meio: Ponto } {
  * legenda de tipos e dica de filtro. Sem zoom/pan/drag (isso mora no
  * diagrama completo, `gerarDiagramaHtml`) — clique filtra os itens.
  */
-export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, onClickNo, contagemPorNo, altura }: DiagramaCompactoProps) {
+export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, onClickNo, contagemPorNo, altura, animado }: DiagramaCompactoProps) {
   // Pan/zoom (SPEC-24 Fase E — "deve ser possível clicar no quadro do canvas
   // e movimentá-lo, tal como no outro canvas do projeto, também ampliar,
   // reduzir"): a vista é um viewBox alternativo; `null` = enquadramento
@@ -199,7 +205,7 @@ export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, on
 
         {arestas.map((e) => {
           const { d, meio } = caminhoAresta(e.a, e.b);
-          const tocaAtivo = !!noAtivoId && (e.source === noAtivoId || e.target === noAtivoId);
+          const tocaAtivo = !!animado && !!noAtivoId && (e.source === noAtivoId || e.target === noAtivoId);
           // Cor do nó de ORIGEM, como no protótipo (a aresta "pertence" a
           // quem inicia a comunicação).
           const cor = e.a.cor;
@@ -280,7 +286,7 @@ export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, on
                 fill="#151b28"
                 stroke={ativo ? n.cor : "#263344"}
                 strokeWidth={ativo ? 1.6 : 1}
-                className={ativo ? "diagrama-no-ativo" : undefined}
+                className={ativo && animado ? "diagrama-no-ativo" : undefined}
               />
               <rect x={n.x} y={n.y + 6} width={3} height={ALTURA_NO - 12} fill={n.cor} rx={1.5} />
               <text x={n.x + 14} y={n.y + 22} style={tipoNoEstilo} fill={n.cor}>
