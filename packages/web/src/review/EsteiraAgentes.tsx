@@ -1,10 +1,12 @@
-import type { PapelPipeline } from "../api/client";
-import { DESCRICAO_PAPEL, PAPEIS_PIPELINE, ROTULO_PAPEL } from "./useEsteiraDeAgentes";
+import { PAPEIS_PADRAO, type PapelConfigurado } from "../api/client";
 
 export interface EsteiraAgentesProps {
-  /** `null` quando a esteira não está rodando — a faixa continua visível
-   * (mostra os 4 papéis em repouso), só sem nenhum ativo. */
-  papelAtual: PapelPipeline | null;
+  /** SPEC-24 Fase F — papéis ATIVOS na ordem configurada. Default: os 4 de
+   * fábrica (`PAPEIS_PADRAO`). */
+  papeis?: PapelConfigurado[];
+  /** ID do papel em execução; `null` quando a esteira não está rodando — a
+   * faixa continua visível (papéis em repouso), só sem nenhum ativo. */
+  papelAtual: string | null;
   /** Subtítulo do papel ativo: o que ele está fazendo agora (item N de M ·
    * rótulo). Vazio quando nada está rodando. */
   atividadeAtual?: string;
@@ -13,25 +15,26 @@ export interface EsteiraAgentesProps {
 
 /**
  * Faixa de agentes — o elemento de assinatura da tela (SPEC-24 Fase E):
- * quatro especialistas em ordem, cada um recebendo o artefato do anterior.
+ * os papéis configurados em ordem, cada um recebendo o artefato do anterior
+ * (desde a Fase F a lista vem da config — reordenável, com papéis custom).
  * Fica numa banda própria abaixo do header (não espremida dentro dele —
  * achado real do usuário: "a barra dos agentes é menor, localização dos
  * textos" comparando com o protótipo), com número, nome, subtítulo de
  * estado e tick de conclusão por célula, e um token que atravessa a seta
  * a cada handoff.
  */
-export function EsteiraAgentes({ papelAtual, atividadeAtual, pausado }: EsteiraAgentesProps) {
-  const indiceAtual = papelAtual ? PAPEIS_PIPELINE.indexOf(papelAtual) : -1;
+export function EsteiraAgentes({ papeis = PAPEIS_PADRAO, papelAtual, atividadeAtual, pausado }: EsteiraAgentesProps) {
+  const indiceAtual = papelAtual ? papeis.findIndex((p) => p.id === papelAtual) : -1;
 
   return (
     <div style={faixaEstilo} role="status" aria-live="polite" aria-label="Esteira de agentes">
-      {PAPEIS_PIPELINE.map((papel, i) => {
-        const ativo = papel === papelAtual;
+      {papeis.map((papel, i) => {
+        const ativo = papel.id === papelAtual;
         // Sem papel ativo (esteira parada), ninguém está "feito" — a faixa
         // fica inteira em repouso, sem fingir progresso que não houve.
         const feito = indiceAtual >= 0 && i < indiceAtual;
         return (
-          <div key={papel} style={celulaWrapEstilo}>
+          <div key={papel.id} style={celulaWrapEstilo}>
             {i > 0 && (
               <div style={hopEstilo}>
                 <span style={hopSetaEstilo} />
@@ -39,13 +42,13 @@ export function EsteiraAgentes({ papelAtual, atividadeAtual, pausado }: EsteiraA
                     retriggerando a animação CSS — só na seta recém-cruzada. */}
                 {ativo && atividadeAtual && (
                   <span key={indiceAtual} className="handoff-hop-token" style={hopTokenEstilo}>
-                    {ROTULO_PAPEL[PAPEIS_PIPELINE[i - 1]]} → {ROTULO_PAPEL[papel]}
+                    {papeis[i - 1].nome} → {papel.nome}
                   </span>
                 )}
               </div>
             )}
             <div
-              data-testid={`handoff-${papel}`}
+              data-testid={`handoff-${papel.id}`}
               aria-current={ativo ? "step" : undefined}
               style={{ ...agenteEstilo, ...(ativo ? agenteAtivoEstilo : {}) }}
             >
@@ -54,12 +57,12 @@ export function EsteiraAgentes({ papelAtual, atividadeAtual, pausado }: EsteiraA
               </span>
               <span style={quemEstilo}>
                 <b style={{ ...nomeEstilo, ...(ativo ? nomeAtivoEstilo : feito ? nomeFeitoEstilo : {}) }}>
-                  {ROTULO_PAPEL[papel]}
+                  {papel.nome}
                 </b>
                 <span style={{ ...subtituloEstilo, ...(ativo ? subtituloAtivoEstilo : {}) }}>
                   {ativo && atividadeAtual
                     ? `${pausado ? "Pausado — " : ""}${atividadeAtual}`
-                    : DESCRICAO_PAPEL[papel]}
+                    : papel.descricao ?? ""}
                 </span>
               </span>
               <span

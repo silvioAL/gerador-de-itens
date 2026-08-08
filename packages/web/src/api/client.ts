@@ -253,10 +253,44 @@ export interface PedidoPipelineIa {
   itens: ItemPedidoPipelineIa[];
 }
 
-/** SPEC-24 — os 4 papéis da esteira, em ordem fixa (default configurável na
- * Fase F). Cada papel só produz um subconjunto dos placeholders da ficha —
- * ver `PAPEIS_PIPELINE` em `useEsteiraDeAgentes.ts`. */
-export type PapelPipeline = "po" | "arquiteto" | "especialista" | "qa";
+/** SPEC-24 Fase F — o id de um papel da esteira. Não é mais um union fixo:
+ * o pipeline é configurável (`config/pipeline-agentes.json`), papéis custom
+ * têm ids livres. As SEÇÕES da ficha continuam fixas — ver `GrupoFicha`. */
+export type PapelPipeline = string;
+
+/** As 4 seções da ficha que a esteira preenche — dado do engine, NÃO
+ * configurável (os placeholders existem na ficha independente de quantos
+ * papéis a esteira tenha). Todo papel configurado escreve em exatamente um
+ * grupo; papéis custom escolhem qual. */
+export type GrupoFicha = "po" | "arquiteto" | "especialista" | "qa";
+
+/** Um papel da esteira, como configurado em `config/pipeline-agentes.json`
+ * (SPEC-24 Fase F). A ordem do array É a ordem de execução. */
+export interface PapelConfigurado {
+  id: string;
+  nome: string;
+  descricao?: string;
+  /** Seção da ficha que este papel escreve. */
+  grupo: GrupoFicha;
+  /** Preâmbulo custom do prompt — vazio/ausente usa o padrão do grupo
+   * (resolvido no servidor, que é quem monta o prompt). */
+  preambulo?: string;
+  ativo: boolean;
+  /** Techs/contextos em que este papel se aplica (ex.: "Backend-mensagens").
+   * Vazio = todos os itens. Quando mais de um papel ativo do MESMO grupo
+   * casa com um item, o primeiro da lista leva — coloque o contextual antes
+   * do geral pra ele "roubar" os itens do contexto dele. */
+  contextos: string[];
+}
+
+/** Os 4 papéis padrão — o pipeline de fábrica, usado quando a config não
+ * define `papeis` (projetos antigos) e como base do editor na Fase F. */
+export const PAPEIS_PADRAO: PapelConfigurado[] = [
+  { id: "po", nome: "PO", descricao: "Escreve a história e os critérios de aceite", grupo: "po", ativo: true, contextos: [] },
+  { id: "arquiteto", nome: "Arquiteto", descricao: "Amarra o item ao nó e escreve o contrato", grupo: "arquiteto", ativo: true, contextos: [] },
+  { id: "especialista", nome: "Especialista técnico", descricao: "Aplica a tabela de regras do contexto", grupo: "especialista", ativo: true, contextos: [] },
+  { id: "qa", nome: "QA", descricao: "Deriva as regras de teste e escreve os cenários", grupo: "qa", ativo: true, contextos: [] },
+];
 
 export const apiIa = {
   /** Se o modelo local está instalado e pronto pra uso — usado antes de
@@ -379,6 +413,9 @@ export const apiEspecificacaoTemplate = {
 
 export interface ConfigPipelineAgentes {
   confirmacaoObrigatoria: boolean;
+  /** SPEC-24 Fase F — lista ordenada de papéis da esteira. Ausente em
+   * configs antigas (só o toggle) — quem consome cai em `PAPEIS_PADRAO`. */
+  papeis?: PapelConfigurado[];
 }
 
 /** SPEC-24 Fase E — achado real do usuário: "pode avançar sozinho até o fim,

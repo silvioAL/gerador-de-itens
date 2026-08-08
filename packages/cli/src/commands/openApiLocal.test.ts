@@ -358,6 +358,36 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     expect(prompt).not.toContain("Product Owner");
   });
 
+  it("Fase F: preâmbulo custom da config vence o padrão; papel custom sem preâmbulo cai no padrão do GRUPO dele", async () => {
+    verificarStatusMock.mockResolvedValue({
+      chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+    });
+    mkdirSync(join(dirTemp, "config"), { recursive: true });
+    writeFileSync(
+      join(dirTemp, "config", "pipeline-agentes.json"),
+      JSON.stringify({
+        confirmacaoObrigatoria: true,
+        papeis: [
+          { id: "po", nome: "PO", grupo: "po", preambulo: "Você é a PO sênior do squad de crédito.", ativo: true, contextos: [] },
+          { id: "esp-kafka", nome: "Especialista Kafka", grupo: "especialista", ativo: true, contextos: ["Backend-mensagens"] },
+        ],
+      })
+    );
+    const corpo = {
+      itens: [{ chave: "n1::setup", rotulo: "x", contextoNo: "", placeholders: [{ chave: "_historiaUsuario", tech: "", rotulo: "História" }] }],
+    };
+
+    await fetch(`${base}/ia/pipeline/po`, { method: "POST", body: JSON.stringify(corpo) });
+    const [promptPo] = completarComSchemaMock.mock.calls.at(-1) as [string];
+    expect(promptPo).toContain("Você é a PO sênior do squad de crédito.");
+    expect(promptPo).not.toContain("Product Owner");
+
+    await fetch(`${base}/ia/pipeline/esp-kafka`, { method: "POST", body: JSON.stringify(corpo) });
+    const [promptKafka] = completarComSchemaMock.mock.calls.at(-1) as [string];
+    // Sem preâmbulo próprio, herda o padrão do grupo "especialista".
+    expect(promptKafka).toContain("Especialista técnico");
+  });
+
   it("POST /ia/pipeline/:papel com papel desconhecido usa o preâmbulo genérico, não devolve erro (SPEC-24 Fase B — pipeline configurável)", async () => {
     verificarStatusMock.mockResolvedValue({
       chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
@@ -618,19 +648,43 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     expect(resposta.conteudo).toBe("# {{titulo}} customizado");
   });
 
-  it("GET /config/pipeline-agentes sem arquivo local devolve o default (confirmacaoObrigatoria: true) — SPEC-24 Fase E", async () => {
+  it("GET /config/pipeline-agentes sem arquivo local devolve o default — toggle + os 4 papéis de fábrica (Fase F)", async () => {
     const resposta = await fetch(`${base}/config/pipeline-agentes`).then((r) => r.json());
-    expect(resposta).toEqual({ confirmacaoObrigatoria: true });
+    expect(resposta.confirmacaoObrigatoria).toBe(true);
+    expect(resposta.papeis.map((p: { id: string }) => p.id)).toEqual(["po", "arquiteto", "especialista", "qa"]);
+    expect(resposta.papeis[0]).toMatchObject({ nome: "PO", grupo: "po", ativo: true, contextos: [] });
   });
 
-  it("PUT /config/pipeline-agentes grava config/pipeline-agentes.json, e GET lê de volta", async () => {
+  it("PUT /config/pipeline-agentes grava papéis custom (ordem, contextos, preâmbulo), e GET lê de volta; inválidos degradam campo a campo", async () => {
     await fetch(`${base}/config/pipeline-agentes`, {
       method: "PUT",
-      body: JSON.stringify({ confirmacaoObrigatoria: false }),
+      body: JSON.stringify({
+        confirmacaoObrigatoria: false,
+        papeis: [
+          { id: "qa", nome: "QA", grupo: "qa", ativo: false, contextos: [] },
+          { id: "esp-kafka", nome: "Especialista Kafka", grupo: "especialista", preambulo: "Você é o especialista em mensageria.", ativo: true, contextos: ["Backend-mensagens"] },
+          { id: "", nome: "sem id — descartado", grupo: "po", ativo: true, contextos: [] },
+          { id: "torto", grupo: "grupo-que-nao-existe", contextos: "não é array" },
+        ],
+      }),
     });
 
     const resposta = await fetch(`${base}/config/pipeline-agentes`).then((r) => r.json());
-    expect(resposta).toEqual({ confirmacaoObrigatoria: false });
+    expect(resposta.confirmacaoObrigatoria).toBe(false);
+    expect(resposta.papeis.map((p: { id: string }) => p.id)).toEqual(["qa", "esp-kafka", "torto"]);
+    expect(resposta.papeis[0].ativo).toBe(false);
+    expect(resposta.papeis[1]).toMatchObject({ preambulo: "Você é o especialista em mensageria.", contextos: ["Backend-mensagens"] });
+    // Degradação: grupo desconhecido cai em "especialista", nome vazio cai no id, contextos não-array vira [].
+    expect(resposta.papeis[2]).toMatchObject({ nome: "torto", grupo: "especialista", ativo: true, contextos: [] });
+  });
+
+  it("config antiga no disco (só o toggle, pré-Fase F) ganha os papéis de fábrica no GET — nunca uma esteira vazia", async () => {
+    mkdirSync(join(dirTemp, "config"), { recursive: true });
+    writeFileSync(join(dirTemp, "config", "pipeline-agentes.json"), JSON.stringify({ confirmacaoObrigatoria: false }));
+
+    const resposta = await fetch(`${base}/config/pipeline-agentes`).then((r) => r.json());
+    expect(resposta.confirmacaoObrigatoria).toBe(false);
+    expect(resposta.papeis).toHaveLength(4);
   });
 
   it("/times e /convites devolvem 501 — sem conceito de múltiplos times no modo local", async () => {
