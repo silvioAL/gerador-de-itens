@@ -509,8 +509,11 @@ describe("ReviewScreen — geração ao vivo (Fase 1d, SPEC-23 — orquestraçã
     );
 
     expect(await screen.findByText(/Escrevendo requisito 1 de \d+/)).toBeInTheDocument();
-    // Segue o item automaticamente pra aba Refinamento, sem clique nenhum do usuário.
-    expect(screen.getByText("● Seguindo a geração")).toBeInTheDocument();
+    // Segue o item automaticamente pra aba Refinamento, sem clique nenhum do usuário
+    // (o auto-follow reage num efeito separado, após o commit que liga a
+    // orquestração — por isso `findByText`, não `getByText`, dá tempo pro
+    // segundo render acontecer mesmo numa máquina de CI mais lenta).
+    expect(await screen.findByText("● Seguindo a geração")).toBeInTheDocument();
     expect(await screen.findByText("resposta parcial")).toBeInTheDocument();
 
     liberar();
