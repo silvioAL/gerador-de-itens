@@ -56,9 +56,36 @@ export interface EstadoEsteiraDeAgentes {
   atual: ItemFilaEsteira | null;
   /** Progresso DENTRO do papel atual — reseta a cada handoff. */
   progresso: { feito: number; total: number };
+  /** O que o modelo está ESCREVENDO agora, por chave de placeholder do item
+   * atual (SPEC-24 Fase E — extraído ao vivo do JSON parcial que a rota
+   * streama). Vazio fora de uma chamada em andamento. */
+  respostasAoVivo: Record<string, string>;
   iniciar: (fila: ItemFilaEsteira[]) => void;
   pausar: () => void;
   continuar: () => void;
+}
+
+/**
+ * Extrai os pares chave→valor de um JSON de strings possivelmente
+ * INCOMPLETO — o texto cru que o modelo ainda está escrevendo. Todos os
+ * valores do schema do pipeline são strings planas, então uma varredura de
+ * pares `"chave": "valor..."` basta (o último valor pode não ter fechado a
+ * aspa ainda — capturado até o fim do texto). Não é um parser de JSON
+ * geral, e não precisa ser: é só pra exibição ao vivo; o parse de verdade
+ * acontece no final, sobre o corpo completo garantido pela grammar.
+ */
+export function extrairRespostasParciais(texto: string): Record<string, string> {
+  const parciais: Record<string, string> = {};
+  const par = /"((?:[^"\\]|\\.)*)"\s*:\s*"((?:[^"\\]|\\.)*)(?:"|$)/g;
+  let m: RegExpExecArray | null;
+  while ((m = par.exec(texto))) {
+    parciais[desescapar(m[1])] = desescapar(m[2]);
+  }
+  return parciais;
+}
+
+function desescapar(s: string): string {
+  return s.replace(/\\n/g, "\n").replace(/\\t/g, "\t").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
 }
 
 /**
@@ -82,6 +109,7 @@ export function useEsteiraDeAgentes({
   const [itemIndice, setItemIndice] = useState(0);
   const [rodando, setRodando] = useState(false);
   const [pausado, setPausado] = useState(false);
+  const [respostasAoVivo, setRespostasAoVivo] = useState<Record<string, string>>({});
 
   const pausadoRef = useRef(false);
   const tokenRef = useRef(0);
@@ -115,13 +143,22 @@ export function useEsteiraDeAgentes({
 
           setItemIndice(i);
           const item = itensDoPapel[i];
+          setRespostasAoVivo({});
           try {
-            const respostas = await apiIa.sugerirPipeline(papel, {
-              atividadeRotulo: item.atividadeRotulo,
-              contextoNo: item.contextoNo,
-              contextoEpico,
-              placeholders: item.placeholdersPorPapel[papel],
-            });
+            const respostas = await apiIa.sugerirPipeline(
+              papel,
+              {
+                atividadeRotulo: item.atividadeRotulo,
+                contextoNo: item.contextoNo,
+                contextoEpico,
+                placeholders: item.placeholdersPorPapel[papel],
+              },
+              (acumulado) => {
+                // O que o modelo escreveu até agora, quebrado por chave —
+                // guardado só se essa execução ainda é a corrente.
+                if (tokenRef.current === token) setRespostasAoVivo(extrairRespostasParciais(acumulado));
+              }
+            );
             if (tokenRef.current !== token) return;
             for (const placeholder of item.placeholdersPorPapel[papel]) {
               const valor = respostas[placeholder.chave];
@@ -136,6 +173,8 @@ export function useEsteiraDeAgentes({
             // Falha isolada (ex.: modelo travou nesse item/papel) não trava a
             // esteira — segue pro próximo item do mesmo papel. Item fica sem
             // aquele campo, editável manualmente depois.
+          } finally {
+            if (tokenRef.current === token) setRespostasAoVivo({});
           }
         }
       }
@@ -178,6 +217,7 @@ export function useEsteiraDeAgentes({
     papelAtual,
     atual: rodando ? (itensDoPapelAtual[itemIndice] ?? null) : null,
     progresso: { feito: rodando ? itemIndice : itensDoPapelAtual.length, total: itensDoPapelAtual.length },
+    respostasAoVivo,
     iniciar,
     pausar,
     continuar,

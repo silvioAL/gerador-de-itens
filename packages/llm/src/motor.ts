@@ -19,8 +19,11 @@ export interface MotorChat {
    * livre que precisaria ser "parseado na sorte". O tipo de retorno fica a
    * cargo de quem chama (`as T` no call site) — a inferência de tipo do
    * `node-llama-cpp` não se propaga limpo através de um wrapper genérico
-   * próprio (limitação conhecida de generics de ordem superior do TS). */
-  completarComSchema(prompt: string, schema: GbnfJsonSchema): Promise<unknown>;
+   * próprio (limitação conhecida de generics de ordem superior do TS).
+   * `onTexto` (SPEC-24 Fase E) recebe o texto CRU do JSON restrito sendo
+   * gerado, token a token — a grammar não impede streaming, só restringe o
+   * que sai; é o que permite mostrar o modelo escrevendo em tempo real. */
+  completarComSchema(prompt: string, schema: GbnfJsonSchema, opcoes?: { onTexto?: (pedaco: string) => void }): Promise<unknown>;
   descartar(): Promise<void>;
 }
 
@@ -39,14 +42,14 @@ export async function carregarModeloChat(caminhoModelo: string): Promise<MotorCh
     async completar(prompt, opcoes) {
       return sessao.prompt(prompt, { onTextChunk: opcoes?.onTexto });
     },
-    async completarComSchema(prompt, schema) {
+    async completarComSchema(prompt, schema, opcoes) {
       // `as never`: `createGrammarForJsonSchema` é genérica com `const T`
       // próprio, que não unifica com o `GbnfJsonSchema` (union) recebido
       // aqui de fora — limitação de inferência de generics de ordem
       // superior do TS, não um erro de tipo real (o runtime aceita
       // qualquer `GbnfJsonSchema` válido normalmente).
       const grammar = await llama.createGrammarForJsonSchema(schema as never);
-      const resposta = await sessao.prompt(prompt, { grammar });
+      const resposta = await sessao.prompt(prompt, { grammar, onTextChunk: opcoes?.onTexto });
       return grammar.parse(resposta);
     },
     async descartar() {

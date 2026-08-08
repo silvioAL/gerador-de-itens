@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { useEsteiraDeAgentes, type ItemFilaEsteira } from "./useEsteiraDeAgentes";
+import { extrairRespostasParciais, useEsteiraDeAgentes, type ItemFilaEsteira } from "./useEsteiraDeAgentes";
 
 const apiIaSugerirPipelineMock = vi.hoisted(() => vi.fn());
 vi.mock("../api/client", () => ({ apiIa: { sugerirPipeline: apiIaSugerirPipelineMock } }));
@@ -23,6 +23,27 @@ function item(n: number): ItemFilaEsteira {
     },
   };
 }
+
+describe("extrairRespostasParciais (SPEC-24 Fase E — o que o modelo está escrevendo, por chave)", () => {
+  it("JSON completo: extrai todos os pares", () => {
+    expect(extrairRespostasParciais('{"_historiaUsuario": "Como analista, quero X", "_criteriosAceite": "1. Y"}')).toEqual({
+      _historiaUsuario: "Como analista, quero X",
+      _criteriosAceite: "1. Y",
+    });
+  });
+
+  it("JSON INCOMPLETO (o modelo ainda escrevendo): o último valor vem até onde chegou", () => {
+    expect(extrairRespostasParciais('{"_historiaUsuario": "Como analista, quero rec')).toEqual({
+      _historiaUsuario: "Como analista, quero rec",
+    });
+  });
+
+  it("escapes de aspas e quebras de linha viram texto de verdade", () => {
+    expect(extrairRespostasParciais('{"chave": "linha 1\\nlinha \\"dois\\""}')).toEqual({
+      chave: 'linha 1\nlinha "dois"',
+    });
+  });
+});
 
 describe("useEsteiraDeAgentes (SPEC-24 — orquestração por papel × todos os itens)", () => {
   it("processa papel por papel, cada um em todos os itens, antes de passar pro próximo (handoff)", async () => {
@@ -71,6 +92,28 @@ describe("useEsteiraDeAgentes (SPEC-24 — orquestração por papel × todos os 
     expect(onResponderItem).toHaveBeenCalledWith("a1", "_regrasTeste", {
       valor: "resposta qa/_regrasTeste", origem: "sugerido", confirmado: false,
     });
+  });
+
+  it("respostasAoVivo reflete o que o modelo está escrevendo DURANTE a chamada, e limpa ao terminar", async () => {
+    let emitir!: (acumulado: string) => void;
+    let liberar!: () => void;
+    apiIaSugerirPipelineMock.mockImplementationOnce(
+      (_papel: string, _pedido: unknown, onTexto: (acumulado: string) => void) =>
+        new Promise((resolve) => {
+          emitir = onTexto;
+          liberar = () => resolve({ _historiaUsuario: "final" });
+        })
+    );
+    const { result } = renderHook(() => useEsteiraDeAgentes({}));
+    act(() => result.current.iniciar([item(1)]));
+
+    act(() => emitir('{"_historiaUsuario": "Como um analista de cré'));
+    await waitFor(() =>
+      expect(result.current.respostasAoVivo._historiaUsuario).toBe("Como um analista de cré")
+    );
+
+    act(() => liberar());
+    await waitFor(() => expect(result.current.respostasAoVivo).toEqual({}));
   });
 
   it("confirmacaoObrigatoria: false aplica direto (confirmado: true), sem pausa — SPEC-24 Fase E, achado real do usuário", async () => {

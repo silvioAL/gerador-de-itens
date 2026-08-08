@@ -599,12 +599,26 @@ async function tratarIaPipeline(req: IncomingMessage, res: ServerResponse, papel
     ].join("\n");
 
     const motor = await obterMotorChat();
-    const resultado = await motor.completarComSchema(prompt, schema);
-    enviarJson(res, 200, resultado);
+    // SPEC-24 Fase E (achado real: "fica só o ícone de gerando e 3 pontos...
+    // mostrar o que está rodando no modelo seria a melhor coisa, tal como a
+    // experiência que existe com o Claude"): a resposta vira o texto CRU do
+    // JSON restrito por GBNF, transmitido em pedaços conforme o modelo
+    // escreve. O corpo completo é sempre JSON válido (a grammar garante),
+    // então o cliente acumula, mostra ao vivo, e faz o parse no final —
+    // sem precisar de um segundo canal pra resposta estruturada.
+    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" });
+    await motor.completarComSchema(prompt, schema, { onTexto: (pedaco) => res.write(pedaco) });
+    res.end();
   } catch (erro) {
     motorChatSingleton = undefined;
     const mensagem = erro instanceof Error ? erro.message : "Falha desconhecida ao gerar a ficha.";
-    enviarJson(res, 500, { erro: `Não foi possível gerar a ficha: ${mensagem}` });
+    // Mesmo achado da Fase 1c: se o streaming já começou, não dá mais pra
+    // trocar o status — encerra, e o cliente trata JSON incompleto como falha.
+    if (res.headersSent) {
+      res.end();
+    } else {
+      enviarJson(res, 500, { erro: `Não foi possível gerar a ficha: ${mensagem}` });
+    }
   }
 }
 

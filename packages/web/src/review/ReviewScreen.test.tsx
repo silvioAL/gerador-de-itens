@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   derivar,
@@ -608,10 +608,75 @@ describe("ReviewScreen — esteira de agentes (SPEC-24 — orquestração real p
     // Sem streaming campo a campo (a resposta de um papel chega tudo de uma
     // vez via GBNF) — enquanto o PO ainda não respondeu, mostra um indicador
     // estático nos campos dele.
-    expect(await screen.findAllByText(/PO gerando…/)).not.toHaveLength(0);
+    expect(await screen.findAllByText(/PO escrevendo…/)).not.toHaveLength(0);
 
     liberar();
-    await waitFor(() => expect(apiIaSugerirPipelineMock).toHaveBeenCalledWith("po", expect.anything()));
+    await waitFor(() =>
+      expect(apiIaSugerirPipelineMock).toHaveBeenCalledWith("po", expect.anything(), expect.any(Function))
+    );
+  });
+
+  it("campo em geração mostra o texto do modelo DIGITANDO (streaming), não '…' parado — Fase E, achado real do usuário", async () => {
+    apiIaStatusMock.mockResolvedValueOnce({ chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "" });
+    let emitir!: (acumulado: string) => void;
+    apiIaSugerirPipelineMock.mockImplementationOnce(
+      (_papel: string, _pedido: unknown, onTexto: (acumulado: string) => void) =>
+        new Promise(() => {
+          emitir = onTexto; // nunca resolve — o teste só olha o meio do caminho
+        })
+    );
+    const resultado = resultadoFixture01();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        regras={regrasUmPlaceholder}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    // Espera a esteira ligar (auto-follow abre a aba Refinamento do item 1).
+    await screen.findByTestId("handoff-po");
+    await waitFor(() => expect(apiIaSugerirPipelineMock).toHaveBeenCalled());
+
+    act(() => emitir('{"_historiaUsuario": "Como parceiro integrado, quero enviar'));
+    expect(await screen.findByTestId("ao-vivo-_historiaUsuario")).toHaveTextContent(
+      "Como parceiro integrado, quero enviar"
+    );
+  });
+
+  it("divisória arrastável muda a altura do diagrama (Fase E — 'clicar e arrastar pra cima e pra baixo')", async () => {
+    const resultado = resultadoFixture01();
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    // jsdom não implementa PointerEvent — Event genérico com props atribuídas
+    // à mão (o fireEvent.pointerDown descartaria clientY).
+    function eventoPonteiro(tipo: string, props: Record<string, unknown>) {
+      const ev = new Event(tipo, { bubbles: true, cancelable: true });
+      Object.assign(ev, props);
+      return ev;
+    }
+    const divisoria = screen.getByTestId("divisoria-diagrama");
+    fireEvent(divisoria, eventoPonteiro("pointerdown", { clientY: 300, pointerId: 1, button: 0 }));
+    fireEvent(divisoria, eventoPonteiro("pointermove", { clientY: 600, pointerId: 1 }));
+    fireEvent(divisoria, eventoPonteiro("pointerup", { pointerId: 1 }));
+
+    // jsdom mede altura 0 pro elemento anterior, então 0 + 300 = 300px.
+    const palco = screen.getByRole("img", { name: "Diagrama compacto da solução" }).parentElement as HTMLElement;
+    expect(palco.style.height).toBe("300px");
   });
 
   it("confirmacaoObrigatoria: false (config carregada) aplica as respostas direto, confirmado: true — SPEC-24 Fase E, achado real do usuário", async () => {

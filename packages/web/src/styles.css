@@ -155,6 +155,29 @@ button {
   animation: pip-pulso 900ms ease-in-out infinite;
 }
 
+/* Texto do modelo digitando em tempo real (SPEC-24 Fase E — "mostrar o que
+   está rodando no modelo, tal como a experiência que existe com o Claude"):
+   caret piscando no fim do texto que cresce. */
+@keyframes caret-piscar {
+  50% {
+    opacity: 0;
+  }
+}
+.texto-ao-vivo::after {
+  content: "▋";
+  color: #38bdf8;
+  margin-left: 1px;
+  animation: caret-piscar 900ms steps(1) infinite;
+}
+
+/* Antes do primeiro token do campo chegar: pontinhos respirando, não "…"
+   parado. */
+.pensando-ao-vivo {
+  color: #5c6a7e;
+  letter-spacing: 3px;
+  animation: pip-pulso 1.1s ease-in-out infinite;
+}
+
 /* Scrollbar da lista de itens — a nativa do Windows (larga, clara) destoava
    demais do tema escuro (achado real do usuário comparando com o protótipo). */
 .review-lista {
