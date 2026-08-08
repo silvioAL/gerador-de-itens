@@ -223,13 +223,60 @@ export interface PedidoSugestaoIa {
   contextoEpico?: string;
 }
 
+export interface StatusIa {
+  chatInstalado: boolean;
+  embeddingInstalado: boolean;
+  pronto: boolean;
+  caminhoModelos: string;
+}
+
 export const apiIa = {
+  /** Se o modelo local está instalado e pronto pra uso — usado antes de
+   * disparar a geração ao vivo (Fase 1d, SPEC-23) sem forçar IA em quem não
+   * instalou os modelos. */
+  status: () => requisitar<StatusIa>("/ia/status"),
   /** Fluxo 3 (Fase 1, SPEC-23) — pede ao modelo local uma sugestão de texto
-   * pra um placeholder "<- ✍️ especificar". Lança (via `requisitar`) se os
-   * modelos não estiverem instalados (HTTP 503) — quem chama trata isso como
-   * qualquer outro erro de rede, mostrando a mensagem pro usuário. */
-  sugerir: (pedido: PedidoSugestaoIa) =>
-    requisitar<{ valor: string }>("/ia/sugerir", { method: "POST", body: JSON.stringify(pedido) }),
+   * pra um placeholder "<- ✍️ especificar". Streaming de verdade desde a Fase
+   * 1c: a resposta chega em pedaços (`text/plain`, chunked), entregues via
+   * `onPedaco` conforme o modelo gera — quem não passar esse callback recebe
+   * só o texto completo no final, igual antes. Não usa `requisitar()` (que
+   * assume corpo JSON, usado por todas as outras rotas deste arquivo) porque
+   * o corpo de sucesso aqui é texto puro, não JSON. Lança se os modelos não
+   * estiverem instalados (HTTP 503) ou a geração falhar (500) — mesmo
+   * tratamento de erro de sempre (`{erro: "mensagem"}` JSON, corpo de sucesso
+   * é que muda). */
+  async sugerir(pedido: PedidoSugestaoIa, onPedaco?: (pedaco: string) => void): Promise<{ valor: string }> {
+    const resposta = await fetch(`${BASE_URL}/ia/sugerir`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(pedido),
+    });
+    if (!resposta.ok) {
+      const corpo = await resposta.json().catch(() => ({}));
+      const mensagem = typeof corpo.erro === "string" ? corpo.erro : "Não foi possível completar a operação.";
+      throw new Error(mensagem);
+    }
+    // `response.body` pode faltar em ambiente sem suporte a streams (ex.:
+    // alguns runtimes de teste) — cai pro texto completo de uma vez, mesmo
+    // resultado final, só sem os pedaços intermediários.
+    const leitor = resposta.body?.getReader();
+    if (!leitor) {
+      const valor = await resposta.text();
+      onPedaco?.(valor);
+      return { valor };
+    }
+    const decoder = new TextDecoder();
+    let valor = "";
+    for (;;) {
+      const { done, value } = await leitor.read();
+      if (done) break;
+      const pedaco = decoder.decode(value, { stream: true });
+      valor += pedaco;
+      onPedaco?.(pedaco);
+    }
+    return { valor };
+  },
 };
 
 export const apiPerfisTime = {

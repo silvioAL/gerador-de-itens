@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   derivar,
@@ -18,9 +18,14 @@ vi.mock("../persistence/baixarArquivo", () => ({ baixarArquivoTexto: baixarArqui
 
 // Mockado pra não depender do modelo real (mesma disciplina do resto do
 // projeto) — testa só o contrato: o que a aba Refinamento manda pra
-// apiIa.sugerir e o que faz com a resposta (Fase 1, SPEC-23).
+// apiIa.sugerir e o que faz com a resposta (Fase 1, SPEC-23). `status`
+// default "não pronto" — sem isso a orquestração ao vivo (Fase 1d) dispararia
+// sozinha em todo teste que não testa exatamente esse comportamento.
 const apiIaSugerirMock = vi.hoisted(() => vi.fn());
-vi.mock("../api/client", () => ({ apiIa: { sugerir: apiIaSugerirMock } }));
+const apiIaStatusMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ chatInstalado: false, embeddingInstalado: false, pronto: false, caminhoModelos: "" })
+);
+vi.mock("../api/client", () => ({ apiIa: { sugerir: apiIaSugerirMock, status: apiIaStatusMock } }));
 
 interface Fixture01 {
   quebra: { diagrama: Diagrama };
@@ -280,7 +285,8 @@ describe("ReviewScreen — abas da ficha (Fase 1d-i, SPEC-23 — dado estruturad
     await user.click(screen.getByRole("button", { name: "✨ Sugerir" }));
 
     expect(apiIaSugerirMock).toHaveBeenCalledWith(
-      expect.objectContaining({ tech: "Backend", rotulo: "DLQ configurada e monitorada" })
+      expect.objectContaining({ tech: "Backend", rotulo: "DLQ configurada e monitorada" }),
+      expect.anything()
     );
     expect(await screen.findByDisplayValue("sim, via política X no tópico Y")).toBeInTheDocument();
     expect(onResponderItem).toHaveBeenCalledWith(
@@ -316,10 +322,48 @@ describe("ReviewScreen — abas da ficha (Fase 1d-i, SPEC-23 — dado estruturad
     expect(apiIaSugerirMock).toHaveBeenCalledWith(
       expect.objectContaining({
         contextoEpico: expect.stringContaining("Épico: reduzir tempo de aprovação de crédito."),
-      })
+      }),
+      expect.anything()
     );
     const [pedido] = apiIaSugerirMock.mock.calls.at(-1)!;
     expect(pedido.contextoEpico).toContain("Retro: SLA estourava por falta de dado do bureau.");
+  });
+
+  it("Sugerir mostra o texto sendo escrito em pedaços, não só o resultado final de uma vez (Fase 1c, SPEC-23)", async () => {
+    // Promise controlada manualmente — sem timer de teste arbitrário: chama
+    // onPedaco com o primeiro pedaço, deixa pendente até o teste confirmar o
+    // intermediário no DOM, só então resolve com o texto final.
+    let resolverPromise!: (v: { valor: string }) => void;
+    const promisePendente = new Promise<{ valor: string }>((resolve) => {
+      resolverPromise = resolve;
+    });
+    apiIaSugerirMock.mockImplementationOnce((_pedido: unknown, onPedaco?: (p: string) => void) => {
+      onPedaco?.("sim, via");
+      return promisePendente;
+    });
+    const resultado = resultadoFixture01();
+    const atividade = atividadeComPlaceholder(resultado);
+    const user = userEvent.setup();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        regras={regras}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    await selecionarEIrPraAba(user, atividade.chave, "Refinamento");
+    await user.click(screen.getByRole("button", { name: "✨ Sugerir" }));
+
+    // O pedaço intermediário aparece no campo antes do texto final completo.
+    expect(await screen.findByDisplayValue("sim, via")).toBeInTheDocument();
+    resolverPromise({ valor: "sim, via política X" });
+    expect(await screen.findByDisplayValue("sim, via política X")).toBeInTheDocument();
   });
 
   it("clicar Confirmar chama onResponderItem com origem manual", async () => {
@@ -400,6 +444,190 @@ describe("ReviewScreen — abas da ficha (Fase 1d-i, SPEC-23 — dado estruturad
     await selecionarEIrPraAba(user, atividade.chave, "Testes");
 
     expect(screen.getByText("Sem regra de teste pra esta combinação.")).toBeInTheDocument();
+  });
+});
+
+describe("ReviewScreen — geração ao vivo (Fase 1d, SPEC-23 — orquestração real sobre o streaming de 1c)", () => {
+  beforeEach(() => {
+    apiIaStatusMock.mockReset();
+    apiIaStatusMock.mockResolvedValue({ chatInstalado: false, embeddingInstalado: false, pronto: false, caminhoModelos: "" });
+    apiIaSugerirMock.mockReset();
+  });
+
+  const regrasUmPlaceholder: RegrasConfig = {
+    tipos: [],
+    tamanhos: [],
+    porTech: {
+      Backend: {
+        checklistTecnico: [{ texto: "DLQ configurada e monitorada", contextos: ["Backend-mensagens"] }],
+        testes: [],
+      },
+    },
+  };
+
+  const regrasDoisPlaceholders: RegrasConfig = {
+    tipos: [],
+    tamanhos: [],
+    porTech: {
+      Backend: {
+        checklistTecnico: [
+          { texto: "DLQ configurada e monitorada", contextos: ["Backend-mensagens"] },
+          { texto: "Retry com backoff exponencial", contextos: ["Backend-mensagens"] },
+        ],
+        testes: [],
+      },
+    },
+  };
+
+  function atividadeComPlaceholder(resultado: ReturnType<typeof resultadoFixture01>) {
+    return resultado.atividades.find(
+      (a) => a.techs.includes("Backend") && a.contextos.some((c) => c.includes("Backend-mensagens"))
+    )!;
+  }
+
+  it("modelo pronto: dispara sozinho, mostra a barra de fase e segue o item automaticamente", async () => {
+    apiIaStatusMock.mockResolvedValueOnce({ chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "" });
+    let liberar!: () => void;
+    apiIaSugerirMock.mockImplementationOnce((_pedido: unknown, onPedaco?: (p: string) => void) => {
+      onPedaco?.("resposta parcial");
+      return new Promise((resolve) => {
+        liberar = () => resolve({ valor: "resposta completa" });
+      });
+    });
+    const resultado = resultadoFixture01();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        regras={regrasUmPlaceholder}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    expect(await screen.findByText(/Escrevendo requisito 1 de \d+/)).toBeInTheDocument();
+    // Segue o item automaticamente pra aba Refinamento, sem clique nenhum do usuário
+    // (o auto-follow reage num efeito separado, após o commit que liga a
+    // orquestração — por isso `findByText`, não `getByText`, dá tempo pro
+    // segundo render acontecer mesmo numa máquina de CI mais lenta).
+    expect(await screen.findByText("● Seguindo a geração")).toBeInTheDocument();
+    expect(await screen.findByText("resposta parcial")).toBeInTheDocument();
+
+    liberar();
+    await waitFor(() => expect(screen.queryByText(/Escrevendo requisito/)).not.toBeInTheDocument());
+  });
+
+  it("modelo não pronto: não dispara sozinho, tela fica no comportamento manual de sempre", async () => {
+    apiIaStatusMock.mockResolvedValueOnce({ chatInstalado: false, embeddingInstalado: false, pronto: false, caminhoModelos: "" });
+    const resultado = resultadoFixture01();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        regras={regrasUmPlaceholder}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    await waitFor(() => expect(apiIaStatusMock).toHaveBeenCalled());
+    expect(screen.queryByText(/Escrevendo requisito/)).not.toBeInTheDocument();
+    expect(apiIaSugerirMock).not.toHaveBeenCalled();
+  });
+
+  it("Pausar interrompe antes da próxima chamada; Continuar retoma", async () => {
+    apiIaStatusMock.mockResolvedValueOnce({ chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "" });
+    let liberarPrimeira!: () => void;
+    apiIaSugerirMock
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            liberarPrimeira = () => resolve({ valor: "primeira" });
+          })
+      )
+      // A partir do 2º item, nunca resolve — evita que a fila inteira (que
+      // pode ter mais de 2 pendentes na fixture real) corra sozinha depois
+      // do Continuar; só interessa provar que a 2ª chamada foi disparada.
+      .mockImplementation(() => new Promise(() => {}));
+    const resultado = resultadoFixture01();
+    const user = userEvent.setup();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        regras={regrasDoisPlaceholders}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    await waitFor(() => expect(apiIaSugerirMock).toHaveBeenCalledTimes(1));
+    await user.click(screen.getByRole("button", { name: "⏸ Pausar" }));
+    expect(await screen.findByText(/Pausado/)).toBeInTheDocument();
+
+    liberarPrimeira();
+    await new Promise((r) => setTimeout(r, 250));
+    expect(apiIaSugerirMock).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole("button", { name: "▶ Continuar" }));
+    await waitFor(() => expect(apiIaSugerirMock).toHaveBeenCalledTimes(2));
+  });
+
+  it("clicar manualmente num item quebra o auto-follow — badge 'Seguindo a geração' some", async () => {
+    apiIaStatusMock.mockResolvedValueOnce({ chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "" });
+    apiIaSugerirMock.mockImplementationOnce(() => new Promise(() => {})); // nunca resolve nesse teste
+    const resultado = resultadoFixture01();
+    const outraAtividade = resultado.atividades.find((a) => a.chave !== atividadeComPlaceholder(resultado).chave)!;
+    const user = userEvent.setup();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        regras={regrasUmPlaceholder}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    await screen.findByText("● Seguindo a geração");
+    await user.click(screen.getByTestId(`item-${outraAtividade.chave}`));
+    expect(screen.queryByText("● Seguindo a geração")).not.toBeInTheDocument();
+  });
+
+  it("'Gerar de novo' aparece quando não está rodando, e reinicia a orquestração", async () => {
+    apiIaStatusMock.mockResolvedValueOnce({ chatInstalado: false, embeddingInstalado: false, pronto: false, caminhoModelos: "" });
+    apiIaSugerirMock.mockResolvedValue({ valor: "ok" });
+    const resultado = resultadoFixture01();
+    const user = userEvent.setup();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        regras={regrasUmPlaceholder}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    const botaoGerar = await screen.findByRole("button", { name: "🔄 Gerar de novo" });
+    await user.click(botaoGerar);
+
+    await waitFor(() => expect(apiIaSugerirMock).toHaveBeenCalled());
   });
 });
 
@@ -515,7 +743,7 @@ describe("ReviewScreen — diagrama animado (SPEC-21)", () => {
       />
     );
 
-    await user.click(screen.getByRole("button", { name: "🔀 Ver diagrama animado" }));
+    await user.click(screen.getByRole("button", { name: "🔍 Ver diagrama completo" }));
 
     const iframe = screen.getByTitle("Diagrama animado da solução") as HTMLIFrameElement;
     expect(iframe).toBeInTheDocument();
@@ -540,7 +768,7 @@ describe("ReviewScreen — diagrama animado (SPEC-21)", () => {
       />
     );
 
-    await user.click(screen.getByRole("button", { name: "🔀 Ver diagrama animado" }));
+    await user.click(screen.getByRole("button", { name: "🔍 Ver diagrama completo" }));
     expect(screen.queryByRole("button", { name: "Gerar especificação de solução" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Baixar diagrama (.html)" }));
@@ -567,7 +795,7 @@ describe("ReviewScreen — diagrama animado (SPEC-21)", () => {
       />
     );
 
-    await user.click(screen.getByRole("button", { name: "🔀 Ver diagrama animado" }));
+    await user.click(screen.getByRole("button", { name: "🔍 Ver diagrama completo" }));
     await user.click(screen.getByRole("button", { name: "Voltar à lista" }));
 
     expect(screen.getByText(resultado.atividades[0].rotulo)).toBeInTheDocument();
