@@ -221,6 +221,15 @@ Rota `POST /ia/sugerir`: schema fixo `{valor: string}` via GBNF, motor de chat c
 
 **Validação real, não só testes:** com `gerador open` rodando de verdade contra os modelos já instalados (Fase 0), `POST /ia/sugerir` com um requisito real (`"DLQ configurada e monitorada"`, tech Backend, contexto de uma fila Rabbit) devolveu uma sugestão coerente e específica em português, via GBNF/JSON Schema, em poucos segundos. Regressão completa: engine 132, llm 11, web 135, cli 37.
 
+### Achado real pós-publicação: instalação global sem `--allow-scripts` + rejeição não tratada derrubava o processo
+
+Usuário instalou `v0.1.23` de verdade (`npm install -g gerador-de-itens`, sem flag) e recebeu um aviso do Windows ("Parte deste aplicativo foi bloqueado") ao carregar `ggml-cpu-icelake.dll`. Causa raiz, confirmada passo a passo:
+
+1. `npm` (versões recentes) pula por padrão o postinstall de pacotes não aprovados — o próprio `npm install -g` avisou: `node-llama-cpp@3.19.1 (postinstall: node ./dist/cli.js postinstall)` não coberto por `allowScripts`. Sem esse postinstall rodar, `node-llama-cpp` não passa pelo processo próprio dele de instalação/verificação do binário nativo pra plataforma — daí o Windows Defender não reconhecer o `.dll` resultante como confiável.
+2. **Bug real encontrado ao verificar a afirmação "o resto do app continua funcionando" antes de documentá-la**: `tratarIaSugerir` (`openApiLocal.ts`) não tinha `try/catch`, e `open.ts` chama `tratarApiLocal` dentro de uma IIFE assíncrona (`void (async () => {...})()`) sem `.catch()` nenhum. Se `carregarModeloChat`/`completarComSchema` lançasse (exatamente o caso de um binário nativo bloqueado), a rejeição virava **rejeição de promise não tratada**, que em versões recentes do Node.js **derruba o processo inteiro** — não só a requisição de `/ia/sugerir`, o `gerador open` inteiro caía.
+
+**Correção:** `tratarIaSugerir` ganhou `try/catch`, devolvendo `500 { erro }` tratado em vez de propagar; o singleton do motor (`motorChatSingleton`) é descartado na falha, permitindo tentar carregar de novo na chamada seguinte sem reiniciar o servidor (ex.: usuário desbloqueia o binário e tenta de novo, sem precisar fechar/reabrir `gerador open`). README raiz e `packages/cli/README.md` atualizados com o comando correto (`npm install -g gerador-de-itens --allow-scripts=node-llama-cpp`) e uma nota de solução de problemas explicando o aviso do Windows e que só a chamada de verdade ao modelo fica indisponível sem a flag — o resto do app (`init`/`derive`/`implementar`/`open`/`import-graphify`, incluindo `ia instalar`/`status`, que só baixam/checam arquivo) não depende do binário nativo carregar com sucesso.
+
 ## 7. Verificação
 
 Fase 0 e Fase 1: testes automatizados com fake determinístico do modelo/HTTP (nunca modelo real em CI) + validação manual contra o modelo de verdade, seguindo a disciplina já estabelecida no projeto — nenhuma exceção nas duas fases implementadas até aqui. Fases 2-5 seguem a mesma regra (§6.1) quando começarem: detalhamento nesta spec antes de qualquer código.
