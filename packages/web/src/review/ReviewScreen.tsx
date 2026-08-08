@@ -13,7 +13,16 @@ import {
   type ValorSpec,
   type ResultadoDependenciasDe,
 } from "@gerador/engine";
-import { apiIa, apiPipelineAgentes, type EspecificacaoTemplate, type PapelPipeline, type PlaceholderPedidoItemIa } from "../api/client";
+import {
+  PAPEIS_PADRAO,
+  apiIa,
+  apiPipelineAgentes,
+  type EspecificacaoTemplate,
+  type GrupoFicha,
+  type PapelConfigurado,
+  type PapelPipeline,
+  type PlaceholderPedidoItemIa,
+} from "../api/client";
 import { baixarArquivoTexto } from "../persistence/baixarArquivo";
 import { DiagramaCompacto } from "./DiagramaCompacto";
 import { EsteiraAgentes } from "./EsteiraAgentes";
@@ -64,13 +73,37 @@ function respostaConfirmada(resp: ValorSpec | undefined): boolean {
  * única usada pra montar a fila da esteira, os pips por item e as seções da
  * aba Refinamento — nunca uma segunda lista hardcoded de "quais campos
  * existem". */
-function placeholdersPorPapel(ficha: FichaItem): Record<PapelPipeline, FichaPlaceholder[]> {
+function placeholdersPorPapel(ficha: FichaItem): Record<GrupoFicha, FichaPlaceholder[]> {
   return {
     po: [ficha.historiaUsuario, ficha.criteriosAceiteContextual],
     arquiteto: [ficha.contrato.noVinculado, ficha.contrato.request, ficha.contrato.response, ficha.contrato.erros, ficha.contrato.dependencias],
     especialista: [...ficha.checklistTecnico, ...ficha.volumetria],
     qa: [ficha.regrasTeste, ficha.cenarioFeature],
   };
+}
+
+const GRUPOS_FICHA: GrupoFicha[] = ["po", "arquiteto", "especialista", "qa"];
+
+/** SPEC-24 Fase F — qual papel CONFIGURADO leva a seção `grupo` de um item:
+ * o primeiro papel ativo da lista com esse grupo cujos contextos casem com
+ * as techs/contextos da atividade (lista vazia casa com tudo). É assim que
+ * um agente contextual "rouba" os itens do contexto dele — basta estar
+ * ANTES do papel geral na ordem configurada. Casamento parcial e sem case,
+ * a MESMA semântica do `contextoBate()` do engine (regras.json): configurar
+ * "Backend-mensagens" casa com "Backend-mensagens rabbitmq" e "... kafka". */
+function papelDoGrupo(
+  papeisAtivos: PapelConfigurado[],
+  grupo: GrupoFicha,
+  atividade: { techs: string[]; contextos: string[] }
+): PapelConfigurado | undefined {
+  return papeisAtivos.find(
+    (p) =>
+      p.grupo === grupo &&
+      (p.contextos.length === 0 ||
+        p.contextos.some((c) =>
+          [...atividade.contextos, ...atividade.techs].some((sel) => sel.toLowerCase().includes(c.toLowerCase()))
+        ))
+  );
 }
 
 type StatusItem = "rascunho" | "revisar" | "refinado";
@@ -217,22 +250,11 @@ export function ReviewScreen({
   // SPEC-24 Fase E: default seguro (pausa pra confirmação manual) até o
   // valor real carregar — nunca aplica direto sem saber a config de verdade.
   const [confirmacaoObrigatoria, setConfirmacaoObrigatoria] = useState(true);
+  // SPEC-24 Fase F: papéis da esteira vindos da config (ordem/ativo/
+  // contextos/prompt) — default de fábrica até (e se) a config carregar.
+  const [papeisConfig, setPapeisConfig] = useState<PapelConfigurado[]>(PAPEIS_PADRAO);
 
-  useEffect(() => {
-    let cancelado = false;
-    apiPipelineAgentes
-      .obter()
-      .then((config) => {
-        if (!cancelado) setConfirmacaoObrigatoria(config.confirmacaoObrigatoria);
-      })
-      .catch(() => {
-        // Servidor sem essa rota ainda, ou indisponível — mantém o default
-        // seguro (confirmação obrigatória).
-      });
-    return () => {
-      cancelado = true;
-    };
-  }, []);
+  const papeisAtivos = useMemo(() => papeisConfig.filter((p) => p.ativo), [papeisConfig]);
 
   const diagramaHtml = useMemo(
     () => gerarDiagramaHtml(resultado.atividades, diagrama, config),
@@ -261,30 +283,40 @@ export function ReviewScreen({
   // `apenasPendentes` false é usado por "Gerar de novo" (regenera tudo,
   // inclusive já confirmado).
   const montarFilaEsteira = useCallback(
-    (apenasPendentes: boolean): ItemFilaEsteira[] => {
+    (apenasPendentes: boolean, papeis?: PapelConfigurado[]): ItemFilaEsteira[] => {
+      // O auto-start passa os papéis RECÉM-resolvidos da config — o estado
+      // ainda não re-renderizou nesse instante (mesma corrida do
+      // confirmacaoObrigatoria, Fase E). Os demais chamadores usam o estado.
+      const lista = papeis ?? papeisAtivos;
       const filaNova: ItemFilaEsteira[] = [];
       for (const a of resultado.atividades) {
         const ficha = fichas.get(a.chave);
         if (!ficha) continue;
         const contextoNo = contextoDoPlaceholder(ficha.especificacaoTecnica);
-        const porPapel = placeholdersPorPapel(ficha);
-        const placeholdersPedido = Object.fromEntries(
-          PAPEIS_PIPELINE.map((papel) => {
-            const relevantes = apenasPendentes ? porPapel[papel].filter((p) => !respostaConfirmada(p.resposta)) : porPapel[papel];
-            return [papel, relevantes.map((p) => ({ chave: p.chave, tech: p.tech, rotulo: p.rotulo }))];
-          })
-        ) as Record<PapelPipeline, PlaceholderPedidoItemIa[]>;
-        const temTrabalho = PAPEIS_PIPELINE.some((papel) => placeholdersPedido[papel].length > 0);
+        const porGrupo = placeholdersPorPapel(ficha);
+        // Fase F: cada seção da ficha vai pro papel CONFIGURADO que a leva
+        // neste item (contextos) — chaveado pelo id do papel, não pelo grupo.
+        const placeholdersPedido: Record<string, PlaceholderPedidoItemIa[]> = Object.fromEntries(
+          lista.map((p) => [p.id, [] as PlaceholderPedidoItemIa[]])
+        );
+        for (const grupo of GRUPOS_FICHA) {
+          const dono = papelDoGrupo(lista, grupo, a);
+          if (!dono) continue;
+          const relevantes = apenasPendentes ? porGrupo[grupo].filter((p) => !respostaConfirmada(p.resposta)) : porGrupo[grupo];
+          placeholdersPedido[dono.id].push(...relevantes.map((p) => ({ chave: p.chave, tech: p.tech, rotulo: p.rotulo })));
+        }
+        const temTrabalho = lista.some((p) => placeholdersPedido[p.id].length > 0);
         if (!temTrabalho) continue;
         filaNova.push({ atividadeChave: a.chave, atividadeRotulo: a.rotulo, contextoNo, placeholdersPorPapel: placeholdersPedido });
       }
       return filaNova;
     },
-    [resultado.atividades, fichas]
+    [resultado.atividades, fichas, papeisAtivos]
   );
 
   const esteira = useEsteiraDeAgentes({
     contextoEpico,
+    papeis: papeisAtivos,
     confirmacaoObrigatoria,
     onResponderItem: (atividadeChave, chavePlaceholder, resposta) => onResponderItem?.(atividadeChave, chavePlaceholder, resposta),
   });
@@ -295,17 +327,31 @@ export function ReviewScreen({
     // sempre (botão "✨ Sugerir" continua funcionando igual). Reagir a
     // fichas/resultado mudando de novo a cada resposta reiniciaria a
     // esteira sem sentido — "Gerar de novo" já cobre o caso de refazer.
+    //
+    // Fase F: espera o status E a config de papéis JUNTOS antes de arrancar
+    // — sem isso a fila era montada com os 4 papéis de fábrica numa corrida
+    // com o fetch da config (papel desativado rodava mesmo assim se a config
+    // resolvesse depois do status). A fila e a esteira recebem os papéis
+    // recém-resolvidos explicitamente: o estado ainda não re-renderizou aqui.
     let cancelado = false;
-    apiIa
-      .status()
-      .then((status) => {
-        if (cancelado || !status.pronto) return;
-        const filaInicial = montarFilaEsteira(true);
-        if (filaInicial.length > 0) esteira.iniciar(filaInicial);
-      })
-      .catch(() => {
-        // Servidor sem essa rota ainda, ou indisponível — sem geração automática.
-      });
+    void Promise.allSettled([apiIa.status(), apiPipelineAgentes.obter()]).then(([status, cfg]) => {
+      if (cancelado) return;
+      let papeisResolvidos = PAPEIS_PADRAO;
+      if (cfg.status === "fulfilled") {
+        setConfirmacaoObrigatoria(cfg.value.confirmacaoObrigatoria);
+        if (cfg.value.papeis?.length) {
+          setPapeisConfig(cfg.value.papeis);
+          papeisResolvidos = cfg.value.papeis;
+        }
+      }
+      // Config indisponível mantém os defaults seguros (confirmação
+      // obrigatória, pipeline de fábrica); status indisponível/não pronto =
+      // sem geração automática.
+      if (status.status !== "fulfilled" || !status.value.pronto) return;
+      const ativos = papeisResolvidos.filter((p) => p.ativo);
+      const filaInicial = montarFilaEsteira(true, ativos);
+      if (filaInicial.length > 0) esteira.iniciar(filaInicial, ativos);
+    });
     return () => {
       cancelado = true;
     };
@@ -460,6 +506,7 @@ export function ReviewScreen({
 
       {!mostrarDiagrama && (
         <EsteiraAgentes
+          papeis={papeisAtivos}
           papelAtual={esteira.rodando ? esteira.papelAtual : null}
           atividadeAtual={
             esteira.rodando && esteira.atual
@@ -592,8 +639,12 @@ export function ReviewScreen({
                     </div>
                   ) : null}
                   <div style={{ display: "flex", gap: 4, marginTop: 6 }} title="Por onde este item já passou na esteira">
-                    {PAPEIS_PIPELINE.map((papel) => {
-                      const placeholders = porPapel[papel];
+                    {papeisAtivos.map((papel) => {
+                      // Fase F: um pip por papel CONFIGURADO. Papel que não
+                      // leva este item (contexto não casa, outro papel do
+                      // grupo leva) conta como não-aplicável — pip apagado.
+                      const aplicavel = papelDoGrupo(papeisAtivos, papel.grupo, a)?.id === papel.id;
+                      const placeholders = aplicavel ? porPapel[papel.grupo] : [];
                       const passou = placeholders.length > 0 && placeholders.every((p) => p.resposta !== undefined);
                       // Pip do papel/item em processamento agora pulsa — o
                       // resto do card já mostra estático (Fase E: "faltava
@@ -601,12 +652,12 @@ export function ReviewScreen({
                       // preenchidos"). Com o lote, o grupo INTEIRO em
                       // geração pulsa, não um item só.
                       const emProcessamento =
-                        esteira.rodando && esteira.papelAtual === papel && esteira.escrevendoChaves.includes(a.chave);
+                        esteira.rodando && esteira.papelAtual === papel.id && esteira.escrevendoChaves.includes(a.chave);
                       return (
                         <i
-                          key={papel}
-                          data-testid={`pip-${a.chave}-${papel}`}
-                          title={ROTULO_PAPEL[papel]}
+                          key={papel.id}
+                          data-testid={`pip-${a.chave}-${papel.id}`}
+                          title={papel.nome}
                           className={emProcessamento ? "pip-pulsando" : undefined}
                           style={{ ...pipEstilo, ...(passou || emProcessamento ? pipOnEstilo : {}) }}
                         />
@@ -654,8 +705,11 @@ export function ReviewScreen({
                       contextoEpico={contextoEpico}
                       onResponder={(chave, resposta) => onResponderItem?.(atividadeSelecionada.chave, chave, resposta)}
                       papelEmGeracao={
-                        esteira.rodando && esteira.escrevendoChaves.includes(atividadeSelecionada.chave) ? esteira.papelAtual ?? undefined : undefined
+                        esteira.rodando && esteira.escrevendoChaves.includes(atividadeSelecionada.chave)
+                          ? papeisAtivos.find((p) => p.id === esteira.papelAtual)?.grupo
+                          : undefined
                       }
+                      nomePapelEmGeracao={papeisAtivos.find((p) => p.id === esteira.papelAtual)?.nome}
                       respostasAoVivo={
                         esteira.rodando && esteira.escrevendoChaves.includes(atividadeSelecionada.chave)
                           ? esteira.respostasAoVivoPorItem[atividadeSelecionada.chave]
@@ -794,7 +848,10 @@ interface AbaRefinamentoProps {
    * no estado normal de rascunho/confirmação — diferente de 1d-ii (uma
    * chamada só, "gerando a ficha inteira" valia pra tudo de uma vez), agora
    * cada papel tem seu próprio momento. */
-  papelEmGeracao?: PapelPipeline;
+  papelEmGeracao?: GrupoFicha;
+  /** Nome do papel CONFIGURADO em geração (Fase F) — pro "✨ escrevendo…".
+   * Ausente cai no rótulo fixo da seção. */
+  nomePapelEmGeracao?: string;
   /** SPEC-24 Fase E — o que o modelo está ESCREVENDO agora, por chave
    * (extraído do JSON parcial streamado). O campo em geração mostra esse
    * texto digitando com um caret, em vez de "…" parado — achado real do
@@ -815,7 +872,7 @@ interface AbaRefinamentoProps {
  * "nada sugerido conta até confirmado" já usada pro semáforo de prontidão
  * dos nós).
  */
-function AbaRefinamento({ ficha, contextoEpico, onResponder, papelEmGeracao, respostasAoVivo }: AbaRefinamentoProps) {
+function AbaRefinamento({ ficha, contextoEpico, onResponder, papelEmGeracao, nomePapelEmGeracao, respostasAoVivo }: AbaRefinamentoProps) {
   const [rascunhos, setRascunhos] = useState<Record<string, string>>({});
   const [carregando, setCarregando] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -894,7 +951,7 @@ function AbaRefinamento({ ficha, contextoEpico, onResponder, papelEmGeracao, res
                             ●●●
                           </pre>
                         )}
-                        <span style={{ fontSize: 10.5, color: "#38bdf8" }}>✨ {ROTULO_PAPEL[papel]} escrevendo…</span>
+                        <span style={{ fontSize: 10.5, color: "#38bdf8" }}>✨ {nomePapelEmGeracao ?? ROTULO_PAPEL[papel]} escrevendo…</span>
                       </div>
                     ) : (
                       <div style={{ marginTop: 8 }}>

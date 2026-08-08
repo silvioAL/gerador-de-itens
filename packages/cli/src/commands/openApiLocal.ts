@@ -419,22 +419,87 @@ async function tratarEspecificacaoTemplate(req: IncomingMessage, res: ServerResp
 // aplicou direto, sem funil de aprovação). Mesmo arquivo que a Fase F
 // (configurabilidade do pipeline — prompts/ordem/agentes contextuais, ainda
 // não implementada) vai estender, não um arquivo novo por campo.
+type GrupoFichaLocal = "po" | "arquiteto" | "especialista" | "qa";
+const GRUPOS_FICHA: GrupoFichaLocal[] = ["po", "arquiteto", "especialista", "qa"];
+
+interface PapelConfiguradoLocal {
+  id: string;
+  nome: string;
+  descricao?: string;
+  grupo: GrupoFichaLocal;
+  preambulo?: string;
+  ativo: boolean;
+  contextos: string[];
+}
+
 interface ConfigPipelineAgentesLocal {
   confirmacaoObrigatoria: boolean;
+  papeis?: PapelConfiguradoLocal[];
 }
-const CONFIG_PIPELINE_AGENTES_PADRAO: ConfigPipelineAgentesLocal = { confirmacaoObrigatoria: true };
+
+/** O pipeline de fábrica (SPEC-24 Fase F) — mesmo shape/conteúdo do
+ * `PAPEIS_PADRAO` do web (`api/client.ts`): a fonte da UI é a config servida
+ * daqui, então os dois lados precisam concordar no default. */
+const PAPEIS_PADRAO_LOCAL: PapelConfiguradoLocal[] = [
+  { id: "po", nome: "PO", descricao: "Escreve a história e os critérios de aceite", grupo: "po", ativo: true, contextos: [] },
+  { id: "arquiteto", nome: "Arquiteto", descricao: "Amarra o item ao nó e escreve o contrato", grupo: "arquiteto", ativo: true, contextos: [] },
+  { id: "especialista", nome: "Especialista técnico", descricao: "Aplica a tabela de regras do contexto", grupo: "especialista", ativo: true, contextos: [] },
+  { id: "qa", nome: "QA", descricao: "Deriva as regras de teste e escreve os cenários", grupo: "qa", ativo: true, contextos: [] },
+];
+const CONFIG_PIPELINE_AGENTES_PADRAO: Required<ConfigPipelineAgentesLocal> = {
+  confirmacaoObrigatoria: true,
+  papeis: PAPEIS_PADRAO_LOCAL,
+};
+
+/** Coage a lista de papéis vinda do PUT (ou de um arquivo editado à mão) pra
+ * um shape sempre válido — entrada inválida degrada campo a campo, nunca
+ * derruba a config inteira: id vazio descarta o papel, grupo desconhecido
+ * cai em "especialista", nome vazio cai no id. */
+function sanearPapeis(entrada: unknown): PapelConfiguradoLocal[] | undefined {
+  if (!Array.isArray(entrada)) return undefined;
+  const papeis: PapelConfiguradoLocal[] = [];
+  for (const bruto of entrada as Partial<PapelConfiguradoLocal>[]) {
+    const id = typeof bruto?.id === "string" ? bruto.id.trim() : "";
+    if (!id || papeis.some((p) => p.id === id)) continue;
+    const grupo = GRUPOS_FICHA.includes(bruto.grupo as GrupoFichaLocal) ? (bruto.grupo as GrupoFichaLocal) : "especialista";
+    papeis.push({
+      id,
+      nome: typeof bruto.nome === "string" && bruto.nome.trim() ? bruto.nome.trim() : id,
+      ...(typeof bruto.descricao === "string" && bruto.descricao.trim() ? { descricao: bruto.descricao.trim() } : {}),
+      grupo,
+      ...(typeof bruto.preambulo === "string" && bruto.preambulo.trim() ? { preambulo: bruto.preambulo.trim() } : {}),
+      ativo: bruto.ativo !== false,
+      contextos: Array.isArray(bruto.contextos) ? bruto.contextos.filter((c): c is string => typeof c === "string" && c.trim() !== "") : [],
+    });
+  }
+  return papeis.length > 0 ? papeis : undefined;
+}
+
+async function lerConfigPipelineAgentes(dirProjeto: string): Promise<Required<ConfigPipelineAgentesLocal>> {
+  const arquivo = resolve(dirProjeto, "config", "pipeline-agentes.json");
+  const config = await lerJsonOpcional<ConfigPipelineAgentesLocal>(arquivo);
+  if (!config) return CONFIG_PIPELINE_AGENTES_PADRAO;
+  return {
+    confirmacaoObrigatoria: config.confirmacaoObrigatoria !== false,
+    // Config antiga (só o toggle, pré-Fase F) ou papéis todos inválidos:
+    // pipeline de fábrica — nunca uma esteira vazia por acidente.
+    papeis: sanearPapeis(config.papeis) ?? PAPEIS_PADRAO_LOCAL,
+  };
+}
 
 async function tratarPipelineAgentes(req: IncomingMessage, res: ServerResponse, metodo: string, dirProjeto: string): Promise<void> {
   const arquivo = resolve(dirProjeto, "config", "pipeline-agentes.json");
 
   if (metodo === "GET") {
-    const config = await lerJsonOpcional<ConfigPipelineAgentesLocal>(arquivo);
-    return enviarJson(res, 200, config ?? CONFIG_PIPELINE_AGENTES_PADRAO);
+    return enviarJson(res, 200, await lerConfigPipelineAgentes(dirProjeto));
   }
 
   if (metodo === "PUT") {
-    const { confirmacaoObrigatoria } = await lerCorpoJson<{ confirmacaoObrigatoria: boolean }>(req);
-    const config: ConfigPipelineAgentesLocal = { confirmacaoObrigatoria: !!confirmacaoObrigatoria };
+    const corpo = await lerCorpoJson<ConfigPipelineAgentesLocal>(req);
+    const config: Required<ConfigPipelineAgentesLocal> = {
+      confirmacaoObrigatoria: !!corpo.confirmacaoObrigatoria,
+      papeis: sanearPapeis(corpo.papeis) ?? PAPEIS_PADRAO_LOCAL,
+    };
     await mkdir(resolve(dirProjeto, "config"), { recursive: true });
     await writeFile(arquivo, JSON.stringify(config, null, 2), "utf-8");
     return enviarJson(res, 200, config);
@@ -553,7 +618,17 @@ const PREAMBULO_PADRAO_POR_PAPEL: Record<string, string> = {
 const PREAMBULO_GENERICO =
   `Você ajuda a especificar tecnicamente um item de trabalho de software.`;
 
-async function tratarIaPipeline(req: IncomingMessage, res: ServerResponse, papel: string): Promise<void> {
+/** Preâmbulo efetivo de um papel (SPEC-24 Fase F): o custom da config vence;
+ * sem ele, o padrão do GRUPO do papel (que pros 4 padrão é o próprio id);
+ * papel que nem existe na config cai no genérico — nunca 400. */
+async function preambuloDoPapel(papel: string, dirProjeto: string): Promise<string> {
+  const config = await lerConfigPipelineAgentes(dirProjeto);
+  const configurado = config.papeis.find((p) => p.id === papel);
+  if (configurado?.preambulo) return configurado.preambulo;
+  return PREAMBULO_PADRAO_POR_PAPEL[configurado?.grupo ?? papel] ?? PREAMBULO_GENERICO;
+}
+
+async function tratarIaPipeline(req: IncomingMessage, res: ServerResponse, papel: string, dirProjeto: string): Promise<void> {
   try {
     const status = await verificarStatus();
     if (!status.pronto) {
@@ -609,7 +684,7 @@ async function tratarIaPipeline(req: IncomingMessage, res: ServerResponse, papel
     );
 
     const prompt = [
-      PREAMBULO_PADRAO_POR_PAPEL[papel] ?? PREAMBULO_GENERICO,
+      await preambuloDoPapel(papel, dirProjeto),
       ...(contextoEpico ? [`Contexto geral da demanda/épico:`, contextoEpico, ``] : []),
       `Você vai responder um LOTE de ${itens.length} item(ns) de uma vez.`,
       `Responda TODOS os campos de TODOS os itens, em português, cada um com`,
@@ -676,7 +751,7 @@ export async function tratarApiLocal(req: IncomingMessage, res: ServerResponse, 
   }
   const matchPipeline = metodo === "POST" && caminho.match(/^\/ia\/pipeline\/([^/]+)$/);
   if (matchPipeline) {
-    await tratarIaPipeline(req, res, decodeURIComponent(matchPipeline[1]));
+    await tratarIaPipeline(req, res, decodeURIComponent(matchPipeline[1]), dirProjeto);
     return true;
   }
   if (caminho === "/auth/me" && metodo === "GET") {

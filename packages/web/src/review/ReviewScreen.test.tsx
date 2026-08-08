@@ -31,7 +31,9 @@ const apiIaStatusMock = vi.hoisted(() =>
 // nenhum teste desta suíte testa o modo "aplica direto", então mantém o
 // comportamento pausado de sempre em todos os outros.
 const apiPipelineAgentesObterMock = vi.hoisted(() => vi.fn().mockResolvedValue({ confirmacaoObrigatoria: true }));
-vi.mock("../api/client", () => ({
+vi.mock("../api/client", async (importActual) => ({
+  // Constantes reais (PAPEIS_PADRAO etc., Fase F) — só a API de rede é mockada.
+  ...(await importActual<typeof import("../api/client")>()),
   apiIa: { sugerir: apiIaSugerirMock, sugerirPipeline: apiIaSugerirPipelineMock, status: apiIaStatusMock },
   apiPipelineAgentes: { obter: apiPipelineAgentesObterMock },
 }));
@@ -753,6 +755,61 @@ describe("ReviewScreen — esteira de agentes (SPEC-24 — orquestração real p
         expect.objectContaining({ confirmado: true })
       )
     );
+  });
+
+  it("Fase F: config com papéis reordenados/desativados dirige a faixa E a esteira; agente contextual leva os itens do contexto dele", async () => {
+    apiIaStatusMock.mockResolvedValueOnce({ chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "" });
+    // QA desativado; um Especialista contextual de mensageria ANTES do geral
+    // (regra da Fase F: o primeiro do grupo que casar leva o item).
+    apiPipelineAgentesObterMock.mockResolvedValueOnce({
+      confirmacaoObrigatoria: true,
+      papeis: [
+        { id: "po", nome: "PO", grupo: "po", ativo: true, contextos: [] },
+        { id: "arquiteto", nome: "Arquiteto", grupo: "arquiteto", ativo: true, contextos: [] },
+        { id: "esp-mensagens", nome: "Especialista mensageria", grupo: "especialista", ativo: true, contextos: ["Backend-mensagens"] },
+        { id: "especialista", nome: "Especialista técnico", grupo: "especialista", ativo: true, contextos: [] },
+        { id: "qa", nome: "QA", grupo: "qa", ativo: false, contextos: [] },
+      ],
+    });
+    const chamadas: { papel: string; chaves: string[] }[] = [];
+    apiIaSugerirPipelineMock.mockImplementation(async (papel: string, pedido: { itens: { chave: string }[] }) => {
+      chamadas.push({ papel, chaves: pedido.itens.map((i) => i.chave) });
+      return {};
+    });
+    const resultado = resultadoFixture01();
+    const comMensageria = resultado.atividades
+      .filter((a) => a.contextos.some((c) => c.includes("Backend-mensagens")))
+      .map((a) => a.chave);
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        regras={regrasUmPlaceholder}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    // A faixa mostra o papel custom e esconde o desativado.
+    expect(await screen.findByTestId("handoff-esp-mensagens")).toBeInTheDocument();
+    expect(screen.queryByTestId("handoff-qa")).not.toBeInTheDocument();
+
+    // Espera a esteira COMPLETAR (botão de refazer volta) — só então dá pra
+    // afirmar quem foi e quem não foi chamado.
+    await screen.findByRole("button", { name: "🔄 Gerar de novo" }, { timeout: 4000 });
+
+    // QA desativado: nenhuma chamada. O contextual levou EXATAMENTE os itens
+    // de mensageria. O Especialista geral ficou sem trabalho nesta fixture
+    // (o único requisito técnico é de mensageria, e o contextual o roubou) —
+    // zero chamadas dele também, que é o comportamento certo.
+    expect(chamadas.filter((c) => c.papel === "qa")).toHaveLength(0);
+    const doContextual = chamadas.filter((c) => c.papel === "esp-mensagens").flatMap((c) => c.chaves);
+    const doGeral = chamadas.filter((c) => c.papel === "especialista").flatMap((c) => c.chaves);
+    expect(doContextual.sort()).toEqual([...comMensageria].sort());
+    expect(doGeral).toHaveLength(0);
   });
 
   it("modelo não pronto: não dispara sozinha, tela fica no comportamento manual de sempre", async () => {

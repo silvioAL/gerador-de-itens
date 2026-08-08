@@ -3,7 +3,11 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { TAM_LOTE_ESTEIRA, extrairRespostasParciaisAninhadas, useEsteiraDeAgentes, type ItemFilaEsteira } from "./useEsteiraDeAgentes";
 
 const apiIaSugerirPipelineMock = vi.hoisted(() => vi.fn());
-vi.mock("../api/client", () => ({ apiIa: { sugerirPipeline: apiIaSugerirPipelineMock } }));
+vi.mock("../api/client", async (importActual) => ({
+  // Constantes reais (PAPEIS_PADRAO etc.) — só a API de rede é mockada.
+  ...(await importActual<typeof import("../api/client")>()),
+  apiIa: { sugerirPipeline: apiIaSugerirPipelineMock },
+}));
 
 interface PedidoLote {
   contextoEpico?: string;
@@ -235,6 +239,37 @@ describe("useEsteiraDeAgentes (SPEC-24 — orquestração por papel × lotes de 
 
     act(() => result.current.continuar());
     await waitFor(() => expect(apiIaSugerirPipelineMock).toHaveBeenCalledTimes(2));
+  });
+
+  it("Fase F: papéis configurados dirigem a esteira — ordem custom, papel extra e nenhuma chamada pra quem ficou de fora", async () => {
+    const chamadas: string[] = [];
+    apiIaSugerirPipelineMock.mockImplementation(async (papel: string) => {
+      chamadas.push(papel);
+      return {};
+    });
+    // QA primeiro, um agente contextual custom no meio, e SEM arquiteto.
+    const papeis = [
+      { id: "qa", nome: "QA", grupo: "qa" as const, ativo: true, contextos: [] },
+      { id: "especialista-kafka", nome: "Especialista Kafka", grupo: "especialista" as const, ativo: true, contextos: [] },
+      { id: "po", nome: "PO", grupo: "po" as const, ativo: true, contextos: [] },
+    ];
+    const base = item(1);
+    const filaItem: ItemFilaEsteira = {
+      ...base,
+      // A fila já vem chaveada pelo ID do papel configurado (quem monta é a
+      // ReviewScreen) — o hook só segue a lista.
+      placeholdersPorPapel: {
+        qa: base.placeholdersPorPapel.qa,
+        "especialista-kafka": base.placeholdersPorPapel.especialista,
+        po: base.placeholdersPorPapel.po,
+      },
+    };
+    const { result } = renderHook(() => useEsteiraDeAgentes({ papeis }));
+
+    act(() => result.current.iniciar([filaItem]));
+    await waitFor(() => expect(result.current.rodando).toBe(false));
+
+    expect(chamadas).toEqual(["qa", "especialista-kafka", "po"]);
   });
 
   it("iniciar de novo reinicia do zero, mesmo com execução anterior em voo (token invalida a antiga)", async () => {

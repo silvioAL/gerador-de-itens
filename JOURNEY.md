@@ -1100,3 +1100,18 @@ Dois pedidos do usuário nesta rodada:
 Regressão: engine 145, llm 11, cli 47, web 190 — verde sem tocar em teste nenhum (nenhum teste assertava cor, uma boa surpresa). Validação real com Playwright contra `gerador open`: home vazia, cenário de crédito carregado (canvas com cards escuros e arestas rotuladas), painel do épico exibindo os 1692 chars novos, JourneyModal e Configurações escuros e coesos com a revisão.
 
 Próximo passo: pendentes de antes (validar `confirmacaoObrigatoria: false` ao vivo; Fase F ou "roda de novo o ciclo a partir da alteração").
+
+## 78. SPEC-24 Fase F: o funil configurável que o usuário pediu desde o início — ordem, papéis, prompts e agentes contextuais
+
+"Eu já disse que o funil é configurável, pode escolher e configurar os agentes e ordem, criar agentes contextuais, etc" — registrado desde a Fase E, entregue agora. `config/pipeline-agentes.json` ganhou `papeis[]`: lista ordenada de `{id, nome, descricao, grupo, preambulo, ativo, contextos}`.
+
+A fronteira que segura o desenho inteiro: as 4 SEÇÕES da ficha (história/critérios, contrato, checklist/volumetria, testes — `GrupoFicha`) continuam FIXAS, porque são dado do engine; o que é configurável é QUEM escreve nelas. A esteira tem N papéis, cada um preso a um grupo; um **agente contextual** é um papel custom com `contextos` (ex.: "Backend-mensagens", casamento parcial idêntico ao `contextoBate()` do engine) que rouba os itens do contexto dele do papel geral — basta vir antes na ordem (`papelDoGrupo()`: o primeiro papel ativo do grupo que casar leva o item). O prompt de cada papel é editável (`preambulo`, resolvido no servidor: custom → padrão do grupo → genérico), papéis desativam sem sumir da config, e a aba "Pipeline de IA" virou o editor completo (↑↓, checkbox, campos, "+ Agente contextual").
+
+Dois achados reais no caminho:
+
+- **Corrida no auto-start**: a esteira de montagem largava com os 4 papéis de fábrica se a config resolvesse DEPOIS do `/ia/status` — papel desativado rodava mesmo assim. Mesma família do stale-closure do `confirmacaoObrigatoria` (§72): a correção foi esperar os dois fetches juntos (`Promise.allSettled`) e passar os papéis recém-resolvidos EXPLICITAMENTE pra fila e pro `iniciar` (o estado ainda não re-renderizou naquele instante). Pego por teste de integração, de novo — o teste do hook isolado não pegaria.
+- **Input controlado que come vírgula**: normalizar o campo de contextos (split/trim/join) a cada tecla apagava a vírgula recém-digitada. O input mostra o texto CRU; o parse alimenta só o estado canônico.
+
+Validação real (Playwright + Qwen3-4B + `gerador open`): config com QA desativado, PO renomeado ("PO do squad") com preâmbulo custom e `confirmacaoObrigatoria: false` — faixa renderizou os 3 papéis com o nome custom, nenhuma chamada `/ia/pipeline/qa`, e as respostas aplicadas direto (✓ sem revisão manual) — o que também fecha a pendência antiga de validar o modo sem confirmação ao vivo. Regressão: engine 145, llm 11, cli 49 (+2), web 197 (+7).
+
+Pendente que sobra da SPEC-24: "roda de novo o ciclo a partir da alteração" (precisa de dependência entre papéis — os prompts de papéis posteriores hoje não recebem as respostas dos anteriores) e o canvas visual de papel→contexto (a semântica já existe via config).

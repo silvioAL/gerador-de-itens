@@ -1,26 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ValorSpec } from "@gerador/engine";
-import { apiIa, type PapelPipeline, type PlaceholderPedidoItemIa } from "../api/client";
+import { PAPEIS_PADRAO, apiIa, type GrupoFicha, type PapelConfigurado, type PlaceholderPedidoItemIa } from "../api/client";
 
-/** Ordem fixa da esteira default (SPEC-24) — editável na Fase F, hardcoded
- * por enquanto (pipeline configurável ainda não existe). */
-export const PAPEIS_PIPELINE: PapelPipeline[] = ["po", "arquiteto", "especialista", "qa"];
+/** As 4 SEÇÕES fixas da ficha (dado do engine) — não confundir com os papéis
+ * da esteira, que desde a Fase F são configuráveis (`PapelConfigurado`): N
+ * papéis escrevem nessas 4 seções. Mantém o nome exportado antigo porque
+ * AbaRefinamento/pips seccionam a FICHA por aqui. */
+export const PAPEIS_PIPELINE: GrupoFicha[] = ["po", "arquiteto", "especialista", "qa"];
 
-export const ROTULO_PAPEL: Record<PapelPipeline, string> = {
+/** Rótulo das seções da ficha (cabeçalhos da aba Refinamento). Os papéis da
+ * esteira têm `nome` próprio na config — este aqui é da SEÇÃO. */
+export const ROTULO_PAPEL: Record<GrupoFicha, string> = {
   po: "PO",
   arquiteto: "Arquiteto",
   especialista: "Especialista técnico",
   qa: "QA",
-};
-
-/** O que cada papel faz — subtítulo na faixa de agentes enquanto ele ainda
- * não começou. Enquanto está ativo, o subtítulo vira o item em processamento
- * (quem renderiza decide, ver `EsteiraAgentes`). */
-export const DESCRICAO_PAPEL: Record<PapelPipeline, string> = {
-  po: "Escreve a história e os critérios de aceite",
-  arquiteto: "Amarra o item ao nó e escreve o contrato",
-  especialista: "Aplica a tabela de regras do contexto",
-  qa: "Deriva as regras de teste e escreve os cenários",
 };
 
 /** Quantos itens vão numa chamada só ao modelo (SPEC-24 Fase E — achado real
@@ -44,11 +38,19 @@ export interface ItemFilaEsteira {
   atividadeChave: string;
   atividadeRotulo: string;
   contextoNo: string;
-  placeholdersPorPapel: Record<PapelPipeline, PlaceholderPedidoItemIa[]>;
+  /** Chave = ID do papel CONFIGURADO (não o grupo) — quem monta a fila
+   * (`ReviewScreen.montarFilaEsteira`) já resolveu qual papel leva cada
+   * seção de cada item (contextos, Fase F). */
+  placeholdersPorPapel: Record<string, PlaceholderPedidoItemIa[]>;
 }
 
 export interface UseEsteiraDeAgentesParams {
   contextoEpico?: string;
+  /** SPEC-24 Fase F — papéis ATIVOS da esteira, na ordem de execução. Vem da
+   * config (`pipeline-agentes.json`); ausente cai nos 4 padrão. Lido via ref
+   * dentro da esteira (mesmo motivo do `confirmacaoObrigatoria`: a config
+   * resolve DEPOIS do auto-start de montagem). */
+  papeis?: PapelConfigurado[];
   /** SPEC-24 Fase E — achado real do usuário: "pode avançar sozinho até o
    * fim, ou ir parando conforme está hoje". `true` (default) preserva o
    * comportamento atual — cada resposta fica `confirmado: false`, pendente
@@ -61,7 +63,8 @@ export interface UseEsteiraDeAgentesParams {
 export interface EstadoEsteiraDeAgentes {
   rodando: boolean;
   pausado: boolean;
-  papelAtual: PapelPipeline | null;
+  /** ID do papel configurado em execução agora. */
+  papelAtual: string | null;
   /** O item que o modelo está ESCREVENDO agora (derivado do streaming do
    * lote — a última chave de item aberta no JSON parcial), com fallback pro
    * primeiro item do lote corrente enquanto nada chegou. */
@@ -76,7 +79,10 @@ export interface EstadoEsteiraDeAgentes {
    * placeholder (SPEC-24 Fase E — extraído ao vivo do JSON aninhado parcial
    * que a rota streama). Vazio fora de uma chamada em andamento. */
   respostasAoVivoPorItem: Record<string, Record<string, string>>;
-  iniciar: (fila: ItemFilaEsteira[]) => void;
+  /** `papeisOverride` (Fase F): o auto-start acabou de resolver a config e o
+   * prop `papeis` ainda não re-renderizou — passa a lista fresca direto pra
+   * esta corrida não largar com a antiga. */
+  iniciar: (fila: ItemFilaEsteira[], papeisOverride?: PapelConfigurado[]) => void;
   pausar: () => void;
   continuar: () => void;
 }
@@ -160,11 +166,12 @@ function desescapar(s: string): string {
  */
 export function useEsteiraDeAgentes({
   contextoEpico,
+  papeis = PAPEIS_PADRAO,
   confirmacaoObrigatoria = true,
   onResponderItem,
 }: UseEsteiraDeAgentesParams): EstadoEsteiraDeAgentes {
   const [fila, setFila] = useState<ItemFilaEsteira[]>([]);
-  const [papelIndice, setPapelIndice] = useState(0);
+  const [papelAtualId, setPapelAtualId] = useState<string | null>(null);
   const [itensFeitos, setItensFeitos] = useState(0);
   const [loteChaves, setLoteChaves] = useState<string[]>([]);
   const [rodando, setRodando] = useState(false);
@@ -184,14 +191,20 @@ export function useEsteiraDeAgentes({
   useEffect(() => {
     confirmacaoObrigatoriaRef.current = confirmacaoObrigatoria;
   }, [confirmacaoObrigatoria]);
+  const papeisRef = useRef(papeis);
+  useEffect(() => {
+    papeisRef.current = papeis;
+  }, [papeis]);
 
   const processarEsteira = useCallback(
     async (filaNova: ItemFilaEsteira[], token: number) => {
-      for (let p = 0; p < PAPEIS_PIPELINE.length; p++) {
+      // Fixa a lista NO INÍCIO da corrida — a config mudar no meio não muda
+      // uma esteira já em andamento (a próxima usa a nova).
+      const papeisDaCorrida = papeisRef.current;
+      for (const papel of papeisDaCorrida) {
         if (tokenRef.current !== token) return;
-        const papel = PAPEIS_PIPELINE[p];
-        const itensDoPapel = filaNova.filter((item) => item.placeholdersPorPapel[papel].length > 0);
-        setPapelIndice(p);
+        const itensDoPapel = filaNova.filter((item) => (item.placeholdersPorPapel[papel.id] ?? []).length > 0);
+        setPapelAtualId(papel.id);
         setItensFeitos(0);
 
         for (let i = 0; i < itensDoPapel.length; i += TAM_LOTE_ESTEIRA) {
@@ -207,14 +220,14 @@ export function useEsteiraDeAgentes({
           setAoVivoPorItem({});
           try {
             const respostas = await apiIa.sugerirPipeline(
-              papel,
+              papel.id,
               {
                 contextoEpico,
                 itens: lote.map((item) => ({
                   chave: item.atividadeChave,
                   rotulo: item.atividadeRotulo,
                   contextoNo: item.contextoNo,
-                  placeholders: item.placeholdersPorPapel[papel],
+                  placeholders: item.placeholdersPorPapel[papel.id],
                 })),
               },
               (acumulado) => {
@@ -223,7 +236,7 @@ export function useEsteiraDeAgentes({
             );
             if (tokenRef.current !== token) return;
             for (const item of lote) {
-              for (const placeholder of item.placeholdersPorPapel[papel]) {
+              for (const placeholder of item.placeholdersPorPapel[papel.id]) {
                 const valor = respostas[item.atividadeChave]?.[placeholder.chave];
                 if (valor === undefined) continue;
                 onResponderItem?.(item.atividadeChave, placeholder.chave, {
@@ -252,15 +265,18 @@ export function useEsteiraDeAgentes({
   );
 
   const iniciar = useCallback(
-    (filaNova: ItemFilaEsteira[]) => {
+    (filaNova: ItemFilaEsteira[], papeisOverride?: PapelConfigurado[]) => {
+      if (papeisOverride) papeisRef.current = papeisOverride;
       const token = ++tokenRef.current;
       pausadoRef.current = false;
       setPausado(false);
       setFila(filaNova);
-      setPapelIndice(0);
+      setPapelAtualId(null);
       setItensFeitos(0);
       setLoteChaves([]);
-      const temTrabalho = filaNova.some((item) => PAPEIS_PIPELINE.some((papel) => item.placeholdersPorPapel[papel].length > 0));
+      const temTrabalho = filaNova.some((item) =>
+        papeisRef.current.some((papel) => (item.placeholdersPorPapel[papel.id] ?? []).length > 0)
+      );
       setRodando(temTrabalho);
       if (temTrabalho) void processarEsteira(filaNova, token);
     },
@@ -277,8 +293,8 @@ export function useEsteiraDeAgentes({
     setPausado(false);
   }, []);
 
-  const papelAtual = rodando ? (PAPEIS_PIPELINE[papelIndice] ?? null) : null;
-  const itensDoPapelAtual = papelAtual ? fila.filter((item) => item.placeholdersPorPapel[papelAtual].length > 0) : [];
+  const papelAtual = rodando ? papelAtualId : null;
+  const itensDoPapelAtual = papelAtual ? fila.filter((item) => (item.placeholdersPorPapel[papelAtual] ?? []).length > 0) : [];
   // O item "sendo escrito": a ÚLTIMA chave de item aberta no JSON parcial
   // (objetos preservam ordem de inserção); antes do primeiro token do lote,
   // o primeiro item do lote.
