@@ -13,10 +13,10 @@ import {
   type ValorSpec,
   type ResultadoDependenciasDe,
 } from "@gerador/engine";
-import { apiIa, type EspecificacaoTemplate } from "../api/client";
+import { apiIa, type EspecificacaoTemplate, type PapelPipeline, type PlaceholderPedidoItemIa } from "../api/client";
 import { baixarArquivoTexto } from "../persistence/baixarArquivo";
 import { DiagramaCompacto } from "./DiagramaCompacto";
-import { useGeracaoAoVivo, type ItemFilaGeracao } from "./useGeracaoAoVivo";
+import { PAPEIS_PIPELINE, ROTULO_PAPEL, useEsteiraDeAgentes, type ItemFilaEsteira } from "./useEsteiraDeAgentes";
 
 export interface ReviewScreenProps {
   resultado: ResultadoDependenciasDe<Atividade>;
@@ -56,14 +56,33 @@ function respostaConfirmada(resp: ValorSpec | undefined): boolean {
   return !!resp && (resp.origem === "manual" || resp.confirmado === true);
 }
 
+/** Agrupa os placeholders da ficha pelo papel da esteira responsável
+ * (SPEC-24) — PO escreve história/critérios, Arquiteto o contrato,
+ * Especialista técnico o checklist/volumetria (mecanismo já existente,
+ * reencaixado como papel), QA as regras de teste/cenário Gherkin. Fonte
+ * única usada pra montar a fila da esteira, os pips por item e as seções da
+ * aba Refinamento — nunca uma segunda lista hardcoded de "quais campos
+ * existem". */
+function placeholdersPorPapel(ficha: FichaItem): Record<PapelPipeline, FichaPlaceholder[]> {
+  return {
+    po: [ficha.historiaUsuario, ficha.criteriosAceiteContextual],
+    arquiteto: [ficha.contrato.noVinculado, ficha.contrato.request, ficha.contrato.response, ficha.contrato.erros, ficha.contrato.dependencias],
+    especialista: [...ficha.checklistTecnico, ...ficha.volumetria],
+    qa: [ficha.regrasTeste, ficha.cenarioFeature],
+  };
+}
+
 type StatusItem = "rascunho" | "revisar" | "refinado";
 
 /** Status derivado só da UI (não persistido) — nenhum placeholder aplicável
  * já é "refinado" trivialmente; com pendência mas alguma resposta (mesmo que
  * sugerida e ainda não confirmada) já é "revisar", não fica preso em
- * "rascunho" pra sempre. */
+ * "rascunho" pra sempre. SPEC-24: agora conta os 9 placeholders (os 4 papéis
+ * da esteira), não só história/critérios/checklist — existe orquestração
+ * real (Fase B/C) capaz de preenchê-los, então contá-los como pendência não
+ * é mais uma regressão de UX sem ferramenta pra resolver. */
 function statusDoItem(ficha: FichaItem): StatusItem {
-  const placeholders = [ficha.historiaUsuario, ficha.criteriosAceiteContextual, ...ficha.checklistTecnico, ...ficha.volumetria];
+  const placeholders = Object.values(placeholdersPorPapel(ficha)).flat();
   if (placeholders.length === 0) return "refinado";
   const pendentes = placeholders.filter((p) => !respostaConfirmada(p.resposta));
   if (pendentes.length === 0) return "refinado";
@@ -133,19 +152,20 @@ const ABAS: { id: Aba; rotulo: string }[] = [
  * partir do dado estruturado do engine (`montarFichaItem`, Fase 1a) em vez
  * de um bloco de markdown único.
  *
- * Geração ao vivo (Fase 1d, SPEC-23): assim que a tela monta, se o modelo
- * local estiver instalado, dispara sozinha uma orquestração real
- * (`useGeracaoAoVivo`) sobre todos os placeholders pendentes, em sequência,
- * usando o streaming de verdade da Fase 1c — a ficha do item em andamento
- * segue automaticamente ("Seguindo a geração"), quebrando o auto-follow só
- * quando o usuário clica manualmente noutro item. Diferença deliberada do
- * protótipo de referência (que anima itens "pousando" um a um): os itens já
- * existem TODOS de verdade assim que `derivar()` roda (síncrono,
- * determinístico) — não tem processo real de "descobrir itens" pra narrar, só
- * o preenchimento do refinamento via IA. `DiagramaCompacto` fica sempre
- * visível no topo (substitui o antigo atrás-de-alternância da 1d-i, que não
- * tinha processo real pra sincronizar); o diagrama completo (`gerarDiagramaHtml`,
- * SPEC-21, com seletor de sequência e painel lateral próprios) continua
+ * Esteira de agentes (SPEC-24): assim que a tela monta, se o modelo local
+ * estiver instalado, dispara sozinha a esteira real (`useEsteiraDeAgentes`)
+ * — 4 papéis (PO/Arquiteto/Especialista técnico/QA) em sequência fixa, cada
+ * um processando TODOS os itens antes do próximo começar (não item por item,
+ * como a Fase 1d-ii processava). A ficha do item em andamento segue
+ * automaticamente ("Seguindo a geração"), quebrando o auto-follow só quando o
+ * usuário clica manualmente noutro item. Diferença deliberada do protótipo de
+ * referência (que anima itens "pousando" um a um): os itens já existem TODOS
+ * de verdade assim que `derivar()` roda (síncrono, determinístico) — não tem
+ * processo real de "descobrir itens" pra narrar, só o preenchimento do
+ * refinamento via IA. `DiagramaCompacto` fica sempre visível no topo
+ * (substitui o antigo atrás-de-alternância da 1d-i, que não tinha processo
+ * real pra sincronizar); o diagrama completo (`gerarDiagramaHtml`, SPEC-21,
+ * com seletor de sequência e painel lateral próprios) continua
  * acessível via "🔍 Ver diagrama completo".
  */
 export function ReviewScreen({
@@ -189,50 +209,51 @@ export function ReviewScreen({
 
   const contextoEpico = contextoEpicoCompleto(demandInfo, anexosContexto);
 
-  // Fase 1d-ii (SPEC-23): fila de trabalho pra orquestração real — um item por
-  // ATIVIDADE (não mais por placeholder), a IA responde a ficha inteira numa
-  // chamada só. `apenasPendentes` false é usado por "Gerar de novo" (regenera
-  // tudo, inclusive já confirmado).
-  const montarFila = useCallback(
-    (apenasPendentes: boolean): ItemFilaGeracao[] => {
-      const filaNova: ItemFilaGeracao[] = [];
+  // SPEC-24 Fase C: fila de trabalho da esteira — um item por ATIVIDADE,
+  // com os placeholders já separados por papel (`ItemFilaEsteira`).
+  // `apenasPendentes` false é usado por "Gerar de novo" (regenera tudo,
+  // inclusive já confirmado).
+  const montarFilaEsteira = useCallback(
+    (apenasPendentes: boolean): ItemFilaEsteira[] => {
+      const filaNova: ItemFilaEsteira[] = [];
       for (const a of resultado.atividades) {
         const ficha = fichas.get(a.chave);
         if (!ficha) continue;
         const contextoNo = contextoDoPlaceholder(ficha.especificacaoTecnica);
-        const todos = [ficha.historiaUsuario, ficha.criteriosAceiteContextual, ...ficha.checklistTecnico, ...ficha.volumetria];
-        const relevantes = apenasPendentes ? todos.filter((p) => !respostaConfirmada(p.resposta)) : todos;
-        if (relevantes.length === 0) continue;
-        filaNova.push({
-          atividadeChave: a.chave,
-          atividadeRotulo: a.rotulo,
-          contextoNo,
-          placeholders: relevantes.map((p) => ({ chave: p.chave, tech: p.tech, rotulo: p.rotulo })),
-        });
+        const porPapel = placeholdersPorPapel(ficha);
+        const placeholdersPedido = Object.fromEntries(
+          PAPEIS_PIPELINE.map((papel) => {
+            const relevantes = apenasPendentes ? porPapel[papel].filter((p) => !respostaConfirmada(p.resposta)) : porPapel[papel];
+            return [papel, relevantes.map((p) => ({ chave: p.chave, tech: p.tech, rotulo: p.rotulo }))];
+          })
+        ) as Record<PapelPipeline, PlaceholderPedidoItemIa[]>;
+        const temTrabalho = PAPEIS_PIPELINE.some((papel) => placeholdersPedido[papel].length > 0);
+        if (!temTrabalho) continue;
+        filaNova.push({ atividadeChave: a.chave, atividadeRotulo: a.rotulo, contextoNo, placeholdersPorPapel: placeholdersPedido });
       }
       return filaNova;
     },
     [resultado.atividades, fichas]
   );
 
-  const geracao = useGeracaoAoVivo({
+  const esteira = useEsteiraDeAgentes({
     contextoEpico,
     onResponderItem: (atividadeChave, chavePlaceholder, resposta) => onResponderItem?.(atividadeChave, chavePlaceholder, resposta),
   });
 
   useEffect(() => {
-    // Só na montagem: dispara sozinho quando o modelo já está instalado E há
+    // Só na montagem: dispara sozinha quando o modelo já está instalado E há
     // placeholder pendente — sem modelo, cai no comportamento manual de
     // sempre (botão "✨ Sugerir" continua funcionando igual). Reagir a
     // fichas/resultado mudando de novo a cada resposta reiniciaria a
-    // orquestração sem sentido — "Gerar de novo" já cobre o caso de refazer.
+    // esteira sem sentido — "Gerar de novo" já cobre o caso de refazer.
     let cancelado = false;
     apiIa
       .status()
       .then((status) => {
         if (cancelado || !status.pronto) return;
-        const filaInicial = montarFila(true);
-        if (filaInicial.length > 0) geracao.iniciar(filaInicial);
+        const filaInicial = montarFilaEsteira(true);
+        if (filaInicial.length > 0) esteira.iniciar(filaInicial);
       })
       .catch(() => {
         // Servidor sem essa rota ainda, ou indisponível — sem geração automática.
@@ -243,10 +264,10 @@ export function ReviewScreen({
   }, []);
 
   useEffect(() => {
-    if (!seguindoGeracao || !geracao.atual) return;
-    setSelecionada(geracao.atual.atividadeChave);
+    if (!seguindoGeracao || !esteira.atual) return;
+    setSelecionada(esteira.atual.atividadeChave);
     setAba("refinamento");
-  }, [geracao.atual, seguindoGeracao]);
+  }, [esteira.atual, seguindoGeracao]);
 
   const chaveParaNodeId = Object.fromEntries(
     resultado.atividades.filter((a) => a.origem.nodeId).map((a) => [a.chave, a.origem.nodeId!])
@@ -298,16 +319,30 @@ export function ReviewScreen({
     <div style={telaEstilo}>
       <header style={headerEstilo}>
         <strong style={{ fontSize: 14 }}>Revisão da quebra</strong>
-        {geracao.rodando && geracao.atual ? (
+        {esteira.rodando && esteira.atual && esteira.papelAtual ? (
           <div style={faseBarraEstilo} role="status" aria-live="polite">
+            <div style={handoffEstilo}>
+              {PAPEIS_PIPELINE.map((papel, i) => (
+                <span key={papel} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  {i > 0 && <span style={{ color: "#5C6A7E" }}>→</span>}
+                  <span
+                    data-testid={`handoff-${papel}`}
+                    aria-current={papel === esteira.papelAtual ? "step" : undefined}
+                    style={papel === esteira.papelAtual ? handoffPapelAtivoEstilo : handoffPapelEstilo}
+                  >
+                    {ROTULO_PAPEL[papel]}
+                  </span>
+                </span>
+              ))}
+            </div>
             <span style={{ fontSize: 12 }}>
-              {`${geracao.pausado ? "Pausado — " : "Escrevendo "}item ${geracao.progresso.feito + 1} de ${geracao.progresso.total} · ${geracao.atual.atividadeRotulo}`}
+              {`${esteira.pausado ? "Pausado — " : ""}item ${esteira.progresso.feito + 1} de ${esteira.progresso.total} · ${esteira.atual.atividadeRotulo}`}
             </span>
             <div style={progressoTrilhoEstilo}>
               <div
                 style={{
                   ...progressoBarraEstilo,
-                  width: `${(geracao.progresso.feito / Math.max(1, geracao.progresso.total)) * 100}%`,
+                  width: `${(esteira.progresso.feito / Math.max(1, esteira.progresso.total)) * 100}%`,
                 }}
               />
             </div>
@@ -325,15 +360,15 @@ export function ReviewScreen({
             ))}
           </div>
         )}
-        {geracao.rodando ? (
-          <button onClick={geracao.pausado ? geracao.continuar : geracao.pausar} style={botaoEstilo}>
-            {geracao.pausado ? "▶ Continuar" : "⏸ Pausar"}
+        {esteira.rodando ? (
+          <button onClick={esteira.pausado ? esteira.continuar : esteira.pausar} style={botaoEstilo}>
+            {esteira.pausado ? "▶ Continuar" : "⏸ Pausar"}
           </button>
         ) : (
           <button
             onClick={() => {
               setSeguindoGeracao(true);
-              geracao.iniciar(montarFila(false));
+              esteira.iniciar(montarFilaEsteira(false));
             }}
             style={botaoEstilo}
           >
@@ -367,7 +402,7 @@ export function ReviewScreen({
           <DiagramaCompacto
             diagrama={diagrama}
             config={config}
-            noAtivoId={geracao.atual ? chaveParaNodeId[geracao.atual.atividadeChave] : undefined}
+            noAtivoId={esteira.atual ? chaveParaNodeId[esteira.atual.atividadeChave] : undefined}
           />
           <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
           <section data-tour="review-table" style={listaEstilo}>
@@ -419,6 +454,7 @@ export function ReviewScreen({
               const status = statusDoItem(ficha);
               const cruzaOutroTime = outrosTimes(a).length > 0;
               const sel = a.chave === selecionada;
+              const porPapel = placeholdersPorPapel(ficha);
               return (
                 <button
                   key={a.chave}
@@ -440,6 +476,20 @@ export function ReviewScreen({
                       {a.timesEnvolvidos.join(", ")}
                     </div>
                   ) : null}
+                  <div style={{ display: "flex", gap: 4, marginTop: 6 }} title="Por onde este item já passou na esteira">
+                    {PAPEIS_PIPELINE.map((papel) => {
+                      const placeholders = porPapel[papel];
+                      const passou = placeholders.length > 0 && placeholders.every((p) => p.resposta !== undefined);
+                      return (
+                        <i
+                          key={papel}
+                          data-testid={`pip-${a.chave}-${papel}`}
+                          title={ROTULO_PAPEL[papel]}
+                          style={{ ...pipEstilo, ...(passou ? pipOnEstilo : {}) }}
+                        />
+                      );
+                    })}
+                  </div>
                 </button>
               );
             })}
@@ -455,7 +505,7 @@ export function ReviewScreen({
                     <button style={{ ...linkEstilo, fontSize: 16, fontWeight: 600 }} onClick={() => irParaChave(atividadeSelecionada.chave)} disabled={!chaveParaNodeId[atividadeSelecionada.chave]}>
                       {atividadeSelecionada.rotulo}
                     </button>
-                    {seguindoGeracao && geracao.rodando && (
+                    {seguindoGeracao && esteira.rodando && (
                       <span style={seguindoBadgeEstilo}>● Seguindo a geração</span>
                     )}
                   </div>
@@ -479,7 +529,9 @@ export function ReviewScreen({
                       ficha={fichaSelecionada}
                       contextoEpico={contextoEpico}
                       onResponder={(chave, resposta) => onResponderItem?.(atividadeSelecionada.chave, chave, resposta)}
-                      emGeracaoAoVivo={geracao.rodando && geracao.atual?.atividadeChave === atividadeSelecionada.chave}
+                      papelEmGeracao={
+                        esteira.rodando && esteira.atual?.atividadeChave === atividadeSelecionada.chave ? esteira.papelAtual ?? undefined : undefined
+                      }
                     />
                   )}
                   {aba === "testes" && <AbaTestes ficha={fichaSelecionada} />}
@@ -607,30 +659,32 @@ interface AbaRefinamentoProps {
   /** Contexto do épico/demanda (Fase 1b, SPEC-23) — mandado junto no `/ia/sugerir` real. */
   contextoEpico?: string;
   onResponder?: (chavePlaceholder: string, resposta: ValorSpec) => void;
-  /** Fase 1d-ii, SPEC-23: a orquestração ao vivo está gerando A FICHA INTEIRA
-   * desta atividade agora (não mais um placeholder por vez — a resposta
-   * chega tudo de uma vez via `/ia/sugerir-item`, sem streaming campo a
-   * campo). Usado só pra decidir o placeholder de "gerando…" nos campos
-   * ainda sem resposta; assim que `onResponderItem` preenche cada um, o
-   * card vira o estado normal de rascunho/confirmação. */
-  emGeracaoAoVivo?: boolean;
+  /** SPEC-24 — qual papel da esteira está gerando ESTE item agora (se
+   * algum). Só o grupo daquele papel mostra "gerando…" nos campos ainda sem
+   * resposta; os demais grupos (já passados ou ainda não chegou a vez) ficam
+   * no estado normal de rascunho/confirmação — diferente de 1d-ii (uma
+   * chamada só, "gerando a ficha inteira" valia pra tudo de uma vez), agora
+   * cada papel tem seu próprio momento. */
+  papelEmGeracao?: PapelPipeline;
 }
 
 /**
- * Requisitos de refinamento (fluxo 3, Fase 1, SPEC-23) — história de usuário
- * e critérios de aceite contextuais (Fase 1d-ii) sempre aparecem primeiro,
- * seguidos do checklist técnico/volumetria filtrado por tech/contexto. Cada
- * um respondido à mão ou via "✨ Sugerir" (modelo local). Sugestão fica
- * `origem: "sugerido", confirmado: false` até o usuário clicar "Confirmar" —
- * só aí passa a valer pro documento final (mesma disciplina "nada sugerido
- * conta até confirmado" já usada pro semáforo de prontidão dos nós).
+ * Requisitos de refinamento (fluxo 3, Fase 1, SPEC-23), agrupados por papel
+ * da esteira (SPEC-24): PO (história/critérios), Arquiteto (contrato),
+ * Especialista técnico (checklist/volumetria, filtrado por tech/contexto —
+ * mecanismo já existente), QA (regras de teste/cenário Gherkin). Cada
+ * placeholder respondido à mão ou via "✨ Sugerir" (modelo local). Sugestão
+ * fica `origem: "sugerido", confirmado: false` até o usuário clicar
+ * "Confirmar" — só aí passa a valer pro documento final (mesma disciplina
+ * "nada sugerido conta até confirmado" já usada pro semáforo de prontidão
+ * dos nós).
  */
-function AbaRefinamento({ ficha, contextoEpico, onResponder, emGeracaoAoVivo }: AbaRefinamentoProps) {
+function AbaRefinamento({ ficha, contextoEpico, onResponder, papelEmGeracao }: AbaRefinamentoProps) {
   const [rascunhos, setRascunhos] = useState<Record<string, string>>({});
   const [carregando, setCarregando] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
-  const placeholders = [ficha.historiaUsuario, ficha.criteriosAceiteContextual, ...ficha.checklistTecnico, ...ficha.volumetria];
+  const grupos = placeholdersPorPapel(ficha);
 
   async function sugerir(p: FichaPlaceholder) {
     setErro(null);
@@ -665,45 +719,56 @@ function AbaRefinamento({ ficha, contextoEpico, onResponder, emGeracaoAoVivo }: 
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       {erro && <div style={{ fontSize: 11, color: "#f87171" }}>{erro}</div>}
-      {placeholders.map((p) => {
-        const confirmada = respostaConfirmada(p.resposta);
-        const aguardandoGeracaoAoVivo = !!emGeracaoAoVivo && p.resposta === undefined;
-        const rascunho = rascunhos[p.chave] ?? (typeof p.resposta?.valor === "string" ? p.resposta.valor : "");
+      {PAPEIS_PIPELINE.map((papel) => {
+        const placeholders = grupos[papel];
+        if (placeholders.length === 0) return null;
         return (
-          <div key={p.chave} data-testid={`placeholder-${p.chave}`} style={{ ...reqEstilo, ...(confirmada ? reqPreenchidoEstilo : {}) }}>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-              <span style={{ ...marcaEstilo, ...(confirmada ? marcaOnEstilo : {}) }}>{confirmada ? "✓" : ""}</span>
-              <span style={{ flex: 1, fontSize: 13 }}>{p.rotulo}</span>
-              <span style={origemEstilo}>{p.tech || "Geral"}</span>
+          <div key={papel}>
+            <span style={lblEstilo}>{ROTULO_PAPEL[papel]}</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 6 }}>
+              {placeholders.map((p) => {
+                const confirmada = respostaConfirmada(p.resposta);
+                const aguardandoGeracao = papelEmGeracao === papel && p.resposta === undefined;
+                const rascunho = rascunhos[p.chave] ?? (typeof p.resposta?.valor === "string" ? p.resposta.valor : "");
+                return (
+                  <div key={p.chave} data-testid={`placeholder-${p.chave}`} style={{ ...reqEstilo, ...(confirmada ? reqPreenchidoEstilo : {}) }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                      <span style={{ ...marcaEstilo, ...(confirmada ? marcaOnEstilo : {}) }}>{confirmada ? "✓" : ""}</span>
+                      <span style={{ flex: 1, fontSize: 13 }}>{p.rotulo}</span>
+                      <span style={origemEstilo}>{p.tech || "Geral"}</span>
+                    </div>
+                    {confirmada ? (
+                      <pre style={{ ...preEstilo, marginTop: 8 }}>{String(p.resposta?.valor)}</pre>
+                    ) : aguardandoGeracao ? (
+                      <div style={{ marginTop: 8 }}>
+                        <pre style={preEstilo}>…</pre>
+                        <span style={{ fontSize: 10.5, color: "#38bdf8" }}>✨ {ROTULO_PAPEL[papel]} gerando…</span>
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: 8 }}>
+                        <textarea
+                          value={rascunho}
+                          onChange={(e) => setRascunhos((r) => ({ ...r, [p.chave]: e.target.value }))}
+                          placeholder="Resposta manual, ou clique em Sugerir"
+                          rows={3}
+                          style={textareaEstilo}
+                        />
+                        <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                          <button onClick={() => sugerir(p)} disabled={carregando === p.chave} style={botaoEstilo}>
+                            {carregando === p.chave ? "Gerando..." : "✨ Sugerir"}
+                          </button>
+                          <button onClick={() => confirmar(p.chave)} disabled={!rascunho.trim()} style={botaoEstilo}>
+                            Confirmar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            {confirmada ? (
-              <pre style={{ ...preEstilo, marginTop: 8 }}>{String(p.resposta?.valor)}</pre>
-            ) : aguardandoGeracaoAoVivo ? (
-              <div style={{ marginTop: 8 }}>
-                <pre style={preEstilo}>…</pre>
-                <span style={{ fontSize: 10.5, color: "#38bdf8" }}>✨ gerando a ficha inteira…</span>
-              </div>
-            ) : (
-              <div style={{ marginTop: 8 }}>
-                <textarea
-                  value={rascunho}
-                  onChange={(e) => setRascunhos((r) => ({ ...r, [p.chave]: e.target.value }))}
-                  placeholder="Resposta manual, ou clique em Sugerir"
-                  rows={3}
-                  style={textareaEstilo}
-                />
-                <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-                  <button onClick={() => sugerir(p)} disabled={carregando === p.chave} style={botaoEstilo}>
-                    {carregando === p.chave ? "Gerando..." : "✨ Sugerir"}
-                  </button>
-                  <button onClick={() => confirmar(p.chave)} disabled={!rascunho.trim()} style={botaoEstilo}>
-                    Confirmar
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         );
       })}
@@ -787,6 +852,39 @@ const seguindoBadgeEstilo: React.CSSProperties = {
   fontSize: 10.5,
   color: "#38bdf8",
   fontWeight: 600,
+};
+
+// SPEC-24 — handoff visual entre os 4 papéis da esteira (PO→Arquiteto→
+// Especialista técnico→QA): o papel atual fica destacado, os demais em
+// tom apagado, uma seta entre cada um — comunica visualmente que a esteira
+// avança papel a papel, não item a item (achado real do usuário: sem isso,
+// "não tem os mesmos feedback visuais do protótipo").
+const handoffEstilo: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  fontSize: 10.5,
+};
+
+const handoffPapelEstilo: React.CSSProperties = {
+  color: "#5C6A7E",
+};
+
+const handoffPapelAtivoEstilo: React.CSSProperties = {
+  color: "#38bdf8",
+  fontWeight: 700,
+};
+
+const pipEstilo: React.CSSProperties = {
+  width: 14,
+  height: 4,
+  borderRadius: 2,
+  background: "#1B2533",
+  display: "inline-block",
+};
+
+const pipOnEstilo: React.CSSProperties = {
+  background: "#3ecf8e",
 };
 
 const listaEstilo: React.CSSProperties = {

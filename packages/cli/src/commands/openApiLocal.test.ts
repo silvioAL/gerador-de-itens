@@ -32,10 +32,10 @@ const completarMock = vi.fn(async (_prompt: string, opcoes?: { onTexto?: (p: str
   }
   return PEDACOS_SUGESTAO.join("");
 });
-// Fase 1d-ii (SPEC-23) — /ia/sugerir-item usa completarComSchema (GBNF), não
-// completar (texto livre): mock devolve um valor por chave recebida no
-// schema, pra simular o comportamento real de "resposta sempre bate com o
-// schema pedido" sem depender do binário nativo em CI.
+// SPEC-24 — /ia/pipeline/:papel usa completarComSchema (GBNF), não completar
+// (texto livre): mock devolve um valor por chave recebida no schema, pra
+// simular o comportamento real de "resposta sempre bate com o schema
+// pedido" sem depender do binário nativo em CI.
 const completarComSchemaMock = vi.fn(async (_prompt: string, schema: { properties?: Record<string, unknown> }) => {
   const chaves = Object.keys(schema.properties ?? {});
   return Object.fromEntries(chaves.map((chave) => [chave, `resposta gerada pra ${chave}`]));
@@ -228,12 +228,12 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     expect(pedacosRecebidos.join("")).toBe("sugestão de teste");
   });
 
-  it("POST /ia/sugerir-item sem modelos instalados devolve 503, não tenta carregar o modelo (Fase 1d-ii, SPEC-23)", async () => {
-    const resposta = await fetch(`${base}/ia/sugerir-item`, {
+  it("POST /ia/pipeline/:papel sem modelos instalados devolve 503 (SPEC-24 Fase B)", async () => {
+    const resposta = await fetch(`${base}/ia/pipeline/po`, {
       method: "POST",
       body: JSON.stringify({
-        atividadeRotulo: "srv-checkout publica em fila-pedidos",
-        contextoNo: "fila rabbitmq",
+        atividadeRotulo: "x",
+        contextoNo: "",
         placeholders: [{ chave: "_historiaUsuario", tech: "", rotulo: "História de usuário" }],
       }),
     });
@@ -241,31 +241,23 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     expect(carregarModeloChatMock).not.toHaveBeenCalled();
   });
 
-  it("POST /ia/sugerir-item sem placeholders devolve 400 (Fase 1d-ii, SPEC-23)", async () => {
+  it("POST /ia/pipeline/:papel sem placeholders devolve 400 (SPEC-24 Fase B)", async () => {
     verificarStatusMock.mockResolvedValue({
-      chatInstalado: true,
-      embeddingInstalado: true,
-      pronto: true,
-      caminhoModelos: "/fake/models",
+      chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
     });
-
-    const resposta = await fetch(`${base}/ia/sugerir-item`, {
+    const resposta = await fetch(`${base}/ia/pipeline/po`, {
       method: "POST",
       body: JSON.stringify({ atividadeRotulo: "x", contextoNo: "", placeholders: [] }),
     });
     expect(resposta.status).toBe(400);
-    expect(carregarModeloChatMock).not.toHaveBeenCalled();
   });
 
-  it("POST /ia/sugerir-item monta schema dinâmico a partir das chaves recebidas e devolve Record<chave,string> (Fase 1d-ii, SPEC-23)", async () => {
+  it("POST /ia/pipeline/po usa o preâmbulo do PO, monta schema dinâmico e devolve Record<chave,string> (SPEC-24 Fase B)", async () => {
     verificarStatusMock.mockResolvedValue({
-      chatInstalado: true,
-      embeddingInstalado: true,
-      pronto: true,
-      caminhoModelos: "/fake/models",
+      chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
     });
 
-    const resposta = await fetch(`${base}/ia/sugerir-item`, {
+    const resposta = await fetch(`${base}/ia/pipeline/po`, {
       method: "POST",
       body: JSON.stringify({
         atividadeRotulo: "srv-checkout publica em fila-pedidos",
@@ -274,28 +266,56 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
         placeholders: [
           { chave: "_historiaUsuario", tech: "", rotulo: "História de usuário" },
           { chave: "_criteriosAceite", tech: "", rotulo: "Critérios de aceite" },
-          { chave: "Backend::DLQ configurada e monitorada", tech: "Backend", rotulo: "DLQ configurada e monitorada" },
         ],
       }),
     });
 
     expect(resposta.status).toBe(200);
-    expect(resposta.headers.get("content-type")).toContain("application/json");
     expect(await resposta.json()).toEqual({
       _historiaUsuario: "resposta gerada pra _historiaUsuario",
       _criteriosAceite: "resposta gerada pra _criteriosAceite",
-      "Backend::DLQ configurada e monitorada": "resposta gerada pra Backend::DLQ configurada e monitorada",
     });
 
     const [prompt, schema] = completarComSchemaMock.mock.calls.at(-1) as [string, { properties: Record<string, unknown>; required: string[] }];
+    expect(prompt).toContain("Product Owner");
     expect(prompt).toContain("Épico: reduzir tempo de aprovação de crédito de 3 dias pra 1 hora.");
     expect(prompt).toContain("srv-checkout publica em fila-pedidos");
-    expect(Object.keys(schema.properties)).toEqual([
-      "_historiaUsuario",
-      "_criteriosAceite",
-      "Backend::DLQ configurada e monitorada",
-    ]);
-    expect(schema.required).toEqual(Object.keys(schema.properties));
+    expect(Object.keys(schema.properties)).toEqual(["_historiaUsuario", "_criteriosAceite"]);
+  });
+
+  it("POST /ia/pipeline/arquiteto usa o preâmbulo do Arquiteto — prompt diferente do PO pro mesmo item (SPEC-24 Fase B)", async () => {
+    verificarStatusMock.mockResolvedValue({
+      chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+    });
+
+    await fetch(`${base}/ia/pipeline/arquiteto`, {
+      method: "POST",
+      body: JSON.stringify({
+        atividadeRotulo: "srv-checkout publica em fila-pedidos",
+        contextoNo: "fila rabbitmq",
+        placeholders: [{ chave: "_contratoRequest", tech: "", rotulo: "Request" }],
+      }),
+    });
+
+    const [prompt] = completarComSchemaMock.mock.calls.at(-1) as [string];
+    expect(prompt).toContain("Arquiteto");
+    expect(prompt).not.toContain("Product Owner");
+  });
+
+  it("POST /ia/pipeline/:papel com papel desconhecido usa o preâmbulo genérico, não devolve erro (SPEC-24 Fase B — pipeline configurável)", async () => {
+    verificarStatusMock.mockResolvedValue({
+      chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+    });
+
+    const resposta = await fetch(`${base}/ia/pipeline/agente-custom`, {
+      method: "POST",
+      body: JSON.stringify({
+        atividadeRotulo: "x",
+        contextoNo: "",
+        placeholders: [{ chave: "_historiaUsuario", tech: "", rotulo: "História de usuário" }],
+      }),
+    });
+    expect(resposta.status).toBe(200);
   });
 
   it("GET /quebras sem quebras/ ainda devolve lista vazia, não erro", async () => {

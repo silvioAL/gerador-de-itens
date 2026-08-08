@@ -482,18 +482,46 @@ async function tratarIaSugerir(req: IncomingMessage, res: ServerResponse): Promi
   }
 }
 
-// --- POST /ia/sugerir-item — Fase 1d-ii (SPEC-23): a IA escreve a ficha
-// inteira do item numa chamada só (história de usuário + critérios de
-// aceite contextuais + checklist técnico/volumetria), não campo por campo —
-// é a correção de rumo depois de 1d: a fila de geração ao vivo passa a
-// disparar isso por atividade, não por placeholder. Schema JSON monta em
-// runtime a partir de `placeholders[]` (as chaves variam por item — cada
-// atividade tem um conjunto diferente de requisitos técnicos aplicáveis),
-// então GBNF/saída estruturada volta a fazer sentido aqui (ao contrário de
-// `/ia/sugerir`, que É de propósito texto livre desde 1c: lá o schema
-// sempre foi um único campo). `/ia/sugerir` continua intocado — é o que o
-// botão manual "✨ Sugerir" por placeholder ainda usa.
-async function tratarIaSugerirItem(req: IncomingMessage, res: ServerResponse): Promise<void> {
+// --- POST /ia/pipeline/:papel — SPEC-24 Fase B: esteira de agentes (PO →
+// Arquiteto → Especialista técnico → QA). Substitui `/ia/sugerir-item`
+// (Fase 1d-ii, removida — aquele mecanismo gerava a ficha inteira do item
+// numa chamada só; a esteira processa por PAPEL, não por item inteiro de
+// uma vez). Mesmo mecanismo de base (schema JSON dinâmico a partir de
+// `placeholders[]`,
+// GBNF via `completarComSchema`) — só o PREÂMBULO do prompt muda por papel,
+// focando o que aquele papel deve produzir. Quem decide QUAIS placeholders
+// mandar pra cada papel é o cliente (web, `useEsteiraDeAgentes` — cada papel
+// só recebe os placeholders da sua própria seção: `_historiaUsuario`/
+// `_criteriosAceite` pro PO, `_contrato*` pro Arquiteto, checklist técnico/
+// volumetria pro Especialista, `_regrasTeste`/`_cenarioFeature` pro QA).
+// `/ia/sugerir` (streaming, um placeholder, botão manual "✨ Sugerir")
+// continua intocado. Papel desconhecido cai no preâmbulo genérico (nunca
+// 400 — o pipeline é configurável, SPEC-24 Fase F vai permitir papel custom).
+const PREAMBULO_PADRAO_POR_PAPEL: Record<string, string> = {
+  po: [
+    `Você é o Product Owner num time de desenvolvimento de software.`,
+    `Escreva a história de usuário e os critérios de aceite deste item.`,
+  ].join(" "),
+  arquiteto: [
+    `Você é o Arquiteto de software responsável pelo contrato técnico deste item.`,
+    `Descreva o nó de arquitetura vinculado, o request, o response, os erros`,
+    `possíveis e as dependências — decisões concretas, nunca genéricas.`,
+  ].join(" "),
+  especialista: [
+    `Você é o Especialista técnico responsável pelos requisitos de refinamento`,
+    `deste item, pra tech e contexto informados — cada requisito precisa de`,
+    `uma decisão concreta pra esse caso específico.`,
+  ].join(" "),
+  qa: [
+    `Você é o QA responsável pelas regras de teste e cenários Gherkin deste item.`,
+    `Escreva regras de teste automatizado e um cenário Gherkin adicional`,
+    `específico pro contexto — não repita cenários óbvios de erro genérico.`,
+  ].join(" "),
+};
+const PREAMBULO_GENERICO =
+  `Você ajuda a especificar tecnicamente um item de trabalho de software.`;
+
+async function tratarIaPipeline(req: IncomingMessage, res: ServerResponse, papel: string): Promise<void> {
   try {
     const status = await verificarStatus();
     if (!status.pronto) {
@@ -524,7 +552,7 @@ async function tratarIaSugerirItem(req: IncomingMessage, res: ServerResponse): P
       .join("\n");
 
     const prompt = [
-      `Você ajuda a especificar tecnicamente um item de trabalho de software.`,
+      PREAMBULO_PADRAO_POR_PAPEL[papel] ?? PREAMBULO_GENERICO,
       ...(contextoEpico ? [`Contexto geral da demanda/épico:`, contextoEpico, ``] : []),
       `Item: "${atividadeRotulo}"`,
       `Contexto do(s) nó(s) de arquitetura envolvidos:`,
@@ -532,11 +560,7 @@ async function tratarIaSugerirItem(req: IncomingMessage, res: ServerResponse): P
       ``,
       `Responda TODOS os campos abaixo, em português, cada um com uma decisão`,
       `concreta pra esse item nesse contexto — nunca genérica, nunca repetindo`,
-      `o requisito. Pro campo "_historiaUsuario", escreva uma história de`,
-      `usuário no formato "Como <papel>, quero <ação> para que <benefício>".`,
-      `Pro campo "_criteriosAceite", escreva 1 ou 2 cenários de teste`,
-      `adicionais específicos desse contexto (não repita cenários óbvios de`,
-      `erro genérico, que já existem em outro lugar).`,
+      `o requisito.`,
       ``,
       `Campos a responder (responda pela chave entre aspas):`,
       listaRequisitos,
@@ -578,8 +602,9 @@ export async function tratarApiLocal(req: IncomingMessage, res: ServerResponse, 
     await tratarIaSugerir(req, res);
     return true;
   }
-  if (caminho === "/ia/sugerir-item" && metodo === "POST") {
-    await tratarIaSugerirItem(req, res);
+  const matchPipeline = metodo === "POST" && caminho.match(/^\/ia\/pipeline\/([^/]+)$/);
+  if (matchPipeline) {
+    await tratarIaPipeline(req, res, decodeURIComponent(matchPipeline[1]));
     return true;
   }
   if (caminho === "/auth/me" && metodo === "GET") {

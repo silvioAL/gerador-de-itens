@@ -245,6 +245,11 @@ export interface PedidoSugestaoItemIa {
   placeholders: PlaceholderPedidoItemIa[];
 }
 
+/** SPEC-24 — os 4 papéis da esteira, em ordem fixa (default configurável na
+ * Fase F). Cada papel só produz um subconjunto dos placeholders da ficha —
+ * ver `PAPEIS_PIPELINE` em `useEsteiraDeAgentes.ts`. */
+export type PapelPipeline = "po" | "arquiteto" | "especialista" | "qa";
+
 export const apiIa = {
   /** Se o modelo local está instalado e pronto pra uso — usado antes de
    * disparar a geração ao vivo (Fase 1d, SPEC-23) sem forçar IA em quem não
@@ -292,16 +297,21 @@ export const apiIa = {
     }
     return { valor };
   },
-  /** Fase 1d-ii (SPEC-23) — correção de rumo depois de 1d: a IA escreve a
-   * ficha inteira do item numa chamada só (história de usuário + critérios
-   * de aceite contextuais + checklist técnico/volumetria juntos), não mais
-   * placeholder por placeholder. Resposta é JSON estruturado (schema
-   * dinâmico montado no servidor a partir de `placeholders[]`), então usa
-   * `requisitar()` normalmente — sem streaming aqui (contraste deliberado
-   * com `sugerir()` acima: múltiplos campos de uma vez não dá pra mostrar
-   * crescendo caractere a caractere sem parecer JSON quebrado no meio). */
-  sugerirItem: (pedido: PedidoSugestaoItemIa) =>
-    requisitar<Record<string, string>>("/ia/sugerir-item", { method: "POST", body: JSON.stringify(pedido) }),
+  /** SPEC-24 Fase B/C — esteira de agentes (PO → Arquiteto → Especialista
+   * técnico → QA): a IA escreve os campos de um papel numa chamada só
+   * (resposta é JSON estruturado, schema dinâmico montado no servidor a
+   * partir de `placeholders[]` — sem streaming aqui, múltiplos campos de
+   * uma vez não dá pra mostrar crescendo caractere a caractere sem parecer
+   * JSON quebrado no meio). O servidor troca o preâmbulo do prompt conforme
+   * `papel`; quem decide QUAIS placeholders mandar (só os da seção daquele
+   * papel) é quem chama, não esta função. Substitui o mecanismo de item
+   * único da Fase 1d-ii (`/ia/sugerir-item`, removido — a esteira processa
+   * por papel, não por item inteiro de uma vez). */
+  sugerirPipeline: (papel: PapelPipeline, pedido: PedidoSugestaoItemIa) =>
+    requisitar<Record<string, string>>(`/ia/pipeline/${encodeURIComponent(papel)}`, {
+      method: "POST",
+      body: JSON.stringify(pedido),
+    }),
 };
 
 export const apiPerfisTime = {
