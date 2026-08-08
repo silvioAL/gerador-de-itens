@@ -114,6 +114,10 @@ async function comoQuebraSalva(id: string, arquivo: string) {
     // a quebra inteira) mas nunca devolvido aqui — GET /quebras/:id nunca
     // mostrava respostasItens salvo, mesmo já estando no disco (Fase 1, SPEC-23).
     respostasItens: quebra?.respostasItens ?? {},
+    // Mesmo bug, achado de novo investigando a Fase 1b (SPEC-23): demandInfo
+    // e anexosContexto sobreviviam no arquivo, mas nunca voltavam no GET.
+    demandInfo: quebra?.demandInfo ?? "",
+    anexosContexto: quebra?.anexosContexto ?? [],
     criadoEm: info.birthtime.toISOString(),
     atualizadoEm: info.mtime.toISOString(),
   };
@@ -438,9 +442,15 @@ async function tratarIaSugerir(req: IncomingMessage, res: ServerResponse): Promi
       return;
     }
 
-    const { tech, rotulo, contextoNo } = await lerCorpoJson<{ tech: string; rotulo: string; contextoNo: string }>(req);
+    const { tech, rotulo, contextoNo, contextoEpico } = await lerCorpoJson<{
+      tech: string;
+      rotulo: string;
+      contextoNo: string;
+      contextoEpico?: string;
+    }>(req);
     const prompt = [
       `Você ajuda a especificar um requisito técnico de refinamento de software.`,
+      ...(contextoEpico ? [`Contexto geral da demanda/épico:`, contextoEpico, ``] : []),
       `Tecnologia: ${tech}`,
       `Requisito a especificar: "${rotulo}"`,
       `Contexto do(s) nó(s) de arquitetura envolvidos:`,

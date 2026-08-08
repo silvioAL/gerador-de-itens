@@ -217,6 +217,10 @@ export interface PedidoSugestaoIa {
   tech: string;
   rotulo: string;
   contextoNo: string;
+  /** Contexto do épico/demanda (Fase 1b, SPEC-23) — `demandInfo` + conteúdo
+   * dos anexos, quando o usuário preencheu. Opcional pra não quebrar
+   * chamadas existentes sem esse dado. */
+  contextoEpico?: string;
 }
 
 export const apiIa = {

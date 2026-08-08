@@ -14,9 +14,13 @@ const verificarStatusMock = vi.fn(async () => ({
   pronto: false,
   caminhoModelos: "/fake/models",
 }));
+// Instância única (não recriada a cada chamada de carregarModeloChatMock) pra
+// dar pra inspecionar o prompt de verdade recebido em `completarComSchema`
+// (Fase 1b, SPEC-23 — assert de que o contexto do épico chega no prompt).
+const completarComSchemaMock = vi.fn(async () => ({ valor: "sugestão de teste" }));
 const carregarModeloChatMock = vi.fn(async () => ({
   completar: vi.fn(async () => "resposta livre"),
-  completarComSchema: vi.fn(async () => ({ valor: "sugestão de teste" })),
+  completarComSchema: completarComSchemaMock,
   descartar: vi.fn(async () => {}),
 }));
 vi.mock("@gerador/llm", async () => {
@@ -33,6 +37,7 @@ let dirTemp: string;
 beforeEach(async () => {
   verificarStatusMock.mockClear();
   carregarModeloChatMock.mockClear();
+  completarComSchemaMock.mockClear();
   verificarStatusMock.mockResolvedValue({
     chatInstalado: false,
     embeddingInstalado: false,
@@ -141,6 +146,36 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     expect(carregarModeloChatMock).toHaveBeenCalledTimes(2);
   });
 
+  it("POST /ia/sugerir inclui o contexto do épico no prompt quando presente (Fase 1b, SPEC-23)", async () => {
+    verificarStatusMock.mockResolvedValue({
+      chatInstalado: true,
+      embeddingInstalado: true,
+      pronto: true,
+      caminhoModelos: "/fake/models",
+    });
+
+    await fetch(`${base}/ia/sugerir`, {
+      method: "POST",
+      body: JSON.stringify({
+        tech: "Backend",
+        rotulo: "DLQ configurada e monitorada",
+        contextoNo: "fila rabbitmq",
+        contextoEpico: "Épico: reduzir tempo de aprovação de crédito de 3 dias pra 1 hora.",
+      }),
+    });
+
+    const prompt = completarComSchemaMock.mock.calls.at(-1)?.[0] as string;
+    expect(prompt).toContain("Épico: reduzir tempo de aprovação de crédito de 3 dias pra 1 hora.");
+
+    // Sem contextoEpico, o prompt não menciona a seção — não inventa contexto vazio.
+    await fetch(`${base}/ia/sugerir`, {
+      method: "POST",
+      body: JSON.stringify({ tech: "Backend", rotulo: "outro requisito", contextoNo: "" }),
+    });
+    const promptSemEpico = completarComSchemaMock.mock.calls.at(-1)?.[0] as string;
+    expect(promptSemEpico).not.toContain("Contexto geral da demanda/épico");
+  });
+
   it("GET /quebras sem quebras/ ainda devolve lista vazia, não erro", async () => {
     const resposta = await fetch(`${base}/quebras`);
     expect(resposta.status).toBe(200);
@@ -178,6 +213,27 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
         atualizadoEm: expect.any(String),
       },
     ]);
+  });
+
+  it("demandInfo e anexosContexto sobrevivem a salvar+recarregar (Fase 1b, SPEC-23 — achado real: GET não devolvia esses campos)", async () => {
+    const quebra = {
+      titulo: "Aprovação de crédito v3",
+      time: "time-x",
+      diagrama: { nodes: [], edges: [] },
+      demandInfo: "Épico: reduzir tempo de aprovação de crédito de 3 dias pra 1 hora.",
+      anexosContexto: [{ nome: "retro.md", conteudo: "Retro anterior: SLA estourava por falta de dado do bureau." }],
+    };
+    const criada = await fetch(`${base}/quebras`, {
+      method: "POST",
+      body: JSON.stringify(quebra),
+    }).then((r) => r.json());
+
+    expect(criada.demandInfo).toBe(quebra.demandInfo);
+    expect(criada.anexosContexto).toEqual(quebra.anexosContexto);
+
+    const lida = await fetch(`${base}/quebras/${criada.id}`).then((r) => r.json());
+    expect(lida.demandInfo).toBe(quebra.demandInfo);
+    expect(lida.anexosContexto).toEqual(quebra.anexosContexto);
   });
 
   it("duas quebras salvas em sequência (ex.: 'Nova quebra' + salvar) não se sobrescrevem — achado real", async () => {
