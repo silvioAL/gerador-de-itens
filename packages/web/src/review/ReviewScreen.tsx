@@ -686,19 +686,22 @@ function AbaRefinamento({ ficha, contextoEpico, onResponder, emGeracaoAoVivo }: 
                 <span style={{ fontSize: 10.5, color: "#38bdf8" }}>✨ gerando a ficha inteira…</span>
               </div>
             ) : (
-              <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                <input
+              <div style={{ marginTop: 8 }}>
+                <textarea
                   value={rascunho}
                   onChange={(e) => setRascunhos((r) => ({ ...r, [p.chave]: e.target.value }))}
                   placeholder="Resposta manual, ou clique em Sugerir"
-                  style={inputEstilo}
+                  rows={3}
+                  style={textareaEstilo}
                 />
-                <button onClick={() => sugerir(p)} disabled={carregando === p.chave} style={botaoEstilo}>
-                  {carregando === p.chave ? "Gerando..." : "✨ Sugerir"}
-                </button>
-                <button onClick={() => confirmar(p.chave)} disabled={!rascunho.trim()} style={botaoEstilo}>
-                  Confirmar
-                </button>
+                <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                  <button onClick={() => sugerir(p)} disabled={carregando === p.chave} style={botaoEstilo}>
+                    {carregando === p.chave ? "Gerando..." : "✨ Sugerir"}
+                  </button>
+                  <button onClick={() => confirmar(p.chave)} disabled={!rascunho.trim()} style={botaoEstilo}>
+                    Confirmar
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -973,14 +976,21 @@ const origemEstilo: React.CSSProperties = {
   flexShrink: 0,
 };
 
-const inputEstilo: React.CSSProperties = {
-  flex: 1,
+// Achado real (SPEC-24): história de usuário/critérios de aceite são texto
+// longo — um `<input>` de uma linha só truncava o conteúdo, ilegível. `<pre>`
+// (texto confirmado) já usa `whiteSpace: pre-wrap`; o textarea replica isso
+// no estado de edição.
+const textareaEstilo: React.CSSProperties = {
+  width: "100%",
   fontSize: 12,
-  padding: "6px 8px",
+  padding: "8px 10px",
   borderRadius: 6,
   border: "1px solid #263344",
   background: "#0C111A",
   color: "#E8EEF8",
+  fontFamily: "inherit",
+  resize: "vertical",
+  boxSizing: "border-box",
 };
 
 const botaoEstilo: React.CSSProperties = {

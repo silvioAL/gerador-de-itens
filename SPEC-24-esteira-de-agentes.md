@@ -30,31 +30,39 @@ Cada papel é um registro `{id, rotulo, ordem, promptBase, entradas[], saidasEsp
 
 | Papel | Consome | Produz | Onde grava |
 |---|---|---|---|
-| `po` | diagrama (nós/arestas), contexto do épico | história de usuário, critérios de aceite (lista) | `respostasItens[chave]["_historiaUsuario"]`, novo campo lista `criteriosAceite[]` (§5) |
-| `arquiteto` | itens do PO, arestas do diagrama | contrato (nó vinculado, request, response, erros), dependências | novo campo `contrato` por item (§5) |
+| `po` | diagrama (nós/arestas), contexto do épico | história de usuário, critérios de aceite | `respostasItens[chave]["_historiaUsuario"]`/`["_criteriosAceite"]` — **já existente (1d-ii), sem mudança** |
+| `arquiteto` | itens do PO, arestas do diagrama | contrato (nó vinculado, request, response, erros, dependências) | 5 chaves fixas novas em `respostasItens[chave]` (§4.2) |
 | `especialista` | contratos, `RegrasConfig` (tabela já existente) | requisitos de refinamento (checklist técnico/volumetria) | `respostasItens[chave]["${tech}::${texto}"]` — **mecanismo já existente, sem mudança** |
-| `qa` | critérios do PO, contrato do Arquiteto, requisitos do Especialista | regras de teste + cenários Gherkin | novo campo `regrasTeste[]`/`cenarioFeature` por item (§5) |
+| `qa` | critérios do PO, contrato do Arquiteto, requisitos do Especialista | regras de teste + cenário Gherkin (texto livre) | `respostasItens[chave]["_regrasTeste"]`/`["_cenarioFeature"]`, chaves fixas novas (§4.2) |
 
 Cada papel só começa quando o anterior terminou **todos os itens** — não é uma restrição nova de código, é a ordem de iteração do orquestrador (§6).
 
-### 4.2 Contrato e cenários de teste ganham modelo de dados novo — não cabem em `ValorSpec`
+### 4.2 Contrato e cenários de teste — decisão fechada: sem tipo novo, cada sub-campo é sua própria chave em `respostasItens`
+
+Decisão fechada (revisitada antes de codar a Fase A — a ideia original de serializar um objeto dentro de `ValorSpec.valor: unknown` foi descartada): **nenhum tipo novo no `model/types.ts`, nenhuma mudança em `ValorSpec`**. Cada sub-campo do contrato vira sua própria chave fixa dentro de `respostasItens[atividadeChave]`, exatamente como `_historiaUsuario`/`_criteriosAceite` já funcionam — um `ValorSpec` normal, `valor: string`, sem exceção. Motivo: um `valor: unknown` guardando JSON serializado quebraria toda suposição hoje espalhada pela UI (`typeof p.resposta?.valor === "string"` em `ReviewScreen.tsx`, `String(p.resposta?.valor)` em `renderizarItemEspecificacao`) e exigiria um editor de sub-campo novo — ao passo que campos escalares soltos reusam **tudo** (input, "✨ Sugerir", "Confirmar", markdown final) sem nenhuma linha de UI nova além de listar mais placeholders. Precedente direto: o próprio contrato-de-nó em `AbaContrato` já é uma lista de campos escalares, não um objeto aninhado editável de uma vez.
+
+Chaves fixas novas, sempre presentes (mesmo padrão de `CHAVE_HISTORIA_USUARIO`/`CHAVE_CRITERIOS_ACEITE`):
 
 ```ts
-// packages/engine/src/model/types.ts — extensão de Atividade ou de Quebra.respostasItens
-export interface ContratoItem {
-  noVinculado?: string;           // nodeId
-  request?: string;               // texto livre ou JSON — decidir em Fase A
-  response?: string;
-  erros?: string;
-  dependencias?: string;
-  origem: Origem;
-  confirmado?: boolean;
-}
-export interface RegraTeste { tipo: string; validacao: string; dev: boolean; hlg: boolean; origem: Origem; confirmado?: boolean }
-export interface CenarioFeature { conteudo: string; origem: Origem; confirmado?: boolean }
+// packages/engine/src/refinamento/gerarRefinamento.ts
+export const CHAVE_CONTRATO_NO_VINCULADO = "_contratoNoVinculado";
+export const CHAVE_CONTRATO_REQUEST = "_contratoRequest";
+export const CHAVE_CONTRATO_RESPONSE = "_contratoResponse";
+export const CHAVE_CONTRATO_ERROS = "_contratoErros";
+export const CHAVE_CONTRATO_DEPENDENCIAS = "_contratoDependencias";
+export const CHAVE_REGRAS_TESTE = "_regrasTeste";       // texto livre (markdown), mesma forma que _criteriosAceite
+export const CHAVE_CENARIO_FEATURE = "_cenarioFeature";  // conteúdo Gherkin, texto livre
 ```
 
-Decisão a confirmar em Fase A (não fechada nesta spec): esses três campos vivem em `Quebra.respostasItens[chave]` sob chaves fixas novas (`_contrato`, `_regrasTeste`, `_cenarioFeature`, valor serializado como JSON dentro de `ValorSpec.valor: unknown`, que já é `unknown`-typed) — **reaproveita 100% do mecanismo de persistência/round-trip/"nada sugerido conta até confirmado"** — versus um campo novo top-level em `Atividade`. A primeira opção é consistente com a disciplina "reusar `respostasItens` antes de inventar campo novo" já seguida em 1d-ii; only motivo pra campo novo seria se a UI precisar editar sub-campos individualmente (ex.: só o `response` sem tocar `request`) de um jeito que um `ValorSpec` único não suporta bem — decisão de UI, adiada pra Fase A/C quando o formulário de edição for desenhado.
+`PlaceholderRefinamento.secao` ganha 3 valores novos: `"contrato" | "regrasTeste" | "cenarioFeature"` (as 5 chaves de contrato compartilham a seção `"contrato"` — são o mesmo agrupamento visual). `FichaItem` ganha:
+
+```ts
+contrato: { noVinculado: FichaPlaceholder; request: FichaPlaceholder; response: FichaPlaceholder; erros: FichaPlaceholder; dependencias: FichaPlaceholder };
+regrasTeste: FichaPlaceholder;
+cenarioFeature: FichaPlaceholder;
+```
+
+`regrasTeste`/`cenarioFeature` sendo texto livre (não lista estruturada de `RegraTeste[]`) é a mesma simplificação já aplicada a `_criteriosAceite` ("1 ou 2 cenários... formato livre, pode ser Gherkin") — consistente, não uma regressão de expressividade em relação ao resto do sistema.
 
 ### 4.3 Estado do item é derivado, não persistido — generaliza `statusDoItem()` já existente
 
@@ -114,7 +122,7 @@ Cada resposta (`ValorSpec`) já carrega `origem`. Falta: (a) `evidencia` populad
 
 ## 9. Roteiro faseado (registrado nesta spec, não implementado nesta rodada)
 
-1. **Fase A — modelo de dados**: `ContratoItem`/`RegraTeste`/`CenarioFeature` no engine (decisão de §4.2 fechada), `statusDoItem()` generalizado, sem UI/rota nova ainda.
+1. **Fase A — modelo de dados (implementada)**: 7 chaves fixas novas (contrato ×5, `_regrasTeste`, `_cenarioFeature`) sempre presentes em `listarPlaceholders()`, `FichaItem`/`montarFichaItem()` expondo os campos novos, seções novas em `renderizarItemEspecificacao()` (decisão de §4.2 fechada). **Decisão tomada na implementação, revisando a intenção original deste item**: `statusDoItem()` (ReviewScreen) e a fila de geração (`montarFila()`/`AbaRefinamento`) **não foram generalizados** pra contar os 7 campos novos — eles ficam de propósito fora da UI/fila até a Fase B/C existirem. Motivo: sem uma rota/orquestração capaz de preenchê-los ainda, contá-los como pendência faria todo item regredir pra "rascunho" permanentemente, sem nenhuma ferramenta (nem manual) pra resolver — regressão de UX sem benefício. `FichaItem` expõe os campos novos (dado disponível pra quem quiser consumir), mas nenhuma tela referencia isso ainda — é modelo de dados puro, exatamente como planejado, só que a fronteira "invisível" inclui também `statusDoItem`/fila, não só rota/UI.
 2. **Fase B — cli**: rota(s) por papel (`POST /ia/pipeline/:papel` ou 4 rotas nomeadas — decidir em Fase B se o schema por papel justifica rotas separadas ou um parâmetro só muda o prompt), reaproveitando `completarComSchema`/schema dinâmico já existente.
 3. **Fase C — orquestração web**: `useGeracaoAoVivo` reescrito pro eixo "papel × todos os itens" (§6), fase bar com handoff visual, pips por item.
 4. **Fase D — canvas com filtro**: extensão de `DiagramaCompacto` (§4.5).

@@ -59,6 +59,21 @@ export function respostaVisivel(resp: ValorSpec | undefined): resp is ValorSpec 
 export const CHAVE_HISTORIA_USUARIO = "_historiaUsuario";
 export const CHAVE_CRITERIOS_ACEITE = "_criteriosAceite";
 
+/** Chaves fixas dos placeholders da esteira de agentes (SPEC-24) — contrato de
+ * arquitetura (papel Arquiteto: nó vinculado/request/response/erros/
+ * dependências) e regras de teste + cenário Gherkin (papel QA). Mesma
+ * disciplina de `CHAVE_HISTORIA_USUARIO`/`CHAVE_CRITERIOS_ACEITE`: cada
+ * sub-campo é seu próprio `ValorSpec` escalar, sempre presente — decisão
+ * fechada em SPEC-24 §4.2 depois de descartar guardar um objeto serializado
+ * (quebraria toda suposição de `valor: string` já espalhada pela UI). */
+export const CHAVE_CONTRATO_NO_VINCULADO = "_contratoNoVinculado";
+export const CHAVE_CONTRATO_REQUEST = "_contratoRequest";
+export const CHAVE_CONTRATO_RESPONSE = "_contratoResponse";
+export const CHAVE_CONTRATO_ERROS = "_contratoErros";
+export const CHAVE_CONTRATO_DEPENDENCIAS = "_contratoDependencias";
+export const CHAVE_REGRAS_TESTE = "_regrasTeste";
+export const CHAVE_CENARIO_FEATURE = "_cenarioFeature";
+
 /**
  * Checklist de refinamento técnico em Markdown, filtrado por techs+contextos
  * da atividade e por `when` (ver `condicaoBate`) — ex.: "definir plano de
@@ -210,7 +225,7 @@ export function gerarCiclosDeTeste(regras: RegrasConfig, techs: string[], contex
 export interface PlaceholderRefinamento {
   chave: string;
   tech: string;
-  secao: "historiaUsuario" | "criteriosAceite" | "checklistTecnico" | "volumetria";
+  secao: "historiaUsuario" | "criteriosAceite" | "contrato" | "checklistTecnico" | "volumetria" | "regrasTeste" | "cenarioFeature";
   rotulo: string;
 }
 
@@ -235,6 +250,13 @@ export function listarPlaceholders(
   const placeholders: PlaceholderRefinamento[] = [
     { chave: CHAVE_HISTORIA_USUARIO, tech: "", secao: "historiaUsuario", rotulo: "História de usuário" },
     { chave: CHAVE_CRITERIOS_ACEITE, tech: "", secao: "criteriosAceite", rotulo: "Critérios de aceite (cenários contextuais)" },
+    { chave: CHAVE_CONTRATO_NO_VINCULADO, tech: "", secao: "contrato", rotulo: "Nó vinculado" },
+    { chave: CHAVE_CONTRATO_REQUEST, tech: "", secao: "contrato", rotulo: "Request" },
+    { chave: CHAVE_CONTRATO_RESPONSE, tech: "", secao: "contrato", rotulo: "Response" },
+    { chave: CHAVE_CONTRATO_ERROS, tech: "", secao: "contrato", rotulo: "Erros" },
+    { chave: CHAVE_CONTRATO_DEPENDENCIAS, tech: "", secao: "contrato", rotulo: "Dependências" },
+    { chave: CHAVE_REGRAS_TESTE, tech: "", secao: "regrasTeste", rotulo: "Regras de teste" },
+    { chave: CHAVE_CENARIO_FEATURE, tech: "", secao: "cenarioFeature", rotulo: "Cenário Gherkin" },
   ];
 
   for (const tech of techs) {

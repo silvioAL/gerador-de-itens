@@ -2,8 +2,15 @@ import type { Atividade, Aresta, Diagrama, No, Origem, StatusNo, ValorSpec } fro
 import type { DiagramaConfig, FieldSpec, RegrasConfig } from "../config/types.js";
 import { camposVisiveis } from "../spec/campos.js";
 import {
+  CHAVE_CENARIO_FEATURE,
+  CHAVE_CONTRATO_DEPENDENCIAS,
+  CHAVE_CONTRATO_ERROS,
+  CHAVE_CONTRATO_NO_VINCULADO,
+  CHAVE_CONTRATO_REQUEST,
+  CHAVE_CONTRATO_RESPONSE,
   CHAVE_CRITERIOS_ACEITE,
   CHAVE_HISTORIA_USUARIO,
+  CHAVE_REGRAS_TESTE,
   MARCADOR_ESPECIFICAR,
   gerarChecklistProcesso,
   gerarChecklistTecnico,
@@ -326,6 +333,27 @@ export function renderizarItemEspecificacao(
   const criteriosContextuaisResp = respostas?.[CHAVE_CRITERIOS_ACEITE];
   const criteriosContextuais = respostaVisivel(criteriosContextuaisResp) ? String(criteriosContextuaisResp.valor) : undefined;
 
+  // SPEC-24 — contrato de arquitetura (papel Arquiteto) e regras de teste +
+  // cenário Gherkin (papel QA): mesma régua "nada sugerido conta até
+  // confirmado", só aparecem no documento quando resolvidos.
+  const camposContrato = [
+    ["Nó vinculado", respostas?.[CHAVE_CONTRATO_NO_VINCULADO]],
+    ["Request", respostas?.[CHAVE_CONTRATO_REQUEST]],
+    ["Response", respostas?.[CHAVE_CONTRATO_RESPONSE]],
+    ["Erros", respostas?.[CHAVE_CONTRATO_ERROS]],
+    ["Dependências", respostas?.[CHAVE_CONTRATO_DEPENDENCIAS]],
+  ] as const;
+  const contratoPreenchido = camposContrato.filter(([, resp]) => respostaVisivel(resp));
+  const contratoArquitetura =
+    contratoPreenchido.length > 0
+      ? contratoPreenchido.map(([label, resp]) => `- **${label}:** ${String(resp!.valor)}`).join("\n")
+      : undefined;
+
+  const regrasTesteResp = respostas?.[CHAVE_REGRAS_TESTE];
+  const regrasTeste = respostaVisivel(regrasTesteResp) ? String(regrasTesteResp.valor) : undefined;
+  const cenarioFeatureResp = respostas?.[CHAVE_CENARIO_FEATURE];
+  const cenarioFeature = respostaVisivel(cenarioFeatureResp) ? String(cenarioFeatureResp.valor) : undefined;
+
   return [
     `### ${numero}. ${atividade.rotulo} — ${atividade.descricao}`,
     "",
@@ -340,6 +368,7 @@ export function renderizarItemEspecificacao(
     "#### Especificação técnica",
     "",
     especificacaoTecnica,
+    ...(contratoArquitetura ? ["", "#### Contrato de arquitetura", "", contratoArquitetura] : []),
     "",
     "#### Requisitos de refinamento técnico",
     "",
@@ -351,6 +380,8 @@ export function renderizarItemEspecificacao(
     "",
     criteriosAceite,
     ...(criteriosContextuais ? ["", "_Cenários adicionais (contextuais):_", "", criteriosContextuais] : []),
+    ...(regrasTeste ? ["", "#### Regras de teste (QA)", "", regrasTeste] : []),
+    ...(cenarioFeature ? ["", "#### Cenário Gherkin adicional (QA)", "", "```gherkin", cenarioFeature, "```"] : []),
   ].join("\n");
 }
 
@@ -393,11 +424,37 @@ export interface FichaItem {
    * responde checklist técnico. */
   historiaUsuario: FichaPlaceholder;
   criteriosAceiteContextual: FichaPlaceholder;
+  /** SPEC-24 — placeholders da esteira de agentes: contrato de arquitetura
+   * (papel Arquiteto) e regras de teste/cenário Gherkin (papel QA), sempre
+   * presentes como escalares próprios (decisão §4.2 — nenhum objeto
+   * aninhado novo, mesma disciplina de história/critérios). */
+  contrato: {
+    noVinculado: FichaPlaceholder;
+    request: FichaPlaceholder;
+    response: FichaPlaceholder;
+    erros: FichaPlaceholder;
+    dependencias: FichaPlaceholder;
+  };
+  regrasTeste: FichaPlaceholder;
+  cenarioFeature: FichaPlaceholder;
   checklistTecnico: FichaPlaceholder[];
   volumetria: FichaPlaceholder[];
   checklistProcessoMarkdown: string;
   ciclosTesteMarkdown: string;
   criteriosAceiteMarkdown: string;
+}
+
+/** Um placeholder específico (por chave, não por seção) já resolvido pra ficha
+ * — usado pros campos de contrato/regrasTeste/cenarioFeature (SPEC-24), que
+ * a UI referencia individualmente (ex.: só o campo "Request"), diferente de
+ * checklistTecnico/volumetria (consumidos como lista). */
+function acharPorChave(
+  placeholders: PlaceholderRefinamento[],
+  respostas: Record<string, ValorSpec> | undefined,
+  chave: string
+): FichaPlaceholder {
+  const p = placeholders.find((x) => x.chave === chave)!;
+  return { chave: p.chave, tech: p.tech, rotulo: p.rotulo, resposta: respostas?.[p.chave] };
 }
 
 /**
@@ -448,6 +505,15 @@ export function montarFichaItem(
     especificacaoTecnica,
     historiaUsuario: paraFicha("historiaUsuario")[0],
     criteriosAceiteContextual: paraFicha("criteriosAceite")[0],
+    contrato: {
+      noVinculado: acharPorChave(placeholders, respostas, CHAVE_CONTRATO_NO_VINCULADO),
+      request: acharPorChave(placeholders, respostas, CHAVE_CONTRATO_REQUEST),
+      response: acharPorChave(placeholders, respostas, CHAVE_CONTRATO_RESPONSE),
+      erros: acharPorChave(placeholders, respostas, CHAVE_CONTRATO_ERROS),
+      dependencias: acharPorChave(placeholders, respostas, CHAVE_CONTRATO_DEPENDENCIAS),
+    },
+    regrasTeste: acharPorChave(placeholders, respostas, CHAVE_REGRAS_TESTE),
+    cenarioFeature: acharPorChave(placeholders, respostas, CHAVE_CENARIO_FEATURE),
     checklistTecnico: paraFicha("checklistTecnico"),
     volumetria: paraFicha("volumetria"),
     checklistProcessoMarkdown: regras
