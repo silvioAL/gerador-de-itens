@@ -14,3 +14,4 @@ infra/secrets/.env
 .idea/
 .vscode/
 _prototipos/
+_tmp-*
