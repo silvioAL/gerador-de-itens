@@ -30,13 +30,13 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.erro) {
       return (
         <div style={{ padding: 32, fontFamily: "system-ui, sans-serif", maxWidth: 640 }}>
-          <h1 style={{ fontSize: 18, color: "#b91c1c" }}>Algo deu errado</h1>
-          <p style={{ fontSize: 13, color: "#475569", lineHeight: 1.5 }}>
+          <h1 style={{ fontSize: 18, color: "var(--vermelho)" }}>Algo deu errado</h1>
+          <p style={{ fontSize: 13, color: "var(--texto-2)", lineHeight: 1.5 }}>
             Um erro inesperado interrompeu esta tela — provavelmente um dado ou uma configuração em formato
             inesperado (ex.: <code>config/regras.json</code> editado à mão). Recarregar a página deve resolver;
             se persistir, veja o console do navegador (F12) para o detalhe técnico.
           </p>
-          <pre style={{ fontSize: 11, color: "#94a3b8", whiteSpace: "pre-wrap", marginTop: 12 }}>
+          <pre style={{ fontSize: 11, color: "var(--texto-mudo)", whiteSpace: "pre-wrap", marginTop: 12 }}>
             {this.state.erro.message}
           </pre>
           <button
@@ -46,8 +46,8 @@ export class ErrorBoundary extends Component<Props, State> {
               fontSize: 13,
               padding: "8px 16px",
               borderRadius: 6,
-              border: "1px solid #cbd5e1",
-              background: "#fff",
+              border: "1px solid var(--borda-forte)",
+              background: "var(--painel)",
               cursor: "pointer",
             }}
           >

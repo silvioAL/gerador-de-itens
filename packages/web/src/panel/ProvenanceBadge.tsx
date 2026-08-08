@@ -1,10 +1,10 @@
 import type { ValorSpec } from "@gerador/engine";
 
 const ESTILOS: Record<ValorSpec["origem"], React.CSSProperties> = {
-  manual: { background: "#f1f5f9", color: "#475569" },
-  extraido: { background: "#dcfce7", color: "#15803d" },
-  inferido: { background: "#fef3c7", color: "#92400e" },
-  sugerido: { background: "#ede9fe", color: "#6d28d9", fontWeight: 700 },
+  manual: { background: "var(--painel-alto)", color: "var(--texto-2)" },
+  extraido: { background: "rgba(62, 207, 142, 0.16)", color: "var(--verde)" },
+  inferido: { background: "rgba(251, 191, 36, 0.14)", color: "var(--amarelo)" },
+  sugerido: { background: "rgba(99, 102, 241, 0.16)", color: "#6d28d9", fontWeight: 700 },
 };
 
 const ROTULOS: Record<ValorSpec["origem"], string> = {

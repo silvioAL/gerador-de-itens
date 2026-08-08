@@ -80,19 +80,19 @@ export function PerfisTimeTab({ perfisTime, config, onEditarValor }: PerfisTimeT
         }}
       >
         {times.length === 0 && (
-          <p style={{ fontSize: 12, color: "#94a3b8" }}>
+          <p style={{ fontSize: 12, color: "var(--texto-mudo)" }}>
             Nenhum time com perfil cadastrado ainda em config/perfis-time.json.
           </p>
         )}
         {times.map(([timeId, perfil]) => (
           <div key={timeId} style={cardEstilo}>
-            <strong style={{ fontSize: 13, color: "#0f172a" }}>{timeId}</strong>
+            <strong style={{ fontSize: 13, color: "var(--texto)" }}>{timeId}</strong>
             {Object.entries(perfil).map(([tipo, campos]) => (
               <div key={tipo} style={{ marginTop: 8 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--texto-fraco)", textTransform: "uppercase" }}>
                   {config.nodeTypes[tipo]?.label ?? tipo}
                 </div>
-                <ul style={{ margin: "4px 0 0", paddingLeft: 16, fontSize: 12.5, color: "#334155", listStyle: "none" }}>
+                <ul style={{ margin: "4px 0 0", paddingLeft: 16, fontSize: 12.5, color: "var(--texto-2)", listStyle: "none" }}>
                   {Object.entries(campos as Record<string, unknown>).map(([campo, valor]) => (
                     <li key={campo} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
                       <span>
@@ -219,17 +219,17 @@ function FormularioEditarValor({
 
 const introTextoEstilo: React.CSSProperties = {
   fontSize: 13,
-  color: "#475569",
+  color: "var(--texto-2)",
   lineHeight: 1.5,
   marginTop: 0,
   maxWidth: 680,
 };
 
 const cardEstilo: React.CSSProperties = {
-  border: "1px solid #e2e8f0",
+  border: "1px solid var(--borda)",
   borderRadius: 12,
   padding: 14,
-  background: "#fff",
+  background: "var(--painel)",
 };
 
 const botaoAdicionarEstilo: React.CSSProperties = {
@@ -247,8 +247,8 @@ const formularioEstilo: React.CSSProperties = {
   marginTop: 4,
   padding: 14,
   borderRadius: 10,
-  border: "1px solid #e2e8f0",
-  background: "#f8fafc",
+  border: "1px solid var(--borda)",
+  background: "var(--painel)",
   display: "flex",
   flexDirection: "column",
   gap: 4,
@@ -258,7 +258,7 @@ const formularioEstilo: React.CSSProperties = {
 const labelFormEstilo: React.CSSProperties = {
   fontSize: 11,
   fontWeight: 600,
-  color: "#334155",
+  color: "var(--texto-2)",
   marginTop: 8,
 };
 
@@ -266,7 +266,7 @@ const inputFormEstilo: React.CSSProperties = {
   fontSize: 13,
   padding: "6px 10px",
   borderRadius: 6,
-  border: "1px solid #cbd5e1",
+  border: "1px solid var(--borda-forte)",
   outline: "none",
   boxSizing: "border-box",
 };
@@ -285,15 +285,15 @@ const botaoCancelarEstilo: React.CSSProperties = {
   fontSize: 12,
   padding: "7px 12px",
   borderRadius: 7,
-  border: "1px solid #cbd5e1",
-  background: "#fff",
-  color: "#475569",
+  border: "1px solid var(--borda-forte)",
+  background: "var(--painel)",
+  color: "var(--texto-2)",
   cursor: "pointer",
 };
 
 const linkBotaoEstilo: React.CSSProperties = {
   fontSize: 11,
-  color: "#4f46e5",
+  color: "#a5b4fc",
   background: "none",
   border: "none",
   cursor: "pointer",

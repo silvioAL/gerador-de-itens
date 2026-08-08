@@ -19,12 +19,12 @@ export function EdgePanel({ aresta, config, quebraState }: EdgePanelProps) {
 
   return (
     <aside style={painelEstilo}>
-      <h2 style={{ fontSize: 13, fontWeight: 700, color: "#334155", margin: 0 }}>Aresta</h2>
-      <p style={{ fontSize: 12, color: "#64748b", marginTop: 8 }}>
+      <h2 style={{ fontSize: 13, fontWeight: 700, color: "var(--texto-2)", margin: 0 }}>Aresta</h2>
+      <p style={{ fontSize: 12, color: "var(--texto-fraco)", marginTop: 8 }}>
         {origem?.label ?? aresta.source} → {destino?.label ?? aresta.target}
       </p>
 
-      <label style={{ fontSize: 12, fontWeight: 600, color: "#334155", display: "block", marginTop: 12 }}>
+      <label style={{ fontSize: 12, fontWeight: 600, color: "var(--texto-2)", display: "block", marginTop: 12 }}>
         Tipo
       </label>
       {opcoesValidas.length > 0 ? (
@@ -40,21 +40,21 @@ export function EdgePanel({ aresta, config, quebraState }: EdgePanelProps) {
           ))}
         </select>
       ) : (
-        <p style={{ fontSize: 12, color: "#94a3b8" }}>
+        <p style={{ fontSize: 12, color: "var(--texto-mudo)" }}>
           {config.edgeTypes[aresta.type]?.label ?? aresta.type} (sem outras opções válidas para este destino)
         </p>
       )}
 
       {camposDoTipo.length > 0 && (
         <>
-          <hr style={{ margin: "14px 0", border: "none", borderTop: "1px solid #e2e8f0" }} />
+          <hr style={{ margin: "14px 0", border: "none", borderTop: "1px solid var(--borda)" }} />
           {camposDoTipo.map((campo) => (
             <div key={campo.key} style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "#334155", display: "block", marginBottom: 4 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--texto-2)", display: "block", marginBottom: 4 }}>
                 {campo.label}
                 {campo.required && <span style={{ color: "#ef4444" }}> *</span>}
               </label>
-              {campo.ajuda && <p style={{ fontSize: 11, color: "#94a3b8", margin: "0 0 6px" }}>{campo.ajuda}</p>}
+              {campo.ajuda && <p style={{ fontSize: 11, color: "var(--texto-mudo)", margin: "0 0 6px" }}>{campo.ajuda}</p>}
               <FieldControl
                 campo={campo}
                 valor={aresta.spec?.[campo.key]?.valor}
@@ -66,13 +66,13 @@ export function EdgePanel({ aresta, config, quebraState }: EdgePanelProps) {
         </>
       )}
 
-      <hr style={{ margin: "14px 0", border: "none", borderTop: "1px solid #e2e8f0" }} />
+      <hr style={{ margin: "14px 0", border: "none", borderTop: "1px solid var(--borda)" }} />
       <button
         onClick={() => {
           removerAresta(aresta.id);
           setArestaSelecionadaId(null);
         }}
-        style={{ ...botaoEstilo, color: "#b91c1c", borderColor: "#fecaca" }}
+        style={{ ...botaoEstilo, color: "var(--vermelho)", borderColor: "#fecaca" }}
       >
         Excluir aresta
       </button>
@@ -83,10 +83,10 @@ export function EdgePanel({ aresta, config, quebraState }: EdgePanelProps) {
 const painelEstilo: React.CSSProperties = {
   width: 320,
   flexShrink: 0,
-  borderLeft: "1px solid #e2e8f0",
+  borderLeft: "1px solid var(--borda)",
   padding: 16,
   overflowY: "auto",
-  background: "#ffffff",
+  background: "var(--painel)",
   fontFamily: "system-ui, sans-serif",
 };
 
@@ -95,7 +95,7 @@ const inputEstilo: React.CSSProperties = {
   padding: "6px 10px",
   fontSize: 13,
   borderRadius: 6,
-  border: "1px solid #cbd5e1",
+  border: "1px solid var(--borda-forte)",
   outline: "none",
   boxSizing: "border-box",
   marginTop: 4,
@@ -105,7 +105,7 @@ const botaoEstilo: React.CSSProperties = {
   fontSize: 11,
   padding: "4px 8px",
   borderRadius: 6,
-  border: "1px solid #cbd5e1",
-  background: "#f8fafc",
+  border: "1px solid var(--borda-forte)",
+  background: "var(--painel)",
   cursor: "pointer",
 };

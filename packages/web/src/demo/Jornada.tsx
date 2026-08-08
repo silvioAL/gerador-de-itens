@@ -72,11 +72,11 @@ export function Jornada() {
             >
               {etapa.numero}
             </div>
-            {i < ETAPAS.length - 1 && <div style={{ width: 2, flex: 1, background: "#e2e8f0", minHeight: 24 }} />}
+            {i < ETAPAS.length - 1 && <div style={{ width: 2, flex: 1, background: "var(--borda)", minHeight: 24 }} />}
           </div>
           <div style={{ paddingBottom: 22 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{etapa.titulo}</div>
-            <div style={{ fontSize: 13, color: "#475569", marginTop: 4, lineHeight: 1.5, maxWidth: 640 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--texto)" }}>{etapa.titulo}</div>
+            <div style={{ fontSize: 13, color: "var(--texto-2)", marginTop: 4, lineHeight: 1.5, maxWidth: 640 }}>
               {etapa.texto}
             </div>
           </div>

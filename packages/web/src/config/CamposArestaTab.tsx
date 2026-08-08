@@ -202,9 +202,9 @@ export function CamposArestaTab({ config, camposAresta, timeAtivo, onCriar, onAt
 
           return (
             <div key={tipoAresta} style={cardEstilo}>
-              <strong style={{ fontSize: 13, color: "#0f172a" }}>{config.edgeTypes[tipoAresta]?.label ?? tipoAresta}</strong>
+              <strong style={{ fontSize: 13, color: "var(--texto)" }}>{config.edgeTypes[tipoAresta]?.label ?? tipoAresta}</strong>
               {camposPadrao.length === 0 && camposCustom.length === 0 && (
-                <p style={{ fontSize: 11.5, color: "#94a3b8", margin: "6px 0 0" }}>Nenhum campo ainda.</p>
+                <p style={{ fontSize: 11.5, color: "var(--texto-mudo)", margin: "6px 0 0" }}>Nenhum campo ainda.</p>
               )}
               <ul style={{ margin: "8px 0 0", paddingLeft: 0, listStyle: "none" }}>
                 {camposPadrao.map((campo) => (
@@ -213,11 +213,11 @@ export function CamposArestaTab({ config, camposAresta, timeAtivo, onCriar, onAt
                     style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: 12.5 }}
                   >
                     <span style={{ ...tagOrigemEstilo, ...tagPadraoEstilo }}>padrão</span>
-                    <span style={{ color: "#334155" }}>
-                      {campo.label} <span style={{ color: "#94a3b8" }}>({campo.key}, {campo.type})</span>
+                    <span style={{ color: "var(--texto-2)" }}>
+                      {campo.label} <span style={{ color: "var(--texto-mudo)" }}>({campo.key}, {campo.type})</span>
                     </span>
                     {chavesSobrescritas.has(campo.key) && (
-                      <span style={{ fontSize: 10.5, color: "#15803d" }}>sobrescrito abaixo pro seu time</span>
+                      <span style={{ fontSize: 10.5, color: "var(--verde)" }}>sobrescrito abaixo pro seu time</span>
                     )}
                     <div style={{ flex: 1 }} />
                     <button onClick={() => abrirSobrescrita(tipoAresta, campo)} style={linkBotaoEstilo}>
@@ -238,14 +238,14 @@ export function CamposArestaTab({ config, camposAresta, timeAtivo, onCriar, onAt
                     >
                       {campo.timeId === "__global__" ? "global" : campo.timeId}
                     </span>
-                    <span style={{ color: "#334155" }}>
-                      {campo.label} <span style={{ color: "#94a3b8" }}>({campo.key}, {campo.type})</span>
+                    <span style={{ color: "var(--texto-2)" }}>
+                      {campo.label} <span style={{ color: "var(--texto-mudo)" }}>({campo.key}, {campo.type})</span>
                     </span>
                     <div style={{ flex: 1 }} />
                     <button onClick={() => abrirEdicao(campo)} style={linkBotaoEstilo}>
                       editar
                     </button>
-                    <button onClick={() => void onExcluir(campo.id)} style={{ ...linkBotaoEstilo, color: "#b91c1c" }}>
+                    <button onClick={() => void onExcluir(campo.id)} style={{ ...linkBotaoEstilo, color: "var(--vermelho)" }}>
                       excluir
                     </button>
                   </li>
@@ -342,7 +342,7 @@ function FormularioCampoAresta({
             disabled={formulario.chaveFixa}
           />
           {formulario.chaveFixa && (
-            <span style={{ fontSize: 10.5, color: "#94a3b8" }}>
+            <span style={{ fontSize: 10.5, color: "var(--texto-mudo)" }}>
               Fixa — é o que liga este campo ao original, não dá pra mudar.
             </span>
           )}
@@ -426,17 +426,17 @@ function FormularioCampoAresta({
 
 const introTextoEstilo: React.CSSProperties = {
   fontSize: 13,
-  color: "#475569",
+  color: "var(--texto-2)",
   lineHeight: 1.5,
   marginTop: 0,
   maxWidth: 680,
 };
 
 const cardEstilo: React.CSSProperties = {
-  border: "1px solid #e2e8f0",
+  border: "1px solid var(--borda)",
   borderRadius: 12,
   padding: 14,
-  background: "#fff",
+  background: "var(--painel)",
 };
 
 const tagOrigemEstilo: React.CSSProperties = {
@@ -447,9 +447,9 @@ const tagOrigemEstilo: React.CSSProperties = {
   flexShrink: 0,
 };
 
-const tagGlobalEstilo: React.CSSProperties = { background: "#e0e7ff", color: "#4338ca" };
-const tagTimeEstilo: React.CSSProperties = { background: "#dcfce7", color: "#15803d" };
-const tagPadraoEstilo: React.CSSProperties = { background: "#f1f5f9", color: "#64748b" };
+const tagGlobalEstilo: React.CSSProperties = { background: "rgba(99, 102, 241, 0.16)", color: "#a5b4fc" };
+const tagTimeEstilo: React.CSSProperties = { background: "rgba(62, 207, 142, 0.16)", color: "var(--verde)" };
+const tagPadraoEstilo: React.CSSProperties = { background: "var(--painel-alto)", color: "var(--texto-fraco)" };
 
 const botaoAdicionarEstilo: React.CSSProperties = {
   fontSize: 12,
@@ -466,8 +466,8 @@ const formularioEstilo: React.CSSProperties = {
   marginTop: 4,
   padding: 14,
   borderRadius: 10,
-  border: "1px solid #e2e8f0",
-  background: "#f8fafc",
+  border: "1px solid var(--borda)",
+  background: "var(--painel)",
   display: "flex",
   flexDirection: "column",
   gap: 4,
@@ -477,13 +477,13 @@ const formularioEstilo: React.CSSProperties = {
 const labelFormEstilo: React.CSSProperties = {
   fontSize: 11,
   fontWeight: 600,
-  color: "#334155",
+  color: "var(--texto-2)",
   marginTop: 8,
 };
 
 const captionFormEstilo: React.CSSProperties = {
   fontSize: 10.5,
-  color: "#94a3b8",
+  color: "var(--texto-mudo)",
   margin: "1px 0 3px",
   lineHeight: 1.4,
 };
@@ -492,7 +492,7 @@ const inputFormEstilo: React.CSSProperties = {
   fontSize: 13,
   padding: "6px 10px",
   borderRadius: 6,
-  border: "1px solid #cbd5e1",
+  border: "1px solid var(--borda-forte)",
   outline: "none",
   boxSizing: "border-box",
 };
@@ -511,15 +511,15 @@ const botaoCancelarEstilo: React.CSSProperties = {
   fontSize: 12,
   padding: "7px 12px",
   borderRadius: 7,
-  border: "1px solid #cbd5e1",
-  background: "#fff",
-  color: "#475569",
+  border: "1px solid var(--borda-forte)",
+  background: "var(--painel)",
+  color: "var(--texto-2)",
   cursor: "pointer",
 };
 
 const linkBotaoEstilo: React.CSSProperties = {
   fontSize: 11,
-  color: "#4f46e5",
+  color: "#a5b4fc",
   background: "none",
   border: "none",
   cursor: "pointer",

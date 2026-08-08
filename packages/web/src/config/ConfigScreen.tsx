@@ -79,7 +79,7 @@ export function ConfigScreen({
       style={{
         position: "fixed",
         inset: 0,
-        background: "#ffffff",
+        background: "var(--painel)",
         zIndex: 55,
         display: "flex",
         flexDirection: "column",
@@ -92,18 +92,18 @@ export function ConfigScreen({
           alignItems: "center",
           gap: 10,
           padding: "12px 16px",
-          borderBottom: "1px solid #e2e8f0",
+          borderBottom: "1px solid var(--borda)",
         }}
       >
         <strong style={{ fontSize: 14 }}>Configurações</strong>
-        <span style={{ fontSize: 12, color: "#64748b" }}>time ativo: {timeAtivo}</span>
+        <span style={{ fontSize: 12, color: "var(--texto-fraco)" }}>time ativo: {timeAtivo}</span>
         <div style={{ flex: 1 }} />
         <button onClick={onFechar} style={{ ...botaoEstilo, ...botaoPrimarioEstilo }}>
           Voltar ao canvas
         </button>
       </header>
 
-      <div style={{ display: "flex", gap: 4, padding: "12px 16px 0", borderBottom: "1px solid #e2e8f0" }}>
+      <div style={{ display: "flex", gap: 4, padding: "12px 16px 0", borderBottom: "1px solid var(--borda)" }}>
         <button onClick={() => setAba("perfis")} style={aba === "perfis" ? abaAtivaEstilo : abaEstilo}>
           Perfis de time ({Object.keys(perfisTime).length})
         </button>
@@ -170,8 +170,8 @@ const botaoEstilo: React.CSSProperties = {
   fontSize: 12,
   padding: "6px 10px",
   borderRadius: 6,
-  border: "1px solid #cbd5e1",
-  background: "#f8fafc",
+  border: "1px solid var(--borda-forte)",
+  background: "var(--painel)",
   cursor: "pointer",
   whiteSpace: "nowrap",
 };
@@ -190,12 +190,12 @@ const abaEstilo: React.CSSProperties = {
   border: "none",
   borderBottom: "2px solid transparent",
   background: "none",
-  color: "#64748b",
+  color: "var(--texto-fraco)",
   cursor: "pointer",
 };
 
 const abaAtivaEstilo: React.CSSProperties = {
   ...abaEstilo,
-  color: "#4f46e5",
+  color: "#a5b4fc",
   borderBottom: "2px solid #4f46e5",
 };

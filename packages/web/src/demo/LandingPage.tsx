@@ -14,7 +14,7 @@ export function LandingPage({ onEntrar }: LandingPageProps) {
   return (
     <div style={containerEstilo}>
       <header style={headerEstilo}>
-        <strong style={{ fontSize: 16, color: "#0f172a" }}>Gerador de Itens</strong>
+        <strong style={{ fontSize: 16, color: "var(--texto)" }}>Gerador de Itens</strong>
         <div style={{ flex: 1 }} />
         <button onClick={onEntrar} style={botaoEntrarEstilo}>
           Entrar
@@ -22,8 +22,8 @@ export function LandingPage({ onEntrar }: LandingPageProps) {
       </header>
 
       <div style={conteudoEstilo}>
-        <h1 style={{ fontSize: 24, color: "#0f172a", margin: "0 0 6px" }}>Do diagrama à especificação de solução, sem inventar nada</h1>
-        <p style={{ fontSize: 14, color: "#475569", lineHeight: 1.6, maxWidth: 640, marginBottom: 32 }}>
+        <h1 style={{ fontSize: 24, color: "var(--texto)", margin: "0 0 6px" }}>Do diagrama à especificação de solução, sem inventar nada</h1>
+        <p style={{ fontSize: 14, color: "var(--texto-2)", lineHeight: 1.6, maxWidth: 640, marginBottom: 32 }}>
           Não é um gerador de prompt de IA — é um mecanismo determinístico. O mesmo diagrama sempre produz os mesmos
           itens, com proveniência em cada campo e nada virando "pronto" sem alguém confirmar.
         </p>
@@ -38,7 +38,7 @@ export function LandingPage({ onEntrar }: LandingPageProps) {
 
 const containerEstilo: React.CSSProperties = {
   minHeight: "100vh",
-  background: "#f8fafc",
+  background: "var(--painel)",
   fontFamily: "system-ui, sans-serif",
 };
 
@@ -46,8 +46,8 @@ const headerEstilo: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   padding: "14px 24px",
-  borderBottom: "1px solid #e2e8f0",
-  background: "#fff",
+  borderBottom: "1px solid var(--borda)",
+  background: "var(--painel)",
 };
 
 const conteudoEstilo: React.CSSProperties = {

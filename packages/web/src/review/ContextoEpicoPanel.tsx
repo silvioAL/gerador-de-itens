@@ -80,7 +80,7 @@ export function ContextoEpicoPanel({ demandInfo, anexosContexto, onSalvar, onFec
         role="dialog"
         aria-label="Contexto do épico"
         style={{
-          background: "#ffffff",
+          background: "var(--painel)",
           borderRadius: 16,
           width: "min(640px, 100%)",
           maxHeight: "88vh",
@@ -91,9 +91,9 @@ export function ContextoEpicoPanel({ demandInfo, anexosContexto, onSalvar, onFec
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <header style={{ padding: "18px 24px", borderBottom: "1px solid #e2e8f0" }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>📎 Contexto do épico</div>
-          <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+        <header style={{ padding: "18px 24px", borderBottom: "1px solid var(--borda)" }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "var(--texto)" }}>📎 Contexto do épico</div>
+          <div style={{ fontSize: 12, color: "var(--texto-fraco)", marginTop: 2 }}>
             Cole o estado atual da história/épico e anexe material de apoio (texto) — alimenta a seção "Contexto" do
             documento exportado e a sugestão de IA real na aba Refinamento.
           </div>
@@ -110,7 +110,7 @@ export function ContextoEpicoPanel({ demandInfo, anexosContexto, onSalvar, onFec
               width: "100%",
               padding: "10px 12px",
               borderRadius: 8,
-              border: "1px solid #cbd5e1",
+              border: "1px solid var(--borda-forte)",
               fontSize: 13,
               fontFamily: "inherit",
               resize: "vertical",
@@ -124,8 +124,8 @@ export function ContextoEpicoPanel({ demandInfo, anexosContexto, onSalvar, onFec
                 display: "inline-block",
                 padding: "7px 14px",
                 borderRadius: 8,
-                border: "1px solid #cbd5e1",
-                background: "#f8fafc",
+                border: "1px solid var(--borda-forte)",
+                background: "var(--painel)",
                 fontSize: 12,
                 cursor: "pointer",
               }}
@@ -140,7 +140,7 @@ export function ContextoEpicoPanel({ demandInfo, anexosContexto, onSalvar, onFec
               />
             </label>
 
-            {erro && <p style={{ fontSize: 12, color: "#dc2626", marginTop: 8 }}>{erro}</p>}
+            {erro && <p style={{ fontSize: 12, color: "var(--vermelho)", marginTop: 8 }}>{erro}</p>}
 
             {anexos.length > 0 && (
               <ul style={{ listStyle: "none", padding: 0, margin: "10px 0 0", display: "flex", flexDirection: "column", gap: 6 }}>
@@ -152,7 +152,7 @@ export function ContextoEpicoPanel({ demandInfo, anexosContexto, onSalvar, onFec
                       alignItems: "center",
                       gap: 8,
                       fontSize: 12,
-                      background: "#f1f5f9",
+                      background: "var(--painel-alto)",
                       borderRadius: 6,
                       padding: "6px 10px",
                     }}
@@ -161,7 +161,7 @@ export function ContextoEpicoPanel({ demandInfo, anexosContexto, onSalvar, onFec
                     <button
                       onClick={() => removerAnexo(a.nome)}
                       aria-label={`Remover anexo ${a.nome}`}
-                      style={{ border: "none", background: "none", cursor: "pointer", color: "#dc2626", fontSize: 13 }}
+                      style={{ border: "none", background: "none", cursor: "pointer", color: "var(--vermelho)", fontSize: 13 }}
                     >
                       remover
                     </button>
@@ -172,16 +172,16 @@ export function ContextoEpicoPanel({ demandInfo, anexosContexto, onSalvar, onFec
           </div>
         </div>
 
-        <footer style={{ padding: "14px 24px", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "flex-end", gap: 8 }}>
+        <footer style={{ padding: "14px 24px", borderTop: "1px solid var(--borda)", display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <button
             onClick={onFechar}
-            style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", fontSize: 12, cursor: "pointer" }}
+            style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid var(--borda-forte)", background: "var(--painel)", fontSize: 12, cursor: "pointer" }}
           >
             Cancelar
           </button>
           <button
             onClick={salvar}
-            style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: "#0f172a", color: "#fff", fontSize: 12, cursor: "pointer" }}
+            style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: "var(--acento-indigo)", color: "#fff", fontSize: 12, cursor: "pointer" }}
           >
             Salvar
           </button>

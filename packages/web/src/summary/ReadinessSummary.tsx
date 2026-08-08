@@ -29,15 +29,15 @@ export function ReadinessSummary({ diagrama, config, onSelecionar }: ReadinessSu
         alignItems: "center",
         gap: 14,
         padding: "8px 16px",
-        borderBottom: "1px solid #e2e8f0",
-        background: "#ffffff",
+        borderBottom: "1px solid var(--borda)",
+        background: "var(--painel)",
         fontFamily: "system-ui, sans-serif",
         fontSize: 12,
       }}
     >
       <ContagemComLista rotulo="vermelho" itens={vermelhos} onSelecionar={onSelecionar} />
       <ContagemComLista rotulo="amarelo" itens={amarelos} onSelecionar={onSelecionar} />
-      <span style={{ color: "#15803d" }}>
+      <span style={{ color: "var(--verde)" }}>
         <ReadinessBadge nivel="verde" /> {verdes.length}
       </span>
       {pendentes.length > 0 && (
@@ -92,8 +92,8 @@ function ContagemComLista({
             top: "100%",
             left: 0,
             marginTop: 4,
-            background: "#ffffff",
-            border: "1px solid #e2e8f0",
+            background: "var(--painel)",
+            border: "1px solid var(--borda)",
             borderRadius: 8,
             boxShadow: "0 8px 20px rgba(15, 23, 42, 0.12)",
             zIndex: 30,
@@ -117,14 +117,14 @@ function ContagemComLista({
                 padding: "6px 10px",
                 background: "none",
                 border: "none",
-                borderBottom: "1px solid #f1f5f9",
+                borderBottom: "1px solid var(--borda)",
                 cursor: "pointer",
-                color: "#334155",
+                color: "var(--texto-2)",
               }}
             >
               <div style={{ fontWeight: 600 }}>{item.no.label}</div>
               {item.camposFaltando.length > 0 && (
-                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: "var(--texto-mudo)", marginTop: 2 }}>
                   {item.camposFaltando.slice(0, 3).join(", ")}
                   {item.camposFaltando.length > 3 && ` +${item.camposFaltando.length - 3}`}
                 </div>
@@ -142,9 +142,9 @@ const botaoProximoEstilo: React.CSSProperties = {
   fontWeight: 600,
   padding: "4px 10px",
   borderRadius: 999,
-  border: "1px solid #c7d2fe",
-  background: "#f5f5ff",
-  color: "#4f46e5",
+  border: "1px solid rgba(99, 102, 241, 0.45)",
+  background: "rgba(99, 102, 241, 0.14)",
+  color: "#a5b4fc",
   cursor: "pointer",
   whiteSpace: "nowrap",
 };
