@@ -1069,3 +1069,22 @@ Achado real de infra de teste (custou 3 iterações): **jsdom 25 não implementa
 Regressão: engine 145, web 187 (+9), cli 47, llm 11. Validação real com o Qwen3-4B: streaming visível campo a campo (texto crescendo entre duas medições), divisória mudando a altura do palco, pan/zoom/recentrar funcionando — detalhes na verificação do SPEC-24 §10.
 
 Próximo passo: o mesmo — validar `confirmacaoObrigatoria: false` ao vivo; Fase F ou o "roda de novo a partir da alteração".
+
+## 76. SPEC-24 (quinta rodada): lote por agente — a pergunta "os itens são gerados com chamadas individuais?" respondida com sim, e corrigida
+
+O usuário pediu pra rodar o graphify e explicar o pipeline, com a hipótese certa: "os itens são gerados com chamadas individuais ao modelo? acredito que sim, pois está muito lento". Era exatamente isso — **1 chamada por item por papel** (4×N: 13 itens = até 52 chamadas, cada uma pagando prompt+prefill inteiro de novo). A direção que ele deu virou o desenho: "passe todo material em uma chamada única para cada agente... com 20-30 itens rode em grupos de 5-10 com recuperação do contexto, depois o usuário pode revisar e arrumar individualmente".
+
+O que mudou (detalhe em SPEC-24 §6, quinta rodada):
+
+- **`/ia/pipeline/:papel` virou rota de LOTE**: recebe `{contextoEpico?, itens: [{chave, rotulo, contextoNo, placeholders}]}`, devolve JSON aninhado `{itemChave: {placeholderChave: valor}}` garantido por schema GBNF aninhado — continua streamando o texto cru (a grammar restringe O QUE sai, não impede streaming, achado da quarta rodada que aqui pagou de novo).
+- **`useEsteiraDeAgentes` fatia em `TAM_LOTE_ESTEIRA = 5`** — 5, não 10, porque a resposta do lote precisa caber na janela de saída do modelo local sem truncar (os campos longos do Especialista estouram fácil). Cada lote re-envia o prompt completo — a "recuperação do contexto" pedida. 4×⌈N/5⌉: 13 itens caem de 52 pra 12 chamadas. A revisão individual não muda: as respostas continuam aterrissando placeholder a placeholder via `onResponderItem`.
+- **Streaming aninhado**: `extrairRespostasParciaisAninhadas()` (mesmo mini-scanner, dois níveis fixos) alimenta `respostasAoVivoPorItem`; o item destacado (`atual`/auto-follow) é derivado da última chave de item aberta no JSON parcial — o destaque acompanha o item que o modelo está literalmente escrevendo dentro do lote; `escrevendoChaves` marca o lote inteiro nos pips/rail, e a faixa de agentes mostra "itens 1–5 de 13".
+
+Duas correções na mesma rodada, ambas achados reais do usuário:
+
+- **Confirmar sem ação**: o handler lia só o rascunho digitado — resposta vinda da esteira sem edição era `undefined` e o clique era um no-op silencioso, com botão habilitado (o textarea usava o fallback pra `p.resposta.valor`; o handler, não). Mesmo fallback no handler + teste de regressão do cenário exato.
+- **Animações rodando com a aplicação encerrada**: pulso/cometa/fluxo eram chaveados só em `noAtivoId`, que tem fallback pro item selecionado — a tela "trabalhava" pra sempre. `DiagramaCompacto` ganhou `animado` (= `esteira.rodando`); parado, o nó selecionado mantém só o destaque estático.
+
+Regressão: engine 145, llm 11, cli 47 (rota de lote coberta por 5 testes reescritos, incluindo "recebe um LOTE numa chamada só"), web 190 (hook reescrito pro formato aninhado + testes novos de lote/Confirmar/animado). Validação real com Qwen3-4B contra `gerador open` — ver SPEC-24 §10.
+
+Próximo passo: os mesmos pendentes — validar `confirmacaoObrigatoria: false` ao vivo; Fase F (configurabilidade) ou o "roda de novo o ciclo a partir da alteração" (precisa de rastreio de dependência entre papéis, registrado e não implementado).

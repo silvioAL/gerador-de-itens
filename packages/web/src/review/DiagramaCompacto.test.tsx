@@ -91,13 +91,20 @@ describe("DiagramaCompacto (Fase 1d, SPEC-23)", () => {
   });
 
   it("aresta que toca o nó ativo ganha um cometa; as demais, não (Fase E, SPEC-24)", () => {
-    // e1 liga n1→n2, então com n2 ativo ela recebe o cometa.
-    const { rerender } = render(<DiagramaCompacto diagrama={diagrama} config={config} noAtivoId="n2" />);
+    // e1 liga n1→n2, então com n2 ativo E a esteira rodando ela recebe o cometa.
+    const { rerender } = render(<DiagramaCompacto diagrama={diagrama} config={config} noAtivoId="n2" animado />);
     expect(screen.getByTestId("diagrama-cometa-e1")).toBeInTheDocument();
 
     // Sem nó ativo nenhum, nenhuma aresta anima — o diagrama fica em repouso.
-    rerender(<DiagramaCompacto diagrama={diagrama} config={config} />);
+    rerender(<DiagramaCompacto diagrama={diagrama} config={config} animado />);
     expect(screen.queryByTestId("diagrama-cometa-e1")).not.toBeInTheDocument();
+  });
+
+  it("esteira parada: nó selecionado mantém o destaque estático, mas SEM cometa nem pulso — achado real: 'encerro a aplicação e as animações seguem rodando'", () => {
+    render(<DiagramaCompacto diagrama={diagrama} config={config} noAtivoId="n2" />);
+    expect(screen.queryByTestId("diagrama-cometa-e1")).not.toBeInTheDocument();
+    const noAtivo = screen.getByTestId("diagrama-compacto-no-n2").querySelector("rect");
+    expect(noAtivo).not.toHaveClass("diagrama-no-ativo");
   });
 
   it("arrastar o fundo faz pan (viewBox muda) e duplo clique volta ao enquadramento automático (Fase E)", () => {

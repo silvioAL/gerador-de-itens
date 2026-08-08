@@ -493,6 +493,45 @@ describe("ReviewScreen — abas da ficha (Fase 1d-i, SPEC-23 — dado estruturad
     );
   });
 
+  it("achado real: Confirmar funciona SEM digitar nada, confirmando a resposta sugerida pela esteira", async () => {
+    const resultado = resultadoFixture01();
+    const atividade = atividadeComPlaceholder(resultado);
+    const onResponderItem = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        regras={regras}
+        especificacaoTemplate={templateFixture}
+        respostasItens={{
+          [atividade.chave]: {
+            // Resposta que a esteira gravou: sugerida, ainda NÃO confirmada —
+            // o textarea mostra ela como fallback, e o Confirmar precisa
+            // enxergar o MESMO fallback (o bug era ler só o rascunho digitado
+            // e virar um no-op silencioso).
+            "Backend::DLQ configurada e monitorada": { valor: "sim, via DLQ dedicada", origem: "sugerido", confirmado: false },
+          },
+        }}
+        onResponderItem={onResponderItem}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    await selecionarEIrPraAba(user, atividade.chave, "Refinamento");
+    const linhaDlq = screen.getByTestId(`placeholder-Backend::DLQ configurada e monitorada`);
+    await user.click(within(linhaDlq).getByRole("button", { name: "Confirmar" }));
+
+    expect(onResponderItem).toHaveBeenCalledWith(
+      atividade.chave,
+      "Backend::DLQ configurada e monitorada",
+      { valor: "sim, via DLQ dedicada", origem: "manual" }
+    );
+  });
+
   it("achado real: resposta já confirmada aparece como texto fixo, sem campo de edição nem botão Sugerir", async () => {
     const resultado = resultadoFixture01();
     const atividade = atividadeComPlaceholder(resultado);
@@ -598,7 +637,9 @@ describe("ReviewScreen — esteira de agentes (SPEC-24 — orquestração real p
       />
     );
 
-    expect(await screen.findByText(/item 1 de \d+/)).toBeInTheDocument();
+    // 6 atividades com trabalho pro PO, lote de 5 → o primeiro lote mostra o
+    // intervalo, não um item só.
+    expect(await screen.findByText(/itens 1–\d+ de \d+/)).toBeInTheDocument();
     expect(await screen.findByTestId("handoff-po")).toHaveAttribute("aria-current", "step");
     // Segue o item automaticamente pra aba Refinamento, sem clique nenhum do usuário
     // (o auto-follow reage num efeito separado, após o commit que liga a
@@ -643,7 +684,11 @@ describe("ReviewScreen — esteira de agentes (SPEC-24 — orquestração real p
     await screen.findByTestId("handoff-po");
     await waitFor(() => expect(apiIaSugerirPipelineMock).toHaveBeenCalled());
 
-    act(() => emitir('{"_historiaUsuario": "Como parceiro integrado, quero enviar'));
+    // O stream agora é o JSON ANINHADO do lote (item → chave → valor) — o
+    // texto exibido tem que ser o do item que o auto-follow selecionou (o
+    // primeiro do lote).
+    const primeiraChave = apiIaSugerirPipelineMock.mock.calls[0][1].itens[0].chave as string;
+    act(() => emitir(`{"${primeiraChave}": {"_historiaUsuario": "Como parceiro integrado, quero enviar`));
     expect(await screen.findByTestId("ao-vivo-_historiaUsuario")).toHaveTextContent(
       "Como parceiro integrado, quero enviar"
     );
@@ -682,8 +727,8 @@ describe("ReviewScreen — esteira de agentes (SPEC-24 — orquestração real p
   it("confirmacaoObrigatoria: false (config carregada) aplica as respostas direto, confirmado: true — SPEC-24 Fase E, achado real do usuário", async () => {
     apiIaStatusMock.mockResolvedValueOnce({ chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "" });
     apiPipelineAgentesObterMock.mockResolvedValueOnce({ confirmacaoObrigatoria: false });
-    apiIaSugerirPipelineMock.mockImplementation(async (_papel: string, pedido: { placeholders: { chave: string }[] }) =>
-      Object.fromEntries(pedido.placeholders.map((p) => [p.chave, "resposta gerada"]))
+    apiIaSugerirPipelineMock.mockImplementation(async (_papel: string, pedido: { itens: { chave: string; placeholders: { chave: string }[] }[] }) =>
+      Object.fromEntries(pedido.itens.map((i) => [i.chave, Object.fromEntries(i.placeholders.map((p) => [p.chave, "resposta gerada"]))]))
     );
     const resultado = resultadoFixture01();
     const onResponderItem = vi.fn();
@@ -727,7 +772,7 @@ describe("ReviewScreen — esteira de agentes (SPEC-24 — orquestração real p
     );
 
     await waitFor(() => expect(apiIaStatusMock).toHaveBeenCalled());
-    expect(screen.queryByText(/item \d+ de/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/ite(m|ns) \d+/)).not.toBeInTheDocument();
     expect(apiIaSugerirPipelineMock).not.toHaveBeenCalled();
   });
 

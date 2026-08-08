@@ -36,17 +36,24 @@ const completarMock = vi.fn(async (_prompt: string, opcoes?: { onTexto?: (p: str
 // (texto livre): mock devolve um valor por chave recebida no schema, pra
 // simular o comportamento real de "resposta sempre bate com o schema
 // pedido" sem depender do binário nativo em CI. Desde a Fase E a rota
-// STREAMA o texto cru do JSON restrito — o mock emite o mesmo JSON em dois
-// pedaços via onTexto (como o motor real faria token a token), e o corpo
+// STREAMA o texto cru do JSON restrito, e o schema é ANINHADO (um objeto
+// por item do lote) — o mock espelha os dois níveis e emite o JSON em dois
+// pedaços via onTexto (como o motor real faria token a token); o corpo
 // acumulado é o que o cliente parseia.
 const completarComSchemaMock = vi.fn(
   async (
     _prompt: string,
-    schema: { properties?: Record<string, unknown> },
+    schema: { properties?: Record<string, { properties?: Record<string, unknown> }> },
     opcoes?: { onTexto?: (pedaco: string) => void }
   ) => {
-    const chaves = Object.keys(schema.properties ?? {});
-    const resultado = Object.fromEntries(chaves.map((chave) => [chave, `resposta gerada pra ${chave}`]));
+    const resultado = Object.fromEntries(
+      Object.entries(schema.properties ?? {}).map(([chaveItem, sub]) => [
+        chaveItem,
+        Object.fromEntries(
+          Object.keys(sub.properties ?? {}).map((chave) => [chave, `resposta gerada pra ${chaveItem}/${chave}`])
+        ),
+      ])
+    );
     const texto = JSON.stringify(resultado);
     opcoes?.onTexto?.(texto.slice(0, 10));
     await new Promise((r) => setTimeout(r, 5));
@@ -246,27 +253,32 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     const resposta = await fetch(`${base}/ia/pipeline/po`, {
       method: "POST",
       body: JSON.stringify({
-        atividadeRotulo: "x",
-        contextoNo: "",
-        placeholders: [{ chave: "_historiaUsuario", tech: "", rotulo: "História de usuário" }],
+        itens: [
+          {
+            chave: "n1::setup",
+            rotulo: "x",
+            contextoNo: "",
+            placeholders: [{ chave: "_historiaUsuario", tech: "", rotulo: "História de usuário" }],
+          },
+        ],
       }),
     });
     expect(resposta.status).toBe(503);
     expect(carregarModeloChatMock).not.toHaveBeenCalled();
   });
 
-  it("POST /ia/pipeline/:papel sem placeholders devolve 400 (SPEC-24 Fase B)", async () => {
+  it("POST /ia/pipeline/:papel sem nenhum item com placeholder devolve 400 (SPEC-24 Fase B)", async () => {
     verificarStatusMock.mockResolvedValue({
       chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
     });
     const resposta = await fetch(`${base}/ia/pipeline/po`, {
       method: "POST",
-      body: JSON.stringify({ atividadeRotulo: "x", contextoNo: "", placeholders: [] }),
+      body: JSON.stringify({ itens: [{ chave: "n1::setup", rotulo: "x", contextoNo: "", placeholders: [] }] }),
     });
     expect(resposta.status).toBe(400);
   });
 
-  it("POST /ia/pipeline/po usa o preâmbulo do PO, monta schema dinâmico e devolve Record<chave,string> (SPEC-24 Fase B)", async () => {
+  it("POST /ia/pipeline/po recebe um LOTE de itens numa chamada só, com schema aninhado por item (SPEC-24 Fase E — achado real: chamada por item era lento demais)", async () => {
     verificarStatusMock.mockResolvedValue({
       chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
     });
@@ -274,27 +286,52 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     const resposta = await fetch(`${base}/ia/pipeline/po`, {
       method: "POST",
       body: JSON.stringify({
-        atividadeRotulo: "srv-checkout publica em fila-pedidos",
-        contextoNo: "fila rabbitmq",
         contextoEpico: "Épico: reduzir tempo de aprovação de crédito de 3 dias pra 1 hora.",
-        placeholders: [
-          { chave: "_historiaUsuario", tech: "", rotulo: "História de usuário" },
-          { chave: "_criteriosAceite", tech: "", rotulo: "Critérios de aceite" },
+        itens: [
+          {
+            chave: "n1::setup",
+            rotulo: "srv-checkout publica em fila-pedidos",
+            contextoNo: "fila rabbitmq",
+            placeholders: [
+              { chave: "_historiaUsuario", tech: "", rotulo: "História de usuário" },
+              { chave: "_criteriosAceite", tech: "", rotulo: "Critérios de aceite" },
+            ],
+          },
+          {
+            chave: "n2::criacao",
+            rotulo: "criar fila-pedidos",
+            contextoNo: "",
+            placeholders: [{ chave: "_historiaUsuario", tech: "", rotulo: "História de usuário" }],
+          },
         ],
       }),
     });
 
     expect(resposta.status).toBe(200);
+    // Resposta aninhada: um objeto por item do lote — e UMA chamada só ao
+    // modelo pros dois itens.
     expect(await resposta.json()).toEqual({
-      _historiaUsuario: "resposta gerada pra _historiaUsuario",
-      _criteriosAceite: "resposta gerada pra _criteriosAceite",
+      "n1::setup": {
+        _historiaUsuario: "resposta gerada pra n1::setup/_historiaUsuario",
+        _criteriosAceite: "resposta gerada pra n1::setup/_criteriosAceite",
+      },
+      "n2::criacao": { _historiaUsuario: "resposta gerada pra n2::criacao/_historiaUsuario" },
     });
+    expect(completarComSchemaMock).toHaveBeenCalledTimes(1);
 
-    const [prompt, schema] = completarComSchemaMock.mock.calls.at(-1) as [string, { properties: Record<string, unknown>; required: string[] }];
+    const [prompt] = completarComSchemaMock.mock.calls.at(-1) as [string];
     expect(prompt).toContain("Product Owner");
     expect(prompt).toContain("Épico: reduzir tempo de aprovação de crédito de 3 dias pra 1 hora.");
     expect(prompt).toContain("srv-checkout publica em fila-pedidos");
-    expect(Object.keys(schema.properties)).toEqual(["_historiaUsuario", "_criteriosAceite"]);
+    expect(prompt).toContain("criar fila-pedidos");
+    expect(prompt).toContain("LOTE de 2 item(ns)");
+
+    const [, schema] = completarComSchemaMock.mock.calls.at(-1) as [
+      string,
+      { properties: Record<string, { properties: Record<string, unknown> }> },
+    ];
+    expect(Object.keys(schema.properties)).toEqual(["n1::setup", "n2::criacao"]);
+    expect(Object.keys(schema.properties["n1::setup"].properties)).toEqual(["_historiaUsuario", "_criteriosAceite"]);
   });
 
   it("POST /ia/pipeline/arquiteto usa o preâmbulo do Arquiteto — prompt diferente do PO pro mesmo item (SPEC-24 Fase B)", async () => {
@@ -305,9 +342,14 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     await fetch(`${base}/ia/pipeline/arquiteto`, {
       method: "POST",
       body: JSON.stringify({
-        atividadeRotulo: "srv-checkout publica em fila-pedidos",
-        contextoNo: "fila rabbitmq",
-        placeholders: [{ chave: "_contratoRequest", tech: "", rotulo: "Request" }],
+        itens: [
+          {
+            chave: "e1::publish",
+            rotulo: "srv-checkout publica em fila-pedidos",
+            contextoNo: "fila rabbitmq",
+            placeholders: [{ chave: "_contratoRequest", tech: "", rotulo: "Request" }],
+          },
+        ],
       }),
     });
 
@@ -324,9 +366,14 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     const resposta = await fetch(`${base}/ia/pipeline/agente-custom`, {
       method: "POST",
       body: JSON.stringify({
-        atividadeRotulo: "x",
-        contextoNo: "",
-        placeholders: [{ chave: "_historiaUsuario", tech: "", rotulo: "História de usuário" }],
+        itens: [
+          {
+            chave: "n1::setup",
+            rotulo: "x",
+            contextoNo: "",
+            placeholders: [{ chave: "_historiaUsuario", tech: "", rotulo: "História de usuário" }],
+          },
+        ],
       }),
     });
     expect(resposta.status).toBe(200);
