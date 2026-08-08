@@ -47,6 +47,16 @@ describe("DiagramaCompacto (Fase 1d, SPEC-23)", () => {
     expect(onClickNo).toHaveBeenCalledWith("n1");
   });
 
+  it("aresta que toca o nó ativo ganha um cometa; as demais, não (Fase E, SPEC-24)", () => {
+    // e1 liga n1→n2, então com n2 ativo ela recebe o cometa.
+    const { rerender } = render(<DiagramaCompacto diagrama={diagrama} config={config} noAtivoId="n2" />);
+    expect(screen.getByTestId("diagrama-cometa-e1")).toBeInTheDocument();
+
+    // Sem nó ativo nenhum, nenhuma aresta anima — o diagrama fica em repouso.
+    rerender(<DiagramaCompacto diagrama={diagrama} config={config} />);
+    expect(screen.queryByTestId("diagrama-cometa-e1")).not.toBeInTheDocument();
+  });
+
   it("com filtro ativo, o nó filtrado fica opaco e os demais esmaecidos (Fase D, SPEC-24)", () => {
     render(<DiagramaCompacto diagrama={diagrama} config={config} noFiltradoId="n1" />);
     expect(screen.getByTestId("diagrama-compacto-no-n1")).toHaveAttribute("opacity", "1");

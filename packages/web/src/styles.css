@@ -92,6 +92,23 @@ button {
   animation: diagrama-aresta-fluxo 550ms linear infinite;
 }
 
+/* Cometa que percorre a conexão do nó de origem ao de destino. Depende de
+   `pathLength="100"` no elemento: com isso o traço vira porcentagem do
+   comprimento, e a mesma animação serve pra arestas curtas e longas sem
+   ajuste por caso. */
+@keyframes diagrama-cometa {
+  from {
+    stroke-dashoffset: 112;
+  }
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+.diagrama-cometa {
+  stroke-dasharray: 12 100;
+  animation: diagrama-cometa 1.5s linear infinite;
+}
+
 @keyframes pip-pulso {
   50% {
     opacity: 0.35;
@@ -99,4 +116,92 @@ button {
 }
 .pip-pulsando {
   animation: pip-pulso 900ms ease-in-out infinite;
+}
+
+/* Scrollbar da lista de itens — a nativa do Windows (larga, clara) destoava
+   demais do tema escuro (achado real do usuário comparando com o protótipo). */
+.review-lista {
+  scrollbar-width: thin;
+  scrollbar-color: #263344 transparent;
+}
+.review-lista::-webkit-scrollbar {
+  width: 9px;
+}
+.review-lista::-webkit-scrollbar-track {
+  background: transparent;
+}
+.review-lista::-webkit-scrollbar-thumb {
+  background: #263344;
+  border-radius: 9px;
+  /* Borda da cor do fundo "afina" o polegar sem encolher a área de clique. */
+  border: 3px solid #0c111a;
+}
+.review-lista::-webkit-scrollbar-thumb:hover {
+  background: #5c6a7e;
+}
+
+/* Timeline vertical à esquerda dos cards (achado real: "timeline que vai
+   sendo gerada à esquerda dos cards dos itens"). A linha é do trilho; o
+   brilho que cresce é o progresso real da esteira. */
+.review-rail {
+  position: relative;
+  padding-left: 20px;
+}
+.review-rail::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, #1b2533 8%, #1b2533 92%, transparent);
+}
+.review-rail-progresso {
+  position: absolute;
+  left: 2px;
+  top: 0;
+  width: 1px;
+  background: linear-gradient(180deg, #0ea5e9, #38bdf8);
+  box-shadow: 0 0 8px #38bdf8;
+  transition: height 500ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* Cada card ganha o "galho" horizontal e o ponto sobre a linha. */
+.review-item-rail {
+  position: relative;
+}
+.review-item-rail::before {
+  content: "";
+  position: absolute;
+  left: -14px;
+  top: 20px;
+  width: 10px;
+  height: 1px;
+  background: #1b2533;
+}
+.review-item-rail::after {
+  content: "";
+  position: absolute;
+  left: -21px;
+  top: 17px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #0c111a;
+  border: 1px solid #263344;
+  transition: background 250ms ease, border-color 250ms ease, box-shadow 250ms ease;
+}
+.review-item-rail-sel::after {
+  background: #38bdf8;
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+}
+.review-item-rail-escrevendo::after {
+  background: #38bdf8;
+  border-color: #38bdf8;
+  animation: pip-pulso 1s ease-in-out infinite;
+}
+.review-item-rail-refinado::after {
+  background: #3ecf8e;
+  border-color: #3ecf8e;
 }

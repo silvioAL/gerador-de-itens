@@ -16,6 +16,7 @@ import {
 import { apiIa, apiPipelineAgentes, type EspecificacaoTemplate, type PapelPipeline, type PlaceholderPedidoItemIa } from "../api/client";
 import { baixarArquivoTexto } from "../persistence/baixarArquivo";
 import { DiagramaCompacto } from "./DiagramaCompacto";
+import { EsteiraAgentes } from "./EsteiraAgentes";
 import { PAPEIS_PIPELINE, ROTULO_PAPEL, useEsteiraDeAgentes, type ItemFilaEsteira } from "./useEsteiraDeAgentes";
 
 export interface ReviewScreenProps {
@@ -347,60 +348,25 @@ export function ReviewScreen({
   const atividadeSelecionada = selecionada ? resultado.atividades.find((a) => a.chave === selecionada) : undefined;
   const fichaSelecionada = selecionada ? fichas.get(selecionada) : undefined;
 
+  // Altura do brilho da timeline: fração de itens que já saíram do rascunho
+  // (ou seja, algum papel já escreveu algo neles). Derivado do mesmo
+  // `statusDoItem` da lista — sem estado paralelo de "progresso visual" que
+  // pudesse divergir do que os cards mostram.
+  const tocados = atividadesFiltradas.filter((a) => statusDoItem(fichas.get(a.chave)!) !== "rascunho").length;
+  const pctTimeline = atividadesFiltradas.length > 0 ? (tocados / atividadesFiltradas.length) * 100 : 0;
+
   return (
     <div style={telaEstilo}>
       <header style={headerEstilo}>
         <strong style={{ fontSize: 14 }}>Revisão da quebra</strong>
-        {esteira.rodando && esteira.atual && esteira.papelAtual ? (
-          <div style={faseBarraEstilo} role="status" aria-live="polite">
-            <div style={handoffEstilo}>
-              {PAPEIS_PIPELINE.map((papel, i) => {
-                const indicePapel = PAPEIS_PIPELINE.indexOf(papel);
-                const indiceAtual = PAPEIS_PIPELINE.indexOf(esteira.papelAtual!);
-                const feito = indicePapel < indiceAtual;
-                const ativo = papel === esteira.papelAtual;
-                return (
-                  <span key={papel} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                    {i > 0 && (
-                      <span style={hopEstilo}>
-                        →
-                        {/* `key={indiceAtual}` remonta o token a cada handoff, retriggerando
-                            a animação CSS — só aparece na seta que acabou de ser cruzada. */}
-                        {ativo && (
-                          <span key={indiceAtual} className="handoff-hop-token" style={hopTokenEstilo}>
-                            {esteira.atual!.atividadeRotulo}
-                          </span>
-                        )}
-                      </span>
-                    )}
-                    <span
-                      data-testid={`handoff-${papel}`}
-                      aria-current={ativo ? "step" : undefined}
-                      style={{ display: "flex", alignItems: "center", gap: 5 }}
-                    >
-                      <span
-                        className={ativo ? "handoff-tick-ativo" : undefined}
-                        style={feito ? handoffTickFeitoEstilo : ativo ? handoffTickAtivoEstilo : handoffTickPendenteEstilo}
-                      >
-                        {feito ? "✓" : i + 1}
-                      </span>
-                      <span style={ativo ? handoffPapelAtivoEstilo : handoffPapelEstilo}>{ROTULO_PAPEL[papel]}</span>
-                    </span>
-                  </span>
-                );
-              })}
-            </div>
-            <span style={{ fontSize: 12 }}>
-              {`${esteira.pausado ? "Pausado — " : ""}item ${esteira.progresso.feito + 1} de ${esteira.progresso.total} · ${esteira.atual.atividadeRotulo}`}
-            </span>
-            <div style={progressoTrilhoEstilo}>
-              <div
-                style={{
-                  ...progressoBarraEstilo,
-                  width: `${(esteira.progresso.feito / Math.max(1, esteira.progresso.total)) * 100}%`,
-                }}
-              />
-            </div>
+        {esteira.rodando ? (
+          <div style={progressoTrilhoEstilo}>
+            <div
+              style={{
+                ...progressoBarraEstilo,
+                width: `${(esteira.progresso.feito / Math.max(1, esteira.progresso.total)) * 100}%`,
+              }}
+            />
           </div>
         ) : (
           <span data-testid="contagem-itens" style={{ fontSize: 12, color: "var(--dim, #8D9BB0)" }}>
@@ -417,7 +383,7 @@ export function ReviewScreen({
           </span>
         )}
         {contagens && (
-          <div role="status" aria-live="polite" style={contadoresEstilo}>
+          <div data-testid="contadores" role="status" aria-live="polite" style={contadoresEstilo}>
             {(Object.keys(contagens) as StatusItem[]).map((s) => (
               <span key={s} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11 }}>
                 <i style={{ width: 6, height: 6, borderRadius: "50%", background: CORES_STATUS[s], display: "inline-block" }} />
@@ -461,6 +427,18 @@ export function ReviewScreen({
         </button>
       </header>
 
+      {!mostrarDiagrama && (
+        <EsteiraAgentes
+          papelAtual={esteira.rodando ? esteira.papelAtual : null}
+          atividadeAtual={
+            esteira.rodando && esteira.atual
+              ? `item ${esteira.progresso.feito + 1} de ${esteira.progresso.total} · ${esteira.atual.atividadeRotulo}`
+              : undefined
+          }
+          pausado={esteira.pausado}
+        />
+      )}
+
       {mostrarDiagrama ? (
         <iframe title="Diagrama animado da solução" srcDoc={diagramaHtml} style={{ flex: 1, border: "none" }} />
       ) : (
@@ -479,7 +457,7 @@ export function ReviewScreen({
             onClickNo={clicarNoDiagrama}
           />
           <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-          <section data-tour="review-table" style={listaEstilo}>
+          <section data-tour="review-table" className="review-lista" style={listaEstilo}>
             {(resultado.ciclos.length > 0 || resultado.conflitos.length > 0) && (
               <div style={avisoEstilo}>
                 <strong style={{ fontSize: 12 }}>
@@ -529,18 +507,29 @@ export function ReviewScreen({
               </div>
             )}
 
+            <div className="review-rail" style={railEstilo}>
+              <div className="review-rail-progresso" style={{ height: `${pctTimeline}%` }} />
             {atividadesFiltradas.map((a) => {
               const ficha = fichas.get(a.chave)!;
               const status = statusDoItem(ficha);
               const cruzaOutroTime = outrosTimes(a).length > 0;
               const sel = a.chave === selecionada;
               const porPapel = placeholdersPorPapel(ficha);
+              const escrevendo = esteira.rodando && esteira.atual?.atividadeChave === a.chave;
               return (
                 <button
                   key={a.chave}
                   data-testid={`item-${a.chave}`}
                   onClick={() => selecionar(a.chave)}
                   aria-pressed={sel}
+                  className={[
+                    "review-item-rail",
+                    escrevendo ? "review-item-rail-escrevendo" : "",
+                    status === "refinado" ? "review-item-rail-refinado" : "",
+                    sel ? "review-item-rail-sel" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                   style={{ ...itemRailEstilo, ...(sel ? itemRailSelEstilo : {}), ...(cruzaOutroTime ? { borderColor: "#e8b339" } : {}) }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -580,6 +569,7 @@ export function ReviewScreen({
                 </button>
               );
             })}
+            </div>
           </section>
 
           <section style={fichaWrapEstilo}>
@@ -915,15 +905,13 @@ const contadoresEstilo: React.CSSProperties = {
   padding: "4px 10px",
 };
 
-const faseBarraEstilo: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 4,
-  minWidth: 220,
-};
-
+// Trilho fino de progresso no header (mesma ideia do `.track` do protótipo):
+// o detalhe de QUEM está trabalhando mora na faixa de agentes logo abaixo
+// (`EsteiraAgentes`), aqui fica só o avanço bruto.
 const progressoTrilhoEstilo: React.CSSProperties = {
-  height: 4,
+  flex: 1,
+  maxWidth: 320,
+  height: 3,
   borderRadius: 2,
   background: "#1B2533",
   overflow: "hidden",
@@ -939,83 +927,6 @@ const seguindoBadgeEstilo: React.CSSProperties = {
   fontSize: 10.5,
   color: "#38bdf8",
   fontWeight: 600,
-};
-
-// SPEC-24 — handoff visual entre os 4 papéis da esteira (PO→Arquiteto→
-// Especialista técnico→QA): o papel atual fica destacado, os demais em
-// tom apagado, uma seta entre cada um — comunica visualmente que a esteira
-// avança papel a papel, não item a item (achado real do usuário: sem isso,
-// "não tem os mesmos feedback visuais do protótipo").
-const handoffEstilo: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 6,
-  fontSize: 10.5,
-};
-
-// Seta entre dois agentes + posição relativa pro token de handoff que
-// desliza sobre ela (Fase E — "faltava o feedback visual de onde os
-// agentes estão trabalhando, com efeitos de alternância").
-const hopEstilo: React.CSSProperties = {
-  position: "relative",
-  color: "#5C6A7E",
-};
-
-const hopTokenEstilo: React.CSSProperties = {
-  position: "absolute",
-  top: -14,
-  left: "50%",
-  transform: "translateX(-50%)",
-  whiteSpace: "nowrap",
-  fontSize: 9,
-  color: "#38bdf8",
-  background: "#101823",
-  border: "1px solid #263344",
-  borderRadius: 20,
-  padding: "1px 6px",
-  maxWidth: 120,
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-};
-
-const handoffTickBaseEstilo: React.CSSProperties = {
-  width: 15,
-  height: 15,
-  borderRadius: "50%",
-  display: "grid",
-  placeItems: "center",
-  fontSize: 9,
-  fontWeight: 700,
-  flexShrink: 0,
-};
-
-const handoffTickPendenteEstilo: React.CSSProperties = {
-  ...handoffTickBaseEstilo,
-  border: "1px solid #263344",
-  color: "#5C6A7E",
-};
-
-const handoffTickAtivoEstilo: React.CSSProperties = {
-  ...handoffTickBaseEstilo,
-  border: "1.5px solid #38bdf8",
-  borderTopColor: "transparent",
-  color: "#38bdf8",
-};
-
-const handoffTickFeitoEstilo: React.CSSProperties = {
-  ...handoffTickBaseEstilo,
-  border: "1px solid #3ecf8e",
-  background: "rgba(62, 207, 142, 0.16)",
-  color: "#3ecf8e",
-};
-
-const handoffPapelEstilo: React.CSSProperties = {
-  color: "#5C6A7E",
-};
-
-const handoffPapelAtivoEstilo: React.CSSProperties = {
-  color: "#38bdf8",
-  fontWeight: 700,
 };
 
 const pipEstilo: React.CSSProperties = {
@@ -1037,6 +948,12 @@ const listaEstilo: React.CSSProperties = {
   borderRight: "1px solid #1B2533",
   overflowY: "auto",
   padding: 12,
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+};
+
+const railEstilo: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 8,
