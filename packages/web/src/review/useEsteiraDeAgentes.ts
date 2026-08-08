@@ -13,6 +13,16 @@ export const ROTULO_PAPEL: Record<PapelPipeline, string> = {
   qa: "QA",
 };
 
+/** O que cada papel faz — subtítulo na faixa de agentes enquanto ele ainda
+ * não começou. Enquanto está ativo, o subtítulo vira o item em processamento
+ * (quem renderiza decide, ver `EsteiraAgentes`). */
+export const DESCRICAO_PAPEL: Record<PapelPipeline, string> = {
+  po: "Escreve a história e os critérios de aceite",
+  arquiteto: "Amarra o item ao nó e escreve o contrato",
+  especialista: "Aplica a tabela de regras do contexto",
+  qa: "Deriva as regras de teste e escreve os cenários",
+};
+
 /** Um item da fila carrega os placeholders JÁ separados por papel — quem
  * monta isso (`ReviewScreen.montarFilaEsteira`) decide, a partir da ficha,
  * quais chaves pertencem a qual papel (história/critérios → PO, contrato →

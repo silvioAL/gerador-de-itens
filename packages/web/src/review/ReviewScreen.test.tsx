@@ -86,8 +86,11 @@ describe("ReviewScreen — fixture 01 (sem ciclos/conflitos)", () => {
       />
     );
 
+    // Pelo card (testid), não por texto: os rótulos são sequenciais ("01",
+    // "02"…) e a faixa de agentes também numera os papéis com "01".."04" —
+    // `getByText("01")` casaria os dois.
     for (const a of resultado.atividades) {
-      expect(screen.getByText(a.rotulo)).toBeInTheDocument();
+      expect(screen.getByTestId(`item-${a.chave}`)).toHaveTextContent(a.rotulo);
     }
     expect(screen.queryByText(/Ciclo:/)).not.toBeInTheDocument();
   });
@@ -830,7 +833,10 @@ describe("ReviewScreen — contadores de status (rascunho/revisar/refinado)", ()
       />
     );
 
-    const status = screen.getByRole("status");
+    // `getByTestId`, não `getByRole("status")`: a faixa de agentes também é
+    // uma região `status` (anuncia qual papel está trabalhando), então o role
+    // sozinho virou ambíguo — mesma armadilha do `contagem-itens`.
+    const status = screen.getByTestId("contadores");
     expect(within(status).getByText(`${resultado.atividades.length} rascunho`)).toBeInTheDocument();
     expect(within(status).getByText("0 refinado")).toBeInTheDocument();
   });
@@ -956,7 +962,7 @@ describe("ReviewScreen — diagrama animado (SPEC-21)", () => {
     await user.click(screen.getByRole("button", { name: "🔍 Ver diagrama completo" }));
     await user.click(screen.getByRole("button", { name: "Voltar à lista" }));
 
-    expect(screen.getByText(resultado.atividades[0].rotulo)).toBeInTheDocument();
+    expect(screen.getByTestId(`item-${resultado.atividades[0].chave}`)).toBeInTheDocument();
     expect(screen.queryByTitle("Diagrama animado da solução")).not.toBeInTheDocument();
   });
 });

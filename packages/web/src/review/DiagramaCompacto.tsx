@@ -71,17 +71,32 @@ export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, on
         // protótipo) — puramente visual, não muda o mecanismo por trás.
         const tocaAtivo = !!noAtivoId && (e.source === noAtivoId || e.target === noAtivoId);
         return (
-          <line
-            key={e.id}
-            x1={p1.x}
-            y1={p1.y}
-            x2={p2.x}
-            y2={p2.y}
-            stroke={tocaAtivo ? "#38bdf8" : e.cor}
-            strokeWidth={tocaAtivo ? 2.2 : 1.4}
-            opacity={tocaAtivo ? 0.95 : 0.6}
-            className={tocaAtivo ? "diagrama-aresta-ativa" : undefined}
-          />
+          <g key={e.id}>
+            <line
+              x1={p1.x}
+              y1={p1.y}
+              x2={p2.x}
+              y2={p2.y}
+              stroke={tocaAtivo ? "#38bdf8" : e.cor}
+              strokeWidth={tocaAtivo ? 2.2 : 1.4}
+              opacity={tocaAtivo ? 0.95 : 0.6}
+              className={tocaAtivo ? "diagrama-aresta-ativa" : undefined}
+            />
+            {tocaAtivo && (
+              <line
+                data-testid={`diagrama-cometa-${e.id}`}
+                x1={p1.x}
+                y1={p1.y}
+                x2={p2.x}
+                y2={p2.y}
+                pathLength={100}
+                stroke="#e0f2fe"
+                strokeWidth={2.6}
+                strokeLinecap="round"
+                className="diagrama-cometa"
+              />
+            )}
+          </g>
         );
       })}
       {nos.map((n) => {
