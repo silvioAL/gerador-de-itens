@@ -39,7 +39,7 @@ const ETAPAS: Etapa[] = [
     cor: "#15803d",
     titulo: "Especificação de solução",
     texto:
-      "Revisão e especificação são uma coisa só: expanda cada item pra ver a spec técnica completa, o refinamento, os critérios de aceite em Gherkin — sem precisar copiar nada à parte. Quando estiver pronta, um clique gera um único markdown com tudo, pronto pra ser o input de outro agente (ex.: o que sobe os itens pro sistema de tracking do time).",
+      "Revisão e especificação são uma coisa só: selecione cada item pra ver a ficha técnica completa em abas (especificação, contrato, refinamento, testes), com apoio de IA local nos requisitos pendentes. Quando estiver pronta, um clique gera um único markdown com tudo, pronto pra ser o input de outro agente (ex.: o que sobe os itens pro sistema de tracking do time).",
   },
 ];
 
