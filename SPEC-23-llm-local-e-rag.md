@@ -258,13 +258,42 @@ Depois de testar a Fase 1 de verdade (v0.1.24, com o crash já corrigido), o usu
   **Achado real, fora do escopo direto**: o texto de onboarding (`Jornada.tsx`, passo "Especificação de solução") ainda dizia "expanda cada item pra ver a spec técnica completa" — desatualizado pela mudança de interação (agora é "selecionar", não "expandir"). Corrigido junto.
 
   Testes: 20 (era 15) — reescritos pro novo modelo de interação (selecionar item → abas), cobrindo as 4 abas, contadores de status, e o funil sugerir/confirmar já existente. Regressão completa: engine 138, llm 11, web 140 (+5), cli 37.
-- **1b — Contexto do épico**: `Quebra` ganha campo(s) pra texto longo + anexos, tela dedicada antes de "Gerar", persistência local (arquivo, mesmo padrão de `quebras/<id>.json`). Plugado na `ReviewScreen` já reestilizada (1d-i).
+- **1b — Contexto do épico (detalhamento abaixo)**.
 - **1c — Streaming real**: `motor.ts` já suporta `onTextChunk` (`completar()`), não usado ainda — nova rota com streaming de verdade (chunked/SSE, diferente do request-response simples de `/ia/sugerir`), com a mitigação de retry-em-`�`. Habilita a barra de fase/animação de geração de verdade na tela já construída em 1d-i.
 - **1e — Funil unificado de proposta**: "Sugerir" + chat livre convergindo pro mesmo componente de proposta/diff/aprovar/confirmar, generalizando o mecanismo já existente.
 
 Ordem confirmada com o usuário: **1d-i primeiro** (tela visível, sem esperar streaming/contexto do épico), depois 1b (contexto do épico plugado na tela pronta), depois 1c/1e.
 
 Cada sub-fase segue a regra já estabelecida (§6.1): sem código antes de deixar claro o que muda, testável e validável com dado real.
+
+### Correção pós-1d-i: a animação de verdade depende de 1c existir, não é cosmética a adiantar
+
+Usuário testou `v0.1.26` e reportou: "está MUITO diferente do protótipo... parece que não rodou IA ainda". Esclarecido em seguida: o que falta são as animações — o protótipo descreve como deve ser o **processo de geração ao vivo pela IA**, não só o layout estático. Isso bate com a leitura original (1d-i explicitamente não incluiu a barra de fase/diagrama sincronizado/itens "pousando", por decisão registrada acima).
+
+Perguntado como fechar essa lacuna o mais rápido possível sem simular um processo que não existe, três opções foram postas: (a) orquestrar em lote as chamadas reais de `/ia/sugerir` já existentes, animando por cima; (b) só enriquecer visualmente o botão "Sugerir" individual; (c) esperar 1c (streaming token-a-token) existir antes de construir qualquer animação de geração. **Escolhida: (c)** — a animação de verdade fica condicionada a 1c. Confirmada em seguida a ordem: **1b continua o próximo passo** (não adiantar 1c), como já estava combinado.
+
+### 1b — Contexto do épico (detalhamento antes de codar, §6.1)
+
+**Achado real ao investigar antes de desenhar** (mesma disciplina de sempre — verificar o código, não assumir): `Quebra.demandInfo` já existe no modelo (`packages/engine/src/model/types.ts:87`, comentário "a descrição longa do contexto") — é exatamente o campo de texto que faltava, não precisa duplicar. Mas hoje é **campo morto**: inicializado como string vazia em `factory.ts:5`, nunca tem UI de edição em lugar nenhum do app, e só é *lido* (nunca escrito) em `ReviewScreen.tsx:27/184` pra seção "Contexto" do documento final exportado. Mais grave: `comoQuebraSalva()` (`packages/cli/src/commands/openApiLocal.ts:105`) nem devolve esse campo no `GET /quebras/:id` — mesma classe de bug já achada e corrigida pra `respostasItens` na Fase 1 (persiste no arquivo via `POST`/`PUT`, mas some silenciosamente ao recarregar a quebra, porque o `GET` usa uma lista fixa de campos).
+
+**Dado**:
+- `Quebra.demandInfo?: string` — já existe, reusado como o texto do contexto do épico, sem mudança de forma.
+- `Quebra.anexosContexto?: { nome: string; conteudo: string }[]` — novo. Só anexos de texto (`.txt`/`.md`/`.json`), lidos via `FileReader.readAsText` (mesmo padrão já usado em `ImportarGraphify.tsx`). Sem parsing de PDF/binário nesta rodada — sem lib disponível, sem consumidor real hoje, seria especulativo.
+
+**Mudanças**:
+- `packages/engine/src/model/types.ts`: `Quebra` ganha `anexosContexto?: { nome: string; conteudo: string }[]`.
+- `packages/cli/src/commands/openApiLocal.ts:105` (`comoQuebraSalva`): incluir `demandInfo` e `anexosContexto` no objeto devolvido pelo `GET` — corrigir o bug de round-trip antes de qualquer UI depender dele.
+- `packages/web/src/App.tsx` (~linha 571, junto do botão "Derivar Quebra"): novo botão "📎 Contexto do épico" abrindo um painel. Decisão de escopo: não é uma tela cheia dedicada nem bloqueia "Derivar Quebra" — entra como passo opcional no header, reusando a decisão já confirmada ("antes de Gerar") sem inventar navegação nova pra uma tela que ainda não tem geração de verdade por trás (essa é 1c/1e).
+- Novo componente `packages/web/src/review/ContextoEpicoPanel.tsx`: textarea pro texto (`demandInfo`), lista de anexos (nome + remover), `<input type="file" multiple accept=".txt,.md,.json">` + `FileReader.readAsText`. Salva direto via `setQuebra` (mesmo padrão já usado pro campo `titulo` em `App.tsx:470` — sem função nova no `useQuebra`).
+- `packages/web/src/review/ReviewScreen.tsx`: `contextoDoPlaceholder()` (linha 82) ganha um parâmetro `contextoEpico` opcional, concatenado antes do contexto do nó no texto mandado pro `/ia/sugerir` real — o contexto da demanda passa a alimentar a sugestão de hoje, não só o documento final.
+- `packages/web/src/api/client.ts`: `PedidoSugestaoIa` ganha `contextoEpico?: string`.
+- `packages/cli/src/commands/openApiLocal.ts` (`tratarIaSugerir`, linha 433): prompt passa a incluir o contexto do épico quando presente.
+
+**Fora de escopo, deliberado**: anexos binários/PDF; tela cheia dedicada (protótipo mostra isso, mas sem geração real por trás ainda seria só decoração); geração em lote/streaming usando esse contexto (1c/1e, próximos passos).
+
+**Feito quando**: contexto do épico e anexos sobrevivem a salvar+recarregar a quebra (fix do bug de round-trip, validado com dado real via `curl`/UI, não só teste); o texto colado + conteúdo dos anexos aparece de fato no prompt enviado ao `/ia/sugerir` real; regressão completa verde.
+
+**(implementada)**. Escopo entregue exatamente como detalhado acima, sem desvio. **Validação real, não só testes**: com `gerador open` de verdade, abri o painel "📎 Contexto do épico", colei texto e anexei um arquivo `.md` real (via `input[type=file]` + `FileReader`), salvei, fechei e reabri o painel — texto e anexo sobreviveram no estado da UI. Salvei a quebra de verdade (`POST /quebras`) e chamei `GET /quebras/:id` contra o servidor real: `demandInfo` e `anexosContexto` vieram de volta intactos, confirmando o fix do bug de round-trip (mesma classe do achado de `respostasItens` na Fase 1) contra o servidor de verdade, não só a suíte de testes. A inclusão do contexto no prompt real de `/ia/sugerir` ficou coberta por teste de integração HTTP (server real + modelo mockado, mesma disciplina já usada pro resto de `/ia/*`) em vez de round-trip com o modelo de verdade nesta rodada — o mecanismo de chamada real ao modelo (`completarComSchema` via GBNF) já tinha sido validado ponta a ponta na Fase 1 e de novo na 1d-i; testar de novo aqui só provaria o mesmo call site, não o campo novo. Testes: cli +2 (round-trip de `demandInfo`/`anexosContexto`, prompt inclui/omite o contexto do épico), web +5 (`ContextoEpicoPanel` × 4, wiring do `contextoEpico` no `ReviewScreen` × 1). Regressão completa: engine 138, llm 11, web 145 (+5), cli 39 (+2).
 
 ## 7. Verificação
 

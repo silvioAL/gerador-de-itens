@@ -95,6 +95,11 @@ export interface Quebra {
    * recalculada. Não passa por `calcularProntidao()` — é reuso da FORMA de
    * `ValorSpec`/`Origem`, não do semáforo de prontidão em si. */
   respostasItens?: Record<string, Record<string, ValorSpec>>;
+  /** Anexos de texto do contexto do épico (Fase 1b, SPEC-23) — nome do
+   * arquivo + conteúdo já extraído (`FileReader.readAsText`, só arquivos de
+   * texto). Junto com `demandInfo`, alimenta o prompt real de `/ia/sugerir`,
+   * não só a seção "Contexto" do documento exportado. */
+  anexosContexto?: { nome: string; conteudo: string }[];
 }
 
 export type TipoItem = "História" | "Task" | "Débito Técnico";

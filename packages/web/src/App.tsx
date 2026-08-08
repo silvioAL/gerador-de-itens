@@ -38,6 +38,7 @@ import { EdgePanel } from "./panel/EdgePanel";
 import { ReadinessSummary } from "./summary/ReadinessSummary";
 import { calcularResumoProntidao } from "./summary/prontidaoResumo";
 import { ReviewScreen } from "./review/ReviewScreen";
+import { ContextoEpicoPanel } from "./review/ContextoEpicoPanel";
 import { JourneyModal, type AbaJornada } from "./demo/JourneyModal";
 import { ConfigScreen, type AbaConfig } from "./config/ConfigScreen";
 import { TourOverlay } from "./demo/TourOverlay";
@@ -273,6 +274,7 @@ function AppCarregado({
   const [abaJornadaAlvo, setAbaJornadaAlvo] = useState<AbaJornada | undefined>(undefined);
   const [mostrarConfig, setMostrarConfig] = useState(false);
   const [mostrarAbrir, setMostrarAbrir] = useState(false);
+  const [mostrarContextoEpico, setMostrarContextoEpico] = useState(false);
   const [abaConfigAlvo, setAbaConfigAlvo] = useState<AbaConfig | undefined>(undefined);
   useEffect(() => {
     if (!localStorage.getItem(CHAVE_JORNADA_VISTA)) setMostrarJornada(true);
@@ -569,6 +571,13 @@ function AppCarregado({
           Salvar
         </button>
         <button
+          onClick={() => setMostrarContextoEpico(true)}
+          style={botaoEstilo}
+          title="Cole o estado atual da demanda/épico e anexe material de apoio — alimenta a sugestão de IA real na revisão."
+        >
+          📎 Contexto do épico
+        </button>
+        <button
           data-tour="derivar-button"
           onClick={derivarQuebra}
           disabled={vermelhos.length > 0}
@@ -636,6 +645,7 @@ function AppCarregado({
           regras={regrasConfig}
           especificacaoTemplate={especificacaoTemplate}
           demandInfo={quebra.demandInfo}
+          anexosContexto={quebra.anexosContexto}
           time={quebra.time}
           respostasItens={quebra.respostasItens}
           onResponderItem={responderItem}
@@ -678,6 +688,15 @@ function AppCarregado({
           onExcluirCampoAresta={excluirCampoAresta}
           onFechar={() => setMostrarConfig(false)}
           abaForcada={abaConfigAlvo}
+        />
+      )}
+
+      {mostrarContextoEpico && (
+        <ContextoEpicoPanel
+          demandInfo={quebra.demandInfo}
+          anexosContexto={quebra.anexosContexto}
+          onSalvar={(demandInfo, anexosContexto) => setQuebra((q) => ({ ...q, demandInfo, anexosContexto }))}
+          onFechar={() => setMostrarContextoEpico(false)}
         />
       )}
 

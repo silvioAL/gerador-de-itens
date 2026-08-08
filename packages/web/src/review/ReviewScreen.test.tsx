@@ -290,6 +290,38 @@ describe("ReviewScreen — abas da ficha (Fase 1d-i, SPEC-23 — dado estruturad
     );
   });
 
+  it("Sugerir manda demandInfo + anexosContexto como contextoEpico (Fase 1b, SPEC-23)", async () => {
+    apiIaSugerirMock.mockResolvedValueOnce({ valor: "sim, via política X" });
+    const resultado = resultadoFixture01();
+    const atividade = atividadeComPlaceholder(resultado);
+    const user = userEvent.setup();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        regras={regras}
+        especificacaoTemplate={templateFixture}
+        demandInfo="Épico: reduzir tempo de aprovação de crédito."
+        anexosContexto={[{ nome: "retro.md", conteudo: "Retro: SLA estourava por falta de dado do bureau." }]}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    await selecionarEIrPraAba(user, atividade.chave, "Refinamento");
+    await user.click(screen.getByRole("button", { name: "✨ Sugerir" }));
+
+    expect(apiIaSugerirMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contextoEpico: expect.stringContaining("Épico: reduzir tempo de aprovação de crédito."),
+      })
+    );
+    const [pedido] = apiIaSugerirMock.mock.calls.at(-1)!;
+    expect(pedido.contextoEpico).toContain("Retro: SLA estourava por falta de dado do bureau.");
+  });
+
   it("clicar Confirmar chama onResponderItem com origem manual", async () => {
     const resultado = resultadoFixture01();
     const atividade = atividadeComPlaceholder(resultado);

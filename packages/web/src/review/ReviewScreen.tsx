@@ -23,8 +23,13 @@ export interface ReviewScreenProps {
   regras?: RegrasConfig;
   /** Efetivo pro time ativo — template do time se existir, senão o global (SPEC-14 §6). */
   especificacaoTemplate: EspecificacaoTemplate;
-  /** `quebra.demandInfo` — de onde vem a demanda, pra seção "Contexto" do documento (SPEC-14 §4). */
+  /** `quebra.demandInfo` — de onde vem a demanda. Além da seção "Contexto" do
+   * documento (SPEC-14 §4), desde a Fase 1b (SPEC-23) também alimenta o
+   * prompt real de `/ia/sugerir`. */
   demandInfo?: string;
+  /** `quebra.anexosContexto` — anexos de texto do contexto do épico (Fase 1b,
+   * SPEC-23), mesmo tratamento de `demandInfo`. */
+  anexosContexto?: { nome: string; conteudo: string }[];
   /** `quebra.time` — toda atividade já carrega esse time em `timesEnvolvidos` por padrão
    * (achado do usuário: só aparecer no item excepcional lia como dado quebrado); usado aqui
    * só pra filtrar o que já é óbvio e destacar de verdade quando é outro time. */
@@ -91,6 +96,18 @@ function contextoDoPlaceholder(ficha: FichaEspecificacaoNo[]): string {
     .join(" | ");
 }
 
+/** `demandInfo` + conteúdo dos anexos (Fase 1b, SPEC-23), concatenados num
+ * único texto pra mandar como contexto real ao `/ia/sugerir` — antes disso
+ * `demandInfo` só entrava na seção "Contexto" do documento exportado, nunca
+ * alimentava a geração de verdade. */
+function contextoEpicoCompleto(demandInfo?: string, anexos?: { nome: string; conteudo: string }[]): string | undefined {
+  const partes = [
+    demandInfo?.trim() ? demandInfo.trim() : undefined,
+    ...(anexos ?? []).map((a) => (a.conteudo.trim() ? `[Anexo: ${a.nome}]\n${a.conteudo.trim()}` : undefined)),
+  ].filter((p): p is string => !!p);
+  return partes.length > 0 ? partes.join("\n\n") : undefined;
+}
+
 type Aba = "especificacao" | "contrato" | "refinamento" | "testes";
 
 const ABAS: { id: Aba; rotulo: string }[] = [
@@ -127,6 +144,7 @@ export function ReviewScreen({
   regras,
   especificacaoTemplate,
   demandInfo,
+  anexosContexto,
   time,
   respostasItens,
   onResponderItem,
@@ -201,6 +219,7 @@ export function ReviewScreen({
 
   const atividadeSelecionada = selecionada ? resultado.atividades.find((a) => a.chave === selecionada) : undefined;
   const fichaSelecionada = selecionada ? fichas.get(selecionada) : undefined;
+  const contextoEpico = contextoEpicoCompleto(demandInfo, anexosContexto);
 
   return (
     <div style={telaEstilo}>
@@ -345,6 +364,7 @@ export function ReviewScreen({
                   {aba === "refinamento" && (
                     <AbaRefinamento
                       ficha={fichaSelecionada}
+                      contextoEpico={contextoEpico}
                       onResponder={(chave, resposta) => onResponderItem?.(atividadeSelecionada.chave, chave, resposta)}
                     />
                   )}
@@ -469,6 +489,8 @@ function formatarValorCampo(valor: unknown): string {
 
 interface AbaRefinamentoProps {
   ficha: FichaItem;
+  /** Contexto do épico/demanda (Fase 1b, SPEC-23) — mandado junto no `/ia/sugerir` real. */
+  contextoEpico?: string;
   onResponder?: (chavePlaceholder: string, resposta: ValorSpec) => void;
 }
 
@@ -479,7 +501,7 @@ interface AbaRefinamentoProps {
  * só aí passa a valer pro documento final (mesma disciplina "nada sugerido
  * conta até confirmado" já usada pro semáforo de prontidão dos nós).
  */
-function AbaRefinamento({ ficha, onResponder }: AbaRefinamentoProps) {
+function AbaRefinamento({ ficha, contextoEpico, onResponder }: AbaRefinamentoProps) {
   const [rascunhos, setRascunhos] = useState<Record<string, string>>({});
   const [carregando, setCarregando] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -493,7 +515,12 @@ function AbaRefinamento({ ficha, onResponder }: AbaRefinamentoProps) {
     setErro(null);
     setCarregando(p.chave);
     try {
-      const { valor } = await apiIa.sugerir({ tech: p.tech, rotulo: p.rotulo, contextoNo: contextoDoPlaceholder(ficha.especificacaoTecnica) });
+      const { valor } = await apiIa.sugerir({
+        tech: p.tech,
+        rotulo: p.rotulo,
+        contextoNo: contextoDoPlaceholder(ficha.especificacaoTecnica),
+        contextoEpico,
+      });
       setRascunhos((r) => ({ ...r, [p.chave]: valor }));
       onResponder?.(p.chave, { valor, origem: "sugerido", confirmado: false });
     } catch (e) {
