@@ -186,6 +186,9 @@ export function ReviewScreen({
   const [selecionada, setSelecionada] = useState<string | null>(null);
   const [aba, setAba] = useState<Aba>("especificacao");
   const [seguindoGeracao, setSeguindoGeracao] = useState(true);
+  // SPEC-24 Fase D: clique num nó do DiagramaCompacto filtra a lista de
+  // itens por aquele nó; segundo clique no mesmo nó limpa (toggle).
+  const [filtroNoId, setFiltroNoId] = useState<string | null>(null);
 
   const diagramaHtml = useMemo(
     () => gerarDiagramaHtml(resultado.atividades, diagrama, config),
@@ -291,6 +294,15 @@ export function ReviewScreen({
     setAba("especificacao");
   }
 
+  function clicarNoDiagrama(nodeId: string) {
+    setFiltroNoId((atual) => (atual === nodeId ? null : nodeId));
+  }
+
+  const atividadesFiltradas = filtroNoId
+    ? resultado.atividades.filter((a) => chaveParaNodeId[a.chave] === filtroNoId)
+    : resultado.atividades;
+  const noFiltrado = filtroNoId ? diagrama.nodes.find((n) => n.id === filtroNoId) : undefined;
+
   function baixarEspecificacao() {
     const documento = gerarEspecificacaoEntrega(resultado.atividades, diagrama, config, {
       regras,
@@ -348,7 +360,18 @@ export function ReviewScreen({
             </div>
           </div>
         ) : (
-          <span style={{ fontSize: 12, color: "var(--dim, #8D9BB0)" }}>{resultado.atividades.length} itens</span>
+          <span data-testid="contagem-itens" style={{ fontSize: 12, color: "var(--dim, #8D9BB0)" }}>
+            {filtroNoId ? (
+              <>
+                {atividadesFiltradas.length} de {resultado.atividades.length} itens · {noFiltrado?.label ?? filtroNoId}{" "}
+                <button onClick={() => setFiltroNoId(null)} style={linkEstilo}>
+                  × limpar filtro
+                </button>
+              </>
+            ) : (
+              `${resultado.atividades.length} itens`
+            )}
+          </span>
         )}
         {contagens && (
           <div role="status" aria-live="polite" style={contadoresEstilo}>
@@ -402,7 +425,15 @@ export function ReviewScreen({
           <DiagramaCompacto
             diagrama={diagrama}
             config={config}
-            noAtivoId={esteira.atual ? chaveParaNodeId[esteira.atual.atividadeChave] : undefined}
+            noAtivoId={
+              esteira.atual
+                ? chaveParaNodeId[esteira.atual.atividadeChave]
+                : selecionada
+                  ? chaveParaNodeId[selecionada]
+                  : undefined
+            }
+            noFiltradoId={filtroNoId ?? undefined}
+            onClickNo={clicarNoDiagrama}
           />
           <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
           <section data-tour="review-table" style={listaEstilo}>
@@ -449,7 +480,13 @@ export function ReviewScreen({
               </div>
             )}
 
-            {resultado.atividades.map((a) => {
+            {filtroNoId && atividadesFiltradas.length === 0 && (
+              <div style={{ fontSize: 12, color: "var(--dim, #8D9BB0)", padding: "8px 4px" }}>
+                Nenhum item derivado desse nó.
+              </div>
+            )}
+
+            {atividadesFiltradas.map((a) => {
               const ficha = fichas.get(a.chave)!;
               const status = statusDoItem(ficha);
               const cruzaOutroTime = outrosTimes(a).length > 0;
