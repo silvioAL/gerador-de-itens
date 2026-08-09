@@ -1434,3 +1434,34 @@ describe("ReviewScreen — o que um papel escreveu continua na tela quando o pr�
     liberarArquiteto();
   });
 });
+
+describe("ReviewScreen — sinais que o usuário leu como falha (relato com print)", () => {
+  it("papel sem NADA a escrever no item tem pip de 'sem trabalho', não de 'não fez'", () => {
+    // Relato: "o pipeline rodou por completo mas o penúltimo stage não foi
+    // preenchido". Não foi porque não havia o que preencher — a config de
+    // regras não cobria a tech/contexto. O pip apagado era idêntico ao de um
+    // papel que falhou, e a leitura virou "o agente não rodou".
+    const resultado = resultadoFixture01();
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    // Sem `regras`, nenhum papel tem placeholder derivado de tabela de regras:
+    // é exatamente o cenário do relato.
+    const chave = resultado.atividades[0].chave;
+    const pips = screen.getAllByTestId(new RegExp(`^pip-${chave}-`));
+    expect(pips.length).toBeGreaterThan(0);
+    const estados = pips.map((p) => p.getAttribute("data-estado"));
+    expect(estados).toContain("sem-trabalho");
+    // E o título explica — o pip sozinho não teria como contar isso.
+    const semTrabalho = pips.find((p) => p.getAttribute("data-estado") === "sem-trabalho")!;
+    expect(semTrabalho.getAttribute("title")).toMatch(/nada a escrever neste item/);
+  });
+});

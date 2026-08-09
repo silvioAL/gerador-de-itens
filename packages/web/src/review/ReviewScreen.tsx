@@ -339,16 +339,10 @@ export function ReviewScreen({
 
   // SPEC-26 Bloco 4a — o revisor determinístico. Roda a cada render (é conta
   // pura sobre dados já em memória) e NUNCA escreve nada: aponta.
-  const achados = useMemo(
+  const achadosBrutos = useMemo(
     () => revisarQuebra(resultado.atividades, diagrama, config, regras, respostasItens),
     [resultado.atividades, diagrama, config, regras, respostasItens]
   );
-  const resumo = useMemo(() => resumirAchados(achados), [achados]);
-  const achadosPorItem = useMemo(() => {
-    const mapa = new Map<string, Achado[]>();
-    for (const a of achados) mapa.set(a.atividadeChave, [...(mapa.get(a.atividadeChave) ?? []), a]);
-    return mapa;
-  }, [achados]);
   const [mostrarAchados, setMostrarAchados] = useState(false);
   // SPEC-27 Fase 2 — a conversa da especificação. Fase própria, janela
   // própria: carrega os itens derivados, não o catálogo de tipos de nó.
@@ -411,6 +405,26 @@ export function ReviewScreen({
     // SPEC-26 Bloco 1: o que a esteira escreve também nasce carimbado.
     onResponderItem: responderComProcedencia,
   });
+
+  // ACHADO REAL do usuário: "aparecem diversos erros e avisos desde o início,
+  // enquanto a IA nem gerou todo o conteúdo — isso é certo?". Não é.
+  //
+  // Há dois tipos de achado, e só um é ruído nessa hora: os que falam do
+  // DESENHO (dependência órfã, campo do nó em branco, tech sem ciclo de teste
+  // configurado, item G) valem desde o primeiro segundo — a esteira não vai
+  // mudá-los. Já os que falam de RESPOSTA que a esteira ainda está escrevendo
+  // acusam algo em andamento. Enquanto ela roda, esses ficam de fora; ao
+  // terminar aparecem sozinhos, porque o `useMemo` recalcula.
+  const achados = useMemo(
+    () => (esteira.rodando ? achadosBrutos.filter((a) => a.regra !== "volumetria-sem-valor") : achadosBrutos),
+    [achadosBrutos, esteira.rodando]
+  );
+  const resumo = useMemo(() => resumirAchados(achados), [achados]);
+  const achadosPorItem = useMemo(() => {
+    const mapa = new Map<string, Achado[]>();
+    for (const a of achados) mapa.set(a.atividadeChave, [...(mapa.get(a.atividadeChave) ?? []), a]);
+    return mapa;
+  }, [achados]);
 
   // "O usuário poderá revisar, alterar e aí roda de novo o ciclo a partir
   // daquela alteração" (registrado desde a Fase E, possível agora que os
@@ -841,6 +855,13 @@ export function ReviewScreen({
                       const aplicavel = papelDoGrupo(papeisAtivos, papel.grupo, a)?.id === papel.id;
                       const placeholders = aplicavel ? porPapel[papel.grupo] : [];
                       const passou = placeholders.length > 0 && placeholders.every((p) => p.resposta !== undefined);
+                      // ACHADO REAL do usuário: "o penúltimo stage não foi
+                      // preenchido". Não foi — porque não tinha NADA pra
+                      // preencher (a config de regras não cobre a tech/contexto
+                      // daquele item), e o pip apagado era idêntico ao de um
+                      // papel que falhou. Sem trabalho ≠ trabalho não feito:
+                      // agora o terceiro estado existe e o title diz qual é.
+                      const semTrabalho = placeholders.length === 0;
                       // Pip do papel/item em processamento agora pulsa — o
                       // resto do card já mostra estático (Fase E: "faltava
                       // efeito de alternância conforme os itens são
@@ -852,9 +873,22 @@ export function ReviewScreen({
                         <i
                           key={papel.id}
                           data-testid={`pip-${a.chave}-${papel.id}`}
-                          title={papel.nome}
+                          data-estado={passou ? "feito" : semTrabalho ? "sem-trabalho" : "pendente"}
+                          title={
+                            semTrabalho
+                              ? `${papel.nome}: nada a escrever neste item (nenhuma regra configurada cobre ${
+                                  a.techs.join("/") || "este item"
+                                })`
+                              : passou
+                                ? `${papel.nome}: escrito`
+                                : `${papel.nome}: pendente`
+                          }
                           className={emProcessamento ? "pip-pulsando" : undefined}
-                          style={{ ...pipEstilo, ...(passou || emProcessamento ? pipOnEstilo : {}) }}
+                          style={{
+                            ...pipEstilo,
+                            ...(passou || emProcessamento ? pipOnEstilo : {}),
+                            ...(semTrabalho && !emProcessamento ? pipSemTrabalhoEstilo : {}),
+                          }}
                         />
                       );
                     })}
@@ -1360,6 +1394,15 @@ const pipEstilo: React.CSSProperties = {
   borderRadius: 2,
   background: "#1B2533",
   display: "inline-block",
+};
+
+/** "Nada a escrever aqui" ≠ "não escreveu": pip vazado, não sólido. Sem essa
+ * distinção o usuário lê ausência de trabalho como falha do agente — e foi
+ * exatamente o que aconteceu ("o penúltimo stage não foi preenchido"). */
+const pipSemTrabalhoEstilo: React.CSSProperties = {
+  background: "transparent",
+  border: "1px dashed #2A3646",
+  height: 2,
 };
 
 const pipOnEstilo: React.CSSProperties = {

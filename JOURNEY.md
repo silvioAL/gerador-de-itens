@@ -1441,3 +1441,30 @@ E uma que só apareceu escrevendo o teste: o prompt precisa ser **determinístic
 A comparação honesta da §5.5 continua valendo e está na spec: o prompt único não tem formato garantido, não tem revisão campo a campo dentro da ferramenta e não propaga mudança depois. Ele tem uma coisa só, e é a que importa agora — funciona.
 
 Regressão: engine 189 (+19), llm 47, cli 80 (+3), web 259 (+7).
+
+## 97. Três sintomas, um relato, e o revisor que contradizia o próprio produto
+
+O usuário rodou uma quebra real de 20 itens e trouxe print de três coisas estranhas. As três eram reais, mas nenhuma era o que parecia.
+
+**1. "Todos os nós verdes, tudo obrigatório preenchido — e 49 erros de campo obrigatório em branco."** Duas telas do mesmo produto se contradizendo, que é o pior tipo de defeito: destrói a confiança nas duas. A causa é minha, do Bloco 4a: `calcularProntidao` filtra os campos por `camposVisiveis()` (que avalia `when`), e o meu revisor iterava o spec **inteiro** do tipo de nó. O caso concreto:
+
+```json
+{ "key": "migracao", "label": "Plano de migração", "required": true,
+  "when": { "not": { "nodeStatus": "novo" } } }
+```
+
+Num desenho só de nós **NOVOS** esse campo não existe — e era cobrado em todos eles. A correção é uma linha: usar a MESMA `camposVisiveis` que a prontidão usa. Não é só o menor diff; é o que torna a divergência **impossível** daqui pra frente, em vez de consertar este caso. O teste reproduz o cenário exato (nó novo com o campo `when`) e falha sem a correção.
+
+**2. "Aparecem erros e avisos desde o início, enquanto a IA nem gerou o conteúdo — isso é certo?"** Não. Mas a resposta não é "não mostrar nada até o fim": há dois tipos de achado, e eles têm naturezas diferentes. Os que falam do **desenho** (dependência órfã, campo do nó, tech sem ciclo de teste configurado, item G) valem desde o primeiro segundo — a esteira não vai mudá-los, e escondê-los seria perder tempo de correção. Os que falam de **resposta** (volumetria sem valor) acusam algo que está sendo escrito naquele instante. Só estes ficam de fora enquanto a esteira roda.
+
+**3. "O pipeline rodou por completo mas o penúltimo stage não foi preenchido."** Aqui o pipeline não falhou: o Especialista técnico **não tinha o que escrever**, porque a config de regras não cobria a tech/contexto daqueles itens — e o próprio revisor já dizia isso, em outra linha da mesma tela ("Nenhum ciclo de teste configurado cobre Backend"). O defeito era de comunicação:
+
+```ts
+const passou = placeholders.length > 0 && placeholders.every(...)
+```
+
+Zero placeholders dá `passou: false`, e o pip apagado ficava **idêntico** ao de um papel que devia escrever e não escreveu. Agora são três estados: feito, pendente e "sem trabalho" (pip vazado, com o motivo no `title`). **Ausência de trabalho não é trabalho não feito** — e uma interface que não distingue as duas coisas está afirmando a errada.
+
+A lição que atravessa os três: nenhum era falha de geração. Um era o revisor contradizendo a prontidão, e dois eram a tela contando mal uma verdade que o sistema já sabia.
+
+Regressão: engine 190 (+1), llm 47, cli 80, web 260 (+1).

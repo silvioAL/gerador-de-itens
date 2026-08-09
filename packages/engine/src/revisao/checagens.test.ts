@@ -81,6 +81,49 @@ describe("revisarQuebra (SPEC-26 Bloco 4a — o revisor determinístico)", () =>
     );
   });
 
+  it("BUG REAL: campo obrigatório INVISÍVEL (`when` não satisfeito) não pode ser cobrado", () => {
+    // Relatado com print: todos os nós verdes no canvas e, ao mesmo tempo, 49
+    // erros de "campo obrigatório em branco" na revisão. O caso concreto era
+    // `migracao` ("Plano de migração"), `when: not(nodeStatus novo)`: num
+    // desenho só de nós NOVOS o campo não existe — e era cobrado em todos.
+    const configComWhen = {
+      ...config,
+      nodeTypes: {
+        service: {
+          ...config.nodeTypes.service,
+          spec: [
+            ...config.nodeTypes.service.spec,
+            {
+              key: "migracao",
+              label: "Plano de migração",
+              type: "text",
+              required: true,
+              when: { not: { nodeStatus: "novo" } },
+            },
+          ],
+        },
+      },
+    } as unknown as DiagramaConfig;
+
+    const novo = {
+      nodes: [{ id: "n1", type: "service", label: "srv-checkout", x: 0, y: 0, status: "novo", spec: completo }],
+      edges: [],
+    } as unknown as Diagrama;
+    expect(revisarQuebra([atividade()], novo, configComWhen).map((a) => a.regra)).not.toContain(
+      "campo-obrigatorio-vazio"
+    );
+
+    // E no estado em que o campo EXISTE, continua sendo cobrado — a correção
+    // não pode ter sido "parar de checar".
+    const existente = {
+      nodes: [{ id: "n1", type: "service", label: "srv-checkout", x: 0, y: 0, status: "existente", spec: completo }],
+      edges: [],
+    } as unknown as Diagrama;
+    expect(revisarQuebra([atividade()], existente, configComWhen).map((a) => a.regra)).toContain(
+      "campo-obrigatorio-vazio"
+    );
+  });
+
   it("campo obrigatório em branco é ERRO; marcado como N/A não é lacuna", () => {
     const semLinguagem = revisarQuebra([atividade()], diagrama({ nome: completo.nome }), config);
     expect(semLinguagem.map((a) => a.regra)).toContain("campo-obrigatorio-vazio");
