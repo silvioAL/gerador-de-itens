@@ -74,6 +74,23 @@ export const MODELOS_CHAT: ModeloRegistrado[] = [MODELO_CHAT];
 
 export const TODOS_OS_MODELOS: ModeloRegistrado[] = [...MODELOS_CHAT, MODELO_EMBEDDING];
 
+/**
+ * SPEC-25 Fase 2 — o provedor remoto vive no MESMO espaço de ids dos modelos
+ * locais (§4.6), porque `config/ia.json` tem um campo só (`provedorPadrao`) e
+ * a aba mostra uma lista só de cards. Ele não é um `ModeloRegistrado`: não tem
+ * arquivo, não tem download, não tem tamanho — por isso mora aqui como um id
+ * à parte em vez de entrar em `MODELOS_CHAT`, que é a lista do que se baixa.
+ */
+export const ID_PROVEDOR_GATEWAY = "compativel-openai";
+export const NOME_PROVEDOR_GATEWAY = "Gateway compatível com OpenAI";
+export const PAPEL_PROVEDOR_GATEWAY =
+  "Wrapper corporativo, DeepSeek oficial, Ollama, vLLM, LiteLLM — qualquer endpoint /chat/completions";
+
+/** Ids que `config/ia.json` aceita: os modelos de chat baixáveis + o gateway. */
+export function idsDeProvedorValidos(): string[] {
+  return [...MODELOS_CHAT.map((m) => m.id), ID_PROVEDOR_GATEWAY];
+}
+
 export function modeloPorId(id: string): ModeloRegistrado | undefined {
   return TODOS_OS_MODELOS.find((m) => m.id === id);
 }

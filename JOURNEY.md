@@ -1398,3 +1398,25 @@ O diff virou **cartão dentro da conversa**: antes riscado, depois, e o porquê,
 **Um bug meu, pego pelo teste que eu mesmo escrevi**: a primeira versão guardava o cartão *renderizado* dentro da mensagem no estado. Clicar em Aceitar mudava o estado, mas o JSX salvo continuava o antigo — a tela não refletia o clique. Guardar JSX em estado é guardar um retrato; o que se guarda é dado, e a tela se monta na renderização. O teste de "Rejeitar tira o botão" falhou na hora.
 
 Regressão: engine 170 (+7), llm 18, cli 64 (+3), web 241 (+11).
+
+## 95. O provedor que não dá pra testar de verdade — e como testá-lo mesmo assim
+
+SPEC-25 Fase 2. O pedido é antigo: rodar a esteira pelo **wrapper corporativo** em vez do Qwen local. O impedimento também: o token da empresa não saiu. A tentação seria adiar até sair — e a spec (§8.1) já tinha decidido o contrário: implementar como **soquete dormente**, pronto e testado, para que no dia do token a validação seja colar três campos e clicar.
+
+O achado que desenhou a fase veio antes, do próprio usuário: ele **já** fala com o DeepSeek por um wrapper interno. Um `ProvedorDeepSeekApi` específico teria nascido inútil. O que existe é `criarProvedorCompativelOpenAI({baseUrl, chave, modelo})` — `POST {baseUrl}/chat/completions`, que é o formato de-facto do wrapper corporativo, do DeepSeek oficial, do Ollama, do vLLM, do LiteLLM, do OpenRouter. Uma implementação, N destinos. E quando o gateway é interno, nada sai da empresa: a objeção de privacidade que travaria o uso real se resolve de graça.
+
+**A parte difícil é o JSON.** No local, a GBNF torna JSON inválido *impossível*. Aqui não existe grammar, e fingir que existe seria mentira: a garantia passou a ser `response_format: json_object` + o schema no prompt + **validação contra o schema** + **um** retry mandando a tentativa errada de volta com o defeito nomeado (`falta a chave "valor"`, não "responda direito"). Um retry, não três: se o gateway erra duas vezes com o defeito apontado, o problema é dele, e insistir só gasta o tempo de quem espera. A diferença de força entre os dois caminhos está escrita no código, não escondida atrás da interface.
+
+**Testar sem token.** A suíte sobe um `node:http` que responde SSE de verdade — e é aí que aparece o que um `fetch` mockado nunca mostraria: o gateway pode fechar o pacote TCP **no meio de um `data:`**. Sem buffer entre leituras, esse pedaço vira JSON inválido e o texto some em silêncio (o mesmo tipo de perda silenciosa do §93). O teste que corta a linha em dois `write()` existe por isso.
+
+E um achado real que só o HTTP de verdade dava: `resposta.body` **sempre** existe no `fetch` do Node. O caminho "gateway que não streama" estava escrito atrás de `if (!leitor)` e era **inalcançável** — teria falhado na primeira vez que alguém apontasse para um Ollama sem streaming. A detecção passou a ser pelo que chegou: nenhum `data:` no corpo → tenta `choices[0].message.content`.
+
+**A regra de segurança virou teste.** SPEC-25 §4.4 dizia "credenciais nunca em `config/`", porque `config/` é pasta do projeto e entra no git. Dizer não basta: agora um teste falha se o caminho contiver `config`, outro falha se a resposta HTTP contiver a chave, e o que a tela mostra é `sk-…7890`. A chave mora em `~/.gerador/credenciais.json` com modo `0600` e nunca volta pela rede — nem para a tela que acabou de enviá-la. Consequência prática disso: como o campo mostra a máscara, chave vazia significa "mantenha a que já está lá", senão trocar só a base URL exigiria redigitar o segredo.
+
+Duas decisões pequenas que evitam confusão futura: o gateway entra no **mesmo espaço de ids** dos modelos locais (`config/ia.json` tem um campo só), mas **fora** de `MODELOS_CHAT` — essa lista é a do que se **baixa**, e gateway não se baixa. E `pronto`, para o gateway, não exige o modelo de embedding local: ele só serve ao RAG, e cobrar 650 MB de quem escolheu rodar tudo remoto travaria a esteira sem motivo.
+
+Um teste ainda pegou uma fragilidade minha: `gerador ia usar` fazia `find(...)!` no status e estourava com `undefined` se o id não estivesse listado. O `!` era uma aposta; virou fallback para o próprio id.
+
+**O que NÃO foi verificado, e fica dito**: o gateway real. Contra servidor falso está ponta a ponta; contra o wrapper da empresa, não — depende do token. A Fase 2 está pronta, não validada em produção.
+
+Regressão: engine 170, llm 47 (+29), cli 77 (+13), web 252 (+11).
