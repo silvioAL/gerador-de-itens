@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "gerador-de-itens",
   "version": "0.1.47",
   "description": "Quebra técnica derivada deterministicamente de um diagrama de arquitetura — CLI local, sem servidor.",
