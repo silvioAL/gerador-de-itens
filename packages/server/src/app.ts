@@ -10,6 +10,7 @@ import { registrarRotasCamposNo } from "./routes/camposNo.js";
 import { registrarRotasEspecificacaoTemplate } from "./routes/especificacaoTemplate.js";
 import { registrarRotasAuth } from "./routes/auth.js";
 import { registrarRotasTimes } from "./routes/times.js";
+import { registrarRotasAcessos } from "./routes/acessos.js";
 
 export interface OpcoesApp {
   db: BancoDeDados;
@@ -63,6 +64,7 @@ export async function buildApp(opcoes: OpcoesApp): Promise<FastifyInstance> {
   await registrarRotasCamposNo(app, opcoes);
   await registrarRotasEspecificacaoTemplate(app, opcoes);
   await registrarRotasTimes(app, opcoes);
+  await registrarRotasAcessos(app, opcoes);
 
   return app;
 }

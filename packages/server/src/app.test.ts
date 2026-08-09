@@ -7,12 +7,16 @@ import { buildApp } from "./app.js";
 import { criarBancoDeDados, type BancoDeDados } from "./db/client.js";
 import {
   auditoria,
+  CAMPO_GLOBAL,
   camposNo,
   convitesTime,
   organizacoes,
+  papeisAcesso,
+  papelPermissao,
   perfisTime,
   quebras,
   times,
+  usuarioPapel,
   usuarioTime,
 } from "./db/schema.js";
 
@@ -65,8 +69,11 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+  // `usuarioPapel`/`papelPermissao` PRECISAM entrar aqui: um papel deixado
+  // para trás liga o RBAC da organização (SPEC-28 §4.3) e faria todos os
+  // outros testes — que assumem o modo aberto — falharem com 403.
   await db.execute(
-    sql`truncate table ${quebras}, ${perfisTime}, ${camposNo}, ${convitesTime}, ${auditoria}`
+    sql`truncate table ${quebras}, ${perfisTime}, ${camposNo}, ${convitesTime}, ${auditoria}, ${usuarioPapel}, ${papelPermissao}, ${papeisAcesso}`
   );
 });
 
@@ -794,5 +801,166 @@ describe("rate limit do login", () => {
       await appIsolado.close();
       process.env.RATE_LIMIT_LOGIN_MAX = anterior;
     }
+  });
+});
+
+describe("SPEC-28 — gestão de acessos", () => {
+  /** Cria papel direto no banco: as rotas de administração exigem permissão de
+   * `acessos`, e alguém precisa ser o primeiro (o Administrador do onboarding,
+   * §4.4). No teste, o banco faz esse papel. */
+  async function criarPapel(
+    nome: string,
+    permissoes: { recurso: string; acao: string }[],
+    membros: { email: string; escopoTimeId?: string }[]
+  ): Promise<string> {
+    const [org] = await db.select().from(organizacoes).limit(1);
+    const [papel] = await db.insert(papeisAcesso).values({ organizacaoId: org.id, nome }).returning();
+    if (permissoes.length > 0) {
+      await db.insert(papelPermissao).values(permissoes.map((p) => ({ papelId: papel.id, ...p })));
+    }
+    for (const m of membros) {
+      await db.insert(usuarioPapel).values({ email: m.email, papelId: papel.id, escopoTimeId: m.escopoTimeId ?? null });
+    }
+    return papel.id;
+  }
+
+  /**
+   * Campo GLOBAL por padrão de propósito: `exigirTime` devolve `null` para
+   * `__global__`, então o único portão que sobra é a permissão — que é o que
+   * estes testes querem medir. Usar um time aqui misturaria os dois 403 (o de
+   * "não é do time" e o de "não tem permissão") e o teste passaria pelo
+   * motivo errado. Os casos que testam ESCOPO passam `timeId` explícito.
+   */
+  async function criarCampo(cookie: string, key: string, timeId: string = CAMPO_GLOBAL) {
+    return app.inject({
+      method: "POST",
+      url: "/campos-no",
+      cookies: { gerador_sessao: cookie },
+      payload: { timeId, tipoNo: "service", key, label: "X", type: "text" },
+    });
+  }
+
+  it("MIGRAÇÃO: organização sem papel nenhum continua deixando qualquer membro editar", async () => {
+    // Se este quebrar, atualizar a versão tranca todos os clientes existentes
+    // para fora — o modo de falha que a §4.3 existe para impedir.
+    const resposta = await criarCampo(await logarComo(EMAIL_DEV), "modo-aberto");
+    expect(resposta.statusCode).toBe(201);
+  });
+
+  it("o cenário do usuário: Arquitetura edita campos, Agilidade não — cada uma 403 na área da outra", async () => {
+    await criarPapel(
+      "Agilidade",
+      [
+        { recurso: "regras.checklistProcesso", acao: "editar" },
+        { recurso: "pipeline-agentes", acao: "editar" },
+      ],
+      [{ email: EMAIL_OUTRO }]
+    );
+    await criarPapel("Arquitetura", [{ recurso: "campos-no", acao: "editar" }], [{ email: EMAIL_DEV }]);
+
+    expect((await criarCampo(await logarComo(EMAIL_DEV), "arq-pode")).statusCode).toBe(201);
+
+    const negado = await criarCampo(await logarComo(EMAIL_OUTRO), "agil-nao-pode");
+    expect(negado.statusCode).toBe(403);
+    expect(negado.json()).toMatchObject({ recurso: "campos-no", acao: "editar" });
+  });
+
+  it("o MESMO papel por time: vale no time A e dá 403 no time B", async () => {
+    // É a linha "em outra empresa isso ocorre por time" (§4.1) virando teste.
+    await criarPapel("Agilidade", [{ recurso: "campos-no", acao: "editar" }], [
+      { email: EMAIL_DEV, escopoTimeId: TIME_A },
+    ]);
+    const cookie = await logarComo(EMAIL_DEV);
+
+    expect((await criarCampo(cookie, "no-time-a", TIME_A)).statusCode).toBe(201);
+    expect((await criarCampo(cookie, "no-time-b", TIME_B)).statusCode).toBe(403);
+  });
+
+  it("papel de escopo ORGANIZACIONAL cobre qualquer time", async () => {
+    await criarPapel("Plataforma", [{ recurso: "campos-no", acao: "editar" }], [{ email: EMAIL_DEV }]);
+    const cookie = await logarComo(EMAIL_DEV);
+
+    expect((await criarCampo(cookie, "org-time-a", TIME_A)).statusCode).toBe(201);
+    expect((await criarCampo(cookie, "org-time-b", TIME_B)).statusCode).toBe(201);
+  });
+
+  it("com RBAC ligado, quem não tem papel nenhum é negado", async () => {
+    await criarPapel("Arquitetura", [{ recurso: "campos-no", acao: "editar" }], [{ email: EMAIL_DEV }]);
+    expect((await criarCampo(await logarComo(EMAIL_OUTRO), "sem-papel")).statusCode).toBe(403);
+  });
+
+  it("`editar` NÃO implica `ler` — as duas são concedidas explicitamente", async () => {
+    await criarPapel("SoEditar", [{ recurso: "campos-no", acao: "editar" }], [{ email: EMAIL_DEV }]);
+    const minhas = await app.inject({
+      method: "GET",
+      url: "/permissoes/minhas",
+      cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
+    });
+    expect(minhas.json().porRecurso["campos-no"]).toEqual(["editar"]);
+  });
+
+  it("GET /permissoes/minhas diz se o RBAC está ligado — é o que a UI usa pra esconder botão", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const antes = await app.inject({ method: "GET", url: "/permissoes/minhas", cookies: { gerador_sessao: cookie } });
+    expect(antes.json()).toMatchObject({ rbacAtivo: false });
+
+    await criarPapel("Qualquer", [{ recurso: "quebras", acao: "ler" }], [{ email: EMAIL_DEV }]);
+    const depois = await app.inject({ method: "GET", url: "/permissoes/minhas", cookies: { gerador_sessao: cookie } });
+    expect(depois.json()).toMatchObject({ rbacAtivo: true, porRecurso: { quebras: ["ler"] } });
+  });
+
+  it("administrar acessos exige permissão de `acessos` — sem ela, 403", async () => {
+    await criarPapel("Arquitetura", [{ recurso: "campos-no", acao: "editar" }], [{ email: EMAIL_DEV }]);
+    const resposta = await app.inject({
+      method: "POST",
+      url: "/acessos/papeis",
+      cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
+      payload: { nome: "Novo", permissoes: [] },
+    });
+    expect(resposta.statusCode).toBe(403);
+  });
+
+  it("quem administra acessos cria papel pela API, e recurso inventado é 400", async () => {
+    await criarPapel("Administrador", [{ recurso: "acessos", acao: "editar" }], [{ email: EMAIL_DEV }]);
+    const cookie = await logarComo(EMAIL_DEV);
+
+    const criado = await app.inject({
+      method: "POST",
+      url: "/acessos/papeis",
+      cookies: { gerador_sessao: cookie },
+      payload: { nome: "Agilidade", permissoes: [{ recurso: "regras.checklistProcesso", acao: "editar" }] },
+    });
+    expect(criado.statusCode).toBe(201);
+
+    // Recurso fora do enum: rejeitado na porta. Guardar isso viraria permissão
+    // que nenhuma rota checa — falha aberta e silenciosa (§4.2).
+    const invalido = await app.inject({
+      method: "POST",
+      url: "/acessos/papeis",
+      cookies: { gerador_sessao: cookie },
+      payload: { nome: "Inventado", permissoes: [{ recurso: "coisa-que-nao-existe", acao: "editar" }] },
+    });
+    expect(invalido.statusCode).toBe(400);
+  });
+
+  it("apagar papel leva permissões e atribuições junto — nada de permissão órfã autorizando", async () => {
+    await criarPapel("Administrador", [{ recurso: "acessos", acao: "editar" }], [{ email: EMAIL_DEV }]);
+    const idOutro = await criarPapel(
+      "Temporario",
+      [{ recurso: "campos-no", acao: "editar" }],
+      [{ email: EMAIL_OUTRO }]
+    );
+
+    expect((await criarCampo(await logarComo(EMAIL_OUTRO), "antes")).statusCode).toBe(201);
+
+    const apagado = await app.inject({
+      method: "DELETE",
+      url: "/acessos/papeis/" + idOutro,
+      cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
+    });
+    expect(apagado.statusCode).toBe(204);
+
+    // O RBAC segue ligado (Administrador existe) e agora EMAIL_OUTRO não tem papel.
+    expect((await criarCampo(await logarComo(EMAIL_OUTRO), "depois")).statusCode).toBe(403);
   });
 });

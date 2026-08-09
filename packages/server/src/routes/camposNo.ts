@@ -1,10 +1,11 @@
 import { eq, or } from "drizzle-orm";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import type { OpcoesApp } from "../app.js";
 import { exigirTime } from "../auth/middleware.js";
+import { exigirPermissao } from "../auth/permissoes.js";
 import { registrarAuditoria } from "../auditoria.js";
-import { CAMPO_GLOBAL, camposNo } from "../db/schema.js";
+import { CAMPO_GLOBAL, camposNo, organizacoes } from "../db/schema.js";
 
 const tipoCampo = z.enum(["text", "textarea", "number", "boolean", "select", "lista"]);
 /** Sub-campo dentro de um `type: "lista"` — sem "lista" aninhada. */
@@ -43,6 +44,23 @@ async function buscarPorId(db: OpcoesApp["db"], id: string) {
 }
 
 export async function registrarRotasCamposNo(app: FastifyInstance, { db }: OpcoesApp) {
+  async function organizacaoPadrao(): Promise<string | null> {
+    const [org] = await db.select({ id: organizacoes.id }).from(organizacoes).limit(1);
+    return org?.id ?? null;
+  }
+  /**
+   * SPEC-28: a permissão é camada de CIMA de `exigirTime` — pertencer ao time
+   * continua necessário; sem papel nenhum na organização, nada muda (§4.3).
+   *
+   * O `resolverTimeId` NÃO é opcional aqui, e isso custou um teste vermelho:
+   * sem ele, `resolverPermissoes` só considera papéis de escopo
+   * organizacional, e quem tem "Agilidade no time-pagamentos" era negado até
+   * no próprio time. O terceiro eixo da SPEC-28 só existe se o contexto do
+   * time chegar até a checagem.
+   */
+  const podeEditarCampos = (resolverTimeId: (req: FastifyRequest) => string | null | Promise<string | null>) =>
+    exigirPermissao(db, organizacaoPadrao, "campos-no", "editar", resolverTimeId);
+
   // Leitura é aberta (sem sessão) — mesma régua de perfis-time: times
   // se beneficiam de ver a config uns dos outros, só a escrita é restrita.
   app.get("/campos-no", async (req) => {
@@ -65,7 +83,12 @@ export async function registrarRotasCamposNo(app: FastifyInstance, { db }: Opcoe
 
   app.post(
     "/campos-no",
-    { preHandler: exigirTime((req) => comoTimeParaAutorizacao((req.body as { timeId?: string }).timeId ?? CAMPO_GLOBAL)) },
+    {
+      preHandler: [
+        exigirTime((req) => comoTimeParaAutorizacao((req.body as { timeId?: string }).timeId ?? CAMPO_GLOBAL)),
+        podeEditarCampos((req) => comoTimeParaAutorizacao((req.body as { timeId?: string }).timeId ?? CAMPO_GLOBAL)),
+      ],
+    },
     async (req, reply) => {
       const corpo = corpoCampoNo.safeParse(req.body);
       if (!corpo.success) return reply.code(400).send({ erro: corpo.error.flatten() });
@@ -79,11 +102,18 @@ export async function registrarRotasCamposNo(app: FastifyInstance, { db }: Opcoe
   app.put(
     "/campos-no/:id",
     {
-      preHandler: exigirTime(async (req) => {
-        const { id } = req.params as { id: string };
-        const linha = await buscarPorId(db, id);
-        return comoTimeParaAutorizacao(linha?.timeId ?? CAMPO_GLOBAL);
-      }),
+      preHandler: [
+        exigirTime(async (req) => {
+          const { id } = req.params as { id: string };
+          const linha = await buscarPorId(db, id);
+          return comoTimeParaAutorizacao(linha?.timeId ?? CAMPO_GLOBAL);
+        }),
+        podeEditarCampos(async (req) => {
+          const { id } = req.params as { id: string };
+          const linha = await buscarPorId(db, id);
+          return comoTimeParaAutorizacao(linha?.timeId ?? CAMPO_GLOBAL);
+        }),
+      ],
     },
     async (req, reply) => {
       const { id } = req.params as { id: string };
@@ -104,11 +134,18 @@ export async function registrarRotasCamposNo(app: FastifyInstance, { db }: Opcoe
   app.delete(
     "/campos-no/:id",
     {
-      preHandler: exigirTime(async (req) => {
-        const { id } = req.params as { id: string };
-        const linha = await buscarPorId(db, id);
-        return comoTimeParaAutorizacao(linha?.timeId ?? CAMPO_GLOBAL);
-      }),
+      preHandler: [
+        exigirTime(async (req) => {
+          const { id } = req.params as { id: string };
+          const linha = await buscarPorId(db, id);
+          return comoTimeParaAutorizacao(linha?.timeId ?? CAMPO_GLOBAL);
+        }),
+        podeEditarCampos(async (req) => {
+          const { id } = req.params as { id: string };
+          const linha = await buscarPorId(db, id);
+          return comoTimeParaAutorizacao(linha?.timeId ?? CAMPO_GLOBAL);
+        }),
+      ],
     },
     async (req, reply) => {
       const { id } = req.params as { id: string };

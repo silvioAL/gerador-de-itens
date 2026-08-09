@@ -71,6 +71,13 @@
       "when": 1754450000000,
       "tag": "0009_campos_no_item_spec",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1754460000000,
+      "tag": "0010_acessos",
+      "breakpoints": true
     }
   ]
 }

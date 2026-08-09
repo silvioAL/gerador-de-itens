@@ -124,6 +124,61 @@ export const usuarioTime = pgTable(
 );
 
 /**
+ * SPEC-28 — gestão de acessos. Papel é da ORGANIZAÇÃO, não do time: o mesmo
+ * "Agilidade" pode valer na organização inteira ou só num time, e quem decide
+ * isso é `usuarioPapel.escopoTimeId`, não a definição do papel. Foi essa
+ * separação que permitiu atender "numa empresa é por área, noutra é por time"
+ * sem dois modelos (SPEC-28 §4.1).
+ */
+export const papeisAcesso = pgTable(
+  "papeis_acesso",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizacaoId: uuid("organizacao_id")
+      .notNull()
+      .references(() => organizacoes.id),
+    nome: text("nome").notNull(),
+    criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("papeis_acesso_nome_unico").on(t.organizacaoId, t.nome)]
+);
+
+/**
+ * O que um papel pode fazer. `recurso` e `acao` são validados contra listas
+ * FECHADAS em `auth/permissoes.ts` antes de chegar aqui — permissão sobre
+ * recurso inventado nunca seria checada por rota nenhuma, ou seja, falharia
+ * aberta e em silêncio (SPEC-28 §4.2).
+ */
+export const papelPermissao = pgTable(
+  "papel_permissao",
+  {
+    papelId: uuid("papel_id")
+      .notNull()
+      .references(() => papeisAcesso.id, { onDelete: "cascade" }),
+    recurso: text("recurso").notNull(),
+    acao: text("acao").notNull(),
+  },
+  (t) => [uniqueIndex("papel_permissao_chave_unica").on(t.papelId, t.recurso, t.acao)]
+);
+
+/**
+ * Quem tem qual papel, e ONDE. `escopoTimeId` nulo = vale na organização
+ * inteira; preenchido = só naquele time. É o terceiro eixo da SPEC-28 §4.1
+ * inteiro num campo.
+ */
+export const usuarioPapel = pgTable(
+  "usuario_papel",
+  {
+    email: text("email").notNull(),
+    papelId: uuid("papel_id")
+      .notNull()
+      .references(() => papeisAcesso.id, { onDelete: "cascade" }),
+    escopoTimeId: text("escopo_time_id").references(() => times.id),
+  },
+  (t) => [uniqueIndex("usuario_papel_chave_unica").on(t.email, t.papelId, t.escopoTimeId)]
+);
+
+/**
  * Convite de time por link (SPEC-09 §3) — só quem já é do time gera um
  * (`POST /times/:timeId/convites`), qualquer pessoa logada aceita
  * (`POST /convites/:token/aceitar`). Single-use: `usadoPor`/`usadoEm`
