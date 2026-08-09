@@ -1,41 +1,46 @@
 import { useEffect, useState } from "react";
-import type { RegrasConfig, Requisito } from "@gerador/engine";
-import { apiRegras, type SugestaoRegra } from "../api/client";
+import type { ItemProcesso, RegrasConfig, RegrasPorTech, Requisito, TesteAutomatizado } from "@gerador/engine";
+import { apiRegras, type SugestaoRegra, type SugestaoTeste } from "../api/client";
 import { SugerirComIa } from "./SugerirComIa";
 
 /**
  * SPEC-23 fluxo 5 — editor de `config/regras.json`.
  *
- * Este arquivo é a tabela que decide QUAIS requisitos de refinamento cada item
- * gerado recebe (por tech e contexto). Era o único arquivo de configuração sem
- * rota nem tela: só dava pra editar à mão, apesar de ser o que mais muda com o
- * tempo — cada aprendizado do time deveria virar uma linha aqui.
+ * Este arquivo é a tabela que decide QUAIS requisitos cada item gerado recebe
+ * (por tech e contexto). Era o único arquivo de configuração sem rota nem
+ * tela: só dava pra editar à mão, apesar de ser o que mais muda com o tempo —
+ * cada aprendizado do time deveria virar uma linha aqui.
  *
- * Escopo desta primeira versão, deliberado: **checklist técnico** (`Requisito`)
- * — a lista que alimenta os placeholders "<- ✍️ especificar" e, por
- * consequência, a esteira de agentes. `checklistProcesso`, `testes` e
- * `volumetria` continuam existindo no arquivo e são preservados no salvamento
- * (a UI nunca os apaga), mas ganham tela numa rodada própria; misturar as
- * quatro listas numa tela só foi o erro que a SPEC-20 já corrigiu no domínio.
+ * As quatro listas ficam em seções SEPARADAS, não numa lista só: a SPEC-20
+ * desfez exatamente essa mistura no domínio (o que se DECIDE no desenho versus
+ * o que se FAZ pra executar), e juntá-las na tela desfaria a distinção de novo.
  *
- * `when` (condição sobre os nós) também fica de fora da edição: é a parte mais
+ * `when` (condição sobre os nós) continua fora da edição — é a parte mais
  * sutil da configuração, e uma UI ingênua pra ela induziria erro silencioso.
- * Requisito que já tem `when` é mostrado com um selo e preservado intacto.
+ * Item que já tem `when` aparece com selo e é preservado intacto.
  */
+type Secao = "tecnico" | "processo" | "testes" | "volumetria";
+
+const SECOES: { id: Secao; rotulo: string }[] = [
+  { id: "tecnico", rotulo: "Técnico" },
+  { id: "processo", rotulo: "Processo" },
+  { id: "testes", rotulo: "Testes" },
+  { id: "volumetria", rotulo: "Volumetria" },
+];
+
 export function RegrasTab() {
   const [regras, setRegras] = useState<RegrasConfig | null>(null);
-  const [techSelecionada, setTechSelecionada] = useState<string>("");
+  const [tech, setTech] = useState<string>("");
+  const [secao, setSecao] = useState<Secao>("tecnico");
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
-  const [novoTexto, setNovoTexto] = useState("");
-  const [novosContextos, setNovosContextos] = useState("");
 
   useEffect(() => {
     apiRegras
       .obter()
       .then((r) => {
         setRegras(r);
-        setTechSelecionada(Object.keys(r.porTech ?? {})[0] ?? "");
+        setTech(Object.keys(r.porTech ?? {})[0] ?? "");
       })
       .catch((e) => setErro(e instanceof Error ? e.message : String(e)));
   }, []);
@@ -44,7 +49,7 @@ export function RegrasTab() {
   if (!regras) return <p style={{ color: "var(--texto-fraco)", fontSize: 13 }}>Carregando regras…</p>;
 
   const techs = Object.keys(regras.porTech ?? {});
-  const daTech = techSelecionada ? (regras.porTech[techSelecionada]?.checklistTecnico ?? []) : [];
+  const bloco: RegrasPorTech = regras.porTech[tech] ?? { checklistTecnico: [], testes: [] };
 
   async function gravar(novo: RegrasConfig) {
     setRegras(novo);
@@ -59,111 +64,190 @@ export function RegrasTab() {
     }
   }
 
-  /** Substitui só o `checklistTecnico` da tech, preservando o resto do bloco
-   * (processo/testes/volumetria) — a UI não é dona do arquivo inteiro. */
-  function comChecklist(lista: Requisito[]): RegrasConfig {
-    const bloco = regras!.porTech[techSelecionada] ?? { checklistTecnico: [], testes: [] };
-    return { ...regras!, porTech: { ...regras!.porTech, [techSelecionada]: { ...bloco, checklistTecnico: lista } } };
-  }
-
-  function adicionar(texto: string, contextos: string[]) {
-    if (!texto.trim() || !techSelecionada) return;
-    void gravar(comChecklist([...daTech, { texto: texto.trim(), contextos }]));
-    setNovoTexto("");
-    setNovosContextos("");
-  }
-
-  function remover(i: number) {
-    void gravar(comChecklist(daTech.filter((_, n) => n !== i)));
-  }
-
-  function editarTexto(i: number, texto: string) {
-    setRegras(comChecklist(daTech.map((r, n) => (n === i ? { ...r, texto } : r))));
-  }
-
-  function editarContextos(i: number, texto: string) {
-    const contextos = texto.split(",").map((c) => c.trim()).filter(Boolean);
-    setRegras(comChecklist(daTech.map((r, n) => (n === i ? { ...r, contextos } : r))));
+  /** Troca só o pedaço editado do bloco da tech — o resto do arquivo (outras
+   * techs, `tipos`, `tamanhos`, e as listas que esta seção não edita) passa
+   * intacto. A tela nunca é dona do arquivo inteiro. */
+  function comBloco(mudanca: Partial<RegrasPorTech>): RegrasConfig {
+    return { ...regras!, porTech: { ...regras!.porTech, [tech]: { ...bloco, ...mudanca } } };
   }
 
   return (
     <div>
       <p style={introTextoEstilo}>
-        Cada requisito daqui vira uma linha de "refinamento técnico" nos itens gerados para a tech correspondente —
-        é o que a esteira de agentes recebe pra responder. Contextos vazios valem sempre que a tech aparecer; com
-        contextos, o requisito só entra nos itens daquele contexto.
+        O que você configura aqui vira o conteúdo dos itens gerados para a tecnologia escolhida — é também o que a
+        esteira de agentes recebe pra responder. Contextos vazios valem sempre que a tecnologia aparecer; com
+        contextos, a regra só entra nos itens daquele contexto.
       </p>
 
-      <div style={{ ...cardEstilo, display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ ...cardEstilo, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <label style={{ fontSize: 12.5, color: "var(--texto-2)" }}>Tecnologia</label>
-        <select
-          value={techSelecionada}
-          onChange={(e) => setTechSelecionada(e.target.value)}
-          style={selectEstilo}
-          aria-label="Tecnologia"
-        >
+        <select value={tech} onChange={(e) => setTech(e.target.value)} style={selectEstilo} aria-label="Tecnologia">
           {techs.map((t) => (
             <option key={t} value={t}>
-              {t} ({regras.porTech[t]?.checklistTecnico?.length ?? 0})
+              {t}
             </option>
           ))}
         </select>
+        <div style={{ display: "flex", gap: 4 }}>
+          {SECOES.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => setSecao(s.id)}
+              style={secao === s.id ? subAbaAtivaEstilo : subAbaEstilo}
+              data-testid={`secao-${s.id}`}
+            >
+              {s.rotulo}
+              {s.id === "tecnico" && ` (${bloco.checklistTecnico?.length ?? 0})`}
+              {s.id === "processo" && ` (${bloco.checklistProcesso?.length ?? 0})`}
+              {s.id === "testes" && ` (${bloco.testes?.length ?? 0})`}
+            </button>
+          ))}
+        </div>
         {salvando && <span style={{ fontSize: 11.5, color: "var(--texto-mudo)" }}>salvando…</span>}
         {erro && <span style={{ fontSize: 11.5, color: "var(--vermelho)" }}>{erro}</span>}
       </div>
 
-      {techSelecionada && (
-        <SugerirComIa<SugestaoRegra>
-          alvo="regra-refinamento"
-          contexto={`Tecnologia: ${techSelecionada}. Requisitos que já existem: ${
-            daTech.map((r) => r.texto).join("; ") || "(nenhum)"
-          }`}
-          exemplo="ex.: o que o time precisa decidir sobre idempotência de mensagem"
-          onSugestao={(s) => adicionar(s.texto, s.contextos ?? [])}
+      {secao === "tecnico" && (
+        <ListaDeTexto
+          titulo="Requisitos de refinamento técnico"
+          ajuda="O que precisa ser DECIDIDO no desenho antes de implementar."
+          itens={bloco.checklistTecnico ?? []}
+          alvoIa="regra-refinamento"
+          exemploIa="ex.: o que o time precisa decidir sobre idempotência de mensagem"
+          tech={tech}
+          onMudar={(lista) => void gravar(comBloco({ checklistTecnico: lista as Requisito[] }))}
+          onEditarLocal={(lista) => setRegras(comBloco({ checklistTecnico: lista as Requisito[] }))}
+          onSalvarPendente={() => void gravar(regras)}
         />
       )}
 
-      <div style={{ ...cardEstilo, marginTop: 12 }}>
-        <strong style={{ fontSize: 13, color: "var(--texto)" }}>
-          Requisitos de refinamento técnico{techSelecionada ? ` · ${techSelecionada}` : ""}
-        </strong>
+      {secao === "processo" && (
+        <ListaDeTexto
+          titulo="Checklist de processo"
+          ajuda="O que o time precisa FAZER pra conseguir executar e testar (mock, massa, acesso) — diferente do que precisa ser decidido."
+          itens={bloco.checklistProcesso ?? []}
+          alvoIa="item-processo"
+          exemploIa="ex.: o que precisa estar pronto no ambiente antes de testar"
+          tech={tech}
+          onMudar={(lista) => void gravar(comBloco({ checklistProcesso: lista as ItemProcesso[] }))}
+          onEditarLocal={(lista) => setRegras(comBloco({ checklistProcesso: lista as ItemProcesso[] }))}
+          onSalvarPendente={() => void gravar(regras)}
+        />
+      )}
 
-        <ul style={{ listStyle: "none", padding: 0, margin: "10px 0 0", display: "flex", flexDirection: "column", gap: 8 }}>
-          {daTech.map((r, i) => (
+      {secao === "testes" && (
+        <ListaDeTestes
+          itens={bloco.testes ?? []}
+          tech={tech}
+          onMudar={(lista) => void gravar(comBloco({ testes: lista }))}
+          onEditarLocal={(lista) => setRegras(comBloco({ testes: lista }))}
+          onSalvarPendente={() => void gravar(regras)}
+        />
+      )}
+
+      {secao === "volumetria" && (
+        <Volumetria
+          valor={bloco.volumetria}
+          onMudar={(v) => void gravar(comBloco({ volumetria: v }))}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Editor comum das duas listas cujo item é {texto, contextos} — checklist
+ * técnico e checklist de processo. A forma é a mesma; o que muda é o rótulo,
+ * a explicação e o alvo de sugestão da IA. */
+function ListaDeTexto({
+  titulo,
+  ajuda,
+  itens,
+  alvoIa,
+  exemploIa,
+  tech,
+  onMudar,
+  onEditarLocal,
+  onSalvarPendente,
+}: {
+  titulo: string;
+  ajuda: string;
+  itens: (Requisito | ItemProcesso)[];
+  alvoIa: "regra-refinamento" | "item-processo";
+  exemploIa: string;
+  tech: string;
+  onMudar: (lista: (Requisito | ItemProcesso)[]) => void;
+  onEditarLocal: (lista: (Requisito | ItemProcesso)[]) => void;
+  onSalvarPendente: () => void;
+}) {
+  const [novoTexto, setNovoTexto] = useState("");
+  const [novosContextos, setNovosContextos] = useState("");
+
+  function adicionar(texto: string, contextos: string[]) {
+    if (!texto.trim()) return;
+    onMudar([...itens, { texto: texto.trim(), contextos }]);
+    setNovoTexto("");
+    setNovosContextos("");
+  }
+
+  return (
+    <>
+      <SugerirComIa<SugestaoRegra>
+        alvo={alvoIa}
+        contexto={`Tecnologia: ${tech}. Itens que já existem nesta lista: ${
+          itens.map((r) => r.texto).join("; ") || "(nenhum)"
+        }`}
+        exemplo={exemploIa}
+        onSugestao={(s) => adicionar(s.texto, s.contextos ?? [])}
+      />
+
+      <div style={{ ...cardEstilo, marginTop: 12 }}>
+        <strong style={{ fontSize: 13, color: "var(--texto)" }}>{titulo}</strong>
+        <p style={{ margin: "4px 0 0", fontSize: 11.5, color: "var(--texto-mudo)" }}>{ajuda}</p>
+
+        <ul style={listaEstilo}>
+          {itens.map((r, i) => (
             <li key={i} style={linhaEstilo} data-testid={`regra-${i}`}>
               <textarea
                 value={r.texto}
-                onChange={(e) => editarTexto(i, e.target.value)}
-                onBlur={() => void gravar(regras)}
+                onChange={(e) => onEditarLocal(itens.map((x, n) => (n === i ? { ...x, texto: e.target.value } : x)))}
+                onBlur={onSalvarPendente}
                 rows={2}
-                aria-label={`Texto do requisito ${i + 1}`}
+                aria-label={`Texto do item ${i + 1}`}
                 style={textareaEstilo}
               />
               <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
                 <input
                   value={r.contextos.join(", ")}
-                  onChange={(e) => editarContextos(i, e.target.value)}
-                  onBlur={() => void gravar(regras)}
+                  onChange={(e) =>
+                    onEditarLocal(
+                      itens.map((x, n) =>
+                        n === i
+                          ? { ...x, contextos: e.target.value.split(",").map((c) => c.trim()).filter(Boolean) }
+                          : x
+                      )
+                    )
+                  }
+                  onBlur={onSalvarPendente}
                   placeholder="contextos (separados por vírgula) — vazio vale sempre"
-                  aria-label={`Contextos do requisito ${i + 1}`}
+                  aria-label={`Contextos do item ${i + 1}`}
                   style={inputEstilo}
                 />
                 {r.when && (
-                  <span style={seloWhenEstilo} title="Este requisito tem uma condição (`when`) editável só no arquivo">
+                  <span style={seloEstilo} title="Este item tem uma condição (`when`) editável só no arquivo">
                     condicional
                   </span>
                 )}
-                <button onClick={() => remover(i)} style={botaoRemoverEstilo} aria-label={`Remover requisito ${i + 1}`}>
+                <button
+                  onClick={() => onMudar(itens.filter((_, n) => n !== i))}
+                  style={botaoRemoverEstilo}
+                  aria-label={`Remover item ${i + 1}`}
+                >
                   remover
                 </button>
               </div>
             </li>
           ))}
-          {daTech.length === 0 && (
-            <li style={{ fontSize: 12.5, color: "var(--texto-mudo)" }}>
-              Nenhum requisito para esta tecnologia ainda.
-            </li>
-          )}
+          {itens.length === 0 && <li style={vazioEstilo}>Nada configurado para esta tecnologia ainda.</li>}
         </ul>
 
         <div style={{ ...linhaEstilo, marginTop: 10 }}>
@@ -171,8 +255,8 @@ export function RegrasTab() {
             value={novoTexto}
             onChange={(e) => setNovoTexto(e.target.value)}
             rows={2}
-            placeholder="Novo requisito — ex.: Definir a política de retry e o timeout da chamada"
-            aria-label="Novo requisito"
+            placeholder="Novo item"
+            aria-label="Novo item"
             style={textareaEstilo}
           />
           <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
@@ -180,12 +264,12 @@ export function RegrasTab() {
               value={novosContextos}
               onChange={(e) => setNovosContextos(e.target.value)}
               placeholder="contextos (opcional)"
-              aria-label="Contextos do novo requisito"
+              aria-label="Contextos do novo item"
               style={inputEstilo}
             />
             <button
               onClick={() => adicionar(novoTexto, novosContextos.split(",").map((c) => c.trim()).filter(Boolean))}
-              disabled={!novoTexto.trim() || !techSelecionada}
+              disabled={!novoTexto.trim()}
               style={botaoAdicionarEstilo}
             >
               + Adicionar
@@ -193,6 +277,170 @@ export function RegrasTab() {
           </div>
         </div>
       </div>
+    </>
+  );
+}
+
+function ListaDeTestes({
+  itens,
+  tech,
+  onMudar,
+  onEditarLocal,
+  onSalvarPendente,
+}: {
+  itens: TesteAutomatizado[];
+  tech: string;
+  onMudar: (lista: TesteAutomatizado[]) => void;
+  onEditarLocal: (lista: TesteAutomatizado[]) => void;
+  onSalvarPendente: () => void;
+}) {
+  function editar(i: number, mudanca: Partial<TesteAutomatizado>, salvarJa = false) {
+    const lista = itens.map((t, n) => (n === i ? { ...t, ...mudanca } : t));
+    if (salvarJa) onMudar(lista);
+    else onEditarLocal(lista);
+  }
+
+  return (
+    <>
+      <SugerirComIa<SugestaoTeste>
+        alvo="teste-automatizado"
+        contexto={`Tecnologia: ${tech}. Ciclos que já existem: ${
+          itens.map((t) => t.tipo).join("; ") || "(nenhum)"
+        }`}
+        exemplo="ex.: um ciclo que prove o contrato da mensagem publicada"
+        onSugestao={(s) =>
+          onMudar([
+            ...itens,
+            {
+              tipo: s.tipo,
+              validacao: s.validacao,
+              contextos: s.contextos ?? [],
+              dev: !!s.dev,
+              hlg: !!s.hlg,
+            },
+          ])
+        }
+      />
+
+      <div style={{ ...cardEstilo, marginTop: 12 }}>
+        <strong style={{ fontSize: 13, color: "var(--texto)" }}>Ciclos de teste automatizado</strong>
+        <p style={{ margin: "4px 0 0", fontSize: 11.5, color: "var(--texto-mudo)" }}>
+          Cada ciclo vira uma linha na tabela de testes do item, com os ambientes em que roda.
+        </p>
+
+        <ul style={listaEstilo}>
+          {itens.map((t, i) => (
+            <li key={i} style={linhaEstilo} data-testid={`teste-${i}`}>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  value={t.tipo}
+                  onChange={(e) => editar(i, { tipo: e.target.value })}
+                  onBlur={onSalvarPendente}
+                  placeholder="tipo do ciclo"
+                  aria-label={`Tipo do teste ${i + 1}`}
+                  style={{ ...inputEstilo, maxWidth: 220 }}
+                />
+                <input
+                  value={t.validacao}
+                  onChange={(e) => editar(i, { validacao: e.target.value })}
+                  onBlur={onSalvarPendente}
+                  placeholder="o que o teste prova"
+                  aria-label={`Validação do teste ${i + 1}`}
+                  style={inputEstilo}
+                />
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
+                <input
+                  value={t.contextos.join(", ")}
+                  onChange={(e) =>
+                    editar(i, { contextos: e.target.value.split(",").map((c) => c.trim()).filter(Boolean) })
+                  }
+                  onBlur={onSalvarPendente}
+                  placeholder="contextos (opcional)"
+                  aria-label={`Contextos do teste ${i + 1}`}
+                  style={inputEstilo}
+                />
+                <label style={caixaAmbienteEstilo}>
+                  <input
+                    type="checkbox"
+                    checked={t.dev}
+                    onChange={(e) => editar(i, { dev: e.target.checked }, true)}
+                    aria-label={`Teste ${i + 1} roda em dev`}
+                  />
+                  dev
+                </label>
+                <label style={caixaAmbienteEstilo}>
+                  <input
+                    type="checkbox"
+                    checked={t.hlg}
+                    onChange={(e) => editar(i, { hlg: e.target.checked }, true)}
+                    aria-label={`Teste ${i + 1} roda em hlg`}
+                  />
+                  hlg
+                </label>
+                <button
+                  onClick={() => onMudar(itens.filter((_, n) => n !== i))}
+                  style={botaoRemoverEstilo}
+                  aria-label={`Remover teste ${i + 1}`}
+                >
+                  remover
+                </button>
+              </div>
+            </li>
+          ))}
+          {itens.length === 0 && <li style={vazioEstilo}>Nenhum ciclo de teste para esta tecnologia ainda.</li>}
+        </ul>
+      </div>
+    </>
+  );
+}
+
+/** Volumetria não é lista: é um interruptor por contexto. Presente = o bloco
+ * fixo (Response time / Max error / RPS / Test duration) entra no item, sempre
+ * em branco pra preenchimento — o formato é exigido pelo agente validador e
+ * nunca é inventado aqui, então não há o que editar além de ONDE ele aparece. */
+function Volumetria({
+  valor,
+  onMudar,
+}: {
+  valor: { contextos: string[] } | undefined;
+  onMudar: (v: { contextos: string[] } | undefined) => void;
+}) {
+  const ligada = valor !== undefined;
+  return (
+    <div style={{ ...cardEstilo, marginTop: 12 }}>
+      <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+        <input
+          type="checkbox"
+          checked={ligada}
+          onChange={(e) => onMudar(e.target.checked ? { contextos: valor?.contextos ?? [] } : undefined)}
+          aria-label="Exigir requisitos de volumetria"
+          style={{ marginTop: 3 }}
+        />
+        <span>
+          <strong style={{ fontSize: 13, color: "var(--texto)", display: "block" }}>
+            Exigir requisitos de volumetria
+          </strong>
+          <span style={{ fontSize: 12.5, color: "var(--texto-2)", lineHeight: 1.6 }}>
+            Acrescenta o bloco fixo (Response time, Max error, RPS, Test duration) aos itens desta tecnologia,
+            sempre em branco — o formato é o exigido pelo agente validador, não é editável aqui.
+          </span>
+        </span>
+      </label>
+
+      {ligada && (
+        <div style={{ marginTop: 10 }}>
+          <input
+            value={valor!.contextos.join(", ")}
+            onChange={(e) =>
+              onMudar({ contextos: e.target.value.split(",").map((c) => c.trim()).filter(Boolean) })
+            }
+            placeholder="contextos (separados por vírgula) — vazio vale sempre que a tecnologia aparecer"
+            aria-label="Contextos da volumetria"
+            style={inputEstilo}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -209,6 +457,15 @@ const cardEstilo: React.CSSProperties = {
   borderRadius: 8,
   padding: 12,
   background: "var(--painel)",
+};
+
+const listaEstilo: React.CSSProperties = {
+  listStyle: "none",
+  padding: 0,
+  margin: "10px 0 0",
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
 };
 
 const linhaEstilo: React.CSSProperties = {
@@ -241,6 +498,22 @@ const selectEstilo: React.CSSProperties = {
   fontSize: 12.5,
 };
 
+const subAbaEstilo: React.CSSProperties = {
+  padding: "5px 10px",
+  borderRadius: 6,
+  border: "1px solid var(--borda)",
+  background: "transparent",
+  color: "var(--texto-fraco)",
+  fontSize: 12,
+  cursor: "pointer",
+};
+
+const subAbaAtivaEstilo: React.CSSProperties = {
+  ...subAbaEstilo,
+  border: "1px solid var(--acento)",
+  color: "var(--acento)",
+};
+
 const botaoAdicionarEstilo: React.CSSProperties = {
   padding: "6px 12px",
   borderRadius: 6,
@@ -262,7 +535,17 @@ const botaoRemoverEstilo: React.CSSProperties = {
   cursor: "pointer",
 };
 
-const seloWhenEstilo: React.CSSProperties = {
+const caixaAmbienteEstilo: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 4,
+  fontSize: 11.5,
+  color: "var(--texto-2)",
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+};
+
+const seloEstilo: React.CSSProperties = {
   fontSize: 10.5,
   color: "var(--amarelo)",
   border: "1px solid var(--borda-forte)",
@@ -270,5 +553,7 @@ const seloWhenEstilo: React.CSSProperties = {
   padding: "2px 6px",
   whiteSpace: "nowrap",
 };
+
+const vazioEstilo: React.CSSProperties = { fontSize: 12.5, color: "var(--texto-mudo)" };
 
 const erroEstilo: React.CSSProperties = { color: "var(--vermelho)", fontSize: 12.5 };
