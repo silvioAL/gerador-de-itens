@@ -1268,3 +1268,19 @@ Dos três alvos, o que mais vale é `papel`: o preâmbulo do agente é o que sep
 Um detalhe de honestidade na UI: o JSON parcial aparece enquanto o modelo escreve. No modelo local a chamada leva minutos, e sem isso a espera parece travamento — o mesmo achado que já tinha aparecido na esteira ("fica só o ícone de gerando").
 
 Regressão: engine 145, llm 18, cli 57 (+3), web 205 (+4).
+
+## 88. O arquivo que mais muda era o único sem tela
+
+`config/regras.json` decide quais requisitos de refinamento cada item gerado recebe, por tech e por contexto. É a peça que deveria acumular o aprendizado do time — cada "esquecemos de definir o timeout de novo" vira uma linha ali. E era o único arquivo de configuração sem rota e sem tela: só dava pra editar à mão, o que na prática significava que quase nunca era editado.
+
+A rota (`GET`/`PUT /config/regras`) é de propósito burra: grava o arquivo inteiro sem normalizar nada. Quem valida a forma de uma regra é o engine, na carga. Repetir essa validação na rota criaria duas fontes de verdade sobre o que é uma regra válida — e a que discordasse do engine venceria calada. O único cuidado é rejeitar corpo sem `porTech`, pra um PUT torto não apagar o arquivo.
+
+Três coisas que a tela deliberadamente NÃO faz, e vale registrar o porquê:
+
+- **Não edita `checklistProcesso`, `testes` nem `volumetria`** — mas preserva os três no salvamento, com teste garantindo. A tela nunca é dona do arquivo inteiro. Juntar as quatro listas numa tela só recriaria exatamente a mistura que a SPEC-20 desfez no domínio (o que se *decide* no desenho versus o que se *faz* pra executar).
+- **Não edita `when`** (a condição sobre os nós). É a parte mais sutil da configuração; uma UI ingênua pra ela produziria requisitos que aparecem na hora errada, sem ninguém perceber. Quem tem `when` ganha um selo "condicional" e passa intacto.
+- **A IA também não propõe `when`** — o schema do alvo `regra-refinamento` tem só `texto` e `contextos`. Onde a decisão é sutil demais para uma tela, ela é sutil demais para o modelo.
+
+O campo de sugestão da aba leva no prompt os requisitos que já existem para aquela tech. Sem isso, o modelo propõe de novo o que já está na lista — foi o primeiro detalhe que apareceu ao montar o teste.
+
+Regressão: cli 59 (+2), web 210 (+5).

@@ -8,8 +8,17 @@ import { MembrosTab } from "./MembrosTab";
 import { EspecificacaoTemplateTab } from "./EspecificacaoTemplateTab";
 import { PipelineAgentesTab } from "./PipelineAgentesTab";
 import { ModeloIaTab } from "./ModeloIaTab";
+import { RegrasTab } from "./RegrasTab";
 
-export type AbaConfig = "perfis" | "campos" | "camposAresta" | "membros" | "especificacao" | "pipeline" | "modeloIa";
+export type AbaConfig =
+  | "perfis"
+  | "campos"
+  | "camposAresta"
+  | "regras"
+  | "membros"
+  | "especificacao"
+  | "pipeline"
+  | "modeloIa";
 
 export interface ConfigScreenProps {
   config: DiagramaConfig;
@@ -121,6 +130,11 @@ export function ConfigScreen({
             Membros
           </button>
         )}
+        {mostrarCamposAresta && (
+          <button onClick={() => setAba("regras")} style={aba === "regras" ? abaAtivaEstilo : abaEstilo}>
+            Regras de refinamento
+          </button>
+        )}
         <button onClick={() => setAba("especificacao")} style={aba === "especificacao" ? abaAtivaEstilo : abaEstilo}>
           Especificação de solução
         </button>
@@ -156,6 +170,7 @@ export function ConfigScreen({
             onExcluir={onExcluirCampoAresta}
           />
         )}
+        {aba === "regras" && mostrarCamposAresta && <RegrasTab />}
         {aba === "membros" && mostrarMembros && <MembrosTab timeAtivo={timeAtivo} />}
         {aba === "especificacao" && (
           <EspecificacaoTemplateTab

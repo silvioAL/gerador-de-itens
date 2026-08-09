@@ -388,3 +388,21 @@ O alvo `papel` é o de maior valor: o preâmbulo é o que decide se um agente en
 **`SugerirComIa`** (`packages/web/src/config/SugerirComIa.tsx`): um componente só, genérico no tipo de retorno, usado pelas três abas — input em português + botão, com o JSON parcial aparecendo enquanto o modelo escreve (a espera de minutos no modelo local não pode parecer travamento) e a linha fixa "nada é salvo até você revisar e clicar em salvar".
 
 **Feito quando**: as três abas mostram o campo de sugestão; o objeto devolvido pré-preenche o formulário sem salvar nada; alvo inválido e instrução vazia são 400; sem modelo instalado é 503 como as outras rotas de IA. Testes: 4 no componente (envio com contexto, streaming parcial, erro na tela, botão desabilitado sem instrução) e 3 na rota (schema do alvo respeitado incluindo enum e array, 400 duplo, 503).
+
+## 6.7 Fase 2 (fluxo 5) — parte 1 implementada: `regras.json` ganha tela
+
+A Fase 2 original era "RAG de retrospectivas + UI nova pra `config/regras.json`". As duas metades foram separadas, porque só uma delas depende de infraestrutura nova: **a UI vale por si e vem agora; o RAG continua na fila.**
+
+`config/regras.json` era o único arquivo de configuração sem rota e sem tela — só editável à mão — apesar de ser o que mais muda com o tempo: é a tabela que decide quais requisitos de refinamento cada item gerado recebe, por tech e por contexto. Cada aprendizado do time deveria virar uma linha ali, e a fricção de abrir o JSON garantia que não virava.
+
+**`GET`/`PUT /config/regras`**: lê e grava o arquivo inteiro, deliberadamente sem normalizar o conteúdo — quem valida a forma de uma regra é o engine (`validarConfig`) na carga; repetir essa validação na rota criaria duas fontes de verdade sobre o que é regra válida. A rota garante só que o corpo é JSON e tem `porTech`, senão um PUT torto apagaria o arquivo. Sem arquivo, o GET devolve a forma vazia — a tela abre editável em vez de num erro.
+
+**`RegrasTab`**: seletor de tech + lista editável do **checklist técnico**, com adicionar/editar/remover e o campo de sugestão por IA (alvo `regra-refinamento`) já embutido, levando no prompt os requisitos que já existem — sem isso o modelo repete o que está lá.
+
+Três limites conscientes desta primeira versão:
+
+- **Só o checklist técnico.** `checklistProcesso`, `testes` e `volumetria` continuam no arquivo, são **preservados no salvamento** (a UI nunca é dona do arquivo inteiro; teste garante) e ganham tela numa rodada própria. Juntar as quatro listas numa tela só repetiria a confusão que a SPEC-20 desfez no domínio.
+- **`when` não é editável.** É a parte mais sutil da configuração; uma UI ingênua para condições induziria erro silencioso. Requisito que já tem `when` aparece com selo "condicional" e é preservado intacto.
+- **A IA não propõe `when`** pelo mesmo motivo — o schema do alvo tem só `texto` e `contextos`.
+
+**Feito quando**: a aba lista, edita, adiciona e remove requisitos por tech; o arquivo gravado preserva tudo que a tela não edita; PUT sem `porTech` é 400 e não corrompe o arquivo existente. Testes: 5 na aba, 2 na rota.

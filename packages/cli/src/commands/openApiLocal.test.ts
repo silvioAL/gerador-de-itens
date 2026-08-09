@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createServer, type Server } from "node:http";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -355,6 +355,31 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       "_historiaUsuario",
       "_criteriosAceite",
     ]);
+  });
+
+  it("GET /config/regras sem arquivo devolve a forma vazia; PUT grava e o GET seguinte lê de volta (SPEC-23 fluxo 5)", async () => {
+    const vazio = await fetch(`${base}/config/regras`).then((r) => r.json());
+    expect(vazio).toEqual({ tipos: [], tamanhos: [], porTech: {} });
+
+    const regras = {
+      tipos: ["História"],
+      tamanhos: ["M"],
+      porTech: { Backend: { checklistTecnico: [{ texto: "Definir timeout", contextos: [] }], testes: [] } },
+    };
+    const put = await fetch(`${base}/config/regras`, { method: "PUT", body: JSON.stringify(regras) });
+    expect(put.status).toBe(200);
+    expect(await fetch(`${base}/config/regras`).then((r) => r.json())).toEqual(regras);
+    // Grava no lugar que o app carrega — não num arquivo paralelo.
+    expect(JSON.parse(readFileSync(join(dirTemp, "config", "regras.json"), "utf-8"))).toEqual(regras);
+  });
+
+  it("PUT /config/regras sem `porTech` é 400 — corpo torto não apaga o arquivo existente", async () => {
+    const regras = { tipos: [], tamanhos: [], porTech: { Backend: { checklistTecnico: [], testes: [] } } };
+    await fetch(`${base}/config/regras`, { method: "PUT", body: JSON.stringify(regras) });
+
+    const ruim = await fetch(`${base}/config/regras`, { method: "PUT", body: JSON.stringify({ tipos: ["X"] }) });
+    expect(ruim.status).toBe(400);
+    expect(await fetch(`${base}/config/regras`).then((r) => r.json())).toEqual(regras);
   });
 
   it("POST /ia/sugerir-config devolve um objeto no schema do alvo, com o pedido e o contexto no prompt (SPEC-23 Fluxo 2)", async () => {

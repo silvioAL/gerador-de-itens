@@ -508,6 +508,40 @@ async function tratarPipelineAgentes(req: IncomingMessage, res: ServerResponse, 
   enviarJson(res, 404, { erro: "não encontrado" });
 }
 
+// --- GET/PUT /config/regras — SPEC-23 fluxo 5: `config/regras.json` nunca
+// teve rota nem UI; era o único arquivo de configuração que só dava pra
+// editar à mão, apesar de ser o que MAIS muda (é a tabela de requisitos de
+// refinamento por tech e contexto que alimenta cada item gerado).
+//
+// A rota é deliberadamente burra: lê e grava o arquivo inteiro, sem
+// normalizar o conteúdo. Quem valida a forma é o engine (`validarConfig`),
+// na carga — duplicar essa validação aqui criaria duas fontes de verdade
+// sobre o que é uma regra válida. O que a rota garante é só que o corpo é
+// JSON e tem `porTech` (senão qualquer PUT torto apagaria o arquivo).
+
+async function tratarRegras(req: IncomingMessage, res: ServerResponse, metodo: string, dirProjeto: string): Promise<void> {
+  const arquivo = resolve(dirProjeto, "config", "regras.json");
+
+  if (metodo === "GET") {
+    const config = await lerJsonOpcional<Record<string, unknown>>(arquivo);
+    // Sem arquivo, devolve a forma vazia — a UI abre num estado editável em
+    // vez de num erro, e o primeiro PUT cria o arquivo.
+    return enviarJson(res, 200, config ?? { tipos: [], tamanhos: [], porTech: {} });
+  }
+
+  if (metodo === "PUT") {
+    const corpo = await lerCorpoJson<{ porTech?: unknown }>(req);
+    if (!corpo || typeof corpo.porTech !== "object" || corpo.porTech === null || Array.isArray(corpo.porTech)) {
+      return enviarJson(res, 400, { erro: "corpo precisa ter `porTech` (objeto tech → regras)" });
+    }
+    await mkdir(resolve(dirProjeto, "config"), { recursive: true });
+    await writeFile(arquivo, JSON.stringify(corpo, null, 2), "utf-8");
+    return enviarJson(res, 200, corpo);
+  }
+
+  enviarJson(res, 404, { erro: "não encontrado" });
+}
+
 // --- POST /ia/sugerir — fluxo 3 (Fase 1, SPEC-23): sugestão de texto pra um
 // placeholder "<- ✍️ especificar" do checklist técnico/volumetria ---
 
@@ -706,6 +740,25 @@ const ALVOS_SUGESTAO_CONFIG: Record<string, AlvoSugestaoConfig> = {
       `"key" em camelCase, sem espaços nem acentos.`,
       `O campo descreve a CONEXÃO (contrato, timeout, autenticação, retry), não os nós das pontas.`,
       `"opcoes" só faz sentido com type "select"; nos outros, devolva lista vazia.`,
+    ],
+  },
+  "regra-refinamento": {
+    descricao:
+      "um REQUISITO DE REFINAMENTO TÉCNICO — uma decisão que o time precisa tomar no desenho antes de implementar",
+    schema: {
+      type: "object",
+      properties: {
+        texto: { type: "string" },
+        contextos: { type: "array", items: { type: "string" } },
+      },
+      required: ["texto", "contextos"],
+    },
+    regras: [
+      `"texto" começa com um verbo no infinitivo e nomeia a DECISÃO a tomar`,
+      `(ex.: "Definir a política de retry e o timeout da chamada"), não uma`,
+      `pergunta nem uma tarefa de execução — quem executa é o checklist de processo.`,
+      `Um requisito por resposta, específico da tech e do contexto informados.`,
+      `"contextos" limita onde o requisito aparece; lista vazia = vale sempre que a tech estiver presente.`,
     ],
   },
   papel: {
@@ -1005,6 +1058,10 @@ export async function tratarApiLocal(req: IncomingMessage, res: ServerResponse, 
   }
   if (caminho === "/config/pipeline-agentes" && (metodo === "GET" || metodo === "PUT")) {
     await tratarPipelineAgentes(req, res, metodo, dirProjeto);
+    return true;
+  }
+  if (caminho === "/config/regras" && (metodo === "GET" || metodo === "PUT")) {
+    await tratarRegras(req, res, metodo, dirProjeto);
     return true;
   }
   const matchPipeline = metodo === "POST" && caminho.match(/^\/ia\/pipeline\/([^/]+)$/);

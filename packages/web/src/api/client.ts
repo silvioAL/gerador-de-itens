@@ -1,4 +1,4 @@
-import type { Diagrama, PerfisConfig, Quebra, ValorSpec } from "@gerador/engine";
+import type { Diagrama, PerfisConfig, Quebra, RegrasConfig, ValorSpec } from "@gerador/engine";
 
 /**
  * Base do @gerador/server — configurável em runtime via `VITE_API_URL`
@@ -459,7 +459,15 @@ export const apiIa = {
 };
 
 /** Alvos que o servidor sabe sugerir (`ALVOS_SUGESTAO_CONFIG` no CLI). */
-export type AlvoSugestaoConfig = "campo-no" | "campo-aresta" | "papel";
+export type AlvoSugestaoConfig = "campo-no" | "campo-aresta" | "papel" | "regra-refinamento";
+
+/** O que a IA devolve pro alvo "regra-refinamento" — o `when` (condição sobre
+ * os nós) fica de fora de propósito: é a parte mais sutil da configuração e
+ * não deve ser adivinhada; quem precisa dele edita o arquivo. */
+export interface SugestaoRegra {
+  texto: string;
+  contextos: string[];
+}
 
 /** O que a IA devolve pro alvo "campo-no"/"campo-aresta" — subconjunto de
  * `DadosCampoNo` que faz sentido a IA propor (nada de `ordem`, `timeId` ou
@@ -528,6 +536,15 @@ export const apiPipelineAgentes = {
   obter: () => requisitar<ConfigPipelineAgentes>("/config/pipeline-agentes"),
   salvar: (dados: ConfigPipelineAgentes) =>
     requisitar<ConfigPipelineAgentes>("/config/pipeline-agentes", { method: "PUT", body: JSON.stringify(dados) }),
+};
+
+/** SPEC-23 fluxo 5 — `config/regras.json` (a tabela de requisitos de
+ * refinamento por tech/contexto). Era o único arquivo de configuração sem
+ * rota nem UI: só dava pra editar à mão. O tipo é o do engine, sem cópia. */
+export const apiRegras = {
+  obter: () => requisitar<RegrasConfig>("/config/regras"),
+  salvar: (dados: RegrasConfig) =>
+    requisitar<RegrasConfig>("/config/regras", { method: "PUT", body: JSON.stringify(dados) }),
 };
 
 export interface ConviteTime {
