@@ -72,7 +72,7 @@ describe("revisarQuebra (SPEC-26 Bloco 4a — o revisor determinístico)", () =>
 
   it("dependência apontando pra item que não existe mais é ERRO — apagar um nó não avisa quem dependia dele", () => {
     const achados = revisarQuebra(
-      [atividade({ dependencias: [{ type: "depende", alvoChave: "n9::sumido" }] })],
+      [atividade({ dependencias: [{ type: "dependent", alvoChave: "n9::sumido" }] })],
       diagrama(completo),
       config
     );
@@ -134,7 +134,7 @@ describe("revisarQuebra (SPEC-26 Bloco 4a — o revisor determinístico)", () =>
 
   it("resumirAchados separa erro de aviso — é o que o cabeçalho da revisão mostra", () => {
     const achados = revisarQuebra(
-      [atividade({ tamanho: "G", dependencias: [{ type: "depende", alvoChave: "sumido" }] })],
+      [atividade({ tamanho: "G", dependencias: [{ type: "dependent", alvoChave: "sumido" }] })],
       diagrama({ nome: completo.nome }),
       config,
       regras,
