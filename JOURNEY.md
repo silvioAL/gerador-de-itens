@@ -1468,3 +1468,19 @@ Zero placeholders dá `passou: false`, e o pip apagado ficava **idêntico** ao d
 A lição que atravessa os três: nenhum era falha de geração. Um era o revisor contradizendo a prontidão, e dois eram a tela contando mal uma verdade que o sistema já sabia.
 
 Regressão: engine 190 (+1), llm 47, cli 80, web 260 (+1).
+
+## 98. Piscar e barra cinza: dois defeitos de acabamento que o teste consegue provar
+
+Dois relatos de UI na mesma leva. Nenhum é "estético" no sentido de opinião — os dois têm causa mecânica e teste.
+
+**O rótulo da conexão piscava a cada tecla digitada no painel do nó.** O React Flow decide repintar por **identidade** das props. O memo que monta as arestas dependia de `quebra.diagrama.nodes`; digitar num campo produz um array de nós novo (`atualizarNo` faz `nodes.map(...)`), o memo invalidava e devolvia objetos `Edge` novos — com `style` e `labelStyle` literais recriados. Nada tinha mudado nas arestas, e todas repintavam.
+
+Das posições dos nós as arestas precisam de **uma** coisa: `x` e `y`, pro `handlesPadrao`. A dependência virou uma **string de geometria** (`id:x:y|...`) — valor primitivo, que só muda quando um nó de fato se move, entra ou sai. E os objetos de estilo saíram para constantes de módulo, com um cache de `{stroke}` por cor. Digitar spec agora não toca em aresta nenhuma.
+
+O teste captura o que o `ReactFlow` **recebe** em cada render e compara referências — não dá pra ver "piscar" em jsdom, mas dá pra ver exatamente o que o causa. Ele falha com o código antigo. E tem um par: mover um nó **ainda** troca o handle, porque a correção não podia ser "congelar tudo".
+
+Detalhe do próprio teste que valeu corrigir: a primeira versão montava um estado inteiramente novo a cada render, inclusive o array de arestas — e portanto falhava mesmo com a correção aplicada. Um fake que não espelha o que o app faz (`atualizarNo` preserva a referência de `edges`) testa outra coisa e dá o veredito errado.
+
+**A barra de rolagem cinza do Windows.** A regra escura existia desde a rodada da timeline, mas presa a `.review-lista`. O usuário voltou apontando o óbvio: o painel de propriedades e as outras telas continuavam com a barra clara do sistema — o mesmo app com duas barras diferentes. Agora é global (seletor universal, não classe: qualquer contêiner com overflow herda sem precisar ser lembrado), com `border` transparente + `background-clip: padding-box` no lugar da borda pintada com a cor do fundo — assim o polegar afina sobre painel, modal e canvas sem moldura de cor errada.
+
+Regressão: engine 190, llm 47, cli 80, web 262 (+2).

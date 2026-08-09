@@ -252,26 +252,44 @@ textarea::placeholder {
   animation: pip-pulso 1.1s ease-in-out infinite;
 }
 
-/* Scrollbar da lista de itens — a nativa do Windows (larga, clara) destoava
-   demais do tema escuro (achado real do usuário comparando com o protótipo). */
-.review-lista {
+/* Scrollbar escura em TODA barra de rolagem do app — a nativa do Windows
+   (larga, clara) destoa do tema escuro (achado real do usuário comparando com
+   o protótipo).
+
+   Nasceu restrita à lista de itens da revisão, e o usuário voltou apontando o
+   óbvio: o painel de propriedades e as demais telas continuavam com a barra
+   cinza do sistema, ou seja, o mesmo app com duas barras diferentes. Agora a
+   regra é global — o seletor universal, e não `.classe`, porque qualquer
+   contêiner com overflow deve herdar isto sem precisar ser lembrado.
+
+   `border` transparente + `background-clip: padding-box` no lugar de uma borda
+   com a cor do fundo: afina o polegar sem encolher a área de clique e, ao
+   contrário da versão anterior (que fixava `#0c111a`), funciona sobre painel,
+   modal e canvas sem "moldura" de cor errada. */
+* {
   scrollbar-width: thin;
   scrollbar-color: #263344 transparent;
 }
-.review-lista::-webkit-scrollbar {
+*::-webkit-scrollbar {
   width: 9px;
+  height: 9px;
 }
-.review-lista::-webkit-scrollbar-track {
+*::-webkit-scrollbar-track {
   background: transparent;
 }
-.review-lista::-webkit-scrollbar-thumb {
+*::-webkit-scrollbar-thumb {
   background: #263344;
   border-radius: 9px;
-  /* Borda da cor do fundo "afina" o polegar sem encolher a área de clique. */
-  border: 3px solid #0c111a;
+  border: 3px solid transparent;
+  background-clip: padding-box;
 }
-.review-lista::-webkit-scrollbar-thumb:hover {
+*::-webkit-scrollbar-thumb:hover {
   background: #5c6a7e;
+  background-clip: padding-box;
+}
+/* Canto onde as duas barras se encontram — sem isto ele volta a ser branco. */
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* Timeline vertical à esquerda dos cards (achado real: "timeline que vai

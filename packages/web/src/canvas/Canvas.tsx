@@ -23,6 +23,23 @@ const nodeTypes = { domNo: NodeCard };
  * explícito) — sem isso a aresta sempre ancorava no primeiro handle declarado
  * no nó (topo), não importa a posição relativa dos dois nós no canvas.
  */
+const LABEL_STYLE = { fontSize: 11, fill: "#c5ceda" };
+const LABEL_BG_STYLE = { fill: "#101823" };
+
+/** Um objeto de estilo por COR, reaproveitado entre renders — o React Flow
+ * compara por referência, e um literal novo a cada render faz o rótulo da
+ * aresta repintar sem nada ter mudado. */
+const estilosDeTraco = new Map<string, { stroke: string }>();
+function estiloPorTipo(config: DiagramaConfig, tipo: string): { stroke: string } {
+  const cor = config.edgeTypes[tipo]?.color ?? "#5c6a7e";
+  let estilo = estilosDeTraco.get(cor);
+  if (!estilo) {
+    estilo = { stroke: cor };
+    estilosDeTraco.set(cor, estilo);
+  }
+  return estilo;
+}
+
 export function handlesPadrao(origem: Pick<No, "x" | "y">, destino: Pick<No, "x" | "y">) {
   const dx = destino.x - origem.x;
   const dy = destino.y - origem.y;
@@ -71,11 +88,34 @@ export function Canvas({ quebraState, config }: CanvasProps) {
     [quebra.diagrama.nodes, quebra.diagrama.edges, quebra.time, config, selecionadoId]
   );
 
+  /**
+   * ACHADO REAL do usuário: "o texto contido nas conexões (ex: publica) pisca
+   * a cada conteúdo inserido" ao digitar no painel de propriedades.
+   *
+   * A causa era este memo depender de `quebra.diagrama.nodes`. Digitar num
+   * campo do nó produz um array `nodes` NOVO — e ainda que nenhuma aresta
+   * mude, o memo invalidava e devolvia objetos `Edge` novos (com `style` e
+   * `labelStyle` literais recriados), fazendo o React Flow repintar todo
+   * rótulo a cada tecla.
+   *
+   * Dos nós, as arestas precisam de UMA coisa só: a posição, pro
+   * `handlesPadrao` (que usa apenas `x` e `y`). Então a dependência passa a
+   * ser uma STRING de geometria — valor primitivo, que só muda quando um nó
+   * de fato se move, entra ou sai. Digitar spec não mexe nela.
+   */
+  const geometriaNos = quebra.diagrama.nodes.map((n) => `${n.id}:${n.x}:${n.y}`).join("|");
+  const posicoes = useMemo(
+    () => new Map(quebra.diagrama.nodes.map((n) => [n.id, { x: n.x, y: n.y }])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a string É a
+    // identidade da geometria; depender do array traria o piscar de volta.
+    [geometriaNos]
+  );
+
   const edges: Edge[] = useMemo(
     () =>
       quebra.diagrama.edges.map((e) => {
-        const origem = quebra.diagrama.nodes.find((n) => n.id === e.source);
-        const destino = quebra.diagrama.nodes.find((n) => n.id === e.target);
+        const origem = posicoes.get(e.source);
+        const destino = posicoes.get(e.target);
         const padrao = origem && destino ? handlesPadrao(origem, destino) : undefined;
         return {
           id: e.id,
@@ -85,12 +125,14 @@ export function Canvas({ quebraState, config }: CanvasProps) {
           targetHandle: e.targetHandle ?? padrao?.targetHandle,
           selected: e.id === arestaSelecionadaId,
           label: config.edgeTypes[e.type]?.label ?? e.type,
-          style: { stroke: config.edgeTypes[e.type]?.color ?? "#5c6a7e" },
-          labelStyle: { fontSize: 11, fill: "#c5ceda" },
-          labelBgStyle: { fill: "#101823" },
+          style: estiloPorTipo(config, e.type),
+          // Constantes de módulo: literais aqui seriam objetos novos a cada
+          // render, e é isso que o React Flow usa pra decidir se repinta.
+          labelStyle: LABEL_STYLE,
+          labelBgStyle: LABEL_BG_STYLE,
         };
       }),
-    [quebra.diagrama.nodes, quebra.diagrama.edges, config.edgeTypes, arestaSelecionadaId]
+    [posicoes, quebra.diagrama.edges, config, arestaSelecionadaId]
   );
 
   function onNodesChange(changes: NodeChange[]) {
