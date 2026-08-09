@@ -1531,3 +1531,23 @@ Entregue: `SPEC-28-gestao-de-acessos.md`, `SPEC-29-modelos-por-agente-e-credenci
 - **Acessos**: o corpus de retrospectivas é o material mais sensível que o produto vai guardar (nome de pessoa, conflito, decisão que deu errado). Ganha recursos próprios, com `ingerir` separado de `ler` — porque a regra da SPEC-23 de *citar o trecho de origem* significa que quem vê a sugestão vê o trecho. E a regra que impede o vazamento clássico de RAG multi-tenant: **o filtro de escopo vem antes da busca vetorial, nunca depois**. O teste que importa é o caso em que a busca "acerta" e o produto erra — o trecho do time B é o mais similar à pergunta do time A e ainda assim não pode aparecer.
 - **Credenciais**: o RAG chama modelo em dois momentos com riscos assimétricos. Na consulta sai a pergunta; na **ingestão sai o corpus inteiro**, todo chunk, toda reindexação. Um seletor único de "provedor" trataria as duas como a mesma escolha. Decisão: **embedding local por padrão** — e o argumento que a fecha é que a opção segura já está pronta (o modelo de embedding está no registro desde a SPEC-23 Fase 0). Credencial ganha `usoPermitido`, e a pessoal não indexa corpus da organização: misturaria custo e custódia.
 - **Multimodal**: retrospectiva **é uma reunião** — o material só existe hoje se alguém escrever depois, que é o motivo de nunca virar checklist. A transcrição da Fase 1 é a fonte natural do corpus, de graça. Com uma trava: **ingerir é ato deliberado**, nunca automático, senão a ferramenta vira arquivo permanente de conversa de time.
+
+## 101. SPEC-28 Fase 1: o RBAC entra sem trancar ninguém para fora
+
+Primeira fase da gestão de acessos implementada — schema, checagem e API, sem UI (que é a Fase 2).
+
+**A decisão que mais importa não é técnica: como ligar isso sem quebrar quem já usa.** Um produto que hoje deixa qualquer membro editar tudo e amanhã exige permissão trava a base inteira no dia do deploy. A regra é: **organização sem nenhum papel criado se comporta exatamente como antes**; o RBAC passa a valer quando o primeiro papel nasce. Adotar vira decisão explícita de quem administra, e o caminho de volta (apagar os papéis) é óbvio enquanto a configuração está sendo desenhada. Tem teste próprio, e ele é o mais importante do conjunto: se quebrar, atualizar a versão tranca clientes existentes.
+
+**O terceiro eixo custou um teste vermelho, e foi barato ter falhado.** O modelo é recurso × ação × **escopo**, e o escopo é o que responde "numa empresa é por área, noutra é por time". Na primeira versão eu registrei o `exigirPermissao` nas rotas **sem passar o resolvedor de time** — resultado: `resolverPermissoes` só enxergava papéis organizacionais, e quem tinha "Agilidade no time-pagamentos" era negado **até no próprio time**. O eixo existia no banco e não existia no caminho da requisição. O teste "o MESMO papel por time" pegou na hora.
+
+**Um detalhe de teste que era armadilha maior que o código.** Os primeiros testes criavam campo num time ao qual o usuário não pertencia, e recebiam 403 — mas do `exigirTime`, não da permissão. Passariam pelo motivo errado. Agora o padrão é campo **global** (onde `exigirTime` devolve `null` e o único portão é a permissão), e só os casos que medem escopo passam `timeId` explícito. Teste de autorização que não isola qual portão fechou não prova nada.
+
+Três decisões que ficaram no código com o porquê:
+
+- **Recursos são enum fechado**, validado com `z.enum` na porta: recurso inventado é 400. Permissão sobre recurso que nenhuma rota checa é permissão que falha **aberta** e em silêncio — o pior modo de falha numa camada de autorização.
+- **`editar` não implica `ler`.** As duas são concedidas explicitamente. "Pode editar mas não pode ver" é bug, e o jeito de garantir que ele não apareça é não esconder a implicação no código.
+- **O 403 diz qual recurso e qual ação faltaram.** Erro de permissão que não diz o que falta vira chamado de suporte, não correção.
+
+Também precisei incluir as três tabelas novas no `truncate` do `beforeEach`: um papel deixado para trás liga o RBAC da organização e faz **todos** os outros testes — que assumem o modo aberto — falharem com 403. Isso teria sido um mistério caro de depurar.
+
+Rodou contra Postgres de verdade (o `db` do docker-compose do próprio projeto), não mock. Regressão: engine 190, llm 47, cli 80, web 264, **server 45 (+10)**.
