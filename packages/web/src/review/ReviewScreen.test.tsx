@@ -1464,4 +1464,72 @@ describe("ReviewScreen — sinais que o usuário leu como falha (relato com prin
     const semTrabalho = pips.find((p) => p.getAttribute("data-estado") === "sem-trabalho")!;
     expect(semTrabalho.getAttribute("title")).toMatch(/nada a escrever neste item/);
   });
+
+  it("/ia/status inacessível (modo hospedado) DIZ que os agentes não rodam aqui", async () => {
+    // Relato: "cliquei em derivar quebra e na tela de revisão não aconteceu
+    // nada além do desenho do diagrama". O servidor hospedado não registra
+    // rota /ia/* nenhuma — elas só existem no `gerador open` —, então o status
+    // dá 404, a promessa rejeita e o efeito de montagem fazia `return` mudo.
+    // A esteira ficava desenhada e parada, o que se lê como produto quebrado.
+    apiIaStatusMock.mockRejectedValueOnce(new Error("404 Not Found"));
+    render(
+      <ReviewScreen
+        resultado={resultadoFixture01()}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    const aviso = await screen.findByTestId("ia-indisponivel-sem-rota");
+    expect(aviso).toHaveTextContent(/não rodam neste modo/i);
+    // Aponta pro modo que tem o recurso, senão o aviso só constata o problema.
+    expect(aviso).toHaveTextContent(/gerador open/);
+    // E deixa claro que o resto do produto não depende disso.
+    expect(aviso).toHaveTextContent(/especificação de solução continuam funcionando/i);
+  });
+
+  it("modelo não instalado é motivo DIFERENTE de rota ausente — a ação de quem lê é outra", async () => {
+    // Os dois davam no mesmo silêncio. Um se resolve baixando o modelo, o
+    // outro trocando de modo: confundir os dois manda a pessoa pro lugar errado.
+    render(
+      <ReviewScreen
+        resultado={resultadoFixture01()}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    const aviso = await screen.findByTestId("ia-indisponivel-sem-modelo");
+    expect(aviso).toHaveTextContent(/gerador ia instalar/);
+    expect(screen.queryByTestId("ia-indisponivel-sem-rota")).not.toBeInTheDocument();
+  });
+
+  it("com o modelo pronto, aviso nenhum aparece — ele é sobre ausência, não decoração", async () => {
+    apiIaStatusMock.mockResolvedValueOnce({
+      chatInstalado: true,
+      embeddingInstalado: true,
+      pronto: true,
+      caminhoModelos: "/x",
+    });
+    render(
+      <ReviewScreen
+        resultado={resultadoFixture01()}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    await waitFor(() => expect(apiIaStatusMock).toHaveBeenCalled());
+    expect(screen.queryByTestId("ia-indisponivel-sem-rota")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ia-indisponivel-sem-modelo")).not.toBeInTheDocument();
+  });
 });
