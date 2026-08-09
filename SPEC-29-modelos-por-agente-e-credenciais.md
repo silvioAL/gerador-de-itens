@@ -90,6 +90,26 @@ Recursos novos no enum de permissões:
 
 A separação entre as duas primeiras é o ponto: numa empresa, cadastrar o gateway corporativo é ato de plataforma, enquanto plugar o Claude pessoal é ato de quem paga por ele. Um recurso só não expressaria isso.
 
+## 6.1 O RAG: embedding também é um modelo — e o mais perigoso de terceirizar
+
+O RAG da SPEC-23 (fluxo 5) tem **dois** momentos de chamada a modelo, e eles têm riscos assimétricos:
+
+- **Consulta**: manda a pergunta + os trechos recuperados para o modelo de chat. Sai o que a pessoa perguntou e alguns trechos.
+- **Ingestão**: manda **o corpus inteiro** para o modelo de embedding, um chunk de cada vez. Sai *tudo* — toda retrospectiva, toda vez que o índice é reconstruído.
+
+Trocar o provedor de chat por um gateway é decisão de qualidade e custo. Trocar o de embedding é decisão sobre **onde o corpus de retrospectivas passa a existir**. Não são a mesma escolha, e um único seletor "provedor" as trataria como se fossem.
+
+**Decisão: embedding é local por padrão, e sair disso é escolha explícita.**
+
+Isso é barato de sustentar: o `Qwen3-Embedding-0.6B` já está no registro (~650 MB, SPEC-23 Fase 0), e o corpus esperado — retrospectivas de um time, não milhões de documentos — cabe em busca por similaridade em arquivo plano. Ou seja, **a opção segura também é a que já está pronta**.
+
+Consequências no modelo desta SPEC:
+
+- `ProvedorIa` declara `capacidades: { embedding: boolean }` — nem todo gateway expõe `/embeddings`, e oferecer o que o provedor não faz é o erro que a SPEC-30 §4.1 também previne.
+- `credenciais_ia` ganha `usoPermitido` (`chat` | `embedding` | ambos). Uma credencial pode ser aprovada para responder e **não** para indexar — que é exatamente a política "pode usar IA externa para escrever, mas o material interno não sai daqui".
+- Trocar o provedor de embedding **invalida o índice** (vetores de modelos diferentes não são comparáveis): a troca exige reindexação, e a UI precisa dizer isso antes, não depois.
+- Credencial de escopo `usuario` (o "Claude pessoal") **não pode** ser usada para embedding do corpus da organização: indexar material do time na conta pessoal de alguém mistura custo e custódia. Regra do modelo, não convenção.
+
 ## 7. Fora de escopo, deliberado
 
 - **OAuth com provedor de modelo** — §1: não existe, e na Anthropic é violação dos Termos. Se algum provedor lançar um fluxo legítimo, entra como implementação nova de credencial sem mexer no resto.

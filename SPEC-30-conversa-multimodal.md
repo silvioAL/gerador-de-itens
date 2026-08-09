@@ -75,6 +75,17 @@ No fluxo do desenho (SPEC-27 Fase 1), a imagem serve para o que o usuário descr
 
 Em todos, a saída continua sendo **a mesma de hoje**: uma proposta de diagrama em JSON, com os tipos vindo da config real do projeto (os "trilhos" da SPEC-27), que a pessoa aceita ou rejeita. A imagem entra como **insumo**, não como novo formato de saída — o que significa que nada em `useQuebra`, `derivar` ou na esteira precisa mudar.
 
+## 5.1 Onde o RAG encosta nisto: a retrospectiva acontece falando
+
+O RAG da SPEC-23 (fluxo 5) precisa de um corpus de retrospectivas — e **retrospectiva é uma reunião**. Hoje o material só existe se alguém se der ao trabalho de escrever depois, que é justamente o motivo de o conhecimento não virar checklist reusável (SPEC-23 §2).
+
+A Fase 1 desta SPEC (transcrição local) é, sem trabalho adicional, **a fonte natural desse corpus**: grava-se a retro, transcreve-se localmente, e o texto está pronto para ingestão. O mesmo modelo de transcrição serve os dois usos.
+
+Duas regras que ficam registradas para quando o RAG for implementado:
+
+- **Ingerir é ato deliberado, nunca automático.** Transcrição de retro contém nome de pessoa e avaliação de trabalho alheio. O caminho é: transcreve → a pessoa **lê, edita e decide** enviar ao índice. Um pipeline que indexasse toda gravação transformaria a ferramenta num arquivo permanente de conversa de time — o oposto do que ela é para. Isso é a mesma disciplina do §3.2 (texto editável antes de enviar), aqui por um motivo mais forte que a acurácia.
+- **Imagem não entra no índice.** Um print vale como insumo de uma conversa (§5), não como documento indexável: extrair texto de imagem para indexar exige OCR ou modelo de visão na ingestão, e o resultado é texto sem procedência confiável. Se um diagrama precisa virar conhecimento pesquisável, o caminho é ele virar **diagrama de verdade** na ferramenta — que é exatamente o que a conversa do desenho já faz.
+
 ## 6. Fora de escopo, deliberado
 
 - **Resposta em áudio (TTS)**: o pedido é falar com a ferramenta, não ouvi-la.

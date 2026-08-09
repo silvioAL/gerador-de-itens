@@ -109,6 +109,25 @@ Para `(usuário, recurso, ação, timeId?)`:
 
 **Auditoria**: toda escrita já registra autor (SPEC-09 §4); passa a registrar também o papel que autorizou. Sem isso, "quem aprovou isso?" não tem resposta.
 
+## 7.1 O RAG entra aqui, e é o caso mais sensível
+
+O corpus de retrospectivas (SPEC-23 fluxo 5, ainda na fila) é o material **mais sensível** que o produto vai guardar: retrospectiva tem nome de pessoa, conflito de time, decisão que deu errado. Duas consequências para esta SPEC:
+
+**1. Recursos próprios, separando ingerir de ler.**
+
+| Recurso | Ação | Quem tipicamente |
+|---|---|---|
+| `retrospectivas` | `editar` | quem facilita a retro (agilidade) — ingerir e remover documento |
+| `retrospectivas` | `ler` | quem pode ver os trechos citados como fonte de uma sugestão |
+
+São ações diferentes de propósito: sugerir um checklist **citando o trecho de origem** (que é a regra da SPEC-23 §5 — nunca sugestão sem rastro) significa que **quem vê a sugestão vê o trecho**. Se a pessoa não pode ler o corpus, a citação tem que ser suprimida — e uma sugestão sem rastro é uma sugestão que ninguém consegue avaliar. Ou seja: na prática, quem usa o RAG precisa de `ler`. O modelo deixa isso explícito em vez de deixar vazar por descuido.
+
+**2. O filtro de escopo vem ANTES da busca vetorial, nunca depois.**
+
+Esta é a regra que impede o vazamento clássico de RAG multi-tenant. Buscar no índice inteiro e filtrar o resultado depois parece equivalente e não é: basta um erro de ordem, um `top-k` aplicado antes do filtro, ou um trecho que escapa para o prompt, e a retrospectiva do time A aparece na sugestão do time B. A consulta é montada com o escopo (`organizacaoId` + `timeId` autorizados) **como parte do critério de recuperação**, e o índice guarda esse escopo junto de cada chunk.
+
+Registrado como requisito de verificação, não como recomendação: o teste da Fase 1 precisa provar que uma busca do time A **nunca** retorna chunk do time B — inclusive quando o texto do B é o mais similar à pergunta do A. Esse é o teste que importa, porque é o caso em que a busca "acerta" e o produto erra.
+
 ## 8. Fora de escopo, deliberado
 
 - **Modo local** (§2).
