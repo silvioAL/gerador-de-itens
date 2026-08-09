@@ -48,7 +48,33 @@ Toda propagação produz **propostas**, não escritas. Painel de diff campo a ca
 
 Saída: lista de achados clicáveis, cada um levando ao campo. O revisor **não escreve nada sozinho** — aponta.
 
-### Bloco 5 — Aprendizado: o "ir melhorando gradualmente"
+### Bloco 5 — Chat de refinamento com ferramentas (a interface do segundo passe)
+
+Achado real do usuário, que define a INTERFACE de tudo acima: *"hoje quando isso acontece eu vou tentando trabalhar no Jira direto com o Rovo, mas ainda dá muito trabalho; por isso, tendo todo material salvo, poderia alterar — mesmo que da mesma forma, conversando com um chat de IA com algum agente (melhor do que aqueles botões de sugerir que colocamos) + approve"*.
+
+Por que a conversa vence os botões e vence o Jira:
+
+- **Contra os botões "✨ Sugerir"**: o botão é *campo a campo* e exige que o usuário já saiba ONDE clicar. A conversa é no nível da INTENÇÃO — *"o timeout do fidelidade caiu pra 150ms, ajusta o que decorre disso"* — e quem descobre os campos é a ferramenta. Os botões continuam existindo (funcionam para um retoque pontual, sem gastar conversa), mas deixam de ser o caminho principal.
+- **Contra conversar no Jira/Rovo**: lá o material é prosa espalhada em tickets — a IA relê tudo e **infere** o impacto a cada pedido. Aqui o material está estruturado (campos, chaves estáveis, procedência) e o impacto é **computado** no grafo (Bloco 2). A mesma conversa custa muito menos e erra muito menos.
+
+**Desenho — o agente não escreve, o agente propõe.** Painel de chat na tela de revisão, com um conjunto fechado de ferramentas (tool use) sobre o material salvo:
+
+| Ferramenta | O que faz |
+|---|---|
+| `listarItens(filtro?)` | inventário dos itens derivados (com status e campos desatualizados) |
+| `lerItem(chave)` | ficha completa de um item |
+| `listarImpactados(chave \| noId)` | quem depende — **computado no grafo**, não inferido (Bloco 2) |
+| `proporAlteracao(chave, campo, valor, motivo)` | registra uma PROPOSTA (nunca escreve) |
+| `proporQuebraDeItem(chave, partes[])` | item tamanho 8 → múltiplos itens (regra que hoje o modelo tinha que lembrar) |
+| `rodarChecagens()` | achados determinísticas do revisor (Bloco 4a) |
+
+Toda proposta cai no **mesmo painel de diff do Bloco 3** — aceitar/rejeitar, individual ou em lote. O `approve` do usuário é literalmente o mecanismo que já existe (`origem: "sugerido"` → `confirmado: true`): nada entra na quebra sem passar por lá.
+
+**Pré-requisito honesto**: tool use encadeado confiável. Com o Qwen3-4B local isso seria frustrante (modelos pequenos erram a escolha e os argumentos das ferramentas em cadeias longas). O chat depende da **SPEC-25 Fase 2** — o wrapper corporativo ou o Claude. Registrado como dependência dura, não como detalhe.
+
+Relação com o histórico: este é o "Fluxo 1 — canvas em conversa" da SPEC-23, que foi desenhado e adiado por ser o mais arriscado. Ele volta agora **com o alvo trocado** — conversa sobre os ITENS já derivados (material estruturado, impacto computável), não sobre o desenho do canvas. É a versão de menor risco e maior valor imediato da mesma ideia; o canvas em conversa continua adiado.
+
+### Bloco 6 — Aprendizado: o "ir melhorando gradualmente"
 
 Toda edição humana sobre uma sugestão é sinal. Capturar o par (sugerido → editado), por papel e por contexto, e usar de três formas:
 
@@ -59,10 +85,11 @@ Toda edição humana sobre uma sugestão é sinal. Capturar o par (sugerido → 
 ## 5. Sequência recomendada
 
 1. **Bloco 1** — procedência + obsolescência. Determinístico, barato, pré-requisito de tudo, com valor imediato mesmo sem modelo melhor.
-2. **SPEC-25 Fase 0 + 2** (em paralelo/na sequência curta) — conectar ao wrapper corporativo destrava a QUALIDADE: propagar mudança com um modelo de 4B produziria ajustes ruins e sabotaria a confiança no recurso.
+2. **SPEC-25 Fase 0 + 2** — conectar ao wrapper corporativo/Claude. Deixou de ser paralelo e virou **pré-requisito duro**: propagação com modelo de 4B produz ajuste ruim, e o chat do Bloco 5 depende de tool use encadeado confiável.
 3. **Blocos 2 + 3** juntos — propagação e diff nascem casados; um sem o outro é perigoso ou inútil.
-4. **Bloco 4a** — checagens determinísticas: barato e de alto valor, independe de tudo acima.
-5. **Blocos 5 e 4b** — o flywheel, depois que houver volume de edições reais para aprender.
+4. **Bloco 5 (chat)** — a interface preferida do usuário, montada SOBRE 2+3 (as ferramentas do agente são as operações já implementadas ali; sem elas o chat seria conversa fiada).
+5. **Bloco 4a** — checagens determinísticas: barato, alto valor, independe de tudo acima (pode ser antecipado a qualquer momento).
+6. **Blocos 6 e 4b** — o flywheel, quando houver volume de edições reais para aprender.
 
 ## 6. Fora de escopo, deliberado
 
@@ -73,4 +100,4 @@ Toda edição humana sobre uma sugestão é sinal. Capturar o par (sugerido → 
 
 ## 7. Verificação
 
-Cada bloco contra o `gerador open` real, disciplina de sempre: **Bloco 1** = mudar um campo de um nó e conferir que exatamente os campos derivados dele (e só eles) marcam desatualizado; **Bloco 2** = propagar e conferir por requisição que só os itens impactados foram chamados, na ordem do grafo; **Bloco 3** = diff mostrando antes/depois, rejeitar preservando o valor antigo; **Bloco 4a** = provocar cada checagem com uma quebra propositalmente inconsistente; **Bloco 5** = editar, ver o exemplo aparecer no prompt seguinte e a correção recorrente virar regra.
+Cada bloco contra o `gerador open` real, disciplina de sempre: **Bloco 1** = mudar um campo de um nó e conferir que exatamente os campos derivados dele (e só eles) marcam desatualizado; **Bloco 2** = propagar e conferir por requisição que só os itens impactados foram chamados, na ordem do grafo; **Bloco 3** = diff mostrando antes/depois, rejeitar preservando o valor antigo; **Bloco 4a** = provocar cada checagem com uma quebra propositalmente inconsistente; **Bloco 5** = pedir em linguagem natural uma mudança com impacto cruzado ("o timeout caiu pra 150ms") e conferir, pelas requisições, que o agente chamou `listarImpactados` e propôs alteração só nos itens certos, sem escrever nada antes do approve; **Bloco 6** = editar, ver o exemplo aparecer no prompt seguinte e a correção recorrente virar regra.

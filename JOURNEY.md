@@ -1152,3 +1152,18 @@ Dois efeitos no desenho (SPEC-25 atualizada):
 **E então o usuário nomeou o ponto do projeto**: *"a ideia é melhorar esse processo de refinamento, conseguir alterar as especificações no desenho e usar a IA para ajustar nos outros itens, ajudar a revisar, não esquecer coisas, fazer o processo ir melhorando gradualmente"* — com a dor concreta: *"mudou especificação na história X, aí preciso atualizar tudo manualmente depois"*.
 
 Isso virou a **SPEC-26**. Diagnóstico registrado: a ferramenta é forte no PRIMEIRO passe e fraca no SEGUNDO; o custo do refinamento não está em escrever a primeira versão, está em manter o conjunto coerente depois de cada mudança. E é aí que conhecer o GRAFO vence o prompt único — `resolverDependencias()` já sabe quem depende de quem, então "o que ficou obsoleto quando X mudou?" deixa de ser memória e vira computação. Cinco blocos: (1) procedência de insumos + detecção determinística de obsolescência — primeiro porque não depende de modelo e sozinho já tira o "preciso lembrar"; (2) onda de impacto propagando pelo grafo só nos campos desatualizados; (3) revisão em diff, nunca sobrescrita silenciosa; (4) revisor em duas camadas, com as checagens determinísticas ANTES da IA; (5) aprendizado — few-shot dos próprios acertos e promoção de correção recorrente a regra em `regras.json`, migrando responsabilidade de "o modelo talvez lembre" para "o motor garante" (o caminho contrário ao do prompt único, que acumula instrução defensiva).
+
+## 83. A interface do segundo passe é conversa, não botão — e por que aqui ela é mais barata que no Jira
+
+Complemento do usuário logo depois da SPEC-26: *"hoje quando isso acontece eu vou tentando trabalhar no Jira direto com o Rovo, mas ainda dá muito trabalho; por isso, tendo todo material salvo, poderia alterar — mesmo que da mesma forma, conversando com um chat de IA com algum agente (melhor do que aqueles botões de sugerir que colocamos) + approve"*.
+
+Duas comparações que entraram na spec como justificativa do desenho:
+
+- **Contra os botões "✨ Sugerir"** (que nós mesmos construímos): o botão é campo a campo e exige que o usuário já saiba ONDE clicar. A conversa é no nível da intenção ("o timeout caiu pra 150ms, ajusta o que decorre") e quem descobre os campos é a ferramenta. Os botões sobrevivem para retoque pontual — deixam de ser o caminho principal.
+- **Contra conversar no Jira com o Rovo**: lá o material é prosa espalhada em tickets, então a IA relê e INFERE o impacto a cada pedido. Aqui o material é estruturado e o impacto é COMPUTADO no grafo. É a mesma conversa custando muito menos e errando menos — a vantagem estrutural de ter o desenho, não só o texto.
+
+Virou o **Bloco 5 da SPEC-26**: painel de chat com um conjunto FECHADO de ferramentas (`listarItens`, `lerItem`, `listarImpactados`, `proporAlteracao`, `proporQuebraDeItem`, `rodarChecagens`). O princípio que segura tudo: **o agente não escreve, o agente propõe** — toda saída cai no painel de diff do Bloco 3, e o "approve" é literalmente o mecanismo `origem: "sugerido"` → `confirmado: true` que existe desde o MVP.
+
+Duas consequências registradas com honestidade: (a) o chat exige tool use encadeado confiável, o que **promove a SPEC-25 Fase 2 (wrapper/Claude) de "paralelo" a pré-requisito duro** — com Qwen 4B a experiência seria frustrante; (b) este é o "Fluxo 1 — canvas em conversa" da SPEC-23, adiado lá por ser o mais arriscado, voltando com o alvo trocado: conversa sobre os ITENS derivados (estruturados, impacto computável), não sobre o desenho do canvas. Menor risco, maior valor imediato, mesma ideia.
+
+Sequência da SPEC-26 atualizada: Bloco 1 → SPEC-25 Fase 0+2 → Blocos 2+3 → **Bloco 5 (chat, montado sobre 2+3)** → 4a → 6/4b.
