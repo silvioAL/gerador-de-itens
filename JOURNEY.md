@@ -1382,3 +1382,19 @@ Duas correções, e a segunda é a que importa:
 Os testes provam o bug antes de provar a correção: com a fonte revertida, dois deles falham com "expected 0 to be greater than 0" — zero campos aplicados, que é o sintoma relatado.
 
 **O que ainda não sei**: POR QUE a resposta trunca. O `console.error` da próxima execução real vai dizer (um "Unexpected end of JSON input" aponta truncamento; outra mensagem aponta rede). A hipótese principal é a janela de saída do modelo local com lotes grandes — o próprio comentário do `TAM_LOTE_ESTEIRA` já previa isso ("com os campos do Especialista, 10 itens estouram fácil"). Não mexi no tamanho do lote sem medir: seria trocar um chute por outro.
+
+## 94. A propagação aterrissa na conversa — e o app decide o escopo, não o modelo
+
+Fase 2 da SPEC-27: o fluxo que o usuário já tem com outra ferramenta — *"peço para ele alterar um item e depois para ele revisar os demais; ele me devolve as sugestões e vou confirmando"* — agora existe aqui.
+
+O que vale registrar não é a tela, é a divisão de trabalho: **quem escolhe QUAIS itens revisar é o app**. `itensImpactados` sai do grafo que a derivação já produz (dependências transitivas + itens da mesma origem). Pedir ao LLM que descubra as dependências seria dar a ele um trabalho que o app faz com certeza, e ainda somar a chance de errar nas duas etapas. O modelo só escreve o ajuste de cada item.
+
+E a propagação é deliberadamente **para baixo**: quem depende do item alterado entra; quem o item alterado depende, não. Propagar para cima transformaria qualquer edição numa revisão da quebra inteira — o trabalho manual que se quer justamente evitar.
+
+Uma chamada por item, e não um lote — decisão direta do §93: o lote grande foi o que truncou a resposta e apagou o trabalho de um papel inteiro. Aqui a resposta é pequena por construção, o progresso aparece item a item, e uma falha isolada só perde aquele item (com log).
+
+O diff virou **cartão dentro da conversa**: antes riscado, depois, e o porquê, com Aceitar/Rejeitar por campo. O Bloco 3 da SPEC-26 existe — só não como tela própria, porque a conversa já era o lugar.
+
+**Um bug meu, pego pelo teste que eu mesmo escrevi**: a primeira versão guardava o cartão *renderizado* dentro da mensagem no estado. Clicar em Aceitar mudava o estado, mas o JSX salvo continuava o antigo — a tela não refletia o clique. Guardar JSX em estado é guardar um retrato; o que se guarda é dado, e a tela se monta na renderização. O teste de "Rejeitar tira o botão" falhou na hora.
+
+Regressão: engine 170 (+7), llm 18, cli 64 (+3), web 241 (+11).

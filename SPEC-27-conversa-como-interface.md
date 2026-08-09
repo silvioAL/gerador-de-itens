@@ -83,3 +83,26 @@ Mesma janela, escopo outro: alterar o campo de um item e mandar revisar os demai
 ## 8. Verificação
 
 Contra o `gerador open` real, com o modelo local: descrever uma demanda de verdade (o épico de crédito que o usuário já usa como massa), conferir que os tipos propostos existem na configuração, que as conexões respeitam `edgeRules`, e que aplicar produz um canvas editável. Regressão completa verde antes.
+
+## 9. Fase 2 — implementada: a conversa da especificação
+
+`POST /ia/alterar-item` serve os DOIS pedidos do fluxo real com uma rota só, porque são a mesma operação vista de ângulos diferentes: *dado um item e um motivo, o que muda nos campos dele*.
+
+- **"Altere o item X"** → manda `instrucao`.
+- **"Revise os demais"** → manda `oQueMudou` (o que já foi aceito) em vez de instrução, e o prompt vira *"ajuste APENAS o que decorre disso; se nada decorre, devolva lista VAZIA — essa é uma resposta correta e esperada, não uma falha"*.
+
+Três travas, todas herdadas de erro anterior:
+
+| trava | por quê |
+|---|---|
+| `campo` é **enum das chaves do próprio item** | o modelo não altera um campo que não existe — mesmo trilho do diagrama (§4) |
+| **uma chamada por item** | o lote grande foi o que truncou e apagou o trabalho de um papel inteiro (JOURNEY §93); aqui a resposta é pequena por construção e o progresso aparece item a item |
+| o **valor atual** vai no prompt | sem o "antes", o modelo reescreve do zero em vez de ajustar — o oposto do pedido |
+
+**Quem escolhe o escopo da revisão é o app, não o modelo.** `itensImpactados` (engine, determinístico) devolve quem depende do item alterado (transitivamente) e quem nasce da mesma origem — nó ou conexão. Propagação para cima fica de fora de propósito: o produtor não muda porque o consumidor mudou, e propagar assim transformaria qualquer edição numa revisão da quebra inteira, que é exatamente o trabalho manual que se quer evitar.
+
+**O diff virou cartão.** Cada campo proposto aparece com antes (riscado), depois e o porquê, com Aceitar/Rejeitar. É o Bloco 3 da SPEC-26 aterrissando dentro da conversa em vez de numa tela própria — menos superfície nova, mesma garantia: nada é escrito sem clique.
+
+"Revisar os demais" só habilita **depois de aceitar alguma alteração** — é a mudança aceita que se propaga; sem ela não há o que propagar.
+
+**Bug pego pelo próprio teste**: a primeira versão guardava o cartão renderizado (JSX) dentro da mensagem, no estado. Aceitar/Rejeitar mudava o estado mas o elemento salvo continuava o antigo, e a tela não refletia o clique. Mensagem passou a guardar **dado**; o cartão é montado na renderização.

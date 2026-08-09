@@ -439,6 +439,81 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     expect(completarComSchemaMock).not.toHaveBeenCalled();
   });
 
+  it("POST /ia/alterar-item restringe `campo` às chaves do item e leva o valor ATUAL no prompt (SPEC-27 Fase 2)", async () => {
+    verificarStatusMock.mockResolvedValue({
+      chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
+    });
+
+    const resposta = await fetch(`${base}/ia/alterar-item`, {
+      method: "POST",
+      body: JSON.stringify({
+        instrucao: "o timeout passou de 300ms para 150ms",
+        itemRotulo: "01",
+        contextoNo: "srv-checkout (Serviço)",
+        campos: [
+          { chave: "_historiaUsuario", rotulo: "História de usuário", valorAtual: "Como cliente, quero fechar o pedido." },
+          { chave: "_criteriosAceite", rotulo: "Critérios de aceite", valorAtual: "1. Responde em 300ms." },
+        ],
+      }),
+    });
+    expect(resposta.status).toBe(200);
+    const corpo = JSON.parse(await resposta.text());
+    expect(Object.keys(corpo)).toEqual(["alteracoes"]);
+
+    const { prompt, schema } = ultimaChamadaComSchema();
+    const item = (schema.properties?.alteracoes as SchemaFake | undefined)?.items;
+    // O enum é a trava: o modelo não altera um campo que o item não tem.
+    expect(item?.properties?.campo.enum).toEqual(["_historiaUsuario", "_criteriosAceite"]);
+    expect(item?.required).toContain("motivo");
+    // O "antes" precisa estar no prompt — sem ele o modelo reescreve do zero.
+    expect(prompt).toContain("1. Responde em 300ms.");
+    expect(prompt).toContain("o timeout passou de 300ms para 150ms");
+  });
+
+  it("POST /ia/alterar-item com `oQueMudou` vira PROPAGAÇÃO: manda preservar o resto e aceita lista vazia", async () => {
+    verificarStatusMock.mockResolvedValue({
+      chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
+    });
+
+    await fetch(`${base}/ia/alterar-item`, {
+      method: "POST",
+      body: JSON.stringify({
+        instrucao: "",
+        itemRotulo: "02",
+        oQueMudou: "01 · Critérios de aceite: 1. Responde em 150ms.",
+        campos: [{ chave: "_criteriosAceite", rotulo: "Critérios de aceite" }],
+      }),
+    });
+
+    const { prompt } = ultimaChamadaComSchema();
+    expect(prompt).toContain("O QUE MUDOU");
+    expect(prompt).toContain("Ajuste APENAS o que decorre dessa mudança");
+    // Lista vazia é resposta correta — sem isso o modelo inventa alteração.
+    expect(prompt).toContain("lista VAZIA");
+  });
+
+  it("POST /ia/alterar-item sem campos, ou sem instrução nem `oQueMudou`, é 400 e não carrega o modelo", async () => {
+    verificarStatusMock.mockResolvedValue({
+      chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
+    });
+
+    const semCampos = await fetch(`${base}/ia/alterar-item`, {
+      method: "POST",
+      body: JSON.stringify({ instrucao: "muda algo", itemRotulo: "01", campos: [] }),
+    });
+    expect(semCampos.status).toBe(400);
+
+    const semPedido = await fetch(`${base}/ia/alterar-item`, {
+      method: "POST",
+      body: JSON.stringify({ instrucao: "  ", itemRotulo: "01", campos: [{ chave: "x", rotulo: "X" }] }),
+    });
+    expect(semPedido.status).toBe(400);
+    expect(completarComSchemaMock).not.toHaveBeenCalled();
+  });
+
   it("POST /ia/sugerir-config devolve um objeto no schema do alvo, com o pedido e o contexto no prompt (SPEC-23 Fluxo 2)", async () => {
     verificarStatusMock.mockResolvedValue({
       chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
