@@ -70,7 +70,10 @@ Por que a conversa vence os botões e vence o Jira:
 
 Toda proposta cai no **mesmo painel de diff do Bloco 3** — aceitar/rejeitar, individual ou em lote. O `approve` do usuário é literalmente o mecanismo que já existe (`origem: "sugerido"` → `confirmado: true`): nada entra na quebra sem passar por lá.
 
-**Pré-requisito honesto**: tool use encadeado confiável. Com o Qwen3-4B local isso seria frustrante (modelos pequenos erram a escolha e os argumentos das ferramentas em cadeias longas). O chat depende da **SPEC-25 Fase 2** — o wrapper corporativo ou o Claude. Registrado como dependência dura, não como detalhe.
+**Pré-requisito honesto, em dois degraus** (revisto depois do achado da SPEC-25 §8.1 — o token do wrapper ainda não existe, então nada pode ficar refém dele):
+
+- **5a — comando guiado (funciona em modelo pequeno)**: o usuário escreve a intenção em linguagem natural, mas quem **computa o impacto é o app** (`listarImpactados` no grafo, determinístico) e o modelo só **redige** o ajuste de cada campo — exatamente o que ele já faz bem hoje na esteira. Sem tool use livre, sem cadeia longa: uma chamada por campo, com o diff da mudança no prompt. É o chat "com trilhos".
+- **5b — conversa livre com ferramentas (exige provedor forte)**: o agente escolhe e encadeia as ferramentas sozinho. Com o Qwen3-4B isso seria frustrante (modelos pequenos erram a escolha e os argumentos em cadeias longas). Espera a **SPEC-25 Fase 2** — wrapper corporativo ou Claude —, sem bloquear nada antes disso.
 
 Relação com o histórico: este é o "Fluxo 1 — canvas em conversa" da SPEC-23, que foi desenhado e adiado por ser o mais arriscado. Ele volta agora **com o alvo trocado** — conversa sobre os ITENS já derivados (material estruturado, impacto computável), não sobre o desenho do canvas. É a versão de menor risco e maior valor imediato da mesma ideia; o canvas em conversa continua adiado.
 
@@ -84,12 +87,16 @@ Toda edição humana sobre uma sugestão é sinal. Capturar o par (sugerido → 
 
 ## 5. Sequência recomendada
 
-1. **Bloco 1** — procedência + obsolescência. Determinístico, barato, pré-requisito de tudo, com valor imediato mesmo sem modelo melhor.
-2. **SPEC-25 Fase 0 + 2** — conectar ao wrapper corporativo/Claude. Deixou de ser paralelo e virou **pré-requisito duro**: propagação com modelo de 4B produz ajuste ruim, e o chat do Bloco 5 depende de tool use encadeado confiável.
-3. **Blocos 2 + 3** juntos — propagação e diff nascem casados; um sem o outro é perigoso ou inútil.
-4. **Bloco 5 (chat)** — a interface preferida do usuário, montada SOBRE 2+3 (as ferramentas do agente são as operações já implementadas ali; sem elas o chat seria conversa fiada).
-5. **Bloco 4a** — checagens determinísticas: barato, alto valor, independe de tudo acima (pode ser antecipado a qualquer momento).
-6. **Blocos 6 e 4b** — o flywheel, quando houver volume de edições reais para aprender.
+Revista depois do achado da SPEC-25 §8.1 (*"já tenho o endpoint da empresa, mas ainda não tenho o token; embarcar um modelo é a forma de validar a ferramenta no dia a dia"*). Regra que passa a valer: **nada que dependa do token entra no caminho crítico** — e o que é determinístico vem antes, porque entrega valor com qualquer modelo.
+
+1. **SPEC-25 Fase 0 + Anthropic** — abstração `ProvedorIa` (refactor puro) e conexão ao Claude na máquina pessoal. Primeiro por um motivo prático (SPEC-25 §8.2): é o que transforma um ciclo de validação de ~12 minutos em segundos. Tudo abaixo fica mais barato de construir depois disso. Não depende do token corporativo.
+2. **Bloco 1** — procedência + obsolescência. Determinístico, barato, pré-requisito dos blocos 2/3 e com valor imediato: a tela passa a avisar o que ficou para trás mesmo sem IA nenhuma.
+3. **Bloco 4a** — checagens determinísticas do engine. Independem de tudo, custam pouco, atacam direto o "não esquecer coisas".
+4. **Blocos 2 + 3** — propagação e diff, casados. Desenhados no Claude, **validados também no embarcado** antes de fechar (princípio de §8.2: degradar até o piso, não otimizar para ele). O diff é justamente o que torna aceitável o modelo errar.
+5. **SPEC-25 Fase 1 (DeepSeek local)** — sobe o piso do ambiente da empresa, medido contra a saída do Claude no mesmo cenário como referência.
+6. **Bloco 5a** — chat com trilhos (impacto computado pelo app, modelo só redige). É o modo que roda na empresa.
+7. **SPEC-25 Fase 2/wrapper** quando o token sair → destrava **5b** (conversa livre com ferramentas) sem mudar nada da arquitetura.
+8. **Blocos 6 e 4b** — o flywheel, quando houver volume de edições reais para aprender.
 
 ## 6. Fora de escopo, deliberado
 
