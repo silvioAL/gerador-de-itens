@@ -126,6 +126,69 @@ describe("useEsteiraDeAgentes (SPEC-24 — orquestração por papel × lotes de 
     });
   });
 
+  it("item com MUITO mais placeholders que os outros no mesmo lote recebe todos — chaves com '::', espaços e acentos", async () => {
+    // Achado da validação real (cenário de integração interna): o item do nó
+    // marcado como EXISTENTE tinha 17 placeholders contra 10 dos demais — 9
+    // deles do especialista, com chaves como
+    // "Backend::volumetria::Response time" e "Backend::Definir timeout e
+    // política de retry". Ele terminou a esteira sem nenhum pip aceso,
+    // enquanto os outros 3 itens do MESMO lote acenderam os 4. Este teste
+    // fixa a parte que é nossa: dado que o modelo devolve as chaves, a
+    // distribuição não pode perder nenhuma por causa da forma da chave nem
+    // do desequilíbrio de tamanho entre itens do lote.
+    const chavesPesadas = [
+      "Backend::Definir pontos de log (decisão, erro, correlação)",
+      "Backend::Definir timeout e política de retry",
+      "Backend::Definir autenticação/autorização da chamada",
+      "Backend::volumetria::Response time",
+      "Backend::volumetria::RPS (Requisições por segundo)",
+    ];
+    const pesado: ItemFilaEsteira = {
+      atividadeChave: "n2::ep0",
+      atividadeRotulo: "Endpoint do serviço existente",
+      contextoNo: "",
+      placeholdersPorPapel: {
+        po: [{ chave: "_historiaUsuario", tech: "", rotulo: "História de usuário" }],
+        arquiteto: [{ chave: "_contratoRequest", tech: "", rotulo: "Request" }],
+        especialista: chavesPesadas.map((chave) => ({ chave, tech: "Backend", rotulo: chave })),
+        qa: [{ chave: "_regrasTeste", tech: "", rotulo: "Regras de teste" }],
+      },
+    };
+    apiIaSugerirPipelineMock.mockImplementation(async (papel: string, pedido: PedidoLote) => respostaDoLote(papel, pedido));
+    const onResponderItem = vi.fn();
+    const { result } = renderHook(() => useEsteiraDeAgentes({ onResponderItem }));
+
+    act(() => result.current.iniciar([item(1), pesado, item(2)]));
+    await waitFor(() => expect(result.current.rodando).toBe(false));
+
+    const respondidasDoPesado = onResponderItem.mock.calls.filter(([chave]) => chave === "n2::ep0").map(([, ph]) => ph);
+    expect(respondidasDoPesado).toEqual(["_historiaUsuario", "_contratoRequest", ...chavesPesadas, "_regrasTeste"]);
+    // E o item leve do mesmo lote não perde nada por conviver com o pesado.
+    expect(onResponderItem.mock.calls.filter(([chave]) => chave === "a1")).toHaveLength(4);
+  });
+
+  it("resposta que volta sem campos de um item AVISA no console — a falha que custou horas era silenciosa", async () => {
+    const avisos: unknown[][] = [];
+    const spy = vi.spyOn(console, "warn").mockImplementation((...args) => void avisos.push(args));
+    // O modelo responde o item a1 e ignora o a2 — exatamente o formato do
+    // problema observado na validação real.
+    apiIaSugerirPipelineMock.mockImplementation(async (papel: string, pedido: PedidoLote) => {
+      const completa = respostaDoLote(papel, pedido);
+      delete completa.a2;
+      return completa;
+    });
+    const { result } = renderHook(() => useEsteiraDeAgentes({}));
+
+    act(() => result.current.iniciar([item(1), item(2)]));
+    await waitFor(() => expect(result.current.rodando).toBe(false));
+
+    const doA2 = avisos.filter((a) => String(a[0]).includes('"a2"'));
+    // Um aviso por papel que perdeu o item — nenhum papel some sem deixar rastro.
+    expect(doA2).toHaveLength(4);
+    expect(String(doA2[0][0])).toContain("[esteira/po]");
+    spy.mockRestore();
+  });
+
   it("respostasAoVivoPorItem reflete o streaming aninhado DURANTE a chamada, e limpa ao terminar; atual segue o item escrito", async () => {
     let emitir!: (acumulado: string) => void;
     let liberar!: () => void;

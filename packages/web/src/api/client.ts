@@ -419,7 +419,71 @@ export const apiIa = {
     }
     return JSON.parse(acumulado) as Record<string, Record<string, string>>;
   },
+  /** SPEC-23 Fluxo 2 — configurar com apoio de IA ("poder ajustar as
+   * configurações com apoio de IA"). Devolve um OBJETO no schema do `alvo`
+   * (campo de nó, campo de aresta, papel da esteira), pra UI pré-preencher o
+   * formulário que já existe. A IA nunca grava configuração: quem salva é o
+   * usuário, pela rota de sempre. Mesmo contrato de streaming do pipeline —
+   * texto cru do JSON, parse no fim. */
+  sugerirConfig: async <T>(
+    pedido: { alvo: AlvoSugestaoConfig; instrucao: string; contexto?: string },
+    onTexto?: (acumulado: string) => void
+  ): Promise<T> => {
+    const resposta = await fetch(`${BASE_URL}/ia/sugerir-config`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(pedido),
+    });
+    if (!resposta.ok) {
+      const corpo = await resposta.json().catch(() => ({}));
+      const mensagem = typeof corpo.erro === "string" ? corpo.erro : "Não foi possível gerar a sugestão.";
+      throw new Error(mensagem);
+    }
+    let acumulado = "";
+    const leitor = resposta.body?.getReader();
+    if (leitor) {
+      const decodificador = new TextDecoder();
+      for (;;) {
+        const { done, value } = await leitor.read();
+        if (done) break;
+        acumulado += decodificador.decode(value, { stream: true });
+        onTexto?.(acumulado);
+      }
+      acumulado += decodificador.decode();
+    } else {
+      acumulado = await resposta.text();
+    }
+    return JSON.parse(acumulado) as T;
+  },
 };
+
+/** Alvos que o servidor sabe sugerir (`ALVOS_SUGESTAO_CONFIG` no CLI). */
+export type AlvoSugestaoConfig = "campo-no" | "campo-aresta" | "papel";
+
+/** O que a IA devolve pro alvo "campo-no"/"campo-aresta" — subconjunto de
+ * `DadosCampoNo` que faz sentido a IA propor (nada de `ordem`, `timeId` ou
+ * `tipoNo`, que são do contexto, não da sugestão). */
+export interface SugestaoCampo {
+  key: string;
+  label: string;
+  type: CampoNo["type"];
+  ajuda: string;
+  opcoes: string[];
+  required: boolean;
+  permiteNA: boolean;
+}
+
+/** O que a IA devolve pro alvo "papel" — sem `grupo`/`ativo`/`ordem`, que a
+ * UI decide (um papel novo nasce ativo, no fim da fila, no grupo escolhido
+ * por quem está configurando). */
+export interface SugestaoPapel {
+  id: string;
+  nome: string;
+  descricao: string;
+  preambulo: string;
+  contextos: string[];
+}
 
 export const apiPerfisTime = {
   listar: () => requisitar<PerfisConfig>("/perfis-time"),

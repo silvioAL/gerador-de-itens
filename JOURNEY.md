@@ -1244,3 +1244,11 @@ Três coisas que este episódio deixa registradas:
 - **A abstração sobreviveu ao motivo que a criou.** `ProvedorIa` nasceu pra alternar entre dois modelos locais — alternativa que deixou de existir no mesmo dia. Ela continua, porque o valor real dela sempre foi a Fase 2 (o wrapper corporativo, §4.6 da SPEC-25). Uma abstração que só se justifica por um caso de uso vira dívida quando o caso some; esta tinha dois.
 - **"O modelo é fraco" é uma hipótese, não um diagnóstico** — e é a hipótese mais cara de aceitar sem teste, porque a resposta natural (baixar um modelo maior) custa GB, horas e complexidade permanente. A pergunta barata era "o que o nosso código está impedindo o modelo de fazer?", e ela vinha antes.
 - **Trabalho jogado fora não foi desperdício.** O DeepSeek instalado foi o que forçou a briga grammar × raciocínio, o `resetChatHistory()`, o `console.error` na rota e o caminho de duas fases. Tudo isso ficou — e é exatamente o que faz o Qwen render agora. O que saiu foi só o arquivo de 5 GB.
+
+**Um ponto ficou em aberto, e vai registrado como aberto.** Na esteira completa de validação (4 papéis, 4× HTTP 200, 3647s), três dos quatro itens acenderam os quatro pips e um não acendeu nenhum: `n2::ep0`, o item do nó marcado como EXISTENTE, que tem 17 placeholders contra 10 dos demais. O que foi possível descartar sem gastar mais uma hora de modelo:
+
+- **Não é a UI**: os quatro elementos de pip existem para esse item, e ele entra na fila (17 campos de refinamento renderizados).
+- **Não é a distribuição**: um teste determinístico novo monta exatamente essa forma — item pesado no mesmo lote que itens leves, chaves com `::`, espaços e acentos (`Backend::volumetria::RPS (Requisições por segundo)`) — e todas as chaves chegam ao `onResponderItem`.
+- **A tentativa de isolar o papel PO não concluiu**: passou de 1800s sem resposta e expirou.
+
+Sobra a hipótese do lado do modelo (resposta incompleta para aquele item apesar da grammar). Em vez de chutar, apliquei a mesma lição do bug anterior: **perda parcial agora avisa**. Quando um lote volta com dados mas faltando campos de algum item, o hook loga papel, item e chaves ausentes. Na próxima execução real a resposta vem de graça, em vez de sair de novo de um pip apagado num screenshot.

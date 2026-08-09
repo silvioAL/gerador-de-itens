@@ -636,6 +636,160 @@ async function tratarIaSugerir(req: IncomingMessage, res: ServerResponse, dirPro
   }
 }
 
+// --- POST /ia/sugerir-config — SPEC-23 Fluxo 2: configurar com apoio de IA.
+// Pedido do usuário: "poder ajustar as configurações com apoio de IA". A
+// diferença pro `/ia/sugerir` (texto livre, um campo) é que aqui a saída É um
+// OBJETO de configuração — precisa sair no schema exato que o formulário já
+// sabe editar, senão não dá pra pré-preencher.
+//
+// Decisão que evita a armadilha do JOURNEY §41 (a skill que virou ferramenta
+// paralela): a IA NÃO grava configuração. Ela devolve o objeto, a UI preenche
+// o formulário que já existe, e o usuário salva pelo caminho normal — mesma
+// rota, mesma validação, mesmo arquivo. Sugestão é rascunho, nunca escrita.
+//
+// Os alvos ficam numa TABELA declarativa: adicionar um novo (ex.: regra de
+// checklist na Fase 5) é uma entrada aqui, sem tocar no roteador nem na UI
+// genérica do botão.
+interface AlvoSugestaoConfig {
+  /** O que a IA está escrevendo — entra no prompt em primeira linha. */
+  descricao: string;
+  schema: GbnfJsonSchema;
+  /** Regras de preenchimento específicas do alvo (formato de chave, limites
+   * de vocabulário) — o que um modelo pequeno erra se não for dito. */
+  regras: string[];
+}
+
+const TIPOS_CAMPO = ["text", "textarea", "number", "boolean", "select", "lista"] as const;
+
+const ALVOS_SUGESTAO_CONFIG: Record<string, AlvoSugestaoConfig> = {
+  "campo-no": {
+    descricao: "um campo de formulário de um TIPO DE NÓ do diagrama de arquitetura",
+    schema: {
+      type: "object",
+      properties: {
+        key: { type: "string" },
+        label: { type: "string" },
+        type: { enum: [...TIPOS_CAMPO] },
+        ajuda: { type: "string" },
+        opcoes: { type: "array", items: { type: "string" } },
+        required: { type: "boolean" },
+        permiteNA: { type: "boolean" },
+      },
+      required: ["key", "label", "type", "ajuda", "opcoes", "required", "permiteNA"],
+    },
+    regras: [
+      `"key" em camelCase, sem espaços nem acentos — é identificador, não texto de tela.`,
+      `"label" é o texto que aparece pro usuário, em português.`,
+      `"opcoes" só faz sentido com type "select"; nos outros, devolva lista vazia.`,
+      `"ajuda" é uma frase curta explicando o que preencher, não a repetição do label.`,
+    ],
+  },
+  "campo-aresta": {
+    descricao: "um campo de formulário de um TIPO DE CONEXÃO entre nós do diagrama",
+    schema: {
+      type: "object",
+      properties: {
+        key: { type: "string" },
+        label: { type: "string" },
+        type: { enum: [...TIPOS_CAMPO] },
+        ajuda: { type: "string" },
+        opcoes: { type: "array", items: { type: "string" } },
+        required: { type: "boolean" },
+        permiteNA: { type: "boolean" },
+      },
+      required: ["key", "label", "type", "ajuda", "opcoes", "required", "permiteNA"],
+    },
+    regras: [
+      `"key" em camelCase, sem espaços nem acentos.`,
+      `O campo descreve a CONEXÃO (contrato, timeout, autenticação, retry), não os nós das pontas.`,
+      `"opcoes" só faz sentido com type "select"; nos outros, devolva lista vazia.`,
+    ],
+  },
+  papel: {
+    descricao: "um PAPEL (agente) da esteira que especifica os itens de trabalho",
+    schema: {
+      type: "object",
+      properties: {
+        id: { type: "string" },
+        nome: { type: "string" },
+        descricao: { type: "string" },
+        preambulo: { type: "string" },
+        contextos: { type: "array", items: { type: "string" } },
+      },
+      required: ["id", "nome", "descricao", "preambulo", "contextos"],
+    },
+    regras: [
+      `"id" em minúsculas, sem espaços nem acentos (ex.: "seguranca").`,
+      `"nome" é o título curto que aparece na esteira; "descricao" cabe em uma linha.`,
+      `"preambulo" é a INSTRUÇÃO que esse agente recebe: diga o papel, o formato`,
+      `esperado e a profundidade (quantos itens, o que cobrir) — é o que separa`,
+      `uma resposta útil de uma resposta de duas linhas.`,
+      `"contextos" limita em quais itens o papel atua; lista vazia = atua em todos.`,
+    ],
+  },
+};
+
+async function tratarIaSugerirConfig(req: IncomingMessage, res: ServerResponse, dirProjeto: string): Promise<void> {
+  try {
+    const status = await verificarStatus(undefined, (await lerConfigIa(dirProjeto)).provedorPadrao);
+    if (!status.pronto) {
+      enviarJson(res, 503, { erro: "modelos de IA não instalados — rode `gerador ia instalar`" });
+      return;
+    }
+
+    const { alvo, instrucao, contexto } = await lerCorpoJson<{
+      alvo: string;
+      instrucao: string;
+      /** Onde a sugestão vai morar (tipo de nó, tipo de aresta, techs do time)
+       * — sem isso o modelo escreve campo genérico, que é o que ninguém quer. */
+      contexto?: string;
+    }>(req);
+
+    const definicao = ALVOS_SUGESTAO_CONFIG[alvo];
+    // Alvo desconhecido é 400 de propósito (ao contrário de papel na esteira,
+    // que cai no genérico): aqui o schema É o contrato com o formulário — sem
+    // ele a resposta não teria onde ser preenchida.
+    if (!definicao) {
+      enviarJson(res, 400, {
+        erro: `alvo desconhecido: "${alvo}" (conhecidos: ${Object.keys(ALVOS_SUGESTAO_CONFIG).join(", ")})`,
+      });
+      return;
+    }
+    if (!instrucao?.trim()) {
+      enviarJson(res, 400, { erro: "instrucao vazia — descreva o que a IA deve propor" });
+      return;
+    }
+
+    const prompt = [
+      `Você ajuda a configurar uma ferramenta de refinamento de itens de trabalho de software.`,
+      `Escreva ${definicao.descricao}.`,
+      ``,
+      `Pedido do usuário: ${instrucao.trim()}`,
+      ...(contexto?.trim() ? [``, `Onde essa configuração vai valer:`, contexto.trim()] : []),
+      ``,
+      `Regras:`,
+      ...definicao.regras.map((r) => `- ${r}`),
+      `- Responda em português, com decisões concretas pro caso descrito — nunca genéricas.`,
+    ].join("\n");
+
+    const provedor = await obterProvedor(dirProjeto);
+    // Mesmo contrato de `/ia/pipeline/:papel`: texto cru do JSON restrito por
+    // grammar, streamado. A UI mostra o progresso e faz o parse no fim.
+    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" });
+    await provedor.completarEstruturado(prompt, definicao.schema, { onTexto: (pedaco) => res.write(pedaco) });
+    res.end();
+  } catch (erro) {
+    void descartarProvedor();
+    const mensagem = erro instanceof Error ? erro.message : "Falha desconhecida ao sugerir configuração.";
+    console.error(`[ia/sugerir-config] falhou:`, mensagem);
+    if (res.headersSent) {
+      res.end();
+    } else {
+      enviarJson(res, 500, { erro: `Não foi possível gerar a sugestão: ${mensagem}` });
+    }
+  }
+}
+
 // --- POST /ia/pipeline/:papel — SPEC-24 Fase B: esteira de agentes (PO →
 // Arquiteto → Especialista técnico → QA). Substitui `/ia/sugerir-item`
 // (Fase 1d-ii, removida — aquele mecanismo gerava a ficha inteira do item
@@ -836,6 +990,10 @@ export async function tratarApiLocal(req: IncomingMessage, res: ServerResponse, 
   }
   if (caminho === "/ia/sugerir" && metodo === "POST") {
     await tratarIaSugerir(req, res, dirProjeto);
+    return true;
+  }
+  if (caminho === "/ia/sugerir-config" && metodo === "POST") {
+    await tratarIaSugerirConfig(req, res, dirProjeto);
     return true;
   }
   if (caminho === "/config/ia" && (metodo === "GET" || metodo === "PUT")) {
