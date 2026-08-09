@@ -66,29 +66,62 @@ Risco central documentado: modelos R são RACIOCINADORES — emitem `<think>…<
 - `gerador ia instalar --modelo deepseek` baixa o segundo GGUF; `gerador ia status` lista os dois + estado da conexão externa.
 - Aba Pipeline de IA (Fase F): select opcional de provedor por papel (Fase 3).
 
-## 5. Trade-offs registrados
+## 5. Jornada do usuário (planejada com o usuário: "escolher um modelo local, ou conectar-se ao DeepSeek ou ao Claude")
 
-| | Qwen3-4B (atual) | DeepSeek R1 distill 7-8B | Claude (Anthropic) |
-|---|---|---|---|
-| Qualidade/profundidade | básica | boa (raciocínio) | melhor |
-| Velocidade (CPU local) | referência | ~2-3× mais lento + think | rápida (rede) |
-| Custo | zero | zero | por token |
-| Privacidade | total | total | dados saem da máquina |
-| Requisitos | ~2.5GB disco | ~5GB disco, mais RAM | chave + rede |
+Tudo acontece numa aba nova **"Modelo de IA"** em Configurações: um card por provedor, cada um com estado, ação principal e o radio "usar como padrão". O mesmo fluxo existe em CLI (`gerador ia …`) pra quem não abre a UI.
 
-## 6. Fora de escopo, deliberado
+### 5.1 Jornada A — modelo local (sem conta, sem rede além do download)
 
+1. Card "Qwen3-4B (local)" — estado: `instalado ✓` (é o de fábrica) — e card "DeepSeek R1 (local)" — estado: `baixar ~5 GB`.
+2. Clique em "Baixar e usar" → barra de progresso (mesmo mecanismo do `gerador ia instalar` de hoje) → ao concluir, o card vira `instalado ✓` e o radio pode ser marcado.
+3. Marcar o radio grava `provedorPadrao` em `config/ia.json`. A próxima esteira já roda no modelo escolhido. Nenhum dado sai da máquina, nunca.
+
+### 5.2 Jornada B — conectar ao DeepSeek (nuvem, API)
+
+Registro honesto de mecanismo: **não existe OAuth de terceiros pra API do DeepSeek** — "entrar com Google" acontece NO SITE do DeepSeek (a plataforma deles aceita conta Google), não dentro do nosso app; o artefato que chega pra gente é sempre uma CHAVE de API. A jornada embrulha isso pra parecer um login guiado:
+
+1. Card "DeepSeek (nuvem)" → botão **"Conectar"**.
+2. O app abre o navegador na página de chaves da plataforma DeepSeek (lá o usuário entra como preferir — Google incluído — e cria/copia a chave).
+3. De volta ao app: campo "cole a chave", botão "Validar e conectar" → uma chamada de teste barata confirma a chave.
+4. Chave gravada em `~/.gerador/credenciais.json` (home, NUNCA em `config/` — que é versionável). Card vira `conectado (sk-…c12)` com botão "Desconectar".
+5. Aviso permanente no card: "o conteúdo das quebras/épicos é enviado ao provedor; cobrança por token".
+
+Se um dia o provedor oferecer OAuth de verdade pra API, a jornada troca os passos 2-3 pelo fluxo direto — o resto (armazenamento, aviso, card) não muda.
+
+### 5.3 Jornada C — conectar ao Claude (Anthropic)
+
+Idêntica à B, apontando pro console da Anthropic (chaves de API). Campo extra no card: o modelo (`claude-sonnet-5` default). Mesmo armazenamento, mesmo aviso.
+
+### 5.4 Jornada D — por papel (Fase 4, depois do resto)
+
+Na aba Pipeline de IA (Fase F), cada papel ganha um select "Provedor: (padrão) | …" listando só os provedores prontos/conectados. Caso de uso: PO/QA no Claude, Especialista no local.
+
+## 6. Trade-offs registrados
+
+| | Qwen3-4B (local, atual) | DeepSeek R1 distill (local) | DeepSeek API (nuvem) | Claude (Anthropic) |
+|---|---|---|---|---|
+| Qualidade/profundidade | básica | boa (raciocínio) | muito boa (R1/V3 completos) | melhor |
+| Velocidade | referência | ~2-3× mais lento + think | rápida (rede) | rápida (rede) |
+| Custo | zero | zero | baixo (por token) | por token |
+| Privacidade | total | total | dados saem da máquina | dados saem da máquina |
+| Requisitos | ~2.5GB disco | ~5GB disco, mais RAM | conta + chave + rede | conta + chave + rede |
+
+Nota da API DeepSeek: compatível com o formato OpenAI (`chat/completions`); a garantia de estrutura é mais fraca que GBNF/tool-use (`response_format: json_object` + validação + 1 retry no provedor); o R1 expõe o raciocínio em `reasoning_content` separado — encaixa direto no estado "pensando…" da UI.
+
+## 7. Fora de escopo, deliberado
+
+- OAuth próprio do app ("entrar com Google" DENTRO do gerador) — não existe suporte de terceiros nas APIs de DeepSeek/Anthropic hoje (§5.2); a jornada de conexão guiada entrega o mesmo resultado com o mecanismo que existe.
 - Ollama/OpenAI/outros provedores — a interface `ProvedorIa` os comporta; registrados como extensão, não desenhados agora.
 - Fine-tuning; benchmark automatizado (a medição da Fase 1 é manual e registrada no JOURNEY).
 - Trocar o modelo de EMBEDDINGS (só chat/pipeline — o índice de retrospectivas da SPEC-23 continua como está).
 
-## 7. Roteiro faseado
+## 8. Roteiro faseado
 
-1. **Fase 0 — abstração**: interface `ProvedorIa` + `ProvedorLocalLlama` embrulhando o motor atual; rotas resolvem provedor pela config (`config/ia.json` com só o default). Zero mudança de comportamento; regressão prova.
-2. **Fase 1 — DeepSeek local**: registro do modelo, `ia instalar --modelo deepseek`, seleção pela aba nova, tratamento do `<think>` (§4.3). Verificação: mesma esteira no cenário de crédito com os dois modelos, comparação de profundidade/tempo registrada no JOURNEY.
-3. **Fase 2 — Anthropic**: `ProvedorAnthropic` (tool use estruturado + streaming), `gerador ia conectar`, aviso de privacidade. Verificação real com chave do usuário.
-4. **Fase 3 — provedor por papel** (Fase F): `papeis[].provedor` + select na aba Pipeline.
+1. **Fase 0 — abstração**: interface `ProvedorIa` + `ProvedorLocalLlama` embrulhando o motor atual; rotas resolvem provedor pela config (`config/ia.json` com só o default); aba "Modelo de IA" nasce aqui mostrando só os cards locais. Zero mudança de comportamento; regressão prova.
+2. **Fase 1 — DeepSeek local**: registro do modelo, download pela aba/`ia instalar --modelo deepseek`, seleção (Jornada A completa), tratamento do `<think>` (§4.3). Verificação: mesma esteira no cenário de crédito com os dois modelos, comparação de profundidade/tempo registrada no JOURNEY.
+3. **Fase 2 — conexão a provedores (Jornadas B e C)**: a infraestrutura de "Conectar" é UMA só (abrir navegador, colar chave, validar, `~/.gerador/credenciais.json`, aviso de privacidade, `gerador ia conectar <provedor>`) — implementada uma vez e instanciada duas: `ProvedorDeepSeekApi` (formato OpenAI, `json_object` + validação/retry, `reasoning_content` → "pensando…") e `ProvedorAnthropic` (tool use forçado + streaming de `input_json`). Verificação real com as chaves do usuário.
+4. **Fase 3 — provedor por papel** (Jornada D): `papeis[].provedor` + select na aba Pipeline listando só provedores prontos.
 
-## 8. Verificação
+## 9. Verificação
 
-Fase a fase, contra o `gerador open` real (disciplina de sempre): Fase 0 = regressão intacta; Fase 1 = comparação lado a lado dos dois modelos locais; Fase 2 = esteira completa via Claude com streaming e JSON válido; Fase 3 = esteira mista (papéis em provedores diferentes) num run só.
+Fase a fase, contra o `gerador open` real (disciplina de sempre): Fase 0 = regressão intacta + aba renderizando; Fase 1 = comparação lado a lado dos dois modelos locais; Fase 2 = esteira completa via DeepSeek API e via Claude, com streaming e JSON válido, chave validada e guardada fora do projeto; Fase 3 = esteira mista (papéis em provedores diferentes) num run só.
