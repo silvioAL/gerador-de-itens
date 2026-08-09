@@ -1302,3 +1302,23 @@ Cada seção herdou a forma do seu tipo, sem forçar uma abstração comum onde 
 Validação real contra o `regras.json` do projeto de teste: 27 requisitos técnicos, 11 de processo, 13 ciclos de teste e a volumetria com seus 4 contextos, todos renderizados; marcar `hlg` num ciclo gravou no arquivo mantendo o resto intacto.
 
 Regressão: web 214 (+4).
+
+## 90. A ferramenta passa a saber o que ficou para trás
+
+A dor que abriu a SPEC-26, nas palavras do usuário: *"mudou especificação na história X, aí preciso atualizar tudo manualmente depois"*. Reler tudo a cada mudança de desenho é caro — mas o caro de verdade não é reescrever, é **lembrar** o que precisa ser reescrito.
+
+Bloco 1 resolve exatamente essa metade, e resolve **sem modelo nenhum**: toda resposta gravada leva junto o carimbo dos insumos que a produziram (rótulo → hash). Comparar o carimbo com o desenho atual diz, a qualquer momento, quais respostas nasceram de algo que já mudou.
+
+Três decisões que valem mais que o código:
+
+- **Hash por insumo, não do conjunto.** Um hash único diria "algo mudou" — inútil. Por insumo, a tela diz `srv-checkout.endpoints`, e a pessoa sabe onde olhar.
+- **Sem valor antigo.** Guardar antes/depois seria versionamento, que a §6 da própria spec tira de escopo. O aviso vira "escrito antes de mudar: X" em vez de "mudou de A para B" — mesma ação resultante, sem carregar histórico que ninguém pediu.
+- **Sem `node:crypto`.** O engine roda no browser também; um hash que diferisse entre ambientes marcaria tudo como desatualizado sem nada ter mudado. FNV-1a de nove linhas resolve — não é criptografia, é detecção de mudança acidental.
+
+E um limite consciente: as respostas encadeadas dos papéis anteriores ainda **não** entram como insumo. Fazer isso exige saber a ORDEM dos papéis, que mora na config do pipeline e não no engine — sem ela, toda resposta viraria "desatualizada" assim que o papel seguinte escrevesse. Ruído, não sinal. Fica para o Bloco 2, que já vai precisar do grafo de ordem.
+
+Ausência de carimbo não acusa nada. Quem respondeu antes disto existir não tem o que comparar, e transformar isso em âmbar encheria a tela de alarme falso no primeiro uso.
+
+Validação real, o ciclo inteiro: responder um campo à mão (nenhum aviso), voltar ao canvas, mudar `endpoints` do `srv-checkout`, voltar à revisão — "⚠ 1 campo desatualizado" no header, selo no item e, no campo, "escrito antes de mudar: srv-checkout.endpoints".
+
+Regressão: engine 154 (+9), web 218 (+4).

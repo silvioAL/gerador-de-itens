@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  carimbarInsumos,
   gerarDiagramaHtml,
   gerarEspecificacaoEntrega,
+  insumosDivergentes,
+  insumosDoItem,
   montarFichaItem,
   type Atividade,
+  type InsumoDivergente,
   type Diagrama,
   type DiagramaConfig,
   type FichaEspecificacaoNo,
@@ -278,6 +282,54 @@ export function ReviewScreen({
 
   const contextoEpico = contextoEpicoCompleto(demandInfo, anexosContexto);
 
+  // SPEC-26 Bloco 1 — procedência. Toda resposta gravada leva junto o carimbo
+  // dos insumos que a produziram; comparar esse carimbo com o estado atual do
+  // desenho é o que permite dizer, depois, quais respostas ficaram para trás
+  // ("mudou especificação na história X, aí preciso atualizar tudo
+  // manualmente"). O carimbo é aplicado AQUI, e não no `useQuebra`, porque é
+  // aqui que existem as atividades derivadas — o hook guarda estado, não
+  // deriva.
+  const carimboDoItem = useCallback(
+    (atividadeChave: string): Record<string, string> | undefined => {
+      const atividade = resultado.atividades.find((a) => a.chave === atividadeChave);
+      if (!atividade) return undefined;
+      return carimbarInsumos(insumosDoItem(atividade, diagrama, contextoEpico));
+    },
+    [resultado.atividades, diagrama, contextoEpico]
+  );
+
+  const responderComProcedencia = useCallback(
+    (atividadeChave: string, chavePlaceholder: string, resposta: ValorSpec) => {
+      onResponderItem?.(atividadeChave, chavePlaceholder, {
+        ...resposta,
+        baseadoEm: carimboDoItem(atividadeChave),
+      });
+    },
+    [onResponderItem, carimboDoItem]
+  );
+
+  /** Quais insumos mudaram desde que cada resposta do item foi escrita. Vazio
+   * = alinhado com o desenho (ou resposta sem carimbo, de antes deste bloco —
+   * ver `insumosDivergentes`). */
+  const desatualizadosPorItem = useMemo(() => {
+    const mapa = new Map<string, Map<string, InsumoDivergente[]>>();
+    for (const atividade of resultado.atividades) {
+      const insumos = insumosDoItem(atividade, diagrama, contextoEpico);
+      const porChave = new Map<string, InsumoDivergente[]>();
+      for (const [chave, resposta] of Object.entries(respostasItens?.[atividade.chave] ?? {})) {
+        const divergentes = insumosDivergentes(resposta.baseadoEm, insumos);
+        if (divergentes.length > 0) porChave.set(chave, divergentes);
+      }
+      if (porChave.size > 0) mapa.set(atividade.chave, porChave);
+    }
+    return mapa;
+  }, [resultado.atividades, diagrama, contextoEpico, respostasItens]);
+
+  const totalDesatualizados = useMemo(
+    () => [...desatualizadosPorItem.values()].reduce((soma, m) => soma + m.size, 0),
+    [desatualizadosPorItem]
+  );
+
   // SPEC-24 Fase C: fila de trabalho da esteira — um item por ATIVIDADE,
   // com os placeholders já separados por papel (`ItemFilaEsteira`).
   // `apenasPendentes` false é usado por "Gerar de novo" (regenera tudo,
@@ -332,7 +384,8 @@ export function ReviewScreen({
     contextoEpico,
     papeis: papeisAtivos,
     confirmacaoObrigatoria,
-    onResponderItem: (atividadeChave, chavePlaceholder, resposta) => onResponderItem?.(atividadeChave, chavePlaceholder, resposta),
+    // SPEC-26 Bloco 1: o que a esteira escreve também nasce carimbado.
+    onResponderItem: responderComProcedencia,
   });
 
   // "O usuário poderá revisar, alterar e aí roda de novo o ciclo a partir
@@ -526,6 +579,13 @@ export function ReviewScreen({
             ))}
           </div>
         )}
+        {totalDesatualizados > 0 && (
+          // SPEC-26 Bloco 1: o aviso existe pra você parar de precisar LEMBRAR
+          // o que ficou pra trás quando o desenho muda.
+          <span data-testid="contador-desatualizados" style={avisoDesatualizadoEstilo} title="Respostas escritas antes de o desenho mudar">
+            ⚠ {totalDesatualizados} {totalDesatualizados === 1 ? "campo desatualizado" : "campos desatualizados"}
+          </span>
+        )}
         {esteira.rodando ? (
           <button onClick={esteira.pausado ? esteira.continuar : esteira.pausar} style={botaoEstilo}>
             {esteira.pausado ? "▶ Continuar" : "⏸ Pausar"}
@@ -685,6 +745,15 @@ export function ReviewScreen({
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <i style={{ width: 6, height: 6, borderRadius: "50%", background: CORES_STATUS[status], flexShrink: 0 }} />
                     <span style={{ fontWeight: 600, fontSize: 13 }}>{a.rotulo}</span>
+                    {desatualizadosPorItem.has(a.chave) && (
+                      <span
+                        data-testid={`desatualizado-${a.chave}`}
+                        style={seloDesatualizadoEstilo}
+                        title={`${desatualizadosPorItem.get(a.chave)!.size} campo(s) escrito(s) antes de o desenho mudar`}
+                      >
+                        ⚠ desatualizado
+                      </span>
+                    )}
                   </div>
                   <div style={{ fontSize: 11, color: "var(--dim, #8D9BB0)", marginTop: 3 }}>
                     {a.tipo} · {a.tamanho}
@@ -758,9 +827,10 @@ export function ReviewScreen({
                   {aba === "contrato" && <AbaContrato ficha={fichaSelecionada} />}
                   {aba === "refinamento" && (
                     <AbaRefinamento
+                      desatualizados={desatualizadosPorItem.get(atividadeSelecionada.chave)}
                       ficha={fichaSelecionada}
                       contextoEpico={contextoEpico}
-                      onResponder={(chave, resposta) => onResponderItem?.(atividadeSelecionada.chave, chave, resposta)}
+                      onResponder={(chave, resposta) => responderComProcedencia(atividadeSelecionada.chave, chave, resposta)}
                       papelEmGeracao={
                         esteira.rodando && esteira.escrevendoChaves.includes(atividadeSelecionada.chave)
                           ? papeisAtivos.find((p) => p.id === esteira.papelAtual)?.grupo
@@ -902,6 +972,9 @@ function formatarValorCampo(valor: unknown): string {
 }
 
 interface AbaRefinamentoProps {
+  /** SPEC-26 Bloco 1: chave do placeholder → insumos que mudaram desde que a
+   * resposta foi escrita. Ausente/vazio = alinhado com o desenho. */
+  desatualizados?: Map<string, InsumoDivergente[]>;
   ficha: FichaItem;
   /** Contexto do épico/demanda (Fase 1b, SPEC-23) — mandado junto no `/ia/sugerir` real. */
   contextoEpico?: string;
@@ -946,6 +1019,7 @@ interface AbaRefinamentoProps {
 function AbaRefinamento({
   ficha,
   contextoEpico,
+  desatualizados,
   onResponder,
   papelEmGeracao,
   nomePapelEmGeracao,
@@ -1028,6 +1102,18 @@ function AbaRefinamento({
                       <span style={{ flex: 1, fontSize: 13 }}>{p.rotulo}</span>
                       <span style={origemEstilo}>{p.tech || "Geral"}</span>
                     </div>
+                    {desatualizados?.get(p.chave)?.length ? (
+                      // O "por quê" navegável: qual insumo mudou depois desta
+                      // resposta. Não mostra o valor ANTIGO de propósito —
+                      // procedência não é versionamento (SPEC-26 §6).
+                      <div data-testid={`desatualizado-campo-${p.chave}`} style={motivoDesatualizadoEstilo}>
+                        ⚠ escrito antes de mudar:{" "}
+                        {desatualizados
+                          .get(p.chave)!
+                          .map((d) => `${d.rotulo}${d.tipo === "novo" ? " (novo)" : d.tipo === "removido" ? " (removido)" : ""}`)
+                          .join(", ")}
+                      </div>
+                    ) : null}
                     {confirmada ? (
                       <pre style={{ ...preEstilo, marginTop: 8 }}>{String(p.resposta?.valor)}</pre>
                     ) : aguardandoGeracao ? (
@@ -1117,6 +1203,31 @@ const headerEstilo: React.CSSProperties = {
   padding: "12px 16px",
   borderBottom: "1px solid #1B2533",
   background: "#0C111A",
+};
+
+const avisoDesatualizadoEstilo: React.CSSProperties = {
+  fontSize: 11,
+  color: "var(--amarelo, #fbbf24)",
+  border: "1px solid var(--borda-forte)",
+  borderRadius: 6,
+  padding: "3px 8px",
+  whiteSpace: "nowrap",
+};
+
+const seloDesatualizadoEstilo: React.CSSProperties = {
+  fontSize: 10,
+  color: "var(--amarelo, #fbbf24)",
+  border: "1px solid var(--amarelo, #fbbf24)",
+  borderRadius: 4,
+  padding: "1px 5px",
+  whiteSpace: "nowrap",
+};
+
+const motivoDesatualizadoEstilo: React.CSSProperties = {
+  marginTop: 6,
+  fontSize: 11,
+  color: "var(--amarelo, #fbbf24)",
+  lineHeight: 1.5,
 };
 
 const contadoresEstilo: React.CSSProperties = {

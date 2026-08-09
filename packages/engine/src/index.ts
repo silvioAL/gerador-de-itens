@@ -55,3 +55,13 @@ export {
   type RegraMapeamentoGraphify,
   type ResultadoImportacao,
 } from "./adapters/graphify/importarGrafo.js";
+export {
+  hashCurto,
+  insumosDoItem,
+  carimbarInsumos,
+  insumosDivergentes,
+  respostaDesatualizada,
+  type InsumoDoItem,
+  type CarimboProcedencia,
+  type InsumoDivergente,
+} from "./procedencia/procedencia.js";
