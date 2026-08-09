@@ -164,6 +164,22 @@ Consequências, registradas para não repetir a inversão de prioridade que eu m
 - **O que NÃO depende de modelo tem prioridade real**: SPEC-26 Bloco 1 (procedência/obsolescência) e Bloco 4a (checagens determinísticas do engine) entregam valor no dia a dia rodando com qualquer modelo — inclusive nenhum.
 - **O chat (SPEC-26 Bloco 5) fica por último** e ganha um degrau intermediário (§5.5 da SPEC-26): o impacto é computado pelo app (determinístico) e o modelo só REDIGE o ajuste — isso funciona em modelo pequeno; tool use livre encadeado espera o provedor forte.
 
+### 8.2 Dois ambientes, dois papéis — e por que o Claude sobe na fila
+
+Complemento do usuário: *"poder logar e usar você lá seria uma forma de agilizar meus testes na minha máquina (na empresa só vou poder usar o embarcado)"*.
+
+| | Máquina pessoal — **laboratório** | Empresa — **produção** |
+|---|---|---|
+| Provedor | Claude (chave própria, obtível HOJE) | modelo embarcado, e o wrapper quando o token sair |
+| Papel | validar desenho e prompts em segundos | uso real no dia a dia |
+| Efeito no ciclo | esteira completa em ~segundos | ~12 min por esteira (Qwen3-4B, medido) |
+
+Três consequências de arquitetura, não só de agenda:
+
+1. **A Fase 2/Anthropic sobe para logo depois da Fase 0** — não por qualidade em produção (que é o embarcado), mas como **acelerador do ciclo de desenvolvimento**: cada rodada de validação real desta conversa levou 12-25 minutos esperando o modelo local. Com Claude conectado, o mesmo teste roda em segundos, e a cadência de iteração de prompt/propagação/chat muda de patamar. A chave da Anthropic não depende do token corporativo.
+2. **O Claude vira a referência de qualidade**: a saída dele no mesmo cenário é o alvo contra o qual se mede se o modelo embarcado está aceitável — em vez de julgar "está raso?" no vácuo, compara-se lado a lado.
+3. **Princípio de projeto que passa a valer: nunca assumir capacidade do modelo.** O embarcado define o PISO do produto — mas a restrição é explicitamente **temporária** (*"por enquanto ao menos"*): pode cair quando o token sair ou a política mudar. Logo, o desenho **não otimiza PARA o modelo pequeno** (isso amarraria o produto a uma limitação passageira) — ele **degrada ATÉ** ele. Toda funcionalidade nasce com dois caminhos sobre a MESMA arquitetura: o de qualidade (provedor forte) e o de piso (embarcado), sem virar duas implementações paralelas. Daí o Bloco 5a "com trilhos" da SPEC-26 não ser consolo, e sim o modo que roda na empresa hoje — e que continua útil depois, porque é mais barato e previsível. Verificação passa a exigir os dois lados: nenhuma feature é dada por pronta sem rodar no embarcado.
+
 ## 9. Verificação
 
 Fase a fase, contra o `gerador open` real (disciplina de sempre): Fase 0 = regressão intacta + aba renderizando; Fase 1 = comparação lado a lado dos dois modelos locais; Fase 2 = esteira completa via DeepSeek API e via Claude, com streaming e JSON válido, chave validada e guardada fora do projeto; Fase 3 = esteira mista (papéis em provedores diferentes) num run só.

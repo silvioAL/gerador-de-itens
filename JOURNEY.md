@@ -1182,3 +1182,13 @@ O que mudou:
 - **O chat ganha dois degraus** (SPEC-26 §Bloco 5): **5a com trilhos** — o app computa o impacto no grafo (determinístico) e o modelo só REDIGE o ajuste, o que funciona bem em modelo pequeno; **5b conversa livre** com tool use encadeado espera o provedor forte, sem bloquear nada antes.
 
 Sequência final registrada: Fase 0+1 → Bloco 1 → Bloco 4a → Blocos 2+3 → Bloco 5a → (token) Fase 2 → 5b → 6/4b.
+
+Complemento na mesma conversa, que reordena de novo: *"poder logar e usar você lá seria uma forma de agilizar meus testes na minha máquina (na empresa só vou poder usar o embarcado)"* — e, logo depois, *"por enquanto ao menos"*.
+
+Isso separa **dois ambientes com papéis distintos** (SPEC-25 §8.2): a máquina pessoal é o **laboratório** (Claude conectado, chave obtível hoje, sem depender do token corporativo) e a empresa é a **produção** (embarcado). Três efeitos:
+
+1. **A conexão ao Claude sobe para logo depois da Fase 0** — não por qualidade em produção, mas como acelerador do ciclo: cada validação real desta conversa custou 12-25 minutos esperando o Qwen local; com Claude, segundos. Tudo que vem depois fica mais barato de construir.
+2. **O Claude vira a referência de qualidade** contra a qual se mede se o embarcado está aceitável — em vez de julgar "está raso?" no vácuo.
+3. **Princípio novo: nunca assumir capacidade do modelo — mas também não otimizar para a limitação.** O "por enquanto ao menos" foi registrado com peso: a restrição do embarcado é temporária, então o desenho **degrada ATÉ** o modelo pequeno em vez de ser desenhado PARA ele; toda feature tem o caminho de qualidade e o de piso sobre a MESMA arquitetura, nunca duas implementações. E nenhuma feature é dada por pronta sem rodar no embarcado.
+
+Sequência final: Fase 0 + Claude → Bloco 1 → Bloco 4a → Blocos 2+3 (validados nos dois) → Fase 1 (DeepSeek local, medido contra o Claude) → Bloco 5a → (token) Fase 2 → 5b → 6/4b.

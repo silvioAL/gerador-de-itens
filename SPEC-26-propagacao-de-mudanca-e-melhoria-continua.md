@@ -89,13 +89,14 @@ Toda edição humana sobre uma sugestão é sinal. Capturar o par (sugerido → 
 
 Revista depois do achado da SPEC-25 §8.1 (*"já tenho o endpoint da empresa, mas ainda não tenho o token; embarcar um modelo é a forma de validar a ferramenta no dia a dia"*). Regra que passa a valer: **nada que dependa do token entra no caminho crítico** — e o que é determinístico vem antes, porque entrega valor com qualquer modelo.
 
-1. **SPEC-25 Fase 0 + 1** — abstração `ProvedorIa` (refactor puro) e DeepSeek local. É a única alavanca de qualidade acionável hoje, e a Fase 0 é o soquete onde o wrapper pluga depois sem reescrita.
+1. **SPEC-25 Fase 0 + Anthropic** — abstração `ProvedorIa` (refactor puro) e conexão ao Claude na máquina pessoal. Primeiro por um motivo prático (SPEC-25 §8.2): é o que transforma um ciclo de validação de ~12 minutos em segundos. Tudo abaixo fica mais barato de construir depois disso. Não depende do token corporativo.
 2. **Bloco 1** — procedência + obsolescência. Determinístico, barato, pré-requisito dos blocos 2/3 e com valor imediato: a tela passa a avisar o que ficou para trás mesmo sem IA nenhuma.
 3. **Bloco 4a** — checagens determinísticas do engine. Independem de tudo, custam pouco, atacam direto o "não esquecer coisas".
-4. **Blocos 2 + 3** — propagação e diff, casados. Rodam com o modelo local (qualidade menor, mecanismo válido); o diff é justamente o que torna aceitável errar.
-5. **Bloco 5a** — chat com trilhos (impacto computado pelo app, modelo só redige). Funciona no modelo local.
-6. **SPEC-25 Fase 2** quando o token sair → destrava **5b** (conversa livre com ferramentas) e sobe a qualidade de 2/3 sem mudar nada da arquitetura.
-7. **Blocos 6 e 4b** — o flywheel, quando houver volume de edições reais para aprender.
+4. **Blocos 2 + 3** — propagação e diff, casados. Desenhados no Claude, **validados também no embarcado** antes de fechar (princípio de §8.2: degradar até o piso, não otimizar para ele). O diff é justamente o que torna aceitável o modelo errar.
+5. **SPEC-25 Fase 1 (DeepSeek local)** — sobe o piso do ambiente da empresa, medido contra a saída do Claude no mesmo cenário como referência.
+6. **Bloco 5a** — chat com trilhos (impacto computado pelo app, modelo só redige). É o modo que roda na empresa.
+7. **SPEC-25 Fase 2/wrapper** quando o token sair → destrava **5b** (conversa livre com ferramentas) sem mudar nada da arquitetura.
+8. **Blocos 6 e 4b** — o flywheel, quando houver volume de edições reais para aprender.
 
 ## 6. Fora de escopo, deliberado
 
