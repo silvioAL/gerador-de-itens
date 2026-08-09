@@ -3,7 +3,6 @@ export {
   MODELOS_CHAT,
   TODOS_OS_MODELOS,
   MODELO_CHAT,
-  MODELO_CHAT_DEEPSEEK,
   MODELO_EMBEDDING,
   modeloPorId,
   modeloChatPorId,

@@ -11,11 +11,7 @@ function statusFake(instalado: boolean) {
     modelosChat: [
       {
         id: "qwen-local", nome: "Qwen3-4B", papel: "Qwen3-4B (chat)", instalado,
-        tamanhoAproximadoBytes: 2_500_000_000, raciocinador: false, selecionado: true,
-      },
-      {
-        id: "deepseek-local", nome: "DeepSeek-R1 8B", papel: "DeepSeek-R1 (raciocinador)", instalado: false,
-        tamanhoAproximadoBytes: 5_027_785_216, raciocinador: true, selecionado: false,
+        tamanhoAproximadoBytes: 2_500_000_000, raciocinador: true, selecionado: true,
       },
     ],
   };

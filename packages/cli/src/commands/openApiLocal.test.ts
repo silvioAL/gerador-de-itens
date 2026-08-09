@@ -705,24 +705,26 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     expect(resposta).toEqual({ provedorPadrao: "qwen-local" });
   });
 
-  it("PUT /config/ia troca o modelo, grava em config/ia.json e o próximo pedido usa o provedor novo", async () => {
+  it("PUT /config/ia grava a escolha e o pedido seguinte resolve o provedor por ela", async () => {
     verificarStatusMock.mockResolvedValue({
       chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
-      provedor: "deepseek-local", modelosChat: [],
+      provedor: "qwen-local", modelosChat: [],
     });
 
     const put = await fetch(`${base}/config/ia`, {
       method: "PUT",
-      body: JSON.stringify({ provedorPadrao: "deepseek-local" }),
+      body: JSON.stringify({ provedorPadrao: "qwen-local" }),
     });
     expect(put.status).toBe(200);
-    expect(await fetch(`${base}/config/ia`).then((r) => r.json())).toEqual({ provedorPadrao: "deepseek-local" });
+    expect(await fetch(`${base}/config/ia`).then((r) => r.json())).toEqual({ provedorPadrao: "qwen-local" });
 
     await fetch(`${base}/ia/sugerir`, {
       method: "POST",
       body: JSON.stringify({ tech: "Backend", rotulo: "x", contextoNo: "" }),
     });
-    expect(criarProvedorPorIdMock).toHaveBeenCalledWith("deepseek-local");
+    // O provedor sai da CONFIG, não de um modelo fixo no código — é o que
+    // permite a Fase 2 (wrapper/Claude) entrar sem tocar nas rotas.
+    expect(criarProvedorPorIdMock).toHaveBeenCalledWith("qwen-local");
   });
 
   it("PUT /config/ia com provedor desconhecido devolve 400 — não deixa a esteira cair no padrão sem avisar", async () => {

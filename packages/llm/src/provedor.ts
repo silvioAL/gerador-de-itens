@@ -12,8 +12,10 @@ export interface OpcoesGeracao {
 /**
  * SPEC-25 Fase 0 — a fronteira entre "de onde vem a inteligência" e o resto
  * do produto. Todo consumidor (rotas de `/ia/*`) fala só com esta interface;
- * trocar Qwen local por DeepSeek local, e depois por um gateway remoto
- * (Fase 2), não toca em quem chama.
+ * trocar o modelo local pelo wrapper corporativo ou por um gateway remoto
+ * (Fase 2) não toca em quem chama. Hoje existe um provedor local só — a
+ * abstração não sobrevive por causa da pluralidade de modelos locais (essa
+ * acabou na Fase 1, ver SPEC-25 §4.3), e sim por causa da Fase 2.
  *
  * O contrato que precisa valer em QUALQUER implementação: entra um prompt,
  * o texto streama, e no fim o corpo completo de `completarEstruturado` é

@@ -10,7 +10,7 @@
  * correspondente (`config/ia.json` → `provedorPadrao`). Um espaço de ids só,
  * pra não precisar de um mapa provedor↔modelo; provedores remotos (Fase 2)
  * entram com ids próprios ("anthropic", "wrapper"). */
-export type IdModelo = "qwen-local" | "deepseek-local" | "embedding";
+export type IdModelo = "qwen-local" | "embedding";
 
 export interface ModeloRegistrado {
   /** Chave estável usada em `cache.ts`/`status.ts` — nunca muda mesmo se o
@@ -36,20 +36,15 @@ export const MODELO_CHAT: ModeloRegistrado = {
   repositorioHuggingFace: "Qwen/Qwen3-4B-GGUF",
   nomeArquivo: "Qwen3-4B-Q4_K_M.gguf",
   tamanhoAproximadoBytes: 2_500_000_000,
-};
-
-/** SPEC-25 Fase 1 — o modelo raciocinador embarcado. Distill do R1 sobre
- * Qwen3-8B: roda no MESMO runtime (node-llama-cpp), mesmo download/cache.
- * Repo e nome de arquivo CONFIRMADOS na API da Hugging Face antes de
- * escrever aqui (mesma lição do embedding abaixo — o nome "óbvio" dava 404);
- * tamanho conferido no `content-length` real: 5.027.785.216 bytes. */
-export const MODELO_CHAT_DEEPSEEK: ModeloRegistrado = {
-  id: "deepseek-local",
-  nome: "DeepSeek-R1 8B",
-  papel: "DeepSeek-R1-0528-Qwen3-8B (chat raciocinador, GGUF Q4_K_M)",
-  repositorioHuggingFace: "unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF",
-  nomeArquivo: "DeepSeek-R1-0528-Qwen3-8B-Q4_K_M.gguf",
-  tamanhoAproximadoBytes: 5_027_785_216,
+  // ACHADO REAL que decidiu a SPEC-25 Fase 1: o Qwen3 é HÍBRIDO
+  // RACIOCINADOR — pensa por padrão (o node-llama-cpp inclusive traz um
+  // `QwenChatWrapper` com suporte a segmentos `thought`). Até aqui a
+  // ferramenta o tratava como modelo comum, e a grammar GBNF valendo desde
+  // o primeiro token MATAVA esse raciocínio. Boa parte da "limitação de
+  // raciocínio do modelo atual" relatada pelo usuário era limitação nossa.
+  // Medido, mesmo prompt: 330s com raciocínio (respostas com critérios
+  // numerados citando o contrato) contra 1500s do DeepSeek-R1 8B — 5x mais
+  // rápido E suficiente, o que tornou o modelo de 5 GB desnecessário.
   raciocinador: true,
 };
 
@@ -66,13 +61,16 @@ export const MODELO_EMBEDDING: ModeloRegistrado = {
   tamanhoAproximadoBytes: 650_000_000,
 };
 
-/** O que `gerador ia instalar` baixa SEM argumento — o mínimo pra ferramenta
- * funcionar. O DeepSeek fica de fora de propósito: 5 GB não se baixa sem o
- * usuário pedir (`--modelo deepseek-local`). */
+/** O que `gerador ia instalar` baixa — tudo que a ferramenta precisa. */
 export const MODELOS_PADRAO: ModeloRegistrado[] = [MODELO_CHAT, MODELO_EMBEDDING];
 
-/** Modelos de chat alternáveis (SPEC-25) — a ordem é a de exibição. */
-export const MODELOS_CHAT: ModeloRegistrado[] = [MODELO_CHAT, MODELO_CHAT_DEEPSEEK];
+/** Modelos de chat disponíveis (SPEC-25). Um só hoje, por DECISÃO do
+ * usuário depois da medição: o Qwen3-4B raciocinando cobre a necessidade em
+ * 1/5 do tempo do DeepSeek-R1 8B, que foi removido em vez de ficar como
+ * opção que ninguém usaria. A lista existe (em vez de um modelo fixo)
+ * porque a Fase 2 entra aqui — wrapper corporativo e Claude viram entradas
+ * novas, sem mexer em quem consome. */
+export const MODELOS_CHAT: ModeloRegistrado[] = [MODELO_CHAT];
 
 export const TODOS_OS_MODELOS: ModeloRegistrado[] = [...MODELOS_CHAT, MODELO_EMBEDDING];
 

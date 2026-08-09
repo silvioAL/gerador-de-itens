@@ -1,4 +1,6 @@
-# SPEC-25 — Seleção de modelo e provedores de IA (local Qwen, local DeepSeek, e conexão a provedores externos)
+# SPEC-25 — Seleção de modelo e provedores de IA (local embarcado + conexão a provedores externos)
+
+> **Desfecho da Fase 1 (leia §4.3 antes do resto)**: o plano era embarcar um segundo modelo local (DeepSeek R1-distill 8B) para ganhar raciocínio. Ao medir na máquina real, descobriu-se que o **Qwen3-4B já era raciocinador** — quem suprimia o `<think>` era o nosso próprio código. Com o raciocínio ligado ele ficou 5x mais rápido que o DeepSeek e suficiente pela barra do usuário, que decidiu ficar **só com o Qwen3-4B**. A abstração de provedores continua de pé — ela existe para o wrapper corporativo/Claude (Fase 2), não para a pluralidade de locais. Onde esta spec fala em "escolher entre os 2 modelos locais", leia como histórico do raciocínio.
 
 ## 1. Objetivo
 
@@ -39,24 +41,32 @@ O motor atual vira a primeira implementação (`ProvedorLocalLlama`, parametriza
 
 | Provedor | Garantia de estrutura | Streaming |
 |---|---|---|
-| Local (Qwen/DeepSeek, node-llama-cpp) | GBNF (como hoje) | texto cru do JSON, como hoje |
+| Local (Qwen3-4B, node-llama-cpp) | GBNF (como hoje) | texto cru do JSON, como hoje |
+| Compatível-OpenAI (wrapper corporativo) | `json_object` + validação/retry | delta de `content`; `reasoning_content` vira "pensando…" |
 | Anthropic (Claude) | tool use com `tool_choice` forçado — o input do tool É o JSON no schema | delta de `input_json` streamado |
 
 A diferença fica ENCAPSULADA no provedor: quem chama (`/ia/pipeline/:papel`) continua recebendo "pedaços de texto + JSON válido no final". O extrator parcial da UI (`extrairRespostasParciaisAninhadas`) não muda.
 
-### 4.3 DeepSeek local — modelo e o problema do `<think>`
+### 4.3 Raciocínio × grammar — o achado que dispensou o DeepSeek
 
-Candidato: **DeepSeek-R1-0528-Qwen3-8B** (distill sobre Qwen3-8B, GGUF Q4_K_M ~5GB) — roda no MESMO runtime (node-llama-cpp), mesmo mecanismo de download/cache. Alternativa menor: R1-Distill-Qwen-7B. Decisão final na Fase 1, medindo na máquina real.
+**A barra de qualidade, calibrada pelo uso real**: *"no meu uso da ferramenta o DeepSeek atendia bem (em alguns casos até o Rovo atende, que é mais fraco); posso tolerar que fique lento, desde que seja possível trabalhar sem toda essa limitação do modelo atual em termos de raciocínio"*.
 
-**A barra de qualidade, calibrada pelo uso real (achado decisivo)**: *"no meu uso da ferramenta o DeepSeek atendia bem (em alguns casos até o Rovo atende, que é mais fraco); posso tolerar que fique lento, desde que seja possível trabalhar sem toda essa limitação do modelo atual em termos de raciocínio"*.
+Isso definiu o alvo (não é modelo de fronteira — é "nível DeepSeek", com piso ainda mais baixo), nomeou o gargalo (**raciocínio, não estilo**: prompt melhor já tinha tirado o que dava) e liberou o custo (**lentidão é tolerada**, então `<think>` não é custo a minimizar — é o recurso a preservar).
 
-Três consequências que mudam o status desta fase:
+O plano original era embarcar **DeepSeek-R1-0528-Qwen3-8B** (~5GB) para conseguir esse raciocínio. Ao implementar, o achado real inverteu a conclusão:
 
-- **O alvo não é modelo de fronteira — é "nível DeepSeek"**, e o piso aceitável é ainda mais baixo (Rovo às vezes basta). Ou seja: o R1-distill embarcado tem chance real de **atender de verdade** o ambiente da empresa, não só de servir de piso. A Fase 1 deixa de ser compromisso e vira **a aposta principal do ambiente de produção**.
-- **O gargalo nomeado é raciocínio, não estilo.** Não é caso de continuar calibrando prompt do Qwen3-4B: um modelo de 4B sem cadeia de raciocínio tem teto, e o usuário já bateu nele. Prompt melhor (feito na rodada anterior) tirou o que dava; o resto exige o modelo.
-- **Lentidão é explicitamente tolerada**, então o `<think>` do R1 **não é custo a minimizar — é o recurso a preservar**. Isso decide o desenho de §4.3 abaixo: em nenhuma hipótese forçar a grammar desde o primeiro token; melhor pagar o tempo do raciocínio e aplicar a estrutura depois.
+> **O Qwen3-4B, que a ferramenta já usava, é um modelo híbrido raciocinador — ele pensa por padrão.** Quem matava o raciocínio não era o modelo: era o nosso código, que aplicava a grammar GBNF desde o primeiro token. GBNF restringe a amostragem desde o token zero, então o `<think>` nunca tinha como sair. A ferramenta vinha usando um raciocinador em modo mudo.
 
-Risco central documentado: modelos R são RACIOCINADORES — emitem `<think>…</think>` antes da resposta. GBNF forçando JSON desde o primeiro token **mata o raciocínio** (perderia justamente o que se busca no DeepSeek). Estratégia da Fase 1: deixar o think correr livre e aplicar a grammar só após o fechamento do think (node-llama-cpp tem suporte a reasoning budget/segmentos; se a versão instalada não expuser, fallback: geração livre com instrução de JSON + validação + 1 retry). O streaming do think pode aparecer na UI como "pensando…" (o painel ao vivo já tem esse estado) — o texto do think NÃO entra no JSON final.
+Medido na máquina real, mesmo prompt e mesmo lote: **Qwen3-4B com raciocínio ligado, 330s e 306s** em duas chamadas sequenciais, com critérios de aceite numerados citando número real de latência e status HTTP — a profundidade que faltava. **DeepSeek-R1 8B, >1500s** e a segunda chamada não terminou em 25 minutos. Cinco vezes mais rápido e suficiente pela barra declarada, com 5GB a menos de disco e sem segundo download.
+
+Daí a decisão do usuário: **"faz muito mais sentido termos SOMENTE o Qwen3-4B"**. Um modelo local só, o registro (`MODELOS_CHAT`) fica com um item, e a pluralidade de provedores continua existindo pra Fase 2 (wrapper corporativo) — que é onde ela sempre importou de verdade (§4.6).
+
+**Como o raciocínio e a grammar convivem** (`motor.ts`, `completarComSchema`): duas fases na MESMA sessão.
+
+1. **Livre** — o modelo raciocina e rascunha, com `budgets: { thoughtTokens: 2000 }`. **Nada disso vai pro stream de saída**: o consumidor acumula pedaços e faz `JSON.parse` no fim, então prosa quebraria o parse. A UI já mostra "pensando…" nesse intervalo.
+2. **Estruturada** — mesma sessão, agora com a grammar E `budgets: { thoughtTokens: 0 }`. Sem zerar o budget o modelo tenta raciocinar de novo e colide com a grammar.
+
+O teto de 2000 tokens de raciocínio não é estético: **sem limite, uma única chamada levou 2563s (~42 min)**. E cada chamada faz `sessao.resetChatHistory()` antes de começar — ver §8.3.
 
 ### 4.4 Configuração e credenciais
 
@@ -156,7 +166,7 @@ Nota da API DeepSeek: compatível com o formato OpenAI (`chat/completions`); a g
 ## 8. Roteiro faseado
 
 1. **Fase 0 — abstração**: interface `ProvedorIa` + `ProvedorLocalLlama` embrulhando o motor atual; rotas resolvem provedor pela config (`config/ia.json` com só o default); aba "Modelo de IA" nasce aqui mostrando só os cards locais. Zero mudança de comportamento; regressão prova.
-2. **Fase 1 — DeepSeek local**: registro do modelo, download pela aba/`ia instalar --modelo deepseek`, seleção (Jornada A completa), tratamento do `<think>` (§4.3). Verificação: mesma esteira no cenário de crédito com os dois modelos, comparação de profundidade/tempo registrada no JOURNEY.
+2. **Fase 1 — raciocínio no modelo local** *(concluída, com desfecho diferente do planejado: ver §4.3 e §8.3)*: era "embarcar o DeepSeek"; virou "ligar o raciocínio que o Qwen3-4B já tinha". Um modelo local só.
 3. **Fase 2 — conexão a provedores (Jornadas B, C e E)**: a infraestrutura de "Conectar" é UMA só (abrir navegador, colar chave, validar, `~/.gerador/credenciais.json`, aviso condicional de privacidade, `gerador ia conectar <provedor>`), com duas implementações: **`ProvedorCompativelOpenAI`** genérico (§4.6 — serve o wrapper corporativo, o DeepSeek oficial e qualquer gateway; `json_object` + validação/retry, `reasoning_content` → "pensando…") e `ProvedorAnthropic` (tool use forçado + streaming de `input_json`). **Prioridade dentro da fase: o compatível-OpenAI primeiro** — é o que o usuário usa na empresa. Verificação real com as chaves/base URL do usuário.
    - **Fase 2.1 (opcional, barata)**: modo "copiar prompt do breakdown" (§5.5) — ponte com o fluxo atual, não depende de provedor nenhum.
 4. **Fase 3 — provedor por papel** (Jornada D): `papeis[].provedor` + select na aba Pipeline listando só provedores prontos.
@@ -188,6 +198,21 @@ Três consequências de arquitetura, não só de agenda:
 2. **O Claude vira a referência de qualidade**: a saída dele no mesmo cenário é o alvo contra o qual se mede se o modelo embarcado está aceitável — em vez de julgar "está raso?" no vácuo, compara-se lado a lado.
 3. **Princípio de projeto que passa a valer: nunca assumir capacidade do modelo.** O embarcado define o PISO do produto — mas a restrição é explicitamente **temporária** (*"por enquanto ao menos"*): pode cair quando o token sair ou a política mudar. Logo, o desenho **não otimiza PARA o modelo pequeno** (isso amarraria o produto a uma limitação passageira) — ele **degrada ATÉ** ele. Toda funcionalidade nasce com dois caminhos sobre a MESMA arquitetura: o de qualidade (provedor forte) e o de piso (embarcado), sem virar duas implementações paralelas. Daí o Bloco 5a "com trilhos" da SPEC-26 não ser consolo, e sim o modo que roda na empresa hoje — e que continua útil depois, porque é mais barato e previsível. Verificação passa a exigir os dois lados: nenhuma feature é dada por pronta sem rodar no embarcado.
 
+### 8.3 Fases 0 e 1 — implementadas (e a Fase 1 terminou diferente do planejado)
+
+**Fase 0 (abstração)**: `ProvedorIa` em `packages/llm/src/provedor.ts` — `completar`/`completarEstruturado`/`descartar`, com `criarProvedorLocal(modelo)` parametrizado pelo `ModeloRegistrado` (era fixo no Qwen). As rotas `/ia/*` do CLI falam só com a interface. `config/ia.json` (`{provedorPadrao}`) + `GET`/`PUT /config/ia`; **PUT com id desconhecido devolve 400** de propósito — cair no padrão em silêncio faria o usuário achar que trocou de modelo sem ter trocado. Trocar o provedor **descarta** o anterior (libera os GB de RAM em vez de manter dois carregados). `verificarStatus(baseDir?, idChat?)` lista os modelos de chat um a um, e `pronto` é uma afirmação sobre o modelo SELECIONADO.
+
+Essa abstração continua valendo inteira com um modelo local só: ela existe para a Fase 2 (wrapper corporativo), não para a pluralidade de locais.
+
+**Fase 1 — o DeepSeek foi implementado, medido e removido.** O caminho está em §4.3: o R1-distill 8B chegou a rodar de verdade, mas o achado de que o **Qwen3-4B já era raciocinador** o tornou desnecessário — 5x mais rápido, qualidade suficiente pela barra declarada, 5GB a menos. Decisão do usuário: só o Qwen3-4B. `MODELOS_CHAT` fica com um item; `raciocinador: true` no registro é o que liga o caminho de duas fases do `motor.ts`.
+
+Dois bugs reais achados nessa medição, ambos invisíveis sem rodar:
+
+- **A sessão acumulava histórico entre chamadas.** `LlamaChatSession` é singleton no servidor e vive o processo inteiro; cada papel da esteira ia empilhando prompt+resposta até estourar o contexto. Sintoma: **só o primeiro papel respondia**, e os seguintes falhavam em 4 segundos — tempo impossível para um raciocinador, e foi esse detalhe que denunciou. Correção: `sessao.resetChatHistory()` no início de cada chamada. Não é gambiarra: nenhum fluxo aqui depende de memória entre chamadas (todo prompt carrega épico, itens e respostas anteriores explicitamente).
+- **As falhas eram silenciosas.** A rota engolia o erro e a UI só mostrava o pip apagado. Um `console.error` no catch expôs o bug acima — e, no mesmo dia, um erro meu: forçar `contextSize: {min: 16384}` estourava a VRAM ("context size too large") e derrubava todas as chamadas. O default do `createContext()` voltou, com o motivo em comentário para ninguém "melhorar" isso de novo.
+
+CLI: `gerador ia instalar [--modelo <id>]`, `gerador ia usar <id>`, `status` listando os modelos de chat com o selecionado marcado. Web: aba **"Modelo de IA"** com card por modelo (estado real do disco, selo "raciocinador", tamanho) e radio que grava a escolha — pronta para receber o wrapper corporativo como segundo card na Fase 2.
+
 ## 9. Verificação
 
-Fase a fase, contra o `gerador open` real (disciplina de sempre): Fase 0 = regressão intacta + aba renderizando; Fase 1 = comparação lado a lado dos dois modelos locais; Fase 2 = esteira completa via DeepSeek API e via Claude, com streaming e JSON válido, chave validada e guardada fora do projeto; Fase 3 = esteira mista (papéis em provedores diferentes) num run só.
+Fase a fase, contra o `gerador open` real (disciplina de sempre): Fase 0 = regressão intacta + aba renderizando; **Fase 1 = esteira completa no cenário real com raciocínio ligado, medindo tempo e profundidade contra a linha de base sem raciocínio (registrado no JOURNEY §85)**; Fase 2 = esteira completa via wrapper compatível-OpenAI e via Claude, com streaming e JSON válido, chave validada e guardada fora do projeto; Fase 3 = esteira mista (papéis em provedores diferentes) num run só.

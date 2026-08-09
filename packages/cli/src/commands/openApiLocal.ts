@@ -796,6 +796,12 @@ async function tratarIaPipeline(req: IncomingMessage, res: ServerResponse, papel
   } catch (erro) {
     void descartarProvedor();
     const mensagem = erro instanceof Error ? erro.message : "Falha desconhecida ao gerar a ficha.";
+    // ACHADO REAL (validação da Fase 1): o cliente engole falha de lote de
+    // propósito (uma falha isolada não trava a esteira), então SEM este log
+    // três papéis inteiros falharam sem deixar rastro em lugar nenhum — só
+    // se descobriu olhando os pips apagados num screenshot. O servidor é o
+    // único lugar que enxerga a causa.
+    console.error(`[ia/pipeline/${papel}] falhou:`, mensagem);
     // Mesmo achado da Fase 1c: se o streaming já começou, não dá mais pra
     // trocar o status — encerra, e o cliente trata JSON incompleto como falha.
     if (res.headersSent) {

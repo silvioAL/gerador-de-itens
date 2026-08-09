@@ -33,20 +33,23 @@ describe("verificarStatus", () => {
     writeFileSync(join(dirModelos, MODELO_CHAT.nomeArquivo), "qwen-baixado");
     writeFileSync(join(dirModelos, MODELO_EMBEDDING.nomeArquivo), "embedding-baixado");
 
-    // Sem seleção explícita, o padrão (Qwen) manda — e está instalado.
     const padrao = await verificarStatus(base);
     expect(padrao.pronto).toBe(true);
-    expect(padrao.modelosChat.map((m) => [m.id, m.instalado, m.selecionado])).toEqual([
-      ["qwen-local", true, true],
-      ["deepseek-local", false, false],
+    expect(padrao.modelosChat.map((m) => [m.id, m.instalado, m.selecionado, m.raciocinador])).toEqual([
+      ["qwen-local", true, true, true],
     ]);
+    expect(padrao.provedor).toBe("qwen-local");
+  });
 
-    // Selecionando o DeepSeek (que NÃO está baixado), a IA deixa de estar
-    // pronta — mesmo com o Qwen no disco. `pronto` é sobre o selecionado.
-    const comDeepSeek = await verificarStatus(base, "deepseek-local");
-    expect(comDeepSeek.chatInstalado).toBe(false);
-    expect(comDeepSeek.pronto).toBe(false);
-    expect(comDeepSeek.provedor).toBe("deepseek-local");
+  it("`pronto` é sobre o modelo SELECIONADO — id desconhecido cai no padrão, nunca deixa sem modelo", async () => {
+    const dirModelos = join(base, ".gerador", "models");
+    mkdirSync(dirModelos, { recursive: true });
+    writeFileSync(join(dirModelos, MODELO_EMBEDDING.nomeArquivo), "embedding-baixado");
+    // Só o embedding no disco: o chat selecionado não está instalado.
+    const semChat = await verificarStatus(base, "provedor-que-nao-existe");
+    expect(semChat.provedor).toBe("qwen-local");
+    expect(semChat.chatInstalado).toBe(false);
+    expect(semChat.pronto).toBe(false);
   });
 
   it("só o modelo de chat presente: pronto continua false (precisa dos dois)", async () => {
