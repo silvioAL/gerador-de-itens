@@ -1,7 +1,9 @@
 import type { GbnfJsonSchema } from "node-llama-cpp";
 import { caminhoDoModelo } from "./cache.js";
+import { lerCredenciais } from "./credenciais.js";
 import { carregarModeloChat } from "./motor.js";
-import { modeloChatPorId, type ModeloRegistrado } from "./modelos.js";
+import { ID_PROVEDOR_GATEWAY, modeloChatPorId, type ModeloRegistrado } from "./modelos.js";
+import { criarProvedorCompativelOpenAI } from "./provedorOpenAI.js";
 
 export interface OpcoesGeracao {
   /** Texto da RESPOSTA sendo gerada, pedaço a pedaço. Raciocínio de modelo
@@ -49,9 +51,30 @@ export async function criarProvedorLocal(modelo: ModeloRegistrado, baseDir?: str
   };
 }
 
-/** Resolve o provedor a partir do id gravado em `config/ia.json`. Hoje só
- * existem provedores locais; id desconhecido cai no modelo padrão (nunca
- * deixa o servidor sem IA por causa de config editada à mão). */
-export function criarProvedorPorId(id: string | undefined, baseDir?: string): Promise<ProvedorIa> {
+/**
+ * Resolve o provedor a partir do id gravado em `config/ia.json`. Id
+ * desconhecido cai no modelo local padrão (nunca deixa o servidor sem IA por
+ * causa de config editada à mão).
+ *
+ * O gateway (Fase 2) é a única exceção que pode FALHAR em vez de cair no
+ * padrão: se a pessoa selecionou "gateway" e não configurou a credencial,
+ * silenciosamente rodar o Qwen local seria pior — ela veria respostas
+ * diferentes das esperadas sem entender por quê. O erro diz o que fazer.
+ */
+export async function criarProvedorPorId(id: string | undefined, baseDir?: string): Promise<ProvedorIa> {
+  if (id === ID_PROVEDOR_GATEWAY) {
+    const credencial = (await lerCredenciais(baseDir))[ID_PROVEDOR_GATEWAY];
+    if (!credencial?.baseUrl || !credencial?.chave || !credencial?.modelo) {
+      throw new Error(
+        "Gateway selecionado mas sem credencial — rode `gerador ia conectar` ou preencha o card na aba “Modelo de IA”."
+      );
+    }
+    return criarProvedorCompativelOpenAI({
+      baseUrl: credencial.baseUrl,
+      chave: credencial.chave,
+      modelo: credencial.modelo,
+      cabecalhos: credencial.cabecalhos,
+    });
+  }
   return criarProvedorLocal(modeloChatPorId(id), baseDir);
 }

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createServer, type Server } from "node:http";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createServer, type Server, type ServerResponse } from "node:http";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -92,9 +92,31 @@ const criarProvedorPorIdMock = vi.fn(async (id?: string) => ({
   completarEstruturado: completarComSchemaMock,
   descartar: vi.fn(async () => {}),
 }));
+/**
+ * SPEC-25 Fase 2 — credenciais em memória no teste.
+ *
+ * A persistência real (`~/.gerador/credenciais.json`, modo 0600, merge entre
+ * provedores) está testada de verdade em `packages/llm/src/credenciais.test.ts`.
+ * Aqui ela é substituída por um mapa porque a rota grava no HOME REAL da
+ * máquina — um teste que escreve na credencial do usuário seria inaceitável.
+ * `criarProvedorCompativelOpenAI` continua REAL: o teste de conexão bate num
+ * servidor HTTP falso de verdade.
+ */
+const credenciaisFalsas = vi.hoisted(() => ({ atual: {} as Record<string, unknown> }));
+const lerCredenciaisMock = vi.fn(async () => credenciaisFalsas.atual);
+const salvarCredencialMock = vi.fn(async (id: string, cred: unknown) => {
+  credenciaisFalsas.atual = { ...credenciaisFalsas.atual, [id]: cred };
+});
+
 vi.mock("@gerador/llm", async () => {
   const real = await vi.importActual<typeof import("@gerador/llm")>("@gerador/llm");
-  return { ...real, verificarStatus: verificarStatusMock, criarProvedorPorId: criarProvedorPorIdMock };
+  return {
+    ...real,
+    verificarStatus: verificarStatusMock,
+    criarProvedorPorId: criarProvedorPorIdMock,
+    lerCredenciais: lerCredenciaisMock,
+    salvarCredencial: salvarCredencialMock,
+  };
 });
 
 const { tratarApiLocal } = await import("./openApiLocal.js");
@@ -109,6 +131,9 @@ beforeEach(async () => {
   completarMock.mockClear();
   completarComSchemaMock.mockClear();
   verificarStatusMock.mockResolvedValue(STATUS_NAO_INSTALADO);
+  credenciaisFalsas.atual = {};
+  lerCredenciaisMock.mockClear();
+  salvarCredencialMock.mockClear();
   dirTemp = mkdtempSync(join(tmpdir(), "gerador-cli-api-local-"));
   servidor = createServer((req, res) => {
     void tratarApiLocal(req, res, dirTemp).then((tratado) => {
@@ -1038,5 +1063,121 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       "time-a": { service: { linguagem: "Go" } },
       "time-b": { service: { linguagem: "Python" } },
     });
+  });
+});
+
+describe("SPEC-25 Fase 2 — credencial do gateway", () => {
+  /** Um gateway compatível com OpenAI de mentira, mas HTTP de verdade. */
+  let gateway: Server;
+  let urlGateway: string;
+  let respostaGateway: (res: ServerResponse) => void;
+
+  beforeEach(async () => {
+    respostaGateway = (res) => {
+      res.writeHead(200, { "Content-Type": "text/event-stream" });
+      res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "ok" } }] })}\n\n`);
+      res.write("data: [DONE]\n\n");
+      res.end();
+    };
+    gateway = createServer((req, res) => {
+      req.resume();
+      req.on("end", () => respostaGateway(res));
+    });
+    await new Promise<void>((ok) => gateway.listen(0, "127.0.0.1", ok));
+    const end = gateway.address();
+    urlGateway = `http://127.0.0.1:${typeof end === "object" && end ? end.port : 0}/v1`;
+  });
+
+  afterEach(async () => {
+    await new Promise<void>((ok) => gateway.close(() => ok()));
+  });
+
+  it("PUT /ia/credencial grava fora do projeto — nada em config/, que vai pro git", async () => {
+    const resposta = await fetch(`${base}/ia/credencial`, {
+      method: "PUT",
+      body: JSON.stringify({ baseUrl: "https://gw/v1", chave: "sk-secreta", modelo: "deepseek-chat" }),
+    });
+    expect(resposta.status).toBe(200);
+    expect(salvarCredencialMock).toHaveBeenCalledWith("compativel-openai", {
+      baseUrl: "https://gw/v1",
+      chave: "sk-secreta",
+      modelo: "deepseek-chat",
+    });
+    // A regra de segurança da fase, verificada e não só documentada.
+    expect(existsSync(join(dirTemp, "config", "credenciais.json"))).toBe(false);
+  });
+
+  it("a resposta do PUT não devolve a chave — nem pra tela que acabou de mandá-la", async () => {
+    const corpo = await fetch(`${base}/ia/credencial`, {
+      method: "PUT",
+      body: JSON.stringify({ baseUrl: "https://gw/v1", chave: "sk-secreta", modelo: "m" }),
+    }).then((r) => r.text());
+    expect(corpo).not.toContain("sk-secreta");
+  });
+
+  it("chave vazia mantém a que já estava — trocar só a base URL não exige redigitar", async () => {
+    credenciaisFalsas.atual = {
+      "compativel-openai": { baseUrl: "https://antigo/v1", chave: "sk-ja-salva", modelo: "m" },
+    };
+    await fetch(`${base}/ia/credencial`, {
+      method: "PUT",
+      body: JSON.stringify({ baseUrl: "https://novo/v1", chave: "", modelo: "m" }),
+    });
+    expect(salvarCredencialMock).toHaveBeenCalledWith("compativel-openai", {
+      baseUrl: "https://novo/v1",
+      chave: "sk-ja-salva",
+      modelo: "m",
+    });
+  });
+
+  it("campo faltando é 400, não credencial pela metade salva", async () => {
+    const resposta = await fetch(`${base}/ia/credencial`, {
+      method: "PUT",
+      body: JSON.stringify({ baseUrl: "https://gw/v1", chave: "sk-1" }),
+    });
+    expect(resposta.status).toBe(400);
+    expect(salvarCredencialMock).not.toHaveBeenCalled();
+  });
+
+  it("POST /ia/credencial/testar bate no gateway de verdade e devolve a amostra", async () => {
+    const corpo = await fetch(`${base}/ia/credencial/testar`, {
+      method: "POST",
+      body: JSON.stringify({ baseUrl: urlGateway, chave: "sk-1", modelo: "m" }),
+    }).then((r) => r.json());
+
+    expect(corpo.ok).toBe(true);
+    expect(corpo.amostra).toBe("ok");
+    expect(typeof corpo.duracaoMs).toBe("number");
+  });
+
+  it("gateway que recusa a chave devolve ok:false com a mensagem — a falha É o resultado do teste", async () => {
+    respostaGateway = (res) => res.writeHead(401).end("Unauthorized");
+    const resposta = await fetch(`${base}/ia/credencial/testar`, {
+      method: "POST",
+      body: JSON.stringify({ baseUrl: urlGateway, chave: "sk-errada", modelo: "m" }),
+    });
+
+    // HTTP 200: a rota funcionou; quem falhou foi o gateway.
+    expect(resposta.status).toBe(200);
+    const corpo = await resposta.json();
+    expect(corpo.ok).toBe(false);
+    expect(corpo.erro).toMatch(/Credencial recusada/);
+  });
+
+  it("PUT /config/ia aceita o gateway — ele não está em MODELOS_CHAT e antes era recusado", async () => {
+    const resposta = await fetch(`${base}/config/ia`, {
+      method: "PUT",
+      body: JSON.stringify({ provedorPadrao: "compativel-openai" }),
+    });
+    expect(resposta.status).toBe(200);
+    expect(await resposta.json()).toEqual({ provedorPadrao: "compativel-openai" });
+  });
+
+  it("id inventado continua recusado", async () => {
+    const resposta = await fetch(`${base}/config/ia`, {
+      method: "PUT",
+      body: JSON.stringify({ provedorPadrao: "gpt-imaginario" }),
+    });
+    expect(resposta.status).toBe(400);
   });
 });

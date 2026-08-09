@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiConfigIa, apiIa, type StatusIa } from "../api/client";
+import { apiConfigIa, apiIa, type ResumoGateway, type StatusIa, type StatusModeloChat } from "../api/client";
 
 function formatarGB(bytes: number): string {
   return `${(bytes / 1_000_000_000).toFixed(1)} GB`;
@@ -49,14 +49,25 @@ export function ModeloIaTab() {
   return (
     <div>
       <p style={introTextoEstilo}>
-        Qual modelo a esteira de agentes usa. Tudo roda na sua máquina — nenhum dado sai daqui. Modelos maiores
-        raciocinam melhor e demoram mais; a troca vale a partir da próxima geração.
+        Qual modelo a esteira de agentes usa. Nos modelos locais tudo roda na sua máquina e nenhum dado sai daqui;
+        num gateway, o que for gerado passa pelo endereço que você configurar — se ele for interno da empresa, os
+        dados continuam dentro dela. A troca vale a partir da próxima geração.
       </p>
 
       {status === null && !erro && <p style={{ fontSize: 12.5, color: "var(--texto-fraco)" }}>Carregando…</p>}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: 680 }}>
-        {modelos.map((m) => (
+        {modelos.map((m) =>
+          m.remoto ? (
+            <CardGateway
+              key={m.id}
+              modelo={m}
+              gateway={status?.gateway}
+              salvando={salvando !== null}
+              onSelecionar={() => void selecionar(m.id)}
+              onSalvo={async () => setStatus(await apiIa.status())}
+            />
+          ) : (
           <label
             key={m.id}
             data-testid={`modelo-ia-${m.id}`}
@@ -85,10 +96,11 @@ export function ModeloIaTab() {
               </span>
             </span>
           </label>
-        ))}
+          )
+        )}
       </div>
 
-      {status && !status.embeddingInstalado && (
+      {status && !status.embeddingInstalado && !status.modelosChat?.some((m) => m.remoto && m.selecionado) && (
         <p style={{ ...avisoEstilo, marginTop: 12 }}>
           O modelo de embedding não está instalado — a IA só fica pronta com ele. Rode `gerador ia instalar`.
         </p>
@@ -102,6 +114,166 @@ export function ModeloIaTab() {
     </div>
   );
 }
+
+/**
+ * SPEC-25 Fase 2 — o card do gateway. Três campos e nada mais: base URL,
+ * chave, nome do modelo (§4.6). Um card em vez de um `<label>` como os locais
+ * porque aqui tem input de texto dentro: clicar num campo dentro de um label
+ * ativaria o radio junto.
+ *
+ * Nasce DORMENTE e testado: no dia em que o token corporativo sair, validar é
+ * colar os três campos e clicar em "Testar conexão".
+ */
+function CardGateway({
+  modelo,
+  gateway,
+  salvando,
+  onSelecionar,
+  onSalvo,
+}: {
+  modelo: StatusModeloChat;
+  gateway?: ResumoGateway;
+  salvando: boolean;
+  onSelecionar: () => void;
+  onSalvo: () => Promise<void>;
+}) {
+  const [baseUrl, setBaseUrl] = useState(gateway?.baseUrl ?? "");
+  const [chave, setChave] = useState("");
+  const [nomeModelo, setNomeModelo] = useState(gateway?.modelo ?? "");
+  const [ocupado, setOcupado] = useState<"salvar" | "testar" | null>(null);
+  const [resultado, setResultado] = useState<{ ok: boolean; texto: string } | null>(null);
+
+  // A credencial só chega depois do primeiro `/ia/status`; sem isto os campos
+  // ficariam vazios mesmo com gateway já configurado.
+  useEffect(() => {
+    setBaseUrl(gateway?.baseUrl ?? "");
+    setNomeModelo(gateway?.modelo ?? "");
+  }, [gateway?.baseUrl, gateway?.modelo]);
+
+  const dados = { baseUrl: baseUrl.trim(), chave: chave.trim(), modelo: nomeModelo.trim() };
+  // A chave pode vir vazia quando já existe uma salva: o campo mostra a
+  // máscara, então exigir redigitá-la pra mudar só a base URL seria hostil.
+  const completo = !!dados.baseUrl && !!dados.modelo && (!!dados.chave || !!gateway?.configurado);
+
+  async function executar(acao: "salvar" | "testar") {
+    setOcupado(acao);
+    setResultado(null);
+    try {
+      if (acao === "salvar") {
+        await apiIa.salvarCredencial(dados);
+        setChave("");
+        await onSalvo();
+        setResultado({ ok: true, texto: "Credencial salva em ~/.gerador (fora do repositório)." });
+      } else {
+        const r = await apiIa.testarCredencial(dados);
+        setResultado(
+          r.ok
+            ? { ok: true, texto: `Respondeu em ${((r.duracaoMs ?? 0) / 1000).toFixed(1)}s: “${r.amostra}”` }
+            : { ok: false, texto: r.erro ?? "falhou" }
+        );
+      }
+    } catch (e) {
+      setResultado({ ok: false, texto: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setOcupado(null);
+    }
+  }
+
+  return (
+    <div
+      data-testid={`modelo-ia-${modelo.id}`}
+      style={{ ...cardEstilo, ...(modelo.selecionado ? cardSelecionadoEstilo : {}), cursor: "default" }}
+    >
+      <input
+        type="radio"
+        name="modelo-ia"
+        checked={modelo.selecionado}
+        disabled={!modelo.instalado || salvando}
+        onChange={onSelecionar}
+        aria-label={`Usar ${modelo.nome}`}
+        style={{ marginTop: 3 }}
+      />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <strong style={{ fontSize: 13, color: "var(--texto)", display: "block" }}>
+          {modelo.nome}
+          <span style={selo}>remoto</span>
+        </strong>
+        <span style={{ fontSize: 12.5, color: "var(--texto-2)", lineHeight: 1.6, display: "block" }}>
+          {modelo.papel}
+        </span>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
+          <input
+            value={baseUrl}
+            onChange={(e) => setBaseUrl(e.target.value)}
+            placeholder="https://gateway-interno.empresa/v1"
+            aria-label="Base URL do gateway"
+            style={campoEstilo}
+          />
+          <input
+            type="password"
+            value={chave}
+            onChange={(e) => setChave(e.target.value)}
+            placeholder={gateway?.chaveMascarada ? `chave atual: ${gateway.chaveMascarada}` : "chave de API"}
+            aria-label="Chave de API"
+            style={campoEstilo}
+          />
+          <input
+            value={nomeModelo}
+            onChange={(e) => setNomeModelo(e.target.value)}
+            placeholder="nome do modelo (ex.: deepseek-chat)"
+            aria-label="Nome do modelo"
+            style={campoEstilo}
+          />
+        </div>
+
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <button onClick={() => void executar("salvar")} disabled={!completo || ocupado !== null} style={botaoEstilo}>
+            {ocupado === "salvar" ? "salvando…" : "Salvar"}
+          </button>
+          <button
+            onClick={() => void executar("testar")}
+            disabled={!completo || ocupado !== null}
+            style={{ ...botaoEstilo, borderColor: "var(--borda-forte)", color: "var(--texto-2)" }}
+          >
+            {ocupado === "testar" ? "testando…" : "Testar conexão"}
+          </button>
+        </div>
+
+        {resultado && (
+          <p
+            data-testid="gateway-resultado"
+            style={{ fontSize: 11.5, marginBottom: 0, color: resultado.ok ? "var(--verde)" : "var(--vermelho)" }}
+          >
+            {resultado.texto}
+          </p>
+        )}
+        <p style={{ fontSize: 11, color: "var(--texto-mudo)", marginBottom: 0, marginTop: 6 }}>
+          A chave vai pra <code>~/.gerador/credenciais.json</code>, nunca pra <code>config/</code> — que entra no git.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+const campoEstilo: React.CSSProperties = {
+  padding: "6px 9px",
+  borderRadius: 6,
+  border: "1px solid var(--borda-forte)",
+  background: "var(--painel-alto, #15202D)",
+  color: "var(--texto)",
+  fontSize: 12.5,
+};
+
+const botaoEstilo: React.CSSProperties = {
+  padding: "6px 12px",
+  borderRadius: 6,
+  border: "1px solid var(--acento)",
+  background: "transparent",
+  color: "var(--acento)",
+  fontSize: 12.5,
+  cursor: "pointer",
+};
 
 const introTextoEstilo: React.CSSProperties = {
   fontSize: 13,

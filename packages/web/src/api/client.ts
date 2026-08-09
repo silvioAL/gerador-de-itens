@@ -232,6 +232,18 @@ export interface StatusModeloChat {
   tamanhoAproximadoBytes: number;
   raciocinador: boolean;
   selecionado: boolean;
+  /** SPEC-25 Fase 2 — provedor remoto: não se baixa, se configura (base URL,
+   * chave, modelo). O card troca "baixar" pelos três campos. */
+  remoto?: boolean;
+}
+
+/** O que dá pra mostrar da credencial do gateway sem expor a chave. */
+export interface ResumoGateway {
+  configurado: boolean;
+  baseUrl?: string;
+  modelo?: string;
+  /** `sk-…1234`. A chave inteira nunca trafega de volta pro navegador. */
+  chaveMascarada?: string;
 }
 
 export interface StatusIa {
@@ -243,6 +255,7 @@ export interface StatusIa {
   /** SPEC-25 — ausentes em servidor antigo; a UI trata como lista vazia. */
   provedor?: string;
   modelosChat?: StatusModeloChat[];
+  gateway?: ResumoGateway;
 }
 
 export interface ConfigIa {
@@ -334,6 +347,17 @@ export const apiIa = {
    * disparar a geração ao vivo (Fase 1d, SPEC-23) sem forçar IA em quem não
    * instalou os modelos. */
   status: () => requisitar<StatusIa>("/ia/status"),
+  /** SPEC-25 Fase 2 — grava a credencial do gateway em `~/.gerador`, NUNCA em
+   * `config/` (que é versionável). Chave vazia = manter a que já está lá. */
+  salvarCredencial: (dados: { baseUrl: string; chave: string; modelo: string }) =>
+    requisitar<{ ok: true }>("/ia/credencial", { method: "PUT", body: JSON.stringify(dados) }),
+  /** Bate no gateway de verdade com um prompt mínimo. Falha de conexão volta
+   * como `{ok: false, erro}` (HTTP 200): o resultado do teste É a falha. */
+  testarCredencial: (dados: { baseUrl: string; chave: string; modelo: string }) =>
+    requisitar<{ ok: boolean; amostra?: string; duracaoMs?: number; erro?: string }>("/ia/credencial/testar", {
+      method: "POST",
+      body: JSON.stringify(dados),
+    }),
   /** Fluxo 3 (Fase 1, SPEC-23) — pede ao modelo local uma sugestão de texto
    * pra um placeholder "<- ✍️ especificar". Streaming de verdade desde a Fase
    * 1c: a resposta chega em pedaços (`text/plain`, chunked), entregues via

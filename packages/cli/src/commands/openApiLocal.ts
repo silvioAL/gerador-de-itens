@@ -4,7 +4,17 @@ import { randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { TEMPLATE_ESPECIFICACAO_PADRAO, type PerfisConfig, type Quebra } from "@gerador/engine";
-import { MODELOS_CHAT, criarProvedorPorId, verificarStatus, type ProvedorIa } from "@gerador/llm";
+import {
+  ID_PROVEDOR_GATEWAY,
+  MODELOS_CHAT,
+  criarProvedorCompativelOpenAI,
+  criarProvedorPorId,
+  idsDeProvedorValidos,
+  lerCredenciais,
+  salvarCredencial,
+  verificarStatus,
+  type ProvedorIa,
+} from "@gerador/llm";
 import type { GbnfJsonSchema } from "node-llama-cpp";
 
 const CAMPO_GLOBAL = "__global__";
@@ -567,7 +577,9 @@ async function tratarConfigIa(req: IncomingMessage, res: ServerResponse, metodo:
     const corpo = await lerCorpoJson<Partial<ConfigIaLocal>>(req);
     // Só aceita id de provedor conhecido — id inventado deixaria a esteira
     // silenciosamente no modelo padrão sem o usuário entender por quê.
-    const conhecido = MODELOS_CHAT.some((m) => m.id === corpo.provedorPadrao);
+    // Desde a Fase 2 a lista inclui o gateway remoto, que não é um modelo
+    // baixável e por isso não está em `MODELOS_CHAT`.
+    const conhecido = idsDeProvedorValidos().includes(String(corpo.provedorPadrao));
     if (!conhecido) {
       return enviarJson(res, 400, { erro: `provedor desconhecido: ${String(corpo.provedorPadrao)}` });
     }
@@ -581,6 +593,70 @@ async function tratarConfigIa(req: IncomingMessage, res: ServerResponse, metodo:
     return enviarJson(res, 200, config);
   }
   enviarJson(res, 404, { erro: "não encontrado" });
+}
+
+// --- PUT /ia/credencial — SPEC-25 Fase 2: os três campos do card do gateway.
+//
+// NÃO passa por `dirProjeto` de propósito: a credencial é da MÁQUINA
+// (`~/.gerador/credenciais.json`), não do repositório. `config/` é
+// versionável — chave de API ali seria vazamento esperando um `git push`.
+// A resposta devolve só o resumo mascarado; a chave inteira nunca volta pela
+// rede, nem pra tela que acabou de enviá-la.
+
+async function tratarIaCredencial(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const corpo = await lerCorpoJson<{ baseUrl?: string; chave?: string; modelo?: string }>(req);
+  const baseUrl = (corpo.baseUrl ?? "").trim();
+  const modelo = (corpo.modelo ?? "").trim();
+  // Chave vazia com base URL preenchida = "quero manter a chave que já
+  // está lá" (o card mostra a máscara, não a chave, então reenviá-la seria
+  // impossível). Trocar de gateway sem trocar a chave é o caso comum.
+  const chaveNova = (corpo.chave ?? "").trim();
+  const atual = (await lerCredenciais())[ID_PROVEDOR_GATEWAY];
+  const chave = chaveNova || atual?.chave || "";
+
+  if (!baseUrl || !chave || !modelo) {
+    enviarJson(res, 400, { erro: "informe base URL, chave e nome do modelo" });
+    return;
+  }
+  await salvarCredencial(ID_PROVEDOR_GATEWAY, { baseUrl, chave, modelo });
+  // A credencial mudou: o provedor carregado (se era o gateway) está velho.
+  void descartarProvedor();
+  enviarJson(res, 200, { ok: true });
+}
+
+/**
+ * Testa a credencial contra o gateway de verdade, com um prompt mínimo.
+ *
+ * É o que transforma o card de "preenchi e torço" em "funciona". Testa a
+ * credencial ENVIADA (não a salva), pra dar pra validar antes de gravar.
+ */
+async function tratarIaTestarCredencial(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const corpo = await lerCorpoJson<{ baseUrl?: string; chave?: string; modelo?: string }>(req);
+  const salva = (await lerCredenciais())[ID_PROVEDOR_GATEWAY];
+  const baseUrl = (corpo.baseUrl ?? "").trim() || salva?.baseUrl || "";
+  const chave = (corpo.chave ?? "").trim() || salva?.chave || "";
+  const modelo = (corpo.modelo ?? "").trim() || salva?.modelo || "";
+  if (!baseUrl || !chave || !modelo) {
+    enviarJson(res, 400, { erro: "informe base URL, chave e nome do modelo" });
+    return;
+  }
+
+  const provedor = criarProvedorCompativelOpenAI({ baseUrl, chave, modelo, cabecalhos: salva?.cabecalhos });
+  const inicio = Date.now();
+  try {
+    const resposta = await provedor.completar("Responda apenas: ok");
+    enviarJson(res, 200, {
+      ok: true,
+      // O trecho da resposta é o que prova que veio de um modelo, e não de um
+      // proxy que devolve 200 pra qualquer coisa.
+      amostra: resposta.trim().slice(0, 120),
+      duracaoMs: Date.now() - inicio,
+    });
+  } catch (erro) {
+    // 200 com `ok: false`: a falha É o resultado do teste, não um erro da
+    // rota. A mensagem do provedor já vem pronta pra tela.
+    enviarJson(res, 200, { ok: false, erro: erro instanceof Error ? erro.message : String(erro) });
+  }
 }
 
 // --- POST /ia/sugerir — fluxo 3 (Fase 1, SPEC-23): sugestão de texto pra um
@@ -1348,6 +1424,14 @@ export async function tratarApiLocal(req: IncomingMessage, res: ServerResponse, 
   }
   if (caminho === "/config/ia" && (metodo === "GET" || metodo === "PUT")) {
     await tratarConfigIa(req, res, metodo, dirProjeto);
+    return true;
+  }
+  if (caminho === "/ia/credencial" && metodo === "PUT") {
+    await tratarIaCredencial(req, res);
+    return true;
+  }
+  if (caminho === "/ia/credencial/testar" && metodo === "POST") {
+    await tratarIaTestarCredencial(req, res);
     return true;
   }
   if (caminho === "/config/pipeline-agentes" && (metodo === "GET" || metodo === "PUT")) {

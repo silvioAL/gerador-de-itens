@@ -213,6 +213,22 @@ Dois bugs reais achados nessa medição, ambos invisíveis sem rodar:
 
 CLI: `gerador ia instalar [--modelo <id>]`, `gerador ia usar <id>`, `status` listando os modelos de chat com o selecionado marcado. Web: aba **"Modelo de IA"** com card por modelo (estado real do disco, selo "raciocinador", tamanho) e radio que grava a escolha — pronta para receber o wrapper corporativo como segundo card na Fase 2.
 
+### 8.4 Fase 2 (compatível-OpenAI) — implementada como soquete dormente
+
+Feita exatamente como §8.1 mandou: **pronta e testada, sem depender do token corporativo**. O que existe:
+
+- **`packages/llm/src/provedorOpenAI.ts`** — `criarProvedorCompativelOpenAI({baseUrl, chave, modelo, cabecalhos?, fetchImpl?})`. `POST {baseUrl}/chat/completions` com `stream: true`; SSE decodificado com **buffer entre leituras** (o gateway pode fechar o pacote TCP no meio de um `data:` — sem buffer, o pedaço vira JSON inválido e o texto some). `reasoning_content` é descartado da resposta, mesma regra do `<think>` local. `cabecalhos` extras existem porque wrapper corporativo costuma exigir os seus.
+- **JSON sem GBNF**: `response_format: {type: "json_object"}` + o schema no prompt + **`validarContraSchema`** (chaves obrigatórias, tipos, `enum`) + **um** retry mandando a tentativa errada de volta com o defeito nomeado (`falta a chave "valor"`). Errar duas vezes com o defeito apontado é problema do gateway — insistir mais só gastaria o tempo do usuário. Isso é deliberadamente mais fraco que a grammar: lá o JSON inválido é *impossível*, aqui é *improvável*.
+- **Credenciais (§4.4) — a regra dura, agora executável**: `packages/llm/src/credenciais.ts` grava em `~/.gerador/credenciais.json` com `mode 0o600`, e um teste falha se o caminho contiver `config/`. `config/` é versionável: chave ali é vazamento esperando um `git push`. A chave **nunca volta pela rede**: `resumirCredencial` devolve `sk-…7890`, e há teste de que o corpo da resposta não a contém.
+- **Um espaço de ids só**: `ID_PROVEDOR_GATEWAY = "compativel-openai"` entra em `idsDeProvedorValidos()` (não em `MODELOS_CHAT`, que é a lista do que se **baixa**). `PUT /config/ia` passou a aceitá-lo; id inventado continua 400.
+- **`pronto` sem embedding local**: quem roda tudo por gateway não precisa dos 650 MB do modelo de embedding (ele só serve ao RAG). O gate do gateway é a credencial, e só.
+- **CLI**: `gerador ia conectar --url <base> --chave <chave> --modelo <nome>` (sem argumentos, mostra o configurado com a chave mascarada). **Web**: card "remoto" na aba com os três campos, **Salvar** e **Testar conexão** — chave vazia significa "manter a que já está lá", porque o campo mostra a máscara e exigir redigitá-la para mudar só a base URL seria hostil.
+- **Testado contra HTTP real, não `fetch` mockado**: um `node:http` de mentira responde SSE de verdade, inclusive evento partido entre chunks, `[DONE]`, corpo inteiro sem streaming e 401/404. É o que precisa funcionar no dia do token — um mock de `fetch` provaria só que o código chama o que ele mesmo espera.
+
+**Achado real da implementação**: `resposta.body` **sempre** existe no `fetch` do Node, então o caminho "gateway que não streama" nunca era alcançado por `if (!leitor)`. A detecção passou a ser pelo que chegou (nenhum `data:` no corpo → tenta `choices[0].message.content`), o que também cobre wrapper com `Content-Type` errado.
+
+O que falta para dar a Fase 2 por completa é só o que não depende de nós: **validação real com a base URL e o token do usuário**, e o `ProvedorAnthropic` (§8.2).
+
 ## 9. Verificação
 
-Fase a fase, contra o `gerador open` real (disciplina de sempre): Fase 0 = regressão intacta + aba renderizando; **Fase 1 = esteira completa no cenário real com raciocínio ligado, medindo tempo e profundidade contra a linha de base sem raciocínio (registrado no JOURNEY §85)**; Fase 2 = esteira completa via wrapper compatível-OpenAI e via Claude, com streaming e JSON válido, chave validada e guardada fora do projeto; Fase 3 = esteira mista (papéis em provedores diferentes) num run só.
+Fase a fase, contra o `gerador open` real (disciplina de sempre): Fase 0 = regressão intacta + aba renderizando; **Fase 1 = esteira completa no cenário real com raciocínio ligado, medindo tempo e profundidade contra a linha de base sem raciocínio (registrado no JOURNEY §85)**; Fase 2 = esteira completa via wrapper compatível-OpenAI e via Claude, com streaming e JSON válido, chave validada e guardada fora do projeto — **hoje verificada contra um gateway HTTP falso ponta a ponta (§8.4); a verificação com o gateway real fica pendente do token, e está explicitamente NÃO feita**; Fase 3 = esteira mista (papéis em provedores diferentes) num run só.
