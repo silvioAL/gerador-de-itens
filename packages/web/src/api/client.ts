@@ -1,4 +1,4 @@
-import type { Diagrama, PerfisConfig, Quebra, ValorSpec } from "@gerador/engine";
+import type { Diagrama, PerfisConfig, Quebra, RegrasConfig, ValorSpec } from "@gerador/engine";
 
 /**
  * Base do @gerador/server — configurável em runtime via `VITE_API_URL`
@@ -223,12 +223,40 @@ export interface PedidoSugestaoIa {
   contextoEpico?: string;
 }
 
+/** Um modelo de chat alternável e seu estado no disco (SPEC-25). */
+export interface StatusModeloChat {
+  id: string;
+  nome: string;
+  papel: string;
+  instalado: boolean;
+  tamanhoAproximadoBytes: number;
+  raciocinador: boolean;
+  selecionado: boolean;
+}
+
 export interface StatusIa {
+  /** Do modelo SELECIONADO — é o que libera a esteira. */
   chatInstalado: boolean;
   embeddingInstalado: boolean;
   pronto: boolean;
   caminhoModelos: string;
+  /** SPEC-25 — ausentes em servidor antigo; a UI trata como lista vazia. */
+  provedor?: string;
+  modelosChat?: StatusModeloChat[];
 }
+
+export interface ConfigIa {
+  provedorPadrao: string;
+}
+
+/** SPEC-25 Fase 0 — qual provedor/modelo a IA usa neste projeto
+ * (`config/ia.json`). Trocar aqui derruba o modelo carregado no servidor: o
+ * próximo pedido sobe o novo. */
+export const apiConfigIa = {
+  obter: () => requisitar<ConfigIa>("/config/ia"),
+  salvar: (dados: ConfigIa) =>
+    requisitar<ConfigIa>("/config/ia", { method: "PUT", body: JSON.stringify(dados) }),
+};
 
 /** Fase 1d-ii (SPEC-23) — um placeholder a resolver dentro da ficha de um
  * item (chave namespaced por tech, ou `_historiaUsuario`/`_criteriosAceite`). */
@@ -391,7 +419,79 @@ export const apiIa = {
     }
     return JSON.parse(acumulado) as Record<string, Record<string, string>>;
   },
+  /** SPEC-23 Fluxo 2 — configurar com apoio de IA ("poder ajustar as
+   * configurações com apoio de IA"). Devolve um OBJETO no schema do `alvo`
+   * (campo de nó, campo de aresta, papel da esteira), pra UI pré-preencher o
+   * formulário que já existe. A IA nunca grava configuração: quem salva é o
+   * usuário, pela rota de sempre. Mesmo contrato de streaming do pipeline —
+   * texto cru do JSON, parse no fim. */
+  sugerirConfig: async <T>(
+    pedido: { alvo: AlvoSugestaoConfig; instrucao: string; contexto?: string },
+    onTexto?: (acumulado: string) => void
+  ): Promise<T> => {
+    const resposta = await fetch(`${BASE_URL}/ia/sugerir-config`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(pedido),
+    });
+    if (!resposta.ok) {
+      const corpo = await resposta.json().catch(() => ({}));
+      const mensagem = typeof corpo.erro === "string" ? corpo.erro : "Não foi possível gerar a sugestão.";
+      throw new Error(mensagem);
+    }
+    let acumulado = "";
+    const leitor = resposta.body?.getReader();
+    if (leitor) {
+      const decodificador = new TextDecoder();
+      for (;;) {
+        const { done, value } = await leitor.read();
+        if (done) break;
+        acumulado += decodificador.decode(value, { stream: true });
+        onTexto?.(acumulado);
+      }
+      acumulado += decodificador.decode();
+    } else {
+      acumulado = await resposta.text();
+    }
+    return JSON.parse(acumulado) as T;
+  },
 };
+
+/** Alvos que o servidor sabe sugerir (`ALVOS_SUGESTAO_CONFIG` no CLI). */
+export type AlvoSugestaoConfig = "campo-no" | "campo-aresta" | "papel" | "regra-refinamento";
+
+/** O que a IA devolve pro alvo "regra-refinamento" — o `when` (condição sobre
+ * os nós) fica de fora de propósito: é a parte mais sutil da configuração e
+ * não deve ser adivinhada; quem precisa dele edita o arquivo. */
+export interface SugestaoRegra {
+  texto: string;
+  contextos: string[];
+}
+
+/** O que a IA devolve pro alvo "campo-no"/"campo-aresta" — subconjunto de
+ * `DadosCampoNo` que faz sentido a IA propor (nada de `ordem`, `timeId` ou
+ * `tipoNo`, que são do contexto, não da sugestão). */
+export interface SugestaoCampo {
+  key: string;
+  label: string;
+  type: CampoNo["type"];
+  ajuda: string;
+  opcoes: string[];
+  required: boolean;
+  permiteNA: boolean;
+}
+
+/** O que a IA devolve pro alvo "papel" — sem `grupo`/`ativo`/`ordem`, que a
+ * UI decide (um papel novo nasce ativo, no fim da fila, no grupo escolhido
+ * por quem está configurando). */
+export interface SugestaoPapel {
+  id: string;
+  nome: string;
+  descricao: string;
+  preambulo: string;
+  contextos: string[];
+}
 
 export const apiPerfisTime = {
   listar: () => requisitar<PerfisConfig>("/perfis-time"),
@@ -436,6 +536,15 @@ export const apiPipelineAgentes = {
   obter: () => requisitar<ConfigPipelineAgentes>("/config/pipeline-agentes"),
   salvar: (dados: ConfigPipelineAgentes) =>
     requisitar<ConfigPipelineAgentes>("/config/pipeline-agentes", { method: "PUT", body: JSON.stringify(dados) }),
+};
+
+/** SPEC-23 fluxo 5 — `config/regras.json` (a tabela de requisitos de
+ * refinamento por tech/contexto). Era o único arquivo de configuração sem
+ * rota nem UI: só dava pra editar à mão. O tipo é o do engine, sem cópia. */
+export const apiRegras = {
+  obter: () => requisitar<RegrasConfig>("/config/regras"),
+  salvar: (dados: RegrasConfig) =>
+    requisitar<RegrasConfig>("/config/regras", { method: "PUT", body: JSON.stringify(dados) }),
 };
 
 export interface ConviteTime {

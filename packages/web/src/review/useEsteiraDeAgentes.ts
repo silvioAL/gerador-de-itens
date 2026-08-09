@@ -258,6 +258,27 @@ export function useEsteiraDeAgentes({
             );
             if (tokenRef.current !== token) return;
             for (const item of lote) {
+              // ACHADO REAL (validação da Fase 1 da SPEC-25): num lote de 4
+              // itens, três receberam tudo e um — o do nó EXISTENTE, com 17
+              // placeholders contra 10 dos outros — não recebeu nada, e a
+              // única pista foi um pip apagado num screenshot. A grammar do
+              // servidor obriga todas as chaves, então uma ausência aqui é
+              // sinal de que a resposta veio incompleta (ou de que o schema e
+              // o pedido divergiram) — e isso precisa aparecer, não sumir.
+              // Mesmo princípio do `console.error` na rota: falha silenciosa
+              // custou horas de diagnóstico.
+              const faltando = item.placeholdersPorPapel[papel.id].filter(
+                (p) => respostas[item.atividadeChave]?.[p.chave] === undefined
+              );
+              // Só avisa de perda PARCIAL: se a resposta veio vazia inteira, a
+              // causa é outra (falha da chamada) e o servidor já registrou —
+              // repetir por item aqui só faria barulho.
+              if (faltando.length > 0 && Object.keys(respostas).length > 0) {
+                console.warn(
+                  `[esteira/${papel.id}] item "${item.atividadeChave}" voltou sem ${faltando.length} de ${item.placeholdersPorPapel[papel.id].length} campos:`,
+                  faltando.map((p) => p.chave)
+                );
+              }
               for (const placeholder of item.placeholdersPorPapel[papel.id]) {
                 const valor = respostas[item.atividadeChave]?.[placeholder.chave];
                 if (valor === undefined) continue;

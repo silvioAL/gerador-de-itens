@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { PAPEIS_PADRAO, type ConfigPipelineAgentes, type GrupoFicha, type PapelConfigurado } from "../api/client";
+import {
+  PAPEIS_PADRAO,
+  type ConfigPipelineAgentes,
+  type GrupoFicha,
+  type PapelConfigurado,
+  type SugestaoPapel,
+} from "../api/client";
+import { SugerirComIa } from "./SugerirComIa";
 
 export interface PipelineAgentesTabProps {
   config: ConfigPipelineAgentes;
@@ -67,6 +74,33 @@ export function PipelineAgentesTab({ config, onSalvar }: PipelineAgentesTabProps
     editarPapeis(papeis.filter((p) => p.id !== id));
   }
 
+  /** SPEC-23 Fluxo 2 — a IA propõe o agente inteiro (id, nome, descrição,
+   * preâmbulo e contextos). O preâmbulo é o que mais custa escrever à mão:
+   * é ele que decide se o papel entrega três linhas ou uma especificação.
+   * Entra como papel NOVO no fim da fila, já expandido pra revisão — e nada
+   * é salvo até o usuário clicar em salvar, como qualquer edição manual. */
+  function adicionarSugerido(sugestao: SugestaoPapel) {
+    const base = sugestao.id?.trim() || "agente-custom";
+    let id = base;
+    for (let n = 2; papeis.some((p) => p.id === id); n++) id = `${base}-${n}`;
+    editarPapeis([
+      ...papeis,
+      {
+        id,
+        nome: sugestao.nome || "Agente custom",
+        descricao: sugestao.descricao ?? "",
+        // Um papel novo escreve na seção do especialista: é a única das quatro
+        // seções da ficha que aceita mais de um autor. Trocar de grupo continua
+        // sendo escolha do usuário, no editor abaixo.
+        grupo: "especialista",
+        preambulo: sugestao.preambulo ?? "",
+        ativo: true,
+        contextos: sugestao.contextos ?? [],
+      },
+    ]);
+    setExpandido(id);
+  }
+
   async function alternarConfirmacao(valor: boolean) {
     setConfirmacaoObrigatoria(valor);
     setSalvando(true);
@@ -129,6 +163,13 @@ export function PipelineAgentesTab({ config, onSalvar }: PipelineAgentesTabProps
             + Agente contextual
           </button>
         </div>
+
+        <SugerirComIa<SugestaoPapel>
+          alvo="papel"
+          contexto={`A esteira hoje tem os papéis: ${papeis.map((p) => p.nome).join(", ")}.`}
+          exemplo="ex.: um agente de segurança que cobre LGPD e dados sensíveis"
+          onSugestao={adicionarSugerido}
+        />
 
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {papeis.map((p, i) => {

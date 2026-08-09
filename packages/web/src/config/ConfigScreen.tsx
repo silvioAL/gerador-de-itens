@@ -7,8 +7,18 @@ import { CamposArestaTab } from "./CamposArestaTab";
 import { MembrosTab } from "./MembrosTab";
 import { EspecificacaoTemplateTab } from "./EspecificacaoTemplateTab";
 import { PipelineAgentesTab } from "./PipelineAgentesTab";
+import { ModeloIaTab } from "./ModeloIaTab";
+import { RegrasTab } from "./RegrasTab";
 
-export type AbaConfig = "perfis" | "campos" | "camposAresta" | "membros" | "especificacao" | "pipeline";
+export type AbaConfig =
+  | "perfis"
+  | "campos"
+  | "camposAresta"
+  | "regras"
+  | "membros"
+  | "especificacao"
+  | "pipeline"
+  | "modeloIa";
 
 export interface ConfigScreenProps {
   config: DiagramaConfig;
@@ -120,11 +130,19 @@ export function ConfigScreen({
             Membros
           </button>
         )}
+        {mostrarCamposAresta && (
+          <button onClick={() => setAba("regras")} style={aba === "regras" ? abaAtivaEstilo : abaEstilo}>
+            Regras de refinamento
+          </button>
+        )}
         <button onClick={() => setAba("especificacao")} style={aba === "especificacao" ? abaAtivaEstilo : abaEstilo}>
           Especificação de solução
         </button>
         <button onClick={() => setAba("pipeline")} style={aba === "pipeline" ? abaAtivaEstilo : abaEstilo}>
           Pipeline de IA
+        </button>
+        <button onClick={() => setAba("modeloIa")} style={aba === "modeloIa" ? abaAtivaEstilo : abaEstilo}>
+          Modelo de IA
         </button>
       </div>
 
@@ -152,6 +170,7 @@ export function ConfigScreen({
             onExcluir={onExcluirCampoAresta}
           />
         )}
+        {aba === "regras" && mostrarCamposAresta && <RegrasTab />}
         {aba === "membros" && mostrarMembros && <MembrosTab timeAtivo={timeAtivo} />}
         {aba === "especificacao" && (
           <EspecificacaoTemplateTab
@@ -161,6 +180,7 @@ export function ConfigScreen({
           />
         )}
         {aba === "pipeline" && <PipelineAgentesTab config={pipelineAgentes} onSalvar={onSalvarPipelineAgentes} />}
+        {aba === "modeloIa" && <ModeloIaTab />}
       </div>
     </div>
   );

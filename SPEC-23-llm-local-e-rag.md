@@ -364,3 +364,45 @@ Pedido do usuário, direto: um pipeline simples — a IA recebe todo o contexto 
 ## 7. Verificação
 
 Fase 0 e Fase 1 (infra + fluxo 3 v1): testes automatizados com fake determinístico do modelo/HTTP (nunca modelo real em CI) + validação manual contra o modelo de verdade, seguindo a disciplina já estabelecida no projeto — nenhuma exceção. Fase 1 segue em redesenho (§6.5, sub-fases 1a-1e) e as fases 2-5 seguem a mesma regra (§6.1) quando começarem: detalhamento nesta spec antes de qualquer código.
+
+## 6.6 Fase 3 (fluxo 2) — implementada: configurar com apoio de IA
+
+Antecipada na fila a pedido explícito do usuário (*"lembro que haviam outras demandas como poder ajustar as configurações com apoio de IA... foque nesse tipo de task"*) — vem antes da Fase 2 (RAG do fluxo 5), que continua na fila.
+
+**A decisão que define a fase: a IA propõe, o formulário existente recebe, o usuário salva.** A rota devolve um OBJETO de configuração; a UI usa esse objeto pra pré-preencher o mesmo formulário que já existia, e o salvamento continua sendo a rota de sempre, com a mesma validação. Em nenhum momento a IA escreve em `config/`. Essa fronteira é a lição do JOURNEY §41 aplicada de novo: a skill removida naquela rodada morreu por virar um canal paralelo, desconectado do pipeline real — assistência que grava direto repetiria o erro.
+
+**`POST /ia/sugerir-config`** (`openApiLocal.ts`): recebe `{alvo, instrucao, contexto?}` e resolve o alvo numa **tabela declarativa** (`ALVOS_SUGESTAO_CONFIG`), onde cada entrada tem descrição, schema GBNF e as regras de preenchimento que um modelo pequeno erra sem instrução explícita (formato da `key`, quando `opcoes` faz sentido, o que é `preambulo`). Adicionar um alvo novo — a regra de checklist da Fase 2, por exemplo — é uma entrada na tabela, sem tocar no roteador nem na UI.
+
+Três alvos hoje:
+
+| alvo | o que a IA escreve | onde entra |
+|---|---|---|
+| `campo-no` | campo de formulário de um tipo de nó | `CamposNoTab` |
+| `campo-aresta` | campo de um tipo de conexão (sem `lista`, que `CampoAresta` não aceita — o enum do schema já impede) | `CamposArestaTab` |
+| `papel` | agente da esteira: id, nome, descrição, **preâmbulo** e contextos | `PipelineAgentesTab` |
+
+O alvo `papel` é o de maior valor: o preâmbulo é o que decide se um agente entrega três linhas ou uma especificação (§ da SPEC-24 sobre profundidade), e é justamente a parte que dá mais trabalho de escrever à mão.
+
+**Alvo desconhecido devolve 400**, ao contrário do papel na esteira, que cai num preâmbulo genérico. Aqui o schema É o contrato com o formulário: sem ele a resposta não teria onde ser preenchida, e cair em outro schema em silêncio entregaria um objeto que a UI ignoraria.
+
+**`SugerirComIa`** (`packages/web/src/config/SugerirComIa.tsx`): um componente só, genérico no tipo de retorno, usado pelas três abas — input em português + botão, com o JSON parcial aparecendo enquanto o modelo escreve (a espera de minutos no modelo local não pode parecer travamento) e a linha fixa "nada é salvo até você revisar e clicar em salvar".
+
+**Feito quando**: as três abas mostram o campo de sugestão; o objeto devolvido pré-preenche o formulário sem salvar nada; alvo inválido e instrução vazia são 400; sem modelo instalado é 503 como as outras rotas de IA. Testes: 4 no componente (envio com contexto, streaming parcial, erro na tela, botão desabilitado sem instrução) e 3 na rota (schema do alvo respeitado incluindo enum e array, 400 duplo, 503).
+
+## 6.7 Fase 2 (fluxo 5) — parte 1 implementada: `regras.json` ganha tela
+
+A Fase 2 original era "RAG de retrospectivas + UI nova pra `config/regras.json`". As duas metades foram separadas, porque só uma delas depende de infraestrutura nova: **a UI vale por si e vem agora; o RAG continua na fila.**
+
+`config/regras.json` era o único arquivo de configuração sem rota e sem tela — só editável à mão — apesar de ser o que mais muda com o tempo: é a tabela que decide quais requisitos de refinamento cada item gerado recebe, por tech e por contexto. Cada aprendizado do time deveria virar uma linha ali, e a fricção de abrir o JSON garantia que não virava.
+
+**`GET`/`PUT /config/regras`**: lê e grava o arquivo inteiro, deliberadamente sem normalizar o conteúdo — quem valida a forma de uma regra é o engine (`validarConfig`) na carga; repetir essa validação na rota criaria duas fontes de verdade sobre o que é regra válida. A rota garante só que o corpo é JSON e tem `porTech`, senão um PUT torto apagaria o arquivo. Sem arquivo, o GET devolve a forma vazia — a tela abre editável em vez de num erro.
+
+**`RegrasTab`**: seletor de tech + lista editável do **checklist técnico**, com adicionar/editar/remover e o campo de sugestão por IA (alvo `regra-refinamento`) já embutido, levando no prompt os requisitos que já existem — sem isso o modelo repete o que está lá.
+
+Três limites conscientes desta primeira versão:
+
+- **Só o checklist técnico.** `checklistProcesso`, `testes` e `volumetria` continuam no arquivo, são **preservados no salvamento** (a UI nunca é dona do arquivo inteiro; teste garante) e ganham tela numa rodada própria. Juntar as quatro listas numa tela só repetiria a confusão que a SPEC-20 desfez no domínio.
+- **`when` não é editável.** É a parte mais sutil da configuração; uma UI ingênua para condições induziria erro silencioso. Requisito que já tem `when` aparece com selo "condicional" e é preservado intacto.
+- **A IA não propõe `when`** pelo mesmo motivo — o schema do alvo tem só `texto` e `contextos`.
+
+**Feito quando**: a aba lista, edita, adiciona e remove requisitos por tech; o arquivo gravado preserva tudo que a tela não edita; PUT sem `porTech` é 400 e não corrompe o arquivo existente. Testes: 5 na aba, 2 na rota.

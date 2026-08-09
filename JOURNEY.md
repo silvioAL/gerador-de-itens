@@ -1201,3 +1201,86 @@ Fecha a conversa o dado mais útil de todos, que calibra a barra: *"no meu uso d
 - **Fase 1 também desarrisca**: tudo que vier depois precisa rodar no embarcado; descobrir isso no fim custaria retrabalho.
 
 Sequência definitiva desta rodada de planejamento: **Fase 0 + Claude → Fase 1 (DeepSeek local) → Bloco 1 → Bloco 4a → Blocos 2+3 → Bloco 5a → (token) Fase 2 → 5b → 6/4b.**
+
+## 85. SPEC-25 Fases 0 e 1: a abstração de provedor e o DeepSeek R1 embarcado — com a briga entre grammar e raciocínio resolvida
+
+Primeira rodada de CÓDIGO da SPEC-25, com o escopo que o usuário fechou: *"por enquanto vamos cortar a parte do Claude, vamos de R1-distill embarcado, tenho espaço sim"*.
+
+**Fase 0 — abstração.** `ProvedorIa` (`completar`/`completarEstruturado`/`descartar`) virou a fronteira entre "de onde vem a inteligência" e o resto; `criarProvedorLocal(modelo)` é parametrizado pelo `ModeloRegistrado` (antes o caminho do Qwen era fixo no código da rota). `config/ia.json` (`{provedorPadrao}`) com `GET`/`PUT /config/ia`. Duas decisões pequenas que valem registro: **PUT com id desconhecido devolve 400** em vez de cair no padrão — cair em silêncio faria o usuário achar que trocou de modelo sem ter trocado; e trocar de provedor **descarta** o anterior, liberando os GB de RAM em vez de manter dois modelos carregados. `verificarStatus` agora lista os modelos de chat um a um, e `pronto` passou a ser uma afirmação sobre o modelo SELECIONADO (com DeepSeek escolhido e não baixado, a IA não está pronta mesmo com o Qwen no disco).
+
+**Fase 1 — DeepSeek.** Registro do `unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF` com repo, nome de arquivo e tamanho (5.027.785.216 bytes) **confirmados na API da Hugging Face antes de escrever** — a lição do embedding, que estava registrada em comentário desde a SPEC-23, evitou repetir o 404 por nome "óbvio".
+
+O problema central da fase, e a solução: **a grammar GBNF restringe a amostragem desde o primeiro token**, então aplicá-la junto com o prompt mataria o `<think>` — exatamente a capacidade pela qual o modelo foi escolhido. A geração estruturada virou **duas fases na mesma sessão**: (A) livre, o modelo raciocina e rascunha, e **nada daqui vai pro stream** (quem consome acumula os pedaços e faz `JSON.parse` no fim — prosa no meio quebraria o parse; a UI fica no "pensando…" que já existia); (B) com a grammar **e `budgets.thoughtTokens: 0`** — sem esse orçamento zerado o modelo tenta raciocinar de novo e colide com a grammar. Achado que simplificou o caminho livre: o node-llama-cpp 3.19 já separa segmentos `thought` nativamente (`onResponseChunk`), então `completar()` só encaminha o texto da resposta principal, com um strip defensivo de `<think>` no retorno caso um GGUF com template inesperado emita a marcação inline. Modelo não-raciocinador segue o caminho de fase única: **pro Qwen, a Fase 0 é refactor puro**.
+
+CLI: `gerador ia instalar --modelo <id>` (sem argumento continua baixando só o par padrão — 5 GB não se baixa sem pedir), `gerador ia usar <id>` e `status` listando os dois com o selecionado marcado. Web: aba **"Modelo de IA"** com card por modelo (estado real do disco, selo "raciocinador", tamanho) e radio que grava a escolha.
+
+**E a validação real achou um bug que a suíte jamais acharia.** Com o R1 selecionado, a esteira completa levou 1551s e o screenshot final mostrava **só o pip do PO aceso**: Arquiteto rodou 700s e falhou, Especialista e QA falharam em 4s cada — os três em silêncio, porque o `catch` por lote da esteira (deliberado: "falha isolada não trava a esteira") engole o erro e nenhum log existia. Só se descobriu porque o intervalo de 4 segundos entre duas chamadas era impossível pra um modelo que raciocina, e o screenshot confirmou.
+
+Causa: a `LlamaChatSession` **acumula o histórico entre chamadas**, e o singleton do servidor vive o processo inteiro. Com o Qwen sem raciocínio isso passava despercebido (1 prompt curto por chamada); com raciocínio são 2 fases + `<think>` longo, então o contexto estourava logo no segundo papel. Correções: (a) `resetChatHistory()` no início de cada geração — nenhum fluxo aqui depende de memória entre chamadas, cada prompt já carrega todo o contexto de que precisa, então zerar é o comportamento CORRETO, não um remendo; (b) `console.error` no catch da rota — a falha era literalmente invisível, e o servidor é o único lugar que enxerga a causa.
+
+E o (c) que eu tinha escrito aqui como correção era um **erro meu**: forçar `contextSize: { min: 16384 }` "pra dar espaço ao think" estourou a VRAM (*"a context size of 16384 is too large for the available VRAM"*) e derrubou as três chamadas. Quem denunciou foi justamente o `console.error` que eu tinha acabado de adicionar — a instrumentação pegou o autor primeiro. Voltou pro default do `createContext()`, com o motivo em comentário no código pra ninguém "melhorar" isso de novo. Fica o registro: o log que se adiciona pra caçar bug alheio é o mesmo que pega o próprio.
+
+## 86. O modelo que já sabia pensar: a Fase 1 termina removendo o DeepSeek que ela tinha acabado de instalar
+
+Com a sessão corrigida, o teste comparativo finalmente pôde rodar de verdade — e desmontou a premissa da fase inteira.
+
+**O Qwen3-4B é um modelo híbrido raciocinador.** Ele pensa por padrão. A ferramenta usava esse modelo desde a SPEC-23 e nunca tinha visto um `<think>` — porque o nosso próprio código aplicava a grammar GBNF junto com o prompt, e GBNF restringe a amostragem desde o token zero. Estávamos rodando um raciocinador em modo mudo e concluindo, da saída rasa, que "modelo de 4B tem teto". O teto era nosso.
+
+O diagnóstico que valia pro DeepSeek valia pro modelo que já estava no disco. Bastou marcar `raciocinador: true` no registro — a mesma flag, o mesmo caminho de duas fases do `motor.ts`. Medido na máquina real, mesmo prompt e mesmo lote:
+
+| | Qwen3-4B com raciocínio | DeepSeek-R1 8B |
+|---|---|---|
+| 1ª chamada | **330s** | 1500s |
+| 2ª chamada | **306s** | não terminou em 25 min |
+| Disco | 2,5 GB (já baixado) | +5 GB |
+| Conteúdo | critérios numerados citando latência de 150ms e status 200 | idem, quando terminava |
+
+Cinco vezes mais rápido, com a profundidade que faltava, sem download novo. A decisão do usuário foi imediata: *"faz muito mais sentido termos SOMENTE o Qwen3-4B, essa é minha decisão, prossiga"*. `MODELOS_CHAT` voltou a ter um item; `MODELO_CHAT_DEEPSEEK`, o download de 5 GB e o `--modelo deepseek` saíram.
+
+Um teto de 2000 tokens de raciocínio (`TETO_RACIOCINIO`) ficou: **sem limite, uma única chamada levou 2563s (~42 min)**. "Lentidão tolerada" tem fundo.
+
+Três coisas que este episódio deixa registradas:
+
+- **A abstração sobreviveu ao motivo que a criou.** `ProvedorIa` nasceu pra alternar entre dois modelos locais — alternativa que deixou de existir no mesmo dia. Ela continua, porque o valor real dela sempre foi a Fase 2 (o wrapper corporativo, §4.6 da SPEC-25). Uma abstração que só se justifica por um caso de uso vira dívida quando o caso some; esta tinha dois.
+- **"O modelo é fraco" é uma hipótese, não um diagnóstico** — e é a hipótese mais cara de aceitar sem teste, porque a resposta natural (baixar um modelo maior) custa GB, horas e complexidade permanente. A pergunta barata era "o que o nosso código está impedindo o modelo de fazer?", e ela vinha antes.
+- **Trabalho jogado fora não foi desperdício.** O DeepSeek instalado foi o que forçou a briga grammar × raciocínio, o `resetChatHistory()`, o `console.error` na rota e o caminho de duas fases. Tudo isso ficou — e é exatamente o que faz o Qwen render agora. O que saiu foi só o arquivo de 5 GB.
+
+**Um ponto ficou em aberto, e vai registrado como aberto.** Na esteira completa de validação (4 papéis, 4× HTTP 200, 3647s), três dos quatro itens acenderam os quatro pips e um não acendeu nenhum: `n2::ep0`, o item do nó marcado como EXISTENTE, que tem 17 placeholders contra 10 dos demais. O que foi possível descartar sem gastar mais uma hora de modelo:
+
+- **Não é a UI**: os quatro elementos de pip existem para esse item, e ele entra na fila (17 campos de refinamento renderizados).
+- **Não é a distribuição**: um teste determinístico novo monta exatamente essa forma — item pesado no mesmo lote que itens leves, chaves com `::`, espaços e acentos (`Backend::volumetria::RPS (Requisições por segundo)`) — e todas as chaves chegam ao `onResponderItem`.
+- **A tentativa de isolar o papel PO não concluiu**: passou de 1800s sem resposta e expirou.
+
+Sobra a hipótese do lado do modelo (resposta incompleta para aquele item apesar da grammar). Em vez de chutar, apliquei a mesma lição do bug anterior: **perda parcial agora avisa**. Quando um lote volta com dados mas faltando campos de algum item, o hook loga papel, item e chaves ausentes. Na próxima execução real a resposta vem de graça, em vez de sair de novo de um pip apagado num screenshot.
+
+## 87. Configurar com apoio de IA: a sugestão preenche o formulário, nunca o arquivo
+
+Pedido do usuário no meio da rodada: *"lembro que haviam outras demandas como poder ajustar as configurações com apoio de IA... foque nesse tipo de task, que já está mapeada no nosso roadmap"*. É o fluxo 2 da SPEC-23, que estava como Fase 3 do roteiro — antecipado.
+
+O desenho inteiro cabe numa frase: **a IA propõe o objeto, o formulário que já existe recebe, o usuário salva pelo caminho de sempre.** A rota `/ia/sugerir-config` devolve um objeto no schema do alvo e nada mais; não existe caminho em que ela escreva em `config/`.
+
+Isso não é cautela genérica — é a lição do §41 aplicada de propósito. A skill do Claude Code foi removida naquela rodada porque tinha virado uma ferramenta paralela, produzindo material fora do pipeline real. Assistência de configuração que gravasse direto repetiria exatamente esse erro: dois caminhos de escrita, um deles sem a validação do outro.
+
+Os alvos ficam numa **tabela declarativa** no servidor (`ALVOS_SUGESTAO_CONFIG`): descrição, schema GBNF e as regras que um modelo pequeno erra sem instrução explícita — `key` em camelCase, `opcoes` só faz sentido em `select`, o que é um preâmbulo. Adicionar alvo é acrescentar uma entrada; o roteador e o componente de UI não mudam. Já rendeu: o alvo `campo-aresta` nasceu com o enum sem `"lista"`, porque `CampoAresta` não aceita esse tipo — o schema impede o modelo de propor algo que o formulário rejeitaria, em vez de deixar a UI consertar depois (a guarda na UI ficou mesmo assim, para servidor mais antigo).
+
+Dos três alvos, o que mais vale é `papel`: o preâmbulo do agente é o que separa uma resposta de três linhas de uma especificação de verdade — e é a parte mais chata de escrever à mão. Descrever "um agente de segurança que cobre LGPD e dados sensíveis" e receber o papel montado, pronto pra revisar, é o caso de uso inteiro.
+
+Um detalhe de honestidade na UI: o JSON parcial aparece enquanto o modelo escreve. No modelo local a chamada leva minutos, e sem isso a espera parece travamento — o mesmo achado que já tinha aparecido na esteira ("fica só o ícone de gerando").
+
+Regressão: engine 145, llm 18, cli 57 (+3), web 205 (+4).
+
+## 88. O arquivo que mais muda era o único sem tela
+
+`config/regras.json` decide quais requisitos de refinamento cada item gerado recebe, por tech e por contexto. É a peça que deveria acumular o aprendizado do time — cada "esquecemos de definir o timeout de novo" vira uma linha ali. E era o único arquivo de configuração sem rota e sem tela: só dava pra editar à mão, o que na prática significava que quase nunca era editado.
+
+A rota (`GET`/`PUT /config/regras`) é de propósito burra: grava o arquivo inteiro sem normalizar nada. Quem valida a forma de uma regra é o engine, na carga. Repetir essa validação na rota criaria duas fontes de verdade sobre o que é uma regra válida — e a que discordasse do engine venceria calada. O único cuidado é rejeitar corpo sem `porTech`, pra um PUT torto não apagar o arquivo.
+
+Três coisas que a tela deliberadamente NÃO faz, e vale registrar o porquê:
+
+- **Não edita `checklistProcesso`, `testes` nem `volumetria`** — mas preserva os três no salvamento, com teste garantindo. A tela nunca é dona do arquivo inteiro. Juntar as quatro listas numa tela só recriaria exatamente a mistura que a SPEC-20 desfez no domínio (o que se *decide* no desenho versus o que se *faz* pra executar).
+- **Não edita `when`** (a condição sobre os nós). É a parte mais sutil da configuração; uma UI ingênua pra ela produziria requisitos que aparecem na hora errada, sem ninguém perceber. Quem tem `when` ganha um selo "condicional" e passa intacto.
+- **A IA também não propõe `when`** — o schema do alvo `regra-refinamento` tem só `texto` e `contextos`. Onde a decisão é sutil demais para uma tela, ela é sutil demais para o modelo.
+
+O campo de sugestão da aba leva no prompt os requisitos que já existem para aquela tech. Sem isso, o modelo propõe de novo o que já está na lista — foi o primeiro detalhe que apareceu ao montar o teste.
+
+Regressão: cli 59 (+2), web 210 (+5).

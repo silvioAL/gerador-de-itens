@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createServer, type Server } from "node:http";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -8,13 +8,16 @@ import { join } from "node:path";
 // (mesma disciplina de ia.test.ts) — e pra poder testar o caminho 503 (modelos
 // não instalados) de forma determinística, sem depender do estado real da
 // máquina que roda o teste.
-const verificarStatusMock = vi.fn(async () => ({
+const STATUS_NAO_INSTALADO = {
   chatInstalado: false,
   embeddingInstalado: false,
   pronto: false,
   caminhoModelos: "/fake/models",
-}));
-// Instância única (não recriada a cada chamada de carregarModeloChatMock) pra
+  provedor: "qwen-local",
+  modelosChat: [],
+};
+const verificarStatusMock = vi.fn(async () => STATUS_NAO_INSTALADO);
+// Instância única (não recriada a cada chamada de criarProvedorPorIdMock) pra
 // dar pra inspecionar o prompt de verdade recebido em `completar` (Fase 1b,
 // SPEC-23 — assert de que o contexto do épico chega no prompt) e simular
 // streaming de verdade via `onTexto` (Fase 1c — /ia/sugerir virou texto
@@ -40,19 +43,30 @@ const completarMock = vi.fn(async (_prompt: string, opcoes?: { onTexto?: (p: str
 // por item do lote) — o mock espelha os dois níveis e emite o JSON em dois
 // pedaços via onTexto (como o motor real faria token a token); o corpo
 // acumulado é o que o cliente parseia.
+interface SchemaFake {
+  type?: string;
+  enum?: unknown[];
+  items?: SchemaFake;
+  properties?: Record<string, SchemaFake>;
+}
+/** Um valor plausível pra cada forma de schema — o mock precisa respeitar o
+ * schema tanto no aninhado do pipeline quanto no PLANO de /ia/sugerir-config
+ * (SPEC-23 Fluxo 2), que tem boolean, enum e array de string. */
+function valorFake(chave: string, sub: SchemaFake, prefixo: string): unknown {
+  if (sub.properties) {
+    return Object.fromEntries(
+      Object.entries(sub.properties).map(([k, s]) => [k, valorFake(k, s, `${prefixo}${chave}/`)])
+    );
+  }
+  if (sub.enum) return sub.enum[0];
+  if (sub.type === "boolean") return false;
+  if (sub.type === "array") return [`item gerado pra ${chave}`];
+  return `resposta gerada pra ${prefixo}${chave}`;
+}
 const completarComSchemaMock = vi.fn(
-  async (
-    _prompt: string,
-    schema: { properties?: Record<string, { properties?: Record<string, unknown> }> },
-    opcoes?: { onTexto?: (pedaco: string) => void }
-  ) => {
+  async (_prompt: string, schema: SchemaFake, opcoes?: { onTexto?: (pedaco: string) => void }) => {
     const resultado = Object.fromEntries(
-      Object.entries(schema.properties ?? {}).map(([chaveItem, sub]) => [
-        chaveItem,
-        Object.fromEntries(
-          Object.keys(sub.properties ?? {}).map((chave) => [chave, `resposta gerada pra ${chaveItem}/${chave}`])
-        ),
-      ])
+      Object.entries(schema.properties ?? {}).map(([chave, sub]) => [chave, valorFake(chave, sub, "")])
     );
     const texto = JSON.stringify(resultado);
     opcoes?.onTexto?.(texto.slice(0, 10));
@@ -61,14 +75,26 @@ const completarComSchemaMock = vi.fn(
     return resultado;
   }
 );
-const carregarModeloChatMock = vi.fn(async () => ({
+/** Último prompt/schema entregues ao provedor — os testes checam os dois o
+ * tempo todo, e ler direto de `mock.calls.at(-1)` exigia um cast por chamada. */
+function ultimaChamadaComSchema(): { prompt: string; schema: SchemaFake } {
+  const chamada = completarComSchemaMock.mock.calls.at(-1);
+  if (!chamada) throw new Error("completarComSchema não foi chamado");
+  return { prompt: chamada[0], schema: chamada[1] };
+}
+// SPEC-25 Fase 0: as rotas falam com `ProvedorIa`, não mais com o motor —
+// o mock acompanha a fronteira nova. `criarProvedorPorId` recebe o id vindo
+// de `config/ia.json`, o que também permite asserir a troca de modelo.
+const criarProvedorPorIdMock = vi.fn(async (id?: string) => ({
+  id: id ?? "qwen-local",
+  nome: id ?? "qwen-local",
   completar: completarMock,
-  completarComSchema: completarComSchemaMock,
+  completarEstruturado: completarComSchemaMock,
   descartar: vi.fn(async () => {}),
 }));
 vi.mock("@gerador/llm", async () => {
   const real = await vi.importActual<typeof import("@gerador/llm")>("@gerador/llm");
-  return { ...real, verificarStatus: verificarStatusMock, carregarModeloChat: carregarModeloChatMock };
+  return { ...real, verificarStatus: verificarStatusMock, criarProvedorPorId: criarProvedorPorIdMock };
 });
 
 const { tratarApiLocal } = await import("./openApiLocal.js");
@@ -79,15 +105,10 @@ let dirTemp: string;
 
 beforeEach(async () => {
   verificarStatusMock.mockClear();
-  carregarModeloChatMock.mockClear();
+  criarProvedorPorIdMock.mockClear();
   completarMock.mockClear();
   completarComSchemaMock.mockClear();
-  verificarStatusMock.mockResolvedValue({
-    chatInstalado: false,
-    embeddingInstalado: false,
-    pronto: false,
-    caminhoModelos: "/fake/models",
-  });
+  verificarStatusMock.mockResolvedValue(STATUS_NAO_INSTALADO);
   dirTemp = mkdtempSync(join(tmpdir(), "gerador-cli-api-local-"));
   servidor = createServer((req, res) => {
     void tratarApiLocal(req, res, dirTemp).then((tratado) => {
@@ -140,7 +161,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       body: JSON.stringify({ tech: "Backend", rotulo: "DLQ configurada e monitorada", contextoNo: "fila rabbitmq" }),
     });
     expect(resposta.status).toBe(503);
-    expect(carregarModeloChatMock).not.toHaveBeenCalled();
+    expect(criarProvedorPorIdMock).not.toHaveBeenCalled();
   });
 
   it("POST /ia/sugerir: falha do motor devolve 500 tratado e reseta o singleton; sucesso seguinte carrega e reusa (Fase 1, SPEC-23)", async () => {
@@ -159,7 +180,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     // rejeição não tratada e derrubava o processo INTEIRO do `gerador open`
     // (open.ts chama tratarApiLocal sem try/catch no request handler) — não
     // só essa requisição.
-    carregarModeloChatMock.mockRejectedValueOnce(new Error("binário nativo bloqueado"));
+    criarProvedorPorIdMock.mockRejectedValueOnce(new Error("binário nativo bloqueado"));
     const falha = await fetch(`${base}/ia/sugerir`, {
       method: "POST",
       body: JSON.stringify({ tech: "Backend", rotulo: "DLQ configurada e monitorada", contextoNo: "fila rabbitmq" }),
@@ -188,7 +209,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     });
 
     // 2 chamadas totais a carregarModeloChat: a que falhou (passo 1) + a que carregou de verdade (passo 3).
-    expect(carregarModeloChatMock).toHaveBeenCalledTimes(2);
+    expect(criarProvedorPorIdMock).toHaveBeenCalledTimes(2);
   });
 
   it("POST /ia/sugerir inclui o contexto do épico no prompt quando presente (Fase 1b, SPEC-23)", async () => {
@@ -264,12 +285,13 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       }),
     });
     expect(resposta.status).toBe(503);
-    expect(carregarModeloChatMock).not.toHaveBeenCalled();
+    expect(criarProvedorPorIdMock).not.toHaveBeenCalled();
   });
 
   it("POST /ia/pipeline/:papel sem nenhum item com placeholder devolve 400 (SPEC-24 Fase B)", async () => {
     verificarStatusMock.mockResolvedValue({
       chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
     });
     const resposta = await fetch(`${base}/ia/pipeline/po`, {
       method: "POST",
@@ -281,6 +303,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
   it("POST /ia/pipeline/po recebe um LOTE de itens numa chamada só, com schema aninhado por item (SPEC-24 Fase E — achado real: chamada por item era lento demais)", async () => {
     verificarStatusMock.mockResolvedValue({
       chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
     });
 
     const resposta = await fetch(`${base}/ia/pipeline/po`, {
@@ -319,24 +342,111 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     });
     expect(completarComSchemaMock).toHaveBeenCalledTimes(1);
 
-    const [prompt] = completarComSchemaMock.mock.calls.at(-1) as [string];
+    const { prompt: prompt } = ultimaChamadaComSchema();
     expect(prompt).toContain("Product Owner");
     expect(prompt).toContain("Épico: reduzir tempo de aprovação de crédito de 3 dias pra 1 hora.");
     expect(prompt).toContain("srv-checkout publica em fila-pedidos");
     expect(prompt).toContain("criar fila-pedidos");
     expect(prompt).toContain("LOTE de 2 item(ns)");
 
-    const [, schema] = completarComSchemaMock.mock.calls.at(-1) as [
-      string,
-      { properties: Record<string, { properties: Record<string, unknown> }> },
-    ];
-    expect(Object.keys(schema.properties)).toEqual(["n1::setup", "n2::criacao"]);
-    expect(Object.keys(schema.properties["n1::setup"].properties)).toEqual(["_historiaUsuario", "_criteriosAceite"]);
+    const { schema } = ultimaChamadaComSchema();
+    expect(Object.keys(schema.properties ?? {})).toEqual(["n1::setup", "n2::criacao"]);
+    expect(Object.keys(schema.properties?.["n1::setup"].properties ?? {})).toEqual([
+      "_historiaUsuario",
+      "_criteriosAceite",
+    ]);
+  });
+
+  it("GET /config/regras sem arquivo devolve a forma vazia; PUT grava e o GET seguinte lê de volta (SPEC-23 fluxo 5)", async () => {
+    const vazio = await fetch(`${base}/config/regras`).then((r) => r.json());
+    expect(vazio).toEqual({ tipos: [], tamanhos: [], porTech: {} });
+
+    const regras = {
+      tipos: ["História"],
+      tamanhos: ["M"],
+      porTech: { Backend: { checklistTecnico: [{ texto: "Definir timeout", contextos: [] }], testes: [] } },
+    };
+    const put = await fetch(`${base}/config/regras`, { method: "PUT", body: JSON.stringify(regras) });
+    expect(put.status).toBe(200);
+    expect(await fetch(`${base}/config/regras`).then((r) => r.json())).toEqual(regras);
+    // Grava no lugar que o app carrega — não num arquivo paralelo.
+    expect(JSON.parse(readFileSync(join(dirTemp, "config", "regras.json"), "utf-8"))).toEqual(regras);
+  });
+
+  it("PUT /config/regras sem `porTech` é 400 — corpo torto não apaga o arquivo existente", async () => {
+    const regras = { tipos: [], tamanhos: [], porTech: { Backend: { checklistTecnico: [], testes: [] } } };
+    await fetch(`${base}/config/regras`, { method: "PUT", body: JSON.stringify(regras) });
+
+    const ruim = await fetch(`${base}/config/regras`, { method: "PUT", body: JSON.stringify({ tipos: ["X"] }) });
+    expect(ruim.status).toBe(400);
+    expect(await fetch(`${base}/config/regras`).then((r) => r.json())).toEqual(regras);
+  });
+
+  it("POST /ia/sugerir-config devolve um objeto no schema do alvo, com o pedido e o contexto no prompt (SPEC-23 Fluxo 2)", async () => {
+    verificarStatusMock.mockResolvedValue({
+      chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
+    });
+
+    const resposta = await fetch(`${base}/ia/sugerir-config`, {
+      method: "POST",
+      body: JSON.stringify({
+        alvo: "campo-no",
+        instrucao: "quero registrar a política de retenção da fila",
+        contexto: "Tipo de nó: Fila Rabbit. Time: pagamentos.",
+      }),
+    });
+    expect(resposta.status).toBe(200);
+    // Mesmo contrato do pipeline: corpo é o texto cru do JSON restrito.
+    const corpo = JSON.parse(await resposta.text());
+    expect(Object.keys(corpo).sort()).toEqual(
+      ["ajuda", "key", "label", "opcoes", "permiteNA", "required", "type"].sort()
+    );
+    // O enum do schema é respeitado — a UI depende disso pro select de tipo.
+    expect(["text", "textarea", "number", "boolean", "select", "lista"]).toContain(corpo.type);
+    expect(Array.isArray(corpo.opcoes)).toBe(true);
+
+    const { prompt: prompt } = ultimaChamadaComSchema();
+    expect(prompt).toContain("quero registrar a política de retenção da fila");
+    expect(prompt).toContain("Tipo de nó: Fila Rabbit. Time: pagamentos.");
+    expect(prompt).toContain("camelCase");
+  });
+
+  it("POST /ia/sugerir-config: alvo desconhecido é 400 (o schema É o contrato com o formulário) e instrução vazia também", async () => {
+    verificarStatusMock.mockResolvedValue({
+      chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
+    });
+
+    const alvoRuim = await fetch(`${base}/ia/sugerir-config`, {
+      method: "POST",
+      body: JSON.stringify({ alvo: "inventado", instrucao: "qualquer coisa" }),
+    });
+    expect(alvoRuim.status).toBe(400);
+    expect((await alvoRuim.json()).erro).toContain("alvo desconhecido");
+
+    const semInstrucao = await fetch(`${base}/ia/sugerir-config`, {
+      method: "POST",
+      body: JSON.stringify({ alvo: "papel", instrucao: "   " }),
+    });
+    expect(semInstrucao.status).toBe(400);
+    // Nenhuma das duas chega a carregar o modelo.
+    expect(completarComSchemaMock).not.toHaveBeenCalled();
+  });
+
+  it("POST /ia/sugerir-config sem modelo instalado devolve 503, igual às outras rotas de IA", async () => {
+    const resposta = await fetch(`${base}/ia/sugerir-config`, {
+      method: "POST",
+      body: JSON.stringify({ alvo: "campo-no", instrucao: "campo novo" }),
+    });
+    expect(resposta.status).toBe(503);
+    expect(criarProvedorPorIdMock).not.toHaveBeenCalled();
   });
 
   it("POST /ia/pipeline/arquiteto usa o preâmbulo do Arquiteto — prompt diferente do PO pro mesmo item (SPEC-24 Fase B)", async () => {
     verificarStatusMock.mockResolvedValue({
       chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
     });
 
     await fetch(`${base}/ia/pipeline/arquiteto`, {
@@ -353,7 +463,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       }),
     });
 
-    const [prompt] = completarComSchemaMock.mock.calls.at(-1) as [string];
+    const { prompt: prompt } = ultimaChamadaComSchema();
     expect(prompt).toContain("Arquiteto");
     expect(prompt).not.toContain("Product Owner");
   });
@@ -361,6 +471,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
   it("encadeamento: respostasAnteriores dos papéis anteriores entram no prompt como insumo ('a ideia de pipeline é justamente essa')", async () => {
     verificarStatusMock.mockResolvedValue({
       chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
     });
 
     await fetch(`${base}/ia/pipeline/arquiteto`, {
@@ -380,7 +491,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       }),
     });
 
-    const [prompt] = completarComSchemaMock.mock.calls.at(-1) as [string];
+    const { prompt: prompt } = ultimaChamadaComSchema();
     expect(prompt).toContain("O que os papéis anteriores já definiram");
     expect(prompt).toContain("História de usuário: Como analista de crédito, quero consultar o score");
   });
@@ -388,6 +499,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
   it("preâmbulo padrão do PO prescreve formato e profundidade (3 a 7 critérios) — achado real: respostas de 2-3 linhas", async () => {
     verificarStatusMock.mockResolvedValue({
       chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
     });
     await fetch(`${base}/ia/pipeline/po`, {
       method: "POST",
@@ -395,7 +507,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
         itens: [{ chave: "n1::setup", rotulo: "x", contextoNo: "", placeholders: [{ chave: "_historiaUsuario", tech: "", rotulo: "História" }] }],
       }),
     });
-    const [prompt] = completarComSchemaMock.mock.calls.at(-1) as [string];
+    const { prompt: prompt } = ultimaChamadaComSchema();
     expect(prompt).toContain("lista NUMERADA de 3 a 7 critérios");
     expect(prompt).toContain("Como <persona>, quero <capacidade>, para <benefício>");
   });
@@ -403,6 +515,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
   it("Fase F: preâmbulo custom da config vence o padrão; papel custom sem preâmbulo cai no padrão do GRUPO dele", async () => {
     verificarStatusMock.mockResolvedValue({
       chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
     });
     mkdirSync(join(dirTemp, "config"), { recursive: true });
     writeFileSync(
@@ -420,12 +533,12 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     };
 
     await fetch(`${base}/ia/pipeline/po`, { method: "POST", body: JSON.stringify(corpo) });
-    const [promptPo] = completarComSchemaMock.mock.calls.at(-1) as [string];
+    const { prompt: promptPo } = ultimaChamadaComSchema();
     expect(promptPo).toContain("Você é a PO sênior do squad de crédito.");
     expect(promptPo).not.toContain("Product Owner");
 
     await fetch(`${base}/ia/pipeline/esp-kafka`, { method: "POST", body: JSON.stringify(corpo) });
-    const [promptKafka] = completarComSchemaMock.mock.calls.at(-1) as [string];
+    const { prompt: promptKafka } = ultimaChamadaComSchema();
     // Sem preâmbulo próprio, herda o padrão do grupo "especialista".
     expect(promptKafka).toContain("Especialista técnico");
   });
@@ -433,6 +546,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
   it("POST /ia/pipeline/:papel com papel desconhecido usa o preâmbulo genérico, não devolve erro (SPEC-24 Fase B — pipeline configurável)", async () => {
     verificarStatusMock.mockResolvedValue({
       chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
     });
 
     const resposta = await fetch(`${base}/ia/pipeline/agente-custom`, {
@@ -688,6 +802,42 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
 
     const resposta = await fetch(`${base}/especificacao-template`).then((r) => r.json());
     expect(resposta.conteudo).toBe("# {{titulo}} customizado");
+  });
+
+  it("GET /config/ia sem arquivo local devolve o provedor padrão (SPEC-25 Fase 0)", async () => {
+    const resposta = await fetch(`${base}/config/ia`).then((r) => r.json());
+    expect(resposta).toEqual({ provedorPadrao: "qwen-local" });
+  });
+
+  it("PUT /config/ia grava a escolha e o pedido seguinte resolve o provedor por ela", async () => {
+    verificarStatusMock.mockResolvedValue({
+      chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
+    });
+
+    const put = await fetch(`${base}/config/ia`, {
+      method: "PUT",
+      body: JSON.stringify({ provedorPadrao: "qwen-local" }),
+    });
+    expect(put.status).toBe(200);
+    expect(await fetch(`${base}/config/ia`).then((r) => r.json())).toEqual({ provedorPadrao: "qwen-local" });
+
+    await fetch(`${base}/ia/sugerir`, {
+      method: "POST",
+      body: JSON.stringify({ tech: "Backend", rotulo: "x", contextoNo: "" }),
+    });
+    // O provedor sai da CONFIG, não de um modelo fixo no código — é o que
+    // permite a Fase 2 (wrapper/Claude) entrar sem tocar nas rotas.
+    expect(criarProvedorPorIdMock).toHaveBeenCalledWith("qwen-local");
+  });
+
+  it("PUT /config/ia com provedor desconhecido devolve 400 — não deixa a esteira cair no padrão sem avisar", async () => {
+    const resposta = await fetch(`${base}/config/ia`, {
+      method: "PUT",
+      body: JSON.stringify({ provedorPadrao: "modelo-que-nao-existe" }),
+    });
+    expect(resposta.status).toBe(400);
+    expect(await fetch(`${base}/config/ia`).then((r) => r.json())).toEqual({ provedorPadrao: "qwen-local" });
   });
 
   it("GET /config/pipeline-agentes sem arquivo local devolve o default — toggle + os 4 papéis de fábrica (Fase F)", async () => {

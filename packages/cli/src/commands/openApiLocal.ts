@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { TEMPLATE_ESPECIFICACAO_PADRAO, type PerfisConfig, type Quebra } from "@gerador/engine";
-import { caminhoDoModelo, carregarModeloChat, MODELO_CHAT, verificarStatus, type MotorChat } from "@gerador/llm";
+import { MODELOS_CHAT, criarProvedorPorId, verificarStatus, type ProvedorIa } from "@gerador/llm";
 import type { GbnfJsonSchema } from "node-llama-cpp";
 
 const CAMPO_GLOBAL = "__global__";
@@ -508,6 +508,81 @@ async function tratarPipelineAgentes(req: IncomingMessage, res: ServerResponse, 
   enviarJson(res, 404, { erro: "não encontrado" });
 }
 
+// --- GET/PUT /config/regras — SPEC-23 fluxo 5: `config/regras.json` nunca
+// teve rota nem UI; era o único arquivo de configuração que só dava pra
+// editar à mão, apesar de ser o que MAIS muda (é a tabela de requisitos de
+// refinamento por tech e contexto que alimenta cada item gerado).
+//
+// A rota é deliberadamente burra: lê e grava o arquivo inteiro, sem
+// normalizar o conteúdo. Quem valida a forma é o engine (`validarConfig`),
+// na carga — duplicar essa validação aqui criaria duas fontes de verdade
+// sobre o que é uma regra válida. O que a rota garante é só que o corpo é
+// JSON e tem `porTech` (senão qualquer PUT torto apagaria o arquivo).
+
+async function tratarRegras(req: IncomingMessage, res: ServerResponse, metodo: string, dirProjeto: string): Promise<void> {
+  const arquivo = resolve(dirProjeto, "config", "regras.json");
+
+  if (metodo === "GET") {
+    const config = await lerJsonOpcional<Record<string, unknown>>(arquivo);
+    // Sem arquivo, devolve a forma vazia — a UI abre num estado editável em
+    // vez de num erro, e o primeiro PUT cria o arquivo.
+    return enviarJson(res, 200, config ?? { tipos: [], tamanhos: [], porTech: {} });
+  }
+
+  if (metodo === "PUT") {
+    const corpo = await lerCorpoJson<{ porTech?: unknown }>(req);
+    if (!corpo || typeof corpo.porTech !== "object" || corpo.porTech === null || Array.isArray(corpo.porTech)) {
+      return enviarJson(res, 400, { erro: "corpo precisa ter `porTech` (objeto tech → regras)" });
+    }
+    await mkdir(resolve(dirProjeto, "config"), { recursive: true });
+    await writeFile(arquivo, JSON.stringify(corpo, null, 2), "utf-8");
+    return enviarJson(res, 200, corpo);
+  }
+
+  enviarJson(res, 404, { erro: "não encontrado" });
+}
+
+// --- POST /ia/sugerir — fluxo 3 (Fase 1, SPEC-23): sugestão de texto pra um
+// placeholder "<- ✍️ especificar" do checklist técnico/volumetria ---
+
+// --- config/ia.json — qual provedor/modelo a IA usa (SPEC-25 Fase 0) ---
+
+interface ConfigIaLocal {
+  provedorPadrao: string;
+}
+const CONFIG_IA_PADRAO: ConfigIaLocal = { provedorPadrao: MODELOS_CHAT[0].id };
+
+async function lerConfigIa(dirProjeto: string): Promise<ConfigIaLocal> {
+  const config = await lerJsonOpcional<Partial<ConfigIaLocal>>(resolve(dirProjeto, "config", "ia.json"));
+  const id = typeof config?.provedorPadrao === "string" ? config.provedorPadrao : undefined;
+  return { provedorPadrao: id ?? CONFIG_IA_PADRAO.provedorPadrao };
+}
+
+async function tratarConfigIa(req: IncomingMessage, res: ServerResponse, metodo: string, dirProjeto: string): Promise<void> {
+  const arquivo = resolve(dirProjeto, "config", "ia.json");
+  if (metodo === "GET") {
+    return enviarJson(res, 200, await lerConfigIa(dirProjeto));
+  }
+  if (metodo === "PUT") {
+    const corpo = await lerCorpoJson<Partial<ConfigIaLocal>>(req);
+    // Só aceita id de provedor conhecido — id inventado deixaria a esteira
+    // silenciosamente no modelo padrão sem o usuário entender por quê.
+    const conhecido = MODELOS_CHAT.some((m) => m.id === corpo.provedorPadrao);
+    if (!conhecido) {
+      return enviarJson(res, 400, { erro: `provedor desconhecido: ${String(corpo.provedorPadrao)}` });
+    }
+    const config: ConfigIaLocal = { provedorPadrao: corpo.provedorPadrao as string };
+    await mkdir(resolve(dirProjeto, "config"), { recursive: true });
+    await writeFile(arquivo, JSON.stringify(config, null, 2), "utf-8");
+    // Troca de modelo derruba o provedor carregado — o próximo pedido sobe o
+    // novo. Descartar aqui (e não só trocar a referência) libera os GB do
+    // modelo antigo da memória em vez de deixar os dois carregados.
+    void descartarProvedor();
+    return enviarJson(res, 200, config);
+  }
+  enviarJson(res, 404, { erro: "não encontrado" });
+}
+
 // --- POST /ia/sugerir — fluxo 3 (Fase 1, SPEC-23): sugestão de texto pra um
 // placeholder "<- ✍️ especificar" do checklist técnico/volumetria ---
 
@@ -515,16 +590,32 @@ async function tratarPipelineAgentes(req: IncomingMessage, res: ServerResponse, 
 // não por requisição, o que custaria segundos por sugestão. Sem cache de
 // resposta entre chamadas diferentes: reiniciar `gerador open` descarrega o
 // modelo, é o único "cache" que existe aqui (mesma decisão de `motor.ts`,
-// que não guarda estado escondido — quem chama decide).
-let motorChatSingleton: Promise<MotorChat> | undefined;
-function obterMotorChat(): Promise<MotorChat> {
-  motorChatSingleton ??= carregarModeloChat(caminhoDoModelo(MODELO_CHAT));
-  return motorChatSingleton;
+// que não guarda estado escondido — quem chama decide). Desde a Fase 0 o
+// singleton guarda TAMBÉM qual provedor foi carregado: trocar o modelo na
+// config precisa recarregar, não reaproveitar o antigo.
+let provedorSingleton: { id: string; provedor: Promise<ProvedorIa> } | undefined;
+
+async function obterProvedor(dirProjeto: string): Promise<ProvedorIa> {
+  const { provedorPadrao } = await lerConfigIa(dirProjeto);
+  if (provedorSingleton?.id !== provedorPadrao) {
+    void descartarProvedor();
+    provedorSingleton = { id: provedorPadrao, provedor: criarProvedorPorId(provedorPadrao) };
+  }
+  return provedorSingleton.provedor;
 }
 
-async function tratarIaSugerir(req: IncomingMessage, res: ServerResponse): Promise<void> {
+async function descartarProvedor(): Promise<void> {
+  const anterior = provedorSingleton;
+  provedorSingleton = undefined;
+  if (!anterior) return;
+  // Falha ao descartar (modelo que nem chegou a carregar) não pode derrubar
+  // a requisição que pediu a troca.
+  await anterior.provedor.then((p) => p.descartar()).catch(() => undefined);
+}
+
+async function tratarIaSugerir(req: IncomingMessage, res: ServerResponse, dirProjeto: string): Promise<void> {
   try {
-    const status = await verificarStatus();
+    const status = await verificarStatus(undefined, (await lerConfigIa(dirProjeto)).provedorPadrao);
     if (!status.pronto) {
       enviarJson(res, 503, { erro: "modelos de IA não instalados — rode `gerador ia instalar`" });
       return;
@@ -547,7 +638,7 @@ async function tratarIaSugerir(req: IncomingMessage, res: ServerResponse): Promi
       `Responda de forma curta, específica e em português, com uma decisão concreta pra esse requisito nesse contexto. Não repita o requisito, só a resposta.`,
     ].join("\n");
 
-    const motor = await obterMotorChat();
+    const provedor = await obterProvedor(dirProjeto);
 
     // Fase 1c (SPEC-23): texto livre (sem GBNF) — o schema de sugestão sempre
     // foi um único campo string (`valor`), então "estrutura" era decorativa;
@@ -556,7 +647,7 @@ async function tratarIaSugerir(req: IncomingMessage, res: ServerResponse): Promi
     // em pedaços — `res.write()` várias vezes faz o Node fazer chunked
     // transfer sozinho, sem precisar setar o header à mão.
     res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" });
-    await motor.completar(prompt, { onTexto: (pedaco) => res.write(pedaco) });
+    await provedor.completar(prompt, { onTexto: (pedaco) => res.write(pedaco) });
     res.end();
   } catch (erro) {
     // Achado real: sem este catch, uma falha no motor de IA (binário nativo
@@ -565,12 +656,188 @@ async function tratarIaSugerir(req: IncomingMessage, res: ServerResponse): Promi
     // — não só essa requisição (open.ts chama tratarApiLocal sem try/catch
     // no request handler). Descarta o singleton pra tentar carregar de novo
     // na próxima chamada, sem precisar reiniciar o servidor.
-    motorChatSingleton = undefined;
+    void descartarProvedor();
     const mensagem = erro instanceof Error ? erro.message : "Falha desconhecida ao gerar sugestão.";
     // Achado real (Fase 1c): se o streaming já começou, `res.writeHead` já
     // rodou — não dá mais pra trocar o status code. Falha nessa janela é rara
     // (o modelo já carregou e estava respondendo); só encerra a conexão, o
     // cliente trata resposta incompleta como falha.
+    if (res.headersSent) {
+      res.end();
+    } else {
+      enviarJson(res, 500, { erro: `Não foi possível gerar a sugestão: ${mensagem}` });
+    }
+  }
+}
+
+// --- POST /ia/sugerir-config — SPEC-23 Fluxo 2: configurar com apoio de IA.
+// Pedido do usuário: "poder ajustar as configurações com apoio de IA". A
+// diferença pro `/ia/sugerir` (texto livre, um campo) é que aqui a saída É um
+// OBJETO de configuração — precisa sair no schema exato que o formulário já
+// sabe editar, senão não dá pra pré-preencher.
+//
+// Decisão que evita a armadilha do JOURNEY §41 (a skill que virou ferramenta
+// paralela): a IA NÃO grava configuração. Ela devolve o objeto, a UI preenche
+// o formulário que já existe, e o usuário salva pelo caminho normal — mesma
+// rota, mesma validação, mesmo arquivo. Sugestão é rascunho, nunca escrita.
+//
+// Os alvos ficam numa TABELA declarativa: adicionar um novo (ex.: regra de
+// checklist na Fase 5) é uma entrada aqui, sem tocar no roteador nem na UI
+// genérica do botão.
+interface AlvoSugestaoConfig {
+  /** O que a IA está escrevendo — entra no prompt em primeira linha. */
+  descricao: string;
+  schema: GbnfJsonSchema;
+  /** Regras de preenchimento específicas do alvo (formato de chave, limites
+   * de vocabulário) — o que um modelo pequeno erra se não for dito. */
+  regras: string[];
+}
+
+const TIPOS_CAMPO = ["text", "textarea", "number", "boolean", "select", "lista"] as const;
+/** Conexão não tem campo do tipo "lista" (`CampoAresta` não aceita) — o enum
+ * do schema já impede o modelo de propor um tipo que o formulário rejeitaria. */
+const TIPOS_CAMPO_ARESTA = TIPOS_CAMPO.filter((t) => t !== "lista");
+
+const ALVOS_SUGESTAO_CONFIG: Record<string, AlvoSugestaoConfig> = {
+  "campo-no": {
+    descricao: "um campo de formulário de um TIPO DE NÓ do diagrama de arquitetura",
+    schema: {
+      type: "object",
+      properties: {
+        key: { type: "string" },
+        label: { type: "string" },
+        type: { enum: [...TIPOS_CAMPO] },
+        ajuda: { type: "string" },
+        opcoes: { type: "array", items: { type: "string" } },
+        required: { type: "boolean" },
+        permiteNA: { type: "boolean" },
+      },
+      required: ["key", "label", "type", "ajuda", "opcoes", "required", "permiteNA"],
+    },
+    regras: [
+      `"key" em camelCase, sem espaços nem acentos — é identificador, não texto de tela.`,
+      `"label" é o texto que aparece pro usuário, em português.`,
+      `"opcoes" só faz sentido com type "select"; nos outros, devolva lista vazia.`,
+      `"ajuda" é uma frase curta explicando o que preencher, não a repetição do label.`,
+    ],
+  },
+  "campo-aresta": {
+    descricao: "um campo de formulário de um TIPO DE CONEXÃO entre nós do diagrama",
+    schema: {
+      type: "object",
+      properties: {
+        key: { type: "string" },
+        label: { type: "string" },
+        type: { enum: [...TIPOS_CAMPO_ARESTA] },
+        ajuda: { type: "string" },
+        opcoes: { type: "array", items: { type: "string" } },
+        required: { type: "boolean" },
+        permiteNA: { type: "boolean" },
+      },
+      required: ["key", "label", "type", "ajuda", "opcoes", "required", "permiteNA"],
+    },
+    regras: [
+      `"key" em camelCase, sem espaços nem acentos.`,
+      `O campo descreve a CONEXÃO (contrato, timeout, autenticação, retry), não os nós das pontas.`,
+      `"opcoes" só faz sentido com type "select"; nos outros, devolva lista vazia.`,
+    ],
+  },
+  "regra-refinamento": {
+    descricao:
+      "um REQUISITO DE REFINAMENTO TÉCNICO — uma decisão que o time precisa tomar no desenho antes de implementar",
+    schema: {
+      type: "object",
+      properties: {
+        texto: { type: "string" },
+        contextos: { type: "array", items: { type: "string" } },
+      },
+      required: ["texto", "contextos"],
+    },
+    regras: [
+      `"texto" começa com um verbo no infinitivo e nomeia a DECISÃO a tomar`,
+      `(ex.: "Definir a política de retry e o timeout da chamada"), não uma`,
+      `pergunta nem uma tarefa de execução — quem executa é o checklist de processo.`,
+      `Um requisito por resposta, específico da tech e do contexto informados.`,
+      `"contextos" limita onde o requisito aparece; lista vazia = vale sempre que a tech estiver presente.`,
+    ],
+  },
+  papel: {
+    descricao: "um PAPEL (agente) da esteira que especifica os itens de trabalho",
+    schema: {
+      type: "object",
+      properties: {
+        id: { type: "string" },
+        nome: { type: "string" },
+        descricao: { type: "string" },
+        preambulo: { type: "string" },
+        contextos: { type: "array", items: { type: "string" } },
+      },
+      required: ["id", "nome", "descricao", "preambulo", "contextos"],
+    },
+    regras: [
+      `"id" em minúsculas, sem espaços nem acentos (ex.: "seguranca").`,
+      `"nome" é o título curto que aparece na esteira; "descricao" cabe em uma linha.`,
+      `"preambulo" é a INSTRUÇÃO que esse agente recebe: diga o papel, o formato`,
+      `esperado e a profundidade (quantos itens, o que cobrir) — é o que separa`,
+      `uma resposta útil de uma resposta de duas linhas.`,
+      `"contextos" limita em quais itens o papel atua; lista vazia = atua em todos.`,
+    ],
+  },
+};
+
+async function tratarIaSugerirConfig(req: IncomingMessage, res: ServerResponse, dirProjeto: string): Promise<void> {
+  try {
+    const status = await verificarStatus(undefined, (await lerConfigIa(dirProjeto)).provedorPadrao);
+    if (!status.pronto) {
+      enviarJson(res, 503, { erro: "modelos de IA não instalados — rode `gerador ia instalar`" });
+      return;
+    }
+
+    const { alvo, instrucao, contexto } = await lerCorpoJson<{
+      alvo: string;
+      instrucao: string;
+      /** Onde a sugestão vai morar (tipo de nó, tipo de aresta, techs do time)
+       * — sem isso o modelo escreve campo genérico, que é o que ninguém quer. */
+      contexto?: string;
+    }>(req);
+
+    const definicao = ALVOS_SUGESTAO_CONFIG[alvo];
+    // Alvo desconhecido é 400 de propósito (ao contrário de papel na esteira,
+    // que cai no genérico): aqui o schema É o contrato com o formulário — sem
+    // ele a resposta não teria onde ser preenchida.
+    if (!definicao) {
+      enviarJson(res, 400, {
+        erro: `alvo desconhecido: "${alvo}" (conhecidos: ${Object.keys(ALVOS_SUGESTAO_CONFIG).join(", ")})`,
+      });
+      return;
+    }
+    if (!instrucao?.trim()) {
+      enviarJson(res, 400, { erro: "instrucao vazia — descreva o que a IA deve propor" });
+      return;
+    }
+
+    const prompt = [
+      `Você ajuda a configurar uma ferramenta de refinamento de itens de trabalho de software.`,
+      `Escreva ${definicao.descricao}.`,
+      ``,
+      `Pedido do usuário: ${instrucao.trim()}`,
+      ...(contexto?.trim() ? [``, `Onde essa configuração vai valer:`, contexto.trim()] : []),
+      ``,
+      `Regras:`,
+      ...definicao.regras.map((r) => `- ${r}`),
+      `- Responda em português, com decisões concretas pro caso descrito — nunca genéricas.`,
+    ].join("\n");
+
+    const provedor = await obterProvedor(dirProjeto);
+    // Mesmo contrato de `/ia/pipeline/:papel`: texto cru do JSON restrito por
+    // grammar, streamado. A UI mostra o progresso e faz o parse no fim.
+    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" });
+    await provedor.completarEstruturado(prompt, definicao.schema, { onTexto: (pedaco) => res.write(pedaco) });
+    res.end();
+  } catch (erro) {
+    void descartarProvedor();
+    const mensagem = erro instanceof Error ? erro.message : "Falha desconhecida ao sugerir configuração.";
+    console.error(`[ia/sugerir-config] falhou:`, mensagem);
     if (res.headersSent) {
       res.end();
     } else {
@@ -644,7 +911,7 @@ async function preambuloDoPapel(papel: string, dirProjeto: string): Promise<stri
 
 async function tratarIaPipeline(req: IncomingMessage, res: ServerResponse, papel: string, dirProjeto: string): Promise<void> {
   try {
-    const status = await verificarStatus();
+    const status = await verificarStatus(undefined, (await lerConfigIa(dirProjeto)).provedorPadrao);
     if (!status.pronto) {
       enviarJson(res, 503, { erro: "modelos de IA não instalados — rode `gerador ia instalar`" });
       return;
@@ -725,7 +992,7 @@ async function tratarIaPipeline(req: IncomingMessage, res: ServerResponse, papel
       ...blocosItens,
     ].join("\n");
 
-    const motor = await obterMotorChat();
+    const provedor = await obterProvedor(dirProjeto);
     // SPEC-24 Fase E (achado real: "fica só o ícone de gerando e 3 pontos...
     // mostrar o que está rodando no modelo seria a melhor coisa, tal como a
     // experiência que existe com o Claude"): a resposta vira o texto CRU do
@@ -734,11 +1001,17 @@ async function tratarIaPipeline(req: IncomingMessage, res: ServerResponse, papel
     // então o cliente acumula, mostra ao vivo, e faz o parse no final —
     // sem precisar de um segundo canal pra resposta estruturada.
     res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" });
-    await motor.completarComSchema(prompt, schema, { onTexto: (pedaco) => res.write(pedaco) });
+    await provedor.completarEstruturado(prompt, schema, { onTexto: (pedaco) => res.write(pedaco) });
     res.end();
   } catch (erro) {
-    motorChatSingleton = undefined;
+    void descartarProvedor();
     const mensagem = erro instanceof Error ? erro.message : "Falha desconhecida ao gerar a ficha.";
+    // ACHADO REAL (validação da Fase 1): o cliente engole falha de lote de
+    // propósito (uma falha isolada não trava a esteira), então SEM este log
+    // três papéis inteiros falharam sem deixar rastro em lugar nenhum — só
+    // se descobriu olhando os pips apagados num screenshot. O servidor é o
+    // único lugar que enxerga a causa.
+    console.error(`[ia/pipeline/${papel}] falhou:`, mensagem);
     // Mesmo achado da Fase 1c: se o streaming já começou, não dá mais pra
     // trocar o status — encerra, e o cliente trata JSON incompleto como falha.
     if (res.headersSent) {
@@ -768,15 +1041,27 @@ export async function tratarApiLocal(req: IncomingMessage, res: ServerResponse, 
     return true;
   }
   if (caminho === "/ia/status" && metodo === "GET") {
-    enviarJson(res, 200, await verificarStatus());
+    enviarJson(res, 200, await verificarStatus(undefined, (await lerConfigIa(dirProjeto)).provedorPadrao));
     return true;
   }
   if (caminho === "/ia/sugerir" && metodo === "POST") {
-    await tratarIaSugerir(req, res);
+    await tratarIaSugerir(req, res, dirProjeto);
+    return true;
+  }
+  if (caminho === "/ia/sugerir-config" && metodo === "POST") {
+    await tratarIaSugerirConfig(req, res, dirProjeto);
+    return true;
+  }
+  if (caminho === "/config/ia" && (metodo === "GET" || metodo === "PUT")) {
+    await tratarConfigIa(req, res, metodo, dirProjeto);
     return true;
   }
   if (caminho === "/config/pipeline-agentes" && (metodo === "GET" || metodo === "PUT")) {
     await tratarPipelineAgentes(req, res, metodo, dirProjeto);
+    return true;
+  }
+  if (caminho === "/config/regras" && (metodo === "GET" || metodo === "PUT")) {
+    await tratarRegras(req, res, metodo, dirProjeto);
     return true;
   }
   const matchPipeline = metodo === "POST" && caminho.match(/^\/ia\/pipeline\/([^/]+)$/);

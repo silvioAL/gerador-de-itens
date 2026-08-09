@@ -1,12 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const baixarModeloMock = vi.fn(async () => "/caminho/fake/modelo.gguf");
-const verificarStatusMock = vi.fn(async () => ({
-  chatInstalado: false,
-  embeddingInstalado: false,
-  pronto: false,
-  caminhoModelos: "/caminho/fake/models",
-}));
+function statusFake(instalado: boolean) {
+  return {
+    chatInstalado: instalado,
+    embeddingInstalado: instalado,
+    pronto: instalado,
+    caminhoModelos: "/caminho/fake/models",
+    provedor: "qwen-local",
+    modelosChat: [
+      {
+        id: "qwen-local", nome: "Qwen3-4B", papel: "Qwen3-4B (chat)", instalado,
+        tamanhoAproximadoBytes: 2_500_000_000, raciocinador: true, selecionado: true,
+      },
+    ],
+  };
+}
+const verificarStatusMock = vi.fn(async () => statusFake(false));
 
 vi.mock("@gerador/llm", async () => {
   const real = await vi.importActual<typeof import("@gerador/llm")>("@gerador/llm");
@@ -57,12 +67,7 @@ describe("comando `gerador ia`", () => {
   });
 
   it("achado real: `status` avisa 'pronta pra uso' quando os dois modelos estão instalados", async () => {
-    verificarStatusMock.mockResolvedValueOnce({
-      chatInstalado: true,
-      embeddingInstalado: true,
-      pronto: true,
-      caminhoModelos: "/caminho/fake/models",
-    });
+    verificarStatusMock.mockResolvedValueOnce(statusFake(true));
     await ia(["status"]);
     expect(logs.join("\n")).toContain("pronta pra uso");
   });

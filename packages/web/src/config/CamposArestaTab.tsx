@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import type { DiagramaConfig, FieldSpec } from "@gerador/engine";
-import type { CampoAresta, DadosCampoAresta } from "../api/client";
+import type { CampoAresta, DadosCampoAresta, SugestaoCampo } from "../api/client";
+import { SugerirComIa } from "./SugerirComIa";
 
 export interface CamposArestaTabProps {
   config: DiagramaConfig;
@@ -129,6 +130,26 @@ export function CamposArestaTab({ config, camposAresta, timeAtivo, onCriar, onAt
     formRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }
 
+  /** SPEC-23 Fluxo 2 — a sugestão vira rascunho no formulário; o tipo de
+   * conexão continua sendo o selecionado e nada é salvo sem o usuário. */
+  function aplicarSugestao(sugestao: SugestaoCampo) {
+    const base = formulario ?? formularioVazio(tiposDeAresta[0] ?? "");
+    setFormulario({
+      ...base,
+      key: sugestao.key || base.key,
+      keyEditadaManualmente: true,
+      label: sugestao.label || base.label,
+      // O schema do alvo "campo-aresta" já não oferece "lista" (conexão não
+      // suporta); a guarda aqui é pra config antiga/servidor mais velho não
+      // conseguir empurrar um tipo que este formulário não sabe editar.
+      type: sugestao.type === "lista" ? "text" : sugestao.type,
+      required: sugestao.required,
+      ajuda: sugestao.ajuda ?? "",
+      opcoes: sugestao.type === "select" ? (sugestao.opcoes ?? []).join(", ") : base.opcoes,
+    });
+    formRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  }
+
   async function salvar() {
     if (!formulario) return;
     if (!formulario.tipoAresta || !formulario.key.trim() || !formulario.label.trim()) return;
@@ -174,6 +195,13 @@ export function CamposArestaTab({ config, camposAresta, timeAtivo, onCriar, onAt
         roteamento, se é síncrono. "sobrescrever" cria uma versão específica pro time <strong>{timeAtivo}</strong>;
         "global" muda o original pra todo mundo; "+ Adicionar campo" cria um campo novo, que não existia antes.
       </p>
+
+      <SugerirComIa<SugestaoCampo>
+        alvo="campo-aresta"
+        contexto={`Tipo de conexão: ${config.edgeTypes[formulario?.tipoAresta ?? tiposDeAresta[0]]?.label ?? formulario?.tipoAresta ?? tiposDeAresta[0]}. Time: ${timeAtivo}.`}
+        exemplo="ex.: campo pro timeout e a política de retry da chamada"
+        onSugestao={aplicarSugestao}
+      />
 
       <div ref={formRef}>
         {formulario ? (

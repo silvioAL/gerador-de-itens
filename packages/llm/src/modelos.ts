@@ -6,26 +6,51 @@
  * depender de uma segunda stack de embeddings). GGUF Q4_K_M: equilíbrio
  * tamanho/qualidade já validado pela comunidade pra rodar em CPU comum.
  */
+/** SPEC-25 Fase 0/1 — o id de um modelo de chat É o id do provedor local
+ * correspondente (`config/ia.json` → `provedorPadrao`). Um espaço de ids só,
+ * pra não precisar de um mapa provedor↔modelo; provedores remotos (Fase 2)
+ * entram com ids próprios ("anthropic", "wrapper"). */
+export type IdModelo = "qwen-local" | "embedding";
+
 export interface ModeloRegistrado {
   /** Chave estável usada em `cache.ts`/`status.ts` — nunca muda mesmo se o
    * arquivo/repo de origem mudar de nome. */
-  id: "chat" | "embedding";
+  id: IdModelo;
   papel: string;
+  /** Nome curto pra UI/CLI (o `papel` é a descrição longa). */
+  nome: string;
   repositorioHuggingFace: string;
   nomeArquivo: string;
   tamanhoAproximadoBytes: number;
+  /** Modelo RACIOCINADOR: emite `<think>…</think>` antes da resposta. Muda
+   * como a geração estruturada é feita (`motor.ts`) — a grammar não pode
+   * valer desde o primeiro token, senão o raciocínio (o motivo de usar este
+   * modelo) morre. SPEC-25 §4.3. */
+  raciocinador?: boolean;
 }
 
 export const MODELO_CHAT: ModeloRegistrado = {
-  id: "chat",
+  id: "qwen-local",
+  nome: "Qwen3-4B",
   papel: "Qwen3-4B (chat/instruct, GGUF Q4_K_M)",
   repositorioHuggingFace: "Qwen/Qwen3-4B-GGUF",
   nomeArquivo: "Qwen3-4B-Q4_K_M.gguf",
   tamanhoAproximadoBytes: 2_500_000_000,
+  // ACHADO REAL que decidiu a SPEC-25 Fase 1: o Qwen3 é HÍBRIDO
+  // RACIOCINADOR — pensa por padrão (o node-llama-cpp inclusive traz um
+  // `QwenChatWrapper` com suporte a segmentos `thought`). Até aqui a
+  // ferramenta o tratava como modelo comum, e a grammar GBNF valendo desde
+  // o primeiro token MATAVA esse raciocínio. Boa parte da "limitação de
+  // raciocínio do modelo atual" relatada pelo usuário era limitação nossa.
+  // Medido, mesmo prompt: 330s com raciocínio (respostas com critérios
+  // numerados citando o contrato) contra 1500s do DeepSeek-R1 8B — 5x mais
+  // rápido E suficiente, o que tornou o modelo de 5 GB desnecessário.
+  raciocinador: true,
 };
 
 export const MODELO_EMBEDDING: ModeloRegistrado = {
   id: "embedding",
+  nome: "Qwen3-Embedding-0.6B",
   papel: "Qwen3-Embedding-0.6B (embeddings multilíngue, GGUF Q8_0)",
   repositorioHuggingFace: "Qwen/Qwen3-Embedding-0.6B-GGUF",
   // Achado real: o nome "óbvio" (tudo minúsculo, seguindo a convenção do
@@ -36,7 +61,29 @@ export const MODELO_EMBEDDING: ModeloRegistrado = {
   tamanhoAproximadoBytes: 650_000_000,
 };
 
-export const MODELOS: ModeloRegistrado[] = [MODELO_CHAT, MODELO_EMBEDDING];
+/** O que `gerador ia instalar` baixa — tudo que a ferramenta precisa. */
+export const MODELOS_PADRAO: ModeloRegistrado[] = [MODELO_CHAT, MODELO_EMBEDDING];
+
+/** Modelos de chat disponíveis (SPEC-25). Um só hoje, por DECISÃO do
+ * usuário depois da medição: o Qwen3-4B raciocinando cobre a necessidade em
+ * 1/5 do tempo do DeepSeek-R1 8B, que foi removido em vez de ficar como
+ * opção que ninguém usaria. A lista existe (em vez de um modelo fixo)
+ * porque a Fase 2 entra aqui — wrapper corporativo e Claude viram entradas
+ * novas, sem mexer em quem consome. */
+export const MODELOS_CHAT: ModeloRegistrado[] = [MODELO_CHAT];
+
+export const TODOS_OS_MODELOS: ModeloRegistrado[] = [...MODELOS_CHAT, MODELO_EMBEDDING];
+
+export function modeloPorId(id: string): ModeloRegistrado | undefined {
+  return TODOS_OS_MODELOS.find((m) => m.id === id);
+}
+
+/** Modelo de chat de um id de provedor local; cai no default quando o id é
+ * desconhecido (config editada à mão, ou provedor remoto ainda não
+ * implementado) — nunca deixa o servidor sem modelo por causa de config. */
+export function modeloChatPorId(id: string | undefined): ModeloRegistrado {
+  return MODELOS_CHAT.find((m) => m.id === id) ?? MODELO_CHAT;
+}
 
 export function urlDownload(modelo: ModeloRegistrado): string {
   return `https://huggingface.co/${modelo.repositorioHuggingFace}/resolve/main/${modelo.nomeArquivo}`;
