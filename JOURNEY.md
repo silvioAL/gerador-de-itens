@@ -1484,3 +1484,21 @@ Detalhe do próprio teste que valeu corrigir: a primeira versão montava um esta
 **A barra de rolagem cinza do Windows.** A regra escura existia desde a rodada da timeline, mas presa a `.review-lista`. O usuário voltou apontando o óbvio: o painel de propriedades e as outras telas continuavam com a barra clara do sistema — o mesmo app com duas barras diferentes. Agora é global (seletor universal, não classe: qualquer contêiner com overflow herda sem precisar ser lembrado), com `border` transparente + `background-clip: padding-box` no lugar da borda pintada com a cor do fundo — assim o polegar afina sobre painel, modal e canvas sem moldura de cor errada.
 
 Regressão: engine 190, llm 47, cli 80, web 262 (+2).
+
+## 99. Sensibilidade do arrasto, seleção indesejada, e a persona que era o próprio time
+
+Três ajustes pontuais vindos de uso real. Os dois primeiros no mesmo painel, o terceiro no prompt.
+
+**"Preciso arrastar até muito distante para movimentar — efeito análogo a pouca sensibilidade."** A descrição é precisa e a causa é aritmética. O pan convertia pixels de tela em unidades do `viewBox` com `w / rect.width`. Mas o SVG usa `preserveAspectRatio="xMidYMid meet"`, que escala pelo fator que faz o conteúdo INTEIRO caber — o **maior** entre `w/largura` e `h/altura`. O painel do diagrama é largo e baixo (30vh) com conteúdo largo: quem dita a escala é a **altura**. Usando só a largura, o fator saía menor que o real e o desenho andava menos que o ponteiro. `Math.max` dos dois, e o arrasto passa a acompanhar o dedo.
+
+Vale registrar o formato do teste: ele fixa um `getBoundingClientRect` de 900×200 (a proporção real do painel, não uma quadrada), arrasta 100px e exige que o deslocamento seja `100 × escala real` — e ainda assere que essa escala é **maior** que a fórmula antiga, que é exatamente a diferença que o usuário sentiu. Com a fórmula antiga, falha.
+
+**"Ao clicar no fundo e arrastar, os textos são selecionados."** Faltava `user-select: none` no SVG. Num painel que se navega arrastando, seleção de texto nunca é o gesto pretendido — é ruído azul por cima do desenho.
+
+**"Algumas histórias criadas pelo PO têm como persona o time de desenvolvimento."** O preâmbulo pedia `"Como <persona>, quero…"` e parava aí. Num item técnico ("Cache de CPF", "API Externa") o modelo pega o caminho fácil e escreve *"Como um desenvolvedor de sistemas, quero…"* — que não é história de usuário, é tarefa disfarçada: some o benefício de negócio e o critério de aceite nasce sobre a implementação em vez do resultado.
+
+Proibir sozinho não resolveria (o modelo precisa de um lugar PARA ONDE ir), então o prompt agora faz as duas coisas: lista o que não pode ser persona (desenvolvedor, time, dev, engenheiro, arquiteto, QA) **e** diz onde achar a certa — quem recebe o valor: usuário final, cliente, analista/operador, área consumidora, ou o **sistema consumidor nomeado** quando o item é de infraestrutura e não tem gente diretamente. Com um exemplo que fecha o raciocínio: um cache existe para o cliente ter resposta rápida, não para o time "ter cache".
+
+O teste verifica o prompt, não a saída do modelo — é o que dá pra afirmar deterministicamente. Se a persona continuar saindo errada com o prompt certo, o problema é do modelo local, e aí a alavanca é outra (gateway, SPEC-25 Fase 2).
+
+Regressão: engine 190, llm 47, cli 80, web 264 (+2).

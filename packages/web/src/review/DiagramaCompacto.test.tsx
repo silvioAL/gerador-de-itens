@@ -149,3 +149,47 @@ describe("DiagramaCompacto (Fase 1d, SPEC-23)", () => {
     expect(screen.getByTestId("diagrama-compacto-no-n2")).toHaveAttribute("opacity", "0.25");
   });
 });
+
+describe("DiagramaCompacto — arrastar o fundo (achados reais do usuário)", () => {
+  /** O painel real é largo e BAIXO (30vh): é isso que faz a escala do
+   * `preserveAspectRatio="meet"` ser ditada pela altura, e era o que o cálculo
+   * antigo ignorava. */
+  function comTamanho(largura: number, altura: number) {
+    vi.spyOn(SVGElement.prototype, "getBoundingClientRect").mockReturnValue({
+      x: 0, y: 0, width: largura, height: altura, top: 0, left: 0, right: largura, bottom: altura,
+      toJSON: () => ({}),
+    } as DOMRect);
+  }
+
+  function vistaDoSvg(): { x: number; y: number; w: number; h: number } {
+    const [x, y, w, h] = screen.getByRole("img").getAttribute("viewBox")!.split(" ").map(Number);
+    return { x, y, w, h };
+  }
+
+  it("arrastar N pixels move o desenho os MESMOS N pixels (não uma fração)", () => {
+    // Relato: "preciso arrastar até muito distante para movimentar — efeito
+    // análogo a pouca sensibilidade". A causa era usar só w/largura ignorando
+    // que, num painel baixo, quem dita a escala do `meet` é a ALTURA.
+    comTamanho(900, 200);
+    const { container } = render(<DiagramaCompacto diagrama={diagrama} config={config} />);
+    const svg = container.querySelector("svg")!;
+    const antes = vistaDoSvg();
+
+    fireEvent(svg, eventoPonteiro("pointerdown", { clientX: 500, clientY: 100, button: 0, pointerId: 1 }));
+    fireEvent(svg, eventoPonteiro("pointermove", { clientX: 400, clientY: 100, pointerId: 1 }));
+
+    const depois = vistaDoSvg();
+    // 100px de arrasto × escala real (h/altura, que é a que manda aqui).
+    const escalaReal = Math.max(antes.w / 900, antes.h / 200);
+    expect(depois.x - antes.x).toBeCloseTo(100 * escalaReal, 5);
+    // E a escala real é MAIOR que a que o cálculo antigo usava — é a diferença
+    // que o usuário sentiu como falta de sensibilidade.
+    expect(escalaReal).toBeGreaterThan(antes.w / 900);
+  });
+
+  it("o svg não deixa selecionar texto — arrastar o fundo não pode pintar os rótulos de azul", () => {
+    comTamanho(900, 200);
+    const { container } = render(<DiagramaCompacto diagrama={diagrama} config={config} />);
+    expect(container.querySelector("svg")!.style.userSelect).toBe("none");
+  });
+});

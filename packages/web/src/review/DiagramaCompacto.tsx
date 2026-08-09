@@ -125,11 +125,21 @@ export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, on
   const vistaEfetiva = vista ?? vistaBase;
   const viewBox = `${vistaEfetiva.x} ${vistaEfetiva.y} ${vistaEfetiva.w} ${vistaEfetiva.h}`;
 
-  /** Converte um delta em pixels de tela pra unidades do viewBox. */
+  /**
+   * Converte um delta em pixels de tela pra unidades do viewBox.
+   *
+   * ACHADO REAL do usuário: "preciso arrastar até muito distante para
+   * movimentar — efeito análogo a pouca sensibilidade". A causa era usar só
+   * `w / rect.width`. Com `preserveAspectRatio="xMidYMid meet"` o SVG escala
+   * pelo fator que faz o conteúdo INTEIRO caber, ou seja, o MAIOR entre
+   * `w/largura` e `h/altura` — e o painel do diagrama é baixo (30vh) com
+   * conteúdo largo, então quem manda é a altura. Ignorando isso, `k` saía
+   * menor que o real e o desenho andava menos que o ponteiro.
+   */
   function escalaPorPixel(): number {
     const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect || rect.width === 0) return 1;
-    return vistaEfetiva.w / rect.width;
+    if (!rect || rect.width === 0 || rect.height === 0) return 1;
+    return Math.max(vistaEfetiva.w / rect.width, vistaEfetiva.h / rect.height);
   }
 
   function aoPressionar(e: React.PointerEvent<SVGSVGElement>) {
@@ -193,6 +203,12 @@ export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, on
           height: "100%",
           display: "block",
           touchAction: "none",
+          // Sem isto, arrastar o fundo seleciona os rótulos dos nós e das
+          // conexões (achado real: "ao clicar no fundo e arrastar os textos
+          // são selecionados"). Num painel que se navega arrastando, seleção
+          // de texto não é o gesto que se quer — é ruído azul na tela.
+          userSelect: "none",
+          WebkitUserSelect: "none",
           cursor: arrastoRef.current ? "grabbing" : "grab",
         }}
       >
