@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiConfigIa, apiIa, type ResumoGateway, type StatusIa, type StatusModeloChat } from "../api/client";
 
 function formatarGB(bytes: number): string {
@@ -145,9 +145,19 @@ function CardGateway({
 
   // A credencial só chega depois do primeiro `/ia/status`; sem isto os campos
   // ficariam vazios mesmo com gateway já configurado.
+  //
+  // Mas só sobrescreve o campo que ainda está como o servidor mandou. Sem essa
+  // guarda, qualquer `/ia/status` que chegasse enquanto alguém digita (o pai
+  // refaz a busca depois de salvar, e o card monta em duas passadas) apagava o
+  // texto no meio da digitação. Foi assim que este teste ficou intermitente na
+  // CI — vermelho num run, verde no outro, mesmo commit; o teste estava certo, a
+  // corrida era de verdade.
+  const doServidor = useRef({ baseUrl: gateway?.baseUrl ?? "", modelo: gateway?.modelo ?? "" });
   useEffect(() => {
-    setBaseUrl(gateway?.baseUrl ?? "");
-    setNomeModelo(gateway?.modelo ?? "");
+    const vindo = { baseUrl: gateway?.baseUrl ?? "", modelo: gateway?.modelo ?? "" };
+    setBaseUrl((atual) => (atual === doServidor.current.baseUrl ? vindo.baseUrl : atual));
+    setNomeModelo((atual) => (atual === doServidor.current.modelo ? vindo.modelo : atual));
+    doServidor.current = vindo;
   }, [gateway?.baseUrl, gateway?.modelo]);
 
   const dados = { baseUrl: baseUrl.trim(), chave: chave.trim(), modelo: nomeModelo.trim() };

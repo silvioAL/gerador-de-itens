@@ -188,7 +188,6 @@ export function ConfigScreen({
         {aba === "regras" && mostrarCamposAresta && <RegrasTab />}
         {aba === "membros" && mostrarMembros && <MembrosTab timeAtivo={timeAtivo} />}
         {aba === "acessos" && mostrarMembros && <AcessosTab timeAtivo={timeAtivo} />}
-        {aba === "acessos" && mostrarMembros && <AcessosTab timeAtivo={timeAtivo} />}
         {aba === "especificacao" && (
           <EspecificacaoTemplateTab
             template={especificacaoTemplate}

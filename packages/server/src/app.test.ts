@@ -5,6 +5,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { resolve } from "node:path";
 import { buildApp } from "./app.js";
 import { criarBancoDeDados, type BancoDeDados } from "./db/client.js";
+import { exigirBancoDescartavel, garantirBancoDeTeste, URL_BANCO_DE_TESTE } from "./test-support/bancoDeTeste.js";
 import {
   auditoria,
   CAMPO_GLOBAL,
@@ -20,7 +21,11 @@ import {
   usuarioTime,
 } from "./db/schema.js";
 
-const DATABASE_URL = process.env.DATABASE_URL ?? "postgres://gerador:gerador@localhost:5432/gerador";
+// Banco PRÓPRIO da suíte, nunca o de desenvolvimento — ver
+// test-support/bancoDeTeste.ts pro estrago real que motivou isso.
+// `||` e não `??`: `DATABASE_URL=` vazia no shell passa pelo `??` e viraria uma
+// URL inválida lá na frente, com erro que não aponta pra cá.
+const DATABASE_URL = process.env.DATABASE_URL || URL_BANCO_DE_TESTE;
 
 // Seedados pela migração 0001 (packages/server/migrations/0001_auth_e_campos_no.sql) —
 // "dev" pertence aos três times (testa troca de time; "time-checkout" existe só
@@ -57,6 +62,8 @@ async function garantirTime(timeId: string): Promise<void> {
 const DIRETORIO_CONFIG = resolve(import.meta.dirname, "../../../config");
 
 beforeAll(async () => {
+  exigirBancoDescartavel(DATABASE_URL);
+  await garantirBancoDeTeste(DATABASE_URL);
   const banco = criarBancoDeDados(DATABASE_URL);
   db = banco.db;
   await migrate(db, { migrationsFolder: resolve(import.meta.dirname, "../migrations") });

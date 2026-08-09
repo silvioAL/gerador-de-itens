@@ -99,6 +99,24 @@ describe("ModeloIaTab — card do gateway (SPEC-25 Fase 2)", () => {
     expect(salvar).toBeEnabled();
   });
 
+  it("um /ia/status que chega no meio da digitação NÃO apaga o que foi digitado", async () => {
+    // A corrida que deixou este arquivo intermitente na CI: o pai refaz
+    // `/ia/status` (depois de salvar, ou porque o card montou em duas passadas)
+    // e o efeito que preenche os campos com a credencial do servidor jogava por
+    // cima do texto em edição. Aqui ela é provocada de propósito.
+    const { rerender } = render(<ModeloIaTab />);
+    await waitFor(() => expect(screen.getByTestId("modelo-ia-compativel-openai")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText("Base URL do gateway"), { target: { value: "https://digitando/v1" } });
+    fireEvent.change(screen.getByLabelText("Chave de API"), { target: { value: "sk-1" } });
+    fireEvent.change(screen.getByLabelText("Nome do modelo"), { target: { value: "meu-modelo" } });
+
+    rerender(<ModeloIaTab />); // status chegando de novo no meio do caminho
+    await waitFor(() => expect(screen.getByLabelText("Base URL do gateway")).toHaveValue("https://digitando/v1"));
+    expect(screen.getByLabelText("Nome do modelo")).toHaveValue("meu-modelo");
+    expect(screen.getByRole("button", { name: "Salvar" })).toBeEnabled();
+  });
+
   it("com chave já salva, dá pra mudar só a base URL sem redigitar a chave", async () => {
     // O campo mostra a máscara, não a chave — exigir redigitá-la seria hostil.
     await montar(

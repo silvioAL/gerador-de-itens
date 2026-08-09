@@ -38,6 +38,10 @@ jobs:
 
       - run: npm test --workspaces --if-present
         env:
-          DATABASE_URL: postgres://gerador:gerador@localhost:5432/gerador
+          # `gerador_test`, não `gerador`: a suíte trunca tabelas, e o padrão
+          # antigo apontava pro mesmo banco do docker-compose de desenvolvimento
+          # — aqui é efêmero, mas a URL do CI é a que as pessoas copiam. O banco
+          # é criado sob demanda (src/test-support/bancoDeTeste.ts).
+          DATABASE_URL: postgres://gerador:gerador@localhost:5432/gerador_test
 
       - run: npm run lint --workspaces --if-present
