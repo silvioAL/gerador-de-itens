@@ -1607,3 +1607,28 @@ Duas defesas, e a segunda é a que importa: banco próprio (`gerador_test`, cria
 Fora isso, a linha `<AcessosTab>` duplicada na `ConfigScreen` (renderizava a aba duas vezes) e a validação do modo hospedado ponta a ponta com Playwright: login, escolha de time, e a aba **Acessos contra o servidor de verdade pela primeira vez** — catálogo de recursos carregando do `/acessos/catalogo`, matriz montada, zero erro de rede.
 
 O padrão que se repete: **rodar o produto encontra o que a suíte não encontra**. Build de imagem, isolamento de banco e corrida de renderização não são coisas que um teste unitário vê.
+
+## 105. A esteira parada em silêncio: o modo hospedado não tem IA, e a tela não dizia
+
+Relato com print: *"carreguei o cenário de aprovação de crédito, cliquei em derivar quebra, e na tela de revisão não aconteceu nada além do desenho do diagrama"*. Os quatro agentes desenhados, as bolinhas vazias, 14 itens em rascunho, nada acontecendo.
+
+A causa é uma linha, `ReviewScreen.tsx`:
+
+```ts
+if (status.status !== "fulfilled" || !status.value.pronto) return;
+```
+
+**`packages/server` não registra rota `/ia/*` nenhuma.** Elas existem só no `openApiLocal.ts` do `gerador open`. No modo hospedado, `/ia/status` dá 404, a promessa rejeita, e o efeito de montagem faz `return` — mudo. A esteira fica desenhada e parada, que é indistinguível de produto quebrado.
+
+O buraco é maior que a linha: `/ia/sugerir`, `/ia/sugerir-item`, `/ia/pipeline/:papel`, `/ia/alterar-item`, `/ia/propor-diagrama`, `/ia/sugerir-config`, `/ia/credencial` — **nenhuma existe no servidor**. "Refinar conversando", "Desenhar conversando", "✨ Sugerir" e a aba Modelo de IA são todos botões vivos numa tela onde não têm backend. Nunca foi decidido; foi acumulando: a IA nasceu no caminho local (SPEC-23) e cada fase seguinte continuou ali, enquanto o hospedado seguia sendo persistência + auth.
+
+Esta rodada não fecha o buraco — fecha o **silêncio**, que é o que fazia parecer defeito. A tela agora distingue dois motivos, porque pedem ações opostas de quem lê:
+
+- **`sem-rota`**: "os agentes não rodam neste modo", apontando o `gerador open`, e dizendo que derivação, revisão determinística e especificação continuam funcionando aqui.
+- **`sem-modelo`**: "rode `gerador ia instalar`", com o "✨ Sugerir" manual ainda disponível.
+
+Confundir os dois manda a pessoa pro lugar errado — daí serem estados separados e não uma mensagem genérica.
+
+Validado no hospedado de verdade, repetindo o caminho do relato: login, cenário de crédito carregado, Derivar Quebra, e a faixa aparece com o texto certo. Os 404s medidos no caminho: `/ia/status` e `/config/pipeline-agentes`.
+
+Fica registrado como pergunta em aberto: **IA no modo hospedado** é trabalho de verdade, e o caminho natural não é embarcar 3GB de GGUF no container — é o `ProvedorCompativelOpenAI` da SPEC-25 Fase 2, que já existe dormente exatamente pra isso, com a custódia de credencial da SPEC-29.

@@ -264,6 +264,10 @@ export function ReviewScreen({
   // SPEC-24 Fase F: papéis da esteira vindos da config (ordem/ativo/
   // contextos/prompt) — default de fábrica até (e se) a config carregar.
   const [papeisConfig, setPapeisConfig] = useState<PapelConfigurado[]>(PAPEIS_PADRAO);
+  // Por que a esteira não arrancou. `null` enquanto não se sabe (o efeito de
+  // montagem ainda não respondeu) e depois de ela ter arrancado — a faixa de
+  // aviso é sobre ausência, não sobre progresso.
+  const [iaIndisponivel, setIaIndisponivel] = useState<"sem-rota" | "sem-modelo" | null>(null);
 
   const papeisAtivos = useMemo(() => papeisConfig.filter((p) => p.ativo), [papeisConfig]);
 
@@ -495,7 +499,22 @@ export function ReviewScreen({
       // Config indisponível mantém os defaults seguros (confirmação
       // obrigatória, pipeline de fábrica); status indisponível/não pronto =
       // sem geração automática.
-      if (status.status !== "fulfilled" || !status.value.pronto) return;
+      //
+      // ACHADO REAL do usuário: no modo hospedado isto era um `return` mudo. O
+      // servidor (packages/server) não registra rota `/ia/*` nenhuma — elas só
+      // existem no `gerador open` (openApiLocal.ts) — então `/ia/status` dá 404,
+      // a promessa rejeita, e a tela ficava com a esteira desenhada, os quatro
+      // agentes com as bolinhas vazias e NADA acontecendo, sem uma palavra de
+      // explicação. Distinguir os dois motivos importa: "não tem IA neste modo"
+      // e "tem, mas o modelo não foi baixado" pedem ações opostas de quem lê.
+      if (status.status !== "fulfilled") {
+        setIaIndisponivel("sem-rota");
+        return;
+      }
+      if (!status.value.pronto) {
+        setIaIndisponivel("sem-modelo");
+        return;
+      }
       const ativos = papeisResolvidos.filter((p) => p.ativo);
       const filaInicial = montarFilaEsteira(true, ativos);
       if (filaInicial.length > 0) esteira.iniciar(filaInicial, ativos);
@@ -700,6 +719,26 @@ export function ReviewScreen({
           }
           pausado={esteira.pausado}
         />
+      )}
+
+      {/* A esteira desenhada e parada, sem explicação, é pior que não ter
+          esteira: parece produto quebrado. Diz o motivo e o que fazer. */}
+      {!mostrarDiagrama && iaIndisponivel && !esteira.rodando && (
+        <div style={avisoIaEstilo} data-testid={`ia-indisponivel-${iaIndisponivel}`}>
+          {iaIndisponivel === "sem-rota" ? (
+            <>
+              <strong>Os agentes não rodam neste modo.</strong> Este servidor não expõe as rotas de IA — elas
+              existem só no modo local (<code>gerador open</code>). A derivação, a revisão determinística e a
+              especificação de solução continuam funcionando aqui; o que não roda é o preenchimento assistido.
+            </>
+          ) : (
+            <>
+              <strong>Modelo de IA não instalado.</strong> Rode <code>gerador ia instalar</code> (ou configure um
+              gateway na aba <em>Modelo de IA</em>) pra esteira preencher os itens sozinha. Sem isso, o botão
+              “✨ Sugerir” de cada campo continua disponível item a item.
+            </>
+          )}
+        </div>
       )}
 
       {mostrarDiagrama ? (
@@ -1362,6 +1401,20 @@ const contadoresEstilo: React.CSSProperties = {
   border: "1px solid #1B2533",
   borderRadius: 8,
   padding: "4px 10px",
+};
+
+// Amarelo de aviso, não vermelho de erro: a quebra derivou, a revisão rodou, a
+// especificação sai. O que falta é o preenchimento assistido — e isso é uma
+// ausência de recurso, não uma falha.
+const avisoIaEstilo: React.CSSProperties = {
+  margin: "0 16px 8px",
+  padding: "8px 12px",
+  borderRadius: 8,
+  border: "1px solid rgba(232, 179, 57, 0.3)",
+  background: "rgba(232, 179, 57, 0.06)",
+  color: "#E8B339",
+  fontSize: 12.5,
+  lineHeight: 1.6,
 };
 
 // Trilho fino de progresso no header (mesma ideia do `.track` do protótipo):
