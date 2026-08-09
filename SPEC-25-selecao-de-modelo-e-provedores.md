@@ -48,6 +48,14 @@ A diferença fica ENCAPSULADA no provedor: quem chama (`/ia/pipeline/:papel`) co
 
 Candidato: **DeepSeek-R1-0528-Qwen3-8B** (distill sobre Qwen3-8B, GGUF Q4_K_M ~5GB) — roda no MESMO runtime (node-llama-cpp), mesmo mecanismo de download/cache. Alternativa menor: R1-Distill-Qwen-7B. Decisão final na Fase 1, medindo na máquina real.
 
+**A barra de qualidade, calibrada pelo uso real (achado decisivo)**: *"no meu uso da ferramenta o DeepSeek atendia bem (em alguns casos até o Rovo atende, que é mais fraco); posso tolerar que fique lento, desde que seja possível trabalhar sem toda essa limitação do modelo atual em termos de raciocínio"*.
+
+Três consequências que mudam o status desta fase:
+
+- **O alvo não é modelo de fronteira — é "nível DeepSeek"**, e o piso aceitável é ainda mais baixo (Rovo às vezes basta). Ou seja: o R1-distill embarcado tem chance real de **atender de verdade** o ambiente da empresa, não só de servir de piso. A Fase 1 deixa de ser compromisso e vira **a aposta principal do ambiente de produção**.
+- **O gargalo nomeado é raciocínio, não estilo.** Não é caso de continuar calibrando prompt do Qwen3-4B: um modelo de 4B sem cadeia de raciocínio tem teto, e o usuário já bateu nele. Prompt melhor (feito na rodada anterior) tirou o que dava; o resto exige o modelo.
+- **Lentidão é explicitamente tolerada**, então o `<think>` do R1 **não é custo a minimizar — é o recurso a preservar**. Isso decide o desenho de §4.3 abaixo: em nenhuma hipótese forçar a grammar desde o primeiro token; melhor pagar o tempo do raciocínio e aplicar a estrutura depois.
+
 Risco central documentado: modelos R são RACIOCINADORES — emitem `<think>…</think>` antes da resposta. GBNF forçando JSON desde o primeiro token **mata o raciocínio** (perderia justamente o que se busca no DeepSeek). Estratégia da Fase 1: deixar o think correr livre e aplicar a grammar só após o fechamento do think (node-llama-cpp tem suporte a reasoning budget/segmentos; se a versão instalada não expuser, fallback: geração livre com instrução de JSON + validação + 1 retry). O streaming do think pode aparecer na UI como "pensando…" (o painel ao vivo já tem esse estado) — o texto do think NÃO entra no JSON final.
 
 ### 4.4 Configuração e credenciais

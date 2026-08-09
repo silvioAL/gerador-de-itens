@@ -1192,3 +1192,12 @@ Isso separa **dois ambientes com papéis distintos** (SPEC-25 §8.2): a máquina
 3. **Princípio novo: nunca assumir capacidade do modelo — mas também não otimizar para a limitação.** O "por enquanto ao menos" foi registrado com peso: a restrição do embarcado é temporária, então o desenho **degrada ATÉ** o modelo pequeno em vez de ser desenhado PARA ele; toda feature tem o caminho de qualidade e o de piso sobre a MESMA arquitetura, nunca duas implementações. E nenhuma feature é dada por pronta sem rodar no embarcado.
 
 Sequência final: Fase 0 + Claude → Bloco 1 → Bloco 4a → Blocos 2+3 (validados nos dois) → Fase 1 (DeepSeek local, medido contra o Claude) → Bloco 5a → (token) Fase 2 → 5b → 6/4b.
+
+Fecha a conversa o dado mais útil de todos, que calibra a barra: *"no meu uso da ferramenta o DeepSeek atendia bem (em alguns casos até o Rovo atende, que é mais fraco); posso tolerar que fique lento, desde que seja possível trabalhar sem toda essa limitação do modelo atual em termos de raciocínio"*.
+
+- **O alvo não é fronteira — é "nível DeepSeek"**, com piso ainda mais baixo. O R1-distill embarcado deixa de ser piso tolerável e vira **a aposta principal** do ambiente da empresa; a Fase 1 sobe para logo depois da conexão ao Claude (que segue sendo o acelerador do ciclo de desenvolvimento, não o modelo de produção).
+- **O gargalo tem nome: raciocínio, não estilo.** Encerra a linha de "calibrar mais o prompt do Qwen3-4B" — a rodada anterior já tirou o que dava com preâmbulos prescritivos; o resto é teto do modelo.
+- **Lentidão tolerada muda uma decisão de desenho**: o `<think>` do R1 não é custo a minimizar, é o recurso a preservar — em nenhuma hipótese forçar a grammar desde o primeiro token (§4.3 da SPEC-25).
+- **Fase 1 também desarrisca**: tudo que vier depois precisa rodar no embarcado; descobrir isso no fim custaria retrabalho.
+
+Sequência definitiva desta rodada de planejamento: **Fase 0 + Claude → Fase 1 (DeepSeek local) → Bloco 1 → Bloco 4a → Blocos 2+3 → Bloco 5a → (token) Fase 2 → 5b → 6/4b.**
