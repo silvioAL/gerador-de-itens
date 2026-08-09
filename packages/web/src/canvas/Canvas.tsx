@@ -23,6 +23,19 @@ const nodeTypes = { domNo: NodeCard };
  * explícito) — sem isso a aresta sempre ancorava no primeiro handle declarado
  * no nó (topo), não importa a posição relativa dos dois nós no canvas.
  */
+/** `"id:x:y|id:x:y"` de volta pra mapa. Reconstruir da string (em vez de ler
+ * o array de nós) mantém a função pura e a dependência do memo honesta: tudo
+ * que ela usa está na própria string. */
+function posicoesDaGeometria(geometria: string): Map<string, { x: number; y: number }> {
+  const mapa = new Map<string, { x: number; y: number }>();
+  if (!geometria) return mapa;
+  for (const parte of geometria.split("|")) {
+    const [id, x, y] = parte.split(":");
+    mapa.set(id, { x: Number(x), y: Number(y) });
+  }
+  return mapa;
+}
+
 const LABEL_STYLE = { fontSize: 11, fill: "#c5ceda" };
 const LABEL_BG_STYLE = { fill: "#101823" };
 
@@ -104,12 +117,9 @@ export function Canvas({ quebraState, config }: CanvasProps) {
    * de fato se move, entra ou sai. Digitar spec não mexe nela.
    */
   const geometriaNos = quebra.diagrama.nodes.map((n) => `${n.id}:${n.x}:${n.y}`).join("|");
-  const posicoes = useMemo(
-    () => new Map(quebra.diagrama.nodes.map((n) => [n.id, { x: n.x, y: n.y }])),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- a string É a
-    // identidade da geometria; depender do array traria o piscar de volta.
-    [geometriaNos]
-  );
+  // Depende SÓ da string: ela é a identidade da geometria. Depender do array
+  // de nós traria o piscar de volta — é literalmente o bug que se corrige aqui.
+  const posicoes = useMemo(() => posicoesDaGeometria(geometriaNos), [geometriaNos]);
 
   const edges: Edge[] = useMemo(
     () =>
