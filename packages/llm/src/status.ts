@@ -7,8 +7,10 @@ import {
   MODELO_EMBEDDING,
   NOME_PROVEDOR_GATEWAY,
   PAPEL_PROVEDOR_GATEWAY,
+  PRESETS_GATEWAY,
   modeloChatPorId,
   type ModeloRegistrado,
+  type PresetGateway,
 } from "./modelos.js";
 
 /** Um modelo de chat e se ele está baixado — alimenta os cards da aba
@@ -42,6 +44,14 @@ export interface StatusIa {
    * `chaveMascarada`, nunca a chave. Sempre presente (com
    * `configurado: false` quando não há nada), pra UI não precisar de guarda. */
   gateway: ReturnType<typeof resumirCredencial>;
+  /**
+   * Destinos conhecidos do gateway, pra UI preencher base URL e modelo. Vem do
+   * servidor em vez de uma cópia no front pelo mesmo motivo do catálogo de
+   * acessos: lista duplicada envelhece em silêncio, e `packages/web` não pode
+   * importar `@gerador/llm` — o pacote arrasta `node-llama-cpp` (binário
+   * nativo) pro bundle do navegador.
+   */
+  presetsGateway: PresetGateway[];
 }
 
 async function existeArquivoNaoVazio(caminho: string): Promise<boolean> {
@@ -110,5 +120,6 @@ export async function verificarStatus(baseDir?: string, idChatSelecionado?: stri
     provedor: gatewaySelecionado ? ID_PROVEDOR_GATEWAY : selecionado.id,
     modelosChat,
     gateway,
+    presetsGateway: PRESETS_GATEWAY,
   };
 }

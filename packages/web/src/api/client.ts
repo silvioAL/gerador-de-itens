@@ -256,6 +256,25 @@ export interface StatusIa {
   provedor?: string;
   modelosChat?: StatusModeloChat[];
   gateway?: ResumoGateway;
+  /** SPEC-25 Fase 2.1 — destinos conhecidos (Claude, DeepSeek, Ollama). Vem do
+   * servidor, não de uma cópia aqui: `@gerador/llm` não pode entrar no bundle
+   * (arrasta `node-llama-cpp`), e lista duplicada envelheceria em silêncio. */
+  presetsGateway?: PresetGateway[];
+}
+
+/** Um destino conhecido do gateway — espelha `PresetGateway` de `@gerador/llm`,
+ * que não dá pra importar aqui (binário nativo no bundle do navegador). */
+export interface PresetGateway {
+  id: string;
+  nome: string;
+  baseUrl: string;
+  modelos: string[];
+  modeloPadrao: string;
+  /** `false` = o destino ignora `response_format`; a estrutura vem de
+   * validação + retry, e a tela precisa dizer isso. */
+  jsonNativo: boolean;
+  urlChave?: string;
+  observacao: string;
 }
 
 export interface ConfigIa {

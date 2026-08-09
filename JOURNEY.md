@@ -1632,3 +1632,25 @@ Confundir os dois manda a pessoa pro lugar errado — daí serem estados separad
 Validado no hospedado de verdade, repetindo o caminho do relato: login, cenário de crédito carregado, Derivar Quebra, e a faixa aparece com o texto certo. Os 404s medidos no caminho: `/ia/status` e `/config/pipeline-agentes`.
 
 Fica registrado como pergunta em aberto: **IA no modo hospedado** é trabalho de verdade, e o caminho natural não é embarcar 3GB de GGUF no container — é o `ProvedorCompativelOpenAI` da SPEC-25 Fase 2, que já existe dormente exatamente pra isso, com a custódia de credencial da SPEC-29.
+
+## 106. Claude na ferramenta: o soquete dormente serviu pra exatamente isto
+
+Depois de descobrir que o modo hospedado não tem IA, o usuário escolheu o caminho: *"vamos começar simples, se eu conseguir usar o claude integrado a ferramenta já é ótimo"*.
+
+**Nenhum provedor novo foi escrito.** A Anthropic publica uma camada compatível com a API da OpenAI — `https://api.anthropic.com/v1/`, `Authorization: Bearer`, `POST /chat/completions`, streaming — que é literalmente o que o `ProvedorCompativelOpenAI` da SPEC-25 Fase 2 já falava. Confirmei antes de escrever qualquer linha: um `curl` com chave falsa no endpoint real devolveu 401 no formato de erro da OpenAI, ou seja a camada de compatibilidade respondendo.
+
+A Fase 2 tinha sido entregue como "soquete dormente" e ficou registrado no código que *"wrapper corporativo e Claude viram entradas novas, sem mexer em quem consome"*. Foi o que aconteceu.
+
+O trabalho real foi tudo menos transporte, e saiu da documentação da Anthropic:
+
+**`max_tokens` explícito.** O provedor nunca mandava esse campo. A API nativa da Anthropic **exige** `max_tokens`, então a camada de compatibilidade arbitra um valor que não está documentado — e um lote de 5 itens da esteira bate nesse teto e volta cortado. Essa é a falha silenciosa mais cara deste projeto (resposta truncada = trabalho perdido sem aviso, ver §270 do backlog). Agora o teto é nosso: 8192 por padrão, configurável.
+
+**A garantia de JSON fica mais fraca, e a tela diz.** A Anthropic **ignora** `response_format` (documentado por eles). Onde isso vale, quem garante estrutura é `validarContraSchema` + um retry — a degradação que a Fase 2 já previa, agora escrita na aba em vez de escondida no código. O preset carrega `jsonNativo: false` e o aviso aparece antes de salvar, não depois de uma resposta estranha.
+
+**Presets vêm do servidor.** `PRESETS_GATEWAY` mora em `packages/llm` e chega ao front por `/ia/status`. Não é preciosismo: `packages/web` **não pode** importar `@gerador/llm` — o pacote arrasta `node-llama-cpp`, binário nativo, pro bundle do navegador. E uma cópia no front envelheceria em silêncio, o mesmo argumento do catálogo de acessos da SPEC-28.
+
+Um erro meu que os testes pegaram: a primeira versão de "trocar de destino" preservava o modelo digitado **sempre**, então ir de Claude pro DeepSeek deixava `claude-sonnet-5` apontando pro endpoint errado — erro que só apareceria na primeira chamada. Agora troca quando o valor veio de algum preset e preserva só o que foi digitado à mão (o caso do gateway interno com nome próprio).
+
+Verificado contra o endpoint real, não só com mock: `/ia/credencial/testar` com chave inválida responde *"Credencial recusada pelo gateway (HTTP 401)"* e com base URL errada responde *"Endpoint não encontrado — confira a base URL (HTTP 404)"*. A cadeia rota → provedor → `api.anthropic.com` está fechada. O que **não** dá pra verificar sem uma chave paga é uma resposta completa de verdade — e isso está dito, não escondido.
+
+Custo é decisão de quem usa: chave do console da Anthropic é cobrança por uso, separada da assinatura do Claude.ai ou do Claude Code. Não há caminho por OAuth — credenciais do Claude Code são exclusivas dele (ToS), o que já estava registrado na SPEC-25 §4.5.

@@ -28,6 +28,15 @@ export interface OpcoesProvedorOpenAI {
   modelo: string;
   /** Alguns wrappers corporativos exigem cabeçalhos próprios. */
   cabecalhos?: Record<string, string>;
+  /**
+   * Teto de tokens da resposta. Mandado SEMPRE, com default generoso, porque
+   * omitir deixa o corte no default de cada gateway — e esse default não é
+   * documentado em todos. Na Anthropic a API nativa **exige** `max_tokens`, e a
+   * camada de compatibilidade arbitra um valor por nós: um lote de 5 itens da
+   * esteira bate nesse teto e volta cortado, que é exatamente a falha silenciosa
+   * mais cara deste projeto (resposta truncada = trabalho perdido sem aviso).
+   */
+  maxTokens?: number;
   /** Injetável no teste — evita depender de rede real na suíte. */
   fetchImpl?: typeof fetch;
 }
@@ -43,6 +52,13 @@ interface DeltaStream {
     };
   }[];
 }
+
+/**
+ * Alto o bastante pro maior pedido real da esteira (um lote de 5 itens com
+ * ficha técnica completa) e dentro do que todo destino da lista aceita. Um teto
+ * explícito e folgado é melhor que nenhum: sem ele, quem escolhe é o gateway.
+ */
+const MAX_TOKENS_PADRAO = 8192;
 
 /** Erro com a mensagem já pronta pra tela — o resto da stack não interessa a
  * quem está configurando um gateway. */
@@ -129,6 +145,10 @@ export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): Pro
         model: opcoes.modelo,
         messages: mensagens,
         stream: true,
+        max_tokens: opcoes.maxTokens ?? MAX_TOKENS_PADRAO,
+        // A Anthropic IGNORA este campo (documentado por eles). Continua sendo
+        // mandado porque para os outros destinos ele ajuda de verdade; onde é
+        // ignorado, quem garante a estrutura é `validarContraSchema` + o retry.
         ...(formatoJson ? { response_format: { type: "json_object" } } : {}),
       }),
     });
