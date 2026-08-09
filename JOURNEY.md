@@ -1569,3 +1569,25 @@ Três decisões que valem registro:
 E um detalhe de teste que ia passando pelo motivo errado: a asserção do escopo procurava "organização inteira", que **também** aparece no texto de introdução da aba. Passava por casar com a intro, não com o escopo da pessoa. Buscar pelo travessão junto (`— organização inteira`) resolve — a mesma lição do teste de permissão da Fase 1, onde o 403 vinha do portão errado.
 
 Regressão: web 273 (+9), server 45, engine 190, llm 47, cli 80.
+
+## 103. "Nenhuma regra cobre Backend" era verdade — e a culpa era da config padrão
+
+O usuário rodou o produto e estranhou, com razão: *"achei estranho 'nenhuma regra cobre Backend' — no especialista, sendo que estamos falando de integrações http, rabbit, kafka; precisamos revisar as configurações default."*
+
+A resposta que eu tinha dado na §97 estava certa mas incompleta: eu disse que o aviso era legítimo e que a config dele não cobria aquelas combinações. Só que a config em questão **é a que o produto entrega**. Não era o time dele que tinha deixado buraco; era o exemplo padrão.
+
+O diagnóstico não foi o óbvio. A tech `Backend` **tem** regras — 13 testes, 27 itens de checklist. O que faltava era casamento por **contexto**, em três lugares:
+
+1. **`Serviço` e `Job/Scheduler` têm `contextos: []`**, e nenhum teste usava `contextos: []`. O padrão "sem contexto = aplica sempre" existia no checklist (um item, sobre logs) e **não existia nos testes**. Resultado: os dois tipos mais genéricos do catálogo — justamente os que aparecem em qualquer desenho — ficavam sem ciclo de teste algum.
+2. **`Backend-topologia-mensageria`** (Exchange Rabbit) não era declarado por teste nenhum.
+3. **`Job/Scheduler` não tinha contexto próprio**, então tampouco recebia checklist ou volumetria específicos — e um job tem preocupações bem concretas (reexecução idempotente, sobreposição de execuções, de onde retomar após falha) que nenhuma regra endereçava.
+
+Corrigido nos dois lados que precisam andar juntos (`config/*.example.json` e `packages/cli/templates/*.json`, que são cópias por decisão registrada — corrigir só um deixaria o `gerador open`, que usa os templates, com o problema). Novo contexto `Backend-agendamento`, testes que valem para qualquer componente Backend (unitário e smoke de subida), testes de roteamento/mensagem-não-roteada para topologia, e testes + checklist de agendamento.
+
+**O teste que fecha isso é o que mais importa**, porque o defeito era invisível: um tipo de nó novo nasce, ninguém escreve regra para o contexto dele, e o Especialista fica sem trabalho — que na tela parece **agente quebrado**, não configuração incompleta. O teste roda o **revisor de verdade** (`revisarQuebra`) sobre a config real, com um diagrama contendo os 16 tipos, e falha nomeando quais ficaram descobertos. Rodado contra a config antiga, ele acusa exatamente `service`, `rabbit-exchange` e `job`.
+
+Mais dois testes de coerência que nasceram junto, porque a mesma classe de erro tem dois irmãos: **contexto órfão** (declarado em `app.json` e usado por regra nenhuma — opção que não faz nada) e **contexto fantasma** (usado por um tipo de nó e ausente da lista do app — não aparece como opção em lugar algum).
+
+A lição vale além deste caso: o produto tinha **conteúdo** de configuração e não tinha **verificação de cobertura** dele. Configuração de exemplo é código de produto — e como código, precisa de teste dizendo que está inteira.
+
+Regressão: engine 193 (+3), llm 47, cli 80, web 273, server 45.

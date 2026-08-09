@@ -1,5 +1,9 @@
 {
-  "techs": ["Backend", "Frontend", "Mobile"],
+  "techs": [
+    "Backend",
+    "Frontend",
+    "Mobile"
+  ],
   "contextos": [
     "Backend-mensagens rabbitmq",
     "Backend-mensagens kafka",
@@ -10,6 +14,7 @@
     "Backend-regras",
     "Backend-cache",
     "Backend-storage",
+    "Backend-agendamento",
     "Backend-processamento em lote",
     "Mobile-android",
     "Mobile-ios"

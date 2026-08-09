@@ -1,126 +1,566 @@
 {
-  "tipos": ["História", "Task", "Débito Técnico"],
-  "tamanhos": ["PP", "P", "M", "G"],
+  "tipos": [
+    "História",
+    "Task",
+    "Débito Técnico"
+  ],
+  "tamanhos": [
+    "PP",
+    "P",
+    "M",
+    "G"
+  ],
   "porTech": {
     "Backend": {
       "checklistTecnico": [
-        { "texto": "Definir pontos de log (decisão, erro, correlação) e o que não pode ser logado", "contextos": [] },
-
-        { "texto": "Definir estratégia de retry e DLQ (tentativas, backoff, destino da mensagem morta)", "contextos": ["Backend-mensagens"] },
-        { "texto": "Definir se o consumo é idempotente; se não, especificar a chave de deduplicação", "contextos": ["Backend-mensagens"] },
-        { "texto": "Documentar se a ordem de processamento importa e como é garantida", "contextos": ["Backend-mensagens"] },
-
-        { "texto": "Dimensionar prefetch para o volume esperado", "contextos": ["Backend-mensagens rabbitmq"] },
-
-        { "texto": "Definir chave e estratégia de particionamento", "contextos": ["Backend-mensagens kafka"] },
-        { "texto": "Definir consumer group e política de offset (earliest/latest)", "contextos": ["Backend-mensagens kafka"] },
-
-        { "texto": "Verificar se as queries novas exigem índice e especificar quais — se aplicável", "contextos": ["Backend-dados"] },
-        { "texto": "Definir plano de migração e rollback do schema", "contextos": ["Backend-dados"], "when": { "nodeStatus": "existente" } },
-        { "texto": "Estimar volume e definir retenção dos dados", "contextos": ["Backend-dados"] },
-
-        { "texto": "Definir timeout e política de retry", "contextos": ["Backend-chamadas http"] },
-        { "texto": "Definir autenticação/autorização da chamada", "contextos": ["Backend-chamadas http"] },
-        { "texto": "Definir circuit breaker ou fallback para indisponibilidade", "contextos": ["Backend-chamadas http"] },
-
-        { "texto": "Descrever as alterações no processo (etapas, gateways, listeners afetados)", "contextos": ["Backend-orquestracao"] },
-        { "texto": "Definir estratégia de compensação (rollback) do processo", "contextos": ["Backend-orquestracao"] },
-        { "texto": "Definir o que acontece com instâncias em voo na migração (migrar ou deixar terminar na versão anterior)", "contextos": ["Backend-orquestracao"], "when": { "nodeStatus": "existente" } },
-
-        { "texto": "Descrever os motores, rulesets ou fluxos de decisão modificados", "contextos": ["Backend-regras"] },
-        { "texto": "Definir a trilha de auditoria da decisão (o que registrar para reconstruir por que decidiu X)", "contextos": ["Backend-regras"] },
-        { "texto": "Definir versionamento das regras (o que acontece com decisões já tomadas na versão anterior)", "contextos": ["Backend-regras"], "when": { "nodeStatus": "existente" } },
-
-        { "texto": "Definir estratégia de invalidação (TTL, ativa no write, ou ambas)", "contextos": ["Backend-cache"] },
-        { "texto": "Definir comportamento com cache indisponível (fail-open ou fail-closed)", "contextos": ["Backend-cache"] },
-
-        { "texto": "Definir política de acesso ao objeto (privado, presigned ou público — e por quê)", "contextos": ["Backend-storage"] },
-        { "texto": "Definir ciclo de vida do objeto (expiração, arquivamento)", "contextos": ["Backend-storage"] },
-
-        { "texto": "Definir se o job é restartável a partir do checkpoint e como", "contextos": ["Backend-processamento em lote"] },
-        { "texto": "Definir política de skip/retry por item (e o limite de itens pulados)", "contextos": ["Backend-processamento em lote"] },
-        { "texto": "Dimensionar chunk size para o volume esperado", "contextos": ["Backend-processamento em lote"] },
-        { "texto": "Se a origem ou o destino for arquivo, especificar o layout (posicional/CSV, delimitador, encoding, header) — se aplicável", "contextos": ["Backend-processamento em lote"] }
+        {
+          "texto": "Definir pontos de log (decisão, erro, correlação) e o que não pode ser logado",
+          "contextos": []
+        },
+        {
+          "texto": "Definir estratégia de retry e DLQ (tentativas, backoff, destino da mensagem morta)",
+          "contextos": [
+            "Backend-mensagens"
+          ]
+        },
+        {
+          "texto": "Definir se o consumo é idempotente; se não, especificar a chave de deduplicação",
+          "contextos": [
+            "Backend-mensagens"
+          ]
+        },
+        {
+          "texto": "Documentar se a ordem de processamento importa e como é garantida",
+          "contextos": [
+            "Backend-mensagens"
+          ]
+        },
+        {
+          "texto": "Dimensionar prefetch para o volume esperado",
+          "contextos": [
+            "Backend-mensagens rabbitmq"
+          ]
+        },
+        {
+          "texto": "Definir chave e estratégia de particionamento",
+          "contextos": [
+            "Backend-mensagens kafka"
+          ]
+        },
+        {
+          "texto": "Definir consumer group e política de offset (earliest/latest)",
+          "contextos": [
+            "Backend-mensagens kafka"
+          ]
+        },
+        {
+          "texto": "Verificar se as queries novas exigem índice e especificar quais — se aplicável",
+          "contextos": [
+            "Backend-dados"
+          ]
+        },
+        {
+          "texto": "Definir plano de migração e rollback do schema",
+          "contextos": [
+            "Backend-dados"
+          ],
+          "when": {
+            "nodeStatus": "existente"
+          }
+        },
+        {
+          "texto": "Estimar volume e definir retenção dos dados",
+          "contextos": [
+            "Backend-dados"
+          ]
+        },
+        {
+          "texto": "Definir timeout e política de retry",
+          "contextos": [
+            "Backend-chamadas http"
+          ]
+        },
+        {
+          "texto": "Definir autenticação/autorização da chamada",
+          "contextos": [
+            "Backend-chamadas http"
+          ]
+        },
+        {
+          "texto": "Definir circuit breaker ou fallback para indisponibilidade",
+          "contextos": [
+            "Backend-chamadas http"
+          ]
+        },
+        {
+          "texto": "Descrever as alterações no processo (etapas, gateways, listeners afetados)",
+          "contextos": [
+            "Backend-orquestracao"
+          ]
+        },
+        {
+          "texto": "Definir estratégia de compensação (rollback) do processo",
+          "contextos": [
+            "Backend-orquestracao"
+          ]
+        },
+        {
+          "texto": "Definir o que acontece com instâncias em voo na migração (migrar ou deixar terminar na versão anterior)",
+          "contextos": [
+            "Backend-orquestracao"
+          ],
+          "when": {
+            "nodeStatus": "existente"
+          }
+        },
+        {
+          "texto": "Descrever os motores, rulesets ou fluxos de decisão modificados",
+          "contextos": [
+            "Backend-regras"
+          ]
+        },
+        {
+          "texto": "Definir a trilha de auditoria da decisão (o que registrar para reconstruir por que decidiu X)",
+          "contextos": [
+            "Backend-regras"
+          ]
+        },
+        {
+          "texto": "Definir versionamento das regras (o que acontece com decisões já tomadas na versão anterior)",
+          "contextos": [
+            "Backend-regras"
+          ],
+          "when": {
+            "nodeStatus": "existente"
+          }
+        },
+        {
+          "texto": "Definir estratégia de invalidação (TTL, ativa no write, ou ambas)",
+          "contextos": [
+            "Backend-cache"
+          ]
+        },
+        {
+          "texto": "Definir comportamento com cache indisponível (fail-open ou fail-closed)",
+          "contextos": [
+            "Backend-cache"
+          ]
+        },
+        {
+          "texto": "Definir política de acesso ao objeto (privado, presigned ou público — e por quê)",
+          "contextos": [
+            "Backend-storage"
+          ]
+        },
+        {
+          "texto": "Definir ciclo de vida do objeto (expiração, arquivamento)",
+          "contextos": [
+            "Backend-storage"
+          ]
+        },
+        {
+          "texto": "Definir se o job é restartável a partir do checkpoint e como",
+          "contextos": [
+            "Backend-processamento em lote"
+          ]
+        },
+        {
+          "texto": "Definir política de skip/retry por item (e o limite de itens pulados)",
+          "contextos": [
+            "Backend-processamento em lote"
+          ]
+        },
+        {
+          "texto": "Dimensionar chunk size para o volume esperado",
+          "contextos": [
+            "Backend-processamento em lote"
+          ]
+        },
+        {
+          "texto": "Se a origem ou o destino for arquivo, especificar o layout (posicional/CSV, delimitador, encoding, header) — se aplicável",
+          "contextos": [
+            "Backend-processamento em lote"
+          ]
+        },
+        {
+          "texto": "Definir o tipo da exchange (direct/topic/fanout/headers) e as routing keys de cada binding",
+          "contextos": [
+            "Backend-topologia-mensageria"
+          ]
+        },
+        {
+          "texto": "Definir o destino de mensagem não roteada (alternate exchange ou DLX) — descartar em silêncio não é opção",
+          "contextos": [
+            "Backend-topologia-mensageria"
+          ]
+        },
+        {
+          "texto": "Definir a expressão de agendamento (cron) e o fuso horário considerado",
+          "contextos": [
+            "Backend-agendamento"
+          ]
+        },
+        {
+          "texto": "Definir o comportamento quando a execução anterior ainda está rodando (pular, enfileirar ou rodar em paralelo)",
+          "contextos": [
+            "Backend-agendamento"
+          ]
+        },
+        {
+          "texto": "Definir como o job retoma depois de falha no meio (reprocessa a janela inteira ou de onde parou)",
+          "contextos": [
+            "Backend-agendamento"
+          ]
+        }
       ],
       "checklistProcesso": [
-        { "texto": "Levantar massa de teste para HLG (dados, contas, cenários) — quem provê e quando", "contextos": [] },
-
-        { "texto": "Especificar as filas/exchanges/tópicos a criar ou alterar (nomes, bindings, por ambiente)", "contextos": ["Backend-mensagens"] },
-
-        { "texto": "Anexar snippet curl da chamada a ser realizada", "contextos": ["Backend-chamadas http"] },
-        { "texto": "Configurar mock (Mockoon ou equivalente) com os cenários de sucesso e erro — massa de teste de DEV", "contextos": ["Backend-chamadas http", "Backend-orquestracao"] },
-        { "texto": "Especificar quais serviços precisam ter o apontamento alterado durante o teste, e para quais rotas", "contextos": ["Backend-chamadas http", "Backend-orquestracao"] },
-
-        { "texto": "Anexar snippet curl da chamada que inicializa o processo", "contextos": ["Backend-orquestracao"] },
-
-        { "texto": "Anexar a documentação das políticas aplicáveis (regras, funções, parâmetros)", "contextos": ["Backend-regras"] },
-
-        { "texto": "Publicar o contrato do endpoint novo (OpenAPI/Swagger) para os consumidores",
+        {
+          "texto": "Levantar massa de teste para HLG (dados, contas, cenários) — quem provê e quando",
+          "contextos": []
+        },
+        {
+          "texto": "Especificar as filas/exchanges/tópicos a criar ou alterar (nomes, bindings, por ambiente)",
+          "contextos": [
+            "Backend-mensagens"
+          ]
+        },
+        {
+          "texto": "Anexar snippet curl da chamada a ser realizada",
+          "contextos": [
+            "Backend-chamadas http"
+          ]
+        },
+        {
+          "texto": "Configurar mock (Mockoon ou equivalente) com os cenários de sucesso e erro — massa de teste de DEV",
+          "contextos": [
+            "Backend-chamadas http",
+            "Backend-orquestracao"
+          ]
+        },
+        {
+          "texto": "Especificar quais serviços precisam ter o apontamento alterado durante o teste, e para quais rotas",
+          "contextos": [
+            "Backend-chamadas http",
+            "Backend-orquestracao"
+          ]
+        },
+        {
+          "texto": "Anexar snippet curl da chamada que inicializa o processo",
+          "contextos": [
+            "Backend-orquestracao"
+          ]
+        },
+        {
+          "texto": "Anexar a documentação das políticas aplicáveis (regras, funções, parâmetros)",
+          "contextos": [
+            "Backend-regras"
+          ]
+        },
+        {
+          "texto": "Publicar o contrato do endpoint novo (OpenAPI/Swagger) para os consumidores",
           "contextos": [],
-          "when": { "allOf": [
-            { "nodeType": ["service"] },
-            { "listaContem": { "field": "endpoints", "sub": "action", "equals": "novo" } } ] } },
-
-        { "texto": "Avisar os consumidores atuais do endpoint alterado e combinar a janela de mudança",
+          "when": {
+            "allOf": [
+              {
+                "nodeType": [
+                  "service"
+                ]
+              },
+              {
+                "listaContem": {
+                  "field": "endpoints",
+                  "sub": "action",
+                  "equals": "novo"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "texto": "Avisar os consumidores atuais do endpoint alterado e combinar a janela de mudança",
           "contextos": [],
-          "when": { "allOf": [
-            { "nodeType": ["service"] },
-            { "listaContem": { "field": "endpoints", "sub": "action", "equals": "alterar" } } ] } },
-
-        { "texto": "Confirmar se o provedor tem ambiente de teste; sem ele, o teste integrado depende de mock",
+          "when": {
+            "allOf": [
+              {
+                "nodeType": [
+                  "service"
+                ]
+              },
+              {
+                "listaContem": {
+                  "field": "endpoints",
+                  "sub": "action",
+                  "equals": "alterar"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "texto": "Confirmar se o provedor tem ambiente de teste; sem ele, o teste integrado depende de mock",
           "contextos": [],
-          "when": { "nodeType": ["external"] } },
-
-        { "texto": "Abrir a demanda de configuração do parâmetro nos ambientes (DEV/HLG/PROD) e quem executa",
+          "when": {
+            "nodeType": [
+              "external"
+            ]
+          }
+        },
+        {
+          "texto": "Abrir a demanda de configuração do parâmetro nos ambientes (DEV/HLG/PROD) e quem executa",
           "contextos": [],
-          "when": { "nodeType": ["rule", "fico"] } }
+          "when": {
+            "nodeType": [
+              "rule",
+              "fico"
+            ]
+          }
+        }
       ],
       "testes": [
-        { "tipo": "Teste de contrato", "validacao": "Payload publicado/recebido bate com o schema acordado", "contextos": ["Backend-mensagens"], "dev": true, "hlg": true },
-        { "tipo": "Teste de retry/DLQ", "validacao": "Mensagem malformada ou que falha repetidamente vai para a DLQ", "contextos": ["Backend-mensagens"], "dev": true, "hlg": false },
-
-        { "tipo": "Teste de carga", "validacao": "Fila absorve pico de 2x o volume médio sem atraso relevante", "contextos": ["Backend-mensagens rabbitmq"], "dev": false, "hlg": true },
-
-        { "tipo": "Teste de rebalanceamento", "validacao": "Consumer group rebalanceia sem perda ou duplicação de mensagem", "contextos": ["Backend-mensagens kafka"], "dev": false, "hlg": true },
-
-        { "tipo": "Teste de migração", "validacao": "Migration roda limpo numa base com dados existentes", "contextos": ["Backend-dados"], "dev": true, "hlg": true },
-
-        { "tipo": "Teste de timeout", "validacao": "Chamada expira dentro do limite configurado e é tratada", "contextos": ["Backend-chamadas http"], "dev": true, "hlg": false },
-        { "tipo": "Teste de contrato", "validacao": "Request/response batem com o contrato da API externa", "contextos": ["Backend-chamadas http"], "dev": true, "hlg": true },
-
-        { "tipo": "Teste funcional do processo", "validacao": "Processo inicializado via chamada HTTP percorre os cenários esperados; erro/falha sempre cai na tarefa manual, se aplicável", "contextos": ["Backend-orquestracao"], "dev": true, "hlg": false },
-        { "tipo": "Teste de compensação", "validacao": "Rollback funciona quando uma etapa do processo falha", "contextos": ["Backend-orquestracao"], "dev": false, "hlg": true },
-
-        { "tipo": "Teste de regressão de regras", "validacao": "Casos conhecidos continuam decidindo da mesma forma após a mudança", "contextos": ["Backend-regras"], "dev": true, "hlg": true },
-
-        { "tipo": "Teste de cache miss/hit", "validacao": "Valor é recalculado corretamente em cache miss e servido do cache em hit", "contextos": ["Backend-cache"], "dev": true, "hlg": false },
-
-        { "tipo": "Teste de upload/download", "validacao": "Objeto enviado é recuperável com o mesmo conteúdo e metadados", "contextos": ["Backend-storage"], "dev": true, "hlg": true },
-
-        { "tipo": "Teste de restart", "validacao": "Job retomado após falha no meio continua do checkpoint, sem duplicar itens já processados", "contextos": ["Backend-processamento em lote"], "dev": false, "hlg": true }
+        {
+          "tipo": "Teste de contrato",
+          "validacao": "Payload publicado/recebido bate com o schema acordado",
+          "contextos": [
+            "Backend-mensagens"
+          ],
+          "dev": true,
+          "hlg": true
+        },
+        {
+          "tipo": "Teste de retry/DLQ",
+          "validacao": "Mensagem malformada ou que falha repetidamente vai para a DLQ",
+          "contextos": [
+            "Backend-mensagens"
+          ],
+          "dev": true,
+          "hlg": false
+        },
+        {
+          "tipo": "Teste de carga",
+          "validacao": "Fila absorve pico de 2x o volume médio sem atraso relevante",
+          "contextos": [
+            "Backend-mensagens rabbitmq"
+          ],
+          "dev": false,
+          "hlg": true
+        },
+        {
+          "tipo": "Teste de rebalanceamento",
+          "validacao": "Consumer group rebalanceia sem perda ou duplicação de mensagem",
+          "contextos": [
+            "Backend-mensagens kafka"
+          ],
+          "dev": false,
+          "hlg": true
+        },
+        {
+          "tipo": "Teste de migração",
+          "validacao": "Migration roda limpo numa base com dados existentes",
+          "contextos": [
+            "Backend-dados"
+          ],
+          "dev": true,
+          "hlg": true
+        },
+        {
+          "tipo": "Teste de timeout",
+          "validacao": "Chamada expira dentro do limite configurado e é tratada",
+          "contextos": [
+            "Backend-chamadas http"
+          ],
+          "dev": true,
+          "hlg": false
+        },
+        {
+          "tipo": "Teste de contrato",
+          "validacao": "Request/response batem com o contrato da API externa",
+          "contextos": [
+            "Backend-chamadas http"
+          ],
+          "dev": true,
+          "hlg": true
+        },
+        {
+          "tipo": "Teste funcional do processo",
+          "validacao": "Processo inicializado via chamada HTTP percorre os cenários esperados; erro/falha sempre cai na tarefa manual, se aplicável",
+          "contextos": [
+            "Backend-orquestracao"
+          ],
+          "dev": true,
+          "hlg": false
+        },
+        {
+          "tipo": "Teste de compensação",
+          "validacao": "Rollback funciona quando uma etapa do processo falha",
+          "contextos": [
+            "Backend-orquestracao"
+          ],
+          "dev": false,
+          "hlg": true
+        },
+        {
+          "tipo": "Teste de regressão de regras",
+          "validacao": "Casos conhecidos continuam decidindo da mesma forma após a mudança",
+          "contextos": [
+            "Backend-regras"
+          ],
+          "dev": true,
+          "hlg": true
+        },
+        {
+          "tipo": "Teste de cache miss/hit",
+          "validacao": "Valor é recalculado corretamente em cache miss e servido do cache em hit",
+          "contextos": [
+            "Backend-cache"
+          ],
+          "dev": true,
+          "hlg": false
+        },
+        {
+          "tipo": "Teste de upload/download",
+          "validacao": "Objeto enviado é recuperável com o mesmo conteúdo e metadados",
+          "contextos": [
+            "Backend-storage"
+          ],
+          "dev": true,
+          "hlg": true
+        },
+        {
+          "tipo": "Teste de restart",
+          "validacao": "Job retomado após falha no meio continua do checkpoint, sem duplicar itens já processados",
+          "contextos": [
+            "Backend-processamento em lote"
+          ],
+          "dev": false,
+          "hlg": true
+        },
+        {
+          "tipo": "Teste unitário",
+          "validacao": "Regras de negócio e caminhos de erro do componente cobertos, sem depender de infraestrutura",
+          "contextos": [],
+          "dev": true,
+          "hlg": false
+        },
+        {
+          "tipo": "Teste de subida (smoke)",
+          "validacao": "Componente sobe com a configuração do ambiente e responde ao health check",
+          "contextos": [],
+          "dev": true,
+          "hlg": true
+        },
+        {
+          "tipo": "Teste de roteamento",
+          "validacao": "Mensagem publicada com cada routing key chega às filas ligadas por binding, e só a elas",
+          "contextos": [
+            "Backend-topologia-mensageria"
+          ],
+          "dev": true,
+          "hlg": true
+        },
+        {
+          "tipo": "Teste de mensagem não roteada",
+          "validacao": "Mensagem sem binding correspondente cai na alternate exchange/DLX em vez de ser descartada em silêncio",
+          "contextos": [
+            "Backend-topologia-mensageria"
+          ],
+          "dev": true,
+          "hlg": false
+        },
+        {
+          "tipo": "Teste de reexecução",
+          "validacao": "Rodar o job duas vezes sobre a mesma janela não duplica efeito (idempotência)",
+          "contextos": [
+            "Backend-agendamento"
+          ],
+          "dev": true,
+          "hlg": true
+        },
+        {
+          "tipo": "Teste de sobreposição",
+          "validacao": "Nova execução disparada com a anterior ainda rodando não processa em paralelo o mesmo lote",
+          "contextos": [
+            "Backend-agendamento"
+          ],
+          "dev": true,
+          "hlg": false
+        }
       ],
       "volumetria": {
-        "contextos": ["Backend-chamadas http", "Backend-mensagens", "Backend-orquestracao", "Backend-processamento em lote"]
+        "contextos": [
+          "Backend-chamadas http",
+          "Backend-mensagens",
+          "Backend-orquestracao",
+          "Backend-processamento em lote",
+          "Backend-agendamento"
+        ]
       }
     },
     "Mobile": {
       "checklistTecnico": [
-        { "texto": "Definir o que é persistido no dispositivo e como (nada sensível em texto puro)", "contextos": [] },
-        { "texto": "Definir comportamento sem rede (offline), não só o caminho feliz online", "contextos": [] },
-
-        { "texto": "Definir permissões pedidas em runtime e o fluxo quando o usuário negar", "contextos": ["Mobile-android"] },
-        { "texto": "Definir a versão mínima de SDK/API level suportada e como validar a compatibilidade", "contextos": ["Mobile-android"] },
-
-        { "texto": "Definir permissões pedidas em runtime e o fluxo quando o usuário negar", "contextos": ["Mobile-ios"] },
-        { "texto": "Definir a versão mínima de iOS suportada e como validar a compatibilidade", "contextos": ["Mobile-ios"] },
-        { "texto": "Revisar a mudança contra as App Store Review Guidelines relevantes", "contextos": ["Mobile-ios"] }
+        {
+          "texto": "Definir o que é persistido no dispositivo e como (nada sensível em texto puro)",
+          "contextos": []
+        },
+        {
+          "texto": "Definir comportamento sem rede (offline), não só o caminho feliz online",
+          "contextos": []
+        },
+        {
+          "texto": "Definir permissões pedidas em runtime e o fluxo quando o usuário negar",
+          "contextos": [
+            "Mobile-android"
+          ]
+        },
+        {
+          "texto": "Definir a versão mínima de SDK/API level suportada e como validar a compatibilidade",
+          "contextos": [
+            "Mobile-android"
+          ]
+        },
+        {
+          "texto": "Definir permissões pedidas em runtime e o fluxo quando o usuário negar",
+          "contextos": [
+            "Mobile-ios"
+          ]
+        },
+        {
+          "texto": "Definir a versão mínima de iOS suportada e como validar a compatibilidade",
+          "contextos": [
+            "Mobile-ios"
+          ]
+        },
+        {
+          "texto": "Revisar a mudança contra as App Store Review Guidelines relevantes",
+          "contextos": [
+            "Mobile-ios"
+          ]
+        }
       ],
       "checklistProcesso": [
-        { "texto": "Reservar dispositivo físico para o teste, ou confirmar que emulador/simulador basta", "contextos": [] }
+        {
+          "texto": "Reservar dispositivo físico para o teste, ou confirmar que emulador/simulador basta",
+          "contextos": []
+        }
       ],
       "testes": [
-        { "tipo": "Teste em dispositivo real", "validacao": "Fluxo principal funciona em ao menos um dispositivo físico Android, não só emulador", "contextos": ["Mobile-android"], "dev": true, "hlg": false },
-        { "tipo": "Teste em dispositivo real", "validacao": "Fluxo principal funciona em ao menos um dispositivo físico iOS, não só simulador", "contextos": ["Mobile-ios"], "dev": true, "hlg": false }
+        {
+          "tipo": "Teste em dispositivo real",
+          "validacao": "Fluxo principal funciona em ao menos um dispositivo físico Android, não só emulador",
+          "contextos": [
+            "Mobile-android"
+          ],
+          "dev": true,
+          "hlg": false
+        },
+        {
+          "tipo": "Teste em dispositivo real",
+          "validacao": "Fluxo principal funciona em ao menos um dispositivo físico iOS, não só simulador",
+          "contextos": [
+            "Mobile-ios"
+          ],
+          "dev": true,
+          "hlg": false
+        }
       ]
     }
   }
