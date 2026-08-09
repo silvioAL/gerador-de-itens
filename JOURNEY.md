@@ -1502,3 +1502,32 @@ Proibir sozinho não resolveria (o modelo precisa de um lugar PARA ONDE ir), ent
 O teste verifica o prompt, não a saída do modelo — é o que dá pra afirmar deterministicamente. Se a persona continuar saindo errada com o prompt certo, o problema é do modelo local, e aí a alavanca é outra (gateway, SPEC-25 Fase 2).
 
 Regressão: engine 190, llm 47, cli 80, web 264 (+2).
+
+## 100. Três SPECs de uma vez — e a pesquisa que matou a ideia mais bonita
+
+Rodada de planejamento, sem código: gestão de acessos, modelo por agente, e conversa com áudio/imagem. O padrão da SPEC-23 vale aqui — documento primeiro, implementação depois, faseada.
+
+**A pergunta que precisou ser feita.** A gestão de acessos só faz sentido onde existe login, e o produto tem dois modos: o CLI local-first (sem autenticação nenhuma, por decisão da SPEC-17) e o hospedado. Perguntar foi barato e mudou tudo: **só no hospedado**. Permissão em arquivo local seria convenção, não segurança — qualquer pessoa edita o JSON —, e um produto que finge controlar o que não controla é pior que um que assume não controlar.
+
+**O achado que reorientou a segunda SPEC.** O usuário sugeriu, com a ressalva de não ter certeza, autenticação externa: *"abre no navegador, usuário autentica na página do modelo e segue usando"* — e pediu para eu pesquisar. Pesquisei, e o caminho **não existe**:
+
+- A **Anthropic** atualizou em fevereiro de 2026 a política de credenciais: OAuth (planos Free/Pro/Max) é **exclusivo do Claude Code e do claude.ai**, e usar esses tokens em ferramenta de terceiro **viola os Termos**. Para terceiro, só API key do Console.
+- A **OpenAI** não tem `/oauth/authorize` na API de plataforma; o "Sign in with ChatGPT" é identidade, e só dentro do Codex.
+
+Ou seja, a ideia mais elegante era também a única proibida — e implementá-la colocaria o usuário em violação de contrato com o provedor dele. Vale dizer o que isso ensina sobre a pesquisa: se eu tivesse "seguido o pedido" sem verificar, teria desenhado uma feature ilegal com a melhor das intenções.
+
+O que sobra é chave — e aí a intuição do usuário sobre vault estava certa, só que no lugar exato. Infisical e Vault, como o projeto já os usa, guardam segredo **de infraestrutura**; segredo **de usuário** pede outra ferramenta: **envelope encryption**, onde o vault guarda a chave não-extraível e o *ciphertext* mora na nossa tabela. O **Infisical KMS** faz isso (AES-GCM, chaves não extraíveis, CMEK — a organização pode usar a própria chave no cloud dela), e já está no repositório desde a SPEC-12.
+
+**A separação que evita um redesenho na terceira.** "Áudio e imagem" parece um problema só — "precisamos de um modelo multimodal". Não é. Áudio é **entrada de texto com outro teclado**: transcreve, e o texto entra na conversa como se tivesse sido digitado — nada no `ProvedorIa`, no prompt ou na esteira muda. Imagem é entrada que **só o modelo entende**, e aí o provedor muda mesmo. Separar permite entregar a metade mais usada (falar em vez de digitar) sem esperar nada da visão.
+
+E a resposta à dúvida direta do usuário — *"não sei se nosso modelo atual faz isso"* — é **não, e nem o binding**: a documentação do `node-llama-cpp` não menciona multimodal. O llama.cpp por baixo tem (mmproj, `llama-mtmd-cli`), mas chegar lá exigiria subprocesso e mais 2 GB. Enquanto o caminho do gateway (SPEC-25 Fase 2) já aceita imagem no próprio `messages`, com uma mudança pequena. Fase 2 barata, Fase 3 condicional — só se aparecer necessidade de ver imagem **sem** rede.
+
+Uma decisão de UI atravessa as três: **a interface tem que dizer a verdade sobre o que o sistema consegue**. Provedor sem visão não mostra botão de anexar imagem; recurso sem permissão não mostra botão de salvar. É a mesma lição do pip "sem trabalho" da §97, agora aplicada antes de o problema existir.
+
+Entregue: `SPEC-28-gestao-de-acessos.md`, `SPEC-29-modelos-por-agente-e-credenciais.md`, `SPEC-30-conversa-multimodal.md`. Nenhuma linha de código — a implementação começa quando o usuário escolher por onde.
+
+**Adendo (mesma rodada, lembrete do usuário): "não esqueça de prever onde fica o RAG em tudo isso."** Estava mesmo faltando, e o RAG atravessa as três — em cada uma pelo ângulo mais perigoso:
+
+- **Acessos**: o corpus de retrospectivas é o material mais sensível que o produto vai guardar (nome de pessoa, conflito, decisão que deu errado). Ganha recursos próprios, com `ingerir` separado de `ler` — porque a regra da SPEC-23 de *citar o trecho de origem* significa que quem vê a sugestão vê o trecho. E a regra que impede o vazamento clássico de RAG multi-tenant: **o filtro de escopo vem antes da busca vetorial, nunca depois**. O teste que importa é o caso em que a busca "acerta" e o produto erra — o trecho do time B é o mais similar à pergunta do time A e ainda assim não pode aparecer.
+- **Credenciais**: o RAG chama modelo em dois momentos com riscos assimétricos. Na consulta sai a pergunta; na **ingestão sai o corpus inteiro**, todo chunk, toda reindexação. Um seletor único de "provedor" trataria as duas como a mesma escolha. Decisão: **embedding local por padrão** — e o argumento que a fecha é que a opção segura já está pronta (o modelo de embedding está no registro desde a SPEC-23 Fase 0). Credencial ganha `usoPermitido`, e a pessoal não indexa corpus da organização: misturaria custo e custódia.
+- **Multimodal**: retrospectiva **é uma reunião** — o material só existe hoje se alguém escrever depois, que é o motivo de nunca virar checklist. A transcrição da Fase 1 é a fonte natural do corpus, de graça. Com uma trava: **ingerir é ato deliberado**, nunca automático, senão a ferramenta vira arquivo permanente de conversa de time.
