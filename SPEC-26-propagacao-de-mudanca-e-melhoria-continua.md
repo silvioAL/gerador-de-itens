@@ -129,3 +129,25 @@ Cada bloco contra o `gerador open` real, disciplina de sempre: **Bloco 1** = mud
 UI (`ReviewScreen`): contador "⚠ N campos desatualizados" no header, selo "⚠ desatualizado" no card do item, e o motivo no próprio campo ("escrito antes de mudar: srv-checkout.endpoints").
 
 **Validação real**: cenário de integração interna, resposta escrita e confirmada à mão (sem aviso), volta ao canvas, alteração de `endpoints` no `srv-checkout`, volta à revisão — header com "⚠ 1 campo desatualizado", selo no item 01 e o motivo apontando o campo exato.
+
+## 8. Bloco 4a — implementado
+
+`packages/engine/src/revisao/checagens.ts`: `revisarQuebra(atividades, diagrama, config, regras?, respostas?)` → `Achado[]`, e `resumirAchados` pro cabeçalho.
+
+**A escolha de desenho**: o que dá pra computar não deve depender de modelo. Um item sem ciclo de teste aplicável, uma dependência apontando pra item inexistente, um campo obrigatório em branco — nada disso é opinião, é conta. Deixar isso a cargo do LLM troca certeza por probabilidade de graça (e, no modelo local, por minutos de espera).
+
+As cinco checagens desta camada:
+
+| regra | severidade | por que existe |
+|---|---|---|
+| `dependencia-orfa` | erro | apagar um nó remove o item dele, mas quem dependia continua apontando — e some no meio da lista |
+| `campo-obrigatorio-vazio` | erro | o semáforo já cobre no canvas; aqui aparece do lado de quem vai escrever o item. `specNA` é saída legítima, não lacuna |
+| `volumetria-sem-valor` | aviso | a presença do placeholder já é a regra; o que falta é o número |
+| `sem-ciclo-de-teste` | aviso | o buraco é da CONFIGURAÇÃO, e passa despercebido justamente por não gerar nada na tela |
+| `item-grande` | aviso | regra que existe no template do usuário e hoje depende do modelo obedecer |
+
+Sem `regras` configuradas, só as checagens estruturais rodam — não se inventa exigência que o time não tem.
+
+UI: botão no header com a contagem (`✕ N erro(s) · ⚠ N aviso(s)`), painel com cada achado clicável levando ao item. **O revisor não escreve nada.** Quebra saudável não mostra botão nenhum — revisor que sempre fala vira ruído.
+
+**Validação real** (cenário "Fluxo completo: aprovação de crédito"): 14 erros e 18 avisos, todos verdadeiros — campos obrigatórios em branco (`Plano de migração`, `Estratégia para instâncias em voo`), volumetria exigida sem valores e uma tech sem ciclo de teste configurado.

@@ -6,7 +6,10 @@ import {
   insumosDivergentes,
   insumosDoItem,
   montarFichaItem,
+  resumirAchados,
+  revisarQuebra,
   type Atividade,
+  type Achado,
   type InsumoDivergente,
   type Diagrama,
   type DiagramaConfig,
@@ -330,6 +333,20 @@ export function ReviewScreen({
     [desatualizadosPorItem]
   );
 
+  // SPEC-26 Bloco 4a — o revisor determinístico. Roda a cada render (é conta
+  // pura sobre dados já em memória) e NUNCA escreve nada: aponta.
+  const achados = useMemo(
+    () => revisarQuebra(resultado.atividades, diagrama, config, regras, respostasItens),
+    [resultado.atividades, diagrama, config, regras, respostasItens]
+  );
+  const resumo = useMemo(() => resumirAchados(achados), [achados]);
+  const achadosPorItem = useMemo(() => {
+    const mapa = new Map<string, Achado[]>();
+    for (const a of achados) mapa.set(a.atividadeChave, [...(mapa.get(a.atividadeChave) ?? []), a]);
+    return mapa;
+  }, [achados]);
+  const [mostrarAchados, setMostrarAchados] = useState(false);
+
   // SPEC-24 Fase C: fila de trabalho da esteira — um item por ATIVIDADE,
   // com os placeholders já separados por papel (`ItemFilaEsteira`).
   // `apenasPendentes` false é usado por "Gerar de novo" (regenera tudo,
@@ -586,6 +603,18 @@ export function ReviewScreen({
             ⚠ {totalDesatualizados} {totalDesatualizados === 1 ? "campo desatualizado" : "campos desatualizados"}
           </span>
         )}
+        {achados.length > 0 && (
+          <button
+            data-testid="abrir-revisor"
+            onClick={() => setMostrarAchados((v) => !v)}
+            style={{ ...botaoEstilo, borderColor: resumo.erros > 0 ? "var(--vermelho)" : "var(--borda-forte)" }}
+            title="Checagens determinísticas — o revisor aponta, não corrige"
+          >
+            {resumo.erros > 0 ? `✕ ${resumo.erros} erro(s)` : ""}
+            {resumo.erros > 0 && resumo.avisos > 0 ? " · " : ""}
+            {resumo.avisos > 0 ? `⚠ ${resumo.avisos} aviso(s)` : ""}
+          </button>
+        )}
         {esteira.rodando ? (
           <button onClick={esteira.pausado ? esteira.continuar : esteira.pausar} style={botaoEstilo}>
             {esteira.pausado ? "▶ Continuar" : "⏸ Pausar"}
@@ -668,6 +697,23 @@ export function ReviewScreen({
           </div>
           <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
           <section data-tour="review-table" className="review-lista" style={listaEstilo}>
+            {mostrarAchados && achados.length > 0 && (
+              // SPEC-26 Bloco 4a: cada achado leva ao item. O revisor aponta
+              // — não escreve, não corrige, não sugere texto.
+              <div style={avisoEstilo} data-testid="painel-achados">
+                <strong style={{ fontSize: 12 }}>Revisão automática (sem IA)</strong>
+                <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 12, lineHeight: 1.7 }}>
+                  {achados.map((achado, i) => (
+                    <li key={i} style={{ color: achado.severidade === "erro" ? "var(--vermelho)" : "var(--amarelo)" }}>
+                      <button style={linkEstilo} onClick={() => irParaChave(achado.atividadeChave)}>
+                        {resultado.atividades.find((a) => a.chave === achado.atividadeChave)?.rotulo ?? achado.atividadeChave}
+                      </button>{" "}
+                      <span style={{ color: "var(--texto-2)" }}>{achado.mensagem}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {(resultado.ciclos.length > 0 || resultado.conflitos.length > 0) && (
               <div style={avisoEstilo}>
                 <strong style={{ fontSize: 12 }}>

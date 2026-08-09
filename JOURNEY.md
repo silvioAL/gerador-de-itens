@@ -1322,3 +1322,20 @@ Ausência de carimbo não acusa nada. Quem respondeu antes disto existir não te
 Validação real, o ciclo inteiro: responder um campo à mão (nenhum aviso), voltar ao canvas, mudar `endpoints` do `srv-checkout`, voltar à revisão — "⚠ 1 campo desatualizado" no header, selo no item e, no campo, "escrito antes de mudar: srv-checkout.endpoints".
 
 Regressão: engine 154 (+9), web 218 (+4).
+
+## 91. O revisor que não usa IA — porque o que dá pra contar não se pergunta
+
+Bloco 4a da SPEC-26 ataca o "não esquecer coisas" pela metade barata: **o que dá pra computar não deve depender de modelo.**
+
+Item sem ciclo de teste aplicável, dependência apontando pra item que não existe mais, campo obrigatório em branco, volumetria exigida e vazia, item tamanho G não quebrado — nada disso é opinião. Perguntar isso ao LLM troca certeza por probabilidade de graça, e no modelo local troca também por minutos de espera. A camada semântica (critérios que não cobrem um erro do contrato, história que contradiz o épico) é outra coisa e vem depois, porque ali o modelo é a única ferramenta possível.
+
+Duas decisões de comportamento importam tanto quanto as regras:
+
+- **Sem `regras` configuradas, só as checagens estruturais rodam.** Não se inventa exigência que o time não tem — um projeto sem tabela de testes não deveria ser acusado de não ter ciclo de teste.
+- **Quebra saudável não mostra botão nenhum.** Revisor que sempre fala vira ruído, e ruído é o mecanismo pelo qual avisos param de ser lidos.
+
+E o revisor **aponta, não escreve**. Cada achado é um link pro item; nenhuma correção automática, nenhum texto sugerido. É a mesma disciplina do "nada sugerido conta até ser confirmado", aplicada a diagnóstico.
+
+Validação real no cenário de crédito: 14 erros e 18 avisos, todos verdadeiros — `Plano de migração` em branco em três nós diferentes, `Estratégia para instâncias em voo` vazia no processo Camunda, volumetria exigida sem números, e uma tech sem nenhum ciclo de teste que a cubra. Nenhum desses aparecia em lugar algum antes.
+
+Regressão: engine 163 (+9), web 220 (+2).
