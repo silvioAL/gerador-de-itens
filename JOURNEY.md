@@ -1252,3 +1252,19 @@ Três coisas que este episódio deixa registradas:
 - **A tentativa de isolar o papel PO não concluiu**: passou de 1800s sem resposta e expirou.
 
 Sobra a hipótese do lado do modelo (resposta incompleta para aquele item apesar da grammar). Em vez de chutar, apliquei a mesma lição do bug anterior: **perda parcial agora avisa**. Quando um lote volta com dados mas faltando campos de algum item, o hook loga papel, item e chaves ausentes. Na próxima execução real a resposta vem de graça, em vez de sair de novo de um pip apagado num screenshot.
+
+## 87. Configurar com apoio de IA: a sugestão preenche o formulário, nunca o arquivo
+
+Pedido do usuário no meio da rodada: *"lembro que haviam outras demandas como poder ajustar as configurações com apoio de IA... foque nesse tipo de task, que já está mapeada no nosso roadmap"*. É o fluxo 2 da SPEC-23, que estava como Fase 3 do roteiro — antecipado.
+
+O desenho inteiro cabe numa frase: **a IA propõe o objeto, o formulário que já existe recebe, o usuário salva pelo caminho de sempre.** A rota `/ia/sugerir-config` devolve um objeto no schema do alvo e nada mais; não existe caminho em que ela escreva em `config/`.
+
+Isso não é cautela genérica — é a lição do §41 aplicada de propósito. A skill do Claude Code foi removida naquela rodada porque tinha virado uma ferramenta paralela, produzindo material fora do pipeline real. Assistência de configuração que gravasse direto repetiria exatamente esse erro: dois caminhos de escrita, um deles sem a validação do outro.
+
+Os alvos ficam numa **tabela declarativa** no servidor (`ALVOS_SUGESTAO_CONFIG`): descrição, schema GBNF e as regras que um modelo pequeno erra sem instrução explícita — `key` em camelCase, `opcoes` só faz sentido em `select`, o que é um preâmbulo. Adicionar alvo é acrescentar uma entrada; o roteador e o componente de UI não mudam. Já rendeu: o alvo `campo-aresta` nasceu com o enum sem `"lista"`, porque `CampoAresta` não aceita esse tipo — o schema impede o modelo de propor algo que o formulário rejeitaria, em vez de deixar a UI consertar depois (a guarda na UI ficou mesmo assim, para servidor mais antigo).
+
+Dos três alvos, o que mais vale é `papel`: o preâmbulo do agente é o que separa uma resposta de três linhas de uma especificação de verdade — e é a parte mais chata de escrever à mão. Descrever "um agente de segurança que cobre LGPD e dados sensíveis" e receber o papel montado, pronto pra revisar, é o caso de uso inteiro.
+
+Um detalhe de honestidade na UI: o JSON parcial aparece enquanto o modelo escreve. No modelo local a chamada leva minutos, e sem isso a espera parece travamento — o mesmo achado que já tinha aparecido na esteira ("fica só o ícone de gerando").
+
+Regressão: engine 145, llm 18, cli 57 (+3), web 205 (+4).

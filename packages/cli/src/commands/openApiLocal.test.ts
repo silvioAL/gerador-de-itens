@@ -43,19 +43,30 @@ const completarMock = vi.fn(async (_prompt: string, opcoes?: { onTexto?: (p: str
 // por item do lote) — o mock espelha os dois níveis e emite o JSON em dois
 // pedaços via onTexto (como o motor real faria token a token); o corpo
 // acumulado é o que o cliente parseia.
+interface SchemaFake {
+  type?: string;
+  enum?: unknown[];
+  items?: SchemaFake;
+  properties?: Record<string, SchemaFake>;
+}
+/** Um valor plausível pra cada forma de schema — o mock precisa respeitar o
+ * schema tanto no aninhado do pipeline quanto no PLANO de /ia/sugerir-config
+ * (SPEC-23 Fluxo 2), que tem boolean, enum e array de string. */
+function valorFake(chave: string, sub: SchemaFake, prefixo: string): unknown {
+  if (sub.properties) {
+    return Object.fromEntries(
+      Object.entries(sub.properties).map(([k, s]) => [k, valorFake(k, s, `${prefixo}${chave}/`)])
+    );
+  }
+  if (sub.enum) return sub.enum[0];
+  if (sub.type === "boolean") return false;
+  if (sub.type === "array") return [`item gerado pra ${chave}`];
+  return `resposta gerada pra ${prefixo}${chave}`;
+}
 const completarComSchemaMock = vi.fn(
-  async (
-    _prompt: string,
-    schema: { properties?: Record<string, { properties?: Record<string, unknown> }> },
-    opcoes?: { onTexto?: (pedaco: string) => void }
-  ) => {
+  async (_prompt: string, schema: SchemaFake, opcoes?: { onTexto?: (pedaco: string) => void }) => {
     const resultado = Object.fromEntries(
-      Object.entries(schema.properties ?? {}).map(([chaveItem, sub]) => [
-        chaveItem,
-        Object.fromEntries(
-          Object.keys(sub.properties ?? {}).map((chave) => [chave, `resposta gerada pra ${chaveItem}/${chave}`])
-        ),
-      ])
+      Object.entries(schema.properties ?? {}).map(([chave, sub]) => [chave, valorFake(chave, sub, "")])
     );
     const texto = JSON.stringify(resultado);
     opcoes?.onTexto?.(texto.slice(0, 10));
@@ -64,6 +75,13 @@ const completarComSchemaMock = vi.fn(
     return resultado;
   }
 );
+/** Último prompt/schema entregues ao provedor — os testes checam os dois o
+ * tempo todo, e ler direto de `mock.calls.at(-1)` exigia um cast por chamada. */
+function ultimaChamadaComSchema(): { prompt: string; schema: SchemaFake } {
+  const chamada = completarComSchemaMock.mock.calls.at(-1);
+  if (!chamada) throw new Error("completarComSchema não foi chamado");
+  return { prompt: chamada[0], schema: chamada[1] };
+}
 // SPEC-25 Fase 0: as rotas falam com `ProvedorIa`, não mais com o motor —
 // o mock acompanha a fronteira nova. `criarProvedorPorId` recebe o id vindo
 // de `config/ia.json`, o que também permite asserir a troca de modelo.
@@ -324,19 +342,80 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     });
     expect(completarComSchemaMock).toHaveBeenCalledTimes(1);
 
-    const [prompt] = completarComSchemaMock.mock.calls.at(-1) as [string];
+    const { prompt: prompt } = ultimaChamadaComSchema();
     expect(prompt).toContain("Product Owner");
     expect(prompt).toContain("Épico: reduzir tempo de aprovação de crédito de 3 dias pra 1 hora.");
     expect(prompt).toContain("srv-checkout publica em fila-pedidos");
     expect(prompt).toContain("criar fila-pedidos");
     expect(prompt).toContain("LOTE de 2 item(ns)");
 
-    const [, schema] = completarComSchemaMock.mock.calls.at(-1) as [
-      string,
-      { properties: Record<string, { properties: Record<string, unknown> }> },
-    ];
-    expect(Object.keys(schema.properties)).toEqual(["n1::setup", "n2::criacao"]);
-    expect(Object.keys(schema.properties["n1::setup"].properties)).toEqual(["_historiaUsuario", "_criteriosAceite"]);
+    const { schema } = ultimaChamadaComSchema();
+    expect(Object.keys(schema.properties ?? {})).toEqual(["n1::setup", "n2::criacao"]);
+    expect(Object.keys(schema.properties?.["n1::setup"].properties ?? {})).toEqual([
+      "_historiaUsuario",
+      "_criteriosAceite",
+    ]);
+  });
+
+  it("POST /ia/sugerir-config devolve um objeto no schema do alvo, com o pedido e o contexto no prompt (SPEC-23 Fluxo 2)", async () => {
+    verificarStatusMock.mockResolvedValue({
+      chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
+    });
+
+    const resposta = await fetch(`${base}/ia/sugerir-config`, {
+      method: "POST",
+      body: JSON.stringify({
+        alvo: "campo-no",
+        instrucao: "quero registrar a política de retenção da fila",
+        contexto: "Tipo de nó: Fila Rabbit. Time: pagamentos.",
+      }),
+    });
+    expect(resposta.status).toBe(200);
+    // Mesmo contrato do pipeline: corpo é o texto cru do JSON restrito.
+    const corpo = JSON.parse(await resposta.text());
+    expect(Object.keys(corpo).sort()).toEqual(
+      ["ajuda", "key", "label", "opcoes", "permiteNA", "required", "type"].sort()
+    );
+    // O enum do schema é respeitado — a UI depende disso pro select de tipo.
+    expect(["text", "textarea", "number", "boolean", "select", "lista"]).toContain(corpo.type);
+    expect(Array.isArray(corpo.opcoes)).toBe(true);
+
+    const { prompt: prompt } = ultimaChamadaComSchema();
+    expect(prompt).toContain("quero registrar a política de retenção da fila");
+    expect(prompt).toContain("Tipo de nó: Fila Rabbit. Time: pagamentos.");
+    expect(prompt).toContain("camelCase");
+  });
+
+  it("POST /ia/sugerir-config: alvo desconhecido é 400 (o schema É o contrato com o formulário) e instrução vazia também", async () => {
+    verificarStatusMock.mockResolvedValue({
+      chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
+    });
+
+    const alvoRuim = await fetch(`${base}/ia/sugerir-config`, {
+      method: "POST",
+      body: JSON.stringify({ alvo: "inventado", instrucao: "qualquer coisa" }),
+    });
+    expect(alvoRuim.status).toBe(400);
+    expect((await alvoRuim.json()).erro).toContain("alvo desconhecido");
+
+    const semInstrucao = await fetch(`${base}/ia/sugerir-config`, {
+      method: "POST",
+      body: JSON.stringify({ alvo: "papel", instrucao: "   " }),
+    });
+    expect(semInstrucao.status).toBe(400);
+    // Nenhuma das duas chega a carregar o modelo.
+    expect(completarComSchemaMock).not.toHaveBeenCalled();
+  });
+
+  it("POST /ia/sugerir-config sem modelo instalado devolve 503, igual às outras rotas de IA", async () => {
+    const resposta = await fetch(`${base}/ia/sugerir-config`, {
+      method: "POST",
+      body: JSON.stringify({ alvo: "campo-no", instrucao: "campo novo" }),
+    });
+    expect(resposta.status).toBe(503);
+    expect(criarProvedorPorIdMock).not.toHaveBeenCalled();
   });
 
   it("POST /ia/pipeline/arquiteto usa o preâmbulo do Arquiteto — prompt diferente do PO pro mesmo item (SPEC-24 Fase B)", async () => {
@@ -359,7 +438,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       }),
     });
 
-    const [prompt] = completarComSchemaMock.mock.calls.at(-1) as [string];
+    const { prompt: prompt } = ultimaChamadaComSchema();
     expect(prompt).toContain("Arquiteto");
     expect(prompt).not.toContain("Product Owner");
   });
@@ -387,7 +466,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       }),
     });
 
-    const [prompt] = completarComSchemaMock.mock.calls.at(-1) as [string];
+    const { prompt: prompt } = ultimaChamadaComSchema();
     expect(prompt).toContain("O que os papéis anteriores já definiram");
     expect(prompt).toContain("História de usuário: Como analista de crédito, quero consultar o score");
   });
@@ -403,7 +482,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
         itens: [{ chave: "n1::setup", rotulo: "x", contextoNo: "", placeholders: [{ chave: "_historiaUsuario", tech: "", rotulo: "História" }] }],
       }),
     });
-    const [prompt] = completarComSchemaMock.mock.calls.at(-1) as [string];
+    const { prompt: prompt } = ultimaChamadaComSchema();
     expect(prompt).toContain("lista NUMERADA de 3 a 7 critérios");
     expect(prompt).toContain("Como <persona>, quero <capacidade>, para <benefício>");
   });
@@ -429,12 +508,12 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     };
 
     await fetch(`${base}/ia/pipeline/po`, { method: "POST", body: JSON.stringify(corpo) });
-    const [promptPo] = completarComSchemaMock.mock.calls.at(-1) as [string];
+    const { prompt: promptPo } = ultimaChamadaComSchema();
     expect(promptPo).toContain("Você é a PO sênior do squad de crédito.");
     expect(promptPo).not.toContain("Product Owner");
 
     await fetch(`${base}/ia/pipeline/esp-kafka`, { method: "POST", body: JSON.stringify(corpo) });
-    const [promptKafka] = completarComSchemaMock.mock.calls.at(-1) as [string];
+    const { prompt: promptKafka } = ultimaChamadaComSchema();
     // Sem preâmbulo próprio, herda o padrão do grupo "especialista".
     expect(promptKafka).toContain("Especialista técnico");
   });

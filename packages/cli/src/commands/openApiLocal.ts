@@ -660,6 +660,9 @@ interface AlvoSugestaoConfig {
 }
 
 const TIPOS_CAMPO = ["text", "textarea", "number", "boolean", "select", "lista"] as const;
+/** Conexão não tem campo do tipo "lista" (`CampoAresta` não aceita) — o enum
+ * do schema já impede o modelo de propor um tipo que o formulário rejeitaria. */
+const TIPOS_CAMPO_ARESTA = TIPOS_CAMPO.filter((t) => t !== "lista");
 
 const ALVOS_SUGESTAO_CONFIG: Record<string, AlvoSugestaoConfig> = {
   "campo-no": {
@@ -691,7 +694,7 @@ const ALVOS_SUGESTAO_CONFIG: Record<string, AlvoSugestaoConfig> = {
       properties: {
         key: { type: "string" },
         label: { type: "string" },
-        type: { enum: [...TIPOS_CAMPO] },
+        type: { enum: [...TIPOS_CAMPO_ARESTA] },
         ajuda: { type: "string" },
         opcoes: { type: "array", items: { type: "string" } },
         required: { type: "boolean" },

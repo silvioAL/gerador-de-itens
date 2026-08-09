@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import type { DiagramaConfig, FieldSpec } from "@gerador/engine";
-import type { CampoNo, DadosCampoNo, ItemSpecCampo } from "../api/client";
+import type { CampoNo, DadosCampoNo, ItemSpecCampo, SugestaoCampo } from "../api/client";
+import { SugerirComIa } from "./SugerirComIa";
 
 export interface CamposNoTabProps {
   config: DiagramaConfig;
@@ -161,6 +162,26 @@ export function CamposNoTab({ config, camposNo, timeAtivo, onCriar, onAtualizar,
     formRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }
 
+  /** SPEC-23 Fluxo 2 — a sugestão da IA vira RASCUNHO no formulário, com as
+   * mesmas regras de um campo digitado à mão: o tipo de nó continua sendo o
+   * que estava selecionado (a IA não escolhe onde o campo vai morar) e a key
+   * é tratada como já editada, pra não ser reescrita pelo gerador automático
+   * assim que alguém ajustar o rótulo. */
+  function aplicarSugestao(sugestao: SugestaoCampo) {
+    const base = formulario ?? formularioVazio(tiposDeNo[0] ?? "");
+    setFormulario({
+      ...base,
+      key: sugestao.key || base.key,
+      keyEditadaManualmente: true,
+      label: sugestao.label || base.label,
+      type: sugestao.type,
+      required: sugestao.required,
+      ajuda: sugestao.ajuda ?? "",
+      opcoes: sugestao.type === "select" ? (sugestao.opcoes ?? []).join(", ") : base.opcoes,
+    });
+    formRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  }
+
   async function salvar() {
     if (!formulario) return;
     if (!formulario.tipoNo || !formulario.key.trim() || !formulario.label.trim()) return;
@@ -211,6 +232,13 @@ export function CamposNoTab({ config, camposNo, timeAtivo, onCriar, onAtualizar,
         obrigatório) que passa a valer no lugar do original, só aqui. Um campo "global" muda o original pra todo
         mundo; "+ Adicionar campo" cria um campo novo, que não existia antes.
       </p>
+
+      <SugerirComIa<SugestaoCampo>
+        alvo="campo-no"
+        contexto={`Tipo de nó: ${config.nodeTypes[formulario?.tipoNo ?? tiposDeNo[0]]?.label ?? formulario?.tipoNo ?? tiposDeNo[0]}. Time: ${timeAtivo}.`}
+        exemplo="ex.: campo pra registrar a política de retenção da fila"
+        onSugestao={aplicarSugestao}
+      />
 
       <div ref={formRef}>
         {formulario ? (
