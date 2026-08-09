@@ -1331,7 +1331,7 @@ describe("ReviewScreen — revisor determinístico (SPEC-26 Bloco 4a)", () => {
     const resultado = resultadoFixture01();
     // Simula o que acontece de verdade: um nó apagado deixa quem dependia dele
     // apontando pro vazio.
-    resultado.atividades[0].dependencias = [{ type: "depende", alvoChave: "n9::sumido" }];
+    resultado.atividades[0].dependencias = [{ type: "dependent", alvoChave: "n9::sumido" }];
 
     render(
       <ReviewScreen
