@@ -108,3 +108,24 @@ Revista depois do achado da SPEC-25 §8.1 (*"já tenho o endpoint da empresa, ma
 ## 7. Verificação
 
 Cada bloco contra o `gerador open` real, disciplina de sempre: **Bloco 1** = mudar um campo de um nó e conferir que exatamente os campos derivados dele (e só eles) marcam desatualizado; **Bloco 2** = propagar e conferir por requisição que só os itens impactados foram chamados, na ordem do grafo; **Bloco 3** = diff mostrando antes/depois, rejeitar preservando o valor antigo; **Bloco 4a** = provocar cada checagem com uma quebra propositalmente inconsistente; **Bloco 5** = pedir em linguagem natural uma mudança com impacto cruzado ("o timeout caiu pra 150ms") e conferir, pelas requisições, que o agente chamou `listarImpactados` e propôs alteração só nos itens certos, sem escrever nada antes do approve; **Bloco 6** = editar, ver o exemplo aparecer no prompt seguinte e a correção recorrente virar regra.
+
+## 7. Bloco 1 — implementado
+
+`ValorSpec` ganhou `baseadoEm`: **rótulo do insumo → hash do valor dele** no momento em que a resposta foi escrita. Comparar esse carimbo com o estado atual do desenho responde a pergunta que antes só a memória respondia: *quais respostas nasceram de algo que já mudou?*
+
+**Por que um hash por insumo, e não um hash do conjunto**: um hash único diria apenas "algo mudou". Por insumo, a tela diz **qual** — `srv-checkout.endpoints` — e isso é a diferença entre um alerta útil e um alarme.
+
+**O que NÃO é guardado, de propósito**: o valor antigo. §6 tira versionamento de escopo ("o rastro aqui é de procedência, não de versões"), então a tela mostra o que mudou e o valor atual, nunca o par antes/depois. O exemplo original desta spec (*"mudou de 300ms para 150ms"*) fica, portanto, como *"escrito antes de mudar: srv-fidelidade.timeout"* — mesma ação resultante, sem carregar histórico.
+
+`packages/engine/src/procedencia/procedencia.ts` (puro, sem `node:crypto` — o engine roda no browser, e um hash diferente entre ambientes marcaria tudo como desatualizado sem motivo):
+
+- `insumosDoItem(atividade, diagrama, contextoEpico?)` — spec dos nós de origem + spec da conexão (quando o item vem de uma aresta) + contexto do épico. Campo em branco não entra: senão preencher qualquer campo marcaria como obsoleta uma resposta que nada tem com ele.
+- `carimbarInsumos` / `insumosDivergentes` / `respostaDesatualizada`.
+
+**Escopo desta v1**: as respostas encadeadas dos papéis anteriores ainda não entram como insumo. Para isso o cálculo precisaria da ORDEM dos papéis, que mora na configuração do pipeline e não no engine; incluí-las sem essa ordem marcaria como desatualizada toda resposta assim que o papel seguinte escrevesse — ruído, não sinal. Fica registrado para o Bloco 2, que já precisa do grafo de ordem.
+
+**Resposta sem carimbo não é acusada de nada.** Quem respondeu antes deste mecanismo existir não tem o que comparar; tratar ausência como obsolescência encheria a tela de âmbar no primeiro uso.
+
+UI (`ReviewScreen`): contador "⚠ N campos desatualizados" no header, selo "⚠ desatualizado" no card do item, e o motivo no próprio campo ("escrito antes de mudar: srv-checkout.endpoints").
+
+**Validação real**: cenário de integração interna, resposta escrita e confirmada à mão (sem aviso), volta ao canvas, alteração de `endpoints` no `srv-checkout`, volta à revisão — header com "⚠ 1 campo desatualizado", selo no item 01 e o motivo apontando o campo exato.

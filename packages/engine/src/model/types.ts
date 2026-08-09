@@ -14,6 +14,12 @@ export interface ValorSpec {
   confianca?: number; // origem = inferido
   confirmado?: boolean; // origem = inferido ou sugerido
   padrao?: string; // id do padrão que preencheu, se houver
+  /** SPEC-26 Bloco 1 — procedência: rótulo do insumo → hash do valor dele no
+   * momento em que esta resposta foi escrita. Comparar com o estado atual diz
+   * se a resposta nasceu de um desenho que já mudou (ver
+   * `procedencia/procedencia.ts`). Ausente em resposta escrita antes deste
+   * mecanismo existir, e nesse caso nada se afirma sobre ela. */
+  baseadoEm?: Record<string, string>;
 }
 
 export interface JustificativaNA {

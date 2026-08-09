@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
+  carimbarInsumos,
   derivar,
+  insumosDoItem,
   resolverDependencias,
   TEMPLATE_ESPECIFICACAO_PADRAO,
   type Diagrama,
@@ -388,7 +390,9 @@ describe("ReviewScreen — abas da ficha (Fase 1d-i, SPEC-23 — dado estruturad
     expect(onResponderItem).toHaveBeenCalledWith(
       atividade.chave,
       "Backend::DLQ configurada e monitorada",
-      { valor: "sim, via política X no tópico Y", origem: "sugerido", confirmado: false }
+      // `objectContaining`: desde a SPEC-26 Bloco 1 a resposta também leva
+      // `baseadoEm` (procedência), que não é o objeto deste teste.
+      expect.objectContaining({ valor: "sim, via política X no tópico Y", origem: "sugerido", confirmado: false })
     );
   });
 
@@ -491,7 +495,7 @@ describe("ReviewScreen — abas da ficha (Fase 1d-i, SPEC-23 — dado estruturad
     expect(onResponderItem).toHaveBeenCalledWith(
       atividade.chave,
       "Backend::DLQ configurada e monitorada",
-      { valor: "sim, via TTL de 7 dias", origem: "manual" }
+      expect.objectContaining({ valor: "sim, via TTL de 7 dias", origem: "manual" })
     );
   });
 
@@ -530,7 +534,7 @@ describe("ReviewScreen — abas da ficha (Fase 1d-i, SPEC-23 — dado estruturad
     expect(onResponderItem).toHaveBeenCalledWith(
       atividade.chave,
       "Backend::DLQ configurada e monitorada",
-      { valor: "sim, via DLQ dedicada", origem: "manual" }
+      expect.objectContaining({ valor: "sim, via DLQ dedicada", origem: "manual" })
     );
   });
 
@@ -1224,5 +1228,100 @@ describe("ReviewScreen — ciclo detectado", () => {
 
     expect(screen.getByText("Não é possível derivar ainda")).toBeInTheDocument();
     expect(screen.getByText(/Ciclo:/)).toBeInTheDocument();
+  });
+});
+
+describe("ReviewScreen — obsolescência de respostas (SPEC-26 Bloco 1)", () => {
+  const primeiraChave = () => resultadoFixture01().atividades[0].chave;
+
+  /** Carimbo de uma resposta escrita quando o desenho estava como está agora. */
+  function carimboAtual() {
+    const resultado = resultadoFixture01();
+    return carimbarInsumos(insumosDoItem(resultado.atividades[0], fixture.quebra.diagrama));
+  }
+
+  function comResposta(baseadoEm?: Record<string, string>) {
+    return { [primeiraChave()]: { _historiaUsuario: { valor: "Como analista...", origem: "manual" as const, baseadoEm } } };
+  }
+
+  it("desenho intacto: nenhum aviso de desatualizado", () => {
+    render(
+      <ReviewScreen
+        resultado={resultadoFixture01()}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        respostasItens={comResposta(carimboAtual())}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+    expect(screen.queryByTestId("contador-desatualizados")).not.toBeInTheDocument();
+  });
+
+  it("spec do nó mudou depois da resposta: contador no header e selo no item", () => {
+    const diagramaMudado = structuredClone(fixture.quebra.diagrama);
+    const no = diagramaMudado.nodes[0];
+    no.spec = { ...no.spec, timeout: { valor: "150ms", origem: "manual" } };
+
+    render(
+      <ReviewScreen
+        resultado={resultadoFixture01()}
+        diagrama={diagramaMudado}
+        config={config}
+        respostasItens={comResposta(carimboAtual())}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId("contador-desatualizados")).toHaveTextContent("1 campo desatualizado");
+    expect(screen.getByTestId(`desatualizado-${primeiraChave()}`)).toBeInTheDocument();
+  });
+
+  it("resposta SEM carimbo (escrita antes deste mecanismo) não vira alarme falso", () => {
+    const diagramaMudado = structuredClone(fixture.quebra.diagrama);
+    diagramaMudado.nodes[0].spec = { ...diagramaMudado.nodes[0].spec, timeout: { valor: "150ms", origem: "manual" } };
+
+    render(
+      <ReviewScreen
+        resultado={resultadoFixture01()}
+        diagrama={diagramaMudado}
+        config={config}
+        respostasItens={comResposta(undefined)}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+    expect(screen.queryByTestId("contador-desatualizados")).not.toBeInTheDocument();
+  });
+
+  it("toda resposta nova nasce carimbada — é o que permite detectar a mudança depois", () => {
+    const onResponderItem = vi.fn();
+    render(
+      <ReviewScreen
+        resultado={resultadoFixture01()}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        onResponderItem={onResponderItem}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    // Confirma um campo pela ficha (o caminho manual) e olha o que foi gravado.
+    fireEvent.click(screen.getAllByTestId(/^item-/)[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Refinamento" }));
+    const textarea = screen.getAllByRole("textbox")[0];
+    fireEvent.change(textarea, { target: { value: "Como analista, quero X" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Confirmar" })[0]);
+
+    expect(onResponderItem).toHaveBeenCalled();
+    const [, , resposta] = onResponderItem.mock.calls.at(-1)!;
+    expect(resposta.baseadoEm).toBeTruthy();
+    expect(Object.keys(resposta.baseadoEm).length).toBeGreaterThan(0);
   });
 });
