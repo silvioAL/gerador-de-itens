@@ -88,6 +88,23 @@ describe("ProvedorCompativelOpenAI — o wire (SPEC-25 Fase 2)", () => {
     expect(pedidos[0].corpo.response_format).toBeUndefined();
   });
 
+  it("manda max_tokens SEMPRE — sem isso quem escolhe o corte é o gateway", async () => {
+    // A API nativa da Anthropic exige `max_tokens`, então a camada de
+    // compatibilidade arbitra um valor por nós quando ele falta — e esse valor
+    // não é documentado. Um lote de 5 itens da esteira bate nesse teto e volta
+    // cortado: exatamente a falha silenciosa mais cara deste projeto.
+    respostas.push(sseTexto("ok"));
+    await provedor().completar("oi");
+    expect(pedidos[0].corpo.max_tokens).toBe(8192);
+  });
+
+  it("max_tokens é configurável — gateway com teto próprio não fica refém do default", async () => {
+    respostas.push(sseTexto("ok"));
+    const p = criarProvedorCompativelOpenAI({ baseUrl, chave: "k", modelo: "m", maxTokens: 2048 });
+    await p.completar("oi");
+    expect(pedidos[0].corpo.max_tokens).toBe(2048);
+  });
+
   it("manda os cabeçalhos extras — é o que faz um wrapper corporativo funcionar", async () => {
     respostas.push(sseTexto("ok"));
     await provedor({ "X-Time": "plataforma" }).completar("oi");

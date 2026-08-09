@@ -43,6 +43,27 @@ function status(over: Partial<StatusIa> = {}): StatusIa {
       },
     ],
     gateway: { configurado: false },
+    presetsGateway: [
+      {
+        id: "anthropic",
+        nome: "Claude (Anthropic)",
+        baseUrl: "https://api.anthropic.com/v1",
+        modelos: ["claude-sonnet-5", "claude-opus-5"],
+        modeloPadrao: "claude-sonnet-5",
+        jsonNativo: false,
+        urlChave: "https://console.anthropic.com/settings/keys",
+        observacao: "Precisa de uma chave de API do console da Anthropic",
+      },
+      {
+        id: "deepseek",
+        nome: "DeepSeek (oficial)",
+        baseUrl: "https://api.deepseek.com/v1",
+        modelos: ["deepseek-chat"],
+        modeloPadrao: "deepseek-chat",
+        jsonNativo: true,
+        observacao: "Cobrança por uso.",
+      },
+    ],
     ...over,
   };
 }
@@ -115,6 +136,60 @@ describe("ModeloIaTab — card do gateway (SPEC-25 Fase 2)", () => {
     await waitFor(() => expect(screen.getByLabelText("Base URL do gateway")).toHaveValue("https://digitando/v1"));
     expect(screen.getByLabelText("Nome do modelo")).toHaveValue("meu-modelo");
     expect(screen.getByRole("button", { name: "Salvar" })).toBeEnabled();
+  });
+
+  it("escolher Claude preenche base URL e modelo — ninguém tem que adivinhar a URL", async () => {
+    await montar();
+    fireEvent.change(screen.getByLabelText("Destino conhecido"), { target: { value: "anthropic" } });
+
+    expect(screen.getByLabelText("Base URL do gateway")).toHaveValue("https://api.anthropic.com/v1");
+    expect(screen.getByLabelText("Nome do modelo")).toHaveValue("claude-sonnet-5");
+  });
+
+  it("o preset AVISA que a Anthropic ignora o modo JSON — a garantia ali é mais fraca", async () => {
+    // A camada de compatibilidade da Anthropic ignora `response_format`
+    // (documentado por eles). Quem escolhe merece saber antes, não depois de
+    // uma resposta estranha: a estrutura passa a vir de validação + retry.
+    await montar();
+    fireEvent.change(screen.getByLabelText("Destino conhecido"), { target: { value: "anthropic" } });
+
+    const nota = screen.getByTestId("preset-nota-anthropic");
+    expect(nota).toHaveTextContent(/ignora o modo JSON/i);
+    expect(nota).toHaveTextContent(/chave de API do console/i);
+  });
+
+  it("destino com JSON nativo NÃO mostra o aviso — ele é sobre a exceção", async () => {
+    await montar();
+    fireEvent.change(screen.getByLabelText("Destino conhecido"), { target: { value: "deepseek" } });
+    expect(screen.getByTestId("preset-nota-deepseek")).not.toHaveTextContent(/ignora o modo JSON/i);
+  });
+
+  it("trocar de destino troca o modelo sugerido, mas preserva o digitado à mão", async () => {
+    // Sem isso, ir de Claude pro DeepSeek deixaria "claude-sonnet-5" apontando
+    // pro endpoint errado — erro que só apareceria na primeira chamada.
+    await montar();
+    fireEvent.change(screen.getByLabelText("Destino conhecido"), { target: { value: "anthropic" } });
+    fireEvent.change(screen.getByLabelText("Destino conhecido"), { target: { value: "deepseek" } });
+    expect(screen.getByLabelText("Nome do modelo")).toHaveValue("deepseek-chat");
+
+    // Nome próprio de gateway interno sobrevive à troca.
+    fireEvent.change(screen.getByLabelText("Nome do modelo"), { target: { value: "modelo-interno-v3" } });
+    fireEvent.change(screen.getByLabelText("Destino conhecido"), { target: { value: "anthropic" } });
+    expect(screen.getByLabelText("Nome do modelo")).toHaveValue("modelo-interno-v3");
+  });
+
+  it("credencial já salva reconhece o destino — não volta como 'preencher à mão'", async () => {
+    await montar(
+      status({
+        gateway: {
+          configurado: true,
+          baseUrl: "https://api.anthropic.com/v1",
+          modelo: "claude-opus-5",
+          chaveMascarada: "sk-…7890",
+        },
+      })
+    );
+    expect(screen.getByLabelText("Destino conhecido")).toHaveValue("anthropic");
   });
 
   it("com chave já salva, dá pra mudar só a base URL sem redigitar a chave", async () => {

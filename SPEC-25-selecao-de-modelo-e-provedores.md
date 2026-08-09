@@ -242,6 +242,22 @@ Decisões que valem registro:
 - **Nada sugerido e não confirmado entra** — mesma régua do resto do produto. Mandar palpite como se fosse decisão faria o modelo construir em cima do que ninguém aprovou.
 - **Determinístico**: o template padrão não usa `{{timestamp}}`, então dois prompts da mesma quebra são idênticos e comparáveis. Quem quiser data tem a variável.
 
+### 8.6 Fase 2.2 (Claude de verdade) — implementada, e não precisou de provedor novo
+
+Pedido do usuário depois de descobrir que o modo hospedado não tem IA: *"vamos começar simples, se eu conseguir usar o claude integrado a ferramenta já é ótimo"*.
+
+**Nenhum código de provedor foi escrito.** A Anthropic publica uma camada compatível com a API da OpenAI (`https://api.anthropic.com/v1/`, `Authorization: Bearer`, `POST /chat/completions`, streaming) — exatamente o que o `ProvedorCompativelOpenAI` da Fase 2 já falava. O soquete dormente serviu para o que foi projetado.
+
+O que faltava era tudo menos o transporte:
+
+- **Presets de destino** (`PRESETS_GATEWAY` em `packages/llm/modelos.ts`): Claude, DeepSeek e Ollama, cada um com base URL, modelos sugeridos, onde pegar a chave e uma observação. Escolher preenche os campos. A lista **vem do servidor** por `/ia/status` — `packages/web` não pode importar `@gerador/llm` (arrasta `node-llama-cpp`, binário nativo, para o bundle do navegador), e uma cópia no front envelheceria em silêncio. Mesmo raciocínio do catálogo de acessos da SPEC-28.
+- **`max_tokens` explícito** (default 8192, configurável). O provedor não mandava esse campo. A API nativa da Anthropic **exige** `max_tokens`, então a camada de compatibilidade arbitra um valor não documentado — e um lote de 5 itens da esteira bate nesse teto e volta cortado. É a falha silenciosa mais cara deste projeto (resposta truncada = trabalho perdido sem aviso), então o teto passou a ser nosso.
+- **Honestidade sobre a garantia**: a Anthropic **ignora `response_format`** (documentado por eles). Onde isso vale, a estrutura é garantida só por `validarContraSchema` + um retry — a degradação que a Fase 2 já previa, agora escrita na tela em vez de escondida no código. O preset carrega `jsonNativo: false` e a aba avisa antes de a pessoa salvar.
+
+**Custo é decisão de quem usa, e a tela diz**: chave de API do console da Anthropic é cobrança por uso, separada de assinatura do Claude.ai ou do Claude Code. Não existe caminho por OAuth: as credenciais do Claude Code são exclusivas dele (ToS), o que já estava registrado no §4.5 e continua valendo.
+
+Verificado contra o endpoint real: `/ia/credencial/testar` com chave inválida responde "Credencial recusada pelo gateway (HTTP 401)" e com base URL errada responde "Endpoint não encontrado — confira a base URL (HTTP 404)". A cadeia rota → provedor → `api.anthropic.com` está fechada; o que não dá para verificar sem uma chave paga é uma resposta completa de verdade.
+
 ## 9. Verificação
 
 Fase a fase, contra o `gerador open` real (disciplina de sempre): Fase 0 = regressão intacta + aba renderizando; **Fase 1 = esteira completa no cenário real com raciocínio ligado, medindo tempo e profundidade contra a linha de base sem raciocínio (registrado no JOURNEY §85)**; Fase 2 = esteira completa via wrapper compatível-OpenAI e via Claude, com streaming e JSON válido, chave validada e guardada fora do projeto — **hoje verificada contra um gateway HTTP falso ponta a ponta (§8.4); a verificação com o gateway real fica pendente do token, e está explicitamente NÃO feita**; Fase 3 = esteira mista (papéis em provedores diferentes) num run só.

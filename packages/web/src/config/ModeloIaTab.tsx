@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { apiConfigIa, apiIa, type ResumoGateway, type StatusIa, type StatusModeloChat } from "../api/client";
+import {
+  apiConfigIa,
+  apiIa,
+  type PresetGateway,
+  type ResumoGateway,
+  type StatusIa,
+  type StatusModeloChat,
+} from "../api/client";
 
 function formatarGB(bytes: number): string {
   return `${(bytes / 1_000_000_000).toFixed(1)} GB`;
@@ -63,6 +70,7 @@ export function ModeloIaTab() {
               key={m.id}
               modelo={m}
               gateway={status?.gateway}
+              presets={status?.presetsGateway ?? []}
               salvando={salvando !== null}
               onSelecionar={() => void selecionar(m.id)}
               onSalvo={async () => setStatus(await apiIa.status())}
@@ -127,12 +135,15 @@ export function ModeloIaTab() {
 function CardGateway({
   modelo,
   gateway,
+  presets,
   salvando,
   onSelecionar,
   onSalvo,
 }: {
   modelo: StatusModeloChat;
   gateway?: ResumoGateway;
+  /** Destinos conhecidos vindos do servidor (`/ia/status`). */
+  presets: PresetGateway[];
   salvando: boolean;
   onSelecionar: () => void;
   onSalvo: () => Promise<void>;
@@ -142,6 +153,26 @@ function CardGateway({
   const [nomeModelo, setNomeModelo] = useState(gateway?.modelo ?? "");
   const [ocupado, setOcupado] = useState<"salvar" | "testar" | null>(null);
   const [resultado, setResultado] = useState<{ ok: boolean; texto: string } | null>(null);
+  // Reconhece o destino pela base URL já salva, pra quem volta na tela não ver
+  // "outro (preencher à mão)" numa credencial que veio de um preset.
+  const [presetId, setPresetId] = useState(
+    () => presets.find((p) => p.baseUrl === gateway?.baseUrl)?.id ?? ""
+  );
+  const preset = presets.find((p) => p.id === presetId);
+
+  function aplicarPreset(id: string) {
+    setPresetId(id);
+    const p = presets.find((x) => x.id === id);
+    if (!p) return;
+    setBaseUrl(p.baseUrl);
+    // Troca o modelo quando o valor atual veio de um preset (inclusive o
+    // anterior) ou está vazio; preserva o que foi digitado à mão, que é o caso
+    // do gateway interno com nome próprio. Sem isso, trocar de destino deixaria
+    // "claude-sonnet-5" apontando pro DeepSeek — erro que só apareceria na
+    // primeira chamada.
+    const deAlgumPreset = (v: string) => presets.some((x) => x.modelos.includes(v));
+    setNomeModelo((atual) => (!atual.trim() || deAlgumPreset(atual.trim()) ? p.modeloPadrao : atual));
+  }
 
   // A credencial só chega depois do primeiro `/ia/status`; sem isto os campos
   // ficariam vazios mesmo com gateway já configurado.
@@ -212,6 +243,49 @@ function CardGateway({
           {modelo.papel}
         </span>
 
+        {/* Um destino conhecido preenche base URL e modelo. Os campos seguem
+            livres: gateway interno não está em lista nenhuma. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
+          <span style={{ fontSize: 11.5, color: "var(--texto-fraco)" }}>Destino:</span>
+          <select
+            value={presetId}
+            onChange={(e) => aplicarPreset(e.target.value)}
+            aria-label="Destino conhecido"
+            style={{ ...campoEstilo, flex: "none", width: 200 }}
+          >
+            <option value="">outro (preencher à mão)</option>
+            {presets.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nome}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {preset && (
+          <p style={notaPresetEstilo} data-testid={`preset-nota-${preset.id}`}>
+            {preset.observacao}
+            {preset.urlChave && (
+              <>
+                {" "}
+                <a href={preset.urlChave} target="_blank" rel="noreferrer" style={{ color: "var(--acento)" }}>
+                  pegar a chave
+                </a>
+                .
+              </>
+            )}
+            {/* Honestidade sobre a garantia: onde `response_format` é ignorado,
+                a estrutura vem de validação + retry, e pode falhar mais. */}
+            {!preset.jsonNativo && (
+              <>
+                {" "}
+                Este destino <strong>ignora o modo JSON</strong>: a estrutura é garantida por validação contra o
+                schema e uma nova tentativa, não pelo próprio modelo.
+              </>
+            )}
+          </p>
+        )}
+
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
           <input
             value={baseUrl}
@@ -228,13 +302,24 @@ function CardGateway({
             aria-label="Chave de API"
             style={campoEstilo}
           />
+          {/* `datalist` em vez de `select`: as sugestões do destino aparecem,
+              mas o campo continua livre — gateway interno tem nome próprio que
+              lista nenhuma conhece. */}
           <input
             value={nomeModelo}
             onChange={(e) => setNomeModelo(e.target.value)}
+            list={preset ? `modelos-${preset.id}` : undefined}
             placeholder="nome do modelo (ex.: deepseek-chat)"
             aria-label="Nome do modelo"
             style={campoEstilo}
           />
+          {preset && (
+            <datalist id={`modelos-${preset.id}`}>
+              {preset.modelos.map((m) => (
+                <option key={m} value={m} />
+              ))}
+            </datalist>
+          )}
         </div>
 
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
@@ -265,6 +350,13 @@ function CardGateway({
     </div>
   );
 }
+
+const notaPresetEstilo: React.CSSProperties = {
+  fontSize: 11.5,
+  color: "var(--texto-fraco)",
+  lineHeight: 1.6,
+  margin: "6px 0 0",
+};
 
 const campoEstilo: React.CSSProperties = {
   padding: "6px 9px",

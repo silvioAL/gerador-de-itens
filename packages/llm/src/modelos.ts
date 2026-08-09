@@ -86,6 +86,73 @@ export const NOME_PROVEDOR_GATEWAY = "Gateway compatível com OpenAI";
 export const PAPEL_PROVEDOR_GATEWAY =
   "Wrapper corporativo, DeepSeek oficial, Ollama, vLLM, LiteLLM — qualquer endpoint /chat/completions";
 
+/**
+ * Destinos conhecidos do gateway — SPEC-25 Fase 2.1.
+ *
+ * Pedido do usuário: *"vamos começar simples, se eu conseguir usar o claude
+ * integrado a ferramenta já é ótimo"*. Não precisou de provedor novo: a
+ * Anthropic publica uma camada compatível com a API da OpenAI
+ * (https://platform.claude.com/docs/en/api/openai-sdk), então o
+ * `ProvedorCompativelOpenAI` que já existia serve — o que faltava era a pessoa
+ * ter que adivinhar a base URL e o nome do modelo.
+ *
+ * O preset preenche os dois campos e escreve na tela o que muda em cada
+ * destino. `jsonNativo: false` não é detalhe de implementação: com a Anthropic,
+ * `response_format` é IGNORADO (documentado por eles), então a estrutura passa
+ * a ser garantida só pela validação contra o schema + retry do provedor. Quem
+ * escolhe merece saber disso antes, não depois de uma resposta estranha.
+ */
+export interface PresetGateway {
+  id: string;
+  nome: string;
+  baseUrl: string;
+  /** Sugestões — o campo continua livre, gateway interno tem nome próprio. */
+  modelos: string[];
+  modeloPadrao: string;
+  /** O endpoint respeita `response_format: json_object`? */
+  jsonNativo: boolean;
+  /** Onde a pessoa consegue a chave. */
+  urlChave?: string;
+  observacao: string;
+}
+
+export const PRESETS_GATEWAY: PresetGateway[] = [
+  {
+    id: "anthropic",
+    nome: "Claude (Anthropic)",
+    baseUrl: "https://api.anthropic.com/v1",
+    modelos: ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5-20251001"],
+    modeloPadrao: "claude-sonnet-5",
+    jsonNativo: false,
+    urlChave: "https://console.anthropic.com/settings/keys",
+    observacao:
+      "Precisa de uma chave de API do console da Anthropic — assinatura do Claude.ai ou do Claude Code não dá acesso à API, é cobrança por uso à parte.",
+  },
+  {
+    id: "deepseek",
+    nome: "DeepSeek (oficial)",
+    baseUrl: "https://api.deepseek.com/v1",
+    modelos: ["deepseek-chat", "deepseek-reasoner"],
+    modeloPadrao: "deepseek-chat",
+    jsonNativo: true,
+    urlChave: "https://platform.deepseek.com/api_keys",
+    observacao: "Cobrança por uso. `deepseek-reasoner` pensa antes de responder e custa mais.",
+  },
+  {
+    id: "ollama",
+    nome: "Ollama (na sua máquina)",
+    baseUrl: "http://localhost:11434/v1",
+    modelos: ["qwen3:4b", "llama3.1:8b"],
+    modeloPadrao: "qwen3:4b",
+    jsonNativo: true,
+    observacao: "Roda local, sem custo e sem sair da máquina. A chave é ignorada pelo Ollama — preencha qualquer coisa.",
+  },
+];
+
+export function presetGatewayPorId(id: string): PresetGateway | undefined {
+  return PRESETS_GATEWAY.find((p) => p.id === id);
+}
+
 /** Ids que `config/ia.json` aceita: os modelos de chat baixáveis + o gateway. */
 export function idsDeProvedorValidos(): string[] {
   return [...MODELOS_CHAT.map((m) => m.id), ID_PROVEDOR_GATEWAY];
