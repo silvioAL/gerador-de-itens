@@ -25,8 +25,7 @@ RUN mkdir -p packages/web/dist/config && \
     cp config/app.example.json packages/web/dist/config/app.json && \
     cp config/regras.example.json packages/web/dist/config/regras.json && \
     cp config/perfis-time.example.json packages/web/dist/config/perfis-time.json && \
-    cp -r config/cenarios packages/web/dist/config/cenarios && \
-    cp -r config/referencias packages/web/dist/config/referencias
+    cp -r config/cenarios packages/web/dist/config/cenarios
 
 FROM nginx:alpine AS runtime
 COPY --from=build /app/packages/web/dist /usr/share/nginx/html

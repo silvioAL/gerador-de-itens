@@ -1591,3 +1591,19 @@ Mais dois testes de coerência que nasceram junto, porque a mesma classe de erro
 A lição vale além deste caso: o produto tinha **conteúdo** de configuração e não tinha **verificação de cobertura** dele. Configuração de exemplo é código de produto — e como código, precisa de teste dizendo que está inteira.
 
 Regressão: engine 193 (+3), llm 47, cli 80, web 273, server 45.
+
+## 104. Subir o modo hospedado achou três defeitos que nenhum teste pegava
+
+Pedido do usuário: *"depois derrube o processo da porta e vou rodar o outro modo (suba os containeres)"*. Uma tarefa de operação — que virou a rodada mais reveladora em muito tempo, porque **nada disso aparece rodando `npm test`**.
+
+**1. A imagem Docker não buildava desde a remoção do export-vault (§41).** O `Dockerfile` copiava `config/referencias` pra dentro de `packages/web/dist/config`; a pasta foi apagada junto com a feature do Obsidian e o `cp` passou a falhar. O modo hospedado estava sem build havia semanas e a CI seguia verde: ela roda build de TypeScript e testes, **não constrói a imagem**. Lição registrada: `Dockerfile` referencia caminhos que só existem por convenção — quando um diretório de config morre, ele é um dos lugares a visitar.
+
+**2. A suíte do server truncava o banco de desenvolvimento.** `DATABASE_URL ?? "…/gerador"` — o mesmo banco do `docker-compose.yml`. Cada `npm test` apagava as tabelas do ambiente de uso, e o último teste deixava para trás o que tinha criado. O estrago concreto foi pior do que "perdi a massa de demo": sobrou um papel `Administrador` da suíte de acessos, e **papel existindo LIGA o RBAC da organização** (SPEC-28 §4.3). O banco de trabalho ficou com controle de acesso ativo, um único papel podendo só `acessos:editar` — ou seja, a edição de tudo o mais negada — e a massa de demonstração apagada. A suíte esteve verde o tempo todo: o dano é no ambiente ao lado, não no teste.
+
+Duas defesas, e a segunda é a que importa: banco próprio (`gerador_test`, criado sob demanda) e uma **trava que recusa rodar contra banco cujo nome não termine em `_test`**, com escape explícito via `PERMITIR_BANCO_NAO_TESTE=1`. O padrão pode ser quebrado de novo por engano; a trava faz a suíte parar com uma mensagem que diz o que fazer, em vez de truncar o banco de alguém. Cinco testes cobrem a própria trava.
+
+**3. O teste instável do gateway era um bug de verdade.** `ModeloIaTab.test.tsx > "Salvar só habilita com os três preenchidos"` falhou num run da CI e passou noutro, mesmo commit. O efeito que preenche os campos com a credencial vinda de `/ia/status` sobrescrevia o estado local **sempre** — então qualquer status chegando enquanto alguém digita apagava o texto no meio da digitação. O teste estava certo; a corrida era real. Agora o efeito só sobrescreve o campo que ainda está exatamente como o servidor mandou, e existe um teste que provoca a corrida de propósito (a suíte rodou seis vezes seguidas, verde).
+
+Fora isso, a linha `<AcessosTab>` duplicada na `ConfigScreen` (renderizava a aba duas vezes) e a validação do modo hospedado ponta a ponta com Playwright: login, escolha de time, e a aba **Acessos contra o servidor de verdade pela primeira vez** — catálogo de recursos carregando do `/acessos/catalogo`, matriz montada, zero erro de rede.
+
+O padrão que se repete: **rodar o produto encontra o que a suíte não encontra**. Build de imagem, isolamento de banco e corrida de renderização não são coisas que um teste unitário vê.
