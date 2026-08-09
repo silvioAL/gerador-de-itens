@@ -60,7 +60,13 @@ Risco central documentado: modelos R são RACIOCINADORES — emitem `<think>…<
 
 `papeis[].provedor?: string` em `config/pipeline-agentes.json` — ausente usa o `provedorPadrao`. Caso de uso citado pelo usuário na prática: PO/QA no Claude (linguagem, critérios), Especialista no local (dados sensíveis de infra, volume alto). A rota `/ia/pipeline/:papel` já sabe o papel — só resolve o provedor dele. Fase 3, depois do resto estar de pé.
 
-### 4.6 UI
+### 4.6 Wrapper corporativo — o provedor que mais importa na prática (achado real)
+
+O usuário já usa, na empresa, **um wrapper interno: uma interface unificada para vários modelos**, e é por ele que a chamada ao DeepSeek acontece hoje. Isso muda o desenho para melhor: em vez de um `ProvedorDeepSeekApi` específico, a Fase 2 implementa um **`ProvedorCompativelOpenAI(baseUrl, chave, modelo, cabecalhosExtra?)`** genérico — o formato `POST {baseUrl}/chat/completions` é o de-facto desses gateways (DeepSeek oficial, wrappers corporativos, Ollama, vLLM, LiteLLM, OpenRouter). Uma implementação, N destinos: o DeepSeek oficial vira uma instância pré-configurada; o wrapper da empresa é outra, onde o usuário informa a base URL interna.
+
+Consequência para a jornada: o card "Compatível com OpenAI (wrapper/gateway)" pede **base URL + chave + nome do modelo**, e nada mais. Sem rede externa nenhuma quando o gateway é interno — o que resolve de graça a objeção de privacidade corporativa (os dados não saem da empresa).
+
+### 4.7 UI
 
 - Aba nova **"Modelo de IA"** em Configurações: um card por provedor (status: instalado / baixar N GB / chave configurada ou não), radio de "usar como padrão", link "como conectar".
 - `gerador ia instalar --modelo deepseek` baixa o segundo GGUF; `gerador ia status` lista os dois + estado da conexão externa.
@@ -92,7 +98,31 @@ Se um dia o provedor oferecer OAuth de verdade pra API, a jornada troca os passo
 
 Idêntica à B, apontando pro console da Anthropic (chaves de API). Campo extra no card: o modelo (`claude-sonnet-5` default). Mesmo armazenamento, mesmo aviso.
 
-### 5.4 Jornada D — por papel (Fase 4, depois do resto)
+### 5.4 Jornada E — wrapper/gateway corporativo (§4.6)
+
+Card "Compatível com OpenAI": três campos (base URL, chave, modelo), botão "Validar e conectar" (mesma chamada de teste das outras). É o caminho que o usuário realmente usa na empresa. Sem aviso de "dados saem da máquina" quando a base URL é interna — o aviso é condicional ao destino, não fixo.
+
+### 5.5 Modo "prompt único" — a ponte com o fluxo atual (`gerador_de_itens_2.html`)
+
+O fluxo que o usuário roda hoje na empresa é: **um prompt único gigante** (template com `{{descricaoEpico}}`, `{{requisitosTecnicos}}`, `{{itensBreakDownContent}}`…) colado no wrapper, que devolve o markdown de todas as histórias. Registrado como MODO alternativo, não como futuro:
+
+- **"Copiar prompt do breakdown"** (barato, sem integração): a tela de revisão renderiza o template — configurável, reusando o mecanismo de `{{variavel}}` que a aba "Especificação de solução" já tem — com épico, tecnologias, contextos e todos os itens derivados, e copia. O usuário cola onde já cola. Funciona sem provedor conectado nenhum.
+- **Chamada única integrada** (com provedor conectado): mesmo prompt, chamada direta, markdown guardado como documento da quebra. **Sem parse de volta na v1**: reconstruir o parse do markdown seria reintroduzir a fragilidade que a esteira elimina (o próprio template diz "scripts de parsing dependem desta estrutura exata").
+
+Comparação honesta registrada — não é "um substitui o outro":
+
+| | Prompt único | Esteira de agentes |
+|---|---|---|
+| Chamadas | 1 | 4×⌈N/5⌉ |
+| Saída | markdown linear | campo a campo, estruturado |
+| Revisão | fora da ferramenta | dentro (confirmar/editar/re-rodar por campo) |
+| Formato garantido | não (o template gasta ~metade do texto se defendendo de erro do modelo) | sim (GBNF/tool use) |
+| Regras críticas (✍️, volumetria em branco, Task sem ciclo de teste, item 8 quebrado) | o modelo precisa obedecer | **o engine garante** — o modelo nem é consultado |
+| Propagar mudança depois | recomeçar do zero | SPEC-26 |
+
+Observação que orienta o roadmap: boa parte do template atual existe para conter alucinação (volumetria em branco, indicador literal, "NUNCA misturar teste com refinamento"). Tudo isso já é determinístico no motor — o valor do modelo se concentra no que é textual.
+
+### 5.6 Jornada D — por papel (Fase 4, depois do resto)
 
 Na aba Pipeline de IA (Fase F), cada papel ganha um select "Provedor: (padrão) | …" listando só os provedores prontos/conectados. Caso de uso: PO/QA no Claude, Especialista no local.
 
@@ -119,7 +149,8 @@ Nota da API DeepSeek: compatível com o formato OpenAI (`chat/completions`); a g
 
 1. **Fase 0 — abstração**: interface `ProvedorIa` + `ProvedorLocalLlama` embrulhando o motor atual; rotas resolvem provedor pela config (`config/ia.json` com só o default); aba "Modelo de IA" nasce aqui mostrando só os cards locais. Zero mudança de comportamento; regressão prova.
 2. **Fase 1 — DeepSeek local**: registro do modelo, download pela aba/`ia instalar --modelo deepseek`, seleção (Jornada A completa), tratamento do `<think>` (§4.3). Verificação: mesma esteira no cenário de crédito com os dois modelos, comparação de profundidade/tempo registrada no JOURNEY.
-3. **Fase 2 — conexão a provedores (Jornadas B e C)**: a infraestrutura de "Conectar" é UMA só (abrir navegador, colar chave, validar, `~/.gerador/credenciais.json`, aviso de privacidade, `gerador ia conectar <provedor>`) — implementada uma vez e instanciada duas: `ProvedorDeepSeekApi` (formato OpenAI, `json_object` + validação/retry, `reasoning_content` → "pensando…") e `ProvedorAnthropic` (tool use forçado + streaming de `input_json`). Verificação real com as chaves do usuário.
+3. **Fase 2 — conexão a provedores (Jornadas B, C e E)**: a infraestrutura de "Conectar" é UMA só (abrir navegador, colar chave, validar, `~/.gerador/credenciais.json`, aviso condicional de privacidade, `gerador ia conectar <provedor>`), com duas implementações: **`ProvedorCompativelOpenAI`** genérico (§4.6 — serve o wrapper corporativo, o DeepSeek oficial e qualquer gateway; `json_object` + validação/retry, `reasoning_content` → "pensando…") e `ProvedorAnthropic` (tool use forçado + streaming de `input_json`). **Prioridade dentro da fase: o compatível-OpenAI primeiro** — é o que o usuário usa na empresa. Verificação real com as chaves/base URL do usuário.
+   - **Fase 2.1 (opcional, barata)**: modo "copiar prompt do breakdown" (§5.5) — ponte com o fluxo atual, não depende de provedor nenhum.
 4. **Fase 3 — provedor por papel** (Jornada D): `papeis[].provedor` + select na aba Pipeline listando só provedores prontos.
 
 ## 9. Verificação
