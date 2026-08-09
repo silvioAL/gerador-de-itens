@@ -229,6 +229,19 @@ Feita exatamente como §8.1 mandou: **pronta e testada, sem depender do token co
 
 O que falta para dar a Fase 2 por completa é só o que não depende de nós: **validação real com a base URL e o token do usuário**, e o `ProvedorAnthropic` (§8.2).
 
+### 8.5 Fase 2.1 (prompt único) — implementada
+
+O §5.5 saiu do papel, e por um motivo prático: **é a única saída que funciona hoje no ambiente real**, sem token e sem provedor conectado. `gerarPromptUnico()` (engine, função pura) monta o texto; a tela de revisão abre o painel "📋 Prompt único" com o prompt inteiro visível e um botão de copiar.
+
+Decisões que valem registro:
+
+- **Painel, não botão que copia direto.** O texto vai para o chat da empresa, onde não há desfazer. Ver antes de colar é barato.
+- **Template é config do projeto** (`config/prompt-unico-template.md`, aba "Prompt único"), com 8 variáveis num conjunto **fechado e validado**: `descricaoEpico`, `contextoAdicional`, `itensBreakDownContent`, `requisitosTecnicos`, `ciclosTeste`, `tecnologiasEnvolvidas`, `contextosAplicaveis`, `timestamp`. No protótipo legado o template era um arquivo subido a cada sessão e a troca era `String.replace` solto — variável errada só aparecia como `{{tipoErrado}}` cru no prompt já colado. Agora o `PUT` devolve **400** e o erro aparece na edição.
+- **O template padrão é mais curto que o legado de propósito.** Boa parte daquele texto existia para conter alucinação (volumetria em branco, "NUNCA misturar teste com refinamento"); isso aqui **já é determinístico** e entra pronto no prompt. Sobra para o modelo o que é textual.
+- **Dependência sai pelo número do item**, não pela chave interna (`n1::ep0` não diz nada a quem lê nem ao modelo).
+- **Nada sugerido e não confirmado entra** — mesma régua do resto do produto. Mandar palpite como se fosse decisão faria o modelo construir em cima do que ninguém aprovou.
+- **Determinístico**: o template padrão não usa `{{timestamp}}`, então dois prompts da mesma quebra são idênticos e comparáveis. Quem quiser data tem a variável.
+
 ## 9. Verificação
 
 Fase a fase, contra o `gerador open` real (disciplina de sempre): Fase 0 = regressão intacta + aba renderizando; **Fase 1 = esteira completa no cenário real com raciocínio ligado, medindo tempo e profundidade contra a linha de base sem raciocínio (registrado no JOURNEY §85)**; Fase 2 = esteira completa via wrapper compatível-OpenAI e via Claude, com streaming e JSON válido, chave validada e guardada fora do projeto — **hoje verificada contra um gateway HTTP falso ponta a ponta (§8.4); a verificação com o gateway real fica pendente do token, e está explicitamente NÃO feita**; Fase 3 = esteira mista (papéis em provedores diferentes) num run só.
