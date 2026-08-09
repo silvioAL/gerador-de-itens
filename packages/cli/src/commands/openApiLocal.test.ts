@@ -8,13 +8,16 @@ import { join } from "node:path";
 // (mesma disciplina de ia.test.ts) — e pra poder testar o caminho 503 (modelos
 // não instalados) de forma determinística, sem depender do estado real da
 // máquina que roda o teste.
-const verificarStatusMock = vi.fn(async () => ({
+const STATUS_NAO_INSTALADO = {
   chatInstalado: false,
   embeddingInstalado: false,
   pronto: false,
   caminhoModelos: "/fake/models",
-}));
-// Instância única (não recriada a cada chamada de carregarModeloChatMock) pra
+  provedor: "qwen-local",
+  modelosChat: [],
+};
+const verificarStatusMock = vi.fn(async () => STATUS_NAO_INSTALADO);
+// Instância única (não recriada a cada chamada de criarProvedorPorIdMock) pra
 // dar pra inspecionar o prompt de verdade recebido em `completar` (Fase 1b,
 // SPEC-23 — assert de que o contexto do épico chega no prompt) e simular
 // streaming de verdade via `onTexto` (Fase 1c — /ia/sugerir virou texto
@@ -61,14 +64,19 @@ const completarComSchemaMock = vi.fn(
     return resultado;
   }
 );
-const carregarModeloChatMock = vi.fn(async () => ({
+// SPEC-25 Fase 0: as rotas falam com `ProvedorIa`, não mais com o motor —
+// o mock acompanha a fronteira nova. `criarProvedorPorId` recebe o id vindo
+// de `config/ia.json`, o que também permite asserir a troca de modelo.
+const criarProvedorPorIdMock = vi.fn(async (id?: string) => ({
+  id: id ?? "qwen-local",
+  nome: id ?? "qwen-local",
   completar: completarMock,
-  completarComSchema: completarComSchemaMock,
+  completarEstruturado: completarComSchemaMock,
   descartar: vi.fn(async () => {}),
 }));
 vi.mock("@gerador/llm", async () => {
   const real = await vi.importActual<typeof import("@gerador/llm")>("@gerador/llm");
-  return { ...real, verificarStatus: verificarStatusMock, carregarModeloChat: carregarModeloChatMock };
+  return { ...real, verificarStatus: verificarStatusMock, criarProvedorPorId: criarProvedorPorIdMock };
 });
 
 const { tratarApiLocal } = await import("./openApiLocal.js");
@@ -79,15 +87,10 @@ let dirTemp: string;
 
 beforeEach(async () => {
   verificarStatusMock.mockClear();
-  carregarModeloChatMock.mockClear();
+  criarProvedorPorIdMock.mockClear();
   completarMock.mockClear();
   completarComSchemaMock.mockClear();
-  verificarStatusMock.mockResolvedValue({
-    chatInstalado: false,
-    embeddingInstalado: false,
-    pronto: false,
-    caminhoModelos: "/fake/models",
-  });
+  verificarStatusMock.mockResolvedValue(STATUS_NAO_INSTALADO);
   dirTemp = mkdtempSync(join(tmpdir(), "gerador-cli-api-local-"));
   servidor = createServer((req, res) => {
     void tratarApiLocal(req, res, dirTemp).then((tratado) => {
@@ -140,7 +143,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       body: JSON.stringify({ tech: "Backend", rotulo: "DLQ configurada e monitorada", contextoNo: "fila rabbitmq" }),
     });
     expect(resposta.status).toBe(503);
-    expect(carregarModeloChatMock).not.toHaveBeenCalled();
+    expect(criarProvedorPorIdMock).not.toHaveBeenCalled();
   });
 
   it("POST /ia/sugerir: falha do motor devolve 500 tratado e reseta o singleton; sucesso seguinte carrega e reusa (Fase 1, SPEC-23)", async () => {
@@ -159,7 +162,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     // rejeição não tratada e derrubava o processo INTEIRO do `gerador open`
     // (open.ts chama tratarApiLocal sem try/catch no request handler) — não
     // só essa requisição.
-    carregarModeloChatMock.mockRejectedValueOnce(new Error("binário nativo bloqueado"));
+    criarProvedorPorIdMock.mockRejectedValueOnce(new Error("binário nativo bloqueado"));
     const falha = await fetch(`${base}/ia/sugerir`, {
       method: "POST",
       body: JSON.stringify({ tech: "Backend", rotulo: "DLQ configurada e monitorada", contextoNo: "fila rabbitmq" }),
@@ -188,7 +191,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     });
 
     // 2 chamadas totais a carregarModeloChat: a que falhou (passo 1) + a que carregou de verdade (passo 3).
-    expect(carregarModeloChatMock).toHaveBeenCalledTimes(2);
+    expect(criarProvedorPorIdMock).toHaveBeenCalledTimes(2);
   });
 
   it("POST /ia/sugerir inclui o contexto do épico no prompt quando presente (Fase 1b, SPEC-23)", async () => {
@@ -264,12 +267,13 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       }),
     });
     expect(resposta.status).toBe(503);
-    expect(carregarModeloChatMock).not.toHaveBeenCalled();
+    expect(criarProvedorPorIdMock).not.toHaveBeenCalled();
   });
 
   it("POST /ia/pipeline/:papel sem nenhum item com placeholder devolve 400 (SPEC-24 Fase B)", async () => {
     verificarStatusMock.mockResolvedValue({
       chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
     });
     const resposta = await fetch(`${base}/ia/pipeline/po`, {
       method: "POST",
@@ -281,6 +285,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
   it("POST /ia/pipeline/po recebe um LOTE de itens numa chamada só, com schema aninhado por item (SPEC-24 Fase E — achado real: chamada por item era lento demais)", async () => {
     verificarStatusMock.mockResolvedValue({
       chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
     });
 
     const resposta = await fetch(`${base}/ia/pipeline/po`, {
@@ -337,6 +342,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
   it("POST /ia/pipeline/arquiteto usa o preâmbulo do Arquiteto — prompt diferente do PO pro mesmo item (SPEC-24 Fase B)", async () => {
     verificarStatusMock.mockResolvedValue({
       chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
     });
 
     await fetch(`${base}/ia/pipeline/arquiteto`, {
@@ -361,6 +367,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
   it("encadeamento: respostasAnteriores dos papéis anteriores entram no prompt como insumo ('a ideia de pipeline é justamente essa')", async () => {
     verificarStatusMock.mockResolvedValue({
       chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
     });
 
     await fetch(`${base}/ia/pipeline/arquiteto`, {
@@ -388,6 +395,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
   it("preâmbulo padrão do PO prescreve formato e profundidade (3 a 7 critérios) — achado real: respostas de 2-3 linhas", async () => {
     verificarStatusMock.mockResolvedValue({
       chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
     });
     await fetch(`${base}/ia/pipeline/po`, {
       method: "POST",
@@ -403,6 +411,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
   it("Fase F: preâmbulo custom da config vence o padrão; papel custom sem preâmbulo cai no padrão do GRUPO dele", async () => {
     verificarStatusMock.mockResolvedValue({
       chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
     });
     mkdirSync(join(dirTemp, "config"), { recursive: true });
     writeFileSync(
@@ -433,6 +442,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
   it("POST /ia/pipeline/:papel com papel desconhecido usa o preâmbulo genérico, não devolve erro (SPEC-24 Fase B — pipeline configurável)", async () => {
     verificarStatusMock.mockResolvedValue({
       chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
     });
 
     const resposta = await fetch(`${base}/ia/pipeline/agente-custom`, {
@@ -688,6 +698,40 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
 
     const resposta = await fetch(`${base}/especificacao-template`).then((r) => r.json());
     expect(resposta.conteudo).toBe("# {{titulo}} customizado");
+  });
+
+  it("GET /config/ia sem arquivo local devolve o provedor padrão (SPEC-25 Fase 0)", async () => {
+    const resposta = await fetch(`${base}/config/ia`).then((r) => r.json());
+    expect(resposta).toEqual({ provedorPadrao: "qwen-local" });
+  });
+
+  it("PUT /config/ia troca o modelo, grava em config/ia.json e o próximo pedido usa o provedor novo", async () => {
+    verificarStatusMock.mockResolvedValue({
+      chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "deepseek-local", modelosChat: [],
+    });
+
+    const put = await fetch(`${base}/config/ia`, {
+      method: "PUT",
+      body: JSON.stringify({ provedorPadrao: "deepseek-local" }),
+    });
+    expect(put.status).toBe(200);
+    expect(await fetch(`${base}/config/ia`).then((r) => r.json())).toEqual({ provedorPadrao: "deepseek-local" });
+
+    await fetch(`${base}/ia/sugerir`, {
+      method: "POST",
+      body: JSON.stringify({ tech: "Backend", rotulo: "x", contextoNo: "" }),
+    });
+    expect(criarProvedorPorIdMock).toHaveBeenCalledWith("deepseek-local");
+  });
+
+  it("PUT /config/ia com provedor desconhecido devolve 400 — não deixa a esteira cair no padrão sem avisar", async () => {
+    const resposta = await fetch(`${base}/config/ia`, {
+      method: "PUT",
+      body: JSON.stringify({ provedorPadrao: "modelo-que-nao-existe" }),
+    });
+    expect(resposta.status).toBe(400);
+    expect(await fetch(`${base}/config/ia`).then((r) => r.json())).toEqual({ provedorPadrao: "qwen-local" });
   });
 
   it("GET /config/pipeline-agentes sem arquivo local devolve o default — toggle + os 4 papéis de fábrica (Fase F)", async () => {

@@ -18,12 +18,35 @@ afterEach(() => {
 describe("verificarStatus", () => {
   it("nenhum modelo presente: os dois false, pronto false", async () => {
     const status = await verificarStatus(base);
-    expect(status).toEqual({
+    expect(status).toMatchObject({
       chatInstalado: false,
       embeddingInstalado: false,
       pronto: false,
       caminhoModelos: join(base, ".gerador", "models"),
+      provedor: "qwen-local",
     });
+  });
+
+  it("SPEC-25: reporta os modelos de chat um a um, marcando o selecionado", async () => {
+    const dirModelos = join(base, ".gerador", "models");
+    mkdirSync(dirModelos, { recursive: true });
+    writeFileSync(join(dirModelos, MODELO_CHAT.nomeArquivo), "qwen-baixado");
+    writeFileSync(join(dirModelos, MODELO_EMBEDDING.nomeArquivo), "embedding-baixado");
+
+    // Sem seleção explícita, o padrão (Qwen) manda — e está instalado.
+    const padrao = await verificarStatus(base);
+    expect(padrao.pronto).toBe(true);
+    expect(padrao.modelosChat.map((m) => [m.id, m.instalado, m.selecionado])).toEqual([
+      ["qwen-local", true, true],
+      ["deepseek-local", false, false],
+    ]);
+
+    // Selecionando o DeepSeek (que NÃO está baixado), a IA deixa de estar
+    // pronta — mesmo com o Qwen no disco. `pronto` é sobre o selecionado.
+    const comDeepSeek = await verificarStatus(base, "deepseek-local");
+    expect(comDeepSeek.chatInstalado).toBe(false);
+    expect(comDeepSeek.pronto).toBe(false);
+    expect(comDeepSeek.provedor).toBe("deepseek-local");
   });
 
   it("só o modelo de chat presente: pronto continua false (precisa dos dois)", async () => {

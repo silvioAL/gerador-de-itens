@@ -223,12 +223,40 @@ export interface PedidoSugestaoIa {
   contextoEpico?: string;
 }
 
+/** Um modelo de chat alternável e seu estado no disco (SPEC-25). */
+export interface StatusModeloChat {
+  id: string;
+  nome: string;
+  papel: string;
+  instalado: boolean;
+  tamanhoAproximadoBytes: number;
+  raciocinador: boolean;
+  selecionado: boolean;
+}
+
 export interface StatusIa {
+  /** Do modelo SELECIONADO — é o que libera a esteira. */
   chatInstalado: boolean;
   embeddingInstalado: boolean;
   pronto: boolean;
   caminhoModelos: string;
+  /** SPEC-25 — ausentes em servidor antigo; a UI trata como lista vazia. */
+  provedor?: string;
+  modelosChat?: StatusModeloChat[];
 }
+
+export interface ConfigIa {
+  provedorPadrao: string;
+}
+
+/** SPEC-25 Fase 0 — qual provedor/modelo a IA usa neste projeto
+ * (`config/ia.json`). Trocar aqui derruba o modelo carregado no servidor: o
+ * próximo pedido sobe o novo. */
+export const apiConfigIa = {
+  obter: () => requisitar<ConfigIa>("/config/ia"),
+  salvar: (dados: ConfigIa) =>
+    requisitar<ConfigIa>("/config/ia", { method: "PUT", body: JSON.stringify(dados) }),
+};
 
 /** Fase 1d-ii (SPEC-23) — um placeholder a resolver dentro da ficha de um
  * item (chave namespaced por tech, ou `_historiaUsuario`/`_criteriosAceite`). */

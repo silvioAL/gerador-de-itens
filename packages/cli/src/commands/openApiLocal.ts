@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { TEMPLATE_ESPECIFICACAO_PADRAO, type PerfisConfig, type Quebra } from "@gerador/engine";
-import { caminhoDoModelo, carregarModeloChat, MODELO_CHAT, verificarStatus, type MotorChat } from "@gerador/llm";
+import { MODELOS_CHAT, criarProvedorPorId, verificarStatus, type ProvedorIa } from "@gerador/llm";
 import type { GbnfJsonSchema } from "node-llama-cpp";
 
 const CAMPO_GLOBAL = "__global__";
@@ -511,20 +511,77 @@ async function tratarPipelineAgentes(req: IncomingMessage, res: ServerResponse, 
 // --- POST /ia/sugerir — fluxo 3 (Fase 1, SPEC-23): sugestão de texto pra um
 // placeholder "<- ✍️ especificar" do checklist técnico/volumetria ---
 
+// --- config/ia.json — qual provedor/modelo a IA usa (SPEC-25 Fase 0) ---
+
+interface ConfigIaLocal {
+  provedorPadrao: string;
+}
+const CONFIG_IA_PADRAO: ConfigIaLocal = { provedorPadrao: MODELOS_CHAT[0].id };
+
+async function lerConfigIa(dirProjeto: string): Promise<ConfigIaLocal> {
+  const config = await lerJsonOpcional<Partial<ConfigIaLocal>>(resolve(dirProjeto, "config", "ia.json"));
+  const id = typeof config?.provedorPadrao === "string" ? config.provedorPadrao : undefined;
+  return { provedorPadrao: id ?? CONFIG_IA_PADRAO.provedorPadrao };
+}
+
+async function tratarConfigIa(req: IncomingMessage, res: ServerResponse, metodo: string, dirProjeto: string): Promise<void> {
+  const arquivo = resolve(dirProjeto, "config", "ia.json");
+  if (metodo === "GET") {
+    return enviarJson(res, 200, await lerConfigIa(dirProjeto));
+  }
+  if (metodo === "PUT") {
+    const corpo = await lerCorpoJson<Partial<ConfigIaLocal>>(req);
+    // Só aceita id de provedor conhecido — id inventado deixaria a esteira
+    // silenciosamente no modelo padrão sem o usuário entender por quê.
+    const conhecido = MODELOS_CHAT.some((m) => m.id === corpo.provedorPadrao);
+    if (!conhecido) {
+      return enviarJson(res, 400, { erro: `provedor desconhecido: ${String(corpo.provedorPadrao)}` });
+    }
+    const config: ConfigIaLocal = { provedorPadrao: corpo.provedorPadrao as string };
+    await mkdir(resolve(dirProjeto, "config"), { recursive: true });
+    await writeFile(arquivo, JSON.stringify(config, null, 2), "utf-8");
+    // Troca de modelo derruba o provedor carregado — o próximo pedido sobe o
+    // novo. Descartar aqui (e não só trocar a referência) libera os GB do
+    // modelo antigo da memória em vez de deixar os dois carregados.
+    void descartarProvedor();
+    return enviarJson(res, 200, config);
+  }
+  enviarJson(res, 404, { erro: "não encontrado" });
+}
+
+// --- POST /ia/sugerir — fluxo 3 (Fase 1, SPEC-23): sugestão de texto pra um
+// placeholder "<- ✍️ especificar" do checklist técnico/volumetria ---
+
 // Carrega o modelo de chat UMA VEZ por processo (lazy, no primeiro POST) —
 // não por requisição, o que custaria segundos por sugestão. Sem cache de
 // resposta entre chamadas diferentes: reiniciar `gerador open` descarrega o
 // modelo, é o único "cache" que existe aqui (mesma decisão de `motor.ts`,
-// que não guarda estado escondido — quem chama decide).
-let motorChatSingleton: Promise<MotorChat> | undefined;
-function obterMotorChat(): Promise<MotorChat> {
-  motorChatSingleton ??= carregarModeloChat(caminhoDoModelo(MODELO_CHAT));
-  return motorChatSingleton;
+// que não guarda estado escondido — quem chama decide). Desde a Fase 0 o
+// singleton guarda TAMBÉM qual provedor foi carregado: trocar o modelo na
+// config precisa recarregar, não reaproveitar o antigo.
+let provedorSingleton: { id: string; provedor: Promise<ProvedorIa> } | undefined;
+
+async function obterProvedor(dirProjeto: string): Promise<ProvedorIa> {
+  const { provedorPadrao } = await lerConfigIa(dirProjeto);
+  if (provedorSingleton?.id !== provedorPadrao) {
+    void descartarProvedor();
+    provedorSingleton = { id: provedorPadrao, provedor: criarProvedorPorId(provedorPadrao) };
+  }
+  return provedorSingleton.provedor;
 }
 
-async function tratarIaSugerir(req: IncomingMessage, res: ServerResponse): Promise<void> {
+async function descartarProvedor(): Promise<void> {
+  const anterior = provedorSingleton;
+  provedorSingleton = undefined;
+  if (!anterior) return;
+  // Falha ao descartar (modelo que nem chegou a carregar) não pode derrubar
+  // a requisição que pediu a troca.
+  await anterior.provedor.then((p) => p.descartar()).catch(() => undefined);
+}
+
+async function tratarIaSugerir(req: IncomingMessage, res: ServerResponse, dirProjeto: string): Promise<void> {
   try {
-    const status = await verificarStatus();
+    const status = await verificarStatus(undefined, (await lerConfigIa(dirProjeto)).provedorPadrao);
     if (!status.pronto) {
       enviarJson(res, 503, { erro: "modelos de IA não instalados — rode `gerador ia instalar`" });
       return;
@@ -547,7 +604,7 @@ async function tratarIaSugerir(req: IncomingMessage, res: ServerResponse): Promi
       `Responda de forma curta, específica e em português, com uma decisão concreta pra esse requisito nesse contexto. Não repita o requisito, só a resposta.`,
     ].join("\n");
 
-    const motor = await obterMotorChat();
+    const provedor = await obterProvedor(dirProjeto);
 
     // Fase 1c (SPEC-23): texto livre (sem GBNF) — o schema de sugestão sempre
     // foi um único campo string (`valor`), então "estrutura" era decorativa;
@@ -556,7 +613,7 @@ async function tratarIaSugerir(req: IncomingMessage, res: ServerResponse): Promi
     // em pedaços — `res.write()` várias vezes faz o Node fazer chunked
     // transfer sozinho, sem precisar setar o header à mão.
     res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" });
-    await motor.completar(prompt, { onTexto: (pedaco) => res.write(pedaco) });
+    await provedor.completar(prompt, { onTexto: (pedaco) => res.write(pedaco) });
     res.end();
   } catch (erro) {
     // Achado real: sem este catch, uma falha no motor de IA (binário nativo
@@ -565,7 +622,7 @@ async function tratarIaSugerir(req: IncomingMessage, res: ServerResponse): Promi
     // — não só essa requisição (open.ts chama tratarApiLocal sem try/catch
     // no request handler). Descarta o singleton pra tentar carregar de novo
     // na próxima chamada, sem precisar reiniciar o servidor.
-    motorChatSingleton = undefined;
+    void descartarProvedor();
     const mensagem = erro instanceof Error ? erro.message : "Falha desconhecida ao gerar sugestão.";
     // Achado real (Fase 1c): se o streaming já começou, `res.writeHead` já
     // rodou — não dá mais pra trocar o status code. Falha nessa janela é rara
@@ -644,7 +701,7 @@ async function preambuloDoPapel(papel: string, dirProjeto: string): Promise<stri
 
 async function tratarIaPipeline(req: IncomingMessage, res: ServerResponse, papel: string, dirProjeto: string): Promise<void> {
   try {
-    const status = await verificarStatus();
+    const status = await verificarStatus(undefined, (await lerConfigIa(dirProjeto)).provedorPadrao);
     if (!status.pronto) {
       enviarJson(res, 503, { erro: "modelos de IA não instalados — rode `gerador ia instalar`" });
       return;
@@ -725,7 +782,7 @@ async function tratarIaPipeline(req: IncomingMessage, res: ServerResponse, papel
       ...blocosItens,
     ].join("\n");
 
-    const motor = await obterMotorChat();
+    const provedor = await obterProvedor(dirProjeto);
     // SPEC-24 Fase E (achado real: "fica só o ícone de gerando e 3 pontos...
     // mostrar o que está rodando no modelo seria a melhor coisa, tal como a
     // experiência que existe com o Claude"): a resposta vira o texto CRU do
@@ -734,10 +791,10 @@ async function tratarIaPipeline(req: IncomingMessage, res: ServerResponse, papel
     // então o cliente acumula, mostra ao vivo, e faz o parse no final —
     // sem precisar de um segundo canal pra resposta estruturada.
     res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" });
-    await motor.completarComSchema(prompt, schema, { onTexto: (pedaco) => res.write(pedaco) });
+    await provedor.completarEstruturado(prompt, schema, { onTexto: (pedaco) => res.write(pedaco) });
     res.end();
   } catch (erro) {
-    motorChatSingleton = undefined;
+    void descartarProvedor();
     const mensagem = erro instanceof Error ? erro.message : "Falha desconhecida ao gerar a ficha.";
     // Mesmo achado da Fase 1c: se o streaming já começou, não dá mais pra
     // trocar o status — encerra, e o cliente trata JSON incompleto como falha.
@@ -768,11 +825,15 @@ export async function tratarApiLocal(req: IncomingMessage, res: ServerResponse, 
     return true;
   }
   if (caminho === "/ia/status" && metodo === "GET") {
-    enviarJson(res, 200, await verificarStatus());
+    enviarJson(res, 200, await verificarStatus(undefined, (await lerConfigIa(dirProjeto)).provedorPadrao));
     return true;
   }
   if (caminho === "/ia/sugerir" && metodo === "POST") {
-    await tratarIaSugerir(req, res);
+    await tratarIaSugerir(req, res, dirProjeto);
+    return true;
+  }
+  if (caminho === "/config/ia" && (metodo === "GET" || metodo === "PUT")) {
+    await tratarConfigIa(req, res, metodo, dirProjeto);
     return true;
   }
   if (caminho === "/config/pipeline-agentes" && (metodo === "GET" || metodo === "PUT")) {

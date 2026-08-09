@@ -7,8 +7,9 @@ import { CamposArestaTab } from "./CamposArestaTab";
 import { MembrosTab } from "./MembrosTab";
 import { EspecificacaoTemplateTab } from "./EspecificacaoTemplateTab";
 import { PipelineAgentesTab } from "./PipelineAgentesTab";
+import { ModeloIaTab } from "./ModeloIaTab";
 
-export type AbaConfig = "perfis" | "campos" | "camposAresta" | "membros" | "especificacao" | "pipeline";
+export type AbaConfig = "perfis" | "campos" | "camposAresta" | "membros" | "especificacao" | "pipeline" | "modeloIa";
 
 export interface ConfigScreenProps {
   config: DiagramaConfig;
@@ -126,6 +127,9 @@ export function ConfigScreen({
         <button onClick={() => setAba("pipeline")} style={aba === "pipeline" ? abaAtivaEstilo : abaEstilo}>
           Pipeline de IA
         </button>
+        <button onClick={() => setAba("modeloIa")} style={aba === "modeloIa" ? abaAtivaEstilo : abaEstilo}>
+          Modelo de IA
+        </button>
       </div>
 
       <div style={{ flex: 1, overflow: "auto", padding: 24 }}>
@@ -161,6 +165,7 @@ export function ConfigScreen({
           />
         )}
         {aba === "pipeline" && <PipelineAgentesTab config={pipelineAgentes} onSalvar={onSalvarPipelineAgentes} />}
+        {aba === "modeloIa" && <ModeloIaTab />}
       </div>
     </div>
   );
