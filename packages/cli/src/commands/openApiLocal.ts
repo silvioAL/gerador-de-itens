@@ -594,25 +594,39 @@ async function tratarIaSugerir(req: IncomingMessage, res: ServerResponse): Promi
 // `/ia/sugerir` (streaming, um placeholder, botão manual "✨ Sugerir")
 // continua intocado. Papel desconhecido cai no preâmbulo genérico (nunca
 // 400 — o pipeline é configurável, SPEC-24 Fase F vai permitir papel custom).
+// Preâmbulos padrão com FORMATO e PROFUNDIDADE explícitos (achado real do
+// usuário: "as respostas do PO têm 2-3 linhas, muito distante da necessidade
+// real — ~3-7 critérios de aceite"). Um modelo local pequeno responde o
+// mínimo quando o prompt não prescreve estrutura; estes são o piso — cada
+// papel pode ter o preâmbulo sobrescrito na config (Fase F).
 const PREAMBULO_PADRAO_POR_PAPEL: Record<string, string> = {
   po: [
     `Você é o Product Owner num time de desenvolvimento de software.`,
-    `Escreva a história de usuário e os critérios de aceite deste item.`,
+    `Pra história de usuário: escreva no formato "Como <persona>, quero <capacidade>, para <benefício>",`,
+    `específica pra ESTE item e este contexto — nunca genérica.`,
+    `Pros critérios de aceite: escreva uma lista NUMERADA de 3 a 7 critérios, um por linha,`,
+    `cada um objetivo e verificável. Cubra o caminho feliz, pelo menos um caso de erro/exceção`,
+    `e pelo menos um limite ou regra de negócio do contexto (use os números e restrições`,
+    `do épico quando existirem — latências, prazos, limites, regulações).`,
   ].join(" "),
   arquiteto: [
     `Você é o Arquiteto de software responsável pelo contrato técnico deste item.`,
-    `Descreva o nó de arquitetura vinculado, o request, o response, os erros`,
-    `possíveis e as dependências — decisões concretas, nunca genéricas.`,
+    `Descreva o nó de arquitetura vinculado, o request (campos com tipos), o response`,
+    `(campos com tipos), os erros possíveis (código + motivo + comportamento esperado, um por linha)`,
+    `e as dependências nomeadas — decisões concretas, nunca genéricas.`,
   ].join(" "),
   especialista: [
     `Você é o Especialista técnico responsável pelos requisitos de refinamento`,
-    `deste item, pra tech e contexto informados — cada requisito precisa de`,
-    `uma decisão concreta pra esse caso específico.`,
+    `deste item, pra tech e contexto informados. Cada requisito precisa de uma`,
+    `decisão concreta pra esse caso específico: a escolha, o valor/configuração`,
+    `exata e o porquê em 1-2 frases.`,
   ].join(" "),
   qa: [
     `Você é o QA responsável pelas regras de teste e cenários Gherkin deste item.`,
-    `Escreva regras de teste automatizado e um cenário Gherkin adicional`,
-    `específico pro contexto — não repita cenários óbvios de erro genérico.`,
+    `Pras regras de teste: lista NUMERADA de 3 a 6 regras de teste automatizado, uma por linha,`,
+    `cobrindo o contrato, os erros e os limites definidos pelos papéis anteriores.`,
+    `Pro cenário: um cenário Gherkin completo (Dado/Quando/Então) específico do contexto`,
+    `— não repita cenários óbvios de erro genérico.`,
   ].join(" "),
 };
 const PREAMBULO_GENERICO =
@@ -650,6 +664,11 @@ async function tratarIaPipeline(req: IncomingMessage, res: ServerResponse, papel
         rotulo: string;
         contextoNo: string;
         placeholders: { chave: string; tech: string; rotulo: string }[];
+        /** Encadeamento (achado real: "deveriam responder, pois está
+         * preenchido — a ideia de pipeline é justamente essa"): o que os
+         * papéis ANTERIORES já escreveram pra este item, pro papel atual
+         * construir em cima em vez de trabalhar às cegas. */
+        respostasAnteriores?: { rotulo: string; valor: string }[];
       }[];
     }>(req);
 
@@ -678,6 +697,17 @@ async function tratarIaPipeline(req: IncomingMessage, res: ServerResponse, papel
         `### Item "${item.rotulo}" (chave "${item.chave}")`,
         `Contexto do(s) nó(s) de arquitetura envolvidos:`,
         item.contextoNo || "(sem contexto adicional)",
+        // Encadeamento entre papéis: o artefato dos anteriores é insumo, não
+        // decoração. Valores longos são cortados em 600 chars só por defesa
+        // da janela do modelo — o essencial de uma história/contrato cabe.
+        ...(item.respostasAnteriores?.length
+          ? [
+              `O que os papéis anteriores já definiram pra este item (construa em cima disso, sem contradizer):`,
+              ...item.respostasAnteriores.map(
+                (r) => `- ${r.rotulo}: ${r.valor.length > 600 ? `${r.valor.slice(0, 600)}…` : r.valor}`
+              ),
+            ]
+          : []),
         `Campos a responder (responda pela chave entre aspas):`,
         ...item.placeholders.map((p) => `- (chave "${p.chave}") ${p.tech ? `[${p.tech}] ` : ""}${p.rotulo}`),
       ].join("\n")

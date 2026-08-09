@@ -307,7 +307,21 @@ export function ReviewScreen({
         }
         const temTrabalho = lista.some((p) => placeholdersPedido[p.id].length > 0);
         if (!temTrabalho) continue;
-        filaNova.push({ atividadeChave: a.chave, atividadeRotulo: a.rotulo, contextoNo, placeholdersPorPapel: placeholdersPedido });
+        // Encadeamento: tudo que JÁ está respondido e NÃO vai ser regenerado
+        // nesta corrida entra como insumo dos papéis (o Arquiteto lê a
+        // história que o PO escreveu — "a ideia de pipeline é justamente
+        // essa"). As respostas geradas durante a corrida o hook acumula.
+        const chavesNaFila = new Set(Object.values(placeholdersPedido).flat().map((p) => p.chave));
+        const respostasExistentes = GRUPOS_FICHA.flatMap((grupo) => porGrupo[grupo])
+          .filter((p) => typeof p.resposta?.valor === "string" && p.resposta.valor !== "" && !chavesNaFila.has(p.chave))
+          .map((p) => ({ rotulo: p.rotulo, valor: String(p.resposta?.valor) }));
+        filaNova.push({
+          atividadeChave: a.chave,
+          atividadeRotulo: a.rotulo,
+          contextoNo,
+          placeholdersPorPapel: placeholdersPedido,
+          respostasExistentes,
+        });
       }
       return filaNova;
     },
@@ -320,6 +334,49 @@ export function ReviewScreen({
     confirmacaoObrigatoria,
     onResponderItem: (atividadeChave, chavePlaceholder, resposta) => onResponderItem?.(atividadeChave, chavePlaceholder, resposta),
   });
+
+  // "O usuário poderá revisar, alterar e aí roda de novo o ciclo a partir
+  // daquela alteração" (registrado desde a Fase E, possível agora que os
+  // papéis são encadeados): regenera, SÓ pra este item, os papéis que vêm
+  // DEPOIS do dono da seção alterada — a alteração (e todo o resto já
+  // respondido fora do que será regenerado) entra como insumo via
+  // `respostasExistentes`.
+  const reRodarSeguintes = useCallback(
+    (atividadeChave: string, grupoAlterado: GrupoFicha) => {
+      const a = resultado.atividades.find((x) => x.chave === atividadeChave);
+      const ficha = fichas.get(atividadeChave);
+      if (!a || !ficha) return;
+      const dono = papelDoGrupo(papeisAtivos, grupoAlterado, a);
+      if (!dono) return;
+      const seguintes = papeisAtivos.slice(papeisAtivos.findIndex((p) => p.id === dono.id) + 1);
+      if (seguintes.length === 0) return;
+      const porGrupo = placeholdersPorPapel(ficha);
+      const placeholdersPedido: Record<string, PlaceholderPedidoItemIa[]> = Object.fromEntries(
+        papeisAtivos.map((p) => [p.id, [] as PlaceholderPedidoItemIa[]])
+      );
+      for (const grupo of GRUPOS_FICHA) {
+        const donoGrupo = papelDoGrupo(papeisAtivos, grupo, a);
+        if (!donoGrupo || !seguintes.some((p) => p.id === donoGrupo.id)) continue;
+        // Regenera TUDO dos papéis seguintes (mesmo confirmado) — a montante mudou.
+        placeholdersPedido[donoGrupo.id].push(...porGrupo[grupo].map((p) => ({ chave: p.chave, tech: p.tech, rotulo: p.rotulo })));
+      }
+      const chavesNaFila = new Set(Object.values(placeholdersPedido).flat().map((p) => p.chave));
+      if (chavesNaFila.size === 0) return;
+      const respostasExistentes = GRUPOS_FICHA.flatMap((g) => porGrupo[g])
+        .filter((p) => typeof p.resposta?.valor === "string" && p.resposta.valor !== "" && !chavesNaFila.has(p.chave))
+        .map((p) => ({ rotulo: p.rotulo, valor: String(p.resposta?.valor) }));
+      esteira.iniciar([
+        {
+          atividadeChave,
+          atividadeRotulo: a.rotulo,
+          contextoNo: contextoDoPlaceholder(ficha.especificacaoTecnica),
+          placeholdersPorPapel: placeholdersPedido,
+          respostasExistentes,
+        },
+      ]);
+    },
+    [resultado.atividades, fichas, papeisAtivos, esteira]
+  );
 
   useEffect(() => {
     // Só na montagem: dispara sozinha quando o modelo já está instalado E há
@@ -715,6 +772,13 @@ export function ReviewScreen({
                           ? esteira.respostasAoVivoPorItem[atividadeSelecionada.chave]
                           : undefined
                       }
+                      gruposComSeguinte={GRUPOS_FICHA.filter((g) => {
+                        const dono = papelDoGrupo(papeisAtivos, g, atividadeSelecionada);
+                        return !!dono && papeisAtivos.findIndex((p) => p.id === dono.id) < papeisAtivos.length - 1;
+                      })}
+                      onReRodarSeguintes={
+                        esteira.rodando ? undefined : (grupo) => reRodarSeguintes(atividadeSelecionada.chave, grupo)
+                      }
                     />
                   )}
                   {aba === "testes" && <AbaTestes ficha={fichaSelecionada} />}
@@ -852,6 +916,13 @@ interface AbaRefinamentoProps {
   /** Nome do papel CONFIGURADO em geração (Fase F) — pro "✨ escrevendo…".
    * Ausente cai no rótulo fixo da seção. */
   nomePapelEmGeracao?: string;
+  /** Seções cujo dono tem papéis DEPOIS na esteira — só nelas faz sentido o
+   * "re-rodar a partir daqui". */
+  gruposComSeguinte?: GrupoFicha[];
+  /** "Revisar, alterar e rodar de novo o ciclo a partir daquela alteração":
+   * regenera os papéis seguintes deste item usando esta seção como insumo.
+   * `undefined` enquanto a esteira roda (sem reentrada no meio). */
+  onReRodarSeguintes?: (grupo: GrupoFicha) => void;
   /** SPEC-24 Fase E — o que o modelo está ESCREVENDO agora, por chave
    * (extraído do JSON parcial streamado). O campo em geração mostra esse
    * texto digitando com um caret, em vez de "…" parado — achado real do
@@ -872,7 +943,16 @@ interface AbaRefinamentoProps {
  * "nada sugerido conta até confirmado" já usada pro semáforo de prontidão
  * dos nós).
  */
-function AbaRefinamento({ ficha, contextoEpico, onResponder, papelEmGeracao, nomePapelEmGeracao, respostasAoVivo }: AbaRefinamentoProps) {
+function AbaRefinamento({
+  ficha,
+  contextoEpico,
+  onResponder,
+  papelEmGeracao,
+  nomePapelEmGeracao,
+  respostasAoVivo,
+  gruposComSeguinte,
+  onReRodarSeguintes,
+}: AbaRefinamentoProps) {
   const [rascunhos, setRascunhos] = useState<Record<string, string>>({});
   const [carregando, setCarregando] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -922,7 +1002,20 @@ function AbaRefinamento({ ficha, contextoEpico, onResponder, papelEmGeracao, nom
         if (placeholders.length === 0) return null;
         return (
           <div key={papel}>
-            <span style={lblEstilo}>{ROTULO_PAPEL[papel]}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={lblEstilo}>{ROTULO_PAPEL[papel]}</span>
+              {onReRodarSeguintes &&
+                gruposComSeguinte?.includes(papel) &&
+                placeholders.some((p) => p.resposta !== undefined) && (
+                  <button
+                    onClick={() => onReRodarSeguintes(papel)}
+                    title="Regenera os papéis seguintes deste item usando esta seção (com as suas alterações) como insumo"
+                    style={reRodarEstilo}
+                  >
+                    ↻ Re-rodar papéis seguintes
+                  </button>
+                )}
+            </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 6 }}>
               {placeholders.map((p) => {
                 const confirmada = respostaConfirmada(p.resposta);
@@ -1180,6 +1273,17 @@ const metaGridEstilo: React.CSSProperties = {
   borderRadius: 10,
   overflow: "hidden",
   marginBottom: 20,
+};
+
+const reRodarEstilo: React.CSSProperties = {
+  fontSize: 10.5,
+  padding: "3px 10px",
+  borderRadius: 999,
+  border: "1px solid var(--borda-forte)",
+  background: "var(--painel-alto)",
+  color: "var(--acento)",
+  cursor: "pointer",
+  whiteSpace: "nowrap",
 };
 
 const lblEstilo: React.CSSProperties = {

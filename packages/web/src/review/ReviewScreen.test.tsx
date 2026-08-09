@@ -812,6 +812,52 @@ describe("ReviewScreen — esteira de agentes (SPEC-24 — orquestração real p
     expect(doGeral).toHaveLength(0);
   });
 
+  it("re-rodar a partir da alteração: botão na seção regenera SÓ os papéis seguintes deste item, com a alteração como insumo", async () => {
+    apiIaStatusMock.mockResolvedValueOnce({ chatInstalado: false, embeddingInstalado: false, pronto: false, caminhoModelos: "" });
+    const chamadas: { papel: string; itens: { chave: string; respostasAnteriores?: { rotulo: string; valor: string }[] }[] }[] = [];
+    apiIaSugerirPipelineMock.mockImplementation(async (papel: string, pedido: { itens: { chave: string; respostasAnteriores?: { rotulo: string; valor: string }[] }[] }) => {
+      chamadas.push({ papel, itens: pedido.itens });
+      return {};
+    });
+    const resultado = resultadoFixture01();
+    const atividade = atividadeComPlaceholder(resultado);
+    const user = userEvent.setup();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        regras={regrasUmPlaceholder}
+        especificacaoTemplate={templateFixture}
+        respostasItens={{
+          // A história foi revisada e ALTERADA pelo usuário — o ciclo tem que
+          // rodar de novo a partir daqui, com esse texto como insumo.
+          [atividade.chave]: {
+            _historiaUsuario: { valor: "Como analista, quero a versão REVISADA da história.", origem: "manual" },
+          },
+        }}
+        onResponderItem={vi.fn()}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByTestId(`item-${atividade.chave}`));
+    await user.click(screen.getByRole("button", { name: "Refinamento" }));
+    const botoes = await screen.findAllByRole("button", { name: "↻ Re-rodar papéis seguintes" });
+    await user.click(botoes[0]); // seção PO — a primeira com resposta
+
+    await waitFor(() => expect(apiIaSugerirPipelineMock).toHaveBeenCalled());
+    // Só papéis DEPOIS do PO; um item só; a história revisada vai como insumo.
+    expect(chamadas.every((c) => c.papel !== "po")).toBe(true);
+    expect(chamadas[0].itens).toHaveLength(1);
+    expect(chamadas[0].itens[0].chave).toBe(atividade.chave);
+    expect(chamadas[0].itens[0].respostasAnteriores).toEqual(
+      expect.arrayContaining([expect.objectContaining({ valor: "Como analista, quero a versão REVISADA da história." })])
+    );
+  });
+
   it("modelo não pronto: não dispara sozinha, tela fica no comportamento manual de sempre", async () => {
     apiIaStatusMock.mockResolvedValueOnce({ chatInstalado: false, embeddingInstalado: false, pronto: false, caminhoModelos: "" });
     const resultado = resultadoFixture01();

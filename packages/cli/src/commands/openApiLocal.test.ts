@@ -358,6 +358,48 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     expect(prompt).not.toContain("Product Owner");
   });
 
+  it("encadeamento: respostasAnteriores dos papéis anteriores entram no prompt como insumo ('a ideia de pipeline é justamente essa')", async () => {
+    verificarStatusMock.mockResolvedValue({
+      chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+    });
+
+    await fetch(`${base}/ia/pipeline/arquiteto`, {
+      method: "POST",
+      body: JSON.stringify({
+        itens: [
+          {
+            chave: "n1::setup",
+            rotulo: "Criar serviço",
+            contextoNo: "serviço novo",
+            placeholders: [{ chave: "_contratoRequest", tech: "", rotulo: "Request" }],
+            respostasAnteriores: [
+              { rotulo: "História de usuário", valor: "Como analista de crédito, quero consultar o score, para decidir em minutos." },
+            ],
+          },
+        ],
+      }),
+    });
+
+    const [prompt] = completarComSchemaMock.mock.calls.at(-1) as [string];
+    expect(prompt).toContain("O que os papéis anteriores já definiram");
+    expect(prompt).toContain("História de usuário: Como analista de crédito, quero consultar o score");
+  });
+
+  it("preâmbulo padrão do PO prescreve formato e profundidade (3 a 7 critérios) — achado real: respostas de 2-3 linhas", async () => {
+    verificarStatusMock.mockResolvedValue({
+      chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+    });
+    await fetch(`${base}/ia/pipeline/po`, {
+      method: "POST",
+      body: JSON.stringify({
+        itens: [{ chave: "n1::setup", rotulo: "x", contextoNo: "", placeholders: [{ chave: "_historiaUsuario", tech: "", rotulo: "História" }] }],
+      }),
+    });
+    const [prompt] = completarComSchemaMock.mock.calls.at(-1) as [string];
+    expect(prompt).toContain("lista NUMERADA de 3 a 7 critérios");
+    expect(prompt).toContain("Como <persona>, quero <capacidade>, para <benefício>");
+  });
+
   it("Fase F: preâmbulo custom da config vence o padrão; papel custom sem preâmbulo cai no padrão do GRUPO dele", async () => {
     verificarStatusMock.mockResolvedValue({
       chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
