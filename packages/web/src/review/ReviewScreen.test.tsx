@@ -1325,3 +1325,42 @@ describe("ReviewScreen — obsolescência de respostas (SPEC-26 Bloco 1)", () =>
     expect(Object.keys(resposta.baseadoEm).length).toBeGreaterThan(0);
   });
 });
+
+describe("ReviewScreen — revisor determinístico (SPEC-26 Bloco 4a)", () => {
+  it("quebra com dependência órfã: botão de achados no header e painel que leva ao item", () => {
+    const resultado = resultadoFixture01();
+    // Simula o que acontece de verdade: um nó apagado deixa quem dependia dele
+    // apontando pro vazio.
+    resultado.atividades[0].dependencias = [{ type: "depende", alvoChave: "n9::sumido" }];
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    const botao = screen.getByTestId("abrir-revisor");
+    expect(botao).toHaveTextContent("erro");
+    fireEvent.click(botao);
+    expect(screen.getByTestId("painel-achados")).toHaveTextContent("n9::sumido");
+  });
+
+  it("quebra saudável não mostra o botão — revisor silencioso é revisor que não vira ruído", () => {
+    render(
+      <ReviewScreen
+        resultado={resultadoFixture01()}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+    expect(screen.queryByTestId("abrir-revisor")).not.toBeInTheDocument();
+  });
+});

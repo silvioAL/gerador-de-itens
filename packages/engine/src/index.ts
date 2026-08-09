@@ -65,3 +65,9 @@ export {
   type CarimboProcedencia,
   type InsumoDivergente,
 } from "./procedencia/procedencia.js";
+export {
+  revisarQuebra,
+  resumirAchados,
+  type Achado,
+  type SeveridadeAchado,
+} from "./revisao/checagens.js";
