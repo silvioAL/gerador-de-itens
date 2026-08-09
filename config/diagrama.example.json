@@ -3,32 +3,114 @@
     "service": {
       "label": "Serviço",
       "derives": "service",
-      "techs": ["Backend"],
+      "techs": [
+        "Backend"
+      ],
       "contextos": [],
       "color": "#3b82f6",
       "icon": "Server",
       "spec": [
-        { "key": "nome", "label": "Nome do serviço", "type": "text", "required": true, "identificador": true },
-        { "key": "linguagem", "label": "Linguagem/Stack", "type": "select",
-          "options": ["Java", "Node", "Python"], "required": false, "permiteNA": true,
-          "ajuda": "Sugerido automaticamente a partir do perfil de stack do time, quando configurado." },
-        { "key": "framework", "label": "Framework", "type": "text", "required": false, "permiteNA": true },
-        { "key": "endpoints", "label": "Endpoints", "type": "lista",
-          "required": false, "permiteNA": true,
+        {
+          "key": "nome",
+          "label": "Nome do serviço",
+          "type": "text",
+          "required": true,
+          "identificador": true
+        },
+        {
+          "key": "linguagem",
+          "label": "Linguagem/Stack",
+          "type": "select",
+          "options": [
+            "Java",
+            "Node",
+            "Python"
+          ],
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Sugerido automaticamente a partir do perfil de stack do time, quando configurado."
+        },
+        {
+          "key": "framework",
+          "label": "Framework",
+          "type": "text",
+          "required": false,
+          "permiteNA": true
+        },
+        {
+          "key": "endpoints",
+          "label": "Endpoints",
+          "type": "lista",
+          "required": false,
+          "permiteNA": true,
           "ajuda": "Um item por endpoint novo — method, path e o contrato de request/response de cada um. Sem isso, quem for implementar só sabe que o serviço existe, não o que ele expõe.",
           "itemSpec": [
-            { "key": "method", "label": "Method", "type": "select", "options": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
-            { "key": "path", "label": "Path", "type": "text" },
-            { "key": "action", "label": "Ação", "type": "select", "options": ["novo", "alterar", "nova-versao", "leitura"] },
-            { "key": "request", "label": "Contrato de request", "type": "textarea" },
-            { "key": "response", "label": "Contrato de response", "type": "textarea" }
-          ] },
-        { "key": "contratoGrpc", "label": "Contrato gRPC (serviço e mensagens)", "type": "textarea",
-          "required": false, "permiteNA": true, "when": { "hasIncomingEdge": ["grpc"] },
-          "ajuda": "Definição do serviço/mensagens — cole o .proto ou descreva. \"Endpoints\" é REST; isto é o contrato binário/protobuf." },
-        { "key": "contratoGraphql", "label": "Schema GraphQL (queries/mutations/tipos)", "type": "textarea",
-          "required": false, "permiteNA": true, "when": { "hasIncomingEdge": ["graphql"] },
-          "ajuda": "Queries/mutations/tipos expostos — cole o SDL ou descreva." }
+            {
+              "key": "method",
+              "label": "Method",
+              "type": "select",
+              "options": [
+                "GET",
+                "POST",
+                "PUT",
+                "PATCH",
+                "DELETE"
+              ]
+            },
+            {
+              "key": "path",
+              "label": "Path",
+              "type": "text"
+            },
+            {
+              "key": "action",
+              "label": "Ação",
+              "type": "select",
+              "options": [
+                "novo",
+                "alterar",
+                "nova-versao",
+                "leitura"
+              ]
+            },
+            {
+              "key": "request",
+              "label": "Contrato de request",
+              "type": "textarea"
+            },
+            {
+              "key": "response",
+              "label": "Contrato de response",
+              "type": "textarea"
+            }
+          ]
+        },
+        {
+          "key": "contratoGrpc",
+          "label": "Contrato gRPC (serviço e mensagens)",
+          "type": "textarea",
+          "required": false,
+          "permiteNA": true,
+          "when": {
+            "hasIncomingEdge": [
+              "grpc"
+            ]
+          },
+          "ajuda": "Definição do serviço/mensagens — cole o .proto ou descreva. \"Endpoints\" é REST; isto é o contrato binário/protobuf."
+        },
+        {
+          "key": "contratoGraphql",
+          "label": "Schema GraphQL (queries/mutations/tipos)",
+          "type": "textarea",
+          "required": false,
+          "permiteNA": true,
+          "when": {
+            "hasIncomingEdge": [
+              "graphql"
+            ]
+          },
+          "ajuda": "Queries/mutations/tipos expostos — cole o SDL ou descreva."
+        }
       ],
       "cenarioGherkinPadrao": "```gherkin\nDado que a requisição é válida\nQuando o endpoint é chamado\nEntão a resposta retorna 2xx com o corpo esperado\n\nDado que a requisição é inválida ou não autorizada\nQuando o endpoint é chamado\nEntão a resposta retorna o status 4xx apropriado (400/401/403/404), sem expor detalhe interno\n\nDado que ocorre um erro inesperado no processamento (ex.: exceção não tratada, dependência interna indisponível)\nQuando o endpoint é chamado\nEntão a resposta retorna 500, sem vazar stack trace ou detalhe interno no corpo\n```",
       "cenarioGherkinPorAresta": {
@@ -40,50 +122,200 @@
     "kafka": {
       "label": "Tópico Kafka",
       "derives": "queue",
-      "techs": ["Backend"],
-      "contextos": ["Backend-mensagens kafka"],
+      "techs": [
+        "Backend"
+      ],
+      "contextos": [
+        "Backend-mensagens kafka"
+      ],
       "color": "#f97316",
       "icon": "Radio",
       "spec": [
-        { "key": "topic", "label": "Nome do tópico", "type": "text", "required": true, "identificador": true },
-        { "key": "particoes", "label": "Número de partições", "type": "number", "default": 3, "required": true,
-          "ajuda": "Define o paralelismo máximo de consumo — não dá pra diminuir depois sem recriar o tópico." },
-        { "key": "chaveParticionamento", "label": "Chave de particionamento", "type": "text", "required": true,
-          "when": { "hasIncomingEdge": ["publishes", "pubsub"] },
-          "ajuda": "Mensagens com a mesma chave caem sempre na mesma partição — é o que garante ordem." },
-        { "key": "fatorReplicacao", "label": "Fator de replicação", "type": "number", "default": 3, "required": true,
-          "permiteNA": true, "ajuda": "Em cluster local de dev, 1 costuma bastar — N/A com motivo é aceitável aqui." },
-        { "key": "politicaRetencao", "label": "Política de retenção", "type": "select",
-          "options": ["tempo", "compactacao"], "default": "tempo", "required": true },
-        { "key": "retencaoMs", "label": "Retenção (ms)", "type": "number", "required": true,
-          "when": { "field": "politicaRetencao", "equals": "tempo" } },
-        { "key": "consumerGroup", "label": "Consumer group", "type": "text", "required": true,
-          "when": { "hasIncomingEdge": ["consumes", "pubsub"] } },
-        { "key": "offsetReset", "label": "Offset reset", "type": "select", "options": ["earliest", "latest"],
-          "default": "earliest", "required": true, "when": { "hasIncomingEdge": ["consumes", "pubsub"] } },
-        { "key": "ordenacao", "label": "Exige ordem estrita?", "type": "boolean", "required": true,
-          "when": { "hasIncomingEdge": ["consumes", "pubsub"] },
-          "ajuda": "Kafka só garante ordem dentro de uma partição, nunca entre partições." },
-        { "key": "idempotencia", "label": "Consumo é idempotente?", "type": "boolean", "required": true,
-          "when": { "hasIncomingEdge": ["consumes", "pubsub"] } },
-        { "key": "chaveDedupe", "label": "Chave de deduplicação", "type": "text", "required": true,
-          "when": { "allOf": [
-            { "field": "idempotencia", "equals": false },
-            { "hasIncomingEdge": ["consumes", "pubsub"] } ] } },
-        { "key": "topicoDlq", "label": "Tópico de erro (DLQ)", "type": "text", "required": true,
-          "when": { "hasIncomingEdge": ["consumes", "pubsub"] },
-          "ajuda": "Kafka não tem DLQ nativa — se não redirecionar mensagem com falha para um tópico próprio, ela se perde ou trava o consumidor." },
-        { "key": "schemaRegistry", "label": "Usa Schema Registry?", "type": "boolean", "default": false,
-          "required": true, "permiteNA": true },
-        { "key": "contratoMensagem", "label": "Formato da mensagem (payload)", "type": "textarea",
-          "required": false, "permiteNA": true,
-          "ajuda": "Campos do evento — cole um exemplo de JSON ou descreva o schema. A política de retry/DLQ não diz o que vai dentro da mensagem." },
-        { "key": "migracao", "label": "Plano de migração", "type": "text", "required": true,
-          "when": { "not": { "nodeStatus": "novo" } } }
+        {
+          "key": "topic",
+          "label": "Nome do tópico",
+          "type": "text",
+          "required": true,
+          "identificador": true
+        },
+        {
+          "key": "particoes",
+          "label": "Número de partições",
+          "type": "number",
+          "default": 3,
+          "required": true,
+          "ajuda": "Define o paralelismo máximo de consumo — não dá pra diminuir depois sem recriar o tópico."
+        },
+        {
+          "key": "chaveParticionamento",
+          "label": "Chave de particionamento",
+          "type": "text",
+          "required": true,
+          "when": {
+            "hasIncomingEdge": [
+              "publishes",
+              "pubsub"
+            ]
+          },
+          "ajuda": "Mensagens com a mesma chave caem sempre na mesma partição — é o que garante ordem."
+        },
+        {
+          "key": "fatorReplicacao",
+          "label": "Fator de replicação",
+          "type": "number",
+          "default": 3,
+          "required": true,
+          "permiteNA": true,
+          "ajuda": "Em cluster local de dev, 1 costuma bastar — N/A com motivo é aceitável aqui."
+        },
+        {
+          "key": "politicaRetencao",
+          "label": "Política de retenção",
+          "type": "select",
+          "options": [
+            "tempo",
+            "compactacao"
+          ],
+          "default": "tempo",
+          "required": true
+        },
+        {
+          "key": "retencaoMs",
+          "label": "Retenção (ms)",
+          "type": "number",
+          "required": true,
+          "when": {
+            "field": "politicaRetencao",
+            "equals": "tempo"
+          }
+        },
+        {
+          "key": "consumerGroup",
+          "label": "Consumer group",
+          "type": "text",
+          "required": true,
+          "when": {
+            "hasIncomingEdge": [
+              "consumes",
+              "pubsub"
+            ]
+          }
+        },
+        {
+          "key": "offsetReset",
+          "label": "Offset reset",
+          "type": "select",
+          "options": [
+            "earliest",
+            "latest"
+          ],
+          "default": "earliest",
+          "required": true,
+          "when": {
+            "hasIncomingEdge": [
+              "consumes",
+              "pubsub"
+            ]
+          }
+        },
+        {
+          "key": "ordenacao",
+          "label": "Exige ordem estrita?",
+          "type": "boolean",
+          "required": true,
+          "when": {
+            "hasIncomingEdge": [
+              "consumes",
+              "pubsub"
+            ]
+          },
+          "ajuda": "Kafka só garante ordem dentro de uma partição, nunca entre partições."
+        },
+        {
+          "key": "idempotencia",
+          "label": "Consumo é idempotente?",
+          "type": "boolean",
+          "required": true,
+          "when": {
+            "hasIncomingEdge": [
+              "consumes",
+              "pubsub"
+            ]
+          }
+        },
+        {
+          "key": "chaveDedupe",
+          "label": "Chave de deduplicação",
+          "type": "text",
+          "required": true,
+          "when": {
+            "allOf": [
+              {
+                "field": "idempotencia",
+                "equals": false
+              },
+              {
+                "hasIncomingEdge": [
+                  "consumes",
+                  "pubsub"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "key": "topicoDlq",
+          "label": "Tópico de erro (DLQ)",
+          "type": "text",
+          "required": true,
+          "when": {
+            "hasIncomingEdge": [
+              "consumes",
+              "pubsub"
+            ]
+          },
+          "ajuda": "Kafka não tem DLQ nativa — se não redirecionar mensagem com falha para um tópico próprio, ela se perde ou trava o consumidor."
+        },
+        {
+          "key": "schemaRegistry",
+          "label": "Usa Schema Registry?",
+          "type": "boolean",
+          "default": false,
+          "required": true,
+          "permiteNA": true
+        },
+        {
+          "key": "contratoMensagem",
+          "label": "Formato da mensagem (payload)",
+          "type": "textarea",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Campos do evento — cole um exemplo de JSON ou descreva o schema. A política de retry/DLQ não diz o que vai dentro da mensagem."
+        },
+        {
+          "key": "migracao",
+          "label": "Plano de migração",
+          "type": "text",
+          "required": true,
+          "when": {
+            "not": {
+              "nodeStatus": "novo"
+            }
+          }
+        }
       ],
-      "specResumo": ["particoes", "politicaRetencao", "schemaRegistry"],
+      "specResumo": [
+        "particoes",
+        "politicaRetencao",
+        "schemaRegistry"
+      ],
       "specResumoPorAresta": {
-        "consumes": ["consumerGroup", "offsetReset", "ordenacao", "idempotencia"]
+        "consumes": [
+          "consumerGroup",
+          "offsetReset",
+          "ordenacao",
+          "idempotencia"
+        ]
       },
       "cenarioGherkinPadrao": "```gherkin\nDado que o tópico existe com a configuração esperada (partições, retenção)\nQuando uma mensagem é publicada\nEntão ela chega ao tópico respeitando a chave de particionamento definida\n```",
       "cenarioGherkinPorAresta": {
@@ -95,115 +327,326 @@
     "rabbit": {
       "label": "Fila Rabbit",
       "derives": "queue",
-      "techs": ["Backend"],
-      "contextos": ["Backend-mensagens rabbitmq"],
+      "techs": [
+        "Backend"
+      ],
+      "contextos": [
+        "Backend-mensagens rabbitmq"
+      ],
       "color": "#dc2626",
       "icon": "Rabbit",
       "spec": [
-        { "key": "topic", "label": "Nome da fila", "type": "text", "required": true, "identificador": true,
-          "ajuda": "Nome completo, no padrão do time." },
-
-        { "key": "routingKey", "label": "Routing key da binding", "type": "text", "required": true,
-          "when": { "hasIncomingEdge": ["publishes", "pubsub", "binding"] },
-          "ajuda": "Chave usada na binding entre a exchange e esta fila. Publicação direto na fila (exchange padrão) usa o nome da fila como routing key." },
-
-        { "key": "durable", "label": "Durable", "type": "boolean",
-          "default": true, "required": true,
-          "ajuda": "Fila não durable some quando o broker reinicia." },
-
-        { "key": "queueType", "label": "Tipo de fila", "type": "select",
-          "options": ["quorum", "classic"], "default": "quorum", "required": true,
-          "ajuda": "Quorum é o recomendado para alta disponibilidade desde o RabbitMQ 3.8 — replica entre nós via consenso. Classic é o legado (inclusive mirrored classic, hoje desencorajado)." },
-
-        { "key": "dlq", "label": "Possui DLQ?", "type": "boolean",
-          "default": true, "required": true,
-          "when": { "hasIncomingEdge": ["consumes", "pubsub"] },
-          "ajuda": "Sem DLQ, mensagem que falha repetidamente é perdida ou trava a fila." },
-
-        { "key": "dlxName", "label": "Nome da DLX", "type": "text",
-          "default": "{{topic}}.dlx", "required": true,
-          "when": { "field": "dlq", "equals": true } },
-
-        { "key": "dlqRoutingKey", "label": "Routing key da DLX", "type": "text",
-          "default": "{{topic}}.dlq", "required": true,
-          "when": { "field": "dlq", "equals": true } },
-
-        { "key": "retryStrategy", "label": "Estratégia de retry", "type": "select",
-          "options": ["backoff", "delay-queue", "sem-retry"], "required": true,
-          "when": { "field": "dlq", "equals": true },
-          "ajuda": "backoff = retry do listener; delay-queue = fila de espera com TTL + DLX de volta. São incompatíveis; ver padrões." },
-
-        { "key": "retries", "label": "Tentativas", "type": "number", "default": 3, "required": true,
-          "when": { "field": "retryStrategy", "notEquals": "sem-retry" } },
-
-        { "key": "backoffInicialMs", "label": "Intervalo inicial (ms)", "type": "number",
-          "default": 1000, "required": true,
-          "when": { "field": "retryStrategy", "equals": "backoff" } },
-
-        { "key": "backoffMultiplicador", "label": "Multiplicador", "type": "number",
-          "default": 2, "required": true,
-          "when": { "field": "retryStrategy", "equals": "backoff" } },
-
-        { "key": "delayTtlMs", "label": "TTL da fila de espera (ms)", "type": "number",
+        {
+          "key": "topic",
+          "label": "Nome da fila",
+          "type": "text",
           "required": true,
-          "when": { "field": "retryStrategy", "equals": "delay-queue" } },
-
-        { "key": "ttl", "label": "TTL da mensagem (ms)", "type": "number",
-          "required": true, "permiteNA": true,
-          "ajuda": "Sem TTL, mensagem antiga é processada muito depois de perder o sentido." },
-
-        { "key": "maxLength", "label": "Tamanho máximo da fila", "type": "number",
-          "required": false, "permiteNA": true,
-          "ajuda": "Sem limite, um consumidor lento ou parado deixa a fila crescer sem controle até estourar memória/disco do broker." },
-
-        { "key": "overflowBehavior", "label": "Comportamento ao atingir o limite", "type": "select",
-          "options": ["reject-publish", "drop-head"], "required": true,
-          "when": { "field": "maxLength", "preenchido": true },
-          "ajuda": "reject-publish devolve erro para quem publica; drop-head descarta a mensagem mais antiga da fila." },
-
-        { "key": "ack", "label": "Ack", "type": "select", "options": ["manual", "auto"],
-          "default": "manual", "required": true, "permiteNA": false,
-          "ajuda": "auto confirma antes de processar — perda de mensagem em caso de falha." },
-
-        { "key": "prefetch", "label": "Prefetch", "type": "number", "required": false,
-          "when": { "allOf": [
-            { "hasIncomingEdge": ["consumes"] },
-            { "field": "ack", "equals": "manual" } ] } },
-
-        { "key": "concorrencia", "label": "Consumidores concorrentes", "type": "number",
-          "default": 1, "required": true,
-          "when": { "hasIncomingEdge": ["consumes"] } },
-
-        { "key": "ordenacao", "label": "Exige ordem estrita?", "type": "boolean", "required": true,
-          "when": { "hasIncomingEdge": ["consumes", "pubsub"] },
-          "ajuda": "Incompatível com concorrência > 1, a menos que 'consumidor ativo único' esteja habilitado — nesse caso a ordem é preservada com failover rápido." },
-
-        { "key": "consumidorAtivoUnico", "label": "Consumidor ativo único?", "type": "boolean",
-          "required": true, "permiteNA": true,
-          "when": { "allOf": [
-            { "field": "ordenacao", "equals": true },
-            { "field": "concorrencia", "notEquals": 1 } ] },
-          "ajuda": "Registra múltiplos consumidores mas mantém só um ativo por vez (x-single-active-consumer) — resolve ordem estrita com concorrência > 1 registrada para failover." },
-
-        { "key": "idempotencia", "label": "Consumo é idempotente?", "type": "boolean", "required": true,
-          "when": { "hasIncomingEdge": ["consumes", "pubsub"] },
-          "ajuda": "Com retry, a mesma mensagem chega mais de uma vez. Se não for idempotente, precisa de dedupe." },
-
-        { "key": "chaveDedupe", "label": "Chave de deduplicação", "type": "text", "required": true,
-          "when": { "allOf": [
-            { "field": "idempotencia", "equals": false },
-            { "hasIncomingEdge": ["consumes", "pubsub"] } ] } },
-
-        { "key": "contratoMensagem", "label": "Formato da mensagem (payload)", "type": "textarea",
-          "required": false, "permiteNA": true,
-          "ajuda": "Campos do evento — cole um exemplo de JSON ou descreva o schema. A política de retry/DLQ não diz o que vai dentro da mensagem." },
-
-        { "key": "migracao", "label": "Plano de migração", "type": "text", "required": true,
-          "when": { "not": { "nodeStatus": "novo" } } }
+          "identificador": true,
+          "ajuda": "Nome completo, no padrão do time."
+        },
+        {
+          "key": "routingKey",
+          "label": "Routing key da binding",
+          "type": "text",
+          "required": true,
+          "when": {
+            "hasIncomingEdge": [
+              "publishes",
+              "pubsub",
+              "binding"
+            ]
+          },
+          "ajuda": "Chave usada na binding entre a exchange e esta fila. Publicação direto na fila (exchange padrão) usa o nome da fila como routing key."
+        },
+        {
+          "key": "durable",
+          "label": "Durable",
+          "type": "boolean",
+          "default": true,
+          "required": true,
+          "ajuda": "Fila não durable some quando o broker reinicia."
+        },
+        {
+          "key": "queueType",
+          "label": "Tipo de fila",
+          "type": "select",
+          "options": [
+            "quorum",
+            "classic"
+          ],
+          "default": "quorum",
+          "required": true,
+          "ajuda": "Quorum é o recomendado para alta disponibilidade desde o RabbitMQ 3.8 — replica entre nós via consenso. Classic é o legado (inclusive mirrored classic, hoje desencorajado)."
+        },
+        {
+          "key": "dlq",
+          "label": "Possui DLQ?",
+          "type": "boolean",
+          "default": true,
+          "required": true,
+          "when": {
+            "hasIncomingEdge": [
+              "consumes",
+              "pubsub"
+            ]
+          },
+          "ajuda": "Sem DLQ, mensagem que falha repetidamente é perdida ou trava a fila."
+        },
+        {
+          "key": "dlxName",
+          "label": "Nome da DLX",
+          "type": "text",
+          "default": "{{topic}}.dlx",
+          "required": true,
+          "when": {
+            "field": "dlq",
+            "equals": true
+          }
+        },
+        {
+          "key": "dlqRoutingKey",
+          "label": "Routing key da DLX",
+          "type": "text",
+          "default": "{{topic}}.dlq",
+          "required": true,
+          "when": {
+            "field": "dlq",
+            "equals": true
+          }
+        },
+        {
+          "key": "retryStrategy",
+          "label": "Estratégia de retry",
+          "type": "select",
+          "options": [
+            "backoff",
+            "delay-queue",
+            "sem-retry"
+          ],
+          "required": true,
+          "when": {
+            "field": "dlq",
+            "equals": true
+          },
+          "ajuda": "backoff = retry do listener; delay-queue = fila de espera com TTL + DLX de volta. São incompatíveis; ver padrões."
+        },
+        {
+          "key": "retries",
+          "label": "Tentativas",
+          "type": "number",
+          "default": 3,
+          "required": true,
+          "when": {
+            "field": "retryStrategy",
+            "notEquals": "sem-retry"
+          }
+        },
+        {
+          "key": "backoffInicialMs",
+          "label": "Intervalo inicial (ms)",
+          "type": "number",
+          "default": 1000,
+          "required": true,
+          "when": {
+            "field": "retryStrategy",
+            "equals": "backoff"
+          }
+        },
+        {
+          "key": "backoffMultiplicador",
+          "label": "Multiplicador",
+          "type": "number",
+          "default": 2,
+          "required": true,
+          "when": {
+            "field": "retryStrategy",
+            "equals": "backoff"
+          }
+        },
+        {
+          "key": "delayTtlMs",
+          "label": "TTL da fila de espera (ms)",
+          "type": "number",
+          "required": true,
+          "when": {
+            "field": "retryStrategy",
+            "equals": "delay-queue"
+          }
+        },
+        {
+          "key": "ttl",
+          "label": "TTL da mensagem (ms)",
+          "type": "number",
+          "required": true,
+          "permiteNA": true,
+          "ajuda": "Sem TTL, mensagem antiga é processada muito depois de perder o sentido."
+        },
+        {
+          "key": "maxLength",
+          "label": "Tamanho máximo da fila",
+          "type": "number",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Sem limite, um consumidor lento ou parado deixa a fila crescer sem controle até estourar memória/disco do broker."
+        },
+        {
+          "key": "overflowBehavior",
+          "label": "Comportamento ao atingir o limite",
+          "type": "select",
+          "options": [
+            "reject-publish",
+            "drop-head"
+          ],
+          "required": true,
+          "when": {
+            "field": "maxLength",
+            "preenchido": true
+          },
+          "ajuda": "reject-publish devolve erro para quem publica; drop-head descarta a mensagem mais antiga da fila."
+        },
+        {
+          "key": "ack",
+          "label": "Ack",
+          "type": "select",
+          "options": [
+            "manual",
+            "auto"
+          ],
+          "default": "manual",
+          "required": true,
+          "permiteNA": false,
+          "ajuda": "auto confirma antes de processar — perda de mensagem em caso de falha."
+        },
+        {
+          "key": "prefetch",
+          "label": "Prefetch",
+          "type": "number",
+          "required": false,
+          "when": {
+            "allOf": [
+              {
+                "hasIncomingEdge": [
+                  "consumes"
+                ]
+              },
+              {
+                "field": "ack",
+                "equals": "manual"
+              }
+            ]
+          }
+        },
+        {
+          "key": "concorrencia",
+          "label": "Consumidores concorrentes",
+          "type": "number",
+          "default": 1,
+          "required": true,
+          "when": {
+            "hasIncomingEdge": [
+              "consumes"
+            ]
+          }
+        },
+        {
+          "key": "ordenacao",
+          "label": "Exige ordem estrita?",
+          "type": "boolean",
+          "required": true,
+          "when": {
+            "hasIncomingEdge": [
+              "consumes",
+              "pubsub"
+            ]
+          },
+          "ajuda": "Incompatível com concorrência > 1, a menos que 'consumidor ativo único' esteja habilitado — nesse caso a ordem é preservada com failover rápido."
+        },
+        {
+          "key": "consumidorAtivoUnico",
+          "label": "Consumidor ativo único?",
+          "type": "boolean",
+          "required": true,
+          "permiteNA": true,
+          "when": {
+            "allOf": [
+              {
+                "field": "ordenacao",
+                "equals": true
+              },
+              {
+                "field": "concorrencia",
+                "notEquals": 1
+              }
+            ]
+          },
+          "ajuda": "Registra múltiplos consumidores mas mantém só um ativo por vez (x-single-active-consumer) — resolve ordem estrita com concorrência > 1 registrada para failover."
+        },
+        {
+          "key": "idempotencia",
+          "label": "Consumo é idempotente?",
+          "type": "boolean",
+          "required": true,
+          "when": {
+            "hasIncomingEdge": [
+              "consumes",
+              "pubsub"
+            ]
+          },
+          "ajuda": "Com retry, a mesma mensagem chega mais de uma vez. Se não for idempotente, precisa de dedupe."
+        },
+        {
+          "key": "chaveDedupe",
+          "label": "Chave de deduplicação",
+          "type": "text",
+          "required": true,
+          "when": {
+            "allOf": [
+              {
+                "field": "idempotencia",
+                "equals": false
+              },
+              {
+                "hasIncomingEdge": [
+                  "consumes",
+                  "pubsub"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "key": "contratoMensagem",
+          "label": "Formato da mensagem (payload)",
+          "type": "textarea",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Campos do evento — cole um exemplo de JSON ou descreva o schema. A política de retry/DLQ não diz o que vai dentro da mensagem."
+        },
+        {
+          "key": "migracao",
+          "label": "Plano de migração",
+          "type": "text",
+          "required": true,
+          "when": {
+            "not": {
+              "nodeStatus": "novo"
+            }
+          }
+        }
       ],
-      "specResumo": ["queueType", "dlq", "retryStrategy", "ack"],
+      "specResumo": [
+        "queueType",
+        "dlq",
+        "retryStrategy",
+        "ack"
+      ],
       "specResumoPorAresta": {
-        "consumes": ["ack", "concorrencia", "ordenacao", "idempotencia"]
+        "consumes": [
+          "ack",
+          "concorrencia",
+          "ordenacao",
+          "idempotencia"
+        ]
       },
       "cenarioGherkinPadrao": "```gherkin\nDado que a fila existe com a configuração esperada (durable, tipo, TTL)\nQuando uma mensagem é publicada\nEntão ela chega à fila respeitando a routing key da binding\n```",
       "cenarioGherkinPorAresta": {
@@ -215,419 +658,1398 @@
     "rabbit-exchange": {
       "label": "Exchange Rabbit",
       "derives": "queue",
-      "techs": ["Backend"],
-      "contextos": ["Backend-topologia-mensageria"],
+      "techs": [
+        "Backend"
+      ],
+      "contextos": [
+        "Backend-topologia-mensageria"
+      ],
       "color": "#dc2626",
       "icon": "Split",
       "spec": [
-        { "key": "exchangeName", "label": "Nome da exchange", "type": "text", "required": true, "identificador": true },
-        { "key": "exchangeType", "label": "Tipo", "type": "select",
-          "options": ["topic", "direct", "fanout", "headers"], "default": "topic", "required": true },
-        { "key": "durable", "label": "Durable", "type": "boolean", "default": true, "required": true }
+        {
+          "key": "exchangeName",
+          "label": "Nome da exchange",
+          "type": "text",
+          "required": true,
+          "identificador": true
+        },
+        {
+          "key": "exchangeType",
+          "label": "Tipo",
+          "type": "select",
+          "options": [
+            "topic",
+            "direct",
+            "fanout",
+            "headers"
+          ],
+          "default": "topic",
+          "required": true
+        },
+        {
+          "key": "durable",
+          "label": "Durable",
+          "type": "boolean",
+          "default": true,
+          "required": true
+        }
       ],
-      "specResumo": ["exchangeType", "durable"],
+      "specResumo": [
+        "exchangeType",
+        "durable"
+      ],
       "cenarioGherkinPadrao": "```gherkin\nDado que a exchange existe com o tipo configurado (topic/direct/fanout/headers)\nQuando uma mensagem é publicada nela\nEntão é roteada pra fila (ou filas) corretas conforme o binding\n```"
     },
     "mongo": {
       "label": "Coleção Mongo",
       "derives": "datastore",
-      "techs": ["Backend"],
-      "contextos": ["Backend-dados"],
+      "techs": [
+        "Backend"
+      ],
+      "contextos": [
+        "Backend-dados"
+      ],
       "color": "#10b981",
       "icon": "Database",
       "spec": [
-        { "key": "collection", "label": "Nome da coleção", "type": "text", "required": true, "identificador": true },
-        { "key": "indices", "label": "Índices", "type": "text", "required": false, "permiteNA": true,
-          "ajuda": "Liste os campos indexados, se já souber. Sem índice, queries novas fazem scan completo da coleção." },
-        { "key": "chaveDeSharding", "label": "Chave de sharding", "type": "text", "required": false,
-          "permiteNA": true, "ajuda": "Só relevante se a coleção crescer além do que um único shard aguenta." },
-        { "key": "ttlDias", "label": "TTL (dias)", "type": "number", "required": false, "permiteNA": true,
-          "ajuda": "Sem TTL, os dados crescem indefinidamente — confirme se isso é intencional." },
-        { "key": "writeConcern", "label": "Write concern", "type": "select", "options": ["w1", "majority"],
-          "default": "majority", "required": true },
-        { "key": "schemaDocumento", "label": "Schema do documento (campos e tipos)", "type": "textarea",
-          "required": false, "permiteNA": true,
-          "ajuda": "Campos do documento e seus tipos — cole um exemplo de JSON ou descreva. Índice diz o que é rápido de buscar, não o que o documento contém." },
-        { "key": "migracao", "label": "Plano de migração", "type": "text", "required": true,
-          "when": { "not": { "nodeStatus": "novo" } } }
+        {
+          "key": "collection",
+          "label": "Nome da coleção",
+          "type": "text",
+          "required": true,
+          "identificador": true
+        },
+        {
+          "key": "indices",
+          "label": "Índices",
+          "type": "text",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Liste os campos indexados, se já souber. Sem índice, queries novas fazem scan completo da coleção."
+        },
+        {
+          "key": "chaveDeSharding",
+          "label": "Chave de sharding",
+          "type": "text",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Só relevante se a coleção crescer além do que um único shard aguenta."
+        },
+        {
+          "key": "ttlDias",
+          "label": "TTL (dias)",
+          "type": "number",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Sem TTL, os dados crescem indefinidamente — confirme se isso é intencional."
+        },
+        {
+          "key": "writeConcern",
+          "label": "Write concern",
+          "type": "select",
+          "options": [
+            "w1",
+            "majority"
+          ],
+          "default": "majority",
+          "required": true
+        },
+        {
+          "key": "schemaDocumento",
+          "label": "Schema do documento (campos e tipos)",
+          "type": "textarea",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Campos do documento e seus tipos — cole um exemplo de JSON ou descreva. Índice diz o que é rápido de buscar, não o que o documento contém."
+        },
+        {
+          "key": "migracao",
+          "label": "Plano de migração",
+          "type": "text",
+          "required": true,
+          "when": {
+            "not": {
+              "nodeStatus": "novo"
+            }
+          }
+        }
       ],
-      "specResumo": ["writeConcern", "ttlDias"],
+      "specResumo": [
+        "writeConcern",
+        "ttlDias"
+      ],
       "cenarioGherkinPadrao": "```gherkin\nDado um documento válido para gravação\nQuando a operação de escrita é executada\nEntão o documento é persistido e pode ser lido de volta com os mesmos dados\n\nDado uma tentativa de gravação com dado inválido ou violando índice único\nQuando a operação é executada\nEntão falha de forma controlada, sem corromper documentos existentes\n```"
     },
     "sql": {
       "label": "Tabela SQL",
       "derives": "datastore",
-      "techs": ["Backend"],
-      "contextos": ["Backend-dados"],
+      "techs": [
+        "Backend"
+      ],
+      "contextos": [
+        "Backend-dados"
+      ],
       "color": "#0ea5e9",
       "icon": "Table",
       "spec": [
-        { "key": "tabela", "label": "Nome da tabela", "type": "text", "required": true, "identificador": true },
-        { "key": "chavePrimaria", "label": "Chave primária", "type": "text", "required": true },
-        { "key": "indices", "label": "Índices adicionais", "type": "text", "required": false, "permiteNA": true },
-        { "key": "ferramentaMigracao", "label": "Ferramenta de migração", "type": "select",
-          "options": ["flyway", "liquibase", "nenhuma"], "required": true, "permiteNA": true },
-        { "key": "volumeEsperado", "label": "Volume esperado", "type": "select",
-          "options": ["baixo", "medio", "alto"], "required": true, "permiteNA": true,
-          "ajuda": "Volume alto pede atenção extra a índice e particionamento desde o desenho." },
-        { "key": "schemaColunas", "label": "Colunas (nome, tipo, constraints)", "type": "textarea",
-          "required": false, "permiteNA": true,
-          "ajuda": "Lista de colunas com tipo e constraints — cole o DDL ou descreva. Chave primária sozinha não diz o resto do schema." },
-        { "key": "migracao", "label": "Plano de migração de schema", "type": "text", "required": true,
-          "when": { "not": { "nodeStatus": "novo" } } }
+        {
+          "key": "tabela",
+          "label": "Nome da tabela",
+          "type": "text",
+          "required": true,
+          "identificador": true
+        },
+        {
+          "key": "chavePrimaria",
+          "label": "Chave primária",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "indices",
+          "label": "Índices adicionais",
+          "type": "text",
+          "required": false,
+          "permiteNA": true
+        },
+        {
+          "key": "ferramentaMigracao",
+          "label": "Ferramenta de migração",
+          "type": "select",
+          "options": [
+            "flyway",
+            "liquibase",
+            "nenhuma"
+          ],
+          "required": true,
+          "permiteNA": true
+        },
+        {
+          "key": "volumeEsperado",
+          "label": "Volume esperado",
+          "type": "select",
+          "options": [
+            "baixo",
+            "medio",
+            "alto"
+          ],
+          "required": true,
+          "permiteNA": true,
+          "ajuda": "Volume alto pede atenção extra a índice e particionamento desde o desenho."
+        },
+        {
+          "key": "schemaColunas",
+          "label": "Colunas (nome, tipo, constraints)",
+          "type": "textarea",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Lista de colunas com tipo e constraints — cole o DDL ou descreva. Chave primária sozinha não diz o resto do schema."
+        },
+        {
+          "key": "migracao",
+          "label": "Plano de migração de schema",
+          "type": "text",
+          "required": true,
+          "when": {
+            "not": {
+              "nodeStatus": "novo"
+            }
+          }
+        }
       ],
-      "specResumo": ["volumeEsperado", "ferramentaMigracao"],
+      "specResumo": [
+        "volumeEsperado",
+        "ferramentaMigracao"
+      ],
       "cenarioGherkinPadrao": "```gherkin\nDado um registro válido para gravação\nQuando a operação de escrita é executada\nEntão o registro é persistido respeitando as constraints (chave primária, unicidade)\n\nDado uma tentativa de gravação que viola uma constraint\nQuando a operação é executada\nEntão falha de forma controlada, com a transação revertida, sem dado parcial\n```"
     },
     "camunda": {
       "label": "Processo Camunda",
       "derives": "camunda",
-      "techs": ["Backend"],
-      "contextos": ["Backend-orquestracao"],
+      "techs": [
+        "Backend"
+      ],
+      "contextos": [
+        "Backend-orquestracao"
+      ],
       "color": "#a855f7",
       "icon": "Workflow",
       "spec": [
-        { "key": "processName", "label": "Nome do processo", "type": "text", "required": true, "identificador": true },
-        { "key": "framework", "label": "Versão do Camunda", "type": "select",
-          "options": ["Camunda 7", "Camunda 8"], "required": false, "permiteNA": true },
-        { "key": "compensacao", "label": "Precisa de compensação (rollback)?", "type": "boolean", "required": true,
-          "ajuda": "Se uma etapa falhar depois que outras já rodaram, o processo precisa desfazê-las?" },
-        { "key": "tempoLimite", "label": "Timers/SLA do processo", "type": "text", "required": true,
-          "permiteNA": true },
-        { "key": "estrategiaVersionamento", "label": "Estratégia para instâncias em voo", "type": "select",
-          "options": ["migrar instâncias", "deixar instâncias antigas terminarem na versão anterior"],
-          "required": true, "when": { "not": { "nodeStatus": "novo" } },
-          "ajuda": "Alterar um processo existente com instâncias já em andamento exige decidir o que fazer com elas." },
-        { "key": "descricao", "label": "O que este processo orquestra", "type": "text", "required": false, "permiteNA": true },
-        { "key": "passosProcesso", "label": "Passos do processo (etapas, gateways, quem faz o quê)", "type": "textarea",
-          "required": false, "permiteNA": true,
-          "ajuda": "Lista das etapas/gateways do BPMN — SLA e compensação dizem como o processo se comporta, não quais passos ele tem." }
+        {
+          "key": "processName",
+          "label": "Nome do processo",
+          "type": "text",
+          "required": true,
+          "identificador": true
+        },
+        {
+          "key": "framework",
+          "label": "Versão do Camunda",
+          "type": "select",
+          "options": [
+            "Camunda 7",
+            "Camunda 8"
+          ],
+          "required": false,
+          "permiteNA": true
+        },
+        {
+          "key": "compensacao",
+          "label": "Precisa de compensação (rollback)?",
+          "type": "boolean",
+          "required": true,
+          "ajuda": "Se uma etapa falhar depois que outras já rodaram, o processo precisa desfazê-las?"
+        },
+        {
+          "key": "tempoLimite",
+          "label": "Timers/SLA do processo",
+          "type": "text",
+          "required": true,
+          "permiteNA": true
+        },
+        {
+          "key": "estrategiaVersionamento",
+          "label": "Estratégia para instâncias em voo",
+          "type": "select",
+          "options": [
+            "migrar instâncias",
+            "deixar instâncias antigas terminarem na versão anterior"
+          ],
+          "required": true,
+          "when": {
+            "not": {
+              "nodeStatus": "novo"
+            }
+          },
+          "ajuda": "Alterar um processo existente com instâncias já em andamento exige decidir o que fazer com elas."
+        },
+        {
+          "key": "descricao",
+          "label": "O que este processo orquestra",
+          "type": "text",
+          "required": false,
+          "permiteNA": true
+        },
+        {
+          "key": "passosProcesso",
+          "label": "Passos do processo (etapas, gateways, quem faz o quê)",
+          "type": "textarea",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Lista das etapas/gateways do BPMN — SLA e compensação dizem como o processo se comporta, não quais passos ele tem."
+        }
       ],
-      "specResumo": ["framework", "compensacao"],
+      "specResumo": [
+        "framework",
+        "compensacao"
+      ],
       "cenarioGherkinPadrao": "```gherkin\nDado que o processo é iniciado com as variáveis esperadas\nQuando ele percorre o fluxo normal\nEntão termina no estado esperado dentro do SLA definido\n\nDado que uma etapa falha depois de outras já terem rodado\nQuando o processo trata a falha\nEntão a compensação (rollback) definida é executada, sem deixar estado inconsistente\n```"
     },
     "fico": {
       "label": "Fluxo Decisão (FICO)",
       "derives": "fico",
-      "techs": ["Backend"],
-      "contextos": ["Backend-regras"],
+      "techs": [
+        "Backend"
+      ],
+      "contextos": [
+        "Backend-regras"
+      ],
       "color": "#d97706",
       "icon": "GitBranch",
       "spec": [
-        { "key": "nome", "label": "Nome do fluxo", "type": "text", "required": true, "identificador": true },
-        { "key": "motorPadrao", "label": "Motor de regras", "type": "text", "required": false, "permiteNA": true },
-        { "key": "auditoria", "label": "Decisão precisa ser auditável?", "type": "boolean", "required": true,
-          "ajuda": "Rastreabilidade de quem/quando/por que o fluxo decidiu X — comum em decisão de crédito/risco." },
-        { "key": "fallback", "label": "Comportamento se o motor não decidir", "type": "text", "required": true,
-          "ajuda": "Timeout ou erro do motor: o fluxo bloqueia, segue com um valor padrão, ou escala para humano?" },
-        { "key": "descricao", "label": "Decisão que este fluxo resolve", "type": "text", "required": false, "permiteNA": true },
-        { "key": "logicaDecisao", "label": "Lógica da decisão (variáveis, regras)", "type": "textarea",
-          "required": false, "permiteNA": true,
-          "ajuda": "Variáveis de entrada/saída e a regra que decide entre elas — auditoria diz se fica registrado, não o que é avaliado." },
-        { "key": "migracao", "label": "Plano de migração", "type": "text", "required": true,
-          "when": { "not": { "nodeStatus": "novo" } },
-          "ajuda": "Fluxo que já existe: como a mudança convive com decisões já em curso ou com a versão anterior da regra." }
+        {
+          "key": "nome",
+          "label": "Nome do fluxo",
+          "type": "text",
+          "required": true,
+          "identificador": true
+        },
+        {
+          "key": "motorPadrao",
+          "label": "Motor de regras",
+          "type": "text",
+          "required": false,
+          "permiteNA": true
+        },
+        {
+          "key": "auditoria",
+          "label": "Decisão precisa ser auditável?",
+          "type": "boolean",
+          "required": true,
+          "ajuda": "Rastreabilidade de quem/quando/por que o fluxo decidiu X — comum em decisão de crédito/risco."
+        },
+        {
+          "key": "fallback",
+          "label": "Comportamento se o motor não decidir",
+          "type": "text",
+          "required": true,
+          "ajuda": "Timeout ou erro do motor: o fluxo bloqueia, segue com um valor padrão, ou escala para humano?"
+        },
+        {
+          "key": "descricao",
+          "label": "Decisão que este fluxo resolve",
+          "type": "text",
+          "required": false,
+          "permiteNA": true
+        },
+        {
+          "key": "logicaDecisao",
+          "label": "Lógica da decisão (variáveis, regras)",
+          "type": "textarea",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Variáveis de entrada/saída e a regra que decide entre elas — auditoria diz se fica registrado, não o que é avaliado."
+        },
+        {
+          "key": "migracao",
+          "label": "Plano de migração",
+          "type": "text",
+          "required": true,
+          "when": {
+            "not": {
+              "nodeStatus": "novo"
+            }
+          },
+          "ajuda": "Fluxo que já existe: como a mudança convive com decisões já em curso ou com a versão anterior da regra."
+        }
       ],
-      "specResumo": ["auditoria", "fallback"],
+      "specResumo": [
+        "auditoria",
+        "fallback"
+      ],
       "cenarioGherkinPadrao": "```gherkin\nDado um conjunto de variáveis de entrada válidas\nQuando a decisão é avaliada\nEntão o resultado é o esperado e fica registrado, se a decisão for auditável\n\nDado que o motor de regras não responde ou expira o timeout\nQuando isso ocorre\nEntão o comportamento de fallback definido é aplicado, sem travar o fluxo\n```"
     },
     "external": {
       "label": "API Externa",
       "derives": "external",
-      "techs": ["Backend"],
-      "contextos": ["Backend-chamadas http"],
+      "techs": [
+        "Backend"
+      ],
+      "contextos": [
+        "Backend-chamadas http"
+      ],
       "color": "#475569",
       "icon": "Globe",
       "spec": [
-        { "key": "nome", "label": "Nome da API", "type": "text", "required": true, "identificador": true },
-        { "key": "baseUrl", "label": "URL base", "type": "text", "required": false, "permiteNA": true },
-        { "key": "autenticacao", "label": "Autenticação", "type": "select",
-          "options": ["nenhuma", "api-key", "oauth2", "mtls"], "required": true },
-        { "key": "timeoutMs", "label": "Timeout (ms)", "type": "number", "default": 5000, "required": true },
-        { "key": "rateLimitConhecido", "label": "Rate limit do provedor é conhecido?", "type": "boolean",
-          "required": true, "permiteNA": true, "ajuda": "Evita estourar o limite do provedor em produção." },
-        { "key": "slaContratado", "label": "SLA contratado", "type": "text", "required": false, "permiteNA": true },
-        { "key": "contratoEndpointsChamados", "label": "Endpoints chamados", "type": "textarea",
-          "required": false, "permiteNA": true,
-          "ajuda": "Lista dos endpoints desta API que são chamados (método + caminho), ex.: POST /v1/score." },
-        { "key": "contratoRequest", "label": "Contrato de request", "type": "textarea",
-          "required": false, "permiteNA": true,
-          "ajuda": "Formato do corpo/parâmetros enviados — cole a doc/exemplo de payload de request." },
-        { "key": "contratoResponse", "label": "Contrato de response", "type": "textarea",
-          "required": false, "permiteNA": true,
-          "ajuda": "Formato da resposta recebida (sucesso e erro) — cole a doc/exemplo de payload de response." },
-        { "key": "migracao", "label": "Plano de migração", "type": "text", "required": true,
-          "when": { "not": { "nodeStatus": "novo" } },
-          "ajuda": "Integração que já existe: como a mudança é compatível com quem já consome hoje (versionamento, breaking change)." }
+        {
+          "key": "nome",
+          "label": "Nome da API",
+          "type": "text",
+          "required": true,
+          "identificador": true
+        },
+        {
+          "key": "baseUrl",
+          "label": "URL base",
+          "type": "text",
+          "required": false,
+          "permiteNA": true
+        },
+        {
+          "key": "autenticacao",
+          "label": "Autenticação",
+          "type": "select",
+          "options": [
+            "nenhuma",
+            "api-key",
+            "oauth2",
+            "mtls"
+          ],
+          "required": true
+        },
+        {
+          "key": "timeoutMs",
+          "label": "Timeout (ms)",
+          "type": "number",
+          "default": 5000,
+          "required": true
+        },
+        {
+          "key": "rateLimitConhecido",
+          "label": "Rate limit do provedor é conhecido?",
+          "type": "boolean",
+          "required": true,
+          "permiteNA": true,
+          "ajuda": "Evita estourar o limite do provedor em produção."
+        },
+        {
+          "key": "slaContratado",
+          "label": "SLA contratado",
+          "type": "text",
+          "required": false,
+          "permiteNA": true
+        },
+        {
+          "key": "contratoEndpointsChamados",
+          "label": "Endpoints chamados",
+          "type": "textarea",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Lista dos endpoints desta API que são chamados (método + caminho), ex.: POST /v1/score."
+        },
+        {
+          "key": "contratoRequest",
+          "label": "Contrato de request",
+          "type": "textarea",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Formato do corpo/parâmetros enviados — cole a doc/exemplo de payload de request."
+        },
+        {
+          "key": "contratoResponse",
+          "label": "Contrato de response",
+          "type": "textarea",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Formato da resposta recebida (sucesso e erro) — cole a doc/exemplo de payload de response."
+        },
+        {
+          "key": "migracao",
+          "label": "Plano de migração",
+          "type": "text",
+          "required": true,
+          "when": {
+            "not": {
+              "nodeStatus": "novo"
+            }
+          },
+          "ajuda": "Integração que já existe: como a mudança é compatível com quem já consome hoje (versionamento, breaking change)."
+        }
       ],
-      "specResumo": ["autenticacao", "timeoutMs"],
+      "specResumo": [
+        "autenticacao",
+        "timeoutMs"
+      ],
       "cenarioGherkinPadrao": "```gherkin\nDado que a API externa está disponível\nQuando a chamada é feita com um payload válido\nEntão a resposta retorna 2xx dentro do timeout configurado, com o contrato esperado\n\nDado que a API externa está indisponível, expira o timeout, devolve 4xx/5xx, ou estoura o rate limit\nQuando a chamada é feita\nEntão o comportamento de fallback é acionado, sem propagar o erro cru pro chamador\n```"
     },
     "job": {
       "label": "Job/Scheduler",
       "derives": "job",
-      "techs": ["Backend"],
-      "contextos": [],
+      "techs": [
+        "Backend"
+      ],
+      "contextos": [
+        "Backend-agendamento"
+      ],
       "color": "#6b7280",
       "icon": "Clock",
       "spec": [
-        { "key": "nome", "label": "Nome do job", "type": "text", "required": true, "identificador": true },
-        { "key": "cron", "label": "Expressão cron", "type": "text", "required": true },
-        { "key": "idempotente", "label": "Execução é idempotente?", "type": "boolean", "required": true },
-        { "key": "concorrencia", "label": "Se a execução anterior ainda estiver rodando", "type": "select",
-          "options": ["permite sobreposição", "pula esta execução", "execução exclusiva (fila)"],
-          "default": "execução exclusiva (fila)", "required": true },
-        { "key": "timeoutMinutos", "label": "Timeout (minutos)", "type": "number", "required": true, "permiteNA": true },
-        { "key": "alerta", "label": "Alerta de falha configurado?", "type": "boolean", "required": true,
-          "when": { "nodeStatus": "novo" } },
-        { "key": "descricao", "label": "O que este job faz", "type": "text", "required": false, "permiteNA": true },
-        { "key": "migracao", "label": "Plano de migração", "type": "text", "required": true,
-          "when": { "not": { "nodeStatus": "novo" } },
-          "ajuda": "Job que já existe: o que muda no comportamento atual e como evitar duplicar/perder execução durante o deploy." }
+        {
+          "key": "nome",
+          "label": "Nome do job",
+          "type": "text",
+          "required": true,
+          "identificador": true
+        },
+        {
+          "key": "cron",
+          "label": "Expressão cron",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "idempotente",
+          "label": "Execução é idempotente?",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "key": "concorrencia",
+          "label": "Se a execução anterior ainda estiver rodando",
+          "type": "select",
+          "options": [
+            "permite sobreposição",
+            "pula esta execução",
+            "execução exclusiva (fila)"
+          ],
+          "default": "execução exclusiva (fila)",
+          "required": true
+        },
+        {
+          "key": "timeoutMinutos",
+          "label": "Timeout (minutos)",
+          "type": "number",
+          "required": true,
+          "permiteNA": true
+        },
+        {
+          "key": "alerta",
+          "label": "Alerta de falha configurado?",
+          "type": "boolean",
+          "required": true,
+          "when": {
+            "nodeStatus": "novo"
+          }
+        },
+        {
+          "key": "descricao",
+          "label": "O que este job faz",
+          "type": "text",
+          "required": false,
+          "permiteNA": true
+        },
+        {
+          "key": "migracao",
+          "label": "Plano de migração",
+          "type": "text",
+          "required": true,
+          "when": {
+            "not": {
+              "nodeStatus": "novo"
+            }
+          },
+          "ajuda": "Job que já existe: o que muda no comportamento atual e como evitar duplicar/perder execução durante o deploy."
+        }
       ],
-      "specResumo": ["cron", "concorrencia"],
+      "specResumo": [
+        "cron",
+        "concorrencia"
+      ],
       "cenarioGherkinPadrao": "```gherkin\nDado que o job é disparado no horário/gatilho configurado\nQuando ele executa\nEntão completa dentro do timeout, com o efeito esperado\n\nDado que a execução anterior ainda está rodando quando o gatilho dispara de novo\nQuando isso ocorre\nEntão o comportamento configurado (sobrepor/pular/fila) é respeitado, sem duplicar processamento\n```"
     },
     "rule": {
       "label": "Regra de Negócio",
       "derives": "rule",
-      "techs": ["Backend"],
-      "contextos": ["Backend-regras"],
+      "techs": [
+        "Backend"
+      ],
+      "contextos": [
+        "Backend-regras"
+      ],
       "color": "#8b5cf6",
       "icon": "Scale",
       "spec": [
-        { "key": "nome", "label": "Nome da regra", "type": "text", "required": true, "identificador": true },
-        { "key": "gatilho", "label": "Quando a regra falha", "type": "select",
-          "options": ["bloqueia a operação", "só alerta/loga"], "required": true },
-        { "key": "auditoria", "label": "Resultado precisa ficar registrado?", "type": "boolean", "required": true },
-        { "key": "descricao", "label": "O que esta regra valida", "type": "text", "required": false, "permiteNA": true },
-        { "key": "logicaRegra", "label": "Lógica da regra (condição exata)", "type": "textarea",
-          "required": false, "permiteNA": true,
-          "ajuda": "A condição avaliada de verdade — \"descricao\" é o resumo, isto é o que o código precisa checar." },
-        { "key": "migracao", "label": "Plano de migração", "type": "text", "required": true,
-          "when": { "not": { "nodeStatus": "novo" } },
-          "ajuda": "Regra que já existe: casos que hoje passam podem passar a falhar — como comunicar/tratar isso." }
+        {
+          "key": "nome",
+          "label": "Nome da regra",
+          "type": "text",
+          "required": true,
+          "identificador": true
+        },
+        {
+          "key": "gatilho",
+          "label": "Quando a regra falha",
+          "type": "select",
+          "options": [
+            "bloqueia a operação",
+            "só alerta/loga"
+          ],
+          "required": true
+        },
+        {
+          "key": "auditoria",
+          "label": "Resultado precisa ficar registrado?",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "key": "descricao",
+          "label": "O que esta regra valida",
+          "type": "text",
+          "required": false,
+          "permiteNA": true
+        },
+        {
+          "key": "logicaRegra",
+          "label": "Lógica da regra (condição exata)",
+          "type": "textarea",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "A condição avaliada de verdade — \"descricao\" é o resumo, isto é o que o código precisa checar."
+        },
+        {
+          "key": "migracao",
+          "label": "Plano de migração",
+          "type": "text",
+          "required": true,
+          "when": {
+            "not": {
+              "nodeStatus": "novo"
+            }
+          },
+          "ajuda": "Regra que já existe: casos que hoje passam podem passar a falhar — como comunicar/tratar isso."
+        }
       ],
-      "specResumo": ["gatilho"],
+      "specResumo": [
+        "gatilho"
+      ],
       "cenarioGherkinPadrao": "```gherkin\nDado um caso que deveria passar na regra\nQuando a validação é executada\nEntão a operação segue normalmente\n\nDado um caso que deveria falhar na regra\nQuando a validação é executada\nEntão o comportamento configurado (bloqueia ou só alerta) é aplicado, e fica registrado se for auditável\n```"
     },
     "cache": {
       "label": "Cache",
       "derives": "cache",
-      "techs": ["Backend"],
-      "contextos": ["Backend-cache"],
+      "techs": [
+        "Backend"
+      ],
+      "contextos": [
+        "Backend-cache"
+      ],
       "color": "#ef4444",
       "icon": "Zap",
       "spec": [
-        { "key": "nome", "label": "Nome/namespace da chave", "type": "text", "required": true, "identificador": true,
-          "ajuda": "Prefixo usado nas chaves deste cache, ex.: \"usuario:perfil:{id}\"." },
-        { "key": "tecnologia", "label": "Tecnologia", "type": "select",
-          "options": ["Redis", "Caffeine (em memória local)"], "required": true },
-        { "key": "ttlSegundos", "label": "TTL (segundos)", "type": "number", "required": true, "permiteNA": true,
-          "ajuda": "Sem TTL, uma entrada obsoleta nunca expira sozinha." },
-        { "key": "politicaEviction", "label": "Política de eviction", "type": "select",
-          "options": ["LRU", "LFU", "TTL apenas"], "default": "LRU", "required": true },
-        { "key": "tamanhoMaximoEntradas", "label": "Tamanho máximo (entradas)", "type": "number",
-          "required": false, "permiteNA": true, "when": { "field": "tecnologia", "equals": "Caffeine (em memória local)" },
-          "ajuda": "Cache local compete por heap com o resto do processo — sem limite, pode causar OOM." },
-        { "key": "persistencia", "label": "Persiste em disco (RDB/AOF)?", "type": "boolean",
-          "required": true, "permiteNA": true, "when": { "field": "tecnologia", "equals": "Redis" },
-          "ajuda": "Sem persistência, um restart do Redis zera o cache — aceitável se for só cache, problemático se guardar estado que não existe em outro lugar." },
-        { "key": "invalidacao", "label": "Estratégia de invalidação", "type": "select",
-          "options": ["só TTL", "invalidação ativa no write", "ambas"], "required": true,
-          "ajuda": "TTL sozinho aceita dado obsoleto até expirar — invalidação ativa evita isso ao custo de mais complexidade." },
-        { "key": "contratoValor", "label": "Formato do valor cacheado", "type": "textarea", "required": false,
-          "permiteNA": true, "ajuda": "Estrutura do que é guardado sob cada chave — cole um exemplo de JSON ou descreva." },
-        { "key": "migracao", "label": "Plano de migração", "type": "text", "required": true,
-          "when": { "not": { "nodeStatus": "novo" } } }
+        {
+          "key": "nome",
+          "label": "Nome/namespace da chave",
+          "type": "text",
+          "required": true,
+          "identificador": true,
+          "ajuda": "Prefixo usado nas chaves deste cache, ex.: \"usuario:perfil:{id}\"."
+        },
+        {
+          "key": "tecnologia",
+          "label": "Tecnologia",
+          "type": "select",
+          "options": [
+            "Redis",
+            "Caffeine (em memória local)"
+          ],
+          "required": true
+        },
+        {
+          "key": "ttlSegundos",
+          "label": "TTL (segundos)",
+          "type": "number",
+          "required": true,
+          "permiteNA": true,
+          "ajuda": "Sem TTL, uma entrada obsoleta nunca expira sozinha."
+        },
+        {
+          "key": "politicaEviction",
+          "label": "Política de eviction",
+          "type": "select",
+          "options": [
+            "LRU",
+            "LFU",
+            "TTL apenas"
+          ],
+          "default": "LRU",
+          "required": true
+        },
+        {
+          "key": "tamanhoMaximoEntradas",
+          "label": "Tamanho máximo (entradas)",
+          "type": "number",
+          "required": false,
+          "permiteNA": true,
+          "when": {
+            "field": "tecnologia",
+            "equals": "Caffeine (em memória local)"
+          },
+          "ajuda": "Cache local compete por heap com o resto do processo — sem limite, pode causar OOM."
+        },
+        {
+          "key": "persistencia",
+          "label": "Persiste em disco (RDB/AOF)?",
+          "type": "boolean",
+          "required": true,
+          "permiteNA": true,
+          "when": {
+            "field": "tecnologia",
+            "equals": "Redis"
+          },
+          "ajuda": "Sem persistência, um restart do Redis zera o cache — aceitável se for só cache, problemático se guardar estado que não existe em outro lugar."
+        },
+        {
+          "key": "invalidacao",
+          "label": "Estratégia de invalidação",
+          "type": "select",
+          "options": [
+            "só TTL",
+            "invalidação ativa no write",
+            "ambas"
+          ],
+          "required": true,
+          "ajuda": "TTL sozinho aceita dado obsoleto até expirar — invalidação ativa evita isso ao custo de mais complexidade."
+        },
+        {
+          "key": "contratoValor",
+          "label": "Formato do valor cacheado",
+          "type": "textarea",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Estrutura do que é guardado sob cada chave — cole um exemplo de JSON ou descreva."
+        },
+        {
+          "key": "migracao",
+          "label": "Plano de migração",
+          "type": "text",
+          "required": true,
+          "when": {
+            "not": {
+              "nodeStatus": "novo"
+            }
+          }
+        }
       ],
-      "specResumo": ["tecnologia", "ttlSegundos", "politicaEviction"],
+      "specResumo": [
+        "tecnologia",
+        "ttlSegundos",
+        "politicaEviction"
+      ],
       "cenarioGherkinPadrao": "```gherkin\nDado um valor ainda não cacheado (cache miss)\nQuando ele é consultado\nEntão é calculado a partir da origem e gravado no cache com o TTL configurado\n\nDado um valor já cacheado (cache hit) que ficou desatualizado na origem\nQuando ele é consultado\nEntão respeita a estratégia de invalidação definida (TTL ou invalidação ativa), sem servir dado obsoleto além do esperado\n```"
     },
     "storage": {
       "label": "Storage de Objeto (S3/Blob)",
       "derives": "storage",
-      "techs": ["Backend"],
-      "contextos": ["Backend-storage"],
+      "techs": [
+        "Backend"
+      ],
+      "contextos": [
+        "Backend-storage"
+      ],
       "color": "#0891b2",
       "icon": "Cloud",
       "spec": [
-        { "key": "bucket", "label": "Bucket/container", "type": "text", "required": true, "identificador": true },
-        { "key": "prefixoChave", "label": "Prefixo/padrão de chave do objeto", "type": "text", "required": false,
-          "permiteNA": true, "ajuda": "Ex.: \"comprovantes/{ano}/{mes}/{id}.pdf\"." },
-        { "key": "politicaAcesso", "label": "Política de acesso", "type": "select",
-          "options": ["privado", "público-leitura", "URL pré-assinada (presigned)"], "default": "privado", "required": true },
-        { "key": "criptografiaEmRepouso", "label": "Criptografia em repouso?", "type": "boolean", "default": true,
-          "required": true, "permiteNA": true },
-        { "key": "tamanhoMaximoMb", "label": "Tamanho máximo do objeto (MB)", "type": "number", "required": false,
-          "permiteNA": true },
-        { "key": "cicloDeVida", "label": "Ciclo de vida (expiração/arquivamento)", "type": "text", "required": false,
-          "permiteNA": true, "ajuda": "Ex.: \"move pra classe fria após 90 dias, expira em 1 ano\" — sem isso, objetos se acumulam indefinidamente." },
-        { "key": "contratoObjeto", "label": "Formato/metadados do objeto", "type": "textarea", "required": false,
-          "permiteNA": true, "ajuda": "Tipo de conteúdo, metadados esperados, estrutura interna (se for JSON/CSV) — bucket e prefixo dizem onde, não o que tem dentro." },
-        { "key": "migracao", "label": "Plano de migração", "type": "text", "required": true,
-          "when": { "not": { "nodeStatus": "novo" } } }
+        {
+          "key": "bucket",
+          "label": "Bucket/container",
+          "type": "text",
+          "required": true,
+          "identificador": true
+        },
+        {
+          "key": "prefixoChave",
+          "label": "Prefixo/padrão de chave do objeto",
+          "type": "text",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Ex.: \"comprovantes/{ano}/{mes}/{id}.pdf\"."
+        },
+        {
+          "key": "politicaAcesso",
+          "label": "Política de acesso",
+          "type": "select",
+          "options": [
+            "privado",
+            "público-leitura",
+            "URL pré-assinada (presigned)"
+          ],
+          "default": "privado",
+          "required": true
+        },
+        {
+          "key": "criptografiaEmRepouso",
+          "label": "Criptografia em repouso?",
+          "type": "boolean",
+          "default": true,
+          "required": true,
+          "permiteNA": true
+        },
+        {
+          "key": "tamanhoMaximoMb",
+          "label": "Tamanho máximo do objeto (MB)",
+          "type": "number",
+          "required": false,
+          "permiteNA": true
+        },
+        {
+          "key": "cicloDeVida",
+          "label": "Ciclo de vida (expiração/arquivamento)",
+          "type": "text",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Ex.: \"move pra classe fria após 90 dias, expira em 1 ano\" — sem isso, objetos se acumulam indefinidamente."
+        },
+        {
+          "key": "contratoObjeto",
+          "label": "Formato/metadados do objeto",
+          "type": "textarea",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Tipo de conteúdo, metadados esperados, estrutura interna (se for JSON/CSV) — bucket e prefixo dizem onde, não o que tem dentro."
+        },
+        {
+          "key": "migracao",
+          "label": "Plano de migração",
+          "type": "text",
+          "required": true,
+          "when": {
+            "not": {
+              "nodeStatus": "novo"
+            }
+          }
+        }
       ],
-      "specResumo": ["politicaAcesso", "criptografiaEmRepouso"],
+      "specResumo": [
+        "politicaAcesso",
+        "criptografiaEmRepouso"
+      ],
       "cenarioGherkinPadrao": "```gherkin\nDado um objeto válido para upload\nQuando ele é enviado\nEntão fica acessível conforme a política de acesso definida (privado/presigned/público)\n\nDado uma tentativa de acesso não autorizado ao objeto\nQuando isso ocorre\nEntão o acesso é negado, sem vazar a existência/conteúdo do objeto\n```"
     },
     "batch": {
       "label": "Serviço de Batch (Spring Batch)",
       "derives": "batch",
-      "techs": ["Backend"],
-      "contextos": ["Backend-processamento em lote"],
+      "techs": [
+        "Backend"
+      ],
+      "contextos": [
+        "Backend-processamento em lote"
+      ],
       "color": "#65a30d",
       "icon": "Boxes",
       "spec": [
-        { "key": "nomeJob", "label": "Nome do Job", "type": "text", "required": true, "identificador": true },
-        { "key": "origemDados", "label": "Origem dos dados (reader)", "type": "text", "required": true,
-          "ajuda": "De onde o job lê — arquivo, tabela, fila. O contrato do dado em si fica no nó de origem (Mongo/SQL/arquivo), não aqui." },
-        { "key": "destinoDados", "label": "Destino dos dados (writer)", "type": "text", "required": true },
-        { "key": "chunkSize", "label": "Chunk size", "type": "number", "default": 100, "required": true,
-          "ajuda": "Quantos itens são lidos/processados/gravados por transação — chunk grande demais aumenta o custo de um retry." },
-        { "key": "gatilho", "label": "Gatilho de execução", "type": "select",
-          "options": ["cron", "manual", "evento (mensageria)"], "default": "cron", "required": true },
-        { "key": "cron", "label": "Expressão cron", "type": "text", "required": true,
-          "when": { "field": "gatilho", "equals": "cron" } },
-        { "key": "politicaSkip", "label": "Política de skip (item com erro)", "type": "select",
-          "options": ["falha o job inteiro", "pula e loga", "pula até um limite"],
-          "default": "pula até um limite", "required": true },
-        { "key": "limiteSkip", "label": "Limite de itens pulados", "type": "number", "required": true,
-          "when": { "field": "politicaSkip", "equals": "pula até um limite" } },
-        { "key": "politicaRetry", "label": "Retry automático por chunk?", "type": "boolean", "required": true },
-        { "key": "reiniciavel", "label": "Job é restartável a partir do checkpoint?", "type": "boolean", "required": true,
-          "ajuda": "Spring Batch guarda o estado da execução (JobRepository) — sem isso, uma falha no meio reprocessa tudo do zero." },
-        { "key": "descricao", "label": "O que este job processa", "type": "text", "required": false, "permiteNA": true },
-        { "key": "migracao", "label": "Plano de migração", "type": "text", "required": true,
-          "when": { "not": { "nodeStatus": "novo" } } }
+        {
+          "key": "nomeJob",
+          "label": "Nome do Job",
+          "type": "text",
+          "required": true,
+          "identificador": true
+        },
+        {
+          "key": "origemDados",
+          "label": "Origem dos dados (reader)",
+          "type": "text",
+          "required": true,
+          "ajuda": "De onde o job lê — arquivo, tabela, fila. O contrato do dado em si fica no nó de origem (Mongo/SQL/arquivo), não aqui."
+        },
+        {
+          "key": "destinoDados",
+          "label": "Destino dos dados (writer)",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "chunkSize",
+          "label": "Chunk size",
+          "type": "number",
+          "default": 100,
+          "required": true,
+          "ajuda": "Quantos itens são lidos/processados/gravados por transação — chunk grande demais aumenta o custo de um retry."
+        },
+        {
+          "key": "gatilho",
+          "label": "Gatilho de execução",
+          "type": "select",
+          "options": [
+            "cron",
+            "manual",
+            "evento (mensageria)"
+          ],
+          "default": "cron",
+          "required": true
+        },
+        {
+          "key": "cron",
+          "label": "Expressão cron",
+          "type": "text",
+          "required": true,
+          "when": {
+            "field": "gatilho",
+            "equals": "cron"
+          }
+        },
+        {
+          "key": "politicaSkip",
+          "label": "Política de skip (item com erro)",
+          "type": "select",
+          "options": [
+            "falha o job inteiro",
+            "pula e loga",
+            "pula até um limite"
+          ],
+          "default": "pula até um limite",
+          "required": true
+        },
+        {
+          "key": "limiteSkip",
+          "label": "Limite de itens pulados",
+          "type": "number",
+          "required": true,
+          "when": {
+            "field": "politicaSkip",
+            "equals": "pula até um limite"
+          }
+        },
+        {
+          "key": "politicaRetry",
+          "label": "Retry automático por chunk?",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "key": "reiniciavel",
+          "label": "Job é restartável a partir do checkpoint?",
+          "type": "boolean",
+          "required": true,
+          "ajuda": "Spring Batch guarda o estado da execução (JobRepository) — sem isso, uma falha no meio reprocessa tudo do zero."
+        },
+        {
+          "key": "descricao",
+          "label": "O que este job processa",
+          "type": "text",
+          "required": false,
+          "permiteNA": true
+        },
+        {
+          "key": "migracao",
+          "label": "Plano de migração",
+          "type": "text",
+          "required": true,
+          "when": {
+            "not": {
+              "nodeStatus": "novo"
+            }
+          }
+        }
       ],
-      "specResumo": ["chunkSize", "politicaSkip", "reiniciavel"],
+      "specResumo": [
+        "chunkSize",
+        "politicaSkip",
+        "reiniciavel"
+      ],
       "cenarioGherkinPadrao": "```gherkin\nDado um volume de itens dentro do esperado\nQuando o job processa em chunks\nEntão todos os itens são processados, com o efeito esperado no destino\n\nDado que o job falha no meio da execução\nQuando ele é retomado\nEntão continua do checkpoint (JobRepository), sem reprocessar itens já concluídos\n```"
     },
     "mobile-android": {
       "label": "App Android",
       "derives": "mobile",
-      "techs": ["Mobile"],
-      "contextos": ["Mobile-android"],
+      "techs": [
+        "Mobile"
+      ],
+      "contextos": [
+        "Mobile-android"
+      ],
       "color": "#3ddc84",
       "icon": "Smartphone",
       "spec": [
-        { "key": "nome", "label": "Nome do app", "type": "text", "required": true, "identificador": true },
-        { "key": "versaoMinimaSdk", "label": "Versão mínima do Android (API level)", "type": "text",
-          "required": false, "permiteNA": true,
-          "ajuda": "Ex.: API 26 (Android 8.0). Define o que dá pra usar de API do sistema e o alcance de dispositivos." },
-        { "key": "autenticacao", "label": "Autenticação", "type": "select",
-          "options": ["nenhuma", "oauth2", "token custom", "biometria + token"], "required": true, "permiteNA": true },
-        { "key": "contratoConsumido", "label": "Contrato da API consumida (endpoints, request/response)", "type": "textarea",
-          "required": false, "permiteNA": true,
-          "ajuda": "Endpoints do backend que o app chama e o formato de payload — cole a doc/exemplo." },
-        { "key": "comportamentoOffline", "label": "Comportamento offline / cache local", "type": "textarea",
-          "required": false, "permiteNA": true,
-          "ajuda": "O que funciona sem rede, o que fica em cache local (Room/DataStore), como sincroniza quando a rede volta." },
-        { "key": "notificacoesPush", "label": "Notificações push (FCM)", "type": "textarea",
-          "required": false, "permiteNA": true, "ajuda": "Quais eventos disparam push e o que o usuário vê/faz ao tocar." },
-        { "key": "deepLinks", "label": "Deep links / App Links", "type": "textarea",
-          "required": false, "permiteNA": true, "ajuda": "Quais telas são abertas por link direto (ex.: a partir de um push ou de outro app)." },
-        { "key": "distribuicao", "label": "Distribuição", "type": "select",
-          "options": ["Play Store", "distribuição interna (MDM)"], "required": true, "permiteNA": true },
-        { "key": "migracao", "label": "Plano de migração", "type": "text", "required": true,
-          "when": { "not": { "nodeStatus": "novo" } },
-          "ajuda": "App já publicado: como a mudança convive com versões antigas ainda instaladas em produção (usuário não é forçado a atualizar na hora)." }
+        {
+          "key": "nome",
+          "label": "Nome do app",
+          "type": "text",
+          "required": true,
+          "identificador": true
+        },
+        {
+          "key": "versaoMinimaSdk",
+          "label": "Versão mínima do Android (API level)",
+          "type": "text",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Ex.: API 26 (Android 8.0). Define o que dá pra usar de API do sistema e o alcance de dispositivos."
+        },
+        {
+          "key": "autenticacao",
+          "label": "Autenticação",
+          "type": "select",
+          "options": [
+            "nenhuma",
+            "oauth2",
+            "token custom",
+            "biometria + token"
+          ],
+          "required": true,
+          "permiteNA": true
+        },
+        {
+          "key": "contratoConsumido",
+          "label": "Contrato da API consumida (endpoints, request/response)",
+          "type": "textarea",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Endpoints do backend que o app chama e o formato de payload — cole a doc/exemplo."
+        },
+        {
+          "key": "comportamentoOffline",
+          "label": "Comportamento offline / cache local",
+          "type": "textarea",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "O que funciona sem rede, o que fica em cache local (Room/DataStore), como sincroniza quando a rede volta."
+        },
+        {
+          "key": "notificacoesPush",
+          "label": "Notificações push (FCM)",
+          "type": "textarea",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Quais eventos disparam push e o que o usuário vê/faz ao tocar."
+        },
+        {
+          "key": "deepLinks",
+          "label": "Deep links / App Links",
+          "type": "textarea",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Quais telas são abertas por link direto (ex.: a partir de um push ou de outro app)."
+        },
+        {
+          "key": "distribuicao",
+          "label": "Distribuição",
+          "type": "select",
+          "options": [
+            "Play Store",
+            "distribuição interna (MDM)"
+          ],
+          "required": true,
+          "permiteNA": true
+        },
+        {
+          "key": "migracao",
+          "label": "Plano de migração",
+          "type": "text",
+          "required": true,
+          "when": {
+            "not": {
+              "nodeStatus": "novo"
+            }
+          },
+          "ajuda": "App já publicado: como a mudança convive com versões antigas ainda instaladas em produção (usuário não é forçado a atualizar na hora)."
+        }
       ],
-      "specResumo": ["versaoMinimaSdk", "autenticacao"],
+      "specResumo": [
+        "versaoMinimaSdk",
+        "autenticacao"
+      ],
       "cenarioGherkinPadrao": "```gherkin\nDado que o dispositivo está online e autenticado\nQuando a tela chama a API do backend\nEntão os dados retornados são exibidos corretamente, dentro do timeout esperado\n\nDado que o dispositivo está offline ou a chamada falha\nQuando o usuário abre a tela\nEntão o app mostra o cache local (quando existir) ou um estado de erro claro, sem travar\n```"
     },
     "mobile-ios": {
       "label": "App iOS",
       "derives": "mobile",
-      "techs": ["Mobile"],
-      "contextos": ["Mobile-ios"],
+      "techs": [
+        "Mobile"
+      ],
+      "contextos": [
+        "Mobile-ios"
+      ],
       "color": "#a3a3a3",
       "icon": "Smartphone",
       "spec": [
-        { "key": "nome", "label": "Nome do app", "type": "text", "required": true, "identificador": true },
-        { "key": "versaoMinimaIos", "label": "Versão mínima do iOS", "type": "text",
-          "required": false, "permiteNA": true,
-          "ajuda": "Ex.: iOS 15. Define o que dá pra usar de API do sistema e o alcance de dispositivos." },
-        { "key": "autenticacao", "label": "Autenticação", "type": "select",
-          "options": ["nenhuma", "oauth2", "token custom", "Face ID/Touch ID + token"], "required": true, "permiteNA": true },
-        { "key": "contratoConsumido", "label": "Contrato da API consumida (endpoints, request/response)", "type": "textarea",
-          "required": false, "permiteNA": true,
-          "ajuda": "Endpoints do backend que o app chama e o formato de payload — cole a doc/exemplo." },
-        { "key": "comportamentoOffline", "label": "Comportamento offline / cache local", "type": "textarea",
-          "required": false, "permiteNA": true,
-          "ajuda": "O que funciona sem rede, o que fica em cache local (CoreData/arquivo), como sincroniza quando a rede volta." },
-        { "key": "notificacoesPush", "label": "Notificações push (APNs)", "type": "textarea",
-          "required": false, "permiteNA": true, "ajuda": "Quais eventos disparam push e o que o usuário vê/faz ao tocar." },
-        { "key": "deepLinks", "label": "Universal Links", "type": "textarea",
-          "required": false, "permiteNA": true, "ajuda": "Quais telas são abertas por link direto (ex.: a partir de um push ou de outro app)." },
-        { "key": "distribuicao", "label": "Distribuição", "type": "select",
-          "options": ["App Store", "TestFlight"], "required": true, "permiteNA": true },
-        { "key": "migracao", "label": "Plano de migração", "type": "text", "required": true,
-          "when": { "not": { "nodeStatus": "novo" } },
-          "ajuda": "App já publicado: como a mudança convive com versões antigas ainda instaladas em produção (a App Store leva dias pra aprovar uma atualização)." }
+        {
+          "key": "nome",
+          "label": "Nome do app",
+          "type": "text",
+          "required": true,
+          "identificador": true
+        },
+        {
+          "key": "versaoMinimaIos",
+          "label": "Versão mínima do iOS",
+          "type": "text",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Ex.: iOS 15. Define o que dá pra usar de API do sistema e o alcance de dispositivos."
+        },
+        {
+          "key": "autenticacao",
+          "label": "Autenticação",
+          "type": "select",
+          "options": [
+            "nenhuma",
+            "oauth2",
+            "token custom",
+            "Face ID/Touch ID + token"
+          ],
+          "required": true,
+          "permiteNA": true
+        },
+        {
+          "key": "contratoConsumido",
+          "label": "Contrato da API consumida (endpoints, request/response)",
+          "type": "textarea",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Endpoints do backend que o app chama e o formato de payload — cole a doc/exemplo."
+        },
+        {
+          "key": "comportamentoOffline",
+          "label": "Comportamento offline / cache local",
+          "type": "textarea",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "O que funciona sem rede, o que fica em cache local (CoreData/arquivo), como sincroniza quando a rede volta."
+        },
+        {
+          "key": "notificacoesPush",
+          "label": "Notificações push (APNs)",
+          "type": "textarea",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Quais eventos disparam push e o que o usuário vê/faz ao tocar."
+        },
+        {
+          "key": "deepLinks",
+          "label": "Universal Links",
+          "type": "textarea",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Quais telas são abertas por link direto (ex.: a partir de um push ou de outro app)."
+        },
+        {
+          "key": "distribuicao",
+          "label": "Distribuição",
+          "type": "select",
+          "options": [
+            "App Store",
+            "TestFlight"
+          ],
+          "required": true,
+          "permiteNA": true
+        },
+        {
+          "key": "migracao",
+          "label": "Plano de migração",
+          "type": "text",
+          "required": true,
+          "when": {
+            "not": {
+              "nodeStatus": "novo"
+            }
+          },
+          "ajuda": "App já publicado: como a mudança convive com versões antigas ainda instaladas em produção (a App Store leva dias pra aprovar uma atualização)."
+        }
       ],
-      "specResumo": ["versaoMinimaIos", "autenticacao"],
+      "specResumo": [
+        "versaoMinimaIos",
+        "autenticacao"
+      ],
       "cenarioGherkinPadrao": "```gherkin\nDado que o dispositivo está online e autenticado\nQuando a tela chama a API do backend\nEntão os dados retornados são exibidos corretamente, dentro do timeout esperado\n\nDado que o dispositivo está offline ou a chamada falha\nQuando o usuário abre a tela\nEntão o app mostra o cache local (quando existir) ou um estado de erro claro, sem travar\n```"
     }
   },
   "edgeTypes": {
     "http": {
-      "label": "HTTP", "color": "#475569", "verbo": "chama via HTTP", "tamanhoPadrao": "P",
+      "label": "HTTP",
+      "color": "#475569",
+      "verbo": "chama via HTTP",
+      "tamanhoPadrao": "P",
       "spec": [
-        { "key": "timeoutMs", "label": "Timeout (ms)", "type": "number", "ajuda": "Timeout da chamada, em milissegundos — usado no diagrama exportável e na especificação, quando preenchido." }
+        {
+          "key": "timeoutMs",
+          "label": "Timeout (ms)",
+          "type": "number",
+          "ajuda": "Timeout da chamada, em milissegundos — usado no diagrama exportável e na especificação, quando preenchido."
+        }
       ]
     },
     "grpc": {
-      "label": "gRPC", "color": "#2563eb", "verbo": "chama via gRPC", "tamanhoPadrao": "P",
+      "label": "gRPC",
+      "color": "#2563eb",
+      "verbo": "chama via gRPC",
+      "tamanhoPadrao": "P",
       "spec": [
-        { "key": "timeoutMs", "label": "Timeout (ms)", "type": "number", "ajuda": "Timeout da chamada, em milissegundos — usado no diagrama exportável e na especificação, quando preenchido." }
+        {
+          "key": "timeoutMs",
+          "label": "Timeout (ms)",
+          "type": "number",
+          "ajuda": "Timeout da chamada, em milissegundos — usado no diagrama exportável e na especificação, quando preenchido."
+        }
       ]
     },
-    "graphql": { "label": "GraphQL", "color": "#e10098", "verbo": "consulta via GraphQL", "tamanhoPadrao": "P" },
+    "graphql": {
+      "label": "GraphQL",
+      "color": "#e10098",
+      "verbo": "consulta via GraphQL",
+      "tamanhoPadrao": "P"
+    },
     "publishes": {
-      "label": "publica", "color": "#f97316", "verbo": "publica em", "tamanhoPadrao": "P",
+      "label": "publica",
+      "color": "#f97316",
+      "verbo": "publica em",
+      "tamanhoPadrao": "P",
       "spec": [
-        { "key": "chaveRoteamento", "label": "Chave de roteamento", "type": "text", "ajuda": "Routing key ou nome do tópico/fila de destino, quando relevante — usado no diagrama exportável e na especificação, quando preenchido." }
+        {
+          "key": "chaveRoteamento",
+          "label": "Chave de roteamento",
+          "type": "text",
+          "ajuda": "Routing key ou nome do tópico/fila de destino, quando relevante — usado no diagrama exportável e na especificação, quando preenchido."
+        }
       ]
     },
     "consumes": {
-      "label": "consome", "color": "#0891b2", "verbo": "consome de", "tamanhoPadrao": "M", "fluxo": "reverse",
+      "label": "consome",
+      "color": "#0891b2",
+      "verbo": "consome de",
+      "tamanhoPadrao": "M",
+      "fluxo": "reverse",
       "spec": [
-        { "key": "sincrono", "label": "Processamento síncrono?", "type": "boolean", "ajuda": "Se o consumo bloqueia até processar (síncrono) ou processa em background (assíncrono) — usado no diagrama exportável e na especificação, quando preenchido." }
+        {
+          "key": "sincrono",
+          "label": "Processamento síncrono?",
+          "type": "boolean",
+          "ajuda": "Se o consumo bloqueia até processar (síncrono) ou processa em background (assíncrono) — usado no diagrama exportável e na especificação, quando preenchido."
+        }
       ]
     },
     "pubsub": {
-      "label": "publica+consome", "color": "#7c3aed", "verbo": "publica e consome de", "tamanhoPadrao": "M", "fluxo": "bidirectional",
+      "label": "publica+consome",
+      "color": "#7c3aed",
+      "verbo": "publica e consome de",
+      "tamanhoPadrao": "M",
+      "fluxo": "bidirectional",
       "spec": [
-        { "key": "chaveRoteamento", "label": "Chave de roteamento", "type": "text", "ajuda": "Routing key ou nome do tópico/fila, quando relevante — usado no diagrama exportável e na especificação, quando preenchido." }
+        {
+          "key": "chaveRoteamento",
+          "label": "Chave de roteamento",
+          "type": "text",
+          "ajuda": "Routing key ou nome do tópico/fila, quando relevante — usado no diagrama exportável e na especificação, quando preenchido."
+        }
       ]
     },
-    "reads": { "label": "lê", "color": "#10b981", "verbo": "lê de", "tamanhoPadrao": "P", "fluxo": "reverse" },
-    "writes": { "label": "escreve", "color": "#0ea5e9", "verbo": "escreve em", "tamanhoPadrao": "P" },
-    "readwrite": { "label": "lê e escreve", "color": "#0d9488", "verbo": "lê e escreve em", "tamanhoPadrao": "P", "fluxo": "bidirectional" },
-    "orchestrates": { "label": "orquestra", "color": "#a855f7", "verbo": "orquestra", "tamanhoPadrao": "M" },
-    "binding": { "label": "binding", "color": "#f43f5e", "gerarAtividade": false },
-    "triggers": { "label": "dispara", "color": "#6b7280", "verbo": "dispara", "tamanhoPadrao": "P" },
-    "validates": { "label": "valida", "color": "#8b5cf6", "verbo": "usa a validação de", "tamanhoPadrao": "P" }
+    "reads": {
+      "label": "lê",
+      "color": "#10b981",
+      "verbo": "lê de",
+      "tamanhoPadrao": "P",
+      "fluxo": "reverse"
+    },
+    "writes": {
+      "label": "escreve",
+      "color": "#0ea5e9",
+      "verbo": "escreve em",
+      "tamanhoPadrao": "P"
+    },
+    "readwrite": {
+      "label": "lê e escreve",
+      "color": "#0d9488",
+      "verbo": "lê e escreve em",
+      "tamanhoPadrao": "P",
+      "fluxo": "bidirectional"
+    },
+    "orchestrates": {
+      "label": "orquestra",
+      "color": "#a855f7",
+      "verbo": "orquestra",
+      "tamanhoPadrao": "M"
+    },
+    "binding": {
+      "label": "binding",
+      "color": "#f43f5e",
+      "gerarAtividade": false
+    },
+    "triggers": {
+      "label": "dispara",
+      "color": "#6b7280",
+      "verbo": "dispara",
+      "tamanhoPadrao": "P"
+    },
+    "validates": {
+      "label": "valida",
+      "color": "#8b5cf6",
+      "verbo": "usa a validação de",
+      "tamanhoPadrao": "P"
+    }
   },
   "edgeRules": {
-    "kafka": { "valid": ["publishes", "consumes", "pubsub"], "default": "publishes" },
-    "rabbit": { "valid": ["publishes", "consumes", "pubsub", "binding"], "default": "publishes" },
-    "rabbit-exchange": { "valid": ["publishes", "pubsub"], "default": "publishes" },
-    "mongo": { "valid": ["reads", "writes", "readwrite"], "default": "reads" },
-    "sql": { "valid": ["reads", "writes", "readwrite"], "default": "writes" },
-    "camunda": { "valid": ["orchestrates", "http"], "default": "orchestrates" },
-    "fico": { "valid": ["http", "orchestrates"], "default": "http" },
-    "service": { "valid": ["http", "grpc", "graphql", "triggers", "validates"], "default": "http" },
-    "external": { "valid": ["http"], "default": "http" },
-    "job": { "valid": ["triggers"], "default": "triggers" },
-    "rule": { "valid": ["validates"], "default": "validates" },
-    "cache": { "valid": ["reads", "writes", "readwrite"], "default": "readwrite" },
-    "storage": { "valid": ["reads", "writes", "readwrite"], "default": "writes" },
-    "batch": { "valid": ["triggers"], "default": "triggers" },
-    "mobile-android": { "valid": ["http"], "default": "http" },
-    "mobile-ios": { "valid": ["http"], "default": "http" },
-    "_fallback": { "valid": ["http"], "default": "http" }
+    "kafka": {
+      "valid": [
+        "publishes",
+        "consumes",
+        "pubsub"
+      ],
+      "default": "publishes"
+    },
+    "rabbit": {
+      "valid": [
+        "publishes",
+        "consumes",
+        "pubsub",
+        "binding"
+      ],
+      "default": "publishes"
+    },
+    "rabbit-exchange": {
+      "valid": [
+        "publishes",
+        "pubsub"
+      ],
+      "default": "publishes"
+    },
+    "mongo": {
+      "valid": [
+        "reads",
+        "writes",
+        "readwrite"
+      ],
+      "default": "reads"
+    },
+    "sql": {
+      "valid": [
+        "reads",
+        "writes",
+        "readwrite"
+      ],
+      "default": "writes"
+    },
+    "camunda": {
+      "valid": [
+        "orchestrates",
+        "http"
+      ],
+      "default": "orchestrates"
+    },
+    "fico": {
+      "valid": [
+        "http",
+        "orchestrates"
+      ],
+      "default": "http"
+    },
+    "service": {
+      "valid": [
+        "http",
+        "grpc",
+        "graphql",
+        "triggers",
+        "validates"
+      ],
+      "default": "http"
+    },
+    "external": {
+      "valid": [
+        "http"
+      ],
+      "default": "http"
+    },
+    "job": {
+      "valid": [
+        "triggers"
+      ],
+      "default": "triggers"
+    },
+    "rule": {
+      "valid": [
+        "validates"
+      ],
+      "default": "validates"
+    },
+    "cache": {
+      "valid": [
+        "reads",
+        "writes",
+        "readwrite"
+      ],
+      "default": "readwrite"
+    },
+    "storage": {
+      "valid": [
+        "reads",
+        "writes",
+        "readwrite"
+      ],
+      "default": "writes"
+    },
+    "batch": {
+      "valid": [
+        "triggers"
+      ],
+      "default": "triggers"
+    },
+    "mobile-android": {
+      "valid": [
+        "http"
+      ],
+      "default": "http"
+    },
+    "mobile-ios": {
+      "valid": [
+        "http"
+      ],
+      "default": "http"
+    },
+    "_fallback": {
+      "valid": [
+        "http"
+      ],
+      "default": "http"
+    }
   }
 }
