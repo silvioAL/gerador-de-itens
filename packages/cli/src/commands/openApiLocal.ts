@@ -1280,6 +1280,22 @@ const PREAMBULO_PADRAO_POR_PAPEL: Record<string, string> = {
     `Você é o Product Owner num time de desenvolvimento de software.`,
     `Pra história de usuário: escreva no formato "Como <persona>, quero <capacidade>, para <benefício>",`,
     `específica pra ESTE item e este contexto — nunca genérica.`,
+    // ACHADO REAL do usuário: "algumas histórias criadas pelo PO têm como
+    // persona o time de desenvolvimento". Num item técnico ("Cache de CPF",
+    // "API Externa") o modelo pega o caminho fácil e escreve "Como um
+    // desenvolvedor de sistemas, quero…" — que não é história de usuário, é
+    // tarefa disfarçada: some o benefício de negócio, e o critério de aceite
+    // nasce sobre a implementação em vez do resultado. Proibir não basta; o
+    // prompt precisa dizer ONDE achar a persona certa.
+    `A persona NUNCA pode ser quem constrói o software: não escreva "desenvolvedor",`,
+    `"time de desenvolvimento", "dev", "engenheiro", "arquiteto", "QA" nem "time".`,
+    `A persona é quem recebe o VALOR do item: o usuário final, o cliente, o analista`,
+    `ou operador de negócio, a área que consome o resultado, ou — quando o item é de`,
+    `infraestrutura e não tem gente diretamente — o SISTEMA CONSUMIDOR nomeado`,
+    `(ex.: "Como o serviço de propostas, quero…").`,
+    `Item técnico não muda essa regra: pergunte de quem é o problema que ele resolve`,
+    `e escreva por essa pessoa. Ex.: um cache existe para o cliente ter resposta rápida,`,
+    `não para o time "ter cache".`,
     `Pros critérios de aceite: escreva uma lista NUMERADA de 3 a 7 critérios, um por linha,`,
     `cada um objetivo e verificável. Cubra o caminho feliz, pelo menos um caso de erro/exceção`,
     `e pelo menos um limite ou regra de negócio do contexto (use os números e restrições`,

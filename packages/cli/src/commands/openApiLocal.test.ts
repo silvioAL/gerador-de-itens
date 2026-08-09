@@ -667,6 +667,13 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     const { prompt: prompt } = ultimaChamadaComSchema();
     expect(prompt).toContain("lista NUMERADA de 3 a 7 critérios");
     expect(prompt).toContain("Como <persona>, quero <capacidade>, para <benefício>");
+    // ACHADO REAL: sem isto o modelo escrevia "Como um desenvolvedor de
+    // sistemas, quero…" nos itens técnicos — tarefa disfarçada de história.
+    // Proibir não basta: o prompt precisa dizer onde achar a persona certa.
+    expect(prompt).toContain("NUNCA pode ser quem constrói o software");
+    expect(prompt).toContain("desenvolvedor");
+    expect(prompt).toContain("quem recebe o VALOR");
+    expect(prompt).toContain("SISTEMA CONSUMIDOR");
   });
 
   it("Fase F: preâmbulo custom da config vence o padrão; papel custom sem preâmbulo cai no padrão do GRUPO dele", async () => {
