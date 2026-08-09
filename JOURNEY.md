@@ -1420,3 +1420,24 @@ Um teste ainda pegou uma fragilidade minha: `gerador ia usar` fazia `find(...)!`
 **O que NÃO foi verificado, e fica dito**: o gateway real. Contra servidor falso está ponta a ponta; contra o wrapper da empresa, não — depende do token. A Fase 2 está pronta, não validada em produção.
 
 Regressão: engine 170, llm 47 (+29), cli 77 (+13), web 252 (+11).
+
+## 96. A saída que funciona hoje — o prompt único deixa de ser nota de rodapé
+
+A SPEC-25 §5.5 estava escrita desde a arquitetura, marcada como "opcional, barata". Com o token corporativo ainda sem sair e o modelo local levando dezenas de minutos por esteira, ela virou a coisa mais valiosa do backlog: **o único caminho que entrega valor no ambiente real hoje**, sem depender de liberação nenhuma. A ferramenta monta o prompt; a pessoa cola onde já cola.
+
+O template do protótipo legado estava no repo (`gerador_de_itens-2.html`), então dava para não inventar: as variáveis reais são `descricaoEpico`, `contextoadicional`, `itensBreakDownContent`, `requisitosTecnicos`, `ciclosTeste`, `tecnologiasEnvolvidas`, `contextosAplicaveis`, `timestamp`. Duas coisas mudaram, e as duas são sobre erro silencioso:
+
+1. **O template era um arquivo subido a cada sessão**, trocado com `String.replace` solto. Uma variável digitada errada não dava erro nenhum — virava `{{tipoErrado}}` cru no meio do prompt já colado no chat. Agora ele é config do projeto e o `PUT` **valida contra um conjunto fechado**: erro aparece na edição, que é onde dá para corrigir.
+2. **O padrão ficou mais curto que o legado, de propósito.** Boa parte daquele texto gigante existia para conter alucinação — "volumetria em branco", "NUNCA misturar teste com refinamento", indicador literal. Tudo isso **já é determinístico no motor**: o checklist técnico e os ciclos de teste entram prontos no prompt, não são pedidos ao modelo. O que sobra para ele é o que é de fato textual.
+
+Três decisões pequenas com motivo:
+
+- **Painel, não botão que copia direto.** O destino é um chat onde não existe desfazer. Ver antes de colar custa dois segundos; descobrir depois que era o prompt errado, não.
+- **Dependência sai pelo número do item.** `n1::ep0` é chave interna: não diz nada a quem lê, nem ao modelo.
+- **Nada sugerido e não confirmado entra no prompt.** Mandar palpite como se fosse decisão faria o modelo construir em cima do que ninguém aprovou — a mesma régua que vale no resto do produto desde a §4.3 da SPEC-23.
+
+E uma que só apareceu escrevendo o teste: o prompt precisa ser **determinístico**. Se ele carregar `{{timestamp}}` por padrão, dois prompts da mesma quebra nunca são iguais e não dá para comparar o que mudou no desenho. A variável existe para quem quiser; o template padrão não a usa.
+
+A comparação honesta da §5.5 continua valendo e está na spec: o prompt único não tem formato garantido, não tem revisão campo a campo dentro da ferramenta e não propaga mudança depois. Ele tem uma coisa só, e é a que importa agora — funciona.
+
+Regressão: engine 189 (+19), llm 47, cli 80 (+3), web 259 (+7).

@@ -657,6 +657,21 @@ export const apiEspecificacaoTemplate = {
     requisitar<EspecificacaoTemplate>("/especificacao-template", { method: "PUT", body: JSON.stringify(dados) }),
 };
 
+/** SPEC-25 §5.5 / Fase 2.1 — o template do prompt único (`config/prompt-unico-template.md`). */
+export interface PromptUnicoTemplate {
+  conteudo: string;
+  /** Variáveis que o motor sabe preencher — a UI lista pra quem edita. */
+  variaveis: string[];
+}
+
+export const apiPromptUnicoTemplate = {
+  obter: () => requisitar<PromptUnicoTemplate>("/prompt-unico-template"),
+  /** 400 se o template citar `{{variavel}}` que o motor não preenche — aqui o
+   * erro é caro: viraria texto cru no prompt já colado no chat da empresa. */
+  salvar: (conteudo: string) =>
+    requisitar<PromptUnicoTemplate>("/prompt-unico-template", { method: "PUT", body: JSON.stringify({ conteudo }) }),
+};
+
 export interface ConfigPipelineAgentes {
   confirmacaoObrigatoria: boolean;
   /** SPEC-24 Fase F — lista ordenada de papéis da esteira. Ausente em

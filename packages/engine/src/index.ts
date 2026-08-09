@@ -47,6 +47,13 @@ export {
   type FichaPlaceholder,
   type FichaItem,
 } from "./especificacao/gerarEspecificacaoEntrega.js";
+export {
+  gerarPromptUnico,
+  validarTemplatePromptUnico,
+  VARIAVEIS_PROMPT_UNICO,
+  TEMPLATE_PROMPT_UNICO_PADRAO,
+  type OpcoesPromptUnico,
+} from "./especificacao/gerarPromptUnico.js";
 export { gerarDiagramaHtml, type OpcoesGerarDiagramaHtml } from "./diagrama-html/gerarDiagramaHtml.js";
 export {
   importarGrafo,

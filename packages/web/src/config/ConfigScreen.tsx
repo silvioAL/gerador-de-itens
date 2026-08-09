@@ -7,6 +7,7 @@ import { CamposArestaTab } from "./CamposArestaTab";
 import { MembrosTab } from "./MembrosTab";
 import { EspecificacaoTemplateTab } from "./EspecificacaoTemplateTab";
 import { PipelineAgentesTab } from "./PipelineAgentesTab";
+import { PromptUnicoTab } from "./PromptUnicoTab";
 import { ModeloIaTab } from "./ModeloIaTab";
 import { RegrasTab } from "./RegrasTab";
 
@@ -17,6 +18,7 @@ export type AbaConfig =
   | "regras"
   | "membros"
   | "especificacao"
+  | "promptUnico"
   | "pipeline"
   | "modeloIa";
 
@@ -138,6 +140,9 @@ export function ConfigScreen({
         <button onClick={() => setAba("especificacao")} style={aba === "especificacao" ? abaAtivaEstilo : abaEstilo}>
           Especificação de solução
         </button>
+        <button onClick={() => setAba("promptUnico")} style={aba === "promptUnico" ? abaAtivaEstilo : abaEstilo}>
+          Prompt único
+        </button>
         <button onClick={() => setAba("pipeline")} style={aba === "pipeline" ? abaAtivaEstilo : abaEstilo}>
           Pipeline de IA
         </button>
@@ -179,6 +184,7 @@ export function ConfigScreen({
             onSalvar={onSalvarEspecificacaoTemplate}
           />
         )}
+        {aba === "promptUnico" && <PromptUnicoTab />}
         {aba === "pipeline" && <PipelineAgentesTab config={pipelineAgentes} onSalvar={onSalvarPipelineAgentes} />}
         {aba === "modeloIa" && <ModeloIaTab />}
       </div>

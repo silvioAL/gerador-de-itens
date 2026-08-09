@@ -33,6 +33,7 @@ import {
 import { baixarArquivoTexto } from "../persistence/baixarArquivo";
 import { ConversaEspecificacao } from "../conversa/ConversaEspecificacao";
 import { DiagramaCompacto } from "./DiagramaCompacto";
+import { PromptUnicoPanel } from "./PromptUnicoPanel";
 import { EsteiraAgentes } from "./EsteiraAgentes";
 import { PAPEIS_PIPELINE, ROTULO_PAPEL, useEsteiraDeAgentes, type ItemFilaEsteira } from "./useEsteiraDeAgentes";
 
@@ -235,6 +236,8 @@ export function ReviewScreen({
   // ("usuário pode clicar e arrastar pra cima e pra baixo, assim ganha mais
   // espaço pra ver melhor o conteúdo"). `null` = default proporcional (30vh).
   const [alturaDiagrama, setAlturaDiagrama] = useState<number | null>(null);
+  // SPEC-25 §5.5 / Fase 2.1 — o prompt único pra colar no chat da empresa.
+  const [mostrarPromptUnico, setMostrarPromptUnico] = useState(false);
 
   function iniciarArrastoDivisoria(e: React.PointerEvent<HTMLDivElement>) {
     e.preventDefault();
@@ -653,9 +656,16 @@ export function ReviewScreen({
               Baixar diagrama (.html)
             </button>
           ) : (
-            <button onClick={baixarEspecificacao} style={{ ...botaoEstilo, ...botaoPrimarioEstilo }}>
-              Gerar especificação de solução
-            </button>
+            <>
+              {/* SPEC-25 §5.5: a saída que funciona HOJE no ambiente do
+                  usuário — não depende de provedor conectado nenhum. */}
+              <button onClick={() => setMostrarPromptUnico(true)} style={botaoEstilo} data-testid="abrir-prompt-unico">
+                📋 Prompt único
+              </button>
+              <button onClick={baixarEspecificacao} style={{ ...botaoEstilo, ...botaoPrimarioEstilo }}>
+                Gerar especificação de solução
+              </button>
+            </>
           )}
         </div>
         <button onClick={onFechar} style={botaoEstilo}>
@@ -927,6 +937,17 @@ export function ReviewScreen({
           contextoEpico={contextoEpico}
           onAplicar={responderComProcedencia}
           onFechar={() => setMostrarConversa(false)}
+        />
+      )}
+      {mostrarPromptUnico && (
+        <PromptUnicoPanel
+          atividades={resultado.atividades}
+          diagrama={diagrama}
+          regras={regras}
+          demandInfo={demandInfo}
+          anexosContexto={anexosContexto}
+          respostasItens={respostasItens}
+          onFechar={() => setMostrarPromptUnico(false)}
         />
       )}
     </>
