@@ -7,12 +7,17 @@ export {
   ID_PROVEDOR_GATEWAY,
   NOME_PROVEDOR_GATEWAY,
   PAPEL_PROVEDOR_GATEWAY,
+  PRESETS_GATEWAY,
   idsDeProvedorValidos,
   modeloPorId,
   modeloChatPorId,
+  presetGatewayPorId,
+  formatoJsonPorBaseUrl,
   urlDownload,
   type IdModelo,
   type ModeloRegistrado,
+  type PresetGateway,
+  type FormatoJson,
 } from "./modelos.js";
 export { diretorioDeModelos, caminhoDoModelo, garantirDiretorioDeModelos } from "./cache.js";
 export { baixarModelo, type ProgressoDownload, type OpcoesDownload } from "./download.js";
@@ -21,6 +26,7 @@ export { carregarModeloChat, carregarModeloEmbedding, type MotorChat, type Motor
 export { criarProvedorLocal, criarProvedorPorId, type ProvedorIa, type OpcoesGeracao } from "./provedor.js";
 export {
   criarProvedorCompativelOpenAI,
+  comAdditionalPropertiesFalse,
   validarContraSchema,
   type OpcoesProvedorOpenAI,
 } from "./provedorOpenAI.js";

@@ -74,6 +74,7 @@ export async function criarProvedorPorId(id: string | undefined, baseDir?: strin
       chave: credencial.chave,
       modelo: credencial.modelo,
       cabecalhos: credencial.cabecalhos,
+      formatoJson: credencial.formatoJson,
     });
   }
   return criarProvedorLocal(modeloChatPorId(id), baseDir);

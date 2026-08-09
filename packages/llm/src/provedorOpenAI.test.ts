@@ -105,6 +105,56 @@ describe("ProvedorCompativelOpenAI — o wire (SPEC-25 Fase 2)", () => {
     expect(pedidos[0].corpo.max_tokens).toBe(2048);
   });
 
+  it("formatoJson json_schema manda o SCHEMA, com strict e additionalProperties:false", async () => {
+    // MEDIDO contra a API real da Anthropic, não lido na doc (que diz
+    // "ignored"): sem `strict` dá 400 "Field required"; sem
+    // `additionalProperties: false` dá 400 dizendo isso em cada objeto.
+    respostas.push(sseTexto('{"a":"x"}'));
+    const p = criarProvedorCompativelOpenAI({ baseUrl, chave: "k", modelo: "m", formatoJson: "json_schema" });
+    await p.completarEstruturado("oi", {
+      type: "object",
+      properties: { a: { type: "string" } },
+      required: ["a"],
+    } as never);
+
+    const rf = pedidos[0].corpo.response_format as {
+      type: string;
+      json_schema: { strict: boolean; schema: Record<string, unknown> };
+    };
+    expect(rf.type).toBe("json_schema");
+    expect(rf.json_schema.strict).toBe(true);
+    expect(rf.json_schema.schema.additionalProperties).toBe(false);
+  });
+
+  it("json_schema desce nos objetos ANINHADOS — o lote da esteira é um objeto por item", async () => {
+    respostas.push(sseTexto('{"n0":{"h":"x"}}'));
+    const p = criarProvedorCompativelOpenAI({ baseUrl, chave: "k", modelo: "m", formatoJson: "json_schema" });
+    await p.completarEstruturado("oi", {
+      type: "object",
+      properties: { n0: { type: "object", properties: { h: { type: "string" } }, required: ["h"] } },
+      required: ["n0"],
+    } as never);
+
+    const schema = (pedidos[0].corpo.response_format as { json_schema: { schema: Record<string, never> } }).json_schema
+      .schema;
+    expect(schema.additionalProperties).toBe(false);
+    expect((schema.properties as Record<string, { additionalProperties: boolean }>).n0.additionalProperties).toBe(false);
+  });
+
+  it("formatoJson nenhum não manda o campo — gateway que rejeita em qualquer forma", async () => {
+    respostas.push(sseTexto('{"a":"x"}'));
+    const p = criarProvedorCompativelOpenAI({ baseUrl, chave: "k", modelo: "m", formatoJson: "nenhum" });
+    await p.completarEstruturado("oi", { type: "object", properties: { a: { type: "string" } } } as never);
+    expect(pedidos[0].corpo.response_format).toBeUndefined();
+  });
+
+  it("o padrão continua json_object — não quebra gateway já configurado", async () => {
+    respostas.push(sseTexto('{"a":"x"}'));
+    const p = criarProvedorCompativelOpenAI({ baseUrl, chave: "k", modelo: "m" });
+    await p.completarEstruturado("oi", { type: "object", properties: { a: { type: "string" } } } as never);
+    expect(pedidos[0].corpo.response_format).toEqual({ type: "json_object" });
+  });
+
   it("manda os cabeçalhos extras — é o que faz um wrapper corporativo funcionar", async () => {
     respostas.push(sseTexto("ok"));
     await provedor({ "X-Time": "plataforma" }).completar("oi");

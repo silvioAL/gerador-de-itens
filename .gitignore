@@ -15,3 +15,17 @@ infra/secrets/.env
 .vscode/
 _prototipos/
 _tmp-*
+
+# Config gerada em runtime por quem RODA a ferramenta neste repositório. O que
+# o produto entrega são os `*.example.json`; estes aqui são estado da máquina
+# de quem testou (`config/ia.json` guarda o provedor de IA selecionado, por
+# exemplo) e commitá-los mudaria o padrão de quem clona. Achado real: um
+# `git add -A` durante a validação do Claude quase levou junto o `ia.json`
+# apontando pro gateway.
+config/ia.json
+config/campos-no.json
+config/campos-aresta.json
+config/pipeline-agentes.json
+config/regras.json
+config/prompt-unico-template.md
+config/quebras/

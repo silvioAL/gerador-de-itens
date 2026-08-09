@@ -252,11 +252,38 @@ O que faltava era tudo menos o transporte:
 
 - **Presets de destino** (`PRESETS_GATEWAY` em `packages/llm/modelos.ts`): Claude, DeepSeek e Ollama, cada um com base URL, modelos sugeridos, onde pegar a chave e uma observação. Escolher preenche os campos. A lista **vem do servidor** por `/ia/status` — `packages/web` não pode importar `@gerador/llm` (arrasta `node-llama-cpp`, binário nativo, para o bundle do navegador), e uma cópia no front envelheceria em silêncio. Mesmo raciocínio do catálogo de acessos da SPEC-28.
 - **`max_tokens` explícito** (default 8192, configurável). O provedor não mandava esse campo. A API nativa da Anthropic **exige** `max_tokens`, então a camada de compatibilidade arbitra um valor não documentado — e um lote de 5 itens da esteira bate nesse teto e volta cortado. É a falha silenciosa mais cara deste projeto (resposta truncada = trabalho perdido sem aviso), então o teto passou a ser nosso.
-- **Honestidade sobre a garantia**: a Anthropic **ignora `response_format`** (documentado por eles). Onde isso vale, a estrutura é garantida só por `validarContraSchema` + um retry — a degradação que a Fase 2 já previa, agora escrita na tela em vez de escondida no código. O preset carrega `jsonNativo: false` e a aba avisa antes de a pessoa salvar.
+- **O dialeto de JSON, corrigido pelo teste real** (ver §8.7). A documentação da Anthropic diz que `response_format` é "ignored"; a API responde **HTTP 400**. O preset carrega `formatoJson`, deduzido da base URL.
 
 **Custo é decisão de quem usa, e a tela diz**: chave de API do console da Anthropic é cobrança por uso, separada de assinatura do Claude.ai ou do Claude Code. Não existe caminho por OAuth: as credenciais do Claude Code são exclusivas dele (ToS), o que já estava registrado no §4.5 e continua valendo.
 
-Verificado contra o endpoint real: `/ia/credencial/testar` com chave inválida responde "Credencial recusada pelo gateway (HTTP 401)" e com base URL errada responde "Endpoint não encontrado — confira a base URL (HTTP 404)". A cadeia rota → provedor → `api.anthropic.com` está fechada; o que não dá para verificar sem uma chave paga é uma resposta completa de verdade.
+Verificado contra o endpoint real com chave inválida e com base URL errada, cada uma produzindo a mensagem certa. A resposta completa de verdade veio depois, na §8.7 — e desmentiu parte disto.
+
+### 8.7 O que só apareceu com uma chave de verdade na mão
+
+O usuário mandou uma chave da Anthropic para fechar a validação. Três coisas que **nenhum teste com mock pegaria** e que a documentação não contava:
+
+**1. `response_format: json_object` é REJEITADO, não ignorado.** A tabela oficial lista o campo como "Ignored". A API responde:
+
+```
+HTTP 400  response_format.type: Input should be 'json_schema'
+```
+
+Ou seja: a §8.6 estava errada ao dizer que a garantia com Claude seria mais fraca. Medindo as quatro variantes contra a API:
+
+| envio | resultado |
+| --- | --- |
+| sem `response_format` | 200, mas o JSON volta embrulhado em cerca de markdown |
+| `json_object` | **400** |
+| `json_schema` sem `strict` | 400 — `strict` é obrigatório |
+| `json_schema` + `strict: true` + `additionalProperties: false` em todo nível | **200, JSON limpo** |
+
+A Anthropic aceita **Structured Outputs**, que é garantia **mais forte** que `json_object`: o formato deixa de depender de boa vontade do modelo. O provedor ganhou `formatoJson` (`json_object` | `json_schema` | `nenhum`), deduzido da base URL por `formatoJsonPorBaseUrl()` — inferência, e não campo que a tela manda, para que `gerador ia conectar` no terminal acerte igual.
+
+**2. O teto de tokens não é teórico.** Uma sonda com `max_tokens: 800` voltou com a string cortada no meio, JSON inválido. É a prova viva do §8.6: sem teto explícito, quem escolhe é o gateway.
+
+**3. Falha de gateway virava HTTP 200 com corpo vazio.** As rotas de streaming escreviam `writeHead(200)` **antes** de chamar o modelo; quando a chamada falhava antes do primeiro token, o cliente recebia 200 e nada. Os `catch` já sabiam mandar 500 quando `!res.headersSent` — o ramo nunca rodava. Na tela isso é a esteira "rodando" e não escrevendo nada: o mesmo silêncio do JOURNEY §105, agora vindo de outro lugar. O cabeçalho passou a ser escrito no primeiro pedaço (`escritorDeStream`), e resposta vazia sem erro virou erro explícito.
+
+Com os três corrigidos, o lote real: **5 de 5 itens completos, 39s, JSON válido**, conteúdo específico do contexto (cita o endpoint, HTTP 201, validação de CPF). O mesmo pedido que minutos antes voltava vazio.
 
 ## 9. Verificação
 

@@ -15,6 +15,7 @@ import {
   ID_PROVEDOR_GATEWAY,
   MODELOS_CHAT,
   criarProvedorCompativelOpenAI,
+  formatoJsonPorBaseUrl,
   criarProvedorPorId,
   idsDeProvedorValidos,
   lerCredenciais,
@@ -73,6 +74,29 @@ async function versaoDoPacote(): Promise<string | undefined> {
     }
   }
   return undefined;
+}
+
+/**
+ * Escritor de streaming que só manda o cabeçalho 200 no PRIMEIRO pedaço.
+ *
+ * ACHADO REAL, com o Claude ligado de verdade: as rotas escreviam
+ * `writeHead(200)` ANTES de chamar o modelo. Quando a chamada falhava antes de
+ * qualquer texto — foi o caso, com a Anthropic devolvendo 400 pro
+ * `response_format` — o cliente recebia **HTTP 200 com corpo vazio**. Os
+ * `catch` já sabiam mandar 500 quando `!res.headersSent`, mas esse ramo nunca
+ * rodava. Na tela isso vira a esteira "rodando" e não escrevendo nada: o mesmo
+ * silêncio que este projeto passou a rodada inteira caçando.
+ *
+ * Adiar o cabeçalho não muda nada pro caso feliz (o primeiro token chega e o
+ * 200 sai junto) e devolve o erro de verdade pro caso triste.
+ */
+function escritorDeStream(res: ServerResponse): (pedaco: string) => void {
+  return (pedaco: string) => {
+    if (!res.headersSent) {
+      res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" });
+    }
+    res.write(pedaco);
+  };
 }
 
 function enviarJson(res: ServerResponse, status: number, corpo: unknown): void {
@@ -665,7 +689,14 @@ async function tratarIaCredencial(req: IncomingMessage, res: ServerResponse): Pr
     enviarJson(res, 400, { erro: "informe base URL, chave e nome do modelo" });
     return;
   }
-  await salvarCredencial(ID_PROVEDOR_GATEWAY, { baseUrl, chave, modelo });
+  // O dialeto de JSON é deduzido do destino, não pedido a quem configura:
+  // ninguém precisa saber que a Anthropic exige `json_schema` pra usar Claude.
+  await salvarCredencial(ID_PROVEDOR_GATEWAY, {
+    baseUrl,
+    chave,
+    modelo,
+    formatoJson: formatoJsonPorBaseUrl(baseUrl),
+  });
   // A credencial mudou: o provedor carregado (se era o gateway) está velho.
   void descartarProvedor();
   enviarJson(res, 200, { ok: true });
@@ -688,7 +719,15 @@ async function tratarIaTestarCredencial(req: IncomingMessage, res: ServerRespons
     return;
   }
 
-  const provedor = criarProvedorCompativelOpenAI({ baseUrl, chave, modelo, cabecalhos: salva?.cabecalhos });
+  const provedor = criarProvedorCompativelOpenAI({
+    baseUrl,
+    chave,
+    modelo,
+    cabecalhos: salva?.cabecalhos,
+    // Testar com o MESMO dialeto que o uso real vai usar — senão o teste passa
+    // e a esteira falha, que é pior que não ter teste.
+    formatoJson: formatoJsonPorBaseUrl(baseUrl),
+  });
   const inicio = Date.now();
   try {
     const resposta = await provedor.completar("Responda apenas: ok");
@@ -769,8 +808,9 @@ async function tratarIaSugerir(req: IncomingMessage, res: ServerResponse, dirPro
     // texto de verdade (`{`, `"`, `v`, `a`, `l`...). Resposta vira texto puro
     // em pedaços — `res.write()` várias vezes faz o Node fazer chunked
     // transfer sozinho, sem precisar setar o header à mão.
-    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" });
-    await provedor.completar(prompt, { onTexto: (pedaco) => res.write(pedaco) });
+    const escrever = escritorDeStream(res);
+    await provedor.completar(prompt, { onTexto: escrever });
+    if (!res.headersSent) throw new Error("o modelo não devolveu conteúdo nenhum");
     res.end();
   } catch (erro) {
     // Achado real: sem este catch, uma falha no motor de IA (binário nativo
@@ -1070,8 +1110,10 @@ async function tratarIaDiagrama(req: IncomingMessage, res: ServerResponse, dirPr
     ].join("\n");
 
     const provedor = await obterProvedor(dirProjeto);
-    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" });
-    await provedor.completarEstruturado(prompt, schema, { onTexto: (pedaco) => res.write(pedaco) });
+    const escrever = escritorDeStream(res);
+    await provedor.completarEstruturado(prompt, schema, { onTexto: escrever });
+    // Resposta vazia sem erro: nada pra entregar, e 200 vazio viraria silêncio.
+    if (!res.headersSent) throw new Error("o modelo não devolveu conteúdo nenhum");
     res.end();
   } catch (erro) {
     void descartarProvedor();
@@ -1179,8 +1221,10 @@ async function tratarIaAlterarItem(req: IncomingMessage, res: ServerResponse, di
     ].join("\n");
 
     const provedor = await obterProvedor(dirProjeto);
-    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" });
-    await provedor.completarEstruturado(prompt, schema, { onTexto: (pedaco) => res.write(pedaco) });
+    const escrever = escritorDeStream(res);
+    await provedor.completarEstruturado(prompt, schema, { onTexto: escrever });
+    // Resposta vazia sem erro: nada pra entregar, e 200 vazio viraria silêncio.
+    if (!res.headersSent) throw new Error("o modelo não devolveu conteúdo nenhum");
     res.end();
   } catch (erro) {
     void descartarProvedor();
@@ -1240,8 +1284,9 @@ async function tratarIaSugerirConfig(req: IncomingMessage, res: ServerResponse, 
     const provedor = await obterProvedor(dirProjeto);
     // Mesmo contrato de `/ia/pipeline/:papel`: texto cru do JSON restrito por
     // grammar, streamado. A UI mostra o progresso e faz o parse no fim.
-    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" });
-    await provedor.completarEstruturado(prompt, definicao.schema, { onTexto: (pedaco) => res.write(pedaco) });
+    const escrever = escritorDeStream(res);
+    await provedor.completarEstruturado(prompt, definicao.schema, { onTexto: escrever });
+    if (!res.headersSent) throw new Error("o modelo não devolveu conteúdo nenhum");
     res.end();
   } catch (erro) {
     void descartarProvedor();
@@ -1425,8 +1470,10 @@ async function tratarIaPipeline(req: IncomingMessage, res: ServerResponse, papel
     // escreve. O corpo completo é sempre JSON válido (a grammar garante),
     // então o cliente acumula, mostra ao vivo, e faz o parse no final —
     // sem precisar de um segundo canal pra resposta estruturada.
-    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" });
-    await provedor.completarEstruturado(prompt, schema, { onTexto: (pedaco) => res.write(pedaco) });
+    const escrever = escritorDeStream(res);
+    await provedor.completarEstruturado(prompt, schema, { onTexto: escrever });
+    // Resposta vazia sem erro: nada pra entregar, e 200 vazio viraria silêncio.
+    if (!res.headersSent) throw new Error("o modelo não devolveu conteúdo nenhum");
     res.end();
   } catch (erro) {
     void descartarProvedor();

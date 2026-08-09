@@ -10,6 +10,8 @@ import { dirname, resolve } from "node:path";
  * esperando acontecer. Ficam em `~/.gerador/credenciais.json`, o MESMO
  * diretório-base do cache de modelos — fora de qualquer repositório.
  */
+import type { FormatoJson } from "./modelos.js";
+
 export interface CredencialProvedor {
   /** Base URL do gateway (`.../v1`), sem `/chat/completions`. */
   baseUrl?: string;
@@ -18,6 +20,9 @@ export interface CredencialProvedor {
   modelo?: string;
   /** Cabeçalhos extras que alguns wrappers corporativos exigem. */
   cabecalhos?: Record<string, string>;
+  /** Dialeto de JSON aceito pelo destino (ver `FormatoJson`). Ausente = o
+   * padrão `json_object`, que é o que os gateways já salvos usavam. */
+  formatoJson?: FormatoJson;
 }
 
 export type Credenciais = Record<string, CredencialProvedor>;
