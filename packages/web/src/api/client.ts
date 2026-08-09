@@ -491,7 +491,53 @@ export const apiIa = {
     }
     return JSON.parse(acumulado) as DiagramaProposto;
   },
+  /** SPEC-27 Fase 2 — a conversa da especificação: propõe alterações nos
+   * campos de UM item. Uma chamada por item de propósito (a resposta fica
+   * pequena, e o lote grande foi o que truncou e apagou trabalho antes). */
+  alterarItem: async (pedido: PedidoAlterarItemIa, onTexto?: (acumulado: string) => void): Promise<AlteracoesPropostas> => {
+    const resposta = await fetch(`${BASE_URL}/ia/alterar-item`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(pedido),
+    });
+    if (!resposta.ok) {
+      const corpo = await resposta.json().catch(() => ({}));
+      const mensagem = typeof corpo.erro === "string" ? corpo.erro : "Não foi possível propor a alteração.";
+      throw new Error(mensagem);
+    }
+    let acumulado = "";
+    const leitor = resposta.body?.getReader();
+    if (leitor) {
+      const decodificador = new TextDecoder();
+      for (;;) {
+        const { done, value } = await leitor.read();
+        if (done) break;
+        acumulado += decodificador.decode(value, { stream: true });
+        onTexto?.(acumulado);
+      }
+      acumulado += decodificador.decode();
+    } else {
+      acumulado = await resposta.text();
+    }
+    return JSON.parse(acumulado) as AlteracoesPropostas;
+  },
 };
+
+export interface PedidoAlterarItemIa {
+  instrucao: string;
+  itemRotulo: string;
+  contextoNo?: string;
+  campos: { chave: string; rotulo: string; valorAtual?: string }[];
+  /** Só no "revise os demais": o que mudou em outro item. É o que transforma
+   * reescrita em propagação. */
+  oQueMudou?: string;
+  contextoEpico?: string;
+}
+
+export interface AlteracoesPropostas {
+  alteracoes: { campo: string; valor: string; motivo: string }[];
+}
 
 export interface PedidoDiagramaIa {
   descricao: string;

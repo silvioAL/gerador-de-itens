@@ -962,6 +962,115 @@ async function tratarIaDiagrama(req: IncomingMessage, res: ServerResponse, dirPr
   }
 }
 
+// --- POST /ia/alterar-item — SPEC-27 Fase 2: a conversa da especificação.
+//
+// Serve os dois pedidos do fluxo real ("altere o item X" e "revise os
+// demais") com UMA rota, porque são a mesma operação vista de ângulos
+// diferentes: dado um item e um motivo, o que muda nos campos dele.
+//
+// Decisões que vêm direto das lições anteriores:
+// - **Uma chamada por item.** O lote grande foi o que truncou a resposta e
+//   apagou o trabalho de um papel inteiro (JOURNEY §93). Aqui a resposta é
+//   pequena por construção, e o progresso aparece item a item.
+// - **`campo` é ENUM das chaves do próprio item.** O modelo não consegue
+//   propor alteração num campo que não existe — mesmo trilho do diagrama.
+// - **Lista vazia é resposta válida e esperada.** "Revise os demais" em um
+//   item que não é afetado deve devolver nada; forçar alteração seria pior
+//   que não revisar.
+async function tratarIaAlterarItem(req: IncomingMessage, res: ServerResponse, dirProjeto: string): Promise<void> {
+  try {
+    const status = await verificarStatus(undefined, (await lerConfigIa(dirProjeto)).provedorPadrao);
+    if (!status.pronto) {
+      enviarJson(res, 503, { erro: "modelos de IA não instalados — rode `gerador ia instalar`" });
+      return;
+    }
+
+    const { instrucao, itemRotulo, contextoNo, campos, oQueMudou, contextoEpico } = await lerCorpoJson<{
+      /** O que a pessoa pediu, em português. */
+      instrucao: string;
+      itemRotulo: string;
+      contextoNo?: string;
+      /** Os campos do item COM o valor atual — sem isso o modelo reescreve do
+       * zero em vez de ajustar, que é o oposto do pedido. */
+      campos: { chave: string; rotulo: string; valorAtual?: string }[];
+      /** Preenchido no "revise os demais": o que mudou em OUTRO item. É o que
+       * transforma uma reescrita numa propagação. */
+      oQueMudou?: string;
+      contextoEpico?: string;
+    }>(req);
+
+    if (!instrucao?.trim() && !oQueMudou?.trim()) {
+      enviarJson(res, 400, { erro: "sem instrução nem descrição do que mudou — nada a propor" });
+      return;
+    }
+    if (!Array.isArray(campos) || campos.length === 0) {
+      enviarJson(res, 400, { erro: "item sem campos — nada a alterar" });
+      return;
+    }
+
+    const schema: GbnfJsonSchema = {
+      type: "object",
+      properties: {
+        alteracoes: {
+          type: "array",
+          maxItems: campos.length,
+          items: {
+            type: "object",
+            properties: {
+              campo: { enum: campos.map((c) => c.chave) },
+              valor: { type: "string" },
+              motivo: { type: "string" },
+            },
+            required: ["campo", "valor", "motivo"],
+          },
+        },
+      },
+      required: ["alteracoes"],
+    } as GbnfJsonSchema;
+
+    const prompt = [
+      `Você revisa itens de trabalho de software já especificados.`,
+      ...(contextoEpico?.trim() ? [``, `Contexto da demanda:`, contextoEpico.trim(), ``] : []),
+      `Item: ${itemRotulo}`,
+      ...(contextoNo?.trim() ? [`Contexto do(s) nó(s) de arquitetura:`, contextoNo.trim()] : []),
+      ``,
+      `Conteúdo atual dos campos:`,
+      ...campos.map((c) => `- (campo "${c.chave}") ${c.rotulo}: ${c.valorAtual?.trim() || "(vazio)"}`),
+      ``,
+      ...(oQueMudou?.trim()
+        ? [
+            `O QUE MUDOU em outro ponto da quebra:`,
+            oQueMudou.trim(),
+            ``,
+            `Ajuste APENAS o que decorre dessa mudança. Preserve todo o resto como está.`,
+            `Se nada neste item decorre dela, devolva "alteracoes" como lista VAZIA —`,
+            `essa é uma resposta correta e esperada, não uma falha.`,
+          ]
+        : [`Pedido: ${instrucao.trim()}`, ``, `Altere só o que o pedido exige; preserve o resto.`]),
+      ``,
+      `Regras:`,
+      `- "valor" é o texto COMPLETO e final do campo, já com o ajuste — não um trecho, não um diff.`,
+      `- "motivo" explica em uma frase por que este campo mudou. É o que a pessoa lê antes de aceitar.`,
+      `- Não repita um campo que não precisa mudar.`,
+      `- Responda em português.`,
+    ].join("\n");
+
+    const provedor = await obterProvedor(dirProjeto);
+    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" });
+    await provedor.completarEstruturado(prompt, schema, { onTexto: (pedaco) => res.write(pedaco) });
+    res.end();
+  } catch (erro) {
+    void descartarProvedor();
+    const mensagem = erro instanceof Error ? erro.message : "Falha desconhecida ao propor a alteração.";
+    console.error(`[ia/alterar-item] falhou:`, mensagem);
+    if (res.headersSent) {
+      res.end();
+    } else {
+      enviarJson(res, 500, { erro: `Não foi possível propor a alteração: ${mensagem}` });
+    }
+  }
+}
+
 async function tratarIaSugerirConfig(req: IncomingMessage, res: ServerResponse, dirProjeto: string): Promise<void> {
   try {
     const status = await verificarStatus(undefined, (await lerConfigIa(dirProjeto)).provedorPadrao);
@@ -1231,6 +1340,10 @@ export async function tratarApiLocal(req: IncomingMessage, res: ServerResponse, 
   }
   if (caminho === "/ia/diagrama" && metodo === "POST") {
     await tratarIaDiagrama(req, res, dirProjeto);
+    return true;
+  }
+  if (caminho === "/ia/alterar-item" && metodo === "POST") {
+    await tratarIaAlterarItem(req, res, dirProjeto);
     return true;
   }
   if (caminho === "/config/ia" && (metodo === "GET" || metodo === "PUT")) {

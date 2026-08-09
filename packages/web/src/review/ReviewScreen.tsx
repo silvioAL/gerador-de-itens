@@ -31,6 +31,7 @@ import {
   type PlaceholderPedidoItemIa,
 } from "../api/client";
 import { baixarArquivoTexto } from "../persistence/baixarArquivo";
+import { ConversaEspecificacao } from "../conversa/ConversaEspecificacao";
 import { DiagramaCompacto } from "./DiagramaCompacto";
 import { EsteiraAgentes } from "./EsteiraAgentes";
 import { PAPEIS_PIPELINE, ROTULO_PAPEL, useEsteiraDeAgentes, type ItemFilaEsteira } from "./useEsteiraDeAgentes";
@@ -346,6 +347,9 @@ export function ReviewScreen({
     return mapa;
   }, [achados]);
   const [mostrarAchados, setMostrarAchados] = useState(false);
+  // SPEC-27 Fase 2 — a conversa da especificação. Fase própria, janela
+  // própria: carrega os itens derivados, não o catálogo de tipos de nó.
+  const [mostrarConversa, setMostrarConversa] = useState(false);
 
   // SPEC-24 Fase C: fila de trabalho da esteira — um item por ATIVIDADE,
   // com os placeholders já separados por papel (`ItemFilaEsteira`).
@@ -560,6 +564,7 @@ export function ReviewScreen({
   const pctTimeline = atividadesFiltradas.length > 0 ? (tocados / atividadesFiltradas.length) * 100 : 0;
 
   return (
+    <>
     <div style={telaEstilo}>
       <header style={headerEstilo}>
         <strong style={{ fontSize: 14 }}>Revisão da quebra</strong>
@@ -603,6 +608,14 @@ export function ReviewScreen({
             ⚠ {totalDesatualizados} {totalDesatualizados === 1 ? "campo desatualizado" : "campos desatualizados"}
           </span>
         )}
+        <button
+          data-testid="abrir-conversa-especificacao"
+          onClick={() => setMostrarConversa(true)}
+          style={botaoEstilo}
+          title="Peça a alteração de um item e depois mande revisar os que dependem dele"
+        >
+          ✦ Refinar conversando
+        </button>
         {achados.length > 0 && (
           <button
             data-testid="abrir-revisor"
@@ -906,6 +919,17 @@ export function ReviewScreen({
         </>
       )}
     </div>
+      {mostrarConversa && atividadeSelecionada && (
+        <ConversaEspecificacao
+          atividades={resultado.atividades}
+          fichas={fichas}
+          atividadeSelecionada={atividadeSelecionada}
+          contextoEpico={contextoEpico}
+          onAplicar={responderComProcedencia}
+          onFechar={() => setMostrarConversa(false)}
+        />
+      )}
+    </>
   );
 }
 

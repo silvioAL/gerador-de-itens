@@ -71,3 +71,4 @@ export {
   type Achado,
   type SeveridadeAchado,
 } from "./revisao/checagens.js";
+export { itensImpactados, type ItemImpactado } from "./procedencia/impacto.js";
