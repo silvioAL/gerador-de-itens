@@ -153,6 +153,17 @@ Nota da API DeepSeek: compatível com o formato OpenAI (`chat/completions`); a g
    - **Fase 2.1 (opcional, barata)**: modo "copiar prompt do breakdown" (§5.5) — ponte com o fluxo atual, não depende de provedor nenhum.
 4. **Fase 3 — provedor por papel** (Jornada D): `papeis[].provedor` + select na aba Pipeline listando só provedores prontos.
 
+### 8.1 Realidade que ordena as fases (achado real, e é o que manda)
+
+*"Na empresa já tenho um endpoint, mas ainda não tenho o token para usá-lo; a ideia de embarcar um modelo é uma forma de contornar isso e poder validar a ferramenta no dia a dia."*
+
+Consequências, registradas para não repetir a inversão de prioridade que eu mesmo cometi na rodada anterior (tinha promovido a Fase 2 a "pré-requisito duro" de tudo):
+
+- **O modelo local não é plano B — é o único caminho disponível hoje.** A Fase 1 (DeepSeek local) deixa de ser "melhoria futura" e vira **a única alavanca de qualidade acionável agora**.
+- **A Fase 2 não pode governar a sequência**, porque depende de algo fora do nosso alcance (a liberação do token). Ela é implementada como **soquete pronto e dormente**: `ProvedorCompativelOpenAI` + card na aba com os três campos (base URL, chave, modelo), testado contra um servidor falso na suíte. No dia em que o token sair, a validação real é colar e clicar — zero reescrita.
+- **O que NÃO depende de modelo tem prioridade real**: SPEC-26 Bloco 1 (procedência/obsolescência) e Bloco 4a (checagens determinísticas do engine) entregam valor no dia a dia rodando com qualquer modelo — inclusive nenhum.
+- **O chat (SPEC-26 Bloco 5) fica por último** e ganha um degrau intermediário (§5.5 da SPEC-26): o impacto é computado pelo app (determinístico) e o modelo só REDIGE o ajuste — isso funciona em modelo pequeno; tool use livre encadeado espera o provedor forte.
+
 ## 9. Verificação
 
 Fase a fase, contra o `gerador open` real (disciplina de sempre): Fase 0 = regressão intacta + aba renderizando; Fase 1 = comparação lado a lado dos dois modelos locais; Fase 2 = esteira completa via DeepSeek API e via Claude, com streaming e JSON válido, chave validada e guardada fora do projeto; Fase 3 = esteira mista (papéis em provedores diferentes) num run só.
