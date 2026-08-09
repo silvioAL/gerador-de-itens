@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -10,6 +11,7 @@ import {
   type Diagrama,
   type DiagramaConfig,
   type RegrasConfig,
+  type ValorSpec,
 } from "@gerador/engine";
 import { ReviewScreen } from "./ReviewScreen";
 import { readFixture } from "../test-support/fixtures";
@@ -1362,5 +1364,73 @@ describe("ReviewScreen — revisor determinístico (SPEC-26 Bloco 4a)", () => {
       />
     );
     expect(screen.queryByTestId("abrir-revisor")).not.toBeInTheDocument();
+  });
+});
+
+describe("ReviewScreen — o que um papel escreveu continua na tela quando o próximo começa (bug real)", () => {
+  const regras: RegrasConfig = {
+    tipos: [],
+    tamanhos: [],
+    porTech: {
+      Backend: {
+        checklistTecnico: [{ texto: "DLQ configurada e monitorada", contextos: ["Backend-mensagens"] }],
+        testes: [],
+      },
+    },
+  };
+
+  /** Espelha o App: o pai guarda `respostasItens` e o `onResponderItem` o
+   * atualiza. Sem isso o teste não reproduz o caso real — em `ReviewScreen`
+   * sozinho a prop nunca muda, e o bug some. */
+  function ComEstado({ resultado }: { resultado: ReturnType<typeof resultadoFixture01> }) {
+    const [respostasItens, setRespostasItens] = useState<Record<string, Record<string, ValorSpec>>>({});
+    return (
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        regras={regras}
+        especificacaoTemplate={templateFixture}
+        respostasItens={respostasItens}
+        onResponderItem={(chave, placeholder, resposta) =>
+          setRespostasItens((r) => ({ ...r, [chave]: { ...r[chave], [placeholder]: resposta } }))
+        }
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+  }
+
+  it("o texto do PO continua visível depois que o Arquiteto começa a escrever", async () => {
+    apiIaStatusMock.mockResolvedValueOnce({ chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "" });
+    let liberarArquiteto!: () => void;
+    apiIaSugerirPipelineMock.mockImplementation(
+      async (papel: string, pedido: { itens: { chave: string; placeholders: { chave: string }[] }[] }) => {
+        const resposta = Object.fromEntries(
+          pedido.itens.map((i) => [i.chave, Object.fromEntries(i.placeholders.map((p) => [p.chave, `texto do ${papel}`]))])
+        );
+        if (papel === "po") return resposta;
+        // Arquiteto fica em voo: é exatamente o instante em que o usuário
+        // relatou que o texto do PO sumia da tela.
+        await new Promise<void>((r) => (liberarArquiteto = r));
+        return resposta;
+      }
+    );
+
+    render(<ComEstado resultado={resultadoFixture01()} />);
+
+    // Espera o PO terminar e o Arquiteto entrar em voo.
+    await waitFor(
+      () => expect(apiIaSugerirPipelineMock.mock.calls.map((c) => c[0])).toContain("arquiteto"),
+      { timeout: 4000 }
+    );
+
+    fireEvent.click(screen.getAllByTestId(/^item-/)[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Refinamento" }));
+
+    const campoDoPo = screen.getByTestId("placeholder-_historiaUsuario");
+    await waitFor(() => expect(campoDoPo.textContent + (campoDoPo.querySelector("textarea")?.value ?? "")).toContain("texto do po"));
+
+    liberarArquiteto();
   });
 });

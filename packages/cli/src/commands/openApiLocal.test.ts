@@ -382,6 +382,63 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     expect(await fetch(`${base}/config/regras`).then((r) => r.json())).toEqual(regras);
   });
 
+  it("POST /ia/diagrama restringe o tipo de nó aos que a configuração TEM — o modelo não inventa tipo (SPEC-27)", async () => {
+    verificarStatusMock.mockResolvedValue({
+      chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
+    });
+
+    const resposta = await fetch(`${base}/ia/diagrama`, {
+      method: "POST",
+      body: JSON.stringify({
+        descricao: "o checkout precisa consultar o saldo de pontos de fidelidade",
+        tiposDeNo: [
+          { id: "service", rotulo: "Serviço" },
+          { id: "rabbitQueue", rotulo: "Fila Rabbit" },
+        ],
+        tiposDeConexao: [{ id: "http", rotulo: "HTTP" }],
+        techs: ["Backend"],
+        perfilTime: "service.linguagem: Java",
+      }),
+    });
+    expect(resposta.status).toBe(200);
+    const corpo = JSON.parse(await resposta.text());
+    expect(Object.keys(corpo).sort()).toEqual(["arestas", "nos"]);
+
+    const { prompt, schema } = ultimaChamadaComSchema();
+    // O enum é o que impede a proposta de citar um tipo que a ferramenta não
+    // sabe criar — é a trava central do desenho (SPEC-27 §4).
+    const itemNo = (schema.properties?.nos as SchemaFake | undefined)?.items;
+    expect(itemNo?.properties?.tipo.enum).toEqual(["service", "rabbitQueue"]);
+    expect((schema.properties?.arestas as SchemaFake | undefined)?.items?.properties?.tipo.enum).toEqual(["http"]);
+    // O "motivo" é obrigatório: proposta sem porquê é caixa-preta.
+    expect(itemNo?.required).toContain("motivo");
+
+    expect(prompt).toContain("o checkout precisa consultar o saldo de pontos de fidelidade");
+    expect(prompt).toContain("service: Serviço");
+    expect(prompt).toContain("service.linguagem: Java");
+  });
+
+  it("POST /ia/diagrama: sem descrição ou sem tipos disponíveis é 400, e nem carrega o modelo", async () => {
+    verificarStatusMock.mockResolvedValue({
+      chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",
+      provedor: "qwen-local", modelosChat: [],
+    });
+
+    const semDescricao = await fetch(`${base}/ia/diagrama`, {
+      method: "POST",
+      body: JSON.stringify({ descricao: "   ", tiposDeNo: [{ id: "service", rotulo: "S" }] }),
+    });
+    expect(semDescricao.status).toBe(400);
+
+    const semTipos = await fetch(`${base}/ia/diagrama`, {
+      method: "POST",
+      body: JSON.stringify({ descricao: "algo", tiposDeNo: [] }),
+    });
+    expect(semTipos.status).toBe(400);
+    expect(completarComSchemaMock).not.toHaveBeenCalled();
+  });
+
   it("POST /ia/sugerir-config devolve um objeto no schema do alvo, com o pedido e o contexto no prompt (SPEC-23 Fluxo 2)", async () => {
     verificarStatusMock.mockResolvedValue({
       chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "/fake/models",

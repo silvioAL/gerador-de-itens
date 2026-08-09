@@ -456,7 +456,59 @@ export const apiIa = {
     }
     return JSON.parse(acumulado) as T;
   },
+  /** SPEC-27 Fase 1 — a conversa do desenho: descreve a demanda, recebe o
+   * diagrama proposto. O `tipo` de cada nó/conexão é restrito no servidor aos
+   * ids que a configuração REAL tem, então a proposta nunca cita um tipo que
+   * a ferramenta não sabe criar. */
+  proporDiagrama: async (
+    pedido: PedidoDiagramaIa,
+    onTexto?: (acumulado: string) => void
+  ): Promise<DiagramaProposto> => {
+    const resposta = await fetch(`${BASE_URL}/ia/diagrama`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(pedido),
+    });
+    if (!resposta.ok) {
+      const corpo = await resposta.json().catch(() => ({}));
+      const mensagem = typeof corpo.erro === "string" ? corpo.erro : "Não foi possível propor o diagrama.";
+      throw new Error(mensagem);
+    }
+    let acumulado = "";
+    const leitor = resposta.body?.getReader();
+    if (leitor) {
+      const decodificador = new TextDecoder();
+      for (;;) {
+        const { done, value } = await leitor.read();
+        if (done) break;
+        acumulado += decodificador.decode(value, { stream: true });
+        onTexto?.(acumulado);
+      }
+      acumulado += decodificador.decode();
+    } else {
+      acumulado = await resposta.text();
+    }
+    return JSON.parse(acumulado) as DiagramaProposto;
+  },
 };
+
+export interface PedidoDiagramaIa {
+  descricao: string;
+  tiposDeNo: { id: string; rotulo: string }[];
+  tiposDeConexao: { id: string; rotulo: string }[];
+  techs?: string[];
+  contextos?: string[];
+  perfilTime?: string;
+}
+
+/** O que a IA propõe. `motivo` é obrigatório de propósito: é o que a pessoa lê
+ * pra decidir se aceita — proposta sem porquê é caixa-preta pedindo confiança
+ * cega (SPEC-27 §5). */
+export interface DiagramaProposto {
+  nos: { id: string; tipo: string; rotulo: string; motivo: string }[];
+  arestas: { de: string; para: string; tipo: string; motivo: string }[];
+}
 
 /** Alvos que o servidor sabe sugerir (`ALVOS_SUGESTAO_CONFIG` no CLI). */
 export type AlvoSugestaoConfig =

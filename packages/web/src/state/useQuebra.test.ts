@@ -140,3 +140,71 @@ describe("useQuebra", () => {
     expect(result.current.quebra.diagrama.edges).toHaveLength(0);
   });
 });
+
+describe("aplicarDiagramaProposto (SPEC-27 Fase 1 — a proposta vira nó comum)", () => {
+  it("cria os nós com o rótulo proposto e conecta pelas mesmas regras de um arrasto", () => {
+    const { result } = setup();
+    act(() =>
+      result.current.aplicarDiagramaProposto({
+        nos: [
+          { id: "a", tipo: "service", rotulo: "srv-checkout" },
+          { id: "b", tipo: "rabbit", rotulo: "pedidos.q" },
+        ],
+        arestas: [{ de: "a", para: "b", tipo: "publishes" }],
+      })
+    );
+
+    const { nodes, edges } = result.current.quebra.diagrama;
+    expect(nodes.map((n) => [n.type, n.label])).toEqual([
+      ["service", "srv-checkout"],
+      ["rabbit", "pedidos.q"],
+    ]);
+    // Nó comum: nasce "novo", com spec vazia, editável como qualquer outro.
+    expect(nodes[0].status).toBe("novo");
+    expect(edges).toHaveLength(1);
+    expect(edges[0].type).toBe("publishes");
+    expect(edges[0].source).toBe(nodes[0].id);
+    expect(edges[0].target).toBe(nodes[1].id);
+  });
+
+  it("tipo de conexão que a regra não aceita cai no default — proposta torta não vira erro", () => {
+    const { result } = setup();
+    act(() =>
+      result.current.aplicarDiagramaProposto({
+        nos: [
+          { id: "a", tipo: "service", rotulo: "srv" },
+          { id: "b", tipo: "rabbit", rotulo: "q" },
+        ],
+        // "http" não está em edgeRules.rabbit.valid (["publishes","consumes"]).
+        arestas: [{ de: "a", para: "b", tipo: "http" }],
+      })
+    );
+    expect(result.current.quebra.diagrama.edges[0].type).toBe("publishes");
+  });
+
+  it("tipo de nó que não existe na config é ignorado, e as arestas dele junto", () => {
+    const { result } = setup();
+    act(() =>
+      result.current.aplicarDiagramaProposto({
+        nos: [
+          { id: "a", tipo: "service", rotulo: "srv" },
+          { id: "b", tipo: "inventado", rotulo: "??" },
+        ],
+        arestas: [{ de: "a", para: "b", tipo: "http" }],
+      })
+    );
+    expect(result.current.quebra.diagrama.nodes).toHaveLength(1);
+    expect(result.current.quebra.diagrama.edges).toHaveLength(0);
+  });
+
+  it("aplicar duas vezes ACRESCENTA sem colidir id — mesmo mecanismo de carregar dois cenários", () => {
+    const { result } = setup();
+    const proposta = { nos: [{ id: "a", tipo: "service", rotulo: "srv" }], arestas: [] };
+    act(() => result.current.aplicarDiagramaProposto(proposta));
+    act(() => result.current.aplicarDiagramaProposto(proposta));
+
+    const ids = result.current.quebra.diagrama.nodes.map((n) => n.id);
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids).size).toBe(2);
+  });
+});
