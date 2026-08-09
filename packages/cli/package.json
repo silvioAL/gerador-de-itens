@@ -1,6 +1,6 @@
 {
   "name": "gerador-de-itens",
-  "version": "0.1.54",
+  "version": "0.1.55",
   "description": "Quebra técnica derivada deterministicamente de um diagrama de arquitetura — CLI local, sem servidor.",
   "license": "MIT",
   "repository": {
