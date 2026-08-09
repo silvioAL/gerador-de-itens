@@ -1551,3 +1551,21 @@ Três decisões que ficaram no código com o porquê:
 Também precisei incluir as três tabelas novas no `truncate` do `beforeEach`: um papel deixado para trás liga o RBAC da organização e faz **todos** os outros testes — que assumem o modo aberto — falharem com 403. Isso teria sido um mistério caro de depurar.
 
 Rodou contra Postgres de verdade (o `db` do docker-compose do próprio projeto), não mock. Regressão: engine 190, llm 47, cli 80, web 264, **server 45 (+10)**.
+
+## 102. SPEC-28 Fase 2: a aba que torna o RBAC configurável
+
+A Fase 1 entregou a checagem e a API; sem tela, só existia para quem sabe fazer POST. A aba **Acessos** fecha isso.
+
+A tela é o modelo: um papel é uma **matriz recurso × ação** mais uma lista de pessoas, **cada uma com escopo**. Os três eixos aparecem na mesma ordem em que existem no banco, porque foi assim que o problema foi descrito — *"agilidade pode editar os agentes… em outra empresa isso ocorre por time"*.
+
+Três decisões que valem registro:
+
+**O catálogo de recursos vem do servidor.** Copiar a lista para o front seria mais rápido de escrever e envelheceria em silêncio: um recurso novo nasceria no enum do servidor e simplesmente **não apareceria** na tela — permissão que ninguém consegue conceder porque não existe onde clicar. `GET /acessos/catalogo` resolve, e o teste percorre recurso × ação do catálogo para provar que a matriz é montada a partir dele.
+
+**O estado vazio é informação, não ausência.** Sem papel nenhum, a tela poderia sugerir que ninguém pode nada — quando é exatamente o oposto: o modo aberto está valendo e todo membro edita tudo. O aviso diz isso com todas as letras, e diz também o que muda quando o primeiro papel nascer. Estado vazio que não explica o que está acontecendo é a mesma falha do pip apagado da §97.
+
+**A coluna `aprovar` existe, com um selo "fase 3".** A permissão é guardada desde a Fase 1, mas o fluxo de proposta→aprovação ainda não existe. Mostrar a coluna sem o selo prometeria uma aprovação que não acontece; escondê-la esconderia uma permissão que já é gravada. O selo é a única saída honesta.
+
+E um detalhe de teste que ia passando pelo motivo errado: a asserção do escopo procurava "organização inteira", que **também** aparece no texto de introdução da aba. Passava por casar com a intro, não com o escopo da pessoa. Buscar pelo travessão junto (`— organização inteira`) resolve — a mesma lição do teste de permissão da Fase 1, onde o 403 vinha do portão errado.
+
+Regressão: web 273 (+9), server 45, engine 190, llm 47, cli 80.

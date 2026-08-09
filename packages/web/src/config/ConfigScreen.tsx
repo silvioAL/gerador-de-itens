@@ -5,6 +5,7 @@ import { PerfisTimeTab } from "../demo/PerfisTimeTab";
 import { CamposNoTab } from "./CamposNoTab";
 import { CamposArestaTab } from "./CamposArestaTab";
 import { MembrosTab } from "./MembrosTab";
+import { AcessosTab } from "./AcessosTab";
 import { EspecificacaoTemplateTab } from "./EspecificacaoTemplateTab";
 import { PipelineAgentesTab } from "./PipelineAgentesTab";
 import { PromptUnicoTab } from "./PromptUnicoTab";
@@ -17,6 +18,7 @@ export type AbaConfig =
   | "camposAresta"
   | "regras"
   | "membros"
+  | "acessos"
   | "especificacao"
   | "promptUnico"
   | "pipeline"
@@ -132,6 +134,14 @@ export function ConfigScreen({
             Membros
           </button>
         )}
+        {/* SPEC-28 §2: acessos só existem no modo hospedado — no local não há
+            login, e permissão em arquivo seria convenção, não segurança.
+            `mostrarMembros` já É "modo hospedado" (`modo !== "local"`). */}
+        {mostrarMembros && (
+          <button onClick={() => setAba("acessos")} style={aba === "acessos" ? abaAtivaEstilo : abaEstilo}>
+            Acessos
+          </button>
+        )}
         {mostrarCamposAresta && (
           <button onClick={() => setAba("regras")} style={aba === "regras" ? abaAtivaEstilo : abaEstilo}>
             Regras de refinamento
@@ -177,6 +187,8 @@ export function ConfigScreen({
         )}
         {aba === "regras" && mostrarCamposAresta && <RegrasTab />}
         {aba === "membros" && mostrarMembros && <MembrosTab timeAtivo={timeAtivo} />}
+        {aba === "acessos" && mostrarMembros && <AcessosTab timeAtivo={timeAtivo} />}
+        {aba === "acessos" && mostrarMembros && <AcessosTab timeAtivo={timeAtivo} />}
         {aba === "especificacao" && (
           <EspecificacaoTemplateTab
             template={especificacaoTemplate}

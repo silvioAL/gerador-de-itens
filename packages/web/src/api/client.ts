@@ -657,6 +657,44 @@ export const apiEspecificacaoTemplate = {
     requisitar<EspecificacaoTemplate>("/especificacao-template", { method: "PUT", body: JSON.stringify(dados) }),
 };
 
+/** SPEC-28 — gestão de acessos (só modo hospedado; no local não há login). */
+export interface PapelAcesso {
+  id: string;
+  nome: string;
+  permissoes: { recurso: string; acao: string }[];
+  membros: { email: string; escopoTimeId: string | null }[];
+}
+
+export interface PermissoesMinhas {
+  /** `false` = organização ainda sem papel nenhum: tudo liberado (SPEC-28
+   * §4.3). A UI não deve esconder nada nesse estado. */
+  rbacAtivo: boolean;
+  porRecurso: Record<string, string[]>;
+}
+
+export const apiAcessos = {
+  /** Catálogo vem do SERVIDOR, não de uma lista copiada aqui — uma cópia no
+   * front envelheceria em silêncio quando um recurso novo nascesse. */
+  catalogo: () => requisitar<{ recursos: string[]; acoes: string[] }>("/acessos/catalogo"),
+  papeis: () => requisitar<PapelAcesso[]>("/acessos/papeis"),
+  criarPapel: (dados: { nome: string; permissoes: { recurso: string; acao: string }[] }) =>
+    requisitar<PapelAcesso>("/acessos/papeis", { method: "POST", body: JSON.stringify(dados) }),
+  salvarPapel: (id: string, dados: { nome: string; permissoes: { recurso: string; acao: string }[] }) =>
+    requisitar<PapelAcesso>(`/acessos/papeis/${id}`, { method: "PUT", body: JSON.stringify(dados) }),
+  excluirPapel: (id: string) => requisitar<void>(`/acessos/papeis/${id}`, { method: "DELETE" }),
+  adicionarMembro: (id: string, dados: { email: string; escopoTimeId?: string }) =>
+    requisitar<{ email: string; escopoTimeId: string | null }>(`/acessos/papeis/${id}/membros`, {
+      method: "POST",
+      body: JSON.stringify(dados),
+    }),
+  removerMembro: (id: string, email: string) =>
+    requisitar<void>(`/acessos/papeis/${id}/membros/${encodeURIComponent(email)}`, { method: "DELETE" }),
+  /** O que EU posso — a UI usa pra esconder o que seria negado. Esconder é
+   * conveniência: a negação real acontece no servidor, em cada rota. */
+  minhas: (timeId?: string) =>
+    requisitar<PermissoesMinhas>(`/permissoes/minhas${timeId ? `?timeId=${encodeURIComponent(timeId)}` : ""}`),
+};
+
 /** SPEC-25 §5.5 / Fase 2.1 — o template do prompt único (`config/prompt-unico-template.md`). */
 export interface PromptUnicoTemplate {
   conteudo: string;
