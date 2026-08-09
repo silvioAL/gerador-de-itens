@@ -2,6 +2,7 @@ import type { Atividade, Diagrama, ValorSpec } from "../model/types.js";
 import type { DiagramaConfig, RegrasConfig } from "../config/types.js";
 import { listarPlaceholders, respostaVisivel } from "../refinamento/gerarRefinamento.js";
 import { nosDeOrigem } from "../especificacao/gerarEspecificacaoEntrega.js";
+import { camposVisiveis } from "../spec/campos.js";
 
 /**
  * SPEC-26 Bloco 4a — o revisor determinístico.
@@ -77,8 +78,18 @@ export function revisarQuebra(
     // 2. Campo obrigatório do tipo de nó em branco. O semáforo de prontidão
     //    já cobre isso no canvas; aqui aparece do lado de quem vai escrever o
     //    item, que é onde a falta atrapalha.
+    //
+    //    BUG REAL (relatado pelo usuário): a primeira versão iterava o spec
+    //    INTEIRO do tipo de nó, ignorando `when`. Resultado: nó todo verde no
+    //    canvas e, ao mesmo tempo, "campo obrigatório em branco" na revisão —
+    //    duas telas do mesmo produto se contradizendo. O caso concreto foi
+    //    `migracao` ("Plano de migração"), que é `when: not(nodeStatus novo)`:
+    //    num desenho só de nós NOVOS o campo nem existe, e ainda assim era
+    //    cobrado em todos eles. `camposVisiveis` é a MESMA função que
+    //    `calcularProntidao` usa — é o que garante que as duas telas não
+    //    possam mais divergir.
     for (const no of nosDeOrigem(atividade, diagrama)) {
-      const spec = config.nodeTypes[no.type]?.spec ?? [];
+      const spec = camposVisiveis(config.nodeTypes[no.type]?.spec ?? [], no, diagrama.edges);
       for (const campo of spec) {
         if (!campo.required) continue;
         // `specNA` é a saída legítima de "não se aplica" — não é lacuna.
