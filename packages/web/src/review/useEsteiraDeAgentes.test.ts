@@ -377,3 +377,80 @@ describe("useEsteiraDeAgentes (SPEC-24 — orquestração por papel × lotes de 
     expect(onResponderItem).not.toHaveBeenCalledWith("a1", expect.anything(), expect.anything());
   });
 });
+
+describe("resposta truncada no fim do lote (bug real: 'vi o PO escrevendo e depois todos ficaram vazios')", () => {
+  /** Simula o que acontece de verdade: o texto streama (e a pessoa vê), mas o
+   * corpo chega truncado e o `JSON.parse` dentro de `sugerirPipeline` explode
+   * — exatamente no handoff pro papel seguinte. */
+  function loteQueTruncaNoFim(papelQueFalha: string) {
+    return async (papel: string, pedido: PedidoLote, onTexto?: (t: string) => void) => {
+      const completo = JSON.stringify(respostaDoLote(papel, pedido));
+      if (papel !== papelQueFalha) {
+        onTexto?.(completo);
+        return JSON.parse(completo);
+      }
+      // Streama até quase o fim e "morre" — é o que o usuário vê na tela.
+      onTexto?.(completo.slice(0, Math.floor(completo.length * 0.8)));
+      throw new SyntaxError("Unexpected end of JSON input");
+    };
+  }
+
+  it("o que o modelo chegou a escrever é APLICADO, em vez de sumir com o lote inteiro", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const aviso = vi.spyOn(console, "warn").mockImplementation(() => {});
+    apiIaSugerirPipelineMock.mockImplementation(loteQueTruncaNoFim("po"));
+    const onResponderItem = vi.fn();
+    const { result } = renderHook(() => useEsteiraDeAgentes({ onResponderItem }));
+
+    act(() => result.current.iniciar([item(1), item(2)]));
+    await waitFor(() => expect(result.current.rodando).toBe(false));
+
+    // O PO falhou no parse — mas o que ele escreveu antes de truncar ficou.
+    const doPo = onResponderItem.mock.calls.filter(([, chave]) => chave === "_historiaUsuario");
+    expect(doPo.length).toBeGreaterThan(0);
+    expect(doPo[0][2]).toMatchObject({ origem: "sugerido", confirmado: false });
+    // A falha deixou de ser silenciosa.
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining("[esteira/po]"), expect.anything());
+
+    spy.mockRestore();
+    aviso.mockRestore();
+  });
+
+  it("texto recuperado nunca nasce confirmado, mesmo com confirmação desligada — pode estar truncado", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const aviso = vi.spyOn(console, "warn").mockImplementation(() => {});
+    apiIaSugerirPipelineMock.mockImplementation(loteQueTruncaNoFim("po"));
+    const onResponderItem = vi.fn();
+    const { result } = renderHook(() =>
+      useEsteiraDeAgentes({ onResponderItem, confirmacaoObrigatoria: false })
+    );
+
+    act(() => result.current.iniciar([item(1)]));
+    await waitFor(() => expect(result.current.rodando).toBe(false));
+
+    const doPo = onResponderItem.mock.calls.filter(([, chave]) => chave === "_historiaUsuario");
+    expect(doPo[0][2].confirmado).toBe(false);
+    // Os papéis seguintes, que não falharam, seguem confirmando direto.
+    const doQa = onResponderItem.mock.calls.filter(([, chave]) => chave === "_regrasTeste");
+    expect(doQa[0][2].confirmado).toBe(true);
+
+    spy.mockRestore();
+    aviso.mockRestore();
+  });
+
+  it("a esteira não trava: os papéis seguintes rodam mesmo com o lote do PO quebrado", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const aviso = vi.spyOn(console, "warn").mockImplementation(() => {});
+    apiIaSugerirPipelineMock.mockImplementation(loteQueTruncaNoFim("po"));
+    const { result } = renderHook(() => useEsteiraDeAgentes({}));
+
+    act(() => result.current.iniciar([item(1)]));
+    await waitFor(() => expect(result.current.rodando).toBe(false));
+
+    expect(apiIaSugerirPipelineMock.mock.calls.map((c) => c[0])).toEqual([
+      "po", "arquiteto", "especialista", "qa",
+    ]);
+    spy.mockRestore();
+    aviso.mockRestore();
+  });
+});

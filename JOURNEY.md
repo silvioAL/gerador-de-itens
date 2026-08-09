@@ -1339,3 +1339,46 @@ E o revisor **aponta, não escreve**. Cada achado é um link pro item; nenhuma c
 Validação real no cenário de crédito: 14 erros e 18 avisos, todos verdadeiros — `Plano de migração` em branco em três nós diferentes, `Estratégia para instâncias em voo` vazia no processo Camunda, volumetria exigida sem números, e uma tech sem nenhum ciclo de teste que a cubra. Nenhum desses aparecia em lugar algum antes.
 
 Regressão: engine 163 (+9), web 220 (+2).
+
+## 92. A correção que veio do fluxo real: propagar não é botão, é conversa — e falta a janela
+
+Eu tinha começado a construir os Blocos 2+3 da SPEC-26 como estavam desenhados: um botão "Propagar mudança" e uma tela de diff. O usuário interrompeu com como ele **realmente** trabalha hoje:
+
+> *"Hoje, para mudar, basicamente eu falo com o Rovo (janela de chat) e peço para ele alterar um item e depois para ele revisar os demais; ele me devolve as sugestões e vou confirmando. Acho até mais simples fazer assim. O ponto é que não temos uma feature importante (mesma janela, similar a chatbot), onde eu possa desenhar um diagrama passando as informações (atual botão contexto do épico) e um agente avaliar isso, as configurações, stack do time, etc, e construir o diagrama."*
+
+Duas correções numa frase só, e as duas melhoram o produto:
+
+1. **A propagação já tem interface, e não é a que eu ia construir.** O painel de diff não morre — ele vira o cartão de proposta dentro da conversa. Menos superfície nova, mesma garantia de que nada é escrito sem aprovação.
+2. **A entrada do funil estava vazia.** O botão "Contexto do épico" só GUARDAVA texto; ninguém lia esse texto pra propor arquitetura. A ferramenta ajudava a especificar o que já tinha sido desenhado e não ajudava a desenhar — que é justamente a parte mais cara de começar do zero.
+
+Virou a SPEC-27, com três decisões que vale registrar:
+
+**A conversa é nossa, não do modelo.** O `motor.ts` já zera o histórico da sessão a cada chamada — aquilo que na Fase 1 da SPEC-25 tinha sido correção de bug (o contexto estourava no segundo papel) vira agora propriedade de arquitetura: **quem monta o histórico enviado é o app**. Então o que entra na janela é decisão de produto, não do runtime.
+
+**Uma conversa por fase**, e o usuário chegou nisso sozinho: *"provavelmente, para não exceder janelas de conversa, depois do desenho ele teria que começar outra conversa sobre a especificação"*. Desenho e especificação carregam coisas diferentes (catálogo de tipos versus itens derivados), e no modelo local estourar contexto não dá erro claro — dá resposta pior, em silêncio. Já custou uma noite de diagnóstico uma vez.
+
+**Trilhos, não tool-calling livre.** O caminho "óbvio" seria dar as funções de `useQuebra` como ferramentas e deixar o modelo encadear. Em vez disso, o `tipo` de cada nó e de cada conexão é um **enum montado a partir da configuração real do projeto** — o modelo não consegue propor um tipo que a ferramenta não sabe criar, que é o erro mais provável de um modelo de 4B. E aplicar a proposta passa pelo MESMO `mesclarDiagrama` que carregar um cenário pronto usa: os nós nascem comuns, editáveis, indistinguíveis de um criado no clique. Nenhum canal paralelo de escrita — a lição do §41 de novo.
+
+O `motivo` de cada nó e conexão é obrigatório no schema. Não é enfeite: é o que a pessoa lê pra decidir se aceita. Proposta sem porquê é caixa-preta pedindo confiança cega.
+
+## 93. O bug que só existia no fim: streaming visível, resultado perdido
+
+Relato do usuário: *"quando o PO termina de escrever sua parte e o arquiteto começa, tudo que o PO escreveu some da tela"*. E, depois: *"abri vários itens, todos vazios, sendo que antes eu havia visto eles serem escritos"*, *"acontece quando termina de escrever e passa para os agentes seguintes, é algo no mecanismo"*.
+
+**Duas tentativas de reprodução falharam** antes de eu entender: um teste com o estado no pai (igual ao App) e uma reprodução no bundle real com as rotas de IA interceptadas. Nos dois, o texto sobrevivia. O que faltava era reproduzir a FALHA, não o caminho feliz.
+
+A pista estava nos dois fatos juntos: **ele viu o texto sendo escrito** e **depois não havia nada**. São duas fontes diferentes:
+
+- o texto ao vivo vem de `extrairRespostasParciaisAninhadas`, um scanner que aceita JSON **incompleto** — é feito pra funcionar com o modelo ainda escrevendo;
+- o texto que fica vem de um `JSON.parse` do corpo **inteiro**, no fim do lote.
+
+Se a resposta chega truncada, o parse explode, e o `catch` do lote — deliberado desde a SPEC-24, para uma falha isolada não travar a esteira — engolia tudo **em silêncio**. O usuário via o streaming e perdia o resultado no handoff. O aviso que eu tinha adicionado dois dias antes não pegava esse caso: ele só dispara com `Object.keys(respostas).length > 0`, e num parse quebrado nunca se chega lá.
+
+Duas correções, e a segunda é a que importa:
+
+1. **A falha deixou de ser silenciosa** — `console.error` com papel e tamanho do lote. Sumir com o trabalho de um papel inteiro sem dizer nada é o pior sintoma que este projeto já teve, e já apareceu três vezes com roupas diferentes.
+2. **O que streamou é aproveitado.** No catch, o mesmo parser parcial que alimenta o texto ao vivo recupera o que chegou e aplica. O que a pessoa viu na tela é exatamente o que se recupera — melhor um campo incompleto, visível e editável, do que a tela em branco. E o recuperado **nunca nasce confirmado**, mesmo com confirmação automática ligada: é texto possivelmente truncado, tem que passar pelo olho humano.
+
+Os testes provam o bug antes de provar a correção: com a fonte revertida, dois deles falham com "expected 0 to be greater than 0" — zero campos aplicados, que é o sintoma relatado.
+
+**O que ainda não sei**: POR QUE a resposta trunca. O `console.error` da próxima execução real vai dizer (um "Unexpected end of JSON input" aponta truncamento; outra mensagem aponta rede). A hipótese principal é a janela de saída do modelo local com lotes grandes — o próprio comentário do `TAM_LOTE_ESTEIRA` já previa isso ("com os campos do Especialista, 10 itens estouram fácil"). Não mexi no tamanho do lote sem medir: seria trocar um chute por outro.

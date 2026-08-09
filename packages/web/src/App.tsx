@@ -41,6 +41,7 @@ import { ReadinessSummary } from "./summary/ReadinessSummary";
 import { calcularResumoProntidao } from "./summary/prontidaoResumo";
 import { ReviewScreen } from "./review/ReviewScreen";
 import { ContextoEpicoPanel } from "./review/ContextoEpicoPanel";
+import { ConversaPanel } from "./conversa/ConversaPanel";
 import { JourneyModal, type AbaJornada } from "./demo/JourneyModal";
 import { ConfigScreen, type AbaConfig } from "./config/ConfigScreen";
 import { TourOverlay } from "./demo/TourOverlay";
@@ -216,6 +217,7 @@ function AppComSessao({
 
 function AppCarregado({
   diagramaConfig: diagramaConfigInicial,
+  appConfig,
   regrasConfig,
   cenarios,
   perfisTime: perfisTimeInicial,
@@ -267,6 +269,7 @@ function AppCarregado({
     edgeRejeitada,
     limparEdgeRejeitada,
     responderItem,
+    aplicarDiagramaProposto,
   } = quebraState;
 
   const aoAbrir = useCallback(
@@ -284,6 +287,9 @@ function AppCarregado({
   const [mostrarConfig, setMostrarConfig] = useState(false);
   const [mostrarAbrir, setMostrarAbrir] = useState(false);
   const [mostrarContextoEpico, setMostrarContextoEpico] = useState(false);
+  // SPEC-27 Fase 1 — a conversa do desenho é uma FASE própria, com janela
+  // própria; a da especificação virá separada, de propósito (§3).
+  const [mostrarConversa, setMostrarConversa] = useState(false);
   const [abaConfigAlvo, setAbaConfigAlvo] = useState<AbaConfig | undefined>(undefined);
   useEffect(() => {
     if (!localStorage.getItem(CHAVE_JORNADA_VISTA)) setMostrarJornada(true);
@@ -584,6 +590,14 @@ function AppCarregado({
           Salvar
         </button>
         <button
+          data-testid="abrir-conversa"
+          onClick={() => setMostrarConversa(true)}
+          style={botaoEstilo}
+          title="Descreva a demanda e receba o diagrama proposto, com os tipos que este projeto tem configurados."
+        >
+          ✦ Desenhar conversando
+        </button>
+        <button
           onClick={() => setMostrarContextoEpico(true)}
           style={botaoEstilo}
           title="Cole o estado atual da demanda/épico e anexe material de apoio — alimenta a sugestão de IA real na revisão."
@@ -703,6 +717,22 @@ function AppCarregado({
           onExcluirCampoAresta={excluirCampoAresta}
           onFechar={() => setMostrarConfig(false)}
           abaForcada={abaConfigAlvo}
+        />
+      )}
+
+      {mostrarConversa && (
+        <ConversaPanel
+          config={diagramaConfig}
+          perfisTime={perfisTime}
+          timeAtivo={quebra.time}
+          techs={appConfig.techs}
+          contextos={appConfig.contextos}
+          contextoInicial={quebra.demandInfo}
+          onAplicar={(proposta) => {
+            aplicarDiagramaProposto(proposta);
+            setMostrarConversa(false);
+          }}
+          onFechar={() => setMostrarConversa(false)}
         />
       )}
 

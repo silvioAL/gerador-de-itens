@@ -51,6 +51,21 @@ function semRaciocinio(texto: string): string {
  */
 const TETO_RACIOCINIO = 2000;
 
+/**
+ * Teto de tokens do RASCUNHO da fase livre (SPEC-27, achado real).
+ *
+ * `budgets.thoughtTokens` limita só o `<think>` — o texto da resposta da fase
+ * A ficava sem teto nenhum. Com schema de chaves fixas (a esteira) isso
+ * passava, porque o rascunho tende a ser curto. Com o schema do diagrama, que
+ * tem ARRAYS de tamanho aberto, o modelo escreveu prosa por mais de 25 minutos
+ * sem nunca chegar à fase estruturada — a validação real morreu esperando.
+ *
+ * O rascunho é trabalho de rascunho: existe pra o modelo pensar antes de
+ * formatar, não pra ser lido. Limitá-lo não tira raciocínio (esse tem
+ * orçamento próprio) — tira só a prosa que ninguém consome.
+ */
+const TETO_RASCUNHO = 700;
+
 export interface OpcoesCarregarChat {
   /** Ver `ModeloRegistrado.raciocinador` — muda a estratégia de geração
    * estruturada (SPEC-25 §4.3). */
@@ -128,8 +143,8 @@ export async function carregarModeloChat(caminhoModelo: string, opcoesModelo?: O
       //      `thoughtTokens: 0` — sem esse orçamento zerado o modelo tenta
       //      raciocinar de novo e colide com a grammar.
       await sessao.prompt(
-        `${prompt}\n\nPense com cuidado e escreva um rascunho da resposta. Não se preocupe com formato agora.`,
-        { budgets: { thoughtTokens: TETO_RACIOCINIO } }
+        `${prompt}\n\nPense com cuidado e escreva um rascunho CURTO da resposta (poucas linhas, só as decisões). Não se preocupe com formato agora.`,
+        { budgets: { thoughtTokens: TETO_RACIOCINIO }, maxTokens: TETO_RASCUNHO }
       );
       const resposta = await sessao.prompt(
         `Agora entregue APENAS a resposta final, no formato JSON pedido, sem comentários nem raciocínio.`,

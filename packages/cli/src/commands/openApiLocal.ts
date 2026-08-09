@@ -823,6 +823,145 @@ const ALVOS_SUGESTAO_CONFIG: Record<string, AlvoSugestaoConfig> = {
   },
 };
 
+// --- POST /ia/diagrama — SPEC-27 Fase 1: a conversa do desenho.
+//
+// A maior lacuna do produto até aqui: a ferramenta ajudava a especificar o que
+// já tinha sido desenhado, e não ajudava a DESENHAR. O botão "Contexto do
+// épico" só guardava o texto; ninguém lia esse texto pra propor arquitetura.
+//
+// Decisão de desenho (SPEC-27 §4) — trilhos, não tool-calling livre: o `tipo`
+// de cada nó e de cada conexão é um ENUM montado a partir da configuração REAL
+// do projeto. O modelo não consegue propor um tipo que a ferramenta não tem,
+// o que é o erro mais provável (e mais irritante) de um modelo pequeno. A
+// validade do par origem→destino quem confere é o cliente, com as MESMAS
+// `edgeRules` que validam um arrasto de mouse.
+async function tratarIaDiagrama(req: IncomingMessage, res: ServerResponse, dirProjeto: string): Promise<void> {
+  try {
+    const status = await verificarStatus(undefined, (await lerConfigIa(dirProjeto)).provedorPadrao);
+    if (!status.pronto) {
+      enviarJson(res, 503, { erro: "modelos de IA não instalados — rode `gerador ia instalar`" });
+      return;
+    }
+
+    const { descricao, tiposDeNo, tiposDeConexao, techs, contextos, perfilTime } = await lerCorpoJson<{
+      descricao: string;
+      /** `{id, rotulo}` dos tipos que existem em `config/diagrama.json` — quem
+       * manda é o cliente, que já carregou a config (inclusive os campos
+       * customizados por time, que o servidor não resolve). */
+      tiposDeNo: { id: string; rotulo: string }[];
+      tiposDeConexao: { id: string; rotulo: string }[];
+      techs?: string[];
+      contextos?: string[];
+      /** Stack do time (config/perfis-time.json) — "usamos Java/Spring" muda
+       * a proposta, e é justamente o tipo de contexto que o usuário não
+       * deveria ter que repetir a cada demanda. */
+      perfilTime?: string;
+    }>(req);
+
+    if (!descricao?.trim()) {
+      enviarJson(res, 400, { erro: "descricao vazia — conte o que precisa ser construído" });
+      return;
+    }
+    if (!Array.isArray(tiposDeNo) || tiposDeNo.length === 0) {
+      enviarJson(res, 400, { erro: "tiposDeNo vazio — sem os tipos disponíveis não dá pra restringir a proposta" });
+      return;
+    }
+
+    const idsDeNo = tiposDeNo.map((t) => t.id);
+    const idsDeConexao = tiposDeConexao?.map((t) => t.id) ?? [];
+    // ACHADO REAL (validação da SPEC-27 Fase 1): array de tamanho aberto na
+    // grammar deixa a geração sem fim — a primeira validação passou de 25
+    // minutos sem terminar. Teto explícito, e dito no prompt também: a doc do
+    // node-llama-cpp avisa que `maxItems` sem instrução correspondente leva a
+    // alucinação (o modelo não "vê" a grammar, só é barrado por ela).
+    // Diagrama de uma demanda cabe folgado nisso; diagrama maior que isso é
+    // sinal de demanda que devia ser quebrada antes.
+    const MAX_NOS = 10;
+    const MAX_ARESTAS = 15;
+    const schema: GbnfJsonSchema = {
+      type: "object",
+      properties: {
+        nos: {
+          type: "array",
+          minItems: 1,
+          maxItems: MAX_NOS,
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              tipo: { enum: idsDeNo },
+              rotulo: { type: "string" },
+              motivo: { type: "string" },
+            },
+            required: ["id", "tipo", "rotulo", "motivo"],
+          },
+        },
+        arestas: {
+          type: "array",
+          maxItems: MAX_ARESTAS,
+          items: {
+            type: "object",
+            properties: {
+              de: { type: "string" },
+              para: { type: "string" },
+              // Sem tipos de conexão configurados, vira string livre e o
+              // cliente resolve pelo default de `edgeRules` — melhor que um
+              // enum vazio, que a grammar não sabe representar.
+              tipo: idsDeConexao.length > 0 ? { enum: idsDeConexao } : { type: "string" },
+              motivo: { type: "string" },
+            },
+            required: ["de", "para", "tipo", "motivo"],
+          },
+        },
+      },
+      required: ["nos", "arestas"],
+    } as GbnfJsonSchema;
+
+    const prompt = [
+      `Você é o arquiteto de software que desenha a solução antes do time começar a implementar.`,
+      `A partir da demanda abaixo, proponha o DIAGRAMA: os componentes envolvidos e como eles se conectam.`,
+      ``,
+      `Demanda:`,
+      descricao.trim(),
+      ...(perfilTime?.trim() ? ["", `Stack que este time usa (respeite-a):`, perfilTime.trim()] : []),
+      ...(techs?.length ? ["", `Tecnologias do time: ${techs.join(", ")}`] : []),
+      ...(contextos?.length ? [`Contextos usados: ${contextos.join(", ")}`] : []),
+      ``,
+      `Tipos de componente DISPONÍVEIS (use exclusivamente estes ids):`,
+      ...tiposDeNo.map((t) => `- ${t.id}: ${t.rotulo}`),
+      ...(tiposDeConexao?.length
+        ? [``, `Tipos de conexão disponíveis:`, ...tiposDeConexao.map((t) => `- ${t.id}: ${t.rotulo}`)]
+        : []),
+      ``,
+      `Regras:`,
+      `- "id" de cada nó é curto e único no seu retorno (n1, n2, ...); as arestas se referem a esses ids.`,
+      `- "rotulo" é o NOME REAL do componente no jeito que o time nomeia (ex.: "srv-checkout",`,
+      `  "pagamento.aprovado.q"), nunca um rótulo genérico como "Serviço A".`,
+      `- "motivo" explica em uma frase por que esse componente/conexão faz parte desta demanda.`,
+      `  É o que a pessoa vai ler pra decidir se aceita — sem ele a proposta é uma caixa-preta.`,
+      `- Só inclua o que a demanda realmente exige. Diagrama inflado atrapalha mais que ajuda.`,
+      `- No máximo ${MAX_NOS} componentes e ${MAX_ARESTAS} conexões. Se a demanda parece exigir mais,`,
+      `  ela deveria ser quebrada antes — proponha o núcleo.`,
+      `- Seja conciso: "motivo" em UMA frase curta.`,
+      `- Responda em português.`,
+    ].join("\n");
+
+    const provedor = await obterProvedor(dirProjeto);
+    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" });
+    await provedor.completarEstruturado(prompt, schema, { onTexto: (pedaco) => res.write(pedaco) });
+    res.end();
+  } catch (erro) {
+    void descartarProvedor();
+    const mensagem = erro instanceof Error ? erro.message : "Falha desconhecida ao propor o diagrama.";
+    console.error(`[ia/diagrama] falhou:`, mensagem);
+    if (res.headersSent) {
+      res.end();
+    } else {
+      enviarJson(res, 500, { erro: `Não foi possível propor o diagrama: ${mensagem}` });
+    }
+  }
+}
+
 async function tratarIaSugerirConfig(req: IncomingMessage, res: ServerResponse, dirProjeto: string): Promise<void> {
   try {
     const status = await verificarStatus(undefined, (await lerConfigIa(dirProjeto)).provedorPadrao);
@@ -1088,6 +1227,10 @@ export async function tratarApiLocal(req: IncomingMessage, res: ServerResponse, 
   }
   if (caminho === "/ia/sugerir-config" && metodo === "POST") {
     await tratarIaSugerirConfig(req, res, dirProjeto);
+    return true;
+  }
+  if (caminho === "/ia/diagrama" && metodo === "POST") {
+    await tratarIaDiagrama(req, res, dirProjeto);
     return true;
   }
   if (caminho === "/config/ia" && (metodo === "GET" || metodo === "PUT")) {

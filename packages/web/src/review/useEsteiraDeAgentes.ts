@@ -237,6 +237,14 @@ export function useEsteiraDeAgentes({
           const lote = itensDoPapel.slice(i, i + TAM_LOTE_ESTEIRA);
           setLoteChaves(lote.map((item) => item.atividadeChave));
           setAoVivoPorItem({});
+          // ACHADO REAL (relato do usuário: "vi o PO escrevendo e depois todos
+          // os itens ficaram vazios"): o texto que aparece durante a geração
+          // vem do parser PARCIAL, que aceita JSON incompleto; o que fica vem
+          // do `JSON.parse` do corpo inteiro, no fim. Resposta truncada
+          // (contexto estourado, geração interrompida) faz o parse explodir, o
+          // catch abaixo engolir, e TUDO que o usuário viu ser escrito sumir.
+          // Guardar o acumulado permite salvar o que já chegou.
+          let ultimoAcumulado = "";
           try {
             const respostas = await apiIa.sugerirPipeline(
               papel.id,
@@ -253,6 +261,7 @@ export function useEsteiraDeAgentes({
                 })),
               },
               (acumulado) => {
+                ultimoAcumulado = acumulado;
                 if (tokenRef.current === token) setAoVivoPorItem(extrairRespostasParciaisAninhadas(acumulado));
               }
             );
@@ -290,10 +299,41 @@ export function useEsteiraDeAgentes({
                 });
               }
             }
-          } catch {
+          } catch (erro) {
             // Falha isolada (ex.: modelo travou nesse lote/papel) não trava a
-            // esteira — segue pro próximo lote do mesmo papel. Os itens do
-            // lote ficam sem os campos desse papel, editáveis manualmente.
+            // esteira — segue pro próximo lote do mesmo papel. Mas ela deixou
+            // de ser SILENCIOSA: sumir com o trabalho de um papel inteiro sem
+            // dizer nada foi o pior sintoma que este projeto teve.
+            console.error(
+              `[esteira/${papel.id}] lote de ${lote.length} item(ns) falhou:`,
+              erro instanceof Error ? erro.message : erro
+            );
+            // Salva o que o modelo chegou a escrever: o parser parcial é o
+            // MESMO que alimenta o texto ao vivo, então o que a pessoa viu na
+            // tela é exatamente o que se recupera aqui. Melhor um campo
+            // incompleto, visível e editável, do que a tela em branco.
+            if (tokenRef.current === token && ultimoAcumulado) {
+              const salvas = extrairRespostasParciaisAninhadas(ultimoAcumulado);
+              let recuperados = 0;
+              for (const item of lote) {
+                for (const placeholder of item.placeholdersPorPapel[papel.id]) {
+                  const valor = salvas[item.atividadeChave]?.[placeholder.chave];
+                  if (valor === undefined || valor === "") continue;
+                  recuperados++;
+                  acumuladas.get(item.atividadeChave)?.push({ rotulo: placeholder.rotulo, valor });
+                  // Nunca confirmado, mesmo com confirmação desligada: é texto
+                  // possivelmente truncado, e precisa passar pelo olho humano.
+                  onResponderItem?.(item.atividadeChave, placeholder.chave, {
+                    valor,
+                    origem: "sugerido",
+                    confirmado: false,
+                  });
+                }
+              }
+              if (recuperados > 0) {
+                console.warn(`[esteira/${papel.id}] recuperados ${recuperados} campo(s) do texto já gerado.`);
+              }
+            }
           } finally {
             if (tokenRef.current === token) setAoVivoPorItem({});
           }

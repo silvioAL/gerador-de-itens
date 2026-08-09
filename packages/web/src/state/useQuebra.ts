@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import type { Aresta, DiagramaConfig, No, Quebra, ValorSpec } from "@gerador/engine";
-import { criarAresta, criarNo } from "./factory";
+import { criarAresta, criarNo, mesclarDiagrama } from "./factory";
 
 export interface EdgeRejeitada {
   motivo: string;
@@ -183,6 +183,53 @@ export function useQuebra(inicial: Quebra, config: DiagramaConfig) {
     setArestaSelecionadaId((sel) => (sel === edgeId ? null : sel));
   }, []);
 
+  /**
+   * SPEC-27 Fase 1 — aplica ao canvas o diagrama que a conversa propôs.
+   *
+   * Passa pelo MESMO caminho que carregar um cenário pronto (`mesclarDiagrama`
+   * sobre nós criados por `criarNo`): ids renumerados pra não colidir com o
+   * que já existe, posição deslocada pra não empilhar em cima, e o resultado é
+   * um nó comum — editável, apagável, indistinguível de um criado no clique.
+   * Nenhum canal paralelo de escrita (lição do JOURNEY §41).
+   *
+   * O que a proposta NÃO decide: o tipo de aresta quando ela cita um que não
+   * existe. Aí vale a regra de `edgeRules`, a mesma que valida um arrasto de
+   * mouse — proposta inválida vira conexão pelo tipo default, não erro.
+   */
+  const aplicarDiagramaProposto = useCallback(
+    (proposta: { nos: { id: string; tipo: string; rotulo: string }[]; arestas: { de: string; para: string; tipo: string }[] }) => {
+      setQuebra((q) => {
+        const tiposValidos = new Set(Object.keys(config.nodeTypes));
+        // Ids locais da proposta ("n1", "n2") → nós de verdade. O
+        // `mesclarDiagrama` renumera depois; aqui só precisamos de um mapa
+        // interno consistente.
+        const mapa = new Map<string, No>();
+        const nos: No[] = [];
+        for (const p of proposta.nos) {
+          if (!tiposValidos.has(p.tipo)) continue; // o enum do servidor já evita, mas config pode ter mudado
+          const no = criarNo(p.tipo, config, nos, 120 + (nos.length % 3) * 280, 80 + Math.floor(nos.length / 3) * 200);
+          const comRotulo: No = { ...no, label: p.rotulo?.trim() || no.label };
+          nos.push(comRotulo);
+          mapa.set(p.id, comRotulo);
+        }
+
+        const arestas: Aresta[] = [];
+        for (const a of proposta.arestas) {
+          const origem = mapa.get(a.de);
+          const destino = mapa.get(a.para);
+          if (!origem || !destino) continue;
+          const regra = config.edgeRules[destino.type] ?? config.edgeRules._fallback;
+          const tipo = regra?.valid.includes(a.tipo) ? a.tipo : regra?.default ?? regra?.valid[0];
+          if (!tipo) continue;
+          arestas.push(criarAresta(origem.id, destino.id, tipo, arestas));
+        }
+
+        return { ...q, diagrama: mesclarDiagrama(q.diagrama, { nodes: nos, edges: arestas }) };
+      });
+    },
+    [config]
+  );
+
   /** Resposta (manual ou sugerida por IA) a um placeholder "<- ✍️ especificar"
    * do refinamento técnico/volumetria de uma atividade (Fase 1, SPEC-23) —
    * chaveada por `Atividade.chave` (estável) + a chave do próprio placeholder,
@@ -222,6 +269,7 @@ export function useQuebra(inicial: Quebra, config: DiagramaConfig) {
     definirValorSpecAresta,
     removerAresta,
     responderItem,
+    aplicarDiagramaProposto,
   };
 }
 
