@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ValorSpec } from "@gerador/engine";
-import { PAPEIS_PADRAO, apiIa, type GrupoFicha, type PapelConfigurado, type PlaceholderPedidoItemIa } from "../api/client";
+import {
+  PAPEIS_PADRAO,
+  apiIa,
+  type GrupoFicha,
+  type PapelConfigurado,
+  type PlaceholderPedidoItemIa,
+  type RespostaAnteriorIa,
+} from "../api/client";
 
 /** As 4 SEÇÕES fixas da ficha (dado do engine) — não confundir com os papéis
  * da esteira, que desde a Fase F são configuráveis (`PapelConfigurado`): N
@@ -42,6 +49,12 @@ export interface ItemFilaEsteira {
    * (`ReviewScreen.montarFilaEsteira`) já resolveu qual papel leva cada
    * seção de cada item (contextos, Fase F). */
   placeholdersPorPapel: Record<string, PlaceholderPedidoItemIa[]>;
+  /** Artefatos que JÁ existiam antes desta corrida (respostas confirmadas,
+   * edições do usuário) e que não vão ser regenerados — entram como insumo
+   * dos papéis desde o primeiro ("re-rodar a partir da alteração" manda a
+   * alteração por aqui). As respostas geradas DURANTE a corrida são
+   * acumuladas por cima pelo próprio hook. */
+  respostasExistentes?: RespostaAnteriorIa[];
 }
 
 export interface UseEsteiraDeAgentesParams {
@@ -201,6 +214,12 @@ export function useEsteiraDeAgentes({
       // Fixa a lista NO INÍCIO da corrida — a config mudar no meio não muda
       // uma esteira já em andamento (a próxima usa a nova).
       const papeisDaCorrida = papeisRef.current;
+      // Encadeamento: cada item acumula os artefatos já escritos (os que
+      // existiam antes da corrida + os que os papéis anteriores geraram
+      // nesta corrida), e os papéis seguintes recebem tudo como insumo.
+      const acumuladas = new Map<string, RespostaAnteriorIa[]>(
+        filaNova.map((item) => [item.atividadeChave, [...(item.respostasExistentes ?? [])]])
+      );
       for (const papel of papeisDaCorrida) {
         if (tokenRef.current !== token) return;
         const itensDoPapel = filaNova.filter((item) => (item.placeholdersPorPapel[papel.id] ?? []).length > 0);
@@ -228,6 +247,9 @@ export function useEsteiraDeAgentes({
                   rotulo: item.atividadeRotulo,
                   contextoNo: item.contextoNo,
                   placeholders: item.placeholdersPorPapel[papel.id],
+                  // Snapshot, não a referência viva — o acumulador continua
+                  // crescendo depois desta chamada.
+                  respostasAnteriores: [...(acumuladas.get(item.atividadeChave) ?? [])],
                 })),
               },
               (acumulado) => {
@@ -239,6 +261,7 @@ export function useEsteiraDeAgentes({
               for (const placeholder of item.placeholdersPorPapel[papel.id]) {
                 const valor = respostas[item.atividadeChave]?.[placeholder.chave];
                 if (valor === undefined) continue;
+                acumuladas.get(item.atividadeChave)?.push({ rotulo: placeholder.rotulo, valor });
                 onResponderItem?.(item.atividadeChave, placeholder.chave, {
                   valor,
                   origem: "sugerido",

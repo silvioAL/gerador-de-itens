@@ -241,11 +241,20 @@ export interface PlaceholderPedidoItemIa {
 /** SPEC-24 Fase E — um item dentro do LOTE mandado pra um papel da esteira
  * (achado real do usuário: chamada por item era lento demais; agora todo o
  * material de um grupo de itens vai numa chamada só por agente). */
+/** Um artefato já escrito por um papel anterior (ou pelo usuário), mandado
+ * como insumo pro papel seguinte — o encadeamento que faz a esteira ser um
+ * pipeline de verdade, não 4 geradores independentes. */
+export interface RespostaAnteriorIa {
+  rotulo: string;
+  valor: string;
+}
+
 export interface ItemPedidoPipelineIa {
   chave: string;
   rotulo: string;
   contextoNo: string;
   placeholders: PlaceholderPedidoItemIa[];
+  respostasAnteriores?: RespostaAnteriorIa[];
 }
 
 export interface PedidoPipelineIa {

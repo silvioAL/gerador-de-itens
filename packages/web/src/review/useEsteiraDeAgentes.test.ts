@@ -241,6 +241,31 @@ describe("useEsteiraDeAgentes (SPEC-24 — orquestração por papel × lotes de 
     await waitFor(() => expect(apiIaSugerirPipelineMock).toHaveBeenCalledTimes(2));
   });
 
+  it("encadeamento: o papel seguinte recebe as respostas do anterior (e as pré-existentes da fila) como respostasAnteriores", async () => {
+    const pedidosPorPapel: Record<string, { respostasAnteriores?: { rotulo: string; valor: string }[] }[]> = {};
+    apiIaSugerirPipelineMock.mockImplementation(async (papel: string, pedido: PedidoLote & { itens: { respostasAnteriores?: { rotulo: string; valor: string }[] }[] }) => {
+      pedidosPorPapel[papel] = pedido.itens;
+      if (papel === "po") return { a1: { _historiaUsuario: "Como analista, quero X" } };
+      return {};
+    });
+    const filaItem: ItemFilaEsteira = {
+      ...item(1),
+      respostasExistentes: [{ rotulo: "Request", valor: "POST /v1/coisas {id}" }],
+    };
+    const { result } = renderHook(() => useEsteiraDeAgentes({}));
+
+    act(() => result.current.iniciar([filaItem]));
+    await waitFor(() => expect(result.current.rodando).toBe(false));
+
+    // O PO já recebe o que existia antes da corrida (ex.: edição do usuário).
+    expect(pedidosPorPapel.po[0].respostasAnteriores).toEqual([{ rotulo: "Request", valor: "POST /v1/coisas {id}" }]);
+    // O Arquiteto recebe o de antes + o que o PO acabou de escrever.
+    expect(pedidosPorPapel.arquiteto[0].respostasAnteriores).toEqual([
+      { rotulo: "Request", valor: "POST /v1/coisas {id}" },
+      { rotulo: "História de usuário", valor: "Como analista, quero X" },
+    ]);
+  });
+
   it("Fase F: papéis configurados dirigem a esteira — ordem custom, papel extra e nenhuma chamada pra quem ficou de fora", async () => {
     const chamadas: string[] = [];
     apiIaSugerirPipelineMock.mockImplementation(async (papel: string) => {
