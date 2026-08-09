@@ -1284,3 +1284,21 @@ Três coisas que a tela deliberadamente NÃO faz, e vale registrar o porquê:
 O campo de sugestão da aba leva no prompt os requisitos que já existem para aquela tech. Sem isso, o modelo propõe de novo o que já está na lista — foi o primeiro detalhe que apareceu ao montar o teste.
 
 Regressão: cli 59 (+2), web 210 (+5).
+
+## 89. As outras três listas de regras ganham tela — em seções separadas, de propósito
+
+A primeira versão da aba de regras editava só o checklist técnico e preservava o resto. Agora as quatro listas têm tela: **Técnico**, **Processo**, **Testes** e **Volumetria**.
+
+A decisão de forma vale mais que o código: **seções separadas, não uma lista só.** A SPEC-20 já tinha desfeito exatamente essa mistura no domínio — o que se *decide* no desenho (`Requisito`) é outra coisa do que o time precisa *fazer* pra executar (`ItemProcesso`), e juntar as duas numa lista foi o que confundiu a configuração original. Reunir tudo numa tela só reintroduziria a confusão pela porta da UI.
+
+Cada seção herdou a forma do seu tipo, sem forçar uma abstração comum onde não havia:
+
+- **Técnico e Processo** compartilham o editor (`{texto, contextos}` nos dois), mas com rótulo, explicação e alvo de IA diferentes — a instrução do alvo `item-processo` diz explicitamente: *"se a frase pode ser respondida escrevendo uma decisão, ela é requisito técnico e não cabe aqui"*.
+- **Testes** tem forma própria (tipo, o que o ciclo prova, e os ambientes dev/hlg como caixas).
+- **Volumetria não é lista** — é um interruptor por contexto. O bloco (Response time / Max error / RPS / Test duration) é fixo, exigido pelo agente validador, e nunca foi inventado aqui; então não há o que editar além de *onde* ele aparece. Desligar remove a chave do arquivo, ligar devolve com os contextos.
+
+`when` continua fora da edição e fora da sugestão, pelo mesmo motivo de antes.
+
+Validação real contra o `regras.json` do projeto de teste: 27 requisitos técnicos, 11 de processo, 13 ciclos de teste e a volumetria com seus 4 contextos, todos renderizados; marcar `hlg` num ciclo gravou no arquivo mantendo o resto intacto.
+
+Regressão: web 214 (+4).

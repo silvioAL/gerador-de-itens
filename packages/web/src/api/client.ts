@@ -459,7 +459,22 @@ export const apiIa = {
 };
 
 /** Alvos que o servidor sabe sugerir (`ALVOS_SUGESTAO_CONFIG` no CLI). */
-export type AlvoSugestaoConfig = "campo-no" | "campo-aresta" | "papel" | "regra-refinamento";
+export type AlvoSugestaoConfig =
+  | "campo-no"
+  | "campo-aresta"
+  | "papel"
+  | "regra-refinamento"
+  | "item-processo"
+  | "teste-automatizado";
+
+/** O que a IA devolve pro alvo "teste-automatizado". */
+export interface SugestaoTeste {
+  tipo: string;
+  validacao: string;
+  contextos: string[];
+  dev: boolean;
+  hlg: boolean;
+}
 
 /** O que a IA devolve pro alvo "regra-refinamento" — o `when` (condição sobre
  * os nós) fica de fora de propósito: é a parte mais sutil da configuração e

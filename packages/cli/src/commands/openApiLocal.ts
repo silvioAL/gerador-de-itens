@@ -761,6 +761,44 @@ const ALVOS_SUGESTAO_CONFIG: Record<string, AlvoSugestaoConfig> = {
       `"contextos" limita onde o requisito aparece; lista vazia = vale sempre que a tech estiver presente.`,
     ],
   },
+  "item-processo": {
+    descricao:
+      "um ITEM DE CHECKLIST DE PROCESSO — algo que o time precisa FAZER pra conseguir executar e testar o item",
+    schema: {
+      type: "object",
+      properties: {
+        texto: { type: "string" },
+        contextos: { type: "array", items: { type: "string" } },
+      },
+      required: ["texto", "contextos"],
+    },
+    regras: [
+      `A diferença pro requisito técnico é a natureza: aqui é EXECUÇÃO`,
+      `(configurar mock, levantar massa, repontar serviço, pedir acesso),`,
+      `não uma decisão de desenho. Se a frase pode ser respondida escrevendo`,
+      `uma decisão, ela é requisito técnico e não cabe aqui.`,
+      `"contextos" vazio = vale sempre que a tech estiver presente.`,
+    ],
+  },
+  "teste-automatizado": {
+    descricao: "um CICLO DE TESTE AUTOMATIZADO da tabela de testes do time",
+    schema: {
+      type: "object",
+      properties: {
+        tipo: { type: "string" },
+        validacao: { type: "string" },
+        contextos: { type: "array", items: { type: "string" } },
+        dev: { type: "boolean" },
+        hlg: { type: "boolean" },
+      },
+      required: ["tipo", "validacao", "contextos", "dev", "hlg"],
+    },
+    regras: [
+      `"tipo" é o nome do ciclo (ex.: "Teste de contrato", "Teste de carga").`,
+      `"validacao" diz o que o teste PROVA, em uma frase verificável.`,
+      `"dev"/"hlg" dizem em quais ambientes esse ciclo roda.`,
+    ],
+  },
   papel: {
     descricao: "um PAPEL (agente) da esteira que especifica os itens de trabalho",
     schema: {
