@@ -107,6 +107,7 @@ export {
   PRESETS_GATEWAY,
   presetGatewayPorId,
   presetsDoModo,
+  temVisao,
   type FormatoJson,
   type PresetGateway,
 } from "./presets.js";

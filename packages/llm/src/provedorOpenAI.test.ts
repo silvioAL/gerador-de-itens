@@ -334,6 +334,54 @@ describe("validarContraSchema — a rede que substitui a grammar", () => {
  * nome de arquivo com a extensão certa. Um mock provaria só que o código chama
  * o que ele mesmo espera.
  */
+/**
+ * SPEC-30 Fase 2 — imagem pelo gateway.
+ *
+ * Diferente da transcrição (pré-processamento, sai fora do caminho do modelo),
+ * imagem **só o modelo entende**. O que se testa aqui é o wire: `content` vira
+ * array de parts, e só na ÚLTIMA mensagem.
+ */
+describe("imagem no prompt (SPEC-30 Fase 2)", () => {
+  const png = "data:image/png;base64,iVBORw0KGgo=";
+
+  it("sem imagem, o content continua string — destino antigo não quebra", async () => {
+    respostas.push(sseTexto("ok"));
+    await provedor().completar("oi");
+    expect((pedidos[0].corpo.messages as { content: unknown }[])[0].content).toBe("oi");
+  });
+
+  it("com imagem, o content vira parts com text + image_url", async () => {
+    respostas.push(sseTexto("ok"));
+    await provedor().completar("o que tem neste diagrama?", { imagens: [png] });
+
+    const partes = (pedidos[0].corpo.messages as { content: { type: string; image_url?: { url: string } }[] }[])[0]
+      .content;
+    expect(partes[0]).toEqual({ type: "text", text: "o que tem neste diagrama?" });
+    expect(partes[1]).toEqual({ type: "image_url", image_url: { url: png } });
+  });
+
+  it("anexa só na ÚLTIMA mensagem — reanexar em cada turno multiplicaria o custo", async () => {
+    // O retry de `completarEstruturado` manda 3 mensagens; a imagem tem que
+    // estar na que o modelo está respondendo, não espalhada pelo histórico.
+    respostas.push(sseTexto("nao e json"));
+    respostas.push(sseTexto('{"alteracoes":[]}'));
+    await provedor().completarEstruturado("descreva", schemaAlteracoes, { imagens: [png] });
+
+    const doRetry = pedidos[1].corpo.messages as { content: unknown }[];
+    expect(typeof doRetry[0].content).toBe("string");
+    expect(Array.isArray(doRetry[doRetry.length - 1].content)).toBe(true);
+  });
+
+  it("mais de uma imagem entra na ordem em que veio", async () => {
+    respostas.push(sseTexto("ok"));
+    const outra = "data:image/jpeg;base64,AAAA";
+    await provedor().completar("dois prints", { imagens: [png, outra] });
+
+    const partes = (pedidos[0].corpo.messages as { content: { image_url?: { url: string } }[] }[])[0].content;
+    expect(partes.map((p) => p.image_url?.url).filter(Boolean)).toEqual([png, outra]);
+  });
+});
+
 describe("transcrever — o áudio vai pro gateway como multipart", () => {
   const audio = new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0x01, 0x02, 0x03]);
 

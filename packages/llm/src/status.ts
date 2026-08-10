@@ -9,6 +9,7 @@ import {
   PAPEL_PROVEDOR_GATEWAY,
   modeloChatPorId,
   presetsDoModo,
+  temVisao,
   type ModeloRegistrado,
   type PresetGateway,
 } from "./modelos.js";
@@ -62,7 +63,7 @@ export interface StatusIa {
    * Deduzir no navegador seria repetir a lição do preset de `localhost`
    * (JOURNEY §124) — a informação certa mora de um lado só.
    */
-  capacidades: { transcricao: boolean };
+  capacidades: { transcricao: boolean; visao: boolean };
 }
 
 async function existeArquivoNaoVazio(caminho: string): Promise<boolean> {
@@ -140,6 +141,13 @@ export async function verificarStatus(baseDir?: string, idChatSelecionado?: stri
       // `node-llama-cpp` não expõe multimodal (§1), e é por isso que a Fase 1b
       // (whisper.cpp) é um adaptador NOVO, não um método a mais no mesmo.
       transcricao: gatewaySelecionado && gateway.configurado,
+      // SPEC-30 Fase 2: por MODELO, não por endereço — o mesmo Ollama serve
+      // `qwen2.5:7b` (não vê) e `qwen2.5vl:7b` (vê).
+      visao:
+        gatewaySelecionado &&
+        // Preset OU marcação manual — quem tem gateway próprio sabe do modelo
+        // dele mais que qualquer lista nossa.
+        (gateway.visao === true || temVisao(gateway.baseUrl, gateway.modelo)),
     },
   };
 }

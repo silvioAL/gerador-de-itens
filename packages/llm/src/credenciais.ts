@@ -13,6 +13,8 @@ import { dirname, resolve } from "node:path";
 import type { FormatoJson } from "./modelos.js";
 
 export interface CredencialProvedor {
+  /** SPEC-30 Fase 2 — marcado à mão: este modelo enxerga imagem. */
+  visao?: boolean;
   /** Base URL do gateway (`.../v1`), sem `/chat/completions`. */
   baseUrl?: string;
   chave?: string;
@@ -62,12 +64,18 @@ export function resumirCredencial(c: CredencialProvedor | undefined): {
   baseUrl?: string;
   modelo?: string;
   chaveMascarada?: string;
+  /** SPEC-30 Fase 2 — marcação manual de "este modelo enxerga imagem". Não é
+   * segredo: dizer que o modelo vê imagem não expõe nada. */
+  visao?: boolean;
 } {
-  if (!c?.baseUrl || !c?.chave) return { configurado: false, baseUrl: c?.baseUrl, modelo: c?.modelo };
+  if (!c?.baseUrl || !c?.chave) {
+    return { configurado: false, baseUrl: c?.baseUrl, modelo: c?.modelo, visao: c?.visao };
+  }
   return {
     configurado: true,
     baseUrl: c.baseUrl,
     modelo: c.modelo,
+    visao: c.visao,
     // Nunca a chave inteira, nem em log, nem em tela.
     chaveMascarada: `${c.chave.slice(0, 3)}…${c.chave.slice(-4)}`,
   };

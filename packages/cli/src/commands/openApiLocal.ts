@@ -834,6 +834,8 @@ async function executarPedidoIa(
   const provedor = await obterProvedor(dirProjeto);
   const escrever = escritorDeStream(res);
   await provedor.completarEstruturado(pedido.prompt, pedido.esquema as never, {
+    // SPEC-30 Fase 2: se o pedido trouxe imagem, ela vai junto do prompt.
+    imagens: pedido.imagens,
     onTexto: escrever,
     // Mesmo sinal do modo hospedado — o cliente é o mesmo e não deve precisar
     // saber em qual modo está. Só dispara com provedor de gateway; no local o

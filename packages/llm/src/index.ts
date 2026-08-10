@@ -13,6 +13,7 @@ export {
   modeloChatPorId,
   presetGatewayPorId,
   presetsDoModo,
+  temVisao,
   formatoJsonPorBaseUrl,
   urlDownload,
   type IdModelo,

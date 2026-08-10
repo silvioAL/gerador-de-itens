@@ -26,6 +26,19 @@ export interface OpcoesGeracao {
   /** Texto da RESPOSTA sendo gerada, pedaço a pedaço. Raciocínio de modelo
    * raciocinador nunca chega aqui (ver `motor.ts`). */
   onTexto?: (pedaco: string) => void;
+  /**
+   * SPEC-30 Fase 2 — imagens que acompanham o prompt, como data URLs
+   * (`data:image/png;base64,...`).
+   *
+   * Diferente da transcrição (que é pré-processamento e sai fora do caminho do
+   * modelo), imagem **só o modelo entende**: não existe "converter imagem em
+   * texto" sem já ser um modelo de visão. Por isso entra aqui, junto do prompt.
+   *
+   * Provedor que não tem visão IGNORA este campo — e a UI nem oferece o anexo,
+   * porque `capacidades.visao` diz que não dá. Um provedor que silenciosamente
+   * descartasse a imagem responderia sobre um print que nunca viu.
+   */
+  imagens?: string[];
 }
 
 /**

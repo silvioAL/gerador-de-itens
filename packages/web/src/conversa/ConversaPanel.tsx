@@ -1,6 +1,7 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DiagramaConfig, PerfisConfig } from "@gerador/engine";
 import { apiIa, type DiagramaProposto } from "../api/client";
+import { AnexoDeImagem, type ImagemAnexada } from "./AnexoDeImagem";
 import { BotaoFalar } from "./BotaoFalar";
 import { useVozNaEntrada } from "./useVozNaEntrada";
 
@@ -64,6 +65,29 @@ export function ConversaPanel({
   // mesmo campo, editável antes de enviar. A config vai junto: é dela que sai o
   // vocabulário técnico que a transcrição precisa conhecer.
   const { podeFalar, gravacao } = useVozNaEntrada(setEntrada, { config });
+  // SPEC-30 Fase 2 — prints anexados a esta conversa.
+  const [imagens, setImagens] = useState<ImagemAnexada[]>([]);
+  const [podeAnexar, setPodeAnexar] = useState(false);
+  const [destinoIa, setDestinoIa] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    let cancelado = false;
+    apiIa
+      .status()
+      .then((s) => {
+        if (cancelado) return;
+        setPodeAnexar(s.capacidades?.visao === true);
+        setDestinoIa(s.gateway?.baseUrl);
+      })
+      .catch(() => {
+        // Sem status = sem anexo. Falhar para "não tem" pelo mesmo motivo do
+        // microfone: oferecer o que o sistema não faz custa mais que esconder.
+        if (!cancelado) setPodeAnexar(false);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, []);
   const [pensando, setPensando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const fimRef = useRef<HTMLDivElement>(null);
@@ -89,8 +113,14 @@ export function ConversaPanel({
 
   async function enviar() {
     const descricao = entrada.trim();
-    if (!descricao || pensando) return;
-    setMensagens((m) => [...m, { autor: "voce", texto: descricao }]);
+    // SPEC-30 Fase 2: um print JÁ É a descrição. Exigir texto junto obrigaria a
+    // pessoa a redigitar o que a imagem mostra — o trabalho que anexar deveria
+    // evitar. O montador aceita o mesmo (`montarPedidoDiagrama`).
+    if ((!descricao && imagens.length === 0) || pensando) return;
+    setMensagens((m) => [
+      ...m,
+      { autor: "voce", texto: descricao || `(${imagens.length} imagem(ns) anexada(s))` },
+    ]);
     setEntrada("");
     setPensando(true);
     setErro(null);
@@ -102,6 +132,7 @@ export function ConversaPanel({
         techs,
         contextos,
         perfilTime: descreverPerfil(),
+        imagens: imagens.length ? imagens.map((i) => i.dataUrl) : undefined,
       });
       setMensagens((m) => [
         ...m,
@@ -117,6 +148,9 @@ export function ConversaPanel({
       setMensagens((m) => [...m, { autor: "agente", texto: `Não consegui: ${mensagem}` }]);
     } finally {
       setPensando(false);
+      // Os anexos são do TURNO, não da conversa: mantê-los reenviaria a mesma
+      // imagem (e o mesmo custo de tokens) a cada mensagem seguinte.
+      setImagens([]);
       fimRef.current?.scrollIntoView?.({ behavior: "smooth" });
     }
   }
@@ -185,9 +219,14 @@ export function ConversaPanel({
           pedido nasceu ("botão falar, com animações em Desenhar conversando"),
           e esta janela não reusa a `JanelaConversa`: as duas plugam o mesmo
           hook, cada uma no seu rodapé. */}
-      {podeFalar && (
-        <div style={{ padding: "0 12px 6px" }}>
-          <BotaoFalar gravacao={gravacao} />
+      {(podeFalar || podeAnexar) && (
+        <div style={{ padding: "0 12px 6px", display: "flex", flexDirection: "column", gap: 6 }}>
+          {podeFalar && <BotaoFalar gravacao={gravacao} />}
+          {/* SPEC-30 Fase 2: um print de diagrama vira proposta de nós, com os
+              tipos que existem na config. A imagem é insumo, não saída nova. */}
+          {podeAnexar && (
+            <AnexoDeImagem imagens={imagens} onMudar={setImagens} destino={destinoIa} desabilitado={pensando} />
+          )}
         </div>
       )}
 
@@ -208,7 +247,11 @@ export function ConversaPanel({
           aria-label="Descreva a demanda"
           style={entradaEstilo}
         />
-        <button onClick={() => void enviar()} disabled={pensando || !entrada.trim()} style={botaoEnviarEstilo}>
+        <button
+          onClick={() => void enviar()}
+          disabled={pensando || (!entrada.trim() && imagens.length === 0)}
+          style={botaoEnviarEstilo}
+        >
           {pensando ? "pensando…" : "Enviar"}
         </button>
       </div>

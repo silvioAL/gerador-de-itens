@@ -45,10 +45,13 @@ export const MODELO_GATEWAY_FALSO = "modelo-de-mentira";
 
 /** SPEC-30 Fase 1a — o que o gateway falso "ouve", sempre. Uma frase que soa
  * como demanda ditada, pra o teste conferir que ela chegou no campo certo. */
+/** SPEC-30 Fase 2 — aparece na resposta quando o pedido trouxe imagem. */
+export const MARCA_VIU_IMAGEM = "viu-a-imagem";
+
 export const TEXTO_TRANSCRITO_FALSO = "criar uma fila do rabbit para propostas aprovadas";
 
 interface CorpoChat {
-  messages?: { role: string; content: string }[];
+  messages?: { role: string; content: string | { type?: string; text?: string }[] }[];
   response_format?: { type?: string; json_schema?: { schema?: unknown } };
 }
 
@@ -62,7 +65,17 @@ function schemaPedido(corpo: CorpoChat): unknown | null {
   const doCorpo = corpo.response_format?.json_schema?.schema;
   if (doCorpo) return doCorpo;
 
-  const texto = corpo.messages?.map((m) => m.content).join("\n") ?? "";
+  // ACHADO do próprio teste de imagem: com anexo, `content` deixa de ser
+  // string e vira array de parts. Concatenar direto virava "[object Object]",
+  // o dublê não achava o schema, caía no ramo de texto livre e devolvia algo
+  // que não era JSON — a tela mostrava "Unexpected token 'e'". O prompt (com o
+  // schema) mora na part de texto.
+  const texto =
+    corpo.messages
+      ?.map((m) =>
+        typeof m.content === "string" ? m.content : (m.content ?? []).map((parte) => parte?.text ?? "").join("\n")
+      )
+      .join("\n") ?? "";
   const marca = texto.lastIndexOf("obedeça exatamente a este schema:");
   if (marca < 0) return null;
   const inicio = texto.indexOf("{", marca);
@@ -82,22 +95,22 @@ function schemaPedido(corpo: CorpoChat): unknown | null {
  * divergir do que aquele validador exige, o provedor faz retry e o teste
  * demora — o que já é um sinal útil por si só.
  */
-function preencher(schema: unknown, caminho = ""): unknown {
+function preencher(schema: unknown, caminho = "", sufixo = ""): unknown {
   const s = (schema ?? {}) as Record<string, unknown>;
   if (Array.isArray(s.enum)) return s.enum[0];
-  if (s.type === "array") return [preencher(s.items, `${caminho}[0]`)];
+  if (s.type === "array") return [preencher(s.items, `${caminho}[0]`, sufixo)];
   if (s.type === "boolean") return true;
   if (s.type === "number" || s.type === "integer") return 1;
   if (s.type === "object" || s.properties) {
     const props = (s.properties ?? {}) as Record<string, unknown>;
     return Object.fromEntries(
-      Object.entries(props).map(([chave, sub]) => [chave, preencher(sub, caminho ? `${caminho}.${chave}` : chave)])
+      Object.entries(props).map(([chave, sub]) => [chave, preencher(sub, caminho ? `${caminho}.${chave}` : chave, sufixo)])
     );
   }
   // String: o valor precisa ser reconhecível na tela E diferente por campo,
   // senão um teste que confere "o campo certo recebeu o texto certo" passaria
   // com tudo trocado.
-  return `${MARCA_GATEWAY_FALSO} (${caminho || "resposta"})`;
+  return `${MARCA_GATEWAY_FALSO}${sufixo} (${caminho || "resposta"})`;
 }
 
 /** Um evento SSE no formato que `provedorOpenAI.ts` sabe ler. */
@@ -158,10 +171,20 @@ export function criarGatewayFalso(): Server {
         // Corpo ilegível vira resposta vazia — o provedor trata como erro.
       }
 
+      // SPEC-30 Fase 2: se o pedido trouxe imagem, o dublê diz isso na
+      // resposta — é assim que o teste de navegador prova que o print
+      // atravessou tela -> servidor -> gateway, e não só que o botão existe.
+      const temImagem = (corpo.messages ?? []).some(
+        (m) => Array.isArray(m.content) && m.content.some((p: { type?: string }) => p?.type === "image_url")
+      );
+
       const schema = schemaPedido(corpo);
       const texto = schema
-        ? JSON.stringify(preencher(schema))
-        : `${MARCA_GATEWAY_FALSO}: ok`;
+        // A marca de imagem entra TAMBÉM no caminho estruturado: `/ia/diagrama`
+        // responde JSON, e marcar só o texto livre deixaria o teste de imagem
+        // sem como afirmar nada (foi o que aconteceu).
+        ? JSON.stringify(preencher(schema, "", temImagem ? ` ${MARCA_VIU_IMAGEM}` : ""))
+        : `${MARCA_GATEWAY_FALSO}: ok${temImagem ? ` ${MARCA_VIU_IMAGEM}` : ""}`;
 
       res.writeHead(200, {
         "content-type": "text/event-stream; charset=utf-8",

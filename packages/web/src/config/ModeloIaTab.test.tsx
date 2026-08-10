@@ -213,6 +213,11 @@ describe("ModeloIaTab — card do gateway (SPEC-25 Fase 2)", () => {
       baseUrl: "https://gw/v1",
       chave: "sk-secreta",
       modelo: "deepseek-chat",
+      // SPEC-30: dois campos a mais viajam com a credencial. `baseUrlTranscricao`
+      // vem do destino escolhido (aqui, nenhum) e `visao` da marcação manual —
+      // que nasce desmarcada, porque oferecer anexo que falha custa a conversa.
+      baseUrlTranscricao: undefined,
+      visao: false,
     });
     // A chave sai da tela assim que é gravada.
     await waitFor(() => expect(screen.getByLabelText("Chave de API")).toHaveValue(""));
