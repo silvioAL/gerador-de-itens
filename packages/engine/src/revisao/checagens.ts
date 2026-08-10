@@ -23,12 +23,35 @@ import { camposVisiveis } from "../spec/campos.js";
 
 export type SeveridadeAchado = "erro" | "aviso";
 
+/**
+ * ACHADO REAL (print do usuário): o canvas com as 8 bolinhas VERDES e o painel
+ * vermelho com 20 avisos, ao mesmo tempo. Não era contradição — eram duas
+ * perguntas diferentes — mas a tela não deixava isso claro, e ler "20 avisos"
+ * logo depois de derivar parece defeito quando é pendência.
+ *
+ * - `pessoa`: só alguém resolve. Dependência órfã, campo obrigatório do nó em
+ *   branco, item grande demais. Vale mostrar sempre.
+ * - `esteira`: os agentes preenchem. Volumetria e ciclo de teste. Antes de a
+ *   esteira rodar, isto é a lista de trabalho DELA — não uma lista de erros.
+ */
+export type OrigemAchado = "pessoa" | "esteira";
+
+/** Regras que a esteira de agentes resolve sozinha ao rodar. */
+const REGRAS_DA_ESTEIRA = new Set(["volumetria-sem-valor", "sem-ciclo-de-teste"]);
+
+export function origemDaRegra(regra: string): OrigemAchado {
+  return REGRAS_DA_ESTEIRA.has(regra) ? "esteira" : "pessoa";
+}
+
 export interface Achado {
   /** Item onde o problema está — a UI usa isso pra levar a pessoa até lá. */
   atividadeChave: string;
   /** Chave do placeholder, quando o achado é sobre um campo específico. */
   campo?: string;
   severidade: SeveridadeAchado;
+  /** Quem resolve: a esteira ao rodar, ou uma pessoa. Derivado de `regra` —
+   * ver `origemDaRegra`. */
+  origem: OrigemAchado;
   /** Slug estável da regra — pra UI agrupar e pra teste asseverar sem
    * depender do texto da mensagem. */
   regra: string;
@@ -70,6 +93,7 @@ export function revisarQuebra(
           atividadeChave: atividade.chave,
           severidade: "erro",
           regra: "dependencia-orfa",
+          origem: origemDaRegra("dependencia-orfa"),
           mensagem: `Depende de "${dep.alvoChave}", que não existe mais na quebra.`,
         });
       }
@@ -102,6 +126,7 @@ export function revisarQuebra(
             atividadeChave: atividade.chave,
             severidade: "erro",
             regra: "campo-obrigatorio-vazio",
+            origem: origemDaRegra("campo-obrigatorio-vazio"),
             mensagem: `O campo obrigatório "${campo.label}" do nó "${no.label || no.id}" está em branco.`,
           });
         }
@@ -129,6 +154,7 @@ export function revisarQuebra(
           campo: p.chave,
           severidade: "aviso",
           regra: "volumetria-sem-valor",
+          origem: origemDaRegra("volumetria-sem-valor"),
           mensagem: `Volumetria exigida para este item, mas "${p.rotulo}" está sem valor.`,
         });
       }
@@ -148,6 +174,7 @@ export function revisarQuebra(
         atividadeChave: atividade.chave,
         severidade: "aviso",
         regra: "sem-ciclo-de-teste",
+        origem: origemDaRegra("sem-ciclo-de-teste"),
         mensagem: `Nenhum ciclo de teste configurado cobre ${atividade.techs.join("/")}${
           atividade.contextos.length ? ` em ${atividade.contextos.join(", ")}` : ""
         }.`,
@@ -162,6 +189,7 @@ export function revisarQuebra(
         atividadeChave: atividade.chave,
         severidade: "aviso",
         regra: "item-grande",
+        origem: origemDaRegra("item-grande"),
         mensagem: `Item tamanho G: avalie quebrar em itens menores antes de levar pro time.`,
       });
     }
