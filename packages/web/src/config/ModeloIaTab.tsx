@@ -299,6 +299,12 @@ function CardGateway({
           </p>
         )}
 
+        {/* ACHADO (apontado pelo usuário): a tela oferecia voz e imagem sem
+            dizer o que cada destino realmente faz — e a pessoa só descobria na
+            falha. Estes avisos são por DESTINO, e ficam antes dos campos: são
+            o que muda a decisão de configuração, não uma nota de rodapé. */}
+        <AvisosDoDestino baseUrl={baseUrl} visaoMarcada={visaoManual} />
+
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
           <input
             value={baseUrl}
@@ -441,4 +447,60 @@ const avisoEstilo: React.CSSProperties = {
   fontSize: 12,
   color: "var(--amarelo)",
   marginBottom: 0,
+};
+
+
+/**
+ * SPEC-30 — o que ESTE destino não faz, dito antes de a pessoa tentar.
+ *
+ * Sem isto, três limitações reais só apareciam como falha:
+ * - o Ollama **não transcreve** (o microfone aparecia e morria em 404);
+ * - modelo sem visão recusa imagem (a marcação manual não valida nada);
+ * - em CPU, a esteira leva minutos por item (medido, ver README).
+ *
+ * A régua é a mesma do resto do produto: a interface diz a verdade sobre o que
+ * o sistema consegue. Aviso não é enfeite — é o que evita a pessoa gastar
+ * tempo num caminho que não existe.
+ */
+function AvisosDoDestino({ baseUrl, visaoMarcada }: { baseUrl: string; visaoMarcada: boolean }) {
+  const alvo = baseUrl.trim().toLowerCase();
+  if (!alvo) return null;
+
+  const ehOllama = alvo.includes("ollama:11434") || alvo.includes("localhost:11434");
+  // Endereço na própria infra: sem GPU, o tempo é o que ele é.
+  const ehLocal = ehOllama || alvo.includes("localhost") || alvo.includes("127.0.0.1") || alvo.includes("://whisper");
+
+  const avisos: string[] = [];
+  if (ehOllama) {
+    avisos.push(
+      "O Ollama não transcreve áudio. Para o botão de falar funcionar, suba o serviço de voz junto: `docker compose --profile ia up -d` (a transcrição vai pro Whisper, não pra cá)."
+    );
+  }
+  if (ehLocal) {
+    avisos.push(
+      "Rodando na sua máquina: sem GPU, conte com minutos por item na esteira (medido: ~3min40 para um item com 2 campos no qwen2.5:7b). Com GPU NVIDIA, descomente o bloco `deploy:` do serviço no docker-compose.yml."
+    );
+  }
+  if (visaoMarcada) {
+    avisos.push(
+      "Você marcou que este modelo enxerga imagem — isso não é verificado aqui. Se o modelo não aceitar, a conversa com print anexado falha com uma mensagem dizendo isso."
+    );
+  }
+
+  if (avisos.length === 0) return null;
+  return (
+    <ul style={listaDeAvisosEstilo} data-testid="avisos-do-destino">
+      {avisos.map((texto, i) => (
+        <li key={i}>{texto}</li>
+      ))}
+    </ul>
+  );
+}
+
+const listaDeAvisosEstilo: React.CSSProperties = {
+  margin: "8px 0 0",
+  paddingLeft: 16,
+  fontSize: 11.5,
+  lineHeight: 1.6,
+  color: "var(--amarelo)",
 };

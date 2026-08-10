@@ -386,6 +386,31 @@ function soDepoisDoUltimoReinicio(texto: string): string {
   return ultimo === -1 ? texto : texto.slice(ultimo + 1);
 }
 
+/**
+ * ACHADO, e o pior dos que apareceram no SPEC-30: quando o gateway falha
+ * **depois** que o streaming começou, o cabeçalho HTTP já saiu 200 — não existe
+ * mais status pra sinalizar erro. O que chega é texto solto no lugar do JSON, e
+ * o `JSON.parse` cru mostrava `Unexpected token 'e'` na cara de quem só queria
+ * desenhar um diagrama. A causa real (modelo que não enxerga imagem, resposta
+ * cortada no teto de tokens, modelo respondendo em prosa) ficava só no log do
+ * servidor — onde, no modo hospedado, a pessoa não tem acesso.
+ *
+ * Isto não conserta a falha: ela é do gateway. Traduz. Diz os três motivos que
+ * respondem por quase todos os casos e mostra o começo do que veio, que
+ * costuma ser a própria mensagem de erro do gateway.
+ */
+function interpretarRespostaEstruturada<T>(acumulado: string, oQue: string): T {
+  try {
+    return JSON.parse(acumulado) as T;
+  } catch {
+    const amostra = acumulado.trim().slice(0, 200);
+    throw new Error(
+      `O modelo não devolveu ${oQue} em formato válido. Costuma ser um destes: o modelo não aceita imagem (desmarque "Este modelo enxerga imagem" na aba Modelo de IA), a resposta foi cortada no meio, ou o modelo respondeu em texto livre em vez de JSON.` +
+        (amostra ? ` Começo do que veio: "${amostra}"` : " A resposta veio vazia.")
+    );
+  }
+}
+
 export const apiIa = {
   /** Se o modelo local está instalado e pronto pra uso — usado antes de
    * disparar a geração ao vivo (Fase 1d, SPEC-23) sem forçar IA em quem não
@@ -506,7 +531,7 @@ export const apiIa = {
     } else {
       acumulado = await resposta.text();
     }
-    return JSON.parse(acumulado) as Record<string, Record<string, string>>;
+    return interpretarRespostaEstruturada<Record<string, Record<string, string>>>(acumulado, "as respostas do lote");
   },
   /** SPEC-23 Fluxo 2 — configurar com apoio de IA ("poder ajustar as
    * configurações com apoio de IA"). Devolve um OBJETO no schema do `alvo`
@@ -543,7 +568,7 @@ export const apiIa = {
     } else {
       acumulado = await resposta.text();
     }
-    return JSON.parse(acumulado) as T;
+    return interpretarRespostaEstruturada<T>(acumulado, "a sugestão");
   },
   /** SPEC-27 Fase 1 — a conversa do desenho: descreve a demanda, recebe o
    * diagrama proposto. O `tipo` de cada nó/conexão é restrito no servidor aos
@@ -578,7 +603,7 @@ export const apiIa = {
     } else {
       acumulado = await resposta.text();
     }
-    return JSON.parse(acumulado) as DiagramaProposto;
+    return interpretarRespostaEstruturada<DiagramaProposto>(acumulado, "o diagrama");
   },
   /** SPEC-27 Fase 2 — a conversa da especificação: propõe alterações nos
    * campos de UM item. Uma chamada por item de propósito (a resposta fica
@@ -609,7 +634,7 @@ export const apiIa = {
     } else {
       acumulado = await resposta.text();
     }
-    return JSON.parse(acumulado) as AlteracoesPropostas;
+    return interpretarRespostaEstruturada<AlteracoesPropostas>(acumulado, "as alterações");
   },
 };
 

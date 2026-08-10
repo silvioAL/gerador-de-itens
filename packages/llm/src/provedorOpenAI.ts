@@ -117,10 +117,55 @@ const MAX_TOKENS_PADRAO = 8192;
 
 /** Erro com a mensagem já pronta pra tela — o resto da stack não interessa a
  * quem está configurando um gateway. */
-function erroDeGateway(status: number, corpo: string): Error {
+type Operacao = "chat" | "transcricao";
+
+/**
+ * ACHADO (apontado pelo usuário): a mensagem genérica não bastava.
+ *
+ * Um 404 na transcrição dizia *"confira a base URL"* — e a base URL do chat
+ * estava CERTA: o que faltava era o serviço de voz de pé. Quem lesse aquilo iria
+ * mexer no campo que já estava correto.
+ *
+ * A regra aqui: toda mensagem diz **o que aconteceu** e **o próximo passo**. O
+ * status HTTP sozinho é informação para quem escreveu o código, não para quem
+ * está tentando usar a ferramenta.
+ */
+function erroDeGateway(status: number, corpo: string, operacao: Operacao = "chat"): Error {
   const detalhe = corpo.slice(0, 300);
-  if (status === 401 || status === 403) return new Error(`Credencial recusada pelo gateway (HTTP ${status}).`);
-  if (status === 404) return new Error(`Endpoint não encontrado — confira a base URL (HTTP 404).`);
+
+  if (status === 401 || status === 403) {
+    return new Error(
+      `Credencial recusada pelo gateway (HTTP ${status}). Confira a chave de API na aba "Modelo de IA".`
+    );
+  }
+
+  if (status === 404) {
+    return new Error(
+      operacao === "transcricao"
+        ? "Este endereço não tem transcrição de áudio (HTTP 404). Se você usa o Qwen no Docker, o Ollama não transcreve — suba o serviço de voz com `docker compose --profile ia up -d`. Se é um gateway da empresa, confirme com o time dele se `/audio/transcriptions` está publicado."
+        : "Endpoint não encontrado (HTTP 404) — confira a base URL na aba \"Modelo de IA\"."
+    );
+  }
+
+  // Modelo sem visão recebendo imagem: o destino responde 400 e cita a parte
+  // que não entendeu. Sem tratar, a pessoa via um dump de JSON e não sabia que
+  // o problema era a marcação "este modelo enxerga imagem".
+  if (status === 400 && /image|vision|multimodal|content.*part/i.test(detalhe)) {
+    return new Error(
+      `O modelo configurado não aceita imagem. Desmarque "Este modelo enxerga imagem" na aba "Modelo de IA", ou troque para um modelo com visão (ex.: qwen2.5vl no Ollama, ou um Claude). Resposta do gateway: ${detalhe}`
+    );
+  }
+
+  if (status === 413) {
+    return new Error(
+      `O gateway recusou o tamanho do envio (HTTP 413). Se anexou imagem, use um print menor; se é áudio, grave menos tempo.`
+    );
+  }
+
+  if (status === 429) {
+    return new Error(`O gateway está limitando as chamadas (HTTP 429). Espere um pouco e tente de novo.`);
+  }
+
   return new Error(`Gateway respondeu HTTP ${status}: ${detalhe}`);
 }
 
@@ -444,7 +489,9 @@ export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): Pro
         body: forma,
       });
 
-      if (!resposta.ok) throw erroDeGateway(resposta.status, await resposta.text().catch(() => ""));
+      if (!resposta.ok) {
+        throw erroDeGateway(resposta.status, await resposta.text().catch(() => ""), "transcricao");
+      }
 
       const texto = (await resposta.text()).trim();
       // Gateway que ignora `response_format: text` e devolve JSON assim mesmo —

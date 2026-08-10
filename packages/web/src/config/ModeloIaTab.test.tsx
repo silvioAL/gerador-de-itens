@@ -292,3 +292,52 @@ describe("ModeloIaTab — card do gateway (SPEC-25 Fase 2)", () => {
     expect(screen.queryByText(/modelo de embedding não está instalado/)).not.toBeInTheDocument();
   });
 });
+
+/**
+ * ACHADO apontado pelo usuário: as limitações existiam e a tela não as dizia —
+ * a pessoa só descobria na falha. Estes testes existem para os avisos não
+ * sumirem numa refatoração: eles são o que evita gastar tempo num caminho que
+ * não existe (microfone com Ollama, esteira em CPU, visão marcada à toa).
+ */
+describe("ModeloIaTab — avisos do destino (SPEC-30)", () => {
+  it("Ollama avisa que NÃO transcreve, e diz como subir a voz", async () => {
+    await montar();
+    fireEvent.change(screen.getByLabelText("Base URL do gateway"), {
+      target: { value: "http://ollama:11434/v1" },
+    });
+
+    const avisos = screen.getByTestId("avisos-do-destino");
+    expect(avisos).toHaveTextContent("não transcreve");
+    expect(avisos).toHaveTextContent("--profile ia");
+  });
+
+  it("destino local avisa do tempo em CPU — com número, não com 'pode demorar'", async () => {
+    await montar();
+    fireEvent.change(screen.getByLabelText("Base URL do gateway"), {
+      target: { value: "http://localhost:11434/v1" },
+    });
+
+    expect(screen.getByTestId("avisos-do-destino")).toHaveTextContent("3min40");
+  });
+
+  it("marcar visão avisa que ninguém verifica isso", async () => {
+    await montar();
+    fireEvent.change(screen.getByLabelText("Base URL do gateway"), {
+      target: { value: "https://gateway-interno.empresa/v1" },
+    });
+    fireEvent.click(screen.getByLabelText("Este modelo enxerga imagem"));
+
+    expect(screen.getByTestId("avisos-do-destino")).toHaveTextContent("não é verificado");
+  });
+
+  it("destino público sem visão marcada não vira ruído", async () => {
+    // Aviso que aparece sempre deixa de ser lido — só aparece o que muda a
+    // decisão daquele destino.
+    await montar();
+    fireEvent.change(screen.getByLabelText("Base URL do gateway"), {
+      target: { value: "https://api.anthropic.com/v1" },
+    });
+
+    expect(screen.queryByTestId("avisos-do-destino")).toBeNull();
+  });
+});
