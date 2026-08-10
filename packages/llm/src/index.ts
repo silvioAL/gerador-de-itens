@@ -29,8 +29,10 @@ export {
   dispatcherPara,
   explicarFalhaDeRede,
   explicarRespostaRecusada,
+  origensCandidatas,
   proxyIgnoradoPara,
   type ProxyDetectado,
+  type OrigemCandidata,
 } from "./rede.js";
 export {
   instalarDeArquivoLocal,
@@ -38,6 +40,7 @@ export {
   type ProgressoInstalacao,
   type OpcoesInstalacao,
 } from "./origens.js";
+export { garantirModeloEmbarcado, diretorioDaParte, tamanhoEmbarcado } from "./modeloEmbarcado.js";
 export { verificarStatus, type StatusIa, type StatusModeloChat } from "./status.js";
 export { carregarModeloChat, carregarModeloEmbedding, type MotorChat, type MotorEmbedding } from "./motor.js";
 export { criarProvedorLocal, criarProvedorPorId, type ProvedorIa, type OpcoesGeracao } from "./provedor.js";

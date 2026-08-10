@@ -146,6 +146,65 @@ function suportaCaDoSistema(versao = process.versions.node): boolean {
 }
 
 /**
+ * As origens de onde o modelo PODERIA vir, para testar uma a uma.
+ *
+ * Existe porque adivinhar custou caro. Numa rede corporativa, "tem internet"
+ * não é resposta: o filtro libera por categoria, e o Hugging Face cai em
+ * "file sharing" enquanto o npm passa como "developer tools". Qual delas passa
+ * é uma pergunta empírica, e a máquina que sabe responder é a da pessoa — não
+ * a minha.
+ *
+ * Cada entrada testa o **mesmo tipo de coisa** que o download real faria: um
+ * arquivo binário grande, não a home do site. Filtro que libera a página e
+ * bloqueia o download é comum, e testar a página daria falso positivo.
+ */
+export interface OrigemCandidata {
+  nome: string;
+  url: string;
+  /** O que dá pra fazer se esta origem passar. */
+  saida: string;
+}
+
+export function origensCandidatas(repositorioHf: string, arquivoHf: string): OrigemCandidata[] {
+  return [
+    {
+      nome: "Hugging Face",
+      url: `https://huggingface.co/${repositorioHf}/resolve/main/${arquivoHf}`,
+      saida: "gerador ia instalar (o caminho padrão)",
+    },
+    {
+      nome: "CDN do Hugging Face",
+      // ACHADO da validação: `cdn-lfs.huggingface.co` nem resolve — o host real
+      // do CDN muda e só aparece no redirect. Testar um domínio inventado
+      // produziria um ✗ que não diz nada sobre a rede, só sobre meu palpite.
+      // `?download=true` é o que o HF usa pra mandar direto ao CDN.
+      url: `https://huggingface.co/${repositorioHf}/resolve/main/${arquivoHf}?download=true`,
+      saida: "gerador ia instalar (o arquivo grande vem por aqui)",
+    },
+    {
+      nome: "npm (registry)",
+      url: "https://registry.npmjs.org/gerador-de-itens/latest",
+      saida: "gerador ia instalar --origem npm (modelo em pacotes-parte)",
+    },
+    {
+      nome: "npm (tarball / CDN)",
+      // Metadata e tarball podem estar em domínios diferentes no proxy
+      // corporativo. Se o metadata passa e o tarball não, `npm install` de um
+      // pacote grande falha e a causa não é óbvia.
+      url: "https://registry.npmjs.org/gerador-de-itens/-/gerador-de-itens-0.1.68.tgz",
+      saida: "gerador ia instalar --origem npm",
+    },
+    {
+      nome: "GitHub (arquivo binário)",
+      // Um arquivo de verdade, não a home: filtro que libera a página e
+      // bloqueia o download é comum, e testar a página daria falso positivo.
+      url: "https://github.com/silvioAL/gerador-de-itens/archive/refs/heads/main.tar.gz",
+      saida: "publicar o modelo como release do GitHub e baixar de lá",
+    },
+  ];
+}
+
+/**
  * Explica uma resposta HTTP que não é o arquivo — tipicamente a **página de
  * bloqueio do filtro corporativo**.
  *

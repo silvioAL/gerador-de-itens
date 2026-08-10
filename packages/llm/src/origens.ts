@@ -45,6 +45,11 @@ export interface OpcoesInstalacao {
   baseDir?: string;
   /** Só testes — evita rodar `npm` de verdade. */
   execImpl?: (comando: string, args: string[]) => Promise<unknown>;
+  /** As partes já vieram como dependência do pacote (modelo embarcado): lê do
+   * `node_modules` em vez de rodar `npm install` num prefixo temporário. */
+  jaInstaladas?: boolean;
+  /** Só testes/embarcado — resolve o diretório de um pacote-parte. */
+  resolverParte?: (pacote: string) => string | undefined;
 }
 
 /**
@@ -132,17 +137,26 @@ export async function instalarDePartesNpm(
   const destino = caminhoDoModelo(modelo, opcoes.baseDir);
   if (existsSync(destino)) return destino;
 
-  const prefixo = await mkdtemp(join(tmpdir(), "gerador-modelo-"));
+  // Modelo embarcado (SPEC-32): as partes vieram como dependência, então não
+  // há o que baixar — só remontar. Pular o `npm install` aqui não é
+  // otimização: rodar `npm` de dentro de um `gerador open` seria lento,
+  // barulhento e poderia falhar por politica de rede, pra buscar algo que já
+  // está no disco.
+  const prefixo = opcoes.jaInstaladas ? "" : await mkdtemp(join(tmpdir(), "gerador-modelo-"));
   const exec = opcoes.execImpl ?? ((c: string, a: string[]) => execArquivo(c, a, { maxBuffer: 32 * 1024 * 1024 }));
 
   try {
+    if (opcoes.jaInstaladas) {
+      opcoes.onProgresso?.({ modelo, bytesEscritos: 0, bytesTotais: modelo.tamanhoAproximadoBytes, etapa: "montando" });
+    } else {
     opcoes.onProgresso?.({ modelo, bytesEscritos: 0, bytesTotais: modelo.tamanhoAproximadoBytes, etapa: "baixando" });
     // `--no-save`/`--no-audit`/`--no-fund`: é um prefixo descartável, não um
     // projeto. `--prefix` mantém tudo fora do node_modules de quem instalou a
     // ferramenta — o modelo não é dependência de código, é dado.
     await exec(comandoNpm(), ["install", "--prefix", prefixo, "--no-save", "--no-audit", "--no-fund", ...pacotes]);
+    }
   } catch (erro) {
-    await rm(prefixo, { recursive: true, force: true });
+    if (prefixo) await rm(prefixo, { recursive: true, force: true });
     throw new Error(
       `Falha ao buscar as partes do modelo no npm: ${erro instanceof Error ? erro.message.slice(0, 300) : erro}. ` +
         `Se o registry da sua rede não tem esses pacotes, use --de <caminho do .gguf>.`
@@ -158,7 +172,11 @@ export async function instalarDePartesNpm(
     const saida = createWriteStream(parcial);
     let bytesEscritos = 0;
     for (const pacote of pacotes) {
-      const arquivo = await acharArquivoDaParte(join(prefixo, "node_modules", ...pacote.split("/")));
+      const dir = opcoes.jaInstaladas
+        ? opcoes.resolverParte?.(pacote)
+        : join(prefixo, "node_modules", ...pacote.split("/"));
+      if (!dir) throw new Error(`A parte ${pacote} não foi encontrada — reinstale a ferramenta.`);
+      const arquivo = await acharArquivoDaParte(dir);
       const leitura = createReadStream(arquivo);
       leitura.on("data", (pedaco: Buffer | string) => {
         bytesEscritos += pedaco.length;
@@ -189,7 +207,7 @@ export async function instalarDePartesNpm(
     await rm(parcial, { force: true });
     throw erro;
   } finally {
-    await rm(prefixo, { recursive: true, force: true });
+    if (prefixo) await rm(prefixo, { recursive: true, force: true });
   }
 }
 

@@ -10,6 +10,7 @@ import {
   detectarProxy,
   explicarFalhaDeRede,
   explicarRespostaRecusada,
+  origensCandidatas,
   idsDeProvedorValidos,
   instalarDeArquivoLocal,
   instalarDePartesNpm,
@@ -117,6 +118,34 @@ async function instalar({ idModelo, de, origem }: OpcoesInstalar = {}): Promise<
 }
 
 /**
+ * Testa UMA origem, do jeito que o download real testaria.
+ *
+ * Nunca deixa uma origem derrubar o diagnóstico: o valor do comando é o
+ * panorama completo, e uma origem que estoura é justamente o dado que se quer
+ * ver — não motivo pra parar antes das outras.
+ */
+async function testarOrigem(url: string): Promise<{ ok: boolean; detalhe: string }> {
+  const inicio = Date.now();
+  try {
+    const r = await buscarComProxy(url, { method: "HEAD" });
+    const ms = Date.now() - inicio;
+    // ACHADO da propria validacao: a primeira versao marcava ✗ pra tudo que
+    // nao fosse 200 — e um 404 virava "bloqueado". Errado: 404 e o host
+    // RESPONDENDO, ou seja, a rede deixou passar. O que caracteriza bloqueio e
+    // 403/407, que e como o filtro corporativo recusa. Confundir os dois daria
+    // exatamente o falso negativo que este comando existe pra evitar.
+    const bloqueado = r.status === 403 || r.status === 407;
+    return {
+      ok: !bloqueado,
+      detalhe: `HTTP ${r.status} em ${ms}ms${bloqueado ? " — recusado pelo filtro" : r.ok ? "" : " (host respondeu: a rede passa)"}`,
+    };
+  } catch (erro) {
+    const causa = (erro as { cause?: { code?: string } })?.cause?.code;
+    return { ok: false, detalhe: causa ?? (erro instanceof Error ? erro.message : String(erro)) };
+  }
+}
+
+/**
  * SPEC-32 — diz por que o download falhou, nesta maquina, agora.
  *
  * Existe por um motivo concreto: o usuario recebeu `fetch failed` e a leitura
@@ -133,7 +162,21 @@ async function diagnosticar(): Promise<void> {
   console.log(`Proxy: ${proxy ? `${proxy.url} (de ${proxy.origem})` : "nenhum configurado"}`);
   console.log(`NO_PROXY: ${process.env.NO_PROXY ?? process.env.no_proxy ?? "(vazio)"}`);
   console.log(`NODE_EXTRA_CA_CERTS: ${process.env.NODE_EXTRA_CA_CERTS ?? "(vazio)"}`);
-  console.log(`\nTestando ${new URL(url).host}...`);
+  // Testa TODAS as origens possíveis, não só a padrão. Numa rede corporativa
+  // "tem internet" não é resposta: o filtro libera por categoria, e o Hugging
+  // Face costuma cair em "file sharing" enquanto o npm passa como "developer
+  // tools". Qual delas passa é pergunta empírica, e quem sabe responder é a
+  // máquina de quem usa — não a minha suposição.
+  console.log("\nOrigens possíveis para o modelo:");
+  for (const origem of origensCandidatas(MODELO_CHAT.repositorioHuggingFace, MODELO_CHAT.nomeArquivo)) {
+    // eslint-disable-next-line no-await-in-loop -- sequencial de propósito: em
+    // paralelo, um proxy lento faz os tempos medidos mentirem uns sobre os outros.
+    const r = await testarOrigem(origem.url);
+    console.log(`  ${r.ok ? "✓" : "✗"} ${origem.nome.padEnd(24)} ${r.detalhe}`);
+    if (r.ok) console.log(`      → ${origem.saida}`);
+  }
+
+  console.log(`\nDetalhe do destino padrão (${new URL(url).host}):`);
 
   const inicio = Date.now();
   try {
