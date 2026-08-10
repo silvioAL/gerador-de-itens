@@ -65,6 +65,17 @@ export function LoginScreen({ onEntrar, erro, modo, aceitandoConvite = false }: 
 
         {modo === "dev" && (
           <form onSubmit={aoSubmeter}>
+            {/* ACHADO REAL: "esqueci com qual credencial logar". Não havia
+                credencial para lembrar — em `AUTH_MODE=dev` qualquer e-mail
+                entra, sem senha. A tela pedia e-mail e não dizia isso, então
+                parecia um login de verdade com uma senha esquecida. E o botão
+                do Google não "sumiu": ele só existe em `AUTH_MODE=oidc`. */}
+            <p style={avisoModoDevEstilo} data-testid="aviso-modo-dev">
+              <strong>Modo de desenvolvimento.</strong> Qualquer e-mail entra, sem senha — não há credencial a
+              lembrar. Para entrar com Google, suba o servidor com <code>AUTH_MODE=oidc</code> e os quatro{" "}
+              <code>OIDC_*</code> preenchidos (veja <code>.env.example</code>).
+            </p>
+
             <label style={labelEstilo}>E-mail</label>
             <input
               type="email"
@@ -178,4 +189,15 @@ const botaoGoogleEstilo: React.CSSProperties = {
   color: "#3c4043",
   textDecoration: "none",
   boxSizing: "border-box",
+};
+
+const avisoModoDevEstilo: React.CSSProperties = {
+  border: "1px solid var(--borda)",
+  background: "rgba(148, 163, 184, 0.10)",
+  borderRadius: 8,
+  padding: "9px 11px",
+  margin: "0 0 14px",
+  fontSize: 12,
+  lineHeight: 1.55,
+  color: "var(--texto-fraco)",
 };
