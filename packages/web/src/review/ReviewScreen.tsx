@@ -172,14 +172,24 @@ function contextoEpicoCompleto(demandInfo?: string, anexos?: { nome: string; con
   return partes.length > 0 ? partes.join("\n\n") : undefined;
 }
 
-type Aba = "especificacao" | "contrato" | "refinamento" | "testes";
-
-const ABAS: { id: Aba; rotulo: string }[] = [
-  { id: "especificacao", rotulo: "Especificação" },
-  { id: "contrato", rotulo: "Contrato" },
-  { id: "refinamento", rotulo: "Refinamento" },
-  { id: "testes", rotulo: "Testes" },
-];
+/**
+ * As quatro abas fixas (Especificação / Contrato / Refinamento / Testes)
+ * deixaram de existir. Achado do usuário: *"a IA vai preenchendo as
+ * informações ali na tab Refinamento, e são as mesmas informações repetidas
+ * nessas outras tabs, não faz sentido"* — e ele estava certo, todos os quatro
+ * grupos tinham sombra em outra aba (o Arquiteto escrevia o contrato no
+ * Refinamento e a aba Contrato seguia dizendo "(não preenchido)" pro mesmo
+ * assunto).
+ *
+ * A causa era histórica: as abas nasceram como leitura do DETERMINÍSTICO
+ * (campos do nó, tabela de regras), e o Refinamento nasceu depois como onde os
+ * placeholders são respondidos. Ninguém reconciliou quando a esteira passou a
+ * preencher tudo.
+ *
+ * Agora a ficha é uma só, e a ordem das seções vem da configuração do pipeline
+ * — não de uma lista no código. O que era determinístico não sumiu: virou
+ * "insumos", explicitamente rotulado como de onde os agentes partiram.
+ */
 
 /**
  * Revisão e especificação de solução são uma coisa só (achado do usuário: o
@@ -227,7 +237,6 @@ export function ReviewScreen({
 }: ReviewScreenProps) {
   const [mostrarDiagrama, setMostrarDiagrama] = useState(false);
   const [selecionada, setSelecionada] = useState<string | null>(null);
-  const [aba, setAba] = useState<Aba>("especificacao");
   const [seguindoGeracao, setSeguindoGeracao] = useState(true);
   // SPEC-24 Fase D: clique num nó do DiagramaCompacto filtra a lista de
   // itens por aquele nó; segundo clique no mesmo nó limpa (toggle).
@@ -527,7 +536,6 @@ export function ReviewScreen({
   useEffect(() => {
     if (!seguindoGeracao || !esteira.atual) return;
     setSelecionada(esteira.atual.atividadeChave);
-    setAba("refinamento");
   }, [esteira.atual, seguindoGeracao]);
 
   const chaveParaNodeId = Object.fromEntries(
@@ -556,7 +564,6 @@ export function ReviewScreen({
   function selecionar(chave: string) {
     setSeguindoGeracao(false);
     setSelecionada(chave);
-    setAba("especificacao");
   }
 
   function clicarNoDiagrama(nodeId: string) {
@@ -952,23 +959,11 @@ export function ReviewScreen({
                       <span style={seguindoBadgeEstilo}>● Seguindo a geração</span>
                     )}
                   </div>
-                  <nav style={{ display: "flex", gap: 4, marginTop: 10 }}>
-                    {ABAS.map((t) => (
-                      <button
-                        key={t.id}
-                        onClick={() => setAba(t.id)}
-                        style={{ ...tabBotaoEstilo, ...(aba === t.id ? tabBotaoOnEstilo : {}) }}
-                      >
-                        {t.rotulo}
-                      </button>
-                    ))}
-                  </nav>
                 </div>
                 <div style={fichaBodyEstilo}>
-                  {aba === "especificacao" && <AbaEspecificacao ficha={fichaSelecionada} />}
-                  {aba === "contrato" && <AbaContrato ficha={fichaSelecionada} />}
-                  {aba === "refinamento" && (
-                    <AbaRefinamento
+                  <FichaIdentificacao ficha={fichaSelecionada} />
+                  <AbaRefinamento
+                      papeis={papeisAtivos}
                       desatualizados={desatualizadosPorItem.get(atividadeSelecionada.chave)}
                       ficha={fichaSelecionada}
                       contextoEpico={contextoEpico}
@@ -991,9 +986,8 @@ export function ReviewScreen({
                       onReRodarSeguintes={
                         esteira.rodando ? undefined : (grupo) => reRodarSeguintes(atividadeSelecionada.chave, grupo)
                       }
-                    />
-                  )}
-                  {aba === "testes" && <AbaTestes ficha={fichaSelecionada} />}
+                  />
+                  <Insumos ficha={fichaSelecionada} />
                 </div>
               </>
             )}
@@ -1027,7 +1021,11 @@ export function ReviewScreen({
   );
 }
 
-function AbaEspecificacao({ ficha }: { ficha: FichaItem }) {
+/**
+ * O que o item É, derivado do desenho: nenhum agente escreve isto, e por isso
+ * abre a ficha em vez de disputar espaço com o que é escrito.
+ */
+function FichaIdentificacao({ ficha }: { ficha: FichaItem }) {
   return (
     <div>
       <div style={metaGridEstilo}>
@@ -1052,10 +1050,38 @@ function AbaEspecificacao({ ficha }: { ficha: FichaItem }) {
         <span style={lblEstilo}>Descrição</span>
         <p style={proseEstilo}>{ficha.descricao}</p>
       </div>
-      <div style={secaoEstilo}>
-        <span style={lblEstilo}>Critérios de aceite (Gherkin)</span>
-        <pre style={preEstilo}>{ficha.criteriosAceiteMarkdown}</pre>
-      </div>
+    </div>
+  );
+}
+
+/**
+ * O material DETERMINÍSTICO de onde os agentes partem: campos preenchidos no
+ * canvas, o scaffold Gherkin e a tabela de regras da combinação tech ×
+ * contexto. Fica fechado por padrão e rotulado como insumo — antes isto morava
+ * em três abas irmãs da de Refinamento, e parecia que a mesma informação
+ * estava duplicada (parecia porque, lado a lado com o que o agente escreveu,
+ * um campo vazio do nó lia-se como contradição, não como ponto de partida).
+ */
+function Insumos({ ficha }: { ficha: FichaItem }) {
+  const [aberto, setAberto] = useState(false);
+  return (
+    <div style={{ marginTop: 22, borderTop: "1px solid #1B2533", paddingTop: 12 }}>
+      <button onClick={() => setAberto((a) => !a)} style={insumosBotaoEstilo} data-testid="alternar-insumos">
+        {aberto ? "▾" : "▸"} Insumos — o que os agentes receberam
+      </button>
+      {aberto && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 18, marginTop: 12 }}>
+          <div>
+            <span style={lblEstilo}>Critérios de aceite (scaffold Gherkin)</span>
+            <pre style={preEstilo}>{ficha.criteriosAceiteMarkdown}</pre>
+          </div>
+          <div>
+            <span style={lblEstilo}>Campos preenchidos no canvas</span>
+            <AbaContrato ficha={ficha} />
+          </div>
+          <AbaTestes ficha={ficha} />
+        </div>
+      )}
     </div>
   );
 }
@@ -1136,6 +1162,10 @@ function formatarValorCampo(valor: unknown): string {
 }
 
 interface AbaRefinamentoProps {
+  /** Papéis CONFIGURADOS e ativos, na ordem configurada (Fase F). É o que
+   * define quais seções existem na ficha e em que ordem — a mesma lista que
+   * dirige a esteira, pra não haver duas verdades sobre o fluxo. */
+  papeis: PapelConfigurado[];
   /** SPEC-26 Bloco 1: chave do placeholder → insumos que mudaram desde que a
    * resposta foi escrita. Ausente/vazio = alinhado com o desenho. */
   desatualizados?: Map<string, InsumoDivergente[]>;
@@ -1181,6 +1211,7 @@ interface AbaRefinamentoProps {
  * dos nós).
  */
 function AbaRefinamento({
+  papeis,
   ficha,
   contextoEpico,
   desatualizados,
@@ -1235,13 +1266,20 @@ function AbaRefinamento({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       {erro && <div style={{ fontSize: 11, color: "#f87171" }}>{erro}</div>}
-      {PAPEIS_PIPELINE.map((papel) => {
+      {/* Achado do usuário: *"isso deveria ser flexível, se amanhã o usuário
+          quiser configurar outro agente ou mudar a ordem, os outputs devem
+          aparecer ali na ordem que o fluxo foi configurado"*. Antes esta lista
+          era `PAPEIS_PIPELINE`, fixa no código, enquanto a esteira já rodava
+          pela config (Fase F) — renomear ou reordenar um papel mudava quem
+          escrevia e não mudava onde aparecia. Agora as duas leem a MESMA
+          fonte. */}
+      {papeis.map((papelConfig) => {
+        const papel = papelConfig.grupo;
         const placeholders = grupos[papel];
-        if (placeholders.length === 0) return null;
         return (
-          <div key={papel}>
+          <div key={papelConfig.id}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={lblEstilo}>{ROTULO_PAPEL[papel]}</span>
+              <span style={lblEstilo}>{papelConfig.nome}</span>
               {onReRodarSeguintes &&
                 gruposComSeguinte?.includes(papel) &&
                 placeholders.some((p) => p.resposta !== undefined) && (
@@ -1254,6 +1292,17 @@ function AbaRefinamento({
                   </button>
                 )}
             </div>
+            {/* Papel configurado que não tem o que escrever NESTE item vira
+                uma linha explícita, não um sumiço. Foi o relato: o Especialista
+                "não rodava", quando na verdade a tabela de regras carregada não
+                cobria a combinação do item — invisível numa seção que some. */}
+            {placeholders.length === 0 && (
+              <p style={semTrabalhoEstilo} data-testid={`sem-trabalho-${papelConfig.id}`}>
+                Nada a escrever neste item — a tabela de regras carregada não tem nada para{" "}
+                {ficha.techs.join(", ") || "esta tech"}
+                {ficha.contextos.length > 0 ? ` × ${ficha.contextos.join(", ")}` : ""}.
+              </p>
+            )}
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 6 }}>
               {placeholders.map((p) => {
                 const confirmada = respostaConfirmada(p.resposta);
@@ -1571,6 +1620,23 @@ const metaGridEstilo: React.CSSProperties = {
   borderRadius: 10,
   overflow: "hidden",
   marginBottom: 20,
+};
+
+const insumosBotaoEstilo: React.CSSProperties = {
+  background: "none",
+  border: "none",
+  color: "#8A97AB",
+  fontSize: 12,
+  fontWeight: 600,
+  cursor: "pointer",
+  padding: 0,
+};
+
+const semTrabalhoEstilo: React.CSSProperties = {
+  fontSize: 11.5,
+  color: "#8A97AB",
+  fontStyle: "italic",
+  margin: "6px 0 0",
 };
 
 const reRodarEstilo: React.CSSProperties = {

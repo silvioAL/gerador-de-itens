@@ -1672,3 +1672,32 @@ Corrigidos os três, o lote real: **5 de 5 itens completos, 39s, JSON válido**,
 O dialeto de JSON virou `formatoJson`, **deduzido da base URL** em vez de campo que a tela manda: `gerador ia conectar` no terminal acerta igual, e ninguém precisa saber que a Anthropic é diferente pra configurar o Claude.
 
 A lição não é sobre a Anthropic. É que **documentação de API é uma hipótese**, e este projeto já tem uma seção inteira (§104) sobre defeitos que só aparecem rodando. Duas rodadas seguidas, a mesma conclusão por caminhos diferentes.
+
+## 108. As quatro abas da ficha viram uma, dirigida pela configuração
+
+Relato: *"a IA vai preenchendo as informações ali na tab Refinamento, e são as mesmas informações repetidas nessas outras tabs, não faz sentido"*.
+
+Mapeada, a duplicação era total — **os quatro grupos** tinham sombra em outra aba:
+
+| A IA escrevia em Refinamento | E o mesmo assunto aparecia em |
+| --- | --- |
+| Arquiteto: `Request`, `Response`, `Erros` | **Contrato** → campo do nó "Contrato dos endpoints novos" |
+| Arquiteto: `Nó vinculado`, `Dependências` | **Contrato** (cabeçalho) e a lista de itens |
+| QA: `Cenário Gherkin` | **Especificação** → "Critérios de aceite (Gherkin)" |
+| QA: `Regras de teste` | **Testes** → "Ciclos de teste" |
+
+E o efeito era pior que repetição: o Arquiteto escrevia o contrato e a aba Contrato seguia dizendo **"(não preenchido)"** para o mesmo assunto. A tela se contradizia.
+
+A causa foi acúmulo: as abas nasceram como leitura do determinístico (campos do nó, tabela de regras); o Refinamento nasceu depois, como onde os placeholders são respondidos. Quando a esteira passou a preencher tudo, ninguém reconciliou os dois.
+
+**A escolha do usuário foi melhor que a minha proposta.** Eu sugeri distribuir cada agente na aba do assunto; ele respondeu: *"remover as outras abas e manter a Refinamento… se amanhã o usuário quiser configurar outro agente ou mudar a ordem, os outputs devem aparecer ali na ordem que o fluxo foi configurado, assim o sistema fica genérico e flexível"*.
+
+Isso expôs uma incoerência que eu não tinha visto: a esteira já rodava pela config (`pipeline-agentes.json`, Fase F), mas a ficha iterava `PAPEIS_PIPELINE`, **uma lista fixa no código**. Renomear um papel mudava quem escrevia e não mudava onde aparecia. Duas verdades sobre o mesmo fluxo.
+
+Agora as duas leem a mesma fonte. Renomear, reordenar ou desativar um papel muda a esteira **e** a ficha — com teste que reordena QA antes de PO e confirma títulos e ordem.
+
+O determinístico não sumiu: virou **"Insumos — o que os agentes receberam"**, fechado por padrão. Ele não era duplicata, era ponto de partida; lado a lado com a resposta do agente, um campo vazio do nó lia-se como contradição em vez de insumo.
+
+De brinde, o mistério do §107: papel configurado sem placeholder **some** da tela — o que é indistinguível de falhar. Agora diz "nada a escrever neste item", nomeando a tech × contexto que a tabela de regras não cobre. Foi exatamente o que fez o Especialista parecer quebrado.
+
+E a origem daquele Especialista vazio, confirmada por bisect do `regras.example.json`: o `config/regras.json` do usuário é **0 checklist / 12 testes**, idêntico à config da v0.1.14 ou anterior — de quando `checklistTecnico` nem existia como conceito separado. Não era o casamento nem a config entregue: era um arquivo de outra era, que a ferramenta corretamente nunca sobrescreve e incorretamente nunca comenta.

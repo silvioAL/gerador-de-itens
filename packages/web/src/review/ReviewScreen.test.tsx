@@ -135,10 +135,11 @@ describe("ReviewScreen — fixture 01 (sem ciclos/conflitos)", () => {
 
     await user.click(screen.getByTestId(`item-${atividade.chave}`));
 
-    expect(screen.getByRole("button", { name: "Especificação" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Contrato" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Refinamento" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Testes" })).toBeInTheDocument();
+    // As quatro abas deixaram de existir: a ficha é uma só, com as seções na
+    // ordem do pipeline configurado. O que era determinístico virou "insumos".
+    expect(screen.queryByRole("button", { name: "Especificação" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Contrato" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("alternar-insumos")).toBeInTheDocument();
     expect(screen.getByText(atividade.descricao)).toBeInTheDocument();
   });
 
@@ -308,9 +309,15 @@ describe("ReviewScreen — abas da ficha (Fase 1d-i, SPEC-23 — dado estruturad
     )!;
   }
 
+  /**
+   * As abas da ficha deixaram de existir: tudo o que os agentes escrevem fica
+   * na mesma coluna, na ordem do pipeline configurado. O que era conteúdo das
+   * abas Contrato/Testes virou "insumos", atrás de um expandir — então o
+   * segundo argumento só decide se é preciso abrir esse bloco.
+   */
   async function selecionarEIrPraAba(user: ReturnType<typeof userEvent.setup>, chave: string, aba: string) {
     await user.click(screen.getByTestId(`item-${chave}`));
-    await user.click(screen.getByRole("button", { name: aba }));
+    if (aba === "Contrato" || aba === "Testes") await user.click(screen.getByTestId("alternar-insumos"));
   }
 
   it("aba Contrato: tipo de nó sem campos configurados mostra mensagem clara, não quebra", async () => {
@@ -850,7 +857,6 @@ describe("ReviewScreen — esteira de agentes (SPEC-24 — orquestração real p
     );
 
     await user.click(screen.getByTestId(`item-${atividade.chave}`));
-    await user.click(screen.getByRole("button", { name: "Refinamento" }));
     const botoes = await screen.findAllByRole("button", { name: "↻ Re-rodar papéis seguintes" });
     await user.click(botoes[0]); // seção PO — a primeira com resposta
 
@@ -1316,7 +1322,6 @@ describe("ReviewScreen — obsolescência de respostas (SPEC-26 Bloco 1)", () =>
 
     // Confirma um campo pela ficha (o caminho manual) e olha o que foi gravado.
     fireEvent.click(screen.getAllByTestId(/^item-/)[0]);
-    fireEvent.click(screen.getByRole("button", { name: "Refinamento" }));
     const textarea = screen.getAllByRole("textbox")[0];
     fireEvent.change(textarea, { target: { value: "Como analista, quero X" } });
     fireEvent.click(screen.getAllByRole("button", { name: "Confirmar" })[0]);
@@ -1426,7 +1431,6 @@ describe("ReviewScreen — o que um papel escreveu continua na tela quando o pr�
     );
 
     fireEvent.click(screen.getAllByTestId(/^item-/)[0]);
-    fireEvent.click(screen.getByRole("button", { name: "Refinamento" }));
 
     const campoDoPo = screen.getByTestId("placeholder-_historiaUsuario");
     await waitFor(() => expect(campoDoPo.textContent + (campoDoPo.querySelector("textarea")?.value ?? "")).toContain("texto do po"));
@@ -1531,5 +1535,78 @@ describe("ReviewScreen — sinais que o usuário leu como falha (relato com prin
     await waitFor(() => expect(apiIaStatusMock).toHaveBeenCalled());
     expect(screen.queryByTestId("ia-indisponivel-sem-rota")).not.toBeInTheDocument();
     expect(screen.queryByTestId("ia-indisponivel-sem-modelo")).not.toBeInTheDocument();
+  });
+});
+
+describe("ReviewScreen — a ficha segue o pipeline CONFIGURADO", () => {
+  // Pedido do usuário ao remover as abas: *"se amanhã o usuário quiser
+  // configurar outro agente ou mudar a ordem, os outputs devem aparecer ali na
+  // ordem que o fluxo foi configurado, assim o sistema fica genérico".*
+  // Antes a ficha iterava uma lista fixa no código enquanto a esteira já lia a
+  // config — renomear um papel mudava quem escrevia e não mudava onde aparecia.
+  it("renomear e reordenar papéis muda os títulos e a ORDEM das seções", async () => {
+    apiPipelineAgentesObterMock.mockResolvedValueOnce({
+      confirmacaoObrigatoria: true,
+      papeis: [
+        { id: "qa", nome: "Qualidade", descricao: "", grupo: "qa", ativo: true, contextos: [] },
+        { id: "po", nome: "Dona do Produto", descricao: "", grupo: "po", ativo: true, contextos: [] },
+      ],
+    });
+    const resultado = resultadoFixture01();
+    const user = userEvent.setup();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+    await user.click(screen.getByTestId(`item-${resultado.atividades[0].chave}`));
+
+    // Aparece na faixa da esteira E na seção da ficha — as duas passaram a ler
+    // a mesma config, que era exatamente o ponto.
+    expect((await screen.findAllByText("Dona do Produto")).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("Qualidade").length).toBeGreaterThanOrEqual(2);
+    // Nome configurado, não o rótulo de fábrica.
+    expect(screen.queryByText("PO")).not.toBeInTheDocument();
+
+    // E na ordem configurada: QA antes do PO, o inverso do padrão.
+    const texto = document.body.textContent ?? "";
+    expect(texto.indexOf("Qualidade")).toBeLessThan(texto.indexOf("Dona do Produto"));
+  });
+
+  it("papel configurado sem nada a escrever DIZ isso, em vez de sumir", async () => {
+    // O relato: o Especialista "não rodava". Rodava — a tabela de regras
+    // carregada não cobria a combinação do item, e a seção simplesmente não
+    // era renderizada. Sumir é indistinguível de falhar.
+    apiPipelineAgentesObterMock.mockResolvedValueOnce({
+      confirmacaoObrigatoria: true,
+      papeis: [
+        { id: "especialista", nome: "Especialista técnico", descricao: "", grupo: "especialista", ativo: true, contextos: [] },
+      ],
+    });
+    const resultado = resultadoFixture01();
+    const user = userEvent.setup();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+    await user.click(screen.getByTestId(`item-${resultado.atividades[0].chave}`));
+
+    // Sem `regras`, o Especialista não tem placeholder nenhum — é o cenário real.
+    const aviso = await screen.findByTestId("sem-trabalho-especialista");
+    expect(aviso).toHaveTextContent(/Nada a escrever neste item/i);
+    expect(aviso).toHaveTextContent(/tabela de regras/i);
   });
 });
