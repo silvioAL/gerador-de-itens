@@ -3,6 +3,7 @@ import type { ProvedorIa } from "./tipos.js";
 import { caminhoDoModelo } from "./cache.js";
 import { lerCredenciais } from "./credenciais.js";
 import { carregarModeloChat } from "./motor.js";
+import { diretorioDaParte, garantirModeloEmbarcado } from "./modeloEmbarcado.js";
 import { ID_PROVEDOR_GATEWAY, modeloChatPorId, type ModeloRegistrado } from "./modelos.js";
 import { criarProvedorCompativelOpenAI } from "./provedorOpenAI.js";
 
@@ -14,6 +15,15 @@ export type { OpcoesGeracao, ProvedorIa } from "./tipos.js";
  * comportamento pro Qwen), agora com o modelo vindo de fora em vez de fixo.
  */
 export async function criarProvedorLocal(modelo: ModeloRegistrado, baseDir?: string): Promise<ProvedorIa> {
+  // SPEC-32 — modelo embarcado: se o GGUF ainda não está no cache mas as
+  // partes vieram junto com o pacote, remonta aqui, no primeiro uso. É o que
+  // faz `npm install -g` bastar, sem `ia instalar` e sem postinstall.
+  //
+  // Aqui e não no `verificarStatus`: status é chamado a todo momento (a tela
+  // consulta), e remontar 2,5 GB dentro de uma checagem de status seria
+  // trabalho pesado disparado por quem só queria pintar um ícone.
+  await garantirModeloEmbarcado(modelo, { baseDir, resolverParte: diretorioDaParte });
+
   const motor = await carregarModeloChat(caminhoDoModelo(modelo, baseDir), { raciocinador: modelo.raciocinador });
   return {
     id: modelo.id,

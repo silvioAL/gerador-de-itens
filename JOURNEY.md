@@ -2776,3 +2776,42 @@ o histórico (`git log -S"gguf"` vazio, `files` sempre `dist`/`templates`/
 `web-dist`) não sustenta isso. Insistir teria consumido rodadas e não mudaria
 nada — o que destravou foi medir. Com o certificado resolvido, a pergunta
 "embarcar ou não" deixou de importar.
+
+## 134. O diagnóstico passou a medir as origens, em vez de eu supor
+
+Decisão do usuário, reafirmada quatro vezes: *"melhor embarcar como nas
+primeiras versões"*. E a razão dele não é técnica — é que pedir liberação de
+domínio à infraestrutura exige uma burocracia que não se justifica para algo
+ainda não validado o bastante para apresentar. Uma ferramenta que só funciona
+depois de um chamado não é usável naquele contexto.
+
+Então parei de discutir o histórico e fiz o que dá pra fazer.
+
+**O mecanismo do modelo embarcado está pronto** (`modeloEmbarcado.ts`): se as
+partes vierem como dependência do pacote, `criarProvedorLocal` remonta o GGUF
+no primeiro uso — sem `ia instalar`, sem `postinstall`. O `postinstall` foi
+descartado de propósito: é justamente o que a política de `--allow-scripts`
+desta ferramenta trata com desconfiança, e um script automático escrevendo
+2,5 GB é o tipo de coisa que ambiente corporativo bloqueia. Remontar na
+primeira leitura não pede permissão nenhuma. Falta só publicar as partes, o que
+depende de um token da conta npm do usuário.
+
+**E o `gerador ia diagnosticar` passou a testar TODAS as origens candidatas.**
+Numa rede corporativa "tem internet" não é resposta: o filtro libera por
+categoria, e o Hugging Face cai em "file sharing" enquanto o npm passa como
+"developer tools". Qual delas passa é pergunta empírica, e a máquina que
+responde é a de quem usa.
+
+A própria validação achou dois erros meus, do mesmo tipo que venho consertando
+há três rodadas:
+
+- **404 não é bloqueio.** A primeira versão marcava ✗ pra tudo que não fosse
+  200 — e um 404 virava "bloqueado", quando 404 é o host RESPONDENDO, ou seja,
+  a rede deixou passar. O que caracteriza bloqueio é 403/407.
+- **`cdn-lfs.huggingface.co` não existe.** Testar um domínio que inventei
+  produzia um ✗ que não dizia nada sobre a rede, só sobre o meu palpite.
+
+Fica a medição que contraria o que eu tinha assumido sobre o npm: o teto é
+sobre o **tarball**, e `@qvac/llm-llamacpp` tem 518 MB descompactados em 172 MB
+de tarball. Mas GGUF quase não comprime — pesos quantizados, alta entropia —
+então pra este caso tarball ≈ arquivo, e as partes de 190 MB seguem certas.
