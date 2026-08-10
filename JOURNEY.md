@@ -2672,3 +2672,31 @@ Fica registrado como custo, não como resolvido: publicar ~2,5 GB fatiados no
 registry público é uso incomum do npm. O Qwen3-4B é Apache-2.0, então
 redistribuir é permitido — mas se o npm tratar como abuso, a saída é registry
 privado, e só a lista de pacotes muda.
+
+## 131. O time ativo sobrevive ao F5 (#280)
+
+`timeEscolhido` e `timeAtivo` eram `useState` puro. Recarregar zerava os dois:
+quem tem mais de um time caía no "Qual time?" a cada F5, inclusive no meio do
+trabalho.
+
+A metade pior do defeito era a silenciosa. Cair na tela de escolha é chato mas
+visível; quem tinha **trocado** de time e recarregava voltava calado pro
+primeiro da lista — e a partir dali as sugestões e os campos customizados vinham
+do time errado, sem nada na tela dizendo isso.
+
+`timeLembrado.ts` guarda em `localStorage` com duas regras que valem mais que o
+armazenamento em si:
+
+- **Chave por e-mail.** Sem isso, trocar de conta na mesma máquina herdaria o
+  time da conta anterior, e o sintoma seria "por que a config está errada?".
+- **Sempre validado contra `sessao.timeIds`.** Perder acesso a um time é
+  justamente o caso em que uma lembrança teimosa faria estrago: a pessoa
+  ficaria presa numa tela pedindo dados de um time que o servidor recusa.
+
+`localStorage` indisponível (modo privado) falha para "não lembro", que é
+exatamente o comportamento antigo — não é motivo pra derrubar o app.
+
+Este é um defeito que **só o navegador prova**: num teste de unidade
+"recarregar" não existe, o componente é remontado com as mesmas props e passa.
+Por isso os dois casos viraram E2E, incluindo o silencioso (trocar de time, dar
+F5, e conferir que o seletor continua no time novo).
