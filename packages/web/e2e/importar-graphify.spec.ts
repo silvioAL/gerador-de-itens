@@ -9,7 +9,18 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
 });
 
-test("importar o graph.json real deste repositório: mapeia o que bate, lista o resto, e adiciona ao canvas sem gerar arestas", async ({
+/**
+ * ACHADO REAL, no primeiro run deste job na CI: este teste apontava pro
+ * `graphify-out/graph.json` **deste repositório** — que é gitignored. No runner
+ * o arquivo não existe (`ENOENT`), e na máquina de quem tem, ele muda a cada
+ * `graphify update`. Um teste que depende de um artefato não versionado e
+ * mutável não é um teste de integração, é um teste de sorte.
+ *
+ * A fixture (`fixtures/graph-exemplo.json`) tem a mesma FORMA do arquivo real e
+ * cobre as três vias de casamento do mapeamento — caminho, nome da classe e
+ * import — mais dois arquivos que nenhuma regra alcança.
+ */
+test("importar um graph.json do Graphify: mapeia o que bate, lista o resto, e adiciona ao canvas sem gerar arestas", async ({
   page,
 }) => {
   await entrar(page);
@@ -17,12 +28,12 @@ test("importar o graph.json real deste repositório: mapeia o que bate, lista o 
   await page.getByRole("button", { name: "✦ Como funciona & cenários" }).click();
   await page.getByRole("button", { name: "Importar do Graphify" }).click();
 
-  const caminhoGrafoReal = resolve(AQUI, "../../../graphify-out/graph.json");
+  const caminhoGrafo = resolve(AQUI, "fixtures/graph-exemplo.json");
   const [fileChooser] = await Promise.all([
     page.waitForEvent("filechooser"),
     page.getByText("Escolher graph.json").click(),
   ]);
-  await fileChooser.setFiles(caminhoGrafoReal);
+  await fileChooser.setFiles(caminhoGrafo);
 
   await expect(page.getByText(/nó\(s\) existente\(s\)\/extraído\(s\) encontrado\(s\)/)).toBeVisible({
     timeout: 15000,
