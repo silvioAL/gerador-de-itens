@@ -23,6 +23,12 @@ export {
 } from "./modelos.js";
 export { diretorioDeModelos, caminhoDoModelo, garantirDiretorioDeModelos } from "./cache.js";
 export { baixarModelo, type ProgressoDownload, type OpcoesDownload } from "./download.js";
+export {
+  instalarDeArquivoLocal,
+  instalarDePartesNpm,
+  type ProgressoInstalacao,
+  type OpcoesInstalacao,
+} from "./origens.js";
 export { verificarStatus, type StatusIa, type StatusModeloChat } from "./status.js";
 export { carregarModeloChat, carregarModeloEmbedding, type MotorChat, type MotorEmbedding } from "./motor.js";
 export { criarProvedorLocal, criarProvedorPorId, type ProvedorIa, type OpcoesGeracao } from "./provedor.js";

@@ -27,6 +27,20 @@ export interface ModeloRegistrado {
    * valer desde o primeiro token, senão o raciocínio (o motivo de usar este
    * modelo) morre. SPEC-25 §4.3. */
   raciocinador?: boolean;
+  /**
+   * SPEC-32 — pacotes npm que, concatenados NESTA ORDEM, remontam o GGUF.
+   *
+   * Existe porque a rede onde a ferramenta precisa rodar bloqueia o Hugging
+   * Face, e o npm é o canal que passa. São partes e não um pacote só porque um
+   * pacote de 2,5 GB não publica: 229,9 MB já deu `413 Payload Too Large` no
+   * npmjs.org, e o maior real publicado que achamos tem 258 MB.
+   *
+   * Vazio/ausente = este modelo só vem do Hugging Face ou de arquivo local.
+   */
+  partesNpm?: string[];
+  /** SHA-256 do arquivo montado. Obrigatório pra quem tem `partesNpm`: juntar
+   * pedaços sem conferir dá arquivo do tamanho certo e conteúdo errado. */
+  sha256?: string;
 }
 
 export const MODELO_CHAT: ModeloRegistrado = {

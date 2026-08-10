@@ -6,6 +6,8 @@ import {
   MODELOS_PADRAO,
   baixarModelo,
   idsDeProvedorValidos,
+  instalarDeArquivoLocal,
+  instalarDePartesNpm,
   lerCredenciais,
   modeloPorId,
   resumirCredencial,
@@ -31,41 +33,78 @@ async function provedorSelecionado(dirProjeto: string): Promise<string> {
   }
 }
 
-async function baixarComProgresso(modelo: ModeloRegistrado): Promise<void> {
-  let ultimoPercentual = -1;
-  console.log(`${modelo.papel}...`);
+/**
+ * SPEC-32 — de onde o modelo vem quando o Hugging Face não é uma opção.
+ *
+ * `--de <caminho>` copia um .gguf que já existe; `--origem npm` monta o modelo
+ * a partir dos pacotes-parte publicados. As duas existem pelo mesmo motivo
+ * concreto: a rede onde a ferramenta precisa rodar bloqueia o Hugging Face, e
+ * um download que não completa não é lentidão — é a ferramenta indisponível.
+ */
+async function instalarUm(modelo: ModeloRegistrado, de: string | undefined, origem: string | undefined): Promise<void> {
   const inicio = Date.now();
-  await baixarModelo(modelo, {
-    onProgresso: ({ bytesBaixados, bytesTotais }) => {
-      if (!bytesTotais) return;
-      const percentual = Math.floor((bytesBaixados / bytesTotais) * 100);
-      if (percentual === ultimoPercentual) return;
-      ultimoPercentual = percentual;
-      process.stdout.write(`\r  ${percentual}% (${formatarMB(bytesBaixados)} / ${formatarMB(bytesTotais)})`);
-    },
-  });
+  let ultimo = -1;
+  const relatar = (feito: number, total: number | undefined, etapa: string) => {
+    if (!total) return;
+    const percentual = Math.floor((feito / total) * 100);
+    if (percentual === ultimo) return;
+    ultimo = percentual;
+    process.stdout.write(`  ${etapa} ${percentual}% (${formatarMB(feito)} / ${formatarMB(total)})`);
+  };
+
+  console.log(`${modelo.papel}...`);
+  if (de) {
+    await instalarDeArquivoLocal(modelo, de, {
+      onProgresso: ({ bytesEscritos, bytesTotais }) => relatar(bytesEscritos, bytesTotais, "copiando"),
+    });
+  } else if (origem === "npm") {
+    await instalarDePartesNpm(modelo, {
+      onProgresso: ({ bytesEscritos, bytesTotais, etapa }) => relatar(bytesEscritos, bytesTotais, etapa),
+    });
+  } else {
+    await baixarModelo(modelo, {
+      onProgresso: ({ bytesBaixados, bytesTotais }) => relatar(bytesBaixados, bytesTotais, "baixando"),
+    });
+  }
+
   const segundos = ((Date.now() - inicio) / 1000).toFixed(0);
-  console.log(`\r  concluído em ${segundos}s.                              `);
+  console.log(`  concluído em ${segundos}s.                                        `);
 }
 
-async function instalar(idModelo?: string): Promise<void> {
+interface OpcoesInstalar {
+  idModelo?: string;
+  /** Caminho de um .gguf que já existe nesta máquina. */
+  de?: string;
+  /** "npm" monta o modelo pelos pacotes-parte; ausente = Hugging Face. */
+  origem?: string;
+}
+
+async function instalar({ idModelo, de, origem }: OpcoesInstalar = {}): Promise<void> {
   if (idModelo) {
     const modelo = modeloPorId(idModelo);
     if (!modelo) {
       const ids = MODELOS_CHAT.map((m) => m.id).join(", ");
       throw new Error(`modelo desconhecido: ${idModelo}. Disponíveis: ${ids}`);
     }
-    console.log(`Baixando ${modelo.nome} (~${formatarMB(modelo.tamanhoAproximadoBytes)}) — só na primeira vez.\n`);
-    await baixarComProgresso(modelo);
+    console.log(`Instalando ${modelo.nome} (~${formatarMB(modelo.tamanhoAproximadoBytes)}) — só na primeira vez.\n`);
+    await instalarUm(modelo, de, origem);
     console.log(`\nPronto. Use com \`gerador ia usar ${modelo.id}\`.`);
     return;
   }
 
-  console.log("Baixando modelos de IA local (Qwen3-4B + Qwen3-Embedding-0.6B) — só na primeira vez.\n");
+  if (de) {
+    // Um caminho de arquivo só pode ser UM modelo. Aceitar isso calado
+    // instalaria o mesmo .gguf sob dois nomes diferentes — e o erro apareceria
+    // muito depois, na forma "o embedding não funciona".
+    throw new Error(
+      "--de instala um modelo por vez. Diga qual: gerador ia instalar --modelo qwen-local --de <caminho>"
+    );
+  }
+  console.log("Instalando modelos de IA local (Qwen3-4B + Qwen3-Embedding-0.6B) — só na primeira vez.\n");
   for (const modelo of MODELOS_PADRAO) {
-    // eslint-disable-next-line no-await-in-loop -- baixar um modelo de cada vez é intencional: dois downloads
+    // eslint-disable-next-line no-await-in-loop -- instalar um modelo de cada vez é intencional: dois downloads
     // grandes em paralelo competem pela mesma banda e só deixam a barra de progresso dos dois mais confusa.
-    await baixarComProgresso(modelo);
+    await instalarUm(modelo, undefined, origem);
   }
   console.log("\nPronto. Rode `gerador ia status` pra conferir.");
 }
@@ -177,7 +216,11 @@ export async function ia(args: string[], dirProjeto: string = process.cwd()): Pr
   const subcomando = args[0];
   switch (subcomando) {
     case "instalar":
-      await instalar(valorDeFlag(args, "--modelo"));
+      await instalar({
+        idModelo: valorDeFlag(args, "--modelo"),
+        de: valorDeFlag(args, "--de"),
+        origem: valorDeFlag(args, "--origem"),
+      });
       return;
     case "usar":
       await usar(args[1], dirProjeto);
@@ -190,7 +233,7 @@ export async function ia(args: string[], dirProjeto: string = process.cwd()): Pr
       return;
     default:
       throw new Error(
-        "uso: gerador ia <instalar [--modelo <id>]|usar <id>|conectar --url <base> --chave <chave> --modelo <nome>|status>"
+        "uso: gerador ia <instalar [--modelo <id>] [--de <caminho.gguf>] [--origem npm]|usar <id>|conectar --url <base> --chave <chave> --modelo <nome>|status>"
       );
   }
 }
