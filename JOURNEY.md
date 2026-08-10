@@ -1889,3 +1889,32 @@ O que esta fase **não** entregou, e é honesto dizer: `/ia/pipeline/:papel`,
 local. São ~900 linhas de montagem de prompt dentro do `openApiLocal.ts` que
 precisam virar casos de uso antes de existirem dos dois lados — mesmo caminho
 das fases anteriores, tamanho de uma fase inteira.
+
+## 114. Fase 5: a avaliação que concluiu "ainda não"
+
+A Fase 5 da SPEC-31 — o adaptador Mongo — sempre foi condicional: *"se ainda
+fizer sentido depois de 1 a 4"*. Feita a avaliação, a resposta é não, e vale
+registrar por quê, porque a proposta de Mongo foi minha e do usuário juntos.
+
+**O motivo original era "os schemas não são muito estáveis até então".** Era
+verdade: as quatro fases mudaram o schema três vezes. Mas as três migrações são
+aditivas e as três guardam o que varia em `jsonb` — `respostas_itens`,
+`anexos_contexto`, `config_documentos.documento`, `credenciais_ia.cabecalhos`.
+**O que era instável já é documento.** O que virou coluna é exatamente o que se
+estabilizou. E a parte relacional ganhou o seu: a chave estrangeira de
+`perfis_time` para `times` pegou um caso real na Fase 2.
+
+**O custo inverteu.** Na conversa original, trocar de banco parecia barato
+porque não havia porta nenhuma — não havia nada a reescrever, só nada a
+reaproveitar. Hoje um adaptador Mongo precisa implementar **seis portas**,
+passar **43 casos de contrato**, e trazer Mongo para o `docker-compose`, para o
+CI e para as dependências.
+
+**E é justamente por isso que a decisão é barata.** A pergunta deixou de ser
+arquitetural. Se amanhã aparecer volume, uma forma que o `jsonb` não sirva, ou
+uma restrição de infraestrutura da empresa, são seis arquivos contra interfaces
+que já existem, validados por uma suíte que já existe — meio dia, não um
+refactor.
+
+O melhor resultado possível para esta fase não era construí-la: era torná-la
+opcional. A SPEC-31 fez isso nas quatro anteriores.
