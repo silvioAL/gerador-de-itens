@@ -2362,3 +2362,44 @@ que se usa no dia a dia e uma que se abandona nos primeiros cinco minutos.
 Escrever "use qwen3:4b" no README sem rodar teria sido entregar a segunda
 achando que era a primeira — e o usuario descobriria sozinho, no pior momento
 possivel, que a coisa que ele pediu pra poder trabalhar nao da pra trabalhar.
+
+## 125. A SPEC-30 revisada: o que a SPEC-31 fez com o plano multimodal
+
+Antes de comecar a voz e a imagem, reli a SPEC-30 — escrita antes da SPEC-31 e
+antes de duas frases do usuario. Tres coisas nela tinham deixado de valer:
+
+**1. "Transcricao local" virou "transcricao, com dois adaptadores".** O usuario
+disse: *"para registrar essa parte de imagem e voz tambem pode ser com o claude
+ou api se o usuario quiser, afinal ele escolhe o modelo"*. A versao anterior
+assumia `whisper.cpp` local obrigatorio. Agora `transcrever?` e capacidade
+OPCIONAL do provedor, com adaptador local e adaptador de gateway
+(`/audio/transcriptions`, o mesmo dialeto de-facto que o resto ja usa) — e o de
+gateway reaproveita a credencial ja configurada, sem tela nem chave nova.
+
+**2. O modo hospedado nao pode ter transcricao local.** Nao e limitacao a
+contornar: e a mesma decisao da SPEC-31 Fase 4 que tirou o `node-llama-cpp` do
+container. Escrever isso na SPEC agora evita a Fase 1 nascer com um caminho que
+so funciona em metade do produto.
+
+**3. A ordem das fases inverteu.** Era "local primeiro, gateway depois"; virou
+"gateway primeiro". Mesmo motivo que fez o gateway vir antes do modelo local no
+hospedado: **o caminho que nao precisa de download e o que da pra validar hoje**,
+e ele valida a porta inteira — o adaptador local entra depois sem tocar em UI,
+rota ou contrato.
+
+Duas coisas novas que a revisao trouxe:
+
+- **`capacidades.visao` nao pode ser deduzida da base URL.** O mesmo endereco
+  serve modelo com e sem visao; a diferenca esta no nome do modelo. Fica
+  declarada no preset, e marcavel a mao pra gateway interno — com padrao "nao",
+  porque esconder um botao que funcionaria custa um clique, e oferecer um que
+  falha custa uma conversa.
+- **Audio de retrospectiva so transcreve localmente.** A SPEC ja previa a retro
+  como fonte do corpus de RAG. Com dois adaptadores, isso vira uma escolha — e
+  gravacao de retro e o material mais sensivel que esta ferramenta toca (avaliacao
+  de trabalho de pessoas nomeadas). Ditar uma demanda pelo gateway e razoavel;
+  mandar a retro do time pra um endpoint externo e outra conversa, e nao e uma
+  que a ferramenta deva facilitar por descuido.
+
+O ganho da revisao nao e o documento: e nao ter comecado a Fase 1 pelo caminho
+que ia dar errado em metade dos casos, e descobrir isso na integracao.
