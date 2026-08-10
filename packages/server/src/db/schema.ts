@@ -11,6 +11,15 @@ export const quebras = pgTable("quebras", {
   titulo: text("titulo"),
   time: text("time"),
   diagrama: jsonb("diagrama").notNull(),
+  /**
+   * SPEC-31 Fase 1 / migração 0011. Estes três existiam só no modo local: a
+   * tabela tinha seis colunas e o Zod da borda descartava em silêncio o que a
+   * esteira escreveu e o contexto do épico. Quem rodava os agentes no modo
+   * hospedado salvava e perdia o trabalho.
+   */
+  respostasItens: jsonb("respostas_itens").notNull().default({}),
+  demandInfo: text("demand_info").notNull().default(""),
+  anexosContexto: jsonb("anexos_contexto").$type<string[]>().notNull().default([]),
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
   atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
 });

@@ -1,0 +1,67 @@
+import type { Diagrama, ValorSpec } from "@gerador/engine";
+
+/**
+ * SPEC-31 Fase 1 — a porta de Quebras.
+ *
+ * Existia uma implementação de quebra em `openApiLocal.ts` (arquivo) e outra em
+ * `routes/quebras.ts` (Postgres), escritas separadamente. Escrever esta porta
+ * expôs, antes de qualquer adaptador existir, que **as duas não guardavam a
+ * mesma coisa**: o arquivo persiste `respostasItens`, `demandInfo` e
+ * `anexosContexto`; a tabela `quebras` tinha seis colunas e descartava os três
+ * em silêncio, no Zod da borda. Ou seja, no modo hospedado o trabalho da
+ * esteira e o contexto do épico não sobreviviam ao salvar.
+ *
+ * A forma canônica aqui é a do produto — nove campos — e não a do schema que
+ * estava mais pobre. Deixar o contrato mentir para caber no banco seria nascer
+ * com a fronteira torta e manter o defeito.
+ */
+
+/** O que uma quebra É, independente de onde está guardada. */
+export interface QuebraSalva {
+  id: string;
+  titulo: string | null;
+  time: string | null;
+  diagrama: Diagrama;
+  /** Respostas dos placeholders por item (SPEC-23 Fase 1). */
+  respostasItens: Record<string, Record<string, ValorSpec>>;
+  /** Contexto do épico digitado à mão (SPEC-23 Fase 1b). */
+  demandInfo: string;
+  /** Anexos colados junto do contexto do épico. */
+  anexosContexto: string[];
+  /** ISO-8601. Quem cria decide o valor — o relógio é do adaptador. */
+  criadoEm: string;
+  atualizadoEm: string;
+}
+
+/** Só os metadados — o que a tela de abrir quebra precisa, sem carregar diagrama. */
+export type ResumoQuebra = Pick<QuebraSalva, "id" | "titulo" | "time" | "criadoEm" | "atualizadoEm">;
+
+/** O que se manda ao criar/atualizar: tudo menos identidade e carimbos. */
+export type DadosQuebra = Omit<QuebraSalva, "id" | "criadoEm" | "atualizadoEm">;
+
+export interface RepositorioDeQuebras {
+  /** Mais recentes primeiro — é a ordem que a tela espera, e ordenar é
+   * responsabilidade de quem sabe indexar, não de quem chama. */
+  listar(): Promise<ResumoQuebra[]>;
+  /** `null` quando não existe. Ausência é resposta, não exceção. */
+  obter(id: string): Promise<QuebraSalva | null>;
+  criar(dados: DadosQuebra): Promise<QuebraSalva>;
+  /** `null` quando o id não existe — nunca cria por acidente num PUT. */
+  atualizar(id: string, dados: DadosQuebra): Promise<QuebraSalva | null>;
+}
+
+/**
+ * Preenche o que o cliente omitiu. Existe porque os dois adaptadores recebiam
+ * corpos parciais e cada um inventava o próprio default — o arquivo caía em
+ * `{}`/`""`/`[]`, o Postgres em `undefined` e depois `null`. Um lugar só.
+ */
+export function normalizarDadosQuebra(bruto: Partial<DadosQuebra> | undefined): DadosQuebra {
+  return {
+    titulo: bruto?.titulo ?? null,
+    time: bruto?.time ?? null,
+    diagrama: bruto?.diagrama ?? ({ nodes: [], edges: [] } as unknown as Diagrama),
+    respostasItens: bruto?.respostasItens ?? {},
+    demandInfo: bruto?.demandInfo ?? "",
+    anexosContexto: bruto?.anexosContexto ?? [],
+  };
+}

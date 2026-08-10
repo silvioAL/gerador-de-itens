@@ -33,7 +33,8 @@
     "lint": "eslint src"
   },
   "dependencies": {
-    "node-llama-cpp": "^3.19.1"
+    "node-llama-cpp": "^3.19.1",
+    "@gerador/aplicacao": "*"
   },
   "devDependencies": {
     "@gerador/engine": "*",

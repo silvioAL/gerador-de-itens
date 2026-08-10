@@ -1728,3 +1728,39 @@ Sobre DDD, a recomendação aceita foi **seletiva**: repositórios como portas, 
 Um detalhe de §6 que resolve a discussão original de banco sem precisar vencê-la: os dois contextos quase não se tocam, e o de acesso é genuinamente relacional (8 FKs). Se o Mongo entrar, entra pela especificação, onde o dado é documento; o relacional fica onde as chaves estrangeiras trabalham. A escolha deixa de ser "tudo ou nada".
 
 SPEC-31 escrita, cinco fases por estrangulamento, cada uma um PR publicável. Nenhuma linha de refactor antes da SPEC — regra do projeto, e aqui especialmente necessária.
+
+## 110. A primeira porta, e o que ela encontrou no banco
+
+**SPEC-31 Fase 1.** A porta de Quebras existe: `RepositorioDeQuebras` em
+`packages/aplicacao`, com dois adaptadores — arquivo (`packages/cli`) e Postgres
+(`packages/server`) — e uma suíte de contrato única que os dois respondem.
+
+O achado veio de graça, no primeiro `npm test` depois de escrever o adaptador
+Postgres: **7 dos 8 casos falharam**, incluindo, com o nome exato do defeito,
+`"o que a esteira escreveu SOBREVIVE ao salvar e voltar"`. A tabela `quebras`
+tinha seis colunas. `respostasItens`, `demandInfo` e `anexosContexto` — o
+trabalho inteiro dos agentes e o contexto do épico — não tinham onde morar. O
+modo hospedado aceitava o `POST`, respondia 201, e descartava em silêncio:
+o Zod da rota declarava três campos e jogava o resto fora sem reclamar.
+
+Ninguém tinha reportado isso porque ninguém usava o modo hospedado a sério. Mas
+a pergunta que o teste de contrato faz aos dois adaptadores é a mesma, e o de
+arquivo já respondia certo desde a Fase 1b. A migração `0011` deu as três
+colunas ao Postgres e os 8 casos passaram nos dois. Depois eu derrubei as
+colunas de novo, só para ver: 7 falhas outra vez. A suíte não é decorativa.
+
+O que mudou de forma:
+
+- `packages/aplicacao` — portas e casos de uso, sem I/O. Guardado por
+  `fronteira.sanity.test.ts`, irmão do `boundary.sanity.test.ts` do engine:
+  proíbe `node:fs`, `node:http`, driver de banco, `fetch` e `process.env` na
+  camada. Verifiquei o teste injetando um `process.env.DATABASE_URL` de verdade
+  num caso de uso — reprovou; removi — passou.
+- `routes/quebras.ts` e `openApiLocal.ts::tratarQuebras` viraram borda fina.
+  Traduzem HTTP e delegam ao **mesmo** caso de uso. As duas implementações
+  paralelas de listar/obter/criar/atualizar deixaram de existir.
+- O corpo aceito pela rota hospedada foi de três campos para os nove da porta.
+
+O que essa fase não resolve: o modo hospedado continua sem as rotas de `/ia/*` e
+sem configuração. Isso é Fase 2 e 3 — mas agora tem por onde, porque a forma
+já está escrita num lugar só.
