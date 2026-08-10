@@ -1764,3 +1764,45 @@ O que mudou de forma:
 O que essa fase não resolve: o modo hospedado continua sem as rotas de `/ia/*` e
 sem configuração. Isso é Fase 2 e 3 — mas agora tem por onde, porque a forma
 já está escrita num lugar só.
+
+## 111. Três portas de uma vez, e a validação que só um dos modos tinha
+
+**SPEC-31 Fase 2** — campos-no, perfis-time e o template da especificação
+ganharam porta, adaptador dos dois lados e suíte de contrato. A fase que a
+SPEC descreveu como "repetitiva e rápida" foi as duas coisas, mas achou três
+divergências que ninguém tinha visto.
+
+**A primeira: `POST /campos-no` do mesmo campo devolvia 500 no hospedado.** A
+tabela tem `campos_no_chave_unica` em (time_id, tipo_no, key) e a rota fazia
+`insert` puro — regravar um campo violava a restrição e virava erro 500 sem
+mensagem. No modo local o mesmo gesto sempre foi correção, porque o arquivo
+fazia upsert por chave natural. Verifiquei contra o banco de verdade antes de
+descrever: o segundo insert falha e a tabela fica com uma linha só. A porta
+agora diz `salvar`, não `criar`, e os dois adaptadores fazem upsert.
+
+**A segunda: o modo local aceitava `{{variavelInexistente}}` no template.** O
+hospedado chamava `validarTemplate` antes de gravar e devolvia 400; o local
+gravava calado. O custo era invisível na hora e alto depois — a variável
+errada reaparece como texto cru no documento entregue, e só alguém lendo a
+saída perceberia. A validação subiu para o caso de uso, que é de onde ela
+nunca devia ter saído. Confirmado contra o servidor local: HTTP 400 com
+`variável(is) desconhecida(s) no template: {{tipoErrado}}`.
+
+**A terceira: `GET /perfis-time/:timeId` não existia no modo local.** A rota
+estava só no hospedado. Agora existe nos dois.
+
+Duas coisas que a Fase 2 ensinou sobre a própria suíte de contrato:
+
+- **A chave estrangeira é do adaptador, não da porta.** `perfis_time` referencia
+  `times`, e o de arquivo não tem tabela de times para referenciar. A porta não
+  promete que qualquer string sirva de `timeId` — promete que time EXISTENTE
+  funcione. A suíte publica `TIMES_DO_CONTRATO` e quem tem a restrição prepara
+  o terreno, em vez de o contrato fingir que a restrição não existe.
+- **Truncar tabela compartilhada quebrou um teste de outro arquivo.** Um teste
+  de rota dependia da semente da migração — isto é, de nenhum outro arquivo ter
+  tocado na tabela. Consertei o teste, não a suíte: quem precisa de um estado
+  garante o estado.
+
+`camposEfetivos` (a regra de "campo do time vence o global") era o último
+pedaço de domínio escrito duas vezes palavra por palavra. Agora é uma função,
+num lugar, chamada pelos dois.

@@ -1,11 +1,12 @@
-import { eq, or } from "drizzle-orm";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
+import { CAMPO_GLOBAL, criarCasosDeUsoDeCamposNo } from "@gerador/aplicacao";
 import type { OpcoesApp } from "../app.js";
+import { criarRepositorioDeCamposNoEmPostgres } from "../adaptadores/camposNoEmPostgres.js";
 import { exigirTime } from "../auth/middleware.js";
 import { exigirPermissao } from "../auth/permissoes.js";
 import { registrarAuditoria } from "../auditoria.js";
-import { CAMPO_GLOBAL, camposNo, organizacoes } from "../db/schema.js";
+import { organizacoes } from "../db/schema.js";
 
 const tipoCampo = z.enum(["text", "textarea", "number", "boolean", "select", "lista"]);
 /** Sub-campo dentro de um `type: "lista"` — sem "lista" aninhada. */
@@ -38,12 +39,11 @@ function comoTimeParaAutorizacao(timeId: string): string | null {
   return timeId === CAMPO_GLOBAL ? null : timeId;
 }
 
-async function buscarPorId(db: OpcoesApp["db"], id: string) {
-  const [linha] = await db.select().from(camposNo).where(eq(camposNo.id, id));
-  return linha;
-}
-
 export async function registrarRotasCamposNo(app: FastifyInstance, { db }: OpcoesApp) {
+  // A rota virou borda: autentica, autoriza, audita — e delega o resto ao
+  // mesmo caso de uso que o modo local usa (SPEC-31 Fase 2).
+  const casos = criarCasosDeUsoDeCamposNo(criarRepositorioDeCamposNoEmPostgres(db));
+
   async function organizacaoPadrao(): Promise<string | null> {
     const [org] = await db.select({ id: organizacoes.id }).from(organizacoes).limit(1);
     return org?.id ?? null;
@@ -65,20 +65,7 @@ export async function registrarRotasCamposNo(app: FastifyInstance, { db }: Opcoe
   // se beneficiam de ver a config uns dos outros, só a escrita é restrita.
   app.get("/campos-no", async (req) => {
     const { timeId } = req.query as { timeId?: string };
-    const linhas = timeId
-      ? await db
-          .select()
-          .from(camposNo)
-          .where(or(eq(camposNo.timeId, CAMPO_GLOBAL), eq(camposNo.timeId, timeId)))
-      : await db.select().from(camposNo).where(eq(camposNo.timeId, CAMPO_GLOBAL));
-
-    // Efetivo: campo do time sobrescreve o global de mesma (tipoNo, key) — mesma
-    // regra de override já usada em perfis_time.
-    const porChave = new Map<string, (typeof linhas)[number]>();
-    for (const linha of linhas.sort((a, b) => (a.timeId === CAMPO_GLOBAL ? -1 : 1))) {
-      porChave.set(`${linha.tipoNo}::${linha.key}`, linha);
-    }
-    return [...porChave.values()].sort((a, b) => a.ordem - b.ordem);
+    return casos.listarEfetivos(timeId);
   });
 
   app.post(
@@ -93,7 +80,7 @@ export async function registrarRotasCamposNo(app: FastifyInstance, { db }: Opcoe
       const corpo = corpoCampoNo.safeParse(req.body);
       if (!corpo.success) return reply.code(400).send({ erro: corpo.error.flatten() });
 
-      const [criado] = await db.insert(camposNo).values(corpo.data).returning();
+      const criado = await casos.salvar(corpo.data);
       registrarAuditoria(db, { email: req.usuario!.email, acao: "criar", recurso: "campos_no", recursoId: criado.id });
       return reply.code(201).send(criado);
     }
@@ -105,13 +92,13 @@ export async function registrarRotasCamposNo(app: FastifyInstance, { db }: Opcoe
       preHandler: [
         exigirTime(async (req) => {
           const { id } = req.params as { id: string };
-          const linha = await buscarPorId(db, id);
-          return comoTimeParaAutorizacao(linha?.timeId ?? CAMPO_GLOBAL);
+          const campo = await casos.obter(id);
+          return comoTimeParaAutorizacao(campo?.timeId ?? CAMPO_GLOBAL);
         }),
         podeEditarCampos(async (req) => {
           const { id } = req.params as { id: string };
-          const linha = await buscarPorId(db, id);
-          return comoTimeParaAutorizacao(linha?.timeId ?? CAMPO_GLOBAL);
+          const campo = await casos.obter(id);
+          return comoTimeParaAutorizacao(campo?.timeId ?? CAMPO_GLOBAL);
         }),
       ],
     },
@@ -120,11 +107,7 @@ export async function registrarRotasCamposNo(app: FastifyInstance, { db }: Opcoe
       const corpo = corpoAtualizarCampoNo.safeParse(req.body);
       if (!corpo.success) return reply.code(400).send({ erro: corpo.error.flatten() });
 
-      const [atualizado] = await db
-        .update(camposNo)
-        .set({ ...corpo.data, atualizadoEm: new Date() })
-        .where(eq(camposNo.id, id))
-        .returning();
+      const atualizado = await casos.atualizar(id, corpo.data);
       if (!atualizado) return reply.code(404).send({ erro: "campo não encontrado" });
       registrarAuditoria(db, { email: req.usuario!.email, acao: "atualizar", recurso: "campos_no", recursoId: id });
       return atualizado;
@@ -137,20 +120,19 @@ export async function registrarRotasCamposNo(app: FastifyInstance, { db }: Opcoe
       preHandler: [
         exigirTime(async (req) => {
           const { id } = req.params as { id: string };
-          const linha = await buscarPorId(db, id);
-          return comoTimeParaAutorizacao(linha?.timeId ?? CAMPO_GLOBAL);
+          const campo = await casos.obter(id);
+          return comoTimeParaAutorizacao(campo?.timeId ?? CAMPO_GLOBAL);
         }),
         podeEditarCampos(async (req) => {
           const { id } = req.params as { id: string };
-          const linha = await buscarPorId(db, id);
-          return comoTimeParaAutorizacao(linha?.timeId ?? CAMPO_GLOBAL);
+          const campo = await casos.obter(id);
+          return comoTimeParaAutorizacao(campo?.timeId ?? CAMPO_GLOBAL);
         }),
       ],
     },
     async (req, reply) => {
       const { id } = req.params as { id: string };
-      const [excluido] = await db.delete(camposNo).where(eq(camposNo.id, id)).returning();
-      if (!excluido) return reply.code(404).send({ erro: "campo não encontrado" });
+      if (!(await casos.excluir(id))) return reply.code(404).send({ erro: "campo não encontrado" });
       registrarAuditoria(db, { email: req.usuario!.email, acao: "excluir", recurso: "campos_no", recursoId: id });
       return reply.code(204).send();
     }
