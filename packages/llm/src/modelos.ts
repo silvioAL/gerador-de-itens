@@ -38,10 +38,29 @@ export interface ModeloRegistrado {
    * Vazio/ausente = este modelo só vem do Hugging Face ou de arquivo local.
    */
   partesNpm?: string[];
-  /** SHA-256 do arquivo montado. Obrigatório pra quem tem `partesNpm`: juntar
+  /**
+   * SPEC-32 — URLs que, concatenadas NESTA ORDEM, remontam o GGUF.
+   *
+   * Existe porque a medição em campo (`gerador ia diagnosticar`) mostrou o
+   * quadro real: o filtro corporativo classifica o Hugging Face como *file
+   * sharing* e devolve 403 com página de bloqueio, mas libera o GitHub como
+   * *developer tools*. Não é suposição — são as duas linhas do diagnóstico
+   * naquela máquina.
+   *
+   * São partes e não um arquivo só porque um asset de release do GitHub vai
+   * até 2 GiB, e o Qwen3-4B tem 2.382 MiB.
+   */
+  partesUrl?: string[];
+  /** SHA-256 do arquivo montado. Obrigatório pra quem vem em partes: juntar
    * pedaços sem conferir dá arquivo do tamanho certo e conteúdo errado. */
   sha256?: string;
 }
+
+/**
+ * Onde os pesos moram, além do Hugging Face. Repositório separado e público,
+ * contendo SÓ os `.gguf` — nenhum código do produto fica exposto por isso.
+ */
+const BASE_RELEASE = "https://github.com/silvioAL/gerador-modelos/releases/download/modelos-v1";
 
 export const MODELO_CHAT: ModeloRegistrado = {
   id: "qwen-local",
@@ -60,6 +79,11 @@ export const MODELO_CHAT: ModeloRegistrado = {
   // numerados citando o contrato) contra 1500s do DeepSeek-R1 8B — 5x mais
   // rápido E suficiente, o que tornou o modelo de 5 GB desnecessário.
   raciocinador: true,
+  sha256: "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5",
+  partesUrl: [
+    `${BASE_RELEASE}/Qwen3-4B-Q4_K_M.gguf.part-01`,
+    `${BASE_RELEASE}/Qwen3-4B-Q4_K_M.gguf.part-02`,
+  ],
 };
 
 export const MODELO_EMBEDDING: ModeloRegistrado = {
@@ -73,6 +97,9 @@ export const MODELO_EMBEDDING: ModeloRegistrado = {
   // (huggingface.co/api/models/Qwen/Qwen3-Embedding-0.6B-GGUF), não assumido.
   nomeArquivo: "Qwen3-Embedding-0.6B-Q8_0.gguf",
   tamanhoAproximadoBytes: 650_000_000,
+  sha256: "06507c7b42688469c4e7298b0a1e16deff06caf291cf0a5b278c308249c3e439",
+  // Cabe inteiro num asset (639 MiB < 2 GiB), então uma "parte" só.
+  partesUrl: [`${BASE_RELEASE}/Qwen3-Embedding-0.6B-Q8_0.gguf`],
 };
 
 /** O que `gerador ia instalar` baixa — tudo que a ferramenta precisa. */
