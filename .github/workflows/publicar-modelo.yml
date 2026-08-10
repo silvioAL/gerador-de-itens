@@ -101,9 +101,24 @@ jobs:
           [ "$esperado" = "$obtido" ] || { echo "::error::remontagem NÃO bate — nada será publicado"; exit 1; }
           rm remontado.bin
 
+      # Aqui NÃO dá pra usar OIDC como o publish.yml faz. O Trusted Publishing
+      # do npm é configurado por pacote, na página de um pacote que **já
+      # existe** — e estes são 13 nomes novos. Por isso, e só por isso, este
+      # workflow depende de um token.
+      #
+      # O token mora em Settings → Secrets → Actions (NPM_TOKEN), nunca no
+      # repositório e nunca colado numa conversa. Se ele não estiver lá, o
+      # passo falha dizendo isso, em vez de tentar publicar sem auth e receber
+      # um 404 que não explica nada (foi o que aconteceu no publish.yml).
       - name: Publicar as partes
         if: ${{ !inputs.simular }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "::error::falta o secret NPM_TOKEN (Settings → Secrets → Actions). Os pacotes-parte são nomes novos, e Trusted Publishing só vale pra pacote já existente."
+            exit 1
+          fi
           for d in dist-modelo/parte-*; do
             (cd "$d" && npm publish --access public --no-provenance)
           done
