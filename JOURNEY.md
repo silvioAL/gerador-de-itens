@@ -2051,3 +2051,39 @@ Fase 4:
 O padrão de novo, agora explícito: **fronteira verificada num eixo não é
 fronteira.** O import estava guardado, o pacote não; o comportamento do teste
 estava guardado, o da tela não.
+
+## 118. A tela mandava rodar um comando que não existe naquele modo
+
+Print da aba "Modelo de IA" no modo hospedado: nenhum formulário, e uma linha
+amarela — *"O modelo de embedding não está instalado — a IA só fica pronta com
+ele. Rode `gerador ia instalar`."*
+
+`gerador ia instalar` baixa um GGUF para a máquina. Em container, esse comando
+não existe e **nunca vai existir** — é a decisão da Fase 4. A tela estava
+mandando o usuário fazer algo impossível.
+
+O erro era meu, e é sutil. Meu `/ia/status` do hospedado devolvia
+`modelosChat: []` e `embeddingInstalado: false`. **Os dois valores são
+honestos**: não há modelo local, não há embedding. Mas a tela lê `modelosChat`
+para renderizar os cards — lista vazia, nenhum card, nenhum formulário — e lê
+`embeddingInstalado: false` como "falta instalar", que é a semântica do outro
+modo.
+
+**Valores honestos lidos com a semântica errada.**
+
+A correção que NÃO fiz: dar um `if (modo === "hospedado")` para a tela. Isso
+recria a divergência que a SPEC-31 inteira existiu para matar, agora dentro do
+componente. A correção que fiz: o hospedado passa a falar a **mesma forma** —
+um único modelo, `remoto: true`, `selecionado: true`, com `gateway` e
+`presetsGateway` preenchidos. O componente que já sabia renderizar o card de
+gateway renderiza, sem uma linha nova.
+
+`embeddingInstalado` virou `true` porque a pergunta que a tela faz com esse
+campo é *"falta instalar alguma coisa?"*, e a resposta aqui é não. Não é
+mentira sobre o estado; é responder o que foi perguntado.
+
+Terceira vez que a lição aparece nesta sequência, e a formulação mais precisa
+até agora: **contrato não é só o formato dos campos, é o significado deles.**
+Duas pontas podem concordar no tipo e discordar no sentido — e o teste de
+paridade de rotas não pega isso. Este pega: afirma que o status traz um modelo
+remoto selecionado e os presets, que é o que a tela precisa para funcionar.

@@ -1,6 +1,11 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
-import { criarProvedorCompativelOpenAI, formatoJsonPorBaseUrl, type ProvedorIa } from "@gerador/llm/gateway";
+import {
+  criarProvedorCompativelOpenAI,
+  formatoJsonPorBaseUrl,
+  PRESETS_GATEWAY,
+  type ProvedorIa,
+} from "@gerador/llm/gateway";
 import {
   criarCasosDeUsoDeConfig,
   montarPedidoAlterarItem,
@@ -66,17 +71,48 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
    * responde "o modelo está baixado?"; aqui, "existe credencial de gateway?".
    * A mesma pergunta do ponto de vista de quem chama: dá pra usar IA agora?
    */
+  /**
+   * ACHADO REAL abrindo a aba "Modelo de IA" no modo hospedado: minha primeira
+   * versão devolvia `modelosChat: []` e `embeddingInstalado: false`. A tela
+   * renderiza a LISTA de modelos, então não apareceu formulário nenhum — só o
+   * aviso "o modelo de embedding não está instalado, rode `gerador ia
+   * instalar`", um comando que não existe em container e que a Fase 4 decidiu
+   * que nunca vai existir.
+   *
+   * O erro era meu, não da tela: valores honestos ("não tenho modelo local")
+   * lidos com a semântica do outro modo. A correção é o hospedado falar a
+   * MESMA forma — um único modelo, remoto, sempre selecionado — em vez de a UI
+   * ganhar um `if` por modo. É a mesma regra que rege o resto da SPEC-31.
+   */
   app.get("/ia/status", async () => {
     const repo = await repositorio();
     const resumo = repo ? await repo.resumir(ID_PROVEDOR_GATEWAY) : { configurado: false };
+
     return {
       pronto: resumo.configurado,
       provedor: ID_PROVEDOR_GATEWAY,
-      // Campos do modo local que não se aplicam aqui — a UI já os lê, e
-      // omitir viraria `undefined` no lugar de uma resposta.
       chatInstalado: resumo.configurado,
-      embeddingInstalado: false,
-      modelosChat: [],
+      // Não há embedding aqui, e não é pendência: é a decisão de não carregar
+      // modelo local em container. `true` porque a pergunta que a tela faz com
+      // este campo — "falta instalar algo?" — tem resposta "não".
+      embeddingInstalado: true,
+      caminhoModelos: "",
+      modelosChat: [
+        {
+          id: ID_PROVEDOR_GATEWAY,
+          nome: "Gateway (Claude, DeepSeek, wrapper da empresa)",
+          papel: "Modo hospedado: o modelo roda fora do container, no endereço que você configurar.",
+          instalado: resumo.configurado,
+          tamanhoAproximadoBytes: 0,
+          raciocinador: false,
+          // Único caminho possível aqui — deixar como não-selecionado faria a
+          // tela sugerir uma escolha que não existe.
+          selecionado: true,
+          remoto: true,
+        },
+      ],
+      gateway: resumo,
+      presetsGateway: PRESETS_GATEWAY,
       credencial: resumo,
     };
   });
