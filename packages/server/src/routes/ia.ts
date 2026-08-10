@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
-import { criarProvedorCompativelOpenAI, type ProvedorIa } from "@gerador/llm/gateway";
+import { criarProvedorCompativelOpenAI, formatoJsonPorBaseUrl, type ProvedorIa } from "@gerador/llm/gateway";
 import {
   criarCasosDeUsoDeConfig,
   montarPedidoAlterarItem,
@@ -93,7 +93,11 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
     const repo = await repositorio();
     if (!repo) return reply.code(503).send({ erro: "organização não inicializada" });
 
-    await repo.salvar(ID_PROVEDOR_GATEWAY, corpo.data);
+    // O dialeto de JSON é INFERIDO da base URL quando o cliente não manda —
+    // a tela não deveria precisar saber que a Anthropic exige `json_schema`
+    // (medido contra a API real, não lido na doc). Mesma dedução do modo local.
+    const credencial = { ...corpo.data, formatoJson: corpo.data.formatoJson ?? formatoJsonPorBaseUrl(corpo.data.baseUrl) };
+    await repo.salvar(ID_PROVEDOR_GATEWAY, credencial);
     registrarAuditoria(db, {
       email: req.usuario!.email,
       acao: "atualizar",
@@ -101,25 +105,39 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
       recursoId: ID_PROVEDOR_GATEWAY,
     });
     // Devolve o RESUMO, nunca a chave — nem para quem acabou de mandá-la.
-    return resumirCredencialIa(corpo.data);
+    return resumirCredencialIa(credencial);
   });
 
   /** Uma chamada curta de verdade contra o destino: é a única forma de saber
    * se a credencial funciona, e o custo de descobrir na primeira quebra é
    * uma esteira inteira perdida. */
   app.post("/ia/credencial/testar", { preHandler: exigirSessao }, async (req, reply) => {
+    // A tela testa ANTES de salvar — é o ponto do botão "Testar". Usar só a
+    // credencial gravada faria o primeiro teste da vida sempre falhar com
+    // "nenhuma credencial configurada" enquanto a pessoa olha para os campos
+    // preenchidos. O corpo vence; sem corpo, cai na gravada.
+    const doCorpo = (req.body ?? {}) as CredencialIa;
     const repo = await repositorio();
-    const credencial = repo ? await repo.obter(ID_PROVEDOR_GATEWAY) : null;
+    const credencial =
+      doCorpo.baseUrl && doCorpo.chave
+        ? { ...doCorpo, formatoJson: doCorpo.formatoJson ?? formatoJsonPorBaseUrl(doCorpo.baseUrl) }
+        : repo
+          ? await repo.obter(ID_PROVEDOR_GATEWAY)
+          : null;
     if (!credencial?.baseUrl || !credencial.chave) {
       return reply.code(400).send({ ok: false, erro: "nenhuma credencial configurada" });
     }
 
     const provedor = comoProvedor(credencial);
     try {
+      const inicio = Date.now();
       const resposta = await provedor.completar("Responda apenas: ok");
-      return { ok: true, resposta: resposta.slice(0, 200) };
+      // Mesma forma que a tela já espera do modo local: `amostra` e `duracaoMs`.
+      return { ok: true, amostra: resposta.slice(0, 200), duracaoMs: Date.now() - inicio };
     } catch (erro) {
-      return reply.code(502).send({ ok: false, erro: erro instanceof Error ? erro.message : String(erro) });
+      // Falha de conexão é RESULTADO do teste, não erro da rota — a tela
+      // mostra o motivo em vez de um erro genérico de rede.
+      return { ok: false, erro: erro instanceof Error ? erro.message : String(erro) };
     } finally {
       await provedor.descartar().catch(() => undefined);
     }

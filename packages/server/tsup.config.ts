@@ -15,6 +15,14 @@ export default defineConfig({
   // na imagem de runtime — deploy fica só "copia um arquivo e roda".
   noExternal: [
     "@gerador/engine",
+    // SPEC-31: os dois workspaces novos entram pelo mesmo motivo do engine —
+    // são TS-fonte sem build próprio, e a imagem de runtime não tem
+    // `node_modules`. Faltando aqui, o `dist/server.cjs` sobe e morre no
+    // primeiro require com "Cannot find module '@gerador/aplicacao'".
+    // `@gerador/llm` só é alcançado pelo caminho de gateway (ver
+    // `gateway.fronteira.test.ts`), então bundlá-lo NÃO traz binário nativo.
+    "@gerador/aplicacao",
+    "@gerador/llm",
     "@fastify/cookie",
     "@fastify/cors",
     "@fastify/helmet",
