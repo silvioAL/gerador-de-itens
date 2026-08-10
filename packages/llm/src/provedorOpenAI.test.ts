@@ -1,8 +1,8 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { GbnfJsonSchema } from "node-llama-cpp";
 import { criarProvedorCompativelOpenAI, validarContraSchema } from "./provedorOpenAI.js";
+import type { EsquemaJson } from "./esquema.js";
 
 /**
  * SPEC-25 §8.1 — o provedor nasce DORMENTE, mas testado contra um servidor
@@ -60,7 +60,7 @@ function provedor(cabecalhos?: Record<string, string>) {
   return criarProvedorCompativelOpenAI({ baseUrl, chave: "sk-secreta", modelo: "deepseek-chat", cabecalhos });
 }
 
-const schemaAlteracoes: GbnfJsonSchema = {
+const schemaAlteracoes: EsquemaJson = {
   type: "object",
   properties: {
     alteracoes: {
@@ -295,7 +295,7 @@ describe("validarContraSchema — a rede que substitui a grammar", () => {
   });
 
   it("pega enum fora do conjunto — é a trava que evita tipo de nó inventado", () => {
-    const schema = { enum: ["service", "queue"] } as unknown as GbnfJsonSchema;
+    const schema = { enum: ["service", "queue"] } as unknown as EsquemaJson;
     expect(validarContraSchema("service", schema)).toEqual([]);
     expect(validarContraSchema("banco-de-dados", schema)).toEqual([
       'valor "banco-de-dados" fora do conjunto permitido',
@@ -303,7 +303,7 @@ describe("validarContraSchema — a rede que substitui a grammar", () => {
   });
 
   it("pega tipo trocado", () => {
-    const schema = { type: "object", properties: { n: { type: "number" } } } as GbnfJsonSchema;
+    const schema = { type: "object", properties: { n: { type: "number" } } } as EsquemaJson;
     expect(validarContraSchema({ n: "5" }, schema)).toEqual(['"n": esperado número, veio string']);
   });
 

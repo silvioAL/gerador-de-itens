@@ -1,39 +1,12 @@
-import type { GbnfJsonSchema } from "node-llama-cpp";
+import type { EsquemaJson } from "./esquema.js";
+import type { ProvedorIa } from "./tipos.js";
 import { caminhoDoModelo } from "./cache.js";
 import { lerCredenciais } from "./credenciais.js";
 import { carregarModeloChat } from "./motor.js";
 import { ID_PROVEDOR_GATEWAY, modeloChatPorId, type ModeloRegistrado } from "./modelos.js";
 import { criarProvedorCompativelOpenAI } from "./provedorOpenAI.js";
 
-export interface OpcoesGeracao {
-  /** Texto da RESPOSTA sendo gerada, pedaço a pedaço. Raciocínio de modelo
-   * raciocinador nunca chega aqui (ver `motor.ts`). */
-  onTexto?: (pedaco: string) => void;
-}
-
-/**
- * SPEC-25 Fase 0 — a fronteira entre "de onde vem a inteligência" e o resto
- * do produto. Todo consumidor (rotas de `/ia/*`) fala só com esta interface;
- * trocar o modelo local pelo wrapper corporativo ou por um gateway remoto
- * (Fase 2) não toca em quem chama. Hoje existe um provedor local só — a
- * abstração não sobrevive por causa da pluralidade de modelos locais (essa
- * acabou na Fase 1, ver SPEC-25 §4.3), e sim por causa da Fase 2.
- *
- * O contrato que precisa valer em QUALQUER implementação: entra um prompt,
- * o texto streama, e no fim o corpo completo de `completarEstruturado` é
- * um JSON válido no schema pedido. Como cada provedor garante isso é
- * problema dele — GBNF nos locais, tool use forçado no Anthropic,
- * `json_object` + validação nos compatíveis com OpenAI.
- */
-export interface ProvedorIa {
-  readonly id: string;
-  readonly nome: string;
-  completar(prompt: string, opcoes?: OpcoesGeracao): Promise<string>;
-  /** O tipo de retorno fica a cargo de quem chama (`as T` no call site) —
-   * mesma limitação de generics de ordem superior documentada em `motor.ts`. */
-  completarEstruturado(prompt: string, schema: GbnfJsonSchema, opcoes?: OpcoesGeracao): Promise<unknown>;
-  descartar(): Promise<void>;
-}
+export type { OpcoesGeracao, ProvedorIa } from "./tipos.js";
 
 /**
  * Provedor local sobre `node-llama-cpp`, parametrizado pelo modelo — é o

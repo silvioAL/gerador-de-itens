@@ -24,7 +24,8 @@
     "openid-client": "^5.7.1",
     "pg": "^8.13.1",
     "zod": "^3.23.8",
-    "@gerador/aplicacao": "*"
+    "@gerador/aplicacao": "*",
+    "@gerador/llm": "*"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

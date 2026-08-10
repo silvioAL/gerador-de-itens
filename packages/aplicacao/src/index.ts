@@ -86,3 +86,10 @@ export {
   type GrupoFicha,
   type PapelConfigurado,
 } from "./config/normalizacao.js";
+
+export {
+  resumirCredencialIa,
+  type CredencialIa,
+  type RepositorioDeCredenciais,
+  type ResumoCredencial,
+} from "./portas/repositorioDeCredenciais.js";

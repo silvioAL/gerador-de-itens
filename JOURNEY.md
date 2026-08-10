@@ -1851,3 +1851,41 @@ o `dist`. `raizDoPacote()` agora tenta os dois layouts e exige encontrar
 De brinde, o carimbo: gravar config anota a versão que gravou. Nulo continua
 legítimo — é o caso da config anterior a esta fase, exatamente o que o
 diagnóstico existe para atender.
+
+## 113. A IA existe no modo hospedado — e o container não carrega o binário
+
+**SPEC-31 Fase 4.** O modo hospedado ganhou `/ia/status`, `/ia/credencial`
+(GET/PUT/testar) e `/ia/sugerir`. Antes o app servido pelo container pedia
+`/ia/status` e recebia **404** — a esteira não rodava e a tela não dizia por
+quê. Era o §105 visto de outro ângulo.
+
+**A separação que fez a fase valer a pena.** `node-llama-cpp` é 200 MB de
+binário nativo que, num container que só fala HTTP com um gateway, nunca
+executa. Mas `provedor.ts` misturava a interface `ProvedorIa` com as fábricas
+que carregam o modelo local, e `provedorOpenAI.ts` importava `GbnfJsonSchema` —
+type-only, some na compilação, e ainda assim obriga o pacote a ser resolvível.
+
+Agora há `EsquemaJson` (a forma que este projeto realmente usa), `tipos.ts` (só
+o contrato) e `gateway.ts` (a porta de entrada sem nada nativo). A separação é
+por **arquivo**, não por flag: um `if` em runtime não impede o bundler de
+arrastar a dependência junto.
+
+E tem teste com dentes: `gateway.fronteira.test.ts` caminha o grafo de imports
+de verdade a partir de `gateway.ts` e falha se `node-llama-cpp` aparecer — mais
+um caso que prova o oposto (o índice normal do pacote **alcança** o binário),
+para o dia em que o primeiro virar decorativo sem ninguém perceber. Ele já
+pegou um vazamento na primeira execução: `gateway.ts` reexportava de
+`provedor.js`, que puxa `motor.js`.
+
+**A credencial muda de dono entre os modos.** No local é da pessoa, em
+`~/.gerador/credenciais.json`, fora do projeto e do git. No hospedado é da
+organização, no banco, e é usada por terceiros — o que muda o risco. A porta
+reflete isso: `resumir()` é o único caminho que a API expõe, e o teste afirma
+que a chave não aparece na resposta do `PUT` **nem para quem acabou de
+mandá-la**, nem no `GET`, nem no `/ia/status`.
+
+O que esta fase **não** entregou, e é honesto dizer: `/ia/pipeline/:papel`,
+`/ia/diagrama`, `/ia/alterar-item` e `/ia/sugerir-config` continuam só no modo
+local. São ~900 linhas de montagem de prompt dentro do `openApiLocal.ts` que
+precisam virar casos de uso antes de existirem dos dois lados — mesmo caminho
+das fases anteriores, tamanho de uma fase inteira.

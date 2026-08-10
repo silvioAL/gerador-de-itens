@@ -321,6 +321,69 @@ describe("/perfis-time", () => {
  * SPEC-31 Fase 3 — configuração no modo hospedado. Estas rotas NÃO EXISTIAM:
  * quem subia o Docker ficava com o default compilado, sem tela nem API.
  */
+/**
+ * SPEC-31 Fase 4 — as rotas de IA no modo hospedado. NÃO EXISTIAM (§105): o
+ * app servido pelo container pedia `/ia/status` e recebia 404, então a esteira
+ * de agentes não rodava e a tela não dizia por quê.
+ */
+describe("/ia/* (SPEC-31 Fase 4)", () => {
+  it("sem credencial, o status diz que não está pronto em vez de 404", async () => {
+    const resposta = await app.inject({ method: "GET", url: "/ia/status" });
+
+    expect(resposta.statusCode).toBe(200);
+    expect(resposta.json().pronto).toBe(false);
+    expect(resposta.json().provedor).toBe("gateway");
+  });
+
+  it("sem credencial, /ia/sugerir responde 503 explicando — não 500 nem silêncio", async () => {
+    const resposta = await app.inject({
+      method: "POST",
+      url: "/ia/sugerir",
+      payload: { tech: "Backend", rotulo: "timeout", contextoNo: "" },
+    });
+
+    expect(resposta.statusCode).toBe(503);
+    expect(resposta.json().erro).toContain("credencial");
+  });
+
+  it("PUT da credencial exige sessão", async () => {
+    const resposta = await app.inject({
+      method: "PUT",
+      url: "/ia/credencial",
+      payload: { baseUrl: "https://api.anthropic.com/v1", chave: "sk-ant-x", modelo: "claude-sonnet-5" },
+    });
+
+    expect(resposta.statusCode).toBe(401);
+  });
+
+  /**
+   * A regra que existe porque no hospedado a credencial é da ORGANIZAÇÃO e é
+   * usada por terceiros: a chave entra e nunca mais volta por HTTP.
+   */
+  it("a chave NUNCA volta — nem para quem acabou de gravá-la", async () => {
+    const cookieDev = await logarComo(EMAIL_DEV);
+    const chave = "sk-ant-uma-chave-que-nao-pode-vazar";
+
+    const put = await app.inject({
+      method: "PUT",
+      url: "/ia/credencial",
+      cookies: { gerador_sessao: cookieDev },
+      payload: { baseUrl: "https://api.anthropic.com/v1", chave, modelo: "claude-sonnet-5" },
+    });
+    expect(put.statusCode).toBe(200);
+    expect(put.body).not.toContain(chave);
+    expect(put.json().chaveMascarada).toBe("sk-…azar");
+
+    const get = await app.inject({ method: "GET", url: "/ia/credencial" });
+    expect(get.body).not.toContain(chave);
+    expect(get.json().configurado).toBe(true);
+
+    const status = await app.inject({ method: "GET", url: "/ia/status" });
+    expect(status.body).not.toContain(chave);
+    expect(status.json().pronto).toBe(true);
+  });
+});
+
 describe("/config/:chave (SPEC-31 Fase 3)", () => {
   it("chave desconhecida é 404 — a lista de configs é fechada", async () => {
     expect((await app.inject({ method: "GET", url: "/config/inventada" })).statusCode).toBe(404);
