@@ -272,6 +272,9 @@ export interface PresetGateway {
   id: string;
   nome: string;
   baseUrl: string;
+  /** SPEC-30 — onde fica a transcrição, quando o destino do chat não faz áudio
+   * (o Ollama não faz). A tela repassa isto ao salvar a credencial. */
+  baseUrlTranscricao?: string;
   modelos: string[];
   modeloPadrao: string;
   /** `false` = o destino ignora `response_format`; a estrutura vem de
@@ -388,7 +391,7 @@ export const apiIa = {
   status: () => requisitar<StatusIa>("/ia/status"),
   /** SPEC-25 Fase 2 — grava a credencial do gateway em `~/.gerador`, NUNCA em
    * `config/` (que é versionável). Chave vazia = manter a que já está lá. */
-  salvarCredencial: (dados: { baseUrl: string; chave: string; modelo: string }) =>
+  salvarCredencial: (dados: { baseUrl: string; chave: string; modelo: string; baseUrlTranscricao?: string }) =>
     requisitar<{ ok: true }>("/ia/credencial", { method: "PUT", body: JSON.stringify(dados) }),
   /** Bate no gateway de verdade com um prompt mínimo. Falha de conexão volta
    * como `{ok: false, erro}` (HTTP 200): o resultado do teste É a falha. */
@@ -404,8 +407,9 @@ export const apiIa = {
    * cru, e o `Content-Type` é o que o `MediaRecorder` produziu — quem decide o
    * decodificador é o destino, do outro lado da rota.
    */
-  async transcrever(audio: Blob): Promise<string> {
-    const resposta = await fetch(`${BASE_URL}/ia/transcrever`, {
+  async transcrever(audio: Blob, vocabulario?: string): Promise<string> {
+    const query = vocabulario ? `?vocabulario=${encodeURIComponent(vocabulario)}` : "";
+    const resposta = await fetch(`${BASE_URL}/ia/transcrever${query}`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": audio.type || "audio/webm" },

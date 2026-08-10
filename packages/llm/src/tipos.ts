@@ -70,4 +70,18 @@ export interface OpcoesTranscricao {
   /** Dica de idioma (ISO-639-1). Melhora muito o reconhecimento de sigla e nome
    * de sistema em português, que é o vocabulário desta ferramenta. */
   idioma?: string;
+  /**
+   * Vocabulário do projeto, como frase de contexto (`initial_prompt` do
+   * Whisper). É o campo que mais muda o resultado — MEDIDO, mesma frase, mesmo
+   * modelo `base` em CPU:
+   *
+   * ```
+   * sem: "fila do rabitém IKEA … com dedileta arquil e idem potência"
+   * com: "fila do RabbitMQ … com dead letter queue e idempotência"
+   * ```
+   *
+   * Quem monta é `montarVocabularioTranscricao` (camada de aplicação), a partir
+   * da config do projeto — ver o porquê de não ser fine-tuning lá.
+   */
+  vocabulario?: string;
 }

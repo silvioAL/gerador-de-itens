@@ -79,3 +79,11 @@ export {
   type SeveridadeAchado,
 } from "./revisao/checagens.js";
 export { itensImpactados, type ItemImpactado } from "./procedencia/impacto.js";
+
+// SPEC-30 Fase 1a — o vocabulário que a transcrição recebe como contexto.
+// Vive no engine (e não na aplicação) porque `packages/web` precisa dele: quem
+// tem a config E o diagrama abertos é o navegador, e é ele que monta a frase.
+export {
+  montarVocabularioTranscricao,
+  type OpcoesVocabulario,
+} from "./transcricao/vocabulario.js";

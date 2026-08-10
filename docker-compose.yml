@@ -97,6 +97,40 @@ services:
     #           count: all
     #           capabilities: [gpu]
 
+  # SPEC-30 Fase 1a — transcrição de voz, também dentro da stack.
+  #
+  # Serviço SEPARADO porque o Ollama **não transcreve**: ele serve modelos de
+  # texto e visão, e não tem `/audio/transcriptions`. Este fala o mesmo dialeto
+  # compatível com a OpenAI, então o adaptador do produto conversa com ele sem
+  # uma linha de código nova.
+  #
+  # Medido nesta máquina, em CPU, com 33s de fala em português:
+  #
+  #   base (145 MB)             1,1 s
+  #   small (465 MB)            3,5 s
+  #   large-v3-turbo (1,6 GB)   11 s
+  #
+  # `base` é o padrão porque o que faltava não era tamanho de modelo: era
+  # VOCABULÁRIO. Os três erravam "RabbitMQ" e "idempotência"; o `base` com o
+  # vocabulário do projeto (montarVocabularioTranscricao, no engine) acerta os
+  # dois. Subir o modelo custava 10x o tempo e não resolvia.
+  whisper:
+    image: hwdsl2/whisper-server
+    profiles: ["ia"]
+    environment:
+      WHISPER_MODEL: ${MODELO_VOZ:-base}
+      # Vazio = sem autenticação. É um serviço interno da rede do compose, e a
+      # porta publicada abaixo é pra própria máquina — a chave só adicionaria
+      # um segredo a gerenciar sem fronteira nova pra proteger.
+      WHISPER_API_KEY: ""
+      WHISPER_LANGUAGE: pt
+    volumes:
+      - whisper-models:/var/lib/whisper
+    ports:
+      # Publicado pra fora pelo mesmo motivo do Ollama: a MESMA instância serve
+      # o `gerador open` (modo local), sem instalar nada na máquina.
+      - "9000:9000"
+
   # Baixa o modelo uma vez e sai. Sem isto, a primeira chamada da esteira
   # falharia com "model not found" — que é um jeito ruim de descobrir que
   # faltava um passo manual.
@@ -116,3 +150,4 @@ services:
 volumes:
   db-data:
   ollama-models:
+  whisper-models:

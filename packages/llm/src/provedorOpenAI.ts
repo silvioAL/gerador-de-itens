@@ -61,6 +61,16 @@ export interface OpcoesProvedorOpenAI {
    * destinos compatíveis espelham.
    */
   modeloTranscricao?: string;
+  /**
+   * SPEC-30 Fase 1a — endereço da TRANSCRIÇÃO, quando é diferente do chat.
+   *
+   * Existe por um caso concreto e comum: rodando tudo na própria stack, o chat
+   * fica no Ollama (`http://ollama:11434/v1`) e a transcrição num servidor
+   * Whisper (`http://whisper:9000/v1`) — o Ollama **não transcreve**. Num
+   * destino que faz as duas coisas (OpenAI, Groq), fica ausente e o `baseUrl`
+   * serve para ambos.
+   */
+  baseUrlTranscricao?: string;
   /** Injetável no teste — evita depender de rede real na suíte. */
   fetchImpl?: typeof fetch;
 }
@@ -198,7 +208,7 @@ function extensaoDe(formato: string): string {
 export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): ProvedorIa {
   const fetchFn = opcoes.fetchImpl ?? fetch;
   const url = `${opcoes.baseUrl.replace(/\/$/, "")}/chat/completions`;
-  const urlTranscricao = `${opcoes.baseUrl.replace(/\/$/, "")}/audio/transcriptions`;
+  const urlTranscricao = `${(opcoes.baseUrlTranscricao || opcoes.baseUrl).replace(/\/$/, "")}/audio/transcriptions`;
 
   const modoJson: FormatoJson = opcoes.formatoJson ?? "json_object";
 
@@ -380,6 +390,10 @@ export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): Pro
       // Sigla e nome de sistema em português são o vocabulário desta
       // ferramenta, e é exatamente onde transcrição sem dica de idioma erra.
       if (opcoesTranscricao.idioma) forma.append("language", opcoesTranscricao.idioma);
+      // `prompt` é o `initial_prompt` do Whisper: enviesa o vocabulário sem
+      // treinar nada. É o que transforma "rabitém IKEA" em "RabbitMQ" — ver
+      // `OpcoesTranscricao.vocabulario` para a medição.
+      if (opcoesTranscricao.vocabulario) forma.append("prompt", opcoesTranscricao.vocabulario);
       // `text` em vez de `json`: a resposta é uma frase, e pedir JSON só
       // adicionaria um formato a desembrulhar (e a divergir entre gateways).
       forma.append("response_format", "text");

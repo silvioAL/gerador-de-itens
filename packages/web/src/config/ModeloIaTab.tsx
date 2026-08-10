@@ -191,7 +191,16 @@ function CardGateway({
     doServidor.current = vindo;
   }, [gateway?.baseUrl, gateway?.modelo]);
 
-  const dados = { baseUrl: baseUrl.trim(), chave: chave.trim(), modelo: nomeModelo.trim() };
+  const dados = {
+    baseUrl: baseUrl.trim(),
+    chave: chave.trim(),
+    modelo: nomeModelo.trim(),
+    // SPEC-30: onde fica a TRANSCRIÇÃO, quando não é o mesmo endereço do chat.
+    // Vem do destino escolhido — o Ollama não transcreve, e a voz vai pro
+    // serviço `whisper` do mesmo compose. Destino que faz as duas coisas
+    // (OpenAI, Groq) não declara nada e o `baseUrl` serve pros dois.
+    baseUrlTranscricao: preset?.baseUrlTranscricao,
+  };
   // A chave pode vir vazia quando já existe uma salva: o campo mostra a
   // máscara, então exigir redigitá-la pra mudar só a base URL seria hostil.
   const completo = !!dados.baseUrl && !!dados.modelo && (!!dados.chave || !!gateway?.configurado);

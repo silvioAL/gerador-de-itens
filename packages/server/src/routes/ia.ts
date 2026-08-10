@@ -52,6 +52,9 @@ const corpoCredencial = z.object({
   modelo: z.string().min(1),
   cabecalhos: z.record(z.string()).optional(),
   formatoJson: z.enum(["json_object", "json_schema", "nenhum"]).optional(),
+  // SPEC-30: o Ollama não transcreve, então o preset do Docker aponta a voz
+  // pro serviço `whisper` do mesmo compose.
+  baseUrlTranscricao: z.string().url().optional(),
 });
 
 function comoProvedor(credencial: CredencialIa): ProvedorIa {
@@ -61,6 +64,7 @@ function comoProvedor(credencial: CredencialIa): ProvedorIa {
     modelo: credencial.modelo!,
     cabecalhos: credencial.cabecalhos,
     formatoJson: credencial.formatoJson as never,
+    baseUrlTranscricao: credencial.baseUrlTranscricao,
   });
 }
 
@@ -369,6 +373,10 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
       const texto = await provedor.transcrever(new Uint8Array(audio), {
         formato: (req.headers["content-type"] ?? "audio/webm").split(";")[0].trim(),
         idioma: "pt",
+        // Mesmo contrato do modo local: o vocabulário do projeto viaja na
+        // query (o corpo é o áudio). Quem monta é o navegador, que tem config
+        // e diagrama — `montarVocabularioTranscricao`, no engine.
+        vocabulario: (req.query as { vocabulario?: string } | undefined)?.vocabulario,
       });
       return { texto };
     } catch (erro) {

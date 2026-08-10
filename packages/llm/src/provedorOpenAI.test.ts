@@ -418,6 +418,28 @@ describe("transcrever — o áudio vai pro gateway como multipart", () => {
     expect(await provedor().transcrever!(audio, { formato: "audio/webm" })).toBe("fila do rabbit");
   });
 
+  it("manda o vocabulário como `prompt` — o campo que mais muda o resultado", async () => {
+    // MEDIDO com o Whisper `base` em CPU, a mesma frase:
+    //   sem: "fila do rabitém IKEA … com dedileta arquil e idem potência"
+    //   com: "fila do RabbitMQ … com dead letter queue e idempotência"
+    // Subir o modelo NÃO resolvia (large-v3-turbo continuava errando, 10x mais
+    // lento); esta linha resolveu.
+    respostas.push(respondeTexto("ok"));
+    await provedor().transcrever!(audio, {
+      formato: "audio/webm",
+      vocabulario: "Vocabulário técnico usado nesta conversa: RabbitMQ, idempotência.",
+    });
+
+    expect(pedidos[0].bruto).toContain('name="prompt"');
+    expect(pedidos[0].bruto).toContain("RabbitMQ");
+  });
+
+  it("sem vocabulário, não manda o campo — destino que não suporta não recebe lixo", async () => {
+    respostas.push(respondeTexto("ok"));
+    await provedor().transcrever!(audio, { formato: "audio/webm" });
+    expect(pedidos[0].bruto).not.toContain('name="prompt"');
+  });
+
   it("credencial recusada vira mensagem que diz o que fazer", async () => {
     respostas.push((res) => res.writeHead(401).end("no"));
 

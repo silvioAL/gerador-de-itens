@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { montarVocabularioTranscricao, type DiagramaConfig, type RegrasConfig } from "@gerador/engine";
 import { apiIa } from "../api/client";
 import { useGravacaoDeVoz, type GravacaoDeVoz } from "./useGravacaoDeVoz";
 
@@ -21,8 +22,20 @@ export interface VozNaEntrada {
   gravacao: GravacaoDeVoz;
 }
 
-export function useVozNaEntrada(setEntrada: Dispatch<SetStateAction<string>>): VozNaEntrada {
+export interface ContextoDoVocabulario {
+  config?: DiagramaConfig;
+  regras?: RegrasConfig;
+  /** Rótulos do diagrama aberto — os termos mais específicos que existem, e os
+   * que nenhum modelo genérico conhece. */
+  rotulos?: string[];
+}
+
+export function useVozNaEntrada(
+  setEntrada: Dispatch<SetStateAction<string>>,
+  contexto: ContextoDoVocabulario = {}
+): VozNaEntrada {
   const [podeFalar, setPodeFalar] = useState(false);
+  const { config, regras, rotulos } = contexto;
 
   /**
    * O texto transcrito cai no MESMO campo, editável, e não é enviado sozinho.
@@ -38,11 +51,16 @@ export function useVozNaEntrada(setEntrada: Dispatch<SetStateAction<string>>): V
    */
   const aoTranscrever = useCallback(
     async (audio: Blob) => {
-      const texto = (await apiIa.transcrever(audio)).trim();
+      // O vocabulário do projeto vai junto — é o que faz o modelo acertar
+      // "RabbitMQ" e "idempotência" em vez de "rabitém IKEA" e "idem
+      // potência". Montado aqui porque é o navegador que tem config E
+      // diagrama; o servidor só repassa.
+      const vocabulario = montarVocabularioTranscricao(config, regras, { rotulos });
+      const texto = (await apiIa.transcrever(audio, vocabulario)).trim();
       if (!texto) return;
       setEntrada((atual) => (atual.trim() ? `${atual.trim()} ${texto}` : texto));
     },
-    [setEntrada]
+    [setEntrada, config, regras, rotulos]
   );
 
   const gravacao = useGravacaoDeVoz(aoTranscrever);
