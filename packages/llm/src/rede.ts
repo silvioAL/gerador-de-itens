@@ -112,13 +112,37 @@ export function explicarFalhaDeRede(erro: unknown, url: string, env: NodeJS.Proc
     return new Error(`Conexão com ${host} não completou (${codigo}).${semProxy}`);
   }
   if (codigo.startsWith("CERT_") || codigo === "SELF_SIGNED_CERT_IN_CHAIN" || codigo === "UNABLE_TO_VERIFY_LEAF_SIGNATURE") {
+    // ACHADO real, na máquina do usuário: era ISTO — inspeção TLS corporativa,
+    // não bloqueio de conteúdo e não proxy. A rede intercepta o HTTPS e
+    // reassina com uma CA da empresa, que o Node não conhece. É também a
+    // explicação final pro "o npm funciona e o download não": o npm usa o
+    // repositório de certificados do Windows; o Node, por padrão, não.
+    //
+    // `--use-system-ca` vem primeiro de propósito. Ele resolve com UMA variável
+    // de ambiente, usando a CA que já está instalada na máquina — enquanto
+    // NODE_EXTRA_CA_CERTS exige caçar e exportar um .pem, que é onde a maioria
+    // das pessoas desiste.
     return new Error(
-      `O certificado de ${host} não foi aceito (${codigo}). Rede com inspeção TLS costuma exigir o certificado da empresa: aponte NODE_EXTRA_CA_CERTS pro arquivo .pem dela.`
+      `O certificado de ${host} não foi aceito (${codigo}) — sua rede faz inspeção TLS.${
+        suportaCaDoSistema()
+          ? ` Resolva com: NODE_OPTIONS=--use-system-ca (usa a CA da empresa que já está instalada nesta máquina).`
+          : ` Aponte NODE_EXTRA_CA_CERTS pro .pem da CA da empresa (o Node ${process.version} é antigo demais pro --use-system-ca, que precisa de 22.15+).`
+      }`
     );
   }
   return new Error(
     `Falha de rede ao baixar de ${host}: ${codigo || "sem código"} — ${detalhe}.${semProxy} Alternativa sem rede: gerador ia instalar --modelo <id> --de <caminho do .gguf>.`
   );
+}
+
+/**
+ * `--use-system-ca` (usar o repositório de certificados do SO) existe a partir
+ * do Node 22.15. Abaixo disso, a única saída é exportar o `.pem` — e dizer o
+ * contrário mandaria a pessoa tentar uma flag que o Node dela ignora.
+ */
+function suportaCaDoSistema(versao = process.versions.node): boolean {
+  const [maior = 0, menor = 0] = versao.split(".").map(Number);
+  return maior > 22 || (maior === 22 && menor >= 15);
 }
 
 function seguroHost(url: string): string {

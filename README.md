@@ -112,7 +112,31 @@ A porta `11434` também é publicada pra fora, então a **mesma** instância ser
 
 > **Modelo local sem Docker.** No `gerador open` existe o outro caminho: `gerador ia instalar` baixa um GGUF e roda embutido no processo, sem container nenhum (SPEC-23). O caminho do Ollama acima é o do **modo hospedado**, onde carregar o modelo dentro do container do servidor foi descartado de propósito (SPEC-31 Fase 4).
 
-##### Se a sua rede bloqueia o Hugging Face
+##### Se `gerador ia instalar` falha na rede da empresa
+
+Antes de qualquer outra coisa, rode o diagnóstico — ele testa o caminho de verdade e diz a **causa real**, não `fetch failed`:
+
+```bash
+gerador ia diagnosticar
+```
+
+A causa mais comum, medida em campo, é **inspeção TLS**: a rede intercepta o HTTPS e reassina com uma CA da empresa, que o Node não conhece. É também o que explica o `npm` funcionar e o download não — o npm usa o repositório de certificados do Windows, o Node não usa por padrão.
+
+| O que o diagnóstico diz | O que fazer |
+|---|---|
+| `SELF_SIGNED_CERT_IN_CHAIN` / `CERT_*` | `NODE_OPTIONS=--use-system-ca` (Node 22.15+ — usa a CA que já está na máquina). Em Node mais antigo, `NODE_EXTRA_CA_CERTS=caminho\ca.pem` |
+| `ENOTFOUND` / `ECONNREFUSED` / timeout, sem proxy | `HTTPS_PROXY=http://proxy.empresa:8080` — o npm honra proxy sozinho, e até a v0.1.65 o download não honrava |
+| Tudo falhou | Use `--de` ou `--origem npm` abaixo |
+
+No Windows, para não repetir a cada terminal:
+
+```powershell
+[Environment]::SetEnvironmentVariable("NODE_OPTIONS", "--use-system-ca", "User")
+```
+
+> **Nada disso é necessário para usar a ferramenta.** `gerador open` abre o editor, o canvas, a derivação e a especificação sem baixar modelo nenhum — só os recursos de IA dependem dele. E se a sua rede libera algum gateway de LLM, `gerador ia conectar --url <base> --chave <chave> --modelo <nome>` resolve com **zero download**.
+
+##### Se a rede realmente não alcança o Hugging Face
 
 Por padrão `gerador ia instalar` busca o GGUF no Hugging Face. Onde isso é bloqueado, há duas saídas — nenhuma delas exige rede liberada para lá (SPEC-32):
 
