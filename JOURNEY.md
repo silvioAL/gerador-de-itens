@@ -2700,3 +2700,44 @@ Este é um defeito que **só o navegador prova**: num teste de unidade
 "recarregar" não existe, o componente é remontado com as mesmas props e passa.
 Por isso os dois casos viraram E2E, incluindo o silencioso (trocar de time, dar
 F5, e conferir que o seletor continua no time novo).
+
+## 132. `fetch failed` não era bloqueio — era proxy (SPEC-32)
+
+Três palavras conduziram a investigação inteira para o lado errado. O usuário
+rodou `gerador ia instalar` na máquina do trabalho e recebeu **`fetch failed`**.
+A leitura fácil foi "a rede bloqueia o Hugging Face", e ela levou a construir um
+caminho de distribuição por npm inteiro antes de alguém olhar o `error.cause`.
+
+Duas coisas estavam erradas ali, e as duas eram nossas:
+
+**1. A mensagem escondia a causa.** `fetch failed` é o texto genérico do undici;
+a causa real mora em `error.cause` — `ENOTFOUND`, `ECONNREFUSED`,
+`UND_ERR_CONNECT_TIMEOUT`, `CERT_HAS_EXPIRED`. São diagnósticos diferentes, com
+ações diferentes, e nenhum aparecia.
+
+**2. O download não honrava proxy.** E isto explica o sintoma mais confuso de
+todos — *"o npm funciona e o download não"*: o npm lê proxy do `.npmrc`/env, o
+`fetch` do Node **ignora proxy por completo**. Mesma rede, mesmo destino, um
+passa e o outro não. Não era bloqueio: era o cliente HTTP não configurado.
+
+Agora o download passa por `buscarComProxy` (HTTPS_PROXY/HTTP_PROXY/
+`npm_config_*`, respeitando NO_PROXY), e `gerador ia diagnosticar` testa o
+caminho de verdade e imprime Node, proxy, NO_PROXY, NODE_EXTRA_CA_CERTS e o que
+voltou.
+
+Três achados saíram da validação real, nenhum dos testes:
+
+- **`undici` não sobrevive ao bundle.** Empacotado pelo tsup, quebra na
+  primeira chamada com stack trace apontando pro `dist`. Foi pra `external`,
+  como o `node-llama-cpp`.
+- **Dispatcher de um undici não serve pro `fetch` de outro.** Passar o
+  `ProxyAgent` do `node_modules` pro `fetch` global (que usa o undici *interno*
+  do Node) estoura com `UND_ERR_INVALID_ARG — invalid onRequestStart method`.
+  Tem que ser o `fetch` do mesmo undici.
+- **Com proxy, `ENOTFOUND` é do proxy, não do destino.** A mensagem dizia "não
+  consegui resolver huggingface.co" quando quem não resolveu era o proxy — o
+  que mandaria a pessoa investigar a caixa errada.
+
+A lição que fica: **mensagem de erro ruim custa mais que bug.** O bug era uma
+linha de configuração; o diagnóstico errado custou uma SPEC, um workflow e três
+rodadas.

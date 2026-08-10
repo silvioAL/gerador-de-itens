@@ -24,6 +24,14 @@ export {
 export { diretorioDeModelos, caminhoDoModelo, garantirDiretorioDeModelos } from "./cache.js";
 export { baixarModelo, type ProgressoDownload, type OpcoesDownload } from "./download.js";
 export {
+  buscarComProxy,
+  detectarProxy,
+  dispatcherPara,
+  explicarFalhaDeRede,
+  proxyIgnoradoPara,
+  type ProxyDetectado,
+} from "./rede.js";
+export {
   instalarDeArquivoLocal,
   instalarDePartesNpm,
   type ProgressoInstalacao,

@@ -4,6 +4,7 @@ import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { caminhoDoModelo, garantirDiretorioDeModelos } from "./cache.js";
 import { urlDownload, type ModeloRegistrado } from "./modelos.js";
+import { buscarComProxy, explicarFalhaDeRede } from "./rede.js";
 
 export interface ProgressoDownload {
   modelo: ModeloRegistrado;
@@ -40,7 +41,21 @@ export async function baixarModelo(modelo: ModeloRegistrado, opcoes: OpcoesDownl
 
   if (existsSync(caminhoFinal)) return caminhoFinal;
 
-  const resposta = await fetchReal(urlDownload(modelo));
+  const url = urlDownload(modelo);
+
+  // ACHADO que custou uma investigacao inteira: o `fetch` do Node **ignora
+  // proxy**, enquanto o `npm` honra. Numa rede corporativa isso faz o npm
+  // funcionar e este download morrer com um `fetch failed` de tres palavras —
+  // e a leitura facil ("a rede bloqueia o Hugging Face") manda consertar a
+  // coisa errada. O dispatcher abaixo e o que faltava.
+  let resposta: Response;
+  try {
+    resposta = await (opcoes.fetchImpl ? fetchReal(url) : buscarComProxy(url));
+  } catch (erro) {
+    // `fetch failed` nao diz nada; a causa real mora em `error.cause`.
+    throw explicarFalhaDeRede(erro, url);
+  }
+
   if (!resposta.ok || !resposta.body) {
     throw new Error(`Falha ao baixar ${modelo.nomeArquivo}: HTTP ${resposta.status}`);
   }
