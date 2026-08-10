@@ -2189,3 +2189,40 @@ primeiro e so a lista do que vem a seguir.
 Vale notar o que NAO mudou: nenhuma checagem, nenhum calculo, nenhum
 comportamento do revisor. So o significado ficou visivel — que e o mesmo tipo
 de correcao do diagnostico de config (§112) e da tela de login (§116).
+
+## 122. Separar os grupos nao bastou: a CONTAGEM continuava somando os dois
+
+Depois do §121, o usuario voltou: *"essa diferenca entre pendencia e defeito nao
+ficou muito clara"*. Estava certo, e o motivo e simples de ver depois de
+apontado: o painel separava os grupos por dentro, mas **o botao do cabecalho
+continuava dizendo "20 aviso(s)"** — o numero somado. Quem le o cabecalho e nao
+abre o painel recebe exatamente a mesma informacao errada de antes. Separacao
+que so existe depois de um clique nao e separacao; e nota de rodape.
+
+Duas mudancas, as duas de texto:
+
+- O botao passa a contar as duas coisas separadamente e a nomea-las:
+  *"⚠ 3 a resolver · 17 na fila da esteira"*. A borda vermelha so acende se
+  houver algo do lado de pessoa.
+- Cada grupo ganhou **uma linha dizendo quem resolve aquilo**. "Precisa de
+  voce" explica que nenhum agente resolve — depende de decisao no diagrama ou
+  nos campos do no. O da esteira responde direto a pergunta do print: *"Nao e
+  erro: e a lista do que os agentes vao escrever quando a esteira rodar. Some
+  sozinho."*
+
+### O achado de brinde: a suite estava mentindo em vermelho
+
+Rodando a regressao, a suite do web falhava — e falhava com um conjunto
+**diferente** de testes a cada rodada. `CamposArestaTab` numa, `AbrirQuebraScreen`
+na outra, quatro da esteira na terceira. Nenhuma era regressao: rodando o
+arquivo isolado, o mesmo teste passa em ~5,1s.
+
+A causa e o teto padrao do vitest, 5000ms. Varios testes de `userEvent` (que
+digita tecla a tecla, com timers de verdade, sobre arvores grandes) encostam
+nele; com os arquivos rodando em paralelo, encostar vira estourar. `testTimeout`
+e `hookTimeout` foram pra 20s e a suite ficou 291/291.
+
+Registro isso porque o custo real nao era o tempo perdido nesta rodada: era
+estar treinando a mim mesmo a olhar vermelho e pensar "deve ser flaky". Uma
+suite que falha aleatoriamente ensina a ignorar o sinal que ela existe pra dar —
+e a proxima falha, a de verdade, chega no meio desse ruido.

@@ -673,12 +673,20 @@ export function ReviewScreen({
           <button
             data-testid="abrir-revisor"
             onClick={() => setMostrarAchados((v) => !v)}
-            style={{ ...botaoEstilo, borderColor: resumo.erros > 0 ? "var(--vermelho)" : "var(--borda-forte)" }}
-            title="Checagens determinísticas — o revisor aponta, não corrige"
+            style={{ ...botaoEstilo, borderColor: achadosDePessoa.length > 0 ? "var(--vermelho)" : "var(--borda-forte)" }}
+            title={
+              "Checagens determinísticas — o revisor aponta, não corrige. " +
+              `${achadosDePessoa.length} precisa(m) de você; ` +
+              `${achadosDaEsteira.length} a esteira preenche ao rodar.`
+            }
           >
-            {resumo.erros > 0 ? `✕ ${resumo.erros} erro(s)` : ""}
-            {resumo.erros > 0 && resumo.avisos > 0 ? " · " : ""}
-            {resumo.avisos > 0 ? `⚠ ${resumo.avisos} aviso(s)` : ""}
+            {/* ACHADO REAL: "20 aviso(s)" logo depois de derivar era lido como
+                20 defeitos, quando quase todos eram a fila da esteira. Contar
+                junto o que tem donos diferentes é o que criava a leitura
+                errada — antes mesmo de alguém abrir o painel. */}
+            {achadosDePessoa.length > 0 ? `⚠ ${achadosDePessoa.length} a resolver` : ""}
+            {achadosDePessoa.length > 0 && achadosDaEsteira.length > 0 ? " · " : ""}
+            {achadosDaEsteira.length > 0 ? `${achadosDaEsteira.length} na fila da esteira` : ""}
           </button>
         )}
         {esteira.rodando ? (
@@ -802,8 +810,12 @@ export function ReviewScreen({
                     pendência. Agora as duas coisas ficam separadas, e o que a
                     esteira preenche só vira lista quando ela já rodou. */}
                 {achadosDePessoa.length > 0 && (
-                  <>
-                    <strong style={{ fontSize: 12 }}>Revisão automática (sem IA)</strong>
+                  <div data-testid="pendencias-de-pessoa">
+                    <strong style={{ fontSize: 12 }}>Precisa de você</strong>
+                    <p style={explicacaoDoGrupoEstilo}>
+                      Checagens determinísticas, sem IA. Nenhum agente resolve isto — são coisas que dependem de
+                      uma decisão sua no diagrama ou nos campos do nó.
+                    </p>
                     <ul style={listaDeAchadosEstilo}>
                       {achadosDePessoa.map((achado, i) => (
                         <li key={i} style={{ color: achado.severidade === "erro" ? "var(--vermelho)" : "var(--amarelo)" }}>
@@ -814,7 +826,7 @@ export function ReviewScreen({
                         </li>
                       ))}
                     </ul>
-                  </>
+                  </div>
                 )}
 
                 {achadosDaEsteira.length > 0 && (
@@ -824,6 +836,11 @@ export function ReviewScreen({
                         ? `A esteira rodou e ${achadosDaEsteira.length} campo(s) continuam em branco`
                         : `${achadosDaEsteira.length} campo(s) que a esteira ainda vai preencher`}
                     </strong>
+                    <p style={explicacaoDoGrupoEstilo}>
+                      {esteiraJaRodou
+                        ? "Isto era pra ter sido preenchido pelos agentes e não foi — vale olhar, pode ser regra faltando na configuração ou resposta que não veio."
+                        : "Não é erro: é a lista do que os agentes vão escrever quando a esteira rodar. Some sozinho."}
+                    </p>
                     <ul style={listaDeAchadosEstilo}>
                       {achadosDaEsteira.map((achado, i) => (
                         <li key={i} style={{ color: esteiraJaRodou ? "var(--amarelo)" : "var(--texto-mudo)" }}>
@@ -1851,4 +1868,11 @@ const listaDeAchadosEstilo: React.CSSProperties = {
   paddingLeft: 18,
   fontSize: 12,
   lineHeight: 1.7,
+};
+
+const explicacaoDoGrupoEstilo: React.CSSProperties = {
+  margin: "4px 0 0",
+  fontSize: 11.5,
+  lineHeight: 1.5,
+  color: "var(--texto-mudo)",
 };
