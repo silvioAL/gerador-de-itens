@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ItemProcesso, RegrasConfig, RegrasPorTech, Requisito, TesteAutomatizado } from "@gerador/engine";
-import { apiRegras, type SugestaoRegra, type SugestaoTeste } from "../api/client";
+import { apiRegras, type DiagnosticoConfig, type SugestaoRegra, type SugestaoTeste } from "../api/client";
 import { SugerirComIa } from "./SugerirComIa";
 
 /**
@@ -34,13 +34,15 @@ export function RegrasTab() {
   const [secao, setSecao] = useState<Secao>("tecnico");
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [diagnostico, setDiagnostico] = useState<DiagnosticoConfig | null>(null);
 
   useEffect(() => {
     apiRegras
-      .obter()
-      .then((r) => {
-        setRegras(r);
-        setTech(Object.keys(r.porTech ?? {})[0] ?? "");
+      .obterComDiagnostico()
+      .then((envelope) => {
+        setRegras(envelope.documento);
+        setDiagnostico(envelope.diagnostico);
+        setTech(Object.keys(envelope.documento.porTech ?? {})[0] ?? "");
       })
       .catch((e) => setErro(e instanceof Error ? e.message : String(e)));
   }, []);
@@ -73,6 +75,15 @@ export function RegrasTab() {
 
   return (
     <div>
+      {/* SPEC-31 Fase 3 — o aviso que faltava no §108. A ferramenta nunca
+          sobrescreve a sua config; o que ela passou a fazer é dizer quando uma
+          seção inteira está vazia porque foi criada depois do seu arquivo. */}
+      {diagnostico?.possivelmenteDesatualizada && (
+        <div data-testid="aviso-config-desatualizada" style={avisoEstilo}>
+          <strong>Sua tabela de regras parece ser de uma versão anterior.</strong>
+          <p style={{ margin: "6px 0 0" }}>{diagnostico.mensagem}</p>
+        </div>
+      )}
       <p style={introTextoEstilo}>
         O que você configura aqui vira o conteúdo dos itens gerados para a tecnologia escolhida — é também o que a
         esteira de agentes recebe pra responder. Contextos vazios valem sempre que a tecnologia aparecer; com
@@ -557,3 +568,13 @@ const seloEstilo: React.CSSProperties = {
 const vazioEstilo: React.CSSProperties = { fontSize: 12.5, color: "var(--texto-mudo)" };
 
 const erroEstilo: React.CSSProperties = { color: "var(--vermelho)", fontSize: 12.5 };
+
+const avisoEstilo: React.CSSProperties = {
+  border: "1px solid #b45309",
+  background: "rgba(180, 83, 9, 0.12)",
+  borderRadius: 8,
+  padding: "10px 12px",
+  marginBottom: 14,
+  fontSize: 13,
+  lineHeight: 1.5,
+};

@@ -382,29 +382,71 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     ]);
   });
 
-  it("GET /config/regras sem arquivo devolve a forma vazia; PUT grava e o GET seguinte lê de volta (SPEC-23 fluxo 5)", async () => {
-    const vazio = await fetch(`${base}/config/regras`).then((r) => r.json());
-    expect(vazio).toEqual({ tipos: [], tamanhos: [], porTech: {} });
+  /** SPEC-31 Fase 3: o GET passou a devolver um envelope — o documento MAIS o
+   * diagnóstico contra o template desta versão — e o PUT recebe `{ documento }`.
+   * A mesma forma nos dois modos; antes o hospedado nem tinha estas rotas. */
+  it("GET /config/regras devolve o template desta versão quando nunca editado; PUT grava e o GET seguinte lê de volta", async () => {
+    const inicial = await fetch(`${base}/config/regras`).then((r) => r.json());
+    expect(inicial.personalizado).toBe(false);
+    expect(inicial.documento).toHaveProperty("porTech");
 
     const regras = {
       tipos: ["História"],
       tamanhos: ["M"],
       porTech: { Backend: { checklistTecnico: [{ texto: "Definir timeout", contextos: [] }], testes: [] } },
     };
-    const put = await fetch(`${base}/config/regras`, { method: "PUT", body: JSON.stringify(regras) });
+    const put = await fetch(`${base}/config/regras`, { method: "PUT", body: JSON.stringify({ documento: regras }) });
     expect(put.status).toBe(200);
-    expect(await fetch(`${base}/config/regras`).then((r) => r.json())).toEqual(regras);
+
+    const depois = await fetch(`${base}/config/regras`).then((r) => r.json());
+    expect(depois.documento).toEqual(regras);
+    expect(depois.personalizado).toBe(true);
     // Grava no lugar que o app carrega — não num arquivo paralelo.
     expect(JSON.parse(readFileSync(join(dirTemp, "config", "regras.json"), "utf-8"))).toEqual(regras);
   });
 
   it("PUT /config/regras sem `porTech` é 400 — corpo torto não apaga o arquivo existente", async () => {
     const regras = { tipos: [], tamanhos: [], porTech: { Backend: { checklistTecnico: [], testes: [] } } };
-    await fetch(`${base}/config/regras`, { method: "PUT", body: JSON.stringify(regras) });
+    await fetch(`${base}/config/regras`, { method: "PUT", body: JSON.stringify({ documento: regras }) });
 
-    const ruim = await fetch(`${base}/config/regras`, { method: "PUT", body: JSON.stringify({ tipos: ["X"] }) });
+    const ruim = await fetch(`${base}/config/regras`, {
+      method: "PUT",
+      body: JSON.stringify({ documento: { tipos: ["X"] } }),
+    });
     expect(ruim.status).toBe(400);
-    expect(await fetch(`${base}/config/regras`).then((r) => r.json())).toEqual(regras);
+    expect((await fetch(`${base}/config/regras`).then((r) => r.json())).documento).toEqual(regras);
+  });
+
+  /**
+   * A primeira validação real desta fase falhou EM SILÊNCIO: o caminho do
+   * template resolvia um diretório acima do certo, o diagnóstico comparava
+   * contra um template vazio e nunca acusava nada — e "não acusou" é
+   * indistinguível de "está tudo em dia".
+   *
+   * Este teste fixa o contrato (o template comparado tem que ter conteúdo),
+   * mas é honesto dizer que ele NÃO teria pego aquele defeito: a suíte roda
+   * sobre `src/`, onde o caminho antigo também resolvia. O que pegou foi rodar
+   * o `dist` de verdade, e é isso que a validação do tarball antes de publicar
+   * continua fazendo.
+   */
+  it("o template desta versão resolve de verdade — comparar contra o vazio nunca acusaria nada", async () => {
+    const { diagnostico } = await fetch(`${base}/config/regras`).then((r) => r.json());
+
+    expect(diagnostico.template.checklistTecnico).toBeGreaterThan(0);
+    expect(diagnostico.template.testes).toBeGreaterThan(0);
+  });
+
+  /** O achado do JOURNEY §108, agora com voz: config de outra era não é
+   * sobrescrita — é NOMEADA. */
+  it("GET /config/regras acusa a seção vazia de uma config de outra era", async () => {
+    const deOutraEra = { tipos: [], tamanhos: [], porTech: { Backend: { testes: [{ texto: "unitário", contextos: [] }] } } };
+    await fetch(`${base}/config/regras`, { method: "PUT", body: JSON.stringify({ documento: deOutraEra }) });
+
+    const { diagnostico } = await fetch(`${base}/config/regras`).then((r) => r.json());
+
+    expect(diagnostico.possivelmenteDesatualizada).toBe(true);
+    expect(diagnostico.secoesVazias.map((s: { secao: string }) => s.secao)).toContain("checklistTecnico");
+    expect(diagnostico.mensagem).toContain("versão anterior");
   });
 
   it("POST /ia/diagrama restringe o tipo de nó aos que a configuração TEM — o modelo não inventa tipo (SPEC-27)", async () => {
@@ -1005,7 +1047,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
   });
 
   it("GET /config/pipeline-agentes sem arquivo local devolve o default — toggle + os 4 papéis de fábrica (Fase F)", async () => {
-    const resposta = await fetch(`${base}/config/pipeline-agentes`).then((r) => r.json());
+    const { documento: resposta } = await fetch(`${base}/config/pipeline-agentes`).then((r) => r.json());
     expect(resposta.confirmacaoObrigatoria).toBe(true);
     expect(resposta.papeis.map((p: { id: string }) => p.id)).toEqual(["po", "arquiteto", "especialista", "qa"]);
     expect(resposta.papeis[0]).toMatchObject({ nome: "PO", grupo: "po", ativo: true, contextos: [] });
@@ -1015,6 +1057,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     await fetch(`${base}/config/pipeline-agentes`, {
       method: "PUT",
       body: JSON.stringify({
+        documento: {
         confirmacaoObrigatoria: false,
         papeis: [
           { id: "qa", nome: "QA", grupo: "qa", ativo: false, contextos: [] },
@@ -1022,10 +1065,11 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
           { id: "", nome: "sem id — descartado", grupo: "po", ativo: true, contextos: [] },
           { id: "torto", grupo: "grupo-que-nao-existe", contextos: "não é array" },
         ],
+        },
       }),
     });
 
-    const resposta = await fetch(`${base}/config/pipeline-agentes`).then((r) => r.json());
+    const { documento: resposta } = await fetch(`${base}/config/pipeline-agentes`).then((r) => r.json());
     expect(resposta.confirmacaoObrigatoria).toBe(false);
     expect(resposta.papeis.map((p: { id: string }) => p.id)).toEqual(["qa", "esp-kafka", "torto"]);
     expect(resposta.papeis[0].ativo).toBe(false);
@@ -1038,7 +1082,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     mkdirSync(join(dirTemp, "config"), { recursive: true });
     writeFileSync(join(dirTemp, "config", "pipeline-agentes.json"), JSON.stringify({ confirmacaoObrigatoria: false }));
 
-    const resposta = await fetch(`${base}/config/pipeline-agentes`).then((r) => r.json());
+    const { documento: resposta } = await fetch(`${base}/config/pipeline-agentes`).then((r) => r.json());
     expect(resposta.confirmacaoObrigatoria).toBe(false);
     expect(resposta.papeis).toHaveLength(4);
   });

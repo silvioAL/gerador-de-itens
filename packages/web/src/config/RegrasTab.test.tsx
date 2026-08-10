@@ -3,11 +3,29 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { RegrasTab } from "./RegrasTab";
 
 const obterMock = vi.hoisted(() => vi.fn());
+
+/** SPEC-31 Fase 3: a aba passou a pedir o envelope (documento + diagnóstico)
+ * em vez do documento cru — é o que permite avisar sobre config de outra era.
+ * O helper embrulha o documento com um diagnóstico "tudo em dia". */
+const semAviso = (documento: unknown) => ({
+  documento,
+  personalizado: true,
+  versaoTemplate: null,
+  atualizadoEm: null,
+  diagnostico: {
+    chave: "regras",
+    atual: {},
+    template: {},
+    secoesVazias: [],
+    possivelmenteDesatualizada: false,
+    mensagem: null,
+  },
+});
 const salvarMock = vi.hoisted(() => vi.fn());
 const sugerirConfigMock = vi.hoisted(() => vi.fn());
 vi.mock("../api/client", async (importActual) => ({
   ...(await importActual<typeof import("../api/client")>()),
-  apiRegras: { obter: obterMock, salvar: salvarMock },
+  apiRegras: { obterComDiagnostico: obterMock, salvar: salvarMock },
   apiIa: { sugerirConfig: sugerirConfigMock },
 }));
 
@@ -32,11 +50,42 @@ beforeEach(() => {
   obterMock.mockReset();
   salvarMock.mockReset();
   sugerirConfigMock.mockReset();
-  obterMock.mockResolvedValue(structuredClone(REGRAS));
+  obterMock.mockResolvedValue(semAviso(structuredClone(REGRAS)));
   salvarMock.mockResolvedValue(undefined);
 });
 
 describe("RegrasTab (SPEC-23 fluxo 5 — regras.json ganha tela)", () => {
+  /**
+   * SPEC-31 Fase 3 — o aviso do JOURNEY §108 chegando à tela. A ferramenta
+   * nunca sobrescreve a config; o que ela passou a fazer é nomear a seção que
+   * ficou vazia porque nasceu depois do arquivo do usuário.
+   */
+  it("avisa quando a config é de uma versão anterior — e não avisa quando está em dia", async () => {
+    obterMock.mockResolvedValue({
+      ...semAviso(structuredClone(REGRAS)),
+      diagnostico: {
+        chave: "regras",
+        atual: { checklistTecnico: 0, testes: 12 },
+        template: { checklistTecnico: 32, testes: 19 },
+        secoesVazias: [{ secao: "checklistTecnico", noTemplate: 32 }],
+        possivelmenteDesatualizada: true,
+        mensagem: "A sua configuração de \"regras\" não tem nenhuma entrada de checklist técnico (32 no padrão desta versão).",
+      },
+    });
+
+    render(<RegrasTab />);
+
+    const aviso = await screen.findByTestId("aviso-config-desatualizada");
+    expect(aviso.textContent).toContain("checklist técnico (32 no padrão desta versão)");
+  });
+
+  it("config em dia não mostra aviso nenhum", async () => {
+    render(<RegrasTab />);
+    await waitFor(() => expect(screen.getByTestId("secao-volumetria")).toBeTruthy());
+
+    expect(screen.queryByTestId("aviso-config-desatualizada")).toBeNull();
+  });
+
   it("lista os requisitos da tech selecionada e marca o que tem condição", async () => {
     render(<RegrasTab />);
     await waitFor(() => expect(screen.getByDisplayValue("Definir timeout e política de retry")).toBeTruthy());
@@ -148,7 +197,7 @@ describe("RegrasTab — as quatro listas em seções separadas (SPEC-20 aplicada
   });
 
   it("volumetria é um interruptor: desligar remove a chave, ligar devolve com os contextos", async () => {
-    obterMock.mockResolvedValue({
+    obterMock.mockResolvedValue(semAviso({
       ...structuredClone(REGRAS),
       porTech: {
         Backend: {
@@ -157,7 +206,7 @@ describe("RegrasTab — as quatro listas em seções separadas (SPEC-20 aplicada
           volumetria: { contextos: ["Backend-http"] },
         },
       },
-    });
+    }));
     render(<RegrasTab />);
     await waitFor(() => expect(screen.getByTestId("secao-volumetria")).toBeTruthy());
     fireEvent.click(screen.getByTestId("secao-volumetria"));

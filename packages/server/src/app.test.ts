@@ -317,6 +317,59 @@ describe("/perfis-time", () => {
   });
 });
 
+/**
+ * SPEC-31 Fase 3 — configuração no modo hospedado. Estas rotas NÃO EXISTIAM:
+ * quem subia o Docker ficava com o default compilado, sem tela nem API.
+ */
+describe("/config/:chave (SPEC-31 Fase 3)", () => {
+  it("chave desconhecida é 404 — a lista de configs é fechada", async () => {
+    expect((await app.inject({ method: "GET", url: "/config/inventada" })).statusCode).toBe(404);
+  });
+
+  it("nunca editada devolve o template desta versão, marcado como não personalizado", async () => {
+    const resposta = await app.inject({ method: "GET", url: "/config/prompt-unico" });
+
+    expect(resposta.statusCode).toBe(200);
+    expect(resposta.json().personalizado).toBe(false);
+  });
+
+  it("PUT grava, carimba e o GET seguinte devolve o documento com o diagnóstico", async () => {
+    const cookieDev = await logarComo(EMAIL_DEV);
+    const documento = {
+      porTech: { Backend: { checklistTecnico: [{ texto: "timeout", contextos: [] }], checklistProcesso: [], testes: [], volumetria: [] } },
+    };
+
+    const put = await app.inject({
+      method: "PUT",
+      url: "/config/regras",
+      cookies: { gerador_sessao: cookieDev },
+      payload: { documento },
+    });
+    expect(put.statusCode).toBe(200);
+
+    const get = await app.inject({ method: "GET", url: "/config/regras" });
+    expect(get.json().documento).toEqual(documento);
+    expect(get.json().personalizado).toBe(true);
+    expect(get.json().diagnostico).toHaveProperty("possivelmenteDesatualizada");
+  });
+
+  it("PUT sem sessão é rejeitado — ler config é aberto, escrever não", async () => {
+    const resposta = await app.inject({ method: "PUT", url: "/config/regras", payload: { documento: { porTech: {} } } });
+    expect(resposta.statusCode).toBe(401);
+  });
+
+  it("PUT sem `documento` é 400 — corpo torto não apaga a config", async () => {
+    const cookieDev = await logarComo(EMAIL_DEV);
+    const resposta = await app.inject({
+      method: "PUT",
+      url: "/config/regras",
+      cookies: { gerador_sessao: cookieDev },
+      payload: { porTech: {} },
+    });
+    expect(resposta.statusCode).toBe(400);
+  });
+});
+
 describe("/campos-no", () => {
   it("cria campo global (qualquer sessão) e campo de time (só sessão do time), e mescla os dois na leitura", async () => {
     const cookieDev = await logarComo(EMAIL_DEV);

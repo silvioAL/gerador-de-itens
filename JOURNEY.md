@@ -1806,3 +1806,48 @@ Duas coisas que a Fase 2 ensinou sobre a própria suíte de contrato:
 `camposEfetivos` (a regra de "campo do time vence o global") era o último
 pedaço de domínio escrito duas vezes palavra por palavra. Agora é uma função,
 num lugar, chamada pelos dois.
+
+## 112. A config passa a saber dizer que está velha
+
+**SPEC-31 Fase 3.** `regras`, `pipeline-agentes` e `prompt-unico` ganharam
+porta, adaptador dos dois lados e — a parte que importa — **voz**.
+
+O modo hospedado não tinha nenhuma dessas rotas. Quem subia o Docker ficava com
+o default compilado, sem tela nem API para mudar. Agora as duas metades falam
+com o mesmo caso de uso, com a mesma coerção de entrada (`sanearPapeis` e a
+exigência de `porTech` moravam só no `openApiLocal.ts`; o hospedado herdaria
+zero validação ao ganhar rota).
+
+**O diagnóstico é a resposta ao §108.** Lá a conclusão foi que a ferramenta
+*"corretamente nunca sobrescreve e incorretamente nunca comenta"* uma config de
+outra era. Isto é o comentário: `GET /config/:chave` devolve, junto do
+documento, a comparação com o template desta versão. A régua é estreita de
+propósito — só acusa **seção inteiramente vazia** contra uma que o padrão
+preenche. Config enxuta é escolha de time; transformar escolha em alerta ensina
+a ignorar alertas. Zero contra não-zero é outra coisa: é uma seção que a versão
+inteira assume existir.
+
+Reproduzido contra o servidor real, com um `regras.json` no formato do seu:
+
+```
+a sua   : { techs: 2, checklistTecnico:  0, checklistProcesso:  0, testes: 12 }
+o padrão: { techs: 2, checklistTecnico: 39, checklistProcesso: 12, testes: 21 }
+seções vazias: [checklistTecnico, checklistProcesso]
+```
+
+E a frase que a aba de Regras agora mostra em cima da tela, em vez de o
+Especialista técnico simplesmente não escrever nada.
+
+**A validação real pegou um defeito que os testes não pegariam.** Na primeira
+execução, todas as contagens do template vieram zero: o caminho resolvia
+`packages/` em vez de `packages/cli/`, porque compilado o módulo vira
+`dist/cli.js` e fica um nível mais raso que em `src/commands/`. O diagnóstico
+comparava contra o vazio e nunca acusaria nada — e **"não acusou" é
+indistinguível de "está tudo em dia"**. Nenhum teste da suíte pegaria: eles
+rodam sobre `src/`, onde o caminho antigo também resolvia. Quem pegou foi rodar
+o `dist`. `raizDoPacote()` agora tenta os dois layouts e exige encontrar
+`package.json` **e** `templates/` antes de aceitar um.
+
+De brinde, o carimbo: gravar config anota a versão que gravou. Nulo continua
+legítimo — é o caso da config anterior a esta fase, exatamente o que o
+diagnóstico existe para atender.

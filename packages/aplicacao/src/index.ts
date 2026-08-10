@@ -52,3 +52,37 @@ export {
   TemplateInvalido,
   type CasosDeUsoDeTemplateEspecificacao,
 } from "./casos-de-uso/templateEspecificacao.js";
+
+export {
+  CHAVES_CONFIG,
+  ehChaveConfig,
+  type ChaveConfig,
+  type DocumentoConfig,
+  type RepositorioDeConfig,
+} from "./portas/repositorioDeConfig.js";
+
+export {
+  diagnosticarConfig,
+  resumirConfig,
+  type DiagnosticoConfig,
+  type ResumoConfig,
+  type SecaoVazia,
+} from "./config/diagnostico.js";
+
+export {
+  criarCasosDeUsoDeConfig,
+  type CasosDeUsoDeConfig,
+  type ConfigComDiagnostico,
+} from "./casos-de-uso/config.js";
+
+export {
+  ConfigInvalida,
+  GRUPOS_FICHA,
+  normalizarDocumentoConfig,
+  normalizarPipelineAgentes,
+  PAPEIS_PADRAO,
+  sanearPapeis,
+  type ConfigPipelineAgentes,
+  type GrupoFicha,
+  type PapelConfigurado,
+} from "./config/normalizacao.js";

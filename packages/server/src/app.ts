@@ -8,6 +8,7 @@ import { registrarRotasQuebras } from "./routes/quebras.js";
 import { registrarRotasPerfisTime } from "./routes/perfisTime.js";
 import { registrarRotasCamposNo } from "./routes/camposNo.js";
 import { registrarRotasEspecificacaoTemplate } from "./routes/especificacaoTemplate.js";
+import { registrarRotasConfig } from "./routes/config.js";
 import { registrarRotasAuth } from "./routes/auth.js";
 import { registrarRotasTimes } from "./routes/times.js";
 import { registrarRotasAcessos } from "./routes/acessos.js";
@@ -63,6 +64,7 @@ export async function buildApp(opcoes: OpcoesApp): Promise<FastifyInstance> {
   await registrarRotasPerfisTime(app, opcoes);
   await registrarRotasCamposNo(app, opcoes);
   await registrarRotasEspecificacaoTemplate(app, opcoes);
+  await registrarRotasConfig(app, opcoes);
   await registrarRotasTimes(app, opcoes);
   await registrarRotasAcessos(app, opcoes);
 

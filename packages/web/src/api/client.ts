@@ -741,20 +741,50 @@ export interface ConfigPipelineAgentes {
  * é o comportamento de hoje — cada campo sugerido pela IA fica pendente até o
  * usuário confirmar. `false` faz a esteira aplicar direto, sem pausa, como o
  * protótipo de referência sempre fez. */
-export const apiPipelineAgentes = {
-  obter: () => requisitar<ConfigPipelineAgentes>("/config/pipeline-agentes"),
-  salvar: (dados: ConfigPipelineAgentes) =>
-    requisitar<ConfigPipelineAgentes>("/config/pipeline-agentes", { method: "PUT", body: JSON.stringify(dados) }),
-};
+/**
+ * SPEC-31 Fase 3 — o veredito sobre a config em uso, comparada ao template
+ * desta versão. `possivelmenteDesatualizada` é `true` quando uma seção que o
+ * padrão preenche está vazia na sua — o sintoma do JOURNEY §108, em que um
+ * `regras.json` de outra era deixava o Especialista técnico mudo.
+ */
+export interface DiagnosticoConfig {
+  chave: string;
+  atual: Record<string, number>;
+  template: Record<string, number>;
+  secoesVazias: { secao: string; noTemplate: number }[];
+  possivelmenteDesatualizada: boolean;
+  mensagem: string | null;
+}
+
+/** O que `GET /config/:chave` devolve nos DOIS modos desde a Fase 3. */
+export interface ConfigComDiagnostico<T> {
+  documento: T;
+  personalizado: boolean;
+  versaoTemplate: string | null;
+  atualizadoEm: string | null;
+  diagnostico: DiagnosticoConfig;
+}
+
+/** Chamadas de config: `obter` desembrulha o envelope (os chamadores só
+ * querem o documento) e `obterComDiagnostico` entrega o envelope inteiro,
+ * para quem vai avisar o usuário. */
+function configDe<T>(chave: string) {
+  return {
+    obterComDiagnostico: () => requisitar<ConfigComDiagnostico<T>>(`/config/${chave}`),
+    obter: async (): Promise<T> => (await requisitar<ConfigComDiagnostico<T>>(`/config/${chave}`)).documento,
+    salvar: async (documento: T): Promise<T> => {
+      await requisitar(`/config/${chave}`, { method: "PUT", body: JSON.stringify({ documento }) });
+      return documento;
+    },
+  };
+}
+
+export const apiPipelineAgentes = configDe<ConfigPipelineAgentes>("pipeline-agentes");
 
 /** SPEC-23 fluxo 5 — `config/regras.json` (a tabela de requisitos de
  * refinamento por tech/contexto). Era o único arquivo de configuração sem
  * rota nem UI: só dava pra editar à mão. O tipo é o do engine, sem cópia. */
-export const apiRegras = {
-  obter: () => requisitar<RegrasConfig>("/config/regras"),
-  salvar: (dados: RegrasConfig) =>
-    requisitar<RegrasConfig>("/config/regras", { method: "PUT", body: JSON.stringify(dados) }),
-};
+export const apiRegras = configDe<RegrasConfig>("regras");
 
 export interface ConviteTime {
   token: string;
