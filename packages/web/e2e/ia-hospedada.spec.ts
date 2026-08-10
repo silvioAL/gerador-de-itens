@@ -79,10 +79,16 @@ test("configurar o gateway pela tela: testar antes de salvar, salvar, e a base U
   // A chave NUNCA volta do servidor: o campo fica vazio e o placeholder mostra
   // só a máscara. Se um dia a chave inteira voltar, esta asserção é a que grita.
   await page.reload();
-  // O time ativo mora em memória, não na sessão: recarregar a página cai de
-  // volta em "Qual time?". Não é o alvo deste teste — mas é um atrito real,
-  // registrado como tarefa própria em vez de escondido atrás de um helper.
-  await page.getByRole("button", { name: "time-pagamentos", exact: true }).click();
+  // Aqui havia um clique pra reescolher o time: o `timeAtivo` morava em
+  // memória e recarregar caía de volta em "Qual time?" (#280). O passo foi
+  // removido porque a tela não volta mais — o time é lembrado (ver
+  // `timeLembrado.ts` e `time-lembrado.spec.ts`).
+  //
+  // Vale registrar o que isso mostrou: **este teste tinha o defeito embutido
+  // como comportamento esperado**. Enquanto o passo existiu, a suíte inteira
+  // ficava verde com o atrito de pé, e corrigir o produto foi o que a deixou
+  // vermelha. Contornar um defeito conhecido dentro do teste transforma a
+  // suíte em cúmplice dele.
   await abrirModeloIa(page);
   const cardRecarregado = page.getByTestId("modelo-ia-gateway");
   await expect(cardRecarregado.getByLabel("Base URL do gateway")).toHaveValue(BASE_URL_GATEWAY_FALSO);
