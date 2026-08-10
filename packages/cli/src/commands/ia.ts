@@ -140,11 +140,17 @@ async function diagnosticar(): Promise<void> {
     const r = await buscarComProxy(url, { method: "HEAD" });
     const ms = Date.now() - inicio;
     console.log(`  HTTP ${r.status} em ${ms}ms — tamanho anunciado: ${r.headers.get("content-length") ?? "?"} bytes`);
-    console.log(
-      r.ok
-        ? "\nA rede alcança o modelo. `gerador ia instalar` deve funcionar."
-        : "\nO host respondeu, mas recusou o arquivo."
-    );
+    if (r.ok) {
+      console.log("\nA rede alcança o modelo. `gerador ia instalar` deve funcionar.");
+    } else {
+      // "O host respondeu, mas recusou o arquivo" não dizia NADA acionável.
+      // Um 403 com corpo HTML é a página de bloqueio do filtro corporativo, e
+      // o título dela costuma nomear a política — que é exatamente o que a
+      // infraestrutura precisa pra liberar. O HEAD não traz corpo; por isso o
+      // GET aqui, só neste caminho de falha.
+      const comCorpo = await buscarComProxy(url, { method: "GET" }).catch(() => r);
+      console.log(`\n${(await explicarRespostaRecusada(comCorpo, MODELO_CHAT.nomeArquivo)).message}`);
+    }
   } catch (erro) {
     console.log(`  falhou em ${Date.now() - inicio}ms\n`);
     console.log(explicarFalhaDeRede(erro, url).message);

@@ -23,6 +23,12 @@ function fetchFake(corpo: string, opcoes: { ok?: boolean; status?: number; conte
     ok: opcoes.ok ?? true,
     status: opcoes.status ?? 200,
     headers: { get: (nome: string) => (nome === "content-length" ? (opcoes.contentLength ?? String(bytes.length)) : null) },
+    // Um `Response` de verdade sempre tem `text()`. Este dublê não tinha, e
+    // quebrou quando o tratamento de HTTP não-ok passou a LER o corpo pra
+    // distinguir página de bloqueio corporativo de "arquivo não existe".
+    // Corrigir o dublê, não o código: dublê incompleto é o que deixa o produto
+    // parecer certo enquanto o caminho real quebra.
+    text: async () => corpo,
     body: new ReadableStream({
       start(controller) {
         controller.enqueue(bytes);

@@ -4,7 +4,7 @@ import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { caminhoDoModelo, garantirDiretorioDeModelos } from "./cache.js";
 import { urlDownload, type ModeloRegistrado } from "./modelos.js";
-import { buscarComProxy, explicarFalhaDeRede } from "./rede.js";
+import { buscarComProxy, explicarFalhaDeRede, explicarRespostaRecusada } from "./rede.js";
 
 export interface ProgressoDownload {
   modelo: ModeloRegistrado;
@@ -57,7 +57,9 @@ export async function baixarModelo(modelo: ModeloRegistrado, opcoes: OpcoesDownl
   }
 
   if (!resposta.ok || !resposta.body) {
-    throw new Error(`Falha ao baixar ${modelo.nomeArquivo}: HTTP ${resposta.status}`);
+    // Nao basta o status: um 403 com corpo HTML e a pagina de bloqueio do
+    // filtro corporativo, e a acao (falar com a infra) e outra.
+    throw await explicarRespostaRecusada(resposta, modelo.nomeArquivo);
   }
 
   const cabecalhoTamanho = resposta.headers.get("content-length");

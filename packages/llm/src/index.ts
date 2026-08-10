@@ -28,6 +28,7 @@ export {
   detectarProxy,
   dispatcherPara,
   explicarFalhaDeRede,
+  explicarRespostaRecusada,
   proxyIgnoradoPara,
   type ProxyDetectado,
 } from "./rede.js";

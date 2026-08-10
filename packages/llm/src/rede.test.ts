@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectarProxy, explicarFalhaDeRede, proxyIgnoradoPara } from "./rede.js";
+import { detectarProxy, explicarFalhaDeRede, explicarRespostaRecusada, proxyIgnoradoPara } from "./rede.js";
 
 /**
  * O defeito que estes testes protegem não é de rede — é de DIAGNÓSTICO. O
@@ -94,5 +94,57 @@ describe("explicarFalhaDeRede — a mensagem que faltava", () => {
   it("erro desconhecido ainda oferece a saída sem rede", () => {
     const m = explicarFalhaDeRede(falha("EQUALQUERCOISA"), URL_HF, {}).message;
     expect(m).toContain("--de <caminho do .gguf>");
+  });
+});
+
+/**
+ * ACHADO REAL, o segundo da mesma máquina: resolvido o certificado, o download
+ * passou a receber `HTTP 403` com ~28 KB de corpo. O Hugging Face não devolve
+ * 403 num arquivo público, e 28 KB é HTML — é a página do filtro corporativo.
+ *
+ * Distinguir isso de "o arquivo não existe" importa porque as ações são
+ * opostas: uma é falar com a infraestrutura, a outra é conferir o nome do
+ * modelo. E o título da página costuma nomear a política, que é justamente o
+ * que a infra precisa.
+ */
+function resposta(status: number, corpo: string, tipo = "text/html"): Response {
+  return {
+    status,
+    ok: status >= 200 && status < 300,
+    headers: new Headers({ "content-type": tipo }),
+    text: async () => corpo,
+  } as unknown as Response;
+}
+
+describe("explicarRespostaRecusada", () => {
+  it("403 com HTML é dito como bloqueio da REDE, não do Hugging Face", async () => {
+    const e = await explicarRespostaRecusada(
+      resposta(403, "<html><head><title>Acesso bloqueado — política Corp</title></head></html>"),
+      "x.gguf"
+    );
+    expect(e.message).toContain("filtro corporativo");
+    expect(e.message).toContain("não do Hugging Face");
+  });
+
+  it("mostra o título da página — é o que a infra precisa pra liberar", async () => {
+    const e = await explicarRespostaRecusada(
+      resposta(403, "<html><head><title>Acesso bloqueado — política Corp</title></head></html>"),
+      "x.gguf"
+    );
+    expect(e.message).toContain("política Corp");
+  });
+
+  it("oferece a saída sem rede junto com o pedido à infraestrutura", async () => {
+    const e = await explicarRespostaRecusada(resposta(403, "<html><body>bloqueado</body></html>"), "x.gguf");
+    expect(e.message).toContain("huggingface.co");
+    expect(e.message).toContain("--de");
+  });
+
+  it("resposta não-HTML continua sendo relatada como HTTP puro", async () => {
+    // 404 de nome de arquivo errado não é bloqueio, e mandar falar com a infra
+    // seria mandar a pessoa pro lugar errado.
+    const e = await explicarRespostaRecusada(resposta(404, "Entry not found", "text/plain"), "x.gguf");
+    expect(e.message).toContain("HTTP 404");
+    expect(e.message).not.toContain("filtro corporativo");
   });
 });
