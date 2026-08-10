@@ -2281,3 +2281,84 @@ falhas como artefato). Os 9 specs foram consertados; 19/19 verdes.
   trata console sujo como falha.
 - Recarregar a pagina perde o time ativo e cai em "Qual time?". Nao e o alvo
   desta rodada; virou tarefa propria em vez de ser escondida atras de um helper.
+
+## 124. O Qwen no modo hospedado: a parte facil era o encanamento
+
+Pedido do usuario, com um motivo concreto: *"chamadas ao claude podem ser
+bloqueadas no ambiente corporativo atual e ficarei sem ter como usar no dia a
+dia, mesmo tendo docker"*. Ou seja: o modo hospedado precisa de um caminho de
+IA que **nao sai da rede**.
+
+O encanamento saiu como esperado. Um servico `ollama` no `docker-compose.yml`
+(atras de `profiles: ["ia"]`, pra quem so quer ver a ferramenta nao baixar 2,5
+GB), um segundo servico que faz `ollama pull` uma vez e sai, e o servidor
+falando com ele pela rede interna. `packages/server` continua sem
+`node-llama-cpp`: quem carrega o GGUF e o container do Ollama, e o server so faz
+HTTP — a mesma fronteira que a Fase 4 estabeleceu.
+
+Uma correcao de verdade apareceu no caminho: ja existia um preset "Ollama"
+apontando pra `http://localhost:11434/v1`, e ele **nunca funcionaria no modo
+hospedado**. Quem faz a chamada ali e o container do server, e `localhost` e ele
+mesmo — o pedido morre em "connection refused" sem nunca sair. Nao daria erro de
+configuracao: daria falha na primeira geracao, com os tres campos preenchidos e
+certos na tela. Dai `presetsDoModo(modo)`: cada lado oferece o destino que
+consegue alcancar, e endereco na internet (Anthropic, DeepSeek) aparece nos
+dois, porque e o mesmo endereco de qualquer lugar.
+
+### O que a medicao mostrou, e que eu teria escrito errado sem medir
+
+Eu ia recomendar `qwen3:4b` como padrao — foi o modelo que o usuario citou desde
+a SPEC-23, e o registro local ja usa. Rodei contra a stack de verdade:
+
+- `POST /ia/credencial/testar` (uma frase): **49 s**.
+- `POST /ia/pipeline/po`, UM item com UM campo: **22 minutos**.
+
+E pior: a primeira resposta veio **errada** — o modelo devolveu o *schema* em vez
+de uma instancia dele (`{"type":"object","properties":{...}}`). A validacao
+pegou, o retry disparou, a segunda veio certa. O mecanismo funcionou; o custo foi
+dobrar uma espera que ja era absurda.
+
+A causa nao e o tamanho, e o tipo: `qwen3` e um modelo **de raciocinio**. Na API
+compativel do Ollama o pensamento vai pra `message.reasoning` e **consome o
+mesmo orcamento de `max_tokens`**. Medido isolado, com `max_tokens: 80`:
+`finish_reason: "length"`, 80 tokens gastos, `content` **vazio** — a resposta
+inteira ficou dentro do raciocinio. Com o teto de 8192 do provedor ele termina,
+mas gastando minutos por campo.
+
+Comparativo, mesma maquina, CPU pura (sem GPU no container — `nvidia-smi` nao
+existe la). Duas medicoes, e a diferenca entre elas importa:
+
+| modelo | prompt curto, modelo quente | pipeline REAL (1 item, 2 campos) | JSON certo de primeira |
+|---|---|---|---|
+| `qwen2.5:3b` | 5,5 s | **1 min 48 s** | sim |
+| `qwen2.5:7b` | 16,3 s | **3 min 42 s** | sim |
+| `qwen3:4b` (raciocinio) | — | ~22 min | nao, so no retry |
+
+O microbenchmark diz 16 s; o pedido de verdade diz 3m42. Nao e contradicao — o
+prompt do pipeline carrega ficha do item, contexto do epico e preambulo do
+papel, e em CPU processar a ENTRADA custa. Se eu tivesse publicado os 16 s no
+README, o numero seria verdadeiro e a expectativa, falsa.
+
+Padrao escolhido: `qwen2.5:7b`, com o 3b documentado como a troca honesta pra
+quem nao tem GPU (2x mais rapido, texto um pouco pior).
+
+### Uma medicao errada no meio, que quase virou conclusao errada
+
+Numa das rodadas, o `qwen2.5:7b` devolveu o **schema** em vez de uma instancia —
+o mesmo defeito do `qwen3`. Ia registrar "modelos pequenos confundem schema com
+instancia". Antes disso, refiz com o prompt REAL do `completarEstruturado`
+("...que obedeca exatamente a este schema:") em vez do meu texto de teste
+("...no schema"). Acertou de primeira, em 19,4 s.
+
+Ou seja: o erro era do meu prompt de teste, nao do modelo. Um teste que nao
+reproduz o pedido real mede outra coisa — e nesse caso teria acusado o inocente
+e escondido a variavel que importava.
+
+### A licao
+
+**"O usuario citou esse modelo" nao e evidencia de que ele serve pro uso.** A
+diferenca entre 16 s e 22 minutos por campo e a diferenca entre uma ferramenta
+que se usa no dia a dia e uma que se abandona nos primeiros cinco minutos.
+Escrever "use qwen3:4b" no README sem rodar teria sido entregar a segunda
+achando que era a primeira — e o usuario descobriria sozinho, no pior momento
+possivel, que a coisa que ele pediu pra poder trabalhar nao da pra trabalhar.

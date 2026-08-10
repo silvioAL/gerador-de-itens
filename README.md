@@ -40,6 +40,61 @@ docker compose up --build
 
 Abra `http://localhost:8080`. Usa o config de exemplo deste repositório (rabbit, kafka, mongo, sql, camunda, fico, api externa, job, regra, cache, storage, batch — 14 tipos de nó, mais gRPC/GraphQL como tipos de conexão sobre "Serviço"). Sobe em `AUTH_MODE=dev` (login só com e-mail, sem senha — ver SPEC-08 §2.1), nunca precisa de segredo nenhum.
 
+#### IA rodando dentro da stack (Qwen, sem sair da sua rede)
+
+Se o seu ambiente bloqueia a API do Claude — o caso comum em rede corporativa — dá pra rodar o modelo **num container ao lado do servidor**. Nada sai da máquina, e não é preciso chave de API nenhuma.
+
+```powershell
+docker compose --profile ia up -d --build
+```
+
+Isso sobe dois serviços a mais: o **Ollama** e um passo único que baixa o modelo (`qwen2.5:7b`, 4,7 GB — a primeira subida demora). Sem `--profile ia`, nada disso é baixado.
+
+Depois, na aplicação:
+
+1. Entre em **⚙ Configurações → Modelo de IA**.
+2. Em **Destino**, escolha **"Qwen no Docker (junto do servidor)"** — isso preenche a base URL (`http://ollama:11434/v1`) e o modelo.
+3. Em **Chave de API**, escreva qualquer coisa (`nao-usada`, por exemplo). O Ollama ignora a chave, mas o campo é obrigatório porque os outros destinos exigem.
+4. Clique em **Testar conexão** e depois em **Salvar**.
+
+A esteira de agentes passa a rodar sozinha ao derivar uma quebra.
+
+##### Qual modelo escolher (medido, não estimado)
+
+Rodando o pipeline **de verdade** (`POST /ia/pipeline/po`, 1 item com 2 campos), **em CPU pura**, sem GPU no container:
+
+| modelo | tamanho | 1 item / 2 campos | JSON no formato certo |
+|---|---|---|---|
+| **`qwen2.5:7b`** (padrão) | 4,7 GB | ~3 min 40 s | de primeira |
+| `qwen2.5:3b` | 1,9 GB | ~1 min 50 s | de primeira, texto um pouco pior |
+| `qwen3:4b` | 2,5 GB | **~22 min** | só depois de uma segunda tentativa |
+
+> **Seja realista sobre CPU.** Uma quebra pequena leva minutos; uma quebra grande, com quatro agentes passando por todos os itens, leva bem mais. Se a máquina tiver **GPU NVIDIA**, ative-a (abaixo) — é a diferença entre usável e não usável. Sem GPU, o `qwen2.5:3b` é ~2× mais rápido e continua acertando o formato; vale a troca se a espera incomodar mais que a qualidade do texto.
+
+> **Não use `qwen3` aqui**, apesar do nome mais novo. Ele é um modelo de **raciocínio**: o Ollama coloca o pensamento em `message.reasoning`, e isso consome o mesmo orçamento de tokens da resposta. Com teto baixo, o campo volta **vazio**; com teto alto, chega — gastando minutos por campo. É um bom modelo para outro uso; a esteira quer estrutura, não deliberação.
+
+Para trocar, use `MODELO_IA` no `.env` da raiz (qualquer [tag do Ollama](https://ollama.com/library)):
+
+```powershell
+echo "MODELO_IA=qwen2.5:3b" >> .env
+docker compose --profile ia up -d
+```
+
+E troque também o campo **Nome do modelo** na tela — o nome precisa bater com o que foi baixado, senão a primeira geração falha com `model not found`.
+
+Se a máquina tiver **GPU NVIDIA**, vale muito a pena: descomente o bloco `deploy:` do serviço `ollama` no `docker-compose.yml` (precisa do NVIDIA Container Toolkit no host).
+
+<details>
+<summary>Por que o endereço é <code>ollama</code> e não <code>localhost</code></summary>
+
+Quem faz a chamada é o **container do servidor**, não o seu navegador. Dentro dele, `localhost` é ele mesmo — o pedido morreria em "connection refused" sem nunca sair. `ollama` é o nome do serviço no `docker-compose.yml`, que a rede interna do Docker resolve pro container certo.
+
+A porta `11434` também é publicada pra fora, então a **mesma** instância serve o `gerador open` (modo local, aí sim em `http://localhost:11434/v1`) — sem instalar Ollama na máquina.
+
+</details>
+
+> **Modelo local sem Docker.** No `gerador open` existe o outro caminho: `gerador ia instalar` baixa um GGUF e roda embutido no processo, sem container nenhum (SPEC-23). O caminho do Ollama acima é o do **modo hospedado**, onde carregar o modelo dentro do container do servidor foi descartado de propósito (SPEC-31 Fase 4).
+
 #### Produção (VM na nuvem + login Google real)
 
 Hospedar de verdade (não só `docker compose up` local) é uma sequência de três passos:

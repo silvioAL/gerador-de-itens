@@ -7,8 +7,8 @@ import {
   MODELO_EMBEDDING,
   NOME_PROVEDOR_GATEWAY,
   PAPEL_PROVEDOR_GATEWAY,
-  PRESETS_GATEWAY,
   modeloChatPorId,
+  presetsDoModo,
   type ModeloRegistrado,
   type PresetGateway,
 } from "./modelos.js";
@@ -120,6 +120,9 @@ export async function verificarStatus(baseDir?: string, idChatSelecionado?: stri
     provedor: gatewaySelecionado ? ID_PROVEDOR_GATEWAY : selecionado.id,
     modelosChat,
     gateway,
-    presetsGateway: PRESETS_GATEWAY,
+    // `verificarStatus` só existe no caminho local (ele lê o disco atrás de
+    // GGUF). O modo hospedado monta a própria resposta em `routes/ia.ts` e
+    // pede `presetsDoModo("hospedado")` lá.
+    presetsGateway: presetsDoModo("local"),
   };
 }

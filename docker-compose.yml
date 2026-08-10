@@ -55,5 +55,64 @@ services:
       db:
         condition: service_healthy
 
+  # SPEC-31 — o modelo de IA rodando DENTRO da stack.
+  #
+  # O motivo é concreto: num ambiente corporativo que bloqueia a API do Claude,
+  # o modo hospedado ficaria sem IA nenhuma. Com o Ollama aqui, o servidor fala
+  # com `http://ollama:11434/v1` pela rede interna do compose — nenhuma chamada
+  # sai da máquina, e o `packages/server` continua sem `node-llama-cpp` (ele só
+  # faz HTTP; quem carrega o GGUF é este container, que não é nosso).
+  #
+  # `profiles: ["ia"]` deixa isto DE FORA do `docker compose up` normal, de
+  # propósito: são ~4,7 GB de modelo, e quem sobe a stack só pra ver a
+  # ferramenta não deve pagar por eles. Ligar é explícito:
+  #
+  #     docker compose --profile ia up -d
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["ia"]
+    volumes:
+      # Sem isto, cada `docker compose down` joga fora o modelo baixado e a
+      # próxima subida baixa os 4,7 GB de novo.
+      - ollama-models:/root/.ollama
+    ports:
+      # Publicado pra fora também: assim a MESMA instância serve o modo local
+      # (`gerador open` -> http://localhost:11434) sem instalar Ollama na máquina.
+      - "11434:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    # GPU NVIDIA, se houver: descomente as seis linhas abaixo. Em CPU pura,
+    # medido nesta máquina, o `qwen2.5:7b` leva ~16s por campo — uma esteira de
+    # 8 itens vira minutos de espera. Precisa do NVIDIA Container Toolkit
+    # instalado no host; sem ele, o `docker compose up` falha na hora de criar o
+    # container (não degrada silenciosamente pra CPU).
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  # Baixa o modelo uma vez e sai. Sem isto, a primeira chamada da esteira
+  # falharia com "model not found" — que é um jeito ruim de descobrir que
+  # faltava um passo manual.
+  ollama-modelo:
+    image: ollama/ollama:latest
+    profiles: ["ia"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      # Faz o CLI falar com o container do serviço em vez de subir um servidor
+      # próprio — por isso este aqui não precisa do volume.
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c", "ollama pull ${MODELO_IA:-qwen2.5:7b}"]
+    restart: "no"
+
 volumes:
   db-data:
+  ollama-models:

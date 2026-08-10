@@ -25,6 +25,9 @@ export interface PresetGateway {
   /** Onde a pessoa consegue a chave. */
   urlChave?: string;
   observacao: string;
+  /** Em quais modos este destino é alcançável. Ausente = nos dois (endereço na
+   * internet vale de qualquer lugar). Ver `presetsDoModo`. */
+  modos?: ("local" | "hospedado")[];
 }
 
 export const PRESETS_GATEWAY: PresetGateway[] = [
@@ -54,12 +57,61 @@ export const PRESETS_GATEWAY: PresetGateway[] = [
     id: "ollama",
     nome: "Ollama (na sua máquina)",
     baseUrl: "http://localhost:11434/v1",
-    modelos: ["qwen3:4b", "llama3.1:8b"],
-    modeloPadrao: "qwen3:4b",
+    // `qwen2.5`, não `qwen3`: ver a observação do preset de baixo — a diferença
+    // é de minutos para segundos, medida contra esta stack.
+    modelos: ["qwen2.5:7b", "qwen2.5:3b", "llama3.1:8b"],
+    modeloPadrao: "qwen2.5:7b",
     formatoJson: "json_object",
     observacao: "Roda local, sem custo e sem sair da máquina. A chave é ignorada pelo Ollama — preencha qualquer coisa.",
+    modos: ["local"],
+  },
+  {
+    id: "ollama-docker",
+    nome: "Qwen no Docker (junto do servidor)",
+    // `ollama`, não `localhost`: quem faz esta chamada é o CONTAINER do server,
+    // e ali `localhost` é ele mesmo. É o nome do serviço no docker-compose que
+    // resolve pro container certo, e foi exatamente o que faltava pro preset
+    // "Ollama" existente servir no modo hospedado.
+    baseUrl: "http://ollama:11434/v1",
+    /**
+     * `qwen2.5`, NÃO `qwen3` — medido contra esta stack, em CPU:
+     *
+     * | modelo       | por campo | JSON certo de primeira |
+     * |--------------|-----------|------------------------|
+     * | `qwen2.5:3b` |     5,5 s | sim                    |
+     * | `qwen2.5:7b` |    16,3 s | sim                    |
+     * | `qwen3:4b`   |   ~22 min | não, só no retry       |
+     *
+     * `qwen3` é modelo de RACIOCÍNIO: o Ollama põe o pensamento em
+     * `message.reasoning`, e ele consome o mesmo orçamento de `max_tokens`. Com
+     * teto baixo a resposta volta vazia (`finish_reason: "length"`, `content`
+     * em branco); com teto alto ela chega, gastando minutos por campo. Bom
+     * modelo, uso errado — a esteira quer estrutura, não deliberação.
+     */
+    modelos: ["qwen2.5:7b", "qwen2.5:3b"],
+    modeloPadrao: "qwen2.5:7b",
+    formatoJson: "json_object",
+    observacao:
+      "O modelo roda num container ao lado do servidor: nada sai da sua rede, e nenhuma chamada vai pra internet — o caso de quem tem o Claude bloqueado na empresa. Suba com `docker compose --profile ia up -d`. A chave é ignorada pelo Ollama; preencha qualquer coisa. Em CPU, conte ~16s por campo com o 7b (o 3b é ~3x mais rápido e um pouco pior).",
+    modos: ["hospedado"],
   },
 ];
+
+/**
+ * Os destinos que fazem sentido em cada modo de execução.
+ *
+ * A distinção existe por um motivo só, mas decisivo: `localhost` significa
+ * coisas diferentes dos dois lados. No `gerador open`, quem chama o gateway é um
+ * processo na máquina da pessoa, e `localhost:11434` é o Ollama dela. No modo
+ * hospedado, quem chama é o container do server, e `localhost` é ele próprio —
+ * o pedido morre em "connection refused" sem nunca sair.
+ *
+ * Preset sem `modos` aparece nos dois: um endereço na internet (Anthropic,
+ * DeepSeek) é o mesmo endereço de qualquer lugar.
+ */
+export function presetsDoModo(modo: "local" | "hospedado"): PresetGateway[] {
+  return PRESETS_GATEWAY.filter((p) => !p.modos || p.modos.includes(modo));
+}
 
 export function presetGatewayPorId(id: string): PresetGateway | undefined {
   return PRESETS_GATEWAY.find((p) => p.id === id);

@@ -12,6 +12,7 @@ export {
   modeloPorId,
   modeloChatPorId,
   presetGatewayPorId,
+  presetsDoModo,
   formatoJsonPorBaseUrl,
   urlDownload,
   type IdModelo,

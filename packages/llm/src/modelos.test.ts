@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatoJsonPorBaseUrl, PRESETS_GATEWAY, presetGatewayPorId } from "./modelos.js";
+import { formatoJsonPorBaseUrl, PRESETS_GATEWAY, presetGatewayPorId, presetsDoModo } from "./modelos.js";
 
 describe("PRESETS_GATEWAY — os destinos conhecidos", () => {
   it("Claude está na lista, com base URL e modelo prontos pra usar", () => {
@@ -16,8 +16,49 @@ describe("PRESETS_GATEWAY — os destinos conhecidos", () => {
 
   it("todo preset diz onde pegar a chave, ou é local", () => {
     for (const p of PRESETS_GATEWAY) {
-      if (p.baseUrl.includes("localhost")) continue;
+      // Destino sem chave é o que roda na própria infra: `localhost` (Ollama na
+      // máquina) ou um nome de serviço do compose, que não é endereço público.
+      if (p.baseUrl.includes("localhost") || p.modos?.includes("hospedado")) continue;
       expect(p.urlChave, p.id).toBeTruthy();
+    }
+  });
+});
+
+/**
+ * `localhost` significa coisas diferentes dos dois lados, e essa é a diferença
+ * inteira: no `gerador open` quem chama é um processo na máquina da pessoa; no
+ * modo hospedado é o container do server, pra quem `localhost` é ele mesmo.
+ *
+ * Oferecer o preset errado não daria erro de configuração — daria "connection
+ * refused" na primeira geração, com os três campos preenchidos e certos na
+ * tela. É o tipo de defeito que a pessoa não tem como diagnosticar sozinha.
+ */
+describe("presetsDoModo — o destino tem que ser alcançável de onde a chamada sai", () => {
+  it("no modo local, o Ollama oferecido é o da máquina", () => {
+    const locais = presetsDoModo("local");
+    expect(locais.find((p) => p.id === "ollama")?.baseUrl).toBe("http://localhost:11434/v1");
+    expect(locais.some((p) => p.id === "ollama-docker")).toBe(false);
+  });
+
+  it("no modo hospedado, o Ollama oferecido é o serviço do compose", () => {
+    const hospedados = presetsDoModo("hospedado");
+    expect(hospedados.find((p) => p.id === "ollama-docker")?.baseUrl).toBe("http://ollama:11434/v1");
+    expect(hospedados.some((p) => p.id === "ollama")).toBe(false);
+  });
+
+  it("destino na internet aparece nos dois — o endereço é o mesmo de qualquer lugar", () => {
+    for (const modo of ["local", "hospedado"] as const) {
+      expect(presetsDoModo(modo).map((p) => p.id), modo).toContain("anthropic");
+      expect(presetsDoModo(modo).map((p) => p.id), modo).toContain("deepseek");
+    }
+  });
+
+  it("nenhum modo fica sem uma opção que roda na própria infra", () => {
+    // O ponto do pedido: com o Claude bloqueado na empresa, os DOIS modos
+    // precisam ter um caminho que não sai da rede.
+    for (const modo of ["local", "hospedado"] as const) {
+      const semInternet = presetsDoModo(modo).filter((p) => p.baseUrl.startsWith("http://"));
+      expect(semInternet.length, modo).toBeGreaterThan(0);
     }
   });
 });
