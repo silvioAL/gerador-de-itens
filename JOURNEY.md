@@ -2158,3 +2158,34 @@ E um erro meu de método, no §119: encontrei um defeito real (o retry corrompen
 o stream), corrigi, e **apresentei como se fosse a causa** do que ele relatou.
 Não reproduzi antes de concluir. Da segunda vez reproduzi primeiro, e o
 diagnóstico veio em dois comandos.
+
+## 121. Pendencia nao e defeito: o painel de avisos passa a distinguir
+
+Observacao do usuario, com print: o canvas com as 8 bolinhas VERDES e o painel
+vermelho com 20 avisos, ao mesmo tempo.
+
+Investigado, nao havia contradicao — havia duas perguntas diferentes:
+
+- **A bolinha verde** responde *"este no tem os campos preenchidos pra eu
+  conseguir derivar itens dele?"*. Os 8 estavam completos.
+- **Os avisos** respondem *"os itens derivados ja tem a volumetria
+  respondida?"*. A checagem le `respostasDoItem`, preenchido pela ESTEIRA — e
+  na tela dele a esteira ainda nao tinha rodado.
+
+Os dois estavam certos. O que estava errado era a tela apresentar como erro
+algo que e fila de trabalho, num painel vermelho chamado "Revisao automatica",
+antes de existir qualquer chance de estar preenchido.
+
+`Achado` ganhou `origem`, derivada da regra: `volumetria-sem-valor` e
+`sem-ciclo-de-teste` sao da **esteira**; `dependencia-orfa`,
+`campo-obrigatorio-vazio` e `item-grande` sao de **pessoa**. Regra desconhecida
+cai em pessoa — o padrao e mostrar, nao esconder.
+
+O painel separa os dois grupos, e o titulo do segundo muda conforme o estado:
+*"N campo(s) que a esteira ainda vai preencher"* antes, *"a esteira rodou e N
+campo(s) continuam em branco"* depois. O segundo caso merece atencao; o
+primeiro e so a lista do que vem a seguir.
+
+Vale notar o que NAO mudou: nenhuma checagem, nenhum calculo, nenhum
+comportamento do revisor. So o significado ficou visivel — que e o mesmo tipo
+de correcao do diagnostico de config (§112) e da tela de login (§116).

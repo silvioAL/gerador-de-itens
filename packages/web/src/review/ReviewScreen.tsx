@@ -433,6 +433,16 @@ export function ReviewScreen({
     [achadosBrutos, esteira.rodando]
   );
   const resumo = useMemo(() => resumirAchados(achados), [achados]);
+
+  /** A esteira já passou por aqui? Se algum item tem QUALQUER resposta, sim.
+   * É o que distingue "ainda não preenchido" de "a esteira rodou e deixou em
+   * branco" — o segundo merece atenção, o primeiro é só a fila de trabalho. */
+  const esteiraJaRodou = useMemo(
+    () => Object.values(respostasItens ?? {}).some((campos) => Object.keys(campos ?? {}).length > 0),
+    [respostasItens]
+  );
+  const achadosDePessoa = useMemo(() => achados.filter((a) => a.origem !== "esteira"), [achados]);
+  const achadosDaEsteira = useMemo(() => achados.filter((a) => a.origem === "esteira"), [achados]);
   const achadosPorItem = useMemo(() => {
     const mapa = new Map<string, Achado[]>();
     for (const a of achados) mapa.set(a.atividadeChave, [...(mapa.get(a.atividadeChave) ?? []), a]);
@@ -784,17 +794,48 @@ export function ReviewScreen({
               // SPEC-26 Bloco 4a: cada achado leva ao item. O revisor aponta
               // — não escreve, não corrige, não sugere texto.
               <div style={avisoEstilo} data-testid="painel-achados">
-                <strong style={{ fontSize: 12 }}>Revisão automática (sem IA)</strong>
-                <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 12, lineHeight: 1.7 }}>
-                  {achados.map((achado, i) => (
-                    <li key={i} style={{ color: achado.severidade === "erro" ? "var(--vermelho)" : "var(--amarelo)" }}>
-                      <button style={linkEstilo} onClick={() => irParaChave(achado.atividadeChave)}>
-                        {resultado.atividades.find((a) => a.chave === achado.atividadeChave)?.rotulo ?? achado.atividadeChave}
-                      </button>{" "}
-                      <span style={{ color: "var(--texto-2)" }}>{achado.mensagem}</span>
-                    </li>
-                  ))}
-                </ul>
+                {/* ACHADO REAL (print): canvas com as 8 bolinhas VERDES e este
+                    painel vermelho com 20 avisos ao mesmo tempo. Não era
+                    contradição — o verde responde "o nó dá pra derivar?" e os
+                    avisos respondem "os itens já estão preenchidos?" — mas ler
+                    "20 avisos" logo depois de derivar parece defeito quando é
+                    pendência. Agora as duas coisas ficam separadas, e o que a
+                    esteira preenche só vira lista quando ela já rodou. */}
+                {achadosDePessoa.length > 0 && (
+                  <>
+                    <strong style={{ fontSize: 12 }}>Revisão automática (sem IA)</strong>
+                    <ul style={listaDeAchadosEstilo}>
+                      {achadosDePessoa.map((achado, i) => (
+                        <li key={i} style={{ color: achado.severidade === "erro" ? "var(--vermelho)" : "var(--amarelo)" }}>
+                          <button style={linkEstilo} onClick={() => irParaChave(achado.atividadeChave)}>
+                            {resultado.atividades.find((a) => a.chave === achado.atividadeChave)?.rotulo ?? achado.atividadeChave}
+                          </button>{" "}
+                          <span style={{ color: "var(--texto-2)" }}>{achado.mensagem}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+
+                {achadosDaEsteira.length > 0 && (
+                  <div data-testid="pendencias-da-esteira" style={{ marginTop: achadosDePessoa.length > 0 ? 12 : 0 }}>
+                    <strong style={{ fontSize: 12, color: "var(--texto-2)" }}>
+                      {esteiraJaRodou
+                        ? `A esteira rodou e ${achadosDaEsteira.length} campo(s) continuam em branco`
+                        : `${achadosDaEsteira.length} campo(s) que a esteira ainda vai preencher`}
+                    </strong>
+                    <ul style={listaDeAchadosEstilo}>
+                      {achadosDaEsteira.map((achado, i) => (
+                        <li key={i} style={{ color: esteiraJaRodou ? "var(--amarelo)" : "var(--texto-mudo)" }}>
+                          <button style={linkEstilo} onClick={() => irParaChave(achado.atividadeChave)}>
+                            {resultado.atividades.find((a) => a.chave === achado.atividadeChave)?.rotulo ?? achado.atividadeChave}
+                          </button>{" "}
+                          <span style={{ color: "var(--texto-2)" }}>{achado.mensagem}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
             {(resultado.ciclos.length > 0 || resultado.conflitos.length > 0) && (
@@ -1803,4 +1844,11 @@ const avisoEstilo: React.CSSProperties = {
   padding: "10px 12px",
   marginBottom: 6,
   color: "#fca5a5",
+};
+
+const listaDeAchadosEstilo: React.CSSProperties = {
+  margin: "6px 0 0",
+  paddingLeft: 18,
+  fontSize: 12,
+  lineHeight: 1.7,
 };

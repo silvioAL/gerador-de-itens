@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Atividade, Diagrama, ValorSpec } from "../model/types.js";
 import type { DiagramaConfig, RegrasConfig } from "../config/types.js";
-import { resumirAchados, revisarQuebra } from "./checagens.js";
+import { origemDaRegra, resumirAchados, revisarQuebra } from "./checagens.js";
 
 const config: DiagramaConfig = {
   nodeTypes: {
@@ -186,5 +186,28 @@ describe("revisarQuebra (SPEC-26 Bloco 4a — o revisor determinístico)", () =>
     const { erros, avisos } = resumirAchados(achados);
     expect(erros).toBeGreaterThan(0);
     expect(avisos).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * ACHADO REAL (print do usuário): canvas com as 8 bolinhas VERDES e o painel
+ * vermelho com 20 avisos ao mesmo tempo. As duas coisas estavam certas — o
+ * verde responde "o nó dá pra derivar?" e os avisos respondem "os itens já
+ * foram preenchidos?" — mas o painel não distinguia pendência de defeito.
+ */
+describe("origem do achado: quem resolve", () => {
+  it("volumetria e ciclo de teste são da ESTEIRA — ela preenche ao rodar", () => {
+    expect(origemDaRegra("volumetria-sem-valor")).toBe("esteira");
+    expect(origemDaRegra("sem-ciclo-de-teste")).toBe("esteira");
+  });
+
+  it("dependência órfã e campo obrigatório são de PESSOA — nenhum agente resolve", () => {
+    expect(origemDaRegra("dependencia-orfa")).toBe("pessoa");
+    expect(origemDaRegra("campo-obrigatorio-vazio")).toBe("pessoa");
+    expect(origemDaRegra("item-grande")).toBe("pessoa");
+  });
+
+  it("regra desconhecida cai em PESSOA — o padrão é mostrar, não esconder", () => {
+    expect(origemDaRegra("regra-que-ainda-nao-existe")).toBe("pessoa");
   });
 });
