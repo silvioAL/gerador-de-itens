@@ -21,6 +21,7 @@ Comandos:
   ia instalar               Instala os modelos de IA local (Qwen3-4B + embeddings) — só na primeira vez
     --de <caminho.gguf>    Instala de um arquivo que você já tem, sem rede (SPEC-32)
     --origem npm           Monta o modelo pelos pacotes-parte do npm, sem Hugging Face
+  ia diagnosticar           Testa a rede ate o modelo e diz a causa real de uma falha
   ia status                 Mostra se a IA local está instalada e pronta pra uso
 `;
 

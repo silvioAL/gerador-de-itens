@@ -4,7 +4,11 @@ import {
   ID_PROVEDOR_GATEWAY,
   MODELOS_CHAT,
   MODELOS_PADRAO,
+  MODELO_CHAT,
   baixarModelo,
+  buscarComProxy,
+  detectarProxy,
+  explicarFalhaDeRede,
   idsDeProvedorValidos,
   instalarDeArquivoLocal,
   instalarDePartesNpm,
@@ -49,7 +53,9 @@ async function instalarUm(modelo: ModeloRegistrado, de: string | undefined, orig
     const percentual = Math.floor((feito / total) * 100);
     if (percentual === ultimo) return;
     ultimo = percentual;
-    process.stdout.write(`  ${etapa} ${percentual}% (${formatarMB(feito)} / ${formatarMB(total)})`);
+    // `\r` e não `\n`: a barra reescreve a MESMA linha. Com quebra de linha,
+    // um download de 2,5 GB vira centenas de linhas de log.
+    process.stdout.write(`\r  ${etapa} ${percentual}% (${formatarMB(feito)} / ${formatarMB(total)})`);
   };
 
   console.log(`${modelo.papel}...`);
@@ -68,7 +74,7 @@ async function instalarUm(modelo: ModeloRegistrado, de: string | undefined, orig
   }
 
   const segundos = ((Date.now() - inicio) / 1000).toFixed(0);
-  console.log(`  concluído em ${segundos}s.                                        `);
+  console.log(`\r  concluído em ${segundos}s.                                        `);
 }
 
 interface OpcoesInstalar {
@@ -107,6 +113,42 @@ async function instalar({ idModelo, de, origem }: OpcoesInstalar = {}): Promise<
     await instalarUm(modelo, undefined, origem);
   }
   console.log("\nPronto. Rode `gerador ia status` pra conferir.");
+}
+
+/**
+ * SPEC-32 — diz por que o download falhou, nesta maquina, agora.
+ *
+ * Existe por um motivo concreto: o usuario recebeu `fetch failed` e a leitura
+ * facil foi "a rede bloqueia o Hugging Face". Tres palavras nao sustentam essa
+ * conclusao — e agir sobre ela custou um caminho inteiro construido antes de
+ * alguem olhar o `error.cause`. Este comando existe pra ninguem mais precisar
+ * adivinhar: ele tenta de verdade e mostra o que voltou.
+ */
+async function diagnosticar(): Promise<void> {
+  const url = `https://huggingface.co/${MODELO_CHAT.repositorioHuggingFace}/resolve/main/${MODELO_CHAT.nomeArquivo}`;
+  const proxy = detectarProxy();
+
+  console.log(`Node:  ${process.version}`);
+  console.log(`Proxy: ${proxy ? `${proxy.url} (de ${proxy.origem})` : "nenhum configurado"}`);
+  console.log(`NO_PROXY: ${process.env.NO_PROXY ?? process.env.no_proxy ?? "(vazio)"}`);
+  console.log(`NODE_EXTRA_CA_CERTS: ${process.env.NODE_EXTRA_CA_CERTS ?? "(vazio)"}`);
+  console.log(`\nTestando ${new URL(url).host}...`);
+
+  const inicio = Date.now();
+  try {
+    // HEAD e suficiente: o que se testa e alcancar o host, nao baixar 2,5 GB.
+    const r = await buscarComProxy(url, { method: "HEAD" });
+    const ms = Date.now() - inicio;
+    console.log(`  HTTP ${r.status} em ${ms}ms — tamanho anunciado: ${r.headers.get("content-length") ?? "?"} bytes`);
+    console.log(
+      r.ok
+        ? "\nA rede alcança o modelo. `gerador ia instalar` deve funcionar."
+        : "\nO host respondeu, mas recusou o arquivo."
+    );
+  } catch (erro) {
+    console.log(`  falhou em ${Date.now() - inicio}ms\n`);
+    console.log(explicarFalhaDeRede(erro, url).message);
+  }
 }
 
 /** SPEC-25 Fase 0 — grava a escolha no mesmo `config/ia.json` que o servidor
@@ -215,6 +257,9 @@ function valorDeFlag(args: string[], flag: string): string | undefined {
 export async function ia(args: string[], dirProjeto: string = process.cwd()): Promise<void> {
   const subcomando = args[0];
   switch (subcomando) {
+    case "diagnosticar":
+      await diagnosticar();
+      break;
     case "instalar":
       await instalar({
         idModelo: valorDeFlag(args, "--modelo"),
@@ -233,7 +278,7 @@ export async function ia(args: string[], dirProjeto: string = process.cwd()): Pr
       return;
     default:
       throw new Error(
-        "uso: gerador ia <instalar [--modelo <id>] [--de <caminho.gguf>] [--origem npm]|usar <id>|conectar --url <base> --chave <chave> --modelo <nome>|status>"
+        "uso: gerador ia <diagnosticar|instalar [--modelo <id>] [--de <caminho.gguf>] [--origem npm]|usar <id>|conectar --url <base> --chave <chave> --modelo <nome>|status>"
       );
   }
 }
