@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import type { DiagramaConfig, PerfisConfig } from "@gerador/engine";
 import { apiIa, type DiagramaProposto } from "../api/client";
+import { BotaoFalar } from "./BotaoFalar";
+import { useVozNaEntrada } from "./useVozNaEntrada";
 
 export interface ConversaPanelProps {
   config: DiagramaConfig;
@@ -58,6 +60,9 @@ export function ConversaPanel({
     },
   ]);
   const [entrada, setEntrada] = useState(contextoInicial?.trim() ?? "");
+  // SPEC-30 Fase 1a — mesmo hook da `JanelaConversa`; o texto ditado cai neste
+  // mesmo campo, editável antes de enviar.
+  const { podeFalar, gravacao } = useVozNaEntrada(setEntrada);
   const [pensando, setPensando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const fimRef = useRef<HTMLDivElement>(null);
@@ -174,6 +179,16 @@ export function ConversaPanel({
       </div>
 
       {erro && <p style={{ margin: "0 12px", fontSize: 11.5, color: "var(--vermelho)" }}>{erro}</p>}
+
+      {/* SPEC-30 Fase 1a — falar a demanda em vez de digitar. É AQUI que o
+          pedido nasceu ("botão falar, com animações em Desenhar conversando"),
+          e esta janela não reusa a `JanelaConversa`: as duas plugam o mesmo
+          hook, cada uma no seu rodapé. */}
+      {podeFalar && (
+        <div style={{ padding: "0 12px 6px" }}>
+          <BotaoFalar gravacao={gravacao} />
+        </div>
+      )}
 
       <div style={rodapeEstilo}>
         <textarea

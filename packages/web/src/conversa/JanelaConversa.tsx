@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { BotaoFalar } from "./BotaoFalar";
+import { useVozNaEntrada } from "./useVozNaEntrada";
 
 export interface MensagemConversa {
   autor: "voce" | "agente";
@@ -45,6 +47,8 @@ export function JanelaConversa({
 }: JanelaConversaProps) {
   const [entrada, setEntrada] = useState(valorInicial?.trim() ?? "");
   const fimRef = useRef<HTMLDivElement>(null);
+  // SPEC-30 Fase 1a — o mesmo hook serve as duas janelas de conversa.
+  const { podeFalar, gravacao } = useVozNaEntrada(setEntrada);
 
   useEffect(() => {
     fimRef.current?.scrollIntoView?.({ behavior: "smooth" });
@@ -85,6 +89,15 @@ export function JanelaConversa({
 
       {erro && <p style={{ margin: "0 12px", fontSize: 11.5, color: "var(--vermelho)" }}>{erro}</p>}
       {acoes && <div style={acoesEstilo}>{acoes}</div>}
+
+      {/* SPEC-30 Fase 1a. Só aparece quando o provedor transcreve — botão que
+          grava 30s e falha depois é pior que botão nenhum, porque desperdiça o
+          tempo E a fala. */}
+      {podeFalar && (
+        <div style={{ padding: "0 12px 6px" }}>
+          <BotaoFalar gravacao={gravacao} />
+        </div>
+      )}
 
       <div style={rodapeEstilo}>
         <textarea

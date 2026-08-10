@@ -49,5 +49,25 @@ export interface ProvedorIa {
   /** O tipo de retorno fica a cargo de quem chama (`as T` no call site) —
    * mesma limitação de generics de ordem superior documentada em `motor.ts`. */
   completarEstruturado(prompt: string, schema: EsquemaJson, opcoes?: OpcoesGeracao): Promise<unknown>;
+  /**
+   * SPEC-30 Fase 1a — transcrever fala em texto. **Opcional de propósito**: o
+   * provedor local não faz (`node-llama-cpp` não expõe multimodal, SPEC-30 §1),
+   * e a UI usa a ausência para não desenhar o botão de microfone.
+   *
+   * Oferecer um botão que grava 30 segundos e falha depois é pior que não ter
+   * botão — desperdiça o tempo *e* a fala. Por isso a capacidade é lida da
+   * presença do método, não de uma flag que pode mentir.
+   */
+  transcrever?(audio: Uint8Array, opcoes: OpcoesTranscricao): Promise<string>;
   descartar(): Promise<void>;
+}
+
+export interface OpcoesTranscricao {
+  /** Tipo MIME do que o navegador gravou (ex.: `audio/webm`). Vai como nome de
+   * arquivo e content-type no multipart — destinos compatíveis com OpenAI
+   * decidem o decodificador por ele. */
+  formato: string;
+  /** Dica de idioma (ISO-639-1). Melhora muito o reconhecimento de sigla e nome
+   * de sistema em português, que é o vocabulário desta ferramenta. */
+  idioma?: string;
 }

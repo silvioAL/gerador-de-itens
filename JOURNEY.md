@@ -2403,3 +2403,50 @@ Duas coisas novas que a revisao trouxe:
 
 O ganho da revisao nao e o documento: e nao ter comecado a Fase 1 pelo caminho
 que ia dar errado em metade dos casos, e descobrir isso na integracao.
+
+## 126. Voz na conversa: a feature quase nasceu na janela errada
+
+SPEC-30 Fase 1a implementada — falar em vez de digitar, com a transcricao indo
+pelo gateway ja configurado. A porta (`transcrever?` em `ProvedorIa`) e
+opcional de proposito: o provedor local nao faz, e a UI usa a AUSENCIA do
+metodo pra nao desenhar o botao. Botao que grava 30s e falha depois e pior que
+botao nenhum — desperdica o tempo E a fala.
+
+A rota `POST /ia/transcrever` nasceu nos dois modos de uma vez, e o
+`paridade.sanity.test.ts` confirmou. No hospedado so o gateway transcreve, pela
+mesma decisao da Fase 4 que tirou o binario nativo do container.
+
+### O achado: existem DUAS janelas de conversa
+
+Plugei o botao na `JanelaConversa`, rodei o typecheck, verde. Antes de escrever
+o E2E fui procurar como abrir "Desenhar conversando" na tela — e descobri que
+essa janela e a `ConversaPanel.tsx`, que tem `<aside>` proprio e **nao reusa a
+`JanelaConversa`**.
+
+Ou seja: eu tinha acabado de entregar o botao de falar na conversa da
+ESPECIFICACAO, quando o pedido era *"botão falar, com animações em Desenhar
+conversando"*. Typecheck verde, teste de unidade verde, feature no lugar
+errado. Nada teria acusado — os dois testes que eu tinha escrito eram sobre a
+janela em que eu tinha mexido.
+
+A correcao virou `useVozNaEntrada`: a decisao de mostrar, a gravacao e o "onde
+o texto cai" num hook so, e cada janela gasta tres linhas. As duas ganharam o
+botao, que era o certo desde o comeco.
+
+O que me salvou nao foi teste nem tipo: foi ir procurar o seletor pro E2E. A
+pergunta "por onde o usuario chega nisso?" e a que revela se a feature esta
+onde ele vai olhar — e ela nao aparece sozinha em nenhuma suite.
+
+### Dois detalhes que valem registro
+
+- **A onda vem do microfone de verdade** (`AnalyserNode`, RMS do sinal), nao de
+  um `setInterval` com numero aleatorio. Nao e capricho: uma animacao que se
+  mexe sem ninguem falar mente sobre o estado do sistema — quem esta com o
+  microfone mudo veria o mesmo de quem esta falando, e so descobriria no
+  silencio da transcricao vazia.
+- **13 testes quebraram** quando o hook entrou: specs que mockavam `apiIa` so
+  com o metodo que usavam agora batiam em `apiIa.status is not a function`. Dava
+  pra "consertar" com `apiIa.status?.()` no hook — e isso teria escondido um
+  acoplamento real atras de uma guarda que so existe pro mock. Completei os
+  mocks: o teste passa a descrever o contrato inteiro, que e o que ele deveria
+  fazer.

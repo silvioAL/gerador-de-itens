@@ -260,6 +260,10 @@ export interface StatusIa {
    * servidor, não de uma cópia aqui: `@gerador/llm` não pode entrar no bundle
    * (arrasta `node-llama-cpp`), e lista duplicada envelheceria em silêncio. */
   presetsGateway?: PresetGateway[];
+  /** SPEC-30 — o que o provedor selecionado faz além de texto. Ausente em
+   * servidor antigo, e a UI trata isso como "não faz": esconder um botão que
+   * funcionaria custa um clique; mostrar um que falha custa a gravação. */
+  capacidades?: { transcricao?: boolean };
 }
 
 /** Um destino conhecido do gateway — espelha `PresetGateway` de `@gerador/llm`,
@@ -393,6 +397,26 @@ export const apiIa = {
       method: "POST",
       body: JSON.stringify(dados),
     }),
+  /**
+   * SPEC-30 Fase 1a — manda o áudio gravado e recebe o texto.
+   *
+   * Não usa `requisitar()` porque o corpo é binário, não JSON: o `Blob` vai
+   * cru, e o `Content-Type` é o que o `MediaRecorder` produziu — quem decide o
+   * decodificador é o destino, do outro lado da rota.
+   */
+  async transcrever(audio: Blob): Promise<string> {
+    const resposta = await fetch(`${BASE_URL}/ia/transcrever`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": audio.type || "audio/webm" },
+      body: audio,
+    });
+    const corpo = await resposta.json().catch(() => ({}));
+    if (!resposta.ok) {
+      throw new Error(typeof corpo.erro === "string" ? corpo.erro : "Não foi possível transcrever o áudio.");
+    }
+    return typeof corpo.texto === "string" ? corpo.texto : "";
+  },
   /** Fluxo 3 (Fase 1, SPEC-23) — pede ao modelo local uma sugestão de texto
    * pra um placeholder "<- ✍️ especificar". Streaming de verdade desde a Fase
    * 1c: a resposta chega em pedaços (`text/plain`, chunked), entregues via

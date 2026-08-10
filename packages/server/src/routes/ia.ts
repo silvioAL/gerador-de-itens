@@ -41,6 +41,11 @@ import { organizacoes } from "../db/schema.js";
  */
 const ID_PROVEDOR_GATEWAY = "gateway";
 
+/** Teto de upload de áudio — o mesmo do modo local, pelo mesmo motivo
+ * (JOURNEY: *toda ausência de teto virou bug*). ~10 MB de WebM/Opus são vários
+ * minutos de fala, bem acima de "ditar uma demanda". */
+const LIMITE_AUDIO_BYTES = 10 * 1024 * 1024;
+
 const corpoCredencial = z.object({
   baseUrl: z.string().url(),
   chave: z.string().min(1),
@@ -117,6 +122,10 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
       // `localhost`. Servir a lista do outro modo ofereceria um destino que
       // falha em "connection refused" sem nunca sair do container.
       presetsGateway: presetsDoModo("hospedado"),
+      // SPEC-30: aqui só existe o gateway, e o gateway transcreve — então a
+      // capacidade é exatamente "tem credencial?". A tela usa isto pra decidir
+      // se desenha o microfone.
+      capacidades: { transcricao: resumo.configurado },
       credencial: resumo,
     };
   });
@@ -322,5 +331,50 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
     const pedido = comPedido(() => montarPedidoSugerirConfig((req.body ?? {}) as never), reply);
     if (!pedido) return reply;
     return executarPedido(reply, pedido, "ia/sugerir-config");
+  });
+
+  /**
+   * SPEC-30 Fase 1a — transcrição. Mesma rota e mesmo contrato do modo local
+   * (`paridade.sanity.test.ts` cobra isso), com a diferença que aqui **só o
+   * gateway transcreve**: carregar modelo dentro do container é justamente o
+   * que a Fase 4 decidiu não fazer.
+   *
+   * `addContentTypeParser` porque o Fastify, sem isso, tenta parsear o corpo
+   * como JSON e devolve 400 antes do handler rodar — o áudio chega como bytes
+   * crus, com o `Content-Type` que o navegador gravou.
+   */
+  app.addContentTypeParser(
+    ["audio/webm", "audio/ogg", "audio/mpeg", "audio/mp4", "audio/wav"],
+    { parseAs: "buffer", bodyLimit: LIMITE_AUDIO_BYTES },
+    (_req, corpo, feito) => feito(null, corpo)
+  );
+
+  app.post("/ia/transcrever", async (req, reply) => {
+    const repo = await repositorio();
+    const credencial = repo ? await repo.obter(ID_PROVEDOR_GATEWAY) : null;
+    if (!credencial?.baseUrl || !credencial.chave) {
+      return reply.code(503).send({ erro: "IA não configurada — cadastre a credencial do gateway" });
+    }
+
+    const audio = req.body as Buffer | undefined;
+    if (!audio?.length) return reply.code(400).send({ erro: "nenhum áudio recebido" });
+
+    const provedor = comoProvedor(credencial);
+    try {
+      // Sempre existe no provedor de gateway; a checagem é pelo contrato, não
+      // por otimismo — `transcrever` é opcional em `ProvedorIa`.
+      if (!provedor.transcrever) {
+        return reply.code(501).send({ erro: "o provedor configurado não transcreve áudio" });
+      }
+      const texto = await provedor.transcrever(new Uint8Array(audio), {
+        formato: (req.headers["content-type"] ?? "audio/webm").split(";")[0].trim(),
+        idioma: "pt",
+      });
+      return { texto };
+    } catch (erro) {
+      return reply.code(502).send({ erro: erro instanceof Error ? erro.message : String(erro) });
+    } finally {
+      await provedor.descartar().catch(() => undefined);
+    }
   });
 }
