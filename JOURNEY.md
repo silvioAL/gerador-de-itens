@@ -2120,3 +2120,41 @@ as duas coisas: que o sinal veio uma vez, e que **sem descartar, o acumulado nã
 
 Isto responde a pendência #270 — *"descobrir POR QUE o lote volta truncado"*.
 Não voltava truncado: voltava **duplicado**.
+
+## 120. Funcionava no curl e falhava no navegador: CORS pulado pelo reply.raw
+
+Depois de corrigir o retry (§119), os campos continuaram vazios. Desta vez não
+supus: reproduzi contra o servidor dele, com a credencial dele.
+
+`POST /ia/pipeline/po` respondeu **HTTP 200, JSON válido, conteúdo correto em
+português, sem retry**. O servidor estava certo. Então o problema era o caminho
+até o navegador — e a comparação lado a lado deu a prova:
+
+```
+/ia/status        -> access-control-allow-origin: http://localhost:8080
+/ia/pipeline/po   -> (nenhum cabeçalho CORS)
+```
+
+**Escrever direto em `reply.raw` pula os hooks do Fastify**, inclusive os
+cabeçalhos que o `@fastify/cors` já tinha calculado. O navegador bloqueava a
+LEITURA de uma resposta que estava perfeita: o `fetch` rejeitava e o lote se
+perdia sem erro visível. `curl` passava porque `curl` não aplica CORS.
+
+A correção é copiar `reply.getHeaders()` para o `writeHead` antes de assumir o
+socket.
+
+**O que isso diz sobre a Fase 4, e é desconfortável:** este é o QUARTO defeito
+no código que escrevi para o modo hospedado, todos encontrados pelo uso real e
+nenhum pela suíte — testar antes de salvar, deduzir o dialeto de JSON, a forma
+do status para a tela, e agora CORS. A suíte estava verde nos quatro.
+
+A causa comum não é distração: é que `app.inject()` do Fastify **não passa por
+CORS, não roda no navegador e não tem tela**. Ele exercita o handler, não o
+sistema. Tudo que mora entre o handler e o usuário — cabeçalhos de hook, o
+formato que a UI lê, o momento em que o botão é clicado — estava fora do alcance
+de todo teste que escrevi.
+
+E um erro meu de método, no §119: encontrei um defeito real (o retry corrompendo
+o stream), corrigi, e **apresentei como se fosse a causa** do que ele relatou.
+Não reproduzi antes de concluir. Da segunda vez reproduzi primeiro, e o
+diagnóstico veio em dois comandos.
