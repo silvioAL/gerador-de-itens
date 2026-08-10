@@ -1,5 +1,5 @@
-import type { GbnfJsonSchema } from "node-llama-cpp";
-import type { OpcoesGeracao, ProvedorIa } from "./provedor.js";
+import type { EsquemaJson } from "./esquema.js";
+import type { OpcoesGeracao, ProvedorIa } from "./tipos.js";
 
 /**
  * SPEC-25 Fase 2 — provedor compatível com a API da OpenAI.
@@ -65,18 +65,18 @@ export type FormatoJson = "json_object" | "json_schema" | "nenhum";
  * inclusive nos aninhados, que é o caso do lote da esteira (um objeto por
  * item). Sem isso: HTTP 400 dizendo exatamente isso.
  */
-export function comAdditionalPropertiesFalse(schema: GbnfJsonSchema): GbnfJsonSchema {
+export function comAdditionalPropertiesFalse(schema: EsquemaJson): EsquemaJson {
   const s = schema as Record<string, unknown>;
   if (s.type === "array" && s.items) {
-    return { ...s, items: comAdditionalPropertiesFalse(s.items as GbnfJsonSchema) } as GbnfJsonSchema;
+    return { ...s, items: comAdditionalPropertiesFalse(s.items as EsquemaJson) } as EsquemaJson;
   }
   if (s.type !== "object" && !s.properties) return schema;
-  const props = (s.properties ?? {}) as Record<string, GbnfJsonSchema>;
+  const props = (s.properties ?? {}) as Record<string, EsquemaJson>;
   return {
     ...s,
     additionalProperties: false,
     properties: Object.fromEntries(Object.entries(props).map(([k, v]) => [k, comAdditionalPropertiesFalse(v)])),
-  } as GbnfJsonSchema;
+  } as EsquemaJson;
 }
 
 interface DeltaStream {
@@ -115,7 +115,7 @@ function erroDeGateway(status: number, corpo: string): Error {
  * subconjunto pequeno (object/array/string/boolean/enum). O objetivo é pegar a
  * falha real que acontece: campo faltando ou tipo trocado.
  */
-export function validarContraSchema(valor: unknown, schema: GbnfJsonSchema): string[] {
+export function validarContraSchema(valor: unknown, schema: EsquemaJson): string[] {
   const problemas: string[] = [];
   const s = schema as Record<string, unknown>;
 
@@ -125,7 +125,7 @@ export function validarContraSchema(valor: unknown, schema: GbnfJsonSchema): str
   }
   if (s.type === "array") {
     if (!Array.isArray(valor)) return [`esperado array, veio ${typeof valor}`];
-    if (s.items) valor.forEach((v, i) => problemas.push(...validarContraSchema(v, s.items as GbnfJsonSchema).map((p) => `[${i}] ${p}`)));
+    if (s.items) valor.forEach((v, i) => problemas.push(...validarContraSchema(v, s.items as EsquemaJson).map((p) => `[${i}] ${p}`)));
     return problemas;
   }
   if (s.type === "object" || s.properties) {
@@ -136,7 +136,7 @@ export function validarContraSchema(valor: unknown, schema: GbnfJsonSchema): str
     for (const chave of (s.required as string[] | undefined) ?? []) {
       if (!(chave in obj)) problemas.push(`falta a chave "${chave}"`);
     }
-    for (const [chave, sub] of Object.entries((s.properties as Record<string, GbnfJsonSchema>) ?? {})) {
+    for (const [chave, sub] of Object.entries((s.properties as Record<string, EsquemaJson>) ?? {})) {
       if (chave in obj) problemas.push(...validarContraSchema(obj[chave], sub).map((p) => `"${chave}": ${p}`));
     }
     return problemas;
@@ -170,7 +170,7 @@ export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): Pro
   const modoJson: FormatoJson = opcoes.formatoJson ?? "json_object";
 
   /** O que vai no corpo pra pedir JSON, no dialeto que o destino aceita. */
-  function pedidoDeJson(schema?: GbnfJsonSchema): Record<string, unknown> {
+  function pedidoDeJson(schema?: EsquemaJson): Record<string, unknown> {
     if (modoJson === "nenhum") return {};
     if (modoJson === "json_schema") {
       if (!schema) return {};
@@ -188,7 +188,7 @@ export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): Pro
     mensagens: { role: string; content: string }[],
     formatoJson: boolean,
     onTexto?: (pedaco: string) => void,
-    schema?: GbnfJsonSchema
+    schema?: EsquemaJson
   ): Promise<string> {
     const resposta = await fetchFn(url, {
       method: "POST",

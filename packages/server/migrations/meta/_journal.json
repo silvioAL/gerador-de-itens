@@ -92,6 +92,13 @@
       "when": 1754480000000,
       "tag": "0012_config_documentos",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1754490000000,
+      "tag": "0013_credenciais_ia",
+      "breakpoints": true
     }
   ]
 }

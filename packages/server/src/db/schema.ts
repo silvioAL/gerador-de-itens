@@ -257,3 +257,29 @@ export const configDocumentos = pgTable(
   },
   (t) => [uniqueIndex("config_documentos_chave_unica").on(t.chave, t.timeId)]
 );
+
+/**
+ * SPEC-31 Fase 4 — credencial do provedor de IA, por organização.
+ *
+ * No modo local a credencial é da pessoa (`~/.gerador/credenciais.json`); aqui
+ * é da organização e é usada por terceiros. Quem lê a chave inteira é só o
+ * adaptador do provedor, na hora da chamada — a API expõe apenas o resumo
+ * mascarado.
+ */
+export const credenciaisIa = pgTable(
+  "credenciais_ia",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizacaoId: uuid("organizacao_id")
+      .notNull()
+      .references(() => organizacoes.id),
+    provedorId: text("provedor_id").notNull(),
+    baseUrl: text("base_url"),
+    chave: text("chave"),
+    modelo: text("modelo"),
+    cabecalhos: jsonb("cabecalhos").$type<Record<string, string>>(),
+    formatoJson: text("formato_json"),
+    atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("credenciais_ia_chave_unica").on(t.organizacaoId, t.provedorId)]
+);
