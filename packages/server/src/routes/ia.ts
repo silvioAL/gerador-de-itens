@@ -238,7 +238,19 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
     // texto aparecendo, e perder isso no hospedado seria a mesma tela com
     // uma experiência pior — o tipo de divergência que esta fase existe pra
     // eliminar.
-    reply.raw.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
+    // ACHADO REAL (todos os campos vazios na tela, e `curl` funcionando):
+    // escrever direto em `reply.raw` PULA os hooks do Fastify — inclusive os
+    // cabeçalhos de CORS que o `@fastify/cors` já tinha calculado. Sem eles o
+    // navegador bloqueia a LEITURA da resposta: o servidor responde 200 com o
+    // JSON certo, o `fetch` rejeita, e o lote inteiro se perde sem erro visível.
+    // Por isso `curl` passava e a tela não.
+    //
+    // `reply.getHeaders()` traz o que o Fastify já montou; copiar antes de
+    // assumir o socket é o que mantém o comportamento das outras rotas.
+    reply.raw.writeHead(200, {
+      ...(reply.getHeaders() as Record<string, string>),
+      "content-type": "text/plain; charset=utf-8",
+    });
     try {
       await provedor.completarEstruturado(pedido.prompt, pedido.esquema as never, {
         onTexto: (pedaco) => reply.raw.write(pedaco),
