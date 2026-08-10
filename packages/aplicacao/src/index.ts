@@ -93,3 +93,19 @@ export {
   type RepositorioDeCredenciais,
   type ResumoCredencial,
 } from "./portas/repositorioDeCredenciais.js";
+
+export {
+  ALVOS_DE_SUGESTAO_CONHECIDOS,
+  montarPedidoAlterarItem,
+  montarPedidoDiagrama,
+  montarPedidoPipeline,
+  montarPedidoSugerirConfig,
+  preambuloDoPapel,
+  PedidoInvalido,
+  type EntradaAlterarItem,
+  type EntradaDiagrama,
+  type EntradaPipeline,
+  type EntradaSugerirConfig,
+  type ItemDoLote,
+  type PedidoIa,
+} from "./casos-de-uso/ia/pedidos.js";

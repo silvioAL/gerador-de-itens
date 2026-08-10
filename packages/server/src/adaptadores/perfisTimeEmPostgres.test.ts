@@ -6,8 +6,13 @@ import {
   TIMES_DO_CONTRATO,
 } from "@gerador/aplicacao/src/portas/contratoDePerfisTime.js";
 import { criarBancoDeDados, type BancoDeDados } from "../db/client.js";
-import { organizacoes, perfisTime, times } from "../db/schema.js";
-import { exigirBancoDescartavel, garantirBancoDeTeste, URL_BANCO_DE_TESTE } from "../test-support/bancoDeTeste.js";
+import { perfisTime, times } from "../db/schema.js";
+import {
+  exigirBancoDescartavel,
+  garantirBancoDeTeste,
+  organizacaoDeTeste,
+  URL_BANCO_DE_TESTE,
+} from "../test-support/bancoDeTeste.js";
 import { criarRepositorioDePerfisTimeEmPostgres } from "./perfisTimeEmPostgres.js";
 
 /**
@@ -36,12 +41,7 @@ testarContratoDePerfisTime("postgres", async () => {
     limpar: async () => {
       await banco.execute(sql`truncate table ${perfisTime}`);
 
-      const [org] = await banco
-        .insert(organizacoes)
-        .values({ nome: "Contrato" })
-        .onConflictDoNothing()
-        .returning();
-      const organizacaoId = org?.id ?? (await banco.select({ id: organizacoes.id }).from(organizacoes))[0].id;
+      const organizacaoId = await organizacaoDeTeste(banco);
 
       for (const id of TIMES_DO_CONTRATO) {
         await banco.insert(times).values({ id, organizacaoId, nome: id }).onConflictDoNothing();

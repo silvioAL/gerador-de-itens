@@ -1,4 +1,6 @@
 import { Client } from "pg";
+import type { BancoDeDados } from "../db/client.js";
+import { organizacoes } from "../db/schema.js";
 
 /**
  * ACHADO REAL, rodando o modo hospedado: a suíte do server tinha
@@ -66,4 +68,22 @@ export async function garantirBancoDeTeste(url: string): Promise<void> {
   } finally {
     await cliente.end();
   }
+}
+
+/**
+ * A organização que os testes usam: a que existir, ou uma nova se o banco
+ * estiver vazio.
+ *
+ * Existe porque `organizacoes` NÃO tem restrição única em `nome`, então
+ * `insert(...).onConflictDoNothing()` sempre insere. Dois arquivos de teste
+ * fazendo isso deixavam a tabela com várias linhas, e qualquer teste que
+ * lesse "a primeira organização" passava a depender da ordem do Postgres —
+ * o que apareceu como uma falha isolada e não reproduzível.
+ */
+export async function organizacaoDeTeste(db: BancoDeDados): Promise<string> {
+  const [existente] = await db.select({ id: organizacoes.id }).from(organizacoes).limit(1);
+  if (existente) return existente.id;
+
+  const [criada] = await db.insert(organizacoes).values({ nome: "Organização de teste" }).returning();
+  return criada.id;
 }

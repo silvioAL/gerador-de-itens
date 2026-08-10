@@ -1918,3 +1918,51 @@ refactor.
 
 O melhor resultado possível para esta fase não era construí-la: era torná-la
 opcional. A SPEC-31 fez isso nas quatro anteriores.
+
+## 115. O hospedado fica completo — e a paridade passa a ser verificada
+
+Reação do usuário ao meu relatório da Fase 4: *"preciso do modo hospedado
+completo, não estou entendendo por que tanta diferença entre um e outro, a
+ideia do hexagonal e DDD é justamente facilitar esse tipo de coisa"*.
+
+Ele está certo, e a objeção é a correta. Eu tinha tratado como "fase nova" o
+que era **dívida da Fase 4**: as ~900 linhas de montagem de prompt dentro do
+`openApiLocal.ts` eram a última duplicação, e enquanto elas moravam lá o
+hospedado não tinha como ter as rotas sem reescrevê-las. Chamar isso de escopo
+futuro era descrever o problema como se fosse a solução.
+
+**O que a extração revelou é que era mais simples do que eu disse.** Cada rota
+de IA fazia três coisas: montar schema, montar prompt, chamar o provedor. As
+duas primeiras são **puras** — entra dado, sai texto e schema. Extraídas para
+`casos-de-uso/ia/pedidos.ts`, as quatro rotas locais viraram quatro linhas cada,
+e as quatro do hospedado nasceram no mesmo dia. `openApiLocal.ts` foi de **1549
+para 1060 linhas**.
+
+O streaming veio junto: o hospedado usa `reply.raw` e transmite pedaço a pedaço,
+porque a esteira mostra o texto aparecendo — a mesma tela com experiência pior
+seria a divergência que esta fase existe para eliminar, só que disfarçada.
+
+**A parte que importa mais que as rotas: a paridade virou teste.**
+`paridade.sanity.test.ts` lê as DUAS bordas — o roteador `node:http` e as rotas
+Fastify — e compara os conjuntos de caminho. Cada exceção precisa de uma linha
+declarando o motivo (instalar GGUF não faz sentido em container; derivar roda no
+navegador no modo local). Adicionar rota num lado só passa a **quebrar o build**.
+
+Prometer paridade em documento não impediu a divergência quatro vezes. Verificar
+impede.
+
+Ele já achou três gaps que ninguém tinha visto, na primeira execução:
+
+- **`/campos-aresta`** — SPEC-21 criou no local e nunca chegou ao hospedado.
+  Nem rota, nem tabela (migração `0014`).
+- **`/prompt-unico-template`** — o mesmo documento com dois nomes: `/config/prompt-unico`
+  aqui, `/prompt-unico-template` lá. A `packages/web` teria que saber em qual
+  modo está.
+- **`/versao`** — trivial, e sem razão nenhuma para faltar.
+
+E um efeito colateral instrutivo: corrigir um flake meu (inserir organização
+nova a cada execução, porque `organizacoes` não tem restrição única em `nome`)
+**expôs** um teste que dependia de não haver credencial gravada. O flake estava
+escondendo a dependência: cada arquivo via uma organização diferente e nunca
+enxergava a credencial do outro. Mesma lição da Fase 3, agora pela terceira vez:
+quem precisa de um estado garante o estado.

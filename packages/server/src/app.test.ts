@@ -11,6 +11,7 @@ import {
   CAMPO_GLOBAL,
   camposNo,
   convitesTime,
+  credenciaisIa,
   especificacaoTemplates,
   organizacoes,
   papeisAcesso,
@@ -327,6 +328,17 @@ describe("/perfis-time", () => {
  * de agentes não rodava e a tela não dizia por quê.
  */
 describe("/ia/* (SPEC-31 Fase 4)", () => {
+  /**
+   * Estes casos afirmam o comportamento SEM credencial, então precisam garantir
+   * que não há credencial — a suíte de contrato do adaptador grava uma e o
+   * último `limpar` dela roda ANTES do último caso, não depois. Mesma lição do
+   * template da Fase 3: quem precisa de um estado garante o estado, em vez de
+   * combinar ordem entre arquivos.
+   */
+  beforeAll(async () => {
+    await db.execute(sql`truncate table ${credenciaisIa}`);
+  });
+
   it("sem credencial, o status diz que não está pronto em vez de 404", async () => {
     const resposta = await app.inject({ method: "GET", url: "/ia/status" });
 
@@ -340,6 +352,34 @@ describe("/ia/* (SPEC-31 Fase 4)", () => {
       method: "POST",
       url: "/ia/sugerir",
       payload: { tech: "Backend", rotulo: "timeout", contextoNo: "" },
+    });
+
+    expect(resposta.statusCode).toBe(503);
+    expect(resposta.json().erro).toContain("credencial");
+  });
+
+  /**
+   * SPEC-31 Fase 4 (conclusão) — as QUATRO rotas que faltavam existem aqui
+   * agora, e recusam entrada inválida com a MESMA mensagem do modo local,
+   * porque quem valida é o mesmo montador da camada de aplicação.
+   */
+  it.each([
+    ["/ia/diagrama", {}, "descricao vazia"],
+    ["/ia/alterar-item", { itemRotulo: "x", campos: [] }, "nada a propor"],
+    ["/ia/sugerir-config", { alvo: "inventado", instrucao: "x" }, "alvo desconhecido"],
+    ["/ia/pipeline/po", { itens: [] }, "nenhum item com placeholder"],
+  ])("POST %s com entrada inválida é 400 com a mesma mensagem do modo local", async (url, payload, trecho) => {
+    const resposta = await app.inject({ method: "POST", url, payload });
+
+    expect(resposta.statusCode).toBe(400);
+    expect(resposta.json().erro).toContain(trecho);
+  });
+
+  it("com entrada válida mas sem credencial, as quatro respondem 503 explicando", async () => {
+    const resposta = await app.inject({
+      method: "POST",
+      url: "/ia/diagrama",
+      payload: { descricao: "um serviço de crédito", tiposDeNo: [{ id: "servico", rotulo: "Serviço" }] },
     });
 
     expect(resposta.statusCode).toBe(503);
