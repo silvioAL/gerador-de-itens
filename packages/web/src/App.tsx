@@ -51,6 +51,7 @@ import { CursorFantasma } from "./demo/CursorFantasma";
 import { TerminalAnimado } from "./demo/TerminalAnimado";
 import { LandingPage } from "./demo/LandingPage";
 import { EscolherTimeScreen } from "./auth/EscolherTimeScreen";
+import { lembrarTime, lerTimeLembrado } from "./auth/timeLembrado";
 import { SemTimeScreen } from "./auth/SemTimeScreen";
 
 const CHAVE_JORNADA_VISTA = "gerador:jornada-vista";
@@ -79,7 +80,20 @@ export function App() {
   const [mostrarLogin, setMostrarLogin] = useState(false);
   // Time ativo inicial, só quando a sessão tem mais de um (EscolherTimeScreen) —
   // com um só, nem chega a perguntar, usa esse direto.
+  // Começa do que ficou lembrado da sessão anterior (#280) — sem isso, um F5
+  // acidental jogava de volta no "Qual time?" no meio do trabalho. Só é usado
+  // se o time ainda estiver na sessão; ver `timeLembrado.ts`.
   const [timeEscolhido, setTimeEscolhido] = useState<string | undefined>(undefined);
+  const timeLembrado = sessao ? lerTimeLembrado(sessao.email, sessao.timeIds) : undefined;
+  const timeInicial = timeEscolhido ?? timeLembrado;
+
+  const escolherTime = useCallback(
+    (timeId: string) => {
+      if (sessao) lembrarTime(sessao.email, timeId);
+      setTimeEscolhido(timeId);
+    },
+    [sessao]
+  );
 
   // Compartilhado entre o auto-aceite (?convite=TOKEN na URL) e o formulário
   // manual da SemTimeScreen (colar link/código) — mesmo efeito, duas entradas.
@@ -128,10 +142,10 @@ export function App() {
     // em vez de só dizer "peça um convite" sem dar jeito de usá-lo aqui.
     return <SemTimeScreen onAceitarToken={aceitarToken} onCriarTime={criarTime} onSair={sair} erro={erroConvite} />;
   }
-  if (sessao.timeIds.length > 1 && !timeEscolhido) {
-    return <EscolherTimeScreen timeIds={sessao.timeIds} onEscolher={setTimeEscolhido} onSair={sair} />;
+  if (sessao.timeIds.length > 1 && !timeInicial) {
+    return <EscolherTimeScreen timeIds={sessao.timeIds} onEscolher={escolherTime} onSair={sair} />;
   }
-  return <AppComSessao sessao={sessao} modo={modo} onSair={sair} timeInicial={timeEscolhido} />;
+  return <AppComSessao sessao={sessao} modo={modo} onSair={sair} timeInicial={timeInicial} />;
 }
 
 interface DadosCarregados extends ConfigCarregada {
@@ -163,6 +177,18 @@ function AppComSessao({
 }) {
   const [timeAtivo, setTimeAtivo] = useState(timeInicial ?? sessao.timeIds[0]);
   const [dados, setDados] = useState<DadosCarregados | null>(null);
+
+  // A troca pelo seletor também precisa ser lembrada (#280). Sem isto, quem
+  // trocasse de time e desse F5 voltava calado pro primeiro da lista — e as
+  // sugestões e campos customizados passavam a vir do time errado, que é uma
+  // falha muito mais difícil de perceber do que cair no "Qual time?".
+  const trocarTimeAtivo = useCallback(
+    (timeId: string) => {
+      lembrarTime(sessao.email, timeId);
+      setTimeAtivo(timeId);
+    },
+    [sessao.email]
+  );
   const [erroConfig, setErroConfig] = useState<string | null>(null);
 
   useEffect(() => {
@@ -209,7 +235,7 @@ function AppComSessao({
       sessao={sessao}
       modo={modo}
       timeAtivo={timeAtivo}
-      onTrocarTimeAtivo={setTimeAtivo}
+      onTrocarTimeAtivo={trocarTimeAtivo}
       onSair={onSair}
     />
   );
