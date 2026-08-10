@@ -1352,7 +1352,12 @@ describe("ReviewScreen — revisor determinístico (SPEC-26 Bloco 4a)", () => {
     );
 
     const botao = screen.getByTestId("abrir-revisor");
-    expect(botao).toHaveTextContent("erro");
+    // O rótulo conta QUANTOS dependem de uma decisão sua, não quantos achados
+    // existem no total: "20 aviso(s)" logo depois de derivar era lido como 20
+    // defeitos quando quase todos eram só a fila do que a esteira ainda vai
+    // escrever (achado real do usuário: "no canvas está tudo com a bolinha
+    // verde"). Dependência órfã é das de pessoa — nenhum agente resolve.
+    expect(botao).toHaveTextContent("1 a resolver");
     fireEvent.click(botao);
     expect(screen.getByTestId("painel-achados")).toHaveTextContent("n9::sumido");
   });
@@ -1369,6 +1374,44 @@ describe("ReviewScreen — revisor determinístico (SPEC-26 Bloco 4a)", () => {
       />
     );
     expect(screen.queryByTestId("abrir-revisor")).not.toBeInTheDocument();
+  });
+
+  /**
+   * ACHADO REAL (dois prints do usuário): canvas com TODAS as bolinhas verdes e,
+   * ao mesmo tempo, um painel vermelho com 20 avisos — *"precisamos entender o
+   * motivo de ter apresentado esses erros"*. Não havia erro nenhum: eram os
+   * campos que a esteira ainda ia escrever, contados junto com os defeitos.
+   *
+   * A separação por `origem` é o que impede as duas telas de se contradizerem,
+   * e este teste é o que impede a contagem de voltar a somar as duas coisas.
+   */
+  it("pendência da esteira não é contada como coisa a resolver", () => {
+    // `porTech` vazio: nenhum ciclo de teste cobre as techs dos itens, então
+    // toda atividade com tech gera `sem-ciclo-de-teste` — regra da esteira.
+    const semCicloDeTeste: RegrasConfig = { tipos: [], tamanhos: [], porTech: {} };
+
+    render(
+      <ReviewScreen
+        resultado={resultadoFixture01()}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        regras={semCicloDeTeste}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    const botao = screen.getByTestId("abrir-revisor");
+    expect(botao).toHaveTextContent("na fila da esteira");
+    expect(botao).not.toHaveTextContent("a resolver");
+
+    fireEvent.click(botao);
+    const daEsteira = screen.getByTestId("pendencias-da-esteira");
+    // Antes de a esteira rodar o texto diz que isto some sozinho — é a frase
+    // que responde "por que apareceu erro se está tudo verde?".
+    expect(daEsteira).toHaveTextContent("ainda vai preencher");
+    expect(screen.queryByTestId("pendencias-de-pessoa")).not.toBeInTheDocument();
   });
 });
 
