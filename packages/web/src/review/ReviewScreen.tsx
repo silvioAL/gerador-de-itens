@@ -951,6 +951,30 @@ export function ReviewScreen({
                       {a.timesEnvolvidos.join(", ")}
                     </div>
                   ) : null}
+                  {/* ACHADO #261 — "item n2::ep0 sem pips depois da esteira completa".
+                      Ninguém falhou: ninguém ASSUMIU. `papelDoGrupo` só aceita
+                      um papel se ele casa com os contextos/techs do item (ou
+                      se tem contexto vazio, que casa com tudo). A atividade de
+                      endpoint nasce com `contextos: []` quando o nó está sem
+                      tech — então, se todos os papéis configurados forem
+                      contextuais, nenhum pega o item e a esteira "completa"
+                      deixando-o intocado.
+
+                      Isso era invisível: pip apagado de "não assumido" é
+                      idêntico ao de "nada a escrever". Aqui o card passa a
+                      dizer a causa e onde corrigi-la. Não inventamos dono de
+                      propósito — um agente de mensageria escrevendo sobre um
+                      item HTTP produziria texto plausível e errado, que é pior
+                      que texto nenhum. */}
+                  {papeisAtivos.length > 0 &&
+                  papeisAtivos.every((p) => papelDoGrupo(papeisAtivos, p.grupo, a) === undefined) ? (
+                    <div data-testid={`sem-dono-${a.chave}`} style={semDonoEstilo}>
+                      Nenhum agente assumiu este item
+                      {a.techs.length === 0
+                        ? " — o nó não tem tecnologia definida, então nenhum agente contextual o reconhece. Preencha a tech do nó no diagrama."
+                        : " — nenhum agente configurado cobre este contexto. Ajuste os contextos na aba Pipeline de agentes."}
+                    </div>
+                  ) : null}
                   <div style={{ display: "flex", gap: 4, marginTop: 6 }} title="Por onde este item já passou na esteira">
                     {papeisAtivos.map((papel) => {
                       // Fase F: um pip por papel CONFIGURADO. Papel que não
@@ -1546,6 +1570,15 @@ const seguindoBadgeEstilo: React.CSSProperties = {
   fontSize: 10.5,
   color: "#38bdf8",
   fontWeight: 600,
+};
+
+/** Aviso de item órfão (#261). Cor de atenção, não de erro: não houve falha —
+ * houve um buraco de configuração, e quem lê precisa saber onde mexer. */
+const semDonoEstilo: React.CSSProperties = {
+  marginTop: 6,
+  fontSize: 11,
+  lineHeight: 1.5,
+  color: "#e8b339",
 };
 
 const pipEstilo: React.CSSProperties = {
