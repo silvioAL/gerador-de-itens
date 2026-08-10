@@ -2087,3 +2087,36 @@ até agora: **contrato não é só o formato dos campos, é o significado deles.
 Duas pontas podem concordar no tipo e discordar no sentido — e o teste de
 paridade de rotas não pega isso. Este pega: afirma que o status traz um modelo
 remoto selecionado e os presets, que é o que a tela precisa para funcionar.
+
+## 119. O retry streamava por cima da primeira tentativa
+
+Relato, com print: *"tudo estava normal até o PO responder, então as
+informações sumiram, os indicadores de timeline sumiram por um tempo e começou
+a rodar o arquiteto"*. Campos do PO vazios, tique verde do PO na esteira, e o
+Arquiteto seguindo em frente como se nada tivesse acontecido.
+
+**A causa está em `completarEstruturado`, do provedor de gateway.** Quando a
+resposta não obedece ao schema, ele faz UM retry dizendo o que faltou — decisão
+certa. Só que a segunda tentativa streamava no **mesmo canal** da primeira.
+Quem acumula os pedaços para dar `JSON.parse` no fim — que é exatamente o que a
+`packages/web` faz — recebia as duas concatenadas. O parse falhava, o lote
+inteiro do papel era descartado, e a tela seguia para o próximo papel sem dizer
+nada.
+
+**Por que nunca apareceu antes:** com GBNF o modelo local devolve JSON válido na
+primeira passada, e o retry nunca roda. No gateway, o retry É o caminho normal
+de recuperação — o defeito nasceu junto com o Claude e só apareceu com um lote
+grande o bastante para o schema ser violado.
+
+A correção é um sinal no contrato, não um remendo numa ponta: `OpcoesGeracao`
+ganhou `onReiniciar`, o provedor chama antes de repetir, as duas bordas emitem
+um caractere NUL (U+0000, impossível em JSON válido) e o cliente descarta tudo
+que veio antes dele. O efeito visível é o texto ao vivo recomeçar — em vez de
+virar lixo silencioso.
+
+O teste que fixa isso sobe um servidor HTTP que erra e depois acerta, e afirma
+as duas coisas: que o sinal veio uma vez, e que **sem descartar, o acumulado não
+é JSON válido**. É a prova do defeito, não só da correção.
+
+Isto responde a pendência #270 — *"descobrir POR QUE o lote volta truncado"*.
+Não voltava truncado: voltava **duplicado**.

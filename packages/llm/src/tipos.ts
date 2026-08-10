@@ -11,6 +11,18 @@ import type { EsquemaJson } from "./esquema.js";
  * A separação é por ARQUIVO porque é a única que o bundler respeita.
  */
 export interface OpcoesGeracao {
+  /**
+   * ACHADO REAL (modo hospedado, esteira com Claude): quando a resposta não
+   * obedece ao schema, `completarEstruturado` tenta de novo — e a segunda
+   * tentativa streamava no MESMO canal da primeira. Quem acumulava os pedaços
+   * recebia as duas concatenadas, o `JSON.parse` falhava, e o lote inteiro era
+   * descartado em silêncio: o trabalho do papel sumia da tela.
+   *
+   * Isto avisa "esqueça tudo que mandei até agora". Quem só exibe texto ao
+   * vivo limpa a área; quem acumula para dar `parse` no fim zera o buffer.
+   * Nunca dispara no caminho local (GBNF já garante JSON válido de primeira).
+   */
+  onReiniciar?: () => void;
   /** Texto da RESPOSTA sendo gerada, pedaço a pedaço. Raciocínio de modelo
    * raciocinador nunca chega aqui (ver `motor.ts`). */
   onTexto?: (pedaco: string) => void;

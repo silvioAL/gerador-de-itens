@@ -295,6 +295,10 @@ export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): Pro
 
       if (problemas.length === 0) return valor;
 
+      // O que já foi streamado é lixo a partir daqui: avisa antes de mandar
+      // a segunda tentativa pelo mesmo canal (ver `OpcoesGeracao.onReiniciar`).
+      opcoesGeracao?.onReiniciar?.();
+
       // UM retry, dizendo o que faltou. Sem GBNF a garantia é probabilística;
       // insistir mais que uma vez só gastaria tempo do usuário — se o gateway
       // erra duas vezes com o defeito apontado, o problema é dele.
