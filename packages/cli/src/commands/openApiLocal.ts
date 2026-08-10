@@ -248,7 +248,11 @@ async function tratarCamposNo(req: IncomingMessage, res: ServerResponse, metodo:
   if (matchDelete) {
     await casos.excluir(decodeURIComponent(matchDelete[1]));
     res.writeHead(204);
-    return res.end();
+    // `res.end()` devolve o próprio ServerResponse; `return` dele num handler
+    // que promete `void` é o que o typecheck acusava. O `return` aqui é só
+    // para sair do handler, não para entregar valor.
+    res.end();
+    return;
   }
 
   enviarJson(res, 404, { erro: "não encontrado" });
@@ -340,7 +344,11 @@ async function tratarCamposAresta(req: IncomingMessage, res: ServerResponse, met
     const campos = await lerCamposAresta(dirProjeto);
     await salvarCamposAresta(dirProjeto, campos.filter((c) => c.id !== id));
     res.writeHead(204);
-    return res.end();
+    // `res.end()` devolve o próprio ServerResponse; `return` dele num handler
+    // que promete `void` é o que o typecheck acusava. O `return` aqui é só
+    // para sair do handler, não para entregar valor.
+    res.end();
+    return;
   }
 
   enviarJson(res, 404, { erro: "não encontrado" });

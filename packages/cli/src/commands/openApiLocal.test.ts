@@ -4,6 +4,25 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+/**
+ * `Response.json()` devolve `unknown` (correto: ninguém sabe o que vem da
+ * rede). Cada teste castava — ou não castava, e o typecheck do CLI ficava
+ * vermelho, o que manteve o portão desligado e deixou passar um
+ * `is not defined` publicado (#286).
+ *
+ * Um helper só resolve os ~50 casos sem espalhar `as` pelo arquivo.
+ *
+ * O default é `any` de propósito, e é um trade-off declarado: o valor deste
+ * portão é pegar erro de CÓDIGO (identificador inexistente, import faltando —
+ * a classe que publicou um `is not defined`), não tipar corpo de resposta em
+ * teste. Tipar ~50 corpos à mão custaria muito e protegeria pouco; quem
+ * precisa de garantia passa o tipo na chamada: `corpoDe<{ id: string }>(r)`.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- trade-off declarado acima
+async function corpoDe<T = any>(resposta: Response): Promise<T> {
+  return (await resposta.json()) as T;
+}
+
 // Mockado pra /ia/sugerir não depender do binário nativo + modelo real em CI
 // (mesma disciplina de ia.test.ts) — e pra poder testar o caminho 503 (modelos
 // não instalados) de forma determinística, sem depender do estado real da
@@ -48,6 +67,9 @@ interface SchemaFake {
   enum?: unknown[];
   items?: SchemaFake;
   properties?: Record<string, SchemaFake>;
+  /** Os testes já liam `required` (é JSON Schema de verdade), mas o tipo do
+   * dublê não declarava — e sem typecheck ninguém percebeu. */
+  required?: string[];
 }
 /** Um valor plausível pra cada forma de schema — o mock precisa respeitar o
  * schema tanto no aninhado do pipeline quanto no PLANO de /ia/sugerir-config
@@ -156,24 +178,24 @@ afterEach(async () => {
 
 describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador open)", () => {
   it("GET /auth/modo devolve local, e /auth/me sempre devolve uma sessão fixa (sem login nenhum)", async () => {
-    const modo = await fetch(`${base}/auth/modo`).then((r) => r.json());
+    const modo = await fetch(`${base}/auth/modo`).then(corpoDe);
     expect(modo).toEqual({ modo: "local" });
 
-    const me = await fetch(`${base}/auth/me`).then((r) => r.json());
+    const me = await fetch(`${base}/auth/me`).then(corpoDe);
     expect(me).toEqual({ email: "local", timeIds: ["local"] });
   });
 
   it("achado real: GET /versao devolve a versão de package.json — usuário não tinha como saber se o npm install pegou a versão nova", async () => {
     const resposta = await fetch(`${base}/versao`);
     expect(resposta.status).toBe(200);
-    const corpo = (await resposta.json()) as { versao?: string };
+    const corpo = (await corpoDe(resposta)) as { versao?: string };
     expect(corpo.versao).toMatch(/^\d+\.\d+\.\d+$/);
   });
 
   it("GET /ia/status devolve o mesmo formato de verificarStatus() (SPEC-23 Fase 0)", async () => {
     const resposta = await fetch(`${base}/ia/status`);
     expect(resposta.status).toBe(200);
-    const corpo = (await resposta.json()) as Record<string, unknown>;
+    const corpo = (await corpoDe(resposta)) as Record<string, unknown>;
     expect(typeof corpo.chatInstalado).toBe("boolean");
     expect(typeof corpo.embeddingInstalado).toBe("boolean");
     expect(typeof corpo.pronto).toBe("boolean");
@@ -198,6 +220,10 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       chatInstalado: true,
       embeddingInstalado: true,
       pronto: true,
+      // O dublê omitia `provedor`/`modelosChat`, que o tipo real exige desde a
+      // SPEC-25 — dublê incompleto que o typecheck desligado deixava passar.
+      provedor: "qwen-local",
+      modelosChat: [],
       caminhoModelos: "/fake/models",
     });
 
@@ -211,7 +237,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       body: JSON.stringify({ tech: "Backend", rotulo: "DLQ configurada e monitorada", contextoNo: "fila rabbitmq" }),
     });
     expect(falha.status).toBe(500);
-    expect((await falha.json()).erro).toContain("binário nativo bloqueado");
+    expect((await corpoDe(falha)).erro).toContain("binário nativo bloqueado");
 
     // 2) Servidor continua respondendo normalmente depois da falha — processo sobreviveu.
     expect((await fetch(`${base}/ia/status`)).status).toBe(200);
@@ -242,6 +268,10 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       chatInstalado: true,
       embeddingInstalado: true,
       pronto: true,
+      // O dublê omitia `provedor`/`modelosChat`, que o tipo real exige desde a
+      // SPEC-25 — dublê incompleto que o typecheck desligado deixava passar.
+      provedor: "qwen-local",
+      modelosChat: [],
       caminhoModelos: "/fake/models",
     });
 
@@ -272,6 +302,10 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       chatInstalado: true,
       embeddingInstalado: true,
       pronto: true,
+      // O dublê omitia `provedor`/`modelosChat`, que o tipo real exige desde a
+      // SPEC-25 — dublê incompleto que o typecheck desligado deixava passar.
+      provedor: "qwen-local",
+      modelosChat: [],
       caminhoModelos: "/fake/models",
     });
 
@@ -358,7 +392,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     expect(resposta.status).toBe(200);
     // Resposta aninhada: um objeto por item do lote — e UMA chamada só ao
     // modelo pros dois itens.
-    expect(await resposta.json()).toEqual({
+    expect(await corpoDe(resposta)).toEqual({
       "n1::setup": {
         _historiaUsuario: "resposta gerada pra n1::setup/_historiaUsuario",
         _criteriosAceite: "resposta gerada pra n1::setup/_criteriosAceite",
@@ -386,7 +420,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
    * diagnóstico contra o template desta versão — e o PUT recebe `{ documento }`.
    * A mesma forma nos dois modos; antes o hospedado nem tinha estas rotas. */
   it("GET /config/regras devolve o template desta versão quando nunca editado; PUT grava e o GET seguinte lê de volta", async () => {
-    const inicial = await fetch(`${base}/config/regras`).then((r) => r.json());
+    const inicial = await fetch(`${base}/config/regras`).then(corpoDe);
     expect(inicial.personalizado).toBe(false);
     expect(inicial.documento).toHaveProperty("porTech");
 
@@ -398,7 +432,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     const put = await fetch(`${base}/config/regras`, { method: "PUT", body: JSON.stringify({ documento: regras }) });
     expect(put.status).toBe(200);
 
-    const depois = await fetch(`${base}/config/regras`).then((r) => r.json());
+    const depois = await fetch(`${base}/config/regras`).then(corpoDe);
     expect(depois.documento).toEqual(regras);
     expect(depois.personalizado).toBe(true);
     // Grava no lugar que o app carrega — não num arquivo paralelo.
@@ -414,7 +448,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       body: JSON.stringify({ documento: { tipos: ["X"] } }),
     });
     expect(ruim.status).toBe(400);
-    expect((await fetch(`${base}/config/regras`).then((r) => r.json())).documento).toEqual(regras);
+    expect((await fetch(`${base}/config/regras`).then(corpoDe)).documento).toEqual(regras);
   });
 
   /**
@@ -430,7 +464,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
    * continua fazendo.
    */
   it("o template desta versão resolve de verdade — comparar contra o vazio nunca acusaria nada", async () => {
-    const { diagnostico } = await fetch(`${base}/config/regras`).then((r) => r.json());
+    const { diagnostico } = await fetch(`${base}/config/regras`).then(corpoDe);
 
     expect(diagnostico.template.checklistTecnico).toBeGreaterThan(0);
     expect(diagnostico.template.testes).toBeGreaterThan(0);
@@ -442,7 +476,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     const deOutraEra = { tipos: [], tamanhos: [], porTech: { Backend: { testes: [{ texto: "unitário", contextos: [] }] } } };
     await fetch(`${base}/config/regras`, { method: "PUT", body: JSON.stringify({ documento: deOutraEra }) });
 
-    const { diagnostico } = await fetch(`${base}/config/regras`).then((r) => r.json());
+    const { diagnostico } = await fetch(`${base}/config/regras`).then(corpoDe);
 
     expect(diagnostico.possivelmenteDesatualizada).toBe(true);
     expect(diagnostico.secoesVazias.map((s: { secao: string }) => s.secao)).toContain("checklistTecnico");
@@ -622,7 +656,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       body: JSON.stringify({ alvo: "inventado", instrucao: "qualquer coisa" }),
     });
     expect(alvoRuim.status).toBe(400);
-    expect((await alvoRuim.json()).erro).toContain("alvo desconhecido");
+    expect((await corpoDe(alvoRuim)).erro).toContain("alvo desconhecido");
 
     const semInstrucao = await fetch(`${base}/ia/sugerir-config`, {
       method: "POST",
@@ -774,7 +808,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
   it("GET /quebras sem quebras/ ainda devolve lista vazia, não erro", async () => {
     const resposta = await fetch(`${base}/quebras`);
     expect(resposta.status).toBe(200);
-    expect(await resposta.json()).toEqual([]);
+    expect(await corpoDe(resposta)).toEqual([]);
   });
 
   it("POST /quebras cria um arquivo com id novo em quebras/, e GET /quebras/:id lê de volta", async () => {
@@ -786,7 +820,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     const criada = await fetch(`${base}/quebras`, {
       method: "POST",
       body: JSON.stringify(quebra),
-    }).then((r) => r.json());
+    }).then(corpoDe);
 
     expect(criada.id).toEqual(expect.any(String));
     expect(criada.id.length).toBeGreaterThan(0);
@@ -794,11 +828,11 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     expect(criada.time).toBe("time-x");
     expect(criada.diagrama).toEqual(quebra.diagrama);
 
-    const lida = await fetch(`${base}/quebras/${criada.id}`).then((r) => r.json());
+    const lida = await fetch(`${base}/quebras/${criada.id}`).then(corpoDe);
     expect(lida.diagrama).toEqual(quebra.diagrama);
     expect(lida.titulo).toBe("Aprovação de crédito v2");
 
-    const lista = await fetch(`${base}/quebras`).then((r) => r.json());
+    const lista = await fetch(`${base}/quebras`).then(corpoDe);
     expect(lista).toEqual([
       {
         id: criada.id,
@@ -821,12 +855,12 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     const criada = await fetch(`${base}/quebras`, {
       method: "POST",
       body: JSON.stringify(quebra),
-    }).then((r) => r.json());
+    }).then(corpoDe);
 
     expect(criada.demandInfo).toBe(quebra.demandInfo);
     expect(criada.anexosContexto).toEqual(quebra.anexosContexto);
 
-    const lida = await fetch(`${base}/quebras/${criada.id}`).then((r) => r.json());
+    const lida = await fetch(`${base}/quebras/${criada.id}`).then(corpoDe);
     expect(lida.demandInfo).toBe(quebra.demandInfo);
     expect(lida.anexosContexto).toEqual(quebra.anexosContexto);
   });
@@ -835,19 +869,19 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     const primeira = await fetch(`${base}/quebras`, {
       method: "POST",
       body: JSON.stringify({ time: "a", diagrama: { nodes: [{ id: "n1", type: "service" }], edges: [] } }),
-    }).then((r) => r.json());
+    }).then(corpoDe);
 
     const segunda = await fetch(`${base}/quebras`, {
       method: "POST",
       body: JSON.stringify({ time: "b", diagrama: { nodes: [{ id: "n2", type: "service" }], edges: [] } }),
-    }).then((r) => r.json());
+    }).then(corpoDe);
 
     expect(primeira.id).not.toBe(segunda.id);
 
-    const lista = await fetch(`${base}/quebras`).then((r) => r.json());
+    const lista = await fetch(`${base}/quebras`).then(corpoDe);
     expect(lista).toHaveLength(2);
 
-    const primeiraAindaIntacta = await fetch(`${base}/quebras/${primeira.id}`).then((r) => r.json());
+    const primeiraAindaIntacta = await fetch(`${base}/quebras/${primeira.id}`).then(corpoDe);
     expect(primeiraAindaIntacta.time).toBe("a");
   });
 
@@ -855,12 +889,12 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     const criada = await fetch(`${base}/quebras`, {
       method: "POST",
       body: JSON.stringify({ time: "a", diagrama: { nodes: [], edges: [] } }),
-    }).then((r) => r.json());
+    }).then(corpoDe);
 
     const atualizada = await fetch(`${base}/quebras/${criada.id}`, {
       method: "PUT",
       body: JSON.stringify({ time: "b", diagrama: { nodes: [{ id: "n1", type: "service" }], edges: [] } }),
-    }).then((r) => r.json());
+    }).then(corpoDe);
 
     expect(atualizada.id).toBe(criada.id);
     expect(atualizada.time).toBe("b");
@@ -877,35 +911,35 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
 
   it("GET /perfis-time sem config/perfis-time.json devolve objeto vazio", async () => {
     const resposta = await fetch(`${base}/perfis-time`);
-    expect(await resposta.json()).toEqual({});
+    expect(await corpoDe(resposta)).toEqual({});
   });
 
   it("PUT /perfis-time/:timeId cria/mescla valores e persiste em config/perfis-time.json", async () => {
     const bucket = await fetch(`${base}/perfis-time/time-x`, {
       method: "PUT",
       body: JSON.stringify({ tipoNo: "service", valores: { linguagem: "Java" } }),
-    }).then((r) => r.json());
+    }).then(corpoDe);
     expect(bucket).toEqual({ linguagem: "Java" });
 
     const bucket2 = await fetch(`${base}/perfis-time/time-x`, {
       method: "PUT",
       body: JSON.stringify({ tipoNo: "service", valores: { framework: "Spring" } }),
-    }).then((r) => r.json());
+    }).then(corpoDe);
     expect(bucket2).toEqual({ linguagem: "Java", framework: "Spring" });
 
-    const todos = await fetch(`${base}/perfis-time`).then((r) => r.json());
+    const todos = await fetch(`${base}/perfis-time`).then(corpoDe);
     expect(todos).toEqual({ "time-x": { service: { linguagem: "Java", framework: "Spring" } } });
   });
 
   it("GET /campos-no sem config/campos-no.json ainda devolve lista vazia, não erro", async () => {
-    expect(await fetch(`${base}/campos-no`).then((r) => r.json())).toEqual([]);
+    expect(await fetch(`${base}/campos-no`).then(corpoDe)).toEqual([]);
   });
 
   it("POST /campos-no grava em config/campos-no.json, e GET /campos-no?timeId= devolve global + o do time", async () => {
     const global = await fetch(`${base}/campos-no`, {
       method: "POST",
       body: JSON.stringify({ tipoNo: "rabbit", key: "topic", label: "Nome do tópico", type: "text" }),
-    }).then((r) => r.json());
+    }).then(corpoDe);
     expect(global.timeId).toBe("__global__");
 
     await fetch(`${base}/campos-no`, {
@@ -920,11 +954,11 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       }),
     });
 
-    const efetivos = await fetch(`${base}/campos-no?timeId=time-x`).then((r) => r.json());
+    const efetivos = await fetch(`${base}/campos-no?timeId=time-x`).then(corpoDe);
     expect(efetivos).toHaveLength(1); // time sobrescreve o global de mesma (tipoNo, key)
     expect(efetivos[0].ajuda).toBe("Sufixo .queue obrigatório");
 
-    const semTime = await fetch(`${base}/campos-no`).then((r) => r.json());
+    const semTime = await fetch(`${base}/campos-no`).then(corpoDe);
     expect(semTime).toHaveLength(1);
     expect(semTime[0].timeId).toBe("__global__");
   });
@@ -933,28 +967,28 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     const criado = await fetch(`${base}/campos-no`, {
       method: "POST",
       body: JSON.stringify({ tipoNo: "rabbit", key: "topic", label: "Nome do tópico", type: "text" }),
-    }).then((r) => r.json());
+    }).then(corpoDe);
 
     const atualizado = await fetch(`${base}/campos-no/${criado.id}`, {
       method: "PUT",
       body: JSON.stringify({ ajuda: "Sufixo .queue" }),
-    }).then((r) => r.json());
+    }).then(corpoDe);
     expect(atualizado.ajuda).toBe("Sufixo .queue");
 
     const respostaDelete = await fetch(`${base}/campos-no/${criado.id}`, { method: "DELETE" });
     expect(respostaDelete.status).toBe(204);
-    expect(await fetch(`${base}/campos-no`).then((r) => r.json())).toEqual([]);
+    expect(await fetch(`${base}/campos-no`).then(corpoDe)).toEqual([]);
   });
 
   it("GET /campos-aresta sem config/campos-aresta.json ainda devolve lista vazia, não erro (SPEC-21)", async () => {
-    expect(await fetch(`${base}/campos-aresta`).then((r) => r.json())).toEqual([]);
+    expect(await fetch(`${base}/campos-aresta`).then(corpoDe)).toEqual([]);
   });
 
   it("POST /campos-aresta grava em config/campos-aresta.json, e GET /campos-aresta?timeId= devolve global + o do time", async () => {
     const global = await fetch(`${base}/campos-aresta`, {
       method: "POST",
       body: JSON.stringify({ tipoAresta: "http", key: "timeoutMs", label: "Timeout (ms)", type: "number" }),
-    }).then((r) => r.json());
+    }).then(corpoDe);
     expect(global.timeId).toBe("__global__");
 
     await fetch(`${base}/campos-aresta`, {
@@ -969,11 +1003,11 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       }),
     });
 
-    const efetivos = await fetch(`${base}/campos-aresta?timeId=time-x`).then((r) => r.json());
+    const efetivos = await fetch(`${base}/campos-aresta?timeId=time-x`).then(corpoDe);
     expect(efetivos).toHaveLength(1); // time sobrescreve o global de mesma (tipoAresta, key)
     expect(efetivos[0].valorPadrao).toBe("3000");
 
-    const semTime = await fetch(`${base}/campos-aresta`).then((r) => r.json());
+    const semTime = await fetch(`${base}/campos-aresta`).then(corpoDe);
     expect(semTime).toHaveLength(1);
     expect(semTime[0].timeId).toBe("__global__");
   });
@@ -982,21 +1016,21 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     const criado = await fetch(`${base}/campos-aresta`, {
       method: "POST",
       body: JSON.stringify({ tipoAresta: "http", key: "timeoutMs", label: "Timeout (ms)", type: "number" }),
-    }).then((r) => r.json());
+    }).then(corpoDe);
 
     const atualizado = await fetch(`${base}/campos-aresta/${criado.id}`, {
       method: "PUT",
       body: JSON.stringify({ valorPadrao: "5000" }),
-    }).then((r) => r.json());
+    }).then(corpoDe);
     expect(atualizado.valorPadrao).toBe("5000");
 
     const respostaDelete = await fetch(`${base}/campos-aresta/${criado.id}`, { method: "DELETE" });
     expect(respostaDelete.status).toBe(204);
-    expect(await fetch(`${base}/campos-aresta`).then((r) => r.json())).toEqual([]);
+    expect(await fetch(`${base}/campos-aresta`).then(corpoDe)).toEqual([]);
   });
 
   it("GET /especificacao-template sem arquivo local devolve o template padrão do engine", async () => {
-    const resposta = await fetch(`${base}/especificacao-template`).then((r) => r.json());
+    const resposta = await fetch(`${base}/especificacao-template`).then(corpoDe);
     expect(resposta.conteudo).toContain("{{titulo}}");
   });
 
@@ -1006,12 +1040,12 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       body: JSON.stringify({ conteudo: "# {{titulo}} customizado" }),
     });
 
-    const resposta = await fetch(`${base}/especificacao-template`).then((r) => r.json());
+    const resposta = await fetch(`${base}/especificacao-template`).then(corpoDe);
     expect(resposta.conteudo).toBe("# {{titulo}} customizado");
   });
 
   it("GET /config/ia sem arquivo local devolve o provedor padrão (SPEC-25 Fase 0)", async () => {
-    const resposta = await fetch(`${base}/config/ia`).then((r) => r.json());
+    const resposta = await fetch(`${base}/config/ia`).then(corpoDe);
     expect(resposta).toEqual({ provedorPadrao: "qwen-local" });
   });
 
@@ -1026,7 +1060,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       body: JSON.stringify({ provedorPadrao: "qwen-local" }),
     });
     expect(put.status).toBe(200);
-    expect(await fetch(`${base}/config/ia`).then((r) => r.json())).toEqual({ provedorPadrao: "qwen-local" });
+    expect(await fetch(`${base}/config/ia`).then(corpoDe)).toEqual({ provedorPadrao: "qwen-local" });
 
     await fetch(`${base}/ia/sugerir`, {
       method: "POST",
@@ -1043,11 +1077,11 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       body: JSON.stringify({ provedorPadrao: "modelo-que-nao-existe" }),
     });
     expect(resposta.status).toBe(400);
-    expect(await fetch(`${base}/config/ia`).then((r) => r.json())).toEqual({ provedorPadrao: "qwen-local" });
+    expect(await fetch(`${base}/config/ia`).then(corpoDe)).toEqual({ provedorPadrao: "qwen-local" });
   });
 
   it("GET /config/pipeline-agentes sem arquivo local devolve o default — toggle + os 4 papéis de fábrica (Fase F)", async () => {
-    const { documento: resposta } = await fetch(`${base}/config/pipeline-agentes`).then((r) => r.json());
+    const { documento: resposta } = await fetch(`${base}/config/pipeline-agentes`).then(corpoDe);
     expect(resposta.confirmacaoObrigatoria).toBe(true);
     expect(resposta.papeis.map((p: { id: string }) => p.id)).toEqual(["po", "arquiteto", "especialista", "qa"]);
     expect(resposta.papeis[0]).toMatchObject({ nome: "PO", grupo: "po", ativo: true, contextos: [] });
@@ -1069,7 +1103,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       }),
     });
 
-    const { documento: resposta } = await fetch(`${base}/config/pipeline-agentes`).then((r) => r.json());
+    const { documento: resposta } = await fetch(`${base}/config/pipeline-agentes`).then(corpoDe);
     expect(resposta.confirmacaoObrigatoria).toBe(false);
     expect(resposta.papeis.map((p: { id: string }) => p.id)).toEqual(["qa", "esp-kafka", "torto"]);
     expect(resposta.papeis[0].ativo).toBe(false);
@@ -1082,7 +1116,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
     mkdirSync(join(dirTemp, "config"), { recursive: true });
     writeFileSync(join(dirTemp, "config", "pipeline-agentes.json"), JSON.stringify({ confirmacaoObrigatoria: false }));
 
-    const { documento: resposta } = await fetch(`${base}/config/pipeline-agentes`).then((r) => r.json());
+    const { documento: resposta } = await fetch(`${base}/config/pipeline-agentes`).then(corpoDe);
     expect(resposta.confirmacaoObrigatoria).toBe(false);
     expect(resposta.papeis).toHaveLength(4);
   });
@@ -1109,7 +1143,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
       body: JSON.stringify({ tipoNo: "service", valores: { linguagem: "Python" } }),
     });
 
-    const todos = await fetch(`${base}/perfis-time`).then((r) => r.json());
+    const todos = await fetch(`${base}/perfis-time`).then(corpoDe);
     expect(todos).toEqual({
       "time-a": { service: { linguagem: "Go" } },
       "time-b": { service: { linguagem: "Python" } },
@@ -1119,7 +1153,7 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
 
 describe("SPEC-25 §5.5 / Fase 2.1 — template do prompt único", () => {
   it("sem arquivo no projeto, devolve o padrão do engine e as variáveis disponíveis", async () => {
-    const corpo = await fetch(`${base}/prompt-unico-template`).then((r) => r.json());
+    const corpo = await fetch(`${base}/prompt-unico-template`).then(corpoDe);
     expect(corpo.conteudo).toContain("{{itensBreakDownContent}}");
     expect(corpo.variaveis).toContain("descricaoEpico");
   });
@@ -1130,7 +1164,7 @@ describe("SPEC-25 §5.5 / Fase 2.1 — template do prompt único", () => {
     expect(put.status).toBe(200);
 
     expect(readFileSync(join(dirTemp, "config", "prompt-unico-template.md"), "utf-8")).toBe(conteudo);
-    expect((await fetch(`${base}/prompt-unico-template`).then((r) => r.json())).conteudo).toBe(conteudo);
+    expect((await fetch(`${base}/prompt-unico-template`).then(corpoDe)).conteudo).toBe(conteudo);
   });
 
   it("variável inventada é 400 — senão viraria texto cru no prompt já colado no chat", async () => {
@@ -1139,7 +1173,7 @@ describe("SPEC-25 §5.5 / Fase 2.1 — template do prompt único", () => {
       body: JSON.stringify({ conteudo: "{{descricaoEpico}} {{naoExisteEssa}}" }),
     });
     expect(resposta.status).toBe(400);
-    const corpo = (await resposta.json()) as Record<string, unknown>;
+    const corpo = (await corpoDe(resposta)) as Record<string, unknown>;
     expect(corpo.erro).toContain("naoExisteEssa");
     // E não gravou nada: template inválido não pode substituir um que funciona.
     expect(existsSync(join(dirTemp, "config", "prompt-unico-template.md"))).toBe(false);
@@ -1240,7 +1274,7 @@ describe("SPEC-25 Fase 2 — credencial do gateway", () => {
     const corpo = await fetch(`${base}/ia/credencial/testar`, {
       method: "POST",
       body: JSON.stringify({ baseUrl: urlGateway, chave: "sk-1", modelo: "m" }),
-    }).then((r) => r.json());
+    }).then(corpoDe);
 
     expect(corpo.ok).toBe(true);
     expect(corpo.amostra).toBe("ok");
@@ -1256,7 +1290,7 @@ describe("SPEC-25 Fase 2 — credencial do gateway", () => {
 
     // HTTP 200: a rota funcionou; quem falhou foi o gateway.
     expect(resposta.status).toBe(200);
-    const corpo = (await resposta.json()) as Record<string, unknown>;
+    const corpo = (await corpoDe(resposta)) as Record<string, unknown>;
     expect(corpo.ok).toBe(false);
     expect(corpo.erro).toMatch(/Credencial recusada/);
   });
@@ -1267,7 +1301,7 @@ describe("SPEC-25 Fase 2 — credencial do gateway", () => {
       body: JSON.stringify({ provedorPadrao: "compativel-openai" }),
     });
     expect(resposta.status).toBe(200);
-    expect(await resposta.json()).toEqual({ provedorPadrao: "compativel-openai" });
+    expect(await corpoDe(resposta)).toEqual({ provedorPadrao: "compativel-openai" });
   });
 
   it("id inventado continua recusado", async () => {

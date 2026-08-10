@@ -2925,3 +2925,41 @@ derivação — produziriam texto plausível e errado (um agente de mensageria
 escrevendo sobre um item HTTP) ou afirmariam uma tech que ninguém declarou.
 Texto plausível e errado é pior que texto nenhum, porque não se revisa o que
 não parece suspeito.
+
+## 138. Ligar o typecheck achou um bug que estava em produção (#286)
+
+O build do CLI rodava só `tsup`, que não typecheca. O `web` sempre rodou
+`tsc --noEmit` antes do build; o CLI, nunca. Foi por isso que um
+`explicarRespostaRecusada is not defined` — import que eu esqueci de gravar —
+passou no build e explodiu na mão do usuário.
+
+Ligar o portão custou 62 erros de dívida. Mas o primeiro deles não era dívida:
+era um **defeito em produção**.
+
+`CredencialProvedor` (o que o modo local persiste) não tinha
+`baseUrlTranscricao`, embora o campo existisse na porta (`CredencialIa`), no
+provedor (`OpcoesProvedorOpenAI`) e na tela. E `criarProvedorPorId` montava o
+provedor sem ele. Efeito: no `gerador open`, com Ollama no chat e Whisper na
+voz, **a transcrição ia para o endereço do CHAT** — batia no Ollama, que não
+transcreve, e voltava 404. Exatamente o sintoma que a mensagem de erro da
+SPEC-30 descreve, escrita nesta mesma rodada sem saber que havia um caminho
+interno produzindo-o.
+
+Mesma classe do bug da migração 0015 (campo existia na UI e sumia na
+persistência), do outro lado da fronteira. E a divergência de tipos era o
+apontador — que ninguém via porque o typecheck não rodava.
+
+O teste que prende isso observa **para onde o áudio vai**, não se o método
+existe: `transcrever` existe de qualquer jeito, e um teste que só checasse isso
+passaria igual antes e depois. Verificado revertendo a correção — sem ela, a
+URL é `http://ollama:11434/v1/audio/transcriptions`.
+
+Dois registros de método:
+
+- **Errei feio no meio.** Um regex de substituição em massa reescreveu o corpo
+  do próprio helper (`corpoDe` passou a chamar `corpoDe`), criando recursão
+  infinita. Rodar a suíte logo depois de cada passo mecânico é o que pegou.
+- **Trade-off declarado:** o helper de leitura de JSON nos testes tem default
+  `any`. O valor deste portão é pegar erro de CÓDIGO — identificador
+  inexistente, import faltando —, não tipar ~50 corpos de resposta em teste.
+  Quem precisa de garantia passa o tipo na chamada.

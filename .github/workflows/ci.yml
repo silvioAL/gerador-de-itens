@@ -36,6 +36,12 @@ jobs:
 
       - run: npm run build --workspaces --if-present
 
+      # ACHADO #286: o build do CLI roda só `tsup`, que NÃO typecheca — e foi
+      # isso que deixou um `explicarRespostaRecusada is not defined` chegar
+      # publicado. O `web` sempre rodou `tsc --noEmit`; o CLI nunca rodou.
+      # Aqui o portão passa a valer pra todo workspace que tenha o script.
+      - run: npm run typecheck --workspaces --if-present
+
       - run: npm test --workspaces --if-present
         env:
           # `gerador_test`, não `gerador`: a suíte trunca tabelas, e o padrão
