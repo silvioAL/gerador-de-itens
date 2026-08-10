@@ -61,8 +61,9 @@ export function ConversaPanel({
   ]);
   const [entrada, setEntrada] = useState(contextoInicial?.trim() ?? "");
   // SPEC-30 Fase 1a — mesmo hook da `JanelaConversa`; o texto ditado cai neste
-  // mesmo campo, editável antes de enviar.
-  const { podeFalar, gravacao } = useVozNaEntrada(setEntrada);
+  // mesmo campo, editável antes de enviar. A config vai junto: é dela que sai o
+  // vocabulário técnico que a transcrição precisa conhecer.
+  const { podeFalar, gravacao } = useVozNaEntrada(setEntrada, { config });
   const [pensando, setPensando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const fimRef = useRef<HTMLDivElement>(null);

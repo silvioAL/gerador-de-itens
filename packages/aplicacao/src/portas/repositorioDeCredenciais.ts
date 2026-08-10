@@ -18,6 +18,9 @@ export interface CredencialIa {
   modelo?: string;
   cabecalhos?: Record<string, string>;
   formatoJson?: string;
+  /** SPEC-30 — endereço da transcrição, quando o destino do chat não faz áudio
+   * (o caso do Ollama). Ausente = usa o mesmo `baseUrl`. */
+  baseUrlTranscricao?: string;
 }
 
 /** O que pode atravessar HTTP: nunca a chave inteira. */

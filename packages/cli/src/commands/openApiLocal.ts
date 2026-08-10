@@ -975,7 +975,12 @@ async function tratarIaPipeline(req: IncomingMessage, res: ServerResponse, papel
  * legítima sobre a configuração, não uma falha do servidor. A tela usa isso
  * pra não desenhar o botão de microfone.
  */
-async function tratarIaTranscrever(req: IncomingMessage, res: ServerResponse, dirProjeto: string): Promise<void> {
+async function tratarIaTranscrever(
+  req: IncomingMessage,
+  res: ServerResponse,
+  dirProjeto: string,
+  vocabulario?: string
+): Promise<void> {
   try {
     const provedor = await obterProvedor(dirProjeto);
     if (!provedor.transcrever) {
@@ -996,6 +1001,11 @@ async function tratarIaTranscrever(req: IncomingMessage, res: ServerResponse, di
       // Português fixo: é o idioma do produto inteiro, e a dica é o que faz
       // sigla e nome de sistema serem reconhecidos.
       idioma: "pt",
+      // O vocabulário vem de quem tem config E diagrama abertos: o navegador
+      // (`montarVocabularioTranscricao`, no engine). É o que faz o modelo de
+      // 145 MB acertar "RabbitMQ" e "idempotência" em vez de "rabitém IKEA" e
+      // "idem potência" — medido, ver a doc daquela função.
+      vocabulario,
     });
     enviarJson(res, 200, { texto });
   } catch (erro) {
@@ -1067,7 +1077,9 @@ export async function tratarApiLocal(req: IncomingMessage, res: ServerResponse, 
     return true;
   }
   if (caminho === "/ia/transcrever" && metodo === "POST") {
-    await tratarIaTranscrever(req, res, dirProjeto);
+    // O corpo é o áudio cru, então o vocabulário viaja na query — é texto
+    // curto (teto de 850 chars no montador) e cabe folgado numa URL.
+    await tratarIaTranscrever(req, res, dirProjeto, query.get("vocabulario") ?? undefined);
     return true;
   }
   if (caminho === "/config/ia" && (metodo === "GET" || metodo === "PUT")) {

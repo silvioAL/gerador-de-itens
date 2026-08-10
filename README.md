@@ -84,6 +84,23 @@ E troque também o campo **Nome do modelo** na tela — o nome precisa bater com
 
 Se a máquina tiver **GPU NVIDIA**, vale muito a pena: descomente o bloco `deploy:` do serviço `ollama` no `docker-compose.yml` (precisa do NVIDIA Container Toolkit no host).
 
+##### Voz: falar em vez de digitar
+
+O mesmo `--profile ia` sobe um **servidor Whisper** (145 MB) ao lado. Ele é um serviço à parte porque **o Ollama não transcreve** — serve texto e visão, não áudio.
+
+Com o destino **"Qwen no Docker"** escolhido, a conversa ganha um botão **🎤 Falar**: você fala, a onda se mexe com sua voz, e o texto cai no campo **editável** (não é enviado sozinho). Nada sai da sua rede.
+
+O ganho de qualidade não vem do tamanho do modelo — vem do **vocabulário**. A ferramenta manda junto os termos do seu projeto (tipos de nó da config, nomes do diagrama, jargão de arquitetura). Medido, mesma frase, mesmo modelo de 145 MB:
+
+| | transcrição |
+|---|---|
+| sem vocabulário | "fila do **rabitém IKEA** … com **dedileta arquil** e **idem potência**" |
+| com vocabulário | "fila do **RabbitMQ** … com **dead letter queue** e **idempotência**" |
+
+Modelos maiores **não** resolviam isso (o `large-v3-turbo` continuava errando, 10× mais lento) — e é por isso que **não há fine-tuning aqui**: treinar um modelo para aprender termos que já estão num JSON seria caro, e em manutenção eterna, para o que uma linha de contexto resolve.
+
+Para um modelo de voz maior, use `MODELO_VOZ` no `.env` (`small`, `large-v3-turbo`).
+
 <details>
 <summary>Por que o endereço é <code>ollama</code> e não <code>localhost</code></summary>
 

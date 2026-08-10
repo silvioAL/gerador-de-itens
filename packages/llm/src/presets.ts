@@ -22,6 +22,9 @@ export interface PresetGateway {
    * API responde 400 exigindo `json_schema`.
    */
   formatoJson: FormatoJson;
+  /** SPEC-30 — endereço da transcrição, quando o destino do chat não
+   * transcreve. É o caso do Ollama: ele serve texto, não áudio. */
+  baseUrlTranscricao?: string;
   /** Onde a pessoa consegue a chave. */
   urlChave?: string;
   observacao: string;
@@ -57,6 +60,9 @@ export const PRESETS_GATEWAY: PresetGateway[] = [
     id: "ollama",
     nome: "Ollama (na sua máquina)",
     baseUrl: "http://localhost:11434/v1",
+    // Mesmo motivo do preset de baixo; no modo local o Whisper do compose é
+    // alcançável pela porta publicada.
+    baseUrlTranscricao: "http://localhost:9000/v1",
     // `qwen2.5`, não `qwen3`: ver a observação do preset de baixo — a diferença
     // é de minutos para segundos, medida contra esta stack.
     modelos: ["qwen2.5:7b", "qwen2.5:3b", "llama3.1:8b"],
@@ -73,6 +79,9 @@ export const PRESETS_GATEWAY: PresetGateway[] = [
     // resolve pro container certo, e foi exatamente o que faltava pro preset
     // "Ollama" existente servir no modo hospedado.
     baseUrl: "http://ollama:11434/v1",
+    // O Ollama NÃO transcreve — a voz vai pro serviço `whisper` do mesmo
+    // compose. Sem isto, o botão de falar apareceria e morreria em 404.
+    baseUrlTranscricao: "http://whisper:9000/v1",
     /**
      * `qwen2.5`, NÃO `qwen3` — medido contra esta stack, em CPU:
      *

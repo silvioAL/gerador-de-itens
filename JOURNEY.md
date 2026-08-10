@@ -2450,3 +2450,73 @@ onde ele vai olhar — e ela nao aparece sozinha em nenhuma suite.
   acoplamento real atras de uma guarda que so existe pro mock. Completei os
   mocks: o teste passa a descrever o contrato inteiro, que e o que ele deveria
   fazer.
+
+## 127. O vocabulário valeu mais que o modelo
+
+Pergunta do usuario: *"tem algo como whisper que podemos incluir como o nosso
+modelo gratuito?"*, e logo depois: *"faria sentido fazer algum fine tunning
+nesse modelo mais leve?"*.
+
+Primeiro achado, antes de qualquer codigo: **o Ollama nao transcreve**. Ele
+serve texto e visao; nao tem `/audio/transcriptions`. Entao "poe junto do Qwen"
+significava um servico A MAIS, nao um modelo a mais. O `hwdsl2/whisper-server`
+(faster-whisper) fala o dialeto compativel — o adaptador da Fase 1a conversa com
+ele sem uma linha nova.
+
+### A medicao que decidiu tudo
+
+Gerei um WAV em portugues com a voz nativa do Windows (SAPI) ditando uma frase
+com jargao real: *"criar uma fila do RabbitMQ … com dead letter queue e
+idempotencia"*. Em CPU, 33 s de audio:
+
+| modelo | tamanho | tempo | jargao |
+|---|---|---|---|
+| `base` | 145 MB | **1,1 s** | "rabitém IKEA", "dedileta arquil", "idem potência" |
+| `small` | 465 MB | 3,5 s | "Habitamik", "Dead Leth, Arq" |
+| `large-v3-turbo` | 1,6 GB | 11 s | "Habitmq", "dedileta arquivo" |
+
+O portugues comum saiu perfeito nos tres. O que todos erravam era **exatamente
+o jargao** — o vocabulario desta ferramenta. E **subir o modelo nao resolvia**:
+custava 10x o tempo e continuava errando.
+
+Ai testei o `initial_prompt` do Whisper (campo `prompt`, no mesmo endpoint), com
+uma lista de termos. Mesmo modelo `base`, mesma maquina, 1,1 s:
+
+```
+sem: "fila do rabitém IKEA … com dedileta arquil e idem potência"
+com: "fila do RabbitMQ … com dead letter queue e idempotência"
+```
+
+Transcricao perfeita. **O que faltava nao era modelo, era contexto.**
+
+### Por que isso responde "fine-tuning?" com um nao
+
+Fine-tuning custaria dataset de audio anotado, GPU, ciclo de treino e manutencao
+eterna (termo novo = retreinar) — para resolver o que uma linha resolve. Mas o
+argumento mais forte nao e o custo: **esta ferramenta ja sabe o vocabulario
+dela.** Os rotulos dos tipos de no estao em `config/diagrama.json`, as techs e
+contextos nas regras, os nomes dos sistemas no diagrama aberto.
+
+Dai `montarVocabularioTranscricao` (no engine, funcao pura): monta a frase de
+contexto a partir da config e do diagrama, do mais especifico pro mais generico,
+com teto — porque passar do limite faz o Whisper descartar o comeco em silencio.
+Um time de Camunda e FICO recebe um vocabulario; um de Kafka e Redis recebe
+outro. Sem treinar nada, e melhorando sozinho conforme a config cresce.
+
+E a mesma regra do resto do produto: nada adivinhado, tudo derivado de
+configuracao explicita.
+
+### O erro que so apareceu testando o caminho de verdade
+
+Com o vocabulario derivado da config, o resultado melhorou mas **nao ficou
+perfeito**: "rabitém IKEA" virou "RabbitMiki". Os outros dois termos acertaram.
+
+O motivo: na config o rotulo e **"Fila Rabbit"** — e o que a pessoa FALA e
+"RabbitMQ". Derivar da config cobre o que o TIME nomeou; nao cobre o que a
+INDUSTRIA nomeou. Entrou uma lista curta de nomes de produto (RabbitMQ, Kafka,
+MongoDB, Camunda…), antes do jargao generico na ordem de corte. Revalidado: a
+transcricao saiu identica ao que foi dito.
+
+Vale como licao geral: **o rotulo da tela nem sempre e a palavra dita.** E eu so
+descobri porque rodei o caminho real do produto contra o servidor de verdade —
+o teste manual anterior, feito com a lista "certa" escrita a mao, tinha passado.
