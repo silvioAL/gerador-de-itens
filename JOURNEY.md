@@ -2815,3 +2815,42 @@ Fica a medição que contraria o que eu tinha assumido sobre o npm: o teto é
 sobre o **tarball**, e `@qvac/llm-llamacpp` tem 518 MB descompactados em 172 MB
 de tarball. Mas GGUF quase não comprime — pesos quantizados, alta entropia —
 então pra este caso tarball ≈ arquivo, e as partes de 190 MB seguem certas.
+
+## 135. O modelo mudou de casa — porque a medição disse onde
+
+O `gerador ia diagnosticar` rodou na máquina do usuário e fechou a questão:
+
+```
+✗ Hugging Face             HTTP 403 — recusado pelo filtro
+✗ CDN do Hugging Face      HTTP 403 — recusado pelo filtro
+✓ npm (registry)           HTTP 200
+✓ GitHub (arquivo binário) HTTP 404 (host respondeu: a rede passa)
+```
+
+O filtro classifica o Hugging Face como *file sharing* e libera o GitHub como
+*developer tools*. Com isso, a escolha deixou de ser opinião.
+
+Os pesos passaram a morar num **repositório público separado**
+(`silvioAL/gerador-modelos`), contendo só os `.gguf` — o código do produto
+continua privado. Qwen3-4B é Apache-2.0, redistribuir sem modificação é
+permitido, com atribuição.
+
+Vão em partes porque um asset de release do GitHub vai até 2 GiB e o modelo tem
+2.382 MiB. A mesma restrição de tamanho da SPEC-32, origem diferente — por isso
+a conferência de SHA-256 foi reusada inteira.
+
+**O release virou o padrão, e o Hugging Face a reserva** — não o contrário. Os
+dois arquivos são byte a byte idênticos (mesmo hash, conferido nos dois
+caminhos), então preferir o que passa em mais redes não custa nada. A reserva
+existe pro caso oposto: rede que libera o HF e bloqueia o GitHub. Nenhuma das
+duas é universal, e o código não finge que é.
+
+Validação real, não só teste: `gerador ia instalar --modelo embedding` num HOME
+temporário baixou os 639 MB do release em 313s e o SHA-256 bateu. E o hash das
+partes do chat, calculado aqui na hora de fatiar, bateu com o que a CI tinha
+calculado numa rodada anterior a partir do download do Hugging Face — duas
+origens independentes, mesmo arquivo.
+
+O teste que fixava "instalar chama `baixarModelo` duas vezes" foi reescrito, e
+não contornado: ele descrevia o padrão antigo. Ganhou dois irmãos — um pro
+`--origem huggingface` e um pra queda do release cair na reserva.

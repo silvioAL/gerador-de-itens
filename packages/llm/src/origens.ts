@@ -7,7 +7,9 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { Readable } from "node:stream";
 import { caminhoDoModelo, garantirDiretorioDeModelos } from "./cache.js";
+import { buscarComProxy, explicarFalhaDeRede, explicarRespostaRecusada } from "./rede.js";
 import type { ModeloRegistrado } from "./modelos.js";
 
 const execArquivo = promisify(execFile);
@@ -260,4 +262,78 @@ function comandoNpm(): string {
 
 function mb(bytes: number): number {
   return Math.round(bytes / 1024 / 1024);
+}
+
+/**
+ * Baixa o modelo das URLs do release e remonta.
+ *
+ * ACHADO que decidiu isto, medido na máquina do usuário com `gerador ia
+ * diagnosticar` — não suposto:
+ *
+ * ```
+ * ✗ Hugging Face             HTTP 403 — recusado pelo filtro
+ * ✗ CDN do Hugging Face      HTTP 403 — recusado pelo filtro
+ * ✓ npm (registry)           HTTP 200
+ * ✓ GitHub (arquivo binário) HTTP 404 (host respondeu: a rede passa)
+ * ```
+ *
+ * O filtro corporativo classifica o Hugging Face como *file sharing* e libera
+ * o GitHub como *developer tools*. Então os pesos passaram a morar num release
+ * público (`silvioAL/gerador-modelos`, só os `.gguf`, Apache-2.0).
+ *
+ * São partes porque um asset de release vai até 2 GiB e o Qwen3-4B tem
+ * 2.382 MiB — a mesma restrição de tamanho, uma origem diferente. Por isso
+ * reusa a conferência de SHA-256: parte fora de ordem ou download truncado dá
+ * arquivo do tamanho certo e conteúdo errado.
+ */
+export async function instalarDeUrls(modelo: ModeloRegistrado, opcoes: OpcoesInstalacao = {}): Promise<string> {
+  const urls = modelo.partesUrl;
+  if (!urls?.length) {
+    throw new Error(`${modelo.nome} não tem release publicado. Use --de <caminho do .gguf>.`);
+  }
+
+  await garantirDiretorioDeModelos(opcoes.baseDir);
+  const destino = caminhoDoModelo(modelo, opcoes.baseDir);
+  if (existsSync(destino)) return destino;
+  const parcial = `${destino}.part`;
+
+  try {
+    const saida = createWriteStream(parcial);
+    let bytesEscritos = 0;
+
+    for (const url of urls) {
+      // eslint-disable-next-line no-await-in-loop -- ordem importa: as partes
+      // são concatenadas, e baixar em paralelo exigiria montar depois, sem
+      // ganho real (a banda é a mesma).
+      const resposta = await buscarComProxy(url).catch((erro) => {
+        throw explicarFalhaDeRede(erro, url);
+      });
+      if (!resposta.ok || !resposta.body) throw await explicarRespostaRecusada(resposta, modelo.nomeArquivo);
+
+      const origem = Readable.fromWeb(resposta.body as import("node:stream/web").ReadableStream);
+      origem.on("data", (pedaco: Buffer) => {
+        bytesEscritos += pedaco.length;
+        opcoes.onProgresso?.({
+          modelo,
+          bytesEscritos,
+          bytesTotais: modelo.tamanhoAproximadoBytes,
+          etapa: "baixando",
+        });
+      });
+      await pipeline(origem, saida, { end: false });
+    }
+
+    await new Promise<void>((resolver, rejeitar) => {
+      saida.once("finish", resolver);
+      saida.once("error", rejeitar);
+      saida.end();
+    });
+
+    await conferirHashSeHouver(modelo, parcial, opcoes);
+    await rename(parcial, destino);
+    return destino;
+  } catch (erro) {
+    await rm(parcial, { force: true });
+    throw erro;
+  }
 }

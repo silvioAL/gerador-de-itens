@@ -37,6 +37,7 @@ export {
 export {
   instalarDeArquivoLocal,
   instalarDePartesNpm,
+  instalarDeUrls,
   type ProgressoInstalacao,
   type OpcoesInstalacao,
 } from "./origens.js";

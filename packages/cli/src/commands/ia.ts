@@ -14,6 +14,7 @@ import {
   idsDeProvedorValidos,
   instalarDeArquivoLocal,
   instalarDePartesNpm,
+  instalarDeUrls,
   lerCredenciais,
   modeloPorId,
   resumirCredencial,
@@ -69,10 +70,29 @@ async function instalarUm(modelo: ModeloRegistrado, de: string | undefined, orig
     await instalarDePartesNpm(modelo, {
       onProgresso: ({ bytesEscritos, bytesTotais, etapa }) => relatar(bytesEscritos, bytesTotais, etapa),
     });
-  } else {
+  } else if (origem === "huggingface" || !modelo.partesUrl?.length) {
     await baixarModelo(modelo, {
       onProgresso: ({ bytesBaixados, bytesTotais }) => relatar(bytesBaixados, bytesTotais, "baixando"),
     });
+  } else {
+    // Release do GitHub como PADRAO, Hugging Face como reserva — e nao o
+    // contrario. Medido em campo: o filtro corporativo classifica o Hugging
+    // Face como *file sharing* e devolve 403, enquanto libera o GitHub. O
+    // mirror e byte a byte identico (mesmo SHA-256, conferido nos dois
+    // caminhos), entao preferir o que funciona em mais redes nao custa nada.
+    //
+    // A reserva existe pro caso oposto: rede que libera o Hugging Face e
+    // bloqueia o GitHub. Nenhuma das duas e universal.
+    try {
+      await instalarDeUrls(modelo, {
+        onProgresso: ({ bytesEscritos, bytesTotais }) => relatar(bytesEscritos, bytesTotais, "baixando"),
+      });
+    } catch (erro) {
+      console.log(`  release indisponivel (${erro instanceof Error ? erro.message.slice(0, 120) : erro}); tentando o Hugging Face...`);
+      await baixarModelo(modelo, {
+        onProgresso: ({ bytesBaixados, bytesTotais }) => relatar(bytesBaixados, bytesTotais, "baixando"),
+      });
+    }
   }
 
   const segundos = ((Date.now() - inicio) / 1000).toFixed(0);
@@ -328,7 +348,7 @@ export async function ia(args: string[], dirProjeto: string = process.cwd()): Pr
       return;
     default:
       throw new Error(
-        "uso: gerador ia <diagnosticar|instalar [--modelo <id>] [--de <caminho.gguf>] [--origem npm]|usar <id>|conectar --url <base> --chave <chave> --modelo <nome>|status>"
+        "uso: gerador ia <diagnosticar|instalar [--modelo <id>] [--de <caminho.gguf>] [--origem npm|huggingface]|usar <id>|conectar --url <base> --chave <chave> --modelo <nome>|status>"
       );
   }
 }

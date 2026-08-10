@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const baixarModeloMock = vi.fn(async () => "/caminho/fake/modelo.gguf");
+/** SPEC-32 — a origem padrão passou a ser o release do GitHub. */
+const instalarDeUrlsMock = vi.fn(async () => "/caminho/fake/modelo.gguf");
 function statusFake(instalado: boolean) {
   return {
     chatInstalado: instalado,
@@ -36,6 +38,7 @@ vi.mock("@gerador/llm", async () => {
   return {
     ...real,
     baixarModelo: baixarModeloMock,
+    instalarDeUrls: instalarDeUrlsMock,
     verificarStatus: verificarStatusMock,
     salvarCredencial: salvarCredencialMock,
     lerCredenciais: lerCredenciaisMock,
@@ -58,6 +61,7 @@ beforeEach(() => {
   // aceitável porque o spy só existe pra engolir a barra de progresso.
   writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true) as never;
   baixarModeloMock.mockClear();
+  instalarDeUrlsMock.mockClear();
   verificarStatusMock.mockClear();
 });
 
@@ -72,9 +76,32 @@ describe("comando `gerador ia`", () => {
     await expect(ia(["outra-coisa"])).rejects.toThrow(/uso: gerador ia/);
   });
 
-  it("`instalar` baixa os dois modelos registrados, um de cada vez", async () => {
+  it("`instalar` traz os dois modelos do RELEASE por padrão, um de cada vez", async () => {
+    // O padrão deixou de ser o Hugging Face de propósito (SPEC-32): medido em
+    // campo com `gerador ia diagnosticar`, o filtro corporativo devolve 403
+    // pro HF e libera o GitHub. O mirror é byte a byte idêntico (mesmo
+    // SHA-256, conferido nos dois caminhos), então preferir o que funciona em
+    // mais redes não custa nada.
     await ia(["instalar"]);
+    expect(instalarDeUrlsMock).toHaveBeenCalledTimes(2);
+    expect(baixarModeloMock).not.toHaveBeenCalled();
+    expect(logs.join("\n")).toContain("Pronto");
+  });
+
+  it("`--origem huggingface` força a origem canônica", async () => {
+    await ia(["instalar", "--origem", "huggingface"]);
     expect(baixarModeloMock).toHaveBeenCalledTimes(2);
+    expect(instalarDeUrlsMock).not.toHaveBeenCalled();
+  });
+
+  it("release fora do ar cai no Hugging Face, em vez de falhar", async () => {
+    // A reserva existe pro caso oposto do que foi medido: rede que libera o
+    // Hugging Face e bloqueia o GitHub. Nenhuma das duas origens é universal.
+    instalarDeUrlsMock.mockRejectedValueOnce(new Error("503 no release"));
+
+    await ia(["instalar", "--modelo", "qwen-local"]);
+
+    expect(baixarModeloMock).toHaveBeenCalledTimes(1);
     expect(logs.join("\n")).toContain("Pronto");
   });
 

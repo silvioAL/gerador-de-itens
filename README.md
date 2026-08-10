@@ -136,7 +136,20 @@ No Windows, para não repetir a cada terminal:
 
 > **Nada disso é necessário para usar a ferramenta.** `gerador open` abre o editor, o canvas, a derivação e a especificação sem baixar modelo nenhum — só os recursos de IA dependem dele. E se a sua rede libera algum gateway de LLM, `gerador ia conectar --url <base> --chave <chave> --modelo <nome>` resolve com **zero download**.
 
-##### Se a rede realmente não alcança o Hugging Face
+##### De onde o modelo vem
+
+Por padrão, `gerador ia instalar` baixa de um **release do GitHub**
+([silvioAL/gerador-modelos](https://github.com/silvioAL/gerador-modelos)) — não do
+Hugging Face. O motivo é medido, não suposto: redes corporativas costumam
+classificar o Hugging Face como *file sharing* e devolver 403 com página de
+filtro, enquanto liberam o GitHub como *developer tools*. Rode
+`gerador ia diagnosticar` e veja qual é o caso da sua.
+
+Os arquivos são os mesmos pesos, byte a byte — o SHA-256 é conferido nos dois
+caminhos. Se o release estiver fora do ar, ele cai automaticamente no Hugging
+Face; `--origem huggingface` força a origem canônica.
+
+##### Se nenhuma das duas origens passa
 
 Por padrão `gerador ia instalar` busca o GGUF no Hugging Face. Onde isso é bloqueado, há duas saídas — nenhuma delas exige rede liberada para lá (SPEC-32):
 
