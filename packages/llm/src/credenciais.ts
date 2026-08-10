@@ -17,6 +17,20 @@ export interface CredencialProvedor {
   visao?: boolean;
   /** Base URL do gateway (`.../v1`), sem `/chat/completions`. */
   baseUrl?: string;
+  /**
+   * SPEC-30 — endereço da transcrição, quando o destino do chat não faz áudio
+   * (o caso do Ollama). Ausente = usa o mesmo `baseUrl`.
+   *
+   * ACHADO (#286): este campo existia na porta (`CredencialIa`) e no provedor
+   * (`OpcoesProvedorOpenAI`), mas NÃO aqui — que é o que o modo local
+   * persiste. `criarProvedorPorId` montava o provedor sem ele, então no
+   * `gerador open` a transcrição ia para o endereço do chat, batia no Ollama e
+   * voltava 404. Mesma classe do bug da migração 0015 (o campo existia na UI e
+   * sumia na persistência), agora do outro lado.
+   *
+   * O typecheck que a CI não rodava era o que apontava a divergência.
+   */
+  baseUrlTranscricao?: string;
   chave?: string;
   /** Nome do modelo no gateway (ex.: "deepseek-chat", "gpt-4o"). */
   modelo?: string;

@@ -302,7 +302,7 @@ export async function instalarDeUrls(modelo: ModeloRegistrado, opcoes: OpcoesIns
     let bytesEscritos = 0;
 
     for (const url of urls) {
-      // eslint-disable-next-line no-await-in-loop -- ordem importa: as partes
+      // ordem importa: as partes
       // são concatenadas, e baixar em paralelo exigiria montar depois, sem
       // ganho real (a banda é a mesma).
       const resposta = await buscarComProxy(url).catch((erro) => {

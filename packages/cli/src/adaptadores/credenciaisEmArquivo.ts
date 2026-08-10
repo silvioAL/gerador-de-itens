@@ -1,4 +1,4 @@
-import { lerCredenciais, salvarCredencial } from "@gerador/llm/gateway";
+import { lerCredenciais, salvarCredencial, type CredencialProvedor } from "@gerador/llm/gateway";
 import {
   resumirCredencialIa,
   type CredencialIa,
@@ -20,7 +20,19 @@ export function criarRepositorioDeCredenciaisEmArquivo(baseDir?: string): Reposi
     },
 
     async salvar(provedorId, credencial) {
-      await salvarCredencial(provedorId, credencial, baseDir);
+      // Conversão de fronteira, explícita: a porta (`CredencialIa`) declara
+      // `formatoJson` como `string` porque `packages/aplicacao` não conhece —
+      // nem deve conhecer — o union `FormatoJson` do `packages/llm`. O
+      // estreitamento é responsabilidade deste adaptador, que é justamente
+      // quem atravessa as duas camadas.
+      //
+      // Antes isto passava por acaso (sem typecheck no build do CLI), e junto
+      // passava a PERDA de `baseUrlTranscricao` — ver #286.
+      await salvarCredencial(
+        provedorId,
+        { ...credencial, formatoJson: credencial.formatoJson as CredencialProvedor["formatoJson"] },
+        baseDir
+      );
     },
 
     async resumir(provedorId) {

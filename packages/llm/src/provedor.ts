@@ -58,6 +58,14 @@ export async function criarProvedorPorId(id: string | undefined, baseDir?: strin
       modelo: credencial.modelo,
       cabecalhos: credencial.cabecalhos,
       formatoJson: credencial.formatoJson,
+      // #286: este campo era DESCARTADO aqui. Sem ele a transcrição ia pro
+      // endereço do CHAT — 404 no Ollama, que não transcreve. O campo existia
+      // na UI e na porta; só não atravessava este ponto.
+      //
+      // `visao` NÃO entra: é consumido pelo status/UI (quais capacidades
+      // mostrar), não pelo provedor. Passar aqui só porque "também estava na
+      // credencial" seria acoplar sem motivo.
+      baseUrlTranscricao: credencial.baseUrlTranscricao,
     });
   }
   return criarProvedorLocal(modeloChatPorId(id), baseDir);
