@@ -12,6 +12,12 @@
  * um `if` em runtime não impede o bundler de arrastar a dependência junto.
  */
 export type { EsquemaJson } from "./esquema.js";
+export {
+  formatoJsonPorBaseUrl,
+  PRESETS_GATEWAY,
+  presetGatewayPorId,
+  type PresetGateway,
+} from "./presets.js";
 export type { OpcoesGeracao, ProvedorIa } from "./tipos.js";
 export {
   comAdditionalPropertiesFalse,

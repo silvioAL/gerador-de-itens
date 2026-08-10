@@ -386,6 +386,44 @@ describe("/ia/* (SPEC-31 Fase 4)", () => {
     expect(resposta.json().erro).toContain("credencial");
   });
 
+  /**
+   * ACHADO REAL configurando o modo hospedado: a tela testa a credencial ANTES
+   * de salvar (é o ponto do botão "Testar"). Minha primeira versão só lia a
+   * credencial gravada, então o primeiro teste da vida sempre respondia
+   * "nenhuma credencial configurada" com os campos preenchidos na frente.
+   */
+  it("testar usa a credencial do CORPO — a tela testa antes de salvar", async () => {
+    const cookieDev = await logarComo(EMAIL_DEV);
+
+    const resposta = await app.inject({
+      method: "POST",
+      url: "/ia/credencial/testar",
+      cookies: { gerador_sessao: cookieDev },
+      payload: { baseUrl: "https://destino-que-nao-existe.invalid/v1", chave: "sk-x", modelo: "m" },
+    });
+
+    // Falha de conexão é RESULTADO do teste (HTTP 200 com ok:false), não erro
+    // da rota — e o importante: NÃO é o 400 de "nenhuma credencial".
+    expect(resposta.statusCode).toBe(200);
+    expect(resposta.json().ok).toBe(false);
+    expect(resposta.json().erro).toBeTruthy();
+  });
+
+  /** A tela não deveria precisar saber que a Anthropic exige `json_schema`
+   * (medido contra a API real, não lido na documentação). */
+  it("o dialeto de JSON é deduzido da base URL quando o cliente não manda", async () => {
+    const cookieDev = await logarComo(EMAIL_DEV);
+    await app.inject({
+      method: "PUT",
+      url: "/ia/credencial",
+      cookies: { gerador_sessao: cookieDev },
+      payload: { baseUrl: "https://api.anthropic.com/v1", chave: "sk-ant-teste-de-dialeto", modelo: "claude-sonnet-5" },
+    });
+
+    const [linha] = await db.select().from(credenciaisIa);
+    expect(linha.formatoJson).toBe("json_schema");
+  });
+
   it("PUT da credencial exige sessão", async () => {
     const resposta = await app.inject({
       method: "PUT",

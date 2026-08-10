@@ -1997,3 +1997,57 @@ mais caros deste projeto não foram código errado, foram **código certo em
 silêncio** — a config de outra era que nunca era comentada, a esteira que não
 escrevia nada sem dizer que não havia regra, e agora uma tela de login que não
 diz que não pede senha.
+
+## 117. O container não subia — e o teste de fronteira estava verde
+
+*"Funcionou, mas ainda sem acesso aos modelos de IA."* O diagnóstico foi
+imediato: a imagem do container era de **6 horas antes** da SPEC-31 inteira. As
+rotas existiam no código e não na imagem. `docker compose build server` deveria
+resolver — e falhou **quatro vezes**, cada uma por um motivo diferente e cada
+uma ensinando algo.
+
+**1. `node-llama-cpp` entrava pelo `package.json`, não pelo `import`.**
+`gateway.fronteira.test.ts` caminha o grafo de imports e estava verde. O build
+morreu assim mesmo:
+
+```
+npm error path /app/node_modules/node-llama-cpp
+npm error [node-llama-cpp] Git is not installed, please install it first to build llama.cpp
+```
+
+Eu tinha guardado o grafo de IMPORTS e esquecido o grafo de DEPENDÊNCIAS.
+`@gerador/llm` declarava `node-llama-cpp` em `dependencies`, então o `npm
+install` tentava compilar llama.cpp num Alpine sem git nem make — antes de
+qualquer linha rodar. Agora é peer **opcional**: quem usa o caminho local
+(`packages/cli`) declara de verdade; quem usa só o gateway não paga. E existe
+`gateway.pacote.test.ts`, que verifica o grafo que faltava.
+
+**2. `--workspace` não impede o npm de materializar o lockfile.** O lockfile da
+raiz descreve o monorepo inteiro. `--ignore-scripts` é a resposta certa aqui, e
+não gambiarra: nenhuma dependência do server tem script de instalação, e o
+estágio de runtime copia só `dist/` e `migrations/`.
+
+**3. `@gerador/aplicacao` faltava no `noExternal` do tsup.** A imagem subiu e
+morreu no primeiro require. Mesma classe do que já tinha acontecido no CLI —
+workspace não publicado precisa ser embutido.
+
+**4. E o app web também era da era anterior**, com o contrato de `/config/*` de
+antes da Fase 3 (documento cru, não envelope). Rebuildado junto.
+
+**Dois defeitos meus que só a configuração real revelou**, os dois no código da
+Fase 4:
+
+- `/ia/credencial/testar` lia só a credencial **gravada**. Mas a tela testa
+  ANTES de salvar — é o ponto do botão. O primeiro teste da vida sempre
+  responderia "nenhuma credencial configurada" com os campos preenchidos na
+  frente. Agora o corpo vence.
+- O **dialeto de JSON** não era deduzido. A Anthropic exige `json_schema` (§107:
+  medido contra a API, contra o que a documentação diz), e a tela não manda esse
+  campo. Sem a dedução, a esteira falharia com HTTP 400 no primeiro item —
+  depois de a credencial ter sido "salva com sucesso". `formatoJsonPorBaseUrl`
+  saiu de `modelos.ts` (que importa o binário) para `presets.ts`, e a rota
+  deduz.
+
+O padrão de novo, agora explícito: **fronteira verificada num eixo não é
+fronteira.** O import estava guardado, o pacote não; o comportamento do teste
+estava guardado, o da tela não.
