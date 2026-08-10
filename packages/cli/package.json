@@ -29,6 +29,7 @@
   },
   "scripts": {
     "build": "tsup && node scripts/copy-web-dist.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "lint": "eslint src"
   },

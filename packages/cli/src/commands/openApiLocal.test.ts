@@ -166,14 +166,14 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
   it("achado real: GET /versao devolve a versão de package.json — usuário não tinha como saber se o npm install pegou a versão nova", async () => {
     const resposta = await fetch(`${base}/versao`);
     expect(resposta.status).toBe(200);
-    const corpo = await resposta.json();
+    const corpo = (await resposta.json()) as { versao?: string };
     expect(corpo.versao).toMatch(/^\d+\.\d+\.\d+$/);
   });
 
   it("GET /ia/status devolve o mesmo formato de verificarStatus() (SPEC-23 Fase 0)", async () => {
     const resposta = await fetch(`${base}/ia/status`);
     expect(resposta.status).toBe(200);
-    const corpo = await resposta.json();
+    const corpo = (await resposta.json()) as Record<string, unknown>;
     expect(typeof corpo.chatInstalado).toBe("boolean");
     expect(typeof corpo.embeddingInstalado).toBe("boolean");
     expect(typeof corpo.pronto).toBe("boolean");
@@ -1139,7 +1139,7 @@ describe("SPEC-25 §5.5 / Fase 2.1 — template do prompt único", () => {
       body: JSON.stringify({ conteudo: "{{descricaoEpico}} {{naoExisteEssa}}" }),
     });
     expect(resposta.status).toBe(400);
-    const corpo = await resposta.json();
+    const corpo = (await resposta.json()) as Record<string, unknown>;
     expect(corpo.erro).toContain("naoExisteEssa");
     // E não gravou nada: template inválido não pode substituir um que funciona.
     expect(existsSync(join(dirTemp, "config", "prompt-unico-template.md"))).toBe(false);
@@ -1256,7 +1256,7 @@ describe("SPEC-25 Fase 2 — credencial do gateway", () => {
 
     // HTTP 200: a rota funcionou; quem falhou foi o gateway.
     expect(resposta.status).toBe(200);
-    const corpo = await resposta.json();
+    const corpo = (await resposta.json()) as Record<string, unknown>;
     expect(corpo.ok).toBe(false);
     expect(corpo.erro).toMatch(/Credencial recusada/);
   });

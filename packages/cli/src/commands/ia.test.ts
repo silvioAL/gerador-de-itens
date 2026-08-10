@@ -53,7 +53,10 @@ beforeEach(() => {
   logSpy = vi.spyOn(console, "log").mockImplementation((msg: string) => {
     logs.push(String(msg));
   });
-  writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+  // `as never`: a assinatura de `process.stdout.write` tem sobrecargas, e o
+  // tipo do spy não casa com o `MockInstance` genérico. Silenciar aqui é
+  // aceitável porque o spy só existe pra engolir a barra de progresso.
+  writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true) as never;
   baixarModeloMock.mockClear();
   verificarStatusMock.mockClear();
 });
