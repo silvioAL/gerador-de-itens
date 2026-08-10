@@ -42,5 +42,15 @@ export default defineConfig({
       timeout: 30000,
       env: { VITE_API_URL: "http://localhost:4000" },
     },
+    // Gateway de IA falso (ver e2e/gatewayFalso.ts). Sobe sempre, mesmo pros
+    // specs que não usam IA: é um processo de ~50 linhas sem estado, e deixá-lo
+    // condicional traria um modo de falha novo ("o spec de IA falha quando
+    // rodado sozinho") em troca de nada.
+    {
+      command: "npx tsx e2e/gatewayFalso.bin.ts",
+      url: "http://127.0.0.1:4123/health",
+      reuseExistingServer: false,
+      timeout: 30000,
+    },
   ],
 });

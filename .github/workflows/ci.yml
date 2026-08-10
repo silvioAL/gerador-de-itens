@@ -45,3 +45,62 @@ jobs:
           DATABASE_URL: postgres://gerador:gerador@localhost:5432/gerador_test
 
       - run: npm run lint --workspaces --if-present
+
+  # ACHADO REAL: este job não existia, e a suíte Playwright estava MORTA há
+  # muitas rodadas — 19 testes, dos quais 9 falhavam por seletor ou texto que o
+  # produto tinha mudado meses antes. Ninguém tinha visto porque ninguém rodava.
+  #
+  # Isso custou caro de verdade: a SPEC-31 Fase 4 entregou o modo hospedado com
+  # a suíte de unidade verde e QUATRO defeitos chegaram ao usuário, todos no vão
+  # que só um navegador enxerga (CORS, dialeto de JSON, corpo do teste de
+  # credencial, forma do `/ia/status`). Existia um teste de navegador. Ele
+  # estava vermelho e ninguém sabia.
+  #
+  # Job separado do `test` de propósito: precisa de browser (~400 MB) e de dois
+  # servidores de pé, e falhar aqui deve dizer "o navegador quebrou", não se
+  # misturar com uma falha de unidade.
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: gerador
+          POSTGRES_PASSWORD: gerador
+          POSTGRES_DB: gerador
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gerador -d gerador"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - run: npm ci
+
+      # Só o Chromium: a suíte não testa diferença entre motores, e baixar os
+      # três triplicaria o tempo do job sem responder pergunta nenhuma.
+      - run: npx playwright install --with-deps chromium
+
+      # `playwright.config.ts` sobe sozinho os três processos que a suíte
+      # precisa (server Fastify, vite e o gateway de IA falso) — aqui não há
+      # nada a orquestrar além do banco, que é o `services` acima.
+      - run: npm run test:e2e --workspace packages/web
+        env:
+          DATABASE_URL: postgres://gerador:gerador@localhost:5432/gerador
+
+      # O screenshot de cada falha é o que torna um E2E vermelho diagnosticável
+      # sem reproduzir na máquina de ninguém.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-resultados
+          path: packages/web/test-results/
+          retention-days: 7

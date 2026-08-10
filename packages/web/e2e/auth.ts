@@ -22,5 +22,9 @@ export async function entrar(page: Page, timeId = "time-pagamentos", email = "de
   // dá pra usar isso como prova de login bem-sucedido. O botão "+ Serviço" só
   // existe depois de autenticado de verdade (achado real: sem essa asserção
   // específica, um 429 de rate limit no login passava batido pelo teste).
-  await expect(page.getByRole("button", { name: "+ Serviço" })).toBeVisible({ timeout: 10000 });
+  // `exact: true` porque a paleta ganhou "+ Serviço de Batch (Spring Batch)"
+  // depois que este helper foi escrito, e o seletor solto passou a casar com
+  // dois botões — o Playwright falha em modo estrito, então TODA spec que
+  // chama `entrar()` estava vermelha por um motivo que não era o dela.
+  await expect(page.getByRole("button", { name: "+ Serviço", exact: true })).toBeVisible({ timeout: 10000 });
 }

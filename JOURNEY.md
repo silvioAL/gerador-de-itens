@@ -2226,3 +2226,58 @@ Registro isso porque o custo real nao era o tempo perdido nesta rodada: era
 estar treinando a mim mesmo a olhar vermelho e pensar "deve ser flaky". Uma
 suite que falha aleatoriamente ensina a ignorar o sinal que ela existe pra dar —
 e a proxima falha, a de verdade, chega no meio desse ruido.
+
+## 123. O teste de navegador existia. Estava morto ha meses e ninguem sabia
+
+A tarefa era escrever um teste de Playwright contra a stack hospedada, com um
+gateway de IA falso — a resposta pra pergunta da retrospectiva da Fase 4: *por
+que a suite estava verde e quatro defeitos chegaram ao usuario?* Porque
+`app.inject()` chama o handler, nao o sistema: sem CORS, sem navegador, sem
+tela. Os quatro moravam nesse vao.
+
+Escrevi `e2e/gatewayFalso.ts` (um servidor OpenAI-compativel, SSE de verdade,
+resposta fixa, 401 pra chave errada) e `e2e/ia-hospedada.spec.ts`, quatro casos:
+a aba mostra o formulario do gateway em vez do comando que nao existe; testar
+ANTES de salvar funciona; a esteira roda no navegador e o texto chega nos
+campos; credencial errada vira mensagem util. Nao ha mock: o Chromium fala com
+o Fastify, que fala HTTP com o gateway falso. A unica mentira e o conteudo da
+resposta.
+
+Ai a primeira rodada mostrou o que importa nesta entrada.
+
+### O helper de login estava quebrado — pra TODA a suite
+
+`entrar()` esperava `getByRole("button", { name: "+ Serviço" })`. A paleta ganhou
+"+ Serviço de Batch (Spring Batch)" em algum momento, o seletor passou a casar
+com dois botoes, e o Playwright falha em modo estrito. **Toda spec que chama
+`entrar()`** — quase todas — estava vermelha por um motivo que nao era o dela.
+
+Puxando o fio: dos 19 testes, 9 falhavam. Paleta esperando 11 tipos quando ha
+16. `"4 atividades"` quando a tela diz `"4 itens"` desde a SPEC-14. Um botao
+`"expandir 01"` que deixou de existir quando a revisao virou lista-mais-ficha na
+SPEC-24. Nada disso era bug de produto: era a suite descrevendo um app que nao
+existe mais.
+
+### Por que ninguem sabia: o CI nunca rodou o E2E
+
+`.github/workflows/ci.yml` roda `npm test --workspaces`. O Playwright nao esta
+em `npm test` de workspace nenhum — ele e `npm run test:e2e`, e nada o chamava.
+A suite foi escrita, passou uma vez, e apodreceu em silencio por meses.
+
+Isso fecha o circulo de um jeito incomodo: **existia um teste de navegador
+quando os quatro defeitos da Fase 4 passaram.** Ele so estava vermelho, sem
+ninguem olhando. A licao nao e "faltava teste de navegador" — e que teste que
+nao roda em algum lugar automatico nao e teste, e um arquivo.
+
+O job `e2e` entrou no CI (Postgres de servico, so Chromium, screenshot das
+falhas como artefato). Os 9 specs foram consertados; 19/19 verdes.
+
+### Dois defeitos de produto sairam de brinde
+
+- `EsteiraAgentes.tsx` misturava `borderBottom` (shorthand) com
+  `borderBottomColor` no mesmo elemento. O React descarta a cor e avisa a cada
+  re-render — o realce do agente ativo dependia de um estilo que o React
+  removia, com um warning por quadro no console. Achado porque o spec novo
+  trata console sujo como falha.
+- Recarregar a pagina perde o time ativo e cai em "Qual time?". Nao e o alvo
+  desta rodada; virou tarefa propria em vez de ser escondida atras de um helper.

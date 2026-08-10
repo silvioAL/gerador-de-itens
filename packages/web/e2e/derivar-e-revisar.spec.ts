@@ -41,12 +41,18 @@ test("derivar quebra abre a revisão com a atividade esperada e exporta", async 
 
   await page.screenshot({ path: "e2e/screenshots/revisao.png", fullPage: true });
 
-  // Expandir o item mostra a especificação técnica completa inline — sem
-  // precisar de um botão de "copiar" separado (revisão e especificação são
-  // uma coisa só).
-  await page.getByRole("button", { name: "expandir 01" }).click();
-  await expect(page.getByText("Especificação técnica")).toBeVisible();
-  await expect(page.getByText(/Nome da fila.*proposta\.aprovada\.q.*manual/)).toBeVisible();
+  // Selecionar o item mostra a ficha técnica ao lado — revisão e especificação
+  // continuam sendo uma coisa só, mas o "expandir inline" virou lista à
+  // esquerda + ficha à direita (SPEC-24). O texto de vazio é o que prova que a
+  // ficha só aparece depois da escolha.
+  await expect(page.getByText("Selecione um item na lista")).toBeVisible();
+  await page.locator('[data-testid^="item-"]').first().click();
+  await expect(page.getByText("Selecione um item na lista")).not.toBeVisible();
+  // O que o nó era no canvas chega classificado na ficha: o tipo virou tech e
+  // contexto, e é isso que depois seleciona as regras de refinamento. Sem este
+  // elo a ficha seria um formulário vazio com um número em cima.
+  await expect(page.getByText("Backend-mensagens rabbitmq")).toBeVisible();
+  await expect(page.getByText("Criar Fila Rabbit.")).toBeVisible();
 
   const downloadMd = page.waitForEvent("download");
   await page.getByRole("button", { name: "Gerar especificação de solução" }).click();
