@@ -2889,3 +2889,39 @@ seguida: **o sistema já estava dizendo a causa, e a gente não estava lendo.**
 Primeiro foi o `error.cause` do `fetch failed`; depois o corpo HTML do 403;
 agora o `finish_reason`. Nos três, o trabalho não foi descobrir nada novo — foi
 parar de descartar o que já chegava.
+
+## 137. O item que ninguém assumiu (#261)
+
+"Item `n2::ep0` sem pips depois da esteira completa." A leitura natural é que
+algum agente falhou. Não falhou: **ninguém assumiu.**
+
+`papelDoGrupo` só aceita um papel se ele casa com os contextos/techs do item —
+ou se tem `contextos: []`, que casa com tudo. E a atividade de endpoint nasce
+assim, em `derivar.ts`:
+
+```ts
+const contextoHttp = cfg.techs.length > 0 ? [`${cfg.techs[0]}-chamadas http`] : [];
+```
+
+Nó sem tech preenchida → `contextos: []` e `techs: []` → o array comparado é
+vazio → nenhum `.some()` casa → só papéis de contexto vazio são aplicáveis. Com
+todos os agentes contextuais, ninguém pega o item, e a esteira "completa"
+deixando-o intocado.
+
+Era invisível porque o pip apagado de "não assumido" é **idêntico** ao de "nada
+a escrever" — o mesmo problema que a Fase F já tinha resolvido uma vez para
+outro caso, reaparecendo num nível acima.
+
+**A medição derrubou a primeira hipótese, e vale registrar.** Eu supus que o
+item tivesse zero placeholders. Não tem: mesmo sem tech há **9 fixos**
+(`_historiaUsuario`, `_criteriosAceite`, os 5 de contrato, `_regrasTeste`,
+`_cenarioFeature`) — medido rodando `listarPlaceholders` com `techs: []`. Os
+placeholders existem; quem os zera é o gate por papel, um nível acima. Sem
+medir, eu teria "corrigido" o lugar errado.
+
+Decisão do usuário entre três saídas: **avisar sem inventar dono.** As outras
+duas — deixar o papel geral assumir o órfão, ou forçar contexto http na
+derivação — produziriam texto plausível e errado (um agente de mensageria
+escrevendo sobre um item HTTP) ou afirmariam uma tech que ninguém declarou.
+Texto plausível e errado é pior que texto nenhum, porque não se revisa o que
+não parece suspeito.

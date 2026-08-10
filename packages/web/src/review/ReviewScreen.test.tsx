@@ -1653,3 +1653,65 @@ describe("ReviewScreen — a ficha segue o pipeline CONFIGURADO", () => {
     expect(aviso).toHaveTextContent(/tabela de regras/i);
   });
 });
+
+/**
+ * #261 — "item n2::ep0 sem pips depois da esteira completa".
+ *
+ * Ninguém falhou: ninguém ASSUMIU. `papelDoGrupo` só aceita um papel se ele
+ * casa com os contextos/techs do item, ou se tem `contextos: []` (casa com
+ * tudo). A atividade de endpoint nasce com `contextos: []` quando o nó está
+ * sem tech — então, com todos os papéis contextuais, nenhum pega o item.
+ *
+ * Era invisível porque o pip apagado de "não assumido" é idêntico ao de "nada
+ * a escrever". Estes testes prendem a mensagem que passou a distinguir os dois.
+ */
+describe("ReviewScreen — item que nenhum agente assume (#261)", () => {
+  function comItemSemContexto() {
+    const resultado = resultadoFixture01();
+    const orfao = { ...resultado.atividades[0], techs: [], contextos: [] };
+    return { ...resultado, atividades: [orfao, ...resultado.atividades.slice(1)] };
+  }
+
+  function renderizar(resultado: ReturnType<typeof resultadoFixture01>) {
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+  }
+
+  it("com TODOS os papéis contextuais, o item órfão avisa — e aponta a tech do nó", async () => {
+    apiPipelineAgentesObterMock.mockResolvedValueOnce({
+      confirmacaoObrigatoria: true,
+      papeis: [
+        { id: "po-msg", nome: "PO mensageria", grupo: "po", ativo: true, contextos: ["Backend-mensagens"] },
+        { id: "arq-msg", nome: "Arquiteto mensageria", grupo: "arquiteto", ativo: true, contextos: ["Backend-mensagens"] },
+      ],
+    });
+    const resultado = comItemSemContexto();
+    renderizar(resultado);
+
+    const aviso = await screen.findByTestId(`sem-dono-${resultado.atividades[0].chave}`);
+    expect(aviso).toHaveTextContent("Nenhum agente assumiu");
+    // A causa e onde corrigir, não só o sintoma.
+    expect(aviso).toHaveTextContent("não tem tecnologia definida");
+  });
+
+  it("com um papel geral (contextos vazios), NÃO avisa — alguém assumiu", async () => {
+    // O geral casa com tudo, então o item tem dono e o aviso seria ruído.
+    apiPipelineAgentesObterMock.mockResolvedValueOnce({
+      confirmacaoObrigatoria: true,
+      papeis: [{ id: "po", nome: "PO", grupo: "po", ativo: true, contextos: [] }],
+    });
+    const resultado = comItemSemContexto();
+    renderizar(resultado);
+
+    await screen.findByTestId(`item-${resultado.atividades[0].chave}`);
+    expect(screen.queryByTestId(`sem-dono-${resultado.atividades[0].chave}`)).toBeNull();
+  });
+});
