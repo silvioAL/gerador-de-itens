@@ -24,6 +24,8 @@ import {
   type ProvedorIa,
 } from "@gerador/llm";
 import type { GbnfJsonSchema } from "node-llama-cpp";
+import { criarCasosDeUsoDeQuebras } from "@gerador/aplicacao";
+import { criarRepositorioDeQuebrasEmArquivo } from "../adaptadores/quebrasEmArquivo.js";
 
 const CAMPO_GLOBAL = "__global__";
 
@@ -132,78 +134,34 @@ async function existeArquivo(caminho: string): Promise<boolean> {
 // cliente web já gera um id novo no primeiro POST e reusa via PUT no resto —
 // só faltava o servidor local respeitar isso em vez de um id fixo "local".
 
-async function listarQuebras(dirQuebras: string): Promise<{ id: string; arquivo: string }[]> {
-  let nomes: string[];
-  try {
-    nomes = await readdir(dirQuebras);
-  } catch {
-    return [];
-  }
-  return nomes
-    .filter((n) => n.endsWith(".json"))
-    .map((n) => ({ id: n.slice(0, -".json".length), arquivo: resolve(dirQuebras, n) }));
-}
 
-async function comoQuebraSalva(id: string, arquivo: string) {
-  const info = await stat(arquivo);
-  const quebra = await lerJsonOpcional<Quebra>(arquivo);
-  return {
-    id,
-    titulo: quebra?.titulo ?? null,
-    time: quebra?.time ?? null,
-    diagrama: quebra?.diagrama ?? { nodes: [], edges: [] },
-    // Achado real: campo persistido no arquivo (JSON.stringify(quebra) grava
-    // a quebra inteira) mas nunca devolvido aqui — GET /quebras/:id nunca
-    // mostrava respostasItens salvo, mesmo já estando no disco (Fase 1, SPEC-23).
-    respostasItens: quebra?.respostasItens ?? {},
-    // Mesmo bug, achado de novo investigando a Fase 1b (SPEC-23): demandInfo
-    // e anexosContexto sobreviviam no arquivo, mas nunca voltavam no GET.
-    demandInfo: quebra?.demandInfo ?? "",
-    anexosContexto: quebra?.anexosContexto ?? [],
-    criadoEm: info.birthtime.toISOString(),
-    atualizadoEm: info.mtime.toISOString(),
-  };
-}
 
 async function tratarQuebras(req: IncomingMessage, res: ServerResponse, metodo: string, caminho: string, dirProjeto: string): Promise<void> {
-  const dirQuebras = resolve(dirProjeto, "quebras");
+  // SPEC-31 Fase 1: mesma camada de aplicação do modo hospedado. O que muda é
+  // só o adaptador — arquivo aqui, Postgres lá. Antes eram duas implementações
+  // do mesmo domínio, escritas separadamente, e uma sempre ficava para trás.
+  const casos = criarCasosDeUsoDeQuebras(criarRepositorioDeQuebrasEmArquivo(dirProjeto));
 
   if (metodo === "GET" && caminho === "/quebras") {
-    const todas = await listarQuebras(dirQuebras);
-    const salvas = await Promise.all(todas.map(({ id, arquivo }) => comoQuebraSalva(id, arquivo)));
-    salvas.sort((a, b) => b.atualizadoEm.localeCompare(a.atualizadoEm));
-    return enviarJson(
-      res,
-      200,
-      salvas.map(({ id, titulo, time, criadoEm, atualizadoEm }) => ({ id, titulo, time, criadoEm, atualizadoEm }))
-    );
+    return enviarJson(res, 200, await casos.listar());
   }
 
   const matchGet = metodo === "GET" && caminho.match(/^\/quebras\/([^/]+)$/);
   if (matchGet) {
-    const id = decodeURIComponent(matchGet[1]);
-    const arquivo = resolve(dirQuebras, `${id}.json`);
-    if (!(await existeArquivo(arquivo))) return enviarJson(res, 404, { erro: "quebra não encontrada" });
-    return enviarJson(res, 200, await comoQuebraSalva(id, arquivo));
+    const quebra = await casos.obter(decodeURIComponent(matchGet[1]));
+    if (!quebra) return enviarJson(res, 404, { erro: "quebra não encontrada" });
+    return enviarJson(res, 200, quebra);
   }
 
   if (metodo === "POST" && caminho === "/quebras") {
-    const quebra = await lerCorpoJson<Quebra>(req);
-    const id = randomUUID();
-    await mkdir(dirQuebras, { recursive: true });
-    const arquivo = resolve(dirQuebras, `${id}.json`);
-    await writeFile(arquivo, JSON.stringify(quebra, null, 2), "utf-8");
-    return enviarJson(res, 201, await comoQuebraSalva(id, arquivo));
+    return enviarJson(res, 201, await casos.criar(await lerCorpoJson(req)));
   }
 
   const matchPut = metodo === "PUT" && caminho.match(/^\/quebras\/([^/]+)$/);
   if (matchPut) {
-    const id = decodeURIComponent(matchPut[1]);
-    const arquivo = resolve(dirQuebras, `${id}.json`);
-    if (!(await existeArquivo(arquivo))) return enviarJson(res, 404, { erro: "quebra não encontrada" });
-    const quebra = await lerCorpoJson<Quebra>(req);
-    await writeFile(arquivo, JSON.stringify(quebra, null, 2), "utf-8");
-    return enviarJson(res, 200, await comoQuebraSalva(id, arquivo));
+    const atualizada = await casos.atualizar(decodeURIComponent(matchPut[1]), await lerCorpoJson(req));
+    if (!atualizada) return enviarJson(res, 404, { erro: "quebra não encontrada" });
+    return enviarJson(res, 200, atualizada);
   }
 
   enviarJson(res, 404, { erro: "não encontrado" });

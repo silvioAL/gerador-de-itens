@@ -5,6 +5,7 @@
   "workspaces": [
     "packages/engine",
     "packages/llm",
+    "packages/aplicacao",
     "packages/web",
     "packages/cli",
     "packages/server"
