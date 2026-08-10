@@ -151,6 +151,9 @@ function CardGateway({
   const [baseUrl, setBaseUrl] = useState(gateway?.baseUrl ?? "");
   const [chave, setChave] = useState("");
   const [nomeModelo, setNomeModelo] = useState(gateway?.modelo ?? "");
+  // SPEC-30 Fase 2 — marcação manual: nenhum preset conhece o modelo que a
+  // empresa batizou, e sem isto gateway interno nunca teria visão.
+  const [visaoManual, setVisaoManual] = useState(gateway?.visao === true);
   const [ocupado, setOcupado] = useState<"salvar" | "testar" | null>(null);
   const [resultado, setResultado] = useState<{ ok: boolean; texto: string } | null>(null);
   // Reconhece o destino pela base URL já salva, pra quem volta na tela não ver
@@ -200,6 +203,7 @@ function CardGateway({
     // serviço `whisper` do mesmo compose. Destino que faz as duas coisas
     // (OpenAI, Groq) não declara nada e o `baseUrl` serve pros dois.
     baseUrlTranscricao: preset?.baseUrlTranscricao,
+    visao: visaoManual,
   };
   // A chave pode vir vazia quando já existe uma salva: o campo mostra a
   // máscara, então exigir redigitá-la pra mudar só a base URL seria hostil.
@@ -322,6 +326,19 @@ function CardGateway({
             aria-label="Nome do modelo"
             style={campoEstilo}
           />
+          {/* SPEC-30 Fase 2 — a tela não tem como adivinhar se um modelo de
+              gateway interno enxerga imagem. Padrão desmarcado: esconder um
+              botão que funcionaria custa um clique; mostrar um que falha custa
+              a conversa. */}
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--texto-2)" }}>
+            <input
+              type="checkbox"
+              checked={visaoManual}
+              onChange={(e) => setVisaoManual(e.target.checked)}
+              aria-label="Este modelo enxerga imagem"
+            />
+            Este modelo enxerga imagem (permite anexar prints na conversa)
+          </label>
           {preset && (
             <datalist id={`modelos-${preset.id}`}>
               {preset.modelos.map((m) => (

@@ -29,6 +29,11 @@ export function criarRepositorioDeCredenciaisEmPostgres(
       modelo: linha.modelo ?? undefined,
       cabecalhos: linha.cabecalhos ?? undefined,
       formatoJson: linha.formatoJson ?? undefined,
+      // SPEC-30: sem estes dois aqui, o valor era gravado e lido como
+      // `undefined` — o botão de anexar imagem nunca aparecia, e só o teste de
+      // NAVEGADOR pegou (a suíte de unidade passava inteira).
+      baseUrlTranscricao: linha.baseUrlTranscricao ?? undefined,
+      visao: linha.visao ?? undefined,
     };
   }
 
@@ -44,6 +49,8 @@ export function criarRepositorioDeCredenciaisEmPostgres(
         modelo: credencial.modelo ?? null,
         cabecalhos: credencial.cabecalhos ?? null,
         formatoJson: credencial.formatoJson ?? null,
+        baseUrlTranscricao: credencial.baseUrlTranscricao ?? null,
+        visao: credencial.visao ?? false,
       };
       await db
         .insert(credenciaisIa)

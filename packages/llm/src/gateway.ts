@@ -17,6 +17,7 @@ export {
   PRESETS_GATEWAY,
   presetGatewayPorId,
   presetsDoModo,
+  temVisao,
   type PresetGateway,
 } from "./presets.js";
 export type { OpcoesGeracao, ProvedorIa } from "./tipos.js";

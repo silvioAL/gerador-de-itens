@@ -25,6 +25,20 @@ export interface PresetGateway {
   /** SPEC-30 — endereço da transcrição, quando o destino do chat não
    * transcreve. É o caso do Ollama: ele serve texto, não áudio. */
   baseUrlTranscricao?: string;
+  /**
+   * SPEC-30 Fase 2 — quais modelos DESTE destino enxergam imagem.
+   *
+   * Por modelo, e não por destino, porque **a base URL não diz**: o mesmo
+   * endereço serve `gpt-4o` (vê) e `whisper-1` (não vê); o mesmo Ollama serve
+   * `qwen2.5:7b` (não vê) e `qwen2.5vl:7b` (vê). Deduzir do endereço seria
+   * repetir o erro do preset de `localhost` (JOURNEY §124) — a informação
+   * certa mora onde ela é conhecida.
+   *
+   * Ausente ou fora da lista = **não vê**. Errar para "não" é deliberado:
+   * esconder um botão que funcionaria custa um clique na configuração;
+   * oferecer um que falha custa uma conversa inteira.
+   */
+  modelosComVisao?: string[];
   /** Onde a pessoa consegue a chave. */
   urlChave?: string;
   observacao: string;
@@ -39,6 +53,8 @@ export const PRESETS_GATEWAY: PresetGateway[] = [
     nome: "Claude (Anthropic)",
     baseUrl: "https://api.anthropic.com/v1",
     modelos: ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5-20251001"],
+    // Toda a família Claude 5 enxerga imagem.
+    modelosComVisao: ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5-20251001"],
     modeloPadrao: "claude-sonnet-5",
     // Structured Outputs: garantia MAIS FORTE que json_object.
     formatoJson: "json_schema",
@@ -51,6 +67,8 @@ export const PRESETS_GATEWAY: PresetGateway[] = [
     nome: "DeepSeek (oficial)",
     baseUrl: "https://api.deepseek.com/v1",
     modelos: ["deepseek-chat", "deepseek-reasoner"],
+    // Nenhum dos dois vê imagem — a API do DeepSeek é só texto.
+    modelosComVisao: [],
     modeloPadrao: "deepseek-chat",
     formatoJson: "json_object",
     urlChave: "https://platform.deepseek.com/api_keys",
@@ -65,7 +83,10 @@ export const PRESETS_GATEWAY: PresetGateway[] = [
     baseUrlTranscricao: "http://localhost:9000/v1",
     // `qwen2.5`, não `qwen3`: ver a observação do preset de baixo — a diferença
     // é de minutos para segundos, medida contra esta stack.
-    modelos: ["qwen2.5:7b", "qwen2.5:3b", "llama3.1:8b"],
+    modelos: ["qwen2.5:7b", "qwen2.5:3b", "llama3.1:8b", "qwen2.5vl:7b"],
+    // Só a variante VL. `qwen2.5:7b` NÃO vê — mesmo endereço, capacidades
+    // diferentes, que é exatamente o motivo de isto ser por modelo.
+    modelosComVisao: ["qwen2.5vl:7b"],
     modeloPadrao: "qwen2.5:7b",
     formatoJson: "json_object",
     observacao: "Roda local, sem custo e sem sair da máquina. A chave é ignorada pelo Ollama — preencha qualquer coisa.",
@@ -97,7 +118,8 @@ export const PRESETS_GATEWAY: PresetGateway[] = [
      * em branco); com teto alto ela chega, gastando minutos por campo. Bom
      * modelo, uso errado — a esteira quer estrutura, não deliberação.
      */
-    modelos: ["qwen2.5:7b", "qwen2.5:3b"],
+    modelos: ["qwen2.5:7b", "qwen2.5:3b", "qwen2.5vl:7b"],
+    modelosComVisao: ["qwen2.5vl:7b"],
     modeloPadrao: "qwen2.5:7b",
     formatoJson: "json_object",
     observacao:
@@ -139,4 +161,19 @@ export function formatoJsonPorBaseUrl(baseUrl: string | undefined): FormatoJson 
   const alvo = baseUrl.replace(/\/+$/, "").toLowerCase();
   const preset = PRESETS_GATEWAY.find((p) => alvo.startsWith(p.baseUrl.replace(/\/+$/, "").toLowerCase()));
   return preset?.formatoJson ?? "json_object";
+}
+
+/**
+ * SPEC-30 Fase 2 — este destino, com ESTE modelo, enxerga imagem?
+ *
+ * Nome do modelo, não base URL: um mesmo endereço serve modelo com e sem
+ * visão. Destino desconhecido (gateway interno com nome próprio) responde
+ * `false` — e a tela permite marcar à mão, porque nenhuma lista conhece o
+ * modelo que a empresa batizou.
+ */
+export function temVisao(baseUrl: string | undefined, modelo: string | undefined): boolean {
+  if (!baseUrl || !modelo) return false;
+  const alvo = baseUrl.replace(/\/+$/, "").toLowerCase();
+  const preset = PRESETS_GATEWAY.find((p) => alvo.startsWith(p.baseUrl.replace(/\/+$/, "").toLowerCase()));
+  return preset?.modelosComVisao?.includes(modelo.trim()) ?? false;
 }

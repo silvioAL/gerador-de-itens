@@ -14,6 +14,12 @@ import type { EsquemaJson } from "@gerador/llm/gateway";
  * `node-llama-cpp` no local, gateway no container.
  */
 export interface PedidoIa {
+  /**
+   * SPEC-30 Fase 2 — imagens (data URLs) que acompanham o prompt. Viajam com o
+   * pedido porque quem executa é o adaptador: o montador continua puro e sem
+   * saber quem enxerga imagem.
+   */
+  imagens?: string[];
   prompt: string;
   esquema: EsquemaJson;
 }
@@ -316,10 +322,15 @@ export interface EntradaDiagrama {
 const MAX_NOS = 10;
 const MAX_ARESTAS = 15;
 
-export function montarPedidoDiagrama(entrada: EntradaDiagrama): PedidoIa {
-  const { descricao, tiposDeNo, tiposDeConexao, techs, contextos, perfilTime } = entrada;
+export function montarPedidoDiagrama(entrada: EntradaDiagrama & { imagens?: string[] }): PedidoIa {
+  const { descricao, tiposDeNo, tiposDeConexao, techs, contextos, perfilTime, imagens } = entrada;
 
-  if (!descricao?.trim()) throw new PedidoInvalido("descricao vazia — conte o que precisa ser construído");
+  // SPEC-30 Fase 2: um print de diagrama JÁ É a descrição. Exigir texto junto
+  // obrigaria a pessoa a redigitar o que a imagem mostra — que é exatamente o
+  // trabalho que anexar o print deveria evitar.
+  if (!descricao?.trim() && !imagens?.length) {
+    throw new PedidoInvalido("descricao vazia — conte o que precisa ser construído (ou anexe uma imagem)");
+  }
   if (!Array.isArray(tiposDeNo) || tiposDeNo.length === 0) {
     throw new PedidoInvalido("tiposDeNo vazio — sem os tipos disponíveis não dá pra restringir a proposta");
   }
@@ -394,7 +405,8 @@ export function montarPedidoDiagrama(entrada: EntradaDiagrama): PedidoIa {
     `- Responda em português.`,
   ].join("\n");
 
-  return { prompt, esquema };
+  // As imagens seguem com o pedido — quem as manda pro modelo é o adaptador.
+  return { prompt, esquema, imagens };
 }
 
 export interface EntradaAlterarItem {

@@ -5,6 +5,7 @@ import {
   CHAVE_GATEWAY_FALSO,
   MARCA_GATEWAY_FALSO,
   MODELO_GATEWAY_FALSO,
+  MARCA_VIU_IMAGEM,
   TEXTO_TRANSCRITO_FALSO,
 } from "./gatewayFalso";
 
@@ -210,4 +211,52 @@ test.describe("voz na conversa", () => {
     await campo.fill(`${await campo.inputValue()} (corrigido à mão)`);
     await expect(campo).toHaveValue(/corrigido à mão/);
   });
+});
+
+/**
+ * SPEC-30 Fase 2 — anexar um print, pelo navegador.
+ *
+ * O que só o navegador prova: que o `FileReader` produz um data URL que
+ * sobrevive ao POST, que o servidor repassa ao provedor, e que o provedor monta
+ * `content` como parts — o gateway falso responde com `MARCA_VIU_IMAGEM` só
+ * quando a imagem chegou de verdade.
+ */
+test("anexar um print manda a imagem até o gateway", async ({ page }) => {
+  await entrar(page);
+
+  await abrirModeloIa(page);
+  const card = page.getByTestId("modelo-ia-gateway");
+  await card.getByLabel("Base URL do gateway").fill(BASE_URL_GATEWAY_FALSO);
+  await card.getByLabel("Chave de API").fill(CHAVE_GATEWAY_FALSO);
+  await card.getByLabel("Nome do modelo").fill(MODELO_GATEWAY_FALSO);
+  // Gateway interno não está em lista nenhuma — é exatamente por isso que a
+  // marcação manual existe (SPEC-30 §4.2).
+  await card.getByLabel("Este modelo enxerga imagem").check();
+  await card.getByRole("button", { name: "Salvar" }).click();
+  await expect(page.getByTestId("gateway-resultado")).toContainText("Credencial salva");
+  await page.getByRole("button", { name: "Voltar ao canvas" }).click();
+
+  await page.getByRole("button", { name: "✦ Desenhar conversando" }).click();
+  const anexar = page.getByTestId("anexar-imagem");
+  await expect(anexar).toBeVisible();
+
+  // 1x1 PNG — o menor arquivo válido possível; o teste é sobre o caminho, não
+  // sobre o conteúdo da imagem.
+  await page.getByLabel("Escolher imagem").setInputFiles({
+    name: "diagrama.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "base64"
+    ),
+  });
+
+  await expect(page.getByTestId("imagem-anexada-0")).toBeVisible();
+  // O aviso de saída de dados aparece com a imagem, e diz para onde ela vai.
+  await expect(page.getByTestId("aviso-saida-de-dados")).toContainText("127.0.0.1");
+
+  // Enviar SEM texto: o print já é a descrição.
+  await page.getByRole("button", { name: "Enviar" }).click();
+
+  await expect(page.getByText(new RegExp(MARCA_VIU_IMAGEM)).first()).toBeVisible({ timeout: 30000 });
 });

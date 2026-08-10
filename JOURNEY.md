@@ -2520,3 +2520,54 @@ transcricao saiu identica ao que foi dito.
 Vale como licao geral: **o rotulo da tela nem sempre e a palavra dita.** E eu so
 descobri porque rodei o caminho real do produto contra o servidor de verdade —
 o teste manual anterior, feito com a lista "certa" escrita a mao, tinha passado.
+
+## 128. Imagem na conversa: o teste de navegador achou o que a unidade nao via
+
+SPEC-30 Fase 2 — anexar um print no "Desenhar conversando". O caminho e o mesmo
+da voz: capacidade declarada, UI que so oferece o que existe, gateway
+compativel. Mas os defeitos foram outros, e nenhum apareceu na suite de unidade.
+
+### 1. O retry perdia a imagem
+
+`completarEstruturado` tenta de novo quando a resposta nao obedece ao schema. A
+segunda chamada montava as mensagens sem as imagens — ou seja, **respondia
+sobre um print que nao viu**. Peguei escrevendo o teste "anexa so na ULTIMA
+mensagem": ele falhou por um motivo diferente do que eu esperava, e o motivo
+era um bug real.
+
+### 2. `capacidades.visao` nao pode sair da base URL — e nem do preset sozinho
+
+A SPEC ja dizia que a base URL nao serve (o mesmo endereco serve `gpt-4o` e
+`whisper-1`; o mesmo Ollama serve `qwen2.5:7b` e `qwen2.5vl:7b`). Virou
+`modelosComVisao` por preset.
+
+O que a SPEC nao tinha resolvido: **gateway interno nao esta em preset nenhum**.
+Sem uma marcacao manual, quem tem wrapper corporativo nunca teria visao — e o
+proprio E2E, que usa um gateway falso, nao conseguia ligar a feature. Entrou o
+checkbox "Este modelo enxerga imagem", desmarcado por padrao.
+
+### 3. O campo novo nao chegava no banco
+
+Adicionei `visao` e `baseUrlTranscricao` ao tipo `CredencialIa`, ao formulario,
+ao zod da rota e ao resumo. **A suite de unidade passou inteira** — 300 testes.
+O E2E falhou: o botao de anexar nao aparecia.
+
+Motivo: o adaptador Postgres tem **colunas explicitas**, nao um `jsonb`
+generico. Campo novo no tipo nao vira campo novo na tabela — o valor era
+gravado no ar e lido como `undefined`. Faltava a migracao 0015.
+
+Isso e a mesma familia do §123: **teste de unidade prova que o handler faz o que
+o handler acha que faz.** A persistencia real, o navegador real e o formato real
+sao outra pergunta — e e a pergunta que o usuario faz.
+
+### 4. O dublê tambem precisou aprender o formato
+
+Com imagem, `content` deixa de ser string e vira array de parts. O
+`gatewayFalso` concatenava `m.content` direto: virava `"[object Object]"`, ele
+nao achava o schema no prompt, caia no ramo de texto livre e devolvia algo que
+nao era JSON. A tela mostrou `Unexpected token 'e'`.
+
+Vale registrar porque e contraintuitivo: **o dublê de teste tem contrato
+proprio**, e mudar o formato do pedido quebra ele igual quebraria o destino de
+verdade. Um mock que aceitasse qualquer coisa teria escondido isso — e escondido
+tambem se o produto tivesse montado as parts errado.

@@ -4,6 +4,7 @@ import {
   criarProvedorCompativelOpenAI,
   formatoJsonPorBaseUrl,
   presetsDoModo,
+  temVisao,
   type ProvedorIa,
 } from "@gerador/llm/gateway";
 import {
@@ -55,6 +56,8 @@ const corpoCredencial = z.object({
   // SPEC-30: o Ollama não transcreve, então o preset do Docker aponta a voz
   // pro serviço `whisper` do mesmo compose.
   baseUrlTranscricao: z.string().url().optional(),
+  // Marcação manual de visão — pra gateway interno, que nenhum preset conhece.
+  visao: z.boolean().optional(),
 });
 
 function comoProvedor(credencial: CredencialIa): ProvedorIa {
@@ -129,7 +132,13 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
       // SPEC-30: aqui só existe o gateway, e o gateway transcreve — então a
       // capacidade é exatamente "tem credencial?". A tela usa isto pra decidir
       // se desenha o microfone.
-      capacidades: { transcricao: resumo.configurado },
+      capacidades: {
+        transcricao: resumo.configurado,
+        // Por MODELO: o mesmo endereço serve modelo com e sem visão.
+        // Preset OU marcação manual: quem tem gateway próprio sabe do modelo
+        // dele mais que qualquer lista nossa.
+        visao: resumo.visao === true || temVisao(resumo.baseUrl, resumo.modelo),
+      },
       credencial: resumo,
     };
   });
@@ -270,6 +279,8 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
     });
     try {
       await provedor.completarEstruturado(pedido.prompt, pedido.esquema as never, {
+        // SPEC-30 Fase 2: se o pedido trouxe imagem, ela vai junto do prompt.
+        imagens: pedido.imagens,
         onTexto: (pedaco) => reply.raw.write(pedaco),
         // NUL nunca aparece em JSON válido: é o sinal de "descarte o que
         // recebeu até aqui" quando o provedor vai repetir a tentativa.

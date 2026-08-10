@@ -279,6 +279,10 @@ export const credenciaisIa = pgTable(
     modelo: text("modelo"),
     cabecalhos: jsonb("cabecalhos").$type<Record<string, string>>(),
     formatoJson: text("formato_json"),
+    /** SPEC-30 — a voz pode ir pra outro endereço (o Ollama não transcreve). */
+    baseUrlTranscricao: text("base_url_transcricao"),
+    /** SPEC-30 Fase 2 — "este modelo enxerga imagem", marcado à mão. */
+    visao: boolean("visao").notNull().default(false),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("credenciais_ia_chave_unica").on(t.organizacaoId, t.provedorId)]

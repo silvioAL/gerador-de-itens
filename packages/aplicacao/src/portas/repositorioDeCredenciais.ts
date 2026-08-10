@@ -21,6 +21,14 @@ export interface CredencialIa {
   /** SPEC-30 — endereço da transcrição, quando o destino do chat não faz áudio
    * (o caso do Ollama). Ausente = usa o mesmo `baseUrl`. */
   baseUrlTranscricao?: string;
+  /**
+   * SPEC-30 Fase 2 — "este modelo enxerga imagem", marcado à mão.
+   *
+   * Existe porque nenhuma lista conhece o modelo que a empresa batizou: o
+   * preset cobre os destinos públicos, e o gateway interno precisa de alguém
+   * dizendo. Padrão ausente = não vê.
+   */
+  visao?: boolean;
 }
 
 /** O que pode atravessar HTTP: nunca a chave inteira. */
@@ -28,6 +36,10 @@ export interface ResumoCredencial {
   configurado: boolean;
   baseUrl?: string;
   modelo?: string;
+  /** SPEC-30 Fase 2 — a marcação manual de visão. Não é segredo: dizer que o
+   * modelo enxerga imagem não expõe nada, e a tela precisa disso pra decidir
+   * se oferece o anexo. */
+  visao?: boolean;
   chaveMascarada?: string;
 }
 
@@ -41,11 +53,14 @@ export interface RepositorioDeCredenciais {
 
 /** Mascara para exibição — três primeiros e quatro últimos, nunca o meio. */
 export function resumirCredencialIa(c: CredencialIa | null | undefined): ResumoCredencial {
-  if (!c?.baseUrl || !c?.chave) return { configurado: false, baseUrl: c?.baseUrl, modelo: c?.modelo };
+  if (!c?.baseUrl || !c?.chave) {
+    return { configurado: false, baseUrl: c?.baseUrl, modelo: c?.modelo, visao: c?.visao };
+  }
   return {
     configurado: true,
     baseUrl: c.baseUrl,
     modelo: c.modelo,
+    visao: c.visao,
     chaveMascarada: `${c.chave.slice(0, 3)}…${c.chave.slice(-4)}`,
   };
 }

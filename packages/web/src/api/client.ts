@@ -244,6 +244,8 @@ export interface ResumoGateway {
   modelo?: string;
   /** `sk-…1234`. A chave inteira nunca trafega de volta pro navegador. */
   chaveMascarada?: string;
+  /** SPEC-30 Fase 2 — marcação manual de "este modelo enxerga imagem". */
+  visao?: boolean;
 }
 
 export interface StatusIa {
@@ -263,7 +265,7 @@ export interface StatusIa {
   /** SPEC-30 — o que o provedor selecionado faz além de texto. Ausente em
    * servidor antigo, e a UI trata isso como "não faz": esconder um botão que
    * funcionaria custa um clique; mostrar um que falha custa a gravação. */
-  capacidades?: { transcricao?: boolean };
+  capacidades?: { transcricao?: boolean; visao?: boolean };
 }
 
 /** Um destino conhecido do gateway — espelha `PresetGateway` de `@gerador/llm`,
@@ -391,7 +393,7 @@ export const apiIa = {
   status: () => requisitar<StatusIa>("/ia/status"),
   /** SPEC-25 Fase 2 — grava a credencial do gateway em `~/.gerador`, NUNCA em
    * `config/` (que é versionável). Chave vazia = manter a que já está lá. */
-  salvarCredencial: (dados: { baseUrl: string; chave: string; modelo: string; baseUrlTranscricao?: string }) =>
+  salvarCredencial: (dados: { baseUrl: string; chave: string; modelo: string; baseUrlTranscricao?: string; visao?: boolean }) =>
     requisitar<{ ok: true }>("/ia/credencial", { method: "PUT", body: JSON.stringify(dados) }),
   /** Bate no gateway de verdade com um prompt mínimo. Falha de conexão volta
    * como `{ok: false, erro}` (HTTP 200): o resultado do teste É a falha. */
@@ -633,6 +635,9 @@ export interface PedidoDiagramaIa {
   techs?: string[];
   contextos?: string[];
   perfilTime?: string;
+  /** SPEC-30 Fase 2 — prints anexados (data URLs). Só vão quando o provedor
+   * enxerga imagem; a UI nem oferece o anexo quando não. */
+  imagens?: string[];
 }
 
 /** O que a IA propõe. `motivo` é obrigatório de propósito: é o que a pessoa lê

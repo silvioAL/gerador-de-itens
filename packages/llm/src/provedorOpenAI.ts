@@ -205,6 +205,38 @@ function extensaoDe(formato: string): string {
   return conhecidos[base] ?? "webm";
 }
 
+
+/**
+ * SPEC-30 Fase 2 — anexa imagens à ÚLTIMA mensagem do usuário, no formato de
+ * content-parts que os destinos compatíveis com OpenAI aceitam.
+ *
+ * `content` deixa de ser string e vira array (`{type:"text"}` +
+ * `{type:"image_url"}`). Só a última mensagem muda: as anteriores são histórico,
+ * e reanexar a imagem em cada turno multiplicaria o custo de tokens sem
+ * acrescentar informação.
+ *
+ * Sem imagem, a forma antiga (string) é preservada byte a byte — destino que
+ * não entende content-parts continua funcionando como antes.
+ */
+function comImagens(
+  mensagens: { role: string; content: string }[],
+  imagens: string[] | undefined
+): { role: string; content: unknown }[] {
+  if (!imagens?.length) return mensagens;
+  const ultimo = mensagens.length - 1;
+  return mensagens.map((m, i) =>
+    i === ultimo
+      ? {
+          role: m.role,
+          content: [
+            { type: "text", text: m.content },
+            ...imagens.map((url) => ({ type: "image_url", image_url: { url } })),
+          ],
+        }
+      : m
+  );
+}
+
 export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): ProvedorIa {
   const fetchFn = opcoes.fetchImpl ?? fetch;
   const url = `${opcoes.baseUrl.replace(/\/$/, "")}/chat/completions`;
@@ -231,7 +263,8 @@ export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): Pro
     mensagens: { role: string; content: string }[],
     formatoJson: boolean,
     onTexto?: (pedaco: string) => void,
-    schema?: EsquemaJson
+    schema?: EsquemaJson,
+    imagens?: string[]
   ): Promise<string> {
     const resposta = await fetchFn(url, {
       method: "POST",
@@ -242,7 +275,7 @@ export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): Pro
       },
       body: JSON.stringify({
         model: opcoes.modelo,
-        messages: mensagens,
+        messages: comImagens(mensagens, imagens),
         stream: true,
         max_tokens: opcoes.maxTokens ?? MAX_TOKENS_PADRAO,
         ...(formatoJson ? pedidoDeJson(schema) : {}),
@@ -314,7 +347,7 @@ export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): Pro
     id: "compativel-openai",
     nome: `${opcoes.modelo} (gateway)`,
     async completar(prompt, opcoesGeracao?: OpcoesGeracao) {
-      return chamar([{ role: "user", content: prompt }], false, opcoesGeracao?.onTexto);
+      return chamar([{ role: "user", content: prompt }], false, opcoesGeracao?.onTexto, undefined, opcoesGeracao?.imagens);
     },
     async completarEstruturado(prompt, schema, opcoesGeracao?: OpcoesGeracao) {
       const instrucao = [
@@ -325,7 +358,7 @@ export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): Pro
       ].join("\n");
 
       const mensagens = [{ role: "user", content: instrucao }];
-      let texto = await chamar(mensagens, true, opcoesGeracao?.onTexto, schema);
+      let texto = await chamar(mensagens, true, opcoesGeracao?.onTexto, schema, opcoesGeracao?.imagens);
       let valor: unknown;
       let problemas: string[];
       try {
@@ -355,7 +388,12 @@ export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): Pro
           },
         ],
         true,
-        opcoesGeracao?.onTexto
+        opcoesGeracao?.onTexto,
+        undefined,
+        // ACHADO do teste: sem repassar aqui, a segunda tentativa responderia
+        // sobre um print que ela não viu — o pedido é o MESMO, só a instrução
+        // de formato muda.
+        opcoesGeracao?.imagens
       );
       texto = retry;
       try {
