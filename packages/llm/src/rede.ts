@@ -145,6 +145,41 @@ function suportaCaDoSistema(versao = process.versions.node): boolean {
   return maior > 22 || (maior === 22 && menor >= 15);
 }
 
+/**
+ * Explica uma resposta HTTP que não é o arquivo — tipicamente a **página de
+ * bloqueio do filtro corporativo**.
+ *
+ * ACHADO REAL, o segundo da mesma máquina: resolvido o certificado, o download
+ * passou a receber `HTTP 403` com ~28 KB de corpo. O Hugging Face não devolve
+ * 403 num arquivo público, e 28 KB é HTML, não GGUF — é a página do filtro
+ * dizendo "categoria bloqueada".
+ *
+ * Distinguir isso de "o arquivo não existe" importa porque as ações são
+ * opostas: uma é falar com a infraestrutura (e para isso o texto da página
+ * serve, porque costuma nomear a política e o produto de filtro), a outra é
+ * conferir o nome do modelo.
+ */
+export async function explicarRespostaRecusada(resposta: Response, nomeArquivo: string): Promise<Error> {
+  const tipo = resposta.headers.get("content-type") ?? "";
+  const corpo = await resposta.text().catch(() => "");
+  const pareceHtml = tipo.includes("html") || /<html|<!doctype/i.test(corpo.slice(0, 200));
+
+  if (pareceHtml) {
+    const titulo = /<title[^>]*>([^<]{1,140})<\/title>/i.exec(corpo)?.[1]?.trim();
+    return new Error(
+      `A sua rede recusou o download (HTTP ${resposta.status}) e devolveu uma página HTML no lugar do arquivo — ` +
+        `isso é bloqueio do filtro corporativo, não do Hugging Face.` +
+        (titulo ? ` A página diz: "${titulo}".` : "") +
+        ` Peça à infraestrutura para liberar huggingface.co e cdn-lfs.huggingface.co, ou instale sem rede: ` +
+        `gerador ia instalar --modelo <id> --de <caminho do .gguf>.`
+    );
+  }
+
+  return new Error(
+    `Falha ao baixar ${nomeArquivo}: HTTP ${resposta.status}${corpo ? ` — ${corpo.slice(0, 200)}` : ""}`
+  );
+}
+
 function seguroHost(url: string): string {
   try {
     return new URL(url).host.toLowerCase();
