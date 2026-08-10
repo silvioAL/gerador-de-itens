@@ -3,7 +3,7 @@ import { z } from "zod";
 import {
   criarProvedorCompativelOpenAI,
   formatoJsonPorBaseUrl,
-  PRESETS_GATEWAY,
+  presetsDoModo,
   type ProvedorIa,
 } from "@gerador/llm/gateway";
 import {
@@ -112,7 +112,11 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
         },
       ],
       gateway: resumo,
-      presetsGateway: PRESETS_GATEWAY,
+      // Do modo HOSPEDADO: quem chama o gateway daqui é este container, então
+      // o Ollama alcançável é `http://ollama:11434` (serviço do compose), não
+      // `localhost`. Servir a lista do outro modo ofereceria um destino que
+      // falha em "connection refused" sem nunca sair do container.
+      presetsGateway: presetsDoModo("hospedado"),
       credencial: resumo,
     };
   });

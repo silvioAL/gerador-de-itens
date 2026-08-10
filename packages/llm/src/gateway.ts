@@ -16,6 +16,7 @@ export {
   formatoJsonPorBaseUrl,
   PRESETS_GATEWAY,
   presetGatewayPorId,
+  presetsDoModo,
   type PresetGateway,
 } from "./presets.js";
 export type { OpcoesGeracao, ProvedorIa } from "./tipos.js";
