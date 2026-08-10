@@ -37,8 +37,46 @@ export interface OpcoesProvedorOpenAI {
    * mais cara deste projeto (resposta truncada = trabalho perdido sem aviso).
    */
   maxTokens?: number;
+  /**
+   * Como o destino aceita pedido de JSON. **Medido contra a API real, não lido
+   * na documentação**: a tabela da Anthropic diz que `response_format` é
+   * "ignored", e na prática ela responde **HTTP 400** —
+   * `response_format.type: Input should be 'json_schema'`.
+   *
+   * - `json_object`: o de-facto da OpenAI (DeepSeek, Ollama, vLLM). Continua
+   *   sendo o padrão, porque é o que os gateways já configurados usam.
+   * - `json_schema`: Structured Outputs. Manda o schema junto, com
+   *   `strict: true` e `additionalProperties: false` em TODO nível de objeto —
+   *   os dois são exigidos, cada um descoberto por um 400 diferente. É garantia
+   *   mais FORTE que `json_object`, não mais fraca.
+   * - `nenhum`: destino que rejeita o campo em qualquer forma. Sobra
+   *   `validarContraSchema` + retry — e aí o modelo pode devolver o JSON
+   *   embrulhado em cerca de markdown (visto com o Claude sem o campo).
+   */
+  formatoJson?: FormatoJson;
   /** Injetável no teste — evita depender de rede real na suíte. */
   fetchImpl?: typeof fetch;
+}
+
+export type FormatoJson = "json_object" | "json_schema" | "nenhum";
+
+/**
+ * Structured Outputs exige `additionalProperties: false` em cada objeto —
+ * inclusive nos aninhados, que é o caso do lote da esteira (um objeto por
+ * item). Sem isso: HTTP 400 dizendo exatamente isso.
+ */
+export function comAdditionalPropertiesFalse(schema: GbnfJsonSchema): GbnfJsonSchema {
+  const s = schema as Record<string, unknown>;
+  if (s.type === "array" && s.items) {
+    return { ...s, items: comAdditionalPropertiesFalse(s.items as GbnfJsonSchema) } as GbnfJsonSchema;
+  }
+  if (s.type !== "object" && !s.properties) return schema;
+  const props = (s.properties ?? {}) as Record<string, GbnfJsonSchema>;
+  return {
+    ...s,
+    additionalProperties: false,
+    properties: Object.fromEntries(Object.entries(props).map(([k, v]) => [k, comAdditionalPropertiesFalse(v)])),
+  } as GbnfJsonSchema;
 }
 
 interface DeltaStream {
@@ -129,10 +167,28 @@ export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): Pro
   const fetchFn = opcoes.fetchImpl ?? fetch;
   const url = `${opcoes.baseUrl.replace(/\/$/, "")}/chat/completions`;
 
+  const modoJson: FormatoJson = opcoes.formatoJson ?? "json_object";
+
+  /** O que vai no corpo pra pedir JSON, no dialeto que o destino aceita. */
+  function pedidoDeJson(schema?: GbnfJsonSchema): Record<string, unknown> {
+    if (modoJson === "nenhum") return {};
+    if (modoJson === "json_schema") {
+      if (!schema) return {};
+      return {
+        response_format: {
+          type: "json_schema",
+          json_schema: { name: "resposta", strict: true, schema: comAdditionalPropertiesFalse(schema) },
+        },
+      };
+    }
+    return { response_format: { type: "json_object" } };
+  }
+
   async function chamar(
     mensagens: { role: string; content: string }[],
     formatoJson: boolean,
-    onTexto?: (pedaco: string) => void
+    onTexto?: (pedaco: string) => void,
+    schema?: GbnfJsonSchema
   ): Promise<string> {
     const resposta = await fetchFn(url, {
       method: "POST",
@@ -146,10 +202,7 @@ export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): Pro
         messages: mensagens,
         stream: true,
         max_tokens: opcoes.maxTokens ?? MAX_TOKENS_PADRAO,
-        // A Anthropic IGNORA este campo (documentado por eles). Continua sendo
-        // mandado porque para os outros destinos ele ajuda de verdade; onde é
-        // ignorado, quem garante a estrutura é `validarContraSchema` + o retry.
-        ...(formatoJson ? { response_format: { type: "json_object" } } : {}),
+        ...(formatoJson ? pedidoDeJson(schema) : {}),
       }),
     });
 
@@ -229,7 +282,7 @@ export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): Pro
       ].join("\n");
 
       const mensagens = [{ role: "user", content: instrucao }];
-      let texto = await chamar(mensagens, true, opcoesGeracao?.onTexto);
+      let texto = await chamar(mensagens, true, opcoesGeracao?.onTexto, schema);
       let valor: unknown;
       let problemas: string[];
       try {

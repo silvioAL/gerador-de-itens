@@ -1654,3 +1654,21 @@ Um erro meu que os testes pegaram: a primeira versão de "trocar de destino" pre
 Verificado contra o endpoint real, não só com mock: `/ia/credencial/testar` com chave inválida responde *"Credencial recusada pelo gateway (HTTP 401)"* e com base URL errada responde *"Endpoint não encontrado — confira a base URL (HTTP 404)"*. A cadeia rota → provedor → `api.anthropic.com` está fechada. O que **não** dá pra verificar sem uma chave paga é uma resposta completa de verdade — e isso está dito, não escondido.
 
 Custo é decisão de quem usa: chave do console da Anthropic é cobrança por uso, separada da assinatura do Claude.ai ou do Claude Code. Não há caminho por OAuth — credenciais do Claude Code são exclusivas dele (ToS), o que já estava registrado na SPEC-25 §4.5.
+
+## 107. A chave de verdade desmentiu a documentação (e a minha §106)
+
+O usuário mandou uma chave da Anthropic pra fechar a validação que eu tinha declarado impossível. Em minutos, três defeitos que **nenhum mock pegaria**.
+
+**1. `response_format: json_object` é rejeitado, não ignorado.** A tabela oficial da Anthropic lista o campo como *"Ignored"*. A API responde `HTTP 400: response_format.type: Input should be 'json_schema'`. A §106 dizia, com todas as letras, que a garantia com Claude seria mais fraca — **estava errado**, e errado na direção oposta: medindo as quatro variantes, `json_schema` + `strict: true` + `additionalProperties: false` em todo nível volta 200 com JSON limpo. É **Structured Outputs**, garantia mais forte que `json_object`. Sem o campo, o Claude devolve o JSON embrulhado em cerca de markdown.
+
+Cada exigência foi descoberta por um 400 diferente: sem `strict`, "Field required"; sem `additionalProperties: false`, a mensagem apontando o objeto. Nenhuma das duas estava na tabela.
+
+**2. O teto de tokens não era teórico.** Uma sonda com `max_tokens: 800` voltou com a string cortada no meio do critério de aceite. A §106 tinha argumentado que o teto explícito importava; aqui deu pra ver acontecendo.
+
+**3. Falha de gateway virava HTTP 200 com corpo vazio.** As rotas de streaming escreviam `writeHead(200)` **antes** de chamar o modelo. Quando a chamada falhava antes do primeiro token — que é exatamente o caso do 400 acima — o cliente recebia 200 e nada. Os `catch` já sabiam mandar 500 quando `!res.headersSent`; o ramo simplesmente nunca rodava. Na tela: a esteira "rodando" sem escrever nada, o mesmo silêncio do §105 vindo de outro lugar. Agora o cabeçalho sai no primeiro pedaço, e resposta vazia sem erro virou erro explícito.
+
+Corrigidos os três, o lote real: **5 de 5 itens completos, 39s, JSON válido**, com conteúdo específico do contexto (endpoint citado, HTTP 201, validação de CPF). O mesmo pedido que minutos antes voltava vazio.
+
+O dialeto de JSON virou `formatoJson`, **deduzido da base URL** em vez de campo que a tela manda: `gerador ia conectar` no terminal acerta igual, e ninguém precisa saber que a Anthropic é diferente pra configurar o Claude.
+
+A lição não é sobre a Anthropic. É que **documentação de API é uma hipótese**, e este projeto já tem uma seção inteira (§104) sobre defeitos que só aparecem rodando. Duas rodadas seguidas, a mesma conclusão por caminhos diferentes.

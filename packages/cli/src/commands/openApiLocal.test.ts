@@ -1138,6 +1138,8 @@ describe("SPEC-25 Fase 2 — credencial do gateway", () => {
       baseUrl: "https://gw/v1",
       chave: "sk-secreta",
       modelo: "deepseek-chat",
+      // Deduzido da base URL: destino desconhecido fica no de-facto da OpenAI.
+      formatoJson: "json_object",
     });
     // A regra de segurança da fase, verificada e não só documentada.
     expect(existsSync(join(dirTemp, "config", "credenciais.json"))).toBe(false);
@@ -1163,7 +1165,22 @@ describe("SPEC-25 Fase 2 — credencial do gateway", () => {
       baseUrl: "https://novo/v1",
       chave: "sk-ja-salva",
       modelo: "m",
+      formatoJson: "json_object",
     });
+  });
+
+  it("base URL da Anthropic grava formatoJson json_schema — sem ninguém precisar saber disso", async () => {
+    // MEDIDO contra a API real: a Anthropic responde 400 pra
+    // `response_format: json_object`, exigindo `json_schema`. A dedução mora
+    // aqui pra valer também pro `gerador ia conectar` no terminal.
+    await fetch(`${base}/ia/credencial`, {
+      method: "PUT",
+      body: JSON.stringify({ baseUrl: "https://api.anthropic.com/v1", chave: "sk-ant-x", modelo: "claude-sonnet-5" }),
+    });
+    expect(salvarCredencialMock).toHaveBeenCalledWith(
+      "compativel-openai",
+      expect.objectContaining({ formatoJson: "json_schema" })
+    );
   });
 
   it("campo faltando é 400, não credencial pela metade salva", async () => {
