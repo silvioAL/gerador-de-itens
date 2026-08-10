@@ -11,6 +11,7 @@ import {
   CAMPO_GLOBAL,
   camposNo,
   convitesTime,
+  especificacaoTemplates,
   organizacoes,
   papeisAcesso,
   papelPermissao,
@@ -342,6 +343,34 @@ describe("/campos-no", () => {
     expect(chaves).toEqual(expect.arrayContaining(["linguagem", "motorPadrao"]));
   });
 
+  /**
+   * SPEC-31 Fase 2 — o defeito que a suíte de contrato expôs, visto pela
+   * borda: `POST` do mesmo (time, tipoNo, key) fazia `insert` puro contra a
+   * restrição `campos_no_chave_unica` e devolvia 500. O modo local, no mesmo
+   * gesto, corrigia o campo. Agora os dois corrigem.
+   */
+  it("salvar o MESMO campo de novo corrige em vez de estourar a restrição única", async () => {
+    const cookieDev = await logarComo(EMAIL_DEV);
+    const payload = { tipoNo: "cache", key: "ttl", label: "TTL", type: "text" };
+
+    const primeira = await app.inject({ method: "POST", url: "/campos-no", cookies: { gerador_sessao: cookieDev }, payload });
+    const segunda = await app.inject({
+      method: "POST",
+      url: "/campos-no",
+      cookies: { gerador_sessao: cookieDev },
+      payload: { ...payload, label: "TTL em segundos", ordem: 4 },
+    });
+
+    expect(primeira.statusCode).toBe(201);
+    expect(segunda.statusCode).toBe(201);
+    expect(segunda.json().id).toBe(primeira.json().id);
+
+    const efetivo = await app.inject({ method: "GET", url: "/campos-no" });
+    const ttl = efetivo.json().filter((c: { key: string }) => c.key === "ttl");
+    expect(ttl).toHaveLength(1);
+    expect(ttl[0]).toMatchObject({ label: "TTL em segundos", ordem: 4 });
+  });
+
   it("campo de time sobrescreve campo global de mesma key", async () => {
     const cookieDev = await logarComo(EMAIL_DEV);
     await app.inject({
@@ -426,7 +455,23 @@ describe("/campos-no", () => {
 });
 
 describe("/especificacao-template (SPEC-14)", () => {
-  it("GET sem timeId devolve o global semeado pela migração", async () => {
+  /**
+   * O global vem semeado pela migração, mas depender disso é depender de
+   * NENHUM outro arquivo de teste ter tocado na tabela — e a suíte de contrato
+   * do adaptador (SPEC-31 Fase 2) trunca de propósito, para começar limpa.
+   * Garantir aqui o que este teste precisa é mais barato que combinar ordem
+   * entre arquivos.
+   */
+  const CONTEUDO_GLOBAL = "# {{titulo}}\n\nEspecificação de entrega.";
+
+  beforeAll(async () => {
+    await db
+      .insert(especificacaoTemplates)
+      .values({ timeId: "__global__", conteudo: CONTEUDO_GLOBAL })
+      .onConflictDoUpdate({ target: especificacaoTemplates.timeId, set: { conteudo: CONTEUDO_GLOBAL } });
+  });
+
+  it("GET sem timeId devolve o global", async () => {
     const resposta = await app.inject({ method: "GET", url: "/especificacao-template" });
     expect(resposta.json().timeId).toBe("__global__");
     expect(resposta.json().conteudo).toContain("{{titulo}}");

@@ -1,11 +1,10 @@
-import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { validarTemplate } from "@gerador/engine";
+import { CAMPO_GLOBAL, criarCasosDeUsoDeTemplateEspecificacao, TemplateInvalido } from "@gerador/aplicacao";
 import type { OpcoesApp } from "../app.js";
+import { criarRepositorioDeTemplateEspecificacaoEmPostgres } from "../adaptadores/templateEspecificacaoEmPostgres.js";
 import { exigirTime } from "../auth/middleware.js";
 import { registrarAuditoria } from "../auditoria.js";
-import { CAMPO_GLOBAL, especificacaoTemplates } from "../db/schema.js";
 
 const corpoTemplate = z.object({
   timeId: z.string().min(1).default(CAMPO_GLOBAL),
@@ -19,18 +18,19 @@ function comoTimeParaAutorizacao(timeId: string): string | null {
 
 /**
  * Template da especificação de entrega (SPEC-14) — 1 documento por quebra,
- * então 1 template por `timeId` (não mais por tipo de item). Leitura aberta
- * (sem sessão) — mesma régua de campos-no/perfis-time.
+ * então 1 template por `timeId`. Leitura aberta (sem sessão) — mesma régua de
+ * campos-no/perfis-time.
+ *
+ * A validação das variáveis saiu daqui e foi para o caso de uso (SPEC-31
+ * Fase 2): estava só neste lado, e o modo local aceitava `{{tipoErrado}}` sem
+ * reclamar.
  */
 export async function registrarRotasEspecificacaoTemplate(app: FastifyInstance, { db }: OpcoesApp) {
+  const casos = criarCasosDeUsoDeTemplateEspecificacao(criarRepositorioDeTemplateEspecificacaoEmPostgres(db));
+
   app.get("/especificacao-template", async (req) => {
     const { timeId } = req.query as { timeId?: string };
-    if (timeId) {
-      const [doTime] = await db.select().from(especificacaoTemplates).where(eq(especificacaoTemplates.timeId, timeId));
-      if (doTime) return doTime;
-    }
-    const [global] = await db.select().from(especificacaoTemplates).where(eq(especificacaoTemplates.timeId, CAMPO_GLOBAL));
-    return global ?? null;
+    return casos.obter(timeId);
   });
 
   // Upsert por chave natural (timeId) — não expõe id sintético pro cliente
@@ -42,28 +42,19 @@ export async function registrarRotasEspecificacaoTemplate(app: FastifyInstance, 
       const corpo = corpoTemplate.safeParse(req.body);
       if (!corpo.success) return reply.code(400).send({ erro: corpo.error.flatten() });
 
-      const variaveisDesconhecidas = validarTemplate(corpo.data.conteudo);
-      if (variaveisDesconhecidas.length > 0) {
-        return reply.code(400).send({
-          erro: `variável(is) desconhecida(s) no template: ${variaveisDesconhecidas.map((v) => `{{${v}}}`).join(", ")}`,
+      try {
+        const salvo = await casos.salvar(corpo.data.timeId, corpo.data.conteudo);
+        registrarAuditoria(db, {
+          email: req.usuario!.email,
+          acao: "atualizar",
+          recurso: "especificacao_templates",
+          recursoId: salvo.id,
         });
+        return salvo;
+      } catch (erro) {
+        if (erro instanceof TemplateInvalido) return reply.code(400).send({ erro: erro.message });
+        throw erro;
       }
-
-      const [salvo] = await db
-        .insert(especificacaoTemplates)
-        .values(corpo.data)
-        .onConflictDoUpdate({
-          target: especificacaoTemplates.timeId,
-          set: { conteudo: corpo.data.conteudo, atualizadoEm: new Date() },
-        })
-        .returning();
-      registrarAuditoria(db, {
-        email: req.usuario!.email,
-        acao: "atualizar",
-        recurso: "especificacao_templates",
-        recursoId: salvo.id,
-      });
-      return salvo;
     }
   );
 }

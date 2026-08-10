@@ -20,3 +20,35 @@ export {
 } from "./portas/repositorioDeQuebras.js";
 
 export { criarCasosDeUsoDeQuebras, type CasosDeUsoDeQuebras } from "./casos-de-uso/quebras.js";
+
+export {
+  CAMPO_GLOBAL,
+  camposEfetivos,
+  normalizarDadosCampoNo,
+  type CampoNo,
+  type DadosCampoNo,
+  type ItemSpecCampo,
+  type RepositorioDeCamposNo,
+  type TipoCampoNo,
+} from "./portas/repositorioDeCamposNo.js";
+
+export { criarCasosDeUsoDeCamposNo, type CasosDeUsoDeCamposNo } from "./casos-de-uso/camposNo.js";
+
+export type {
+  PerfilDeTime,
+  PerfisDeTimes,
+  RepositorioDePerfisTime,
+} from "./portas/repositorioDePerfisTime.js";
+
+export { criarCasosDeUsoDePerfisTime, type CasosDeUsoDePerfisTime } from "./casos-de-uso/perfisTime.js";
+
+export type {
+  RepositorioDeTemplateEspecificacao,
+  TemplateEspecificacao,
+} from "./portas/repositorioDeTemplateEspecificacao.js";
+
+export {
+  criarCasosDeUsoDeTemplateEspecificacao,
+  TemplateInvalido,
+  type CasosDeUsoDeTemplateEspecificacao,
+} from "./casos-de-uso/templateEspecificacao.js";

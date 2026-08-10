@@ -24,8 +24,18 @@ import {
   type ProvedorIa,
 } from "@gerador/llm";
 import type { GbnfJsonSchema } from "node-llama-cpp";
-import { criarCasosDeUsoDeQuebras } from "@gerador/aplicacao";
+import {
+  criarCasosDeUsoDeCamposNo,
+  criarCasosDeUsoDePerfisTime,
+  criarCasosDeUsoDeQuebras,
+  criarCasosDeUsoDeTemplateEspecificacao,
+  TemplateInvalido,
+  type DadosCampoNo,
+} from "@gerador/aplicacao";
 import { criarRepositorioDeQuebrasEmArquivo } from "../adaptadores/quebrasEmArquivo.js";
+import { criarRepositorioDeCamposNoEmArquivo } from "../adaptadores/camposNoEmArquivo.js";
+import { criarRepositorioDePerfisTimeEmArquivo } from "../adaptadores/perfisTimeEmArquivo.js";
+import { criarRepositorioDeTemplateEspecificacaoEmArquivo } from "../adaptadores/templateEspecificacaoEmArquivo.js";
 
 const CAMPO_GLOBAL = "__global__";
 
@@ -170,127 +180,59 @@ async function tratarQuebras(req: IncomingMessage, res: ServerResponse, metodo: 
 // --- config/perfis-time.json — mesmo arquivo que já existe hoje ---
 
 async function tratarPerfisTime(req: IncomingMessage, res: ServerResponse, metodo: string, caminho: string, dirProjeto: string): Promise<void> {
-  const arquivo = resolve(dirProjeto, "config", "perfis-time.json");
+  // SPEC-31 Fase 2: mesmo caso de uso do modo hospedado, adaptador diferente.
+  const casos = criarCasosDeUsoDePerfisTime(criarRepositorioDePerfisTimeEmArquivo(dirProjeto));
 
   if (metodo === "GET" && caminho === "/perfis-time") {
-    return enviarJson(res, 200, (await lerJsonOpcional<PerfisConfig>(arquivo)) ?? {});
+    return enviarJson(res, 200, await casos.listarTodos());
+  }
+
+  // Esta rota só existia no modo hospedado — a `packages/web` já sabia pedir.
+  const matchGetTime = metodo === "GET" && caminho.match(/^\/perfis-time\/([^/]+)$/);
+  if (matchGetTime) {
+    return enviarJson(res, 200, await casos.obter(decodeURIComponent(matchGetTime[1])));
   }
 
   const matchPut = metodo === "PUT" && caminho.match(/^\/perfis-time\/([^/]+)$/);
   if (matchPut) {
     const timeId = decodeURIComponent(matchPut[1]);
-    const { tipoNo, valores } = await lerCorpoJson<{ tipoNo: string; valores: Record<string, unknown> }>(req);
-    const perfis = ((await lerJsonOpcional<PerfisConfig>(arquivo)) ?? {}) as Record<string, Record<string, Record<string, unknown>>>;
-    perfis[timeId] ??= {};
-    perfis[timeId][tipoNo] = { ...perfis[timeId][tipoNo], ...valores };
-    await mkdir(resolve(dirProjeto, "config"), { recursive: true });
-    await writeFile(arquivo, JSON.stringify(perfis, null, 2), "utf-8");
-    return enviarJson(res, 200, perfis[timeId][tipoNo]);
+    const { tipoNo, valores } = await lerCorpoJson<{ tipoNo: string; valores: Record<string, string> }>(req);
+    return enviarJson(res, 200, await casos.definir(timeId, tipoNo, valores));
   }
 
   enviarJson(res, 404, { erro: "não encontrado" });
 }
 
-// --- config/campos-no.json — campos por tipo de nó, global ou por time,
-// mesmo modelo (e mesma regra de merge) que packages/server/src/routes/camposNo.ts
-// já usa no modo hospedado: time sobrescreve global de mesma (tipoNo, key).
-
-interface ItemSpecCampoLocal {
-  key: string;
-  label: string;
-  type: "text" | "textarea" | "number" | "boolean" | "select";
-  options?: string[];
-}
-
-interface CampoNoLocal {
-  id: string;
-  timeId: string;
-  tipoNo: string;
-  key: string;
-  label: string;
-  type: "text" | "textarea" | "number" | "boolean" | "select" | "lista";
-  required: boolean;
-  valorPadrao: string | null;
-  opcoes: string[] | null;
-  ajuda: string | null;
-  permiteNA: boolean;
-  ordem: number;
-  /** Só quando `type === "lista"` — a forma de cada item. */
-  itemSpec: ItemSpecCampoLocal[] | null;
-}
-
-async function lerCamposNo(dirProjeto: string): Promise<CampoNoLocal[]> {
-  return (await lerJsonOpcional<CampoNoLocal[]>(resolve(dirProjeto, "config", "campos-no.json"))) ?? [];
-}
-
-async function salvarCamposNo(dirProjeto: string, campos: CampoNoLocal[]): Promise<void> {
-  await mkdir(resolve(dirProjeto, "config"), { recursive: true });
-  await writeFile(resolve(dirProjeto, "config", "campos-no.json"), JSON.stringify(campos, null, 2), "utf-8");
-}
-
-/** Efetivo: todo campo global + os do `timeId` pedido, time sobrescrevendo
- * global de mesma (tipoNo, key) — idêntico ao GET /campos-no do modo hospedado. */
-function camposEfetivos(campos: CampoNoLocal[], timeId?: string): CampoNoLocal[] {
-  const relevantes = campos.filter((c) => c.timeId === CAMPO_GLOBAL || c.timeId === timeId);
-  const porChave = new Map<string, CampoNoLocal>();
-  for (const c of [...relevantes].sort((a, b) => (a.timeId === CAMPO_GLOBAL ? -1 : 1))) {
-    porChave.set(`${c.tipoNo}::${c.key}`, c);
-  }
-  return [...porChave.values()].sort((a, b) => a.ordem - b.ordem);
-}
+// --- config/campos-no.json — campos por tipo de nó, global ou por time.
+// SPEC-31 Fase 2: os tipos, a regra de sobreposição e o upsert por chave
+// natural moram em `@gerador/aplicacao` agora; aqui sobrou o roteamento.
 
 async function tratarCamposNo(req: IncomingMessage, res: ServerResponse, metodo: string, caminho: string, query: URLSearchParams, dirProjeto: string): Promise<void> {
+  const casos = criarCasosDeUsoDeCamposNo(criarRepositorioDeCamposNoEmArquivo(dirProjeto));
+
   if (metodo === "GET" && caminho === "/campos-no") {
-    const campos = await lerCamposNo(dirProjeto);
-    return enviarJson(res, 200, camposEfetivos(campos, query.get("timeId") ?? undefined));
+    return enviarJson(res, 200, await casos.listarEfetivos(query.get("timeId") ?? undefined));
   }
 
   if (metodo === "POST" && caminho === "/campos-no") {
-    const corpo = await lerCorpoJson<Partial<CampoNoLocal>>(req);
+    const corpo = await lerCorpoJson<Partial<DadosCampoNo>>(req);
     if (!corpo.tipoNo || !corpo.key || !corpo.label || !corpo.type) {
       return enviarJson(res, 400, { erro: "tipoNo, key, label e type são obrigatórios" });
     }
-    const campos = await lerCamposNo(dirProjeto);
-    const timeId = corpo.timeId ?? CAMPO_GLOBAL;
-    // Mesma key+tipoNo+timeId já existente vira upsert, não duplicata.
-    const existente = campos.find((c) => c.timeId === timeId && c.tipoNo === corpo.tipoNo && c.key === corpo.key);
-    const novo: CampoNoLocal = {
-      id: existente?.id ?? randomUUID(),
-      timeId,
-      tipoNo: corpo.tipoNo,
-      key: corpo.key,
-      label: corpo.label,
-      type: corpo.type,
-      required: corpo.required ?? false,
-      valorPadrao: corpo.valorPadrao ?? null,
-      opcoes: corpo.opcoes ?? null,
-      ajuda: corpo.ajuda ?? null,
-      permiteNA: corpo.permiteNA ?? false,
-      ordem: corpo.ordem ?? 0,
-      itemSpec: corpo.itemSpec ?? null,
-    };
-    const restantes = campos.filter((c) => c.id !== novo.id);
-    await salvarCamposNo(dirProjeto, [...restantes, novo]);
-    return enviarJson(res, 201, novo);
+    return enviarJson(res, 201, await casos.salvar(corpo));
   }
 
   const matchPut = metodo === "PUT" && caminho.match(/^\/campos-no\/([^/]+)$/);
   if (matchPut) {
     const id = decodeURIComponent(matchPut[1]);
-    const campos = await lerCamposNo(dirProjeto);
-    const alvo = campos.find((c) => c.id === id);
-    if (!alvo) return enviarJson(res, 404, { erro: "campo não encontrado" });
-    const corpo = await lerCorpoJson<Partial<CampoNoLocal>>(req);
-    const atualizado: CampoNoLocal = { ...alvo, ...corpo, id: alvo.id, timeId: alvo.timeId, tipoNo: alvo.tipoNo, key: alvo.key };
-    await salvarCamposNo(dirProjeto, campos.map((c) => (c.id === id ? atualizado : c)));
+    const atualizado = await casos.atualizar(id, await lerCorpoJson<Partial<DadosCampoNo>>(req));
+    if (!atualizado) return enviarJson(res, 404, { erro: "campo não encontrado" });
     return enviarJson(res, 200, atualizado);
   }
 
   const matchDelete = metodo === "DELETE" && caminho.match(/^\/campos-no\/([^/]+)$/);
   if (matchDelete) {
-    const id = decodeURIComponent(matchDelete[1]);
-    const campos = await lerCamposNo(dirProjeto);
-    await salvarCamposNo(dirProjeto, campos.filter((c) => c.id !== id));
+    await casos.excluir(decodeURIComponent(matchDelete[1]));
     res.writeHead(204);
     return res.end();
   }
@@ -393,18 +335,30 @@ async function tratarCamposAresta(req: IncomingMessage, res: ServerResponse, met
 // --- especificação de entrega: template customizável opcional, default do engine ---
 
 async function tratarEspecificacaoTemplate(req: IncomingMessage, res: ServerResponse, metodo: string, dirProjeto: string): Promise<void> {
-  const arquivo = resolve(dirProjeto, "config", "especificacao-template.md");
+  const casos = criarCasosDeUsoDeTemplateEspecificacao(criarRepositorioDeTemplateEspecificacaoEmArquivo(dirProjeto));
 
   if (metodo === "GET") {
-    const conteudo = await readFile(arquivo, "utf-8").catch(() => TEMPLATE_ESPECIFICACAO_PADRAO);
-    return enviarJson(res, 200, { id: "local", timeId: "local", conteudo, atualizadoEm: new Date().toISOString() });
+    const salvo = await casos.obter();
+    // Projeto que nunca editou o template usa o do engine — o default é da
+    // borda, não da porta: o modo hospedado semeia o dele por migração.
+    return enviarJson(
+      res,
+      200,
+      salvo ?? { id: "local", timeId: "local", conteudo: TEMPLATE_ESPECIFICACAO_PADRAO, atualizadoEm: new Date().toISOString() }
+    );
   }
 
   if (metodo === "PUT") {
     const { conteudo } = await lerCorpoJson<{ conteudo: string }>(req);
-    await mkdir(resolve(dirProjeto, "config"), { recursive: true });
-    await writeFile(arquivo, conteudo, "utf-8");
-    return enviarJson(res, 200, { id: "local", timeId: "local", conteudo, atualizadoEm: new Date().toISOString() });
+    try {
+      // SPEC-31 Fase 2: a validação de variáveis passou a valer aqui também.
+      // Antes, um `{{tipoErrado}}` era aceito em silêncio no modo local e
+      // reaparecia como texto cru no documento entregue.
+      return enviarJson(res, 200, await casos.salvar(undefined, conteudo));
+    } catch (erro) {
+      if (erro instanceof TemplateInvalido) return enviarJson(res, 400, { erro: erro.message });
+      throw erro;
+    }
   }
 
   enviarJson(res, 404, { erro: "não encontrado" });
