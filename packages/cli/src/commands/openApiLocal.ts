@@ -3,6 +3,7 @@ import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { existsSync, readFileSync } from "node:fs";
 import {
   TEMPLATE_ESPECIFICACAO_PADRAO,
   TEMPLATE_PROMPT_UNICO_PADRAO,
@@ -30,8 +31,14 @@ import {
   criarCasosDeUsoDeQuebras,
   criarCasosDeUsoDeTemplateEspecificacao,
   TemplateInvalido,
+  ConfigInvalida,
+  criarCasosDeUsoDeConfig,
+  ehChaveConfig,
+  PAPEIS_PADRAO,
+  type ChaveConfig,
   type DadosCampoNo,
 } from "@gerador/aplicacao";
+import { criarRepositorioDeConfigEmArquivo } from "../adaptadores/configEmArquivo.js";
 import { criarRepositorioDeQuebrasEmArquivo } from "../adaptadores/quebrasEmArquivo.js";
 import { criarRepositorioDeCamposNoEmArquivo } from "../adaptadores/camposNoEmArquivo.js";
 import { criarRepositorioDePerfisTimeEmArquivo } from "../adaptadores/perfisTimeEmArquivo.js";
@@ -480,56 +487,89 @@ async function lerConfigPipelineAgentes(dirProjeto: string): Promise<Required<Co
   };
 }
 
-async function tratarPipelineAgentes(req: IncomingMessage, res: ServerResponse, metodo: string, dirProjeto: string): Promise<void> {
-  const arquivo = resolve(dirProjeto, "config", "pipeline-agentes.json");
+/**
+ * A raiz do pacote instalado — onde ficam `templates/` e o `package.json`.
+ *
+ * Compilado, este módulo vira `dist/cli.js`, então a raiz está UM nível acima.
+ * Em desenvolvimento ele roda de `src/commands/`, dois níveis acima. Tentar os
+ * dois é mais honesto que assumir um: errar aqui não quebra nada visivelmente
+ * — só faz o diagnóstico comparar contra um template vazio e nunca acusar
+ * nada, que foi exatamente o que aconteceu na primeira validação real.
+ */
+const DIR_ESTE_ARQUIVO = dirname(fileURLToPath(import.meta.url));
 
-  if (metodo === "GET") {
-    return enviarJson(res, 200, await lerConfigPipelineAgentes(dirProjeto));
+function raizDoPacote(): string {
+  for (const candidato of [resolve(DIR_ESTE_ARQUIVO, ".."), resolve(DIR_ESTE_ARQUIVO, "..", "..")]) {
+    if (existsSync(resolve(candidato, "package.json")) && existsSync(resolve(candidato, "templates"))) {
+      return candidato;
+    }
   }
-
-  if (metodo === "PUT") {
-    const corpo = await lerCorpoJson<ConfigPipelineAgentesLocal>(req);
-    const config: Required<ConfigPipelineAgentesLocal> = {
-      confirmacaoObrigatoria: !!corpo.confirmacaoObrigatoria,
-      papeis: sanearPapeis(corpo.papeis) ?? PAPEIS_PADRAO_LOCAL,
-    };
-    await mkdir(resolve(dirProjeto, "config"), { recursive: true });
-    await writeFile(arquivo, JSON.stringify(config, null, 2), "utf-8");
-    return enviarJson(res, 200, config);
-  }
-
-  enviarJson(res, 404, { erro: "não encontrado" });
+  return resolve(DIR_ESTE_ARQUIVO, "..");
 }
 
-// --- GET/PUT /config/regras — SPEC-23 fluxo 5: `config/regras.json` nunca
-// teve rota nem UI; era o único arquivo de configuração que só dava pra
-// editar à mão, apesar de ser o que MAIS muda (é a tabela de requisitos de
-// refinamento por tech e contexto que alimenta cada item gerado).
-//
-// A rota é deliberadamente burra: lê e grava o arquivo inteiro, sem
-// normalizar o conteúdo. Quem valida a forma é o engine (`validarConfig`),
-// na carga — duplicar essa validação aqui criaria duas fontes de verdade
-// sobre o que é uma regra válida. O que a rota garante é só que o corpo é
-// JSON e tem `porTech` (senão qualquer PUT torto apagaria o arquivo).
+const RAIZ_DO_PACOTE = raizDoPacote();
 
-async function tratarRegras(req: IncomingMessage, res: ServerResponse, metodo: string, dirProjeto: string): Promise<void> {
-  const arquivo = resolve(dirProjeto, "config", "regras.json");
+/** A versão desta instalação — carimbo de quem gravou a config. */
+const VERSAO_ATUAL: string | null = (() => {
+  try {
+    const pkg = JSON.parse(readFileSync(resolve(RAIZ_DO_PACOTE, "package.json"), "utf-8"));
+    return typeof pkg.version === "string" ? pkg.version : null;
+  } catch {
+    return null;
+  }
+})();
+
+/**
+ * O template de fábrica desta versão: o que o pacote traz em `templates/`.
+ * É contra ELE que a config em uso é comparada — sem nunca sobrescrevê-la.
+ */
+async function templateDaVersao(chave: ChaveConfig): Promise<unknown> {
+  const candidatos = [
+    resolve(RAIZ_DO_PACOTE, "templates", `${chave}.json`),
+    resolve(RAIZ_DO_PACOTE, "..", "..", "config", `${chave}.example.json`),
+  ];
+  for (const candidato of candidatos) {
+    const conteudo = await lerJsonOpcional<unknown>(candidato);
+    if (conteudo) return conteudo;
+  }
+  // Sem template no disco (instalação podada), o default compilado responde.
+  return chave === "pipeline-agentes"
+    ? { confirmacaoObrigatoria: true, papeis: PAPEIS_PADRAO }
+    : chave === "regras"
+      ? { tipos: [], tamanhos: [], porTech: {} }
+      : { conteudo: "" };
+}
+
+async function tratarConfigPorChave(
+  req: IncomingMessage,
+  res: ServerResponse,
+  metodo: string,
+  chave: ChaveConfig,
+  dirProjeto: string
+): Promise<void> {
+  // SPEC-31 Fase 3: mesmo caso de uso do modo hospedado. O GET vem com o
+  // diagnóstico contra o template DESTA versão — é o que faltava no §108,
+  // quando um regras.json de outra era deixava o Especialista mudo.
+  const casos = criarCasosDeUsoDeConfig(criarRepositorioDeConfigEmArquivo(dirProjeto));
 
   if (metodo === "GET") {
-    const config = await lerJsonOpcional<Record<string, unknown>>(arquivo);
-    // Sem arquivo, devolve a forma vazia — a UI abre num estado editável em
-    // vez de num erro, e o primeiro PUT cria o arquivo.
-    return enviarJson(res, 200, config ?? { tipos: [], tamanhos: [], porTech: {} });
+    return enviarJson(res, 200, await casos.obter(chave, await templateDaVersao(chave), undefined));
   }
 
   if (metodo === "PUT") {
-    const corpo = await lerCorpoJson<{ porTech?: unknown }>(req);
-    if (!corpo || typeof corpo.porTech !== "object" || corpo.porTech === null || Array.isArray(corpo.porTech)) {
-      return enviarJson(res, 400, { erro: "corpo precisa ter `porTech` (objeto tech → regras)" });
+    try {
+      // Mesmo corpo do modo hospedado: `{ documento }`. Simétrico com o GET,
+      // que devolve o documento dentro de um envelope com o diagnóstico.
+      const corpo = await lerCorpoJson<{ documento?: unknown }>(req);
+      if (!corpo || corpo.documento === undefined) {
+        return enviarJson(res, 400, { erro: "corpo precisa ter `documento`" });
+      }
+      const salvo = await casos.salvar(chave, corpo.documento, VERSAO_ATUAL, undefined);
+      return enviarJson(res, 200, salvo);
+    } catch (erro) {
+      if (erro instanceof ConfigInvalida) return enviarJson(res, 400, { erro: erro.message });
+      throw erro;
     }
-    await mkdir(resolve(dirProjeto, "config"), { recursive: true });
-    await writeFile(arquivo, JSON.stringify(corpo, null, 2), "utf-8");
-    return enviarJson(res, 200, corpo);
   }
 
   enviarJson(res, 404, { erro: "não encontrado" });
@@ -1456,12 +1496,11 @@ export async function tratarApiLocal(req: IncomingMessage, res: ServerResponse, 
     await tratarIaTestarCredencial(req, res);
     return true;
   }
-  if (caminho === "/config/pipeline-agentes" && (metodo === "GET" || metodo === "PUT")) {
-    await tratarPipelineAgentes(req, res, metodo, dirProjeto);
-    return true;
-  }
-  if (caminho === "/config/regras" && (metodo === "GET" || metodo === "PUT")) {
-    await tratarRegras(req, res, metodo, dirProjeto);
+  // SPEC-31 Fase 3: as três chaves de config passam pelo mesmo caminho — o
+  // mesmo que o modo hospedado ganhou nesta fase.
+  const matchConfig = (metodo === "GET" || metodo === "PUT") && caminho.match(/^\/config\/([^/]+)$/);
+  if (matchConfig && ehChaveConfig(matchConfig[1])) {
+    await tratarConfigPorChave(req, res, metodo, matchConfig[1], dirProjeto);
     return true;
   }
   const matchPipeline = metodo === "POST" && caminho.match(/^\/ia\/pipeline\/([^/]+)$/);

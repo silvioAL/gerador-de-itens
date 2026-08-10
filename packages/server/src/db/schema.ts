@@ -235,3 +235,25 @@ export const auditoria = pgTable("auditoria", {
   recursoId: text("recurso_id"),
   timestamp: timestamp("timestamp", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * SPEC-31 Fase 3 — documentos de configuração (`regras`, `pipeline-agentes`,
+ * `prompt-unico`) no modo hospedado, que até agora só existiam como arquivo no
+ * modo local. Documento é `jsonb` opaco: quem sabe interpretá-lo é o engine.
+ *
+ * `versaoTemplate` guarda qual versão do gerador semeou o documento — nulo é
+ * legítimo (config gravada antes desta fase) e é o caso que o diagnóstico de
+ * config desatualizada atende.
+ */
+export const configDocumentos = pgTable(
+  "config_documentos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    chave: text("chave").notNull(),
+    timeId: text("time_id").notNull().default(CAMPO_GLOBAL),
+    documento: jsonb("documento").notNull(),
+    versaoTemplate: text("versao_template"),
+    atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("config_documentos_chave_unica").on(t.chave, t.timeId)]
+);
