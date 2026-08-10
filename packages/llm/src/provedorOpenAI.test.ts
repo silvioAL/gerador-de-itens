@@ -14,7 +14,14 @@ import type { EsquemaJson } from "./esquema.js";
 
 let servidor: Server;
 let baseUrl: string;
-let pedidos: { corpo: Record<string, unknown>; cabecalhos: IncomingMessage["headers"] }[] = [];
+let pedidos: {
+  corpo: Record<string, unknown>;
+  /** O corpo como chegou. Necessário desde a SPEC-30: transcrição manda
+   * `multipart/form-data`, que não é JSON e não pode ser parseado como tal. */
+  bruto: string;
+  url: string;
+  cabecalhos: IncomingMessage["headers"];
+}[] = [];
 /** Cada resposta é consumida em ordem — permite testar o retry. */
 let respostas: ((res: ServerResponse) => void)[] = [];
 
@@ -39,7 +46,13 @@ beforeEach(async () => {
     let bruto = "";
     req.on("data", (p) => (bruto += p));
     req.on("end", () => {
-      pedidos.push({ corpo: JSON.parse(bruto || "{}"), cabecalhos: req.headers });
+      const ehJson = (req.headers["content-type"] ?? "").includes("application/json");
+      pedidos.push({
+        corpo: ehJson ? JSON.parse(bruto || "{}") : {},
+        bruto,
+        url: req.url ?? "",
+        cabecalhos: req.headers,
+      });
       const proxima = respostas.shift();
       if (!proxima) {
         res.writeHead(500).end("sem resposta programada");
@@ -309,5 +322,107 @@ describe("validarContraSchema — a rede que substitui a grammar", () => {
 
   it("array no lugar de objeto não passa como objeto", () => {
     expect(validarContraSchema([], schemaAlteracoes)).toEqual(["esperado objeto, veio array"]);
+  });
+});
+
+/**
+ * SPEC-30 Fase 1a — transcrição pelo gateway.
+ *
+ * Mesma disciplina do resto deste arquivo: servidor HTTP de verdade, não mock
+ * de `fetch`. Aqui isso importa ainda mais que no chat, porque o que pode dar
+ * errado é justamente o wire — `multipart/form-data` montado à mão, boundary,
+ * nome de arquivo com a extensão certa. Um mock provaria só que o código chama
+ * o que ele mesmo espera.
+ */
+describe("transcrever — o áudio vai pro gateway como multipart", () => {
+  const audio = new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0x01, 0x02, 0x03]);
+
+  function respondeTexto(texto: string): (res: ServerResponse) => void {
+    return (res) => {
+      res.writeHead(200, { "Content-Type": "text/plain" });
+      res.end(texto);
+    };
+  }
+
+  it("posta em /audio/transcriptions com Bearer e devolve o texto", async () => {
+    respostas.push(respondeTexto("  criar uma fila do rabbit  "));
+
+    const texto = await provedor().transcrever!(audio, { formato: "audio/webm", idioma: "pt" });
+
+    expect(texto).toBe("criar uma fila do rabbit");
+    expect(pedidos[0].url).toBe("/v1/audio/transcriptions");
+    expect(pedidos[0].cabecalhos.authorization).toBe("Bearer sk-secreta");
+  });
+
+  it("monta multipart com boundary — e NÃO declara Content-Type à mão", () => {
+    // Declarar `Content-Type: multipart/form-data` sem o boundary é o erro
+    // clássico deste endpoint: o servidor recebe um corpo que não consegue
+    // separar em partes e responde 400. Quem monta o cabeçalho é o `fetch`.
+    respostas.push(respondeTexto("ok"));
+    return provedor()
+      .transcrever!(audio, { formato: "audio/webm" })
+      .then(() => {
+        const tipo = String(pedidos[0].cabecalhos["content-type"]);
+        expect(tipo).toContain("multipart/form-data");
+        expect(tipo).toContain("boundary=");
+      });
+  });
+
+  it("manda o nome do arquivo com a extensão do formato — o destino decide o decodificador por ela", async () => {
+    respostas.push(respondeTexto("ok"));
+    await provedor().transcrever!(audio, { formato: "audio/webm;codecs=opus" });
+    // `;codecs=opus` é o que o Chrome manda de verdade; a extensão sai do tipo
+    // base, senão viraria um `fala.audio/webm;codecs=opus`.
+    expect(pedidos[0].bruto).toContain('filename="fala.webm"');
+
+    respostas.push(respondeTexto("ok"));
+    await provedor().transcrever!(audio, { formato: "audio/wav" });
+    expect(pedidos[1].bruto).toContain('filename="fala.wav"');
+  });
+
+  it("manda o idioma quando informado, e o omite quando não", async () => {
+    respostas.push(respondeTexto("ok"));
+    await provedor().transcrever!(audio, { formato: "audio/webm", idioma: "pt" });
+    expect(pedidos[0].bruto).toContain('name="language"');
+    expect(pedidos[0].bruto).toContain("pt");
+
+    respostas.push(respondeTexto("ok"));
+    await provedor().transcrever!(audio, { formato: "audio/webm" });
+    expect(pedidos[1].bruto).not.toContain('name="language"');
+  });
+
+  it("usa whisper-1 por padrão, e o nome configurado quando existe", async () => {
+    respostas.push(respondeTexto("ok"));
+    await provedor().transcrever!(audio, { formato: "audio/webm" });
+    expect(pedidos[0].bruto).toContain("whisper-1");
+
+    respostas.push(respondeTexto("ok"));
+    const comNome = criarProvedorCompativelOpenAI({
+      baseUrl,
+      chave: "sk-secreta",
+      modelo: "deepseek-chat",
+      modeloTranscricao: "transcricao-interna-v2",
+    });
+    await comNome.transcrever!(audio, { formato: "audio/webm" });
+    expect(pedidos[1].bruto).toContain("transcricao-interna-v2");
+  });
+
+  it("tolera gateway que ignora response_format e devolve JSON", async () => {
+    // Acontece na prática, e o custo de tolerar e uma linha — contra uma falha
+    // que apareceria como `{"text":"..."}` dentro do campo de texto da tela.
+    respostas.push((res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ text: "fila do rabbit" }));
+    });
+
+    expect(await provedor().transcrever!(audio, { formato: "audio/webm" })).toBe("fila do rabbit");
+  });
+
+  it("credencial recusada vira mensagem que diz o que fazer", async () => {
+    respostas.push((res) => res.writeHead(401).end("no"));
+
+    await expect(provedor().transcrever!(audio, { formato: "audio/webm" })).rejects.toThrow(
+      /Credencial recusada/i
+    );
   });
 });

@@ -1,5 +1,5 @@
 import type { EsquemaJson } from "./esquema.js";
-import type { OpcoesGeracao, ProvedorIa } from "./tipos.js";
+import type { OpcoesGeracao, OpcoesTranscricao, ProvedorIa } from "./tipos.js";
 
 /**
  * SPEC-25 Fase 2 — provedor compatível com a API da OpenAI.
@@ -54,6 +54,13 @@ export interface OpcoesProvedorOpenAI {
    *   embrulhado em cerca de markdown (visto com o Claude sem o campo).
    */
   formatoJson?: FormatoJson;
+  /**
+   * SPEC-30 Fase 1a — nome do modelo de transcrição no destino. Separado do
+   * modelo de chat porque são dois modelos diferentes no mesmo endereço
+   * (`gpt-4o` e `whisper-1` convivem). Ausente = `whisper-1`, o nome que os
+   * destinos compatíveis espelham.
+   */
+  modeloTranscricao?: string;
   /** Injetável no teste — evita depender de rede real na suíte. */
   fetchImpl?: typeof fetch;
 }
@@ -163,9 +170,35 @@ function extrairJson(texto: string): unknown {
   }
 }
 
+/**
+ * SPEC-30 Fase 1a — modelo de transcrição, quando o destino não diz qual usar.
+ *
+ * `whisper-1` é o nome que a OpenAI usa e que a maioria dos gateways
+ * compatíveis espelha. Configurável porque wrapper interno costuma ter nome
+ * próprio, exatamente como o modelo de chat.
+ */
+const MODELO_TRANSCRICAO_PADRAO = "whisper-1";
+
+/** Extensão que combina com o MIME — o endpoint decide o decodificador pelo
+ * nome do arquivo, e mandar `.bin` faz destino sério recusar. */
+function extensaoDe(formato: string): string {
+  const base = formato.split(";")[0].trim().toLowerCase();
+  const conhecidos: Record<string, string> = {
+    "audio/webm": "webm",
+    "audio/ogg": "ogg",
+    "audio/mpeg": "mp3",
+    "audio/mp4": "mp4",
+    "audio/wav": "wav",
+    "audio/x-wav": "wav",
+    "audio/wave": "wav",
+  };
+  return conhecidos[base] ?? "webm";
+}
+
 export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): ProvedorIa {
   const fetchFn = opcoes.fetchImpl ?? fetch;
   const url = `${opcoes.baseUrl.replace(/\/$/, "")}/chat/completions`;
+  const urlTranscricao = `${opcoes.baseUrl.replace(/\/$/, "")}/audio/transcriptions`;
 
   const modoJson: FormatoJson = opcoes.formatoJson ?? "json_object";
 
@@ -325,6 +358,54 @@ export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): Pro
         throw new Error(`O gateway não devolveu JSON no formato pedido: ${problemas.join("; ")}`);
       }
       return valor;
+    },
+    /**
+     * SPEC-30 Fase 1a. `multipart/form-data` com o arquivo, no formato de-facto
+     * da OpenAI (`/audio/transcriptions`) — o mesmo que Groq e wrappers
+     * corporativos espelham.
+     *
+     * O áudio vai como o navegador gravou (WebM/Opus), sem conversão: quem
+     * decodifica é o destino. É a vantagem concreta deste adaptador sobre o
+     * local, que exige WAV 16 kHz mono e, portanto, `ffmpeg` no meio.
+     */
+    async transcrever(audio: Uint8Array, opcoesTranscricao: OpcoesTranscricao) {
+      const forma = new FormData();
+      const bytes = new Uint8Array(audio);
+      forma.append(
+        "file",
+        new Blob([bytes], { type: opcoesTranscricao.formato }),
+        `fala.${extensaoDe(opcoesTranscricao.formato)}`
+      );
+      forma.append("model", opcoes.modeloTranscricao ?? MODELO_TRANSCRICAO_PADRAO);
+      // Sigla e nome de sistema em português são o vocabulário desta
+      // ferramenta, e é exatamente onde transcrição sem dica de idioma erra.
+      if (opcoesTranscricao.idioma) forma.append("language", opcoesTranscricao.idioma);
+      // `text` em vez de `json`: a resposta é uma frase, e pedir JSON só
+      // adicionaria um formato a desembrulhar (e a divergir entre gateways).
+      forma.append("response_format", "text");
+
+      const resposta = await fetchFn(urlTranscricao, {
+        method: "POST",
+        // Sem `Content-Type` de propósito: o `fetch` monta o boundary do
+        // multipart sozinho, e declarar à mão quebra o parse do outro lado.
+        headers: { Authorization: `Bearer ${opcoes.chave}`, ...opcoes.cabecalhos },
+        body: forma,
+      });
+
+      if (!resposta.ok) throw erroDeGateway(resposta.status, await resposta.text().catch(() => ""));
+
+      const texto = (await resposta.text()).trim();
+      // Gateway que ignora `response_format: text` e devolve JSON assim mesmo —
+      // acontece, e o custo de tolerar é uma linha.
+      if (texto.startsWith("{")) {
+        try {
+          const corpo = JSON.parse(texto) as { text?: string };
+          if (typeof corpo.text === "string") return corpo.text.trim();
+        } catch {
+          // Não era JSON de verdade: devolve o texto como veio.
+        }
+      }
+      return texto;
     },
     async descartar() {
       // Nada a liberar: não há modelo na memória, só HTTP.

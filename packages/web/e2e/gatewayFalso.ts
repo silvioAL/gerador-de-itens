@@ -43,6 +43,10 @@ export const BASE_URL_GATEWAY_FALSO = `http://127.0.0.1:${PORTA_GATEWAY_FALSO}/v
 
 export const MODELO_GATEWAY_FALSO = "modelo-de-mentira";
 
+/** SPEC-30 Fase 1a — o que o gateway falso "ouve", sempre. Uma frase que soa
+ * como demanda ditada, pra o teste conferir que ela chegou no campo certo. */
+export const TEXTO_TRANSCRITO_FALSO = "criar uma fila do rabbit para propostas aprovadas";
+
 interface CorpoChat {
   messages?: { role: string; content: string }[];
   response_format?: { type?: string; json_schema?: { schema?: unknown } };
@@ -107,6 +111,26 @@ export function criarGatewayFalso(): Server {
     if (req.url === "/health") {
       res.writeHead(200, { "content-type": "text/plain" });
       res.end("ok");
+      return;
+    }
+
+    // SPEC-30 Fase 1a — transcrição. O mesmo dublê serve os dois endpoints
+    // porque é o mesmo dialeto e a mesma credencial: quem configurou o gateway
+    // pra chat ganhou a transcrição junto, e o teste precisa provar isso.
+    if (req.url?.endsWith("/audio/transcriptions") && req.method === "POST") {
+      if (req.headers.authorization !== `Bearer ${CHAVE_GATEWAY_FALSO}`) {
+        res.writeHead(401, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: "credencial recusada pelo gateway falso" }));
+        return;
+      }
+      // Drena o multipart sem parsear: o que este teste prova é que o áudio
+      // CHEGOU e que o texto volta pro campo certo, não como o boundary é
+      // montado (isso é `provedorOpenAI.test.ts`, contra servidor real).
+      req.resume();
+      req.on("end", () => {
+        res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
+        res.end(TEXTO_TRANSCRITO_FALSO);
+      });
       return;
     }
 

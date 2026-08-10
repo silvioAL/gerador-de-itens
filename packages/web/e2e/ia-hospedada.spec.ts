@@ -5,6 +5,7 @@ import {
   CHAVE_GATEWAY_FALSO,
   MARCA_GATEWAY_FALSO,
   MODELO_GATEWAY_FALSO,
+  TEXTO_TRANSCRITO_FALSO,
 } from "./gatewayFalso";
 
 /**
@@ -152,4 +153,61 @@ test("credencial errada é reportada como resultado do teste, não como erro gen
   // numa frase que diz o que fazer. "Failed to fetch" seria a mesma informação
   // que nenhuma informação.
   await expect(page.getByTestId("gateway-resultado")).toContainText(/Credencial recusada/i, { timeout: 15000 });
+});
+
+/**
+ * SPEC-30 Fase 1a — o botão de falar, pelo navegador.
+ *
+ * O que só um teste de navegador prova aqui: que a capacidade lida de
+ * `/ia/status` chega na tela, que o `MediaRecorder` produz um Blob que
+ * sobrevive ao POST binário, e que o texto volta pro campo **editável** em vez
+ * de virar mensagem enviada. Um teste de unidade com `apiIa` mockado provaria
+ * só que o componente chama o que ele mesmo espera.
+ *
+ * O microfone é falso — `--use-fake-device-for-media-stream` faz o Chromium
+ * gerar um tom e conceder a permissão sem diálogo. O áudio é sintético, mas o
+ * caminho (getUserMedia → MediaRecorder → fetch → Fastify → gateway) é real.
+ */
+test.describe("voz na conversa", () => {
+  // As flags do microfone falso vivem no `playwright.config.ts` —
+  // `launchOptions` num describe força um worker novo e o Playwright recusa.
+  test.use({ permissions: ["microphone"] });
+
+  test("falar preenche o campo com o texto transcrito, editável e sem enviar sozinho", async ({ page }) => {
+    await entrar(page);
+
+    // O caso "sem provedor que transcreve, sem botão" fica em
+    // `JanelaConversa.voz.test.tsx`, não aqui: os testes deste arquivo rodam em
+    // ordem e os anteriores já salvaram credencial (o `globalSetup` trunca uma
+    // vez, no início da suíte). Afirmar ausência aqui seria afirmar sobre um
+    // estado que este arquivo não controla.
+    await abrirModeloIa(page);
+    const card = page.getByTestId("modelo-ia-gateway");
+    await card.getByLabel("Base URL do gateway").fill(BASE_URL_GATEWAY_FALSO);
+    await card.getByLabel("Chave de API").fill(CHAVE_GATEWAY_FALSO);
+    await card.getByLabel("Nome do modelo").fill(MODELO_GATEWAY_FALSO);
+    await card.getByRole("button", { name: "Salvar" }).click();
+    await expect(page.getByTestId("gateway-resultado")).toContainText("Credencial salva");
+    await page.getByRole("button", { name: "Voltar ao canvas" }).click();
+
+    await page.getByRole("button", { name: "✦ Desenhar conversando" }).click();
+    const falar = page.getByTestId("voz-falar");
+    await expect(falar).toBeVisible();
+
+    await falar.click();
+    await expect(page.getByTestId("voz-gravando")).toBeVisible();
+    // Um instante de gravação de verdade: sem isso o MediaRecorder pode fechar
+    // sem nenhum chunk, e o teste passaria por não ter gravado nada.
+    await page.waitForTimeout(1200);
+    await page.getByRole("button", { name: "Parar e transcrever" }).click();
+
+    const campo = page.getByLabel("Descreva a demanda");
+    await expect(campo).toHaveValue(new RegExp(TEXTO_TRANSCRITO_FALSO), { timeout: 20000 });
+
+    // O texto ficou EDITÁVEL no campo — não virou mensagem enviada. É a regra
+    // que impede erro de transcrição de virar nó errado no diagrama.
+    await expect(page.getByTestId("conversa-pensando")).toHaveCount(0);
+    await campo.fill(`${await campo.inputValue()} (corrigido à mão)`);
+    await expect(campo).toHaveValue(/corrigido à mão/);
+  });
 });

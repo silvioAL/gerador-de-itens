@@ -52,6 +52,17 @@ export interface StatusIa {
    * nativo) pro bundle do navegador.
    */
   presetsGateway: PresetGateway[];
+  /**
+   * SPEC-30 — o que o provedor SELECIONADO consegue fazer além de texto. A UI
+   * lê isto pra decidir se desenha o botão de microfone (e, na Fase 2, o de
+   * anexar imagem).
+   *
+   * Existe como campo, e não como dedução no front, porque quem sabe é quem
+   * cria o provedor: um mesmo endereço serve modelo com e sem a capacidade.
+   * Deduzir no navegador seria repetir a lição do preset de `localhost`
+   * (JOURNEY §124) — a informação certa mora de um lado só.
+   */
+  capacidades: { transcricao: boolean };
 }
 
 async function existeArquivoNaoVazio(caminho: string): Promise<boolean> {
@@ -124,5 +135,11 @@ export async function verificarStatus(baseDir?: string, idChatSelecionado?: stri
     // GGUF). O modo hospedado monta a própria resposta em `routes/ia.ts` e
     // pede `presetsDoModo("hospedado")` lá.
     presetsGateway: presetsDoModo("local"),
+    capacidades: {
+      // SPEC-30: só o gateway transcreve. O provedor local não tem como —
+      // `node-llama-cpp` não expõe multimodal (§1), e é por isso que a Fase 1b
+      // (whisper.cpp) é um adaptador NOVO, não um método a mais no mesmo.
+      transcricao: gatewaySelecionado && gateway.configurado,
+    },
   };
 }

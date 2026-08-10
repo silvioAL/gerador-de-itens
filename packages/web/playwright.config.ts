@@ -15,6 +15,14 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:5190",
     screenshot: "only-on-failure",
+    // SPEC-30 Fase 1a — microfone falso do Chromium: `getUserMedia` devolve um
+    // tom sintético e a permissão é concedida sem diálogo. Fica aqui, e não no
+    // `test.use()` do spec, porque `launchOptions` num describe forçaria um
+    // worker novo (o Playwright recusa). É inofensivo pros outros specs: sem
+    // ninguém chamar `getUserMedia`, nada muda.
+    launchOptions: {
+      args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"],
+    },
   },
   webServer: [
     {

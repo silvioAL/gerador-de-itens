@@ -964,6 +964,71 @@ async function tratarIaPipeline(req: IncomingMessage, res: ServerResponse, papel
 }
 
 /**
+ * SPEC-30 Fase 1a — `POST /ia/transcrever`.
+ *
+ * O corpo é o áudio cru (o `Content-Type` diz o formato que o navegador
+ * gravou), a resposta é `{ texto }`. Quem transcreve é o provedor selecionado,
+ * e ele pode não saber: transcrição é capacidade OPCIONAL (`ProvedorIa`), e o
+ * modelo local não tem — `node-llama-cpp` não expõe multimodal.
+ *
+ * 501 quando não sabe, não 500: "este provedor não faz" é uma resposta
+ * legítima sobre a configuração, não uma falha do servidor. A tela usa isso
+ * pra não desenhar o botão de microfone.
+ */
+async function tratarIaTranscrever(req: IncomingMessage, res: ServerResponse, dirProjeto: string): Promise<void> {
+  try {
+    const provedor = await obterProvedor(dirProjeto);
+    if (!provedor.transcrever) {
+      enviarJson(res, 501, {
+        erro: `O modelo selecionado (${provedor.nome}) não transcreve áudio. Configure um gateway na aba "Modelo de IA".`,
+      });
+      return;
+    }
+
+    const audio = await lerCorpoBinario(req, LIMITE_AUDIO_BYTES);
+    if (audio.length === 0) {
+      enviarJson(res, 400, { erro: "nenhum áudio recebido" });
+      return;
+    }
+
+    const texto = await provedor.transcrever(audio, {
+      formato: (req.headers["content-type"] ?? "audio/webm").split(";")[0].trim(),
+      // Português fixo: é o idioma do produto inteiro, e a dica é o que faz
+      // sigla e nome de sistema serem reconhecidos.
+      idioma: "pt",
+    });
+    enviarJson(res, 200, { texto });
+  } catch (erro) {
+    responderFalhaIa(res, erro, "ia/transcrever", "transcrever o áudio");
+  }
+}
+
+/**
+ * Teto de upload. Áudio longo é transcrição longa e cara — e sem teto explícito
+ * o limite acaba sendo a memória do processo. ~10 MB de WebM/Opus são vários
+ * minutos de fala, muito acima de "ditar uma demanda".
+ *
+ * A lição vem da SPEC-25 Fase 1 e está no JOURNEY: *toda ausência de teto virou
+ * bug*. Este nasce com o primeiro commit da feature, não depois do incidente.
+ */
+const LIMITE_AUDIO_BYTES = 10 * 1024 * 1024;
+
+/** Lê o corpo como bytes, abortando se passar do teto. */
+async function lerCorpoBinario(req: IncomingMessage, limite: number): Promise<Uint8Array> {
+  const partes: Buffer[] = [];
+  let total = 0;
+  for await (const parte of req) {
+    const bloco = parte as Buffer;
+    total += bloco.length;
+    // Corta na hora, não depois de montar tudo: o ponto do teto é não guardar
+    // o excesso na memória.
+    if (total > limite) throw new Error(`Áudio grande demais (limite: ${Math.round(limite / 1024 / 1024)} MB).`);
+    partes.push(bloco);
+  }
+  return new Uint8Array(Buffer.concat(partes));
+}
+
+/**
  * Roteador da API local — devolve `true` se tratou a requisição (`gerador
  * open` não deve cair pro fallback de arquivo estático nesse caso), `false`
  * pra deixar o resto (`/`, `/assets/*`, `/config/*.json`) seguir como já era.
@@ -999,6 +1064,10 @@ export async function tratarApiLocal(req: IncomingMessage, res: ServerResponse, 
   }
   if (caminho === "/ia/alterar-item" && metodo === "POST") {
     await tratarIaAlterarItem(req, res, dirProjeto);
+    return true;
+  }
+  if (caminho === "/ia/transcrever" && metodo === "POST") {
+    await tratarIaTranscrever(req, res, dirProjeto);
     return true;
   }
   if (caminho === "/config/ia" && (metodo === "GET" || metodo === "PUT")) {

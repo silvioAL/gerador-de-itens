@@ -6,7 +6,11 @@ import { ConversaEspecificacao } from "./ConversaEspecificacao";
 const alterarItemMock = vi.hoisted(() => vi.fn());
 vi.mock("../api/client", async (importActual) => ({
   ...(await importActual<typeof import("../api/client")>()),
-  apiIa: { alterarItem: alterarItemMock },
+  // SPEC-30 Fase 1a: a janela agora pergunta ao servidor se o provedor
+  // transcreve (`useVozNaEntrada`). Sem `status` no mock, o componente
+  // quebra — e o mock incompleto seria uma mentira sobre o contrato.
+  // "não transcreve" mantém estas specs no cenário que elas descrevem.
+  apiIa: { alterarItem: alterarItemMock, status: async () => ({ capacidades: { transcricao: false } }) },
 }));
 
 function placeholder(chave: string, rotulo: string, valor?: string) {
