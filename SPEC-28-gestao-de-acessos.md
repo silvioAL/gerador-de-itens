@@ -211,10 +211,29 @@ Registrado como requisito de verificação, não como recomendação: o teste da
 
    Ou seja: a organização fica trancada fora de `/acessos` entre as duas
    chamadas, sempre, e nem um papel que conceda `acessos/editar` salva — não
-   dá pra atribuí-lo a ninguém. Só sai disso com acesso ao banco. Duas saídas
-   possíveis, a escolher na implementação: criar o papel Administrador (com
-   `acessos/editar`) junto da organização, ou fazer `POST /acessos/papeis`
-   atribuir o papel a quem o criou quando ele é o primeiro da organização.
+   dá pra atribuí-lo a ninguém. Só sai disso com acesso ao banco.
+
+   Medido contra o Postgres de verdade, não deduzido:
+
+   ```
+   POST /acessos/papeis            → 201  {"nome":"Administrador",
+                                           "permissoes":[{"recurso":"acessos","acao":"editar"}]}
+   POST /acessos/papeis/:id/membros → 403  {"erro":"sem permissão para \"editar\" em \"acessos\""}
+   ```
+
+   **A saída não é auto-atribuir o primeiro papel a quem o criou.** Parece a
+   correção óbvia e não é: se o primeiro papel for "Agilidade" com só
+   `regras.checklistProcesso`, auto-atribuí-lo dá à pessoa exatamente esse
+   papel — e ela segue trancada fora de `acessos`. A auto-atribuição resolve o
+   caso em que o primeiro papel por acaso concede `acessos/editar`, que é o
+   caso fácil.
+
+   O que fecha o buraco em todos os casos é **garantir `acessos/editar` a
+   alguém antes que o RBAC possa ligar**: papel Administrador criado junto da
+   organização, no onboarding. Para as organizações que já existem sem ele,
+   isso exige uma migração que escolha um administrador — e *quem* é essa
+   pessoa é decisão de produto, não de implementação. Está aqui como pergunta,
+   não como plano.
 
    Fasear 1a/1b não é burocracia: a diferença entre "o mecanismo funciona" e
    "o mecanismo protege" é justamente onde esta SPEC se enganou uma vez. Uma

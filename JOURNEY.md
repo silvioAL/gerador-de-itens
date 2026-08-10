@@ -3015,9 +3015,29 @@ independente de quem o tem. Na chamada 2 o criador ainda não está atribuído:
 `acessos/editar` salva, porque não dá pra atribuí-lo a ninguém. Saída: acesso ao
 banco.
 
+Isso não é dedução — foi medido contra o Postgres, com um teste descartável:
+
+```
+POST /acessos/papeis             → 201  Administrador, permissoes:[acessos/editar]
+POST /acessos/papeis/:id/membros → 403  sem permissão para "editar" em "acessos"
+```
+
 Ninguém tinha visto porque os testes criam papel e atribuição na mesma função de
-apoio, numa transação que nunca passa pelo `preHandler` da segunda rota. O teste
-pulava exatamente a janela onde o produto quebra.
+apoio, com `insert` direto no banco, sem passar pelo `preHandler` da segunda
+rota. O teste pulava exatamente a janela onde o produto quebra. Aliás, o dano
+real já está registrado neste repositório: o comentário de
+`test-support/bancoDeTeste.ts` conta que a suíte deixou um papel "Administrador"
+no banco de desenvolvimento e *"o banco de trabalho ficou com controle de acesso
+ativo, um único papel podendo só `acessos:editar`"*. Era esta tranca acontecendo
+de verdade, e foi lida na época como sujeira de teste.
+
+E medir também derrubou a correção que eu tinha escrito primeiro. "Auto-atribuir
+o primeiro papel a quem o criou" parece a solução óbvia e não é: se o primeiro
+papel for "Agilidade" com só `regras.checklistProcesso`, auto-atribuí-lo entrega
+exatamente esse papel — e a pessoa segue trancada fora de `acessos`. Só funciona
+no caso em que o primeiro papel por acaso já concede `acessos/editar`, que é o
+caso fácil. O que fecha em todos os casos é garantir `acessos/editar` a alguém
+**antes** que o RBAC possa ligar.
 
 ### A lição, que é a mesma de sempre com outra roupa
 
