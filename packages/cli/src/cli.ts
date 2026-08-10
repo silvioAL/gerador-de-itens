@@ -18,7 +18,9 @@ Comandos:
     --port <porta>         Padrão: 4321
   import-graphify <graph.json>   Rascunho de quebra.json a partir de um grafo já extraído pelo Graphify
     --out <arquivo>        Padrão: quebra-rascunho.json
-  ia instalar               Baixa os modelos de IA local (Qwen3-4B + embeddings) — só na primeira vez
+  ia instalar               Instala os modelos de IA local (Qwen3-4B + embeddings) — só na primeira vez
+    --de <caminho.gguf>    Instala de um arquivo que você já tem, sem rede (SPEC-32)
+    --origem npm           Monta o modelo pelos pacotes-parte do npm, sem Hugging Face
   ia status                 Mostra se a IA local está instalada e pronta pra uso
 `;
 

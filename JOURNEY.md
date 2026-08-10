@@ -2614,3 +2614,61 @@ O achado de processo veio do próprio fechamento: o teste novo passou no vitest 
 **quebrou o `tsc`** (`.catch(e => e)` devolve `Error | T`, e ler `.message` ali
 não compila). É a mesma lição de sempre — a suíte verde não é o que a CI checa.
 Regressão: 847 testes nos 6 workspaces, 21/21 E2E, build limpo.
+
+## 130. O modelo deixa de depender do Hugging Face (SPEC-32)
+
+Pedido urgente: *"não é possível usar essa estratégia de não embutir o modelo
+no artefato, vamos embutir para eu poder usar a ferramenta, melhor ter um build
+maior e conseguir usar"*. O motivo apurado: a rede onde a ferramenta precisa
+rodar **bloqueia o Hugging Face**.
+
+Duas correções de premissa antes do desenho.
+
+**A primeira, minha.** O usuário lembrava que *"já funcionava assim antes, vinha
+no pacote"*. Não vinha: `git log -S"gguf"` e `-S"models"` em
+`packages/cli/package.json` não retornam nada, e o `files` sempre foi
+`dist`/`templates`/`web-dist`. O `gerador ia instalar` nasceu junto com os
+modelos (SPEC-23 Fase 0), e a SPEC-23 já registrava a decisão de não embutir.
+Isso não muda o que ele quer — muda só de onde a gente parte.
+
+**A segunda, do npm.** "Embutir no pacote" no sentido literal **não existe**: um
+pacote de 229,9 MB já levou `413 Payload Too Large` no npmjs.org, e o maior real
+publicado que encontramos (`onnxruntime-node`) tem 258 MB. O teto não está
+documentado em página nenhuma — ele aparece como 413 na hora do publish. Um
+Qwen3-4B tem 2.497 MB.
+
+Então o modelo ganhou **origem plugável**:
+
+- `--de <caminho.gguf>` copia um arquivo que já existe. Destrava uma pessoa
+  hoje, sem publicar nada e sem rede.
+- `--origem npm` monta o modelo a partir de pacotes-parte de ~190 MB. Quem
+  baixa é o **próprio `npm install`** num prefixo descartável — não um cliente
+  HTTP nosso. Isso é o que faz o caminho funcionar numa rede corporativa: o npm
+  já sabe ler `.npmrc`, proxy, registry espelhado e credencial.
+
+E o hash deixou de ser opcional. A SPEC-23 tinha registrado integridade "só por
+tamanho, hash como evolução futura"; com remontagem isso vira perigoso, porque
+parte fora de ordem dá um arquivo **do tamanho certo e do conteúdo errado** — o
+sintoma seria o modelo gerando lixo, longe da causa.
+
+O achado da rodada foi o teste tentando provar exatamente isso. O fixture era
+`"gguf-de-mentira-".repeat(64)`, e o teste de "parte fora de ordem" passava
+verde: num buffer periódico, trocar as metades devolve os mesmos bytes, então o
+hash batia e o teste não testava nada. A segunda tentativa, `(i*37+11)%256`,
+parecia aleatória e caiu no mesmo buraco — período 256, quatro blocos iguais em
+1 KB. Só com `randomBytes` o teste começou a falhar como devia. É o mesmo erro
+que o código evita, cometido no teste que existe pra pegá-lo.
+
+Um bug real saiu daí de graça: o `saida.end()` da remontagem não era aguardado
+antes do hash. Com 1 KB o flush acontece a tempo e nada aparece; com 2,5 GB o
+sintoma seria "chegou corrompido" num arquivo que estava certo.
+
+Validado com dado real, não só com teste: `gerador ia instalar --modelo
+embedding --de <caminho>` copiou os 639 MB em 2s; o `fatiar-modelo.mjs` gerou
+4 pacotes e o `cat parte-*/parte.bin` remontou um arquivo com o sha256
+**idêntico** ao original.
+
+Fica registrado como custo, não como resolvido: publicar ~2,5 GB fatiados no
+registry público é uso incomum do npm. O Qwen3-4B é Apache-2.0, então
+redistribuir é permitido — mas se o npm tratar como abuso, a saída é registry
+privado, e só a lista de pacotes muda.

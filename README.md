@@ -112,6 +112,28 @@ A porta `11434` também é publicada pra fora, então a **mesma** instância ser
 
 > **Modelo local sem Docker.** No `gerador open` existe o outro caminho: `gerador ia instalar` baixa um GGUF e roda embutido no processo, sem container nenhum (SPEC-23). O caminho do Ollama acima é o do **modo hospedado**, onde carregar o modelo dentro do container do servidor foi descartado de propósito (SPEC-31 Fase 4).
 
+##### Se a sua rede bloqueia o Hugging Face
+
+Por padrão `gerador ia instalar` busca o GGUF no Hugging Face. Onde isso é bloqueado, há duas saídas — nenhuma delas exige rede liberada para lá (SPEC-32):
+
+```bash
+# 1. De um arquivo que você já tem (pendrive, share, a máquina de um colega)
+gerador ia instalar --modelo qwen-local --de D:\modelos\Qwen3-4B-Q4_K_M.gguf
+
+# 2. Pelos pacotes-parte no npm — usa o registry/proxy que a sua rede já libera
+gerador ia instalar --origem npm
+```
+
+O `--origem npm` existe porque **um pacote npm de 2,5 GB não publica**: um pacote de 229,9 MB já levou `413 Payload Too Large` no npmjs.org. Então o modelo vai fatiado em pacotes de ~190 MB e é remontado na instalação, com o SHA-256 do arquivo inteiro conferido no fim — parte fora de ordem produziria um arquivo do tamanho certo e do conteúdo errado.
+
+Para gerar e publicar esses pacotes a partir de um GGUF:
+
+```bash
+node scripts/fatiar-modelo.mjs caminho/modelo.gguf --escopo @seu-escopo
+```
+
+O script imprime o `sha256`/`partesNpm` para colar em `packages/llm/src/modelos.ts` e o comando de publicação — mas **não publica**: mexer numa conta npm pública é decisão de quem é dono dela.
+
 ##### Imagem: anexar um print
 
 Na conversa do desenho, **🖼 Anexar imagem** manda um print junto com o texto: um diagrama de Miro, uma foto de lousa, um desenho de Confluence. O agente propõe os nós e conexões equivalentes **usando os tipos que existem na sua config** — a imagem é insumo, não um formato novo de saída.
