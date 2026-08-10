@@ -1701,3 +1701,30 @@ O determinístico não sumiu: virou **"Insumos — o que os agentes receberam"**
 De brinde, o mistério do §107: papel configurado sem placeholder **some** da tela — o que é indistinguível de falhar. Agora diz "nada a escrever neste item", nomeando a tech × contexto que a tabela de regras não cobre. Foi exatamente o que fez o Especialista parecer quebrado.
 
 E a origem daquele Especialista vazio, confirmada por bisect do `regras.example.json`: o `config/regras.json` do usuário é **0 checklist / 12 testes**, idêntico à config da v0.1.14 ou anterior — de quando `checklistTecnico` nem existia como conceito separado. Não era o casamento nem a config entregue: era um arquivo de outra era, que a ferramenta corretamente nunca sobrescreve e incorretamente nunca comenta.
+
+## 109. Hexagonal: o refactor que a sessão inteira estava pedindo
+
+Depois de discutirmos migrar de Postgres para Mongo, o usuário propôs algo maior: *"vamos aproveitar para fazer melhoria arquitetura para hexagonal com DDD, é um refactor grande, mas vai valer a pena"*.
+
+Isso converge — arquitetura hexagonal **é** a fronteira de repositório que eu tinha recomendado contra a migração direta, levada à forma completa. E ela dissolve a discussão de banco: com portas, Mongo vira adaptador, escrito e descartado sem tocar no resto.
+
+Medindo antes de planejar, o prêmio apareceu, e **não é o banco**:
+
+```
+openApiLocal.ts (local, arquivo)     1.598 linhas
+routes/* + app.ts (hospedado, PG)      964 linhas
+```
+
+`quebras`, `campos-no`, `perfis-time` e `especificacao-template` estão implementados **duas vezes**. E essa duplicação é a causa documentada de tudo que doeu nesta sessão: o hospedado sem IA (§105), sem tabela de regras (§108), e as duas configs em eras diferentes. Não foi descuido — é o resultado inevitável de escrever o mesmo domínio em dois lugares. Um dos dois sempre fica para trás.
+
+Duas descobertas que mudaram o risco do plano, ambas a favor:
+
+**O hexágono já está pela metade.** `packages/engine` é puro — zero `node:fs`, `http`, `fetch` ou `process.env` em 5.900 linhas — e `boundary.sanity.test.ts` guarda isso desde a Fase 1. O núcleo existe e está protegido há meses.
+
+**E uma porta já roda em produção.** `ProvedorIa` tem dois adaptadores (llama local e gateway HTTP) e trocar de modelo já é trocar de adaptador. O refactor generaliza um padrão que este código já provou, em vez de importar um paradigma novo.
+
+Sobre DDD, a recomendação aceita foi **seletiva**: repositórios como portas, os dois contextos delimitados (especificação | acesso), e a linguagem ubíqua que já existe em português. Fora: agregados como classes, value objects encapsulados, eventos de domínio, CQRS. Envolver um núcleo funcional puro e testado em cerimônia de objeto custa reescrita e não compra invariante que falte.
+
+Um detalhe de §6 que resolve a discussão original de banco sem precisar vencê-la: os dois contextos quase não se tocam, e o de acesso é genuinamente relacional (8 FKs). Se o Mongo entrar, entra pela especificação, onde o dado é documento; o relacional fica onde as chaves estrangeiras trabalham. A escolha deixa de ser "tudo ou nada".
+
+SPEC-31 escrita, cinco fases por estrangulamento, cada uma um PR publicável. Nenhuma linha de refactor antes da SPEC — regra do projeto, e aqui especialmente necessária.
