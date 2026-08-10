@@ -1966,3 +1966,34 @@ nova a cada execução, porque `organizacoes` não tem restrição única em `no
 escondendo a dependência: cada arquivo via uma organização diferente e nunca
 enxergava a credencial do outro. Mesma lição da Fase 3, agora pela terceira vez:
 quem precisa de um estado garante o estado.
+
+## 116. "Esqueci com qual credencial logar" — não havia credencial
+
+Relato: *"podemos fazer o login com google (abre outra janela), eu esqueci com
+qual credencial logar"*. Somado ao relato anterior — *"o login com conta google
+sumiu"* — parecia dois defeitos. **Não era nenhum.**
+
+O código do Google está inteiro e correto: botão na `LoginScreen`, `GET
+/auth/login` com PKCE, `/auth/callback`, verificação de `email_verified` e de
+domínio permitido. O `docker-compose` repassa as cinco variáveis e o
+`.env.example` documenta. O que faltava era **configuração**: sem `AUTH_MODE=oidc`
+o servidor sobe em `dev`, e o botão do Google, por construção, não existe.
+
+E o modo `dev` **aceita qualquer e-mail, sem senha**. Verificado contra o
+servidor dele, no ar: `POST /auth/login` com o e-mail pessoal devolve 200. Não
+havia credencial para lembrar.
+
+Os dois relatos, então, eram a mesma coisa: **a tela não se explicava**. Pedia
+"E-mail" com um botão "Entrar" — que é exatamente como se parece um login de
+verdade, com uma senha que a pessoa acha que esqueceu.
+
+A correção é uma frase na tela, em modo dev: *"Qualquer e-mail entra, sem senha
+— não há credencial a lembrar. Para entrar com Google, suba o servidor com
+`AUTH_MODE=oidc`"*. Mesma régua do diagnóstico de config da Fase 3: quando o
+sistema sabe por que está se comportando assim, ele diz.
+
+Vale registrar o padrão, porque é a terceira vez nesta sequência: os defeitos
+mais caros deste projeto não foram código errado, foram **código certo em
+silêncio** — a config de outra era que nunca era comentada, a esteira que não
+escrevia nada sem dizer que não havia regra, e agora uma tela de login que não
+diz que não pede senha.
