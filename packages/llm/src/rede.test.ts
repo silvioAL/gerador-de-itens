@@ -77,9 +77,18 @@ describe("explicarFalhaDeRede — a mensagem que faltava", () => {
     expect(m).not.toContain("Nenhum proxy configurado");
   });
 
-  it("certificado aponta pra inspeção TLS e pro NODE_EXTRA_CA_CERTS", () => {
+  it("certificado aponta inspeção TLS e a saída mais barata primeiro", () => {
+    // ACHADO REAL na máquina do usuário: era exatamente isto — nem bloqueio,
+    // nem proxy. A rede reassina o HTTPS com uma CA da empresa. E é a
+    // explicação final do "npm funciona, download não": o npm usa o
+    // repositório do Windows, o Node não.
+    //
+    // `--use-system-ca` vem primeiro porque resolve com UMA variável, usando a
+    // CA já instalada; NODE_EXTRA_CA_CERTS exige caçar e exportar um .pem, que
+    // é onde a maioria desiste. (Node de teste é 20+; em 22.15+ a flag existe.)
     const m = explicarFalhaDeRede(falha("SELF_SIGNED_CERT_IN_CHAIN"), URL_HF, {}).message;
-    expect(m).toContain("NODE_EXTRA_CA_CERTS");
+    expect(m).toContain("inspeção TLS");
+    expect(m).toMatch(/--use-system-ca|NODE_EXTRA_CA_CERTS/);
   });
 
   it("erro desconhecido ainda oferece a saída sem rede", () => {

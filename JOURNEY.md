@@ -2741,3 +2741,38 @@ Três achados saíram da validação real, nenhum dos testes:
 A lição que fica: **mensagem de erro ruim custa mais que bug.** O bug era uma
 linha de configuração; o diagnóstico errado custou uma SPEC, um workflow e três
 rodadas.
+
+## 133. A causa era inspeção TLS — e só um comando descobriu
+
+O `gerador ia diagnosticar` da §132 rodou na máquina do usuário e devolveu a
+resposta em uma linha:
+
+```
+O certificado de huggingface.co não foi aceito (SELF_SIGNED_CERT_IN_CHAIN).
+```
+
+Não era bloqueio de conteúdo. Não era proxy. Era **inspeção TLS corporativa**:
+a rede intercepta o HTTPS e reassina com uma CA da empresa, que o Node não
+conhece. E é a explicação final do sintoma que confundiu tudo — *"o npm
+funciona e o download não"*: o npm usa o repositório de certificados do
+Windows; o Node, por padrão, não.
+
+A correção para o usuário é uma variável: `NODE_OPTIONS=--use-system-ca` (Node
+22.15+), que manda o Node usar a CA que **já está instalada** na máquina. A
+mensagem passou a oferecer isso primeiro, com `NODE_EXTRA_CA_CERTS` como
+alternativa — caçar e exportar um `.pem` é onde a maioria das pessoas desiste,
+e a versão do Node decide qual das duas frases faz sentido.
+
+O que vale registrar é a economia. Antes do comando existir, três palavras
+(`fetch failed`) sustentaram uma conclusão errada por três rodadas e
+produziram uma SPEC de distribuição por npm, um script de fatiamento e um
+workflow de CI — trabalho legítimo, que continua útil como plano B, mas que
+**não era o problema**. Com o diagnóstico, a causa apareceu na primeira
+tentativa.
+
+Fica também o registro de uma discordância que não foi resolvida por
+argumento: o usuário lembrava de o modelo já ter vindo embarcado no pacote, e
+o histórico (`git log -S"gguf"` vazio, `files` sempre `dist`/`templates`/
+`web-dist`) não sustenta isso. Insistir teria consumido rodadas e não mudaria
+nada — o que destravou foi medir. Com o certificado resolvido, a pergunta
+"embarcar ou não" deixou de importar.
