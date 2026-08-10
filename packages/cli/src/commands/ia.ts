@@ -9,6 +9,7 @@ import {
   buscarComProxy,
   detectarProxy,
   explicarFalhaDeRede,
+  explicarRespostaRecusada,
   idsDeProvedorValidos,
   instalarDeArquivoLocal,
   instalarDePartesNpm,
