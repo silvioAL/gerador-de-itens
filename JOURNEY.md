@@ -2854,3 +2854,38 @@ origens independentes, mesmo arquivo.
 O teste que fixava "instalar chama `baixarModelo` duas vezes" foi reescrito, e
 não contornado: ele descrevia o padrão antigo. Ganhou dois irmãos — um pro
 `--origem huggingface` e um pra queda do release cair na reserva.
+
+## 136. O lote truncava e o gateway sempre disse por quê (#270)
+
+A tarefa era "descobrir POR QUE o lote volta truncado". A resposta estava na
+resposta HTTP desde sempre: toda API compatível com a OpenAI manda
+`finish_reason`, e `"length"` significa exatamente *"parei porque bati no teto
+de `max_tokens`; o que você tem está cortado"*.
+
+Nós líamos só o `content` e descartávamos o motivo. Então a resposta chegava
+pela metade, o `JSON.parse` falhava, e o sintoma virava "truncou" — uma
+palavra que não distingue teto de tokens de queda de conexão, de gateway
+recusando, de modelo respondendo prosa.
+
+Os números explicam a intermitência. `MAX_TOKENS_PADRAO = 8192`, e ninguém
+passa `maxTokens` explícito no caminho do lote. Um item traz `historiaUsuario`,
+`criteriosAceite`, `contrato`, `regrasTeste` e `cenarioFeature`; cinco itens
+disso ficam na casa de 7–8 mil tokens **de saída**. O teto não estava folgado:
+estava encostado. Um teto que "quase sempre dá" é precisamente o que produz
+falha às vezes.
+
+A instrumentação muda a AÇÃO, que é o ponto. Truncamento por teto **não se
+resolve com retry** — a segunda tentativa tem o mesmo teto e corta no mesmo
+lugar, gastando o tempo da pessoa duas vezes pro mesmo resultado. Por isso a
+mensagem diz isso com todas as letras e aponta as duas saídas reais: lote menor
+ou teto maior.
+
+Um teste garante que gateway que **não** manda `finish_reason` continua
+funcionando — wrapper corporativo caseiro costuma omitir campos, e exigir o
+campo quebraria destinos que hoje funcionam.
+
+É a mesma lição da sequência de rede desta rodada, na terceira aparição
+seguida: **o sistema já estava dizendo a causa, e a gente não estava lendo.**
+Primeiro foi o `error.cause` do `fetch failed`; depois o corpo HTML do 403;
+agora o `finish_reason`. Nos três, o trabalho não foi descobrir nada novo — foi
+parar de descartar o que já chegava.
