@@ -112,6 +112,26 @@ A porta `11434` também é publicada pra fora, então a **mesma** instância ser
 
 > **Modelo local sem Docker.** No `gerador open` existe o outro caminho: `gerador ia instalar` baixa um GGUF e roda embutido no processo, sem container nenhum (SPEC-23). O caminho do Ollama acima é o do **modo hospedado**, onde carregar o modelo dentro do container do servidor foi descartado de propósito (SPEC-31 Fase 4).
 
+##### Imagem: anexar um print
+
+Na conversa do desenho, **🖼 Anexar imagem** manda um print junto com o texto: um diagrama de Miro, uma foto de lousa, um desenho de Confluence. O agente propõe os nós e conexões equivalentes **usando os tipos que existem na sua config** — a imagem é insumo, não um formato novo de saída.
+
+Até 3 imagens, 4 MB cada. Com imagem anexada, a tela diz **para onde** ela vai: `ollama` é o container ao lado, `api.anthropic.com` é upload para terceiro. Print de arquitetura costuma ter mais informação sensível do que quem anexa lembra na hora.
+
+O botão só aparece se o modelo configurado enxerga imagem. Como não há como perguntar isso a um gateway compatível com a OpenAI, é uma caixinha que **você** marca na aba **Modelo de IA** — e ninguém verifica se é verdade.
+
+##### Quando não funciona
+
+As limitações abaixo são reais e não têm conserto do nosso lado — o que existe é a ferramenta dizer qual delas você pegou, em vez de um erro técnico:
+
+| O que acontece | Por quê | O que fazer |
+|---|---|---|
+| **O 🎤 aparece e a transcrição dá erro** | O Ollama não transcreve, e o serviço de voz é separado | `docker compose --profile ia up -d` (a mensagem de erro já diz isso) |
+| **Cada item da esteira leva ~3min40** | CPU, sem GPU. Não é travamento | Descomente o bloco `deploy:` do `ollama` se tiver GPU NVIDIA |
+| **"O modelo não devolveu … em formato válido"** | O gateway falhou **depois** que a resposta começou — não há mais status HTTP pra sinalizar | A mensagem mostra o começo do que veio; costuma ser modelo sem visão, resposta cortada, ou prosa em vez de JSON |
+| **Marquei "enxerga imagem" e dá 400** | O modelo não aceita mesmo — ninguém verifica a caixinha | Desmarque, ou troque de modelo |
+| **HTTP 413 ao anexar** | O gateway tem teto menor que o nosso | Print menor, ou grave menos tempo |
+
 #### Produção (VM na nuvem + login Google real)
 
 Hospedar de verdade (não só `docker compose up` local) é uma sequência de três passos:

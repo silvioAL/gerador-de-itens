@@ -496,3 +496,54 @@ describe("transcrever — o áudio vai pro gateway como multipart", () => {
     );
   });
 });
+
+/**
+ * ACHADO apontado pelo usuário: *"vc precisa colocar tratamentos para essas
+ * limitações para o usuário entender"*.
+ *
+ * Estava certo, e havia uma contradição no que eu tinha entregue: o produto
+ * dizia "botão que falha é pior que botão nenhum" e mesmo assim devolvia
+ * `HTTP 404` cru quando o serviço de voz não estava de pé — mandando a pessoa
+ * "conferir a base URL" que estava CERTA.
+ *
+ * A régua destes testes: toda mensagem diz o que aconteceu E o próximo passo.
+ */
+describe("mensagens de falha — dizem o próximo passo, não o status HTTP", () => {
+  const audio = new Uint8Array([1, 2, 3]);
+
+  it("404 na transcrição fala do serviço de voz, não da base URL", async () => {
+    respostas.push((res) => res.writeHead(404).end("not found"));
+
+    await expect(provedor().transcrever!(audio, { formato: "audio/webm" })).rejects.toThrow(
+      /Ollama não transcreve|serviço de voz|--profile ia/
+    );
+  });
+
+  it("404 no chat continua falando da base URL — ali o conselho é outro", async () => {
+    respostas.push((res) => res.writeHead(404).end("not found"));
+    await expect(provedor().completar("oi")).rejects.toThrow(/base URL/);
+  });
+
+  it("modelo sem visão recebendo imagem: diz para desmarcar a opção", async () => {
+    // O destino responde 400 citando a parte que não entendeu; sem tratar, a
+    // pessoa via um dump de JSON e não ligava ao checkbox que ela marcou.
+    respostas.push((res) => res.writeHead(400).end('{"error":"invalid image_url content part"}'));
+
+    await expect(provedor().completar("veja", { imagens: ["data:image/png;base64,AA"] })).rejects.toThrow(
+      /não aceita imagem.*desmarque|Desmarque/i
+    );
+  });
+
+  it("credencial recusada aponta onde arrumar", async () => {
+    respostas.push((res) => res.writeHead(401).end("no"));
+    await expect(provedor().completar("oi")).rejects.toThrow(/Modelo de IA/);
+  });
+
+  it("413 e 429 viram instrução, não código", async () => {
+    respostas.push((res) => res.writeHead(413).end("too large"));
+    await expect(provedor().completar("oi")).rejects.toThrow(/print menor|grave menos/);
+
+    respostas.push((res) => res.writeHead(429).end("slow down"));
+    await expect(provedor().completar("oi")).rejects.toThrow(/Espere um pouco/);
+  });
+});

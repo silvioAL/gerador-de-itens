@@ -45,19 +45,26 @@ export function BotaoFalar({ gravacao }: { gravacao: GravacaoDeVoz }) {
   }
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <button
         onClick={() => void comecar()}
-        style={botaoSecundarioEstilo}
+        style={{ ...botaoSecundarioEstilo, alignSelf: "flex-start" }}
         aria-label="Falar em vez de digitar"
         data-testid="voz-falar"
       >
         🎤 Falar
       </button>
+      {/* Bloco, não linha: as mensagens de falha aqui dizem o PRÓXIMO PASSO
+          (subir o serviço de voz, conferir o gateway) e não cabem numa linha
+          espremida ao lado do botão — cortar a explicação seria devolver o
+          problema original, que era a pessoa não entender o que fazer. */}
       {erro && (
-        <span style={{ fontSize: 11.5, color: "var(--vermelho)" }} data-testid="voz-erro">
+        <p
+          style={{ margin: 0, fontSize: 11.5, color: "var(--vermelho)", lineHeight: 1.5 }}
+          data-testid="voz-erro"
+        >
           {erro}
-        </span>
+        </p>
       )}
     </div>
   );

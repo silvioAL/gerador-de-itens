@@ -2571,3 +2571,46 @@ Vale registrar porque e contraintuitivo: **o dublê de teste tem contrato
 proprio**, e mudar o formato do pedido quebra ele igual quebraria o destino de
 verdade. Um mock que aceitasse qualquer coisa teria escondido isso — e escondido
 tambem se o produto tivesse montado as parts errado.
+
+## 129. As limitações viraram texto na tela (correção do usuário)
+
+Fechei a Fase 2 listando as limitações **para o usuário, no chat** — e deixei
+todas invisíveis **no produto**. Ele respondeu: *"ok, porém vc precisa colocar
+tratamentos para essas limitações para o usuário entender"*.
+
+A contradição era minha e explícita: eu tinha escrito, no comentário do
+`useVozNaEntrada`, que *"um botão que grava 30s e morre no envio desperdiça o
+tempo E a fala"* — e entreguei exatamente isso, porque `capacidades.transcricao`
+responde "o provedor tem o método", não "o serviço de voz está de pé". Com o
+preset do Docker, o microfone aparece mesmo sem o container `whisper`.
+
+Não dá pra consertar a causa: descobrir se um gateway compatível com a OpenAI
+transcreve exigiria mandar áudio pra perguntar. O que dá é **a falha dizer o
+próximo passo**. `erroDeGateway` passou a receber a operação e traduzir por
+status:
+
+- **404 em transcrição** → "o Ollama não transcreve — suba o serviço de voz com
+  `docker compose --profile ia up -d`", em vez de "Endpoint não encontrado".
+- **400 com "image"/"vision" no corpo** → "desmarque *Este modelo enxerga
+  imagem*", que é o único botão que resolve.
+- **401/403** → aponta a aba onde a chave mora.
+- **413/429** → print menor / espere.
+
+O pior caso não tinha status nenhum. Quando o gateway falha **depois** que o
+streaming começou, o 200 já saiu: chega texto no lugar do JSON, e o
+`JSON.parse` cru mostrava `Unexpected token 'e'` na tela de quem só queria
+desenhar um diagrama — com a causa real presa no log do servidor, onde no modo
+hospedado a pessoa não tem acesso. Os quatro pontos de parse agora passam por
+`interpretarRespostaEstruturada`, que nomeia os três motivos prováveis e mostra
+o começo do que veio (que costuma ser a mensagem do próprio gateway).
+
+E a aba **Modelo de IA** ganhou `AvisosDoDestino`: avisa antes, não depois, e
+só o que muda a decisão **daquele** destino — Ollama não transcreve, CPU leva
+~3min40 por item, "enxerga imagem" não é verificado por ninguém. Um teste
+garante que destino público sem visão marcada **não** mostra aviso nenhum:
+aviso que aparece sempre deixa de ser lido.
+
+O achado de processo veio do próprio fechamento: o teste novo passou no vitest e
+**quebrou o `tsc`** (`.catch(e => e)` devolve `Error | T`, e ler `.message` ali
+não compila). É a mesma lição de sempre — a suíte verde não é o que a CI checa.
+Regressão: 847 testes nos 6 workspaces, 21/21 E2E, build limpo.
