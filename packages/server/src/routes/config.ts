@@ -42,6 +42,10 @@ export async function registrarRotasConfig(app: FastifyInstance, { db, diretorio
     return DEFAULTS_COMPILADOS[chave];
   }
 
+  /** SPEC-31 (paridade): o modo local expõe `/versao` para a UI saber com o
+   * que está falando. Não havia razão para o hospedado não expor. */
+  app.get("/versao", async () => ({ versao: versaoAtual, modo: "hospedado" }));
+
   // Leitura aberta (sem sessão) — mesma régua de campos-no/perfis-time.
   app.get("/config/:chave", async (req, reply) => {
     const { chave } = req.params as { chave: string };
@@ -49,6 +53,23 @@ export async function registrarRotasConfig(app: FastifyInstance, { db, diretorio
 
     const { timeId } = req.query as { timeId?: string };
     return casos.obter(chave, await templateDaVersao(chave), timeId);
+  });
+
+  /**
+   * SPEC-31 (paridade) — o modo local expõe o template do prompt único em
+   * `/prompt-unico-template`; o hospedado só tinha `/config/prompt-unico`.
+   * Mesmo documento, dois nomes: a `packages/web` teria que saber em qual modo
+   * está, que é exatamente o que a SPEC-31 existe para evitar. O alias resolve
+   * sem quebrar quem já chama qualquer um dos dois.
+   */
+  app.get("/prompt-unico-template", async () => casos.obter("prompt-unico", await templateDaVersao("prompt-unico")));
+
+  app.put("/prompt-unico-template", { preHandler: exigirSessao }, async (req, reply) => {
+    const corpo = req.body as { documento?: unknown; conteudo?: string } | null;
+    const documento = corpo?.documento ?? (corpo?.conteudo !== undefined ? { conteudo: corpo.conteudo } : undefined);
+    if (documento === undefined) return reply.code(400).send({ erro: "corpo precisa ter `documento` ou `conteudo`" });
+
+    return casos.salvar("prompt-unico", documento, versaoAtual, CAMPO_GLOBAL);
   });
 
   app.put("/config/:chave", { preHandler: exigirSessao }, async (req, reply) => {

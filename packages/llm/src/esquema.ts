@@ -12,6 +12,10 @@
  */
 export type EsquemaJson =
   | { type: "string"; enum?: readonly string[] }
+  // Enum SEM `type` é forma legítima e é a que este projeto usa nos trilhos
+  // (tipo de nó, tipo de conexão, chave de campo). O GBNF aceita, e exigir
+  // `type` aqui só forçaria todo call site a repetir o óbvio.
+  | { enum: readonly (string | number | boolean | null)[] }
   | { type: "number" | "integer" | "boolean" | "null" }
   | { type: "array"; items?: EsquemaJson; minItems?: number; maxItems?: number }
   | {

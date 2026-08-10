@@ -283,3 +283,28 @@ export const credenciaisIa = pgTable(
   },
   (t) => [uniqueIndex("credenciais_ia_chave_unica").on(t.organizacaoId, t.provedorId)]
 );
+
+/**
+ * SPEC-31 (paridade) — campos por tipo de conexão. A SPEC-21 criou isto no
+ * modo local e nunca chegou aqui: quem subia o Docker não conseguia configurar
+ * campo de conexão nenhum. Mesma forma de `camposNo`, sem `itemSpec`
+ * (`CampoAresta` não aceita campo do tipo "lista").
+ */
+export const camposAresta = pgTable(
+  "campos_aresta",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    timeId: text("time_id").notNull().default(CAMPO_GLOBAL),
+    tipoAresta: text("tipo_aresta").notNull(),
+    key: text("key").notNull(),
+    label: text("label").notNull(),
+    type: text("type").notNull(),
+    required: boolean("required").notNull().default(false),
+    valorPadrao: text("valor_padrao"),
+    opcoes: jsonb("opcoes").$type<string[]>(),
+    ajuda: text("ajuda"),
+    ordem: integer("ordem").notNull().default(0),
+    atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("campos_aresta_chave_unica").on(t.timeId, t.tipoAresta, t.key)]
+);

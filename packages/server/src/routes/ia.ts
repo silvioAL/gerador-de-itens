@@ -1,7 +1,20 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import { criarProvedorCompativelOpenAI, type ProvedorIa } from "@gerador/llm/gateway";
-import { resumirCredencialIa, type CredencialIa } from "@gerador/aplicacao";
+import {
+  criarCasosDeUsoDeConfig,
+  montarPedidoAlterarItem,
+  montarPedidoDiagrama,
+  montarPedidoPipeline,
+  montarPedidoSugerirConfig,
+  normalizarPipelineAgentes,
+  preambuloDoPapel,
+  PedidoInvalido,
+  resumirCredencialIa,
+  type CredencialIa,
+  type PedidoIa,
+} from "@gerador/aplicacao";
+import { criarRepositorioDeConfigEmPostgres } from "../adaptadores/configEmPostgres.js";
 import type { OpcoesApp } from "../app.js";
 import { criarRepositorioDeCredenciaisEmPostgres } from "../adaptadores/credenciaisEmPostgres.js";
 import { exigirSessao } from "../auth/middleware.js";
@@ -150,5 +163,91 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
     } finally {
       await provedor.descartar().catch(() => undefined);
     }
+  });
+  /**
+   * SPEC-31 Fase 4 (conclusão) — as quatro rotas que faltavam.
+   *
+   * Elas existem aqui pelo MESMO motivo que existem no modo local: o pedido
+   * (prompt + schema) é montado pela camada de aplicação, que não conhece
+   * arquivo, banco nem provedor. O que muda entre os modos é só quem executa —
+   * `node-llama-cpp` lá, gateway aqui.
+   */
+  async function executarPedido(reply: FastifyReply, pedido: PedidoIa, rotulo: string) {
+    const repo = await repositorio();
+    const credencial = repo ? await repo.obter(ID_PROVEDOR_GATEWAY) : null;
+    if (!credencial?.baseUrl || !credencial.chave) {
+      return reply.code(503).send({ erro: "IA não configurada — cadastre a credencial do gateway" });
+    }
+
+    const provedor = comoProvedor(credencial);
+    // Streaming de verdade (não "junta tudo e manda"): a esteira mostra o
+    // texto aparecendo, e perder isso no hospedado seria a mesma tela com
+    // uma experiência pior — o tipo de divergência que esta fase existe pra
+    // eliminar.
+    reply.raw.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
+    try {
+      await provedor.completarEstruturado(pedido.prompt, pedido.esquema as never, {
+        onTexto: (pedaco) => reply.raw.write(pedaco),
+      });
+      reply.raw.end();
+    } catch (erro) {
+      const mensagem = erro instanceof Error ? erro.message : String(erro);
+      app.log.error(`[${rotulo}] falhou: ${mensagem}`);
+      // Cabeçalho já foi: não dá pra trocar o status, só encerrar. O cliente
+      // detecta o JSON incompleto — mesmo contrato do modo local.
+      reply.raw.end();
+    } finally {
+      await provedor.descartar().catch(() => undefined);
+    }
+  }
+
+  /** Entrada inválida vira 400 ANTES de qualquer byte de resposta. */
+  function comPedido(montar: () => PedidoIa, reply: FastifyReply): PedidoIa | null {
+    try {
+      return montar();
+    } catch (erro) {
+      if (erro instanceof PedidoInvalido) {
+        void reply.code(400).send({ erro: erro.message });
+        return null;
+      }
+      throw erro;
+    }
+  }
+
+  app.post("/ia/pipeline/:papel", async (req, reply) => {
+    const { papel } = req.params as { papel: string };
+    const corpo = (req.body ?? {}) as { contextoEpico?: string; itens?: never };
+
+    // O preâmbulo sai da config da esteira — a mesma porta da Fase 3, agora
+    // com o adaptador Postgres. É por isso que renomear um papel na tela de
+    // configuração muda o prompt nos DOIS modos.
+    const casosDeConfig = criarCasosDeUsoDeConfig(criarRepositorioDeConfigEmPostgres(db));
+    const { documento } = await casosDeConfig.obter("pipeline-agentes", { papeis: [] });
+    const { papeis } = normalizarPipelineAgentes(documento);
+
+    const pedido = comPedido(
+      () => montarPedidoPipeline({ preambulo: preambuloDoPapel(papel, papeis), ...corpo, itens: corpo.itens ?? [] }),
+      reply
+    );
+    if (!pedido) return reply;
+    return executarPedido(reply, pedido, `ia/pipeline/${papel}`);
+  });
+
+  app.post("/ia/diagrama", async (req, reply) => {
+    const pedido = comPedido(() => montarPedidoDiagrama((req.body ?? {}) as never), reply);
+    if (!pedido) return reply;
+    return executarPedido(reply, pedido, "ia/diagrama");
+  });
+
+  app.post("/ia/alterar-item", async (req, reply) => {
+    const pedido = comPedido(() => montarPedidoAlterarItem((req.body ?? {}) as never), reply);
+    if (!pedido) return reply;
+    return executarPedido(reply, pedido, "ia/alterar-item");
+  });
+
+  app.post("/ia/sugerir-config", async (req, reply) => {
+    const pedido = comPedido(() => montarPedidoSugerirConfig((req.body ?? {}) as never), reply);
+    if (!pedido) return reply;
+    return executarPedido(reply, pedido, "ia/sugerir-config");
   });
 }
