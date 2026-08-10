@@ -1,6 +1,8 @@
 # SPEC-28 — Gestão de acessos: quem pode editar o quê
 
-> **Status**: desenho aprovado, implementação não iniciada. Escrito depois da pergunta do usuário sobre "grupo de usuários de agilidade pode editar os agentes / revisar / aprovar alterações nos checklists de processo; os arquitetos nas configurações de padrões arquiteturais e especificações; outro setor edita o fluxo de agentes; **em outra empresa isso ocorre por time**".
+> **Status**: Fase 1 implementada no MECANISMO, pendente na COBERTURA — 2 dos 16 recursos são de fato checados por alguma rota. Ver §3, que é o que vale ler antes de mexer aqui.
+>
+> **Origem**: Escrito depois da pergunta do usuário sobre "grupo de usuários de agilidade pode editar os agentes / revisar / aprovar alterações nos checklists de processo; os arquitetos nas configurações de padrões arquiteturais e especificações; outro setor edita o fluxo de agentes; **em outra empresa isso ocorre por time**".
 
 ## 1. Objetivo
 
@@ -14,16 +16,68 @@ O modo local (`gerador open`) **continua sem permissão nenhuma** — quem roda 
 
 Consequência prática de projeto: **toda checagem de permissão vive em `packages/server`**. Nem `engine` nem `web` decidem permissão — o web só *esconde* o que o servidor já negaria, e esconder é conveniência, nunca o mecanismo.
 
-## 3. Estado atual (o que existe e o que falta)
+## 3. Estado atual (revisado — o que EXISTE e o que FALTA)
 
-O que já existe e é reaproveitado:
+> Esta seção foi reescrita depois de ler o código. A versão anterior descrevia
+> um mundo onde nada de RBAC existia, e isso deixou de ser verdade quando a
+> Fase 1 foi implementada. Uma SPEC que descreve o passado como se fosse o
+> presente é pior que uma SPEC desatualizada: ela faz alguém reconstruir o que
+> já está lá.
 
-- `usuarioTime(email, timeId)` — pertencimento a time, sem papel nenhum.
-- `exigirSessao()` e `exigirTime(resolverTimeId)` em `packages/server/src/auth/middleware.ts` — dois níveis só: *logado* e *pertence ao time*.
-- `organizacoes`, `times`, `convitesTime` no schema.
-- `registrarAuditoria()` — já grava quem escreveu o quê nas rotas protegidas (SPEC-09 §4).
+### 3.1 O mecanismo existe, e está completo
 
-O que falta, e é exatamente o pedido: **não existe papel**. O comentário no schema é explícito — *"sem papel de admin separado, qualquer membro do time administra a própria lista de membros"*. Hoje, quem entra no time edita tudo: regras de refinamento, pipeline de agentes, templates, campos.
+Em `packages/server`:
+
+- **Tabelas** `papeis_acesso`, `papel_permissao`, `usuario_papel` — criadas na
+  migração `0010_acessos.sql`.
+- **`resolverPermissoes()`** (`auth/permissoes.ts`) implementa os três eixos do
+  §4.1, incluindo o escopo: papel organizacional (`escopoTimeId` nulo) cobre
+  qualquer time; papel de time cobre só o dele.
+- **`exigirPermissao()`** como `preHandler`, com 403 que diz **qual** recurso e
+  **qual** ação faltaram.
+- **Modo aberto (§4.3)** honrado: organização sem papel nenhum → `rbacAtivo:
+  false` → permite tudo.
+- **Lista fechada** de 16 recursos, com `regras` quebrado em quatro (§4.2).
+- **`editar` não implica `ler`** — as duas são concedidas explicitamente, como
+  o §6 exige.
+- **Rota `/acessos`** para administrar papéis, ela mesma protegida por
+  `exigirPermissao("acessos", "editar")` (§4.4).
+
+Nada disso precisa ser redesenhado. O desenho aguentou o encontro com o código.
+
+### 3.2 A cobertura não existe — e este é o ponto
+
+**Apenas 2 dos 16 recursos são checados por alguma rota:** `campos-no` (editar)
+e `acessos` (editar).
+
+Os outros 14 — `perfis-time`, `campos-aresta`, os quatro `regras.*`,
+`especificacao-template`, `prompt-unico-template`, `pipeline-agentes`,
+`modelo-ia`, `credenciais-ia`, `retrospectivas`, `quebras`, `membros` — podem
+ser concedidos e negados na tabela, e **nenhuma rota pergunta**.
+
+Consequência concreta: criar o papel "Agilidade" com permissão só em
+`regras.checklistProcesso`, atribuir a alguém, e essa pessoa continua editando
+`pipeline-agentes`, `credenciais-ia` e todo o resto. A permissão existe, é
+gravada, é resolvida — e ignorada.
+
+O próprio código já nomeia esse modo de falha, no comentário da lista de
+recursos:
+
+> *"permissão sobre recurso que nenhuma rota checa é permissão que falha ABERTA
+> e em silêncio — o pior modo de falha possível numa camada de autorização"*
+
+É a descrição exata do estado atual. O comentário foi escrito como justificativa
+para a lista ser fechada; virou o diagnóstico da própria implementação.
+
+### 3.3 Leitura honesta do que aconteceu
+
+A Fase 1 entregou o **mecanismo** e usou `campos-no` como piloto — o que é uma
+decisão defensável: provar o desenho numa rota antes de espalhá-lo por catorze.
+O erro não foi parar ali; foi **marcar a fase como concluída** com o piloto no
+lugar da cobertura, sem deixar registrado que faltava o resto.
+
+Por isso o teste de aceitação do §10, que é o pedido do usuário escrito como
+cenário, hoje só passaria com `campos-no`.
 
 ## 4. Decisões de arquitetura
 
@@ -137,13 +191,58 @@ Registrado como requisito de verificação, não como recomendação: o teste da
 
 ## 9. Roteiro faseado
 
-1. **Fase 1 — modelo e checagem**: tabelas, `exigirPermissao`, enum de recursos, modo aberto (§4.3), papel Administrador no onboarding. Sem UI: prova com testes de rota (403/200 por papel).
-2. **Fase 2 — UI de acessos**: aba Acessos + `GET /permissoes/minhas` + esconder o que não pode. É aqui que a feature vira usável.
-3. **Fase 3 — aprovação**: `recurso_politica.exigeAprovacao`, proposta pendente, tela de revisão com diff, ação `aprovar` valendo. Reusa o cartão antes/depois que a `ConversaEspecificacao` já tem (SPEC-27 Fase 2) — o formato de "veja o que muda e aceite" já existe e foi validado.
-4. **Fase 4 — SSO de grupos** (se e quando pedido).
+1. **Fase 1a — mecanismo** ✅ *feito*: tabelas, `resolverPermissoes`,
+   `exigirPermissao`, enum de recursos, modo aberto (§4.3), rota `/acessos`.
+   Piloto em `campos-no`.
+2. **Fase 1b — cobertura** ⬅️ *é aqui que estamos*: aplicar `exigirPermissao`
+   nas 14 rotas restantes e escrever o teste de cenário do §10.
+
+   Entra aqui também o **papel Administrador no onboarding**, que a Fase 1
+   prometia e não entregou: hoje ele só existe dentro dos testes, que o criam
+   à mão.
+
+   Sem ele há uma **tranca inevitável**, não condicional. Criar um papel são
+   duas chamadas — `POST /acessos/papeis` e depois
+   `POST /acessos/papeis/:id/membros`. A primeira passa (modo aberto: zero
+   papéis). Mas ela mesma cria o primeiro papel, e `resolverPermissoes` liga o
+   RBAC assim que **existe qualquer papel na organização**, independente de
+   quem o tem. Na segunda chamada quem acabou de criar o papel ainda não está
+   atribuído a ele: `atribuicoes.length === 0` → `porRecurso` vazio → 403.
+
+   Ou seja: a organização fica trancada fora de `/acessos` entre as duas
+   chamadas, sempre, e nem um papel que conceda `acessos/editar` salva — não
+   dá pra atribuí-lo a ninguém. Só sai disso com acesso ao banco. Duas saídas
+   possíveis, a escolher na implementação: criar o papel Administrador (com
+   `acessos/editar`) junto da organização, ou fazer `POST /acessos/papeis`
+   atribuir o papel a quem o criou quando ele é o primeiro da organização.
+
+   Fasear 1a/1b não é burocracia: a diferença entre "o mecanismo funciona" e
+   "o mecanismo protege" é justamente onde esta SPEC se enganou uma vez. Uma
+   fase que termina com 2 de 16 recursos cobertos precisa dizer isso no nome.
+
+   **Decisão pendente do usuário** (§3.2 lista os 14): `quebras` e
+   `credenciais-ia` merecem tratamento diferente? `quebras` é o trabalho do
+   dia a dia e já tem escopo por time — travar por papel pode atrapalhar mais
+   do que proteger. `credenciais-ia` é o oposto: é o recurso mais sensível do
+   produto (chave de API), e talvez devesse exigir permissão mesmo em
+   organização sem papel nenhum, quebrando o modo aberto de propósito.
+3. **Fase 2 — UI de acessos**: aba Acessos + `GET /permissoes/minhas` + esconder o que não pode. É aqui que a feature vira usável.
+4. **Fase 3 — aprovação**: `recurso_politica.exigeAprovacao`, proposta pendente, tela de revisão com diff, ação `aprovar` valendo. Reusa o cartão antes/depois que a `ConversaEspecificacao` já tem (SPEC-27 Fase 2) — o formato de "veja o que muda e aceite" já existe e foi validado.
+5. **Fase 4 — SSO de grupos** (se e quando pedido).
 
 ## 10. Verificação
 
 Fase 1 e 2 têm um teste que é o próprio pedido do usuário, escrito como cenário: uma organização com papel "Agilidade" (editar `regras.checklistProcesso` + `pipeline-agentes`, escopo organizacional) e papel "Arquitetura" (editar `campos-no`, `campos-aresta`, `regras.checklistTecnico`, `especificacao-template`, escopo organizacional); uma pessoa de cada; e a asserção de que **cada uma recebe 200 no seu recurso e 403 no da outra**. Mais o cenário por time: o mesmo papel "Agilidade" com `escopoTimeId`, dando 200 no time A e 403 no time B.
 
 E um teste de migração: organização sem papéis continua deixando qualquer membro editar (§4.3) — se este quebrar, a atualização tranca clientes existentes.
+
+### 10.1 O teste que faltava, e que teria evitado o buraco do §3.2
+
+Um teste que percorra a lista `RECURSOS` e afirme que **cada recurso é exigido
+por pelo menos uma rota**. Sem ele, acrescentar um recurso ao enum é gratuito e
+silencioso: a permissão passa a existir na UI e na tabela, e nenhuma rota a
+consulta.
+
+É o mesmo padrão do `paridade.sanity.test.ts`, que compara as rotas dos dois
+modos lendo o código-fonte — a diferença entre "confio que alguém lembrou" e
+"o teste não deixa esquecer".
