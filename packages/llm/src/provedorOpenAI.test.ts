@@ -547,3 +547,81 @@ describe("mensagens de falha — dizem o próximo passo, não o status HTTP", ()
     await expect(provedor().completar("oi")).rejects.toThrow(/Espere um pouco/);
   });
 });
+
+/**
+ * #270 — "o lote volta truncado", sem ninguém saber por quê.
+ *
+ * A causa não estava escondida: o gateway sempre disse, no `finish_reason`.
+ * Nós líamos só o `content`. Estes testes existem pra essa informação não
+ * voltar a ser descartada numa refatoração — e porque a distinção muda a AÇÃO:
+ * truncamento por teto não se resolve com retry.
+ */
+describe("finish_reason — o gateway diz por que parou, e agora a gente escuta (#270)", () => {
+  function sseCom(pedacos: string[], motivo: string | null): typeof fetch {
+    const eventos = pedacos.map((p) => `data: ${JSON.stringify({ choices: [{ delta: { content: p } }] })}\n\n`);
+    eventos.push(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: motivo }] })}\n\n`);
+    eventos.push("data: [DONE]\n\n");
+    return (async () =>
+      ({
+        ok: true,
+        status: 200,
+        headers: new Headers(),
+        body: new ReadableStream({
+          start(c) {
+            for (const e of eventos) c.enqueue(new TextEncoder().encode(e));
+            c.close();
+          },
+        }),
+      }) as unknown as Response) as unknown as typeof fetch;
+  }
+
+  it('finish_reason "length" vira erro explícito, não texto pela metade', async () => {
+    const provedor = criarProvedorCompativelOpenAI({
+      baseUrl: "https://gw/v1",
+      chave: "k",
+      modelo: "m",
+      fetchImpl: sseCom(['{"item1":{"historia":"comec'], "length"),
+    });
+
+    await expect(provedor.completar("x")).rejects.toThrow(/CORTADA no teto de tokens/);
+  });
+
+  it("diz que repetir não adianta — a ação certa é outra", async () => {
+    // Sem essa frase, o reflexo é clicar de novo: a segunda tentativa tem o
+    // mesmo teto e corta no mesmo lugar, gastando o tempo da pessoa duas vezes.
+    const provedor = criarProvedorCompativelOpenAI({
+      baseUrl: "https://gw/v1",
+      chave: "k",
+      modelo: "m",
+      fetchImpl: sseCom(["algo"], "length"),
+    });
+
+    const erro = await provedor.completar("x").catch((e: Error) => e);
+    expect((erro as Error).message).toMatch(/repetir não adianta/);
+    expect((erro as Error).message).toMatch(/Reduza o tamanho do lote/);
+  });
+
+  it('finish_reason "stop" passa direto — o caminho feliz não paga por isso', async () => {
+    const provedor = criarProvedorCompativelOpenAI({
+      baseUrl: "https://gw/v1",
+      chave: "k",
+      modelo: "m",
+      fetchImpl: sseCom(["resposta ", "completa"], "stop"),
+    });
+
+    await expect(provedor.completar("x")).resolves.toBe("resposta completa");
+  });
+
+  it("gateway que não manda finish_reason continua funcionando", async () => {
+    // Wrapper corporativo caseiro costuma omitir campos. Exigir o campo
+    // quebraria destinos que hoje funcionam — o teste trava isso.
+    const provedor = criarProvedorCompativelOpenAI({
+      baseUrl: "https://gw/v1",
+      chave: "k",
+      modelo: "m",
+      fetchImpl: sseCom(["ok"], null),
+    });
+
+    await expect(provedor.completar("x")).resolves.toBe("ok");
+  });
+});

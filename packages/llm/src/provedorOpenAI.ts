@@ -98,6 +98,9 @@ export function comAdditionalPropertiesFalse(schema: EsquemaJson): EsquemaJson {
 
 interface DeltaStream {
   choices?: {
+    /** Por que o modelo parou. `"length"` = bateu no teto de `max_tokens`, e a
+     * resposta esta CORTADA. O gateway sempre manda; nos ignoravamos. */
+    finish_reason?: string | null;
     delta?: {
       content?: string;
       /** DeepSeek e alguns gateways expõem o raciocínio num campo próprio.
@@ -114,6 +117,36 @@ interface DeltaStream {
  * explícito e folgado é melhor que nenhum: sem ele, quem escolhe é o gateway.
  */
 const MAX_TOKENS_PADRAO = 8192;
+
+/**
+ * ACHADO da tarefa #270 — "o lote volta truncado", sem ninguém saber por quê.
+ *
+ * A causa não estava escondida: **o gateway sempre disse.** Toda resposta
+ * compatível com a OpenAI traz `finish_reason`, e `"length"` significa
+ * exatamente "parei porque bati no teto de `max_tokens`, o que você tem está
+ * cortado". Nós líamos só o `content` e jogávamos o motivo fora — então a
+ * resposta chegava pela metade, o `JSON.parse` falhava, e o sintoma virava
+ * "truncou" em vez de "estourou o teto".
+ *
+ * Isso importa porque muda a AÇÃO. Truncamento por teto não se resolve com
+ * retry: a segunda tentativa tem o mesmo teto e corta no mesmo lugar — é
+ * gastar o tempo da pessoa duas vezes pro mesmo resultado. O que resolve é
+ * pedir menos de uma vez (lote menor) ou levantar o teto onde o destino
+ * permite.
+ *
+ * Por isso falha aqui, alto e explícito, em vez de devolver texto pela metade
+ * pra quem chamou tentar interpretar.
+ */
+function exigirRespostaInteira(motivo: string | null | undefined, texto: string): void {
+  if (motivo !== "length") return;
+  const aprox = Math.round(texto.length / 4);
+  throw new Error(
+    `A resposta foi CORTADA no teto de tokens (finish_reason: "length") — vieram ~${aprox} tokens. ` +
+      `Não é falha de rede e repetir não adianta: o teto é o mesmo. ` +
+      `Reduza o tamanho do lote (menos itens por chamada) ou levante o teto do modelo, se o destino permitir.`
+  );
+}
+
 
 /** Erro com a mensagem já pronta pra tela — o resto da stack não interessa a
  * quem está configurando um gateway. */
@@ -337,6 +370,7 @@ export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): Pro
     let completo = "";
     let bruto = "";
     let viuEventoSse = false;
+    let motivoParada: string | null | undefined;
     for (;;) {
       const { done, value } = await leitor.read();
       if (done) break;
@@ -357,6 +391,10 @@ export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): Pro
         if (carga === "[DONE]") continue;
         try {
           const evento = JSON.parse(carga) as DeltaStream;
+          // O motivo da parada chega no ULTIMO evento, junto de um delta
+          // vazio. Guardar em vez de ignorar e a diferenca entre "voltou
+          // truncado" e "bateu no teto de tokens".
+          motivoParada = evento.choices?.[0]?.finish_reason ?? motivoParada;
           const pedaco = evento.choices?.[0]?.delta?.content;
           // `reasoning_content` é ignorado de propósito: é raciocínio, não
           // resposta — mesma regra do `<think>` no provedor local.
@@ -375,8 +413,11 @@ export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): Pro
     // corpo é sempre um stream, e header errado é comum em wrapper caseiro.
     if (!viuEventoSse && bruto.trim()) {
       try {
-        const corpo = JSON.parse(bruto) as { choices?: { message?: { content?: string } }[] };
+        const corpo = JSON.parse(bruto) as {
+          choices?: { finish_reason?: string | null; message?: { content?: string } }[];
+        };
         const texto = corpo.choices?.[0]?.message?.content ?? "";
+        exigirRespostaInteira(corpo.choices?.[0]?.finish_reason, texto);
         if (texto) onTexto?.(texto);
         return texto;
       } catch {
@@ -385,6 +426,7 @@ export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): Pro
         return bruto;
       }
     }
+    exigirRespostaInteira(motivoParada, completo);
     return completo;
   }
 
