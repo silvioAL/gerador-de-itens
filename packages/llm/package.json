@@ -35,6 +35,6 @@
     }
   },
   "dependencies": {
-    "undici": "^8.10.0"
+    "undici": "^6.28.0"
   }
 }

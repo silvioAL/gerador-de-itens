@@ -34,7 +34,7 @@
   },
   "dependencies": {
     "node-llama-cpp": "^3.19.1",
-    "undici": "^8.10.0"
+    "undici": "^6.28.0"
   },
   "devDependencies": {
     "@gerador/aplicacao": "*",
