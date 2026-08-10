@@ -361,6 +361,22 @@ export const PAPEIS_PADRAO: PapelConfigurado[] = [
   { id: "qa", nome: "QA", descricao: "Deriva as regras de teste e escreve os cenários", grupo: "qa", ativo: true, contextos: [] },
 ];
 
+/**
+ * ACHADO REAL (esteira com Claude no modo hospedado): quando a resposta não
+ * obedece ao schema, o provedor de gateway tenta UMA segunda vez — e a segunda
+ * tentativa vinha pelo mesmo stream da primeira. Acumular as duas dá um texto
+ * que nunca é JSON válido: o `parse` falhava, o lote inteiro era descartado, e
+ * na tela o trabalho do papel simplesmente sumia.
+ *
+ * O servidor agora manda um NUL (` `, impossível em JSON válido) antes de
+ * repetir. Aqui isso significa "descarte tudo que veio antes" — e o efeito
+ * visível é o texto ao vivo recomeçar, em vez de virar lixo silencioso.
+ */
+function soDepoisDoUltimoReinicio(texto: string): string {
+  const ultimo = texto.lastIndexOf(" ");
+  return ultimo === -1 ? texto : texto.slice(ultimo + 1);
+}
+
 export const apiIa = {
   /** Se o modelo local está instalado e pronto pra uso — usado antes de
    * disparar a geração ao vivo (Fase 1d, SPEC-23) sem forçar IA em quem não
@@ -453,10 +469,10 @@ export const apiIa = {
       for (;;) {
         const { done, value } = await leitor.read();
         if (done) break;
-        acumulado += decodificador.decode(value, { stream: true });
+        acumulado = soDepoisDoUltimoReinicio(acumulado + decodificador.decode(value, { stream: true }));
         onTexto?.(acumulado);
       }
-      acumulado += decodificador.decode();
+      acumulado = soDepoisDoUltimoReinicio(acumulado + decodificador.decode());
     } else {
       acumulado = await resposta.text();
     }
@@ -490,10 +506,10 @@ export const apiIa = {
       for (;;) {
         const { done, value } = await leitor.read();
         if (done) break;
-        acumulado += decodificador.decode(value, { stream: true });
+        acumulado = soDepoisDoUltimoReinicio(acumulado + decodificador.decode(value, { stream: true }));
         onTexto?.(acumulado);
       }
-      acumulado += decodificador.decode();
+      acumulado = soDepoisDoUltimoReinicio(acumulado + decodificador.decode());
     } else {
       acumulado = await resposta.text();
     }
@@ -525,10 +541,10 @@ export const apiIa = {
       for (;;) {
         const { done, value } = await leitor.read();
         if (done) break;
-        acumulado += decodificador.decode(value, { stream: true });
+        acumulado = soDepoisDoUltimoReinicio(acumulado + decodificador.decode(value, { stream: true }));
         onTexto?.(acumulado);
       }
-      acumulado += decodificador.decode();
+      acumulado = soDepoisDoUltimoReinicio(acumulado + decodificador.decode());
     } else {
       acumulado = await resposta.text();
     }
@@ -556,10 +572,10 @@ export const apiIa = {
       for (;;) {
         const { done, value } = await leitor.read();
         if (done) break;
-        acumulado += decodificador.decode(value, { stream: true });
+        acumulado = soDepoisDoUltimoReinicio(acumulado + decodificador.decode(value, { stream: true }));
         onTexto?.(acumulado);
       }
-      acumulado += decodificador.decode();
+      acumulado = soDepoisDoUltimoReinicio(acumulado + decodificador.decode());
     } else {
       acumulado = await resposta.text();
     }

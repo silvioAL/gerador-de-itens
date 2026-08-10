@@ -833,7 +833,13 @@ async function executarPedidoIa(
 ): Promise<void> {
   const provedor = await obterProvedor(dirProjeto);
   const escrever = escritorDeStream(res);
-  await provedor.completarEstruturado(pedido.prompt, pedido.esquema as never, { onTexto: escrever });
+  await provedor.completarEstruturado(pedido.prompt, pedido.esquema as never, {
+    onTexto: escrever,
+    // Mesmo sinal do modo hospedado — o cliente é o mesmo e não deve precisar
+    // saber em qual modo está. Só dispara com provedor de gateway; no local o
+    // GBNF garante JSON válido de primeira.
+    onReiniciar: () => escrever(" "),
+  });
   // Resposta vazia sem erro: nada pra entregar, e 200 vazio viraria silêncio.
   if (!res.headersSent) throw new Error(`o modelo não devolveu conteúdo nenhum (${rotulo})`);
   res.end();

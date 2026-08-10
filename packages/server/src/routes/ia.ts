@@ -242,6 +242,9 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
     try {
       await provedor.completarEstruturado(pedido.prompt, pedido.esquema as never, {
         onTexto: (pedaco) => reply.raw.write(pedaco),
+        // NUL nunca aparece em JSON válido: é o sinal de "descarte o que
+        // recebeu até aqui" quando o provedor vai repetir a tentativa.
+        onReiniciar: () => reply.raw.write(" "),
       });
       reply.raw.end();
     } catch (erro) {
