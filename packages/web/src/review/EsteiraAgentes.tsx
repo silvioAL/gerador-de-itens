@@ -103,7 +103,14 @@ const agenteEstilo: React.CSSProperties = {
   padding: "0 16px",
   flex: 1,
   minWidth: 0,
-  borderBottom: "2px solid transparent",
+  // Longhand de propósito: `agenteAtivoEstilo` troca só a COR, e misturar
+  // `borderBottom` (shorthand) com `borderBottomColor` no mesmo elemento faz o
+  // React descartar a cor a cada re-render — com um warning por quadro no
+  // console. Achado real do teste de navegador, que trata console sujo como
+  // falha: o realce do agente ativo dependia de um estilo que o React removia.
+  borderBottomWidth: 2,
+  borderBottomStyle: "solid",
+  borderBottomColor: "transparent",
   transition: "background 300ms ease, border-color 300ms ease",
 };
 

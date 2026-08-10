@@ -15,6 +15,15 @@ export default async function globalSetup() {
   await client.connect();
   try {
     await client.query('TRUNCATE TABLE "quebras", "perfis_time", "campos_no"');
+    // `credenciais_ia` entra na limpeza porque `ia-hospedada.spec.ts` afere o
+    // estado "nenhuma credencial ainda" — o primeiro "Testar conexão" da vida,
+    // que é exatamente onde estava um dos defeitos. Sem truncar, a suíte passa
+    // na primeira rodada e mente na segunda.
+    //
+    // Numa tabela separada porque ela não existe em banco novo (a migração 0013
+    // cria) — junto com as outras, o TRUNCATE inteiro falharia e cairia no
+    // `catch` de "banco sem tabelas", deixando as três primeiras sujas.
+    await client.query('TRUNCATE TABLE "credenciais_ia"').catch(() => undefined);
 
     await client.query(
       `INSERT INTO "perfis_time" ("time_id", "tipo_no", "campo", "valor") VALUES

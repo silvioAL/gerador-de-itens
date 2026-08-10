@@ -10,7 +10,7 @@ test("resumo de prontidão: popover abre ao clicar (não só hover), mostra o qu
 }) => {
   await entrar(page);
 
-  await page.getByRole("button", { name: "+ Serviço" }).click();
+  await page.getByRole("button", { name: "+ Serviço", exact: true }).click();
   await page.getByRole("button", { name: "+ Fila Rabbit" }).click();
 
   // Os dois nós recém-criados são vermelhos (campos obrigatórios em aberto).

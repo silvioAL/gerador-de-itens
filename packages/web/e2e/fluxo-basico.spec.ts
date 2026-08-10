@@ -21,10 +21,12 @@ test("paleta completa de tipos, criação de nó, preenchimento e prontidão ver
     if (msg.type() === "error") erros.push(msg.text());
   });
 
-  // Paleta com todos os tipos do config (service, kafka, rabbit, rabbit-exchange,
-  // mongo, sql, camunda, fico, external, job, rule) — 11 tipos.
+  // A paleta é montada a partir de `config/diagrama.json` — a contagem é o que
+  // prova que ela vem do config e não de uma lista fixa no código. O número
+  // sobe quando um tipo novo entra (foi 11, hoje é 16, com cache/storage/batch
+  // e os dois de mobile); quem adiciona o tipo atualiza aqui, de propósito.
   const botoesDeTipo = page.locator("header button", { hasText: "+" });
-  await expect(botoesDeTipo).toHaveCount(11);
+  await expect(botoesDeTipo).toHaveCount(16);
   await expect(page.getByRole("button", { name: "+ Fila Rabbit" })).toBeVisible();
   await expect(page.getByRole("button", { name: "+ Tópico Kafka" })).toBeVisible();
   await expect(page.getByRole("button", { name: "+ Processo Camunda" })).toBeVisible();
@@ -79,7 +81,7 @@ test("perfil de stack do time sugere linguagem/framework do serviço", async ({ 
   // Login como time-pagamentos já define o time ativo — não tem mais input livre.
   await entrar(page, "time-pagamentos");
 
-  await page.getByRole("button", { name: "+ Serviço" }).click();
+  await page.getByRole("button", { name: "+ Serviço", exact: true }).click();
 
   const node = page.locator(".react-flow__node", { hasText: "Serviço" });
   await node.click();
@@ -112,7 +114,7 @@ test("kafka: aresta de consumo (arrastada de verdade) revela consumerGroup, e id
 }) => {
   await entrar(page);
 
-  await page.getByRole("button", { name: "+ Serviço" }).click();
+  await page.getByRole("button", { name: "+ Serviço", exact: true }).click();
   await page.getByRole("button", { name: "+ Tópico Kafka" }).click();
 
   const svc = page.locator(".react-flow__node", { hasText: "Serviço" });

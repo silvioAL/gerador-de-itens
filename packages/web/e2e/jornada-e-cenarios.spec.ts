@@ -6,7 +6,10 @@ test("jornada abre sozinha no primeiro acesso, explica as saídas, e some ao fec
 
   await expect(page.getByText("Como funciona o Gerador de Itens")).toBeVisible();
   await expect(page.getByText("Não é um gerador de prompt de IA")).toBeVisible();
-  await expect(page.getByText("Especificação de solução")).toBeVisible();
+  // `.first()`: "Especificação de solução" aparece duas vezes na jornada (o
+  // título da saída e a menção no corpo). O que este teste garante é que a
+  // saída está listada, não quantas vezes o nome aparece.
+  await expect(page.getByText("Especificação de solução").first()).toBeVisible();
 
   await page.getByRole("button", { name: "Fechar" }).click();
   await expect(page.getByText("Como funciona o Gerador de Itens")).not.toBeVisible();
@@ -31,7 +34,7 @@ test("carregar um cenário pronto popula o canvas e deriva sem ciclos/conflitos"
   await expect(botaoDerivar).toBeEnabled();
   await botaoDerivar.click();
 
-  await expect(page.getByText("4 atividades")).toBeVisible();
+  await expect(page.getByText("4 itens")).toBeVisible();
   await expect(page.getByText("Não é possível derivar ainda")).not.toBeVisible();
 
   await page.screenshot({ path: "e2e/screenshots/cenario-mongo.png", fullPage: true });
@@ -85,7 +88,7 @@ test("declarar 'time trabalha com Java' na aba Perfis de time faz um Serviço no
 
   // Login como time-checkout já deixou esse time ativo no header (select, não
   // mais texto livre) — um Serviço novo já nasce sugerindo o valor recém-declarado.
-  await page.getByRole("button", { name: "+ Serviço" }).click();
+  await page.getByRole("button", { name: "+ Serviço", exact: true }).click();
   await page.locator(".react-flow__node", { hasText: "Serviço" }).click();
 
   await expect(page.getByText("usar sugestão: Java")).toBeVisible();
@@ -123,7 +126,7 @@ test("adicionar dois cenários ao canvas (sem substituir) compõe um diagrama ma
 
   // 4 atividades do mongo + 5 do kafka = 9 — se algum ID tivesse colidido/se
   // perdido na mesclagem, esse número não bateria.
-  await expect(page.getByText("9 atividades")).toBeVisible();
+  await expect(page.getByText("9 itens")).toBeVisible();
   await expect(page.getByText("Não é possível derivar ainda")).not.toBeVisible();
 
   await page.screenshot({ path: "e2e/screenshots/cenarios-compostos.png", fullPage: true });
@@ -196,7 +199,10 @@ test("tour guiado de 1 clique percorre diagrama, prontidão, proveniência, deri
 
   // Passo 10: modelo da especificação de solução — mesma tela, só troca de aba.
   await expect(page.getByText("PASSO 10 DE 12")).toBeVisible();
-  await expect(telaConfigNoTour.getByText(/\{\{titulo\}\}/)).toBeVisible();
+  // `.first()`: o template ganhou mais de uma ocorrência de `{{titulo}}` (o
+  // cabeçalho do documento e o corpo). O passo do tour prova que a aba certa
+  // abriu, não quantas variáveis o modelo usa.
+  await expect(telaConfigNoTour.getByText(/\{\{titulo\}\}/).first()).toBeVisible();
   await page.getByRole("button", { name: "Próximo" }).click();
 
   // Passo 11: linha de comando (sem alvo).
