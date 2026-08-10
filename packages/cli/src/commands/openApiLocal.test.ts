@@ -18,7 +18,6 @@ import { join } from "node:path";
  * teste. Tipar ~50 corpos à mão custaria muito e protegeria pouco; quem
  * precisa de garantia passa o tipo na chamada: `corpoDe<{ id: string }>(r)`.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- trade-off declarado acima
 async function corpoDe<T = any>(resposta: Response): Promise<T> {
   return (await resposta.json()) as T;
 }

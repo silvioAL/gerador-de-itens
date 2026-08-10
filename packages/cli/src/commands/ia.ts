@@ -88,7 +88,8 @@ async function instalarUm(modelo: ModeloRegistrado, de: string | undefined, orig
         onProgresso: ({ bytesEscritos, bytesTotais }) => relatar(bytesEscritos, bytesTotais, "baixando"),
       });
     } catch (erro) {
-      console.log(`  release indisponivel (${erro instanceof Error ? erro.message.slice(0, 120) : erro}); tentando o Hugging Face...`);
+      console.log(`
+  release indisponivel (${erro instanceof Error ? erro.message.slice(0, 120) : erro}); tentando o Hugging Face...`);
       await baixarModelo(modelo, {
         onProgresso: ({ bytesBaixados, bytesTotais }) => relatar(bytesBaixados, bytesTotais, "baixando"),
       });
@@ -130,7 +131,7 @@ async function instalar({ idModelo, de, origem }: OpcoesInstalar = {}): Promise<
   }
   console.log("Instalando modelos de IA local (Qwen3-4B + Qwen3-Embedding-0.6B) — só na primeira vez.\n");
   for (const modelo of MODELOS_PADRAO) {
-    // eslint-disable-next-line no-await-in-loop -- instalar um modelo de cada vez é intencional: dois downloads
+    // instalar um modelo de cada vez é intencional: dois downloads
     // grandes em paralelo competem pela mesma banda e só deixam a barra de progresso dos dois mais confusa.
     await instalarUm(modelo, undefined, origem);
   }
@@ -189,7 +190,7 @@ async function diagnosticar(): Promise<void> {
   // máquina de quem usa — não a minha suposição.
   console.log("\nOrigens possíveis para o modelo:");
   for (const origem of origensCandidatas(MODELO_CHAT.repositorioHuggingFace, MODELO_CHAT.nomeArquivo)) {
-    // eslint-disable-next-line no-await-in-loop -- sequencial de propósito: em
+    // sequencial de propósito: em
     // paralelo, um proxy lento faz os tempos medidos mentirem uns sobre os outros.
     const r = await testarOrigem(origem.url);
     console.log(`  ${r.ok ? "✓" : "✗"} ${origem.nome.padEnd(24)} ${r.detalhe}`);
