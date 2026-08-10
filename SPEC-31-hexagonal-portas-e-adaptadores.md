@@ -90,7 +90,19 @@ Estrangulamento, não big bang. Cada fase é um PR publicável.
 - **Fase 2 — campos-no, perfis-time, templates.** Mesmo tratamento, agora repetitivo e rápido.
 - **Fase 3 — config (regras, pipeline, prompt único).** Nasce nos **dois** modos ao mesmo tempo, com semente a partir do template da versão. Fecha o buraco do §108: config velha e silenciosa deixa de ser possível.
 - **Fase 4 — IA como porta no hospedado.** As 7 rotas passam a existir dos dois lados, com `@gerador/llm/gateway` (sem binário nativo no container) e custódia de credencial da SPEC-29. Fecha o §105.
-- **Fase 5 — adaptador Mongo**, se ainda fizer sentido depois de 1 a 4. Escrito contra as mesmas portas, validado pela mesma suíte.
+- **Fase 5 — adaptador Mongo**, se ainda fizer sentido depois de 1 a 4. Escrito contra as mesmas portas, validado pela mesma suíte. **Avaliado e não construído** — ver §7.1.
+
+### 7.1 Fase 5: a avaliação, e por que a resposta foi "ainda não"
+
+A Fase 5 sempre foi condicional. Feita a avaliação depois de 1 a 4, com os números:
+
+**O motivo original não se sustentou.** A proposta de Mongo veio de *"os schemas não são muito estáveis até então"*. As Fases 1 a 4 mudaram o schema três vezes (migrações `0011`, `0012`, `0013`) — então a instabilidade era real. Mas **as três são aditivas e as três guardam o que varia em `jsonb`**: `respostas_itens`, `anexos_contexto`, `config_documentos.documento`, `credenciais_ia.cabecalhos`. O que era instável já é documento; o que virou coluna (`demand_info`, `base_url`, `versao_template`) é justamente o que se estabilizou. O Postgres está sendo usado como banco de documentos onde precisa ser, e como relacional onde a integridade importa — a FK de `perfis_time` para `times` pegou um caso na Fase 2.
+
+**O custo hoje é maior que na primeira conversa.** Um adaptador Mongo agora precisa implementar **seis portas** e passar **43 casos de contrato**, mais Mongo no `docker-compose`, no CI e como dependência. Na conversa original eram zero portas — a troca pareceria barata porque não havia nada escrito.
+
+**O que a SPEC-31 entregou torna a decisão barata de reverter.** A pergunta "e se um dia precisarmos de Mongo?" deixou de ser arquitetural: são seis arquivos de adaptador contra interfaces que já existem, validados por uma suíte que já existe. Isso é meio dia de trabalho quando houver um motivo — volume, forma que o `jsonb` não sirva, ou uma restrição de infraestrutura da empresa.
+
+**A decisão, então: não construir agora.** Não por preferência por Postgres, e sim porque nenhum problema atual aponta para Mongo, e a Fase 5 existia para responder a um problema que as Fases 1 a 4 resolveram por outro caminho.
 
 ## 8. Como não quebrar no caminho
 
