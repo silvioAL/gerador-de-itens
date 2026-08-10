@@ -347,6 +347,29 @@ describe("/ia/* (SPEC-31 Fase 4)", () => {
     expect(resposta.json().provedor).toBe("gateway");
   });
 
+  /**
+   * ACHADO REAL, com print da tela: a aba "Modelo de IA" no modo hospedado não
+   * mostrava formulário nenhum — só "o modelo de embedding não está instalado,
+   * rode `gerador ia instalar`", um comando que não existe em container.
+   *
+   * A tela renderiza `status.modelosChat`, e eu devolvia lista VAZIA com
+   * `embeddingInstalado: false`. Valores honestos ("não tenho modelo local")
+   * lidos com a semântica do outro modo. O status do hospedado passa a falar a
+   * MESMA forma, em vez de a UI ganhar um `if` por modo.
+   */
+  it("o status fala a forma que a tela de Modelo de IA espera — um modelo remoto, selecionado", async () => {
+    const resposta = await app.inject({ method: "GET", url: "/ia/status" });
+    const status = resposta.json();
+
+    expect(status.modelosChat).toHaveLength(1);
+    expect(status.modelosChat[0]).toMatchObject({ remoto: true, selecionado: true, id: "gateway" });
+    // Não há embedding a instalar aqui — e isso é decisão, não pendência.
+    expect(status.embeddingInstalado).toBe(true);
+    // Os destinos conhecidos vêm do servidor: a Anthropic tem que estar entre eles.
+    expect(status.presetsGateway.some((p: { id: string }) => p.id === "anthropic")).toBe(true);
+    expect(status.gateway).toBeTruthy();
+  });
+
   it("sem credencial, /ia/sugerir responde 503 explicando — não 500 nem silêncio", async () => {
     const resposta = await app.inject({
       method: "POST",
