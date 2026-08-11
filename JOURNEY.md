@@ -3976,3 +3976,44 @@ coisa (os pacotes-parte do GGUF, `workflow_dispatch` manual). Com o modo local
 removido, ele publicaria peças de um caminho que não existe mais. E a SPEC-33
 §7 registra a reversão da Fase 1 em vez de deixá-la lá parecendo pendência —
 que é o mesmo cuidado da §4 com o #304.
+
+## 160. Dois overlays viraram um assistente no canto (#298)
+
+O reescopo do item já dizia o essencial: *invólucro comum + gatilho, não
+reescrever as conversas*. "Desenhar conversando" e "Contexto do épico" já
+funcionavam — mas cada um com uma casca própria. A conversa era um painel
+lateral fixo colado à direita; o contexto era um modal centrado com backdrop.
+Duas portas com roupas diferentes para a mesma classe de coisa ("falar com a
+ferramenta sobre a demanda"), ocupando dois botões num header que já quebra
+linha.
+
+O `AssistenteFlutuante` é exatamente as três coisas do reescopo: o botão
+flutuante no canto inferior direito (✦ que vira × com rotação), a janela
+ancorada acima dele, e as abas. Os painéis perderam SÓ a casca — o
+posicionamento, o cabeçalho próprio, o backdrop — e passaram a preencher a
+janela; nenhuma linha da lógica de conversa mudou. A lista `ABAS` é declarada
+como o ponto de extensão de propósito: o #297 ("configurar conversando") nasce
+como uma entrada nela, não como um terceiro botão solto — que é o motivo de o
+invólucro vir antes dele na fila.
+
+Abrir cai na conversa, a ação primária. E a razão de os dois morarem juntos
+ficou testável: o contexto salvo numa aba pré-preenche a outra, atravessando o
+estado real do App (`quebra.demandInfo`), não um estado interno de painel. O
+teste novo de navegador afirma exatamente essa travessia — e mordeu quando
+cortei o fio `contextoInicial` de propósito: vermelho na asserção certa, verde
+de volta com o fio religado.
+
+**E o instrumento errou primeiro, de novo.** Meu script de validação contra o
+bundle de produção acusou "os botões antigos ainda estão no header" — com o
+código certo. O seletor `page.locator("header")` casava com TODO header da
+página, e a janela do assistente tem um header com abas que se chamam... "✦
+Desenhar conversando" e "📎 Contexto do épico". O nome que os botões antigos
+tinham. É a regra da §152 aplicada antes de abrir o código: quando o teste
+falha de um jeito que não corresponde a nenhuma hipótese sobre o código, a
+hipótese seguinte é sobre o teste. Desta vez custou minutos, não horas.
+
+Um detalhe de acessibilidade que o teste unitário forçou: com a janela aberta,
+o × interno e o botão flutuante teriam ambos `aria-label="Fechar assistente"`
+— ambíguo pra leitor de tela e pra qualquer seletor. O botão ficou com rótulo
+fixo "Assistente" + `aria-expanded`, que é o padrão correto pra um gatilho de
+painel.

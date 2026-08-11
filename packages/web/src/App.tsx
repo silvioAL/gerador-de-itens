@@ -42,6 +42,7 @@ import { calcularResumoProntidao } from "./summary/prontidaoResumo";
 import { ReviewScreen } from "./review/ReviewScreen";
 import { ContextoEpicoPanel } from "./review/ContextoEpicoPanel";
 import { ConversaPanel } from "./conversa/ConversaPanel";
+import { AssistenteFlutuante, type AbaAssistente } from "./assistente/AssistenteFlutuante";
 import { JourneyModal, type AbaJornada } from "./demo/JourneyModal";
 import { ConfigScreen, type AbaConfig } from "./config/ConfigScreen";
 import { TourOverlay } from "./demo/TourOverlay";
@@ -312,10 +313,11 @@ function AppCarregado({
   const [abaJornadaAlvo, setAbaJornadaAlvo] = useState<AbaJornada | undefined>(undefined);
   const [mostrarConfig, setMostrarConfig] = useState(false);
   const [mostrarAbrir, setMostrarAbrir] = useState(false);
-  const [mostrarContextoEpico, setMostrarContextoEpico] = useState(false);
-  // SPEC-27 Fase 1 — a conversa do desenho é uma FASE própria, com janela
-  // própria; a da especificação virá separada, de propósito (§3).
-  const [mostrarConversa, setMostrarConversa] = useState(false);
+  // #298 — a conversa do desenho (SPEC-27 Fase 1) e o contexto do épico moram
+  // no mesmo assistente flutuante, cada um numa aba; `null` = fechado. A
+  // conversa da especificação continua separada, de propósito (SPEC-27 §3) —
+  // ela pertence à tela de revisão, não ao canvas.
+  const [abaAssistente, setAbaAssistente] = useState<AbaAssistente | null>(null);
   const [abaConfigAlvo, setAbaConfigAlvo] = useState<AbaConfig | undefined>(undefined);
   useEffect(() => {
     if (!localStorage.getItem(CHAVE_JORNADA_VISTA)) setMostrarJornada(true);
@@ -630,21 +632,6 @@ function AppCarregado({
           Salvar
         </button>
         <button
-          data-testid="abrir-conversa"
-          onClick={() => setMostrarConversa(true)}
-          style={botaoEstilo}
-          title="Descreva a demanda e receba o diagrama proposto, com os tipos que este projeto tem configurados."
-        >
-          ✦ Desenhar conversando
-        </button>
-        <button
-          onClick={() => setMostrarContextoEpico(true)}
-          style={botaoEstilo}
-          title="Cole o estado atual da demanda/épico e anexe material de apoio — alimenta a sugestão de IA real na revisão."
-        >
-          📎 Contexto do épico
-        </button>
-        <button
           data-tour="derivar-button"
           onClick={derivarQuebra}
           disabled={vermelhos.length > 0}
@@ -760,30 +747,30 @@ function AppCarregado({
         />
       )}
 
-      {mostrarConversa && (
-        <ConversaPanel
-          config={diagramaConfig}
-          perfisTime={perfisTime}
-          timeAtivo={quebra.time}
-          techs={appConfig.techs}
-          contextos={appConfig.contextos}
-          contextoInicial={quebra.demandInfo}
-          onAplicar={(proposta) => {
-            aplicarDiagramaProposto(proposta);
-            setMostrarConversa(false);
-          }}
-          onFechar={() => setMostrarConversa(false)}
-        />
-      )}
-
-      {mostrarContextoEpico && (
-        <ContextoEpicoPanel
-          demandInfo={quebra.demandInfo}
-          anexosContexto={quebra.anexosContexto}
-          onSalvar={(demandInfo, anexosContexto) => setQuebra((q) => ({ ...q, demandInfo, anexosContexto }))}
-          onFechar={() => setMostrarContextoEpico(false)}
-        />
-      )}
+      <AssistenteFlutuante aba={abaAssistente} onMudarAba={setAbaAssistente}>
+        {abaAssistente === "conversa" && (
+          <ConversaPanel
+            config={diagramaConfig}
+            perfisTime={perfisTime}
+            timeAtivo={quebra.time}
+            techs={appConfig.techs}
+            contextos={appConfig.contextos}
+            contextoInicial={quebra.demandInfo}
+            onAplicar={(proposta) => {
+              aplicarDiagramaProposto(proposta);
+              setAbaAssistente(null);
+            }}
+          />
+        )}
+        {abaAssistente === "contexto" && (
+          <ContextoEpicoPanel
+            demandInfo={quebra.demandInfo}
+            anexosContexto={quebra.anexosContexto}
+            onSalvar={(demandInfo, anexosContexto) => setQuebra((q) => ({ ...q, demandInfo, anexosContexto }))}
+            onFechar={() => setAbaAssistente(null)}
+          />
+        )}
+      </AssistenteFlutuante>
 
       {mostrarAbrir && (
         <AbrirQuebraScreen

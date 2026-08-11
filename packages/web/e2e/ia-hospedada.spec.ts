@@ -197,7 +197,8 @@ test.describe("voz na conversa", () => {
     await expect(page.getByTestId("gateway-resultado")).toContainText("Credencial salva");
     await page.getByRole("button", { name: "Voltar ao canvas" }).click();
 
-    await page.getByRole("button", { name: "✦ Desenhar conversando" }).click();
+    // #298 — a conversa mora no assistente flutuante; abrir cai direto nela.
+    await page.getByTestId("assistente-flutuante").click();
     const falar = page.getByTestId("voz-falar");
     await expect(falar).toBeVisible();
 
@@ -242,7 +243,8 @@ test("anexar um print manda a imagem até o gateway", async ({ page }) => {
   await expect(page.getByTestId("gateway-resultado")).toContainText("Credencial salva");
   await page.getByRole("button", { name: "Voltar ao canvas" }).click();
 
-  await page.getByRole("button", { name: "✦ Desenhar conversando" }).click();
+  // #298 — a conversa mora no assistente flutuante; abrir cai direto nela.
+  await page.getByTestId("assistente-flutuante").click();
   const anexar = page.getByTestId("anexar-imagem");
   await expect(anexar).toBeVisible();
 
