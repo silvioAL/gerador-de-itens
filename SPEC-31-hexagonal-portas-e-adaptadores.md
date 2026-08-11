@@ -121,3 +121,51 @@ A Fase 5 sempre foi condicional. Feita a avaliação depois de 1 a 4, com os nú
 ## 10. Verificação
 
 Por fase: suíte completa verde (engine, llm, web, cli, server), `tsc --noEmit`, lint, e — a checagem que importa — **a mesma suíte de contrato passando nos dois adaptadores da porta daquela fase**. Ao fim da Fase 3, uma verificação de produto: criar uma regra pela UI no modo hospedado e vê-la aplicada numa derivação, que hoje é impossível.
+
+## 11. Revisão pós-implementação (#295)
+
+O usuário levantou a questão certa depois de uma sequência de defeitos: *"na teoria com arquitetura hexagonal e DDD não estaríamos passando por esses problemas, foi a intenção do refacto que fizemos há algum tempo"*. Esta seção responde com medição, não com opinião.
+
+### 11.1 Onde os defeitos realmente caíram
+
+Classificando os ~19 defeitos registrados **depois** que as Fases 1–4 fecharam (JOURNEY §126 a §148):
+
+| Território | Defeitos | Tem porta hoje? |
+| --- | --- | --- |
+| UI (`packages/web`) | ~9 | Não — nunca esteve no escopo |
+| Borda HTTP de entrada | ~3 | **Não** |
+| Adaptador de saída (`llm`/gateway) | ~3 | Sim (`ProvedorIa`) |
+| Teste / CI / ambiente | ~4 | N/A |
+| Persistência (o alvo da SPEC-31) | **1** | Sim |
+
+O único que caiu no território que a SPEC-31 governa foi o `baseUrlTranscricao` descartado em `ResumoCredencial` — e ele foi corrigido **na porta**, com teste de regressão em `repositorioDeCredenciais.test.ts`, exatamente como o desenho previa.
+
+**A conclusão é desconfortável e é a verdade: o refatoramento não falhou. Os defeitos mudaram de endereço.** Hexagonal não é uma apólice contra defeito em geral; é uma apólice contra *uma* classe — implementação duplicada divergindo. Essa classe praticamente parou.
+
+### 11.2 O que se verificou como entregue
+
+- `packages/aplicacao`: 6 portas, 6 suítes de contrato (580 linhas) rodando contra os dois adaptadores.
+- `fronteira.sanity.test.ts` proíbe `node:fs`, `node:http`, driver de banco, `fetch` e `process.env` na camada de aplicação — e passa.
+- `openApiLocal.ts` encolheu de 1.598 para **1.118** linhas (−30%).
+- O lado hospedado *cresceu* (964 → 1.710) porque recebeu as 7 rotas de IA e o RBAC que não tinha. Crescimento por função nova, não por duplicação.
+
+### 11.3 Os três buracos concretos
+
+**(a) `campos-aresta` ficou de fora, e é irmão gêmeo de `campos-no`.** A tabela da §5 lista `RepositorioDeCamposNo` e nunca listou o de aresta. Hoje: 4 rotas no Fastify com SQL direto, 4 no roteador local com arquivo, **zero porta e zero contrato**. É a duplicação viva que a SPEC existia para matar, sobrevivendo por omissão de uma linha numa tabela.
+
+**(b) O lado condutor não tem porta.** A SPEC tratou só o lado *dirigido* (persistência). Das 51 rotas do server, 20 vão direto ao SQL — 20 delas são o contexto "Acesso e organização", dispensado por decisão explícita da §6, e as outras 4 são o item (a). O que não existe é um contrato do lado de *entrada*: nada obriga uma rota nova a passar por caso de uso, e foi nessa faixa que nasceram o RBAC ausente em 14 rotas (#287) e o `writeHead(200)` comprometido antes do primeiro byte.
+
+**(c) A paridade compara nomes, não formas.** `paridade.sanity.test.ts` lê os dois roteadores e compara **conjuntos de caminho**. Duas rotas com o mesmo nome e corpos de resposta diferentes passam. Pior: `packages/web/src/api/client.ts` (883 linhas) é um **terceiro** adaptador HTTP escrito à mão, e o `client.test.ts` valida contra `fetch` *mockado* — ou seja, afirma o que o cliente faz com uma resposta imaginada, nunca com a real.
+
+O item (c) é a mesma armadilha do #302 noutro disfarce: **o teste está do lado errado da fronteira que ele diz proteger.**
+
+### 11.4 O que hexagonal não ia resolver, e é bom dizer
+
+Nove dos defeitos moram na UI: `fitView` que só enquadra no primeiro render, `<button>` que não herda `color`, `deleteKeyCode` que ignora `Delete`. Nenhuma quantidade de porta, agregado ou contexto delimitado alcança isso. São detalhes de biblioteca e de navegador, e só o navegador os revela — o que já está registrado como prática (JOURNEY §128, §148).
+
+### 11.5 Recomendação, por relação custo/benefício
+
+1. **`RepositorioDeCamposAresta`** — a porta que faltou. Padrão já repetido cinco vezes, contrato já escrito cinco vezes. Baixo risco, fecha duplicação real.
+2. **Paridade por forma, não por nome** — subir os dois modos na suíte e comparar as respostas das rotas equivalentes. É o teste que teria pego o `writeHead(200)` e pegaria a próxima divergência de corpo.
+3. **Cobertura do lado condutor** — generalizar o `permissoes.cobertura.test.ts`: toda rota do server ou passa por caso de uso, ou está numa lista de dispensa com motivo escrito. Mesma mecânica que já funcionou para RBAC.
+4. **Não** adotar agregados, eventos de domínio ou CQRS. A §4.2 decidiu isso e a medição não trouxe nada que reabra a decisão — nenhum dos 19 defeitos foi invariante de domínio violada.

@@ -3565,3 +3565,61 @@ não nas outras catorze rotas. Confirmação no painel mas não na tecla. A perg
 que teria evitado as três é sempre a mesma — *quantos caminhos chegam aqui?* —
 e desta vez ela tem um par: *o meu teste está do mesmo lado da fronteira que o
 defeito?*
+
+## 149. O refatoramento hexagonal não falhou — os defeitos mudaram de endereço (#295)
+
+O usuário guardou esta pergunta há semanas, quando três defeitos de tela saíram
+em sequência: *"na teoria com arquitetura hexagonal e ddd não estaríamos
+passando por esses problemas, foi a intenção do refacto que fizemos há algum
+tempo, anote revisar isso"*. Era a terceira da fila. Chegou a vez.
+
+A tentação era responder pela impressão — "é, o refatoramento não pegou" ou "é,
+mas foi bom mesmo assim". Contei em vez de opinar.
+
+**Dos ~19 defeitos registrados depois que as Fases 1–4 fecharam (§126 a §148),
+exatamente UM caiu no território que a SPEC-31 governa.** Nove estão na UI. Três
+na borda HTTP de entrada. Três no adaptador de saída. Quatro em teste, CI ou
+ambiente. E o único da persistência — o `baseUrlTranscricao` sumindo em
+`ResumoCredencial` — foi corrigido **na porta**, com teste de contrato, do jeito
+que o desenho previa.
+
+Então a resposta honesta é: **a premissa está certa sobre a intenção e errada
+sobre o alcance.** Hexagonal não é apólice contra defeito; é apólice contra uma
+classe específica — implementação duplicada que diverge sozinha. Essa classe
+praticamente parou. `openApiLocal.ts` caiu de 1.598 para 1.118 linhas; as seis
+portas têm 580 linhas de contrato rodando nos dois adaptadores; a fronteira da
+camada de aplicação é verificada e passa. O que sobrou de defeito é
+`fitView` que só enquadra no primeiro render, `<button>` que não herda `color`,
+`deleteKeyCode` que ignora `Delete`. Nenhuma porta alcança isso.
+
+**Três buracos concretos apareceram, e nenhum é "adotar mais DDD".**
+
+O primeiro é embaraçoso de tão simples: **`campos-aresta` ficou de fora.** É o
+irmão gêmeo de `campos-no`, que tem porta, contrato e adaptador dos dois lados.
+O de aresta tem 4 rotas com SQL direto no Fastify, 4 com arquivo no roteador
+local, e nada no meio. Sobreviveu porque a tabela da §5 nunca o listou — a
+duplicação que a SPEC existia para matar, viva por omissão de uma linha.
+
+O segundo: **a SPEC tratou o lado dirigido e nunca o condutor.** Portas de
+persistência, sim; contrato de entrada, não. Nada obriga uma rota nova a passar
+por caso de uso. Foi nessa faixa que nasceram o RBAC ausente em catorze rotas e
+o `writeHead(200)` comprometido antes do primeiro byte.
+
+O terceiro é o que mais me interessa, porque é o defeito de hoje outra vez:
+**`paridade.sanity.test.ts` compara nomes de rota, não formas de resposta.**
+Duas rotas homônimas devolvendo corpos diferentes passam. E o
+`packages/web/src/api/client.ts` — 883 linhas — é um *terceiro* adaptador HTTP
+escrito à mão, cujo teste valida contra `fetch` mockado: afirma o que o cliente
+faz com uma resposta imaginada, nunca com a real.
+
+É a mesma frase de manhã, quando o vitest com `@xyflow/react` mockado passou com
+a tecla `Delete` quebrada: **o teste está do lado errado da fronteira que ele diz
+proteger.** Um dublê não recusa `Delete` porque não é ele quem escuta o teclado;
+um `fetch` mockado não diverge do servidor porque não é ele quem responde.
+
+A recomendação saiu curta e sem paradigma novo: a porta de campos-aresta,
+paridade por forma em vez de por nome, e cobertura do lado condutor pela mesma
+mecânica que já funcionou no RBAC. Agregados, eventos de domínio e CQRS
+continuam fora — nenhum dos 19 defeitos foi invariante de domínio violada, e
+adotar cerimônia para resolver um problema que não se manifestou é como comprar
+a apólice do sinistro que não aconteceu enquanto o telhado com goteira é outro.
