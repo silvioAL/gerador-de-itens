@@ -3060,3 +3060,101 @@ Duas perguntas de produto, registradas na Fase 1b em vez de decididas por mim:
 atrapalhar mais do que proteger) e `credenciais-ia` (chave de API; talvez deva
 exigir permissão *mesmo em modo aberto*, quebrando a regra de propósito).
 
+## 140. A delegação cabia em quinze rotas e num documento que não cabia (#287, #288)
+
+O usuário disse para que serve o RBAC, e a frase reorganizou o trabalho:
+
+> *"a ideia de avançar com as permissões é poder delegar a gestão de padrões
+> técnicos configuráveis (obrigatórios ou não), e checklists de processos e
+> gestão do pipeline a setores específicos da empresa"*
+
+Isso respondeu, de um jeito que eu não tinha antecipado, as duas perguntas que
+eu havia deixado em aberto na rodada anterior — e me poupou de fazê-las de novo.
+
+### O recorte que a frase decide
+
+**`quebras` fica fora do RBAC.** Não por ser menos importante: por ser
+trabalho, não padrão. Se `quebras` exigisse permissão, no instante em que a
+empresa criasse o primeiro papel para delegar um checklist, todo mundo sem
+papel pararia de conseguir criar quebra. A feature de delegar configuração
+derrubaria a operação. Quem quer isolar quebra já tem o escopo por time.
+
+**`credenciais-ia` entra como qualquer outro**, sem a exceção que eu tinha
+cogitado (exigir permissão mesmo em modo aberto). Uma regra que vale "menos no
+caso X" é uma regra que ninguém lembra na hora de depurar.
+
+**"Obrigatórios ou não" já existia inteiro.** Fui conferir antes de planejar
+qualquer coisa: `FieldSpec.required` é editável por checkbox nas duas abas de
+campos e o engine bloqueia prontidão em `obrigatoriosEmAberto`
+(`prontidao.ts:64`). Não havia mecanismo a construir — só faltava quem pode
+mexer.
+
+### O obstáculo que só aparece com o propósito na mão
+
+"Agilidade cuida do processo, Arquitetura do técnico" parecia coberto: a
+SPEC-28 §4.2 já tinha quebrado `regras` em quatro recursos, justamente por
+isso. Mas a persistência é **um documento só**, salvo inteiro por
+`PUT /config/regras`. E um `preHandler` decide antes de ler o corpo — ele não
+tem como distinguir "mexeu no processo" de "mexeu no técnico".
+
+Ou seja: o desenho de permissões e o desenho de persistência tinham sido
+feitos em rodadas diferentes, cada um coerente sozinho, e a incompatibilidade
+só ficou visível quando alguém disse para que a feature servia.
+
+A saída foi conferir por **diferença**: comparar o documento recebido com o
+gravado e exigir permissão só das seções que mudaram. O efeito prático é o que
+importa — a tela manda o documento COMPLETO ao salvar uma aba, e sem isso quem
+cuida do processo levaria 403 por causa das seções que nem tocou.
+
+Dois detalhes que a implementação forçou a decidir:
+
+- **Comparação canônica com chaves ordenadas.** `JSON.stringify` puro faria o
+  mesmo conteúdo em outra ordem parecer alteração — 403 numa edição que não
+  aconteceu. Tem teste só para isso.
+- **`tipos`/`tamanhos` exigem as quatro permissões.** São taxonomia
+  compartilhada; não pertencem a nenhuma das seções e afetam todas.
+
+### A tranca, corrigida — e a correção que eu tinha escrito errado
+
+`POST /acessos/papeis` agora cria também o papel Administrador (com
+`acessos/editar`, atribuído a quem chamou) quando é o primeiro papel da
+organização. Quem liga o controle de acesso continua podendo administrá-lo; o
+teste verifica também que **ninguém mais herda isso** — o RBAC vale para os
+demais desde o primeiro instante.
+
+Vale registrar que a primeira correção que escrevi na SPEC estava errada, e foi
+a medição que derrubou: "auto-atribuir o primeiro papel a quem o criou" só
+funciona quando esse papel por acaso concede `acessos`. Um primeiro papel
+"Agilidade" tranca igual. O teste que ficou usa exatamente esse caso.
+
+### O teste-guarda, e a prova de que ele morde
+
+`permissoes.cobertura.test.ts` lê o código-fonte das rotas e exige que todo
+recurso do enum seja exigido em algum lugar — ou esteja em `RECURSOS_SEM_ROTA`
+com motivo escrito. Três estão: `quebras` (decisão acima), `retrospectivas` (a
+ingestão nunca foi construída no modo hospedado) e `modelo-ia` (no hospedado a
+escolha do modelo viaja junto com a credencial, que já é protegida).
+
+A omissão continua possível; ela deixou de ser silenciosa.
+
+E, dada a história recente deste repositório com testes que passam pelo motivo
+errado, não bastava vê-lo verde: esvaziei `RECURSOS_SEM_ROTA` e confirmei que
+ele falha nomeando os três. Falha.
+
+### Um teste meu que passou testando um quinto do que dizia testar
+
+O teste das cinco rotas recém-cobertas nasceu com dois defeitos, e os dois são
+instrutivos:
+
+1. **Media o portão errado.** Usava `time-pagamentos`, e `EMAIL_OUTRO` não é
+   desse time — o 403 vinha de `exigirTime`, antes de a permissão ser
+   consultada. Verde, e sem ter exercido nada do que a rodada construiu. O
+   `camposNo.ts` já documentava essa armadilha; eu caí nela mesmo assim.
+2. **`expect` dentro do laço.** Ao falhar na primeira rota, as outras quatro
+   nunca rodaram. Um teste de cinco rotas que na prática testava uma. Agora
+   coleta os cinco resultados e compara de uma vez.
+
+O primeiro só apareceu porque o teste falhou por acidente. Se eu tivesse usado
+o time certo desde o começo, ele teria passado — testando uma rota e alegando
+cinco.
+

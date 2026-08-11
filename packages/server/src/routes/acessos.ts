@@ -28,6 +28,11 @@ const corpoAtribuicao = z.object({
   escopoTimeId: z.string().min(1).optional(),
 });
 
+/** O papel que nasce junto com o primeiro papel da organização, para que ligar
+ * o RBAC não tranque quem o ligou. Nome fixo porque a UI o mostra como qualquer
+ * outro — ele é editável e removível depois, não é mágico. */
+export const NOME_PAPEL_ADMINISTRADOR = "Administrador";
+
 export async function registrarRotasAcessos(app: FastifyInstance, { db }: OpcoesApp) {
   async function organizacaoPadrao(): Promise<string | null> {
     const [org] = await db.select({ id: organizacoes.id }).from(organizacoes).limit(1);
@@ -84,12 +89,45 @@ export async function registrarRotasAcessos(app: FastifyInstance, { db }: Opcoes
     const parseado = corpoPapel.safeParse(req.body);
     if (!parseado.success) return reply.code(400).send({ erro: parseado.error.flatten() });
     const corpo = parseado.data;
+
+    /**
+     * TRANCA DO PRIMEIRO PAPEL — medido contra o Postgres antes de existir esta
+     * correção: `POST /acessos/papeis` devolvia 201 e o
+     * `POST /acessos/papeis/:id/membros` seguinte devolvia 403, deixando a
+     * organização sem ninguém capaz de administrar acessos. Saída só pelo banco.
+     *
+     * A causa é uma assimetria de tempo: o RBAC liga quando **existe** papel na
+     * organização (`resolverPermissoes`), não quando alguém **tem** papel. A
+     * primeira criação passa pelo modo aberto e, ao terminar, fecha a porta
+     * atrás de si — inclusive para quem acabou de criá-la.
+     *
+     * Auto-atribuir o papel recém-criado a quem o criou NÃO resolve: um primeiro
+     * papel "Agilidade", sem `acessos`, tranca igual. O que resolve é garantir
+     * que quem liga o controle de acesso continue podendo administrá-lo — que é
+     * também a regra mais defensável do ponto de vista de produto, já que a
+     * delegação a setores pressupõe alguém que delega.
+     */
+    const jaExistiaPapel = await db
+      .select({ id: papeisAcesso.id })
+      .from(papeisAcesso)
+      .where(eq(papeisAcesso.organizacaoId, orgId))
+      .limit(1);
+
     const [papel] = await db
       .insert(papeisAcesso)
       .values({ organizacaoId: orgId, nome: corpo.nome })
       .returning();
     if (corpo.permissoes.length > 0) {
       await db.insert(papelPermissao).values(corpo.permissoes.map((p) => ({ papelId: papel.id, ...p })));
+    }
+
+    if (jaExistiaPapel.length === 0) {
+      const [administrador] = await db
+        .insert(papeisAcesso)
+        .values({ organizacaoId: orgId, nome: NOME_PAPEL_ADMINISTRADOR })
+        .returning();
+      await db.insert(papelPermissao).values({ papelId: administrador.id, recurso: "acessos", acao: "editar" });
+      await db.insert(usuarioPapel).values({ papelId: administrador.id, email: req.usuario!.email, escopoTimeId: null });
     }
     registrarAuditoria(db, { email: req.usuario!.email, acao: "criar", recurso: "papeis_acesso", recursoId: papel.id });
     return reply.code(201).send({ id: papel.id, nome: papel.nome, permissoes: corpo.permissoes });

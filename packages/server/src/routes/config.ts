@@ -1,10 +1,17 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import { CAMPO_GLOBAL, criarCasosDeUsoDeConfig, ehChaveConfig, type ChaveConfig } from "@gerador/aplicacao";
 import type { OpcoesApp } from "../app.js";
 import { criarRepositorioDeConfigEmPostgres } from "../adaptadores/configEmPostgres.js";
 import { exigirSessao } from "../auth/middleware.js";
+import {
+  exigirPermissao,
+  organizacaoPadraoDe,
+  primeiroRecursoNegado,
+  secoesDeRegrasAlteradas,
+  type Recurso,
+} from "../auth/permissoes.js";
 import { registrarAuditoria } from "../auditoria.js";
 
 /**
@@ -42,6 +49,44 @@ export async function registrarRotasConfig(app: FastifyInstance, { db, diretorio
     return DEFAULTS_COMPILADOS[chave];
   }
 
+  const organizacaoPadrao = organizacaoPadraoDe(db);
+
+  const podeEditarPromptUnico = exigirPermissao(db, organizacaoPadrao, "prompt-unico-template", "editar");
+
+  /**
+   * SPEC-28 Fase 1b — a checagem que não cabe num `preHandler`.
+   *
+   * `PUT /config/:chave` serve três recursos diferentes, e um deles (`regras`)
+   * é um documento só que carrega QUATRO recursos dentro: checklist técnico,
+   * checklist de processo, testes e volumetria. Isso não é acidente de
+   * implementação, é o pedido — "Agilidade cuida do processo, Arquitetura do
+   * técnico" só existe se as seções puderem ter donos diferentes.
+   *
+   * Um `preHandler` decide antes de ler o corpo, então não consegue distinguir
+   * "mexeu no processo" de "mexeu no técnico". Aqui a permissão é conferida por
+   * **diferença** contra o que está gravado: quem só pode processo pode mandar o
+   * documento inteiro de volta, desde que as outras seções voltem iguais — que é
+   * exatamente o que a UI faz ao salvar uma aba.
+   */
+  async function recursoNegadoPara(
+    req: FastifyRequest,
+    chave: ChaveConfig,
+    documento: unknown,
+    timeId?: string
+  ): Promise<Recurso | undefined> {
+    const orgId = await organizacaoPadrao();
+    const email = req.usuario!.email;
+
+    if (chave !== "regras") {
+      const recurso: Recurso = chave === "pipeline-agentes" ? "pipeline-agentes" : "prompt-unico-template";
+      return primeiroRecursoNegado(db, orgId, email, [recurso], "editar", timeId ?? null);
+    }
+
+    const atual = await casos.obter("regras", await templateDaVersao("regras"), timeId);
+    const alteradas = secoesDeRegrasAlteradas(atual.documento, documento);
+    return primeiroRecursoNegado(db, orgId, email, alteradas, "editar", timeId ?? null);
+  }
+
   /** SPEC-31 (paridade): o modo local expõe `/versao` para a UI saber com o
    * que está falando. Não havia razão para o hospedado não expor. */
   app.get("/versao", async () => ({ versao: versaoAtual, modo: "hospedado" }));
@@ -64,7 +109,7 @@ export async function registrarRotasConfig(app: FastifyInstance, { db, diretorio
    */
   app.get("/prompt-unico-template", async () => casos.obter("prompt-unico", await templateDaVersao("prompt-unico")));
 
-  app.put("/prompt-unico-template", { preHandler: exigirSessao }, async (req, reply) => {
+  app.put("/prompt-unico-template", { preHandler: [exigirSessao, podeEditarPromptUnico] }, async (req, reply) => {
     const corpo = req.body as { documento?: unknown; conteudo?: string } | null;
     const documento = corpo?.documento ?? (corpo?.conteudo !== undefined ? { conteudo: corpo.conteudo } : undefined);
     if (documento === undefined) return reply.code(400).send({ erro: "corpo precisa ter `documento` ou `conteudo`" });
@@ -79,6 +124,15 @@ export async function registrarRotasConfig(app: FastifyInstance, { db, diretorio
     const corpo = req.body as { documento?: unknown; timeId?: string } | null;
     if (!corpo || corpo.documento === undefined) {
       return reply.code(400).send({ erro: "corpo precisa ter `documento`" });
+    }
+
+    const negado = await recursoNegadoPara(req, chave, corpo.documento, corpo.timeId);
+    if (negado) {
+      return reply.code(403).send({
+        erro: `sem permissão para "editar" em "${negado}"`,
+        recurso: negado,
+        acao: "editar",
+      });
     }
 
     const salvo = await casos.salvar(chave, corpo.documento, versaoAtual, corpo.timeId ?? CAMPO_GLOBAL);

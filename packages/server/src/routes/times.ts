@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { OpcoesApp } from "../app.js";
 import { exigirSessao, exigirTime } from "../auth/middleware.js";
+import { exigirPermissao, organizacaoPadraoDe } from "../auth/permissoes.js";
 import { registrarAuditoria } from "../auditoria.js";
 import { assinarSessao, COOKIE_SESSAO } from "../auth/sessao.js";
 import { convitesTime, organizacoes, times, usuarioTime } from "../db/schema.js";
@@ -26,6 +27,15 @@ const corpoCriarTime = z.object({
  * que já é do time pode convidar/adicionar/remover membros daquele time.
  */
 export async function registrarRotasTimes(app: FastifyInstance, { db }: OpcoesApp) {
+  /** SPEC-28 Fase 1b — quem entra e sai do time. Camada de cima de `exigirTime`:
+   * continuar sendo do time segue necessário; a permissão é adicional. Criar
+   * convite entra aqui porque convidar É adicionar membro, com um passo a mais.
+   *
+   * O `GET` de membros fica aberto de propósito — mesma régua de campos-no e
+   * perfis-time, onde só a escrita é restrita. */
+  const podeAdministrarMembros = (resolverTimeId: Parameters<typeof exigirPermissao>[4]) =>
+    exigirPermissao(db, organizacaoPadraoDe(db), "membros", "editar", resolverTimeId);
+
   // Correção pós-uso do SPEC-09 §3.3 — a versão original só permitia entrar
   // num time por convite, sempre exigindo que alguém já estivesse lá antes
   // (bootstrap era sempre uma linha manual em `usuario_time`, achado real: a
@@ -69,7 +79,12 @@ export async function registrarRotasTimes(app: FastifyInstance, { db }: OpcoesAp
 
   app.post(
     "/times/:timeId/convites",
-    { preHandler: exigirTime((req) => (req.params as { timeId: string }).timeId) },
+    {
+      preHandler: [
+        exigirTime((req) => (req.params as { timeId: string }).timeId),
+        podeAdministrarMembros((req) => (req.params as { timeId: string }).timeId),
+      ],
+    },
     async (req, reply) => {
       const { timeId } = req.params as { timeId: string };
       const expiraEm = new Date(Date.now() + DURACAO_CONVITE_MS);
@@ -139,7 +154,12 @@ export async function registrarRotasTimes(app: FastifyInstance, { db }: OpcoesAp
 
   app.post(
     "/times/:timeId/membros",
-    { preHandler: exigirTime((req) => (req.params as { timeId: string }).timeId) },
+    {
+      preHandler: [
+        exigirTime((req) => (req.params as { timeId: string }).timeId),
+        podeAdministrarMembros((req) => (req.params as { timeId: string }).timeId),
+      ],
+    },
     async (req, reply) => {
       const { timeId } = req.params as { timeId: string };
       const corpo = corpoAdicionarMembro.safeParse(req.body);
@@ -158,7 +178,12 @@ export async function registrarRotasTimes(app: FastifyInstance, { db }: OpcoesAp
 
   app.delete(
     "/times/:timeId/membros/:email",
-    { preHandler: exigirTime((req) => (req.params as { timeId: string }).timeId) },
+    {
+      preHandler: [
+        exigirTime((req) => (req.params as { timeId: string }).timeId),
+        podeAdministrarMembros((req) => (req.params as { timeId: string }).timeId),
+      ],
+    },
     async (req, reply) => {
       const { timeId, email } = req.params as { timeId: string; email: string };
       const membros = await db.select().from(usuarioTime).where(eq(usuarioTime.timeId, timeId));

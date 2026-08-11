@@ -4,6 +4,7 @@ import { CAMPO_GLOBAL, criarCasosDeUsoDeTemplateEspecificacao, TemplateInvalido 
 import type { OpcoesApp } from "../app.js";
 import { criarRepositorioDeTemplateEspecificacaoEmPostgres } from "../adaptadores/templateEspecificacaoEmPostgres.js";
 import { exigirTime } from "../auth/middleware.js";
+import { exigirPermissao, organizacaoPadraoDe } from "../auth/permissoes.js";
 import { registrarAuditoria } from "../auditoria.js";
 
 const corpoTemplate = z.object({
@@ -37,7 +38,14 @@ export async function registrarRotasEspecificacaoTemplate(app: FastifyInstance, 
   // ter que buscar antes de editar.
   app.put(
     "/especificacao-template",
-    { preHandler: exigirTime((req) => comoTimeParaAutorizacao((req.body as { timeId?: string })?.timeId ?? CAMPO_GLOBAL)) },
+    {
+      preHandler: [
+        exigirTime((req) => comoTimeParaAutorizacao((req.body as { timeId?: string })?.timeId ?? CAMPO_GLOBAL)),
+        exigirPermissao(db, organizacaoPadraoDe(db), "especificacao-template", "editar", (req) =>
+          comoTimeParaAutorizacao((req.body as { timeId?: string })?.timeId ?? CAMPO_GLOBAL)
+        ),
+      ],
+    },
     async (req, reply) => {
       const corpo = corpoTemplate.safeParse(req.body);
       if (!corpo.success) return reply.code(400).send({ erro: corpo.error.flatten() });
