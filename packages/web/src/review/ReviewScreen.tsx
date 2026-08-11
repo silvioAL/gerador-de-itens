@@ -34,6 +34,7 @@ import { baixarArquivoTexto } from "../persistence/baixarArquivo";
 import { ConversaEspecificacao } from "../conversa/ConversaEspecificacao";
 import { DiagramaCompacto } from "./DiagramaCompacto";
 import { EsteiraAgentes } from "./EsteiraAgentes";
+import { SimulacaoEsteira } from "./SimulacaoEsteira";
 import { PAPEIS_PIPELINE, ROTULO_PAPEL, useEsteiraDeAgentes, type ItemFilaEsteira } from "./useEsteiraDeAgentes";
 
 export interface ReviewScreenProps {
@@ -271,6 +272,7 @@ export function ReviewScreen({
   // SPEC-24 Fase F: papéis da esteira vindos da config (ordem/ativo/
   // contextos/prompt) — default de fábrica até (e se) a config carregar.
   const [papeisConfig, setPapeisConfig] = useState<PapelConfigurado[]>(PAPEIS_PADRAO);
+  const [mostrarSimulacao, setMostrarSimulacao] = useState(false);
   // Por que a esteira não arrancou. `null` enquanto não se sabe (o efeito de
   // montagem ainda não respondeu) e depois de ela ter arrancado — a faixa de
   // aviso é sobre ausência, não sobre progresso.
@@ -702,6 +704,14 @@ export function ReviewScreen({
             🔄 Gerar de novo
           </button>
         )}
+        {/* #299 — ao lado do botão que GASTA, de propósito: a pergunta "quanto
+            isto vai custar e o que exatamente vai" se faz aqui, no momento de
+            decidir, não numa tela de configuração à parte. */}
+        {!esteira.rodando && (
+          <button onClick={() => setMostrarSimulacao(true)} style={botaoEstilo} data-testid="abrir-simulacao">
+            👁 Simular (sem gastar IA)
+          </button>
+        )}
         <div style={{ flex: 1 }} />
         <button onClick={() => setMostrarDiagrama((v) => !v)} style={botaoEstilo}>
           {mostrarDiagrama ? "Voltar à lista" : "🔍 Ver diagrama completo"}
@@ -1081,6 +1091,17 @@ export function ReviewScreen({
           contextoEpico={contextoEpico}
           onAplicar={responderComProcedencia}
           onFechar={() => setMostrarConversa(false)}
+        />
+      )}
+      {mostrarSimulacao && (
+        <SimulacaoEsteira
+          // `false` = a fila que "Gerar de novo" usaria: exatamente o que a
+          // próxima corrida faria. Simular a fila de outro botão responderia
+          // uma pergunta que ninguém fez.
+          fila={montarFilaEsteira(false)}
+          papeis={papeisAtivos}
+          contextoEpico={contextoEpico}
+          onFechar={() => setMostrarSimulacao(false)}
         />
       )}
     </>
