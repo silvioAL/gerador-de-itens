@@ -54,11 +54,15 @@ describe("fronteira de PACOTE do gateway (SPEC-31 Fase 4)", () => {
     }
   });
 
-  it("o CLI — que roda na máquina e carrega GGUF — declara a dependência de verdade", async () => {
-    // O contraponto: sem isto, o modo local perderia o modelo embarcado e o
-    // teste acima estaria "passando" por ter quebrado a outra metade.
-    const cli = await pacote("packages/cli");
+  /**
+   * SPEC-33 — o contraponto deste teste era `packages/cli`, que declarava
+   * `node-llama-cpp` de verdade porque rodava o GGUF na máquina. Com o modo
+   * local removido, ninguém no repositório declara essa dependência: o
+   * hospedado fala HTTP com um gateway e nada mais.
+   *
+   * O caso foi removido em vez de reescrito porque não sobrou quem afirmar. O
+   * de cima — "o gateway NÃO carrega binário nativo" — passa a valer sozinho,
+   * e é o que protege a imagem do servidor de voltar a inchar.
+   */
 
-    expect(cli.dependencies?.["node-llama-cpp"]).toBeTruthy();
-  });
 });

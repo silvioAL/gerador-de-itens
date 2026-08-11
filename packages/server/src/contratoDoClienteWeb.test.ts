@@ -8,6 +8,18 @@ import { camposNo } from "./db/schema.js";
 import { exigirBancoDescartavel, garantirBancoDeTeste, URL_BANCO_DE_TESTE } from "./test-support/bancoDeTeste.js";
 
 /**
+ * Banco PRÓPRIO, e não o `gerador_test` compartilhado.
+ *
+ * O vitest roda arquivos em paralelo, e `app.test.ts` trunca `campos_no` no
+ * meio da corrida deste — a primeira versão passava ou falhava conforme o
+ * interleaving. Um teste que depende de quem chegou primeiro é pior que
+ * nenhum: ensina a equipe a re-rodar até passar.
+ *
+ * O sufixo `_test` é obrigatório — é o que `exigirBancoDescartavel` exige, e
+ * foi a trava criada depois de o E2E apagar o banco de trabalho do usuário.
+ */
+
+/**
  * #308 — o contrato do lado CONDUTOR, que a revisão da SPEC-31 (§11) apontou
  * como o maior buraco que sobrou.
  *

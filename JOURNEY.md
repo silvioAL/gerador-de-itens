@@ -3853,3 +3853,44 @@ sem nenhum E2E se cobrem na Fase 2, e só depois se remove na Fase 3. Não é
 zelo — é a lição de hoje. A aba de Regras abriu em branco em produção porque
 nada a clicava num navegador; apagar um modo inteiro com quatro abas
 descobertas repetiria isso em escala.
+
+## 156. O modo local saiu, e o contrato de ontem quase virou teste instável (SPEC-33 Fase 3/4)
+
+O usuário autorizou a remoção completa, incluindo os comandos headless. Saíram
+`packages/cli` inteiro (1.118 linhas de `openApiLocal.ts`, 523 de adaptadores
+em arquivo, os seis comandos), `paridade.sanity.test.ts` e o pacote dos
+workspaces.
+
+**Uma dependência real, e não era a que eu esperava.** O mapeamento mostrou onze
+arquivos citando `packages/cli`; dez eram comentário em prosa. A única de código
+era `gateway.pacote.test.ts`, que afirmava "o CLI declara `node-llama-cpp` de
+verdade" como contraponto de "o gateway NÃO carrega binário nativo". Removi o
+caso em vez de reescrevê-lo: **não sobrou quem afirmar**. O de cima passa a
+valer sozinho, e é ele que protege a imagem do servidor de voltar a inchar.
+
+**E o contrato do #308, escrito horas antes, quase virou lixo.** Na suíte
+completa ele falhou — `app.test.ts` roda em paralelo e trunca `campos_no` no
+meio da corrida dele. Tinha passado sozinho e passado na suíte do server; a
+combinação nova é que expôs. Um teste que passa conforme o interleaving é pior
+que nenhum: ensina a equipe a re-rodar até passar. Dei banco próprio a ele
+(`gerador_contrato_test`). Passou local, **e a CI ficou vermelha de três jeitos
+diferentes**: contagens erradas por um, `app.test.ts` vendo linhas que não eram
+dele, e `duplicate key value violates unique constraint
+"pg_database_datname_index"` — dois `CREATE DATABASE` concorrentes disputando o
+catálogo do Postgres. Eu tinha mudado o LUGAR do problema, não a causa.
+
+A causa é uma frase: **os testes do server compartilham um banco, e o vitest
+roda arquivos em paralelo.** Enquanto `app.test.ts` era o único que escrevia, o
+paralelismo era invisível. `fileParallelism: false` diz a verdade sobre esta
+suíte — bancos não viram paralelizáveis por vontade. Custa segundos numa suíte
+de ~8s; compra um teste que passa pelo mesmo motivo toda vez.
+
+Vale como regra: **quando um teste novo entra num banco compartilhado, a
+pergunta não é "ele passa", é "quem mais escreve aqui".**
+
+**O README ficou com um aviso, não com uma reescrita.** Dez seções falam de
+`npm install -g` e `gerador <comando>`. Reescrever isso com o resto do contexto
+que eu tinha seria fazer mal a porta de entrada do projeto. Um banner no topo
+diz que estão desatualizadas e aponta a SPEC-33; a reescrita virou tarefa
+própria. Aviso honesto vale mais que documentação apressada — e mais que
+documentação que manda instalar um pacote depreciado.
