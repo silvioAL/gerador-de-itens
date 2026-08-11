@@ -199,16 +199,16 @@ describe("ConfigurarPanel (SPEC-34 Fase 1 — configurar conversando)", () => {
     ]);
   });
 
-  it("guardar uma retro salva pelo servidor e ela entra na lista da seção", async () => {
-    retroCriarMock.mockResolvedValue({ id: "r1", timeId: "time-pagamentos", titulo: "Retro 42", texto: "aprendemos X", criadoEm: "2026-08-11" });
+  it("guardar uma anotação salva pelo servidor e ela entra na lista da seção", async () => {
+    retroCriarMock.mockResolvedValue({ id: "r1", timeId: "time-pagamentos", titulo: "Sprint 42", texto: "aprendemos X", criadoEm: "2026-08-11" });
     montar();
 
-    fireEvent.change(screen.getByLabelText("Título da retrospectiva"), { target: { value: "Retro 42" } });
-    fireEvent.change(screen.getByLabelText("Texto da retrospectiva"), { target: { value: "aprendemos X" } });
-    fireEvent.click(screen.getByRole("button", { name: "Guardar retro" }));
+    fireEvent.change(screen.getByLabelText("Título da anotação"), { target: { value: "Sprint 42" } });
+    fireEvent.change(screen.getByLabelText("Texto da anotação"), { target: { value: "aprendemos X" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
 
-    await waitFor(() => expect(retroCriarMock).toHaveBeenCalledWith({ timeId: "time-pagamentos", titulo: "Retro 42", texto: "aprendemos X" }));
-    expect(await screen.findByText("Retro 42")).toBeInTheDocument();
+    await waitFor(() => expect(retroCriarMock).toHaveBeenCalledWith({ timeId: "time-pagamentos", titulo: "Sprint 42", texto: "aprendemos X" }));
+    expect(await screen.findByText("Sprint 42")).toBeInTheDocument();
   });
 
   it("listagem negada aparece como erro na seção — a UI diz, não finge lista vazia", async () => {

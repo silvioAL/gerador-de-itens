@@ -100,6 +100,16 @@ export function ConfigScreen({
 }: ConfigScreenProps) {
   const [aba, setAba] = useState<AbaConfig>(abaForcada ?? "perfis");
 
+  // tech → labels dos componentes que a usam — é o que deixa a aba de Regras
+  // falar "vale para: Serviço, Fila Rabbit…" em vez de exibir um seletor de
+  // "Tecnologia" (vocabulário interno que o usuário apontou como sem sentido).
+  const componentesPorTech: Record<string, string[]> = {};
+  for (const tipo of Object.values(config.nodeTypes)) {
+    for (const tech of tipo.techs ?? []) {
+      (componentesPorTech[tech] ??= []).push(tipo.label);
+    }
+  }
+
   useEffect(() => {
     if (abaForcada) setAba(abaForcada);
   }, [abaForcada]);
@@ -233,7 +243,11 @@ export function ConfigScreen({
          * existe, e só um foi revisado — a §145 outra vez.
          */}
         {abaAtiva === "regras" && (
-          <RegrasTab podeSecao={(id) => permissoes.pode(RECURSO_DA_SECAO_DE_REGRAS[id])} contextos={contextos} />
+          <RegrasTab
+            podeSecao={(id) => permissoes.pode(RECURSO_DA_SECAO_DE_REGRAS[id])}
+            contextos={contextos}
+            componentesPorTech={componentesPorTech}
+          />
         )}
         {abaAtiva === "membros" && mostrarMembros && <MembrosTab timeAtivo={timeAtivo} />}
         {abaAtiva === "acessos" && mostrarMembros && <AcessosTab timeAtivo={timeAtivo} />}

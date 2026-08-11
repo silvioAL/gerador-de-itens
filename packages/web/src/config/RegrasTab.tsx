@@ -44,13 +44,18 @@ export interface RegrasTabProps {
    * valores como "Backend-mensagens rabbitmq" de cabeça (e um typo não
    * avisava: a regra só nunca casava). Vazio = cai no input livre. */
   contextos?: string[];
+  /** tech → labels dos componentes que a usam (derivado de
+   * `diagramaConfig.nodeTypes`). É o que traduz o eixo interno ("tech") para
+   * o vocabulário do produto: o cabeçalho de cada grupo diz PARA QUAIS
+   * COMPONENTES as regras valem — "padrão por componente", como o usuário
+   * nomeou, sem nenhum seletor pra operar. */
+  componentesPorTech?: Record<string, string[]>;
 }
 
-export function RegrasTab({ podeSecao, contextos }: RegrasTabProps = {}) {
-  const opcoesDeContexto = contextos ?? [];
+export function RegrasTab({ podeSecao, contextos, componentesPorTech }: RegrasTabProps = {}) {
+  const todasAsOpcoes = contextos ?? [];
   const secoesVisiveis = SECOES.filter((s) => podeSecao?.(s.id) ?? true);
   const [regras, setRegras] = useState<RegrasConfig | null>(null);
-  const [tech, setTech] = useState<string>("");
   const [secao, setSecao] = useState<Secao>(secoesVisiveis[0]?.id ?? "tecnico");
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -62,7 +67,6 @@ export function RegrasTab({ podeSecao, contextos }: RegrasTabProps = {}) {
       .then((envelope) => {
         setRegras(envelope.documento);
         setDiagnostico(envelope.diagnostico);
-        setTech(Object.keys(envelope.documento.porTech ?? {})[0] ?? "");
       })
       .catch((e) => setErro(e instanceof Error ? e.message : String(e)));
   }, []);
@@ -70,8 +74,22 @@ export function RegrasTab({ podeSecao, contextos }: RegrasTabProps = {}) {
   if (erro && !regras) return <p style={erroEstilo}>{erro}</p>;
   if (!regras) return <p style={{ color: "var(--texto-fraco)", fontSize: 13 }}>Carregando regras…</p>;
 
+  // O seletor "Tecnologia" saiu (achado do usuário: "nem precisaria existir
+  // essa label — nós temos padrão por componente"). O DOCUMENTO continua por
+  // tech; a tela empilha um grupo por tech e o cabeçalho de cada grupo diz
+  // para quais componentes ele vale — agrupamento se lê, seletor se opera.
   const techs = Object.keys(regras.porTech ?? {});
-  const bloco: RegrasPorTech = regras.porTech[tech] ?? { checklistTecnico: [], testes: [] };
+  const blocoDe = (tech: string): RegrasPorTech => regras.porTech[tech] ?? { checklistTecnico: [], testes: [] };
+
+  // Contexto pertence à tech pelo prefixo ("Mobile-android" só existe em
+  // componentes Mobile) — convenção medida em TODOS os nodeTypes da config.
+  // Oferecer "Backend-cache" numa regra Mobile nunca casaria com item nenhum.
+  // Tech sem contexto próprio cai na lista completa — melhor oferecer demais
+  // do que travar a edição.
+  function opcoesDeContextoDe(tech: string): string[] {
+    const daTech = todasAsOpcoes.filter((c) => c.toLowerCase().startsWith(`${tech.toLowerCase()}-`));
+    return daTech.length > 0 ? daTech : todasAsOpcoes;
+  }
 
   async function gravar(novo: RegrasConfig) {
     setRegras(novo);
@@ -89,9 +107,18 @@ export function RegrasTab({ podeSecao, contextos }: RegrasTabProps = {}) {
   /** Troca só o pedaço editado do bloco da tech — o resto do arquivo (outras
    * techs, `tipos`, `tamanhos`, e as listas que esta seção não edita) passa
    * intacto. A tela nunca é dona do arquivo inteiro. */
-  function comBloco(mudanca: Partial<RegrasPorTech>): RegrasConfig {
-    return { ...regras!, porTech: { ...regras!.porTech, [tech]: { ...bloco, ...mudanca } } };
+  function comBloco(tech: string, mudanca: Partial<RegrasPorTech>): RegrasConfig {
+    return { ...regras!, porTech: { ...regras!.porTech, [tech]: { ...blocoDe(tech), ...mudanca } } };
   }
+
+  /** O elo com o vocabulário do produto: quais componentes usam esta tech. */
+  function valePara(tech: string): string {
+    const componentes = componentesPorTech?.[tech] ?? [];
+    return componentes.length > 0 ? `vale para: ${componentes.join(", ")}` : "";
+  }
+
+  const totalDe = (chave: "checklistTecnico" | "checklistProcesso" | "testes") =>
+    techs.reduce((soma, t) => soma + (blocoDe(t)[chave]?.length ?? 0), 0);
 
   return (
     <div>
@@ -105,20 +132,12 @@ export function RegrasTab({ podeSecao, contextos }: RegrasTabProps = {}) {
         </div>
       )}
       <p style={introTextoEstilo}>
-        O que você configura aqui vira o conteúdo dos itens gerados para a tecnologia escolhida — é também o que a
-        esteira de agentes recebe pra responder. Contextos vazios valem sempre que a tecnologia aparecer; com
-        contextos, a regra só entra nos itens daquele contexto.
+        O que você configura aqui vira o conteúdo dos itens gerados — é também o que a esteira de agentes recebe pra
+        responder. Cada grupo diz para quais componentes vale; contextos vazios valem para todos os itens daqueles
+        componentes.
       </p>
 
       <div style={{ ...cardEstilo, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <label style={{ fontSize: 12.5, color: "var(--texto-2)" }}>Tecnologia</label>
-        <select value={tech} onChange={(e) => setTech(e.target.value)} style={selectEstilo} aria-label="Tecnologia">
-          {techs.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
         <div style={{ display: "flex", gap: 4 }}>
           {secoesVisiveis.map((s) => (
             <button
@@ -128,9 +147,9 @@ export function RegrasTab({ podeSecao, contextos }: RegrasTabProps = {}) {
               data-testid={`secao-${s.id}`}
             >
               {s.rotulo}
-              {s.id === "tecnico" && ` (${bloco.checklistTecnico?.length ?? 0})`}
-              {s.id === "processo" && ` (${bloco.checklistProcesso?.length ?? 0})`}
-              {s.id === "testes" && ` (${bloco.testes?.length ?? 0})`}
+              {s.id === "tecnico" && ` (${totalDe("checklistTecnico")})`}
+              {s.id === "processo" && ` (${totalDe("checklistProcesso")})`}
+              {s.id === "testes" && ` (${totalDe("testes")})`}
             </button>
           ))}
         </div>
@@ -138,53 +157,68 @@ export function RegrasTab({ podeSecao, contextos }: RegrasTabProps = {}) {
         {erro && <span style={{ fontSize: 11.5, color: "var(--vermelho)" }}>{erro}</span>}
       </div>
 
-      {secao === "tecnico" && (
-        <ListaDeTexto
-          titulo="Requisitos de refinamento técnico"
-          ajuda="O que precisa ser DECIDIDO no desenho antes de implementar."
-          itens={bloco.checklistTecnico ?? []}
-          alvoIa="regra-refinamento"
-          exemploIa="ex.: o que o time precisa decidir sobre idempotência de mensagem"
-          tech={tech}
-          onMudar={(lista) => void gravar(comBloco({ checklistTecnico: lista as Requisito[] }))}
-          onEditarLocal={(lista) => setRegras(comBloco({ checklistTecnico: lista as Requisito[] }))}
-          onSalvarPendente={() => void gravar(regras)}
-          opcoesDeContexto={opcoesDeContexto}
-        />
+      {techs.length === 0 && (
+        <p style={{ fontSize: 12.5, color: "var(--texto-fraco)", marginTop: 12 }}>
+          Nenhum grupo de regras configurado ainda neste ambiente.
+        </p>
       )}
 
-      {secao === "processo" && (
-        <ListaDeTexto
-          titulo="Checklist de processo"
-          ajuda="O que o time precisa FAZER pra conseguir executar e testar (mock, massa, acesso) — diferente do que precisa ser decidido."
-          itens={bloco.checklistProcesso ?? []}
-          alvoIa="item-processo"
-          exemploIa="ex.: o que precisa estar pronto no ambiente antes de testar"
-          tech={tech}
-          onMudar={(lista) => void gravar(comBloco({ checklistProcesso: lista as ItemProcesso[] }))}
-          onEditarLocal={(lista) => setRegras(comBloco({ checklistProcesso: lista as ItemProcesso[] }))}
-          onSalvarPendente={() => void gravar(regras)}
-          opcoesDeContexto={opcoesDeContexto}
-        />
-      )}
+      {techs.map((tech) => (
+        <section key={tech} data-testid={`regras-grupo-${tech}`} style={{ marginTop: 16 }}>
+          <h3 style={{ margin: "0 0 2px", fontSize: 13.5, color: "var(--texto)" }}>{tech}</h3>
+          {valePara(tech) && (
+            <p style={{ margin: "0 0 6px", fontSize: 11.5, color: "var(--texto-mudo)" }}>{valePara(tech)}</p>
+          )}
 
-      {secao === "testes" && (
-        <ListaDeTestes
-          itens={bloco.testes ?? []}
-          tech={tech}
-          onMudar={(lista) => void gravar(comBloco({ testes: lista }))}
-          onEditarLocal={(lista) => setRegras(comBloco({ testes: lista }))}
-          onSalvarPendente={() => void gravar(regras)}
-        />
-      )}
+          {secao === "tecnico" && (
+            <ListaDeTexto
+              titulo="Requisitos de refinamento técnico"
+              ajuda="O que precisa ser DECIDIDO no desenho antes de implementar."
+              itens={blocoDe(tech).checklistTecnico ?? []}
+              alvoIa="regra-refinamento"
+              exemploIa="ex.: o que o time precisa decidir sobre idempotência de mensagem"
+              tech={tech}
+              onMudar={(lista) => void gravar(comBloco(tech, { checklistTecnico: lista as Requisito[] }))}
+              onEditarLocal={(lista) => setRegras(comBloco(tech, { checklistTecnico: lista as Requisito[] }))}
+              onSalvarPendente={() => void gravar(regras)}
+              opcoesDeContexto={opcoesDeContextoDe(tech)}
+            />
+          )}
 
-      {secao === "volumetria" && (
-        <Volumetria
-          valor={bloco.volumetria}
-          onMudar={(v) => void gravar(comBloco({ volumetria: v }))}
-          opcoesDeContexto={opcoesDeContexto}
-        />
-      )}
+          {secao === "processo" && (
+            <ListaDeTexto
+              titulo="Checklist de processo"
+              ajuda="O que o time precisa FAZER pra conseguir executar e testar (mock, massa, acesso) — diferente do que precisa ser decidido."
+              itens={blocoDe(tech).checklistProcesso ?? []}
+              alvoIa="item-processo"
+              exemploIa="ex.: o que precisa estar pronto no ambiente antes de testar"
+              tech={tech}
+              onMudar={(lista) => void gravar(comBloco(tech, { checklistProcesso: lista as ItemProcesso[] }))}
+              onEditarLocal={(lista) => setRegras(comBloco(tech, { checklistProcesso: lista as ItemProcesso[] }))}
+              onSalvarPendente={() => void gravar(regras)}
+              opcoesDeContexto={opcoesDeContextoDe(tech)}
+            />
+          )}
+
+          {secao === "testes" && (
+            <ListaDeTestes
+              itens={blocoDe(tech).testes ?? []}
+              tech={tech}
+              onMudar={(lista) => void gravar(comBloco(tech, { testes: lista }))}
+              onEditarLocal={(lista) => setRegras(comBloco(tech, { testes: lista }))}
+              onSalvarPendente={() => void gravar(regras)}
+            />
+          )}
+
+          {secao === "volumetria" && (
+            <Volumetria
+              valor={blocoDe(tech).volumetria}
+              onMudar={(v) => void gravar(comBloco(tech, { volumetria: v }))}
+              opcoesDeContexto={opcoesDeContextoDe(tech)}
+            />
+          )}
+        </section>
+      ))}
     </div>
   );
 }

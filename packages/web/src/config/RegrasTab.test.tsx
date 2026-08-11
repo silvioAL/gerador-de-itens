@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { RegrasTab } from "./RegrasTab";
+
+/** As techs agora aparecem EMPILHADAS (o seletor "Tecnologia" saiu — achado do
+ * usuário: "nem precisaria existir essa label; nós temos padrão por
+ * componente"). Com dois grupos na tela, os gestos são escopados pelo grupo. */
+const grupo = (tech: string) => within(screen.getByTestId(`regras-grupo-${tech}`));
 
 const obterMock = vi.hoisted(() => vi.fn());
 
@@ -97,13 +102,15 @@ describe("RegrasTab (SPEC-23 fluxo 5 — regras.json ganha tela)", () => {
 
   it("adicionar um requisito grava o arquivo inteiro preservando processo/testes da tech", async () => {
     render(<RegrasTab />);
-    await waitFor(() => expect(screen.getByLabelText("Novo item")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("regras-grupo-Backend")).toBeTruthy());
 
-    fireEvent.change(screen.getByLabelText("Novo item"), {
+    fireEvent.change(grupo("Backend").getByLabelText("Novo item"), {
       target: { value: "Definir a chave de idempotência da mensagem" },
     });
-    fireEvent.change(screen.getByLabelText("Contextos do novo item"), { target: { value: "Backend-mensagens" } });
-    fireEvent.click(screen.getByRole("button", { name: "+ Adicionar" }));
+    fireEvent.change(grupo("Backend").getByLabelText("Contextos do novo item"), {
+      target: { value: "Backend-mensagens" },
+    });
+    fireEvent.click(grupo("Backend").getByRole("button", { name: "+ Adicionar" }));
 
     await waitFor(() => expect(salvarMock).toHaveBeenCalled());
     const gravado = salvarMock.mock.calls.at(-1)![0];
@@ -136,12 +143,12 @@ describe("RegrasTab (SPEC-23 fluxo 5 — regras.json ganha tela)", () => {
       contextos: ["Backend-mensagens"],
     });
     render(<RegrasTab />);
-    await waitFor(() => expect(screen.getByTestId("sugerir-ia-regra-refinamento")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("regras-grupo-Backend")).toBeTruthy());
 
-    fireEvent.change(screen.getByLabelText("Descreva o que a IA deve propor"), {
+    fireEvent.change(grupo("Backend").getByLabelText("Descreva o que a IA deve propor"), {
       target: { value: "algo sobre duplicidade de mensagem" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /Sugerir/ }));
+    fireEvent.click(grupo("Backend").getByRole("button", { name: /Sugerir/ }));
 
     await waitFor(() => expect(salvarMock).toHaveBeenCalled());
     const gravado = salvarMock.mock.calls.at(-1)![0];
@@ -155,11 +162,40 @@ describe("RegrasTab (SPEC-23 fluxo 5 — regras.json ganha tela)", () => {
     expect(pedido.contexto).toContain("Definir timeout e política de retry");
   });
 
-  it("trocar de tech mostra a lista da outra tech", async () => {
+  it("o menu de contexto de um grupo só oferece os contextos DAQUELA tech", async () => {
+    obterMock.mockResolvedValue(
+      semAviso({
+        tipos: [],
+        tamanhos: [],
+        porTech: {
+          Backend: { checklistTecnico: [{ texto: "Definir retry", contextos: [] }], testes: [] },
+          Mobile: { checklistTecnico: [{ texto: "Definir offline", contextos: [] }], testes: [] },
+        },
+      })
+    );
+    render(
+      <RegrasTab contextos={["Backend-http", "Backend-dados", "Mobile-android", "Mobile-ios"]} />
+    );
+    await waitFor(() => expect(screen.getByTestId("regras-grupo-Mobile")).toBeTruthy());
+
+    // "Backend-dados" numa regra Mobile nunca casaria com item nenhum — era o
+    // que fazia o eixo de tech parecer redundante ao lado do contexto.
+    fireEvent.click(grupo("Mobile").getByRole("button", { name: "Contextos do item 1: adicionar" }));
+    const opcoes = grupo("Mobile")
+      .getAllByRole("option")
+      .map((o) => o.textContent);
+    expect(opcoes).toEqual(["Mobile-android", "Mobile-ios"]);
+  });
+
+  it("as techs aparecem empilhadas, sem seletor — agrupamento se lê, seletor se opera", async () => {
     render(<RegrasTab />);
-    await waitFor(() => expect(screen.getByLabelText("Tecnologia")).toBeTruthy());
-    fireEvent.change(screen.getByLabelText("Tecnologia"), { target: { value: "Frontend" } });
-    await waitFor(() => expect(screen.getByText("Nada configurado para esta tecnologia ainda.")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("regras-grupo-Backend")).toBeTruthy());
+
+    // O grupo da outra tech está na MESMA tela, sem nenhum gesto de troca.
+    expect(screen.getByTestId("regras-grupo-Frontend")).toBeTruthy();
+    expect(grupo("Frontend").getByText("Nada configurado para esta tecnologia ainda.")).toBeTruthy();
+    // E o seletor não existe mais — devolver o select seria devolver o problema.
+    expect(screen.queryByLabelText("Tecnologia")).toBeNull();
   });
 });
 
@@ -170,8 +206,8 @@ describe("RegrasTab — as quatro listas em seções separadas (SPEC-20 aplicada
     fireEvent.click(screen.getByTestId("secao-processo"));
 
     expect(screen.getByDisplayValue("Levantar massa de teste")).toBeTruthy();
-    fireEvent.change(screen.getByLabelText("Novo item"), { target: { value: "Pedir acesso ao broker de HLG" } });
-    fireEvent.click(screen.getByRole("button", { name: "+ Adicionar" }));
+    fireEvent.change(grupo("Backend").getByLabelText("Novo item"), { target: { value: "Pedir acesso ao broker de HLG" } });
+    fireEvent.click(grupo("Backend").getByRole("button", { name: "+ Adicionar" }));
 
     await waitFor(() => expect(salvarMock).toHaveBeenCalled());
     const gravado = salvarMock.mock.calls.at(-1)![0];
@@ -230,10 +266,10 @@ describe("RegrasTab — as quatro listas em seções separadas (SPEC-20 aplicada
     await waitFor(() => expect(screen.getByTestId("secao-testes")).toBeTruthy());
     fireEvent.click(screen.getByTestId("secao-testes"));
 
-    fireEvent.change(screen.getByLabelText("Descreva o que a IA deve propor"), {
+    fireEvent.change(grupo("Backend").getByLabelText("Descreva o que a IA deve propor"), {
       target: { value: "algo que prove o contrato" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /Sugerir/ }));
+    fireEvent.click(grupo("Backend").getByRole("button", { name: /Sugerir/ }));
 
     await waitFor(() => expect(salvarMock).toHaveBeenCalled());
     expect(salvarMock.mock.calls.at(-1)![0].porTech.Backend.testes.at(-1)).toEqual({

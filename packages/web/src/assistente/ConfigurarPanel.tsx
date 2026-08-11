@@ -186,7 +186,7 @@ export function ConfigurarPanel({
     try {
       const salva = await apiRetrospectivas.criar({
         timeId: timeAtivo,
-        titulo: tituloRetro.trim() || `Retro de ${new Date().toLocaleDateString("pt-BR")}`,
+        titulo: tituloRetro.trim() || `Anotação de ${new Date().toLocaleDateString("pt-BR")}`,
         texto: textoRetro.trim(),
       });
       setRetros((atuais) => [salva, ...atuais]);
@@ -462,12 +462,15 @@ export function ConfigurarPanel({
 
       {erro && <p style={{ margin: "0 12px", fontSize: 11.5, color: "var(--vermelho)" }}>{erro}</p>}
 
-      {/* SPEC-34 Fase 2 — as retros moram na conversa porque é aqui que elas
-          são USADAS: o servidor injeta as do time no prompt, e a proposta cita
-          o trecho. Uma tela própria seria material guardado longe do uso. */}
+      {/* SPEC-34 Fase 2 — o material do time mora na conversa porque é aqui
+          que ele é USADO: o servidor injeta o do time no prompt, e a proposta
+          cita o trecho. Na TELA o nome é "anotações" (pedido do usuário:
+          "retro" complicava — §147, devolver o vocabulário dele); no código e
+          na API continua `retrospectivas`, o nome que o recurso de RBAC tem
+          desde a SPEC-28. */}
       <details style={{ borderTop: "1px solid var(--borda)", padding: "8px 12px" }} data-testid="retros-secao">
         <summary style={{ fontSize: 12, color: "var(--texto-fraco)", cursor: "pointer" }}>
-          📝 Retrospectivas do time ({retros.length}) — entram como contexto da conversa
+          📝 Anotações do time ({retros.length}) — entram como contexto da conversa
         </summary>
         {erroRetros && <p style={{ fontSize: 11.5, color: "var(--vermelho)", margin: "6px 0 0" }}>{erroRetros}</p>}
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
@@ -476,7 +479,7 @@ export function ConfigurarPanel({
               <span style={{ flex: 1 }}>{r.titulo}</span>
               <button
                 onClick={() => void excluirRetro(r.id)}
-                aria-label={`Excluir retrospectiva ${r.titulo}`}
+                aria-label={`Excluir anotação ${r.titulo}`}
                 style={{ border: "none", background: "none", cursor: "pointer", color: "var(--vermelho)", fontSize: 12 }}
               >
                 remover
@@ -484,18 +487,18 @@ export function ConfigurarPanel({
             </div>
           ))}
           <input
-            aria-label="Título da retrospectiva"
+            aria-label="Título da anotação"
             value={tituloRetro}
             onChange={(e) => setTituloRetro(e.target.value)}
-            placeholder="Título (ex.: Retro sprint 42)"
+            placeholder="Título (ex.: Sprint 42)"
             style={{ fontSize: 12, padding: "5px 8px" }}
           />
           <textarea
-            aria-label="Texto da retrospectiva"
+            aria-label="Texto da anotação"
             value={textoRetro}
             onChange={(e) => setTextoRetro(e.target.value)}
             rows={3}
-            placeholder="Cole aqui o material da retro — aprendizados, incidentes, decisões."
+            placeholder="Cole aqui o material do time — aprendizados, incidentes, decisões."
             style={{ fontSize: 12, padding: "5px 8px", resize: "vertical" }}
           />
           <button
@@ -503,7 +506,7 @@ export function ConfigurarPanel({
             disabled={!textoRetro.trim() || salvandoRetro}
             style={{ ...botaoAplicarEstilo, alignSelf: "flex-start" }}
           >
-            {salvandoRetro ? "salvando…" : "Guardar retro"}
+            {salvandoRetro ? "salvando…" : "Guardar"}
           </button>
         </div>
       </details>

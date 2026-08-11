@@ -32,8 +32,8 @@ test("Regras de refinamento: carrega o documento do servidor e mostra as seçõe
   await abrirConfig(page, /Regras de refinamento/);
 
   // O defeito real era a aba abrir VAZIA — o corpo estava atrás de um gate de
-  // modo local. Aqui se exige o conteúdo, não a ausência de branco.
-  await expect(page.getByLabel("Tecnologia")).toBeVisible();
+  // modo local. Aqui se exige o conteúdo, não a ausência de branco. (O seletor
+  // "Tecnologia" saiu — as regras agora aparecem agrupadas por componente.)
   await expect(page.getByText(/vira o conteúdo dos itens gerados/)).toBeVisible();
 
   // As seções que a pessoa alterna (checklist técnico, testes, volumetria,
@@ -69,9 +69,11 @@ test("Regras: contexto vira clique na lista conhecida — o campo de vírgula sa
 
   await page.getByRole("button", { name: /Configurações/ }).click();
   await page.getByRole("button", { name: /Regras de refinamento/ }).click();
-  await page.getByLabel("Tecnologia").selectOption("TechDeTesteE2E");
-
-  const primeiro = page.getByTestId("regra-0");
+  // Sem seletor de tecnologia: os grupos aparecem empilhados, e o do teste é
+  // localizado pelo próprio nome — `regra-0` é escopado pelo grupo porque a
+  // numeração recomeça em cada tech.
+  const grupo = page.getByTestId("regras-grupo-TechDeTesteE2E");
+  const primeiro = grupo.getByTestId("regra-0");
   await primeiro.getByRole("button", { name: /adicionar$/ }).click();
   // As opções vêm de appConfig.contextos — valor exato, sem digitação.
   await page.getByRole("option", { name: "Mobile-android" }).click();
@@ -81,8 +83,9 @@ test("Regras: contexto vira clique na lista conhecida — o campo de vírgula sa
   await page.getByRole("button", { name: "Voltar ao canvas" }).click();
   await page.getByRole("button", { name: /Configurações/ }).click();
   await page.getByRole("button", { name: /Regras de refinamento/ }).click();
-  await page.getByLabel("Tecnologia").selectOption("TechDeTesteE2E");
-  await expect(page.getByTestId("regra-0").getByRole("button", { name: "Remover contexto Mobile-android" })).toBeVisible();
+  await expect(
+    page.getByTestId("regras-grupo-TechDeTesteE2E").getByRole("button", { name: "Remover contexto Mobile-android" })
+  ).toBeVisible();
 
   // Restaura o documento como estava — regras é da organização, não do teste.
   await page.request.put(`${API}/config/regras`, { data: { documento: antes.documento } });
