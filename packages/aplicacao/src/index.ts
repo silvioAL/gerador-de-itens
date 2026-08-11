@@ -34,6 +34,17 @@ export {
 
 export { criarCasosDeUsoDeCamposNo, type CasosDeUsoDeCamposNo } from "./casos-de-uso/camposNo.js";
 
+export {
+  camposArestaEfetivos,
+  normalizarDadosCampoAresta,
+  type CampoAresta,
+  type DadosCampoAresta,
+  type RepositorioDeCamposAresta,
+  type TipoCampoAresta,
+} from "./portas/repositorioDeCamposAresta.js";
+
+export { criarCasosDeUsoDeCamposAresta, type CasosDeUsoDeCamposAresta } from "./casos-de-uso/camposAresta.js";
+
 export type {
   PerfilDeTime,
   PerfisDeTimes,

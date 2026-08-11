@@ -1,24 +1,23 @@
-import { and, eq, or } from "drizzle-orm";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { CAMPO_GLOBAL } from "@gerador/aplicacao";
+import { CAMPO_GLOBAL, criarCasosDeUsoDeCamposAresta } from "@gerador/aplicacao";
 import type { OpcoesApp } from "../app.js";
+import { criarRepositorioDeCamposArestaEmPostgres } from "../adaptadores/camposArestaEmPostgres.js";
 import { exigirTime } from "../auth/middleware.js";
 import { exigirPermissao, organizacaoPadraoDe } from "../auth/permissoes.js";
 import { registrarAuditoria } from "../auditoria.js";
-import { camposAresta } from "../db/schema.js";
 
 /**
- * SPEC-31 (paridade) — campos por tipo de conexão no modo hospedado.
+ * SPEC-31 (paridade) / #303 — campos por tipo de conexão.
  *
- * A SPEC-21 criou isto como `config/campos-aresta.json` no modo local e nunca
- * chegou aqui: nem rota, nem tabela. A divergência ficou invisível até o teste
- * de paridade (`paridade.sanity.test.ts`) comparar as duas bordas e apontar.
+ * A rota virou borda, como `camposNo`: autentica, autoriza, audita — e delega
+ * ao caso de uso. O SQL que morava aqui foi para o adaptador
+ * (`camposArestaEmPostgres`), e a cópia inline da regra de sobreposição, que a
+ * §153 apontou como "quarta cópia sem dono", morreu com ele: quem resolve o
+ * merge global × time é `camposArestaEfetivos`, na porta.
  *
  * Mesma régua de `campos-no`: leitura aberta, escrita exige o time, e o campo
- * do time vence o global de mesma (`tipoAresta`, `key`). O upsert por chave
- * natural é o mesmo aprendizado da Fase 2 — regravar um campo é correção, não
- * violação de restrição única.
+ * do time vence o global de mesma (`tipoAresta`, `key`).
  */
 const corpoCampoAresta = z.object({
   timeId: z.string().min(1).default(CAMPO_GLOBAL),
@@ -40,6 +39,8 @@ function comoTimeParaAutorizacao(timeId: string): string | null {
 }
 
 export async function registrarRotasCamposAresta(app: FastifyInstance, { db }: OpcoesApp) {
+  const casos = criarCasosDeUsoDeCamposAresta(criarRepositorioDeCamposArestaEmPostgres(db));
+
   /** SPEC-28 Fase 1b — camada de cima de `exigirTime`, igual a campos-no. O
    * time precisa chegar até a checagem, senão papel com escopo de time é
    * negado no próprio time (a lição que custou um teste vermelho lá). */
@@ -49,26 +50,13 @@ export async function registrarRotasCamposAresta(app: FastifyInstance, { db }: O
   /** O time de um campo existente — o `:id` não diz de que time é. */
   const timeDoCampo = async (req: FastifyRequest) => {
     const { id } = req.params as { id: string };
-    const [linha] = await db.select().from(camposAresta).where(eq(camposAresta.id, id));
-    return comoTimeParaAutorizacao(linha?.timeId ?? CAMPO_GLOBAL);
+    const campo = await casos.obter(id);
+    return comoTimeParaAutorizacao(campo?.timeId ?? CAMPO_GLOBAL);
   };
 
   app.get("/campos-aresta", async (req) => {
     const { timeId } = req.query as { timeId?: string };
-    const linhas = timeId
-      ? await db
-          .select()
-          .from(camposAresta)
-          .where(or(eq(camposAresta.timeId, CAMPO_GLOBAL), eq(camposAresta.timeId, timeId)))
-      : await db.select().from(camposAresta).where(eq(camposAresta.timeId, CAMPO_GLOBAL));
-
-    // Mesma regra de sobreposição de `camposEfetivos` (campos-no), aplicada à
-    // chave desta tabela.
-    const porChave = new Map<string, (typeof linhas)[number]>();
-    for (const linha of [...linhas].sort((a, b) => (a.timeId === CAMPO_GLOBAL ? -1 : 1))) {
-      porChave.set(`${linha.tipoAresta}::${linha.key}`, linha);
-    }
-    return [...porChave.values()].sort((a, b) => a.ordem - b.ordem);
+    return casos.listarEfetivos(timeId);
   });
 
   app.post(
@@ -83,14 +71,7 @@ export async function registrarRotasCamposAresta(app: FastifyInstance, { db }: O
       const corpo = corpoCampoAresta.safeParse(req.body);
       if (!corpo.success) return reply.code(400).send({ erro: corpo.error.flatten() });
 
-      const [salvo] = await db
-        .insert(camposAresta)
-        .values(corpo.data)
-        .onConflictDoUpdate({
-          target: [camposAresta.timeId, camposAresta.tipoAresta, camposAresta.key],
-          set: { ...corpo.data, atualizadoEm: new Date() },
-        })
-        .returning();
+      const salvo = await casos.salvar(corpo.data);
       registrarAuditoria(db, { email: req.usuario!.email, acao: "criar", recurso: "campos_aresta", recursoId: salvo.id });
       return reply.code(201).send(salvo);
     }
@@ -109,11 +90,7 @@ export async function registrarRotasCamposAresta(app: FastifyInstance, { db }: O
       const corpo = corpoAtualizar.safeParse(req.body);
       if (!corpo.success) return reply.code(400).send({ erro: corpo.error.flatten() });
 
-      const [atualizado] = await db
-        .update(camposAresta)
-        .set({ ...corpo.data, atualizadoEm: new Date() })
-        .where(eq(camposAresta.id, id))
-        .returning();
+      const atualizado = await casos.atualizar(id, corpo.data);
       if (!atualizado) return reply.code(404).send({ erro: "campo não encontrado" });
       registrarAuditoria(db, { email: req.usuario!.email, acao: "atualizar", recurso: "campos_aresta", recursoId: id });
       return atualizado;
@@ -130,8 +107,7 @@ export async function registrarRotasCamposAresta(app: FastifyInstance, { db }: O
     },
     async (req, reply) => {
       const { id } = req.params as { id: string };
-      const [excluido] = await db.delete(camposAresta).where(and(eq(camposAresta.id, id))).returning();
-      if (!excluido) return reply.code(404).send({ erro: "campo não encontrado" });
+      if (!(await casos.excluir(id))) return reply.code(404).send({ erro: "campo não encontrado" });
       registrarAuditoria(db, { email: req.usuario!.email, acao: "excluir", recurso: "campos_aresta", recursoId: id });
       return reply.code(204).send();
     }
