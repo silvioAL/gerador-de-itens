@@ -4129,3 +4129,32 @@ Duas mordidas provadas, uma por camada: sem o `pode("editar")` no POST, o
 teste do feito-quando (403 com RBAC ativo) fica vermelho; salvando só a seção
 nova, o teste de preservação fica vermelho. 137 no server, 357 no web, 38/38
 no navegador.
+
+## 164. campos-aresta ganha a porta que a §5 esqueceu de listar (#303)
+
+O item nasceu na revisão do #295 como "o irmão gêmeo de campos-no que ficou de
+fora da SPEC-31 por omissão de uma linha na tabela", e foi reescopado pela
+§153: com o modo local removido, não há dois adaptadores para unificar — é
+tirar SQL de dentro de `routes/camposAresta.ts`. Feito exatamente na ordem que
+o padrão de campos-no ensina: porta (com `camposArestaEfetivos` e a
+normalização), caso de uso, adaptador Postgres — e a rota virou borda:
+autentica, autoriza, audita, delega.
+
+Duas coisas morreram junto com o SQL na rota. A **cópia inline da regra de
+sobreposição** no GET — a "quarta cópia sem dono" que a §153 tinha tirado do
+repositório quando o esqueleto do #303 entrou por engano num `git add -A`;
+agora ela volta como a ÚNICA cópia, na porta, com dono e contrato. E o **500
+para id fora do formato uuid** no PUT/DELETE: o adaptador responde ausência
+(404 na borda) como o contrato manda, igual campos-no.
+
+A suíte de contrato existe mesmo com um adaptador só — foi a ausência dela que
+deixou campos-aresta invisível para a SPEC-31. Oito casos, rodando contra
+Postgres de verdade, e a mordida provada no defeito histórico exato: trocando
+o upsert por insert puro, "salvar a MESMA chave natural corrige, não duplica"
+fica vermelho — o mesmo 500 que motivou a suíte de campos-no.
+
+E um flake para o caderno: o teste de anexar print falhou uma vez na suíte
+completa ("anexar-imagem" não visível em 5s) e passou isolado, no arquivo e na
+suíte seguinte. Segunda aparição intermitente no mesmo arquivo hoje (a
+primeira foi a voz) — se aparecer de novo, a rodada é sobre o /ia/status na
+montagem do painel, não sobre quem estiver mexendo no código naquele dia.
