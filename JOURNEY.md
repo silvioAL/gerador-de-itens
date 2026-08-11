@@ -4028,8 +4028,11 @@ mais.
 **Pra menos: a sugestão estruturada já existe no hospedado.** Eu teria jurado
 que `/ia/sugerir-config` tinha morrido com o `openApiLocal.ts` da CLI — mas a
 migração hexagonal levou a tabela `ALVOS_SUGESTAO_CONFIG` para
-`packages/aplicacao` e a rota está viva em `routes/ia.ts`, com os quatro
-alvos. O #297 não é "construir a sugestão de config"; é construir a CONVERSA
+`packages/aplicacao` e a rota está viva em `routes/ia.ts` — e com SEIS alvos,
+não os três da SPEC-23 §6.6: `item-processo` e `teste-automatizado` entraram
+em rodadas que eu nem lembrava. Verificar o que se afirma, de novo: eu escrevi
+"quatro alvos" nesta SPEC de memória e a tabela real me corrigiu.
+O #297 não é "construir a sugestão de config"; é construir a CONVERSA
 por cima dela: intenção → alvo → proposta → approve. O que o usuário pediu no
 §83, aliás, era exatamente isso — "melhor do que aqueles botões de sugerir".
 

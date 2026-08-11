@@ -26,8 +26,9 @@ declarado onde esta conversa nasce.
 1. **A sugestão estruturada JÁ EXISTE no hospedado.** `POST /ia/sugerir-config`
    está em `packages/server/src/routes/ia.ts` e a tabela declarativa
    `ALVOS_SUGESTAO_CONFIG` mora em
-   `packages/aplicacao/src/casos-de-uso/ia/pedidos.ts` (alvos: `campo-no`,
-   `campo-aresta`, `papel`, `regra-refinamento`). O #297 **não** é "construir a
+   `packages/aplicacao/src/casos-de-uso/ia/pedidos.ts` (seis alvos: `campo-no`,
+   `campo-aresta`, `regra-refinamento`, `item-processo`, `teste-automatizado`,
+   `papel`). O #297 **não** é "construir a
    sugestão de config" — é construir a conversa por cima dela: intenção →
    alvo(s) → proposta → approve.
 2. **`retrospectivas` está em `RECURSOS_SEM_ROTA`**
@@ -139,7 +140,7 @@ motivo: condição induz erro silencioso).
   outra fase do trabalho, outro material. Esta SPEC não a adianta nem a bloqueia.
 - **Escrever config sem clique** — nem com "modo confiante". A fronteira do
   §41/SPEC-23 §6.6 não tem exceção.
-- **Alvos novos** além dos quatro existentes: cada um é uma entrada na tabela
+- **Alvos novos** além dos seis existentes: cada um é uma entrada na tabela
   em rodada própria, com schema e regras de preenchimento medidos.
 
 ## 6. Verificação
