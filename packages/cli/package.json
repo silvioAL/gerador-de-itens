@@ -1,8 +1,9 @@
 {
   "name": "gerador-de-itens",
   "version": "0.1.75",
+  "author": "Silvio Allgayer Trindade <silvioaltr@gmail.com> (https://github.com/silvioAL)",
+  "license": "Apache-2.0",
   "description": "Quebra técnica derivada deterministicamente de um diagrama de arquitetura — CLI local, sem servidor.",
-  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/silvioAL/gerador-de-itens.git",
@@ -17,7 +18,9 @@
   "files": [
     "dist",
     "templates",
-    "web-dist"
+    "web-dist",
+    "LICENSE",
+    "NOTICE"
   ],
   "keywords": [
     "architecture-diagram",

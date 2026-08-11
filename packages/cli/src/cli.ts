@@ -5,6 +5,13 @@ import { importGraphify } from "./commands/importGraphify.js";
 import { implementar } from "./commands/implementar.js";
 import { ia } from "./commands/ia.js";
 
+/** Injetados pelo tsup no build (ver tsup.config.ts). Os `declare` existem
+ * porque o TypeScript não conhece as constantes que o bundler substitui. */
+declare const __VERSAO__: string;
+declare const __AUTOR__: string;
+declare const __LICENCA__: string;
+declare const __REPOSITORIO__: string;
+
 const AJUDA = `Uso: gerador <comando> [opções]
 
 Comandos:
@@ -24,6 +31,7 @@ Comandos:
     --origem huggingface   Forca o Hugging Face (o padrao e o release do GitHub)
   ia diagnosticar           Testa a rede ate o modelo e diz a causa real de uma falha
   ia status                 Mostra se a IA local está instalada e pronta pra uso
+  --version                 Versão, autoria e licença
 `;
 
 async function main(): Promise<void> {
@@ -47,6 +55,18 @@ async function main(): Promise<void> {
       return;
     case "ia":
       await ia(resto);
+      return;
+    case "--version":
+    case "-v":
+    case "version":
+      console.log(
+        [
+          `gerador-de-itens ${__VERSAO__}`,
+          `Autor: ${__AUTOR__}`,
+          `Licença: ${__LICENCA__} — a atribuição ao autor deve ser preservada (ver NOTICE)`,
+          __REPOSITORIO__,
+        ].join("\n")
+      );
       return;
     case "help":
     case "--help":

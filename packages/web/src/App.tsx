@@ -490,7 +490,16 @@ function AppCarregado({
           background: "var(--painel)",
         }}
       >
-        <strong style={{ fontSize: 14, color: "var(--texto)" }}>Gerador de Itens</strong>
+        {/* A autoria fica no título, não num rodapé: rodapé de app de tela
+            cheia é o lugar onde nada é lido. `title` em vez de texto visível
+            porque o cabeçalho é estreito — mas o dado viaja no HTML, e é o que
+            sobrevive a alguém copiar a pasta e chamar de seu. */}
+        <strong
+          title="Gerador de Itens — Silvio Allgayer Trindade (Apache-2.0). github.com/silvioAL/gerador-de-itens"
+          style={{ fontSize: 14, color: "var(--texto)" }}
+        >
+          Gerador de Itens
+        </strong>
         {versao && (
           <span
             title="Versão do pacote gerador-de-itens instalado — mesma versão da tag no GitHub"

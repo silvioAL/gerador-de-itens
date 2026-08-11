@@ -4,6 +4,18 @@ Ferramenta de quebra técnica: desenhe um diagrama de arquitetura (serviços, fi
 
 Não é um gerador de prompt de IA. O mesmo diagrama sempre produz os mesmos itens.
 
+---
+
+**Autor:** Silvio Allgayer Trindade — <https://github.com/silvioAL>
+**Licença:** Apache-2.0 (ver [LICENSE](LICENSE) e [NOTICE](NOTICE))
+
+A Apache-2.0 permite uso, modificação e uso comercial. Exige, em contrapartida,
+que a **atribuição ao autor seja preservada**: mantenha o `NOTICE` nas cópias e
+marque as modificações que fizer. O direito de ser reconhecido como autor do
+programa é, além disso, garantido pela Lei 9.609/98 e é irrenunciável.
+
+---
+
 ## Início rápido
 
 O caminho padrão é o CLI local — instala com um comando, sem servidor, sem login (SPEC-17). Além de mais simples, isso evita depender de um domínio novo hospedado (VM+DNS próprio) que times corporativos costumam bloquear até serem categorizados/liberados no firewall — o CLI local não sai do `localhost`, só `npm install` contra `registry.npmjs.org` (já confiável na maioria dos ambientes). Docker/login real continuam existindo (modo hospedado, pra quem já usa esse caminho e não tem essa restrição), mas deixaram de ser o recomendado por padrão.

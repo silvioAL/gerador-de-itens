@@ -1,4 +1,5 @@
 import { defineConfig } from "tsup";
+import pacote from "./package.json" with { type: "json" };
 
 export default defineConfig({
   entry: ["src/cli.ts"],
@@ -22,4 +23,17 @@ export default defineConfig({
   // problema. Como `node-llama-cpp`, ele precisa continuar em node_modules de
   // verdade — e por isso mora em "dependencies" de packages/cli.
   external: ["undici"],
+  /**
+   * `gerador --version` precisa saber a versão e a autoria DEPOIS de instalado
+   * globalmente, onde `npm_package_version` não existe e o `package.json` não é
+   * resolvível a partir do bundle. Injetar no build é o único jeito de a
+   * atribuição viajar junto com o binário — que é o ponto: quem copia a pasta
+   * leva o crédito junto, e removê-lo passa a ser edição deliberada.
+   */
+  define: {
+    __VERSAO__: JSON.stringify(pacote.version),
+    __AUTOR__: JSON.stringify(pacote.author),
+    __LICENCA__: JSON.stringify(pacote.license),
+    __REPOSITORIO__: JSON.stringify(pacote.homepage),
+  },
 });
