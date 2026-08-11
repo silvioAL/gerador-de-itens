@@ -3463,3 +3463,38 @@ banco que só cobria o vitest.
 
 A pergunta que teria evitado as três: *quantos caminhos chegam aqui?*
 
+## 146. O preset sabia que não transcreve, e não dizia onde transcrever (#291)
+
+Sequência do §141. Com a IA já respondendo pelo gateway da Anthropic, o usuário
+testou o microfone e levou:
+
+> Este endereço não tem transcrição de áudio (HTTP 404).
+
+A mensagem está certa e a causa é estrutural: nenhum preset de chat-only
+(Anthropic, DeepSeek) traz `baseUrlTranscricao`, então a transcrição ia para o
+endereço do CHAT. E os presets estão certos em não trazer — esses provedores
+realmente não transcrevem.
+
+O que faltava é que **a própria stack tem um Whisper**, no mesmo compose, com
+endereço fixo e conhecido (`whisper:9000` de dentro, `localhost:9000` de fora).
+A informação existia no repositório inteiro — nos presets do Ollama, no
+`docker-compose.yml` — e não chegava a quem escolhia Anthropic.
+
+Agora `presetsDoModo` preenche a voz com o Whisper do modo quando o preset não
+traz um próprio. Sugerir, não impor: o campo continua editável.
+
+### A contrapartida, assumida em vez de escondida
+
+Quem sobe o hospedado **sem** o profile `ia` não tem Whisper, e o valor sugerido
+aponta para um host inexistente. Vale mesmo assim, e a razão é sobre qual erro
+ensina mais: "conexão recusada em whisper" nomeia o passo que falta
+(`docker compose --profile ia up -d`); um 404 na API de chat não explica nada.
+
+### O teste que não é óbvio
+
+Além de conferir que o chat-only recebe o endereço, há um que afirma que **quem
+já traz o seu não é sobrescrito**. Hoje daria no mesmo por acaso — os presets do
+Ollama apontam justamente para esses endereços. Quebraria no dia em que um
+preset trouxesse um serviço de voz diferente, que é exatamente quando ninguém
+está olhando.
+

@@ -47,6 +47,16 @@ export interface PresetGateway {
   modos?: ("local" | "hospedado")[];
 }
 
+/**
+ * O serviço de voz que a própria stack traz (`whisper` no docker-compose).
+ * Endereço fixo por modo: de dentro do compose o host é o nome do serviço; de
+ * fora, `localhost` na porta publicada.
+ */
+export const WHISPER_DO_MODO: Record<"local" | "hospedado", string> = {
+  local: "http://localhost:9000/v1",
+  hospedado: "http://whisper:9000/v1",
+};
+
 export const PRESETS_GATEWAY: PresetGateway[] = [
   {
     id: "anthropic",
@@ -80,7 +90,7 @@ export const PRESETS_GATEWAY: PresetGateway[] = [
     baseUrl: "http://localhost:11434/v1",
     // Mesmo motivo do preset de baixo; no modo local o Whisper do compose é
     // alcançável pela porta publicada.
-    baseUrlTranscricao: "http://localhost:9000/v1",
+    baseUrlTranscricao: WHISPER_DO_MODO.local,
     // `qwen2.5`, não `qwen3`: ver a observação do preset de baixo — a diferença
     // é de minutos para segundos, medida contra esta stack.
     modelos: ["qwen2.5:7b", "qwen2.5:3b", "llama3.1:8b", "qwen2.5vl:7b"],
@@ -102,7 +112,7 @@ export const PRESETS_GATEWAY: PresetGateway[] = [
     baseUrl: "http://ollama:11434/v1",
     // O Ollama NÃO transcreve — a voz vai pro serviço `whisper` do mesmo
     // compose. Sem isto, o botão de falar apareceria e morreria em 404.
-    baseUrlTranscricao: "http://whisper:9000/v1",
+    baseUrlTranscricao: WHISPER_DO_MODO.hospedado,
     /**
      * `qwen2.5`, NÃO `qwen3` — medido contra esta stack, em CPU:
      *
@@ -140,8 +150,29 @@ export const PRESETS_GATEWAY: PresetGateway[] = [
  * Preset sem `modos` aparece nos dois: um endereço na internet (Anthropic,
  * DeepSeek) é o mesmo endereço de qualquer lugar.
  */
+/**
+ * ACHADO REAL: o usuário escolheu o preset da Anthropic, salvou, e ao testar o
+ * microfone levou "Este endereço não tem transcrição de áudio (HTTP 404)" — a
+ * voz tinha ido para o endereço do CHAT.
+ *
+ * Nenhum preset de chat-only (Anthropic, DeepSeek) traz `baseUrlTranscricao`, e
+ * isso está certo: esses provedores não transcrevem. Só que a stack TEM um
+ * Whisper ali do lado, no mesmo compose, com endereço conhecido e fixo — e a
+ * pessoa não tem como adivinhar isso.
+ *
+ * Então o preset passa a SUGERIR o Whisper do modo quando não traz um próprio.
+ * Sugerir, não impor: o campo continua editável.
+ *
+ * Contrapartida assumida: quem sobe o hospedado SEM o profile `ia` não tem
+ * Whisper, e o valor sugerido aponta para um host inexistente. Vale mesmo
+ * assim — "conexão recusada em whisper" nomeia o passo que falta
+ * (`docker compose --profile ia up -d`), enquanto o 404 na API de chat não
+ * explica nada.
+ */
 export function presetsDoModo(modo: "local" | "hospedado"): PresetGateway[] {
-  return PRESETS_GATEWAY.filter((p) => !p.modos || p.modos.includes(modo));
+  return PRESETS_GATEWAY.filter((p) => !p.modos || p.modos.includes(modo)).map((p) =>
+    p.baseUrlTranscricao ? p : { ...p, baseUrlTranscricao: WHISPER_DO_MODO[modo] }
+  );
 }
 
 export function presetGatewayPorId(id: string): PresetGateway | undefined {
