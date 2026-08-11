@@ -3623,3 +3623,53 @@ mecânica que já funcionou no RBAC. Agregados, eventos de domínio e CQRS
 continuam fora — nenhum dos 19 defeitos foi invariante de domínio violada, e
 adotar cerimônia para resolver um problema que não se manifestou é como comprar
 a apólice do sinistro que não aconteceu enquanto o telhado com goteira é outro.
+
+## 150. O prompt estava lá; o campo é que estava em branco (#296)
+
+O usuário mandou junto com um print: *"não consigo ver o conteúdo atual dos
+prompts nessa parte dedicada a edição, deveriam estar disponíveis para edição,
+os locais das variáveis também parecem não aparecer"*.
+
+São dois defeitos numa frase só, e eu quase tratei como um.
+
+**O primeiro: o campo mentia por omissão.** A aba tinha
+`value={p.preambulo ?? ""}` — vazio pra todo papel não personalizado. Só que
+`preambulo` ausente na config nunca significou "sem prompt": significa
+*herda*. Na hora do pedido, `preambuloDoPapel` resolve pro padrão do grupo, e
+o padrão do PO tem quinze linhas cuidadosamente escritas, incluindo a regra
+sobre persona que nasceu de um achado do próprio usuário. Nada disso chegava à
+tela, porque `PREAMBULO_PADRAO_POR_PAPEL` era `const` de módulo. A pessoa via
+uma caixa em branco chamada "Prompt do papel" e concluía, com razão, que não
+havia prompt nenhum.
+
+É a irmã gêmea da §147: um valor herdado exibido como ausência. Lá era o
+contador `(0)`; aqui é o campo vazio. Nos dois casos a tela mostrou o **delta**
+e chamou de **total**.
+
+**O segundo: o preâmbulo é só a cabeça.** Tudo o mais — épico, instrução do
+lote, bloco por item, contexto dos nós, o que os papéis anteriores definiram,
+os campos a responder — é montado por `montarPedidoPipeline` e era invisível.
+Quem configura a esteira não tinha como saber onde entra o que preenche no
+canvas. Não existem `{{variáveis}}` aqui como no template de especificação; a
+pergunta do usuário sobre "os locais das variáveis" era sobre algo que
+genuinamente não tinha representação nenhuma.
+
+A resposta foi `ANATOMIA_DO_PROMPT_PIPELINE`: cada parte com rótulo, origem
+(*você configura* / *vem da quebra* / *fixo do produto*) e onde se mexe nela.
+Mora ao lado da função que monta, não numa lista à parte na UI — e
+`pedidos.anatomia.test.ts` monta um prompt de verdade e exige que todo marcador
+declarado apareça nele. Mudar a montagem sem mudar a tabela quebra o build. Sem
+isso, a explicação vira a próxima coisa a envelhecer em silêncio.
+
+**Herdado continua herdado.** O texto aparece em leitura e só vira campo
+editável depois de um clique explícito. Salvar uma cópia do padrão sem querer
+congelaria o papel numa versão que não acompanha as melhorias do produto — e
+como esses preâmbulos já foram corrigidos duas vezes por achado do usuário, é
+uma armadilha com histórico.
+
+**E o teste achou um defeito no meu próprio desenho.** Eu tinha derivado
+"mostrando editor" de `preambulo` não-vazio. Parecia limpo. O caso do agente
+custom falhou: `clear()` seguido de `type()` não gravava nada — porque esvaziar
+o campo desmontava o editor no meio da digitação, e é exatamente o que alguém
+faz pra reescrever do zero. O estado "estou editando" é do usuário, não do
+texto. Virou um `Set` explícito, que só o botão de voltar ao padrão encerra.

@@ -171,7 +171,15 @@ const ALVOS_SUGESTAO_CONFIG: Record<string, AlvoSugestaoConfig> = {
   },
 };
 
-const PREAMBULO_PADRAO_POR_PAPEL: Record<string, string> = {
+/**
+ * ACHADO REAL do usuário (#296): *"não consigo ver o conteúdo atual dos prompts
+ * nessa parte dedicada a edição"*. Estes preâmbulos eram `const` de módulo —
+ * o campo da tela nascia VAZIO em todo papel não personalizado, e o texto que
+ * de fato ia pro modelo não tinha como chegar à UI. Exportados de propósito:
+ * é o mesmo padrão de `VARIAVEIS_ESPECIFICACAO`, que a aba de especificação já
+ * importa pra mostrar o que existe.
+ */
+export const PREAMBULO_PADRAO_POR_PAPEL: Record<string, string> = {
   po: [
     `Você é o Product Owner num time de desenvolvimento de software.`,
     `Pra história de usuário: escreva no formato "Como <persona>, quero <capacidade>, para <benefício>",`,
@@ -217,8 +225,78 @@ const PREAMBULO_PADRAO_POR_PAPEL: Record<string, string> = {
     `— não repita cenários óbvios de erro genérico.`,
   ].join(" "),
 };
-const PREAMBULO_GENERICO =
+export const PREAMBULO_GENERICO =
   `Você ajuda a especificar tecnicamente um item de trabalho de software.`;
+
+/**
+ * A ANATOMIA do prompt do lote — a segunda metade do #296: *"os locais das
+ * variáveis também parecem não aparecer"*.
+ *
+ * O preâmbulo é só a CABEÇA do que sai. Tudo o mais — épico, blocos por item,
+ * contexto dos nós, respostas dos papéis anteriores, campos a responder — é
+ * montado em `montarPedidoPipeline` e era invisível: quem configurava a esteira
+ * não tinha como saber onde o que ele preenche no canvas entra.
+ *
+ * Mora AQUI, ao lado da função que monta, e não numa lista à parte na UI, por
+ * um motivo específico: `pedidos.anatomia.test.ts` monta um pedido de verdade e
+ * exige que todo `marcador` apareça nele. Mudar a montagem sem mudar esta
+ * tabela quebra o build — que é a única forma de a explicação não envelhecer.
+ */
+export type OrigemDaParte = "configuravel" | "da-quebra" | "fixo";
+
+export interface ParteDoPromptPipeline {
+  id: string;
+  rotulo: string;
+  origem: OrigemDaParte;
+  /** Onde a pessoa mexe nisso — vazio quando é fixo. */
+  ondeSeEdita?: string;
+  /** Trecho literal do prompt montado. É o que o teste de anti-desvio ancora. */
+  marcador: string;
+}
+
+export const ANATOMIA_DO_PROMPT_PIPELINE: ParteDoPromptPipeline[] = [
+  {
+    id: "preambulo",
+    rotulo: "Preâmbulo do papel",
+    origem: "configuravel",
+    ondeSeEdita: "aqui nesta aba, no campo de prompt de cada papel",
+    marcador: PREAMBULO_GENERICO,
+  },
+  {
+    id: "epico",
+    rotulo: "Contexto geral da demanda/épico",
+    origem: "da-quebra",
+    ondeSeEdita: 'botão "Contexto do épico", no topo da tela do diagrama',
+    marcador: "Contexto geral da demanda/épico:",
+  },
+  {
+    id: "instrucao-lote",
+    rotulo: "Instrução do lote",
+    origem: "fixo",
+    marcador: "Você vai responder um LOTE de",
+  },
+  {
+    id: "contexto-no",
+    rotulo: "Contexto dos nós de arquitetura",
+    origem: "da-quebra",
+    ondeSeEdita: "os campos que você preenche em cada componente do diagrama",
+    marcador: "Contexto do(s) nó(s) de arquitetura envolvidos:",
+  },
+  {
+    id: "respostas-anteriores",
+    rotulo: "O que os papéis anteriores já definiram",
+    origem: "da-quebra",
+    ondeSeEdita: "a ordem dos papéis nesta aba decide quem vê o quê",
+    marcador: "O que os papéis anteriores já definiram pra este item",
+  },
+  {
+    id: "campos",
+    rotulo: "Campos a responder",
+    origem: "da-quebra",
+    ondeSeEdita: 'aba "Regras" (checklist técnico, testes, volumetria) e os padrões por componente',
+    marcador: "Campos a responder (responda pela chave entre aspas):",
+  },
+];
 
 // --- Os quatro pedidos ------------------------------------------------------
 //
