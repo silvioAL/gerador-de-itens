@@ -65,11 +65,6 @@ function contarPipeline(documento: unknown): ResumoConfig {
   };
 }
 
-function contarPromptUnico(documento: unknown): ResumoConfig {
-  const conteudo = typeof documento === "string" ? documento : ((documento as { conteudo?: string } | null)?.conteudo ?? "");
-  return { caracteres: conteudo.length };
-}
-
 /** O resumo comparável de um documento, por chave. */
 export function resumirConfig(chave: ChaveConfig, documento: unknown): ResumoConfig {
   switch (chave) {
@@ -77,8 +72,6 @@ export function resumirConfig(chave: ChaveConfig, documento: unknown): ResumoCon
       return contarRegras(documento);
     case "pipeline-agentes":
       return contarPipeline(documento);
-    case "prompt-unico":
-      return contarPromptUnico(documento);
   }
 }
 

@@ -5,10 +5,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync, readFileSync } from "node:fs";
 import {
-  TEMPLATE_ESPECIFICACAO_PADRAO,
-  TEMPLATE_PROMPT_UNICO_PADRAO,
-  VARIAVEIS_PROMPT_UNICO,
-  validarTemplatePromptUnico,
+  TEMPLATE_ESPECIFICACAO_PADRAO,
   type PerfisConfig,
   type Quebra,
 } from "@gerador/engine";
@@ -393,38 +390,6 @@ async function tratarEspecificacaoTemplate(req: IncomingMessage, res: ServerResp
 // alto e silencioso: um `{{tipoErrado}}` só apareceria como texto cru no meio
 // do prompt já colado no chat da empresa.
 
-async function tratarPromptUnicoTemplate(
-  req: IncomingMessage,
-  res: ServerResponse,
-  metodo: string,
-  dirProjeto: string
-): Promise<void> {
-  const arquivo = resolve(dirProjeto, "config", "prompt-unico-template.md");
-
-  if (metodo === "GET") {
-    const conteudo = await readFile(arquivo, "utf-8").catch(() => TEMPLATE_PROMPT_UNICO_PADRAO);
-    return enviarJson(res, 200, { conteudo, variaveis: VARIAVEIS_PROMPT_UNICO });
-  }
-
-  if (metodo === "PUT") {
-    const { conteudo } = await lerCorpoJson<{ conteudo: string }>(req);
-    if (typeof conteudo !== "string") {
-      return enviarJson(res, 400, { erro: "conteudo é obrigatório" });
-    }
-    const desconhecidas = validarTemplatePromptUnico(conteudo);
-    if (desconhecidas.length > 0) {
-      return enviarJson(res, 400, {
-        erro: `variáveis desconhecidas: ${desconhecidas.join(", ")}`,
-        variaveis: VARIAVEIS_PROMPT_UNICO,
-      });
-    }
-    await mkdir(resolve(dirProjeto, "config"), { recursive: true });
-    await writeFile(arquivo, conteudo, "utf-8");
-    return enviarJson(res, 200, { conteudo, variaveis: VARIAVEIS_PROMPT_UNICO });
-  }
-
-  enviarJson(res, 404, { erro: "não encontrado" });
-}
 
 // --- GET/PUT /config/pipeline-agentes — SPEC-24 Fase E: se a esteira pausa
 // pra confirmação manual campo a campo (`confirmacaoObrigatoria: true`,
@@ -1142,10 +1107,6 @@ export async function tratarApiLocal(req: IncomingMessage, res: ServerResponse, 
   }
   if (caminho === "/especificacao-template") {
     await tratarEspecificacaoTemplate(req, res, metodo, dirProjeto);
-    return true;
-  }
-  if (caminho === "/prompt-unico-template") {
-    await tratarPromptUnicoTemplate(req, res, metodo, dirProjeto);
     return true;
   }
   if (caminho.startsWith("/times") || caminho.startsWith("/convites")) {

@@ -33,7 +33,6 @@ export const RECURSOS = [
   "regras.testes",
   "regras.volumetria",
   "especificacao-template",
-  "prompt-unico-template",
   "pipeline-agentes",
   "modelo-ia",
   "credenciais-ia",

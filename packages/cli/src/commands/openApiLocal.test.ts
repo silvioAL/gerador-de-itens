@@ -1150,34 +1150,6 @@ describe("openApiLocal (SPEC-17 — API mínima sem login/servidor pro gerador o
   });
 });
 
-describe("SPEC-25 §5.5 / Fase 2.1 — template do prompt único", () => {
-  it("sem arquivo no projeto, devolve o padrão do engine e as variáveis disponíveis", async () => {
-    const corpo = await fetch(`${base}/prompt-unico-template`).then(corpoDe);
-    expect(corpo.conteudo).toContain("{{itensBreakDownContent}}");
-    expect(corpo.variaveis).toContain("descricaoEpico");
-  });
-
-  it("PUT grava em config/ e o GET seguinte devolve o que foi gravado", async () => {
-    const conteudo = "MEU PROMPT\n{{descricaoEpico}}\n{{itensBreakDownContent}}";
-    const put = await fetch(`${base}/prompt-unico-template`, { method: "PUT", body: JSON.stringify({ conteudo }) });
-    expect(put.status).toBe(200);
-
-    expect(readFileSync(join(dirTemp, "config", "prompt-unico-template.md"), "utf-8")).toBe(conteudo);
-    expect((await fetch(`${base}/prompt-unico-template`).then(corpoDe)).conteudo).toBe(conteudo);
-  });
-
-  it("variável inventada é 400 — senão viraria texto cru no prompt já colado no chat", async () => {
-    const resposta = await fetch(`${base}/prompt-unico-template`, {
-      method: "PUT",
-      body: JSON.stringify({ conteudo: "{{descricaoEpico}} {{naoExisteEssa}}" }),
-    });
-    expect(resposta.status).toBe(400);
-    const corpo = (await corpoDe(resposta)) as Record<string, unknown>;
-    expect(corpo.erro).toContain("naoExisteEssa");
-    // E não gravou nada: template inválido não pode substituir um que funciona.
-    expect(existsSync(join(dirTemp, "config", "prompt-unico-template.md"))).toBe(false);
-  });
-});
 
 describe("SPEC-25 Fase 2 — credencial do gateway", () => {
   /** Um gateway compatível com OpenAI de mentira, mas HTTP de verdade. */

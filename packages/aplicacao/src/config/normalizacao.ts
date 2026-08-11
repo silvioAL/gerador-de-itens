@@ -101,7 +101,5 @@ export function normalizarDocumentoConfig(chave: ChaveConfig, documento: unknown
       return normalizarRegras(documento);
     case "pipeline-agentes":
       return normalizarPipelineAgentes(documento);
-    case "prompt-unico":
-      return documento;
   }
 }
