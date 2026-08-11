@@ -4017,3 +4017,32 @@ o × interno e o botão flutuante teriam ambos `aria-label="Fechar assistente"`
 — ambíguo pra leitor de tela e pra qualquer seletor. O botão ficou com rótulo
 fixo "Assistente" + `aria-expanded`, que é o padrão correto pra um gatilho de
 painel.
+
+## 161. A SPEC do configurar conversando — e a medição que encolheu o item (#297)
+
+O #297 é mudança global (rota nova de IA, tabela nova, recurso de RBAC saindo
+de `RECURSOS_SEM_ROTA`), então SPEC antes de código. Escrever a SPEC-34 com as
+medições na mão mudou o tamanho do item duas vezes — uma pra menos, uma pra
+mais.
+
+**Pra menos: a sugestão estruturada já existe no hospedado.** Eu teria jurado
+que `/ia/sugerir-config` tinha morrido com o `openApiLocal.ts` da CLI — mas a
+migração hexagonal levou a tabela `ALVOS_SUGESTAO_CONFIG` para
+`packages/aplicacao` e a rota está viva em `routes/ia.ts`, com os quatro
+alvos. O #297 não é "construir a sugestão de config"; é construir a CONVERSA
+por cima dela: intenção → alvo → proposta → approve. O que o usuário pediu no
+§83, aliás, era exatamente isso — "melhor do que aqueles botões de sugerir".
+
+**Pra mais: as retrospectivas são do zero de verdade.** O comentário assinado
+em `RECURSOS_SEM_ROTA` confirma: a ingestão do fluxo 5 nunca existiu no
+hospedado. Mas a SPEC corta o RAG da v1 com a régua que a SPEC-23 §4 já tinha
+usado — corpus de um time não justifica vetor; v1 nem embeddings tem, retro
+entra como contexto do prompt e toda proposta nascida dela cita o trecho. A
+Fase 3 registra a busca vetorial como "fora por enquanto" nomeadamente, pra
+ninguém completar o RAG por zelo.
+
+As decisões que a SPEC herda sem reabrir: a IA propõe e a rota existente
+recebe (SPEC-23 §6.6), o agente não escreve (SPEC-26 Bloco 5), nada no caminho
+crítico exige modelo forte (§84). E a que o #298 preparou: a conversa nasce
+como terceira entrada em `ABAS`, não como overlay novo — que era o motivo de o
+invólucro vir antes na fila.
