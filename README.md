@@ -16,6 +16,21 @@ programa é, além disso, garantido pela Lei 9.609/98 e é irrenunciável.
 
 ---
 
+## Testes de ponta a ponta
+
+A suíte E2E (Playwright) usa uma **stack própria**, nunca o banco de
+desenvolvimento:
+
+```bash
+npm run e2e          # sobe, roda e derruba
+# ou, separado:
+npm run e2e:up && npm run test:e2e -w packages/web && npm run e2e:down
+```
+
+O banco vive em `localhost:5433/gerador_e2e_test`, sem volume. Apontar a suíte
+para um banco cujo nome não termine em `_test` faz o `globalSetup` recusar
+rodar — ela trunca tabelas, e já apagou dados de ambiente em uso uma vez.
+
 ## Início rápido
 
 O caminho padrão é o CLI local — instala com um comando, sem servidor, sem login (SPEC-17). Além de mais simples, isso evita depender de um domínio novo hospedado (VM+DNS próprio) que times corporativos costumam bloquear até serem categorizados/liberados no firewall — o CLI local não sai do `localhost`, só `npm install` contra `registry.npmjs.org` (já confiável na maioria dos ambientes). Docker/login real continuam existindo (modo hospedado, pra quem já usa esse caminho e não tem essa restrição), mas deixaram de ser o recomendado por padrão.

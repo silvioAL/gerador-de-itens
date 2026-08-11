@@ -1,4 +1,8 @@
 import { Client } from "pg";
+// Caminho relativo, e não uma cópia: a regra de "banco descartável" precisa ser
+// UMA só. Duplicá-la aqui é exatamente o tipo de coisa que deixou o Playwright
+// de fora da trava original.
+import { exigirBancoDescartavel } from "../../server/src/test-support/bancoDeTeste.js";
 
 /**
  * Limpa o banco antes da suíte E2E e reaplica o mesmo seed da migração inicial
@@ -10,7 +14,10 @@ import { Client } from "pg";
  * como um dos usuários já seedados.
  */
 export default async function globalSetup() {
-  const url = process.env.DATABASE_URL ?? "postgres://gerador:gerador@localhost:5432/gerador";
+  const url = process.env.DATABASE_URL ?? "postgres://gerador:gerador@localhost:5433/gerador_e2e_test";
+  // Antes de qualquer TRUNCATE. Sem isto, apontar a suíte pro banco errado
+  // apaga o ambiente de alguém em silêncio — foi o que aconteceu.
+  exigirBancoDescartavel(url);
   const client = new Client({ connectionString: url });
   await client.connect();
   try {

@@ -5,7 +5,21 @@ import { defineConfig } from "@playwright/test";
 // — a app agora carrega perfisTime/referencias/quebras do @gerador/server, não
 // mais de arquivo local, então o server precisa estar de pé pra qualquer E2E
 // passar da tela de carregamento.
-const DATABASE_URL_TESTE = process.env.DATABASE_URL ?? "postgres://gerador:gerador@localhost:5432/gerador";
+/**
+ * ACHADO REAL: este default era o banco de DESENVOLVIMENTO
+ * (`localhost:5432/gerador`). A suíte truncava as tabelas do ambiente em uso e
+ * deixava para trás a credencial do gateway falso — encontrada no banco de
+ * trabalho do usuário, derrubando toda chamada de IA.
+ *
+ * Mesma armadilha que `test-support/bancoDeTeste.ts` já tinha corrigido para o
+ * vitest; o Playwright escapava da trava porque nunca passava por lá.
+ *
+ * Agora o padrão é a stack dedicada (`docker-compose.e2e.yml`): porta 5433,
+ * banco próprio. E `globalSetup` chama `exigirBancoDescartavel`, então apontar
+ * para um banco sem sufixo `_test` faz a suíte se recusar a rodar.
+ */
+const DATABASE_URL_TESTE =
+  process.env.DATABASE_URL ?? "postgres://gerador:gerador@localhost:5433/gerador_e2e_test";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -28,7 +42,11 @@ export default defineConfig({
     {
       command: "npm run dev --workspace=packages/server",
       cwd: "../..",
-      url: "http://localhost:4000/health",
+      // Porta 4100, não 4000: a stack de TRABALHO (docker-compose.yml) publica
+      // o servidor em 4000, e rodar o E2E com o ambiente de pé morria com
+      // "port already used". Isolar o banco e deixar a porta em conflito é
+      // isolamento pela metade — foi o que a primeira versão desta stack fez.
+      url: "http://localhost:4100/health",
       reuseExistingServer: false,
       timeout: 30000,
       // RATE_LIMIT_LOGIN_MAX alto de propósito: o default de produção (10/5min,
@@ -38,7 +56,7 @@ export default defineConfig({
       // teste dedicado em packages/server/src/app.test.ts, isolado do E2E).
       env: {
         DATABASE_URL: DATABASE_URL_TESTE,
-        PORT: "4000",
+        PORT: "4100",
         RATE_LIMIT_LOGIN_MAX: "1000",
         RATE_LIMIT_GLOBAL_MAX: "10000",
       },
@@ -48,7 +66,7 @@ export default defineConfig({
       url: "http://localhost:5190",
       reuseExistingServer: false,
       timeout: 30000,
-      env: { VITE_API_URL: "http://localhost:4000" },
+      env: { VITE_API_URL: "http://localhost:4100" },
     },
     // Gateway de IA falso (ver e2e/gatewayFalso.ts). Sobe sempre, mesmo pros
     // specs que não usam IA: é um processo de ~50 linhas sem estado, e deixá-lo
