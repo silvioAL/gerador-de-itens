@@ -3403,3 +3403,63 @@ E a seção que ABRE é uma que a pessoa pode, não a primeira do catálogo: sem
 isso a tela abriria em "Técnico", que ela não vê, e o conteúdo viria vazio sem
 explicação.
 
+## 145. O E2E tinha a mesma armadilha que já tínhamos corrigido uma vez (#290)
+
+O gatilho foi concreto: investigando por que a IA não respondia no modo
+hospedado (§141), a credencial encontrada no banco de TRABALHO do usuário era a
+do gateway falso — `127.0.0.1:4123`, `modelo-de-mentira`, chave terminando em
+`-e2e`. Bate campo a campo com `packages/web/e2e/gatewayFalso.ts`.
+
+### A linha
+
+```ts
+const DATABASE_URL_TESTE = process.env.DATABASE_URL ?? "postgres://gerador:gerador@localhost:5432/gerador";
+```
+
+Em `playwright.config.ts` e, idêntica, em `globalSetup.ts`. O padrão era o banco
+de **desenvolvimento**. A suíte truncava `quebras`, `perfis_time`, `campos_no` e
+`credenciais_ia` do ambiente em uso a cada rodada, e ainda deixava para trás a
+credencial falsa — porque o truncate acontece no INÍCIO, e nada limpa no fim.
+
+O incomôdo é que isto **já tinha sido corrigido**. O comentário de
+`test-support/bancoDeTeste.ts` descreve exatamente esta armadilha, com o mesmo
+estrago, para a suíte do vitest. A trava criada lá exige nome de banco
+terminando em `_test`. Só que o Playwright nunca passou por aquele arquivo: ele
+fala HTTP com a stack que estiver de pé e monta sua própria conexão para o
+`globalSetup`. A defesa existia e não alcançava o segundo caminho.
+
+### A correção, na ordem em que importa
+
+1. **Stack dedicada** (`docker-compose.e2e.yml`): porta 5433, banco
+   `gerador_e2e_test`, **sem volume**. Decisão do usuário, e é a defesa de raiz —
+   o E2E não tem como sujar o que não alcança, e some a necessidade de acertar
+   um teardown.
+2. **A trava, reusada**. `globalSetup` agora chama `exigirBancoDescartavel`
+   antes de qualquer `TRUNCATE`. Importada por caminho relativo do
+   `test-support` do servidor, **não copiada**: duplicar a regra é literalmente
+   o que deixou o Playwright de fora dela.
+
+O nome `gerador_e2e_test` termina em `_test` de propósito — assim a regra
+continua sendo UMA, sem um segundo conceito de "banco descartável".
+
+### Provado, não presumido
+
+```
+$ DATABASE_URL=postgres://...:5432/gerador npx tsx (globalSetup)
+RESULTADO: RECUSOU — A suíte trunca tabelas e o banco "gerador" não termina
+em "_test" — recusando rodar pra não apagar dados de um ambiente em uso.
+```
+
+Apontar o E2E para o banco de trabalho agora para com uma mensagem, em vez de
+apagar em silêncio.
+
+### O padrão que se repete
+
+Duas vezes seguidas nesta semana a mesma forma: uma defesa existe, é boa, e não
+cobre o segundo caminho que faz a mesma coisa. Foi assim com a permissão em
+`campos-no` mas não nas outras catorze rotas (§140), com a confirmação de
+exclusão que eu quase implementei só no canvas (§142), e agora com a trava de
+banco que só cobria o vitest.
+
+A pergunta que teria evitado as três: *quantos caminhos chegam aqui?*
+

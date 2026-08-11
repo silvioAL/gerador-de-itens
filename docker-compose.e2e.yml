@@ -1,0 +1,49 @@
+# Stack DEDICADA da suíte E2E (Playwright).
+#
+# ACHADO REAL: o `playwright.config.ts` e o `globalSetup.ts` tinham
+# `DATABASE_URL ?? "postgres://gerador:gerador@localhost:5432/gerador"` — o
+# banco de DESENVOLVIMENTO do docker-compose principal. A suíte truncava
+# `quebras`, `perfis_time`, `campos_no` e `credenciais_ia` do ambiente em uso, e
+# ainda deixava para trás a credencial do gateway falso (127.0.0.1:4123,
+# "modelo-de-mentira"), que foi encontrada no banco de trabalho do usuário e
+# derrubou toda chamada de IA até alguém investigar.
+#
+# É a MESMA armadilha que `packages/server/src/test-support/bancoDeTeste.ts` já
+# tinha documentado e corrigido para o vitest. A trava criada lá exige nome de
+# banco terminando em `_test`, mas o Playwright escapava dela: fala HTTP com a
+# stack que estiver de pé e nunca passou pelo `bancoDeTeste`.
+#
+# Duas defesas, nesta ordem:
+#
+# 1. Esta stack — porta e banco próprios. O E2E não tem como sujar o que não
+#    alcança, e some a necessidade de acertar um teardown.
+# 2. `exigirBancoDescartavel` no `globalSetup`, agora também no caminho do
+#    Playwright. É ela que importa: um compose pode ser trocado por engano, mas
+#    a trava recusa rodar e diz por quê.
+#
+# Uso:
+#   docker compose -f docker-compose.e2e.yml up -d
+#   npm run test:e2e -w packages/web
+#   docker compose -f docker-compose.e2e.yml down -v
+services:
+  db-e2e:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: gerador
+      POSTGRES_PASSWORD: gerador
+      # Termina em `_test` de propósito: é o que faz `exigirBancoDescartavel`
+      # aceitar. Renomear para algo sem esse sufixo faz a suíte se recusar a
+      # rodar — que é o comportamento desejado.
+      POSTGRES_DB: gerador_e2e_test
+    # Porta diferente da stack de trabalho (5432): rodar o E2E com o ambiente de
+    # desenvolvimento de pé não pode ser um acidente possível.
+    ports:
+      - "5433:5432"
+    # SEM volume, de propósito: banco de teste que sobrevive ao `down` é banco
+    # que acumula estado entre rodadas e faz a suíte passar na primeira e mentir
+    # na segunda.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gerador -d gerador_e2e_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
