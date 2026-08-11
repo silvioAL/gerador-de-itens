@@ -91,14 +91,14 @@ describe("useTour", () => {
     expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("perfis");
   });
 
-  it("passa por Campos por tipo de nó e Modelo da especificação de solução, abrindo a aba certa em cada um", () => {
+  it("passa por Padrões por componente e Modelo da especificação de solução, abrindo a aba certa em cada um", () => {
     const opts = montarOpts();
     const { result } = renderHook(() => useTour(opts));
 
     act(() => result.current.iniciar());
-    for (let i = 0; i < 8; i++) act(() => result.current.proximo()); // -> passo 8 (Campos por tipo de nó)
+    for (let i = 0; i < 8; i++) act(() => result.current.proximo()); // -> passo 8 (Padrões por componente)
 
-    expect(result.current.passoAtual?.titulo).toBe("Campos por tipo de nó");
+    expect(result.current.passoAtual?.titulo).toBe("Padrões por componente");
     expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("campos");
 
     act(() => result.current.proximo()); // -> passo 9 (Modelo da especificação de solução)

@@ -113,7 +113,17 @@ export function ConfigScreen({
   const abasVisiveis = (
     [
       { id: "perfis", rotulo: `Perfis de time (${Object.keys(perfisTime).length})`, existe: true },
-      { id: "campos", rotulo: `Campos por tipo de nó (${camposNo.length})`, existe: true },
+      /**
+       * "Campos por tipo de nó" era vocabulário do CÓDIGO: "nó" é jargão de
+       * canvas e "campos" não diz o que se ganha. O nome novo é o do próprio
+       * usuário — ele diz "componente", e chamou isto de "padrões técnicos
+       * configuráveis (obrigatórios ou não)" ao explicar para que serve o RBAC.
+       *
+       * O contador diz "do time" porque "(0)" lia como "não existe nada",
+       * quando há dezenas de campos padrão vindos do `diagrama.json`. Zero aqui
+       * significa "este time ainda não personalizou", não "está vazio".
+       */
+      { id: "campos", rotulo: `Padrões por componente (${camposNo.length} do time)`, existe: true },
       { id: "camposAresta", rotulo: `Campos por tipo de conexão (${camposAresta.length})`, existe: mostrarCamposAresta },
       { id: "membros", rotulo: "Membros", existe: mostrarMembros },
       // SPEC-28 §2: acessos só existem no hospedado — no local não há login, e
