@@ -17,7 +17,7 @@ import { registrarAuditoria } from "../auditoria.js";
 /**
  * SPEC-31 Fase 3 — configuração no modo hospedado.
  *
- * Estas rotas **não existiam**. `regras`, `pipeline-agentes` e `prompt-unico`
+ * Estas rotas **não existiam**. `regras` e `pipeline-agentes`
  * só eram editáveis no modo local, como arquivo; quem subia o Docker ficava com
  * o default compilado e sem tela para mudar. Agora as duas metades falam com o
  * mesmo caso de uso.
@@ -30,7 +30,6 @@ import { registrarAuditoria } from "../auditoria.js";
 const DEFAULTS_COMPILADOS: Record<ChaveConfig, unknown> = {
   regras: { tipos: [], tamanhos: [], porTech: {} },
   "pipeline-agentes": { confirmacaoObrigatoria: true, papeis: [] },
-  "prompt-unico": { conteudo: "" },
 };
 
 export async function registrarRotasConfig(app: FastifyInstance, { db, diretorioConfig }: OpcoesApp) {
@@ -50,8 +49,6 @@ export async function registrarRotasConfig(app: FastifyInstance, { db, diretorio
   }
 
   const organizacaoPadrao = organizacaoPadraoDe(db);
-
-  const podeEditarPromptUnico = exigirPermissao(db, organizacaoPadrao, "prompt-unico-template", "editar");
 
   /**
    * SPEC-28 Fase 1b — a checagem que não cabe num `preHandler`.
@@ -78,8 +75,7 @@ export async function registrarRotasConfig(app: FastifyInstance, { db, diretorio
     const email = req.usuario!.email;
 
     if (chave !== "regras") {
-      const recurso: Recurso = chave === "pipeline-agentes" ? "pipeline-agentes" : "prompt-unico-template";
-      return primeiroRecursoNegado(db, orgId, email, [recurso], "editar", timeId ?? null);
+      return primeiroRecursoNegado(db, orgId, email, ["pipeline-agentes"], "editar", timeId ?? null);
     }
 
     const atual = await casos.obter("regras", await templateDaVersao("regras"), timeId);
@@ -98,23 +94,6 @@ export async function registrarRotasConfig(app: FastifyInstance, { db, diretorio
 
     const { timeId } = req.query as { timeId?: string };
     return casos.obter(chave, await templateDaVersao(chave), timeId);
-  });
-
-  /**
-   * SPEC-31 (paridade) — o modo local expõe o template do prompt único em
-   * `/prompt-unico-template`; o hospedado só tinha `/config/prompt-unico`.
-   * Mesmo documento, dois nomes: a `packages/web` teria que saber em qual modo
-   * está, que é exatamente o que a SPEC-31 existe para evitar. O alias resolve
-   * sem quebrar quem já chama qualquer um dos dois.
-   */
-  app.get("/prompt-unico-template", async () => casos.obter("prompt-unico", await templateDaVersao("prompt-unico")));
-
-  app.put("/prompt-unico-template", { preHandler: [exigirSessao, podeEditarPromptUnico] }, async (req, reply) => {
-    const corpo = req.body as { documento?: unknown; conteudo?: string } | null;
-    const documento = corpo?.documento ?? (corpo?.conteudo !== undefined ? { conteudo: corpo.conteudo } : undefined);
-    if (documento === undefined) return reply.code(400).send({ erro: "corpo precisa ter `documento` ou `conteudo`" });
-
-    return casos.salvar("prompt-unico", documento, versaoAtual, CAMPO_GLOBAL);
   });
 
   app.put("/config/:chave", { preHandler: exigirSessao }, async (req, reply) => {

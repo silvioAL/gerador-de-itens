@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
   Background,
   Controls,
@@ -9,6 +9,7 @@ import {
   type Node,
   type NodeChange,
   type EdgeChange,
+  useReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { DiagramaConfig, No } from "@gerador/engine";
@@ -79,10 +80,37 @@ export function Canvas({ quebraState, config }: CanvasProps) {
     arestaSelecionadaId,
     setArestaSelecionadaId,
     moverNo,
-    removerNo,
     tentarConectar,
-    removerAresta,
+    pedidoDeEnquadramento,
+    exclusaoPendente,
+    pedirExclusao,
+    cancelarExclusao,
+    confirmarExclusao,
   } = quebraState;
+
+  /**
+   * ACHADO REAL do usuário: depois de "Aplicar ao canvas" os componentes "não
+   * aparecem", e com nós pré-existentes "não aparecem nem assim".
+   *
+   * A prop `fitView` abaixo enquadra SÓ no primeiro render — é o
+   * comportamento documentado dela, e é fácil ler como "sempre enquadra".
+   * Inserção em lote depois disso caía fora da área visível, e pior a cada
+   * lote, porque `mesclarDiagrama` empilha os novos em `max(y) + 220`.
+   *
+   * O contador vem de `useQuebra` e só é incrementado por quem insere em lote
+   * (conversa, cenário, import) — nunca por um nó avulso da paleta, que a
+   * pessoa acabou de posicionar.
+   */
+  const { fitView } = useReactFlow();
+  const ultimoPedido = useRef(pedidoDeEnquadramento);
+  useEffect(() => {
+    if (pedidoDeEnquadramento === ultimoPedido.current) return;
+    ultimoPedido.current = pedidoDeEnquadramento;
+    // `duration`: o movimento mostra DE ONDE pra onde a tela foi. Saltar seco
+    // deixa a dúvida de se o canvas mudou ou se apareceu outro diagrama.
+    fitView({ padding: 0.2, duration: 400 });
+  }, [pedidoDeEnquadramento, fitView]);
+
 
   const nodes: Node[] = useMemo(
     () =>
@@ -150,17 +178,16 @@ export function Canvas({ quebraState, config }: CanvasProps) {
       if (change.type === "position" && change.position) {
         moverNo(change.id, change.position.x, change.position.y);
       }
-      if (change.type === "remove") {
-        removerNo(change.id);
-      }
+      // Não apaga: PEDE. Como os nós são derivados de `quebra`, o React Flow
+      // some com ele internamente e o próximo render o traz de volta — nada se
+      // perde enquanto a confirmação está aberta.
+      if (change.type === "remove") pedirExclusao("no", change.id);
     }
   }
 
   function onEdgesChange(changes: EdgeChange[]) {
     for (const change of changes) {
-      if (change.type === "remove") {
-        removerAresta(change.id);
-      }
+      if (change.type === "remove") pedirExclusao("aresta", change.id);
     }
   }
 
@@ -207,6 +234,116 @@ export function Canvas({ quebraState, config }: CanvasProps) {
           boxShadow: "0 4px 14px rgba(0,0,0,.4)",
         }}
       />
+      {exclusaoPendente && (
+        <ConfirmarExclusao
+          alvo={
+            exclusaoPendente.tipo === "no"
+              ? {
+                  tipo: "no",
+                  rotulo: quebra.diagrama.nodes.find((n) => n.id === exclusaoPendente.id)?.label ?? "este componente",
+                  conexoes: quebra.diagrama.edges.filter(
+                    (e) => e.source === exclusaoPendente.id || e.target === exclusaoPendente.id
+                  ).length,
+                }
+              : { tipo: "aresta" }
+          }
+          onCancelar={cancelarExclusao}
+          onConfirmar={confirmarExclusao}
+        />
+      )}
     </ReactFlow>
   );
 }
+
+interface ConfirmarExclusaoProps {
+  alvo: { tipo: "no"; rotulo: string; conexoes: number } | { tipo: "aresta" };
+  onCancelar: () => void;
+  onConfirmar: () => void;
+}
+
+/** Sobre o canvas, não um `window.confirm`: o texto precisa dizer o rótulo do
+ * componente e quantas conexões somem junto, e o `confirm` do navegador não
+ * combina com o tema nem aceita destaque no botão destrutivo. */
+function ConfirmarExclusao({ alvo, onCancelar, onConfirmar }: ConfirmarExclusaoProps) {
+  const ehNo = alvo.tipo === "no";
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={ehNo ? "Excluir componente" : "Excluir conexão"}
+      data-testid="confirmar-exclusao"
+      onClick={onCancelar}
+      style={sobreposicaoEstilo}
+    >
+      <div onClick={(e) => e.stopPropagation()} style={caixaEstilo}>
+        <h3 style={{ margin: "0 0 8px", fontSize: 15 }}>
+          {ehNo ? `Excluir "${alvo.rotulo}"?` : "Excluir esta conexão?"}
+        </h3>
+        <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--texto-2)", lineHeight: 1.5 }}>
+          {ehNo ? (
+            <>
+              O componente sai do diagrama com tudo que foi preenchido nele
+              {alvo.conexoes > 0 ? (
+                <>
+                  , e as <strong>{alvo.conexoes}</strong> conexões ligadas a ele vão junto
+                </>
+              ) : null}
+              . Não dá pra desfazer.
+            </>
+          ) : (
+            "A conexão sai do diagrama junto com o que foi preenchido nela. Não dá pra desfazer."
+          )}
+        </p>
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <button onClick={onCancelar} style={botaoNeutroEstilo}>
+            Cancelar
+          </button>
+          <button onClick={onConfirmar} data-testid="confirmar-exclusao-ok" style={botaoDestrutivoEstilo} autoFocus>
+            Excluir
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const sobreposicaoEstilo: React.CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  // Acima dos controles e do minimapa do React Flow, que ficam em z-index 5.
+  zIndex: 20,
+  display: "grid",
+  placeItems: "center",
+  background: "rgba(8, 12, 20, 0.6)",
+};
+
+const caixaEstilo: React.CSSProperties = {
+  width: 380,
+  maxWidth: "90%",
+  padding: 18,
+  borderRadius: 12,
+  border: "1px solid var(--borda-forte)",
+  background: "var(--painel-alto)",
+  boxShadow: "0 12px 32px rgba(0,0,0,.5)",
+};
+
+const botaoNeutroEstilo: React.CSSProperties = {
+  padding: "7px 14px",
+  borderRadius: 8,
+  border: "1px solid var(--borda-forte)",
+  background: "var(--painel)",
+  color: "var(--texto)",
+  fontSize: 13,
+  cursor: "pointer",
+};
+
+const botaoDestrutivoEstilo: React.CSSProperties = {
+  padding: "7px 14px",
+  borderRadius: 8,
+  border: "1px solid #7f1d1d",
+  background: "#b91c1c",
+  color: "#fff",
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: "pointer",
+};

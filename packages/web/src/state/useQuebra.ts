@@ -196,6 +196,41 @@ export function useQuebra(inicial: Quebra, config: DiagramaConfig) {
    * existe. Aí vale a regra de `edgeRules`, a mesma que valida um arrasto de
    * mouse — proposta inválida vira conexão pelo tipo default, não erro.
    */
+  /**
+   * ACHADO REAL do usuário: depois de "Aplicar ao canvas", os componentes "não
+   * aparecem a menos que se clique em próximo pendente (1 por 1)", e com nós
+   * pré-existentes "não aparecem nem assim".
+   *
+   * O estado sempre esteve certo — os nós existiam, com id único e posição em
+   * grade. O que não acontecia era a VIEWPORT acompanhar: o `fitView` do
+   * ReactFlow, passado como prop booleana, só enquadra no primeiro render. Com
+   * nós pré-existentes fica pior por construção, porque `mesclarDiagrama`
+   * empurra os novos para `max(y) + 220` — cada vez mais longe do que se vê.
+   *
+   * Este contador é o pedido explícito de "enquadre agora". Explícito, e não
+   * "detecte que entraram nós", porque adicionar UM nó pela paleta não deve
+   * mexer no enquadramento: a pessoa acabou de escolher onde ele fica.
+   */
+  const [pedidoDeEnquadramento, setPedidoDeEnquadramento] = useState(0);
+  const pedirEnquadramento = useCallback(() => setPedidoDeEnquadramento((n) => n + 1), []);
+
+  /**
+   * Pedido do usuário: excluir componente deve perguntar antes.
+   *
+   * Mora AQUI, e não no Canvas, porque há três portas para a mesma exclusão: a
+   * tecla Delete sobre o nó selecionado, o botão do `PropertiesPanel` e o do
+   * `EdgePanel`. Confirmação implementada numa delas deixaria as outras duas
+   * apagando em silêncio — que é justamente a versão do defeito que o usuário
+   * encontrou (ele seleciona e exclui pelo painel).
+   *
+   * Guarda só `{tipo, id}`: rótulo e número de conexões são derivados de
+   * `quebra` na hora de desenhar, e assim não há como a mensagem descrever um
+   * estado que já mudou.
+   */
+  const [exclusaoPendente, setExclusaoPendente] = useState<{ tipo: "no" | "aresta"; id: string } | null>(null);
+  const pedirExclusao = useCallback((tipo: "no" | "aresta", id: string) => setExclusaoPendente({ tipo, id }), []);
+  const cancelarExclusao = useCallback(() => setExclusaoPendente(null), []);
+
   const aplicarDiagramaProposto = useCallback(
     (proposta: { nos: { id: string; tipo: string; rotulo: string }[]; arestas: { de: string; para: string; tipo: string }[] }) => {
       setQuebra((q) => {
@@ -226,8 +261,9 @@ export function useQuebra(inicial: Quebra, config: DiagramaConfig) {
 
         return { ...q, diagrama: mesclarDiagrama(q.diagrama, { nodes: nos, edges: arestas }) };
       });
+      pedirEnquadramento();
     },
-    [config]
+    [config, pedirEnquadramento]
   );
 
   /** Resposta (manual ou sugerida por IA) a um placeholder "<- ✍️ especificar"
@@ -243,6 +279,15 @@ export function useQuebra(inicial: Quebra, config: DiagramaConfig) {
       },
     }));
   }, []);
+
+  const confirmarExclusao = useCallback(() => {
+    setExclusaoPendente((pendente) => {
+      if (!pendente) return null;
+      if (pendente.tipo === "no") removerNo(pendente.id);
+      else removerAresta(pendente.id);
+      return null;
+    });
+  }, [removerNo, removerAresta]);
 
   return {
     quebra,
@@ -270,6 +315,12 @@ export function useQuebra(inicial: Quebra, config: DiagramaConfig) {
     removerAresta,
     responderItem,
     aplicarDiagramaProposto,
+    pedidoDeEnquadramento,
+    pedirEnquadramento,
+    exclusaoPendente,
+    pedirExclusao,
+    cancelarExclusao,
+    confirmarExclusao,
   };
 }
 

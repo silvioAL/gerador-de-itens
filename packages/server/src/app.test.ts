@@ -491,10 +491,18 @@ describe("/config/:chave (SPEC-31 Fase 3)", () => {
   });
 
   it("nunca editada devolve o template desta versão, marcado como não personalizado", async () => {
-    const resposta = await app.inject({ method: "GET", url: "/config/prompt-unico" });
+    const resposta = await app.inject({ method: "GET", url: "/config/pipeline-agentes" });
 
     expect(resposta.statusCode).toBe(200);
     expect(resposta.json().personalizado).toBe(false);
+  });
+
+  it("chave removida do produto é 404, não um documento vazio", async () => {
+    // `prompt-unico` saiu junto com a feature (JOURNEY §143). A rota rejeitar a
+    // chave é o comportamento certo: linha órfã no banco não deve voltar a ser
+    // lida como configuração viva só porque o caminho ainda existe.
+    const resposta = await app.inject({ method: "GET", url: "/config/prompt-unico" });
+    expect(resposta.statusCode).toBe(404);
   });
 
   it("PUT grava, carimba e o GET seguinte devolve o documento com o diagnóstico", async () => {

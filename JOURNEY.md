@@ -3246,3 +3246,118 @@ Cheguei a afirmar ao usuário que a causa era `strict` faltando no `json_schema`
 pedido que eu mesmo escrevi à mão para testar, sem `strict`. Refeito com o
 payload real, passou — e o erro verdadeiro (`maxItems`) só apareceu depois.
 
+## 142. Três defeitos de tela, e dois eram mais largos do que pareciam (#292, #293, #294)
+
+Rodada de ajustes pedida pelo usuário depois de voltar a usar o modo hospedado.
+
+### O que ele viu, e o que era
+
+**"o botão cancelar nessa tela está preto, difícil visualizar"** (com print do
+painel de contexto do épico). A linha culpada é `ContextoEpicoPanel.tsx:178`:
+`background: var(--painel)` e nenhum `color`. Mas a causa não é do painel — o
+navegador reseta `color` de `<button>` para `buttontext` (preto) em vez de
+herdar do `body`. Uma varredura por botões escuros sem `color` achou o mesmo
+padrão em cerca de vinte lugares: App, LoginScreen, SemTimeScreen,
+EscolherTimeScreen, AcessosTab, CamposArestaTab, NodeCard.
+
+Por isso a correção foi uma linha em `styles.css` (`button { color:
+var(--texto) }`) e não vinte edições: um `color` por arquivo deixaria os outros
+dezenove esperando alguém esbarrar neles.
+
+**"ao selecionar um componente na tela, deveria perguntar se deseja excluir"**.
+Havia TRÊS portas para a mesma exclusão: a tecla Delete sobre o nó selecionado
+(`Canvas.onNodesChange`), o botão do `PropertiesPanel` e o do `EdgePanel`.
+Minha primeira versão pôs a confirmação no Canvas — e teria deixado as outras
+duas apagando em silêncio, inclusive a que o usuário de fato usa (ele seleciona
+e clica em "Excluir nó" no painel). O estado foi para o `useQuebra`, onde as
+três chegam.
+
+O diálogo diz **quantas conexões vão junto**, que é a parte que não se vê
+olhando o nó selecionado.
+
+### O bug de verdade: `fitView` só enquadra uma vez
+
+**"após o retorno da IA... clicar em aplicar ao canvas eles não aparecem a menos
+que se clique em próximo pendente (1 por 1) e ficam imóveis; se previamente
+existir outros componentes eles não aparecem nem assim."**
+
+Investiguei na ordem errada e isso valeu a pena registrar. Suspeitei de:
+
+1. `mesclarDiagrama` perdendo nós — está correto, renumera e concatena.
+2. `criarNo` ignorando as posições — a assinatura bate, a grade é calculada.
+3. `proximoId` gerando id duplicado (o que quebraria o React Flow e explicaria
+   "imóveis") — é `max+1` sobre os existentes, sem colisão.
+4. O Canvas não re-sincronizando — ele deriva por `useMemo`, corretamente.
+
+Nada disso. A causa é que `fitView` está passado como **prop booleana** ao
+`ReactFlow`, e nessa forma ela enquadra **apenas no primeiro render**. Os nós
+sempre estiveram lá, com id único e posição válida — fora da área visível. E
+com nós pré-existentes fica pior por construção: `mesclarDiagrama` empilha os
+novos em `max(y) + 220`, cada lote mais longe. "Próximo pendente" centraliza a
+viewport num nó, e por isso eles apareciam um a um.
+
+Quatro hipóteses erradas antes da certa, todas plausíveis lendo o código. O que
+as descartou rápido foi ler a função inteira em vez de deduzir pelo sintoma —
+`mesclarDiagrama` e `proximoId` levaram trinta segundos cada.
+
+A correção é um contador explícito (`pedirEnquadramento`) incrementado só por
+quem insere em LOTE: conversa, cenário e import. Não por um nó avulso da
+paleta, que a pessoa acabou de posicionar — enquadrar ali faria a viewport
+pular no meio do desenho.
+
+### Efeito colateral honesto num teste
+
+`useReactFlow` exige `ReactFlowProvider` como ancestral, e o
+`Canvas.piscar.test.tsx` renderizava o `Canvas` solto. Em produção o provider
+sempre esteve lá (`App.tsx`), então o teste é que montava um cenário
+inexistente. Embrulhar o teste aproximou-o do app em vez de afrouxar o código.
+
+## 143. O prompt único quebrou, e a resposta certa foi removê-lo
+
+> *"em configurações -> prompt único (algo que deveria ser removido) consta o
+> erro: Cannot read properties of undefined (reading 'map')"*
+
+### O defeito: as duas metades falavam formas diferentes
+
+`PromptUnicoTab` fazia `setVariaveis(r.variaveis)` e depois `variaveis.map(...)`.
+Medido contra a stack do usuário, o hospedado devolvia:
+
+```json
+{"documento":{"conteudo":""},"personalizado":false,"versaoTemplate":null,
+ "atualizadoEm":null,"diagnostico":{...}}
+```
+
+Sem `conteudo` no topo e **sem `variaveis`** — que vira `undefined` e derruba a
+tela no `.map`. O modo local devolvia `{conteudo, variaveis}`. Mesma rota, dois
+formatos.
+
+É a terceira vez que uma divergência de FORMA entre os modos aparece como bug de
+tela: o `/ia/status` no #70, o `capacidades` da §141, e agora esta. O
+`paridade.sanity.test.ts` compara quais rotas existem em cada modo, e isso não
+alcança o que elas devolvem. Fica anotado como buraco de teste, não como
+coincidência.
+
+### Por que remover em vez de consertar
+
+O usuário já tinha cancelado o prompt único uma vez ("prompt único vamos
+cancelar") e agora o descreveu como *"algo que deveria ser removido"*. Perguntei
+antes de agir, porque consertar e remover são trabalhos materialmente
+diferentes e a segunda opção apaga uma feature da tela de revisão. Ele confirmou
+a remoção.
+
+Saíram: a aba de Configurações, o painel da revisão, `gerarPromptUnico` no
+engine, a chave `prompt-unico` de `CHAVES_CONFIG`, o recurso
+`prompt-unico-template` do RBAC, as rotas dos dois modos e o cliente. Cinco
+arquivos apagados, oito editados.
+
+### O que ficou no lugar
+
+Um teste que afirma que `GET /config/prompt-unico` agora é **404**. Parece
+óbvio, mas o ponto é outro: linha órfã em `config_documentos` com essa chave não
+pode voltar a ser lida como configuração viva só porque o caminho da rota ainda
+casa. `ehChaveConfig` rejeitar é o comportamento correto, e agora está escrito.
+
+Não apaguei as linhas do banco. Elas são inertes — nenhum código as alcança — e
+uma migração destrutiva por causa de dado que ninguém lê custa mais risco do que
+resolve.
+

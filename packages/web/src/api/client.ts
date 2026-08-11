@@ -795,13 +795,6 @@ export interface PromptUnicoTemplate {
   variaveis: string[];
 }
 
-export const apiPromptUnicoTemplate = {
-  obter: () => requisitar<PromptUnicoTemplate>("/prompt-unico-template"),
-  /** 400 se o template citar `{{variavel}}` que o motor não preenche — aqui o
-   * erro é caro: viraria texto cru no prompt já colado no chat da empresa. */
-  salvar: (conteudo: string) =>
-    requisitar<PromptUnicoTemplate>("/prompt-unico-template", { method: "PUT", body: JSON.stringify({ conteudo }) }),
-};
 
 export interface ConfigPipelineAgentes {
   confirmacaoObrigatoria: boolean;

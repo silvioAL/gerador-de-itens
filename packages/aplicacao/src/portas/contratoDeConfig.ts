@@ -75,14 +75,6 @@ export function testarContratoDeConfig(
       expect((await repo.obter("regras"))?.documento).toEqual({ porTech: { java: {} } });
     });
 
-    it("o template do prompt único é texto, e sobrevive com quebras de linha e acentuação", async () => {
-      const conteudo = "# Prompt\n\nGere a especificação de {{titulo}} — atenção à acentuação.\n";
-
-      await repo.salvar("prompt-unico", CAMPO_GLOBAL, { conteudo }, "0.1.60");
-
-      expect((await repo.obter("prompt-unico"))?.documento).toEqual({ conteudo });
-    });
-
     it("atualizadoEm é ISO-8601 nos dois adaptadores", async () => {
       const salvo = await repo.salvar("regras", CAMPO_GLOBAL, { porTech: {} }, "0.1.60");
 

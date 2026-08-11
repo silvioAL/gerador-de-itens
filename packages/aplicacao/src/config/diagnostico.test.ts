@@ -82,12 +82,9 @@ describe("diagnóstico de config desatualizada (SPEC-31 Fase 3)", () => {
     ]);
   });
 
-  it("serve para as outras chaves: esteira sem papel ativo e prompt vazio", () => {
+  it("serve para a outra chave: esteira sem papel ativo", () => {
     const semPapeis = diagnosticarConfig("pipeline-agentes", { papeis: [] }, { papeis: [{ id: "po", ativo: true }] });
     expect(semPapeis.secoesVazias.map((s) => s.secao)).toEqual(["papeis", "papeisAtivos"]);
-
-    const promptVazio = diagnosticarConfig("prompt-unico", { conteudo: "" }, { conteudo: "modelo de prompt" });
-    expect(promptVazio.possivelmenteDesatualizada).toBe(true);
   });
 
   it("documento ausente ou torto não derruba o diagnóstico", () => {

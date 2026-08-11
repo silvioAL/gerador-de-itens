@@ -14,7 +14,11 @@ export { CAMPO_GLOBAL };
  * e duplicar essa validação no repositório criaria duas fontes de verdade
  * sobre o que é uma regra válida.
  */
-export const CHAVES_CONFIG = ["regras", "pipeline-agentes", "prompt-unico"] as const;
+/** `prompt-unico` saiu daqui quando a feature foi removida (ver JOURNEY §143):
+ * documento sem tela, sem rota e sem uso. Linha do banco com essa chave passa a
+ * ser rejeitada por `ehChaveConfig`, que é o comportamento certo — dado órfão
+ * não deve voltar a ser lido como se fosse configuração viva. */
+export const CHAVES_CONFIG = ["regras", "pipeline-agentes"] as const;
 
 export type ChaveConfig = (typeof CHAVES_CONFIG)[number];
 
