@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { criarProvedorCompativelOpenAI, validarContraSchema } from "./provedorOpenAI.js";
+import { comAdditionalPropertiesFalse, criarProvedorCompativelOpenAI, validarContraSchema } from "./provedorOpenAI.js";
 import type { EsquemaJson } from "./esquema.js";
 
 /**
@@ -623,5 +623,56 @@ describe("finish_reason — o gateway diz por que parou, e agora a gente escuta 
     });
 
     await expect(provedor.completar("x")).resolves.toBe("ok");
+  });
+});
+
+/**
+ * ACHADO REAL no modo hospedado com Claude Haiku: "Desenhar conversando" não
+ * respondia nada e a tela mostrava "Unexpected end of JSON input". A causa só
+ * ficou visível depois de ligar o log do servidor:
+ *
+ * ```
+ * HTTP 400 response_format.json_schema.schema:
+ *   For 'array' type, property 'maxItems' is not supported
+ * ```
+ *
+ * O schema do diagrama declara `maxItems`, e Structured Outputs recusa o
+ * pedido INTEIRO por causa disso. Não é uma restrição perdida: é a chamada
+ * impossível.
+ */
+describe("schema para Structured Outputs — o que o gateway recusa (#294)", () => {
+  it("remove `maxItems` de array, que é o que derrubava a chamada", () => {
+    const limpo = comAdditionalPropertiesFalse({
+      type: "array",
+      maxItems: 8,
+      minItems: 1,
+      items: { type: "object", properties: { id: { type: "string" } } },
+    } as never) as Record<string, unknown>;
+
+    expect(limpo.maxItems).toBeUndefined();
+    expect(limpo.minItems).toBeUndefined();
+    // O que importa para a decodificação restrita continua lá.
+    expect(limpo.type).toBe("array");
+    expect((limpo.items as Record<string, unknown>).additionalProperties).toBe(false);
+  });
+
+  it("limpa também nas FOLHAS — onde a primeira versão desta correção falhava", () => {
+    // O retorno antecipado devolvia o schema original em vez da cópia limpa,
+    // então um `{type:"string", maxLength}` dentro de `properties` passava
+    // intacto e o gateway recusava do mesmo jeito.
+    const limpo = comAdditionalPropertiesFalse({
+      type: "object",
+      properties: { rotulo: { type: "string", maxLength: 40 } },
+    } as never) as Record<string, unknown>;
+
+    const rotulo = (limpo.properties as Record<string, Record<string, unknown>>).rotulo;
+    expect(rotulo.maxLength).toBeUndefined();
+    expect(rotulo.type).toBe("string");
+  });
+
+  it("não mexe no schema recebido — quem chamou pode reusá-lo", () => {
+    const original = { type: "array", maxItems: 3, items: { type: "string" } };
+    comAdditionalPropertiesFalse(original as never);
+    expect(original.maxItems).toBe(3);
   });
 });

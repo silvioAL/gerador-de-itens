@@ -285,23 +285,59 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
     //
     // `reply.getHeaders()` traz o que o Fastify já montou; copiar antes de
     // assumir o socket é o que mantém o comportamento das outras rotas.
-    reply.raw.writeHead(200, {
-      ...(reply.getHeaders() as Record<string, string>),
-      "content-type": "text/plain; charset=utf-8",
-    });
+    /**
+     * ACHADO REAL caçando "Unexpected end of JSON input" na tela: o `writeHead`
+     * ficava AQUI, antes de qualquer byte do provedor. Com isso, toda falha do
+     * gateway — inclusive um 400 com mensagem explícita — virava 200 com corpo
+     * VAZIO, porque quando o erro chegava o status já tinha sido comprometido.
+     * A tela recebia zero byte e mostrava o erro do `JSON.parse`, que não diz
+     * nada sobre a causa.
+     *
+     * Adiar o cabeçalho até o PRIMEIRO pedaço resolve sem perder streaming:
+     * enquanto nada chegou, ainda dá pra responder 502 com o motivo; a partir
+     * do primeiro byte o comportamento é o de antes.
+     */
+    let comecou = false;
+    const comecar = () => {
+      if (comecou) return;
+      comecou = true;
+      reply.raw.writeHead(200, {
+        ...(reply.getHeaders() as Record<string, string>),
+        "content-type": "text/plain; charset=utf-8",
+      });
+    };
+
     try {
       await provedor.completarEstruturado(pedido.prompt, pedido.esquema as never, {
         // SPEC-30 Fase 2: se o pedido trouxe imagem, ela vai junto do prompt.
         imagens: pedido.imagens,
-        onTexto: (pedaco) => reply.raw.write(pedaco),
+        onTexto: (pedaco) => {
+          comecar();
+          reply.raw.write(pedaco);
+        },
         // NUL nunca aparece em JSON válido: é o sinal de "descarte o que
         // recebeu até aqui" quando o provedor vai repetir a tentativa.
-        onReiniciar: () => reply.raw.write(" "),
+        onReiniciar: () => {
+          comecar();
+          reply.raw.write(" ");
+        },
       });
+      if (!comecou) {
+        // Sem exceção e sem um único byte. Acontece quando o gateway aceita a
+        // chamada e devolve resposta vazia — e é indistinguível de sucesso pra
+        // quem só olha o status.
+        return reply.code(502).send({
+          erro: `O modelo respondeu, mas não veio nenhum texto. Confira o modelo e o endereço na aba "Modelo de IA".`,
+        });
+      }
       reply.raw.end();
     } catch (erro) {
       const mensagem = erro instanceof Error ? erro.message : String(erro);
       app.log.error(`[${rotulo}] falhou: ${mensagem}`);
+      if (!comecou) {
+        // Nada foi enviado ainda: dá pra dizer o que houve, com status de erro.
+        return reply.code(502).send({ erro: `A chamada ao modelo falhou: ${mensagem}`, rotulo });
+      }
       // Cabeçalho já foi: não dá pra trocar o status, só encerrar. O cliente
       // detecta o JSON incompleto — mesmo contrato do modo local.
       reply.raw.end();

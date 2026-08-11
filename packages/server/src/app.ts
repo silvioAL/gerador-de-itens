@@ -37,7 +37,25 @@ export async function buildApp(opcoes: OpcoesApp): Promise<FastifyInstance> {
   // limit por IP (abaixo) enxergaria o IP do proxy pra todo mundo, não o IP
   // real de quem está batendo. Em dev/E2E, sem proxy, isso ficaria errado do
   // jeito oposto (confiaria em X-Forwarded-For vindo direto do cliente).
-  const app = Fastify({ logger: false, trustProxy: producao });
+  /**
+   * ACHADO REAL, caçando "Unexpected end of JSON input" no modo hospedado:
+   * isto era `logger: false`, e por isso TODO `app.log.error` do projeto era
+   * um no-op silencioso. O `catch` de `executarPedido` fazia exatamente a coisa
+   * certa — capturava o erro do gateway e o registrava — e a linha ia para
+   * lugar nenhum. `docker logs` mostrava só a linha de inicialização, mesmo com
+   * a rota falhando a cada chamada.
+   *
+   * O efeito era pior que não ter tratamento: havia um tratamento, ele parecia
+   * suficiente ao ler o código, e não produzia nada. Diagnosticar virou
+   * adivinhação.
+   *
+   * `LOG_NIVEL=silent` continua disponível para quem quiser o silêncio de
+   * volta; o padrão passa a ser falar.
+   */
+  const app = Fastify({
+    logger: { level: process.env.LOG_NIVEL ?? "info" },
+    trustProxy: producao,
+  });
 
   await app.register(cors, {
     origin: opcoes.origemPermitida ?? true,

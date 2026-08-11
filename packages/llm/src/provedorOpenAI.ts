@@ -82,12 +82,38 @@ export type FormatoJson = "json_object" | "json_schema" | "nenhum";
  * inclusive nos aninhados, que é o caso do lote da esteira (um objeto por
  * item). Sem isso: HTTP 400 dizendo exatamente isso.
  */
+/**
+ * Palavras-chave que Structured Outputs recusa, medido contra a Anthropic:
+ *
+ * ```
+ * HTTP 400 response_format.json_schema.schema:
+ *   For 'array' type, property 'maxItems' is not supported
+ * ```
+ *
+ * Mandá-las não deixa a resposta melhor e deixa a chamada IMPOSSÍVEL: o
+ * gateway recusa o pedido inteiro. O limite continua existindo onde sempre
+ * funcionou de fato — no texto do prompt —, e o schema fica com o que a
+ * decodificação restrita sabe impor: forma, tipo e campos obrigatórios.
+ *
+ * Vale para arrays (`maxItems`/`minItems`) e para strings (`maxLength`/
+ * `minLength`), pela mesma razão e com o mesmo custo: nenhum.
+ */
+const NAO_SUPORTADAS_EM_STRUCTURED_OUTPUTS = ["maxItems", "minItems", "maxLength", "minLength"] as const;
+
+function semPalavrasNaoSuportadas(s: Record<string, unknown>): Record<string, unknown> {
+  const copia = { ...s };
+  for (const chave of NAO_SUPORTADAS_EM_STRUCTURED_OUTPUTS) delete copia[chave];
+  return copia;
+}
+
 export function comAdditionalPropertiesFalse(schema: EsquemaJson): EsquemaJson {
-  const s = schema as Record<string, unknown>;
+  const s = semPalavrasNaoSuportadas(schema as Record<string, unknown>);
   if (s.type === "array" && s.items) {
     return { ...s, items: comAdditionalPropertiesFalse(s.items as EsquemaJson) } as EsquemaJson;
   }
-  if (s.type !== "object" && !s.properties) return schema;
+  // `s`, não `schema`: numa folha (ex.: `{type:"string", maxLength:50}`) devolver
+  // o original desfaria a limpeza logo onde ela mais aparece.
+  if (s.type !== "object" && !s.properties) return s as EsquemaJson;
   const props = (s.properties ?? {}) as Record<string, EsquemaJson>;
   return {
     ...s,
