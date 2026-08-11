@@ -89,7 +89,7 @@ export function useTour(opts: UseTourOpts) {
     },
     {
       selector: "[data-tour=config-screen-content]",
-      titulo: "Campos por tipo de nó",
+      titulo: "Padrões por componente",
       texto:
         'Cada tipo de nó já vem com campos padrão (ex.: nome do tópico, DLQ) — "sobrescrever" cria uma versão específica pro seu time (ex.: um sufixo obrigatório de nomenclatura), e "+ Adicionar campo" cria um campo novo do zero.',
       onEnter: () => opts.abrirConfigNaAba("campos"),

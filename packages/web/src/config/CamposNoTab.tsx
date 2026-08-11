@@ -217,6 +217,10 @@ export function CamposNoTab({ config, camposNo, timeAtivo, onCriar, onAtualizar,
     }
   }
 
+  // O denominador que faltava: sem ele, "(0)" na aba lê como "não há campos".
+
+  const camposPadrao = Object.values(config.nodeTypes).reduce((n, t) => n + (t.spec?.length ?? 0), 0);
+
   const porTipo = new Map<string, CampoNo[]>();
   for (const campo of camposNo) {
     const lista = porTipo.get(campo.tipoNo) ?? [];
@@ -227,10 +231,16 @@ export function CamposNoTab({ config, camposNo, timeAtivo, onCriar, onAtualizar,
   return (
     <div>
       <p style={introTextoEstilo}>
-        Cada tipo de nó (Serviço, Fila Rabbit...) já vem com um conjunto de campos base — "sobrescrever" cria uma
-        versão específica pro time <strong>{timeAtivo}</strong> (ex.: a convenção de nomenclatura da fila, um sufixo
-        obrigatório) que passa a valer no lugar do original, só aqui. Um campo "global" muda o original pra todo
-        mundo; "+ Adicionar campo" cria um campo novo, que não existia antes.
+        O que este time <strong>exige que seja preenchido</strong> em cada componente do diagrama. É o formulário
+        que aparece ao selecionar um Serviço, uma Fila, um Banco — e o que estiver marcado como obrigatório
+        segura a prontidão do item até alguém responder.
+      </p>
+      <p style={introTextoEstilo}>
+        Todo tipo de componente já vem com {camposPadrao} campos padrão, prontos para uso — a contagem na aba é
+        só do que o time <strong>{timeAtivo}</strong> personalizou por cima. Zero ali significa "ainda não
+        mexemos", não "está vazio". <em>Sobrescrever</em> troca um campo padrão só para este time (ex.: a
+        convenção de nomenclatura da fila); <em>+ Adicionar campo</em> cria um que não existia; e um campo
+        marcado como <em>global</em> vale para todo mundo.
       </p>
 
       <SugerirComIa<SugestaoCampo>
