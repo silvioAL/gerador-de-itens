@@ -3673,3 +3673,42 @@ custom falhou: `clear()` seguido de `type()` não gravava nada — porque esvazi
 o campo desmontava o editor no meio da digitação, e é exatamente o que alguém
 faz pra reescrever do zero. O estado "estou editando" é do usuário, não do
 texto. Virou um `Set` explícito, que só o botão de voltar ao padrão encerra.
+
+## 151. A massa que nunca existiu, e o motor de simular sem gastar (#301, #299)
+
+O usuário saiu deixando quatro itens pré-aprovados. Estes dois saíram.
+
+**#301 — `campos_no` nunca teve uma linha.** A tabela nasceu vazia em 0001 e
+nenhuma migração jamais inseriu nada: por isso a aba mostrava "(0)" e ele
+perguntou *"parece zerado, isso está correto?"*. A 0016 semeia seis padrões que
+são o caso de uso que ele mesmo descreveu ao justificar o RBAC — runbook de
+plantão, classificação de dado com PCI-DSS, schema registrado, retenção LGPD,
+homologação de fornecedor e SLAs por operação.
+
+E aí a medição corrigiu o meu palpite. Semeei em `time-pagamentos`, rodei o
+E2E, e **quatro specs de cenário quebraram de uma vez**: campo obrigatório
+deixa o nó vermelho, vermelho bloqueia "Derivar Quebra". A seed estava certa; o
+time é que estava errado. Foi para `time-portabilidade` — `time-pagamentos`
+segue sendo o time de demo cujos cenários derivam do zero.
+
+O `globalSetup` do E2E trunca `campos_no`, então reaplica a seed **lendo o
+arquivo da migração**. O bloco de `perfis_time` logo acima é uma cópia à mão do
+0000_init e já é a segunda versão de uma verdade só; não fiz uma terceira.
+
+**#299 — simular a esteira.** O risco da feature inteira é a simulação virar
+uma segunda versão do prompt: aí ela responde *"o que eu acho que sairia"*, que
+é pior do que não existir — dá confiança sem base.
+
+Então não há segunda versão. `montarPedidoPipeline` é a mesma função que a
+borda chama, e o corpo do lote saiu de dentro do hook para `corpoDoLote()`, que
+os dois caminhos usam. Um dos testes lê o FONTE do hook e recusa a montagem
+manual de volta — porque o defeito que isso previne não tem sintoma: os dois
+prompts só divergem, e ninguém compara.
+
+Uma coisa a simulação não sabe: o que o modelo responderia. O encadeamento
+entre papéis entra com um marcador dizendo isso, em vez de um texto plausível
+inventado — que faria a pessoa dimensionar a janela de contexto por um número
+falso.
+
+Ficou o motor com testes; a tela que expõe isso na esteira não entrou nesta
+rodada, e está dito no PR.

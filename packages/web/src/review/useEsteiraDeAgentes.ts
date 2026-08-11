@@ -8,6 +8,7 @@ import {
   type PlaceholderPedidoItemIa,
   type RespostaAnteriorIa,
 } from "../api/client";
+import { corpoDoLote, itensDoPapel as itensDoPapelDaFila } from "./lotesDaEsteira";
 
 /** As 4 SEÇÕES fixas da ficha (dado do engine) — não confundir com os papéis
  * da esteira, que desde a Fase F são configuráveis (`PapelConfigurado`): N
@@ -222,7 +223,7 @@ export function useEsteiraDeAgentes({
       );
       for (const papel of papeisDaCorrida) {
         if (tokenRef.current !== token) return;
-        const itensDoPapel = filaNova.filter((item) => (item.placeholdersPorPapel[papel.id] ?? []).length > 0);
+        const itensDoPapel = itensDoPapelDaFila(papel.id, filaNova);
         setPapelAtualId(papel.id);
         setItensFeitos(0);
 
@@ -248,18 +249,10 @@ export function useEsteiraDeAgentes({
           try {
             const respostas = await apiIa.sugerirPipeline(
               papel.id,
-              {
-                contextoEpico,
-                itens: lote.map((item) => ({
-                  chave: item.atividadeChave,
-                  rotulo: item.atividadeRotulo,
-                  contextoNo: item.contextoNo,
-                  placeholders: item.placeholdersPorPapel[papel.id],
-                  // Snapshot, não a referência viva — o acumulador continua
-                  // crescendo depois desta chamada.
-                  respostasAnteriores: [...(acumuladas.get(item.atividadeChave) ?? [])],
-                })),
-              },
+              // #299 — a MESMA função que a simulação usa. Enquanto o corpo for
+              // montado aqui e lá separadamente, "ver o prompt que sairia" é um
+              // palpite bem-intencionado.
+              corpoDoLote(papel.id, lote, acumuladas, contextoEpico),
               (acumulado) => {
                 ultimoAcumulado = acumulado;
                 if (tokenRef.current === token) setAoVivoPorItem(extrairRespostasParciaisAninhadas(acumulado));
