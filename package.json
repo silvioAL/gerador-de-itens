@@ -2,6 +2,8 @@
   "name": "gerador",
   "private": true,
   "version": "0.1.0",
+  "author": "Silvio Allgayer Trindade <silvioaltr@gmail.com> (https://github.com/silvioAL)",
+  "license": "Apache-2.0",
   "workspaces": [
     "packages/engine",
     "packages/llm",
