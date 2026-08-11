@@ -60,8 +60,7 @@ describe("excluir pelo painel de propriedades (composição real)", () => {
             arestas={estado.quebra.diagrama.edges}
             config={config}
             quebraState={estado}
-            perfisTime={{}}
-            timesConhecidos={["time-a"]}
+            time={quebra.time}
           />
         ) : (
           <span data-testid="sem-no">nó excluído</span>
