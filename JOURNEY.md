@@ -3917,3 +3917,30 @@ Windows — `PATH`, `--allow-scripts`, Defender bloqueando binário nativo.
 com os três problemas que o modo hospedado de fato tem, sendo o primeiro
 esquecer de `docker compose build gerador` e testar o bundle anterior — que é
 literalmente o que gerou um reporte de defeito já corrigido nesta sessão.
+
+## 158. As abas descobertas ganharam navegador, e uma delas provou o método (#306)
+
+A medição da §153 tinha dito quais: das nove abas de Configurações, quatro sem
+nenhum E2E. Sobraram três — "Campos por tipo de conexão" só existia no modo
+local, que a SPEC-33 removeu.
+
+O `ConfigScreen.test.tsx` já garante em jsdom que **nenhuma aba abre vazia**.
+Estes vão além disso: afirmam que o CONTEÚDO chegou — o que depende de o
+servidor responder, da rota existir e de a permissão não esconder tudo. Nenhuma
+das três coisas o jsdom vê.
+
+**E a prova de que mordem.** Reintroduzi o gate `mostrarCamposAresta` no corpo
+da aba de Regras — o defeito exato que chegou ao usuário hoje de manhã. O teste
+ficou vermelho e os outros dois seguiram verdes, isolando o problema na aba
+certa.
+
+Vale registrar por quê isso não é cerimônia: essa mesma verificação, feita
+quatro vezes hoje (`Delete` no canvas, o `page.route` que derrubava o app, o
+contrato que dependia do interleaving, e agora esta aba), mudou o que eu
+entregaria em três delas. Um teste que nunca se viu falhar é uma hipótese, não
+uma rede.
+
+Fica um resíduo anotado: `modo === "local"` continua no `App.tsx`, e o servidor
+nunca devolve esse valor — a aba "Campos por tipo de conexão" virou inalcançável
+em vez de removida. É ramo morto, não defeito, mas é exatamente o tipo de
+sobra que a SPEC-33 §8 avisou que ia aparecer.
