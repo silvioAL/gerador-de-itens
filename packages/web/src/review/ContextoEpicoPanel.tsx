@@ -31,6 +31,9 @@ function lerArquivoComoTexto(arquivo: File): Promise<string> {
  * exportado, nunca a sugestão real de IA (Fase 1b, SPEC-23). Este painel
  * alimenta os dois: o documento final e o prompt de `/ia/sugerir` na aba
  * Refinamento.
+ *
+ * Desde o #298 não é mais um modal com backdrop próprio: é uma aba do
+ * `AssistenteFlutuante`, que é quem posiciona, abre e fecha a janela.
  */
 export function ContextoEpicoPanel({ demandInfo, anexosContexto, onSalvar, onFechar }: ContextoEpicoPanelProps) {
   const [texto, setTexto] = useState(demandInfo ?? "");
@@ -63,43 +66,14 @@ export function ContextoEpicoPanel({ demandInfo, anexosContexto, onSalvar, onFec
 
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(15, 23, 42, 0.45)",
-        zIndex: 60,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-        fontFamily: "system-ui, sans-serif",
-      }}
-      onClick={onFechar}
+      aria-label="Contexto do épico"
+      style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
     >
-      <div
-        role="dialog"
-        aria-label="Contexto do épico"
-        style={{
-          background: "var(--painel)",
-          borderRadius: 16,
-          width: "min(640px, 100%)",
-          maxHeight: "88vh",
-          display: "flex",
-          flexDirection: "column",
-          boxShadow: "0 20px 60px rgba(15, 23, 42, 0.35)",
-          overflow: "hidden",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header style={{ padding: "18px 24px", borderBottom: "1px solid var(--borda)" }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "var(--texto)" }}>📎 Contexto do épico</div>
-          <div style={{ fontSize: 12, color: "var(--texto-fraco)", marginTop: 2 }}>
-            Cole o estado atual da história/épico e anexe material de apoio (texto) — alimenta a seção "Contexto" do
-            documento exportado e a sugestão de IA real na aba Refinamento.
-          </div>
-        </header>
-
-        <div style={{ padding: 24, overflow: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ flex: 1, padding: "14px 16px", overflow: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
+        <p style={{ margin: 0, fontSize: 12, color: "var(--texto-fraco)" }}>
+          Cole o estado atual da história/épico e anexe material de apoio (texto) — alimenta a seção "Contexto" do
+          documento exportado e a sugestão de IA real na aba Refinamento.
+        </p>
           <textarea
             aria-label="Contexto do épico (texto)"
             value={texto}
@@ -172,21 +146,20 @@ export function ContextoEpicoPanel({ demandInfo, anexosContexto, onSalvar, onFec
           </div>
         </div>
 
-        <footer style={{ padding: "14px 24px", borderTop: "1px solid var(--borda)", display: "flex", justifyContent: "flex-end", gap: 8 }}>
-          <button
-            onClick={onFechar}
-            style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid var(--borda-forte)", background: "var(--painel)", fontSize: 12, cursor: "pointer" }}
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={salvar}
-            style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: "var(--acento-indigo)", color: "#fff", fontSize: 12, cursor: "pointer" }}
-          >
-            Salvar
-          </button>
-        </footer>
-      </div>
+      <footer style={{ padding: "12px 16px", borderTop: "1px solid var(--borda)", display: "flex", justifyContent: "flex-end", gap: 8 }}>
+        <button
+          onClick={onFechar}
+          style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid var(--borda-forte)", background: "var(--painel)", fontSize: 12, cursor: "pointer" }}
+        >
+          Cancelar
+        </button>
+        <button
+          onClick={salvar}
+          style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: "var(--acento-indigo)", color: "#fff", fontSize: 12, cursor: "pointer" }}
+        >
+          Salvar
+        </button>
+      </footer>
     </div>
   );
 }

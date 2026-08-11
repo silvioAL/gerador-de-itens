@@ -15,7 +15,6 @@ export interface ConversaPanelProps {
    * com isso na caixa, em vez de pedir que ele digite tudo de novo. */
   contextoInicial?: string;
   onAplicar: (proposta: DiagramaProposto) => void;
-  onFechar: () => void;
 }
 
 interface Mensagem {
@@ -42,6 +41,9 @@ interface Mensagem {
  *
  * A resposta nunca é aplicada sozinha: vira um cartão com o porquê de cada nó
  * e um botão. Confirmar é do usuário.
+ *
+ * Desde o #298 este painel não tem casca própria (posição, cabeçalho, fechar):
+ * ele preenche a janela do `AssistenteFlutuante`, que é quem abre e fecha.
  */
 export function ConversaPanel({
   config,
@@ -51,7 +53,6 @@ export function ConversaPanel({
   contextos,
   contextoInicial,
   onAplicar,
-  onFechar,
 }: ConversaPanelProps) {
   const [mensagens, setMensagens] = useState<Mensagem[]>([
     {
@@ -157,15 +158,6 @@ export function ConversaPanel({
 
   return (
     <aside style={painelEstilo} data-testid="conversa-desenho" aria-label="Conversa do desenho">
-      <header style={cabecalhoEstilo}>
-        <strong style={{ fontSize: 13 }}>Desenhar conversando</strong>
-        <span style={{ fontSize: 11, color: "var(--texto-mudo)" }}>fase: desenho</span>
-        <div style={{ flex: 1 }} />
-        <button onClick={onFechar} style={botaoFecharEstilo} aria-label="Fechar conversa">
-          ×
-        </button>
-      </header>
-
       <div style={listaEstilo}>
         {mensagens.map((m, i) => (
           <div key={i} style={m.autor === "voce" ? balaoVoceEstilo : balaoAgenteEstilo}>
@@ -260,26 +252,10 @@ export function ConversaPanel({
 }
 
 const painelEstilo: React.CSSProperties = {
-  position: "fixed",
-  right: 0,
-  top: 0,
-  bottom: 0,
-  width: 420,
-  maxWidth: "100vw",
+  flex: 1,
+  minHeight: 0,
   display: "flex",
   flexDirection: "column",
-  background: "var(--painel)",
-  borderLeft: "1px solid var(--borda-forte)",
-  zIndex: 40,
-};
-
-const cabecalhoEstilo: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-  padding: "10px 12px",
-  borderBottom: "1px solid var(--borda)",
-  color: "var(--texto)",
 };
 
 const listaEstilo: React.CSSProperties = {
@@ -362,11 +338,3 @@ const botaoEnviarEstilo: React.CSSProperties = {
   whiteSpace: "nowrap",
 };
 
-const botaoFecharEstilo: React.CSSProperties = {
-  background: "transparent",
-  border: "none",
-  color: "var(--texto-fraco)",
-  fontSize: 18,
-  cursor: "pointer",
-  lineHeight: 1,
-};

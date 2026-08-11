@@ -37,7 +37,7 @@ beforeEach(() => {
 
 describe("ConversaPanel (SPEC-27 Fase 1 — a conversa do desenho)", () => {
   it("manda a descrição junto com os tipos que a configuração REALMENTE tem", async () => {
-    render(<ConversaPanel config={config} onAplicar={vi.fn()} onFechar={vi.fn()} techs={["Backend"]} />);
+    render(<ConversaPanel config={config} onAplicar={vi.fn()} techs={["Backend"]} />);
 
     fireEvent.change(screen.getByLabelText("Descreva a demanda"), {
       target: { value: "o checkout precisa consultar o saldo de pontos" },
@@ -57,7 +57,7 @@ describe("ConversaPanel (SPEC-27 Fase 1 — a conversa do desenho)", () => {
   });
 
   it("a proposta aparece com o PORQUÊ de cada nó — sem isso é caixa-preta pedindo confiança cega", async () => {
-    render(<ConversaPanel config={config} onAplicar={vi.fn()} onFechar={vi.fn()} />);
+    render(<ConversaPanel config={config} onAplicar={vi.fn()} />);
     fireEvent.change(screen.getByLabelText("Descreva a demanda"), { target: { value: "qualquer coisa" } });
     fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
 
@@ -68,7 +68,7 @@ describe("ConversaPanel (SPEC-27 Fase 1 — a conversa do desenho)", () => {
 
   it("nada é aplicado sozinho: só ao clicar em Aplicar ao canvas", async () => {
     const onAplicar = vi.fn();
-    render(<ConversaPanel config={config} onAplicar={onAplicar} onFechar={vi.fn()} />);
+    render(<ConversaPanel config={config} onAplicar={onAplicar} />);
     fireEvent.change(screen.getByLabelText("Descreva a demanda"), { target: { value: "qualquer coisa" } });
     fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
 
@@ -85,7 +85,6 @@ describe("ConversaPanel (SPEC-27 Fase 1 — a conversa do desenho)", () => {
         config={config}
         contextoInicial="reduzir o tempo de aprovação de crédito de 3 dias pra 1 hora"
         onAplicar={vi.fn()}
-        onFechar={vi.fn()}
       />
     );
     expect(screen.getByLabelText("Descreva a demanda")).toHaveValue(
@@ -100,7 +99,6 @@ describe("ConversaPanel (SPEC-27 Fase 1 — a conversa do desenho)", () => {
         timeAtivo="pagamentos"
         perfisTime={{ pagamentos: { service: { linguagem: "Java", framework: "Spring Boot" } } }}
         onAplicar={vi.fn()}
-        onFechar={vi.fn()}
       />
     );
     fireEvent.change(screen.getByLabelText("Descreva a demanda"), { target: { value: "x" } });
@@ -114,7 +112,7 @@ describe("ConversaPanel (SPEC-27 Fase 1 — a conversa do desenho)", () => {
 
   it("falha do modelo aparece na conversa, sem derrubar a janela", async () => {
     proporDiagramaMock.mockRejectedValue(new Error("modelos de IA não instalados"));
-    render(<ConversaPanel config={config} onAplicar={vi.fn()} onFechar={vi.fn()} />);
+    render(<ConversaPanel config={config} onAplicar={vi.fn()} />);
     fireEvent.change(screen.getByLabelText("Descreva a demanda"), { target: { value: "x" } });
     fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
 
