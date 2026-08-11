@@ -9,7 +9,6 @@
     "packages/llm",
     "packages/aplicacao",
     "packages/web",
-    "packages/cli",
     "packages/server"
   ],
   "scripts": {

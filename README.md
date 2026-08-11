@@ -1,5 +1,18 @@
 # Gerador de Itens
 
+> ## ⚠️ A CLI local foi descontinuada
+>
+> O Gerador de Itens passou a rodar **apenas no modo hospedado** (Docker +
+> Postgres + navegador). O pacote `gerador-de-itens` no npm está depreciado e
+> não recebe mais atualizações; `gerador open`, `gerador derive`,
+> `gerador implementar` e `gerador import-graphify` saíram do repositório.
+>
+> **As seções abaixo que falam em `npm install -g` e `gerador <comando>` estão
+> desatualizadas** e serão reescritas. Enquanto isso, o caminho válido é o
+> `docker compose` da seção de Produção.
+>
+> Motivo, medições e roteiro: [`SPEC-33-modo-unico-hospedado.md`](SPEC-33-modo-unico-hospedado.md).
+
 Ferramenta de quebra técnica: desenhe um diagrama de arquitetura (serviços, filas, bancos, processos de negócio, regras...) num canvas visual, preencha um painel de propriedades dirigido por config, e derive **deterministicamente** itens de trabalho com dependências reais — agnóstico de qual sistema de tracking recebe isso depois. Nada aqui é gerado por um LLM adivinhando a partir de uma descrição solta — sempre por regras explícitas em `config/diagrama.json`.
 
 Não é um gerador de prompt de IA. O mesmo diagrama sempre produz os mesmos itens.
