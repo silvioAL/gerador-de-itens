@@ -591,3 +591,87 @@ export function montarPedidoSugerirConfig({ alvo, instrucao, contexto }: Entrada
 
 /** Os alvos que a UI conhece — a borda usa para recusar cedo. */
 export const ALVOS_DE_SUGESTAO_CONHECIDOS = Object.keys(ALVOS_SUGESTAO_CONFIG);
+
+/**
+ * SPEC-34 Fase 1 — os alvos que a CONVERSA de configuração propõe: os que se
+ * aplicam por uma rota que o App já chama, com no máximo um destino (tipo de
+ * nó/conexão, grupo do papel) escolhido no cartão. Os alvos de regras exigem
+ * tech e o fluxo de escrita é da RegrasTab — entram na Fase 2, junto com as
+ * retrospectivas.
+ */
+export const ALVOS_DA_CONVERSA_DE_CONFIG = ["campo-no", "campo-aresta", "papel"] as const;
+
+export interface MensagemConfigurar {
+  autor: "voce" | "agente";
+  texto: string;
+}
+
+export interface EntradaConfigurarConversa {
+  mensagens: MensagemConfigurar[];
+  /** Resumo da config atual do time — é o que faz o modelo propor MUDANÇA,
+   * não duplicata do que já existe. */
+  resumoConfig?: string;
+}
+
+/** Mesmo motivo do teto de nós no diagrama: array aberto deixa a geração sem
+ * fim, e mais de três propostas numa resposta vira lista pra revisar, não
+ * conversa. */
+const MAX_PROPOSTAS_CONFIG = 3;
+
+/**
+ * SPEC-34 §3.5 — o PRIMEIRO passo da conversa de configuração: decidir se o
+ * pedido vira proposta e de qual alvo, destilando a instrução. O objeto em si
+ * é materializado pelo segundo passo, que reusa `montarPedidoSugerirConfig`
+ * com o schema estrito do alvo — aqui o schema é fixo de propósito (schema
+ * condicional por alvo é o que um gateway `json_object` não garante).
+ */
+export function montarPedidoConfigurarConversa({ mensagens, resumoConfig }: EntradaConfigurarConversa): PedidoIa {
+  const faladas = (mensagens ?? []).filter((m) => m?.texto?.trim());
+  if (!faladas.some((m) => m.autor === "voce")) {
+    throw new PedidoInvalido("conversa vazia — descreva o que quer configurar");
+  }
+
+  const esquema = {
+    type: "object",
+    properties: {
+      texto: { type: "string" },
+      propostas: {
+        type: "array",
+        maxItems: MAX_PROPOSTAS_CONFIG,
+        items: {
+          type: "object",
+          properties: {
+            alvo: { enum: [...ALVOS_DA_CONVERSA_DE_CONFIG] },
+            instrucao: { type: "string" },
+          },
+          required: ["alvo", "instrucao"],
+        },
+      },
+    },
+    required: ["texto", "propostas"],
+  } as EsquemaJson;
+
+  const prompt = [
+    `Você ajuda a configurar uma ferramenta de refinamento de itens de trabalho de software, conversando.`,
+    `Decida se o pedido da pessoa vira uma ou mais PROPOSTAS de configuração, e de qual tipo.`,
+    ``,
+    `Tipos de proposta disponíveis (campo "alvo"):`,
+    ...ALVOS_DA_CONVERSA_DE_CONFIG.map((a) => `- ${a}: ${ALVOS_SUGESTAO_CONFIG[a].descricao}`),
+    ...(resumoConfig?.trim()
+      ? [``, `Configuração atual do time (proponha mudança, não duplicata):`, resumoConfig.trim()]
+      : []),
+    ``,
+    `Conversa até aqui:`,
+    ...faladas.map((m) => `${m.autor === "voce" ? "Pessoa" : "Você"}: ${m.texto.trim()}`),
+    ``,
+    `Regras:`,
+    `- "texto" é a sua fala na conversa: curta, em português, dizendo o que você propõe e por quê.`,
+    `- "instrucao" de cada proposta é o pedido DESTILADO e autossuficiente — outra chamada vai`,
+    `  materializar o objeto lendo SÓ a instrução, sem ver esta conversa. Inclua nela tudo que importa.`,
+    `- Se a conversa ainda não dá uma proposta concreta, devolva "propostas" VAZIA e use "texto"`,
+    `  para perguntar o que falta. Lista vazia é resposta correta, não falha.`,
+    `- No máximo ${MAX_PROPOSTAS_CONFIG} propostas por resposta.`,
+  ].join("\n");
+
+  return { prompt, esquema };
+}

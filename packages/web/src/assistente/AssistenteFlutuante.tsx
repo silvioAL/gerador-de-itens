@@ -1,11 +1,12 @@
-export type AbaAssistente = "conversa" | "contexto";
+export type AbaAssistente = "conversa" | "contexto" | "configurar";
 
-/** A ordem aqui é a ordem visual das abas. O #297 ("configurar conversando")
- * nasce como uma entrada nova nesta lista, não como mais um botão solto — foi
- * exatamente pra isso que o invólucro existe. */
+/** A ordem aqui é a ordem visual das abas. Entrada nova = aba nova — foi
+ * exatamente pra isso que o invólucro existe (o "configurar" do #297 nasceu
+ * assim, como a SPEC-34 §3.1 previa). */
 const ABAS: { id: AbaAssistente; rotulo: string }[] = [
   { id: "conversa", rotulo: "✦ Desenhar conversando" },
   { id: "contexto", rotulo: "📎 Contexto do épico" },
+  { id: "configurar", rotulo: "⚙ Configurar" },
 ];
 
 export interface AssistenteFlutuanteProps {

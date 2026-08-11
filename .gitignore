@@ -29,3 +29,7 @@ config/pipeline-agentes.json
 config/regras.json
 config/prompt-unico-template.md
 config/quebras/
+
+# Artefatos de Playwright rodado por engano a partir da raiz
+/e2e/
+/test-results/

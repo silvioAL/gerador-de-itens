@@ -43,6 +43,7 @@ import { ReviewScreen } from "./review/ReviewScreen";
 import { ContextoEpicoPanel } from "./review/ContextoEpicoPanel";
 import { ConversaPanel } from "./conversa/ConversaPanel";
 import { AssistenteFlutuante, type AbaAssistente } from "./assistente/AssistenteFlutuante";
+import { ConfigurarPanel } from "./assistente/ConfigurarPanel";
 import { JourneyModal, type AbaJornada } from "./demo/JourneyModal";
 import { ConfigScreen, type AbaConfig } from "./config/ConfigScreen";
 import { TourOverlay } from "./demo/TourOverlay";
@@ -768,6 +769,19 @@ function AppCarregado({
             anexosContexto={quebra.anexosContexto}
             onSalvar={(demandInfo, anexosContexto) => setQuebra((q) => ({ ...q, demandInfo, anexosContexto }))}
             onFechar={() => setAbaAssistente(null)}
+          />
+        )}
+        {abaAssistente === "configurar" && (
+          <ConfigurarPanel
+            config={diagramaConfig}
+            camposNo={camposNo}
+            camposAresta={camposAresta}
+            pipelineAgentes={pipelineAgentes}
+            timeAtivo={timeAtivo}
+            hospedado={modo !== "local"}
+            onCriarCampoNo={criarCampoNo}
+            onCriarCampoAresta={criarCampoAresta}
+            onSalvarPipelineAgentes={salvarPipelineAgentes}
           />
         )}
       </AssistenteFlutuante>

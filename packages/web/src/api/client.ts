@@ -636,7 +636,52 @@ export const apiIa = {
     }
     return interpretarRespostaEstruturada<AlteracoesPropostas>(acumulado, "as alterações");
   },
+  /** SPEC-34 Fase 1 — o passo 1 da conversa de configuração: a conversa decide
+   * o alvo e destila a instrução; o objeto é materializado pelo passo 2, que é
+   * o `sugerirConfig` acima, intocado. Mesmo contrato de streaming. */
+  configurar: async (pedido: PedidoConfigurarIa, onTexto?: (acumulado: string) => void): Promise<RespostaConfigurar> => {
+    const resposta = await fetch(`${BASE_URL}/ia/configurar`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(pedido),
+    });
+    if (!resposta.ok) {
+      const corpo = await resposta.json().catch(() => ({}));
+      const mensagem = typeof corpo.erro === "string" ? corpo.erro : "Não foi possível responder.";
+      throw new Error(mensagem);
+    }
+    let acumulado = "";
+    const leitor = resposta.body?.getReader();
+    if (leitor) {
+      const decodificador = new TextDecoder();
+      for (;;) {
+        const { done, value } = await leitor.read();
+        if (done) break;
+        acumulado = soDepoisDoUltimoReinicio(acumulado + decodificador.decode(value, { stream: true }));
+        onTexto?.(acumulado);
+      }
+      acumulado = soDepoisDoUltimoReinicio(acumulado + decodificador.decode());
+    } else {
+      acumulado = await resposta.text();
+    }
+    return interpretarRespostaEstruturada<RespostaConfigurar>(acumulado, "a resposta");
+  },
 };
+
+export interface PedidoConfigurarIa {
+  mensagens: { autor: "voce" | "agente"; texto: string }[];
+  resumoConfig?: string;
+}
+
+/** Alvos que a conversa de configuração propõe na Fase 1 (SPEC-34 §4) — os de
+ * regras entram na Fase 2, junto com as retrospectivas. */
+export type AlvoConversaConfig = "campo-no" | "campo-aresta" | "papel";
+
+export interface RespostaConfigurar {
+  texto: string;
+  propostas: { alvo: AlvoConversaConfig; instrucao: string }[];
+}
 
 export interface PedidoAlterarItemIa {
   instrucao: string;

@@ -268,3 +268,68 @@ test("anexar um print manda a imagem até o gateway", async ({ page }) => {
 
   await expect(page.getByText(new RegExp(MARCA_VIU_IMAGEM)).first()).toBeVisible({ timeout: 30000 });
 });
+
+/**
+ * SPEC-34 Fase 1 — configurar conversando (#297), no navegador.
+ *
+ * Mora NESTE arquivo, e não num spec próprio, porque é este arquivo que possui
+ * o estado "credencial de gateway existe" (ver o comentário do describe de
+ * voz). A primeira versão era um `assistente-configurar.spec.ts` avulso — em
+ * ordem alfabética ele salvava a credencial da organização no primeiro lote de
+ * workers, e `derivar-e-revisar` (que afirma a revisão SEM IA) via a esteira
+ * entrar em geração ao vivo no meio da corrida. O invariante implícito da
+ * suíte é: credencial nasce quando este arquivo roda.
+ *
+ * O que só o navegador prova: os DOIS passos de IA atravessando servidor e
+ * gateway de verdade (conversa → alvo+instrução; instrução → objeto), e o
+ * Aplicar caindo na MESMA rota de escrita do formulário — o campo criado pela
+ * conversa aparece na aba "Padrões por componente", a prova de que não existe
+ * caminho paralelo de escrita.
+ */
+test("configurar conversando: a conversa vira proposta, aplicar cria o campo, e ele aparece em Configurações", async ({
+  page,
+}) => {
+  // time-checkout, e não o default: o campo aplicado nasce `required: true`
+  // (o gateway falso preenche boolean como true), e campo obrigatório deixa
+  // TODO nó desse tipo vermelho — em time-pagamentos isso derrubou os seis
+  // specs de cenário/derivação da suíte, o achado da §151 de novo (a seed foi
+  // para time-portabilidade pelo mesmo motivo). time-checkout não é usado por
+  // nenhum outro spec.
+  await entrar(page, "time-checkout");
+
+  // Idempotente com os testes anteriores do arquivo — e mantém este teste
+  // rodável sozinho via --grep.
+  await abrirModeloIa(page);
+  const card = page.getByTestId("modelo-ia-gateway");
+  await card.getByLabel("Base URL do gateway").fill(BASE_URL_GATEWAY_FALSO);
+  await card.getByLabel("Chave de API").fill(CHAVE_GATEWAY_FALSO);
+  await card.getByLabel("Nome do modelo").fill(MODELO_GATEWAY_FALSO);
+  await card.getByRole("button", { name: "Salvar" }).click();
+  await expect(page.getByTestId("gateway-resultado")).toContainText("Credencial salva");
+  await page.getByRole("button", { name: "Voltar ao canvas" }).click();
+
+  // A conversa mora na terceira aba do assistente flutuante (#298).
+  await page.getByTestId("assistente-flutuante").click();
+  await page.getByRole("button", { name: "⚙ Configurar" }).click();
+  await expect(page.getByTestId("configurar-conversa")).toBeVisible();
+
+  await page.getByLabel("Descreva o que configurar").fill("todo serviço novo precisa declarar o runbook de plantão");
+  await page.getByRole("button", { name: "Enviar" }).click();
+
+  // O cartão materializado carrega a marca do gateway — os dois passos de IA
+  // aconteceram de verdade (rede, streaming, parse), não um mock de fetch.
+  const cartao = page.getByTestId(/proposta-config-/).first();
+  await expect(cartao).toBeVisible({ timeout: 30000 });
+  await expect(cartao).toContainText(MARCA_GATEWAY_FALSO, { timeout: 30000 });
+
+  // Nada foi escrito ainda: aplicar é o clique, não a resposta do modelo.
+  await cartao.getByRole("button", { name: "Aplicar" }).click();
+  await expect(cartao.getByTestId("proposta-aplicada")).toBeVisible({ timeout: 15000 });
+
+  // A prova de que a escrita passou pela rota de sempre: a aba de Configurações
+  // que o formulário alimenta lista o campo criado pela conversa.
+  await page.getByTestId("assistente-flutuante").click();
+  await page.getByRole("button", { name: "⚙ Configurações" }).click();
+  await page.getByRole("button", { name: /Padrões por componente/ }).click();
+  await expect(page.getByText(new RegExp(`${MARCA_GATEWAY_FALSO}.*\\(label\\)`)).first()).toBeVisible();
+});
