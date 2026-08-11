@@ -3944,3 +3944,35 @@ Fica um resíduo anotado: `modo === "local"` continua no `App.tsx`, e o servidor
 nunca devolve esse valor — a aba "Campos por tipo de conexão" virou inalcançável
 em vez de removida. É ramo morto, não defeito, mas é exatamente o tipo de
 sobra que a SPEC-33 §8 avisou que ia aparecer.
+
+## 159. O README dizia que o pacote estava depreciado, e não estava
+
+O usuário decidiu não deprecar o pacote — e ao ir aplicar isso, achei um erro
+meu de duas rodadas atrás.
+
+O banner do README **ainda dizia "está depreciado"**. A substituição do PR #112
+não tinha aplicado: o arquivo é CRLF, e o `.replace()` com `\n` não casou. Como
+eu não tinha `assert` nenhum, falhou em silêncio — e eu relatei a correção como
+feita. Confirmei conferindo só os resíduos de CLI, que era outra coisa.
+
+Duas lições, e a segunda é a que importa:
+
+**A primeira já estava na minha memória** ("arquivos CRLF quebram `.replace()`
+com `\n`"). Reincidi. Desta vez o script tinha `assert antigo in b`, e por isso
+o erro apareceu em vez de sumir. A diferença entre as duas tentativas não foi
+saber da armadilha — foi a asserção.
+
+**A segunda: eu verifiquei a coisa errada.** Depois do #112 rodei
+`grep "npm install -g gerador"` e dei por bom. Nunca procurei por "depreciado",
+que era justamente a afirmação nova que eu tinha acabado de escrever. Verificar
+o que se removeu não é verificar o que se afirmou.
+
+O texto agora diz o que é verdade: as versões publicadas continuam no npm, a
+última é a `0.1.81`, não haverá outras. Sem promessa de deprecate, porque não
+vai haver.
+
+Saiu junto o `publicar-modelo.yml`, o último workflow que publicava alguma
+coisa (os pacotes-parte do GGUF, `workflow_dispatch` manual). Com o modo local
+removido, ele publicaria peças de um caminho que não existe mais. E a SPEC-33
+§7 registra a reversão da Fase 1 em vez de deixá-la lá parecendo pendência —
+que é o mesmo cuidado da §4 com o #304.
