@@ -10,7 +10,7 @@ export interface EdgePanelProps {
 }
 
 export function EdgePanel({ aresta, config, quebraState }: EdgePanelProps) {
-  const { quebra, definirTipoAresta, definirValorSpecAresta, removerAresta, setArestaSelecionadaId } = quebraState;
+  const { quebra, definirTipoAresta, definirValorSpecAresta, pedirExclusao, setArestaSelecionadaId } = quebraState;
   const origem = quebra.diagrama.nodes.find((n) => n.id === aresta.source);
   const destino = quebra.diagrama.nodes.find((n) => n.id === aresta.target);
   const regra = destino ? (config.edgeRules[destino.type] ?? config.edgeRules._fallback) : undefined;
@@ -68,10 +68,11 @@ export function EdgePanel({ aresta, config, quebraState }: EdgePanelProps) {
 
       <hr style={{ margin: "14px 0", border: "none", borderTop: "1px solid var(--borda)" }} />
       <button
-        onClick={() => {
-          removerAresta(aresta.id);
-          setArestaSelecionadaId(null);
-        }}
+        // Sem `setArestaSelecionadaId(null)` aqui: desselecionar já fecharia
+        // este painel, e cancelar a confirmação deixaria a pessoa sem a aresta
+        // selecionada de volta. Quem limpa a seleção é `removerAresta`, depois
+        // de confirmada.
+        onClick={() => pedirExclusao("aresta", aresta.id)}
         style={{ ...botaoEstilo, color: "var(--vermelho)", borderColor: "#fecaca" }}
       >
         Excluir aresta

@@ -1,8 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 import { render } from "@testing-library/react";
+import { ReactFlowProvider } from "@xyflow/react";
 import type { Edge } from "@xyflow/react";
 import type { DiagramaConfig } from "@gerador/engine";
 import { Canvas } from "./Canvas";
+
+/**
+ * O `Canvas` usa `useReactFlow` (para enquadrar depois de inserção em lote),
+ * que exige o `ReactFlowProvider` como ancestral. Em produção ele sempre está
+ * lá — `App.tsx` envolve o canvas inteiro. Renderizar solto aqui era o teste
+ * montando um cenário que não existe; embrulhar aproxima o teste do app.
+ */
+function comProvider(elemento: React.ReactElement) {
+  return <ReactFlowProvider>{elemento}</ReactFlowProvider>;
+}
 
 /**
  * ACHADO REAL do usuário: "ao digitar o conteúdo das especificações na tela
@@ -76,10 +87,10 @@ function estado(specDoNo: Record<string, unknown>, n2 = N2) {
 describe("Canvas — o rótulo da conexão não pode repintar quando se digita no nó", () => {
   it("digitar no spec de um nó NÃO troca as referências das arestas", () => {
     edgesRecebidos.length = 0;
-    const { rerender } = render(<Canvas quebraState={estado({ nome: { valor: "a", origem: "manual" } })} config={config} />);
+    const { rerender } = render(comProvider(<Canvas quebraState={estado({ nome: { valor: "a", origem: "manual" } })} config={config} />));
     // Cada tecla produz um objeto `spec` novo — é o que a UI real faz.
-    rerender(<Canvas quebraState={estado({ nome: { valor: "ab", origem: "manual" } })} config={config} />);
-    rerender(<Canvas quebraState={estado({ nome: { valor: "abc", origem: "manual" } })} config={config} />);
+    rerender(comProvider(<Canvas quebraState={estado({ nome: { valor: "ab", origem: "manual" } })} config={config} />));
+    rerender(comProvider(<Canvas quebraState={estado({ nome: { valor: "abc", origem: "manual" } })} config={config} />));
 
     expect(edgesRecebidos.length).toBeGreaterThanOrEqual(3);
     const primeiro = edgesRecebidos[0][0];
@@ -96,11 +107,11 @@ describe("Canvas — o rótulo da conexão não pode repintar quando se digita n
     // precisa continuar mudando a aresta.
     edgesRecebidos.length = 0;
     const spec = { nome: { valor: "a", origem: "manual" } };
-    const { rerender } = render(<Canvas quebraState={estado(spec)} config={config} />);
+    const { rerender } = render(comProvider(<Canvas quebraState={estado(spec)} config={config} />));
     expect(edgesRecebidos.at(-1)![0].sourceHandle).toBe("source-right");
 
     // n2 vai pra ESQUERDA de n1: o handle padrão tem que virar.
-    rerender(<Canvas quebraState={estado(spec, { ...N2, x: -300 })} config={config} />);
+    rerender(comProvider(<Canvas quebraState={estado(spec, { ...N2, x: -300 })} config={config} />));
     expect(edgesRecebidos.at(-1)![0].sourceHandle).toBe("source-left");
   });
 });

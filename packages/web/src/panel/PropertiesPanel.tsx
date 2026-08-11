@@ -54,7 +54,7 @@ export function PropertiesPanel({
 
   const visiveis = camposVisiveis(cfg.spec, no, arestas);
   const prontidao = calcularProntidao(cfg.spec, no, arestas);
-  const { renomearNo, alternarStatus, definirTime, removerNo } = quebraState;
+  const { renomearNo, alternarStatus, definirTime, pedirExclusao } = quebraState;
 
   // Exclui o campo de identidade (nome do serviço, tópico, tabela...) da
   // captura de "padrão do time" — sugerir o mesmo valor fixo pra todo nó novo
@@ -128,7 +128,9 @@ export function PropertiesPanel({
 
       <hr style={{ margin: "14px 0", border: "none", borderTop: "1px solid var(--borda)" }} />
       <button
-        onClick={() => removerNo(no.id)}
+        // Pede confirmação (useQuebra) — este é o caminho por onde o usuário
+        // de fato exclui: seleciona o componente e clica aqui.
+        onClick={() => pedirExclusao("no", no.id)}
         style={{ ...statusBotaoEstilo, color: "var(--vermelho)", borderColor: "#fecaca" }}
       >
         Excluir nó

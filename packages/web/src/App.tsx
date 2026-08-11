@@ -370,8 +370,12 @@ function AppCarregado({
     demoAutomatica.play();
   }
 
+  // Os três caminhos que inserem nós em LOTE pedem enquadramento pelo mesmo
+  // motivo: sem isso o material novo cai fora da área visível (ver
+  // `pedirEnquadramento` em useQuebra).
   function adicionarCenario(q: Quebra) {
     setQuebra((atual) => ({ ...atual, diagrama: mesclarDiagrama(atual.diagrama, q.diagrama) }));
+    quebraState.pedirEnquadramento();
   }
 
   function importarGraphify(nodes: No[]) {
@@ -379,6 +383,7 @@ function AppCarregado({
       ...atual,
       diagrama: mesclarDiagrama(atual.diagrama, { nodes, edges: [] }),
     }));
+    quebraState.pedirEnquadramento();
   }
 
   /**

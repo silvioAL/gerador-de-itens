@@ -32,8 +32,20 @@ body,
   color: var(--texto);
 }
 
+/* ACHADO REAL do usuário, com print: o "Cancelar" do painel de contexto do
+   épico aparecia PRETO sobre fundo escuro, quase invisível.
+
+   A causa não é do painel: o navegador reseta `color` de <button> para
+   `buttontext` (preto) em vez de herdar do `body`, então todo botão que define
+   só `background: var(--painel)` e confia na herança fica ilegível. A varredura
+   achou o mesmo padrão em cerca de vinte lugares — o usuário topou com um.
+
+   Por isso a correção é aqui e não no painel: um `color` por arquivo deixaria
+   os outros dezenove esperando alguém esbarrar neles. Botão que define `color`
+   inline continua vencendo esta regra. */
 button {
   font-family: inherit;
+  color: var(--texto);
 }
 
 /* Campos sem estilo inline próprio herdavam o default claro do browser e
