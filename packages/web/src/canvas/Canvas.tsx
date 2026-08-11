@@ -37,6 +37,18 @@ function posicoesDaGeometria(geometria: string): Map<string, { x: number; y: num
   return mapa;
 }
 
+/**
+ * ACHADO REAL: o usuário selecionou o componente, apertou `Delete` e nada
+ * aconteceu — nem a exclusão, nem a confirmação. O padrão do React Flow é
+ * `deleteKeyCode: "Backspace"` e só; `Delete` nunca chegou a virar um
+ * `NodeChange` do tipo `remove`, então `onNodesChange` não tinha o que pedir.
+ * A confirmação estava certa o tempo todo — quem faltava era a tecla.
+ *
+ * Constante de módulo porque o React Flow compara a prop por referência: um
+ * array literal aqui seria um valor novo a cada render.
+ */
+const TECLAS_DE_EXCLUSAO = ["Delete", "Backspace"];
+
 const LABEL_STYLE = { fontSize: 11, fill: "#c5ceda" };
 const LABEL_BG_STYLE = { fill: "#101823" };
 
@@ -204,6 +216,7 @@ export function Canvas({ quebraState, config }: CanvasProps) {
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
+      deleteKeyCode={TECLAS_DE_EXCLUSAO}
       onNodeClick={(_, node) => {
         setSelecionadoId(node.id);
         setArestaSelecionadaId(null);

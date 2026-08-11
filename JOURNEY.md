@@ -3498,3 +3498,70 @@ Ollama apontam justamente para esses endereços. Quebraria no dia em que um
 preset trouxesse um serviço de voz diferente, que é exatamente quando ninguém
 está olhando.
 
+
+## 147. "Campos por tipo de nó (0)" era vocabulário nosso, e o zero mentia (#300)
+
+O usuário olhou a aba e disse duas coisas numa frase só: *"é muito provável que
+usuário não entenda para que essa parte serve"* e *"precisamos de outro nome
+para a feature e rever a UX"*. Escolheu **"Padrões por componente"** entre as
+alternativas, e delimitou o escopo: **só renomear e clarear** — a massa de
+teste fica para depois (#301).
+
+Duas coisas estavam erradas, e a segunda é a que importa.
+
+**O nome era o do código.** "Nó" é jargão do canvas; "campos" não diz o que se
+ganha. O nome novo é o do próprio usuário — ele fala "componente", e quando
+explicou para que serve o RBAC chamou isto de *"padrões técnicos configuráveis
+(obrigatórios ou não)"*. Não inventamos vocabulário: devolvemos o dele.
+
+**O contador mentia.** `Campos por tipo de nó (0)` lê como "não existe nada
+aqui" — e o usuário leu exatamente assim, perguntando *"parece zerado, isso
+está correto?"*. Estava, e não estava. Aquele número conta só o que **este
+time** personalizou; os campos padrão vindos do `diagrama.json` são dezenas, e
+nunca apareceram em lugar nenhum da tela. Agora o rótulo diz `Padrões por
+componente (N do time)` e o texto de abertura da aba abre com o total padrão —
+zero passou a significar "ainda não personalizado", que é a verdade.
+
+A lição não é sobre copy. Um número sem denominador é uma afirmação sem sujeito,
+e quem lê preenche o sujeito sozinho — quase sempre errado.
+
+## 148. A confirmação estava certa; faltava a tecla (#302)
+
+O usuário voltou ao #294 (excluir componente pede confirmação) e reportou:
+*"tentei deletar um item selecionando o componente e clicando em deletar (...)
+deveria perguntar se realmente desejo excluir e então excluir caso seja
+confirmado, mas não ocorreu"*. E pediu a ordem certa: *"avalie se é questão da
+versão, ou não está funcionando"*.
+
+**Primeiro a versão, porque é barato.** O bundle servido em `localhost:8080`
+continha `confirmar-exclusao` e não continha `Padrões por componente` — ou seja,
+o #294 estava no ar e o #300 ainda não. Não era versão.
+
+**Depois o defeito — e aqui eu quase errei.** Escrevi um teste vitest compondo
+`Canvas` + `PropertiesPanel` de verdade: **passou**. Rodei outro com o
+`ReactFlow` real sob jsdom: o diálogo chegava ao DOM. Com dois verdes na mão a
+conclusão tentadora era "renderiza mas fica invisível no navegador". Era
+palpite. Fui ao navegador de verdade contra a stack do usuário — e o diálogo
+aparecia, visível, centralizado, com o nó intacto atrás.
+
+O que faltava era a **outra** porta. `Delete` não fazia absolutamente nada;
+`Backspace` funcionava. O padrão do React Flow é `deleteKeyCode: "Backspace"` e
+só — `Delete` nunca virava um `NodeChange` do tipo `remove`, então
+`onNodesChange` não tinha o que pedir. A confirmação do #294 estava correta o
+tempo todo. Um `deleteKeyCode={["Delete", "Backspace"]}` resolve.
+
+**Por que os meus testes passaram com o defeito presente.** O vitest mocka
+`@xyflow/react`, e é DENTRO do React Flow que a tecla vira mudança. Um dublê
+nunca ia recusar `Delete`, porque não é ele quem escuta o teclado. O teste não
+estava frouxo — estava do lado errado da fronteira. Então
+`e2e/excluir-componente.spec.ts` cobre as duas teclas, os dois painéis (nó e
+aresta) e o cancelar, no navegador; e o caso que sobrou no vitest afirma só o
+que é honesto afirmar de um dublê: qual valor o `Canvas` mandou. Removi o
+`deleteKeyCode` e rodei: o E2E fica vermelho. É ele que morde.
+
+Isto é a §145 outra vez, num terceiro disfarce: **a defesa existe, é boa, e não
+cobre o segundo caminho que faz a mesma coisa.** Permissão em `campos-no` mas
+não nas outras catorze rotas. Confirmação no painel mas não na tecla. A pergunta
+que teria evitado as três é sempre a mesma — *quantos caminhos chegam aqui?* —
+e desta vez ela tem um par: *o meu teste está do mesmo lado da fronteira que o
+defeito?*
