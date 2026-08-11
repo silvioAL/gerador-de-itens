@@ -3,13 +3,12 @@
 > ## ⚠️ A CLI local foi descontinuada
 >
 > O Gerador de Itens passou a rodar **apenas no modo hospedado** (Docker +
-> Postgres + navegador). O pacote `gerador-de-itens` no npm está depreciado e
-> não recebe mais atualizações; `gerador open`, `gerador derive`,
-> `gerador implementar` e `gerador import-graphify` saíram do repositório.
+> Postgres + navegador). `gerador open`, `gerador derive`, `gerador implementar`
+> e `gerador import-graphify` saíram do repositório.
 >
-> **As seções abaixo que falam em `npm install -g` e `gerador <comando>` estão
-> desatualizadas** e serão reescritas. Enquanto isso, o caminho válido é o
-> `docker compose` da seção de Produção.
+> As versões já publicadas do pacote `gerador-de-itens` continuam no npm — a
+> última é a `0.1.81` — e **não haverá outras**. Quem instalou segue com o que
+> baixou; ninguém deve contar com correções ali.
 >
 > Motivo, medições e roteiro: [`SPEC-33-modo-unico-hospedado.md`](SPEC-33-modo-unico-hospedado.md).
 

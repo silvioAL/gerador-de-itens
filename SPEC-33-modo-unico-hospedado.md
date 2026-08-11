@@ -86,7 +86,12 @@ dependia daquilo.
 
 - **Fase 0 — parar de publicar.** ✅ feito (PR #109). `git tag` deixa de
   publicar no npm; o release passa a ser imagem Docker.
-- **Fase 1 — `npm deprecate`.** Depende de sessão interativa do npm, do
+- **Fase 1 — ~~`npm deprecate`~~. DECISÃO REVERTIDA pelo usuário: não vai
+  acontecer.** As versões publicadas ficam como estão, sem marca de
+  depreciação. O que sustenta isso é o §2: `unpublish` está bloqueado pelos
+  8.576 downloads/semana, e depreciar era escolha, não necessidade. O que
+  garante que ninguém receba versão nova é a Fase 0, já feita — nada mais é
+  publicado. **Não registrar isto como pendência.**
   usuário. Mensagem já redigida.
 - **Fase 2 — cobrir o que vai ficar sem rede.** As 4 abas de Configurações sem
   nenhum E2E (#306): Regras de refinamento, Acessos, Pipeline de IA, Campos por
@@ -107,7 +112,7 @@ dependia daquilo.
   lugar onde a metade errada pode sobrar — que é exatamente o defeito de hoje.
   O teste genérico "nenhuma aba visível abre em branco" (`ConfigScreen.test.tsx`)
   fica como rede.
-- **Deprecar não é remover.** Quem já instalou continua funcionando com uma CLI
+- **Sem deprecate, o aviso é só o README.** Quem já instalou continua com uma CLI
   que fala com um `openApiLocal` que não existe mais no repositório. É
   aceitável — a versão publicada é imutável e continua íntegra —, mas ninguém
   deve prometer suporte a ela.
