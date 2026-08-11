@@ -28,10 +28,23 @@ const SECOES: { id: Secao; rotulo: string }[] = [
   { id: "volumetria", rotulo: "Volumetria" },
 ];
 
-export function RegrasTab() {
+export interface RegrasTabProps {
+  /**
+   * SPEC-28 Fase 2 — as quatro seções são QUATRO recursos do RBAC, e podem ter
+   * donos diferentes (Agilidade no processo, Arquitetura no técnico). Filtrar
+   * aqui, e não esconder a aba inteira, é o que torna a delegação possível:
+   * quem cuida só do processo continua enxergando a sua seção.
+   *
+   * Ausente (modo local, sem RBAC) = pode tudo.
+   */
+  podeSecao?: (id: Secao) => boolean;
+}
+
+export function RegrasTab({ podeSecao }: RegrasTabProps = {}) {
+  const secoesVisiveis = SECOES.filter((s) => podeSecao?.(s.id) ?? true);
   const [regras, setRegras] = useState<RegrasConfig | null>(null);
   const [tech, setTech] = useState<string>("");
-  const [secao, setSecao] = useState<Secao>("tecnico");
+  const [secao, setSecao] = useState<Secao>(secoesVisiveis[0]?.id ?? "tecnico");
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [diagnostico, setDiagnostico] = useState<DiagnosticoConfig | null>(null);
@@ -100,7 +113,7 @@ export function RegrasTab() {
           ))}
         </select>
         <div style={{ display: "flex", gap: 4 }}>
-          {SECOES.map((s) => (
+          {secoesVisiveis.map((s) => (
             <button
               key={s.id}
               onClick={() => setSecao(s.id)}

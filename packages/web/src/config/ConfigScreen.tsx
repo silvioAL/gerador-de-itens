@@ -10,6 +10,7 @@ import { EspecificacaoTemplateTab } from "./EspecificacaoTemplateTab";
 import { PipelineAgentesTab } from "./PipelineAgentesTab";
 import { ModeloIaTab } from "./ModeloIaTab";
 import { RegrasTab } from "./RegrasTab";
+import { RECURSO_DA_ABA, RECURSO_DA_SECAO_DE_REGRAS, usePermissoes } from "../auth/usePermissoes";
 
 export type AbaConfig =
   | "perfis"
@@ -52,6 +53,18 @@ export interface ConfigScreenProps {
 }
 
 /**
+ * Regras é a exceção: uma tela, QUATRO recursos. Aparece se a pessoa puder
+ * QUALQUER um dos quatro — esconder a aba inteira tiraria o checklist de
+ * processo de quem cuida só dele, que é exatamente a delegação que a feature
+ * existe para permitir. As seções internas são filtradas uma a uma.
+ */
+function podeVerAba(id: AbaConfig, pode: (recurso: string, acao?: string) => boolean): boolean {
+  if (id === "regras") return Object.values(RECURSO_DA_SECAO_DE_REGRAS).some((r) => pode(r));
+  const recurso = RECURSO_DA_ABA[id];
+  return recurso ? pode(recurso) : true;
+}
+
+/**
  * Tela cheia (mesmo padrão de ReviewScreen.tsx), não mais aba dentro da
  * JourneyModal — o editor de campos por tipo de nó não cabe na densidade de
  * uma aba de onboarding (SPEC-08 §3.5). Reúne o que é config recorrente de
@@ -85,6 +98,49 @@ export function ConfigScreen({
     if (abaForcada) setAba(abaForcada);
   }, [abaForcada]);
 
+  // `mostrarMembros` já É "modo hospedado" (ver a prop). O RBAC só existe lá.
+  const permissoes = usePermissoes({ hospedado: mostrarMembros, timeId: timeAtivo });
+
+  /**
+   * SPEC-28 Fase 2 — a aba some quando a permissão não existe.
+   *
+   * Duas condições diferentes, deliberadamente separadas:
+   * - `existe`: a aba faz sentido NESTE MODO (local x hospedado). Nada a ver
+   *   com permissão; é a régua que já existia.
+   * - o `pode`: quem está logado tem a permissão. Só vale no hospedado com RBAC
+   *   ligado — em qualquer outro caso o hook devolve `true` (falha aberta).
+   */
+  const abasVisiveis = (
+    [
+      { id: "perfis", rotulo: `Perfis de time (${Object.keys(perfisTime).length})`, existe: true },
+      { id: "campos", rotulo: `Campos por tipo de nó (${camposNo.length})`, existe: true },
+      { id: "camposAresta", rotulo: `Campos por tipo de conexão (${camposAresta.length})`, existe: mostrarCamposAresta },
+      { id: "membros", rotulo: "Membros", existe: mostrarMembros },
+      // SPEC-28 §2: acessos só existem no hospedado — no local não há login, e
+      // permissão em arquivo seria convenção, não segurança.
+      { id: "acessos", rotulo: "Acessos", existe: mostrarMembros },
+      /**
+       * ACHADO desta rodada: esta aba estava atrás de `mostrarCamposAresta`, que
+       * é "modo LOCAL". Fazia sentido quando ela nasceu (SPEC-23 fluxo 5), com
+       * `regras` existindo só como arquivo. A SPEC-31 Fase 3 criou
+       * `/config/regras` no hospedado depois, e ninguém revisitou o gate.
+       *
+       * O efeito era uma contradição silenciosa: o RBAC só existe no hospedado,
+       * e a tela que edita os quatro `regras.*` só aparecia no local. "Agilidade
+       * cuida do checklist de processo" — o pedido que originou a SPEC-28
+       * inteira — não tinha por onde ser exercido.
+       */
+      { id: "regras", rotulo: "Regras de refinamento", existe: true },
+      { id: "especificacao", rotulo: "Especificação de solução", existe: true },
+      { id: "pipeline", rotulo: "Pipeline de IA", existe: true },
+      { id: "modeloIa", rotulo: "Modelo de IA", existe: true },
+    ] satisfies { id: AbaConfig; rotulo: string; existe: boolean }[]
+  ).filter((a) => a.existe && podeVerAba(a.id, permissoes.pode));
+
+  // A aba ativa pode ter sumido (papel trocado, ou `abaForcada` do tour
+  // apontando pra algo negado). Cair na primeira visível evita a tela em branco.
+  const abaAtiva = abasVisiveis.some((a) => a.id === aba) ? aba : abasVisiveis[0]?.id;
+
   return (
     <div
       data-tour="config-screen-content"
@@ -116,51 +172,18 @@ export function ConfigScreen({
       </header>
 
       <div style={{ display: "flex", gap: 4, padding: "12px 16px 0", borderBottom: "1px solid var(--borda)" }}>
-        <button onClick={() => setAba("perfis")} style={aba === "perfis" ? abaAtivaEstilo : abaEstilo}>
-          Perfis de time ({Object.keys(perfisTime).length})
-        </button>
-        <button onClick={() => setAba("campos")} style={aba === "campos" ? abaAtivaEstilo : abaEstilo}>
-          Campos por tipo de nó ({camposNo.length})
-        </button>
-        {mostrarCamposAresta && (
-          <button onClick={() => setAba("camposAresta")} style={aba === "camposAresta" ? abaAtivaEstilo : abaEstilo}>
-            Campos por tipo de conexão ({camposAresta.length})
+        {abasVisiveis.map((a) => (
+          <button key={a.id} onClick={() => setAba(a.id)} style={abaAtiva === a.id ? abaAtivaEstilo : abaEstilo}>
+            {a.rotulo}
           </button>
-        )}
-        {mostrarMembros && (
-          <button onClick={() => setAba("membros")} style={aba === "membros" ? abaAtivaEstilo : abaEstilo}>
-            Membros
-          </button>
-        )}
-        {/* SPEC-28 §2: acessos só existem no modo hospedado — no local não há
-            login, e permissão em arquivo seria convenção, não segurança.
-            `mostrarMembros` já É "modo hospedado" (`modo !== "local"`). */}
-        {mostrarMembros && (
-          <button onClick={() => setAba("acessos")} style={aba === "acessos" ? abaAtivaEstilo : abaEstilo}>
-            Acessos
-          </button>
-        )}
-        {mostrarCamposAresta && (
-          <button onClick={() => setAba("regras")} style={aba === "regras" ? abaAtivaEstilo : abaEstilo}>
-            Regras de refinamento
-          </button>
-        )}
-        <button onClick={() => setAba("especificacao")} style={aba === "especificacao" ? abaAtivaEstilo : abaEstilo}>
-          Especificação de solução
-        </button>
-        <button onClick={() => setAba("pipeline")} style={aba === "pipeline" ? abaAtivaEstilo : abaEstilo}>
-          Pipeline de IA
-        </button>
-        <button onClick={() => setAba("modeloIa")} style={aba === "modeloIa" ? abaAtivaEstilo : abaEstilo}>
-          Modelo de IA
-        </button>
+        ))}
       </div>
 
       <div style={{ flex: 1, overflow: "auto", padding: 24 }}>
-        {aba === "perfis" && (
+        {abaAtiva === "perfis" && (
           <PerfisTimeTab perfisTime={perfisTime} config={config} onEditarValor={onEditarValorPerfilTime} />
         )}
-        {aba === "campos" && (
+        {abaAtiva === "campos" && (
           <CamposNoTab
             config={config}
             camposNo={camposNo}
@@ -170,7 +193,7 @@ export function ConfigScreen({
             onExcluir={onExcluirCampoNo}
           />
         )}
-        {aba === "camposAresta" && mostrarCamposAresta && (
+        {abaAtiva === "camposAresta" && mostrarCamposAresta && (
           <CamposArestaTab
             config={config}
             camposAresta={camposAresta}
@@ -180,18 +203,18 @@ export function ConfigScreen({
             onExcluir={onExcluirCampoAresta}
           />
         )}
-        {aba === "regras" && mostrarCamposAresta && <RegrasTab />}
-        {aba === "membros" && mostrarMembros && <MembrosTab timeAtivo={timeAtivo} />}
-        {aba === "acessos" && mostrarMembros && <AcessosTab timeAtivo={timeAtivo} />}
-        {aba === "especificacao" && (
+        {abaAtiva === "regras" && mostrarCamposAresta && <RegrasTab podeSecao={(id) => permissoes.pode(RECURSO_DA_SECAO_DE_REGRAS[id])} />}
+        {abaAtiva === "membros" && mostrarMembros && <MembrosTab timeAtivo={timeAtivo} />}
+        {abaAtiva === "acessos" && mostrarMembros && <AcessosTab timeAtivo={timeAtivo} />}
+        {abaAtiva === "especificacao" && (
           <EspecificacaoTemplateTab
             template={especificacaoTemplate}
             timeAtivo={timeAtivo}
             onSalvar={onSalvarEspecificacaoTemplate}
           />
         )}
-        {aba === "pipeline" && <PipelineAgentesTab config={pipelineAgentes} onSalvar={onSalvarPipelineAgentes} />}
-        {aba === "modeloIa" && <ModeloIaTab />}
+        {abaAtiva === "pipeline" && <PipelineAgentesTab config={pipelineAgentes} onSalvar={onSalvarPipelineAgentes} />}
+        {abaAtiva === "modeloIa" && <ModeloIaTab />}
       </div>
     </div>
   );

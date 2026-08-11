@@ -3361,3 +3361,45 @@ Não apaguei as linhas do banco. Elas são inertes — nenhum código as alcanç
 uma migração destrutiva por causa de dado que ninguém lê custa mais risco do que
 resolve.
 
+## 144. A tela esconde o que seria negado — e a delegação não tinha por onde acontecer (#289)
+
+SPEC-28 Fase 2. O RBAC já negava de verdade desde a Fase 1b; faltava a tela
+parar de oferecer o que o servidor recusa.
+
+### O achado que mudou o escopo
+
+A aba **Regras de refinamento** estava atrás de `mostrarCamposAresta`, que
+significa **modo LOCAL**. E o RBAC só existe no modo **hospedado**.
+
+Ou seja: a tela que edita os quatro `regras.*` só aparecia onde não há
+permissão, e as permissões só existem onde a tela não aparecia. O pedido que
+originou a SPEC-28 inteira — *"Agilidade cuida do checklist de processo,
+Arquitetura do técnico"* — **não tinha por onde ser exercido**.
+
+Não é bug de descuido: a aba nasceu na SPEC-23 fluxo 5, quando `regras` só
+existia como arquivo local. A SPEC-31 Fase 3 criou `/config/regras` no
+hospedado bem depois, e ninguém revisitou o gate. Medido antes de mexer:
+`GET /config/regras` no hospedado devolve 200.
+
+Vale como padrão: **flag de modo envelhece em silêncio**. `mostrarCamposAresta`
+era um nome honesto para "modo local" em 2026-06 e virou uma condição errada
+para outra coisa em 2026-08, sem nenhum teste reclamar.
+
+### As duas decisões que parecem descuido e não são
+
+**Falha ABERTA.** Se `/permissoes/minhas` não responde, o hook libera tudo.
+Esconder é conveniência; a negação real está em cada rota. Falhar fechado
+esconderia funcionalidade de quem TEM permissão por causa de um soluço de
+rede — pior que o pior caso de falhar aberto, que é ver um botão devolvendo
+403, exatamente como era antes desta rodada.
+
+**A aba de regras não é escondida inteira.** Ela é uma tela com QUATRO
+recursos. Esconder tudo quando falta um tiraria o checklist de processo de quem
+cuida só dele — destruiria a delegação em nome de aplicá-la. O filtro é por
+SEÇÃO, espelhando o `secoesDeRegrasAlteradas` que o servidor usa para decidir a
+mesma coisa (§140).
+
+E a seção que ABRE é uma que a pessoa pode, não a primeira do catálogo: sem
+isso a tela abriria em "Técnico", que ela não vê, e o conteúdo viria vazio sem
+explicação.
+
