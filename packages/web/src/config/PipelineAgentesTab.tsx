@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ANATOMIA_DO_PROMPT_PIPELINE, preambuloDoPapel } from "@gerador/aplicacao";
 import {
   PAPEIS_PADRAO,
   type ConfigPipelineAgentes,
@@ -7,6 +8,20 @@ import {
   type SugestaoPapel,
 } from "../api/client";
 import { SugerirComIa } from "./SugerirComIa";
+
+/** O preâmbulo que este papel manda hoje — o mesmo que a borda resolve na hora
+ * do pedido. Importado da camada de aplicação em vez de recopiado aqui: uma
+ * segunda cópia do texto envelheceria em silêncio, que é o defeito do #296
+ * noutro lugar. */
+function preambuloEfetivo(p: PapelConfigurado): string {
+  return preambuloDoPapel(p.id, [{ id: p.id, grupo: p.grupo, preambulo: p.preambulo }]);
+}
+
+const ROTULO_ORIGEM: Record<string, string> = {
+  configuravel: "você configura",
+  "da-quebra": "vem da quebra",
+  fixo: "fixo do produto",
+};
 
 export interface PipelineAgentesTabProps {
   config: ConfigPipelineAgentes;
@@ -37,6 +52,30 @@ export function PipelineAgentesTab({ config, onSalvar }: PipelineAgentesTabProps
   // acontece no onChange pro estado canônico, mas o input mostra o cru.
   const [textoContextos, setTextoContextos] = useState<Record<string, string>>({});
   const [expandido, setExpandido] = useState<string | null>(null);
+  /**
+   * Quem está com o editor de prompt ABERTO, independente do conteúdo.
+   *
+   * Derivar isso só de `preambulo` não-vazio parecia natural e tem um defeito
+   * que o teste pegou: selecionar tudo e apagar pra reescrever esvazia o campo
+   * por um instante, e o editor sumia no meio da digitação. O estado de "estou
+   * editando" é do usuário, não do texto — só o botão de voltar ao padrão o
+   * encerra.
+   */
+  const [editando, setEditando] = useState<Set<string>>(new Set());
+
+  function abrirEditorDePrompt(p: PapelConfigurado) {
+    editarPapel(p.id, { preambulo: preambuloEfetivo(p) });
+    setEditando((atual) => new Set(atual).add(p.id));
+  }
+
+  function voltarAoPadrao(id: string) {
+    editarPapel(id, { preambulo: "" });
+    setEditando((atual) => {
+      const novo = new Set(atual);
+      novo.delete(id);
+      return novo;
+    });
+  }
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [sujo, setSujo] = useState(false);
@@ -256,16 +295,54 @@ export function PipelineAgentesTab({ config, onSalvar }: PipelineAgentesTabProps
                         style={inputEstilo}
                       />
                     </label>
-                    <label style={campoEstilo}>
-                      Prompt do papel (preâmbulo — vazio usa o padrão da seção)
-                      <textarea
-                        value={p.preambulo ?? ""}
-                        onChange={(e) => editarPapel(p.id, { preambulo: e.target.value })}
-                        rows={3}
-                        placeholder="Ex.: Você é o especialista em mensageria do time. Aplique nossos padrões de DLQ e retry..."
-                        style={{ ...inputEstilo, resize: "vertical", fontFamily: "inherit" }}
-                      />
-                    </label>
+                    {/**
+                     * ACHADO REAL (#296): aqui havia só o `textarea` com
+                     * `value={p.preambulo ?? ""}` — em branco pra todo papel não
+                     * personalizado. O prompt que de fato ia pro modelo (o padrão
+                     * da seção) era invisível, e a pessoa não tinha como editar o
+                     * que não conseguia ler.
+                     *
+                     * Herdado continua sendo herdado: o texto aparece em modo
+                     * leitura e só vira cópia editável quando alguém clica —
+                     * salvar uma cópia do padrão sem querer congelaria o papel
+                     * numa versão que não acompanha as melhorias do produto.
+                     */}
+                    <div style={campoEstilo}>
+                      Prompt do papel (preâmbulo)
+                      {p.preambulo?.trim() || editando.has(p.id) ? (
+                        <>
+                          <textarea
+                            value={p.preambulo}
+                            onChange={(e) => editarPapel(p.id, { preambulo: e.target.value })}
+                            rows={6}
+                            data-testid={`preambulo-${p.id}`}
+                            style={{ ...inputEstilo, resize: "vertical", fontFamily: "inherit" }}
+                          />
+                          <button
+                            onClick={() => voltarAoPadrao(p.id)}
+                            style={{ ...botaoEstilo, alignSelf: "flex-start", marginTop: 6 }}
+                          >
+                            Voltar ao padrão da seção
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <pre data-testid={`preambulo-herdado-${p.id}`} style={promptHerdadoEstilo}>
+                            {preambuloEfetivo(p)}
+                          </pre>
+                          <span style={{ fontSize: 11.5, color: "var(--texto-fraco)" }}>
+                            Padrão da seção — usado como está. Editar cria uma cópia só deste papel, que deixa de
+                            acompanhar melhorias futuras do padrão.
+                          </span>
+                          <button
+                            onClick={() => abrirEditorDePrompt(p)}
+                            style={{ ...botaoEstilo, alignSelf: "flex-start", marginTop: 6 }}
+                          >
+                            Editar a partir deste texto
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -277,6 +354,32 @@ export function PipelineAgentesTab({ config, onSalvar }: PipelineAgentesTabProps
           Quando dois papéis escrevem na mesma seção, o PRIMEIRO da lista cujos contextos casarem com o item leva —
           coloque o agente contextual antes do papel geral pra ele assumir os itens do contexto dele.
         </p>
+
+        {/**
+         * A segunda metade do #296: "os locais das variáveis também parecem não
+         * aparecer". O preâmbulo é só a CABEÇA do prompt — o resto é montado por
+         * `montarPedidoPipeline` e era invisível. A lista vem da própria camada
+         * de aplicação, e `pedidos.anatomia.test.ts` monta um prompt de verdade
+         * pra provar que cada parte declarada existe nele.
+         */}
+        <details style={anatomiaEstilo} data-testid="anatomia-do-prompt">
+          <summary style={{ cursor: "pointer", fontSize: 13, color: "var(--texto)" }}>
+            <strong>Como o prompt de cada papel é montado</strong> — onde entra o que você preenche
+          </summary>
+          <p style={{ ...dicaEstilo, marginTop: 10 }}>
+            O preâmbulo acima é só o começo. Na hora de rodar, a esteira monta o prompt nesta ordem, e as partes
+            opcionais somem quando não há o que colocar nelas:
+          </p>
+          <ol style={{ margin: "10px 0 0", paddingLeft: 20, display: "grid", gap: 10 }}>
+            {ANATOMIA_DO_PROMPT_PIPELINE.map((parte) => (
+              <li key={parte.id} style={{ fontSize: 12.5, color: "var(--texto-fraco)" }}>
+                <strong style={{ color: "var(--texto)" }}>{parte.rotulo}</strong>{" "}
+                <span style={tagOrigemEstilo}>{ROTULO_ORIGEM[parte.origem]}</span>
+                {parte.ondeSeEdita ? <div style={{ marginTop: 3 }}>Onde se mexe: {parte.ondeSeEdita}.</div> : null}
+              </li>
+            ))}
+          </ol>
+        </details>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
           <button onClick={() => void salvarPapeis()} disabled={!sujo || salvando} style={{ ...botaoEstilo, ...(sujo ? botaoPrimarioEstilo : {}) }}>
@@ -355,6 +458,38 @@ const tagPromptEstilo: React.CSSProperties = {
   borderRadius: 999,
   padding: "1px 8px",
   whiteSpace: "nowrap",
+};
+
+const tagOrigemEstilo: React.CSSProperties = {
+  ...tagPromptEstilo,
+  color: "var(--texto-2)",
+  background: "var(--fundo-2)",
+  border: "1px solid var(--borda)",
+};
+
+/** O preâmbulo herdado, em leitura. `pre` porque os padrões são texto corrido
+ * longo e quebrar por conta própria esconde onde uma frase termina. */
+const promptHerdadoEstilo: React.CSSProperties = {
+  margin: "4px 0 0",
+  padding: 10,
+  background: "var(--fundo-2)",
+  border: "1px solid var(--borda)",
+  borderRadius: 6,
+  fontSize: 12,
+  lineHeight: 1.55,
+  color: "var(--texto-2)",
+  whiteSpace: "pre-wrap",
+  maxHeight: 200,
+  overflowY: "auto",
+  fontFamily: "inherit",
+};
+
+const anatomiaEstilo: React.CSSProperties = {
+  marginTop: 14,
+  padding: 12,
+  background: "var(--painel)",
+  border: "1px solid var(--borda)",
+  borderRadius: 8,
 };
 
 const setaEstilo: React.CSSProperties = {

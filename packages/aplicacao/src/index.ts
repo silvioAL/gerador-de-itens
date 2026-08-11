@@ -96,6 +96,9 @@ export {
 
 export {
   ALVOS_DE_SUGESTAO_CONHECIDOS,
+  ANATOMIA_DO_PROMPT_PIPELINE,
+  PREAMBULO_GENERICO,
+  PREAMBULO_PADRAO_POR_PAPEL,
   montarPedidoAlterarItem,
   montarPedidoDiagrama,
   montarPedidoPipeline,
@@ -107,5 +110,7 @@ export {
   type EntradaPipeline,
   type EntradaSugerirConfig,
   type ItemDoLote,
+  type OrigemDaParte,
+  type ParteDoPromptPipeline,
   type PedidoIa,
 } from "./casos-de-uso/ia/pedidos.js";

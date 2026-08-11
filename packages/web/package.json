@@ -13,6 +13,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@gerador/aplicacao": "*",
     "@gerador/engine": "*",
     "@xyflow/react": "^12.3.5",
     "lucide-react": "^1.28.0",

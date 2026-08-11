@@ -60,13 +60,14 @@ function servirConfigEmDev(): Plugin {
   };
 }
 
-// @gerador/engine é um workspace TS-fonte (sem build próprio) — não deve ser
+// @gerador/engine e @gerador/aplicacao são workspaces TS-fonte (sem build
+// próprio) — não devem ser
 // pré-empacotado como se fosse um pacote publicado, senão o esbuild de dep
 // optimization tenta tratá-lo como JS já compilado.
 export default defineConfig({
   plugins: [react(), servirConfigEmDev()],
   optimizeDeps: {
-    exclude: ["@gerador/engine"],
+    exclude: ["@gerador/aplicacao", "@gerador/engine"],
   },
   server: {
     fs: { allow: [repoRoot] },
