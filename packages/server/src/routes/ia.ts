@@ -24,6 +24,7 @@ import { criarRepositorioDeConfigEmPostgres } from "../adaptadores/configEmPostg
 import type { OpcoesApp } from "../app.js";
 import { criarRepositorioDeCredenciaisEmPostgres } from "../adaptadores/credenciaisEmPostgres.js";
 import { exigirSessao } from "../auth/middleware.js";
+import { exigirPermissao, organizacaoPadraoDe } from "../auth/permissoes.js";
 import { registrarAuditoria } from "../auditoria.js";
 import { organizacoes } from "../db/schema.js";
 
@@ -72,6 +73,17 @@ function comoProvedor(credencial: CredencialIa): ProvedorIa {
 }
 
 export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) {
+  /**
+   * SPEC-28 Fase 1b — `credenciais-ia` cobre as DUAS rotas: gravar e testar.
+   * Testar manda a chave no corpo e devolve se o gateway aceitou; sem o mesmo
+   * portão, quem não pode gravar credencial poderia usar o servidor como
+   * oráculo para validar chaves alheias.
+   *
+   * No modo hospedado a escolha do modelo viaja junto com a credencial, então
+   * `modelo-ia` não tem rota própria — ver RECURSOS_SEM_ROTA.
+   */
+  const podeEditarCredenciais = exigirPermissao(db, organizacaoPadraoDe(db), "credenciais-ia", "editar");
+
   async function repositorio() {
     const [org] = await db.select({ id: organizacoes.id }).from(organizacoes).limit(1);
     if (!org) return null;
@@ -148,7 +160,7 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
     return repo ? repo.resumir(ID_PROVEDOR_GATEWAY) : { configurado: false };
   });
 
-  app.put("/ia/credencial", { preHandler: exigirSessao }, async (req, reply) => {
+  app.put("/ia/credencial", { preHandler: [exigirSessao, podeEditarCredenciais] }, async (req, reply) => {
     const corpo = corpoCredencial.safeParse(req.body);
     if (!corpo.success) return reply.code(400).send({ erro: corpo.error.flatten() });
 
@@ -173,7 +185,7 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
   /** Uma chamada curta de verdade contra o destino: é a única forma de saber
    * se a credencial funciona, e o custo de descobrir na primeira quebra é
    * uma esteira inteira perdida. */
-  app.post("/ia/credencial/testar", { preHandler: exigirSessao }, async (req, reply) => {
+  app.post("/ia/credencial/testar", { preHandler: [exigirSessao, podeEditarCredenciais] }, async (req, reply) => {
     // A tela testa ANTES de salvar — é o ponto do botão "Testar". Usar só a
     // credencial gravada faria o primeiro teste da vida sempre falhar com
     // "nenhuma credencial configurada" enquanto a pessoa olha para os campos

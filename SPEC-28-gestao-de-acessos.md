@@ -1,6 +1,6 @@
 # SPEC-28 — Gestão de acessos: quem pode editar o quê
 
-> **Status**: Fase 1 implementada no MECANISMO, pendente na COBERTURA — 2 dos 16 recursos são de fato checados por alguma rota. Ver §3, que é o que vale ler antes de mexer aqui.
+> **Status**: Fases 1a (mecanismo) e 1b (cobertura) implementadas. 13 dos 16 recursos são exigidos por alguma rota; os outros 3 estão em `RECURSOS_SEM_ROTA` com motivo escrito, e um teste-guarda impede que a lista cresça em silêncio. Falta a Fase 2 (UI esconder o que seria negado).
 >
 > **Origem**: Escrito depois da pergunta do usuário sobre "grupo de usuários de agilidade pode editar os agentes / revisar / aprovar alterações nos checklists de processo; os arquitetos nas configurações de padrões arquiteturais e especificações; outro setor edita o fluxo de agentes; **em outra empresa isso ocorre por time**".
 
@@ -189,19 +189,70 @@ Registrado como requisito de verificação, não como recomendação: o teste da
 - **Permissão por item/quebra individual** (ACL por registro). O pedido é sobre configuração, e ACL por registro multiplica a complexidade do modelo por N.
 - **Hierarquia de papéis** (papel que herda de outro). Sem caso real ainda; herança é fácil de adicionar e difícil de tirar.
 
+## 8.1 Para que serve isto, na frase de quem pediu
+
+> *"a ideia de avançar com as permissões é poder delegar a gestão de padrões
+> técnicos configuráveis (obrigatórios ou não), e checklists de processos e
+> gestão do pipeline a setores específicos da empresa"*
+
+Vale fixar porque **decide o recorte**, e o recorte não era óbvio pela lista de
+recursos:
+
+- **É sobre configuração, não sobre trabalho.** O alvo são campos de nó e
+  aresta, perfis de time, os quatro `regras.*`, template de especificação e
+  pipeline de agentes. Por isso `quebras` fica de fora (§`RECURSOS_SEM_ROTA`):
+  exigir permissão para criar quebra faria com que delegar um checklist
+  parasse a empresa inteira de trabalhar.
+- **"Obrigatórios ou não" já existe.** `FieldSpec.required` é editável por
+  checkbox em `CamposNoTab`/`CamposArestaTab` e o engine bloqueia a prontidão
+  em `obrigatoriosEmAberto` (`prontidao.ts`). Delegar essa decisão é só
+  permissão; não há mecanismo novo a construir.
+- **"Setores da empresa", não times.** É o escopo organizacional, que já
+  existia como terceiro eixo (§4.1). Nenhum eixo novo.
+
+### O obstáculo real, que só aparece com esse propósito na mão
+
+"Agilidade cuida do checklist de processo, Arquitetura do técnico" esbarra num
+detalhe de persistência: os quatro `regras.*` são **um documento só**, salvo
+inteiro por `PUT /config/regras`. Um `preHandler` decide antes de ler o corpo,
+então não distingue quem mexeu em quê.
+
+A saída foi conferir permissão por **diferença** (`secoesDeRegrasAlteradas`):
+compara-se o documento recebido com o gravado, e só as seções que mudaram de
+fato exigem permissão. Quem só pode processo continua podendo mandar o
+documento inteiro de volta — que é exatamente o que a tela faz ao salvar.
+
+Dois detalhes que a implementação obrigou a decidir:
+
+- **Comparação canônica**, com chaves ordenadas: `JSON.stringify` puro faria o
+  mesmo conteúdo em outra ordem parecer alteração, e a pessoa levaria 403 por
+  uma edição que não fez.
+- **`tipos`/`tamanhos`** são taxonomia compartilhada, não pertencem a nenhuma
+  das quatro seções: mexer neles exige as quatro permissões.
+
 ## 9. Roteiro faseado
 
 1. **Fase 1a — mecanismo** ✅ *feito*: tabelas, `resolverPermissoes`,
    `exigirPermissao`, enum de recursos, modo aberto (§4.3), rota `/acessos`.
    Piloto em `campos-no`.
-2. **Fase 1b — cobertura** ⬅️ *é aqui que estamos*: aplicar `exigirPermissao`
-   nas 14 rotas restantes e escrever o teste de cenário do §10.
+2. **Fase 1b — cobertura** ✅ *feito*: `exigirPermissao` em `perfis-time`,
+   `campos-aresta`, `especificacao-template`, `prompt-unico-template`,
+   `pipeline-agentes`, `credenciais-ia` e `membros`; os quatro `regras.*` por
+   diferença (§8.1); `quebras`, `retrospectivas` e `modelo-ia` declarados em
+   `RECURSOS_SEM_ROTA` com motivo. Mais o teste-guarda do §10.1 e o cenário do
+   §10.
 
    Entra aqui também o **papel Administrador no onboarding**, que a Fase 1
    prometia e não entregou: hoje ele só existe dentro dos testes, que o criam
    à mão.
 
-   Sem ele há uma **tranca inevitável**, não condicional. Criar um papel são
+   ✅ *Corrigido nesta rodada*: `POST /acessos/papeis` agora cria também o
+   papel Administrador — com `acessos/editar` e atribuído a quem fez a chamada
+   — quando é o primeiro papel da organização. Quem liga o controle de acesso
+   continua podendo administrá-lo; ninguém mais herda isso. O que segue abaixo
+   é o diagnóstico que levou a essa forma.
+
+   Havia uma **tranca inevitável**, não condicional. Criar um papel são
    duas chamadas — `POST /acessos/papeis` e depois
    `POST /acessos/papeis/:id/membros`. A primeira passa (modo aberto: zero
    papéis). Mas ela mesma cria o primeiro papel, e `resolverPermissoes` liga o
@@ -239,12 +290,12 @@ Registrado como requisito de verificação, não como recomendação: o teste da
    "o mecanismo protege" é justamente onde esta SPEC se enganou uma vez. Uma
    fase que termina com 2 de 16 recursos cobertos precisa dizer isso no nome.
 
-   **Decisão pendente do usuário** (§3.2 lista os 14): `quebras` e
-   `credenciais-ia` merecem tratamento diferente? `quebras` é o trabalho do
-   dia a dia e já tem escopo por time — travar por papel pode atrapalhar mais
-   do que proteger. `credenciais-ia` é o oposto: é o recurso mais sensível do
-   produto (chave de API), e talvez devesse exigir permissão mesmo em
-   organização sem papel nenhum, quebrando o modo aberto de propósito.
+   As duas dúvidas que ficaram abertas na revisão foram resolvidas pelo
+   propósito (§8.1): `quebras` fica fora por ser trabalho, não padrão;
+   `credenciais-ia` entra como qualquer outro recurso, **sem** exceção ao modo
+   aberto — uma regra que vale "menos no caso X" é uma regra que ninguém
+   lembra na hora de depurar, e o ganho seria pequeno num produto onde o modo
+   aberto já significa "esta organização não configurou controle nenhum".
 3. **Fase 2 — UI de acessos**: aba Acessos + `GET /permissoes/minhas` + esconder o que não pode. É aqui que a feature vira usável.
 4. **Fase 3 — aprovação**: `recurso_politica.exigeAprovacao`, proposta pendente, tela de revisão com diff, ação `aprovar` valendo. Reusa o cartão antes/depois que a `ConversaEspecificacao` já tem (SPEC-27 Fase 2) — o formato de "veja o que muda e aceite" já existe e foi validado.
 5. **Fase 4 — SSO de grupos** (se e quando pedido).

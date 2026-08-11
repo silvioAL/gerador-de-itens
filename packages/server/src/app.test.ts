@@ -1109,6 +1109,164 @@ describe("SPEC-28 — gestão de acessos", () => {
     });
   }
 
+  /**
+   * A TRANCA — o defeito que a revisão da SPEC-28 achou, medido antes de
+   * existir a correção: `POST /acessos/papeis` devolvia 201 e o
+   * `POST /acessos/papeis/:id/membros` seguinte devolvia 403, deixando a
+   * organização sem ninguém capaz de administrar acessos.
+   *
+   * Nenhum teste via porque todos criam papel e atribuição com `insert` direto
+   * (o `criarPapel` acima), sem passar pelo `preHandler` da segunda rota —
+   * pulando exatamente a janela onde o produto quebrava.
+   */
+  it("criar o PRIMEIRO papel não tranca a organização fora de /acessos", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+
+    const criado = await app.inject({
+      method: "POST",
+      url: "/acessos/papeis",
+      cookies: { gerador_sessao: cookie },
+      payload: { nome: "Agilidade", permissoes: [{ recurso: "regras.checklistProcesso", acao: "editar" }] },
+    });
+    expect(criado.statusCode).toBe(201);
+
+    // ANTES da correção: 403. Repare que o papel criado NÃO concede `acessos` —
+    // é o caso que a auto-atribuição ingênua não resolveria.
+    const atribuir = await app.inject({
+      method: "POST",
+      url: `/acessos/papeis/${criado.json().id}/membros`,
+      cookies: { gerador_sessao: cookie },
+      payload: { email: EMAIL_OUTRO },
+    });
+    expect(atribuir.statusCode).toBe(201);
+  });
+
+  it("quem liga o RBAC vira Administrador — e ninguém mais herda isso", async () => {
+    await app.inject({
+      method: "POST",
+      url: "/acessos/papeis",
+      cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
+      payload: { nome: "Agilidade", permissoes: [] },
+    });
+
+    const minhasDoDev = await app.inject({
+      method: "GET",
+      url: "/permissoes/minhas",
+      cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
+    });
+    expect(minhasDoDev.json().porRecurso.acessos).toEqual(["editar"]);
+
+    // A correção dá a chave a QUEM LIGOU, não a todo mundo: o RBAC continua
+    // valendo para os demais desde o primeiro instante.
+    const minhasDoOutro = await app.inject({
+      method: "GET",
+      url: "/permissoes/minhas",
+      cookies: { gerador_sessao: await logarComo(EMAIL_OUTRO) },
+    });
+    expect(minhasDoOutro.json()).toMatchObject({ rbacAtivo: true, porRecurso: {} });
+  });
+
+  /**
+   * O PEDIDO, literalmente: "delegar a gestão de padrões técnicos e checklists
+   * de processos a setores específicos". As quatro seções de `regras` moram no
+   * MESMO documento, salvo inteiro por `PUT /config/regras` — então a permissão
+   * é conferida por diferença, não por rota.
+   */
+  describe("delegação dentro de `regras` (o documento único com quatro donos)", () => {
+    const REGRAS_BASE = {
+      tipos: ["Story"],
+      tamanhos: ["P"],
+      porTech: {
+        java: {
+          checklistTecnico: [{ texto: "definir pool de conexões", contextos: [] }],
+          checklistProcesso: [{ texto: "abrir mudança", contextos: [] }],
+          testes: [],
+        },
+      },
+    };
+
+    async function salvarRegras(cookie: string, documento: unknown) {
+      return app.inject({
+        method: "PUT",
+        url: "/config/regras",
+        cookies: { gerador_sessao: cookie },
+        payload: { documento },
+      });
+    }
+
+    it("Agilidade edita o checklist de PROCESSO mandando o documento inteiro de volta", async () => {
+      await salvarRegras(await logarComo(EMAIL_DEV), REGRAS_BASE); // modo aberto ainda
+      await criarPapel("Agilidade", [{ recurso: "regras.checklistProcesso", acao: "editar" }], [
+        { email: EMAIL_OUTRO },
+      ]);
+
+      const doc = structuredClone(REGRAS_BASE);
+      doc.porTech.java.checklistProcesso = [{ texto: "abrir mudança no ServiceNow", contextos: [] }];
+
+      // O ponto: a UI manda o documento COMPLETO. Se a checagem fosse por rota,
+      // isto seria 403 por causa do checklist técnico que veio junto, intacto.
+      expect((await salvarRegras(await logarComo(EMAIL_OUTRO), doc)).statusCode).toBe(200);
+    });
+
+    it("...e leva 403 ao encostar no checklist TÉCNICO, que é de outro setor", async () => {
+      await salvarRegras(await logarComo(EMAIL_DEV), REGRAS_BASE);
+      await criarPapel("Agilidade", [{ recurso: "regras.checklistProcesso", acao: "editar" }], [
+        { email: EMAIL_OUTRO },
+      ]);
+
+      const doc = structuredClone(REGRAS_BASE);
+      doc.porTech.java.checklistTecnico = [{ texto: "trocar o pool por HikariCP", contextos: [] }];
+
+      const negado = await salvarRegras(await logarComo(EMAIL_OUTRO), doc);
+      expect(negado.statusCode).toBe(403);
+      expect(negado.json()).toMatchObject({ recurso: "regras.checklistTecnico", acao: "editar" });
+    });
+
+    it("reenviar o documento sem mudar nada passa mesmo sem permissão nenhuma", async () => {
+      await salvarRegras(await logarComo(EMAIL_DEV), REGRAS_BASE);
+      await criarPapel("SoCampos", [{ recurso: "campos-no", acao: "editar" }], [{ email: EMAIL_OUTRO }]);
+
+      // Salvar sem editar não é uma edição. Sem isto, abrir a tela e clicar em
+      // salvar por reflexo viraria 403 para quase todo mundo.
+      expect((await salvarRegras(await logarComo(EMAIL_OUTRO), REGRAS_BASE)).statusCode).toBe(200);
+    });
+  });
+
+  it("as rotas que a Fase 1b passou a cobrir negam quem não tem o papel", async () => {
+    await criarPapel("SoProcesso", [{ recurso: "regras.checklistProcesso", acao: "editar" }], [
+      { email: EMAIL_OUTRO },
+    ]);
+    const cookie = await logarComo(EMAIL_OUTRO);
+
+    // Sempre o time DE EMAIL_OUTRO (`time-portabilidade`), nunca outro: com um
+    // time alheio o 403 viria de `exigirTime` e o teste passaria sem que a
+    // permissão tivesse sido consultada — mediria o portão errado. Foi o que
+    // aconteceu na primeira versão deste teste.
+    const chamadas = [
+      ["PUT", `/perfis-time/${TIME_B}`, { tipoNo: "service", valores: {} }, "perfis-time"],
+      ["POST", "/campos-aresta", { tipoAresta: "http", key: "x", label: "X", type: "text" }, "campos-aresta"],
+      ["PUT", "/especificacao-template", { conteudo: "oi" }, "especificacao-template"],
+      ["PUT", "/ia/credencial", { baseUrl: "https://gw/v1", chave: "k", modelo: "m" }, "credenciais-ia"],
+      ["POST", `/times/${TIME_B}/membros`, { email: "novo@gerador.local" }, "membros"],
+    ] as const;
+
+    // Coletar e comparar de uma vez: `expect` dentro do laço aborta no primeiro
+    // erro, e as rotas seguintes nunca seriam exercidas — um teste de cinco
+    // rotas que na prática testava uma.
+    const obtido = [];
+    for (const [method, url, payload] of chamadas) {
+      const r = await app.inject({ method, url, cookies: { gerador_sessao: cookie }, payload });
+      obtido.push({ url, status: r.statusCode, corpo: r.json() });
+    }
+    expect(obtido).toEqual(
+      chamadas.map(([, url, , recurso]) => ({
+        url,
+        status: 403,
+        corpo: { erro: expect.stringContaining(recurso), recurso, acao: "editar" },
+      }))
+    );
+  });
+
   it("MIGRAÇÃO: organização sem papel nenhum continua deixando qualquer membro editar", async () => {
     // Se este quebrar, atualizar a versão tranca todos os clientes existentes
     // para fora — o modo de falha que a §4.3 existe para impedir.

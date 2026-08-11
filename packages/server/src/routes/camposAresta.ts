@@ -1,9 +1,10 @@
 import { and, eq, or } from "drizzle-orm";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { CAMPO_GLOBAL } from "@gerador/aplicacao";
 import type { OpcoesApp } from "../app.js";
 import { exigirTime } from "../auth/middleware.js";
+import { exigirPermissao, organizacaoPadraoDe } from "../auth/permissoes.js";
 import { registrarAuditoria } from "../auditoria.js";
 import { camposAresta } from "../db/schema.js";
 
@@ -39,6 +40,19 @@ function comoTimeParaAutorizacao(timeId: string): string | null {
 }
 
 export async function registrarRotasCamposAresta(app: FastifyInstance, { db }: OpcoesApp) {
+  /** SPEC-28 Fase 1b — camada de cima de `exigirTime`, igual a campos-no. O
+   * time precisa chegar até a checagem, senão papel com escopo de time é
+   * negado no próprio time (a lição que custou um teste vermelho lá). */
+  const podeEditarArestas = (resolverTimeId: Parameters<typeof exigirPermissao>[4]) =>
+    exigirPermissao(db, organizacaoPadraoDe(db), "campos-aresta", "editar", resolverTimeId);
+
+  /** O time de um campo existente — o `:id` não diz de que time é. */
+  const timeDoCampo = async (req: FastifyRequest) => {
+    const { id } = req.params as { id: string };
+    const [linha] = await db.select().from(camposAresta).where(eq(camposAresta.id, id));
+    return comoTimeParaAutorizacao(linha?.timeId ?? CAMPO_GLOBAL);
+  };
+
   app.get("/campos-aresta", async (req) => {
     const { timeId } = req.query as { timeId?: string };
     const linhas = timeId
@@ -59,7 +73,12 @@ export async function registrarRotasCamposAresta(app: FastifyInstance, { db }: O
 
   app.post(
     "/campos-aresta",
-    { preHandler: exigirTime((req) => comoTimeParaAutorizacao((req.body as { timeId?: string })?.timeId ?? CAMPO_GLOBAL)) },
+    {
+      preHandler: [
+        exigirTime((req) => comoTimeParaAutorizacao((req.body as { timeId?: string })?.timeId ?? CAMPO_GLOBAL)),
+        podeEditarArestas((req) => comoTimeParaAutorizacao((req.body as { timeId?: string })?.timeId ?? CAMPO_GLOBAL)),
+      ],
+    },
     async (req, reply) => {
       const corpo = corpoCampoAresta.safeParse(req.body);
       if (!corpo.success) return reply.code(400).send({ erro: corpo.error.flatten() });
@@ -80,11 +99,10 @@ export async function registrarRotasCamposAresta(app: FastifyInstance, { db }: O
   app.put(
     "/campos-aresta/:id",
     {
-      preHandler: exigirTime(async (req) => {
-        const { id } = req.params as { id: string };
-        const [linha] = await db.select().from(camposAresta).where(eq(camposAresta.id, id));
-        return comoTimeParaAutorizacao(linha?.timeId ?? CAMPO_GLOBAL);
-      }),
+      preHandler: [
+        exigirTime(timeDoCampo),
+        podeEditarArestas(timeDoCampo),
+      ],
     },
     async (req, reply) => {
       const { id } = req.params as { id: string };
@@ -105,11 +123,10 @@ export async function registrarRotasCamposAresta(app: FastifyInstance, { db }: O
   app.delete(
     "/campos-aresta/:id",
     {
-      preHandler: exigirTime(async (req) => {
-        const { id } = req.params as { id: string };
-        const [linha] = await db.select().from(camposAresta).where(eq(camposAresta.id, id));
-        return comoTimeParaAutorizacao(linha?.timeId ?? CAMPO_GLOBAL);
-      }),
+      preHandler: [
+        exigirTime(timeDoCampo),
+        podeEditarArestas(timeDoCampo),
+      ],
     },
     async (req, reply) => {
       const { id } = req.params as { id: string };

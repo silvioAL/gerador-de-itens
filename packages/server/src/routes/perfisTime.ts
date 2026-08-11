@@ -4,6 +4,7 @@ import { criarCasosDeUsoDePerfisTime } from "@gerador/aplicacao";
 import type { OpcoesApp } from "../app.js";
 import { criarRepositorioDePerfisTimeEmPostgres } from "../adaptadores/perfisTimeEmPostgres.js";
 import { exigirTime } from "../auth/middleware.js";
+import { exigirPermissao, organizacaoPadraoDe } from "../auth/permissoes.js";
 import { registrarAuditoria } from "../auditoria.js";
 
 const corpoAtualizarPerfil = z.object({
@@ -28,7 +29,12 @@ export async function registrarRotasPerfisTime(app: FastifyInstance, { db }: Opc
   // hoje contra perfis-time.json local — aqui vira upsert por (time, tipo, campo).
   app.put(
     "/perfis-time/:timeId",
-    { preHandler: exigirTime((req) => (req.params as { timeId: string }).timeId) },
+    {
+      preHandler: [
+        exigirTime((req) => (req.params as { timeId: string }).timeId),
+        exigirPermissao(db, organizacaoPadraoDe(db), "perfis-time", "editar", (req) => (req.params as { timeId: string }).timeId),
+      ],
+    },
     async (req, reply) => {
       const { timeId } = req.params as { timeId: string };
       const corpo = corpoAtualizarPerfil.safeParse(req.body);

@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { OpcoesApp } from "../app.js";
-import { papeisAcesso, papelPermissao, usuarioPapel } from "../db/schema.js";
+import { organizacoes, papeisAcesso, papelPermissao, usuarioPapel } from "../db/schema.js";
 import { exigirSessao } from "./middleware.js";
 
 /**
@@ -44,6 +44,51 @@ export const RECURSOS = [
 ] as const;
 
 export type Recurso = (typeof RECURSOS)[number];
+
+/**
+ * Recursos que NENHUMA rota exige, **de propósito**.
+ *
+ * Existe porque a alternativa é pior. O comentário acima diz que permissão sem
+ * rota "falha ABERTA e em silêncio" — e por várias versões foi exatamente o que
+ * aconteceu com 14 dos 16 recursos, sem que nada apontasse. O teste-guarda em
+ * `permissoes.cobertura.test.ts` agora exige que todo recurso esteja coberto ou
+ * esteja aqui, com motivo escrito. A falha continua aberta, mas deixa de ser
+ * silenciosa: passa a ser uma decisão assinada.
+ *
+ * - `quebras`: o motivo é o propósito da feature. O RBAC existe para **delegar
+ *   a gestão de padrões** (campos, checklists, pipeline) a setores da empresa —
+ *   não para racionar o trabalho do dia a dia. Exigir permissão aqui teria um
+ *   efeito perverso: no instante em que a empresa criasse o primeiro papel para
+ *   delegar checklist, todo mundo sem papel pararia de conseguir criar quebra.
+ *   Quem quer isolar quebra já tem o escopo por time, que é o eixo certo para
+ *   trabalho.
+ * - `retrospectivas`: a ingestão de retrospectivas (SPEC-23 fluxo 5) nunca foi
+ *   construída no modo hospedado. Não há rota a proteger — o recurso está no
+ *   enum antecipando a feature.
+ * - `modelo-ia`: no modo hospedado a escolha do modelo viaja **junto com a
+ *   credencial** (`PUT /ia/credencial`), que já é protegida por
+ *   `credenciais-ia`. Não existe rota separada para gatear; deixar as duas
+ *   permissões na mesma rota faria uma delas ser decorativa.
+ */
+export const RECURSOS_SEM_ROTA: readonly Recurso[] = ["quebras", "retrospectivas", "modelo-ia"];
+
+/** Uma organização por instalação, hoje. Repetido em cada arquivo de rota antes
+ * de virar isto. */
+export function organizacaoPadraoDe(db: OpcoesApp["db"]): () => Promise<string | null> {
+  return async () => {
+    const [org] = await db.select({ id: organizacoes.id }).from(organizacoes).limit(1);
+    return org?.id ?? null;
+  };
+}
+
+/** As quatro seções de `regras` que viram recursos separados, e a chave de cada
+ * uma dentro de `RegrasPorTech`. Ver `secoesDeRegrasAlteradas`. */
+export const SECOES_DE_REGRAS = {
+  checklistTecnico: "regras.checklistTecnico",
+  checklistProcesso: "regras.checklistProcesso",
+  testes: "regras.testes",
+  volumetria: "regras.volumetria",
+} as const satisfies Record<string, Recurso>;
 
 /**
  * `aprovar` já existe no modelo, mas na Fase 1 nenhuma rota a exige: o fluxo
@@ -119,6 +164,81 @@ export async function resolverPermissoes(
     if (!atual.includes(acao)) porRecurso[recurso] = [...atual, acao];
   }
   return { rbacAtivo: true, porRecurso };
+}
+
+/** Comparação estável: `JSON.stringify` depende da ordem das chaves, e o mesmo
+ * conteúdo devolvido pela UI com as chaves noutra ordem viraria "mudou" — um
+ * 403 em cima de uma edição que não aconteceu. */
+function canonico(valor: unknown): string {
+  if (valor === null || typeof valor !== "object") return JSON.stringify(valor ?? null);
+  if (Array.isArray(valor)) return `[${valor.map(canonico).join(",")}]`;
+  const chaves = Object.keys(valor as Record<string, unknown>).sort();
+  return `{${chaves.map((k) => `${JSON.stringify(k)}:${canonico((valor as Record<string, unknown>)[k])}`).join(",")}}`;
+}
+
+function porTechDe(documento: unknown): Record<string, Record<string, unknown>> {
+  const porTech = (documento as { porTech?: unknown } | null | undefined)?.porTech;
+  if (!porTech || typeof porTech !== "object") return {};
+  return porTech as Record<string, Record<string, unknown>>;
+}
+
+/**
+ * Quais dos quatro recursos `regras.*` uma edição de `regras` toca.
+ *
+ * Isto existe por um descompasso que só aparece quando a delegação é o
+ * objetivo: a SPEC-28 §4.2 quebrou `regras` em quatro recursos porque o pedido
+ * era Agilidade no checklist de PROCESSO e Arquitetura no TÉCNICO — mas a
+ * persistência é **um documento só**, salvo inteiro por `PUT /config/regras`.
+ * Um `preHandler` não alcança isso: ele decide antes de olhar o corpo, e o
+ * corpo traz as quatro seções juntas, mudadas ou não.
+ *
+ * Então a permissão é conferida por **diferença**: compara-se o que veio com o
+ * que está gravado, e só as seções que de fato mudaram exigem permissão. Quem
+ * só pode mexer em processo continua podendo mandar o documento inteiro de
+ * volta — desde que as outras três seções voltem iguais.
+ *
+ * `tipos`/`tamanhos` são a taxonomia compartilhada, não pertencem a nenhuma das
+ * quatro; mudá-las exige as quatro permissões, porque afeta todas.
+ */
+export function secoesDeRegrasAlteradas(antes: unknown, depois: unknown): Recurso[] {
+  const alteradas = new Set<Recurso>();
+  const a = porTechDe(antes);
+  const d = porTechDe(depois);
+
+  for (const tech of new Set([...Object.keys(a), ...Object.keys(d)])) {
+    for (const [chave, recurso] of Object.entries(SECOES_DE_REGRAS)) {
+      if (canonico(a[tech]?.[chave]) !== canonico(d[tech]?.[chave])) alteradas.add(recurso);
+    }
+  }
+
+  const taxonomia = (doc: unknown) => {
+    const d = doc as { tipos?: unknown; tamanhos?: unknown } | null | undefined;
+    return canonico([d?.tipos ?? null, d?.tamanhos ?? null]);
+  };
+  if (taxonomia(antes) !== taxonomia(depois)) {
+    for (const recurso of Object.values(SECOES_DE_REGRAS)) alteradas.add(recurso);
+  }
+
+  return [...alteradas];
+}
+
+/**
+ * A checagem sem o `preHandler`, para quem precisa decidir depois de ler o
+ * corpo (ver `secoesDeRegrasAlteradas`). Devolve o primeiro recurso negado, ou
+ * `undefined` se está tudo liberado.
+ */
+export async function primeiroRecursoNegado(
+  db: OpcoesApp["db"],
+  organizacaoId: string | null,
+  email: string,
+  recursos: Recurso[],
+  acao: Acao,
+  timeId?: string | null
+): Promise<Recurso | undefined> {
+  if (!organizacaoId || recursos.length === 0) return undefined;
+  const { rbacAtivo, porRecurso } = await resolverPermissoes(db, organizacaoId, email, timeId);
+  if (!rbacAtivo) return undefined;
+  return recursos.find((recurso) => !porRecurso[recurso]?.includes(acao));
 }
 
 /**
