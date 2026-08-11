@@ -90,18 +90,30 @@ fluxo é:
 Busca vetorial só quando o corpus real justificar — fica registrado aqui para
 ninguém "completar o RAG" por zelo.
 
-### 3.5 Uma rota conversacional: `POST /ia/configurar`
+### 3.5 Uma rota conversacional nova + a rota de sugestão reusada, em dois passos
 
-Recebe `{mensagens, timeId}`; o montador (`montarPedidoConfigurarConversa`, em
-`packages/aplicacao`, mesmo padrão de `montarPedidoDiagrama`) inclui: os alvos
-disponíveis com seus schemas, um resumo da config atual do time (para o modelo
-propor mudança, não duplicata) e as retrospectivas do time (Fase 2). Devolve
-`{texto, propostas}`.
+O primeiro rascunho desta seção prometia uma chamada única devolvendo
+`{alvo, objeto}` — e o schema do `objeto` muda por alvo. Schema condicional
+(`oneOf`) é justamente o que um gateway em modo `json_object` não garante;
+prometer estrutura que o transporte não segura seria reintroduzir a classe de
+defeito que a GBNF local existia para matar. Então são dois passos, cada um com
+schema fixo:
+
+1. **`POST /ia/configurar`** (nova): recebe `{mensagens}` + resumo da config
+   atual do time (para propor mudança, não duplicata) e, na Fase 2, as
+   retrospectivas. O montador (`montarPedidoConfigurarConversa`, em
+   `packages/aplicacao`, mesmo padrão de `montarPedidoDiagrama`) devolve
+   `{texto, propostas: [{alvo, instrucao}]}` — o alvo vem de um `enum` com os
+   alvos conhecidos, e `instrucao` é o pedido destilado da conversa.
+2. **`POST /ia/sugerir-config`** (existente, intocada): o cliente materializa
+   cada proposta chamando a rota que já existe, com o schema estrito do alvo.
+   É literalmente "a conversa por cima da sugestão que já existe" (§2.1).
 
 **Sem tool-use encadeado na v1.** A decisão do §84 continua valendo: nada no
-caminho crítico pode exigir modelo forte. Uma chamada, resposta estruturada,
-zero ou mais propostas. Se o gateway conectado for um modelo capaz, a
-qualidade sobe sozinha — a mecânica não muda.
+caminho crítico pode exigir modelo forte. O encadeamento aqui é fixo e de dois
+passos, orquestrado pelo app — não é o modelo decidindo quais ferramentas
+chamar. Se o gateway conectado for um modelo capaz, a qualidade sobe sozinha —
+a mecânica não muda.
 
 ## 4. Fases
 
