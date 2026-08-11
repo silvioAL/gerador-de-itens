@@ -3825,3 +3825,31 @@ O teste já valeu antes de ser commitado: três dos oito casos falharam com
 e a sessão traz `timeIds`, não `times`. Eram os MEUS palpites errados, não
 defeitos do produto — mas é precisamente essa a distância entre o que se supõe
 e o que existe, e era ela que nada media.
+
+## 155. A SPEC do modo único, e o número que trocou remover por depreciar (#307)
+
+O usuário decidiu: só o modo hospedado, e o pacote sai do npm. A SPEC-33
+registra isso — mas duas medições feitas antes de escrever mudaram o conteúdo
+dela.
+
+**8.576 downloads na última semana.** Eu ia executar `npm unpublish` porque
+foi o que a autorização dizia. O número diz que o npm recusaria (política de
+300/semana) e que, se aceitasse, quebraria quem já instalou. Levei o fato de
+volta ao usuário antes de agir, com as opções; ele escolheu depreciar. Não era
+re-litigar a decisão dele — era entregar um dado que ele não tinha e que
+mudava qual comando executar.
+
+**Nem o web nem o server dependem do `packages/cli`.** Isso transformou "quanto
+risco tem essa remoção" de estimativa em fato: nenhum efeito cascata sobre o
+produto hospedado.
+
+E a seção que existe justamente para não ser óbvia daqui a um mês: **o modo
+único reescreve a dívida hexagonal.** O #304 (paridade por forma de resposta)
+perde o objeto — não haverá duas bordas para comparar. Sem isso escrito, alguém
+retomaria o item construindo um teste para uma fronteira que deixou de existir.
+
+O roteiro põe a **cobertura antes da remoção**: as quatro abas de Configurações
+sem nenhum E2E se cobrem na Fase 2, e só depois se remove na Fase 3. Não é
+zelo — é a lição de hoje. A aba de Regras abriu em branco em produção porque
+nada a clicava num navegador; apagar um modo inteiro com quatro abas
+descobertas repetiria isso em escala.
