@@ -40,6 +40,18 @@ export interface ResumoCredencial {
    * modelo enxerga imagem não expõe nada, e a tela precisa disso pra decidir
    * se oferece o anexo. */
   visao?: boolean;
+  /**
+   * ACHADO REAL, configurando voz com gateway da Anthropic: este campo existia
+   * no formulário, no zod da rota e na coluna do banco — e NÃO voltava aqui.
+   * Efeito: a aba "Modelo de IA" carregava o endereço de transcrição em branco
+   * mesmo com valor gravado, e o próximo "Salvar" mandava `undefined`,
+   * APAGANDO a configuração de voz sem que ninguém tivesse pedido isso.
+   *
+   * Mesma classe do #286 (`baseUrlTranscricao` descartado ao montar o
+   * provedor), uma camada acima: lá o campo se perdia na ida, aqui na volta.
+   * Não é segredo — é um endereço, como `baseUrl`, que já volta.
+   */
+  baseUrlTranscricao?: string;
   chaveMascarada?: string;
 }
 
@@ -54,13 +66,20 @@ export interface RepositorioDeCredenciais {
 /** Mascara para exibição — três primeiros e quatro últimos, nunca o meio. */
 export function resumirCredencialIa(c: CredencialIa | null | undefined): ResumoCredencial {
   if (!c?.baseUrl || !c?.chave) {
-    return { configurado: false, baseUrl: c?.baseUrl, modelo: c?.modelo, visao: c?.visao };
+    return {
+      configurado: false,
+      baseUrl: c?.baseUrl,
+      modelo: c?.modelo,
+      visao: c?.visao,
+      baseUrlTranscricao: c?.baseUrlTranscricao,
+    };
   }
   return {
     configurado: true,
     baseUrl: c.baseUrl,
     modelo: c.modelo,
     visao: c.visao,
+    baseUrlTranscricao: c.baseUrlTranscricao,
     chaveMascarada: `${c.chave.slice(0, 3)}…${c.chave.slice(-4)}`,
   };
 }

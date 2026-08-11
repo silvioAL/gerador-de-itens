@@ -3158,3 +3158,91 @@ O primeiro só apareceu porque o teste falhou por acidente. Se eu tivesse usado
 o time certo desde o começo, ele teria passado — testando uma rota e alegando
 cinco.
 
+## 141. Quatro defeitos empilhados, e o de baixo era o log desligado (#294)
+
+O usuário, rodando o modo hospedado com Claude Haiku: *"não apareceu nada de
+modo de voz e imagem em desenhar conversando"*. Depois: *"erro foi: Não
+consegui: Unexpected end of JSON input"*.
+
+Quatro causas independentes, e a ordem em que foram descascadas importa.
+
+### 1. Duas imagens Docker mais velhas que os recursos
+
+`GET /ia/status` da stack dele devolvia `capacidades: null`. A tela decide o
+microfone e o anexo com `s.capacidades?.transcricao` e `?.visao` — com `null`,
+os dois somem. O campo existe no código desde o commit `0612992`, de 11:10; a
+imagem em execução tinha sido construída às 09:36. O bundle do web também era
+anterior, e por isso o erro apareceu cru em vez da mensagem amigável que o
+`client.ts:606` já produz.
+
+Nada a corrigir no repositório. Vale o registro porque **1h30 de diferença
+entre imagem e commit produziu um sintoma que parecia bug de produto**.
+
+### 2. `logger: false` — o defeito que escondia os outros
+
+Este é o central. `app.ts` construía o Fastify com `logger: false`, o que
+tornava **todo `app.log.error` do projeto um no-op**. O `catch` de
+`executarPedido` fazia exatamente a coisa certa — capturava o erro do gateway e
+o registrava — e a linha ia para lugar nenhum. `docker logs` mostrava só a
+linha de inicialização, com a rota falhando a cada chamada.
+
+É pior do que não ter tratamento nenhum: havia um, parecia suficiente ao ler o
+código, e não produzia nada. Diagnosticar virou adivinhação.
+
+### 3. O `200` era comprometido antes do primeiro byte
+
+`executarPedido` chamava `reply.raw.writeHead(200, ...)` antes de pedir
+qualquer coisa ao provedor. Quando o gateway falhava — inclusive com um 400 e
+mensagem explícita —, não sobrava status para trocar: a resposta ia como **200
+com corpo vazio**. O navegador recebia zero byte, e o `JSON.parse("")` produzia
+o "Unexpected end of JSON input" que o usuário viu, que não diz nada sobre a
+causa.
+
+Agora o cabeçalho só é escrito no primeiro pedaço que chega. Antes disso, falha
+vira **502 com a mensagem**; depois, o comportamento é o de antes. O caso "sem
+exceção e sem um único byte" também virou 502 — antes era indistinguível de
+sucesso para quem olhava só o status.
+
+### 4. A causa real, visível só depois de 2 e 3
+
+```
+HTTP 400 response_format.json_schema.schema:
+  For 'array' type, property 'maxItems' is not supported
+```
+
+O schema do diagrama declara `maxItems`, e Structured Outputs recusa o pedido
+INTEIRO. Não era uma restrição ignorada: era a chamada impossível. `maxItems`,
+`minItems`, `maxLength` e `minLength` passam a ser removidos do schema enviado
+— o limite continua no texto do prompt, que é onde ele sempre funcionou de
+fato, e o schema fica com o que a decodificação restrita sabe impor.
+
+### 5. De brinde, um quinto: a voz que se apagava sozinha
+
+Configurada a voz para o Whisper do compose, `resumirCredencialIa` devolvia
+`visao` mas **não** `baseUrlTranscricao`. O campo existia no formulário, no zod
+da rota e na coluna do banco — e não voltava. A aba carregava em branco mesmo
+com valor gravado, e o "Salvar" seguinte mandava `undefined`, apagando a
+configuração de voz sem ninguém pedir.
+
+Mesma classe do #286, que perdeu o MESMO campo do outro lado da fronteira: lá
+sumia na ida, aqui na volta.
+
+### A lição, que é a de sempre com uma inversão
+
+As rodadas anteriores fecharam com "o sistema já estava dizendo a causa e nós
+descartávamos" — `error.cause`, o HTML do 403, o `finish_reason`. Aqui o
+sistema **tentava** dizer e o canal estava desligado. A diferença prática é
+nenhuma; a diferença de diagnóstico é enorme, porque não havia nem sintoma de
+que existia uma mensagem sendo perdida.
+
+Vale o mesmo para o comentário no código: um `catch` que loga parece
+tratamento. Só é tratamento se a linha chega em algum lugar.
+
+### Correção minha, no meio do caminho
+
+Cheguei a afirmar ao usuário que a causa era `strict` faltando no `json_schema`
+— o 400 que eu tinha na mão dizia isso. Estava errado: o produto já manda
+`strict: true` (`provedorOpenAI.ts:333`) e já checa `!resposta.ok`. O 400 era do
+pedido que eu mesmo escrevi à mão para testar, sem `strict`. Refeito com o
+payload real, passou — e o erro verdadeiro (`maxItems`) só apareceu depois.
+
