@@ -2963,3 +2963,100 @@ Dois registros de método:
   `any`. O valor deste portão é pegar erro de CÓDIGO — identificador
   inexistente, import faltando —, não tipar ~50 corpos de resposta em teste.
   Quem precisa de garantia passa o tipo na chamada.
+
+## 139. A SPEC-28 descrevia um mundo que não existia mais (#274)
+
+O usuário cancelou o prompt único e disse: *"acho que já temos um schema de
+permissões, precisamos revisitar essa spec e ver o código"*. Perguntei se ele
+queria a cobertura das rotas ou a revisão da SPEC primeiro. Resposta: **"revise
+primeiro"** — e foi a decisão certa, porque a leitura do código mudou o que a
+próxima rodada precisa fazer.
+
+### O que a SPEC dizia e o que o código diz
+
+O §3 "Estado atual" afirmava: *"O que falta, e é exatamente o pedido: **não
+existe papel**"*. Falso desde a Fase 1. Existem as tabelas (`0010_acessos.sql`),
+`resolverPermissoes` com os três eixos, `exigirPermissao`, a rota `/acessos`, o
+modo aberto, os 16 recursos. O mecanismo está inteiro e o desenho aguentou o
+encontro com o código — nada a redesenhar.
+
+O que **não** existe é cobertura. Medido, não estimado:
+
+```
+=== chamadas a exigirPermissao por arquivo:
+packages/server/src/routes/acessos.ts:1
+packages/server/src/routes/camposNo.ts:1
+```
+
+**2 recursos de 16.** Os outros 14 podem ser concedidos na tabela, aparecem na
+UI, são resolvidos por `resolverPermissoes` — e nenhuma rota pergunta. O papel
+"Agilidade" com permissão só em `regras.checklistProcesso` continua editando
+`credenciais-ia`.
+
+O próprio código já tinha nomeado isso, no comentário da lista de recursos:
+*"permissão sobre recurso que nenhuma rota checa é permissão que falha ABERTA e
+em silêncio — o pior modo de falha possível numa camada de autorização"*. Foi
+escrito como justificativa para a lista ser fechada; virou o diagnóstico da
+implementação que veio depois.
+
+### O achado que a revisão produziu de brinde
+
+Ao conferir se o "papel Administrador no onboarding" da Fase 1 existia (não
+existe — só nos testes, criado à mão), apareceu uma **tranca inevitável** em
+produção. Criar um papel são duas chamadas:
+
+1. `POST /acessos/papeis` — passa, modo aberto, zero papéis.
+2. `POST /acessos/papeis/:id/membros` — **403**.
+
+Porque a chamada 1 cria o primeiro papel, e `resolverPermissoes` liga o RBAC
+quando existe *qualquer* papel na organização (`papeisDaOrg.length === 0`),
+independente de quem o tem. Na chamada 2 o criador ainda não está atribuído:
+`atribuicoes.length === 0` → `porRecurso` vazio. Nem um papel que conceda
+`acessos/editar` salva, porque não dá pra atribuí-lo a ninguém. Saída: acesso ao
+banco.
+
+Isso não é dedução — foi medido contra o Postgres, com um teste descartável:
+
+```
+POST /acessos/papeis             → 201  Administrador, permissoes:[acessos/editar]
+POST /acessos/papeis/:id/membros → 403  sem permissão para "editar" em "acessos"
+```
+
+Ninguém tinha visto porque os testes criam papel e atribuição na mesma função de
+apoio, com `insert` direto no banco, sem passar pelo `preHandler` da segunda
+rota. O teste pulava exatamente a janela onde o produto quebra. Aliás, o dano
+real já está registrado neste repositório: o comentário de
+`test-support/bancoDeTeste.ts` conta que a suíte deixou um papel "Administrador"
+no banco de desenvolvimento e *"o banco de trabalho ficou com controle de acesso
+ativo, um único papel podendo só `acessos:editar`"*. Era esta tranca acontecendo
+de verdade, e foi lida na época como sujeira de teste.
+
+E medir também derrubou a correção que eu tinha escrito primeiro. "Auto-atribuir
+o primeiro papel a quem o criou" parece a solução óbvia e não é: se o primeiro
+papel for "Agilidade" com só `regras.checklistProcesso`, auto-atribuí-lo entrega
+exatamente esse papel — e a pessoa segue trancada fora de `acessos`. Só funciona
+no caso em que o primeiro papel por acaso já concede `acessos/editar`, que é o
+caso fácil. O que fecha em todos os casos é garantir `acessos/editar` a alguém
+**antes** que o RBAC possa ligar.
+
+### A lição, que é a mesma de sempre com outra roupa
+
+Fasear "mecanismo" e "cobertura" como uma coisa só permitiu marcar a Fase 1 como
+concluída com um piloto (`campos-no`) no lugar da proteção. O erro não foi parar
+no piloto — é uma decisão defensável provar o desenho numa rota antes de
+espalhá-lo por catorze. O erro foi **não deixar registrado que faltava o resto**,
+e a SPEC então descreveu o passado como presente por várias rodadas.
+
+Daí o teste novo que o §10.1 pede: percorrer `RECURSOS` e exigir que cada um
+seja checado por pelo menos uma rota. É o mesmo padrão do
+`paridade.sanity.test.ts`, que compara as rotas dos dois modos lendo o
+código-fonte — a diferença entre "confio que alguém lembrou" e "o teste não
+deixa esquecer". Sem ele, acrescentar um recurso ao enum é gratuito e silencioso.
+
+### O que fica pro usuário decidir
+
+Duas perguntas de produto, registradas na Fase 1b em vez de decididas por mim:
+`quebras` (trabalho do dia a dia, já tem escopo por time — travar por papel pode
+atrapalhar mais do que proteger) e `credenciais-ia` (chave de API; talvez deva
+exigir permissão *mesmo em modo aberto*, quebrando a regra de propósito).
+
