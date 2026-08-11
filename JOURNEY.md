@@ -4199,3 +4199,41 @@ novo semeia a própria tech via API, e fica anotado como pedido de UX a fazer
 vezes na mesma rodada: contei as options do select antes do "Carregando
 regras…" sumir e concluí "0 techs" numa stack que tem duas. A régua da §152
 segue pagando o aluguel.
+
+## 166. "Nem precisaria existir essa label" — o seletor de Tecnologia morre, e o vocabulário fica sem "retro"
+
+Três mensagens do usuário na mesma conversa, e a terceira fechou a decisão:
+*"remover referência a palavra retro"*, *"esse rótulo Tecnologia, é usado em
+algo? avalie"*, e — quando eu ia responder com tooltip e filtro — *"a
+impressão que tenho é que nem precisaria existir essa label... pois nós temos
+padrão por componente"*.
+
+**A avaliação primeiro, porque ele perguntou.** O eixo de tech É usado e é
+estrutural: as regras vivem em `porTech[tech]`, e a tech de cada item derivado
+vem do tipo do componente no diagrama. Remover o EIXO exigiria migração de
+modelo (candidata a SPEC futura: regras por componente, unificando de vez com
+"Padrões por componente"). Mas o argumento dele desmonta o CONTROLE: o resto
+do produto fala por componente, e um seletor que a pessoa precisa operar para
+ver metade das regras não paga o que custa. **Agrupamento se lê; seletor se
+opera.** O select saiu; as techs aparecem empilhadas, e o cabeçalho de cada
+grupo traduz o eixo para o vocabulário dele: "Mobile — vale para: App
+Android, App iOS" (derivado de `nodeTypes[].techs`). Os contadores das
+sub-abas passaram a somar todas as techs.
+
+Junto foi a causa original da estranheza: o menu de contexto oferecia
+"Backend-cache" numa regra Mobile — contexto de outra tech nunca casaria com
+item nenhum (convenção de prefixo medida em todos os nodeTypes). O menu agora
+filtra pela tech do grupo, com fallback pra lista completa quando a tech não
+tem contexto próprio. Teste dedicado, mordido: sem o filtro, vermelho.
+
+**E "retro" saiu da tela.** A seção virou "Anotações do time", com "Guardar"
+e "Cole aqui o material do time" — na tela, o vocabulário é dele (§147); no
+código e na API continua `retrospectivas`, o nome que o recurso de RBAC tem
+desde a SPEC-28. Renomear a tabela por causa de um rótulo seria pagar
+migração por cosmética.
+
+E a memória do CRLF cobrou pedágio de novo — pela via boa: a reversão de uma
+mordida via `.replace()` multi-linha não casou (âncora com `\n` num arquivo
+CRLF), e desta vez o `assert` estava lá e gritou em vez de falhar em silêncio
+— o defeito da mordida teria ido parar no commit. A diferença entre §159 e
+hoje continua sendo a asserção, não a memória.
