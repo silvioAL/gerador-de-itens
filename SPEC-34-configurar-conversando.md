@@ -124,6 +124,14 @@ Aba "⚙ Configurar" no assistente; `POST /ia/configurar`;
 `pedidos.anatomia.test.ts`); cartões de proposta com Aplicar pela rota
 existente; RBAC visível (§3.3).
 
+Na Fase 1 a conversa propõe três alvos: `campo-no`, `campo-aresta` e `papel` —
+os que se aplicam por uma rota que o App já chama, precisando no máximo de um
+destino (tipo de nó/conexão) que o cartão oferece num select. Os três alvos de
+regras (`regra-refinamento`, `item-processo`, `teste-automatizado`) exigem
+escolher tech e escrever via `PUT /config/regras`, cujo fluxo é da `RegrasTab`
+— entram na Fase 2, junto com as retrospectivas, que é onde "isso vira regra"
+acontece de verdade.
+
 **Feito quando**: no E2E com gateway falso, descrever uma intenção gera uma
 proposta de `campo-no`, Aplicar cria o campo de verdade (a aba "Padrões por
 componente" passa a listá-lo) e nada é escrito sem o clique. Prova de mordida:
