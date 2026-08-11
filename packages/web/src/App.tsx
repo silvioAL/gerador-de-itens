@@ -777,6 +777,7 @@ function AppCarregado({
             camposNo={camposNo}
             camposAresta={camposAresta}
             pipelineAgentes={pipelineAgentes}
+            techs={appConfig.techs}
             timeAtivo={timeAtivo}
             hospedado={modo !== "local"}
             onCriarCampoNo={criarCampoNo}

@@ -1,7 +1,9 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DiagramaConfig } from "@gerador/engine";
 import {
   apiIa,
+  apiRegras,
+  apiRetrospectivas,
   PAPEIS_PADRAO,
   type AlvoConversaConfig,
   type CampoAresta,
@@ -11,6 +13,7 @@ import {
   type DadosCampoNo,
   type GrupoFicha,
   type PapelConfigurado,
+  type Retrospectiva,
 } from "../api/client";
 import { usePermissoes } from "../auth/usePermissoes";
 
@@ -19,6 +22,8 @@ export interface ConfigurarPanelProps {
   camposNo: CampoNo[];
   camposAresta: CampoAresta[];
   pipelineAgentes: ConfigPipelineAgentes;
+  /** Techs do time (appConfig) — destino dos alvos de regras. */
+  techs?: string[];
   timeAtivo?: string;
   hospedado: boolean;
   onCriarCampoNo: (dados: DadosCampoNo) => Promise<void>;
@@ -47,13 +52,20 @@ interface ObjetoPapel {
   contextos?: string[];
 }
 
+/** Forma comum de `regra-refinamento` e `item-processo` — a razão de os dois
+ * terem entrado juntos na Fase 2. */
+interface ObjetoRegra {
+  texto: string;
+  contextos?: string[];
+}
+
 interface Cartao {
   alvo: AlvoConversaConfig;
   instrucao: string;
   estado: "materializando" | "pronta" | "aplicando" | "aplicada" | "erro";
-  objeto?: ObjetoCampo | ObjetoPapel;
+  objeto?: ObjetoCampo | ObjetoPapel | ObjetoRegra;
   erro?: string;
-  /** tipoNo/tipoAresta para campos; grupo da ficha para papel. */
+  /** tipoNo/tipoAresta para campos; grupo da ficha para papel; tech para regras. */
   destino: string;
 }
 
@@ -63,17 +75,22 @@ interface Mensagem {
   cartoes?: Cartao[];
 }
 
-/** Aba → recurso do RBAC que a rota de escrita exige (espelha o servidor). */
+/** Alvo → recurso do RBAC que a rota de escrita exige (espelha o servidor —
+ * as seções de `regras` são recursos separados, ver SECOES_DE_REGRAS). */
 const RECURSO_DO_ALVO: Record<AlvoConversaConfig, string> = {
   "campo-no": "campos-no",
   "campo-aresta": "campos-aresta",
   papel: "pipeline-agentes",
+  "regra-refinamento": "regras.checklistTecnico",
+  "item-processo": "regras.checklistProcesso",
 };
 
 const ROTULO_DO_ALVO: Record<AlvoConversaConfig, string> = {
   "campo-no": "campo de componente",
   "campo-aresta": "campo de conexão",
   papel: "papel da esteira",
+  "regra-refinamento": "requisito de refinamento",
+  "item-processo": "item de checklist de processo",
 };
 
 /**
@@ -91,6 +108,7 @@ export function ConfigurarPanel({
   camposNo,
   camposAresta,
   pipelineAgentes,
+  techs,
   timeAtivo,
   hospedado,
   onCriarCampoNo,
@@ -133,7 +151,61 @@ export function ConfigurarPanel({
   function destinoInicial(alvo: AlvoConversaConfig): string {
     if (alvo === "campo-no") return tiposDeNo[0]?.id ?? "";
     if (alvo === "campo-aresta") return tiposDeAresta[0]?.id ?? "";
+    if (alvo === "regra-refinamento" || alvo === "item-processo") return techs?.[0] ?? "";
     return "especialista";
+  }
+
+  // SPEC-34 Fase 2 — as retros do time, com a mesma honestidade do RBAC: se a
+  // listagem for negada (403), a seção diz isso em vez de fingir lista vazia.
+  const [retros, setRetros] = useState<Retrospectiva[]>([]);
+  const [erroRetros, setErroRetros] = useState<string | null>(null);
+  const [tituloRetro, setTituloRetro] = useState("");
+  const [textoRetro, setTextoRetro] = useState("");
+  const [salvandoRetro, setSalvandoRetro] = useState(false);
+
+  useEffect(() => {
+    if (!timeAtivo) return;
+    let cancelado = false;
+    apiRetrospectivas
+      .listar(timeAtivo)
+      .then((lista) => {
+        if (!cancelado) setRetros(lista);
+      })
+      .catch((e) => {
+        if (!cancelado) setErroRetros(e instanceof Error ? e.message : "Não foi possível listar as retrospectivas.");
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [timeAtivo]);
+
+  async function salvarRetro() {
+    if (!timeAtivo || !textoRetro.trim() || salvandoRetro) return;
+    setSalvandoRetro(true);
+    setErroRetros(null);
+    try {
+      const salva = await apiRetrospectivas.criar({
+        timeId: timeAtivo,
+        titulo: tituloRetro.trim() || `Retro de ${new Date().toLocaleDateString("pt-BR")}`,
+        texto: textoRetro.trim(),
+      });
+      setRetros((atuais) => [salva, ...atuais]);
+      setTituloRetro("");
+      setTextoRetro("");
+    } catch (e) {
+      setErroRetros(e instanceof Error ? e.message : "Não foi possível salvar a retrospectiva.");
+    } finally {
+      setSalvandoRetro(false);
+    }
+  }
+
+  async function excluirRetro(id: string) {
+    try {
+      await apiRetrospectivas.excluir(id);
+      setRetros((atuais) => atuais.filter((r) => r.id !== id));
+    } catch (e) {
+      setErroRetros(e instanceof Error ? e.message : "Não foi possível excluir a retrospectiva.");
+    }
   }
 
   function atualizarCartao(indiceMensagem: number, indiceCartao: number, mudanca: Partial<Cartao>) {
@@ -155,7 +227,7 @@ export function ConfigurarPanel({
     setPensando(true);
     setErro(null);
     try {
-      const resposta = await apiIa.configurar({ mensagens: transcript, resumoConfig: resumoConfig() });
+      const resposta = await apiIa.configurar({ mensagens: transcript, resumoConfig: resumoConfig(), timeId: timeAtivo });
       const cartoes: Cartao[] = resposta.propostas.map((p) => ({
         alvo: p.alvo,
         instrucao: p.instrucao,
@@ -223,7 +295,7 @@ export function ConfigurarPanel({
           opcoes: o.type === "select" ? o.opcoes : undefined,
           ajuda: o.ajuda,
         });
-      } else {
+      } else if (cartao.alvo === "papel") {
         const o = cartao.objeto as ObjetoPapel;
         const novo: PapelConfigurado = {
           id: o.id,
@@ -237,6 +309,20 @@ export function ConfigurarPanel({
         // Espalha os papéis EFETIVOS (padrão quando a config nunca foi salva):
         // gravar só o novo apagaria os quatro de fábrica.
         await onSalvarPipelineAgentes({ ...pipelineAgentes, papeis: [...papeisAtuais, novo] });
+      } else {
+        // Regras: lê o documento INTEIRO, acrescenta na seção da tech escolhida
+        // e grava tudo de volta — a UI nunca é dona do arquivo (SPEC-23 §6.7);
+        // o servidor decide a permissão pela seção alterada
+        // (`secoesDeRegrasAlteradas`), então o 403 vem certo por construção.
+        const o = cartao.objeto as ObjetoRegra;
+        const secao = cartao.alvo === "regra-refinamento" ? "checklistTecnico" : "checklistProcesso";
+        const documento = await apiRegras.obter();
+        const porTech = { ...(documento.porTech ?? {}) };
+        const daTech = { ...(porTech[cartao.destino] ?? {}) };
+        const lista = [...(daTech[secao] ?? [])];
+        lista.push({ texto: o.texto, contextos: o.contextos ?? [] });
+        porTech[cartao.destino] = { ...daTech, [secao]: lista };
+        await apiRegras.salvar({ ...documento, porTech });
       }
       atualizarCartao(indiceMensagem, indiceCartao, { estado: "aplicada" });
     } catch (e) {
@@ -250,6 +336,9 @@ export function ConfigurarPanel({
   function cartaoDestinos(cartao: Cartao): { id: string; rotulo: string }[] {
     if (cartao.alvo === "campo-no") return tiposDeNo;
     if (cartao.alvo === "campo-aresta") return tiposDeAresta;
+    if (cartao.alvo === "regra-refinamento" || cartao.alvo === "item-processo") {
+      return (techs ?? []).map((t) => ({ id: t, rotulo: t }));
+    }
     return (["po", "arquiteto", "especialista", "qa"] as const).map((g) => ({ id: g, rotulo: g }));
   }
 
@@ -274,7 +363,17 @@ export function ConfigurarPanel({
                   {cartao.estado === "erro" && (
                     <div style={{ fontSize: 12, color: "var(--vermelho)" }}>{cartao.erro}</div>
                   )}
-                  {objeto && cartao.alvo !== "papel" && (
+                  {objeto && (cartao.alvo === "regra-refinamento" || cartao.alvo === "item-processo") && (
+                    <div style={{ fontSize: 12.5, lineHeight: 1.6 }}>
+                      <strong>{(objeto as ObjetoRegra).texto}</strong>
+                      {((objeto as ObjetoRegra).contextos?.length ?? 0) > 0 && (
+                        <div style={{ color: "var(--texto-mudo)", fontSize: 11 }}>
+                          contextos: {(objeto as ObjetoRegra).contextos!.join(", ")}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {objeto && (cartao.alvo === "campo-no" || cartao.alvo === "campo-aresta") && (
                     <div style={{ fontSize: 12.5, lineHeight: 1.6 }}>
                       <strong>{(objeto as ObjetoCampo).label}</strong>{" "}
                       <code style={{ fontSize: 11 }}>{(objeto as ObjetoCampo).key}</code>{" "}
@@ -306,7 +405,11 @@ export function ConfigurarPanel({
                   {objeto && (cartao.estado === "pronta" || cartao.estado === "aplicando") && (
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
                       <label style={{ fontSize: 11.5, color: "var(--texto-fraco)" }}>
-                        {cartao.alvo === "papel" ? "escreve a seção de" : "em"}{" "}
+                        {cartao.alvo === "papel"
+                          ? "escreve a seção de"
+                          : cartao.alvo === "regra-refinamento" || cartao.alvo === "item-processo"
+                            ? "na tech"
+                            : "em"}{" "}
                         <select
                           aria-label={cartao.alvo === "papel" ? "Grupo do papel" : "Destino da proposta"}
                           value={cartao.destino}
@@ -358,6 +461,52 @@ export function ConfigurarPanel({
       </div>
 
       {erro && <p style={{ margin: "0 12px", fontSize: 11.5, color: "var(--vermelho)" }}>{erro}</p>}
+
+      {/* SPEC-34 Fase 2 — as retros moram na conversa porque é aqui que elas
+          são USADAS: o servidor injeta as do time no prompt, e a proposta cita
+          o trecho. Uma tela própria seria material guardado longe do uso. */}
+      <details style={{ borderTop: "1px solid var(--borda)", padding: "8px 12px" }} data-testid="retros-secao">
+        <summary style={{ fontSize: 12, color: "var(--texto-fraco)", cursor: "pointer" }}>
+          📝 Retrospectivas do time ({retros.length}) — entram como contexto da conversa
+        </summary>
+        {erroRetros && <p style={{ fontSize: 11.5, color: "var(--vermelho)", margin: "6px 0 0" }}>{erroRetros}</p>}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+          {retros.map((r) => (
+            <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, background: "var(--painel-alto)", borderRadius: 6, padding: "5px 8px" }}>
+              <span style={{ flex: 1 }}>{r.titulo}</span>
+              <button
+                onClick={() => void excluirRetro(r.id)}
+                aria-label={`Excluir retrospectiva ${r.titulo}`}
+                style={{ border: "none", background: "none", cursor: "pointer", color: "var(--vermelho)", fontSize: 12 }}
+              >
+                remover
+              </button>
+            </div>
+          ))}
+          <input
+            aria-label="Título da retrospectiva"
+            value={tituloRetro}
+            onChange={(e) => setTituloRetro(e.target.value)}
+            placeholder="Título (ex.: Retro sprint 42)"
+            style={{ fontSize: 12, padding: "5px 8px" }}
+          />
+          <textarea
+            aria-label="Texto da retrospectiva"
+            value={textoRetro}
+            onChange={(e) => setTextoRetro(e.target.value)}
+            rows={3}
+            placeholder="Cole aqui o material da retro — aprendizados, incidentes, decisões."
+            style={{ fontSize: 12, padding: "5px 8px", resize: "vertical" }}
+          />
+          <button
+            onClick={() => void salvarRetro()}
+            disabled={!textoRetro.trim() || salvandoRetro}
+            style={{ ...botaoAplicarEstilo, alignSelf: "flex-start" }}
+          >
+            {salvandoRetro ? "salvando…" : "Guardar retro"}
+          </button>
+        </div>
+      </details>
 
       <div style={rodapeEstilo}>
         <textarea

@@ -7,10 +7,17 @@ import { PAPEIS_PADRAO } from "../api/client";
 const configurarMock = vi.hoisted(() => vi.fn());
 const sugerirConfigMock = vi.hoisted(() => vi.fn());
 const minhasMock = vi.hoisted(() => vi.fn());
+const retroListarMock = vi.hoisted(() => vi.fn());
+const retroCriarMock = vi.hoisted(() => vi.fn());
+const retroExcluirMock = vi.hoisted(() => vi.fn());
+const regrasObterMock = vi.hoisted(() => vi.fn());
+const regrasSalvarMock = vi.hoisted(() => vi.fn());
 vi.mock("../api/client", async (importActual) => ({
   ...(await importActual<typeof import("../api/client")>()),
   apiIa: { configurar: configurarMock, sugerirConfig: sugerirConfigMock },
   apiAcessos: { minhas: minhasMock },
+  apiRetrospectivas: { listar: retroListarMock, criar: retroCriarMock, excluir: retroExcluirMock },
+  apiRegras: { obter: regrasObterMock, salvar: regrasSalvarMock },
 }));
 
 const config = {
@@ -62,6 +69,13 @@ beforeEach(() => {
   configurarMock.mockReset();
   sugerirConfigMock.mockReset();
   minhasMock.mockReset();
+  retroListarMock.mockReset();
+  retroCriarMock.mockReset();
+  retroExcluirMock.mockReset();
+  regrasObterMock.mockReset();
+  regrasSalvarMock.mockReset();
+  retroListarMock.mockResolvedValue([]);
+  regrasSalvarMock.mockImplementation(async (d) => d);
   configurarMock.mockResolvedValue({
     texto: "Proponho um campo obrigatório de runbook no Serviço.",
     propostas: [{ alvo: "campo-no", instrucao: "campo obrigatório de runbook de plantão para serviços" }],
@@ -149,6 +163,58 @@ describe("ConfigurarPanel (SPEC-34 Fase 1 — configurar conversando)", () => {
     const aplicar = screen.getByRole("button", { name: "Aplicar" });
     await waitFor(() => expect(aplicar).toBeDisabled());
     expect(screen.getByText(/sem permissão para editar campo de componente/)).toBeInTheDocument();
+  });
+
+  it("aplicar uma regra acrescenta na seção da tech e PRESERVA o resto do documento", async () => {
+    configurarMock.mockResolvedValue({
+      texto: "Proponho um requisito de retry.",
+      propostas: [{ alvo: "regra-refinamento", instrucao: "definir política de retry para chamadas kafka" }],
+    });
+    sugerirConfigMock.mockResolvedValue({ texto: "Definir a política de retry e o timeout", contextos: [] });
+    // Documento com material que a conversa NÃO edita — sumir com ele seria o
+    // defeito clássico de "a UI virou dona do arquivo" (SPEC-23 §6.7).
+    regrasObterMock.mockResolvedValue({
+      tipos: ["Story"],
+      porTech: {
+        java: {
+          checklistTecnico: [{ texto: "definir pool", contextos: [] }],
+          checklistProcesso: [{ texto: "abrir mudança", contextos: [] }],
+        },
+      },
+    });
+    montar({ techs: ["java", "kafka"] });
+    await enviarIntencao("todo consumo kafka precisa de política de retry");
+    await waitFor(() => expect(screen.getByText("Definir a política de retry e o timeout")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText("Destino da proposta"), { target: { value: "kafka" } });
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+
+    await waitFor(() => expect(regrasSalvarMock).toHaveBeenCalled());
+    const salvo = regrasSalvarMock.mock.calls.at(-1)![0];
+    expect(salvo.tipos).toEqual(["Story"]);
+    expect(salvo.porTech.java.checklistTecnico).toEqual([{ texto: "definir pool", contextos: [] }]);
+    expect(salvo.porTech.java.checklistProcesso).toEqual([{ texto: "abrir mudança", contextos: [] }]);
+    expect(salvo.porTech.kafka.checklistTecnico).toEqual([
+      { texto: "Definir a política de retry e o timeout", contextos: [] },
+    ]);
+  });
+
+  it("guardar uma retro salva pelo servidor e ela entra na lista da seção", async () => {
+    retroCriarMock.mockResolvedValue({ id: "r1", timeId: "time-pagamentos", titulo: "Retro 42", texto: "aprendemos X", criadoEm: "2026-08-11" });
+    montar();
+
+    fireEvent.change(screen.getByLabelText("Título da retrospectiva"), { target: { value: "Retro 42" } });
+    fireEvent.change(screen.getByLabelText("Texto da retrospectiva"), { target: { value: "aprendemos X" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar retro" }));
+
+    await waitFor(() => expect(retroCriarMock).toHaveBeenCalledWith({ timeId: "time-pagamentos", titulo: "Retro 42", texto: "aprendemos X" }));
+    expect(await screen.findByText("Retro 42")).toBeInTheDocument();
+  });
+
+  it("listagem negada aparece como erro na seção — a UI diz, não finge lista vazia", async () => {
+    retroListarMock.mockRejectedValue(new Error("Sem permissão para retrospectivas neste time."));
+    montar();
+    expect(await screen.findByText("Sem permissão para retrospectivas neste time.")).toBeInTheDocument();
   });
 
   it("resposta sem proposta é conversa, não erro — o agente pode perguntar de volta", async () => {
