@@ -4049,3 +4049,45 @@ recebe (SPEC-23 §6.6), o agente não escreve (SPEC-26 Bloco 5), nada no caminho
 crítico exige modelo forte (§84). E a que o #298 preparou: a conversa nasce
 como terceira entrada em `ABAS`, não como overlay novo — que era o motivo de o
 invólucro vir antes na fila.
+
+## 162. A Fase 1 do configurar conversando — e o campo obrigatório que derrubou seis specs de novo (#297)
+
+A implementação seguiu a SPEC-34 sem surpresa na mecânica: os dois passos com
+schema fixo (`/ia/configurar` decide alvo e destila a instrução;
+`/ia/sugerir-config` intocado materializa), a aba nova em `ABAS`, cartões com
+select de destino, Aplicar chamando `criarCampoNo`/`criarCampoAresta`/
+`salvarPipelineAgentes` — as funções que o formulário já usa. Dois testes
+valem menção: o que trava o CONTRATO entre os passos (todo alvo que o passo 1
+pode propor tem de ser aceito pelo passo 2 — se divergirem, o modelo propõe o
+que a materialização recusa com 400); e o que afirma que aplicar um papel novo
+preserva os quatro de fábrica, porque `papeis` ausente significa "os padrão", e
+gravar só o novo apagaria a esteira inteira em silêncio.
+
+**As surpresas foram as duas leis já registradas, cobrando de novo.**
+
+A primeira é a §151 literal. O E2E novo aplica um campo que nasce
+`required: true` (o gateway falso preenche boolean como `true`) — e campo
+obrigatório deixa todo nó do tipo vermelho, vermelho desabilita "Derivar
+Quebra". Seis specs caíram de uma vez, exatamente como quando a seed entrou em
+`time-pagamentos`. Mesma solução: o teste conversa em `time-checkout`, que
+nenhum outro spec usa.
+
+A segunda é a da §156 ("quem mais escreve aqui"), na versão de estado global:
+movido para spec próprio, o teste passou a salvar a CREDENCIAL do gateway — que
+é da organização — no primeiro lote de workers, e `derivar-e-revisar` (que
+afirma a revisão SEM IA) viu a esteira entrar em geração ao vivo no meio da
+corrida. O invariante implícito da suíte era "credencial nasce quando
+`ia-hospedada.spec.ts` roda", e o arquivo até dizia isso num comentário. O
+teste foi morar lá, onde o dono do estado é o arquivo. A pergunta da §156 tem
+agora uma irmã: *que estado global este teste cria, e quem corre em paralelo
+com ele?*
+
+A prova de mordida saiu como a SPEC pedia: com o fio proposta→rota cortado, o
+E2E ficou vermelho na asserção exata (o campo não listado em Configurações) —
+duas vezes, na suíte cheia e filtrado. 38/38 na rodada final.
+
+Resíduo anotado: na stack de trabalho sem credencial, a conversa mostra "Não
+consegui: Não foi possível responder." em vez do erro específico da rota — o
+fallback genérico do cliente quando o corpo de erro não chega como JSON. É o
+mesmo comportamento das outras conversas, não desta rodada; fica registrado
+para uma rodada de mensagens de erro.

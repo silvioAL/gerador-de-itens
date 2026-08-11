@@ -10,6 +10,7 @@ import {
 import {
   criarCasosDeUsoDeConfig,
   montarPedidoAlterarItem,
+  montarPedidoConfigurarConversa,
   montarPedidoDiagrama,
   montarPedidoPipeline,
   montarPedidoSugerirConfig,
@@ -394,6 +395,16 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
     const pedido = comPedido(() => montarPedidoSugerirConfig((req.body ?? {}) as never), reply);
     if (!pedido) return reply;
     return executarPedido(reply, pedido, "ia/sugerir-config");
+  });
+
+  /** SPEC-34 Fase 1 — o passo 1 da conversa de configuração: decide alvo e
+   * destila a instrução; a materialização reusa `/ia/sugerir-config` acima.
+   * Sem RBAC aqui de propósito: conversar e receber proposta é leitura; a
+   * escrita acontece nas rotas de config, que já têm o portão. */
+  app.post("/ia/configurar", async (req, reply) => {
+    const pedido = comPedido(() => montarPedidoConfigurarConversa((req.body ?? {}) as never), reply);
+    if (!pedido) return reply;
+    return executarPedido(reply, pedido, "ia/configurar");
   });
 
   /**
