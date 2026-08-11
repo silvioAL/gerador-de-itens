@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { Client } from "pg";
 // Caminho relativo, e não uma cópia: a regra de "banco descartável" precisa ser
 // UMA só. Duplicá-la aqui é exatamente o tipo de coisa que deixou o Playwright
@@ -40,6 +42,19 @@ export default async function globalSetup() {
         ('time-pagamentos', 'fico', 'motorPadrao', 'FICO Blaze Advisor'),
         ('time-portabilidade', 'service', 'linguagem', 'Node')`
     );
+
+    // #301 — os padrões por componente também morrem no TRUNCATE acima, e sem
+    // eles `padroes-por-componente.spec.ts` testaria uma tabela vazia.
+    //
+    // Lendo o ARQUIVO da migração em vez de recopiar o INSERT: o bloco de
+    // `perfis_time` logo acima é uma cópia à mão do 0000_init e já é a segunda
+    // versão de uma verdade só — quando alguém mexer num, o outro fica para
+    // trás em silêncio. Aqui a seed tem um dono só.
+    const seed = await readFile(
+      resolve(import.meta.dirname, "..", "..", "server", "migrations", "0016_padroes_por_componente_demo.sql"),
+      "utf-8"
+    );
+    await client.query(seed);
   } catch {
     // banco novo, sem tabelas ainda — as migrações do @gerador/server (webServer
     // desta config) criam e semeiam tudo no boot; nada pra fazer na primeira rodada.
