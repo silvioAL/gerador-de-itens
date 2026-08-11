@@ -3787,3 +3787,41 @@ mão, testado contra `fetch` mockado — e o #305.
 Por isso tirei do repositório o esqueleto do #303 que tinha entrado por um
 `git add -A`: nada o importava, e o que ficou foi uma quarta cópia da regra de
 sobreposição sem dono. Volta quando for ligado, sob o desenho novo.
+
+## 154. O cliente do web finalmente encontra o servidor de verdade (#308)
+
+A revisão da SPEC-31 (§11) tinha apontado o buraco: `packages/web/src/api/client.ts`
+são 883 linhas de adaptador HTTP escrito à mão, e o teste dele valida contra
+`fetch` **mockado** — afirma o que o cliente faz com uma resposta imaginada,
+nunca com a real. Nada no projeto comparava as duas pontas. O usuário mandou
+priorizar exatamente isso, e é o único dos três achados que sobrevive à decisão
+de remover o modo local.
+
+`contratoDoClienteWeb.test.ts` sobe o servidor **de verdade** (Fastify +
+Postgres + migrações) numa porta efêmera, stuba `VITE_API_URL` antes do import
+(o `BASE_URL` do cliente é `const` de módulo) e importa o cliente **de verdade**
+do `packages/web`. Oito casos cobrindo sessão, campos-no, os dois envelopes de
+config, perfis de time, template e quebras.
+
+Duas coisas que quase mataram o teste, e as duas são sobre honestidade do
+instrumento:
+
+**O cookie.** O cliente manda `credentials: "include"` e o `fetch` do Node não
+guarda cookie — toda rota autenticada responderia 401 e o contrato cobriria só
+o que não importa. Um pote de cookies de quinze linhas, **no teste**, emulando o
+que o navegador faz. Nada mudou em produção para o teste passar.
+
+**A ordem dos arquivos.** A primeira versão lia a seed da migração 0016 e
+passava sozinha; na suíte inteira, quebrava — `app.test.ts` trunca `campos_no`.
+Troquei por um insert próprio. Aí a escrita pelo cliente esbarrou no estado de
+RBAC que o outro arquivo cria. **Um contrato que depende da ordem dos arquivos
+de teste não é contrato, é acaso.** Ficou: insere pelo banco, lê pelo cliente —
+porque o que se afirma é a FORMA DA RESPOSTA, e o caminho de leitura é o do
+cliente.
+
+O teste já valeu antes de ser commitado: três dos oito casos falharam com
+`is not a function` e um com forma errada. `apiAuth.login` não existe (é
+`entrarDev`), `apiAuth.eu` é `me`, `apiEspecificacaoTemplate.obter` é `buscar`,
+e a sessão traz `timeIds`, não `times`. Eram os MEUS palpites errados, não
+defeitos do produto — mas é precisamente essa a distância entre o que se supõe
+e o que existe, e era ela que nada media.
