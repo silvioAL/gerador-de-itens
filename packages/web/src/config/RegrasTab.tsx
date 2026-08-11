@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { ItemProcesso, RegrasConfig, RegrasPorTech, Requisito, TesteAutomatizado } from "@gerador/engine";
 import { apiRegras, type DiagnosticoConfig, type SugestaoRegra, type SugestaoTeste } from "../api/client";
 import { SugerirComIa } from "./SugerirComIa";
+import { SeletorDeContextos } from "./SeletorDeContextos";
 
 /**
  * SPEC-23 fluxo 5 — editor de `config/regras.json`.
@@ -38,9 +39,15 @@ export interface RegrasTabProps {
    * Ausente (modo local, sem RBAC) = pode tudo.
    */
   podeSecao?: (id: Secao) => boolean;
+  /** Os contextos conhecidos (`appConfig.contextos`) — viram o seletor por
+   * clique no lugar do campo "separados por vírgula", que exigia digitar
+   * valores como "Backend-mensagens rabbitmq" de cabeça (e um typo não
+   * avisava: a regra só nunca casava). Vazio = cai no input livre. */
+  contextos?: string[];
 }
 
-export function RegrasTab({ podeSecao }: RegrasTabProps = {}) {
+export function RegrasTab({ podeSecao, contextos }: RegrasTabProps = {}) {
+  const opcoesDeContexto = contextos ?? [];
   const secoesVisiveis = SECOES.filter((s) => podeSecao?.(s.id) ?? true);
   const [regras, setRegras] = useState<RegrasConfig | null>(null);
   const [tech, setTech] = useState<string>("");
@@ -142,6 +149,7 @@ export function RegrasTab({ podeSecao }: RegrasTabProps = {}) {
           onMudar={(lista) => void gravar(comBloco({ checklistTecnico: lista as Requisito[] }))}
           onEditarLocal={(lista) => setRegras(comBloco({ checklistTecnico: lista as Requisito[] }))}
           onSalvarPendente={() => void gravar(regras)}
+          opcoesDeContexto={opcoesDeContexto}
         />
       )}
 
@@ -156,6 +164,7 @@ export function RegrasTab({ podeSecao }: RegrasTabProps = {}) {
           onMudar={(lista) => void gravar(comBloco({ checklistProcesso: lista as ItemProcesso[] }))}
           onEditarLocal={(lista) => setRegras(comBloco({ checklistProcesso: lista as ItemProcesso[] }))}
           onSalvarPendente={() => void gravar(regras)}
+          opcoesDeContexto={opcoesDeContexto}
         />
       )}
 
@@ -173,6 +182,7 @@ export function RegrasTab({ podeSecao }: RegrasTabProps = {}) {
         <Volumetria
           valor={bloco.volumetria}
           onMudar={(v) => void gravar(comBloco({ volumetria: v }))}
+          opcoesDeContexto={opcoesDeContexto}
         />
       )}
     </div>
@@ -192,6 +202,7 @@ function ListaDeTexto({
   onMudar,
   onEditarLocal,
   onSalvarPendente,
+  opcoesDeContexto,
 }: {
   titulo: string;
   ajuda: string;
@@ -202,15 +213,16 @@ function ListaDeTexto({
   onMudar: (lista: (Requisito | ItemProcesso)[]) => void;
   onEditarLocal: (lista: (Requisito | ItemProcesso)[]) => void;
   onSalvarPendente: () => void;
+  opcoesDeContexto: string[];
 }) {
   const [novoTexto, setNovoTexto] = useState("");
-  const [novosContextos, setNovosContextos] = useState("");
+  const [novosContextos, setNovosContextos] = useState<string[]>([]);
 
   function adicionar(texto: string, contextos: string[]) {
     if (!texto.trim()) return;
     onMudar([...itens, { texto: texto.trim(), contextos }]);
     setNovoTexto("");
-    setNovosContextos("");
+    setNovosContextos([]);
   }
 
   return (
@@ -240,21 +252,14 @@ function ListaDeTexto({
                 style={textareaEstilo}
               />
               <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
-                <input
-                  value={r.contextos.join(", ")}
-                  onChange={(e) =>
-                    onEditarLocal(
-                      itens.map((x, n) =>
-                        n === i
-                          ? { ...x, contextos: e.target.value.split(",").map((c) => c.trim()).filter(Boolean) }
-                          : x
-                      )
-                    )
-                  }
-                  onBlur={onSalvarPendente}
-                  placeholder="contextos (separados por vírgula) — vazio vale sempre"
-                  aria-label={`Contextos do item ${i + 1}`}
-                  style={inputEstilo}
+                {/* Toggle persiste direto (como o "remover" ao lado) — clique é
+                    gesto completo, não digitação esperando blur. */}
+                <SeletorDeContextos
+                  valores={r.contextos}
+                  opcoes={opcoesDeContexto}
+                  onMudar={(contextos) => onMudar(itens.map((x, n) => (n === i ? { ...x, contextos } : x)))}
+                  rotuloVazio="vazio vale sempre"
+                  ariaLabel={`Contextos do item ${i + 1}`}
                 />
                 {r.when && (
                   <span style={seloEstilo} title="Este item tem uma condição (`when`) editável só no arquivo">
@@ -284,15 +289,15 @@ function ListaDeTexto({
             style={textareaEstilo}
           />
           <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-            <input
-              value={novosContextos}
-              onChange={(e) => setNovosContextos(e.target.value)}
-              placeholder="contextos (opcional)"
-              aria-label="Contextos do novo item"
-              style={inputEstilo}
+            <SeletorDeContextos
+              valores={novosContextos}
+              opcoes={opcoesDeContexto}
+              onMudar={setNovosContextos}
+              rotuloVazio="contextos (opcional) — vazio vale sempre"
+              ariaLabel="Contextos do novo item"
             />
             <button
-              onClick={() => adicionar(novoTexto, novosContextos.split(",").map((c) => c.trim()).filter(Boolean))}
+              onClick={() => adicionar(novoTexto, novosContextos)}
               disabled={!novoTexto.trim()}
               style={botaoAdicionarEstilo}
             >
@@ -426,9 +431,11 @@ function ListaDeTestes({
 function Volumetria({
   valor,
   onMudar,
+  opcoesDeContexto,
 }: {
   valor: { contextos: string[] } | undefined;
   onMudar: (v: { contextos: string[] } | undefined) => void;
+  opcoesDeContexto: string[];
 }) {
   const ligada = valor !== undefined;
   return (
@@ -453,15 +460,13 @@ function Volumetria({
       </label>
 
       {ligada && (
-        <div style={{ marginTop: 10 }}>
-          <input
-            value={valor!.contextos.join(", ")}
-            onChange={(e) =>
-              onMudar({ contextos: e.target.value.split(",").map((c) => c.trim()).filter(Boolean) })
-            }
-            placeholder="contextos (separados por vírgula) — vazio vale sempre que a tecnologia aparecer"
-            aria-label="Contextos da volumetria"
-            style={inputEstilo}
+        <div style={{ marginTop: 10, display: "flex" }}>
+          <SeletorDeContextos
+            valores={valor!.contextos}
+            opcoes={opcoesDeContexto}
+            onMudar={(contextos) => onMudar({ contextos })}
+            rotuloVazio="vazio vale sempre que a tecnologia aparecer"
+            ariaLabel="Contextos da volumetria"
           />
         </div>
       )}

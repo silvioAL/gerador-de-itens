@@ -43,6 +43,22 @@ test("abre na conversa, e o contexto salvo numa aba pré-preenche a outra", asyn
   await expect(page.getByTestId("assistente-janela")).toHaveCount(0);
 });
 
+test("dentro de Configurações o bubble flutua sobre a tela e abre direto no ⚙ Configurar", async ({ page }) => {
+  await entrar(page);
+
+  await page.getByRole("button", { name: "⚙ Configurações" }).click();
+  // O mesmo bubble, sobreposto à tela cheia — não some atrás dela.
+  const fab = page.getByTestId("assistente-flutuante");
+  await expect(fab).toBeVisible();
+
+  // Abrir aqui cai no contexto de quem está configurando, não na conversa de desenho.
+  await fab.click();
+  const janela = page.getByTestId("assistente-janela");
+  await expect(janela).toBeVisible();
+  await expect(janela.getByRole("button", { name: "⚙ Configurar" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("configurar-conversa")).toBeVisible();
+});
+
 test("os botões antigos saíram do header — um caminho só, não três", async ({ page }) => {
   await entrar(page);
 

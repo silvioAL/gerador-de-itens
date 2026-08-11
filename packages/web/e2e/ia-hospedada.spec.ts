@@ -193,6 +193,12 @@ test.describe("voz na conversa", () => {
     await card.getByLabel("Base URL do gateway").fill(BASE_URL_GATEWAY_FALSO);
     await card.getByLabel("Chave de API").fill(CHAVE_GATEWAY_FALSO);
     await card.getByLabel("Nome do modelo").fill(MODELO_GATEWAY_FALSO);
+    // Visão marcada AQUI TAMBÉM, embora voz não precise dela: com
+    // `fullyParallel`, os testes deste arquivo podem rodar em workers
+    // diferentes, e a credencial é UMA por organização — regravá-la sem visão
+    // no meio do teste de anexar derruba o botão de anexar lá (flake real,
+    // três ocorrências). Todos os saves gravam a mesma credencial.
+    await card.getByLabel("Este modelo enxerga imagem").check();
     await card.getByRole("button", { name: "Salvar" }).click();
     await expect(page.getByTestId("gateway-resultado")).toContainText("Credencial salva");
     await page.getByRole("button", { name: "Voltar ao canvas" }).click();
@@ -298,12 +304,15 @@ test("configurar conversando: a conversa vira proposta, aplicar cria o campo, e 
   await entrar(page, "time-checkout");
 
   // Idempotente com os testes anteriores do arquivo — e mantém este teste
-  // rodável sozinho via --grep.
+  // rodável sozinho via --grep. Visão marcada pelo mesmo motivo do teste de
+  // voz: a credencial é uma por organização e os testes deste arquivo correm
+  // em paralelo — todos os saves gravam a mesma credencial.
   await abrirModeloIa(page);
   const card = page.getByTestId("modelo-ia-gateway");
   await card.getByLabel("Base URL do gateway").fill(BASE_URL_GATEWAY_FALSO);
   await card.getByLabel("Chave de API").fill(CHAVE_GATEWAY_FALSO);
   await card.getByLabel("Nome do modelo").fill(MODELO_GATEWAY_FALSO);
+  await card.getByLabel("Este modelo enxerga imagem").check();
   await card.getByRole("button", { name: "Salvar" }).click();
   await expect(page.getByTestId("gateway-resultado")).toContainText("Credencial salva");
   await page.getByRole("button", { name: "Voltar ao canvas" }).click();

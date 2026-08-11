@@ -50,6 +50,10 @@ export interface ConfigScreenProps {
   onFechar: () => void;
   /** Troca a aba ativa de fora (tour guiado) sem fechar/reabrir a tela. */
   abaForcada?: AbaConfig;
+  /** Techs e contextos conhecidos (`appConfig`) — alimentam os seletores de
+   * contexto por clique de Regras e Pipeline. */
+  techs?: string[];
+  contextos?: string[];
 }
 
 /**
@@ -91,6 +95,8 @@ export function ConfigScreen({
   onSalvarPipelineAgentes,
   onFechar,
   abaForcada,
+  techs,
+  contextos,
 }: ConfigScreenProps) {
   const [aba, setAba] = useState<AbaConfig>(abaForcada ?? "perfis");
 
@@ -226,7 +232,9 @@ export function ConfigScreen({
          * ao lado da metade que foi corrigida. Dois lugares decidem se uma aba
          * existe, e só um foi revisado — a §145 outra vez.
          */}
-        {abaAtiva === "regras" && <RegrasTab podeSecao={(id) => permissoes.pode(RECURSO_DA_SECAO_DE_REGRAS[id])} />}
+        {abaAtiva === "regras" && (
+          <RegrasTab podeSecao={(id) => permissoes.pode(RECURSO_DA_SECAO_DE_REGRAS[id])} contextos={contextos} />
+        )}
         {abaAtiva === "membros" && mostrarMembros && <MembrosTab timeAtivo={timeAtivo} />}
         {abaAtiva === "acessos" && mostrarMembros && <AcessosTab timeAtivo={timeAtivo} />}
         {abaAtiva === "especificacao" && (
@@ -236,7 +244,14 @@ export function ConfigScreen({
             onSalvar={onSalvarEspecificacaoTemplate}
           />
         )}
-        {abaAtiva === "pipeline" && <PipelineAgentesTab config={pipelineAgentes} onSalvar={onSalvarPipelineAgentes} />}
+        {abaAtiva === "pipeline" && (
+          <PipelineAgentesTab
+            config={pipelineAgentes}
+            onSalvar={onSalvarPipelineAgentes}
+            // Papel casa tanto por tech quanto por contexto — as duas listas.
+            opcoesDeContexto={[...(techs ?? []), ...(contextos ?? [])]}
+          />
+        )}
         {abaAtiva === "modeloIa" && <ModeloIaTab />}
       </div>
     </div>
