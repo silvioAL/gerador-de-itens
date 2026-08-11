@@ -3712,3 +3712,29 @@ falso.
 
 Ficou o motor com testes; a tela que expõe isso na esteira não entrou nesta
 rodada, e está dito no PR.
+
+## 152. A simulação ganhou tela, e o teste de navegador achou o próprio teste (#299)
+
+O motor tinha saído na §151 sem interface. Esta rodada fecha o item: um botão
+**"👁 Simular (sem gastar IA)"** ao lado do que gasta — de propósito, porque a
+pergunta *"quanto isto custa e o que exatamente vai"* se faz no momento de
+decidir, não numa tela de configuração à parte.
+
+Numa quebra de quatro itens o painel responde: **4 chamadas, 20.431
+caracteres**, com o prompt de cada lote aberto e copiável. Caracteres, e dito
+na tela que não são tokens — um número que parece token e não é vira decisão
+errada de janela de contexto.
+
+**O E2E achou um defeito no próprio E2E.** Escrevi `page.route("**/ia/**")` pra
+provar que nenhuma chamada de IA sai durante a simulação. O teste travou antes
+do login, sem explicação óbvia. O glob casava com o caminho do MÓDULO que o
+Vite serve em dev — `packages/aplicacao/src/casos-de-uso/ia/pedidos.ts` — e eu
+estava abortando o carregamento da própria aplicação. Trocado por um predicado
+sobre `pathname.startsWith("/ia/")`, que só casa com a API.
+
+É a terceira vez nesta sequência que o instrumento de medição é que estava
+errado, não o código medido: o dublê do React Flow que não recusava `Delete`, o
+`fetch` mockado que não diverge do servidor, e agora um interceptador que
+derruba o app que ele deveria observar. Vale como padrão próprio: **quando o
+teste falha de um jeito que não corresponde a nenhuma hipótese sobre o código,
+a hipótese seguinte é sobre o teste.**
