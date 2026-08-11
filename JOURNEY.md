@@ -3738,3 +3738,52 @@ errado, não o código medido: o dublê do React Flow que não recusava `Delete`
 derruba o app que ele deveria observar. Vale como padrão próprio: **quando o
 teste falha de um jeito que não corresponde a nenhuma hipótese sobre o código,
 a hipótese seguinte é sobre o teste.**
+
+## 153. A aba em branco, a medição de E2E que a previa, e a decisão de matar um modo
+
+Três coisas nesta rodada, e a ordem delas importa.
+
+**A aba abriu em branco.** O usuário mandou o print: "Regras de refinamento" no
+modo hospedado, botão presente, conteúdo nenhum. O gate `mostrarCamposAresta`
+(que significa *modo local*) tinha saído da DECLARAÇÃO da aba na rodada do #289
+e continuado no corpo dela, oitenta linhas abaixo. Dois lugares decidem se uma
+aba existe, e só um foi revisado — com o comentário explicando a correção
+parado ao lado da metade corrigida.
+
+É a §145 pela quarta vez. O teste novo, por isso, não pergunta pela aba de
+Regras: clica TODAS as abas oferecidas, nos dois modos, e exige conteúdo. Um
+teste específico teria fechado este caso e deixado o próximo aberto — que é
+literalmente o que aconteceu da primeira vez.
+
+**A medição de E2E previa exatamente esta aba.** O usuário pediu para avaliar se
+faltavam testes de navegador. Contei por aba de Configurações:
+
+```
+Perfis de time              2 specs
+Modelo de IA                2
+Padrões por componente      1
+Membros                     1
+Especificação de solução    1
+Campos por tipo de conexão  0
+Acessos                     0
+Regras de refinamento       0   <- a que quebrou
+Pipeline de IA              0   <- alterada no #296, sem cobertura
+```
+
+Quatro das nove sem nenhum E2E. O defeito de hoje não foi azar: chegou ao
+usuário porque nada clicava naquela aba num navegador. E "Acessos" sem
+cobertura é pior — é a delegação de RBAC, o pedido que originou a SPEC-28
+inteira.
+
+**E a decisão que muda o resto:** o usuário anunciou que vai rodar **só o modo
+hospedado** e excluir o local. Isso reescreve os três achados da revisão do
+#295. `RepositorioDeCamposAresta` (#303) existia para unificar dois
+adaptadores; com um só, ele deixa de ser sobre duplicação e passa a ser sobre
+tirar SQL de dentro da rota. `paridade.sanity.test.ts` (#304) perde o objeto:
+não há duas bordas para comparar. O que **sobrevive inteiro** é a metade do
+#304 que trata do `client.ts` do web — 883 linhas de adaptador HTTP escrito à
+mão, testado contra `fetch` mockado — e o #305.
+
+Por isso tirei do repositório o esqueleto do #303 que tinha entrado por um
+`git add -A`: nada o importava, e o que ficou foi uma quarta cópia da regra de
+sobreposição sem dono. Volta quando for ligado, sob o desenho novo.
