@@ -32,6 +32,16 @@ describe("AssistenteFlutuante (#298 — um ponto de entrada pra conversar com a 
     expect(onMudarAba).toHaveBeenCalledWith("contexto");
   });
 
+  it("dentro de Configurações o mesmo botão abre direto na conversa de configuração", async () => {
+    const onMudarAba = vi.fn();
+    const user = userEvent.setup();
+
+    render(<AssistenteFlutuante aba={null} onMudarAba={onMudarAba} abaPrimaria="configurar" sobreposto />);
+
+    await user.click(screen.getByTestId("assistente-flutuante"));
+    expect(onMudarAba).toHaveBeenCalledWith("configurar");
+  });
+
   it("fechar: tanto o × da janela quanto o próprio botão flutuante", async () => {
     const onMudarAba = vi.fn();
     const user = userEvent.setup();

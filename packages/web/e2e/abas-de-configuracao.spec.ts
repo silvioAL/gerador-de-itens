@@ -42,6 +42,52 @@ test("Regras de refinamento: carrega o documento do servidor e mostra as seçõe
   expect(await secoes.count()).toBeGreaterThan(1);
 });
 
+test("Regras: contexto vira clique na lista conhecida — o campo de vírgula saiu (pedido do usuário)", async ({ page }) => {
+  await entrar(page);
+
+  // MEDIÇÃO desta rodada: num banco limpo o GET de regras devolve a forma
+  // VAZIA — não há tech nenhuma no select (a tela nem tem como criar uma; fica
+  // anotado no JOURNEY). O teste semeia a própria tech via API, com a sessão
+  // do navegador — tech própria também evita a corrida da §162: nenhum outro
+  // spec deriva "TechDeTesteE2E".
+  const API = "http://localhost:4100";
+  const antes = await (await page.request.get(`${API}/config/regras`)).json();
+  await page.request.put(`${API}/config/regras`, {
+    data: {
+      documento: {
+        ...antes.documento,
+        porTech: {
+          ...(antes.documento.porTech ?? {}),
+          TechDeTesteE2E: {
+            checklistTecnico: [{ texto: "Definir persistência no dispositivo", contextos: [] }],
+            testes: [],
+          },
+        },
+      },
+    },
+  });
+
+  await page.getByRole("button", { name: /Configurações/ }).click();
+  await page.getByRole("button", { name: /Regras de refinamento/ }).click();
+  await page.getByLabel("Tecnologia").selectOption("TechDeTesteE2E");
+
+  const primeiro = page.getByTestId("regra-0");
+  await primeiro.getByRole("button", { name: /adicionar$/ }).click();
+  // As opções vêm de appConfig.contextos — valor exato, sem digitação.
+  await page.getByRole("option", { name: "Mobile-android" }).click();
+  await expect(primeiro.getByRole("button", { name: "Remover contexto Mobile-android" })).toBeVisible();
+
+  // Persistiu de verdade: sair da aba e voltar relê do servidor.
+  await page.getByRole("button", { name: "Voltar ao canvas" }).click();
+  await page.getByRole("button", { name: /Configurações/ }).click();
+  await page.getByRole("button", { name: /Regras de refinamento/ }).click();
+  await page.getByLabel("Tecnologia").selectOption("TechDeTesteE2E");
+  await expect(page.getByTestId("regra-0").getByRole("button", { name: "Remover contexto Mobile-android" })).toBeVisible();
+
+  // Restaura o documento como estava — regras é da organização, não do teste.
+  await page.request.put(`${API}/config/regras`, { data: { documento: antes.documento } });
+});
+
 test("Acessos: a tela da delegação de RBAC abre e diz o estado atual", async ({ page }) => {
   await abrirConfig(page, /^Acessos/);
 

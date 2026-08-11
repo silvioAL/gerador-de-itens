@@ -65,7 +65,13 @@ describe("PipelineAgentesTab (SPEC-24 Fase F — pipeline configurável)", () =>
   it("+ Agente contextual cria papel custom editável (nome, contextos, prompt) e removível", async () => {
     const onSalvar = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();
-    render(<PipelineAgentesTab config={{ confirmacaoObrigatoria: true, papeis: PAPEIS_PADRAO }} onSalvar={onSalvar} />);
+    render(
+      <PipelineAgentesTab
+        config={{ confirmacaoObrigatoria: true, papeis: PAPEIS_PADRAO }}
+        onSalvar={onSalvar}
+        opcoesDeContexto={["Backend-mensagens", "Kafka", "Backend-dados"]}
+      />
+    );
 
     await user.click(screen.getByRole("button", { name: "+ Agente contextual" }));
     const card = screen.getByTestId("papel-config-agente-custom");
@@ -73,7 +79,11 @@ describe("PipelineAgentesTab (SPEC-24 Fase F — pipeline configurável)", () =>
     const nome = within(card).getByLabelText("Nome");
     await user.clear(nome);
     await user.type(nome, "Especialista Kafka");
-    await user.type(within(card).getByLabelText(/Contextos\/techs/), "Backend-mensagens, Kafka");
+    // Contexto agora é clique na lista conhecida, não digitação com vírgula.
+    await user.click(within(card).getByRole("button", { name: /adicionar$/ }));
+    await user.click(screen.getByRole("option", { name: "Backend-mensagens" }));
+    await user.click(within(card).getByRole("button", { name: /adicionar$/ }));
+    await user.click(screen.getByRole("option", { name: "Kafka" }));
     // Papel novo nasce herdando o padrão da seção (#296): o prompt aparece em
     // leitura e só vira campo editável depois do clique, pra ninguém congelar
     // uma cópia do padrão por acidente.
@@ -94,8 +104,9 @@ describe("PipelineAgentesTab (SPEC-24 Fase F — pipeline configurável)", () =>
     });
 
     // Papel custom pode ser removido; os 4 padrão, não (só desativados).
-    expect(within(card).getByLabelText(/Remover/)).toBeInTheDocument();
-    expect(within(screen.getByTestId("papel-config-po")).queryByLabelText(/Remover/)).not.toBeInTheDocument();
+    // Nomeado, porque os chips de contexto também dizem "Remover contexto X".
+    expect(within(card).getByLabelText("Remover Especialista Kafka")).toBeInTheDocument();
+    expect(within(screen.getByTestId("papel-config-po")).queryByLabelText("Remover PO")).not.toBeInTheDocument();
   });
   /**
    * ACHADO REAL do usuário (#296): *"não consigo ver o conteúdo atual dos

@@ -745,10 +745,19 @@ function AppCarregado({
           onExcluirCampoAresta={excluirCampoAresta}
           onFechar={() => setMostrarConfig(false)}
           abaForcada={abaConfigAlvo}
+          techs={appConfig.techs}
+          contextos={appConfig.contextos}
         />
       )}
 
-      <AssistenteFlutuante aba={abaAssistente} onMudarAba={setAbaAssistente}>
+      <AssistenteFlutuante
+        aba={abaAssistente}
+        onMudarAba={setAbaAssistente}
+        // Dentro de Configurações o mesmo bubble flutua SOBRE a tela e abre
+        // direto na conversa de configuração — o contexto de quem está ali.
+        abaPrimaria={mostrarConfig ? "configurar" : "conversa"}
+        sobreposto={mostrarConfig}
+      >
         {abaAssistente === "conversa" && (
           <ConversaPanel
             config={diagramaConfig}

@@ -14,6 +14,14 @@ export interface AssistenteFlutuanteProps {
    * painéis separados) — o invólucro só desenha gatilho, janela e abas. */
   aba: AbaAssistente | null;
   onMudarAba: (aba: AbaAssistente | null) => void;
+  /** Em qual aba o clique no botão ABRE — o assistente é sensível a onde a
+   * pessoa está: no canvas cai na conversa de desenho; dentro de
+   * Configurações cai direto no "⚙ Configurar" (pedido do usuário: o mesmo
+   * bubble, voltado à facilitação da configuração). */
+  abaPrimaria?: AbaAssistente;
+  /** `true` quando uma tela cheia (Configurações) está aberta e o assistente
+   * deve flutuar SOBRE ela em vez de sumir atrás. */
+  sobreposto?: boolean;
   /** O conteúdo da aba ativa — o App decide qual painel entra. */
   children?: React.ReactNode;
 }
@@ -29,12 +37,26 @@ export interface AssistenteFlutuanteProps {
  * e passaram a preencher esta janela. Quem fecha, abre e troca de aba é o
  * invólucro; quem conversa continua sendo cada painel.
  */
-export function AssistenteFlutuante({ aba, onMudarAba, children }: AssistenteFlutuanteProps) {
+export function AssistenteFlutuante({
+  aba,
+  onMudarAba,
+  abaPrimaria = "conversa",
+  sobreposto = false,
+  children,
+}: AssistenteFlutuanteProps) {
   const aberto = aba !== null;
+  // zIndex 58 quando sobreposto: acima da ConfigScreen (55), abaixo do tour
+  // (80) — é o que faz o mesmo bubble existir dentro de Configurações.
+  const elevacao = sobreposto ? { zIndex: 58 } : {};
   return (
     <>
       {aberto && (
-        <section className="assistente-janela" style={janelaEstilo} aria-label="Assistente" data-testid="assistente-janela">
+        <section
+          className="assistente-janela"
+          style={{ ...janelaEstilo, ...elevacao }}
+          aria-label="Assistente"
+          data-testid="assistente-janela"
+        >
           <header style={cabecalhoEstilo}>
             {ABAS.map((a) => (
               <button
@@ -61,15 +83,17 @@ export function AssistenteFlutuante({ aba, onMudarAba, children }: AssistenteFlu
       <button
         className="assistente-fab"
         data-testid="assistente-flutuante"
-        onClick={() => onMudarAba(aberto ? null : "conversa")}
+        onClick={() => onMudarAba(aberto ? null : abaPrimaria)}
         aria-label="Assistente"
         aria-expanded={aberto}
         title={
           aberto
             ? undefined
-            : "Assistente: descreva a demanda e receba o diagrama proposto, ou cole o contexto do épico."
+            : abaPrimaria === "configurar"
+              ? "Assistente: descreva o que o time precisa configurar — eu proponho, você aplica."
+              : "Assistente: descreva a demanda e receba o diagrama proposto, ou cole o contexto do épico."
         }
-        style={fabEstilo}
+        style={{ ...fabEstilo, ...elevacao }}
       >
         {/* A rotação entre ✦ e × é do span, não do botão — girar o botão
             giraria também a sombra e o hover. */}

@@ -4158,3 +4158,44 @@ completa ("anexar-imagem" não visível em 5s) e passou isolado, no arquivo e na
 suíte seguinte. Segunda aparição intermitente no mesmo arquivo hoje (a
 primeira foi a voz) — se aparecer de novo, a rodada é sobre o /ia/status na
 montagem do painel, não sobre quem estiver mexendo no código naquele dia.
+
+## 165. Contexto vira clique, o bubble entra nas Configurações — e o flake confessa (#pedidos do usuário)
+
+Dois pedidos na mesma mensagem, com um print: *"essa parte do contextos
+separados por vírgula é de difícil configuração... nossa experiência deve ser
+fácil"*, e o assistente flutuante presente na tela de Configurações, "mesmo
+esquema, com bubble", abrindo direto no contexto de configuração.
+
+**O campo de vírgula era pior do que difícil: era silencioso.** Os contextos
+válidos SÃO uma lista conhecida (`appConfig.contextos`, treze valores como
+"Backend-mensagens rabbitmq") — e um typo digitado nunca avisava: a regra só
+nunca casava com item nenhum. O `SeletorDeContextos` troca digitação por
+clique (chips + menu da lista conhecida), preserva valor legado fora da lista
+como chip removível (sumir com ele em silêncio seria pior que o typo), e sem
+lista nenhuma cai no input livre de antes. Entrou nos quatro pontos de
+contexto: itens das duas listas de Regras, novo item, volumetria e o papel da
+esteira — onde o estado de "texto cru pra vírgula não sumir a cada tecla"
+morreu junto com a digitação. As "Opções" de campos select ficaram como estão:
+lista livre de valores é digitação legítima.
+
+**O bubble nas Configurações** é o `abaPrimaria`/`sobreposto` do invólucro: o
+mesmo botão, elevado sobre a tela cheia (zIndex 58), abrindo direto no "⚙
+Configurar" — o assistente é sensível a onde a pessoa está.
+
+**E o flake do §164 confessou a causa — que não era a minha hipótese.** Eu
+tinha apostado no `/ia/status`; a terceira ocorrência mostrou o padrão: as
+três são pós-Fase-1, e `fullyParallel` roda testes DO MESMO ARQUIVO em workers
+diferentes. Meu teste de configurar (e o de voz) regravam a credencial da
+organização SEM visão; aterrissando entre o save do teste de anexar e o status
+do painel dele, o botão de anexar some. §162 outra vez, dentro de um arquivo
+só: a credencial é UMA por organização. Correção mínima: todo save de
+credencial na suíte grava a mesma credencial (visão marcada) — indiferente
+pra voz e configurar, essencial pro anexar.
+
+Duas medições de percurso: num banco limpo o GET de regras devolve a forma
+VAZIA e **a aba de Regras não tem como criar uma tech pela tela** — o teste
+novo semeia a própria tech via API, e fica anotado como pedido de UX a fazer
+(a instalação nova não tem por onde começar). E o meu instrumento errou DUAS
+vezes na mesma rodada: contei as options do select antes do "Carregando
+regras…" sumir e concluí "0 techs" numa stack que tem duas. A régua da §152
+segue pagando o aluguel.

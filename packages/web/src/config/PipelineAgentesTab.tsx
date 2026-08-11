@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ANATOMIA_DO_PROMPT_PIPELINE, preambuloDoPapel } from "@gerador/aplicacao";
+import { SeletorDeContextos } from "./SeletorDeContextos";
 import {
   PAPEIS_PADRAO,
   type ConfigPipelineAgentes,
@@ -26,6 +27,9 @@ const ROTULO_ORIGEM: Record<string, string> = {
 export interface PipelineAgentesTabProps {
   config: ConfigPipelineAgentes;
   onSalvar: (dados: ConfigPipelineAgentes) => Promise<void>;
+  /** Techs + contextos conhecidos — o campo de contextos do papel vira seleção
+   * por clique, mesma correção da RegrasTab. Vazio = input livre. */
+  opcoesDeContexto?: string[];
 }
 
 const ROTULO_GRUPO: Record<GrupoFicha, string> = {
@@ -43,14 +47,9 @@ const ROTULO_GRUPO: Record<GrupoFicha, string> = {
  * vem antes na ordem). As SEÇÕES da ficha continuam fixas — todo papel
  * escreve numa delas (`grupo`).
  */
-export function PipelineAgentesTab({ config, onSalvar }: PipelineAgentesTabProps) {
+export function PipelineAgentesTab({ config, onSalvar, opcoesDeContexto }: PipelineAgentesTabProps) {
   const [confirmacaoObrigatoria, setConfirmacaoObrigatoria] = useState(config.confirmacaoObrigatoria);
   const [papeis, setPapeis] = useState<PapelConfigurado[]>(config.papeis?.length ? config.papeis : PAPEIS_PADRAO);
-  // Texto CRU do campo de contextos por papel — normalizar (split/trim/join)
-  // a cada tecla apagava a vírgula que o usuário acabou de digitar (input
-  // controlado re-renderiza com o valor normalizado). O parse de verdade
-  // acontece no onChange pro estado canônico, mas o input mostra o cru.
-  const [textoContextos, setTextoContextos] = useState<Record<string, string>>({});
   const [expandido, setExpandido] = useState<string | null>(null);
   /**
    * Quem está com o editor de prompt ABERTO, independente do conteúdo.
@@ -279,20 +278,16 @@ export function PipelineAgentesTab({ config, onSalvar }: PipelineAgentesTabProps
                       </select>
                     </label>
                     <label style={campoEstilo}>
-                      Contextos/techs em que se aplica (separados por vírgula — vazio = todos os itens)
-                      <input
-                        value={textoContextos[p.id] ?? p.contextos.join(", ")}
-                        onChange={(e) => {
-                          setTextoContextos((t) => ({ ...t, [p.id]: e.target.value }));
-                          editarPapel(p.id, {
-                            contextos: e.target.value
-                              .split(",")
-                              .map((c) => c.trim())
-                              .filter(Boolean),
-                          });
-                        }}
-                        placeholder="ex.: Backend-mensagens, Kafka"
-                        style={inputEstilo}
+                      Contextos/techs em que se aplica
+                      {/* O estado de "texto cru" que vivia aqui (pra vírgula não
+                          sumir a cada tecla) morreu junto com a digitação: com
+                          seleção por clique, o valor canônico É o do gesto. */}
+                      <SeletorDeContextos
+                        valores={p.contextos}
+                        opcoes={opcoesDeContexto ?? []}
+                        onMudar={(contextos) => editarPapel(p.id, { contextos })}
+                        rotuloVazio="vazio = todos os itens"
+                        ariaLabel={`Contextos do papel ${p.nome}`}
                       />
                     </label>
                     {/**
