@@ -3894,3 +3894,26 @@ que eu tinha seria fazer mal a porta de entrada do projeto. Um banner no topo
 diz que estão desatualizadas e aponta a SPEC-33; a reescrita virou tarefa
 própria. Aviso honesto vale mais que documentação apressada — e mais que
 documentação que manda instalar um pacote depreciado.
+
+## 157. O README parou de mandar instalar o que não existe (#310)
+
+O usuário adiou o `npm deprecate` e pediu o README primeiro. As duas coisas se
+cruzam num detalhe que eu tinha errado: o banner provisório da §156 dizia que o
+pacote **"está depreciado"**. Sem o comando executado, isso é falso. Trocado por
+o que é verdade — as versões publicadas continuam lá, a última é a `0.1.81`, e
+não haverá outras.
+
+Documentação que descreve um estado que você pretendia atingir, e não o que
+atingiu, é a mesma classe do teste que passa pelo motivo errado.
+
+O resto foi corte: a seção "1. CLI local (recomendado)" com o `npm install -g`
+e o parágrafo que vendia o CLI como caminho padrão; a tabela inteira de
+"Comandos da CLI"; o bloco de instalação de GGUF na máquina (`gerador ia
+instalar`, três subseções sobre rede corporativa bloqueando Hugging Face); e a
+"Solução de problemas", que era **inteira** sobre instalar binário global no
+Windows — `PATH`, `--allow-scripts`, Defender bloqueando binário nativo.
+
+337 linhas viraram 240. E a Solução de problemas não ficou vazia: foi reescrita
+com os três problemas que o modo hospedado de fato tem, sendo o primeiro
+esquecer de `docker compose build gerador` e testar o bundle anterior — que é
+literalmente o que gerou um reporte de defeito já corrigido nesta sessão.

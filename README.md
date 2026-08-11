@@ -46,33 +46,12 @@ rodar — ela trunca tabelas, e já apagou dados de ambiente em uso uma vez.
 
 ## Início rápido
 
-O caminho padrão é o CLI local — instala com um comando, sem servidor, sem login (SPEC-17). Além de mais simples, isso evita depender de um domínio novo hospedado (VM+DNS próprio) que times corporativos costumam bloquear até serem categorizados/liberados no firewall — o CLI local não sai do `localhost`, só `npm install` contra `registry.npmjs.org` (já confiável na maioria dos ambientes). Docker/login real continuam existindo (modo hospedado, pra quem já usa esse caminho e não tem essa restrição), mas deixaram de ser o recomendado por padrão.
+Um caminho só: subir a stack com Docker. O servidor guarda as quebras em
+Postgres, a autenticação decide quem edita o quê, e o editor abre no
+navegador.
 
-### 1. CLI local (recomendado)
+### 1. Docker — o jeito de rodar
 
-```powershell
-npm install -g gerador-de-itens --allow-scripts=node-llama-cpp
-gerador init                            # em qualquer diretório de projeto
-gerador derive quebra.json --out itens.md
-gerador open                            # editor visual, http://localhost:4321 — já vem empacotado, sem build extra
-```
-
-`--allow-scripts=node-llama-cpp` é necessário porque o CLI depende do [node-llama-cpp](https://github.com/withcatai/node-llama-cpp) (motor de IA local, SPEC-23) — sem essa flag, o `npm` (versões recentes) pula o postinstall dele por padrão, e os binários nativos ficam num estado incompleto/incorreto que o Windows Defender pode sinalizar como "app bloqueado" ao tentar carregar (ver [Solução de problemas](#solução-de-problemas)).
-
-Publicado no [npm](https://www.npmjs.com/package/gerador-de-itens), mesmo mecanismo de instalação do Graphify — sem clonar este repositório. Veja [`packages/cli/README.md`](packages/cli/README.md) pra instalar a partir do código (contribuindo/testando), e [Comandos da CLI](#comandos-da-cli) abaixo pra lista completa.
-
-#### Atualizar pra versão mais nova
-
-```powershell
-npm uninstall -g gerador-de-itens
-npm install -g gerador-de-itens --allow-scripts=node-llama-cpp
-```
-
-Desinstalar antes é o caminho mais garantido — evita herdar um estado de instalação anterior incompleto (ex.: binário nativo baixado sem a flag `--allow-scripts`, ver [Solução de problemas](#solução-de-problemas)). `npm install -g gerador-de-itens@latest --allow-scripts=node-llama-cpp` sozinho também funciona no dia a dia (o `npm` sobrescreve a instalação anterior), mas depois de qualquer problema de instalação vale desinstalar primeiro.
-
-Confirme a versão instalada com `npm list -g gerador-de-itens` (ou `npm view gerador-de-itens version` pra ver a versão mais recente publicada, sem instalar) — o próprio app (`gerador open`) também mostra a versão rodando no canto da tela.
-
-### 2. Docker (modo hospedado, opcional — canvas visual + Postgres + login)
 
 ```powershell
 docker compose up --build
@@ -146,70 +125,15 @@ Para um modelo de voz maior, use `MODELO_VOZ` no `.env` (`small`, `large-v3-turb
 
 Quem faz a chamada é o **container do servidor**, não o seu navegador. Dentro dele, `localhost` é ele mesmo — o pedido morreria em "connection refused" sem nunca sair. `ollama` é o nome do serviço no `docker-compose.yml`, que a rede interna do Docker resolve pro container certo.
 
-A porta `11434` também é publicada pra fora, então a **mesma** instância serve o `gerador open` (modo local, aí sim em `http://localhost:11434/v1`) — sem instalar Ollama na máquina.
+A porta `11434` também é publicada pra fora, então dá pra apontar um cliente da sua máquina para a **mesma** instância (`http://localhost:11434/v1`) — sem instalar Ollama localmente.
 
 </details>
 
-> **Modelo local sem Docker.** No `gerador open` existe o outro caminho: `gerador ia instalar` baixa um GGUF e roda embutido no processo, sem container nenhum (SPEC-23). O caminho do Ollama acima é o do **modo hospedado**, onde carregar o modelo dentro do container do servidor foi descartado de propósito (SPEC-31 Fase 4).
-
-##### Se `gerador ia instalar` falha na rede da empresa
-
-Antes de qualquer outra coisa, rode o diagnóstico — ele testa o caminho de verdade e diz a **causa real**, não `fetch failed`:
-
-```bash
-gerador ia diagnosticar
-```
-
-A causa mais comum, medida em campo, é **inspeção TLS**: a rede intercepta o HTTPS e reassina com uma CA da empresa, que o Node não conhece. É também o que explica o `npm` funcionar e o download não — o npm usa o repositório de certificados do Windows, o Node não usa por padrão.
-
-| O que o diagnóstico diz | O que fazer |
-|---|---|
-| `SELF_SIGNED_CERT_IN_CHAIN` / `CERT_*` | `NODE_OPTIONS=--use-system-ca` (Node 22.15+ — usa a CA que já está na máquina). Em Node mais antigo, `NODE_EXTRA_CA_CERTS=caminho\ca.pem` |
-| `ENOTFOUND` / `ECONNREFUSED` / timeout, sem proxy | `HTTPS_PROXY=http://proxy.empresa:8080` — o npm honra proxy sozinho, e até a v0.1.65 o download não honrava |
-| Tudo falhou | Use `--de` ou `--origem npm` abaixo |
-
-No Windows, para não repetir a cada terminal:
-
-```powershell
-[Environment]::SetEnvironmentVariable("NODE_OPTIONS", "--use-system-ca", "User")
-```
-
-> **Nada disso é necessário para usar a ferramenta.** `gerador open` abre o editor, o canvas, a derivação e a especificação sem baixar modelo nenhum — só os recursos de IA dependem dele. E se a sua rede libera algum gateway de LLM, `gerador ia conectar --url <base> --chave <chave> --modelo <nome>` resolve com **zero download**.
-
-##### De onde o modelo vem
-
-Por padrão, `gerador ia instalar` baixa de um **release do GitHub**
-([silvioAL/gerador-modelos](https://github.com/silvioAL/gerador-modelos)) — não do
-Hugging Face. O motivo é medido, não suposto: redes corporativas costumam
-classificar o Hugging Face como *file sharing* e devolver 403 com página de
-filtro, enquanto liberam o GitHub como *developer tools*. Rode
-`gerador ia diagnosticar` e veja qual é o caso da sua.
-
-Os arquivos são os mesmos pesos, byte a byte — o SHA-256 é conferido nos dois
-caminhos. Se o release estiver fora do ar, ele cai automaticamente no Hugging
-Face; `--origem huggingface` força a origem canônica.
-
-##### Se nenhuma das duas origens passa
-
-Por padrão `gerador ia instalar` busca o GGUF no Hugging Face. Onde isso é bloqueado, há duas saídas — nenhuma delas exige rede liberada para lá (SPEC-32):
-
-```bash
-# 1. De um arquivo que você já tem (pendrive, share, a máquina de um colega)
-gerador ia instalar --modelo qwen-local --de D:\modelos\Qwen3-4B-Q4_K_M.gguf
-
-# 2. Pelos pacotes-parte no npm — usa o registry/proxy que a sua rede já libera
-gerador ia instalar --origem npm
-```
-
-O `--origem npm` existe porque **um pacote npm de 2,5 GB não publica**: um pacote de 229,9 MB já levou `413 Payload Too Large` no npmjs.org. Então o modelo vai fatiado em pacotes de ~190 MB e é remontado na instalação, com o SHA-256 do arquivo inteiro conferido no fim — parte fora de ordem produziria um arquivo do tamanho certo e do conteúdo errado.
-
-Para gerar e publicar esses pacotes a partir de um GGUF:
-
-```bash
-node scripts/fatiar-modelo.mjs caminho/modelo.gguf --escopo @seu-escopo
-```
-
-O script imprime o `sha256`/`partesNpm` para colar em `packages/llm/src/modelos.ts` e o comando de publicação — mas **não publica**: mexer numa conta npm pública é decisão de quem é dono dela.
+> **Sem modelo embutido.** A instalação de um GGUF na máquina (`gerador ia
+> instalar`) saiu junto com o modo local — ver
+> [`SPEC-33`](SPEC-33-modo-unico-hospedado.md). No hospedado o caminho é o
+> gateway: o Ollama do compose acima, ou qualquer endpoint compatível com a
+> API da OpenAI configurado na aba **Modelo de IA**.
 
 ##### Imagem: anexar um print
 
@@ -255,7 +179,7 @@ cp .env.example .env   # preencher INFISICAL_CLIENT_ID/SECRET/PROJECT_ID + OIDC_
 docker compose -f docker-compose.yml -f docker-compose.secrets.yml up -d --build
 ```
 
-### 3. Desenvolvimento local (hot reload, pra trabalhar no próprio `gerador`)
+### 2. Desenvolvimento local (hot reload, pra trabalhar no próprio `gerador`)
 
 ```powershell
 npm install
@@ -276,42 +200,21 @@ Também dá pra ver a jornada de linha de comando dentro do próprio app web: bo
 - **Derivar os itens** — motor determinístico que calcula dependências a partir das arestas do diagrama, detecta ciclos e conflitos antes de deixar você seguir.
 - **Revisar e exportar** — depois de derivar, expanda cada item pra ver a especificação técnica completa, o refinamento e os critérios de aceite em Gherkin, sem precisar copiar nada à parte. Um clique gera um único markdown — a **especificação de solução** da quebra inteira (contexto, visão geral, cada item completo, DoR/DoD no fim) — pronto pra ser o input de outro agente (ex.: o que sobe os itens pro sistema de tracking do time).
 
-## Comandos da CLI
-
-| Comando | Quando usar |
-|---|---|
-| `gerador init [diretório]` | Começar um projeto novo — cria `config/` de exemplo, nunca sobrescreve o que já existir. |
-| `gerador derive <quebra.json> [--out arquivo]` | Gerar os itens (Markdown) a partir de um diagrama já pronto, sem abrir o browser. |
-| `gerador implementar <quebra.json> [--out arquivo]` | Gerar a especificação de solução da quebra inteira — um documento com todos os itens, especificação técnica completa e refinamento — pronto pra ser o input de outro agente. |
-| `gerador open [--port]` | Abrir o editor visual — já vem empacotado dentro do pacote npm, sem depender de `npm run dev` nem de clonar o repositório. Serve o `config/` do diretório onde foi chamado. |
-| `gerador import-graphify <graph.json> [--out arquivo]` | Rascunhar nós `existente`/`extraído` a partir de um projeto já mapeado pelo Graphify. Precisa de `config/graphify-mapping.json` (mapeamento de padrão de arquivo → tipo de nó); `gerador init` cria um exemplo. |
-
-Todo comando lê `config/*.json` do **diretório atual**, nunca deste repositório — o mesmo pacote serve qualquer projeto.
-
 ## Solução de problemas
 
-**`gerador` não é reconhecido como comando depois do `npm install -g`.** O `npm` instalou o binário, mas a pasta global de binários do `npm` não está no `PATH` do Windows — comum em instalações novas do Node, principalmente sem reiniciar o terminal depois. Confirme rodando `npm config get prefix` (é essa pasta que precisa estar no `PATH`); se `gerador --help` ainda falhar depois disso, feche e reabra o terminal.
+**A stack sobe mas o navegador mostra tela em branco.** O `gerador` (nginx)
+serve um build estático: depois de mudar o código do `packages/web`, é preciso
+`docker compose build gerador` antes do `up`. Sem isso você testa o bundle
+anterior — foi assim que um defeito já corrigido voltou a ser reportado.
 
-**Windows mostra "Parte deste aplicativo foi bloqueado" ao rodar `gerador ia instalar`/`status`/`open`.** Sintoma de ter instalado sem `--allow-scripts=node-llama-cpp` (ver comando acima) — sem o postinstall dele rodar, os binários nativos de IA ficam num estado que o Windows Defender não reconhece. Corrija reinstalando com a flag:
+**Erro de IA com o gateway configurado.** A aba **Modelo de IA** tem um
+"Testar conexão" que reporta o que o gateway respondeu, em vez de um erro
+genérico de rede. Comece por ele: credencial errada, endereço sem `/v1` e
+modelo inexistente dão mensagens diferentes.
 
-```powershell
-npm uninstall -g gerador-de-itens
-npm install -g gerador-de-itens --allow-scripts=node-llama-cpp
-```
-
-Se preferir não rodar postinstall de dependência nenhuma por princípio, tudo bem — todo o resto da ferramenta (`init`/`derive`/`implementar`/`open`/`import-graphify`, incluindo `gerador ia instalar`/`status`, que só baixam/checam arquivo) funciona normalmente; só a chamada de verdade ao modelo — botão "✨ Sugerir" na revisão — fica indisponível, com erro claro em vez de travar o resto do app.
-
-```powershell
-$npmPath = npm config get prefix
-$userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
-
-if ($userPath -split ';' -notcontains $npmPath) {
-    [Environment]::SetEnvironmentVariable('Path', "$userPath;$npmPath", 'User')
-    Write-Host "Adicionado ao PATH: $npmPath" -ForegroundColor Green
-} else {
-    Write-Host "Ja esta no PATH: $npmPath" -ForegroundColor Yellow
-}
-```
+**`docker compose up` reclama de porta em uso.** A stack publica 8080 (web),
+4000 (servidor), 5432 (Postgres), 9000 (Whisper) e 11434 (Ollama). O E2E usa
+um compose separado, em 5433, justamente para não disputar com a de trabalho.
 
 ## Desenvolvimento
 
