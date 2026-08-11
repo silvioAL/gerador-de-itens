@@ -3,8 +3,16 @@ WORKDIR /app
 
 COPY package.json package-lock.json* ./
 COPY packages/engine/package.json packages/engine/package.json
+# #296 — o web passou a depender de `@gerador/aplicacao` (preâmbulos dos papéis
+# e a anatomia do prompt). Sem o package.json dele aqui, o `npm install` abaixo
+# não resolve o workspace, cai no registry e acaba puxando `node-llama-cpp`,
+# que exige git no container e derruba o build inteiro.
+COPY packages/aplicacao/package.json packages/aplicacao/package.json
 COPY packages/web/package.json packages/web/package.json
-RUN npm install
+# `--ignore-scripts`: este estágio só compila um frontend estático. O lock do
+# monorepo alcança `node-llama-cpp`, cujo postinstall tenta compilar llama.cpp e
+# exige git no container — binário nativo que a imagem do web nunca usa.
+RUN npm install --ignore-scripts
 
 COPY . .
 # Vite resolve import.meta.env.VITE_API_URL em build time, não em runtime
