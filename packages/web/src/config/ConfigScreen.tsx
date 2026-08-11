@@ -189,7 +189,10 @@ export function ConfigScreen({
         ))}
       </div>
 
-      <div style={{ flex: 1, overflow: "auto", padding: 24 }}>
+      {/* `data-testid` no CORPO da aba, e não em cada conteúdo: é o que permite
+          a um teste só perguntar "toda aba visível mostra alguma coisa?" — a
+          pergunta que ninguém tinha feito quando o gate ficou pela metade. */}
+      <div data-testid="corpo-da-aba" style={{ flex: 1, overflow: "auto", padding: 24 }}>
         {abaAtiva === "perfis" && (
           <PerfisTimeTab perfisTime={perfisTime} config={config} onEditarValor={onEditarValorPerfilTime} />
         )}
@@ -213,7 +216,17 @@ export function ConfigScreen({
             onExcluir={onExcluirCampoAresta}
           />
         )}
-        {abaAtiva === "regras" && mostrarCamposAresta && <RegrasTab podeSecao={(id) => permissoes.pode(RECURSO_DA_SECAO_DE_REGRAS[id])} />}
+        {/**
+         * ACHADO REAL do usuário: no modo HOSPEDADO a aba "Regras de refinamento"
+         * abria em branco. O gate `mostrarCamposAresta` (que é "modo local") foi
+         * removido da DECLARAÇÃO da aba na rodada do #289 — e continuou aqui, no
+         * corpo. Resultado: o botão aparecia, o conteúdo não.
+         *
+         * Pior: o comentário que explica a correção está a oitenta linhas daqui,
+         * ao lado da metade que foi corrigida. Dois lugares decidem se uma aba
+         * existe, e só um foi revisado — a §145 outra vez.
+         */}
+        {abaAtiva === "regras" && <RegrasTab podeSecao={(id) => permissoes.pode(RECURSO_DA_SECAO_DE_REGRAS[id])} />}
         {abaAtiva === "membros" && mostrarMembros && <MembrosTab timeAtivo={timeAtivo} />}
         {abaAtiva === "acessos" && mostrarMembros && <AcessosTab timeAtivo={timeAtivo} />}
         {abaAtiva === "especificacao" && (
