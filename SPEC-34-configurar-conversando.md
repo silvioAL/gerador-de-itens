@@ -126,11 +126,16 @@ existente; RBAC visível (§3.3).
 
 Na Fase 1 a conversa propõe três alvos: `campo-no`, `campo-aresta` e `papel` —
 os que se aplicam por uma rota que o App já chama, precisando no máximo de um
-destino (tipo de nó/conexão) que o cartão oferece num select. Os três alvos de
-regras (`regra-refinamento`, `item-processo`, `teste-automatizado`) exigem
-escolher tech e escrever via `PUT /config/regras`, cujo fluxo é da `RegrasTab`
-— entram na Fase 2, junto com as retrospectivas, que é onde "isso vira regra"
-acontece de verdade.
+destino (tipo de nó/conexão) que o cartão oferece num select. Os alvos de
+regras exigem escolher tech e escrever via `PUT /config/regras` — entram na
+Fase 2, junto com as retrospectivas, que é onde "isso vira regra" acontece de
+verdade.
+
+*(Corrigido ao implementar a Fase 2: entraram `regra-refinamento` e
+`item-processo`, que têm a MESMA forma `{texto, contextos}` das seções que os
+recebem. `teste-automatizado` ficou fora — o schema do alvo
+(`tipo/validacao/dev/hlg`) não é a forma de `regras.testes`, e aplicar exigiria
+uma conversão inventada; entra quando o mapeamento for medido, não suposto.)*
 
 **Feito quando**: no E2E com gateway falso, descrever uma intenção gera uma
 proposta de `campo-no`, Aplicar cria o campo de verdade (a aba "Padrões por

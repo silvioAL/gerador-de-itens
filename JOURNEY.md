@@ -4091,3 +4091,41 @@ consegui: Não foi possível responder." em vez do erro específico da rota — 
 fallback genérico do cliente quando o corpo de erro não chega como JSON. É o
 mesmo comportamento das outras conversas, não desta rodada; fica registrado
 para uma rodada de mensagens de erro.
+
+## 163. Retrospectivas saem de RECURSOS_SEM_ROTA — a Fase 2 do #297
+
+O recurso `retrospectivas` esperou no enum de RBAC desde a SPEC-28, com o
+motivo assinado: "a ingestão nunca foi construída no hospedado — o recurso
+antecipa a feature". Esta rodada é a feature chegando: tabela, rotas com o
+portão (`ler` para listar, `editar` para escrever — retro é material interno
+do time, não config pública de formulário), e a linha saindo da lista de
+exceções. O teste-guarda de cobertura, que exige recurso coberto ou
+justificado, passou a cobrar exatamente isso sem precisar mudar.
+
+**As retros moram na conversa, não numa tela própria.** É ali que elas são
+usadas: com `timeId` no pedido, o SERVIDOR injeta as do time no prompt — lidas
+do banco, não mandadas pela tela, porque a fonte de verdade do que o time
+registrou é a tabela, não o estado de quem está conversando. E o prompt só
+ganha a regra "proposta nascida de retro CITA o trecho" quando há retro de
+verdade — prompt que promete contexto que não tem ensina o modelo a inventar.
+
+**Os alvos de regras entraram pela forma, não pela lista.** A SPEC dizia "os
+três alvos de regras na Fase 2"; a implementação corrigiu para dois —
+`regra-refinamento` e `item-processo` têm exatamente a forma
+`{texto, contextos}` das seções que os recebem, e o Aplicar lê o documento
+inteiro, acrescenta na tech escolhida e grava tudo de volta (a UI nunca é dona
+do arquivo, SPEC-23 §6.7 — e há teste que morde: salvar só a seção nova deixa
+o caso de preservação vermelho). `teste-automatizado` ficou fora: o schema do
+alvo não é a forma de `regras.testes`, e uma conversão inventada aplicaria
+silenciosamente o objeto errado. A SPEC ganhou a correção anotada em vez de
+reescrita — o "três" errado documentado vale mais que o histórico limpo.
+
+O RBAC das seções veio de graça e certo por construção: quem decide a
+permissão do PUT de regras é `secoesDeRegrasAlteradas`, sobre o diff real do
+documento — a conversa que só acrescenta checklist técnico exige só
+`regras.checklistTecnico`, sem uma linha nova de autorização.
+
+Duas mordidas provadas, uma por camada: sem o `pode("editar")` no POST, o
+teste do feito-quando (403 com RBAC ativo) fica vermelho; salvando só a seção
+nova, o teste de preservação fica vermelho. 137 no server, 357 no web, 38/38
+no navegador.

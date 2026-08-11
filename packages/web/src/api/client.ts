@@ -672,16 +672,38 @@ export const apiIa = {
 export interface PedidoConfigurarIa {
   mensagens: { autor: "voce" | "agente"; texto: string }[];
   resumoConfig?: string;
+  /** Fase 2 — com o time, o SERVIDOR injeta as retros dele no prompt (a fonte
+   * de verdade é a tabela, não o estado da tela). */
+  timeId?: string;
 }
 
-/** Alvos que a conversa de configuração propõe na Fase 1 (SPEC-34 §4) — os de
- * regras entram na Fase 2, junto com as retrospectivas. */
-export type AlvoConversaConfig = "campo-no" | "campo-aresta" | "papel";
+/** Alvos que a conversa de configuração propõe (SPEC-34 §4). Os dois de regras
+ * entraram na Fase 2 — `teste-automatizado` fica fora até o mapeamento para
+ * `regras.testes` ser medido, não suposto. */
+export type AlvoConversaConfig = "campo-no" | "campo-aresta" | "papel" | "regra-refinamento" | "item-processo";
 
 export interface RespostaConfigurar {
   texto: string;
   propostas: { alvo: AlvoConversaConfig; instrucao: string }[];
 }
+
+export interface Retrospectiva {
+  id: string;
+  timeId: string;
+  titulo: string;
+  texto: string;
+  criadoEm: string;
+}
+
+/** SPEC-34 Fase 2 — a ingestão de retrospectivas do fluxo 5, no hospedado.
+ * Material interno do time: leitura e escrita passam pelo recurso
+ * `retrospectivas` do RBAC. */
+export const apiRetrospectivas = {
+  listar: (timeId: string) => requisitar<Retrospectiva[]>(`/retrospectivas?timeId=${encodeURIComponent(timeId)}`),
+  criar: (dados: { timeId: string; titulo: string; texto: string }) =>
+    requisitar<Retrospectiva>("/retrospectivas", { method: "POST", body: JSON.stringify(dados) }),
+  excluir: (id: string) => requisitar<void>(`/retrospectivas/${id}`, { method: "DELETE" }),
+};
 
 export interface PedidoAlterarItemIa {
   instrucao: string;

@@ -313,6 +313,15 @@ test("configurar conversando: a conversa vira proposta, aplicar cria o campo, e 
   await page.getByRole("button", { name: "⚙ Configurar" }).click();
   await expect(page.getByTestId("configurar-conversa")).toBeVisible();
 
+  // SPEC-34 Fase 2 — a retro atravessa navegador → rota → tabela e volta na
+  // lista. O uso dela no prompt é coberto no montador; a citação de trecho é
+  // comportamento do modelo real, que o dublê genérico não representa.
+  await page.getByTestId("retros-secao").locator("summary").click();
+  await page.getByLabel("Título da retrospectiva").fill("Retro sprint 42");
+  await page.getByLabel("Texto da retrospectiva").fill("aprendemos que todo consumo precisa de DLQ");
+  await page.getByRole("button", { name: "Guardar retro" }).click();
+  await expect(page.getByTestId("retros-secao").getByText("Retro sprint 42")).toBeVisible();
+
   await page.getByLabel("Descreva o que configurar").fill("todo serviço novo precisa declarar o runbook de plantão");
   await page.getByRole("button", { name: "Enviar" }).click();
 

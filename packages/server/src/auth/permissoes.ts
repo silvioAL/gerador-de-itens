@@ -61,15 +61,12 @@ export type Recurso = (typeof RECURSOS)[number];
  *   delegar checklist, todo mundo sem papel pararia de conseguir criar quebra.
  *   Quem quer isolar quebra já tem o escopo por time, que é o eixo certo para
  *   trabalho.
- * - `retrospectivas`: a ingestão de retrospectivas (SPEC-23 fluxo 5) nunca foi
- *   construída no modo hospedado. Não há rota a proteger — o recurso está no
- *   enum antecipando a feature.
  * - `modelo-ia`: no modo hospedado a escolha do modelo viaja **junto com a
  *   credencial** (`PUT /ia/credencial`), que já é protegida por
  *   `credenciais-ia`. Não existe rota separada para gatear; deixar as duas
  *   permissões na mesma rota faria uma delas ser decorativa.
  */
-export const RECURSOS_SEM_ROTA: readonly Recurso[] = ["quebras", "retrospectivas", "modelo-ia"];
+export const RECURSOS_SEM_ROTA: readonly Recurso[] = ["quebras", "modelo-ia"];
 
 /** Uma organização por instalação, hoje. Repetido em cada arquivo de rota antes
  * de virar isto. */
