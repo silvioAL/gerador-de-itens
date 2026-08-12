@@ -38,12 +38,21 @@ export function AcessosTab({ timeAtivo }: { timeAtivo: string }) {
 
   useEffect(() => {
     let cancelado = false;
-    Promise.all([apiAcessos.catalogo(), apiAcessos.papeis(), apiAcessos.minhas(timeAtivo)])
-      .then(([cat, lista, minhas]) => {
+    // As solicitações do PDCA entram JÁ no mount — o defeito real da §183 era
+    // este efeito ter um Promise.all próprio, sem os ajustes: a seção só
+    // aparecia depois de alguma ação recarregar.
+    Promise.all([
+      apiAcessos.catalogo(),
+      apiAcessos.papeis(),
+      apiAcessos.minhas(timeAtivo),
+      apiPdca.listarAjustes().catch(() => []),
+    ])
+      .then(([cat, lista, minhas, pedidos]) => {
         if (cancelado) return;
         setCatalogo(cat);
         setPapeis(lista);
         setRbacAtivo(minhas.rbacAtivo);
+        setAjustes(pedidos);
       })
       .catch((e: unknown) => {
         if (!cancelado) setErro(e instanceof Error ? e.message : String(e));

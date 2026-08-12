@@ -11,6 +11,8 @@ const salvarPapelMock = vi.hoisted(() => vi.fn());
 const excluirPapelMock = vi.hoisted(() => vi.fn());
 const adicionarMembroMock = vi.hoisted(() => vi.fn());
 const adicionarTimeMock = vi.hoisted(() => vi.fn());
+const listarAjustesMock = vi.hoisted(() => vi.fn());
+const decidirAjusteMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../api/client", async (importActual) => ({
   ...(await importActual<typeof import("../api/client")>()),
@@ -25,6 +27,10 @@ vi.mock("../api/client", async (importActual) => ({
     removerMembro: vi.fn(),
     adicionarTime: adicionarTimeMock,
     removerTime: vi.fn(),
+  },
+  apiPdca: {
+    listarAjustes: listarAjustesMock,
+    decidirAjuste: decidirAjusteMock,
   },
 }));
 
@@ -45,6 +51,8 @@ beforeEach(() => {
   salvarPapelMock.mockReset().mockResolvedValue(papel());
   excluirPapelMock.mockReset().mockResolvedValue(undefined);
   adicionarMembroMock.mockReset().mockResolvedValue({ email: "x@y.z", escopoTimeId: null });
+  listarAjustesMock.mockReset().mockResolvedValue([]);
+  decidirAjusteMock.mockReset().mockResolvedValue({});
 });
 
 describe("AcessosTab (SPEC-28 Fase 2)", () => {
@@ -182,5 +190,28 @@ describe("AcessosTab (SPEC-28 Fase 2)", () => {
 
     fireEvent.click(screen.getByLabelText("Agilidade: editar campos-no"));
     expect(await screen.findByText(/sem permissão/)).toBeInTheDocument();
+  });
+});
+
+describe("SPEC-39 — solicitações de ajuste na aba Acessos", () => {
+  it("as solicitações aparecem JÁ no mount (o defeito real da §183: só carregavam após uma ação)", async () => {
+    listarAjustesMock.mockResolvedValue([
+      {
+        id: "s1",
+        timeId: "time-pagamentos",
+        solicitante: "dev@empresa.com",
+        recurso: "regras",
+        descricao: "faltou item de DLQ",
+        estado: "pendente",
+        criadoEm: new Date().toISOString(),
+      },
+    ]);
+    render(<AcessosTab timeAtivo="time-pagamentos" />);
+
+    await waitFor(() => expect(screen.getByTestId("solicitacoes-de-ajuste")).toBeInTheDocument());
+    expect(screen.getByText(/faltou item de DLQ/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Aprovar ajuste de dev@empresa.com" }));
+    await waitFor(() => expect(decidirAjusteMock).toHaveBeenCalledWith("s1", true));
   });
 });
