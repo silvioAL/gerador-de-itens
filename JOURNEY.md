@@ -4895,3 +4895,25 @@ contexto.
 Mordidas: capturar sempre-criando → teste "não duplica" vermelho; chips
 truncados a um → teste dos chips múltiplos vermelho. 193 engine + 163
 server + 416 web; 49/49 E2E.
+
+## 191. Salvar credencial sem redigitar a chave — e o rodapé parou de falar de git
+
+Achado do usuário com o Qwen no Docker: "testei conexão e deu certo, mas
+não consigo salvar". A causa era uma assimetria entre as duas rotas: o
+`POST /ia/credencial/testar` tinha fallback pra credencial gravada quando a
+chave faltava (por isso o teste passava), mas o `PUT /ia/credencial` exigia
+`chave: min(1)` — e a tela promete "campo vazio = manter a chave atual" (o
+placeholder mostra "chave atual: sk-…"). Trocar só o modelo devolvia 400,
+que o client exibia como o genérico "Não foi possível completar a
+operação".
+
+Agora o PUT completa a chave vazia com a salva (e responde 400 legível —
+"informe a chave" — só quando não há nenhuma pra manter), e o /testar
+mescla o formulário com a chave gravada em vez de descartar o formulário
+inteiro (antes, mudar o modelo e testar testava a config ANTIGA). O rodapé
+da tela dizia "a chave vai pra ~/.gerador/credenciais.json, nunca pra
+config/ — que entra no git" — texto do modo local morto; no hospedado a
+chave mora no banco da organização e a API só devolve o resumo mascarado
+(o usuário roda Infisical na stack; a observação sobre git não fazia
+sentido nenhum). Mordida: fallback removido → teste do fluxo exato
+vermelho. 165 server; 416 web.
