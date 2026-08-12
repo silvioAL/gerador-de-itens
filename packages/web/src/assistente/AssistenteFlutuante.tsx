@@ -1,3 +1,6 @@
+import { useState } from "react";
+import { useArrastavel } from "./useArrastavel";
+
 export type AbaAssistente = "conversa" | "contexto" | "configurar";
 
 /** A ordem aqui é a ordem visual das abas. Entrada nova = aba nova — foi
@@ -26,10 +29,13 @@ export interface AssistenteFlutuanteProps {
   chamando?: boolean;
   /** SPEC-37 — o balão do momento: fala curta + chip de ação opcional,
    * sempre dispensável. Só aparece com o assistente FECHADO — aberto, quem
-   * fala é o chat. */
+   * fala é o chat. `entrada` transforma o balão em pergunta (ex.: o nome da
+   * demanda antes de derivar): o chip principal confirma com o texto digitado. */
   balao?: {
     texto: string;
     acao?: { rotulo: string; onExecutar: () => void };
+    acaoSecundaria?: { rotulo: string; onExecutar: () => void };
+    entrada?: { placeholder: string; rotulo: string; onConfirmar: (valor: string) => void };
     onDispensar: () => void;
   };
   /** O conteúdo da aba ativa — o App decide qual painel entra. */
@@ -57,6 +63,12 @@ export function AssistenteFlutuante({
   children,
 }: AssistenteFlutuanteProps) {
   const aberto = aba !== null;
+  // Pedido do usuário: o bubble apareceu sobre um botão e não tinha como
+  // mover — agora arrasta (a janela e o balão continuam ancorados no canto,
+  // previsíveis; é o GATILHO que sai do caminho).
+  const { estiloArrasto, handlersDeArrasto } = useArrastavel("gerador:fab-assistente");
+  // Rascunho do input do balão-pergunta (ex.: nome da demanda).
+  const [valorEntrada, setValorEntrada] = useState("");
   // zIndex 58 quando sobreposto: acima da ConfigScreen (55), abaixo do tour
   // (80) — é o que faz o mesmo bubble existir dentro de Configurações.
   const elevacao = sobreposto ? { zIndex: 58 } : {};
@@ -95,10 +107,42 @@ export function AssistenteFlutuante({
       {!aberto && balao && (
         <div className="assistente-janela" style={{ ...balaoEstilo, ...elevacao }} data-testid="assistente-balao" role="status">
           <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: "var(--texto-2)" }}>{balao.texto}</p>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+          {balao.entrada && (
+            <input
+              aria-label={balao.entrada.placeholder}
+              value={valorEntrada}
+              onChange={(e) => setValorEntrada(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && valorEntrada.trim()) balao.entrada!.onConfirmar(valorEntrada.trim());
+              }}
+              placeholder={balao.entrada.placeholder}
+              style={{ width: "100%", marginTop: 8, fontSize: 12.5, padding: "6px 8px" }}
+              autoFocus
+            />
+          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+            {balao.entrada && (
+              <button
+                onClick={() => balao.entrada!.onConfirmar(valorEntrada.trim())}
+                disabled={!valorEntrada.trim()}
+                style={{ ...chipAcaoEstilo, ...(valorEntrada.trim() ? {} : { opacity: 0.5, cursor: "not-allowed" }) }}
+                data-testid="assistente-balao-confirmar"
+              >
+                {balao.entrada.rotulo}
+              </button>
+            )}
             {balao.acao && (
               <button onClick={balao.acao.onExecutar} style={chipAcaoEstilo} data-testid="assistente-balao-acao">
                 {balao.acao.rotulo}
+              </button>
+            )}
+            {balao.acaoSecundaria && (
+              <button
+                onClick={balao.acaoSecundaria.onExecutar}
+                style={{ ...chipAcaoEstilo, background: "transparent", color: "var(--acento-indigo)" }}
+                data-testid="assistente-balao-secundaria"
+              >
+                {balao.acaoSecundaria.rotulo}
               </button>
             )}
             <button onClick={balao.onDispensar} aria-label="Dispensar sugestão" style={dispensarEstilo}>
@@ -120,7 +164,8 @@ export function AssistenteFlutuante({
               ? "Assistente: descreva o que o time precisa configurar — por texto ou por voz. Eu proponho, você aplica."
               : "Assistente: converse por texto ou por voz — descreva a demanda, cole o contexto do épico ou peça configuração."
         }
-        style={{ ...fabEstilo, ...elevacao }}
+        style={{ ...fabEstilo, ...elevacao, ...estiloArrasto }}
+        {...handlersDeArrasto}
       >
         {/* A rotação entre ✦ e × é do span, não do botão — girar o botão
             giraria também a sombra e o hover. */}

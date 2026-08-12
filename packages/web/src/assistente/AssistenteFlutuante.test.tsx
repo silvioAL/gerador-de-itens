@@ -1,7 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AssistenteFlutuante } from "./AssistenteFlutuante";
+
+beforeEach(() => localStorage.removeItem("gerador:fab-assistente"));
 
 describe("AssistenteFlutuante (#298 — um ponto de entrada pra conversar com a ferramenta)", () => {
   it("fechado: só o botão flutuante; abrir cai na conversa, que é a ação primária", async () => {
@@ -78,6 +80,80 @@ describe("AssistenteFlutuante (#298 — um ponto de entrada pra conversar com a 
     );
     expect(screen.queryByTestId("assistente-balao")).not.toBeInTheDocument();
     expect(screen.getByTestId("assistente-flutuante").className).not.toContain("assistente-fab--chamando");
+  });
+
+  it("balão-pergunta: confirmar só com texto, e o valor digitado chega trimado", async () => {
+    const onConfirmar = vi.fn();
+    const onSecundaria = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <AssistenteFlutuante
+        aba={null}
+        onMudarAba={vi.fn()}
+        balao={{
+          texto: "Qual é o nome da demanda?",
+          entrada: { placeholder: "ex.: Fatura mensal em lote", rotulo: "Derivar e salvar", onConfirmar },
+          acaoSecundaria: { rotulo: "Derivar sem salvar", onExecutar: onSecundaria },
+          onDispensar: vi.fn(),
+        }}
+      />
+    );
+
+    // Vazio: o chip principal não confirma — sem nome não há o que salvar.
+    const confirmar = screen.getByTestId("assistente-balao-confirmar");
+    expect(confirmar).toBeDisabled();
+
+    await user.type(screen.getByLabelText("ex.: Fatura mensal em lote"), "  Fatura mensal  ");
+    await user.click(confirmar);
+    expect(onConfirmar).toHaveBeenCalledWith("Fatura mensal");
+
+    // A saída sem compromisso continua a um clique.
+    await user.click(screen.getByTestId("assistente-balao-secundaria"));
+    expect(onSecundaria).toHaveBeenCalled();
+  });
+
+  it("balão-pergunta: Enter no input confirma — o teclado não obriga o mouse", async () => {
+    const onConfirmar = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <AssistenteFlutuante
+        aba={null}
+        onMudarAba={vi.fn()}
+        balao={{
+          texto: "Qual é o nome da demanda?",
+          entrada: { placeholder: "nome", rotulo: "Derivar e salvar", onConfirmar },
+          onDispensar: vi.fn(),
+        }}
+      />
+    );
+
+    await user.type(screen.getByLabelText("nome"), "Cobrança{Enter}");
+    expect(onConfirmar).toHaveBeenCalledWith("Cobrança");
+  });
+
+  it("arrastar o bubble move (e persiste), e o soltar NÃO conta como clique de abrir", () => {
+    const onMudarAba = vi.fn();
+    render(<AssistenteFlutuante aba={null} onMudarAba={onMudarAba} />);
+    const fab = screen.getByTestId("assistente-flutuante");
+
+    // jsdom não tem PointerEvent — MouseEvent com o tipo pointer* carrega o
+    // clientX que o fallback do fireEvent perderia.
+    const pointer = (tipo: string, x: number, y: number) =>
+      fireEvent(fab, new MouseEvent(tipo, { bubbles: true, clientX: x, clientY: y }));
+    pointer("pointerdown", 100, 100);
+    pointer("pointermove", 160, 40);
+    pointer("pointerup", 160, 40);
+    fireEvent.click(fab);
+
+    expect(onMudarAba).not.toHaveBeenCalled();
+    expect(fab.style.left).not.toBe("");
+    expect(localStorage.getItem("gerador:fab-assistente")).toBeTruthy();
+
+    // O clique SEGUINTE, sem arrasto, volta a abrir normalmente.
+    fireEvent.click(fab);
+    expect(onMudarAba).toHaveBeenCalledWith("conversa");
   });
 
   it("fechar: tanto o × da janela quanto o próprio botão flutuante", async () => {

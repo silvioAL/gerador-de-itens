@@ -32,6 +32,7 @@ import {
 } from "../api/client";
 import { baixarArquivoTexto } from "../persistence/baixarArquivo";
 import { ConversaEspecificacao } from "../conversa/ConversaEspecificacao";
+import { useArrastavel } from "../assistente/useArrastavel";
 import { DiagramaCompacto } from "./DiagramaCompacto";
 import { EsteiraAgentes } from "./EsteiraAgentes";
 import { SimulacaoEsteira } from "./SimulacaoEsteira";
@@ -366,6 +367,9 @@ export function ReviewScreen({
   const rodavaAntes = useRef(false);
   // SPEC-37 M7 — "agora não" do balão de gerar a especificação.
   const [m7Dispensado, setM7Dispensado] = useState(false);
+  // O bubble da revisão também arrasta (mesma chave do App: o bubble É um só
+  // conceito — movê-lo numa tela move nas duas).
+  const { estiloArrasto, handlersDeArrasto } = useArrastavel("gerador:fab-assistente");
 
   // SPEC-24 Fase C: fila de trabalho da esteira — um item por ATIVIDADE,
   // com os placeholders já separados por papel (`ItemFilaEsteira`).
@@ -935,9 +939,14 @@ export function ReviewScreen({
 
             <div className="review-rail" style={railEstilo}>
               <div className="review-rail-progresso" style={{ height: `${pctTimeline}%` }} />
-            {atividadesFiltradas.map((a) => {
+            {atividadesFiltradas.map((a, indice) => {
               const ficha = fichas.get(a.chave)!;
               const status = statusDoItem(ficha);
+              // Pedido do usuário: a timeline sinaliza onde começa e onde
+              // termina — primeiro card com marco de início, último com o de
+              // fim; lista de UM item carrega os dois no mesmo card.
+              const primeiro = indice === 0;
+              const ultimo = indice === atividadesFiltradas.length - 1;
               const cruzaOutroTime = outrosTimes(a).length > 0;
               const sel = a.chave === selecionada;
               const porPapel = placeholdersPorPapel(ficha);
@@ -950,6 +959,13 @@ export function ReviewScreen({
                   aria-pressed={sel}
                   className={[
                     "review-item-rail",
+                    primeiro && ultimo
+                      ? "review-item-rail-unico"
+                      : primeiro
+                        ? "review-item-rail-inicio"
+                        : ultimo
+                          ? "review-item-rail-fim"
+                          : "",
                     escrevendo ? "review-item-rail-escrevendo" : "",
                     status === "refinado" ? "review-item-rail-refinado" : "",
                     sel ? "review-item-rail-sel" : "",
@@ -1150,6 +1166,7 @@ export function ReviewScreen({
       <button
         className={`assistente-fab${(falaDeConducao && !mostrarConversa) || momentoM7Ativo ? " assistente-fab--chamando" : ""}`}
         data-testid="abrir-conversa-especificacao"
+        {...handlersDeArrasto}
         onClick={() => {
           if (!atividadeSelecionada && resultado.atividades.length > 0) {
             setSelecionada(resultado.atividades[0].chave);
@@ -1163,7 +1180,7 @@ export function ReviewScreen({
             ? undefined
             : "Refinar conversando — por texto ou por voz: peça a alteração de um item e depois mande revisar os que dependem dele."
         }
-        style={fabRefinarEstilo}
+        style={{ ...fabRefinarEstilo, ...estiloArrasto }}
       >
         <span
           style={{

@@ -153,6 +153,9 @@ describe("ConversaEspecificacao (SPEC-27 Fase 2 — alterar item e revisar os de
     const botao = screen.getByTestId("revisar-demais") as HTMLButtonElement;
     expect(botao).toHaveTextContent("Revisar os demais (1)"); // o item 02 depende do 01
     expect(botao.disabled).toBe(true);
+    // Achado real: "quando eu clico nada aparece" — o porquê precisa estar
+    // VISÍVEL, não escondido num tooltip que ninguém pausa pra ler.
+    expect(screen.getByText(/aceite uma alteração primeiro/)).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Descreva o que você quer"), { target: { value: "x" } });
     fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
@@ -160,6 +163,7 @@ describe("ConversaEspecificacao (SPEC-27 Fase 2 — alterar item e revisar os de
     fireEvent.click(screen.getByRole("button", { name: "Aceitar" }));
 
     expect((screen.getByTestId("revisar-demais") as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByText(/aceite uma alteração primeiro/)).not.toBeInTheDocument();
   });
 
   it("revisar os demais manda o QUE MUDOU e não a instrução — é propagação, não reescrita", async () => {

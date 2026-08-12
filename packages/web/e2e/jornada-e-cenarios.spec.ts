@@ -45,6 +45,11 @@ test("carregar um cenário pronto popula o canvas e deriva sem ciclos/conflitos"
   await expect(botaoDerivar).toBeEnabled();
   await botaoDerivar.click();
 
+  // Cenário carregado não tem título → o assistente pergunta o nome antes.
+  // Aqui é exploração, não registro: "Derivar sem salvar" segue direto.
+  await expect(page.getByTestId("assistente-balao")).toContainText("qual é o nome da demanda");
+  await page.getByTestId("assistente-balao-secundaria").click();
+
   await expect(page.getByTestId("contagem-itens")).toHaveText("4 itens");
   await expect(page.getByText("Não é possível derivar ainda")).not.toBeVisible();
 
@@ -134,6 +139,10 @@ test("adicionar dois cenários ao canvas (sem substituir) compõe um diagrama ma
   const botaoDerivar = page.locator('[data-tour="derivar-button"]');
   await expect(botaoDerivar).toBeEnabled();
   await botaoDerivar.click();
+
+  // Sem título → pergunta do nome; composição de cenários é exploração.
+  await expect(page.getByTestId("assistente-balao")).toContainText("qual é o nome da demanda");
+  await page.getByTestId("assistente-balao-secundaria").click();
 
   // 4 atividades do mongo + 5 do kafka = 9 — se algum ID tivesse colidido/se
   // perdido na mesclagem, esse número não bateria.

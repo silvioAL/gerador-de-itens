@@ -49,6 +49,13 @@ test("derivar quebra abre a revisão com a atividade esperada e exporta", async 
   await expect(page.getByTestId("assistente-balao")).toContainText("Tudo verde");
   await page.getByTestId("assistente-balao-acao").click();
 
+  // Quebra sem título: antes de derivar o assistente pergunta o NOME da
+  // demanda — é ele que habilita o auto-save depois de gerar os itens
+  // (achado real: "senti falta de um auto-save após gerar os itens").
+  await expect(page.getByTestId("assistente-balao")).toContainText("qual é o nome da demanda");
+  await page.getByLabel("ex.: Fatura mensal em lote").fill("Fila de propostas aprovadas");
+  await page.getByTestId("assistente-balao-confirmar").click();
+
   await expect(page.getByTestId("contagem-itens")).toHaveText("1 itens");
   await expect(page.getByRole("button", { name: "01" })).toBeVisible();
   await expect(page.getByText("Não é possível derivar ainda")).not.toBeVisible();
@@ -86,6 +93,11 @@ test("derivar quebra abre a revisão com a atividade esperada e exporta", async 
   await page.getByRole("button", { name: "Voltar ao canvas" }).click();
   await expect(page.getByTestId("contagem-itens")).not.toBeVisible();
   await expect(page.locator(".react-flow__node")).toBeVisible();
+
+  // O nome respondido no balão virou o título, e o auto-save aconteceu de
+  // verdade: o indicador do header diz "salva" (não "dê um título antes").
+  await expect(page.getByLabel("Título da quebra")).toHaveValue("Fila de propostas aprovadas");
+  await expect(page.getByText(/· salva$/)).toBeVisible();
 
   expect(erros, `Erros no console do browser:\n${erros.join("\n")}`).toEqual([]);
 });

@@ -108,3 +108,21 @@ a rodada da Fase 2, quando o fluxo estiver na mão.
   "Tudo refinado" com o chip "Gerar especificação de solução", o MESMO
   `baixarEspecificacao` do botão do header; bubble pulsa junto.
 - Fase 3 (M2–M5, M8) segue no mapa, para depois do uso real das duas fases.
+
+## 9. M10 — o nome antes de derivar (achado do uso real, §174)
+
+O uso real pediu um momento fora do mapa original: **auto-save após gerar os
+itens, com o nome da demanda perguntado ANTES de derivar**. Derivar é o
+momento do compromisso — o rascunho é livre, mas o resultado vale registrar.
+
+- Gatilho: qualquer derivação (chip M9 ou botão do header) numa quebra SEM
+  título. Com título, deriva direto e auto-salva.
+- Conduta: balão-pergunta com INPUT no próprio balão (anatomia do `balao`
+  ganhou `entrada` e `acaoSecundaria`): "qual é o nome da demanda?" com
+  "Derivar e salvar" (confirma com o texto) e "Derivar sem salvar" — porque
+  rascunho não é obrigado a virar registro (régua da §2: sempre dispensável).
+- O auto-save espera o render com o título aplicado antes de chamar o
+  `salvar()` da persistência (setState assíncrono; salvar no mesmo tick
+  gravaria "sem-titulo").
+- Tour e demo automática derivam SEM a pergunta e SEM auto-save —
+  demonstração não é demanda.

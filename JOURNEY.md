@@ -4460,3 +4460,37 @@ Desta vez a correção foi proporcional: 15s na asserção do gravando, e ponto.
 
 Duas mordidas nos testes exatos (a pergunta do M6 desligada → unit vermelho;
 a condição do M7 zerada → E2E vermelho). 360 no web, 41/41 no navegador.
+
+## 174. Cinco achados de uso real: o batch sobreposto, a timeline com pontas, o botão que explica, o bubble que sai do caminho e o nome antes de derivar
+
+Uma sessão de uso de verdade rendeu cinco itens, do pixel ao fluxo:
+
+1. **"Essa batch está com letra repetida"** — não era letra repetida: o TIPO
+   ("SERVIÇO DE BATCH (SPRING BATCH)") corria por baixo do badge de contagem
+   no diagrama compacto e o número parecia um caractere duplicado. A linha do
+   tipo agora trunca com reticências num teto que encolhe quando o badge
+   existe e quando há a marca EXISTENTE.
+2. **A timeline da revisão ganhou pontas**: o primeiro card marca o início
+   (▸), o último o fim (⚑), e com um item só as duas moram no mesmo card —
+   classes `review-item-rail-inicio/-fim/-unico` sobre o rail que já existia.
+3. **"Revisar os demais... quando eu clico nada aparece"** — o motivo morava
+   só no `title`, que ninguém pausa pra ler. O botão agora PARECE desabilitado
+   (opacidade, cursor) e a dica ficou visível ao lado: "aceite uma alteração
+   primeiro — é ela que se propaga aos demais".
+4. **O bubble virou arrastável** (`useArrastavel`): pointer events com captura,
+   posição persistida em localStorage, limitada à viewport, e um arrasto de
+   verdade (>6px) suprime o clique do soltar — sem isso todo arrasto abriria o
+   assistente. A MESMA chave de storage nas duas telas (canvas e revisão),
+   porque o bubble é um só conceito. Janela e balão continuam ancorados: é o
+   gatilho que sai do caminho, não a conversa.
+5. **O nome da demanda antes de derivar, e o auto-save depois** — derivar é o
+   momento do compromisso: sem título, o balão do assistente pergunta o nome
+   (input no próprio balão, novidade na anatomia do `balao`), com "Derivar e
+   salvar" e "Derivar sem salvar" — porque rascunho não é obrigado a virar
+   registro. O auto-save espera o RENDER com o título aplicado (setState é
+   assíncrono; salvar no mesmo tick gravaria "sem-titulo"). O tour e a demo
+   derivam direto, sem pergunta — demonstração não é demanda.
+
+Cinco mordidas provadas (truncamento desligado, classes do rail removidas,
+dica escondida, supressão de clique removida, trim/disabled do confirmar
+desligados) — cada uma deixou vermelho exatamente o teste que a vigia.
