@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { OpcoesApp } from "../app.js";
-import { organizacoes, papeisAcesso, papelPermissao, usuarioPapel } from "../db/schema.js";
+import { organizacoes, papeisAcesso, papelPermissao, timePapel, usuarioPapel, usuarioTime } from "../db/schema.js";
 import { exigirSessao } from "./middleware.js";
 import { maiorNivel, nivelNoTime } from "./niveis.js";
 
@@ -151,13 +151,27 @@ export async function resolverPermissoes(
       )
     );
 
+  // SPEC-38 Fase 3 — papéis PORTADOS POR TIME: herdam os membros OWNER do
+  // time portador, com escopo organizacional. É o que faz "o time de
+  // arquitetura edita o pipeline" acompanhar a composição do time em vez de
+  // dessincronizar em atribuições e-mail a e-mail.
+  const herdados = await db
+    .select({ papelId: timePapel.papelId })
+    .from(timePapel)
+    .innerJoin(
+      usuarioTime,
+      and(eq(usuarioTime.timeId, timePapel.timeId), eq(usuarioTime.email, email), eq(usuarioTime.nivel, "owner"))
+    )
+    .where(inArray(timePapel.papelId, idsDaOrg));
+
+  const papelIds = [...new Set([...atribuicoes.map((a) => a.papelId), ...herdados.map((h) => h.papelId)])];
   const porRecurso: Partial<Record<Recurso, Acao[]>> = {};
-  if (atribuicoes.length === 0) return { rbacAtivo: true, porRecurso };
+  if (papelIds.length === 0) return { rbacAtivo: true, porRecurso };
 
   const permissoes = await db
     .select({ recurso: papelPermissao.recurso, acao: papelPermissao.acao })
     .from(papelPermissao)
-    .where(inArray(papelPermissao.papelId, [...new Set(atribuicoes.map((a) => a.papelId))]));
+    .where(inArray(papelPermissao.papelId, papelIds));
 
   for (const { recurso, acao } of permissoes) {
     if (!ehRecurso(recurso) || !ehAcao(acao)) continue;

@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { resolve } from "node:path";
 import { buildApp } from "./app.js";
@@ -19,6 +19,7 @@ import {
   perfilStackValores,
   perfisStack,
   quebras,
+  timePapel,
   times,
   usuarioPapel,
   usuarioTime,
@@ -83,7 +84,7 @@ beforeEach(async () => {
   // para trás liga o RBAC da organização (SPEC-28 §4.3) e faria todos os
   // outros testes — que assumem o modo aberto — falharem com 403.
   await db.execute(
-    sql`truncate table ${quebras}, ${perfilStackValores}, ${camposNo}, ${convitesTime}, ${auditoria}, ${usuarioPapel}, ${papelPermissao}, ${papeisAcesso}`
+    sql`truncate table ${quebras}, ${perfilStackValores}, ${camposNo}, ${convitesTime}, ${auditoria}, ${usuarioPapel}, ${papelPermissao}, ${papeisAcesso}, ${timePapel}`
   );
   // O catálogo de perfis (SPEC-38 F2) não entra no truncate: `times` aponta
   // pra ele por FK — primeiro solta os ponteiros, depois apaga (os valores
@@ -1413,6 +1414,118 @@ describe("SPEC-38 Fase 2 — perfis de stack (catálogo apontado pelo time)", ()
     expect(depois.perfis.filter((p: { nome: string }) => p.nome.startsWith("stack de")).length).toBe(1);
     const projecao = (await app.inject({ method: "GET", url: "/perfis-time" })).json();
     expect(projecao[TIME_STACK].service).toEqual({ linguagem: "Kotlin", framework: "Spring Boot" });
+  });
+});
+
+describe("SPEC-38 Fase 3 — papel portado por time (owners herdam)", () => {
+  const TIME_PORTADOR = "time-teste-portador";
+  const EMAIL_OWNER_ARQ = "owner-arq@gerador.local";
+  const EMAIL_OPERAR_ARQ = "operar-arq@gerador.local";
+
+  beforeEach(async () => {
+    await garantirTime(TIME_PORTADOR);
+    await db.delete(usuarioTime).where(eq(usuarioTime.timeId, TIME_PORTADOR));
+    await db.insert(usuarioTime).values([
+      { email: EMAIL_OWNER_ARQ, timeId: TIME_PORTADOR, nivel: "owner" },
+      { email: EMAIL_OPERAR_ARQ, timeId: TIME_PORTADOR, nivel: "operar" },
+    ]);
+  });
+
+  afterEach(async () => {
+    await db.delete(usuarioTime).where(eq(usuarioTime.timeId, TIME_PORTADOR));
+  });
+
+  it("o cenário literal da SPEC: papel Curadoria portado pelo time — owner do time herda (edita catálogo), operar não, e owner de FORA continua barrado", async () => {
+    const [org] = await db.select().from(organizacoes).limit(1);
+    const [papel] = await db.insert(papeisAcesso).values({ organizacaoId: org.id, nome: "Curadoria" }).returning();
+    await db.insert(papelPermissao).values({ papelId: papel.id, recurso: "perfis-stack", acao: "editar" });
+
+    // Atribuição a TIME pela rota (dev é owner → o eixo de nível do exigirPermissao autoriza `acessos`).
+    const atribuir = await app.inject({
+      method: "POST",
+      url: `/acessos/papeis/${papel.id}/times`,
+      cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
+      payload: { timeId: TIME_PORTADOR },
+    });
+    expect(atribuir.statusCode).toBe(201);
+
+    // A herança aparece no /permissoes/minhas do owner do time portador…
+    const minhas = await app.inject({
+      method: "GET",
+      url: "/permissoes/minhas",
+      cookies: { gerador_sessao: await logarComo(EMAIL_OWNER_ARQ) },
+    });
+    expect(minhas.json().porRecurso["perfis-stack"]).toEqual(["editar"]);
+
+    // …e funciona numa rota REAL onde só o grant vale (curadoria ligada barra
+    // até owners): o herdeiro cria perfil no catálogo.
+    const criaHerdeiro = await app.inject({
+      method: "POST",
+      url: "/perfis-stack",
+      cookies: { gerador_sessao: await logarComo(EMAIL_OWNER_ARQ) },
+      payload: { nome: "Perfil da curadoria" },
+    });
+    expect(criaHerdeiro.statusCode).toBe(201);
+
+    // Operar do MESMO time não herda (D3: delegação é para quem lida com config).
+    const criaOperar = await app.inject({
+      method: "POST",
+      url: "/perfis-stack",
+      cookies: { gerador_sessao: await logarComo(EMAIL_OPERAR_ARQ) },
+      payload: { nome: "não deveria" },
+    });
+    expect(criaOperar.statusCode).toBe(403);
+
+    // Owner de OUTRO time, sem o papel: a curadoria continua barrando.
+    const criaDev = await app.inject({
+      method: "POST",
+      url: "/perfis-stack",
+      cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
+      payload: { nome: "também não" },
+    });
+    expect(criaDev.statusCode).toBe(403);
+
+    // Rebaixado a operar, o ex-owner PERDE a herança na hora — o papel
+    // acompanha a composição do time, sem atribuição pra limpar.
+    await db
+      .update(usuarioTime)
+      .set({ nivel: "operar" })
+      .where(and(eq(usuarioTime.email, EMAIL_OWNER_ARQ), eq(usuarioTime.timeId, TIME_PORTADOR)));
+    const criaRebaixado = await app.inject({
+      method: "POST",
+      url: "/perfis-stack",
+      cookies: { gerador_sessao: await logarComo(EMAIL_OWNER_ARQ) },
+      payload: { nome: "perdeu" },
+    });
+    expect(criaRebaixado.statusCode).toBe(403);
+  });
+
+  it("GET /acessos/papeis lista os times portadores; remover a atribuição corta a herança", async () => {
+    const [org] = await db.select().from(organizacoes).limit(1);
+    const [papel] = await db.insert(papeisAcesso).values({ organizacaoId: org.id, nome: "Curadoria" }).returning();
+    await db.insert(papelPermissao).values({ papelId: papel.id, recurso: "perfis-stack", acao: "editar" });
+    const cookieDev = await logarComo(EMAIL_DEV);
+    await app.inject({
+      method: "POST",
+      url: `/acessos/papeis/${papel.id}/times`,
+      cookies: { gerador_sessao: cookieDev },
+      payload: { timeId: TIME_PORTADOR },
+    });
+
+    const papeis = (await app.inject({ method: "GET", url: "/acessos/papeis", cookies: { gerador_sessao: cookieDev } })).json();
+    expect(papeis.find((p: { id: string }) => p.id === papel.id).times).toEqual([TIME_PORTADOR]);
+
+    await app.inject({
+      method: "DELETE",
+      url: `/acessos/papeis/${papel.id}/times/${TIME_PORTADOR}`,
+      cookies: { gerador_sessao: cookieDev },
+    });
+    const minhas = await app.inject({
+      method: "GET",
+      url: "/permissoes/minhas",
+      cookies: { gerador_sessao: await logarComo(EMAIL_OWNER_ARQ) },
+    });
+    expect(minhas.json().porRecurso["perfis-stack"]).toBeUndefined();
   });
 });
 

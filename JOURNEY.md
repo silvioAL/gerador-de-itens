@@ -4584,3 +4584,25 @@ próprio ponteiro nunca entra na curadoria: é ato de owner do time.
 Mordidas: curadoria ignorada (owner criando com papel curador vivo →
 vermelho), ponteiro sem efeito (projeção não segue → vermelho), aba sem
 avisar o App (projeção velha na tela → vermelho).
+
+## 178. SPEC-38 Fase 3 — o papel ganhou corpo: time_papel e a herança dos owners
+
+A última perna do desenho: `time_papel` permite atribuir um papel de acesso
+a um TIME, e os membros de nível owner o herdam com escopo organizacional —
+entrar, sair ou mudar de nível atualiza a permissão sozinho, que é o que a
+atribuição e-mail a e-mail nunca conseguiu.
+
+O detalhe que fez o teste-âncora valer: com o owner-bypass da Fase 1, a
+herança seria decorativa nas configs comuns (owner já pode). Onde ela tem
+valor REAL é (a) na curadoria, que barra até owners, e (b) em escopo de time
+alheio. O teste usa (a): papel Curadoria portado pelo time — o owner do time
+portador cria perfil no catálogo com curadoria ligada; o operar do mesmo
+time não herda; o owner de fora continua barrado; e o rebaixado perde a
+herança na hora. Um truncate esquecido mordeu antes do teste: `time_papel`
+referencia `papeis_acesso` e o truncate global quebrou em 87 testes até a
+tabela entrar na lista — o tipo de vermelho em massa que aponta a causa
+certa de uma vez.
+
+Mordida da fase: herança removida da união do `resolverPermissoes` → o
+teste-âncora vermelho. AcessosTab ganhou "times que portam este papel" com
+atribuir/remover, coberto por unit.

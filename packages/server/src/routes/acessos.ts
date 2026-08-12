@@ -6,7 +6,7 @@ import { registrarAuditoria } from "../auditoria.js";
 import { exigirSessao } from "../auth/middleware.js";
 import { maiorNivel, nivelNoTime } from "../auth/niveis.js";
 import { ACOES, RECURSOS, exigirPermissao, resolverPermissoes } from "../auth/permissoes.js";
-import { organizacoes, papeisAcesso, papelPermissao, usuarioPapel } from "../db/schema.js";
+import { organizacoes, papeisAcesso, papelPermissao, timePapel, times, usuarioPapel } from "../db/schema.js";
 
 /**
  * SPEC-28 Fase 1 — a API de acessos. A UI é a Fase 2; aqui o que existe é o
@@ -79,6 +79,7 @@ export async function registrarRotasAcessos(app: FastifyInstance, { db }: Opcoes
     const ids = papeis.map((p) => p.id);
     const permissoes = await db.select().from(papelPermissao).where(inArray(papelPermissao.papelId, ids));
     const membros = await db.select().from(usuarioPapel).where(inArray(usuarioPapel.papelId, ids));
+    const timesPortadores = await db.select().from(timePapel).where(inArray(timePapel.papelId, ids));
 
     return papeis.map((p) => ({
       id: p.id,
@@ -87,6 +88,8 @@ export async function registrarRotasAcessos(app: FastifyInstance, { db }: Opcoes
       membros: membros
         .filter((m) => m.papelId === p.id)
         .map(({ email, escopoTimeId }) => ({ email, escopoTimeId })),
+      // SPEC-38 F3 — os times que PORTAM o papel (owners herdam).
+      times: timesPortadores.filter((t) => t.papelId === p.id).map((t) => t.timeId),
     }));
   });
 
@@ -184,6 +187,28 @@ export async function registrarRotasAcessos(app: FastifyInstance, { db }: Opcoes
       .onConflictDoNothing();
     registrarAuditoria(db, { email: req.usuario!.email, acao: "criar", recurso: "usuario_papel", recursoId: `${id}:${corpo.email}` });
     return reply.code(201).send({ email: corpo.email, escopoTimeId: corpo.escopoTimeId ?? null });
+  });
+
+  // SPEC-38 Fase 3 — o papel portado por TIME: owners do time herdam.
+  app.post("/acessos/papeis/:id/times", { preHandler: exigeAdministrarAcessos }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const parseado = z.object({ timeId: z.string().min(1) }).safeParse(req.body);
+    if (!parseado.success) return reply.code(400).send({ erro: parseado.error.flatten() });
+    const [papel] = await db.select().from(papeisAcesso).where(eq(papeisAcesso.id, id));
+    if (!papel) return reply.code(404).send({ erro: "papel não encontrado" });
+    const [time] = await db.select().from(times).where(eq(times.id, parseado.data.timeId));
+    if (!time) return reply.code(404).send({ erro: `time "${parseado.data.timeId}" não encontrado` });
+
+    await db.insert(timePapel).values({ timeId: parseado.data.timeId, papelId: id }).onConflictDoNothing();
+    registrarAuditoria(db, { email: req.usuario!.email, acao: "criar", recurso: "time_papel", recursoId: `${id}:${parseado.data.timeId}` });
+    return reply.code(201).send({ timeId: parseado.data.timeId });
+  });
+
+  app.delete("/acessos/papeis/:id/times/:timeId", { preHandler: exigeAdministrarAcessos }, async (req, reply) => {
+    const { id, timeId } = req.params as { id: string; timeId: string };
+    await db.delete(timePapel).where(and(eq(timePapel.papelId, id), eq(timePapel.timeId, timeId)));
+    registrarAuditoria(db, { email: req.usuario!.email, acao: "excluir", recurso: "time_papel", recursoId: `${id}:${timeId}` });
+    return reply.code(204).send();
   });
 
   app.delete("/acessos/papeis/:id/membros/:email", { preHandler: exigeAdministrarAcessos }, async (req, reply) => {

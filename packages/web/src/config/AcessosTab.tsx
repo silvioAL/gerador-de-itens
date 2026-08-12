@@ -224,6 +224,35 @@ function MembrosDoPapel({
           Adicionar
         </button>
       </div>
+
+      {/* SPEC-38 F3 — o papel portado por TIME: os owners do time herdam, e a
+          permissão acompanha a composição (entrar/sair/mudar nível). */}
+      <span style={{ fontSize: 11.5, color: "var(--texto-fraco)", display: "block", marginTop: 10 }}>
+        Times que portam este papel (os owners do time herdam)
+      </span>
+      <ul style={{ margin: "4px 0", paddingLeft: 18, fontSize: 12.5 }}>
+        {papel.times.length === 0 && <li style={{ color: "var(--texto-mudo)" }}>nenhum time</li>}
+        {papel.times.map((t) => (
+          <li key={t}>
+            {t}{" "}
+            <button
+              onClick={() => void onExecutar(() => apiAcessos.removerTime(papel.id, t))}
+              disabled={salvando}
+              style={botaoLinkEstilo}
+            >
+              remover
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button
+        onClick={() => void onExecutar(() => apiAcessos.adicionarTime(papel.id, timeAtivo))}
+        disabled={salvando || papel.times.includes(timeAtivo)}
+        style={botaoEstilo}
+        aria-label={`Atribuir ${papel.nome} ao time ${timeAtivo}`}
+      >
+        + Atribuir ao time {timeAtivo}
+      </button>
     </div>
   );
 }

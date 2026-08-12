@@ -213,6 +213,27 @@ export const usuarioPapel = pgTable(
 );
 
 /**
+ * SPEC-38 Fase 3 — papel portado por TIME. Diferente de `usuarioPapel` (por
+ * e-mail): aqui o papel acompanha a composição do time — entrar/sair/mudar de
+ * nível atualiza a permissão sozinho. Herdam só os membros de nível OWNER do
+ * time portador (coerente com a D3). O papel herdado vale com escopo
+ * ORGANIZACIONAL: é o caso de uso literal ("o time de arquitetura edita
+ * prompts e fluxo"), que não é por-time.
+ */
+export const timePapel = pgTable(
+  "time_papel",
+  {
+    timeId: text("time_id")
+      .notNull()
+      .references(() => times.id),
+    papelId: uuid("papel_id")
+      .notNull()
+      .references(() => papeisAcesso.id, { onDelete: "cascade" }),
+  },
+  (t) => [uniqueIndex("time_papel_chave_unica").on(t.timeId, t.papelId)]
+);
+
+/**
  * Convite de time por link (SPEC-09 §3) — só quem já é do time gera um
  * (`POST /times/:timeId/convites`), qualquer pessoa logada aceita
  * (`POST /convites/:token/aceitar`). Single-use: `usadoPor`/`usadoEm`

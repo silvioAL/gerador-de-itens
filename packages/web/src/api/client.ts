@@ -832,6 +832,8 @@ export interface PapelAcesso {
   nome: string;
   permissoes: { recurso: string; acao: string }[];
   membros: { email: string; escopoTimeId: string | null }[];
+  /** SPEC-38 F3 — times que portam o papel (owners herdam). */
+  times: string[];
 }
 
 /** SPEC-38 — nível de participação num time (lista fechada, espelho de
@@ -866,6 +868,13 @@ export const apiAcessos = {
     }),
   removerMembro: (id: string, email: string) =>
     requisitar<void>(`/acessos/papeis/${id}/membros/${encodeURIComponent(email)}`, { method: "DELETE" }),
+  adicionarTime: (id: string, timeId: string) =>
+    requisitar<{ timeId: string }>(`/acessos/papeis/${id}/times`, {
+      method: "POST",
+      body: JSON.stringify({ timeId }),
+    }),
+  removerTime: (id: string, timeId: string) =>
+    requisitar<void>(`/acessos/papeis/${id}/times/${encodeURIComponent(timeId)}`, { method: "DELETE" }),
   /** O que EU posso — a UI usa pra esconder o que seria negado. Esconder é
    * conveniência: a negação real acontece no servidor, em cada rota. */
   minhas: (timeId?: string) =>
