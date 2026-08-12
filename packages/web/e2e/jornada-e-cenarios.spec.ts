@@ -1,6 +1,17 @@
 import { test, expect } from "@playwright/test";
 import { entrar } from "./auth";
 
+// Este arquivo testa fluxos determinísticos SEM IA (cenários, tour) — mas a
+// credencial do gateway é da organização e outros specs a criam em paralelo
+// (§162), o que ligava a esteira (e o M1 da SPEC-37) conforme a corrida. O
+// route declara o pressuposto: sem gateway. O M1 é coberto em ia-hospedada.
+test.beforeEach(async ({ page }) => {
+  await page.route(
+    (url) => url.pathname === "/ia/status",
+    (rota) => rota.fulfill({ json: { modelosChat: [], embeddingInstalado: false, capacidades: {} } })
+  );
+});
+
 test("jornada abre sozinha no primeiro acesso, explica as saídas, e some ao fechar", async ({ page }) => {
   await entrar(page);
 
@@ -30,11 +41,11 @@ test("carregar um cenário pronto popula o canvas e deriva sem ciclos/conflitos"
   await expect(page.locator(".react-flow__node", { hasText: "srv-catalogo" })).toBeVisible();
   await expect(page.locator(".react-flow__node", { hasText: "produtos" })).toBeVisible();
 
-  const botaoDerivar = page.getByRole("button", { name: "Derivar Quebra" });
+  const botaoDerivar = page.locator('[data-tour="derivar-button"]');
   await expect(botaoDerivar).toBeEnabled();
   await botaoDerivar.click();
 
-  await expect(page.getByText("4 itens")).toBeVisible();
+  await expect(page.getByTestId("contagem-itens")).toHaveText("4 itens");
   await expect(page.getByText("Não é possível derivar ainda")).not.toBeVisible();
 
   await page.screenshot({ path: "e2e/screenshots/cenario-mongo.png", fullPage: true });
@@ -120,13 +131,13 @@ test("adicionar dois cenários ao canvas (sem substituir) compõe um diagrama ma
   await expect(page.locator(".react-flow__node", { hasText: "srv-auditoria-eventos" })).toBeVisible();
   await expect(page.locator(".react-flow__node")).toHaveCount(5);
 
-  const botaoDerivar = page.getByRole("button", { name: "Derivar Quebra" });
+  const botaoDerivar = page.locator('[data-tour="derivar-button"]');
   await expect(botaoDerivar).toBeEnabled();
   await botaoDerivar.click();
 
   // 4 atividades do mongo + 5 do kafka = 9 — se algum ID tivesse colidido/se
   // perdido na mesclagem, esse número não bateria.
-  await expect(page.getByText("9 itens")).toBeVisible();
+  await expect(page.getByTestId("contagem-itens")).toHaveText("9 itens");
   await expect(page.getByText("Não é possível derivar ainda")).not.toBeVisible();
 
   await page.screenshot({ path: "e2e/screenshots/cenarios-compostos.png", fullPage: true });
@@ -175,7 +186,7 @@ test("tour guiado de 1 clique percorre diagrama, prontidão, proveniência, deri
   // Passo 6: revisão — o tour já disparou a derivação de verdade.
   await expect(page.getByText("PASSO 6 DE 11")).toBeVisible();
   await expect(page.locator('[data-tour="review-table"]')).toBeVisible();
-  await expect(page.getByText("4 itens")).toBeVisible();
+  await expect(page.getByTestId("contagem-itens")).toHaveText("4 itens");
   await page.getByRole("button", { name: "Próximo" }).click();
 
   // Passo 7: especificação de solução — revisão e especificação viraram uma coisa só.
@@ -212,7 +223,7 @@ test("tour guiado de 1 clique percorre diagrama, prontidão, proveniência, deri
   await page.getByRole("button", { name: "Concluir" }).click();
 
   await expect(page.getByText(/PASSO \d+ DE 11/)).not.toBeVisible();
-  await expect(page.getByText("4 itens")).not.toBeVisible();
+  await expect(page.getByTestId("contagem-itens")).not.toBeVisible();
 });
 
 test("pular tour a qualquer momento encerra o overlay imediatamente", async ({ page }) => {

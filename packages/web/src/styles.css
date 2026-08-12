@@ -290,6 +290,23 @@ textarea::placeholder {
   box-shadow: 0 8px 26px rgba(99, 102, 241, 0.45);
 }
 
+/* SPEC-37 — o pulso de CHAMADA dos momentos de condução. Diferente do hover
+   (interesse do usuário), este é o assistente pedindo atenção: um anel que
+   expande e some, repetido. Só liga quando há um momento ativo — pulso
+   permanente vira ruído (a mesma régua do comentário do bubble acima). */
+@keyframes assistente-chamar {
+  0%,
+  100% {
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45), 0 0 0 0 rgba(99, 102, 241, 0.55);
+  }
+  50% {
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45), 0 0 0 12px rgba(99, 102, 241, 0);
+  }
+}
+.assistente-fab--chamando {
+  animation: assistente-chamar 1.6s ease-out infinite;
+}
+
 /* Scrollbar escura em TODA barra de rolagem do app — a nativa do Windows
    (larga, clara) destoa do tema escuro (achado real do usuário comparando com
    o protótipo).

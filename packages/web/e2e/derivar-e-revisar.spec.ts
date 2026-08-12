@@ -3,6 +3,15 @@ import { entrar } from "./auth";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
+  // Este arquivo testa o fluxo determinístico SEM IA — mas a credencial do
+  // gateway é da organização e outros specs a criam em paralelo (§162), o que
+  // ligava a esteira (e o M1 da SPEC-37) conforme a corrida. O teste declara o
+  // próprio pressuposto: /ia/status responde "sem gateway", como um ambiente
+  // sem credencial. O M1 é coberto onde é determinístico (ia-hospedada).
+  await page.route(
+    (url) => url.pathname === "/ia/status",
+    (rota) => rota.fulfill({ json: { modelosChat: [], embeddingInstalado: false, capacidades: {} } })
+  );
 });
 
 test("derivar quebra abre a revisão com a atividade esperada e exporta", async ({ page }) => {
@@ -22,7 +31,7 @@ test("derivar quebra abre a revisão com a atividade esperada e exporta", async 
   await node.click();
 
   // Nó recém-criado é vermelho (campos obrigatórios em aberto) — gate bloqueia.
-  const botaoDerivar = page.getByRole("button", { name: "Derivar Quebra" });
+  const botaoDerivar = page.locator('[data-tour="derivar-button"]');
   await expect(botaoDerivar).toBeDisabled();
 
   const painel = page.locator("aside");
@@ -33,9 +42,14 @@ test("derivar quebra abre a revisão com a atividade esperada e exporta", async 
   await painel.getByRole("combobox", { name: "Ack" }).selectOption("manual");
 
   await expect(botaoDerivar).toBeEnabled();
-  await botaoDerivar.click();
 
-  await expect(page.getByText("1 itens")).toBeVisible();
+  // SPEC-37 M9 — tudo verde acorda o assistente: bubble pulsando e balão com
+  // o chip de Derivar. Derivamos PELO CHIP, provando que ele executa a mesma
+  // ação do botão do header (não um atalho paralelo).
+  await expect(page.getByTestId("assistente-balao")).toContainText("Tudo verde");
+  await page.getByTestId("assistente-balao-acao").click();
+
+  await expect(page.getByTestId("contagem-itens")).toHaveText("1 itens");
   await expect(page.getByRole("button", { name: "01" })).toBeVisible();
   await expect(page.getByText("Não é possível derivar ainda")).not.toBeVisible();
 
@@ -44,7 +58,8 @@ test("derivar quebra abre a revisão com a atividade esperada e exporta", async 
   // Selecionar o item mostra a ficha técnica ao lado — revisão e especificação
   // continuam sendo uma coisa só, mas o "expandir inline" virou lista à
   // esquerda + ficha à direita (SPEC-24). O texto de vazio é o que prova que a
-  // ficha só aparece depois da escolha.
+  // ficha só aparece depois da escolha. (Sem IA — o route do beforeEach — o
+  // M1 não abre nada sozinho, e este fluxo manual é determinístico.)
   await expect(page.getByText("Selecione um item na lista")).toBeVisible();
 
   // O chat de refinamento abre pelo bubble flutuante (mesmo esquema do #298),
@@ -53,7 +68,6 @@ test("derivar quebra abre a revisão com a atividade esperada e exporta", async 
   await page.getByTestId("abrir-conversa-especificacao").click();
   await expect(page.getByTestId("conversa-especificacao")).toBeVisible();
   await expect(page.getByText("Selecione um item na lista")).not.toBeVisible();
-  // O mesmo bubble fecha (vira ×) — e devolve a tela como estava.
   await page.getByTestId("abrir-conversa-especificacao").click();
   await expect(page.getByTestId("conversa-especificacao")).toHaveCount(0);
 
@@ -70,7 +84,7 @@ test("derivar quebra abre a revisão com a atividade esperada e exporta", async 
   expect(md.suggestedFilename()).toBe("especificacao-de-solucao.md");
 
   await page.getByRole("button", { name: "Voltar ao canvas" }).click();
-  await expect(page.getByText("1 itens")).not.toBeVisible();
+  await expect(page.getByTestId("contagem-itens")).not.toBeVisible();
   await expect(page.locator(".react-flow__node")).toBeVisible();
 
   expect(erros, `Erros no console do browser:\n${erros.join("\n")}`).toEqual([]);

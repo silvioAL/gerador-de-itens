@@ -58,7 +58,7 @@ export function ConversaPanel({
     {
       autor: "agente",
       texto:
-        "Descreva a demanda: o que precisa ser construído, quais sistemas participam, o que muda. Eu proponho o diagrama com os tipos que este projeto tem configurados, e você decide se aplica.",
+        "Descreva a demanda — por texto ou por voz (🎤): o que precisa ser construído, quais sistemas participam, o que muda. Eu proponho o diagrama com os tipos que este projeto tem configurados, e você decide se aplica.",
     },
   ]);
   const [entrada, setEntrada] = useState(contextoInicial?.trim() ?? "");
