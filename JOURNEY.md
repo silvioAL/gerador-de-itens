@@ -4524,3 +4524,35 @@ RBAC da SPEC-28 (recurso novo `perfis-stack`, aberto até alguém ligar);
 e `time_papel` — papéis portados por time, herdados pelos owners, que
 entram e saem da permissão junto com a composição do time. Spec apenas;
 implementação espera o aval, fase a fase.
+
+## 176. SPEC-38 Fase 1 — visualizar · operar · owner, e a escrita ganhou dois eixos
+
+"Pode seguir" — e a Fase 1 (níveis) entrou inteira. A migração 0019 dá a
+`usuario_time` a coluna `nivel` (default `operar` — insert esquecido nunca
+nasce com poder de configuração) e promove os membros EXISTENTES a `owner`,
+que é o poder que já tinham de fato; rebaixar vira decisão humana, não
+efeito colateral de migração.
+
+O coração da fase é a mudança de semântica do `exigirPermissao` (e do
+`primeiroRecursoNegado`, o caminho por-diferença das regras): escrita agora
+tem DOIS eixos — **owner do escopo sempre pode** (D3: configuração é ato de
+owner) e **quem não é owner precisa de grant RBAC explícito**. A falha-aberta
+da SPEC-28 §4.3 continua valendo só no eixo RBAC; o eixo de nível é sempre
+exigido. Isso inverteu cinco testes da SPEC-28 — os seeds, agora owners,
+passavam onde o teste esperava 403 — e a adaptação foi rebaixá-los a
+`operar` no próprio teste, porque o que aqueles testes medem é a DELEGAÇÃO,
+não o poder de owner.
+
+O resto seguiu o desenho: convite com teto (403, não clamp silencioso — um
+convite rebaixado em silêncio surpreenderia os dois lados), aceite entrando
+com o nível do convite, rota nova de mudar nível com a proteção do último
+owner (400: a requisição é legítima, o estado que ela produziria é que é
+inválido), escrita de quebra exigindo `operar` (quebra sem time usa o MAIOR
+nível — quem é visualizar em tudo não opera em lugar nenhum), e o
+`/permissoes/minhas` carregando o nível pro `usePermissoes` esconder o
+Salvar de quem é `visualizar` (esconder é conveniência; o 403 mora na rota).
+
+Seis mordidas provadas (teto desligado, gate de quebras rebaixado, owner-gate
+removido do exigirPermissao, eixo de nível removido das regras, convite
+ignorando o nível da UI, hook devolvendo nivel null) — cada uma acendeu
+exatamente o teste que a vigia.

@@ -13,7 +13,7 @@ import {
 import { criarCasosDeUsoDeQuebras } from "@gerador/aplicacao";
 import type { OpcoesApp } from "../app.js";
 import { criarRepositorioDeQuebrasEmPostgres } from "../adaptadores/quebrasEmPostgres.js";
-import { exigirSessao } from "../auth/middleware.js";
+import { exigirNivel } from "../auth/niveis.js";
 
 /**
  * SPEC-31 Fase 1: o corpo passou a aceitar os NOVE campos da porta. Antes eram
@@ -58,16 +58,25 @@ export async function registrarRotasQuebras(app: FastifyInstance, { db, diretori
     return quebra;
   });
 
-  // Escrita exige só sessão válida (não é restrita a um time — uma quebra pode
-  // referenciar serviços de vários times no mesmo diagrama).
-  app.post("/quebras", { preHandler: exigirSessao }, async (req, reply) => {
+  // SPEC-38 Fase 1 — escrita de quebra é trabalho do dia a dia: exige nível
+  // `operar` (visualizar lê, não grava). O escopo é o time da PRÓPRIA quebra
+  // quando ela declara um; sem time, vale o maior nível da pessoa — quem é
+  // visualizar em tudo não opera em lugar nenhum. (Uma quebra pode referenciar
+  // serviços de vários times no diagrama; o gate é sobre quem grava, não sobre
+  // o que o desenho menciona.)
+  const podeOperarNaQuebra = exigirNivel(db, "operar", (req) => {
+    const time = (req.body as { time?: string | null } | null)?.time;
+    return typeof time === "string" && time.trim() ? time : null;
+  });
+
+  app.post("/quebras", { preHandler: podeOperarNaQuebra }, async (req, reply) => {
     const corpo = corpoQuebra.safeParse(req.body);
     if (!corpo.success) return reply.code(400).send({ erro: corpo.error.flatten() });
 
     return reply.code(201).send(await casos.criar(corpo.data as never));
   });
 
-  app.put("/quebras/:id", { preHandler: exigirSessao }, async (req, reply) => {
+  app.put("/quebras/:id", { preHandler: podeOperarNaQuebra }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const corpo = corpoQuebra.safeParse(req.body);
     if (!corpo.success) return reply.code(400).send({ erro: corpo.error.flatten() });

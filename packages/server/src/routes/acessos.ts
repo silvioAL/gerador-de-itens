@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { OpcoesApp } from "../app.js";
 import { registrarAuditoria } from "../auditoria.js";
 import { exigirSessao } from "../auth/middleware.js";
+import { maiorNivel, nivelNoTime } from "../auth/niveis.js";
 import { ACOES, RECURSOS, exigirPermissao, resolverPermissoes } from "../auth/permissoes.js";
 import { organizacoes, papeisAcesso, papelPermissao, usuarioPapel } from "../db/schema.js";
 
@@ -48,8 +49,15 @@ export async function registrarRotasAcessos(app: FastifyInstance, { db }: Opcoes
   app.get("/permissoes/minhas", { preHandler: exigirSessao }, async (req) => {
     const orgId = await organizacaoPadrao();
     const { timeId } = req.query as { timeId?: string };
-    if (!orgId) return { rbacAtivo: false, porRecurso: {} };
-    return resolverPermissoes(db, orgId, req.usuario!.email, timeId ?? null);
+    // SPEC-38 — o nível viaja junto: é o que deixa a UI esconder o botão de
+    // salvar de quem é `visualizar` (esconder é conveniência; a negação real
+    // mora nas rotas de escrita).
+    const nivel = timeId
+      ? await nivelNoTime(db, req.usuario!.email, timeId)
+      : await maiorNivel(db, req.usuario!.email);
+    if (!orgId) return { rbacAtivo: false, porRecurso: {}, nivel };
+    const permissoes = await resolverPermissoes(db, orgId, req.usuario!.email, timeId ?? null);
+    return { ...permissoes, nivel };
   });
 
   /** Catálogo — a UI monta a matriz recurso×ação a partir daqui, nunca de uma

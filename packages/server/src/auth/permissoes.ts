@@ -3,6 +3,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import type { OpcoesApp } from "../app.js";
 import { organizacoes, papeisAcesso, papelPermissao, usuarioPapel } from "../db/schema.js";
 import { exigirSessao } from "./middleware.js";
+import { maiorNivel, nivelNoTime } from "./niveis.js";
 
 /**
  * SPEC-28 Fase 1 — quem pode editar o quê.
@@ -226,6 +227,11 @@ export function secoesDeRegrasAlteradas(antes: unknown, depois: unknown): Recurs
  * A checagem sem o `preHandler`, para quem precisa decidir depois de ler o
  * corpo (ver `secoesDeRegrasAlteradas`). Devolve o primeiro recurso negado, ou
  * `undefined` se está tudo liberado.
+ *
+ * SPEC-38 (D3) — mesmos dois eixos do `exigirPermissao` na escrita: owner do
+ * escopo sempre pode; quem não é owner precisa de grant RBAC explícito. Todos
+ * os chamadores são de escrita ("editar"), então o eixo de nível vale aqui
+ * sem exceção de `ler`.
  */
 export async function primeiroRecursoNegado(
   db: OpcoesApp["db"],
@@ -236,8 +242,10 @@ export async function primeiroRecursoNegado(
   timeId?: string | null
 ): Promise<Recurso | undefined> {
   if (!organizacaoId || recursos.length === 0) return undefined;
+  const nivel = timeId ? await nivelNoTime(db, email, timeId) : await maiorNivel(db, email);
+  if (nivel === "owner") return undefined;
   const { rbacAtivo, porRecurso } = await resolverPermissoes(db, organizacaoId, email, timeId);
-  if (!rbacAtivo) return undefined;
+  if (!rbacAtivo) return recursos[0];
   return recursos.find((recurso) => !porRecurso[recurso]?.includes(acao));
 }
 
@@ -245,6 +253,15 @@ export async function primeiroRecursoNegado(
  * `preHandler` que exige sessão E a permissão pedida. Convive com
  * `exigirTime`: pertencer ao time continua necessário onde já era; a
  * permissão é a camada de cima, não a substituta.
+ *
+ * SPEC-38 Fase 1 (D3) — para ações de ESCRITA, dois eixos:
+ * - **nível**: `owner` no time-alvo (ou, em recurso sem dono de time, owner
+ *   de algum time) sempre pode — configuração é ato de owner;
+ * - **delegação**: quem não é owner precisa de permissão RBAC EXPLÍCITA no
+ *   recurso — é a "permissão dada por owner" da D3.
+ * A falha-aberta da SPEC-28 §4.3 (organização sem papel nenhum) continua
+ * valendo só para o eixo RBAC; o eixo de nível é sempre exigido na escrita.
+ * `ler` fica como era: só o eixo RBAC, aberto quando não configurado.
  *
  * O 403 diz QUAL recurso e QUAL ação faltaram — erro de permissão que não diz
  * o que falta vira chamado de suporte, não correção.
@@ -265,8 +282,24 @@ export function exigirPermissao(
     // modo aberto em vez de travar tudo — mesma escolha do §4.3.
     if (!orgId) return;
 
+    const email = req.usuario!.email;
     const timeId = resolverTimeId ? await resolverTimeId(req) : null;
-    const { rbacAtivo, porRecurso } = await resolverPermissoes(db, orgId, req.usuario!.email, timeId);
+
+    if (acao !== "ler") {
+      const nivel = timeId ? await nivelNoTime(db, email, timeId) : await maiorNivel(db, email);
+      if (nivel === "owner") return;
+
+      const { rbacAtivo, porRecurso } = await resolverPermissoes(db, orgId, email, timeId);
+      if (rbacAtivo && porRecurso[recurso]?.includes(acao)) return;
+      reply.code(403).send({
+        erro: `"${acao}" em "${recurso}"${timeId ? ` no time "${timeId}"` : ""} exige nível owner ou permissão delegada`,
+        recurso,
+        acao,
+      });
+      return;
+    }
+
+    const { rbacAtivo, porRecurso } = await resolverPermissoes(db, orgId, email, timeId);
     if (!rbacAtivo) return;
 
     if (!porRecurso[recurso]?.includes(acao)) {

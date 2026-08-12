@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiAcessos, type PermissoesMinhas } from "../api/client";
+import { apiAcessos, type NivelTime, type PermissoesMinhas } from "../api/client";
 
 /**
  * SPEC-28 Fase 2 — o que ESTA pessoa pode, para a tela esconder o resto.
@@ -26,6 +26,9 @@ export interface Permissoes {
    * vale mostrar qualquer explicação sobre permissão. */
   rbacAtivo: boolean;
   pode: (recurso: string, acao?: string) => boolean;
+  /** SPEC-38 — o nível no time consultado (`null` = ainda não sei / falha
+   * aberta). A UI só esconde escrita quando tem CERTEZA que é `visualizar`. */
+  nivel: NivelTime | null;
 }
 
 export function usePermissoes(opcoes: { hospedado: boolean; timeId?: string }): Permissoes {
@@ -66,6 +69,7 @@ export function usePermissoes(opcoes: { hospedado: boolean; timeId?: string }): 
       if (!hospedado || !rbacAtivo) return true;
       return dados?.porRecurso?.[recurso]?.includes(acao) === true;
     },
+    nivel: (dados?.nivel as NivelTime | undefined) ?? null,
   };
 }
 
