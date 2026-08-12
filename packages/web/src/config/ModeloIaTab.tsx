@@ -376,7 +376,7 @@ function CardGateway({
           </p>
         )}
         <p style={{ fontSize: 11, color: "var(--texto-mudo)", marginBottom: 0, marginTop: 6 }}>
-          A chave vai pra <code>~/.gerador/credenciais.json</code>, nunca pra <code>config/</code> — que entra no git.
+          A chave fica no banco do servidor (da organização) e a API só devolve o resumo mascarado — nada vai pra arquivo de configuração nem pro git. Deixar o campo vazio mantém a chave atual.
         </p>
       </div>
     </div>

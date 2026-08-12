@@ -51,7 +51,9 @@ const LIMITE_AUDIO_BYTES = 10 * 1024 * 1024;
 
 const corpoCredencial = z.object({
   baseUrl: z.string().url(),
-  chave: z.string().min(1),
+  // Vazia/ausente = MANTER a chave já salva (a tela mostra "chave atual:
+  // sk-...": obrigar a redigitar pra trocar o modelo quebrava o Salvar).
+  chave: z.string().optional(),
   modelo: z.string().min(1),
   cabecalhos: z.record(z.string()).optional(),
   formatoJson: z.enum(["json_object", "json_schema", "nenhum"]).optional(),
@@ -168,10 +170,21 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
     const repo = await repositorio();
     if (!repo) return reply.code(503).send({ erro: "organização não inicializada" });
 
+    // Chave vazia = manter a que está salva (achado real: testar passava e o
+    // Salvar devolvia 400, porque só o /testar tinha esse fallback).
+    let chave = corpo.data.chave?.trim() ?? "";
+    if (!chave) {
+      const atual = await repo.obter(ID_PROVEDOR_GATEWAY);
+      if (!atual?.chave) {
+        return reply.code(400).send({ erro: "informe a chave — ainda não há nenhuma salva para manter" });
+      }
+      chave = atual.chave;
+    }
+
     // O dialeto de JSON é INFERIDO da base URL quando o cliente não manda —
     // a tela não deveria precisar saber que a Anthropic exige `json_schema`
     // (medido contra a API real, não lido na doc). Mesma dedução do modo local.
-    const credencial = { ...corpo.data, formatoJson: corpo.data.formatoJson ?? formatoJsonPorBaseUrl(corpo.data.baseUrl) };
+    const credencial = { ...corpo.data, chave, formatoJson: corpo.data.formatoJson ?? formatoJsonPorBaseUrl(corpo.data.baseUrl) };
     await repo.salvar(ID_PROVEDOR_GATEWAY, credencial);
     registrarAuditoria(db, {
       email: req.usuario!.email,
@@ -193,12 +206,16 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
     // preenchidos. O corpo vence; sem corpo, cai na gravada.
     const doCorpo = (req.body ?? {}) as CredencialIa;
     const repo = await repositorio();
-    const credencial =
-      doCorpo.baseUrl && doCorpo.chave
-        ? { ...doCorpo, formatoJson: doCorpo.formatoJson ?? formatoJsonPorBaseUrl(doCorpo.baseUrl) }
-        : repo
-          ? await repo.obter(ID_PROVEDOR_GATEWAY)
-          : null;
+    const gravada = repo ? await repo.obter(ID_PROVEDOR_GATEWAY) : null;
+    // Corpo com endereço mas sem chave: testa o FORMULÁRIO com a chave salva
+    // (antes caía inteiro na credencial gravada e testava a config antiga).
+    const credencial = doCorpo.baseUrl
+      ? {
+          ...doCorpo,
+          chave: doCorpo.chave || gravada?.chave,
+          formatoJson: doCorpo.formatoJson ?? formatoJsonPorBaseUrl(doCorpo.baseUrl),
+        }
+      : gravada;
     if (!credencial?.baseUrl || !credencial.chave) {
       return reply.code(400).send({ ok: false, erro: "nenhuma credencial configurada" });
     }

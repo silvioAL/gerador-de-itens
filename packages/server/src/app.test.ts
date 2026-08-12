@@ -448,6 +448,43 @@ describe("/ia/* (SPEC-31 Fase 4)", () => {
     expect(linha.formatoJson).toBe("json_schema");
   });
 
+  it("achado real (§191): salvar com a chave VAZIA mantém a salva — trocar de modelo não exige redigitar a chave", async () => {
+    const cookieDev = await logarComo(EMAIL_DEV);
+    await app.inject({
+      method: "PUT",
+      url: "/ia/credencial",
+      cookies: { gerador_sessao: cookieDev },
+      payload: { baseUrl: "http://ollama:11434/v1", chave: "qualquer-coisa", modelo: "qwen3:8b" },
+    });
+
+    // O fluxo do usuário: o campo de chave fica vazio (placeholder mostra a
+    // atual), só o modelo muda. Antes: 400; a chave salva tem que permanecer.
+    const troca = await app.inject({
+      method: "PUT",
+      url: "/ia/credencial",
+      cookies: { gerador_sessao: cookieDev },
+      payload: { baseUrl: "http://ollama:11434/v1", chave: "", modelo: "qwen2.5:7b" },
+    });
+    expect(troca.statusCode).toBe(200);
+    expect(troca.json().modelo).toBe("qwen2.5:7b");
+
+    const [linha] = await db.select().from(credenciaisIa);
+    expect(linha.modelo).toBe("qwen2.5:7b");
+    expect(linha.chave).toBe("qualquer-coisa");
+  });
+
+  it("chave vazia SEM nenhuma salva é 400 com mensagem legível", async () => {
+    await db.delete(credenciaisIa);
+    const resposta = await app.inject({
+      method: "PUT",
+      url: "/ia/credencial",
+      cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
+      payload: { baseUrl: "http://ollama:11434/v1", chave: "", modelo: "qwen2.5:7b" },
+    });
+    expect(resposta.statusCode).toBe(400);
+    expect(resposta.json().erro).toContain("informe a chave");
+  });
+
   it("PUT da credencial exige sessão", async () => {
     const resposta = await app.inject({
       method: "PUT",
