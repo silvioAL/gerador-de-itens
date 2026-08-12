@@ -4376,3 +4376,26 @@ edição multi-linha é trabalho do Edit, não de script.
 
 Mordida do grupo novo provada (clique sem gravar → vermelho no caso exato);
 356 no web, 41/41 no navegador, e as duas telas conferidas em produção.
+
+## 171. SPEC-36 — regras por componente: a medição que desinflou a migração
+
+A última pendência do caderno era a candidata a SPEC da §166 (regras
+organizadas por componente, unificando com "Padrões por componente"). O
+desenho saiu — e a medição mudou a conclusão antes do primeiro rascunho de
+código: **o modelo atual já tem as três granularidades** (tech, contexto por
+prefixo, contexto exato — `contextoBate` casa "Backend-mensagens" com os dois
+filhos), e uma regra de "Backend" alcança ~14 componentes de uma vez. Migrar
+o arquivo para `porComponente` não adicionaria poder de expressão nenhum; só
+mudaria onde a mesma informação mora, ao custo de motor, RBAC, diagnóstico e
+migração de dados.
+
+A recomendação registrada é a **Opção A — projeção por componente**: criar
+regra escolhendo o COMPONENTE (que deriva tech+contexto sozinho, com o escopo
+"só este / o grupo / todo Backend" em nomes legíveis) e mostrar em cada regra
+os componentes que ela alcança. Custo de UI, risco baixo, vocabulário 100%
+componente. A Opção B (migração com herança) fica escrita como o caminho para
+uma necessidade que a projeção não cubra — e a SPEC já diz qual seria o
+primeiro passo nesse dia (criar o contexto que falta, não migrar o arquivo).
+
+Design-only de propósito: a decisão de implementar é do usuário, e agora tem
+um desenho medido para decidir em cima.
