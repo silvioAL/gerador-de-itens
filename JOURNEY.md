@@ -4629,3 +4629,28 @@ Fila Rabbit → a pergunta na ficha).
 
 Mordida no mapeamento (contexto exato trocado por vazio → unit E teste de UI
 vermelhos, cada um na sua camada).
+
+## 180. SPEC-37 Fase 3 — o mapa de momentos completo, e a prioridade que virou módulo
+
+M2 (canvas vazio convida pra conversa), M3 (proposta aplicada → "agora é
+preencher os campos"), M4 (revisão sem credencial de IA, com chip pra aba
+Modelo de IA), M5 (derivou sem Contexto do épico) e M8 (Configurações numa
+instalação sem padrões do time). A decisão de QUAL momento fala agora mora
+em `assistente/momentos.ts`, pura — porque a prioridade é exatamente onde um
+bug seria silencioso: dois balões brigando, ou o mais bloqueante perdendo a
+vez. M4 > M5 > M7 na revisão; M9 > M3 > M2 no canvas; esteira rodando ou
+chat aberto silenciam tudo (quem fala é o trabalho).
+
+O detalhe fino foi o M5: como aviso permanente, ele BLOQUEARIA o M7 pra
+sempre em quebra sem contexto (o teste do M7 da Fase 2 teria quebrado). A
+regra que resolve: M5 só com a revisão intocada — é um aviso de CHEGADA;
+quando o trabalho começa, o momento dele passou.
+
+E a suíte E2E pagou um flake de fundação que valeu registrar: os specs de
+níveis criavam um time NOVO por rodada na mesma stack, e a lista da
+EscolherTimeScreen cresceu até empurrar o time do seed pra fora do viewport
+— três specs vermelhos por timeout de clique. Times de teste viraram fixos e
+idempotentes (409 = já criado, segue).
+
+Mordida da fase: prioridade M4/M5 invertida no módulo → o unit da prioridade
+E o teste de UI do M4 vermelhos, cada camada acusando o mesmo defeito.

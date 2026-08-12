@@ -55,6 +55,7 @@ import { EscolherTimeScreen } from "./auth/EscolherTimeScreen";
 import { lembrarTime, lerTimeLembrado } from "./auth/timeLembrado";
 import { SemTimeScreen } from "./auth/SemTimeScreen";
 import { usePermissoes } from "./auth/usePermissoes";
+import { momentoDaConfig, momentoDoCanvas } from "./assistente/momentos";
 
 const CHAVE_JORNADA_VISTA = "gerador:jornada-vista";
 
@@ -349,10 +350,33 @@ function AppCarregado({
   const [resultado, setResultado] = useState<ResultadoDependenciasDe<Atividade> | null>(null);
   const { vermelhos } = calcularResumoProntidao(quebra.diagrama, diagramaConfig);
 
+  // SPEC-37 Fase 3 — M2 (canvas vazio), M3 (proposta aplicada, campos por
+  // preencher) e M8 (config aberta sem padrões do time). A DECISÃO de qual
+  // momento vale mora em `momentos.ts` (pura, com a prioridade testada);
+  // aqui só se coletam os fatos e se guardam os dispensados da sessão.
+  const [momentosDispensados, setMomentosDispensados] = useState<string[]>([]);
+  const [aplicouProposta, setAplicouProposta] = useState(false);
+  const dispensar = (m: string) => setMomentosDispensados((d) => [...d, m]);
+
+  const momentoCanvas = momentoDoCanvas({
+    nodes: quebra.diagrama.nodes.length,
+    vermelhos: vermelhos.length,
+    temResultado: !!resultado,
+    aplicouProposta,
+    dispensados: derivarDispensado ? [...momentosDispensados, "m9"] : momentosDispensados,
+  });
+  const momentoConfig = momentoDaConfig({
+    configAberta: mostrarConfig,
+    // "Padrões do time" = algum campo customizado DESTE time ou alguma regra
+    // já configurada — instalação com o exemplo de fábrica não é nua.
+    temPadroesDoTime:
+      camposNo.some((c) => c.timeId === timeAtivo) || Object.keys(regrasConfig?.porTech ?? {}).length > 0,
+    dispensados: momentosDispensados,
+  });
+
   // SPEC-37 M9 — a condição do momento: há diagrama, está todo verde, e a
   // derivação ainda não aconteceu. Some sozinho ao derivar ou ao dispensar.
-  const momentoDerivarAtivo =
-    quebra.diagrama.nodes.length > 0 && vermelhos.length === 0 && !resultado && !derivarDispensado;
+  const momentoDerivarAtivo = momentoCanvas === "m9";
 
   // SPEC-37 (pedido do usuário) — o rascunho é livre, mas derivar é o momento
   // do compromisso: sem título, o assistente pergunta o nome da demanda ANTES,
@@ -730,6 +754,7 @@ function AppCarregado({
 
       {resultado && (
         <ReviewScreen
+          onConfigurarModeloIa={() => abrirConfigNaAba("modeloIa")}
           resultado={resultado}
           diagrama={quebra.diagrama}
           config={diagramaConfig}
@@ -794,7 +819,7 @@ function AppCarregado({
         sobreposto={mostrarConfig}
         // SPEC-37 M9 — tudo verde e nada derivado: o momento certo de conduzir
         // ao Derivar, com o chip executando a mesma ação do botão do header.
-        chamando={momentoDerivarAtivo || pedindoNomeDaDemanda}
+        chamando={pedindoNomeDaDemanda || momentoConfig === "m8" || (!mostrarConfig && momentoCanvas !== null)}
         balao={
           pedindoNomeDaDemanda
             ? {
@@ -807,13 +832,32 @@ function AppCarregado({
                 acaoSecundaria: { rotulo: "Derivar sem salvar", onExecutar: () => executarDerivacao(false) },
                 onDispensar: () => setPedindoNomeDaDemanda(false),
               }
-            : momentoDerivarAtivo
+            : momentoConfig === "m8"
               ? {
-                  texto: "Tudo verde — a quebra está pronta para derivar os itens de trabalho.",
-                  acao: { rotulo: "Derivar Quebra", onExecutar: derivarQuebra },
-                  onDispensar: () => setDerivarDispensado(true),
+                  texto: "Este ambiente ainda está sem padrões do time — posso te ajudar a configurar conversando, por texto ou voz (🎤).",
+                  acao: { rotulo: "Configurar conversando", onExecutar: () => setAbaAssistente("configurar") },
+                  onDispensar: () => dispensar("m8"),
                 }
-              : undefined
+              : mostrarConfig
+                ? undefined
+                : momentoCanvas === "m9"
+                  ? {
+                      texto: "Tudo verde — a quebra está pronta para derivar os itens de trabalho.",
+                      acao: { rotulo: "Derivar Quebra", onExecutar: derivarQuebra },
+                      onDispensar: () => setDerivarDispensado(true),
+                    }
+                  : momentoCanvas === "m3"
+                    ? {
+                        texto: "Diagrama no canvas. Agora é preencher os campos de cada componente — o semáforo mostra o que falta; vermelho trava a derivação.",
+                        onDispensar: () => dispensar("m3"),
+                      }
+                    : momentoCanvas === "m2"
+                      ? {
+                          texto: "Quer começar conversando? Descreva a demanda — por texto ou voz (🎤) — e eu proponho o diagrama.",
+                          acao: { rotulo: "Desenhar conversando", onExecutar: () => setAbaAssistente("conversa") },
+                          onDispensar: () => dispensar("m2"),
+                        }
+                      : undefined
         }
       >
         {abaAssistente === "conversa" && (
@@ -826,6 +870,9 @@ function AppCarregado({
             contextoInicial={quebra.demandInfo}
             onAplicar={(proposta) => {
               aplicarDiagramaProposto(proposta);
+              // SPEC-37 M3 — a proposta aplicada é o gatilho da fala de
+              // "agora preencha os campos" (a decisão mora em momentos.ts).
+              setAplicouProposta(true);
               setAbaAssistente(null);
             }}
           />

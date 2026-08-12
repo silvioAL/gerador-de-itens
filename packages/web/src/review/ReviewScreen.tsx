@@ -33,6 +33,7 @@ import {
 import { baixarArquivoTexto } from "../persistence/baixarArquivo";
 import { ConversaEspecificacao } from "../conversa/ConversaEspecificacao";
 import { useArrastavel } from "../assistente/useArrastavel";
+import { momentoDaRevisao } from "../assistente/momentos";
 import { DiagramaCompacto } from "./DiagramaCompacto";
 import { EsteiraAgentes } from "./EsteiraAgentes";
 import { SimulacaoEsteira } from "./SimulacaoEsteira";
@@ -62,6 +63,8 @@ export interface ReviewScreenProps {
   respostasItens?: Record<string, Record<string, ValorSpec>>;
   onResponderItem?: (atividadeChave: string, chavePlaceholder: string, resposta: ValorSpec) => void;
   onFechar: () => void;
+  /** SPEC-37 F3 (M4) — abre Configurações na aba Modelo de IA por cima da revisão. */
+  onConfigurarModeloIa?: () => void;
   onSelecionarNo: (id: string) => void;
 }
 
@@ -234,6 +237,7 @@ export function ReviewScreen({
   respostasItens,
   onResponderItem,
   onFechar,
+  onConfigurarModeloIa,
   onSelecionarNo,
 }: ReviewScreenProps) {
   const [mostrarDiagrama, setMostrarDiagrama] = useState(false);
@@ -367,6 +371,9 @@ export function ReviewScreen({
   const rodavaAntes = useRef(false);
   // SPEC-37 M7 — "agora não" do balão de gerar a especificação.
   const [m7Dispensado, setM7Dispensado] = useState(false);
+  // SPEC-37 F3 — dispensados dos momentos M4/M5 (por sessão da revisão).
+  const [momentosDispensados, setMomentosDispensados] = useState<string[]>([]);
+  const dispensarMomento = (m: string) => setMomentosDispensados((d) => [...d, m]);
   // O bubble da revisão também arrasta (mesma chave do App: o bubble É um só
   // conceito — movê-lo numa tela move nas duas).
   const { estiloArrasto, handlersDeArrasto } = useArrastavel("gerador:fab-assistente");
@@ -635,15 +642,21 @@ export function ReviewScreen({
   const atividadeSelecionada = selecionada ? resultado.atividades.find((a) => a.chave === selecionada) : undefined;
   const fichaSelecionada = selecionada ? fichas.get(selecionada) : undefined;
 
-  // SPEC-37 M7 — todos os itens refinados, esteira parada, chat fechado.
-  const momentoM7Ativo =
-    !!contagens &&
-    contagens.refinado > 0 &&
-    contagens.rascunho === 0 &&
-    contagens.revisar === 0 &&
-    !esteira.rodando &&
-    !mostrarConversa &&
-    !m7Dispensado;
+  // SPEC-37 F3 — M4 (sem modelo de IA), M5 (derivou sem contexto do épico) e
+  // M7 (tudo refinado): a prioridade mora em momentos.ts, testada pura.
+  const momentoRevisao = momentoDaRevisao({
+    semModeloDeIa: iaIndisponivel === "sem-modelo",
+    demandInfoVazio: !(demandInfo ?? "").trim(),
+    // Sem `regras` não há contagens — e uma revisão sem status calculado é,
+    // por definição, intocada (ninguém confirmou nada).
+    revisaoIntocada: !contagens || (contagens.refinado === 0 && contagens.revisar === 0),
+    tudoRefinado:
+      !!contagens && contagens.refinado > 0 && contagens.rascunho === 0 && contagens.revisar === 0,
+    esteiraRodando: esteira.rodando,
+    conversaAberta: mostrarConversa,
+    dispensados: m7Dispensado ? [...momentosDispensados, "m7"] : momentosDispensados,
+  });
+  const momentoM7Ativo = momentoRevisao === "m7";
 
   // Altura do brilho da timeline: fração de itens que já saíram do rascunho
   // (ou seja, algum papel já escreveu algo neles). Derivado do mesmo
@@ -1163,8 +1176,50 @@ export function ReviewScreen({
           </div>
         </div>
       )}
+      {/* SPEC-37 F3 — M4: a esteira inteira parada por falta de credencial é o
+          momento mais bloqueante da revisão; o chip abre a aba certa. */}
+      {momentoRevisao === "m4" && (
+        <div className="assistente-janela" style={balaoM7Estilo} data-testid="balao-sem-ia" role="status">
+          <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: "var(--texto-2)" }}>
+            A esteira de IA está desligada — sem credencial de gateway. Configuro com você? (aba Modelo de IA)
+          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+            {onConfigurarModeloIa && (
+              <button onClick={onConfigurarModeloIa} style={chipM7Estilo} data-testid="balao-sem-ia-acao">
+                Abrir Modelo de IA
+              </button>
+            )}
+            <button
+              onClick={() => dispensarMomento("m4")}
+              aria-label="Dispensar sugestão"
+              style={{ fontSize: 11.5, padding: "5px 8px", borderRadius: 999, border: "none", background: "transparent", color: "var(--texto-mudo)", cursor: "pointer" }}
+            >
+              agora não
+            </button>
+          </div>
+        </div>
+      )}
+      {/* M5 — derivou sem Contexto do épico: aviso de chegada, sem chip (o
+          material se cola na aba 📎 do assistente, no canvas). */}
+      {momentoRevisao === "m5" && (
+        <div className="assistente-janela" style={balaoM7Estilo} data-testid="balao-sem-contexto" role="status">
+          <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: "var(--texto-2)" }}>
+            Sem o Contexto do épico, as sugestões de IA e o documento final saem mais pobres — quer colar o material
+            da demanda? Fica na aba “📎 Contexto do épico” do assistente, lá no canvas.
+          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+            <button
+              onClick={() => dispensarMomento("m5")}
+              aria-label="Dispensar sugestão"
+              style={{ fontSize: 11.5, padding: "5px 8px", borderRadius: 999, border: "none", background: "transparent", color: "var(--texto-mudo)", cursor: "pointer" }}
+            >
+              agora não
+            </button>
+          </div>
+        </div>
+      )}
       <button
-        className={`assistente-fab${(falaDeConducao && !mostrarConversa) || momentoM7Ativo ? " assistente-fab--chamando" : ""}`}
+        className={`assistente-fab${(falaDeConducao && !mostrarConversa) || momentoRevisao !== null ? " assistente-fab--chamando" : ""}`}
         data-testid="abrir-conversa-especificacao"
         {...handlersDeArrasto}
         onClick={() => {

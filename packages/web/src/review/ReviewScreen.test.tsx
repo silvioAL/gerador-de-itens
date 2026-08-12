@@ -142,6 +142,52 @@ describe("ReviewScreen — fixture 01 (sem ciclos/conflitos)", () => {
     expect(card.className).not.toMatch(/rail-inicio|rail-fim/);
   });
 
+  it("SPEC-37 M4: sem modelo de IA, o balão mais bloqueante aparece e o chip abre a aba Modelo de IA", async () => {
+    const onConfigurarModeloIa = vi.fn();
+    render(
+      <ReviewScreen
+        resultado={resultadoFixture01()}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+        onConfigurarModeloIa={onConfigurarModeloIa}
+      />
+    );
+
+    // O status default dos mocks é "pronto: false" — exatamente o gatilho.
+    const balao = await screen.findByTestId("balao-sem-ia");
+    expect(balao).toHaveTextContent("sem credencial de gateway");
+    // M4 GANHA do M5 (demandInfo também está vazio aqui): um balão por vez,
+    // o mais bloqueante primeiro.
+    expect(screen.queryByTestId("balao-sem-contexto")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("balao-sem-ia-acao"));
+    expect(onConfigurarModeloIa).toHaveBeenCalled();
+  });
+
+  it("SPEC-37 M5: derivou sem Contexto do épico (e IA não é o problema) — aviso dispensável", async () => {
+    // Status rejeitado = "sem-rota" (modo sem IA): não é o M4; sobra o M5.
+    apiIaStatusMock.mockRejectedValueOnce(new Error("sem rota"));
+    render(
+      <ReviewScreen
+        resultado={resultadoFixture01()}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    const balao = await screen.findByTestId("balao-sem-contexto");
+    expect(balao).toHaveTextContent("Contexto do épico");
+
+    fireEvent.click(within(balao).getByRole("button", { name: "Dispensar sugestão" }));
+    expect(screen.queryByTestId("balao-sem-contexto")).not.toBeInTheDocument();
+  });
+
   it("nenhum item selecionado inicialmente — ficha mostra estado vazio", () => {
     const resultado = resultadoFixture01();
     render(
