@@ -867,6 +867,12 @@ export const apiPerfisStack = {
     requisitar<{ perfis: PerfilStackCatalogo[]; ponteiros: Record<string, string> }>("/perfis-stack"),
   criar: (nome: string) =>
     requisitar<PerfilStackCatalogo>("/perfis-stack", { method: "POST", body: JSON.stringify({ nome }) }),
+  /** SPEC-42 — editar valor age no PERFIL (rota existente da SPEC-38 F2). */
+  definirValores: (perfilId: string, tipoNo: string, valores: Record<string, string>) =>
+    requisitar<Record<string, string>>(`/perfis-stack/${encodeURIComponent(perfilId)}/valores`, {
+      method: "PUT",
+      body: JSON.stringify({ tipoNo, valores }),
+    }),
   apontar: (timeId: string, perfilStackId: string | null) =>
     requisitar<{ timeId: string; perfilStackId: string | null }>(
       `/times/${encodeURIComponent(timeId)}/perfil-stack`,

@@ -39,14 +39,12 @@ function renderTela(area: AbaConfig, extras: { onAbrirMenu?: () => void; onFecha
   return render(
     <ConfigScreen
       config={config}
-      perfisTime={{}}
       camposNo={[]}
       camposAresta={[]}
       especificacaoTemplate={especificacaoTemplate}
       pipelineAgentes={{ confirmacaoObrigatoria: true }}
       timeAtivo="time-x"
       onPerfisMudaram={vi.fn()}
-      onEditarValorPerfilTime={vi.fn()}
       onCriarCampoNo={vi.fn()}
       onAtualizarCampoNo={vi.fn()}
       onExcluirCampoNo={vi.fn()}

@@ -4833,3 +4833,32 @@ CASCADE dos testes vizinhos (o contrato compartilhado pegou na hora); e o
 nome acessível sobrescrevendo o texto visível num seletor de E2E. Mordidas:
 gate do render (3 testes da marca), preservação do exportado no adaptador,
 régua de completude da tela. 193 engine + 164 server + 419 web; 49/49 E2E.
+
+## 189. SPEC-42 — time não é stack: a tela virou catálogo-primeiro
+
+Achado do usuário, com print: "time não é a mesma coisa que stack, e aqui
+está meio misturado". O MODELO estava certo desde a SPEC-38 F2 (stack é
+perfil nomeado num catálogo; o time aponta), mas a UI ficou no paradigma
+anterior: o menu rotulava o seletor de time como "Time (stack conhecida)",
+e a tela de perfis renderizava cards POR TIME projetando o perfil apontado
+— dois times compartilhando perfil viravam cards idênticos duplicados, e o
+"editar" num card de time gravava no perfil compartilhado mudando a stack
+dos outros em silêncio.
+
+A revisão foi toda de frontend (o server já expunha tudo, até a rota
+`PUT /perfis-stack/:id/valores` que o client nem usava): a
+`demo/PerfisTimeTab` morreu e nasceu a `config/PerfisStackTab` —
+cards por PERFIL, cada um uma vez, com o badge "usado por: time-a, time-b"
+tornando o compartilhamento visível; editar/adicionar valor age no perfil
+(select de perfil, sem campo "Time") e o formulário avisa o alcance ("vale
+para os 2 times que apontam..."); o vínculo do time é uma seção própria e
+pequena ("Stack do time ativo"). No menu, o rótulo virou só "Time", com a
+stack como linha informativa derivada do ponteiro ("stack: Java + Spring
+Boot" / "sem perfil apontado").
+
+Mordida: reintroduzir o defeito antigo (definirValores recebendo o TIME em
+vez do perfil) deixou vermelho exatamente o teste "editar age no PERFIL".
+Quatro E2E asseravam a UI antiga e mudaram de propósito — o de "declarar
+Java" agora percorre o fluxo novo inteiro: criar perfil no catálogo →
+apontar o time → valor no perfil → sugestão no nó novo. 418 web unit;
+49/49 E2E.

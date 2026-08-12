@@ -14,6 +14,7 @@ function montar(extras: Partial<Parameters<typeof MenuLateral>[0]> = {}) {
     onNovaQuebra: vi.fn(),
     onAbrirQuebras: vi.fn(),
   onItens: vi.fn(),
+  stackDoTimeAtivo: "Java + Spring Boot",
     onCenarios: vi.fn(),
     onSair: vi.fn(),
     ...extras,
@@ -29,7 +30,7 @@ describe("MenuLateral (SPEC-40 F1 — gestão no menu, frequência no header)", 
       expect(screen.getByText(grupo)).toBeInTheDocument();
     }
     expect(screen.getByText("dev@gerador.local")).toBeInTheDocument();
-    expect(screen.getByLabelText("Time (stack conhecida)")).toHaveValue("time-pagamentos");
+    expect(screen.getByLabelText("Time")).toHaveValue("time-pagamentos");
   });
 
   it("clicar num item navega pra ÁREA certa e fecha o menu", () => {
@@ -47,5 +48,19 @@ describe("MenuLateral (SPEC-40 F1 — gestão no menu, frequência no header)", 
   it("fechado, não existe no DOM (overlay some de verdade)", () => {
     montar({ aberto: false });
     expect(screen.queryByTestId("menu-lateral")).not.toBeInTheDocument();
+  });
+});
+
+describe("MenuLateral — time não é stack (SPEC-42)", () => {
+  it("o seletor chama-se só 'Time', e a stack aparece como linha informativa do ponteiro", () => {
+    montar();
+    expect(screen.getByLabelText("Time")).toBeInTheDocument();
+    expect(screen.queryByText(/stack conhecida/)).not.toBeInTheDocument();
+    expect(screen.getByTestId("stack-do-time-menu").textContent).toContain("stack: Java + Spring Boot");
+  });
+
+  it("sem perfil apontado, a linha diz isso — nunca finge que o time tem stack", () => {
+    montar({ stackDoTimeAtivo: null });
+    expect(screen.getByTestId("stack-do-time-menu").textContent).toContain("sem perfil apontado");
   });
 });

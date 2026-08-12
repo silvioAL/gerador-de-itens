@@ -57,7 +57,7 @@ test("carregar um cenário pronto popula o canvas e deriva sem ciclos/conflitos"
   await page.screenshot({ path: "e2e/screenshots/cenario-mongo.png", fullPage: true });
 });
 
-test("aba Perfis de time (tela de Configurações) mostra os times conhecidos e explica como capturar um novo", async ({
+test("tela Perfis de stack (SPEC-42): cards por PERFIL com 'usado por', nunca um card por time", async ({
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
@@ -69,10 +69,11 @@ test("aba Perfis de time (tela de Configurações) mostra os times conhecidos e 
   // Escopado pra dentro da tela de config: o header tem um <select> com essas
   // mesmas strings como <option>, e getByText também bate em <option>s no DOM.
   const telaConfig = page.locator('[data-tour="config-screen-content"]');
-  await expect(telaConfig.getByText("time-pagamentos", { exact: true })).toBeVisible();
-  await expect(telaConfig.getByText("time-portabilidade", { exact: true })).toBeVisible();
-  // Exato: "Spring Boot" também aparece na intro da aba e no option do
-  // catálogo — o que se afere aqui é o VALOR no card da projeção.
+  // SPEC-42: os times aparecem como "usado por" nos cards de PERFIL — o
+  // compartilhamento visível, sem cards duplicados por time.
+  await expect(telaConfig.getByText(/usado por: .*time-pagamentos/).first()).toBeVisible();
+  await expect(telaConfig.getByText(/usado por: .*time-portabilidade/).first()).toBeVisible();
+  // Exato: o VALOR no card do perfil (a intro fala "Java + Spring Boot", nunca só "Spring Boot").
   await expect(telaConfig.getByText("Spring Boot", { exact: true })).toBeVisible();
   await expect(telaConfig.getByText(/salvar estes valores como padrão do time/)).toBeVisible();
 
@@ -89,19 +90,24 @@ test("declarar 'time trabalha com Java' na aba Perfis de time faz um Serviço no
 
   await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: /Perfis de stack/ }).click();
-  await page.getByText("+ Adicionar ou corrigir um valor de stack").click();
 
-  await page.getByPlaceholder("ex.: time-pagamentos").fill("time-checkout");
-  await page.getByLabel("Tipo de nó").selectOption({ label: "Serviço" });
-  await page.getByLabel("Campo").selectOption({ label: "Linguagem/Stack (linguagem)" });
-  await page.getByPlaceholder("ex.: Java").fill("Java");
-  await page.getByRole("button", { name: "Salvar" }).last().click();
+  // SPEC-42 — o fluxo é pelo CATÁLOGO: cria um perfil, o time aponta, e o
+  // valor entra no perfil (nunca mais um formulário pedindo "Time").
+  const nomePerfil = `stack e2e ${Date.now()}`;
+  await page.getByLabel("Nome do novo perfil de stack").fill(nomePerfil);
+  await page.getByRole("button", { name: "+ Criar perfil" }).click();
+  await page.getByLabel("Perfil de stack do time ativo").selectOption({ label: nomePerfil });
 
-  // Grava direto no servidor — confirma reabrindo a aba e vendo o valor persistido.
-  // Escopado: "time-checkout" também aparece como <option> no <select> do header.
-  const telaConfig = page.locator('[data-tour="config-screen-content"]');
-  await expect(telaConfig.getByText("time-checkout", { exact: true })).toBeVisible();
-  await expect(telaConfig.getByText("linguagem:", { exact: false }).last()).toBeVisible();
+  const cardPerfil = page.getByTestId(`perfil-${nomePerfil}`);
+  await expect(cardPerfil.getByText(/usado por: .*time-checkout/)).toBeVisible();
+  await cardPerfil.getByText("+ adicionar valor").click();
+  await page.getByLabel("Componente").selectOption({ label: "Serviço" });
+  await page.getByLabel("Campo", { exact: true }).selectOption({ label: "Linguagem/Stack" });
+  await page.getByLabel("Valor", { exact: true }).fill("Java");
+  await page.getByTestId("salvar-valor-de-perfil").click();
+
+  // Grava direto no servidor — o valor aparece no card do perfil.
+  await expect(cardPerfil.getByText("linguagem:", { exact: false })).toBeVisible();
 
   await page.getByRole("button", { name: "Voltar ao canvas" }).click();
 
@@ -219,7 +225,8 @@ test("tour guiado de 1 clique percorre diagrama, prontidão, proveniência, deri
   await expect(page.getByText("PASSO 9 DE 13")).toBeVisible();
   const telaConfigNoTour = page.locator('[data-tour="config-screen-content"]');
   await expect(telaConfigNoTour).toBeVisible();
-  await expect(telaConfigNoTour.getByText("time-pagamentos", { exact: true })).toBeVisible();
+  // SPEC-42: a tela é catálogo-primeiro; o vínculo do time é a seção própria.
+  await expect(telaConfigNoTour.getByText(/Stack do time ativo \(time-pagamentos\)/)).toBeVisible();
   await page.getByRole("button", { name: "Próximo" }).click();
 
   // Passo 10: campos por tipo de nó.
