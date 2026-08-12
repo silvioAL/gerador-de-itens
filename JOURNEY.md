@@ -4433,3 +4433,30 @@ assistente).
 Duas mordidas numa tacada, cada uma no spec exato: M1 sem o abrir → vermelho
 no ia-hospedada; chip sem o fio → vermelho no derivar. 358 no web, 41/41 no
 navegador, e o balão do M9 conferido em produção.
+
+## 173. SPEC-37 Fase 2 — a consistência oferecida na hora, e o ciclo fechado no balão
+
+"Pode seguir com a fase 2" fechou M6 e M7, e a decisão 5 do debate
+resolveu-se pelos dois caminhos ao mesmo tempo: **a fala do M6 JÁ nomeia os
+dependentes** ("1 item depende deste (02)") **e o chip dispara** a revisão —
+informar e executar sem passo extra. O chip reusa o `revisarOsDemais` que
+existia desde a SPEC-27; a pergunta fala uma vez por conversa (eco não é
+condução); e um detalhe de React que o desenho da conversa já tinha ensinado
+(§ do "cartão congelado"): o chip é RENDERIZADO a cada render, não guardado na
+mensagem — um ReactNode congelado no aceite levaria o closure daquele momento,
+sem as mudanças aceitas depois.
+
+**O M7 me corrigiu antes de nascer.** O teste que escrevi esperava o balão
+"Tudo refinado" logo que a esteira terminasse — vermelho: `statusDoItem` só
+diz "refinado" com as respostas CONFIRMADAS pelo humano; sugestão de esteira
+não confirmada é "revisar". O produto estava certo e o teste assumiu errado —
+o balão de fechar o ciclo só aparece quando a pessoa de fato revisou, que é o
+sentido de "tudo refinado". O E2E agora confirma campo a campo, como a pessoa
+faria, e só então o chip baixa a especificação (o MESMO handler do botão).
+
+E o flake da voz reapareceu numa terceira variante (o `getUserMedia` do
+microfone FALSO também paga latência sob 6 workers) — passa isolado, sempre.
+Desta vez a correção foi proporcional: 15s na asserção do gravando, e ponto.
+
+Duas mordidas nos testes exatos (a pergunta do M6 desligada → unit vermelho;
+a condição do M7 zerada → E2E vermelho). 360 no web, 41/41 no navegador.

@@ -212,3 +212,56 @@ describe("ConversaEspecificacao (SPEC-27 Fase 2 — alterar item e revisar os de
     spy.mockRestore();
   });
 });
+
+/**
+ * SPEC-37 M6 — a primeira alteração aceita num item com dependentes faz o
+ * agente NOMEAR quem depende e oferecer a revisão de consistência num chip
+ * que dispara o `revisarOsDemais` existente (decisão do debate: a fala já
+ * lista os dependentes e o chip executa — sem passo extra).
+ */
+describe("SPEC-37 M6 — a pergunta de consistência após aceitar", () => {
+  const PROPOSTA = {
+    alteracoes: [{ campo: "_criteriosAceite", valor: "1. Responde em 150ms.", motivo: "timeout caiu" }],
+  };
+
+  async function aceitarUmaAlteracao() {
+    alterarItemMock.mockResolvedValue(PROPOSTA);
+    montar();
+    fireEvent.change(screen.getByLabelText("Descreva o que você quer"), { target: { value: "o timeout caiu para 150ms" } });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Aceitar" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Aceitar" }));
+  }
+
+  it("aceitar com dependentes: o agente nomeia o item e oferece o chip — que dispara a revisão", async () => {
+    await aceitarUmaAlteracao();
+
+    expect(await screen.findByText(/1 item depende deste \(02\)/)).toBeInTheDocument();
+    const chip = screen.getByTestId("chip-revisar-consistencia");
+
+    // O chip usa o fluxo existente: revisar manda o QUE MUDOU pros impactados.
+    alterarItemMock.mockClear();
+    alterarItemMock.mockResolvedValue({ alteracoes: [] });
+    fireEvent.click(chip);
+    await waitFor(() => expect(alterarItemMock).toHaveBeenCalled());
+    expect(alterarItemMock.mock.calls.at(-1)![0].oQueMudou).toContain("150ms");
+  });
+
+  it("a pergunta fala UMA vez por conversa — repetir a cada aceite viraria eco", async () => {
+    alterarItemMock.mockResolvedValue({
+      alteracoes: [
+        { campo: "_criteriosAceite", valor: "1. Responde em 150ms.", motivo: "timeout caiu" },
+        { campo: "_historiaUsuario", valor: "Como cliente, quero fechar rápido.", motivo: "reflete o novo SLA" },
+      ],
+    });
+    montar();
+    fireEvent.change(screen.getByLabelText("Descreva o que você quer"), { target: { value: "o timeout caiu" } });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    await waitFor(() => expect(screen.getAllByRole("button", { name: "Aceitar" })).toHaveLength(2));
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Aceitar" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Aceitar" })[0]);
+
+    await waitFor(() => expect(screen.getAllByText(/mando revisar a consistência/)).toHaveLength(1));
+  });
+});

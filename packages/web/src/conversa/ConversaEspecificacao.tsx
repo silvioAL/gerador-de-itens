@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { itensImpactados, type Atividade, type FichaItem, type ValorSpec } from "@gerador/engine";
 import { apiIa } from "../api/client";
 import { JanelaConversa, botaoAcaoEstilo, botaoNeutroEstilo, cartaoEstilo } from "./JanelaConversa";
@@ -24,6 +24,8 @@ interface MensagemEspecificacao {
   autor: "voce" | "agente";
   texto: string;
   propostas?: AlteracaoProposta[];
+  /** SPEC-37 M6 — a mensagem carrega o chip "Revisar a consistência". */
+  chipConsistencia?: boolean;
 }
 
 interface AlteracaoProposta {
@@ -103,6 +105,8 @@ export function ConversaEspecificacao({
   /** O que já foi aceito nesta conversa — vira o "o que mudou" da revisão dos
    * demais. Sem isso, "revise os demais" não teria o que propagar. */
   const [mudancasAceitas, setMudancasAceitas] = useState<string[]>([]);
+  /** SPEC-37 M6 — a pergunta de consistência fala uma vez por conversa. */
+  const perguntouConsistencia = useRef(false);
 
   const impactados = itensImpactados(atividades, atividadeSelecionada.chave);
 
@@ -146,6 +150,28 @@ export function ConversaEspecificacao({
                       });
                       setAplicados((s) => new Set(s).add(id));
                       setMudancasAceitas((m) => [...m, `${a.atividadeRotulo} · ${a.rotuloCampo}: ${a.valorDepois}`]);
+                      // SPEC-37 M6 — a primeira alteração aceita num item com
+                      // dependentes: o agente nomeia quem depende e oferece a
+                      // revisão de consistência (decisão do debate: a fala JÁ
+                      // lista os dependentes, e o chip dispara — os dois sem
+                      // passo extra). Uma vez por conversa: repetir a pergunta
+                      // a cada aceite viraria eco.
+                      if (impactados.length > 0 && !perguntouConsistencia.current) {
+                        perguntouConsistencia.current = true;
+                        const rotuloDe = (chave: string) => atividades.find((at) => at.chave === chave)?.rotulo ?? chave;
+                        setMensagens((m) => [
+                          ...m,
+                          {
+                            autor: "agente",
+                            texto: `Aplicado. ${
+                              impactados.length === 1
+                                ? `1 item depende deste (${rotuloDe(impactados[0].chave)})`
+                                : `${impactados.length} itens dependem deste (${impactados.map((i) => rotuloDe(i.chave)).join(", ")})`
+                            } — mando revisar a consistência deles com o que mudou?`,
+                            chipConsistencia: true,
+                          },
+                        ]);
+                      }
                     }}
                     style={botaoAcaoEstilo}
                   >
@@ -259,7 +285,26 @@ export function ConversaEspecificacao({
     <JanelaConversa
       titulo="Refinar conversando"
       fase="especificacao"
-      mensagens={mensagens.map((m) => ({ autor: m.autor, texto: m.texto, extra: m.propostas ? cartao(m.propostas) : undefined }))}
+      mensagens={mensagens.map((m) => ({
+        autor: m.autor,
+        texto: m.texto,
+        // O chip do M6 é RENDERIZADO a cada render (não guardado na mensagem):
+        // assim o clique usa o closure atual de `revisarOsDemais`, com todas
+        // as mudanças aceitas até aqui — um ReactNode congelado no aceite
+        // levaria o estado daquele momento.
+        extra: m.propostas ? (
+          cartao(m.propostas)
+        ) : m.chipConsistencia ? (
+          <button
+            onClick={() => void revisarOsDemais()}
+            disabled={pensando}
+            style={botaoAcaoEstilo}
+            data-testid="chip-revisar-consistencia"
+          >
+            Revisar a consistência ({impactados.length})
+          </button>
+        ) : undefined,
+      }))}
       pensando={pensando}
       erro={erro}
       exemplo={`ex.: o timeout passou de 300ms para 150ms, ajuste os critérios de aceite`}
