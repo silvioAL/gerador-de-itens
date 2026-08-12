@@ -131,8 +131,8 @@ test("a esteira roda no navegador e o texto do gateway chega nos campos (o defei
   await painel.getByRole("spinbutton", { name: "TTL da mensagem (ms)" }).fill("60000");
   await painel.getByRole("combobox", { name: "Ack" }).selectOption("manual");
 
-  await page.getByRole("button", { name: "Derivar Quebra" }).click();
-  await expect(page.getByText("1 itens")).toBeVisible();
+  await page.locator('[data-tour="derivar-button"]').click();
+  await expect(page.getByTestId("contagem-itens")).toHaveText("1 itens");
 
   // A esteira começa sozinha quando `/ia/status` diz que dá pra usar IA — com a
   // credencial salva, diz. Este é o ponto exato do defeito: com o `curl` o JSON
@@ -140,6 +140,12 @@ test("a esteira roda no navegador e o texto do gateway chega nos campos (o defei
   // cabeçalhos de CORS (o `reply.raw.writeHead` pulava os hooks do Fastify).
   // O resultado era o relato do usuário: "todos os campos vazios".
   await expect(page.getByText(new RegExp(MARCA_GATEWAY_FALSO)).first()).toBeVisible({ timeout: 60000 });
+
+  // SPEC-37 M1 — a esteira que o usuário disparou TERMINOU: o chat do
+  // refinamento abre sozinho, com a fala do momento. É a única conduta que
+  // abre sem clique (régua da §2 da SPEC), e é exatamente o pedido original.
+  await expect(page.getByTestId("conversa-especificacao")).toBeVisible({ timeout: 60000 });
+  await expect(page.getByTestId("conversa-especificacao")).toContainText(/Pronto — o item foi gerado/);
 
   await page.screenshot({ path: "e2e/screenshots/ia-hospedada.png", fullPage: true });
 

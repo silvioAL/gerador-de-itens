@@ -115,7 +115,7 @@ export function ConfigurarPanel({
     {
       autor: "agente",
       texto:
-        "Descreva o que o time precisa passar a configurar — um padrão novo por componente, um campo de conexão, um papel da esteira. Eu proponho; aplicar é sempre um clique seu.",
+        "Descreva o que o time precisa passar a configurar — por texto ou por voz (🎤): um padrão novo por componente, um campo de conexão, um papel da esteira. Eu proponho; aplicar é sempre um clique seu.",
     },
   ]);
   const [entrada, setEntrada] = useState("");

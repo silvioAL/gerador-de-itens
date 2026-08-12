@@ -1,7 +1,10 @@
-# SPEC-37 — Condução proativa: o assistente percebe o momento (EM DEBATE)
+# SPEC-37 — Condução proativa: o assistente percebe o momento
 
-> **Status: design em debate.** Nada desta SPEC está aprovado para código.
-> As decisões em aberto estão na §6, numeradas para resposta.
+> **Status: aprovada no debate** (*"centro… pode seguir"*), com três acréscimos
+> do usuário incorporados: o Derivar Quebra como CHIP de sugestão no
+> assistente (M9), a comunicação explícita de que as conversas são **por
+> texto ou por voz**, e a ANIMAÇÃO do bubble nos estágios de condução.
+> Fase 1 implementada; ver §7.
 
 ## 1. Pedido
 
@@ -54,6 +57,12 @@ Tudo no web, sem servidor: os gatilhos são estados que as telas já têm.
 | M6 | Alteração aplicada num item com dependentes | `onAplicar` da ConversaEspecificacao + dependências do grafo (o fluxo `oQueMudou` JÁ existe no produto) | fala no chat (já aberto) | "Aplicado. N itens dependem deste — mando revisar a consistência deles?" |
 | M7 | Todos os itens refinados | contadores de status da revisão | pulsar + balão | "Tudo refinado. Quer gerar a especificação de solução?" |
 | M8 | Configurações abertas numa instalação sem regras/campos do time | dados já carregados na ConfigScreen | pulsar + balão | "Este ambiente ainda está sem padrões do time — posso te ajudar a configurar conversando." |
+| M9 | **Prontidão toda verde, nada derivado** (acréscimo do debate) | `vermelhos.length === 0 && nodes > 0 && !resultado` (App) | pulsar + balão com **chip "Derivar Quebra"** que executa a derivação | "Tudo verde — a quebra está pronta para derivar os itens de trabalho." |
+
+Sobre os chips (acréscimo do debate): o balão pode carregar UMA ação primária
+que executa de verdade (a mesma função do botão correspondente) — o chip não é
+atalho novo de escrita, é o mesmo caminho com convite. E toda fala de conversa
+diz que o canal é **texto ou voz (🎤)** — a voz existia e ninguém descobria.
 
 ## 5. Fases propostas
 
@@ -66,12 +75,22 @@ Tudo no web, sem servidor: os gatilhos são estados que as telas já têm.
 - **Fase 3** — M2–M5 e M8, priorizados após sentirmos as duas primeiras no
   uso real.
 
-## 6. Decisões em aberto (para o debate)
+## 6. Decisões do debate
 
-1. **M1 abre o chat sozinho** (como no pedido) ou só pulsa forte? Proposta:
-   abre — é conclusão de processo iniciado pelo usuário.
-2. **A lista da Fase 2** está certa (M6+M7)? Algum momento do mapa sobe ou sai?
-3. **Dispensar um balão** silencia por quebra (proposta) ou pra sempre?
-4. **Os textos das falas** — os rascunhos da tabela são o tom certo?
-5. **M6**: a revisão de consistência dispara automática após o "sim", usando o
-   fluxo `oQueMudou` existente — ou mostra antes a lista dos dependentes?
+O usuário aprovou a proposta como estava ("centro… pode seguir"): M1 abre o
+chat sozinho; Fase 2 = M6+M7; dispensar silencia por quebra; textos mantidos
+como rascunho revisável. A decisão 5 (M6: automático × lista antes) fica para
+a rodada da Fase 2, quando o fluxo estiver na mão.
+
+## 7. Fase 1 — implementada
+
+- Infra no `AssistenteFlutuante`: `chamando` (classe `assistente-fab--chamando`,
+  pulso de anel em CSS puro) e `balao` (fala + chip de ação + "agora não").
+- **M1** de ponta a ponta: transição `esteira.rodando` true→false na revisão
+  abre a `ConversaEspecificacao` com a `falaInicial` do momento (e seleciona o
+  primeiro item se nada estava selecionado); se a pessoa fechar o chat, o
+  bubble segue pulsando.
+- **M9**: balão com chip "Derivar Quebra" quando tudo verde e nada derivado;
+  o chip chama a MESMA `derivarQuebra` do botão do header.
+- **Voz explicada**: titles dos bubbles e primeiras falas das três conversas
+  dizem "por texto ou por voz (🎤)".

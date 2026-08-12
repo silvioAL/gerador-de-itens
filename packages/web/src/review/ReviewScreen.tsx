@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   carimbarInsumos,
   gerarDiagramaHtml,
@@ -360,6 +360,10 @@ export function ReviewScreen({
   // SPEC-27 Fase 2 — a conversa da especificação. Fase própria, janela
   // própria: carrega os itens derivados, não o catálogo de tipos de nó.
   const [mostrarConversa, setMostrarConversa] = useState(false);
+  // SPEC-37 M1 — a fala de condução do fim da esteira. Presente = o chat abriu
+  // (ou deve pulsar) por condução, com esta mensagem no lugar da saudação.
+  const [falaDeConducao, setFalaDeConducao] = useState<string | null>(null);
+  const rodavaAntes = useRef(false);
 
   // SPEC-24 Fase C: fila de trabalho da esteira — um item por ATIVIDADE,
   // com os placeholders já separados por papel (`ItemFilaEsteira`).
@@ -547,6 +551,22 @@ export function ReviewScreen({
     if (!seguindoGeracao || !esteira.atual) return;
     setSelecionada(esteira.atual.atividadeChave);
   }, [esteira.atual, seguindoGeracao]);
+
+  // SPEC-37 M1 — a condução do pedido original: a esteira que O USUÁRIO
+  // disparou terminou; o chat abre sozinho com a fala do momento. É a única
+  // conduta que abre sem clique (régua da SPEC-37 §2): conclusão de processo
+  // iniciado pela pessoa, quando a atenção já espera um resultado.
+  useEffect(() => {
+    if (rodavaAntes.current && !esteira.rodando) {
+      const n = resultado.atividades.length;
+      setFalaDeConducao(
+        `Pronto — ${n === 1 ? "o item foi gerado" : `os ${n} itens foram gerados`}. Revise cada um; se algo precisar mudar, me diga aqui (por texto ou por voz 🎤) que eu aplico a alteração e reviso a consistência dos itens que dependem dele.`
+      );
+      if (!selecionada) setSelecionada(resultado.atividades[0]?.chave ?? null);
+      setMostrarConversa(true);
+    }
+    rodavaAntes.current = esteira.rodando;
+  }, [esteira.rodando, resultado.atividades, selecionada]);
 
   const chaveParaNodeId = Object.fromEntries(
     resultado.atividades.filter((a) => a.origem.nodeId).map((a) => [a.chave, a.origem.nodeId!])
@@ -1081,6 +1101,7 @@ export function ReviewScreen({
           fichas={fichas}
           atividadeSelecionada={atividadeSelecionada}
           contextoEpico={contextoEpico}
+          falaInicial={falaDeConducao ?? undefined}
           onAplicar={responderComProcedencia}
           onFechar={() => setMostrarConversa(false)}
         />
@@ -1092,7 +1113,7 @@ export function ReviewScreen({
           da própria JanelaConversa (60), senão a janela aberta cobriria o
           botão que a fecha. */}
       <button
-        className="assistente-fab"
+        className={`assistente-fab${falaDeConducao && !mostrarConversa ? " assistente-fab--chamando" : ""}`}
         data-testid="abrir-conversa-especificacao"
         onClick={() => {
           if (!atividadeSelecionada && resultado.atividades.length > 0) {
@@ -1105,7 +1126,7 @@ export function ReviewScreen({
         title={
           mostrarConversa
             ? undefined
-            : "Refinar conversando: peça a alteração de um item e depois mande revisar os que dependem dele."
+            : "Refinar conversando — por texto ou por voz: peça a alteração de um item e depois mande revisar os que dependem dele."
         }
         style={fabRefinarEstilo}
       >

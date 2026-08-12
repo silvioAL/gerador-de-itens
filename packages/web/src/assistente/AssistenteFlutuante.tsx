@@ -22,6 +22,16 @@ export interface AssistenteFlutuanteProps {
   /** `true` quando uma tela cheia (Configurações) está aberta e o assistente
    * deve flutuar SOBRE ela em vez de sumir atrás. */
   sobreposto?: boolean;
+  /** SPEC-37 — um momento de condução está ativo: o bubble pulsa. */
+  chamando?: boolean;
+  /** SPEC-37 — o balão do momento: fala curta + chip de ação opcional,
+   * sempre dispensável. Só aparece com o assistente FECHADO — aberto, quem
+   * fala é o chat. */
+  balao?: {
+    texto: string;
+    acao?: { rotulo: string; onExecutar: () => void };
+    onDispensar: () => void;
+  };
   /** O conteúdo da aba ativa — o App decide qual painel entra. */
   children?: React.ReactNode;
 }
@@ -42,6 +52,8 @@ export function AssistenteFlutuante({
   onMudarAba,
   abaPrimaria = "conversa",
   sobreposto = false,
+  chamando = false,
+  balao,
   children,
 }: AssistenteFlutuanteProps) {
   const aberto = aba !== null;
@@ -80,8 +92,23 @@ export function AssistenteFlutuante({
           <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>{children}</div>
         </section>
       )}
+      {!aberto && balao && (
+        <div className="assistente-janela" style={{ ...balaoEstilo, ...elevacao }} data-testid="assistente-balao" role="status">
+          <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: "var(--texto-2)" }}>{balao.texto}</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+            {balao.acao && (
+              <button onClick={balao.acao.onExecutar} style={chipAcaoEstilo} data-testid="assistente-balao-acao">
+                {balao.acao.rotulo}
+              </button>
+            )}
+            <button onClick={balao.onDispensar} aria-label="Dispensar sugestão" style={dispensarEstilo}>
+              agora não
+            </button>
+          </div>
+        </div>
+      )}
       <button
-        className="assistente-fab"
+        className={`assistente-fab${chamando && !aberto ? " assistente-fab--chamando" : ""}`}
         data-testid="assistente-flutuante"
         onClick={() => onMudarAba(aberto ? null : abaPrimaria)}
         aria-label="Assistente"
@@ -90,8 +117,8 @@ export function AssistenteFlutuante({
           aberto
             ? undefined
             : abaPrimaria === "configurar"
-              ? "Assistente: descreva o que o time precisa configurar — eu proponho, você aplica."
-              : "Assistente: descreva a demanda e receba o diagrama proposto, ou cole o contexto do épico."
+              ? "Assistente: descreva o que o time precisa configurar — por texto ou por voz. Eu proponho, você aplica."
+              : "Assistente: converse por texto ou por voz — descreva a demanda, cole o contexto do épico ou peça configuração."
         }
         style={{ ...fabEstilo, ...elevacao }}
       >
@@ -147,6 +174,42 @@ const janelaEstilo: React.CSSProperties = {
   boxShadow: "0 20px 60px rgba(0, 0, 0, 0.5)",
   overflow: "hidden",
   zIndex: 45,
+};
+
+/** O balão do momento — mesma âncora da janela (nasce do bubble), menor. */
+const balaoEstilo: React.CSSProperties = {
+  position: "fixed",
+  right: 20,
+  bottom: 80,
+  width: 280,
+  maxWidth: "calc(100vw - 40px)",
+  padding: "10px 12px",
+  background: "var(--painel)",
+  border: "1px solid var(--borda-forte)",
+  borderRadius: 12,
+  boxShadow: "0 12px 40px rgba(0, 0, 0, 0.5)",
+  zIndex: 45,
+};
+
+const chipAcaoEstilo: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 600,
+  padding: "5px 12px",
+  borderRadius: 999,
+  border: "1px solid var(--acento-indigo)",
+  background: "var(--acento-indigo)",
+  color: "#fff",
+  cursor: "pointer",
+};
+
+const dispensarEstilo: React.CSSProperties = {
+  fontSize: 11.5,
+  padding: "5px 8px",
+  borderRadius: 999,
+  border: "none",
+  background: "transparent",
+  color: "var(--texto-mudo)",
+  cursor: "pointer",
 };
 
 const cabecalhoEstilo: React.CSSProperties = {

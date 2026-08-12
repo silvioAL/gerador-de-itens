@@ -29,7 +29,7 @@ test("simular mostra as chamadas e o prompt real, sem chamar o modelo", async ({
   await page.getByRole("button", { name: "✦ Como funciona & cenários" }).click();
   await page.getByRole("button", { name: /Cenários prontos/ }).click();
   await page.getByRole("button", { name: "Carregar cenário: Dados não-relacionais" }).click();
-  await page.getByRole("button", { name: "Derivar Quebra" }).click();
+  await page.locator('[data-tour="derivar-button"]').click();
 
   await page.getByTestId("abrir-simulacao").click();
   const painel = page.getByTestId("simulacao-esteira");

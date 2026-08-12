@@ -318,6 +318,9 @@ function AppCarregado({
   // conversa da especificação continua separada, de propósito (SPEC-27 §3) —
   // ela pertence à tela de revisão, não ao canvas.
   const [abaAssistente, setAbaAssistente] = useState<AbaAssistente | null>(null);
+  // SPEC-37 M9 — "agora não" silencia o momento até a próxima mudança real de
+  // estado (recarregar/derivar); condução dispensada não insiste.
+  const [derivarDispensado, setDerivarDispensado] = useState(false);
   const [abaConfigAlvo, setAbaConfigAlvo] = useState<AbaConfig | undefined>(undefined);
   useEffect(() => {
     if (!localStorage.getItem(CHAVE_JORNADA_VISTA)) setMostrarJornada(true);
@@ -340,6 +343,11 @@ function AppCarregado({
 
   const [resultado, setResultado] = useState<ResultadoDependenciasDe<Atividade> | null>(null);
   const { vermelhos } = calcularResumoProntidao(quebra.diagrama, diagramaConfig);
+
+  // SPEC-37 M9 — a condição do momento: há diagrama, está todo verde, e a
+  // derivação ainda não aconteceu. Some sozinho ao derivar ou ao dispensar.
+  const momentoDerivarAtivo =
+    quebra.diagrama.nodes.length > 0 && vermelhos.length === 0 && !resultado && !derivarDispensado;
 
   function derivarQuebra() {
     const atividades = derivar(quebra.diagrama, diagramaConfig, { time: quebra.time });
@@ -733,6 +741,18 @@ function AppCarregado({
         // direto na conversa de configuração — o contexto de quem está ali.
         abaPrimaria={mostrarConfig ? "configurar" : "conversa"}
         sobreposto={mostrarConfig}
+        // SPEC-37 M9 — tudo verde e nada derivado: o momento certo de conduzir
+        // ao Derivar, com o chip executando a mesma ação do botão do header.
+        chamando={momentoDerivarAtivo}
+        balao={
+          momentoDerivarAtivo
+            ? {
+                texto: "Tudo verde — a quebra está pronta para derivar os itens de trabalho.",
+                acao: { rotulo: "Derivar Quebra", onExecutar: derivarQuebra },
+                onDispensar: () => setDerivarDispensado(true),
+              }
+            : undefined
+        }
       >
         {abaAssistente === "conversa" && (
           <ConversaPanel

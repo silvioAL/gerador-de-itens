@@ -10,6 +10,9 @@ export interface ConversaEspecificacaoProps {
   /** O item aberto na tela: é dele que a conversa fala por padrão. */
   atividadeSelecionada: Atividade;
   contextoEpico?: string;
+  /** SPEC-37 M1 — quando a conversa abre por CONDUÇÃO (a esteira terminou),
+   * a primeira fala é a do momento, não a saudação padrão do item. */
+  falaInicial?: string;
   onAplicar: (atividadeChave: string, chaveCampo: string, resposta: ValorSpec) => void;
   onFechar: () => void;
 }
@@ -82,13 +85,16 @@ export function ConversaEspecificacao({
   fichas,
   atividadeSelecionada,
   contextoEpico,
+  falaInicial,
   onAplicar,
   onFechar,
 }: ConversaEspecificacaoProps) {
   const [mensagens, setMensagens] = useState<MensagemEspecificacao[]>([
     {
       autor: "agente",
-      texto: `Falando sobre o item ${atividadeSelecionada.rotulo}. Diga o que precisa mudar — depois eu reviso os itens que dependem dele, e você confirma um a um.`,
+      texto:
+        falaInicial ??
+        `Falando sobre o item ${atividadeSelecionada.rotulo}. Diga o que precisa mudar — por texto ou por voz (🎤) — e depois eu reviso os itens que dependem dele, com você confirmando um a um.`,
     },
   ]);
   const [pensando, setPensando] = useState(false);

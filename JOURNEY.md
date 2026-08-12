@@ -4399,3 +4399,37 @@ primeiro passo nesse dia (criar o contexto que falta, não migrar o arquivo).
 
 Design-only de propósito: a decisão de implementar é do usuário, e agora tem
 um desenho medido para decidir em cima.
+
+## 172. SPEC-37 — o assistente aprende a perceber o momento (Fase 1)
+
+O usuário pediu o desenho e o debate veio rápido: *"centro"*, três acréscimos
+(o Derivar como CHIP de sugestão no assistente; dizer que as conversas são por
+texto OU VOZ; a animação do bubble nos estágios), e *"pode seguir"*. A SPEC-37
+saiu do "em debate" para implementada na Fase 1: **M1** (a esteira que o
+usuário disparou terminou → o chat da revisão abre sozinho com a fala do
+momento — a única conduta que abre sem clique, pela régua da §2) e **M9** (tudo
+verde e nada derivado → bubble pulsando com balão e o chip "Derivar Quebra",
+que executa a MESMA função do botão do header). E a voz, que existia desde a
+SPEC-30 e ninguém descobria, agora está dita em todos os titles e primeiras
+falas.
+
+**A suíte cobrou o preço da proatividade — e a resposta foi declarar
+pressupostos.** Com o M1 vivo, os specs de fluxo SEM IA (derivar-e-revisar,
+jornada) ficaram reféns da corrida da credencial global: a esteira ligava ou
+não conforme o interleaving, e o chat abrindo sozinho no meio do teste
+quebrava asserções. O remédio não foi condicionar os testes (teste condicional
+é fraqueza), foi cada arquivo declarar o próprio pressuposto: um `page.route`
+em `/ia/status` respondendo "sem gateway" — o ambiente que aqueles fluxos
+sempre assumiram. O M1 é coberto onde é determinístico, no ia-hospedada, que
+possui o estado de credencial. E o chip com o MESMO rótulo do botão ("Derivar
+Quebra", correto para o usuário) quebrou cinco seletores por ambiguidade — os
+specs migraram para a âncora `data-tour` do header.
+
+Um detalhe de fala que os testes pegaram: "os 1 itens foram gerados" — a
+pluralização entrou junto com a correção dos asserts (`contagem-itens` em vez
+de `getByText("N itens")`, que passou a casar com a própria fala do
+assistente).
+
+Duas mordidas numa tacada, cada uma no spec exato: M1 sem o abrir → vermelho
+no ia-hospedada; chip sem o fio → vermelho no derivar. 358 no web, 41/41 no
+navegador, e o balão do M9 conferido em produção.
