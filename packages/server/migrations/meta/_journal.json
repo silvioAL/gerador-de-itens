@@ -183,6 +183,13 @@
       "when": 1754500000011,
       "tag": "0025_itens_gerados",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1754500000012,
+      "tag": "0026_stacks_globais",
+      "breakpoints": true
     }
   ]
 }

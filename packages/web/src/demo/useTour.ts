@@ -87,7 +87,7 @@ export function useTour(opts: UseTourOpts) {
     },
     {
       selector: "[data-tour=config-screen-content]",
-      titulo: "Perfis de stack",
+      titulo: "Stacks conhecidas",
       texto:
         'A stack é um perfil do CATÁLOGO ("Java + Spring Boot", "Node"...) e o time aponta um — trocar de tecnologia é trocar o ponteiro. Os valores do perfil apontado pré-preenchem sugestões em campos novos; dá pra capturar direto de um nó real com "salvar como padrão do time" no painel.',
       onEnter: () => opts.abrirConfigNaAba("perfis"),

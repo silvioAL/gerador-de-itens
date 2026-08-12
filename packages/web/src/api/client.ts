@@ -808,16 +808,6 @@ export interface SugestaoPapel {
   contextos: string[];
 }
 
-export const apiPerfisTime = {
-  listar: () => requisitar<PerfisConfig>("/perfis-time"),
-  /** A captura (SPEC-38 F2): grava no perfil de stack APONTADO pelo time —
-   * cria "stack de {time}" e aponta se o time ainda não tiver perfil. */
-  atualizar: (timeId: string, tipoNo: string, valores: Record<string, unknown>) =>
-    requisitar<Record<string, unknown>>(`/perfis-time/${encodeURIComponent(timeId)}`, {
-      method: "PUT",
-      body: JSON.stringify({ tipoNo, valores }),
-    }),
-};
 
 /** SPEC-39 — PDCA de configurações: contadores de uso, feedback e ajustes. */
 export interface SolicitacaoAjuste {
@@ -854,32 +844,31 @@ export const apiPdca = {
     }),
 };
 
-/** SPEC-38 Fase 2 — o catálogo de perfis de stack e o ponteiro do time. */
-export interface PerfilStackCatalogo {
+/** SPEC-43 — uma stack conhecida: valores nomeados de UM componente. */
+export interface Stack {
   id: string;
+  tipoNo: string;
   nome: string;
   criadoPor: string;
-  valores: Record<string, Record<string, string>>;
+  valores: Record<string, string>;
 }
 
-export const apiPerfisStack = {
-  catalogo: () =>
-    requisitar<{ perfis: PerfilStackCatalogo[]; ponteiros: Record<string, string> }>("/perfis-stack"),
-  criar: (nome: string) =>
-    requisitar<PerfilStackCatalogo>("/perfis-stack", { method: "POST", body: JSON.stringify({ nome }) }),
-  /** SPEC-42 — editar valor age no PERFIL (rota existente da SPEC-38 F2). */
-  definirValores: (perfilId: string, tipoNo: string, valores: Record<string, string>) =>
-    requisitar<Record<string, string>>(`/perfis-stack/${encodeURIComponent(perfilId)}/valores`, {
-      method: "PUT",
-      body: JSON.stringify({ tipoNo, valores }),
-    }),
-  apontar: (timeId: string, perfilStackId: string | null) =>
-    requisitar<{ timeId: string; perfilStackId: string | null }>(
-      `/times/${encodeURIComponent(timeId)}/perfil-stack`,
-      { method: "PUT", body: JSON.stringify({ perfilStackId }) }
-    ),
-};
+/** `tipoNo → campo → valores conhecidos` — vira os chips de sugestão. */
+export type SugestoesDeStack = Record<string, Record<string, string[]>>;
 
+export const apiStacks = {
+  catalogo: () => requisitar<{ stacks: Stack[] }>("/stacks"),
+  sugestoes: () => requisitar<SugestoesDeStack>("/stacks/sugestoes"),
+  criar: (tipoNo: string, nome: string) =>
+    requisitar<Stack>("/stacks", { method: "POST", body: JSON.stringify({ tipoNo, nome }) }),
+  definirValores: (stackId: string, valores: Record<string, string>) =>
+    requisitar<Record<string, string>>(`/stacks/${encodeURIComponent(stackId)}/valores`, {
+      method: "PUT",
+      body: JSON.stringify({ valores }),
+    }),
+  capturar: (tipoNo: string, valores: Record<string, string>) =>
+    requisitar<Stack>("/stacks/capturar", { method: "POST", body: JSON.stringify({ tipoNo, valores }) }),
+};
 export interface EspecificacaoTemplate {
   id: string;
   timeId: string;

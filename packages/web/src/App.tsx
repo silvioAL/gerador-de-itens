@@ -6,7 +6,6 @@ import {
   type Atividade,
   type DiagramaConfig,
   type No,
-  type PerfisConfig,
   type Quebra,
   type ResultadoDependenciasDe,
   gerarItensDeTrabalho,
@@ -18,7 +17,6 @@ import {
   apiCamposAresta,
   apiCamposNo,
   apiEspecificacaoTemplate,
-  apiPerfisTime,
   apiPipelineAgentes,
   apiTimes,
   apiVersao,
@@ -32,8 +30,8 @@ import {
   apiPdca,
   apiItensGerados,
   type ItemGerado,
-  apiPerfisStack,
-  type PerfilStackCatalogo,
+  apiStacks,
+  type SugestoesDeStack,
 } from "./api/client";
 import { useSessao } from "./auth/useSessao";
 import { LoginScreen } from "./auth/LoginScreen";
@@ -163,7 +161,7 @@ export function App() {
 
 interface DadosCarregados extends ConfigCarregada {
   cenarios: Cenario[];
-  perfisTime: PerfisConfig;
+  sugestoesDeStack: SugestoesDeStack;
   camposNo: CampoNo[];
   camposAresta: CampoAresta[];
   especificacaoTemplate: EspecificacaoTemplate;
@@ -209,7 +207,7 @@ function AppComSessao({
     Promise.all([
       carregarConfig(timeAtivo),
       carregarCenarios(),
-      apiPerfisTime.listar(),
+      apiStacks.sugestoes(),
       apiCamposNo.listar(timeAtivo),
       // Mesmo motivo do catch em loadConfig.ts: /campos-aresta não existe no
       // modo hospedado (packages/server fica dormente, SPEC-21 §2) — ausência
@@ -220,8 +218,8 @@ function AppComSessao({
       // local (SPEC-24 Fase E); no hospedado cai no default seguro.
       apiPipelineAgentes.obter().catch(() => ({ confirmacaoObrigatoria: true })),
     ])
-      .then(([config, cenarios, perfisTime, camposNo, camposAresta, especificacaoTemplate, pipelineAgentes]) => {
-        setDados({ ...config, cenarios, perfisTime, camposNo, camposAresta, especificacaoTemplate, pipelineAgentes });
+      .then(([config, cenarios, sugestoesDeStack, camposNo, camposAresta, especificacaoTemplate, pipelineAgentes]) => {
+        setDados({ ...config, cenarios, sugestoesDeStack, camposNo, camposAresta, especificacaoTemplate, pipelineAgentes });
       })
       .catch((e: unknown) => setErroConfig(e instanceof Error ? e.message : String(e)));
   }, [timeAtivo]);
@@ -259,7 +257,7 @@ function AppCarregado({
   appConfig,
   regrasConfig,
   cenarios,
-  perfisTime: perfisTimeInicial,
+  sugestoesDeStack: sugestoesInicial,
   camposNo: camposNoInicial,
   camposAresta: camposArestaInicial,
   especificacaoTemplate: especificacaoTemplateInicial,
@@ -271,7 +269,7 @@ function AppCarregado({
   onSair,
 }: ConfigCarregada & {
   cenarios: Cenario[];
-  perfisTime: PerfisConfig;
+  sugestoesDeStack: SugestoesDeStack;
   camposNo: CampoNo[];
   camposAresta: CampoAresta[];
   especificacaoTemplate: EspecificacaoTemplate;
@@ -287,7 +285,7 @@ function AppCarregado({
   // real mora no servidor; aqui é só não oferecer o que seria 403).
   const permissoes = usePermissoes({ hospedado: true, timeId: timeAtivo });
   const somenteLeitura = permissoes.nivel === "visualizar";
-  const [perfisTime, setPerfisTime] = useState(perfisTimeInicial);
+  const [sugestoesDeStack, setSugestoesDeStack] = useState(sugestoesInicial);
   const [camposNo, setCamposNo] = useState(camposNoInicial);
   const [camposAresta, setCamposAresta] = useState(camposArestaInicial);
   const [especificacaoTemplate, setEspecificacaoTemplate] = useState(especificacaoTemplateInicial);
@@ -336,15 +334,6 @@ function AppCarregado({
   // verdade é o server (persistem por quebra); o estado local é o espelho da
   // última geração/carga desta sessão.
   const [itensGerados, setItensGerados] = useState<ItemGerado[]>([]);
-  // SPEC-42 — o catálogo de stacks e os ponteiros: o menu informa a stack do
-  // time ativo sem equipará-la ao time (time ≠ stack).
-  const [catalogoStack, setCatalogoStack] = useState<{
-    perfis: PerfilStackCatalogo[];
-    ponteiros: Record<string, string>;
-  } | null>(null);
-  useEffect(() => {
-    apiPerfisStack.catalogo().then(setCatalogoStack).catch(() => {});
-  }, [timeAtivo]);
   const [menuAberto, setMenuAberto] = useState(false);
   const [mostrarAbrir, setMostrarAbrir] = useState(false);
   // #298 — a conversa do desenho (SPEC-27 Fase 1) e o contexto do épico moram
@@ -371,7 +360,6 @@ function AppCarregado({
   const noSelecionado = quebra.diagrama.nodes.find((n) => n.id === selecionadoId);
   const arestaSelecionada = quebra.diagrama.edges.find((e) => e.id === arestaSelecionadaId);
   const tiposDeNo = Object.entries(diagramaConfig.nodeTypes);
-  const perfilDoTime = quebra.time ? perfisTime[quebra.time] : undefined;
 
   const [resultado, setResultado] = useState<ResultadoDependenciasDe<Atividade> | null>(null);
   const { vermelhos } = calcularResumoProntidao(quebra.diagrama, diagramaConfig);
@@ -569,23 +557,19 @@ function AppCarregado({
     quebraState.pedirEnquadramento();
   }
 
-  /**
-   * Único jeito de "configurar a stack do time" hoje: captura os campos preenchidos
-   * manualmente de um nó real (não um formulário à parte, desconectado do uso) e
-   * grava no servidor — direto no perfil compartilhado do time, visível pro resto
-   * da equipe assim que salvo.
-   */
-  async function atualizarPerfisTime(timeId: string, tipoNo: string, valores: Record<string, unknown>) {
-    const camposAtualizados = await apiPerfisTime.atualizar(timeId, tipoNo, valores);
-    setPerfisTime((atual) => ({
-      ...atual,
-      [timeId]: { ...atual[timeId], [tipoNo]: camposAtualizados },
-    }));
-  }
-
-  function salvarComoPerfilDoTime(tipoNo: string, valores: Record<string, unknown>) {
-    if (!quebra.time) return;
-    void atualizarPerfisTime(quebra.time, tipoNo, valores);
+  /** SPEC-43 — captura os campos preenchidos de um nó real como stack
+   * CONHECIDA do catálogo global (não mais "padrão do time"): os valores
+   * viram sugestão pra todo mundo assim que salvos. */
+  function salvarComoStackConhecida(tipoNo: string, valores: Record<string, unknown>) {
+    const soStrings = Object.fromEntries(
+      Object.entries(valores)
+        .filter(([, v]) => v !== undefined && v !== null && v !== "")
+        .map(([k, v]) => [k, String(v)])
+    );
+    void apiStacks
+      .capturar(tipoNo, soStrings)
+      .then(() => apiStacks.sugestoes().then(setSugestoesDeStack))
+      .catch(() => {});
   }
 
   /** Compartilhado entre o <select> (sessão hospedada) e o <input> de texto
@@ -781,9 +765,6 @@ function AppCarregado({
         aberto={menuAberto}
         onFechar={() => setMenuAberto(false)}
         timeAtivo={quebra.time ?? timeAtivo}
-        stackDoTimeAtivo={
-          catalogoStack?.perfis.find((p) => p.id === catalogoStack.ponteiros[quebra.time ?? timeAtivo])?.nome ?? null
-        }
         timeIds={sessao.timeIds}
         email={sessao.email}
         onTrocarTime={aoMudarTime}
@@ -835,9 +816,9 @@ function AppCarregado({
             arestas={quebra.diagrama.edges}
             config={diagramaConfig}
             quebraState={quebraState}
-            perfilDoTime={perfilDoTime}
+            sugestoesDeStack={sugestoesDeStack}
             time={quebra.time}
-            onSalvarPerfilDoTime={salvarComoPerfilDoTime}
+            onSalvarStack={salvarComoStackConhecida}
           />
         )}
       </div>
@@ -905,8 +886,7 @@ function AppCarregado({
           pipelineAgentes={pipelineAgentes}
           timeAtivo={timeAtivo}
           onPerfisMudaram={() => {
-            void apiPerfisTime.listar().then(setPerfisTime);
-            apiPerfisStack.catalogo().then(setCatalogoStack).catch(() => {});
+            void apiStacks.sugestoes().then(setSugestoesDeStack);
           }}
           onSalvarEspecificacaoTemplate={salvarEspecificacaoTemplate}
           onSalvarPipelineAgentes={salvarPipelineAgentes}
@@ -1006,7 +986,7 @@ function AppCarregado({
         {abaAssistente === "conversa" && (
           <ConversaPanel
             config={diagramaConfig}
-            perfisTime={perfisTime}
+            sugestoesDeStack={sugestoesDeStack}
             timeAtivo={quebra.time}
             techs={appConfig.techs}
             contextos={appConfig.contextos}

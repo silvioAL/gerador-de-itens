@@ -57,57 +57,55 @@ test("carregar um cenário pronto popula o canvas e deriva sem ciclos/conflitos"
   await page.screenshot({ path: "e2e/screenshots/cenario-mongo.png", fullPage: true });
 });
 
-test("tela Perfis de stack (SPEC-42): cards por PERFIL com 'usado por', nunca um card por time", async ({
+test("tela Stacks conhecidas (SPEC-43): cards por COMPONENTE, sem nenhuma menção a time", async ({
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   await entrar(page);
 
   await page.getByRole("button", { name: "☰ Menu" }).click();
-  await page.getByRole("button", { name: /Perfis de stack/ }).click();
+  await page.getByRole("button", { name: /Stacks conhecidas/ }).click();
 
   // Escopado pra dentro da tela de config: o header tem um <select> com essas
   // mesmas strings como <option>, e getByText também bate em <option>s no DOM.
   const telaConfig = page.locator('[data-tour="config-screen-content"]');
-  // SPEC-42: os times aparecem como "usado por" nos cards de PERFIL — o
-  // compartilhamento visível, sem cards duplicados por time.
-  await expect(telaConfig.getByText(/usado por: .*time-pagamentos/).first()).toBeVisible();
-  await expect(telaConfig.getByText(/usado por: .*time-portabilidade/).first()).toBeVisible();
-  // Exato: o VALOR no card do perfil (a intro fala "Java + Spring Boot", nunca só "Spring Boot").
-  await expect(telaConfig.getByText("Spring Boot", { exact: true })).toBeVisible();
-  await expect(telaConfig.getByText(/salvar estes valores como padrão do time/)).toBeVisible();
+  // SPEC-43: a migração 0026 fatiou o perfil misto por componente — o card
+  // "Java + Spring Boot" é do Serviço e "Camunda 7" é do Processo, e nenhum
+  // deles menciona time (o catálogo é global).
+  await expect(telaConfig.getByTestId("stack-Java + Spring Boot")).toBeVisible();
+  await expect(telaConfig.getByTestId("stack-Camunda 7")).toBeVisible();
+  await expect(telaConfig.getByTestId("stack-Java + Spring Boot").getByText("Spring Boot", { exact: true })).toBeVisible();
+  await expect(telaConfig.getByText(/usado por/)).toHaveCount(0);
+  await expect(telaConfig.getByText(/salvar estes valores como stack conhecida/)).toBeVisible();
 
   await page.screenshot({ path: "e2e/screenshots/perfis-de-time-tab.png", fullPage: true });
 });
 
-test("declarar 'time trabalha com Java' na aba Perfis de time faz um Serviço novo desse time já sugerir Java", async ({
+test("declarar uma stack conhecida faz um Serviço novo de QUALQUER time já sugerir o valor (SPEC-43)", async ({
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
-  // dev@gerador.local pertence a time-checkout também (seed sem perfil de stack
-  // nenhum ainda — só assim dá pra demonstrar "declarar pela primeira vez").
+  // time-checkout de propósito: o catálogo é GLOBAL — a sugestão chega sem o
+  // time declarar nada (era o ponto do "poderia simplesmente ter tudo").
   await entrar(page, "time-checkout");
 
   await page.getByRole("button", { name: "☰ Menu" }).click();
-  await page.getByRole("button", { name: /Perfis de stack/ }).click();
+  await page.getByRole("button", { name: /Stacks conhecidas/ }).click();
 
-  // SPEC-42 — o fluxo é pelo CATÁLOGO: cria um perfil, o time aponta, e o
-  // valor entra no perfil (nunca mais um formulário pedindo "Time").
-  const nomePerfil = `stack e2e ${Date.now()}`;
-  await page.getByLabel("Nome do novo perfil de stack").fill(nomePerfil);
-  await page.getByRole("button", { name: "+ Criar perfil" }).click();
-  await page.getByLabel("Perfil de stack do time ativo").selectOption({ label: nomePerfil });
+  const nomeStack = `stack e2e ${Date.now()}`;
+  await page.getByLabel("Componente da nova stack").selectOption({ label: "Serviço" });
+  await page.getByLabel("Nome da nova stack").fill(nomeStack);
+  await page.getByRole("button", { name: "+ Criar stack" }).click();
 
-  const cardPerfil = page.getByTestId(`perfil-${nomePerfil}`);
-  await expect(cardPerfil.getByText(/usado por: .*time-checkout/)).toBeVisible();
-  await cardPerfil.getByText("+ adicionar valor").click();
-  await page.getByLabel("Componente").selectOption({ label: "Serviço" });
+  const cardStack = page.getByTestId(`stack-${nomeStack}`);
+  await expect(cardStack).toBeVisible();
+  await cardStack.getByText("+ adicionar valor").click();
   await page.getByLabel("Campo", { exact: true }).selectOption({ label: "Linguagem/Stack" });
   await page.getByLabel("Valor", { exact: true }).fill("Java");
-  await page.getByTestId("salvar-valor-de-perfil").click();
+  await page.getByTestId("salvar-valor-de-stack").click();
 
-  // Grava direto no servidor — o valor aparece no card do perfil.
-  await expect(cardPerfil.getByText("linguagem:", { exact: false })).toBeVisible();
+  // Grava direto no servidor — o valor aparece no card da stack.
+  await expect(cardStack.getByText("linguagem:", { exact: false })).toBeVisible();
 
   await page.getByRole("button", { name: "Voltar ao canvas" }).click();
 
@@ -116,7 +114,7 @@ test("declarar 'time trabalha com Java' na aba Perfis de time faz um Serviço no
   await page.getByRole("button", { name: "+ Serviço", exact: true }).click();
   await page.locator(".react-flow__node", { hasText: "Serviço" }).click();
 
-  await expect(page.getByText("usar sugestão: Java")).toBeVisible();
+  await expect(page.getByText("usar sugestão: Java").first()).toBeVisible();
 });
 
 test("adicionar dois cenários ao canvas (sem substituir) compõe um diagrama maior, sem colidir IDs, e deriva tudo junto", async ({
@@ -225,8 +223,8 @@ test("tour guiado de 1 clique percorre diagrama, prontidão, proveniência, deri
   await expect(page.getByText("PASSO 9 DE 13")).toBeVisible();
   const telaConfigNoTour = page.locator('[data-tour="config-screen-content"]');
   await expect(telaConfigNoTour).toBeVisible();
-  // SPEC-42: a tela é catálogo-primeiro; o vínculo do time é a seção própria.
-  await expect(telaConfigNoTour.getByText(/Stack do time ativo \(time-pagamentos\)/)).toBeVisible();
+  // SPEC-43: a tela é o catálogo global — o título diz "Stacks conhecidas".
+  await expect(telaConfigNoTour.getByText("Stacks conhecidas").first()).toBeVisible();
   await page.getByRole("button", { name: "Próximo" }).click();
 
   // Passo 10: campos por tipo de nó.

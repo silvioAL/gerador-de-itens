@@ -7,7 +7,8 @@ import {
   type No,
 } from "@gerador/engine";
 import type { UseQuebra } from "../state/useQuebra";
-import type { DiagramaConfig, Aresta, PerfilTime } from "@gerador/engine";
+import type { DiagramaConfig, Aresta } from "@gerador/engine";
+import type { SugestoesDeStack } from "../api/client";
 import { ProvenanceBadge } from "./ProvenanceBadge";
 import { ReadinessBadge } from "../summary/ReadinessBadge";
 
@@ -16,12 +17,13 @@ export interface PropertiesPanelProps {
   arestas: Aresta[];
   config: DiagramaConfig;
   quebraState: UseQuebra;
-  /** Base de conhecimento de stack do time da quebra — preenche sugestões sem default estático. */
-  perfilDoTime?: PerfilTime;
-  /** Time da quebra atual — só pra decidir se mostra o botão de capturar perfil. */
+  /** SPEC-43 — os valores conhecidos do catálogo global de stacks: viram os
+   * chips de sugestão em campo vazio (todas as stacks, sem filtro por time). */
+  sugestoesDeStack?: SugestoesDeStack;
+  /** Time da quebra atual — só informativo (placeholder do time responsável). */
   time?: string;
-  /** Grava os campos manuais do nó atual como padrão do time — direto no servidor, visível pro resto do time. */
-  onSalvarPerfilDoTime?: (tipoNo: string, valores: Record<string, unknown>) => void;
+  /** Captura os campos manuais do nó como stack CONHECIDA do catálogo global. */
+  onSalvarStack?: (tipoNo: string, valores: Record<string, unknown>) => void;
 }
 
 export function PropertiesPanel({
@@ -29,9 +31,9 @@ export function PropertiesPanel({
   arestas,
   config,
   quebraState,
-  perfilDoTime,
+  sugestoesDeStack,
   time,
-  onSalvarPerfilDoTime,
+  onSalvarStack,
 }: PropertiesPanelProps) {
   if (!no) {
     return (
@@ -65,7 +67,7 @@ export function PropertiesPanel({
       .filter(([chave, v]) => v.origem === "manual" && !cfg.spec.find((c) => c.key === chave)?.identificador)
       .map(([chave, v]) => [chave, v.valor])
   );
-  const podeSalvarPerfil = Boolean(time) && Boolean(onSalvarPerfilDoTime) && Object.keys(valoresManuais).length > 0;
+  const podeSalvarStack = Boolean(onSalvarStack) && Object.keys(valoresManuais).length > 0;
 
   return (
     <aside data-tour="properties-panel" style={painelEstilo}>
@@ -93,20 +95,14 @@ export function PropertiesPanel({
         />
       </div>
 
-      {podeSalvarPerfil && (
+      {podeSalvarStack && (
         <button
           style={{ ...linkBotaoEstilo, marginTop: 8 }}
-          onClick={() => onSalvarPerfilDoTime!(no.type, valoresManuais)}
-          title={`Grava os campos preenchidos manualmente aqui como padrão de "${cfg.label}" para o time ${time} — direto no servidor, visível pro resto do time.`}
+          onClick={() => onSalvarStack!(no.type, valoresManuais)}
+          title={`Grava os campos preenchidos manualmente aqui como uma stack conhecida de "${cfg.label}" no catálogo — os valores viram sugestão pra todo mundo (SPEC-43).`}
         >
-          💾 salvar estes valores como padrão do time «{time}»
+          💾 salvar estes valores como stack conhecida
         </button>
-      )}
-      {!time && (
-        <p style={{ fontSize: 11, color: "var(--texto-mudo)", marginTop: 6 }}>
-          Sem time definido nesta quebra (campo no topo da tela) — por isso não há sugestão de stack nem como capturar
-          uma.
-        </p>
       )}
 
       <hr style={{ margin: "14px 0", border: "none", borderTop: "1px solid var(--borda)" }} />
@@ -122,7 +118,7 @@ export function PropertiesPanel({
           campo={campo}
           prontidao={prontidao}
           quebraState={quebraState}
-          perfilDoTime={perfilDoTime}
+          sugestoesDeStack={sugestoesDeStack}
         />
       ))}
 
@@ -144,10 +140,10 @@ interface FieldRowProps {
   campo: FieldSpec;
   prontidao: ReturnType<typeof calcularProntidao>;
   quebraState: UseQuebra;
-  perfilDoTime?: PerfilTime;
+  sugestoesDeStack?: SugestoesDeStack;
 }
 
-function FieldRow({ no, campo, prontidao, quebraState, perfilDoTime }: FieldRowProps) {
+function FieldRow({ no, campo, prontidao, quebraState, sugestoesDeStack }: FieldRowProps) {
   const { definirValorSpec, definirNA, removerNA, confirmarValor, descartarValor } = quebraState;
   const [motivoRascunho, setMotivoRascunho] = useState("");
   const [editandoNA, setEditandoNA] = useState(false);
@@ -156,8 +152,16 @@ function FieldRow({ no, campo, prontidao, quebraState, perfilDoTime }: FieldRowP
   const na = no.specNA[campo.key];
   const erro = prontidao.erros.find((e) => e.campo === campo.key);
   const pendente = prontidao.inferidosPendentes.includes(campo.key);
-  const sugestao = resolverDefault(campo, no, perfilDoTime);
-  const temSugestaoNaoUsada = valorSpec === undefined && sugestao !== undefined && sugestao !== "";
+  // SPEC-43 — o default estático do campo + TODOS os valores conhecidos do
+  // catálogo de stacks: um chip por valor (antes era um só, do perfil do time).
+  const defEstatico = resolverDefault(campo, no);
+  const deStacks = sugestoesDeStack?.[no.type]?.[campo.key] ?? [];
+  const sugestoes: unknown[] = [
+    ...(defEstatico !== undefined && defEstatico !== "" ? [defEstatico] : []),
+    ...deStacks.filter((v) => String(defEstatico) !== v),
+  ];
+  const sugestao = sugestoes[0];
+  const temSugestaoNaoUsada = valorSpec === undefined && sugestoes.length > 0;
 
   return (
     <div style={{ marginBottom: 14 }}>
@@ -180,14 +184,16 @@ function FieldRow({ no, campo, prontidao, quebraState, perfilDoTime }: FieldRowP
       ) : (
         <>
           <FieldControl campo={campo} valor={valorSpec?.valor} sugestao={sugestao} onChange={(v) => definirValorSpec(no.id, campo.key, v)} />
-          {temSugestaoNaoUsada && (
-            <button
-              style={linkBotaoEstilo}
-              onClick={() => definirValorSpec(no.id, campo.key, sugestao)}
-            >
-              usar sugestão: {String(sugestao)}
-            </button>
-          )}
+          {temSugestaoNaoUsada &&
+            sugestoes.map((s) => (
+              <button
+                key={String(s)}
+                style={{ ...linkBotaoEstilo, marginRight: 8 }}
+                onClick={() => definirValorSpec(no.id, campo.key, s)}
+              >
+                usar sugestão: {String(s)}
+              </button>
+            ))}
         </>
       )}
 

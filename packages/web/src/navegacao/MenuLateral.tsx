@@ -10,9 +10,6 @@ export interface MenuLateralProps {
   aberto: boolean;
   onFechar: () => void;
   timeAtivo: string;
-  /** SPEC-42 — nome do perfil de stack que o time ativo aponta (null = sem
-   * perfil). Informativo: a stack NÃO é o time, é o ponteiro dele. */
-  stackDoTimeAtivo: string | null;
   timeIds: string[];
   email: string;
   onTrocarTime: (timeId: string) => void;
@@ -29,7 +26,7 @@ const GRUPOS: { titulo: string; itens: { area: AreaConfig; rotulo: string }[] }[
   {
     titulo: "Padrões do time",
     itens: [
-      { area: "perfis", rotulo: "Perfis de stack" },
+      { area: "perfis", rotulo: "Stacks conhecidas" },
       { area: "campos", rotulo: "Padrões por componente" },
       { area: "camposAresta", rotulo: "Campos por tipo de conexão" },
       { area: "regras", rotulo: "Regras de refinamento" },
@@ -57,7 +54,6 @@ export function MenuLateral({
   aberto,
   onFechar,
   timeAtivo,
-  stackDoTimeAtivo,
   timeIds,
   email,
   onTrocarTime,
@@ -129,11 +125,6 @@ export function MenuLateral({
               </option>
             ))}
           </select>
-          {/* time ≠ stack (SPEC-42): a stack aparece como consequência do
-              ponteiro do time, nunca como sinônimo dele. */}
-          <span style={{ fontSize: 11, color: "var(--texto-mudo)", display: "block", marginTop: 4 }} data-testid="stack-do-time-menu">
-            stack: {stackDoTimeAtivo ?? "sem perfil apontado"}
-          </span>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
             <span style={{ fontSize: 11, color: "var(--texto-mudo)", overflow: "hidden", textOverflow: "ellipsis" }}>
               {email}

@@ -16,8 +16,7 @@ import {
   organizacoes,
   papeisAcesso,
   papelPermissao,
-  perfilStackValores,
-  perfisStack,
+  stacks,
   configDocumentos,
   pdcaFeedback,
   pdcaUsos,
@@ -88,13 +87,8 @@ beforeEach(async () => {
   // para trás liga o RBAC da organização (SPEC-28 §4.3) e faria todos os
   // outros testes — que assumem o modo aberto — falharem com 403.
   await db.execute(
-    sql`truncate table ${quebras}, ${perfilStackValores}, ${camposNo}, ${convitesTime}, ${auditoria}, ${usuarioPapel}, ${papelPermissao}, ${papeisAcesso}, ${timePapel} cascade`
+    sql`truncate table ${quebras}, ${stacks}, ${camposNo}, ${convitesTime}, ${auditoria}, ${usuarioPapel}, ${papelPermissao}, ${papeisAcesso}, ${timePapel} cascade`
   );
-  // O catálogo de perfis (SPEC-38 F2) não entra no truncate: `times` aponta
-  // pra ele por FK — primeiro solta os ponteiros, depois apaga (os valores
-  // caem pelo ON DELETE CASCADE).
-  await db.update(times).set({ perfilStackId: null });
-  await db.delete(perfisStack);
 });
 
 afterAll(async () => {
@@ -273,59 +267,55 @@ describe("/quebras", () => {
   });
 });
 
-describe("/perfis-time", () => {
-  it("declarar um valor novo (ex.: time trabalha com Java) e ler de volta", async () => {
+describe("/stacks (SPEC-43 — catálogo global, sem vínculo por time)", () => {
+  it("capturar declara uma stack com nome derivado dos valores; sugestões agregam pra todo mundo", async () => {
     const cookie = await logarComo(EMAIL_DEV);
-    const salvar = await app.inject({
-      method: "PUT",
-      url: `/perfis-time/${TIME_A}`,
+    const captura = await app.inject({
+      method: "POST",
+      url: "/stacks/capturar",
       cookies: { gerador_sessao: cookie },
       payload: { tipoNo: "service", valores: { linguagem: "Java" } },
     });
-    expect(salvar.statusCode).toBe(200);
+    expect(captura.statusCode).toBe(200);
+    expect(captura.json().nome).toBe("Java");
+    expect(captura.json().tipoNo).toBe("service");
 
-    const ler = await app.inject({ method: "GET", url: `/perfis-time/${TIME_A}` });
-    expect(ler.json()).toEqual({ service: { linguagem: "Java" } });
+    const sugestoes = (await app.inject({ method: "GET", url: "/stacks/sugestoes" })).json();
+    expect(sugestoes.service.linguagem).toContain("Java");
 
-    const listarTodos = await app.inject({ method: "GET", url: "/perfis-time" });
-    expect(listarTodos.json()).toEqual({ [TIME_A]: { service: { linguagem: "Java" } } });
+    const catalogo = (await app.inject({ method: "GET", url: "/stacks" })).json();
+    expect(catalogo.stacks.some((st: { nome: string }) => st.nome === "Java")).toBe(true);
   });
 
-  it("corrigir um valor já existente sobrescreve, não duplica", async () => {
+  it("editar valor sobrescreve na stack, não duplica", async () => {
     const cookie = await logarComo(EMAIL_DEV);
+    const criada = (
+      await app.inject({ method: "POST", url: "/stacks", cookies: { gerador_sessao: cookie }, payload: { tipoNo: "service", nome: "JVM" } })
+    ).json();
     await app.inject({
-      method: "PUT",
-      url: `/perfis-time/${TIME_A}`,
-      cookies: { gerador_sessao: cookie },
-      payload: { tipoNo: "service", valores: { linguagem: "Java" } },
+      method: "PUT", url: `/stacks/${criada.id}/valores`, cookies: { gerador_sessao: cookie },
+      payload: { valores: { linguagem: "Java" } },
     });
     await app.inject({
-      method: "PUT",
-      url: `/perfis-time/${TIME_A}`,
-      cookies: { gerador_sessao: cookie },
-      payload: { tipoNo: "service", valores: { linguagem: "Kotlin" } },
+      method: "PUT", url: `/stacks/${criada.id}/valores`, cookies: { gerador_sessao: cookie },
+      payload: { valores: { linguagem: "Kotlin" } },
     });
 
-    const ler = await app.inject({ method: "GET", url: `/perfis-time/${TIME_A}` });
-    expect(ler.json()).toEqual({ service: { linguagem: "Kotlin" } });
+    const catalogo = (await app.inject({ method: "GET", url: "/stacks" })).json();
+    const jvm = catalogo.stacks.find((st: { id: string }) => st.id === criada.id);
+    expect(jvm.valores).toEqual({ linguagem: "Kotlin" });
   });
 
-  it("401 sem sessão, 403 quando a sessão não pertence ao time do recurso", async () => {
+  it("401 sem sessão na escrita; leitura é aberta", async () => {
     const semSessao = await app.inject({
-      method: "PUT",
-      url: `/perfis-time/${TIME_A}`,
+      method: "POST",
+      url: "/stacks/capturar",
       payload: { tipoNo: "service", valores: { linguagem: "Java" } },
     });
     expect(semSessao.statusCode).toBe(401);
 
-    const cookieOutro = await logarComo(EMAIL_OUTRO);
-    const outroTime = await app.inject({
-      method: "PUT",
-      url: `/perfis-time/${TIME_A}`,
-      cookies: { gerador_sessao: cookieOutro },
-      payload: { tipoNo: "service", valores: { linguagem: "Java" } },
-    });
-    expect(outroTime.statusCode).toBe(403);
+    expect((await app.inject({ method: "GET", url: "/stacks" })).statusCode).toBe(200);
+    expect((await app.inject({ method: "GET", url: "/stacks/sugestoes" })).statusCode).toBe(200);
   });
 });
 
@@ -1180,17 +1170,16 @@ describe("SPEC-38 Fase 1 — níveis de participação no time", () => {
     const payload = { tipoNo: "service", valores: { linguagem: "Kotlin" } };
 
     const negado = await app.inject({
-      method: "PUT",
-      url: `/perfis-time/${TIME_NIVEIS}`,
+      method: "POST",
+      url: "/stacks/capturar",
       cookies: { gerador_sessao: await logarComo(EMAIL_OPERAR) },
       payload,
     });
     expect(negado.statusCode).toBe(403);
-    expect(negado.json().erro).toContain("owner");
 
     const gravado = await app.inject({
-      method: "PUT",
-      url: `/perfis-time/${TIME_NIVEIS}`,
+      method: "POST",
+      url: "/stacks/capturar",
       cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
       payload,
     });
@@ -1272,7 +1261,7 @@ describe("SPEC-38 Fase 1 — níveis de participação no time", () => {
   });
 });
 
-describe("SPEC-38 Fase 2 — perfis de stack (catálogo apontado pelo time)", () => {
+describe("SPEC-43 — stacks conhecidas (catálogo global, curadoria como na SPEC-38)", () => {
   const TIME_STACK = "time-teste-stack";
   const EMAIL_OPERAR2 = "operar-stack@gerador.local";
 
@@ -1290,23 +1279,24 @@ describe("SPEC-38 Fase 2 — perfis de stack (catálogo apontado pelo time)", ()
     await db.update(usuarioTime).set({ nivel: "owner" }).where(eq(usuarioTime.email, EMAIL_DEV));
   });
 
-  it("catálogo ABERTO (sem papel curador): owner cria perfil; operar leva 403", async () => {
+  it("catálogo ABERTO (sem papel curador): owner cria stack; operar leva 403", async () => {
     const negado = await app.inject({
       method: "POST",
-      url: "/perfis-stack",
+      url: "/stacks",
       cookies: { gerador_sessao: await logarComo(EMAIL_OPERAR2) },
-      payload: { nome: "Node" },
+      payload: { tipoNo: "service", nome: "Node" },
     });
     expect(negado.statusCode).toBe(403);
 
     const criado = await app.inject({
       method: "POST",
-      url: "/perfis-stack",
+      url: "/stacks",
       cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
-      payload: { nome: "Java + Spring Boot" },
+      payload: { tipoNo: "service", nome: "Java + Spring Boot" },
     });
     expect(criado.statusCode).toBe(201);
     expect(criado.json().nome).toBe("Java + Spring Boot");
+    expect(criado.json().tipoNo).toBe("service");
   });
 
   it("curadoria LIGADA (papel com perfis-stack existe): owner comum leva 403; o curador edita — é a exceção ao owner-bypass (D1)", async () => {
@@ -1318,106 +1308,57 @@ describe("SPEC-38 Fase 2 — perfis de stack (catálogo apontado pelo time)", ()
     // EMAIL_DEV é owner — e mesmo assim 403: a curadoria manda.
     const ownerNegado = await app.inject({
       method: "POST",
-      url: "/perfis-stack",
+      url: "/stacks",
       cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
-      payload: { nome: "Kotlin" },
+      payload: { tipoNo: "service", nome: "Kotlin" },
     });
     expect(ownerNegado.statusCode).toBe(403);
     expect(ownerNegado.json().erro).toContain("curadoria");
 
     const curador = await app.inject({
       method: "POST",
-      url: "/perfis-stack",
+      url: "/stacks",
       cookies: { gerador_sessao: await logarComo(EMAIL_OUTRO) },
-      payload: { nome: "Kotlin" },
+      payload: { tipoNo: "service", nome: "Kotlin" },
     });
     expect(curador.statusCode).toBe(201);
   });
 
-  it("trocar de tecnologia é trocar o PONTEIRO: a projeção /perfis-time segue o perfil apontado", async () => {
+  it("sugestões agregam TODAS as stacks do componente — nenhum filtro por time (SPEC-43)", async () => {
     const cookieDev = await logarComo(EMAIL_DEV);
     const java = (
-      await app.inject({ method: "POST", url: "/perfis-stack", cookies: { gerador_sessao: cookieDev }, payload: { nome: "Java" } })
+      await app.inject({ method: "POST", url: "/stacks", cookies: { gerador_sessao: cookieDev }, payload: { tipoNo: "service", nome: "Java" } })
     ).json();
     const node = (
-      await app.inject({ method: "POST", url: "/perfis-stack", cookies: { gerador_sessao: cookieDev }, payload: { nome: "Node" } })
+      await app.inject({ method: "POST", url: "/stacks", cookies: { gerador_sessao: cookieDev }, payload: { tipoNo: "service", nome: "Node" } })
     ).json();
     await app.inject({
-      method: "PUT",
-      url: `/perfis-stack/${java.id}/valores`,
-      cookies: { gerador_sessao: cookieDev },
-      payload: { tipoNo: "service", valores: { linguagem: "Java" } },
+      method: "PUT", url: `/stacks/${java.id}/valores`, cookies: { gerador_sessao: cookieDev },
+      payload: { valores: { linguagem: "Java" } },
     });
     await app.inject({
-      method: "PUT",
-      url: `/perfis-stack/${node.id}/valores`,
-      cookies: { gerador_sessao: cookieDev },
-      payload: { tipoNo: "service", valores: { linguagem: "Node" } },
+      method: "PUT", url: `/stacks/${node.id}/valores`, cookies: { gerador_sessao: cookieDev },
+      payload: { valores: { linguagem: "Node" } },
     });
 
-    await app.inject({
-      method: "PUT",
-      url: `/times/${TIME_STACK}/perfil-stack`,
-      cookies: { gerador_sessao: cookieDev },
-      payload: { perfilStackId: java.id },
-    });
-    let projecao = (await app.inject({ method: "GET", url: "/perfis-time" })).json();
-    expect(projecao[TIME_STACK]).toEqual({ service: { linguagem: "Java" } });
-
-    // O ponteiro troca — o time inteiro passa a projetar o outro perfil, sem
-    // reescrever nada do time.
-    await app.inject({
-      method: "PUT",
-      url: `/times/${TIME_STACK}/perfil-stack`,
-      cookies: { gerador_sessao: cookieDev },
-      payload: { perfilStackId: node.id },
-    });
-    projecao = (await app.inject({ method: "GET", url: "/perfis-time" })).json();
-    expect(projecao[TIME_STACK]).toEqual({ service: { linguagem: "Node" } });
+    const sugestoes = (await app.inject({ method: "GET", url: "/stacks/sugestoes" })).json();
+    expect(sugestoes.service.linguagem).toEqual(expect.arrayContaining(["Java", "Node"]));
   });
 
-  it("apontar o ponteiro é ato de OWNER do time — operar leva 403 mesmo com catálogo aberto", async () => {
+  it("capturar o MESMO ambiente duas vezes não duplica: mescla na stack de nome derivado", async () => {
     const cookieDev = await logarComo(EMAIL_DEV);
-    const perfil = (
-      await app.inject({ method: "POST", url: "/perfis-stack", cookies: { gerador_sessao: cookieDev }, payload: { nome: "Go" } })
-    ).json();
+    const payload = { tipoNo: "service", valores: { linguagem: "Java", framework: "Spring Boot" } };
 
-    const negado = await app.inject({
-      method: "PUT",
-      url: `/times/${TIME_STACK}/perfil-stack`,
-      cookies: { gerador_sessao: await logarComo(EMAIL_OPERAR2) },
-      payload: { perfilStackId: perfil.id },
+    const primeira = await app.inject({
+      method: "POST", url: "/stacks/capturar", cookies: { gerador_sessao: cookieDev }, payload,
     });
-    expect(negado.statusCode).toBe(403);
-  });
+    expect(primeira.statusCode).toBe(200);
+    // Nome derivado dos valores, em ordem natural (linguagem antes de framework).
+    expect(primeira.json().nome).toBe("Java + Spring Boot");
 
-  it("captura sem ponteiro cria 'stack de {time}' e aponta — o botão do painel continua um clique", async () => {
-    const cookieDev = await logarComo(EMAIL_DEV);
-    const captura = await app.inject({
-      method: "PUT",
-      url: `/perfis-time/${TIME_STACK}`,
-      cookies: { gerador_sessao: cookieDev },
-      payload: { tipoNo: "service", valores: { linguagem: "Java", framework: "Spring Boot" } },
-    });
-    expect(captura.statusCode).toBe(200);
-    expect(captura.json()).toEqual({ linguagem: "Java", framework: "Spring Boot" });
-
-    const catalogo = (await app.inject({ method: "GET", url: "/perfis-stack" })).json();
-    const criado = catalogo.perfis.find((p: { nome: string }) => p.nome === `stack de ${TIME_STACK}`);
-    expect(criado).toBeDefined();
-    expect(catalogo.ponteiros[TIME_STACK]).toBe(criado.id);
-
-    // Segunda captura NÃO cria outro perfil: mescla no apontado.
-    await app.inject({
-      method: "PUT",
-      url: `/perfis-time/${TIME_STACK}`,
-      cookies: { gerador_sessao: cookieDev },
-      payload: { tipoNo: "service", valores: { linguagem: "Kotlin" } },
-    });
-    const depois = (await app.inject({ method: "GET", url: "/perfis-stack" })).json();
-    expect(depois.perfis.filter((p: { nome: string }) => p.nome.startsWith("stack de")).length).toBe(1);
-    const projecao = (await app.inject({ method: "GET", url: "/perfis-time" })).json();
-    expect(projecao[TIME_STACK].service).toEqual({ linguagem: "Kotlin", framework: "Spring Boot" });
+    await app.inject({ method: "POST", url: "/stacks/capturar", cookies: { gerador_sessao: cookieDev }, payload });
+    const catalogo = (await app.inject({ method: "GET", url: "/stacks" })).json();
+    expect(catalogo.stacks.filter((st: { nome: string }) => st.nome === "Java + Spring Boot").length).toBe(1);
   });
 });
 
@@ -1465,27 +1406,27 @@ describe("SPEC-38 Fase 3 — papel portado por time (owners herdam)", () => {
     // até owners): o herdeiro cria perfil no catálogo.
     const criaHerdeiro = await app.inject({
       method: "POST",
-      url: "/perfis-stack",
+      url: "/stacks",
       cookies: { gerador_sessao: await logarComo(EMAIL_OWNER_ARQ) },
-      payload: { nome: "Perfil da curadoria" },
+      payload: { tipoNo: "service", nome: "Perfil da curadoria" },
     });
     expect(criaHerdeiro.statusCode).toBe(201);
 
     // Operar do MESMO time não herda (D3: delegação é para quem lida com config).
     const criaOperar = await app.inject({
       method: "POST",
-      url: "/perfis-stack",
+      url: "/stacks",
       cookies: { gerador_sessao: await logarComo(EMAIL_OPERAR_ARQ) },
-      payload: { nome: "não deveria" },
+      payload: { tipoNo: "service", nome: "não deveria" },
     });
     expect(criaOperar.statusCode).toBe(403);
 
     // Owner de OUTRO time, sem o papel: a curadoria continua barrando.
     const criaDev = await app.inject({
       method: "POST",
-      url: "/perfis-stack",
+      url: "/stacks",
       cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
-      payload: { nome: "também não" },
+      payload: { tipoNo: "service", nome: "também não" },
     });
     expect(criaDev.statusCode).toBe(403);
 
@@ -1497,9 +1438,9 @@ describe("SPEC-38 Fase 3 — papel portado por time (owners herdam)", () => {
       .where(and(eq(usuarioTime.email, EMAIL_OWNER_ARQ), eq(usuarioTime.timeId, TIME_PORTADOR)));
     const criaRebaixado = await app.inject({
       method: "POST",
-      url: "/perfis-stack",
+      url: "/stacks",
       cookies: { gerador_sessao: await logarComo(EMAIL_OWNER_ARQ) },
-      payload: { nome: "perdeu" },
+      payload: { tipoNo: "service", nome: "perdeu" },
     });
     expect(criaRebaixado.statusCode).toBe(403);
   });
@@ -1695,19 +1636,20 @@ describe("§184 — a especificação gerada fica salva NA quebra", () => {
 });
 
 describe("auditoria", () => {
-  it("grava quem/quando depois de uma escrita ter sucesso (ex.: perfis-time)", async () => {
+  it("grava quem/quando depois de uma escrita ter sucesso (ex.: capturar stack)", async () => {
     const cookieDev = await logarComo(EMAIL_DEV);
-    await app.inject({
-      method: "PUT",
-      url: `/perfis-time/${TIME_A}`,
+    const captura = await app.inject({
+      method: "POST",
+      url: "/stacks/capturar",
       cookies: { gerador_sessao: cookieDev },
       payload: { tipoNo: "service", valores: { linguagem: "Java" } },
     });
+    const stackId = captura.json().id;
 
     const linha = await esperarLinhaAuditoria(
-      (l) => l.recurso === "perfis_stack" && l.recursoId === TIME_A && l.acao === "capturar"
+      (l) => l.recurso === "stacks" && l.recursoId === stackId && l.acao === "capturar"
     );
-    expect(linha).toMatchObject({ email: EMAIL_DEV, acao: "capturar", recurso: "perfis_stack", recursoId: TIME_A });
+    expect(linha).toMatchObject({ email: EMAIL_DEV, acao: "capturar", recurso: "stacks", recursoId: stackId });
   });
 });
 
@@ -1920,7 +1862,7 @@ describe("SPEC-28 — gestão de acessos", () => {
     // permissão tivesse sido consultada — mediria o portão errado. Foi o que
     // aconteceu na primeira versão deste teste.
     const chamadas = [
-      ["PUT", `/perfis-time/${TIME_B}`, { tipoNo: "service", valores: {} }, "perfis-stack"],
+      ["POST", "/stacks/capturar", { tipoNo: "service", valores: { linguagem: "x" } }, "perfis-stack"],
       ["POST", "/campos-aresta", { tipoAresta: "http", key: "x", label: "X", type: "text" }, "campos-aresta"],
       ["PUT", "/especificacao-template", { conteudo: "oi" }, "especificacao-template"],
       ["PUT", "/ia/credencial", { baseUrl: "https://gw/v1", chave: "k", modelo: "m" }, "credenciais-ia"],

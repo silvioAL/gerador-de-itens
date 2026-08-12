@@ -79,14 +79,14 @@ describe("useTour", () => {
     expect(result.current.passoAtual?.selector).toBe("[data-tour=review-table]");
   });
 
-  it("passa pela aba Perfis de stack antes do fim, abrindo a tela de config na aba certa", () => {
+  it("passa pela aba Stacks conhecidas antes do fim, abrindo a tela de config na aba certa", () => {
     const opts = montarOpts();
     const { result } = renderHook(() => useTour(opts));
 
     act(() => result.current.iniciar());
-    for (let i = 0; i < 8; i++) act(() => result.current.proximo()); // -> passo 8 (Perfis de stack; o 7 é o menu)
+    for (let i = 0; i < 8; i++) act(() => result.current.proximo()); // -> passo 8 (Stacks conhecidas; o 7 é o menu)
 
-    expect(result.current.passoAtual?.titulo).toBe("Perfis de stack");
+    expect(result.current.passoAtual?.titulo).toBe("Stacks conhecidas");
     expect(result.current.passoAtual?.selector).toBe("[data-tour=config-screen-content]");
     expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("perfis");
   });

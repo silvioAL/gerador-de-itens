@@ -124,7 +124,7 @@ export function ConfigScreen({
    */
   const abasVisiveis = (
     [
-      { id: "perfis", rotulo: "Perfis de stack", existe: true },
+      { id: "perfis", rotulo: "Stacks conhecidas", existe: true },
       /**
        * "Campos por tipo de nó" era vocabulário do CÓDIGO: "nó" é jargão de
        * canvas e "campos" não diz o que se ganha. O nome novo é o do próprio
@@ -208,7 +208,7 @@ export function ConfigScreen({
       <div data-testid="corpo-da-aba" style={{ flex: 1, overflow: "auto", padding: 24 }}>
         {abaAtiva === "pdca" && <PdcaTab />}
         {abaAtiva === "perfis" && (
-          <PerfisStackTab config={config} timeAtivo={timeAtivo} onPerfisMudaram={onPerfisMudaram} />
+          <PerfisStackTab config={config} onPerfisMudaram={onPerfisMudaram} />
         )}
         {abaAtiva === "campos" && (
           <CamposNoTab
