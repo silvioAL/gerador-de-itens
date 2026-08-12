@@ -234,6 +234,47 @@ export const timePapel = pgTable(
 );
 
 /**
+ * SPEC-39 — PDCA de configurações. Contador de usos POR USUÁRIO (a cadência
+ * da entrevista é "a cada N usos do mesmo usuário"), feedback livre e as
+ * solicitações de ajuste com versão-alvo (validade da aprovação tardia).
+ */
+export const pdcaUsos = pgTable(
+  "pdca_usos",
+  {
+    email: text("email").notNull(),
+    tipo: text("tipo").notNull(),
+    contagem: integer("contagem").notNull().default(0),
+  },
+  (t) => [uniqueIndex("pdca_usos_chave_unica").on(t.email, t.tipo)]
+);
+
+export const pdcaFeedback = pgTable("pdca_feedback", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email").notNull(),
+  timeId: text("time_id"),
+  texto: text("texto").notNull(),
+  criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** `versaoAlvo` = `config_documentos.atualizadoEm` do recurso no momento do
+ * pedido — se o documento mudar antes da decisão, aprovar invalida (409). */
+export const solicitacoesAjuste = pgTable("solicitacoes_ajuste", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizacaoId: uuid("organizacao_id")
+    .notNull()
+    .references(() => organizacoes.id),
+  timeId: text("time_id"),
+  solicitante: text("solicitante").notNull(),
+  recurso: text("recurso").notNull(),
+  descricao: text("descricao").notNull(),
+  versaoAlvo: timestamp("versao_alvo", { withTimezone: true }),
+  estado: text("estado").notNull().default("pendente"),
+  criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+  decididoPor: text("decidido_por"),
+  decididoEm: timestamp("decidido_em", { withTimezone: true }),
+});
+
+/**
  * Convite de time por link (SPEC-09 §3) — só quem já é do time gera um
  * (`POST /times/:timeId/convites`), qualquer pessoa logada aceita
  * (`POST /convites/:token/aceitar`). Single-use: `usadoPor`/`usadoEm`

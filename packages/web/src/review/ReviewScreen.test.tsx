@@ -255,14 +255,11 @@ describe("ReviewScreen — fixture 01 (sem ciclos/conflitos)", () => {
     expect(onFechar).toHaveBeenCalled();
   });
 
-  it("botão 'Gerar especificação de solução' baixa um único markdown com tudo", async () => {
-    const resultado = resultadoFixture01();
+  it("SPEC-39: a especificação sai pelo AGENTE — o botão morreu; o chip do balão M12 baixa o markdown", async () => {
     const user = userEvent.setup();
-    baixarArquivoTextoMock.mockClear();
-
     render(
       <ReviewScreen
-        resultado={resultado}
+        resultado={resultadoFixture01()}
         diagrama={fixture.quebra.diagrama}
         config={config}
         especificacaoTemplate={templateFixture}
@@ -271,16 +268,17 @@ describe("ReviewScreen — fixture 01 (sem ciclos/conflitos)", () => {
       />
     );
 
-    await user.click(screen.getByRole("button", { name: "Gerar especificação de solução" }));
+    expect(screen.queryByRole("button", { name: "Gerar especificação de solução" })).not.toBeInTheDocument();
 
-    expect(baixarArquivoTextoMock).toHaveBeenCalledOnce();
-    const [conteudo, nomeArquivo, mime] = baixarArquivoTextoMock.mock.calls[0];
-    expect(nomeArquivo).toBe("especificacao-de-solucao.md");
-    expect(mime).toBe("text/markdown");
-    expect(conteudo).toContain("## Itens");
-    for (const a of resultado.atividades) {
-      expect(conteudo).toContain(a.rotulo);
-    }
+    // O M4 (sem modelo, default dos mocks) fala primeiro — dispensado, o M12
+    // assume como a porta da geração.
+    fireEvent.click(within(await screen.findByTestId("balao-sem-ia")).getByRole("button", { name: "Dispensar sugestão" }));
+    // …e o M5 (sem contexto do épico) fala em seguida — dispensado também.
+    fireEvent.click(within(await screen.findByTestId("balao-sem-contexto")).getByRole("button", { name: "Dispensar sugestão" }));
+    await user.click((await screen.findByTestId("balao-gerar")).querySelector('[data-testid="balao-gerar-acao"]') as HTMLElement);
+
+    expect(baixarArquivoTextoMock).toHaveBeenCalled();
+    expect(baixarArquivoTextoMock.mock.calls.at(-1)).toContain("especificacao-de-solucao.md");
   });
 
   it("não existe botão de copiar — a única saída é o download do documento completo", () => {

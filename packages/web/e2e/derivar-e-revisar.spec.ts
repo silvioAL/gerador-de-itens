@@ -95,8 +95,11 @@ test("derivar quebra abre a revisão com a atividade esperada e exporta", async 
   await expect(page.getByText("Backend-mensagens rabbitmq", { exact: true })).toBeVisible();
   await expect(page.getByText("Criar Fila Rabbit.")).toBeVisible();
 
+  // SPEC-39 — o botão do header morreu: a especificação sai pelo agente.
+  // O M5 (sem contexto) fala antes; dispensado, o M12 é a porta da geração.
+  await page.getByTestId("balao-sem-contexto").getByRole("button", { name: "Dispensar sugestão" }).click();
   const downloadMd = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Gerar especificação de solução" }).click();
+  await page.getByTestId("balao-gerar-acao").click();
   const md = await downloadMd;
   expect(md.suggestedFilename()).toBe("especificacao-de-solucao.md");
 

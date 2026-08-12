@@ -4678,3 +4678,33 @@ teto do convite e os papéis portados por time da SPEC-38. O passo "Perfis de
 stack" teve o texto reescrito pro vocabulário novo (catálogo + ponteiro, não
 mais "stack do time"). O E2E do tour passou a contar 12 passos e a asserir a
 aba Membros aberta no passo novo.
+## 183. SPEC-39 — o PDCA das configurações: a ferramenta pergunta o que ela mesma deveria perguntar
+
+A rodada que fecha o lote pré-autorizado. A ideia do usuário: a configuração
+(checklists, regras, campos) não é um artefato parado — é um ciclo, e o
+agente é quem gira a manivela. A cada N usos (config do admin, default 5), o
+balão pergunta no retorno ao canvas: "sentiu falta — ou sobra — de algum
+item de checklist, regra ou campo?", citando as últimas quebras do TIME como
+âncora de memória (M11). Owner responde abrindo a conversa de configuração;
+quem não pode editar descreve o ajuste ali mesmo e o pedido vira
+SOLICITAÇÃO.
+
+A solicitação carrega a **versão-alvo** (`config_documentos.atualizadoEm` do
+recurso no momento do pedido) — porque entre pedido e decisão a config pode
+mudar, e a validade é checada NA decisão: aprovar por cima de um documento
+que já é outro invalida o pedido (409, estado `invalida`, motivo no corpo).
+Quem decide é quem tem a permissão do RECURSO pedido (os dois eixos da
+SPEC-38), pela seção nova da aba Acessos.
+
+O fim do fluxo também virou conversa: o botão "Gerar especificação de
+solução" morreu — a geração sai pelo agente (M7 quando tudo refinado, M12
+como porta nos demais casos), e a cada N gerações (default 3) o balão M13
+coleta feedback livre ("o que faltou ou sobrou?") direto pro `pdca_feedback`.
+
+Mordidas: validade desligada → teste da aprovação tardia vermelho; e a
+cadência tinha um erro ARITMÉTICO meu no teste (6 % 2 = 0, não ≠) que o
+próprio vermelho corrigiu antes de virar código errado. E2E do ciclo inteiro
+com cadência 1: derivar → gerar pelo agente → feedback 201 → entrevista no
+canvas. Fase 2 anotada na SPEC: a solicitação nascer do 403 do
+ConfigurarPanel e a aplicação automática do aprovado.
+

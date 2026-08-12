@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiAcessos, type PapelAcesso } from "../api/client";
+import { apiAcessos, type PapelAcesso, apiPdca, type SolicitacaoAjuste } from "../api/client";
 
 /**
  * SPEC-28 Fase 2 — a aba de acessos.
@@ -22,11 +22,18 @@ export function AcessosTab({ timeAtivo }: { timeAtivo: string }) {
   const [erro, setErro] = useState<string | null>(null);
   const [novoNome, setNovoNome] = useState("");
   const [salvando, setSalvando] = useState(false);
+  // SPEC-39 — as solicitações de ajuste do PDCA (aprovar/rejeitar aqui).
+  const [ajustes, setAjustes] = useState<SolicitacaoAjuste[]>([]);
 
   async function recarregar() {
-    const [lista, minhas] = await Promise.all([apiAcessos.papeis(), apiAcessos.minhas(timeAtivo)]);
+    const [lista, minhas, pedidos] = await Promise.all([
+      apiAcessos.papeis(),
+      apiAcessos.minhas(timeAtivo),
+      apiPdca.listarAjustes().catch(() => []),
+    ]);
     setPapeis(lista);
     setRbacAtivo(minhas.rbacAtivo);
+    setAjustes(pedidos);
   }
 
   useEffect(() => {
@@ -105,6 +112,46 @@ export function AcessosTab({ timeAtivo }: { timeAtivo: string }) {
           Criar papel
         </button>
       </div>
+
+      {/* SPEC-39 — o PDCA desagua aqui: pedidos de quem não pode editar,
+          decididos por quem pode. Aprovar checa a VALIDADE no servidor — se a
+          config mudou desde o pedido, ele vira "invalida" com o motivo. */}
+      {ajustes.length > 0 && (
+        <section data-testid="solicitacoes-de-ajuste" style={{ margin: "12px 0" }}>
+          <strong style={{ fontSize: 13, color: "var(--texto)" }}>Solicitações de ajuste (PDCA)</strong>
+          <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 12.5 }}>
+            {ajustes.map((a) => (
+              <li key={a.id} style={{ marginBottom: 4 }}>
+                <em>{a.recurso}</em> — {a.descricao}{" "}
+                <span style={{ color: "var(--texto-fraco)" }}>
+                  (por {a.solicitante}
+                  {a.timeId ? `, time ${a.timeId}` : ""}) — {a.estado}
+                </span>{" "}
+                {a.estado === "pendente" && (
+                  <>
+                    <button
+                      onClick={() => void executar(() => apiPdca.decidirAjuste(a.id, true))}
+                      disabled={salvando}
+                      style={botaoLinkEstilo}
+                      aria-label={`Aprovar ajuste de ${a.solicitante}`}
+                    >
+                      aprovar
+                    </button>{" "}
+                    <button
+                      onClick={() => void executar(() => apiPdca.decidirAjuste(a.id, false))}
+                      disabled={salvando}
+                      style={botaoLinkEstilo}
+                      aria-label={`Rejeitar ajuste de ${a.solicitante}`}
+                    >
+                      rejeitar
+                    </button>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {papeis === null && !erro && <p style={{ fontSize: 12.5, color: "var(--texto-fraco)" }}>Carregando…</p>}
 

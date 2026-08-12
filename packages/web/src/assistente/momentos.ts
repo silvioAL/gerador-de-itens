@@ -27,7 +27,7 @@ export function momentoDoCanvas(p: {
   return null;
 }
 
-export type MomentoDaRevisao = "m4" | "m5" | "m7" | null;
+export type MomentoDaRevisao = "m4" | "m5" | "m7" | "m12" | null;
 
 export function momentoDaRevisao(p: {
   semModeloDeIa: boolean;
@@ -48,6 +48,9 @@ export function momentoDaRevisao(p: {
   if (p.demandInfoVazio && p.revisaoIntocada && !p.dispensados.includes("m5")) return "m5";
   // M7 — tudo refinado: fechar o ciclo na especificação.
   if (p.tudoRefinado && !p.dispensados.includes("m7")) return "m7";
+  // M12 (SPEC-39) — sem botão de gerar no header, o agente é a porta da
+  // especificação também fora do "tudo refinado".
+  if (!p.tudoRefinado && !p.dispensados.includes("m12")) return "m12";
   return null;
 }
 
