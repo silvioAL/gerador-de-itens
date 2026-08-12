@@ -10,6 +10,9 @@ export interface MenuLateralProps {
   aberto: boolean;
   onFechar: () => void;
   timeAtivo: string;
+  /** SPEC-42 — nome do perfil de stack que o time ativo aponta (null = sem
+   * perfil). Informativo: a stack NÃO é o time, é o ponteiro dele. */
+  stackDoTimeAtivo: string | null;
   timeIds: string[];
   email: string;
   onTrocarTime: (timeId: string) => void;
@@ -54,6 +57,7 @@ export function MenuLateral({
   aberto,
   onFechar,
   timeAtivo,
+  stackDoTimeAtivo,
   timeIds,
   email,
   onTrocarTime,
@@ -111,10 +115,10 @@ export function MenuLateral({
         <div style={{ flex: 1 }} />
         <div style={rodapeEstilo}>
           <label style={{ fontSize: 11, color: "var(--texto-fraco)", display: "block", marginBottom: 4 }}>
-            Time (stack conhecida)
+            Time
           </label>
           <select
-            aria-label="Time (stack conhecida)"
+            aria-label="Time"
             value={timeAtivo}
             onChange={(e) => onTrocarTime(e.target.value)}
             style={seletorTimeEstilo}
@@ -125,6 +129,11 @@ export function MenuLateral({
               </option>
             ))}
           </select>
+          {/* time ≠ stack (SPEC-42): a stack aparece como consequência do
+              ponteiro do time, nunca como sinônimo dele. */}
+          <span style={{ fontSize: 11, color: "var(--texto-mudo)", display: "block", marginTop: 4 }} data-testid="stack-do-time-menu">
+            stack: {stackDoTimeAtivo ?? "sem perfil apontado"}
+          </span>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
             <span style={{ fontSize: 11, color: "var(--texto-mudo)", overflow: "hidden", textOverflow: "ellipsis" }}>
               {email}

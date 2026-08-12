@@ -102,9 +102,11 @@ test("perfil de stack do time sugere linguagem/framework do serviço", async ({ 
 
   await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: /Perfis de stack/ }).click();
-  const cardTimePagamentos = page.locator("div", { has: page.getByText("time-pagamentos", { exact: true }) }).last();
-  await expect(cardTimePagamentos).toBeVisible();
-  await expect(cardTimePagamentos.getByText("linguagem:", { exact: false })).toBeVisible();
+  // SPEC-42: a captura gravou no PERFIL que time-pagamentos aponta — o card é
+  // do perfil, com o badge "usado por" dizendo quem o usa.
+  const telaConfig = page.locator('[data-tour="config-screen-content"]');
+  await expect(telaConfig.getByText(/usado por: .*time-pagamentos/).first()).toBeVisible();
+  await expect(telaConfig.getByText("linguagem:", { exact: false }).first()).toBeVisible();
   await page.getByRole("button", { name: "Voltar ao canvas" }).click();
 
   await page.screenshot({ path: "e2e/screenshots/perfil-time.png", fullPage: true });

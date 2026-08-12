@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import type { DiagramaConfig, PerfisConfig } from "@gerador/engine";
+import type { DiagramaConfig } from "@gerador/engine";
 import type { CampoAresta, CampoNo, ConfigPipelineAgentes, DadosCampoAresta, DadosCampoNo, EspecificacaoTemplate } from "../api/client";
-import { PerfisTimeTab } from "../demo/PerfisTimeTab";
+import { PerfisStackTab } from "./PerfisStackTab";
 import { CamposNoTab } from "./CamposNoTab";
 import { CamposArestaTab } from "./CamposArestaTab";
 import { MembrosTab } from "./MembrosTab";
@@ -26,7 +26,6 @@ export type AbaConfig =
 
 export interface ConfigScreenProps {
   config: DiagramaConfig;
-  perfisTime: PerfisConfig;
   camposNo: CampoNo[];
   camposAresta: CampoAresta[];
   especificacaoTemplate: EspecificacaoTemplate;
@@ -34,7 +33,6 @@ export interface ConfigScreenProps {
   timeAtivo: string;
   /** false no modo local (CLI) — sem servidor não existe conceito de outros
    * membros pra administrar; a aba não faz sentido. */
-  onEditarValorPerfilTime: (timeId: string, tipoNo: string, campo: string, valor: string) => void;
   /** SPEC-38 F2 — apontar/trocar perfil de stack muda a projeção; o App recarrega. */
   onPerfisMudaram: () => void;
   onCriarCampoNo: (dados: DadosCampoNo) => Promise<void>;
@@ -76,13 +74,11 @@ function podeVerAba(id: AbaConfig, pode: (recurso: string, acao?: string) => boo
  */
 export function ConfigScreen({
   config,
-  perfisTime,
   camposNo,
   camposAresta,
   especificacaoTemplate,
   pipelineAgentes,
   timeAtivo,
-  onEditarValorPerfilTime,
   onPerfisMudaram,
   onCriarCampoNo,
   onAtualizarCampoNo,
@@ -128,7 +124,7 @@ export function ConfigScreen({
    */
   const abasVisiveis = (
     [
-      { id: "perfis", rotulo: `Perfis de stack (${Object.keys(perfisTime).length} do time)`, existe: true },
+      { id: "perfis", rotulo: "Perfis de stack", existe: true },
       /**
        * "Campos por tipo de nó" era vocabulário do CÓDIGO: "nó" é jargão de
        * canvas e "campos" não diz o que se ganha. O nome novo é o do próprio
@@ -212,7 +208,7 @@ export function ConfigScreen({
       <div data-testid="corpo-da-aba" style={{ flex: 1, overflow: "auto", padding: 24 }}>
         {abaAtiva === "pdca" && <PdcaTab />}
         {abaAtiva === "perfis" && (
-          <PerfisTimeTab perfisTime={perfisTime} config={config} timeAtivo={timeAtivo} onEditarValor={onEditarValorPerfilTime} onPerfisMudaram={onPerfisMudaram} />
+          <PerfisStackTab config={config} timeAtivo={timeAtivo} onPerfisMudaram={onPerfisMudaram} />
         )}
         {abaAtiva === "campos" && (
           <CamposNoTab

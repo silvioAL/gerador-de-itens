@@ -32,6 +32,8 @@ import {
   apiPdca,
   apiItensGerados,
   type ItemGerado,
+  apiPerfisStack,
+  type PerfilStackCatalogo,
 } from "./api/client";
 import { useSessao } from "./auth/useSessao";
 import { LoginScreen } from "./auth/LoginScreen";
@@ -334,6 +336,15 @@ function AppCarregado({
   // verdade é o server (persistem por quebra); o estado local é o espelho da
   // última geração/carga desta sessão.
   const [itensGerados, setItensGerados] = useState<ItemGerado[]>([]);
+  // SPEC-42 — o catálogo de stacks e os ponteiros: o menu informa a stack do
+  // time ativo sem equipará-la ao time (time ≠ stack).
+  const [catalogoStack, setCatalogoStack] = useState<{
+    perfis: PerfilStackCatalogo[];
+    ponteiros: Record<string, string>;
+  } | null>(null);
+  useEffect(() => {
+    apiPerfisStack.catalogo().then(setCatalogoStack).catch(() => {});
+  }, [timeAtivo]);
   const [menuAberto, setMenuAberto] = useState(false);
   const [mostrarAbrir, setMostrarAbrir] = useState(false);
   // #298 — a conversa do desenho (SPEC-27 Fase 1) e o contexto do épico moram
@@ -577,12 +588,6 @@ function AppCarregado({
     void atualizarPerfisTime(quebra.time, tipoNo, valores);
   }
 
-  /** Corrige um valor já capturado (ex.: time migrou de Java 11 pra 17) — não inventa
-   * campo novo, só edita um que já existe porque alguém o capturou de um nó real antes. */
-  function editarValorPerfilTime(timeId: string, tipoNo: string, campo: string, valor: string) {
-    void atualizarPerfisTime(timeId, tipoNo, { [campo]: valor });
-  }
-
   /** Compartilhado entre o <select> (sessão hospedada) e o <input> de texto
    * livre (modo local) do campo "Time" do header — trocar sempre atualiza os
    * dois: o time da quebra em si e o timeAtivo (que dirige sugestões e campos
@@ -776,6 +781,9 @@ function AppCarregado({
         aberto={menuAberto}
         onFechar={() => setMenuAberto(false)}
         timeAtivo={quebra.time ?? timeAtivo}
+        stackDoTimeAtivo={
+          catalogoStack?.perfis.find((p) => p.id === catalogoStack.ponteiros[quebra.time ?? timeAtivo])?.nome ?? null
+        }
         timeIds={sessao.timeIds}
         email={sessao.email}
         onTrocarTime={aoMudarTime}
@@ -891,14 +899,15 @@ function AppCarregado({
       {mostrarConfig && (
         <ConfigScreen
           config={diagramaConfig}
-          perfisTime={perfisTime}
           camposNo={camposNo}
           camposAresta={camposAresta}
           especificacaoTemplate={especificacaoTemplate}
           pipelineAgentes={pipelineAgentes}
           timeAtivo={timeAtivo}
-          onEditarValorPerfilTime={editarValorPerfilTime}
-          onPerfisMudaram={() => void apiPerfisTime.listar().then(setPerfisTime)}
+          onPerfisMudaram={() => {
+            void apiPerfisTime.listar().then(setPerfisTime);
+            apiPerfisStack.catalogo().then(setCatalogoStack).catch(() => {});
+          }}
           onSalvarEspecificacaoTemplate={salvarEspecificacaoTemplate}
           onSalvarPipelineAgentes={salvarPipelineAgentes}
           onCriarCampoNo={criarCampoNo}
