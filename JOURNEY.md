@@ -4733,3 +4733,18 @@ REABRE — congelada na chegada, senão gerar a especificação durante a sessã
 reabria o chat por cima do que a pessoa estava fazendo (o clique de "Voltar
 ao canvas" ficou interceptado até o teste denunciar).
 
+## 185. A terceira janela sem microfone
+
+Achado de uso real com print: a conversa de Configurações prometia "por
+texto ou por voz (🎤)" na fala inicial — e o botão de falar não existia. O
+comentário do próprio `useVozNaEntrada` (SPEC-30) descreve a armadilha:
+"existem DUAS janelas de conversa; plugar o botão só na primeira teria
+entregado a feature no lugar que ninguém pediu". O ConfigurarPanel é a
+TERCEIRA janela, nascida depois do hook — e repetiu a armadilha que o hook
+existia para evitar.
+
+O conserto são as três linhas que o hook prometia: `useVozNaEntrada` +
+`BotaoFalar` no rodapé, mesma regra de capacidade (`/ia/status` diz se o
+provedor transcreve; sem transcrição, sem botão). Testes no padrão do
+`JanelaConversa.voz.test` — aparece quando transcreve, some quando não —
+com mordida provada (botão desligado → vermelho).

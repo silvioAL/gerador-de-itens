@@ -6,12 +6,13 @@ import { PAPEIS_PADRAO } from "../api/client";
 
 const configurarMock = vi.hoisted(() => vi.fn());
 const sugerirConfigMock = vi.hoisted(() => vi.fn());
+const statusIaMock = vi.hoisted(() => vi.fn().mockResolvedValue({ capacidades: {} }));
 const minhasMock = vi.hoisted(() => vi.fn());
 const regrasObterMock = vi.hoisted(() => vi.fn());
 const regrasSalvarMock = vi.hoisted(() => vi.fn());
 vi.mock("../api/client", async (importActual) => ({
   ...(await importActual<typeof import("../api/client")>()),
-  apiIa: { configurar: configurarMock, sugerirConfig: sugerirConfigMock },
+  apiIa: { configurar: configurarMock, sugerirConfig: sugerirConfigMock, status: statusIaMock, transcrever: vi.fn() },
   apiAcessos: { minhas: minhasMock },
   apiRegras: { obter: regrasObterMock, salvar: regrasSalvarMock },
 }));
@@ -201,5 +202,20 @@ describe("ConfigurarPanel (SPEC-34 Fase 1 — configurar conversando)", () => {
     await waitFor(() => expect(screen.getByText("Em qual tipo de componente isso vale?")).toBeInTheDocument());
     expect(sugerirConfigMock).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Aplicar" })).not.toBeInTheDocument();
+  });
+});
+
+describe("ConfigurarPanel — botão de falar (SPEC-30, achado real: a fala prometia voz e o botão não existia)", () => {
+  it("aparece quando o provedor transcreve — mesma regra das outras duas janelas de conversa", async () => {
+    statusIaMock.mockResolvedValue({ capacidades: { transcricao: true } });
+    montar();
+    expect(await screen.findByTestId("voz-falar")).toBeTruthy();
+  });
+
+  it("não aparece quando o provedor não transcreve", async () => {
+    statusIaMock.mockResolvedValue({ capacidades: { transcricao: false } });
+    montar();
+    await waitFor(() => expect(statusIaMock).toHaveBeenCalled());
+    expect(screen.queryByTestId("voz-falar")).toBeNull();
   });
 });
