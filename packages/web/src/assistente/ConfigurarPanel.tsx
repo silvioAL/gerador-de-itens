@@ -14,6 +14,8 @@ import {
   type PapelConfigurado,
 } from "../api/client";
 import { usePermissoes } from "../auth/usePermissoes";
+import { BotaoFalar } from "../conversa/BotaoFalar";
+import { useVozNaEntrada } from "../conversa/useVozNaEntrada";
 
 export interface ConfigurarPanelProps {
   config: DiagramaConfig;
@@ -119,6 +121,11 @@ export function ConfigurarPanel({
     },
   ]);
   const [entrada, setEntrada] = useState("");
+  // SPEC-30 — o MESMO hook das outras duas janelas de conversa. Achado real:
+  // a fala inicial prometia voz (🎤) e o botão não existia — exatamente a
+  // armadilha que o comentário do useVozNaEntrada descreve ("duas janelas"),
+  // repetida na terceira janela, que nasceu depois dele.
+  const { podeFalar, gravacao } = useVozNaEntrada(setEntrada, { config });
   const [pensando, setPensando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const fimRef = useRef<HTMLDivElement>(null);
@@ -422,6 +429,7 @@ export function ConfigurarPanel({
           aria-label="Descreva o que configurar"
           style={entradaEstilo}
         />
+        {podeFalar && <BotaoFalar gravacao={gravacao} />}
         <button onClick={() => void enviar()} disabled={pensando || !entrada.trim()} style={botaoEnviarEstilo}>
           {pensando ? "pensando…" : "Enviar"}
         </button>
