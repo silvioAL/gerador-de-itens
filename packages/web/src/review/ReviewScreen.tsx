@@ -661,14 +661,6 @@ export function ReviewScreen({
             ⚠ {totalDesatualizados} {totalDesatualizados === 1 ? "campo desatualizado" : "campos desatualizados"}
           </span>
         )}
-        <button
-          data-testid="abrir-conversa-especificacao"
-          onClick={() => setMostrarConversa(true)}
-          style={botaoEstilo}
-          title="Peça a alteração de um item e depois mande revisar os que dependem dele"
-        >
-          ✦ Refinar conversando
-        </button>
         {achados.length > 0 && (
           <button
             data-testid="abrir-revisor"
@@ -1093,6 +1085,42 @@ export function ReviewScreen({
           onFechar={() => setMostrarConversa(false)}
         />
       )}
+      {/* O mesmo bubble do resto do produto (#298), adaptado à revisão: abre o
+          chat de refinamento, que é POR item — sem item selecionado, o clique
+          seleciona o primeiro (a conversa precisa de um alvo). Substitui o
+          botão "✦ Refinar conversando" que morava no header. zIndex 62: acima
+          da própria JanelaConversa (60), senão a janela aberta cobriria o
+          botão que a fecha. */}
+      <button
+        className="assistente-fab"
+        data-testid="abrir-conversa-especificacao"
+        onClick={() => {
+          if (!atividadeSelecionada && resultado.atividades.length > 0) {
+            setSelecionada(resultado.atividades[0].chave);
+          }
+          setMostrarConversa((v) => !v);
+        }}
+        aria-label="Refinar conversando"
+        aria-expanded={mostrarConversa}
+        title={
+          mostrarConversa
+            ? undefined
+            : "Refinar conversando: peça a alteração de um item e depois mande revisar os que dependem dele."
+        }
+        style={fabRefinarEstilo}
+      >
+        <span
+          style={{
+            fontSize: 20,
+            lineHeight: 1,
+            transition: "transform 200ms cubic-bezier(0.2, 0.7, 0.3, 1)",
+            transform: mostrarConversa ? "rotate(135deg)" : "none",
+          }}
+          aria-hidden="true"
+        >
+          {mostrarConversa ? "+" : "✦"}
+        </span>
+      </button>
       {mostrarSimulacao && (
         <SimulacaoEsteira
           // `false` = a fila que "Gerar de novo" usaria: exatamente o que a
@@ -1863,6 +1891,26 @@ const textareaEstilo: React.CSSProperties = {
   fontFamily: "inherit",
   resize: "vertical",
   boxSizing: "border-box",
+};
+
+/** O mesmo desenho do bubble do App (AssistenteFlutuante) — cor, tamanho e
+ * hover vêm da classe `.assistente-fab`; aqui só o empilhamento muda. */
+const fabRefinarEstilo: React.CSSProperties = {
+  position: "fixed",
+  right: 20,
+  bottom: 20,
+  width: 48,
+  height: 48,
+  borderRadius: "50%",
+  border: "1px solid var(--acento-indigo)",
+  background: "var(--acento-indigo)",
+  color: "#fff",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  boxShadow: "0 6px 20px rgba(0, 0, 0, 0.45)",
+  zIndex: 62,
 };
 
 const botaoEstilo: React.CSSProperties = {

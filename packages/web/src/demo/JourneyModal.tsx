@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import type { DiagramaConfig, No, Quebra } from "@gerador/engine";
 import type { Cenario } from "./scenarios";
 import { ImportarGraphify } from "./ImportarGraphify";
-import { FakeTerminal } from "./FakeTerminal";
 import { Jornada } from "./Jornada";
 
 // "perfis" saiu daqui pra ConfigScreen.tsx — é config recorrente de time, não
 // onboarding/demo (ver SPEC-08 §3.5).
-export type AbaJornada = "jornada" | "cenarios" | "graphify" | "cli";
+// A aba "cli" morreu com o modo local (SPEC-33) — a revisão geral da demo
+// (pedido do usuário: "fala de CLI, que nem temos mais") tirou o resto.
+export type AbaJornada = "jornada" | "cenarios" | "graphify";
 
 export interface JourneyModalProps {
   config: DiagramaConfig;
@@ -111,9 +112,6 @@ export function JourneyModal({
           <button onClick={() => setAba("graphify")} style={aba === "graphify" ? abaAtivaEstilo : abaEstilo}>
             Importar do Graphify
           </button>
-          <button onClick={() => setAba("cli")} style={aba === "cli" ? abaAtivaEstilo : abaEstilo}>
-            Linha de comando
-          </button>
         </div>
 
         <div style={{ flex: 1, overflow: "auto", padding: 24 }}>
@@ -121,7 +119,6 @@ export function JourneyModal({
           {aba === "cenarios" && (
             <Cenarios cenarios={cenarios} config={config} onCarregar={carregar} onAdicionar={onAdicionarCenario} />
           )}
-          {aba === "cli" && <LinhaComando />}
           {aba === "graphify" && <ImportarGraphify onImportar={onImportarGraphify} />}
         </div>
       </div>
@@ -129,59 +126,6 @@ export function JourneyModal({
   );
 }
 
-
-interface ComandoCli {
-  comando: string;
-  quando: string;
-}
-
-const COMANDOS_CLI: ComandoCli[] = [
-  { comando: "gerador init", quando: "Começar um projeto novo — cria config/ de exemplo, nunca sobrescreve o que já existir." },
-  { comando: "gerador derive <quebra.json>", quando: "Gerar os itens a partir de um diagrama já pronto, sem abrir o browser." },
-  {
-    comando: "gerador implementar <quebra.json>",
-    quando: "Gerar a especificação de solução da quebra inteira — documento único com todos os itens, especificação técnica e refinamento — pronto pra ser o input de outro agente.",
-  },
-  { comando: "gerador open", quando: "Abrir o editor visual servindo o build já pronto, sem depender de npm run dev." },
-  {
-    comando: "gerador import-graphify <graph.json>",
-    quando: "Rascunhar nós existente/extraído a partir de um projeto já mapeado pelo Graphify.",
-  },
-];
-
-function LinhaComando() {
-  return (
-    <div>
-      <p style={{ fontSize: 13, color: "var(--texto-2)", lineHeight: 1.5, marginTop: 0, maxWidth: 640 }}>
-        Tudo isso também roda sem abrir o browser — direto no terminal. O app web é uma forma de usar a ferramenta,
-        não a única. Instala uma vez com{" "}
-        <code>npm install -g gerador-de-itens</code> (publicado no npm, mesmo mecanismo do Graphify — sem precisar
-        clonar repositório nenhum) e o comando <code>gerador</code> fica disponível em qualquer projeto.
-      </p>
-
-      <FakeTerminal />
-
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, marginTop: 18 }}>
-        <thead>
-          <tr style={{ textAlign: "left", borderBottom: "2px solid var(--borda)" }}>
-            <th style={{ padding: "6px 8px", color: "var(--texto-2)" }}>Comando</th>
-            <th style={{ padding: "6px 8px", color: "var(--texto-2)" }}>Quando usar</th>
-          </tr>
-        </thead>
-        <tbody>
-          {COMANDOS_CLI.map((c) => (
-            <tr key={c.comando} style={{ borderBottom: "1px solid var(--borda)" }}>
-              <td style={{ padding: "8px", fontFamily: "ui-monospace, Menlo, Consolas, monospace", whiteSpace: "nowrap" }}>
-                {c.comando}
-              </td>
-              <td style={{ padding: "8px", color: "var(--texto-2)" }}>{c.quando}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 const ROTULO_CATEGORIA: Record<Cenario["categoria"], string> = {
   demo: "demo",

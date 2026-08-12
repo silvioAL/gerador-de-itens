@@ -46,8 +46,18 @@ test("derivar quebra abre a revisão com a atividade esperada e exporta", async 
   // esquerda + ficha à direita (SPEC-24). O texto de vazio é o que prova que a
   // ficha só aparece depois da escolha.
   await expect(page.getByText("Selecione um item na lista")).toBeVisible();
-  await page.locator('[data-testid^="item-"]').first().click();
+
+  // O chat de refinamento abre pelo bubble flutuante (mesmo esquema do #298),
+  // que substituiu o botão "✦ Refinar conversando" do header — e sem item
+  // selecionado o clique seleciona o primeiro, porque a conversa é POR item.
+  await page.getByTestId("abrir-conversa-especificacao").click();
+  await expect(page.getByTestId("conversa-especificacao")).toBeVisible();
   await expect(page.getByText("Selecione um item na lista")).not.toBeVisible();
+  // O mesmo bubble fecha (vira ×) — e devolve a tela como estava.
+  await page.getByTestId("abrir-conversa-especificacao").click();
+  await expect(page.getByTestId("conversa-especificacao")).toHaveCount(0);
+
+  await page.locator('[data-testid^="item-"]').first().click();
   // O que o nó era no canvas chega classificado na ficha: o tipo virou tech e
   // contexto, e é isso que depois seleciona as regras de refinamento. Sem este
   // elo a ficha seria um formulário vazio com um número em cima.

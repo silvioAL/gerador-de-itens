@@ -32,8 +32,8 @@ async function buscarJson<T>(caminho: string): Promise<T> {
  * projeto e listá-lo em config/cenarios/index.json, nunca mudar código do
  * app e rebuildar.
  *
- * Índice ausente (404) degrada pra lista vazia — um projeto recém-criado via
- * `gerador init` não tem config/cenarios/ ainda, e isso não é um erro, é só
+ * Índice ausente (404) degrada pra lista vazia — uma instalação recém-criada
+ * pode não ter config/cenarios/ ainda, e isso não é um erro, é só
  * "sem cenários por enquanto". Qualquer outra falha (HTTP 500, JSON inválido,
  * um arquivo listado que não existe) continua falhando alto — index.json
  * existir e apontar pra algo quebrado é config incorreta de verdade.

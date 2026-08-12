@@ -4304,3 +4304,40 @@ remover, a causa da má impressão perdeu o objeto. Fica só o registro honesto:
 os testes todos passavam e a validação de produção também; o que quer que
 tenha incomodado, os instrumentos não mediam. Feature verde que não convence
 no uso é feedback tão real quanto defeito.
+
+## 169. A demo para de vender uma CLI morta, e o refinar conversando vira bubble
+
+Três pedidos numa mensagem: o fluxo do template de especificação constando em
+E2E e na demonstração; uma revisão geral da demo (*"fala de CLI, que nem temos
+mais"*); e o chat da revisão de quebra migrando do botão de header para o
+mesmo bubble flutuante do resto do produto.
+
+**A demo estava vendendo um produto que não existe.** Nove meses depois do
+`npm install -g` sair do README (§157), a demonstração ainda ensinava:
+a aba "Linha de comando" da jornada com tabela de cinco comandos da CLI, o
+passo 11 do tour com o mesmo texto, o terminal animado que digitava
+`npm install -g gerador-de-itens` na demo automática, a mensagem de erro do
+`loadConfig` mandando rodar `gerador init`, e o passo 5 da jornada prometendo
+"apoio de IA local". Tudo fora. O tour foi de 12 para 11 passos; os
+componentes `TerminalAnimado` e `FakeTerminal` morreram sem órfãos. E o
+pedido de "constar na demonstração" o template já estava atendido — o passo
+"Modelo da especificação de solução" abre exatamente a aba do print; o que
+faltava era o resto da demo não desmentir o produto.
+
+**O E2E do template deixou de só bloquear.** O teste da SPEC-35 cancelava no
+fim; agora salva de verdade, sai da tela, volta e confere a persistência —
+restaurando o template vigente da organização no fim. E o template do teste
+mantém `{{titulo}}` de propósito: o tour afirma essa variável nessa mesma aba
+em outro worker, e um template global sem ela abriria a corrida da §162 pela
+terceira vez. Prever a corrida antes de rodar já é o padrão pagando.
+
+**O bubble chegou à revisão.** O botão "✦ Refinar conversando" saiu do header;
+o gatilho é o mesmo bubble do #298 (zIndex acima da própria janela de
+conversa, senão a janela aberta cobriria o botão que a fecha). Adaptação à
+tela: a conversa é POR item — sem item selecionado, o clique seleciona o
+primeiro, em vez do comportamento antigo de não abrir nada em silêncio.
+
+Duas mordidas de uma tacada só, cada defeito no seu spec: o bubble sem a
+seleção automática deixou o E2E da revisão vermelho; o salvar que não salva
+deixou a persistência do template vermelha. 359 no web, 41/41 no navegador,
+jornada validada em produção sem a aba de CLI.

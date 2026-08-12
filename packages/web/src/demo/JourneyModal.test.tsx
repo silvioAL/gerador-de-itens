@@ -141,34 +141,6 @@ describe("JourneyModal", () => {
     expect(screen.getByText("✓ Adicionado")).toBeInTheDocument();
   });
 
-  it("troca para a aba Linha de comando e mostra o terminal simulado + tabela de comandos", async () => {
-    const user = userEvent.setup();
-    render(
-      <JourneyModal
-        config={config}
-        cenarios={cenarios}
-        onFechar={vi.fn()}
-        onCarregarCenario={vi.fn()}
-        onAdicionarCenario={vi.fn()}
-        onImportarGraphify={vi.fn()}
-        onIniciarTour={vi.fn()}
-        onIniciarDemoAutomatica={vi.fn()}
-      />
-    );
-
-    await user.click(screen.getByRole("button", { name: "Linha de comando" }));
-
-    // "gerador init" (e as demais) aparecem tanto no terminal simulado quanto
-    // na tabela de comandos — daí getAllByText em vez de getByText.
-    expect(screen.getAllByText("gerador init").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText(/gerador derive/).length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText(/gerador implementar/).length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText(/gerador open/).length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText(/gerador import-graphify/).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/npm install -g gerador-de-itens/).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/também roda sem abrir o browser/)).toBeInTheDocument();
-  });
-
   it("troca para a aba Importar do Graphify e mostra a explicação do fluxo", async () => {
     const user = userEvent.setup();
     render(

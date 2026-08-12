@@ -52,7 +52,7 @@ export function ImportarGraphify({ onImportar }: ImportarGraphifyProps) {
         setEstado({
           tipo: "erro",
           mensagem:
-            'config/graphify-mapping.json não encontrado — rode "gerador init" ou crie um mapeamento de padrão de arquivo para tipo de nó antes de importar.',
+            "config/graphify-mapping.json não encontrado — crie um mapeamento de padrão de arquivo para tipo de nó (há um exemplo em config/graphify-mapping.example.json) antes de importar.",
         });
         return;
       }
