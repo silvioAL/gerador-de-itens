@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { CAMPO_GLOBAL, criarCasosDeUsoDeConfig, ehChaveConfig, type ChaveConfig } from "@gerador/aplicacao";
+import { CAMPO_GLOBAL, ConfigInvalida, criarCasosDeUsoDeConfig, ehChaveConfig, type ChaveConfig } from "@gerador/aplicacao";
 import type { OpcoesApp } from "../app.js";
 import { criarRepositorioDeConfigEmPostgres } from "../adaptadores/configEmPostgres.js";
 import { exigirSessao } from "../auth/middleware.js";
@@ -114,7 +114,16 @@ export async function registrarRotasConfig(app: FastifyInstance, { db, diretorio
       });
     }
 
-    const salvo = await casos.salvar(chave, corpo.documento, versaoAtual, corpo.timeId ?? CAMPO_GLOBAL);
+    // SPEC-35 — validação de escrita vira 400 com o motivo. Antes disto,
+    // `ConfigInvalida` (ex.: regras sem `porTech`) estourava como 500 aqui:
+    // a rota nunca a capturava, e o motivo escrito morria no log.
+    let salvo;
+    try {
+      salvo = await casos.salvar(chave, corpo.documento, versaoAtual, corpo.timeId ?? CAMPO_GLOBAL);
+    } catch (erro) {
+      if (erro instanceof ConfigInvalida) return reply.code(400).send({ erro: erro.message });
+      throw erro;
+    }
     registrarAuditoria(db, {
       email: req.usuario!.email,
       acao: "atualizar",

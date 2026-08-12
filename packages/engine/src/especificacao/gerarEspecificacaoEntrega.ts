@@ -286,6 +286,53 @@ export function validarTemplate(template: string): string[] {
 }
 
 /**
+ * SPEC-35 — sem `{{itens}}` não há leitura válida de um template de
+ * especificação: o documento sairia sem o corpo. As demais variáveis são
+ * recomendadas — template enxuto é escolha legítima, mas dita em voz alta.
+ */
+export const VARIAVEIS_OBRIGATORIAS_ESPECIFICACAO = ["itens"] as const;
+
+/** A consequência de cada ausência, em português — é o "motivo" que o usuário
+ * pediu para ver, e mora aqui para borda e tela dizerem a MESMA frase. */
+const CONSEQUENCIA_DA_AUSENCIA: Record<(typeof VARIAVEIS_ESPECIFICACAO)[number], string> = {
+  titulo: "o documento sai sem título",
+  contexto: "o texto do Contexto do épico não entra no documento",
+  historiaPo: "a visão geral escrita pelo PO não entra no documento",
+  itens: "o documento sai SEM os itens da quebra — os itens são o corpo do documento",
+  definitionOfReady: "a seção Definition of Ready não entra no documento",
+  definitionOfDone: "a seção Definition of Done não entra no documento",
+};
+
+export interface ProblemasDoTemplate {
+  /** Bloqueiam o salvamento — a borda recusa com 400 e estas frases. */
+  erros: string[];
+  /** Salvam, mas a pessoa precisa saber o que deixa de sair no documento. */
+  avisos: string[];
+}
+
+/** SPEC-35 — a validação única que borda e tela importam (nunca reimplementam). */
+export function problemasDoTemplate(template: string): ProblemasDoTemplate {
+  const erros: string[] = [];
+  const avisos: string[] = [];
+
+  for (const v of validarTemplate(template)) {
+    erros.push(
+      `{{${v}}} não existe — o motor não sabe preenchê-la (válidas: ${VARIAVEIS_ESPECIFICACAO.map((x) => `{{${x}}}`).join(", ")})`
+    );
+  }
+
+  const usadas = extrairVariaveis(template);
+  for (const v of VARIAVEIS_ESPECIFICACAO) {
+    if (usadas.includes(v)) continue;
+    const frase = `sem {{${v}}}, ${CONSEQUENCIA_DA_AUSENCIA[v]}`;
+    if ((VARIAVEIS_OBRIGATORIAS_ESPECIFICACAO as readonly string[]).includes(v)) erros.push(frase);
+    else avisos.push(frase);
+  }
+
+  return { erros, avisos };
+}
+
+/**
  * Renderiza uma atividade como seção do documento (SPEC-14 §4) — não é
  * template editável pelo usuário, só a estrutura de fora é (título/contexto/
  * visão geral/DoR/DoD). Especificação técnica, refinamento e critérios de

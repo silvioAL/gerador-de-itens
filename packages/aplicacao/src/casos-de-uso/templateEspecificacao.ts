@@ -1,14 +1,16 @@
-import { validarTemplate } from "@gerador/engine";
+import { problemasDoTemplate } from "@gerador/engine";
 import {
   CAMPO_GLOBAL,
   type RepositorioDeTemplateEspecificacao,
   type TemplateEspecificacao,
 } from "../portas/repositorioDeTemplateEspecificacao.js";
 
-/** Erro de regra, não de infraestrutura — a borda traduz em HTTP 400. */
+/** Erro de regra, não de infraestrutura — a borda traduz em HTTP 400. Os
+ * motivos vêm de `problemasDoTemplate` (SPEC-35): a mesma frase que a tela
+ * mostra antes do clique. */
 export class TemplateInvalido extends Error {
-  constructor(readonly variaveisDesconhecidas: string[]) {
-    super(`variável(is) desconhecida(s) no template: ${variaveisDesconhecidas.map((v) => `{{${v}}}`).join(", ")}`);
+  constructor(readonly motivos: string[]) {
+    super(motivos.join("; "));
     this.name = "TemplateInvalido";
   }
 }
@@ -34,8 +36,12 @@ export function criarCasosDeUsoDeTemplateEspecificacao(
     obter: (timeId) => repo.obter(timeId),
 
     async salvar(timeId, conteudo) {
-      const desconhecidas = validarTemplate(conteudo);
-      if (desconhecidas.length > 0) throw new TemplateInvalido(desconhecidas);
+      // SPEC-35 — além das variáveis desconhecidas, a ausência das
+      // OBRIGATÓRIAS bloqueia: sem {{itens}} o documento sairia sem o corpo,
+      // e isso não pode ser gravado em silêncio por nenhum caminho (tela,
+      // painel Configurar ou API direta).
+      const { erros } = problemasDoTemplate(conteudo);
+      if (erros.length > 0) throw new TemplateInvalido(erros);
 
       return repo.salvar(timeId || CAMPO_GLOBAL, conteudo);
     },

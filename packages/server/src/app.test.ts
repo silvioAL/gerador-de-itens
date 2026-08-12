@@ -710,13 +710,13 @@ describe("/especificacao-template (SPEC-14)", () => {
       method: "PUT",
       url: "/especificacao-template",
       cookies: { gerador_sessao: cookieDev },
-      payload: { timeId: TIME_A, conteudo: "{{titulo}} — molde do time" },
+      payload: { timeId: TIME_A, conteudo: "{{titulo}} — molde do time\n{{itens}}" },
     });
     expect(put.statusCode).toBe(200);
     expect(put.json().timeId).toBe(TIME_A);
 
     const efetivo = await app.inject({ method: "GET", url: `/especificacao-template?timeId=${TIME_A}` });
-    expect(efetivo.json().conteudo).toBe("{{titulo}} — molde do time");
+    expect(efetivo.json().conteudo).toBe("{{titulo}} — molde do time\n{{itens}}");
 
     // outro time sem override próprio continua vendo o global
     const outroEfetivo = await app.inject({ method: "GET", url: `/especificacao-template?timeId=${TIME_B}` });
@@ -729,18 +729,18 @@ describe("/especificacao-template (SPEC-14)", () => {
       method: "PUT",
       url: "/especificacao-template",
       cookies: { gerador_sessao: cookieDev },
-      payload: { timeId: TIME_C, conteudo: "{{titulo}} v1" },
+      payload: { timeId: TIME_C, conteudo: "{{titulo}} v1\n{{itens}}" },
     });
     const segunda = await app.inject({
       method: "PUT",
       url: "/especificacao-template",
       cookies: { gerador_sessao: cookieDev },
-      payload: { timeId: TIME_C, conteudo: "{{titulo}} v2" },
+      payload: { timeId: TIME_C, conteudo: "{{titulo}} v2\n{{itens}}" },
     });
     expect(segunda.statusCode).toBe(200);
 
     const efetivo = await app.inject({ method: "GET", url: `/especificacao-template?timeId=${TIME_C}` });
-    expect(efetivo.json().conteudo).toBe("{{titulo}} v2");
+    expect(efetivo.json().conteudo).toBe("{{titulo}} v2\n{{itens}}");
   });
 
   it("400 quando o template usa variável desconhecida", async () => {
@@ -1490,5 +1490,58 @@ describe("/retrospectivas (SPEC-34 Fase 2)", () => {
     expect(atribuir.statusCode).toBe(201);
 
     expect((await criarRetro(await logarComo(EMAIL_DEV))).statusCode).toBe(201);
+  });
+});
+
+/**
+ * SPEC-35 — salvar configuração de prompt inválida recusa com o motivo. O
+ * portão mora na aplicação; aqui se prova a TRADUÇÃO: 400 com a frase que a
+ * tela mostra, por qualquer caminho (tab, painel Configurar ou API direta).
+ */
+describe("SPEC-35 — validação de escrita de prompts/templates", () => {
+  it("template sem {{itens}} é 400 com a consequência escrita — o corpo do documento não pode sumir em silêncio", async () => {
+    const resposta = await app.inject({
+      method: "PUT",
+      url: "/especificacao-template",
+      cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
+      payload: { conteudo: "# {{titulo}}\n{{contexto}}" },
+    });
+    expect(resposta.statusCode).toBe(400);
+    expect(resposta.json().erro).toContain("{{itens}}");
+    expect(resposta.json().erro).toContain("corpo do documento");
+  });
+
+  it("pipeline com id duplicado é 400 nomeando o papel — antes o segundo era descartado em silêncio", async () => {
+    const papel = { nome: "PO", grupo: "po", ativo: true, contextos: [] };
+    const resposta = await app.inject({
+      method: "PUT",
+      url: "/config/pipeline-agentes",
+      cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
+      payload: { documento: { confirmacaoObrigatoria: true, papeis: [{ id: "po", ...papel }, { id: "po", ...papel }] } },
+    });
+    expect(resposta.statusCode).toBe(400);
+    expect(resposta.json().erro).toContain('"po"');
+  });
+
+  it("pipeline com `papeis` vazio é 400 — apagar a esteira exige intenção, e a mensagem diz como", async () => {
+    const resposta = await app.inject({
+      method: "PUT",
+      url: "/config/pipeline-agentes",
+      cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
+      payload: { documento: { confirmacaoObrigatoria: true, papeis: [] } },
+    });
+    expect(resposta.statusCode).toBe(400);
+    expect(resposta.json().erro).toContain("esteira");
+  });
+
+  it("regras sem `porTech` é 400, não 500 — a rota nunca capturava ConfigInvalida e o motivo morria no log", async () => {
+    const resposta = await app.inject({
+      method: "PUT",
+      url: "/config/regras",
+      cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
+      payload: { documento: { qualquerCoisa: true } },
+    });
+    expect(resposta.statusCode).toBe(400);
+    expect(resposta.json().erro).toContain("porTech");
   });
 });

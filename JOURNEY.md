@@ -4237,3 +4237,42 @@ mordida via `.replace()` multi-linha não casou (âncora com `\n` num arquivo
 CRLF), e desta vez o `assert` estava lá e gritou em vez de falhar em silêncio
 — o defeito da mordida teria ido parar no commit. A diferença entre §159 e
 hoje continua sendo a asserção, não a memória.
+
+## 167. "Não deveria salvar, e sim alertar" — SPEC-35, e o 500 que ninguém tinha visto
+
+O usuário pediu, com print do template de especificação: apagar variável
+obrigatória não pode salvar — tem que dizer que é inválido e POR QUÊ. E que a
+revisão cobrisse também os prompts do Pipeline de IA. Virou a SPEC-35, com o
+princípio numa linha: **a borda recusa, a tela explica, e a regra mora numa
+função só** — `problemasDoTemplate` no engine e `validarEscritaConfig` na
+aplicação, importadas (nunca reimplementadas) pelos dois lados.
+
+**As medições corrigiram o desenho duas vezes antes do código.** A primeira
+versão da SPEC dizia "a rota do template aceita qualquer coisa" — errado: a
+variável DESCONHECIDA já era recusada pelo caso de uso desde a SPEC-31 Fase 2
+(eu tinha medido só o zod da rota — verificar o que se afirma, de novo). O que
+faltava era a OBRIGATÓRIA ausente. E no meio do caminho apareceu um defeito
+que ninguém tinha visto: **a rota de config nunca capturava `ConfigInvalida`**
+— "regras sem `porTech`" virava 500 com o motivo morrendo no log, desde que a
+validação nasceu.
+
+As decisões de recorte: `{{itens}}` bloqueia (sem ele o documento sai sem o
+corpo — não há leitura válida disso); as outras cinco variáveis AVISAM com a
+consequência escrita ("sem {{contexto}}, o texto do Contexto do épico não
+entra") — template enxuto é escolha legítima, mudo é que não pode. No
+pipeline, o que `sanearPapeis` descartava em silêncio na escrita (papel sem
+id, id duplicado, esteira apagada) virou 400 nomeando o papel e a posição; a
+LEITURA continua tolerante, porque config antiga é problema pra relatar, não
+pra explodir na exibição.
+
+Os testes antigos denunciaram o portão funcionando: dois PUTs de template da
+suíte usavam conteúdo sem `{{itens}}` e ficaram vermelhos — fixtures que hoje
+representam gravações legitimamente inválidas, atualizadas. E o build do
+server (tsup, sem typecheck) deixou passar um `ConfigInvalida` sem import que
+só o teste pegou como 500 — mais um lembrete de que o verde do build não é o
+verde do tsc em todo pacote.
+
+Duas mordidas em dupla camada: obrigatórias zeradas → engine E HTTP vermelhos
+no caso exato; portão do pipeline desligado → os dois 400s vermelhos. 149 no
+server, 363 no web, 41/41 no navegador, e o bloqueio visto em produção com o
+motivo na tela.
