@@ -11,7 +11,7 @@ async function buscarJson<T>(caminho: string): Promise<T> {
   const resposta = await fetch(caminho);
   if (!resposta.ok) {
     throw new Error(
-      `Não foi possível carregar "${caminho}" (HTTP ${resposta.status}). Rode "gerador init" no diretório do projeto, ou confirme que config/ está presente.`
+      `Não foi possível carregar "${caminho}" (HTTP ${resposta.status}). Confirme que a pasta config/ está montada no container (docker compose) e que o servidor está no ar.`
     );
   }
   return (await resposta.json()) as T;

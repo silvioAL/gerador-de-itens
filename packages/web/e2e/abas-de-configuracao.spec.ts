@@ -91,8 +91,14 @@ test("Regras: contexto vira clique na lista conhecida — o campo de vírgula sa
   await page.request.put(`${API}/config/regras`, { data: { documento: antes.documento } });
 });
 
-test("Especificação: apagar {{itens}} não deixa salvar e mostra o motivo (SPEC-35)", async ({ page }) => {
-  await abrirConfig(page, /Especificação de solução/);
+test("Especificação: apagar {{itens}} não deixa salvar e mostra o motivo (SPEC-35); com {{itens}}, salva de verdade", async ({ page }) => {
+  await entrar(page);
+  // O template global é da organização — guarda o vigente pra restaurar no fim.
+  const API = "http://localhost:4100";
+  const antes = await (await page.request.get(`${API}/especificacao-template`)).json();
+
+  await page.getByRole("button", { name: /Configurações/ }).click();
+  await page.getByRole("button", { name: /Especificação de solução/ }).click();
   await page.getByRole("button", { name: "editar" }).click();
 
   const conteudo = page.getByLabel("Conteúdo do template");
@@ -107,13 +113,28 @@ test("Especificação: apagar {{itens}} não deixa salvar e mostra o motivo (SPE
 
   // Template enxuto é aviso, não trava: com {{itens}} de volta, salvar libera
   // e a consequência das ausências continua dita.
-  await conteudo.fill("# {{titulo}}\n{{itens}}");
+  // Mantém {{titulo}}: o tour (spec paralelo) afirma essa variável nesta
+  // mesma aba — um template global sem ela abriria a corrida da §162.
+  await conteudo.fill("# {{titulo}} — Template do E2E\n{{itens}}");
   await expect(page.getByTestId("template-erros")).toHaveCount(0);
   await expect(page.getByTestId("template-avisos")).toContainText("Contexto do épico");
   await expect(salvar).toBeEnabled();
 
-  // Sai sem gravar — o template da organização não é deste teste.
-  await page.getByRole("button", { name: "cancelar" }).click();
+  // E salva DE VERDADE (pedido do usuário: o fluxo de uso desta parte tem que
+  // constar no E2E, não só o bloqueio): grava, sai da tela, volta e o texto
+  // persistido é o novo.
+  await salvar.click();
+  await page.getByRole("button", { name: "Voltar ao canvas" }).click();
+  await page.getByRole("button", { name: /Configurações/ }).click();
+  await page.getByRole("button", { name: /Especificação de solução/ }).click();
+  await expect(page.getByText(/Template do E2E/)).toBeVisible();
+
+  // Restaura o template vigente — ele é da organização, não deste teste.
+  if (antes?.conteudo) {
+    await page.request.put(`${API}/especificacao-template`, {
+      data: { timeId: antes.timeId ?? "__global__", conteudo: antes.conteudo },
+    });
+  }
 });
 
 test("Acessos: a tela da delegação de RBAC abre e diz o estado atual", async ({ page }) => {

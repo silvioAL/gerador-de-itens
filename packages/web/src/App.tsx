@@ -50,7 +50,6 @@ import { TourOverlay } from "./demo/TourOverlay";
 import { useTour } from "./demo/useTour";
 import { useAutoDemo } from "./demo/useAutoDemo";
 import { CursorFantasma } from "./demo/CursorFantasma";
-import { TerminalAnimado } from "./demo/TerminalAnimado";
 import { LandingPage } from "./demo/LandingPage";
 import { EscolherTimeScreen } from "./auth/EscolherTimeScreen";
 import { lembrarTime, lerTimeLembrado } from "./auth/timeLembrado";
@@ -829,11 +828,6 @@ function AppCarregado({
             onPular={demoAutomatica.pularPraFim}
           />
           <CursorFantasma selector={demoAutomatica.passoAtual.selector} />
-          {demoAutomatica.passoAtual.titulo === "Linha de comando" && (
-            <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", width: "min(520px, 90vw)", zIndex: 82 }}>
-              <TerminalAnimado />
-            </div>
-          )}
           <div style={{ position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)", zIndex: 82, display: "flex", gap: 8 }}>
             <button onClick={demoAutomatica.rodando ? demoAutomatica.pausar : demoAutomatica.play} style={botaoDemoEstilo}>
               {demoAutomatica.rodando ? "⏸ Pausar" : "▶ Continuar"}

@@ -2,7 +2,6 @@ import { useState } from "react";
 import type { Quebra } from "@gerador/engine";
 import type { Cenario } from "./scenarios";
 import type { AbaConfig } from "../config/ConfigScreen";
-import { DURACAO_TOTAL_TERMINAL_MS } from "./TerminalAnimado";
 
 export interface PassoTour {
   selector: string | null;
@@ -35,7 +34,7 @@ export function useTour(opts: UseTourOpts) {
       selector: null,
       titulo: "Bem-vindo",
       texto:
-        "Este tour usa um cenário pronto (Catálogo) para mostrar o fluxo completo: diagrama → prontidão → derivação → revisão → especificação de solução → configurações. São 12 passos rápidos.",
+        "Este tour usa um cenário pronto (Catálogo) para mostrar o fluxo completo: diagrama → prontidão → derivação → revisão → especificação de solução → configurações. São 11 passos rápidos.",
       onEnter: () => {
         opts.fecharRevisao();
         opts.selecionarNo(null);
@@ -100,13 +99,6 @@ export function useTour(opts: UseTourOpts) {
       texto:
         "O documento final segue um modelo com seções fixas (Contexto, Visão geral, Itens, Definition of Ready/Done) — customize o texto ao redor dos itens aqui, global ou só pro seu time.",
       onEnter: () => opts.abrirConfigNaAba("especificacao"),
-    },
-    {
-      selector: null,
-      titulo: "Linha de comando",
-      texto:
-        "Tudo isso também roda fora do browser: `npm install -g gerador-de-itens` instala o CLI; `gerador init` cria um config/ de exemplo; `gerador derive quebra.json --out itens.md` deriva os itens; `gerador implementar quebra.json --out especificacao.md` gera a especificação de solução inteira. Todo comando é 100% local, sem servidor.",
-      duracaoMinima: DURACAO_TOTAL_TERMINAL_MS,
     },
     {
       selector: null,

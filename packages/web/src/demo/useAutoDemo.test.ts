@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import type { Quebra } from "@gerador/engine";
 import { ATRASO_MAXIMO_MS, useAutoDemo } from "./useAutoDemo";
-import { DURACAO_TOTAL_TERMINAL_MS } from "./TerminalAnimado";
 import type { Cenario } from "./scenarios";
 
 const cenarioMongo: Cenario = {
@@ -105,31 +104,6 @@ describe("useAutoDemo", () => {
     expect(result.current.ativo).toBe(false);
     expect(result.current.rodando).toBe(false);
     expect(opts.fecharJornada).toHaveBeenCalled();
-  });
-
-  it("passo 'Linha de comando' espera pelo menos o terminal animado terminar de digitar antes de avançar (achado real: cortava no meio)", () => {
-    const { result } = renderHook(() => useAutoDemo(montarOpts()));
-    // Maior dos dois pisos (teto por texto vs. duração do terminal) — o passo
-    // nunca avança antes disso, seja qual for o que dominar.
-    const esperaMinimaGarantida = Math.max(ATRASO_MAXIMO_MS, DURACAO_TOTAL_TERMINAL_MS);
-
-    act(() => result.current.play());
-    while (result.current.passoAtual?.titulo !== "Linha de comando") {
-      act(() => {
-        vi.advanceTimersByTime(ALEM_DE_QUALQUER_PASSO_MS);
-      });
-    }
-    const indiceLinhaDeComando = result.current.indice;
-
-    act(() => {
-      vi.advanceTimersByTime(esperaMinimaGarantida - 500);
-    });
-    expect(result.current.indice).toBe(indiceLinhaDeComando);
-
-    act(() => {
-      vi.advanceTimersByTime(1000);
-    });
-    expect(result.current.indice).toBe(indiceLinhaDeComando + 1);
   });
 
   it("deixado rodando sozinho, percorre todos os passos e encerra no final", () => {
