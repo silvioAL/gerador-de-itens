@@ -83,7 +83,7 @@ export function useTour(opts: UseTourOpts) {
       selector: "[data-tour=config-screen-content]",
       titulo: "Perfis de stack",
       texto:
-        'Um time pode ter uma stack conhecida (linguagem, framework...) que pré-preenche sugestões em campos novos — sem reconfigurar toda vez que desenhar um serviço. Configure ou corrija um valor aqui, ou capture direto de um nó real com o botão "salvar como padrão do time" no painel de propriedades.',
+        'A stack é um perfil do CATÁLOGO ("Java + Spring Boot", "Node"...) e o time aponta um — trocar de tecnologia é trocar o ponteiro. Os valores do perfil apontado pré-preenchem sugestões em campos novos; dá pra capturar direto de um nó real com "salvar como padrão do time" no painel.',
       onEnter: () => opts.abrirConfigNaAba("perfis"),
     },
     {
@@ -92,6 +92,13 @@ export function useTour(opts: UseTourOpts) {
       texto:
         'Cada tipo de nó já vem com campos padrão (ex.: nome do tópico, DLQ) — "sobrescrever" cria uma versão específica pro seu time (ex.: um sufixo obrigatório de nomenclatura), e "+ Adicionar campo" cria um campo novo do zero.',
       onEnter: () => opts.abrirConfigNaAba("campos"),
+    },
+    {
+      selector: "[data-tour=config-screen-content]",
+      titulo: "Níveis e acessos",
+      texto:
+        "Cada membro do time tem um nível: visualizar (lê as quebras), operar (cria, deriva e refina) e owner (configurações e membros). Qualquer um convida até o próprio nível — ninguém escala privilégio. Na aba Acessos, papéis delegam configuração a setores (ex.: Arquitetura no pipeline) e podem ser portados por um TIME inteiro: os owners herdam, e a permissão acompanha a composição.",
+      onEnter: () => opts.abrirConfigNaAba("membros"),
     },
     {
       selector: "[data-tour=config-screen-content]",

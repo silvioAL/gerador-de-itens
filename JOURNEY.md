@@ -4669,3 +4669,12 @@ intenção NÃO vaza (salvar não deriva: a revisão não abre). A mordida foi
 exatamente essa: intenção ignorada (confirmar sempre derivando) → spec
 vermelho. Os specs que digitavam o título migraram pra responder o balão,
 que é como o produto funciona agora.
+
+## 182. Tour e demo aprendem as autorizações
+
+O tour guiado (e a demo automática, que usa a mesma lista de passos) ganhou
+o passo "Níveis e acessos": abre a aba Membros e explica os três níveis, o
+teto do convite e os papéis portados por time da SPEC-38. O passo "Perfis de
+stack" teve o texto reescrito pro vocabulário novo (catálogo + ponteiro, não
+mais "stack do time"). O E2E do tour passou a contar 12 passos e a asserir a
+aba Membros aberta no passo novo.

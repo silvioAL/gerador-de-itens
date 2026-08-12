@@ -101,7 +101,12 @@ describe("useTour", () => {
     expect(result.current.passoAtual?.titulo).toBe("Padrões por componente");
     expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("campos");
 
-    act(() => result.current.proximo()); // -> passo 9 (Modelo da especificação de solução)
+    // SPEC-38 — o passo novo de autorizações entra ANTES do modelo.
+    act(() => result.current.proximo()); // -> passo 9 (Níveis e acessos)
+    expect(result.current.passoAtual?.titulo).toBe("Níveis e acessos");
+    expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("membros");
+
+    act(() => result.current.proximo()); // -> passo 10 (Modelo da especificação de solução)
 
     expect(result.current.passoAtual?.titulo).toBe("Modelo da especificação de solução");
     expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("especificacao");
