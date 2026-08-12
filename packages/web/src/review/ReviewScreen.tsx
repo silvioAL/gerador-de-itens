@@ -29,6 +29,7 @@ import {
   type PapelConfigurado,
   type PapelPipeline,
   type PlaceholderPedidoItemIa,
+  apiPdca,
 } from "../api/client";
 import { baixarArquivoTexto } from "../persistence/baixarArquivo";
 import { ConversaEspecificacao } from "../conversa/ConversaEspecificacao";
@@ -374,6 +375,9 @@ export function ReviewScreen({
   // SPEC-37 F3 — dispensados dos momentos M4/M5 (por sessão da revisão).
   const [momentosDispensados, setMomentosDispensados] = useState<string[]>([]);
   const dispensarMomento = (m: string) => setMomentosDispensados((d) => [...d, m]);
+  // SPEC-39 M13 — o feedback pós-especificação (a cada N gerações do usuário).
+  const [pedindoFeedback, setPedindoFeedback] = useState(false);
+  const [textoFeedback, setTextoFeedback] = useState("");
   // O bubble da revisão também arrasta (mesma chave do App: o bubble É um só
   // conceito — movê-lo numa tela move nas duas).
   const { estiloArrasto, handlersDeArrasto } = useArrastavel("gerador:fab-assistente");
@@ -618,7 +622,17 @@ export function ReviewScreen({
     : resultado.atividades;
   const noFiltrado = filtroNoId ? diagrama.nodes.find((n) => n.id === filtroNoId) : undefined;
 
+  function registrarUsoDeEspecificacao() {
+    apiPdca
+      .uso("especificacao")
+      .then((r) => {
+        if (r.momento) setPedindoFeedback(true);
+      })
+      .catch(() => {});
+  }
+
   function baixarEspecificacao() {
+    registrarUsoDeEspecificacao();
     const documento = gerarEspecificacaoEntrega(resultado.atividades, diagrama, config, {
       regras,
       demandInfo,
@@ -656,7 +670,7 @@ export function ReviewScreen({
     conversaAberta: mostrarConversa,
     dispensados: m7Dispensado ? [...momentosDispensados, "m7"] : momentosDispensados,
   });
-  const momentoM7Ativo = momentoRevisao === "m7";
+  const momentoM7Ativo = momentoRevisao === "m7" && !pedindoFeedback;
 
   // Altura do brilho da timeline: fração de itens que já saíram do rascunho
   // (ou seja, algum papel já escreveu algo neles). Derivado do mesmo
@@ -762,15 +776,9 @@ export function ReviewScreen({
             <button onClick={baixarDiagrama} style={{ ...botaoEstilo, ...botaoPrimarioEstilo }}>
               Baixar diagrama (.html)
             </button>
-          ) : (
-            <>
-              {/* SPEC-25 §5.5: a saída que funciona HOJE no ambiente do
-                  usuário — não depende de provedor conectado nenhum. */}
-              <button onClick={baixarEspecificacao} style={{ ...botaoEstilo, ...botaoPrimarioEstilo }}>
-                Gerar especificação de solução
-              </button>
-            </>
-          )}
+          ) : null /* SPEC-39 — o botão de gerar especificação MORREU: a
+              geração é ação do agente (chip do M7 quando tudo refinado; M12
+              nos demais casos). O contêiner fica pro spotlight do tour. */}
         </div>
         <button onClick={onFechar} style={botaoEstilo}>
           Voltar ao canvas
@@ -1178,7 +1186,7 @@ export function ReviewScreen({
       )}
       {/* SPEC-37 F3 — M4: a esteira inteira parada por falta de credencial é o
           momento mais bloqueante da revisão; o chip abre a aba certa. */}
-      {momentoRevisao === "m4" && (
+      {momentoRevisao === "m4" && !pedindoFeedback && (
         <div className="assistente-janela" style={balaoM7Estilo} data-testid="balao-sem-ia" role="status">
           <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: "var(--texto-2)" }}>
             A esteira de IA está desligada — sem credencial de gateway. Configuro com você? (aba Modelo de IA)
@@ -1201,7 +1209,7 @@ export function ReviewScreen({
       )}
       {/* M5 — derivou sem Contexto do épico: aviso de chegada, sem chip (o
           material se cola na aba 📎 do assistente, no canvas). */}
-      {momentoRevisao === "m5" && (
+      {momentoRevisao === "m5" && !pedindoFeedback && (
         <div className="assistente-janela" style={balaoM7Estilo} data-testid="balao-sem-contexto" role="status">
           <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: "var(--texto-2)" }}>
             Sem o Contexto do épico, as sugestões de IA e o documento final saem mais pobres — quer colar o material
@@ -1210,6 +1218,65 @@ export function ReviewScreen({
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
             <button
               onClick={() => dispensarMomento("m5")}
+              aria-label="Dispensar sugestão"
+              style={{ fontSize: 11.5, padding: "5px 8px", borderRadius: 999, border: "none", background: "transparent", color: "var(--texto-mudo)", cursor: "pointer" }}
+            >
+              agora não
+            </button>
+          </div>
+        </div>
+      )}
+      {/* SPEC-39 M12 — sem o botão do header, o agente é a porta da geração
+          também fora do "tudo refinado". */}
+      {momentoRevisao === "m12" && !pedindoFeedback && (
+        <div className="assistente-janela" style={balaoM7Estilo} data-testid="balao-gerar" role="status">
+          <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: "var(--texto-2)" }}>
+            Quando quiser, eu gero a especificação de solução — mesmo com itens ainda em revisão.
+          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+            <button onClick={baixarEspecificacao} style={chipM7Estilo} data-testid="balao-gerar-acao">
+              Gerar especificação de solução
+            </button>
+            <button
+              onClick={() => dispensarMomento("m12")}
+              aria-label="Dispensar sugestão"
+              style={{ fontSize: 11.5, padding: "5px 8px", borderRadius: 999, border: "none", background: "transparent", color: "var(--texto-mudo)", cursor: "pointer" }}
+            >
+              agora não
+            </button>
+          </div>
+        </div>
+      )}
+      {/* SPEC-39 M13 — o feedback do ciclo: o que faltou ou sobrou? */}
+      {pedindoFeedback && (
+        <div className="assistente-janela" style={balaoM7Estilo} data-testid="balao-feedback" role="status">
+          <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: "var(--texto-2)" }}>
+            Especificação gerada! Me conta: faltou (ou sobrou) algum item de checklist, regra de refinamento ou campo
+            no formulário? É assim que a configuração do time melhora.
+          </p>
+          <input
+            aria-label="O que faltou ou sobrou"
+            value={textoFeedback}
+            onChange={(e) => setTextoFeedback(e.target.value)}
+            placeholder="ex.: sobrou o campo de volumetria; faltou item de DLQ"
+            style={{ width: "100%", marginTop: 8, fontSize: 12.5, padding: "6px 8px" }}
+          />
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+            <button
+              onClick={() => {
+                if (!textoFeedback.trim()) return;
+                void apiPdca.feedback(textoFeedback.trim()).catch(() => {});
+                setPedindoFeedback(false);
+                setTextoFeedback("");
+              }}
+              disabled={!textoFeedback.trim()}
+              style={{ ...chipM7Estilo, ...(textoFeedback.trim() ? {} : { opacity: 0.5, cursor: "not-allowed" }) }}
+              data-testid="balao-feedback-enviar"
+            >
+              Enviar feedback
+            </button>
+            <button
+              onClick={() => setPedindoFeedback(false)}
               aria-label="Dispensar sugestão"
               style={{ fontSize: 11.5, padding: "5px 8px", borderRadius: 999, border: "none", background: "transparent", color: "var(--texto-mudo)", cursor: "pointer" }}
             >

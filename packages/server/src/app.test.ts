@@ -18,7 +18,11 @@ import {
   papelPermissao,
   perfilStackValores,
   perfisStack,
+  configDocumentos,
+  pdcaFeedback,
+  pdcaUsos,
   quebras,
+  solicitacoesAjuste,
   timePapel,
   times,
   usuarioPapel,
@@ -1526,6 +1530,139 @@ describe("SPEC-38 Fase 3 — papel portado por time (owners herdam)", () => {
       cookies: { gerador_sessao: await logarComo(EMAIL_OWNER_ARQ) },
     });
     expect(minhas.json().porRecurso["perfis-stack"]).toBeUndefined();
+  });
+});
+
+describe("SPEC-39 — PDCA de configurações", () => {
+  beforeEach(async () => {
+    await db.execute(sql`truncate table ${pdcaUsos}, ${pdcaFeedback}, ${solicitacoesAjuste}`);
+    await db.delete(configDocumentos).where(eq(configDocumentos.chave, "pdca"));
+  });
+
+  it("a cadência morde no uso certo: default 5, e a config do admin muda o passo", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const usar = () =>
+      app.inject({ method: "POST", url: "/pdca/uso", cookies: { gerador_sessao: cookie }, payload: { tipo: "derivacao", timeId: TIME_A } });
+
+    for (let i = 1; i <= 4; i++) expect((await usar()).json().momento).toBe(false);
+    const quinto = (await usar()).json();
+    expect(quinto.momento).toBe(true);
+
+    // O admin muda a cadência pra 2 (gate: acessos — dev é owner, passa).
+    const configurar = await app.inject({
+      method: "PUT",
+      url: "/pdca/config",
+      cookies: { gerador_sessao: cookie },
+      payload: { cadenciaUsos: 2, cadenciaFeedback: 3 },
+    });
+    expect(configurar.statusCode).toBe(200);
+    expect((await usar()).json().momento).toBe(true); // 6º (6 % 2 = 0)
+    expect((await usar()).json().momento).toBe(false); // 7º
+    expect((await usar()).json().momento).toBe(true); // 8º
+  });
+
+  it("no momento da entrevista, os últimos itens do TIME vêm junto — a âncora de memória", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    await app.inject({
+      method: "POST",
+      url: "/quebras",
+      cookies: { gerador_sessao: cookie },
+      payload: { titulo: "Fatura mensal em lote", time: TIME_A, diagrama: { nodes: [], edges: [] } },
+    });
+    await app.inject({
+      method: "PUT",
+      url: "/pdca/config",
+      cookies: { gerador_sessao: cookie },
+      payload: { cadenciaUsos: 1, cadenciaFeedback: 3 },
+    });
+
+    const uso = (
+      await app.inject({ method: "POST", url: "/pdca/uso", cookies: { gerador_sessao: cookie }, payload: { tipo: "derivacao", timeId: TIME_A } })
+    ).json();
+    expect(uso.momento).toBe(true);
+    expect(uso.ultimosItens).toContain("Fatura mensal em lote");
+  });
+
+  it("VALIDADE: aprovar depois que o documento mudou invalida o pedido (409) — sem mudança, aprova", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const salvarRegras = (documento: unknown) =>
+      app.inject({ method: "PUT", url: "/config/regras", cookies: { gerador_sessao: cookie }, payload: { documento } });
+    const base = { tipos: ["Story"], tamanhos: ["P"], porTech: { java: { checklistProcesso: [{ texto: "abrir mudança", contextos: [] }] } } };
+    await salvarRegras(base);
+
+    const criar = () =>
+      app.inject({
+        method: "POST",
+        url: "/ajustes",
+        cookies: { gerador_sessao: cookie },
+        payload: { recurso: "regras", descricao: "faltou item de DLQ no checklist", timeId: TIME_A },
+      });
+
+    // Pedido 1: o documento MUDA antes da decisão → aprovar invalida.
+    const pedido1 = (await criar()).json();
+    const doc2 = structuredClone(base);
+    doc2.porTech.java.checklistProcesso.push({ texto: "novo item no meio do caminho", contextos: [] });
+    await salvarRegras(doc2);
+
+    const aprovacaoTardia = await app.inject({
+      method: "POST",
+      url: `/ajustes/${pedido1.id}/decidir`,
+      cookies: { gerador_sessao: cookie },
+      payload: { aprovar: true },
+    });
+    expect(aprovacaoTardia.statusCode).toBe(409);
+    expect(aprovacaoTardia.json().estado).toBe("invalida");
+    const lista = (await app.inject({ method: "GET", url: "/ajustes", cookies: { gerador_sessao: cookie } })).json();
+    expect(lista.find((s: { id: string }) => s.id === pedido1.id).estado).toBe("invalida");
+
+    // Pedido 2: nada mudou → aprovada.
+    const pedido2 = (await criar()).json();
+    const aprovacao = await app.inject({
+      method: "POST",
+      url: `/ajustes/${pedido2.id}/decidir`,
+      cookies: { gerador_sessao: cookie },
+      payload: { aprovar: true },
+    });
+    expect(aprovacao.statusCode).toBe(200);
+    expect(aprovacao.json().estado).toBe("aprovada");
+  });
+
+  it("decidir exige a permissão do RECURSO pedido (owner ou grant) — operar sem grant leva 403", async () => {
+    const cookieDev = await logarComo(EMAIL_DEV);
+    const pedido = (
+      await app.inject({
+        method: "POST",
+        url: "/ajustes",
+        cookies: { gerador_sessao: cookieDev },
+        payload: { recurso: "pipeline-agentes", descricao: "prompt do QA verboso demais" },
+      })
+    ).json();
+
+    await db.update(usuarioTime).set({ nivel: "operar" }).where(eq(usuarioTime.email, EMAIL_OUTRO));
+    try {
+      const negado = await app.inject({
+        method: "POST",
+        url: `/ajustes/${pedido.id}/decidir`,
+        cookies: { gerador_sessao: await logarComo(EMAIL_OUTRO) },
+        payload: { aprovar: false },
+      });
+      expect(negado.statusCode).toBe(403);
+    } finally {
+      await db.update(usuarioTime).set({ nivel: "owner" }).where(eq(usuarioTime.email, EMAIL_OUTRO));
+    }
+  });
+
+  it("feedback livre é gravado com autor e time", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const resposta = await app.inject({
+      method: "POST",
+      url: "/pdca/feedback",
+      cookies: { gerador_sessao: cookie },
+      payload: { texto: "sobrou o campo de volumetria no formulário", timeId: TIME_A },
+    });
+    expect(resposta.statusCode).toBe(201);
+    const [linha] = await db.select().from(pdcaFeedback);
+    expect(linha).toMatchObject({ email: EMAIL_DEV, timeId: TIME_A, texto: "sobrou o campo de volumetria no formulário" });
   });
 });
 

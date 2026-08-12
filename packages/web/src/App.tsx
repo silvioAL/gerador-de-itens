@@ -27,6 +27,7 @@ import {
   type DadosCampoNo,
   type EspecificacaoTemplate,
   type SessaoUsuario,
+  apiPdca,
 } from "./api/client";
 import { useSessao } from "./auth/useSessao";
 import { LoginScreen } from "./auth/LoginScreen";
@@ -390,7 +391,17 @@ function AppCarregado({
   const [autoSalvarPendente, setAutoSalvarPendente] = useState(false);
   const [salvarAposNome, setSalvarAposNome] = useState(false);
 
+  // SPEC-39 M11 — a entrevista do PDCA: o servidor conta os usos e diz
+  // quando é o momento; a fala cita as últimas quebras do time.
+  const [entrevistaPdca, setEntrevistaPdca] = useState<string[] | null>(null);
+
   function executarDerivacao(salvarDepois: boolean) {
+    apiPdca
+      .uso("derivacao", timeAtivo)
+      .then((r) => {
+        if (r.momento) setEntrevistaPdca(r.ultimosItens);
+      })
+      .catch(() => {});
     const atividades = derivar(quebra.diagrama, diagramaConfig, { time: quebra.time });
     setResultado(resolverDependencias(atividades));
     setPedindoNomeDaDemanda(false);
@@ -862,7 +873,24 @@ function AppCarregado({
                     : undefined,
                 onDispensar: () => setPedindoNomeDaDemanda(false),
               }
-            : momentoConfig === "m8"
+            : entrevistaPdca !== null && !mostrarConfig && !resultado
+              ? {
+                  texto: `Já usamos a derivação algumas vezes${entrevistaPdca.length > 0 ? ` (últimos itens do time: ${entrevistaPdca.join(", ")})` : ""}. Sentiu falta — ou sobra — de algum item de checklist, regra de refinamento ou campo do formulário? ${somenteLeitura || permissoes.nivel !== "owner" ? "Descreva o ajuste que eu encaminho pra aprovação de quem configura." : "Posso ajustar com você, conversando."}`,
+                  ...(permissoes.nivel === "owner"
+                    ? { acao: { rotulo: "Revisar configurações", onExecutar: () => { setEntrevistaPdca(null); setAbaAssistente("configurar"); } } }
+                    : {
+                        entrada: {
+                          placeholder: "ex.: faltou item de DLQ no checklist",
+                          rotulo: "Pedir ajuste",
+                          onConfirmar: (texto: string) => {
+                            void apiPdca.criarAjuste({ descricao: texto, timeId: timeAtivo }).catch(() => {});
+                            setEntrevistaPdca(null);
+                          },
+                        },
+                      }),
+                  onDispensar: () => setEntrevistaPdca(null),
+                }
+              : momentoConfig === "m8"
               ? {
                   texto: "Este ambiente ainda está sem padrões do time — posso te ajudar a configurar conversando, por texto ou voz (🎤).",
                   acao: { rotulo: "Configurar conversando", onExecutar: () => setAbaAssistente("configurar") },

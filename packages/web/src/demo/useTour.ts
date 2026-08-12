@@ -74,10 +74,10 @@ export function useTour(opts: UseTourOpts) {
       onEnter: () => opts.derivarQuebra(),
     },
     {
-      selector: "[data-tour=export-buttons]",
+      selector: "[data-testid=abrir-conversa-especificacao]",
       titulo: "Especificação de solução",
       texto:
-        "Expanda qualquer item da lista pra ver a spec técnica completa, o refinamento e os critérios de aceite em Gherkin — sem precisar copiar nada. Quando estiver pronto, um clique gera um único markdown com tudo, pensado pra ser o input de outro agente (ex.: o que sobe os itens pro sistema de tracking do time).",
+        "O documento final sai pelo AGENTE: com tudo refinado ele oferece sozinho (balão), e a qualquer momento o balão \"gerar especificação\" baixa o markdown — mesmo parcial. O botão de header morreu; a conversa é o caminho.",
     },
     {
       selector: "[data-tour=config-screen-content]",

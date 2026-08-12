@@ -202,8 +202,9 @@ test("tour guiado de 1 clique percorre diagrama, prontidão, proveniência, deri
 
   // Passo 7: especificação de solução — revisão e especificação viraram uma coisa só.
   await expect(page.getByText("PASSO 7 DE 12")).toBeVisible();
-  await expect(page.locator('[data-tour="export-buttons"]')).toBeVisible();
-  await expect(page.getByRole("button", { name: "Gerar especificação de solução" })).toBeVisible();
+  // SPEC-39 — o botão morreu; o passo aponta pro FAB do agente.
+  await expect(page.getByRole("button", { name: "Gerar especificação de solução" })).toHaveCount(0);
+  await expect(page.getByTestId("abrir-conversa-especificacao")).toBeVisible();
   await page.getByRole("button", { name: "Próximo" }).click();
 
   // Passo 8: perfis de time — o tour abre a tela de Configurações já na aba certa,

@@ -41,7 +41,9 @@ describe("momentoDaRevisao (M4/M5/M7)", () => {
 
   it("derivou sem contexto do épico → M5, mas só enquanto a revisão está intocada", () => {
     expect(momentoDaRevisao({ ...base, demandInfoVazio: true })).toBe("m5");
-    expect(momentoDaRevisao({ ...base, demandInfoVazio: true, revisaoIntocada: false })).toBeNull();
+    // Com o trabalho começado (e nada refinado ainda), quem fala é o M12 —
+    // a porta da especificação (SPEC-39), nunca mais o M5.
+    expect(momentoDaRevisao({ ...base, demandInfoVazio: true, revisaoIntocada: false })).toBe("m12");
   });
 
   it("tudo refinado → M7 — e o M5 já não atrapalha, porque o trabalho começou", () => {

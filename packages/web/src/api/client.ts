@@ -788,6 +788,35 @@ export const apiPerfisTime = {
     }),
 };
 
+/** SPEC-39 — PDCA de configurações: contadores de uso, feedback e ajustes. */
+export interface SolicitacaoAjuste {
+  id: string;
+  timeId: string | null;
+  solicitante: string;
+  recurso: string;
+  descricao: string;
+  estado: "pendente" | "aprovada" | "rejeitada" | "invalida";
+  criadoEm: string;
+}
+
+export const apiPdca = {
+  uso: (tipo: "derivacao" | "especificacao", timeId?: string) =>
+    requisitar<{ contagem: number; momento: boolean; ultimosItens: string[] }>("/pdca/uso", {
+      method: "POST",
+      body: JSON.stringify({ tipo, timeId }),
+    }),
+  feedback: (texto: string, timeId?: string) =>
+    requisitar<{ id: string }>("/pdca/feedback", { method: "POST", body: JSON.stringify({ texto, timeId }) }),
+  criarAjuste: (dados: { recurso?: string; descricao: string; timeId?: string }) =>
+    requisitar<SolicitacaoAjuste>("/ajustes", { method: "POST", body: JSON.stringify(dados) }),
+  listarAjustes: () => requisitar<SolicitacaoAjuste[]>("/ajustes"),
+  decidirAjuste: (id: string, aprovar: boolean) =>
+    requisitar<{ id: string; estado: string }>(`/ajustes/${id}/decidir`, {
+      method: "POST",
+      body: JSON.stringify({ aprovar }),
+    }),
+};
+
 /** SPEC-38 Fase 2 — o catálogo de perfis de stack e o ponteiro do time. */
 export interface PerfilStackCatalogo {
   id: string;
