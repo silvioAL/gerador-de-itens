@@ -10,9 +10,10 @@ import {
   type Diagrama,
   type DiagramaConfig,
 } from "@gerador/engine";
-import { criarCasosDeUsoDeQuebras } from "@gerador/aplicacao";
+import { criarCasosDeUsoDeQuebras, criarCasosDeUsoDeItensGerados } from "@gerador/aplicacao";
 import type { OpcoesApp } from "../app.js";
 import { criarRepositorioDeQuebrasEmPostgres } from "../adaptadores/quebrasEmPostgres.js";
+import { criarRepositorioDeItensGeradosEmPostgres } from "../adaptadores/itensGeradosEmPostgres.js";
 import { exigirNivel } from "../auth/niveis.js";
 
 /**
@@ -85,6 +86,42 @@ export async function registrarRotasQuebras(app: FastifyInstance, { db, diretori
     const atualizada = await casos.atualizar(id, corpo.data as never);
     if (!atualizada) return reply.code(404).send({ erro: "quebra não encontrada" });
     return atualizada;
+  });
+
+  // SPEC-41 Parte B — os itens de trabalho materializados. Quem CALCULA é o
+  // engine no cliente (mesmo material do documento de especificação); aqui só
+  // se persiste e lê o conjunto. Regenerar substitui — a chave estável
+  // preserva o rastro de exportação (Fase 2).
+  const itens = criarCasosDeUsoDeItensGerados(criarRepositorioDeItensGeradosEmPostgres(db));
+
+  const corpoItens = z.object({
+    itens: z.array(
+      z.object({
+        chave: z.string().min(1),
+        titulo: z.string().min(1),
+        tipo: z.string().min(1),
+        tamanho: z.string().min(1),
+        dependencias: z.array(z.string()),
+        corpoMarkdown: z.string(),
+        pendencias: z.number().int().min(0),
+        sugestoes: z.number().int().min(0),
+      })
+    ),
+  });
+
+  app.get("/quebras/:id/itens", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    if (!(await casos.obter(id))) return reply.code(404).send({ erro: "quebra não encontrada" });
+    return itens.listarDaQuebra(id);
+  });
+
+  app.put("/quebras/:id/itens", { preHandler: podeOperarNaQuebra }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    if (!(await casos.obter(id))) return reply.code(404).send({ erro: "quebra não encontrada" });
+    const corpo = corpoItens.safeParse(req.body);
+    if (!corpo.success) return reply.code(400).send({ erro: corpo.error.flatten() });
+
+    return itens.regerarDaQuebra(id, corpo.data.itens);
   });
 
   // Mesmo mecanismo do `gerador derive` (packages/cli/src/commands/derive.ts) e do

@@ -16,6 +16,8 @@ export interface MenuLateralProps {
   onNavegar: (area: AreaConfig) => void;
   onNovaQuebra: () => void;
   onAbrirQuebras: () => void;
+  /** SPEC-41 — a tela dos itens de trabalho gerados da demanda aberta. */
+  onItens: () => void;
   onCenarios: () => void;
   onSair: () => void;
 }
@@ -58,6 +60,7 @@ export function MenuLateral({
   onNavegar,
   onNovaQuebra,
   onAbrirQuebras,
+  onItens,
   onCenarios,
   onSair,
 }: MenuLateralProps) {
@@ -86,6 +89,9 @@ export function MenuLateral({
         </button>
         <button onClick={acao(onAbrirQuebras)} style={itemEstilo}>
           Abrir…
+        </button>
+        <button onClick={acao(onItens)} style={itemEstilo}>
+          Itens de trabalho
         </button>
         <button onClick={acao(onCenarios)} style={itemEstilo}>
           ✦ Como funciona &amp; cenários

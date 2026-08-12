@@ -218,6 +218,32 @@ export const apiQuebras = {
     requisitar<QuebraSalva>(`/quebras/${id}`, { method: "PUT", body: JSON.stringify(quebra) }),
 };
 
+/** SPEC-41 Parte B — um item de trabalho materializado (persistido no server). */
+export interface ItemGerado {
+  id: string;
+  quebraId: string;
+  chave: string;
+  titulo: string;
+  tipo: string;
+  tamanho: string;
+  dependencias: string[];
+  corpoMarkdown: string;
+  pendencias: number;
+  sugestoes: number;
+  estado: "gerado" | "exportado";
+  linkExterno: string | null;
+  criadoEm: string;
+}
+
+/** O que o cliente manda ao (re)gerar — a forma de `ItemDeTrabalho` do engine. */
+export type DadosItemGerado = Omit<ItemGerado, "id" | "quebraId" | "estado" | "linkExterno" | "criadoEm">;
+
+export const apiItensGerados = {
+  listar: (quebraId: string) => requisitar<ItemGerado[]>(`/quebras/${quebraId}/itens`),
+  regerar: (quebraId: string, itens: DadosItemGerado[]) =>
+    requisitar<ItemGerado[]>(`/quebras/${quebraId}/itens`, { method: "PUT", body: JSON.stringify({ itens }) }),
+};
+
 export interface PedidoSugestaoIa {
   tech: string;
   rotulo: string;

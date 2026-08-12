@@ -152,7 +152,8 @@ describe("gerarEspecificacaoEntrega", () => {
       },
     });
 
-    expect(doc).toContain("Logs relevantes emitidos: sim, via Winston + correlationId <- ✍️ especificar");
+    expect(doc).toContain("Logs relevantes emitidos: sim, via Winston + correlationId");
+    expect(doc).not.toContain("correlationId <- ✍️ especificar");
   });
 
   it("história de usuário: marcador quando não respondida, texto confirmado quando presente (Fase 1d-ii, SPEC-23)", () => {
@@ -495,6 +496,27 @@ describe("estruturarEspecificacaoNo / montarFichaItem (Fase 1a, SPEC-23 — dado
     expect(ficha.volumetria.map((v) => v.rotulo)).toEqual([
       "Response time", "Max error", "RPS (Requisições por segundo)", "Test duration",
     ]);
+  });
+
+  it("SPEC-41: história SUGERIDA pela esteira entra no documento com a marca — nunca mais '(sem história definida)' com conteúdo preenchido", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+    const chaveMongo = atividades.find((a) => a.chave.startsWith("n2"))!.chave;
+
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, config, {
+      regras,
+      respostasItens: {
+        [chaveMongo]: {
+          _historiaUsuario: { valor: "Como analista, quero o catálogo atualizado.", origem: "sugerido", confirmado: false },
+        },
+      },
+    });
+
+    expect(doc).toContain("Como analista, quero o catálogo atualizado.");
+    expect(doc).toContain("_(sugerido pela esteira — confirmar)_");
+    // O item COM história não pode mais dizer que não tem.
+    const secaoMongo = doc.split("###").find((s) => s.includes("Como analista"))!;
+    expect(secaoMongo).not.toContain("(sem história definida)");
   });
 
   it("montarFichaItem: resposta confirmada aparece anexada ao placeholder certo", () => {

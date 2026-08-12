@@ -4799,3 +4799,37 @@ time num spec sem o `jornada-vista` (o backdrop interceptava o mundo).
 
 Mordida da fase: resolução de rota quebrada (hash desconhecido deixando de
 cair no canvas) → teste vermelho. 413 unit; 47/47 E2E.
+
+## 188. SPEC-41 — o documento parou de mentir, e os itens nasceram dentro da ferramenta
+
+Dois movimentos numa rodada só, pré-aprovada. Primeiro o defeito de
+fidelidade: o markdown da especificação descartava as sugestões da esteira
+não confirmadas ("(sem história definida)" com a história ali do lado) e
+imprimia "✍️ especificar" junto de respostas presentes. A causa era uma
+função só servindo dois papéis: `respostaVisivel` é o gate de PRONTIDÃO
+(manual/confirmado) e estava também decidindo o RENDER. Nasceu
+`respostaParaDocumento`: confirmada sai limpa, sugerida sai com a marca
+"_(sugerido pela esteira — confirmar)_", e o marcador de especificar só
+aparece em campo realmente vazio. Seis testes do engine asseravam o
+comportamento antigo — atualizados de propósito, com mordida no gate.
+
+Depois a evolução: "Gerar itens de trabalho" nos balões M7/M12 materializa
+cada atividade como item persistido (`itens_gerados`, migração 0025) com o
+MESMO corpo que o documento renderiza — `gerarItensDeTrabalho` reusa
+`renderizarItemEspecificacao`, nunca uma segunda renderização — e contagens
+de completude (quantos ✍️ restam, quantas sugestões aguardam confirmação).
+Gerar é REGERAR: o conjunto da quebra é substituído atomicamente, e a
+`chave` estável preserva o rastro de exportação. A tela `#/itens` (rota no
+padrão SPEC-40, item "Itens de trabalho" no menu ☰) mostra a régua do
+conjunto ("N de M prontos pra exportar", com barra), cards com
+tipo/tamanho/dependências e o corpo expansível, e um vazio que explica de
+onde os itens nascem. A porta `ExportadorDeItens` nasceu junto, com o
+contrato da Fase 2 (adaptador MCP → Jira/tracker) — falha parcial é
+resposta por item, não exceção.
+
+Aprendizados da rodada: a FK nova quebrou os `truncate table quebras` sem
+CASCADE dos testes vizinhos (o contrato compartilhado pegou na hora); e o
+"agora não" dos balões tem `aria-label="Dispensar sugestão"` — de novo o
+nome acessível sobrescrevendo o texto visível num seletor de E2E. Mordidas:
+gate do render (3 testes da marca), preservação do exportado no adaptador,
+régua de completude da tela. 193 engine + 164 server + 419 web; 49/49 E2E.

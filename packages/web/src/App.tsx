@@ -9,6 +9,8 @@ import {
   type PerfisConfig,
   type Quebra,
   type ResultadoDependenciasDe,
+  gerarItensDeTrabalho,
+  type ItemDeTrabalho,
 } from "@gerador/engine";
 import { carregarConfig, type ConfigCarregada } from "./config/loadConfig";
 import { carregarCenarios, type Cenario } from "./demo/scenarios";
@@ -28,6 +30,8 @@ import {
   type EspecificacaoTemplate,
   type SessaoUsuario,
   apiPdca,
+  apiItensGerados,
+  type ItemGerado,
 } from "./api/client";
 import { useSessao } from "./auth/useSessao";
 import { LoginScreen } from "./auth/LoginScreen";
@@ -58,6 +62,7 @@ import { SemTimeScreen } from "./auth/SemTimeScreen";
 import { usePermissoes } from "./auth/usePermissoes";
 import { momentoDaConfig, momentoDoCanvas } from "./assistente/momentos";
 import { MenuLateral } from "./navegacao/MenuLateral";
+import { ItensScreen } from "./itens/ItensScreen";
 import { useRotaHash } from "./navegacao/rota";
 
 const CHAVE_JORNADA_VISTA = "gerador:jornada-vista";
@@ -324,6 +329,11 @@ function AppCarregado({
   // (☰) é o caminho pra ela. F5 mantém o lugar; condutores navegam por rota.
   const { rota, navegar } = useRotaHash();
   const mostrarConfig = rota.tela === "config";
+  const mostrarItens = rota.tela === "itens";
+  // SPEC-41 Parte B — os itens materializados da quebra aberta. A fonte de
+  // verdade é o server (persistem por quebra); o estado local é o espelho da
+  // última geração/carga desta sessão.
+  const [itensGerados, setItensGerados] = useState<ItemGerado[]>([]);
   const [menuAberto, setMenuAberto] = useState(false);
   const [mostrarAbrir, setMostrarAbrir] = useState(false);
   // #298 — a conversa do desenho (SPEC-27 Fase 1) e o contexto do épico moram
@@ -465,6 +475,44 @@ function AppCarregado({
       void persistencia.salvar();
     }
   }, [salvarAposNome, quebra.titulo]);
+
+  // Entrar na tela de itens (menu, deep-link ou F5) recarrega do server — o
+  // que está salvo é o que vale; a geração local só espelha na hora.
+  useEffect(() => {
+    if (!mostrarItens || !persistencia.quebraId) return;
+    let cancelado = false;
+    apiItensGerados
+      .listar(persistencia.quebraId)
+      .then((itens) => {
+        if (!cancelado) setItensGerados(itens);
+      })
+      .catch(() => {});
+    return () => {
+      cancelado = true;
+    };
+  }, [mostrarItens, persistencia.quebraId]);
+
+  /** SPEC-41 Parte B — o clique "Gerar itens" da revisão: persiste o conjunto
+   * (quando a quebra está salva) e abre a tela `#/itens`. Sem id ainda, os
+   * itens vivem no estado — salvos na próxima geração com a quebra salva. */
+  function aoGerarItens(itens: ItemDeTrabalho[]) {
+    const locais: ItemGerado[] = itens.map((it) => ({
+      ...it,
+      id: it.chave,
+      quebraId: persistencia.quebraId ?? "",
+      estado: "gerado",
+      linkExterno: null,
+      criadoEm: new Date().toISOString(),
+    }));
+    setItensGerados(locais);
+    if (persistencia.quebraId) {
+      apiItensGerados
+        .regerar(persistencia.quebraId, itens)
+        .then(setItensGerados)
+        .catch(() => {});
+    }
+    navegar({ tela: "itens" });
+  }
 
   const opcoesTour = {
     cenarios,
@@ -740,6 +788,7 @@ function AppCarregado({
           navegar({ tela: "canvas" });
           setMostrarAbrir(true);
         }}
+        onItens={() => navegar({ tela: "itens" })}
         onCenarios={() => setMostrarJornada(true)}
         onSair={() => void onSair()}
       />
@@ -785,9 +834,13 @@ function AppCarregado({
         )}
       </div>
 
+      {/* display:none (e não desmontar): a tela de itens cobre a revisão sem
+          perder o estado dela — os balões da revisão (zIndex 62) não vazam. */}
       {resultado && (
+        <div style={{ display: mostrarItens ? "none" : "contents" }}>
         <ReviewScreen
           onConfigurarModeloIa={() => abrirConfigNaAba("modeloIa")}
+          onItensGerados={aoGerarItens}
           especificacaoJaGerada={!!quebra.especificacao}
           onEspecificacaoGerada={(md) => {
             setQuebra((q) => ({ ...q, especificacao: md }));
@@ -807,6 +860,17 @@ function AppCarregado({
           onResponderItem={responderItem}
           onFechar={() => setResultado(null)}
           onSelecionarNo={setSelecionadoId}
+        />
+        </div>
+      )}
+
+      {mostrarItens && (
+        <ItensScreen
+          itens={itensGerados}
+          tituloDaQuebra={quebra.titulo ?? null}
+          onAbrirMenu={() => setMenuAberto(true)}
+          onFechar={() => navegar({ tela: "canvas" })}
+          onIrParaRevisao={() => navegar({ tela: "canvas" })}
         />
       )}
 

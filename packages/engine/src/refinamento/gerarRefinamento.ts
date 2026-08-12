@@ -51,6 +51,23 @@ export function respostaVisivel(resp: ValorSpec | undefined): resp is ValorSpec 
   return !!resp && (resp.origem === "manual" || resp.confirmado === true);
 }
 
+/** SPEC-41 §1 — a marca de sugestão não confirmada NO DOCUMENTO. */
+export const MARCA_SUGERIDO = "_(sugerido pela esteira — confirmar)_";
+
+/**
+ * SPEC-41 §1 — o que o DOCUMENTO mostra (a prontidão continua com
+ * `respostaVisivel`: confirmação humana é o que refina). Achado real: o
+ * markdown saía com "(sem história definida)" e "✍️ especificar" ao lado de
+ * conteúdo JÁ preenchido — sugestão da esteira era descartada do documento,
+ * e o marcador era impresso incondicionalmente.
+ */
+export function respostaParaDocumento(
+  resp: ValorSpec | undefined
+): { texto: string; sugerida: boolean } | null {
+  if (!resp || String(resp.valor ?? "").trim() === "") return null;
+  return { texto: String(resp.valor), sugerida: !respostaVisivel(resp) };
+}
+
 /** Chaves fixas dos dois placeholders que toda atividade tem, independente
  * de tech/regras.json (Fase 1d-ii, SPEC-23) — achado real: o usuário queria
  * que a IA escrevesse a história do item e cenários de teste contextuais, não
@@ -106,9 +123,10 @@ export function gerarChecklistTecnico(
 
     const linhas = [`**${tech.toUpperCase()}:**`];
     for (const r of relevantes) {
-      const resp = respostas?.[chaveChecklistTecnico(tech, r.texto)];
-      const sufixo = respostaVisivel(resp) ? `: ${String(resp.valor)}` : "";
-      linhas.push(`- ${r.texto}${sufixo} ${MARCADOR_ESPECIFICAR}`);
+      const resp = respostaParaDocumento(respostas?.[chaveChecklistTecnico(tech, r.texto)]);
+      // O marcador só em campo VAZIO; resposta sugerida entra com a marca.
+      if (resp) linhas.push(`- ${r.texto}: ${resp.texto}${resp.sugerida ? ` ${MARCA_SUGERIDO}` : ""}`);
+      else linhas.push(`- ${r.texto} ${MARCADOR_ESPECIFICAR}`);
     }
     blocos.push(linhas.join("\n"));
   }
@@ -187,9 +205,9 @@ export function gerarVolumetria(
   // de "um bloco só, não um por tech" que o bloco de volumetria já tinha.
   const tech = techsAplicaveis[0];
   return CAMPOS_VOLUMETRIA.map((campo) => {
-    const resp = respostas?.[chaveVolumetria(tech, campo)];
-    const valor = respostaVisivel(resp) ? String(resp.valor) : "___";
-    return `- ${campo}: ${valor} ${MARCADOR_ESPECIFICAR}`;
+    const resp = respostaParaDocumento(respostas?.[chaveVolumetria(tech, campo)]);
+    if (resp) return `- ${campo}: ${resp.texto}${resp.sugerida ? ` ${MARCA_SUGERIDO}` : ""}`;
+    return `- ${campo}: ___ ${MARCADOR_ESPECIFICAR}`;
   }).join("\n");
 }
 

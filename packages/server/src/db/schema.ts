@@ -29,6 +29,35 @@ export const quebras = pgTable("quebras", {
 });
 
 /**
+ * SPEC-41 Parte B — os itens de trabalho materializados dentro da ferramenta.
+ * Um conjunto por quebra, substituído inteiro a cada geração; `chave` é a
+ * `Atividade.chave` (estável entre regenerações), e é por ela que o rastro de
+ * exportação (`estado`/`linkExterno`, Fase 2 via MCP) sobrevive ao regerar.
+ */
+export const itensGerados = pgTable(
+  "itens_gerados",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    quebraId: uuid("quebra_id")
+      .notNull()
+      .references(() => quebras.id, { onDelete: "cascade" }),
+    ordem: integer("ordem").notNull().default(0),
+    chave: text("chave").notNull(),
+    titulo: text("titulo").notNull(),
+    tipo: text("tipo").notNull(),
+    tamanho: text("tamanho").notNull(),
+    dependencias: jsonb("dependencias").$type<string[]>().notNull().default([]),
+    corpoMarkdown: text("corpo_markdown").notNull(),
+    pendencias: integer("pendencias").notNull().default(0),
+    sugestoes: integer("sugestoes").notNull().default(0),
+    estado: text("estado").notNull().default("gerado"),
+    linkExterno: text("link_externo"),
+    criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("itens_gerados_chave_unica").on(t.quebraId, t.chave)]
+);
+
+/**
  * SPEC-38 Fase 2 — o catálogo de perfis de stack. A stack deixou de ser
  * atributo do time (`perfis_time` morreu na migração 0020): o time APONTA um
  * perfil nomeado ("Java + Spring Boot") via `times.perfil_stack_id`, e trocar

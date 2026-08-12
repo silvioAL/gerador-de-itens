@@ -3,6 +3,8 @@ import {
   carimbarInsumos,
   gerarDiagramaHtml,
   gerarEspecificacaoEntrega,
+  gerarItensDeTrabalho,
+  type ItemDeTrabalho,
   insumosDivergentes,
   insumosDoItem,
   montarFichaItem,
@@ -68,6 +70,9 @@ export interface ReviewScreenProps {
   onConfigurarModeloIa?: () => void;
   /** §184 — o markdown gerado sobe pro App, que o salva NA QUEBRA. */
   onEspecificacaoGerada?: (md: string) => void;
+  /** SPEC-41 Parte B — os itens materializados sobem pro App, que persiste e
+   * abre a tela `#/itens`. Mesmo material do documento (fonte única). */
+  onItensGerados?: (itens: ItemDeTrabalho[]) => void;
   /** §184 — a demanda reaberta já tem especificação: o chat abre com a fala adaptada. */
   especificacaoJaGerada?: boolean;
   onSelecionarNo: (id: string) => void;
@@ -244,6 +249,7 @@ export function ReviewScreen({
   onFechar,
   onConfigurarModeloIa,
   onEspecificacaoGerada,
+  onItensGerados,
   especificacaoJaGerada = false,
   onSelecionarNo,
 }: ReviewScreenProps) {
@@ -668,6 +674,14 @@ export function ReviewScreen({
     // §184 — o documento gerado (com TODO o material do momento) sobe pro App
     // e fica salvo na quebra: gerar é publicar uma versão, não só baixar.
     onEspecificacaoGerada?.(documento);
+  }
+
+  // SPEC-41 Parte B — os itens de trabalho, do MESMO material do documento.
+  function gerarItens() {
+    registrarUsoDeEspecificacao();
+    onItensGerados?.(
+      gerarItensDeTrabalho(resultado.atividades, diagrama, config, { regras, respostasItens })
+    );
   }
 
   const contagens = regras
@@ -1201,6 +1215,11 @@ export function ReviewScreen({
             <button onClick={baixarEspecificacao} style={chipM7Estilo} data-testid="balao-especificacao-acao">
               Gerar especificação de solução
             </button>
+            {onItensGerados && (
+              <button onClick={gerarItens} style={chipM7Estilo} data-testid="balao-especificacao-itens">
+                Gerar itens de trabalho
+              </button>
+            )}
             <button
               onClick={() => setM7Dispensado(true)}
               aria-label="Dispensar sugestão"
@@ -1264,6 +1283,11 @@ export function ReviewScreen({
             <button onClick={baixarEspecificacao} style={chipM7Estilo} data-testid="balao-gerar-acao">
               Gerar especificação de solução
             </button>
+            {onItensGerados && (
+              <button onClick={gerarItens} style={chipM7Estilo} data-testid="balao-gerar-itens">
+                Gerar itens de trabalho
+              </button>
+            )}
             <button
               onClick={() => dispensarMomento("m12")}
               aria-label="Dispensar sugestão"

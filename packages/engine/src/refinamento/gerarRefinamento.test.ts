@@ -149,21 +149,23 @@ describe("gerarChecklistTecnico", () => {
       expect(md).toContain("- DLQ configurada e monitorada <- ✍️ especificar");
     });
 
-    it("sugestão não confirmada não aparece na linha — só resposta manual ou sugerida+confirmada", () => {
+    it("SPEC-41: sugestão não confirmada ENTRA no documento, com a marca de sugerido", () => {
       const md = gerarChecklistTecnico(
         regras, ["Backend"], ["Backend-mensagens rabbitmq"], [noTecnico()], semArestasTecnico,
         { "Backend::DLQ configurada e monitorada": respostaSugeridaNaoConfirmada }
       );
-      expect(md).toContain("- DLQ configurada e monitorada <- ✍️ especificar");
-      expect(md).not.toContain("política X");
+      expect(md).toContain("política X");
+      expect(md).toContain("_(sugerido pela esteira — confirmar)_");
+      expect(md).not.toContain("DLQ configurada e monitorada <- ✍️ especificar");
     });
 
-    it("resposta manual aparece interpolada na linha, marcador continua no fim", () => {
+    it("resposta manual aparece interpolada, SEM marcador sobrando (SPEC-41)", () => {
       const md = gerarChecklistTecnico(
         regras, ["Backend"], ["Backend-mensagens rabbitmq"], [noTecnico()], semArestasTecnico,
         { "Backend::DLQ configurada e monitorada": respostaManual }
       );
-      expect(md).toContain("- DLQ configurada e monitorada: sim, via TTL de 7 dias <- ✍️ especificar");
+      expect(md).toContain("- DLQ configurada e monitorada: sim, via TTL de 7 dias");
+      expect(md).not.toContain("TTL de 7 dias <- ✍️ especificar");
     });
 
     it("sugestão confirmada aparece interpolada, mesma régua da manual", () => {
@@ -171,7 +173,10 @@ describe("gerarChecklistTecnico", () => {
         regras, ["Backend"], ["Backend-mensagens rabbitmq"], [noTecnico()], semArestasTecnico,
         { "Backend::DLQ configurada e monitorada": respostaSugeridaConfirmada }
       );
-      expect(md).toContain("- DLQ configurada e monitorada: sim, via política X <- ✍️ especificar");
+      expect(md).toContain("- DLQ configurada e monitorada: sim, via política X");
+      expect(md).not.toContain("política X <- ✍️ especificar");
+      // Confirmada: sem a marca de sugerido — a régua é a da manual mesmo.
+      expect(md).not.toContain("política X _(sugerido");
     });
   });
 });
@@ -213,17 +218,19 @@ describe("gerarVolumetria", () => {
     expect(gerarVolumetria(regras, ["Mobile"], ["Backend-chamadas http"])).toBe("");
   });
 
-  it("resposta confirmada substitui o '___' do campo, marcador continua no fim (Fase 1, SPEC-23)", () => {
+  it("resposta confirmada substitui o '___' do campo, sem marcador sobrando (SPEC-41)", () => {
     const respostas = { "Backend::volumetria::Response time": { valor: "200ms p95", origem: "manual" as const } };
     const md = gerarVolumetria(regras, ["Backend"], ["Backend-chamadas http"], respostas);
-    expect(md).toContain("- Response time: 200ms p95 <- ✍️ especificar");
+    // SPEC-41: com resposta, o marcador NÃO sobra ao lado; campo vazio mantém.
+    expect(md).toContain("- Response time: 200ms p95");
+    expect(md).not.toContain("200ms p95 <- ✍️ especificar");
     expect(md).toContain("- Max error: ___ <- ✍️ especificar");
   });
 
-  it("resposta sugerida não confirmada não substitui o '___'", () => {
+  it("SPEC-41: resposta sugerida substitui o '___' com a marca de sugerido", () => {
     const respostas = { "Backend::volumetria::Response time": { valor: "200ms p95", origem: "sugerido" as const, confirmado: false } };
     const md = gerarVolumetria(regras, ["Backend"], ["Backend-chamadas http"], respostas);
-    expect(md).toContain("- Response time: ___ <- ✍️ especificar");
+    expect(md).toContain("- Response time: 200ms p95 _(sugerido pela esteira — confirmar)_");
   });
 });
 
