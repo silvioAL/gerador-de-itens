@@ -34,6 +34,8 @@ import {
   apiPdca,
 } from "../api/client";
 import { baixarArquivoTexto } from "../persistence/baixarArquivo";
+import { assinarSugestao, fraseDeCompletude, pendenciasDaRevisao, type PendenteDeConfirmacao } from "./pendencias";
+import { FilaDeRevisao } from "./FilaDeRevisao";
 import { ConversaEspecificacao } from "../conversa/ConversaEspecificacao";
 import { useArrastavel } from "../assistente/useArrastavel";
 import { momentoDaRevisao } from "../assistente/momentos";
@@ -64,7 +66,10 @@ export interface ReviewScreenProps {
    * refinamento (Fase 1, SPEC-23), pra saber o que já está confirmado e não
    * precisa mais aparecer pendente na ficha. */
   respostasItens?: Record<string, Record<string, ValorSpec>>;
-  onResponderItem?: (atividadeChave: string, chavePlaceholder: string, resposta: ValorSpec) => void;
+  /** SPEC-44: `undefined` remove a resposta (Descartar da fila guiada). */
+  onResponderItem?: (atividadeChave: string, chavePlaceholder: string, resposta: ValorSpec | undefined) => void;
+  /** SPEC-44 — deep-link da tela de itens: seleciona este item ao abrir. */
+  itemInicial?: string | null;
   onFechar: () => void;
   /** SPEC-37 F3 (M4) — abre Configurações na aba Modelo de IA por cima da revisão. */
   onConfigurarModeloIa?: () => void;
@@ -246,6 +251,7 @@ export function ReviewScreen({
   time,
   respostasItens,
   onResponderItem,
+  itemInicial,
   onFechar,
   onConfigurarModeloIa,
   onEspecificacaoGerada,
@@ -337,7 +343,11 @@ export function ReviewScreen({
   );
 
   const responderComProcedencia = useCallback(
-    (atividadeChave: string, chavePlaceholder: string, resposta: ValorSpec) => {
+    (atividadeChave: string, chavePlaceholder: string, resposta: ValorSpec | undefined) => {
+      if (resposta === undefined) {
+        onResponderItem?.(atividadeChave, chavePlaceholder, undefined);
+        return;
+      }
       onResponderItem?.(atividadeChave, chavePlaceholder, {
         ...resposta,
         baseadoEm: carimboDoItem(atividadeChave),
@@ -684,6 +694,27 @@ export function ReviewScreen({
     );
   }
 
+  // SPEC-44 — a régua única: sugestões aguardando assinatura x campos vazios,
+  // agregadas sobre TODOS os itens (a barra, os chips e a fila leem daqui).
+  const pend = regras
+    ? pendenciasDaRevisao(
+        resultado.atividades.map((a) => ({ chave: a.chave, rotulo: a.rotulo, ficha: fichas.get(a.chave)! }))
+      )
+    : null;
+  const [filaAberta, setFilaAberta] = useState<PendenteDeConfirmacao[] | null>(null);
+
+  function confirmarTodas() {
+    for (const s of pend?.sugestoes ?? []) {
+      responderComProcedencia(s.itemChave, s.chave, assinarSugestao(s.resposta));
+    }
+  }
+
+  // Deep-link da tela de itens: chegar com um item alvo seleciona ele.
+  useEffect(() => {
+    if (itemInicial) setSelecionada(itemInicial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemInicial]);
+
   const contagens = regras
     ? resultado.atividades.reduce(
         (acc, a) => {
@@ -825,6 +856,34 @@ export function ReviewScreen({
           Voltar ao canvas
         </button>
       </header>
+
+      {/* SPEC-44 — a barra de pendências: o agregado que faltava. Aceitar é
+          barato (1 clique global); intervir é que merece clique. Some quando
+          não há pendência, e espera a esteira terminar (os números mudariam
+          sob o usuário). */}
+      {pend && !esteira.rodando && (pend.sugestoes.length > 0 || pend.vazios > 0) && (
+        <div style={barraPendenciasEstilo} data-testid="barra-pendencias">
+          <span style={{ fontSize: 12.5, color: "var(--texto-2)" }}>
+            {pend.sugestoes.length > 0 &&
+              `${pend.sugestoes.length} ${pend.sugestoes.length === 1 ? "sugestão" : "sugestões"} da esteira aguardando`}
+            {pend.sugestoes.length > 0 && pend.vazios > 0 && " · "}
+            {pend.vazios > 0 && `${pend.vazios} campo${pend.vazios === 1 ? "" : "s"} vazio${pend.vazios === 1 ? "" : "s"}`}
+          </span>
+          <div style={trilhoPendenciasEstilo} aria-hidden="true">
+            <div style={{ ...barraProgressoPendenciasEstilo, width: `${pend.totais > 0 ? (pend.confirmados / pend.totais) * 100 : 0}%` }} />
+          </div>
+          {pend.sugestoes.length > 0 && (
+            <>
+              <button onClick={confirmarTodas} style={botaoBarraEstilo} data-testid="confirmar-todas">
+                Confirmar todas ({pend.sugestoes.length})
+              </button>
+              <button onClick={() => setFilaAberta(pend.sugestoes)} style={botaoBarraSecEstilo} data-testid="revisar-uma-a-uma">
+                Revisar uma a uma
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {!mostrarDiagrama && (
         <EsteiraAgentes
@@ -1053,6 +1112,33 @@ export function ReviewScreen({
                     {a.tipo} · {a.tamanho}
                     {a.dependencias.length > 0 && ` · depende de ${descreverDependencia(a)}`}
                   </div>
+                  {/* SPEC-44 — a MESMA frase de completude da tela de itens,
+                      e o lote por item: assinar tudo deste item num clique. */}
+                  {(() => {
+                    const doItem = pendenciasDaRevisao([{ chave: a.chave, rotulo: a.rotulo, ficha }]);
+                    return (
+                      <div style={{ display: "flex", gap: 6, marginTop: 4, alignItems: "center", flexWrap: "wrap" }}>
+                        <span style={chipCompletudeEstilo} data-testid={`completude-${a.chave}`}>
+                          {fraseDeCompletude(doItem.sugestoes.length, doItem.vazios)}
+                        </span>
+                        {doItem.sugestoes.length > 0 && (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            data-testid={`confirmar-item-${a.chave}`}
+                            title={`Assina as ${doItem.sugestoes.length} sugestões deste item`}
+                            style={confirmarItemEstilo}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              for (const s of doItem.sugestoes) responderComProcedencia(s.itemChave, s.chave, assinarSugestao(s.resposta));
+                            }}
+                          >
+                            ✓ confirmar item
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                   {a.timesEnvolvidos?.length ? (
                     <div style={{ fontSize: 11, color: cruzaOutroTime ? "#e8b339" : "var(--dim, #8D9BB0)", marginTop: 2 }}>
                       {a.timesEnvolvidos.join(", ")}
@@ -1206,6 +1292,14 @@ export function ReviewScreen({
           especificação de solução, e o chip executa o MESMO baixarEspecificacao
           do botão do header. Só com o chat fechado (aberto, quem fala é ele) e
           com a esteira parada — no meio da corrida os números ainda mudam. */}
+      {filaAberta && (
+        <FilaDeRevisao
+          pendentes={filaAberta}
+          onConfirmar={(itemChave, chave, resposta) => responderComProcedencia(itemChave, chave, resposta)}
+          onDescartar={(itemChave, chave) => responderComProcedencia(itemChave, chave, undefined)}
+          onFechar={() => setFilaAberta(null)}
+        />
+      )}
       {momentoM7Ativo && (
         <div className="assistente-janela" style={balaoM7Estilo} data-testid="balao-especificacao" role="status">
           <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: "var(--texto-2)" }}>
@@ -1641,6 +1735,22 @@ function AbaRefinamento({
           <div key={papelConfig.id}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={lblEstilo}>{papelConfig.nome}</span>
+              {/* SPEC-44 — lote por seção: assinar tudo que o papel escreveu. */}
+              {placeholders.some((p) => p.resposta !== undefined && !respostaConfirmada(p.resposta)) && (
+                <button
+                  onClick={() => {
+                    for (const p of placeholders) {
+                      if (p.resposta !== undefined && !respostaConfirmada(p.resposta)) {
+                        onResponder?.(p.chave, { ...p.resposta, confirmado: true });
+                      }
+                    }
+                  }}
+                  style={reRodarEstilo}
+                  data-testid={`confirmar-secao-${papelConfig.id}`}
+                >
+                  ✓ Confirmar seção
+                </button>
+              )}
               {onReRodarSeguintes &&
                 gruposComSeguinte?.includes(papel) &&
                 placeholders.some((p) => p.resposta !== undefined) && (
@@ -2233,4 +2343,70 @@ const explicacaoDoGrupoEstilo: React.CSSProperties = {
   fontSize: 11.5,
   lineHeight: 1.5,
   color: "var(--texto-mudo)",
+};
+
+const barraPendenciasEstilo: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+  padding: "8px 16px",
+  borderBottom: "1px solid var(--borda)",
+  background: "var(--painel-alto)",
+};
+
+const trilhoPendenciasEstilo: React.CSSProperties = {
+  flex: 1,
+  height: 5,
+  borderRadius: 999,
+  background: "var(--fundo)",
+  overflow: "hidden",
+  maxWidth: 220,
+};
+
+const barraProgressoPendenciasEstilo: React.CSSProperties = {
+  height: "100%",
+  borderRadius: 999,
+  background: "var(--verde, #3ecf8e)",
+  transition: "width 250ms ease",
+};
+
+const botaoBarraEstilo: React.CSSProperties = {
+  fontSize: 12,
+  padding: "6px 12px",
+  borderRadius: 999,
+  border: "none",
+  background: "var(--acento)",
+  color: "#fff",
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+};
+
+const botaoBarraSecEstilo: React.CSSProperties = {
+  fontSize: 12,
+  padding: "6px 12px",
+  borderRadius: 999,
+  border: "1px solid var(--borda-forte)",
+  background: "transparent",
+  color: "var(--texto)",
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+};
+
+const chipCompletudeEstilo: React.CSSProperties = {
+  fontSize: 10.5,
+  padding: "2px 8px",
+  borderRadius: 999,
+  border: "1px solid var(--borda-forte)",
+  color: "var(--texto-fraco)",
+  background: "var(--fundo)",
+};
+
+const confirmarItemEstilo: React.CSSProperties = {
+  fontSize: 10.5,
+  padding: "2px 8px",
+  borderRadius: 999,
+  border: "none",
+  background: "rgba(62, 207, 142, 0.15)",
+  color: "var(--verde, #3ecf8e)",
+  cursor: "pointer",
 };

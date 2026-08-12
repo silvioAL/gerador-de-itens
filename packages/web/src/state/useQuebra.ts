@@ -270,14 +270,15 @@ export function useQuebra(inicial: Quebra, config: DiagramaConfig) {
    * do refinamento técnico/volumetria de uma atividade (Fase 1, SPEC-23) —
    * chaveada por `Atividade.chave` (estável) + a chave do próprio placeholder,
    * mesmo padrão de `definirValorSpec` pra campos de nó. */
-  const responderItem = useCallback((atividadeChave: string, chavePlaceholder: string, resposta: ValorSpec) => {
-    setQuebra((q) => ({
-      ...q,
-      respostasItens: {
-        ...q.respostasItens,
-        [atividadeChave]: { ...q.respostasItens?.[atividadeChave], [chavePlaceholder]: resposta },
-      },
-    }));
+  // SPEC-44: `undefined` REMOVE a resposta (o Descartar da fila guiada) — o
+  // campo volta a "✍️ especificar" de verdade, não fica um valor vazio.
+  const responderItem = useCallback((atividadeChave: string, chavePlaceholder: string, resposta: ValorSpec | undefined) => {
+    setQuebra((q) => {
+      const doItem = { ...q.respostasItens?.[atividadeChave] };
+      if (resposta === undefined) delete doItem[chavePlaceholder];
+      else doItem[chavePlaceholder] = resposta;
+      return { ...q, respostasItens: { ...q.respostasItens, [atividadeChave]: doItem } };
+    });
   }, []);
 
   const confirmarExclusao = useCallback(() => {

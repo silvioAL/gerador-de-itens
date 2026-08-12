@@ -4917,3 +4917,34 @@ chave mora no banco da organização e a API só devolve o resumo mascarado
 (o usuário roda Infisical na stack; a observação sobre git não fazia
 sentido nenhum). Mordida: fallback removido → teste do fluxo exato
 vermelho. 165 server; 416 web.
+
+## 192. SPEC-44 — a revisão pós-IA sem os 30 cliques: lote, fila guiada e uma régua só
+
+Pedido do usuário (pré-aprovado, as duas fases): "a experiência de clicar
+em confirmar/sugerir a item a item não está boa, e depois vai para a tela
+onde aparece apenas uma lista". Medido: ~9 placeholders por item, cada um
+com o seu Confirmar — ~30 cliques para a decisão mais comum ("está bom"),
+nenhum agregado dizendo quantas sugestões aguardavam, e revisão e tela de
+itens falando réguas diferentes.
+
+O princípio da SPEC: aceitar deve ser barato e em lote; intervir é que
+merece o clique. Nasceu `review/pendencias.ts` — a régua ÚNICA, pura:
+"sugestão aguardando" (a esteira escreveu, ninguém assinou) x "campo vazio"
+(ninguém escreveu), com `assinarSugestao` mantendo a procedência
+(`origem: "sugerido"` fica; o humano só assina — editar é que vira
+`manual`). Em cima dela: a barra de pendências no topo da revisão ("N
+sugestões da esteira aguardando · M campos vazios", progresso, "Confirmar
+todas" e "Revisar uma a uma"), o lote por seção ("✓ Confirmar seção" no
+header de cada papel), o lote por item ("✓ confirmar item" no card) e a
+fila guiada (Fase 2): overlay com UMA sugestão por vez, Confirmar
+(Enter) · Pular · Descartar, snapshot das pendências na abertura, avanço
+automático atravessando itens. Descartar REMOVE a resposta de verdade —
+`responderItem` aceita `undefined` agora.
+
+A régua única fecha o ciclo: o card da revisão diz a MESMA frase de
+completude da tela de itens, e lá o chip de item não-pronto virou botão de
+volta ("… ↩") que abre a revisão já naquele item (`itemInicial`). O teste
+da frase mordeu um bug real de pluralização ("2 sugestãos") que já existia
+na tela de itens — corrigido nos três pontos. Mordida da régua: confirmadas
+contadas como pendentes → 2 testes vermelhos. 424 web unit; 50/50 E2E (o
+novo percorre o ciclo inteiro com /ia/sugerir mockado).

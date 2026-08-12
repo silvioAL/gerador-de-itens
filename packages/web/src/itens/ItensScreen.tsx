@@ -18,6 +18,8 @@ export interface ItensScreenProps {
   onFechar: () => void;
   /** Regenerar = voltar pra revisão, onde o material mora. */
   onIrParaRevisao?: () => void;
+  /** SPEC-44 — deep-link: abre a revisão JÁ no item deste card. */
+  onRevisarItem?: (chave: string) => void;
 }
 
 function completudeDoItem(item: ItemGerado): { rotulo: string; cor: string; fundo: string } {
@@ -26,7 +28,7 @@ function completudeDoItem(item: ItemGerado): { rotulo: string; cor: string; fund
     return { rotulo: "Pronto pra exportar", cor: "var(--verde, #4ade80)", fundo: "rgba(74, 222, 128, 0.12)" };
   if (item.pendencias === 0)
     return {
-      rotulo: `${item.sugestoes} sugestão${item.sugestoes === 1 ? "" : "s"} a confirmar`,
+      rotulo: `${item.sugestoes} ${item.sugestoes === 1 ? "sugestão" : "sugestões"} a confirmar`,
       cor: "var(--amarelo, #facc15)",
       fundo: "rgba(250, 204, 21, 0.12)",
     };
@@ -37,7 +39,7 @@ function completudeDoItem(item: ItemGerado): { rotulo: string; cor: string; fund
   };
 }
 
-export function ItensScreen({ itens, tituloDaQuebra, onAbrirMenu, onFechar, onIrParaRevisao }: ItensScreenProps) {
+export function ItensScreen({ itens, tituloDaQuebra, onAbrirMenu, onFechar, onIrParaRevisao, onRevisarItem }: ItensScreenProps) {
   const [aberto, setAberto] = useState<string | null>(null);
 
   const prontos = itens.filter((i) => i.pendencias === 0 && i.sugestoes === 0).length;
@@ -110,12 +112,25 @@ export function ItensScreen({ itens, tituloDaQuebra, onAbrirMenu, onFechar, onIr
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
                         <span style={chipEstilo}>{item.tipo}</span>
                         <span style={chipEstilo}>tamanho {item.tamanho}</span>
-                        <span
-                          style={{ ...chipEstilo, color: completude.cor, background: completude.fundo, borderColor: "transparent" }}
-                          data-testid={`item-completude-${i}`}
-                        >
-                          {completude.rotulo}
-                        </span>
+                        {/* SPEC-44 — item não-pronto: o chip é o caminho de
+                            VOLTA pra revisão daquele item, não um beco. */}
+                        {onRevisarItem && (item.pendencias > 0 || item.sugestoes > 0) && item.estado !== "exportado" ? (
+                          <button
+                            onClick={() => onRevisarItem(item.chave)}
+                            title="Abrir a revisão já neste item pra resolver as pendências"
+                            style={{ ...chipEstilo, color: completude.cor, background: completude.fundo, borderColor: "transparent", cursor: "pointer" }}
+                            data-testid={`item-completude-${i}`}
+                          >
+                            {completude.rotulo} ↩
+                          </button>
+                        ) : (
+                          <span
+                            style={{ ...chipEstilo, color: completude.cor, background: completude.fundo, borderColor: "transparent" }}
+                            data-testid={`item-completude-${i}`}
+                          >
+                            {completude.rotulo}
+                          </span>
+                        )}
                         {item.estado === "exportado" && item.linkExterno && (
                           <a href={item.linkExterno} target="_blank" rel="noreferrer" style={{ ...chipEstilo, textDecoration: "none" }}>
                             abrir no tracker ↗
