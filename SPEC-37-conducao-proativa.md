@@ -109,6 +109,17 @@ a rodada da Fase 2, quando o fluxo estiver na mão.
   `baixarEspecificacao` do botão do header; bubble pulsa junto.
 - Fase 3 (M2–M5, M8) segue no mapa, para depois do uso real das duas fases.
 
+## 8.1 Fase 3 — implementada (§180)
+
+M2–M5 e M8 entraram, com a DECISÃO extraída pura em
+`assistente/momentos.ts` (a prioridade é onde o bug seria silencioso):
+`momentoDoCanvas` (M9 > M3 > M2; nada com resultado aberto),
+`momentoDaRevisao` (M4 > M5 > M7; silêncio com esteira rodando ou chat
+aberto; M5 só com a revisão INTOCADA — é aviso de chegada, e sem essa
+janela ele bloquearia o M7 pra sempre) e `momentoDaConfig` (M8 quando a
+instalação não tem padrões do time). M4 ganhou chip "Abrir Modelo de IA";
+M2 e M8 convidam pra conversa citando texto ou voz (🎤).
+
 ## 9. M10 — o nome antes de derivar (achado do uso real, §174)
 
 O uso real pediu um momento fora do mapa original: **auto-save após gerar os

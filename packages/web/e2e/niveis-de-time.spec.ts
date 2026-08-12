@@ -28,10 +28,10 @@ test("visualizar lê a quebra mas não vê o Salvar; o servidor nega a escrita p
   // O owner monta o cenário pela API: time novo (o criador nasce owner) e um
   // membro `visualizar`. Sufixo aleatório porque o banco E2E é descartável
   // entre rodadas, mas não entre re-execuções da mesma stack.
-  const timeId = `time-niveis-${Math.random().toString(36).slice(2, 8)}`;
+  const timeId = "time-e2e-niveis"; // fixo e idempotente: um time novo POR RODADA fazia a lista da EscolherTimeScreen crescer até empurrar o time do seed pra fora do viewport (flake real medido)
   const viewer = `viewer-${Math.random().toString(36).slice(2, 8)}@gerador.local`;
   const criar = await page.request.post(`${API}/times`, { data: { timeId } });
-  expect(criar.status()).toBe(201);
+  expect([201, 409]).toContain(criar.status()); // 409 = rodada anterior na mesma stack já criou; o dev segue owner
   const adicionar = await page.request.post(`${API}/times/${timeId}/membros`, {
     data: { email: viewer, nivel: "visualizar" },
   });
@@ -66,9 +66,9 @@ test("aba Membros mostra e edita níveis, e a mudança persiste no servidor", as
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   await entrar(page);
 
-  const timeId = `time-teto-${Math.random().toString(36).slice(2, 8)}`;
+  const timeId = "time-e2e-teto";
   const operador = `oper-${Math.random().toString(36).slice(2, 8)}@gerador.local`;
-  expect((await page.request.post(`${API}/times`, { data: { timeId } })).status()).toBe(201);
+  expect([201, 409]).toContain((await page.request.post(`${API}/times`, { data: { timeId } })).status());
   expect(
     (await page.request.post(`${API}/times/${timeId}/membros`, { data: { email: operador, nivel: "operar" } })).status()
   ).toBe(201);

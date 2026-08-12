@@ -25,6 +25,9 @@ test("derivar quebra abre a revisão com a atividade esperada e exporta", async 
     if (msg.type() === "error") erros.push(msg.text());
   });
 
+  // SPEC-37 M2 — canvas vazio no boot: o convite de começar conversando.
+  await expect(page.getByTestId("assistente-balao")).toContainText("Quer começar conversando");
+
   await page.getByRole("button", { name: "+ Fila Rabbit" }).click();
 
   const node = page.locator(".react-flow__node", { hasText: "Fila Rabbit" });
@@ -57,6 +60,11 @@ test("derivar quebra abre a revisão com a atividade esperada e exporta", async 
   await page.getByTestId("assistente-balao-confirmar").click();
 
   await expect(page.getByTestId("contagem-itens")).toHaveText("1 itens");
+
+  // SPEC-37 M4 — este spec declara "sem gateway" no /ia/status: o balão mais
+  // bloqueante da revisão aparece, com o chip da aba certa.
+  await expect(page.getByTestId("balao-sem-ia")).toContainText("sem credencial de gateway");
+  await page.getByTestId("balao-sem-ia").getByRole("button", { name: "Dispensar sugestão" }).click();
   await expect(page.getByRole("button", { name: "01" })).toBeVisible();
   await expect(page.getByText("Não é possível derivar ainda")).not.toBeVisible();
 
