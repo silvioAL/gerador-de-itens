@@ -1574,7 +1574,12 @@ describe("ReviewScreen â€” o que um papel escreveu continua na tela quando o prÃ
         especificacaoTemplate={templateFixture}
         respostasItens={respostasItens}
         onResponderItem={(chave, placeholder, resposta) =>
-          setRespostasItens((r) => ({ ...r, [chave]: { ...r[chave], [placeholder]: resposta } }))
+          setRespostasItens((r) => {
+            const doItem = { ...r[chave] };
+            if (resposta === undefined) delete doItem[placeholder];
+            else doItem[placeholder] = resposta;
+            return { ...r, [chave]: doItem };
+          })
         }
         onFechar={vi.fn()}
         onSelecionarNo={vi.fn()}

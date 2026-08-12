@@ -334,6 +334,8 @@ function AppCarregado({
   // verdade é o server (persistem por quebra); o estado local é o espelho da
   // última geração/carga desta sessão.
   const [itensGerados, setItensGerados] = useState<ItemGerado[]>([]);
+  // SPEC-44 — deep-link da tela de itens pra revisão: o item a selecionar.
+  const [itemInicialRevisao, setItemInicialRevisao] = useState<string | null>(null);
   const [menuAberto, setMenuAberto] = useState(false);
   const [mostrarAbrir, setMostrarAbrir] = useState(false);
   // #298 — a conversa do desenho (SPEC-27 Fase 1) e o contexto do épico moram
@@ -847,6 +849,7 @@ function AppCarregado({
           time={quebra.time}
           respostasItens={quebra.respostasItens}
           onResponderItem={responderItem}
+          itemInicial={itemInicialRevisao}
           onFechar={() => setResultado(null)}
           onSelecionarNo={setSelecionadoId}
         />
@@ -860,6 +863,14 @@ function AppCarregado({
           onAbrirMenu={() => setMenuAberto(true)}
           onFechar={() => navegar({ tela: "canvas" })}
           onIrParaRevisao={() => navegar({ tela: "canvas" })}
+          onRevisarItem={
+            resultado
+              ? (chave) => {
+                  setItemInicialRevisao(chave);
+                  navegar({ tela: "canvas" });
+                }
+              : undefined
+          }
         />
       )}
 
