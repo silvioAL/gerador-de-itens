@@ -32,6 +32,8 @@ function comoQuebraSalva(linha: LinhaQuebra): QuebraSalva {
     respostasItens: (linha.respostasItens ?? {}) as QuebraSalva["respostasItens"],
     demandInfo: linha.demandInfo ?? "",
     anexosContexto: (linha.anexosContexto ?? []) as string[],
+    especificacao: linha.especificacao ?? null,
+    especificacaoGeradaEm: linha.especificacaoGeradaEm?.toISOString() ?? null,
     criadoEm: linha.criadoEm.toISOString(),
     atualizadoEm: linha.atualizadoEm.toISOString(),
   };
@@ -77,6 +79,9 @@ export function criarRepositorioDeQuebrasEmPostgres(db: BancoDeDados): Repositor
           respostasItens: dados.respostasItens,
           demandInfo: dados.demandInfo,
           anexosContexto: dados.anexosContexto,
+          especificacao: dados.especificacao ?? null,
+          // A data marca a VERSÃO da especificação — só quando o texto vem.
+          especificacaoGeradaEm: dados.especificacao ? new Date() : null,
         })
         .returning();
       return comoQuebraSalva(criada);
@@ -93,6 +98,8 @@ export function criarRepositorioDeQuebrasEmPostgres(db: BancoDeDados): Repositor
           respostasItens: dados.respostasItens,
           demandInfo: dados.demandInfo,
           anexosContexto: dados.anexosContexto,
+          especificacao: dados.especificacao ?? null,
+          ...(dados.especificacao ? { especificacaoGeradaEm: new Date() } : {}),
           atualizadoEm: new Date(),
         })
         .where(eq(quebras.id, id))

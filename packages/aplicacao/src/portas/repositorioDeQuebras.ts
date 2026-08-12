@@ -28,7 +28,10 @@ export interface QuebraSalva {
   demandInfo: string;
   /** Anexos colados junto do contexto do épico. */
   anexosContexto: string[];
+  /** §184 — o markdown da especificação gerada (null = nunca gerada). */
+  especificacao?: string | null;
   /** ISO-8601. Quem cria decide o valor — o relógio é do adaptador. */
+  especificacaoGeradaEm?: string | null;
   criadoEm: string;
   atualizadoEm: string;
 }
@@ -63,5 +66,8 @@ export function normalizarDadosQuebra(bruto: Partial<DadosQuebra> | undefined): 
     respostasItens: bruto?.respostasItens ?? {},
     demandInfo: bruto?.demandInfo ?? "",
     anexosContexto: bruto?.anexosContexto ?? [],
+    // §184 — sem esta linha a especificação morre aqui, do mesmo jeito que os
+    // três campos da SPEC-31 morriam no Zod da borda.
+    especificacao: bruto?.especificacao ?? null,
   };
 }

@@ -29,10 +29,10 @@
           "x": 420, "y": 120,
           "spec": {
             "collection": { "valor": "produtos", "origem": "manual" },
-            "indices": { "valor": "sku (unique), categoria", "origem": "manual" },
+            "indices": { "valor": "codigo (unique), categoria", "origem": "manual" },
             "writeConcern": { "valor": "majority", "origem": "manual" },
             "schemaDocumento": {
-              "valor": "{ sku: string, nome: string, categoria: string, precoCentavos: number, ativo: boolean, atualizadoEm: ISODate }",
+              "valor": "{ codigo: string, nome: string, categoria: string, precoCentavos: number, ativo: boolean, atualizadoEm: ISODate }",
               "origem": "manual"
             }
           },

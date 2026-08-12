@@ -52,6 +52,11 @@ export interface QuebraSalva {
   /** Respostas (humanas ou IA confirmada) aos placeholders "<- ✍️ especificar"
    * do refinamento técnico/volumetria (Fase 1, SPEC-23). */
   respostasItens?: Record<string, Record<string, ValorSpec>>;
+  demandInfo?: string;
+  anexosContexto?: string[];
+  /** §184 — o markdown da especificação gerada (null = nunca gerada). */
+  especificacao?: string | null;
+  especificacaoGeradaEm?: string | null;
   criadoEm: string;
   atualizadoEm: string;
 }
