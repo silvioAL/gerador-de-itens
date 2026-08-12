@@ -159,6 +159,16 @@ papel com `perfis-stack` existe → SÓ o grant edita, inclusive por cima de
 owners — a exceção deliberada ao owner-bypass da Fase 1 (D1). Apontar o
 ponteiro é `exigirNivel(owner)` no próprio time, sempre.
 
+## 5.3 Fase 3 — implementada (§178)
+
+`time_papel` (migração 0022): papel atribuível a um TIME, herdado pelos
+membros de nível owner com escopo organizacional, resolvido dentro do
+`resolverPermissoes` (a herança une com as atribuições por e-mail). Rotas
+`POST/DELETE /acessos/papeis/:id/times`, lista `times` no GET, e o botão
+"Atribuir ao time" no AcessosTab. O teste-âncora usa o caso onde a herança
+tem valor de verdade: curadoria ligada barra até owners, e o owner do time
+portador passa pelo grant herdado — rebaixado, perde na hora.
+
 ## 6. Verificação (feito quando)
 
 1. Um `visualizar` abre quebras do time e recebe 403 ao tentar salvar; a UI

@@ -10,6 +10,7 @@ const criarPapelMock = vi.hoisted(() => vi.fn());
 const salvarPapelMock = vi.hoisted(() => vi.fn());
 const excluirPapelMock = vi.hoisted(() => vi.fn());
 const adicionarMembroMock = vi.hoisted(() => vi.fn());
+const adicionarTimeMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../api/client", async (importActual) => ({
   ...(await importActual<typeof import("../api/client")>()),
@@ -22,6 +23,8 @@ vi.mock("../api/client", async (importActual) => ({
     excluirPapel: excluirPapelMock,
     adicionarMembro: adicionarMembroMock,
     removerMembro: vi.fn(),
+    adicionarTime: adicionarTimeMock,
+    removerTime: vi.fn(),
   },
 }));
 
@@ -31,7 +34,7 @@ const CATALOGO = {
 };
 
 function papel(over: Partial<PapelAcesso> = {}): PapelAcesso {
-  return { id: "p1", nome: "Agilidade", permissoes: [], membros: [], ...over };
+  return { id: "p1", nome: "Agilidade", permissoes: [], membros: [], times: [], ...over };
 }
 
 beforeEach(() => {
@@ -158,6 +161,17 @@ describe("AcessosTab (SPEC-28 Fase 2)", () => {
 
     await waitFor(() => expect(criarPapelMock).toHaveBeenCalledWith({ nome: "Arquitetura", permissoes: [] }));
     expect(papeisMock).toHaveBeenCalledTimes(2); // carga inicial + recarga
+  });
+
+  it("SPEC-38 F3: atribuir o papel ao time ativo chama a API — owners do time herdam", async () => {
+    papeisMock.mockResolvedValue([papel({ times: [] })]);
+    adicionarTimeMock.mockResolvedValue({ timeId: "time-pagamentos" });
+    render(<AcessosTab timeAtivo="time-pagamentos" />);
+
+    await waitFor(() => expect(screen.getByText("Agilidade")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Atribuir Agilidade ao time time-pagamentos" }));
+
+    await waitFor(() => expect(adicionarTimeMock).toHaveBeenCalledWith("p1", "time-pagamentos"));
   });
 
   it("erro do servidor aparece na tela, não some", async () => {
