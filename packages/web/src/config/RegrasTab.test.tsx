@@ -51,6 +51,17 @@ const REGRAS = {
   },
 };
 
+const NODE_TYPES = {
+  rabbit: {
+    label: "Fila Rabbit",
+    derives: "queue",
+    techs: ["Backend"],
+    contextos: ["Backend-mensagens rabbitmq"],
+    spec: [],
+  },
+  service: { label: "Serviço", derives: "service", techs: ["Backend"], contextos: [], spec: [] },
+};
+
 beforeEach(() => {
   obterMock.mockReset();
   salvarMock.mockReset();
@@ -296,5 +307,49 @@ describe("RegrasTab — as quatro listas em seções separadas (SPEC-20 aplicada
       dev: true,
       hlg: false,
     });
+  });
+});
+
+describe("SPEC-36 Opção A — criar regra pela linguagem do componente", () => {
+  it("escolher Fila Rabbit grava no grupo Backend com o CONTEXTO derivado — sem digitar tech nenhuma", async () => {
+    render(<RegrasTab nodeTypes={NODE_TYPES} contextos={["Backend-mensagens rabbitmq", "Backend-http"]} />);
+    await waitFor(() => expect(screen.getByTestId("nova-regra-por-componente")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText("Componente da nova regra"), { target: { value: "rabbit" } });
+    // A prévia diz o alcance ANTES de salvar — a defesa contra a regra que
+    // nunca casa com item nenhum.
+    expect(screen.getByTestId("alcance-da-regra")).toHaveTextContent("alcança: Fila Rabbit");
+
+    fireEvent.change(screen.getByLabelText("Texto da nova regra"), {
+      target: { value: "política de DLQ definida?" },
+    });
+    fireEvent.click(screen.getByTestId("adicionar-regra-por-componente"));
+
+    await waitFor(() => expect(salvarMock).toHaveBeenCalled());
+    const doc = salvarMock.mock.calls.at(-1)![0];
+    expect(doc.porTech.Backend.checklistTecnico.at(-1)).toEqual({
+      texto: "política de DLQ definida?",
+      contextos: ["Backend-mensagens rabbitmq"],
+    });
+  });
+
+  it("o escopo 'todo Backend' grava contextos VAZIOS — vale para a tech inteira", async () => {
+    render(<RegrasTab nodeTypes={NODE_TYPES} contextos={["Backend-mensagens rabbitmq"]} />);
+    await waitFor(() => expect(screen.getByTestId("nova-regra-por-componente")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText("Componente da nova regra"), { target: { value: "rabbit" } });
+    const escopo = screen.getByLabelText("Escopo da nova regra");
+    const indiceTech = Array.from((escopo as HTMLSelectElement).options).findIndex((o) =>
+      o.text.includes("todo Backend")
+    );
+    fireEvent.change(escopo, { target: { value: String(indiceTech) } });
+    expect(screen.getByTestId("alcance-da-regra")).toHaveTextContent("Serviço");
+
+    fireEvent.change(screen.getByLabelText("Texto da nova regra"), { target: { value: "regra larga" } });
+    fireEvent.click(screen.getByTestId("adicionar-regra-por-componente"));
+
+    await waitFor(() => expect(salvarMock).toHaveBeenCalled());
+    const doc = salvarMock.mock.calls.at(-1)![0];
+    expect(doc.porTech.Backend.checklistTecnico.at(-1)).toEqual({ texto: "regra larga", contextos: [] });
   });
 });

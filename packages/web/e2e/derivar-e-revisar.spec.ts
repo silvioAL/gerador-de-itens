@@ -82,7 +82,9 @@ test("derivar quebra abre a revisão com a atividade esperada e exporta", async 
   // O que o nó era no canvas chega classificado na ficha: o tipo virou tech e
   // contexto, e é isso que depois seleciona as regras de refinamento. Sem este
   // elo a ficha seria um formulário vazio com um número em cima.
-  await expect(page.getByText("Backend-mensagens rabbitmq")).toBeVisible();
+  // Exato: com as regras vindas do DOCUMENTO (SPEC-36/§179), a mensagem de
+  // "nada a escrever" do especialista também cita o contexto.
+  await expect(page.getByText("Backend-mensagens rabbitmq", { exact: true })).toBeVisible();
   await expect(page.getByText("Criar Fila Rabbit.")).toBeVisible();
 
   const downloadMd = page.waitForEvent("download");
