@@ -23,7 +23,6 @@ export interface ConfigurarPanelProps {
   /** Techs do time (appConfig) — destino dos alvos de regras. */
   techs?: string[];
   timeAtivo?: string;
-  hospedado: boolean;
   onCriarCampoNo: (dados: DadosCampoNo) => Promise<void>;
   onCriarCampoAresta: (dados: DadosCampoAresta) => Promise<void>;
   onSalvarPipelineAgentes: (dados: ConfigPipelineAgentes) => Promise<void>;
@@ -108,7 +107,6 @@ export function ConfigurarPanel({
   pipelineAgentes,
   techs,
   timeAtivo,
-  hospedado,
   onCriarCampoNo,
   onCriarCampoAresta,
   onSalvarPipelineAgentes,
@@ -124,7 +122,8 @@ export function ConfigurarPanel({
   const [pensando, setPensando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const fimRef = useRef<HTMLDivElement>(null);
-  const permissoes = usePermissoes({ hospedado, timeId: timeAtivo });
+  // SPEC-33: só o hospedado existe — a prop de modo saiu com o ramo morto (§158).
+  const permissoes = usePermissoes({ hospedado: true, timeId: timeAtivo });
 
   const tiposDeNo = Object.entries(config.nodeTypes).map(([id, cfg]) => ({ id, rotulo: cfg.label ?? id }));
   const tiposDeAresta = Object.entries(config.edgeTypes ?? {}).map(([id, cfg]) => ({

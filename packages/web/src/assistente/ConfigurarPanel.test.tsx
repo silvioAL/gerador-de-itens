@@ -46,7 +46,6 @@ function montar(extra: Partial<Parameters<typeof ConfigurarPanel>[0]> = {}) {
       camposAresta={[]}
       pipelineAgentes={{ confirmacaoObrigatoria: true }}
       timeAtivo="time-pagamentos"
-      hospedado={false}
       onCriarCampoNo={onCriarCampoNo}
       onCriarCampoAresta={onCriarCampoAresta}
       onSalvarPipelineAgentes={onSalvarPipelineAgentes}
@@ -68,6 +67,9 @@ beforeEach(() => {
   regrasObterMock.mockReset();
   regrasSalvarMock.mockReset();
   regrasSalvarMock.mockImplementation(async (d) => d);
+  // O painel agora é sempre hospedado (§158): o hook de permissões busca de
+  // verdade — modo aberto (sem papel) é o default que deixa tudo permitido.
+  minhasMock.mockResolvedValue({ rbacAtivo: false, porRecurso: {} });
   configurarMock.mockResolvedValue({
     texto: "Proponho um campo obrigatório de runbook no Serviço.",
     propostas: [{ alvo: "campo-no", instrucao: "campo obrigatório de runbook de plantão para serviços" }],
@@ -148,7 +150,7 @@ describe("ConfigurarPanel (SPEC-34 Fase 1 — configurar conversando)", () => {
 
   it("sem permissão o Aplicar fica desabilitado COM o motivo escrito — não some (§144)", async () => {
     minhasMock.mockResolvedValue({ rbacAtivo: true, porRecurso: {} });
-    montar({ hospedado: true });
+    montar();
     await enviarIntencao("campo novo");
     await waitFor(() => expect(screen.getByText("Runbook de plantão")).toBeInTheDocument());
 

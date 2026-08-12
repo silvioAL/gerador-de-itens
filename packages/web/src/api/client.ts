@@ -514,7 +514,10 @@ export const apiIa = {
     });
     if (!resposta.ok) {
       const corpo = await resposta.json().catch(() => ({}));
-      const mensagem = typeof corpo.erro === "string" ? corpo.erro : "Não foi possível gerar a ficha.";
+      // §162 — sem `erro` legível no corpo (proxy devolvendo HTML, socket
+      // caído), o status ao menos diz ONDE olhar, em vez de um genérico mudo.
+      const mensagem =
+        typeof corpo.erro === "string" ? corpo.erro : `Não foi possível gerar a ficha (HTTP ${resposta.status}, sem detalhe do servidor).`;
       throw new Error(mensagem);
     }
     let acumulado = "";
@@ -551,7 +554,8 @@ export const apiIa = {
     });
     if (!resposta.ok) {
       const corpo = await resposta.json().catch(() => ({}));
-      const mensagem = typeof corpo.erro === "string" ? corpo.erro : "Não foi possível gerar a sugestão.";
+      const mensagem =
+        typeof corpo.erro === "string" ? corpo.erro : `Não foi possível gerar a sugestão (HTTP ${resposta.status}, sem detalhe do servidor).`;
       throw new Error(mensagem);
     }
     let acumulado = "";
@@ -586,7 +590,8 @@ export const apiIa = {
     });
     if (!resposta.ok) {
       const corpo = await resposta.json().catch(() => ({}));
-      const mensagem = typeof corpo.erro === "string" ? corpo.erro : "Não foi possível propor o diagrama.";
+      const mensagem =
+        typeof corpo.erro === "string" ? corpo.erro : `Não foi possível propor o diagrama (HTTP ${resposta.status}, sem detalhe do servidor).`;
       throw new Error(mensagem);
     }
     let acumulado = "";
@@ -617,7 +622,8 @@ export const apiIa = {
     });
     if (!resposta.ok) {
       const corpo = await resposta.json().catch(() => ({}));
-      const mensagem = typeof corpo.erro === "string" ? corpo.erro : "Não foi possível propor a alteração.";
+      const mensagem =
+        typeof corpo.erro === "string" ? corpo.erro : `Não foi possível propor a alteração (HTTP ${resposta.status}, sem detalhe do servidor).`;
       throw new Error(mensagem);
     }
     let acumulado = "";
@@ -648,7 +654,8 @@ export const apiIa = {
     });
     if (!resposta.ok) {
       const corpo = await resposta.json().catch(() => ({}));
-      const mensagem = typeof corpo.erro === "string" ? corpo.erro : "Não foi possível responder.";
+      const mensagem =
+        typeof corpo.erro === "string" ? corpo.erro : `Não foi possível responder (HTTP ${resposta.status}, sem detalhe do servidor).`;
       throw new Error(mensagem);
     }
     let acumulado = "";
