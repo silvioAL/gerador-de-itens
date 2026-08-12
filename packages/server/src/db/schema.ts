@@ -58,40 +58,36 @@ export const itensGerados = pgTable(
 );
 
 /**
- * SPEC-38 Fase 2 — o catálogo de perfis de stack. A stack deixou de ser
- * atributo do time (`perfis_time` morreu na migração 0020): o time APONTA um
- * perfil nomeado ("Java + Spring Boot") via `times.perfil_stack_id`, e trocar
- * de tecnologia é trocar o ponteiro. Curadoria: recurso RBAC `perfis-stack` —
- * sem papel nenhum com ele, o catálogo é aberto a owners de time (D1).
+ * SPEC-43 — stacks conhecidas: catálogo global POR COMPONENTE, sem vínculo
+ * por time. "Java + Spring Boot" é uma stack DO Serviço; "Camunda 7" é outra,
+ * DO Processo. Todo valor do catálogo vira sugestão pra todo mundo — o
+ * vínculo por time (SPEC-38 F2) morreu na migração 0026 a pedido do usuário
+ * ("poderia simplesmente ter tudo"). Curadoria: recurso RBAC `perfis-stack`
+ * (nome mantido — permissões concedidas continuam valendo).
  */
-export const perfisStack = pgTable(
-  "perfis_stack",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    organizacaoId: uuid("organizacao_id")
-      .notNull()
-      .references(() => organizacoes.id),
-    nome: text("nome").notNull(),
-    criadoPor: text("criado_por").notNull(),
-    criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [uniqueIndex("perfis_stack_nome_unico").on(t.organizacaoId, t.nome)]
-);
+export const stacks = pgTable("stacks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizacaoId: uuid("organizacao_id")
+    .notNull()
+    .references(() => organizacoes.id),
+  tipoNo: text("tipo_no").notNull(),
+  nome: text("nome").notNull(),
+  criadoPor: text("criado_por").notNull(),
+  criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+});
 
-/** Mesma forma relacional do antigo `perfis_time` (uma linha por valor, pra
- * UPDATE pontual) — só que pendurada no PERFIL, não no time. */
-export const perfilStackValores = pgTable(
-  "perfil_stack_valores",
+/** Uma linha por valor (UPDATE pontual) — o tipoNo mora na stack, não aqui. */
+export const stackValores = pgTable(
+  "stack_valores",
   {
-    perfilId: uuid("perfil_id")
+    stackId: uuid("stack_id")
       .notNull()
-      .references(() => perfisStack.id, { onDelete: "cascade" }),
-    tipoNo: text("tipo_no").notNull(),
+      .references(() => stacks.id, { onDelete: "cascade" }),
     campo: text("campo").notNull(),
     valor: text("valor").notNull(),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("perfil_stack_valores_chave_unica").on(t.perfilId, t.tipoNo, t.campo)]
+  (t) => [uniqueIndex("stack_valores_chave_unica").on(t.stackId, t.campo)]
 );
 
 /** Sentinela usada em `campos_no.time_id` pra campo compartilhado por todo mundo —
@@ -158,9 +154,6 @@ export const times = pgTable("times", {
     .notNull()
     .references(() => organizacoes.id),
   nome: text("nome").notNull(),
-  /** SPEC-38 Fase 2 — o perfil de stack que este time usa (nullable: time sem
-   * stack declarada). Apontar é ato de owner DO TIME, sempre. */
-  perfilStackId: uuid("perfil_stack_id").references(() => perfisStack.id),
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -110,16 +110,16 @@ describe("PropertiesPanel — perfil de stack do time", () => {
     edgeTypes: {},
     edgeRules: {},
   };
-  const perfil: PerfilTime = { service: { linguagem: "Java" } };
+  const sugestoes = { service: { linguagem: ["Java", "Node"] } };
 
   function HarnessServico({
-    perfilDoTime,
+    sugestoesDeStack,
     time,
-    onSalvarPerfilDoTime,
+    onSalvarStack,
   }: {
-    perfilDoTime?: PerfilTime;
+    sugestoesDeStack?: Record<string, Record<string, string[]>>;
     time?: string;
-    onSalvarPerfilDoTime?: (tipoNo: string, valores: Record<string, unknown>) => void;
+    onSalvarStack?: (tipoNo: string, valores: Record<string, unknown>) => void;
   }) {
     const quebraState = useQuebra(
       {
@@ -137,65 +137,60 @@ describe("PropertiesPanel — perfil de stack do time", () => {
         arestas={[]}
         config={configService}
         quebraState={quebraState}
-        perfilDoTime={perfilDoTime}
+        sugestoesDeStack={sugestoesDeStack}
         time={time}
-        onSalvarPerfilDoTime={onSalvarPerfilDoTime}
+        onSalvarStack={onSalvarStack}
       />
     );
   }
 
-  it("sem perfil, não há sugestão para um campo sem default", () => {
+  it("sem stacks conhecidas, não há sugestão para um campo sem default", () => {
     render(<HarnessServico />);
     expect(screen.queryByText(/usar sugestão/)).not.toBeInTheDocument();
   });
 
-  it("com perfil do time, sugere o valor conhecido e aceitar grava como manual", async () => {
+  it("SPEC-43: TODOS os valores conhecidos viram chips — um por stack — e aceitar grava como manual", async () => {
     const user = userEvent.setup();
-    render(<HarnessServico perfilDoTime={perfil} />);
+    render(<HarnessServico sugestoesDeStack={sugestoes} />);
 
-    const botaoSugestao = screen.getByText("usar sugestão: Java");
-    expect(botaoSugestao).toBeInTheDocument();
+    // Duas stacks conhecem "linguagem": dois chips, sem filtro por time.
+    expect(screen.getByText("usar sugestão: Java")).toBeInTheDocument();
+    expect(screen.getByText("usar sugestão: Node")).toBeInTheDocument();
 
-    await user.click(botaoSugestao);
+    await user.click(screen.getByText("usar sugestão: Java"));
 
     expect(screen.queryByText(/usar sugestão/)).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("Java")).toBeInTheDocument();
     expect(screen.getByText("manual", { exact: true })).toBeInTheDocument();
   });
 
-  it("sem time definido, mostra a dica de onde configurar em vez do botão de capturar perfil", () => {
-    render(<HarnessServico />);
-    expect(screen.getByText(/Sem time definido nesta quebra/)).toBeInTheDocument();
-    expect(screen.queryByText(/salvar estes valores como padrão do time/)).not.toBeInTheDocument();
-  });
-
-  it("com time definido e um campo preenchido manualmente, captura o perfil do time ao clicar", async () => {
+  it("com um campo preenchido manualmente, captura como stack conhecida ao clicar — sem depender de time", async () => {
     const user = userEvent.setup();
-    const onSalvarPerfilDoTime = vi.fn();
-    render(<HarnessServico time="time-x" onSalvarPerfilDoTime={onSalvarPerfilDoTime} />);
+    const onSalvarStack = vi.fn();
+    render(<HarnessServico onSalvarStack={onSalvarStack} />);
 
-    expect(screen.queryByText(/salvar estes valores como padrão do time/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/salvar estes valores como stack conhecida/)).not.toBeInTheDocument();
 
     const campo = screen.getByRole("textbox", { name: "Linguagem/Stack" });
     await user.type(campo, "Kotlin");
 
-    const botao = screen.getByText("💾 salvar estes valores como padrão do time «time-x»");
+    const botao = screen.getByText("💾 salvar estes valores como stack conhecida");
     await user.click(botao);
 
-    expect(onSalvarPerfilDoTime).toHaveBeenCalledWith("service", { linguagem: "Kotlin" });
+    expect(onSalvarStack).toHaveBeenCalledWith("service", { linguagem: "Kotlin" });
   });
 
   it("achado real: campo de identidade (nome do serviço) preenchido manualmente não entra na captura — cada instância precisa do seu próprio nome", async () => {
     const user = userEvent.setup();
-    const onSalvarPerfilDoTime = vi.fn();
-    render(<HarnessServico time="time-x" onSalvarPerfilDoTime={onSalvarPerfilDoTime} />);
+    const onSalvarStack = vi.fn();
+    render(<HarnessServico onSalvarStack={onSalvarStack} />);
 
     await user.type(screen.getByRole("textbox", { name: "Nome do serviço" }), "srv-checkout");
     await user.type(screen.getByRole("textbox", { name: "Linguagem/Stack" }), "Kotlin");
 
-    await user.click(screen.getByText("💾 salvar estes valores como padrão do time «time-x»"));
+    await user.click(screen.getByText("💾 salvar estes valores como stack conhecida"));
 
-    expect(onSalvarPerfilDoTime).toHaveBeenCalledWith("service", { linguagem: "Kotlin" });
+    expect(onSalvarStack).toHaveBeenCalledWith("service", { linguagem: "Kotlin" });
   });
 });
 

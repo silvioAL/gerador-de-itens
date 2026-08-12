@@ -97,7 +97,7 @@ describe("ConversaPanel (SPEC-27 Fase 1 — a conversa do desenho)", () => {
       <ConversaPanel
         config={config}
         timeAtivo="pagamentos"
-        perfisTime={{ pagamentos: { service: { linguagem: "Java", framework: "Spring Boot" } } }}
+        sugestoesDeStack={{ service: { linguagem: ["Java"], framework: ["Spring Boot"] } }}
         onAplicar={vi.fn()}
       />
     );

@@ -2,15 +2,15 @@ import { describe, expect, it, vi, beforeEach, type Mock } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { DiagramaConfig } from "@gerador/engine";
 vi.mock("../api/client", () => ({
-  apiPerfisStack: {
+  apiStacks: {
     catalogo: vi.fn(),
     criar: vi.fn(),
-    apontar: vi.fn(),
     definirValores: vi.fn(),
+    capturar: vi.fn(),
   },
 }));
 
-import { apiPerfisStack } from "../api/client";
+import { apiStacks } from "../api/client";
 import { PerfisStackTab } from "./PerfisStackTab";
 
 const config: DiagramaConfig = {
@@ -27,89 +27,81 @@ const config: DiagramaConfig = {
         { key: "framework", label: "Framework", type: "text", required: false },
       ],
     },
+    camunda: {
+      label: "Processo Camunda",
+      derives: "process",
+      techs: [],
+      contextos: [],
+      color: "#f59e0b",
+      spec: [{ key: "framework", label: "Framework", type: "text", required: false }],
+    },
   },
   edgeTypes: {},
   edgeRules: {},
 };
 
-/** O cenário do print do usuário (§189): DOIS times apontando o MESMO perfil. */
-const catalogoCompartilhado = {
-  perfis: [
-    {
-      id: "p1",
-      nome: "Java + Spring Boot",
-      criadoPor: "dev",
-      valores: { service: { linguagem: "Java", framework: "Spring Boot" } },
-    },
-    { id: "p2", nome: "Node", criadoPor: "dev", valores: { service: { linguagem: "Node" } } },
+/** O achado do usuário (§190): o "perfil" antigo misturava componentes num
+ * nome só. Aqui cada stack é de UM componente — catálogo com três stacks. */
+const catalogo = {
+  stacks: [
+    { id: "s1", tipoNo: "service", nome: "Java + Spring Boot", criadoPor: "dev", valores: { linguagem: "Java", framework: "Spring Boot" } },
+    { id: "s2", tipoNo: "service", nome: "Node", criadoPor: "dev", valores: { linguagem: "Node" } },
+    { id: "s3", tipoNo: "camunda", nome: "Camunda 7", criadoPor: "dev", valores: { framework: "Camunda 7" } },
   ],
-  ponteiros: { "time-pagamentos": "p1", "time-silvio": "p1", "time-portabilidade": "p2" },
 };
 
 function montar() {
   const onPerfisMudaram = vi.fn();
-  render(<PerfisStackTab config={config} timeAtivo="time-silvio" onPerfisMudaram={onPerfisMudaram} />);
+  render(<PerfisStackTab config={config} onPerfisMudaram={onPerfisMudaram} />);
   return { onPerfisMudaram };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  (apiPerfisStack.catalogo as Mock).mockResolvedValue(catalogoCompartilhado);
+  (apiStacks.catalogo as Mock).mockResolvedValue(catalogo);
 });
 
-describe("PerfisStackTab (SPEC-42 — time não é stack)", () => {
-  it("cards são por PERFIL, cada um UMA vez, com 'usado por' dizendo quem aponta — nunca um card por time", async () => {
+describe("PerfisStackTab (SPEC-43 — stacks conhecidas, catálogo global)", () => {
+  it("agrupa por COMPONENTE: 'Java + Spring Boot' fica no Serviço e 'Camunda 7' no Processo — nada de pacote misto", async () => {
     montar();
-    const cardJava = await screen.findByTestId("perfil-Java + Spring Boot");
-    expect(within(cardJava).getByText(/usado por: time-pagamentos, time-silvio/)).toBeInTheDocument();
-    expect(within(screen.getByTestId("perfil-Node")).getByText(/usado por: time-portabilidade/)).toBeInTheDocument();
-    // O defeito do print: 3 times, 2 perfis → DOIS cards (um por perfil),
-    // nunca um card por time.
-    expect(screen.getAllByTestId(/^perfil-/)).toHaveLength(2);
+    const cardJava = await screen.findByTestId("stack-Java + Spring Boot");
+    expect(within(cardJava).getByText("Spring Boot", { exact: true })).toBeInTheDocument();
+    // O card do Serviço NÃO carrega Camunda dentro (o defeito do print do §190).
+    expect(within(cardJava).queryByText(/Camunda/)).not.toBeInTheDocument();
+    expect(screen.getByTestId("stack-Camunda 7")).toBeInTheDocument();
+    // Sem nenhuma menção a time ou "usado por" — o catálogo é global.
+    expect(screen.queryByText(/usado por|time ativo|do time/i)).not.toBeInTheDocument();
   });
 
-  it("editar um valor age no PERFIL via definirValores, e o aviso diz pra quantos times vale", async () => {
+  it("editar um valor age na STACK via definirValores, e recarrega as sugestões do App", async () => {
     const { onPerfisMudaram } = montar();
-    (apiPerfisStack.definirValores as Mock).mockResolvedValue({ linguagem: "Java 21" });
+    (apiStacks.definirValores as Mock).mockResolvedValue({ linguagem: "Java 21" });
 
-    const cardJava = await screen.findByTestId("perfil-Java + Spring Boot");
-    fireEvent.click(
-      within(cardJava).getByRole("button", { name: "Editar linguagem de Serviço no perfil Java + Spring Boot" })
-    );
-
-    // O aviso que faltava: o alcance da edição, em times.
-    expect(screen.getByTestId("alcance-do-valor").textContent).toContain(
-      'vale para os 2 times que apontam "Java + Spring Boot"'
-    );
+    const cardJava = await screen.findByTestId("stack-Java + Spring Boot");
+    fireEvent.click(within(cardJava).getByRole("button", { name: "Editar linguagem da stack Java + Spring Boot" }));
 
     fireEvent.change(screen.getByLabelText("Valor"), { target: { value: "Java 21" } });
-    fireEvent.click(screen.getByTestId("salvar-valor-de-perfil"));
+    fireEvent.click(screen.getByTestId("salvar-valor-de-stack"));
 
-    await waitFor(() =>
-      expect(apiPerfisStack.definirValores).toHaveBeenCalledWith("p1", "service", { linguagem: "Java 21" })
-    );
+    await waitFor(() => expect(apiStacks.definirValores).toHaveBeenCalledWith("s1", { linguagem: "Java 21" }));
     await waitFor(() => expect(onPerfisMudaram).toHaveBeenCalled());
   });
 
-  it("apontar um perfil pro time ativo continua funcionando (o vínculo do time, separado do catálogo)", async () => {
-    const { onPerfisMudaram } = montar();
-    (apiPerfisStack.apontar as Mock).mockResolvedValue({});
-
-    await screen.findByTestId("perfil-Node");
-    fireEvent.change(screen.getByLabelText("Perfil de stack do time ativo"), { target: { value: "p2" } });
-
-    await waitFor(() => expect(apiPerfisStack.apontar).toHaveBeenCalledWith("time-silvio", "p2"));
-    await waitFor(() => expect(onPerfisMudaram).toHaveBeenCalled());
-  });
-
-  it("catálogo vazio conduz: criar o primeiro perfil", async () => {
-    (apiPerfisStack.catalogo as Mock).mockResolvedValue({ perfis: [], ponteiros: {} });
-    (apiPerfisStack.criar as Mock).mockResolvedValue({ id: "novo", nome: "Node 20 + Fastify", criadoPor: "x", valores: {} });
+  it("criar stack pede o COMPONENTE junto do nome", async () => {
+    (apiStacks.criar as Mock).mockResolvedValue({ id: "novo", tipoNo: "camunda", nome: "Camunda 8", criadoPor: "x", valores: {} });
     montar();
+    await screen.findByTestId("stack-Node");
 
+    fireEvent.change(screen.getByLabelText("Componente da nova stack"), { target: { value: "camunda" } });
+    fireEvent.change(screen.getByLabelText("Nome da nova stack"), { target: { value: "Camunda 8" } });
+    fireEvent.click(screen.getByRole("button", { name: "+ Criar stack" }));
+
+    await waitFor(() => expect(apiStacks.criar).toHaveBeenCalledWith("camunda", "Camunda 8"));
+  });
+
+  it("catálogo vazio conduz: criar a primeira stack ou capturar pelo painel", async () => {
+    (apiStacks.catalogo as Mock).mockResolvedValue({ stacks: [] });
+    montar();
     expect(await screen.findByText(/Catálogo vazio/)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Nome do novo perfil de stack"), { target: { value: "Node 20 + Fastify" } });
-    fireEvent.click(screen.getByRole("button", { name: "+ Criar perfil" }));
-    await waitFor(() => expect(apiPerfisStack.criar).toHaveBeenCalledWith("Node 20 + Fastify"));
   });
 });

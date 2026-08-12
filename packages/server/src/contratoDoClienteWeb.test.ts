@@ -160,9 +160,9 @@ describe("o cliente do web contra o servidor de verdade (#308)", () => {
     expect(envelope.diagnostico).toHaveProperty("possivelmenteDesatualizada");
   });
 
-  it("perfis de time volta como mapa tipoNo -> campo -> valor", async () => {
-    const perfis = await cliente.apiPerfisTime.listar("time-pagamentos");
-    expect(typeof perfis).toBe("object");
+  it("sugestões de stack voltam como mapa tipoNo -> campo -> valores[] (SPEC-43)", async () => {
+    const sugestoes = await cliente.apiStacks.sugestoes();
+    expect(typeof sugestoes).toBe("object");
   });
 
   it("template de especificação traz `conteudo` — é o que a aba edita", async () => {

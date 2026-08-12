@@ -52,14 +52,9 @@ export {
 
 export { criarCasosDeUsoDeCamposAresta, type CasosDeUsoDeCamposAresta } from "./casos-de-uso/camposAresta.js";
 
-export type {
-  PerfilDeTime,
-  PerfilStack,
-  PerfisDeTimes,
-  RepositorioDePerfisStack,
-} from "./portas/repositorioDePerfisStack.js";
+export type { Stack, SugestoesDeStack, RepositorioDeStacks } from "./portas/repositorioDeStacks.js";
 
-export { criarCasosDeUsoDePerfisStack, type CasosDeUsoDePerfisStack } from "./casos-de-uso/perfisStack.js";
+export { criarCasosDeUsoDeStacks, nomeDerivadoDosValores, type CasosDeUsoDeStacks } from "./casos-de-uso/stacks.js";
 
 export type {
   RepositorioDeTemplateEspecificacao,

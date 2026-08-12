@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { DiagramaConfig, PerfisConfig } from "@gerador/engine";
+import type { DiagramaConfig } from "@gerador/engine";
+import type { SugestoesDeStack } from "../api/client";
 import { apiIa, type DiagramaProposto } from "../api/client";
 import { AnexoDeImagem, type ImagemAnexada } from "./AnexoDeImagem";
 import { BotaoFalar } from "./BotaoFalar";
@@ -7,7 +8,7 @@ import { useVozNaEntrada } from "./useVozNaEntrada";
 
 export interface ConversaPanelProps {
   config: DiagramaConfig;
-  perfisTime?: PerfisConfig;
+  sugestoesDeStack?: SugestoesDeStack;
   timeAtivo?: string;
   techs?: string[];
   contextos?: string[];
@@ -47,7 +48,7 @@ interface Mensagem {
  */
 export function ConversaPanel({
   config,
-  perfisTime,
+  sugestoesDeStack,
   timeAtivo,
   techs,
   contextos,
@@ -99,15 +100,14 @@ export function ConversaPanel({
     rotulo: (cfg as { label?: string }).label ?? id,
   }));
 
-  /** A stack do time vira uma frase — é contexto que o usuário não deveria ter
-   * que repetir a cada demanda (é justamente pra isso que perfis-time existe). */
+  /** SPEC-43 — as stacks conhecidas viram uma frase de contexto: o agente fica
+   * sabendo os valores usuais sem o usuário repetir a cada demanda. */
   function descreverPerfil(): string | undefined {
-    const perfil = timeAtivo ? perfisTime?.[timeAtivo] : undefined;
-    if (!perfil) return undefined;
-    const partes = Object.entries(perfil).flatMap(([tipoNo, valores]) =>
-      Object.entries(valores as Record<string, unknown>)
-        .filter(([, v]) => v !== undefined && v !== null && v !== "")
-        .map(([campo, v]) => `${tipoNo}.${campo}: ${String(v)}`)
+    if (!sugestoesDeStack) return undefined;
+    const partes = Object.entries(sugestoesDeStack).flatMap(([tipoNo, campos]) =>
+      Object.entries(campos)
+        .filter(([, valores]) => valores.length > 0)
+        .map(([campo, valores]) => `${tipoNo}.${campo}: ${valores.join(" | ")}`)
     );
     return partes.length > 0 ? partes.join("; ") : undefined;
   }

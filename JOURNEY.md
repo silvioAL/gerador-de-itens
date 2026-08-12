@@ -4862,3 +4862,36 @@ Quatro E2E asseravam a UI antiga e mudaram de propósito — o de "declarar
 Java" agora percorre o fluxo novo inteiro: criar perfil no catálogo →
 apontar o time → valor no perfil → sugestão no nó novo. 418 web unit;
 49/49 E2E.
+
+## 190. SPEC-43 — stacks conhecidas: catálogo global por componente, sem vínculo por time
+
+A continuação natural do §189, guiada pelo usuário em dois passos: primeiro
+"aparece Java + Spring Boot e tem outras coisas" — o perfil era um pacote
+heterogêneo (Serviço + Camunda + FICO) com nome que mente; depois "isso se
+é que faz sentido representar por time, poderia simplesmente ter tudo".
+Decisão travada com AskUserQuestion: ter tudo, sem vínculo por time.
+
+O modelo novo: `stacks` {tipo_no, nome} + `stack_valores` — "Java + Spring
+Boot" é uma stack DO Serviço, "Camunda 7" é outra DO Processo; o nome fica
+honesto porque o escopo é um componente só. A migração 0026 fatia cada
+(perfil × componente) numa stack com nome derivado dos próprios valores
+(string_agg DESC — "Java + Spring Boot", "Camunda 7", "FICO Blaze Advisor",
+"Node", conferido contra o banco real do container) e derruba
+`times.perfil_stack_id`, `perfis_stack` e `perfil_stack_valores`. Morreram
+as rotas `/perfis-time/*` e o ponteiro; nasceram `GET/POST /stacks`,
+`GET /stacks/sugestoes` (agregado tipo→campo→valores[]),
+`PUT /stacks/:id/valores` e `POST /stacks/capturar` — a captura mescla na
+stack de mesmo nome derivado (capturar duas vezes não duplica). O RBAC
+continua o da SPEC-38 (`perfis-stack`, curadoria/owners).
+
+Na UI: o painel do nó agora mostra UM CHIP POR VALOR conhecido ("usar
+sugestão: Java" e "usar sugestão: Node" lado a lado) e o botão virou
+"salvar estes valores como stack conhecida" — sem depender de time; a área
+foi renomeada "Stacks conhecidas" (menu, tela, tour), agrupada por
+componente; a linha "stack:" do menu (SPEC-42) morreu junto com o conceito
+de stack-do-time; o chat de configuração descreve o catálogo inteiro como
+contexto.
+
+Mordidas: capturar sempre-criando → teste "não duplica" vermelho; chips
+truncados a um → teste dos chips múltiplos vermelho. 193 engine + 163
+server + 416 web; 49/49 E2E.

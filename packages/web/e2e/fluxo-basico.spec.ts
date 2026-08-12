@@ -93,19 +93,15 @@ test("perfil de stack do time sugere linguagem/framework do serviço", async ({ 
   await painel.getByText("usar sugestão: Java").click();
   await expect(painel.locator("select").first()).toHaveValue("Java");
 
-  // Um dos jeitos de "configurar a stack do time": capturar valores preenchidos
-  // manualmente num nó real — grava direto no @gerador/server (compartilhado com
-  // o resto do time), não baixa mais arquivo nenhum.
-  const botaoSalvarPerfil = painel.getByText(/salvar estes valores como padrão do time/);
-  await expect(botaoSalvarPerfil).toBeVisible();
-  await botaoSalvarPerfil.click();
+  // SPEC-43: capturar valores preenchidos num nó real grava uma stack
+  // CONHECIDA no catálogo global — sem depender de time nenhum.
+  const botaoSalvarStack = painel.getByText(/salvar estes valores como stack conhecida/);
+  await expect(botaoSalvarStack).toBeVisible();
+  await botaoSalvarStack.click();
 
   await page.getByRole("button", { name: "☰ Menu" }).click();
-  await page.getByRole("button", { name: /Perfis de stack/ }).click();
-  // SPEC-42: a captura gravou no PERFIL que time-pagamentos aponta — o card é
-  // do perfil, com o badge "usado por" dizendo quem o usa.
+  await page.getByRole("button", { name: /Stacks conhecidas/ }).click();
   const telaConfig = page.locator('[data-tour="config-screen-content"]');
-  await expect(telaConfig.getByText(/usado por: .*time-pagamentos/).first()).toBeVisible();
   await expect(telaConfig.getByText("linguagem:", { exact: false }).first()).toBeVisible();
   await page.getByRole("button", { name: "Voltar ao canvas" }).click();
 

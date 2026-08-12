@@ -10,7 +10,7 @@ import { ConfigScreen, type AbaConfig } from "./ConfigScreen";
  * nova entra aqui, de propósito manualmente.
  */
 const AREAS: { area: AbaConfig; rotulo: RegExp }[] = [
-  { area: "perfis", rotulo: /Perfis de stack/ },
+  { area: "perfis", rotulo: /Stacks conhecidas/ },
   { area: "campos", rotulo: /Padrões por componente/ },
   { area: "camposAresta", rotulo: /Campos por tipo de conexão/ },
   { area: "membros", rotulo: /Membros/ },
