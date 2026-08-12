@@ -57,7 +57,7 @@ test("regra criada pelo componente grava o contexto certo e chega no item deriva
     await page.getByTestId("assistente-balao-secundaria").click(); // sem título: derivar sem salvar
 
     await page.locator('[data-testid^="item-"]').first().click();
-    await expect(page.getByText("Política de DLQ definida e documentada?")).toBeVisible();
+    await expect(page.getByText(/Política de DLQ definida e documentada/).first()).toBeVisible();
   } finally {
     await page.request.put(`${API}/config/regras`, { data: { documento: original } });
   }
