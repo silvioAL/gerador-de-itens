@@ -91,6 +91,8 @@ export {
   GRUPOS_FICHA,
   normalizarDocumentoConfig,
   normalizarPipelineAgentes,
+  validarEscritaConfig,
+  validarEscritaPipelineAgentes,
   PAPEIS_PADRAO,
   sanearPapeis,
   type ConfigPipelineAgentes,

@@ -7,6 +7,7 @@ import {
   extrairVariaveis,
   validarTemplate,
   TEMPLATE_ESPECIFICACAO_PADRAO,
+  problemasDoTemplate,
   estruturarEspecificacaoNo,
   montarFichaItem,
   nosDeOrigem,
@@ -571,5 +572,36 @@ describe("extrairVariaveis / validarTemplate", () => {
 
   it("extrai nomes sem duplicatas", () => {
     expect(extrairVariaveis("{{titulo}} — {{titulo}} de novo — {{itens}}")).toEqual(["titulo", "itens"]);
+  });
+});
+
+/**
+ * SPEC-35 — o motivo que o usuário pediu para ver ("não deveria salvar e sim
+ * alertar que é inválido e mostrar o motivo"). Borda e tela importam esta
+ * função; se ela erra, os dois erram juntos — por isso os casos aqui são a
+ * rede de verdade.
+ */
+describe("problemasDoTemplate (SPEC-35)", () => {
+  it("o template padrão não tem erro nem aviso — o estado de fábrica é válido por construção", () => {
+    expect(problemasDoTemplate(TEMPLATE_ESPECIFICACAO_PADRAO)).toEqual({ erros: [], avisos: [] });
+  });
+
+  it("apagar {{itens}} é ERRO, com a consequência escrita — o documento sairia sem o corpo", () => {
+    const { erros } = problemasDoTemplate("# {{titulo}}\n{{contexto}}");
+    expect(erros.some((e) => e.includes("{{itens}}") && e.includes("corpo do documento"))).toBe(true);
+  });
+
+  it("variável desconhecida é ERRO e diz quais são as válidas", () => {
+    const { erros } = problemasDoTemplate("{{itens}} {{especificacaoTecnica}}");
+    expect(erros).toHaveLength(1);
+    expect(erros[0]).toContain("{{especificacaoTecnica}}");
+    expect(erros[0]).toContain("{{titulo}}");
+  });
+
+  it("template enxuto é escolha legítima: sem {{contexto}} é AVISO com a consequência, não erro", () => {
+    const { erros, avisos } = problemasDoTemplate("{{itens}}");
+    expect(erros).toEqual([]);
+    expect(avisos.some((a) => a.includes("{{contexto}}") && a.includes("Contexto do épico"))).toBe(true);
+    expect(avisos).toHaveLength(5);
   });
 });

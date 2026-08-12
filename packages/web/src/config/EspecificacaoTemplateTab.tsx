@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { VARIAVEIS_ESPECIFICACAO, validarTemplate } from "@gerador/engine";
+import { VARIAVEIS_ESPECIFICACAO, problemasDoTemplate } from "@gerador/engine";
 import type { EspecificacaoTemplate } from "../api/client";
 
 export interface EspecificacaoTemplateTabProps {
@@ -30,10 +30,13 @@ export function EspecificacaoTemplateTab({ template, timeAtivo, onSalvar }: Espe
     setEditando(true);
   }
 
-  const variaveisDesconhecidas = validarTemplate(conteudo);
+  // SPEC-35 — a MESMA função da borda: erros bloqueiam o salvar (variável
+  // desconhecida, {{itens}} ausente); avisos dizem o que deixa de sair no
+  // documento sem impedir o template enxuto.
+  const problemas = problemasDoTemplate(conteudo);
 
   async function salvar() {
-    if (variaveisDesconhecidas.length > 0) return;
+    if (problemas.erros.length > 0) return;
     setSalvando(true);
     setErro(null);
     try {
@@ -98,21 +101,33 @@ export function EspecificacaoTemplateTab({ template, timeAtivo, onSalvar }: Espe
               style={textareaFormEstilo}
             />
 
-            {variaveisDesconhecidas.length > 0 && (
-              <p style={erroEstilo}>
-                Variável(is) desconhecida(s): {variaveisDesconhecidas.map((v) => `{{${v}}}`).join(", ")}
-              </p>
+            {problemas.erros.length > 0 && (
+              <div style={erroEstilo} data-testid="template-erros">
+                <strong>Não dá pra salvar assim:</strong>
+                <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+                  {problemas.erros.map((e) => (
+                    <li key={e}>{e}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {problemas.avisos.length > 0 && (
+              <div style={avisoEstilo} data-testid="template-avisos">
+                {problemas.avisos.map((a) => (
+                  <div key={a}>{a}</div>
+                ))}
+              </div>
             )}
             {erro && <p style={erroEstilo}>{erro}</p>}
 
             <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
               <button
                 onClick={() => void salvar()}
-                disabled={salvando || variaveisDesconhecidas.length > 0}
+                disabled={salvando || problemas.erros.length > 0}
                 style={{
                   ...botaoSalvarEstilo,
-                  opacity: variaveisDesconhecidas.length > 0 ? 0.5 : 1,
-                  cursor: variaveisDesconhecidas.length > 0 ? "not-allowed" : "pointer",
+                  opacity: problemas.erros.length > 0 ? 0.5 : 1,
+                  cursor: problemas.erros.length > 0 ? "not-allowed" : "pointer",
                 }}
               >
                 Salvar
@@ -210,6 +225,13 @@ const erroEstilo: React.CSSProperties = {
   color: "var(--vermelho)",
   marginTop: 8,
   marginBottom: 0,
+};
+
+const avisoEstilo: React.CSSProperties = {
+  fontSize: 12,
+  color: "var(--amarelo)",
+  marginTop: 8,
+  lineHeight: 1.6,
 };
 
 const botaoSalvarEstilo: React.CSSProperties = {

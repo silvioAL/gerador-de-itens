@@ -91,6 +91,31 @@ test("Regras: contexto vira clique na lista conhecida — o campo de vírgula sa
   await page.request.put(`${API}/config/regras`, { data: { documento: antes.documento } });
 });
 
+test("Especificação: apagar {{itens}} não deixa salvar e mostra o motivo (SPEC-35)", async ({ page }) => {
+  await abrirConfig(page, /Especificação de solução/);
+  await page.getByRole("button", { name: "editar" }).click();
+
+  const conteudo = page.getByLabel("Conteúdo do template");
+  await conteudo.fill("# {{titulo}}\n{{contexto}}");
+
+  // O motivo aparece ANTES do clique, e o salvar trava — nada é gravado.
+  // (Escopado pela aba: o header da quebra também tem um "Salvar".)
+  const salvar = page.getByTestId("corpo-da-aba").getByRole("button", { name: "Salvar", exact: true });
+  await expect(page.getByTestId("template-erros")).toContainText("{{itens}}");
+  await expect(page.getByTestId("template-erros")).toContainText("corpo do documento");
+  await expect(salvar).toBeDisabled();
+
+  // Template enxuto é aviso, não trava: com {{itens}} de volta, salvar libera
+  // e a consequência das ausências continua dita.
+  await conteudo.fill("# {{titulo}}\n{{itens}}");
+  await expect(page.getByTestId("template-erros")).toHaveCount(0);
+  await expect(page.getByTestId("template-avisos")).toContainText("Contexto do épico");
+  await expect(salvar).toBeEnabled();
+
+  // Sai sem gravar — o template da organização não é deste teste.
+  await page.getByRole("button", { name: "cancelar" }).click();
+});
+
 test("Acessos: a tela da delegação de RBAC abre e diz o estado atual", async ({ page }) => {
   await abrirConfig(page, /^Acessos/);
 

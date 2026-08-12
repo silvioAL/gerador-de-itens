@@ -12,9 +12,10 @@ mostrar o motivo"*.
 ## 2. Medições (o que acontece hoje)
 
 1. **Template**: apagar `{{itens}}` salva sem aviso — o documento gerado perde
-   o corpo em silêncio. Variável desconhecida é barrada SÓ na UI
-   (`EspecificacaoTemplateTab`); a rota aceita `z.string().min(1)` e mais nada
-   — o painel Configurar ou uma chamada de API salvam template inválido.
+   o corpo em silêncio. Variável DESCONHECIDA já é barrada na borda (o caso de
+   uso `templateEspecificacao` lança `TemplateInvalido` desde a SPEC-31 Fase 2
+   — a primeira versão desta medição errou ao olhar só o zod da rota); o que
+   falta é a variável OBRIGATÓRIA ausente, que passa por todos os caminhos.
 2. **Pipeline**: `sanearPapeis` descarta em silêncio papel sem `id` e `id`
    duplicado (salva 5, sobrevivem 4, ninguém avisa); papéis todos inválidos
    viram a esteira de fábrica sem aviso. Preâmbulo vazio herda o padrão — isso

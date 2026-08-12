@@ -1,5 +1,5 @@
 import { diagnosticarConfig, type DiagnosticoConfig } from "../config/diagnostico.js";
-import { normalizarDocumentoConfig } from "../config/normalizacao.js";
+import { normalizarDocumentoConfig, validarEscritaConfig } from "../config/normalizacao.js";
 import {
   CAMPO_GLOBAL,
   type ChaveConfig,
@@ -63,7 +63,11 @@ export function criarCasosDeUsoDeConfig(repo: RepositorioDeConfig): CasosDeUsoDe
 
     // Gravar carimba a versão de quem gravou. É o que permite, no futuro,
     // dizer "isto foi salvo na 0.1.14" em vez de só inferir pelo formato.
-    salvar: (chave, documento, versaoAtual, timeId) =>
-      repo.salvar(chave, timeId || CAMPO_GLOBAL, normalizarDocumentoConfig(chave, documento), versaoAtual),
+    // SPEC-35: a escrita valida ANTES de normalizar — o que o saneamento
+    // descartaria em silêncio vira `ConfigInvalida`, que a borda traduz em 400.
+    salvar: (chave, documento, versaoAtual, timeId) => {
+      validarEscritaConfig(chave, documento);
+      return repo.salvar(chave, timeId || CAMPO_GLOBAL, normalizarDocumentoConfig(chave, documento), versaoAtual);
+    },
   };
 }

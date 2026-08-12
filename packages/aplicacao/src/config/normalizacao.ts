@@ -94,6 +94,40 @@ function normalizarRegras(documento: unknown): unknown {
   return bruto;
 }
 
+/**
+ * SPEC-35 — a ESCRITA recusa o que a LEITURA tolera. `sanearPapeis` continua
+ * saneando config antiga na exibição; mas num PUT o corpo é a intenção do
+ * usuário, e descartar parte dela em silêncio (papel sem id, id duplicado,
+ * esteira apagada) era exatamente o "sistema quebra sem avisar" do pedido.
+ */
+export function validarEscritaPipelineAgentes(documento: unknown): void {
+  const bruto = (documento ?? {}) as Partial<ConfigPipelineAgentes>;
+  // Sem a chave `papeis` é o formato antigo (só o toggle) — legítimo.
+  if (bruto.papeis === undefined) return;
+  if (!Array.isArray(bruto.papeis)) throw new ConfigInvalida("`papeis` precisa ser uma lista de papéis");
+  if (bruto.papeis.length === 0) {
+    throw new ConfigInvalida(
+      "`papeis` vazio apagaria a esteira inteira — para voltar à esteira de fábrica, remova a chave `papeis`"
+    );
+  }
+  const vistos = new Set<string>();
+  for (const [i, p] of (bruto.papeis as Partial<PapelConfigurado>[]).entries()) {
+    const id = typeof p?.id === "string" ? p.id.trim() : "";
+    if (!id) {
+      throw new ConfigInvalida(`o papel na posição ${i + 1} está sem "id" — seria descartado em silêncio ao salvar`);
+    }
+    if (vistos.has(id)) {
+      throw new ConfigInvalida(`há dois papéis com o id "${id}" — o segundo seria descartado em silêncio ao salvar`);
+    }
+    vistos.add(id);
+  }
+}
+
+/** O portão de escrita por chave — chamado só no `salvar` dos casos de uso. */
+export function validarEscritaConfig(chave: string, documento: unknown): void {
+  if (chave === "pipeline-agentes") validarEscritaPipelineAgentes(documento);
+}
+
 /** Aplica a coerção da chave. O que não tem regra própria passa como veio. */
 export function normalizarDocumentoConfig(chave: ChaveConfig, documento: unknown): unknown {
   switch (chave) {
