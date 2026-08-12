@@ -145,6 +145,15 @@ criado.
 
 ### Fase 2 — retrospectivas do zero
 
+> **REVERTIDA em parte (2026-08-11), a pedido do usuário** — *"quero remover
+> isso, parece sequer funcionar direito"*, sobre a seção de anotações. Saíram:
+> a seção da conversa, as rotas `/retrospectivas`, a tabela (migração 0018) e
+> a injeção no prompt; o recurso `retrospectivas` VOLTOU a `RECURSOS_SEM_ROTA`
+> com o motivo atualizado. O que a Fase 2 entregou e FICOU: os alvos de regras
+> (`regra-refinamento`, `item-processo`) aplicáveis pela conversa, e a
+> validação `regras`/RBAC por seção. Se a ingestão voltar, que seja por
+> decisão nova — não retomando este texto como pendência.
+
 Migração + rotas + recurso RBAC ganhando rota (atualizar `RECURSOS_SEM_ROTA` e
 o teste-guarda); anexar/listar retros na aba; retros no contexto do prompt;
 proposta citando o trecho.

@@ -18,7 +18,6 @@ import {
   papelPermissao,
   perfisTime,
   quebras,
-  retrospectivas,
   times,
   usuarioPapel,
   usuarioTime,
@@ -83,7 +82,7 @@ beforeEach(async () => {
   // para trás liga o RBAC da organização (SPEC-28 §4.3) e faria todos os
   // outros testes — que assumem o modo aberto — falharem com 403.
   await db.execute(
-    sql`truncate table ${quebras}, ${perfisTime}, ${camposNo}, ${convitesTime}, ${auditoria}, ${usuarioPapel}, ${papelPermissao}, ${papeisAcesso}, ${retrospectivas}`
+    sql`truncate table ${quebras}, ${perfisTime}, ${camposNo}, ${convitesTime}, ${auditoria}, ${usuarioPapel}, ${papelPermissao}, ${papeisAcesso}`
   );
 });
 
@@ -1398,98 +1397,6 @@ describe("SPEC-28 — gestão de acessos", () => {
 
     // O RBAC segue ligado (Administrador existe) e agora EMAIL_OUTRO não tem papel.
     expect((await criarCampo(await logarComo(EMAIL_OUTRO), "depois")).statusCode).toBe(403);
-  });
-});
-
-/**
- * SPEC-34 Fase 2 — as rotas de retrospectivas, nascendo já com o portão.
- *
- * O recurso `retrospectivas` esperou em RECURSOS_SEM_ROTA desde a SPEC-28;
- * estas rotas o tiram de lá, e o teste-guarda de cobertura passa a exigir
- * exatamente o que este describe prova: leitura com `ler`, escrita com
- * `editar`, e o escopo de time valendo como em campos.
- */
-describe("/retrospectivas (SPEC-34 Fase 2)", () => {
-  const criarRetro = (cookie: string, timeId = TIME_A) =>
-    app.inject({
-      method: "POST",
-      url: "/retrospectivas",
-      cookies: { gerador_sessao: cookie },
-      payload: { timeId, titulo: "Retro sprint 42", texto: "aprendemos que todo consumo precisa de DLQ" },
-    });
-
-  it("CRUD do time: criar, listar em ordem recente-primeiro, excluir", async () => {
-    const cookie = await logarComo(EMAIL_DEV);
-    const criada = await criarRetro(cookie);
-    expect(criada.statusCode).toBe(201);
-    const id = criada.json().id;
-
-    const lista = await app.inject({
-      method: "GET",
-      url: `/retrospectivas?timeId=${TIME_A}`,
-      cookies: { gerador_sessao: cookie },
-    });
-    expect(lista.statusCode).toBe(200);
-    expect(lista.json()).toHaveLength(1);
-    expect(lista.json()[0].titulo).toBe("Retro sprint 42");
-
-    const apagada = await app.inject({
-      method: "DELETE",
-      url: `/retrospectivas/${id}`,
-      cookies: { gerador_sessao: cookie },
-    });
-    expect(apagada.statusCode).toBe(204);
-  });
-
-  it("401 sem sessão; 403 quando a sessão não pertence ao time", async () => {
-    const semSessao = await app.inject({
-      method: "POST",
-      url: "/retrospectivas",
-      payload: { timeId: TIME_A, titulo: "x", texto: "y" },
-    });
-    expect(semSessao.statusCode).toBe(401);
-
-    // EMAIL_OUTRO não pertence a TIME_A — o escopo de time nega antes do RBAC.
-    const outroTime = await criarRetro(await logarComo(EMAIL_OUTRO), TIME_A);
-    expect(outroTime.statusCode).toBe(403);
-  });
-
-  it("com RBAC ativo, POST sem `retrospectivas` é 403 — e com a permissão, 201 (feito-quando da SPEC-34 Fase 2)", async () => {
-    const cookie = await logarComo(EMAIL_DEV);
-    // Ligar o RBAC: dev vira Administrador (só `acessos`) — sem retrospectivas.
-    const papel = await app.inject({
-      method: "POST",
-      url: "/acessos/papeis",
-      cookies: { gerador_sessao: cookie },
-      payload: { nome: "Agilidade", permissoes: [] },
-    });
-    expect(papel.statusCode).toBe(201);
-
-    expect((await criarRetro(await logarComo(EMAIL_DEV))).statusCode).toBe(403);
-
-    // Conceder o recurso devolve o caminho — leitura e escrita separadas.
-    const comRecurso = await app.inject({
-      method: "POST",
-      url: "/acessos/papeis",
-      cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
-      payload: {
-        nome: "Facilitador de retro",
-        permissoes: [
-          { recurso: "retrospectivas", acao: "editar" },
-          { recurso: "retrospectivas", acao: "ler" },
-        ],
-      },
-    });
-    expect(comRecurso.statusCode).toBe(201);
-    const atribuir = await app.inject({
-      method: "POST",
-      url: `/acessos/papeis/${comRecurso.json().id}/membros`,
-      cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
-      payload: { email: EMAIL_DEV },
-    });
-    expect(atribuir.statusCode).toBe(201);
-
-    expect((await criarRetro(await logarComo(EMAIL_DEV))).statusCode).toBe(201);
   });
 });
 

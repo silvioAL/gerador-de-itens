@@ -4276,3 +4276,31 @@ Duas mordidas em dupla camada: obrigatórias zeradas → engine E HTTP vermelhos
 no caso exato; portão do pipeline desligado → os dois 400s vermelhos. 149 no
 server, 363 no web, 41/41 no navegador, e o bloqueio visto em produção com o
 motivo na tela.
+
+## 168. As anotações do time saem — construídas e removidas na mesma semana
+
+O usuário olhou a seção e decidiu: *"eu quero remover isso, parece sequer
+funcionar direito"*. A seção era a cara visível da SPEC-34 Fase 2
+(retrospectivas), entregue dias antes.
+
+A decisão de execução que importa: **remoção completa, não cosmética**. Tirar
+só a tela deixaria as anotações gravadas entrando invisíveis no prompt da
+conversa — material que ninguém vê influenciando propostas é pior que o
+incômodo que motivou o pedido. Saíram juntos: a seção do painel, o
+`apiRetrospectivas`, as rotas, a injeção no prompt (e a regra de citação que
+só fazia sentido com ela), a tabela — via migração 0018 com DROP, porque
+migração aplicada não se apaga, se desfaz — e o recurso `retrospectivas`
+VOLTOU a `RECURSOS_SEM_ROTA`, com o motivo reescrito: construída e removida a
+pedido; se voltar, que seja decisão nova, não resto de código. A SPEC-34
+ganhou o bloco de reversão no lugar da Fase 2 — o mesmo cuidado da SPEC-33 §7
+com a Fase 1 revertida, para ninguém "retomar a pendência" daqui a um mês.
+
+O que a Fase 2 entregou e FICOU: os alvos de regras na conversa
+(`regra-refinamento`, `item-processo`) e o RBAC por seção — nada disso
+dependia das anotações.
+
+Não diagnostiquei o "parece sequer funcionar direito" — com a decisão de
+remover, a causa da má impressão perdeu o objeto. Fica só o registro honesto:
+os testes todos passavam e a validação de produção também; o que quer que
+tenha incomodado, os instrumentos não mediam. Feature verde que não convence
+no uso é feedback tão real quanto defeito.

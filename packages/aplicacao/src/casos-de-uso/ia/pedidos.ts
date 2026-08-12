@@ -614,24 +614,11 @@ export interface MensagemConfigurar {
   texto: string;
 }
 
-export interface RetrospectivaParaConversa {
-  titulo: string;
-  texto: string;
-}
-
-/** Teto do que entra de retro no prompt — retro é prosa longa, e a conversa
- * não é RAG (SPEC-34 §3.4): as mais recentes entram inteiras, o resto espera
- * a fase de busca de verdade, se o corpus um dia justificar. */
-const MAX_RETROSPECTIVAS_NO_PROMPT = 5;
-
 export interface EntradaConfigurarConversa {
   mensagens: MensagemConfigurar[];
   /** Resumo da config atual do time — é o que faz o modelo propor MUDANÇA,
    * não duplicata do que já existe. */
   resumoConfig?: string;
-  /** SPEC-34 Fase 2 — as retros do time entram como contexto, e proposta
-   * nascida delas cita o trecho de origem na instrução. */
-  retrospectivas?: RetrospectivaParaConversa[];
 }
 
 /** Mesmo motivo do teto de nós no diagrama: array aberto deixa a geração sem
@@ -646,16 +633,11 @@ const MAX_PROPOSTAS_CONFIG = 3;
  * com o schema estrito do alvo — aqui o schema é fixo de propósito (schema
  * condicional por alvo é o que um gateway `json_object` não garante).
  */
-export function montarPedidoConfigurarConversa({
-  mensagens,
-  resumoConfig,
-  retrospectivas,
-}: EntradaConfigurarConversa): PedidoIa {
+export function montarPedidoConfigurarConversa({ mensagens, resumoConfig }: EntradaConfigurarConversa): PedidoIa {
   const faladas = (mensagens ?? []).filter((m) => m?.texto?.trim());
   if (!faladas.some((m) => m.autor === "voce")) {
     throw new PedidoInvalido("conversa vazia — descreva o que quer configurar");
   }
-  const retros = (retrospectivas ?? []).filter((r) => r?.texto?.trim()).slice(0, MAX_RETROSPECTIVAS_NO_PROMPT);
 
   const esquema = {
     type: "object",
@@ -686,13 +668,6 @@ export function montarPedidoConfigurarConversa({
     ...(resumoConfig?.trim()
       ? [``, `Configuração atual do time (proponha mudança, não duplicata):`, resumoConfig.trim()]
       : []),
-    ...(retros.length > 0
-      ? [
-          ``,
-          `Retrospectivas do time (material de onde aprendizados viram configuração):`,
-          ...retros.map((r) => `--- ${r.titulo.trim() || "retrospectiva"} ---\n${r.texto.trim()}`),
-        ]
-      : []),
     ``,
     `Conversa até aqui:`,
     ...faladas.map((m) => `${m.autor === "voce" ? "Pessoa" : "Você"}: ${m.texto.trim()}`),
@@ -703,12 +678,6 @@ export function montarPedidoConfigurarConversa({
     `  materializar o objeto lendo SÓ a instrução, sem ver esta conversa. Inclua nela tudo que importa.`,
     `- Se a conversa ainda não dá uma proposta concreta, devolva "propostas" VAZIA e use "texto"`,
     `  para perguntar o que falta. Lista vazia é resposta correta, não falha.`,
-    ...(retros.length > 0
-      ? [
-          `- Proposta nascida de uma retrospectiva CITA na instrução o trecho de origem, entre aspas —`,
-          `  nunca uma sugestão sem rastro de onde veio.`,
-        ]
-      : []),
     `- No máximo ${MAX_PROPOSTAS_CONFIG} propostas por resposta.`,
   ].join("\n");
 

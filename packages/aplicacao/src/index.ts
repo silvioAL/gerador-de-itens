@@ -127,7 +127,6 @@ export {
   type EntradaSugerirConfig,
   type ItemDoLote,
   type MensagemConfigurar,
-  type RetrospectivaParaConversa,
   type OrigemDaParte,
   type ParteDoPromptPipeline,
   type PedidoIa,

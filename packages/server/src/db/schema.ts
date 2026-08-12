@@ -1,4 +1,4 @@
-import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 /**
  * `diagrama` guarda { nodes, edges } exatamente como packages/engine espera
@@ -311,22 +311,4 @@ export const camposAresta = pgTable(
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("campos_aresta_chave_unica").on(t.timeId, t.tipoAresta, t.key)]
-);
-
-/**
- * SPEC-34 Fase 2 — retrospectivas do time. A ingestão do fluxo 5 (SPEC-23)
- * nunca tinha chegado ao hospedado; o recurso `retrospectivas` esperava no
- * enum de RBAC desde a SPEC-28. v1 sem embeddings: o texto entra como contexto
- * da conversa de configuração.
- */
-export const retrospectivas = pgTable(
-  "retrospectivas",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    timeId: text("time_id").notNull(),
-    titulo: text("titulo").notNull(),
-    texto: text("texto").notNull(),
-    criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [index("retrospectivas_por_time").on(t.timeId)]
 );
