@@ -37,25 +37,6 @@ describe("montarPedidoConfigurarConversa (SPEC-34 Fase 1)", () => {
     expect(propostas).not.toContain("teste-automatizado");
   });
 
-  it("as retros entram no prompt com a regra de citação — e há teto, porque retro é prosa longa", () => {
-    const muitas = Array.from({ length: 8 }, (_, i) => ({
-      titulo: `Retro ${i}`,
-      texto: `aprendizado número ${i}`,
-    }));
-    const { prompt } = montarPedidoConfigurarConversa({ mensagens, retrospectivas: muitas });
-    expect(prompt).toContain("Retrospectivas do time");
-    expect(prompt).toContain("aprendizado número 0");
-    expect(prompt).toContain("aprendizado número 4");
-    expect(prompt).not.toContain("aprendizado número 5");
-    expect(prompt).toContain("CITA na instrução o trecho de origem");
-  });
-
-  it("sem retro, nem o bloco nem a regra de citação aparecem — prompt não promete o que não tem", () => {
-    const { prompt } = montarPedidoConfigurarConversa({ mensagens });
-    expect(prompt).not.toContain("Retrospectivas do time");
-    expect(prompt).not.toContain("CITA na instrução");
-  });
-
   it("a conversa inteira entra no prompt, com quem disse o quê", () => {
     const { prompt } = montarPedidoConfigurarConversa({ mensagens, resumoConfig: "16 tipos de nó; 4 papéis" });
     expect(prompt).toContain("Pessoa: todo serviço novo precisa declarar o runbook de plantão");

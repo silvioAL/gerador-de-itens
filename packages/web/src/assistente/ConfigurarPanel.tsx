@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { DiagramaConfig } from "@gerador/engine";
 import {
   apiIa,
   apiRegras,
-  apiRetrospectivas,
   PAPEIS_PADRAO,
   type AlvoConversaConfig,
   type CampoAresta,
@@ -13,7 +12,6 @@ import {
   type DadosCampoNo,
   type GrupoFicha,
   type PapelConfigurado,
-  type Retrospectiva,
 } from "../api/client";
 import { usePermissoes } from "../auth/usePermissoes";
 
@@ -155,59 +153,6 @@ export function ConfigurarPanel({
     return "especialista";
   }
 
-  // SPEC-34 Fase 2 — as retros do time, com a mesma honestidade do RBAC: se a
-  // listagem for negada (403), a seção diz isso em vez de fingir lista vazia.
-  const [retros, setRetros] = useState<Retrospectiva[]>([]);
-  const [erroRetros, setErroRetros] = useState<string | null>(null);
-  const [tituloRetro, setTituloRetro] = useState("");
-  const [textoRetro, setTextoRetro] = useState("");
-  const [salvandoRetro, setSalvandoRetro] = useState(false);
-
-  useEffect(() => {
-    if (!timeAtivo) return;
-    let cancelado = false;
-    apiRetrospectivas
-      .listar(timeAtivo)
-      .then((lista) => {
-        if (!cancelado) setRetros(lista);
-      })
-      .catch((e) => {
-        if (!cancelado) setErroRetros(e instanceof Error ? e.message : "Não foi possível listar as retrospectivas.");
-      });
-    return () => {
-      cancelado = true;
-    };
-  }, [timeAtivo]);
-
-  async function salvarRetro() {
-    if (!timeAtivo || !textoRetro.trim() || salvandoRetro) return;
-    setSalvandoRetro(true);
-    setErroRetros(null);
-    try {
-      const salva = await apiRetrospectivas.criar({
-        timeId: timeAtivo,
-        titulo: tituloRetro.trim() || `Anotação de ${new Date().toLocaleDateString("pt-BR")}`,
-        texto: textoRetro.trim(),
-      });
-      setRetros((atuais) => [salva, ...atuais]);
-      setTituloRetro("");
-      setTextoRetro("");
-    } catch (e) {
-      setErroRetros(e instanceof Error ? e.message : "Não foi possível salvar a retrospectiva.");
-    } finally {
-      setSalvandoRetro(false);
-    }
-  }
-
-  async function excluirRetro(id: string) {
-    try {
-      await apiRetrospectivas.excluir(id);
-      setRetros((atuais) => atuais.filter((r) => r.id !== id));
-    } catch (e) {
-      setErroRetros(e instanceof Error ? e.message : "Não foi possível excluir a retrospectiva.");
-    }
-  }
-
   function atualizarCartao(indiceMensagem: number, indiceCartao: number, mudanca: Partial<Cartao>) {
     setMensagens((atuais) =>
       atuais.map((m, i) =>
@@ -227,7 +172,7 @@ export function ConfigurarPanel({
     setPensando(true);
     setErro(null);
     try {
-      const resposta = await apiIa.configurar({ mensagens: transcript, resumoConfig: resumoConfig(), timeId: timeAtivo });
+      const resposta = await apiIa.configurar({ mensagens: transcript, resumoConfig: resumoConfig() });
       const cartoes: Cartao[] = resposta.propostas.map((p) => ({
         alvo: p.alvo,
         instrucao: p.instrucao,
@@ -461,55 +406,6 @@ export function ConfigurarPanel({
       </div>
 
       {erro && <p style={{ margin: "0 12px", fontSize: 11.5, color: "var(--vermelho)" }}>{erro}</p>}
-
-      {/* SPEC-34 Fase 2 — o material do time mora na conversa porque é aqui
-          que ele é USADO: o servidor injeta o do time no prompt, e a proposta
-          cita o trecho. Na TELA o nome é "anotações" (pedido do usuário:
-          "retro" complicava — §147, devolver o vocabulário dele); no código e
-          na API continua `retrospectivas`, o nome que o recurso de RBAC tem
-          desde a SPEC-28. */}
-      <details style={{ borderTop: "1px solid var(--borda)", padding: "8px 12px" }} data-testid="retros-secao">
-        <summary style={{ fontSize: 12, color: "var(--texto-fraco)", cursor: "pointer" }}>
-          📝 Anotações do time ({retros.length}) — entram como contexto da conversa
-        </summary>
-        {erroRetros && <p style={{ fontSize: 11.5, color: "var(--vermelho)", margin: "6px 0 0" }}>{erroRetros}</p>}
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
-          {retros.map((r) => (
-            <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, background: "var(--painel-alto)", borderRadius: 6, padding: "5px 8px" }}>
-              <span style={{ flex: 1 }}>{r.titulo}</span>
-              <button
-                onClick={() => void excluirRetro(r.id)}
-                aria-label={`Excluir anotação ${r.titulo}`}
-                style={{ border: "none", background: "none", cursor: "pointer", color: "var(--vermelho)", fontSize: 12 }}
-              >
-                remover
-              </button>
-            </div>
-          ))}
-          <input
-            aria-label="Título da anotação"
-            value={tituloRetro}
-            onChange={(e) => setTituloRetro(e.target.value)}
-            placeholder="Título (ex.: Sprint 42)"
-            style={{ fontSize: 12, padding: "5px 8px" }}
-          />
-          <textarea
-            aria-label="Texto da anotação"
-            value={textoRetro}
-            onChange={(e) => setTextoRetro(e.target.value)}
-            rows={3}
-            placeholder="Cole aqui o material do time — aprendizados, incidentes, decisões."
-            style={{ fontSize: 12, padding: "5px 8px", resize: "vertical" }}
-          />
-          <button
-            onClick={() => void salvarRetro()}
-            disabled={!textoRetro.trim() || salvandoRetro}
-            style={{ ...botaoAplicarEstilo, alignSelf: "flex-start" }}
-          >
-            {salvandoRetro ? "salvando…" : "Guardar"}
-          </button>
-        </div>
-      </details>
 
       <div style={rodapeEstilo}>
         <textarea

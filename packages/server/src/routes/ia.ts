@@ -27,8 +27,7 @@ import { criarRepositorioDeCredenciaisEmPostgres } from "../adaptadores/credenci
 import { exigirSessao } from "../auth/middleware.js";
 import { exigirPermissao, organizacaoPadraoDe } from "../auth/permissoes.js";
 import { registrarAuditoria } from "../auditoria.js";
-import { organizacoes, retrospectivas } from "../db/schema.js";
-import { desc, eq } from "drizzle-orm";
+import { organizacoes } from "../db/schema.js";
 
 /**
  * SPEC-31 Fase 4 — as rotas de IA no modo hospedado. **Não existiam** (§105):
@@ -401,24 +400,9 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
   /** SPEC-34 Fase 1 — o passo 1 da conversa de configuração: decide alvo e
    * destila a instrução; a materialização reusa `/ia/sugerir-config` acima.
    * Sem RBAC aqui de propósito: conversar e receber proposta é leitura; a
-   * escrita acontece nas rotas de config, que já têm o portão.
-   *
-   * Fase 2: com `timeId` no corpo, as retros do time entram no prompt — lidas
-   * AQUI, do banco, e não mandadas pelo cliente: a fonte de verdade do que o
-   * time registrou é a tabela, não o estado da tela de quem conversa. */
+   * escrita acontece nas rotas de config, que já têm o portão. */
   app.post("/ia/configurar", async (req, reply) => {
-    const { timeId, ...corpo } = (req.body ?? {}) as { timeId?: string } & Record<string, unknown>;
-    const retros = timeId
-      ? await db
-          .select({ titulo: retrospectivas.titulo, texto: retrospectivas.texto })
-          .from(retrospectivas)
-          .where(eq(retrospectivas.timeId, timeId))
-          .orderBy(desc(retrospectivas.criadoEm))
-      : [];
-    const pedido = comPedido(
-      () => montarPedidoConfigurarConversa({ ...corpo, retrospectivas: retros } as never),
-      reply
-    );
+    const pedido = comPedido(() => montarPedidoConfigurarConversa((req.body ?? {}) as never), reply);
     if (!pedido) return reply;
     return executarPedido(reply, pedido, "ia/configurar");
   });

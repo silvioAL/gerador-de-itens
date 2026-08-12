@@ -61,12 +61,16 @@ export type Recurso = (typeof RECURSOS)[number];
  *   delegar checklist, todo mundo sem papel pararia de conseguir criar quebra.
  *   Quem quer isolar quebra já tem o escopo por time, que é o eixo certo para
  *   trabalho.
+ * - `retrospectivas`: a ingestão foi construída (SPEC-34 Fase 2) e REMOVIDA a
+ *   pedido do usuário na mesma semana — a seção de anotações não convenceu na
+ *   prática. O recurso volta a esperar no enum; se a feature voltar, que seja
+ *   por decisão nova, não por resto de código.
  * - `modelo-ia`: no modo hospedado a escolha do modelo viaja **junto com a
  *   credencial** (`PUT /ia/credencial`), que já é protegida por
  *   `credenciais-ia`. Não existe rota separada para gatear; deixar as duas
  *   permissões na mesma rota faria uma delas ser decorativa.
  */
-export const RECURSOS_SEM_ROTA: readonly Recurso[] = ["quebras", "modelo-ia"];
+export const RECURSOS_SEM_ROTA: readonly Recurso[] = ["quebras", "retrospectivas", "modelo-ia"];
 
 /** Uma organização por instalação, hoje. Repetido em cada arquivo de rota antes
  * de virar isto. */
