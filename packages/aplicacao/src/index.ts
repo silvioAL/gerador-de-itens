@@ -47,11 +47,12 @@ export { criarCasosDeUsoDeCamposAresta, type CasosDeUsoDeCamposAresta } from "./
 
 export type {
   PerfilDeTime,
+  PerfilStack,
   PerfisDeTimes,
-  RepositorioDePerfisTime,
-} from "./portas/repositorioDePerfisTime.js";
+  RepositorioDePerfisStack,
+} from "./portas/repositorioDePerfisStack.js";
 
-export { criarCasosDeUsoDePerfisTime, type CasosDeUsoDePerfisTime } from "./casos-de-uso/perfisTime.js";
+export { criarCasosDeUsoDePerfisStack, type CasosDeUsoDePerfisStack } from "./casos-de-uso/perfisStack.js";
 
 export type {
   RepositorioDeTemplateEspecificacao,

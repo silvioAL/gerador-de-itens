@@ -34,6 +34,8 @@ export interface ConfigScreenProps {
   /** false no modo local (CLI) — sem servidor não existe conceito de outros
    * membros pra administrar; a aba não faz sentido. */
   onEditarValorPerfilTime: (timeId: string, tipoNo: string, campo: string, valor: string) => void;
+  /** SPEC-38 F2 — apontar/trocar perfil de stack muda a projeção; o App recarrega. */
+  onPerfisMudaram: () => void;
   onCriarCampoNo: (dados: DadosCampoNo) => Promise<void>;
   onAtualizarCampoNo: (id: string, dados: Partial<DadosCampoNo>) => Promise<void>;
   onExcluirCampoNo: (id: string) => Promise<void>;
@@ -78,6 +80,7 @@ export function ConfigScreen({
   pipelineAgentes,
   timeAtivo,
   onEditarValorPerfilTime,
+  onPerfisMudaram,
   onCriarCampoNo,
   onAtualizarCampoNo,
   onExcluirCampoNo,
@@ -124,7 +127,7 @@ export function ConfigScreen({
    */
   const abasVisiveis = (
     [
-      { id: "perfis", rotulo: `Perfis de time (${Object.keys(perfisTime).length})`, existe: true },
+      { id: "perfis", rotulo: `Perfis de stack (${Object.keys(perfisTime).length} do time)`, existe: true },
       /**
        * "Campos por tipo de nó" era vocabulário do CÓDIGO: "nó" é jargão de
        * canvas e "campos" não diz o que se ganha. O nome novo é o do próprio
@@ -206,7 +209,7 @@ export function ConfigScreen({
           pergunta que ninguém tinha feito quando o gate ficou pela metade. */}
       <div data-testid="corpo-da-aba" style={{ flex: 1, overflow: "auto", padding: 24 }}>
         {abaAtiva === "perfis" && (
-          <PerfisTimeTab perfisTime={perfisTime} config={config} onEditarValor={onEditarValorPerfilTime} />
+          <PerfisTimeTab perfisTime={perfisTime} config={config} timeAtivo={timeAtivo} onEditarValor={onEditarValorPerfilTime} onPerfisMudaram={onPerfisMudaram} />
         )}
         {abaAtiva === "campos" && (
           <CamposNoTab

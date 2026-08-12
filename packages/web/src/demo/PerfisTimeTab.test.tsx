@@ -1,7 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi, type Mock } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { DiagramaConfig, PerfisConfig } from "@gerador/engine";
+vi.mock("../api/client", () => ({
+  apiPerfisStack: {
+    catalogo: vi.fn().mockResolvedValue({ perfis: [], ponteiros: {} }),
+    criar: vi.fn(),
+    apontar: vi.fn(),
+  },
+}));
+
 import { PerfisTimeTab } from "./PerfisTimeTab";
 
 const config: DiagramaConfig = {
@@ -24,14 +32,40 @@ const config: DiagramaConfig = {
 };
 
 describe("PerfisTimeTab", () => {
+  it("SPEC-38 F2: apontar um perfil do catálogo chama a API e pede pro App recarregar a projeção", async () => {
+    const { apiPerfisStack } = await import("../api/client");
+    (apiPerfisStack.catalogo as Mock).mockResolvedValue({
+      perfis: [{ id: "p1", nome: "Java + Spring Boot", criadoPor: "dev", valores: {} }],
+      ponteiros: {},
+    });
+    (apiPerfisStack.apontar as Mock).mockResolvedValue({});
+    const onPerfisMudaram = vi.fn();
+
+    render(
+      <PerfisTimeTab
+        perfisTime={{}}
+        config={config}
+        timeAtivo="time-pagamentos"
+        onPerfisMudaram={onPerfisMudaram}
+        onEditarValor={vi.fn()}
+      />
+    );
+
+    await waitFor(() => expect(screen.getByRole("option", { name: "Java + Spring Boot" })).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Perfil de stack do time ativo"), { target: { value: "p1" } });
+
+    await waitFor(() => expect(apiPerfisStack.apontar).toHaveBeenCalledWith("time-pagamentos", "p1"));
+    await waitFor(() => expect(onPerfisMudaram).toHaveBeenCalled());
+  });
+
   it("sem times cadastrados, mostra a mensagem de vazio", () => {
-    render(<PerfisTimeTab perfisTime={{}} config={config} onEditarValor={vi.fn()} />);
-    expect(screen.getByText(/Nenhum time com perfil cadastrado/)).toBeInTheDocument();
+    render(<PerfisTimeTab perfisTime={{}} config={config} timeAtivo="time-pagamentos" onPerfisMudaram={() => {}} onEditarValor={vi.fn()} />);
+    expect(screen.getByText(/Nenhum time apontando perfil de stack/)).toBeInTheDocument();
   });
 
   it("lista os times com seus valores conhecidos e um link de editar por campo", () => {
     const perfisTime: PerfisConfig = { "time-x": { service: { linguagem: "Java" } } };
-    render(<PerfisTimeTab perfisTime={perfisTime} config={config} onEditarValor={vi.fn()} />);
+    render(<PerfisTimeTab perfisTime={perfisTime} config={config} timeAtivo="time-pagamentos" onPerfisMudaram={() => {}} onEditarValor={vi.fn()} />);
 
     expect(screen.getByText("time-x")).toBeInTheDocument();
     expect(screen.getByText("linguagem:", { exact: false })).toBeInTheDocument();
@@ -41,7 +75,7 @@ describe("PerfisTimeTab", () => {
   it("declarar um valor novo direto pelo formulário (ex.: time trabalha com Java) chama onEditarValor com time/tipo/campo/valor", async () => {
     const user = userEvent.setup();
     const onEditarValor = vi.fn();
-    render(<PerfisTimeTab perfisTime={{}} config={config} onEditarValor={onEditarValor} />);
+    render(<PerfisTimeTab perfisTime={{}} config={config} timeAtivo="time-pagamentos" onPerfisMudaram={() => {}} onEditarValor={onEditarValor} />);
 
     await user.click(screen.getByText("+ Adicionar ou corrigir um valor de stack"));
 
@@ -58,7 +92,7 @@ describe("PerfisTimeTab", () => {
     const user = userEvent.setup();
     const onEditarValor = vi.fn();
     const perfisTime: PerfisConfig = { "time-x": { service: { linguagem: "Java" } } };
-    render(<PerfisTimeTab perfisTime={perfisTime} config={config} onEditarValor={onEditarValor} />);
+    render(<PerfisTimeTab perfisTime={perfisTime} config={config} timeAtivo="time-pagamentos" onPerfisMudaram={() => {}} onEditarValor={onEditarValor} />);
 
     await user.click(screen.getByRole("button", { name: /Editar linguagem de Serviço para time-x/ }));
 
@@ -72,7 +106,7 @@ describe("PerfisTimeTab", () => {
 
   it("achado real: campo de identidade (nome do serviço) nunca é sugerido — nem como default, nem como opção no seletor de Campo", async () => {
     const user = userEvent.setup();
-    render(<PerfisTimeTab perfisTime={{}} config={config} onEditarValor={vi.fn()} />);
+    render(<PerfisTimeTab perfisTime={{}} config={config} timeAtivo="time-pagamentos" onPerfisMudaram={() => {}} onEditarValor={vi.fn()} />);
 
     await user.click(screen.getByText("+ Adicionar ou corrigir um valor de stack"));
 
@@ -87,7 +121,7 @@ describe("PerfisTimeTab", () => {
 
   it("botão Salvar fica desabilitado sem time ou sem valor preenchido", async () => {
     const user = userEvent.setup();
-    render(<PerfisTimeTab perfisTime={{}} config={config} onEditarValor={vi.fn()} />);
+    render(<PerfisTimeTab perfisTime={{}} config={config} timeAtivo="time-pagamentos" onPerfisMudaram={() => {}} onEditarValor={vi.fn()} />);
     await user.click(screen.getByText("+ Adicionar ou corrigir um valor de stack"));
 
     expect(screen.getByRole("button", { name: "Salvar" })).toBeDisabled();

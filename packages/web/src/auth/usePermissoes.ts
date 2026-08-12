@@ -87,7 +87,7 @@ export function usePermissoes(opcoes: { hospedado: boolean; timeId?: string }): 
  * rota exige de fato (ver RECURSOS_SEM_ROTA no servidor).
  */
 export const RECURSO_DA_ABA: Record<string, string> = {
-  perfis: "perfis-time",
+  perfis: "perfis-stack",
   campos: "campos-no",
   camposAresta: "campos-aresta",
   membros: "membros",

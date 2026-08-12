@@ -5,7 +5,7 @@ import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import type { BancoDeDados } from "./db/client.js";
 import { registrarRotasQuebras } from "./routes/quebras.js";
-import { registrarRotasPerfisTime } from "./routes/perfisTime.js";
+import { registrarRotasPerfisStack } from "./routes/perfisStack.js";
 import { registrarRotasCamposNo } from "./routes/camposNo.js";
 import { registrarRotasEspecificacaoTemplate } from "./routes/especificacaoTemplate.js";
 import { registrarRotasConfig } from "./routes/config.js";
@@ -81,7 +81,7 @@ export async function buildApp(opcoes: OpcoesApp): Promise<FastifyInstance> {
 
   await registrarRotasAuth(app, opcoes);
   await registrarRotasQuebras(app, opcoes);
-  await registrarRotasPerfisTime(app, opcoes);
+  await registrarRotasPerfisStack(app, opcoes);
   await registrarRotasCamposNo(app, opcoes);
   await registrarRotasEspecificacaoTemplate(app, opcoes);
   await registrarRotasConfig(app, opcoes);

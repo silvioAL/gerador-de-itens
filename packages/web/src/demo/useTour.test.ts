@@ -79,14 +79,14 @@ describe("useTour", () => {
     expect(result.current.passoAtual?.selector).toBe("[data-tour=review-table]");
   });
 
-  it("passa pela aba Perfis de time antes do fim, abrindo a tela de config na aba certa", () => {
+  it("passa pela aba Perfis de stack antes do fim, abrindo a tela de config na aba certa", () => {
     const opts = montarOpts();
     const { result } = renderHook(() => useTour(opts));
 
     act(() => result.current.iniciar());
-    for (let i = 0; i < 7; i++) act(() => result.current.proximo()); // -> passo 7 (Perfis de time)
+    for (let i = 0; i < 7; i++) act(() => result.current.proximo()); // -> passo 7 (Perfis de stack)
 
-    expect(result.current.passoAtual?.titulo).toBe("Perfis de time");
+    expect(result.current.passoAtual?.titulo).toBe("Perfis de stack");
     expect(result.current.passoAtual?.selector).toBe("[data-tour=config-screen-content]");
     expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("perfis");
   });

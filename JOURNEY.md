@@ -4556,3 +4556,31 @@ Seis mordidas provadas (teto desligado, gate de quebras rebaixado, owner-gate
 removido do exigirPermissao, eixo de nível removido das regras, convite
 ignorando o nível da UI, hook devolvendo nivel null) — cada uma acendeu
 exatamente o teste que a vigia.
+
+## 177. SPEC-38 Fase 2 — a stack solta do time: catálogo, ponteiro e curadoria
+
+A tese da fase coube numa frase do teste: **trocar de tecnologia é trocar o
+ponteiro**. `perfis_time` morreu (D4, sem migração de dados — migração 0020)
+e nasceram `perfis_stack` (o catálogo nomeado da organização) e
+`times.perfil_stack_id` (o ponteiro). O truque que conteve o raio da mudança:
+a projeção `PerfisDeTimes` que as sugestões da web sempre consumiram
+sobreviveu com o MESMO contrato — `GET /perfis-time` continua devolvendo
+`Record<timeId, perfil>` — só que agora derivada (time → perfil apontado →
+valores). PropertiesPanel, ConversaPanel e o motor de sugestões não mudaram
+uma linha; o hexágono pagou a promessa: trocou-se a porta+adaptador
+(`repositorioDePerfisStack`) e a borda ficou.
+
+A captura ("salvar estes valores como padrão do time") também manteve rota e
+um-clique: grava no perfil apontado, e sem ponteiro cria "stack de {time}" e
+aponta — a segunda captura mescla, não duplica (teste conta os perfis).
+
+A curadoria (D1) é a parte fina: `exigirEdicaoCurada` é a EXCEÇÃO deliberada
+ao owner-bypass da Fase 1. Sem papel nenhum com `perfis-stack`, o catálogo é
+aberto a owners; o admin liga a curadoria criando um papel com o recurso — e
+a partir daí só o grant edita, inclusive por cima de owners (o teste faz o
+owner levar 403 com a curadoria ligada, e o curador passar). Apontar o
+próprio ponteiro nunca entra na curadoria: é ato de owner do time.
+
+Mordidas: curadoria ignorada (owner criando com papel curador vivo →
+vermelho), ponteiro sem efeito (projeção não segue → vermelho), aba sem
+avisar o App (projeção velha na tela → vermelho).

@@ -43,6 +43,7 @@ function renderTela() {
       especificacaoTemplate={especificacaoTemplate}
       pipelineAgentes={{ confirmacaoObrigatoria: true }}
       timeAtivo="time-x"
+      onPerfisMudaram={vi.fn()}
       onEditarValorPerfilTime={vi.fn()}
       onCriarCampoNo={vi.fn()}
       onAtualizarCampoNo={vi.fn()}

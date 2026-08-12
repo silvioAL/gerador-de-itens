@@ -63,14 +63,16 @@ test("aba Perfis de time (tela de Configurações) mostra os times conhecidos e 
   await entrar(page);
 
   await page.getByRole("button", { name: "⚙ Configurações" }).click();
-  await page.getByRole("button", { name: /Perfis de time/ }).click();
+  await page.getByRole("button", { name: /Perfis de stack/ }).click();
 
   // Escopado pra dentro da tela de config: o header tem um <select> com essas
   // mesmas strings como <option>, e getByText também bate em <option>s no DOM.
   const telaConfig = page.locator('[data-tour="config-screen-content"]');
   await expect(telaConfig.getByText("time-pagamentos", { exact: true })).toBeVisible();
   await expect(telaConfig.getByText("time-portabilidade", { exact: true })).toBeVisible();
-  await expect(telaConfig.getByText(/Spring Boot/)).toBeVisible();
+  // Exato: "Spring Boot" também aparece na intro da aba e no option do
+  // catálogo — o que se afere aqui é o VALOR no card da projeção.
+  await expect(telaConfig.getByText("Spring Boot", { exact: true })).toBeVisible();
   await expect(telaConfig.getByText(/salvar estes valores como padrão do time/)).toBeVisible();
 
   await page.screenshot({ path: "e2e/screenshots/perfis-de-time-tab.png", fullPage: true });
@@ -85,7 +87,7 @@ test("declarar 'time trabalha com Java' na aba Perfis de time faz um Serviço no
   await entrar(page, "time-checkout");
 
   await page.getByRole("button", { name: "⚙ Configurações" }).click();
-  await page.getByRole("button", { name: /Perfis de time/ }).click();
+  await page.getByRole("button", { name: /Perfis de stack/ }).click();
   await page.getByText("+ Adicionar ou corrigir um valor de stack").click();
 
   await page.getByPlaceholder("ex.: time-pagamentos").fill("time-checkout");
