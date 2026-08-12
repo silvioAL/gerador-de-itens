@@ -712,7 +712,6 @@ export function ReviewScreen({
   // Deep-link da tela de itens: chegar com um item alvo seleciona ele.
   useEffect(() => {
     if (itemInicial) setSelecionada(itemInicial);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemInicial]);
 
   const contagens = regras
