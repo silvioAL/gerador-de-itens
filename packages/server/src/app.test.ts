@@ -88,7 +88,7 @@ beforeEach(async () => {
   // para trás liga o RBAC da organização (SPEC-28 §4.3) e faria todos os
   // outros testes — que assumem o modo aberto — falharem com 403.
   await db.execute(
-    sql`truncate table ${quebras}, ${perfilStackValores}, ${camposNo}, ${convitesTime}, ${auditoria}, ${usuarioPapel}, ${papelPermissao}, ${papeisAcesso}, ${timePapel}`
+    sql`truncate table ${quebras}, ${perfilStackValores}, ${camposNo}, ${convitesTime}, ${auditoria}, ${usuarioPapel}, ${papelPermissao}, ${papeisAcesso}, ${timePapel} cascade`
   );
   // O catálogo de perfis (SPEC-38 F2) não entra no truncate: `times` aponta
   // pra ele por FK — primeiro solta os ponteiros, depois apaga (os valores

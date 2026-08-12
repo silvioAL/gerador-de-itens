@@ -20,6 +20,13 @@ export {
 } from "./portas/repositorioDeQuebras.js";
 
 export { criarCasosDeUsoDeQuebras, type CasosDeUsoDeQuebras } from "./casos-de-uso/quebras.js";
+export type {
+  ItemGeradoSalvo,
+  DadosItemGerado,
+  RepositorioDeItensGerados,
+} from "./portas/repositorioDeItensGerados.js";
+export type { ExportadorDeItens, ItemExportado } from "./portas/exportadorDeItens.js";
+export { criarCasosDeUsoDeItensGerados, type CasosDeUsoDeItensGerados } from "./casos-de-uso/itensGerados.js";
 
 export {
   CAMPO_GLOBAL,

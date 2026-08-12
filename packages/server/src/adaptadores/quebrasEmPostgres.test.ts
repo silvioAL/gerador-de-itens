@@ -31,7 +31,7 @@ testarContratoDeQuebras("postgres", async () => {
   return {
     repo: criarRepositorioDeQuebrasEmPostgres(banco),
     limpar: async () => {
-      await banco.execute(sql`truncate table ${quebras}`);
+      await banco.execute(sql`truncate table ${quebras} cascade`);
     },
   };
 });

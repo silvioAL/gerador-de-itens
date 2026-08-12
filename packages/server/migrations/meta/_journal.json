@@ -176,6 +176,13 @@
       "when": 1754500000010,
       "tag": "0024_especificacao_na_quebra",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1754500000011,
+      "tag": "0025_itens_gerados",
+      "breakpoints": true
     }
   ]
 }
