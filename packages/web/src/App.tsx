@@ -57,6 +57,8 @@ import { lembrarTime, lerTimeLembrado } from "./auth/timeLembrado";
 import { SemTimeScreen } from "./auth/SemTimeScreen";
 import { usePermissoes } from "./auth/usePermissoes";
 import { momentoDaConfig, momentoDoCanvas } from "./assistente/momentos";
+import { MenuLateral } from "./navegacao/MenuLateral";
+import { useRotaHash } from "./navegacao/rota";
 
 const CHAVE_JORNADA_VISTA = "gerador:jornada-vista";
 
@@ -318,7 +320,11 @@ function AppCarregado({
 
   const [mostrarJornada, setMostrarJornada] = useState(false);
   const [abaJornadaAlvo, setAbaJornadaAlvo] = useState<AbaJornada | undefined>(undefined);
-  const [mostrarConfig, setMostrarConfig] = useState(false);
+  // SPEC-40 F1 — a tela de config é ROTA (#/config/…), não estado; o menu
+  // (☰) é o caminho pra ela. F5 mantém o lugar; condutores navegam por rota.
+  const { rota, navegar } = useRotaHash();
+  const mostrarConfig = rota.tela === "config";
+  const [menuAberto, setMenuAberto] = useState(false);
   const [mostrarAbrir, setMostrarAbrir] = useState(false);
   // #298 — a conversa do desenho (SPEC-27 Fase 1) e o contexto do épico moram
   // no mesmo assistente flutuante, cada um numa aba; `null` = fechado. A
@@ -328,7 +334,6 @@ function AppCarregado({
   // SPEC-37 M9 — "agora não" silencia o momento até a próxima mudança real de
   // estado (recarregar/derivar); condução dispensada não insiste.
   const [derivarDispensado, setDerivarDispensado] = useState(false);
-  const [abaConfigAlvo, setAbaConfigAlvo] = useState<AbaConfig | undefined>(undefined);
   useEffect(() => {
     if (!localStorage.getItem(CHAVE_JORNADA_VISTA)) setMostrarJornada(true);
   }, []);
@@ -339,8 +344,7 @@ function AppCarregado({
   /** Usado pelo tour guiado pra abrir a tela de config já numa aba específica (ou
    * trocar de aba com a tela já aberta), sem o usuário precisar navegar manualmente. */
   function abrirConfigNaAba(aba: AbaConfig) {
-    setAbaConfigAlvo(aba);
-    setMostrarConfig(true);
+    navegar({ tela: "config", area: aba });
   }
 
   const noSelecionado = quebra.diagrama.nodes.find((n) => n.id === selecionadoId);
@@ -472,7 +476,7 @@ function AppCarregado({
     fecharRevisao: () => setResultado(null),
     abrirConfigNaAba,
     fecharJornada,
-    fecharConfig: () => setMostrarConfig(false),
+    fecharConfig: () => navegar({ tela: "canvas" }),
   };
 
   const tour = useTour(opcoesTour);
@@ -614,6 +618,15 @@ function AppCarregado({
             cheia é o lugar onde nada é lido. `title` em vez de texto visível
             porque o cabeçalho é estreito — mas o dado viaja no HTML, e é o que
             sobrevive a alguém copiar a pasta e chamar de seu. */}
+        {/* SPEC-40 F1 — frequência no header, gestão no menu: tudo que é
+            administração/aprendizado mora atrás do ☰. */}
+        {/* Só quando o canvas é a tela — a tela de config tem o SEU ☰; dois
+            no DOM viravam strict-violation em todo clique de menu. */}
+        {!mostrarConfig && (
+          <button onClick={() => setMenuAberto(true)} data-tour="menu-botao" style={botaoEstilo}>
+            ☰ Menu
+          </button>
+        )}
         <strong
           title="Gerador de Itens — Silvio Allgayer Trindade (Apache-2.0). github.com/silvioAL/gerador-de-itens"
           style={{ fontSize: 14, color: "var(--texto)" }}
@@ -636,12 +649,6 @@ function AppCarregado({
           </span>
         )}
 
-        <button onClick={() => setMostrarJornada(true)} style={{ ...botaoEstilo, ...botaoJornadaEstilo }}>
-          ✦ Como funciona &amp; cenários
-        </button>
-        <button onClick={() => setMostrarConfig(true)} style={botaoEstilo}>
-          ⚙ Configurações
-        </button>
 
         <div style={{ width: 1, height: 20, background: "var(--borda-forte)" }} />
 
@@ -659,24 +666,6 @@ function AppCarregado({
 
         <div style={{ width: 1, height: 20, background: "var(--borda-forte)" }} />
 
-        {/* O input de texto livre do modo local morreu com a SPEC-33 — este é
-            o ramo morto que a §158 anotou, removido de vez na rodada das
-            pendências. Só o hospedado existe: o time vem sempre da sessão. */}
-        <select
-          aria-label="Time (stack conhecida)"
-          value={quebra.time ?? timeAtivo}
-          onChange={(e) => aoMudarTime(e.target.value)}
-          title="Times aos quais sua sessão pertence — pré-preenchem sugestões de stack e os campos customizados desse time."
-          style={{ fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid var(--borda-forte)", background: "var(--fundo)", color: "var(--texto)", width: 170 }}
-        >
-          {sessao.timeIds.map((time) => (
-            <option key={time} value={time}>
-              {time}
-            </option>
-          ))}
-        </select>
-
-        <div style={{ width: 1, height: 20, background: "var(--borda-forte)" }} />
 
         {tiposDeNo.map(([tipo, cfg]) => (
           <button
@@ -695,12 +684,6 @@ function AppCarregado({
 
         <div style={{ flex: 1 }} />
 
-        <span style={{ fontSize: 11, color: "var(--texto-mudo)", whiteSpace: "nowrap" }}>{sessao.email}</span>
-        <button onClick={() => void onSair()} style={botaoEstilo}>
-          Sair
-        </button>
-
-        <div style={{ width: 1, height: 20, background: "var(--borda-forte)" }} />
 
         <span style={{ fontSize: 11, color: "var(--texto-mudo)", whiteSpace: "nowrap" }}>
           {persistencia.quebraId ? quebra.time ?? "sem time" : "nova quebra"} ·{" "}
@@ -713,12 +696,6 @@ function AppCarregado({
             erro: "erro ao salvar",
           }[persistencia.status]}
         </span>
-        <button onClick={() => persistencia.nova(quebraVazia(timeAtivo))} style={botaoEstilo}>
-          Nova
-        </button>
-        <button onClick={() => setMostrarAbrir(true)} style={botaoEstilo} title="Buscar e abrir uma quebra já salva">
-          Abrir…
-        </button>
         {!somenteLeitura && (
           <button
             onClick={salvarQuebra}
@@ -746,6 +723,26 @@ function AppCarregado({
           Derivar Quebra
         </button>
       </header>
+
+      <MenuLateral
+        aberto={menuAberto}
+        onFechar={() => setMenuAberto(false)}
+        timeAtivo={quebra.time ?? timeAtivo}
+        timeIds={sessao.timeIds}
+        email={sessao.email}
+        onTrocarTime={aoMudarTime}
+        onNavegar={(area) => abrirConfigNaAba(area)}
+        onNovaQuebra={() => {
+          navegar({ tela: "canvas" });
+          persistencia.nova(quebraVazia(timeAtivo));
+        }}
+        onAbrirQuebras={() => {
+          navegar({ tela: "canvas" });
+          setMostrarAbrir(true);
+        }}
+        onCenarios={() => setMostrarJornada(true)}
+        onSair={() => void onSair()}
+      />
 
       {edgeRejeitada && (
         <div
@@ -846,8 +843,9 @@ function AppCarregado({
           onCriarCampoAresta={criarCampoAresta}
           onAtualizarCampoAresta={atualizarCampoAresta}
           onExcluirCampoAresta={excluirCampoAresta}
-          onFechar={() => setMostrarConfig(false)}
-          abaForcada={abaConfigAlvo}
+          onFechar={() => navegar({ tela: "canvas" })}
+          area={rota.tela === "config" ? rota.area : "perfis"}
+          onAbrirMenu={() => setMenuAberto(true)}
           techs={appConfig.techs}
           contextos={appConfig.contextos}
         />

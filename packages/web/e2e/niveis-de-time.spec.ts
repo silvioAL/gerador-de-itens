@@ -45,7 +45,10 @@ test("visualizar lê a quebra mas não vê o Salvar; o servidor nega a escrita p
 
   // A UI não oferece o que seria 403: sem botão Salvar. Os vizinhos (Abrir…)
   // continuam lá — é esconder a escrita, não mutilar o header.
+  // "Abrir…" mudou pro menu (SPEC-40) — segue lá pro viewer; Salvar não.
+  await paginaViewer.getByRole("button", { name: "☰ Menu" }).click();
   await expect(paginaViewer.getByRole("button", { name: "Abrir…" })).toBeVisible();
+  await paginaViewer.getByRole("button", { name: "Fechar menu" }).click();
   await expect(paginaViewer.getByRole("button", { name: "Salvar", exact: true })).not.toBeVisible();
 
   // E mesmo que a UI falhasse, o servidor nega: escrita direta é 403 com o
@@ -76,8 +79,11 @@ test("aba Membros mostra e edita níveis, e a mudança persiste no servidor", as
   // O POST /times reemitiu a sessão com o time novo, mas o app carregou antes:
   // o reload traz o /auth/me atualizado e o time aparece no seletor do header.
   await page.reload();
+  // O seletor de time mora no MENU (SPEC-40); trocar o time recarrega o app
+  // (key={timeAtivo}) e o menu fecha junto — reabre pra navegar.
+  await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByLabel("Time (stack conhecida)").selectOption(timeId);
-  await page.getByRole("button", { name: "⚙ Configurações" }).click();
+  await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: /Membros/ }).click();
 
   await expect(page.getByText(operador)).toBeVisible();
@@ -87,7 +93,7 @@ test("aba Membros mostra e edita níveis, e a mudança persiste no servidor", as
   // não só pro estado local.
   await page.getByLabel(`Nível de ${operador}`).selectOption("owner");
   await page.getByRole("button", { name: "Voltar ao canvas" }).click();
-  await page.getByRole("button", { name: "⚙ Configurações" }).click();
+  await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: /Membros/ }).click();
   await expect(page.getByLabel(`Nível de ${operador}`)).toHaveValue("owner");
 });

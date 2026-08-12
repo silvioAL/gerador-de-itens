@@ -60,6 +60,7 @@ test("Sair encerra a sessão e volta pra tela de login (achado real: requisitar(
 }) => {
   await entrar(page);
 
+  await page.getByRole("button", { name: "☰ Menu" }).click(); // SPEC-40: item do menu
   await page.getByRole("button", { name: "Sair" }).click();
 
   // mostrarLogin já ficou true no login anterior (App.tsx) — depois de sair,
@@ -70,7 +71,7 @@ test("Sair encerra a sessão e volta pra tela de login (achado real: requisitar(
 test("gerar link de convite funciona pelo browser de verdade (achado real: mesmo bug do Sair)", async ({ page }) => {
   await entrar(page);
 
-  await page.getByRole("button", { name: "⚙ Configurações" }).click();
+  await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: "Membros" }).click();
   await page.getByRole("button", { name: "Gerar link de convite" }).click();
 
@@ -99,7 +100,7 @@ test("perfil de stack do time sugere linguagem/framework do serviço", async ({ 
   await expect(botaoSalvarPerfil).toBeVisible();
   await botaoSalvarPerfil.click();
 
-  await page.getByRole("button", { name: "⚙ Configurações" }).click();
+  await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: /Perfis de stack/ }).click();
   const cardTimePagamentos = page.locator("div", { has: page.getByText("time-pagamentos", { exact: true }) }).last();
   await expect(cardTimePagamentos).toBeVisible();

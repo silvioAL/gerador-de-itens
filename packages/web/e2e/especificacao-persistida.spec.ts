@@ -40,10 +40,13 @@ test("gerar salva a especificação na quebra; reabrir conduz à revisão com a 
   await expect(page.getByText(/· salva$/)).toBeVisible();
 
   // Recomeça do zero e REABRE a demanda: o material salvo volta inteiro.
-  await page.getByRole("button", { name: "Nova", exact: true }).click();
+  await page.getByRole("button", { name: "☰ Menu" }).click(); // SPEC-40: item do menu
+  await page.getByRole("button", { name: "Nova quebra" }).click();
+  await page.getByRole("button", { name: "☰ Menu" }).click(); // SPEC-40: item do menu
   await page.getByRole("button", { name: "Abrir…" }).click();
   await page.getByPlaceholder(/busca/i).or(page.getByRole("textbox")).first().fill(titulo);
-  await page.getByText(titulo).first().click();
+  // exact: o balão da entrevista do PDCA (M11) pode citar o título nos últimos itens
+  await page.getByText(titulo, { exact: true }).first().click();
 
   // M14 — o agente reconhece a demanda já especificada e conduz à revisão.
   const balao = page.getByTestId("assistente-balao");

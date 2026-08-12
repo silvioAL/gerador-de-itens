@@ -80,6 +80,12 @@ export function useTour(opts: UseTourOpts) {
         "O documento final sai pelo AGENTE: com tudo refinado ele oferece sozinho (balão), e a qualquer momento o balão \"gerar especificação\" baixa o markdown — mesmo parcial. O botão de header morreu; a conversa é o caminho.",
     },
     {
+      selector: "[data-tour=menu-botao]",
+      titulo: "O menu",
+      texto:
+        "Tudo que é administração mora no menu ☰ — padrões do time, pessoas e acessos, IA. Cada item abre uma tela própria, com endereço: dá pra voltar por F5 ou colar o link. Os próximos passos abrem algumas delas.",
+    },
+    {
       selector: "[data-tour=config-screen-content]",
       titulo: "Perfis de stack",
       texto:

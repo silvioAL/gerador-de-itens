@@ -10,6 +10,7 @@ import { entrar } from "./auth";
  * existir, e isso só aparece num reload de verdade.
  */
 test("recarregar mantém o time ativo, em vez de voltar pro 'Qual time?'", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   await entrar(page, "time-portabilidade");
 
   await page.reload();
@@ -24,12 +25,18 @@ test("trocar de time e recarregar mantém o NOVO time, não o primeiro da lista"
   // A metade mais perigosa do defeito: cair no "Qual time?" é chato mas
   // visível. Voltar calado pro primeiro time da lista muda quais campos
   // customizados e quais perfis de stack aparecem — e ninguém percebe.
+  await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   await entrar(page, "time-portabilidade");
 
+  // SPEC-40 — o seletor de time mora no MENU. Trocar de time remonta o app
+  // (key={timeAtivo}), o que fecha o menu: cada leitura reabre.
+  await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("combobox", { name: /time/i }).selectOption("time-checkout");
+  await page.getByRole("button", { name: "☰ Menu" }).click();
   await expect(page.getByRole("combobox", { name: /time/i })).toHaveValue("time-checkout");
 
   await page.reload();
 
+  await page.getByRole("button", { name: "☰ Menu" }).click();
   await expect(page.getByRole("combobox", { name: /time/i })).toHaveValue("time-checkout", { timeout: 10000 });
 });

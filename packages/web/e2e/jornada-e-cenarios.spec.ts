@@ -33,6 +33,7 @@ test("carregar um cenário pronto popula o canvas e deriva sem ciclos/conflitos"
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   await entrar(page);
 
+  await page.getByRole("button", { name: "☰ Menu" }).click(); // SPEC-40: item do menu
   await page.getByRole("button", { name: "✦ Como funciona & cenários" }).click();
   await page.getByRole("button", { name: /Cenários prontos/ }).click();
   await page.getByRole("button", { name: "Carregar cenário: Dados não-relacionais" }).click();
@@ -62,7 +63,7 @@ test("aba Perfis de time (tela de Configurações) mostra os times conhecidos e 
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   await entrar(page);
 
-  await page.getByRole("button", { name: "⚙ Configurações" }).click();
+  await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: /Perfis de stack/ }).click();
 
   // Escopado pra dentro da tela de config: o header tem um <select> com essas
@@ -86,7 +87,7 @@ test("declarar 'time trabalha com Java' na aba Perfis de time faz um Serviço no
   // nenhum ainda — só assim dá pra demonstrar "declarar pela primeira vez").
   await entrar(page, "time-checkout");
 
-  await page.getByRole("button", { name: "⚙ Configurações" }).click();
+  await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: /Perfis de stack/ }).click();
   await page.getByText("+ Adicionar ou corrigir um valor de stack").click();
 
@@ -118,6 +119,7 @@ test("adicionar dois cenários ao canvas (sem substituir) compõe um diagrama ma
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   await entrar(page);
 
+  await page.getByRole("button", { name: "☰ Menu" }).click(); // SPEC-40: item do menu
   await page.getByRole("button", { name: "✦ Como funciona & cenários" }).click();
   await page.getByRole("button", { name: /Cenários prontos/ }).click();
 
@@ -162,7 +164,7 @@ test("tour guiado de 1 clique percorre diagrama, prontidão, proveniência, deri
   await page.getByRole("button", { name: "▶ Iniciar tour guiado" }).click();
 
   // Passo 1: bem-vindo (sem alvo, overlay centralizado).
-  await expect(page.getByText("PASSO 1 DE 12")).toBeVisible();
+  await expect(page.getByText("PASSO 1 DE 13")).toBeVisible();
   await expect(page.getByText("Bem-vindo")).toBeVisible();
   await page.getByRole("button", { name: "Próximo" }).click();
 
@@ -170,76 +172,81 @@ test("tour guiado de 1 clique percorre diagrama, prontidão, proveniência, deri
   // DOM — sem isso o overlay cai silenciosamente no fallback centralizado de
   // tela cheia em vez de apontar pro elemento certo (achado por QA visual).
   // Passo 2: diagrama — cenário mongo já carregado no canvas real.
-  await expect(page.getByText("PASSO 2 DE 12")).toBeVisible();
+  await expect(page.getByText("PASSO 2 DE 13")).toBeVisible();
   await expect(page.locator(".react-flow")).toBeVisible();
   await expect(page.locator(".react-flow__node", { hasText: "srv-catalogo" })).toBeVisible();
   await page.getByRole("button", { name: "Próximo" }).click();
 
   // Passo 3: prontidão.
-  await expect(page.getByText("PASSO 3 DE 12")).toBeVisible();
+  await expect(page.getByText("PASSO 3 DE 13")).toBeVisible();
   await expect(page.locator('[data-tour="readiness-summary"]')).toBeVisible();
   await page.getByRole("button", { name: "Próximo" }).click();
 
   // Passo 4: proveniência — o tour seleciona o nó mongo, painel real abre.
   // O alvo do spotlight precisa existir de verdade — sem isso o overlay cai
   // silenciosamente no fallback centralizado de tela cheia (achado por QA visual).
-  await expect(page.getByText("PASSO 4 DE 12")).toBeVisible();
+  await expect(page.getByText("PASSO 4 DE 13")).toBeVisible();
   const painel = page.locator('[data-tour="properties-panel"]');
   await expect(painel).toBeVisible();
   await expect(painel.getByText("Coleção Mongo")).toBeVisible();
   await page.getByRole("button", { name: "Próximo" }).click();
 
   // Passo 5: derivar.
-  await expect(page.getByText("PASSO 5 DE 12")).toBeVisible();
+  await expect(page.getByText("PASSO 5 DE 13")).toBeVisible();
   await expect(page.locator('[data-tour="derivar-button"]')).toBeVisible();
   await page.getByRole("button", { name: "Próximo" }).click();
 
   // Passo 6: revisão — o tour já disparou a derivação de verdade.
-  await expect(page.getByText("PASSO 6 DE 12")).toBeVisible();
+  await expect(page.getByText("PASSO 6 DE 13")).toBeVisible();
   await expect(page.locator('[data-tour="review-table"]')).toBeVisible();
   await expect(page.getByTestId("contagem-itens")).toHaveText("4 itens");
   await page.getByRole("button", { name: "Próximo" }).click();
 
   // Passo 7: especificação de solução — revisão e especificação viraram uma coisa só.
-  await expect(page.getByText("PASSO 7 DE 12")).toBeVisible();
+  await expect(page.getByText("PASSO 7 DE 13")).toBeVisible();
   // SPEC-39 — o botão morreu; o passo aponta pro FAB do agente.
   await expect(page.getByRole("button", { name: "Gerar especificação de solução" })).toHaveCount(0);
   await expect(page.getByTestId("abrir-conversa-especificacao")).toBeVisible();
   await page.getByRole("button", { name: "Próximo" }).click();
 
-  // Passo 8: perfis de time — o tour abre a tela de Configurações já na aba certa,
+  // Passo 8: o MENU (SPEC-40) — o spotlight aponta pro ☰.
+  await expect(page.getByText("PASSO 8 DE 13")).toBeVisible();
+  await expect(page.getByText("O menu", { exact: true }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Próximo" }).click();
+
+  // Passo 9: perfis de stack — o tour abre a tela já na área certa,
   // sem o usuário precisar navegar até lá sozinho.
-  await expect(page.getByText("PASSO 8 DE 12")).toBeVisible();
+  await expect(page.getByText("PASSO 9 DE 13")).toBeVisible();
   const telaConfigNoTour = page.locator('[data-tour="config-screen-content"]');
   await expect(telaConfigNoTour).toBeVisible();
   await expect(telaConfigNoTour.getByText("time-pagamentos", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Próximo" }).click();
 
-  // Passo 9: campos por tipo de nó — mesma tela, só troca de aba.
-  await expect(page.getByText("PASSO 9 DE 12")).toBeVisible();
+  // Passo 10: campos por tipo de nó.
+  await expect(page.getByText("PASSO 10 DE 13")).toBeVisible();
   await expect(telaConfigNoTour.getByRole("button", { name: "sobrescrever" }).first()).toBeVisible();
   await page.getByRole("button", { name: "Próximo" }).click();
 
-  // Passo 10: níveis e acessos (SPEC-38) — a aba Membros com os níveis.
-  await expect(page.getByText("PASSO 10 DE 12")).toBeVisible();
+  // Passo 11: níveis e acessos (SPEC-38) — a tela de Membros com os níveis.
+  await expect(page.getByText("PASSO 11 DE 13")).toBeVisible();
   await expect(telaConfigNoTour.getByText(/visualizar.*lê as quebras/).first()).toBeVisible();
   await page.getByRole("button", { name: "Próximo" }).click();
 
-  // Passo 11: modelo da especificação de solução — mesma tela, só troca de aba.
-  await expect(page.getByText("PASSO 11 DE 12")).toBeVisible();
+  // Passo 12: modelo da especificação de solução.
+  await expect(page.getByText("PASSO 12 DE 13")).toBeVisible();
   // `.first()`: o template ganhou mais de uma ocorrência de `{{titulo}}` (o
   // cabeçalho do documento e o corpo). O passo do tour prova que a aba certa
   // abriu, não quantas variáveis o modelo usa.
   await expect(telaConfigNoTour.getByText(/\{\{titulo\}\}/).first()).toBeVisible();
   await page.getByRole("button", { name: "Próximo" }).click();
 
-  // Passo 12: fim do tour — fecha a tela de Configurações de volta.
-  await expect(page.getByText("PASSO 12 DE 12")).toBeVisible();
+  // Passo 13: fim do tour — fecha a tela de volta.
+  await expect(page.getByText("PASSO 13 DE 13")).toBeVisible();
   await expect(page.getByText("Fim do tour")).toBeVisible();
   await expect(page.locator('[data-tour="config-screen-content"]')).not.toBeVisible();
   await page.getByRole("button", { name: "Concluir" }).click();
 
-  await expect(page.getByText(/PASSO \d+ DE 12/)).not.toBeVisible();
+  await expect(page.getByText(/PASSO \d+ DE 13/)).not.toBeVisible();
   await expect(page.getByTestId("contagem-itens")).not.toBeVisible();
 });
 
@@ -247,10 +254,11 @@ test("pular tour a qualquer momento encerra o overlay imediatamente", async ({ p
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   await entrar(page);
 
+  await page.getByRole("button", { name: "☰ Menu" }).click(); // SPEC-40: item do menu
   await page.getByRole("button", { name: "✦ Como funciona & cenários" }).click();
   await page.getByRole("button", { name: "▶ Iniciar tour guiado" }).click();
   await page.getByRole("button", { name: "Próximo" }).click();
   await page.getByRole("button", { name: "Pular tour" }).click();
 
-  await expect(page.getByText(/PASSO \d+ DE 12/)).not.toBeVisible();
+  await expect(page.getByText(/PASSO \d+ DE 13/)).not.toBeVisible();
 });

@@ -4773,3 +4773,29 @@ reusando os componentes de aba atuais como corpo. O valor não está no
 ícone: está nas telas com rota — F5 mantém o lugar, M4/M8/tour navegam por
 link, e a "transição crua" desaparece porque troca de página substitui swap
 de formulário. Spec apenas; implementação em 3 fases aguarda o aval.
+
+## 187. SPEC-40 Fase 1 — o app ganhou endereços: menu ☰, rotas hash e o fim da régua de abas
+
+A estrutura inteira de navegação mudou de uma vez, como a SPEC desenhou:
+o header do canvas ficou só com o TRABALHO (☰ Menu · paleta · prontidão ·
+Salvar · Derivar), e tudo que é administração foi pro menu lateral, agrupado
+por intenção (Demanda / Padrões do time / Pessoas & acesso / IA, com o
+rodapé de time e sessão). Cada área de configuração virou TELA específica
+com rota hash (`#/config/membros`, `#/config/regras`…) — a ConfigScreen
+perdeu a régua de abas e o estado interno; a área vem da rota, o corpo reusa
+os componentes de aba que já existiam, e o título da tela diz onde se está.
+F5 mantém o lugar; M4/M8/tour navegam pelo mesmo caminho; a cadência do
+PDCA ganhou a tela que faltava (era só API).
+
+A migração dos E2E pagou dividendos de design: o padrão antigo
+("⚙ Configurações" → clicar a aba) virou ("☰ Menu" → clicar o item de MESMO
+nome) — uma linha por spec. E os vermelhos do caminho ensinaram coisas
+reais: `aria-label` sobrescreve o texto visível no nome acessível (o "☰
+Menu" sumia dos seletores); dois ☰ no DOM com a tela aberta viram
+strict-violation (o do canvas agora se esconde); o `reload` MANTER a tela
+pela rota quebrou um spec que contava com o comportamento antigo — que é
+exatamente o valor da mudança; e a modal da jornada reabria a cada troca de
+time num spec sem o `jornada-vista` (o backdrop interceptava o mundo).
+
+Mordida da fase: resolução de rota quebrada (hash desconhecido deixando de
+cair no canvas) → teste vermelho. 413 unit; 47/47 E2E.

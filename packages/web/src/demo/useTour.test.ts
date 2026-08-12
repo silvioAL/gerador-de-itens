@@ -84,7 +84,7 @@ describe("useTour", () => {
     const { result } = renderHook(() => useTour(opts));
 
     act(() => result.current.iniciar());
-    for (let i = 0; i < 7; i++) act(() => result.current.proximo()); // -> passo 7 (Perfis de stack)
+    for (let i = 0; i < 8; i++) act(() => result.current.proximo()); // -> passo 8 (Perfis de stack; o 7 é o menu)
 
     expect(result.current.passoAtual?.titulo).toBe("Perfis de stack");
     expect(result.current.passoAtual?.selector).toBe("[data-tour=config-screen-content]");
@@ -96,17 +96,17 @@ describe("useTour", () => {
     const { result } = renderHook(() => useTour(opts));
 
     act(() => result.current.iniciar());
-    for (let i = 0; i < 8; i++) act(() => result.current.proximo()); // -> passo 8 (Padrões por componente)
+    for (let i = 0; i < 9; i++) act(() => result.current.proximo()); // -> passo 9 (Padrões por componente)
 
     expect(result.current.passoAtual?.titulo).toBe("Padrões por componente");
     expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("campos");
 
     // SPEC-38 — o passo novo de autorizações entra ANTES do modelo.
-    act(() => result.current.proximo()); // -> passo 9 (Níveis e acessos)
+    act(() => result.current.proximo()); // -> passo 10 (Níveis e acessos)
     expect(result.current.passoAtual?.titulo).toBe("Níveis e acessos");
     expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("membros");
 
-    act(() => result.current.proximo()); // -> passo 10 (Modelo da especificação de solução)
+    act(() => result.current.proximo()); // -> passo 11 (Modelo da especificação de solução)
 
     expect(result.current.passoAtual?.titulo).toBe("Modelo da especificação de solução");
     expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("especificacao");

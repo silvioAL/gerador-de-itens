@@ -1,0 +1,206 @@
+import type { AreaConfig } from "./rota";
+
+/**
+ * SPEC-40 Fase 1 — o menu (☰): navegação SECUNDÁRIA agrupada por intenção.
+ * O fluxo primário (desenhar → derivar → revisar) nunca entra aqui; o menu é
+ * a lista do que se ADMINISTRA. O filtro por perfil (cadeados, "pedir
+ * ajuste") é a Fase 2 — a estrutura de grupos já nasce pronta pra ele.
+ */
+export interface MenuLateralProps {
+  aberto: boolean;
+  onFechar: () => void;
+  timeAtivo: string;
+  timeIds: string[];
+  email: string;
+  onTrocarTime: (timeId: string) => void;
+  onNavegar: (area: AreaConfig) => void;
+  onNovaQuebra: () => void;
+  onAbrirQuebras: () => void;
+  onCenarios: () => void;
+  onSair: () => void;
+}
+
+const GRUPOS: { titulo: string; itens: { area: AreaConfig; rotulo: string }[] }[] = [
+  {
+    titulo: "Padrões do time",
+    itens: [
+      { area: "perfis", rotulo: "Perfis de stack" },
+      { area: "campos", rotulo: "Padrões por componente" },
+      { area: "camposAresta", rotulo: "Campos por tipo de conexão" },
+      { area: "regras", rotulo: "Regras de refinamento" },
+      { area: "especificacao", rotulo: "Especificação de solução" },
+    ],
+  },
+  {
+    titulo: "Pessoas & acesso",
+    itens: [
+      { area: "membros", rotulo: "Membros" },
+      { area: "acessos", rotulo: "Acessos" },
+    ],
+  },
+  {
+    titulo: "IA",
+    itens: [
+      { area: "pipeline", rotulo: "Pipeline de IA" },
+      { area: "modeloIa", rotulo: "Modelo de IA" },
+      { area: "pdca", rotulo: "Cadência do PDCA" },
+    ],
+  },
+];
+
+export function MenuLateral({
+  aberto,
+  onFechar,
+  timeAtivo,
+  timeIds,
+  email,
+  onTrocarTime,
+  onNavegar,
+  onNovaQuebra,
+  onAbrirQuebras,
+  onCenarios,
+  onSair,
+}: MenuLateralProps) {
+  if (!aberto) return null;
+
+  const acao = (fn: () => void) => () => {
+    fn();
+    onFechar();
+  };
+
+  return (
+    <>
+      <div onClick={onFechar} style={fundoEstilo} aria-hidden="true" />
+      <nav aria-label="Menu" data-testid="menu-lateral" style={menuEstilo}>
+        <header style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <strong style={{ fontSize: 14 }}>Gerador de Itens</strong>
+          <div style={{ flex: 1 }} />
+          <button onClick={onFechar} aria-label="Fechar menu" style={fecharEstilo}>
+            ×
+          </button>
+        </header>
+
+        <p style={tituloGrupoEstilo}>Demanda</p>
+        <button onClick={acao(onNovaQuebra)} style={itemEstilo}>
+          Nova quebra
+        </button>
+        <button onClick={acao(onAbrirQuebras)} style={itemEstilo}>
+          Abrir…
+        </button>
+        <button onClick={acao(onCenarios)} style={itemEstilo}>
+          ✦ Como funciona &amp; cenários
+        </button>
+
+        {GRUPOS.map((grupo) => (
+          <div key={grupo.titulo}>
+            <p style={tituloGrupoEstilo}>{grupo.titulo}</p>
+            {grupo.itens.map((item) => (
+              <button key={item.area} onClick={acao(() => onNavegar(item.area))} style={itemEstilo}>
+                {item.rotulo}
+              </button>
+            ))}
+          </div>
+        ))}
+
+        <div style={{ flex: 1 }} />
+        <div style={rodapeEstilo}>
+          <label style={{ fontSize: 11, color: "var(--texto-fraco)", display: "block", marginBottom: 4 }}>
+            Time (stack conhecida)
+          </label>
+          <select
+            aria-label="Time (stack conhecida)"
+            value={timeAtivo}
+            onChange={(e) => onTrocarTime(e.target.value)}
+            style={seletorTimeEstilo}
+          >
+            {timeIds.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
+            <span style={{ fontSize: 11, color: "var(--texto-mudo)", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {email}
+            </span>
+            <div style={{ flex: 1 }} />
+            <button onClick={acao(onSair)} style={{ ...itemEstilo, width: "auto", padding: "6px 12px" }}>
+              Sair
+            </button>
+          </div>
+        </div>
+      </nav>
+    </>
+  );
+}
+
+const fundoEstilo: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0, 0, 0, 0.45)",
+  zIndex: 69,
+};
+
+const menuEstilo: React.CSSProperties = {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  bottom: 0,
+  width: 300,
+  maxWidth: "85vw",
+  background: "var(--painel)",
+  borderRight: "1px solid var(--borda-forte)",
+  zIndex: 70,
+  padding: "14px 14px 16px",
+  display: "flex",
+  flexDirection: "column",
+  overflowY: "auto",
+  boxShadow: "12px 0 40px rgba(0, 0, 0, 0.45)",
+};
+
+const tituloGrupoEstilo: React.CSSProperties = {
+  fontSize: 10.5,
+  fontWeight: 700,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+  color: "var(--texto-fraco)",
+  margin: "14px 4px 4px",
+};
+
+const itemEstilo: React.CSSProperties = {
+  display: "block",
+  width: "100%",
+  textAlign: "left",
+  fontSize: 13,
+  padding: "7px 10px",
+  borderRadius: 8,
+  border: "none",
+  background: "transparent",
+  color: "var(--texto)",
+  cursor: "pointer",
+};
+
+const rodapeEstilo: React.CSSProperties = {
+  borderTop: "1px solid var(--borda)",
+  paddingTop: 12,
+  marginTop: 12,
+};
+
+const seletorTimeEstilo: React.CSSProperties = {
+  width: "100%",
+  fontSize: 12.5,
+  padding: "6px 8px",
+  borderRadius: 6,
+  border: "1px solid var(--borda-forte)",
+  background: "var(--fundo)",
+  color: "var(--texto)",
+};
+
+const fecharEstilo: React.CSSProperties = {
+  background: "transparent",
+  border: "none",
+  color: "var(--texto-fraco)",
+  fontSize: 18,
+  cursor: "pointer",
+  lineHeight: 1,
+};

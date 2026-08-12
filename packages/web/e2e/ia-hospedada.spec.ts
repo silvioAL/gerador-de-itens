@@ -29,7 +29,7 @@ test.beforeEach(async ({ page }) => {
 
 /** A aba "Modelo de IA" dentro da tela de Configurações. */
 async function abrirModeloIa(page: Page) {
-  await page.getByRole("button", { name: "⚙ Configurações" }).click();
+  await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: "Modelo de IA" }).click();
 }
 
@@ -365,7 +365,7 @@ test("configurar conversando: a conversa vira proposta, aplicar cria o campo, e 
   // A prova de que a escrita passou pela rota de sempre: a aba de Configurações
   // que o formulário alimenta lista o campo criado pela conversa.
   await page.getByTestId("assistente-flutuante").click();
-  await page.getByRole("button", { name: "⚙ Configurações" }).click();
+  await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: /Padrões por componente/ }).click();
   await expect(page.getByText(new RegExp(`${MARCA_GATEWAY_FALSO}.*\\(label\\)`)).first()).toBeVisible();
 });

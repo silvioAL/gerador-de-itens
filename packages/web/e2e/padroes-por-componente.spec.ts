@@ -20,12 +20,13 @@ test.beforeEach(async ({ page }) => {
 
 test("a aba lista os padrões semeados do time, com o contador batendo", async ({ page }) => {
   await entrar(page, "time-portabilidade");
-  await page.getByRole("button", { name: /Configurações/ }).click();
+  await page.getByRole("button", { name: "☰ Menu" }).click();
 
   // O rótulo carrega o número: "(N do time)". Se a seed sumir, some o número.
-  const aba = page.getByRole("button", { name: /Padrões por componente \(6 do time\)/ });
-  await expect(aba).toBeVisible();
-  await aba.click();
+  // SPEC-40 — o item do menu não carrega contagem; ela vive no TÍTULO da
+  // tela ("Padrões por componente (6 do time)"), asserido após navegar.
+  await page.getByRole("button", { name: /Padrões por componente/ }).click();
+  await expect(page.getByText(/Padrões por componente \(6 do time\)/)).toBeVisible();
 
   for (const rotulo of [
     "Runbook de plantão (URL)",
