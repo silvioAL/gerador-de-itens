@@ -4748,3 +4748,28 @@ O conserto são as três linhas que o hook prometia: `useVozNaEntrada` +
 provedor transcreve; sem transcrição, sem botão). Testes no padrão do
 `JanelaConversa.voz.test` — aparece quando transcreve, some quando não —
 com mordida provada (botão desligado → vermelho).
+
+## 186. SPEC-40 — a navegação repensada: do contêiner de abas ao menu com telas de verdade
+
+O pedido começou como "as transições entre as tabs parecem cruas — e o que
+deveria aparecer pra cada perfil?", e a primeira análise (indicador
+deslizante, fade, agrupamento) morreu com razão: superficial. A pergunta
+certa, feita pelo usuário, era estrutural — "não valeria um menu hambúrguer
+na tela anterior e telas específicas?".
+
+A avaliação de UX confirmou com três medições no código: o header do canvas
+tem a hierarquia de frequência INVERTIDA (paleta de 12 tipos disputando
+espaço com tour e configurações — quebra em duas linhas nos prints reais);
+Configurações não é um lugar, é um contêiner de 10 formulários trocados por
+useState num app SEM ROTA nenhuma (F5 volta pro canvas, condutores navegam
+por prop drilling); e o perfil não participa da exibição (operar vê dez
+formulários que devolvem 403).
+
+A SPEC-40 fecha o desenho: header enxuto (só o trabalho), drawer ☰ com
+grupos por intenção FILTRADOS por nível+RBAC (o menu é a lista do que esta
+pessoa pode fazer — cadeado com "pedir ajuste" do PDCA nos padrões, Acessos
+some de quem não pode), e cada área vira TELA específica com rota hash,
+reusando os componentes de aba atuais como corpo. O valor não está no
+ícone: está nas telas com rota — F5 mantém o lugar, M4/M8/tour navegam por
+link, e a "transição crua" desaparece porque troca de página substitui swap
+de formulário. Spec apenas; implementação em 3 fases aguarda o aval.
