@@ -117,7 +117,6 @@ export function AssistenteFlutuante({
               }}
               placeholder={balao.entrada.placeholder}
               style={{ width: "100%", marginTop: 8, fontSize: 12.5, padding: "6px 8px" }}
-              // eslint-disable-next-line jsx-a11y/no-autofocus
               autoFocus
             />
           )}
