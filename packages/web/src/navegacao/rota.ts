@@ -18,7 +18,7 @@ export type AreaConfig =
   | "modeloIa"
   | "pdca";
 
-export type Rota = { tela: "canvas" } | { tela: "config"; area: AreaConfig };
+export type Rota = { tela: "canvas" } | { tela: "config"; area: AreaConfig } | { tela: "itens" };
 
 /** id interno ↔ segmento legível da URL (o hash é interface, fala produto). */
 const SEGMENTO_DA_AREA: Record<AreaConfig, string> = {
@@ -38,12 +38,15 @@ const AREA_DO_SEGMENTO = Object.fromEntries(
 );
 
 export function hashDaRota(rota: Rota): string {
-  return rota.tela === "canvas" ? "#/" : `#/config/${SEGMENTO_DA_AREA[rota.area]}`;
+  if (rota.tela === "canvas") return "#/";
+  if (rota.tela === "itens") return "#/itens";
+  return `#/config/${SEGMENTO_DA_AREA[rota.area]}`;
 }
 
 /** Hash desconhecido cai no canvas — link velho nunca vira tela em branco. */
 export function rotaDoHash(hash: string): Rota {
   const partes = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
+  if (partes[0] === "itens") return { tela: "itens" };
   if (partes[0] === "config") {
     const area = AREA_DO_SEGMENTO[partes[1] ?? ""];
     if (area) return { tela: "config", area };
