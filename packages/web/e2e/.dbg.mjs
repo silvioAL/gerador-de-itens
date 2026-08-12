@@ -1,0 +1,17 @@
+import { chromium } from "@playwright/test";
+const browser = await chromium.launch();
+const page = await browser.newPage();
+page.on("response", (r) => { if (r.url().includes("/ajustes")) console.log("RESP", r.status(), r.url()); });
+page.on("console", (m) => m.type() === "error" && console.log("CONSOLE", m.text()));
+await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
+await page.goto("http://localhost:8080");
+await page.getByRole("button", { name: "Entrar" }).first().click();
+await page.getByPlaceholder("voce@empresa.com").fill("dev@gerador.local");
+await page.getByRole("button", { name: "Entrar" }).click();
+await page.getByRole("button", { name: "time-pagamentos", exact: true }).click();
+await page.getByRole("button", { name: "+ Serviço", exact: true }).waitFor({ timeout: 15000 });
+await page.getByRole("button", { name: "⚙ Configurações" }).click();
+await page.getByRole("button", { name: /Acessos/ }).click();
+await page.waitForTimeout(3000);
+console.log("secao presente:", await page.getByTestId("solicitacoes-de-ajuste").count());
+await browser.close();
