@@ -101,6 +101,47 @@ describe("ReviewScreen — fixture 01 (sem ciclos/conflitos)", () => {
     expect(screen.queryByText(/Ciclo:/)).not.toBeInTheDocument();
   });
 
+  it("a timeline sinaliza começo e fim: primeiro item marca início, último marca fim (achado real)", () => {
+    const resultado = resultadoFixture01();
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    const cards = resultado.atividades.map((a) => screen.getByTestId(`item-${a.chave}`));
+    expect(cards.length).toBeGreaterThan(1);
+    expect(cards[0].className).toContain("review-item-rail-inicio");
+    expect(cards[cards.length - 1].className).toContain("review-item-rail-fim");
+    for (const meio of cards.slice(1, -1)) {
+      expect(meio.className).not.toMatch(/rail-inicio|rail-fim|rail-unico/);
+    }
+  });
+
+  it("com UM item só, início e fim moram no mesmo card (classe própria, não as duas)", () => {
+    const resultado = resultadoFixture01();
+    const unico = { ...resultado, atividades: resultado.atividades.slice(0, 1) };
+    render(
+      <ReviewScreen
+        resultado={unico}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    const card = screen.getByTestId(`item-${unico.atividades[0].chave}`);
+    expect(card.className).toContain("review-item-rail-unico");
+    expect(card.className).not.toMatch(/rail-inicio|rail-fim/);
+  });
+
   it("nenhum item selecionado inicialmente — ficha mostra estado vazio", () => {
     const resultado = resultadoFixture01();
     render(

@@ -131,6 +131,9 @@ test("a esteira roda no navegador e o texto do gateway chega nos campos (o defei
   await painel.getByRole("spinbutton", { name: "TTL da mensagem (ms)" }).fill("60000");
   await painel.getByRole("combobox", { name: "Ack" }).selectOption("manual");
 
+  // Com título preenchido a derivação segue DIRETO (sem a pergunta do nome) —
+  // é o caminho de quem já batizou a demanda.
+  await page.getByLabel("Título da quebra").fill("Esteira com gateway falso");
   await page.locator('[data-tour="derivar-button"]').click();
   await expect(page.getByTestId("contagem-itens")).toHaveText("1 itens");
 

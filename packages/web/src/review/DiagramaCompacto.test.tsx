@@ -57,6 +57,27 @@ describe("DiagramaCompacto (Fase 1d, SPEC-23)", () => {
     expect(within(screen.getByTestId("diagrama-compacto-no-n2")).getByText("FILA RABBIT")).toBeInTheDocument();
   });
 
+  it("tipo comprido é truncado com reticências pra não colidir com o badge (achado real: letra sobreposta no SERVIÇO DE BATCH)", () => {
+    const cfg: DiagramaConfig = {
+      ...config,
+      nodeTypes: {
+        ...config.nodeTypes,
+        batch: { label: "Serviço de Batch (Spring Batch)", derives: "service", techs: [], contextos: [], spec: [], color: "#38bdf8" },
+      },
+    };
+    const diag: Diagrama = {
+      nodes: [{ id: "nb", type: "batch", label: "faturamento", x: 0, y: 0, status: "novo", spec: {}, specNA: {} }],
+      edges: [],
+    };
+    render(<DiagramaCompacto diagrama={diag} config={cfg} contagemPorNo={{ nb: 4 }} />);
+
+    const tipo = within(screen.getByTestId("diagrama-compacto-no-nb")).getByText(/SERVIÇO DE BATCH/);
+    // Com badge de contagem o teto é 18 caracteres — o texto termina em "…"
+    // em vez de correr por baixo do círculo.
+    expect(tipo.textContent).toMatch(/…$/);
+    expect(tipo.textContent!.length).toBeLessThanOrEqual(18);
+  });
+
   it("aresta colorida pela cor do nó de origem, com o rótulo da conexão em caps no meio", () => {
     render(<DiagramaCompacto diagrama={diagrama} config={config} />);
     const aresta = screen.getByTestId("diagrama-aresta-e1");

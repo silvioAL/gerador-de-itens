@@ -305,8 +305,16 @@ export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, on
                 className={ativo && animado ? "diagrama-no-ativo" : undefined}
               />
               <rect x={n.x} y={n.y + 6} width={3} height={ALTURA_NO - 12} fill={n.cor} rx={1.5} />
+              {/* A linha do TIPO é truncada pra nunca correr por baixo do
+                  badge de contagem (achado real: "SERVIÇO DE BATCH (SPRING
+                  BATCH)" passava sob o número e parecia letra duplicada). O
+                  teto encolhe quando o badge existe e quando há "EXISTENTE". */}
               <text x={n.x + 14} y={n.y + 22} style={tipoNoEstilo} fill={n.cor}>
-                {n.tipo.toUpperCase()}
+                {(() => {
+                  const teto = (contagem > 0 ? 18 : 21) - (n.existente ? 10 : 0);
+                  const tipo = n.tipo.toUpperCase();
+                  return tipo.length > teto ? `${tipo.slice(0, teto - 1)}…` : tipo;
+                })()}
                 {n.existente && (
                   <tspan dx={8} fill="#5C6A7E">
                     EXISTENTE

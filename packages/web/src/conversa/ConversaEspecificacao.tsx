@@ -310,10 +310,24 @@ export function ConversaEspecificacao({
       exemplo={`ex.: o timeout passou de 300ms para 150ms, ajuste os critérios de aceite`}
       acoes={
         impactados.length > 0 ? (
+          <>
+          {/* Achado real: o botão desabilitado parecia clicável e "clicar não
+              fazia nada" — o motivo morava só no title, que ninguém vê. O
+              estilo agora diz desabilitado, e a dica fica VISÍVEL. */}
+          {mudancasAceitas.length === 0 && (
+            <span style={{ display: "block", fontSize: 11, color: "var(--texto-mudo)", marginBottom: 4 }}>
+              aceite uma alteração primeiro — é ela que se propaga aos demais
+            </span>
+          )}
           <button
             onClick={() => void revisarOsDemais()}
             disabled={pensando || mudancasAceitas.length === 0}
-            style={botaoAcaoEstilo}
+            style={{
+              ...botaoAcaoEstilo,
+              ...(pensando || mudancasAceitas.length === 0
+                ? { opacity: 0.45, cursor: "not-allowed" }
+                : {}),
+            }}
             data-testid="revisar-demais"
             title={
               mudancasAceitas.length === 0
@@ -323,6 +337,7 @@ export function ConversaEspecificacao({
           >
             Revisar os demais ({impactados.length})
           </button>
+          </>
         ) : undefined
       }
       onEnviar={(texto) => void enviar(texto)}

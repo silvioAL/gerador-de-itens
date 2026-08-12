@@ -349,16 +349,53 @@ function AppCarregado({
   const momentoDerivarAtivo =
     quebra.diagrama.nodes.length > 0 && vermelhos.length === 0 && !resultado && !derivarDispensado;
 
-  function derivarQuebra() {
+  // SPEC-37 (pedido do usuário) — o rascunho é livre, mas derivar é o momento
+  // do compromisso: sem título, o assistente pergunta o nome da demanda ANTES,
+  // porque é ele que permite o auto-save depois de gerar os itens. "Derivar
+  // sem salvar" continua a um clique — rascunho que não quer virar registro
+  // não é obrigado a virar.
+  const [pedindoNomeDaDemanda, setPedindoNomeDaDemanda] = useState(false);
+  const [autoSalvarPendente, setAutoSalvarPendente] = useState(false);
+
+  function executarDerivacao(salvarDepois: boolean) {
     const atividades = derivar(quebra.diagrama, diagramaConfig, { time: quebra.time });
     setResultado(resolverDependencias(atividades));
+    setPedindoNomeDaDemanda(false);
+    if (salvarDepois) setAutoSalvarPendente(true);
   }
+
+  function derivarQuebra() {
+    if (!(quebra.titulo ?? "").trim()) {
+      // O balão só existe com o assistente fechado — fechar garante que a
+      // pergunta apareça mesmo se o chat estava aberto.
+      setAbaAssistente(null);
+      setPedindoNomeDaDemanda(true);
+      return;
+    }
+    executarDerivacao(true);
+  }
+
+  function confirmarNomeEDerivar(nome: string) {
+    setQuebra((q) => ({ ...q, titulo: nome }));
+    executarDerivacao(true);
+  }
+
+  // O auto-save espera o RENDER com o título aplicado (setQuebra é assíncrono
+  // — salvar no mesmo tick gravaria a quebra sem nome, status "sem-titulo").
+  useEffect(() => {
+    if (autoSalvarPendente && resultado && (quebra.titulo ?? "").trim()) {
+      setAutoSalvarPendente(false);
+      void persistencia.salvar();
+    }
+  }, [autoSalvarPendente, resultado, quebra.titulo]);
 
   const opcoesTour = {
     cenarios,
     carregarCenario: (q: Quebra) => aoAbrir(q),
     selecionarNo: setSelecionadoId,
-    derivarQuebra,
+    // O tour/demo deriva DIRETO, sem a pergunta do nome nem auto-save — é uma
+    // demonstração, não uma quebra de verdade para registrar.
+    derivarQuebra: () => executarDerivacao(false),
     fecharRevisao: () => setResultado(null),
     abrirConfigNaAba,
     fecharJornada,
@@ -743,15 +780,26 @@ function AppCarregado({
         sobreposto={mostrarConfig}
         // SPEC-37 M9 — tudo verde e nada derivado: o momento certo de conduzir
         // ao Derivar, com o chip executando a mesma ação do botão do header.
-        chamando={momentoDerivarAtivo}
+        chamando={momentoDerivarAtivo || pedindoNomeDaDemanda}
         balao={
-          momentoDerivarAtivo
+          pedindoNomeDaDemanda
             ? {
-                texto: "Tudo verde — a quebra está pronta para derivar os itens de trabalho.",
-                acao: { rotulo: "Derivar Quebra", onExecutar: derivarQuebra },
-                onDispensar: () => setDerivarDispensado(true),
+                texto: "Antes de derivar: qual é o nome da demanda? Com ele eu salvo a quebra automaticamente depois de gerar os itens.",
+                entrada: {
+                  placeholder: "ex.: Fatura mensal em lote",
+                  rotulo: "Derivar e salvar",
+                  onConfirmar: confirmarNomeEDerivar,
+                },
+                acaoSecundaria: { rotulo: "Derivar sem salvar", onExecutar: () => executarDerivacao(false) },
+                onDispensar: () => setPedindoNomeDaDemanda(false),
               }
-            : undefined
+            : momentoDerivarAtivo
+              ? {
+                  texto: "Tudo verde — a quebra está pronta para derivar os itens de trabalho.",
+                  acao: { rotulo: "Derivar Quebra", onExecutar: derivarQuebra },
+                  onDispensar: () => setDerivarDispensado(true),
+                }
+              : undefined
         }
       >
         {abaAssistente === "conversa" && (

@@ -412,3 +412,35 @@ textarea::placeholder {
   background: #3ecf8e;
   border-color: #3ecf8e;
 }
+
+/* Marcos de início/fim da timeline (pedido do usuário): o primeiro card diz
+   onde o fluxo começa (▸), o último onde termina (⚑); lista de UM item
+   carrega os dois no mesmo card. Estas regras vêm DEPOIS das de status de
+   propósito: para o marco, o glifo substitui o ponto colorido — o status
+   continua legível pelas barrinhas do próprio card. */
+.review-item-rail-inicio::after,
+.review-item-rail-fim::after,
+.review-item-rail-unico::after {
+  content: "▸";
+  background: transparent;
+  border: none;
+  color: #38bdf8;
+  font-size: 13px;
+  line-height: 1;
+  width: auto;
+  height: auto;
+  left: -24px;
+  top: 13px;
+}
+.review-item-rail-fim::after {
+  content: "⚑";
+  font-size: 11px;
+  top: 14px;
+}
+.review-item-rail-unico::after {
+  content: "▸⚑";
+  font-size: 11px;
+  letter-spacing: 1px;
+  left: -30px;
+  top: 14px;
+}
