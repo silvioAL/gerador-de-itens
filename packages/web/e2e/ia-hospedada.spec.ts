@@ -131,10 +131,11 @@ test("a esteira roda no navegador e o texto do gateway chega nos campos (o defei
   await painel.getByRole("spinbutton", { name: "TTL da mensagem (ms)" }).fill("60000");
   await painel.getByRole("combobox", { name: "Ack" }).selectOption("manual");
 
-  // Com título preenchido a derivação segue DIRETO (sem a pergunta do nome) —
-  // é o caminho de quem já batizou a demanda.
-  await page.getByLabel("Título da quebra").fill("Esteira com gateway falso");
+  // O título não se digita mais (campo removido — só via agente): derivar
+  // pergunta o nome e o "Derivar e salvar" segue com auto-save.
   await page.locator('[data-tour="derivar-button"]').click();
+  await page.getByLabel("ex.: Fatura mensal em lote").fill("Esteira com gateway falso");
+  await page.getByTestId("assistente-balao-confirmar").click();
   await expect(page.getByTestId("contagem-itens")).toHaveText("1 itens");
 
   // A esteira começa sozinha quando `/ia/status` diz que dá pra usar IA — com a

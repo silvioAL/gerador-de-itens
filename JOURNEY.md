@@ -4654,3 +4654,18 @@ idempotentes (409 = já criado, segue).
 
 Mordida da fase: prioridade M4/M5 invertida no módulo → o unit da prioridade
 E o teste de UI do M4 vermelhos, cada camada acusando o mesmo defeito.
+
+## 181. O campo Título morreu — o nome da demanda é conversa, não formulário
+
+O input "Título (obrigatório pra salvar)" saiu do header. O nome da demanda
+agora é mapeado SÓ pelo agente: a pergunta do balão (M10, §174) ganhou
+INTENÇÃO — "derivar" (o fluxo que já existia, com auto-save) e "salvar" (o
+botão Salvar sem título deixa de travar em cinza: pergunta o nome, aplica no
+tick de render seguinte e grava). No header, o título virou texto de
+leitura; o botão Salvar nunca mais nasce desabilitado.
+
+O E2E novo prova o caminho do salvar de ponta a ponta — inclusive que a
+intenção NÃO vaza (salvar não deriva: a revisão não abre). A mordida foi
+exatamente essa: intenção ignorada (confirmar sempre derivando) → spec
+vermelho. Os specs que digitavam o título migraram pra responder o balão,
+que é como o produto funciona agora.
