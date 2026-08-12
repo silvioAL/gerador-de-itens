@@ -4341,3 +4341,38 @@ Duas mordidas de uma tacada só, cada defeito no seu spec: o bubble sem a
 seleção automática deixou o E2E da revisão vermelho; o salvar que não salva
 deixou a persistência do template vermelha. 359 no web, 41/41 no navegador,
 jornada validada em produção sem a aba de CLI.
+
+## 170. A rodada das pendências: o grupo que nasce pela tela, o ramo morto que morre, e a aba presa que destrava
+
+Três pendências do caderno, fechadas juntas a pedido ("vamos adiante com as
+pendências").
+
+**§165 — a instalação limpa ganhou por onde começar.** As techs canônicas do
+produto que ainda não têm grupo de regras viram um clique ("Adicionar grupo de
+regras: + Frontend"); tech inventada continua impossível — um grupo que nunca
+casaria com item nenhum é o typo silencioso de novo. O E2E agora cria o grupo
+PELA TELA em vez de semear via API — e a rodada ensinou uma lição de suíte na
+prática: o restore do documento virou `finally`, porque um teste que falha no
+meio deixava o grupo pra trás e a rodada SEGUINTE falhava no botão que não
+existe mais. Estado sujo de run falho é a §162 no eixo do tempo.
+
+**§158 — o ramo morto `modo === "local"` morreu de verdade.** O input de texto
+livre do time saiu do header; as props `mostrarMembros`/`mostrarCamposAresta`
+saíram da ConfigScreen; e a consequência boa: **a aba "Campos por tipo de
+conexão" DESTRAVOU** — ela estava inalcançável atrás do gate de modo local
+havia meses, com as rotas vivas no servidor desde a SPEC-31 e a porta desde o
+#303. O produto tinha uma feature completa que nenhum clique alcançava.
+
+**§162 — o erro sem corpo ganhou endereço.** Quando o servidor responde sem
+JSON legível (proxy devolvendo HTML, socket caído), as conversas diziam só
+"Não foi possível responder."; agora dizem o status ("HTTP 503, sem detalhe do
+servidor") — não conserta o problema, mas diz onde olhar.
+
+E o instrumento cobrou de novo, duas vezes: um python com `unicode_escape`
+gravou mojibake REAL num spec (revertido via git e refeito com o Edit — a
+ferramenta certa existia); e o replace multi-linha falhou em CRLF mais uma
+vez, salvo pelo assert. A regra operacional que fica: em arquivo deste repo,
+edição multi-linha é trabalho do Edit, não de script.
+
+Mordida do grupo novo provada (clique sem gravar → vermelho no caso exato);
+356 no web, 41/41 no navegador, e as duas telas conferidas em produção.

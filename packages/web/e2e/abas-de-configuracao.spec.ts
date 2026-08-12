@@ -42,37 +42,36 @@ test("Regras de refinamento: carrega o documento do servidor e mostra as seçõe
   expect(await secoes.count()).toBeGreaterThan(1);
 });
 
-test("Regras: contexto vira clique na lista conhecida — o campo de vírgula saiu (pedido do usuário)", async ({ page }) => {
+test("Regras: criar um grupo pela tela (§165) e marcar contexto por clique — o campo de vírgula saiu", async ({ page }) => {
   await entrar(page);
 
-  // MEDIÇÃO desta rodada: num banco limpo o GET de regras devolve a forma
-  // VAZIA — não há tech nenhuma no select (a tela nem tem como criar uma; fica
-  // anotado no JOURNEY). O teste semeia a própria tech via API, com a sessão
-  // do navegador — tech própria também evita a corrida da §162: nenhum outro
-  // spec deriva "TechDeTesteE2E".
+  // O documento de regras é da organização — guarda o vigente pra restaurar.
+  // Frontend de propósito: nenhum cenário dos outros specs deriva itens
+  // Frontend, então o grupo criado aqui não muda ficha de ninguém (§162).
   const API = "http://localhost:4100";
   const antes = await (await page.request.get(`${API}/config/regras`)).json();
+  // Setup determinístico: garante que Frontend NÃO tem grupo antes de testar a
+  // criação — um run falho anterior pode ter deixado o grupo salvo (o restore
+  // do fim não roda quando o teste morre no meio; por isso ele virou finally).
+  const { Frontend: _f, ...porTechSemFrontend } = antes.documento.porTech ?? {};
   await page.request.put(`${API}/config/regras`, {
-    data: {
-      documento: {
-        ...antes.documento,
-        porTech: {
-          ...(antes.documento.porTech ?? {}),
-          TechDeTesteE2E: {
-            checklistTecnico: [{ texto: "Definir persistência no dispositivo", contextos: [] }],
-            testes: [],
-          },
-        },
-      },
-    },
+    data: { documento: { ...antes.documento, porTech: porTechSemFrontend } },
   });
 
+  try {
   await page.getByRole("button", { name: /Configurações/ }).click();
   await page.getByRole("button", { name: /Regras de refinamento/ }).click();
-  // Sem seletor de tecnologia: os grupos aparecem empilhados, e o do teste é
-  // localizado pelo próprio nome — `regra-0` é escopado pelo grupo porque a
-  // numeração recomeça em cada tech.
-  const grupo = page.getByTestId("regras-grupo-TechDeTesteE2E");
+
+  // §165 — a instalação limpa nasce sem grupo nenhum; o clique cria.
+  await page.getByTestId("novo-grupo-Frontend").click();
+  const grupo = page.getByTestId("regras-grupo-Frontend");
+  await expect(grupo).toBeVisible();
+
+  // O fluxo real continua: um requisito novo digitado no grupo recém-criado,
+  // e o contexto por clique (Frontend não tem contexto próprio, então o menu
+  // cai na lista completa — o fallback documentado).
+  await grupo.getByRole("textbox", { name: "Novo item", exact: true }).fill("Definir o tratamento de estado offline");
+  await grupo.getByRole("button", { name: "+ Adicionar" }).click();
   const primeiro = grupo.getByTestId("regra-0");
   await primeiro.getByRole("button", { name: /adicionar$/ }).click();
   // As opções vêm de appConfig.contextos — valor exato, sem digitação.
@@ -84,11 +83,15 @@ test("Regras: contexto vira clique na lista conhecida — o campo de vírgula sa
   await page.getByRole("button", { name: /Configurações/ }).click();
   await page.getByRole("button", { name: /Regras de refinamento/ }).click();
   await expect(
-    page.getByTestId("regras-grupo-TechDeTesteE2E").getByRole("button", { name: "Remover contexto Mobile-android" })
+    page.getByTestId("regras-grupo-Frontend").getByRole("button", { name: "Remover contexto Mobile-android" })
   ).toBeVisible();
 
-  // Restaura o documento como estava — regras é da organização, não do teste.
-  await page.request.put(`${API}/config/regras`, { data: { documento: antes.documento } });
+  } finally {
+    // Restaura o documento como estava — regras é da organização, não do
+    // teste; e `finally` porque um teste que falha no meio não pode deixar o
+    // grupo pra trás (foi exatamente o que sujou a rodada anterior).
+    await page.request.put(`${API}/config/regras`, { data: { documento: antes.documento } });
+  }
 });
 
 test("Especificação: apagar {{itens}} não deixa salvar e mostra o motivo (SPEC-35); com {{itens}}, salva de verdade", async ({ page }) => {

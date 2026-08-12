@@ -538,43 +538,22 @@ function AppCarregado({
 
         <div style={{ width: 1, height: 20, background: "var(--borda-forte)" }} />
 
-        {modo === "local" ? (
-          <>
-            {/* Achado real: no modo local a "sessão" é sempre um único time falso
-             * (SESSAO_LOCAL em openApiLocal.ts) — travar este campo em
-             * sessao.timeIds tornava impossível selecionar qualquer time real já
-             * configurado em perfis-time.json. Sem login pra isolar, texto livre
-             * (com sugestão dos times já conhecidos) é o comportamento certo aqui. */}
-            <input
-              aria-label="Time (stack conhecida)"
-              list="times-conhecidos-local"
-              value={quebra.time ?? timeAtivo}
-              onChange={(e) => aoMudarTime(e.target.value)}
-              placeholder="ex.: time-pagamentos"
-              title="Nome livre — pré-preenche sugestões de stack e os campos customizados desse time (config/perfis-time.json e config/campos-no.json)."
-              style={{ fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid var(--borda-forte)", background: "var(--fundo)", color: "var(--texto)", width: 170 }}
-            />
-            <datalist id="times-conhecidos-local">
-              {Object.keys(perfisTime).map((time) => (
-                <option key={time} value={time} />
-              ))}
-            </datalist>
-          </>
-        ) : (
-          <select
-            aria-label="Time (stack conhecida)"
-            value={quebra.time ?? timeAtivo}
-            onChange={(e) => aoMudarTime(e.target.value)}
-            title="Times aos quais sua sessão pertence — pré-preenchem sugestões de stack e os campos customizados desse time."
-            style={{ fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid var(--borda-forte)", background: "var(--fundo)", color: "var(--texto)", width: 170 }}
-          >
-            {sessao.timeIds.map((time) => (
-              <option key={time} value={time}>
-                {time}
-              </option>
-            ))}
-          </select>
-        )}
+        {/* O input de texto livre do modo local morreu com a SPEC-33 — este é
+            o ramo morto que a §158 anotou, removido de vez na rodada das
+            pendências. Só o hospedado existe: o time vem sempre da sessão. */}
+        <select
+          aria-label="Time (stack conhecida)"
+          value={quebra.time ?? timeAtivo}
+          onChange={(e) => aoMudarTime(e.target.value)}
+          title="Times aos quais sua sessão pertence — pré-preenchem sugestões de stack e os campos customizados desse time."
+          style={{ fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid var(--borda-forte)", background: "var(--fundo)", color: "var(--texto)", width: 170 }}
+        >
+          {sessao.timeIds.map((time) => (
+            <option key={time} value={time}>
+              {time}
+            </option>
+          ))}
+        </select>
 
         <div style={{ width: 1, height: 20, background: "var(--borda-forte)" }} />
 
@@ -731,8 +710,6 @@ function AppCarregado({
           especificacaoTemplate={especificacaoTemplate}
           pipelineAgentes={pipelineAgentes}
           timeAtivo={timeAtivo}
-          mostrarMembros={modo !== "local"}
-          mostrarCamposAresta={modo === "local"}
           onEditarValorPerfilTime={editarValorPerfilTime}
           onSalvarEspecificacaoTemplate={salvarEspecificacaoTemplate}
           onSalvarPipelineAgentes={salvarPipelineAgentes}
@@ -787,7 +764,6 @@ function AppCarregado({
             pipelineAgentes={pipelineAgentes}
             techs={appConfig.techs}
             timeAtivo={timeAtivo}
-            hospedado={modo !== "local"}
             onCriarCampoNo={criarCampoNo}
             onCriarCampoAresta={criarCampoAresta}
             onSalvarPipelineAgentes={salvarPipelineAgentes}

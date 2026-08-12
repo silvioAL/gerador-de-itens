@@ -33,11 +33,6 @@ export interface ConfigScreenProps {
   timeAtivo: string;
   /** false no modo local (CLI) — sem servidor não existe conceito de outros
    * membros pra administrar; a aba não faz sentido. */
-  mostrarMembros: boolean;
-  /** true só no modo local — `/campos-aresta` não existe no servidor hospedado
-   * (SPEC-21 §2, dormente de propósito); mostrar a aba lá levaria a salvar e
-   * sempre falhar. Inverso de `mostrarMembros`. */
-  mostrarCamposAresta: boolean;
   onEditarValorPerfilTime: (timeId: string, tipoNo: string, campo: string, valor: string) => void;
   onCriarCampoNo: (dados: DadosCampoNo) => Promise<void>;
   onAtualizarCampoNo: (id: string, dados: Partial<DadosCampoNo>) => Promise<void>;
@@ -82,8 +77,6 @@ export function ConfigScreen({
   especificacaoTemplate,
   pipelineAgentes,
   timeAtivo,
-  mostrarMembros,
-  mostrarCamposAresta,
   onEditarValorPerfilTime,
   onCriarCampoNo,
   onAtualizarCampoNo,
@@ -114,8 +107,11 @@ export function ConfigScreen({
     if (abaForcada) setAba(abaForcada);
   }, [abaForcada]);
 
-  // `mostrarMembros` já É "modo hospedado" (ver a prop). O RBAC só existe lá.
-  const permissoes = usePermissoes({ hospedado: mostrarMembros, timeId: timeAtivo });
+  // SPEC-33: só o hospedado existe — as props de modo (`mostrarMembros`/
+  // `mostrarCamposAresta`) morreram junto com o ramo morto da §158, e a aba
+  // de campos de conexão DESTRAVOU: as rotas existem desde a SPEC-31 e a
+  // porta desde o #303, mas o gate `modo === "local"` a mantinha inalcançável.
+  const permissoes = usePermissoes({ hospedado: true, timeId: timeAtivo });
 
   /**
    * SPEC-28 Fase 2 — a aba some quando a permissão não existe.
@@ -140,11 +136,11 @@ export function ConfigScreen({
        * significa "este time ainda não personalizou", não "está vazio".
        */
       { id: "campos", rotulo: `Padrões por componente (${camposNo.length} do time)`, existe: true },
-      { id: "camposAresta", rotulo: `Campos por tipo de conexão (${camposAresta.length})`, existe: mostrarCamposAresta },
-      { id: "membros", rotulo: "Membros", existe: mostrarMembros },
+      { id: "camposAresta", rotulo: `Campos por tipo de conexão (${camposAresta.length})`, existe: true },
+      { id: "membros", rotulo: "Membros", existe: true },
       // SPEC-28 §2: acessos só existem no hospedado — no local não há login, e
       // permissão em arquivo seria convenção, não segurança.
-      { id: "acessos", rotulo: "Acessos", existe: mostrarMembros },
+      { id: "acessos", rotulo: "Acessos", existe: true },
       /**
        * ACHADO desta rodada: esta aba estava atrás de `mostrarCamposAresta`, que
        * é "modo LOCAL". Fazia sentido quando ela nasceu (SPEC-23 fluxo 5), com
@@ -222,7 +218,7 @@ export function ConfigScreen({
             onExcluir={onExcluirCampoNo}
           />
         )}
-        {abaAtiva === "camposAresta" && mostrarCamposAresta && (
+        {abaAtiva === "camposAresta" && (
           <CamposArestaTab
             config={config}
             camposAresta={camposAresta}
@@ -247,10 +243,11 @@ export function ConfigScreen({
             podeSecao={(id) => permissoes.pode(RECURSO_DA_SECAO_DE_REGRAS[id])}
             contextos={contextos}
             componentesPorTech={componentesPorTech}
+            techs={techs}
           />
         )}
-        {abaAtiva === "membros" && mostrarMembros && <MembrosTab timeAtivo={timeAtivo} />}
-        {abaAtiva === "acessos" && mostrarMembros && <AcessosTab timeAtivo={timeAtivo} />}
+        {abaAtiva === "membros" && <MembrosTab timeAtivo={timeAtivo} />}
+        {abaAtiva === "acessos" && <AcessosTab timeAtivo={timeAtivo} />}
         {abaAtiva === "especificacao" && (
           <EspecificacaoTemplateTab
             template={especificacaoTemplate}

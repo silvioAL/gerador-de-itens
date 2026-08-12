@@ -50,9 +50,13 @@ export interface RegrasTabProps {
    * COMPONENTES as regras valem — "padrão por componente", como o usuário
    * nomeou, sem nenhum seletor pra operar. */
   componentesPorTech?: Record<string, string[]>;
+  /** As techs canônicas do produto (`appConfig.techs`) — são as candidatas a
+   * grupo novo. Achado da §165: numa instalação limpa a aba nascia vazia e SEM
+   * COMO começar (o select antigo só listava o que já existia no documento). */
+  techs?: string[];
 }
 
-export function RegrasTab({ podeSecao, contextos, componentesPorTech }: RegrasTabProps = {}) {
+export function RegrasTab({ podeSecao, contextos, componentesPorTech, techs: techsDoApp }: RegrasTabProps = {}) {
   const todasAsOpcoes = contextos ?? [];
   const secoesVisiveis = SECOES.filter((s) => podeSecao?.(s.id) ?? true);
   const [regras, setRegras] = useState<RegrasConfig | null>(null);
@@ -162,6 +166,33 @@ export function RegrasTab({ podeSecao, contextos, componentesPorTech }: RegrasTa
           Nenhum grupo de regras configurado ainda neste ambiente.
         </p>
       )}
+
+      {/* §165 — o caminho de começar: as techs do produto que ainda não têm
+          grupo viram um clique. Só as canônicas: um grupo de tech inventada
+          nunca casaria com item nenhum (mesma lição do seletor de contextos). */}
+      {(() => {
+        const candidatas = [...new Set([...(techsDoApp ?? []), ...Object.keys(componentesPorTech ?? {})])].filter(
+          (t) => !techs.includes(t)
+        );
+        if (candidatas.length === 0) return null;
+        return (
+          <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 12, color: "var(--texto-fraco)" }}>Adicionar grupo de regras:</span>
+            {candidatas.map((t) => (
+              <button
+                key={t}
+                onClick={() =>
+                  void gravar({ ...regras, porTech: { ...regras.porTech, [t]: { checklistTecnico: [], testes: [] } } })
+                }
+                style={botaoNovoGrupoEstilo}
+                data-testid={`novo-grupo-${t}`}
+              >
+                + {t}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
 
       {techs.map((tech) => (
         <section key={tech} data-testid={`regras-grupo-${tech}`} style={{ marginTop: 16 }}>
@@ -559,6 +590,16 @@ const selectEstilo: React.CSSProperties = {
   background: "var(--painel)",
   color: "var(--texto)",
   fontSize: 12.5,
+};
+
+const botaoNovoGrupoEstilo: React.CSSProperties = {
+  fontSize: 12,
+  padding: "4px 10px",
+  borderRadius: 999,
+  border: "1px dashed var(--borda-forte)",
+  background: "transparent",
+  color: "var(--texto-2)",
+  cursor: "pointer",
 };
 
 const subAbaEstilo: React.CSSProperties = {

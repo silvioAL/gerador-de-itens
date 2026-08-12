@@ -187,6 +187,23 @@ describe("RegrasTab (SPEC-23 fluxo 5 — regras.json ganha tela)", () => {
     expect(opcoes).toEqual(["Mobile-android", "Mobile-ios"]);
   });
 
+  it("tech do produto sem grupo vira um clique de criar — instalação limpa deixa de nascer sem por onde começar (§165)", async () => {
+    render(<RegrasTab techs={["Backend", "Frontend", "Mobile"]} />);
+    await waitFor(() => expect(screen.getByTestId("regras-grupo-Backend")).toBeTruthy());
+
+    // Backend e Frontend já têm grupo no documento — só Mobile é candidata.
+    expect(screen.queryByTestId("novo-grupo-Backend")).toBeNull();
+    expect(screen.queryByTestId("novo-grupo-Frontend")).toBeNull();
+    fireEvent.click(screen.getByTestId("novo-grupo-Mobile"));
+
+    await waitFor(() => expect(salvarMock).toHaveBeenCalled());
+    const gravado = salvarMock.mock.calls.at(-1)![0];
+    expect(gravado.porTech.Mobile).toEqual({ checklistTecnico: [], testes: [] });
+    // O resto do documento passa intacto — o grupo novo não é dono do arquivo.
+    expect(gravado.porTech.Backend.checklistTecnico).toHaveLength(2);
+    expect(gravado.tipos).toEqual(["História", "Task"]);
+  });
+
   it("as techs aparecem empilhadas, sem seletor — agrupamento se lê, seletor se opera", async () => {
     render(<RegrasTab />);
     await waitFor(() => expect(screen.getByTestId("regras-grupo-Backend")).toBeTruthy());
