@@ -106,7 +106,7 @@ test("derivar quebra abre a revisão com a atividade esperada e exporta", async 
 
   // O nome respondido no balão virou o título, e o auto-save aconteceu de
   // verdade: o indicador do header diz "salva" (não "dê um título antes").
-  await expect(page.getByLabel("Título da quebra")).toHaveValue("Fila de propostas aprovadas");
+  await expect(page.getByTestId("titulo-da-quebra")).toHaveText("Fila de propostas aprovadas");
   await expect(page.getByText(/· salva$/)).toBeVisible();
 
   expect(erros, `Erros no console do browser:\n${erros.join("\n")}`).toEqual([]);

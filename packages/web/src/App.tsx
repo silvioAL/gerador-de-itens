@@ -383,8 +383,12 @@ function AppCarregado({
   // porque é ele que permite o auto-save depois de gerar os itens. "Derivar
   // sem salvar" continua a um clique — rascunho que não quer virar registro
   // não é obrigado a virar.
-  const [pedindoNomeDaDemanda, setPedindoNomeDaDemanda] = useState(false);
+  // O campo "Título" saiu do header (pedido do usuário: o nome é mapeado só
+  // via agente). A pergunta do balão ganhou INTENÇÃO: "derivar" (M10, com
+  // auto-save) ou "salvar" (o Salvar sem título pergunta em vez de travar).
+  const [pedindoNomeDaDemanda, setPedindoNomeDaDemanda] = useState<false | "derivar" | "salvar">(false);
   const [autoSalvarPendente, setAutoSalvarPendente] = useState(false);
+  const [salvarAposNome, setSalvarAposNome] = useState(false);
 
   function executarDerivacao(salvarDepois: boolean) {
     const atividades = derivar(quebra.diagrama, diagramaConfig, { time: quebra.time });
@@ -404,15 +408,28 @@ function AppCarregado({
       // O balão só existe com o assistente fechado — fechar garante que a
       // pergunta apareça mesmo se o chat estava aberto.
       setAbaAssistente(null);
-      setPedindoNomeDaDemanda(true);
+      setPedindoNomeDaDemanda("derivar");
       return;
     }
     executarDerivacao(true);
   }
 
-  function confirmarNomeEDerivar(nome: string) {
+  function confirmarNome(nome: string) {
+    const intencao = pedindoNomeDaDemanda;
     setQuebra((q) => ({ ...q, titulo: nome }));
-    executarDerivacao(true);
+    setPedindoNomeDaDemanda(false);
+    if (intencao === "derivar") executarDerivacao(true);
+    else setSalvarAposNome(true);
+  }
+
+  /** O Salvar do header: com título salva direto; sem, o agente pergunta. */
+  function salvarQuebra() {
+    if ((quebra.titulo ?? "").trim()) {
+      void persistencia.salvar();
+      return;
+    }
+    setAbaAssistente(null);
+    setPedindoNomeDaDemanda("salvar");
   }
 
   // O auto-save espera o RENDER com o título aplicado (setQuebra é assíncrono
@@ -423,6 +440,15 @@ function AppCarregado({
       void persistencia.salvar();
     }
   }, [autoSalvarPendente, resultado, quebra.titulo]);
+
+  // O mesmo tick-de-render do auto-save, para o Salvar-com-pergunta: o nome
+  // precisa estar APLICADO na quebra antes de gravar.
+  useEffect(() => {
+    if (salvarAposNome && (quebra.titulo ?? "").trim()) {
+      setSalvarAposNome(false);
+      void persistencia.salvar();
+    }
+  }, [salvarAposNome, quebra.titulo]);
 
   const opcoesTour = {
     cenarios,
@@ -607,14 +633,17 @@ function AppCarregado({
 
         <div style={{ width: 1, height: 20, background: "var(--borda-forte)" }} />
 
-        <input
-          aria-label="Título da quebra"
-          value={quebra.titulo ?? ""}
-          onChange={(e) => setQuebra((q) => ({ ...q, titulo: e.target.value }))}
-          placeholder="Título (obrigatório pra salvar)"
-          title="Curto, pra achar esta quebra depois na busca de 'Abrir…'."
-          style={{ fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid var(--borda-forte)", background: "var(--fundo)", color: "var(--texto)", width: 220 }}
-        />
+        {/* O campo de digitar título MORREU: o nome da demanda é mapeado pelo
+            agente (balão-pergunta no derivar/salvar). Aqui só se LÊ. */}
+        {(quebra.titulo ?? "").trim() !== "" && (
+          <span
+            data-testid="titulo-da-quebra"
+            title="O nome da demanda — perguntado pelo assistente ao derivar ou salvar."
+            style={{ fontSize: 12.5, fontWeight: 600, color: "var(--texto)", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+          >
+            {quebra.titulo}
+          </span>
+        )}
 
         <div style={{ width: 1, height: 20, background: "var(--borda-forte)" }} />
 
@@ -680,14 +709,9 @@ function AppCarregado({
         </button>
         {!somenteLeitura && (
           <button
-            onClick={() => void persistencia.salvar()}
-            disabled={!(quebra.titulo ?? "").trim()}
-            title={(quebra.titulo ?? "").trim() ? undefined : "Dê um título à quebra antes de salvar"}
-            style={{
-              ...botaoEstilo,
-              ...botaoPrimarioEstilo,
-              ...((quebra.titulo ?? "").trim() ? {} : botaoDesabilitadoEstilo),
-            }}
+            onClick={salvarQuebra}
+            title="Salvar a quebra — sem nome ainda, o assistente pergunta primeiro."
+            style={{ ...botaoEstilo, ...botaoPrimarioEstilo }}
           >
             Salvar
           </button>
@@ -819,17 +843,23 @@ function AppCarregado({
         sobreposto={mostrarConfig}
         // SPEC-37 M9 — tudo verde e nada derivado: o momento certo de conduzir
         // ao Derivar, com o chip executando a mesma ação do botão do header.
-        chamando={pedindoNomeDaDemanda || momentoConfig === "m8" || (!mostrarConfig && momentoCanvas !== null)}
+        chamando={pedindoNomeDaDemanda !== false || momentoConfig === "m8" || (!mostrarConfig && momentoCanvas !== null)}
         balao={
           pedindoNomeDaDemanda
             ? {
-                texto: "Antes de derivar: qual é o nome da demanda? Com ele eu salvo a quebra automaticamente depois de gerar os itens.",
+                texto:
+                  pedindoNomeDaDemanda === "derivar"
+                    ? "Antes de derivar: qual é o nome da demanda? Com ele eu salvo a quebra automaticamente depois de gerar os itens."
+                    : "Pra salvar a quebra eu preciso de um nome — qual é o nome da demanda?",
                 entrada: {
                   placeholder: "ex.: Fatura mensal em lote",
-                  rotulo: "Derivar e salvar",
-                  onConfirmar: confirmarNomeEDerivar,
+                  rotulo: pedindoNomeDaDemanda === "derivar" ? "Derivar e salvar" : "Salvar",
+                  onConfirmar: confirmarNome,
                 },
-                acaoSecundaria: { rotulo: "Derivar sem salvar", onExecutar: () => executarDerivacao(false) },
+                acaoSecundaria:
+                  pedindoNomeDaDemanda === "derivar"
+                    ? { rotulo: "Derivar sem salvar", onExecutar: () => executarDerivacao(false) }
+                    : undefined,
                 onDispensar: () => setPedindoNomeDaDemanda(false),
               }
             : momentoConfig === "m8"
