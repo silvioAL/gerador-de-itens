@@ -147,6 +147,20 @@ test("a esteira roda no navegador e o texto do gateway chega nos campos (o defei
   await expect(page.getByTestId("conversa-especificacao")).toBeVisible({ timeout: 60000 });
   await expect(page.getByTestId("conversa-especificacao")).toContainText(/Pronto — o item foi gerado/);
 
+  // SPEC-37 M7 — "refinado" exige confirmação HUMANA de cada campo sugerido
+  // (statusDoItem): o teste fecha o chat da condução e confirma um a um, como
+  // a pessoa faria. Só então o balão de fechamento do ciclo aparece, e o chip
+  // baixa a especificação de verdade — o MESMO handler do botão do header.
+  await page.getByTestId("abrir-conversa-especificacao").click();
+  const confirmar = page.getByRole("button", { name: "Confirmar", exact: true });
+  while ((await confirmar.count()) > 0) {
+    await confirmar.first().click();
+  }
+  await expect(page.getByTestId("balao-especificacao")).toContainText("Tudo refinado");
+  const download = page.waitForEvent("download");
+  await page.getByTestId("balao-especificacao-acao").click();
+  expect((await download).suggestedFilename()).toBe("especificacao-de-solucao.md");
+
   await page.screenshot({ path: "e2e/screenshots/ia-hospedada.png", fullPage: true });
 
   expect(erros, `Erros no console do browser:\n${erros.join("\n")}`).toEqual([]);
@@ -215,7 +229,10 @@ test.describe("voz na conversa", () => {
     await expect(falar).toBeVisible();
 
     await falar.click();
-    await expect(page.getByTestId("voz-gravando")).toBeVisible();
+    // 15s, não os 5s default: o getUserMedia do microfone FALSO também paga
+    // latência sob 6 workers — terceira aparição intermitente desta asserção,
+    // sempre passando isolada (JOURNEY §173).
+    await expect(page.getByTestId("voz-gravando")).toBeVisible({ timeout: 15000 });
     // Um instante de gravação de verdade: sem isso o MediaRecorder pode fechar
     // sem nenhum chunk, e o teste passaria por não ter gravado nada.
     await page.waitForTimeout(1200);

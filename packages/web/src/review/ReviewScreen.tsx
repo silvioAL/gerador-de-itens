@@ -364,6 +364,8 @@ export function ReviewScreen({
   // (ou deve pulsar) por condução, com esta mensagem no lugar da saudação.
   const [falaDeConducao, setFalaDeConducao] = useState<string | null>(null);
   const rodavaAntes = useRef(false);
+  // SPEC-37 M7 — "agora não" do balão de gerar a especificação.
+  const [m7Dispensado, setM7Dispensado] = useState(false);
 
   // SPEC-24 Fase C: fila de trabalho da esteira — um item por ATIVIDADE,
   // com os placeholders já separados por papel (`ItemFilaEsteira`).
@@ -628,6 +630,16 @@ export function ReviewScreen({
 
   const atividadeSelecionada = selecionada ? resultado.atividades.find((a) => a.chave === selecionada) : undefined;
   const fichaSelecionada = selecionada ? fichas.get(selecionada) : undefined;
+
+  // SPEC-37 M7 — todos os itens refinados, esteira parada, chat fechado.
+  const momentoM7Ativo =
+    !!contagens &&
+    contagens.refinado > 0 &&
+    contagens.rascunho === 0 &&
+    contagens.revisar === 0 &&
+    !esteira.rodando &&
+    !mostrarConversa &&
+    !m7Dispensado;
 
   // Altura do brilho da timeline: fração de itens que já saíram do rascunho
   // (ou seja, algum papel já escreveu algo neles). Derivado do mesmo
@@ -1112,8 +1124,31 @@ export function ReviewScreen({
           botão "✦ Refinar conversando" que morava no header. zIndex 62: acima
           da própria JanelaConversa (60), senão a janela aberta cobriria o
           botão que a fecha. */}
+      {/* SPEC-37 M7 — tudo refinado: o fechamento natural do ciclo é gerar a
+          especificação de solução, e o chip executa o MESMO baixarEspecificacao
+          do botão do header. Só com o chat fechado (aberto, quem fala é ele) e
+          com a esteira parada — no meio da corrida os números ainda mudam. */}
+      {momentoM7Ativo && (
+        <div className="assistente-janela" style={balaoM7Estilo} data-testid="balao-especificacao" role="status">
+          <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: "var(--texto-2)" }}>
+            Tudo refinado — os {contagens?.refinado} itens estão prontos. Quer gerar a especificação de solução?
+          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+            <button onClick={baixarEspecificacao} style={chipM7Estilo} data-testid="balao-especificacao-acao">
+              Gerar especificação de solução
+            </button>
+            <button
+              onClick={() => setM7Dispensado(true)}
+              aria-label="Dispensar sugestão"
+              style={{ fontSize: 11.5, padding: "5px 8px", borderRadius: 999, border: "none", background: "transparent", color: "var(--texto-mudo)", cursor: "pointer" }}
+            >
+              agora não
+            </button>
+          </div>
+        </div>
+      )}
       <button
-        className={`assistente-fab${falaDeConducao && !mostrarConversa ? " assistente-fab--chamando" : ""}`}
+        className={`assistente-fab${(falaDeConducao && !mostrarConversa) || momentoM7Ativo ? " assistente-fab--chamando" : ""}`}
         data-testid="abrir-conversa-especificacao"
         onClick={() => {
           if (!atividadeSelecionada && resultado.atividades.length > 0) {
@@ -1912,6 +1947,32 @@ const textareaEstilo: React.CSSProperties = {
   fontFamily: "inherit",
   resize: "vertical",
   boxSizing: "border-box",
+};
+
+/** Balão do M7 — mesma âncora e desenho do balão do assistente no App. */
+const balaoM7Estilo: React.CSSProperties = {
+  position: "fixed",
+  right: 20,
+  bottom: 80,
+  width: 300,
+  maxWidth: "calc(100vw - 40px)",
+  padding: "10px 12px",
+  background: "var(--painel)",
+  border: "1px solid var(--borda-forte)",
+  borderRadius: 12,
+  boxShadow: "0 12px 40px rgba(0, 0, 0, 0.5)",
+  zIndex: 62,
+};
+
+const chipM7Estilo: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 600,
+  padding: "5px 12px",
+  borderRadius: 999,
+  border: "1px solid var(--acento-indigo)",
+  background: "var(--acento-indigo)",
+  color: "#fff",
+  cursor: "pointer",
 };
 
 /** O mesmo desenho do bubble do App (AssistenteFlutuante) — cor, tamanho e

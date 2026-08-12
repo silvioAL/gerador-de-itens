@@ -94,3 +94,17 @@ a rodada da Fase 2, quando o fluxo estiver na mão.
   o chip chama a MESMA `derivarQuebra` do botão do header.
 - **Voz explicada**: titles dos bubbles e primeiras falas das três conversas
   dizem "por texto ou por voz (🎤)".
+
+## 8. Fase 2 — implementada
+
+- **M6**: a primeira alteração ACEITA num item com dependentes faz o agente
+  nomear quem depende ("1 item depende deste (02)") e oferecer o chip
+  "Revisar a consistência (N)", que dispara o `revisarOsDemais` existente. A
+  decisão 5 do debate resolveu-se pelos dois ao mesmo tempo: a fala JÁ lista
+  os dependentes e o chip executa — sem passo extra. Uma pergunta por
+  conversa; o chip é renderizado a cada render (closure atual do que mudou).
+- **M7**: todos os itens REFINADOS (respostas confirmadas pelo humano —
+  sugestão da esteira não conta), esteira parada e chat fechado → balão
+  "Tudo refinado" com o chip "Gerar especificação de solução", o MESMO
+  `baixarEspecificacao` do botão do header; bubble pulsa junto.
+- Fase 3 (M2–M5, M8) segue no mapa, para depois do uso real das duas fases.
