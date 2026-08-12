@@ -4494,3 +4494,33 @@ Uma sessão de uso de verdade rendeu cinco itens, do pixel ao fluxo:
 Cinco mordidas provadas (truncamento desligado, classes do rail removidas,
 dica escondida, supressão de clique removida, trim/disabled do confirmar
 desligados) — cada uma deixou vermelho exatamente o teste que a vigia.
+
+## 175. SPEC-38 — a falha de abstração: time não é stack, membro não é admin, owner não tem corpo
+
+O usuário olhou a aba "Perfis de time" e viu o modelo errado por três
+ângulos de uma vez: **a stack é arquétipo e aberta** (time começa com
+tecnologia A ou B quando quiser — e os owners dos papéis nem configuram por
+stack, configuram por componente, como a SPEC-36 já tinha medido); **time é
+grupo de usuários com níveis** (visualizar · operar · administrar as
+configs), não um blob onde todo membro é admin implícito; e **participação
+cross é comum** — o que o modelo já aceita, mas sem nível por vínculo.
+
+A investigação confirmou as três no código: `perfis_time` pendura a escolha
+técnica na identidade do time; `usuario_time` não tem coluna de nível e o
+próprio comentário da tabela assume que "qualquer membro administra";
+`usuario_papel` só aceita e-mail — o time de arquitetura não existe como
+portador de papel, teria que receber permissão pessoa a pessoa.
+
+Debate curto fechou quatro decisões: curadoria do catálogo é configurável
+pelo admin via papel (D1); administrar ≠ operar — administrar é lidar com as
+configs (D2); editar configuração exige owner ou permissão dada por owner
+(D3); os perfis existentes podem ser zerados, sem migração de dados (D4).
+
+A SPEC-38 desenha o alvo em três fases: níveis com teto no convite (quem
+convida não escala privilégio — e os membros atuais viram owner, porque é o
+poder que já têm de fato); stack vira catálogo de perfis nomeados que o time
+APONTA (trocar de tecnologia é trocar ponteiro), com curadoria reusando o
+RBAC da SPEC-28 (recurso novo `perfis-stack`, aberto até alguém ligar);
+e `time_papel` — papéis portados por time, herdados pelos owners, que
+entram e saem da permissão junto com a composição do time. Spec apenas;
+implementação espera o aval, fase a fase.
