@@ -18,6 +18,8 @@ import {
   gerarVolumetria,
   listarPlaceholders,
   respostaVisivel,
+  respostaParaDocumento,
+  MARCA_SUGERIDO,
   type PlaceholderRefinamento,
 } from "../refinamento/gerarRefinamento.js";
 
@@ -376,9 +378,19 @@ export function renderizarItemEspecificacao(
   // (não a frase mecânica de `atividade.descricao`) e cenários de teste
   // contextuais além do scaffold determinístico.
   const historiaResp = respostas?.[CHAVE_HISTORIA_USUARIO];
-  const historiaUsuario = respostaVisivel(historiaResp) ? String(historiaResp.valor) : `_(sem história definida)_ ${MARCADOR_ESPECIFICAR}`;
+  const respHistoria = respostaParaDocumento(historiaResp);
+  const historiaUsuario = respHistoria
+    ? `${respHistoria.texto}${respHistoria.sugerida ? `
+
+${MARCA_SUGERIDO}` : ""}`
+    : `_(sem história definida)_ ${MARCADOR_ESPECIFICAR}`;
   const criteriosContextuaisResp = respostas?.[CHAVE_CRITERIOS_ACEITE];
-  const criteriosContextuais = respostaVisivel(criteriosContextuaisResp) ? String(criteriosContextuaisResp.valor) : undefined;
+  const respCriterios = respostaParaDocumento(criteriosContextuaisResp);
+  const criteriosContextuais = respCriterios
+    ? `${respCriterios.texto}${respCriterios.sugerida ? `
+
+${MARCA_SUGERIDO}` : ""}`
+    : undefined;
 
   // SPEC-24 — contrato de arquitetura (papel Arquiteto) e regras de teste +
   // cenário Gherkin (papel QA): mesma régua "nada sugerido conta até
@@ -390,16 +402,26 @@ export function renderizarItemEspecificacao(
     ["Erros", respostas?.[CHAVE_CONTRATO_ERROS]],
     ["Dependências", respostas?.[CHAVE_CONTRATO_DEPENDENCIAS]],
   ] as const;
-  const contratoPreenchido = camposContrato.filter(([, resp]) => respostaVisivel(resp));
+  const contratoPreenchido = camposContrato.filter(([, resp]) => respostaParaDocumento(resp) !== null);
   const contratoArquitetura =
     contratoPreenchido.length > 0
       ? contratoPreenchido.map(([label, resp]) => `- **${label}:** ${String(resp!.valor)}`).join("\n")
       : undefined;
 
   const regrasTesteResp = respostas?.[CHAVE_REGRAS_TESTE];
-  const regrasTeste = respostaVisivel(regrasTesteResp) ? String(regrasTesteResp.valor) : undefined;
+  const respRegrasTeste = respostaParaDocumento(regrasTesteResp);
+  const regrasTeste = respRegrasTeste
+    ? `${respRegrasTeste.texto}${respRegrasTeste.sugerida ? `
+
+${MARCA_SUGERIDO}` : ""}`
+    : undefined;
   const cenarioFeatureResp = respostas?.[CHAVE_CENARIO_FEATURE];
-  const cenarioFeature = respostaVisivel(cenarioFeatureResp) ? String(cenarioFeatureResp.valor) : undefined;
+  const respCenario = respostaParaDocumento(cenarioFeatureResp);
+  const cenarioFeature = respCenario
+    ? `${respCenario.texto}${respCenario.sugerida ? `
+
+${MARCA_SUGERIDO}` : ""}`
+    : undefined;
 
   return [
     `### ${numero}. ${atividade.rotulo} — ${atividade.descricao}`,
