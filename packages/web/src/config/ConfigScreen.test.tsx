@@ -1,23 +1,25 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import type { DiagramaConfig } from "@gerador/engine";
 import type { EspecificacaoTemplate } from "../api/client";
-import { ConfigScreen } from "./ConfigScreen";
+import { ConfigScreen, type AbaConfig } from "./ConfigScreen";
 
-/** Os rótulos das abas, para separar os botões de aba dos botões de dentro do
- * conteúdo. Uma aba nova entra aqui — e é de propósito que seja manual: a lista
- * é a declaração de "isto deveria funcionar". */
-const ROTULOS_DE_ABA = [
-  "Perfis de time",
-  "Padrões por componente",
-  "Campos por tipo de conexão",
-  "Membros",
-  "Acessos",
-  "Regras de refinamento",
-  "Especificação de solução",
-  "Pipeline de IA",
-  "Modelo de IA",
+/**
+ * SPEC-40 F1 — a régua de abas morreu: cada área é uma TELA, dirigida pela
+ * rota. A lista abaixo é a declaração de "isto deveria funcionar" — uma área
+ * nova entra aqui, de propósito manualmente.
+ */
+const AREAS: { area: AbaConfig; rotulo: RegExp }[] = [
+  { area: "perfis", rotulo: /Perfis de stack/ },
+  { area: "campos", rotulo: /Padrões por componente/ },
+  { area: "camposAresta", rotulo: /Campos por tipo de conexão/ },
+  { area: "membros", rotulo: /Membros/ },
+  { area: "acessos", rotulo: /Acessos/ },
+  { area: "regras", rotulo: /Regras de refinamento/ },
+  { area: "especificacao", rotulo: /Especificação de solução/ },
+  { area: "pipeline", rotulo: /Pipeline de IA/ },
+  { area: "modeloIa", rotulo: /Modelo de IA/ },
+  { area: "pdca", rotulo: /Cadência do PDCA/ },
 ];
 
 const config: DiagramaConfig = {
@@ -33,7 +35,7 @@ const especificacaoTemplate: EspecificacaoTemplate = {
   atualizadoEm: new Date().toISOString(),
 };
 
-function renderTela() {
+function renderTela(area: AbaConfig, extras: { onAbrirMenu?: () => void; onFechar?: () => void } = {}) {
   return render(
     <ConfigScreen
       config={config}
@@ -53,47 +55,41 @@ function renderTela() {
       onExcluirCampoAresta={vi.fn()}
       onSalvarEspecificacaoTemplate={vi.fn()}
       onSalvarPipelineAgentes={vi.fn()}
-      onFechar={vi.fn()}
+      onFechar={extras.onFechar ?? vi.fn()}
+      area={area}
+      onAbrirMenu={extras.onAbrirMenu ?? vi.fn()}
     />
   );
 }
 
-describe("ConfigScreen — só o hospedado existe (SPEC-33), sem props de modo", () => {
-  it("Membros e Campos por tipo de conexão SEMPRE aparecem — o gate de modo era o ramo morto da §158", () => {
-    renderTela();
-    expect(screen.getByRole("button", { name: "Membros" })).toBeInTheDocument();
-    // A aba de campos de conexão ficou INALCANÇÁVEL por meses atrás de
-    // `modo === "local"`, com rotas vivas no servidor desde a SPEC-31 e a
-    // porta desde o #303 — destravada junto com a remoção do gate.
-    expect(screen.getByRole("button", { name: /Campos por tipo de conexão/ })).toBeInTheDocument();
-  });
+/**
+ * Herdeiro do "nenhuma aba visível abre em branco" (achado real: Regras abria
+ * vazia no hospedado). A pergunta continua por TODAS as áreas — agora cada
+ * uma é uma tela, então cada uma renderiza direto pela prop de rota.
+ */
+describe("ConfigScreen — nenhuma ÁREA abre em branco, e o header diz onde se está", () => {
+  for (const { area, rotulo } of AREAS) {
+    it(`área "${area}" mostra conteúdo e o título da tela`, () => {
+      const { unmount } = renderTela(area);
+      expect((screen.getByTestId("corpo-da-aba").textContent ?? "").trim()).not.toBe("");
+      // O rótulo aparece no header da tela (sense of place da SPEC-40).
+      expect(screen.getAllByText(rotulo).length).toBeGreaterThan(0);
+      unmount();
+    });
+  }
 });
 
-/**
- * ACHADO REAL do usuário: no modo HOSPEDADO a aba "Regras de refinamento" abria
- * EM BRANCO — botão presente, conteúdo nenhum. O gate `mostrarCamposAresta`
- * (que significa "modo local") tinha saído da declaração da aba na rodada do
- * #289 e continuado no corpo dela. Dois lugares decidem se uma aba existe, e só
- * um foi revisado.
- *
- * Este teste não pergunta pela aba de Regras: pergunta por TODAS. Um teste
- * específico teria fechado este caso e deixado o próximo aberto — que é
- * literalmente o que aconteceu da primeira vez.
- */
-describe("ConfigScreen — nenhuma aba visível abre em branco", () => {
-  it("toda aba oferecida mostra conteúdo ao ser aberta", async () => {
-    const user = userEvent.setup();
-    renderTela();
+describe("ConfigScreen — a navegação é do menu e da rota", () => {
+  it("☰ Menu abre o menu; Voltar ao canvas fecha a tela — e não existe mais régua de abas", () => {
+    const onAbrirMenu = vi.fn();
+    const onFechar = vi.fn();
+    renderTela("membros", { onAbrirMenu, onFechar });
 
-    const abas = screen.getAllByRole("button").filter((b) => ROTULOS_DE_ABA.some((r) => b.textContent?.startsWith(r)));
-    expect(abas.length).toBeGreaterThan(3);
-
-    const vazias: string[] = [];
-    for (const aba of abas) {
-      const rotulo = aba.textContent ?? "?";
-      await user.click(aba);
-      if (!(screen.getByTestId("corpo-da-aba").textContent ?? "").trim()) vazias.push(rotulo);
-    }
-    expect(vazias, `abas que abrem em branco: ${vazias.join(", ")}`).toEqual([]);
+    screen.getByRole("button", { name: "☰ Menu" }).click();
+    expect(onAbrirMenu).toHaveBeenCalled();
+    screen.getByRole("button", { name: "Voltar ao canvas" }).click();
+    expect(onFechar).toHaveBeenCalled();
+    // Régua morta: não há botão de OUTRA área dentro da tela de Membros.
+    expect(screen.queryByRole("button", { name: /Pipeline de IA/ })).not.toBeInTheDocument();
   });
 });

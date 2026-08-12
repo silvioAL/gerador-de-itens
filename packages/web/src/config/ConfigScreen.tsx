@@ -11,6 +11,7 @@ import { PipelineAgentesTab } from "./PipelineAgentesTab";
 import { ModeloIaTab } from "./ModeloIaTab";
 import { RegrasTab } from "./RegrasTab";
 import { RECURSO_DA_ABA, RECURSO_DA_SECAO_DE_REGRAS, usePermissoes } from "../auth/usePermissoes";
+import { PdcaTab } from "./PdcaTab";
 
 export type AbaConfig =
   | "perfis"
@@ -21,7 +22,7 @@ export type AbaConfig =
   | "acessos"
   | "especificacao"
   | "pipeline"
-  | "modeloIa";
+  | "modeloIa" | "pdca";
 
 export interface ConfigScreenProps {
   config: DiagramaConfig;
@@ -46,7 +47,9 @@ export interface ConfigScreenProps {
   onSalvarPipelineAgentes: (dados: ConfigPipelineAgentes) => Promise<void>;
   onFechar: () => void;
   /** Troca a aba ativa de fora (tour guiado) sem fechar/reabrir a tela. */
-  abaForcada?: AbaConfig;
+  area: AbaConfig;
+  /** Abre o menu (☰) por cima da tela — trocar de área é pelo menu. */
+  onAbrirMenu: () => void;
   /** Techs e contextos conhecidos (`appConfig`) — alimentam os seletores de
    * contexto por clique de Regras e Pipeline. */
   techs?: string[];
@@ -90,11 +93,12 @@ export function ConfigScreen({
   onSalvarEspecificacaoTemplate,
   onSalvarPipelineAgentes,
   onFechar,
-  abaForcada,
+  area,
+  onAbrirMenu,
   techs,
   contextos,
 }: ConfigScreenProps) {
-  const [aba, setAba] = useState<AbaConfig>(abaForcada ?? "perfis");
+
 
   // tech → labels dos componentes que a usam — é o que deixa a aba de Regras
   // falar "vale para: Serviço, Fila Rabbit…" em vez de exibir um seletor de
@@ -106,9 +110,6 @@ export function ConfigScreen({
     }
   }
 
-  useEffect(() => {
-    if (abaForcada) setAba(abaForcada);
-  }, [abaForcada]);
 
   // SPEC-33: só o hospedado existe — as props de modo (`mostrarMembros`/
   // `mostrarCamposAresta`) morreram junto com o ramo morto da §158, e a aba
@@ -159,12 +160,16 @@ export function ConfigScreen({
       { id: "especificacao", rotulo: "Especificação de solução", existe: true },
       { id: "pipeline", rotulo: "Pipeline de IA", existe: true },
       { id: "modeloIa", rotulo: "Modelo de IA", existe: true },
+      { id: "pdca", rotulo: "Cadência do PDCA", existe: true },
     ] satisfies { id: AbaConfig; rotulo: string; existe: boolean }[]
   ).filter((a) => a.existe && podeVerAba(a.id, permissoes.pode));
 
   // A aba ativa pode ter sumido (papel trocado, ou `abaForcada` do tour
   // apontando pra algo negado). Cair na primeira visível evita a tela em branco.
-  const abaAtiva = abasVisiveis.some((a) => a.id === aba) ? aba : abasVisiveis[0]?.id;
+  // A área da rota pode estar negada pro papel — cai na primeira visível
+  // (mesma régua de antes, agora dirigida pela rota).
+  const abaAtiva = abasVisiveis.some((a) => a.id === area) ? area : abasVisiveis[0]?.id;
+  const rotuloDaArea = abasVisiveis.find((a) => a.id === abaAtiva)?.rotulo ?? "Configurações";
 
   return (
     <div
@@ -188,26 +193,24 @@ export function ConfigScreen({
           borderBottom: "1px solid var(--borda)",
         }}
       >
-        <strong style={{ fontSize: 14 }}>Configurações</strong>
-        <span style={{ fontSize: 12, color: "var(--texto-fraco)" }}>time ativo: {timeAtivo}</span>
+        {/* SPEC-40 F1 — a régua de abas MORREU: cada área é uma tela com rota
+            própria; trocar de área é pelo menu (☰), que também vive aqui. */}
+        <button onClick={onAbrirMenu} data-tour="menu-botao" style={botaoEstilo}>
+          ☰ Menu
+        </button>
+        <strong style={{ fontSize: 14 }}>{rotuloDaArea}</strong>
+        <span style={{ fontSize: 12, color: "var(--texto-fraco)" }}>Configurações · time ativo: {timeAtivo}</span>
         <div style={{ flex: 1 }} />
         <button onClick={onFechar} style={{ ...botaoEstilo, ...botaoPrimarioEstilo }}>
           Voltar ao canvas
         </button>
       </header>
 
-      <div style={{ display: "flex", gap: 4, padding: "12px 16px 0", borderBottom: "1px solid var(--borda)" }}>
-        {abasVisiveis.map((a) => (
-          <button key={a.id} onClick={() => setAba(a.id)} style={abaAtiva === a.id ? abaAtivaEstilo : abaEstilo}>
-            {a.rotulo}
-          </button>
-        ))}
-      </div>
-
       {/* `data-testid` no CORPO da aba, e não em cada conteúdo: é o que permite
           a um teste só perguntar "toda aba visível mostra alguma coisa?" — a
           pergunta que ninguém tinha feito quando o gate ficou pela metade. */}
       <div data-testid="corpo-da-aba" style={{ flex: 1, overflow: "auto", padding: 24 }}>
+        {abaAtiva === "pdca" && <PdcaTab />}
         {abaAtiva === "perfis" && (
           <PerfisTimeTab perfisTime={perfisTime} config={config} timeAtivo={timeAtivo} onEditarValor={onEditarValorPerfilTime} onPerfisMudaram={onPerfisMudaram} />
         )}

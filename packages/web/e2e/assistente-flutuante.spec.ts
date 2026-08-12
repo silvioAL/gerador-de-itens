@@ -46,7 +46,8 @@ test("abre na conversa, e o contexto salvo numa aba pré-preenche a outra", asyn
 test("dentro de Configurações o bubble flutua sobre a tela e abre direto no ⚙ Configurar", async ({ page }) => {
   await entrar(page);
 
-  await page.getByRole("button", { name: "⚙ Configurações" }).click();
+  await page.getByRole("button", { name: "☰ Menu" }).click();
+  await page.getByRole("button", { name: "Membros" }).click(); // SPEC-40: tela específica
   // O mesmo bubble, sobreposto à tela cheia — não some atrás dela.
   const fab = page.getByTestId("assistente-flutuante");
   await expect(fab).toBeVisible();

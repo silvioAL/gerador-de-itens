@@ -25,6 +25,7 @@ test("importar um graph.json do Graphify: mapeia o que bate, lista o resto, e ad
 }) => {
   await entrar(page);
 
+  await page.getByRole("button", { name: "☰ Menu" }).click(); // SPEC-40: item do menu
   await page.getByRole("button", { name: "✦ Como funciona & cenários" }).click();
   await page.getByRole("button", { name: "Importar do Graphify" }).click();
 

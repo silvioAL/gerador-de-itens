@@ -805,6 +805,12 @@ export interface SolicitacaoAjuste {
 }
 
 export const apiPdca = {
+  config: () => requisitar<{ cadenciaUsos: number; cadenciaFeedback: number }>("/pdca/config"),
+  salvarConfig: (dados: { cadenciaUsos: number; cadenciaFeedback: number }) =>
+    requisitar<{ cadenciaUsos: number; cadenciaFeedback: number }>("/pdca/config", {
+      method: "PUT",
+      body: JSON.stringify(dados),
+    }),
   uso: (tipo: "derivacao" | "especificacao", timeId?: string) =>
     requisitar<{ contagem: number; momento: boolean; ultimosItens: string[] }>("/pdca/uso", {
       method: "POST",

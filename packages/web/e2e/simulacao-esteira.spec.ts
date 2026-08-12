@@ -26,6 +26,7 @@ test("simular mostra as chamadas e o prompt real, sem chamar o modelo", async ({
   );
 
   await entrar(page);
+  await page.getByRole("button", { name: "☰ Menu" }).click(); // SPEC-40: item do menu
   await page.getByRole("button", { name: "✦ Como funciona & cenários" }).click();
   await page.getByRole("button", { name: /Cenários prontos/ }).click();
   await page.getByRole("button", { name: "Carregar cenário: Dados não-relacionais" }).click();

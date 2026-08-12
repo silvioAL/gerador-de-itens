@@ -24,7 +24,7 @@ test.beforeEach(async ({ page }) => {
 
 async function abrirConfig(page: import("@playwright/test").Page, aba: RegExp) {
   await entrar(page);
-  await page.getByRole("button", { name: /Configurações/ }).click();
+  await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: aba }).click();
 }
 
@@ -59,7 +59,7 @@ test("Regras: criar um grupo pela tela (§165) e marcar contexto por clique — 
   });
 
   try {
-  await page.getByRole("button", { name: /Configurações/ }).click();
+  await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: /Regras de refinamento/ }).click();
 
   // §165 — a instalação limpa nasce sem grupo nenhum; o clique cria.
@@ -80,7 +80,7 @@ test("Regras: criar um grupo pela tela (§165) e marcar contexto por clique — 
 
   // Persistiu de verdade: sair da aba e voltar relê do servidor.
   await page.getByRole("button", { name: "Voltar ao canvas" }).click();
-  await page.getByRole("button", { name: /Configurações/ }).click();
+  await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: /Regras de refinamento/ }).click();
   await expect(
     page.getByTestId("regras-grupo-Frontend").getByRole("button", { name: "Remover contexto Mobile-android" })
@@ -100,7 +100,7 @@ test("Especificação: apagar {{itens}} não deixa salvar e mostra o motivo (SPE
   const API = "http://localhost:4100";
   const antes = await (await page.request.get(`${API}/especificacao-template`)).json();
 
-  await page.getByRole("button", { name: /Configurações/ }).click();
+  await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: /Especificação de solução/ }).click();
   await page.getByRole("button", { name: "editar" }).click();
 
@@ -128,7 +128,7 @@ test("Especificação: apagar {{itens}} não deixa salvar e mostra o motivo (SPE
   // persistido é o novo.
   await salvar.click();
   await page.getByRole("button", { name: "Voltar ao canvas" }).click();
-  await page.getByRole("button", { name: /Configurações/ }).click();
+  await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: /Especificação de solução/ }).click();
   await expect(page.getByText(/Template do E2E/)).toBeVisible();
 

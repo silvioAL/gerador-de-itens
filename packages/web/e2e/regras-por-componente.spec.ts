@@ -11,6 +11,7 @@ const API = "http://localhost:4100";
  * §162 — estado sujo em config compartilhada derruba os specs vizinhos).
  */
 test("regra criada pelo componente grava o contexto certo e chega no item derivado", async ({ page }) => {
+  test.setTimeout(60000); // fluxo longo (config + reload + derivação) — 30s estourava com a stack fria
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   await page.route(
     (url) => url.pathname === "/ia/status",
@@ -20,7 +21,7 @@ test("regra criada pelo componente grava o contexto certo e chega no item deriva
 
   const original = (await (await page.request.get(`${API}/config/regras`)).json()).documento;
   try {
-    await page.getByRole("button", { name: "⚙ Configurações" }).click();
+    await page.getByRole("button", { name: "☰ Menu" }).click();
     await page.getByRole("button", { name: /Regras de refinamento/ }).click();
 
     const form = page.getByTestId("nova-regra-por-componente");
@@ -33,12 +34,14 @@ test("regra criada pelo componente grava o contexto certo e chega no item deriva
 
     // A regra entrou no grupo Backend — sem o usuário ter dito "Backend".
     await expect(
-      page.getByTestId("regras-grupo-Backend").getByText("Política de DLQ definida e documentada?")
+      page.getByTestId("regras-grupo-Backend").getByText("Política de DLQ definida e documentada?").first()
     ).toBeVisible();
 
     // Agora o outro lado: uma Fila Rabbit derivada RECEBE a regra. O App
     // carrega as regras no boot — recarrega pra derivação usar o documento novo.
-    await page.reload();
+    // O reload agora mantém a TELA (rota #/config/regras — SPEC-40): navegar
+  // pro canvas explicitamente, recarregando o app com as regras novas.
+  await page.goto("/#/");
     await expect(page.getByRole("button", { name: "+ Fila Rabbit" })).toBeVisible({ timeout: 10000 });
     await page.getByRole("button", { name: "+ Fila Rabbit" }).click();
     await page.locator(".react-flow__node", { hasText: "Fila Rabbit" }).click();
