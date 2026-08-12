@@ -1666,6 +1666,34 @@ describe("SPEC-39 — PDCA de configurações", () => {
   });
 });
 
+describe("§184 — a especificação gerada fica salva NA quebra", () => {
+  it("PUT com especificacao grava o markdown e carimba a versão; o GET devolve tudo", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const criada = (
+      await app.inject({
+        method: "POST",
+        url: "/quebras",
+        cookies: { gerador_sessao: cookie },
+        payload: { titulo: "Com especificação", time: TIME_A, diagrama: { nodes: [], edges: [] } },
+      })
+    ).json();
+    expect(criada.especificacao ?? null).toBeNull();
+
+    const md = "# Especificação de solução\n\n## Itens\n1. Criar fila";
+    const atualizada = await app.inject({
+      method: "PUT",
+      url: `/quebras/${criada.id}`,
+      cookies: { gerador_sessao: cookie },
+      payload: { titulo: "Com especificação", time: TIME_A, diagrama: { nodes: [], edges: [] }, especificacao: md },
+    });
+    expect(atualizada.statusCode).toBe(200);
+
+    const lida = (await app.inject({ method: "GET", url: `/quebras/${criada.id}` })).json();
+    expect(lida.especificacao).toBe(md);
+    expect(lida.especificacaoGeradaEm).toBeTruthy();
+  });
+});
+
 describe("auditoria", () => {
   it("grava quem/quando depois de uma escrita ter sucesso (ex.: perfis-time)", async () => {
     const cookieDev = await logarComo(EMAIL_DEV);

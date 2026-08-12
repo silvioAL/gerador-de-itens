@@ -4708,3 +4708,28 @@ com cadência 1: derivar → gerar pelo agente → feedback 201 → entrevista n
 canvas. Fase 2 anotada na SPEC: a solicitação nascer do 403 do
 ConfigurarPanel e a aplicação automática do aprovado.
 
+## 184. A especificação vira registro: salva na quebra, e a demanda reaberta se reconhece
+
+Dois pedidos do uso real. O pequeno: o "SKU" dos cenários de demo (mongo e
+grpc) era SKU de estoque mesmo — virou `codigo`, vocabulário neutro.
+
+O grande: **gerar a especificação é publicar uma versão, não só baixar um
+arquivo**. O markdown gerado (com TODO o material do momento — inclusive as
+respostas confirmadas, que o teste prova presentes no documento) agora sobe
+pro App e fica salvo NA QUEBRA (`quebras.especificacao` +
+`especificacao_gerada_em`, migração 0024). No caminho, dois vazamentos
+reais: `normalizarDadosQuebra` descartava o campo novo (a MESMA armadilha da
+SPEC-31, agora na porta — mordida provada), e o `abrirPorId` só devolvia
+título/time/diagrama: as respostas da esteira, o contexto e os anexos se
+PERDIAM ao reabrir qualquer demanda. Reabrir agora devolve o material
+inteiro.
+
+E o agente reconhece a demanda já especificada: no canvas, o M14 ("esta
+demanda já tem a especificação completa — quer abrir a revisão?") ganha até
+do M9; na revisão, o chat abre sozinho com a MESMA mecânica do M1 e a fala
+adaptada ("…revise; se algo mudar, eu aplico, reviso a consistência e gero a
+especificação de novo"). O detalhe fino veio do E2E: a fala é para quem
+REABRE — congelada na chegada, senão gerar a especificação durante a sessão
+reabria o chat por cima do que a pessoa estava fazendo (o clique de "Voltar
+ao canvas" ficou interceptado até o teste denunciar).
+

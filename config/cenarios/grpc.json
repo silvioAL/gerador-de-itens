@@ -28,7 +28,7 @@
             "nome": { "valor": "srv-catalogo", "origem": "manual" },
             "migracao": { "valor": "Método gRPC novo — não impacta os consumidores REST já existentes.", "origem": "manual" },
             "contratoGrpc": {
-              "valor": "service CatalogoService { rpc BuscarProduto(BuscarProdutoRequest) returns (Produto); } message BuscarProdutoRequest { string sku = 1; } message Produto { string sku = 1; string nome = 2; int64 preco_centavos = 3; }",
+              "valor": "service CatalogoService { rpc BuscarProduto(BuscarProdutoRequest) returns (Produto); } message BuscarProdutoRequest { string codigo = 1; } message Produto { string codigo = 1; string nome = 2; int64 preco_centavos = 3; }",
               "origem": "manual"
             }
           },

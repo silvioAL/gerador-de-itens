@@ -60,7 +60,18 @@ export function usePersistencia(quebra: Quebra, aoAbrir: (q: Quebra) => void) {
       setStatus("salvando");
       try {
         const salva = await apiQuebras.buscar(id);
-        aoAbrir({ titulo: salva.titulo ?? undefined, time: salva.time ?? undefined, diagrama: salva.diagrama });
+        // §184 — reabrir devolve TODO o material salvo. Antes só vinham
+        // título/time/diagrama: as respostas da esteira, o contexto e a
+        // especificação gerada se perdiam na reabertura (achado real).
+        aoAbrir({
+          titulo: salva.titulo ?? undefined,
+          time: salva.time ?? undefined,
+          diagrama: salva.diagrama,
+          respostasItens: salva.respostasItens,
+          demandInfo: salva.demandInfo || undefined,
+          anexosContexto: (salva.anexosContexto ?? []).map((conteudo, i) => ({ nome: `anexo-${i + 1}.txt`, conteudo })),
+          especificacao: salva.especificacao ?? undefined,
+        });
         setQuebraId(salva.id);
         setStatus("salvo");
       } catch {

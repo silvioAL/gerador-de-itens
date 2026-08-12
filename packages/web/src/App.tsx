@@ -364,6 +364,7 @@ function AppCarregado({
     vermelhos: vermelhos.length,
     temResultado: !!resultado,
     aplicouProposta,
+    temEspecificacaoSalva: !!quebra.especificacao,
     dispensados: derivarDispensado ? [...momentosDispensados, "m9"] : momentosDispensados,
   });
   const momentoConfig = momentoDaConfig({
@@ -790,6 +791,13 @@ function AppCarregado({
       {resultado && (
         <ReviewScreen
           onConfigurarModeloIa={() => abrirConfigNaAba("modeloIa")}
+          especificacaoJaGerada={!!quebra.especificacao}
+          onEspecificacaoGerada={(md) => {
+            setQuebra((q) => ({ ...q, especificacao: md }));
+            // Fica salvo de verdade quando a quebra tem nome (mesmo tick-de-
+            // render do auto-save); sem nome, mora no estado até salvar.
+            setSalvarAposNome(true);
+          }}
           resultado={resultado}
           diagrama={quebra.diagrama}
           config={diagramaConfig}
@@ -898,6 +906,12 @@ function AppCarregado({
                 }
               : mostrarConfig
                 ? undefined
+                : momentoCanvas === "m14"
+                  ? {
+                      texto: "Esta demanda já tem a especificação de solução completa. Quer abrir a revisão? Se algo mudou, eu aplico os ajustes e gero a especificação de novo.",
+                      acao: { rotulo: "Abrir revisão", onExecutar: derivarQuebra },
+                      onDispensar: () => dispensar("m14"),
+                    }
                 : momentoCanvas === "m9"
                   ? {
                       texto: "Tudo verde — a quebra está pronta para derivar os itens de trabalho.",

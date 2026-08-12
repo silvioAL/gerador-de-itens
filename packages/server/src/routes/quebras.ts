@@ -27,6 +27,7 @@ const corpoQuebra = z.object({
   respostasItens: z.record(z.record(z.unknown())).optional(),
   demandInfo: z.string().optional(),
   anexosContexto: z.array(z.string()).optional(),
+  especificacao: z.string().nullish(),
 });
 
 /** Mesmo fallback de `.example.json` de `packages/web/vite.config.ts` (servirConfigEmDev)

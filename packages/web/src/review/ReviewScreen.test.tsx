@@ -188,6 +188,54 @@ describe("ReviewScreen — fixture 01 (sem ciclos/conflitos)", () => {
     expect(screen.queryByTestId("balao-sem-contexto")).not.toBeInTheDocument();
   });
 
+  it("§184: demanda com especificação JÁ GERADA — o chat abre sozinho com a fala adaptada (mecânica do M1)", async () => {
+    render(
+      <ReviewScreen
+        resultado={resultadoFixture01()}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+        especificacaoJaGerada
+      />
+    );
+
+    await waitFor(() => expect(screen.getByTestId("conversa-especificacao")).toBeInTheDocument());
+    expect(screen.getByTestId("conversa-especificacao")).toHaveTextContent(
+      /já tem a especificação de solução completa/
+    );
+  });
+
+  it("§184: gerar sobe o markdown pro App com TODO o material — inclusive a resposta confirmada", async () => {
+    const onEspecificacaoGerada = vi.fn();
+    const user = userEvent.setup();
+    const resultado = resultadoFixture01();
+    const chave = resultado.atividades[0].chave;
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+        onEspecificacaoGerada={onEspecificacaoGerada}
+        respostasItens={{
+          [chave]: { _historiaUsuario: { valor: "Como cobrança, quero enfileirar propostas.", origem: "manual" } },
+        }}
+      />
+    );
+
+    fireEvent.click(within(await screen.findByTestId("balao-sem-ia")).getByRole("button", { name: "Dispensar sugestão" }));
+    fireEvent.click(within(await screen.findByTestId("balao-sem-contexto")).getByRole("button", { name: "Dispensar sugestão" }));
+    await user.click((await screen.findByTestId("balao-gerar")).querySelector('[data-testid="balao-gerar-acao"]') as HTMLElement);
+
+    expect(onEspecificacaoGerada).toHaveBeenCalled();
+    const md = onEspecificacaoGerada.mock.calls.at(-1)![0] as string;
+    expect(md).toContain("Como cobrança, quero enfileirar propostas.");
+  });
+
   it("nenhum item selecionado inicialmente — ficha mostra estado vazio", () => {
     const resultado = resultadoFixture01();
     render(

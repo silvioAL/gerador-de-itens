@@ -66,6 +66,10 @@ export interface ReviewScreenProps {
   onFechar: () => void;
   /** SPEC-37 F3 (M4) — abre Configurações na aba Modelo de IA por cima da revisão. */
   onConfigurarModeloIa?: () => void;
+  /** §184 — o markdown gerado sobe pro App, que o salva NA QUEBRA. */
+  onEspecificacaoGerada?: (md: string) => void;
+  /** §184 — a demanda reaberta já tem especificação: o chat abre com a fala adaptada. */
+  especificacaoJaGerada?: boolean;
   onSelecionarNo: (id: string) => void;
 }
 
@@ -239,6 +243,8 @@ export function ReviewScreen({
   onResponderItem,
   onFechar,
   onConfigurarModeloIa,
+  onEspecificacaoGerada,
+  especificacaoJaGerada = false,
   onSelecionarNo,
 }: ReviewScreenProps) {
   const [mostrarDiagrama, setMostrarDiagrama] = useState(false);
@@ -585,6 +591,24 @@ export function ReviewScreen({
     rodavaAntes.current = esteira.rodando;
   }, [esteira.rodando, resultado.atividades, selecionada]);
 
+  // §184 — a demanda JÁ TEM a especificação completa (reaberta depois de
+  // gerada): MESMA mecânica do M1 (o chat abre sozinho), só muda a fala —
+  // aqui não há esteira terminando, há material pronto pra revisitar.
+  const conduziuJaEspecificada = useRef(false);
+  // Congelado na CHEGADA: gerar a especificação durante ESTA sessão da
+  // revisão não pode reabrir o chat por cima do que a pessoa está fazendo —
+  // a fala é pra quem REABRE uma demanda já especificada.
+  const jaGeradaNaChegada = useRef(especificacaoJaGerada);
+  useEffect(() => {
+    if (!jaGeradaNaChegada.current || conduziuJaEspecificada.current || esteira.rodando) return;
+    conduziuJaEspecificada.current = true;
+    setFalaDeConducao(
+      "Esta demanda já tem a especificação de solução completa. Revise os itens; se algo precisar mudar, me diga aqui (por texto ou por voz 🎤) que eu aplico a alteração, reviso a consistência dos itens que dependem — e gero a especificação de novo."
+    );
+    if (!selecionada) setSelecionada(resultado.atividades[0]?.chave ?? null);
+    setMostrarConversa(true);
+  }, [especificacaoJaGerada, esteira.rodando, resultado.atividades, selecionada]);
+
   const chaveParaNodeId = Object.fromEntries(
     resultado.atividades.filter((a) => a.origem.nodeId).map((a) => [a.chave, a.origem.nodeId!])
   );
@@ -641,6 +665,9 @@ export function ReviewScreen({
       respostasItens,
     });
     baixarArquivoTexto(documento, "especificacao-de-solucao.md", "text/markdown");
+    // §184 — o documento gerado (com TODO o material do momento) sobe pro App
+    // e fica salvo na quebra: gerar é publicar uma versão, não só baixar.
+    onEspecificacaoGerada?.(documento);
   }
 
   const contagens = regras

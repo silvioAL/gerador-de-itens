@@ -106,6 +106,10 @@ export interface Quebra {
    * texto). Junto com `demandInfo`, alimenta o prompt real de `/ia/sugerir`,
    * não só a seção "Contexto" do documento exportado. */
   anexosContexto?: { nome: string; conteudo: string }[];
+  /** §184 — a especificação de solução GERADA (markdown completo, com o
+   * material do momento da geração). Persistida na quebra: é o que permite o
+   * agente reconhecer uma demanda já especificada ao reabri-la. */
+  especificacao?: string | null;
 }
 
 export type TipoItem = "História" | "Task" | "Débito Técnico";

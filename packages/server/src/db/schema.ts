@@ -20,6 +20,10 @@ export const quebras = pgTable("quebras", {
   respostasItens: jsonb("respostas_itens").notNull().default({}),
   demandInfo: text("demand_info").notNull().default(""),
   anexosContexto: jsonb("anexos_contexto").$type<string[]>().notNull().default([]),
+  /** §184 — o documento de especificação GERADO, com o material daquele
+   * momento; a data marca a versão (setada pelo adaptador quando o texto vem). */
+  especificacao: text("especificacao"),
+  especificacaoGeradaEm: timestamp("especificacao_gerada_em", { withTimezone: true }),
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
   atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
 });
