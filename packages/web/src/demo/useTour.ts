@@ -81,7 +81,7 @@ export function useTour(opts: UseTourOpts) {
     },
     {
       selector: "[data-tour=config-screen-content]",
-      titulo: "Perfis de time",
+      titulo: "Perfis de stack",
       texto:
         'Um time pode ter uma stack conhecida (linguagem, framework...) que pré-preenche sugestões em campos novos — sem reconfigurar toda vez que desenhar um serviço. Configure ou corrija um valor aqui, ou capture direto de um nó real com o botão "salvar como padrão do time" no painel de propriedades.',
       onEnter: () => opts.abrirConfigNaAba("perfis"),

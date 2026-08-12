@@ -769,6 +769,7 @@ function AppCarregado({
           pipelineAgentes={pipelineAgentes}
           timeAtivo={timeAtivo}
           onEditarValorPerfilTime={editarValorPerfilTime}
+          onPerfisMudaram={() => void apiPerfisTime.listar().then(setPerfisTime)}
           onSalvarEspecificacaoTemplate={salvarEspecificacaoTemplate}
           onSalvarPipelineAgentes={salvarPipelineAgentes}
           onCriarCampoNo={criarCampoNo}

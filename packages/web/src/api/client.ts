@@ -779,11 +779,33 @@ export interface SugestaoPapel {
 
 export const apiPerfisTime = {
   listar: () => requisitar<PerfisConfig>("/perfis-time"),
+  /** A captura (SPEC-38 F2): grava no perfil de stack APONTADO pelo time —
+   * cria "stack de {time}" e aponta se o time ainda não tiver perfil. */
   atualizar: (timeId: string, tipoNo: string, valores: Record<string, unknown>) =>
     requisitar<Record<string, unknown>>(`/perfis-time/${encodeURIComponent(timeId)}`, {
       method: "PUT",
       body: JSON.stringify({ tipoNo, valores }),
     }),
+};
+
+/** SPEC-38 Fase 2 — o catálogo de perfis de stack e o ponteiro do time. */
+export interface PerfilStackCatalogo {
+  id: string;
+  nome: string;
+  criadoPor: string;
+  valores: Record<string, Record<string, string>>;
+}
+
+export const apiPerfisStack = {
+  catalogo: () =>
+    requisitar<{ perfis: PerfilStackCatalogo[]; ponteiros: Record<string, string> }>("/perfis-stack"),
+  criar: (nome: string) =>
+    requisitar<PerfilStackCatalogo>("/perfis-stack", { method: "POST", body: JSON.stringify({ nome }) }),
+  apontar: (timeId: string, perfilStackId: string | null) =>
+    requisitar<{ timeId: string; perfilStackId: string | null }>(
+      `/times/${encodeURIComponent(timeId)}/perfil-stack`,
+      { method: "PUT", body: JSON.stringify({ perfilStackId }) }
+    ),
 };
 
 export interface EspecificacaoTemplate {

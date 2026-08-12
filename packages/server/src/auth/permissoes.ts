@@ -26,7 +26,7 @@ import { maiorNivel, nivelNoTime } from "./niveis.js";
  * `regras` único não conseguiria expressar isso.
  */
 export const RECURSOS = [
-  "perfis-time",
+  "perfis-stack",
   "campos-no",
   "campos-aresta",
   "regras.checklistTecnico",
@@ -247,6 +247,62 @@ export async function primeiroRecursoNegado(
   const { rbacAtivo, porRecurso } = await resolverPermissoes(db, organizacaoId, email, timeId);
   if (!rbacAtivo) return recursos[0];
   return recursos.find((recurso) => !porRecurso[recurso]?.includes(acao));
+}
+
+/**
+ * SPEC-38 Fase 2 (D1) — o gate de CURADORIA, a exceção deliberada ao
+ * owner-bypass do `exigirPermissao`:
+ *
+ * - Nenhum papel da organização tem o recurso → catálogo ABERTO: qualquer
+ *   owner de time edita ("o owner do time pode criar").
+ * - Existe papel com o recurso → curadoria LIGADA: só o grant explícito
+ *   edita — inclusive por cima de owners ("o admin define se haverá
+ *   curadoria e por qual papel"). É diferente do exigirPermissao de
+ *   propósito: lá o owner sempre pode; aqui a curadoria manda.
+ */
+export function exigirEdicaoCurada(
+  db: OpcoesApp["db"],
+  organizacaoId: () => Promise<string | null>,
+  recurso: Recurso,
+  resolverTimeId?: (req: FastifyRequest) => string | null | Promise<string | null>
+) {
+  return async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    await exigirSessao(req, reply);
+    if (reply.sent) return;
+
+    const orgId = await organizacaoId();
+    if (!orgId) return;
+
+    const email = req.usuario!.email;
+    const timeId = resolverTimeId ? await resolverTimeId(req) : null;
+
+    const [papelCurador] = await db
+      .select({ papelId: papelPermissao.papelId })
+      .from(papelPermissao)
+      .innerJoin(papeisAcesso, eq(papelPermissao.papelId, papeisAcesso.id))
+      .where(and(eq(papeisAcesso.organizacaoId, orgId), eq(papelPermissao.recurso, recurso)))
+      .limit(1);
+
+    if (papelCurador) {
+      const { porRecurso } = await resolverPermissoes(db, orgId, email, timeId);
+      if (porRecurso[recurso]?.includes("editar")) return;
+      reply.code(403).send({
+        erro: `a curadoria de "${recurso}" está ligada — a edição é de quem tem o papel curador`,
+        recurso,
+        acao: "editar",
+      });
+      return;
+    }
+
+    const nivel = timeId ? await nivelNoTime(db, email, timeId) : await maiorNivel(db, email);
+    if (nivel !== "owner") {
+      reply.code(403).send({
+        erro: `"editar" em "${recurso}" exige nível owner (catálogo aberto) ou o papel curador`,
+        recurso,
+        acao: "editar",
+      });
+    }
+  };
 }
 
 /**

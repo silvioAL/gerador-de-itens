@@ -100,7 +100,7 @@ test("perfil de stack do time sugere linguagem/framework do serviço", async ({ 
   await botaoSalvarPerfil.click();
 
   await page.getByRole("button", { name: "⚙ Configurações" }).click();
-  await page.getByRole("button", { name: /Perfis de time/ }).click();
+  await page.getByRole("button", { name: /Perfis de stack/ }).click();
   const cardTimePagamentos = page.locator("div", { has: page.getByText("time-pagamentos", { exact: true }) }).last();
   await expect(cardTimePagamentos).toBeVisible();
   await expect(cardTimePagamentos.getByText("linguagem:", { exact: false })).toBeVisible();

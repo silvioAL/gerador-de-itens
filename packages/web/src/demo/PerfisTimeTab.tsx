@@ -1,10 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { DiagramaConfig, PerfisConfig } from "@gerador/engine";
+import { apiPerfisStack, type PerfilStackCatalogo } from "../api/client";
 
 export interface PerfisTimeTabProps {
   perfisTime: PerfisConfig;
   config: DiagramaConfig;
+  timeAtivo: string;
   onEditarValor: (timeId: string, tipoNo: string, campo: string, valor: string) => void;
+  /** Depois de apontar/trocar o perfil do time, o App recarrega a projeção. */
+  onPerfisMudaram: () => void;
 }
 
 /** Campos sugeríveis por time excluem o campo de identidade (`identificador:
@@ -19,9 +23,48 @@ function primeiroCampoSugerivel(config: DiagramaConfig, tipoNo: string): string 
   return camposSugeriveis(config, tipoNo)[0]?.key ?? "";
 }
 
-export function PerfisTimeTab({ perfisTime, config, onEditarValor }: PerfisTimeTabProps) {
+export function PerfisTimeTab({ perfisTime, config, timeAtivo, onEditarValor, onPerfisMudaram }: PerfisTimeTabProps) {
   const times = Object.entries(perfisTime);
   const [formulario, setFormulario] = useState<FormularioValor | null>(null);
+  // SPEC-38 F2 — o catálogo e os ponteiros vêm do servidor.
+  const [catalogo, setCatalogo] = useState<{ perfis: PerfilStackCatalogo[]; ponteiros: Record<string, string> } | null>(null);
+  const [nomeNovoPerfil, setNomeNovoPerfil] = useState("");
+  const [erroCatalogo, setErroCatalogo] = useState<string | null>(null);
+
+  async function recarregarCatalogo() {
+    try {
+      setCatalogo(await apiPerfisStack.catalogo());
+    } catch (e) {
+      setErroCatalogo(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  useEffect(() => {
+    void recarregarCatalogo();
+  }, []);
+
+  async function apontar(perfilId: string) {
+    setErroCatalogo(null);
+    try {
+      await apiPerfisStack.apontar(timeAtivo, perfilId === "" ? null : perfilId);
+      await recarregarCatalogo();
+      onPerfisMudaram();
+    } catch (e) {
+      setErroCatalogo(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function criarPerfil() {
+    if (!nomeNovoPerfil.trim()) return;
+    setErroCatalogo(null);
+    try {
+      await apiPerfisStack.criar(nomeNovoPerfil.trim());
+      setNomeNovoPerfil("");
+      await recarregarCatalogo();
+    } catch (e) {
+      setErroCatalogo(e instanceof Error ? e.message : String(e));
+    }
+  }
 
   function abrirNovoValor() {
     const primeiroTipo = Object.keys(config.nodeTypes)[0] ?? "";
@@ -48,13 +91,42 @@ export function PerfisTimeTab({ perfisTime, config, onEditarValor }: PerfisTimeT
   return (
     <div>
       <p style={introTextoEstilo}>
-        Times podem ter uma stack conhecida (linguagem, framework...) que pré-preenche sugestões em campos novos, sem
-        reconfigurar a cada nó. O jeito natural de capturar isso é usando a ferramenta de verdade: informe o time no
-        campo do topo da tela, preencha os campos manualmente num nó, e clique em "💾 salvar estes valores como padrão
-        do time" no painel de propriedades. Pra corrigir um valor já existente ou declarar um direto (ex.: "o time
-        trabalha com Java"), use o formulário abaixo. Os dois gravam direto no perfil do time compartilhado — visível
-        pra todo mundo com acesso a esse time assim que salvo.
+        A stack é um <strong>perfil do catálogo</strong> ("Java + Spring Boot", "Node"...), não um atributo do time: o
+        time <em>aponta</em> um perfil, e trocar de tecnologia é trocar o ponteiro. Os valores do perfil apontado
+        pré-preenchem sugestões em campos novos. Pra capturar valores usando a ferramenta de verdade, preencha os
+        campos num nó e clique em "💾 salvar estes valores como padrão do time" no painel — grava no perfil apontado
+        (cria um se o time ainda não tiver). O formulário abaixo faz o mesmo, campo a campo.
       </p>
+
+      <div style={cardEstilo}>
+        <strong style={{ fontSize: 13, color: "var(--texto)" }}>Perfil de stack de {timeAtivo}</strong>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
+          <select
+            aria-label="Perfil de stack do time ativo"
+            value={catalogo?.ponteiros[timeAtivo] ?? ""}
+            onChange={(e) => void apontar(e.target.value)}
+            style={inputFormEstilo}
+          >
+            <option value="">— sem perfil —</option>
+            {(catalogo?.perfis ?? []).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nome}
+              </option>
+            ))}
+          </select>
+          <input
+            aria-label="Nome do novo perfil de stack"
+            value={nomeNovoPerfil}
+            onChange={(e) => setNomeNovoPerfil(e.target.value)}
+            placeholder="ex.: Node 20 + Fastify"
+            style={inputFormEstilo}
+          />
+          <button onClick={() => void criarPerfil()} style={botaoAdicionarEstilo} disabled={!nomeNovoPerfil.trim()}>
+            + Criar perfil no catálogo
+          </button>
+        </div>
+        {erroCatalogo && <p style={{ fontSize: 12, color: "var(--vermelho)", marginBottom: 0 }}>{erroCatalogo}</p>}
+      </div>
 
       {formulario ? (
         <FormularioEditarValor
@@ -81,7 +153,7 @@ export function PerfisTimeTab({ perfisTime, config, onEditarValor }: PerfisTimeT
       >
         {times.length === 0 && (
           <p style={{ fontSize: 12, color: "var(--texto-mudo)" }}>
-            Nenhum time com perfil cadastrado ainda em config/perfis-time.json.
+            Nenhum time apontando perfil de stack ainda — crie um perfil acima e aponte, ou capture pelo painel.
           </p>
         )}
         {times.map(([timeId, perfil]) => (

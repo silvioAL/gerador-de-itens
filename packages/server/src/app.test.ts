@@ -16,7 +16,8 @@ import {
   organizacoes,
   papeisAcesso,
   papelPermissao,
-  perfisTime,
+  perfilStackValores,
+  perfisStack,
   quebras,
   times,
   usuarioPapel,
@@ -82,8 +83,13 @@ beforeEach(async () => {
   // para trás liga o RBAC da organização (SPEC-28 §4.3) e faria todos os
   // outros testes — que assumem o modo aberto — falharem com 403.
   await db.execute(
-    sql`truncate table ${quebras}, ${perfisTime}, ${camposNo}, ${convitesTime}, ${auditoria}, ${usuarioPapel}, ${papelPermissao}, ${papeisAcesso}`
+    sql`truncate table ${quebras}, ${perfilStackValores}, ${camposNo}, ${convitesTime}, ${auditoria}, ${usuarioPapel}, ${papelPermissao}, ${papeisAcesso}`
   );
+  // O catálogo de perfis (SPEC-38 F2) não entra no truncate: `times` aponta
+  // pra ele por FK — primeiro solta os ponteiros, depois apaga (os valores
+  // caem pelo ON DELETE CASCADE).
+  await db.update(times).set({ perfilStackId: null });
+  await db.delete(perfisStack);
 });
 
 afterAll(async () => {
@@ -1261,6 +1267,155 @@ describe("SPEC-38 Fase 1 — níveis de participação no time", () => {
   });
 });
 
+describe("SPEC-38 Fase 2 — perfis de stack (catálogo apontado pelo time)", () => {
+  const TIME_STACK = "time-teste-stack";
+  const EMAIL_OPERAR2 = "operar-stack@gerador.local";
+
+  beforeEach(async () => {
+    await garantirTime(TIME_STACK);
+    await db.delete(usuarioTime).where(eq(usuarioTime.timeId, TIME_STACK));
+    await db.insert(usuarioTime).values([
+      { email: EMAIL_DEV, timeId: TIME_STACK, nivel: "owner" },
+      { email: EMAIL_OPERAR2, timeId: TIME_STACK, nivel: "operar" },
+    ]);
+  });
+
+  afterEach(async () => {
+    await db.delete(usuarioTime).where(eq(usuarioTime.timeId, TIME_STACK));
+    await db.update(usuarioTime).set({ nivel: "owner" }).where(eq(usuarioTime.email, EMAIL_DEV));
+  });
+
+  it("catálogo ABERTO (sem papel curador): owner cria perfil; operar leva 403", async () => {
+    const negado = await app.inject({
+      method: "POST",
+      url: "/perfis-stack",
+      cookies: { gerador_sessao: await logarComo(EMAIL_OPERAR2) },
+      payload: { nome: "Node" },
+    });
+    expect(negado.statusCode).toBe(403);
+
+    const criado = await app.inject({
+      method: "POST",
+      url: "/perfis-stack",
+      cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
+      payload: { nome: "Java + Spring Boot" },
+    });
+    expect(criado.statusCode).toBe(201);
+    expect(criado.json().nome).toBe("Java + Spring Boot");
+  });
+
+  it("curadoria LIGADA (papel com perfis-stack existe): owner comum leva 403; o curador edita — é a exceção ao owner-bypass (D1)", async () => {
+    const [org] = await db.select().from(organizacoes).limit(1);
+    const [papel] = await db.insert(papeisAcesso).values({ organizacaoId: org.id, nome: "Curadoria" }).returning();
+    await db.insert(papelPermissao).values({ papelId: papel.id, recurso: "perfis-stack", acao: "editar" });
+    await db.insert(usuarioPapel).values({ email: EMAIL_OUTRO, papelId: papel.id, escopoTimeId: null });
+
+    // EMAIL_DEV é owner — e mesmo assim 403: a curadoria manda.
+    const ownerNegado = await app.inject({
+      method: "POST",
+      url: "/perfis-stack",
+      cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
+      payload: { nome: "Kotlin" },
+    });
+    expect(ownerNegado.statusCode).toBe(403);
+    expect(ownerNegado.json().erro).toContain("curadoria");
+
+    const curador = await app.inject({
+      method: "POST",
+      url: "/perfis-stack",
+      cookies: { gerador_sessao: await logarComo(EMAIL_OUTRO) },
+      payload: { nome: "Kotlin" },
+    });
+    expect(curador.statusCode).toBe(201);
+  });
+
+  it("trocar de tecnologia é trocar o PONTEIRO: a projeção /perfis-time segue o perfil apontado", async () => {
+    const cookieDev = await logarComo(EMAIL_DEV);
+    const java = (
+      await app.inject({ method: "POST", url: "/perfis-stack", cookies: { gerador_sessao: cookieDev }, payload: { nome: "Java" } })
+    ).json();
+    const node = (
+      await app.inject({ method: "POST", url: "/perfis-stack", cookies: { gerador_sessao: cookieDev }, payload: { nome: "Node" } })
+    ).json();
+    await app.inject({
+      method: "PUT",
+      url: `/perfis-stack/${java.id}/valores`,
+      cookies: { gerador_sessao: cookieDev },
+      payload: { tipoNo: "service", valores: { linguagem: "Java" } },
+    });
+    await app.inject({
+      method: "PUT",
+      url: `/perfis-stack/${node.id}/valores`,
+      cookies: { gerador_sessao: cookieDev },
+      payload: { tipoNo: "service", valores: { linguagem: "Node" } },
+    });
+
+    await app.inject({
+      method: "PUT",
+      url: `/times/${TIME_STACK}/perfil-stack`,
+      cookies: { gerador_sessao: cookieDev },
+      payload: { perfilStackId: java.id },
+    });
+    let projecao = (await app.inject({ method: "GET", url: "/perfis-time" })).json();
+    expect(projecao[TIME_STACK]).toEqual({ service: { linguagem: "Java" } });
+
+    // O ponteiro troca — o time inteiro passa a projetar o outro perfil, sem
+    // reescrever nada do time.
+    await app.inject({
+      method: "PUT",
+      url: `/times/${TIME_STACK}/perfil-stack`,
+      cookies: { gerador_sessao: cookieDev },
+      payload: { perfilStackId: node.id },
+    });
+    projecao = (await app.inject({ method: "GET", url: "/perfis-time" })).json();
+    expect(projecao[TIME_STACK]).toEqual({ service: { linguagem: "Node" } });
+  });
+
+  it("apontar o ponteiro é ato de OWNER do time — operar leva 403 mesmo com catálogo aberto", async () => {
+    const cookieDev = await logarComo(EMAIL_DEV);
+    const perfil = (
+      await app.inject({ method: "POST", url: "/perfis-stack", cookies: { gerador_sessao: cookieDev }, payload: { nome: "Go" } })
+    ).json();
+
+    const negado = await app.inject({
+      method: "PUT",
+      url: `/times/${TIME_STACK}/perfil-stack`,
+      cookies: { gerador_sessao: await logarComo(EMAIL_OPERAR2) },
+      payload: { perfilStackId: perfil.id },
+    });
+    expect(negado.statusCode).toBe(403);
+  });
+
+  it("captura sem ponteiro cria 'stack de {time}' e aponta — o botão do painel continua um clique", async () => {
+    const cookieDev = await logarComo(EMAIL_DEV);
+    const captura = await app.inject({
+      method: "PUT",
+      url: `/perfis-time/${TIME_STACK}`,
+      cookies: { gerador_sessao: cookieDev },
+      payload: { tipoNo: "service", valores: { linguagem: "Java", framework: "Spring Boot" } },
+    });
+    expect(captura.statusCode).toBe(200);
+    expect(captura.json()).toEqual({ linguagem: "Java", framework: "Spring Boot" });
+
+    const catalogo = (await app.inject({ method: "GET", url: "/perfis-stack" })).json();
+    const criado = catalogo.perfis.find((p: { nome: string }) => p.nome === `stack de ${TIME_STACK}`);
+    expect(criado).toBeDefined();
+    expect(catalogo.ponteiros[TIME_STACK]).toBe(criado.id);
+
+    // Segunda captura NÃO cria outro perfil: mescla no apontado.
+    await app.inject({
+      method: "PUT",
+      url: `/perfis-time/${TIME_STACK}`,
+      cookies: { gerador_sessao: cookieDev },
+      payload: { tipoNo: "service", valores: { linguagem: "Kotlin" } },
+    });
+    const depois = (await app.inject({ method: "GET", url: "/perfis-stack" })).json();
+    expect(depois.perfis.filter((p: { nome: string }) => p.nome.startsWith("stack de")).length).toBe(1);
+    const projecao = (await app.inject({ method: "GET", url: "/perfis-time" })).json();
+    expect(projecao[TIME_STACK].service).toEqual({ linguagem: "Kotlin", framework: "Spring Boot" });
+  });
+});
+
 describe("auditoria", () => {
   it("grava quem/quando depois de uma escrita ter sucesso (ex.: perfis-time)", async () => {
     const cookieDev = await logarComo(EMAIL_DEV);
@@ -1272,9 +1427,9 @@ describe("auditoria", () => {
     });
 
     const linha = await esperarLinhaAuditoria(
-      (l) => l.recurso === "perfis_time" && l.recursoId === TIME_A && l.acao === "atualizar"
+      (l) => l.recurso === "perfis_stack" && l.recursoId === TIME_A && l.acao === "capturar"
     );
-    expect(linha).toMatchObject({ email: EMAIL_DEV, acao: "atualizar", recurso: "perfis_time", recursoId: TIME_A });
+    expect(linha).toMatchObject({ email: EMAIL_DEV, acao: "capturar", recurso: "perfis_stack", recursoId: TIME_A });
   });
 });
 
@@ -1487,7 +1642,7 @@ describe("SPEC-28 — gestão de acessos", () => {
     // permissão tivesse sido consultada — mediria o portão errado. Foi o que
     // aconteceu na primeira versão deste teste.
     const chamadas = [
-      ["PUT", `/perfis-time/${TIME_B}`, { tipoNo: "service", valores: {} }, "perfis-time"],
+      ["PUT", `/perfis-time/${TIME_B}`, { tipoNo: "service", valores: {} }, "perfis-stack"],
       ["POST", "/campos-aresta", { tipoAresta: "http", key: "x", label: "X", type: "text" }, "campos-aresta"],
       ["PUT", "/especificacao-template", { conteudo: "oi" }, "especificacao-template"],
       ["PUT", "/ia/credencial", { baseUrl: "https://gw/v1", chave: "k", modelo: "m" }, "credenciais-ia"],

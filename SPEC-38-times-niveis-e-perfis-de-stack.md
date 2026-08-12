@@ -142,6 +142,23 @@ obriga a decisão no mesmo commit).
 Cada fase com a régua de sempre: teste que MORDE (defeito reinjetado →
 vermelho exato), suítes completas, validação no bundle de produção.
 
+## 5.1 Fase 1 — implementada (§176)
+
+Níveis, teto do convite, gates de escrita (quebra=operar, config=owner ou
+delegação) e a UI de membros — ver JOURNEY §176.
+
+## 5.2 Fase 2 — implementada (§177)
+
+`perfis_stack` + `perfil_stack_valores` + `times.perfil_stack_id` (migração
+0020, com o DROP de `perfis_time` da D4). A projeção `PerfisDeTimes` que as
+sugestões consomem sobreviveu com o MESMO contrato (`GET /perfis-time`) — só
+que derivada do perfil apontado. A captura (`PUT /perfis-time/:timeId`)
+grava no perfil apontado e cria "stack de {time}" quando não há ponteiro. A
+curadoria virou o preHandler `exigirEdicaoCurada`: aberto → ato de owner;
+papel com `perfis-stack` existe → SÓ o grant edita, inclusive por cima de
+owners — a exceção deliberada ao owner-bypass da Fase 1 (D1). Apontar o
+ponteiro é `exigirNivel(owner)` no próprio time, sempre.
+
 ## 6. Verificação (feito quando)
 
 1. Um `visualizar` abre quebras do time e recebe 403 ao tentar salvar; a UI
