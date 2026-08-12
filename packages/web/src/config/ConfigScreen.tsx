@@ -247,6 +247,7 @@ export function ConfigScreen({
             contextos={contextos}
             componentesPorTech={componentesPorTech}
             techs={techs}
+            nodeTypes={config.nodeTypes}
           />
         )}
         {abaAtiva === "membros" && <MembrosTab timeAtivo={timeAtivo} />}

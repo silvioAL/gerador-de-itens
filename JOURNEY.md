@@ -4606,3 +4606,26 @@ certa de uma vez.
 Mordida da fase: herança removida da união do `resolverPermissoes` → o
 teste-âncora vermelho. AcessosTab ganhou "times que portam este papel" com
 atribuir/remover, coberto por unit.
+
+## 179. SPEC-36 Opção A — criar regra falando componente, e o defeito que o E2E desenterrou
+
+A projeção aprovada na §171 virou código: "adicionar regra para
+[Fila Rabbit ▾] valendo para [só Fila Rabbit ▾]" — o select é de
+COMPONENTES, e `escoposDoComponente` deriva tech + contexto sozinho (exato,
+família por prefixo quando alarga de verdade, tech inteira), com a prévia
+"alcança: …" dizendo ANTES de salvar quais componentes a regra atinge — a
+defesa contra o defeito silencioso medido na SPEC, a regra que nunca casa
+com item nenhum. O documento continua `porTech`: motor, RBAC por diferença e
+diagnóstico intactos, exatamente como a Opção A prometia.
+
+**O E2E do "feito quando" desenterrou um defeito real que nenhum teste
+via**: a regra criada pela aba nunca chegava na ficha do item, porque o
+`carregarConfig` lia `/config/regras.json` ESTÁTICO (o arquivo do bundle)
+enquanto a RegrasTab gravava no documento do banco (`/config/regras`). Dois
+donos para a mesma verdade, cada tela olhando um. O conserto: a revisão
+passou a ler o documento editável, com o estático de fallback — e o spec
+prova o ciclo inteiro (criar pela linguagem do componente → derivar uma
+Fila Rabbit → a pergunta na ficha).
+
+Mordida no mapeamento (contexto exato trocado por vazio → unit E teste de UI
+vermelhos, cada um na sua camada).

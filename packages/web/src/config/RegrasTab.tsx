@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import type { ItemProcesso, RegrasConfig, RegrasPorTech, Requisito, TesteAutomatizado } from "@gerador/engine";
+import type { DiagramaConfig, ItemProcesso, RegrasConfig, RegrasPorTech, Requisito, TesteAutomatizado } from "@gerador/engine";
 import { apiRegras, type DiagnosticoConfig, type SugestaoRegra, type SugestaoTeste } from "../api/client";
 import { SugerirComIa } from "./SugerirComIa";
 import { SeletorDeContextos } from "./SeletorDeContextos";
+import { componentesAlcancados, escoposDoComponente } from "./regraPorComponente";
 
 /**
  * SPEC-23 fluxo 5 — editor de `config/regras.json`.
@@ -39,6 +40,10 @@ export interface RegrasTabProps {
    * Ausente (modo local, sem RBAC) = pode tudo.
    */
   podeSecao?: (id: Secao) => boolean;
+  /** SPEC-36 Opção A — os tipos de nó da config: viram o seletor de
+   * COMPONENTE do formulário de criação (o vocabulário do produto), que
+   * deriva tech + contexto sozinho. */
+  nodeTypes?: DiagramaConfig["nodeTypes"];
   /** Os contextos conhecidos (`appConfig.contextos`) — viram o seletor por
    * clique no lugar do campo "separados por vírgula", que exigia digitar
    * valores como "Backend-mensagens rabbitmq" de cabeça (e um typo não
@@ -56,7 +61,7 @@ export interface RegrasTabProps {
   techs?: string[];
 }
 
-export function RegrasTab({ podeSecao, contextos, componentesPorTech, techs: techsDoApp }: RegrasTabProps = {}) {
+export function RegrasTab({ podeSecao, contextos, componentesPorTech, techs: techsDoApp, nodeTypes }: RegrasTabProps = {}) {
   const todasAsOpcoes = contextos ?? [];
   const secoesVisiveis = SECOES.filter((s) => podeSecao?.(s.id) ?? true);
   const [regras, setRegras] = useState<RegrasConfig | null>(null);
@@ -161,6 +166,20 @@ export function RegrasTab({ podeSecao, contextos, componentesPorTech, techs: tec
         {erro && <span style={{ fontSize: 11.5, color: "var(--vermelho)" }}>{erro}</span>}
       </div>
 
+      {/* SPEC-36 Opção A — criar pela linguagem do produto: escolhe-se o
+          COMPONENTE, e tech + contexto saem do mapeamento (nunca digitados). */}
+      {nodeTypes && (secao === "tecnico" || secao === "processo") && (
+        <NovaRegraPorComponente
+          nodeTypes={nodeTypes}
+          todosOsContextos={todasAsOpcoes}
+          onAdicionar={(tech, contextosDaRegra, texto) => {
+            const chave = secao === "tecnico" ? "checklistTecnico" : "checklistProcesso";
+            const lista = [...(blocoDe(tech)[chave] ?? []), { texto, contextos: contextosDaRegra }];
+            void gravar(comBloco(tech, { [chave]: lista }));
+          }}
+        />
+      )}
+
       {techs.length === 0 && (
         <p style={{ fontSize: 12.5, color: "var(--texto-fraco)", marginTop: 12 }}>
           Nenhum grupo de regras configurado ainda neste ambiente.
@@ -253,6 +272,103 @@ export function RegrasTab({ podeSecao, contextos, componentesPorTech, techs: tec
     </div>
   );
 }
+
+/**
+ * SPEC-36 Opção A — "adicionar regra para [Fila Rabbit ▾]". O select é de
+ * COMPONENTES; tech e contexto derivam do mapeamento (`escoposDoComponente`),
+ * e o escopo sobe com nomes legíveis ("só Fila Rabbit / todo o grupo
+ * mensagens / todo Backend"). A prévia diz quais componentes a regra alcança
+ * ANTES de salvar — o defeito silencioso que a SPEC mediu era exatamente a
+ * regra que nunca casava com item nenhum.
+ */
+function NovaRegraPorComponente({
+  nodeTypes,
+  todosOsContextos,
+  onAdicionar,
+}: {
+  nodeTypes: NonNullable<RegrasTabProps["nodeTypes"]>;
+  todosOsContextos: string[];
+  onAdicionar: (tech: string, contextos: string[], texto: string) => void;
+}) {
+  const tipos = Object.entries(nodeTypes).filter(([, cfg]) => (cfg.techs ?? []).length > 0);
+  const [tipoNo, setTipoNo] = useState(tipos[0]?.[0] ?? "");
+  const [indiceEscopo, setIndiceEscopo] = useState(0);
+  const [texto, setTexto] = useState("");
+
+  const projecao = escoposDoComponente(tipoNo, nodeTypes, todosOsContextos);
+  if (!projecao) return null;
+  const escopo = projecao.opcoes[Math.min(indiceEscopo, projecao.opcoes.length - 1)];
+  const alcance = componentesAlcancados(projecao.tech, escopo.contextos, nodeTypes);
+
+  return (
+    <div style={{ ...cardEstilo, marginTop: 12 }} data-testid="nova-regra-por-componente">
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ fontSize: 12.5, color: "var(--texto-2)" }}>Adicionar regra para</span>
+        <select
+          aria-label="Componente da nova regra"
+          value={tipoNo}
+          onChange={(e) => {
+            setTipoNo(e.target.value);
+            setIndiceEscopo(0);
+          }}
+          style={campoNovaRegraEstilo}
+        >
+          {tipos.map(([tipo, cfg]) => (
+            <option key={tipo} value={tipo}>
+              {cfg.label}
+            </option>
+          ))}
+        </select>
+        <span style={{ fontSize: 12.5, color: "var(--texto-2)" }}>valendo para</span>
+        <select
+          aria-label="Escopo da nova regra"
+          value={indiceEscopo}
+          onChange={(e) => setIndiceEscopo(Number(e.target.value))}
+          style={campoNovaRegraEstilo}
+        >
+          {projecao.opcoes.map((o, i) => (
+            <option key={o.rotulo} value={i}>
+              {o.rotulo}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
+        <input
+          aria-label="Texto da nova regra"
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          placeholder="ex.: política de DLQ definida e documentada?"
+          style={{ ...campoNovaRegraEstilo, flex: 1, minWidth: 260 }}
+        />
+        <button
+          onClick={() => {
+            if (!texto.trim()) return;
+            onAdicionar(projecao.tech, escopo.contextos, texto.trim());
+            setTexto("");
+          }}
+          disabled={!texto.trim()}
+          style={botaoNovoGrupoEstilo}
+          data-testid="adicionar-regra-por-componente"
+        >
+          + Adicionar
+        </button>
+      </div>
+      <p style={{ margin: "6px 0 0", fontSize: 11.5, color: "var(--texto-mudo)" }} data-testid="alcance-da-regra">
+        alcança: {alcance.length > 0 ? alcance.join(", ") : "nenhum componente (revise o escopo)"}
+      </p>
+    </div>
+  );
+}
+
+const campoNovaRegraEstilo: React.CSSProperties = {
+  fontSize: 12.5,
+  padding: "6px 9px",
+  borderRadius: 6,
+  border: "1px solid var(--borda-forte)",
+  background: "var(--fundo)",
+  color: "var(--texto)",
+};
 
 /** Editor comum das duas listas cujo item é {texto, contextos} — checklist
  * técnico e checklist de processo. A forma é a mesma; o que muda é o rótulo,

@@ -1,5 +1,5 @@
 import type { AppConfig, DiagramaConfig, FieldSpec, RegrasConfig } from "@gerador/engine";
-import { apiCamposAresta, apiCamposNo, type CampoAresta, type CampoNo } from "../api/client";
+import { apiCamposAresta, apiCamposNo, type CampoAresta, type CampoNo, apiRegras } from "../api/client";
 
 export interface ConfigCarregada {
   diagramaConfig: DiagramaConfig;
@@ -103,7 +103,14 @@ export async function carregarConfig(timeAtivo?: string): Promise<ConfigCarregad
   const [diagramaConfig, appConfig, regrasConfig, camposCustomizados, camposArestaCustomizados] = await Promise.all([
     buscarJson<DiagramaConfig>("/config/diagrama.json"),
     buscarJson<AppConfig>("/config/app.json"),
-    buscarJsonOpcional<RegrasConfig>("/config/regras.json"),
+    // O DOCUMENTO editável (banco, com override da RegrasTab) — não o JSON
+    // estático do bundle. Achado real do E2E da SPEC-36: a regra criada pela
+    // aba nunca chegava na ficha do item, porque a revisão lia o arquivo
+    // servido e a aba gravava no banco. O estático fica de fallback.
+    apiRegras
+      .obterComDiagnostico()
+      .then((envelope) => envelope.documento as RegrasConfig)
+      .catch(() => buscarJsonOpcional<RegrasConfig>("/config/regras.json")),
     apiCamposNo.listar(timeAtivo),
     // /campos-aresta só existe no modo local (openApiLocal.ts) — packages/server
     // fica dormente de propósito, sem essa rota (SPEC-21 §2). Achado real: sem

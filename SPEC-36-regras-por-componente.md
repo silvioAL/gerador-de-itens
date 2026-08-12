@@ -57,6 +57,15 @@ caminho caso um dia exista uma necessidade que a projeção não cubra (ex.:
 regra específica de UM componente sem contexto próprio na config) — e nesse
 dia o primeiro passo é criar o contexto que falta, não migrar o arquivo.
 
+## 4.1 Implementada (§179)
+
+A Opção A entrou: formulário "adicionar regra para [componente ▾]" com
+escopo legível e prévia de alcance (`regraPorComponente.ts`), documento
+`porTech` intacto. De quebra, o E2E do §5 desenterrou e consertou um defeito
+real: a revisão lia o `regras.json` estático do bundle enquanto a aba
+gravava no documento do banco — a regra criada pela UI nunca chegava na
+ficha. `carregarConfig` agora lê o documento editável (estático de fallback).
+
 ## 5. Feito quando (se a Opção A for aprovada)
 
 Criar uma regra escolhendo "Fila Rabbit" grava com o contexto certo sem o
