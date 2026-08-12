@@ -42,6 +42,7 @@ test("regra criada pelo componente grava o contexto certo e chega no item deriva
     // O reload agora mantém a TELA (rota #/config/regras — SPEC-40): navegar
   // pro canvas explicitamente, recarregando o app com as regras novas.
   await page.goto("/#/");
+  await page.reload(); // goto só de fragment é same-document — o reload é o que recarrega as regras no App
     await expect(page.getByRole("button", { name: "+ Fila Rabbit" })).toBeVisible({ timeout: 10000 });
     await page.getByRole("button", { name: "+ Fila Rabbit" }).click();
     await page.locator(".react-flow__node", { hasText: "Fila Rabbit" }).click();
