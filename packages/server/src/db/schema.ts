@@ -116,10 +116,16 @@ export const times = pgTable("times", {
 /**
  * Fonte de verdade de quais times uma pessoa pertence — usada pela sessão
  * (JWT) pra saber quais `timeId` autorizar. Onboarding: criar um time novo
- * (`POST /times`, qualquer sessão) ou convite por link (`convitesTime`) ou
- * administração direta (rotas `/times/:timeId/membros`, SPEC-09 §3-4) — sem
- * papel de admin separado, qualquer membro do time administra a própria
- * lista de membros.
+ * (`POST /times`, qualquer sessão — o criador nasce `owner`) ou convite por
+ * link (`convitesTime`, que carrega o nível) ou administração direta
+ * (rotas `/times/:timeId/membros`, SPEC-09 §3-4).
+ *
+ * SPEC-38 Fase 1 — cada participação carrega um `nivel`:
+ * `visualizar` (lê quebras) · `operar` (o dia a dia: criar/derivar/refinar) ·
+ * `owner` (configurações do time, membros e níveis). O default `operar`
+ * garante que um insert que esqueça o nível nunca nasce com poder de
+ * configuração; a validação de valor mora no CHECK da migração 0019 e na
+ * lista fechada de `auth/niveis.ts`.
  */
 export const usuarioTime = pgTable(
   "usuario_time",
@@ -128,6 +134,7 @@ export const usuarioTime = pgTable(
     timeId: text("time_id")
       .notNull()
       .references(() => times.id),
+    nivel: text("nivel").notNull().default("operar"),
   },
   (t) => [uniqueIndex("usuario_time_chave_unica").on(t.email, t.timeId)]
 );
@@ -198,6 +205,9 @@ export const convitesTime = pgTable("convites_time", {
   timeId: text("time_id")
     .notNull()
     .references(() => times.id),
+  /** SPEC-38 — o nível com que o aceite entra no time. O teto (nível pedido ≤
+   * nível de quem convida) é aplicado na criação do convite, não aqui. */
+  nivel: text("nivel").notNull().default("operar"),
   criadoPor: text("criado_por").notNull(),
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
   expiraEm: timestamp("expira_em", { withTimezone: true }).notNull(),

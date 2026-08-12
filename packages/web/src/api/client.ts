@@ -812,11 +812,19 @@ export interface PapelAcesso {
   membros: { email: string; escopoTimeId: string | null }[];
 }
 
+/** SPEC-38 — nível de participação num time (lista fechada, espelho de
+ * `auth/niveis.ts` do servidor). */
+export type NivelTime = "visualizar" | "operar" | "owner";
+export const NIVEIS_TIME: NivelTime[] = ["visualizar", "operar", "owner"];
+
 export interface PermissoesMinhas {
   /** `false` = organização ainda sem papel nenhum: tudo liberado (SPEC-28
    * §4.3). A UI não deve esconder nada nesse estado. */
   rbacAtivo: boolean;
   porRecurso: Record<string, string[]>;
+  /** SPEC-38 — o nível no time consultado (ou o MAIOR nível da pessoa, sem
+   * `timeId`). `null` = não é membro de time nenhum. */
+  nivel?: NivelTime | null;
 }
 
 export const apiAcessos = {
@@ -910,26 +918,41 @@ export const apiRegras = configDe<RegrasConfig>("regras");
 export interface ConviteTime {
   token: string;
   timeId: string;
+  nivel: NivelTime;
   expiraEm: string;
   url: string;
 }
 
-/** Convite e administração de membros de time (SPEC-09 §3-4) — sem papel de
- * admin separado, qualquer membro do time administra a própria lista. */
+export interface MembroTime {
+  email: string;
+  nivel: NivelTime;
+}
+
+/** Convite e administração de membros de time (SPEC-09 §3-4, níveis na
+ * SPEC-38): adicionar/remover/mudar nível é ato de owner; convidar é de
+ * qualquer membro, com teto no próprio nível. */
 export const apiTimes = {
   /** Qualquer sessão pode criar um time novo — só falha (409) se o nome já
    * existir (aí é convite, não criação). Correção do SPEC-09 §3.3: bootstrap
-   * não depende mais de alguém já estar no sistema antes. */
+   * não depende mais de alguém já estar no sistema antes. O criador nasce owner. */
   criarTime: (timeId: string) => requisitar<{ timeId: string }>("/times", { method: "POST", body: JSON.stringify({ timeId }) }),
-  criarConvite: (timeId: string) =>
-    requisitar<ConviteTime>(`/times/${encodeURIComponent(timeId)}/convites`, { method: "POST" }),
-  aceitarConvite: (token: string) => requisitar<{ timeId: string }>(`/convites/${token}/aceitar`, { method: "POST" }),
-  listarMembros: (timeId: string) => requisitar<string[]>(`/times/${encodeURIComponent(timeId)}/membros`),
-  adicionarMembro: (timeId: string, email: string) =>
-    requisitar<{ email: string; timeId: string }>(`/times/${encodeURIComponent(timeId)}/membros`, {
+  criarConvite: (timeId: string, nivel: NivelTime = "operar") =>
+    requisitar<ConviteTime>(`/times/${encodeURIComponent(timeId)}/convites`, {
       method: "POST",
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ nivel }),
     }),
+  aceitarConvite: (token: string) => requisitar<{ timeId: string }>(`/convites/${token}/aceitar`, { method: "POST" }),
+  listarMembros: (timeId: string) => requisitar<MembroTime[]>(`/times/${encodeURIComponent(timeId)}/membros`),
+  adicionarMembro: (timeId: string, email: string, nivel: NivelTime = "operar") =>
+    requisitar<MembroTime & { timeId: string }>(`/times/${encodeURIComponent(timeId)}/membros`, {
+      method: "POST",
+      body: JSON.stringify({ email, nivel }),
+    }),
+  alterarNivel: (timeId: string, email: string, nivel: NivelTime) =>
+    requisitar<MembroTime & { timeId: string }>(
+      `/times/${encodeURIComponent(timeId)}/membros/${encodeURIComponent(email)}/nivel`,
+      { method: "PUT", body: JSON.stringify({ nivel }) }
+    ),
   removerMembro: (timeId: string, email: string) =>
     requisitar<void>(`/times/${encodeURIComponent(timeId)}/membros/${encodeURIComponent(email)}`, {
       method: "DELETE",

@@ -54,6 +54,7 @@ import { LandingPage } from "./demo/LandingPage";
 import { EscolherTimeScreen } from "./auth/EscolherTimeScreen";
 import { lembrarTime, lerTimeLembrado } from "./auth/timeLembrado";
 import { SemTimeScreen } from "./auth/SemTimeScreen";
+import { usePermissoes } from "./auth/usePermissoes";
 
 const CHAVE_JORNADA_VISTA = "gerador:jornada-vista";
 
@@ -271,6 +272,10 @@ function AppCarregado({
   onSair: () => Promise<void>;
 }) {
   const [diagramaConfig, setDiagramaConfig] = useState<DiagramaConfig>(diagramaConfigInicial);
+  // SPEC-38 — o nível no time ativo. `visualizar` esconde o Salvar (a negação
+  // real mora no servidor; aqui é só não oferecer o que seria 403).
+  const permissoes = usePermissoes({ hospedado: true, timeId: timeAtivo });
+  const somenteLeitura = permissoes.nivel === "visualizar";
   const [perfisTime, setPerfisTime] = useState(perfisTimeInicial);
   const [camposNo, setCamposNo] = useState(camposNoInicial);
   const [camposAresta, setCamposAresta] = useState(camposArestaInicial);
@@ -365,6 +370,12 @@ function AppCarregado({
   }
 
   function derivarQuebra() {
+    // SPEC-38 — visualizar deriva (é leitura computada do diagrama), mas sem a
+    // pergunta do nome nem auto-save: salvar seria 403 no servidor.
+    if (somenteLeitura) {
+      executarDerivacao(false);
+      return;
+    }
     if (!(quebra.titulo ?? "").trim()) {
       // O balão só existe com o assistente fechado — fechar garante que a
       // pergunta apareça mesmo se o chat estava aberto.
@@ -643,18 +654,20 @@ function AppCarregado({
         <button onClick={() => setMostrarAbrir(true)} style={botaoEstilo} title="Buscar e abrir uma quebra já salva">
           Abrir…
         </button>
-        <button
-          onClick={() => void persistencia.salvar()}
-          disabled={!(quebra.titulo ?? "").trim()}
-          title={(quebra.titulo ?? "").trim() ? undefined : "Dê um título à quebra antes de salvar"}
-          style={{
-            ...botaoEstilo,
-            ...botaoPrimarioEstilo,
-            ...((quebra.titulo ?? "").trim() ? {} : botaoDesabilitadoEstilo),
-          }}
-        >
-          Salvar
-        </button>
+        {!somenteLeitura && (
+          <button
+            onClick={() => void persistencia.salvar()}
+            disabled={!(quebra.titulo ?? "").trim()}
+            title={(quebra.titulo ?? "").trim() ? undefined : "Dê um título à quebra antes de salvar"}
+            style={{
+              ...botaoEstilo,
+              ...botaoPrimarioEstilo,
+              ...((quebra.titulo ?? "").trim() ? {} : botaoDesabilitadoEstilo),
+            }}
+          >
+            Salvar
+          </button>
+        )}
         <button
           data-tour="derivar-button"
           onClick={derivarQuebra}

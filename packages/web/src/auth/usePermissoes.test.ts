@@ -58,6 +58,19 @@ describe("usePermissoes — o que a tela pode esconder", () => {
     expect(result.current.pode("quebras", "ler")).toBe(true);
   });
 
+  it("SPEC-38: o nível do time vem junto; sem resposta, `null` — que NÃO esconde nada", async () => {
+    minhas.mockResolvedValueOnce({ rbacAtivo: false, porRecurso: {}, nivel: "visualizar" });
+    const { result } = renderHook(() => usePermissoes({ hospedado: true, timeId: "time-x" }));
+    await waitFor(() => expect(result.current.carregando).toBe(false));
+    expect(result.current.nivel).toBe("visualizar");
+
+    // Falha aberta: rede fora → nivel null → a UI trata como "ainda não sei".
+    minhas.mockRejectedValueOnce(new Error("rede caiu"));
+    const { result: semRede } = renderHook(() => usePermissoes({ hospedado: true, timeId: "time-x" }));
+    await waitFor(() => expect(semRede.current.carregando).toBe(false));
+    expect(semRede.current.nivel).toBeNull();
+  });
+
   it("o time entra na consulta — papel com escopo de time depende disso", async () => {
     minhas.mockResolvedValueOnce({ rbacAtivo: true, porRecurso: {} });
     renderHook(() => usePermissoes({ hospedado: true, timeId: "time-pagamentos" }));

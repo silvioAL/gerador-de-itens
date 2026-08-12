@@ -863,7 +863,11 @@ describe("/times — convites", () => {
     // arquivo — precisa de um primeiro membro pra sequer poder gerar convite.
     await garantirTime(TIME_CONVITE);
     await db.delete(usuarioTime).where(eq(usuarioTime.timeId, TIME_CONVITE));
-    await db.insert(usuarioTime).values({ email: EMAIL_DEV, timeId: TIME_CONVITE }).onConflictDoNothing();
+    // Owner, como o criador de um time de verdade seria (SPEC-38).
+    await db
+      .insert(usuarioTime)
+      .values({ email: EMAIL_DEV, timeId: TIME_CONVITE, nivel: "owner" })
+      .onConflictDoNothing();
   });
 
   // Sem isso, EMAIL_DEV fica pertencendo a TIME_CONVITE pra sempre (usuario_time
@@ -915,7 +919,14 @@ describe("/times — convites", () => {
       url: `/times/${TIME_CONVITE}/membros`,
       cookies: { gerador_sessao: cookieDev },
     });
-    expect(membros.json()).toEqual(expect.arrayContaining(["novo-convidado@gerador.local", EMAIL_DEV]));
+    // SPEC-38 — a lista carrega níveis: o convite sem nível explícito entra
+    // como `operar` (o default do dia a dia), nunca como owner.
+    expect(membros.json()).toEqual(
+      expect.arrayContaining([
+        { email: "novo-convidado@gerador.local", nivel: "operar" },
+        { email: EMAIL_DEV, nivel: "owner" },
+      ])
+    );
   });
 
   it("401 sem sessão pra criar convite; 403 quando a sessão não é do time", async () => {
@@ -982,7 +993,12 @@ describe("/times — administração de membros", () => {
   beforeEach(async () => {
     await garantirTime(TIME_MEMBROS);
     await db.delete(usuarioTime).where(eq(usuarioTime.timeId, TIME_MEMBROS));
-    await db.insert(usuarioTime).values({ email: EMAIL_DEV, timeId: TIME_MEMBROS }).onConflictDoNothing();
+    // SPEC-38 — administrar membros virou ato de owner; o primeiro membro dos
+    // testes precisa sê-lo (era o poder implícito de todo membro, antes).
+    await db
+      .insert(usuarioTime)
+      .values({ email: EMAIL_DEV, timeId: TIME_MEMBROS, nivel: "owner" })
+      .onConflictDoNothing();
   });
 
   afterEach(async () => {
@@ -1004,7 +1020,12 @@ describe("/times — administração de membros", () => {
       url: `/times/${TIME_MEMBROS}/membros`,
       cookies: { gerador_sessao: cookieDev },
     });
-    expect(listar.json()).toEqual(expect.arrayContaining(["adicionado-direto@gerador.local", EMAIL_DEV]));
+    expect(listar.json()).toEqual(
+      expect.arrayContaining([
+        { email: "adicionado-direto@gerador.local", nivel: "operar" },
+        { email: EMAIL_DEV, nivel: "owner" },
+      ])
+    );
 
     const remover = await app.inject({
       method: "DELETE",
@@ -1018,7 +1039,7 @@ describe("/times — administração de membros", () => {
       url: `/times/${TIME_MEMBROS}/membros`,
       cookies: { gerador_sessao: cookieDev },
     });
-    expect(listarDepois.json()).toEqual([EMAIL_DEV]);
+    expect(listarDepois.json()).toEqual([{ email: EMAIL_DEV, nivel: "owner" }]);
   });
 
   it("recusa remover o último membro do time", async () => {
@@ -1042,6 +1063,201 @@ describe("/times — administração de membros", () => {
       cookies: { gerador_sessao: cookieOutro },
     });
     expect(outroTime.statusCode).toBe(403);
+  });
+});
+
+describe("SPEC-38 Fase 1 — níveis de participação no time", () => {
+  const TIME_NIVEIS = "time-teste-niveis";
+  const EMAIL_OPERAR = "operar@gerador.local";
+  const EMAIL_VISUALIZAR = "visualizar@gerador.local";
+
+  beforeEach(async () => {
+    await garantirTime(TIME_NIVEIS);
+    await db.delete(usuarioTime).where(eq(usuarioTime.timeId, TIME_NIVEIS));
+    await db.insert(usuarioTime).values([
+      { email: EMAIL_DEV, timeId: TIME_NIVEIS, nivel: "owner" },
+      { email: EMAIL_OPERAR, timeId: TIME_NIVEIS, nivel: "operar" },
+      { email: EMAIL_VISUALIZAR, timeId: TIME_NIVEIS, nivel: "visualizar" },
+    ]);
+  });
+
+  afterEach(async () => {
+    await db.delete(usuarioTime).where(eq(usuarioTime.timeId, TIME_NIVEIS));
+  });
+
+  it("convite tem TETO: operar não convida owner (403), e o aceite entra com o nível do convite", async () => {
+    const cookieOperar = await logarComo(EMAIL_OPERAR);
+
+    // Acima do próprio nível: 403, não clamp — rebaixar em silêncio seria
+    // surpresa pra quem convidou E pra quem aceitou.
+    const acimaDoTeto = await app.inject({
+      method: "POST",
+      url: `/times/${TIME_NIVEIS}/convites`,
+      cookies: { gerador_sessao: cookieOperar },
+      payload: { nivel: "owner" },
+    });
+    expect(acimaDoTeto.statusCode).toBe(403);
+
+    const dentroDoTeto = await app.inject({
+      method: "POST",
+      url: `/times/${TIME_NIVEIS}/convites`,
+      cookies: { gerador_sessao: cookieOperar },
+      payload: { nivel: "visualizar" },
+    });
+    expect(dentroDoTeto.statusCode).toBe(201);
+
+    const cookieNovo = await logarComo("convidado-visualizar@gerador.local");
+    const aceitar = await app.inject({
+      method: "POST",
+      url: `/convites/${dentroDoTeto.json().token}/aceitar`,
+      cookies: { gerador_sessao: cookieNovo },
+    });
+    expect(aceitar.statusCode).toBe(200);
+
+    const membros = await app.inject({
+      method: "GET",
+      url: `/times/${TIME_NIVEIS}/membros`,
+      cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
+    });
+    expect(membros.json()).toEqual(
+      expect.arrayContaining([{ email: "convidado-visualizar@gerador.local", nivel: "visualizar" }])
+    );
+    // Limpeza do vazamento (usuario_time não é truncado entre testes).
+    await db.delete(usuarioTime).where(eq(usuarioTime.email, "convidado-visualizar@gerador.local"));
+  });
+
+  it("escrita de quebra exige `operar`: visualizar leva 403, operar grava", async () => {
+    const quebraDoTime = { time: TIME_NIVEIS, diagrama: { nodes: [], edges: [] } };
+
+    const negado = await app.inject({
+      method: "POST",
+      url: "/quebras",
+      cookies: { gerador_sessao: await logarComo(EMAIL_VISUALIZAR) },
+      payload: quebraDoTime,
+    });
+    expect(negado.statusCode).toBe(403);
+    expect(negado.json().nivelExigido).toBe("operar");
+
+    // Quebra SEM time também não escapa: vale o MAIOR nível da pessoa, e quem
+    // é visualizar em tudo não opera em lugar nenhum.
+    const semTime = await app.inject({
+      method: "POST",
+      url: "/quebras",
+      cookies: { gerador_sessao: await logarComo(EMAIL_VISUALIZAR) },
+      payload: { diagrama: { nodes: [], edges: [] } },
+    });
+    expect(semTime.statusCode).toBe(403);
+
+    const criado = await app.inject({
+      method: "POST",
+      url: "/quebras",
+      cookies: { gerador_sessao: await logarComo(EMAIL_OPERAR) },
+      payload: quebraDoTime,
+    });
+    expect(criado.statusCode).toBe(201);
+
+    const editado = await app.inject({
+      method: "PUT",
+      url: `/quebras/${criado.json().id}`,
+      cookies: { gerador_sessao: await logarComo(EMAIL_VISUALIZAR) },
+      payload: quebraDoTime,
+    });
+    expect(editado.statusCode).toBe(403);
+  });
+
+  it("configuração é ato de OWNER (D3): operar leva 403 mesmo com RBAC desligado; owner grava", async () => {
+    const payload = { tipoNo: "service", valores: { linguagem: "Kotlin" } };
+
+    const negado = await app.inject({
+      method: "PUT",
+      url: `/perfis-time/${TIME_NIVEIS}`,
+      cookies: { gerador_sessao: await logarComo(EMAIL_OPERAR) },
+      payload,
+    });
+    expect(negado.statusCode).toBe(403);
+    expect(negado.json().erro).toContain("owner");
+
+    const gravado = await app.inject({
+      method: "PUT",
+      url: `/perfis-time/${TIME_NIVEIS}`,
+      cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
+      payload,
+    });
+    expect(gravado.statusCode).toBe(200);
+  });
+
+  it("regras (o documento por diferença) também exige owner sem RBAC — o caminho de `primeiroRecursoNegado`", async () => {
+    const base = {
+      tipos: ["Story"],
+      tamanhos: ["P"],
+      porTech: { java: { checklistProcesso: [{ texto: "abrir mudança", contextos: [] }] } },
+    };
+    const salvar = (cookie: string, documento: unknown) =>
+      app.inject({ method: "PUT", url: "/config/regras", cookies: { gerador_sessao: cookie }, payload: { documento } });
+
+    expect((await salvar(await logarComo(EMAIL_DEV), base)).statusCode).toBe(200);
+
+    const doc = structuredClone(base);
+    doc.porTech.java.checklistProcesso = [{ texto: "abrir mudança no ServiceNow", contextos: [] }];
+    expect((await salvar(await logarComo(EMAIL_OPERAR), doc)).statusCode).toBe(403);
+    expect((await salvar(await logarComo(EMAIL_DEV), doc)).statusCode).toBe(200);
+  });
+
+  it("mudar nível é ato de owner; rebaixar o último owner é 400", async () => {
+    // Operar não muda nível de ninguém.
+    const negado = await app.inject({
+      method: "PUT",
+      url: `/times/${TIME_NIVEIS}/membros/${EMAIL_VISUALIZAR}/nivel`,
+      cookies: { gerador_sessao: await logarComo(EMAIL_OPERAR) },
+      payload: { nivel: "operar" },
+    });
+    expect(negado.statusCode).toBe(403);
+
+    // Owner promove; o promovido aparece com o nível novo.
+    const cookieDev = await logarComo(EMAIL_DEV);
+    const promovido = await app.inject({
+      method: "PUT",
+      url: `/times/${TIME_NIVEIS}/membros/${EMAIL_OPERAR}/nivel`,
+      cookies: { gerador_sessao: cookieDev },
+      payload: { nivel: "owner" },
+    });
+    expect(promovido.statusCode).toBe(200);
+
+    // Com DOIS owners, rebaixar um deles pode; aí o que sobrou vira o último
+    // e não pode mais ser rebaixado nem removido.
+    const rebaixaDev = await app.inject({
+      method: "PUT",
+      url: `/times/${TIME_NIVEIS}/membros/${EMAIL_DEV}/nivel`,
+      cookies: { gerador_sessao: cookieDev },
+      payload: { nivel: "operar" },
+    });
+    expect(rebaixaDev.statusCode).toBe(200);
+
+    const cookieNovoOwner = await logarComo(EMAIL_OPERAR);
+    const rebaixaUltimo = await app.inject({
+      method: "PUT",
+      url: `/times/${TIME_NIVEIS}/membros/${EMAIL_OPERAR}/nivel`,
+      cookies: { gerador_sessao: cookieNovoOwner },
+      payload: { nivel: "operar" },
+    });
+    expect(rebaixaUltimo.statusCode).toBe(400);
+
+    const removeUltimo = await app.inject({
+      method: "DELETE",
+      url: `/times/${TIME_NIVEIS}/membros/${EMAIL_OPERAR}`,
+      cookies: { gerador_sessao: cookieNovoOwner },
+    });
+    expect(removeUltimo.statusCode).toBe(400);
+    expect(removeUltimo.json().erro).toContain("owner");
+  });
+
+  it("GET /permissoes/minhas carrega o nível — é o que a UI usa pra esconder o botão de salvar", async () => {
+    const minhas = await app.inject({
+      method: "GET",
+      url: `/permissoes/minhas?timeId=${TIME_NIVEIS}`,
+      cookies: { gerador_sessao: await logarComo(EMAIL_VISUALIZAR) },
+    });
+    expect(minhas.json().nivel).toBe("visualizar");
   });
 });
 
@@ -1082,6 +1298,22 @@ describe("rate limit do login", () => {
 });
 
 describe("SPEC-28 — gestão de acessos", () => {
+  /**
+   * SPEC-38 (D3) mudou a semântica de escrita: OWNER do escopo edita mesmo com
+   * RBAC ligado — a delegação por papel passou a ser o caminho de quem NÃO é
+   * owner. Os seeds da migração viraram owner, então os testes que medem a
+   * negação RBAC rebaixam o usuário para `operar` antes (e o afterEach
+   * restaura, porque `usuario_time` não é truncado entre testes).
+   */
+  async function nivelDoSeed(email: string, nivel: string) {
+    await db.update(usuarioTime).set({ nivel }).where(eq(usuarioTime.email, email));
+  }
+
+  afterEach(async () => {
+    await nivelDoSeed(EMAIL_DEV, "owner");
+    await nivelDoSeed(EMAIL_OUTRO, "owner");
+  });
+
   /** Cria papel direto no banco: as rotas de administração exigem permissão de
    * `acessos`, e alguém precisa ser o primeiro (o Administrador do onboarding,
    * §4.4). No teste, o banco faz esse papel. */
@@ -1203,7 +1435,8 @@ describe("SPEC-28 — gestão de acessos", () => {
     }
 
     it("Agilidade edita o checklist de PROCESSO mandando o documento inteiro de volta", async () => {
-      await salvarRegras(await logarComo(EMAIL_DEV), REGRAS_BASE); // modo aberto ainda
+      await salvarRegras(await logarComo(EMAIL_DEV), REGRAS_BASE); // dev é owner: pode
+      await nivelDoSeed(EMAIL_OUTRO, "operar"); // a delegação é o caminho de quem NÃO é owner
       await criarPapel("Agilidade", [{ recurso: "regras.checklistProcesso", acao: "editar" }], [
         { email: EMAIL_OUTRO },
       ]);
@@ -1218,6 +1451,7 @@ describe("SPEC-28 — gestão de acessos", () => {
 
     it("...e leva 403 ao encostar no checklist TÉCNICO, que é de outro setor", async () => {
       await salvarRegras(await logarComo(EMAIL_DEV), REGRAS_BASE);
+      await nivelDoSeed(EMAIL_OUTRO, "operar");
       await criarPapel("Agilidade", [{ recurso: "regras.checklistProcesso", acao: "editar" }], [
         { email: EMAIL_OUTRO },
       ]);
@@ -1232,6 +1466,7 @@ describe("SPEC-28 — gestão de acessos", () => {
 
     it("reenviar o documento sem mudar nada passa mesmo sem permissão nenhuma", async () => {
       await salvarRegras(await logarComo(EMAIL_DEV), REGRAS_BASE);
+      await nivelDoSeed(EMAIL_OUTRO, "operar");
       await criarPapel("SoCampos", [{ recurso: "campos-no", acao: "editar" }], [{ email: EMAIL_OUTRO }]);
 
       // Salvar sem editar não é uma edição. Sem isto, abrir a tela e clicar em
@@ -1241,6 +1476,7 @@ describe("SPEC-28 — gestão de acessos", () => {
   });
 
   it("as rotas que a Fase 1b passou a cobrir negam quem não tem o papel", async () => {
+    await nivelDoSeed(EMAIL_OUTRO, "operar");
     await criarPapel("SoProcesso", [{ recurso: "regras.checklistProcesso", acao: "editar" }], [
       { email: EMAIL_OUTRO },
     ]);
@@ -1275,14 +1511,20 @@ describe("SPEC-28 — gestão de acessos", () => {
     );
   });
 
-  it("MIGRAÇÃO: organização sem papel nenhum continua deixando qualquer membro editar", async () => {
+  it("MIGRAÇÃO: organização sem papel nenhum continua deixando o OWNER editar", async () => {
     // Se este quebrar, atualizar a versão tranca todos os clientes existentes
-    // para fora — o modo de falha que a §4.3 existe para impedir.
+    // para fora — o modo de falha que a §4.3 existe para impedir. Com a
+    // SPEC-38, quem a migração 0019 preservou com esse poder é o owner (todos
+    // os membros pré-existentes), não mais "qualquer membro" novo.
     const resposta = await criarCampo(await logarComo(EMAIL_DEV), "modo-aberto");
     expect(resposta.statusCode).toBe(201);
   });
 
   it("o cenário do usuário: Arquitetura edita campos, Agilidade não — cada uma 403 na área da outra", async () => {
+    // Ambos operar: o que está sendo medido é a DELEGAÇÃO por papel, não o
+    // poder de owner (que passaria por cima e o teste mediria o portão errado).
+    await nivelDoSeed(EMAIL_DEV, "operar");
+    await nivelDoSeed(EMAIL_OUTRO, "operar");
     await criarPapel(
       "Agilidade",
       [
@@ -1302,6 +1544,7 @@ describe("SPEC-28 — gestão de acessos", () => {
 
   it("o MESMO papel por time: vale no time A e dá 403 no time B", async () => {
     // É a linha "em outra empresa isso ocorre por time" (§4.1) virando teste.
+    await nivelDoSeed(EMAIL_DEV, "operar");
     await criarPapel("Agilidade", [{ recurso: "campos-no", acao: "editar" }], [
       { email: EMAIL_DEV, escopoTimeId: TIME_A },
     ]);
@@ -1319,7 +1562,8 @@ describe("SPEC-28 — gestão de acessos", () => {
     expect((await criarCampo(cookie, "org-time-b", TIME_B)).statusCode).toBe(201);
   });
 
-  it("com RBAC ligado, quem não tem papel nenhum é negado", async () => {
+  it("com RBAC ligado, quem não tem papel nenhum (nem é owner) é negado", async () => {
+    await nivelDoSeed(EMAIL_OUTRO, "operar");
     await criarPapel("Arquitetura", [{ recurso: "campos-no", acao: "editar" }], [{ email: EMAIL_DEV }]);
     expect((await criarCampo(await logarComo(EMAIL_OUTRO), "sem-papel")).statusCode).toBe(403);
   });
@@ -1345,6 +1589,7 @@ describe("SPEC-28 — gestão de acessos", () => {
   });
 
   it("administrar acessos exige permissão de `acessos` — sem ela, 403", async () => {
+    await nivelDoSeed(EMAIL_DEV, "operar");
     await criarPapel("Arquitetura", [{ recurso: "campos-no", acao: "editar" }], [{ email: EMAIL_DEV }]);
     const resposta = await app.inject({
       method: "POST",
@@ -1379,6 +1624,7 @@ describe("SPEC-28 — gestão de acessos", () => {
   });
 
   it("apagar papel leva permissões e atribuições junto — nada de permissão órfã autorizando", async () => {
+    await nivelDoSeed(EMAIL_OUTRO, "operar");
     await criarPapel("Administrador", [{ recurso: "acessos", acao: "editar" }], [{ email: EMAIL_DEV }]);
     const idOutro = await criarPapel(
       "Temporario",
