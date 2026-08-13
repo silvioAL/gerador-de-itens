@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ItemGerado } from "../api/client";
 import { ItensScreen } from "./ItensScreen";
 
@@ -98,5 +98,63 @@ describe("ItensScreen", () => {
     renderTela([]);
     expect(screen.getByTestId("itens-vazio").textContent).toContain("Nenhum item escrito ainda");
     expect(screen.getByRole("button", { name: "Ir para a demanda" })).toBeInTheDocument();
+  });
+
+  it("SPEC-49 — o botão exporta os PRONTOS e diz o destino; resultado mostra sucesso, erro e ignorados", async () => {
+    const onExportar = vi.fn().mockResolvedValue({
+      exportados: [item("a")],
+      erros: [{ chave: "b", erro: "projeto AB não aceita issue do tipo Task" }],
+      ignorados: ["c"],
+      destino: "Jira do time",
+    });
+    render(
+      <ItensScreen
+        itens={[item("a"), item("b", { pendencias: 2 })]}
+        tituloDaQuebra="Demanda X"
+        onAbrirMenu={vi.fn()}
+        onFechar={vi.fn()}
+        onExportar={onExportar}
+        destinoDaExportacao="Jira do time"
+      />
+    );
+
+    expect(screen.getByTestId("exportar-prontos").textContent).toContain("Exportar prontos (1)");
+    expect(screen.getByText(/destino: Jira do time/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("exportar-prontos"));
+    await waitFor(() => expect(onExportar).toHaveBeenCalled());
+
+    const resultado = await screen.findByTestId("resultado-exportacao");
+    expect(resultado.textContent).toContain("1 item(ns) no Jira do time");
+    expect(resultado.textContent).toContain("projeto AB não aceita");
+    expect(resultado.textContent).toContain("1 ficaram de fora");
+  });
+
+  it("SPEC-49 — sem destino configurado, a tela DIZ onde configurar em vez de oferecer um botão que falharia", () => {
+    render(
+      <ItensScreen
+        itens={[item("a")]}
+        tituloDaQuebra="Demanda X"
+        onAbrirMenu={vi.fn()}
+        onFechar={vi.fn()}
+        onExportar={vi.fn()}
+        destinoDaExportacao={null}
+      />
+    );
+    expect(screen.getByText(/sem destino configurado/)).toBeInTheDocument();
+  });
+
+  it("SPEC-49 — nenhum item pronto: o botão fica desligado (item pela metade não vira issue)", () => {
+    render(
+      <ItensScreen
+        itens={[item("a", { pendencias: 3 })]}
+        tituloDaQuebra="Demanda X"
+        onAbrirMenu={vi.fn()}
+        onFechar={vi.fn()}
+        onExportar={vi.fn()}
+        destinoDaExportacao="Jira"
+      />
+    );
+    expect(screen.getByTestId("exportar-prontos")).toBeDisabled();
   });
 });

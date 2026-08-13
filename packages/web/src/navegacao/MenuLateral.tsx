@@ -30,6 +30,7 @@ const GRUPOS: { titulo: string; itens: { area: AreaConfig; rotulo: string }[] }[
       { area: "camposAresta", rotulo: "Campos por tipo de conexão" },
       { area: "regras", rotulo: "Regras de refinamento" },
       { area: "especificacao", rotulo: "Especificação de solução" },
+      { area: "exportacao", rotulo: "Exportação (tracker)" },
     ],
   },
   {

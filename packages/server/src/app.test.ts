@@ -1335,6 +1335,64 @@ describe("SPEC-38 Fase 1 — níveis de participação no time", () => {
   });
 });
 
+describe("SPEC-49 — exportação dos itens pro tracker", () => {
+  async function quebraComItens(cookie: string, itens: Record<string, unknown>[]) {
+    const quebra = (
+      await app.inject({
+        method: "POST",
+        url: "/quebras",
+        cookies: { gerador_sessao: cookie },
+        payload: { titulo: "quebra de exportação", diagrama: { nodes: [], edges: [] } },
+      })
+    ).json();
+    await app.inject({
+      method: "PUT",
+      url: `/quebras/${quebra.id}/itens`,
+      cookies: { gerador_sessao: cookie },
+      payload: { itens },
+    });
+    return quebra.id as string;
+  }
+
+  const itemPronto = {
+    chave: "a",
+    titulo: "Item pronto",
+    tipo: "Task",
+    tamanho: "P",
+    dependencias: [],
+    corpoMarkdown: "### 1. Item pronto",
+    pendencias: 0,
+    sugestoes: 0,
+  };
+  const itemComPendencia = { ...itemPronto, chave: "b", titulo: "Item pela metade", pendencias: 2 };
+
+  it("sem destino configurado, a resposta DIZ onde configurar — não é erro genérico", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    await app.inject({
+      method: "PUT",
+      url: "/config/exportador",
+      cookies: { gerador_sessao: cookie },
+      payload: { documento: { endpoint: "", rotulo: "", cabecalhos: {} } },
+    });
+    const quebraId = await quebraComItens(cookie, [itemPronto]);
+
+    const r = await app.inject({ method: "POST", url: `/quebras/${quebraId}/itens/exportar`, cookies: { gerador_sessao: cookie } });
+    expect(r.statusCode).toBe(409);
+    expect(r.json().erro).toContain("Configurações → Exportação");
+  });
+
+  it("endereço inválido é barrado na CONFIGURAÇÃO, não na hora de exportar com item na mão", async () => {
+    const r = await app.inject({
+      method: "PUT",
+      url: "/config/exportador",
+      cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
+      payload: { documento: { endpoint: "jira.empresa", rotulo: "Jira", cabecalhos: {} } },
+    });
+    expect(r.statusCode).toBe(400);
+    expect(JSON.stringify(r.json())).toContain("http://");
+  });
+});
+
 describe("SPEC-45 — a jornada do PDCA (feedback → ajuste → aplicado)", () => {
   it("o feedback do agente APARECE numa listagem — era escrita-só (o relato do §194)", async () => {
     const cookie = await logarComo(EMAIL_DEV);

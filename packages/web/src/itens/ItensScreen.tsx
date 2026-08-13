@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { ItemGerado } from "../api/client";
+import type { ItemGerado, ResultadoDaExportacao } from "../api/client";
 
 /**
  * SPEC-41 Parte B — a tela dos itens de trabalho (`#/itens`), no padrão de
@@ -20,6 +20,11 @@ export interface ItensScreenProps {
   onIrParaRevisao?: () => void;
   /** SPEC-44 — deep-link: abre a revisão JÁ no item deste card. */
   onRevisarItem?: (chave: string) => void;
+  /** SPEC-49 — manda os itens PRONTOS pro tracker (via agente configurado).
+   * Ausente = a quebra ainda não foi salva, e sem id não há o que exportar. */
+  onExportar?: () => Promise<ResultadoDaExportacao>;
+  /** Pra onde vai, como a configuração chamou ("Jira do time X"). */
+  destinoDaExportacao?: string | null;
 }
 
 function completudeDoItem(item: ItemGerado): { rotulo: string; cor: string; fundo: string } {
@@ -39,7 +44,19 @@ function completudeDoItem(item: ItemGerado): { rotulo: string; cor: string; fund
   };
 }
 
-export function ItensScreen({ itens, tituloDaQuebra, onAbrirMenu, onFechar, onIrParaRevisao, onRevisarItem }: ItensScreenProps) {
+export function ItensScreen({
+  itens,
+  tituloDaQuebra,
+  onAbrirMenu,
+  onFechar,
+  onIrParaRevisao,
+  onRevisarItem,
+  onExportar,
+  destinoDaExportacao,
+}: ItensScreenProps) {
+  const [exportando, setExportando] = useState(false);
+  const [resultado, setResultado] = useState<ResultadoDaExportacao | null>(null);
+  const [erroExportacao, setErroExportacao] = useState<string | null>(null);
   // SPEC-47 — a escrita REAL do item aparece por padrão: a tela era uma lista
   // de títulos, e o que interessa a quem vai executar é o texto (§196). Quem
   // quiser varrer a lista fecha; o estado guarda quem está FECHADO.
@@ -98,9 +115,67 @@ export function ItensScreen({ itens, tituloDaQuebra, onAbrirMenu, onFechar, onIr
               </div>
               <p style={{ fontSize: 12, color: "var(--texto-fraco)", margin: "6px 0 0" }}>
                 Um item fica pronto quando nenhum campo pede “✍️ especificar” e nenhuma sugestão da esteira está sem
-                confirmação. A exportação pro seu tracker (Jira etc.) chega na próxima fase — os corpos já saem
-                completos daqui.
+                confirmação. Só os prontos vão pro tracker — item pela metade não vira issue meia-boca.
               </p>
+
+              {/* SPEC-49 — a exportação de verdade. Só os PRONTOS sobem, e a
+                  falha é por item: quem subiu fica com o link, quem falhou diz
+                  o motivo aqui embaixo. */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+                <button
+                  onClick={async () => {
+                    if (!onExportar) return;
+                    setExportando(true);
+                    setErroExportacao(null);
+                    setResultado(null);
+                    try {
+                      setResultado(await onExportar());
+                    } catch (e) {
+                      setErroExportacao(e instanceof Error ? e.message : String(e));
+                    } finally {
+                      setExportando(false);
+                    }
+                  }}
+                  disabled={!onExportar || exportando || prontos === 0}
+                  data-testid="exportar-prontos"
+                  title={
+                    !onExportar
+                      ? "Salve a quebra antes de exportar"
+                      : prontos === 0
+                        ? "Nenhum item pronto ainda"
+                        : `Manda os ${prontos} itens prontos pro tracker`
+                  }
+                  style={prontos > 0 && onExportar ? botaoPrimarioEstilo : { ...botaoEstilo, opacity: 0.55 }}
+                >
+                  {exportando ? "exportando…" : `Exportar prontos (${prontos})`}
+                </button>
+                <span style={{ fontSize: 11.5, color: "var(--texto-mudo)" }}>
+                  {destinoDaExportacao ? `destino: ${destinoDaExportacao}` : "sem destino configurado (Configurações → Exportação)"}
+                </span>
+              </div>
+
+              {erroExportacao && (
+                <p style={{ fontSize: 12, color: "var(--vermelho)", margin: "8px 0 0" }} data-testid="erro-exportacao">
+                  {erroExportacao}
+                </p>
+              )}
+              {resultado && (
+                <div style={{ marginTop: 8 }} data-testid="resultado-exportacao">
+                  <p style={{ fontSize: 12.5, color: "var(--verde, #4ade80)", margin: 0 }}>
+                    {resultado.exportados.length} item(ns) no {resultado.destino}.
+                  </p>
+                  {resultado.erros.map((e) => (
+                    <p key={e.chave} style={{ fontSize: 12, color: "var(--vermelho)", margin: "4px 0 0" }}>
+                      {e.chave}: {e.erro}
+                    </p>
+                  ))}
+                  {resultado.ignorados.length > 0 && (
+                    <p style={{ fontSize: 11.5, color: "var(--texto-mudo)", margin: "4px 0 0" }}>
+                      {resultado.ignorados.length} ficaram de fora por ainda ter pendência.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {itens.map((item, i) => {

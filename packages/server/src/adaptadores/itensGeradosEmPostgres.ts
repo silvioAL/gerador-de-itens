@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import type { DadosItemGerado, ItemGeradoSalvo, RepositorioDeItensGerados } from "@gerador/aplicacao";
 import type { BancoDeDados } from "../db/client.js";
 import { itensGerados } from "../db/schema.js";
@@ -39,6 +39,15 @@ export function criarRepositorioDeItensGeradosEmPostgres(db: BancoDeDados): Repo
         .where(eq(itensGerados.quebraId, quebraId))
         .orderBy(asc(itensGerados.ordem));
       return linhas.map(comoItemSalvo);
+    },
+
+    async marcarExportado(quebraId, chave, linkExterno) {
+      const [linha] = await db
+        .update(itensGerados)
+        .set({ estado: "exportado", linkExterno })
+        .where(and(eq(itensGerados.quebraId, quebraId), eq(itensGerados.chave, chave)))
+        .returning();
+      return linha ? comoItemSalvo(linha) : null;
     },
 
     async substituirDaQuebra(quebraId: string, itens: DadosItemGerado[]): Promise<ItemGeradoSalvo[]> {

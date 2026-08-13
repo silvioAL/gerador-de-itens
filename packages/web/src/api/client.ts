@@ -238,10 +238,21 @@ export interface ItemGerado {
 /** O que o cliente manda ao (re)gerar — a forma de `ItemDeTrabalho` do engine. */
 export type DadosItemGerado = Omit<ItemGerado, "id" | "quebraId" | "estado" | "linkExterno" | "criadoEm">;
 
+/** SPEC-49 — o que a exportação devolve: o que subiu, o que falhou (com
+ * motivo) e o que ficou de fora por ainda ter pendência. */
+export interface ResultadoDaExportacao {
+  exportados: ItemGerado[];
+  erros: { chave: string; erro: string }[];
+  ignorados: string[];
+  destino: string;
+}
+
 export const apiItensGerados = {
   listar: (quebraId: string) => requisitar<ItemGerado[]>(`/quebras/${quebraId}/itens`),
   regerar: (quebraId: string, itens: DadosItemGerado[]) =>
     requisitar<ItemGerado[]>(`/quebras/${quebraId}/itens`, { method: "PUT", body: JSON.stringify({ itens }) }),
+  exportar: (quebraId: string) =>
+    requisitar<ResultadoDaExportacao>(`/quebras/${quebraId}/itens/exportar`, { method: "POST" }),
 };
 
 export interface PedidoSugestaoIa {
@@ -1034,6 +1045,16 @@ export const apiPipelineAgentes = configDe<ConfigPipelineAgentes>("pipeline-agen
  * refinamento por tech/contexto). Era o único arquivo de configuração sem
  * rota nem UI: só dava pra editar à mão. O tipo é o do engine, sem cópia. */
 export const apiRegras = configDe<RegrasConfig>("regras");
+
+/** SPEC-49 — pra onde os itens vão: o AGENTE que fala com o tracker (o
+ * gerador não implementa Jira, chama quem implementa). */
+export interface ConfigExportador {
+  endpoint: string;
+  rotulo: string;
+  cabecalhos: Record<string, string>;
+}
+
+export const apiExportador = configDe<ConfigExportador>("exportador");
 
 export interface ConviteTime {
   token: string;

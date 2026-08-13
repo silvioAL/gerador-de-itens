@@ -31,6 +31,7 @@ import {
   apiItensGerados,
   type ItemGerado,
   apiStacks,
+  apiExportador,
   type SugestoesDeStack,
 } from "./api/client";
 import { useSessao } from "./auth/useSessao";
@@ -343,6 +344,16 @@ function AppCarregado({
   const [itensGerados, setItensGerados] = useState<ItemGerado[]>([]);
   // SPEC-44 — deep-link da tela de itens pra revisão: o item a selecionar.
   const [itemInicialRevisao, setItemInicialRevisao] = useState<string | null>(null);
+  // SPEC-49 — pra onde os itens vão; só pra tela DIZER o destino (a exportação
+  // em si é do servidor, que lê a mesma config).
+  const [destinoDaExportacao, setDestinoDaExportacao] = useState<string | null>(null);
+  useEffect(() => {
+    if (!mostrarItens) return;
+    apiExportador
+      .obter()
+      .then((c) => setDestinoDaExportacao(c.endpoint ? c.rotulo || c.endpoint : null))
+      .catch(() => setDestinoDaExportacao(null));
+  }, [mostrarItens]);
   // SPEC-45 — quantos feedbacks do ciclo ainda esperam alguém: é o que faz o
   // assistente chamar pra tratar (M15) em vez de o texto morrer no banco.
   const [feedbacksNovos, setFeedbacksNovos] = useState(0);
@@ -919,6 +930,16 @@ function AppCarregado({
           onAbrirMenu={() => setMenuAberto(true)}
           onFechar={() => navegar({ tela: "canvas" })}
           onIrParaRevisao={() => navegar({ tela: "canvas" })}
+          onExportar={
+            persistencia.quebraId
+              ? async () => {
+                  const r = await apiItensGerados.exportar(persistencia.quebraId!);
+                  setItensGerados(await apiItensGerados.listar(persistencia.quebraId!));
+                  return r;
+                }
+              : undefined
+          }
+          destinoDaExportacao={destinoDaExportacao}
           onRevisarItem={
             resultado
               ? (chave) => {

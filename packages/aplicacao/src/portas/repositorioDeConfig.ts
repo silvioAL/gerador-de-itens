@@ -18,7 +18,10 @@ export { CAMPO_GLOBAL };
  * documento sem tela, sem rota e sem uso. Linha do banco com essa chave passa a
  * ser rejeitada por `ehChaveConfig`, que é o comportamento certo — dado órfão
  * não deve voltar a ser lido como se fosse configuração viva. */
-export const CHAVES_CONFIG = ["regras", "pipeline-agentes"] as const;
+/** SPEC-49 — `exportador` é o endereço do AGENTE que fala com o tracker: o
+ * gerador não implementa Jira, chama quem implementa (mesma disciplina do
+ * gateway de IA). */
+export const CHAVES_CONFIG = ["regras", "pipeline-agentes", "exportador"] as const;
 
 export type ChaveConfig = (typeof CHAVES_CONFIG)[number];
 

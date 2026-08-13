@@ -20,6 +20,7 @@ const AREAS: { area: AbaConfig; rotulo: RegExp }[] = [
   { area: "pipeline", rotulo: /Pipeline de IA/ },
   { area: "modeloIa", rotulo: /Modelo de IA/ },
   { area: "pdca", rotulo: /PDCA — melhoria contínua/ },
+  { area: "exportacao", rotulo: /Exportação/ },
 ];
 
 const config: DiagramaConfig = {
