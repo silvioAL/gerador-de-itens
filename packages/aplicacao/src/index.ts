@@ -54,6 +54,10 @@ export {
 export { criarCasosDeUsoDeCamposAresta, type CasosDeUsoDeCamposAresta } from "./casos-de-uso/camposAresta.js";
 
 export type { Stack, SugestoesDeStack, RepositorioDeStacks } from "./portas/repositorioDeStacks.js";
+// SPEC-54 — a credencial de IA sai do banco e vai para o cofre.
+export type { CofreDeSegredos } from "./portas/cofreDeSegredos.js";
+export { nomeDoSegredoDeCredencial } from "./portas/cofreDeSegredos.js";
+export { comCofreDeSegredos } from "./casos-de-uso/credenciaisComCofre.js";
 // SPEC-53 — o produto e o contexto que ele carrega.
 export type {
   Produto,
