@@ -60,6 +60,8 @@ export interface ItemFilaEsteira {
 
 export interface UseEsteiraDeAgentesParams {
   contextoEpico?: string;
+  /** SPEC-53 — o que o PRODUTO é; viaja separado do contexto da demanda. */
+  contextoDoProduto?: string;
   /** SPEC-24 Fase F — papéis ATIVOS da esteira, na ordem de execução. Vem da
    * config (`pipeline-agentes.json`); ausente cai nos 4 padrão. Lido via ref
    * dentro da esteira (mesmo motivo do `confirmacaoObrigatoria`: a config
@@ -194,6 +196,7 @@ function desescapar(s: string): string {
  */
 export function useEsteiraDeAgentes({
   contextoEpico,
+  contextoDoProduto,
   papeis = PAPEIS_PADRAO,
   confirmacaoObrigatoria = true,
   onResponderItem,
@@ -267,7 +270,7 @@ export function useEsteiraDeAgentes({
               // #299 — a MESMA função que a simulação usa. Enquanto o corpo for
               // montado aqui e lá separadamente, "ver o prompt que sairia" é um
               // palpite bem-intencionado.
-              corpoDoLote(papel.id, lote, acumuladas, contextoEpico),
+              corpoDoLote(papel.id, lote, acumuladas, contextoEpico, contextoDoProduto),
               (acumulado) => {
                 ultimoAcumulado = acumulado;
                 if (tokenRef.current === token) setAoVivoPorItem(extrairRespostasParciaisAninhadas(acumulado));
@@ -372,7 +375,7 @@ export function useEsteiraDeAgentes({
         setLoteChaves([]);
       }
     },
-    [contextoEpico, onResponderItem]
+    [contextoEpico, contextoDoProduto, onResponderItem]
   );
 
   const iniciar = useCallback(

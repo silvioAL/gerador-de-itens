@@ -121,6 +121,30 @@ describe("gerarEspecificacaoEntrega", () => {
     expect(doc.match(/Cliente pediu catálogo mais rápido\./g)).toHaveLength(1);
   });
 
+  it("SPEC-53 — o contexto do PRODUTO abre a seção, antes do da demanda", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, config, {
+      contextoDoProduto: "## Produto: Catálogo\n\n### Glossário\n- **SKU**: unidade vendável",
+      demandInfo: "Cliente pediu catálogo mais rápido.",
+    });
+
+    // Quem recebe o documento (outro time, um fornecedor, um agente) não tem o
+    // contexto que quem escreveu tinha na cabeça — e precisa saber de que
+    // negócio se trata ANTES de ler o que muda nesta entrega.
+    expect(doc).toContain("**SKU**: unidade vendável");
+    expect(doc.indexOf("Produto: Catálogo")).toBeLessThan(doc.indexOf("Cliente pediu catálogo mais rápido."));
+  });
+
+  it("SPEC-53 — sem produto, a seção de contexto fica exatamente como era", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, config, { demandInfo: "só a demanda" });
+    expect(doc).toContain("só a demanda");
+    expect(doc).not.toContain("Produto:");
+  });
+
   it("título customizado substitui o default", () => {
     const diagrama = diagramaBase();
     const atividades = derivar(diagrama, config, {});

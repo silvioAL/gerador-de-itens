@@ -52,6 +52,7 @@ import { ConversaPanel } from "./conversa/ConversaPanel";
 import { AssistenteFlutuante, type AbaAssistente } from "./assistente/AssistenteFlutuante";
 import { ConfigurarPanel } from "./assistente/ConfigurarPanel";
 import { JourneyModal, type AbaJornada } from "./demo/JourneyModal";
+import { contextoDoProdutoEmTexto } from "@gerador/aplicacao";
 import { ConfigScreen, type AbaConfig } from "./config/ConfigScreen";
 import { TourOverlay } from "./demo/TourOverlay";
 import { useTour } from "./demo/useTour";
@@ -333,6 +334,28 @@ function AppCarregado({
     responderItem,
     aplicarDiagramaProposto,
   } = quebraState;
+
+  /**
+   * SPEC-53 Fase 2 — o contexto do produto ESCOLHIDO, já em texto.
+   *
+   * Buscado sob demanda (e não junto da lista) porque a lista é só nome: o
+   * contexto inteiro de todos os produtos da organização seria carregado a
+   * cada boot para usar, no máximo, um.
+   */
+  const [contextoDoProduto, setContextoDoProduto] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!quebra.produtoId) {
+      setContextoDoProduto(undefined);
+      return;
+    }
+    apiProdutos
+      .obter(quebra.produtoId)
+      .then((p) => setContextoDoProduto(contextoDoProdutoEmTexto(p) || undefined))
+      // Produto apagado depois de a demanda apontar pra ele: a demanda
+      // continua valendo, só sem o contexto (a FK é ON DELETE SET NULL, mas a
+      // quebra em memória pode estar mais velha que o banco).
+      .catch(() => setContextoDoProduto(undefined));
+  }, [quebra.produtoId]);
 
   const aoAbrir = useCallback(
     (q: Quebra) => {
@@ -934,6 +957,7 @@ function AppCarregado({
           templateItem={templateItem?.conteudo}
           demandInfo={quebra.demandInfo}
           anexosContexto={quebra.anexosContexto}
+          contextoDoProduto={contextoDoProduto}
           time={quebra.time}
           respostasItens={quebra.respostasItens}
           onResponderItem={responderItem}

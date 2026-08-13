@@ -247,15 +247,19 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
       return reply.code(503).send({ erro: "IA não configurada — cadastre a credencial do gateway" });
     }
 
-    const { tech, rotulo, contextoNo, contextoEpico } = (req.body ?? {}) as {
+    const { tech, rotulo, contextoNo, contextoEpico, contextoDoProduto } = (req.body ?? {}) as {
       tech?: string;
       rotulo?: string;
       contextoNo?: string;
       contextoEpico?: string;
+      contextoDoProduto?: string;
     };
     const prompt = [
       `Você ajuda a especificar um requisito técnico de refinamento de software.`,
-      ...(contextoEpico ? [`Contexto geral da demanda/épico:`, contextoEpico, ``] : []),
+      // SPEC-53 — o produto antes da demanda: o campo sugerido aqui é escrito
+      // com o vocabulário da casa, não com o genérico do modelo.
+      ...(contextoDoProduto ? [`Contexto do PRODUTO (vale sempre):`, contextoDoProduto, ``] : []),
+      ...(contextoEpico ? [`Contexto desta demanda/épico:`, contextoEpico, ``] : []),
       `Tecnologia: ${tech ?? "(não informada)"}`,
       `Requisito a especificar: "${rotulo ?? ""}"`,
       `Contexto do(s) nó(s) de arquitetura envolvidos:`,

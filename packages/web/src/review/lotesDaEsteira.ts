@@ -24,10 +24,15 @@ export function corpoDoLote(
   papelId: string,
   lote: ItemFilaEsteira[],
   acumuladas: Map<string, RespostaAnteriorIa[]>,
-  contextoEpico?: string
+  contextoEpico?: string,
+  /** SPEC-53 — o que o PRODUTO é. Separado do contexto da demanda até dentro
+   * do corpo da requisição: quem lê o prompt precisa distinguir o permanente
+   * do circunstancial. */
+  contextoDoProduto?: string
 ) {
   return {
     contextoEpico,
+    contextoDoProduto,
     itens: lote.map((item) => ({
       chave: item.atividadeChave,
       rotulo: item.atividadeRotulo,
@@ -63,6 +68,9 @@ export interface EntradaSimulacao {
   fila: ItemFilaEsteira[];
   papeis: PapelConfigurado[];
   contextoEpico?: string;
+  /** SPEC-53 — o contexto do produto, para a simulação mostrar o prompt REAL
+   * (com ele dentro), e não uma versão que não existe. */
+  contextoDoProduto?: string;
   /** Respostas que já existem antes da corrida (edições confirmadas). */
   existentesPorItem?: Map<string, RespostaAnteriorIa[]>;
 }
@@ -78,7 +86,7 @@ export interface EntradaSimulacao {
  */
 export const RESPOSTA_NAO_GERADA = "(resposta deste papel — só existe depois de rodar de verdade)";
 
-export function simularEsteira({ fila, papeis, contextoEpico, existentesPorItem }: EntradaSimulacao): LoteSimulado[] {
+export function simularEsteira({ fila, papeis, contextoEpico, contextoDoProduto, existentesPorItem }: EntradaSimulacao): LoteSimulado[] {
   const acumuladas = new Map<string, RespostaAnteriorIa[]>(existentesPorItem ?? []);
   const simulados: LoteSimulado[] = [];
 
@@ -88,7 +96,7 @@ export function simularEsteira({ fila, papeis, contextoEpico, existentesPorItem 
 
     for (let i = 0; i < itens.length; i += TAM_LOTE_ESTEIRA) {
       const lote = itens.slice(i, i + TAM_LOTE_ESTEIRA);
-      const corpo = corpoDoLote(papel.id, lote, acumuladas, contextoEpico);
+      const corpo = corpoDoLote(papel.id, lote, acumuladas, contextoEpico, contextoDoProduto);
       const { prompt } = montarPedidoPipeline({
         preambulo: preambuloDoPapel(papel.id, papeis),
         ...corpo,

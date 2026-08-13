@@ -54,12 +54,19 @@ describe("simularEsteira reproduz a corrida sem chamar o modelo (#299)", () => {
     // mentir em silêncio. O defeito que isto previne não tem sintoma visível —
     // os dois prompts só divergem, e ninguém compara.
     const fonte = readFileSync(resolve(import.meta.dirname, "useEsteiraDeAgentes.ts"), "utf-8");
-    expect(fonte).toContain("corpoDoLote(papel.id, lote, acumuladas, contextoEpico)");
+    expect(fonte).toContain("corpoDoLote(papel.id, lote, acumuladas, contextoEpico, contextoDoProduto)");
     expect(fonte).not.toContain("itens: lote.map((item) => ({");
   });
 
   it("o prompt simulado tem todas as partes que a anatomia declara", () => {
-    const [primeiro] = simularEsteira({ fila: [item(1, ["po"])], papeis, contextoEpico: "Portabilidade, 5 dias." });
+    const [primeiro] = simularEsteira({
+      fila: [item(1, ["po"])],
+      papeis,
+      contextoEpico: "Portabilidade, 5 dias.",
+      // SPEC-53 — o contexto do produto é parte declarada da anatomia: a
+      // simulação tem que mostrá-lo, senão ela mente sobre o que sairia.
+      contextoDoProduto: "## Produto: Consignado",
+    });
     const ausentes = ANATOMIA_DO_PROMPT_PIPELINE.filter((p) => !primeiro.prompt.includes(p.marcador))
       .map((p) => p.id)
       // Duas exceções, e as duas por motivo declarado:

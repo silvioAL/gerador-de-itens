@@ -10,6 +10,9 @@ export interface ConversaEspecificacaoProps {
   /** O item aberto na tela: é dele que a conversa fala por padrão. */
   atividadeSelecionada: Atividade;
   contextoEpico?: string;
+  /** SPEC-53 — o vocabulário do produto vale também para quem CONVERSA sobre
+   * o item, não só para quem o gera. */
+  contextoDoProduto?: string;
   /** SPEC-37 M1 — quando a conversa abre por CONDUÇÃO (a esteira terminou),
    * a primeira fala é a do momento, não a saudação padrão do item. */
   falaInicial?: string;
@@ -87,6 +90,7 @@ export function ConversaEspecificacao({
   fichas,
   atividadeSelecionada,
   contextoEpico,
+  contextoDoProduto,
   falaInicial,
   onAplicar,
   onFechar,
@@ -200,6 +204,7 @@ export function ConversaEspecificacao({
       campos,
       oQueMudou,
       contextoEpico,
+      contextoDoProduto,
     });
     const porChave = new Map(campos.map((c) => [c.chave, c]));
     return alteracoes

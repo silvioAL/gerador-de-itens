@@ -7,6 +7,8 @@ export interface SimulacaoEsteiraProps {
   fila: ItemFilaEsteira[];
   papeis: PapelConfigurado[];
   contextoEpico?: string;
+  /** SPEC-53 — a simulação mostra o prompt REAL, e o do produto faz parte dele. */
+  contextoDoProduto?: string;
   onFechar: () => void;
 }
 
@@ -21,10 +23,10 @@ export interface SimulacaoEsteiraProps {
  * O texto aqui não é montado por este componente — vem de `simularEsteira`, que
  * usa a MESMA função da borda. Ver o cabeçalho de `lotesDaEsteira.ts`.
  */
-export function SimulacaoEsteira({ fila, papeis, contextoEpico, onFechar }: SimulacaoEsteiraProps) {
+export function SimulacaoEsteira({ fila, papeis, contextoEpico, contextoDoProduto, onFechar }: SimulacaoEsteiraProps) {
   const lotes = useMemo(
-    () => simularEsteira({ fila, papeis, contextoEpico }),
-    [fila, papeis, contextoEpico]
+    () => simularEsteira({ fila, papeis, contextoEpico, contextoDoProduto }),
+    [fila, papeis, contextoEpico, contextoDoProduto]
   );
   const [aberto, setAberto] = useState<number | null>(lotes.length > 0 ? 0 : null);
   const [copiado, setCopiado] = useState<number | null>(null);

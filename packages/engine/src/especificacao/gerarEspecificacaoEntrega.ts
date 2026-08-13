@@ -749,6 +749,10 @@ export interface OpcoesGerarEspecificacao {
   regras?: RegrasConfig;
   /** `quebra.demandInfo` — de onde vem a demanda, pra seção "Contexto" (SPEC-14 §4). */
   demandInfo?: string;
+  /** SPEC-53 Fase 2 — o contexto do PRODUTO em texto. Vem ANTES do da demanda
+   * na seção "Contexto": quem lê o documento precisa saber de que negócio se
+   * trata antes de ler o que muda nesta entrega. */
+  contextoDoProduto?: string;
   /** Título do documento — default "Especificação de solução" (não é mais o rótulo de uma atividade, SPEC-14 §2). */
   titulo?: string;
   /** Template com placeholders `{{variavel}}` — sem isso, usa `TEMPLATE_ESPECIFICACAO_PADRAO`. */
@@ -789,6 +793,7 @@ export function gerarEspecificacaoEntrega(
     }
   }
   const partesContexto: string[] = [];
+  if (opcoes.contextoDoProduto?.trim()) partesContexto.push(opcoes.contextoDoProduto.trim());
   if (opcoes.demandInfo) partesContexto.push(opcoes.demandInfo);
   if (todosOsTimes.size > 0) partesContexto.push(`Times envolvidos: ${[...todosOsTimes].join(", ")}`);
   const contexto = partesContexto.length > 0 ? partesContexto.join("\n\n") : "_Sem contexto adicional informado._";

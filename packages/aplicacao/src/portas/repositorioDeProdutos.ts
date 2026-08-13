@@ -72,6 +72,12 @@ export function produtosDoTime(produtos: Produto[], timeId?: string): Produto[] 
   return produtos.filter((p) => p.timeIds.length === 0 || p.timeIds.includes(timeId));
 }
 
+/** A forma MÍNIMA que virar texto exige — nem id, nem organização, nem times.
+ * É o que deixa a web (que tem seu próprio tipo `Produto`, sem os campos de
+ * persistência) usar a mesma função do servidor, em vez de escrever uma
+ * segunda versão que combina por enquanto. */
+export type ProdutoComContexto = Omit<Produto, "id" | "organizacaoId" | "timeIds" | "criadoPor" | "atualizadoEm">;
+
 /**
  * O contexto do produto em texto, para entrar no prompt e no documento
  * (SPEC-53 Fase 2). Seção vazia não vira título órfão — a mesma régua do
@@ -82,7 +88,7 @@ export function produtosDoTime(produtos: Produto[], timeId?: string): Produto[] 
  * vem depois dele no prompt. Cortar em silêncio seria pior, então o texto diz
  * quantos ficaram de fora.
  */
-export function contextoDoProdutoEmTexto(produto: Produto, limiteDeTermos = 40): string {
+export function contextoDoProdutoEmTexto(produto: ProdutoComContexto, limiteDeTermos = 40): string {
   const secoes: string[] = [`## Produto: ${produto.nome}`];
   const adicionar = (titulo: string, corpo: string) => {
     if (corpo.trim()) secoes.push(`### ${titulo}\n${corpo.trim()}`);

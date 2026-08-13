@@ -263,11 +263,20 @@ export const ANATOMIA_DO_PROMPT_PIPELINE: ParteDoPromptPipeline[] = [
     marcador: PREAMBULO_GENERICO,
   },
   {
+    // SPEC-53 — o contexto do PRODUTO é bloco próprio, antes do da demanda: um
+    // vale para tudo o que aquele produto gera, o outro só para esta entrega.
+    id: "produto",
+    rotulo: "Contexto do produto",
+    origem: "da-quebra",
+    ondeSeEdita: 'tela "Contexto do produto", e o produto da demanda no painel "Contexto do épico"',
+    marcador: "Contexto do PRODUTO (vale para todas as demandas dele, não só esta):",
+  },
+  {
     id: "epico",
-    rotulo: "Contexto geral da demanda/épico",
+    rotulo: "Contexto desta demanda/épico",
     origem: "da-quebra",
     ondeSeEdita: 'botão "Contexto do épico", no topo da tela do diagrama',
-    marcador: "Contexto geral da demanda/épico:",
+    marcador: "Contexto desta demanda/épico especificamente:",
   },
   {
     id: "instrucao-lote",
@@ -312,14 +321,25 @@ export interface ItemDoLote {
   respostasAnteriores?: { rotulo: string; valor: string }[];
 }
 
+/**
+ * SPEC-53 Fase 2 — o contexto do PRODUTO viaja separado do da demanda, e não
+ * concatenado nele.
+ *
+ * São naturezas diferentes: um vale para todas as demandas do produto
+ * (objetivo, glossário, regras permanentes), o outro só para esta. Fundir os
+ * dois num bloco só ensinaria o modelo a tratar o glossário como
+ * circunstância da demanda — quando ele é justamente o que não muda.
+ */
 export interface EntradaPipeline {
   /** Já resolvido pela borda a partir da config da esteira (Fase 3). */
   preambulo: string;
   contextoEpico?: string;
+  /** SPEC-53 — o que o PRODUTO é: vale para toda demanda ligada a ele. */
+  contextoDoProduto?: string;
   itens: ItemDoLote[];
 }
 
-export function montarPedidoPipeline({ preambulo, contextoEpico, itens }: EntradaPipeline): PedidoIa {
+export function montarPedidoPipeline({ preambulo, contextoEpico, contextoDoProduto, itens }: EntradaPipeline): PedidoIa {
   if (!Array.isArray(itens) || itens.length === 0 || itens.every((i) => i.placeholders.length === 0)) {
     throw new PedidoInvalido("nenhum item com placeholder informado pra gerar");
   }
@@ -361,7 +381,13 @@ export function montarPedidoPipeline({ preambulo, contextoEpico, itens }: Entrad
 
   const prompt = [
     preambulo,
-    ...(contextoEpico ? [`Contexto geral da demanda/épico:`, contextoEpico, ``] : []),
+    // O produto ANTES da demanda: o geral orienta a leitura do específico, e a
+    // ordem inversa faria o modelo decidir o tom antes de saber de que negócio
+    // se trata.
+    ...(contextoDoProduto?.trim()
+      ? [`Contexto do PRODUTO (vale para todas as demandas dele, não só esta):`, contextoDoProduto.trim(), ``]
+      : []),
+    ...(contextoEpico ? [`Contexto desta demanda/épico especificamente:`, contextoEpico, ``] : []),
     `Você vai responder um LOTE de ${itens.length} item(ns) de uma vez.`,
     `Responda TODOS os campos de TODOS os itens, em português, cada um com`,
     `uma decisão concreta pro item específico naquele contexto — nunca`,
@@ -494,10 +520,13 @@ export interface EntradaAlterarItem {
   campos: { chave: string; rotulo: string; valorAtual?: string }[];
   oQueMudou?: string;
   contextoEpico?: string;
+  /** SPEC-53 — quem revisa um item precisa do vocabulário do produto tanto
+   * quanto quem o escreveu. */
+  contextoDoProduto?: string;
 }
 
 export function montarPedidoAlterarItem(entrada: EntradaAlterarItem): PedidoIa {
-  const { instrucao, itemRotulo, contextoNo, campos, oQueMudou, contextoEpico } = entrada;
+  const { instrucao, itemRotulo, contextoNo, campos, oQueMudou, contextoEpico, contextoDoProduto } = entrada;
 
   if (!instrucao?.trim() && !oQueMudou?.trim()) {
     throw new PedidoInvalido("sem instrução nem descrição do que mudou — nada a propor");
@@ -528,7 +557,8 @@ export function montarPedidoAlterarItem(entrada: EntradaAlterarItem): PedidoIa {
 
   const prompt = [
     `Você revisa itens de trabalho de software já especificados.`,
-    ...(contextoEpico?.trim() ? [``, `Contexto da demanda:`, contextoEpico.trim(), ``] : []),
+    ...(contextoDoProduto?.trim() ? [``, `Contexto do PRODUTO:`, contextoDoProduto.trim(), ``] : []),
+    ...(contextoEpico?.trim() ? [``, `Contexto desta demanda:`, contextoEpico.trim(), ``] : []),
     `Item: ${itemRotulo}`,
     ...(contextoNo?.trim() ? [`Contexto do(s) nó(s) de arquitetura:`, contextoNo.trim()] : []),
     ``,

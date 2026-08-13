@@ -265,6 +265,9 @@ export interface PedidoSugestaoIa {
    * dos anexos, quando o usuário preencheu. Opcional pra não quebrar
    * chamadas existentes sem esse dado. */
   contextoEpico?: string;
+  /** SPEC-53 — o contexto do PRODUTO, com rótulo próprio no prompt: o que vale
+   * sempre, ao lado do que vale só nesta demanda. */
+  contextoDoProduto?: string;
 }
 
 /** Um modelo de chat alternável e seu estado no disco (SPEC-25). */
@@ -745,6 +748,9 @@ export interface PedidoAlterarItemIa {
    * reescrita em propagação. */
   oQueMudou?: string;
   contextoEpico?: string;
+  /** SPEC-53 — quem revisa precisa do vocabulário do produto tanto quanto quem
+   * escreveu o item pela primeira vez. */
+  contextoDoProduto?: string;
 }
 
 export interface AlteracoesPropostas {
