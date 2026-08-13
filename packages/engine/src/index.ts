@@ -55,7 +55,10 @@ export {
   aplicarOperacao,
   descreverOperacao,
   diferencaDoChecklist,
+  secaoDaOperacao,
   type OperacaoDeAjuste,
+  type SecaoDeRegras,
+  type SecaoDeChecklist,
 } from "./pdca/ajusteDeRegras.js";
 export { gerarDiagramaHtml, type OpcoesGerarDiagramaHtml } from "./diagrama-html/gerarDiagramaHtml.js";
 export {

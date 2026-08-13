@@ -5029,3 +5029,38 @@ E2E vizinho caiu de brinde e ensinou algo real: o contador de usos do PDCA
 entrevista rouba o momento de outro spec — neutralizado com rota mockada,
 que é o que torna aquele teste sobre o que ele mede. 199 engine + 170
 server + 441 web; 51/51 E2E.
+
+## 195. SPEC-46 — o ajuste vale para as quatro seções (e o dono de cada uma)
+
+Continuação pedida na hora certa: "o mesmo deve ser aplicável aos
+checklists de processo e requisitos de refinamento". A SPEC-45 tinha
+coberto só o checklist técnico — e é justamente nas outras seções que boa
+parte do feedback real mora ("sobrou o bloco de volumetria", "faltou
+repontar massa").
+
+`OperacaoDeAjuste` passou a cobrir as quatro: checklist técnico, checklist
+de processo, ciclos de teste (com o que valida e os ambientes dev/hlg) e
+volumetria (que é liga/desliga por tech, não lista). `secao` ausente
+continua significando checklist técnico — solicitação gravada antes desta
+fase segue válida e aplicável, sem migração de dado.
+
+A extensão expôs um defeito que estava escondido enquanto só existia uma
+seção: o gate de decidir/aplicar era FIXO em `regras.checklistTecnico`.
+Com processo/testes/volumetria, todo pedido iria para o dono errado — e
+barraria exatamente quem cuida daquela seção, que é o oposto da delegação
+que a SPEC-28 existe para permitir. Agora o recurso RBAC vem da operação
+(`secaoDaOperacao` → `SECOES_DE_REGRAS`). O teste que prova isso precisou
+rebaixar o curador para `operar`: com owner o bypass passa por cima e o
+teste mediria o portão errado — a mesma armadilha que o teste de delegação
+da SPEC-28 já documentava.
+
+Na tela, o estúdio ganhou "Onde (a seção das regras de refinamento)" e os
+campos passaram a seguir a seção. Um achado de acessibilidade no caminho: o
+rótulo visível virava "Tipo do ciclo de teste" enquanto o nome acessível
+continuava "Texto do item" — leitor de tela ouviria a coisa errada; agora
+os dois acompanham a seção. A prévia não precisou de código novo: o item
+de exemplo já renderiza as quatro seções, então o efeito aparece no lugar
+certo sozinho.
+
+Mordida: gate de volta ao recurso fixo → o teste do dono da seção vermelho.
+206 engine + 173 server + 444 web; 51/51 E2E.

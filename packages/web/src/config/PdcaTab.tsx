@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { DiagramaConfig, OperacaoDeAjuste, RegrasConfig } from "@gerador/engine";
+import type { DiagramaConfig, OperacaoDeAjuste, RegrasConfig, SecaoDeRegras } from "@gerador/engine";
 import { descreverOperacao } from "@gerador/engine";
 import { apiIa, apiPdca, apiRegras, type FeedbackPdca, type SolicitacaoAjuste } from "../api/client";
 import type { AreaConfig } from "../navegacao/rota";
@@ -251,7 +251,14 @@ function EstudioDeAjuste({
   const tipos = Object.entries(config.nodeTypes);
   const [tipoNo, setTipoNo] = useState(tipos[0]?.[0] ?? "");
   const techsDoTipo = config.nodeTypes[tipoNo]?.techs ?? [];
-  const [operacaoTipo, setOperacaoTipo] = useState<OperacaoDeAjuste["tipo"]>("adicionar-checklist");
+  // SPEC-46 — as quatro seções das regras de refinamento, não só o checklist
+  // técnico: "sobrou volumetria" e "faltou repontar massa" são feedback real,
+  // e cada seção tem dono próprio (SPEC-28).
+  const [secao, setSecao] = useState<SecaoDeRegras>("checklistTecnico");
+  const [acao, setAcao] = useState<"adicionar" | "remover">("adicionar");
+  const [validacao, setValidacao] = useState("");
+  const [dev, setDev] = useState(true);
+  const [hlg, setHlg] = useState(false);
   const [tech, setTech] = useState(techsDoTipo[0] ?? "");
   const [texto, setTexto] = useState("");
   const [descricao, setDescricao] = useState(`A partir do feedback: “${feedback.texto}”`);
@@ -266,19 +273,35 @@ function EstudioDeAjuste({
     if (techsDoTipo.length > 0 && !techsDoTipo.includes(tech)) setTech(techsDoTipo[0]);
   }, [tipoNo]);
 
+  const contextos = contextual ? config.nodeTypes[tipoNo]?.contextos ?? [] : [];
   const operacao: OperacaoDeAjuste | null = useMemo(() => {
-    if (!tech || !texto.trim()) return null;
-    return operacaoTipo === "adicionar-checklist"
-      ? { tipo: "adicionar-checklist", tech, contextos: contextual ? config.nodeTypes[tipoNo]?.contextos ?? [] : [], texto: texto.trim() }
-      : { tipo: "remover-checklist", tech, texto: texto.trim() };
-  }, [operacaoTipo, tech, texto, contextual, tipoNo, config]);
+    if (!tech) return null;
+    // Volumetria é liga/desliga por tech — não tem texto por item.
+    if (secao === "volumetria") {
+      return acao === "adicionar" ? { tipo: "definir-volumetria", tech, contextos } : { tipo: "remover-volumetria", tech };
+    }
+    if (!texto.trim()) return null;
+    if (secao === "testes") {
+      return acao === "adicionar"
+        ? { tipo: "adicionar-teste", tech, contextos, tipoTeste: texto.trim(), validacao: validacao.trim() || "a definir", dev, hlg }
+        : { tipo: "remover-teste", tech, tipoTeste: texto.trim() };
+    }
+    return acao === "adicionar"
+      ? { tipo: "adicionar-checklist", secao, tech, contextos, texto: texto.trim() }
+      : { tipo: "remover-checklist", secao, tech, texto: texto.trim() };
+  }, [secao, acao, tech, texto, validacao, dev, hlg, contextos]);
 
   const previa = useMemo(
     () => (tipoNo ? simularItemComAjuste(config, regras, tipoNo, operacao) : null),
     [config, regras, tipoNo, operacao]
   );
 
-  const itensDaTech = regras.porTech[tech]?.checklistTecnico ?? [];
+  const itensDaTech: string[] =
+    secao === "testes"
+      ? (regras.porTech[tech]?.testes ?? []).map((t) => t.tipo)
+      : secao === "volumetria"
+        ? []
+        : (regras.porTech[tech]?.[secao] ?? []).map((c) => c.texto);
 
   async function redigirComIa() {
     setErro(null);
@@ -346,15 +369,31 @@ function EstudioDeAjuste({
           <h3 style={tituloEstilo}>Propor ajuste</h3>
           <p style={{ ...proseEstilo, fontStyle: "italic" }}>“{feedback.texto}”</p>
 
+          <label style={labelEstilo}>Onde (a seção das regras de refinamento)</label>
+          <select
+            aria-label="Seção das regras"
+            value={secao}
+            onChange={(e) => {
+              setSecao(e.target.value as SecaoDeRegras);
+              setTexto("");
+            }}
+            style={inputEstilo}
+          >
+            <option value="checklistTecnico">Checklist técnico</option>
+            <option value="checklistProcesso">Checklist de processo</option>
+            <option value="testes">Ciclos de teste</option>
+            <option value="volumetria">Requisitos de volumetria</option>
+          </select>
+
           <label style={labelEstilo}>O que fazer</label>
           <select
             aria-label="Tipo de ajuste"
-            value={operacaoTipo}
-            onChange={(e) => setOperacaoTipo(e.target.value as OperacaoDeAjuste["tipo"])}
+            value={acao}
+            onChange={(e) => setAcao(e.target.value as "adicionar" | "remover")}
             style={inputEstilo}
           >
-            <option value="adicionar-checklist">Adicionar item ao checklist técnico</option>
-            <option value="remover-checklist">Remover item do checklist técnico</option>
+            <option value="adicionar">{secao === "volumetria" ? "Passar a exigir" : "Adicionar item"}</option>
+            <option value="remover">{secao === "volumetria" ? "Deixar de exigir" : "Remover item"}</option>
           </select>
 
           <label style={labelEstilo}>Componente de exemplo (o item que vou simular)</label>
@@ -375,20 +414,22 @@ function EstudioDeAjuste({
             ))}
           </select>
 
-          <label style={labelEstilo}>Texto do item</label>
-          {operacaoTipo === "remover-checklist" && itensDaTech.length > 0 ? (
-            <select aria-label="Texto do item" value={texto} onChange={(e) => setTexto(e.target.value)} style={inputEstilo}>
+          {secao !== "volumetria" && (
+            <label style={labelEstilo}>{secao === "testes" ? "Tipo do ciclo de teste" : "Texto do item"}</label>
+          )}
+          {secao === "volumetria" ? null : acao === "remover" && itensDaTech.length > 0 ? (
+            <select aria-label={secao === "testes" ? "Tipo do ciclo de teste" : "Texto do item"} value={texto} onChange={(e) => setTexto(e.target.value)} style={inputEstilo}>
               <option value="">— escolha o item a remover —</option>
-              {itensDaTech.map((c) => (
-                <option key={c.texto} value={c.texto}>
-                  {c.texto}
+              {itensDaTech.map((t) => (
+                <option key={t} value={t}>
+                  {t}
                 </option>
               ))}
             </select>
           ) : (
             <>
               <textarea
-                aria-label="Texto do item"
+                aria-label={secao === "testes" ? "Tipo do ciclo de teste" : "Texto do item"}
                 value={texto}
                 onChange={(e) => setTexto(e.target.value)}
                 rows={2}
@@ -401,7 +442,28 @@ function EstudioDeAjuste({
             </>
           )}
 
-          {operacaoTipo === "adicionar-checklist" && (
+          {secao === "testes" && acao === "adicionar" && (
+            <>
+              <label style={labelEstilo}>O que valida</label>
+              <input
+                aria-label="Validação do teste"
+                value={validacao}
+                onChange={(e) => setValidacao(e.target.value)}
+                placeholder="ex.: contrato do publisher continua compatível"
+                style={inputEstilo}
+              />
+              <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+                <label style={{ fontSize: 11.5, color: "var(--texto-2)" }}>
+                  <input type="checkbox" checked={dev} onChange={(e) => setDev(e.target.checked)} /> roda em dev
+                </label>
+                <label style={{ fontSize: 11.5, color: "var(--texto-2)" }}>
+                  <input type="checkbox" checked={hlg} onChange={(e) => setHlg(e.target.checked)} /> roda em hlg
+                </label>
+              </div>
+            </>
+          )}
+
+          {acao === "adicionar" && (
             <label style={{ ...labelEstilo, display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
               <input type="checkbox" checked={contextual} onChange={(e) => setContextual(e.target.checked)} />
               vale só nos contextos deste componente ({(config.nodeTypes[tipoNo]?.contextos ?? []).join(", ") || "nenhum"})
