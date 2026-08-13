@@ -54,6 +54,8 @@ export interface QuebraSalva {
   respostasItens?: Record<string, Record<string, ValorSpec>>;
   demandInfo?: string;
   anexosContexto?: string[];
+  /** SPEC-53 — de que produto é esta demanda (null = nenhum). */
+  produtoId?: string | null;
   /** §184 — o markdown da especificação gerada (null = nunca gerada). */
   especificacao?: string | null;
   especificacaoGeradaEm?: string | null;
@@ -892,6 +894,54 @@ export interface Stack {
 
 /** `tipoNo → campo → valores conhecidos` — vira os chips de sugestão. */
 export type SugestoesDeStack = Record<string, Record<string, string[]>>;
+
+/**
+ * SPEC-53 — o contexto do produto: o que a ferramenta nunca soube. Seis seções
+ * fixas mais o glossário, que é a única estruturada.
+ */
+export interface TermoDeGlossario {
+  id: string;
+  termo: string;
+  definicao: string;
+  ordem: number;
+}
+
+export interface Produto {
+  id: string;
+  nome: string;
+  objetivo: string;
+  quemUsa: string;
+  regrasDeNegocio: string;
+  sistemas: string;
+  restricoes: string;
+  glossario: TermoDeGlossario[];
+  timeIds: string[];
+  criadoPor: string;
+  atualizadoEm: string;
+}
+
+export type DadosDoProduto = Pick<Produto, "nome" | "objetivo" | "quemUsa" | "regrasDeNegocio" | "sistemas" | "restricoes">;
+
+export const apiProdutos = {
+  /** `timeId` restringe aos que interessam ao time — produto sem time amarrado
+   * aparece pra todos (é o estado em que ele nasce). */
+  listar: (timeId?: string) =>
+    requisitar<Produto[]>(`/produtos${timeId ? `?timeId=${encodeURIComponent(timeId)}` : ""}`),
+  obter: (id: string) => requisitar<Produto>(`/produtos/${id}`),
+  criar: (nome: string) => requisitar<Produto>("/produtos", { method: "POST", body: JSON.stringify({ nome }) }),
+  atualizar: (id: string, dados: Partial<DadosDoProduto>) =>
+    requisitar<Produto>(`/produtos/${id}`, { method: "PUT", body: JSON.stringify(dados) }),
+  definirTimes: (id: string, timeIds: string[]) =>
+    requisitar<Produto>(`/produtos/${id}/times`, { method: "PUT", body: JSON.stringify({ timeIds }) }),
+  salvarTermo: (id: string, termo: string, definicao: string) =>
+    requisitar<TermoDeGlossario>(`/produtos/${id}/glossario`, {
+      method: "POST",
+      body: JSON.stringify({ termo, definicao }),
+    }),
+  excluirTermo: (id: string, termoId: string) =>
+    requisitar<void>(`/produtos/${id}/glossario/${termoId}`, { method: "DELETE" }),
+  excluir: (id: string) => requisitar<void>(`/produtos/${id}`, { method: "DELETE" }),
+};
 
 export const apiStacks = {
   catalogo: () => requisitar<{ stacks: Stack[] }>("/stacks"),

@@ -22,6 +22,9 @@ export const quebras = pgTable("quebras", {
   anexosContexto: jsonb("anexos_contexto").$type<string[]>().notNull().default([]),
   /** §184 — o documento de especificação GERADO, com o material daquele
    * momento; a data marca a versão (setada pelo adaptador quando o texto vem). */
+  /** SPEC-53 — de que produto é esta demanda. Opcional: quem já usa a
+   * ferramenta não passa a precisar cadastrar produto pra fazer o que fazia. */
+  produtoId: uuid("produto_id"),
   especificacao: text("especificacao"),
   especificacaoGeradaEm: timestamp("especificacao_gerada_em", { withTimezone: true }),
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
@@ -441,3 +444,55 @@ export const camposAresta = pgTable(
   },
   (t) => [uniqueIndex("campos_aresta_chave_unica").on(t.timeId, t.tipoAresta, t.key)]
 );
+
+/**
+ * SPEC-53 Fase 1 — o produto como ENTIDADE (migração 0029).
+ *
+ * Não é a volta do `produto` que o §21 removeu: aquele era um texto solto na
+ * quebra, escrito em quatro pontos e nunca lido. Este guarda o contexto que o
+ * prompt dos agentes e o documento vão LER — é a razão de existir dele.
+ *
+ * Seis colunas nomeadas em vez de um JSON: as seções são fixas e escolhidas
+ * (SPEC-53 §3), e nomeá-las é o que deixa tela, prompt e documento falarem da
+ * mesma coisa sem combinar chave de JSON.
+ */
+export const produtos = pgTable("produtos", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizacaoId: uuid("organizacao_id")
+    .notNull()
+    .references(() => organizacoes.id),
+  nome: text("nome").notNull(),
+  objetivo: text("objetivo").notNull().default(""),
+  quemUsa: text("quem_usa").notNull().default(""),
+  regrasDeNegocio: text("regras_de_negocio").notNull().default(""),
+  sistemas: text("sistemas").notNull().default(""),
+  restricoes: text("restricoes").notNull().default(""),
+  criadoPor: text("criado_por").notNull(),
+  criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+  atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** A única seção estruturada — termo → definição, ordenável. */
+export const produtoGlossario = pgTable(
+  "produto_glossario",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    produtoId: uuid("produto_id")
+      .notNull()
+      .references(() => produtos.id, { onDelete: "cascade" }),
+    termo: text("termo").notNull(),
+    definicao: text("definicao").notNull(),
+    ordem: integer("ordem").notNull().default(0),
+  },
+  (t) => [uniqueIndex("produto_glossario_termo_unico").on(t.produtoId, t.termo)]
+);
+
+/** N:N — um time atende vários produtos, um produto atravessa times. */
+export const produtoTime = pgTable("produto_time", {
+  produtoId: uuid("produto_id")
+    .notNull()
+    .references(() => produtos.id, { onDelete: "cascade" }),
+  timeId: text("time_id")
+    .notNull()
+    .references(() => times.id, { onDelete: "cascade" }),
+});

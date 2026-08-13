@@ -27,6 +27,14 @@ export interface MenuLateralProps {
 
 const GRUPOS: { titulo: string; itens: { area: AreaConfig; rotulo: string }[] }[] = [
   {
+    // SPEC-53 — grupo próprio, e não um item dentro de "Padrões do time":
+    // produto não é do time (um time atende vários, um produto atravessa
+    // times). Pendurá-lo ali repetiria a mistura que a SPEC-42 desfez entre
+    // time e stack.
+    titulo: "Produto",
+    itens: [{ area: "produtos", rotulo: "Contexto do produto" }],
+  },
+  {
     titulo: "Padrões do time",
     itens: [
       { area: "perfis", rotulo: "Stacks conhecidas" },

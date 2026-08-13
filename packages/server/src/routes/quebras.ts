@@ -37,6 +37,8 @@ const corpoQuebra = z.object({
   demandInfo: z.string().optional(),
   anexosContexto: z.array(z.string()).optional(),
   especificacao: z.string().nullish(),
+  /** SPEC-53 — o vínculo com o produto. */
+  produtoId: z.string().uuid().nullish(),
 });
 
 /** Mesmo fallback de `.example.json` de `packages/web/vite.config.ts` (servirConfigEmDev)

@@ -7,6 +7,8 @@ import { useCallback, useEffect, useState } from "react";
  * funções puras e um hook fino.
  */
 export type AreaConfig =
+  // SPEC-53 — o contexto do PRODUTO: de que negócio a demanda fala.
+  | "produtos"
   | "perfis"
   | "campos"
   | "camposAresta"
@@ -23,6 +25,7 @@ export type Rota = { tela: "canvas" } | { tela: "config"; area: AreaConfig } | {
 
 /** id interno ↔ segmento legível da URL (o hash é interface, fala produto). */
 const SEGMENTO_DA_AREA: Record<AreaConfig, string> = {
+  produtos: "produtos",
   perfis: "perfis-stack",
   campos: "componentes",
   camposAresta: "conexoes",
