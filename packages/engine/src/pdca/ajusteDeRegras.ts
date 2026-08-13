@@ -35,10 +35,23 @@ export type OperacaoDeAjuste =
     }
   | { tipo: "remover-teste"; tech: string; tipoTeste: string }
   | { tipo: "definir-volumetria"; tech: string; contextos: string[] }
-  | { tipo: "remover-volumetria"; tech: string };
+  | { tipo: "remover-volumetria"; tech: string }
+  // SPEC-50 — o ajuste sai das regras: papel da esteira que sobra (ou que
+  // falta) é feedback tão comum quanto item de checklist, e até agora só
+  // dava pra pedir por texto e aplicar à mão.
+  | { tipo: "ativar-papel"; papelId: string; papelNome?: string }
+  | { tipo: "desativar-papel"; papelId: string; papelNome?: string };
+
+/** SPEC-50 — qual DOCUMENTO a operação altera. O recurso RBAC e o caminho de
+ * aplicação saem daqui: `regras` tem dono por seção (SPEC-28), o pipeline
+ * tem dono próprio. */
+export function recursoAlvoDaOperacao(op: OperacaoDeAjuste): "regras" | "pipeline-agentes" {
+  return op.tipo === "ativar-papel" || op.tipo === "desativar-papel" ? "pipeline-agentes" : "regras";
+}
 
 /** Qual seção a operação mexe — é o que decide QUEM pode aprovar (o RBAC por
- * seção da SPEC-28) e o que a tela destaca na prévia. */
+ * seção da SPEC-28) e o que a tela destaca na prévia. Só faz sentido quando
+ * o alvo é `regras`. */
 export function secaoDaOperacao(op: OperacaoDeAjuste): SecaoDeRegras {
   switch (op.tipo) {
     case "adicionar-checklist":
@@ -52,6 +65,27 @@ export function secaoDaOperacao(op: OperacaoDeAjuste): SecaoDeRegras {
   }
 }
 
+/** A forma mínima do documento de pipeline que a operação precisa conhecer —
+ * o engine não importa o tipo do `aplicacao` só pra ligar/desligar um papel. */
+export interface PipelineComPapeis {
+  papeis: { id: string; nome?: string; ativo: boolean }[];
+}
+
+/**
+ * SPEC-50 — liga/desliga um papel da esteira, devolvendo documento NOVO (a
+ * prévia compara antes/depois). Papel que não existe é no-op: a config pode
+ * ter mudado entre o pedido e a decisão, e a validade por versão já barra o
+ * caso grave.
+ */
+export function aplicarOperacaoNoPipeline<T extends PipelineComPapeis>(pipeline: T, op: OperacaoDeAjuste): T {
+  if (op.tipo !== "ativar-papel" && op.tipo !== "desativar-papel") return pipeline;
+  const ativo = op.tipo === "ativar-papel";
+  return {
+    ...pipeline,
+    papeis: pipeline.papeis.map((p) => (p.id === op.papelId ? { ...p, ativo } : p)),
+  };
+}
+
 const ROTULO_SECAO: Record<SecaoDeRegras, string> = {
   checklistTecnico: "checklist técnico",
   checklistProcesso: "checklist de processo",
@@ -61,7 +95,7 @@ const ROTULO_SECAO: Record<SecaoDeRegras, string> = {
 
 /** A frase que a solicitação mostra a quem decide — sem jargão de estrutura. */
 export function descreverOperacao(op: OperacaoDeAjuste): string {
-  const secao = ROTULO_SECAO[secaoDaOperacao(op)];
+  const secao = recursoAlvoDaOperacao(op) === "regras" ? ROTULO_SECAO[secaoDaOperacao(op)] : "";
   const contextosDe = (contextos: string[]) =>
     contextos.length > 0 ? ` (contextos: ${contextos.join(", ")})` : " (todos os contextos)";
 
@@ -82,6 +116,10 @@ export function descreverOperacao(op: OperacaoDeAjuste): string {
       return `Exigir ${secao} em ${op.tech}${contextosDe(op.contextos)}`;
     case "remover-volumetria":
       return `Não exigir mais ${secao} em ${op.tech}`;
+    case "ativar-papel":
+      return `Ligar o papel "${op.papelNome ?? op.papelId}" na esteira de agentes`;
+    case "desativar-papel":
+      return `Desligar o papel "${op.papelNome ?? op.papelId}" da esteira de agentes`;
   }
 }
 
@@ -96,6 +134,12 @@ export function descreverOperacao(op: OperacaoDeAjuste): string {
  * decisão (a validade por versão já barra o caso grave).
  */
 export function aplicarOperacao(regras: RegrasConfig, op: OperacaoDeAjuste): RegrasConfig {
+  // Operação de outro documento (papel da esteira, SPEC-50) não mexe aqui —
+  // quem escolhe o caminho é `recursoAlvoDaOperacao`, e passar pelo lugar
+  // errado tem que ser no-op, não exceção.
+  // (checagem pelo `tipo` e não por `recursoAlvoDaOperacao`: é o que estreita
+  // a união pro resto da função enxergar `tech`.)
+  if (op.tipo === "ativar-papel" || op.tipo === "desativar-papel") return regras;
   const porTech = { ...regras.porTech };
   const daTech = { ...(porTech[op.tech] ?? { checklistTecnico: [], testes: [] }) };
 

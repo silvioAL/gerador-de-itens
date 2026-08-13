@@ -5219,3 +5219,34 @@ A validação de ponta a ponta usou o `/health` do próprio servidor como
 atravessou até a tela por item — evidência melhor do que um mock cordato
 daria. Mordida: item ignorado pelo agente virando sucesso → o teste do
 sucesso silencioso vermelho. 211 engine + 177 server + 453 web; 52/52 E2E.
+
+## 201. SPEC-50 — o ajuste alcança a esteira, e o alvo passa a mandar
+
+A SPEC-46 espalhou o ajuste pelas quatro seções das REGRAS; o "aplicar
+automático" continuava recusando qualquer outro documento com um 409
+honesto ("ainda só existe para regras"). O pipeline de agentes é o próximo
+que o feedback cita — "esse papel sobra nos meus itens" —, e agora ele
+entra pelo mesmo caminho: `ativar-papel` / `desativar-papel`.
+
+A mudança conceitual que isso forçou: com mais de um documento alvo, o
+**rótulo do pedido deixou de mandar**. Nasceu `recursoAlvoDaOperacao(op)`, e
+é ele que decide onde aplicar e quem aprova — um ajuste de papel vai pro
+dono do `pipeline-agentes` mesmo que o pedido tenha nascido marcado como
+"regras", e a validade da aprovação passa a comparar a versão do documento
+CERTO. Sem isso, o gate mandaria metade dos pedidos pra pessoa errada, que
+foi exatamente o defeito que a SPEC-46 corrigiu um nível acima.
+
+A prévia precisou de outra pergunta. Para regras, ela mostra o item de
+exemplo mudando; para a esteira, o texto do item não muda — muda quem o
+escreve. Então a tela diz isso em vez de fingir um diff: "o papel X para de
+escrever: a seção dele fica sem dono e os campos chegam em branco", com a
+lista dos papéis marcando o que muda e o aviso de que vale da próxima
+geração em diante. E o seletor de papel sugere o OPOSTO do estado atual —
+quem abre um ajuste quer mudar, não confirmar o que já está.
+
+Detalhe de tipagem que virou comentário no código: estreitar a união pelo
+`recursoAlvoDaOperacao()` não convence o TypeScript; a checagem tem que ser
+pelo `tipo` da operação, e é por isso que `aplicarOperacao` começa com um
+no-op explícito para as operações de papel. Mordida: gate ignorando o alvo
+→ o teste do dono do pipeline vermelho. 215 engine + 186 server + 455 web;
+52/52 E2E.

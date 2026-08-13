@@ -6,7 +6,15 @@ import { registrarAuditoria } from "../auditoria.js";
 import { exigirSessao } from "../auth/middleware.js";
 import { exigirPermissao, organizacaoPadraoDe, SECOES_DE_REGRAS, type Recurso } from "../auth/permissoes.js";
 import { configDocumentos, pdcaFeedback, pdcaUsos, quebras, solicitacoesAjuste } from "../db/schema.js";
-import { aplicarOperacao, secaoDaOperacao, type OperacaoDeAjuste, type RegrasConfig } from "@gerador/engine";
+import {
+  aplicarOperacao,
+  aplicarOperacaoNoPipeline,
+  recursoAlvoDaOperacao,
+  secaoDaOperacao,
+  type OperacaoDeAjuste,
+  type PipelineComPapeis,
+  type RegrasConfig,
+} from "@gerador/engine";
 
 /**
  * SPEC-39 Fase 1 — o PDCA das configurações.
@@ -70,8 +78,13 @@ export async function registrarRotasPdca(app: FastifyInstance, { db }: OpcoesApp
    * pessoa errada — e barraria justamente quem cuida daquela seção.
    */
   function recursoDaSolicitacao(pedido: { recurso: string; operacao: unknown }): Recurso {
-    if (pedido.recurso === "regras" && pedido.operacao) {
-      return SECOES_DE_REGRAS[secaoDaOperacao(pedido.operacao as OperacaoDeAjuste)];
+    if (pedido.operacao) {
+      const op = pedido.operacao as OperacaoDeAjuste;
+      // SPEC-50 — quem manda é a OPERAÇÃO, não o rótulo do pedido: um ajuste
+      // de papel é do dono do pipeline, mesmo que o pedido tenha nascido
+      // marcado como "regras".
+      if (recursoAlvoDaOperacao(op) === "pipeline-agentes") return "pipeline-agentes";
+      return SECOES_DE_REGRAS[secaoDaOperacao(op)];
     }
     return RECURSO_DA_DECISAO[pedido.recurso as (typeof RECURSOS_SOLICITAVEIS)[number]] ?? "regras.checklistTecnico";
   }
@@ -217,6 +230,9 @@ export async function registrarRotasPdca(app: FastifyInstance, { db }: OpcoesApp
               contextos: z.array(z.string()).default([]),
             }),
             z.object({ tipo: z.literal("remover-volumetria"), tech: z.string().min(1) }),
+            // SPEC-50 — papel da esteira: o outro documento que o feedback cita.
+            z.object({ tipo: z.literal("ativar-papel"), papelId: z.string().min(1), papelNome: z.string().optional() }),
+            z.object({ tipo: z.literal("desativar-papel"), papelId: z.string().min(1), papelNome: z.string().optional() }),
           ])
           .optional(),
         /** De qual feedback este pedido nasceu — fecha a ponte que faltava. */
@@ -284,9 +300,8 @@ export async function registrarRotasPdca(app: FastifyInstance, { db }: OpcoesApp
     if (!pedido.operacao) {
       return reply.code(409).send({ erro: "este pedido é só texto (sem operação) — abra a configuração e edite à mão" });
     }
-    if (pedido.recurso !== "regras") {
-      return reply.code(409).send({ erro: `aplicar automático ainda só existe para "regras"` });
-    }
+    const operacao = pedido.operacao as OperacaoDeAjuste;
+    const alvo = recursoAlvoDaOperacao(operacao);
 
     const gate = exigirPermissao(db, organizacaoId, recursoDaSolicitacao(pedido), "editar", () => pedido.timeId);
     await gate(req, reply);
@@ -295,11 +310,14 @@ export async function registrarRotasPdca(app: FastifyInstance, { db }: OpcoesApp
     const [doc] = await db
       .select()
       .from(configDocumentos)
-      .where(and(eq(configDocumentos.chave, "regras"), eq(configDocumentos.timeId, GLOBAL)))
+      .where(and(eq(configDocumentos.chave, alvo), eq(configDocumentos.timeId, GLOBAL)))
       .limit(1);
-    if (!doc) return reply.code(409).send({ erro: "documento de regras não encontrado" });
+    if (!doc) return reply.code(409).send({ erro: `documento de ${alvo} não encontrado` });
 
-    const documentoNovo = aplicarOperacao(doc.documento as RegrasConfig, pedido.operacao as OperacaoDeAjuste);
+    const documentoNovo =
+      alvo === "pipeline-agentes"
+        ? aplicarOperacaoNoPipeline(doc.documento as PipelineComPapeis, operacao)
+        : aplicarOperacao(doc.documento as RegrasConfig, operacao);
     await db
       .update(configDocumentos)
       .set({ documento: documentoNovo, atualizadoEm: new Date() })
@@ -310,7 +328,7 @@ export async function registrarRotasPdca(app: FastifyInstance, { db }: OpcoesApp
       .where(eq(solicitacoesAjuste.id, id))
       .returning();
 
-    registrarAuditoria(db, { email: req.usuario!.email, acao: "atualizar", recurso: "config_documentos", recursoId: "regras" });
+    registrarAuditoria(db, { email: req.usuario!.email, acao: "atualizar", recurso: "config_documentos", recursoId: alvo });
     return { id, estado: aplicada.estado, aplicadaPor: aplicada.aplicadaPor };
   });
 
@@ -330,7 +348,9 @@ export async function registrarRotasPdca(app: FastifyInstance, { db }: OpcoesApp
     if (reply.sent) return;
 
     if (corpo.data.aprovar) {
-      const versaoAtual = await versaoDoDocumento(pedido.recurso);
+      const versaoAtual = await versaoDoDocumento(
+        pedido.operacao ? recursoAlvoDaOperacao(pedido.operacao as OperacaoDeAjuste) : pedido.recurso
+      );
       const alvo = pedido.versaoAlvo?.getTime() ?? null;
       const atual = versaoAtual?.getTime() ?? null;
       if (alvo !== atual) {
