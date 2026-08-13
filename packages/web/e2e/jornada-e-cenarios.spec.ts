@@ -33,9 +33,7 @@ test("carregar um cenário pronto popula o canvas e deriva sem ciclos/conflitos"
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   await entrar(page);
 
-  await page.getByRole("button", { name: "☰ Menu" }).click(); // SPEC-40: item do menu
-  await page.getByRole("button", { name: "✦ Como funciona & cenários" }).click();
-  await page.getByRole("button", { name: /Cenários prontos/ }).click();
+  await page.getByTestId("abrir-cenarios").click();
   await page.getByRole("button", { name: "Carregar cenário: Dados não-relacionais" }).click();
 
   await expect(page.getByText("Como funciona o Gerador de Itens")).not.toBeVisible();
@@ -123,9 +121,7 @@ test("adicionar dois cenários ao canvas (sem substituir) compõe um diagrama ma
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   await entrar(page);
 
-  await page.getByRole("button", { name: "☰ Menu" }).click(); // SPEC-40: item do menu
-  await page.getByRole("button", { name: "✦ Como funciona & cenários" }).click();
-  await page.getByRole("button", { name: /Cenários prontos/ }).click();
+  await page.getByTestId("abrir-cenarios").click();
 
   await page.getByRole("button", { name: "Adicionar cenário ao canvas: Dados não-relacionais" }).click();
   await expect(page.getByText("✓ Adicionado")).toBeVisible();
@@ -245,8 +241,7 @@ test("pular tour a qualquer momento encerra o overlay imediatamente", async ({ p
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   await entrar(page);
 
-  await page.getByRole("button", { name: "☰ Menu" }).click(); // SPEC-40: item do menu
-  await page.getByRole("button", { name: "✦ Como funciona & cenários" }).click();
+  await page.getByTestId("abrir-demonstracao").click();
   await page.getByRole("button", { name: "▶ Iniciar tour guiado" }).click();
   await page.getByRole("button", { name: "Próximo" }).click();
   await page.getByRole("button", { name: "Pular tour" }).click();

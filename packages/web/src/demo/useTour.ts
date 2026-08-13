@@ -141,7 +141,7 @@ export function useTour(opts: UseTourOpts) {
     {
       selector: null,
       titulo: "Fim do tour",
-      texto: "Você pode reabrir isso, ou carregar outro cenário, pelo botão ✦ Como funciona & cenários.",
+      texto: "Dá pra rever isto em ▶ Demonstração & tour, ou carregar outro desenho em ✦ Cenários prontos — os dois botões ficam sempre no topo.",
       onEnter: () => opts.fecharConfig(),
     },
   ];
