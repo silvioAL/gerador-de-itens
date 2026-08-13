@@ -5482,3 +5482,50 @@ demanda a ele, escreve contexto próprio da demanda e abre a simulação da
 esteira — que mostra o prompt real, com os dois blocos, na ordem certa.
 Mordida: tirar o contexto do produto do corpo do lote → o prompt sem o bloco
 (vermelho). 227 engine + 197 server + 477 web + 40 aplicação; 56/56 E2E.
+
+## 207. SPEC-54 — a credencial de IA sai do banco e vai para o cofre
+
+A chave do gateway estava numa coluna em texto plano: todo backup do Postgres
+do app a carregava junto, e quem lia o banco lia a chave. O usuário já roda
+Infisical self-hosted (SPEC-12) — a observação dele, na §191, foi direta: com
+um cofre de pé, guardar segredo no banco do app não se sustenta.
+
+**Por que a SPEC-12 não resolvia isto sozinha.** Ela decidiu, com razão, não
+colocar SDK de vault no servidor: os segredos dela são de BOOT, e
+`infisical run` os injeta como variáveis de ambiente antes do processo subir.
+A credencial de IA não é de boot — nasce em runtime, quando alguém cola a
+chave na tela, testa a conexão e salva. `infisical run` não escreve, e injeção
+no boot não muda depois. Problema diferente, solução diferente.
+
+**O que vai e o que fica.** Só a `chave` é segredo; endereço do gateway, modelo
+e flags são configuração que a tela precisa ler para se desenhar. Mandá-los
+para o vault faria a tela depender do cofre para mostrar um formulário. Então:
+chave no cofre, resto no banco — e a porta `RepositorioDeCredenciais` não muda,
+porque quem chama não deve saber de onde vem a chave. O que entrou foi uma
+porta de três métodos (`CofreDeSegredos`), um adaptador HTTP e um decorator.
+
+Três decisões que valem registro:
+
+- **Sem `INFISICAL_*`, nada muda.** Dev, E2E e quem ainda não tem vault seguem
+  no banco. O servidor loga qual caminho está ativo, porque "minha chave sumiu"
+  e "o cofre não subiu" são a mesma tela para quem usa.
+- **A chave que já estava no banco migra sozinha**, na primeira leitura: grava
+  no cofre, apaga a coluna. Nessa ordem — falha no meio deixa a chave nos dois
+  lugares (recuperável), nunca em nenhum.
+- **Cofre fora do ar SOBE como erro.** Se virasse "não configurado", a tela
+  pediria para configurar uma chave que existe, e o próximo salvar gravaria por
+  cima. 404 é ausência; qualquer outro erro é falha, e a diferença está testada.
+
+E o custo, escrito na SPEC em vez de descoberto depois: a identidade do
+Infisical passa a precisar de ESCRITA, quando a SPEC-12 pedia só leitura.
+A alternativa era a credencial virar segredo de boot — o que elimina a escrita
+e elimina junto a configuração pela tela, que é como o produto funciona. Entre
+perder a funcionalidade e ampliar o escopo de uma identidade revogável pela UI,
+a escolha foi ampliar, com o motivo registrado.
+
+O teste que fecha a conta sobe um **Infisical falso** (servidor HTTP que fala o
+protocolo v3) e exercita a rota real: `PUT /ia/credencial` grava no cofre e a
+coluna do banco fica `null`. Mordidas: rota ignorando o cofre → a chave não
+chega lá (3 vermelhos); migração sem limpar a coluna → a chave ficando nos dois
+lugares (1 vermelho). 227 engine + 211 server + 477 web + 48 aplicação; 56/56
+E2E.

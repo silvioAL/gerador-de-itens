@@ -20,10 +20,12 @@ import {
   resumirCredencialIa,
   type CredencialIa,
   type PedidoIa,
+  comCofreDeSegredos,
 } from "@gerador/aplicacao";
 import { criarRepositorioDeConfigEmPostgres } from "../adaptadores/configEmPostgres.js";
 import type { OpcoesApp } from "../app.js";
 import { criarRepositorioDeCredenciaisEmPostgres } from "../adaptadores/credenciaisEmPostgres.js";
+import { criarCofreInfisical, opcoesDoAmbiente } from "../adaptadores/cofreInfisical.js";
 import { exigirSessao } from "../auth/middleware.js";
 import { exigirPermissao, organizacaoPadraoDe } from "../auth/permissoes.js";
 import { registrarAuditoria } from "../auditoria.js";
@@ -87,10 +89,31 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
    */
   const podeEditarCredenciais = exigirPermissao(db, organizacaoPadraoDe(db), "credenciais-ia", "editar");
 
+  /**
+   * SPEC-54 — o cofre, quando existe. Construído UMA vez: cada instância
+   * cacheia o token de acesso, e refazer isso por requisição significaria um
+   * login no Infisical por leitura de credencial.
+   *
+   * Sem `INFISICAL_*` no ambiente, `null` — e tudo segue no banco, como antes
+   * (§3.2). O log diz qual caminho está ativo porque "minha chave sumiu" e "o
+   * cofre não subiu" são a mesma tela para quem usa.
+   */
+  const opcoesDoCofre = opcoesDoAmbiente();
+  const cofre = opcoesDoCofre ? criarCofreInfisical(opcoesDoCofre) : null;
+  app.log.info(
+    cofre
+      ? { cofre: opcoesDoCofre?.apiUrl }
+      : {},
+    cofre
+      ? "SPEC-54: credencial de IA no cofre (Infisical); o banco guarda só a configuração"
+      : "SPEC-54: sem INFISICAL_* no ambiente — credencial de IA continua no banco"
+  );
+
   async function repositorio() {
     const [org] = await db.select({ id: organizacoes.id }).from(organizacoes).limit(1);
     if (!org) return null;
-    return criarRepositorioDeCredenciaisEmPostgres(db, org.id);
+    const doBanco = criarRepositorioDeCredenciaisEmPostgres(db, org.id);
+    return cofre ? comCofreDeSegredos(doBanco, cofre) : doBanco;
   }
 
   /**
