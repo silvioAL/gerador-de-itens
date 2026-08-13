@@ -51,6 +51,12 @@ export {
   type FichaItem,
 } from "./especificacao/gerarEspecificacaoEntrega.js";
 export { gerarItensDeTrabalho, type ItemDeTrabalho } from "./especificacao/gerarItensDeTrabalho.js";
+export {
+  aplicarOperacao,
+  descreverOperacao,
+  diferencaDoChecklist,
+  type OperacaoDeAjuste,
+} from "./pdca/ajusteDeRegras.js";
 export { gerarDiagramaHtml, type OpcoesGerarDiagramaHtml } from "./diagrama-html/gerarDiagramaHtml.js";
 export {
   importarGrafo,

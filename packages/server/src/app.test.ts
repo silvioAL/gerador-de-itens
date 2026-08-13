@@ -1298,6 +1298,142 @@ describe("SPEC-38 Fase 1 — níveis de participação no time", () => {
   });
 });
 
+describe("SPEC-45 — a jornada do PDCA (feedback → ajuste → aplicado)", () => {
+  it("o feedback do agente APARECE numa listagem — era escrita-só (o relato do §194)", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    await app.inject({
+      method: "POST",
+      url: "/pdca/feedback",
+      cookies: { gerador_sessao: cookie },
+      payload: { texto: "sobrou volumetria nos itens de fila" },
+    });
+
+    const lista = await app.inject({ method: "GET", url: "/pdca/feedback", cookies: { gerador_sessao: cookie } });
+    expect(lista.statusCode).toBe(200);
+    const meu = lista.json().find((f: { texto: string }) => f.texto === "sobrou volumetria nos itens de fila");
+    expect(meu).toBeDefined();
+    expect(meu.estado).toBe("novo");
+  });
+
+  it("virar solicitação LIGA o feedback ao pedido — a ponte que não existia", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const feedback = (
+      await app.inject({
+        method: "POST",
+        url: "/pdca/feedback",
+        cookies: { gerador_sessao: cookie },
+        payload: { texto: "faltou item de DLQ" },
+      })
+    ).json();
+
+    const criada = await app.inject({
+      method: "POST",
+      url: "/ajustes",
+      cookies: { gerador_sessao: cookie },
+      payload: {
+        recurso: "regras",
+        descricao: "Adicionar DLQ ao checklist",
+        feedbackId: feedback.id,
+        operacao: { tipo: "adicionar-checklist", tech: "java", contextos: [], texto: "Política de DLQ definida" },
+      },
+    });
+    expect(criada.statusCode).toBe(201);
+    expect(criada.json().operacao).toMatchObject({ tipo: "adicionar-checklist", texto: "Política de DLQ definida" });
+
+    const lista = (await app.inject({ method: "GET", url: "/pdca/feedback", cookies: { gerador_sessao: cookie } })).json();
+    const tratado = lista.find((f: { id: string }) => f.id === feedback.id);
+    expect(tratado.estado).toBe("virou-ajuste");
+    expect(tratado.solicitacaoId).toBe(criada.json().id);
+  });
+
+  it("descartar registra a decisão de NÃO tratar", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const feedback = (
+      await app.inject({ method: "POST", url: "/pdca/feedback", cookies: { gerador_sessao: cookie }, payload: { texto: "nada a ver" } })
+    ).json();
+
+    const r = await app.inject({
+      method: "POST",
+      url: `/pdca/feedback/${feedback.id}/descartar`,
+      cookies: { gerador_sessao: cookie },
+    });
+    expect(r.statusCode).toBe(200);
+    expect(r.json().estado).toBe("descartado");
+  });
+
+  it("aprovada + aplicar MUDA o documento de regras de verdade — o Act que faltava", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    // O documento precisa existir (a validade compara a versão dele).
+    await app.inject({
+      method: "PUT",
+      url: "/config/regras",
+      cookies: { gerador_sessao: cookie },
+      payload: { documento: { tipos: ["Story"], tamanhos: ["P"], porTech: { java: { checklistTecnico: [] } } } },
+    });
+
+    const criada = (
+      await app.inject({
+        method: "POST",
+        url: "/ajustes",
+        cookies: { gerador_sessao: cookie },
+        payload: {
+          recurso: "regras",
+          descricao: "DLQ no checklist",
+          operacao: { tipo: "adicionar-checklist", tech: "java", contextos: [], texto: "Política de DLQ definida" },
+        },
+      })
+    ).json();
+
+    // Aplicar antes de aprovar é 409 — o estado manda.
+    const cedo = await app.inject({ method: "POST", url: `/ajustes/${criada.id}/aplicar`, cookies: { gerador_sessao: cookie } });
+    expect(cedo.statusCode).toBe(409);
+
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: `/ajustes/${criada.id}/decidir`,
+          cookies: { gerador_sessao: cookie },
+          payload: { aprovar: true },
+        })
+      ).statusCode
+    ).toBe(200);
+
+    const aplicada = await app.inject({ method: "POST", url: `/ajustes/${criada.id}/aplicar`, cookies: { gerador_sessao: cookie } });
+    expect(aplicada.statusCode).toBe(200);
+    expect(aplicada.json().estado).toBe("aplicada");
+
+    // O documento MUDOU — é o ponto do ciclo inteiro.
+    const regras = (await app.inject({ method: "GET", url: "/config/regras" })).json();
+    expect(regras.documento.porTech.java.checklistTecnico).toContainEqual({
+      texto: "Política de DLQ definida",
+      contextos: [],
+    });
+  });
+
+  it("pedido só em texto (sem operação) não aplica sozinho — e diz o porquê", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const criada = (
+      await app.inject({
+        method: "POST",
+        url: "/ajustes",
+        cookies: { gerador_sessao: cookie },
+        payload: { recurso: "regras", descricao: "mudar alguma coisa por favor" },
+      })
+    ).json();
+    await app.inject({
+      method: "POST",
+      url: `/ajustes/${criada.id}/decidir`,
+      cookies: { gerador_sessao: cookie },
+      payload: { aprovar: true },
+    });
+
+    const r = await app.inject({ method: "POST", url: `/ajustes/${criada.id}/aplicar`, cookies: { gerador_sessao: cookie } });
+    expect(r.statusCode).toBe(409);
+    expect(r.json().erro).toContain("só texto");
+  });
+});
+
 describe("SPEC-43 — stacks conhecidas (catálogo global, curadoria como na SPEC-38)", () => {
   const TIME_STACK = "time-teste-stack";
   const EMAIL_OPERAR2 = "operar-stack@gerador.local";

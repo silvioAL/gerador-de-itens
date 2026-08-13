@@ -71,3 +71,26 @@ describe("momentoDaConfig (M8)", () => {
     expect(momentoDaConfig({ ...base, configAberta: false })).toBeNull();
   });
 });
+
+describe("momentoDaConfig — M15 (SPEC-45: feedback do ciclo esperando)", () => {
+  it("com feedback novo, o assistente chama pra tratar — mesmo que os padrões do time já existam", () => {
+    expect(momentoDaConfig({ configAberta: true, temPadroesDoTime: true, feedbacksNovos: 3, dispensados: [] })).toBe("m15");
+  });
+
+  it("M15 tem prioridade sobre o M8: feedback parado é gente esperando resposta", () => {
+    expect(momentoDaConfig({ configAberta: true, temPadroesDoTime: false, feedbacksNovos: 1, dispensados: [] })).toBe("m15");
+  });
+
+  it("sem feedback novo, nada muda no comportamento antigo", () => {
+    expect(momentoDaConfig({ configAberta: true, temPadroesDoTime: false, feedbacksNovos: 0, dispensados: [] })).toBe("m8");
+    expect(momentoDaConfig({ configAberta: true, temPadroesDoTime: true, feedbacksNovos: 0, dispensados: [] })).toBe(null);
+  });
+
+  it("dispensado não volta", () => {
+    expect(momentoDaConfig({ configAberta: true, temPadroesDoTime: true, feedbacksNovos: 2, dispensados: ["m15"] })).toBe(null);
+  });
+
+  it("com a config fechada, o assistente não fala de configuração", () => {
+    expect(momentoDaConfig({ configAberta: false, temPadroesDoTime: false, feedbacksNovos: 5, dispensados: [] })).toBe(null);
+  });
+});

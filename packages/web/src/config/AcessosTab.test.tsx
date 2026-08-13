@@ -193,25 +193,5 @@ describe("AcessosTab (SPEC-28 Fase 2)", () => {
   });
 });
 
-describe("SPEC-39 — solicitações de ajuste na aba Acessos", () => {
-  it("as solicitações aparecem JÁ no mount (o defeito real da §183: só carregavam após uma ação)", async () => {
-    listarAjustesMock.mockResolvedValue([
-      {
-        id: "s1",
-        timeId: "time-pagamentos",
-        solicitante: "dev@empresa.com",
-        recurso: "regras",
-        descricao: "faltou item de DLQ",
-        estado: "pendente",
-        criadoEm: new Date().toISOString(),
-      },
-    ]);
-    render(<AcessosTab timeAtivo="time-pagamentos" />);
-
-    await waitFor(() => expect(screen.getByTestId("solicitacoes-de-ajuste")).toBeInTheDocument());
-    expect(screen.getByText(/faltou item de DLQ/)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Aprovar ajuste de dev@empresa.com" }));
-    await waitFor(() => expect(decidirAjusteMock).toHaveBeenCalledWith("s1", true));
-  });
-});
+/* SPEC-45 — o teste das solicitações mudou de casa junto com a seção: elas
+   são PDCA, não permissão. Vive agora em PdcaTab.test.tsx. */

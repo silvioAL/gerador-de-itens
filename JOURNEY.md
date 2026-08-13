@@ -4985,3 +4985,47 @@ headers por 310 s — acima do limite que matava — devolveu
 `{"ok":true,"duracaoMs":310038}`. Mordidas: timeouts de volta em 300 s →
 testes das opções vermelhos; faixa de falhas desligada → teste do aviso
 vermelho. 129 llm + 425 web + 165 server + 193 engine; 50/50 E2E.
+
+## 194. SPEC-45 — a jornada do PDCA: do feedback à configuração mudada
+
+Relato: "preenchi o feedback no agente e não vi nenhuma ação na aplicação
+para avaliar/melhorar as configurações". Medido: `POST /pdca/feedback`
+gravava e **não existia GET nenhum** — o texto entrava no banco e ninguém
+via, nunca. O outro caminho (entrevista → `/ajustes`) morava escondido em
+*Acessos* e terminava na aprovação: aprovar mudava um estado e mais nada,
+alguém tinha que ir reescrever o documento à mão. O produto fazia o *Plan*
+e o *Do* do ciclo e parava.
+
+O pedido foi por jornada, não por tela: "onde aparecem os feedbacks e o
+usuário consegue gerar sugestões, revisar e alterar configurações de forma
+simples e com o apoio do assistente" — e, no meio da implementação, a peça
+que mudou o desenho: "simular um item do mesmo tipo, gerando um item de
+simulação com a IA e iterando até chegar no que o usuário deseja".
+
+Isso obrigou o ajuste a deixar de ser texto e virar DADO
+(`OperacaoDeAjuste` no engine: adicionar/remover item de checklist por
+tech). Ser dado destravou as três coisas que faltavam: **prever** (o item
+de exemplo é derivado e renderizado com a config proposta pelo MESMO
+`renderizarItemEspecificacao` do documento real — prévia com outra lógica
+seria promessa que a geração não cumpre), **aplicar** (aprovada + Aplicar
+grava o documento pela mesma função pura, sem reescrita manual) e
+**rastrear** (`aplicadaEm`/`aplicadaPor`, e o feedback marcado
+`virou-ajuste` com o id da solicitação).
+
+A tela `#/config/pdca` deixou de ser dois campos de cadência e virou a
+jornada na ordem em que se anda: o que disseram → estúdio (proposta à
+esquerda, prévia iterativa à direita, com ✨ redigindo o item a partir do
+feedback e ✨ simulando a história com a IA) → revisar → aplicar →
+cadência. As solicitações saíram de *Acessos* (que é permissão, não
+melhoria) e o assistente ganhou o M15: com feedback parado, ele chama pra
+tratar. Um detalhe que a prévia ensina sozinha: escolher uma tech que o
+componente não usa mostra "nada muda neste item" — o erro mais fácil de
+cometer aqui, visível antes de virar pedido.
+
+Mordidas: `aplicarOperacao` mutando o documento original → 3 testes
+vermelhos; aplicar sem gravar o documento → o teste do *Act* vermelho. Um
+E2E vizinho caiu de brinde e ensinou algo real: o contador de usos do PDCA
+é global do ambiente, então a suíte inteira empurra a cadência e o balão da
+entrevista rouba o momento de outro spec — neutralizado com rota mockada,
+que é o que torna aquele teste sobre o que ele mede. 199 engine + 170
+server + 441 web; 51/51 E2E.

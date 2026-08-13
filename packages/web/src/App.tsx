@@ -336,6 +336,9 @@ function AppCarregado({
   const [itensGerados, setItensGerados] = useState<ItemGerado[]>([]);
   // SPEC-44 — deep-link da tela de itens pra revisão: o item a selecionar.
   const [itemInicialRevisao, setItemInicialRevisao] = useState<string | null>(null);
+  // SPEC-45 — quantos feedbacks do ciclo ainda esperam alguém: é o que faz o
+  // assistente chamar pra tratar (M15) em vez de o texto morrer no banco.
+  const [feedbacksNovos, setFeedbacksNovos] = useState(0);
   const [menuAberto, setMenuAberto] = useState(false);
   const [mostrarAbrir, setMostrarAbrir] = useState(false);
   // #298 — a conversa do desenho (SPEC-27 Fase 1) e o contexto do épico moram
@@ -382,8 +385,17 @@ function AppCarregado({
     temEspecificacaoSalva: !!quebra.especificacao,
     dispensados: derivarDispensado ? [...momentosDispensados, "m9"] : momentosDispensados,
   });
+  useEffect(() => {
+    if (!mostrarConfig) return;
+    apiPdca
+      .listarFeedback()
+      .then((fs) => setFeedbacksNovos(fs.filter((f) => f.estado === "novo").length))
+      .catch(() => {});
+  }, [mostrarConfig, rota]);
+
   const momentoConfig = momentoDaConfig({
     configAberta: mostrarConfig,
+    feedbacksNovos,
     // "Padrões do time" = algum campo customizado DESTE time ou alguma regra
     // já configurada — instalação com o exemplo de fábrica não é nua.
     temPadroesDoTime:
@@ -896,6 +908,7 @@ function AppCarregado({
           especificacaoTemplate={especificacaoTemplate}
           pipelineAgentes={pipelineAgentes}
           timeAtivo={timeAtivo}
+          onAbrirArea={(area) => abrirConfigNaAba(area)}
           onPerfisMudaram={() => {
             void apiStacks.sugestoes().then(setSugestoesDeStack);
           }}
@@ -924,7 +937,7 @@ function AppCarregado({
         sobreposto={mostrarConfig}
         // SPEC-37 M9 — tudo verde e nada derivado: o momento certo de conduzir
         // ao Derivar, com o chip executando a mesma ação do botão do header.
-        chamando={pedindoNomeDaDemanda !== false || momentoConfig === "m8" || (!mostrarConfig && momentoCanvas !== null)}
+        chamando={pedindoNomeDaDemanda !== false || momentoConfig !== null || (!mostrarConfig && momentoCanvas !== null)}
         balao={
           pedindoNomeDaDemanda
             ? {
@@ -959,6 +972,12 @@ function AppCarregado({
                         },
                       }),
                   onDispensar: () => setEntrevistaPdca(null),
+                }
+              : momentoConfig === "m15"
+              ? {
+                  texto: `Tem ${feedbacksNovos} ${feedbacksNovos === 1 ? "feedback" : "feedbacks"} do time esperando: dá pra transformar em ajuste e ver o efeito num item de exemplo antes de decidir.`,
+                  acao: { rotulo: "Ver os feedbacks", onExecutar: () => abrirConfigNaAba("pdca") },
+                  onDispensar: () => dispensar("m15"),
                 }
               : momentoConfig === "m8"
               ? {

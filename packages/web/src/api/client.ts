@@ -1,4 +1,4 @@
-import type { Diagrama, PerfisConfig, Quebra, RegrasConfig, ValorSpec } from "@gerador/engine";
+import type { Diagrama, OperacaoDeAjuste, PerfisConfig, Quebra, RegrasConfig, ValorSpec } from "@gerador/engine";
 
 /**
  * Base do @gerador/server — configurável em runtime via `VITE_API_URL`
@@ -816,7 +816,22 @@ export interface SolicitacaoAjuste {
   solicitante: string;
   recurso: string;
   descricao: string;
-  estado: "pendente" | "aprovada" | "rejeitada" | "invalida";
+  estado: "pendente" | "aprovada" | "rejeitada" | "invalida" | "aplicada";
+  /** SPEC-45 — a mudança como dado; nulo = pedido só em texto (SPEC-39). */
+  operacao: OperacaoDeAjuste | null;
+  criadoEm: string;
+  aplicadaEm?: string | null;
+  aplicadaPor?: string | null;
+}
+
+/** SPEC-45 — um feedback do ciclo, como a tela do PDCA o mostra. */
+export interface FeedbackPdca {
+  id: string;
+  email: string;
+  timeId: string | null;
+  texto: string;
+  estado: "novo" | "virou-ajuste" | "descartado";
+  solicitacaoId: string | null;
   criadoEm: string;
 }
 
@@ -834,7 +849,18 @@ export const apiPdca = {
     }),
   feedback: (texto: string, timeId?: string) =>
     requisitar<{ id: string }>("/pdca/feedback", { method: "POST", body: JSON.stringify({ texto, timeId }) }),
-  criarAjuste: (dados: { recurso?: string; descricao: string; timeId?: string }) =>
+  listarFeedback: () => requisitar<FeedbackPdca[]>("/pdca/feedback"),
+  descartarFeedback: (id: string) =>
+    requisitar<{ id: string; estado: string }>(`/pdca/feedback/${id}/descartar`, { method: "POST" }),
+  aplicarAjuste: (id: string) =>
+    requisitar<{ id: string; estado: string; aplicadaPor: string | null }>(`/ajustes/${id}/aplicar`, { method: "POST" }),
+  criarAjuste: (dados: {
+    recurso?: string;
+    descricao: string;
+    timeId?: string;
+    operacao?: OperacaoDeAjuste;
+    feedbackId?: string;
+  }) =>
     requisitar<SolicitacaoAjuste>("/ajustes", { method: "POST", body: JSON.stringify(dados) }),
   listarAjustes: () => requisitar<SolicitacaoAjuste[]>("/ajustes"),
   decidirAjuste: (id: string, aprovar: boolean) =>

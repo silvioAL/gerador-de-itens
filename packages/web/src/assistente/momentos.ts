@@ -63,8 +63,14 @@ export function momentoDaRevisao(p: {
 export function momentoDaConfig(p: {
   configAberta: boolean;
   temPadroesDoTime: boolean;
+  /** SPEC-45 — feedbacks do ciclo ainda sem tratamento (estado `novo`). */
+  feedbacksNovos?: number;
   dispensados: readonly string[];
-}): "m8" | null {
-  if (!p.configAberta || p.temPadroesDoTime || p.dispensados.includes("m8")) return null;
+}): "m8" | "m15" | null {
+  if (!p.configAberta) return null;
+  // M15 vem primeiro: feedback parado é trabalho de alguém esperando resposta,
+  // e a pessoa já está na tela de configuração — é o momento exato de agir.
+  if ((p.feedbacksNovos ?? 0) > 0 && !p.dispensados.includes("m15")) return "m15";
+  if (p.temPadroesDoTime || p.dispensados.includes("m8")) return null;
   return "m8";
 }
