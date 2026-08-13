@@ -105,7 +105,11 @@ function respostaConfirmada(resp: ValorSpec | undefined): boolean {
  * existem". */
 function placeholdersPorPapel(ficha: FichaItem): Record<GrupoFicha, FichaPlaceholder[]> {
   return {
-    po: [ficha.historiaUsuario, ficha.criteriosAceiteContextual],
+    // §199 — a ENTREGA FINAL é do PO: quem diz o valor entregue é quem pede o
+    // item. Sem estar aqui, ela era cobrada no documento (✍️ especificar) e
+    // não tinha onde ser escrita — nem pela esteira, nem à mão. Pendência sem
+    // ferramenta pra resolver é o defeito que este projeto mais combate.
+    po: [ficha.historiaUsuario, ficha.criteriosAceiteContextual, ficha.entregaFinal],
     arquiteto: [ficha.contrato.noVinculado, ficha.contrato.request, ficha.contrato.response, ficha.contrato.erros, ficha.contrato.dependencias],
     especialista: [...ficha.checklistTecnico, ...ficha.volumetria],
     qa: [ficha.regrasTeste, ficha.cenarioFeature],

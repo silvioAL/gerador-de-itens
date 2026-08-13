@@ -72,4 +72,24 @@ describe("pendenciasDaRevisao (SPEC-44 — a régua única)", () => {
     expect(fraseDeCompletude(1, 3)).toBe("1 sugestão a confirmar · ✍️ 3 a especificar");
     expect(fraseDeCompletude(0, 1)).toBe("✍️ 1 a especificar");
   });
+
+  it("§199 — a ENTREGA FINAL entra na régua: sem ela o item não é 'pronto'", () => {
+    // O defeito: o card do item cobrava "✍️ 1 campo a especificar" e a barra
+    // da revisão dizia que não havia nada pendente. Duas réguas de novo.
+    const semEntrega = pendenciasDaRevisao([fichaCom({})]);
+    const comEntrega = pendenciasDaRevisao([
+      fichaCom({ _entregaFinal: { valor: "Fila publicando, com painel do volume do dia.", origem: "manual" } }),
+    ]);
+
+    expect(comEntrega.vazios).toBe(semEntrega.vazios - 1);
+    expect(comEntrega.confirmados).toBe(semEntrega.confirmados + 1);
+  });
+
+  it("§199 — respondida e confirmada, ela conta como confirmada (mesma régua dos outros campos)", () => {
+    const sugerida = pendenciasDaRevisao([
+      fichaCom({ _entregaFinal: { valor: "x", origem: "sugerido", confirmado: false } }),
+    ]);
+    expect(sugerida.sugestoes.map((s) => s.chave)).toContain("_entregaFinal");
+    expect(sugerida.sugestoes.find((s) => s.chave === "_entregaFinal")?.rotulo).toContain("Entrega final");
+  });
 });

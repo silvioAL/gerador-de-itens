@@ -62,10 +62,12 @@ test("barra de pendências, confirmar todas, fila guiada e o deep-link da tela d
   await botaoItens.first().click();
   await expect(page.getByTestId("itens-screen")).toBeVisible();
 
-  // SPEC-47 — todo item passou a exigir a ENTREGA FINAL, então nenhum nasce
-  // pronto: o chip é o botão de volta pra revisão daquele item.
-  await expect(page.getByTestId("item-completude-0")).toContainText("especificar");
-  await page.getByTestId("item-completude-0").click();
+  // §199 — a entrega final agora TEM onde ser escrita (é do PO): com os três
+  // campos do item respondidos, ele fecha como pronto. Antes desta correção
+  // nenhum item conseguia ficar pronto, porque o campo era cobrado e não
+  // existia na tela. O chip de quem AINDA tem pendência é o link de volta.
+  await expect(page.getByTestId("item-completude-0")).toContainText("Pronto pra exportar");
+  await page.getByTestId("item-completude-1").click();
   await expect(page.getByTestId("itens-screen")).not.toBeVisible();
   await expect(page.locator('[data-testid^="item-"][aria-pressed="true"]').first()).toBeVisible();
 });

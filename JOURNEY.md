@@ -5160,3 +5160,30 @@ pelo botão, o que encurtou cada um em duas linhas (abrir menu → clicar item
 anotar: o spec de regras estourou o timeout no `finally` que restaura o
 documento global — corrida entre specs que compartilham a mesma config, não
 regressão; passou sozinho na re-rodada. 446 web unit; 51/51 E2E.
+
+## 199. A entrega final ganhou dono — a pendência que eu criei sem ferramenta
+
+Pergunta do usuário: "temos alguma implementação pendente?". O levantamento
+achou fases adiadas de propósito (MCP→Jira, menu por perfil, aplicar
+automático fora de `regras`) e um DEFEITO ativo, meu, da rodada anterior.
+
+A SPEC-47 criou o placeholder `_entregaFinal` e o pôs no template do item —
+mas não o ligou em `placeholdersPorPapel` (a lista que a esteira usa pra
+montar o lote de cada papel) nem em `placeholdersDaFicha` (a régua da
+SPEC-44). O efeito: o documento e o card do item COBRAVAM a entrega final
+("✍️ especificar"), a esteira nunca a escrevia, não havia campo na tela pra
+preencher à mão, e a barra da revisão dizia que não havia nada pendente
+enquanto o card dizia que havia. Duas réguas de novo, e uma exigência sem
+caminho pra cumprir — exatamente o defeito que este projeto mais combate.
+
+A correção é de duas linhas: a entrega final é do **PO** (quem pede o item
+é quem diz o valor entregue) e entra na régua junto dos outros campos. Com
+isso a esteira passa a pedi-la ao PO no mesmo lote da história e dos
+critérios, e o campo aparece na aba de refinamento pra edição manual.
+
+A prova mais bonita veio do E2E que quebrou: o spec da revisão em lote
+esperava que NENHUM item ficasse pronto (era o que acontecia — o campo
+impreenchível travava todos), e passou a encontrar o primeiro item "Pronto
+pra exportar". Nenhum teste tinha pegado o gap antes: os três escritos
+agora mordem (esteira pedindo `_entregaFinal` ao PO, campo na tela, e a
+contagem da régua). 449 web unit; 51/51 E2E.
