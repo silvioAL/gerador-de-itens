@@ -4,9 +4,9 @@ import { z } from "zod";
 import type { OpcoesApp } from "../app.js";
 import { registrarAuditoria } from "../auditoria.js";
 import { exigirSessao } from "../auth/middleware.js";
-import { exigirPermissao, organizacaoPadraoDe, type Recurso } from "../auth/permissoes.js";
+import { exigirPermissao, organizacaoPadraoDe, SECOES_DE_REGRAS, type Recurso } from "../auth/permissoes.js";
 import { configDocumentos, pdcaFeedback, pdcaUsos, quebras, solicitacoesAjuste } from "../db/schema.js";
-import { aplicarOperacao, type OperacaoDeAjuste, type RegrasConfig } from "@gerador/engine";
+import { aplicarOperacao, secaoDaOperacao, type OperacaoDeAjuste, type RegrasConfig } from "@gerador/engine";
 
 /**
  * SPEC-39 Fase 1 — o PDCA das configurações.
@@ -61,6 +61,19 @@ export async function registrarRotasPdca(app: FastifyInstance, { db }: OpcoesApp
       .where(and(eq(configDocumentos.chave, recurso), eq(configDocumentos.timeId, GLOBAL)))
       .limit(1);
     return doc?.atualizadoEm ?? null;
+  }
+
+  /**
+   * SPEC-46 — quem decide é o dono da SEÇÃO, não o do checklist técnico.
+   * Enquanto só existiam pedidos de checklist técnico, o recurso fixo passava
+   * despercebido; com processo/testes/volumetria ele mandaria o pedido para a
+   * pessoa errada — e barraria justamente quem cuida daquela seção.
+   */
+  function recursoDaSolicitacao(pedido: { recurso: string; operacao: unknown }): Recurso {
+    if (pedido.recurso === "regras" && pedido.operacao) {
+      return SECOES_DE_REGRAS[secaoDaOperacao(pedido.operacao as OperacaoDeAjuste)];
+    }
+    return RECURSO_DA_DECISAO[pedido.recurso as (typeof RECURSOS_SOLICITAVEIS)[number]] ?? "regras.checklistTecnico";
   }
 
   app.get("/pdca/config", { preHandler: exigirSessao }, () => cadencia());
@@ -173,13 +186,37 @@ export async function registrarRotasPdca(app: FastifyInstance, { db }: OpcoesApp
         // SPEC-45 — a mudança como dado: com ela, aprovar consegue APLICAR.
         operacao: z
           .discriminatedUnion("tipo", [
+            // SPEC-46 — as quatro seções das regras de refinamento. `secao`
+            // opcional: pedido gravado antes desta fase continua aplicável.
             z.object({
               tipo: z.literal("adicionar-checklist"),
+              secao: z.enum(["checklistTecnico", "checklistProcesso"]).optional(),
               tech: z.string().min(1),
               contextos: z.array(z.string()).default([]),
               texto: z.string().trim().min(1),
             }),
-            z.object({ tipo: z.literal("remover-checklist"), tech: z.string().min(1), texto: z.string().trim().min(1) }),
+            z.object({
+              tipo: z.literal("remover-checklist"),
+              secao: z.enum(["checklistTecnico", "checklistProcesso"]).optional(),
+              tech: z.string().min(1),
+              texto: z.string().trim().min(1),
+            }),
+            z.object({
+              tipo: z.literal("adicionar-teste"),
+              tech: z.string().min(1),
+              contextos: z.array(z.string()).default([]),
+              tipoTeste: z.string().trim().min(1),
+              validacao: z.string().trim().min(1),
+              dev: z.boolean().default(true),
+              hlg: z.boolean().default(false),
+            }),
+            z.object({ tipo: z.literal("remover-teste"), tech: z.string().min(1), tipoTeste: z.string().trim().min(1) }),
+            z.object({
+              tipo: z.literal("definir-volumetria"),
+              tech: z.string().min(1),
+              contextos: z.array(z.string()).default([]),
+            }),
+            z.object({ tipo: z.literal("remover-volumetria"), tech: z.string().min(1) }),
           ])
           .optional(),
         /** De qual feedback este pedido nasceu — fecha a ponte que faltava. */
@@ -251,8 +288,7 @@ export async function registrarRotasPdca(app: FastifyInstance, { db }: OpcoesApp
       return reply.code(409).send({ erro: `aplicar automático ainda só existe para "regras"` });
     }
 
-    const recursoRbac = RECURSO_DA_DECISAO[pedido.recurso as (typeof RECURSOS_SOLICITAVEIS)[number]];
-    const gate = exigirPermissao(db, organizacaoId, recursoRbac, "editar", () => pedido.timeId);
+    const gate = exigirPermissao(db, organizacaoId, recursoDaSolicitacao(pedido), "editar", () => pedido.timeId);
     await gate(req, reply);
     if (reply.sent) return;
 
@@ -287,9 +323,9 @@ export async function registrarRotasPdca(app: FastifyInstance, { db }: OpcoesApp
     if (!pedido) return reply.code(404).send({ erro: "solicitação não encontrada" });
     if (pedido.estado !== "pendente") return reply.code(409).send({ erro: `solicitação já está "${pedido.estado}"` });
 
-    // Gate por recurso, com o escopo do time do pedido (quando houver).
-    const recursoRbac = RECURSO_DA_DECISAO[pedido.recurso as (typeof RECURSOS_SOLICITAVEIS)[number]] ?? "regras.checklistTecnico";
-    const gate = exigirPermissao(db, organizacaoId, recursoRbac, "editar", () => pedido.timeId);
+    // Gate por recurso (pela SEÇÃO quando o pedido é estruturado), com o
+    // escopo do time do pedido (quando houver).
+    const gate = exigirPermissao(db, organizacaoId, recursoDaSolicitacao(pedido), "editar", () => pedido.timeId);
     await gate(req, reply);
     if (reply.sent) return;
 

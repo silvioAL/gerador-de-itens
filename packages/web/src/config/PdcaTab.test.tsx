@@ -108,6 +108,7 @@ describe("PdcaTab — a jornada do PDCA (SPEC-45)", () => {
           feedbackId: "f1",
           operacao: {
             tipo: "adicionar-checklist",
+            secao: "checklistTecnico",
             tech: "Backend",
             contextos: ["Backend-mensageria"],
             texto: "Política de DLQ definida",
@@ -154,5 +155,69 @@ describe("PdcaTab — a jornada do PDCA (SPEC-45)", () => {
     montar();
     fireEvent.click(await screen.findByTestId("descartar-f1"));
     await waitFor(() => expect(apiPdca.descartarFeedback).toHaveBeenCalledWith("f1"));
+  });
+
+  it("SPEC-46 — dá pra ajustar o checklist de PROCESSO, e a prévia mostra no item de exemplo", async () => {
+    (apiPdca.criarAjuste as Mock).mockResolvedValue({ id: "s2" });
+    montar();
+    fireEvent.click(await screen.findByTestId("propor-f1"));
+
+    fireEvent.change(screen.getByLabelText("Seção das regras"), { target: { value: "checklistProcesso" } });
+    fireEvent.change(screen.getByLabelText("Texto do item"), { target: { value: "Repontar massa de teste" } });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("previa-adicionado").textContent).toContain("Repontar massa de teste")
+    );
+
+    fireEvent.click(screen.getByTestId("salvar-ajuste"));
+    await waitFor(() =>
+      expect(apiPdca.criarAjuste).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operacao: expect.objectContaining({ tipo: "adicionar-checklist", secao: "checklistProcesso" }),
+        })
+      )
+    );
+  });
+
+  it("SPEC-46 — ciclo de teste pede o que valida e os ambientes", async () => {
+    (apiPdca.criarAjuste as Mock).mockResolvedValue({ id: "s3" });
+    montar();
+    fireEvent.click(await screen.findByTestId("propor-f1"));
+
+    fireEvent.change(screen.getByLabelText("Seção das regras"), { target: { value: "testes" } });
+    fireEvent.change(screen.getByLabelText("Tipo do ciclo de teste"), { target: { value: "Teste de contrato" } });
+    fireEvent.change(screen.getByLabelText("Validação do teste"), { target: { value: "pacto continua verde" } });
+    fireEvent.click(screen.getByTestId("salvar-ajuste"));
+
+    await waitFor(() =>
+      expect(apiPdca.criarAjuste).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operacao: expect.objectContaining({
+            tipo: "adicionar-teste",
+            tipoTeste: "Teste de contrato",
+            validacao: "pacto continua verde",
+            dev: true,
+          }),
+        })
+      )
+    );
+  });
+
+  it("SPEC-46 — volumetria é liga/desliga: sem campo de texto, e 'deixar de exigir' vira remover", async () => {
+    (apiPdca.criarAjuste as Mock).mockResolvedValue({ id: "s4" });
+    montar();
+    fireEvent.click(await screen.findByTestId("propor-f1"));
+
+    fireEvent.change(screen.getByLabelText("Seção das regras"), { target: { value: "volumetria" } });
+    expect(screen.queryByLabelText("Texto do item")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Tipo de ajuste"), { target: { value: "remover" } });
+    fireEvent.click(screen.getByTestId("salvar-ajuste"));
+
+    await waitFor(() =>
+      expect(apiPdca.criarAjuste).toHaveBeenCalledWith(
+        expect.objectContaining({ operacao: { tipo: "remover-volumetria", tech: "Backend" } })
+      )
+    );
   });
 });

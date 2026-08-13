@@ -1411,6 +1411,152 @@ describe("SPEC-45 — a jornada do PDCA (feedback → ajuste → aplicado)", () 
     });
   });
 
+  it("SPEC-46 — o ajuste vale para as QUATRO seções: processo aplicado muda o checklist de processo", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    await app.inject({
+      method: "PUT",
+      url: "/config/regras",
+      cookies: { gerador_sessao: cookie },
+      payload: { documento: { tipos: ["Story"], tamanhos: ["P"], porTech: { java: { checklistTecnico: [], testes: [] } } } },
+    });
+
+    const criada = (
+      await app.inject({
+        method: "POST",
+        url: "/ajustes",
+        cookies: { gerador_sessao: cookie },
+        payload: {
+          recurso: "regras",
+          descricao: "faltou repontar massa",
+          operacao: {
+            tipo: "adicionar-checklist",
+            secao: "checklistProcesso",
+            tech: "java",
+            contextos: [],
+            texto: "Repontar massa de teste",
+          },
+        },
+      })
+    ).json();
+    await app.inject({
+      method: "POST",
+      url: `/ajustes/${criada.id}/decidir`,
+      cookies: { gerador_sessao: cookie },
+      payload: { aprovar: true },
+    });
+    expect((await app.inject({ method: "POST", url: `/ajustes/${criada.id}/aplicar`, cookies: { gerador_sessao: cookie } })).statusCode).toBe(200);
+
+    const regras = (await app.inject({ method: "GET", url: "/config/regras" })).json();
+    expect(regras.documento.porTech.java.checklistProcesso).toContainEqual({ texto: "Repontar massa de teste", contextos: [] });
+    // Sem invadir a seção vizinha — cada uma tem dono próprio (SPEC-28).
+    expect(regras.documento.porTech.java.checklistTecnico).toEqual([]);
+  });
+
+  it("SPEC-46 — ciclo de teste e volumetria também aplicam de verdade", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    await app.inject({
+      method: "PUT",
+      url: "/config/regras",
+      cookies: { gerador_sessao: cookie },
+      payload: { documento: { tipos: ["Story"], tamanhos: ["P"], porTech: { java: { checklistTecnico: [], testes: [] } } } },
+    });
+
+    for (const operacao of [
+      { tipo: "adicionar-teste", tech: "java", contextos: [], tipoTeste: "Teste de contrato", validacao: "pacto verde", dev: true, hlg: false },
+      { tipo: "definir-volumetria", tech: "java", contextos: [] },
+    ]) {
+      const criada = (
+        await app.inject({
+          method: "POST",
+          url: "/ajustes",
+          cookies: { gerador_sessao: cookie },
+          payload: { recurso: "regras", descricao: `pedido ${operacao.tipo}`, operacao },
+        })
+      ).json();
+      await app.inject({
+        method: "POST",
+        url: `/ajustes/${criada.id}/decidir`,
+        cookies: { gerador_sessao: cookie },
+        payload: { aprovar: true },
+      });
+      expect((await app.inject({ method: "POST", url: `/ajustes/${criada.id}/aplicar`, cookies: { gerador_sessao: cookie } })).statusCode).toBe(200);
+    }
+
+    const regras = (await app.inject({ method: "GET", url: "/config/regras" })).json();
+    expect(regras.documento.porTech.java.testes).toContainEqual({
+      tipo: "Teste de contrato",
+      validacao: "pacto verde",
+      contextos: [],
+      dev: true,
+      hlg: false,
+    });
+    expect(regras.documento.porTech.java.volumetria).toEqual({ contextos: [] });
+  });
+
+  it("SPEC-46 — quem decide é o dono da SEÇÃO: curador de processo aprova o pedido de processo e é barrado no técnico", async () => {
+    const [org] = await db.select().from(organizacoes).limit(1);
+    const [papel] = await db.insert(papeisAcesso).values({ organizacaoId: org.id, nome: "Agilidade" }).returning();
+    await db.insert(papelPermissao).values({ papelId: papel.id, recurso: "regras.checklistProcesso", acao: "editar" });
+    await db.insert(usuarioPapel).values({ email: EMAIL_OUTRO, papelId: papel.id, escopoTimeId: null });
+    // A delegação é o caminho de quem NÃO é owner: owner passa por bypass
+    // (SPEC-38) e o teste mediria o portão errado.
+    await db.update(usuarioTime).set({ nivel: "operar" }).where(eq(usuarioTime.email, EMAIL_OUTRO));
+    const cookieCurador = await logarComo(EMAIL_OUTRO);
+    const cookieDev = await logarComo(EMAIL_DEV);
+
+    const pedidoDeProcesso = (
+      await app.inject({
+        method: "POST",
+        url: "/ajustes",
+        cookies: { gerador_sessao: cookieDev },
+        payload: {
+          recurso: "regras",
+          descricao: "processo",
+          operacao: { tipo: "adicionar-checklist", secao: "checklistProcesso", tech: "java", contextos: [], texto: "Abrir mudança" },
+        },
+      })
+    ).json();
+    const pedidoTecnico = (
+      await app.inject({
+        method: "POST",
+        url: "/ajustes",
+        cookies: { gerador_sessao: cookieDev },
+        payload: {
+          recurso: "regras",
+          descricao: "tecnico",
+          operacao: { tipo: "adicionar-checklist", tech: "java", contextos: [], texto: "DLQ" },
+        },
+      })
+    ).json();
+
+    // O dono do PROCESSO decide o de processo...
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: `/ajustes/${pedidoDeProcesso.id}/decidir`,
+          cookies: { gerador_sessao: cookieCurador },
+          payload: { aprovar: true },
+        })
+      ).statusCode
+    ).toBe(200);
+
+    // ...e leva 403 no TÉCNICO, que é de outro dono. Antes desta fase o
+    // recurso era fixo em checklistTecnico: os dois iam para a pessoa errada.
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: `/ajustes/${pedidoTecnico.id}/decidir`,
+          cookies: { gerador_sessao: cookieCurador },
+          payload: { aprovar: true },
+        })
+      ).statusCode
+    ).toBe(403);
+
+    await db.update(usuarioTime).set({ nivel: "owner" }).where(eq(usuarioTime.email, EMAIL_OUTRO));
+  });
+
   it("pedido só em texto (sem operação) não aplica sozinho — e diz o porquê", async () => {
     const cookie = await logarComo(EMAIL_DEV);
     const criada = (

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RegrasConfig } from "../config/types.js";
-import { aplicarOperacao, descreverOperacao, diferencaDoChecklist } from "./ajusteDeRegras.js";
+import { aplicarOperacao, descreverOperacao, diferencaDoChecklist, secaoDaOperacao } from "./ajusteDeRegras.js";
 
 const base: RegrasConfig = {
   tipos: [],
@@ -78,5 +78,89 @@ describe("ajusteDeRegras (SPEC-45 — o ajuste como dado)", () => {
     expect(descreverOperacao({ tipo: "remover-checklist", tech: "Backend", texto: "Y" })).toBe(
       'Remover do checklist técnico de Backend: "Y"'
     );
+  });
+
+  it("SPEC-46 — sem `secao`, continua sendo o checklist técnico: pedido antigo segue aplicável", () => {
+    const op = { tipo: "adicionar-checklist", tech: "Backend", contextos: [], texto: "X" } as const;
+    expect(secaoDaOperacao(op)).toBe("checklistTecnico");
+    expect(aplicarOperacao(base, op).porTech.Backend.checklistTecnico).toHaveLength(2);
+  });
+
+  it("SPEC-46 — checklist de PROCESSO tem seção própria e não invade o técnico", () => {
+    const depois = aplicarOperacao(base, {
+      tipo: "adicionar-checklist",
+      secao: "checklistProcesso",
+      tech: "Backend",
+      contextos: [],
+      texto: "Repontar massa de teste",
+    });
+
+    expect(depois.porTech.Backend.checklistProcesso).toEqual([{ texto: "Repontar massa de teste", contextos: [] }]);
+    expect(depois.porTech.Backend.checklistTecnico).toHaveLength(1);
+    expect(secaoDaOperacao({ tipo: "remover-checklist", secao: "checklistProcesso", tech: "Backend", texto: "x" })).toBe(
+      "checklistProcesso"
+    );
+  });
+
+  it("SPEC-46 — ciclo de teste entra com validação e ambientes; remover tira pelo tipo", () => {
+    const comTeste = aplicarOperacao(base, {
+      tipo: "adicionar-teste",
+      tech: "Backend",
+      contextos: ["Backend-dados"],
+      tipoTeste: "Teste de migração",
+      validacao: "roda limpo em base vazia",
+      dev: true,
+      hlg: false,
+    });
+    expect(comTeste.porTech.Backend.testes).toEqual([
+      { tipo: "Teste de migração", validacao: "roda limpo em base vazia", contextos: ["Backend-dados"], dev: true, hlg: false },
+    ]);
+
+    const semTeste = aplicarOperacao(comTeste, { tipo: "remover-teste", tech: "Backend", tipoTeste: "Teste de migração" });
+    expect(semTeste.porTech.Backend.testes).toHaveLength(0);
+  });
+
+  it("SPEC-46 — volumetria liga e desliga por tech (o 'sobrou volumetria' do feedback real)", () => {
+    const com = aplicarOperacao(base, { tipo: "definir-volumetria", tech: "Backend", contextos: ["Backend-dados"] });
+    expect(com.porTech.Backend.volumetria).toEqual({ contextos: ["Backend-dados"] });
+
+    const sem = aplicarOperacao(com, { tipo: "remover-volumetria", tech: "Backend" });
+    expect(sem.porTech.Backend.volumetria).toBeUndefined();
+    // E o original continua intacto — a prévia compara os dois.
+    expect(com.porTech.Backend.volumetria).toEqual({ contextos: ["Backend-dados"] });
+  });
+
+  it("SPEC-46 — a seção manda em QUEM aprova, então cada operação diz a sua", () => {
+    expect(secaoDaOperacao({ tipo: "adicionar-teste", tech: "T", contextos: [], tipoTeste: "x", validacao: "y", dev: true, hlg: true })).toBe("testes");
+    expect(secaoDaOperacao({ tipo: "definir-volumetria", tech: "T", contextos: [] })).toBe("volumetria");
+    expect(secaoDaOperacao({ tipo: "remover-volumetria", tech: "T" })).toBe("volumetria");
+  });
+
+  it("SPEC-46 — a descrição nomeia a seção certa pra quem decide", () => {
+    expect(
+      descreverOperacao({ tipo: "adicionar-checklist", secao: "checklistProcesso", tech: "Backend", contextos: [], texto: "Massa" })
+    ).toContain("checklist de processo");
+    expect(
+      descreverOperacao({ tipo: "adicionar-teste", tech: "Backend", contextos: [], tipoTeste: "Contrato", validacao: "pacto ok", dev: true, hlg: false })
+    ).toContain("ciclos de teste de Backend");
+    expect(descreverOperacao({ tipo: "remover-volumetria", tech: "Backend" })).toBe(
+      "Não exigir mais requisitos de volumetria em Backend"
+    );
+  });
+
+  it("SPEC-46 — o diff sabe olhar a seção pedida", () => {
+    const comProcesso = aplicarOperacao(base, {
+      tipo: "adicionar-checklist",
+      secao: "checklistProcesso",
+      tech: "Backend",
+      contextos: [],
+      texto: "Massa repontada",
+    });
+    expect(diferencaDoChecklist(base, comProcesso, "Backend", "checklistProcesso")).toEqual({
+      adicionados: ["Massa repontada"],
+      removidos: [],
+    });
+    // Na seção técnica, nada mudou.
+    expect(diferencaDoChecklist(base, comProcesso, "Backend")).toEqual({ adicionados: [], removidos: [] });
   });
 });
