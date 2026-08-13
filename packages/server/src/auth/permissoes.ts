@@ -34,6 +34,10 @@ export const RECURSOS = [
   "regras.testes",
   "regras.volumetria",
   "especificacao-template",
+  // SPEC-53 — o contexto do produto tem dono próprio: quem responde pelo
+  // vocabulário e pelas regras de negócio não é quem cuida de stack nem de
+  // pipeline.
+  "produtos",
   "pipeline-agentes",
   "modelo-ia",
   "credenciais-ia",

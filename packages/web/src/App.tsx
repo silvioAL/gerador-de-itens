@@ -16,6 +16,7 @@ import { carregarCenarios, type Cenario } from "./demo/scenarios";
 import {
   apiCamposAresta,
   apiCamposNo,
+  apiProdutos,
   apiEspecificacaoTemplate,
   apiPipelineAgentes,
   apiTimes,
@@ -295,6 +296,18 @@ function AppCarregado({
   const [sugestoesDeStack, setSugestoesDeStack] = useState(sugestoesInicial);
   const [camposNo, setCamposNo] = useState(camposNoInicial);
   const [camposAresta, setCamposAresta] = useState(camposArestaInicial);
+  /** SPEC-53 — os produtos que este time enxerga. Carregados à parte do boot
+   * (e não junto de `carregarConfig`) porque produto não é configuração de
+   * time: é entidade da organização, e o vínculo com o time só RESTRINGE. */
+  const [produtos, setProdutos] = useState<{ id: string; nome: string }[]>([]);
+  useEffect(() => {
+    apiProdutos
+      .listar(timeAtivo)
+      .then((lista) => setProdutos(lista.map((p) => ({ id: p.id, nome: p.nome }))))
+      // Instalação sem produto nenhum não é erro: o seletor some e tudo segue
+      // como antes (SPEC-53 §4, Fase 1).
+      .catch(() => setProdutos([]));
+  }, [timeAtivo]);
   const [especificacaoTemplate, setEspecificacaoTemplate] = useState(especificacaoTemplateInicial);
   const [templateItem, setTemplateItem] = useState(templateItemInicial);
   const [pipelineAgentes, setPipelineAgentes] = useState(pipelineAgentesInicial);
@@ -982,6 +995,7 @@ function AppCarregado({
           templateItem={templateItem}
           pipelineAgentes={pipelineAgentes}
           timeAtivo={timeAtivo}
+          timeIds={sessao.timeIds}
           onAbrirArea={(area) => abrirConfigNaAba(area)}
           onPerfisMudaram={() => {
             void apiStacks.sugestoes().then(setSugestoesDeStack);
@@ -1121,7 +1135,11 @@ function AppCarregado({
           <ContextoEpicoPanel
             demandInfo={quebra.demandInfo}
             anexosContexto={quebra.anexosContexto}
-            onSalvar={(demandInfo, anexosContexto) => setQuebra((q) => ({ ...q, demandInfo, anexosContexto }))}
+            produtoId={quebra.produtoId}
+            produtos={produtos}
+            onSalvar={(demandInfo, anexosContexto, produtoId) =>
+              setQuebra((q) => ({ ...q, demandInfo, anexosContexto, produtoId }))
+            }
             onFechar={() => setAbaAssistente(null)}
           />
         )}

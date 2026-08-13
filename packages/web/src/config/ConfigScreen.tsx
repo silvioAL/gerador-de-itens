@@ -15,8 +15,10 @@ import { RECURSO_DA_ABA, RECURSO_DA_SECAO_DE_REGRAS, usePermissoes } from "../au
 import { apiPdca } from "../api/client";
 import { PdcaTab } from "./PdcaTab";
 import { ExportacaoTab } from "./ExportacaoTab";
+import { ProdutosTab } from "./ProdutosTab";
 
 export type AbaConfig =
+  | "produtos"
   | "perfis"
   | "campos"
   | "camposAresta"
@@ -36,6 +38,8 @@ export interface ConfigScreenProps {
   templateItem?: EspecificacaoTemplate | null;
   pipelineAgentes: ConfigPipelineAgentes;
   timeAtivo: string;
+  /** SPEC-53 — os times aos quais um produto pode ser amarrado. */
+  timeIds: string[];
   /** false no modo local (CLI) — sem servidor não existe conceito de outros
    * membros pra administrar; a aba não faz sentido. */
   /** SPEC-38 F2 — apontar/trocar perfil de stack muda a projeção; o App recarrega. */
@@ -90,6 +94,7 @@ export function ConfigScreen({
   templateItem,
   pipelineAgentes,
   timeAtivo,
+  timeIds,
   onPerfisMudaram,
   onFichaMudou,
   onCriarCampoNo,
@@ -137,6 +142,10 @@ export function ConfigScreen({
    */
   const abasVisiveis = (
     [
+      // SPEC-53 — primeiro da lista de propósito: é o contexto que vale para
+      // tudo o que vem depois (a stack, o checklist e o item são COMO se
+      // constrói; o produto é PARA QUÊ).
+      { id: "produtos", rotulo: "Contexto do produto", existe: true },
       { id: "perfis", rotulo: "Stacks conhecidas", existe: true },
       /**
        * "Campos por tipo de nó" era vocabulário do CÓDIGO: "nó" é jargão de
@@ -227,6 +236,7 @@ export function ConfigScreen({
           <PdcaTab config={config} timeAtivo={timeAtivo} onAbrirArea={onAbrirArea} onFichaMudou={onFichaMudou} />
         )}
         {abaAtiva === "exportacao" && <ExportacaoTab />}
+        {abaAtiva === "produtos" && <ProdutosTab timeIds={timeIds} />}
         {abaAtiva === "perfis" && (
           <PerfisStackTab config={config} onPerfisMudaram={onPerfisMudaram} />
         )}

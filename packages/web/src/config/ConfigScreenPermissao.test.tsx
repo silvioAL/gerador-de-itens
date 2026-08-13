@@ -22,6 +22,7 @@ function renderTela(area: AbaConfig) {
   render(
     <ConfigScreen
       config={config}
+      timeIds={["time-pagamentos"]}
       camposNo={[]}
       camposAresta={[]}
       especificacaoTemplate={template}

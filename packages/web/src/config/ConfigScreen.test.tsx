@@ -40,6 +40,7 @@ function renderTela(area: AbaConfig, extras: { onAbrirMenu?: () => void; onFecha
   return render(
     <ConfigScreen
       config={config}
+      timeIds={["time-pagamentos"]}
       camposNo={[]}
       camposAresta={[]}
       especificacaoTemplate={especificacaoTemplate}

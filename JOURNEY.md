@@ -5382,3 +5382,63 @@ Mordidas: recusa de escopo desligada → o pedido de time apagando o campo globa
 sobrescrita (vermelho); ficha da conexão usando os componentes → vocabulário
 trocado (vermelho); config mesclada sem recarregar → o campo aprovado invisível
 no painel (vermelho). 225 engine + 189 server + 468 web; 54/54 E2E.
+
+## 205. SPEC-53 Fase 1 — o produto passa a existir (e por que não é o `produto` do §21)
+
+O usuário perguntou se a estrutura de ajuste servia para os checklists de
+processo. Serve — e isso não precisou de código nenhum: as quatro seções são
+operação estruturada desde a SPEC-46, cada uma com dono próprio no RBAC
+(`regras.checklistProcesso`), e o aplicar automático da §204 vale para todas.
+
+A pergunta boa veio junto: **contexto do produto**. Levantando o que existe,
+três coisas parecem contexto e nenhuma é: `demandInfo` (contexto DA DEMANDA,
+recolado a cada épico e que morre com a quebra), `contextos` (tag técnica que
+filtra checklist) e as stacks (tecnologia). Nada guarda o que o produto **é** —
+objetivo, vocabulário, quem usa, regras que valem sempre, sistemas,
+restrições. O efeito está em `montarPedidoPipeline`: o agente recebe só o texto
+daquela demanda. Todo item nascia sem saber de que produto falava.
+
+**Produto é entidade própria, não campo do time.** Um time atende vários
+produtos e um produto atravessa times; fundir os dois repetiria a confusão que
+a SPEC-42 desfez entre time e stack. E, por decisão explícita do usuário,
+produto **não** se mistura com checklist de processo: são abstrações
+diferentes. O produto pode *entrar* no checklist como eixo de aplicabilidade
+(ao lado de `contextos`), nunca substituindo a costura existente — Fase 3.
+
+**A pergunta que o próprio schema fez.** O comentário no topo de `schema.ts`
+avisa: "não tem mais `produto` (§21) — era informação do épico, não do item".
+Fui ler antes de reintroduzir o conceito. O que saiu lá era um TEXTO solto,
+escrito em quatro pontos de `derivar.ts` e **nunca lido** por exportador
+nenhum. O que entra agora é o oposto em todos os eixos: entidade com conteúdo,
+fora da demanda, e cuja razão de existir é ser lida. Está escrito na SPEC que,
+se a Fase 2 não acontecer, esta recria o defeito do §21 com outro nome.
+
+Decisões da Fase 1 que valem registro:
+
+- **Produto sem time amarrado aparece para todos.** É o estado em que ele
+  nasce; sumir da tela de quem acabou de criá-lo seria o pior primeiro minuto
+  possível. Amarrar times **restringe** — e a tela diz isso, porque "marcar"
+  costuma sugerir o contrário.
+- **O vínculo com a quebra é opcional.** Quem já usa a ferramenta não passa a
+  precisar cadastrar produto para fazer o que fazia.
+- **Seis seções fixas, uma estruturada.** Só o glossário tem forma (termo →
+  definição), porque é onde estrutura paga: é a seção que mais muda a escrita
+  de um item. Uma "configuração de quais seções o contexto tem" seria camada a
+  mais para um problema que ninguém tem.
+- **Ler exige sessão, escrever exige o recurso `produtos`.** Diferente de
+  campos e stacks (leitura aberta): o que está aqui é vocabulário e regra de
+  negócio da empresa, não configuração técnica que serve a todo mundo ver.
+
+Um achado de processo: `npm run typecheck -w packages/web` **não** cobre o que
+o `npm run build` cobre. Três erros reais (incluindo `produtoId` faltando no
+tipo `Quebra` do engine) só apareceram no build — a mesma lição já anotada de
+"checar o que a CI checa", agora com um caso concreto de tsc filtrado
+escondendo erro.
+
+Mordidas: `produtoId` fora de `normalizarDadosQuebra` → o vínculo voltando null
+(o campo morrendo na borda, igual à SPEC-31); RBAC trocado por sessão → escrita
+liberada para quem não tem o recurso; `onSalvar` sem o produto → o E2E pegando
+`produtoId: null` no POST real. 35 aplicação + 197 server + 477 web; 55/55 E2E.
+
+Fica na fila, e é onde o valor aparece: **Fase 2** — o contexto do produto
+entrando no prompt dos agentes, na especificação e na tela.

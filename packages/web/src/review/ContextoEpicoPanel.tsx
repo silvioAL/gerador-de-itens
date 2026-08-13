@@ -8,7 +8,12 @@ export interface AnexoContexto {
 export interface ContextoEpicoPanelProps {
   demandInfo?: string;
   anexosContexto?: AnexoContexto[];
-  onSalvar: (demandInfo: string, anexosContexto: AnexoContexto[]) => void;
+  /** SPEC-53 — de que produto é esta demanda (null = nenhum). */
+  produtoId?: string | null;
+  /** Os produtos que o time enxerga; vazio = ninguém cadastrou ainda, e aí o
+   * seletor some em vez de oferecer uma lista vazia. */
+  produtos?: { id: string; nome: string }[];
+  onSalvar: (demandInfo: string, anexosContexto: AnexoContexto[], produtoId: string | null) => void;
   onFechar: () => void;
 }
 
@@ -35,9 +40,17 @@ function lerArquivoComoTexto(arquivo: File): Promise<string> {
  * Desde o #298 não é mais um modal com backdrop próprio: é uma aba do
  * `AssistenteFlutuante`, que é quem posiciona, abre e fecha a janela.
  */
-export function ContextoEpicoPanel({ demandInfo, anexosContexto, onSalvar, onFechar }: ContextoEpicoPanelProps) {
+export function ContextoEpicoPanel({
+  demandInfo,
+  anexosContexto,
+  produtoId,
+  produtos = [],
+  onSalvar,
+  onFechar,
+}: ContextoEpicoPanelProps) {
   const [texto, setTexto] = useState(demandInfo ?? "");
   const [anexos, setAnexos] = useState<AnexoContexto[]>(anexosContexto ?? []);
+  const [produto, setProduto] = useState<string>(produtoId ?? "");
   const [erro, setErro] = useState<string | null>(null);
 
   async function aoSelecionarArquivos(e: React.ChangeEvent<HTMLInputElement>) {
@@ -60,7 +73,7 @@ export function ContextoEpicoPanel({ demandInfo, anexosContexto, onSalvar, onFec
   }
 
   function salvar() {
-    onSalvar(texto, anexos);
+    onSalvar(texto, anexos, produto || null);
     onFechar();
   }
 
@@ -74,6 +87,44 @@ export function ContextoEpicoPanel({ demandInfo, anexosContexto, onSalvar, onFec
           Cole o estado atual da história/épico e anexe material de apoio (texto) — alimenta a seção "Contexto" do
           documento exportado e a sugestão de IA real na aba Refinamento.
         </p>
+
+        {/* SPEC-53 — o produto é o contexto que NÃO se recola a cada demanda:
+            fica cadastrado uma vez e viaja junto com todas. O seletor mora aqui,
+            e não no header, porque é a mesma pergunta do resto do painel ("de
+            que estamos falando"), só que respondida uma vez por produto. */}
+        {produtos.length > 0 && (
+          <div>
+            <label htmlFor="contexto-produto" style={{ display: "block", fontSize: 11, color: "var(--texto-fraco)", marginBottom: 2 }}>
+              Produto desta demanda
+            </label>
+            <select
+              id="contexto-produto"
+              aria-label="Produto desta demanda"
+              value={produto}
+              onChange={(e) => setProduto(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "7px 10px",
+                borderRadius: 8,
+                border: "1px solid var(--borda-forte)",
+                background: "var(--fundo)",
+                color: "var(--texto)",
+                fontSize: 13,
+              }}
+            >
+              <option value="">— nenhum —</option>
+              {produtos.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nome}
+                </option>
+              ))}
+            </select>
+            <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--texto-mudo)" }}>
+              O contexto do produto (objetivo, glossário, regras que valem sempre) vai junto com esta demanda — sem
+              precisar recolar nada.
+            </p>
+          </div>
+        )}
           <textarea
             aria-label="Contexto do épico (texto)"
             value={texto}

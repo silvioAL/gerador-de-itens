@@ -16,6 +16,7 @@ import {
   organizacoes,
   papeisAcesso,
   papelPermissao,
+  produtos,
   stacks,
   configDocumentos,
   pdcaFeedback,
@@ -87,7 +88,7 @@ beforeEach(async () => {
   // para trás liga o RBAC da organização (SPEC-28 §4.3) e faria todos os
   // outros testes — que assumem o modo aberto — falharem com 403.
   await db.execute(
-    sql`truncate table ${quebras}, ${stacks}, ${camposNo}, ${convitesTime}, ${auditoria}, ${usuarioPapel}, ${papelPermissao}, ${papeisAcesso}, ${timePapel} cascade`
+    sql`truncate table ${quebras}, ${stacks}, ${camposNo}, ${convitesTime}, ${auditoria}, ${usuarioPapel}, ${papelPermissao}, ${papeisAcesso}, ${timePapel}, ${produtos} cascade`
   );
 });
 
@@ -2701,5 +2702,162 @@ describe("SPEC-35 — validação de escrita de prompts/templates", () => {
     });
     expect(resposta.statusCode).toBe(400);
     expect(resposta.json().erro).toContain("porTech");
+  });
+});
+
+/**
+ * SPEC-53 Fase 1 — o produto como entidade. O que se prova aqui é a
+ * modelagem: produto atravessa times, o vínculo com a quebra sobrevive ao
+ * ida-e-volta (foi o que a SPEC-31 apanhou de campo morrendo na borda), e
+ * escrever exige o recurso próprio.
+ */
+describe("produtos (SPEC-53)", () => {
+  it("cria com o mínimo e o contexto nasce vazio — cadastro não pode ser um formulário de seis campos", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const criado = await app.inject({
+      method: "POST",
+      url: "/produtos",
+      cookies: { gerador_sessao: cookie },
+      payload: { nome: "Portabilidade" },
+    });
+
+    expect(criado.statusCode).toBe(201);
+    expect(criado.json()).toMatchObject({ nome: "Portabilidade", objetivo: "", glossario: [], timeIds: [] });
+  });
+
+  it("o contexto sobrevive ao ida-e-volta, seção por seção", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const { id } = (
+      await app.inject({ method: "POST", url: "/produtos", cookies: { gerador_sessao: cookie }, payload: { nome: "Fatura" } })
+    ).json();
+
+    const atualizado = await app.inject({
+      method: "PUT",
+      url: `/produtos/${id}`,
+      cookies: { gerador_sessao: cookie },
+      payload: {
+        objetivo: "Cobrar o que foi consumido no mês.",
+        quemUsa: "Cliente final e o time de atendimento.",
+        regrasDeNegocio: "Fatura fechada não muda de valor.",
+        sistemas: "ERP e o gateway de pagamento.",
+        restricoes: "Retenção fiscal de 5 anos.",
+      },
+    });
+
+    expect(atualizado.statusCode).toBe(200);
+    expect(atualizado.json()).toMatchObject({
+      objetivo: "Cobrar o que foi consumido no mês.",
+      restricoes: "Retenção fiscal de 5 anos.",
+    });
+    const relido = (await app.inject({ method: "GET", url: `/produtos/${id}`, cookies: { gerador_sessao: cookie } })).json();
+    expect(relido.regrasDeNegocio).toBe("Fatura fechada não muda de valor.");
+  });
+
+  it("o glossário é upsert pelo termo — corrigir uma definição não cria um segundo verbete", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const { id } = (
+      await app.inject({ method: "POST", url: "/produtos", cookies: { gerador_sessao: cookie }, payload: { nome: "Carteira" } })
+    ).json();
+
+    for (const definicao of ["saldo disponível", "saldo disponível MENOS o bloqueado"]) {
+      const r = await app.inject({
+        method: "POST",
+        url: `/produtos/${id}/glossario`,
+        cookies: { gerador_sessao: cookie },
+        payload: { termo: "Saldo", definicao },
+      });
+      expect(r.statusCode).toBe(201);
+    }
+
+    const produto = (await app.inject({ method: "GET", url: `/produtos/${id}`, cookies: { gerador_sessao: cookie } })).json();
+    expect(produto.glossario).toHaveLength(1);
+    expect(produto.glossario[0].definicao).toBe("saldo disponível MENOS o bloqueado");
+  });
+
+  it("produto atravessa times, e a lista por time RESTRINGE (sem time amarrado, aparece pra todos)", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const doDois = (
+      await app.inject({ method: "POST", url: "/produtos", cookies: { gerador_sessao: cookie }, payload: { nome: "Compartilhado" } })
+    ).json();
+    const solto = (
+      await app.inject({ method: "POST", url: "/produtos", cookies: { gerador_sessao: cookie }, payload: { nome: "Recém-criado" } })
+    ).json();
+
+    const vinculado = await app.inject({
+      method: "PUT",
+      url: `/produtos/${doDois.id}/times`,
+      cookies: { gerador_sessao: cookie },
+      payload: { timeIds: [TIME_A, "time-checkout", TIME_A] },
+    });
+    expect(vinculado.statusCode).toBe(200);
+    // Duplicata do cliente é ruído, não intenção.
+    expect(vinculado.json().timeIds.sort()).toEqual([TIME_A, "time-checkout"].sort());
+
+    const doTimeA = (
+      await app.inject({ method: "GET", url: `/produtos?timeId=${TIME_A}`, cookies: { gerador_sessao: cookie } })
+    ).json();
+    expect(doTimeA.map((p: { nome: string }) => p.nome).sort()).toEqual(["Compartilhado", "Recém-criado"]);
+
+    const doPortabilidade = (
+      await app.inject({ method: "GET", url: "/produtos?timeId=time-portabilidade", cookies: { gerador_sessao: cookie } })
+    ).json();
+    expect(doPortabilidade.map((p: { nome: string }) => p.nome)).toEqual(["Recém-criado"]);
+  });
+
+  it("o vínculo da QUEBRA com o produto sobrevive ao ida-e-volta — o campo que morria na borda (SPEC-31)", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const produto = (
+      await app.inject({ method: "POST", url: "/produtos", cookies: { gerador_sessao: cookie }, payload: { nome: "Cobrança" } })
+    ).json();
+
+    const criada = await app.inject({
+      method: "POST",
+      url: "/quebras",
+      cookies: { gerador_sessao: cookie },
+      payload: { titulo: "demanda com produto", time: TIME_A, diagrama: { nodes: [], edges: [] }, produtoId: produto.id },
+    });
+    expect(criada.statusCode).toBe(201);
+    expect(criada.json().produtoId).toBe(produto.id);
+
+    const relida = await app.inject({ method: "GET", url: `/quebras/${criada.json().id}`, cookies: { gerador_sessao: cookie } });
+    expect(relida.json().produtoId).toBe(produto.id);
+  });
+
+  it("quebra SEM produto continua funcionando — a ferramenta não passa a exigir cadastro", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const criada = await app.inject({
+      method: "POST",
+      url: "/quebras",
+      cookies: { gerador_sessao: cookie },
+      payload: { titulo: "demanda sem produto", time: TIME_A, diagrama: { nodes: [], edges: [] } },
+    });
+    expect(criada.statusCode).toBe(201);
+    expect(criada.json().produtoId).toBeNull();
+  });
+
+  it("escrever exige o recurso `produtos`: quem não tem leva 403, e continua LENDO", async () => {
+    const [org] = await db.select().from(organizacoes).limit(1);
+    const [papel] = await db.insert(papeisAcesso).values({ organizacaoId: org.id, nome: "Só campos" }).returning();
+    await db.insert(papelPermissao).values({ papelId: papel.id, recurso: "campos-no", acao: "editar" });
+    await db.insert(usuarioPapel).values({ email: EMAIL_OUTRO, papelId: papel.id, escopoTimeId: null });
+    await db.update(usuarioTime).set({ nivel: "operar" }).where(eq(usuarioTime.email, EMAIL_OUTRO));
+    const cookieSemPermissao = await logarComo(EMAIL_OUTRO);
+
+    const negado = await app.inject({
+      method: "POST",
+      url: "/produtos",
+      cookies: { gerador_sessao: cookieSemPermissao },
+      payload: { nome: "Não deveria nascer" },
+    });
+    expect(negado.statusCode).toBe(403);
+
+    // Ler é de todo mundo com sessão: contexto de produto serve a quem escreve
+    // o item, não só a quem administra.
+    const leitura = await app.inject({ method: "GET", url: "/produtos", cookies: { gerador_sessao: cookieSemPermissao } });
+    expect(leitura.statusCode).toBe(200);
+  });
+
+  it("sem sessão, nem ler — é vocabulário e regra de negócio da empresa, não config técnica pública", async () => {
+    expect((await app.inject({ method: "GET", url: "/produtos" })).statusCode).toBe(401);
   });
 });

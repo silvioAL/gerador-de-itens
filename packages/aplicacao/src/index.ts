@@ -54,8 +54,17 @@ export {
 export { criarCasosDeUsoDeCamposAresta, type CasosDeUsoDeCamposAresta } from "./casos-de-uso/camposAresta.js";
 
 export type { Stack, SugestoesDeStack, RepositorioDeStacks } from "./portas/repositorioDeStacks.js";
+// SPEC-53 — o produto e o contexto que ele carrega.
+export type {
+  Produto,
+  DadosDoProduto,
+  TermoDeGlossario,
+  RepositorioDeProdutos,
+} from "./portas/repositorioDeProdutos.js";
+export { produtosDoTime, contextoDoProdutoEmTexto } from "./portas/repositorioDeProdutos.js";
 
 export { criarCasosDeUsoDeStacks, nomeDerivadoDosValores, type CasosDeUsoDeStacks } from "./casos-de-uso/stacks.js";
+export { criarCasosDeUsoDeProdutos, type CasosDeUsoDeProdutos } from "./casos-de-uso/produtos.js";
 
 export type {
   RepositorioDeTemplateEspecificacao,

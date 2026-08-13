@@ -28,6 +28,10 @@ export interface QuebraSalva {
   demandInfo: string;
   /** Anexos colados junto do contexto do épico. */
   anexosContexto: string[];
+  /** SPEC-53 — de que PRODUTO é esta demanda (null = nenhum). Opcional de
+   * propósito: quem já usa a ferramenta não passa a precisar cadastrar produto
+   * pra fazer o que fazia. */
+  produtoId?: string | null;
   /** §184 — o markdown da especificação gerada (null = nunca gerada). */
   especificacao?: string | null;
   /** ISO-8601. Quem cria decide o valor — o relógio é do adaptador. */
@@ -69,5 +73,9 @@ export function normalizarDadosQuebra(bruto: Partial<DadosQuebra> | undefined): 
     // §184 — sem esta linha a especificação morre aqui, do mesmo jeito que os
     // três campos da SPEC-31 morriam no Zod da borda.
     especificacao: bruto?.especificacao ?? null,
+    // SPEC-53 — mesma lição da §184 e da SPEC-31: campo que não entra aqui
+    // morre em silêncio no meio do caminho, e o defeito só aparece quando
+    // alguém nota que o vínculo sumiu depois de salvar.
+    produtoId: bruto?.produtoId ?? null,
   };
 }
