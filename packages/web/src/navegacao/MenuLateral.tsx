@@ -45,7 +45,7 @@ const GRUPOS: { titulo: string; itens: { area: AreaConfig; rotulo: string }[] }[
     itens: [
       { area: "pipeline", rotulo: "Pipeline de IA" },
       { area: "modeloIa", rotulo: "Modelo de IA" },
-      { area: "pdca", rotulo: "Cadência do PDCA" },
+      { area: "pdca", rotulo: "PDCA — melhoria contínua" },
     ],
   },
 ];

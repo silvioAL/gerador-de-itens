@@ -8,6 +8,14 @@ import { entrar } from "./auth";
  */
 test("gerar salva a especificação na quebra; reabrir conduz à revisão com a fala de demanda já especificada", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
+  // O contador de usos do PDCA é global do ambiente: quando a cadência bate,
+  // o balão da ENTREVISTA tem prioridade e rouba o momento que este spec mede.
+  // Neutralizar aqui é o que torna o teste sobre a especificação, não sobre
+  // quantas vezes a suíte já derivou hoje.
+  await page.route(
+    (url) => url.pathname === "/pdca/uso",
+    (rota) => rota.fulfill({ json: { contagem: 1, momento: false, ultimosItens: [] } })
+  );
   await page.route(
     (url) => url.pathname === "/ia/status",
     (rota) => rota.fulfill({ json: { modelosChat: [], embeddingInstalado: false, capacidades: {} } })

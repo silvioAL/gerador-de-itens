@@ -48,6 +48,8 @@ export interface ConfigScreenProps {
   area: AbaConfig;
   /** Abre o menu (☰) por cima da tela — trocar de área é pelo menu. */
   onAbrirMenu: () => void;
+  /** SPEC-45 — deep-link do PDCA para a configuração alvo de um pedido. */
+  onAbrirArea?: (area: AbaConfig) => void;
   /** Techs e contextos conhecidos (`appConfig`) — alimentam os seletores de
    * contexto por clique de Regras e Pipeline. */
   techs?: string[];
@@ -91,6 +93,7 @@ export function ConfigScreen({
   onFechar,
   area,
   onAbrirMenu,
+  onAbrirArea,
   techs,
   contextos,
 }: ConfigScreenProps) {
@@ -156,7 +159,7 @@ export function ConfigScreen({
       { id: "especificacao", rotulo: "Especificação de solução", existe: true },
       { id: "pipeline", rotulo: "Pipeline de IA", existe: true },
       { id: "modeloIa", rotulo: "Modelo de IA", existe: true },
-      { id: "pdca", rotulo: "Cadência do PDCA", existe: true },
+      { id: "pdca", rotulo: "PDCA — melhoria contínua", existe: true },
     ] satisfies { id: AbaConfig; rotulo: string; existe: boolean }[]
   ).filter((a) => a.existe && podeVerAba(a.id, permissoes.pode));
 
@@ -206,7 +209,7 @@ export function ConfigScreen({
           a um teste só perguntar "toda aba visível mostra alguma coisa?" — a
           pergunta que ninguém tinha feito quando o gate ficou pela metade. */}
       <div data-testid="corpo-da-aba" style={{ flex: 1, overflow: "auto", padding: 24 }}>
-        {abaAtiva === "pdca" && <PdcaTab />}
+        {abaAtiva === "pdca" && <PdcaTab config={config} timeAtivo={timeAtivo} onAbrirArea={onAbrirArea} />}
         {abaAtiva === "perfis" && (
           <PerfisStackTab config={config} onPerfisMudaram={onPerfisMudaram} />
         )}

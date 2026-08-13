@@ -279,6 +279,10 @@ export const pdcaFeedback = pgTable("pdca_feedback", {
   email: text("email").notNull(),
   timeId: text("time_id"),
   texto: text("texto").notNull(),
+  /** SPEC-45 — `novo | virou-ajuste | descartado`: sem estado, a tela não
+   * consegue mostrar o que ainda espera alguém (e descartar também é decidir). */
+  estado: text("estado").notNull().default("novo"),
+  solicitacaoId: uuid("solicitacao_id"),
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -295,9 +299,15 @@ export const solicitacoesAjuste = pgTable("solicitacoes_ajuste", {
   descricao: text("descricao").notNull(),
   versaoAlvo: timestamp("versao_alvo", { withTimezone: true }),
   estado: text("estado").notNull().default("pendente"),
+  /** SPEC-45 — a mudança como DADO (`OperacaoDeAjuste` do engine): é o que
+   * permite prever o efeito num item de exemplo e aplicar sem reescrita
+   * manual. Nulo = pedido só em texto (o formato da SPEC-39). */
+  operacao: jsonb("operacao"),
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
   decididoPor: text("decidido_por"),
   decididoEm: timestamp("decidido_em", { withTimezone: true }),
+  aplicadaEm: timestamp("aplicada_em", { withTimezone: true }),
+  aplicadaPor: text("aplicada_por"),
 });
 
 /**

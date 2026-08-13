@@ -125,42 +125,9 @@ export function AcessosTab({ timeAtivo }: { timeAtivo: string }) {
       {/* SPEC-39 — o PDCA desagua aqui: pedidos de quem não pode editar,
           decididos por quem pode. Aprovar checa a VALIDADE no servidor — se a
           config mudou desde o pedido, ele vira "invalida" com o motivo. */}
-      {ajustes.length > 0 && (
-        <section data-testid="solicitacoes-de-ajuste" style={{ margin: "12px 0" }}>
-          <strong style={{ fontSize: 13, color: "var(--texto)" }}>Solicitações de ajuste (PDCA)</strong>
-          <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 12.5 }}>
-            {ajustes.map((a) => (
-              <li key={a.id} style={{ marginBottom: 4 }}>
-                <em>{a.recurso}</em> — {a.descricao}{" "}
-                <span style={{ color: "var(--texto-fraco)" }}>
-                  (por {a.solicitante}
-                  {a.timeId ? `, time ${a.timeId}` : ""}) — {a.estado}
-                </span>{" "}
-                {a.estado === "pendente" && (
-                  <>
-                    <button
-                      onClick={() => void executar(() => apiPdca.decidirAjuste(a.id, true))}
-                      disabled={salvando}
-                      style={botaoLinkEstilo}
-                      aria-label={`Aprovar ajuste de ${a.solicitante}`}
-                    >
-                      aprovar
-                    </button>{" "}
-                    <button
-                      onClick={() => void executar(() => apiPdca.decidirAjuste(a.id, false))}
-                      disabled={salvando}
-                      style={botaoLinkEstilo}
-                      aria-label={`Rejeitar ajuste de ${a.solicitante}`}
-                    >
-                      rejeitar
-                    </button>
-                  </>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      {/* SPEC-45 — as solicitações de ajuste mudaram de casa: elas são
+          PDCA (melhoria), não permissão. Moram em Configurações → PDCA. */}
+
 
       {papeis === null && !erro && <p style={{ fontSize: 12.5, color: "var(--texto-fraco)" }}>Carregando…</p>}
 
