@@ -731,7 +731,44 @@ describe("/especificacao-template (SPEC-14)", () => {
     await db
       .insert(especificacaoTemplates)
       .values({ timeId: "__global__", conteudo: CONTEUDO_GLOBAL })
-      .onConflictDoUpdate({ target: especificacaoTemplates.timeId, set: { conteudo: CONTEUDO_GLOBAL } });
+      .onConflictDoUpdate({
+        // SPEC-47: a chave natural agora é (timeId, tipo).
+        target: [especificacaoTemplates.timeId, especificacaoTemplates.tipo],
+        set: { conteudo: CONTEUDO_GLOBAL },
+      });
+  });
+
+  it("SPEC-47 — o template do ITEM é outro documento, no mesmo lugar: salvar um não pisa no outro", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const doItem = ["### {{rotulo}}", "", "{{historiaUsuario}}", "", "#### Entrega final", "", "{{entregaFinal}}"].join("\n");
+
+    const salvo = await app.inject({
+      method: "PUT",
+      url: "/especificacao-template",
+      cookies: { gerador_sessao: cookie },
+      payload: { conteudo: doItem, tipo: "item" },
+    });
+    expect(salvo.statusCode).toBe(200);
+    expect(salvo.json().tipo).toBe("item");
+
+    const lidoItem = await app.inject({ method: "GET", url: "/especificacao-template?tipo=item" });
+    expect(lidoItem.json().conteudo).toContain("{{entregaFinal}}");
+
+    // O do documento continua o que era — dois templates, mesma tabela.
+    const lidoDocumento = await app.inject({ method: "GET", url: "/especificacao-template" });
+    expect(lidoDocumento.json().conteudo).toContain("{{titulo}}");
+    expect(lidoDocumento.json().tipo).toBe("documento");
+  });
+
+  it("SPEC-47 — variável inventada no template do item é recusada com a lista do que vale", async () => {
+    const resposta = await app.inject({
+      method: "PUT",
+      url: "/especificacao-template",
+      cookies: { gerador_sessao: await logarComo(EMAIL_DEV) },
+      payload: { conteudo: "### {{rotulo}} {{naoExiste}}", tipo: "item" },
+    });
+    expect(resposta.statusCode).toBe(400);
+    expect(JSON.stringify(resposta.json())).toContain("naoExiste");
   });
 
   it("GET sem timeId devolve o global", async () => {

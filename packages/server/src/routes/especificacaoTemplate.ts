@@ -10,6 +10,8 @@ import { registrarAuditoria } from "../auditoria.js";
 const corpoTemplate = z.object({
   timeId: z.string().min(1).default(CAMPO_GLOBAL),
   conteudo: z.string().min(1),
+  /** SPEC-47 — `item` é o template do corpo de cada item; default, o documento. */
+  tipo: z.enum(["documento", "item"]).default("documento"),
 });
 
 /** `timeId` do recurso pro middleware `exigirTime` — `__global__` não exige time nenhum. */
@@ -30,8 +32,10 @@ export async function registrarRotasEspecificacaoTemplate(app: FastifyInstance, 
   const casos = criarCasosDeUsoDeTemplateEspecificacao(criarRepositorioDeTemplateEspecificacaoEmPostgres(db));
 
   app.get("/especificacao-template", async (req) => {
-    const { timeId } = req.query as { timeId?: string };
-    return casos.obter(timeId);
+    // SPEC-47 — `tipo=item` devolve o template do CORPO de cada item; sem
+    // parâmetro, o do documento (o comportamento de sempre).
+    const { timeId, tipo } = req.query as { timeId?: string; tipo?: string };
+    return casos.obter(timeId, tipo === "item" ? "item" : "documento");
   });
 
   // Upsert por chave natural (timeId) — não expõe id sintético pro cliente
@@ -51,7 +55,7 @@ export async function registrarRotasEspecificacaoTemplate(app: FastifyInstance, 
       if (!corpo.success) return reply.code(400).send({ erro: corpo.error.flatten() });
 
       try {
-        const salvo = await casos.salvar(corpo.data.timeId, corpo.data.conteudo);
+        const salvo = await casos.salvar(corpo.data.timeId, corpo.data.conteudo, corpo.data.tipo);
         registrarAuditoria(db, {
           email: req.usuario!.email,
           acao: "atualizar",

@@ -51,6 +51,8 @@ export interface ReviewScreenProps {
   regras?: RegrasConfig;
   /** Efetivo pro time ativo — template do time se existir, senão o global (SPEC-14 §6). */
   especificacaoTemplate: EspecificacaoTemplate;
+  /** SPEC-47 — template do corpo de cada item (o do time, quando existe). */
+  templateItem?: string;
   /** `quebra.demandInfo` — de onde vem a demanda. Além da seção "Contexto" do
    * documento (SPEC-14 §4), desde a Fase 1b (SPEC-23) também alimenta o
    * prompt real de `/ia/sugerir`. */
@@ -246,6 +248,7 @@ export function ReviewScreen({
   config,
   regras,
   especificacaoTemplate,
+  templateItem,
   demandInfo,
   anexosContexto,
   time,
@@ -677,6 +680,7 @@ export function ReviewScreen({
       regras,
       demandInfo,
       template: especificacaoTemplate.conteudo,
+      templateItem,
       time,
       respostasItens,
     });
@@ -690,7 +694,7 @@ export function ReviewScreen({
   function gerarItens() {
     registrarUsoDeEspecificacao();
     onItensGerados?.(
-      gerarItensDeTrabalho(resultado.atividades, diagrama, config, { regras, respostasItens })
+      gerarItensDeTrabalho(resultado.atividades, diagrama, config, { regras, respostasItens, templateItem })
     );
   }
 

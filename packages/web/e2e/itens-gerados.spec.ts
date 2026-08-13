@@ -45,9 +45,12 @@ test("gerar itens na revisão abre a tela #/itens com cards e completude", async
   await expect(primeiro).toBeVisible();
   await expect(page.getByTestId("item-completude-0")).toContainText(/especificar|confirmar|Pronto/);
 
-  // O corpo abre sob demanda e é a seção real do documento.
-  await page.getByTestId("item-expandir-0").click();
+  // SPEC-47 — a escrita do item está À VISTA (era "Ver corpo" colapsado), e
+  // termina na entrega final.
   await expect(page.getByTestId("item-corpo-0")).toContainText("História de usuário");
+  await expect(page.getByTestId("item-corpo-0")).toContainText("Entrega final");
+  await page.getByTestId("item-expandir-0").click(); // recolher é o que é sob demanda
+  await expect(page.getByTestId("item-corpo-0")).toHaveCount(0);
 
   // Voltar ao canvas devolve a revisão (escondida, não desmontada).
   await page.getByRole("button", { name: "Voltar ao canvas" }).click();

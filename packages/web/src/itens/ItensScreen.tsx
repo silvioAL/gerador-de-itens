@@ -40,7 +40,10 @@ function completudeDoItem(item: ItemGerado): { rotulo: string; cor: string; fund
 }
 
 export function ItensScreen({ itens, tituloDaQuebra, onAbrirMenu, onFechar, onIrParaRevisao, onRevisarItem }: ItensScreenProps) {
-  const [aberto, setAberto] = useState<string | null>(null);
+  // SPEC-47 — a escrita REAL do item aparece por padrão: a tela era uma lista
+  // de títulos, e o que interessa a quem vai executar é o texto (§196). Quem
+  // quiser varrer a lista fecha; o estado guarda quem está FECHADO.
+  const [fechados, setFechados] = useState<string[]>([]);
 
   const prontos = itens.filter((i) => i.pendencias === 0 && i.sugestoes === 0).length;
   const geradoEm = itens[0]?.criadoEm ? new Date(itens[0].criadoEm) : null;
@@ -102,7 +105,7 @@ export function ItensScreen({ itens, tituloDaQuebra, onAbrirMenu, onFechar, onIr
 
             {itens.map((item, i) => {
               const completude = completudeDoItem(item);
-              const expandido = aberto === item.chave;
+              const expandido = !fechados.includes(item.chave);
               return (
                 <article key={item.chave} style={cardEstilo} data-testid={`item-gerado-${i}`}>
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
@@ -148,18 +151,22 @@ export function ItensScreen({ itens, tituloDaQuebra, onAbrirMenu, onFechar, onIr
                       )}
                     </div>
                     <button
-                      onClick={() => setAberto(expandido ? null : item.chave)}
+                      onClick={() =>
+                        setFechados((atuais) =>
+                          expandido ? [...atuais, item.chave] : atuais.filter((c) => c !== item.chave)
+                        )
+                      }
                       style={botaoEstilo}
                       aria-expanded={expandido}
                       data-testid={`item-expandir-${i}`}
                     >
-                      {expandido ? "Fechar" : "Ver corpo"}
+                      {expandido ? "Recolher" : "Ver a escrita"}
                     </button>
                   </div>
                   {expandido && (
-                    <pre style={corpoEstilo} data-testid={`item-corpo-${i}`}>
-                      {item.corpoMarkdown}
-                    </pre>
+                    <div style={corpoEstilo} data-testid={`item-corpo-${i}`}>
+                      <EscritaDoItem markdown={item.corpoMarkdown} />
+                    </div>
                   )}
                 </article>
               );
@@ -168,6 +175,91 @@ export function ItensScreen({ itens, tituloDaQuebra, onAbrirMenu, onFechar, onIr
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * SPEC-47 — a escrita do item, legível. O corpo vem em markdown (o MESMO
+ * texto que vai pro documento e, na fase 2, pro tracker); aqui ele é lido
+ * como texto formatado, não como código: títulos viram títulos, listas viram
+ * listas, tabela e bloco de código continuam monoespaçados. Sem dependência
+ * nova — o subconjunto que o gerador emite é pequeno e conhecido.
+ */
+function EscritaDoItem({ markdown }: { markdown: string }) {
+  const blocos: React.ReactNode[] = [];
+  const linhas = markdown.split("\n");
+  let lista: string[] = [];
+  let codigo: string[] | null = null;
+
+  const fecharLista = (chave: string) => {
+    if (lista.length === 0) return;
+    blocos.push(
+      <ul key={`ul-${chave}`} style={listaEstilo}>
+        {lista.map((item, i) => (
+          <li key={i} style={{ marginBottom: 3 }}>
+            {comNegrito(item)}
+          </li>
+        ))}
+      </ul>
+    );
+    lista = [];
+  };
+
+  linhas.forEach((linha, i) => {
+    if (linha.trim().startsWith("```")) {
+      if (codigo === null) {
+        fecharLista(String(i));
+        codigo = [];
+      } else {
+        blocos.push(
+          <pre key={`code-${i}`} style={blocoCodigoEstilo}>
+            {codigo.join("\n")}
+          </pre>
+        );
+        codigo = null;
+      }
+      return;
+    }
+    if (codigo !== null) {
+      codigo.push(linha);
+      return;
+    }
+
+    const titulo = /^(#{2,6})\s+(.*)$/.exec(linha);
+    if (titulo) {
+      fecharLista(String(i));
+      const nivel = titulo[1].length;
+      blocos.push(
+        <p key={`h-${i}`} style={{ ...tituloSecaoEstilo, fontSize: nivel <= 3 ? 13 : 12 }}>
+          {titulo[2]}
+        </p>
+      );
+      return;
+    }
+    if (/^\s*[-*]\s+/.test(linha)) {
+      lista.push(linha.replace(/^\s*[-*]\s+/, ""));
+      return;
+    }
+    fecharLista(String(i));
+    if (linha.trim() === "") return;
+    // Tabela do markdown: monoespaçada, senão as colunas não alinham.
+    const ehTabela = linha.trim().startsWith("|");
+    blocos.push(
+      <p key={`p-${i}`} style={ehTabela ? linhaTabelaEstilo : paragrafoEstilo}>
+        {comNegrito(linha)}
+      </p>
+    );
+  });
+  fecharLista("fim");
+
+  return <>{blocos}</>;
+}
+
+/** `**negrito**` do markdown — o gerador usa em rótulo de campo e de seção. */
+function comNegrito(texto: string): React.ReactNode {
+  const partes = texto.split(/(\*\*[^*]+\*\*)/g);
+  return partes.map((parte, i) =>
+    parte.startsWith("**") && parte.endsWith("**") ? <strong key={i}>{parte.slice(2, -2)}</strong> : parte
   );
 }
 
@@ -281,16 +373,51 @@ const depEstilo: React.CSSProperties = {
 
 const corpoEstilo: React.CSSProperties = {
   marginTop: 12,
-  marginBottom: 0,
   padding: "12px 14px",
   borderRadius: 8,
   border: "1px solid var(--borda)",
   background: "var(--fundo)",
-  fontSize: 12,
-  lineHeight: 1.6,
-  whiteSpace: "pre-wrap",
-  overflowWrap: "break-word",
-  fontFamily: "ui-monospace, 'Cascadia Code', monospace",
-  maxHeight: 420,
+  maxHeight: 520,
   overflow: "auto",
 };
+
+const tituloSecaoEstilo: React.CSSProperties = {
+  fontWeight: 700,
+  color: "var(--texto)",
+  margin: "12px 0 4px",
+};
+
+const paragrafoEstilo: React.CSSProperties = {
+  fontSize: 12.5,
+  lineHeight: 1.6,
+  color: "var(--texto-2)",
+  margin: "0 0 6px",
+  whiteSpace: "pre-wrap",
+};
+
+const linhaTabelaEstilo: React.CSSProperties = {
+  ...paragrafoEstilo,
+  fontFamily: "ui-monospace, 'Cascadia Code', monospace",
+  fontSize: 11.5,
+  margin: 0,
+};
+
+const listaEstilo: React.CSSProperties = {
+  margin: "0 0 8px",
+  paddingLeft: 18,
+  fontSize: 12.5,
+  lineHeight: 1.6,
+  color: "var(--texto-2)",
+};
+
+const blocoCodigoEstilo: React.CSSProperties = {
+  margin: "0 0 8px",
+  padding: "8px 10px",
+  borderRadius: 6,
+  background: "var(--painel-alto)",
+  fontSize: 11.5,
+  lineHeight: 1.5,
+  whiteSpace: "pre-wrap",
+  fontFamily: "ui-monospace, 'Cascadia Code', monospace",
+};
+

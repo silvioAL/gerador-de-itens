@@ -900,16 +900,18 @@ export interface EspecificacaoTemplate {
   timeId: string;
   conteudo: string;
   atualizadoEm: string;
+  /** SPEC-47 — `documento` (a especificação) ou `item` (o corpo de cada item). */
+  tipo?: "documento" | "item";
 }
 
 /** Template da especificação de entrega (SPEC-14) — 1 documento por quebra
  * inteira, então 1 template por time (não mais por tipo de item). */
 export const apiEspecificacaoTemplate = {
   /** Efetivo: template do time se existir, senão o global — SPEC-14 §6. */
-  buscar: (timeId?: string) =>
-    requisitar<EspecificacaoTemplate>(`/especificacao-template${timeId ? `?timeId=${encodeURIComponent(timeId)}` : ""}`),
+  buscar: (timeId?: string, tipo?: "documento" | "item") =>
+    requisitar<EspecificacaoTemplate>(`/especificacao-template?${new URLSearchParams({ ...(timeId ? { timeId } : {}), ...(tipo ? { tipo } : {}) })}`),
   /** Upsert por timeId — 400 se o template usar `{{variavel}}` desconhecida. */
-  salvar: (dados: { timeId?: string; conteudo: string }) =>
+  salvar: (dados: { timeId?: string; conteudo: string; tipo?: "documento" | "item" }) =>
     requisitar<EspecificacaoTemplate>("/especificacao-template", { method: "PUT", body: JSON.stringify(dados) }),
 };
 

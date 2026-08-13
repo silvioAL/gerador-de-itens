@@ -90,6 +90,11 @@ export const CHAVE_CONTRATO_ERROS = "_contratoErros";
 export const CHAVE_CONTRATO_DEPENDENCIAS = "_contratoDependencias";
 export const CHAVE_REGRAS_TESTE = "_regrasTeste";
 export const CHAVE_CENARIO_FEATURE = "_cenarioFeature";
+/** SPEC-47 — o que fica PRONTO quando o item termina. O documento descrevia
+ * o trabalho e parava aí; quem pega o item precisa saber o entregável, e é a
+ * pergunta que o PO responde melhor (foi o pedido: "o template precisa ter a
+ * entrega final no fim de cada item"). */
+export const CHAVE_ENTREGA_FINAL = "_entregaFinal";
 
 /**
  * Checklist de refinamento técnico em Markdown, filtrado por techs+contextos
@@ -243,7 +248,15 @@ export function gerarCiclosDeTeste(regras: RegrasConfig, techs: string[], contex
 export interface PlaceholderRefinamento {
   chave: string;
   tech: string;
-  secao: "historiaUsuario" | "criteriosAceite" | "contrato" | "checklistTecnico" | "volumetria" | "regrasTeste" | "cenarioFeature";
+  secao:
+    | "historiaUsuario"
+    | "criteriosAceite"
+    | "contrato"
+    | "checklistTecnico"
+    | "volumetria"
+    | "regrasTeste"
+    | "cenarioFeature"
+    | "entregaFinal";
   rotulo: string;
 }
 
@@ -275,6 +288,7 @@ export function listarPlaceholders(
     { chave: CHAVE_CONTRATO_DEPENDENCIAS, tech: "", secao: "contrato", rotulo: "Dependências" },
     { chave: CHAVE_REGRAS_TESTE, tech: "", secao: "regrasTeste", rotulo: "Regras de teste" },
     { chave: CHAVE_CENARIO_FEATURE, tech: "", secao: "cenarioFeature", rotulo: "Cenário Gherkin" },
+    { chave: CHAVE_ENTREGA_FINAL, tech: "", secao: "entregaFinal", rotulo: "Entrega final (o que fica pronto)" },
   ];
 
   for (const tech of techs) {
