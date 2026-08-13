@@ -5135,3 +5135,28 @@ E o smoke no bundle pegou um defeito de brinde: com a tela de itens aberta
 havia DOIS botões ☰ no DOM (o do canvas não se escondia) — exatamente o que
 a SPEC-40 corrigiu para a tela de config, repetido na tela nova. Corrigido,
 com o E2E passando a exigir um ☰ só. 446 web unit; 51/51 E2E.
+
+## 198. Duas portas de experimentar, fixas no topo
+
+Pedido curto com print: trazer "✦ Como funciona & cenários" para o header
+como DOIS botões separados, destacados dos botões de componente, em local
+fixo — e separando o que estava junto: **cenários prontos** (material pra
+carregar e brincar) de **demonstração e tour** (o produto se explicando).
+
+Eram a mesma entrada, escondida atrás do menu ☰: quem chegava tinha que
+abrir o menu, achar um item com dois assuntos no nome e só então escolher a
+aba certa. Agora são "✦ Cenários prontos" e "▶ Demonstração & tour", lado a
+lado, **antes** da paleta de componentes — que reflui em duas linhas
+conforme a janela, e por isso não podia ser vizinha de quem precisa ficar
+sempre no mesmo lugar. O estilo é deliberadamente outro (contorno de
+acento, fundo tingido, cantos redondos): ao lado de quinze `+ Componente`
+cinzas, um botão cinza a mais seria só mais um; o que distingue "isto me
+ensina" de "isto adiciona um nó no desenho" é o contraste.
+
+O menu perdeu o item — ele é a casa do que se ADMINISTRA, e experimentar
+não é administrar. Cinco specs E2E entravam pelo menu e passaram a entrar
+pelo botão, o que encurtou cada um em duas linhas (abrir menu → clicar item
+→ clicar aba virou um clique só). Uma flutuação apareceu no caminho e vale
+anotar: o spec de regras estourou o timeout no `finally` que restaura o
+documento global — corrida entre specs que compartilham a mesma config, não
+regressão; passou sozinho na re-rodada. 446 web unit; 51/51 E2E.

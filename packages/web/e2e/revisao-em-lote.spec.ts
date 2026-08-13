@@ -20,9 +20,7 @@ test("barra de pendências, confirmar todas, fila guiada e o deep-link da tela d
   );
   await entrar(page);
 
-  await page.getByRole("button", { name: "☰ Menu" }).click();
-  await page.getByRole("button", { name: "✦ Como funciona & cenários" }).click();
-  await page.getByRole("button", { name: /Cenários prontos/ }).click();
+  await page.getByTestId("abrir-cenarios").click();
   await page.getByRole("button", { name: "Carregar cenário: Dados não-relacionais" }).click();
   await page.locator('[data-tour="derivar-button"]').click();
   await page.getByTestId("assistente-balao-secundaria").click();

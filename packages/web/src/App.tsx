@@ -730,6 +730,37 @@ function AppCarregado({
 
         <div style={{ width: 1, height: 20, background: "var(--borda-forte)" }} />
 
+        {/* §198 — as duas portas de EXPERIMENTAR, separadas uma da outra e da
+            paleta: "cenários prontos" (material pra carregar) e
+            "demonstração & tour" (o produto se explicando) eram a mesma
+            entrada escondida no menu. Ficam antes da paleta, que reflui em
+            duas linhas — assim a posição delas não muda com o tamanho da
+            janela. O estilo é deliberadamente outro: quem chega distingue
+            "isto me ensina" de "isto adiciona um componente". */}
+        <button
+          onClick={() => {
+            setAbaJornadaAlvo("cenarios");
+            setMostrarJornada(true);
+          }}
+          data-testid="abrir-cenarios"
+          title="Diagramas prontos pra carregar no canvas e experimentar"
+          style={botaoExperimentarEstilo}
+        >
+          ✦ Cenários prontos
+        </button>
+        <button
+          onClick={() => {
+            setAbaJornadaAlvo("jornada");
+            setMostrarJornada(true);
+          }}
+          data-testid="abrir-demonstracao"
+          title="Como o produto funciona — com demonstração automática e tour guiado"
+          style={botaoExperimentarEstilo}
+        >
+          ▶ Demonstração &amp; tour
+        </button>
+
+        <div style={{ width: 1, height: 20, background: "var(--borda-forte)" }} />
 
         {tiposDeNo.map(([tipo, cfg]) => (
           <button
@@ -805,7 +836,6 @@ function AppCarregado({
           setMostrarAbrir(true);
         }}
         onItens={() => navegar({ tela: "itens" })}
-        onCenarios={() => setMostrarJornada(true)}
         onSair={() => void onSair()}
       />
 
@@ -1147,6 +1177,20 @@ const botaoEstilo: React.CSSProperties = {
   color: "var(--texto-2)",
   cursor: "pointer",
   whiteSpace: "nowrap",
+};
+
+/** §198 — as portas de experimentar: contorno de acento e fundo tingido, pra
+ * não parecerem "mais um componente" ao lado dos `+ Serviço`. */
+const botaoExperimentarEstilo: React.CSSProperties = {
+  fontSize: 12,
+  padding: "6px 12px",
+  borderRadius: 999,
+  border: "1px solid var(--acento)",
+  background: "rgba(99, 102, 241, 0.14)",
+  color: "var(--texto)",
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+  fontWeight: 600,
 };
 
 const botaoPrimarioEstilo: React.CSSProperties = {

@@ -18,7 +18,6 @@ export interface MenuLateralProps {
   onAbrirQuebras: () => void;
   /** SPEC-41 — a tela dos itens de trabalho gerados da demanda aberta. */
   onItens: () => void;
-  onCenarios: () => void;
   onSair: () => void;
 }
 
@@ -61,7 +60,6 @@ export function MenuLateral({
   onNovaQuebra,
   onAbrirQuebras,
   onItens,
-  onCenarios,
   onSair,
 }: MenuLateralProps) {
   if (!aberto) return null;
@@ -93,9 +91,8 @@ export function MenuLateral({
         <button onClick={acao(onItens)} style={itemEstilo}>
           Itens escritos
         </button>
-        <button onClick={acao(onCenarios)} style={itemEstilo}>
-          ✦ Como funciona &amp; cenários
-        </button>
+        {/* §198 — "cenários" e "demonstração & tour" viraram dois botões
+            fixos no header: são portas de EXPERIMENTAR, não de administrar. */}
 
         {GRUPOS.map((grupo) => (
           <div key={grupo.titulo}>

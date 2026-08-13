@@ -17,9 +17,7 @@ test("gerar itens na revisão abre a tela #/itens com cards e completude", async
   );
   await entrar(page);
 
-  await page.getByRole("button", { name: "☰ Menu" }).click();
-  await page.getByRole("button", { name: "✦ Como funciona & cenários" }).click();
-  await page.getByRole("button", { name: /Cenários prontos/ }).click();
+  await page.getByTestId("abrir-cenarios").click();
   await page.getByRole("button", { name: "Carregar cenário: Dados não-relacionais" }).click();
   await page.locator('[data-tour="derivar-button"]').click();
   // Sem título: derivar sem salvar (exploração) — os itens ficam locais.
