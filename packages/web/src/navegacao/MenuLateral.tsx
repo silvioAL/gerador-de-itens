@@ -14,6 +14,10 @@ export interface MenuLateralProps {
   email: string;
   onTrocarTime: (timeId: string) => void;
   onNavegar: (area: AreaConfig) => void;
+  /** SPEC-51 — o menu passa a DIZER o que a pessoa pode: item que ela não
+   * edita vem com cadeado, em vez de levar a uma tela que não é a que ela
+   * clicou (o comportamento antigo caía na primeira área permitida). */
+  podeEditarArea?: (area: AreaConfig) => boolean;
   onNovaQuebra: () => void;
   onAbrirQuebras: () => void;
   /** SPEC-41 — a tela dos itens de trabalho gerados da demanda aberta. */
@@ -58,6 +62,7 @@ export function MenuLateral({
   email,
   onTrocarTime,
   onNavegar,
+  podeEditarArea,
   onNovaQuebra,
   onAbrirQuebras,
   onItens,
@@ -98,11 +103,21 @@ export function MenuLateral({
         {GRUPOS.map((grupo) => (
           <div key={grupo.titulo}>
             <p style={tituloGrupoEstilo}>{grupo.titulo}</p>
-            {grupo.itens.map((item) => (
-              <button key={item.area} onClick={acao(() => onNavegar(item.area))} style={itemEstilo}>
-                {item.rotulo}
-              </button>
-            ))}
+            {grupo.itens.map((item) => {
+              const bloqueada = podeEditarArea ? !podeEditarArea(item.area) : false;
+              return (
+                <button
+                  key={item.area}
+                  onClick={acao(() => onNavegar(item.area))}
+                  style={itemEstilo}
+                  title={bloqueada ? "Você não edita esta área — dá pra pedir um ajuste por lá" : undefined}
+                  data-bloqueada={bloqueada ? "sim" : undefined}
+                >
+                  {item.rotulo}
+                  {bloqueada && <span style={{ marginLeft: 6, opacity: 0.75 }}>🔒</span>}
+                </button>
+              );
+            })}
           </div>
         ))}
 
