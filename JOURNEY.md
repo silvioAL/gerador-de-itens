@@ -5278,3 +5278,49 @@ confiança num formulário.
 Mordidas nas duas peças (área negada voltando a cair noutra tela; cadeado
 desligado) → quatro testes vermelhos, nenhum deles existia antes. 461 web
 unit; 52/52 E2E.
+
+## 203. O caminho NEGADO exercido de verdade — e o setup que mentia em silêncio
+
+A §202 entregou o cadeado e o pedido, mas com uma ressalva honesta: o
+caminho negado nunca tinha sido percorrido com o RBAC LIGADO. Ligar o
+controle de acesso é da organização inteira, e fazer isso no ambiente de
+trabalho de alguém para "ver se funciona" é mudar o ambiente de alguém.
+
+A stack de teste dedicada já existia (`docker-compose.e2e.yml`, banco
+próprio na 5433), então o que faltava era um spec que ligasse o RBAC sem
+contaminar os vizinhos. `playwright.config.ts` ganhou dois projetos: `app` e
+`rbac`, o segundo dependendo do primeiro — o spec que liga o controle roda
+sozinho, depois que todo o resto terminou. Ele entra como quem só pode mexer
+em campos por componente (nível `operar`, porque owner passaria pelo bypass
+da SPEC-38 e o teste mediria o portão errado) e afere as três coisas: o
+cadeado no menu, a área negada explicando que é permissão, e o pedido
+virando solicitação de verdade com o recurso certo e o solicitante certo.
+
+Três defeitos apareceram no caminho, e os três eram de **silêncio**:
+
+1. O helper `entrar()` sempre esperava a tela de escolha de time. Quem tem
+   UM time só não passa por ela, então o clique esperava para sempre — e o
+   relatório mostrava um erro do `finally`, não a causa. `actionTimeout`
+   entrou na config: espera sem fim vira mensagem, não mistério.
+
+2. O `globalSetup` truncava `quebras` sem CASCADE. A FK nova de
+   `itens_gerados` (0025) fazia o TRUNCATE falhar, o `catch {}` engolia, e
+   TODO o resto do setup virava no-op — seed dos padrões incluída. A suíte
+   reportava 18 falhas espalhadas em vez de "o setup não rodou". Agora o
+   `catch` só tolera tabela inexistente (banco novo); qualquer outro erro
+   sobe.
+
+3. Criar o primeiro papel faz o servidor criar junto o "Administrador" — a
+   tranca que impede de trancar quem ligou o RBAC. Apagar só o papel que o
+   teste criou deixava esse de pé, e papel existindo é o que MANTÉM o RBAC
+   ligado: a corrida seguinte inteira levava 403 por um motivo nascido na
+   anterior. A limpeza agora apaga todos e AFERE que sobrou zero, e o
+   `globalSetup` repete a limpeza como rede de segurança.
+
+A lição que fica dos três: limpeza presumida é limpeza que não aconteceu. O
+que o teste arruma no `finally` precisa ser conferido no mesmo lugar, senão
+o estrago aparece longe, noutro spec, sem pista nenhuma.
+
+Mordidas: menu ignorando as permissões → asserção do cadeado vermelha; área
+negada sempre falsa → asserção do aviso vermelha. 53/53 E2E, banco de teste
+sem resíduo depois da corrida.

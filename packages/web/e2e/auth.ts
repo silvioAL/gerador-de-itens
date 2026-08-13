@@ -16,8 +16,17 @@ export async function entrar(page: Page, timeId = "time-pagamentos", email = "de
   await page.getByRole("button", { name: "Entrar" }).first().click();
   await page.getByPlaceholder("voce@empresa.com").fill(email);
   await page.getByRole("button", { name: "Entrar" }).click();
-  // dev@gerador.local tem mais de um time -> EscolherTimeScreen decide qual fica ativo.
-  await page.getByRole("button", { name: timeId, exact: true }).click();
+  // dev@gerador.local tem mais de um time -> EscolherTimeScreen decide qual fica
+  // ativo. Quem tem UM só time não passa por essa tela (o app já entra nele), e
+  // esperar por um botão que nunca vai existir travava o spec inteiro em
+  // silêncio até o timeout do teste — daí a corrida entre as duas telas.
+  const escolherTime = page.getByRole("button", { name: timeId, exact: true });
+  const jaDentro = page.getByRole("button", { name: "+ Serviço", exact: true });
+  await Promise.race([
+    escolherTime.waitFor({ state: "visible", timeout: 15000 }),
+    jaDentro.waitFor({ state: "visible", timeout: 15000 }),
+  ]).catch(() => {});
+  if (await escolherTime.isVisible().catch(() => false)) await escolherTime.click();
   // Landing E tela de login também mostram "Gerador de Itens" (título) — não
   // dá pra usar isso como prova de login bem-sucedido. O botão "+ Serviço" só
   // existe depois de autenticado de verdade (achado real: sem essa asserção

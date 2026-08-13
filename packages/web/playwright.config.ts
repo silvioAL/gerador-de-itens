@@ -24,11 +24,30 @@ const DATABASE_URL_TESTE =
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
+  /**
+   * §203 — dois projetos, e o segundo depende do primeiro.
+   *
+   * O spec de RBAC precisa LIGAR o controle de acesso, que é da organização
+   * inteira: com ele rodando em paralelo, qualquer spec vizinho que assume o
+   * modo aberto passa a levar 403 (é a mesma contaminação que
+   * `app.test.ts` documenta pro vitest). `dependencies` faz esse spec rodar
+   * sozinho, depois que todo o resto terminou.
+   */
+  projects: [
+    { name: "app", testIgnore: /rbac-.*\.spec\.ts/ },
+    { name: "rbac", testMatch: /rbac-.*\.spec\.ts/, dependencies: ["app"] },
+  ],
   reporter: "list",
   globalSetup: "./e2e/globalSetup.ts",
   use: {
     baseURL: "http://localhost:5190",
     screenshot: "only-on-failure",
+    // Sem isto, uma ação que espera por um elemento inexistente consome o
+    // timeout do TESTE e o relatório mostra só o erro do `finally` — foi o que
+    // escondeu, por várias rodadas, um `click()` num botão que nunca ia
+    // aparecer. Alto o bastante pros passos legitimamente lentos (geração via
+    // IA falsa) e ainda assim menor que o teste.
+    actionTimeout: 30000,
     // SPEC-30 Fase 1a — microfone falso do Chromium: `getUserMedia` devolve um
     // tom sintético e a permissão é concedida sem diálogo. Fica aqui, e não no
     // `test.use()` do spec, porque `launchOptions` num describe forçaria um
