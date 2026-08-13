@@ -14,10 +14,11 @@ vi.mock("../api/client", () => ({
     aplicarAjuste: vi.fn(),
   },
   apiRegras: { obter: vi.fn() },
+  apiPipelineAgentes: { obter: vi.fn() },
   apiIa: { sugerir: vi.fn() },
 }));
 
-import { apiIa, apiPdca, apiRegras } from "../api/client";
+import { apiIa, apiPdca, apiPipelineAgentes, apiRegras } from "../api/client";
 import { PdcaTab } from "./PdcaTab";
 
 const config: DiagramaConfig = {
@@ -60,6 +61,13 @@ beforeEach(() => {
   (apiPdca.listarFeedback as Mock).mockResolvedValue([feedback]);
   (apiPdca.listarAjustes as Mock).mockResolvedValue([]);
   (apiRegras.obter as Mock).mockResolvedValue(regras);
+  (apiPipelineAgentes.obter as Mock).mockResolvedValue({
+    confirmacaoObrigatoria: true,
+    papeis: [
+      { id: "po", nome: "PO", grupo: "po", ativo: true, contextos: [] },
+      { id: "qa", nome: "QA", grupo: "qa", ativo: true, contextos: [] },
+    ],
+  });
 });
 
 describe("PdcaTab — a jornada do PDCA (SPEC-45)", () => {
@@ -219,5 +227,43 @@ describe("PdcaTab — a jornada do PDCA (SPEC-45)", () => {
         expect.objectContaining({ operacao: { tipo: "remover-volumetria", tech: "Backend" } })
       )
     );
+  });
+
+  it("SPEC-50 — o ajuste alcança a ESTEIRA: desligar um papel vira operação de pipeline", async () => {
+    (apiPdca.criarAjuste as Mock).mockResolvedValue({ id: "s5" });
+    montar();
+    fireEvent.click(await screen.findByTestId("propor-f1"));
+
+    fireEvent.change(screen.getByLabelText("Documento a ajustar"), { target: { value: "pipeline-agentes" } });
+    await waitFor(() => expect(screen.getByLabelText("Papel da esteira")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Papel da esteira"), { target: { value: "qa" } });
+
+    // A prévia do pipeline responde outra pergunta: quem escreve, não o texto.
+    expect(screen.getByTestId("previa-do-pipeline").textContent).toContain("para de escrever");
+
+    fireEvent.click(screen.getByTestId("salvar-ajuste"));
+    await waitFor(() =>
+      expect(apiPdca.criarAjuste).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recurso: "pipeline-agentes",
+          operacao: { tipo: "desativar-papel", papelId: "qa", papelNome: "QA" },
+        })
+      )
+    );
+  });
+
+  it("SPEC-50 — papel já desligado sugere LIGAR: quem abre o ajuste quer mudar, não confirmar", async () => {
+    (apiPipelineAgentes.obter as Mock).mockResolvedValue({
+      confirmacaoObrigatoria: true,
+      papeis: [{ id: "qa", nome: "QA", grupo: "qa", ativo: false, contextos: [] }],
+    });
+    montar();
+    fireEvent.click(await screen.findByTestId("propor-f1"));
+    fireEvent.change(screen.getByLabelText("Documento a ajustar"), { target: { value: "pipeline-agentes" } });
+    await waitFor(() => expect(screen.getByLabelText("Papel da esteira")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Papel da esteira"), { target: { value: "qa" } });
+
+    expect(screen.getByLabelText("Ligar ou desligar")).toHaveValue("ligar");
+    expect(screen.getByTestId("previa-do-pipeline").textContent).toContain("passa a escrever");
   });
 });

@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import type { DiagramaConfig, OperacaoDeAjuste, RegrasConfig, SecaoDeRegras } from "@gerador/engine";
-import { descreverOperacao } from "@gerador/engine";
-import { apiIa, apiPdca, apiRegras, type FeedbackPdca, type SolicitacaoAjuste } from "../api/client";
+import { descreverOperacao, recursoAlvoDaOperacao } from "@gerador/engine";
+import {
+  apiIa,
+  apiPdca,
+  apiPipelineAgentes,
+  apiRegras,
+  type ConfigPipelineAgentes,
+  type FeedbackPdca,
+  type SolicitacaoAjuste,
+} from "../api/client";
 import type { AreaConfig } from "../navegacao/rota";
 import { simularItemComAjuste } from "./previaDoAjuste";
 
@@ -34,20 +42,24 @@ export function PdcaTab({ config, timeAtivo, onAbrirArea }: PdcaTabProps) {
   const [feedbacks, setFeedbacks] = useState<FeedbackPdca[]>([]);
   const [ajustes, setAjustes] = useState<SolicitacaoAjuste[]>([]);
   const [regras, setRegras] = useState<RegrasConfig | null>(null);
+  const [pipeline, setPipeline] = useState<ConfigPipelineAgentes | null>(null);
   const [emEstudio, setEmEstudio] = useState<FeedbackPdca | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
   async function recarregar() {
-    const [cfg, fbs, ajs, regs] = await Promise.all([
+    const [cfg, fbs, ajs, regs, pipe] = await Promise.all([
       apiPdca.config().catch(() => CADENCIA_PADRAO),
       apiPdca.listarFeedback().catch(() => []),
       apiPdca.listarAjustes().catch(() => []),
       apiRegras.obter().catch(() => null),
+      // SPEC-50 — o outro documento que o ajuste alcança: os papéis da esteira.
+      apiPipelineAgentes.obter().catch(() => null),
     ]);
     setCadencia(cfg);
     setFeedbacks(fbs);
     setAjustes(ajs);
     setRegras(regs);
+    setPipeline(pipe);
   }
 
   useEffect(() => {
@@ -130,6 +142,7 @@ export function PdcaTab({ config, timeAtivo, onAbrirArea }: PdcaTabProps) {
           feedback={emEstudio}
           config={config}
           regras={regras}
+          pipeline={pipeline}
           timeAtivo={timeAtivo}
           onCancelar={() => setEmEstudio(null)}
           onSalvo={() => {
@@ -237,6 +250,7 @@ function EstudioDeAjuste({
   feedback,
   config,
   regras,
+  pipeline,
   timeAtivo,
   onCancelar,
   onSalvo,
@@ -244,6 +258,7 @@ function EstudioDeAjuste({
   feedback: FeedbackPdca;
   config: DiagramaConfig;
   regras: RegrasConfig;
+  pipeline: ConfigPipelineAgentes | null;
   timeAtivo: string;
   onCancelar: () => void;
   onSalvo: () => void;
@@ -254,6 +269,11 @@ function EstudioDeAjuste({
   // SPEC-46 — as quatro seções das regras de refinamento, não só o checklist
   // técnico: "sobrou volumetria" e "faltou repontar massa" são feedback real,
   // e cada seção tem dono próprio (SPEC-28).
+  // SPEC-50 — o ajuste alcança dois documentos: as regras de refinamento e a
+  // esteira de agentes ("esse papel sobra nos meus itens" é feedback comum).
+  const [alvo, setAlvo] = useState<"regras" | "pipeline-agentes">("regras");
+  const [papelId, setPapelId] = useState("");
+  const [ligarPapel, setLigarPapel] = useState(false);
   const [secao, setSecao] = useState<SecaoDeRegras>("checklistTecnico");
   const [acao, setAcao] = useState<"adicionar" | "remover">("adicionar");
   const [validacao, setValidacao] = useState("");
@@ -275,6 +295,13 @@ function EstudioDeAjuste({
 
   const contextos = contextual ? config.nodeTypes[tipoNo]?.contextos ?? [] : [];
   const operacao: OperacaoDeAjuste | null = useMemo(() => {
+    if (alvo === "pipeline-agentes") {
+      if (!papelId) return null;
+      const nome = (pipeline?.papeis ?? []).find((p) => p.id === papelId)?.nome;
+      return ligarPapel
+        ? { tipo: "ativar-papel", papelId, papelNome: nome }
+        : { tipo: "desativar-papel", papelId, papelNome: nome };
+    }
     if (!tech) return null;
     // Volumetria é liga/desliga por tech — não tem texto por item.
     if (secao === "volumetria") {
@@ -289,12 +316,17 @@ function EstudioDeAjuste({
     return acao === "adicionar"
       ? { tipo: "adicionar-checklist", secao, tech, contextos, texto: texto.trim() }
       : { tipo: "remover-checklist", secao, tech, texto: texto.trim() };
-  }, [secao, acao, tech, texto, validacao, dev, hlg, contextos]);
+  }, [alvo, papelId, ligarPapel, pipeline, secao, acao, tech, texto, validacao, dev, hlg, contextos]);
 
   const previa = useMemo(
-    () => (tipoNo ? simularItemComAjuste(config, regras, tipoNo, operacao) : null),
-    [config, regras, tipoNo, operacao]
+    () => (tipoNo && alvo === "regras" ? simularItemComAjuste(config, regras, tipoNo, operacao) : null),
+    [config, regras, tipoNo, operacao, alvo]
   );
+
+  /** SPEC-50 — a prévia do PIPELINE é outra pergunta: o que deixa (ou passa) a
+   * ter dono no item. Desligar um papel não muda o texto do item de exemplo —
+   * muda quem o escreve, e é isso que a pessoa precisa ver antes de decidir. */
+  const papelEmFoco = (pipeline?.papeis ?? []).find((p) => p.id === papelId);
 
   const itensDaTech: string[] =
     secao === "testes"
@@ -349,7 +381,7 @@ function EstudioDeAjuste({
     setErro(null);
     try {
       await apiPdca.criarAjuste({
-        recurso: "regras",
+        recurso: recursoAlvoDaOperacao(operacao),
         descricao: descricao.trim(),
         timeId: timeAtivo,
         operacao,
@@ -369,6 +401,53 @@ function EstudioDeAjuste({
           <h3 style={tituloEstilo}>Propor ajuste</h3>
           <p style={{ ...proseEstilo, fontStyle: "italic" }}>“{feedback.texto}”</p>
 
+          <label style={labelEstilo}>O que ajustar</label>
+          <select
+            aria-label="Documento a ajustar"
+            value={alvo}
+            onChange={(e) => setAlvo(e.target.value as "regras" | "pipeline-agentes")}
+            style={inputEstilo}
+          >
+            <option value="regras">Regras de refinamento (o conteúdo dos itens)</option>
+            <option value="pipeline-agentes">Esteira de agentes (quem escreve o quê)</option>
+          </select>
+
+          {alvo === "pipeline-agentes" ? (
+            <>
+              <label style={labelEstilo}>Papel</label>
+              <select
+                aria-label="Papel da esteira"
+                value={papelId}
+                onChange={(e) => {
+                  setPapelId(e.target.value);
+                  const p = (pipeline?.papeis ?? []).find((x) => x.id === e.target.value);
+                  // Sugere o oposto do estado atual: quem abre o ajuste quer
+                  // MUDAR o papel, não confirmar o que já está.
+                  setLigarPapel(p ? !p.ativo : true);
+                }}
+                style={inputEstilo}
+              >
+                <option value="">— escolha o papel —</option>
+                {(pipeline?.papeis ?? []).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nome} {p.ativo ? "(ligado)" : "(desligado)"}
+                  </option>
+                ))}
+              </select>
+
+              <label style={labelEstilo}>O que fazer</label>
+              <select
+                aria-label="Ligar ou desligar"
+                value={ligarPapel ? "ligar" : "desligar"}
+                onChange={(e) => setLigarPapel(e.target.value === "ligar")}
+                style={inputEstilo}
+              >
+                <option value="desligar">Desligar da esteira</option>
+                <option value="ligar">Ligar na esteira</option>
+              </select>
+            </>
+          ) : (
+          <>
           <label style={labelEstilo}>Onde (a seção das regras de refinamento)</label>
           <select
             aria-label="Seção das regras"
@@ -470,6 +549,9 @@ function EstudioDeAjuste({
             </label>
           )}
 
+          </>
+          )}
+
           <label style={labelEstilo}>O pedido, em uma frase</label>
           <textarea
             aria-label="Descrição do pedido"
@@ -492,6 +574,41 @@ function EstudioDeAjuste({
 
         {/* Coluna 2 — a prévia iterativa */}
         <div style={{ flex: "1 1 320px", minWidth: 300 }} data-testid="previa-do-ajuste">
+          {alvo === "pipeline-agentes" ? (
+            <div data-testid="previa-do-pipeline">
+              <h3 style={tituloEstilo}>O que muda na esteira</h3>
+              {!papelEmFoco ? (
+                <p style={vazioEstilo}>Escolha o papel para ver o efeito.</p>
+              ) : (
+                <>
+                  <p style={proseEstilo}>
+                    {ligarPapel ? (
+                      <>
+                        <strong>{papelEmFoco.nome}</strong> passa a escrever nos itens novos — a seção dele deixa de
+                        chegar vazia na revisão.
+                      </>
+                    ) : (
+                      <>
+                        <strong>{papelEmFoco.nome}</strong> para de escrever: a seção dele fica sem dono e os campos
+                        chegam em branco, pra quem quiser preencher à mão.
+                      </>
+                    )}
+                  </p>
+                  <p style={{ ...proseEstilo, color: "var(--texto-mudo)" }}>
+                    Vale da PRÓXIMA geração em diante — o que já foi escrito continua onde está.
+                  </p>
+                  <ul style={{ fontSize: 12.5, color: "var(--texto-2)", paddingLeft: 18, lineHeight: 1.6 }}>
+                    {(pipeline?.papeis ?? []).map((p) => (
+                      <li key={p.id}>
+                        {p.nome}: {p.id === papelId ? (ligarPapel ? "ligado (mudança)" : "desligado (mudança)") : p.ativo ? "ligado" : "desligado"}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          ) : (
+          <>
           <h3 style={tituloEstilo}>Como fica um item de {config.nodeTypes[tipoNo]?.label ?? tipoNo}</h3>
           {!previa ? (
             <p style={vazioEstilo}>Este componente não gera item — escolha outro para ver a prévia.</p>
@@ -531,6 +648,8 @@ function EstudioDeAjuste({
                 {previa.markdown}
               </pre>
             </>
+          )}
+          </>
           )}
         </div>
       </div>

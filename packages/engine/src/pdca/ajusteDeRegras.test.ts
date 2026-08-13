@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { RegrasConfig } from "../config/types.js";
-import { aplicarOperacao, descreverOperacao, diferencaDoChecklist, secaoDaOperacao } from "./ajusteDeRegras.js";
+import {
+  aplicarOperacao,
+  aplicarOperacaoNoPipeline,
+  descreverOperacao,
+  diferencaDoChecklist,
+  recursoAlvoDaOperacao,
+  secaoDaOperacao,
+} from "./ajusteDeRegras.js";
 
 const base: RegrasConfig = {
   tipos: [],
@@ -162,5 +169,42 @@ describe("ajusteDeRegras (SPEC-45 — o ajuste como dado)", () => {
     });
     // Na seção técnica, nada mudou.
     expect(diferencaDoChecklist(base, comProcesso, "Backend")).toEqual({ adicionados: [], removidos: [] });
+  });
+
+  it("SPEC-50 — papel da esteira também é ajuste: liga/desliga sem tocar no resto do documento", () => {
+    const pipeline = {
+      confirmacaoObrigatoria: true,
+      papeis: [
+        { id: "po", nome: "PO", ativo: true },
+        { id: "qa", nome: "QA", ativo: true },
+      ],
+    };
+
+    const semQa = aplicarOperacaoNoPipeline(pipeline, { tipo: "desativar-papel", papelId: "qa", papelNome: "QA" });
+    expect(semQa.papeis.find((p) => p.id === "qa")?.ativo).toBe(false);
+    expect(semQa.papeis.find((p) => p.id === "po")?.ativo).toBe(true);
+    expect(semQa.confirmacaoObrigatoria).toBe(true);
+    // O original intacto — a prévia compara os dois.
+    expect(pipeline.papeis.find((p) => p.id === "qa")?.ativo).toBe(true);
+
+    const comQa = aplicarOperacaoNoPipeline(semQa, { tipo: "ativar-papel", papelId: "qa" });
+    expect(comQa.papeis.find((p) => p.id === "qa")?.ativo).toBe(true);
+  });
+
+  it("SPEC-50 — papel inexistente é no-op (a config pode ter mudado entre o pedido e a decisão)", () => {
+    const pipeline = { papeis: [{ id: "po", ativo: true }] };
+    expect(aplicarOperacaoNoPipeline(pipeline, { tipo: "desativar-papel", papelId: "sumiu" })).toEqual(pipeline);
+  });
+
+  it("SPEC-50 — o alvo diz qual DOCUMENTO muda: é o que decide o gate e o caminho de aplicar", () => {
+    expect(recursoAlvoDaOperacao({ tipo: "desativar-papel", papelId: "qa" })).toBe("pipeline-agentes");
+    expect(recursoAlvoDaOperacao({ tipo: "adicionar-checklist", tech: "T", contextos: [], texto: "x" })).toBe("regras");
+  });
+
+  it("SPEC-50 — a descrição fala de papel, não de seção de regras", () => {
+    expect(descreverOperacao({ tipo: "desativar-papel", papelId: "qa", papelNome: "QA" })).toBe(
+      'Desligar o papel "QA" da esteira de agentes'
+    );
+    expect(descreverOperacao({ tipo: "ativar-papel", papelId: "qa" })).toContain('Ligar o papel "qa"');
   });
 });

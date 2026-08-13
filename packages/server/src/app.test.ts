@@ -1588,6 +1588,109 @@ describe("SPEC-45 — a jornada do PDCA (feedback → ajuste → aplicado)", () 
     expect(regras.documento.porTech.java.volumetria).toEqual({ contextos: [] });
   });
 
+  it("SPEC-50 — ajuste de PAPEL aplica no pipeline de agentes, não nas regras", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    await app.inject({
+      method: "PUT",
+      url: "/config/pipeline-agentes",
+      cookies: { gerador_sessao: cookie },
+      payload: {
+        documento: {
+          confirmacaoObrigatoria: true,
+          papeis: [
+            { id: "po", nome: "PO", grupo: "po", ativo: true, contextos: [] },
+            { id: "qa", nome: "QA", grupo: "qa", ativo: true, contextos: [] },
+          ],
+        },
+      },
+    });
+
+    const criada = (
+      await app.inject({
+        method: "POST",
+        url: "/ajustes",
+        cookies: { gerador_sessao: cookie },
+        payload: {
+          recurso: "pipeline-agentes",
+          descricao: "o QA sobra nos itens de infra",
+          operacao: { tipo: "desativar-papel", papelId: "qa", papelNome: "QA" },
+        },
+      })
+    ).json();
+
+    await app.inject({
+      method: "POST",
+      url: `/ajustes/${criada.id}/decidir`,
+      cookies: { gerador_sessao: cookie },
+      payload: { aprovar: true },
+    });
+    const aplicada = await app.inject({ method: "POST", url: `/ajustes/${criada.id}/aplicar`, cookies: { gerador_sessao: cookie } });
+    expect(aplicada.statusCode).toBe(200);
+
+    const pipeline = (await app.inject({ method: "GET", url: "/config/pipeline-agentes" })).json();
+    expect(pipeline.documento.papeis.find((p: { id: string }) => p.id === "qa").ativo).toBe(false);
+    expect(pipeline.documento.papeis.find((p: { id: string }) => p.id === "po").ativo).toBe(true);
+    expect(pipeline.documento.confirmacaoObrigatoria).toBe(true);
+  });
+
+  it("SPEC-50 — quem decide um ajuste de papel é o dono do PIPELINE, não o do checklist", async () => {
+    const [org] = await db.select().from(organizacoes).limit(1);
+    const [papel] = await db.insert(papeisAcesso).values({ organizacaoId: org.id, nome: "Arquitetura da esteira" }).returning();
+    await db.insert(papelPermissao).values({ papelId: papel.id, recurso: "pipeline-agentes", acao: "editar" });
+    await db.insert(usuarioPapel).values({ email: EMAIL_OUTRO, papelId: papel.id, escopoTimeId: null });
+    await db.update(usuarioTime).set({ nivel: "operar" }).where(eq(usuarioTime.email, EMAIL_OUTRO));
+    const cookieDono = await logarComo(EMAIL_OUTRO);
+    const cookieDev = await logarComo(EMAIL_DEV);
+
+    const doPipeline = (
+      await app.inject({
+        method: "POST",
+        url: "/ajustes",
+        cookies: { gerador_sessao: cookieDev },
+        payload: {
+          recurso: "pipeline-agentes",
+          descricao: "desligar QA",
+          operacao: { tipo: "desativar-papel", papelId: "qa" },
+        },
+      })
+    ).json();
+    const deRegras = (
+      await app.inject({
+        method: "POST",
+        url: "/ajustes",
+        cookies: { gerador_sessao: cookieDev },
+        payload: {
+          recurso: "regras",
+          descricao: "checklist",
+          operacao: { tipo: "adicionar-checklist", tech: "java", contextos: [], texto: "DLQ" },
+        },
+      })
+    ).json();
+
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: `/ajustes/${doPipeline.id}/decidir`,
+          cookies: { gerador_sessao: cookieDono },
+          payload: { aprovar: true },
+        })
+      ).statusCode
+    ).toBe(200);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: `/ajustes/${deRegras.id}/decidir`,
+          cookies: { gerador_sessao: cookieDono },
+          payload: { aprovar: true },
+        })
+      ).statusCode
+    ).toBe(403);
+
+    await db.update(usuarioTime).set({ nivel: "owner" }).where(eq(usuarioTime.email, EMAIL_OUTRO));
+  });
+
   it("SPEC-46 — quem decide é o dono da SEÇÃO: curador de processo aprova o pedido de processo e é barrado no técnico", async () => {
     const [org] = await db.select().from(organizacoes).limit(1);
     const [papel] = await db.insert(papeisAcesso).values({ organizacaoId: org.id, nome: "Agilidade" }).returning();
