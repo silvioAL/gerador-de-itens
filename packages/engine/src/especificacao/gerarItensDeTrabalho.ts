@@ -38,7 +38,12 @@ export function gerarItensDeTrabalho(
   atividades: Atividade[],
   diagrama: Diagrama,
   config: DiagramaConfig,
-  opcoes: { regras?: RegrasConfig; respostasItens?: Record<string, Record<string, ValorSpec>> } = {}
+  opcoes: {
+    regras?: RegrasConfig;
+    respostasItens?: Record<string, Record<string, ValorSpec>>;
+    /** SPEC-47 — o mesmo template do corpo que o documento usa. */
+    templateItem?: string;
+  } = {}
 ): ItemDeTrabalho[] {
   return atividades.map((a, i) => {
     const corpoMarkdown = renderizarItemEspecificacao(
@@ -47,7 +52,8 @@ export function gerarItensDeTrabalho(
       diagrama,
       config,
       opcoes.regras,
-      opcoes.respostasItens?.[a.chave]
+      opcoes.respostasItens?.[a.chave],
+      opcoes.templateItem
     );
     return {
       chave: a.chave,

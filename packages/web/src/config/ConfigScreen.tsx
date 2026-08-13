@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { DiagramaConfig } from "@gerador/engine";
+import { TEMPLATE_ITEM_PADRAO } from "@gerador/engine";
 import type { CampoAresta, CampoNo, ConfigPipelineAgentes, DadosCampoAresta, DadosCampoNo, EspecificacaoTemplate } from "../api/client";
 import { PerfisStackTab } from "./PerfisStackTab";
 import { CamposNoTab } from "./CamposNoTab";
@@ -29,6 +30,8 @@ export interface ConfigScreenProps {
   camposNo: CampoNo[];
   camposAresta: CampoAresta[];
   especificacaoTemplate: EspecificacaoTemplate;
+  /** SPEC-47 — template do corpo do item (null = ainda o padrão). */
+  templateItem?: EspecificacaoTemplate | null;
   pipelineAgentes: ConfigPipelineAgentes;
   timeAtivo: string;
   /** false no modo local (CLI) — sem servidor não existe conceito de outros
@@ -79,6 +82,7 @@ export function ConfigScreen({
   camposNo,
   camposAresta,
   especificacaoTemplate,
+  templateItem,
   pipelineAgentes,
   timeAtivo,
   onPerfisMudaram,
@@ -259,6 +263,8 @@ export function ConfigScreen({
             template={especificacaoTemplate}
             timeAtivo={timeAtivo}
             onSalvar={onSalvarEspecificacaoTemplate}
+          templateItem={templateItem}
+            templateItemPadrao={TEMPLATE_ITEM_PADRAO}
           />
         )}
         {abaAtiva === "pipeline" && (

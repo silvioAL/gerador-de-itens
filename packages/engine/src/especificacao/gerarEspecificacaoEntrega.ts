@@ -3,6 +3,7 @@ import type { DiagramaConfig, FieldSpec, RegrasConfig } from "../config/types.js
 import { camposVisiveis } from "../spec/campos.js";
 import {
   CHAVE_CENARIO_FEATURE,
+  CHAVE_ENTREGA_FINAL,
   CHAVE_CONTRATO_DEPENDENCIAS,
   CHAVE_CONTRATO_ERROS,
   CHAVE_CONTRATO_NO_VINCULADO,
@@ -335,6 +336,149 @@ export function problemasDoTemplate(template: string): ProblemasDoTemplate {
 }
 
 /**
+ * SPEC-47 — as variáveis do TEMPLATE DO ITEM. O corpo de cada item era
+ * estrutura fixa no código: quem quisesse outra ordem, outro título de seção
+ * ou uma seção nova (o caso que motivou isto: **a entrega final no fim de
+ * cada item**) não tinha por onde. Agora é template, como o documento —
+ * fechado de propósito, pela mesma razão do `VARIAVEIS_ESPECIFICACAO`:
+ * template não inventa variável que o motor não sabe preencher.
+ */
+export const VARIAVEIS_ITEM = [
+  "numero",
+  "rotulo",
+  "descricao",
+  "tipo",
+  "tamanho",
+  "techs",
+  "contextos",
+  "dependencias",
+  "historiaUsuario",
+  "especificacaoTecnica",
+  "contratoArquitetura",
+  "refinamentoTecnico",
+  "checklistProcesso",
+  "volumetria",
+  "criteriosAceite",
+  "criteriosContextuais",
+  "regrasTeste",
+  "cenarioGherkin",
+  "entregaFinal",
+] as const;
+
+/**
+ * O item como o produto o escreve hoje — mais a **Entrega final**, que é o
+ * que faltava: o documento descrevia o trabalho e terminava no cenário de
+ * teste, sem dizer o que fica pronto quando o item acaba.
+ *
+ * Seção cujo conteúdo está vazio some inteira (ver `aplicarTemplateDoItem`):
+ * título de seção sem corpo é ruído em documento que alguém vai ler.
+ */
+export const TEMPLATE_ITEM_PADRAO = `### {{numero}}. {{rotulo}} — {{descricao}}
+
+**Tipo:** {{tipo}} · **Tamanho:** {{tamanho}}
+**Techs:** {{techs}} · **Contextos:** {{contextos}}
+**Dependências:** {{dependencias}}
+
+#### História de usuário
+
+{{historiaUsuario}}
+
+#### Especificação técnica
+
+{{especificacaoTecnica}}
+
+#### Contrato de arquitetura
+
+{{contratoArquitetura}}
+
+#### Requisitos de refinamento técnico
+
+{{refinamentoTecnico}}
+
+#### Checklist de processo
+
+{{checklistProcesso}}
+
+#### Requisitos de volumetria
+
+{{volumetria}}
+
+#### Critérios de aceite (Gherkin)
+
+{{criteriosAceite}}
+
+{{criteriosContextuais}}
+
+#### Regras de teste (QA)
+
+{{regrasTeste}}
+
+#### Cenário Gherkin adicional (QA)
+
+{{cenarioGherkin}}
+
+#### Entrega final
+
+{{entregaFinal}}
+`;
+
+/** Nomes de variável que o template do item usa mas o motor não preenche. */
+export function validarTemplateItem(template: string): string[] {
+  const validas: readonly string[] = VARIAVEIS_ITEM;
+  return extrairVariaveis(template).filter((v) => !validas.includes(v));
+}
+
+/** SPEC-47 — sem `{{entregaFinal}}` o item volta a terminar sem dizer o que
+ * fica pronto (o pedido do §196); sem os três do topo, ninguém sabe o que é
+ * o item. Aviso, não erro: template enxuto é escolha legítima, dita em voz
+ * alta (mesma disciplina do template do documento). */
+export function problemasDoTemplateItem(template: string): ProblemasDoTemplate {
+  const erros = validarTemplateItem(template).map(
+    (v) => `{{${v}}} não existe — o motor não sabe preenchê-la (válidas: ${VARIAVEIS_ITEM.map((x) => `{{${x}}}`).join(", ")})`
+  );
+  const usadas = extrairVariaveis(template);
+  const avisos: string[] = [];
+  if (!usadas.includes("entregaFinal")) avisos.push("sem {{entregaFinal}}, o item não diz o que fica pronto quando termina");
+  if (!usadas.includes("historiaUsuario")) avisos.push("sem {{historiaUsuario}}, o item não diz para quem é nem por quê");
+  if (!usadas.includes("especificacaoTecnica")) avisos.push("sem {{especificacaoTecnica}}, o item sai sem os campos do desenho");
+  return { erros, avisos };
+}
+
+/**
+ * Aplica o template do item. Uma seção com conteúdo VAZIO some junto com o
+ * título que a precede — sem isso, um item sem contrato de arquitetura sairia
+ * com "#### Contrato de arquitetura" seguido de nada, que é exatamente o tipo
+ * de ruído que o §188 mandou tirar do documento.
+ */
+export function aplicarTemplateDoItem(template: string, valores: Record<string, string>): string {
+  REGEX_VARIAVEL.lastIndex = 0;
+  const preenchido = template.replace(REGEX_VARIAVEL, (match, nome: string) =>
+    nome in valores ? valores[nome] : match
+  );
+
+  const linhas = preenchido.split("\n");
+  const saida: string[] = [];
+  for (let i = 0; i < linhas.length; i++) {
+    const linha = linhas[i];
+    const ehTitulo = /^#{2,6}\s/.test(linha);
+    if (ehTitulo) {
+      // Olha o que vem até o próximo título: só espaço em branco = seção vazia.
+      let j = i + 1;
+      let temCorpo = false;
+      for (; j < linhas.length && !/^#{2,6}\s/.test(linhas[j]); j++) {
+        if (linhas[j].trim() !== "") temCorpo = true;
+      }
+      if (!temCorpo) {
+        i = j - 1;
+        continue;
+      }
+    }
+    saida.push(linha);
+  }
+  return saida.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd();
+}
+
+/**
  * Renderiza uma atividade como seção do documento (SPEC-14 §4) — não é
  * template editável pelo usuário, só a estrutura de fora é (título/contexto/
  * visão geral/DoR/DoD). Especificação técnica, refinamento e critérios de
@@ -350,7 +494,10 @@ export function renderizarItemEspecificacao(
   diagrama: Diagrama,
   config: DiagramaConfig,
   regras?: RegrasConfig,
-  respostas?: Record<string, ValorSpec>
+  respostas?: Record<string, ValorSpec>,
+  /** SPEC-47 — o template do ITEM (o do time, quando existe). Sem ele, o
+   * `TEMPLATE_ITEM_PADRAO`: a estrutura de sempre + a entrega final. */
+  templateItem?: string
 ): string {
   const nos = nosDeOrigem(atividade, diagrama);
   const especificacaoTecnica =
@@ -423,35 +570,37 @@ ${MARCA_SUGERIDO}` : ""}`
 ${MARCA_SUGERIDO}` : ""}`
     : undefined;
 
-  return [
-    `### ${numero}. ${atividade.rotulo} — ${atividade.descricao}`,
-    "",
-    `**Tipo:** ${atividade.tipo} · **Tamanho:** ${atividade.tamanho}`,
-    `**Techs:** ${atividade.techs.join(", ") || "—"} · **Contextos:** ${atividade.contextos.join(", ") || "—"}`,
-    `**Dependências:** ${descreverDependencias(atividade)}`,
-    "",
-    "#### História de usuário",
-    "",
+  // SPEC-47 — a entrega final: o que fica PRONTO quando o item termina.
+  const respEntrega = respostaParaDocumento(respostas?.[CHAVE_ENTREGA_FINAL]);
+  const entregaFinal = respEntrega
+    ? `${respEntrega.texto}${respEntrega.sugerida ? `
+
+${MARCA_SUGERIDO}` : ""}`
+    : `_(a definir: o que fica pronto quando este item termina)_ ${MARCADOR_ESPECIFICAR}`;
+
+  return aplicarTemplateDoItem(templateItem ?? TEMPLATE_ITEM_PADRAO, {
+    numero: String(numero),
+    rotulo: atividade.rotulo,
+    descricao: atividade.descricao,
+    tipo: atividade.tipo,
+    tamanho: atividade.tamanho,
+    techs: atividade.techs.join(", ") || "—",
+    contextos: atividade.contextos.join(", ") || "—",
+    dependencias: descreverDependencias(atividade),
     historiaUsuario,
-    "",
-    "#### Especificação técnica",
-    "",
     especificacaoTecnica,
-    ...(contratoArquitetura ? ["", "#### Contrato de arquitetura", "", contratoArquitetura] : []),
-    "",
-    "#### Requisitos de refinamento técnico",
-    "",
+    contratoArquitetura: contratoArquitetura ?? "",
     refinamentoTecnico,
-    ...(checklistProcesso ? ["", "#### Checklist de processo", "", checklistProcesso] : []),
-    ...(volumetria ? ["", "#### Requisitos de volumetria", "", volumetria] : []),
-    "",
-    "#### Critérios de aceite (Gherkin)",
-    "",
+    checklistProcesso: checklistProcesso || "",
+    volumetria: volumetria || "",
     criteriosAceite,
-    ...(criteriosContextuais ? ["", "_Cenários adicionais (contextuais):_", "", criteriosContextuais] : []),
-    ...(regrasTeste ? ["", "#### Regras de teste (QA)", "", regrasTeste] : []),
-    ...(cenarioFeature ? ["", "#### Cenário Gherkin adicional (QA)", "", "```gherkin", cenarioFeature, "```"] : []),
-  ].join("\n");
+    criteriosContextuais: criteriosContextuais ? `_Cenários adicionais (contextuais):_
+
+${criteriosContextuais}` : "",
+    regrasTeste: regrasTeste ?? "",
+    cenarioGherkin: cenarioFeature ? ["```gherkin", cenarioFeature, "```"].join("\n") : "",
+    entregaFinal,
+  });
 }
 
 /** Um placeholder de checklist técnico/volumetria já resolvido pra uma
@@ -506,6 +655,8 @@ export interface FichaItem {
   };
   regrasTeste: FichaPlaceholder;
   cenarioFeature: FichaPlaceholder;
+  /** SPEC-47 — o entregável do item, no fim da seção. */
+  entregaFinal: FichaPlaceholder;
   checklistTecnico: FichaPlaceholder[];
   volumetria: FichaPlaceholder[];
   checklistProcessoMarkdown: string;
@@ -583,6 +734,7 @@ export function montarFichaItem(
     },
     regrasTeste: acharPorChave(placeholders, respostas, CHAVE_REGRAS_TESTE),
     cenarioFeature: acharPorChave(placeholders, respostas, CHAVE_CENARIO_FEATURE),
+    entregaFinal: acharPorChave(placeholders, respostas, CHAVE_ENTREGA_FINAL),
     checklistTecnico: paraFicha("checklistTecnico"),
     volumetria: paraFicha("volumetria"),
     checklistProcessoMarkdown: regras
@@ -606,6 +758,8 @@ export interface OpcoesGerarEspecificacao {
    * por padrão desde a derivação; sem isso, a seção sempre listaria o próprio
    * time da quebra, redundante). */
   time?: string;
+  /** SPEC-47 — template do ITEM (cada seção do documento). */
+  templateItem?: string;
   /** `quebra.respostasItens` — respostas (humanas ou IA confirmada) aos
    * placeholders "<- ✍️ especificar" de cada atividade, chaveadas por
    * `Atividade.chave` (Fase 1, SPEC-23). */
@@ -648,7 +802,15 @@ export function gerarEspecificacaoEntrega(
     atividades.length > 0
       ? atividades
           .map((a, i) =>
-            renderizarItemEspecificacao(i + 1, a, diagrama, config, opcoes.regras, opcoes.respostasItens?.[a.chave])
+            renderizarItemEspecificacao(
+              i + 1,
+              a,
+              diagrama,
+              config,
+              opcoes.regras,
+              opcoes.respostasItens?.[a.chave],
+              opcoes.templateItem
+            )
           )
           .join("\n\n---\n\n")
       : "_Nenhum item nesta quebra._";

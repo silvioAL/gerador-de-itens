@@ -10,16 +10,21 @@ import { CAMPO_GLOBAL } from "./repositorioDeCamposNo.js";
 
 export { CAMPO_GLOBAL };
 
+/** SPEC-47 — `documento` é a especificação inteira; `item` é o corpo de cada
+ * item dentro dela (o que o time quer com "entrega final no fim"). */
+export type TipoDeTemplate = "documento" | "item";
+
 export interface TemplateEspecificacao {
   id: string;
   timeId: string;
+  tipo: TipoDeTemplate;
   conteudo: string;
   atualizadoEm: string;
 }
 
 export interface RepositorioDeTemplateEspecificacao {
   /** O do time, se houver; senão o global; senão `null`. */
-  obter(timeId?: string): Promise<TemplateEspecificacao | null>;
-  /** Upsert pela chave natural (`timeId`). */
-  salvar(timeId: string, conteudo: string): Promise<TemplateEspecificacao>;
+  obter(timeId?: string, tipo?: TipoDeTemplate): Promise<TemplateEspecificacao | null>;
+  /** Upsert pela chave natural (`timeId`, `tipo`). */
+  salvar(timeId: string, conteudo: string, tipo?: TipoDeTemplate): Promise<TemplateEspecificacao>;
 }

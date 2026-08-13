@@ -5064,3 +5064,39 @@ certo sozinho.
 
 Mordida: gate de volta ao recurso fixo → o teste do dono da seção vermelho.
 206 engine + 173 server + 444 web; 51/51 E2E.
+
+## 196. SPEC-47 — o item escrito de verdade: template próprio e entrega final
+
+Relato com dois prints: a tela de itens (títulos, chips e um "Ver corpo"
+colapsado) e o editor do template da especificação. "Gostaria de ver os
+itens estruturados com a escrita real... conforme um template configurado...
+e esse template precisa ter a entrega final no fim de cada item."
+
+Três coisas faltavam, e as três eram a mesma raiz: **só o documento era
+template**. O corpo de cada item era estrutura fixa no código — mudar a
+ordem das seções, renomear um título ou acrescentar uma seção exigia
+recompilar. Agora o item tem template próprio (`tipo: "item"` na mesma
+tabela, migração 0028), com as suas variáveis e a sua régua de validação;
+`{{entregaFinal}}` é a que fechava o buraco: nenhum item dizia o que fica
+pronto quando termina, e o texto acabava no cenário de teste.
+
+A entrega final entrou como placeholder de refinamento (`_entregaFinal`),
+igual a história e critérios: a esteira escreve, o humano confirma, e o
+documento fecha cada item com o entregável. Consequência honesta e visível:
+todo item passou a ter uma pendência a mais até alguém dizer o que entrega —
+dois E2E caíram por isso e foram atualizados de propósito, porque o produto
+mudou de opinião sobre o que é um item completo.
+
+Na tela, a escrita passou a aparecer por padrão, lida como TEXTO (títulos
+viram títulos, listas viram listas, negrito vira negrito, bloco de código
+continua monoespaçado) em vez de markdown cru dentro de um `<pre>`;
+recolher é que virou a ação sob demanda. E a área "Especificação de
+solução" ganhou os dois templates lado a lado, cada um explicando o que é.
+
+Detalhe de implementação que vale registrar: seção cujo conteúdo fica vazio
+some INTEIRA, título junto — sem isso, um item sem contrato de arquitetura
+sairia com um cabeçalho seguido de nada, exatamente o ruído que o §188
+mandou tirar do documento.
+
+Mordida: entrega final sem o marcador de pendência → dois testes do template
+vermelhos. 211 engine + 175 server + 445 web; 51/51 E2E.

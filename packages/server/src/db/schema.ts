@@ -342,10 +342,13 @@ export const especificacaoTemplates = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     timeId: text("time_id").notNull().default(CAMPO_GLOBAL),
+    /** SPEC-47 — `documento` (a especificação inteira) ou `item` (o corpo de
+     * cada item). Dois templates por time, mesma tabela. */
+    tipo: text("tipo").notNull().default("documento"),
     conteudo: text("conteudo").notNull(),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("especificacao_templates_chave_unica").on(t.timeId)]
+  (t) => [uniqueIndex("especificacao_templates_chave_unica").on(t.timeId, t.tipo)]
 );
 
 /**

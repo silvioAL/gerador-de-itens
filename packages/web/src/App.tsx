@@ -165,6 +165,8 @@ interface DadosCarregados extends ConfigCarregada {
   camposNo: CampoNo[];
   camposAresta: CampoAresta[];
   especificacaoTemplate: EspecificacaoTemplate;
+  /** SPEC-47 — template do corpo do item; `null` = o padrão do engine. */
+  templateItem: EspecificacaoTemplate | null;
   pipelineAgentes: ConfigPipelineAgentes;
 }
 
@@ -214,12 +216,14 @@ function AppComSessao({
       // da rota vira "sem campos customizados", nunca erro fatal de carregamento.
       apiCamposAresta.listar(timeAtivo).catch(() => []),
       apiEspecificacaoTemplate.buscar(timeAtivo),
+      // SPEC-47 — o template do CORPO de cada item (nulo = o padrão do engine).
+      apiEspecificacaoTemplate.buscar(timeAtivo, "item").catch(() => null),
       // Mesmo motivo do catch de campos-aresta acima — rota só existe no modo
       // local (SPEC-24 Fase E); no hospedado cai no default seguro.
       apiPipelineAgentes.obter().catch(() => ({ confirmacaoObrigatoria: true })),
     ])
-      .then(([config, cenarios, sugestoesDeStack, camposNo, camposAresta, especificacaoTemplate, pipelineAgentes]) => {
-        setDados({ ...config, cenarios, sugestoesDeStack, camposNo, camposAresta, especificacaoTemplate, pipelineAgentes });
+      .then(([config, cenarios, sugestoesDeStack, camposNo, camposAresta, especificacaoTemplate, templateItem, pipelineAgentes]) => {
+        setDados({ ...config, cenarios, sugestoesDeStack, camposNo, camposAresta, especificacaoTemplate, templateItem, pipelineAgentes });
       })
       .catch((e: unknown) => setErroConfig(e instanceof Error ? e.message : String(e)));
   }, [timeAtivo]);
@@ -261,6 +265,7 @@ function AppCarregado({
   camposNo: camposNoInicial,
   camposAresta: camposArestaInicial,
   especificacaoTemplate: especificacaoTemplateInicial,
+  templateItem: templateItemInicial,
   pipelineAgentes: pipelineAgentesInicial,
   sessao,
   modo,
@@ -273,6 +278,7 @@ function AppCarregado({
   camposNo: CampoNo[];
   camposAresta: CampoAresta[];
   especificacaoTemplate: EspecificacaoTemplate;
+  templateItem: EspecificacaoTemplate | null;
   pipelineAgentes: ConfigPipelineAgentes;
   sessao: SessaoUsuario;
   modo: "dev" | "oidc" | "local" | undefined;
@@ -289,6 +295,7 @@ function AppCarregado({
   const [camposNo, setCamposNo] = useState(camposNoInicial);
   const [camposAresta, setCamposAresta] = useState(camposArestaInicial);
   const [especificacaoTemplate, setEspecificacaoTemplate] = useState(especificacaoTemplateInicial);
+  const [templateItem, setTemplateItem] = useState(templateItemInicial);
   const [pipelineAgentes, setPipelineAgentes] = useState(pipelineAgentesInicial);
 
   // Só o modo local (`gerador open`) tem a rota — hospedado/dev não têm nada
@@ -856,6 +863,7 @@ function AppCarregado({
           config={diagramaConfig}
           regras={regrasConfig}
           especificacaoTemplate={especificacaoTemplate}
+          templateItem={templateItem?.conteudo}
           demandInfo={quebra.demandInfo}
           anexosContexto={quebra.anexosContexto}
           time={quebra.time}
@@ -906,6 +914,7 @@ function AppCarregado({
           camposNo={camposNo}
           camposAresta={camposAresta}
           especificacaoTemplate={especificacaoTemplate}
+          templateItem={templateItem}
           pipelineAgentes={pipelineAgentes}
           timeAtivo={timeAtivo}
           onAbrirArea={(area) => abrirConfigNaAba(area)}

@@ -64,10 +64,10 @@ test("barra de pendências, confirmar todas, fila guiada e o deep-link da tela d
   await botaoItens.first().click();
   await expect(page.getByTestId("itens-screen")).toBeVisible();
 
-  // Item PRONTO tem chip estático (sem link); item não-pronto tem o BOTÃO
-  // de volta pra revisão daquele item — clica no segundo card (não-pronto).
-  await expect(page.getByTestId("item-completude-0")).toContainText("Pronto pra exportar");
-  await page.getByTestId("item-completude-1").click();
+  // SPEC-47 — todo item passou a exigir a ENTREGA FINAL, então nenhum nasce
+  // pronto: o chip é o botão de volta pra revisão daquele item.
+  await expect(page.getByTestId("item-completude-0")).toContainText("especificar");
+  await page.getByTestId("item-completude-0").click();
   await expect(page.getByTestId("itens-screen")).not.toBeVisible();
   await expect(page.locator('[data-testid^="item-"][aria-pressed="true"]').first()).toBeVisible();
 });

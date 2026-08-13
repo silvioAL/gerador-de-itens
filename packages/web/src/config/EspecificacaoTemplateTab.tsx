@@ -1,12 +1,16 @@
 import { useState } from "react";
-import { VARIAVEIS_ESPECIFICACAO, problemasDoTemplate } from "@gerador/engine";
+import { VARIAVEIS_ESPECIFICACAO, VARIAVEIS_ITEM, problemasDoTemplate, problemasDoTemplateItem } from "@gerador/engine";
 import type { EspecificacaoTemplate } from "../api/client";
 
 export interface EspecificacaoTemplateTabProps {
   /** Efetivo pro time ativo — template do time se existir, senão o global. */
   template: EspecificacaoTemplate;
   timeAtivo: string;
-  onSalvar: (dados: { timeId?: string; conteudo: string }) => Promise<void>;
+  onSalvar: (dados: { timeId?: string; conteudo: string; tipo?: "documento" | "item" }) => Promise<void>;
+  /** SPEC-47 — o template do CORPO de cada item (o documento tem o dele). */
+  templateItem?: EspecificacaoTemplate | null;
+  /** O padrão do engine, mostrado quando o time ainda não personalizou. */
+  templateItemPadrao: string;
 }
 
 /**
@@ -16,31 +20,51 @@ export interface EspecificacaoTemplateTabProps {
  * `{{variavel}}` desconhecida roda no cliente (feedback imediato) e de novo
  * no server (nunca confia só no cliente).
  */
-export function EspecificacaoTemplateTab({ template, timeAtivo, onSalvar }: EspecificacaoTemplateTabProps) {
+export function EspecificacaoTemplateTab({
+  template,
+  timeAtivo,
+  onSalvar,
+  templateItem,
+  templateItemPadrao,
+}: EspecificacaoTemplateTabProps) {
+  // SPEC-47 — dois templates na mesma tela: o do DOCUMENTO (o de sempre) e o
+  // do ITEM (o corpo de cada um, com a entrega final no fim). São coisas
+  // diferentes e é aqui que a pessoa entende a diferença.
+  const [alvo, setAlvo] = useState<"documento" | "item">("documento");
   const [editando, setEditando] = useState(false);
   const [escopo, setEscopo] = useState<"global" | "time">(template.timeId === "__global__" ? "global" : "time");
   const [conteudo, setConteudo] = useState(template.conteudo);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
+  /** O template em foco: o do documento, ou o do item (com o padrão do
+   * engine quando o time ainda não personalizou — sempre há o que ler). */
+  const emFoco = alvo === "item" ? templateItem : template;
+  const conteudoAtual = emFoco?.conteudo ?? templateItemPadrao;
+
   function abrirEdicao() {
-    setEscopo(template.timeId === "__global__" ? "global" : "time");
-    setConteudo(template.conteudo);
+    setEscopo(emFoco?.timeId && emFoco.timeId !== "__global__" ? "time" : "global");
+    setConteudo(conteudoAtual);
     setErro(null);
     setEditando(true);
+  }
+
+  function trocarAlvo(novo: "documento" | "item") {
+    setAlvo(novo);
+    setEditando(false);
   }
 
   // SPEC-35 — a MESMA função da borda: erros bloqueiam o salvar (variável
   // desconhecida, {{itens}} ausente); avisos dizem o que deixa de sair no
   // documento sem impedir o template enxuto.
-  const problemas = problemasDoTemplate(conteudo);
+  const problemas = alvo === "item" ? problemasDoTemplateItem(conteudo) : problemasDoTemplate(conteudo);
 
   async function salvar() {
     if (problemas.erros.length > 0) return;
     setSalvando(true);
     setErro(null);
     try {
-      await onSalvar({ conteudo, timeId: escopo === "global" ? undefined : timeAtivo });
+      await onSalvar({ conteudo, timeId: escopo === "global" ? undefined : timeAtivo, tipo: alvo });
       setEditando(false);
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
@@ -51,14 +75,41 @@ export function EspecificacaoTemplateTab({ template, timeAtivo, onSalvar }: Espe
 
   return (
     <div>
-      <p style={introTextoEstilo}>
-        A especificação de solução da quebra (botão "Gerar especificação de solução" na revisão) é um documento só,
-        montado a partir deste template. Placeholders válidos:{" "}
-        {VARIAVEIS_ESPECIFICACAO.map((v) => (
-          <code key={v} style={codigoEstilo}>{`{{${v}}}`}</code>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }} role="group" aria-label="Qual template editar">
+        {(["documento", "item"] as const).map((op) => (
+          <button
+            key={op}
+            onClick={() => trocarAlvo(op)}
+            aria-pressed={alvo === op}
+            data-testid={`alvo-${op}`}
+            style={alvo === op ? abaAtivaEstilo : abaEstilo}
+          >
+            {op === "documento" ? "Documento da especificação" : "Corpo de cada item"}
+          </button>
         ))}
-        .
-      </p>
+      </div>
+
+      {alvo === "documento" ? (
+        <p style={introTextoEstilo}>
+          A especificação de solução da quebra (botão "Gerar especificação de solução" na revisão) é um documento só,
+          montado a partir deste template. Placeholders válidos:{" "}
+          {VARIAVEIS_ESPECIFICACAO.map((v) => (
+            <code key={v} style={codigoEstilo}>{`{{${v}}}`}</code>
+          ))}
+          .
+        </p>
+      ) : (
+        <p style={introTextoEstilo}>
+          Cada item do documento — e cada card da tela <strong>Itens de trabalho</strong> — é escrito a partir deste
+          template. É aqui que se muda a ordem das seções, os títulos, e o que fecha o item: a{" "}
+          <code style={codigoEstilo}>{"{{entregaFinal}}"}</code> diz o que fica pronto quando ele termina. Seção cujo
+          conteúdo estiver vazio some inteira, título junto. Placeholders válidos:{" "}
+          {VARIAVEIS_ITEM.map((v) => (
+            <code key={v} style={codigoEstilo}>{`{{${v}}}`}</code>
+          ))}
+          .
+        </p>
+      )}
 
       <div style={cardEstilo}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -66,10 +117,10 @@ export function EspecificacaoTemplateTab({ template, timeAtivo, onSalvar }: Espe
           <span
             style={{
               ...tagOrigemEstilo,
-              ...(template.timeId === "__global__" ? tagGlobalEstilo : tagTimeEstilo),
+              ...(emFoco && emFoco.timeId !== "__global__" ? tagTimeEstilo : tagGlobalEstilo),
             }}
           >
-            {template.timeId === "__global__" ? "global" : template.timeId}
+            {emFoco && emFoco.timeId !== "__global__" ? emFoco.timeId : alvo === "item" && !templateItem ? "padrão" : "global"}
           </span>
           <div style={{ flex: 1 }} />
           {!editando && (
@@ -138,7 +189,7 @@ export function EspecificacaoTemplateTab({ template, timeAtivo, onSalvar }: Espe
             </div>
           </div>
         ) : (
-          <pre style={preEstilo}>{template.conteudo}</pre>
+          <pre style={preEstilo}>{conteudoAtual}</pre>
         )}
       </div>
     </div>
@@ -261,4 +312,21 @@ const linkBotaoEstilo: React.CSSProperties = {
   border: "none",
   cursor: "pointer",
   padding: 0,
+};
+
+const abaEstilo: React.CSSProperties = {
+  fontSize: 12,
+  padding: "6px 12px",
+  borderRadius: 999,
+  border: "1px solid var(--borda-forte)",
+  background: "transparent",
+  color: "var(--texto-2)",
+  cursor: "pointer",
+};
+
+const abaAtivaEstilo: React.CSSProperties = {
+  ...abaEstilo,
+  border: "none",
+  background: "var(--acento)",
+  color: "#fff",
 };

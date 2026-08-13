@@ -51,15 +51,41 @@ describe("ItensScreen", () => {
     expect(screen.getByTestId("item-completude-2").textContent).toContain("1 sugestão a confirmar");
   });
 
-  it("dependências aparecem como badges; o corpo abre e fecha sob demanda", () => {
+  it("SPEC-47 — a ESCRITA do item aparece de saída; recolher é que é sob demanda", () => {
     renderTela([item("a", { dependencias: ["enabler → n1::service"] })]);
     expect(screen.getByText(/enabler → n1::service/)).toBeInTheDocument();
 
-    expect(screen.queryByTestId("item-corpo-0")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("item-expandir-0"));
+    // A tela era uma lista de títulos; agora o texto do item está à vista.
     expect(screen.getByTestId("item-corpo-0").textContent).toContain("corpo de a");
     fireEvent.click(screen.getByTestId("item-expandir-0"));
     expect(screen.queryByTestId("item-corpo-0")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("item-expandir-0"));
+    expect(screen.getByTestId("item-corpo-0").textContent).toContain("corpo de a");
+  });
+
+  it("SPEC-47 — o markdown é lido como texto: título vira título, lista vira lista, negrito vira negrito", () => {
+    renderTela([
+      item("a", {
+        corpoMarkdown: [
+          "### 1. Item — descrição",
+          "",
+          "**Tipo:** Task · **Tamanho:** P",
+          "",
+          "#### Entrega final",
+          "",
+          "- Serviço publicando na fila",
+          "- Painel com o volume do dia",
+        ].join("\n"),
+      }),
+    ]);
+
+    const corpo = screen.getByTestId("item-corpo-0");
+    // O texto está legível, sem os símbolos do markdown à mostra.
+    expect(corpo.textContent).toContain("Entrega final");
+    expect(corpo.textContent).not.toContain("####");
+    expect(corpo.textContent).not.toContain("**Tipo:**");
+    expect(corpo.querySelectorAll("li")).toHaveLength(2);
+    expect(corpo.querySelector("strong")?.textContent).toBe("Tipo:");
   });
 
   it("item exportado mostra o link do tracker", () => {
