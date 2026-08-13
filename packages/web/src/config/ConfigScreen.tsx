@@ -12,6 +12,7 @@ import { PipelineAgentesTab } from "./PipelineAgentesTab";
 import { ModeloIaTab } from "./ModeloIaTab";
 import { RegrasTab } from "./RegrasTab";
 import { RECURSO_DA_ABA, RECURSO_DA_SECAO_DE_REGRAS, usePermissoes } from "../auth/usePermissoes";
+import { apiPdca } from "../api/client";
 import { PdcaTab } from "./PdcaTab";
 import { ExportacaoTab } from "./ExportacaoTab";
 
@@ -169,10 +170,12 @@ export function ConfigScreen({
     ] satisfies { id: AbaConfig; rotulo: string; existe: boolean }[]
   ).filter((a) => a.existe && podeVerAba(a.id, permissoes.pode));
 
-  // A aba ativa pode ter sumido (papel trocado, ou `abaForcada` do tour
-  // apontando pra algo negado). Cair na primeira visível evita a tela em branco.
-  // A área da rota pode estar negada pro papel — cai na primeira visível
-  // (mesma régua de antes, agora dirigida pela rota).
+  // SPEC-51 — área NEGADA não cai mais em outra tela em silêncio: quem clicou
+  // em "Modelo de IA" e foi parar em "Membros" não entende o que aconteceu (e
+  // pensa que o produto está quebrado). Agora a tela DIZ que é permissão, e
+  // oferece o caminho de pedir — que é o que a pessoa faria de qualquer jeito,
+  // só que fora da ferramenta.
+  const areaNegada = !abasVisiveis.some((a) => a.id === area) && !permissoes.carregando;
   const abaAtiva = abasVisiveis.some((a) => a.id === area) ? area : abasVisiveis[0]?.id;
   const rotuloDaArea = abasVisiveis.find((a) => a.id === abaAtiva)?.rotulo ?? "Configurações";
 
@@ -215,6 +218,7 @@ export function ConfigScreen({
           a um teste só perguntar "toda aba visível mostra alguma coisa?" — a
           pergunta que ninguém tinha feito quando o gate ficou pela metade. */}
       <div data-testid="corpo-da-aba" style={{ flex: 1, overflow: "auto", padding: 24 }}>
+        {areaNegada && <SemPermissao area={area} />}
         {abaAtiva === "pdca" && <PdcaTab config={config} timeAtivo={timeAtivo} onAbrirArea={onAbrirArea} />}
         {abaAtiva === "exportacao" && <ExportacaoTab />}
         {abaAtiva === "perfis" && (
@@ -316,4 +320,112 @@ const abaAtivaEstilo: React.CSSProperties = {
   ...abaEstilo,
   color: "#a5b4fc",
   borderBottom: "2px solid #4f46e5",
+};
+
+/** Recurso do RBAC → recurso SOLICITÁVEL (a lista fechada do servidor). Nem
+ * tudo se pede: acesso e credencial são decisão de quem administra, não
+ * ajuste de configuração — pra esses a tela diz a quem falar. */
+const RECURSO_SOLICITAVEL_DA_ABA: Record<string, string> = {
+  campos: "campos-no",
+  camposAresta: "campos-aresta",
+  especificacao: "especificacao-template",
+  pipeline: "pipeline-agentes",
+  regras: "regras",
+};
+
+/**
+ * SPEC-51 — a permissão que barra vira um PEDIDO, no lugar onde ela barrou.
+ *
+ * Antes, quem não podia editar simplesmente não via a área (e o item do menu
+ * levava a outra tela). O caminho existia — a entrevista do PDCA — mas longe
+ * do momento em que a pessoa quer a mudança. Pedir daqui já sabe o recurso.
+ */
+function SemPermissao({ area }: { area: AbaConfig }) {
+  const [texto, setTexto] = useState("");
+  const [enviado, setEnviado] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const recurso = RECURSO_SOLICITAVEL_DA_ABA[area];
+
+  async function pedir() {
+    setErro(null);
+    try {
+      await apiPdca.criarAjuste({ recurso, descricao: texto.trim() });
+      setEnviado(true);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  return (
+    <div style={semPermissaoEstilo} data-testid="area-sem-permissao">
+      <strong style={{ fontSize: 13.5 }}>🔒 Você não tem permissão para editar esta área.</strong>
+      {recurso ? (
+        enviado ? (
+          <p style={{ fontSize: 12.5, color: "var(--verde, #3ecf8e)", margin: "8px 0 0" }} data-testid="pedido-enviado">
+            Pedido enviado — quem cuida desta configuração vê e decide em Configurações → PDCA.
+          </p>
+        ) : (
+          <>
+            <p style={{ fontSize: 12.5, color: "var(--texto-2)", margin: "8px 0" }}>
+              Diga o que precisa mudar: vira uma solicitação de ajuste pra quem cuida desta configuração — com a
+              mudança visível antes de decidir.
+            </p>
+            <textarea
+              aria-label="O que precisa mudar"
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              rows={3}
+              placeholder="ex.: falta o campo de DLQ no formulário da Fila Rabbit"
+              style={textareaPedidoEstilo}
+            />
+            {erro && <p style={{ fontSize: 12, color: "var(--vermelho)" }}>{erro}</p>}
+            <button
+              onClick={() => void pedir()}
+              disabled={!texto.trim()}
+              style={botaoPedirEstilo}
+              data-testid="pedir-ajuste"
+            >
+              Pedir ajuste
+            </button>
+          </>
+        )
+      ) : (
+        <p style={{ fontSize: 12.5, color: "var(--texto-2)", margin: "8px 0 0" }}>
+          Esta área é de quem administra o time (acessos, membros e credenciais não se pedem por ajuste de
+          configuração) — fale com um owner do time.
+        </p>
+      )}
+    </div>
+  );
+}
+
+const semPermissaoEstilo: React.CSSProperties = {
+  padding: "14px 16px",
+  borderRadius: 10,
+  border: "1px solid var(--borda-forte)",
+  background: "var(--painel-alto)",
+  maxWidth: 620,
+};
+
+const textareaPedidoEstilo: React.CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  fontSize: 12.5,
+  padding: "6px 8px",
+  borderRadius: 6,
+  border: "1px solid var(--borda-forte)",
+  background: "var(--fundo)",
+  color: "var(--texto)",
+  resize: "vertical",
+};
+
+const botaoPedirEstilo: React.CSSProperties = {
+  fontSize: 12,
+  padding: "7px 12px",
+  borderRadius: 8,
+  border: "none",
+  background: "var(--acento)",
+  color: "#fff",
+  cursor: "pointer",
+  marginTop: 8,
 };

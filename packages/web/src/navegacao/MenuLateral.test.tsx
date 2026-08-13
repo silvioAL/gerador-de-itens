@@ -59,3 +59,22 @@ describe("MenuLateral — time não é stack (SPEC-42/43)", () => {
     expect(screen.getByRole("button", { name: "Stacks conhecidas" })).toBeInTheDocument();
   });
 });
+
+describe("MenuLateral — o menu diz o que a pessoa pode (SPEC-51)", () => {
+  it("área que ela não edita vem com cadeado, mas continua clicável (é lá que se pede)", () => {
+    montar({ podeEditarArea: (area) => area !== "modeloIa" });
+
+    const bloqueado = screen.getByRole("button", { name: /Modelo de IA/ });
+    expect(bloqueado.textContent).toContain("🔒");
+    expect(bloqueado.getAttribute("data-bloqueada")).toBe("sim");
+    expect(bloqueado.getAttribute("title")).toContain("pedir um ajuste");
+
+    // O resto continua sem cadeado — o sinal é sobre ausência, não enfeite.
+    expect(screen.getByRole("button", { name: "Membros" }).textContent).not.toContain("🔒");
+  });
+
+  it("sem a função de permissão (modo sem RBAC), nenhum item ganha cadeado", () => {
+    montar();
+    expect(screen.queryByText("🔒")).not.toBeInTheDocument();
+  });
+});

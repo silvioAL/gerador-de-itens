@@ -60,7 +60,7 @@ import { LandingPage } from "./demo/LandingPage";
 import { EscolherTimeScreen } from "./auth/EscolherTimeScreen";
 import { lembrarTime, lerTimeLembrado } from "./auth/timeLembrado";
 import { SemTimeScreen } from "./auth/SemTimeScreen";
-import { usePermissoes } from "./auth/usePermissoes";
+import { RECURSO_DA_ABA, RECURSO_DA_SECAO_DE_REGRAS, usePermissoes } from "./auth/usePermissoes";
 import { momentoDaConfig, momentoDoCanvas } from "./assistente/momentos";
 import { MenuLateral } from "./navegacao/MenuLateral";
 import { ItensScreen } from "./itens/ItensScreen";
@@ -838,6 +838,14 @@ function AppCarregado({
         email={sessao.email}
         onTrocarTime={aoMudarTime}
         onNavegar={(area) => abrirConfigNaAba(area)}
+        podeEditarArea={(area) => {
+          // Regras é a exceção de sempre: uma tela, QUATRO recursos — quem
+          // cuida de uma seção só continua entrando sem cadeado.
+          if (area === "regras") return Object.values(RECURSO_DA_SECAO_DE_REGRAS).some((r) => permissoes.pode(r));
+          if (area === "pdca" || area === "exportacao") return true;
+          const recurso = RECURSO_DA_ABA[area];
+          return recurso ? permissoes.pode(recurso) : true;
+        }}
         onNovaQuebra={() => {
           navegar({ tela: "canvas" });
           persistencia.nova(quebraVazia(timeAtivo));

@@ -5250,3 +5250,31 @@ pelo `tipo` da operação, e é por isso que `aplicarOperacao` começa com um
 no-op explícito para as operações de papel. Mordida: gate ignorando o alvo
 → o teste do dono do pipeline vermelho. 215 engine + 186 server + 455 web;
 52/52 E2E.
+
+## 202. SPEC-51 — cadeado no menu, e o pedido nascendo onde a permissão barra
+
+As duas fases que sobraram do backlog eram a mesma ideia por dois ângulos —
+a SPEC-40 F2 (cadeados no menu) e a SPEC-39 F2 (solicitação nascendo do
+403) — e ficaram numa rodada só.
+
+O defeito era silencioso e feio: o menu listava todas as áreas, a
+`ConfigScreen` escondia as negadas e caía na PRIMEIRA VISÍVEL. Quem clicava
+em "Modelo de IA" ia parar em "Membros" sem uma palavra. A pessoa não
+conclui "falta permissão" — conclui "está quebrado".
+
+Agora o menu marca com 🔒 o que ela não edita (e o item continua clicável de
+propósito: é lá que se pede), a área negada DIZ que é permissão, e o pedido
+nasce ali mesmo: uma caixa de texto vira solicitação de ajuste com o recurso
+já preenchido, caindo na fila do PDCA com prévia e aprovação. O caminho
+existia — a entrevista do agente — mas longe do momento em que a pessoa quer
+a mudança, que é exatamente quando ela desiste.
+
+Uma decisão que vale registrar: **nem tudo se pede**. Acessos, membros e
+credenciais são decisão de quem administra, não ajuste de configuração — pra
+essas a tela manda falar com um owner em vez de oferecer um botão que não
+resolveria. Oferecer o pedido ali seria transformar uma conversa de
+confiança num formulário.
+
+Mordidas nas duas peças (área negada voltando a cair noutra tela; cadeado
+desligado) → quatro testes vermelhos, nenhum deles existia antes. 461 web
+unit; 52/52 E2E.
