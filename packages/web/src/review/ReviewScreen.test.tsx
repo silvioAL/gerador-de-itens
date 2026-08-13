@@ -1619,6 +1619,33 @@ describe("ReviewScreen — o que um papel escreveu continua na tela quando o pr�
     liberarArquiteto();
   });
 
+  it("§199 — a esteira PEDE a entrega final ao PO, e o campo existe pra editar à mão", async () => {
+    apiIaStatusMock.mockResolvedValueOnce({ chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "" });
+    const pedidos: { papel: string; chaves: string[] }[] = [];
+    apiIaSugerirPipelineMock.mockImplementation(
+      async (papel: string, pedido: { itens: { chave: string; placeholders: { chave: string }[] }[] }) => {
+        pedidos.push({ papel, chaves: pedido.itens.flatMap((i) => i.placeholders.map((p) => p.chave)) });
+        return Object.fromEntries(
+          pedido.itens.map((i) => [i.chave, Object.fromEntries(i.placeholders.map((p) => [p.chave, `texto do ${papel}`]))])
+        );
+      }
+    );
+
+    render(<ComEstado resultado={resultadoFixture01()} />);
+
+    // O defeito era este: o documento cobrava a entrega final e NINGUÉM a
+    // escrevia — nem a esteira (não estava no lote do PO), nem a pessoa (não
+    // havia campo na tela).
+    await waitFor(
+      () => expect(pedidos.find((p) => p.papel === "po")?.chaves).toContain("_entregaFinal"),
+      { timeout: 4000 }
+    );
+
+    fireEvent.click(screen.getAllByTestId(/^item-/)[0]);
+    const campo = await screen.findByTestId("placeholder-_entregaFinal");
+    expect(campo.textContent).toContain("Entrega final");
+  });
+
   it("§193 — papel que morre no caminho DIZ isso na tela: o trabalho nunca mais some em silêncio", async () => {
     apiIaStatusMock.mockResolvedValueOnce({ chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "" });
     apiIaSugerirPipelineMock.mockImplementation(

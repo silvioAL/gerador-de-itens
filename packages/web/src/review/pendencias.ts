@@ -28,6 +28,10 @@ export function placeholdersDaFicha(ficha: FichaItem): FichaPlaceholder[] {
     ...ficha.volumetria,
     ficha.regrasTeste,
     ficha.cenarioFeature,
+    // §199 — sem esta linha, a barra da revisão dizia "nada pendente"
+    // enquanto o card do item cobrava "✍️ 1 campo a especificar": duas
+    // réguas de novo, que é justamente o que a SPEC-44 unificou.
+    ficha.entregaFinal,
   ];
 }
 
