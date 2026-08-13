@@ -5529,3 +5529,41 @@ coluna do banco fica `null`. Mordidas: rota ignorando o cofre → a chave não
 chega lá (3 vermelhos); migração sem limpar a coluna → a chave ficando nos dois
 lugares (1 vermelho). 227 engine + 211 server + 477 web + 48 aplicação; 56/56
 E2E.
+
+## 208. Revisão de cobertura — cinco E2E para o que só o navegador prova
+
+Varredura das áreas do menu e das features entregáveis contra os specs
+existentes. Quatro buracos apareceram, e nenhum deles era "falta um caso de
+borda": eram features inteiras sem uma linha de teste de navegador.
+
+**A demonstração automática.** O tour clicável tinha spec; a demo — a outra
+metade do botão que a §198 separou — não tinha nenhuma. E é a única feature do
+produto que depende de TEMPO: avança sozinha, pausa onde está, continua de onde
+parou. Teste de unidade não alcança relógio. Ao escrever, descobri um detalhe
+honesto: o cursor fantasma não existe no primeiro passo, porque ele é card
+central e o componente só desenha o cursor quando há alvo. O teste passou a
+esperar o cursor aparecer em ALGUM passo, em vez de exigir uma promessa que o
+produto não faz.
+
+**Baixar o diagrama (.html).** A SPEC-21 gera um artefato que sai da ferramenta
+e vai parar num chat, num wiki, num anexo de ticket — e só o gerador tinha
+teste. Nada provava que o BOTÃO produz arquivo. O spec confere o conteúdo, não
+só o nome: um HTML vazio baixaria igual e passaria num teste preguiçoso (a
+mordida foi exatamente essa, e ficou vermelha).
+
+**Ajuste de PAPEL pela tela (SPEC-50).** O PDCA tinha E2E para regras e, desde
+a §204, para a ficha. O terceiro alvo — o pipeline — nunca tinha sido
+percorrido no navegador, apesar de ter a prévia mais diferente das três ("quem
+deixa de escrever" em vez de "o que muda no texto").
+
+**Administrar acessos pela tela.** O `rbac-cadeado-e-pedido` cobre quem é
+barrado, mas monta o cenário pela API. Criar papel, marcar a matriz recurso ×
+ação e colocar alguém dentro — o caminho que LIGA o RBAC da organização — só
+existia em teste de unidade. Aqui o Playwright ensinou algo: `check()` exige
+que o estado mude no clique, e esse checkbox só vira verdade quando o servidor
+responde e a lista recarrega. Trocado por `click()` + asserção do estado final,
+que é o que se quer provar mesmo.
+
+Os cinco specs novos e as mordidas: demo que não avança → o passo congelado
+(vermelho); download vazio → o HTML sem conteúdo (vermelho). 61/61 E2E
+(eram 56).
