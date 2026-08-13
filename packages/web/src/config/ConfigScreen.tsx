@@ -40,6 +40,9 @@ export interface ConfigScreenProps {
    * membros pra administrar; a aba não faz sentido. */
   /** SPEC-38 F2 — apontar/trocar perfil de stack muda a projeção; o App recarrega. */
   onPerfisMudaram: () => void;
+  /** SPEC-52 — a ficha mudou por um ajuste APLICADO na tela do PDCA (e não
+   * pela tela de campos, que já tem os callbacks próprios). */
+  onFichaMudou?: () => void;
   onCriarCampoNo: (dados: DadosCampoNo) => Promise<void>;
   onAtualizarCampoNo: (id: string, dados: Partial<DadosCampoNo>) => Promise<void>;
   onExcluirCampoNo: (id: string) => Promise<void>;
@@ -88,6 +91,7 @@ export function ConfigScreen({
   pipelineAgentes,
   timeAtivo,
   onPerfisMudaram,
+  onFichaMudou,
   onCriarCampoNo,
   onAtualizarCampoNo,
   onExcluirCampoNo,
@@ -219,7 +223,9 @@ export function ConfigScreen({
           pergunta que ninguém tinha feito quando o gate ficou pela metade. */}
       <div data-testid="corpo-da-aba" style={{ flex: 1, overflow: "auto", padding: 24 }}>
         {areaNegada && <SemPermissao area={area} />}
-        {abaAtiva === "pdca" && <PdcaTab config={config} timeAtivo={timeAtivo} onAbrirArea={onAbrirArea} />}
+        {abaAtiva === "pdca" && (
+          <PdcaTab config={config} timeAtivo={timeAtivo} onAbrirArea={onAbrirArea} onFichaMudou={onFichaMudou} />
+        )}
         {abaAtiva === "exportacao" && <ExportacaoTab />}
         {abaAtiva === "perfis" && (
           <PerfisStackTab config={config} onPerfisMudaram={onPerfisMudaram} />

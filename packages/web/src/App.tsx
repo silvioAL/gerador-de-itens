@@ -986,6 +986,19 @@ function AppCarregado({
           onPerfisMudaram={() => {
             void apiStacks.sugestoes().then(setSugestoesDeStack);
           }}
+          /* SPEC-52 — aplicar um ajuste de ficha muda os campos pelo lado do
+             PDCA, não pela tela de campos: sem este canal, a pessoa aplicava,
+             voltava ao canvas e o campo aprovado não estava lá (só depois de
+             um F5) — o ciclo parecia não ter fechado. */
+          onFichaMudou={() => {
+            void apiCamposNo.listar(timeAtivo).then(setCamposNo);
+            void apiCamposAresta.listar(timeAtivo).then(setCamposAresta);
+            // A LISTA não é o que o painel lê: quem manda ali é a config
+            // MESCLADA (global + time, resolvida pelo servidor). Recarregar só
+            // a lista deixava o campo aprovado invisível até um F5 — foi o que
+            // o E2E pegou.
+            void recarregarConfig();
+          }}
           onSalvarEspecificacaoTemplate={salvarEspecificacaoTemplate}
           onSalvarPipelineAgentes={salvarPipelineAgentes}
           onCriarCampoNo={criarCampoNo}

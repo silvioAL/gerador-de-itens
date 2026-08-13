@@ -21,7 +21,11 @@ export type SecaoDeRegras = "checklistTecnico" | "checklistProcesso" | "testes" 
 /** As duas seções que compartilham a forma "um texto por item". */
 export type SecaoDeChecklist = "checklistTecnico" | "checklistProcesso";
 
-export type OperacaoDeAjuste =
+/** As operações que mexem no DOCUMENTO de regras — as únicas que têm `tech`.
+ * Separadas da união maior porque `aplicarOperacao` e `secaoDaOperacao` só
+ * fazem sentido sobre elas, e um tipo próprio diz isso melhor que um `if` de
+ * seis termos repetido em cada função. */
+export type OperacaoDeRegras =
   | { tipo: "adicionar-checklist"; secao?: SecaoDeChecklist; tech: string; contextos: string[]; texto: string }
   | { tipo: "remover-checklist"; secao?: SecaoDeChecklist; tech: string; texto: string }
   | {
@@ -35,19 +39,89 @@ export type OperacaoDeAjuste =
     }
   | { tipo: "remover-teste"; tech: string; tipoTeste: string }
   | { tipo: "definir-volumetria"; tech: string; contextos: string[] }
-  | { tipo: "remover-volumetria"; tech: string }
-  // SPEC-50 — o ajuste sai das regras: papel da esteira que sobra (ou que
-  // falta) é feedback tão comum quanto item de checklist, e até agora só
-  // dava pra pedir por texto e aplicar à mão.
+  | { tipo: "remover-volumetria"; tech: string };
+
+/** SPEC-50 — o ajuste sai das regras: papel da esteira que sobra (ou que
+ * falta) é feedback tão comum quanto item de checklist, e até então só dava
+ * pra pedir por texto e aplicar à mão. */
+export type OperacaoDePipeline =
   | { tipo: "ativar-papel"; papelId: string; papelNome?: string }
   | { tipo: "desativar-papel"; papelId: string; papelNome?: string };
+
+/** SPEC-52 — os campos da ficha, que são o pedido mais comum de todos ("falta
+ * um campo de SLA no serviço"). */
+export type OperacaoDeCampo =
+  | { tipo: "adicionar-campo-no"; tipoNo: string; campo: CampoProposto }
+  | { tipo: "remover-campo-no"; tipoNo: string; key: string; label?: string }
+  | { tipo: "adicionar-campo-aresta"; tipoAresta: string; campo: CampoProposto }
+  | { tipo: "remover-campo-aresta"; tipoAresta: string; key: string; label?: string };
+
+export type OperacaoDeAjuste = OperacaoDeRegras | OperacaoDePipeline | OperacaoDeCampo;
+
+/** O guard que estreita a união — `recursoAlvoDaOperacao` devolve string, e
+ * string não estreita nada para o compilador. */
+export function ehOperacaoDeRegras(op: OperacaoDeAjuste): op is OperacaoDeRegras {
+  return recursoAlvoDaOperacao(op) === "regras";
+}
+
+/**
+ * SPEC-52 — o que um pedido consegue propor de um campo.
+ *
+ * `lista` fica de fora de propósito: uma lista carrega `itemSpec` (sub-campos
+ * com chave, rótulo, tipo e opções), que é estrutura para editar na tela de
+ * campos, não para nascer de uma frase de feedback. Pedido de lista continua
+ * sendo texto — nem tudo se aplica sozinho.
+ */
+export type TipoDeCampoProposto = "text" | "textarea" | "number" | "boolean" | "select";
+
+export interface CampoProposto {
+  key: string;
+  label: string;
+  tipoCampo: TipoDeCampoProposto;
+  obrigatorio: boolean;
+  ajuda?: string;
+  opcoes?: string[];
+}
+
+/** A forma mínima de um campo da ficha que a operação precisa conhecer — o
+ * engine não importa `CampoNo`/`CampoAresta` do `aplicacao` só pra dizer qual
+ * campo entra e qual sai (mesma disciplina de `PipelineComPapeis`). */
+export interface CampoDaFicha {
+  key: string;
+  label: string;
+  tipoCampo: TipoDeCampoProposto | "lista";
+  obrigatorio: boolean;
+  ajuda?: string;
+  opcoes?: string[];
+}
+
+/** SPEC-52 — qual RECURSO a operação de campo mexe, e sob qual chave de
+ * componente/conexão. `null` para operação que não é de campo. */
+export function alvoDeCampoDaOperacao(op: OperacaoDeAjuste): { recurso: "campos-no" | "campos-aresta"; escopo: string } | null {
+  switch (op.tipo) {
+    case "adicionar-campo-no":
+      return { recurso: "campos-no", escopo: op.tipoNo };
+    case "remover-campo-no":
+      return { recurso: "campos-no", escopo: op.tipoNo };
+    case "adicionar-campo-aresta":
+      return { recurso: "campos-aresta", escopo: op.tipoAresta };
+    case "remover-campo-aresta":
+      return { recurso: "campos-aresta", escopo: op.tipoAresta };
+    default:
+      return null;
+  }
+}
 
 /** SPEC-50 — qual DOCUMENTO a operação altera. O recurso RBAC e o caminho de
  * aplicação saem daqui: `regras` tem dono por seção (SPEC-28), o pipeline
  * tem dono próprio. */
-export function recursoAlvoDaOperacao(op: OperacaoDeAjuste): "regras" | "pipeline-agentes" {
+export function recursoAlvoDaOperacao(op: OperacaoDeAjuste): RecursoDeAjuste {
+  const campo = alvoDeCampoDaOperacao(op);
+  if (campo) return campo.recurso;
   return op.tipo === "ativar-papel" || op.tipo === "desativar-papel" ? "pipeline-agentes" : "regras";
 }
+
+export type RecursoDeAjuste = "regras" | "pipeline-agentes" | "campos-no" | "campos-aresta";
 
 /** Qual seção a operação mexe — é o que decide QUEM pode aprovar (o RBAC por
  * seção da SPEC-28) e o que a tela destaca na prévia. Só faz sentido quando
@@ -60,8 +134,16 @@ export function secaoDaOperacao(op: OperacaoDeAjuste): SecaoDeRegras {
     case "adicionar-teste":
     case "remover-teste":
       return "testes";
-    default:
+    case "definir-volumetria":
+    case "remover-volumetria":
       return "volumetria";
+    default:
+      // Operação de outro alvo (pipeline, campos): a resposta não significa
+      // nada, e o chamador tem que checar `recursoAlvoDaOperacao` ANTES. Era
+      // um `default: return "volumetria"` que valia para tudo — com as
+      // operações de campo da SPEC-52 isso mandaria o pedido para o dono da
+      // volumetria, que não tem nada com a ficha do componente.
+      return "checklistTecnico";
   }
 }
 
@@ -120,7 +202,62 @@ export function descreverOperacao(op: OperacaoDeAjuste): string {
       return `Ligar o papel "${op.papelNome ?? op.papelId}" na esteira de agentes`;
     case "desativar-papel":
       return `Desligar o papel "${op.papelNome ?? op.papelId}" da esteira de agentes`;
+    case "adicionar-campo-no":
+      return `Adicionar à ficha de ${op.tipoNo} o campo "${op.campo.label}"${op.campo.obrigatorio ? " (obrigatório)" : ""}`;
+    case "remover-campo-no":
+      return `Remover da ficha de ${op.tipoNo} o campo "${op.label ?? op.key}"`;
+    case "adicionar-campo-aresta":
+      return `Adicionar à ficha da conexão ${op.tipoAresta} o campo "${op.campo.label}"${
+        op.campo.obrigatorio ? " (obrigatório)" : ""
+      }`;
+    case "remover-campo-aresta":
+      return `Remover da ficha da conexão ${op.tipoAresta} o campo "${op.label ?? op.key}"`;
   }
+}
+
+/**
+ * SPEC-52 — a ficha DEPOIS da operação, sem mutar a de antes.
+ *
+ * É esta função que a tela usa pra mostrar o antes/depois e que o servidor usa
+ * pra decidir o que gravar: uma régua só, e não duas implementações que
+ * combinam por enquanto.
+ *
+ * Adicionar campo que já existe é no-op (aprovar duas vezes não duplica linha
+ * na ficha de ninguém); remover o que não existe também — é a idempotência que
+ * faz as vezes da validade por versão, que estes dois recursos não têm por não
+ * serem documento.
+ */
+export function aplicarOperacaoNosCampos(campos: CampoDaFicha[], op: OperacaoDeAjuste): CampoDaFicha[] {
+  switch (op.tipo) {
+    case "adicionar-campo-no":
+    case "adicionar-campo-aresta": {
+      if (campos.some((c) => c.key === op.campo.key)) return [...campos];
+      const { key, label, tipoCampo, obrigatorio, ajuda, opcoes } = op.campo;
+      return [...campos, { key, label, tipoCampo, obrigatorio, ...(ajuda ? { ajuda } : {}), ...(opcoes ? { opcoes } : {}) }];
+    }
+    case "remover-campo-no":
+    case "remover-campo-aresta":
+      return campos.filter((c) => c.key !== op.key);
+    default:
+      // Operação de outro documento não mexe na ficha — passar pelo caminho
+      // errado tem que ser no-op, não exceção (mesma régua de `aplicarOperacao`).
+      return [...campos];
+  }
+}
+
+/** O que ENTRA e o que SAI da ficha — o diff que a prévia pinta e que o
+ * servidor traduz em gravação. Por `key`, que é a chave natural do campo. */
+export function diferencaDeCampos(
+  antes: CampoDaFicha[],
+  depois: CampoDaFicha[]
+): { adicionados: CampoDaFicha[]; removidos: CampoDaFicha[] } {
+  const chaves = (lista: CampoDaFicha[]) => new Set(lista.map((c) => c.key));
+  const antesChaves = chaves(antes);
+  const depoisChaves = chaves(depois);
+  return {
+    adicionados: depois.filter((c) => !antesChaves.has(c.key)),
+    removidos: antes.filter((c) => !depoisChaves.has(c.key)),
+  };
 }
 
 /**
@@ -139,7 +276,7 @@ export function aplicarOperacao(regras: RegrasConfig, op: OperacaoDeAjuste): Reg
   // errado tem que ser no-op, não exceção.
   // (checagem pelo `tipo` e não por `recursoAlvoDaOperacao`: é o que estreita
   // a união pro resto da função enxergar `tech`.)
-  if (op.tipo === "ativar-papel" || op.tipo === "desativar-papel") return regras;
+  if (!ehOperacaoDeRegras(op)) return regras;
   const porTech = { ...regras.porTech };
   const daTech = { ...(porTech[op.tech] ?? { checklistTecnico: [], testes: [] }) };
 

@@ -1,7 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import type { DiagramaConfig, OperacaoDeAjuste, RegrasConfig, SecaoDeRegras } from "@gerador/engine";
-import { descreverOperacao, recursoAlvoDaOperacao } from "@gerador/engine";
+import type {
+  CampoDaFicha,
+  DiagramaConfig,
+  OperacaoDeAjuste,
+  RecursoDeAjuste,
+  RegrasConfig,
+  SecaoDeRegras,
+  TipoDeCampoProposto,
+} from "@gerador/engine";
+import { aplicarOperacaoNosCampos, descreverOperacao, diferencaDeCampos, recursoAlvoDaOperacao } from "@gerador/engine";
 import {
+  apiCamposAresta,
+  apiCamposNo,
   apiIa,
   apiPdca,
   apiPipelineAgentes,
@@ -24,6 +34,9 @@ export interface PdcaTabProps {
   timeAtivo: string;
   /** Abrir a configuração alvo de uma solicitação (deep-link, SPEC-40). */
   onAbrirArea?: (area: AreaConfig) => void;
+  /** SPEC-52 — um ajuste de FICHA foi aplicado: quem segura os campos em
+   * memória (o App) precisa relê-los, senão o efeito só aparece num F5. */
+  onFichaMudou?: () => void;
 }
 
 const CADENCIA_PADRAO = { cadenciaUsos: 5, cadenciaFeedback: 3 };
@@ -37,7 +50,7 @@ const AREA_DO_RECURSO: Record<string, AreaConfig> = {
   "campos-aresta": "camposAresta",
 };
 
-export function PdcaTab({ config, timeAtivo, onAbrirArea }: PdcaTabProps) {
+export function PdcaTab({ config, timeAtivo, onAbrirArea, onFichaMudou }: PdcaTabProps) {
   const [cadencia, setCadencia] = useState<typeof CADENCIA_PADRAO | null>(null);
   const [feedbacks, setFeedbacks] = useState<FeedbackPdca[]>([]);
   const [ajustes, setAjustes] = useState<SolicitacaoAjuste[]>([]);
@@ -181,7 +194,16 @@ export function PdcaTab({ config, timeAtivo, onAbrirArea }: PdcaTabProps) {
               )}
               {a.estado === "aprovada" && a.operacao && (
                 <button
-                  onClick={() => void executar(() => apiPdca.aplicarAjuste(a.id))}
+                  onClick={() =>
+                    void executar(async () => {
+                      const resultado = await apiPdca.aplicarAjuste(a.id);
+                      // SPEC-52 — ajuste de ficha muda os campos que a app já
+                      // tem em memória: sem avisar, a pessoa aplica, volta ao
+                      // canvas e o campo aprovado não está lá.
+                      if (a.recurso === "campos-no" || a.recurso === "campos-aresta") onFichaMudou?.();
+                      return resultado;
+                    })
+                  }
                   style={botaoPrimarioEstilo}
                   data-testid={`aplicar-${a.id}`}
                   title="Aplica a mudança no documento de configuração e fecha o ciclo"
@@ -271,7 +293,16 @@ function EstudioDeAjuste({
   // e cada seção tem dono próprio (SPEC-28).
   // SPEC-50 — o ajuste alcança dois documentos: as regras de refinamento e a
   // esteira de agentes ("esse papel sobra nos meus itens" é feedback comum).
-  const [alvo, setAlvo] = useState<"regras" | "pipeline-agentes">("regras");
+  // SPEC-52 — e a FICHA: "falta um campo de SLA no serviço" é o pedido mais
+  // comum de todos, e era o único que ainda terminava em "edite à mão".
+  const [alvo, setAlvo] = useState<RecursoDeAjuste>("regras");
+  const [chaveDaFicha, setChaveDaFicha] = useState("");
+  const [fichaAtual, setFichaAtual] = useState<CampoDaFicha[]>([]);
+  const [campoKey, setCampoKey] = useState("");
+  const [campoKeyEditada, setCampoKeyEditada] = useState(false);
+  const [campoLabel, setCampoLabel] = useState("");
+  const [campoTipo, setCampoTipo] = useState<TipoDeCampoProposto>("text");
+  const [campoObrigatorio, setCampoObrigatorio] = useState(false);
   const [papelId, setPapelId] = useState("");
   const [ligarPapel, setLigarPapel] = useState(false);
   const [secao, setSecao] = useState<SecaoDeRegras>("checklistTecnico");
@@ -294,7 +325,65 @@ function EstudioDeAjuste({
   }, [tipoNo]);
 
   const contextos = contextual ? config.nodeTypes[tipoNo]?.contextos ?? [] : [];
+  const ehFicha = alvo === "campos-no" || alvo === "campos-aresta";
+
+  /** As chaves de componente (ou de conexão) que a ficha aceita — sai do
+   * diagrama configurado, não de uma lista escrita à mão aqui. */
+  const chavesDaFicha: [string, string][] = useMemo(
+    () =>
+      alvo === "campos-aresta"
+        ? Object.entries(config.edgeTypes ?? {}).map(([k, v]) => [k, v.label ?? k])
+        : Object.entries(config.nodeTypes).map(([k, v]) => [k, v.label ?? k]),
+    [alvo, config]
+  );
+
+  // Trocar de alvo (ou de componente) recarrega a ficha REAL — a prévia
+  // compara contra o que está valendo, não contra uma lista imaginada.
+  useEffect(() => {
+    if (!ehFicha) return;
+    const chave = chaveDaFicha || chavesDaFicha[0]?.[0] || "";
+    if (!chaveDaFicha && chave) setChaveDaFicha(chave);
+    if (!chave) return;
+    const carregar =
+      alvo === "campos-aresta"
+        ? apiCamposAresta.listar(timeAtivo).then((cs) => cs.filter((c) => c.tipoAresta === chave))
+        : apiCamposNo.listar(timeAtivo).then((cs) => cs.filter((c) => c.tipoNo === chave));
+    carregar
+      .then((cs) =>
+        setFichaAtual(
+          cs.map((c) => ({
+            key: c.key,
+            label: c.label,
+            tipoCampo: c.type as CampoDaFicha["tipoCampo"],
+            obrigatorio: c.required,
+            ...(c.ajuda ? { ajuda: c.ajuda } : {}),
+          }))
+        )
+      )
+      .catch(() => setFichaAtual([]));
+  }, [alvo, chaveDaFicha, chavesDaFicha, timeAtivo, ehFicha]);
+
   const operacao: OperacaoDeAjuste | null = useMemo(() => {
+    if (ehFicha) {
+      if (!chaveDaFicha) return null;
+      if (acao === "remover") {
+        if (!campoKey) return null;
+        const label = fichaAtual.find((c) => c.key === campoKey)?.label;
+        return alvo === "campos-aresta"
+          ? { tipo: "remover-campo-aresta", tipoAresta: chaveDaFicha, key: campoKey, label }
+          : { tipo: "remover-campo-no", tipoNo: chaveDaFicha, key: campoKey, label };
+      }
+      if (!campoKey.trim() || !campoLabel.trim()) return null;
+      const campo = {
+        key: campoKey.trim(),
+        label: campoLabel.trim(),
+        tipoCampo: campoTipo,
+        obrigatorio: campoObrigatorio,
+      };
+      return alvo === "campos-aresta"
+        ? { tipo: "adicionar-campo-aresta", tipoAresta: chaveDaFicha, campo }
+        : { tipo: "adicionar-campo-no", tipoNo: chaveDaFicha, campo };
+    }
     if (alvo === "pipeline-agentes") {
       if (!papelId) return null;
       const nome = (pipeline?.papeis ?? []).find((p) => p.id === papelId)?.nome;
@@ -316,7 +405,60 @@ function EstudioDeAjuste({
     return acao === "adicionar"
       ? { tipo: "adicionar-checklist", secao, tech, contextos, texto: texto.trim() }
       : { tipo: "remover-checklist", secao, tech, texto: texto.trim() };
-  }, [alvo, papelId, ligarPapel, pipeline, secao, acao, tech, texto, validacao, dev, hlg, contextos]);
+  }, [
+    alvo,
+    ehFicha,
+    chaveDaFicha,
+    campoKey,
+    campoLabel,
+    campoTipo,
+    campoObrigatorio,
+    fichaAtual,
+    papelId,
+    ligarPapel,
+    pipeline,
+    secao,
+    acao,
+    tech,
+    texto,
+    validacao,
+    dev,
+    hlg,
+    contextos,
+  ]);
+
+  /**
+   * SPEC-52 — os campos que vêm do COMPONENTE (o `spec` do tipo, no diagrama
+   * configurado). Eles não moram na tabela de campos e a operação não os
+   * alcança, mas aparecem na ficha de quem preenche — e uma prévia que os
+   * omitisse mentiria por omissão sobre o que a pessoa vai ver.
+   */
+  const camposDoComponente: CampoDaFicha[] = useMemo(() => {
+    if (!ehFicha || !chaveDaFicha) return [];
+    const spec =
+      alvo === "campos-aresta" ? config.edgeTypes?.[chaveDaFicha]?.spec ?? [] : config.nodeTypes[chaveDaFicha]?.spec ?? [];
+    return spec.map((c) => ({
+      key: c.key,
+      label: c.label,
+      tipoCampo: c.type as CampoDaFicha["tipoCampo"],
+      obrigatorio: c.required ?? false,
+    }));
+  }, [ehFicha, alvo, chaveDaFicha, config]);
+
+  /** SPEC-52 — a prévia da ficha: o que a pessoa VAI ter que preencher. Para
+   * campos, simular o texto do item seria responder outra pergunta.
+   *
+   * A ficha DEPOIS sai da mesma função pura que o servidor usa pra decidir o
+   * que gravar — o que se vê aqui é o que vai acontecer, não uma segunda
+   * implementação que combina por enquanto. */
+  const fichaDepois = useMemo(
+    () => (ehFicha && operacao ? aplicarOperacaoNosCampos(fichaAtual, operacao) : fichaAtual),
+    [ehFicha, operacao, fichaAtual]
+  );
+  const previaDaFicha = useMemo(
+    () => (ehFicha && operacao ? diferencaDeCampos(fichaAtual, fichaDepois) : null),
+    [ehFicha, operacao, fichaAtual, fichaDepois]
+  );
 
   const previa = useMemo(
     () => (tipoNo && alvo === "regras" ? simularItemComAjuste(config, regras, tipoNo, operacao) : null),
@@ -405,14 +547,133 @@ function EstudioDeAjuste({
           <select
             aria-label="Documento a ajustar"
             value={alvo}
-            onChange={(e) => setAlvo(e.target.value as "regras" | "pipeline-agentes")}
+            onChange={(e) => {
+              setAlvo(e.target.value as RecursoDeAjuste);
+              // A chave da ficha é de outro vocabulário (componente ou
+              // conexão): manter a anterior ao trocar de alvo produziria um
+              // pedido sobre algo que não existe do outro lado.
+              setChaveDaFicha("");
+              setCampoKey("");
+            }}
             style={inputEstilo}
           >
             <option value="regras">Regras de refinamento (o conteúdo dos itens)</option>
             <option value="pipeline-agentes">Esteira de agentes (quem escreve o quê)</option>
+            <option value="campos-no">Ficha do componente (o que se preenche em cada nó)</option>
+            <option value="campos-aresta">Ficha da conexão (o que se preenche em cada seta)</option>
           </select>
 
-          {alvo === "pipeline-agentes" ? (
+          {ehFicha ? (
+            <>
+              <label style={labelEstilo}>{alvo === "campos-aresta" ? "Tipo de conexão" : "Componente"}</label>
+              <select
+                aria-label="Componente da ficha"
+                value={chaveDaFicha}
+                onChange={(e) => {
+                  setChaveDaFicha(e.target.value);
+                  setCampoKey("");
+                }}
+                style={inputEstilo}
+              >
+                {chavesDaFicha.map(([chave, rotulo]) => (
+                  <option key={chave} value={chave}>
+                    {rotulo}
+                  </option>
+                ))}
+              </select>
+
+              <label style={labelEstilo}>O que fazer</label>
+              <select
+                aria-label="Tipo de ajuste na ficha"
+                value={acao}
+                onChange={(e) => {
+                  setAcao(e.target.value as "adicionar" | "remover");
+                  setCampoKey("");
+                }}
+                style={inputEstilo}
+              >
+                <option value="adicionar">Adicionar um campo</option>
+                <option value="remover">Remover um campo</option>
+              </select>
+
+              {acao === "remover" ? (
+                <>
+                  <label style={labelEstilo}>Campo a remover</label>
+                  <select
+                    aria-label="Campo a remover"
+                    value={campoKey}
+                    onChange={(e) => setCampoKey(e.target.value)}
+                    style={inputEstilo}
+                  >
+                    <option value="">— escolha o campo —</option>
+                    {fichaAtual.map((c) => (
+                      <option key={c.key} value={c.key}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                  {fichaAtual.length === 0 && (
+                    <p style={{ ...metaEstilo, color: "var(--texto-mudo)" }} data-testid="sem-campo-removivel">
+                      Esta ficha só tem os campos que vêm do próprio componente, e esses não saem por aqui — eles são
+                      parte do que o tipo é. Dá pra propor campos novos, ou levar a conversa para quem edita o diagrama.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <label style={labelEstilo}>Nome do campo (o rótulo que aparece na ficha)</label>
+                  <input
+                    aria-label="Rótulo do campo"
+                    value={campoLabel}
+                    onChange={(e) => {
+                      setCampoLabel(e.target.value);
+                      // A chave técnica nasce do rótulo enquanto ninguém a
+                      // editar: obrigar a inventá-la seria pedir à pessoa
+                      // errada, no momento errado.
+                      if (!campoKeyEditada) setCampoKey(chaveTecnicaDe(e.target.value));
+                    }}
+                    placeholder="ex.: SLA acordado"
+                    style={inputEstilo}
+                  />
+
+                  <label style={labelEstilo}>Chave técnica</label>
+                  <input
+                    aria-label="Chave do campo"
+                    value={campoKey}
+                    onChange={(e) => {
+                      setCampoKeyEditada(true);
+                      setCampoKey(e.target.value);
+                    }}
+                    placeholder="ex.: sla_acordado"
+                    style={inputEstilo}
+                  />
+
+                  <label style={labelEstilo}>Tipo</label>
+                  <select
+                    aria-label="Tipo do campo"
+                    value={campoTipo}
+                    onChange={(e) => setCampoTipo(e.target.value as TipoDeCampoProposto)}
+                    style={inputEstilo}
+                  >
+                    <option value="text">Texto curto</option>
+                    <option value="textarea">Texto longo</option>
+                    <option value="number">Número</option>
+                    <option value="boolean">Sim/não</option>
+                    <option value="select">Escolha de uma lista</option>
+                  </select>
+
+                  <label style={{ ...labelEstilo, display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
+                    <input
+                      type="checkbox"
+                      checked={campoObrigatorio}
+                      onChange={(e) => setCampoObrigatorio(e.target.checked)}
+                    />
+                    obrigatório (o item fica pendente enquanto estiver vazio)
+                  </label>
+                </>
+              )}
+            </>
+          ) : alvo === "pipeline-agentes" ? (
             <>
               <label style={labelEstilo}>Papel</label>
               <select
@@ -574,7 +835,53 @@ function EstudioDeAjuste({
 
         {/* Coluna 2 — a prévia iterativa */}
         <div style={{ flex: "1 1 320px", minWidth: 300 }} data-testid="previa-do-ajuste">
-          {alvo === "pipeline-agentes" ? (
+          {ehFicha ? (
+            <div data-testid="previa-da-ficha">
+              <h3 style={tituloEstilo}>
+                Como fica a ficha de {chavesDaFicha.find(([k]) => k === chaveDaFicha)?.[1] ?? chaveDaFicha}
+              </h3>
+              {!previaDaFicha || (previaDaFicha.adicionados.length === 0 && previaDaFicha.removidos.length === 0) ? (
+                <p style={vazioEstilo} data-testid="previa-ficha-sem-efeito">
+                  {operacao ? "Nada muda — esse campo já está exatamente assim." : "Preencha o campo para ver a ficha mudar aqui."}
+                </p>
+              ) : (
+                <p style={{ ...proseEstilo, color: "var(--texto-mudo)" }}>
+                  Vale também para o que já está desenhado: a ficha é lida na hora de preencher, não copiada no desenho.
+                </p>
+              )}
+              <ul style={{ fontSize: 12.5, color: "var(--texto-2)", paddingLeft: 18, lineHeight: 1.7 }}>
+                {camposDoComponente.map((c) => (
+                  <li key={`padrao-${c.key}`} style={{ color: "var(--texto-fraco)" }} data-testid="ficha-campo-do-componente">
+                    {c.label}
+                    {c.obrigatorio ? " (obrigatório)" : ""} <span style={{ fontSize: 11 }}>— do componente</span>
+                  </li>
+                ))}
+                {fichaDepois.map((c) => {
+                  const entrando = previaDaFicha?.adicionados.some((a) => a.key === c.key) ?? false;
+                  return (
+                    <li
+                      key={c.key}
+                      style={entrando ? { color: "var(--verde, #3ecf8e)" } : undefined}
+                      data-testid={entrando ? "ficha-campo-novo" : "ficha-campo"}
+                    >
+                      {entrando ? "+ " : ""}
+                      {c.label}
+                      {c.obrigatorio ? " (obrigatório)" : ""}
+                    </li>
+                  );
+                })}
+                {(previaDaFicha?.removidos ?? []).map((c) => (
+                  <li
+                    key={c.key}
+                    style={{ color: "var(--vermelho, #f87171)", textDecoration: "line-through" }}
+                    data-testid="ficha-campo-removido"
+                  >
+                    {c.label}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : alvo === "pipeline-agentes" ? (
             <div data-testid="previa-do-pipeline">
               <h3 style={tituloEstilo}>O que muda na esteira</h3>
               {!papelEmFoco ? (
@@ -655,6 +962,25 @@ function EstudioDeAjuste({
       </div>
     </section>
   );
+}
+
+/**
+ * SPEC-52 — a chave técnica derivada do rótulo. Quem propõe um campo pensa em
+ * "SLA acordado", não em `sla_acordado`; a chave continua editável para quem
+ * se importa, mas ninguém precisa inventá-la para seguir em frente.
+ *
+ * O servidor só aceita letras, números, hífen e underscore — o que sai daqui
+ * já nasce dentro dessa régua, em vez de virar 400 depois de a pessoa
+ * escrever o pedido inteiro.
+ */
+export function chaveTecnicaDe(rotulo: string): string {
+  return rotulo
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40);
 }
 
 const tituloEstilo: React.CSSProperties = { fontSize: 13, margin: "0 0 4px", color: "var(--texto)" };
