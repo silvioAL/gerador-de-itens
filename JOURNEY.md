@@ -5324,3 +5324,61 @@ o estrago aparece longe, noutro spec, sem pista nenhuma.
 Mordidas: menu ignorando as permissões → asserção do cadeado vermelha; área
 negada sempre falsa → asserção do aviso vermelha. 53/53 E2E, banco de teste
 sem resíduo depois da corrida.
+
+## 204. SPEC-52 — o ajuste também aplica na ficha, e a régua continua sendo uma só
+
+O ciclo do PDCA fechava sozinho para as regras de refinamento e para a esteira
+de agentes. Para os **campos por componente e por conexão** ele parava na
+metade: o pedido nascia, alguém aprovava — e a solicitação ficava com um aviso
+de "abra a configuração e edite à mão". Quem aprovou já tinha entendido e
+concordado; o trabalho manual que sobrava era onde o ciclo perdia gente. E era
+justamente o pedido mais comum ("falta um campo de SLA no serviço").
+
+A razão de ter ficado para trás é boa: regras e pipeline são DOCUMENTOS num
+JSON versionado, e uma função pura devolve documento novo — prévia, validade e
+idempotência saem de graça disso. Campos são TABELA, com chave natural e
+escopo global sobrescrevível por time. Não há documento para versionar nem
+função pura para aplicar.
+
+A saída foi manter a disciplina sem fingir que a tabela é documento:
+`aplicarOperacaoNosCampos` é pura e devolve a ficha nova; a tela usa para a
+prévia e **o servidor usa a mesma função** para decidir o que gravar. O que a
+pessoa vê é literalmente o que acontece, e não duas implementações que
+combinam por enquanto.
+
+Três decisões que valem registro:
+
+**Um pedido de time não apaga o campo de todo mundo.** O campo global aparece
+na ficha do time (é o que a sobreposição faz), então sem checagem de escopo uma
+solicitação que só um time discutiu apagaria o campo da organização inteira —
+com o gate de permissão satisfeito, porque a permissão era do time. Agora a
+aplicação recusa com o motivo, e o teste prova que o campo continua lá.
+
+**`lista` fica de fora.** Uma lista carrega `itemSpec` (sub-campos com chave,
+rótulo, tipo e opções): é estrutura para editar na tela de campos, não para
+nascer de uma frase de feedback. Mesma régua da §202 sobre acessos — nem tudo
+se aplica sozinho.
+
+**Sem versão, a idempotência é que protege.** Adicionar o que já existe é
+no-op, remover o que já saiu também. É mais fraco que a validade por versão, e
+é escolha consciente: inventar uma versão sintética para a tabela seria um
+mecanismo novo para um risco que a idempotência já cobre.
+
+Dois defeitos que só o navegador contou, os dois de ficar **invisível**:
+
+1. A prévia mostrava só os campos customizados. A ficha que a pessoa preenche é
+   o `spec` do componente MAIS os customizados — omitir os primeiros era mentir
+   por omissão sobre o que ela veria. Agora aparecem os dois, e o que vem do
+   componente vem marcado (e não sai por ali: remover um campo do tipo é outra
+   conversa, e a tela diz isso em vez de só não oferecer nada).
+2. Aplicar funcionava no servidor e o campo não aparecia no painel. Recarregar
+   a lista de campos não bastava: quem alimenta o painel é a config MESCLADA
+   (global + time, resolvida pelo servidor). Sem isso, a pessoa aprovava,
+   voltava ao canvas e não via nada até um F5 — o ciclo parecia não ter
+   fechado.
+
+Mordidas: recusa de escopo desligada → o pedido de time apagando o campo global
+(vermelho); chave técnica sempre seguindo o rótulo → a edição à mão sendo
+sobrescrita (vermelho); ficha da conexão usando os componentes → vocabulário
+trocado (vermelho); config mesclada sem recarregar → o campo aprovado invisível
+no painel (vermelho). 225 engine + 189 server + 468 web; 54/54 E2E.

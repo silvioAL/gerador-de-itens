@@ -3,7 +3,9 @@ import type { RegrasConfig } from "../config/types.js";
 import {
   aplicarOperacao,
   aplicarOperacaoNoPipeline,
+  aplicarOperacaoNosCampos,
   descreverOperacao,
+  diferencaDeCampos,
   diferencaDoChecklist,
   recursoAlvoDaOperacao,
   secaoDaOperacao,
@@ -206,5 +208,107 @@ describe("ajusteDeRegras (SPEC-45 — o ajuste como dado)", () => {
       'Desligar o papel "QA" da esteira de agentes'
     );
     expect(descreverOperacao({ tipo: "ativar-papel", papelId: "qa" })).toContain('Ligar o papel "qa"');
+  });
+});
+
+/**
+ * SPEC-52 — a ficha do componente (e da conexão) entra no ciclo. O que se
+ * prova aqui é a régua ÚNICA: a mesma função que a tela usa pra prévia é a que
+ * o servidor usa pra decidir o que gravar.
+ */
+describe("aplicarOperacaoNosCampos (SPEC-52)", () => {
+  const ficha = [
+    { key: "sla", label: "SLA", tipoCampo: "text" as const, obrigatorio: false },
+    { key: "dono", label: "Dono", tipoCampo: "text" as const, obrigatorio: true },
+  ];
+
+  it("adiciona o campo no fim da ficha, sem mutar a de antes", () => {
+    const depois = aplicarOperacaoNosCampos(ficha, {
+      tipo: "adicionar-campo-no",
+      tipoNo: "service",
+      campo: { key: "volumetria", label: "Volumetria esperada", tipoCampo: "number", obrigatorio: true },
+    });
+
+    expect(depois.map((c) => c.key)).toEqual(["sla", "dono", "volumetria"]);
+    expect(depois.at(-1)).toMatchObject({ label: "Volumetria esperada", obrigatorio: true });
+    // O original intacto: a prévia mostra os dois lados ao mesmo tempo.
+    expect(ficha).toHaveLength(2);
+  });
+
+  it("adicionar o que já existe é no-op — aprovar duas vezes não duplica campo na ficha de ninguém", () => {
+    const depois = aplicarOperacaoNosCampos(ficha, {
+      tipo: "adicionar-campo-no",
+      tipoNo: "service",
+      campo: { key: "sla", label: "SLA (outro rótulo)", tipoCampo: "text", obrigatorio: true },
+    });
+    expect(depois).toEqual(ficha);
+  });
+
+  it("remove pela chave, e remover o que não existe também é no-op", () => {
+    expect(
+      aplicarOperacaoNosCampos(ficha, { tipo: "remover-campo-no", tipoNo: "service", key: "sla" }).map((c) => c.key)
+    ).toEqual(["dono"]);
+    expect(aplicarOperacaoNosCampos(ficha, { tipo: "remover-campo-aresta", tipoAresta: "sync", key: "sumiu" })).toEqual(ficha);
+  });
+
+  it("operação de OUTRO alvo não mexe na ficha — passar pelo caminho errado é no-op, não exceção", () => {
+    expect(aplicarOperacaoNosCampos(ficha, { tipo: "desativar-papel", papelId: "qa" })).toEqual(ficha);
+    expect(aplicarOperacaoNosCampos(ficha, { tipo: "remover-volumetria", tech: "Java" })).toEqual(ficha);
+  });
+
+  it("os opcionais só viajam quando existem — campo sem ajuda não grava `ajuda: undefined`", () => {
+    const [novo] = aplicarOperacaoNosCampos([], {
+      tipo: "adicionar-campo-aresta",
+      tipoAresta: "sync",
+      campo: { key: "timeout", label: "Timeout", tipoCampo: "number", obrigatorio: false },
+    });
+    expect(Object.keys(novo).sort()).toEqual(["key", "label", "obrigatorio", "tipoCampo"]);
+  });
+
+  it("o diff diz o que entra e o que sai — é o que a prévia pinta e o servidor grava", () => {
+    const depois = aplicarOperacaoNosCampos(ficha, {
+      tipo: "adicionar-campo-no",
+      tipoNo: "service",
+      campo: { key: "novo", label: "Novo", tipoCampo: "text", obrigatorio: false },
+    });
+    expect(diferencaDeCampos(ficha, depois)).toEqual({
+      adicionados: [{ key: "novo", label: "Novo", tipoCampo: "text", obrigatorio: false }],
+      removidos: [],
+    });
+    expect(diferencaDeCampos(depois, ficha)).toMatchObject({ adicionados: [], removidos: [{ key: "novo" }] });
+  });
+});
+
+describe("o alvo e a descrição das operações de campo (SPEC-52)", () => {
+  it("cada operação de campo aponta pro SEU recurso — é o que decide quem aprova", () => {
+    expect(recursoAlvoDaOperacao({ tipo: "remover-campo-no", tipoNo: "service", key: "sla" })).toBe("campos-no");
+    expect(recursoAlvoDaOperacao({ tipo: "remover-campo-aresta", tipoAresta: "sync", key: "sla" })).toBe("campos-aresta");
+  });
+
+  it("a seção NÃO vira volumetria por descuido: operação de campo não é pedido de regra", () => {
+    // O `default: return "volumetria"` antigo valia para tudo que não fosse
+    // checklist ou teste — com as operações de campo, mandaria o pedido para o
+    // dono da volumetria, que não tem nada com a ficha do componente.
+    expect(secaoDaOperacao({ tipo: "adicionar-campo-no", tipoNo: "service", campo: { key: "k", label: "L", tipoCampo: "text", obrigatorio: false } })).not.toBe(
+      "volumetria"
+    );
+  });
+
+  it("a descrição fala de ficha e de campo, sem jargão de estrutura", () => {
+    expect(
+      descreverOperacao({
+        tipo: "adicionar-campo-no",
+        tipoNo: "service",
+        campo: { key: "sla", label: "SLA", tipoCampo: "text", obrigatorio: true },
+      })
+    ).toBe('Adicionar à ficha de service o campo "SLA" (obrigatório)');
+    expect(descreverOperacao({ tipo: "remover-campo-aresta", tipoAresta: "sync", key: "sla", label: "SLA" })).toBe(
+      'Remover da ficha da conexão sync o campo "SLA"'
+    );
+  });
+
+  it("aplicar uma operação de campo nas REGRAS é no-op — cada documento tem seu caminho", () => {
+    const regras: RegrasConfig = { porTech: { Java: { checklistTecnico: [{ texto: "x", contextos: [] }], testes: [] } } };
+    expect(aplicarOperacao(regras, { tipo: "remover-campo-no", tipoNo: "service", key: "sla" })).toEqual(regras);
   });
 });

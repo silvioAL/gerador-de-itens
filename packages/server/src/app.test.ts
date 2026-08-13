@@ -1633,6 +1633,119 @@ describe("SPEC-45 — a jornada do PDCA (feedback → ajuste → aplicado)", () 
     expect(pipeline.documento.confirmacaoObrigatoria).toBe(true);
   });
 
+  /**
+   * SPEC-52 — o *Act* alcança a FICHA. Campos por componente e por conexão são
+   * tabela, não documento: aplicar aqui grava linha, e o que se prova é que o
+   * ciclo fecha sozinho (sem "edite à mão") e que o escopo é respeitado.
+   */
+  it("SPEC-52 — ajuste de campo aprovado CRIA o campo na ficha do componente", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+
+    const criada = (
+      await app.inject({
+        method: "POST",
+        url: "/ajustes",
+        cookies: { gerador_sessao: cookie },
+        payload: {
+          recurso: "campos-no",
+          descricao: "falta onde declarar o SLA do serviço",
+          operacao: {
+            tipo: "adicionar-campo-no",
+            tipoNo: "service",
+            campo: { key: "sla52", label: "SLA acordado", tipoCampo: "text", obrigatorio: true, ajuda: "em ms" },
+          },
+        },
+      })
+    ).json();
+
+    await app.inject({
+      method: "POST",
+      url: `/ajustes/${criada.id}/decidir`,
+      cookies: { gerador_sessao: cookie },
+      payload: { aprovar: true },
+    });
+    const aplicada = await app.inject({ method: "POST", url: `/ajustes/${criada.id}/aplicar`, cookies: { gerador_sessao: cookie } });
+    expect(aplicada.statusCode).toBe(200);
+    expect(aplicada.json().criados).toEqual(["sla52"]);
+
+    const campos = (await app.inject({ method: "GET", url: "/campos-no" })).json();
+    expect(campos).toContainEqual(
+      expect.objectContaining({ tipoNo: "service", key: "sla52", label: "SLA acordado", required: true, ajuda: "em ms" })
+    );
+  });
+
+  it("SPEC-52 — aplicar duas vezes não duplica campo (a idempotência faz as vezes da validade por versão)", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const operacao = {
+      tipo: "adicionar-campo-aresta",
+      tipoAresta: "sync",
+      campo: { key: "timeout52", label: "Timeout", tipoCampo: "number", obrigatorio: false },
+    };
+
+    for (const vez of [1, 2]) {
+      const criada = (
+        await app.inject({
+          method: "POST",
+          url: "/ajustes",
+          cookies: { gerador_sessao: cookie },
+          payload: { recurso: "campos-aresta", descricao: `timeout na conexão (vez ${vez})`, operacao },
+        })
+      ).json();
+      await app.inject({
+        method: "POST",
+        url: `/ajustes/${criada.id}/decidir`,
+        cookies: { gerador_sessao: cookie },
+        payload: { aprovar: true },
+      });
+      expect(
+        (await app.inject({ method: "POST", url: `/ajustes/${criada.id}/aplicar`, cookies: { gerador_sessao: cookie } })).statusCode
+      ).toBe(200);
+    }
+
+    const campos = (await app.inject({ method: "GET", url: "/campos-aresta" })).json();
+    expect(campos.filter((c: { key: string }) => c.key === "timeout52")).toHaveLength(1);
+  });
+
+  it("SPEC-52 — um pedido de TIME não apaga o campo de todo mundo: recusa com o motivo", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    // Campo GLOBAL — aparece na ficha do time por sobreposição, e é isso que
+    // torna a remoção perigosa se ninguém checar o escopo.
+    await app.inject({
+      method: "POST",
+      url: "/campos-no",
+      cookies: { gerador_sessao: cookie },
+      payload: { tipoNo: "service", key: "detodos52", label: "De todos", type: "text" },
+    });
+
+    const criada = (
+      await app.inject({
+        method: "POST",
+        url: "/ajustes",
+        cookies: { gerador_sessao: cookie },
+        payload: {
+          recurso: "campos-no",
+          descricao: "esse campo não serve pro meu time",
+          timeId: TIME_A,
+          operacao: { tipo: "remover-campo-no", tipoNo: "service", key: "detodos52", label: "De todos" },
+        },
+      })
+    ).json();
+    await app.inject({
+      method: "POST",
+      url: `/ajustes/${criada.id}/decidir`,
+      cookies: { gerador_sessao: cookie },
+      payload: { aprovar: true },
+    });
+
+    const recusa = await app.inject({ method: "POST", url: `/ajustes/${criada.id}/aplicar`, cookies: { gerador_sessao: cookie } });
+    expect(recusa.statusCode).toBe(409);
+    expect(recusa.json().erro).toContain("todo mundo");
+
+    // E o campo continua lá, para todos — a recusa não é cosmética.
+    const campos = (await app.inject({ method: "GET", url: "/campos-no" })).json();
+    expect(campos.some((c: { key: string }) => c.key === "detodos52")).toBe(true);
+  });
+
   it("SPEC-50 — quem decide um ajuste de papel é o dono do PIPELINE, não o do checklist", async () => {
     const [org] = await db.select().from(organizacoes).limit(1);
     const [papel] = await db.insert(papeisAcesso).values({ organizacaoId: org.id, nome: "Arquitetura da esteira" }).returning();

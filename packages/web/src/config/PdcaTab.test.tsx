@@ -14,11 +14,13 @@ vi.mock("../api/client", () => ({
     aplicarAjuste: vi.fn(),
   },
   apiRegras: { obter: vi.fn() },
+  apiCamposNo: { listar: vi.fn() },
+  apiCamposAresta: { listar: vi.fn() },
   apiPipelineAgentes: { obter: vi.fn() },
   apiIa: { sugerir: vi.fn() },
 }));
 
-import { apiIa, apiPdca, apiPipelineAgentes, apiRegras } from "../api/client";
+import { apiCamposAresta, apiCamposNo, apiIa, apiPdca, apiPipelineAgentes, apiRegras } from "../api/client";
 import { PdcaTab } from "./PdcaTab";
 
 const config: DiagramaConfig = {
@@ -31,7 +33,7 @@ const config: DiagramaConfig = {
       spec: [{ key: "nome", label: "Nome da fila", type: "text", required: true, identificador: true }],
     },
   },
-  edgeTypes: {},
+  edgeTypes: { sync: { label: "Chamada síncrona" } },
   edgeRules: {},
 };
 
@@ -61,6 +63,11 @@ beforeEach(() => {
   (apiPdca.listarFeedback as Mock).mockResolvedValue([feedback]);
   (apiPdca.listarAjustes as Mock).mockResolvedValue([]);
   (apiRegras.obter as Mock).mockResolvedValue(regras);
+  (apiCamposNo.listar as Mock).mockResolvedValue([
+    { id: "c1", timeId: "__global__", tipoNo: "fila", key: "nome", label: "Nome da fila", type: "text", required: true, ajuda: null },
+    { id: "c2", timeId: "__global__", tipoNo: "fila", key: "dlq", label: "Tem DLQ?", type: "boolean", required: false, ajuda: null },
+  ]);
+  (apiCamposAresta.listar as Mock).mockResolvedValue([]);
   (apiPipelineAgentes.obter as Mock).mockResolvedValue({
     confirmacaoObrigatoria: true,
     papeis: [
@@ -265,5 +272,100 @@ describe("PdcaTab — a jornada do PDCA (SPEC-45)", () => {
 
     expect(screen.getByLabelText("Ligar ou desligar")).toHaveValue("ligar");
     expect(screen.getByTestId("previa-do-pipeline").textContent).toContain("passa a escrever");
+  });
+});
+
+/**
+ * SPEC-52 — a ficha entra no ciclo. O que se testa aqui é o que a pessoa VÊ
+ * antes de decidir (a ficha mudando, não o texto do item, que seria outra
+ * pergunta) e o que sai do formulário como operação.
+ */
+describe("PdcaTab — o ajuste alcança a FICHA (SPEC-52)", () => {
+  async function abrirFicha(alvo: "campos-no" | "campos-aresta" = "campos-no") {
+    montar();
+    fireEvent.click(await screen.findByTestId("propor-f1"));
+    fireEvent.change(screen.getByLabelText("Documento a ajustar"), { target: { value: alvo } });
+    await waitFor(() => expect(screen.getByTestId("previa-da-ficha")).toBeInTheDocument());
+  }
+
+  it("mostra a ficha REAL do componente e o campo novo entrando nela", async () => {
+    await abrirFicha();
+    await waitFor(() => expect(screen.getByTestId("previa-da-ficha").textContent).toContain("Nome da fila"));
+
+    fireEvent.change(screen.getByLabelText("Rótulo do campo"), { target: { value: "SLA acordado" } });
+
+    const previa = screen.getByTestId("previa-da-ficha");
+    await waitFor(() => expect(within(previa).getByTestId("ficha-campo-novo").textContent).toContain("SLA acordado"));
+    // Os que já existiam continuam listados — a prévia é a ficha inteira, não
+    // só o delta: é assim que se vê se o campo novo faz sentido ao lado deles.
+    expect(previa.textContent).toContain("Tem DLQ?");
+  });
+
+  it("a ficha da prévia inclui o que vem do COMPONENTE — omiti-los mentiria sobre o que a pessoa vai ver", async () => {
+    // Achado real do E2E: a tabela de campos guarda só os CUSTOMIZADOS, e a
+    // prévia mostrava só eles. Quem preenche vê os dois — o `spec` do tipo
+    // junto com o que foi acrescentado.
+    (apiCamposNo.listar as Mock).mockResolvedValue([]);
+    await abrirFicha();
+    await waitFor(() =>
+      expect(screen.getByTestId("previa-da-ficha").textContent).toContain("Nome da fila")
+    );
+    expect(screen.getByTestId("ficha-campo-do-componente").textContent).toContain("do componente");
+  });
+
+  it("sem campo customizado, remover explica por que a lista está vazia em vez de só não oferecer nada", async () => {
+    (apiCamposNo.listar as Mock).mockResolvedValue([]);
+    await abrirFicha();
+    fireEvent.change(screen.getByLabelText("Tipo de ajuste na ficha"), { target: { value: "remover" } });
+    expect(await screen.findByTestId("sem-campo-removivel")).toHaveTextContent("não saem por aqui");
+  });
+
+  it("a chave técnica nasce do rótulo, sem acento nem espaço — e continua editável", async () => {
+    await abrirFicha();
+    fireEvent.change(screen.getByLabelText("Rótulo do campo"), { target: { value: "Tempo de retenção (dias)" } });
+    expect(screen.getByLabelText("Chave do campo")).toHaveValue("tempo_de_retencao_dias");
+
+    // Editada à mão, ela para de seguir o rótulo — senão a pessoa digita a
+    // chave e vê o próximo caractere do rótulo apagá-la.
+    fireEvent.change(screen.getByLabelText("Chave do campo"), { target: { value: "retencao" } });
+    fireEvent.change(screen.getByLabelText("Rótulo do campo"), { target: { value: "Tempo de retenção" } });
+    expect(screen.getByLabelText("Chave do campo")).toHaveValue("retencao");
+  });
+
+  it("salvar manda a operação de campo, com o recurso que decide quem aprova", async () => {
+    await abrirFicha();
+    fireEvent.change(screen.getByLabelText("Rótulo do campo"), { target: { value: "SLA acordado" } });
+    fireEvent.change(screen.getByLabelText("Tipo do campo"), { target: { value: "number" } });
+    fireEvent.click(screen.getByTestId("salvar-ajuste"));
+
+    await waitFor(() =>
+      expect(apiPdca.criarAjuste).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recurso: "campos-no",
+          operacao: {
+            tipo: "adicionar-campo-no",
+            tipoNo: "fila",
+            campo: { key: "sla_acordado", label: "SLA acordado", tipoCampo: "number", obrigatorio: false },
+          },
+        })
+      )
+    );
+  });
+
+  it("remover escolhe entre os campos que EXISTEM, e a prévia risca o que sai", async () => {
+    await abrirFicha();
+    fireEvent.change(screen.getByLabelText("Tipo de ajuste na ficha"), { target: { value: "remover" } });
+    await waitFor(() => expect(screen.getByLabelText("Campo a remover")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Campo a remover"), { target: { value: "dlq" } });
+
+    const previa = screen.getByTestId("previa-da-ficha");
+    await waitFor(() => expect(within(previa).getByTestId("ficha-campo-removido").textContent).toContain("Tem DLQ?"));
+    expect(previa.textContent).toContain("Nome da fila");
+  });
+
+  it("a ficha da CONEXÃO usa os tipos de conexão, não os componentes — vocabulários diferentes", async () => {
+    await abrirFicha("campos-aresta");
+    expect(screen.getByLabelText("Componente da ficha").textContent).toContain("Chamada síncrona");
+    expect(screen.getByLabelText("Componente da ficha").textContent).not.toContain("Fila Rabbit");
   });
 });

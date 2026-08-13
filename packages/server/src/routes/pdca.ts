@@ -15,6 +15,10 @@ import {
   type PipelineComPapeis,
   type RegrasConfig,
 } from "@gerador/engine";
+import { CAMPO_GLOBAL, criarCasosDeUsoDeCamposAresta, criarCasosDeUsoDeCamposNo } from "@gerador/aplicacao";
+import { criarRepositorioDeCamposNoEmPostgres } from "../adaptadores/camposNoEmPostgres.js";
+import { criarRepositorioDeCamposArestaEmPostgres } from "../adaptadores/camposArestaEmPostgres.js";
+import { aplicarOperacaoDeCampo, type PortaDeFicha } from "../pdca/aplicarNosCampos.js";
 
 /**
  * SPEC-39 Fase 1 — o PDCA das configurações.
@@ -26,6 +30,25 @@ import {
  * mudar, e aprovar um pedido sobre uma versão anterior pode não fazer
  * sentido (a validade é checada NA decisão, nunca antes).
  */
+
+/**
+ * SPEC-52 — o campo que um pedido consegue propor. `lista` fica de fora: ela
+ * carrega `itemSpec` (sub-campos), estrutura para editar na tela de campos e
+ * não para nascer de uma frase de feedback. Recusar aqui é melhor que aceitar
+ * e aplicar meia lista.
+ */
+const campoProposto = z.object({
+  key: z
+    .string()
+    .trim()
+    .min(1)
+    .regex(/^[a-zA-Z0-9_-]+$/, "a chave do campo aceita letras, números, hífen e underscore"),
+  label: z.string().trim().min(1),
+  tipoCampo: z.enum(["text", "textarea", "number", "boolean", "select"]),
+  obrigatorio: z.boolean().default(false),
+  ajuda: z.string().trim().optional(),
+  opcoes: z.array(z.string()).optional(),
+});
 
 const CADENCIA_PADRAO = { cadenciaUsos: 5, cadenciaFeedback: 3 };
 const CHAVE_CONFIG_PDCA = "pdca";
@@ -52,6 +75,55 @@ const RECURSO_DA_DECISAO: Record<(typeof RECURSOS_SOLICITAVEIS)[number], Recurso
 
 export async function registrarRotasPdca(app: FastifyInstance, { db }: OpcoesApp) {
   const organizacaoId = organizacaoPadraoDe(db);
+
+  /**
+   * SPEC-52 — as duas fichas que o *Act* alcança, cada uma delegando ao mesmo
+   * caso de uso que a tela de campos usa. A rota do PDCA não fala SQL de
+   * campo: se a regra de sobreposição mudar, muda num lugar só.
+   */
+  const casosDeCamposNo = criarCasosDeUsoDeCamposNo(criarRepositorioDeCamposNoEmPostgres(db));
+  const casosDeCamposAresta = criarCasosDeUsoDeCamposAresta(criarRepositorioDeCamposArestaEmPostgres(db));
+
+  const fichaDeNos: PortaDeFicha = {
+    listar: async (tipoNo, timeId) =>
+      (await casosDeCamposNo.listarEfetivos(timeId)).filter((c) => c.tipoNo === tipoNo),
+    criar: ({ chaveDoComponente, timeId, campo, ordem }) =>
+      casosDeCamposNo
+        .salvar({
+          timeId,
+          tipoNo: chaveDoComponente,
+          key: campo.key,
+          label: campo.label,
+          type: campo.tipoCampo,
+          required: campo.obrigatorio,
+          ajuda: campo.ajuda ?? null,
+          opcoes: campo.opcoes ?? null,
+          ordem,
+        })
+        .then(() => undefined),
+    excluir: (id) => casosDeCamposNo.excluir(id),
+  };
+
+  const fichaDeArestas: PortaDeFicha = {
+    listar: async (tipoAresta, timeId) =>
+      (await casosDeCamposAresta.listarEfetivos(timeId)).filter((c) => c.tipoAresta === tipoAresta),
+    criar: ({ chaveDoComponente, timeId, campo, ordem }) =>
+      casosDeCamposAresta
+        .salvar({
+          timeId,
+          tipoAresta: chaveDoComponente,
+          key: campo.key,
+          label: campo.label,
+          // A ficha de conexão não tem `lista` — o tipo proposto já exclui.
+          type: campo.tipoCampo,
+          required: campo.obrigatorio,
+          ajuda: campo.ajuda ?? null,
+          opcoes: campo.opcoes ?? null,
+          ordem,
+        })
+        .then(() => undefined),
+    excluir: (id) => casosDeCamposAresta.excluir(id),
+  };
 
   async function cadencia(): Promise<typeof CADENCIA_PADRAO> {
     const [doc] = await db
@@ -83,7 +155,11 @@ export async function registrarRotasPdca(app: FastifyInstance, { db }: OpcoesApp
       // SPEC-50 — quem manda é a OPERAÇÃO, não o rótulo do pedido: um ajuste
       // de papel é do dono do pipeline, mesmo que o pedido tenha nascido
       // marcado como "regras".
-      if (recursoAlvoDaOperacao(op) === "pipeline-agentes") return "pipeline-agentes";
+      const alvo = recursoAlvoDaOperacao(op);
+      if (alvo === "pipeline-agentes") return "pipeline-agentes";
+      // SPEC-52 — a ficha tem dono próprio (quem edita campos por componente
+      // ou por conexão), e não é o dono de nenhuma seção das regras.
+      if (alvo === "campos-no" || alvo === "campos-aresta") return alvo;
       return SECOES_DE_REGRAS[secaoDaOperacao(op)];
     }
     return RECURSO_DA_DECISAO[pedido.recurso as (typeof RECURSOS_SOLICITAVEIS)[number]] ?? "regras.checklistTecnico";
@@ -233,6 +309,21 @@ export async function registrarRotasPdca(app: FastifyInstance, { db }: OpcoesApp
             // SPEC-50 — papel da esteira: o outro documento que o feedback cita.
             z.object({ tipo: z.literal("ativar-papel"), papelId: z.string().min(1), papelNome: z.string().optional() }),
             z.object({ tipo: z.literal("desativar-papel"), papelId: z.string().min(1), papelNome: z.string().optional() }),
+            // SPEC-52 — a ficha do componente e a da conexão.
+            z.object({ tipo: z.literal("adicionar-campo-no"), tipoNo: z.string().min(1), campo: campoProposto }),
+            z.object({
+              tipo: z.literal("remover-campo-no"),
+              tipoNo: z.string().min(1),
+              key: z.string().min(1),
+              label: z.string().optional(),
+            }),
+            z.object({ tipo: z.literal("adicionar-campo-aresta"), tipoAresta: z.string().min(1), campo: campoProposto }),
+            z.object({
+              tipo: z.literal("remover-campo-aresta"),
+              tipoAresta: z.string().min(1),
+              key: z.string().min(1),
+              label: z.string().optional(),
+            }),
           ])
           .optional(),
         /** De qual feedback este pedido nasceu — fecha a ponte que faltava. */
@@ -307,6 +398,43 @@ export async function registrarRotasPdca(app: FastifyInstance, { db }: OpcoesApp
     await gate(req, reply);
     if (reply.sent) return;
 
+    /**
+     * SPEC-52 — a ficha não é documento: campos por componente e por conexão
+     * são tabela, com escopo. Aplicar aqui grava linha, mas o QUE gravar sai
+     * da mesma função pura que a tela usou pra mostrar a prévia.
+     *
+     * O escopo é o time do pedido — a permissão foi checada com ele. Pedido
+     * sem time mexe no global.
+     */
+    if (alvo === "campos-no" || alvo === "campos-aresta") {
+      const escopo = pedido.timeId ?? CAMPO_GLOBAL;
+      const resultado = await aplicarOperacaoDeCampo(
+        operacao,
+        escopo,
+        alvo === "campos-no" ? fichaDeNos : fichaDeArestas
+      );
+      if (!resultado.ok) return reply.code(409).send({ erro: resultado.motivo });
+
+      const [aplicadaEmCampos] = await db
+        .update(solicitacoesAjuste)
+        .set({ estado: "aplicada", aplicadaEm: new Date(), aplicadaPor: req.usuario!.email })
+        .where(eq(solicitacoesAjuste.id, id))
+        .returning();
+      registrarAuditoria(db, {
+        email: req.usuario!.email,
+        acao: "atualizar",
+        recurso: alvo === "campos-no" ? "campos_no" : "campos_aresta",
+        recursoId: escopo,
+      });
+      return {
+        id,
+        estado: aplicadaEmCampos.estado,
+        aplicadaPor: aplicadaEmCampos.aplicadaPor,
+        criados: resultado.criados,
+        removidos: resultado.removidos,
+      };
+    }
+
     const [doc] = await db
       .select()
       .from(configDocumentos)
@@ -318,6 +446,7 @@ export async function registrarRotasPdca(app: FastifyInstance, { db }: OpcoesApp
       alvo === "pipeline-agentes"
         ? aplicarOperacaoNoPipeline(doc.documento as PipelineComPapeis, operacao)
         : aplicarOperacao(doc.documento as RegrasConfig, operacao);
+
     await db
       .update(configDocumentos)
       .set({ documento: documentoNovo, atualizadoEm: new Date() })
