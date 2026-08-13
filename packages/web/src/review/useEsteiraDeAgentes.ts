@@ -74,6 +74,17 @@ export interface UseEsteiraDeAgentesParams {
   onResponderItem?: (atividadeChave: string, chavePlaceholder: string, resposta: ValorSpec) => void;
 }
 
+/** Uma corrida de papel que não entregou — o que a tela precisa dizer. */
+export interface FalhaDeEsteira {
+  papelId: string;
+  papelNome: string;
+  mensagem: string;
+  /** Quantos itens do lote ficaram sem resposta deste papel. */
+  itens: number;
+  /** Quantos campos foram salvos do texto parcial que já tinha chegado. */
+  recuperados: number;
+}
+
 export interface EstadoEsteiraDeAgentes {
   rodando: boolean;
   pausado: boolean;
@@ -93,6 +104,9 @@ export interface EstadoEsteiraDeAgentes {
    * placeholder (SPEC-24 Fase E — extraído ao vivo do JSON aninhado parcial
    * que a rota streama). Vazio fora de uma chamada em andamento. */
   respostasAoVivoPorItem: Record<string, Record<string, string>>;
+  /** §193 — papéis que morreram no caminho (timeout, gateway fora, resposta
+   * fora do formato). Sem isto, o trabalho sumia da tela sem uma palavra. */
+  falhas: FalhaDeEsteira[];
   /** `papeisOverride` (Fase F): o auto-start acabou de resolver a config e o
    * prop `papeis` ainda não re-renderizou — passa a lista fresca direto pra
    * esta corrida não largar com a antiga. */
@@ -191,6 +205,7 @@ export function useEsteiraDeAgentes({
   const [rodando, setRodando] = useState(false);
   const [pausado, setPausado] = useState(false);
   const [aoVivoPorItem, setAoVivoPorItem] = useState<Record<string, Record<string, string>>>({});
+  const [falhas, setFalhas] = useState<FalhaDeEsteira[]>([]);
 
   const pausadoRef = useRef(false);
   const tokenRef = useRef(0);
@@ -305,9 +320,9 @@ export function useEsteiraDeAgentes({
             // MESMO que alimenta o texto ao vivo, então o que a pessoa viu na
             // tela é exatamente o que se recupera aqui. Melhor um campo
             // incompleto, visível e editável, do que a tela em branco.
+            let recuperados = 0;
             if (tokenRef.current === token && ultimoAcumulado) {
               const salvas = extrairRespostasParciaisAninhadas(ultimoAcumulado);
-              let recuperados = 0;
               for (const item of lote) {
                 for (const placeholder of item.placeholdersPorPapel[papel.id]) {
                   const valor = salvas[item.atividadeChave]?.[placeholder.chave];
@@ -327,6 +342,25 @@ export function useEsteiraDeAgentes({
                 console.warn(`[esteira/${papel.id}] recuperados ${recuperados} campo(s) do texto já gerado.`);
               }
             }
+            // A tela precisa DIZER o que aconteceu: o pior sintoma deste
+            // projeto foi trabalho sumindo em silêncio (§193 — no Qwen local,
+            // o papel morria no timeout de 300 s do fetch e a pessoa via o
+            // texto do agente anterior desaparecer sem explicação).
+            if (tokenRef.current === token) {
+              const mensagem = erro instanceof Error ? erro.message : String(erro);
+              setFalhas((atuais) => [
+                ...atuais,
+                {
+                  papelId: papel.id,
+                  papelNome: papel.nome ?? papel.id,
+                  mensagem: /fetch failed|network|socket/i.test(mensagem)
+                    ? `a conexão com o modelo caiu no meio da geração (${mensagem})`
+                    : mensagem,
+                  itens: lote.length,
+                  recuperados,
+                },
+              ]);
+            }
           } finally {
             if (tokenRef.current === token) setAoVivoPorItem({});
           }
@@ -344,6 +378,7 @@ export function useEsteiraDeAgentes({
   const iniciar = useCallback(
     (filaNova: ItemFilaEsteira[], papeisOverride?: PapelConfigurado[]) => {
       if (papeisOverride) papeisRef.current = papeisOverride;
+      setFalhas([]);
       const token = ++tokenRef.current;
       pausadoRef.current = false;
       setPausado(false);
@@ -386,6 +421,7 @@ export function useEsteiraDeAgentes({
     escrevendoChaves: rodando ? loteChaves : [],
     progresso: { feito: itensFeitos, total: itensDoPapelAtual.length },
     respostasAoVivoPorItem: aoVivoPorItem,
+    falhas,
     iniciar,
     pausar,
     continuar,

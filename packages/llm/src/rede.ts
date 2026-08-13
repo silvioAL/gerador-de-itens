@@ -1,4 +1,4 @@
-import { ProxyAgent, fetch as fetchUndici, type Dispatcher } from "undici";
+import { Agent, ProxyAgent, fetch as fetchUndici, type Dispatcher } from "undici";
 
 /**
  * Rede corporativa: proxy e diagnóstico do download de modelos.
@@ -79,6 +79,54 @@ export async function buscarComProxy(url: string, init: RequestInit = {}): Promi
   const dispatcher = dispatcherPara(url);
   if (!dispatcher) return fetch(url, init);
   return (await fetchUndici(url, { ...init, dispatcher } as Parameters<typeof fetchUndici>[1])) as unknown as Response;
+}
+
+/**
+ * INFERÊNCIA é diferente de download: o undici corta a conexão em 300 s
+ * parado (`headersTimeout`/`bodyTimeout` padrão), e um modelo local em CPU
+ * legitimamente passa disso — só o *prompt eval* de um lote no qwen2.5:7b já
+ * leva minutos (a própria tela diz "~3min40 para um item com 2 campos").
+ *
+ * ACHADO REAL (§193), medido nos logs do servidor: `[ia/pipeline/po] falhou:
+ * fetch failed` **exatamente 301 s** depois do POST, e o mesmo para o
+ * arquiteto em 302 s. O sintoma na tela era outro e parecia bug de estado —
+ * "quando o próximo agente começa, o que o anterior escreveu some": o papel
+ * inteiro morria no timeout e nada era gravado. Com um gateway remoto rápido
+ * (Claude/Sonnet) o limite nunca é alcançado, e por isso o defeito só
+ * aparecia no modelo local.
+ *
+ * `0` desliga o relógio no undici. Quem limita a espera é a pessoa (fechar a
+ * aba, pausar a esteira), não um default pensado para APIs web.
+ */
+export const TIMEOUTS_DE_INFERENCIA = { headersTimeout: 0, bodyTimeout: 0 } as const;
+
+/** As opções do agente de inferência, como dado — é o que o teste inspeciona
+ * (construir um Agent e perguntar seus timeouts depois não é possível). */
+export function opcoesDeInferencia(
+  url: string,
+  env: NodeJS.ProcessEnv = process.env
+): { headersTimeout: number; bodyTimeout: number; uri?: string } {
+  if (proxyIgnoradoPara(url, env)) return { ...TIMEOUTS_DE_INFERENCIA };
+  const proxy = detectarProxy(env);
+  return proxy ? { ...TIMEOUTS_DE_INFERENCIA, uri: proxy.url } : { ...TIMEOUTS_DE_INFERENCIA };
+}
+
+export function dispatcherDeInferencia(url: string, env: NodeJS.ProcessEnv = process.env): Dispatcher {
+  const opcoes = opcoesDeInferencia(url, env);
+  return opcoes.uri ? new ProxyAgent(opcoes as { uri: string }) : new Agent(opcoes);
+}
+
+/**
+ * `fetch` para CHAMAR O MODELO — honra proxy (como `buscarComProxy`) e não
+ * desiste no meio de uma geração lenta. Sempre pelo undici do pacote: o
+ * `fetch` global usa o undici interno do Node e ignora dispatcher nosso (ver
+ * o achado do `UND_ERR_INVALID_ARG` acima).
+ */
+export async function buscarDoModelo(url: string, init: RequestInit = {}): Promise<Response> {
+  return (await fetchUndici(url, {
+    ...init,
+    dispatcher: dispatcherDeInferencia(url),
+  } as Parameters<typeof fetchUndici>[1])) as unknown as Response;
 }
 
 /**

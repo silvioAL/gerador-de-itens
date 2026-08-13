@@ -1618,6 +1618,27 @@ describe("ReviewScreen — o que um papel escreveu continua na tela quando o pr�
 
     liberarArquiteto();
   });
+
+  it("§193 — papel que morre no caminho DIZ isso na tela: o trabalho nunca mais some em silêncio", async () => {
+    apiIaStatusMock.mockResolvedValueOnce({ chatInstalado: true, embeddingInstalado: true, pronto: true, caminhoModelos: "" });
+    apiIaSugerirPipelineMock.mockImplementation(
+      async (papel: string, pedido: { itens: { chave: string; placeholders: { chave: string }[] }[] }) => {
+        // O defeito real medido no Qwen local: a conexão cai depois de 300 s
+        // e o papel inteiro volta sem nada (o servidor loga "fetch failed").
+        if (papel === "po") throw new Error("fetch failed");
+        return Object.fromEntries(
+          pedido.itens.map((i) => [i.chave, Object.fromEntries(i.placeholders.map((p) => [p.chave, `texto do ${papel}`]))])
+        );
+      }
+    );
+
+    render(<ComEstado resultado={resultadoFixture01()} />);
+
+    const faixa = await screen.findByTestId("falhas-da-esteira", {}, { timeout: 4000 });
+    expect(faixa.textContent).toMatch(/não completou/);
+    expect(faixa.textContent).toMatch(/a conexão com o modelo caiu no meio da geração/);
+    expect(faixa.textContent).toMatch(/nada foi escrito para esses campos/);
+  });
 });
 
 describe("ReviewScreen — sinais que o usuário leu como falha (relato com print)", () => {
