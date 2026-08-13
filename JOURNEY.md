@@ -5129,5 +5129,9 @@ Aprendizado que valeu mais que os passos: **o tour era validado por
 número** ("PASSO 7 DE 13") no E2E e por índice fixo nos testes de unidade —
 então todo passo novo quebrava testes sem que nada estivesse errado. Os dois
 passaram a andar até o passo pelo TÍTULO. É a diferença entre um teste que
-mede a etapa existir e um que mede a contagem não ter mudado. 446 web unit;
-51/51 E2E.
+mede a etapa existir e um que mede a contagem não ter mudado.
+
+E o smoke no bundle pegou um defeito de brinde: com a tela de itens aberta
+havia DOIS botões ☰ no DOM (o do canvas não se escondia) — exatamente o que
+a SPEC-40 corrigiu para a tela de config, repetido na tela nova. Corrigido,
+com o E2E passando a exigir um ☰ só. 446 web unit; 51/51 E2E.

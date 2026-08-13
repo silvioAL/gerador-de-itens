@@ -38,6 +38,9 @@ test("gerar itens na revisão abre a tela #/itens com cards e completude", async
   // A tela dos itens, na rota própria.
   await expect(page.getByTestId("itens-screen")).toBeVisible();
   expect(page.url()).toContain("#/itens");
+  // §197 — UM ☰ só no DOM: o do canvas se esconde atrás da tela (a SPEC-40
+  // corrigiu isso pra config e a tela nova tinha repetido o defeito).
+  await expect(page.getByRole("button", { name: "☰ Menu" })).toHaveCount(1);
   await expect(page.getByTestId("itens-resumo")).toContainText(/de \d+ itens? prontos? pra exportar/);
 
   // Cards com a régua de completude — material recém-derivado tem ✍️ pendentes.
