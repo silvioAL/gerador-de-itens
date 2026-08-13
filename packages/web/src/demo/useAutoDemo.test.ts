@@ -29,6 +29,8 @@ function montarOpts() {
     abrirConfigNaAba: vi.fn(),
     fecharJornada: vi.fn(),
     fecharConfig: vi.fn(),
+    abrirItens: vi.fn(),
+    fecharItens: vi.fn(),
   };
 }
 

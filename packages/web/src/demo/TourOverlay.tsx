@@ -103,7 +103,9 @@ export function TourOverlay({ passo, indice, total, ultimo, onProximo, onPular }
         <div style={{ fontSize: 11, fontWeight: 700, color: "#a5b4fc", letterSpacing: 0.3 }}>
           PASSO {indice + 1} DE {total}
         </div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--texto)", margin: "4px 0 6px" }}>{passo.titulo}</div>
+        <div data-testid="tour-titulo" style={{ fontSize: 14, fontWeight: 700, color: "var(--texto)", margin: "4px 0 6px" }}>
+          {passo.titulo}
+        </div>
         <p style={{ fontSize: 12.5, color: "var(--texto-2)", lineHeight: 1.5, margin: 0 }}>{passo.texto}</p>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14 }}>
           <button onClick={onPular} style={linkEstilo}>

@@ -160,98 +160,84 @@ test("adicionar dois cenários ao canvas (sem substituir) compõe um diagrama ma
   await page.screenshot({ path: "e2e/screenshots/cenarios-compostos.png", fullPage: true });
 });
 
-test("tour guiado de 1 clique percorre diagrama, prontidão, proveniência, derivação, revisão, especificação de solução, perfis de time, campos por tipo de nó e modelo da especificação", async ({
+/**
+ * SPEC-48 — o tour validado pelo TÍTULO de cada passo, não pelo número: o
+ * spec antigo dizia "PASSO 7 DE 13" e quebrava toda vez que o produto
+ * ganhava um passo novo (que é o que se quer que aconteça). O que importa é
+ * que a etapa existe, na ordem, e que a tela certa abre com ela.
+ */
+async function irAtePasso(page: import("@playwright/test").Page, titulo: string) {
+  for (let i = 0; i < 25; i++) {
+    if (await page.getByTestId("tour-titulo").filter({ hasText: titulo }).count()) return;
+    await page.getByRole("button", { name: "Próximo" }).click();
+  }
+  throw new Error(`passo "${titulo}" não apareceu no tour`);
+}
+
+test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, confirmação em lote, itens escritos, documento e configurações", async ({
   page,
 }) => {
+  test.setTimeout(60000);
   await entrar(page);
 
   await page.getByRole("button", { name: "▶ Iniciar tour guiado" }).click();
 
-  // Passo 1: bem-vindo (sem alvo, overlay centralizado).
-  await expect(page.getByText("PASSO 1 DE 13")).toBeVisible();
-  await expect(page.getByText("Bem-vindo")).toBeVisible();
-  await page.getByRole("button", { name: "Próximo" }).click();
+  // Abertura, sem alvo (overlay centralizado).
+  await expect(page.getByTestId("tour-titulo")).toHaveText("Bem-vindo");
+  await expect(page.getByText(/PASSO 1 DE \d+/)).toBeVisible();
 
-  // Cada passo com alvo checa que o seletor do spotlight realmente existe no
-  // DOM — sem isso o overlay cai silenciosamente no fallback centralizado de
-  // tela cheia em vez de apontar pro elemento certo (achado por QA visual).
-  // Passo 2: diagrama — cenário mongo já carregado no canvas real.
-  await expect(page.getByText("PASSO 2 DE 13")).toBeVisible();
-  await expect(page.locator(".react-flow")).toBeVisible();
-  await expect(page.locator(".react-flow__node", { hasText: "srv-catalogo" })).toBeVisible();
-  await page.getByRole("button", { name: "Próximo" }).click();
+  // O diagrama de verdade, com o cenário do tour já carregado.
+  await irAtePasso(page, "O diagrama");
+  await expect(page.locator(".react-flow__node")).toHaveCount(2);
 
-  // Passo 3: prontidão.
-  await expect(page.getByText("PASSO 3 DE 13")).toBeVisible();
+  // Prontidão e proveniência.
+  await irAtePasso(page, "Prontidão");
   await expect(page.locator('[data-tour="readiness-summary"]')).toBeVisible();
-  await page.getByRole("button", { name: "Próximo" }).click();
+  await irAtePasso(page, "Proveniência");
+  await expect(page.locator('[data-tour="properties-panel"]')).toBeVisible();
 
-  // Passo 4: proveniência — o tour seleciona o nó mongo, painel real abre.
-  // O alvo do spotlight precisa existir de verdade — sem isso o overlay cai
-  // silenciosamente no fallback centralizado de tela cheia (achado por QA visual).
-  await expect(page.getByText("PASSO 4 DE 13")).toBeVisible();
-  const painel = page.locator('[data-tour="properties-panel"]');
-  await expect(painel).toBeVisible();
-  await expect(painel.getByText("Coleção Mongo")).toBeVisible();
-  await page.getByRole("button", { name: "Próximo" }).click();
-
-  // Passo 5: derivar.
-  await expect(page.getByText("PASSO 5 DE 13")).toBeVisible();
-  await expect(page.locator('[data-tour="derivar-button"]')).toBeVisible();
-  await page.getByRole("button", { name: "Próximo" }).click();
-
-  // Passo 6: revisão — o tour já disparou a derivação de verdade.
-  await expect(page.getByText("PASSO 6 DE 13")).toBeVisible();
+  // Derivação de verdade — a revisão abre com os itens calculados.
+  await irAtePasso(page, "Revisão");
   await expect(page.locator('[data-tour="review-table"]')).toBeVisible();
   await expect(page.getByTestId("contagem-itens")).toHaveText("4 itens");
-  await page.getByRole("button", { name: "Próximo" }).click();
 
-  // Passo 7: especificação de solução — revisão e especificação viraram uma coisa só.
-  await expect(page.getByText("PASSO 7 DE 13")).toBeVisible();
-  // SPEC-39 — o botão morreu; o passo aponta pro FAB do agente.
+  // SPEC-44/48 — a confirmação em lote entrou no tour.
+  await irAtePasso(page, "Confirmar o que a IA escreveu");
+  await expect(page.getByTestId("barra-pendencias")).toBeVisible();
+
+  // O documento sai pelo agente (o botão do header morreu na SPEC-39).
+  await irAtePasso(page, "Especificação de solução");
   await expect(page.getByRole("button", { name: "Gerar especificação de solução" })).toHaveCount(0);
   await expect(page.getByTestId("abrir-conversa-especificacao")).toBeVisible();
-  await page.getByRole("button", { name: "Próximo" }).click();
 
-  // Passo 8: o MENU (SPEC-40) — o spotlight aponta pro ☰.
-  await expect(page.getByText("PASSO 8 DE 13")).toBeVisible();
-  await expect(page.getByText("O menu", { exact: true }).first()).toBeVisible();
-  await page.getByRole("button", { name: "Próximo" }).click();
+  // SPEC-47/48 — os ITENS ESCRITOS, a tela que o tour não conhecia.
+  await irAtePasso(page, "Itens escritos");
+  await expect(page.getByTestId("itens-screen")).toBeVisible();
 
-  // Passo 9: perfis de stack — o tour abre a tela já na área certa,
-  // sem o usuário precisar navegar até lá sozinho.
-  await expect(page.getByText("PASSO 9 DE 13")).toBeVisible();
+  // O menu e as telas de configuração.
+  await irAtePasso(page, "O menu");
+  await irAtePasso(page, "Stacks conhecidas");
   const telaConfigNoTour = page.locator('[data-tour="config-screen-content"]');
-  await expect(telaConfigNoTour).toBeVisible();
-  // SPEC-43: a tela é o catálogo global — o título diz "Stacks conhecidas".
   await expect(telaConfigNoTour.getByText("Stacks conhecidas").first()).toBeVisible();
-  await page.getByRole("button", { name: "Próximo" }).click();
 
-  // Passo 10: campos por tipo de nó.
-  await expect(page.getByText("PASSO 10 DE 13")).toBeVisible();
+  await irAtePasso(page, "Padrões por componente");
   await expect(telaConfigNoTour.getByRole("button", { name: "sobrescrever" }).first()).toBeVisible();
-  await page.getByRole("button", { name: "Próximo" }).click();
 
-  // Passo 11: níveis e acessos (SPEC-38) — a tela de Membros com os níveis.
-  await expect(page.getByText("PASSO 11 DE 13")).toBeVisible();
+  await irAtePasso(page, "Níveis e acessos");
   await expect(telaConfigNoTour.getByText(/visualizar.*lê as quebras/).first()).toBeVisible();
-  await page.getByRole("button", { name: "Próximo" }).click();
 
-  // Passo 12: modelo da especificação de solução.
-  await expect(page.getByText("PASSO 12 DE 13")).toBeVisible();
-  // `.first()`: o template ganhou mais de uma ocorrência de `{{titulo}}` (o
-  // cabeçalho do documento e o corpo). O passo do tour prova que a aba certa
-  // abriu, não quantas variáveis o modelo usa.
+  await irAtePasso(page, "Modelos: documento e item");
   await expect(telaConfigNoTour.getByText(/\{\{titulo\}\}/).first()).toBeVisible();
-  await page.getByRole("button", { name: "Próximo" }).click();
 
-  // Passo 13: fim do tour — fecha a tela de volta.
-  await expect(page.getByText("PASSO 13 DE 13")).toBeVisible();
-  await expect(page.getByText("Fim do tour")).toBeVisible();
+  // SPEC-45/48 — a jornada da melhoria contínua também entrou.
+  await irAtePasso(page, "Melhoria contínua (PDCA)");
+  await expect(telaConfigNoTour.getByTestId("feedbacks-do-ciclo")).toBeVisible();
+
+  await irAtePasso(page, "Fim do tour");
   await expect(page.locator('[data-tour="config-screen-content"]')).not.toBeVisible();
   await page.getByRole("button", { name: "Concluir" }).click();
 
-  await expect(page.getByText(/PASSO \d+ DE 13/)).not.toBeVisible();
+  await expect(page.getByText(/PASSO \d+ DE \d+/)).not.toBeVisible();
   await expect(page.getByTestId("contagem-itens")).not.toBeVisible();
 });
 

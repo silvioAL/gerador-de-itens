@@ -54,9 +54,9 @@ export function ItensScreen({ itens, tituloDaQuebra, onAbrirMenu, onFechar, onIr
         <button onClick={onAbrirMenu} style={botaoEstilo}>
           ☰ Menu
         </button>
-        <strong style={{ fontSize: 14 }}>Itens de trabalho</strong>
+        <strong style={{ fontSize: 14 }}>Itens escritos</strong>
         <span style={{ fontSize: 12, color: "var(--texto-fraco)" }}>
-          {tituloDaQuebra ? `Demanda: ${tituloDaQuebra}` : "Itens gerados da demanda"}
+          {tituloDaQuebra ? `Demanda: ${tituloDaQuebra}` : "O texto final de cada item da demanda"}
         </span>
         <div style={{ flex: 1 }} />
         <button onClick={onFechar} style={{ ...botaoEstilo, ...botaoPrimarioEstilo }}>
@@ -67,11 +67,11 @@ export function ItensScreen({ itens, tituloDaQuebra, onAbrirMenu, onFechar, onIr
       <div style={{ flex: 1, overflow: "auto", padding: 24 }} data-testid="corpo-dos-itens">
         {itens.length === 0 ? (
           <div style={vazioEstilo} data-testid="itens-vazio">
-            <p style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Nenhum item gerado ainda.</p>
+            <p style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Nenhum item escrito ainda.</p>
             <p style={{ fontSize: 13, color: "var(--texto-2)", maxWidth: 460, lineHeight: 1.6 }}>
-              Os itens de trabalho nascem na revisão da quebra: derive a demanda, refine com a esteira e peça ao
-              assistente para <em>gerar os itens</em>. Cada item vira um card aqui — com o corpo completo da
-              especificação, pronto pra ser levado ao seu tracker.
+              Os itens nascem na revisão da quebra: derive a demanda, refine com a esteira e peça ao assistente para{" "}
+              <em>gerar os itens</em>. Cada um vira um card aqui com a escrita final — a mesma que entra no documento
+              e, na próxima fase, vai pro seu tracker.
             </p>
             {onIrParaRevisao && (
               <button onClick={onIrParaRevisao} style={{ ...botaoEstilo, ...botaoPrimarioEstilo, marginTop: 8 }}>

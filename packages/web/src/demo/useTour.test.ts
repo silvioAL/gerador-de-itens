@@ -24,6 +24,8 @@ function montarOpts() {
     abrirConfigNaAba: vi.fn(),
     fecharJornada: vi.fn(),
     fecharConfig: vi.fn(),
+    abrirItens: vi.fn(),
+    fecharItens: vi.fn(),
   };
 }
 
@@ -79,36 +81,55 @@ describe("useTour", () => {
     expect(result.current.passoAtual?.selector).toBe("[data-tour=review-table]");
   });
 
-  it("passa pela aba Stacks conhecidas antes do fim, abrindo a tela de config na aba certa", () => {
+  /** Andar até o passo pelo TÍTULO, não por contagem: passo novo no meio do
+   * tour (e eles entram a cada rodada) invalidava um índice fixo, e o teste
+   * quebrava sem que nada de errado tivesse acontecido. */
+  function andarAte(result: { current: ReturnType<typeof useTour> }, titulo: string) {
+    for (let i = 0; i < 30 && result.current.passoAtual?.titulo !== titulo; i++) {
+      act(() => result.current.proximo());
+    }
+    expect(result.current.passoAtual?.titulo).toBe(titulo);
+  }
+
+  it("passa pela aba Stacks conhecidas, abrindo a tela de config na aba certa", () => {
     const opts = montarOpts();
     const { result } = renderHook(() => useTour(opts));
 
     act(() => result.current.iniciar());
-    for (let i = 0; i < 8; i++) act(() => result.current.proximo()); // -> passo 8 (Stacks conhecidas; o 7 é o menu)
+    andarAte(result, "Stacks conhecidas");
 
-    expect(result.current.passoAtual?.titulo).toBe("Stacks conhecidas");
     expect(result.current.passoAtual?.selector).toBe("[data-tour=config-screen-content]");
     expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("perfis");
   });
 
-  it("passa por Padrões por componente e Modelo da especificação de solução, abrindo a aba certa em cada um", () => {
+  it("SPEC-48 — o tour mostra a revisão em lote, os ITENS ESCRITOS e o PDCA (o que nasceu depois dele)", () => {
     const opts = montarOpts();
     const { result } = renderHook(() => useTour(opts));
 
     act(() => result.current.iniciar());
-    for (let i = 0; i < 9; i++) act(() => result.current.proximo()); // -> passo 9 (Padrões por componente)
+    andarAte(result, "Confirmar o que a IA escreveu");
+    expect(result.current.passoAtual?.selector).toBe("[data-testid=barra-pendencias]");
 
-    expect(result.current.passoAtual?.titulo).toBe("Padrões por componente");
+    andarAte(result, "Itens escritos");
+    expect(opts.abrirItens).toHaveBeenCalled();
+
+    andarAte(result, "Melhoria contínua (PDCA)");
+    expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("pdca");
+  });
+
+  it("passa por Padrões por componente e pelos Modelos (documento e item), abrindo a aba certa em cada um", () => {
+    const opts = montarOpts();
+    const { result } = renderHook(() => useTour(opts));
+
+    act(() => result.current.iniciar());
+    andarAte(result, "Padrões por componente");
     expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("campos");
 
-    // SPEC-38 — o passo novo de autorizações entra ANTES do modelo.
-    act(() => result.current.proximo()); // -> passo 10 (Níveis e acessos)
-    expect(result.current.passoAtual?.titulo).toBe("Níveis e acessos");
+    // SPEC-38 — o passo de autorizações entra ANTES dos modelos.
+    andarAte(result, "Níveis e acessos");
     expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("membros");
 
-    act(() => result.current.proximo()); // -> passo 11 (Modelo da especificação de solução)
-
-    expect(result.current.passoAtual?.titulo).toBe("Modelo da especificação de solução");
+    andarAte(result, "Modelos: documento e item");
     expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("especificacao");
   });
 
