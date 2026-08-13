@@ -60,6 +60,10 @@ export interface ReviewScreenProps {
   /** `quebra.anexosContexto` — anexos de texto do contexto do épico (Fase 1b,
    * SPEC-23), mesmo tratamento de `demandInfo`. */
   anexosContexto?: { nome: string; conteudo: string }[];
+  /** SPEC-53 Fase 2 — o contexto do PRODUTO já em texto (objetivo, glossário,
+   * regras que valem sempre). Viaja separado do contexto da demanda até o
+   * prompt: um é permanente, o outro é desta vez. */
+  contextoDoProduto?: string;
   /** `quebra.time` — toda atividade já carrega esse time em `timesEnvolvidos` por padrão
    * (achado do usuário: só aparecer no item excepcional lia como dado quebrado); usado aqui
    * só pra filtrar o que já é óbvio e destacar de verdade quando é outro time. */
@@ -255,6 +259,7 @@ export function ReviewScreen({
   templateItem,
   demandInfo,
   anexosContexto,
+  contextoDoProduto,
   time,
   respostasItens,
   onResponderItem,
@@ -463,6 +468,7 @@ export function ReviewScreen({
 
   const esteira = useEsteiraDeAgentes({
     contextoEpico,
+    contextoDoProduto,
     papeis: papeisAtivos,
     confirmacaoObrigatoria,
     // SPEC-26 Bloco 1: o que a esteira escreve também nasce carimbado.
@@ -683,6 +689,10 @@ export function ReviewScreen({
     const documento = gerarEspecificacaoEntrega(resultado.atividades, diagrama, config, {
       regras,
       demandInfo,
+      // SPEC-53 — o documento também diz de que produto se trata: quem o
+      // recebe (outro time, um fornecedor, um agente) não tem o contexto que
+      // quem escreveu tinha na cabeça.
+      contextoDoProduto,
       template: especificacaoTemplate.conteudo,
       templateItem,
       time,
@@ -1266,6 +1276,7 @@ export function ReviewScreen({
                       desatualizados={desatualizadosPorItem.get(atividadeSelecionada.chave)}
                       ficha={fichaSelecionada}
                       contextoEpico={contextoEpico}
+                      contextoDoProduto={contextoDoProduto}
                       onResponder={(chave, resposta) => responderComProcedencia(atividadeSelecionada.chave, chave, resposta)}
                       papelEmGeracao={
                         esteira.rodando && esteira.escrevendoChaves.includes(atividadeSelecionada.chave)
@@ -1301,6 +1312,7 @@ export function ReviewScreen({
           fichas={fichas}
           atividadeSelecionada={atividadeSelecionada}
           contextoEpico={contextoEpico}
+          contextoDoProduto={contextoDoProduto}
           falaInicial={falaDeConducao ?? undefined}
           onAplicar={responderComProcedencia}
           onFechar={() => setMostrarConversa(false)}
@@ -1493,6 +1505,7 @@ export function ReviewScreen({
           fila={montarFilaEsteira(false)}
           papeis={papeisAtivos}
           contextoEpico={contextoEpico}
+          contextoDoProduto={contextoDoProduto}
           onFechar={() => setMostrarSimulacao(false)}
         />
       )}
@@ -1651,6 +1664,8 @@ interface AbaRefinamentoProps {
   ficha: FichaItem;
   /** Contexto do épico/demanda (Fase 1b, SPEC-23) — mandado junto no `/ia/sugerir` real. */
   contextoEpico?: string;
+  /** SPEC-53 — o contexto do produto, no mesmo pedido e com rótulo próprio. */
+  contextoDoProduto?: string;
   onResponder?: (chavePlaceholder: string, resposta: ValorSpec) => void;
   /** SPEC-24 — qual papel da esteira está gerando ESTE item agora (se
    * algum). Só o grupo daquele papel mostra "gerando…" nos campos ainda sem
@@ -1693,6 +1708,7 @@ function AbaRefinamento({
   papeis,
   ficha,
   contextoEpico,
+  contextoDoProduto,
   desatualizados,
   onResponder,
   papelEmGeracao,
@@ -1721,6 +1737,7 @@ function AbaRefinamento({
           rotulo: p.rotulo,
           contextoNo: contextoDoPlaceholder(ficha.especificacaoTecnica),
           contextoEpico,
+          contextoDoProduto,
         },
         (pedaco) => setRascunhos((r) => ({ ...r, [p.chave]: (r[p.chave] ?? "") + pedaco }))
       );

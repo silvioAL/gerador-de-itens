@@ -32,6 +32,8 @@ describe("ANATOMIA_DO_PROMPT_PIPELINE descreve o prompt que sai de verdade (#296
   it("todo marcador declarado aparece num prompt montado com todas as partes presentes", () => {
     const { prompt } = montarPedidoPipeline({
       preambulo: PREAMBULO_GENERICO,
+      // SPEC-53 — "todas as partes" passou a incluir o contexto do PRODUTO.
+      contextoDoProduto: "## Produto: Consignado",
       contextoEpico: "Portabilidade de crédito consignado, prazo regulatório de 5 dias.",
       itens,
     });

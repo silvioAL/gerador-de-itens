@@ -5442,3 +5442,43 @@ liberada para quem não tem o recurso; `onSalvar` sem o produto → o E2E pegand
 
 Fica na fila, e é onde o valor aparece: **Fase 2** — o contexto do produto
 entrando no prompt dos agentes, na especificação e na tela.
+
+## 206. SPEC-53 Fase 2 — o contexto do produto chega em quem escreve
+
+A Fase 1 criou onde guardar. Sozinha, ela repetiria o defeito do §21 — um
+`produto` que ninguém lê. Esta fase é a que a SPEC declarou não-opcional: o
+contexto entra no prompt do pipeline, no `/ia/sugerir` campo a campo, na
+conversa sobre o item e na especificação gerada.
+
+**Separado, não concatenado.** O produto entra como bloco próprio, antes do
+contexto da demanda, com rótulos que dizem o que é o quê: "Contexto do PRODUTO
+(vale para todas as demandas dele, não só esta)" e "Contexto desta demanda/
+épico especificamente". Fundir os dois ensinaria o modelo a tratar o glossário
+como circunstância da entrega — quando ele é exatamente o que não muda. A ordem
+também é decisão: o geral orienta a leitura do específico.
+
+Três testes-guarda quebraram no caminho, e os três estavam certos:
+
+1. `ANATOMIA_DO_PROMPT_PIPELINE` (#296) — a aba do pipeline EXPLICA de onde vem
+   cada pedaço do prompt, e o teste exige que todo marcador declarado exista no
+   prompt real. Mudar a montagem sem mudar a anatomia é a tela mentindo com
+   convicção; o guarda cobrou na hora.
+2. `lotesDaEsteira` (#299) — a simulação usa a MESMA função da corrida real, e
+   um teste lê o código-fonte do hook para garantir que ninguém monte o corpo
+   por fora. Assinatura nova → guarda vermelho.
+3. O mesmo arquivo exige que o prompt simulado tenha todas as partes da
+   anatomia: sem passar o contexto do produto para a simulação, ela mostraria
+   um prompt que não é o que sai.
+
+Um tropeço meu que vale registro: escrevi `\n` dentro de heredoc num teste e
+ele virou quebra de linha real, produzindo string não terminada. O sintoma foi
+pior que o erro — `npm test -- <filtro>` casou com OUTRO arquivo, reportou "9
+passed" e eu quase segui em frente achando que os testes novos tinham rodado.
+Arquivo que falha na COLETA não aparece como falha de teste; rodar pelo nome
+exato do arquivo foi o que revelou.
+
+O E2E prova o ciclo sem gastar modelo: cadastra produto com glossário, liga a
+demanda a ele, escreve contexto próprio da demanda e abre a simulação da
+esteira — que mostra o prompt real, com os dois blocos, na ordem certa.
+Mordida: tirar o contexto do produto do corpo do lote → o prompt sem o bloco
+(vermelho). 227 engine + 197 server + 477 web + 40 aplicação; 56/56 E2E.

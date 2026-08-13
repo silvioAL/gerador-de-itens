@@ -57,6 +57,7 @@ export type { Stack, SugestoesDeStack, RepositorioDeStacks } from "./portas/repo
 // SPEC-53 — o produto e o contexto que ele carrega.
 export type {
   Produto,
+  ProdutoComContexto,
   DadosDoProduto,
   TermoDeGlossario,
   RepositorioDeProdutos,
