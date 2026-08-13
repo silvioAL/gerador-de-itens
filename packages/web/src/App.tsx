@@ -683,7 +683,10 @@ function AppCarregado({
             administração/aprendizado mora atrás do ☰. */}
         {/* Só quando o canvas é a tela — a tela de config tem o SEU ☰; dois
             no DOM viravam strict-violation em todo clique de menu. */}
-        {!mostrarConfig && (
+        {/* §197 — e nem com a tela de ITENS: dois ☰ no DOM foi o defeito que a
+            SPEC-40 corrigiu pra config, e a tela nova repetiu (achado do
+            smoke: strict violation em todo clique de menu). */}
+        {!mostrarConfig && !mostrarItens && (
           <button onClick={() => setMenuAberto(true)} data-tour="menu-botao" style={botaoEstilo}>
             ☰ Menu
           </button>
