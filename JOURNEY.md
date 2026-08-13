@@ -5187,3 +5187,35 @@ impreenchível travava todos), e passou a encontrar o primeiro item "Pronto
 pra exportar". Nenhum teste tinha pegado o gap antes: os três escritos
 agora mordem (esteira pedindo `_entregaFinal` ao PO, campo na tela, e a
 contagem da régua). 449 web unit; 51/51 E2E.
+
+## 200. SPEC-49 — os itens finalmente saem daqui: exportação pro tracker
+
+A Fase 2 da SPEC-41, que a tela vinha prometendo ("a exportação pro seu
+tracker chega na próxima fase"). A porta `ExportadorDeItens` estava lá desde
+então, com contrato e teste; faltava quem a implementasse.
+
+A decisão de fundo: **o gerador não fala Jira**. Implementar um tracker
+seria escolher o tracker de todo mundo, e quem usa outro ficaria de fora. O
+adaptador fala com um AGENTE — MCP bridge, n8n, função interna — no
+endereço que a empresa configurar, com um contrato de três linhas: manda
+`{ itens: [...] }`, recebe `{ resultados: [{ chave, linkExterno } | { chave,
+erro }] }`. É a mesma disciplina do gateway de IA, que também é só um
+endereço.
+
+Três regras que definem o comportamento, todas testadas: **só item pronto
+exporta** (a régua da SPEC-44/47 decide — item pela metade não vira issue
+meia-boca); **falha é por item** (quem subiu fica `exportado` com link, quem
+falhou continua `gerado` e o motivo aparece no card); e **ausência não é
+sucesso** — item sobre o qual o agente não disse nada volta como erro
+explícito, nunca como exportado silencioso.
+
+Um defeito latente apareceu no caminho: `resumirConfig` (o diagnóstico de
+config desatualizada) tinha um `switch` sem default, então a chave nova
+`exportador` derrubava a rota inteira com "Cannot convert undefined or null
+to object". Bomba armada para qualquer chave futura, desarmada agora.
+
+A validação de ponta a ponta usou o `/health` do próprio servidor como
+"agente": ele só aceita GET, o POST volta 404, e o motivo REAL do destino
+atravessou até a tela por item — evidência melhor do que um mock cordato
+daria. Mordida: item ignorado pelo agente virando sucesso → o teste do
+sucesso silencioso vermelho. 211 engine + 177 server + 453 web; 52/52 E2E.

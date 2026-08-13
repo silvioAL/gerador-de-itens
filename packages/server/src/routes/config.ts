@@ -30,6 +30,7 @@ import { registrarAuditoria } from "../auditoria.js";
 const DEFAULTS_COMPILADOS: Record<ChaveConfig, unknown> = {
   regras: { tipos: [], tamanhos: [], porTech: {} },
   "pipeline-agentes": { confirmacaoObrigatoria: true, papeis: [] },
+  exportador: { endpoint: "", rotulo: "", cabecalhos: {} },
 };
 
 export async function registrarRotasConfig(app: FastifyInstance, { db, diretorioConfig }: OpcoesApp) {

@@ -13,6 +13,7 @@ import { ModeloIaTab } from "./ModeloIaTab";
 import { RegrasTab } from "./RegrasTab";
 import { RECURSO_DA_ABA, RECURSO_DA_SECAO_DE_REGRAS, usePermissoes } from "../auth/usePermissoes";
 import { PdcaTab } from "./PdcaTab";
+import { ExportacaoTab } from "./ExportacaoTab";
 
 export type AbaConfig =
   | "perfis"
@@ -23,7 +24,7 @@ export type AbaConfig =
   | "acessos"
   | "especificacao"
   | "pipeline"
-  | "modeloIa" | "pdca";
+  | "modeloIa" | "pdca" | "exportacao";
 
 export interface ConfigScreenProps {
   config: DiagramaConfig;
@@ -164,6 +165,7 @@ export function ConfigScreen({
       { id: "pipeline", rotulo: "Pipeline de IA", existe: true },
       { id: "modeloIa", rotulo: "Modelo de IA", existe: true },
       { id: "pdca", rotulo: "PDCA — melhoria contínua", existe: true },
+      { id: "exportacao", rotulo: "Exportação", existe: true },
     ] satisfies { id: AbaConfig; rotulo: string; existe: boolean }[]
   ).filter((a) => a.existe && podeVerAba(a.id, permissoes.pode));
 
@@ -214,6 +216,7 @@ export function ConfigScreen({
           pergunta que ninguém tinha feito quando o gate ficou pela metade. */}
       <div data-testid="corpo-da-aba" style={{ flex: 1, overflow: "auto", padding: 24 }}>
         {abaAtiva === "pdca" && <PdcaTab config={config} timeAtivo={timeAtivo} onAbrirArea={onAbrirArea} />}
+        {abaAtiva === "exportacao" && <ExportacaoTab />}
         {abaAtiva === "perfis" && (
           <PerfisStackTab config={config} onPerfisMudaram={onPerfisMudaram} />
         )}

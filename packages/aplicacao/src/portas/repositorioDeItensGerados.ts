@@ -41,4 +41,6 @@ export interface RepositorioDeItensGerados {
    * evapora porque o material foi regenerado).
    */
   substituirDaQuebra(quebraId: string, itens: DadosItemGerado[]): Promise<ItemGeradoSalvo[]>;
+  /** SPEC-49 — o item virou issue lá fora: guarda o link e o estado. */
+  marcarExportado(quebraId: string, chave: string, linkExterno: string): Promise<ItemGeradoSalvo | null>;
 }

@@ -16,7 +16,8 @@ export type AreaConfig =
   | "especificacao"
   | "pipeline"
   | "modeloIa"
-  | "pdca";
+  | "pdca"
+  | "exportacao";
 
 export type Rota = { tela: "canvas" } | { tela: "config"; area: AreaConfig } | { tela: "itens" };
 
@@ -32,6 +33,7 @@ const SEGMENTO_DA_AREA: Record<AreaConfig, string> = {
   pipeline: "pipeline",
   modeloIa: "modelo-ia",
   pdca: "pdca",
+  exportacao: "exportacao",
 };
 const AREA_DO_SEGMENTO = Object.fromEntries(
   Object.entries(SEGMENTO_DA_AREA).map(([area, seg]) => [seg, area as AreaConfig])

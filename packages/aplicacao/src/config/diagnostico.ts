@@ -72,6 +72,12 @@ export function resumirConfig(chave: ChaveConfig, documento: unknown): ResumoCon
       return contarRegras(documento);
     case "pipeline-agentes":
       return contarPipeline(documento);
+    // SPEC-49 — o exportador não tem "seções que a versão assume existir": o
+    // único número é "tem destino ou não". Como o template padrão vem com
+    // endpoint vazio (0), o diagnóstico nunca acusa — que é o certo, porque
+    // não configurar exportação é escolha, não desatualização.
+    case "exportador":
+      return { destino: typeof (documento as { endpoint?: string })?.endpoint === "string" && (documento as { endpoint: string }).endpoint.trim() ? 1 : 0 };
   }
 }
 
@@ -84,6 +90,7 @@ const NOME_AMIGAVEL: Record<string, string> = {
   papeis: "papéis da esteira",
   papeisAtivos: "papéis ativos",
   caracteres: "conteúdo",
+  destino: "destino de exportação",
 };
 
 /**

@@ -123,9 +123,42 @@ export function validarEscritaPipelineAgentes(documento: unknown): void {
   }
 }
 
+/**
+ * SPEC-49 — a configuração da exportação: pra ONDE vão os itens. Endereço
+ * vazio = exportação desligada, e a tela diz isso em vez de oferecer um
+ * botão que falharia.
+ */
+export interface ConfigExportador {
+  endpoint: string;
+  /** Como o destino se chama pra quem lê a tela ("Jira do time de pagamentos"). */
+  rotulo: string;
+  /** Token/autenticação do agente — cabeçalhos livres, como o gateway de IA. */
+  cabecalhos: Record<string, string>;
+}
+
+export function normalizarExportador(documento: unknown): ConfigExportador {
+  const bruto = (documento ?? {}) as Partial<ConfigExportador>;
+  return {
+    endpoint: typeof bruto.endpoint === "string" ? bruto.endpoint.trim() : "",
+    rotulo: typeof bruto.rotulo === "string" ? bruto.rotulo.trim() : "",
+    cabecalhos:
+      bruto.cabecalhos && typeof bruto.cabecalhos === "object"
+        ? Object.fromEntries(Object.entries(bruto.cabecalhos).map(([k, v]) => [k, String(v)]))
+        : {},
+  };
+}
+
 /** O portão de escrita por chave — chamado só no `salvar` dos casos de uso. */
 export function validarEscritaConfig(chave: string, documento: unknown): void {
   if (chave === "pipeline-agentes") validarEscritaPipelineAgentes(documento);
+  if (chave === "exportador") {
+    const { endpoint } = normalizarExportador(documento);
+    // Endereço vazio é legítimo (desliga a exportação); endereço inválido
+    // não: o erro apareceria só na hora de exportar, com item na mão.
+    if (endpoint && !/^https?:\/\//i.test(endpoint)) {
+      throw new ConfigInvalida(`o endereço do exportador precisa começar com http:// ou https:// (veio "${endpoint}")`);
+    }
+  }
 }
 
 /** Aplica a coerção da chave. O que não tem regra própria passa como veio. */
@@ -135,5 +168,7 @@ export function normalizarDocumentoConfig(chave: ChaveConfig, documento: unknown
       return normalizarRegras(documento);
     case "pipeline-agentes":
       return normalizarPipelineAgentes(documento);
+    case "exportador":
+      return normalizarExportador(documento);
   }
 }

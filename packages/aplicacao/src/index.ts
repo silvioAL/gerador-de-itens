@@ -27,6 +27,7 @@ export type {
 } from "./portas/repositorioDeItensGerados.js";
 export type { ExportadorDeItens, ItemExportado } from "./portas/exportadorDeItens.js";
 export { criarCasosDeUsoDeItensGerados, type CasosDeUsoDeItensGerados } from "./casos-de-uso/itensGerados.js";
+export { normalizarExportador, type ConfigExportador } from "./config/normalizacao.js";
 
 export {
   CAMPO_GLOBAL,
