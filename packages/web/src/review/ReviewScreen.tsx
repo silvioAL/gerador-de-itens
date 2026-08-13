@@ -856,6 +856,23 @@ export function ReviewScreen({
         </button>
       </header>
 
+      {/* §193 — papel que morreu no caminho DIZ isso. Antes só ia pro
+          console: a pessoa via o texto do agente anterior sumir quando o
+          próximo começava e não tinha como saber que houve falha. */}
+      {esteira.falhas.length > 0 && (
+        <div style={faixaFalhaEstilo} data-testid="falhas-da-esteira" role="status">
+          {esteira.falhas.map((f, i) => (
+            <p key={`${f.papelId}-${i}`} style={{ margin: 0, fontSize: 12.5 }}>
+              ⚠ <strong>{f.papelNome}</strong> não completou {f.itens === 1 ? "1 item" : `${f.itens} itens`}:{" "}
+              {f.mensagem}
+              {f.recuperados > 0
+                ? ` — ${f.recuperados} campo(s) foram salvos do texto que já tinha chegado (confira antes de confirmar).`
+                : " — nada foi escrito para esses campos."}
+            </p>
+          ))}
+        </div>
+      )}
+
       {/* SPEC-44 — a barra de pendências: o agregado que faltava. Aceitar é
           barato (1 clique global); intervir é que merece clique. Some quando
           não há pendência, e espera a esteira terminar (os números mudariam
@@ -2408,4 +2425,14 @@ const confirmarItemEstilo: React.CSSProperties = {
   background: "rgba(62, 207, 142, 0.15)",
   color: "var(--verde, #3ecf8e)",
   cursor: "pointer",
+};
+
+const faixaFalhaEstilo: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+  padding: "8px 16px",
+  borderBottom: "1px solid var(--borda)",
+  background: "rgba(248, 113, 113, 0.12)",
+  color: "#f87171",
 };

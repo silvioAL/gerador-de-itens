@@ -1,5 +1,6 @@
 import type { EsquemaJson } from "./esquema.js";
 import type { OpcoesGeracao, OpcoesTranscricao, ProvedorIa } from "./tipos.js";
+import { buscarDoModelo } from "./rede.js";
 
 /**
  * SPEC-25 Fase 2 — provedor compatível com a API da OpenAI.
@@ -343,6 +344,11 @@ function comImagens(
 
 export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): ProvedorIa {
   const fetchFn = opcoes.fetchImpl ?? fetch;
+  // §193 — a GERAÇÃO não pode usar o `fetch` global: ele corta a conexão em
+  // 300 s e o trabalho do papel inteiro se perde (ver TIMEOUTS_DE_INFERENCIA).
+  // A transcrição continua no `fetch` comum: áudio de segundos nunca chega
+  // perto do limite, e o dublê global do teste #286 mede o destino por lá.
+  const fetchGeracao = opcoes.fetchImpl ?? buscarDoModelo;
   const url = `${opcoes.baseUrl.replace(/\/$/, "")}/chat/completions`;
   const urlTranscricao = `${(opcoes.baseUrlTranscricao || opcoes.baseUrl).replace(/\/$/, "")}/audio/transcriptions`;
 
@@ -370,7 +376,7 @@ export function criarProvedorCompativelOpenAI(opcoes: OpcoesProvedorOpenAI): Pro
     schema?: EsquemaJson,
     imagens?: string[]
   ): Promise<string> {
-    const resposta = await fetchFn(url, {
+    const resposta = await fetchGeracao(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

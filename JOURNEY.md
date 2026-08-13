@@ -4948,3 +4948,40 @@ da frase mordeu um bug real de pluralização ("2 sugestãos") que já existia
 na tela de itens — corrigido nos três pontos. Mordida da régua: confirmadas
 contadas como pendentes → 2 testes vermelhos. 424 web unit; 50/50 E2E (o
 novo percorre o ciclo inteiro com /ia/sugerir mockado).
+
+## 193. O agente seguinte apagava o anterior — era timeout de 300 s, não bug de estado
+
+Relato com print: "quando o agente seguinte começa a escrever, o que foi
+escrito pelo anterior some da tela". Duas informações do usuário mataram a
+investigação de UI pela raiz: **só acontece com o Qwen local; com o Sonnet,
+não**. A evidência estava nos logs do próprio container:
+`[ia/pipeline/arquiteto] falhou: fetch failed` **302 s** depois do POST, e
+`[ia/pipeline/po] falhou` em **301 s**.
+
+301 e 302 não são coincidência: é o `headersTimeout`/`bodyTimeout` padrão do
+undici (300 s) no `fetch` global do Node. Um modelo local em CPU passa disso
+só no *prompt eval* de um lote — a própria tela avisa "~3min40 para um item
+com 2 campos" — e a conexão morria no meio da geração. O papel inteiro
+voltava vazio, o texto que a pessoa tinha visto ao vivo (parser parcial) era
+limpo no fim do lote, e o sintoma na tela parecia perda de estado do React.
+Com um gateway remoto rápido a chamada nunca encosta no limite: por isso o
+defeito era invisível no Sonnet.
+
+Correção na raiz: `buscarDoModelo` (undici com dispatcher próprio,
+`headersTimeout: 0, bodyTimeout: 0`, proxy corporativo honrado) passa a
+servir a GERAÇÃO; a transcrição continua no `fetch` comum (áudio de segundos
+não chega perto do limite, e é por lá que o dublê global do teste #286 mede
+o destino). Quem limita a espera é a pessoa — pausar a esteira, fechar a
+aba —, não um default pensado para APIs web.
+
+Segunda metade, porque o modo de falhar importa: papel que morre no caminho
+agora DIZ isso na tela (faixa com o papel, o motivo em português e quantos
+campos foram salvos do texto parcial). Sumir trabalho em silêncio já foi o
+pior sintoma deste projeto; um timeout com log só no servidor era a mesma
+coisa com outra roupa.
+
+Prova real, medida contra a stack: um gateway de laboratório que segura os
+headers por 310 s — acima do limite que matava — devolveu
+`{"ok":true,"duracaoMs":310038}`. Mordidas: timeouts de volta em 300 s →
+testes das opções vermelhos; faixa de falhas desligada → teste do aviso
+vermelho. 129 llm + 425 web + 165 server + 193 engine; 50/50 E2E.
