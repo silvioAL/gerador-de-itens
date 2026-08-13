@@ -5100,3 +5100,34 @@ mandou tirar do documento.
 
 Mordida: entrega final sem o marcador de pendência → dois testes do template
 vermelhos. 211 engine + 175 server + 445 web; 51/51 E2E.
+
+## 197. SPEC-48 — "Itens escritos", e o tour contando a história inteira
+
+Dois pedidos curtos na sequência do §196: renomear a tela, e dar clareza na
+demonstração automática/tour guiado.
+
+**O nome.** "Itens de trabalho" descrevia a entidade, não o que a tela
+entrega. Depois da SPEC-47 ela mostra a ESCRITA final de cada item — o
+mesmo texto que entra no documento e, na próxima fase, vai pro tracker.
+Virou **"Itens escritos"**, com o subtítulo dizendo isso ("o texto final de
+cada item da demanda"), e o vazio deixou de falar em "item gerado" para
+falar em item escrito.
+
+**O tour.** Ele parou no tempo: terminava na especificação e nas telas de
+configuração de antes, sem citar nada do que nasceu depois — a confirmação
+em lote (SPEC-44), os itens escritos (SPEC-41/47) e a jornada do PDCA
+(SPEC-45/46). Ganhou três passos, na ordem em que se anda: "Confirmar o que
+a IA escreveu" (a barra de pendências, com o princípio dito em voz alta —
+aceitar é barato, corrigir é que merece o clique), "Itens escritos" (a tela
+nova, incluindo a entrega final) e "Melhoria contínua (PDCA)" (feedback →
+sugestão com prévia → aprovar → configuração mudada). O passo dos modelos
+passou a dizer que são DOIS (documento e item). E a abertura parou de
+prometer "11 passos": o número mentia a cada rodada, e quem conta é o
+contador do overlay.
+
+Aprendizado que valeu mais que os passos: **o tour era validado por
+número** ("PASSO 7 DE 13") no E2E e por índice fixo nos testes de unidade —
+então todo passo novo quebrava testes sem que nada estivesse errado. Os dois
+passaram a andar até o passo pelo TÍTULO. É a diferença entre um teste que
+mede a etapa existir e um que mede a contagem não ter mudado. 446 web unit;
+51/51 E2E.

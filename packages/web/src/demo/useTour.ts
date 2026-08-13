@@ -21,6 +21,10 @@ export interface UseTourOpts {
   derivarQuebra: () => void;
   fecharRevisao: () => void;
   abrirConfigNaAba: (aba: AbaConfig) => void;
+  /** SPEC-48 — a tela dos itens escritos (o tour não a conhecia). */
+  abrirItens: () => void;
+  /** Volta ao canvas: os passos de configuração vêm depois dela. */
+  fecharItens: () => void;
   fecharJornada: () => void;
   fecharConfig: () => void;
 }
@@ -34,7 +38,7 @@ export function useTour(opts: UseTourOpts) {
       selector: null,
       titulo: "Bem-vindo",
       texto:
-        "Este tour usa um cenário pronto (Catálogo) para mostrar o fluxo completo: diagrama → prontidão → derivação → revisão → especificação de solução → configurações. São 11 passos rápidos.",
+        "Este tour usa um cenário pronto (Catálogo) e percorre o caminho inteiro: desenhar → derivar → revisar → escrever os itens → gerar o documento → e o que fica configurado por trás disso. O contador aqui em cima diz onde você está.",
       onEnter: () => {
         opts.fecharRevisao();
         opts.selecionarNo(null);
@@ -74,16 +78,30 @@ export function useTour(opts: UseTourOpts) {
       onEnter: () => opts.derivarQuebra(),
     },
     {
+      selector: "[data-testid=barra-pendencias]",
+      titulo: "Confirmar o que a IA escreveu",
+      texto:
+        "Quando a esteira escreve, cada resposta espera a sua assinatura. Esta barra diz quantas estão esperando e permite confirmar TODAS de uma vez — ou revisar uma a uma, no modo foco. Aceitar é barato; corrigir é que merece o clique.",
+    },
+    {
       selector: "[data-testid=abrir-conversa-especificacao]",
       titulo: "Especificação de solução",
       texto:
         "O documento final sai pelo AGENTE: com tudo refinado ele oferece sozinho (balão), e a qualquer momento o balão \"gerar especificação\" baixa o markdown — mesmo parcial. O botão de header morreu; a conversa é o caminho.",
     },
     {
+      selector: "[data-testid=corpo-dos-itens]",
+      titulo: "Itens escritos",
+      texto:
+        "Além do documento, o assistente gera os ITENS um a um — cada card traz a escrita final, o que falta especificar e o que fica pronto quando ele termina (a entrega final). É o que vai virar issue no seu tracker.",
+      onEnter: () => opts.abrirItens(),
+    },
+    {
       selector: "[data-tour=menu-botao]",
       titulo: "O menu",
       texto:
         "Tudo que é administração mora no menu ☰ — padrões do time, pessoas e acessos, IA. Cada item abre uma tela própria, com endereço: dá pra voltar por F5 ou colar o link. Os próximos passos abrem algumas delas.",
+      onEnter: () => opts.fecharItens(),
     },
     {
       selector: "[data-tour=config-screen-content]",
@@ -108,10 +126,17 @@ export function useTour(opts: UseTourOpts) {
     },
     {
       selector: "[data-tour=config-screen-content]",
-      titulo: "Modelo da especificação de solução",
+      titulo: "Modelos: documento e item",
       texto:
-        "O documento final segue um modelo com seções fixas (Contexto, Visão geral, Itens, Definition of Ready/Done) — customize o texto ao redor dos itens aqui, global ou só pro seu time.",
+        "São dois modelos: o do DOCUMENTO (Contexto, Visão geral, Itens, Definition of Ready/Done) e o de CADA ITEM — onde se decide a ordem das seções e o que fecha o item, a entrega final. Global, ou só pro seu time.",
       onEnter: () => opts.abrirConfigNaAba("especificacao"),
+    },
+    {
+      selector: "[data-tour=config-screen-content]",
+      titulo: "Melhoria contínua (PDCA)",
+      texto:
+        "Depois de gerar, o assistente pergunta o que faltou ou sobrou. O que as pessoas respondem aparece aqui: vira sugestão de ajuste, você vê o efeito num item de exemplo antes de decidir, aprova — e a configuração muda de verdade, com registro de quem aplicou.",
+      onEnter: () => opts.abrirConfigNaAba("pdca"),
     },
     {
       selector: null,

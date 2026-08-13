@@ -66,10 +66,10 @@ test("menu ☰ leva à tela de itens; sem geração, o vazio conduz", async ({ p
   await entrar(page);
 
   await page.getByRole("button", { name: "☰ Menu" }).click();
-  await page.getByRole("button", { name: "Itens de trabalho" }).click();
+  await page.getByRole("button", { name: "Itens escritos" }).click();
 
   await expect(page.getByTestId("itens-screen")).toBeVisible();
-  await expect(page.getByTestId("itens-vazio")).toContainText("Nenhum item gerado ainda");
+  await expect(page.getByTestId("itens-vazio")).toContainText("Nenhum item escrito ainda");
   await page.getByRole("button", { name: "Ir para a demanda" }).click();
   await expect(page.getByTestId("itens-screen")).not.toBeVisible();
 });

@@ -91,7 +91,7 @@ export function MenuLateral({
           Abrir…
         </button>
         <button onClick={acao(onItens)} style={itemEstilo}>
-          Itens de trabalho
+          Itens escritos
         </button>
         <button onClick={acao(onCenarios)} style={itemEstilo}>
           ✦ Como funciona &amp; cenários

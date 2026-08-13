@@ -96,7 +96,7 @@ describe("ItensScreen", () => {
 
   it("vazio explica de onde os itens nascem e conduz pra demanda", () => {
     renderTela([]);
-    expect(screen.getByTestId("itens-vazio").textContent).toContain("Nenhum item gerado ainda");
+    expect(screen.getByTestId("itens-vazio").textContent).toContain("Nenhum item escrito ainda");
     expect(screen.getByRole("button", { name: "Ir para a demanda" })).toBeInTheDocument();
   });
 });

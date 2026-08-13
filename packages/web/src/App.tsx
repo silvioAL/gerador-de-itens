@@ -543,6 +543,9 @@ function AppCarregado({
     derivarQuebra: () => executarDerivacao(false),
     fecharRevisao: () => setResultado(null),
     abrirConfigNaAba,
+    // SPEC-48 — o tour passa pela tela dos itens escritos.
+    abrirItens: () => navegar({ tela: "itens" }),
+    fecharItens: () => navegar({ tela: "canvas" }),
     fecharJornada,
     fecharConfig: () => navegar({ tela: "canvas" }),
   };
