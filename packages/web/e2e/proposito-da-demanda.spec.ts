@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { entrar } from "./auth";
+import { BASE_URL_GATEWAY_FALSO, CHAVE_GATEWAY_FALSO, MODELO_GATEWAY_FALSO } from "./gatewayFalso";
 
 /**
  * SPEC-57 fatia A — a cadeia PROPÓSITO → ELEMENTO → ITEM → SPEC, ponta a ponta
@@ -87,4 +88,62 @@ test("apagar o componente devolve a necessidade à condição de lacuna", async 
 
   // O placar volta a acusar: o vínculo apontando para nó morto não conta.
   await expect(page.getByTestId("proposito-resumo")).toContainText("1 sem componente");
+});
+
+/**
+ * SPEC-57 fatia D — o agente propõe o propósito, e o engine mede a proposta
+ * ANTES de a pessoa aceitar.
+ *
+ * Contra o gateway falso: o Chromium fala com o Fastify de verdade, que fala
+ * HTTP de verdade com o dublê. A única mentira é o conteúdo da resposta — que
+ * é justamente o que precisa ser fixo pro teste afirmar algo.
+ */
+test("o agente propõe o propósito, e o delta mostra o trabalho que aceitar cria", async ({ page }) => {
+  test.setTimeout(90000);
+  await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
+  await entrar(page);
+
+  // Credencial do gateway falso — mesma da suíte de IA hospedada.
+  await page.getByRole("button", { name: "☰ Menu" }).click();
+  await page.getByRole("button", { name: "Modelo de IA" }).click();
+  const card = page.getByTestId("modelo-ia-gateway");
+  await card.getByLabel("Base URL do gateway").fill(BASE_URL_GATEWAY_FALSO);
+  await card.getByLabel("Chave de API").fill(CHAVE_GATEWAY_FALSO);
+  await card.getByLabel("Nome do modelo").fill(MODELO_GATEWAY_FALSO);
+  await card.getByLabel("Este modelo enxerga imagem").check();
+  await card.getByRole("button", { name: "Salvar" }).click();
+  await expect(page.getByTestId("gateway-resultado")).toContainText("Credencial salva");
+  await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
+
+  await page.getByRole("button", { name: "+ Serviço", exact: true }).click();
+  await expect(page.locator(".react-flow__node")).toHaveCount(1);
+
+  await page.getByTestId("assistente-flutuante").click();
+  const janela = page.getByTestId("assistente-janela");
+  await janela.getByRole("button", { name: "📎 Contexto do épico" }).click();
+
+  // Sem contexto nenhum o pedido é recusado no servidor — e a recusa aparece
+  // ali, não num alerta solto. Escrever o contexto é o que destrava.
+  await janela.getByLabel("Contexto do épico (texto)").fill("Cobrança recorrente com parceiro externo.");
+
+  await janela.getByRole("button", { name: "✦ Propor a partir do contexto" }).click();
+
+  // A proposta chega SUGERIDA: o delta existe porque nada foi aceito ainda.
+  const delta = janela.getByTestId("delta-da-proposta");
+  // Diagnóstico no lugar certo: se o agente falhou, o painel diz — e é isso
+  // que precisa aparecer no relatório, não um "element not found" mudo.
+  await expect
+    .poll(async () => (await janela.innerText()).slice(0, 600), { timeout: 20000 })
+    .toContain("sugerida(s)");
+  await expect(delta).toBeVisible();
+  await expect(delta).toContainText("sugerida(s), ainda sem efeito");
+
+  // E o placar do topo continua sem acusar: sugestão não vira lacuna sozinha.
+  await expect(page.getByTestId("proposito-resumo")).toHaveCount(0);
+
+  // Aceitar é ato da pessoa — e só aí a medida muda.
+  await delta.getByRole("button", { name: "Confirmar todas" }).click();
+  await expect(janela.getByTestId("delta-da-proposta")).toHaveCount(0);
+  await janela.getByRole("button", { name: "Salvar" }).click();
+  await expect(page.getByTestId("proposito-resumo")).toBeVisible();
 });

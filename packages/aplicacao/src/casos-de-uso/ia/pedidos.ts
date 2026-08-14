@@ -713,3 +713,101 @@ export function montarPedidoConfigurarConversa({ mensagens, resumoConfig }: Entr
 
   return { prompt, esquema };
 }
+
+const MAX_NECESSIDADES = 8;
+
+export interface EntradaNecessidades {
+  /** `quebra.demandInfo` — a descrição em prosa de que a demanda trata. */
+  contextoEpico?: string;
+  /** SPEC-53 — o vocabulário do produto, para a necessidade falar a língua do negócio. */
+  contextoDoProduto?: string;
+  /** Os nós do desenho, para o agente já propor o vínculo. Vazio = mesa em branco. */
+  componentes?: { id: string; rotulo: string; tipo: string }[];
+  /** O que já foi declarado — para não propor de novo o mesmo propósito. */
+  jaDeclaradas?: string[];
+}
+
+/**
+ * SPEC-57 fatia D — o agente PROPÕE o propósito da demanda, lendo o contexto
+ * que já existe.
+ *
+ * Duas disciplinas que este pedido carrega, e que o diferenciam de "gerar
+ * requisitos com IA":
+ *
+ * 1. **Ele propõe o VÍNCULO junto.** Necessidade sem componente é lacuna, e
+ *    uma proposta que só cria lacuna transfere trabalho em vez de adiantar.
+ *    Quando o desenho já tem componentes, o agente diz qual responde por quê —
+ *    e erra na frente da pessoa, que é o lugar certo de errar.
+ * 2. **Nada disso conta ao chegar.** A resposta vira `origem: "sugerido"`, e a
+ *    regra 2 já cuida do resto: não fecha lacuna, não é citada no documento e
+ *    não dá nó por atendido até alguém confirmar.
+ */
+export function montarPedidoNecessidades(entrada: EntradaNecessidades): PedidoIa {
+  const { contextoEpico, contextoDoProduto, componentes = [], jaDeclaradas = [] } = entrada;
+
+  if (!contextoEpico?.trim() && !contextoDoProduto?.trim()) {
+    throw new PedidoInvalido(
+      "sem contexto da demanda nem do produto — não há de onde tirar o propósito; escreva o contexto do épico antes"
+    );
+  }
+
+  const idsDeComponente = componentes.map((c) => c.id);
+
+  const esquema = {
+    type: "object",
+    properties: {
+      necessidades: {
+        type: "array",
+        minItems: 1,
+        maxItems: MAX_NECESSIDADES,
+        items: {
+          type: "object",
+          properties: {
+            texto: { type: "string" },
+            prioridade: { enum: ["alta", "media", "baixa"] },
+            // Sem componente no desenho, o enum ficaria vazio e o modelo não
+            // teria o que responder — aí o campo some do esquema.
+            ...(idsDeComponente.length > 0
+              ? { atendidaPor: { type: "array", items: { enum: idsDeComponente } } }
+              : {}),
+            motivo: { type: "string" },
+          },
+          required: ["texto", "prioridade", "motivo"],
+        },
+      },
+    },
+    required: ["necessidades"],
+  } as EsquemaJson;
+
+  const prompt = [
+    `Você ajuda um time a explicitar O QUE a demanda precisa resolver, antes de desenhar a solução.`,
+    `Proponha as NECESSIDADES desta demanda: os propósitos que a entrega tem que atender.`,
+    ``,
+    ...(contextoDoProduto?.trim() ? [`Produto:`, contextoDoProduto.trim(), ``] : []),
+    ...(contextoEpico?.trim() ? [`Demanda:`, contextoEpico.trim(), ``] : []),
+    ...(jaDeclaradas.length > 0
+      ? [`Já declaradas (NÃO repita nem reescreva estas):`, ...jaDeclaradas.map((t) => `- ${t}`), ``]
+      : []),
+    ...(componentes.length > 0
+      ? [
+          `Componentes já desenhados (use exclusivamente estes ids em "atendidaPor"):`,
+          ...componentes.map((c) => `- ${c.id}: ${c.rotulo} (${c.tipo})`),
+          ``,
+        ]
+      : []),
+    `Regras:`,
+    `- Necessidade é o QUE precisa ser verdade quando a entrega terminar, não COMO se faz.`,
+    `  Bom: "o pedido não pode ser cobrado duas vezes". Ruim: "usar chave de idempotência no worker".`,
+    `- Uma frase por necessidade, no vocabulário do negócio, verificável.`,
+    componentes.length > 0
+      ? `- "atendidaPor": os componentes que respondem por ela. Deixe VAZIO se nenhum dos desenhados responde — a lacuna é informação, não falha sua.`
+      : `- Não há componentes desenhados ainda; proponha só as necessidades.`,
+    `- "motivo" explica em uma frase por que isto é necessidade DESTA demanda.`,
+    `  É o que a pessoa lê para decidir se aceita — sem ele a proposta é caixa-preta.`,
+    `- No máximo ${MAX_NECESSIDADES}. Proponha o que a demanda realmente exige; lista inflada`,
+    `  faz a pessoa aceitar sem ler, que é pior que não propor.`,
+    `- Responda em português.`,
+  ].join("\n");
+
+  return { prompt, esquema };
+}

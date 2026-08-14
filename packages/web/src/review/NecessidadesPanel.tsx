@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Necessidade } from "@gerador/engine";
-import { necessidadeConta } from "@gerador/engine";
+import { analisarLacunas, necessidadeConta } from "@gerador/engine";
 
 export interface ElementoVinculavel {
   id: string;
@@ -12,6 +12,13 @@ export interface NecessidadesPanelProps {
   /** Nós do diagrama, para vincular. Vazio = desenho ainda em branco. */
   elementos: ElementoVinculavel[];
   onMudar: (necessidades: Necessidade[]) => void;
+  /** SPEC-57 fatia D — pede a proposta ao agente. Ausente = botão não aparece
+   * (é o caso do teste de unidade e de quem não tem IA configurada). */
+  onPropor?: () => Promise<void> | void;
+  /** Verdadeiro enquanto o agente responde. */
+  propondo?: boolean;
+  /** O que o agente respondeu de errado, dito onde se pediu. */
+  erroDaProposta?: string | null;
 }
 
 /**
@@ -27,7 +34,14 @@ export interface NecessidadesPanelProps {
  * LACUNA aparece. Ligar a partir do nó é o incremento natural depois — quando
  * a pessoa já sabe qual buraco está fechando.
  */
-export function NecessidadesPanel({ necessidades, elementos, onMudar }: NecessidadesPanelProps) {
+export function NecessidadesPanel({
+  necessidades,
+  elementos,
+  onMudar,
+  onPropor,
+  propondo,
+  erroDaProposta,
+}: NecessidadesPanelProps) {
   const [texto, setTexto] = useState("");
   const [prioridade, setPrioridade] = useState<"alta" | "media" | "baixa">("media");
 
@@ -56,12 +70,68 @@ export function NecessidadesPanel({ necessidades, elementos, onMudar }: Necessid
   const rotuloDoElemento = (id: string) => elementos.find((e) => e.id === id)?.label ?? id;
   const elementoExiste = (id: string) => elementos.some((e) => e.id === id);
 
+  // SPEC-57 fatia D — a proposta MEDIDA antes de aceitar. O engine roda duas
+  // vezes: como está, e como ficaria se tudo o que está sugerido virasse real.
+  //
+  // Nota honesta sobre o que este delta mostra: a §M4 da SPEC-57 imaginava a
+  // confiança PIORANDO ao aceitar. Aquilo vale para proposta de DESENHO, que
+  // traz campos não conferidos junto. Aqui confirmar É a leitura, então o
+  // número que pode piorar é outro — e é mais útil: aceitar propósito sem
+  // ninguém que responda por ele CRIA lacuna. É esse trabalho que a pessoa
+  // precisa ver antes de dizer sim.
+  const diagramaAtual = { nodes: elementos.map((e) => ({ id: e.id })), edges: [] } as never;
+  const pendentes = necessidades.filter((n) => !necessidadeConta(n));
+  const lacunasAgora = analisarLacunas(diagramaAtual, necessidades).semElemento.length;
+  const lacunasSeAceitar = analisarLacunas(
+    diagramaAtual,
+    necessidades.map((n) => ({ ...n, confirmado: true }))
+  ).semElemento.length;
+
+  function confirmarTodas() {
+    onMudar(necessidades.map((n) => (necessidadeConta(n) ? n : { ...n, confirmado: true })));
+  }
+
   return (
     <div aria-label="Necessidades da demanda">
       <p style={{ margin: "0 0 8px", fontSize: 12, color: "var(--texto-fraco)" }}>
         O que esta demanda precisa resolver. Cada necessidade é ligada ao componente que responde por ela — e o que
         ficar sem ninguém aparece como lacuna, antes de virar item.
       </p>
+
+      {onPropor && (
+        <div style={{ marginBottom: 10 }}>
+          <button onClick={() => void onPropor()} disabled={propondo} style={botaoEstilo}>
+            {propondo ? "✦ propondo…" : "✦ Propor a partir do contexto"}
+          </button>
+          {erroDaProposta && (
+            <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--vermelho)" }}>{erroDaProposta}</p>
+          )}
+        </div>
+      )}
+
+      {/* O delta: o efeito de aceitar, ANTES de aceitar. */}
+      {pendentes.length > 0 && (
+        <div
+          data-testid="delta-da-proposta"
+          style={{
+            border: "1px solid var(--borda-forte)",
+            borderRadius: 8,
+            padding: "8px 10px",
+            marginBottom: 10,
+            fontSize: 12,
+            background: "var(--fundo)",
+          }}
+        >
+          <strong style={{ fontSize: 12 }}>{pendentes.length} sugerida(s), ainda sem efeito</strong>
+          <div style={{ marginTop: 4, color: "var(--texto-fraco)" }}>
+            Se aceitar tudo: lacunas {lacunasAgora} → <strong>{lacunasSeAceitar}</strong>
+            {lacunasSeAceitar > lacunasAgora && " — aceitar propósito sem componente cria trabalho"}
+          </div>
+          <button onClick={confirmarTodas} style={{ ...botaoEstilo, marginTop: 6 }}>
+            Confirmar todas
+          </button>
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
         <input

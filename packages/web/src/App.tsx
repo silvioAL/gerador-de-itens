@@ -34,6 +34,7 @@ import {
   apiStacks,
   apiExportador,
   type SugestoesDeStack,
+  apiIa,
 } from "./api/client";
 import { useSessao } from "./auth/useSessao";
 import { LoginScreen } from "./auth/LoginScreen";
@@ -1191,6 +1192,33 @@ function AppCarregado({
             produtos={produtos}
             necessidades={quebra.necessidades}
             elementos={quebra.diagrama.nodes.map((n) => ({ id: n.id, label: n.label || n.id }))}
+            onProporNecessidades={async (jaDeclaradas, contextoEpico) => {
+              const { necessidades } = await apiIa.proporNecessidades({
+                contextoEpico,
+                // O mesmo texto que já alimenta a esteira — o agente do propósito não pode
+                // ler um contexto de produto diferente do que escreve os itens.
+                contextoDoProduto,
+                componentes: quebra.diagrama.nodes.map((n) => ({
+                  id: n.id,
+                  rotulo: n.label || n.id,
+                  tipo: n.type,
+                })),
+                jaDeclaradas,
+              });
+              // Tudo o que o agente propõe entra como `sugerido` e SEM
+              // confirmação: a regra 2 é aplicada aqui, na fronteira, e não
+              // depende de o modelo ter sido bem-comportado.
+              return necessidades.map((p, i) => ({
+                id: `nec-ia-${Date.now().toString(36)}-${i}`,
+                texto: p.texto,
+                prioridade: p.prioridade,
+                origem: "sugerido" as const,
+                confirmado: false,
+                atendidaPor: (p.atendidaPor ?? []).filter((id) =>
+                  quebra.diagrama.nodes.some((n) => n.id === id)
+                ),
+              }));
+            }}
             onSalvar={(demandInfo, anexosContexto, produtoId, necessidades) =>
               setQuebra((q) => ({ ...q, demandInfo, anexosContexto, produtoId, necessidades }))
             }

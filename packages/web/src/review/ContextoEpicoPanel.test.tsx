@@ -164,3 +164,61 @@ describe("ContextoEpicoPanel — o propósito da demanda (SPEC-57)", () => {
     ]);
   });
 });
+
+/**
+ * SPEC-57 fatia D — a costura entre o painel e o agente. O que se prova aqui é
+ * que a proposta chega como SUGERIDA (regra 2 aplicada na fronteira, não
+ * confiando no bom comportamento do modelo) e que o já declarado viaja junto.
+ */
+describe("ContextoEpicoPanel — a proposta do agente (SPEC-57 fatia D)", () => {
+  it("manda as já declaradas e adiciona o que voltou, sem confirmar nada", async () => {
+    const user = userEvent.setup();
+    const onProporNecessidades = vi.fn().mockResolvedValue([
+      { id: "ia-1", texto: "confirmar em 2s", origem: "sugerido", confirmado: false, atendidaPor: [] },
+    ]);
+
+    render(
+      <ContextoEpicoPanel
+        necessidades={[{ id: "r1", texto: "não cobrar duas vezes", origem: "manual", atendidaPor: [] }]}
+        elementos={[{ id: "n1", label: "worker" }]}
+        onProporNecessidades={onProporNecessidades}
+        onSalvar={vi.fn()}
+        onFechar={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "✦ Propor a partir do contexto" }));
+
+    // O já declarado vai junto: repropor o que a pessoa escreveu faz ela parar
+    // de ler a lista.
+    // O contexto da TELA vai junto (defeito achado no E2E: o agente lia o
+    // `demandInfo` salvo, então quem escrevia e pedia proposta na mesma sessão
+    // recebia "sem contexto").
+    expect(onProporNecessidades).toHaveBeenCalledWith(["não cobrar duas vezes"], "");
+    expect(await screen.findByText("confirmar em 2s")).toBeInTheDocument();
+    // E chega sem contar: o delta aparece justamente porque nada foi aceito.
+    expect(screen.getByTestId("delta-da-proposta")).toHaveTextContent("1 sugerida(s)");
+  });
+
+  it("falha do agente é dita ali, e não apaga o que já estava escrito", async () => {
+    const user = userEvent.setup();
+    render(
+      <ContextoEpicoPanel
+        necessidades={[{ id: "r1", texto: "não cobrar duas vezes", origem: "manual", atendidaPor: [] }]}
+        onProporNecessidades={vi.fn().mockRejectedValue(new Error("gateway fora do ar"))}
+        onSalvar={vi.fn()}
+        onFechar={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "✦ Propor a partir do contexto" }));
+
+    expect(await screen.findByText("gateway fora do ar")).toBeInTheDocument();
+    expect(screen.getByText("não cobrar duas vezes")).toBeInTheDocument();
+  });
+
+  it("sem quem proponha, o botão não aparece", () => {
+    render(<ContextoEpicoPanel onSalvar={vi.fn()} onFechar={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: /Propor a partir do contexto/ })).not.toBeInTheDocument();
+  });
+});
