@@ -223,7 +223,7 @@ export function ConfigScreen({
         <span style={{ fontSize: 12, color: "var(--texto-fraco)" }}>Configurações · time ativo: {timeAtivo}</span>
         <div style={{ flex: 1 }} />
         <button onClick={onFechar} style={{ ...botaoEstilo, ...botaoPrimarioEstilo }}>
-          Voltar ao canvas
+          Voltar à mesa de projeto
         </button>
       </header>
 

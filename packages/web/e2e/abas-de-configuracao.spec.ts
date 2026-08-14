@@ -79,7 +79,7 @@ test("Regras: criar um grupo pela tela (§165) e marcar contexto por clique — 
   await expect(primeiro.getByRole("button", { name: "Remover contexto Mobile-android" })).toBeVisible();
 
   // Persistiu de verdade: sair da aba e voltar relê do servidor.
-  await page.getByRole("button", { name: "Voltar ao canvas" }).click();
+  await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
   await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: /Regras de refinamento/ }).click();
   await expect(
@@ -127,7 +127,7 @@ test("Especificação: apagar {{itens}} não deixa salvar e mostra o motivo (SPE
   // constar no E2E, não só o bloqueio): grava, sai da tela, volta e o texto
   // persistido é o novo.
   await salvar.click();
-  await page.getByRole("button", { name: "Voltar ao canvas" }).click();
+  await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
   await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: /Especificação de solução/ }).click();
   await expect(page.getByText(/Template do E2E/)).toBeVisible();

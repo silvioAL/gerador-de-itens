@@ -6061,3 +6061,44 @@ explicitamente antes de navegar, e afirmar que ele fechou.
 
 Mordidas nos dois níveis: voltando a listar tudo, o unitário do menu e o E2E
 ficam vermelhos. 7 testes no `MenuLateral`, 67/67 E2E.
+
+## 222. A tela inicial vira "mesa de projeto"
+
+Pedido do usuário: *"renomear a tela inicial para mesa de projeto"*.
+
+O nome não existia num lugar só — existia como **jargão vazando**. "Canvas" é
+o nome do componente React (`canvas/Canvas.tsx`), do tipo da rota
+(`tela: "canvas"`) e do hook de momentos (`momentoDoCanvas`); em algum ponto
+atravessou a fronteira e virou texto de botão. Quatro telas diferentes tinham
+um "Voltar ao canvas", e a jornada, o modal de cenários e a conversa falavam a
+mesma língua de implementação com quem usa.
+
+**A régua que segui:** trocar onde é INTERFACE, não onde é código. Ficaram
+`Canvas.tsx`, `tela: "canvas"`, `momentoDoCanvas` — renomeá-los seria churn sem
+leitor. Saíram os 13 pontos de texto visível: "Voltar ao canvas" (×4),
+"Aplicar ao canvas", "Carregar no canvas", "+ Adicionar ao canvas", o
+`aria-label` dos cenários, "Campos preenchidos no canvas", a fala do assistente
+e a descrição da jornada. E dois comentários que CITAVAM o nome do botão — se
+não trocasse, o próximo a ler procuraria por um botão que não existe mais.
+
+**Assert antes e depois de cada troca.** Cada substituição verifica que o texto
+velho existia, que o novo entrou e que o velho não sobrou. Não é zelo
+decorativo: um `replace` que não casa é silencioso, e o resultado é rename pela
+metade — exatamente o estado que produz dois nomes para a mesma tela.
+
+**A varredura pegou o que eu tinha esquecido.** Os testes usam o rótulo como
+seletor, então o rename quebra a suíte se ela não for junto: 26 ocorrências em
+14 arquivos de teste/E2E. Mesmo assim escapou uma — `jornada-e-cenarios.spec`
+monta o `aria-label` com o título literal do cenário, não com template, e só o
+E2E vermelho mostrou. Foi por isso que a varredura final passou a procurar por
+`name:` e `getByText` com "canvas" dentro, em vez de confiar na lista de pares.
+
+**Guarda de renome, no espírito da guarda de remoção do §212.** Um teste cobra
+que o nome NOVO está lá e que o VELHO não voltou. Rename sem guarda volta num
+merge distraído e passa a conviver com o novo — e dois nomes concorrentes para
+a mesma tela são pior que um nome ruim sozinho.
+
+README e CONTEXTO-E-ARQUITETURA foram junto onde nomeiam a TELA; onde "canvas"
+é termo técnico (React Flow, canvas SVG do plano original) ficou como está.
+
+479 unitários do web, 67/67 E2E, build e lint limpos.

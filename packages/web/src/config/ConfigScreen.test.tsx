@@ -80,16 +80,30 @@ describe("ConfigScreen — nenhuma ÁREA abre em branco, e o header diz onde se 
 });
 
 describe("ConfigScreen — a navegação é do menu e da rota", () => {
-  it("☰ Menu abre o menu; Voltar ao canvas fecha a tela — e não existe mais régua de abas", () => {
+  it("☰ Menu abre o menu; Voltar à mesa de projeto fecha a tela — e não existe mais régua de abas", () => {
     const onAbrirMenu = vi.fn();
     const onFechar = vi.fn();
     renderTela("membros", { onAbrirMenu, onFechar });
 
     screen.getByRole("button", { name: "☰ Menu" }).click();
     expect(onAbrirMenu).toHaveBeenCalled();
-    screen.getByRole("button", { name: "Voltar ao canvas" }).click();
+    screen.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
     expect(onFechar).toHaveBeenCalled();
     // Régua morta: não há botão de OUTRA área dentro da tela de Membros.
     expect(screen.queryByRole("button", { name: /Pipeline de IA/ })).not.toBeInTheDocument();
+  });
+
+  /**
+   * §222 — guarda de RENOME, no mesmo espírito da guarda de remoção do §212.
+   * A tela inicial passou a se chamar "mesa de projeto"; "canvas" era jargão
+   * de implementação vazando pra interface. Sem uma asserção sobre o nome
+   * VELHO, o antigo volta num merge distraído e passa a conviver com o novo —
+   * e nomes concorrentes para a mesma tela são pior que o nome ruim sozinho.
+   */
+  it("o nome antigo da tela não volta", () => {
+    renderTela("membros", {});
+    expect(screen.getByRole("button", { name: "Voltar à mesa de projeto" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /canvas/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/canvas/i)).not.toBeInTheDocument();
   });
 });

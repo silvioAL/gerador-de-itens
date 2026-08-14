@@ -146,7 +146,7 @@ describe("confirmação antes de excluir (canvas)", () => {
 });
 
 /**
- * ACHADO REAL do usuário: depois de "Aplicar ao canvas", os componentes "não
+ * ACHADO REAL do usuário: depois de "Aplicar à mesa de projeto", os componentes "não
  * aparecem a menos que se clique em próximo pendente (1 por 1)".
  *
  * O teste vive no hook porque é lá que a decisão mora: `fitView` em si é do

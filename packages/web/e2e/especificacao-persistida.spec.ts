@@ -44,7 +44,7 @@ test("gerar salva a especificação na quebra; reabrir conduz à revisão com a 
   const download = page.waitForEvent("download");
   await page.getByTestId("balao-gerar-acao").click();
   await download;
-  await page.getByRole("button", { name: "Voltar ao canvas" }).click();
+  await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
   await expect(page.getByText(/· salva$/)).toBeVisible();
 
   // Recomeça do zero e REABRE a demanda: o material salvo volta inteiro.

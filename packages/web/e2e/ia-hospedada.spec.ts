@@ -118,7 +118,7 @@ test("a esteira roda no navegador e o texto do gateway chega nos campos (o defei
   await card.getByLabel("Nome do modelo").fill(MODELO_GATEWAY_FALSO);
   await card.getByRole("button", { name: "Salvar" }).click();
   await expect(page.getByTestId("gateway-resultado")).toContainText("Credencial salva");
-  await page.getByRole("button", { name: "Voltar ao canvas" }).click();
+  await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
 
   // Um nó completo o bastante pra derivar — mesmo caminho de
   // `derivar-e-revisar.spec.ts`.
@@ -225,7 +225,7 @@ test.describe("voz na conversa", () => {
     await card.getByLabel("Este modelo enxerga imagem").check();
     await card.getByRole("button", { name: "Salvar" }).click();
     await expect(page.getByTestId("gateway-resultado")).toContainText("Credencial salva");
-    await page.getByRole("button", { name: "Voltar ao canvas" }).click();
+    await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
 
     // #298 — a conversa mora no assistente flutuante; abrir cai direto nela.
     await page.getByTestId("assistente-flutuante").click();
@@ -274,7 +274,7 @@ test("anexar um print manda a imagem até o gateway", async ({ page }) => {
   await card.getByLabel("Este modelo enxerga imagem").check();
   await card.getByRole("button", { name: "Salvar" }).click();
   await expect(page.getByTestId("gateway-resultado")).toContainText("Credencial salva");
-  await page.getByRole("button", { name: "Voltar ao canvas" }).click();
+  await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
 
   // #298 — a conversa mora no assistente flutuante; abrir cai direto nela.
   await page.getByTestId("assistente-flutuante").click();
@@ -342,7 +342,7 @@ test("configurar conversando: a conversa vira proposta, aplicar cria o campo, e 
   await card.getByLabel("Este modelo enxerga imagem").check();
   await card.getByRole("button", { name: "Salvar" }).click();
   await expect(page.getByTestId("gateway-resultado")).toContainText("Credencial salva");
-  await page.getByRole("button", { name: "Voltar ao canvas" }).click();
+  await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
 
   // A conversa mora na terceira aba do assistente flutuante (#298).
   await page.getByTestId("assistente-flutuante").click();

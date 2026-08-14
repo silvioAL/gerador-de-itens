@@ -92,7 +92,7 @@ test("aba Membros mostra e edita níveis, e a mudança persiste no servidor", as
   // Owner promove pelo select; recarregar a aba prova que foi pro servidor,
   // não só pro estado local.
   await page.getByLabel(`Nível de ${operador}`).selectOption("owner");
-  await page.getByRole("button", { name: "Voltar ao canvas" }).click();
+  await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
   await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: /Membros/ }).click();
   await expect(page.getByLabel(`Nível de ${operador}`)).toHaveValue("owner");

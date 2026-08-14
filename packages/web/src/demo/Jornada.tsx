@@ -11,7 +11,7 @@ const ETAPAS: Etapa[] = [
     cor: "#3b82f6",
     titulo: "Diagrama",
     texto:
-      "Desenhe a arquitetura no canvas com nós tipados (serviço, fila, banco, processo, regra...) conectados por arestas com regras próprias. Todo campo carrega sua proveniência — manual, extraído, inferido ou sugerido — nunca um valor solto sem se saber de onde veio.",
+      "Desenhe a arquitetura na mesa de projeto com nós tipados (serviço, fila, banco, processo, regra...) conectados por arestas com regras próprias. Todo campo carrega sua proveniência — manual, extraído, inferido ou sugerido — nunca um valor solto sem se saber de onde veio.",
   },
   {
     numero: 2,

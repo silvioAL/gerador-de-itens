@@ -3,7 +3,7 @@ import type { ItemGerado, ResultadoDaExportacao } from "../api/client";
 
 /**
  * SPEC-41 Parte B — a tela dos itens de trabalho (`#/itens`), no padrão de
- * telas da SPEC-40 (☰ Menu · título · Voltar ao canvas). O card responde as
+ * telas da SPEC-40 (☰ Menu · título · Voltar à mesa de projeto). O card responde as
  * três perguntas de quem vai levar o item adiante, nesta ordem: "o que é?"
  * (título + tipo/tamanho), "posso exportar?" (a régua de completude — quantos
  * ✍️ restam e quantas sugestões aguardam confirmação) e "o que vem antes?"
@@ -77,7 +77,7 @@ export function ItensScreen({
         </span>
         <div style={{ flex: 1 }} />
         <button onClick={onFechar} style={{ ...botaoEstilo, ...botaoPrimarioEstilo }}>
-          Voltar ao canvas
+          Voltar à mesa de projeto
         </button>
       </header>
 

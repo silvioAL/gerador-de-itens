@@ -197,7 +197,7 @@ export function useQuebra(inicial: Quebra, config: DiagramaConfig) {
    * mouse — proposta inválida vira conexão pelo tipo default, não erro.
    */
   /**
-   * ACHADO REAL do usuário: depois de "Aplicar ao canvas", os componentes "não
+   * ACHADO REAL do usuário: depois de "Aplicar à mesa de projeto", os componentes "não
    * aparecem a menos que se clique em próximo pendente (1 por 1)", e com nós
    * pré-existentes "não aparecem nem assim".
    *

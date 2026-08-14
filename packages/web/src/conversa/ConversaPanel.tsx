@@ -188,7 +188,7 @@ export function ConversaPanel({
                   </ul>
                 )}
                 <button onClick={() => onAplicar(m.proposta!)} style={botaoAplicarEstilo}>
-                  Aplicar ao canvas
+                  Aplicar à mesa de projeto
                 </button>
                 <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--texto-mudo)" }}>
                   Os nós entram como qualquer outro — dá pra editar, renomear e apagar depois.

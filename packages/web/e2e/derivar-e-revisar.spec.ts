@@ -103,7 +103,7 @@ test("derivar quebra abre a revisão com a atividade esperada e exporta", async 
   const md = await downloadMd;
   expect(md.suggestedFilename()).toBe("especificacao-de-solucao.md");
 
-  await page.getByRole("button", { name: "Voltar ao canvas" }).click();
+  await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
   await expect(page.getByTestId("contagem-itens")).not.toBeVisible();
   await expect(page.locator(".react-flow__node")).toBeVisible();
 

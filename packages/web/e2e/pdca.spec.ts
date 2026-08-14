@@ -53,7 +53,7 @@ test("entrevista, geração pelo agente e feedback — o ciclo inteiro com cadê
     // M11 — no retorno ao canvas, a entrevista do PDCA (cadência 1: o uso da
     // derivação já marcou o momento). Dev é owner: o chip abre a conversa de
     // configuração.
-    await page.getByRole("button", { name: "Voltar ao canvas" }).click();
+    await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
     await expect(page.getByTestId("assistente-balao")).toContainText("Sentiu falta");
     await page.getByTestId("assistente-balao-acao").click();
     await expect(page.getByTestId("assistente-janela")).toBeVisible();

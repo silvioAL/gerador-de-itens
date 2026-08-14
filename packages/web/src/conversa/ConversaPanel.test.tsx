@@ -66,16 +66,16 @@ describe("ConversaPanel (SPEC-27 Fase 1 — a conversa do desenho)", () => {
     expect(screen.getByText("consulta o saldo antes de fechar")).toBeInTheDocument();
   });
 
-  it("nada é aplicado sozinho: só ao clicar em Aplicar ao canvas", async () => {
+  it("nada é aplicado sozinho: só ao clicar em Aplicar à mesa de projeto", async () => {
     const onAplicar = vi.fn();
     render(<ConversaPanel config={config} onAplicar={onAplicar} />);
     fireEvent.change(screen.getByLabelText("Descreva a demanda"), { target: { value: "qualquer coisa" } });
     fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "Aplicar ao canvas" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Aplicar à mesa de projeto" })).toBeInTheDocument());
     expect(onAplicar).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Aplicar ao canvas" }));
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar à mesa de projeto" }));
     expect(onAplicar).toHaveBeenCalledWith(PROPOSTA);
   });
 
