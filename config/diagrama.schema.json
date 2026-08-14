@@ -46,13 +46,15 @@
       "properties": {
         "key": { "type": "string" },
         "label": { "type": "string" },
-        "type": { "enum": ["text", "number", "boolean", "select"] },
+        "type": { "enum": ["text", "textarea", "number", "boolean", "select", "lista"] },
         "required": { "type": "boolean" },
         "default": {},
         "when": { "$ref": "#/$defs/condicao" },
         "ajuda": { "type": "string" },
         "permiteNA": { "type": "boolean" },
-        "options": { "type": "array", "items": { "type": "string" } }
+        "options": { "type": "array", "items": { "type": "string" } },
+        "identificador": { "type": "boolean" },
+        "itemSpec": { "type": "array", "items": { "$ref": "#/$defs/fieldSpec" } }
       }
     },
     "condicao": {

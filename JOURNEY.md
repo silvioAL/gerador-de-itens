@@ -6886,3 +6886,44 @@ encontrado do que em esforço.
 **Cobertura, agora medida:** dos 12 itens do menu, os dois tours cobrem 11. Fica
 de fora só "Campos por componente vs. por conexão" como par — o de componente
 está no tour do produto e o de conexão no de configuração, de propósito.
+
+## 237. As duas dívidas que eu mesmo anotei e não paguei
+
+Perguntado "falta algo?", fui conferir no código em vez de responder de memória
+— e as duas menores eram justamente as que eu tinha achado na SPEC-56 §14,
+anotado, e seguido adiante.
+
+**1. `validateConfig` nunca conferiu o `type` do campo.** Um `"type": "lixo"`
+passava: o campo não renderizava, a prontidão não o cobrava, e nada apontava o
+erro. É a "falha ABERTA e em silêncio" que o comentário do `RECURSOS` nomeia no
+servidor — só que na config, que é o lugar onde este produto promete
+explicitamente falhar alto.
+
+`TipoCampo` era só um tipo, sem lista em runtime. Virou `TIPOS_CAMPO` (const) com
+o tipo derivado dela — uma lista só, sem duas para divergir. A validação cobre
+campo de nó, campo de aresta e o `itemSpec` de uma lista; esse último é onde
+passaria despercebido por mais tempo, porque a lista em si renderiza.
+
+**2. O `diagrama.schema.json` estava defasado em três pontos ao mesmo tempo:**
+faltavam dois tipos (`textarea`, `lista`), faltavam duas propriedades
+(`identificador`, `itemSpec`) e ele declara `additionalProperties: false` — o
+que transforma cada ausência em **erro falso** no editor de quem escreve config
+à mão. Documentação que desinforma é pior que documentação faltando: ela é
+consultada com confiança.
+
+**A parte que interessa não é o conserto, é a correia.** O arquivo é tooling de
+editor: nenhum código o lê, então nada o obrigava a acompanhar o engine — e foi
+exatamente por isso que ficou para trás sem ninguém notar. Agora há teste
+comparando o enum do schema com `TIPOS_CAMPO` e varrendo a config de exemplo
+atrás de propriedade usada e não declarada. Não valida JSON Schema de verdade
+(isso pediria dependência nova para um arquivo que nenhum runtime lê); garante
+que ele não **diverge**, que é o defeito real.
+
+Mordida nas duas: desligando a validação, dois testes caem; devolvendo o enum
+antigo ao schema, o teste da correia cai.
+
+235 engine · 515 web · 217 server · lint e build limpos.
+
+Régua: **"anotei no documento" não é o mesmo que "está resolvido"** — e as duas
+dívidas mais baratas do backlog inteiro ficaram três rodadas paradas porque
+anotá-las deu a sensação de tê-las tratado.

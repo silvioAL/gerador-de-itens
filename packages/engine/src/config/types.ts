@@ -34,7 +34,14 @@ export type Condicao =
  * de Camunda, motores/rulesets do FICO, regras de negócio) — cada uma com seu
  * próprio HTML/JS de repetição. Aqui é um mecanismo genérico só, configurável
  * em `diagrama.json`/`campos-no.json`, não um componente por domínio. */
-export type TipoCampo = "text" | "textarea" | "number" | "boolean" | "select" | "lista";
+export const TIPOS_CAMPO = ["text", "textarea", "number", "boolean", "select", "lista"] as const;
+
+/** Lista FECHADA, e agora também em RUNTIME (§237): o `validateConfig` nunca
+ * conferiu o `type`, então um `"type": "lixo"` passava em silêncio e o campo
+ * simplesmente não renderizava — a mesma "falha ABERTA e em silêncio" que o
+ * comentário do `RECURSOS` nomeia no servidor. Tipo derivado da constante para
+ * não haver duas listas para divergir. */
+export type TipoCampo = (typeof TIPOS_CAMPO)[number];
 
 export interface FieldSpec {
   key: string;
