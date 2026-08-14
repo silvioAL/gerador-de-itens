@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
 import type { DiagramaConfig, No, Quebra } from "@gerador/engine";
 import type { Cenario } from "./scenarios";
-import { ImportarGraphify } from "./ImportarGraphify";
 import { Jornada } from "./Jornada";
 
 // "perfis" saiu daqui pra ConfigScreen.tsx — é config recorrente de time, não
 // onboarding/demo (ver SPEC-08 §3.5).
 // A aba "cli" morreu com o modo local (SPEC-33) — a revisão geral da demo
 // (pedido do usuário: "fala de CLI, que nem temos mais") tirou o resto.
-export type AbaJornada = "jornada" | "cenarios" | "graphify";
+export type AbaJornada = "jornada" | "cenarios";
 
 export interface JourneyModalProps {
   config: DiagramaConfig;
@@ -16,7 +15,6 @@ export interface JourneyModalProps {
   onFechar: () => void;
   onCarregarCenario: (quebra: Quebra) => void;
   onAdicionarCenario: (quebra: Quebra) => void;
-  onImportarGraphify: (nodes: No[]) => void;
   onIniciarTour: () => void;
   /** Demo autoplay (SPEC-17 Fase I) — aditiva ao tour clicável, mesma lista de passos. */
   onIniciarDemoAutomatica: () => void;
@@ -30,7 +28,6 @@ export function JourneyModal({
   onFechar,
   onCarregarCenario,
   onAdicionarCenario,
-  onImportarGraphify,
   onIniciarTour,
   onIniciarDemoAutomatica,
   abaForcada,
@@ -109,9 +106,6 @@ export function JourneyModal({
           <button onClick={() => setAba("cenarios")} style={aba === "cenarios" ? abaAtivaEstilo : abaEstilo}>
             Cenários prontos ({cenarios.length})
           </button>
-          <button onClick={() => setAba("graphify")} style={aba === "graphify" ? abaAtivaEstilo : abaEstilo}>
-            Importar do Graphify
-          </button>
         </div>
 
         <div style={{ flex: 1, overflow: "auto", padding: 24 }}>
@@ -119,7 +113,6 @@ export function JourneyModal({
           {aba === "cenarios" && (
             <Cenarios cenarios={cenarios} config={config} onCarregar={carregar} onAdicionar={onAdicionarCenario} />
           )}
-          {aba === "graphify" && <ImportarGraphify onImportar={onImportarGraphify} />}
         </div>
       </div>
     </div>

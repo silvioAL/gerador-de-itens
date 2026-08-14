@@ -18,7 +18,7 @@ export interface ContextoEpicoPanelProps {
 }
 
 /** `File.text()` não é confiável em todo ambiente (jsdom nos testes) — FileReader
- * é a API mais antiga e amplamente suportada (mesmo padrão de `ImportarGraphify.tsx`). */
+ * é a API mais antiga e amplamente suportada. */
 function lerArquivoComoTexto(arquivo: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const leitor = new FileReader();
