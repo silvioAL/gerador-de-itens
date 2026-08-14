@@ -6102,3 +6102,70 @@ README e CONTEXTO-E-ARQUITETURA foram junto onde nomeiam a TELA; onde "canvas"
 é termo técnico (React Flow, canvas SVG do plano original) ficou como está.
 
 479 unitários do web, 67/67 E2E, build e lint limpos.
+
+## 223. SimArch: o que dá pra trazer sem trazer o motor
+
+Pedido: avaliar o SimArch (github.com/wendelmax/SimArch) atrás de insights
+sobre simulação, cenários, diagramas, configuração e construção de itens.
+Saída em [`SPEC-56-avaliacao-simarch.md`](SPEC-56-avaliacao-simarch.md).
+
+**A primeira coisa que achei não foi técnica.** O repositório **não tem arquivo
+de licença** — sem `LICENSE`, e a API do GitHub devolve `licenseInfo: null`.
+Sem licença o padrão é todos os direitos reservados: legível, não reutilizável.
+Isso decidiu o formato da avaliação inteira antes de eu ler uma linha de C#:
+avalio **ideias, não código**. Somos Apache-2.0 e dependemos de proveniência
+limpa; um trecho traduzido de lá seria dívida que não aparece em teste nenhum.
+
+**O que os dois projetos são, lado a lado.** O SimArch pergunta "esta
+arquitetura aguenta?" e responde com simulação estocástica. Nós perguntamos "o
+que precisa ser construído?" e respondemos com derivação determinística. São
+complementares — e é por isso que a leitura rendeu.
+
+**A recomendação que contraria a intuição do pedido: não trazer o motor.**
+Quatro razões, e a primeira é a que importa. O CONTEXTO §2 diz que atividade só
+nasce de `derivar()`, nunca de algo que interpretou. Não é estética: o produto
+inteiro — proveniência, semáforo, falhar alto — existe contra valor sem origem
+confiável. Um simulador produz número que depende de latência chutada e de um
+`seed`. Pôr esse número ao lado de um item derivado é convidar a confundir os
+dois. Somam-se: o que ele mede não é o que perguntamos; o motor de lá tem 228
+linhas, simula **só o primeiro fluxo** e é laço de passo fixo apesar do nome
+"DiscreteEvent"; e não pode ser copiado de qualquer forma.
+
+**O caminho barato que existe no lugar dele.** Com política de resiliência
+estruturada, dá pra dizer sem `Random` nenhum que três serviços em cadeia com
+timeout de 300ms e retry 3x têm pior caso de 2,7s e estouram o SLA de 1s
+declarado na entrada. Aritmética sobre o diagrama, função pura, mesma família
+do `derivar()` — simulação de **pior caso**, não de amostra, e que sobrevive a
+auditoria.
+
+**O que vale trazer é vocabulário, não motor.** Cinco ideias, e a de maior
+retorno é a mais chata: **políticas de resiliência como campo estruturado** em
+vez de texto livre. Lá é `RetryPolicy { max, backoffMs, exponential }`; aqui é
+um item de checklist perguntando "definiu retry?". A diferença aparece no item
+derivado — com texto, produzimos *"definir política de retry"*, um item que
+devolve a pergunta a quem a fez; com estrutura, produzimos *"retry 3x com
+backoff exponencial de 100ms e DLQ ao esgotar"*, com o Gherkin saindo junto e os
+números dentro. Isso ataca o coração do produto, e o CONTEXTO §5.2 já listava
+campo estruturado como dívida aberta.
+
+As outras: **restrição paramétrica** (`p95 < 200ms` como critério verificável e
+rastreável, útil mesmo sem nada para avaliar contra), **rastreabilidade
+requisito-elemento com gap analysis** (é prontidão de outro tipo — hoje o
+vermelho diz "falta preencher", podia dizer "este requisito não tem componente
+que o atenda"), **perfil do diagrama** ("isto é Black Friday" mudando as
+perguntas do painel via as condições `when` que o engine já avalia) e **ADR
+ancorado no nó**.
+
+**A régua que apliquei em cada uma:** só entra se couber no mecanismo que já
+existe, e se não abrir porta pra texto solto. Requisito sem link é gap a
+mostrar, não item a gerar; ADR é de um nó, não caixa de texto no topo da quebra.
+Foi essa régua que separou "ideia boa" de "ideia boa pra outro produto".
+
+**Sobre o visual, que o usuário pediu para preservar:** os dois usam React +
+ReactFlow, então a comparação é justa — e manter o nosso não é gosto. Nossa
+camada visual carrega mecanismo: o semáforo por nó, a proveniência por campo, a
+esteira animada e a conversa como interface são o produto se explicando
+enquanto a pessoa trabalha. O único empréstimo que vale considerar é aditivo:
+um painel inferior de linha do tempo.
+
+Nada de produção mudou nesta rodada.
