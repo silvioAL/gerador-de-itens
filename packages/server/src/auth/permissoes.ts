@@ -268,6 +268,31 @@ export async function primeiroRecursoNegado(
 }
 
 /**
+ * Os recursos cuja CURADORIA está ligada nesta organização — isto é, aqueles
+ * que ALGUM papel carrega. É a condição exata que `exigirEdicaoCurada` testa,
+ * extraída para poder ser contada à tela.
+ *
+ * Existe por causa de um defeito real (§220): o `pode()` da web reimplementava
+ * a autorização só pelo eixo RBAC e ignorava o eixo de nível, então um **owner
+ * sem grant nenhum via cadeado em tudo** no instante em que a organização
+ * ganhava o primeiro papel — enquanto o servidor aceitava a escrita (owner
+ * bypass). Para a tela espelhar a regra inteira ela precisa saber os dois
+ * eixos, e este é o pedaço que ela não tinha como deduzir: `porRecurso` diz o
+ * que EU tenho, nunca se OUTRO papel carrega o recurso.
+ */
+export async function recursosCurados(
+  db: OpcoesApp["db"],
+  organizacaoId: string
+): Promise<Recurso[]> {
+  const linhas = await db
+    .select({ recurso: papelPermissao.recurso })
+    .from(papelPermissao)
+    .innerJoin(papeisAcesso, eq(papelPermissao.papelId, papeisAcesso.id))
+    .where(eq(papeisAcesso.organizacaoId, organizacaoId));
+  return [...new Set(linhas.map((l) => l.recurso as Recurso))];
+}
+
+/**
  * SPEC-38 Fase 2 (D1) — o gate de CURADORIA, a exceção deliberada ao
  * owner-bypass do `exigirPermissao`:
  *

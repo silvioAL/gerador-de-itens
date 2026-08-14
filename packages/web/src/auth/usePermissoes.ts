@@ -17,6 +17,21 @@ import { apiAcessos, type NivelTime, type PermissoesMinhas } from "../api/client
  * 2. **Modo aberto continua abrindo.** `rbacAtivo: false` (organização sem
  *    papel nenhum) significa que ninguém configurou controle de acesso; a tela
  *    não pode inventar um.
+ *
+ * 3. **O eixo de NÍVEL conta (§220).** Por várias versões o `pode()` olhava só
+ *    o grant RBAC — metade da regra do servidor. O efeito, reproduzido contra
+ *    o banco de verdade: um **owner** de time, no instante em que a organização
+ *    ganhava o primeiro papel, via cadeado em TUDO que não fosse seu grant
+ *    explícito — enquanto o servidor aceitava a escrita normalmente
+ *    (`exigirPermissao`: owner sempre pode). `POST /campos-no` respondia 400 de
+ *    validação, não 403. Ou seja: a tela trancava o que o servidor liberava, e
+ *    a única saída visível era dar a si mesmo um grant por recurso.
+ *
+ *    A regra do servidor tem dois eixos, e agora os dois vivem aqui:
+ *    - `exigirPermissao` — owner **sempre** pode escrever; quem não é owner
+ *      precisa de grant explícito;
+ *    - `exigirEdicaoCurada` — nos recursos sob curadoria (algum papel os
+ *      carrega, `curados` abaixo), o grant manda **inclusive sobre owner**.
  */
 export interface Permissoes {
   /** `false` enquanto a resposta não chegou. Quem desenha deve tratar como
@@ -61,15 +76,22 @@ export function usePermissoes(opcoes: { hospedado: boolean; timeId?: string }): 
   }, [hospedado, timeId]);
 
   const rbacAtivo = dados?.rbacAtivo === true;
+  const nivel = (dados?.nivel as NivelTime | undefined) ?? null;
 
   return {
     carregando,
     rbacAtivo,
     pode: (recurso, acao = "editar") => {
       if (!hospedado || !rbacAtivo) return true;
-      return dados?.porRecurso?.[recurso]?.includes(acao) === true;
+      if (dados?.porRecurso?.[recurso]?.includes(acao) === true) return true;
+      // Eixo de nível (§220): só vale para ESCRITA e só fora da curadoria —
+      // é exatamente o recorte do `exigirPermissao`/`exigirEdicaoCurada`.
+      // `curados` ausente (servidor antigo) fecha este eixo em vez de chutar:
+      // abrir demais aqui mostraria botão que devolve 403 num recurso curado.
+      if (acao !== "editar" || nivel !== "owner") return false;
+      return dados?.curados?.includes(recurso) === false;
     },
-    nivel: (dados?.nivel as NivelTime | undefined) ?? null,
+    nivel,
   };
 }
 
