@@ -5727,3 +5727,62 @@ reidratar no boot. Com essa injeção, o teste fica vermelho. É o que ele exist
 para pegar.
 
 66/66 E2E, duas rodadas completas seguidas.
+
+## 215. Avaliar a migração pro Forge antes de existir cliente
+
+Rodada de pesquisa, não de código: ver se o Gerador cabe num app Forge do Jira
+com o Rovo como única IA no MVP, e o que isso custa. Saída em
+[`SPEC-55-avaliacao-migracao-forge.md`](SPEC-55-avaliacao-migracao-forge.md).
+
+**O achado que muda a conversa:** existe a **Forge LLMs API** (`@forge/llm`,
+Preview liberada pra produção e Marketplace) — Claude Opus 5 / Sonnet 5 / Haiku
+hospedados pela própria Atlassian, com tool use e streaming, sem chave de API e
+sem nada saindo da plataforma. Isso não "integra o Rovo": substitui o
+`packages/llm` inteiro (4.329 linhas), o cofre de credenciais, os presets de
+gateway e o container Ollama que o README ensina a subir. O problema que o
+README resolve em três parágrafos ("se o seu ambiente bloqueia a API do
+Claude — o caso comum em rede corporativa") deixa de existir.
+
+**O que a arquitetura hexagonal comprou.** A SPEC-31 pagou pelas portas por
+outro motivo — matar a divergência entre modo local e hospedado. O retorno
+chega aqui: trocar Postgres por Forge SQL é escrever `*EmForgeSql.ts` ao lado
+de `*EmPostgres.ts` com os mesmos testes de contrato apontando pros dois.
+Engine + aplicação (10.914 linhas) atravessam sem edição, porque não sabem quem
+os implementa. Sem as portas, esta avaliação teria terminado em "reescreve".
+
+**O banco não era o problema.** Era a preocupação declarada no pedido e é o
+item mais barato: sem dado em produção, é recriar 23 tabelas em TiDB (dialeto
+MySQL) com o Drizzle que já usamos. Duas ressalvas reais: Forge SQL **não tem
+chave estrangeira** — e o schema tem 18, várias com `onDelete: cascade`, que
+viram exclusão explícita no adaptador (é ali que nasce item órfão de quebra
+apagada); e a instalação do app vira o tenant, então `organizacoes`, `times`,
+os quatro de RBAC e `credenciais_ia` provavelmente somem. De 23 tabelas para
+~13–15.
+
+**O problema de verdade são 25 segundos.** É o teto de uma invocação disparada
+por usuário. A esteira de agentes é 4 agentes × N itens e o README mede ~3min40
+por item em CPU. Não é adaptação: é a SPEC-24 reescrita para async events (teto
+de 900 s) com progresso consultável e reentrância por item. Orçar como
+reescrita, não como port.
+
+**Duas features não cabem, e vale dizer o nome.** A Forge LLMs é **texto puro**
+— sem visão, sem áudio. O 🎤 Falar (Whisper) e o 🖼 Anexar imagem saem do MVP
+Rovo-only. As saídas existem (Forge Containers em Preview, egress declarado),
+mas todas contradizem o "só Rovo" ou custam o selo *Runs on Atlassian*.
+
+**O E2E é o que eu mais temo perder.** A tela passa a viver num iframe dentro
+de um site Atlassian real — caro e frágil pros 66 casos. O §123 já ensinou o
+preço de deixar essa suíte morrer (quatro defeitos no vão que só um navegador
+enxerga). Plano em duas faixas: os 66 casos contra o bundle standalone com um
+`@forge/bridge` falso — mesma técnica do `gatewayFalso.ts` que já está no
+repositório — e meia dúzia de smoke contra site de desenvolvimento de verdade
+no deploy de staging.
+
+**O buraco que sobrou, e não escondi.** A franquia grátis de LLM do Forge é
+**zero crédito**, e a conta é do desenvolvedor do app, não do cliente. Sem
+medir uma quebra real contra `@forge/llm` não dá pra dizer se o app se sustenta
+de graça. É a pergunta mais importante em aberto e é medível na fase 2 do
+roteiro — junto com a única outra que documentação nenhuma responde: se o React
+Flow se comporta dentro do iframe com a CSP do Forge.
+
+Nada de produção mudou nesta rodada. 66/66 E2E permanecem verdes no `main`.
