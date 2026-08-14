@@ -5833,3 +5833,37 @@ go-to-market.** A SPEC-55 tinha sido escrita sem ela e chegou a conclusões
 tecnicamente corretas com o peso todo errado.
 
 Nada de produção mudou. Só a SPEC-55.
+
+## 217. Deploy e instalação não são a mesma etapa
+
+Pergunta do usuário sobre a SPEC-55: *"tem como instalar por interface?"*
+
+Tem — e a pergunta expôs um erro de estrutura no §2.9, não uma lacuna de
+pesquisa. Eu tinha listado "instalar pelo CLI" e "link de instalação" como dois
+**caminhos alternativos**, quando são duas **etapas diferentes**:
+
+- **Publicar é sempre CLI.** Não existe upload de app por tela; o código só
+  chega na plataforma via `forge deploy`, rodado por alguém ou pela CI.
+- **Instalar pode ser inteiramente por interface.** Developer Console →
+  Distribution → Edit → Sharing gera um link; o admin do site abre no navegador,
+  vê as permissões pedidas, escolhe site e produto num dropdown, confirma.
+  Atualizações depois saem pela página Connected apps. Quem instala nunca toca
+  no CLI.
+
+O desenho que isso recomenda: **CI faz o deploy, admin instala pelo navegador.**
+Ninguém no time precisa do CLI além de quem mexe no pipeline. O texto anterior
+sugeria o oposto — que rodar CLI contra cada site fosse "o nosso caminho".
+
+**Achado de brinde, que amenizou um risco que eu tinha exagerado:** existe
+*rolling releases*, que separa o deploy do código da aprovação de escopo. O que
+for compatível sobe enquanto o admin ainda não aprovou as permissões novas.
+O major version upgrade que o módulo `llm` dispara continua exigindo aprovação,
+mas não trava o release inteiro esperando um clique — que foi como eu descrevi
+no §216. Corrigido no lugar em vez de virar nota de rodapé.
+
+Régua: quando uma pergunta simples do usuário não tem resposta óbvia no
+documento, desconfie da **organização** do documento antes de sair pesquisar
+mais. Aqui os dois fatos já estavam na SPEC — arrumados de um jeito que
+respondia a pergunta errada.
+
+Nada de produção mudou. Só a SPEC-55.
