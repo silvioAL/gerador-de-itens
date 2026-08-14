@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import type { Quebra } from "@gerador/engine";
-import { useTour } from "./useTour";
+import { useTour, passosDeConfiguracao, passosDoProduto } from "./useTour";
 import type { Cenario } from "./scenarios";
 
 const cenarioMongo: Cenario = {
@@ -94,6 +94,37 @@ describe("useTour", () => {
 
     expect(opts.derivarQuebra).toHaveBeenCalled();
     expect(result.current.passoAtual?.selector).toBe("[data-tour=review-table]");
+  });
+
+  it("§236 — o tour de CONFIGURAÇÃO percorre as quatro telas que faltavam", () => {
+    // As quatro que a medição do §234 apontou e que não cabiam no tour do
+    // produto sem diluí-lo.
+    const opts = montarOpts();
+    const { result } = renderHook(() => useTour(opts, passosDeConfiguracao));
+
+    act(() => result.current.iniciar());
+    for (const [titulo, aba] of [
+      ["Modelo de IA", "modeloIa"],
+      ["Esteira de agentes", "pipeline"],
+      ["Regras de refinamento", "regras"],
+      ["Campos por tipo de conexão", "camposAresta"],
+    ] as const) {
+      andarAte(result, titulo);
+      expect(opts.abrirConfigNaAba).toHaveBeenCalledWith(aba);
+    }
+  });
+
+  it("§236 — os dois tours são LISTAS diferentes, não o mesmo com filtro", () => {
+    // Se um passo do produto vazasse para o tour de configuração, quem só quer
+    // configurar levaria a derivação inteira junto.
+    const opts = montarOpts();
+    const produto = passosDoProduto(opts).map((p) => p.titulo);
+    const config = passosDeConfiguracao(opts).map((p) => p.titulo);
+
+    expect(produto).toContain("Derivar");
+    expect(config).not.toContain("Derivar");
+    expect(config).toContain("Modelo de IA");
+    expect(produto).not.toContain("Modelo de IA");
   });
 
   it("§235 — os três passos de espinha estão no tour, na ordem de uso", () => {

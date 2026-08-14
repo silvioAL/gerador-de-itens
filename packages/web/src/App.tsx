@@ -56,7 +56,7 @@ import { JourneyModal, type AbaJornada } from "./demo/JourneyModal";
 import { contextoDoProdutoEmTexto } from "@gerador/aplicacao";
 import { ConfigScreen, type AbaConfig } from "./config/ConfigScreen";
 import { TourOverlay } from "./demo/TourOverlay";
-import { useTour } from "./demo/useTour";
+import { useTour, passosDeConfiguracao } from "./demo/useTour";
 import { useAutoDemo } from "./demo/useAutoDemo";
 import { CursorFantasma } from "./demo/CursorFantasma";
 import { CONVERSA_DO_TOUR } from "./demo/dadosDoTour";
@@ -660,6 +660,9 @@ function AppCarregado({
   };
 
   const tour = useTour(opcoesTour);
+  /** §236 — o segundo tour: o que se molda pro time. Separado para o primeiro
+   * continuar respondendo "isto serve pra quê?" em vez de virar 25 passos. */
+  const tourDeConfiguracao = useTour(opcoesTour, passosDeConfiguracao);
   // Demonstração automática (aditiva ao tour clicável) — mesma lista de passos,
   // mesmos onEnter, só avança sozinha em vez de esperar clique (SPEC-17 Fase I).
   const demoAutomatica = useAutoDemo(opcoesTour);
@@ -667,6 +670,11 @@ function AppCarregado({
   function iniciarTour() {
     fecharJornada();
     tour.iniciar();
+  }
+
+  function iniciarTourDeConfiguracao() {
+    fecharJornada();
+    tourDeConfiguracao.iniciar();
   }
 
   function iniciarDemoAutomatica() {
@@ -1065,6 +1073,7 @@ function AppCarregado({
           onCarregarCenario={(q) => aoAbrir(q)}
           onAdicionarCenario={adicionarCenario}
           onIniciarTour={iniciarTour}
+          onIniciarTourDeConfiguracao={iniciarTourDeConfiguracao}
           onIniciarDemoAutomatica={iniciarDemoAutomatica}
           abaForcada={abaJornadaAlvo}
         />
@@ -1292,6 +1301,17 @@ function AppCarregado({
           ultimo={tour.ultimo}
           onProximo={tour.proximo}
           onPular={tour.pular}
+        />
+      )}
+
+      {tourDeConfiguracao.ativo && tourDeConfiguracao.passoAtual && (
+        <TourOverlay
+          passo={tourDeConfiguracao.passoAtual}
+          indice={tourDeConfiguracao.indice}
+          total={tourDeConfiguracao.total}
+          ultimo={tourDeConfiguracao.ultimo}
+          onProximo={tourDeConfiguracao.proximo}
+          onPular={tourDeConfiguracao.pular}
         />
       )}
 

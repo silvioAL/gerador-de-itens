@@ -38,11 +38,17 @@ export interface UseTourOpts {
   fecharConfig: () => void;
 }
 
-export function useTour(opts: UseTourOpts) {
-  const [passoIndice, setPassoIndice] = useState<number | null>(null);
+/**
+ * §236 — os passos do PRODUTO: o que a ferramenta faz, do desenho ao item.
+ *
+ * Separado dos passos de CONFIGURAÇÃO para o primeiro tour continuar
+ * respondendo "isto serve pra quê?" em vez de virar 25 passos onde metade é
+ * tela de administração. Quem está avaliando a ferramenta quer o primeiro;
+ * quem já decidiu usar quer o segundo.
+ */
+export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
   const cenarioTour = opts.cenarios.find((c) => c.id === "mongo");
-
-  const passos: PassoTour[] = [
+  return [
     {
       selector: null,
       titulo: "Bem-vindo",
@@ -193,7 +199,8 @@ export function useTour(opts: UseTourOpts) {
     {
       selector: null,
       titulo: "Fim do tour",
-      texto: "Dá pra rever isto em ▶ Demonstração & tour, ou carregar outro desenho em ✦ Cenários prontos — os dois botões ficam sempre no topo.",
+      texto:
+        "Dá pra rever isto em ▶ Demonstração & tour — e lá também fica o ▶ Tour de configuração, que percorre o que se molda pro seu time: modelo de IA, esteira de agentes, regras de refinamento e campos de conexão.",
       onEnter: () => {
         // Desligar é obrigatório: dado de demonstração que sobrevive ao tour
         // vira configuração fantasma na tela de quem for usar de verdade.
@@ -202,6 +209,66 @@ export function useTour(opts: UseTourOpts) {
       },
     },
   ];
+}
+
+/**
+ * §236 — os passos de CONFIGURAÇÃO: o que se molda para o time.
+ *
+ * Quatro telas que o tour do produto não alcançava (medido no §234) e que não
+ * cabiam nele sem diluí-lo. Todas leem config que já vem preenchida no
+ * projeto, então nenhuma precisa de dado de demonstração — diferente das três
+ * do §235.
+ */
+export function passosDeConfiguracao(opts: UseTourOpts): PassoTour[] {
+  return [
+    {
+      selector: null,
+      titulo: "Moldar pro seu time",
+      texto:
+        "O outro tour mostra o que a ferramenta FAZ. Este mostra o que ela aprende do seu time: de onde vem a IA, quem escreve cada parte do item, quais perguntas cada tecnologia obriga e o que uma conexão precisa declarar. Nada aqui é obrigatório para usar — é o que faz o resultado parecer escrito por vocês.",
+      onEnter: () => opts.fecharRevisao(),
+    },
+    {
+      selector: "[data-tour=config-screen-content]",
+      titulo: "Modelo de IA",
+      texto:
+        "A ferramenta não embute modelo: ela fala com um endereço compatível com a API da OpenAI — o Claude, um gateway corporativo, ou um container rodando ao lado sem nada sair da sua rede. Aqui se configura qual, e o \"testar conexão\" responde o que o gateway disse, em vez de um erro genérico de rede.",
+      onEnter: () => opts.abrirConfigNaAba("modeloIa"),
+    },
+    {
+      selector: "[data-tour=config-screen-content]",
+      titulo: "Esteira de agentes",
+      texto:
+        "Quem escreve o quê. Cada papel — PO, Arquiteto, Especialista técnico, QA — preenche uma parte do item, na ordem definida aqui. Tudo o que eles escrevem entra como SUGESTÃO e espera confirmação: é a mesma régua do propósito e da proveniência, aplicada ao texto.",
+      onEnter: () => opts.abrirConfigNaAba("pipeline"),
+    },
+    {
+      selector: "[data-tour=config-screen-content]",
+      titulo: "Regras de refinamento",
+      texto:
+        "O que cada tecnologia OBRIGA a decidir: uma fila pede DLQ, retry e idempotência; uma coleção pede índices e write concern. É daqui que sai o checklist técnico de cada item — e é o que transforma \"criar uma fila\" numa lista de decisões que alguém precisa tomar antes de codar.",
+      onEnter: () => opts.abrirConfigNaAba("regras"),
+    },
+    {
+      selector: "[data-tour=config-screen-content]",
+      titulo: "Campos por tipo de conexão",
+      texto:
+        "A conexão também carrega decisão, não é só uma seta: uma chamada síncrona precisa de timeout e retry; um evento precisa de contrato e de garantia de entrega. Campos declarados aqui aparecem no painel da aresta e viram item, do mesmo jeito que os do componente.",
+      onEnter: () => opts.abrirConfigNaAba("camposAresta"),
+    },
+    {
+      selector: null,
+      titulo: "Fim",
+      texto:
+        "Isto é o que se molda. O outro tour — ▶ Iniciar tour guiado — mostra o caminho completo de uma demanda, do desenho ao item escrito.",
+      onEnter: () => opts.fecharConfig(),
+    },
+  ];
+}
+
+export function useTour(opts: UseTourOpts, montarPassos: (o: UseTourOpts) => PassoTour[] = passosDoProduto) {
+  const [passoIndice, setPassoIndice] = useState<number | null>(null);
+  const passos = montarPassos(opts);
 
   function iniciar() {
     setPassoIndice(0);

@@ -6839,3 +6839,50 @@ doença do §233, e agora com 20 passos ele estava errado de qualquer jeito.
 Falta o **tour de configuração** (Modelo de IA, Pipeline de IA, Regras de
 refinamento, Campos por conexão) — a segunda metade da proposta, para o primeiro
 tour continuar sendo "o que a ferramenta faz" em vez de virar 25 passos.
+
+## 236. O segundo tour — e o comando morto que ele desenterrou
+
+Fechando a proposta do §234: o tour do produto ficou com os três passos de
+espinha (§235), e as quatro telas de configuração que sobravam viraram um
+**tour próprio**, no mesmo modal.
+
+**Por que separar em vez de somar.** O primeiro tour responde *"isto serve pra
+quê?"* — é o que decide se alguém adota a ferramenta. O segundo responde *"como
+eu molde pro meu time"* — só interessa a quem já decidiu. Somados dariam 25
+passos, e a parte que convence ficaria no meio de tela de administração.
+
+Tecnicamente foi barato: a lista de passos virou parâmetro
+(`useTour(opts, passosDeConfiguracao)`), e `passosDoProduto`/`passosDeConfiguracao`
+são duas funções exportadas. Tem teste cobrando que são listas **diferentes** e
+não a mesma com filtro — se um passo do produto vazasse para o outro, quem só
+quer configurar levaria a derivação inteira junto.
+
+**E aí o E2E desenterrou um defeito de produto que não tem nada a ver com tour.**
+Ao passar pela aba *Modelo de IA* sem credencial — o estado exato de quem acabou
+de instalar, que é exatamente quem faz o tour — a tela dizia:
+
+> *O modelo de embedding não está instalado — a IA só fica pronta com ele. Rode
+> `gerador ia instalar`.*
+
+A CLI foi removida na SPEC-33. O comando não existe há dezenas de rodadas, e a
+condição que mostra a mensagem (`!embeddingInstalado` e nenhum modelo remoto
+selecionado) é **sempre verdadeira no modo hospedado sem credencial** — ou seja,
+é o que TODO usuário novo lê. Havia outra igual na revisão, e um terceiro texto
+mandando rodar `gerador ia instalar --modelo X` por modelo.
+
+Trocadas por instruções que dizem o que fazer **ali**: configurar o gateway.
+E ficou guarda no E2E — `getByText(/gerador ia instalar/)` com `toHaveCount(0)`
+na tela por onde o tour passa. Mordida: repondo a frase morta, o teste cai.
+
+**O que isso diz sobre demonstração como instrumento.** Este é o segundo defeito
+de produto que o tour encontra em duas rodadas (§234 foi a tela de itens vazia).
+Faz sentido: o tour é o único teste que percorre o produto INTEIRO na ordem em
+que uma pessoa nova o encontra — e é justamente aí que resíduo de feature
+removida aparece. Construir a demonstração está saindo mais barato em defeito
+encontrado do que em esforço.
+
+515 web · 71/71 E2E · lint e build limpos.
+
+**Cobertura, agora medida:** dos 12 itens do menu, os dois tours cobrem 11. Fica
+de fora só "Campos por componente vs. por conexão" como par — o de componente
+está no tour do produto e o de conexão no de configuração, de propósito.

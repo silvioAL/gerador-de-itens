@@ -16,6 +16,9 @@ export interface JourneyModalProps {
   onCarregarCenario: (quebra: Quebra) => void;
   onAdicionarCenario: (quebra: Quebra) => void;
   onIniciarTour: () => void;
+  /** §236 — o segundo tour: o que se molda pro time (IA, esteira, regras,
+   * campos de conexão). Separado do primeiro para ele não virar 25 passos. */
+  onIniciarTourDeConfiguracao: () => void;
   /** Demo autoplay (SPEC-17 Fase I) — aditiva ao tour clicável, mesma lista de passos. */
   onIniciarDemoAutomatica: () => void;
   /** Troca a aba ativa de fora (usado pelo tour guiado pra abrir/navegar entre abas sem fechar e reabrir a modal). */
@@ -29,6 +32,7 @@ export function JourneyModal({
   onCarregarCenario,
   onAdicionarCenario,
   onIniciarTour,
+  onIniciarTourDeConfiguracao,
   onIniciarDemoAutomatica,
   abaForcada,
 }: JourneyModalProps) {
@@ -90,6 +94,9 @@ export function JourneyModal({
           <div style={{ flex: 1 }} />
           <button onClick={onIniciarDemoAutomatica} style={botaoDemoAutomaticaEstilo}>
             ▶ Demonstração automática
+          </button>
+          <button onClick={onIniciarTourDeConfiguracao} style={botaoDemoAutomaticaEstilo} data-testid="tour-configuracao">
+            ▶ Tour de configuração
           </button>
           <button onClick={onIniciarTour} style={botaoTourEstilo}>
             ▶ Iniciar tour guiado
