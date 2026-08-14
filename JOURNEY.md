@@ -6703,3 +6703,41 @@ como este produto se comporta:
    vez, dispensava um e travava esperando o terceiro.
 
 70/70 E2E, build e lint limpos.
+
+## 233. O propósito entra no tour — e o tour cobrou o preço de dois atalhos
+
+Pedido do usuário: *"seria interessante colocar isso na demonstração/tour
+guiado"*. Passo novo entre "Prontidão" e "Proveniência", porque propósito é
+**outra dimensão da mesma barra**, não uma tela à parte — e o tour narra isso.
+
+O cenário do tour (`config/cenarios/mongo.json`) ganhou três necessidades:
+duas cobertas e **uma em lacuna**. Escolhi mostrar o buraco de propósito porque
+é o que a feature tem de mais instrutivo — e porque deixa o texto do passo dizer
+a coisa que mais importa: *a lacuna avisa, não bloqueia derivar*. Cenário
+impecável demais não ensina nada.
+
+O passo abre a janela flutuante, e o passo seguinte **a fecha** — senão ela cobre
+o painel de propriedades que a Proveniência mostra. Isso virou asserção, no
+unitário e no E2E: é a terceira aparição da armadilha "overlay flutuante × o que
+está embaixo" (§221 com o menu, §232 com o botão de derivar).
+
+**Dois atalhos meus foram cobrados, e os dois estavam previstos por escrito.**
+
+1. **Dois testes do tour andavam por CONTAGEM de passos** e quebraram quando o
+   passo novo entrou no meio. O próprio arquivo tem um helper `andarAte(titulo)`
+   com o comentário: *"passo novo no meio do tour (e eles entram a cada rodada)
+   invalidava um índice fixo"*. A lição estava escrita, dois testes não a
+   seguiam, e eles quebraram exatamente como previsto. Convertidos.
+
+2. **O teste da fatia D passava isolado e falhava na corrida completa.** A
+   credencial do gateway é **uma por organização**, e specs em workers
+   diferentes a reescrevem — o `ia-hospedada.spec` já documenta esse flake com
+   "três ocorrências". Eu tinha posto o teste noutro arquivo e virei a quarta.
+   Movido para junto dos outros que dependem de credencial, com a nota do
+   porquê. A régua: **estado global de teste define em que ARQUIVO o teste
+   mora**, não o assunto dele.
+
+O que fica: quando um comentário de teste descreve uma armadilha, ele é um aviso
+para o próximo — e o próximo fui eu, duas vezes na mesma rodada.
+
+507 web · 70/70 E2E · lint e build limpos.

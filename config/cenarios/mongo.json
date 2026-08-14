@@ -2,7 +2,10 @@
   "id": "mongo",
   "titulo": "Dados não-relacionais",
   "descricao": "Coleção Mongo nova: índices, write concern e TTL.",
-  "tipos": ["service", "mongo"],
+  "tipos": [
+    "service",
+    "mongo"
+  ],
   "categoria": "demo",
   "designPatterns": [],
   "quebra": {
@@ -10,41 +13,108 @@
     "diagrama": {
       "nodes": [
         {
-          "id": "n1", "type": "service", "status": "novo", "label": "srv-catalogo",
-          "x": 100, "y": 120,
+          "id": "n1",
+          "type": "service",
+          "status": "novo",
+          "label": "srv-catalogo",
+          "x": 100,
+          "y": 120,
           "spec": {
-            "nome": { "valor": "srv-catalogo", "origem": "manual" },
-            "linguagem": { "valor": "Node", "origem": "manual" },
+            "nome": {
+              "valor": "srv-catalogo",
+              "origem": "manual"
+            },
+            "linguagem": {
+              "valor": "Node",
+              "origem": "manual"
+            },
             "endpoints": {
-              "valor": [{ "method": "GET", "path": "/v1/produtos", "action": "novo" }],
+              "valor": [
+                {
+                  "method": "GET",
+                  "path": "/v1/produtos",
+                  "action": "novo"
+                }
+              ],
               "origem": "manual"
             }
           },
           "specNA": {
-            "framework": { "motivo": "POC inicial, framework ainda não definido" }
+            "framework": {
+              "motivo": "POC inicial, framework ainda não definido"
+            }
           }
         },
         {
-          "id": "n2", "type": "mongo", "status": "novo", "label": "produtos",
-          "x": 420, "y": 120,
+          "id": "n2",
+          "type": "mongo",
+          "status": "novo",
+          "label": "produtos",
+          "x": 420,
+          "y": 120,
           "spec": {
-            "collection": { "valor": "produtos", "origem": "manual" },
-            "indices": { "valor": "codigo (unique), categoria", "origem": "manual" },
-            "writeConcern": { "valor": "majority", "origem": "manual" },
+            "collection": {
+              "valor": "produtos",
+              "origem": "manual"
+            },
+            "indices": {
+              "valor": "codigo (unique), categoria",
+              "origem": "manual"
+            },
+            "writeConcern": {
+              "valor": "majority",
+              "origem": "manual"
+            },
             "schemaDocumento": {
               "valor": "{ codigo: string, nome: string, categoria: string, precoCentavos: number, ativo: boolean, atualizadoEm: ISODate }",
               "origem": "manual"
             }
           },
           "specNA": {
-            "chaveDeSharding": { "motivo": "volume atual não justifica sharding" },
-            "ttlDias": { "motivo": "dado de catálogo não expira" }
+            "chaveDeSharding": {
+              "motivo": "volume atual não justifica sharding"
+            },
+            "ttlDias": {
+              "motivo": "dado de catálogo não expira"
+            }
           }
         }
       ],
       "edges": [
-        { "id": "e1", "source": "n1", "target": "n2", "type": "writes" }
+        {
+          "id": "e1",
+          "source": "n1",
+          "target": "n2",
+          "type": "writes"
+        }
       ]
-    }
+    },
+    "necessidades": [
+      {
+        "id": "nec-catalogo-leitura",
+        "texto": "a vitrine carrega o catálogo sem consultar o serviço de origem",
+        "prioridade": "alta",
+        "origem": "manual",
+        "atendidaPor": [
+          "n2"
+        ]
+      },
+      {
+        "id": "nec-catalogo-api",
+        "texto": "o catálogo é consultável por API versionada",
+        "prioridade": "media",
+        "origem": "manual",
+        "atendidaPor": [
+          "n1"
+        ]
+      },
+      {
+        "id": "nec-catalogo-expurgo",
+        "texto": "produto fora de linha some do catálogo em até 24h",
+        "prioridade": "media",
+        "origem": "manual",
+        "atendidaPor": []
+      }
+    ]
   }
 }

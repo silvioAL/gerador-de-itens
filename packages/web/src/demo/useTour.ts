@@ -25,6 +25,11 @@ export interface UseTourOpts {
   abrirItens: () => void;
   /** Volta ao canvas: os passos de configuração vêm depois dela. */
   fecharItens: () => void;
+  /** SPEC-57 fatia A — abre o painel onde o PROPÓSITO da demanda vive
+   * (📎 Contexto do épico). `null` fecha: os passos seguintes usam o painel de
+   * propriedades, e a janela flutuante ficaria por cima dele. */
+  abrirProposito: () => void;
+  fecharAssistente: () => void;
   fecharJornada: () => void;
   fecharConfig: () => void;
 }
@@ -58,11 +63,24 @@ export function useTour(opts: UseTourOpts) {
         "Esse resumo conta quantos nós estão vermelho, amarelo ou verde. Vermelho bloqueia a derivação — aqui os dois já estão verdes.",
     },
     {
+      // SPEC-57 fatia A — o elo da frente da cadeia. Vem logo depois da
+      // prontidão porque é a MESMA barra: propósito é outra dimensão da
+      // mesma medida, não uma tela à parte.
+      selector: "[data-testid=proposito-resumo]",
+      titulo: "Para que serve cada componente",
+      texto:
+        "Além de \"o que falta preencher\", a mesa mede \"para que isto existe\". Cada necessidade da demanda é ligada ao componente que responde por ela — e o que fica sem ninguém aparece aqui como lacuna, antes de virar item. Neste desenho, duas estão cobertas e uma não: repare que a lacuna AVISA, não bloqueia derivar.",
+      onEnter: () => opts.abrirProposito(),
+    },
+    {
       selector: "[data-tour=properties-panel]",
       titulo: "Proveniência",
       texto:
-        "Ao selecionar um nó, o painel mostra os campos do tipo — e a proveniência de cada valor: manual, extraído, inferido ou sugerido.",
-      onEnter: () => opts.selecionarNo("n2"),
+        "Ao selecionar um nó, o painel mostra os campos do tipo — e a proveniência de cada valor: manual, extraído, inferido ou sugerido. É a mesma régua do propósito: o que o agente sugere não conta até alguém confirmar.",
+      onEnter: () => {
+        opts.fecharAssistente();
+        opts.selecionarNo("n2");
+      },
     },
     {
       selector: "[data-tour=derivar-button]",
@@ -87,7 +105,7 @@ export function useTour(opts: UseTourOpts) {
       selector: "[data-testid=abrir-conversa-especificacao]",
       titulo: "Especificação de solução",
       texto:
-        "O documento final sai pelo AGENTE: com tudo refinado ele oferece sozinho (balão), e a qualquer momento o balão \"gerar especificação\" baixa o markdown — mesmo parcial. O botão de header morreu; a conversa é o caminho.",
+        "O documento final sai pelo AGENTE: com tudo refinado ele oferece sozinho (balão), e a qualquer momento o balão \"gerar especificação\" baixa o markdown — mesmo parcial. Cada item do documento cita a necessidade que atende: é assim que o propósito declarado lá no começo chega até quem vai implementar.",
     },
     {
       selector: "[data-testid=corpo-dos-itens]",

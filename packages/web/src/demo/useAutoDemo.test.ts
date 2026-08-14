@@ -31,6 +31,8 @@ function montarOpts() {
     fecharConfig: vi.fn(),
     abrirItens: vi.fn(),
     fecharItens: vi.fn(),
+    abrirProposito: vi.fn(),
+    fecharAssistente: vi.fn(),
   };
 }
 
