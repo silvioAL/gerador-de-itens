@@ -8,6 +8,11 @@ const TIME = "time-pagamentos";
 /**
  * SPEC-51 (§203) — o caminho NEGADO, com o RBAC ligado de verdade.
  *
+ * §221 trocou o mecanismo: onde havia cadeado clicável no menu, agora há
+ * AUSÊNCIA. A tela de "sem permissão" e o pedido de ajuste continuam existindo
+ * e continuam cobertos aqui — o caminho até eles é o link direto, já que as
+ * áreas são deep-linkáveis (`rota.ts`).
+ *
  * Este spec liga o controle de acesso da ORGANIZAÇÃO (criar um papel é o que
  * liga), então roda no projeto `rbac`, que depende do `app`: sozinho, depois
  * de todos os outros. Sem isso, qualquer spec vizinho que assume o modo
@@ -28,7 +33,7 @@ const TIME = "time-pagamentos";
  */
 test.describe.configure({ mode: "serial" });
 
-test("com RBAC ligado: cadeado no menu, área negada explicada e pedido de ajuste nascendo dali", async ({ page }) => {
+test("com RBAC ligado: área negada some do menu, e o pedido de ajuste vive no link direto", async ({ page }) => {
   test.setTimeout(90000);
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   await page.route(
@@ -56,28 +61,31 @@ test("com RBAC ligado: cadeado no menu, área negada explicada e pedido de ajust
     await page.context().clearCookies();
     await entrar(page, TIME, EMAIL_BLOQUEADO);
 
+    // §221 — o menu OCULTA o que ela não edita, em vez de mostrar com cadeado.
     await page.getByRole("button", { name: "☰ Menu" }).click();
-    const permitido = page.getByRole("button", { name: /Padrões por componente/ });
-    const bloqueado = page.getByRole("button", { name: /Modelo de IA/ });
+    await expect(page.getByRole("button", { name: /Padrões por componente/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Modelo de IA/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Acessos" })).toHaveCount(0);
+    await expect(page.getByText("🔒")).toHaveCount(0);
+    // Fechar de verdade: navegar por hash não remonta o app, e o menu aberto
+    // fica na frente interceptando os cliques da tela de destino.
+    await page.getByRole("button", { name: "Fechar menu" }).click();
+    await expect(page.getByTestId("menu-lateral")).toHaveCount(0);
 
-    await expect(bloqueado).toHaveAttribute("data-bloqueada", "sim");
-    await expect(bloqueado).toContainText("🔒");
-    await expect(permitido).not.toHaveAttribute("data-bloqueada", "sim");
-
-    // Clicar no bloqueado NÃO cai noutra tela: diz que é permissão.
-    await bloqueado.click();
+    // Sumir do menu NÃO abre a porta: quem chega por link (as áreas são
+    // deep-linkáveis, `rota.ts`) continua barrado, e é ali que o pedido vive
+    // agora que o cadeado clicável saiu.
+    await page.goto("/#/config/modelo-ia");
     await expect(page.getByTestId("area-sem-permissao")).toContainText("não tem permissão");
 
     // Área de acesso não se pede — manda falar com um owner.
-    await page.getByRole("button", { name: "☰ Menu" }).click();
-    await page.getByRole("button", { name: "Acessos" }).click();
+    await page.goto("/#/config/acessos");
     await expect(page.getByTestId("area-sem-permissao")).toContainText("owner do time");
     await expect(page.getByTestId("pedir-ajuste")).toHaveCount(0);
 
     // Área solicitável: o pedido nasce ali e vira solicitação de verdade.
     const pedido = `pipeline sem o papel de QA — e2e ${Date.now()}`;
-    await page.getByRole("button", { name: "☰ Menu" }).click();
-    await page.getByRole("button", { name: /Pipeline de IA/ }).click();
+    await page.goto("/#/config/pipeline");
     await page.getByLabel("O que precisa mudar").fill(pedido);
     await page.getByTestId("pedir-ajuste").click();
     await expect(page.getByTestId("pedido-enviado")).toBeVisible();
@@ -204,7 +212,7 @@ test("criar papel, marcar permissão e colocar alguém dentro — tudo pela tela
  * o recurso CURADO por outro papel fica trancado até para o owner, e o não
  * curado abre.
  */
-test("owner com RBAC ligado: cadeado só onde há curadoria de outro papel", async ({ page }) => {
+test("owner com RBAC ligado: só some do menu onde há curadoria de outro papel", async ({ page }) => {
   test.setTimeout(90000);
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   await page.route(
@@ -231,19 +239,20 @@ test("owner com RBAC ligado: cadeado só onde há curadoria de outro papel", asy
     await page.getByRole("button", { name: "☰ Menu" }).click();
 
     // Sem curadoria: o owner edita — é o `exigirPermissao` da SPEC-38, e era
-    // isto que aparecia trancado.
+    // isto que aparecia trancado antes do §220.
     for (const area of [/Padrões por componente/, /Campos por tipo de conexão/, /Especificação de solução/, /Pipeline de IA/]) {
-      await expect(page.getByRole("button", { name: area }), `${area} sem cadeado`).not.toHaveAttribute(
-        "data-bloqueada",
-        "sim"
-      );
+      await expect(page.getByRole("button", { name: area }), `${area} visível`).toBeVisible();
     }
 
-    // Com curadoria de outro papel: trancado INCLUSIVE para o owner — é o
-    // `exigirEdicaoCurada`, a exceção deliberada ao bypass.
-    const curado = page.getByRole("button", { name: /Stacks conhecidas/ });
-    await expect(curado).toHaveAttribute("data-bloqueada", "sim");
-    await expect(curado).toContainText("🔒");
+    // Com curadoria de outro papel: negado INCLUSIVE para o owner — é o
+    // `exigirEdicaoCurada`, a exceção deliberada ao bypass. Desde o §221 isso
+    // se manifesta como AUSÊNCIA no menu, não como cadeado.
+    await expect(page.getByRole("button", { name: /Stacks conhecidas/ })).toHaveCount(0);
+    await expect(page.getByText("🔒")).toHaveCount(0);
+
+    // E o servidor continua sendo quem nega de fato — a ocultação é conveniência.
+    await page.goto("/#/config/perfis-stack");
+    await expect(page.getByTestId("area-sem-permissao")).toBeVisible();
   } finally {
     const papeis = (await (await page.request.get(`${API}/acessos/papeis`)).json()) as { id: string }[];
     for (const p of papeis) await page.request.delete(`${API}/acessos/papeis/${p.id}`);

@@ -6019,3 +6019,45 @@ ela, não. Deixei o raciocínio errado visível na entrada, porque apagá-lo
 esconderia como se chega a uma conclusão plausível e falsa: o motivo real
 estava disponível, e eu preferi o que casava com a pesquisa que eu acabara de
 fazer.
+
+## 221. O cadeado sai: o que ela não edita some do menu
+
+Pedido do usuário: *"nesse cenário de não ter permissão não exibir o cadeado e
+sim ocultar o botão do menu"*.
+
+Mudança pequena de código, mas reverte uma decisão de produto da SPEC-51, e
+vale registrar o que ela custava e o que ela comprava.
+
+**O que a SPEC-51 tinha decidido.** O item continuava no menu, com 🔒, clicável
+— e a tela de destino explicava a ausência de permissão e oferecia "pedir
+ajuste". A justificativa era boa: o menu DIZ o que a pessoa pode, em vez de
+levar a uma tela que não é a que ela clicou (o comportamento pré-SPEC-51 caía
+na primeira área permitida). O cadeado era, ao mesmo tempo, sinal e porta.
+
+**O que muda agora.** Menu é a lista do que se ADMINISTRA; listar o que não se
+administra é ruído em toda abertura para ganhar um caminho usado raramente.
+Item sem permissão some.
+
+**O detalhe que quase virou defeito.** O grupo "Produto" tem um item só. Sem
+filtrar no nível do GRUPO, negá-lo deixaria o título de pé apontando para o
+nada. Filtrei antes de decidir se o grupo renderiza, e escrevi o teste do
+cabeçalho órfão junto — é o tipo de coisa que ninguém percebe até ver a captura
+de tela de um usuário.
+
+**O que NÃO morreu junto, e por que verifiquei antes de afirmar.** Ocultar
+remove a descoberta do pedido de ajuste pelo menu. Fui ver se o pedido morria
+com ela: não morre. As áreas são deep-linkáveis por hash (`#/config/pipeline`,
+`rota.ts`), então quem chega por link continua caindo na tela de "sem
+permissão" com o pedido ali; e a condução do PDCA oferece "pedir ajuste" a quem
+não é owner. O E2E foi reescrito para percorrer exatamente esse caminho — ele
+cobria o pedido pelo cadeado, agora cobre pelo link, e a cobertura do pedido
+não caiu por causa de uma mudança de menu.
+
+**Uma armadilha de teste que valeu o tempo.** Navegar por hash NÃO remonta o
+app: o menu aberto ficava na frente e interceptava o clique da tela de destino.
+O Playwright reportou `<button>Exportação (tracker)</button> intercepts pointer
+events` — sintoma que parece defeito do produto e é do teste. Fechar o menu
+explicitamente antes de navegar, e afirmar que ele fechou.
+
+Mordidas nos dois níveis: voltando a listar tudo, o unitário do menu e o E2E
+ficam vermelhos. 7 testes no `MenuLateral`, 67/67 E2E.

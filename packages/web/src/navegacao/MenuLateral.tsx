@@ -14,9 +14,22 @@ export interface MenuLateralProps {
   email: string;
   onTrocarTime: (timeId: string) => void;
   onNavegar: (area: AreaConfig) => void;
-  /** SPEC-51 — o menu passa a DIZER o que a pessoa pode: item que ela não
-   * edita vem com cadeado, em vez de levar a uma tela que não é a que ela
-   * clicou (o comportamento antigo caía na primeira área permitida). */
+  /**
+   * O que a pessoa edita. Área fora disso **não aparece** no menu.
+   *
+   * §221 mudou o mecanismo, não o propósito. A SPEC-51 tinha resolvido isto
+   * com cadeado — o item continuava lá, clicável, e a tela de destino
+   * explicava a ausência de permissão e oferecia "pedir ajuste". Virou
+   * ocultação a pedido do usuário: menu é lista do que se administra, e listar
+   * o que não se administra é ruído em toda abertura para ganhar um caminho
+   * usado raramente.
+   *
+   * O pedido de ajuste **não morreu junto**: as áreas são deep-linkáveis
+   * (`#/config/pipeline`, ver `rota.ts`), então quem chega por link continua
+   * caindo na tela de "sem permissão" com o pedido ali — e a condução do PDCA
+   * oferece "pedir ajuste" a quem não é owner (App.tsx). O que sumiu foi a
+   * DESCOBERTA pelo menu.
+   */
   podeEditarArea?: (area: AreaConfig) => boolean;
   onNovaQuebra: () => void;
   onAbrirQuebras: () => void;
@@ -108,26 +121,23 @@ export function MenuLateral({
         {/* §198 — "cenários" e "demonstração & tour" viraram dois botões
             fixos no header: são portas de EXPERIMENTAR, não de administrar. */}
 
-        {GRUPOS.map((grupo) => (
-          <div key={grupo.titulo}>
-            <p style={tituloGrupoEstilo}>{grupo.titulo}</p>
-            {grupo.itens.map((item) => {
-              const bloqueada = podeEditarArea ? !podeEditarArea(item.area) : false;
-              return (
-                <button
-                  key={item.area}
-                  onClick={acao(() => onNavegar(item.area))}
-                  style={itemEstilo}
-                  title={bloqueada ? "Você não edita esta área — dá pra pedir um ajuste por lá" : undefined}
-                  data-bloqueada={bloqueada ? "sim" : undefined}
-                >
+        {GRUPOS.map((grupo) => {
+          // §221 — área que a pessoa não edita SOME do menu, em vez de vir com
+          // cadeado. Filtrar aqui e não dentro do `map` dos itens é o que evita
+          // deixar o TÍTULO do grupo órfão quando ele fica sem nenhum item.
+          const itens = grupo.itens.filter((item) => (podeEditarArea ? podeEditarArea(item.area) : true));
+          if (itens.length === 0) return null;
+          return (
+            <div key={grupo.titulo}>
+              <p style={tituloGrupoEstilo}>{grupo.titulo}</p>
+              {itens.map((item) => (
+                <button key={item.area} onClick={acao(() => onNavegar(item.area))} style={itemEstilo}>
                   {item.rotulo}
-                  {bloqueada && <span style={{ marginLeft: 6, opacity: 0.75 }}>🔒</span>}
                 </button>
-              );
-            })}
-          </div>
-        ))}
+              ))}
+            </div>
+          );
+        })}
 
         <div style={{ flex: 1 }} />
         <div style={rodapeEstilo}>
