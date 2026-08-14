@@ -60,21 +60,40 @@ describe("MenuLateral — time não é stack (SPEC-42/43)", () => {
   });
 });
 
-describe("MenuLateral — o menu diz o que a pessoa pode (SPEC-51)", () => {
-  it("área que ela não edita vem com cadeado, mas continua clicável (é lá que se pede)", () => {
+/**
+ * §221 — o menu passou a OCULTAR o que a pessoa não edita, em vez de mostrar
+ * com cadeado (SPEC-51). O menu é a lista do que se administra; listar o que
+ * não se administra é ruído em toda abertura.
+ */
+describe("MenuLateral — o que ela não edita não aparece (§221)", () => {
+  it("área sem permissão SOME do menu, e nada de cadeado sobra", () => {
     montar({ podeEditarArea: (area) => area !== "modeloIa" });
 
-    const bloqueado = screen.getByRole("button", { name: /Modelo de IA/ });
-    expect(bloqueado.textContent).toContain("🔒");
-    expect(bloqueado.getAttribute("data-bloqueada")).toBe("sim");
-    expect(bloqueado.getAttribute("title")).toContain("pedir um ajuste");
-
-    // O resto continua sem cadeado — o sinal é sobre ausência, não enfeite.
-    expect(screen.getByRole("button", { name: "Membros" }).textContent).not.toContain("🔒");
+    expect(screen.queryByRole("button", { name: /Modelo de IA/ })).not.toBeInTheDocument();
+    // O que ela edita continua ali, sem enfeite nenhum.
+    const permitido = screen.getByRole("button", { name: "Membros" });
+    expect(permitido).toBeInTheDocument();
+    expect(permitido.textContent).not.toContain("🔒");
+    // O cadeado saiu do componente inteiro, não só do item negado.
+    expect(screen.queryByText("🔒")).not.toBeInTheDocument();
+    expect(document.querySelector("[data-bloqueada]")).toBeNull();
   });
 
-  it("sem a função de permissão (modo sem RBAC), nenhum item ganha cadeado", () => {
+  it("grupo que fica sem item nenhum não deixa o TÍTULO órfão", () => {
+    // "Produto" tem um item só: negá-lo esvazia o grupo. Sem o filtro no
+    // nível do grupo, sobraria um cabeçalho apontando para o nada.
+    montar({ podeEditarArea: (area) => area !== "produtos" });
+
+    expect(screen.queryByRole("button", { name: "Contexto do produto" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Produto")).not.toBeInTheDocument();
+    // Grupo vizinho, que perdeu nenhum item, segue inteiro com seu título.
+    expect(screen.getByText("Pessoas & acesso")).toBeInTheDocument();
+  });
+
+  it("sem a função de permissão (modo sem RBAC), o menu inteiro aparece", () => {
     montar();
+    expect(screen.getByRole("button", { name: "Contexto do produto" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Modelo de IA/ })).toBeInTheDocument();
     expect(screen.queryByText("🔒")).not.toBeInTheDocument();
   });
 });
