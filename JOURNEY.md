@@ -6611,3 +6611,56 @@ lugar natural depois que a pessoa já sabe qual buraco está fechando) e a
 necessidade proposta pelo agente — o modelo já aceita `origem: "sugerido"` e o
 painel já sabe confirmá-la; falta só quem proponha. É a fatia D da SPEC-57, e
 ela agora tem onde encostar.
+
+## 231. Fatia D: o agente propõe, o engine mede antes de aceitar
+
+Seguindo o fatiamento da SPEC-57 §7: A entregue no §230, **D agora**. O agente
+propõe o propósito da demanda a partir do contexto que já existe, e a proposta
+chega **medida** — o efeito de aceitar aparece antes do aceite.
+
+**A peça já estava pronta, e foi o que fez a fatia sair barata.** Proposta entra
+como `origem: "sugerido"` e a regra 2 já a ignora em tudo. Então o delta é só
+rodar `analisarLacunas` duas vezes — como está, e como ficaria se tudo o que
+está sugerido virasse real — e mostrar a diferença. Zero mecanismo novo.
+
+**Uma correção do que eu tinha escrito na SPEC-57 §M4.** Lá o exemplo do delta
+mostrava a **confiança piorando** ao aceitar. Aquilo vale para proposta de
+DESENHO, que traz campos não conferidos junto. Aqui confirmar É a leitura, então
+confiança só melhora — e o número que pode piorar é outro, mais útil: **aceitar
+propósito que ninguém atende CRIA lacuna**. "lacunas 0 → 2, aceitar propósito
+sem componente cria trabalho". É esse o trabalho que a pessoa precisa ver antes
+de dizer sim, e é o que impede o "Confirmar todas" de virar botão automático.
+Deixei a nota no código, no lugar onde alguém iria comparar com a spec.
+
+**Duas disciplinas no pedido ao modelo, e as duas viraram teste:** `atendidaPor`
+é enum FECHADO dos componentes desenhados (o agente não pode inventar nó), e o
+campo **some do esquema** quando não há nó nenhum — esquema que pede campo
+impossível é o jeito mais rápido de receber lixo. E o `motivo` é obrigatório:
+proposta sem porquê é caixa-preta, e a pessoa aceita sem ler.
+
+**A regra 2 é aplicada na FRONTEIRA, não confiando no modelo.** O que volta do
+agente é remapeado no cliente para `sugerido`/`confirmado: false`, e os ids de
+vínculo são filtrados contra os nós que existem de verdade. Se o modelo
+devolver um nó inventado, ele não entra.
+
+**Dois defeitos que só o E2E pegou — e o segundo é de produto.**
+
+1. Eu li a resposta com `.text()` direto, sem o `soDepoisDoUltimoReinicio` que
+   TODA rota de IA usa. Streaming SSE, JSON que nunca casava. As unidades
+   passavam porque mockam o cliente; o dublê de gateway responde SSE de verdade,
+   e é exatamente para isso que ele existe.
+2. **O agente lia o contexto SALVO, não o que estava na tela.** A pessoa
+   escrevia o contexto do épico, clicava em "propor", e recebia *"sem contexto
+   da demanda"* — porque `quebra.demandInfo` só muda depois do Salvar. Defeito
+   de produto legítimo, invisível para a unidade, e o painel ainda por cima
+   reportou o erro no lugar certo, o que tornou o diagnóstico imediato.
+
+O segundo me fez melhorar o próprio teste: em vez de `toBeVisible` mudo, ele
+agora faz `expect.poll` sobre o texto do painel — quando falha, o relatório
+mostra a mensagem de erro que a pessoa veria, não um "element not found".
+
+506 web · 217 server · 232 aplicação · **70/70 E2E** · lint e build limpos.
+
+**O que a fatia D deixa em aberto:** o agente propõe necessidade, não vínculo
+para necessidade que já existe — "esta que você escreveu, quem responde por
+ela?" é a pergunta seguinte, e ela usa o mesmo endpoint com outro recorte.

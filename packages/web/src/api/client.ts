@@ -659,6 +659,44 @@ export const apiIa = {
     }
     return interpretarRespostaEstruturada<DiagramaProposto>(acumulado, "o diagrama");
   },
+  /** SPEC-57 fatia D — o agente propõe o PROPÓSITO da demanda a partir do
+   * contexto que já existe. Chega como `sugerido`: a regra 2 cuida do resto —
+   * não fecha lacuna e não é citado no documento até alguém confirmar. */
+  proporNecessidades: async (pedido: PedidoNecessidadesIa): Promise<NecessidadesPropostas> => {
+    const resposta = await fetch(`${BASE_URL}/ia/necessidades`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(pedido),
+    });
+    if (!resposta.ok) {
+      const corpo = await resposta.json().catch(() => ({}));
+      const mensagem =
+        typeof corpo.erro === "string"
+          ? corpo.erro
+          : `Não foi possível propor as necessidades (HTTP ${resposta.status}, sem detalhe do servidor).`;
+      throw new Error(mensagem);
+    }
+    // O servidor faz STREAMING como em toda rota de IA — ler `.text()` direto
+    // perdia o tratamento de reinício (`soDepoisDoUltimoReinicio`), e o
+    // resultado era um JSON que nunca casava. Achado pelo E2E, não pela
+    // unidade: o dublê de gateway responde SSE de verdade, e é isso que a
+    // suíte de navegador existe para exercitar.
+    let acumulado = "";
+    const leitor = resposta.body?.getReader();
+    if (leitor) {
+      const decodificador = new TextDecoder();
+      for (;;) {
+        const { done, value } = await leitor.read();
+        if (done) break;
+        acumulado = soDepoisDoUltimoReinicio(acumulado + decodificador.decode(value, { stream: true }));
+      }
+      acumulado = soDepoisDoUltimoReinicio(acumulado + decodificador.decode());
+    } else {
+      acumulado = await resposta.text();
+    }
+    return interpretarRespostaEstruturada<NecessidadesPropostas>(acumulado, "as necessidades");
+  },
   /** SPEC-27 Fase 2 — a conversa da especificação: propõe alterações nos
    * campos de UM item. Uma chamada por item de propósito (a resposta fica
    * pequena, e o lote grande foi o que truncou e apagou trabalho antes). */
@@ -998,6 +1036,25 @@ export interface PapelAcesso {
  * `auth/niveis.ts` do servidor). */
 export type NivelTime = "visualizar" | "operar" | "owner";
 export const NIVEIS_TIME: NivelTime[] = ["visualizar", "operar", "owner"];
+
+export interface PedidoNecessidadesIa {
+  contextoEpico?: string;
+  contextoDoProduto?: string;
+  componentes?: { id: string; rotulo: string; tipo: string }[];
+  jaDeclaradas?: string[];
+}
+
+export interface NecessidadeProposta {
+  texto: string;
+  prioridade: "alta" | "media" | "baixa";
+  atendidaPor?: string[];
+  /** Por que o agente acha que isto é necessidade — é o que a pessoa lê pra decidir. */
+  motivo: string;
+}
+
+export interface NecessidadesPropostas {
+  necessidades: NecessidadeProposta[];
+}
 
 export interface PermissoesMinhas {
   /** `false` = organização ainda sem papel nenhum: tudo liberado (SPEC-28

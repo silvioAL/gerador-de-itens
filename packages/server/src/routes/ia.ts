@@ -12,6 +12,7 @@ import {
   montarPedidoAlterarItem,
   montarPedidoConfigurarConversa,
   montarPedidoDiagrama,
+  montarPedidoNecessidades,
   montarPedidoPipeline,
   montarPedidoSugerirConfig,
   normalizarPipelineAgentes,
@@ -433,6 +434,15 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
     const pedido = comPedido(() => montarPedidoAlterarItem((req.body ?? {}) as never), reply);
     if (!pedido) return reply;
     return executarPedido(reply, pedido, "ia/alterar-item");
+  });
+
+  /** SPEC-57 fatia D — o agente propõe o PROPÓSITO da demanda. Sem RBAC, pela
+   * mesma razão do `/ia/configurar`: receber proposta é leitura; a escrita
+   * acontece no `PUT /quebras/:id`, que já tem o portão. */
+  app.post("/ia/necessidades", async (req, reply) => {
+    const pedido = comPedido(() => montarPedidoNecessidades((req.body ?? {}) as never), reply);
+    if (!pedido) return reply;
+    return executarPedido(reply, pedido, "ia/necessidades");
   });
 
   app.post("/ia/sugerir-config", async (req, reply) => {

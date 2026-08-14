@@ -139,3 +139,101 @@ describe("NecessidadesPanel — o propósito da demanda (SPEC-57 fatia A)", () =
     expect(restantes.map((n) => n.id)).toEqual(["r2"]);
   });
 });
+
+/**
+ * SPEC-57 fatia D — a proposta MEDIDA antes de aceitar.
+ *
+ * O que estes testes guardam é a honestidade do delta: aceitar propósito que
+ * ninguém atende CRIA lacuna, e esse número tem que estar visível na mesma
+ * tela em que se aceita. Sem isso, "Confirmar todas" vira um botão que a
+ * pessoa aperta sem ler.
+ */
+describe("NecessidadesPanel — a proposta do agente, medida (fatia D)", () => {
+  function montarComProposta(necessidades: Necessidade[], elementos = ELEMENTOS) {
+    const onMudar = vi.fn();
+    const onPropor = vi.fn();
+    render(
+      <NecessidadesPanel
+        necessidades={necessidades}
+        elementos={elementos}
+        onMudar={onMudar}
+        onPropor={onPropor}
+      />
+    );
+    return { onMudar, onPropor };
+  }
+
+  it("sem `onPropor`, o botão não existe — quem não tem IA não vê promessa vazia", () => {
+    montar([]);
+    expect(screen.queryByRole("button", { name: /Propor a partir do contexto/ })).not.toBeInTheDocument();
+  });
+
+  it("o botão chama quem sabe falar com o agente", async () => {
+    const user = userEvent.setup();
+    const { onPropor } = montarComProposta([]);
+
+    await user.click(screen.getByRole("button", { name: "✦ Propor a partir do contexto" }));
+    expect(onPropor).toHaveBeenCalled();
+  });
+
+  it("sem sugestão pendente, não há delta a mostrar", () => {
+    montarComProposta([necessidade({ id: "r1", atendidaPor: ["n1"] })]);
+    expect(screen.queryByTestId("delta-da-proposta")).not.toBeInTheDocument();
+  });
+
+  it("o delta diz quantas lacunas aceitar vai CRIAR", async () => {
+    // Duas sugeridas sem vínculo: hoje não contam (0 lacunas); aceitas, viram
+    // duas lacunas. É esse trabalho que a pessoa precisa ver antes do sim.
+    montarComProposta([
+      necessidade({ id: "r1", origem: "sugerido" }),
+      necessidade({ id: "r2", origem: "sugerido" }),
+    ]);
+
+    const delta = screen.getByTestId("delta-da-proposta");
+    expect(delta).toHaveTextContent("2 sugerida(s), ainda sem efeito");
+    expect(delta).toHaveTextContent("lacunas 0 → 2");
+    expect(delta).toHaveTextContent("aceitar propósito sem componente cria trabalho");
+  });
+
+  it("sugestão que JÁ vem vinculada não cria lacuna — e o delta diz isso", () => {
+    montarComProposta([necessidade({ id: "r1", origem: "sugerido", atendidaPor: ["n1"] })]);
+
+    const delta = screen.getByTestId("delta-da-proposta");
+    expect(delta).toHaveTextContent("lacunas 0 → 0");
+    expect(delta).not.toHaveTextContent("cria trabalho");
+  });
+
+  it("`Confirmar todas` confirma só as pendentes, sem tocar nas que já contam", async () => {
+    const user = userEvent.setup();
+    const { onMudar } = montarComProposta([
+      necessidade({ id: "r1", atendidaPor: ["n1"] }),
+      necessidade({ id: "r2", origem: "sugerido" }),
+    ]);
+
+    await user.click(screen.getByRole("button", { name: "Confirmar todas" }));
+
+    const [atualizadas] = onMudar.mock.calls[0] as [Necessidade[]];
+    expect(atualizadas[0].confirmado).toBeUndefined();
+    expect(atualizadas[1].confirmado).toBe(true);
+  });
+
+  it("erro do agente aparece onde se pediu, não num alerta solto", () => {
+    render(
+      <NecessidadesPanel
+        necessidades={[]}
+        elementos={ELEMENTOS}
+        onMudar={vi.fn()}
+        onPropor={vi.fn()}
+        erroDaProposta="O modelo não devolveu JSON válido."
+      />
+    );
+    expect(screen.getByText("O modelo não devolveu JSON válido.")).toBeInTheDocument();
+  });
+
+  it("enquanto propõe, o botão diz isso e não aceita segundo clique", () => {
+    render(
+      <NecessidadesPanel necessidades={[]} elementos={ELEMENTOS} onMudar={vi.fn()} onPropor={vi.fn()} propondo />
+    );
+    expect(screen.getByRole("button", { name: "✦ propondo…" })).toBeDisabled();
+  });
+});

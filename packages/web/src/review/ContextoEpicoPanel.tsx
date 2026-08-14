@@ -21,6 +21,10 @@ export interface ContextoEpicoPanelProps {
   necessidades?: Necessidade[];
   /** Nós do desenho, para vincular. */
   elementos?: ElementoVinculavel[];
+  /** SPEC-57 fatia D — pede a proposta de propósito ao agente. Injetada de
+   * fora (e não chamada aqui) para o painel continuar testável sem rede, e
+   * para quem não tem IA configurada simplesmente não receber o botão. */
+  onProporNecessidades?: (jaDeclaradas: string[], contextoEpico: string) => Promise<Necessidade[]>;
   onSalvar: (
     demandInfo: string,
     anexosContexto: AnexoContexto[],
@@ -60,6 +64,7 @@ export function ContextoEpicoPanel({
   produtos = [],
   necessidades: necessidadesIniciais,
   elementos = [],
+  onProporNecessidades,
   onSalvar,
   onFechar,
 }: ContextoEpicoPanelProps) {
@@ -68,6 +73,29 @@ export function ContextoEpicoPanel({
   const [produto, setProduto] = useState<string>(produtoId ?? "");
   const [erro, setErro] = useState<string | null>(null);
   const [necessidades, setNecessidades] = useState<Necessidade[]>(necessidadesIniciais ?? []);
+  const [propondo, setPropondo] = useState(false);
+  const [erroDaProposta, setErroDaProposta] = useState<string | null>(null);
+
+  async function proporNecessidades() {
+    setPropondo(true);
+    setErroDaProposta(null);
+    try {
+      // As já declaradas viajam junto: o agente não deve repropor o que a
+      // pessoa já escreveu — repetição faz ela parar de ler a lista.
+      // O contexto que vai é o da TELA, não o salvo: achado do E2E — a pessoa
+      // escrevia o contexto, pedia a proposta e o agente respondia "sem
+      // contexto", porque `quebra.demandInfo` só muda depois do Salvar.
+      const propostas = await onProporNecessidades!(
+        necessidades.map((n) => n.texto),
+        texto
+      );
+      setNecessidades((atuais) => [...atuais, ...propostas]);
+    } catch (e) {
+      setErroDaProposta(e instanceof Error ? e.message : "Não foi possível propor as necessidades.");
+    } finally {
+      setPropondo(false);
+    }
+  }
 
   async function aoSelecionarArquivos(e: React.ChangeEvent<HTMLInputElement>) {
     const arquivos = Array.from(e.target.files ?? []);
@@ -141,7 +169,14 @@ export function ContextoEpicoPanel({
             </p>
           </div>
         )}
-        <NecessidadesPanel necessidades={necessidades} elementos={elementos} onMudar={setNecessidades} />
+        <NecessidadesPanel
+          necessidades={necessidades}
+          elementos={elementos}
+          onMudar={setNecessidades}
+          onPropor={onProporNecessidades ? proporNecessidades : undefined}
+          propondo={propondo}
+          erroDaProposta={erroDaProposta}
+        />
 
           <textarea
             aria-label="Contexto do épico (texto)"
