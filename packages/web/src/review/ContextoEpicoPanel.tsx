@@ -1,4 +1,6 @@
 import { useState } from "react";
+import type { Necessidade } from "@gerador/engine";
+import { NecessidadesPanel, type ElementoVinculavel } from "./NecessidadesPanel";
 
 export interface AnexoContexto {
   nome: string;
@@ -13,7 +15,18 @@ export interface ContextoEpicoPanelProps {
   /** Os produtos que o time enxerga; vazio = ninguém cadastrou ainda, e aí o
    * seletor some em vez de oferecer uma lista vazia. */
   produtos?: { id: string; nome: string }[];
-  onSalvar: (demandInfo: string, anexosContexto: AnexoContexto[], produtoId: string | null) => void;
+  /** SPEC-57 fatia A — o propósito da demanda, editado aqui junto do resto do
+   * contexto: é a mesma pergunta ("do que esta demanda trata"), respondida em
+   * itens em vez de prosa. */
+  necessidades?: Necessidade[];
+  /** Nós do desenho, para vincular. */
+  elementos?: ElementoVinculavel[];
+  onSalvar: (
+    demandInfo: string,
+    anexosContexto: AnexoContexto[],
+    produtoId: string | null,
+    necessidades: Necessidade[]
+  ) => void;
   onFechar: () => void;
 }
 
@@ -45,6 +58,8 @@ export function ContextoEpicoPanel({
   anexosContexto,
   produtoId,
   produtos = [],
+  necessidades: necessidadesIniciais,
+  elementos = [],
   onSalvar,
   onFechar,
 }: ContextoEpicoPanelProps) {
@@ -52,6 +67,7 @@ export function ContextoEpicoPanel({
   const [anexos, setAnexos] = useState<AnexoContexto[]>(anexosContexto ?? []);
   const [produto, setProduto] = useState<string>(produtoId ?? "");
   const [erro, setErro] = useState<string | null>(null);
+  const [necessidades, setNecessidades] = useState<Necessidade[]>(necessidadesIniciais ?? []);
 
   async function aoSelecionarArquivos(e: React.ChangeEvent<HTMLInputElement>) {
     const arquivos = Array.from(e.target.files ?? []);
@@ -73,7 +89,7 @@ export function ContextoEpicoPanel({
   }
 
   function salvar() {
-    onSalvar(texto, anexos, produto || null);
+    onSalvar(texto, anexos, produto || null, necessidades);
     onFechar();
   }
 
@@ -125,6 +141,8 @@ export function ContextoEpicoPanel({
             </p>
           </div>
         )}
+        <NecessidadesPanel necessidades={necessidades} elementos={elementos} onMudar={setNecessidades} />
+
           <textarea
             aria-label="Contexto do épico (texto)"
             value={texto}

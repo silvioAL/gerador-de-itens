@@ -3,6 +3,12 @@ export * from "./config/types.js";
 export { avaliarCondicao } from "./spec/condicoes.js";
 export { camposVisiveis, camposVisiveisAresta, resolverDefault } from "./spec/campos.js";
 export { calcularProntidao } from "./readiness/prontidao.js";
+export {
+  analisarLacunas,
+  necessidadeConta,
+  necessidadesDoElemento,
+  type Lacunas,
+} from "./proposito/lacunas.js";
 export { validateConfig, validateRegras } from "./config/validator.js";
 export { derivar, type ContextoQuebra } from "./derive/derivar.js";
 export {

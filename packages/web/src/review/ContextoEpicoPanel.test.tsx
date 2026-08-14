@@ -30,7 +30,11 @@ describe("ContextoEpicoPanel (Fase 1b, SPEC-23)", () => {
     expect(onSalvar).toHaveBeenCalledWith(
       "Contexto anterior. Mais detalhe.",
       [{ nome: "retro.md", conteudo: "conteúdo anterior" }],
-      null
+      null,
+      // SPEC-57 fatia A — o propósito viaja no mesmo salvar. Vazio aqui: este
+      // teste é sobre o contexto em prosa, e o painel não pode inventar
+      // necessidade nenhuma por conta própria.
+      []
     );
   });
 
@@ -47,7 +51,7 @@ describe("ContextoEpicoPanel (Fase 1b, SPEC-23)", () => {
     expect(await screen.findByText("material.txt")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Salvar" }));
-    expect(onSalvar).toHaveBeenCalledWith("", [{ nome: "material.txt", conteudo: "conteúdo do arquivo" }], null);
+    expect(onSalvar).toHaveBeenCalledWith("", [{ nome: "material.txt", conteudo: "conteúdo do arquivo" }], null, []);
   });
 
   it("remover um anexo já adicionado tira só aquele, preservando os demais", async () => {
@@ -70,7 +74,7 @@ describe("ContextoEpicoPanel (Fase 1b, SPEC-23)", () => {
     expect(screen.getByText("b.md")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Salvar" }));
-    expect(onSalvar).toHaveBeenCalledWith("", [{ nome: "b.md", conteudo: "conteúdo b" }], null);
+    expect(onSalvar).toHaveBeenCalledWith("", [{ nome: "b.md", conteudo: "conteúdo b" }], null, []);
   });
 
   it("Cancelar fecha sem chamar onSalvar", async () => {
@@ -105,7 +109,7 @@ describe("ContextoEpicoPanel — o produto da demanda (SPEC-53)", () => {
     await user.selectOptions(screen.getByLabelText("Produto desta demanda"), "p2");
     await user.click(screen.getByRole("button", { name: "Salvar" }));
 
-    expect(onSalvar).toHaveBeenCalledWith("", [], "p2");
+    expect(onSalvar).toHaveBeenCalledWith("", [], "p2", []);
   });
 
   it("sem produto cadastrado, o seletor NÃO aparece — lista vazia é pior que nada", () => {
@@ -125,6 +129,38 @@ describe("ContextoEpicoPanel — o produto da demanda (SPEC-53)", () => {
 
     await user.selectOptions(screen.getByLabelText("Produto desta demanda"), "");
     await user.click(screen.getByRole("button", { name: "Salvar" }));
-    expect(onSalvar).toHaveBeenCalledWith("", [], null);
+    expect(onSalvar).toHaveBeenCalledWith("", [], null, []);
+  });
+});
+
+/**
+ * SPEC-57 fatia A — o propósito mora aqui, junto do resto do contexto da
+ * demanda. Este teste é a costura: o painel de necessidades aparece dentro
+ * deste, e o que se edita nele sai no mesmo Salvar.
+ */
+describe("ContextoEpicoPanel — o propósito da demanda (SPEC-57)", () => {
+  it("mostra as necessidades já declaradas e devolve as editadas no salvar", async () => {
+    const user = userEvent.setup();
+    const onSalvar = vi.fn();
+    render(
+      <ContextoEpicoPanel
+        necessidades={[{ id: "r1", texto: "não cobrar duas vezes", origem: "manual", atendidaPor: [] }]}
+        elementos={[{ id: "n1", label: "worker" }]}
+        onSalvar={onSalvar}
+        onFechar={() => {}}
+      />
+    );
+
+    expect(screen.getByText("não cobrar duas vezes")).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Nova necessidade"), "confirmar em 2s");
+    await user.click(screen.getByRole("button", { name: "+ Adicionar" }));
+    await user.click(screen.getByRole("button", { name: "Salvar" }));
+
+    const [, , , necessidades] = onSalvar.mock.calls[0];
+    expect(necessidades.map((n: { texto: string }) => n.texto)).toEqual([
+      "não cobrar duas vezes",
+      "confirmar em 2s",
+    ]);
   });
 });

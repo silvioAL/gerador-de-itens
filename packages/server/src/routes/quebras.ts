@@ -39,6 +39,22 @@ const corpoQuebra = z.object({
   especificacao: z.string().nullish(),
   /** SPEC-53 — o vínculo com o produto. */
   produtoId: z.string().uuid().nullish(),
+  /** SPEC-57 fatia A — o propósito da demanda. `optional` e não `nullish`:
+   * quebra sem necessidade nenhuma é lista vazia, não `null` (a ausência já
+   * significa "não declarou", e dois jeitos de dizer nada é como o campo
+   * morre em silêncio na borda). */
+  necessidades: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        texto: z.string().min(1),
+        prioridade: z.enum(["alta", "media", "baixa"]).optional(),
+        origem: z.enum(["manual", "extraido", "inferido", "sugerido"]),
+        confirmado: z.boolean().optional(),
+        atendidaPor: z.array(z.string()),
+      })
+    )
+    .optional(),
 });
 
 /** Mesmo fallback de `.example.json` de `packages/web/vite.config.ts` (servirConfigEmDev)

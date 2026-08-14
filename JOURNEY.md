@@ -6551,3 +6551,63 @@ sem migração, sem "todo mundo fica vermelho". É a mesma liberdade que a SPEC-
 compra desenho melhor.
 
 Nada de produção mudou nesta rodada.
+
+## 230. Fatia A construída: o propósito entra na cadeia
+
+Pedido: *"revise a spec e implemente"*. Construída a fatia A da SPEC-57 —
+propósito declarado, ligado ao desenho, medido no placar e citado no documento.
+As decisões que a §5 deixou em aberto estão respondidas na SPEC-57 §4.1.
+
+**O primeiro problema foi de vocabulário, não de código.** `Requisito` já
+existe neste projeto: é o item do checklist técnico de refinamento. Precisei do
+conceito "o que a demanda precisa resolver" e a palavra estava ocupada. Chamei
+de **`Necessidade`** — dois "requisito" com sentidos diferentes envenenam toda
+conversa depois, e um `Requisito2` seria pior que escolher a palavra certa.
+
+**A decisão que mais gostei: não cascatear.** Apagar o nó que respondia por uma
+necessidade **não** limpa o vínculo — a necessidade volta a ser lacuna e o
+vínculo aparece marcado como quebrado. É a mesma disciplina do
+`ALVO_INEXISTENTE`: o vínculo órfão é exatamente o evento que precisa
+REAPARECER. Um `delete` em cascata seria mais limpo no banco e esconderia o
+buraco que a feature existe para mostrar. Tem teste no engine e E2E no
+navegador, e a mordida (fazer o vínculo morto contar) derruba os dois.
+
+**A regra 2 apareceu em quatro lugares, e em um deles quase escapou.** Nada
+conta até ser confirmado — então necessidade `sugerido` não acusa lacuna, não é
+citada no documento, e **também não dá o nó por atendido**. Esse terceiro caso
+é o não-óbvio: se contasse como cobertura, o agente sugerindo um vínculo
+fecharia o buraco que ele mesmo deveria expor. Está no teste com esse nome.
+
+**Nada vira obrigação retroativa.** Sem necessidade declarada não há lacuna, o
+indicador nem aparece no placar, e o documento gerado é byte a byte o de antes
+(tem teste comparando os dois). Isso importa menos agora que o usuário disse
+que não há base em produção — mas continua sendo o desenho certo: dimensão nova
+que acusa quem nunca a usou é dimensão que se aprende a ignorar.
+
+**Quatro camadas, quatro mordidas, uma surpresa.** Engine (11 testes),
+persistência (contrato + rota), UI (11 + 4), E2E (2). A surpresa foi o
+`VARIAVEIS_ITEM`: o template do item tem lista FECHADA de variáveis, e a
+`{{necessidades}}` nova reprovou no validador até ser registrada. O mecanismo
+funcionou exatamente como o §196 desenhou — falhou alto, num teste, antes de
+alguém escrever um template com variável que o motor não sabe preencher.
+
+**Duas quebras de assinatura que a suíte pegou na hora:** `onSalvar` do
+ContextoEpicoPanel ganhou um quarto argumento, e cinco testes existentes
+cobravam a antiga. Atualizados, não silenciados — e o quarto argumento vazio
+neles é a asserção de que o painel não inventa necessidade nenhuma sozinho.
+
+**Aferido contra a stack rebuildada, não só contra a suíte:** migração aplicada
+no banco de dev, e no navegador com o usuário real — nó no canvas, necessidade
+digitada, `data-lacuna=sim`, vínculo escolhido, `data-lacuna` some, placar vira
+"🎯 propósito coberto". O visual saiu na linguagem que já existe: borda âmbar
+na necessidade em lacuna, chip do componente vinculado, indicador na mesma
+barra do VERMELHO/AMARELO.
+
+226 engine · 217 server · 495 web · **69/69 E2E** (dois novos) · lint e build
+limpos.
+
+**O que deixei de fora, de propósito:** vincular a partir do painel do nó (o
+lugar natural depois que a pessoa já sabe qual buraco está fechando) e a
+necessidade proposta pelo agente — o modelo já aceita `origem: "sugerido"` e o
+painel já sabe confirmá-la; falta só quem proponha. É a fatia D da SPEC-57, e
+ela agora tem onde encostar.

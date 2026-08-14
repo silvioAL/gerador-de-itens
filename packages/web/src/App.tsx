@@ -935,7 +935,13 @@ function AppCarregado({
         </div>
       )}
 
-      <ReadinessSummary diagrama={quebra.diagrama} config={diagramaConfig} onSelecionar={setSelecionadoId} />
+      <ReadinessSummary
+        diagrama={quebra.diagrama}
+        config={diagramaConfig}
+        onSelecionar={setSelecionadoId}
+        necessidades={quebra.necessidades}
+        onAbrirProposito={() => setAbaAssistente("contexto")}
+      />
 
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
         <div style={{ flex: 1 }}>
@@ -1183,8 +1189,10 @@ function AppCarregado({
             anexosContexto={quebra.anexosContexto}
             produtoId={quebra.produtoId}
             produtos={produtos}
-            onSalvar={(demandInfo, anexosContexto, produtoId) =>
-              setQuebra((q) => ({ ...q, demandInfo, anexosContexto, produtoId }))
+            necessidades={quebra.necessidades}
+            elementos={quebra.diagrama.nodes.map((n) => ({ id: n.id, label: n.label || n.id }))}
+            onSalvar={(demandInfo, anexosContexto, produtoId, necessidades) =>
+              setQuebra((q) => ({ ...q, demandInfo, anexosContexto, produtoId, necessidades }))
             }
             onFechar={() => setAbaAssistente(null)}
           />

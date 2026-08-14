@@ -121,3 +121,67 @@ describe("ReadinessSummary", () => {
     expect(screen.queryByText(/Próximo pendente/)).not.toBeInTheDocument();
   });
 });
+
+/**
+ * SPEC-57 fatia A — a dimensão PROPÓSITO na mesma barra.
+ * A medida aparece onde a decisão é tomada (SPEC-56 §0.8), não numa aba de
+ * relatório: é por isso que ela mora aqui e não numa tela nova.
+ */
+describe("ReadinessSummary — a dimensão propósito", () => {
+  it("sem necessidade declarada, o indicador NÃO aparece", () => {
+    // Dimensão nova não pode acusar quem nunca a usou.
+    render(
+      <ReadinessSummary diagrama={diagramaComDoisVermelhosEUmVerde()} config={config} onSelecionar={() => {}} />
+    );
+    expect(screen.queryByTestId("proposito-resumo")).not.toBeInTheDocument();
+  });
+
+  it("necessidade sem componente aparece contada, e o clique leva onde se resolve", async () => {
+    const user = userEvent.setup();
+    const onAbrirProposito = vi.fn();
+    render(
+      <ReadinessSummary
+        diagrama={diagramaComDoisVermelhosEUmVerde()}
+        config={config}
+        onSelecionar={() => {}}
+        necessidades={[
+          { id: "r1", texto: "sem ninguém", origem: "manual", atendidaPor: [] },
+          { id: "r2", texto: "coberta", origem: "manual", atendidaPor: ["n1"] },
+        ]}
+        onAbrirProposito={onAbrirProposito}
+      />
+    );
+
+    const chip = screen.getByTestId("proposito-resumo");
+    expect(chip).toHaveTextContent("1 sem componente");
+
+    await user.click(chip);
+    expect(onAbrirProposito).toHaveBeenCalled();
+  });
+
+  it("com tudo coberto, o indicador diz isso em vez de sumir", () => {
+    // Sumir faria parecer que a dimensão não existe; dizer "coberto" é o que
+    // dá crédito ao trabalho de ligar.
+    render(
+      <ReadinessSummary
+        diagrama={diagramaComDoisVermelhosEUmVerde()}
+        config={config}
+        onSelecionar={() => {}}
+        necessidades={[{ id: "r1", texto: "coberta", origem: "manual", atendidaPor: ["n1"] }]}
+      />
+    );
+    expect(screen.getByTestId("proposito-resumo")).toHaveTextContent("propósito coberto");
+  });
+
+  it("necessidade sugerida e não confirmada não conta como lacuna", () => {
+    render(
+      <ReadinessSummary
+        diagrama={diagramaComDoisVermelhosEUmVerde()}
+        config={config}
+        onSelecionar={() => {}}
+        necessidades={[{ id: "r1", texto: "sugerida", origem: "sugerido", atendidaPor: [] }]}
+      />
+    );
+    expect(screen.getByTestId("proposito-resumo")).toHaveTextContent("propósito coberto");
+  });
+});

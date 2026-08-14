@@ -2843,6 +2843,57 @@ describe("produtos (SPEC-53)", () => {
     expect(relida.json().produtoId).toBe(produto.id);
   });
 
+  it("SPEC-57 fatia A: o propósito da demanda atravessa a borda inteira", async () => {
+    // A borda é onde campo novo morre: o Zod de `/quebras` descartou em
+    // silêncio três campos até a migração 0011, e a SPEC-53 repetiu a lição.
+    // Este teste existe para a terceira vez não acontecer.
+    const cookie = await logarComo(EMAIL_DEV);
+    const necessidades = [
+      { id: "r1", texto: "não cobrar duas vezes", prioridade: "alta", origem: "manual", atendidaPor: ["n1"] },
+      { id: "r2", texto: "sugestão do agente", origem: "sugerido", confirmado: false, atendidaPor: [] },
+    ];
+
+    const criada = await app.inject({
+      method: "POST",
+      url: "/quebras",
+      cookies: { gerador_sessao: cookie },
+      payload: { titulo: "demanda com propósito", time: TIME_A, diagrama: { nodes: [], edges: [] }, necessidades },
+    });
+    expect(criada.statusCode).toBe(201);
+    expect(criada.json().necessidades).toEqual(necessidades);
+
+    const relida = await app.inject({ method: "GET", url: `/quebras/${criada.json().id}`, cookies: { gerador_sessao: cookie } });
+    expect(relida.json().necessidades).toEqual(necessidades);
+  });
+
+  it("origem inventada numa necessidade é 400 — a lista é FECHADA como a de recursos", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const resposta = await app.inject({
+      method: "POST",
+      url: "/quebras",
+      cookies: { gerador_sessao: cookie },
+      payload: {
+        titulo: "propósito inválido",
+        time: TIME_A,
+        diagrama: { nodes: [], edges: [] },
+        necessidades: [{ id: "r1", texto: "x", origem: "chutado", atendidaPor: [] }],
+      },
+    });
+    expect(resposta.statusCode).toBe(400);
+  });
+
+  it("quebra sem necessidade nenhuma continua funcionando — propósito não vira obrigação retroativa", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const criada = await app.inject({
+      method: "POST",
+      url: "/quebras",
+      cookies: { gerador_sessao: cookie },
+      payload: { titulo: "demanda sem propósito", time: TIME_A, diagrama: { nodes: [], edges: [] } },
+    });
+    expect(criada.statusCode).toBe(201);
+    expect(criada.json().necessidades).toEqual([]);
+  });
+
   it("quebra SEM produto continua funcionando — a ferramenta não passa a exigir cadastro", async () => {
     const cookie = await logarComo(EMAIL_DEV);
     const criada = await app.inject({
