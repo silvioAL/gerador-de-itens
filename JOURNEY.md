@@ -6664,3 +6664,42 @@ mostra a mensagem de erro que a pessoa veria, não um "element not found".
 **O que a fatia D deixa em aberto:** o agente propõe necessidade, não vínculo
 para necessidade que já existe — "esta que você escreveu, quem responde por
 ela?" é a pergunta seguinte, e ela usa o mesmo endpoint com outro recorte.
+
+## 232. O elo final estava solto — e eu ia mandar testar assim
+
+Ao escrever o roteiro de teste manual para o usuário, fui conferir a afirmação
+"o documento gerado cita a necessidade" antes de mandá-lo clicar. **Não citava.**
+
+`gerarEspecificacaoEntrega` aceita `necessidades` desde o §230, e tem teste de
+unidade provando que cita. Mas quem chama a função na aplicação é o
+`ReviewScreen.baixarEspecificacao`, e ele **não passava o campo**. Resultado: a
+citação funcionava numa chamada direta ao engine e não no artefato que sai da
+ferramenta — exatamente o elo M8 da SPEC-57, que é a razão da fatia existir.
+
+**Por que a suíte não pegou.** O teste de unidade do gerador testa *o gerador*,
+não *quem o chama*. O E2E ia até o placar e parava. Foi o mesmo vão do §123 em
+miniatura: duas camadas verdes e o buraco entre elas.
+
+**O que me salvou foi escrever o roteiro.** Ia dizer "derive e veja a citação no
+markdown"; parei para conferir a frase antes de afirmá-la, e o buraco apareceu.
+É a régua do §211 (verificar o que se afirmou) aplicada a uma instrução de uso,
+e não a um commit — e valeu igual.
+
+**Consertado e coberto onde deveria estar desde o começo:** o E2E agora vai até
+o fim — deriva, baixa o markdown e lê o arquivo. A mordida (tirar `necessidades`
+da chamada do `ReviewScreen`) o derruba.
+
+Três coisas que o E2E completo me obrigou a acertar, e que valem como nota de
+como este produto se comporta:
+
+1. **O portão de prontidão bloqueia derivar**, então o teste precisa preencher
+   os obrigatórios — troquei o Serviço por uma Fila Rabbit, cujos campos a
+   suíte já conhecia.
+2. **A janela do assistente fica por cima do header** e intercepta o clique de
+   derivar. Mesma armadilha do §221 com o menu, segunda aparição: overlay
+   flutuante e clique de header não convivem sem fechar antes.
+3. **Os balões da condução proativa aparecem em SEQUÊNCIA** — o seguinte só
+   nasce depois de o anterior ser dispensado. Meu laço checava os dois de uma
+   vez, dispensava um e travava esperando o terceiro.
+
+70/70 E2E, build e lint limpos.

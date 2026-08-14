@@ -18,6 +18,7 @@ import {
   type FichaEspecificacaoNo,
   type FichaItem,
   type FichaPlaceholder,
+  type Necessidade,
   type RegrasConfig,
   type ValorSpec,
   type ResultadoDependenciasDe,
@@ -68,6 +69,10 @@ export interface ReviewScreenProps {
    * (achado do usuário: só aparecer no item excepcional lia como dado quebrado); usado aqui
    * só pra filtrar o que já é óbvio e destacar de verdade quando é outro time. */
   time?: string;
+  /** SPEC-57 fatia A (M8) — o propósito da demanda, para cada item do
+   * documento CITAR a necessidade que atende. Sem isto o elo final da cadeia
+   * fica quebrado justamente no artefato que sai da ferramenta. */
+  necessidades?: Necessidade[];
   /** `quebra.respostasItens` — respostas já salvas aos placeholders de
    * refinamento (Fase 1, SPEC-23), pra saber o que já está confirmado e não
    * precisa mais aparecer pendente na ficha. */
@@ -262,6 +267,7 @@ export function ReviewScreen({
   contextoDoProduto,
   time,
   respostasItens,
+  necessidades,
   onResponderItem,
   itemInicial,
   onFechar,
@@ -697,6 +703,7 @@ export function ReviewScreen({
       templateItem,
       time,
       respostasItens,
+      necessidades,
     });
     baixarArquivoTexto(documento, "especificacao-de-solucao.md", "text/markdown");
     // §184 — o documento gerado (com TODO o material do momento) sobe pro App
