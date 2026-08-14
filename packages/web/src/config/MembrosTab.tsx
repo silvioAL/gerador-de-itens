@@ -134,16 +134,24 @@ export function MembrosTab({ timeAtivo }: MembrosTabProps) {
       {membros === null ? (
         <p style={{ fontSize: 12, color: "var(--texto-mudo)" }}>Carregando…</p>
       ) : (
-        <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none" }}>
+        <ul style={{ margin: 0, padding: 0, listStyle: "none", maxWidth: 680 }}>
           {membros.map((m) => (
-            <li key={m.email} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", fontSize: 13 }}>
-              <span style={{ color: "var(--texto-2)" }}>{m.email}</span>
-              <div style={{ flex: 1 }} />
+            <li key={m.email} style={linhaDoMembroEstilo}>
+              {/* `minWidth: 0` faz o e-mail ENCOLHER com reticências em vez de
+                  empurrar o nível para longe — era um spacer `flex: 1` que
+                  jogava o seletor no canto oposto da tela, a metros do nome de
+                  quem ele descreve. */}
+              <span
+                title={m.email}
+                style={{ minWidth: 0, fontSize: 14, color: "var(--texto)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              >
+                {m.email}
+              </span>
               <select
                 aria-label={`Nível de ${m.email}`}
                 value={m.nivel}
                 onChange={(e) => void mudarNivel(m.email, e.target.value as NivelTime)}
-                style={{ ...inputEstilo, minWidth: 0, fontSize: 12, padding: "4px 6px" }}
+                style={seletorDeNivelEstilo}
               >
                 {NIVEIS_TIME.map((n) => (
                   <option key={n} value={n}>
@@ -151,7 +159,7 @@ export function MembrosTab({ timeAtivo }: MembrosTabProps) {
                   </option>
                 ))}
               </select>
-              <button onClick={() => void remover(m.email)} style={linkBotaoEstilo}>
+              <button onClick={() => void remover(m.email)} style={{ ...linkBotaoEstilo, justifySelf: "start" }}>
                 excluir
               </button>
             </li>
@@ -161,6 +169,37 @@ export function MembrosTab({ timeAtivo }: MembrosTabProps) {
     </div>
   );
 }
+
+/** A linha vira CARTÃO: o contorno agrupa e-mail e nível como uma coisa só,
+ * e a largura limitada (a mesma do texto de introdução) mantém os dois a um
+ * palmo de distância em telas largas. */
+const linhaDoMembroEstilo: React.CSSProperties = {
+  // Grid, e não flex com espaçador: a coluna do e-mail tem TETO (320px), então
+  // o nível fica logo ao lado do nome de quem ele descreve — e, com vários
+  // membros, os seletores ficam alinhados entre si em vez de dançarem conforme
+  // o tamanho de cada e-mail. A última coluna existe só para absorver a sobra.
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 320px) auto 1fr",
+  alignItems: "center",
+  gap: 12,
+  padding: "10px 12px",
+  marginBottom: 6,
+  borderRadius: 8,
+  border: "1px solid var(--borda)",
+  background: "var(--painel)",
+};
+
+/** Maior que o resto do formulário de propósito: é um controle que MUDA
+ * permissão, e estava em 12px, menor que o e-mail ao lado. */
+const seletorDeNivelEstilo: React.CSSProperties = {
+  fontSize: 14,
+  padding: "6px 8px",
+  borderRadius: 6,
+  border: "1px solid var(--borda-forte)",
+  background: "var(--fundo)",
+  color: "var(--texto)",
+  cursor: "pointer",
+};
 
 const introTextoEstilo: React.CSSProperties = {
   fontSize: 13,
