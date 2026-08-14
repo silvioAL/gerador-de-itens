@@ -5867,3 +5867,46 @@ mais. Aqui os dois fatos já estavam na SPEC — arrumados de um jeito que
 respondia a pergunta errada.
 
 Nada de produção mudou. Só a SPEC-55.
+
+## 218. Homologação: o que hoje custaria uma segunda VM é uma flag
+
+Pergunta do usuário: *"precisaria de um ambiente de homologação"*.
+
+Já vem de fábrica. `forge create` cria `development`, `staging` e `production`,
+e dá pra criar mais com `forge environments create`. Homologar é
+`forge deploy -e staging` — sem VM, sem DNS, sem segredo novo.
+
+**Medi o contraste antes de escrever, e ele é maior do que eu esperava:** hoje
+o projeto **não tem homologação nenhuma**. `deploy.yml`,
+`docker-compose.prod.yml` e `infra/README.md` não mencionam staging em lugar
+nenhum — é uma VM, um banco, um domínio. Montar homologação no desenho atual
+seria segunda VM, segundo Postgres, segundo DNS, segundo conjunto de segredos
+no Infisical e segundo alvo no Terraform. Isso reforça o §215 num ponto que eu
+tinha tratado como economia de manutenção: não é só o que deixa de ser mantido,
+é o que passa a existir sem ninguém construir.
+
+Três fatos da plataforma que decidem o desenho:
+
+- **Ambientes são firewalled entre si e não compartilham dado do app.**
+- **Tetos diferentes por ambiente** — Forge SQL dá 1 GiB em produção mas
+  **256 MiB em staging**. Homologa; não recebe cópia de produção.
+- **`forge tunnel` e `forge logs` funcionam em staging e NÃO em produção.** Este
+  é o argumento operacional que eu não tinha: homologação não é só onde se
+  testa, é o único lugar onde se **observa** o app rodando.
+
+**A armadilha, e ela tem nome.** Múltiplos ambientes podem ser instalados no
+mesmo site Jira — o que é ótimo, porque homologa contra dado real. Mas o dado
+do *app* é que é isolado; o *Jira* é o mesmo. Diagrama, derivação, esteira e
+PDCA gravam só no storage do app e não vazam. **A exportação pro tracker
+(SPEC-49) cria work items de verdade.** Homologar exportação contra o site de
+produção é gerar lixo em backlog real. Saída barata: um projeto Jira dedicado à
+homologação no mesmo site. Sandbox só se a empresa já tiver Premium/Enterprise
+— e app Forge tem limitação conhecida ali (ECO-99), que sendo o nosso sem
+licença provavelmente não pega, mas se confirma testando.
+
+Régua da rodada: **"isso já existe hoje?" antes de "quanto custa lá?"**. Eu ia
+descrever o staging do Forge como paridade com o que temos. Não é paridade — é
+uma capacidade nova, e vender como empate teria escondido um dos melhores
+argumentos da migração.
+
+Nada de produção mudou. Só a SPEC-55.
