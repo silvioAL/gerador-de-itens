@@ -6169,3 +6169,63 @@ enquanto a pessoa trabalha. O único empréstimo que vale considerar é aditivo:
 um painel inferior de linha do tempo.
 
 Nada de produção mudou nesta rodada.
+
+## 224. O nível de abstração errado, e o que apareceu no nível certo
+
+Correção do usuário sobre o §223: *"faltou um pouco de abstração na análise, a
+ideia seria evoluir a mesa de projeto de forma geral (…) quanto ao motor de
+simulação especificamente talvez sequer nem seja tão útil, na minha opinião
+praticamente tudo pode ser feito com cálculo aritmético"*.
+
+Ele está certo em dois níveis, e o segundo é o que dói.
+
+**Nível óbvio:** gastei o documento decidindo "copiar ou não copiar o motor",
+que é uma pergunta de catálogo de peças. O pedido era sobre **evolução da mesa
+de projeto**. E a conclusão sobre o motor — a única coisa que a v1 defendeu com
+força — o usuário já tinha, sozinho, em uma frase.
+
+**Nível que interessa:** ao listar feature por feature, eu tratei doze itens
+como doze ideias independentes e ranqueei por "esforço × retorno". Errado. No
+nível certo, **oito das doze são consequência de duas primitivas ausentes**, e
+isso só aparece quando se pergunta o que elas têm em comum em vez de o que cada
+uma custa.
+
+**A tese, reescrita:** hoje a mesa modela COMPONENTES; falta o **percurso** e o
+**número**. Trigger é o começo de um caminho; fallback é bifurcação de um
+caminho; latência, volume e custo são grandezas que se acumulam ao longo de um
+caminho; cenário é trocar as grandezas na entrada; A vs B é rodar o mesmo
+caminho em dois desenhos; conflito arquitetural é regra sobre a forma do
+caminho. `Diagrama { nodes, edges }` é grafo de coisas, não de caminhos.
+
+**Duas medições que a v1 não tinha feito e que mudaram o texto:**
+
+- `TipoCampo` já inclui `"number"` — e **nenhum cálculo no engine consome esse
+  número como número**. Ele é preenchido, validado, renderizado; nunca somado
+  nem comparado. Hoje `number` é um texto que só aceita dígitos. É por isso que
+  a segunda primitiva não é "número", é **número com unidade e regra de
+  composição**.
+- `detectarConflitos()` existe, e detecta três coisas — todas sobre o **grafo
+  de atividades derivadas**, nenhuma sobre o **desenho**. "Validação de
+  conflito arquitetural" é gap de verdade, não feature parcial.
+
+**E uma correção do que eu tinha afirmado na v1:** escrevi que campo
+estruturado era dívida aberta, citando o CONTEXTO §5.2. Está desatualizado —
+`TipoCampo` já tem `lista` com `itemSpec`, a SPEC-18 entregou. Citei
+documentação em vez de conferir o código, e a documentação envelheceu.
+
+**Dois achados colaterais, do tipo que este projeto normalmente não deixa
+passar:** o `validateConfig` confere `when.field`, referências de `{{template}}`
+e tipo de nó destino — e **nunca o `type` do campo**; um `"type": "lixo"` passa
+em silêncio, mesma classe da "falha ABERTA" que o comentário do `RECURSOS`
+nomeia no servidor. E o `config/diagrama.schema.json` declara só quatro dos seis
+tipos (faltam `textarea` e `lista`, que o `diagrama.example.json` usa) e não é
+referenciado por código nenhum — tooling de editor que hoje desinforma quem
+escreve config à mão.
+
+**A régua que fica:** quando uma avaliação vira lista ranqueada de features, é
+sinal de que parei no nível errado. Feature é sintoma; a pergunta é qual
+primitiva ausente produz aquele conjunto de sintomas. E antes de escrever "não
+temos X", medir no código — duas das minhas afirmações da v1 vieram de
+documentação, e uma estava errada.
+
+Nada de produção mudou nesta rodada.
