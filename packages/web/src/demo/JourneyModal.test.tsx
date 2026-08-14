@@ -49,6 +49,7 @@ describe("JourneyModal", () => {
         onCarregarCenario={vi.fn()}
         onAdicionarCenario={vi.fn()}
         onIniciarTour={vi.fn()}
+        onIniciarTourDeConfiguracao={vi.fn()}
         onIniciarDemoAutomatica={vi.fn()}
       />
     );
@@ -72,6 +73,7 @@ describe("JourneyModal", () => {
         onCarregarCenario={vi.fn()}
         onAdicionarCenario={vi.fn()}
         onIniciarTour={vi.fn()}
+        onIniciarTourDeConfiguracao={vi.fn()}
         onIniciarDemoAutomatica={vi.fn()}
       />
     );
@@ -98,6 +100,7 @@ describe("JourneyModal", () => {
         onCarregarCenario={onCarregarCenario}
         onAdicionarCenario={vi.fn()}
         onIniciarTour={vi.fn()}
+        onIniciarTourDeConfiguracao={vi.fn()}
         onIniciarDemoAutomatica={vi.fn()}
       />
     );
@@ -123,6 +126,7 @@ describe("JourneyModal", () => {
         onCarregarCenario={onCarregarCenario}
         onAdicionarCenario={onAdicionarCenario}
         onIniciarTour={vi.fn()}
+        onIniciarTourDeConfiguracao={vi.fn()}
         onIniciarDemoAutomatica={vi.fn()}
       />
     );
@@ -146,6 +150,7 @@ describe("JourneyModal", () => {
         onCarregarCenario={vi.fn()}
         onAdicionarCenario={vi.fn()}
         onIniciarTour={vi.fn()}
+        onIniciarTourDeConfiguracao={vi.fn()}
         onIniciarDemoAutomatica={vi.fn()}
       />
     );
@@ -156,6 +161,32 @@ describe("JourneyModal", () => {
     expect(screen.queryByText(/graph\.json/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "A jornada" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Cenários prontos/ })).toBeInTheDocument();
+  });
+
+  it("§236 — clicar em Tour de configuração chama o SEGUNDO tour, não o primeiro", async () => {
+    // Dois tours, dois botões: o primeiro responde "isto serve pra quê?", o
+    // segundo "como eu moldo pro meu time". Trocar um pelo outro entregaria
+    // tela de administração a quem ainda está avaliando a ferramenta.
+    const user = userEvent.setup();
+    const onIniciarTour = vi.fn();
+    const onIniciarTourDeConfiguracao = vi.fn();
+    render(
+      <JourneyModal
+        config={config}
+        cenarios={cenarios}
+        onFechar={vi.fn()}
+        onCarregarCenario={vi.fn()}
+        onAdicionarCenario={vi.fn()}
+        onIniciarTour={onIniciarTour}
+        onIniciarTourDeConfiguracao={onIniciarTourDeConfiguracao}
+        onIniciarDemoAutomatica={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByTestId("tour-configuracao"));
+
+    expect(onIniciarTourDeConfiguracao).toHaveBeenCalled();
+    expect(onIniciarTour).not.toHaveBeenCalled();
   });
 
   it("clicar em Iniciar tour guiado chama onIniciarTour", async () => {
@@ -169,6 +200,7 @@ describe("JourneyModal", () => {
         onCarregarCenario={vi.fn()}
         onAdicionarCenario={vi.fn()}
         onIniciarTour={onIniciarTour}
+        onIniciarTourDeConfiguracao={vi.fn()}
         onIniciarDemoAutomatica={vi.fn()}
       />
     );
@@ -188,6 +220,7 @@ describe("JourneyModal", () => {
         onCarregarCenario={vi.fn()}
         onAdicionarCenario={vi.fn()}
         onIniciarTour={vi.fn()}
+        onIniciarTourDeConfiguracao={vi.fn()}
         onIniciarDemoAutomatica={onIniciarDemoAutomatica}
       />
     );
@@ -207,6 +240,7 @@ describe("JourneyModal", () => {
         onCarregarCenario={vi.fn()}
         onAdicionarCenario={vi.fn()}
         onIniciarTour={vi.fn()}
+        onIniciarTourDeConfiguracao={vi.fn()}
         onIniciarDemoAutomatica={vi.fn()}
       />
     );

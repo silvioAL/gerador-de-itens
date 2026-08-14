@@ -1739,7 +1739,10 @@ describe("ReviewScreen — sinais que o usuário leu como falha (relato com prin
     );
 
     const aviso = await screen.findByTestId("ia-indisponivel-sem-modelo");
-    expect(aviso).toHaveTextContent(/gerador ia instalar/);
+    // §236 — a mensagem parou de mandar rodar um comando que a SPEC-33 apagou.
+    // O que ela precisa dizer é o que fazer AQUI: configurar o gateway.
+    expect(aviso).toHaveTextContent(/Modelo de IA/);
+    expect(aviso).not.toHaveTextContent(/gerador ia instalar/);
     expect(screen.queryByTestId("ia-indisponivel-sem-rota")).not.toBeInTheDocument();
   });
 

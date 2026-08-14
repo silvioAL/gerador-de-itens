@@ -294,3 +294,47 @@ test("pular tour a qualquer momento encerra o overlay imediatamente", async ({ p
   // faria este teste quebrar por motivo nenhum (§233).
   await expect(page.getByText(/PASSO \d+ DE \d+/)).not.toBeVisible();
 });
+
+/**
+ * §236 — o SEGUNDO tour: o que se molda pro time.
+ *
+ * Separado do primeiro de propósito: aquele responde "isto serve pra quê?" e
+ * este "como eu adapto pro meu time". Juntos seriam 25 passos, e a parte que
+ * decide se alguém adota a ferramenta ficaria no meio de tela de administração.
+ */
+test("tour de configuração percorre as quatro telas que o tour do produto não alcança", async ({ page }) => {
+  test.setTimeout(60000);
+  await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
+  await entrar(page);
+
+  await page.getByTestId("abrir-demonstracao").click();
+  await page.getByTestId("tour-configuracao").click();
+
+  await expect(page.getByTestId("tour-titulo")).toHaveText("Moldar pro seu time");
+
+  const telaConfig = page.locator('[data-tour="config-screen-content"]');
+
+  await irAtePasso(page, "Modelo de IA");
+  await expect(telaConfig).toBeVisible();
+  // Sem credencial configurada — o estado de quem acabou de instalar, que é
+  // exatamente quem faz o tour. §236: aqui a tela dizia para rodar
+  // `gerador ia instalar`, comando que a SPEC-33 apagou junto com a CLI, e o
+  // tour passa por esta tela — a mentira estaria DENTRO da demonstração.
+  await expect(page.getByTestId("ia-sem-gateway")).toBeVisible();
+  await expect(page.getByText(/gerador ia instalar/)).toHaveCount(0);
+
+  await irAtePasso(page, "Esteira de agentes");
+  await expect(telaConfig).toBeVisible();
+
+  await irAtePasso(page, "Regras de refinamento");
+  await expect(telaConfig).toBeVisible();
+
+  await irAtePasso(page, "Campos por tipo de conexão");
+  await expect(telaConfig).toBeVisible();
+
+  // E o passo da DERIVAÇÃO não aparece aqui: são duas listas, não a mesma com
+  // filtro — se um passo do produto vazasse, quem só quer configurar levaria a
+  // ferramenta inteira junto.
+  await irAtePasso(page, "Fim");
+  await expect(page.getByTestId("tour-titulo")).toHaveText("Fim");
+});

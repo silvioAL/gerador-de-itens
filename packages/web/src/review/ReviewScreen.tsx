@@ -953,9 +953,9 @@ export function ReviewScreen({
             </>
           ) : (
             <>
-              <strong>Modelo de IA não instalado.</strong> Rode <code>gerador ia instalar</code> (ou configure um
-              gateway na aba <em>Modelo de IA</em>) pra esteira preencher os itens sozinha. Sem isso, o botão
-              “✨ Sugerir” de cada campo continua disponível item a item.
+              <strong>Sem modelo de IA configurado.</strong> Configure um gateway na aba <em>Modelo de IA</em> pra
+              esteira preencher os itens sozinha. Sem isso, o botão “✨ Sugerir” de cada campo continua disponível
+              item a item.
             </>
           )}
         </div>

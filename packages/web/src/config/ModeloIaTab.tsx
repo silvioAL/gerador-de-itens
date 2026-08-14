@@ -100,7 +100,7 @@ export function ModeloIaTab() {
               <span style={{ fontSize: 11.5, color: m.instalado ? "var(--verde)" : "var(--texto-mudo)" }}>
                 {m.instalado
                   ? `instalado (~${formatarGB(m.tamanhoAproximadoBytes)})`
-                  : `não baixado — rode \`gerador ia instalar --modelo ${m.id}\` (~${formatarGB(m.tamanhoAproximadoBytes)})`}
+                  : `não disponível neste servidor (~${formatarGB(m.tamanhoAproximadoBytes)})`}
               </span>
             </span>
           </label>
@@ -108,9 +108,15 @@ export function ModeloIaTab() {
         )}
       </div>
 
+      {/* §236 — resíduo da SPEC-33: no modo hospedado (o único que existe) o
+          embedding NUNCA está instalado, então esta mensagem aparecia para
+          todo mundo sem credencial, mandando rodar `gerador ia instalar` — um
+          comando que saiu junto com a CLI. Achado pelo E2E do tour de
+          configuração, que passa por esta tela. */}
       {status && !status.embeddingInstalado && !status.modelosChat?.some((m) => m.remoto && m.selecionado) && (
-        <p style={{ ...avisoEstilo, marginTop: 12 }}>
-          O modelo de embedding não está instalado — a IA só fica pronta com ele. Rode `gerador ia instalar`.
+        <p style={{ ...avisoEstilo, marginTop: 12 }} data-testid="ia-sem-gateway">
+          Nenhum gateway configurado ainda — preencha o endereço, a chave e o nome do modelo acima para a esteira de
+          agentes poder escrever.
         </p>
       )}
       {erro && <p style={{ ...avisoEstilo, color: "var(--vermelho)" }}>{erro}</p>}
