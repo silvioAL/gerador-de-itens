@@ -361,6 +361,21 @@ function AppCarregado({
     (q: Quebra) => {
       setQuebra(q);
       setSelecionadoId(null);
+      /**
+       * §210 — RELATO REAL: abrir outra demanda e encontrar, em "Itens
+       * escritos", os itens da demanda ANTERIOR.
+       *
+       * O item pertence a uma quebra (é o que a rota `/quebras/:id/itens`
+       * diz), mas a lista vivia no estado do App e só era recarregada ao
+       * ENTRAR na tela — com uma porta de saída (`if (!quebraId) return`) que,
+       * numa demanda ainda sem id, deixava na tela o que estava lá antes.
+       *
+       * A limpeza mora aqui porque `aoAbrir` é o evento "troquei de demanda"
+       * (abrir uma salva ou começar uma nova) — e não em `quebraId`, que
+       * também muda quando ESTA demanda é salva pela primeira vez, hora em que
+       * apagar os itens recém-gerados seria perder trabalho à toa.
+       */
+      setItensGerados([]);
     },
     [setQuebra, setSelecionadoId]
   );
@@ -546,6 +561,10 @@ function AppCarregado({
   // Entrar na tela de itens (menu, deep-link ou F5) recarrega do server — o
   // que está salvo é o que vale; a geração local só espelha na hora.
   useEffect(() => {
+    // Demanda sem id não tem o que buscar: o que estiver na tela são os itens
+    // LOCAIS desta mesma demanda (gerados antes de ela ser salva), e apagá-los
+    // aqui seria perder trabalho — a limpeza de §210 mora em `aoAbrir`, que é
+    // o evento "troquei de demanda".
     if (!mostrarItens || !persistencia.quebraId) return;
     let cancelado = false;
     apiItensGerados

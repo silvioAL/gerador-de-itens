@@ -5591,3 +5591,37 @@ nível deve ficar ao lado do e-mail, não na borda da tela" (vermelho).
 Validado no bundle de produção da stack local, não só no dev: medi 555px →
 369px de posição do seletor e 14px de fonte com o navegador real em
 `localhost:8080`.
+
+## 210. Os itens de uma demanda aparecendo em outra
+
+Relato do usuário: *"fui em abrir, escolhi uma demanda com 2 itens, depois abri
+o menu e fui em itens escritos, e apareceu os itens escritos da demanda
+anterior"*.
+
+O item pertence a uma quebra — é o que a rota `/quebras/:id/itens` diz, e o
+servidor sempre respondeu certo. O problema era o cliente: a lista vivia no
+estado do App e só era recarregada ao **entrar** na tela, com uma porta de
+saída (`if (!quebraId) return`) que, numa demanda ainda sem id, deixava
+exatamente o que estava lá antes. Quem abre outra demanda e vê o trabalho da
+anterior não conclui "a tela está velha" — conclui que a ferramenta misturou o
+material de duas coisas diferentes, que é o pior que uma ferramenta de
+especificação pode fazer.
+
+**Onde a limpeza mora importa.** A primeira tentativa foi limpar no efeito de
+carga quando não havia id — e ela quebrou o teste que existia desde a SPEC-41:
+gerar itens numa demanda ainda não salva e cair na tela dos itens passou a
+mostrar vazio, porque a limpeza apagava o que acabara de ser gerado. A limpeza
+certa é em `aoAbrir`, que é o evento "troquei de demanda" (abrir uma salva ou
+começar uma nova). Não em `quebraId`, que também muda quando ESTA demanda é
+salva pela primeira vez — hora em que apagar seria perder trabalho à toa.
+
+**O teste que quase não testou nada.** A primeira versão do E2E percorria o
+caminho do relato e passava *antes* da correção: com `expect().toHaveCount(0)`,
+o auto-retry esperava a resposta chegar e via a lista já corrigida — deixando
+passar exatamente o instante que o usuário viu. Trocado por uma leitura
+imediata (`count()`) com a busca atrasada de propósito, e aí morde. Um teste
+que espera o defeito sumir não testa o defeito.
+
+Dois specs novos, ambos vermelhos sem a correção: o caminho do relato (abrir
+outra demanda, com a busca ainda no ar) e o mais grave (demanda nova, sem id,
+herdando 16 itens da anterior).
