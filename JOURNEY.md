@@ -6741,3 +6741,51 @@ O que fica: quando um comentário de teste descreve uma armadilha, ele é um avi
 para o próximo — e o próximo fui eu, duas vezes na mesma rodada.
 
 507 web · 70/70 E2E · lint e build limpos.
+
+## 234. O tour mentia em dois passos, e o teste dizia que estava tudo bem
+
+Achado do usuário, com print: no passo 11 ("O menu") a demo mostrava a **tela de
+revisão da quebra** — que não tem menu ☰ — e o passo anterior ("Itens escritos")
+abria a tela dizendo que **ainda não existe nenhum item**.
+
+Dois defeitos independentes, e a mesma causa raiz de teste.
+
+**1. A tela de itens abria vazia.** `abrirItens` do tour era
+`navegar({ tela: "itens" })` — só a navegação. Mas os itens só existem depois de
+alguém apertar "Gerar itens" na revisão (`aoGerarItens`), ou de virem
+persistidos de uma quebra salva. O tour não faz nem um nem outro: deriva sem
+salvar, de propósito. Resultado: a tela abria no estado vazio enquanto o texto
+do passo prometia *"cada card traz a escrita final, o que falta especificar e o
+que fica pronto quando ele termina"*. Corrigido gerando os itens, com a mesma
+chamada que o botão da revisão faz.
+
+**2. Sair dos itens caía na revisão, não na mesa.** `fecharItens` navegava para
+o canvas, mas `resultado` continuava setado — e a `ReviewScreen` é renderizada
+sempre que há resultado, cobrindo o canvas. Então o passo seguinte falava do
+menu ☰ numa tela que não tem menu ☰, e o holofote do tour caía no canto vazio
+(é o que o print mostra). Corrigido limpando o resultado junto.
+
+**Por que a suíte não pegou, e é a parte que interessa.** O E2E do tour tinha
+esta linha:
+
+```ts
+await irAtePasso(page, "Itens escritos");
+await expect(page.getByTestId("itens-screen")).toBeVisible();
+```
+
+A tela estava visível. **Vazia, mas visível.** A asserção media a existência do
+contêiner, não o conteúdo dele — e passou verde por dez rodadas enquanto a demo
+mostrava uma tela vazia para quem visse. Mesma família do §213 ("teste que passa
+de primeira num defeito que você está caçando"), com outro disfarce: aqui o
+teste nunca podia falhar, porque não afirmava nada que dependesse do defeito.
+
+Agora ele cobra ausência do estado vazio, presença do resumo dos itens, e — no
+passo do menu — que o botão ☰ esteja visível **e** que os nós do canvas estejam
+lá. Mordida nos dois: revertendo qualquer um dos consertos, o E2E fica vermelho.
+
+**A régua:** `toBeVisible()` numa tela inteira é quase sempre uma asserção fraca.
+Tela visível não é tela útil, e o tour é justamente o lugar onde a diferença
+entre as duas é o produto inteiro — é o que a pessoa vê antes de decidir se vale
+usar.
+
+507 web · 70/70 E2E · lint e build limpos.

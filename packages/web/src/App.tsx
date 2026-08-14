@@ -622,9 +622,30 @@ function AppCarregado({
     derivarQuebra: () => executarDerivacao(false),
     fecharRevisao: () => setResultado(null),
     abrirConfigNaAba,
-    // SPEC-48 — o tour passa pela tela dos itens escritos.
-    abrirItens: () => navegar({ tela: "itens" }),
-    fecharItens: () => navegar({ tela: "canvas" }),
+    // SPEC-48 — o tour passa pela tela dos itens escritos. GERA os itens antes
+    // de abrir, como faz o botão da revisão: `navegar({tela:"itens"})` sozinho
+    // abria a tela vazia ("ainda não existe nenhum item"), contradizendo o
+    // texto do passo, que promete os cards (§234).
+    abrirItens: () => {
+      if (resultado) {
+        aoGerarItens(
+          gerarItensDeTrabalho(resultado.atividades, quebra.diagrama, diagramaConfig, {
+            regras: regrasConfig,
+            respostasItens: quebra.respostasItens,
+            templateItem: templateItem?.conteudo,
+          })
+        );
+      } else {
+        navegar({ tela: "itens" });
+      }
+    },
+    // Fechar a REVISÃO junto: sem isso, sair dos itens caía de volta na
+    // revisão (o `resultado` continua setado e ela cobre o canvas), e o passo
+    // seguinte falava do menu ☰ numa tela que não tem menu ☰ (§234).
+    fecharItens: () => {
+      setResultado(null);
+      navegar({ tela: "canvas" });
+    },
     abrirProposito: () => setAbaAssistente("contexto"),
     fecharAssistente: () => setAbaAssistente(null),
     fecharJornada,

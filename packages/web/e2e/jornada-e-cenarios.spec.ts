@@ -217,8 +217,22 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await expect(page.getByTestId("abrir-conversa-especificacao")).toBeVisible();
 
   // SPEC-47/48 — os ITENS ESCRITOS, a tela que o tour não conhecia.
+  //
+  // §234 — cobrar CONTEÚDO, não só a tela: o passo abria a tela vazia
+  // ("ainda não existe nenhum item") enquanto o texto prometia os cards, e a
+  // asserção de visibilidade passava assim mesmo. Tela visível não é a mesma
+  // coisa que tela útil.
   await irAtePasso(page, "Itens escritos");
   await expect(page.getByTestId("itens-screen")).toBeVisible();
+  await expect(page.getByTestId("itens-vazio")).toHaveCount(0);
+  await expect(page.getByTestId("itens-resumo")).toBeVisible();
+
+  // §234 — e o passo do MENU precisa estar numa tela que TEM menu: sair dos
+  // itens caía de volta na revisão (o resultado seguia setado, cobrindo o
+  // canvas), e o ☰ não existe lá.
+  await irAtePasso(page, "O menu");
+  await expect(page.locator('[data-tour="menu-botao"]')).toBeVisible();
+  await expect(page.locator(".react-flow__node")).toHaveCount(2);
 
   // O menu e as telas de configuração.
   await irAtePasso(page, "O menu");
