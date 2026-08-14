@@ -639,14 +639,6 @@ function AppCarregado({
     quebraState.pedirEnquadramento();
   }
 
-  function importarGraphify(nodes: No[]) {
-    setQuebra((atual) => ({
-      ...atual,
-      diagrama: mesclarDiagrama(atual.diagrama, { nodes, edges: [] }),
-    }));
-    quebraState.pedirEnquadramento();
-  }
-
   /** SPEC-43 — captura os campos preenchidos de um nó real como stack
    * CONHECIDA do catálogo global (não mais "padrão do time"): os valores
    * viram sugestão pra todo mundo assim que salvos. */
@@ -1022,7 +1014,6 @@ function AppCarregado({
           onFechar={fecharJornada}
           onCarregarCenario={(q) => aoAbrir(q)}
           onAdicionarCenario={adicionarCenario}
-          onImportarGraphify={importarGraphify}
           onIniciarTour={iniciarTour}
           onIniciarDemoAutomatica={iniciarDemoAutomatica}
           abaForcada={abaJornadaAlvo}

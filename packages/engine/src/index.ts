@@ -81,13 +81,6 @@ export {
 } from "./pdca/ajusteDeRegras.js";
 export { gerarDiagramaHtml, type OpcoesGerarDiagramaHtml } from "./diagrama-html/gerarDiagramaHtml.js";
 export {
-  importarGrafo,
-  type GraphifyGraph,
-  type GraphifyMappingConfig,
-  type RegraMapeamentoGraphify,
-  type ResultadoImportacao,
-} from "./adapters/graphify/importarGrafo.js";
-export {
   hashCurto,
   insumosDoItem,
   carimbarInsumos,

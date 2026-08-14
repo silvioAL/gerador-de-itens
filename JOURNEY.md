@@ -5648,3 +5648,28 @@ projeto não resolveria, porque o Playwright continua distribuindo ARQUIVOS
 diferentes entre workers.
 
 63/63 E2E, duas rodadas completas seguidas antes de abrir o PR desta vez.
+
+## 212. Fora o importador do Graphify
+
+Decisão do usuário: remover a feature "Importar do Graphify". Ela lia o
+`graph.json` de outra ferramenta e rascunhava nós `existente`/`extraído` no
+canvas a partir de `config/graphify-mapping.json` — um mapeamento
+caminho→tipo que só quem conhecia o formato conseguia manter, e que na prática
+ninguém mantinha. Uma porta de entrada que exigia configurar outra coisa antes
+de servir para alguma coisa.
+
+Saiu inteira, não só o botão: o adaptador do engine e seus testes, o
+componente da tela, a aba da jornada, a prop que a atravessava, o E2E, a
+fixture, o `config/graphify-mapping.example.json` e os exports do
+`packages/engine`. Sobrou uma linha de dado semeado na migração 0000 (uma
+"referência de código" apontando para o importador) — migração aplicada é
+histórico, não se reescreve, e a tela que a exibia já não existe.
+
+O teste da aba virou **guarda de remoção**: em vez de sumir com o resto, ele
+agora exige que não haja nenhum botão nem texto de Graphify na jornada, e que
+sobrem as duas abas certas. Feature removida sem guarda volta num merge
+distraído, e ninguém percebe.
+
+README e CONTEXTO-E-ARQUITETURA foram corrigidos junto — documentação que
+descreve uma feature que não existe é pior que documentação faltando. 215
+engine + 473 web; 62/62 E2E (um a menos, o da própria feature).

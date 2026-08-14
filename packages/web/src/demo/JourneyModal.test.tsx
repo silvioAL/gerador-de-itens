@@ -48,7 +48,6 @@ describe("JourneyModal", () => {
         onFechar={vi.fn()}
         onCarregarCenario={vi.fn()}
         onAdicionarCenario={vi.fn()}
-        onImportarGraphify={vi.fn()}
         onIniciarTour={vi.fn()}
         onIniciarDemoAutomatica={vi.fn()}
       />
@@ -72,7 +71,6 @@ describe("JourneyModal", () => {
         onFechar={vi.fn()}
         onCarregarCenario={vi.fn()}
         onAdicionarCenario={vi.fn()}
-        onImportarGraphify={vi.fn()}
         onIniciarTour={vi.fn()}
         onIniciarDemoAutomatica={vi.fn()}
       />
@@ -99,7 +97,6 @@ describe("JourneyModal", () => {
         onFechar={onFechar}
         onCarregarCenario={onCarregarCenario}
         onAdicionarCenario={vi.fn()}
-        onImportarGraphify={vi.fn()}
         onIniciarTour={vi.fn()}
         onIniciarDemoAutomatica={vi.fn()}
       />
@@ -125,7 +122,6 @@ describe("JourneyModal", () => {
         onFechar={onFechar}
         onCarregarCenario={onCarregarCenario}
         onAdicionarCenario={onAdicionarCenario}
-        onImportarGraphify={vi.fn()}
         onIniciarTour={vi.fn()}
         onIniciarDemoAutomatica={vi.fn()}
       />
@@ -141,8 +137,7 @@ describe("JourneyModal", () => {
     expect(screen.getByText("✓ Adicionado")).toBeInTheDocument();
   });
 
-  it("troca para a aba Importar do Graphify e mostra a explicação do fluxo", async () => {
-    const user = userEvent.setup();
+  it("§212 — a aba de importar do Graphify NÃO existe mais", () => {
     render(
       <JourneyModal
         config={config}
@@ -150,16 +145,17 @@ describe("JourneyModal", () => {
         onFechar={vi.fn()}
         onCarregarCenario={vi.fn()}
         onAdicionarCenario={vi.fn()}
-        onImportarGraphify={vi.fn()}
         onIniciarTour={vi.fn()}
         onIniciarDemoAutomatica={vi.fn()}
       />
     );
 
-    await user.click(screen.getByRole("button", { name: "Importar do Graphify" }));
-
-    expect(screen.getByText("Escolher graph.json")).toBeInTheDocument();
-    expect(screen.getByText(/config\/graphify-mapping\.json/)).toBeInTheDocument();
+    // Guarda de remoção: sobraram DUAS abas, e nenhuma menção ao importador.
+    // Sem isto, alguém "restaura" a aba num merge e ninguém percebe.
+    expect(screen.queryByRole("button", { name: /Graphify/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/graph\.json/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "A jornada" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Cenários prontos/ })).toBeInTheDocument();
   });
 
   it("clicar em Iniciar tour guiado chama onIniciarTour", async () => {
@@ -172,7 +168,6 @@ describe("JourneyModal", () => {
         onFechar={vi.fn()}
         onCarregarCenario={vi.fn()}
         onAdicionarCenario={vi.fn()}
-        onImportarGraphify={vi.fn()}
         onIniciarTour={onIniciarTour}
         onIniciarDemoAutomatica={vi.fn()}
       />
@@ -192,7 +187,6 @@ describe("JourneyModal", () => {
         onFechar={vi.fn()}
         onCarregarCenario={vi.fn()}
         onAdicionarCenario={vi.fn()}
-        onImportarGraphify={vi.fn()}
         onIniciarTour={vi.fn()}
         onIniciarDemoAutomatica={onIniciarDemoAutomatica}
       />
@@ -212,7 +206,6 @@ describe("JourneyModal", () => {
         onFechar={onFechar}
         onCarregarCenario={vi.fn()}
         onAdicionarCenario={vi.fn()}
-        onImportarGraphify={vi.fn()}
         onIniciarTour={vi.fn()}
         onIniciarDemoAutomatica={vi.fn()}
       />
