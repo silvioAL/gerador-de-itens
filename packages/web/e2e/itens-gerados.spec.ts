@@ -123,14 +123,25 @@ test("§210 — trocar de demanda NÃO leva junto os itens da anterior", async (
   expect(quantosNaPrimeira).toBeGreaterThan(0);
 
   // Agora o caminho exato do relato: Abrir → outra demanda → Itens escritos.
-  // Duas voltas: a primeira fecha a tela de itens, a segunda fecha a revisão.
-  // Sem a segunda, a revisão fica por cima e INTERCEPTA o clique no ☰ do
-  // canvas — que é o menu que a pessoa usa no relato.
+  //
+  // Voltar até o canvas LIMPO, uma tela por vez e esperando cada uma sumir: a
+  // primeira volta fecha os itens, a segunda fecha a revisão. Encadear os dois
+  // cliques sem esperar falhou na CI (mais lenta que a máquina local) com
+  // "click timeout" — a revisão ainda estava por cima e interceptava o ☰.
   await page.getByRole("button", { name: "Voltar ao canvas" }).click();
-  await page.getByRole("button", { name: "Voltar ao canvas" }).click();
+  await expect(page.getByTestId("itens-screen")).toBeHidden();
+  const fecharRevisao = page.getByRole("button", { name: "Voltar ao canvas" });
+  if (await fecharRevisao.isVisible().catch(() => false)) {
+    await fecharRevisao.click();
+  }
+  await expect(page.getByRole("button", { name: "+ Serviço", exact: true })).toBeVisible();
+
   await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: "Abrir…" }).click();
   await page.getByText(outra).first().click();
+  // A tela de abrir some quando a demanda carrega — sem esta espera, o clique
+  // seguinte no ☰ cai na lista ainda aberta.
+  await expect(page.getByRole("button", { name: "+ Serviço", exact: true })).toBeVisible();
 
   // A busca dos itens da demanda nova fica LENTA de propósito: é na janela
   // entre abrir a outra demanda e a resposta chegar que o relato acontece.
