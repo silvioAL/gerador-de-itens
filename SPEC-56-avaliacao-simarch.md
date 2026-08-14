@@ -123,10 +123,15 @@ decisão) e o que nós faríamos (trabalho a fazer). E é o que mantém a coerê
 com o §2 do CONTEXTO: nada nasce de interpretação, tudo nasce de função pura.
 
 **Pior caso, não média.** A aritmética que serve aqui é a determinística —
-somar tetos declarados. Média e percentil exigem distribuição, distribuição
-exige amostra, e amostra é o motor que não queremos. Pior caso responde "isto
-pode estourar?" com uma conta que qualquer pessoa refaz no papel — e auditável
-é requisito nosso, não luxo.
+somar tetos declarados. Pior caso responde "isto pode estourar?" com uma conta
+que qualquer pessoa refaz no papel, e auditável é requisito nosso, não luxo.
+
+Duas ressalvas honestas, que a **§12.1** desenvolve em vez de esconder:
+pior caso **grita lobo** (somar tetos em oito saltos dá um número que quase
+nunca acontece), e há três casos — cauda de cadeia, fan-out e probabilidade de
+completar no orçamento — em que ele não é apenas grosseiro, é **errado**. Nesses
+casos amostrar responde melhor. O que decide se isso vale aqui não é
+matemática, é proveniência: ver §12.1.3.
 
 ---
 
@@ -276,13 +281,15 @@ trabalha, não enfeite.
 
 ## 12. O que não trazer
 
-**O motor de simulação** — e como você já chegou nisso sozinho, fica o registro
+**O motor de simulação como ele é lá** — e como você já chegou nisso sozinho, fica o registro
 curto: 228 linhas, simula **só o primeiro fluxo** (`model.Flows[0]`), laço de
 passo fixo apesar do nome "DiscreteEvent", 9 testes no projeto inteiro. Mais
 importante que a imaturidade: número que depende de um `seed` e de latência
 chutada, exibido ao lado de item derivado deterministicamente, convida a
 confundir os dois. A aritmética de pior caso (§4) responde à mesma classe de
-pergunta com uma conta que se refaz no papel.
+pergunta com uma conta que se refaz no papel. Isso **não** fecha a porta para
+amostragem em geral — só para transplantar aquele motor. Onde amostrar ganha, e
+sob que condição, está na §12.1.
 
 **Restrição legal, curta e real:** o repositório **não tem arquivo de licença**
 (sem `LICENSE`; a API do GitHub devolve `licenseInfo: null`). O padrão então é
