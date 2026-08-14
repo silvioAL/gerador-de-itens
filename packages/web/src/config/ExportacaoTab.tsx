@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiExportador, type ConfigExportador } from "../api/client";
+import { MarcaDeDemonstracao } from "../demo/dadosDoTour";
 
 /**
  * SPEC-49 — para onde os itens escritos vão.
@@ -9,14 +10,24 @@ import { apiExportador, type ConfigExportador } from "../api/client";
  * de MCP, n8n, função interna) que sabe criar issue no tracker da casa — a
  * mesma disciplina do gateway de IA, que também é só um endereço.
  */
-export function ExportacaoTab() {
-  const [config, setConfig] = useState<ConfigExportador | null>(null);
+export interface ExportacaoTabProps {
+  /** §235 — dado EXCLUSIVO do tour: substitui o fetch e desliga o salvar. Uma
+   * instalação nova tem esta tela vazia, e um passo que promete conteúdo sobre
+   * tela vazia é a mentira que o §234 custou caro. Semear via API seria pior:
+   * o tour passaria a ESCREVER na configuração de quem só quis ver. */
+  demonstracao?: ConfigExportador;
+}
+
+export function ExportacaoTab({ demonstracao }: ExportacaoTabProps = {}) {
+  const [config, setConfig] = useState<ConfigExportador | null>(demonstracao ?? null);
   const [cabecalhosTexto, setCabecalhosTexto] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [salvo, setSalvo] = useState(false);
 
   useEffect(() => {
+    // Em demonstração não se busca nem se grava nada.
+    if (demonstracao) return;
     apiExportador
       .obter()
       .then((c) => {
@@ -28,7 +39,7 @@ export function ExportacaoTab() {
         );
       })
       .catch((e) => setErro(e instanceof Error ? e.message : String(e)));
-  }, []);
+  }, [demonstracao]);
 
   if (erro && !config) return <p style={{ fontSize: 12.5, color: "var(--vermelho)" }}>{erro}</p>;
   if (!config) return <p style={{ fontSize: 12.5, color: "var(--texto-fraco)" }}>Carregando…</p>;
@@ -48,6 +59,9 @@ export function ExportacaoTab() {
   }
 
   async function salvar() {
+    // Demonstração NÃO escreve. Sem esta linha o tour gravaria o endpoint de
+    // exemplo na configuração real de quem só quis ver a ferramenta.
+    if (demonstracao) return;
     setSalvando(true);
     setErro(null);
     setSalvo(false);
@@ -63,6 +77,7 @@ export function ExportacaoTab() {
 
   return (
     <div data-testid="config-exportacao">
+      {demonstracao && <MarcaDeDemonstracao />}
       <p style={proseEstilo}>
         Os itens prontos da tela <strong>Itens escritos</strong> são enviados para um <strong>agente</strong> que fala
         com o seu tracker (MCP, n8n, uma função interna — o que a empresa já tiver). O gerador não implementa Jira:

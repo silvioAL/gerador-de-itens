@@ -59,6 +59,7 @@ import { TourOverlay } from "./demo/TourOverlay";
 import { useTour } from "./demo/useTour";
 import { useAutoDemo } from "./demo/useAutoDemo";
 import { CursorFantasma } from "./demo/CursorFantasma";
+import { CONVERSA_DO_TOUR } from "./demo/dadosDoTour";
 import { LandingPage } from "./demo/LandingPage";
 import { EscolherTimeScreen } from "./auth/EscolherTimeScreen";
 import { lembrarTime, lerTimeLembrado } from "./auth/timeLembrado";
@@ -428,6 +429,10 @@ function AppCarregado({
   // conversa da especificação continua separada, de propósito (SPEC-27 §3) —
   // ela pertence à tela de revisão, não ao canvas.
   const [abaAssistente, setAbaAssistente] = useState<AbaAssistente | null>(null);
+  /** §235 — enquanto o tour percorre telas que leem do servidor (produto,
+   * exportação), elas mostram dado de DEMONSTRAÇÃO em vez de tela vazia — e
+   * não escrevem nada. Desligado no fim do tour, sempre. */
+  const [demonstracaoDoTour, setDemonstracaoDoTour] = useState(false);
   // SPEC-37 M9 — "agora não" silencia o momento até a próxima mudança real de
   // estado (recarregar/derivar); condução dispensada não insiste.
   const [derivarDispensado, setDerivarDispensado] = useState(false);
@@ -648,6 +653,8 @@ function AppCarregado({
     },
     abrirProposito: () => setAbaAssistente("contexto"),
     fecharAssistente: () => setAbaAssistente(null),
+    abrirConversa: () => setAbaAssistente("conversa"),
+    ligarDemonstracao: setDemonstracaoDoTour,
     fecharJornada,
     fecharConfig: () => navegar({ tela: "canvas" }),
   };
@@ -1100,6 +1107,7 @@ function AppCarregado({
           onExcluirCampoAresta={excluirCampoAresta}
           onFechar={() => navegar({ tela: "canvas" })}
           area={rota.tela === "config" ? rota.area : "perfis"}
+          demonstracao={demonstracaoDoTour}
           onAbrirMenu={() => setMenuAberto(true)}
           techs={appConfig.techs}
           contextos={appConfig.contextos}
@@ -1199,6 +1207,7 @@ function AppCarregado({
             techs={appConfig.techs}
             contextos={appConfig.contextos}
             contextoInicial={quebra.demandInfo}
+            mensagensDeDemonstracao={demonstracaoDoTour ? CONVERSA_DO_TOUR : undefined}
             onAplicar={(proposta) => {
               aplicarDiagramaProposto(proposta);
               // SPEC-37 M3 — a proposta aplicada é o gatilho da fala de

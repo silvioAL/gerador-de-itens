@@ -33,6 +33,8 @@ function montarOpts() {
     fecharItens: vi.fn(),
     abrirProposito: vi.fn(),
     fecharAssistente: vi.fn(),
+    abrirConversa: vi.fn(),
+    ligarDemonstracao: vi.fn(),
   };
 }
 

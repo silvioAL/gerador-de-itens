@@ -182,6 +182,12 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await expect(page.getByTestId("tour-titulo")).toHaveText("Bem-vindo");
   await expect(page.getByText(/PASSO 1 DE \d+/)).toBeVisible();
 
+  // §235 — a porta de entrada real: o desenho nasce da conversa, e o tour
+  // antes começava com ele já pronto.
+  await irAtePasso(page, "Começar conversando");
+  await expect(page.getByTestId("assistente-janela")).toBeVisible();
+  await expect(page.getByText(/serviço de catálogo de produtos/i)).toBeVisible();
+
   // O diagrama de verdade, com o cenário do tour já carregado.
   await irAtePasso(page, "O diagrama");
   await expect(page.locator(".react-flow__node")).toHaveCount(2);
@@ -234,8 +240,17 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await expect(page.locator('[data-tour="menu-botao"]')).toBeVisible();
   await expect(page.locator(".react-flow__node")).toHaveCount(2);
 
-  // O menu e as telas de configuração.
-  await irAtePasso(page, "O menu");
+  // As telas de configuração. `irAtePasso` só anda PARA A FRENTE, então a
+  // ordem aqui tem que ser a ordem do tour — pedir um passo já passado faz o
+  // laço ir até o fim, onde não existe mais "Próximo" (foi o que aconteceu).
+  //
+  // §235 — o contexto do PRODUTO vem primeiro, com dado de demonstração e a
+  // marca dizendo que é de demonstração: sem ela, alguém sai do tour achando
+  // que configurou um produto.
+  await irAtePasso(page, "Contexto do produto");
+  await expect(page.getByTestId("marca-demonstracao")).toBeVisible();
+  await expect(page.getByText("Catálogo (exemplo)")).toBeVisible();
+
   await irAtePasso(page, "Stacks conhecidas");
   const telaConfigNoTour = page.locator('[data-tour="config-screen-content"]');
   await expect(telaConfigNoTour.getByText("Stacks conhecidas").first()).toBeVisible();
@@ -250,6 +265,11 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await expect(telaConfigNoTour.getByText(/\{\{titulo\}\}/).first()).toBeVisible();
 
   // SPEC-45/48 — a jornada da melhoria contínua também entrou.
+  // §235 — o último elo da cadeia: o item virando issue no tracker.
+  await irAtePasso(page, "Do item à issue");
+  await expect(page.getByTestId("config-exportacao")).toBeVisible();
+  await expect(page.getByTestId("marca-demonstracao")).toBeVisible();
+
   await irAtePasso(page, "Melhoria contínua (PDCA)");
   await expect(telaConfigNoTour.getByTestId("feedbacks-do-ciclo")).toBeVisible();
 
@@ -270,5 +290,7 @@ test("pular tour a qualquer momento encerra o overlay imediatamente", async ({ p
   await page.getByRole("button", { name: "Próximo" }).click();
   await page.getByRole("button", { name: "Pular tour" }).click();
 
-  await expect(page.getByText(/PASSO \d+ DE 13/)).not.toBeVisible();
+  // Sem contagem fixa: passo novo entra a cada rodada, e um "DE 13" cravado
+  // faria este teste quebrar por motivo nenhum (§233).
+  await expect(page.getByText(/PASSO \d+ DE \d+/)).not.toBeVisible();
 });

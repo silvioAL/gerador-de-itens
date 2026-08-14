@@ -16,6 +16,7 @@ import { apiPdca } from "../api/client";
 import { PdcaTab } from "./PdcaTab";
 import { ExportacaoTab } from "./ExportacaoTab";
 import { ProdutosTab } from "./ProdutosTab";
+import { EXPORTADOR_DO_TOUR, PRODUTO_DO_TOUR } from "../demo/dadosDoTour";
 
 export type AbaConfig =
   | "produtos"
@@ -30,6 +31,9 @@ export type AbaConfig =
   | "modeloIa" | "pdca" | "exportacao";
 
 export interface ConfigScreenProps {
+  /** §235 — o tour percorre estas telas com dado de demonstração, para não
+   * mostrar tela vazia nem escrever na configuração de quem só quis ver. */
+  demonstracao?: boolean;
   config: DiagramaConfig;
   camposNo: CampoNo[];
   camposAresta: CampoAresta[];
@@ -87,6 +91,7 @@ function podeVerAba(id: AbaConfig, pode: (recurso: string, acao?: string) => boo
  * time: perfis de stack, campos de formulário.
  */
 export function ConfigScreen({
+  demonstracao,
   config,
   camposNo,
   camposAresta,
@@ -235,8 +240,12 @@ export function ConfigScreen({
         {abaAtiva === "pdca" && (
           <PdcaTab config={config} timeAtivo={timeAtivo} onAbrirArea={onAbrirArea} onFichaMudou={onFichaMudou} />
         )}
-        {abaAtiva === "exportacao" && <ExportacaoTab />}
-        {abaAtiva === "produtos" && <ProdutosTab timeIds={timeIds} />}
+        {abaAtiva === "exportacao" && (
+          <ExportacaoTab demonstracao={demonstracao ? EXPORTADOR_DO_TOUR : undefined} />
+        )}
+        {abaAtiva === "produtos" && (
+          <ProdutosTab timeIds={timeIds} demonstracao={demonstracao ? PRODUTO_DO_TOUR : undefined} />
+        )}
         {abaAtiva === "perfis" && (
           <PerfisStackTab config={config} onPerfisMudaram={onPerfisMudaram} />
         )}
