@@ -6927,3 +6927,32 @@ antigo ao schema, o teste da correia cai.
 Régua: **"anotei no documento" não é o mesmo que "está resolvido"** — e as duas
 dívidas mais baratas do backlog inteiro ficaram três rodadas paradas porque
 anotá-las deu a sensação de tê-las tratado.
+
+## 238. A fatia D entra no tour — a interação que existia e não aparecia
+
+Ao inventariar o que faltava (§237), o buraco mais constrangedor era este: a
+fatia D construiu a proposta MEDIDA — o agente propõe, o motor mede o efeito de
+aceitar antes do aceite — e o tour mostrava só o *resultado* do propósito, não a
+interação. Feature construída, testada, e invisível na demonstração.
+
+**O que faltava era dado, não código.** O passo do delta só existe se houver
+sugestão pendente na tela. O cenário do tour tinha três necessidades, todas
+`manual` — então o quadro do delta nunca aparecia. Ganhou uma quarta,
+`sugerido` e não confirmada, sem vínculo. Com ela a tela mostra exatamente a
+regra inteira de uma vez:
+
+- o delta diz *"1 sugerida, ainda sem efeito — se aceitar tudo: lacunas 1 → 2,
+  aceitar propósito sem componente cria trabalho"*;
+- e o placar do topo **continua marcando 1**, porque sugestão não conta.
+
+Duas afirmações do produto na mesma tela, uma reforçando a outra. É a
+demonstração mais econômica que consegui montar disso.
+
+O texto do passo diz o porquê, que é o que o tour existe para transmitir: o
+número que pode piorar não é enfeite, é o que impede o "confirmar todas" de
+virar clique automático.
+
+Mordida: tirando a sugerida do cenário, o E2E do tour cai — o passo fica sem o
+que apontar, que é precisamente o defeito do §234 (tela visível, vazia).
+
+515 web · 71/71 E2E · lint e build limpos.

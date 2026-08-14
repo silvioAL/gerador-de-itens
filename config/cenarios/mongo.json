@@ -114,6 +114,14 @@
         "prioridade": "media",
         "origem": "manual",
         "atendidaPor": []
+      },
+      {
+        "id": "nec-catalogo-sugerida",
+        "texto": "o app offline continua vendo o catálogo da última sincronização",
+        "prioridade": "media",
+        "origem": "sugerido",
+        "confirmado": false,
+        "atendidaPor": []
       }
     ]
   }

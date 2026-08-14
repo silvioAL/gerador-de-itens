@@ -203,6 +203,17 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await expect(page.getByTestId("assistente-janela")).toBeVisible();
   await expect(page.getByText("produto fora de linha some do catálogo em até 24h")).toBeVisible();
 
+  // §238 — a proposta MEDIDA antes de aceitar: a interação que a fatia D
+  // construiu e o tour não mostrava. O cenário traz uma necessidade sugerida e
+  // não confirmada, então o delta existe na tela.
+  await irAtePasso(page, "O agente propõe, o motor mede");
+  const delta = page.getByTestId("delta-da-proposta");
+  await expect(delta).toBeVisible();
+  await expect(delta).toContainText("1 sugerida(s), ainda sem efeito");
+  await expect(delta).toContainText("aceitar propósito sem componente cria trabalho");
+  // E o placar NÃO conta a sugerida: só as três confirmadas, uma delas em lacuna.
+  await expect(page.getByTestId("proposito-resumo")).toContainText("1 sem componente");
+
   await irAtePasso(page, "Proveniência");
   // A janela flutuante FECHA: sem isso ela cobre o painel que o passo mostra.
   await expect(page.getByTestId("assistente-janela")).toHaveCount(0);
