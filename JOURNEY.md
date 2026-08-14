@@ -5702,3 +5702,28 @@ aconteceu duas vezes — aqui e no §210, onde o auto-retry esperava o defeito
 sumir.
 
 473 web unit; 64/64 E2E, duas rodadas completas seguidas.
+
+## 214. As outras trocas de contexto: produto e pessoa
+
+Fechando a varredura do §213 nas duas trocas que faltavam.
+
+**Produto da demanda.** Trocar o produto tem que trocar o que o modelo lê. O
+teste escolhe o produto A, olha o prompt real pela simulação (sem gastar
+chamada), troca para o B e cobra que o glossário de A tenha SAÍDO e o de B
+entrado. Mordida: fixar a dependência do efeito que recarrega o contexto →
+prompt com o produto errado (vermelho). Este é o lugar onde o defeito custaria
+mais caro: um contexto "pregado" faz o item ser escrito com o vocabulário do
+produto errado, e ninguém desconfia lendo o resultado.
+
+**Pessoa na sessão.** Sair e entrar com outro e-mail no mesmo navegador não
+pode deixar nada da sessão anterior — aqui o vazamento não seria confusão,
+seria material de uma pessoa aparecendo para outra.
+
+Esse segundo é **rede, não descoberta**: hoje o `sair` faz `setSessao(null)` e
+a árvore inteira desmonta, então o estado morre junto. Para não ficar um teste
+que passa por construção, validei contra o defeito mais plausível que alguém
+introduziria — "não perca seu trabalho": guardar a quebra no `localStorage` e
+reidratar no boot. Com essa injeção, o teste fica vermelho. É o que ele existe
+para pegar.
+
+66/66 E2E, duas rodadas completas seguidas.
