@@ -2594,6 +2594,26 @@ describe("SPEC-28 — gestão de acessos", () => {
     expect(depois.json()).toMatchObject({ rbacAtivo: true, porRecurso: { quebras: ["ler"] } });
   });
 
+  /**
+   * §220 — sem `curados` a tela não tem como espelhar o owner-bypass: ela sabe
+   * o que ELA tem (`porRecurso`), nunca se OUTRO papel carrega o recurso. Foi
+   * essa metade faltando que fez um owner ver cadeado em tudo enquanto o
+   * servidor aceitava a escrita.
+   */
+  it("GET /permissoes/minhas diz ONDE a curadoria está ligada, não só o que eu tenho", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const antes = await app.inject({ method: "GET", url: "/permissoes/minhas", cookies: { gerador_sessao: cookie } });
+    expect(antes.json().curados).toEqual([]);
+
+    // Papel de OUTRA pessoa: não entra no meu `porRecurso`, mas liga a
+    // curadoria do recurso para todo mundo — inclusive para owners.
+    await criarPapel("Curador de stack", [{ recurso: "perfis-stack", acao: "editar" }], [{ email: "outra@gerador.local" }]);
+
+    const depois = (await app.inject({ method: "GET", url: "/permissoes/minhas", cookies: { gerador_sessao: cookie } })).json();
+    expect(depois.porRecurso["perfis-stack"]).toBeUndefined();
+    expect(depois.curados).toEqual(["perfis-stack"]);
+  });
+
   it("administrar acessos exige permissão de `acessos` — sem ela, 403", async () => {
     await nivelDoSeed(EMAIL_DEV, "operar");
     await criarPapel("Arquitetura", [{ recurso: "campos-no", acao: "editar" }], [{ email: EMAIL_DEV }]);

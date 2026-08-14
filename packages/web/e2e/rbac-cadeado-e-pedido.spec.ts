@@ -188,3 +188,65 @@ test("criar papel, marcar permissão e colocar alguém dentro — tudo pela tela
     expect((await (await page.request.get(`${API}/acessos/papeis`)).json()).length, "RBAC desligado de volta").toBe(0);
   }
 });
+
+/**
+ * §220 — o lado OWNER, que faltava, e que era exatamente onde o defeito morava.
+ *
+ * O primeiro spec deste arquivo entra com nível `operar` e explica por quê:
+ * *"owner passaria pelo bypass da SPEC-38 e o teste mediria o portão errado"*.
+ * O comentário estava certo sobre o SERVIDOR e ninguém foi conferir a TELA —
+ * onde o `pode()` só olhava o grant RBAC. Efeito, reproduzido contra o banco de
+ * desenvolvimento antes de virar teste: um owner com um único grant via cadeado
+ * em TUDO no instante em que a organização ganhava o primeiro papel, enquanto
+ * `POST /campos-no` respondia 400 de validação — não 403.
+ *
+ * Aqui os dois eixos aparecem na mesma tela, e é isso que faz o teste valer:
+ * o recurso CURADO por outro papel fica trancado até para o owner, e o não
+ * curado abre.
+ */
+test("owner com RBAC ligado: cadeado só onde há curadoria de outro papel", async ({ page }) => {
+  test.setTimeout(90000);
+  await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
+  await page.route(
+    (url) => url.pathname === "/ia/status",
+    (rota) => rota.fulfill({ json: { modelosChat: [], embeddingInstalado: false, capacidades: {} } })
+  );
+
+  await entrar(page);
+  // Papel de OUTRA pessoa: liga o RBAC da organização E liga a curadoria de
+  // `perfis-stack` — sem dar grant nenhum de `perfis-stack` a quem é owner.
+  const respPapel = await page.request.post(`${API}/acessos/papeis`, {
+    data: { nome: `Curador de stack e2e ${Date.now()}`, permissoes: [{ recurso: "perfis-stack", acao: "editar" }] },
+  });
+  expect(respPapel.status(), "papel criado (LIGA o RBAC e a curadoria)").toBe(201);
+  const papel = await respPapel.json();
+
+  try {
+    const rAtrib = await page.request.post(`${API}/acessos/papeis/${papel.id}/membros`, {
+      data: { email: "curador-stack-e2e@gerador.local" },
+    });
+    expect(rAtrib.status(), "papel atribuído a OUTRA pessoa").toBe(201);
+
+    await page.reload();
+    await page.getByRole("button", { name: "☰ Menu" }).click();
+
+    // Sem curadoria: o owner edita — é o `exigirPermissao` da SPEC-38, e era
+    // isto que aparecia trancado.
+    for (const area of [/Padrões por componente/, /Campos por tipo de conexão/, /Especificação de solução/, /Pipeline de IA/]) {
+      await expect(page.getByRole("button", { name: area }), `${area} sem cadeado`).not.toHaveAttribute(
+        "data-bloqueada",
+        "sim"
+      );
+    }
+
+    // Com curadoria de outro papel: trancado INCLUSIVE para o owner — é o
+    // `exigirEdicaoCurada`, a exceção deliberada ao bypass.
+    const curado = page.getByRole("button", { name: /Stacks conhecidas/ });
+    await expect(curado).toHaveAttribute("data-bloqueada", "sim");
+    await expect(curado).toContainText("🔒");
+  } finally {
+    const papeis = (await (await page.request.get(`${API}/acessos/papeis`)).json()) as { id: string }[];
+    for (const p of papeis) await page.request.delete(`${API}/acessos/papeis/${p.id}`);
+    expect((await (await page.request.get(`${API}/acessos/papeis`)).json()).length, "RBAC desligado de volta").toBe(0);
+  }
+});

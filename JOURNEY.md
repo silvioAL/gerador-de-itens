@@ -5913,8 +5913,17 @@ Nada de produção mudou. Só a SPEC-55.
 
 ## 219. Não vamos migrar — e o que travou não foi técnico
 
-Decisão do usuário, textualmente: *"não vamos migrar, decidido"*. Motivo:
-*"por algum motivo minha credencial silvioaltr@gmail.com não está como admin"*.
+Decisão do usuário, textualmente: *"não vamos migrar, decidido"*.
+
+> **Correção (§220).** A versão original desta entrada dizia que o motivo era a
+> credencial `silvioaltr@gmail.com` não ser admin da Atlassian. Errei: a frase
+> do usuário era sobre o **cadeado dentro do próprio Gerador**, defeito de RBAC
+> na tela que não tem nada a ver com Forge. A decisão de não migrar continua
+> valendo; a causa que atribuí a ela, não. Os dois parágrafos abaixo sobre
+> "o que travou" estão, portanto, errados — ficam visíveis de propósito, porque
+> apagar o raciocínio esconderia como se chega a uma conclusão plausível e
+> falsa: o motivo real estava disponível, e eu preferi o que casava com a
+> pesquisa que eu acabara de fazer.
 
 Registrado no topo da SPEC-55 com data e citação, para o documento não virar um
 plano fantasma. Quatro rodadas de pesquisa (§215–§218) produziram uma avaliação
@@ -5944,3 +5953,69 @@ deploy.** Vale checar antes de medir latência de LLM.
 
 O produto segue no modo hospedado da SPEC-33, sem mudança. Nada de produção foi
 tocado em nenhuma das cinco rodadas.
+
+## 220. A tela trancava o que o servidor liberava
+
+Relato do usuário: *"minha credencial para acessar todas features na aplicação,
+quase tudo está com cadeado"*. Investiguei achando que era nível de time.
+Não era.
+
+**O que o banco de verdade disse.** `silvioaltr@gmail.com` é **owner** de
+`time-silvio` — o nível mais alto. E `/permissoes/minhas` devolvia:
+
+```
+{"rbacAtivo":true,"porRecurso":{"acessos":["editar"]},"nivel":"owner"}
+```
+
+Dois papéis existiam na organização: "Administrador" (só `acessos:editar`) e
+"Arquitetura" (**zero** permissões). Nenhum deles trancava nada de propósito —
+mas **existir papel é o que LIGA o RBAC**, e a partir daí a tela passou a
+esconder tudo que não fosse grant explícito.
+
+**A prova de que era a tela, não o servidor.** `POST /campos-no` com corpo
+vazio, com a sessão do usuário: **400 de validação, não 403**. O servidor
+autorizava a escrita que a tela apresentava trancada.
+
+**O defeito.** `usePermissoes.pode()` reimplementava metade da regra:
+
+```ts
+if (!hospedado || !rbacAtivo) return true;
+return dados?.porRecurso?.[recurso]?.includes(acao) === true;  // só o eixo RBAC
+```
+
+O servidor tem **dois eixos** (SPEC-38 D3): `exigirPermissao` deixa o owner
+escrever sempre, e quem não é owner precisa de grant; `exigirEdicaoCurada` é a
+exceção — no recurso que algum papel carrega, o grant manda inclusive sobre
+owner. A tela só conhecia o segundo pedaço do primeiro eixo.
+
+**O comentário que previu o bug e ninguém foi conferir.** O spec
+`rbac-cadeado-e-pedido` já dizia, na abertura: *"O usuário do teste entra com
+nível `operar` — owner passaria pelo bypass da SPEC-38 e o teste mediria o
+portão errado"*. Estava certo sobre o servidor. Ninguém escreveu o caso do
+owner na TELA, que é onde o bypass não existia. Fica a régua: **comentário que
+justifica NÃO testar um caminho é candidato a teste, não a documentação.**
+
+**A correção.** O eixo que faltava não dava pra deduzir no cliente: `porRecurso`
+diz o que EU tenho, nunca se OUTRO papel carrega o recurso — e é isso que liga
+a curadoria. Então o servidor passou a contar: `/permissoes/minhas` ganhou
+`curados`, alimentado por um `recursosCurados()` que é a mesma consulta que o
+`exigirEdicaoCurada` já fazia. Com os dois eixos em mãos, `pode()` espelha a
+regra inteira. `curados` ausente **fecha** o eixo em vez de chutar — abrir demais
+mostraria botão que devolve 403, que é pior que cadeado porque promete e falha.
+
+**Aferido, não presumido.** Antes de escrever teste, reproduzi contra o banco de
+desenvolvimento e contra a stack rebuildada: menu aberto no navegador com o
+usuário real, **12 áreas, zero cadeados** (era só "Acessos" antes). As duas
+suítes novas foram mordidas: revertendo o `pode()`, 2 unitários e o E2E novo
+ficam vermelhos — e o E2E prova os dois eixos na mesma tela, porque o recurso
+curado por outro papel continua trancado até para o owner.
+
+1.082 unitários, lint limpo, 67/67 E2E.
+
+**Correção do §219 junto.** Eu tinha registrado que a decisão de não migrar pro
+Forge veio desta credencial não ser admin da Atlassian. Era este cadeado aqui,
+que não tem nada a ver com Forge. A decisão continua; a causa que atribuí a
+ela, não. Deixei o raciocínio errado visível na entrada, porque apagá-lo
+esconderia como se chega a uma conclusão plausível e falsa: o motivo real
+estava disponível, e eu preferi o que casava com a pesquisa que eu acabara de
+fazer.

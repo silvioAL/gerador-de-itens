@@ -5,7 +5,7 @@ import type { OpcoesApp } from "../app.js";
 import { registrarAuditoria } from "../auditoria.js";
 import { exigirSessao } from "../auth/middleware.js";
 import { maiorNivel, nivelNoTime } from "../auth/niveis.js";
-import { ACOES, RECURSOS, exigirPermissao, resolverPermissoes } from "../auth/permissoes.js";
+import { ACOES, RECURSOS, exigirPermissao, recursosCurados, resolverPermissoes } from "../auth/permissoes.js";
 import { organizacoes, papeisAcesso, papelPermissao, timePapel, times, usuarioPapel } from "../db/schema.js";
 
 /**
@@ -55,9 +55,13 @@ export async function registrarRotasAcessos(app: FastifyInstance, { db }: Opcoes
     const nivel = timeId
       ? await nivelNoTime(db, req.usuario!.email, timeId)
       : await maiorNivel(db, req.usuario!.email);
-    if (!orgId) return { rbacAtivo: false, porRecurso: {}, nivel };
+    if (!orgId) return { rbacAtivo: false, porRecurso: {}, nivel, curados: [] };
     const permissoes = await resolverPermissoes(db, orgId, req.usuario!.email, timeId ?? null);
-    return { ...permissoes, nivel };
+    // §220 — `porRecurso` diz o que EU tenho; `curados` diz onde a curadoria
+    // está ligada (algum papel carrega o recurso). Sem os dois, a tela não tem
+    // como espelhar o owner-bypass sem abrir demais no recurso curado.
+    const curados = await recursosCurados(db, orgId);
+    return { ...permissoes, nivel, curados };
   });
 
   /** Catálogo — a UI monta a matriz recurso×ação a partir daqui, nunca de uma

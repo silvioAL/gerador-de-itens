@@ -1005,6 +1005,10 @@ export interface PermissoesMinhas {
   /** SPEC-38 — o nível no time consultado (ou o MAIOR nível da pessoa, sem
    * `timeId`). `null` = não é membro de time nenhum. */
   nivel?: NivelTime | null;
+  /** §220 — recursos cuja curadoria está LIGADA (algum papel da organização os
+   * carrega). Nesses, nem owner edita sem grant; fora deles, owner edita.
+   * Ausente = servidor antigo, e aí o hook cai no comportamento conservador. */
+  curados?: string[];
 }
 
 export const apiAcessos = {

@@ -3,10 +3,13 @@
 > ## ⛔ DECIDIDO: a migração **não** vai acontecer
 >
 > Decisão do usuário em **14/08/2026**, textualmente: *"não vamos migrar,
-> decidido"*. Motivo declarado: a credencial `silvioaltr@gmail.com` **não tem
-> perfil de admin** — que é exatamente o pré-requisito organizacional levantado
-> na §2.9 (um admin de site precisa instalar o app) e na fase −1 do roteiro
-> (o Developer Space precisa ser da empresa, com billing admin da empresa).
+> decidido"*. **Motivo não declarado.**
+>
+> Correção de um erro meu: eu havia registrado aqui que a decisão vinha da
+> credencial `silvioaltr@gmail.com` não ser admin da Atlassian. Não era —
+> a frase do usuário era sobre o **cadeado dentro do próprio Gerador**
+> (defeito de RBAC na tela, corrigido no §220), e nada tinha a ver com o
+> Forge. A decisão continua valendo; a causa que atribuí a ela, não.
 >
 > **Nada abaixo deve ser lido como plano.** O roteiro da §9 não está em fila,
 > não está adiado e não tem dono. O produto segue no modo hospedado da SPEC-33.
