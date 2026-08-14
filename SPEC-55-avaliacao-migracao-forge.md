@@ -195,21 +195,45 @@ grátis.
 > trabalha**, instalado nos sites da própria empresa. Publisher e usuário são a
 > mesma organização. Nada disso vai pro Marketplace.
 
-Os três caminhos existentes, para registro:
+#### Duas etapas que é fácil confundir com dois caminhos
 
-1. **Só as instâncias da própria empresa** — `forge deploy -e production` +
-   `forge install`. Instala **direto pelo CLI, sem habilitar compartilhamento
-   nenhum**. É o nosso caminho.
-2. **Distribuição privada por link** — habilita *Sharing* no Developer Console e
-   gera um **link de instalação**, que se pode restringir ou regenerar depois
-   (links antigos morrem; instalações existentes continuam). Útil se a empresa
-   tiver vários sites Atlassian e não se quiser rodar CLI contra cada um. Quem
-   recebe o link precisa ser **admin do site**. Atenção: app Forge **não é
-   compatível com listagem privada de Marketplace** — privado é via link ou CLI,
-   ponto. E app com `license` no manifesto **não pode** usar link de instalação.
+**Publicar (deploy) é sempre CLI. Instalar pode ser por interface.** Não existe
+upload de app por tela: o código só chega na plataforma via `forge deploy`,
+rodado por uma pessoa ou pela CI. O que a interface resolve é a *outra* metade —
+quem instala não precisa de CLI nenhum.
+
+Os caminhos de instalação, para registro:
+
+1. **`forge install` pelo CLI** — direto nos sites da própria empresa, sem
+   habilitar compartilhamento nenhum. Serve para desenvolvimento e para quem já
+   tem o CLI configurado.
+2. **Link de instalação (interface)** — no Developer Console: **Distribution →
+   Edit → Sharing**, preencher os dados do app, escolher em quais produtos
+   Atlassian ele pode ser instalado, salvar. Isso gera um link. O **admin do
+   site** abre o link no navegador e vê uma tela com as informações do app, **as
+   permissões que ele pede** e um dropdown para escolher site e produto —
+   confirma ali, e a instalação acontece do lado da Atlassian. Atualizações
+   depois disso saem pela página **Connected apps** do site. O link pode ser
+   regenerado a qualquer momento (os antigos morrem; quem já instalou continua).
 3. **Marketplace público** — declarar cada escopo de API com justificativa e
    cada hostname remoto para onde o app manda requisição, com decisão da
    Atlassian em ~1 semana. **Fora de escopo.**
+
+**O desenho recomendado é o 1 para desenvolvimento e o 2 para o resto:** a CI
+faz `forge deploy`, o admin instala pelo navegador. Ninguém no time precisa do
+CLI além de quem mexe no pipeline.
+
+Restrições do link, todas satisfeitas pelo nosso caso: o app **não pode ser
+pago**, **não pode ter `license` no `manifest.yml`** e **não pode ter sido
+submetido ao Marketplace**. Vale notar que app Forge **não é compatível com
+listagem privada de Marketplace** — privado é por link ou CLI, ponto.
+
+> **Rolling releases amenizam o atrito de escopo.** A plataforma separa o deploy
+> do código da aprovação de permissões: o que for compatível sobe enquanto o
+> admin ainda não aprovou os escopos novos. Isso torna o major version upgrade
+> disparado pelo módulo `llm` menos bloqueante do que "o release para até alguém
+> clicar" — mas não o elimina: as capacidades que dependem do escopo novo só
+> ligam depois da aprovação.
 
 #### O que cai fora do problema por ser interno
 
@@ -230,11 +254,12 @@ Os três caminhos existentes, para registro:
    conta pessoal de quem desenvolve. Isso é ação de procurement/TI, não de
    engenharia, e é a única coisa desta migração que **não** se resolve escrevendo
    código. Vale começar por ela.
-2. **Um admin de site precisa instalar** e aprovar as permissões. Adicionar o
-   módulo `llm` ou mudar escopo dispara **major version upgrade**, que exige
-   nova aprovação do admin. Sendo interno o admin é um colega, mas é uma pessoa
-   a mais no caminho de cada release que mexe em permissão — planejar as
-   permissões de uma vez em vez de descobri-las aos poucos.
+2. **Um admin de site precisa instalar** (por interface, ver acima) e aprovar as
+   permissões. Adicionar o módulo `llm` ou mudar escopo dispara **major version
+   upgrade**, que exige nova aprovação. Sendo interno o admin é um colega, e
+   rolling releases evitam que o release inteiro pare — mas é uma pessoa a mais
+   no caminho de cada mudança de permissão. Planejar os escopos de uma vez, em
+   vez de descobri-los aos poucos, continua sendo o barato.
 3. **A revisão de segurança da empresa** substitui a da Atlassian. Diferente em
    forma, não em existência.
 
