@@ -535,14 +535,72 @@ Estratégia recomendada, em duas faixas:
   resolvers reais rodando em processo, contra um TiDB local. É o mesmo desenho
   do `gatewayFalso.ts` que já existe na suíte — a técnica está no repositório,
   só muda o que é falsificado. Preserva praticamente todos os casos atuais.
-- **Faixa fina (smoke, no deploy de staging):** meia dúzia de casos contra um
-  site Atlassian de desenvolvimento de verdade, com o app instalado — abrir a
-  global page, desenhar um nó, derivar, exportar. É o que pega o que só a
-  plataforma quebra (CSP, tamanho de payload, escopo faltando).
+- **Faixa fina (smoke, contra o `staging` instalado — §8.1):** meia dúzia de
+  casos com o app de verdade dentro do Jira — abrir a global page, desenhar um
+  nó, derivar, exportar. É o que pega o que só a plataforma quebra (CSP, tamanho
+  de payload, escopo faltando). A exportação é o caso que precisa apontar para
+  um projeto Jira dedicado, pelo motivo da §8.2.
 
 ---
 
-## 8. CI/CD
+## 8. CI/CD e o ambiente de homologação
+
+### 8.1 Homologação já vem de fábrica
+
+`forge create` cria **três ambientes** — `development`, `staging`,
+`production` — e dá pra criar mais com `forge environments create` (sem máximo
+documentado). **`staging` é o ambiente de homologação**, e não custa nada nem
+exige infraestrutura: é `forge deploy -e staging`.
+
+Vale medir o contraste, porque ele é maior do que parece: **hoje o projeto não
+tem homologação nenhuma.** `deploy.yml`, `docker-compose.prod.yml` e
+`infra/README.md` não mencionam staging em lugar nenhum — é uma VM, um banco, um
+domínio. Montar homologação no desenho atual significaria segunda VM, segundo
+Postgres, segundo DNS, segundo conjunto de segredos no Infisical e segundo alvo
+no Terraform. No Forge é uma flag.
+
+O que a plataforma garante entre ambientes:
+
+| | |
+|---|---|
+| Isolamento | **Cada ambiente é firewalled dos outros e não compartilha dado do app.** O storage de `staging` não é o de `production` |
+| Tetos | Diferentes por ambiente — em Forge SQL: **1 GiB produção, 256 MiB staging, 128 MiB dev/custom**. Dá pra homologar; não dá pra restaurar produção inteira |
+| Observabilidade | **`forge tunnel` e `forge logs` funcionam em staging; em produção, não.** É o argumento operacional mais forte pra ter homologação: é o único lugar onde se observa o app rodando de verdade |
+| Identificação | Título ganha sufixo `(STAGING)` / `(DEVELOPMENT)` na tela |
+
+### 8.2 A escolha real: mesmo site Jira ou site separado
+
+**Múltiplos ambientes do mesmo app podem ser instalados no mesmo site Jira**,
+inclusive em versões diferentes. Daí duas topologias:
+
+| | Mesmo site do Jira de produção | Site separado |
+|---|---|---|
+| Dado **do app** (quebras, itens, config) | Isolado por ambiente | Isolado |
+| Dado **do Jira** que o app lê | **O real** — homologa com contexto de verdade | Fictício |
+| Custo | Zero | Sandbox exige Premium/Enterprise, ou um site de desenvolvimento à parte |
+| Risco | Só um, e é nomeável ↓ | Nenhum |
+
+**O único ponto onde "mesmo site" machuca é a exportação pro tracker
+(SPEC-49).** Todo o resto do produto — diagrama, derivação, esteira, PDCA —
+grava apenas no storage do app, que é isolado por ambiente. Mas a exportação
+**cria work items de verdade**, e o Jira é o mesmo. Homologar exportação contra
+produção é gerar lixo em backlog real.
+
+Duas saídas, ambas baratas: um **projeto Jira dedicado à homologação** no mesmo
+site (resolve o caso e custa nada), ou site separado se a empresa já tiver
+sandbox disponível.
+
+> **Ressalva sobre sandbox.** Sandboxes Atlassian são de Premium/Enterprise, e
+> app Forge **pago** tem limitação conhecida para entrar em sandbox
+> ([ECO-99](https://jira.atlassian.com/browse/ECO-99)). Sendo o nosso interno e
+> sem `license` no manifesto, provavelmente não nos atinge — mas é do tipo que
+> se confirma testando, não lendo.
+
+**Recomendação:** `staging` instalado no **mesmo site**, com um projeto Jira
+dedicado para exercitar a exportação. É grátis, é o que o pipeline abaixo já
+faz, e é onde a faixa fina do E2E (§7.2) passa a rodar.
+
+### 8.3 O pipeline
 
 O pipeline atual (dois jobs, ~2min40) evolui em vez de ser substituído:
 
@@ -554,9 +612,9 @@ PR  ─┬─ build --workspaces
      ├─ forge lint                    ← novo
      └─ e2e faixa larga (Chromium + bridge falso)
 
-merge em main ─┬─ forge deploy -e staging
+merge em main ─┬─ forge deploy -e staging      ← homologação (§8.1)
                ├─ forge install --non-interactive
-               └─ e2e faixa fina (site de desenvolvimento)
+               └─ e2e faixa fina (contra o staging instalado)
 
 manual ─── forge deploy -e production   (aprovação de escopos pelo admin)
 ```
@@ -569,6 +627,9 @@ docker-compose, Infisical, os quatro secrets do GitHub do `infra/README.md`, o
 workflow `deploy.yml`. Em linhas de infraestrutura que deixam de ser mantidas
 por nós, este é provavelmente o maior ganho isolado da migração inteira — e o
 menos discutido.
+
+**O que nasce sem custo:** um ambiente de homologação que hoje não existe, com
+logs e tunnel que produção não tem.
 
 ---
 
