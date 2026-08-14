@@ -26,7 +26,7 @@ O objetivo não é "reescrever a mesma ferramenta melhor". É mudar o que a ferr
 
 Esta é a decisão de produto mais importante tomada nesta fase, e o que diferencia esta ferramenta de "mais um desenhador de arquitetura":
 
-1. **Projeto do zero** — a pessoa desenha o diagrama nó a nó, o painel de propriedades pergunta o que precisa ser decidido, a prontidão mostra o que falta.
+1. **Projeto do zero** — a pessoa desenha o diagrama nó a nó na mesa de projeto, o painel de propriedades pergunta o que precisa ser decidido, a prontidão mostra o que falta.
 2. **Projeto existente** — o repositório já tem código. Descrever o que já existe continua sendo trabalho de quem conhece o sistema: nós `status: existente` são marcados à mão, e a proveniência (`manual`/`extraido`/`inferido`/`sugerido`) diz de onde veio cada valor. Houve um importador de `graph.json` do Graphify (MVP5, SPEC-06 §5) — removido em §212: exigia um mapeamento de caminho→tipo que só quem conhecia o formato mantinha, e não era usado.
 
 A proveniência (§6.4) é o mecanismo que torna a jornada 2 segura: nada extraído ou inferido conta como decidido até alguém olhar e confirmar.
@@ -56,7 +56,7 @@ gerador/
 ├── config/       diagrama.json (tipos de nó/aresta), app.json (vocabulário
 │   │             techs/contextos), regras.json (refinamento técnico por tech),
 │   │             perfis-time.json (stack conhecida por time),
-│   │             cenarios/ (exemplos prontos pro canvas, carregados em runtime),
+│   │             cenarios/ (exemplos prontos pra mesa de projeto, carregados em runtime),
 │   │             referencias/ (trechos de código real guardados como referência,
 │   │             mesmo carregamento em runtime)
 ├── fixtures/     casos compartilhados entre as suítes do engine e do web

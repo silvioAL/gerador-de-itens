@@ -813,7 +813,7 @@ function AppCarregado({
             setMostrarJornada(true);
           }}
           data-testid="abrir-cenarios"
-          title="Diagramas prontos pra carregar no canvas e experimentar"
+          title="Diagramas prontos pra carregar na mesa de projeto e experimentar"
           style={botaoExperimentarEstilo}
         >
           ✦ Cenários prontos
@@ -1148,7 +1148,7 @@ function AppCarregado({
                     }
                   : momentoCanvas === "m3"
                     ? {
-                        texto: "Diagrama no canvas. Agora é preencher os campos de cada componente — o semáforo mostra o que falta; vermelho trava a derivação.",
+                        texto: "Diagrama na mesa de projeto. Agora é preencher os campos de cada componente — o semáforo mostra o que falta; vermelho trava a derivação.",
                         onDispensar: () => dispensar("m3"),
                       }
                     : momentoCanvas === "m2"

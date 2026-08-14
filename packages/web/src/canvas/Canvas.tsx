@@ -101,7 +101,7 @@ export function Canvas({ quebraState, config }: CanvasProps) {
   } = quebraState;
 
   /**
-   * ACHADO REAL do usuário: depois de "Aplicar ao canvas" os componentes "não
+   * ACHADO REAL do usuário: depois de "Aplicar à mesa de projeto" os componentes "não
    * aparecem", e com nós pré-existentes "não aparecem nem assim".
    *
    * A prop `fitView` abaixo enquadra SÓ no primeiro render — é o

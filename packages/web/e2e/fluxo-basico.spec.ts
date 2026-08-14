@@ -103,7 +103,7 @@ test("perfil de stack do time sugere linguagem/framework do serviço", async ({ 
   await page.getByRole("button", { name: /Stacks conhecidas/ }).click();
   const telaConfig = page.locator('[data-tour="config-screen-content"]');
   await expect(telaConfig.getByText("linguagem:", { exact: false }).first()).toBeVisible();
-  await page.getByRole("button", { name: "Voltar ao canvas" }).click();
+  await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
 
   await page.screenshot({ path: "e2e/screenshots/perfil-time.png", fullPage: true });
 });

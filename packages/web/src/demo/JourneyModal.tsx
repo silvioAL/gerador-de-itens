@@ -238,15 +238,15 @@ function Cenarios({
               aria-label={`Carregar cenário: ${cenario.titulo}`}
               title="Substitui o diagrama atual por este cenário"
             >
-              Carregar no canvas
+              Carregar na mesa de projeto
             </button>
             <button
               onClick={() => adicionar(cenario)}
               style={{ ...botaoAdicionarEstilo, flex: 1 }}
-              aria-label={`Adicionar cenário ao canvas: ${cenario.titulo}`}
+              aria-label={`Adicionar cenário à mesa de projeto: ${cenario.titulo}`}
               title="Injeta os nós deste cenário no diagrama atual, sem substituir"
             >
-              {adicionadoId === cenario.id ? "✓ Adicionado" : "+ Adicionar ao canvas"}
+              {adicionadoId === cenario.id ? "✓ Adicionado" : "+ Adicionar à mesa de projeto"}
             </button>
           </div>
         </div>

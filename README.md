@@ -12,7 +12,7 @@
 >
 > Motivo, medições e roteiro: [`SPEC-33-modo-unico-hospedado.md`](SPEC-33-modo-unico-hospedado.md).
 
-Ferramenta de quebra técnica: desenhe um diagrama de arquitetura (serviços, filas, bancos, processos de negócio, regras...) num canvas visual, preencha um painel de propriedades dirigido por config, e derive **deterministicamente** itens de trabalho com dependências reais — agnóstico de qual sistema de tracking recebe isso depois. Nada aqui é gerado por um LLM adivinhando a partir de uma descrição solta — sempre por regras explícitas em `config/diagrama.json`.
+Ferramenta de quebra técnica: desenhe um diagrama de arquitetura (serviços, filas, bancos, processos de negócio, regras...) na **mesa de projeto**, preencha um painel de propriedades dirigido por config, e derive **deterministicamente** itens de trabalho com dependências reais — agnóstico de qual sistema de tracking recebe isso depois. Nada aqui é gerado por um LLM adivinhando a partir de uma descrição solta — sempre por regras explícitas em `config/diagrama.json`.
 
 Não é um gerador de prompt de IA. O mesmo diagrama sempre produz os mesmos itens.
 
@@ -191,9 +191,9 @@ Também dá pra ver a jornada de linha de comando dentro do próprio app web: bo
 
 ## O que você pode fazer
 
-- **Desenhar um diagrama** no canvas — 14 tipos de nó prontos (serviço, fila Rabbit/Kafka, banco Mongo/SQL, processo Camunda, motor de decisão FICO, API externa, job, regra de negócio, cache Redis/Caffeine, storage S3/Blob, batch Spring Batch), mais gRPC/GraphQL como tipos de conexão pra chamada interna entre serviços — cada tipo com seu próprio painel de campos condicionais.
-- **Ver o que falta** — cada nó tem um semáforo (vermelho/amarelo/verde); o resumo no topo do canvas mostra a lista de pendências e um botão "Próximo pendente" pra navegar direto até elas.
-- **Carregar ou compor cenários prontos** — 11 exemplos validados (um por tipo de nó, mais um fluxo completo de 8 nós) via o modal "✦ Como funciona & cenários"; "Adicionar ao canvas" injeta um cenário no diagrama atual sem substituir o que já existe.
+- **Desenhar um diagrama** na mesa de projeto — 14 tipos de nó prontos (serviço, fila Rabbit/Kafka, banco Mongo/SQL, processo Camunda, motor de decisão FICO, API externa, job, regra de negócio, cache Redis/Caffeine, storage S3/Blob, batch Spring Batch), mais gRPC/GraphQL como tipos de conexão pra chamada interna entre serviços — cada tipo com seu próprio painel de campos condicionais.
+- **Ver o que falta** — cada nó tem um semáforo (vermelho/amarelo/verde); o resumo no topo da mesa de projeto mostra a lista de pendências e um botão "Próximo pendente" pra navegar direto até elas.
+- **Carregar ou compor cenários prontos** — 11 exemplos validados (um por tipo de nó, mais um fluxo completo de 8 nós) via o modal "✦ Como funciona & cenários"; "Adicionar à mesa de projeto" injeta um cenário no diagrama atual sem substituir o que já existe.
 - **Capturar a stack do time direto do uso** — preencheu campos manualmente num nó (linguagem, framework...) com o time da quebra definido? Um botão no painel salva esses valores como padrão do time em `perfis-time.json` — próximo nó do mesmo tipo já sugere o valor conhecido, sem reconfigurar do zero.
 - **Derivar os itens** — motor determinístico que calcula dependências a partir das arestas do diagrama, detecta ciclos e conflitos antes de deixar você seguir.
 - **Revisar e exportar** — depois de derivar, expanda cada item pra ver a especificação técnica completa, o refinamento e os critérios de aceite em Gherkin, sem precisar copiar nada à parte. Um clique gera um único markdown — a **especificação de solução** da quebra inteira (contexto, visão geral, cada item completo, DoR/DoD no fim) — pronto pra ser o input de outro agente (ex.: o que sobe os itens pro sistema de tracking do time).

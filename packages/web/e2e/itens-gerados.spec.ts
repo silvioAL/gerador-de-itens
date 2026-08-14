@@ -53,8 +53,8 @@ test("gerar itens na revisão abre a tela #/itens com cards e completude", async
   await page.getByTestId("item-expandir-0").click(); // recolher é o que é sob demanda
   await expect(page.getByTestId("item-corpo-0")).toHaveCount(0);
 
-  // Voltar ao canvas devolve a revisão (escondida, não desmontada).
-  await page.getByRole("button", { name: "Voltar ao canvas" }).click();
+  // Voltar à mesa de projeto devolve a revisão (escondida, não desmontada).
+  await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
   await expect(page.getByTestId("itens-screen")).not.toBeVisible();
 });
 
@@ -128,9 +128,9 @@ test("§210 — trocar de demanda NÃO leva junto os itens da anterior", async (
   // primeira volta fecha os itens, a segunda fecha a revisão. Encadear os dois
   // cliques sem esperar falhou na CI (mais lenta que a máquina local) com
   // "click timeout" — a revisão ainda estava por cima e interceptava o ☰.
-  await page.getByRole("button", { name: "Voltar ao canvas" }).click();
+  await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
   await expect(page.getByTestId("itens-screen")).toBeHidden();
-  const fecharRevisao = page.getByRole("button", { name: "Voltar ao canvas" });
+  const fecharRevisao = page.getByRole("button", { name: "Voltar à mesa de projeto" });
   if (await fecharRevisao.isVisible().catch(() => false)) {
     await fecharRevisao.click();
   }
@@ -214,8 +214,8 @@ test("§210 — demanda NOVA (sem id) não herda os itens escritos da anterior",
   expect(await page.locator('[data-testid^="item-"]').count()).toBeGreaterThan(0);
 
   // Começar outra demanda do zero — o "Nova quebra" do menu.
-  await page.getByRole("button", { name: "Voltar ao canvas" }).click();
-  await page.getByRole("button", { name: "Voltar ao canvas" }).click();
+  await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
+  await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
   await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: "Nova quebra" }).click();
 

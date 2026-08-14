@@ -870,7 +870,7 @@ export function ReviewScreen({
               nos demais casos). O contêiner fica pro spotlight do tour. */}
         </div>
         <button onClick={onFechar} style={botaoEstilo}>
-          Voltar ao canvas
+          Voltar à mesa de projeto
         </button>
       </header>
 
@@ -1389,7 +1389,7 @@ export function ReviewScreen({
         <div className="assistente-janela" style={balaoM7Estilo} data-testid="balao-sem-contexto" role="status">
           <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: "var(--texto-2)" }}>
             Sem o Contexto do épico, as sugestões de IA e o documento final saem mais pobres — quer colar o material
-            da demanda? Fica na aba “📎 Contexto do épico” do assistente, lá no canvas.
+            da demanda? Fica na aba “📎 Contexto do épico” do assistente, lá na mesa de projeto.
           </p>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
             <button
@@ -1568,7 +1568,7 @@ function Insumos({ ficha }: { ficha: FichaItem }) {
             <pre style={preEstilo}>{ficha.criteriosAceiteMarkdown}</pre>
           </div>
           <div>
-            <span style={lblEstilo}>Campos preenchidos no canvas</span>
+            <span style={lblEstilo}>Campos preenchidos na mesa de projeto</span>
             <AbaContrato ficha={ficha} />
           </div>
           <AbaTestes ficha={ficha} />

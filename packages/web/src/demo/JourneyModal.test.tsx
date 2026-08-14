@@ -129,7 +129,7 @@ describe("JourneyModal", () => {
 
     await user.click(screen.getByRole("button", { name: `Cenários prontos (${cenarios.length})` }));
     const cenarioMongo = cenarios.find((c) => c.id === "mongo")!;
-    await user.click(screen.getByRole("button", { name: `Adicionar cenário ao canvas: ${cenarioMongo.titulo}` }));
+    await user.click(screen.getByRole("button", { name: `Adicionar cenário à mesa de projeto: ${cenarioMongo.titulo}` }));
 
     expect(onAdicionarCenario).toHaveBeenCalledWith(cenarioMongo.quebra);
     expect(onCarregarCenario).not.toHaveBeenCalled();

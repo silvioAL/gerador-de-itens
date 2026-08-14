@@ -29,7 +29,7 @@ test("jornada abre sozinha no primeiro acesso, explica as saídas, e some ao fec
   await expect(page.getByText("Como funciona o Gerador de Itens")).not.toBeVisible();
 });
 
-test("carregar um cenário pronto popula o canvas e deriva sem ciclos/conflitos", async ({ page }) => {
+test("carregar um cenário pronto popula a mesa de projeto e deriva sem ciclos/conflitos", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   await entrar(page);
 
@@ -105,7 +105,7 @@ test("declarar uma stack conhecida faz um Serviço novo de QUALQUER time já sug
   // Grava direto no servidor — o valor aparece no card da stack.
   await expect(cardStack.getByText("linguagem:", { exact: false })).toBeVisible();
 
-  await page.getByRole("button", { name: "Voltar ao canvas" }).click();
+  await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
 
   // Login como time-checkout já deixou esse time ativo no header (select, não
   // mais texto livre) — um Serviço novo já nasce sugerindo o valor recém-declarado.
@@ -115,7 +115,7 @@ test("declarar uma stack conhecida faz um Serviço novo de QUALQUER time já sug
   await expect(page.getByText("usar sugestão: Java").first()).toBeVisible();
 });
 
-test("adicionar dois cenários ao canvas (sem substituir) compõe um diagrama maior, sem colidir IDs, e deriva tudo junto", async ({
+test("adicionar dois cenários à mesa de projeto (sem substituir) compõe um diagrama maior, sem colidir IDs, e deriva tudo junto", async ({
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
@@ -123,12 +123,12 @@ test("adicionar dois cenários ao canvas (sem substituir) compõe um diagrama ma
 
   await page.getByTestId("abrir-cenarios").click();
 
-  await page.getByRole("button", { name: "Adicionar cenário ao canvas: Dados não-relacionais" }).click();
+  await page.getByRole("button", { name: "Adicionar cenário à mesa de projeto: Dados não-relacionais" }).click();
   await expect(page.getByText("✓ Adicionado")).toBeVisible();
   // Não fecha o modal — dá pra adicionar outro em seguida.
   await expect(page.getByText("Como funciona o Gerador de Itens")).toBeVisible();
 
-  await page.getByRole("button", { name: "Adicionar cenário ao canvas: Streaming Kafka" }).click();
+  await page.getByRole("button", { name: "Adicionar cenário à mesa de projeto: Streaming Kafka" }).click();
   await page.getByRole("button", { name: "Fechar" }).click();
 
   // 4 nós do mongo (2) + kafka (3) = 5, mas mongo e kafka cada um tem um "Serviço"

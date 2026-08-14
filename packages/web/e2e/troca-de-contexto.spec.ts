@@ -65,7 +65,7 @@ test("§214 — trocar o produto da demanda troca o contexto que vai no prompt",
     // Troca para o produto B: o prompt tem que acompanhar. Um contexto que
     // fica "pregado" seria o defeito do §210 na camada que mais importa — o
     // que o modelo lê para escrever o item.
-    await page.getByRole("button", { name: "Voltar ao canvas" }).click();
+    await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
     await escolherProduto(nomeB);
     await page.locator('[data-tour="derivar-button"]').click();
     await page.getByTestId("assistente-balao-secundaria").click();
