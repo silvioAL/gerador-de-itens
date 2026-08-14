@@ -6229,3 +6229,70 @@ temos X", medir no código — duas das minhas afirmações da v1 vieram de
 documentação, e uma estava errada.
 
 Nada de produção mudou nesta rodada.
+
+## 225. Monte Carlo: a pergunta certa não é matemática, é de proveniência
+
+Pergunta do usuário depois de ler a §4 da SPEC-56: *"seria útil rodar algo como
+Monte Carlo com esses dados? seria uma engine diferente da que existe no
+projeto"*. Registrado em SPEC-56 §12.1.
+
+**Primeiro tive que admitir um defeito do que eu mesmo propus.** A aritmética de
+pior caso **grita lobo**: somar tetos ao longo de oito saltos de 300ms dá 2,4s,
+número que por construção quase nunca acontece — exigiria todos os saltos
+estourando na mesma requisição. Alerta que aparece em todo caminho com mais de
+três nós é alerta que se aprende a ignorar. Pior caso é honesto e barato, e é
+uma régua grosseira; eu tinha recomendado sem dizer isso.
+
+**Onde Monte Carlo não é refinamento, é correção.** Três casos, e o segundo é o
+forte:
+
+1. cauda de uma cadeia — p99 de uma soma não é a soma dos p99, e a conta
+   analítica pede convolução; amostrar é mais simples que resolver;
+2. **fan-out** — um nó que chama N serviços em paralelo espera pelo MÁXIMO. Com
+   p99 de 100ms cada, a chance de nenhuma passar disso é `0,99^N`: com N=100,
+   **63% das requisições pegam pelo menos um salto lento**. O pior caso diz
+   "300ms", a média diz "40ms", e as duas estão erradas sobre a experiência
+   real;
+3. probabilidade de completar dentro do orçamento com retry, backoff e fallback
+   interagindo.
+
+Nos três a aritmética não é conservadora — é **errada**, que é diferente de ser
+grosseira.
+
+**O portão, e é aqui que a resposta deixa de ser sobre matemática.** Monte Carlo
+não cria informação: compõe as distribuições que recebe. Alimentado com chute,
+devolve o chute com intervalo de confiança em volta — a aparência de rigor sem
+ganho de conhecimento, que é exatamente a falsa precisão contra a qual a
+proveniência deste projeto existe.
+
+E o mecanismo para decidir isso **já está no modelo**: `Origem = manual |
+extraido | inferido | sugerido`, com `evidencia` em cima do `extraido`. A regra
+sai sozinha, na mesma forma do §6.4 do CONTEXTO: distribuição construída sobre
+valor `manual` não produz número que o produto apresente como achado; onde a
+entrada é chute, o produto diz "não tenho medição para este trecho".
+
+Isso partiu o diagrama em dois territórios, e a divisão explica o produto melhor
+do que eu esperava: para nó `novo`, o número é uma **decisão** (um teto que
+alguém escolheu honrar) e pior caso é a régua certa; para nó `existente` com
+observabilidade, o número pode ser uma **medição**, e aí a distribuição é real.
+A ferramenta é sobre o que ainda vai ser construído — então o território
+determinístico é o maior, e isso não é limitação, é o assunto.
+
+**"É uma engine diferente?"** Como código, não: Monte Carlo com `seed` é
+determinístico (mesma entrada + mesma semente = mesma saída) e cabe como função
+pura ao lado do `derivar()`. Como epistemologia, sim: `derivar()` produz fatos
+sobre o desenho, Monte Carlo produz estimativa sobre a realidade. A exigência
+que isso cria é de interface, não de arquitetura — se as duas aparecerem com a
+mesma tipografia, a estimativa pega emprestada a autoridade do fato.
+
+**O custo real não é o amostrador.** É pedir distribuição a uma pessoa, que
+ninguém sabe responder. Mitigação concreta: pedir p50 e p99 (que estão no
+dashboard dela) e ajustar uma log-normal — duas perguntas respondíveis em vez de
+uma impossível.
+
+**Como decidir sem discutir:** depois de P1+P2, medir quantos nós de quebras
+reais chegam com `origem: extraido`. Se forem poucos, não há o que compor e a
+resposta é "não vale". A medição é barata e encerra o assunto — no espírito do
+§190: construir o instrumento em vez de continuar argumentando.
+
+Nada de produção mudou nesta rodada.
