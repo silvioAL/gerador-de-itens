@@ -6432,3 +6432,59 @@ numa aba de relatório — semáforo funciona porque está em cima do que se est
 editando.
 
 Nada de produção mudou nesta rodada.
+
+## 228. O fluxo antes do código
+
+Pedido do usuário: *"o fluxo de trabalho deve ficar claro antes de codarmos"*.
+Saída em [`SPEC-57-fluxo-da-mesa-de-projeto.md`](SPEC-57-fluxo-da-mesa-de-projeto.md).
+
+A SPEC-56 acumulou o **quê** ao longo de quatro correções — a cadeia
+propósito→decisão→elemento→item→spec, as seis dimensões de medida, a divisão de
+trabalho com o agente. Faltava o **como se trabalha**, e sem isso qualquer
+código começaria pelo pedaço que parece mais divertido.
+
+**O que apareceu ao escrever momento a momento, e que nenhuma das versões
+anteriores tinha mostrado:**
+
+**M4 acontece duas vezes.** Escrevi o passeio de um caso concreto (checkout com
+pagamento externo) e o agente precisou falar de novo *depois* da decisão: a
+pessoa escolheu fila em vez de chamada direta, e isso quebrou o requisito de
+resposta em 2s. Medir → conversar → decidir → **remedir** é ciclo, não fila. A
+tabela de momentos escondia isso; o passeio expôs. Foi por isso que o diagrama
+do §2 desenhou M2→M5 como laço.
+
+**A confiança piora quando se aceita sugestão — e isso é feature.** No delta que
+a proposta do agente mostra antes de aceitar, o fan-out melhora, as violações
+caem, e a **confiança do desenho cai** (porque aceitar sem conferir aumenta a
+parcela de `sugerido`). Esse número é o que impede a interação de virar "aceitar
+tudo": o preço de não olhar fica visível na mesma tela em que se aceita.
+
+**A régua que evita ADR virar wiki.** ADR nasce de **escolha entre alternativas
+ou de exceção consciente** — nunca de "preencher um campo". Sem isso, todo campo
+vira ADR e o mecanismo morre de excesso. Os três casos de decisão do M5 existem
+só para separar isso.
+
+**A exceção registrada é dado de melhoria.** Se o mesmo padrão é violado por
+cinco times, o padrão está errado, não os times — e isso cai direto no PDCA que
+já existe. A válvula da regra 3 não é concessão; é instrumento.
+
+**Cinco perguntas que precisam de resposta antes do primeiro commit**, e uma
+delas é a que mais me incomoda: **padrão vive onde?** Já temos `regras.json`,
+`camposNo` e `perfis-time.json`. Se "padrão verificável" virar um quarto lugar,
+provavelmente está errado — e essa é a pergunta que decide se a fatia B é
+extensão ou invenção.
+
+**Fatiamento com um critério honesto:** cada fatia entrega um fluxo completo e
+usável, não um pedaço de encanamento. Recomendei **A (propósito) primeiro** —
+fecha a cadeia da frente, que é o objetivo declarado, e não depende de nada — e
+**D (proposta medida) em seguida**, porque é a mais barata (o mecanismo de
+`sugerido` já existe) e a que melhor demonstra a tese. Com a consequência dita
+em voz alta: se D não encantar na prática, o resto do plano merece nova conversa
+antes de continuar.
+
+E três coisas que o documento **não** resolve, ditas como tal: a UI de cada
+momento, o custo de token de um agente que fala a cada mudança, e o que
+acontece com as quebras que já existem quando requisitos passarem a existir —
+todas nascem com gap, e "todo mundo fica vermelho" não é resposta aceitável.
+
+Nada de produção mudou nesta rodada.
