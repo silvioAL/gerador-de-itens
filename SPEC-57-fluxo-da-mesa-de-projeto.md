@@ -264,6 +264,28 @@ Nada é substituído. O visual atual é a linguagem; o incremento é de dimensõ
 
 ---
 
+## 4.1 Decidido e construído — fatia A (§230)
+
+A fatia A saiu do papel. As respostas que a §5 pedia, **para o que a fatia A
+precisava**, foram decididas assim (as demais continuam abertas):
+
+| Pergunta (§5) | Decisão | Por quê |
+|---|---|---|
+| Requisito é da demanda ou do produto? | **Da demanda** | Referência ao produto é adição depois, e não custa nada estar fora agora |
+| Como se chama? | **`Necessidade`** | `Requisito` já é o item do checklist técnico; dois "requisito" com sentidos diferentes é pior que escolher a palavra certa para o novo |
+| Onde vive? | `jsonb` na `quebras` | Mesma razão de `respostasItens` — coleção que pertence à quebra, sem consulta transversal que justifique tabela |
+| Onde se edita? | No **📎 Contexto do épico** | É a mesma pergunta do painel ("do que esta demanda trata"), respondida em itens em vez de prosa |
+| Onde se vincula? | **No painel da necessidade** | É onde a lacuna aparece. Ligar a partir do nó é o incremento seguinte |
+| Lacuna bloqueia derivar? | **Não — avisa** | Bloquear no primeiro dia ensina a ignorar a cor |
+| Nó sem necessidade é erro? | **Não — informativo** | Infraestrutura legítima existe sem propósito de negócio |
+| Apagar o nó limpa o vínculo? | **Não** | O vínculo órfão é o evento que precisa reaparecer; cascata em silêncio esconderia |
+
+**O que ficou de fora, de propósito:** ligar a partir do painel do nó, e a
+necessidade proposta pelo agente (o modelo já aceita `origem: "sugerido"` e o
+painel já sabe confirmá-la — falta só quem proponha).
+
+---
+
 ## 5. As perguntas que precisam de resposta antes do primeiro commit
 
 Honestas, e cada uma muda o desenho:

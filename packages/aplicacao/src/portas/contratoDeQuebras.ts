@@ -80,6 +80,58 @@ export function testarContratoDeQuebras(nomeDoAdaptador: string, criarAmbiente: 
       expect(criada.respostasItens).toEqual({});
       expect(criada.demandInfo).toBe("");
       expect(criada.anexosContexto).toEqual([]);
+      expect(criada.necessidades).toEqual([]);
+    });
+
+    it("o PROPÓSITO sobrevive ao salvar e voltar, com vínculo e proveniência", async () => {
+      // Mesma lição da migração 0011 e da SPEC-53, terceira vez: campo novo
+      // que não é ligado ponta a ponta some em silêncio entre a borda e o
+      // banco, e o defeito só aparece quando alguém salva e perde o trabalho.
+      const repo = await comRepo();
+      const necessidades = [
+        {
+          id: "r1",
+          texto: "o pedido não pode ser cobrado duas vezes",
+          prioridade: "alta" as const,
+          origem: "manual" as const,
+          atendidaPor: ["n1"],
+        },
+        {
+          id: "r2",
+          texto: "proposta do agente, ainda não confirmada",
+          origem: "sugerido" as const,
+          confirmado: false,
+          atendidaPor: [],
+        },
+      ];
+
+      const criada = await repo.criar(normalizarDadosQuebra({ diagrama: DIAGRAMA, necessidades }));
+      const lida = await repo.obter(criada.id);
+
+      expect(lida?.necessidades).toEqual(necessidades);
+    });
+
+    it("atualizar troca as necessidades inteiras, sem mesclar com as antigas", async () => {
+      // Coleção da quebra é substituída, não fundida: mesclar faria uma
+      // necessidade apagada na tela voltar do banco, que é o tipo de
+      // ressurreição que ninguém entende olhando a UI.
+      const repo = await comRepo();
+      const criada = await repo.criar(
+        normalizarDadosQuebra({
+          diagrama: DIAGRAMA,
+          necessidades: [{ id: "r1", texto: "primeira", origem: "manual", atendidaPor: [] }],
+        })
+      );
+
+      const atualizada = await repo.atualizar(
+        criada.id,
+        normalizarDadosQuebra({
+          diagrama: DIAGRAMA,
+          necessidades: [{ id: "r2", texto: "segunda", origem: "manual", atendidaPor: ["n1"] }],
+        })
+      );
+
+      expect(atualizada?.necessidades?.map((n) => n.id)).toEqual(["r2"]);
     });
 
     it("obter id inexistente devolve null — ausência é resposta, não exceção", async () => {

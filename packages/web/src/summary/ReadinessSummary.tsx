@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { Diagrama, DiagramaConfig } from "@gerador/engine";
+import type { Diagrama, DiagramaConfig, Necessidade } from "@gerador/engine";
+import { analisarLacunas } from "@gerador/engine";
 import { ReadinessBadge } from "./ReadinessBadge";
 import { calcularResumoProntidao, type NoComProntidao } from "./prontidaoResumo";
 
@@ -7,10 +8,26 @@ export interface ReadinessSummaryProps {
   diagrama: Diagrama;
   config: DiagramaConfig;
   onSelecionar: (id: string) => void;
+  /** SPEC-57 fatia A — o propósito da demanda. Sem necessidade declarada o
+   * indicador não aparece: a dimensão nova não pode acusar quem nunca a usou. */
+  necessidades?: Necessidade[];
+  /** Abre o painel onde a lacuna se resolve. Sem isto o número seria um beco. */
+  onAbrirProposito?: () => void;
 }
 
-export function ReadinessSummary({ diagrama, config, onSelecionar }: ReadinessSummaryProps) {
+export function ReadinessSummary({
+  diagrama,
+  config,
+  onSelecionar,
+  necessidades,
+  onAbrirProposito,
+}: ReadinessSummaryProps) {
   const { vermelhos, amarelos, verdes } = calcularResumoProntidao(diagrama, config);
+  // Dimensão PROPÓSITO (SPEC-56 §0.6): mesma barra, mais uma razão. Amarelo e
+  // não vermelho de propósito: lacuna de propósito avisa, não bloqueia derivar
+  // — bloquear no primeiro dia ensinaria a ignorar a cor.
+  const lacunas = analisarLacunas(diagrama, necessidades ?? []);
+  const semElemento = lacunas.semElemento.length;
   const pendentes = [...vermelhos, ...amarelos];
   const indicePendenteRef = useRef(0);
 
@@ -40,6 +57,20 @@ export function ReadinessSummary({ diagrama, config, onSelecionar }: ReadinessSu
       <span style={{ color: "var(--verde)" }}>
         <ReadinessBadge nivel="verde" /> {verdes.length}
       </span>
+      {(necessidades?.length ?? 0) > 0 && (
+        <button
+          data-testid="proposito-resumo"
+          onClick={onAbrirProposito}
+          title="Necessidades da demanda sem nenhum componente que responda por elas"
+          style={{
+            ...botaoProximoEstilo,
+            borderColor: semElemento > 0 ? "var(--amarelo)" : "var(--borda-forte)",
+            color: semElemento > 0 ? "var(--amarelo)" : "var(--texto-fraco)",
+          }}
+        >
+          🎯 {semElemento > 0 ? `${semElemento} sem componente` : "propósito coberto"}
+        </button>
+      )}
       {pendentes.length > 0 && (
         <button onClick={irParaProximoPendente} style={botaoProximoEstilo}>
           ▶ Próximo pendente ({pendentes.length})

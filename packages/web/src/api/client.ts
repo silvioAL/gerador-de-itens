@@ -1,4 +1,4 @@
-import type { Diagrama, OperacaoDeAjuste, PerfisConfig, Quebra, RegrasConfig, ValorSpec } from "@gerador/engine";
+import type { Diagrama, Necessidade, OperacaoDeAjuste, PerfisConfig, Quebra, RegrasConfig, ValorSpec } from "@gerador/engine";
 
 /**
  * Base do @gerador/server — configurável em runtime via `VITE_API_URL`
@@ -56,6 +56,8 @@ export interface QuebraSalva {
   anexosContexto?: string[];
   /** SPEC-53 — de que produto é esta demanda (null = nenhum). */
   produtoId?: string | null;
+  /** SPEC-57 fatia A — o propósito da demanda. */
+  necessidades?: Necessidade[];
   /** §184 — o markdown da especificação gerada (null = nunca gerada). */
   especificacao?: string | null;
   especificacaoGeradaEm?: string | null;

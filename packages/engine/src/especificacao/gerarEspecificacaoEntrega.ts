@@ -1,4 +1,5 @@
-import type { Atividade, Aresta, Diagrama, No, Origem, StatusNo, ValorSpec } from "../model/types.js";
+import type { Atividade, Aresta, Diagrama, Necessidade, No, Origem, StatusNo, ValorSpec } from "../model/types.js";
+import { necessidadesDoElemento } from "../proposito/lacunas.js";
 import type { DiagramaConfig, FieldSpec, RegrasConfig } from "../config/types.js";
 import { camposVisiveis } from "../spec/campos.js";
 import {
@@ -352,6 +353,9 @@ export const VARIAVEIS_ITEM = [
   "techs",
   "contextos",
   "dependencias",
+  /** SPEC-57 fatia A — o propósito que este item atende. Vazia quando a quebra
+   * não declarou necessidade, e aí a seção some sozinha. */
+  "necessidades",
   "historiaUsuario",
   "especificacaoTecnica",
   "contratoArquitetura",
@@ -378,6 +382,10 @@ export const TEMPLATE_ITEM_PADRAO = `### {{numero}}. {{rotulo}} — {{descricao}
 **Tipo:** {{tipo}} · **Tamanho:** {{tamanho}}
 **Techs:** {{techs}} · **Contextos:** {{contextos}}
 **Dependências:** {{dependencias}}
+
+#### Necessidades atendidas
+
+{{necessidades}}
 
 #### História de usuário
 
@@ -497,7 +505,12 @@ export function renderizarItemEspecificacao(
   respostas?: Record<string, ValorSpec>,
   /** SPEC-47 — o template do ITEM (o do time, quando existe). Sem ele, o
    * `TEMPLATE_ITEM_PADRAO`: a estrutura de sempre + a entrega final. */
-  templateItem?: string
+  templateItem?: string,
+  /** SPEC-57 fatia A (M8) — as necessidades da quebra, para o item CITAR o
+   * propósito que ele atende. Sem elas a seção some sozinha (a remoção de
+   * seção vazia do `aplicarTemplateDoItem` já cuida), então quebra sem
+   * propósito declarado gera o mesmo documento de antes. */
+  necessidades?: Necessidade[]
 ): string {
   const nos = nosDeOrigem(atividade, diagrama);
   const especificacaoTecnica =
@@ -578,6 +591,16 @@ ${MARCA_SUGERIDO}` : ""}`
 ${MARCA_SUGERIDO}` : ""}`
     : `_(a definir: o que fica pronto quando este item termina)_ ${MARCADOR_ESPECIFICAR}`;
 
+  // A citação é da ORIGEM da atividade — o nó ou a aresta de onde ela nasceu.
+  // Não vale usar `nosDeOrigem`, que para atividade de aresta devolve source e
+  // target: o item herdaria o propósito dos dois vizinhos e citaria propósito
+  // que não é dele.
+  const necessidadesCitadas = [
+    ...necessidadesDoElemento(atividade.origem.nodeId, necessidades),
+    ...necessidadesDoElemento(atividade.origem.edgeId, necessidades),
+  ];
+  const textoNecessidades = necessidadesCitadas.map((n) => `- ${n.texto}`).join("\n");
+
   return aplicarTemplateDoItem(templateItem ?? TEMPLATE_ITEM_PADRAO, {
     numero: String(numero),
     rotulo: atividade.rotulo,
@@ -587,6 +610,7 @@ ${MARCA_SUGERIDO}` : ""}`
     techs: atividade.techs.join(", ") || "—",
     contextos: atividade.contextos.join(", ") || "—",
     dependencias: descreverDependencias(atividade),
+    necessidades: textoNecessidades,
     historiaUsuario,
     especificacaoTecnica,
     contratoArquitetura: contratoArquitetura ?? "",
@@ -764,6 +788,9 @@ export interface OpcoesGerarEspecificacao {
   time?: string;
   /** SPEC-47 — template do ITEM (cada seção do documento). */
   templateItem?: string;
+  /** SPEC-57 fatia A — `quebra.necessidades`, para cada item citar o propósito
+   * que atende. Ausente = documento idêntico ao de antes. */
+  necessidades?: Necessidade[];
   /** `quebra.respostasItens` — respostas (humanas ou IA confirmada) aos
    * placeholders "<- ✍️ especificar" de cada atividade, chaveadas por
    * `Atividade.chave` (Fase 1, SPEC-23). */
@@ -814,7 +841,8 @@ export function gerarEspecificacaoEntrega(
               config,
               opcoes.regras,
               opcoes.respostasItens?.[a.chave],
-              opcoes.templateItem
+              opcoes.templateItem,
+              opcoes.necessidades
             )
           )
           .join("\n\n---\n\n")

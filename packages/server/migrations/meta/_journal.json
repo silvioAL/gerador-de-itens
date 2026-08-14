@@ -211,6 +211,13 @@
       "when": 1754500000015,
       "tag": "0029_produtos",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1754500000016,
+      "tag": "0030_necessidades_da_demanda",
+      "breakpoints": true
     }
   ]
 }

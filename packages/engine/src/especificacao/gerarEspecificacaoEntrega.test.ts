@@ -651,3 +651,59 @@ describe("problemasDoTemplate (SPEC-35)", () => {
     expect(avisos).toHaveLength(5);
   });
 });
+
+/**
+ * SPEC-57 fatia A (M8) — "padrões consistentes que CHEGAM até os itens".
+ * Enquanto a citação não estiver no documento, a cadeia
+ * propósito → decisão → elemento → item → spec para no penúltimo elo.
+ */
+describe("necessidades citadas no item (SPEC-57 fatia A)", () => {
+  const necessidades = [
+    { id: "r1", texto: "o pedido não pode ser cobrado duas vezes", origem: "manual" as const, atendidaPor: ["n1"] },
+    { id: "r2", texto: "o catálogo responde em 200ms", origem: "manual" as const, atendidaPor: ["n2"] },
+  ];
+
+  it("cada item cita só o propósito do SEU elemento de origem", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, config, { necessidades });
+
+    expect(doc).toContain("#### Necessidades atendidas");
+    expect(doc).toContain("- o pedido não pode ser cobrado duas vezes");
+    expect(doc).toContain("- o catálogo responde em 200ms");
+
+    // E não cita o propósito do vizinho: o item do n1 não herda o do n2.
+    const itemDoN1 = doc.split("---").find((bloco) => bloco.includes("n1::")) ?? doc;
+    if (itemDoN1 !== doc) {
+      expect(itemDoN1).not.toContain("o catálogo responde em 200ms");
+    }
+  });
+
+  it("sem necessidade declarada, o documento é o de antes — a seção some inteira", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+
+    const semPropósito = gerarEspecificacaoEntrega(atividades, diagrama, config);
+    const comListaVazia = gerarEspecificacaoEntrega(atividades, diagrama, config, { necessidades: [] });
+
+    expect(semPropósito).not.toContain("Necessidades atendidas");
+    expect(comListaVazia).toBe(semPropósito);
+  });
+
+  it("necessidade sugerida e não confirmada NÃO é citada", () => {
+    // Regra 2: um item não pode alegar atender um propósito que ninguém
+    // confirmou — seria o agente escrevendo propósito no documento final.
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, config, {
+      necessidades: [
+        { id: "r1", texto: "propósito ainda não confirmado", origem: "sugerido", atendidaPor: ["n1"] },
+      ],
+    });
+
+    expect(doc).not.toContain("propósito ainda não confirmado");
+    expect(doc).not.toContain("Necessidades atendidas");
+  });
+});

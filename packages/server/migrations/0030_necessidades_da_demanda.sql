@@ -1,0 +1,18 @@
+-- SPEC-57 fatia A — o PROPÓSITO da demanda passa a existir.
+--
+-- Chama-se `necessidades` e não `requisitos` porque "requisito" já é outra
+-- coisa neste produto: o item do checklist técnico de refinamento
+-- (`config/regras.json`). Dois conceitos legítimos disputando a mesma palavra
+-- em português — e escolher a palavra certa para o novo é mais barato que
+-- conviver com dois "requisito" que significam coisas diferentes.
+--
+-- jsonb e não tabela própria, pela mesma razão de `respostas_itens`: é uma
+-- coleção QUE PERTENCE à quebra, sem consulta transversal que a justifique
+-- hoje. "Quais demandas atendem a este requisito de produto?" seria essa
+-- consulta — e ela não existe nesta fatia (SPEC-57 §5, pergunta 1: requisito é
+-- da demanda, podendo referenciar o produto depois).
+--
+-- DEFAULT '[]' e NOT NULL: ausência já significa "não declarou propósito", e
+-- `analisarLacunas` trata lista vazia como "nada a apontar" — quebra que nunca
+-- declarou não passa a estar errada por causa desta coluna.
+ALTER TABLE "quebras" ADD COLUMN "necessidades" jsonb DEFAULT '[]'::jsonb NOT NULL;

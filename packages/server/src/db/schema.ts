@@ -25,6 +25,11 @@ export const quebras = pgTable("quebras", {
   /** SPEC-53 — de que produto é esta demanda. Opcional: quem já usa a
    * ferramenta não passa a precisar cadastrar produto pra fazer o que fazia. */
   produtoId: uuid("produto_id"),
+  /** SPEC-57 fatia A — o PROPÓSITO da demanda: o que ela precisa resolver, e
+   * quais nós/arestas respondem por cada necessidade. jsonb pela mesma razão
+   * de `respostasItens`: é uma coleção da quebra, sem consulta transversal
+   * nenhuma que justifique tabela própria hoje. */
+  necessidades: jsonb("necessidades").notNull().default([]),
   especificacao: text("especificacao"),
   especificacaoGeradaEm: timestamp("especificacao_gerada_em", { withTimezone: true }),
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),

@@ -85,6 +85,33 @@ export interface Diagrama {
   edges: Aresta[];
 }
 
+/**
+ * SPEC-57 M1/M6 — o PROPÓSITO da demanda: o que ela precisa resolver.
+ *
+ * Chama-se `Necessidade` e não `Requisito` porque `Requisito` já é outra coisa
+ * neste projeto (`config/types.ts`): o item do checklist técnico de
+ * refinamento. Dois conceitos legítimos, o mesmo nome em português — e um
+ * `Requisito2` seria pior que escolher a palavra certa para o novo.
+ *
+ * `atendidaPor` guarda ids de nó/aresta. Id que não existe mais no diagrama
+ * **não** satisfaz — a necessidade volta a ser lacuna, sem limpeza nenhuma
+ * (mesma disciplina do `ALVO_INEXISTENTE` em `dependencias.ts`): apagar o nó
+ * que respondia por uma necessidade é exatamente o evento que precisa
+ * reaparecer, não ser silenciado por um `delete` em cascata.
+ */
+export interface Necessidade {
+  /** Estável — é por ele que o vínculo e a citação na spec sobrevivem a edições. */
+  id: string;
+  texto: string;
+  prioridade?: "alta" | "media" | "baixa";
+  /** Mesma escala de `ValorSpec`: proposta de agente entra como `sugerido`. */
+  origem: Origem;
+  /** Regra 2 da SPEC-57: `sugerido`/`inferido` não confirmado não conta. */
+  confirmado?: boolean;
+  /** ids de `No.id` ou `Aresta.id` que respondem por esta necessidade. */
+  atendidaPor: string[];
+}
+
 export interface Quebra {
   /** Curto, pra achar essa quebra depois numa lista/busca — diferente de
    * `demandInfo` (a descrição longa do contexto). Não é chave: duas quebras
@@ -116,6 +143,10 @@ export interface Quebra {
    * material do momento da geração). Persistida na quebra: é o que permite o
    * agente reconhecer uma demanda já especificada ao reabri-la. */
   especificacao?: string | null;
+  /** SPEC-57 fatia A — o propósito da demanda. Ausente em quebra antiga, e
+   * nesse caso nada se afirma sobre ela: sem necessidade declarada não há
+   * lacuna a apontar (ver `analisarLacunas`). */
+  necessidades?: Necessidade[];
 }
 
 export type TipoItem = "História" | "Task" | "Débito Técnico";
