@@ -12,6 +12,80 @@ describe("validateConfig — config/diagrama.example.json + config/app.example.j
     expect(validateConfig(diagrama, app)).toEqual([]);
   });
 
+  /**
+   * §237 — o `type` do campo nunca foi conferido: um valor inventado passava,
+   * o campo não renderizava, a prontidão não o cobrava e nada apontava o erro.
+   * Config incorreta falhando ABERTA e em silêncio — o pior modo de falha, e o
+   * que o "falhar alto" do CONTEXTO existe para impedir.
+   */
+  it("recusa type de campo inventado, dizendo quais existem", () => {
+    const quebrada: DiagramaConfig = {
+      ...diagrama,
+      nodeTypes: {
+        ...diagrama.nodeTypes,
+        rabbit: {
+          ...diagrama.nodeTypes.rabbit,
+          spec: [{ key: "inventado", label: "Inventado", type: "lixo" as never }],
+        },
+      },
+    };
+
+    const erros = validateConfig(quebrada, app);
+
+    expect(erros).toHaveLength(1);
+    expect(erros[0].campo).toBe("nodeTypes.rabbit.spec.inventado.type");
+    expect(erros[0].mensagem).toContain('type "lixo" não existe');
+    // A mensagem diz o que É válido: erro de config que não ensina o conserto
+    // vira tentativa e erro no arquivo.
+    expect(erros[0].mensagem).toContain("textarea");
+    expect(erros[0].mensagem).toContain("lista");
+  });
+
+  it("recusa type inventado DENTRO de um itemSpec de lista", () => {
+    // Mesmo sintoma, uma camada abaixo — e é onde passaria despercebido por
+    // mais tempo, porque a lista em si renderiza.
+    const quebrada: DiagramaConfig = {
+      ...diagrama,
+      nodeTypes: {
+        ...diagrama.nodeTypes,
+        rabbit: {
+          ...diagrama.nodeTypes.rabbit,
+          spec: [
+            {
+              key: "itens",
+              label: "Itens",
+              type: "lista",
+              itemSpec: [{ key: "campo", label: "Campo", type: "chutado" as never }],
+            },
+          ],
+        },
+      },
+    };
+
+    const erros = validateConfig(quebrada, app);
+
+    expect(erros).toHaveLength(1);
+    expect(erros[0].campo).toBe("nodeTypes.rabbit.spec.itens.itemSpec.campo.type");
+  });
+
+  it("recusa type inventado em campo de ARESTA também", () => {
+    const primeiroTipoDeAresta = Object.keys(diagrama.edgeTypes)[0];
+    const quebrada: DiagramaConfig = {
+      ...diagrama,
+      edgeTypes: {
+        ...diagrama.edgeTypes,
+        [primeiroTipoDeAresta]: {
+          ...diagrama.edgeTypes[primeiroTipoDeAresta],
+          spec: [{ key: "x", label: "X", type: "nada" as never }],
+        },
+      },
+    };
+
+    expect(validateConfig(quebrada, app)[0].campo).toBe(
+      `edgeTypes.${primeiroTipoDeAresta}.spec.x.type`
+    );
+  });
+
   it("recusa tech referenciada em nodeTypes que não existe em app.json, apontando o campo", () => {
     const quebrada: DiagramaConfig = {
       ...diagrama,

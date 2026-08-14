@@ -1,4 +1,5 @@
-import type { AppConfig, Condicao, DiagramaConfig, ErroValidacaoConfig, RegrasConfig } from "./types.js";
+import type { AppConfig, Condicao, DiagramaConfig, ErroValidacaoConfig, FieldSpec, RegrasConfig } from "./types.js";
+import { TIPOS_CAMPO } from "./types.js";
 
 const TEMPLATE_RE = /\{\{(\w+)\}\}/g;
 
@@ -60,6 +61,34 @@ export function validateConfig(diagrama: DiagramaConfig, app: AppConfig): ErroVa
   const erros: ErroValidacaoConfig[] = [];
   const tiposDeNo = Object.keys(diagrama.nodeTypes);
 
+  /**
+   * §237 — o `type` de cada campo, conferido em runtime.
+   *
+   * Sem isto um `"type": "lixo"` passava: o campo não renderizava, a prontidão
+   * não o cobrava e nada apontava o erro — config incorreta falhando ABERTA e
+   * em silêncio, que é o pior modo de falha possível e o que o §5 do
+   * CONTEXTO ("falhar alto, nunca em silêncio") existe para impedir.
+   *
+   * Vale para o campo e para o `itemSpec` de uma lista: uma lista com item de
+   * tipo inventado tem exatamente o mesmo sintoma, uma camada abaixo.
+   */
+  function validarTipoDeCampo(campo: FieldSpec, caminho: string) {
+    if (!(TIPOS_CAMPO as readonly string[]).includes(campo.type)) {
+      erros.push({
+        campo: `${caminho}.type`,
+        mensagem: `type "${campo.type}" não existe (válidos: ${TIPOS_CAMPO.join(", ")})`,
+      });
+    }
+    for (const item of campo.itemSpec ?? []) {
+      if (!(TIPOS_CAMPO as readonly string[]).includes(item.type)) {
+        erros.push({
+          campo: `${caminho}.itemSpec.${item.key}.type`,
+          mensagem: `type "${item.type}" não existe (válidos: ${TIPOS_CAMPO.join(", ")})`,
+        });
+      }
+    }
+  }
+
   for (const [tipo, cfg] of Object.entries(diagrama.nodeTypes)) {
     for (const tech of cfg.techs) {
       if (!app.techs.includes(tech)) {
@@ -80,6 +109,7 @@ export function validateConfig(diagrama: DiagramaConfig, app: AppConfig): ErroVa
 
     const chavesDoTipo = new Set(cfg.spec.map((f) => f.key));
     for (const campo of cfg.spec) {
+      validarTipoDeCampo(campo, `nodeTypes.${tipo}.spec.${campo.key}`);
       if (campo.when) {
         validarCondicao(campo.when, `nodeTypes.${tipo}.spec.${campo.key}.when`, chavesDoTipo, erros);
       }
@@ -104,6 +134,7 @@ export function validateConfig(diagrama: DiagramaConfig, app: AppConfig): ErroVa
     // referenciada em `default` continua validada normalmente.
     const chavesDoTipo = new Set((cfg.spec ?? []).map((f) => f.key));
     for (const campo of cfg.spec ?? []) {
+      validarTipoDeCampo(campo, `edgeTypes.${tipo}.spec.${campo.key}`);
       if (typeof campo.default === "string") {
         for (const ref of extrairReferenciasTemplate(campo.default)) {
           if (!chavesDoTipo.has(ref)) {
