@@ -138,7 +138,12 @@ test("§210 — trocar de demanda NÃO leva junto os itens da anterior", async (
 
   await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: "Abrir…" }).click();
-  await page.getByText(outra).first().click();
+  // Filtrar e clicar no BOTÃO da lista, não em "qualquer texto com esse nome":
+  // o balão do PDCA cita os títulos das últimas quebras, e na CI o locator
+  // aberto pegou aquele parágrafo (que ainda estava animando — "element is not
+  // stable") em vez do item da lista.
+  await page.getByPlaceholder("ex.: aprovação de crédito").fill(outra);
+  await page.getByRole("button", { name: new RegExp(outra) }).click();
   // A tela de abrir some quando a demanda carrega — sem esta espera, o clique
   // seguinte no ☰ cai na lista ainda aberta.
   await expect(page.getByRole("button", { name: "+ Serviço", exact: true })).toBeVisible();
