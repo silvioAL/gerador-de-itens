@@ -6488,3 +6488,66 @@ acontece com as quebras que já existem quando requisitos passarem a existir —
 todas nascem com gap, e "todo mundo fica vermelho" não é resposta aceitável.
 
 Nada de produção mudou nesta rodada.
+
+## 229. Tokens e o fim da janela: as duas perguntas têm a mesma resposta
+
+Perguntas do usuário: *"quanto a tokens é possível que ter um histórico ajude?
+também precisamos tratar quando a janela de contexto da conversa acaba"*.
+Registrado na SPEC-57 §8.
+
+**O achado da rodada:** a medição, que a SPEC-56 §0.7 justificou por
+**disciplina** (impedir que o LLM vire fonte de número), é também o principal
+mecanismo de **economia de token** — e por margem grande. Sem ela, a única
+forma de o agente ajudar é receber o desenho inteiro serializado e procurar o
+que está errado. Com ela, recebe as três violações já apuradas. Ordens de
+grandeza menor **e insumo melhor**: o agente para de procurar e passa a
+explicar.
+
+Duas razões independentes — uma epistêmica, uma econômica — apontando para o
+mesmo desenho. Costuma ser sinal de que o desenho está certo, e é o tipo de
+confirmação que não se consegue projetando para uma delas só.
+
+**Sobre histórico ajudar: ajuda em três formas, e as três são de estrutura, não
+de volume.** Prefixo estável primeiro (instrução, vocabulário da config,
+catálogo de padrões, glossário) porque qualquer cache de prompt recompensa
+prefixo invariante — e isso independe de provedor, o que importa aqui porque o
+projeto fala com vários por gateway. Não refazer pergunta respondida — mas
+lendo o **modelo**, não a transcrição. E histórico **entre** sessões, que é ADR
++ proveniência: "isso foi decidido no ADR-07, depois do incidente de cobrança
+dupla" vale mais que quarenta turnos e custa uma fração.
+
+Atrapalha em uma: a transcrição só cresce e é majoritariamente peso morto — e é
+justamente a parte que não se comprime com segurança, porque resumir produz
+`inferido`. Daí a régua: **preferir estado a transcrição**.
+
+**A invariante nova, que é a resposta à segunda pergunta e virou a regra 4 do
+fluxo:** *a conversa nunca pode ser o único lugar onde uma decisão existe*. A
+regra 2 já força isso sem querer — confirmar é o que grava com proveniência.
+Se vale, a transcrição é descartável, e o fim da janela deixa de ser perda: o
+contexto se reconstrói do diagrama + placar + ADRs.
+
+E isso não é doutrina nova. É o §213/§214 aplicado à conversa — lá o painel era
+o assistente e a troca era de demanda; aqui o painel é a conversa e a troca é a
+janela acabando. Mesmo defeito, mesma cura. Gostei de descobrir que o remédio
+já estava escrito.
+
+**O procedimento quando a janela chega perto do fim** não é truncar: é o agente
+listar o que foi conversado e **não está no modelo** e perguntar se grava.
+Transformar o fim da janela num convite a persistir, em vez de uma perda
+administrada. E resumo, se houver, é `inferido` não confirmado — não fecha
+semáforo, não vira item, não é fonte de verdade. É o que impede a falha clássica
+de um resumo virar o registro, com os erros que ele introduziu.
+
+**Três números a medir antes de construir**, e o terceiro é o que decide se a
+invariante é fácil ou dolorosa: quantas decisões por sessão ficam hoje só na
+transcrição. Se for alto, a regra 4 é mudança de hábito cara; se for baixo, já é
+quase verdade e falta o produto garanti-la.
+
+**E uma preocupação saiu da lista:** *"quanto as existentes não vamos nos
+preocupar nem um pouco, não está em prd"*. Sem base instalada, requisito e
+padrão podem nascer obrigatórios no primeiro dia — sem período de convivência,
+sem migração, sem "todo mundo fica vermelho". É a mesma liberdade que a SPEC-55
+§5.4 tinha apontado para o banco, e é o segundo lugar onde não ter usuário ainda
+compra desenho melhor.
+
+Nada de produção mudou nesta rodada.

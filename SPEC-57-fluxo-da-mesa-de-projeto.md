@@ -12,7 +12,7 @@
 
 ---
 
-## 1. As três regras que o fluxo inteiro obedece
+## 1. As quatro regras que o fluxo inteiro obedece
 
 Antes dos momentos, as invariantes. Se algum passo abaixo violar uma delas, o
 passo está errado — não a regra.
@@ -26,6 +26,9 @@ passo está errado — não a regra.
 3. **Violar o padrão é permitido — e fica registrado.** Com quem decidiu e por
    quê. Sem essa saída, a pessoa aprende a ignorar o vermelho, e a medição
    inteira morre junto.
+4. **A conversa nunca é o único lugar onde uma decisão existe.** Aceitar grava
+   no modelo, na hora. É o que torna a transcrição descartável — e o fim da
+   janela de contexto, um não-evento (§8.3).
 
 ---
 
@@ -327,13 +330,133 @@ merece nova conversa antes de continuar.
 
 ---
 
-## 8. O que este documento não resolve
+## 8. Economia de tokens, e o fim da janela de contexto
+
+Pergunta do usuário: *"quanto a tokens é possível que ter um histórico ajude?
+também precisamos tratar quando a janela de contexto da conversa acaba"*.
+
+A resposta curta é que as duas perguntas têm a **mesma** solução, e ela já está
+no fluxo — só não tinha sido nomeada por este ângulo.
+
+### 8.1 O maior ganho de token não é cache: é a medição
+
+A SPEC-56 §0.7 diz que *"o agente lê o desenho medido"*, e justifica isso por
+disciplina — impedir que o LLM vire fonte de número. **É também o principal
+mecanismo de economia**, e por uma margem grande.
+
+Sem medição, a única forma de o agente ajudar é receber o desenho inteiro
+serializado — nós, arestas, todos os campos, toda a proveniência — e procurar
+o que está errado. Com medição, ele recebe o que **já se sabe** que está errado:
+
+```
+sem medição:  "aqui está o diagrama inteiro, ache os problemas"
+com medição:  "3 violações: gateway.timeout=800ms (padrão P-03, ≤500ms);
+               R1 sem elemento; retry 3× sob timeout de 400ms"
+```
+
+O segundo é ordens de grandeza menor **e é insumo melhor** — o agente para de
+procurar e passa a explicar. Duas razões independentes apontando para o mesmo
+desenho costumam ser sinal de que o desenho está certo.
+
+**É medível antes de construir** (§8.6), e vale medir em vez de estimar.
+
+### 8.2 O que faz histórico ajudar — e o que faz ele atrapalhar
+
+**Ajuda, em três formas, e as três são de estrutura, não de volume:**
+
+1. **Prefixo estável.** O que não muda dentro de uma sessão — instrução do
+   agente, vocabulário da config, catálogo de padrões, glossário do produto —
+   deve vir **primeiro e sempre igual**. Qualquer mecanismo de cache de prompt
+   recompensa prefixo invariante; ordenar o contexto para que a parte estável
+   preceda a volátil é arquitetura gratuita, e independe de provedor (este
+   projeto fala com vários, por gateway).
+2. **Não refazer pergunta já respondida.** Real — mas a resposta certa vem do
+   **modelo**, não da transcrição (§8.3).
+3. **Histórico ENTRE sessões = ADR + proveniência.** *"Isso já foi decidido no
+   ADR-07, depois do incidente de cobrança dupla"* vale mais que quarenta
+   turnos de conversa e custa uma fração. É o histórico que compensa carregar.
+
+**Atrapalha em uma:** a transcrição cresce sempre e é majoritariamente **peso
+morto** — saudação, correção de digitação, caminho explorado que não deu em
+nada. E é justamente a parte que não se comprime com segurança, porque resumir
+produz `inferido`.
+
+> **A regra que sai daqui: preferir estado a transcrição.** Estado é pequeno,
+> estruturado, verificável e tem proveniência. Transcrição é grande, ambígua e
+> só cresce.
+
+### 8.3 Se a regra for obedecida, a janela acabar é um não-evento
+
+**Invariante nova, e é a resposta à segunda pergunta:**
+
+> **A conversa nunca pode ser o único lugar onde uma decisão existe.**
+
+Toda proposta aceita é escrita no modelo **no momento em que é aceita** — o que
+a **regra 2** já força, porque confirmar é o que grava com proveniência. Se isso
+vale, a transcrição é descartável: jogar fora o histórico não perde decisão
+nenhuma, e o contexto se reconstrói do diagrama + placar + ADRs em poucas
+centenas de tokens.
+
+Isto não é doutrina nova. É o §213/§214 do JOURNEY aplicado à conversa: estado
+que precisa sobreviver a uma troca de contexto mora no modelo, não no painel.
+Lá o painel era o assistente e a troca era de demanda; aqui o painel é a
+conversa e a troca é a janela acabando. Mesmo defeito, mesma cura.
+
+### 8.4 O procedimento quando a janela chega perto do fim
+
+Nunca truncar em silêncio — "falhar alto" vale aqui como vale na config:
+
+1. **Antes de cortar, gravar.** O agente lista o que foi conversado e **não
+   está no modelo**: *"estas três coisas discutimos e não estão no desenho —
+   quer gravar?"*. Transformar o fim da janela num **convite a persistir** é a
+   jogada que serve ao produto, em vez de uma perda administrada.
+2. **Cortar a transcrição, manter o estado.** Turnos saem; diagrama, placar e
+   ADRs ficam.
+3. **Dizer que cortou.** Uma linha na conversa, não silêncio.
+4. **Resumo, se houver, é `inferido` e não confirmado.** Pela regra 2 ele **não
+   conta**: não fecha semáforo, não vira item, não é fonte de verdade. É
+   conveniência de leitura.
+
+O ponto 4 é o que impede a falha clássica: um resumo que, de tanto ser relido,
+vira o registro — com os erros que o resumo introduziu.
+
+### 8.5 Quando o agente fala
+
+O §7 levantou que um agente falando a cada mudança tem custo. Proposta de
+política — e é política, ajustável sem tocar em prompt:
+
+- **fala quando chamado**;
+- **fala quando o placar PIORA** — regressão é o evento que merece interromper
+  quem está trabalhando;
+- **cala** quando o placar melhora, ou quando a mudança não move medida nenhuma.
+
+Barato de testar e fácil de reverter, que é o que se quer de uma política.
+
+### 8.6 O que medir antes de construir
+
+Três números que decidem o desenho e que ninguém tem hoje:
+
+1. **Tamanho serializado** de `Diagrama` + `spec` de uma quebra real, contra o
+   tamanho do placar com as violações. É a razão de compressão da §8.1.
+2. **Quantos turnos** uma sessão real tem — diz se a janela é problema próximo
+   ou teórico.
+3. **Quantas decisões por sessão ficam hoje só na transcrição.** É o número mais
+   importante: se for alto, a invariante da §8.3 é uma mudança de hábito cara;
+   se for baixo, ela já é quase verdade e só falta o produto garanti-la.
+
+---
+
+## 9. O que este documento não resolve
 
 - **A UI de cada momento.** Aqui está o *quê* e o *quando*; o *como se parece*
   é desenho de tela, e vem depois de as cinco perguntas da §5 terem resposta.
-- **O custo do agente por sessão.** M4 é conversa, e conversa é token. Se o
-  ciclo for a cada mudança, a conta importa — provavelmente o agente só fala
-  quando chamado ou quando o placar **piora**, não a cada tecla.
-- **O que acontece com quebras que já existem** quando requisitos e padrões
-  passarem a existir. Nenhuma quebra antiga tem requisito, e todas vão nascer
-  com gap. Isso precisa de uma resposta que não seja "todo mundo fica vermelho".
+- **O custo do agente por sessão** ganhou tratamento na §8 — mas os três
+  números da §8.6 continuam por medir, e são eles que confirmam ou derrubam o
+  desenho proposto lá.
+
+**Deixou de ser problema:** *"o que acontece com as quebras que já existem"*
+saiu da lista por decisão do usuário — *"quanto as existentes não vamos nos
+preocupar nem um pouco, não está em prd"*. Sem base instalada, requisitos e
+padrões podem nascer obrigatórios desde o primeiro dia, sem período de
+convivência nem migração. É liberdade de desenho que vale registrar: a mesma
+que a SPEC-55 §5.4 apontou para o banco.
