@@ -123,10 +123,15 @@ decisão) e o que nós faríamos (trabalho a fazer). E é o que mantém a coerê
 com o §2 do CONTEXTO: nada nasce de interpretação, tudo nasce de função pura.
 
 **Pior caso, não média.** A aritmética que serve aqui é a determinística —
-somar tetos declarados. Média e percentil exigem distribuição, distribuição
-exige amostra, e amostra é o motor que não queremos. Pior caso responde "isto
-pode estourar?" com uma conta que qualquer pessoa refaz no papel — e auditável
-é requisito nosso, não luxo.
+somar tetos declarados. Pior caso responde "isto pode estourar?" com uma conta
+que qualquer pessoa refaz no papel, e auditável é requisito nosso, não luxo.
+
+Duas ressalvas honestas, que a **§12.1** desenvolve em vez de esconder:
+pior caso **grita lobo** (somar tetos em oito saltos dá um número que quase
+nunca acontece), e há três casos — cauda de cadeia, fan-out e probabilidade de
+completar no orçamento — em que ele não é apenas grosseiro, é **errado**. Nesses
+casos amostrar responde melhor. O que decide se isso vale aqui não é
+matemática, é proveniência: ver §12.1.3.
 
 ---
 
@@ -276,19 +281,149 @@ trabalha, não enfeite.
 
 ## 12. O que não trazer
 
-**O motor de simulação** — e como você já chegou nisso sozinho, fica o registro
+**O motor de simulação como ele é lá** — e como você já chegou nisso sozinho, fica o registro
 curto: 228 linhas, simula **só o primeiro fluxo** (`model.Flows[0]`), laço de
 passo fixo apesar do nome "DiscreteEvent", 9 testes no projeto inteiro. Mais
 importante que a imaturidade: número que depende de um `seed` e de latência
 chutada, exibido ao lado de item derivado deterministicamente, convida a
 confundir os dois. A aritmética de pior caso (§4) responde à mesma classe de
-pergunta com uma conta que se refaz no papel.
+pergunta com uma conta que se refaz no papel. Isso **não** fecha a porta para
+amostragem em geral — só para transplantar aquele motor. Onde amostrar ganha, e
+sob que condição, está na §12.1.
 
 **Restrição legal, curta e real:** o repositório **não tem arquivo de licença**
 (sem `LICENSE`; a API do GitHub devolve `licenseInfo: null`). O padrão então é
 todos os direitos reservados. Nada aqui propõe copiar código — conceito de
 domínio e decisão de produto não são protegidos, e é só disso que este
 documento trata. Somos Apache-2.0 e dependemos de proveniência limpa.
+
+---
+
+## 12.1 Monte Carlo: onde ele ganha da aritmética, e o portão que decide
+
+Pergunta do usuário depois de ler a §4: *"seria útil rodar algo como Monte
+Carlo com esses dados? seria uma engine diferente da que existe no projeto"*.
+
+Resposta curta: **sim, ganha em três casos concretos — e o que decide se vale é
+proveniência, não matemática.**
+
+### 12.1.1 Primeiro, admitir a fraqueza do que a §4 propõe
+
+A aritmética de pior caso tem um defeito que eu não nomeei: **ela grita lobo**.
+Somar tetos declarados ao longo de oito saltos de 300ms dá 2,4s — um número que
+por construção quase nunca acontece, porque exigiria que todos os saltos
+estourassem o teto na mesma requisição. Um alerta que aparece em todo caminho
+com mais de três nós é um alerta que as pessoas aprendem a ignorar, e aí o
+mecanismo inteiro perde valor.
+
+Pior caso é honesto e é barato. Mas é uma régua grosseira, e vale dizer isso em
+voz alta antes de recomendá-la.
+
+### 12.1.2 Os três casos em que Monte Carlo responde o que aritmética nenhuma responde
+
+1. **Cauda de uma cadeia.** O que se quer saber não é o pior caso nem a média —
+   é o p99 da soma. Somar percentis está errado (p99 de uma soma ≠ soma dos
+   p99), e a conta analítica exige convolução de distribuições. Amostrar é
+   honestamente mais simples do que resolver.
+
+2. **Fan-out — e este é o caso forte.** Um nó que chama N serviços em paralelo
+   espera pelo **máximo**, não pela soma. Com cada chamada tendo p99 de 100ms, a
+   chance de nenhuma das N passar de 100ms é `0,99^N`: com N=10 são ~90%, com
+   N=100 caem para ~37% — ou seja, **63% das requisições pegam pelo menos um
+   salto lento**. É o resultado clássico de *tail at scale*, ele muda decisão de
+   arquitetura de verdade (agregar, hedge, reduzir o leque), e **nem o pior caso
+   nem a média o enxergam**: o pior caso diz "300ms" e a média diz "40ms", e as
+   duas estão erradas sobre a experiência real.
+
+3. **Probabilidade de sucesso dentro do orçamento.** Com retry, backoff e
+   timeout interagindo, "qual fração das requisições completa dentro de 1s?" é
+   pergunta inerentemente probabilística. Dá pra fazer no papel em casos
+   simples; deixa de dar assim que houver dois retries e um fallback.
+
+Nos três, **a aritmética não é conservadora — é errada**, e isso é diferente de
+ser grosseira.
+
+### 12.1.3 O portão: é pergunta de proveniência, não de matemática
+
+Monte Carlo não cria informação. Ele **compõe** as distribuições que você deu, e
+a qualidade do resultado é inteiramente a qualidade da entrada. Alimentado com
+chute, ele devolve o chute com intervalo de confiança em volta — a **aparência**
+de rigor sem nenhum ganho de conhecimento. É exatamente a falsa precisão contra
+a qual a proveniência deste projeto foi construída.
+
+E aqui está a parte boa: **nós já temos o mecanismo para decidir isso.**
+`Origem = "manual" | "extraido" | "inferido" | "sugerido"`, com `evidencia` em
+cima do `extraido` (`engine/src/model/types.ts`). A regra escreve sozinha, e é
+a mesma disciplina do §6.4 do CONTEXTO:
+
+> **Distribuição construída sobre valor `manual` não produz número que o
+> produto apresente como achado.** Onde a entrada é chute, o produto diz "não
+> tenho medição para este trecho" — não inventa uma curva.
+
+Isso divide o diagrama em dois territórios, e a divisão é útil por si só:
+
+| Nó | Entrada típica | O que o produto pode afirmar |
+|---|---|---|
+| `status: existente` com observabilidade | p50/p99 reais, `origem: extraido` | Monte Carlo legítimo |
+| `status: novo` | timeout e SLA **decididos**, `origem: manual` | pior caso, e só |
+
+Repare que isso é coerente com o que a ferramenta é: para o que ainda vai ser
+construído, o número é uma **decisão** (um teto que alguém escolheu honrar), e
+pior caso é a régua certa. Para o que já existe, o número pode ser uma
+**medição**, e aí a distribuição é real.
+
+Um efeito colateral bom: "este trecho não tem medição" vira um pendência
+visível — mais um tipo de prontidão, no espírito do gap analysis da §5.
+
+### 12.1.4 O custo real não é o código
+
+O amostrador é pequeno: percorrer o caminho N vezes acumulando sorteios é uns
+poucos milhares de linhas menos do que parece — TS puro, zero I/O, ao lado do
+`derive/`. Os dois custos verdadeiros são outros:
+
+- **Pedir distribuição a uma pessoa é muito mais difícil que pedir um timeout.**
+  Ninguém sabe responder "qual a distribuição de latência do seu serviço".
+  Mitigação concreta: pedir **dois números que a pessoa tem no dashboard**
+  (p50 e p99) e ajustar uma log-normal a partir deles. Duas perguntas
+  respondíveis em vez de uma impossível.
+- **Não confundir os dois tipos de resposta na tela.** Uma afirmação derivada
+  ("este nó precisa decidir DLQ") é verdadeira por regra. Uma afirmação de Monte
+  Carlo ("p99 de 340ms") é uma estimativa sobre o mundo, que pode estar errada.
+  Se as duas aparecerem com a mesma tipografia, a segunda pega emprestada a
+  autoridade da primeira — e é assim que uma ferramenta de disciplina vira uma
+  máquina de confiança injustificada.
+
+### 12.1.5 "É uma engine diferente?"
+
+Sim e não, e a distinção importa:
+
+- **Como código, não é.** Monte Carlo com `seed` explícito é determinístico:
+  mesma entrada + mesma semente = mesma saída, reprodutível em teste e em
+  auditoria. Cabe como função pura ao lado do `derivar()`, sem I/O, sem quebrar
+  nenhuma fronteira que o `packages/engine` defende.
+- **Como epistemologia, é.** `derivar()` produz **fatos sobre o desenho**;
+  Monte Carlo produz **estimativas sobre a realidade**. É uma segunda classe de
+  saída, e a única coisa que ela exige do produto é aparecer rotulada como tal —
+  com quantos nós entraram com medição e quantos não, do mesmo jeito que hoje um
+  campo mostra de onde veio o valor.
+
+Nada disso é o motor do SimArch: lá o número sai de latência declarada e vira
+relatório. Aqui a regra é a de sempre — **todo achado termina num item de
+backlog**. "p99 estoura o SLA em 3% das amostras" não é item. *"O leque de 12
+chamadas paralelas faz o p99 do caminho ser 4× o de cada chamada — avaliar
+agregação ou hedge"* é.
+
+### 12.1.6 Recomendação
+
+**Depois de P1+P2, não em vez.** Monte Carlo precisa do percurso e dos números
+de qualquer forma, e sem eles não há o que amostrar. A ordem que faz sentido:
+
+1. percurso + número + pior caso (§13, passos 1–3) — barato, e já entrega;
+2. medir quantos nós de quebras reais chegam com `origem: extraido`. **Se forem
+   poucos, Monte Carlo não tem o que compor e a resposta vira "não vale".** Essa
+   medição é a que decide, e ela é barata;
+3. se houver dado, começar pelo **fan-out** — é onde a aritmética erra mais feio
+   e onde o resultado muda decisão de arquitetura.
 
 ---
 
@@ -315,6 +450,7 @@ P7 provedor ──────── config, a qualquer momento
 | 7 | **FinOps** | P2 | médio |
 | 8 | **P6 variante + P4 ADR** juntos | P2 | médio |
 | 9 | **P7 dialeto de provedor** | — | baixo |
+| ? | **Monte Carlo** (§12.1) | P1+P2 **e** medição de quanto dado chega como `extraido` | a decidir por medição, não por gosto |
 | — | Painel inferior com a explicação da conta | passo 3 | acompanha o 3 |
 
 **Se for um só passo, que sejam os passos 1–3 juntos, num caminho de exemplo.**
