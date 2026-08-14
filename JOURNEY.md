@@ -5625,3 +5625,26 @@ que espera o defeito sumir não testa o defeito.
 Dois specs novos, ambos vermelhos sem a correção: o caminho do relato (abrir
 outra demanda, com a busca ainda no ar) e o mais grave (demanda nova, sem id,
 herdando 16 itens da anterior).
+
+## 211. Duas falhas de suíte que a minha pressa criou
+
+O PR do §210 foi para a main com a CI de E2E **vermelha** — não há required
+check no repositório, e o merge passou. Duas causas, as duas minhas:
+
+**Rodei o arquivo, não a suíte.** Testei `-g "§210"` isolado e mandei o PR. A
+CI roda tudo, em paralelo, numa máquina mais lenta — e ali o encadeamento de
+dois "Voltar ao canvas" sem esperar cada tela sumir estourou em click timeout:
+a revisão ainda estava por cima, interceptando o ☰. A régua de "checar o que a
+CI checa" existe desde a §176 e eu a apliquei pela metade: rodei build e
+unitários completos, e o E2E filtrado.
+
+**Dois testes disputando o mesmo estado global.** O spec de administrar acessos
+(§208) e o do cadeado (§203) mexem nos papéis da ORGANIZAÇÃO, e rodavam em
+paralelo no mesmo projeto: o `finally` de um apagava os papéis que o outro
+ainda usava, e o cadeado sumia no meio do vizinho. Passou na CI da §208 por
+sorte de timing e falhou aqui. Os dois foram para o mesmo arquivo com
+`test.describe.configure({ mode: "serial" })` — `fullyParallel: false` no
+projeto não resolveria, porque o Playwright continua distribuindo ARQUIVOS
+diferentes entre workers.
+
+63/63 E2E, duas rodadas completas seguidas antes de abrir o PR desta vez.
