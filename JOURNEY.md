@@ -6789,3 +6789,53 @@ entre as duas é o produto inteiro — é o que a pessoa vê antes de decidir se
 usar.
 
 507 web · 70/70 E2E · lint e build limpos.
+
+## 235. Os três buracos de espinha do tour, com dado de demonstração
+
+Depois de eu medir que o tour cobria 5 das 12 áreas (§234), o usuário mandou
+fechar os três de espinha — e autorizou o que faltava para isso ser possível:
+*"se preciso teremos dados mock exclusivos para o tour"*.
+
+**Os três passos novos, na ordem de uso real:**
+
+1. **"Começar conversando"**, ANTES do diagrama. O tour começava com o desenho
+   pronto na mesa, pulando como ele nasce — que é a porta de entrada de verdade
+   e provavelmente o que mais impressiona. Agora o passo abre a conversa com a
+   troca que "produziu" aquele desenho.
+2. **"Contexto do produto"**, antes das stacks. É o par do propósito: lá o
+   *para quê*, aqui o *de que negócio*.
+3. **"Do item à issue"**, antes do PDCA. A cadeia terminava no markdown baixado;
+   o último elo — o item virando issue no tracker — não estava em lugar nenhum.
+
+**O problema que o dado mock resolve, e por que a alternativa era pior.** As
+três telas leem do servidor. Numa instalação nova estão vazias, e passo que
+promete conteúdo sobre tela vazia é exatamente a mentira que o §234 acabou de
+custar caro. A alternativa óbvia — semear pela API — seria **pior**: o tour
+passaria a ESCREVER na configuração de quem só quis ver a ferramenta.
+
+Então cada tela ganhou uma costura explícita (`demonstracao?`) que substitui o
+fetch e **desliga a escrita**. E a regra que mantém isso honesto: **onde entra
+dado de demonstração, entra a marca** — um selo visível dizendo "nada aqui está
+salvo na sua configuração". Sem ele, alguém sai do tour achando que configurou
+um produto.
+
+**A invariante mais importante virou teste:** a demonstração **liga** no
+primeiro passo que mostra dado falso e **desliga no fim do tour**. Dado de
+demonstração que sobrevive ao tour vira configuração fantasma na tela de quem
+for usar de verdade. Mordida: tirando o desligamento, o teste cai.
+
+**Um tropeço meu, e ele tem lição.** Pus a asserção do produto entre dois
+`irAtePasso("O menu")` — e o helper **só anda para a frente**. Pedir um passo já
+passado faz o laço correr até o último, onde não existe mais "Próximo", e o erro
+que aparece é um timeout esperando um botão, sem dizer o motivo real. Deixei o
+comentário no spec: em teste de fluxo linear, a ordem das asserções É a ordem do
+fluxo, e violá-la falha longe de onde está o erro.
+
+Também tirei um `PASSO \d+ DE 13` cravado do teste de "pular tour" — mesma
+doença do §233, e agora com 20 passos ele estava errado de qualquer jeito.
+
+512 web · 70/70 E2E · lint e build limpos.
+
+Falta o **tour de configuração** (Modelo de IA, Pipeline de IA, Regras de
+refinamento, Campos por conexão) — a segunda metade da proposta, para o primeiro
+tour continuar sendo "o que a ferramenta faz" em vez de virar 25 passos.

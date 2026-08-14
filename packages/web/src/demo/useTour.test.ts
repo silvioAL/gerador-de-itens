@@ -28,6 +28,8 @@ function montarOpts() {
     fecharItens: vi.fn(),
     abrirProposito: vi.fn(),
     fecharAssistente: vi.fn(),
+    abrirConversa: vi.fn(),
+    ligarDemonstracao: vi.fn(),
   };
 }
 
@@ -92,6 +94,38 @@ describe("useTour", () => {
 
     expect(opts.derivarQuebra).toHaveBeenCalled();
     expect(result.current.passoAtual?.selector).toBe("[data-tour=review-table]");
+  });
+
+  it("§235 — os três passos de espinha estão no tour, na ordem de uso", () => {
+    const opts = montarOpts();
+    const { result } = renderHook(() => useTour(opts));
+
+    act(() => result.current.iniciar());
+    // A conversa vem ANTES do diagrama: é a porta de entrada real, e o tour
+    // antes começava com o desenho já pronto, pulando como ele nasce.
+    andarAte(result, "Começar conversando");
+    expect(opts.abrirConversa).toHaveBeenCalled();
+
+    andarAte(result, "Contexto do produto");
+    expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("produtos");
+
+    andarAte(result, "Do item à issue");
+    expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("exportacao");
+  });
+
+  it("§235 — a demonstração LIGA no primeiro dado falso e DESLIGA no fim", () => {
+    // A regra que impede o pior efeito colateral: dado de demonstração que
+    // sobrevive ao tour vira configuração fantasma na tela de quem for usar
+    // de verdade.
+    const opts = montarOpts();
+    const { result } = renderHook(() => useTour(opts));
+
+    act(() => result.current.iniciar());
+    andarAte(result, "Começar conversando");
+    expect(opts.ligarDemonstracao).toHaveBeenCalledWith(true);
+
+    andarAte(result, "Fim do tour");
+    expect(opts.ligarDemonstracao).toHaveBeenLastCalledWith(false);
   });
 
   it("SPEC-57 — o tour mostra o PROPÓSITO, e o painel fecha antes do passo seguinte", () => {

@@ -15,6 +15,11 @@ export interface ConversaPanelProps {
   /** O que o usuário já escreveu no "Contexto do épico" — a conversa começa
    * com isso na caixa, em vez de pedir que ele digite tudo de novo. */
   contextoInicial?: string;
+  /** §235 — conversa EXCLUSIVA do tour: uma troca já pronta, com a proposta
+   * que "produziu" o desenho que a mesa já tem. Abrir a conversa vazia no tour
+   * mostraria uma caixa de texto e nada mais — e chamar o modelo de verdade
+   * faria a demonstração depender de credencial e de rede. */
+  mensagensDeDemonstracao?: Mensagem[];
   onAplicar: (proposta: DiagramaProposto) => void;
 }
 
@@ -53,15 +58,18 @@ export function ConversaPanel({
   techs,
   contextos,
   contextoInicial,
+  mensagensDeDemonstracao,
   onAplicar,
 }: ConversaPanelProps) {
-  const [mensagens, setMensagens] = useState<Mensagem[]>([
-    {
-      autor: "agente",
-      texto:
-        "Descreva a demanda — por texto ou por voz (🎤): o que precisa ser construído, quais sistemas participam, o que muda. Eu proponho o diagrama com os tipos que este projeto tem configurados, e você decide se aplica.",
-    },
-  ]);
+  const [mensagens, setMensagens] = useState<Mensagem[]>(
+    mensagensDeDemonstracao ?? [
+      {
+        autor: "agente",
+        texto:
+          "Descreva a demanda — por texto ou por voz (🎤): o que precisa ser construído, quais sistemas participam, o que muda. Eu proponho o diagrama com os tipos que este projeto tem configurados, e você decide se aplica.",
+      },
+    ]
+  );
   const [entrada, setEntrada] = useState(contextoInicial?.trim() ?? "");
   // SPEC-30 Fase 1a — mesmo hook da `JanelaConversa`; o texto ditado cai neste
   // mesmo campo, editável antes de enviar. A config vai junto: é dela que sai o

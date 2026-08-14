@@ -30,6 +30,10 @@ export interface UseTourOpts {
    * propriedades, e a janela flutuante ficaria por cima dele. */
   abrirProposito: () => void;
   fecharAssistente: () => void;
+  /** §235 — os três buracos de espinha: a porta de entrada (conversa), o
+   * contexto de negócio (produto) e o fim da cadeia (exportação). */
+  abrirConversa: () => void;
+  ligarDemonstracao: (ligada: boolean) => void;
   fecharJornada: () => void;
   fecharConfig: () => void;
 }
@@ -51,8 +55,21 @@ export function useTour(opts: UseTourOpts) {
       },
     },
     {
+      selector: "[data-testid=assistente-janela]",
+      titulo: "Começar conversando",
+      texto:
+        "A porta de entrada não é arrastar caixa: você descreve a demanda — por texto, voz ou um print de lousa — e o agente propõe os componentes USANDO OS TIPOS que este projeto tem configurados. Nada é aplicado sozinho: a proposta vem com o motivo de cada peça, e você decide. Este desenho na mesa nasceu da conversa ao lado.",
+      onEnter: () => {
+        // Ligar aqui, e não só no passo do produto: a conversa de demonstração
+        // é o primeiro dado falso que o tour mostra.
+        opts.ligarDemonstracao(true);
+        opts.abrirConversa();
+      },
+    },
+    {
       selector: ".react-flow",
       titulo: "O diagrama",
+      onEnter: () => opts.fecharAssistente(),
       texto:
         "Um serviço novo escrevendo numa coleção Mongo nova. Cada nó já foi preenchido e ficou verde — pronto para virar item de trabalho.",
     },
@@ -123,6 +140,16 @@ export function useTour(opts: UseTourOpts) {
     },
     {
       selector: "[data-tour=config-screen-content]",
+      titulo: "Contexto do produto",
+      texto:
+        "A ferramenta sabia tecnologia e processo, e não sabia DE QUE PRODUTO a demanda falava. O que estiver aqui — objetivo, quem usa, regras, glossário — viaja junto com toda demanda ligada a este produto, e é o que separa um item tecnicamente correto de um item que entende o negócio. É o par do propósito: lá o \"para quê\", aqui o \"de que negócio\".",
+      onEnter: () => {
+        opts.ligarDemonstracao(true);
+        opts.abrirConfigNaAba("produtos");
+      },
+    },
+    {
+      selector: "[data-tour=config-screen-content]",
       titulo: "Stacks conhecidas",
       texto:
         'A stack é um perfil do CATÁLOGO ("Java + Spring Boot", "Node"...) e o time aponta um — trocar de tecnologia é trocar o ponteiro. Os valores do perfil apontado pré-preenchem sugestões em campos novos; dá pra capturar direto de um nó real com "salvar como padrão do time" no painel.',
@@ -151,6 +178,13 @@ export function useTour(opts: UseTourOpts) {
     },
     {
       selector: "[data-tour=config-screen-content]",
+      titulo: "Do item à issue",
+      texto:
+        "O último elo: os itens prontos são enviados para um AGENTE que fala com o seu tracker (MCP, n8n, uma função interna — o que a empresa já tiver). O gerador não implementa Jira de propósito: implementar um tracker seria escolher o tracker de todo mundo. Falha é por item, e reexportar não duplica.",
+      onEnter: () => opts.abrirConfigNaAba("exportacao"),
+    },
+    {
+      selector: "[data-tour=config-screen-content]",
       titulo: "Melhoria contínua (PDCA)",
       texto:
         "Depois de gerar, o assistente pergunta o que faltou ou sobrou. O que as pessoas respondem aparece aqui: vira sugestão de ajuste, você vê o efeito num item de exemplo antes de decidir, aprova — e a configuração muda de verdade, com registro de quem aplicou.",
@@ -160,7 +194,12 @@ export function useTour(opts: UseTourOpts) {
       selector: null,
       titulo: "Fim do tour",
       texto: "Dá pra rever isto em ▶ Demonstração & tour, ou carregar outro desenho em ✦ Cenários prontos — os dois botões ficam sempre no topo.",
-      onEnter: () => opts.fecharConfig(),
+      onEnter: () => {
+        // Desligar é obrigatório: dado de demonstração que sobrevive ao tour
+        // vira configuração fantasma na tela de quem for usar de verdade.
+        opts.ligarDemonstracao(false);
+        opts.fecharConfig();
+      },
     },
   ];
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiProdutos, type Produto } from "../api/client";
+import { MarcaDeDemonstracao } from "../demo/dadosDoTour";
 
 /**
  * SPEC-53 Fase 1 — o contexto do produto.
@@ -17,6 +18,10 @@ import { apiProdutos, type Produto } from "../api/client";
 export interface ProdutosTabProps {
   /** Os times aos quais um produto pode ser amarrado. */
   timeIds: string[];
+  /** §235 — produto EXCLUSIVO do tour: substitui a lista do servidor e desliga
+   * toda escrita. Instalação nova tem esta tela vazia, e passo que promete
+   * conteúdo sobre tela vazia é a mentira que o §234 custou caro. */
+  demonstracao?: Produto;
 }
 
 const SECOES: { chave: keyof Pick<Produto, "objetivo" | "quemUsa" | "regrasDeNegocio" | "sistemas" | "restricoes">; rotulo: string; ajuda: string; placeholder: string }[] = [
@@ -52,7 +57,7 @@ const SECOES: { chave: keyof Pick<Produto, "objetivo" | "quemUsa" | "regrasDeNeg
   },
 ];
 
-export function ProdutosTab({ timeIds }: ProdutosTabProps) {
+export function ProdutosTab({ timeIds, demonstracao }: ProdutosTabProps) {
   const [produtos, setProdutos] = useState<Produto[] | null>(null);
   const [selecionadoId, setSelecionadoId] = useState<string | null>(null);
   const [nomeNovo, setNomeNovo] = useState("");
@@ -64,7 +69,9 @@ export function ProdutosTab({ timeIds }: ProdutosTabProps) {
 
   async function recarregar(idParaSelecionar?: string) {
     try {
-      const lista = await apiProdutos.listar();
+      // §235 — em demonstração não se busca nem se grava: o tour mostra um
+      // produto de exemplo, não a configuração real de quem está vendo.
+      const lista = demonstracao ? [demonstracao] : await apiProdutos.listar();
       setProdutos(lista);
       const alvo = idParaSelecionar ?? selecionadoId;
       const escolhido = lista.find((p) => p.id === alvo) ?? lista[0] ?? null;
@@ -77,9 +84,10 @@ export function ProdutosTab({ timeIds }: ProdutosTabProps) {
 
   useEffect(() => {
     void recarregar();
-  }, []);
+  }, [demonstracao]);
 
   async function executar(acao: () => Promise<unknown>, idDepois?: string) {
+    if (demonstracao) return false;
     setErro(null);
     setSalvo(false);
     try {
@@ -119,6 +127,7 @@ export function ProdutosTab({ timeIds }: ProdutosTabProps) {
 
   return (
     <div data-testid="config-produtos">
+      {demonstracao && <MarcaDeDemonstracao />}
       <p style={proseEstilo}>
         O que a ferramenta sabia era tecnologia, processo e forma dos itens — nunca <strong>de que produto</strong> a
         demanda falava. O que estiver aqui vai junto com toda demanda ligada a este produto, e é o que separa um item
