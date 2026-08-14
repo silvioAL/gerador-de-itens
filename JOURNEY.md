@@ -6358,3 +6358,77 @@ projeto vizinho definia o assunto. Avaliação de ferramenta de terceiro puxa o
 avaliador para o objetivo DELA; ancorar no nosso é trabalho ativo.
 
 Nada de produção mudou nesta rodada.
+
+## 227. Medir o desenho, e a dança com o agente
+
+Três complementos do usuário sobre a SPEC-56, na mesma linha: *"de certa forma
+também é medir arquitetura (…) o usuário vai poder fazer o desenho com o apoio
+do assistente, medir como ele fica com interações incríveis entre a parte
+determinística e o suporte que o agente vai dar"*; *"tudo com esse visual atual
+que é bonito, mas incrementado"*; e *"na mesa de projeto mesmo, interagindo com
+o agente, ele vai poder entender POR QUE aquela é a melhor decisão"*.
+
+**Primeiro, corrigi um exagero meu.** No §226 empurrei "medir" inteiro para fora
+do escopo. Errado: o que sai é medir **desempenho e custo**. Medir o **desenho**
+não só está dentro como **já existe** — e eu podia ter percebido antes de
+escrever, porque está no código: `calcularProntidao()` é função pura, por nó,
+que conta obrigatórios em aberto e pendentes de confirmação, e **já embute
+proveniência** (valor `sugerido` não confirmado não conta como resolvido). O
+semáforo é isso em cor; o `VERMELHO 0 / AMARELO 0` é isso agregado.
+
+Então não é criar medição, é **generalizar a que existe de uma dimensão para
+várias**: completude (temos), conformidade a padrão, propósito (requisito
+órfão), consistência (decisões que se contradizem), confiança (quanto do desenho
+é decidido vs sugerido não confirmado) e forma (fan-out, profundidade, ponto
+único de falha). Todas com a mesma assinatura do que já existe.
+
+A dimensão **confiança** é a que mais me chamou atenção: o dado já está lá,
+campo a campo, e ninguém agrega. "Este desenho está 40% apoiado em sugestão não
+confirmada" é medida honesta, barata, e muda comportamento.
+
+**A divisão de trabalho que faz o ciclo funcionar** — e esta é a tese de produto
+mais forte da avaliação inteira, e não veio do SimArch, veio do usuário:
+
+- **engine mede e acusa** (fatos), nunca opina;
+- **agente explica, ensina o porquê e propõe**, nunca mede nem decide;
+- **a pessoa decide**, e a decisão fica com proveniência.
+
+O agente nunca produz a medida — ele a lê. É a linha que impede o LLM de virar
+fonte de número. E é mútuo: a medição é o que torna o agente bom (ele para de
+adivinhar o que está errado e passa a ler), e o agente é o que torna a medição
+útil ("acoplamento 9" não ajuda ninguém; conversa sobre isso, sim).
+
+**A interação que mais me animou, porque é quase de graça:** o agente propõe, e
+o engine **mede a proposta como se aceita**, mostrando o delta antes de a pessoa
+confirmar — *"vira 4 de fan-out em vez de 9, e resolve duas violações"*. A peça
+que faz isso funcionar já está pronta: proposta entra como `origem: sugerido` e
+a prontidão já a ignora até confirmar. Medir duas vezes — só o confirmado, e o
+confirmado mais o sugerido — e mostrar a diferença é aritmética sobre mecanismo
+existente.
+
+**E o ADR deixou de ser documentação.** Quando o usuário disse "entender por que
+aquela é a melhor decisão", o ADR encontrou sua função real: é **de onde o
+agente tira a explicação**. Acusa-se a violação, e o agente responde por que o
+padrão existe, citando a decisão que o originou. O ciclo se alimenta: decisão
+nova vira ADR, ADR vira a explicação da próxima vez, a explicação forma quem
+desenha.
+
+Isso muda o que a mesa é: de lugar onde o padrão é **cobrado** para lugar onde
+ele é **ensinado**. E é resposta melhor à pergunta do CONTEXTO §1 — forçar a
+decisão sem explicar produz obediência; explicar produz critério.
+
+**Com uma válvula obrigatória:** às vezes a resposta certa é violar o padrão.
+O ciclo tem que aceitar e **registrar** — quem decidiu, por quê —, virando
+emenda ao ADR. Sem essa saída, a pessoa aprende a ignorar o vermelho, e aí a
+medição inteira morre. Isso não é concessão, é o que mantém o mecanismo vivo.
+
+**Visual: incremento de dimensões, não de estética.** A linguagem já é a certa.
+O semáforo do nó ganha mais razões no popover que já existe; o `VERMELHO/AMARELO`
+do topo vira placar do desenho com o "Próximo pendente" navegando por qualquer
+dimensão; a aresta ganha sinal próprio (padrão de caminho não cabe no nó); a
+esteira animada serve à proposta sendo medida; e o painel inferior é onde a
+conta se explica. O princípio: **a medida aparece onde a decisão é tomada**, não
+numa aba de relatório — semáforo funciona porque está em cima do que se está
+editando.
+
+Nada de produção mudou nesta rodada.

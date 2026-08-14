@@ -32,8 +32,9 @@ dessas questões"*, seguido da lista de funcionalidades do SimArch.
 > - **Monte Carlo sai do escopo** (§12.1 inteira). A pergunta era boa e a
 >   resposta está correta — só responde *"vai aguentar?"*, que não é a pergunta
 >   da mesa.
-> - **A aritmética muda de justificativa.** Não é medir a arquitetura; é
->   **conferir a decisão contra o padrão**.
+> - **A aritmética muda de justificativa.** Não é medir desempenho nem custo; é
+>   **conferir a decisão contra o padrão**. Medir o *desenho* continua dentro —
+>   e já existe, no semáforo (§0.6).
 > - **ADR e requisito sobem de "ideias médias" para o eixo central**, porque
 >   são exatamente os elos que faltam na cadeia propósito → decisão → item.
 
@@ -128,6 +129,10 @@ Sob essa luz, o que fica e o que sai da tabela da §4:
 | 8 | **Dialeto de provedor** (P7, §9) | Muda quais padrões se aplicam |
 | — | ~~FinOps~~, ~~Monte Carlo~~ | Fora do escopo (§0.3) |
 
+Atravessando todos: **medir o desenho** (§0.6) e o **ciclo com o agente**
+(§0.7). Não são um passo da fila — cada passo acima entrega uma dimensão nova
+de medida e uma coisa nova que o agente sabe explicar.
+
 Mudou muito em relação à §13: lá o percurso era o passo 1 porque eu estava
 otimizando para **habilitar cálculo**. Aqui ele é o 4, porque o que destrava o
 objetivo é a **cadeia de propósito e decisão**, e essa não depende de caminho
@@ -145,6 +150,133 @@ diferença entre uma spec que alguém precisa acreditar e uma que se confere.
 E é aditivo ao que já existe: o gerador de especificação já monta markdown a
 partir dos itens; os elos novos entram como seções ancoradas, não como um
 formato novo.
+
+### 0.6 Medir, sim — o DESENHO, não o runtime
+
+Complemento do usuário: *"de certa forma também é medir arquitetura (…) o
+usuário vai poder fazer o desenho com o apoio do assistente, medir como ele
+fica"*.
+
+Certo, e a §0.3 foi rápida demais ao empurrar "medir" para fora. O que sai é
+medir **desempenho e custo**; o que entra — e sempre esteve aqui — é medir o
+**desenho como desenho**.
+
+**Isto já existe, e é a semente.** `calcularProntidao()`
+(`engine/src/readiness/prontidao.ts`) é uma medida do desenho: função pura, por
+nó, que conta campos obrigatórios em aberto e valores pendentes de confirmação,
+e **já embute proveniência** — valor `sugerido` não confirmado não conta como
+resolvido (linhas 41‑44). O semáforo é isso mostrado em cor; o `VERMELHO 0 /
+AMARELO 0` no topo da mesa é isso agregado.
+
+Ou seja: não é criar medição. É **generalizar a que já existe de uma dimensão
+para várias**. Todas com a mesma forma — função pura sobre `(diagrama, config,
+contexto)`, explicável em uma frase, e terminando em item ou em decisão.
+
+| Dimensão | Pergunta que responde | Insumo |
+|---|---|---|
+| **Completude** *(existe hoje)* | o que falta decidir? | campos × `when` |
+| **Conformidade** | quais padrões este desenho viola? | padrão verificável (§0.2, §10) |
+| **Propósito** | que requisito ficou sem componente? | rastreabilidade (§5) |
+| **Consistência** | há decisões que se contradizem? | conflito aritmético / topológico |
+| **Confiança** | quanto deste desenho foi *decidido* vs sugerido e não confirmado? | `Origem`, que já temos por campo |
+| **Forma** | fan-out, profundidade de cadeia, ponto único de falha | topologia + percurso (§3) |
+
+A dimensão **Confiança** merece nota: os dados já estão todos lá, campo a
+campo, e ninguém os agrega. "Este desenho está 40% apoiado em sugestão não
+confirmada" é uma medida honesta, barata e que muda comportamento — e é
+exatamente o tipo de coisa que a proveniência foi construída para permitir.
+
+**A régua para não virar dashboard:** toda medida precisa (a) ser função pura,
+(b) caber numa frase de explicação — *por que* deu esse número —, e (c)
+terminar em item de backlog ou em decisão registrada. Medida que só existe para
+ser exibida é enfeite, e enfeite numérico é o começo da falsa precisão.
+
+### 0.7 A dança: o determinístico mede, o agente explica, a pessoa decide
+
+O outro complemento: *"interações incríveis entre a parte determinística e o
+suporte que o agente vai dar"* e *"interagindo com o agente ele vai poder
+entender **por que** aquela é a melhor decisão"*.
+
+Aqui está, na minha leitura, a tese de produto mais forte desta avaliação
+inteira — e ela não veio do SimArch, veio de você.
+
+**A divisão de trabalho que faz isso funcionar:**
+
+| Quem | Faz | Nunca faz |
+|---|---|---|
+| **Engine** | mede e acusa — fatos sobre o desenho | opinar, priorizar, explicar |
+| **Agente** | explica, ensina o porquê, propõe alternativa | medir, decidir, inventar número |
+| **Pessoa** | decide | — (e a decisão fica com proveniência) |
+
+O agente **nunca produz a medida** — ele a lê. É essa a linha que impede o LLM
+de virar fonte de número, e é a mesma disciplina do §2 do CONTEXTO aplicada a
+um lugar novo.
+
+**Por que a medição é o que torna o agente bom.** Hoje o agente escreve texto em
+campo. Com medição, ele ganha um **substrato factual** para conversar: não
+precisa adivinhar o que está errado, ele *lê* — "três nós violam o padrão de
+timeout de chamada externa; dois requisitos não têm componente". Toda sugestão
+passa a poder citar um fato medido, em vez de soar plausível.
+
+**E por que o agente é o que torna a medição útil.** "Acoplamento 9" não ajuda
+ninguém. O agente transforma o número em conversa, e a conversa em decisão — que
+volta ao modelo com proveniência. Um sem o outro é metade.
+
+**As quatro interações concretas**, todas construídas com peças que já existem:
+
+1. **Acusar → explicar.** O engine marca a violação; o agente diz **por que o
+   padrão existe** — e a fonte disso é o **ADR** (§6). É aqui que o ADR deixa de
+   ser documentação e vira insumo vivo: ele é a resposta do agente à pergunta
+   "por que eu deveria fazer assim?".
+2. **Propor → medir antes de aceitar.** O agente propõe uma mudança; o engine
+   mede a proposta **como se aceita** e mostra o delta: *"vira 4 de fan-out em
+   vez de 9, e resolve duas violações"*. A pessoa aceita sabendo o efeito.
+   **Isto é quase grátis:** a proposta do agente já entra como `origem:
+   sugerido` e a prontidão já a ignora até confirmar. Medir duas vezes — só o
+   confirmado, e o confirmado + sugerido — e mostrar a diferença é aritmética
+   sobre um mecanismo pronto.
+3. **Comparar caminhos de decisão.** É a variante A vs B (§8), com a
+   justificativa certa: não comparar desempenho, e sim **quais padrões cada
+   opção satisfaz ou viola**. E as duas opções, com suas contas, são o corpo do
+   ADR que registra a escolha.
+4. **Decidir contra o padrão, de propósito.** Às vezes a resposta certa é violar
+   o padrão. O ciclo tem que aceitar isso **e registrar** — quem decidiu, por
+   quê. Vira uma emenda ao ADR, e some do vermelho sem sumir do histórico. Sem
+   essa saída, a pessoa aprende a ignorar o vermelho, e aí a medição inteira
+   morre.
+
+**O ciclo se alimenta:** decisão registrada vira ADR; ADR vira a explicação que
+o agente dá na próxima vez; a explicação forma quem desenha. A mesa deixa de ser
+só o lugar onde o padrão é **cobrado** e passa a ser onde ele é **ensinado** — o
+que é uma resposta muito melhor para a pergunta que o CONTEXTO §1 coloca
+("mudar o que a ferramenta força a pessoa a decidir antes de escrever código"):
+forçar a decisão sem explicar produz obediência; explicar produz critério.
+
+E nada disso é novo em espécie: a conversa como interface (SPEC-27) e a condução
+proativa (SPEC-37) já existem. O que falta é **o que o agente lê** — hoje ele lê
+o desenho; passaria a ler o desenho **medido**.
+
+### 0.8 O visual: o mesmo, incrementado — e por onde
+
+Pedido explícito: *"tudo com esse visual atual que é bonito, mas incrementado
+para atender esses fins nessa parte"*.
+
+A boa notícia é que a linguagem visual **já existe e é a certa** — o incremento
+é de dimensões, não de estética:
+
+| Elemento de hoje | Incremento |
+|---|---|
+| **Semáforo no nó** (completude) | mesma cor, mais razões: o popover que já lista "o que falta" passa a listar também violação de padrão, requisito órfão e contradição |
+| **`VERMELHO 0 / AMARELO 0` no topo** | vira o **placar do desenho** — as dimensões da §0.6 na mesma barra, com o "Próximo pendente" que já existe navegando por qualquer uma delas |
+| **Aresta** | hoje sem sinal próprio; padrão de caminho (§3) precisa pintar a aresta e o percurso, não só o nó |
+| **Proposta do agente** | já entra como `sugerido` com confirmação nó a nó — o incremento é mostrar o **delta do placar** com e sem a sugestão (§0.7, interação 2) |
+| **Esteira animada** | a mesma linguagem de animação serve para a proposta sendo medida: o desenho "responde" enquanto o agente fala |
+| **Painel inferior** (não existe) | onde a conta se explica passo a passo — é o "por que deu esse número" da régua da §0.6 |
+
+O princípio que segura tudo: **a medida aparece onde a decisão é tomada**, não
+numa aba de relatório. Semáforo no nó funciona porque está em cima da coisa que
+se está editando; um dashboard separado teria a mesma informação e nenhum do
+efeito.
 
 ---
 
