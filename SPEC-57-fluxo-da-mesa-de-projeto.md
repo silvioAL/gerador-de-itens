@@ -12,7 +12,7 @@
 
 ---
 
-## 1. As três regras que o fluxo inteiro obedece
+## 1. As quatro regras que o fluxo inteiro obedece
 
 Antes dos momentos, as invariantes. Se algum passo abaixo violar uma delas, o
 passo está errado — não a regra.
