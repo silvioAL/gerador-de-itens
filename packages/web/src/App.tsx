@@ -376,6 +376,18 @@ function AppCarregado({
        * apagar os itens recém-gerados seria perder trabalho à toa.
        */
       setItensGerados([]);
+      /**
+       * §213 — o mesmo defeito do §210 noutro lugar, achado varrendo a classe:
+       * o painel do assistente guarda o texto num `useState(demandInfo)`,
+       * inicializado UMA vez. Com ele aberto durante a troca, o campo
+       * continuava exibindo o contexto da demanda anterior — e o próximo
+       * "Salvar" gravaria esse texto na demanda nova.
+       *
+       * Fechar a aba desmonta o painel: quando a pessoa reabrir, ele lê o
+       * contexto de quem está aberto agora. Vale para as três abas — a
+       * conversa e a de configurar têm rascunho pelo mesmo motivo.
+       */
+      setAbaAssistente(null);
     },
     [setQuebra, setSelecionadoId]
   );
