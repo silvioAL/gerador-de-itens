@@ -3,6 +3,11 @@
 > **Status: avaliação, não decisão de construir.** Nenhuma linha de produção
 > muda por causa deste documento.
 >
+> **O fluxo de trabalho que sai daqui está na
+> [SPEC-57](SPEC-57-fluxo-da-mesa-de-projeto.md)** — este documento diz *o que
+> falta*; aquele diz *como se trabalha*, momento a momento, e é o que precisa
+> ficar claro antes de qualquer código.
+>
 > **Revisão de 14/08/2026 (§223 → §224).** A primeira versão respondeu a
 > pergunta errada — gastou o documento decidindo "copiar ou não copiar o motor
 > de simulação", quando o pedido era **como a mesa de projeto evolui**.
