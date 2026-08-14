@@ -6296,3 +6296,65 @@ resposta é "não vale". A medição é barata e encerra o assunto — no espír
 §190: construir o instrumento em vez de continuar argumentando.
 
 Nada de produção mudou nesta rodada.
+
+## 226. O objetivo, enfim dito — e o que ele invalida
+
+Correção do usuário: *"esse projeto não serve para calcular orçamento, o nosso
+objetivo é evoluir a mesa para poder tomar boas decisões de desenho e de
+projeto e garantir padrões consistentes que chegam até os itens que vamos
+gerar (no futuro vamos evoluir em termos de specs geradas)"*.
+
+Terceira correção de rumo na mesma avaliação, e a mais útil das três. As duas
+anteriores foram sobre nível de abstração; esta é sobre **para que serve**.
+
+**O que eu estava fazendo sem perceber.** A §4 listava orçamento de latência,
+propagação de volume e custo consolidado; a §12.1 desenvolvia Monte Carlo. Isso
+não é a mesa de projeto — é uma ferramenta de capacity planning, que é um
+produto diferente e mais divertido de projetar. Escorreguei para ele porque a
+lista do SimArch tem gravidade nessa direção e eu não tinha o objetivo escrito
+para me segurar.
+
+**A cadeia, que é o eixo e é mais simples que as oito primitivas:**
+
+```
+PROPÓSITO ──► DECISÃO ──► ELEMENTO ──► ITEM ──► SPEC
+(requisito)    (ADR)     (nó/aresta)  (derivado)  (gerada)
+   falta        falta       temos       temos      temos
+```
+
+A cadeia **começa no meio**. Elemento existe, item nasce dele, spec sai do item
+— essa metade é o produto e funciona. Faltam os dois elos da frente, e por isso
+ninguém sabe para quê um componente existe nem por que ele é assim; e,
+principalmente, **não há como conferir se o padrão foi aplicado**, porque
+conferir exige saber qual padrão deveria valer ali — que é o elo "decisão".
+
+"Padrões consistentes que chegam até os itens" é, mecanicamente, essa cadeia
+ligada e verificável de ponta a ponta. Nada mais que isso.
+
+**A aritmética sobrevive, com justificativa melhor.** Não é medir arquitetura:
+**é o que torna um padrão conferível em vez de opinável**. "Chamada externa tem
+que ter timeout curto" é opinião; `timeout ≤ 500ms` é padrão, e um nó com 800ms
+viola de um jeito que função pura detecta e vira item. O conflito aritmético
+(retry 3x sob timeout de chamador mais curto) deixa de ser capacity planning e
+vira o que sempre foi: **decisão internamente inconsistente**, defeito de
+desenho, exatamente o que a mesa deve pegar antes de virar código.
+
+**A ordem virou de cabeça pra baixo.** Na §13 o percurso era o passo 1, porque
+eu otimizava para habilitar cálculo. Com o objetivo declarado ele é o passo 4:
+o que destrava é a cadeia de propósito e decisão — requisito/rastreabilidade,
+padrão verificável, ADR — e nenhuma delas depende de caminho.
+
+**Fora do escopo, dito com todas as letras:** FinOps e Monte Carlo. Deixei a
+§12.1 inteira no documento com o veredito trocado no topo, em vez de apagar: a
+análise está correta e a fronteira que ela traça é útil para a próxima vez que
+alguém perguntar. Só que ela responde "vai aguentar em produção?", e a mesa
+pergunta "esta decisão é boa e consistente com o nosso padrão?".
+
+**A régua que fica, e é a mais cara das três:** nível de abstração errado se
+corrige relendo; **objetivo não declarado se corrige tarde**. Três rodadas
+sobre o mesmo documento, e o que teria evitado as três era uma frase minha no
+começo — "para que serve isto?" — em vez de assumir que a lista de features do
+projeto vizinho definia o assunto. Avaliação de ferramenta de terceiro puxa o
+avaliador para o objetivo DELA; ancorar no nosso é trabalho ativo.
+
+Nada de produção mudou nesta rodada.

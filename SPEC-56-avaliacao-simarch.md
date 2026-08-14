@@ -15,9 +15,144 @@ Pedido, na segunda passada: *"faltou um pouco de abstração (…) a ideia seria
 evoluir a mesa de projeto de forma geral (…) apenas não temos englobado algumas
 dessas questões"*, seguido da lista de funcionalidades do SimArch.
 
+> ### ⚠️ Correção de rumo (§226) — leia antes do resto
+>
+> O objetivo foi declarado depois que as §§1–13 já estavam escritas:
+>
+> *"esse projeto não serve para calcular orçamento, o nosso objetivo é evoluir
+> a mesa para poder tomar boas decisões de desenho e de projeto e garantir
+> padrões consistentes que chegam até os itens que vamos gerar (no futuro vamos
+> evoluir em termos de specs geradas)"*.
+>
+> **Isso invalida parte do que está abaixo, e a parte invalidada fica visível
+> em vez de ser apagada** — ver §0, que reposiciona tudo. Em resumo:
+>
+> - **FinOps/custo sai do escopo.** Estava na §4 como um dos cálculos; não é
+>   deste produto.
+> - **Monte Carlo sai do escopo** (§12.1 inteira). A pergunta era boa e a
+>   resposta está correta — só responde *"vai aguentar?"*, que não é a pergunta
+>   da mesa.
+> - **A aritmética muda de justificativa.** Não é medir a arquitetura; é
+>   **conferir a decisão contra o padrão**.
+> - **ADR e requisito sobem de "ideias médias" para o eixo central**, porque
+>   são exatamente os elos que faltam na cadeia propósito → decisão → item.
+
+---
+
+## 0. O objetivo, e o que ele reordena
+
+**O objetivo não é medir a arquitetura. É decidir bem e fazer o padrão chegar
+inteiro até o item.**
+
+Reli as §§1–13 com isso em mãos e a estrutura sobrevive — as primitivas estão
+certas —, mas **a justificativa de duas delas estava errada** e duas
+recomendações não servem ao objetivo.
+
+### 0.1 A cadeia que falta
+
+Este é o eixo, e ele é mais simples que as oito primitivas:
+
+```
+PROPÓSITO ──► DECISÃO ──► ELEMENTO ──► ITEM ──► SPEC
+(requisito)    (ADR)     (nó/aresta)  (derivado)  (gerada)
+   ✗ falta     ✗ falta      ✓ temos     ✓ temos    ✓ temos
+```
+
+Hoje a cadeia **começa no meio**. O elemento existe, o item nasce dele, a spec
+sai do item — essa metade funciona e é o produto. Faltam os dois elos da
+frente, e é por isso que:
+
+- ninguém sabe **para quê** um componente existe (só que ele existe);
+- ninguém sabe **por que** ele é assim e não do outro jeito;
+- e, principalmente, **não há como conferir se o padrão foi aplicado** — porque
+  conferir exige saber qual padrão deveria valer ali, o que é justamente o elo
+  "decisão".
+
+"Padrões consistentes que chegam até os itens" é, mecanicamente, **essa cadeia
+inteira ligada e verificável de ponta a ponta**. Nada mais que isso, e nada
+menos.
+
+### 0.2 A aritmética, com a justificativa certa
+
+A §4 vendeu número como "orçamento de latência, volume, custo". Com o objetivo
+declarado, o número serve a outra coisa, e é uma coisa melhor:
+
+> **Um número com unidade é o que torna um padrão conferível em vez de
+> opinável.**
+
+"Chamada externa tem que ter timeout curto" é opinião. `timeout ≤ 500ms` é
+padrão — e um nó que declara 800ms **viola** o padrão, de forma que uma função
+pura detecta e transforma em item. O mesmo vale para o conflito aritmético que
+a §4 já citava (retry 3× sob um timeout de chamador mais curto): não é
+capacity planning, é **decisão internamente inconsistente**, que é defeito de
+desenho e é exatamente o que a mesa deve pegar antes de virar código.
+
+Sob essa luz, o que fica e o que sai da tabela da §4:
+
+| Cálculo da §4 | Serve ao objetivo? |
+|---|---|
+| Conflito aritmético (retry × timeout) | **Sim** — decisão inconsistente é defeito de desenho |
+| Conformidade a padrão numérico (`timeout ≤ 500ms`) | **Sim** — é o padrão virando régua |
+| Restrição paramétrica como critério de aceite | **Sim** — é o padrão chegando ao item |
+| Orçamento de latência ponta a ponta | **Parcial** — vale como coerência entre decisões (SLA declarado na origem vs tetos no caminho), não como previsão de desempenho |
+| Propagação de volume | **Parcial** — vale se muda qual padrão se aplica; não como dimensionamento |
+| **Custo / FinOps** | **Não.** Fora do escopo |
+
+### 0.3 O que sai, e por quê
+
+- **FinOps.** Não é deste produto. Custo de um nó desenhado é chute com casa
+  decimal, e mesmo se fosse exato não ajuda a decidir desenho nem a propagar
+  padrão.
+- **Monte Carlo (§12.1).** Deixo a seção inteira no documento porque a análise
+  está correta e a fronteira que ela traça é útil — mas o veredito muda:
+  **fora do escopo**. Ela responde *"vai aguentar em produção?"*; a mesa
+  pergunta *"esta decisão é boa e consistente com o nosso padrão?"*. São
+  perguntas de ferramentas diferentes, e eu estava respondendo a primeira
+  porque ela é mais divertida, não porque era a sua.
+- **Dialeto de provedor (P7)** muda de justificativa e **sobe um pouco**: saber
+  que a fila é SQS e não Rabbit importa porque **muda quais padrões se
+  aplicam** (DLQ nativa vs configurada, visibility timeout vs prefetch) — não
+  porque é bonito na paleta.
+
+### 0.4 A ordem, refeita pelo objetivo
+
+| # | Passo | Por que, no objetivo declarado |
+|---|---|---|
+| 1 | **Requisito + rastreabilidade + gap analysis** (P3, §5) | É o elo da frente da cadeia. Sem ele não existe "para quê", e consistência sem propósito é conformidade cega |
+| 2 | **Padrão como regra verificável sobre topologia e valor** (P8, §10, + §0.2) | É "garantir padrões consistentes" virando mecanismo, em vez de checklist que a pessoa lê e esquece |
+| 3 | **ADR ancorado no nó** (P4, §6) | É o "por quê" que falta, e é o que faz o item citar a decisão que ele implementa |
+| 4 | **Percurso** (P1, §3) | Muitos padrões são sobre caminho, não sobre nó (idempotência, validação na borda, alternativa para terceiro) |
+| 5 | **Número com unidade** (P2, §4) | Régua dos padrões numéricos — não orçamento |
+| 6 | **Modo de operação** (P5, §7) | Seleciona **quais padrões valem** ("Black Friday ⇒ idempotência obrigatória") |
+| 7 | **Variante A vs B** (P6, §8) | Comparar desenhos **pelos padrões que cada um satisfaz ou viola** — não por números de desempenho |
+| 8 | **Dialeto de provedor** (P7, §9) | Muda quais padrões se aplicam |
+| — | ~~FinOps~~, ~~Monte Carlo~~ | Fora do escopo (§0.3) |
+
+Mudou muito em relação à §13: lá o percurso era o passo 1 porque eu estava
+otimizando para **habilitar cálculo**. Aqui ele é o 4, porque o que destrava o
+objetivo é a **cadeia de propósito e decisão**, e essa não depende de caminho
+nenhum.
+
+### 0.5 O fim da cadeia: a spec gerada
+
+*"No futuro vamos evoluir em termos de specs geradas"* — e a cadeia da §0.1 é
+exatamente o que faz isso valer a pena. Uma spec que hoje diz **o que** fazer
+passaria a poder dizer, por item: qual requisito ele atende, qual decisão ele
+implementa, qual padrão foi aplicado e — quando for o caso — qual padrão foi
+**deliberadamente violado, e por quem**. Isso não é enfeite de documento: é a
+diferença entre uma spec que alguém precisa acreditar e uma que se confere.
+
+E é aditivo ao que já existe: o gerador de especificação já monta markdown a
+partir dos itens; os elos novos entram como seções ancoradas, não como um
+formato novo.
+
 ---
 
 ## 1. A tese
+
+> **Nota (§226):** esta tese continua válida como leitura do *modelo*, mas não
+> é o eixo do objetivo — ver §0. O percurso e o número importam por serem régua
+> de padrão, não por permitirem medir.
 
 **Hoje a mesa de projeto modela COMPONENTES. O que falta é o PERCURSO e o
 NÚMERO.**
@@ -47,20 +182,23 @@ mais.
 
 ## 2. O mapa: as 12 funcionalidades → 8 primitivas
 
-| Funcionalidade do SimArch | Primitiva por trás | Temos hoje? |
-|---|---|---|
-| Diagrama com componentes cloud (AWS/Azure/GCP/Oracle) | **P7** dialeto de provedor | Parcial — temos techs e stacks, sem eixo de provedor |
-| Triggers (user traffic, scheduler, webhook, evento, erro) | **P1** percurso (a origem dele) | **Não** — `job` é tipo de nó, mas não há "o que dispara este fluxo" |
-| Fluxos — passos com fallback e injeção de falha | **P1** percurso | **Não** — arestas são pares, não caminho ordenado |
-| Requisitos e rastreabilidade, gap analysis | **P3** para quê | **Não** |
-| ADRs | **P4** por quê | **Não** — geramos o *o quê*, nunca o *porquê* |
-| FinOps — custo/hora/mês, consolidado | **P2** número com unidade | **Não** — `number` existe como entrada, nada soma |
-| Engine de eventos discretos (CB, timeout, retry, bulkhead, fila) | **P2** + **P1** | Existe como *checklist*, não como valor |
-| Controles (duração, taxa, ramp-up, falha) | **P5** modo de operação | **Não** |
-| Cenários prontos (Normal, Pico, Black Friday, Falha regional) | **P5** modo de operação | **Não** — nossos "cenários" são diagramas de exemplo, homônimo |
-| Comparação A vs B, outra nuvem | **P6** variante | **Não** |
-| Painéis retráteis (esq / dir / inferior) | interface | Parcial — esquerdo e direito sim, inferior não |
-| Validação de conflitos arquiteturais | **P8** regra sobre a topologia | **Não** — nossos conflitos são do grafo de *atividades*, não do desenho |
+> **Nota (§226):** a coluna "serve ao objetivo?" foi acrescentada depois, com o
+> objetivo declarado em §0. Ela é a que manda.
+
+| Funcionalidade do SimArch | Primitiva por trás | Temos hoje? | Serve ao objetivo? |
+|---|---|---|---|
+| Diagrama com componentes cloud (AWS/Azure/GCP/Oracle) | **P7** dialeto de provedor | Parcial — temos techs e stacks, sem eixo de provedor | Sim — muda quais padrões se aplicam |
+| Triggers (user traffic, scheduler, webhook, evento, erro) | **P1** percurso (a origem dele) | **Não** — `job` é tipo de nó, mas não há "o que dispara este fluxo" | Sim — a borda é onde vários padrões valem |
+| Fluxos — passos com fallback e injeção de falha | **P1** percurso | **Não** — arestas são pares, não caminho ordenado | Sim — padrão de caminho não cabe em nó |
+| Requisitos e rastreabilidade, gap analysis | **P3** para quê | **Não** | **Central** — é o elo da frente da cadeia |
+| ADRs | **P4** por quê | **Não** — geramos o *o quê*, nunca o *porquê* | **Central** — é o elo "decisão" |
+| FinOps — custo/hora/mês, consolidado | **P2** número com unidade | **Não** — `number` existe como entrada, nada soma | **Não** — fora do escopo (§0.3) |
+| Engine de eventos discretos (CB, timeout, retry, bulkhead, fila) | **P2** + **P1** | Existe como *checklist*, não como valor | Sim, como **decisão conferível** — não como simulação |
+| Controles (duração, taxa, ramp-up, falha) | **P5** modo de operação | **Não** | Parcial — só o que seleciona padrão |
+| Cenários prontos (Normal, Pico, Black Friday, Falha regional) | **P5** modo de operação | **Não** — nossos "cenários" são diagramas de exemplo, homônimo | Sim — seleciona quais padrões valem |
+| Comparação A vs B, outra nuvem | **P6** variante | **Não** | Sim, comparando **padrões satisfeitos/violados** |
+| Painéis retráteis (esq / dir / inferior) | interface | Parcial — esquerdo e direito sim, inferior não | Aditivo |
+| Validação de conflitos arquiteturais | **P8** regra sobre a topologia | **Não** — nossos conflitos são do grafo de *atividades*, não do desenho | **Central** — é o padrão virando régua |
 
 Oito primitivas. Duas são fundação (P1, P2); quatro só existem em cima delas
 (P5, P6, P8 e o FinOps); duas são ortogonais e baratas (P3, P4); uma é config
@@ -299,7 +437,12 @@ documento trata. Somos Apache-2.0 e dependemos de proveniência limpa.
 
 ---
 
-## 12.1 Monte Carlo: onde ele ganha da aritmética, e o portão que decide
+## 12.1 Monte Carlo: onde ele ganha da aritmética — e por que fica fora
+
+> **Veredito revisado (§226): FORA DO ESCOPO.** A seção fica inteira porque a
+> análise está correta e a fronteira que ela traça é útil — mas Monte Carlo
+> responde *"vai aguentar em produção?"*, e a mesa pergunta *"esta decisão é boa
+> e consistente com o padrão?"*. Ver §0.3.
 
 Pergunta do usuário depois de ler a §4: *"seria útil rodar algo como Monte
 Carlo com esses dados? seria uma engine diferente da que existe no projeto"*.
@@ -413,7 +556,7 @@ backlog**. "p99 estoura o SLA em 3% das amostras" não é item. *"O leque de 12
 chamadas paralelas faz o p99 do caminho ser 4× o de cada chamada — avaliar
 agregação ou hedge"* é.
 
-### 12.1.6 Recomendação
+### 12.1.6 Recomendação — revogada pelo §0.3
 
 **Depois de P1+P2, não em vez.** Monte Carlo precisa do percurso e dos números
 de qualquer forma, e sem eles não há o que amostrar. A ordem que faz sentido:
