@@ -5910,3 +5910,37 @@ uma capacidade nova, e vender como empate teria escondido um dos melhores
 argumentos da migração.
 
 Nada de produção mudou. Só a SPEC-55.
+
+## 219. Não vamos migrar — e o que travou não foi técnico
+
+Decisão do usuário, textualmente: *"não vamos migrar, decidido"*. Motivo:
+*"por algum motivo minha credencial silvioaltr@gmail.com não está como admin"*.
+
+Registrado no topo da SPEC-55 com data e citação, para o documento não virar um
+plano fantasma. Quatro rodadas de pesquisa (§215–§218) produziram uma avaliação
+que dizia "cabe, e aqui está o roteiro" — sem esse carimbo, alguém abre o
+arquivo daqui a três meses e trata a §9 como fila de trabalho.
+
+**O que travou é o que a própria avaliação já tinha nomeado.** O §216 criou uma
+"fase −1" — Developer Space da empresa, com billing admin da empresa — e a
+descreveu como *"a única coisa desta migração que não se resolve escrevendo
+código (…) o tipo de item que só se descobre estar no caminho crítico quando já
+é tarde"*. E a §2.9 registrou que um admin de site precisa instalar o app.
+
+Não descobrimos tarde: descobrimos antes de escrever qualquer linha de código
+Forge. Uma avaliação que custa quatro rodadas de leitura e mata a ideia antes da
+fase 0 saiu mais barata que a fase 0 sozinha.
+
+**Onde a avaliação errou o peso.** Eu tratei os três riscos técnicos — 25
+segundos de invocação, ausência de multimodal, `@forge/llm` em Preview — como
+as perguntas difíceis, e o acesso organizacional como item de checklist a
+disparar em paralelo. Foi ao contrário. As três perguntas técnicas tinham
+resposta na documentação; a de acesso não tinha resposta em documentação
+nenhuma, e era a única capaz de encerrar o assunto sozinha.
+
+A régua que fica: **num app que roda dentro da plataforma de outra empresa,
+"quem tem qual permissão" é requisito de viabilidade, não pré-requisito de
+deploy.** Vale checar antes de medir latência de LLM.
+
+O produto segue no modo hospedado da SPEC-33, sem mudança. Nada de produção foi
+tocado em nenhuma das cinco rodadas.

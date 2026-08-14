@@ -1,9 +1,26 @@
 # SPEC-55 — Avaliação: migrar o Gerador para um app Forge (Jira), com Rovo no MVP
 
-> **Status: avaliação, não decisão de construir.** Este documento existe para
-> responder "dá pra fazer, quanto custa, e o que se perde" com números
-> verificados na documentação da Atlassian de agosto/2026 e no código deste
-> repositório. Nenhuma linha de produção muda por causa dele.
+> ## ⛔ DECIDIDO: a migração **não** vai acontecer
+>
+> Decisão do usuário em **14/08/2026**, textualmente: *"não vamos migrar,
+> decidido"*. Motivo declarado: a credencial `silvioaltr@gmail.com` **não tem
+> perfil de admin** — que é exatamente o pré-requisito organizacional levantado
+> na §2.9 (um admin de site precisa instalar o app) e na fase −1 do roteiro
+> (o Developer Space precisa ser da empresa, com billing admin da empresa).
+>
+> **Nada abaixo deve ser lido como plano.** O roteiro da §9 não está em fila,
+> não está adiado e não tem dono. O produto segue no modo hospedado da SPEC-33.
+>
+> O documento fica no repositório como **pesquisa de plataforma**, não como
+> intenção: se a pergunta voltar — com outra credencial, outra empresa ou outro
+> ano — os números da §2 e o mapeamento da §4/§5 são o ponto de partida, e o que
+> precisa ser refeito é a checagem de datas (a Forge LLMs API estava em Preview,
+> e Preview muda).
+
+> **Status original: avaliação, não decisão de construir.** Este documento
+> existe para responder "dá pra fazer, quanto custa, e o que se perde" com
+> números verificados na documentação da Atlassian de agosto/2026 e no código
+> deste repositório. Nenhuma linha de produção muda por causa dele.
 
 Pedido original: *"pesquisa sobre as novidades do Jira e como funciona
 publicação de applications, avaliar esse projeto no estado atual (…) a intenção
