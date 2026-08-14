@@ -96,4 +96,28 @@ test("aba Membros mostra e edita níveis, e a mudança persiste no servidor", as
   await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: /Membros/ }).click();
   await expect(page.getByLabel(`Nível de ${operador}`)).toHaveValue("owner");
+
+  /**
+   * O nível fica PERTO do nome de quem ele descreve.
+   *
+   * Relato do usuário, com print: o seletor estava jogado no canto oposto da
+   * tela (um espaçador `flex: 1` empurrava até a borda), e em 12px — menor que
+   * o e-mail ao lado. Numa janela larga eram mais de mil pixels entre a pessoa
+   * e o controle que muda a permissão dela.
+   *
+   * Layout raramente merece asserção, mas aqui a distância É o defeito: sem
+   * isto, o próximo `flex: 1` bem-intencionado devolve o problema em silêncio.
+   */
+  await page.setViewportSize({ width: 1600, height: 800 });
+  const seletor = page.getByLabel(`Nível de ${operador}`);
+  const email = page.getByText(operador, { exact: true }).first();
+  const caixaDoSeletor = (await seletor.boundingBox())!;
+  const caixaDoEmail = (await email.boundingBox())!;
+
+  const distancia = caixaDoSeletor.x - (caixaDoEmail.x + caixaDoEmail.width);
+  expect(distancia, "o seletor de nível deve ficar ao lado do e-mail, não na borda da tela").toBeLessThan(120);
+  expect(
+    Number(await seletor.evaluate((e) => getComputedStyle(e).fontSize.replace("px", ""))),
+    "o controle que muda permissão não pode ter letra menor que o texto ao lado"
+  ).toBeGreaterThanOrEqual(14);
 });

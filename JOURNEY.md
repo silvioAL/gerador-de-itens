@@ -5567,3 +5567,27 @@ que é o que se quer provar mesmo.
 Os cinco specs novos e as mordidas: demo que não avança → o passo congelado
 (vermelho); download vazio → o HTML sem conteúdo (vermelho). 61/61 E2E
 (eram 56).
+
+## 209. O nível de acesso perto de quem ele descreve
+
+Print do usuário na tela de Membros: o seletor de nível ("owner") jogado no
+canto direito, a mais de mil pixels do e-mail da pessoa numa janela larga, e em
+letra menor que o texto ao lado. A causa era um espaçador `flex: 1` entre os
+dois, dentro de uma lista sem largura máxima — o seletor ia até onde a tela
+fosse.
+
+A linha virou cartão em **grid** com a coluna do e-mail limitada a 320px: o
+nível encosta no nome (12px de distância, medidos), e com vários membros os
+seletores ficam alinhados entre si em vez de dançarem conforme o tamanho de
+cada e-mail. Fonte de 12 para 14 — é um controle que muda permissão, e estava
+menor que o texto que ele qualifica.
+
+Layout raramente merece asserção, mas aqui a distância **é** o defeito: o teste
+mede o vão entre o fim do e-mail e o início do seletor numa janela de 1600px, e
+confere o tamanho da fonte. Sem isso, o próximo `flex: 1` bem-intencionado
+devolve o problema em silêncio. Mordida: espaçador de volta → "o seletor de
+nível deve ficar ao lado do e-mail, não na borda da tela" (vermelho).
+
+Validado no bundle de produção da stack local, não só no dev: medi 555px →
+369px de posição do seletor e 14px de fonte com o navegador real em
+`localhost:8080`.
