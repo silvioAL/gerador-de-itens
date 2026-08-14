@@ -96,6 +96,14 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       onEnter: () => opts.abrirProposito(),
     },
     {
+      // §238 — a interação que a fatia D construiu e o tour não mostrava.
+      selector: "[data-testid=delta-da-proposta]",
+      titulo: "O agente propõe, o motor mede",
+      texto:
+        "O agente lê o contexto da demanda e propõe propósitos — e nada disso conta ao chegar. Antes de você aceitar, o motor mede a proposta COMO SE aceita e mostra a diferença: aqui, aceitar cria uma lacuna nova, porque a necessidade sugerida ainda não tem componente que responda por ela. É esse trabalho que você precisa ver antes de dizer sim — é o que impede o \"confirmar todas\" de virar um clique automático.",
+      onEnter: () => opts.abrirProposito(),
+    },
+    {
       selector: "[data-tour=properties-panel]",
       titulo: "Proveniência",
       texto:
