@@ -13,6 +13,11 @@ avaliar como podemos fazer com a parte do banco de dados. Essa aplicação não
 está em uso e sim em desenvolvimento (…) mas precisamos de suíte de testes e
 algum meio de fazer o CI/CD"*.
 
+Esclarecimento posterior, que fixa o cenário: *"essa é uma aplicação que
+gostaria de pôr em um dev space da empresa onde trabalho, não publicar para
+qualquer pessoa instalar (…) publisher e usuário seriam a mesma pessoa"*.
+**App interno, não produto de Marketplace** — ver §2.9.
+
 ---
 
 ## 1. Resumo executivo
@@ -41,6 +46,14 @@ Três coisas mudam de verdade, e nenhuma é o banco:
 O banco, que era a preocupação declarada, é o item **mais barato** desta lista:
 sem dado em produção, é recriar 23 tabelas em Forge SQL (TiDB, dialeto MySQL) e
 trocar o driver do Drizzle — que já é o ORM usado aqui.
+
+E, por ser **app interno** (publisher e usuário são a mesma empresa), some a
+metade cara da lista de preocupações de um app Forge: nenhuma revisão de
+Marketplace, nenhum escopo a justificar para a Atlassian, nenhum licenciamento.
+Sobra **uma** pendência não-técnica, e ela bloqueia tudo depois do ambiente de
+desenvolvimento: **o Developer Space precisa ser da empresa**, com billing admin
+da empresa, porque é ali que a conta do Forge (inclusive a de LLM) é emitida.
+Começar por isso.
 
 ---
 
@@ -84,10 +97,12 @@ Franquia mensal gratuita, **por app**:
 | **LLM** | **0 créditos** | por token, in/out |
 
 > **O único zero da tabela é o LLM.** Todo token gasto pela esteira de agentes é
-> cobrado **do desenvolvedor do app**, não do cliente. Isso é uma decisão de
-> modelo de negócio que precisa ser tomada antes de o MVP existir, não depois:
-> uma quebra grande com quatro agentes passando por todos os itens é caro por
-> uso, e o app não tem como repassar isso sem ser pago.
+> cobrado **de quem publica o app**, não de quem instala. No cenário deste
+> projeto — app interno, publisher e usuário são a mesma empresa (§2.9) — isso
+> deixa de ser questão de modelo de negócio e vira **linha de orçamento
+> interno**: a empresa paga o próprio uso, como pagaria por qualquer API de IA.
+> Continua precisando ser medido (§10.1), mas o risco muda de "o produto é
+> insustentável" para "a conta é maior ou menor do que a alternativa".
 
 ### 2.3 Rovo — os módulos disponíveis
 
@@ -174,30 +189,69 @@ automaticamente. **É a porta de saída** para o que não cabe em função (Whis
 processo longo) sem sair da plataforma — mas com preço de reserva, sem franquia
 grátis.
 
-### 2.9 Publicação de applications — como funciona
+### 2.9 Publicação de applications — e por que o Marketplace não nos interessa
 
-Três caminhos, do mais barato ao mais caro:
+> **Cenário decidido:** o app vive num **Developer Space da empresa onde o autor
+> trabalha**, instalado nos sites da própria empresa. Publisher e usuário são a
+> mesma organização. Nada disso vai pro Marketplace.
 
-1. **Só suas instâncias** — `forge deploy -e production` + `forge install`.
-2. **Distribuição privada** — habilita compartilhamento no Developer Console e
-   gera um **link de instalação**. Instala em outros sites sem Marketplace.
-   Atenção: app Forge **não é compatível com listagem privada de Marketplace** —
-   privado é via link, ponto.
-3. **Marketplace público** — no Developer Console, no Developer Space, seção
-   *"Make public on Marketplace"*. Na submissão é preciso declarar **cada escopo
-   de API e por que ele é necessário**, e **cada hostname remoto** para onde o
-   app manda requisição, o que é mandado e por quê. Decisão da Atlassian em
-   ~1 semana.
+Os três caminhos existentes, para registro:
 
-> Aqui está um efeito colateral bom do "só Rovo": um app **sem egress externo**
-> tem a submissão mais simples que existe — não há hostname remoto a justificar,
-> e ele fica elegível ao selo **"Runs on Atlassian"**, que é argumento de venda
-> em cliente corporativo. A arquitetura atual (gateway configurável apontando
-> pra onde o cliente quiser) é exatamente o oposto disso na hora da revisão.
+1. **Só as instâncias da própria empresa** — `forge deploy -e production` +
+   `forge install`. Instala **direto pelo CLI, sem habilitar compartilhamento
+   nenhum**. É o nosso caminho.
+2. **Distribuição privada por link** — habilita *Sharing* no Developer Console e
+   gera um **link de instalação**, que se pode restringir ou regenerar depois
+   (links antigos morrem; instalações existentes continuam). Útil se a empresa
+   tiver vários sites Atlassian e não se quiser rodar CLI contra cada um. Quem
+   recebe o link precisa ser **admin do site**. Atenção: app Forge **não é
+   compatível com listagem privada de Marketplace** — privado é via link ou CLI,
+   ponto. E app com `license` no manifesto **não pode** usar link de instalação.
+3. **Marketplace público** — declarar cada escopo de API com justificativa e
+   cada hostname remoto para onde o app manda requisição, com decisão da
+   Atlassian em ~1 semana. **Fora de escopo.**
+
+#### O que cai fora do problema por ser interno
+
+| Preocupação típica de app Forge | No nosso caso |
+|---|---|
+| Revisão da Atlassian (~1 semana, justificar escopos e hostnames) | **Não existe** |
+| Selo "Runs on Atlassian" como argumento de venda | Deixa de ser venda — mas **continua valendo como argumento de segurança interna**, e é o mais forte que temos (§2.9.1) |
+| Licenciamento, cobrança de cliente, versionamento público | **Não existe** |
+| Egress externo como obstáculo de submissão | **Deixa de ser obstáculo** — muda o custo de voz e imagem (§6.2) |
+| Quem paga o LLM | **A própria empresa**, que também é quem usa (§2.2) |
+
+#### O que passa a ser o problema, no lugar
+
+1. **De quem é o Developer Space.** Faturamento do Forge é **por Developer
+   Space**, agregado numa conta de cobrança ligada a ele: fatura no dia 1º de
+   cada mês, referente ao mês anterior, com autopay se houver meio de pagamento.
+   O espaço precisa ser **da empresa**, com um billing admin da empresa — não a
+   conta pessoal de quem desenvolve. Isso é ação de procurement/TI, não de
+   engenharia, e é a única coisa desta migração que **não** se resolve escrevendo
+   código. Vale começar por ela.
+2. **Um admin de site precisa instalar** e aprovar as permissões. Adicionar o
+   módulo `llm` ou mudar escopo dispara **major version upgrade**, que exige
+   nova aprovação do admin. Sendo interno o admin é um colega, mas é uma pessoa
+   a mais no caminho de cada release que mexe em permissão — planejar as
+   permissões de uma vez em vez de descobri-las aos poucos.
+3. **A revisão de segurança da empresa** substitui a da Atlassian. Diferente em
+   forma, não em existência.
+
+#### 2.9.1 O argumento interno mais forte
+
+O README hoje descreve, em três parágrafos, como subir um Ollama em container
+"se o seu ambiente bloqueia a API do Claude — **o caso comum em rede
+corporativa**". Isso é o produto contornando a política de segurança da
+própria empresa que vai usá-lo.
+
+Com `@forge/llm`, o modelo roda **dentro da plataforma Atlassian que a empresa
+já aprovou e já usa**, sem chave de API, sem egress, sem hostname novo pra
+liberar no proxy. O app deixa de precisar de exceção de rede. Num app interno,
+isso vale mais que qualquer selo de Marketplace — é a diferença entre "aprovado"
+e "em análise pela segurança há três meses".
 
 Ambientes: `development`, `staging`, `production`, via `forge deploy -e <env>`.
-Mudança de escopos ou adição de módulo (como o `llm`) exige aprovação do admin
-na atualização.
 
 ### 2.10 CI/CD de app Forge
 
@@ -375,11 +429,19 @@ MVP Rovo-only.** As alternativas, todas com preço:
 | Cortar do MVP | Grátis. Recomendado. |
 | Web Speech API no navegador | Sem custo de plataforma, mas dentro de iframe com CSP e sem o ganho de vocabulário medido no README (a transcrição volta a errar "rabitém IKEA") |
 | Forge Containers (Preview) com Whisper | Cabe tecnicamente; preço de reserva sem franquia; contradiz "só Rovo" |
-| Egress externo declarado | Some o selo "Runs on Atlassian" e complica a revisão do Marketplace |
+| Egress externo declarado | **Barato agora** — sendo app interno (§2.9) não há revisão de Marketplace pra complicar, só a política de rede da empresa. Mas é exatamente a exceção de proxy que §2.9.1 argumenta que o Forge elimina |
 
-A recomendação é cortar e registrar como feature de fase 2, atrelada ao dia em
-que a Forge LLMs ganhar visão. Vender isso como perda seria desonesto: são as
-duas features mais recentes e menos exercitadas do produto.
+**Sendo app interno, a porta fica destrancada.** Não há revisor da Atlassian
+para convencer, então declarar egress externo ou subir um container Whisper é
+decisão só da empresa. Isso muda a natureza do corte: voz e imagem deixam de ser
+*impossíveis* e passam a ser *adiadas por escolha*.
+
+A recomendação continua sendo cortar, por dois motivos: são as duas features
+mais recentes e menos exercitadas do produto, e reintroduzir egress no dia 1
+joga fora o argumento de §2.9.1 justamente na conversa em que ele mais rende (a
+revisão de segurança interna). Registrar como fase 2 — atrelada ou ao dia em que
+a Forge LLMs ganhar visão, ou a uma decisão consciente de abrir egress depois de
+o app já estar aprovado e em uso.
 
 ### 6.3 25 segundos
 
@@ -491,6 +553,7 @@ Cada fase termina verde e sozinha; nenhuma depende da seguinte ter começado.
 
 | # | Fase | Entrega | Risco |
 |---|---|---|---|
+| **−1** | **Developer Space da empresa** | Espaço criado no nome da empresa, com billing admin e meio de pagamento. **Não é código, e bloqueia tudo o que vier depois de `development`.** Começar por aqui, em paralelo com a fase 0 | fora da engenharia |
 | 0 | **Prova de conceito, 2–3 dias** | App Forge vazio, `jira:globalPage`, Custom UI servindo o `packages/web` de hoje com dados falsos. Responde a única pergunta que documentação não responde: **React Flow se comporta dentro do iframe?** | baixo |
 | 1 | Adaptadores Forge SQL | `*EmForgeSql.ts` para as 10 portas, passando nos testes de contrato existentes. Cascatas explícitas. | médio |
 | 2 | `@forge/llm` atrás da porta de IA | `packages/llm` sai; sobra um adaptador. Sem esteira ainda. | baixo |
@@ -498,11 +561,13 @@ Cada fase termina verde e sozinha; nenhuma depende da seguinte ter começado.
 | 4 | **Esteira assíncrona** | Async events + progresso consultável + reentrância por item. Reescrita da SPEC-24. | **alto** |
 | 5 | Exportação pro tracker | REST do Jira direto, escopo declarado. Fecha a SPEC-49 melhor do que ela foi desenhada. | baixo |
 | 6 | Suíte E2E nas duas faixas | §7.2 | médio |
-| 7 | CI/CD Forge + publicação | §8 + Developer Space + distribuição por link | baixo |
+| 7 | CI/CD Forge + instalação | §8 + `forge install` nos sites da empresa (ou link, §2.9) | baixo |
 
 Fases 0–2 são as que valem a pena fazer **antes** de decidir de verdade: elas
 custam pouco e derrubam as três incertezas que sobraram (iframe, dialeto, custo
-real de token por quebra).
+real de token por quebra). A fase −1 é a que se descobre estar bloqueando
+quando já é tarde — não depende de nenhuma outra e leva o tempo que a burocracia
+da empresa levar.
 
 ---
 
@@ -511,14 +576,18 @@ real de token por quebra).
 Honestidade sobre os buracos, para ninguém tratá-los como resolvidos:
 
 1. **Custo real de token por quebra.** A franquia de LLM é zero e a conta é do
-   desenvolvedor. Sem medir uma quebra real contra `@forge/llm`, não há como
-   dizer se o app é sustentável de graça, se precisa ser pago, ou quanto.
-   **É a pergunta mais importante em aberto, e é medível na fase 2.**
+   Developer Space da empresa. Sendo interno, isso não decide se o produto
+   existe — decide **qual é a conta mensal** e se ela é melhor ou pior que a
+   alternativa que a empresa já paga (ou já bloqueia). Continua sendo a pergunta
+   mais importante em aberto, e é medível na fase 2, gerando uma quebra real e
+   lendo os tokens de entrada/saída que a própria API reporta por requisição.
 2. **React Flow dentro do iframe com a CSP do Forge.** Nenhuma documentação
    responde; só a fase 0 responde.
 3. **Quanto do RBAC realmente sobrevive.** Depende de quanto a permissão de
    projeto do Jira cobre das regras da SPEC-28 — é leitura de spec contra API,
-   não pesquisa de plataforma.
+   não pesquisa de plataforma. Sendo app interno, há um atalho legítimo que não
+   existiria num app de Marketplace: **assumir os grupos do Jira da empresa**
+   como verdade e não modelar nada além do que sobrar.
 4. **Se o Rovo deve ser `rovo:agent` ou só `@forge/llm`.** São coisas diferentes:
    um agente registrado no AI Mate (o usuário conversa com ele de qualquer
    lugar do Jira) ou um app com tela própria que usa LLM por dentro.
@@ -540,4 +609,5 @@ Honestidade sobre os buracos, para ninguém tratá-los como resolvidos:
 - [Forge Containers (Preview)](https://developer.atlassian.com/platform/forge/containers-reference/) · [anúncio](https://www.atlassian.com/blog/development/forge-container-services-preview)
 - [Staging e produção](https://developer.atlassian.com/platform/forge/staging-and-production-apps/) · [CI/CD](https://developer.atlassian.com/platform/forge/set-up-cicd/) · [distribuir apps](https://developer.atlassian.com/platform/forge/distribute-your-apps/) · [listar no Marketplace](https://developer.atlassian.com/platform/marketplace/listing-forge-apps/) · [publicar Developer Space](https://developer.atlassian.com/platform/forge/developer-space/publish-developer-space/)
 - [Preço da plataforma Forge](https://developer.atlassian.com/platform/forge/forge-platform-pricing/) · [mudanças de jan/2026](https://www.atlassian.com/blog/development/updates-to-forge-pricing-effective-january-2026)
+- [Developer Spaces — visão geral](https://developer.atlassian.com/platform/forge/developer-space/developer-spaces-introduction/) · [criar](https://developer.atlassian.com/platform/forge/developer-space/create-developer-space/) · [cobrança e pagamento](https://developer.atlassian.com/platform/forge/developer-space/billing-for-developer-spaces/) · [papéis](https://developer.atlassian.com/platform/forge/developer-space/developer-space-roles/)
 - [Jira — release sazonal](https://www.atlassian.com/software/jira/release) · [Jira 2026 Summer Release](https://community.atlassian.com/forums/Jira-articles/Introducing-the-Jira-2026-Summer-Release/ba-p/3268349) · [Rovo no Jira](https://www.atlassian.com/software/jira/ai)

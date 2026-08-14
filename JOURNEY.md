@@ -5786,3 +5786,50 @@ roteiro — junto com a única outra que documentação nenhuma responde: se o R
 Flow se comporta dentro do iframe com a CSP do Forge.
 
 Nada de produção mudou nesta rodada. 66/66 E2E permanecem verdes no `main`.
+
+## 216. O app é interno — e isso derruba metade das preocupações do §215
+
+Esclarecimento do usuário depois de ler a SPEC-55: *"essa é uma aplicação que
+gostaria de pôr em um dev space da empresa onde trabalho, não publicar para
+qualquer pessoa instalar (…) publisher e usuário seriam a mesma pessoa"*.
+
+Isso não é um detalhe de distribuição. Reescreve quatro conclusões:
+
+**A pergunta mais assustadora do §215 desinflou.** Eu tinha escrito que a
+franquia grátis de LLM do Forge é zero crédito e que a conta é de quem publica
+o app — tratando isso como risco de modelo de negócio ("o app não tem como
+repassar isso sem ser pago"). Com publisher e usuário sendo a mesma empresa,
+não há repasse a fazer: é a empresa pagando o próprio uso, como pagaria por
+qualquer API de IA. Continua precisando ser medido, mas o risco muda de "o
+produto é insustentável" para "a conta é maior ou menor que a alternativa".
+
+**O selo *Runs on Atlassian* trocou de dono do argumento.** Eu o tinha vendido
+como diferencial de Marketplace. Não serve mais pra isso — e ficou mais útil:
+o README de hoje ensina, em três parágrafos, a subir um Ollama em container
+"se o seu ambiente bloqueia a API do Claude — o caso comum em rede
+corporativa". Ou seja, o produto contorna a política de segurança da empresa
+que vai usá-lo. Com `@forge/llm` o modelo roda dentro de uma plataforma que a
+empresa já aprovou, sem chave, sem egress, sem hostname novo pra liberar no
+proxy. Num app interno isso vale mais que qualquer selo: é a diferença entre
+"aprovado" e "em análise pela segurança há três meses".
+
+**Voz e imagem deixaram de ser impossíveis e passaram a ser adiadas.** Sem
+revisor de Marketplace, declarar egress externo ou subir um Whisper em Forge
+Containers é decisão só da empresa. Mantive a recomendação de cortar, mas por
+outro motivo: reintroduzir egress no dia 1 joga fora o argumento do parágrafo
+anterior exatamente na conversa em que ele mais rende.
+
+**Apareceu uma fase −1, e ela não é de engenharia.** A cobrança do Forge é por
+Developer Space, numa conta ligada a ele. O espaço precisa ser **da empresa**,
+com billing admin da empresa — não a conta pessoal de quem desenvolve. É a
+única coisa desta migração que não se resolve escrevendo código, não depende de
+nenhuma outra fase, leva o tempo que a burocracia levar, e bloqueia tudo depois
+do ambiente de desenvolvimento. É o tipo de item que só se descobre estar no
+caminho crítico quando já é tarde — por isso virou fase −1 e não um parágrafo
+no fim.
+
+Fica a régua da rodada: **"pra quem é" é pergunta de arquitetura, não de
+go-to-market.** A SPEC-55 tinha sido escrita sem ela e chegou a conclusões
+tecnicamente corretas com o peso todo errado.
+
+Nada de produção mudou. Só a SPEC-55.
