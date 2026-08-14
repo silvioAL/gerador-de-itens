@@ -986,6 +986,7 @@ function AppCarregado({
           especificacaoTemplate={especificacaoTemplate}
           templateItem={templateItem?.conteudo}
           demandInfo={quebra.demandInfo}
+          necessidades={quebra.necessidades}
           anexosContexto={quebra.anexosContexto}
           contextoDoProduto={contextoDoProduto}
           time={quebra.time}
