@@ -26,6 +26,8 @@ function montarOpts() {
     fecharConfig: vi.fn(),
     abrirItens: vi.fn(),
     fecharItens: vi.fn(),
+    abrirProposito: vi.fn(),
+    fecharAssistente: vi.fn(),
   };
 }
 
@@ -57,14 +59,25 @@ describe("useTour", () => {
     expect(opts.carregarCenario).not.toHaveBeenCalled();
   });
 
+  /** Andar até o passo pelo TÍTULO, não por contagem: passo novo no meio do
+   * tour (e eles entram a cada rodada) invalidava um índice fixo, e o teste
+   * quebrava sem que nada de errado tivesse acontecido. */
+  function andarAte(result: { current: ReturnType<typeof useTour> }, titulo: string) {
+    for (let i = 0; i < 30 && result.current.passoAtual?.titulo !== titulo; i++) {
+      act(() => result.current.proximo());
+    }
+    expect(result.current.passoAtual?.titulo).toBe(titulo);
+  }
+
   it("avança até o passo que seleciona o nó do painel de propriedades", () => {
+    // Por TÍTULO, não por contagem: estes dois testes ainda andavam por índice
+    // e quebraram quando o passo do propósito (SPEC-57) entrou no meio — que é
+    // exatamente o que o comentário do helper acima previa.
     const opts = montarOpts();
     const { result } = renderHook(() => useTour(opts));
 
     act(() => result.current.iniciar());
-    act(() => result.current.proximo()); // -> passo 1 (diagrama)
-    act(() => result.current.proximo()); // -> passo 2 (prontidão)
-    act(() => result.current.proximo()); // -> passo 3 (proveniência): seleciona n2
+    andarAte(result, "Proveniência");
 
     expect(opts.selecionarNo).toHaveBeenCalledWith("n2");
     expect(result.current.passoAtual?.selector).toBe("[data-tour=properties-panel]");
@@ -75,21 +88,27 @@ describe("useTour", () => {
     const { result } = renderHook(() => useTour(opts));
 
     act(() => result.current.iniciar());
-    for (let i = 0; i < 5; i++) act(() => result.current.proximo());
+    andarAte(result, "Revisão");
 
     expect(opts.derivarQuebra).toHaveBeenCalled();
     expect(result.current.passoAtual?.selector).toBe("[data-tour=review-table]");
   });
 
-  /** Andar até o passo pelo TÍTULO, não por contagem: passo novo no meio do
-   * tour (e eles entram a cada rodada) invalidava um índice fixo, e o teste
-   * quebrava sem que nada de errado tivesse acontecido. */
-  function andarAte(result: { current: ReturnType<typeof useTour> }, titulo: string) {
-    for (let i = 0; i < 30 && result.current.passoAtual?.titulo !== titulo; i++) {
-      act(() => result.current.proximo());
-    }
-    expect(result.current.passoAtual?.titulo).toBe(titulo);
-  }
+  it("SPEC-57 — o tour mostra o PROPÓSITO, e o painel fecha antes do passo seguinte", () => {
+    // O passo abre a janela flutuante; o seguinte usa o painel de
+    // propriedades, que ela cobriria. Fechar não é detalhe de estilo.
+    const opts = montarOpts();
+    const { result } = renderHook(() => useTour(opts));
+
+    act(() => result.current.iniciar());
+    andarAte(result, "Para que serve cada componente");
+
+    expect(opts.abrirProposito).toHaveBeenCalled();
+    expect(result.current.passoAtual?.selector).toBe("[data-testid=proposito-resumo]");
+
+    andarAte(result, "Proveniência");
+    expect(opts.fecharAssistente).toHaveBeenCalled();
+  });
 
   it("passa pela aba Stacks conhecidas, abrindo a tela de config na aba certa", () => {
     const opts = montarOpts();

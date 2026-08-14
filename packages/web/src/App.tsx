@@ -625,6 +625,8 @@ function AppCarregado({
     // SPEC-48 — o tour passa pela tela dos itens escritos.
     abrirItens: () => navegar({ tela: "itens" }),
     fecharItens: () => navegar({ tela: "canvas" }),
+    abrirProposito: () => setAbaAssistente("contexto"),
+    fecharAssistente: () => setAbaAssistente(null),
     fecharJornada,
     fecharConfig: () => navegar({ tela: "canvas" }),
   };

@@ -189,7 +189,17 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   // Prontidão e proveniência.
   await irAtePasso(page, "Prontidão");
   await expect(page.locator('[data-tour="readiness-summary"]')).toBeVisible();
+  // SPEC-57 — o passo do PROPÓSITO, entre a prontidão e a proveniência: é a
+  // mesma barra, uma dimensão a mais. O cenário do tour traz três
+  // necessidades, uma delas sem componente — a lacuna é o que instrui.
+  await irAtePasso(page, "Para que serve cada componente");
+  await expect(page.getByTestId("proposito-resumo")).toContainText("1 sem componente");
+  await expect(page.getByTestId("assistente-janela")).toBeVisible();
+  await expect(page.getByText("produto fora de linha some do catálogo em até 24h")).toBeVisible();
+
   await irAtePasso(page, "Proveniência");
+  // A janela flutuante FECHA: sem isso ela cobre o painel que o passo mostra.
+  await expect(page.getByTestId("assistente-janela")).toHaveCount(0);
   await expect(page.locator('[data-tour="properties-panel"]')).toBeVisible();
 
   // Derivação de verdade — a revisão abre com os itens calculados.
