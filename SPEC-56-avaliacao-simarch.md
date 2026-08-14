@@ -1,346 +1,379 @@
-# SPEC-56 — Avaliação do SimArch: o que vale trazer, e o que não
+# SPEC-56 — Como a mesa de projeto evolui (o SimArch como espelho)
 
-> **Status: avaliação, não decisão de construir.** Leitura do código de
-> [`wendelmax/SimArch`](https://github.com/wendelmax/SimArch) (clone raso em
-> 14/08/2026, commit `d868d5c`) contra o Gerador no estado atual. Nenhuma linha
-> de produção muda por causa deste documento.
+> **Status: avaliação, não decisão de construir.** Nenhuma linha de produção
+> muda por causa deste documento.
+>
+> **Revisão de 14/08/2026 (§223 → §224).** A primeira versão respondeu a
+> pergunta errada — gastou o documento decidindo "copiar ou não copiar o motor
+> de simulação", quando o pedido era **como a mesa de projeto evolui**.
+> Reescrita: o SimArch entra como espelho, não como catálogo de peças. O
+> usuário também já cravou a premissa que a v1 levou páginas pra chegar —
+> *"praticamente tudo pode ser feito com cálculo aritmético"* — e é dela que
+> este texto parte, não para ela.
 
-Pedido: *"avaliar esse projeto (…) acredito que podemos ter insights
-interessantes para evoluir o nosso projeto quanto as simulações e
-comportamentos, mapeamento de cenários, construção dos diagramas, configurações
-e construção itens em si, obviamente precisamos manter nosso visual que está
-incrível com animações lindas"*.
-
----
-
-## 0. Restrição legal que decide o formato desta avaliação
-
-**O SimArch não tem arquivo de licença.** Não há `LICENSE`, `COPYING` nem
-`NOTICE` no repositório, e a API do GitHub devolve `licenseInfo: null`.
-
-Sem licença, o padrão é **todos os direitos reservados**: o código está
-publicamente legível, mas não é reutilizável. Isso não é formalidade — nosso
-projeto é Apache-2.0 e depende de proveniência limpa para continuar sendo.
-
-Consequência prática, e é ela que molda tudo abaixo: **avalio ideias, não
-código.** Nada aqui propõe copiar arquivo, trecho ou tradução linha a linha.
-Conceitos de arquitetura, vocabulário de domínio e decisões de produto não são
-protegidos por copyright, e é só disso que este documento trata. Se algum dia a
-vontade for reusar código de lá, o caminho é pedir uma licença ao autor.
+Pedido, na segunda passada: *"faltou um pouco de abstração (…) a ideia seria
+evoluir a mesa de projeto de forma geral (…) apenas não temos englobado algumas
+dessas questões"*, seguido da lista de funcionalidades do SimArch.
 
 ---
 
-## 1. Resumo executivo
+## 1. A tese
 
-O SimArch responde uma pergunta que o Gerador **não** responde, e vice-versa:
+**Hoje a mesa de projeto modela COMPONENTES. O que falta é o PERCURSO e o
+NÚMERO.**
 
-| | SimArch | Gerador |
+O modelo é `Diagrama { nodes, edges }` (`engine/src/model/types.ts`). Um `No`
+tem tipo, campos e proveniência; uma `Aresta` liga dois nós e também pode ter
+campos. É um **grafo de coisas**, e é ótimo naquilo: derivar itens por nó e por
+conexão funciona, e é o produto.
+
+Mas quase tudo na lista que você mandou não é sobre coisas — é sobre
+**caminhos** e sobre **grandezas que andam por eles**. Um trigger é o começo de
+um caminho. Um fallback é uma bifurcação de um caminho. Latência, volume e
+custo são grandezas que se acumulam ao longo de um caminho. Cenário é trocar as
+grandezas na entrada do caminho. A vs B é rodar o mesmo caminho em dois
+desenhos. Conflito arquitetural é uma regra sobre a forma do caminho.
+
+Por isso a lista parece um monte de features soltas e não é: são **duas
+primitivas ausentes e seis consequências delas**.
+
+E é também por isso que sua intuição está certa: com as duas primitivas no
+lugar, tudo o mais é **aritmética sobre o diagrama** — função pura de
+`(diagrama, config, contexto)`, exatamente a família do `derivar()`. Não é uma
+segunda epistemologia entrando no produto; é a mesma, com um tipo de saída a
+mais.
+
+---
+
+## 2. O mapa: as 12 funcionalidades → 8 primitivas
+
+| Funcionalidade do SimArch | Primitiva por trás | Temos hoje? |
 |---|---|---|
-| Pergunta | *"esta arquitetura aguenta?"* | *"o que precisa ser construído?"* |
-| Mecanismo | simulação estocástica de eventos | derivação determinística |
-| Saída | métricas, relatório de impacto, ADR | itens de backlog com dependências |
-| Prova | um número que depende de um `seed` | uma função pura de (diagrama, config) |
+| Diagrama com componentes cloud (AWS/Azure/GCP/Oracle) | **P7** dialeto de provedor | Parcial — temos techs e stacks, sem eixo de provedor |
+| Triggers (user traffic, scheduler, webhook, evento, erro) | **P1** percurso (a origem dele) | **Não** — `job` é tipo de nó, mas não há "o que dispara este fluxo" |
+| Fluxos — passos com fallback e injeção de falha | **P1** percurso | **Não** — arestas são pares, não caminho ordenado |
+| Requisitos e rastreabilidade, gap analysis | **P3** para quê | **Não** |
+| ADRs | **P4** por quê | **Não** — geramos o *o quê*, nunca o *porquê* |
+| FinOps — custo/hora/mês, consolidado | **P2** número com unidade | **Não** — `number` existe como entrada, nada soma |
+| Engine de eventos discretos (CB, timeout, retry, bulkhead, fila) | **P2** + **P1** | Existe como *checklist*, não como valor |
+| Controles (duração, taxa, ramp-up, falha) | **P5** modo de operação | **Não** |
+| Cenários prontos (Normal, Pico, Black Friday, Falha regional) | **P5** modo de operação | **Não** — nossos "cenários" são diagramas de exemplo, homônimo |
+| Comparação A vs B, outra nuvem | **P6** variante | **Não** |
+| Painéis retráteis (esq / dir / inferior) | interface | Parcial — esquerdo e direito sim, inferior não |
+| Validação de conflitos arquiteturais | **P8** regra sobre a topologia | **Não** — nossos conflitos são do grafo de *atividades*, não do desenho |
 
-São **complementares**, e é por isso que a leitura vale. Mas a tentação óbvia —
-"vamos ter simulação também" — é a pior ideia do documento, e explico em §4.
-
-O que vale trazer não é o motor: é o **vocabulário de domínio** que o SimArch
-tem e nós não. Cinco ideias, em ordem de retorno sobre esforço:
-
-1. **Políticas de resiliência como campo estruturado**, não texto livre (§3.1)
-2. **Restrição paramétrica** — `métrica operador valor`, verificável (§3.2)
-3. **Rastreabilidade requisito ↔ elemento, com gap analysis** (§3.3)
-4. **Perfil de carga/contexto como objeto nomeado e reusável** (§3.4)
-5. **ADR ligado ao nó, não solto num wiki** (§3.5)
-
-A #1 é a de maior retorno porque ataca o **coração** do produto: a qualidade do
-item derivado. As outras três primeiras não exigem simulação nenhuma.
+Oito primitivas. Duas são fundação (P1, P2); quatro só existem em cima delas
+(P5, P6, P8 e o FinOps); duas são ortogonais e baratas (P3, P4); uma é config
+(P7).
 
 ---
 
-## 2. O que o SimArch é, medido
+## 3. P1 — O percurso
 
-Clone raso, `src/` com 82 arquivos de código:
+**O que é:** um caminho nomeado, com **origem** (o que dispara), **passos
+ordenados** e **alternativa** (para onde vai se o passo falhar). No SimArch:
+`FlowDefinition { Steps: [{ from, to, onFailure }] }`.
+
+**O que temos:** `Aresta { source, target, type, spec }`. Dá pra reconstruir
+caminhos percorrendo o grafo, mas ninguém declara *qual* caminho importa, nem
+qual é o começo, nem qual ramo é o plano B. Um `fallback` hoje é uma aresta
+igual às outras.
+
+**Por que é a primeira:** sem percurso não existe "ao longo de" — e sem "ao
+longo de" não há soma de latência, propagação de volume, custo de jornada, nem
+regra do tipo "todo caminho que chega no banco passa por cache". P1 é o eixo em
+que P2 vira útil.
+
+**O que muda na derivação, que é o que interessa:** hoje derivamos por nó.
+Com percurso, derivamos também **por jornada**: "o fluxo de checkout não tem
+alternativa para a falha do serviço de pagamento" é um item de backlog real,
+que hoje ninguém gera porque ninguém sabe que existe um fluxo de checkout.
+
+**Cuidado nosso:** percurso não pode virar um desenho paralelo ao diagrama.
+Ele tem que ser **seleção sobre as arestas que já existem** — senão viram duas
+verdades divergentes, que é o erro que a SPEC-31 pagou caro pra matar.
+
+---
+
+## 4. P2 — O número com unidade (e a aritmética que ele libera)
+
+**Achado medido:** `TipoCampo` já inclui `"number"`
+(`engine/src/config/types.ts`), e **nenhum cálculo no engine consome esse
+número como número**. Ele é preenchido, validado e renderizado; nunca somado,
+nunca comparado. Hoje um `number` é um texto que só aceita dígitos.
+
+**O que falta:** unidade (`ms`, `req/s`, `R$/mês`, `%`, `MB`) e a regra de
+composição — se soma ao longo do caminho, se é máximo, se é média ponderada
+pelo volume.
+
+**É aqui que a sua premissa se paga.** Com P1 + P2, sem `Random` nenhum e sem
+motor nenhum, o engine passa a poder afirmar:
+
+| Cálculo | Como | O item que ele gera |
+|---|---|---|
+| **Orçamento de latência** | soma dos `timeout` ao longo do caminho, com retries multiplicando, contra o SLA declarado na origem | *"o pior caso do checkout é 2,7s e o SLA da entrada é 1s — reduzir retry do gateway para 1 ou baixar o timeout de pagamento para 250ms"* |
+| **Propagação de volume** | taxa na origem × fan-out de cada passo | *"a fila recebe 3× o volume da entrada: dimensionar partições e definir política de DLQ"* |
+| **Custo consolidado (FinOps)** | soma do custo por nó, e por caminho | *"o caminho de fallback custa 4× o principal — decidir se ele é permanente ou emergencial"* |
+| **Restrição paramétrica** | `p95 < 200ms` declarado, avaliado contra o cálculo acima | critério de aceite em Gherkin **com o número dentro**, e rastreável |
+| **Conflito aritmético** | o clássico: retry 3× sob um timeout de chamador menor que 3× o timeout do chamado | *"o retry nunca completa: o chamador desiste antes da segunda tentativa"* |
+
+Repare no padrão: **cada cálculo termina num item de backlog**, não num
+gráfico. É essa a diferença entre o que o SimArch faz com número (relatório de
+decisão) e o que nós faríamos (trabalho a fazer). E é o que mantém a coerência
+com o §2 do CONTEXTO: nada nasce de interpretação, tudo nasce de função pura.
+
+**Pior caso, não média.** A aritmética que serve aqui é a determinística —
+somar tetos declarados. Média e percentil exigem distribuição, distribuição
+exige amostra, e amostra é o motor que não queremos. Pior caso responde "isto
+pode estourar?" com uma conta que qualquer pessoa refaz no papel — e auditável
+é requisito nosso, não luxo.
+
+---
+
+## 5. P3 — O para quê (requisito, rastreabilidade, gap analysis)
+
+**O que é:** `Requirement { id, texto, prioridade, tipo }` +
+`TraceabilityLink { requisito → elemento }`, e a matriz que mostra requisito
+sem elemento.
+
+**O que temos:** proveniência — de onde veio **o valor**. Não temos o outro
+eixo: a que **propósito** o elemento serve. São perguntas diferentes e as duas
+importam; hoje só respondemos uma.
+
+**Onde encaixa sem inventar mecanismo:** o gap analysis é **prontidão de outro
+tipo**. Nosso semáforo hoje diz "falta preencher". Passaria a dizer também
+"este requisito não tem componente que o atenda" — que é o buraco que aparece
+tarde, na reunião de refinamento, quando já custa caro.
+
+**A regra que segura a porta:** requisito sem link é **gap a mostrar**, nunca
+item a gerar. O §2 do CONTEXTO — *"todo item nasce de um nó/aresta real, nunca
+de texto solto"* — continua valendo, e é exatamente ele que impede o requisito
+de virar uma caixa de texto que gera backlog do nada.
+
+---
+
+## 6. P4 — O porquê (ADR)
+
+**O que é:** decisão registrada, com opções consideradas, status, quem aprovou,
+o que ela substitui.
+
+**O que temos:** a especificação de solução em markdown — o *o quê* completo.
+Quem abre daqui a seis meses não descobre por que a fila é Rabbit e não Kafka;
+descobre só que é Rabbit.
+
+**A âncora que faz isso caber aqui:** ADR **de um nó ou de uma aresta**, não um
+documento paralelo. Ancorado, ele entra na especificação gerada como seção, e a
+decisão viaja junto com o backlog que nasceu dela. Solto, é wiki — e wiki
+desatualiza sem ninguém perceber, que é o problema que este produto existe para
+não ter.
+
+**Conexão que vale notar:** ADR tem `opções`. P6 (A vs B) é justamente
+**avaliar opções com números**. Os dois são a mesma feature vista de dois
+ângulos — e implementar um pensando no outro sai mais barato que os dois
+separados.
+
+---
+
+## 7. P5 — O modo de operação (o que os "cenários" deles realmente são)
+
+**Homônimo perigoso.** Nossos "cenários prontos" são **diagramas de exemplo**
+para carregar na mesa. Os deles são **perfis de operação**: seis números
+(duração, taxa, ramp-up, taxa de falha, seed) aplicados ao modelo inteiro.
+
+**O que trazer, e não é carga simulada:** um perfil nomeado do diagrama —
+"tráfego de Black Friday", "batch noturno", "interno de baixo volume" — que
+**muda as perguntas do painel e os itens derivados**. Sob Black Friday, DLQ
+deixa de ser opcional, idempotência vira obrigatória, a régua de volumetria
+muda.
+
+**Custo quase zero, e é o ponto:** isso é `when`/condição de visibilidade, que
+o engine **já avalia**. Hoje a condição olha campos do nó; passaria a olhar
+também o perfil do diagrama. Um eixo novo numa máquina que já existe.
+
+E, com P1+P2, o perfil também é o **conjunto de entrada da aritmética**: trocar
+de "normal" para "pico" é trocar a taxa na origem e refazer as contas.
+
+---
+
+## 8. P6 — A variante (A vs B)
+
+**O que é:** dois desenhos da mesma decisão, comparados lado a lado.
+
+**O que temos:** nada. Uma quebra é um diagrama.
+
+**Por que vale mesmo sem simulação:** com P2, comparar A e B é comparar duas
+tabelas de números calculados — pior caso de latência, custo, número de pontos
+sem alternativa. E com P4, a comparação **é** o corpo do ADR: as opções
+consideradas, com a conta de cada uma.
+
+**Cuidado de modelagem:** variante não pode ser "copiar a quebra e editar", ou
+as duas divergem e ninguém sabe qual venceu. Tem que ser **uma quebra com duas
+variantes** e uma decisão registrada de qual foi adotada — de novo, o mesmo
+princípio de fonte única.
+
+---
+
+## 9. P7 — O dialeto de provedor
+
+**O que é:** o mesmo componente com nome de cada nuvem (fila = SQS = Service
+Bus = Pub/Sub), e o mapeamento entre elas.
+
+**O que temos:** techs e perfis de stack (SPEC-38/42/43) — o eixo existe, só
+não tem a dimensão "provedor".
+
+**Honestidade sobre o que copiar:** o mapeamento deles é ingênuo — "pega o
+primeiro componente da mesma categoria" (`cloudMapping.ts`). Nosso mecanismo de
+stack já é mais sério. O que vale é a **ideia de eixo**: saber que a fila é SQS
+e não RabbitMQ muda as perguntas do painel (visibility timeout vs prefetch,
+DLQ nativa vs configurada), e isso é config, não engine.
+
+**Menor prioridade da lista** — é o que mais parece impressionante numa demo e
+o que menos muda o item derivado.
+
+---
+
+## 10. P8 — Regra sobre a topologia (validação de conflito arquitetural)
+
+**Achado medido:** temos `detectarConflitos()`
+(`engine/src/dependency/dependencias.ts`), e ele detecta três coisas —
+`ALVO_INEXISTENTE`, `INDEPENDENT_COM_DEPENDENCIA`, `ENABLER_E_DEPENDENT`.
+Todas sobre o **grafo de atividades derivadas**. Nenhuma sobre o **desenho**.
+
+**O que falta:** regra que olha a forma da arquitetura. Fila sem consumidor.
+Cache sem TTL declarado. Serviço chamando serviço externo sem timeout. Caminho
+sem alternativa até um recurso de terceiro. Retry sob timeout curto demais (o
+conflito aritmético de §4).
+
+**Por que é consequência e não fundação:** as regras mais valiosas precisam de
+P1 (é sobre caminho) e de P2 (é sobre número). Com as duas, P8 é config —
+`regras.json` ganhando um tipo de regra que olha topologia em vez de campo.
+
+**E encaixa no que já fazemos bem:** "falhar alto, nunca em silêncio" é
+princípio declarado do projeto. Conflito arquitetural é o mesmo princípio
+aplicado ao desenho, e não ao arquivo de configuração.
+
+---
+
+## 11. Interface
+
+O que a lista deles tem e nós não: **painel inferior** (timeline/log).
+Esquerdo (menu) e direito (propriedades) já existem.
+
+O painel inferior é o lugar natural para duas coisas que hoje não têm casa fixa
+na mesa: a **linha do tempo da esteira de agentes** (que existe, mas na tela de
+revisão) e a **explicação da conta** — "por que o pior caso é 2,7s", passo a
+passo, com os números que entraram. Sem esse "porquê" visível, a aritmética de
+§4 vira mais um número que a pessoa não sabe de onde veio, que é precisamente o
+que este produto combate.
+
+Sobre o resto do visual: **manter o nosso, e não por gosto**. Os dois projetos
+usam React + ReactFlow, então a comparação é justa — e a nossa camada visual
+carrega mecanismo (semáforo por nó, proveniência por campo, esteira animada,
+conversa como interface). Ela é o produto se explicando enquanto a pessoa
+trabalha, não enfeite.
+
+---
+
+## 12. O que não trazer
+
+**O motor de simulação** — e como você já chegou nisso sozinho, fica o registro
+curto: 228 linhas, simula **só o primeiro fluxo** (`model.Flows[0]`), laço de
+passo fixo apesar do nome "DiscreteEvent", 9 testes no projeto inteiro. Mais
+importante que a imaturidade: número que depende de um `seed` e de latência
+chutada, exibido ao lado de item derivado deterministicamente, convida a
+confundir os dois. A aritmética de pior caso (§4) responde à mesma classe de
+pergunta com uma conta que se refaz no papel.
+
+**Restrição legal, curta e real:** o repositório **não tem arquivo de licença**
+(sem `LICENSE`; a API do GitHub devolve `licenseInfo: null`). O padrão então é
+todos os direitos reservados. Nada aqui propõe copiar código — conceito de
+domínio e decisão de produto não são protegidos, e é só disso que este
+documento trata. Somos Apache-2.0 e dependemos de proveniência limpa.
+
+---
+
+## 13. Ordem, com as dependências explícitas
 
 ```
-src/SimArch.Domain/      entidades + value objects (o modelo)
-src/SimArch.Simulation/  DiscreteEventSimulationEngine.cs — 228 linhas
-src/SimArch.Decision/    DecisionEngine.cs — 102 linhas
-src/SimArch.DSL/         YamlModelLoader — o modelo vem de YAML
-src/SimArch.Api/         ASP.NET Core
-src/SimArch.Web/client/  React + Vite + ReactFlow
-src/SimArch.Export/      PDF / JSON / Mermaid / CSV
-src/SimArch.Tests/       2 arquivos, ~9 testes
+P1 percurso ──┬─► P5 modo de operação (troca as entradas do cálculo)
+              ├─► P8 conflito de topologia
+P2 número ────┴─► FinOps · orçamento de latência · restrição paramétrica
+                     └─► P6 variante A vs B ──► P4 ADR (as opções, com conta)
+
+P3 requisito/gap ─── ortogonal, não depende de nada acima
+P7 provedor ──────── config, a qualquer momento
 ```
 
-Stack: **.NET 10 + React/Vite + ReactFlow**, YARP de proxy, Docker/GHCR.
-Repositório sem estrelas, CI só de publicação de imagem (`docker-publish.yml`),
-sem job de teste.
-
-### 2.1 O modelo de domínio (é aqui que está o valor)
-
-`ServiceDefinition` carrega, por serviço, **políticas tipadas**:
-
-```
-Sla · ScalingPolicy · RetryPolicy · CircuitBreakerPolicy
-TimeoutPolicy · BulkheadPolicy · QueuePolicy · FallbackServiceId
-Provider · Component · CostPerHour · CostPerMonth · Currency
-```
-
-Mais quatro entidades que nós não temos equivalente:
-`Requirement`, `TraceabilityLink`, `ArchitecturalDecisionRecord` (com opções,
-status, `SupersededBy`, emendas) e `ParametricConstraint`.
-
-### 2.2 O motor de simulação, sem cerimônia
-
-Li o `DiscreteEventSimulationEngine` inteiro. O que ele faz:
-
-- laço de **passo fixo** (`simTime += 1/taxa`) até a duração acabar — apesar do
-  nome, não há fila de eventos ordenada por tempo;
-- por requisição, percorre os passos do fluxo aplicando circuit breaker, fila
-  com capacidade (backpressure), fallback e injeção de falha aleatória;
-- `Random(options.Seed)` — a corrida é reprodutível dado o seed.
-
-Duas limitações que valem registro, porque afetam quanto crédito dar aos
-números: **só o primeiro fluxo é simulado** (`model.Flows[0]`), e as latências
-saem de configuração declarada, não de medição. É um simulador de *forma da
-arquitetura*, não de desempenho real — o que, aliás, é coerente com o slogan
-("você testa decisões"). O `DecisionEngine` é sobretudo um coletor: transforma
-políticas declaradas em itens de relatório (`"Timeout 300ms"`, `"Fallback to
-wallet"`) e avalia as restrições paramétricas contra as métricas da corrida.
-
----
-
-## 3. As cinco ideias que valem, e como cada uma cai no nosso mecanismo
-
-### 3.1 Políticas de resiliência como campo estruturado — **maior retorno**
-
-**Lá:** `RetryPolicy { max, backoffMs, exponential }`,
-`CircuitBreakerPolicy { failureThreshold, openDurationMs, successThresholdInHalfOpen }`,
-`QueuePolicy { capacity }`, `BulkheadPolicy { maxConcurrency }`,
-`Sla { maxLatencyMs, availability }` — tudo tipado, no YAML e no modelo.
-
-**Aqui:** as mesmas ideias existem, mas como **item de checklist e texto
-livre**. `regras.json` pergunta "definiu política de retry?" e a resposta é uma
-frase. O CONTEXTO-E-ARQUITETURA §5.2 já lista isso como dívida aberta:
-*"Campos estruturados (lista/sub-formulário) — `stages` de um Camunda,
-`motores` de um FICO ainda são texto livre"*.
-
-**Por que é o maior retorno:** nosso produto não vale pelo desenho, vale pelo
-**item derivado**. Com retry como texto, `derivar()` só consegue produzir
-*"definir política de retry"* — um item que devolve a pergunta pra quem a fez.
-Com retry estruturado, produz *"configurar retry 3× com backoff exponencial de
-100ms e DLQ após esgotar"*, e o critério de aceite em Gherkin sai junto, com os
-números dentro. A diferença entre um backlog que lembra o que decidir e um
-backlog que **carrega a decisão**.
-
-**Custo:** é extensão de `config/diagrama.json` + o tipo de campo estruturado
-que a SPEC-18 começou. Não toca o engine no sentido que a SPEC-03 adverte —
-é config, que é exatamente onde essas coisas devem morar.
-
-**Cuidado:** o catálogo deles é fechado em C#. O nosso tem que continuar
-config-driven, senão viramos a ferramenta que sabe o que é "rabbit" — o erro
-que o §4 do CONTEXTO nomeia.
-
-### 3.2 Restrição paramétrica — `métrica operador valor`
-
-**Lá:** `ParametricConstraint { Id, Metric, Operator, Value, AdrId }`, com
-`Metric` no formato `"servico:p95LatencyMs"` e operadores `lt|le|eq|ge|gt|ne`.
-O `DecisionEngine` resolve a métrica contra o resultado da simulação e devolve
-`passed: true|false`.
-
-**Aqui:** nossa prontidão é binária e sobre **preenchimento** — campo cheio ou
-vazio, semáforo. Não existe "este número precisa ser menor que aquele".
-
-**O que trazer sem simulação nenhuma:** a restrição paramétrica é valiosa
-mesmo sem nada para avaliá-la contra, porque ela vira **critério de aceite
-verificável**. Hoje geramos Gherkin em prosa. Uma restrição declarada
-(`p95 < 200ms`, `throughput ≥ 1000/s`) é o mesmo Gherkin com o número no lugar
-certo — e, mais importante, é **rastreável**: o item derivado sabe qual
-restrição ele existe para satisfazer.
-
-Isso encaixa direto na proveniência: uma restrição é um valor `manual`, decidido
-por alguém, e o item que nasce dela carrega a origem.
-
-**Custo:** baixo. É um tipo de campo novo e uma regra de derivação.
-
-### 3.3 Rastreabilidade requisito ↔ elemento, com gap analysis
-
-**Lá:** `Requirement { Id, Text, Priority, Type, StandardRef }` e
-`TraceabilityLink { RequirementId, LinkType, ElementType, ElementId }`. A
-interface monta matriz de rastreabilidade e **gap analysis** — requisito sem
-elemento que o satisfaça.
-
-**Aqui:** temos proveniência (de onde veio o *valor*) e não temos
-rastreabilidade (a que *propósito* o elemento serve). São eixos diferentes, e a
-ausência do segundo é sentida: o item derivado sabe de qual nó nasceu, e não
-sabe qual necessidade ele atende.
-
-**Por que encaixa bem:** o gap analysis é **prontidão de outro tipo**, e nosso
-semáforo já é o lugar natural para ela. Hoje o vermelho diz "falta preencher".
-Podia dizer também "este requisito não tem nenhum componente que o atenda" — o
-que é o tipo de buraco que só aparece na reunião de refinamento, tarde.
-
-E se liga na SPEC-53 (contexto do produto): requisito é vocabulário de negócio,
-que já tem dono no nosso modelo.
-
-**Cuidado:** requisito **não pode virar texto solto**. A regra do §2 do
-CONTEXTO — *"todo item nasce de um nó/aresta real, nunca de texto solto"* — tem
-que valer aqui: um requisito sem link é um gap a mostrar, não um item a gerar.
-
-### 3.4 Perfil de carga/contexto como objeto nomeado
-
-**Lá:** quatro presets de 6 números cada — Normal, Pico, Black Friday, Falha
-Regional (`durationSec`, `rate`, `failureRate`, `rampUpSec`, `seed`). Aplicáveis
-ao modelo inteiro, e comparáveis A vs B.
-
-**Aqui:** nossos "cenários prontos" são **diagramas de exemplo** — outra coisa
-com o mesmo nome. Volume esperado, janela de pico e tolerância a falha, quando
-existem, são campos de texto por nó.
-
-**O que trazer:** o conceito de **perfil aplicado ao diagrama inteiro**, não a
-carga simulada. "Este é um fluxo de Black Friday" deveria **mudar as perguntas
-que o painel faz** e **os itens que a derivação produz** — DLQ deixa de ser
-opcional, idempotência vira obrigatória, o checklist de volumetria muda de
-régua. Isso é `when`/condição de visibilidade, mecanismo que o engine **já
-tem**: hoje a condição olha campos do nó; passaria a olhar também o perfil do
-diagrama.
-
-É provavelmente a ideia mais barata da lista em relação ao que muda na
-experiência — e a que mais se parece com algo que já queríamos.
-
-### 3.5 ADR ligado ao nó
-
-**Lá:** ADR de primeira classe, com `Options`, `Status`, `SupersededBy`,
-`Amendments` e `LinkedConstraintIds`. Exportável em PDF.
-
-**Aqui:** geramos a **especificação de solução** em markdown — o *o quê*
-completo, sem o *por quê*. Quem lê o documento seis meses depois não descobre
-por que a fila é Rabbit e não Kafka.
-
-**O que trazer:** o ADR **preso ao elemento do diagrama** e à restrição (§3.2),
-não um documento paralelo. Nosso gerador de especificação já monta um markdown
-por quebra; ADRs ancorados em nós entrariam nele como seção, e a decisão viajaria
-junto com o backlog que nasceu dela.
-
-**Cuidado, e é o mesmo de sempre:** ADR é texto por natureza, e texto livre é
-exatamente o que este projeto passa o tempo todo tentando não ter. A disciplina
-que salva é a âncora: ADR **de um nó/aresta**, com opções e status — não uma
-caixa de texto no topo da quebra.
-
-### 3.6 Menções honrosas, com ressalva
-
-- **FinOps (`CostPerHour`/`CostPerMonth` por serviço).** Barato de adicionar e
-  faz a especificação carregar estimativa de custo. Ressalva honesta: custo de
-  um nó desenhado é chute com casa decimal, e o nosso produto trata número sem
-  origem como dívida. Se entrar, entra com proveniência e sem somar em silêncio.
-- **Painel inferior com timeline/log ao vivo.** A esteira de agentes já tem
-  visão ao vivo; um painel inferior com a linha do tempo da derivação é um
-  padrão de UI que combina com o que temos. É UI, não mecanismo.
-- **Equivalência entre nuvens (`cloudMapping`).** Não copiar: a implementação
-  deles é "pega o primeiro componente da mesma categoria", e nosso equivalente
-  (perfis de stack, SPEC-38/42/43) já é mais sério.
-
----
-
-## 4. O que **não** trazer: o motor de simulação
-
-Esta é a recomendação que mais contraria a intuição do pedido, então vai com o
-argumento inteiro.
-
-**1. Colide com a tese do produto.** O CONTEXTO §2 diz, sobre o Gerador:
-*"Nenhuma atividade de backlog nasce de um LLM interpretando uma descrição
-solta. Atividades só existem como saída determinística de `derivar()`."* A razão
-não é preferência estética — é que **valor sem origem confiável contamina a
-decisão**, e o produto inteiro (proveniência, semáforo, "falhar alto") é
-construído contra isso. Um simulador produz números que dependem de latências
-declaradas por chute e de um `seed`. Colocar esses números ao lado de um item
-derivado deterministicamente é convidar a confundir os dois.
-
-**2. O que ele mede não é o que perguntamos.** A simulação responde "aguenta
-500 req/s?". Nosso usuário está perguntando "o que preciso escrever de código
-antes da sprint começar?". Um p95 simulado não muda nenhum item do backlog — a
-menos que vire restrição paramétrica, que é justamente a ideia que §3.2 propõe
-trazer **sem** o motor.
-
-**3. O motor de lá não é forte o bastante para justificar o transplante.** 228
-linhas, simula **só o primeiro fluxo**, laço de passo fixo em vez de fila de
-eventos, 9 testes no projeto inteiro. Não é demérito — é um projeto jovem, sem
-estrelas, e a ideia é boa. Mas não é um ativo pronto a ser incorporado; seria
-reescrever, e reescrever um motor estocástico ao lado de um determinístico é
-duplicar a superfície do produto para responder uma pergunta que ninguém nos
-fez ainda.
-
-**4. Não pode ser copiado mesmo.** §0.
-
-**Se um dia a simulação for querida**, o caminho barato existe e não precisa de
-motor: **derivar as consequências deterministicamente**. Com as políticas
-estruturadas de §3.1, dá pra dizer, sem `Random` nenhum, que uma cadeia de três
-serviços com timeout de 300ms cada e retry 3× tem pior caso de 2,7s e estoura
-o SLA de 1s declarado no nó de entrada. Isso é aritmética sobre o diagrama —
-função pura, do mesmo tipo que `derivar()` — e responde à mesma classe de
-pergunta com uma resposta que **se sustenta em auditoria**. É simulação de
-pior caso, não de amostra.
-
----
-
-## 5. O visual: manter, e o porquê técnico
-
-Ambos usam **React + ReactFlow**, então a comparação é justa. O pedido de manter
-o nosso está certo e não é só gosto: nossa camada visual carrega **mecanismo** —
-o semáforo de prontidão por nó, a proveniência por campo, a animação da esteira
-de agentes e a conversa como interface são o produto se explicando enquanto a
-pessoa trabalha. O SimArch tem uma UI competente de painéis retráteis e um
-catálogo de ícones de nuvem; nada ali substitui o que já temos, e trocar
-qualquer parte custaria mais do que rende.
-
-O único empréstimo de UI que vale considerar é o **painel inferior de linha do
-tempo** (§3.6) — aditivo, não substitutivo.
-
----
-
-## 6. Recomendação
-
-Ordem sugerida, se e quando houver apetite. Cada fase é útil sozinha e nenhuma
-depende de simulação:
-
-| # | O quê | Onde toca | Retorno |
+| # | Passo | Depende de | Retorno |
 |---|---|---|---|
-| 1 | **Políticas de resiliência estruturadas** (§3.1) | `config/diagrama.json` + campo estruturado da SPEC-18 | **alto** — melhora o item derivado, que é o produto |
-| 2 | **Perfil do diagrama** (Black Friday, interno, batch noturno) mudando perguntas e regras (§3.4) | condições `when` que o engine já avalia | **alto** — muda a experiência com mecanismo existente |
-| 3 | **Restrição paramétrica** (§3.2) | tipo de campo + derivação de critério de aceite | médio-alto |
-| 4 | **Requisito + rastreabilidade + gap analysis** (§3.3) | modelo + prontidão | médio-alto |
-| 5 | **ADR ancorado no nó** (§3.5) | especificação de solução | médio |
-| — | ~~Motor de simulação~~ | — | **não** (§4) |
-| — | Pior caso determinístico como alternativa (§4, fim) | engine, função pura | a avaliar depois de 1 e 3 |
+| 1 | **P1 percurso** — fluxo nomeado sobre as arestas existentes, com origem e alternativa | — | **alto**: destrava tudo |
+| 2 | **P2 número com unidade e regra de composição** | — | **alto**: destrava a aritmética |
+| 3 | **Orçamento de latência + conflito aritmético** (o primeiro cálculo de ponta a ponta) | P1+P2 | **alto**: é a prova de que a tese funciona, num caso só |
+| 4 | **P3 requisito + gap analysis** | — | médio-alto, e independente |
+| 5 | **P5 perfil de operação** | P1+P2 | médio-alto por muito pouco código |
+| 6 | **P8 regras de topologia** | P1+P2 | médio-alto, incremental |
+| 7 | **FinOps** | P2 | médio |
+| 8 | **P6 variante + P4 ADR** juntos | P2 | médio |
+| 9 | **P7 dialeto de provedor** | — | baixo |
+| — | Painel inferior com a explicação da conta | passo 3 | acompanha o 3 |
 
-**Se for uma só, que seja a #1.** É a que ataca o coração — a qualidade do item
-— e é pré-requisito natural das #3 e da simulação de pior caso.
-
----
-
-## 7. O que esta avaliação não respondeu
-
-1. **Se o usuário do Gerador quer restrição paramétrica.** Trouxe a ideia porque
-   ela encaixa no mecanismo, não porque alguém pediu. Antes de construir, vale
-   uma pergunta a quem usa — é barato perguntar e caro construir.
-2. **Quanto de `regras.json` viraria campo estruturado.** Estimar isso exige ler
-   as regras de cada tech e decidir uma a uma; é trabalho de spec própria, não
-   de avaliação.
-3. **Se o autor do SimArch licenciaria o projeto.** Não perguntei. Se a resposta
-   for sim, §0 muda e a conversa sobre reuso pode existir — mas nenhuma
-   recomendação deste documento depende disso.
+**Se for um só passo, que sejam os passos 1–3 juntos, num caminho de exemplo.**
+Percurso, número e um cálculo que termina em item derivado — é o menor recorte
+que prova ou derruba a tese inteira, e cabe numa spec própria.
 
 ---
 
-## 8. Fontes
+## 14. Achados colaterais no nosso próprio código
+
+Coisas que apareceram enquanto eu media o "o que temos", e que valem
+independentemente do SimArch:
+
+1. **Correção da v1 deste documento.** Escrevi que campo estruturado era dívida
+   aberta, citando o CONTEXTO §5.2. Está desatualizado: `TipoCampo` já é
+   `text | textarea | number | boolean | select | lista`, com `itemSpec` —
+   a SPEC-18 entregou. O que falta em §4 não é a lista, é a **unidade e a regra
+   de composição** do número.
+2. **`validateConfig` não valida o `type` do campo.** O validador confere
+   `when.field`, referências de `{{template}}` e tipo de nó destino — e nunca o
+   `type`. Um `"type": "lixo"` passa. É a mesma classe de falha que o comentário
+   do `RECURSOS` no servidor chama de *"falha ABERTA e em silêncio"*.
+3. **`config/diagrama.schema.json` está defasado e desligado.** Ele declara
+   `"type": { "enum": ["text","number","boolean","select"] }` — faltam
+   `textarea` e `lista`, que o engine aceita e que o
+   `config/diagrama.example.json` **usa**. E nenhum código o referencia: é
+   tooling de editor, então hoje ele desinforma quem escreve config à mão.
+
+Os dois últimos são pequenos e reais; nenhum é urgente, ambos são do tipo que o
+projeto normalmente não deixa passar.
+
+---
+
+## 15. O que este documento não respondeu
+
+1. **Se o usuário do Gerador quer percurso.** A tese de §1 é minha leitura, não
+   um pedido observado. O passo 1–3 de §13 existe justamente para testá-la
+   barato em vez de assumir.
+2. **Como percurso convive com quebras grandes.** Um diagrama de 30 nós tem
+   quantos fluxos que importam? Se a resposta for "muitos", a UI de declarar
+   fluxo vira o gargalo, e isso muda o desenho.
+3. **De onde vêm os números.** Timeout declarado é decisão; latência de um
+   serviço existente é medição que não temos. Pior caso funciona com o
+   primeiro; qualquer coisa além disso precisa responder de onde vem o dado —
+   e proveniência é justamente o que não se improvisa aqui.
+
+---
+
+## 16. Fontes
 
 - [wendelmax/SimArch](https://github.com/wendelmax/SimArch) — clone raso em
-  14/08/2026, commit `d868d5c`. Sem arquivo de licença (§0).
-- Arquivos lidos: `README.md`, `src/SimArch.Simulation/DiscreteEventSimulationEngine.cs`,
-  `src/SimArch.Decision/DecisionEngine.cs`, `src/SimArch.Domain/Entities/*`,
-  `src/SimArch.Domain/ValueObjects/*`, `src/SimArch.DSL/`,
-  `src/SimArch.Web/client/src/data/{cloudCatalog,cloudMapping,simulationPresets}.ts`,
-  `samples/*.yaml`, `docs/`.
-- Deste repositório: `CONTEXTO-E-ARQUITETURA.md` (§2, §4, §5.2), `SPEC-18`
-  (campo tipo lista), `SPEC-38/42/43` (stacks), `SPEC-53` (contexto do produto).
+  14/08/2026, commit `d868d5c`. Sem arquivo de licença (§12).
+  Lidos: `README.md`, `src/SimArch.Simulation/DiscreteEventSimulationEngine.cs`,
+  `src/SimArch.Decision/DecisionEngine.cs`, `src/SimArch.Domain/{Entities,ValueObjects}/*`,
+  `src/SimArch.DSL/`, `src/SimArch.Web/client/src/data/*.ts`, `samples/*.yaml`.
+- Deste repositório, verificados e não presumidos:
+  `engine/src/model/types.ts` (não há fluxo), `engine/src/config/types.ts`
+  (`TipoCampo`), `engine/src/config/validator.ts` (não valida `type`),
+  `engine/src/dependency/dependencias.ts` (`detectarConflitos` é sobre
+  atividades), `config/diagrama.schema.json` (defasado).
+- `CONTEXTO-E-ARQUITETURA.md` §2, §4, §5.2 · `SPEC-18` · `SPEC-38/42/43` ·
+  `SPEC-53`.
