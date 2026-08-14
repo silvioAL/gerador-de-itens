@@ -5673,3 +5673,32 @@ distraído, e ninguém percebe.
 README e CONTEXTO-E-ARQUITETURA foram corrigidos junto — documentação que
 descreve uma feature que não existe é pior que documentação faltando. 215
 engine + 473 web; 62/62 E2E (um a menos, o da própria feature).
+
+## 213. Varrendo a CLASSE do bug, não o bug
+
+O §210 foi um estado que sobrevivia à troca de demanda. A pergunta certa
+depois disso não é "consertei?" e sim "o que MAIS vive assim?". Varri o estado
+do App atrás de tudo que descreve a demanda atual: a revisão derivada, o
+diagrama, o contexto do épico, os rascunhos do assistente.
+
+**Achado — o painel do assistente.** Com a aba "Contexto do épico" aberta,
+trocar de demanda mantinha o texto da anterior no campo: o painel guarda o
+rascunho num `useState(demandInfo)`, inicializado UMA vez, e ninguém o
+desmontava. Pior que exibir errado — o próximo "Salvar" gravaria o contexto da
+demanda velha na demanda nova. Corrigido fechando a aba do assistente no
+`aoAbrir`: reabrir remonta o painel, que então lê o contexto de quem está
+aberto agora. Vale para as três abas, e as três guardam rascunho.
+
+**Não-achado, e por que ele importa.** A revisão derivada NÃO vaza, mas não
+por cuidado: a tela de revisão é cheia e cobre o ☰, então não existe caminho
+para trocar de demanda com ela aberta — e fechá-la já limpa o resultado. Meu
+primeiro teste percorria exatamente esse caminho impossível e passava com
+qualquer código. Troquei por um que pode falhar: os nós da demanda anterior
+sumindo do canvas (mordido injetando um `aoAbrir` que não troca o diagrama).
+
+Fica a régua: quando um teste passa de primeira num defeito que você está
+caçando, desconfie do teste antes de comemorar o código. Nesta rodada isso
+aconteceu duas vezes — aqui e no §210, onde o auto-retry esperava o defeito
+sumir.
+
+473 web unit; 64/64 E2E, duas rodadas completas seguidas.
