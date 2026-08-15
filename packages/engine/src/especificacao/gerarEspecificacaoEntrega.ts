@@ -2,7 +2,7 @@ import type { Atividade, Aresta, Decisao, Diagrama, ExcecaoDePadrao, Necessidade
 import { avaliarPercursos } from "../percurso/conformidadeDePercurso.js";
 import { percursosQueContam } from "../percurso/percursos.js";
 import { necessidadesDoElemento } from "../proposito/lacunas.js";
-import { decisoesDoElemento, excecoesComoDecisoes } from "../decisao/decisoes.js";
+import { decisoesDoElemento, decisoesVigentes, excecoesComoDecisoes } from "../decisao/decisoes.js";
 import type { DiagramaConfig, FieldSpec, RegrasConfig } from "../config/types.js";
 import { camposVisiveis } from "../spec/campos.js";
 import {
@@ -245,6 +245,12 @@ export const VARIAVEIS_ESPECIFICACAO = [
   "titulo",
   "contexto",
   "historiaPo",
+  /** SPEC-58 fatia 4 — as decisões por inteiro, UMA vez, antes dos itens. */
+  "decisoes",
+  /** SPEC-58 fatia 2 — o que a PESSOA escreveu. Vazias = as seções somem, e o
+   * documento sai idêntico ao de antes em quem nunca escreveu nada. */
+  "tradeOffs",
+  "riscos",
   "itens",
   "definitionOfReady",
   "definitionOfDone",
@@ -263,6 +269,18 @@ export const TEMPLATE_ESPECIFICACAO_PADRAO = `# {{titulo}}
 
 ## Visão geral
 {{historiaPo}}
+
+## Decisões
+
+{{decisoes}}
+
+## Trade-offs e o que ficou de fora
+
+{{tradeOffs}}
+
+## Riscos e o que pode dar errado
+
+{{riscos}}
 
 ## Itens
 
@@ -308,6 +326,9 @@ const CONSEQUENCIA_DA_AUSENCIA: Record<(typeof VARIAVEIS_ESPECIFICACAO)[number],
   itens: "o documento sai SEM os itens da quebra — os itens são o corpo do documento",
   definitionOfReady: "a seção Definition of Ready não entra no documento",
   definitionOfDone: "a seção Definition of Done não entra no documento",
+  decisoes: "as decisões de arquitetura não entram no documento — quem lê fica sem o porquê do desenho",
+  tradeOffs: "não há onde registrar o que se ganhou e o que se perdeu",
+  riscos: "não há onde registrar o que pode dar errado",
 };
 
 export interface ProblemasDoTemplate {
@@ -470,6 +491,31 @@ export function problemasDoTemplateItem(template: string): ProblemasDoTemplate {
 }
 
 /**
+ * SPEC-58 — tira do TEMPLATE do documento a seção de uma variável que veio
+ * vazia, junto com o título que a precede.
+ *
+ * Por que não reusar a varredura de `aplicarTemplateDoItem` aqui: ela roda
+ * sobre o texto **já preenchido**, e o documento preenchido contém os itens,
+ * cujos blocos começam com `###` logo depois do `## Itens`. Para a varredura,
+ * um título seguido de outro título é seção vazia — ela apagaria "## Itens"
+ * inteiro. Rodar sobre o TEMPLATE, antes de substituir, evita isso por
+ * construção.
+ */
+function removerSecaoDaVariavel(template: string, nome: string): string {
+  const linhas = template.split("\n");
+  const alvo = linhas.findIndex((l) => l.includes(`{{${nome}}}`));
+  if (alvo < 0) return template;
+
+  let inicio = alvo;
+  while (inicio > 0 && !/^#{1,6}\s/.test(linhas[inicio])) inicio--;
+  // Variável solta, sem título próprio: tira só a linha dela — apagar até o
+  // topo levaria seção alheia junto.
+  if (!/^#{1,6}\s/.test(linhas[inicio])) inicio = alvo;
+
+  return [...linhas.slice(0, inicio), ...linhas.slice(alvo + 1)].join("\n");
+}
+
+/**
  * Aplica o template do item. Uma seção com conteúdo VAZIO some junto com o
  * título que a precede — sem isso, um item sem contrato de arquitetura sairia
  * com "#### Contrato de arquitetura" seguido de nada, que é exatamente o tipo
@@ -529,6 +575,22 @@ function descreverDecisao(d: Decisao): string {
     linhas.push(`  - ~~${a.titulo}~~${a.consequencia ? ` — ${a.consequencia}` : ""}`);
   }
   return linhas.join("\n");
+}
+
+/**
+ * SPEC-58 fatia 4 — a citação ENCURTADA no item.
+ *
+ * O corpo da decisão (contexto, alternativas descartadas, porquê extenso)
+ * passa a viver uma vez no topo do documento. Repeti-lo em cada item era
+ * tratar o documento como export: num export por item faz sentido, num texto
+ * que alguém lê do começo ao fim é ruído — e ruído repetido é o que faz pular
+ * seção. **O item aponta; o topo conta.**
+ *
+ * `descreverDecisao` continua existindo e é quem monta o bloco completo do
+ * topo — as duas formas são deliberadas, não duplicação.
+ */
+function citarDecisao(d: Decisao): string {
+  return `- ${d.titulo}${d.porque.trim() ? ` — ${d.porque}` : ""}`;
 }
 
 export function renderizarItemEspecificacao(
@@ -651,7 +713,7 @@ ${MARCA_SUGERIDO}` : ""}`
     ...decisoesDoElemento(atividade.origem.nodeId, decisoes),
     ...decisoesDoElemento(atividade.origem.edgeId, decisoes),
   ];
-  const textoDecisoes = decisoesCitadas.map(descreverDecisao).join("\n\n");
+  const textoDecisoes = decisoesCitadas.map(citarDecisao).join("\n");
 
   const textoPercursos = (percursosDoItem ?? [])
     .map((p) => `- ${p.rotulo}${p.regra ? ` — ${p.regra}` : ""}`)
@@ -855,6 +917,10 @@ export interface OpcoesGerarEspecificacao {
   /** SPEC-57 fatia E — `quebra.percursos`, para cada item dizer de que caminho
    * o componente dele participa. */
   percursos?: Percurso[];
+  /** SPEC-58 fatia 2 — as seções que a pessoa escreveu. A máquina nunca as
+   * sobrescreve; aqui elas só entram no texto montado. */
+  tradeOffs?: string;
+  riscos?: string;
   /** §242 — `quebra.excecoes`. Entram como decisões DERIVADAS (nunca
    * persistidas em duplicata): contrariar o padrão de propósito é decisão, e
    * quem lê a spec precisa dela junto das outras, não numa seção à parte. */
@@ -915,7 +981,7 @@ export function gerarEspecificacaoEntrega(
   config: DiagramaConfig,
   opcoes: OpcoesGerarEspecificacao = {}
 ): string {
-  const template = opcoes.template ?? TEMPLATE_ESPECIFICACAO_PADRAO;
+  let template = opcoes.template ?? TEMPLATE_ESPECIFICACAO_PADRAO;
   const titulo = opcoes.titulo ?? "Especificação de solução";
 
   const todosOsTimes = new Set<string>();
@@ -973,17 +1039,42 @@ export function gerarEspecificacaoEntrega(
     "_(critério específico deste fluxo — completar com base no contexto; não é uma lista fechada)_",
   ].join("\n");
 
+  // SPEC-58 fatia 4 — as decisões por inteiro, uma vez, antes dos itens. As
+  // exceções entram junto (§242): contrariar o padrão de propósito é decisão,
+  // e separá-las faria quem lê tratar as duas como coisas diferentes.
+  const decisoesDoDocumento = [
+    ...decisoesVigentes(opcoes.decisoes ?? []),
+    ...excecoesComoDecisoes(opcoes.excecoes),
+  ]
+    .map(descreverDecisao)
+    .join("\n\n");
+
   const valores: Record<(typeof VARIAVEIS_ESPECIFICACAO)[number], string> = {
     titulo,
     contexto,
     historiaPo,
+    decisoes: decisoesDoDocumento,
+    // Vazias somem com a seção (`aplicarTemplate` já cuida): quem nunca
+    // escreveu nada continua recebendo o documento de antes.
+    tradeOffs: opcoes.tradeOffs?.trim() ?? "",
+    riscos: opcoes.riscos?.trim() ?? "",
     itens,
     definitionOfReady,
     definitionOfDone,
   };
 
+  // SPEC-58 — seção nova que veio vazia sai do template inteira. Sem isto,
+  // uma demanda sem decisão sairia com "## Decisões" seguido de nada, que é
+  // exatamente o ruído que o §188 mandou tirar do documento — e ele pesa
+  // ainda mais aqui, porque quem lê é quem nunca abriu a ferramenta.
+  for (const nome of ["decisoes", "tradeOffs", "riscos"] as const) {
+    if (!valores[nome].trim()) template = removerSecaoDaVariavel(template, nome);
+  }
+
   REGEX_VARIAVEL.lastIndex = 0;
-  return template.replace(REGEX_VARIAVEL, (match, nome: string) =>
-    nome in valores ? valores[nome as (typeof VARIAVEIS_ESPECIFICACAO)[number]] : match
-  );
+  return template
+    .replace(REGEX_VARIAVEL, (match, nome: string) =>
+      nome in valores ? valores[nome as (typeof VARIAVEIS_ESPECIFICACAO)[number]] : match
+    )
+    .replace(/\n{3,}/g, "\n\n");
 }

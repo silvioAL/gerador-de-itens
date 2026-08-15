@@ -1,15 +1,20 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import {
   analisarLacunas,
   avaliarConformidade,
   derivar,
+  estruturarDocumento,
+  gerarDiagramaHtml,
+  gerarDocumentoHtml,
+  gerarEspecificacaoEntrega,
   resolverDependencias,
   violacoesEmAberto,
   type Atividade,
   type DiagramaConfig,
   type No,
   type Quebra,
+  type StatusDocumento,
   type ResultadoDependenciasDe,
   gerarItensDeTrabalho,
   type ItemDeTrabalho,
@@ -61,6 +66,8 @@ import { ConfigScreen, type AbaConfig } from "./config/ConfigScreen";
 import { TourOverlay } from "./demo/TourOverlay";
 import { useTour, passosDeConfiguracao } from "./demo/useTour";
 import { CONVERSA_DO_TOUR, DECISOES_DO_TOUR, REGRAS_DO_TOUR } from "./demo/dadosDoTour";
+import { DocumentoScreen } from "./documento/DocumentoScreen";
+import { baixarArquivoTexto } from "./persistence/baixarArquivo";
 import { LandingPage } from "./demo/LandingPage";
 import { EscolherTimeScreen } from "./auth/EscolherTimeScreen";
 import { lembrarTime, lerTimeLembrado } from "./auth/timeLembrado";
@@ -404,6 +411,7 @@ function AppCarregado({
   const { rota, navegar } = useRotaHash();
   const mostrarConfig = rota.tela === "config";
   const mostrarItens = rota.tela === "itens";
+  const mostrarDocumento = rota.tela === "documento";
   // SPEC-41 Parte B — os itens materializados da quebra aberta. A fonte de
   // verdade é o server (persistem por quebra); o estado local é o espelho da
   // última geração/carga desta sessão.
@@ -637,6 +645,140 @@ function AppCarregado({
         })),
       ],
     }));
+  }
+
+  /**
+   * SPEC-58 — o documento montado a partir da MESMA estrutura que alimenta a
+   * tela, o HTML e (pelos mesmos dados) o markdown. Três montagens paralelas
+   * divergiriam na primeira mudança, e o jeito de descobrir seria alguém
+   * reclamar que o arquivo exportado não tem o que a tela tinha (§7.3).
+   *
+   * `useMemo` porque isto roda medição de verdade — conformidade, percursos,
+   * lacunas — e a tela é grande.
+   */
+  /**
+   * SPEC-58 — o documento DERIVA por conta própria, em vez de esperar que
+   * alguém tenha clicado "Derivar Quebra" nesta sessão.
+   *
+   * Achado pelo E2E: ao reabrir uma demanda salva, `resultado` é `null`, e o
+   * documento saía sem item nenhum — dizendo "nenhum item derivado" sobre uma
+   * demanda que tem itens. Pior: a comparação com a foto da aprovação passava a
+   * não enxergar mudança de desenho, porque o texto comparado não continha o
+   * desenho.
+   *
+   * Derivar aqui é barato e puro (é o mesmo motor determinístico), e a
+   * referência memoizada é o que impede o `srcDoc` do diagrama de recarregar a
+   * cada tecla — o que roubava o foco de quem estivesse escrevendo.
+   */
+  const atividadesDoDocumento = useMemo(() => {
+    if (resultado) return resultado.atividades;
+    try {
+      return derivar(quebra.diagrama, diagramaConfig, {
+        time: quebra.time,
+        regras: regrasConfig,
+        excecoes: quebra.excecoes,
+        percursos: quebra.percursos,
+      });
+    } catch {
+      // Diagrama que a config atual não sabe ler não é motivo para a tela
+      // inteira sumir — o documento sai sem itens, e as outras seções ficam.
+      return [];
+    }
+  }, [resultado, quebra.diagrama, quebra.time, quebra.excecoes, quebra.percursos, diagramaConfig, regrasConfig]);
+  const documentoDaDemanda = useMemo(
+    () =>
+      estruturarDocumento(atividadesDoDocumento, quebra.diagrama, diagramaConfig, {
+        titulo: quebra.titulo?.trim() || "Documento de desenho",
+        demandInfo: quebra.demandInfo,
+        contextoDoProduto,
+        time: quebra.time,
+        regras: regrasConfig,
+        necessidades: quebra.necessidades,
+        decisoes: quebra.decisoes,
+        excecoes: quebra.excecoes,
+        percursos: quebra.percursos,
+      }),
+    [atividadesDoDocumento, quebra, diagramaConfig, contextoDoProduto, regrasConfig]
+  );
+
+  /** O diagrama animado que já existe (SPEC-21), embutido no documento — o
+   * maior ganho visual possível, e sem gerador novo. Só quando há nó: um
+   * `iframe` com diagrama vazio é pior que a frase que explica a ausência. */
+  const diagramaHtmlDaDemanda = useMemo(
+    () =>
+      quebra.diagrama.nodes.length > 0
+        ? gerarDiagramaHtml(atividadesDoDocumento, quebra.diagrama, diagramaConfig, {
+            titulo: quebra.titulo ?? "Diagrama da solução",
+          })
+        : undefined,
+    [atividadesDoDocumento, quebra.diagrama, quebra.titulo, diagramaConfig]
+  );
+
+  /**
+   * SPEC-58 §5 — o CARIMBO da aprovação, e o que ele resolve.
+   *
+   * O documento é montado ao vivo: não há "regenerar" a clicar. Então "aprovar"
+   * guarda o markdown do momento em `quebra.especificacao` — a coluna que
+   * existia desde o §184 e servia só de booleano, e que agora tem um propósito
+   * real: ser a FOTO do que foi aprovado.
+   *
+   * Comparar a foto com o documento de agora responde a pergunta que faz
+   * "aprovado" não virar carimbo: *mudou algo depois?* Sem isso o selo diria
+   * "aprovado" sobre um desenho que ninguém aprovou.
+   */
+  const markdownDoDocumento = useMemo(
+    () =>
+      gerarEspecificacaoEntrega(atividadesDoDocumento, quebra.diagrama, diagramaConfig, {
+        regras: regrasConfig,
+        demandInfo: quebra.demandInfo,
+        contextoDoProduto,
+        template: especificacaoTemplate.conteudo,
+        templateItem: templateItem?.conteudo,
+        time: quebra.time,
+        respostasItens: quebra.respostasItens,
+        necessidades: quebra.necessidades,
+        decisoes: quebra.decisoes,
+        excecoes: quebra.excecoes,
+        percursos: quebra.percursos,
+        tradeOffs: quebra.documentoEscrito?.tradeOffs,
+        riscos: quebra.documentoEscrito?.riscos,
+      }),
+    [atividadesDoDocumento, quebra, diagramaConfig, contextoDoProduto, regrasConfig, especificacaoTemplate, templateItem]
+  );
+
+  const documentoDesatualizado =
+    quebra.documentoStatus === "aprovado" && !!quebra.especificacao && quebra.especificacao !== markdownDoDocumento;
+
+  function mudarStatusDoDocumento(documentoStatus: StatusDocumento) {
+    setQuebra((q) => ({
+      ...q,
+      documentoStatus,
+      // Aprovar carimba; sair de aprovado NÃO apaga a foto — ela é o histórico
+      // do que já foi aprovado uma vez, e apagá-la perderia a única referência
+      // que existe para comparar.
+      especificacao: documentoStatus === "aprovado" ? markdownDoDocumento : q.especificacao,
+    }));
+  }
+
+  function baixarDocumentoMarkdown() {
+    // O MESMO markdown que o carimbo usa: duas montagens fariam o arquivo
+    // baixado divergir da foto da aprovação sem ninguém notar.
+    baixarArquivoTexto(markdownDoDocumento, "documento-de-desenho.md", "text/markdown");
+  }
+
+  function baixarDocumentoHtml() {
+    baixarArquivoTexto(
+      gerarDocumentoHtml(documentoDaDemanda, {
+        diagramaHtml: diagramaHtmlDaDemanda,
+        status: quebra.documentoStatus ?? undefined,
+        escritas: [
+          { titulo: "Trade-offs e o que ficou de fora", texto: quebra.documentoEscrito?.tradeOffs ?? "" },
+          { titulo: "Riscos e o que pode dar errado", texto: quebra.documentoEscrito?.riscos ?? "" },
+        ],
+      }),
+      "documento-de-desenho.html",
+      "text/html"
+    );
   }
 
   function salvarQuebra() {
@@ -1035,6 +1177,7 @@ function AppCarregado({
           setMostrarAbrir(true);
         }}
         onItens={() => navegar({ tela: "itens" })}
+        onDocumento={() => navegar({ tela: "documento" })}
         onSair={() => void onSair()}
       />
 
@@ -1168,6 +1311,22 @@ function AppCarregado({
           onSelecionarNo={setSelecionadoId}
         />
         </div>
+      )}
+
+      {mostrarDocumento && (
+        <DocumentoScreen
+          documento={documentoDaDemanda}
+          config={diagramaConfig}
+          diagramaHtml={diagramaHtmlDaDemanda}
+          escrito={quebra.documentoEscrito ?? {}}
+          status={quebra.documentoStatus ?? null}
+          onMudarEscrito={(documentoEscrito) => setQuebra((q) => ({ ...q, documentoEscrito }))}
+          onMudarStatus={mudarStatusDoDocumento}
+          desatualizado={documentoDesatualizado}
+          onBaixarMarkdown={baixarDocumentoMarkdown}
+          onBaixarHtml={baixarDocumentoHtml}
+          onVoltar={() => navegar({ tela: "canvas" })}
+        />
       )}
 
       {mostrarItens && (

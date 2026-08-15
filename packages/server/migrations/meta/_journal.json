@@ -239,6 +239,13 @@
       "when": 1754500000019,
       "tag": "0033_percursos_do_desenho",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1754500000020,
+      "tag": "0034_documento_de_desenho",
+      "breakpoints": true
     }
   ]
 }

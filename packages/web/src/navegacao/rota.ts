@@ -21,7 +21,13 @@ export type AreaConfig =
   | "pdca"
   | "exportacao";
 
-export type Rota = { tela: "canvas" } | { tela: "config"; area: AreaConfig } | { tela: "itens" };
+/** SPEC-58 — `documento` é tela própria da demanda, ao lado de `itens`: o
+ * documento deixou de ser uma saída da revisão e virou o artefato de trabalho. */
+export type Rota =
+  | { tela: "canvas" }
+  | { tela: "config"; area: AreaConfig }
+  | { tela: "itens" }
+  | { tela: "documento" };
 
 /** id interno ↔ segmento legível da URL (o hash é interface, fala produto). */
 const SEGMENTO_DA_AREA: Record<AreaConfig, string> = {
@@ -45,6 +51,7 @@ const AREA_DO_SEGMENTO = Object.fromEntries(
 export function hashDaRota(rota: Rota): string {
   if (rota.tela === "canvas") return "#/";
   if (rota.tela === "itens") return "#/itens";
+  if (rota.tela === "documento") return "#/documento";
   return `#/config/${SEGMENTO_DA_AREA[rota.area]}`;
 }
 
@@ -52,6 +59,7 @@ export function hashDaRota(rota: Rota): string {
 export function rotaDoHash(hash: string): Rota {
   const partes = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
   if (partes[0] === "itens") return { tela: "itens" };
+  if (partes[0] === "documento") return { tela: "documento" };
   if (partes[0] === "config") {
     const area = AREA_DO_SEGMENTO[partes[1] ?? ""];
     if (area) return { tela: "config", area };

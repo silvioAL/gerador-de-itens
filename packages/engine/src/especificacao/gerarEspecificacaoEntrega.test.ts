@@ -648,7 +648,14 @@ describe("problemasDoTemplate (SPEC-35)", () => {
     const { erros, avisos } = problemasDoTemplate("{{itens}}");
     expect(erros).toEqual([]);
     expect(avisos.some((a) => a.includes("{{contexto}}") && a.includes("Contexto do épico"))).toBe(true);
-    expect(avisos).toHaveLength(5);
+    // SPEC-58 — três variáveis novas de topo (decisões + as duas seções
+    // escritas) entram na mesma lista de recomendadas. O número aqui é guarda
+    // de propósito: variável nova que não avisa ninguém nasce dormente, que é
+    // a lição do §244.
+    expect(avisos).toHaveLength(8);
+    expect(avisos.some((a) => a.includes("{{decisoes}}") && a.includes("porquê do desenho"))).toBe(true);
+    expect(avisos.some((a) => a.includes("{{tradeOffs}}"))).toBe(true);
+    expect(avisos.some((a) => a.includes("{{riscos}}"))).toBe(true);
   });
 });
 

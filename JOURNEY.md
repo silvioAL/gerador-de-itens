@@ -7595,3 +7595,81 @@ passa a ser citado num documento que sai para fora da equipe, e o teste da regra
 conferível, C porquê, D proposta medida, E percurso). O que resta da spec são as
 três medições do §8.6 — que não são feature, são instrumentação para saber se o
 que foi construído está sendo usado.
+
+---
+
+## §250 — o documento de desenho, as cinco fatias (SPEC-58)
+
+*"pode implementar todas fases"*, com o requisito que reorientou a execução:
+*"o output deve ser visualmente bonito"*.
+
+**O achado que virou a SPEC do avesso, e que só apareceu porque fui verificar
+antes de escrever:** `quebra.especificacao` estava persistida desde o §184 e
+**nunca era exibida**. O App a lia como booleano (`!!quebra.especificacao`), o
+markdown ia para o download e sumia da aplicação. O documento não precisava ser
+criado — precisava ser **promovido de saída a artefato de trabalho**.
+
+### O que ficou de pé
+
+- **`estruturarDocumento`** — a estrutura de que saem a tela e o HTML. A régua
+  do §7.3 (as saídas não podem divergir) virou um **teste de guarda** que cobra
+  os mesmos fatos nas duas, em vez de uma promessa no comentário;
+- **`#/documento`** — tela própria, ao lado de `#/itens`, com a faixa de saúde
+  (os mesmos 🎯 ⚖ 🧭 🛣 do placar), o **diagrama animado embutido** e as
+  decisões em cartão com as descartadas riscadas;
+- **as duas seções escritas** — trade-offs e riscos, com marca visual própria.
+  É proveniência aplicada ao documento: quem lê precisa saber o que uma pessoa
+  afirmou e o que a máquina apurou;
+- **o ciclo** — rascunho → em revisão → aprovado → implementado, sem bloquear
+  nada;
+- **o HTML autocontido** — um arquivo, CSS inline, zero dependência nova, no
+  molde do `gerarDiagramaHtml` (SPEC-21). `@media print` cuidado dá o PDF de
+  graça.
+
+**Nenhuma biblioteca de markdown entrou.** O `packages/web` continua com seis
+dependências. Reparsear um texto que nós mesmos geramos, para renderizar uma
+estrutura que já está na mão, seria pagar uma árvore de dependências por um
+intermediário desnecessário.
+
+### O carimbo, e o que ele resolve
+
+O documento é montado ao vivo — não há "regenerar" a clicar. Então **aprovar
+guarda o markdown do momento**, e é aí que a coluna `especificacao` finalmente
+ganha propósito: ser a FOTO do que foi aprovado. Comparar a foto com o documento
+de agora é o que faz "aprovado" não virar carimbo.
+
+### Três defeitos encontrados pelo E2E, e um deles é grave
+
+1. **`abrirPorId` apagava metade da quebra.** Ele reconstrói o objeto campo a
+   campo, e o §184 já tinha corrigido isso uma vez ("antes só vinham
+   título/time/diagrama"). Desde então **cada** campo novo — produto (SPEC-53),
+   necessidades, decisões, exceções, percursos, documento — foi esquecido de
+   novo. Reabrir a demanda apagava as fatias A, C e E inteiras, em silêncio, e o
+   autosave seguinte gravava o vazio por cima do que estava salvo. **Terceira
+   ocorrência da mesma classe.** O que fecha isso não é lembrar melhor: é o
+   teste novo, que compara a quebra reaberta com a salva **inteira**, em vez de
+   conferir campo escolhido a dedo — campo novo esquecido quebra o teste no
+   mesmo commit em que nasce.
+2. **O documento não derivava sozinho.** Ao reabrir uma demanda salva,
+   `resultado` é `null`, e o documento dizia "nenhum item derivado" sobre uma
+   demanda que tem itens. Pior: a comparação com a foto deixava de enxergar
+   mudança de desenho, porque o texto comparado não continha o desenho. Agora o
+   documento roda o motor por conta própria.
+3. **`?? []` furando o `useMemo`.** Um array novo a cada render regerava o HTML
+   do diagrama, o `srcDoc` do iframe recarregava e **roubava o foco de quem
+   estava escrevendo**.
+
+### Uma lição de teste que vale por si
+
+`toContainText` do Playwright lê o texto RENDERIZADO. Nesta subárvore o
+`innerText` volta só com o título, e o matcher ficava vendo o estado anterior
+enquanto `textContent` já tinha o texto — verificado com sete amostragens ao
+longo de três segundos. E `toHaveValue` sobre componente controlado é **falso
+positivo por construção**: se o React não re-renderizar, o DOM guarda o valor
+que o próprio teste escreveu. A pergunta que importa não era "o DOM pintou?",
+era "sobreviveu?" — e ela se responde no servidor.
+
+316 engine · 551 web · 63 aplicação · 222 server · 74/74 E2E · build limpo.
+
+Uma falha isolada de `produto-contexto` apareceu numa execução completa; duas
+suítes seguidas depois deram 74/74 sem tocar em nada — flake de paralelismo.

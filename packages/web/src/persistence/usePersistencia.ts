@@ -71,6 +71,25 @@ export function usePersistencia(quebra: Quebra, aoAbrir: (q: Quebra) => void) {
           demandInfo: salva.demandInfo || undefined,
           anexosContexto: (salva.anexosContexto ?? []).map((conteudo, i) => ({ nome: `anexo-${i + 1}.txt`, conteudo })),
           especificacao: salva.especificacao ?? undefined,
+          // §250 — ACHADO REAL, e é a terceira vez que esta lista fica para
+          // trás. O §184 já tinha corrigido isto uma vez ("antes só vinham
+          // título/time/diagrama"), e desde então CADA campo novo da quebra
+          // (produto, necessidades, decisões, exceções, percursos, documento)
+          // foi esquecido aqui — reabrir a demanda apagava as fatias A, C e E
+          // inteiras, em silêncio, e o próximo autosave gravava o vazio por
+          // cima do que estava salvo.
+          //
+          // A lição estrutural: reconstruir o objeto campo a campo é um convite
+          // permanente ao esquecimento. O que protege daqui para frente é o
+          // teste de contrato (`usePersistencia.test`), que compara a quebra
+          // reaberta com a salva INTEIRA, em vez de conferir campo escolhido.
+          produtoId: salva.produtoId ?? undefined,
+          necessidades: salva.necessidades,
+          decisoes: salva.decisoes,
+          excecoes: salva.excecoes,
+          percursos: salva.percursos,
+          documentoEscrito: salva.documentoEscrito,
+          documentoStatus: salva.documentoStatus ?? undefined,
         });
         setQuebraId(salva.id);
         setStatus("salvo");

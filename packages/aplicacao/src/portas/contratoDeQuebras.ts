@@ -183,6 +183,34 @@ export function testarContratoDeQuebras(nomeDoAdaptador: string, criarAmbiente: 
       expect(lida?.percursos?.[0].nos).toEqual(["n1", "n2", "n3"]);
     });
 
+    it("SPEC-58 — o que a PESSOA escreveu no documento sobrevive, com o status", async () => {
+      // A regra 3 da SPEC-58: se a ida e volta apagar isto uma única vez,
+      // ninguém escreve de novo — e o documento volta a ser o export de antes.
+      const repo = await comRepo();
+      const documentoEscrito = {
+        tradeOffs: "Aceitamos latência maior na escrita para a leitura ficar barata.",
+        riscos: "O parceiro pode mudar o contrato sem aviso.",
+      };
+
+      const criada = await repo.criar(
+        normalizarDadosQuebra({ diagrama: DIAGRAMA, documentoEscrito, documentoStatus: "aprovado" })
+      );
+      const lida = await repo.obter(criada.id);
+
+      expect(lida?.documentoEscrito).toEqual(documentoEscrito);
+      expect(lida?.documentoStatus).toBe("aprovado");
+    });
+
+    it("SPEC-58 — quebra nunca gerada tem status nulo, não string vazia", async () => {
+      // Dois jeitos de dizer "nada" é como o campo morre em silêncio na borda
+      // (a lição do §184 e da SPEC-53, aqui aplicada antes de doer).
+      const repo = await comRepo();
+      const criada = await repo.criar(normalizarDadosQuebra({ diagrama: DIAGRAMA }));
+
+      expect((await repo.obter(criada.id))?.documentoStatus).toBeNull();
+      expect((await repo.obter(criada.id))?.documentoEscrito).toEqual({});
+    });
+
     it("atualizar troca as necessidades inteiras, sem mesclar com as antigas", async () => {
       // Coleção da quebra é substituída, não fundida: mesclar faria uma
       // necessidade apagada na tela voltar do banco, que é o tipo de

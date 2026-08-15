@@ -107,6 +107,16 @@ const corpoQuebra = z.object({
       })
     )
     .optional(),
+  /** SPEC-58 fatia 2 — o que a PESSOA escreveu. Chaves fixas: seção arbitrária
+   * viraria um editor de documento, e aí o template configurável (SPEC-47) e o
+   * texto solto disputariam quem manda na estrutura. */
+  documentoEscrito: z
+    .object({ tradeOffs: z.string().optional(), riscos: z.string().optional() })
+    .optional(),
+  /** SPEC-58 fatia 3 — o estado. `nullish` e não `optional`: quebra nunca
+   * gerada tem `null`, e distinguir isso de "não mandou o campo" é o que
+   * permite o PUT não apagar um status por omissão. */
+  documentoStatus: z.enum(["rascunho", "em-revisao", "aprovado", "implementado"]).nullish(),
 });
 
 /** Mesmo fallback de `.example.json` de `packages/web/vite.config.ts` (servirConfigEmDev)
