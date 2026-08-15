@@ -980,6 +980,8 @@ function AppCarregado({
         onSelecionar={setSelecionadoId}
         necessidades={quebra.necessidades}
         onAbrirProposito={() => setAbaAssistente("contexto")}
+        regras={regrasConfig}
+        onSelecionarViolacao={setSelecionadoId}
       />
 
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>

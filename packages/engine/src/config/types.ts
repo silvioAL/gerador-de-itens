@@ -176,9 +176,41 @@ export interface AppConfig {
  * renderiza igual agora, o campo não tinha mais efeito nenhum que fizesse
  * sentido manter.
  */
+export const OPERADORES_CHECAGEM = ["lte", "lt", "gte", "gt", "eq", "ne", "preenchido"] as const;
+export type OperadorChecagem = (typeof OPERADORES_CHECAGEM)[number];
+
+/**
+ * SPEC-57 fatia B (§239) — a versão CONFERÍVEL de um requisito.
+ *
+ * A pergunta em aberto era "padrão vive onde?", com o alerta de que um quarto
+ * lugar (além de `regras.json`, `camposNo` e `perfis-time.json`) provavelmente
+ * seria erro. A resposta: **não é lugar novo, é um campo a mais no requisito
+ * que já existe**. Um `Requisito` já sabe a tech, os contextos e o `when` —
+ * só lhe faltava uma afirmação que a máquina consiga avaliar.
+ *
+ * "Chamada externa tem que ter timeout curto" é opinião; `timeout ≤ 500ms` é
+ * padrão. O `texto` continua sendo o que a pessoa lê; a `checagem` é o que o
+ * motor confere.
+ *
+ * `campo` é a chave de um campo do NÓ. Não dá pra validá-la contra um spec na
+ * carga da config: a regra é por tech, e uma tech vale para vários tipos de nó
+ * com specs diferentes. Campo inexistente num nó simplesmente não gera
+ * violação ali — o mesmo tratamento que `when.field` já dá.
+ */
+export interface Checagem {
+  campo: string;
+  operador: OperadorChecagem;
+  /** Ausente quando o operador é "preenchido". */
+  valor?: number | string | boolean;
+  /** Só para a mensagem ("≤ 500ms"). O motor não converte unidade. */
+  unidade?: string;
+}
+
 export interface Requisito {
   texto: string;
   contextos: string[];
+  /** SPEC-57 fatia B — quando presente, este requisito é CONFERÍVEL. */
+  checagem?: Checagem;
   /** Avaliada contra os nós de origem da atividade — o item aparece se
    * **algum** deles satisfizer (mesma régua de `.some()` do casamento de
    * contexto e do `when` de `ItemProcesso`). Sem `when`, basta tech + contexto

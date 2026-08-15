@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { Diagrama, DiagramaConfig } from "@gerador/engine";
+import type { Diagrama, DiagramaConfig, RegrasConfig } from "@gerador/engine";
 import { ReadinessSummary } from "./ReadinessSummary";
 
 const config: DiagramaConfig = {
@@ -183,5 +183,61 @@ describe("ReadinessSummary — a dimensão propósito", () => {
       />
     );
     expect(screen.getByTestId("proposito-resumo")).toHaveTextContent("propósito coberto");
+  });
+});
+
+/**
+ * §239 — a dimensão CONFORMIDADE: quais padrões este desenho viola.
+ * Terceira dimensão na mesma barra (completude, propósito, conformidade) — a
+ * medida aparece onde a decisão é tomada, não numa aba de relatório.
+ */
+describe("ReadinessSummary — a dimensão conformidade", () => {
+  // O `config` do topo tem `techs: []`, então nenhuma regra por tech casaria —
+  // conformidade precisa de tech no tipo de nó, é assim que a régua liga.
+  const configComTech: DiagramaConfig = {
+    ...config,
+    nodeTypes: { ...config.nodeTypes, service: { ...config.nodeTypes.service, techs: ["Backend"] } },
+  };
+
+  const regrasComPadrao: RegrasConfig = {
+    tipos: ["História"],
+    tamanhos: ["P"],
+    porTech: {
+      Backend: {
+        checklistTecnico: [
+          {
+            texto: "Timeout de chamada externa",
+            contextos: [],
+            checagem: { campo: "nome", operador: "eq", valor: "esperado" },
+          },
+        ],
+        testes: [],
+      },
+    },
+  };
+
+  it("sem regras, o indicador NÃO aparece — quem não declarou padrão não é acusado", () => {
+    render(
+      <ReadinessSummary diagrama={diagramaComDoisVermelhosEUmVerde()} config={config} onSelecionar={() => {}} />
+    );
+    expect(screen.queryByTestId("conformidade-resumo")).not.toBeInTheDocument();
+  });
+
+  it("com padrão violado, conta e leva ao nó — o equivalente ao Próximo pendente", async () => {
+    const user = userEvent.setup();
+    const onSelecionarViolacao = vi.fn();
+    render(
+      <ReadinessSummary
+        diagrama={diagramaComDoisVermelhosEUmVerde()}
+        config={configComTech}
+        onSelecionar={() => {}}
+        regras={regrasComPadrao}
+        onSelecionarViolacao={onSelecionarViolacao}
+      />
+    );
+
+    const chip = screen.getByTestId("conformidade-resumo");
+    await user.click(chip);
+    expect(onSelecionarViolacao).toHaveBeenCalled();
   });
 });
