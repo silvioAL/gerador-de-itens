@@ -113,6 +113,19 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       },
     },
     {
+      // §246 — a fatia C: a régua explica por que existe, e a decisão que a
+      // contraria também. Vem logo depois da conformidade porque é a mesma
+      // frase virada do avesso: lá o padrão cobra, aqui alguém responde.
+      selector: "[data-testid=decisoes-resumo]",
+      titulo: "Por que este desenho é assim",
+      texto:
+        "Preencher um campo não é decidir — decidir é escolher ENTRE alternativas. Clique no 🧭: cada decisão guarda a escolhida, o porquê, e o que foi descartado com o custo de cada opção. É o descartado que serve daqui a um ano: sem ele, quem reabrir a decisão troca por algo que já tinha sido rejeitado por um motivo que ninguém escreveu. E note o ⏳: o agente PROPÕE, mas proposta não vale nada até você aceitar — e o porquê passa a ser seu.",
+      onEnter: () => {
+        opts.fecharAssistente();
+        opts.selecionarNo(null);
+      },
+    },
+    {
       selector: "[data-tour=properties-panel]",
       titulo: "Proveniência",
       texto:

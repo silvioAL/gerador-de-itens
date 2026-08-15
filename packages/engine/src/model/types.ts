@@ -137,6 +137,62 @@ export interface ExcecaoDePadrao {
   em: string;
 }
 
+/**
+ * SPEC-57 M5 caso 2 (fatia C) — a ESCOLHA ENTRE ALTERNATIVAS, ancorada no
+ * elemento que ela decide.
+ *
+ * **A régua que impede isto de virar wiki:** ADR nasce de escolha entre
+ * alternativas ou de exceção consciente — *nunca* de "preencher um campo".
+ * `timeout = 300ms` é valor com proveniência e continua sendo; "Rabbit e não
+ * Kafka, porque X" é decisão. Sem essa régua todo campo vira ADR e o mecanismo
+ * morre de excesso, que é como a maioria dos repositórios de ADR morre.
+ *
+ * `alternativas` é o que separa isto de um campo `observacao`: registrar só a
+ * escolhida documenta o que foi feito e perde o que a torna útil daqui a um
+ * ano — **o que foi descartado e por quê**. Quem reabre a decisão sem isso
+ * refaz a análise inteira, ou pior, troca por uma opção que já tinha sido
+ * rejeitada por um motivo que ninguém escreveu.
+ */
+export interface Alternativa {
+  titulo: string;
+  /** Por que não foi escolhida. Vazio é permitido — meia memória é melhor que nenhuma. */
+  consequencia?: string;
+}
+
+/**
+ * `status` segue a tradição de ADR e existe por um motivo prático: decisão
+ * revista **não se apaga**. `substituida` mantém o rastro de que houve troca,
+ * que é exatamente o que faz alguém não repetir o ciclo. Ver `substituidaPor`.
+ *
+ * `proposta` é o que a regra 2 da SPEC-57 exige do agente: ele pode PROPOR uma
+ * decisão a partir do desenho medido, e ela não vale nada até alguém aceitar.
+ */
+export type StatusDecisao = "proposta" | "aceita" | "substituida";
+
+export interface Decisao {
+  id: string;
+  /** Ancorada em um nó (o caso comum) ou em uma aresta. Ambos ausentes = decisão da quebra inteira. */
+  noId?: string;
+  arestaId?: string;
+  titulo: string;
+  /** O que forçava a escolha. É o que evita reabrir a decisão por não lembrar do aperto. */
+  contexto?: string;
+  /** Inclui a escolhida — a lista é o leque inteiro que estava na mesa. */
+  alternativas: Alternativa[];
+  /** `titulo` da alternativa escolhida. Título e não índice: reordenar a lista não pode trocar a decisão. */
+  escolhida: string;
+  /** O porquê. É a fatia C inteira em um campo — sem ele isto é só um registro de escolha. */
+  porque: string;
+  status: StatusDecisao;
+  /** id da decisão que substituiu esta. Só faz sentido com `status: "substituida"`. */
+  substituidaPor?: string;
+  /** Mesma escala de `ValorSpec`: proposta de agente entra como `sugerido`. */
+  origem: Origem;
+  autor: string;
+  /** ISO-8601. */
+  em: string;
+}
+
 export interface Quebra {
   /** Curto, pra achar essa quebra depois numa lista/busca — diferente de
    * `demandInfo` (a descrição longa do contexto). Não é chave: duas quebras
@@ -174,6 +230,9 @@ export interface Quebra {
   necessidades?: Necessidade[];
   /** §242 — as violações de padrão aceitas DE PROPÓSITO nesta quebra. */
   excecoes?: ExcecaoDePadrao[];
+  /** SPEC-57 fatia C — as escolhas entre alternativas, com o porquê. Ausente em
+   * quebra antiga, e nesse caso nada se afirma sobre ela. */
+  decisoes?: Decisao[];
 }
 
 export type TipoItem = "História" | "Task" | "Débito Técnico";

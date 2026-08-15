@@ -16,6 +16,15 @@ export {
   necessidadesDoElemento,
   type Lacunas,
 } from "./proposito/lacunas.js";
+export {
+  decisaoVigente,
+  decisoesVigentes,
+  decisoesDoElemento,
+  propostasPendentes,
+  resumirDecisoes,
+  excecoesComoDecisoes,
+  type ResumoDeDecisoes,
+} from "./decisao/decisoes.js";
 export { validateConfig, validateRegras } from "./config/validator.js";
 export { derivar, type ContextoQuebra } from "./derive/derivar.js";
 export {

@@ -225,6 +225,13 @@
       "when": 1754500000017,
       "tag": "0031_excecoes_de_padrao",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1754500000018,
+      "tag": "0032_decisoes_de_arquitetura",
+      "breakpoints": true
     }
   ]
 }

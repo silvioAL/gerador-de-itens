@@ -140,6 +140,19 @@ describe("useTour", () => {
     expect(opts.fecharAssistente).toHaveBeenCalled();
   });
 
+  it("§246 — o passo da DECISÃO existe, aponta o 🧭 e fecha o assistente antes", () => {
+    const opts = montarOpts();
+    const { result } = renderHook(() => useTour(opts));
+
+    act(() => result.current.iniciar());
+    andarAte(result, "Por que este desenho é assim");
+
+    expect(result.current.passoAtual?.selector).toBe("[data-testid=decisoes-resumo]");
+    // Quinta aparição da armadilha (§221/§232/§233/§245): o passo aponta um
+    // chip no topo, e a janela flutuante do passo anterior o cobriria.
+    expect(opts.fecharAssistente).toHaveBeenCalled();
+  });
+
   it("§235 — os três passos de espinha estão no tour, na ordem de uso", () => {
     const opts = montarOpts();
     const { result } = renderHook(() => useTour(opts));

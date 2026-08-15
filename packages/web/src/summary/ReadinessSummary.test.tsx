@@ -326,4 +326,87 @@ describe("ReadinessSummary — a dimensão conformidade", () => {
     );
     expect(screen.queryByTestId("conformidade-resumo")).not.toBeInTheDocument();
   });
+
+  it("SPEC-57 fatia C — sem decisão nenhuma o indicador 🧭 não existe", () => {
+    // Mesma disciplina do propósito e da conformidade: dimensão nova não acusa
+    // quem nunca a usou.
+    render(<ReadinessSummary diagrama={diagramaComDoisVermelhosEUmVerde()} config={config} onSelecionar={() => {}} />);
+
+    expect(screen.queryByTestId("decisoes-resumo")).not.toBeInTheDocument();
+  });
+
+  it("o chip cobra o que falta, não o volume: proposta pendente e decisão sem porquê", async () => {
+    // Contar decisões premiaria quem escreve muitas — que é exatamente como
+    // repositório de ADR vira cemitério.
+    const user = userEvent.setup();
+    const base = {
+      noId: "n1",
+      alternativas: [{ titulo: "A" }, { titulo: "B", consequencia: "acopla ao legado" }],
+      escolhida: "A",
+      origem: "manual" as const,
+      autor: "a",
+      em: "2026-01-01T00:00:00.000Z",
+    };
+    const { rerender } = render(
+      <ReadinessSummary
+        diagrama={diagramaComDoisVermelhosEUmVerde()}
+        config={config}
+        onSelecionar={() => {}}
+        decisoes={[{ ...base, id: "d1", titulo: "Fila em vez de síncrono", porque: "desacopla", status: "aceita" }]}
+      />
+    );
+    expect(screen.getByTestId("decisoes-resumo")).toHaveTextContent("1 decisões");
+
+    rerender(
+      <ReadinessSummary
+        diagrama={diagramaComDoisVermelhosEUmVerde()}
+        config={config}
+        onSelecionar={() => {}}
+        decisoes={[
+          { ...base, id: "d1", titulo: "Fila em vez de síncrono", porque: "", status: "aceita" },
+          { ...base, id: "d2", titulo: "Cache antes do bureau", porque: "corta latência", status: "proposta" },
+        ]}
+      />
+    );
+    // Proposta primeiro: ela espera uma PESSOA, e é a que trava a regra 2.
+    expect(screen.getByTestId("decisoes-resumo")).toHaveTextContent("1 a decidir");
+
+    await user.click(screen.getByTestId("decisoes-resumo"));
+    const lista = screen.getByTestId("decisoes-lista");
+    expect(within(lista).getByText(/refazer a análise/)).toBeInTheDocument();
+    // O descartado também aqui: esta lista é onde se lê "por que este desenho
+    // é assim" de uma vez só, e resposta sem o rejeitado é meia resposta.
+    // As duas decisões deste caso compartilham as mesmas alternativas — uma
+    // por decisão listada é o esperado.
+    expect(within(lista).getAllByText(/acopla ao legado/)).toHaveLength(2);
+  });
+
+  it("apagar o nó decidido faz a decisão aparecer como órfã, não sumir", async () => {
+    const user = userEvent.setup();
+    const decisoes = [
+      {
+        id: "d1",
+        noId: "nao-existe-mais",
+        titulo: "Fila em vez de síncrono",
+        alternativas: [{ titulo: "A" }, { titulo: "B" }],
+        escolhida: "A",
+        porque: "desacopla",
+        status: "aceita" as const,
+        origem: "manual" as const,
+        autor: "a",
+        em: "2026-01-01T00:00:00.000Z",
+      },
+    ];
+    render(
+      <ReadinessSummary
+        diagrama={diagramaComDoisVermelhosEUmVerde()}
+        config={config}
+        onSelecionar={() => {}}
+        decisoes={decisoes}
+      />
+    );
+
+    await user.click(screen.getByTestId("decisoes-resumo"));
+    expect(within(screen.getByTestId("decisoes-lista")).getByText(/não existe mais no desenho/)).toBeInTheDocument();
+  });
 });
