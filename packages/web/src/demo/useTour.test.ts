@@ -140,6 +140,19 @@ describe("useTour", () => {
     expect(opts.fecharAssistente).toHaveBeenCalled();
   });
 
+  it("§248 — o passo do PERCURSO existe, aponta o 🛣 e fecha o assistente antes", () => {
+    const opts = montarOpts();
+    const { result } = renderHook(() => useTour(opts));
+
+    act(() => result.current.iniciar());
+    andarAte(result, "O caminho, não só os componentes");
+
+    expect(result.current.passoAtual?.selector).toBe("[data-testid=percursos-resumo]");
+    // Sexta aparição da armadilha (§221/§232/§233/§245/§246). Já não é azar:
+    // a janela do assistente cobre a faixa do placar, ponto.
+    expect(opts.fecharAssistente).toHaveBeenCalled();
+  });
+
   it("§246 — o passo da DECISÃO existe, aponta o 🧭 e fecha o assistente antes", () => {
     const opts = montarOpts();
     const { result } = renderHook(() => useTour(opts));

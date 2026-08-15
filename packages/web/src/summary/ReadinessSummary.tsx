@@ -1,8 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import type { Diagrama, DiagramaConfig, Necessidade, RegrasConfig } from "@gerador/engine";
 import type { ExcecaoDePadrao, Violacao } from "@gerador/engine";
-import { analisarLacunas, avaliarConformidade, resumirDecisoes, violacoesEmAberto } from "@gerador/engine";
-import type { Decisao } from "@gerador/engine";
+import {
+  analisarLacunas,
+  avaliarConformidade,
+  avaliarPercursos,
+  conciliarPercursos,
+  inferirPercursos,
+  resumirDecisoes,
+  violacoesEmAberto,
+} from "@gerador/engine";
+import { PercursosPanel } from "./PercursosPanel";
+import type { Decisao, Percurso } from "@gerador/engine";
 import { ReadinessBadge } from "./ReadinessBadge";
 import { calcularResumoProntidao, type NoComProntidao } from "./prontidaoResumo";
 
@@ -29,6 +38,12 @@ export interface ReadinessSummaryProps {
   decisoes?: Decisao[];
   /** Leva ao nó onde a decisão foi ancorada — sem isto o número seria um beco. */
   onSelecionarDecisao?: (elementoId: string) => void;
+  /** SPEC-57 fatia E — os caminhos CONFIRMADOS da quebra. Os inferidos são
+   * recalculados aqui a cada render: são função pura do grafo, e guardá-los
+   * faria o caminho salvo descolar do desenho. */
+  percursos?: Percurso[];
+  /** Confirmar/descartar um caminho inferido. Ausente = a dimensão não aparece. */
+  onMudarPercursos?: (percursos: Percurso[]) => void;
 }
 
 export function ReadinessSummary({
@@ -43,6 +58,8 @@ export function ReadinessSummary({
   onAceitarViolacao,
   decisoes,
   onSelecionarDecisao,
+  percursos,
+  onMudarPercursos,
 }: ReadinessSummaryProps) {
   const { vermelhos, amarelos, verdes } = calcularResumoProntidao(diagrama, config);
   // Dimensão PROPÓSITO (SPEC-56 §0.6): mesma barra, mais uma razão. Amarelo e
@@ -61,6 +78,13 @@ export function ReadinessSummary({
   // existem" (isso é volume, não qualidade): é quantas esperam alguém e
   // quantas registraram a escolha sem a razão.
   const resumoDecisoes = resumirDecisoes(diagrama, decisoes ?? []);
+  // Fatia E — dimensão PERCURSO. Os caminhos são inferidos do grafo a cada
+  // render (função pura, sem I/O) e conciliados com o que já foi confirmado:
+  // reinferir não pode desconfirmar, e caminho confirmado que sumiu do desenho
+  // vira obsoleto em vez de desaparecer.
+  const inferidos = inferirPercursos(diagrama);
+  const { percursos: percursosVivos, obsoletos } = conciliarPercursos(inferidos.percursos, percursos ?? []);
+  const { violacoes: violacoesDePercurso, naoMedidos } = avaliarPercursos(diagrama, config, percursosVivos, regras);
   const pendentes = [...vermelhos, ...amarelos];
   const indicePendenteRef = useRef(0);
 
@@ -106,6 +130,30 @@ export function ReadinessSummary({
       )}
       {violacoes.length > 0 && (
         <ListaDeViolacoes violacoes={violacoes} onSelecionar={onSelecionarViolacao} onAceitar={onAceitarViolacao} />
+      )}
+      {onMudarPercursos && percursosVivos.length + obsoletos.length > 0 && (
+        <PercursosPanel
+          percursos={[...percursosVivos, ...obsoletos]}
+          violacoes={violacoesDePercurso}
+          naoMedidos={naoMedidos}
+          truncado={inferidos.truncado}
+          onSelecionarNo={onSelecionar}
+          // Confirmar guarda o caminho; descartar o tira da lista até o desenho
+          // mudar de novo — dizer "não é caminho" não pode virar uma briga com
+          // o inferidor a cada render, então o descarte grava a recusa.
+          onConfirmar={(id) =>
+            onMudarPercursos([
+              ...(percursos ?? []).filter((p) => p.id !== id),
+              ...percursosVivos.filter((p) => p.id === id).map((p) => ({ ...p, confirmado: true })),
+            ])
+          }
+          onDescartar={(id) =>
+            onMudarPercursos([
+              ...(percursos ?? []).filter((p) => p.id !== id),
+              ...percursosVivos.filter((p) => p.id === id).map((p) => ({ ...p, confirmado: false })),
+            ])
+          }
+        />
       )}
       {(decisoes?.length ?? 0) > 0 && (
         <ListaDeDecisoes

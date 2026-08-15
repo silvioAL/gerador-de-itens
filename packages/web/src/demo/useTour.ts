@@ -113,6 +113,19 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       },
     },
     {
+      // §248 — a fatia E: a dimensão que não cabe em nó nenhum. Vem depois da
+      // conformidade porque é a mesma pergunta um nível acima: lá "este
+      // componente está na linha", aqui "o CAMINHO inteiro está".
+      selector: "[data-testid=percursos-resumo]",
+      titulo: "O caminho, não só os componentes",
+      texto:
+        "Cinco saltos de 400ms são cinco componentes dentro do padrão e uma resposta de dois segundos — nenhuma medida por componente vê isso. Clique no 🛣: o motor LEU os caminhos do desenho e está pedindo confirmação, porque inferir é grátis e erra. Nada é medido antes de você confirmar. Depois disso as réguas de caminho valem: soma de timeout, elo mais lento, número de saltos. E se faltar um campo no meio, ele diz \"não dá para medir\" em vez de somar o que existe — meia soma vira um verde falso, que é o pior resultado possível de uma medição.",
+      onEnter: () => {
+        opts.fecharAssistente();
+        opts.selecionarNo(null);
+      },
+    },
+    {
       // §246 — a fatia C: a régua explica por que existe, e a decisão que a
       // contraria também. Vem logo depois da conformidade porque é a mesma
       // frase virada do avesso: lá o padrão cobra, aqui alguém responde.

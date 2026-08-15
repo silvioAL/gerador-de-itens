@@ -1,4 +1,4 @@
-import type { Decisao, Diagrama, ExcecaoDePadrao, Necessidade, ValorSpec } from "@gerador/engine";
+import type { Decisao, Diagrama, ExcecaoDePadrao, Necessidade, Percurso, ValorSpec } from "@gerador/engine";
 
 /**
  * SPEC-31 Fase 1 — a porta de Quebras.
@@ -38,6 +38,8 @@ export interface QuebraSalva {
   excecoes?: ExcecaoDePadrao[];
   /** SPEC-57 fatia C — as escolhas entre alternativas, com o porquê. */
   decisoes?: Decisao[];
+  /** SPEC-57 fatia E — os caminhos CONFIRMADOS. A inferência não se guarda. */
+  percursos?: Percurso[];
   /** §184 — o markdown da especificação gerada (null = nunca gerada). */
   especificacao?: string | null;
   /** ISO-8601. Quem cria decide o valor — o relógio é do adaptador. */
@@ -89,5 +91,6 @@ export function normalizarDadosQuebra(bruto: Partial<DadosQuebra> | undefined): 
     necessidades: bruto?.necessidades ?? [],
     excecoes: bruto?.excecoes ?? [],
     decisoes: bruto?.decisoes ?? [],
+    percursos: bruto?.percursos ?? [],
   };
 }

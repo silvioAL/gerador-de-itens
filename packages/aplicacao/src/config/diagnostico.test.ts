@@ -40,7 +40,27 @@ describe("diagnóstico de config desatualizada (SPEC-31 Fase 3)", () => {
       // precisa ser contado: config cheia de checklist e vazia de checagem era
       // invisível para o diagnóstico.
       requisitosConferiveis: 0,
+      // SPEC-57 fatia E — a mesma lição, contada de primeira desta vez.
+      regrasDePercurso: 0,
     });
+  });
+
+  it("fatia E — acusa a config sem nenhuma régua de PERCURSO", () => {
+    // A lição do §244 aplicada antes de doer: `percursos` é lista nova no topo
+    // de `regras`, o documento vive no banco desde a SPEC-36, e instalação
+    // existente nunca relê o arquivo. Sem esta contagem, a fatia nasceria
+    // dormente em 100% das instalações — de novo.
+    const comPercurso = {
+      porTech: {},
+      percursos: [
+        { texto: "cabe no orçamento", checagem: { campo: "timeoutMs", agregacao: "soma", operador: "lte", valor: 2000 } },
+      ],
+    };
+    const diagnostico = diagnosticarConfig("regras", { porTech: {} }, comPercurso);
+
+    expect(diagnostico.secoesVazias).toContainEqual({ secao: "regrasDePercurso", noTemplate: 1 });
+    expect(diagnostico.mensagem).toContain("régua de percurso");
+    expect(diagnostico.mensagem).toContain("mede o CAMINHO");
   });
 
   it("acusa a seção que a config de outra era não tem — o caso do §108", () => {

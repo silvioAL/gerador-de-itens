@@ -37,6 +37,7 @@ export const quebras = pgTable("quebras", {
    * ela justifica tabela. */
   excecoes: jsonb("excecoes").notNull().default([]),
   decisoes: jsonb("decisoes").notNull().default([]),
+  percursos: jsonb("percursos").notNull().default([]),
   especificacao: text("especificacao"),
   especificacaoGeradaEm: timestamp("especificacao_gerada_em", { withTimezone: true }),
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),

@@ -288,11 +288,52 @@ export interface RegrasPorTech {
   volumetria?: { contextos: string[] };
 }
 
+/** SPEC-57 fatia E — como o valor do caminho é apurado a partir dos nós dele. */
+export const AGREGACOES_PERCURSO = ["soma", "maximo", "saltos"] as const;
+export type AgregacaoPercurso = (typeof AGREGACOES_PERCURSO)[number];
+
+/**
+ * A régua aplicada ao CAMINHO, não ao nó.
+ *
+ * `soma` é a que justifica a fatia: cinco saltos de 400ms são cinco nós dentro
+ * do padrão e um percurso de dois segundos, e nenhuma checagem por nó vê isso.
+ * `maximo` pega o elo mais lento; `saltos` conta os nós e dispensa `campo`
+ * ("no máximo 4 saltos entre a borda e o dado").
+ *
+ * Não converte unidade, pelo mesmo motivo de `Checagem`: somar ms com s
+ * caladamente seria pior que não somar.
+ */
+export interface ChecagemDePercurso {
+  /** Chave de campo do nó. Ausente — e obrigatoriamente ausente — em `saltos`. */
+  campo?: string;
+  agregacao: AgregacaoPercurso;
+  operador: OperadorChecagem;
+  valor?: number;
+  unidade?: string;
+}
+
+/**
+ * O requisito de percurso mora em `regras`, ao lado do checklist por tech — e
+ * **não é um quarto lugar de padrão**, que o §5 da SPEC-57 já avisava ser
+ * provável erro. É o mesmo arquivo com um segundo ESCOPO: o checklist vale por
+ * tech, este vale por caminho. Um percurso cruza techs por definição, então
+ * enfiá-lo dentro de `porTech` obrigaria a escolher arbitrariamente uma delas.
+ */
+export interface RequisitoDePercurso {
+  texto: string;
+  /** §242 — por que este padrão existe. É o que transforma cobrança em ensino. */
+  porque?: string;
+  checagem: ChecagemDePercurso;
+}
+
 export interface RegrasConfig {
   tipos: string[];
   tamanhos: string[];
   /** Checklist de refinamento técnico + ciclos de teste, por tech. */
   porTech: Record<string, RegrasPorTech>;
+  /** SPEC-57 fatia E — as réguas que valem sobre o CAMINHO. Ausente = a
+   * dimensão de percurso não mede nada, e não aparece. */
+  percursos?: RequisitoDePercurso[];
 }
 
 /**

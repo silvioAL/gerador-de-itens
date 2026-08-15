@@ -7467,3 +7467,78 @@ subida de container, não regressão.
 
 **A fatia C está fechada.** Restam da SPEC-57 a fatia E (percurso + regras de
 topologia) e as três medições do §8.6.
+
+---
+
+## §248 — o CAMINHO, que não cabe em nó nenhum (SPEC-57 fatia E)
+
+Até aqui a mesa media **elementos**: este componente está completo, aquele viola
+o padrão, esta necessidade não tem quem responda. Mas uma classe inteira de
+defeito não mora em elemento nenhum — mora entre eles. **Cinco saltos de 400ms
+são cinco componentes dentro do padrão e uma resposta de dois segundos**, e
+nenhuma medida por nó vê isso. É literalmente o caso do §6 da SPEC-57: *"com
+fila, R2 (2s) depende do consumo — o pior caso do caminho passa de 2s"*.
+
+**Inferido, não declarado.** A pergunta 4 do §5 estava em aberto: *"declarar dá
+precisão e custa trabalho; inferir do grafo é grátis e erra"*. A resposta é a
+terceira opção que a própria SPEC sugeria — **inferir e pedir confirmação**, que
+é o padrão de proveniência que a casa usa em todo o resto. O motor lê os
+caminhos de entrada a saída a cada render (função pura, sem I/O) e **nada é
+medido antes do aceite**.
+
+Isso trouxe uma consequência que só apareceu escrevendo: o estado de confirmação
+precisa de **três** valores, não dois. `undefined` = o motor inferiu e ninguém
+olhou; `true` = confirmado; `false` = *a pessoa disse que não é caminho*. Sem o
+terceiro, o botão "não é caminho" não faria nada — o inferidor devolveria o
+mesmo caminho no render seguinte, para sempre. Achei isso revisando o próprio
+código antes de testar.
+
+**A decisão mais importante da fatia é o que ela se RECUSA a medir.** Se um nó
+do caminho declara o campo no seu tipo e não o preencheu, a soma está
+incompleta. Somar o que existe produziria um número menor que a verdade — um
+**verde falso**, que é o pior resultado possível de uma medição, porque encerra
+a pergunta. Então a apuração tem três respostas, não duas:
+
+> dentro do padrão · fora do padrão · **"faltam estes campos para eu conseguir
+> dizer"**
+
+E o terceiro estado aparece no chip, com os ids dos nós clicáveis: "não deu para
+medir" sem endereço é uma reclamação, não uma informação. A diferença entre *não
+se aplica* (o tipo do nó nem tem o campo) e *aplica-se e está vazio* é o que
+separa silêncio legítimo de omissão — e é a fatia inteira.
+
+**Onde a régua de percurso mora.** Em `regras`, ao lado do checklist por tech —
+e **não é um quarto lugar de padrão**, que o §5 pergunta 2 já avisava ser
+provável erro. É o mesmo arquivo com um segundo *escopo*: o checklist vale por
+tech, este vale por caminho. Um percurso cruza techs por definição, então
+enfiá-lo dentro de `porTech` obrigaria a escolher arbitrariamente uma delas.
+
+**Duas correções de honestidade encontradas no caminho:**
+
+1. **`saltos` contava nós.** `a → b` é *um* salto, não dois. Um off-by-one num
+   rótulo que a pessoa lê para calibrar a régua faria ela compensar um erro
+   nosso. Agora conta arestas percorridas.
+2. **O diagnóstico do §108 conta `regrasDePercurso` desde o primeiro commit.**
+   `percursos` é lista nova no topo de `regras`, o documento vive no banco desde
+   a SPEC-36, e instalação existente nunca relê o arquivo. Sem a contagem, a
+   fatia nasceria dormente em 100% das instalações — exatamente o §244, de novo.
+   Desta vez foi contada antes de doer.
+
+**No tour, e sem inventar desenho.** O cenário do tour tem dois nós
+(`srv-catalogo → produtos`), e forçar uma violação de caminho ali seria piorar o
+exemplo para ter o que mostrar — o que o §245 criticou. Então o passo mostra o
+que o cenário honestamente tem: **a confirmação**, que é a resposta central da
+fatia, e explica no texto o que as réguas fazem depois dela.
+
+**Armadilha pela sexta vez** (§221, §232, §233, §245, §246): passo que aponta
+chip no topo precisa de `fecharAssistente`. Seis de sete passos novos. A janela
+do assistente cobre a faixa do placar, e isso é característica do layout — não
+azar.
+
+**Mordida:** desligar a guarda de campo faltante → a soma vira `NaN`, o motor
+acusa uma violação inventada, e o teste do verde falso fica vermelho.
+
+292 engine · 536 web · 63 aplicação · 220 server · 73/73 E2E · build limpo.
+
+**Ainda em aberto da fatia E:** o item derivado por violação de percurso (o
+equivalente do §240 para caminho) e a citação do percurso na spec.

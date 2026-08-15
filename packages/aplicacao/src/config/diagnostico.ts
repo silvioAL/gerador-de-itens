@@ -66,6 +66,14 @@ function contarRegras(documento: unknown): ResumoConfig {
     return total + lista.filter((r) => (r as { checagem?: unknown })?.checagem).length;
   }, 0);
 
+  // SPEC-57 fatia E — a régua de PERCURSO é uma lista NOVA no topo de
+  // `regras`, e a lição do §244 é literal aqui: acrescentá-la ao template não
+  // entrega nada, porque o documento vive no banco desde a SPEC-36 e
+  // instalação existente nunca relê o arquivo. Ou o diagnóstico conta, ou a
+  // fatia nasce morta em 100% das instalações. Contada de primeira desta vez.
+  const percursos = (documento as { percursos?: unknown[] } | null)?.percursos;
+  resumo.regrasDePercurso = Array.isArray(percursos) ? percursos.length : 0;
+
   return resumo;
 }
 
@@ -100,6 +108,7 @@ const NOME_AMIGAVEL: Record<string, string> = {
   testes: "regras de teste",
   volumetria: "volumetria",
   requisitosConferiveis: "padrão conferível (a régua que o motor avalia sozinho)",
+  regrasDePercurso: "régua de percurso (a que mede o CAMINHO, não o nó)",
   techs: "tecnologias",
   papeis: "papéis da esteira",
   papeisAtivos: "papéis ativos",

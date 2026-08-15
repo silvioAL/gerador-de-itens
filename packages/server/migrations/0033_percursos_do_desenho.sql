@@ -1,0 +1,20 @@
+-- SPEC-57 fatia E — os CAMINHOS do desenho, inferidos do grafo e confirmados
+-- por uma pessoa.
+--
+-- Existe porque uma classe inteira de defeito não mora em elemento nenhum:
+-- cinco saltos de 400ms são cinco nós dentro do padrão e um percurso de dois
+-- segundos. Nenhuma medida por nó vê isso, e é o que o cliente sente.
+--
+-- Guarda só o que foi CONFIRMADO. A inferência é grátis e roda a cada abertura
+-- (`inferirPercursos` é função pura sobre o grafo); persistir toda inferência
+-- encheria a quebra de caminho que ninguém olhou, e pior: um caminho salvo
+-- ficaria descolado do desenho na primeira aresta que alguém mexesse. O que a
+-- coluna guarda é a DECISÃO ("este caminho importa"), não o dado derivado.
+--
+-- O id é derivado dos nós do caminho, e é isso que permite casar o inferido de
+-- agora com o confirmado de antes sem duplicar a lista na cara de quem usa.
+--
+-- jsonb pela mesma razão de necessidades (0030), excecoes (0031) e decisoes
+-- (0032): coleção que PERTENCE à quebra, sem consulta transversal que
+-- justifique tabela.
+ALTER TABLE "quebras" ADD COLUMN "percursos" jsonb DEFAULT '[]'::jsonb NOT NULL;

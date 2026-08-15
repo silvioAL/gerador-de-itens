@@ -162,6 +162,27 @@ export function testarContratoDeQuebras(nomeDoAdaptador: string, criarAmbiente: 
       expect(lida?.decisoes?.[0].alternativas[0].consequencia).toContain("derruba o checkout");
     });
 
+    it("SPEC-57 fatia E — o percurso CONFIRMADO sobrevive, com a ordem dos nós", async () => {
+      // A ordem é o percurso: `[a,b,c]` e `[a,c,b]` são caminhos diferentes, e
+      // um round-trip que reordenasse trocaria a medida sem trocar nada visível.
+      const repo = await comRepo();
+      const percursos = [
+        {
+          id: "pc::n1>n2>n3",
+          rotulo: "web → api → mongo",
+          nos: ["n1", "n2", "n3"],
+          origem: "inferido" as const,
+          confirmado: true,
+        },
+      ];
+
+      const criada = await repo.criar(normalizarDadosQuebra({ diagrama: DIAGRAMA, percursos }));
+      const lida = await repo.obter(criada.id);
+
+      expect(lida?.percursos).toEqual(percursos);
+      expect(lida?.percursos?.[0].nos).toEqual(["n1", "n2", "n3"]);
+    });
+
     it("atualizar troca as necessidades inteiras, sem mesclar com as antigas", async () => {
       // Coleção da quebra é substituída, não fundida: mesclar faria uma
       // necessidade apagada na tela voltar do banco, que é o tipo de
