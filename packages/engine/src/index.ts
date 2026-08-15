@@ -39,6 +39,14 @@ export {
   type PercursoNaoMedido,
   type ResultadoDePercursos,
 } from "./percurso/conformidadeDePercurso.js";
+export {
+  estruturarDocumento,
+  type DocumentoDeDesenho,
+  type ItemDoDocumento,
+  type IndicadorDeSaude,
+  type OpcoesEstruturarDocumento,
+} from "./documento/estruturarDocumento.js";
+export { gerarDocumentoHtml, type OpcoesDocumentoHtml } from "./documento/gerarDocumentoHtml.js";
 export { validateConfig, validateRegras } from "./config/validator.js";
 export { derivar, type ContextoQuebra } from "./derive/derivar.js";
 export {

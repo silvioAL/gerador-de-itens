@@ -223,6 +223,40 @@ export interface Percurso {
   confirmado?: boolean;
 }
 
+/**
+ * SPEC-58 fatia 3 — o ciclo do documento de desenho.
+ *
+ * Sem status, o documento não se encaixa em rito nenhum do time — é o que
+ * "órfão em termos de processo" queria dizer. Quatro estados e nenhum a mais:
+ * cada um responde "posso confiar nisto?" de um jeito diferente.
+ *
+ * A regra que os mantém honestos está em `documentoStatus` da quebra:
+ * **regenerar um documento aprovado o devolve a "em revisão"**. Não a rascunho
+ * — o trabalho de revisão não se perdeu —, mas dizer que continua aprovado
+ * depois que o desenho mudou seria mentira, e é assim que "aprovado" vira
+ * carimbo.
+ */
+export type StatusDocumento = "rascunho" | "em-revisao" | "aprovado" | "implementado";
+
+/**
+ * SPEC-58 fatia 2 — o que uma PESSOA escreve no documento, e que a máquina
+ * nunca sobrescreve.
+ *
+ * São exatamente as seções que a demanda sem ADR não tinha onde registrar. Se
+ * a regeneração apagar isto uma única vez, ninguém escreve de novo — e o
+ * documento volta a ser o export de antes.
+ *
+ * Chaves fixas e não lista livre: seção arbitrária viraria um editor de
+ * documento, e aí o template configurável (SPEC-47) e o texto solto passariam a
+ * disputar quem manda na estrutura.
+ */
+export interface DocumentoEscrito {
+  /** O que se ganhou e o que se perdeu — e o que ficou de fora de propósito. */
+  tradeOffs?: string;
+  /** O que pode dar errado, e o que se está aceitando correr. */
+  riscos?: string;
+}
+
 export interface Quebra {
   /** Curto, pra achar essa quebra depois numa lista/busca — diferente de
    * `demandInfo` (a descrição longa do contexto). Não é chave: duas quebras
@@ -267,6 +301,11 @@ export interface Quebra {
    * confirmados são guardados: reguardar toda inferência encheria a quebra de
    * caminho que ninguém olhou. */
   percursos?: Percurso[];
+  /** SPEC-58 fatia 2 — as seções escritas por gente. Sobrevivem à regeneração:
+   * é a regra 3 da SPEC-58, e sem ela a fatia inteira não existe. */
+  documentoEscrito?: DocumentoEscrito;
+  /** SPEC-58 fatia 3 — o estado do documento. Ausente = nunca gerado. */
+  documentoStatus?: StatusDocumento;
 }
 
 export type TipoItem = "História" | "Task" | "Débito Técnico";

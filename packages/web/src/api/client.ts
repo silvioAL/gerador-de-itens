@@ -1,4 +1,4 @@
-import type { Decisao, Diagrama, ExcecaoDePadrao, Necessidade, OperacaoDeAjuste, PerfisConfig, Percurso, Quebra, RegrasConfig, ValorSpec } from "@gerador/engine";
+import type { Decisao, Diagrama, DocumentoEscrito, ExcecaoDePadrao, Necessidade, OperacaoDeAjuste, PerfisConfig, Percurso, Quebra, RegrasConfig, StatusDocumento, ValorSpec } from "@gerador/engine";
 
 /**
  * Base do @gerador/server — configurável em runtime via `VITE_API_URL`
@@ -64,6 +64,10 @@ export interface QuebraSalva {
   decisoes?: Decisao[];
   /** SPEC-57 fatia E — os caminhos confirmados. */
   percursos?: Percurso[];
+  /** SPEC-58 fatia 2 — o que a pessoa escreveu no documento. */
+  documentoEscrito?: DocumentoEscrito;
+  /** SPEC-58 fatia 3 — o estado do documento. */
+  documentoStatus?: StatusDocumento | null;
   /** §184 — o markdown da especificação gerada (null = nunca gerada). */
   especificacao?: string | null;
   especificacaoGeradaEm?: string | null;
