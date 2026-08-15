@@ -140,3 +140,47 @@ test("apagar o componente devolve a necessidade à condição de lacuna", async 
   // O placar volta a acusar: o vínculo apontando para nó morto não conta.
   await expect(page.getByTestId("proposito-resumo")).toContainText("1 sem componente");
 });
+
+/**
+ * §253 — o campo de contexto não pode ser espremido pelo que está acima dele.
+ *
+ * Achado por print do usuário: com várias necessidades na lista, o campo do
+ * contexto do épico aparecia com UMA linha e o texto cortado ao meio. Não era
+ * o rodapé cobrindo — o `textarea` é item de um flex column com altura
+ * definida, e item flex encolhe por padrão. Em vez de o container rolar (para
+ * isso ele tem `overflow: auto`), o campo é que sumia.
+ *
+ * Só o navegador prova isto: `rows={8}` está lá no código, e continuaria lá
+ * com o campo medindo 30 pixels. Teste de unidade em jsdom não faz layout, e
+ * conferir o estilo diria "flexShrink está escrito" — não "o campo tem
+ * tamanho".
+ */
+test("§253 — o campo do contexto mantém altura mesmo com a lista cheia acima", async ({ page }) => {
+  test.setTimeout(90000);
+  await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
+  await page.route(
+    (url) => url.pathname === "/ia/status",
+    (rota) => rota.fulfill({ json: { modelosChat: [], embeddingInstalado: false, capacidades: {} } })
+  );
+  await entrar(page);
+
+  await page.getByTestId("assistente-flutuante").click();
+  const janela = page.getByTestId("assistente-janela");
+  await janela.getByRole("button", { name: "📎 Contexto do épico" }).click();
+
+  const campo = janela.getByLabel("Contexto do épico (texto)");
+  const alturaVazia = (await campo.boundingBox())?.height ?? 0;
+  expect(alturaVazia).toBeGreaterThan(100);
+
+  // Enche a lista acima até o painel precisar rolar — que é a condição exata
+  // do print.
+  for (let i = 0; i < 6; i++) {
+    await janela.getByLabel("Nova necessidade", { exact: true }).fill(`necessidade de teste número ${i} com texto longo o bastante para ocupar duas linhas`);
+    await janela.getByRole("button", { name: "+ Adicionar" }).click();
+  }
+  await expect(janela.getByTestId(/^necessidade-/)).toHaveCount(6);
+
+  // O campo continua com tamanho de campo, não de linha.
+  const alturaCheia = (await campo.boundingBox())?.height ?? 0;
+  expect(alturaCheia).toBeGreaterThan(100);
+});

@@ -109,6 +109,15 @@ export const REGRAS_DO_TOUR: RegrasConfig = {
  * mongo) — mesma disciplina do REGRAS_DO_TOUR: a demonstração não inventa
  * desenho para ter o que mostrar.
  */
+/** Prefixo dos ids de decisão de demonstração. É por ele que a tela sabe que
+ * uma decisão é do tour — e não pode ser aceita, porque o aceite grava na
+ * quebra e ela não vive lá (§253). */
+export const PREFIXO_DECISAO_DO_TOUR = "decisao-do-tour-";
+
+export function ehDecisaoDeDemonstracao(id: string): boolean {
+  return id.startsWith(PREFIXO_DECISAO_DO_TOUR);
+}
+
 export const DECISOES_DO_TOUR: Decisao[] = [
   {
     id: "decisao-do-tour-1",

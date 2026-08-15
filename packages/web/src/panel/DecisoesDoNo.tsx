@@ -25,6 +25,10 @@ export interface DecisoesDoNoProps {
   /** SPEC-57 M4 — pedir ao agente que proponha, lendo o desenho MEDIDO.
    * Ausente = o botão não aparece (sem credencial de IA, por exemplo). */
   onPedirAoAgente?: () => Promise<void>;
+  /** §253 — esta decisão é de DEMONSTRAÇÃO (do tour). Recebe a marca do §235 e
+   * não oferece aceite: o aceite grava na quebra, e ela não vive lá — o botão
+   * existiria só para não fazer nada. */
+  ehDeDemonstracao?: (id: string) => boolean;
 }
 
 export function DecisoesDoNo({
@@ -35,6 +39,7 @@ export function DecisoesDoNo({
   onAceitar,
   onSubstituir,
   onPedirAoAgente,
+  ehDeDemonstracao,
 }: DecisoesDoNoProps) {
   const [abrindo, setAbrindo] = useState<false | { substituindo?: string }>(false);
   const [pensando, setPensando] = useState(false);
@@ -63,10 +68,19 @@ export function DecisoesDoNo({
             <strong style={{ fontSize: 12 }}>{d.titulo}</strong>
           </div>
           <CorpoDaDecisao decisao={d} />
-          {/* Regra 2: proposta não vale nada até alguém aceitar. */}
-          <button style={botaoPrimarioEstilo} onClick={() => onAceitar(d.id)} data-testid={`aceitar-${d.id}`}>
-            aceitar esta decisão
-          </button>
+          {ehDeDemonstracao?.(d.id) ? (
+            // §235 — onde entra dado de demonstração, entra a marca. Faltava
+            // nas decisões do tour, e a ausência dela é metade do porquê de
+            // alguém tentar aceitar uma proposta que não é sua.
+            <p data-testid="decisao-de-demonstracao" style={{ fontSize: 11, color: "var(--texto-fraco)", fontStyle: "italic", margin: "6px 0 0" }}>
+              Exemplo da demonstração — o aceite vale nas suas decisões, não nesta.
+            </p>
+          ) : (
+            /* Regra 2: proposta não vale nada até alguém aceitar. */
+            <button style={botaoPrimarioEstilo} onClick={() => onAceitar(d.id)} data-testid={`aceitar-${d.id}`}>
+              aceitar esta decisão
+            </button>
+          )}
         </article>
       ))}
 

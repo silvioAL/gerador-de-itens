@@ -65,7 +65,7 @@ import { contextoDoProdutoEmTexto } from "@gerador/aplicacao";
 import { ConfigScreen, type AbaConfig } from "./config/ConfigScreen";
 import { TourOverlay } from "./demo/TourOverlay";
 import { useTour, passosDeConfiguracao } from "./demo/useTour";
-import { CONVERSA_DO_TOUR, DECISOES_DO_TOUR, REGRAS_DO_TOUR } from "./demo/dadosDoTour";
+import { CONVERSA_DO_TOUR, DECISOES_DO_TOUR, REGRAS_DO_TOUR, ehDecisaoDeDemonstracao } from "./demo/dadosDoTour";
 import { DocumentoScreen } from "./documento/DocumentoScreen";
 import { baixarArquivoTexto } from "./persistence/baixarArquivo";
 import { LandingPage } from "./demo/LandingPage";
@@ -1259,6 +1259,7 @@ function AppCarregado({
             decisoes={decisoesVisiveis}
             autor={sessao.email}
             onPedirDecisoesAoAgente={pedirDecisoesAoAgente}
+            ehDeDemonstracao={demonstracaoDoTour ? ehDecisaoDeDemonstracao : undefined}
             onRegistrarDecisao={(d) => setQuebra((q) => ({ ...q, decisoes: [...(q.decisoes ?? []), d] }))}
             onAceitarDecisao={(id) =>
               setQuebra((q) => ({
