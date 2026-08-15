@@ -55,6 +55,20 @@ const corpoQuebra = z.object({
       })
     )
     .optional(),
+  /** §242 — a válvula: violar o padrão é permitido, e fica registrado. `motivo`
+   * e `autor` com `min(1)` porque exceção sem os dois é só o vermelho
+   * desligado — que é exatamente o que a regra 3 existe para impedir. */
+  excecoes: z
+    .array(
+      z.object({
+        noId: z.string().min(1),
+        campo: z.string().min(1),
+        motivo: z.string().min(1),
+        autor: z.string().min(1),
+        em: z.string().min(1),
+      })
+    )
+    .optional(),
 });
 
 /** Mesmo fallback de `.example.json` de `packages/web/vite.config.ts` (servirConfigEmDev)

@@ -34,6 +34,7 @@ function comoQuebraSalva(linha: LinhaQuebra): QuebraSalva {
     anexosContexto: (linha.anexosContexto ?? []) as string[],
     produtoId: linha.produtoId ?? null,
     necessidades: (linha.necessidades ?? []) as QuebraSalva["necessidades"],
+    excecoes: (linha.excecoes ?? []) as QuebraSalva["excecoes"],
     especificacao: linha.especificacao ?? null,
     especificacaoGeradaEm: linha.especificacaoGeradaEm?.toISOString() ?? null,
     criadoEm: linha.criadoEm.toISOString(),
@@ -83,6 +84,7 @@ export function criarRepositorioDeQuebrasEmPostgres(db: BancoDeDados): Repositor
           anexosContexto: dados.anexosContexto,
           produtoId: dados.produtoId ?? null,
           necessidades: dados.necessidades ?? [],
+          excecoes: dados.excecoes ?? [],
           especificacao: dados.especificacao ?? null,
           // A data marca a VERSÃO da especificação — só quando o texto vem.
           especificacaoGeradaEm: dados.especificacao ? new Date() : null,
@@ -104,6 +106,7 @@ export function criarRepositorioDeQuebrasEmPostgres(db: BancoDeDados): Repositor
           anexosContexto: dados.anexosContexto,
           produtoId: dados.produtoId ?? null,
           necessidades: dados.necessidades ?? [],
+          excecoes: dados.excecoes ?? [],
           especificacao: dados.especificacao ?? null,
           ...(dados.especificacao ? { especificacaoGeradaEm: new Date() } : {}),
           atualizadoEm: new Date(),

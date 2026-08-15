@@ -6,6 +6,8 @@ export { calcularProntidao } from "./readiness/prontidao.js";
 export {
   avaliarConformidade,
   violacoesDoNo,
+  violacoesEmAberto,
+  violacoesAceitas,
   type Violacao,
 } from "./conformidade/conformidade.js";
 export {

@@ -112,6 +112,31 @@ export interface Necessidade {
   atendidaPor: string[];
 }
 
+/**
+ * §242 — a válvula da regra 3 da SPEC-57: *"violar o padrão é permitido — e
+ * fica registrado. Sem essa saída, a pessoa aprende a ignorar o vermelho, e a
+ * medição inteira morre junto."*
+ *
+ * Não é concessão, é o que mantém o mecanismo vivo. Às vezes a resposta certa é
+ * violar: o parceiro é lento, o prazo é regulatório, o legado não muda. O que
+ * não pode é isso acontecer em silêncio — daí `motivo` e `autor` obrigatórios.
+ *
+ * Efeito colateral que vale por si: exceção repetida é dado de melhoria. Se
+ * cinco times violam o mesmo padrão, o padrão está errado, não os times — e é
+ * exatamente o que o PDCA (SPEC-39/45) sabe processar.
+ */
+export interface ExcecaoDePadrao {
+  /** Nó onde a violação foi aceita. */
+  noId: string;
+  /** Campo conferido — junto com `noId`, identifica a violação. */
+  campo: string;
+  /** Por que foi aceita. Sem isto a exceção é só o vermelho desligado. */
+  motivo: string;
+  autor: string;
+  /** ISO-8601. */
+  em: string;
+}
+
 export interface Quebra {
   /** Curto, pra achar essa quebra depois numa lista/busca — diferente de
    * `demandInfo` (a descrição longa do contexto). Não é chave: duas quebras
@@ -147,6 +172,8 @@ export interface Quebra {
    * nesse caso nada se afirma sobre ela: sem necessidade declarada não há
    * lacuna a apontar (ver `analisarLacunas`). */
   necessidades?: Necessidade[];
+  /** §242 — as violações de padrão aceitas DE PROPÓSITO nesta quebra. */
+  excecoes?: ExcecaoDePadrao[];
 }
 
 export type TipoItem = "História" | "Task" | "Débito Técnico";

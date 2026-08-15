@@ -1,0 +1,15 @@
+-- §242 — a válvula da regra 3 da SPEC-57: violar o padrão é permitido, e fica
+-- registrado.
+--
+-- Sem esta saída a pessoa aprende a ignorar o vermelho, e a medição inteira
+-- morre junto. Às vezes a resposta certa é violar — o parceiro é lento, o prazo
+-- é regulatório, o legado não muda. O que não pode é isso acontecer em
+-- silêncio, e é por isso que `motivo` e `autor` são obrigatórios na borda.
+--
+-- jsonb e não tabela, pela mesma razão de `necessidades` (0030): é uma coleção
+-- QUE PERTENCE à quebra, e a consulta transversal que justificaria tabela
+-- ("quantas vezes este padrão foi violado na organização?") ainda não existe.
+-- Quando o PDCA passar a fazer essa pergunta — e ela é boa, porque padrão
+-- violado por cinco times é padrão errado, não time errado — aí a tabela se
+-- paga.
+ALTER TABLE "quebras" ADD COLUMN "excecoes" jsonb DEFAULT '[]'::jsonb NOT NULL;

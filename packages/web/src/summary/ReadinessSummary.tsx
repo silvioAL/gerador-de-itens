@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Diagrama, DiagramaConfig, Necessidade, RegrasConfig } from "@gerador/engine";
-import { analisarLacunas, avaliarConformidade } from "@gerador/engine";
+import type { ExcecaoDePadrao, Violacao } from "@gerador/engine";
+import { analisarLacunas, avaliarConformidade, violacoesEmAberto } from "@gerador/engine";
 import { ReadinessBadge } from "./ReadinessBadge";
 import { calcularResumoProntidao, type NoComProntidao } from "./prontidaoResumo";
 
@@ -16,8 +17,12 @@ export interface ReadinessSummaryProps {
   /** §239 — as regras do time; sem elas não há padrão a conferir, e o
    * indicador de conformidade não aparece. */
   regras?: RegrasConfig;
-  /** Leva ao primeiro nó que viola — o equivalente ao "Próximo pendente". */
+  /** Leva ao nó que viola — o equivalente ao "Próximo pendente". */
   onSelecionarViolacao?: (noId: string) => void;
+  /** §242 — as violações já aceitas de propósito. */
+  excecoes?: ExcecaoDePadrao[];
+  /** §242 — aceitar uma violação, com motivo. Ausente = a válvula não aparece. */
+  onAceitarViolacao?: (violacao: Violacao, motivo: string) => void;
 }
 
 export function ReadinessSummary({
@@ -28,6 +33,8 @@ export function ReadinessSummary({
   onAbrirProposito,
   regras,
   onSelecionarViolacao,
+  excecoes,
+  onAceitarViolacao,
 }: ReadinessSummaryProps) {
   const { vermelhos, amarelos, verdes } = calcularResumoProntidao(diagrama, config);
   // Dimensão PROPÓSITO (SPEC-56 §0.6): mesma barra, mais uma razão. Amarelo e
@@ -38,7 +45,10 @@ export function ReadinessSummary({
   // §239 — dimensão CONFORMIDADE: quais padrões este desenho viola. Amarelo
   // como o propósito: acusa, não bloqueia. Bloquear no primeiro dia ensinaria
   // a ignorar a cor, e a decisão de bloquear é do portão, não da medida.
-  const violacoes = avaliarConformidade(diagrama, config, regras);
+  // §242 — o placar conta só as que ainda cobram alguém. As aceitas de
+  // propósito continuam existindo (`avaliarConformidade` as devolve marcadas):
+  // some do vermelho, não do histórico.
+  const violacoes = violacoesEmAberto(avaliarConformidade(diagrama, config, regras, excecoes ?? []));
   const pendentes = [...vermelhos, ...amarelos];
   const indicePendenteRef = useRef(0);
 
@@ -83,19 +93,117 @@ export function ReadinessSummary({
         </button>
       )}
       {violacoes.length > 0 && (
-        <button
-          data-testid="conformidade-resumo"
-          onClick={() => onSelecionarViolacao?.(violacoes[0].noId)}
-          title={violacoes.map((v) => `${v.noLabel}: ${v.texto} (${v.esperado}, está ${v.atual})`).join("\n")}
-          style={{ ...botaoProximoEstilo, borderColor: "var(--amarelo)", color: "var(--amarelo)" }}
-        >
-          ⚖ {violacoes.length} fora do padrão
-        </button>
+        <ListaDeViolacoes violacoes={violacoes} onSelecionar={onSelecionarViolacao} onAceitar={onAceitarViolacao} />
       )}
       {pendentes.length > 0 && (
         <button onClick={irParaProximoPendente} style={botaoProximoEstilo}>
           ▶ Próximo pendente ({pendentes.length})
         </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * §242 — as violações, com o PORQUÊ do padrão e a válvula para contrariá-lo.
+ *
+ * Chip só com número não ensina nada: a SPEC-56 §0.7 diz que a mesa deve
+ * explicar o padrão, não só cobrá-lo — "forçar a decisão sem explicar produz
+ * obediência; explicar produz critério". E sem uma saída legítima a pessoa
+ * aprende a ignorar o amarelo, que mata a medição inteira (regra 3).
+ */
+function ListaDeViolacoes({
+  violacoes,
+  onSelecionar,
+  onAceitar,
+}: {
+  violacoes: Violacao[];
+  onSelecionar?: (noId: string) => void;
+  onAceitar?: (violacao: Violacao, motivo: string) => void;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const [aceitando, setAceitando] = useState<string | null>(null);
+  const [motivo, setMotivo] = useState("");
+  const raizRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!aberto) return;
+    function aoClicarFora(e: MouseEvent) {
+      if (raizRef.current && !raizRef.current.contains(e.target as Node)) setAberto(false);
+    }
+    document.addEventListener("mousedown", aoClicarFora);
+    return () => document.removeEventListener("mousedown", aoClicarFora);
+  }, [aberto]);
+
+  return (
+    <div ref={raizRef} style={{ position: "relative" }}>
+      <button
+        data-testid="conformidade-resumo"
+        onClick={() => setAberto((a) => !a)}
+        style={{ ...botaoProximoEstilo, borderColor: "var(--amarelo)", color: "var(--amarelo)" }}
+      >
+        ⚖ {violacoes.length} fora do padrão
+      </button>
+
+      {aberto && (
+        <div data-testid="conformidade-lista" style={popoverEstilo}>
+          {violacoes.map((v) => {
+            const id = `${v.noId}::${v.campo}`;
+            return (
+              <div key={id} data-testid={`violacao-${id}`} style={{ padding: "8px 4px", borderBottom: "1px solid var(--borda)" }}>
+                <button
+                  onClick={() => onSelecionar?.(v.noId)}
+                  style={{ ...itemPopoverEstilo, fontWeight: 600 }}
+                >
+                  {v.noLabel}: {v.campo} {v.esperado} — está {v.atual}
+                </button>
+                <div style={{ fontSize: 11, color: "var(--texto-fraco)", padding: "2px 6px" }}>{v.texto}</div>
+                {/* O porquê é o que separa ensinar de cobrar. */}
+                {v.porque && (
+                  <div data-testid={`porque-${id}`} style={{ fontSize: 11, color: "var(--texto-mudo)", padding: "2px 6px" }}>
+                    Por quê: {v.porque}
+                  </div>
+                )}
+
+                {onAceitar &&
+                  (aceitando === id ? (
+                    <div style={{ display: "flex", gap: 4, padding: "4px 6px" }}>
+                      <input
+                        aria-label={`Motivo para aceitar: ${v.texto}`}
+                        value={motivo}
+                        onChange={(e) => setMotivo(e.target.value)}
+                        placeholder="ex.: o parceiro não suporta menos que isso"
+                        style={{ flex: 1, fontSize: 11, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--borda-forte)", background: "var(--fundo)", color: "var(--texto)" }}
+                      />
+                      <button
+                        aria-label={`Confirmar exceção: ${v.texto}`}
+                        disabled={motivo.trim() === ""}
+                        onClick={() => {
+                          onAceitar(v, motivo.trim());
+                          setAceitando(null);
+                          setMotivo("");
+                        }}
+                        style={{ ...botaoProximoEstilo, fontSize: 11 }}
+                      >
+                        Registrar
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      aria-label={`Aceitar de propósito: ${v.texto}`}
+                      onClick={() => {
+                        setAceitando(id);
+                        setMotivo("");
+                      }}
+                      style={{ ...itemPopoverEstilo, fontSize: 11, color: "var(--texto-fraco)" }}
+                    >
+                      aceitar de propósito…
+                    </button>
+                  ))}
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );
@@ -188,6 +296,36 @@ function ContagemComLista({
     </div>
   );
 }
+
+/** Mesmo desenho do popover de prontidão logo acima — a dimensão é nova, a
+ * linguagem visual não. */
+const popoverEstilo: React.CSSProperties = {
+  position: "absolute",
+  top: "100%",
+  left: 0,
+  marginTop: 4,
+  background: "var(--painel)",
+  border: "1px solid var(--borda)",
+  borderRadius: 8,
+  boxShadow: "0 8px 20px rgba(15, 23, 42, 0.12)",
+  zIndex: 30,
+  minWidth: 280,
+  maxWidth: 380,
+  padding: "4px 0",
+};
+
+const itemPopoverEstilo: React.CSSProperties = {
+  display: "block",
+  width: "100%",
+  textAlign: "left",
+  background: "none",
+  border: "none",
+  padding: "4px 6px",
+  cursor: "pointer",
+  font: "inherit",
+  fontSize: 12,
+  color: "var(--texto)",
+};
 
 const botaoProximoEstilo: React.CSSProperties = {
   fontSize: 11,

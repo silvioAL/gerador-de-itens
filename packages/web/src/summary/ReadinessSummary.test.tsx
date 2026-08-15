@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Diagrama, DiagramaConfig, RegrasConfig } from "@gerador/engine";
 import { ReadinessSummary } from "./ReadinessSummary";
@@ -223,7 +223,9 @@ describe("ReadinessSummary — a dimensão conformidade", () => {
     expect(screen.queryByTestId("conformidade-resumo")).not.toBeInTheDocument();
   });
 
-  it("com padrão violado, conta e leva ao nó — o equivalente ao Próximo pendente", async () => {
+  it("com padrão violado, o chip abre a LISTA — e dali se chega ao nó", async () => {
+    // §242 — o chip deixou de navegar direto: número sozinho não ensina nada,
+    // e é na lista que mora o porquê do padrão e a válvula para contrariá-lo.
     const user = userEvent.setup();
     const onSelecionarViolacao = vi.fn();
     render(
@@ -236,8 +238,92 @@ describe("ReadinessSummary — a dimensão conformidade", () => {
       />
     );
 
-    const chip = screen.getByTestId("conformidade-resumo");
-    await user.click(chip);
+    await user.click(screen.getByTestId("conformidade-resumo"));
+    const lista = screen.getByTestId("conformidade-lista");
+    // O primeiro botão da entrada é o que leva ao nó (o rótulo com o valor).
+    await user.click(within(lista).getAllByRole("button")[0]);
     expect(onSelecionarViolacao).toHaveBeenCalled();
+  });
+
+  it("§242 — a lista mostra o PORQUÊ do padrão", async () => {
+    const user = userEvent.setup();
+    const comPorque: RegrasConfig = {
+      ...regrasComPadrao,
+      porTech: {
+        Backend: {
+          checklistTecnico: [
+            {
+              ...regrasComPadrao.porTech.Backend.checklistTecnico[0],
+              porque: "Veio do incidente de cobrança dupla.",
+            },
+          ],
+          testes: [],
+        },
+      },
+    };
+    render(
+      <ReadinessSummary
+        diagrama={diagramaComDoisVermelhosEUmVerde()}
+        config={configComTech}
+        onSelecionar={() => {}}
+        regras={comPorque}
+      />
+    );
+
+    await user.click(screen.getByTestId("conformidade-resumo"));
+    expect(screen.getByText(/incidente de cobrança dupla/)).toBeInTheDocument();
+  });
+
+  it("§242 — aceitar de propósito exige motivo, e devolve a violação com ele", async () => {
+    const user = userEvent.setup();
+    const onAceitarViolacao = vi.fn();
+    render(
+      <ReadinessSummary
+        diagrama={diagramaComDoisVermelhosEUmVerde()}
+        config={configComTech}
+        onSelecionar={() => {}}
+        regras={regrasComPadrao}
+        onAceitarViolacao={onAceitarViolacao}
+      />
+    );
+
+    await user.click(screen.getByTestId("conformidade-resumo"));
+    await user.click(screen.getAllByRole("button", { name: /Aceitar de propósito/ })[0]);
+
+    // Sem motivo não registra: exceção sem justificativa é só o vermelho
+    // desligado, que é o que a regra 3 existe para impedir.
+    const confirmar = screen.getAllByRole("button", { name: /Confirmar exceção/ })[0];
+    expect(confirmar).toBeDisabled();
+
+    await user.type(screen.getAllByLabelText(/Motivo para aceitar/)[0], "o parceiro não suporta menos");
+    await user.click(confirmar);
+
+    expect(onAceitarViolacao).toHaveBeenCalledWith(
+      expect.objectContaining({ campo: "nome" }),
+      "o parceiro não suporta menos"
+    );
+  });
+
+  it("§242 — violação com exceção sai do placar", () => {
+    const { rerender } = render(
+      <ReadinessSummary
+        diagrama={diagramaComDoisVermelhosEUmVerde()}
+        config={configComTech}
+        onSelecionar={() => {}}
+        regras={regrasComPadrao}
+      />
+    );
+    expect(screen.getByTestId("conformidade-resumo")).toBeInTheDocument();
+
+    rerender(
+      <ReadinessSummary
+        diagrama={diagramaComDoisVermelhosEUmVerde()}
+        config={configComTech}
+        onSelecionar={() => {}}
+        regras={regrasComPadrao}
+        excecoes={[{ noId: "n3", campo: "nome", motivo: "m", autor: "a", em: "2026-01-01T00:00:00.000Z" }]}
+      />
+    );
+    expect(screen.queryByTestId("conformidade-resumo")).not.toBeInTheDocument();
   });
 });

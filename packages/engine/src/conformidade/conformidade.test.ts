@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DiagramaConfig, RegrasConfig } from "../config/types.js";
 import type { Diagrama, No } from "../model/types.js";
-import { avaliarConformidade, violacoesDoNo } from "./conformidade.js";
+import { avaliarConformidade, violacoesAceitas, violacoesDoNo, violacoesEmAberto } from "./conformidade.js";
 import { derivar } from "../derive/derivar.js";
 
 const config: DiagramaConfig = {
@@ -242,6 +242,76 @@ describe("avaliarConformidade — o padrão virando régua (SPEC-57 fatia B)", (
 
       expect(avaliarConformidade(diagrama([no("f", { ttl: 100, backoff: 200 })]), config, semFator)).toHaveLength(1);
       expect(avaliarConformidade(diagrama([no("f", { ttl: 300, backoff: 200 })]), config, semFator)).toEqual([]);
+    });
+  });
+
+  describe("§242 — o padrão que ensina, e que aceita ser contrariado", () => {
+    const regrasComPorque: RegrasConfig = {
+      ...regras,
+      porTech: {
+        Integracao: {
+          checklistTecnico: [
+            {
+              texto: "Timeout de chamada externa",
+              contextos: [],
+              porque: "Veio do incidente de 2025: o parceiro travou e derrubou o checkout junto.",
+              checagem: { campo: "timeout", operador: "lte", valor: 500, unidade: "ms" },
+            },
+          ],
+          testes: [],
+        },
+      },
+    };
+
+    it("a violação carrega o PORQUÊ do padrão — cobrança sem lei publicada é multa", () => {
+      const [v] = avaliarConformidade(diagrama([no("gw", { timeout: 800 })]), config, regrasComPorque);
+      expect(v.porque).toContain("incidente de 2025");
+    });
+
+    it("exceção registrada tira do vermelho, mas NÃO do histórico", () => {
+      // Apagar a violação faria a decisão desaparecer junto — e o que se quer
+      // é o oposto: a exceção é o registro de que alguém decidiu.
+      const excecao = {
+        noId: "gw",
+        campo: "timeout",
+        motivo: "O parceiro não suporta menos que 800ms; acordado com o time de integração.",
+        autor: "silvio@exemplo",
+        em: "2026-08-15T10:00:00.000Z",
+      };
+      const violacoes = avaliarConformidade(diagrama([no("gw", { timeout: 800 })]), config, regrasComPorque, [
+        excecao,
+      ]);
+
+      expect(violacoes).toHaveLength(1);
+      expect(violacoes[0].excecao).toEqual(excecao);
+      expect(violacoesEmAberto(violacoes)).toEqual([]);
+      expect(violacoesAceitas(violacoes)).toHaveLength(1);
+    });
+
+    it("a exceção é do PAR nó+campo — não vale para outro nó nem para outro padrão", () => {
+      const excecao = { noId: "gw", campo: "timeout", motivo: "m", autor: "a", em: "2026-01-01T00:00:00.000Z" };
+      const violacoes = avaliarConformidade(
+        diagrama([no("gw", { timeout: 800 }), no("outro", { timeout: 900 })]),
+        config,
+        regrasComPorque,
+        [excecao]
+      );
+
+      expect(violacoesEmAberto(violacoes).map((v) => v.noId)).toEqual(["outro"]);
+    });
+
+    it("violação com exceção NÃO vira item derivado", () => {
+      // Gerar trabalho para o que alguém já resolveu conscientemente é o jeito
+      // mais rápido de ensinar a ignorar o backlog.
+      const d = diagrama([no("gw", { timeout: 800 })]);
+      const semExcecao = derivar(d, config, { regras: regrasComPorque });
+      expect(semExcecao.some((a) => a.chave.includes("::padrao::"))).toBe(true);
+
+      const comExcecao = derivar(d, config, {
+        regras: regrasComPorque,
+        excecoes: [{ noId: "gw", campo: "timeout", motivo: "m", autor: "a", em: "2026-01-01T00:00:00.000Z" }],
+      });
+      expect(comExcecao.some((a) => a.chave.includes("::padrao::"))).toBe(false);
     });
   });
 

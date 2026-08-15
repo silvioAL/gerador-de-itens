@@ -222,6 +222,16 @@ export interface Checagem {
 export interface Requisito {
   texto: string;
   contextos: string[];
+  /**
+   * §242 — POR QUE este padrão existe. A SPEC-56 §0.7 diz que a mesa deve
+   * ENSINAR o padrão, não só cobrá-lo: "forçar a decisão sem explicar produz
+   * obediência; explicar produz critério". Sem isto, uma violação é uma multa
+   * sem lei publicada.
+   *
+   * Uma frase, e de preferência com a história: "veio do incidente de cobrança
+   * dupla" convence mais que "é boa prática".
+   */
+  porque?: string;
   /** SPEC-57 fatia B — quando presente, este requisito é CONFERÍVEL. */
   checagem?: Checagem;
   /** Avaliada contra os nós de origem da atividade — o item aparece se

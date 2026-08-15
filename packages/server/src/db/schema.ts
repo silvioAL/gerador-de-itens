@@ -30,6 +30,12 @@ export const quebras = pgTable("quebras", {
    * de `respostasItens`: é uma coleção da quebra, sem consulta transversal
    * nenhuma que justifique tabela própria hoje. */
   necessidades: jsonb("necessidades").notNull().default([]),
+  /** §242 — as violações de padrão aceitas de propósito nesta quebra, com
+   * motivo e autor. jsonb pelo mesmo motivo de `necessidades`: coleção que
+   * pertence à quebra, sem consulta transversal hoje. Quando "quantas vezes
+   * este padrão foi violado na organização?" virar pergunta do PDCA, aí sim
+   * ela justifica tabela. */
+  excecoes: jsonb("excecoes").notNull().default([]),
   especificacao: text("especificacao"),
   especificacaoGeradaEm: timestamp("especificacao_gerada_em", { withTimezone: true }),
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
