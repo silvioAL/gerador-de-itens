@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import type { Quebra } from "@gerador/engine";
-import { useTour, passosDeConfiguracao, passosDoProduto } from "./useTour";
+import { useTour, passosDeConfiguracao, passosDoProduto, SEGUNDOS_PADRAO } from "./useTour";
 import type { Cenario } from "./scenarios";
 
 const cenarioMongo: Cenario = {
@@ -97,22 +97,43 @@ describe("useTour", () => {
     expect(result.current.passoAtual?.selector).toBe("[data-tour=review-table]");
   });
 
-  it("§236 — o tour de CONFIGURAÇÃO percorre as quatro telas que faltavam", () => {
-    // As quatro que a medição do §234 apontou e que não cabiam no tour do
-    // produto sem diluí-lo.
+  it("§252 — o tour de CONFIGURAÇÃO percorre TODAS as telas de administração", () => {
+    // O §236 dividiu os tours para o de produto não virar 25 passos com
+    // metade de administração; a deriva desfez isso em sete passos, e o §252
+    // devolveu. A lista aqui é a régua: tela de administração que não estiver
+    // neste tour não está em nenhum.
     const opts = montarOpts();
     const { result } = renderHook(() => useTour(opts, passosDeConfiguracao));
 
     act(() => result.current.iniciar());
     for (const [titulo, aba] of [
+      ["Contexto do produto", "produtos"],
+      ["Stacks conhecidas", "perfis"],
+      ["Padrões por componente", "campos"],
+      ["Campos por tipo de conexão", "camposAresta"],
+      ["Regras de refinamento", "regras"],
+      ["Modelos: documento e item", "especificacao"],
       ["Modelo de IA", "modeloIa"],
       ["Esteira de agentes", "pipeline"],
-      ["Regras de refinamento", "regras"],
-      ["Campos por tipo de conexão", "camposAresta"],
+      ["Níveis e acessos", "membros"],
+      ["Do item à issue", "exportacao"],
+      ["Melhoria contínua (PDCA)", "pdca"],
     ] as const) {
       andarAte(result, titulo);
       expect(opts.abrirConfigNaAba).toHaveBeenCalledWith(aba);
     }
+  });
+
+  it("§252 — e o tour do PRODUTO não abre tela de configuração nenhuma", () => {
+    // O outro lado da mesma régua: se um passo de administração vazar de volta
+    // para cá, a divisão derrete de novo, um passo por vez.
+    const opts = montarOpts();
+    const { result } = renderHook(() => useTour(opts));
+
+    act(() => result.current.iniciar());
+    for (let i = 0; i < 40 && result.current.ativo; i++) act(() => result.current.proximo());
+
+    expect(opts.abrirConfigNaAba).not.toHaveBeenCalled();
   });
 
   it("§236 — os dois tours são LISTAS diferentes, não o mesmo com filtro", () => {
@@ -213,11 +234,10 @@ describe("useTour", () => {
     andarAte(result, "Começar conversando");
     expect(opts.abrirConversa).toHaveBeenCalled();
 
-    andarAte(result, "Contexto do produto");
-    expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("produtos");
-
-    andarAte(result, "Do item à issue");
-    expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("exportacao");
+    // §252 — os outros dois elos de espinha (contexto do produto e a saída
+    // para o tracker) migraram para o tour de configuração, e são cobrados lá.
+    andarAte(result, "O documento de desenho");
+    expect(opts.abrirDocumento).toHaveBeenCalled();
   });
 
   it("§235 — a demonstração LIGA no primeiro dado falso e DESLIGA no fim", () => {
@@ -253,7 +273,7 @@ describe("useTour", () => {
 
   it("passa pela aba Stacks conhecidas, abrindo a tela de config na aba certa", () => {
     const opts = montarOpts();
-    const { result } = renderHook(() => useTour(opts));
+    const { result } = renderHook(() => useTour(opts, passosDeConfiguracao));
 
     act(() => result.current.iniciar());
     andarAte(result, "Stacks conhecidas");
@@ -272,25 +292,23 @@ describe("useTour", () => {
 
     andarAte(result, "Itens escritos");
     expect(opts.abrirItens).toHaveBeenCalled();
-
-    andarAte(result, "Melhoria contínua (PDCA)");
-    expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("pdca");
   });
 
   it("passa por Padrões por componente e pelos Modelos (documento e item), abrindo a aba certa em cada um", () => {
     const opts = montarOpts();
-    const { result } = renderHook(() => useTour(opts));
+    const { result } = renderHook(() => useTour(opts, passosDeConfiguracao));
 
     act(() => result.current.iniciar());
     andarAte(result, "Padrões por componente");
     expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("campos");
 
-    // SPEC-38 — o passo de autorizações entra ANTES dos modelos.
-    andarAte(result, "Níveis e acessos");
-    expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("membros");
-
+    // §252 — a ordem virou por ASSUNTO: o que os componentes declaram, as
+    // réguas e os modelos, depois a IA, e só então pessoas e saída.
     andarAte(result, "Modelos: documento e item");
     expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("especificacao");
+
+    andarAte(result, "Níveis e acessos");
+    expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("membros");
   });
 
   it("chegar ao último passo marca ultimo=true, fecha a tela de config, e avançar dele encerra o tour e fecha a revisão", () => {
@@ -322,5 +340,97 @@ describe("useTour", () => {
     expect(result.current.ativo).toBe(false);
     expect(result.current.passoAtual).toBeNull();
     expect(opts.fecharJornada).toHaveBeenCalled();
+  });
+});
+
+/**
+ * §252 — o tour ANDA SOZINHO.
+ *
+ * A demonstração automática existiu e foi removida no §243, porque ela e o
+ * tour faziam a mesma coisa por dois caminhos. Isto não a traz de volta: traz
+ * o comportamento dela para dentro do único mecanismo que sobrou.
+ */
+describe("useTour — o relógio (§252)", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("avança sozinho depois do tempo do passo, sem ninguém clicar", () => {
+    const { result } = renderHook(() => useTour(montarOpts()));
+    act(() => result.current.iniciar());
+    const primeiro = result.current.passoAtual?.titulo;
+
+    act(() => void vi.advanceTimersByTime(result.current.duracao));
+
+    expect(result.current.passoAtual?.titulo).not.toBe(primeiro);
+  });
+
+  it("cada passo dura o que ele pede — não um tempo único para todos", () => {
+    // Passo de transição e a tela do documento montado não merecem o mesmo
+    // tempo. Se todos durassem igual, o tour ou corre demais no que importa ou
+    // se arrasta no que não importa.
+    const passos = passosDoProduto(montarOpts());
+    const duracoes = new Set(passos.map((p) => p.segundos ?? SEGUNDOS_PADRAO));
+
+    expect(duracoes.size).toBeGreaterThan(1);
+    expect(passos.find((p) => p.titulo === "O documento de desenho")?.segundos).toBeGreaterThan(SEGUNDOS_PADRAO);
+  });
+
+  it("pausado, o relógio não anda — por mais que se espere", () => {
+    const { result } = renderHook(() => useTour(montarOpts()));
+    act(() => result.current.iniciar());
+    act(() => result.current.alternarPausa());
+    const parado = result.current.passoAtual?.titulo;
+
+    act(() => void vi.advanceTimersByTime(60_000));
+
+    expect(result.current.passoAtual?.titulo).toBe(parado);
+  });
+
+  it("despausar RECOMEÇA o tempo do passo, em vez de o passo sumir na cara", () => {
+    // Se o relógio continuasse de onde parou, quem pausa para ler perderia o
+    // passo um segundo depois de voltar — que é pior do que não pausar.
+    const { result } = renderHook(() => useTour(montarOpts()));
+    act(() => result.current.iniciar());
+    const duracao = result.current.duracao;
+
+    act(() => void vi.advanceTimersByTime(duracao - 200));
+    act(() => result.current.alternarPausa());
+    const titulo = result.current.passoAtual?.titulo;
+    act(() => result.current.alternarPausa());
+
+    act(() => void vi.advanceTimersByTime(duracao - 200));
+    expect(result.current.passoAtual?.titulo).toBe(titulo);
+
+    act(() => void vi.advanceTimersByTime(400));
+    expect(result.current.passoAtual?.titulo).not.toBe(titulo);
+  });
+
+  it("SEGURAR (ponteiro sobre a carta) para o relógio sem mexer na pausa", () => {
+    // São dois estados de propósito: com um só, mover o mouse até o botão de
+    // pausa já pausava e o clique DESPAUSAVA — o botão não funcionava, pelo
+    // motivo mais difícil de enxergar.
+    const { result } = renderHook(() => useTour(montarOpts()));
+    act(() => result.current.iniciar());
+    const titulo = result.current.passoAtual?.titulo;
+
+    act(() => result.current.segurar(true));
+    act(() => void vi.advanceTimersByTime(60_000));
+
+    expect(result.current.passoAtual?.titulo).toBe(titulo);
+    expect(result.current.pausado).toBe(false);
+
+    act(() => result.current.segurar(false));
+    act(() => void vi.advanceTimersByTime(result.current.duracao));
+    expect(result.current.passoAtual?.titulo).not.toBe(titulo);
+  });
+
+  it("o tour termina sozinho ao fim do último passo", () => {
+    const opts = montarOpts();
+    const { result } = renderHook(() => useTour(opts, () => passosDeConfiguracao(opts).slice(-1)));
+    act(() => result.current.iniciar());
+
+    act(() => void vi.advanceTimersByTime(60_000));
+
+    expect(result.current.ativo).toBe(false);
   });
 });

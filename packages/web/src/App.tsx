@@ -1603,6 +1603,11 @@ function AppCarregado({
           ultimo={tour.ultimo}
           onProximo={tour.proximo}
           onPular={tour.pular}
+          pausado={tour.pausado}
+          segurado={tour.segurado}
+          duracao={tour.duracao}
+          onAlternarPausa={tour.alternarPausa}
+          onSegurar={tour.segurar}
         />
       )}
 
@@ -1614,6 +1619,11 @@ function AppCarregado({
           ultimo={tourDeConfiguracao.ultimo}
           onProximo={tourDeConfiguracao.proximo}
           onPular={tourDeConfiguracao.pular}
+          pausado={tourDeConfiguracao.pausado}
+          segurado={tourDeConfiguracao.segurado}
+          duracao={tourDeConfiguracao.duracao}
+          onAlternarPausa={tourDeConfiguracao.alternarPausa}
+          onSegurar={tourDeConfiguracao.segurar}
         />
       )}
 
