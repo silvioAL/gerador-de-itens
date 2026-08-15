@@ -32,42 +32,69 @@ export interface Violacao {
   atual: string;
 }
 
-function descreverEsperado(c: Checagem): string {
-  const unidade = c.unidade ? c.unidade : "";
+/**
+ * §241 — o alvo da comparação: literal, outro campo, ou o produto de dois.
+ * `undefined` = não dá para afirmar nada (campo ausente ou não numérico), e
+ * nesse caso a checagem inteira se cala — mesmo tratamento do campo ausente.
+ */
+function alvoDa(c: Checagem, no: No): { valor: unknown; descricao: string } | undefined {
+  if (!c.valorDe) return { valor: c.valor, descricao: `${c.valor}${c.unidade ?? ""}` };
+
+  const base = numeroDe(no.spec[c.valorDe]?.valor);
+  if (base === undefined) return undefined;
+  if (!c.multiplicadoPor) return { valor: base, descricao: `${c.valorDe} (= ${base}${c.unidade ?? ""})` };
+
+  const fator = numeroDe(no.spec[c.multiplicadoPor]?.valor);
+  if (fator === undefined) return undefined;
+  return {
+    valor: base * fator,
+    // O nome dos campos E a conta: sem os nomes ninguém sabe o que mudar; sem
+    // o número ninguém sabe o quanto.
+    descricao: `${c.valorDe} × ${c.multiplicadoPor} (= ${base * fator}${c.unidade ?? ""})`,
+  };
+}
+
+function numeroDe(valor: unknown): number | undefined {
+  if (valor === undefined || valor === null || valor === "") return undefined;
+  const n = typeof valor === "number" ? valor : Number(valor);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function descreverEsperado(c: Checagem, alvo: string): string {
   switch (c.operador) {
     case "lte":
-      return `≤ ${c.valor}${unidade}`;
+      return `≤ ${alvo}`;
     case "lt":
-      return `< ${c.valor}${unidade}`;
+      return `< ${alvo}`;
     case "gte":
-      return `≥ ${c.valor}${unidade}`;
+      return `≥ ${alvo}`;
     case "gt":
-      return `> ${c.valor}${unidade}`;
+      return `> ${alvo}`;
     case "eq":
-      return `= ${c.valor}${unidade}`;
+      return `= ${alvo}`;
     case "ne":
-      return `≠ ${c.valor}${unidade}`;
+      return `≠ ${alvo}`;
     case "preenchido":
       return "preenchido";
   }
 }
 
 /** `undefined` = não dá para afirmar nada (campo ausente ou valor de outro tipo). */
-function satisfaz(c: Checagem, valor: unknown): boolean | undefined {
+function satisfaz(c: Checagem, valor: unknown, valorAlvo: unknown): boolean | undefined {
   if (c.operador === "preenchido") {
     return valor !== undefined && valor !== null && valor !== "";
   }
   if (valor === undefined || valor === null || valor === "") return undefined;
 
-  if (c.operador === "eq") return valor === c.valor;
-  if (c.operador === "ne") return valor !== c.valor;
+  if (c.operador === "eq") return valor === valorAlvo;
+  if (c.operador === "ne") return valor !== valorAlvo;
 
   // Comparação de ordem só faz sentido em número. Um campo de texto com
   // operador numérico é config incorreta, e o silêncio aqui é deliberado: o
   // lugar de reclamar disso é a validação de config, não o desenho de quem usa.
-  const n = typeof valor === "number" ? valor : Number(valor);
-  const alvo = typeof c.valor === "number" ? c.valor : Number(c.valor);
-  if (!Number.isFinite(n) || !Number.isFinite(alvo)) return undefined;
+  const n = numeroDe(valor);
+  const alvo = numeroDe(valorAlvo);
+  if (n === undefined || alvo === undefined) return undefined;
 
   switch (c.operador) {
     case "lte":
@@ -103,7 +130,12 @@ export function avaliarConformidade(
 
       for (const requisito of relevantes) {
         const c = requisito.checagem!;
-        const ok = satisfaz(c, no.spec[c.campo]?.valor);
+        const alvo = alvoDa(c, no);
+        // Alvo indeterminado (campo comparado ausente ou não numérico): a
+        // checagem se cala, como faz com o campo ausente. Acusar aqui seria
+        // acusar o desenho por um campo que a regra pressupõe e o tipo não tem.
+        if (!alvo && c.operador !== "preenchido") continue;
+        const ok = satisfaz(c, no.spec[c.campo]?.valor, alvo?.valor);
         if (ok === false) {
           violacoes.push({
             noId: no.id,
@@ -111,7 +143,7 @@ export function avaliarConformidade(
             tech,
             campo: c.campo,
             texto: requisito.texto,
-            esperado: descreverEsperado(c),
+            esperado: descreverEsperado(c, alvo?.descricao ?? ""),
             atual: String(no.spec[c.campo]?.valor ?? "—"),
           });
         }

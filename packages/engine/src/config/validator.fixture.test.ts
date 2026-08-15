@@ -47,7 +47,45 @@ describe("validateConfig — config/diagrama.example.json + config/app.example.j
         },
       },
     };
-    expect(validateRegras(semValor, app).some((e) => e.mensagem.includes("precisa de um valor"))).toBe(true);
+    // §241 mudou a mensagem: o alvo passou a poder ser outro CAMPO, então
+    // "precisa de um valor" virou "precisa de valor ou de valorDe".
+    expect(
+      validateRegras(semValor, app).some((e) => e.mensagem.includes('precisa de "valor" ou de "valorDe"'))
+    ).toBe(true);
+  });
+
+  it("§241 — recusa checagem sem alvo, com dois alvos, ou multiplicando o nada", () => {
+    const comChecagem = (checagem: unknown): RegrasConfig => ({
+      ...regras,
+      porTech: {
+        ...regras.porTech,
+        [Object.keys(regras.porTech)[0]]: {
+          ...regras.porTech[Object.keys(regras.porTech)[0]],
+          checklistTecnico: [{ texto: "x", contextos: [], checagem: checagem as never }],
+        },
+      },
+    });
+
+    // Nenhum alvo: nunca acusaria nada.
+    expect(
+      validateRegras(comChecagem({ campo: "ttl", operador: "gte" }), app).some((e) =>
+        e.mensagem.includes('precisa de "valor" ou de "valorDe"')
+      )
+    ).toBe(true);
+
+    // Dois alvos: a regra significaria coisas diferentes conforme quem lê.
+    expect(
+      validateRegras(comChecagem({ campo: "ttl", operador: "gte", valor: 1, valorDe: "backoff" }), app).some((e) =>
+        e.mensagem.includes("escolha um alvo")
+      )
+    ).toBe(true);
+
+    // Multiplicar sem ter o que multiplicar.
+    expect(
+      validateRegras(comChecagem({ campo: "ttl", operador: "gte", valor: 1, multiplicadoPor: "retry" }), app).some(
+        (e) => e.mensagem.includes("não há o que multiplicar")
+      )
+    ).toBe(true);
   });
 
   it("recusa type de campo inventado, dizendo quais existem", () => {

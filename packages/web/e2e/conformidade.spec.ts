@@ -4,6 +4,15 @@ import { entrar } from "./auth";
 const API = "http://localhost:4100";
 
 /**
+ * Os testes deste arquivo mexem no MESMO documento de regras (global, §239).
+ * Em paralelo, o `finally` de um restaura enquanto o outro ainda depende da
+ * regra que escreveu — e o sintoma é uma violação que simplesmente não
+ * aparece, sem nada apontar a causa. Mesma disciplina (e mesmo remédio) do
+ * `rbac-cadeado-e-pedido`: um por vez.
+ */
+test.describe.configure({ mode: "serial" });
+
+/**
  * SPEC-57 fatia B (§239) — o padrão virando régua, no navegador.
  *
  * O que só o navegador prova é a costura: o valor digitado no painel do
@@ -22,6 +31,65 @@ const API = "http://localhost:4100";
  * que já custou duas rodadas com a credencial de IA (§233). Time novo é
  * isolamento de graça, porque quem cria vira owner.
  */
+/**
+ * §241 — a contradição entre DOIS campos, no navegador.
+ *
+ * O que este teste guarda é a classe de defeito que nenhum campo isolado
+ * revela: TTL de 5s com 5 tentativas de 2s parece sensato em cada campo, e
+ * garante que a mensagem morre antes da última tentativa. Só a conta acusa.
+ */
+test("a relação entre DOIS campos vira violação, com o campo comparado na mensagem", async ({ page }) => {
+  test.setTimeout(90000);
+  await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
+  await page.route(
+    (url) => url.pathname === "/ia/status",
+    (rota) => rota.fulfill({ json: { modelosChat: [], embeddingInstalado: false, capacidades: {} } })
+  );
+  await entrar(page);
+
+  const antes = await (await page.request.get(`${API}/config/regras`)).json();
+  const documento = JSON.parse(JSON.stringify(antes.documento));
+  documento.porTech = documento.porTech ?? {};
+  documento.porTech.Backend = documento.porTech.Backend ?? { checklistTecnico: [], testes: [] };
+  documento.porTech.Backend.checklistTecnico = [
+    ...(documento.porTech.Backend.checklistTecnico ?? []),
+    // A regra é do TESTE, e exercita o mecanismo — não é política que um time
+    // real precise adotar. Kafka e não Rabbit porque os campos de retry do
+    // Rabbit só aparecem depois de DLQ + estratégia, que por sua vez dependem
+    // de uma aresta de consumo: montar isso pelo canvas testaria arrastar
+    // conexão, não conformidade.
+    {
+      texto: "Partições pelo menos iguais ao fator de replicação",
+      contextos: ["Backend-mensagens kafka"],
+      checagem: { campo: "particoes", operador: "gte", valorDe: "fatorReplicacao" },
+    },
+  ];
+  expect((await page.request.put(`${API}/config/regras`, { data: { documento } })).status()).toBe(200);
+
+  try {
+    await page.reload();
+    await page.getByRole("button", { name: "+ Tópico Kafka" }).click();
+    await page.locator(".react-flow__node", { hasText: "Tópico Kafka" }).click();
+
+    const painel = page.locator("aside");
+    await painel.getByRole("spinbutton", { name: "Fator de replicação" }).fill("3");
+
+    // Cada campo, sozinho, parece razoável — e a relação entre os dois não.
+    await painel.getByRole("spinbutton", { name: "Número de partições" }).fill("1");
+    const chip = page.getByTestId("conformidade-resumo");
+    await expect(chip).toContainText("1 fora do padrão");
+    // A mensagem traz o NOME do campo comparado e o valor dele: sem o nome
+    // ninguém sabe o que mudar; sem o número, o quanto.
+    await expect(chip).toHaveAttribute("title", /fatorReplicacao \(= 3\)/);
+
+    // Ajustar fecha a conta — a régua é sobre a RELAÇÃO, não sobre um valor.
+    await painel.getByRole("spinbutton", { name: "Número de partições" }).fill("6");
+    await expect(page.getByTestId("conformidade-resumo")).toHaveCount(0);
+  } finally {
+    await page.request.put(`${API}/config/regras`, { data: { documento: antes.documento } });
+  }
+});
+
 /**
  * Os obrigatórios da API Externa, para o portão de prontidão liberar a
  * derivação — vermelho bloqueia, e é assim que deve ser. Preenchidos por nome

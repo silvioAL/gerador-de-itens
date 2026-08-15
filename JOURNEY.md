@@ -7065,3 +7065,61 @@ faria o teste se adaptar em silêncio a uma mudança de contrato.
 regra sobre topologia. Os dois são incrementos sobre o mesmo `Checagem` — o
 primeiro precisa de uma checagem que leia DOIS campos, o segundo de uma que leia
 arestas.
+
+## 241. A contradição entre dois campos
+
+Último incremento da fatia B que cabia no mesmo `Checagem`: o alvo da
+comparação passou a poder ser **outro campo do nó**, opcionalmente
+multiplicado por um terceiro.
+
+**A classe de defeito que isso pega é a que nenhum campo isolado revela.** TTL
+de 5s numa fila com 5 tentativas de 2s: cada campo parece sensato sozinho, e
+juntos garantem que a mensagem morre antes da última tentativa. Ninguém percebe
+olhando um campo de cada vez — é exatamente o tipo de coisa que a mesa deveria
+pegar antes de virar código, e o exemplo que eu vinha citando desde a SPEC-56
+§0.2 sem ter como conferir.
+
+O requisito de retry/DLQ que já existia no `regras.example.json` **ganhou a
+régua, sem linha nova no checklist**: é a mesma decisão, agora conferível. Foi
+a mesma escolha do §239 com o timeout — padrão conferível é um atributo do
+requisito, não um item a mais para a pessoa ler.
+
+**A mensagem carrega os nomes E a conta:** `≥ backoffInicialMs × retries
+(= 10000ms)`. Sem os nomes ninguém sabe o que mudar; sem o número, o quanto.
+
+**Três invariantes que viraram teste:**
+
+- alvo indeterminado (campo comparado ausente ou não numérico) **cala** a
+  checagem, como já fazia com o campo ausente — acusar seria acusar o desenho
+  por um campo que a regra pressupõe e o tipo não tem;
+- a validação recusa checagem **sem alvo** (nunca acusaria nada), **com dois
+  alvos** (`valor` e `valorDe` juntos — a regra significaria coisas diferentes
+  conforme quem lê) e **multiplicando o nada**;
+- e a mensagem antiga ("precisa de um valor") mudou, então o teste do §239 que
+  a fixava mudou junto — teste que pina texto é contrato, e contrato se
+  atualiza de propósito, não por acidente.
+
+**Dois tropeços que valem mais que o código.**
+
+O primeiro: quis usar o Rabbit no E2E, porque é onde a regra é real. Os campos
+de retry dele só aparecem depois de DLQ + estratégia, que dependem de uma
+**aresta de consumo** — montar isso pelo canvas testaria arrastar conexão, não
+conformidade. Troquei por Kafka com uma regra declarada pelo próprio teste, e
+disse no comentário que a regra é do teste. A alternativa seria inventar uma
+regra de engenharia falsa só para o teste ficar conveniente.
+
+O segundo: os dois testes do arquivo disputavam o **mesmo documento global** de
+regras, e o `finally` de um restaurava enquanto o outro ainda dependia da regra
+que escreveu. O sintoma foi uma violação que simplesmente não aparecia, sem
+nada apontar a causa. Remédio: `test.describe.configure({ mode: "serial" })` —
+o mesmo do `rbac-cadeado-e-pedido`, pelo mesmo motivo. **Terceira vez que
+estado global compartilhado me morde nesta sequência** (credencial no §233,
+regras aqui, e o próprio §239 antes).
+
+254 engine · 517 web · 73/73 E2E · lint e build limpos.
+
+**O que fica de fora da fatia B, e por quê:** regra sobre TOPOLOGIA (fila sem
+consumidor, caminho sem alternativa). Não é extensão do `Checagem` — ela lê
+arestas, não campos, e teria outra forma. Enfiá-la no mesmo tipo criaria uma
+linguagem com duas gramáticas disfarçadas de uma. Ela pertence perto da fatia E
+(percurso), que é quando "caminho" passa a existir como conceito.

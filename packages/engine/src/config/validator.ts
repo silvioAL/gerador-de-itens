@@ -196,10 +196,27 @@ export function validateRegras(regras: RegrasConfig, app: AppConfig): ErroValida
             mensagem: `operador "${c.operador}" não existe (válidos: ${OPERADORES_CHECAGEM.join(", ")})`,
           });
         }
-        if (c.operador !== "preenchido" && c.valor === undefined) {
+        // §241 — o alvo da comparação é literal OU outro campo, nunca os dois
+        // nem nenhum. "Nenhum" nunca acusaria nada; "os dois" faria a regra
+        // significar coisas diferentes conforme quem lê.
+        if (c.operador !== "preenchido") {
+          if (c.valor === undefined && !c.valorDe) {
+            erros.push({
+              campo: `${caminho}.valor`,
+              mensagem: `operador "${c.operador}" precisa de "valor" ou de "valorDe" para comparar`,
+            });
+          }
+          if (c.valor !== undefined && c.valorDe) {
+            erros.push({
+              campo: `${caminho}.valor`,
+              mensagem: 'checagem tem "valor" e "valorDe" ao mesmo tempo — escolha um alvo de comparação',
+            });
+          }
+        }
+        if (c.multiplicadoPor && !c.valorDe) {
           erros.push({
-            campo: `${caminho}.valor`,
-            mensagem: `operador "${c.operador}" precisa de um valor para comparar`,
+            campo: `${caminho}.multiplicadoPor`,
+            mensagem: '"multiplicadoPor" só faz sentido junto de "valorDe" — não há o que multiplicar',
           });
         }
         if (!c.campo?.trim()) {

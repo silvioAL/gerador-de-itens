@@ -15,6 +15,8 @@ const config: DiagramaConfig = {
         { key: "timeout", label: "Timeout (ms)", type: "number" },
         { key: "retry", label: "Retries", type: "number" },
         { key: "dono", label: "Dono", type: "text" },
+        { key: "ttl", label: "TTL (ms)", type: "number" },
+        { key: "backoff", label: "Backoff (ms)", type: "number" },
       ],
     },
     // Mesma tech, spec SEM o campo da checagem — o caso que prova que a regra
@@ -167,6 +169,80 @@ describe("avaliarConformidade — o padrão virando régua (SPEC-57 fatia B)", (
     expect(avaliarConformidade(comRetry(3), config, comOperador("gt", 1))).toEqual([]);
     expect(avaliarConformidade(comRetry(3), config, comOperador("eq", 3))).toEqual([]);
     expect(avaliarConformidade(comRetry(3), config, comOperador("ne", 3))).toHaveLength(1);
+  });
+
+  describe("§241 — a contradição entre DOIS campos", () => {
+    // A classe de defeito que nenhum campo isolado revela: dois valores
+    // individualmente razoáveis que se contradizem. `ttl` de 5s com 5 retries
+    // de 2s parece sensato em cada campo, e garante que a mensagem morre antes
+    // da última tentativa.
+    const regrasTtl: RegrasConfig = {
+      ...regras,
+      porTech: {
+        Integracao: {
+          checklistTecnico: [
+            {
+              texto: "TTL maior que o tempo total de retry",
+              contextos: [],
+              checagem: {
+                campo: "ttl",
+                operador: "gte",
+                valorDe: "backoff",
+                multiplicadoPor: "retry",
+                unidade: "ms",
+              },
+            },
+          ],
+          testes: [],
+        },
+      },
+    };
+
+    it("acusa quando o produto dos dois campos passa do valor conferido", () => {
+      const violacoes = avaliarConformidade(
+        diagrama([no("fila", { ttl: 5000, backoff: 2000, retry: 5 })]),
+        config,
+        regrasTtl
+      );
+
+      expect(violacoes).toHaveLength(1);
+      // A mensagem traz os NOMES e a CONTA: sem os nomes ninguém sabe o que
+      // mudar; sem o número ninguém sabe o quanto.
+      expect(violacoes[0].esperado).toBe("≥ backoff × retry (= 10000ms)");
+      expect(violacoes[0].atual).toBe("5000");
+    });
+
+    it("não acusa quando a conta fecha", () => {
+      expect(
+        avaliarConformidade(diagrama([no("fila", { ttl: 12000, backoff: 2000, retry: 5 })]), config, regrasTtl)
+      ).toEqual([]);
+    });
+
+    it("campo comparado ausente CALA a checagem — não vira violação", () => {
+      // Acusar aqui seria acusar o desenho por um campo que a regra pressupõe
+      // e o tipo de nó não tem.
+      expect(avaliarConformidade(diagrama([no("fila", { ttl: 1 })]), config, regrasTtl)).toEqual([]);
+      expect(
+        avaliarConformidade(diagrama([no("fila", { ttl: 1, backoff: 2000 })]), config, regrasTtl)
+      ).toEqual([]);
+    });
+
+    it("sem `multiplicadoPor`, compara direto com o outro campo", () => {
+      const semFator: RegrasConfig = {
+        ...regras,
+        porTech: {
+          Integracao: {
+            checklistTecnico: [
+              { texto: "t", contextos: [], checagem: { campo: "ttl", operador: "gte", valorDe: "backoff" } },
+            ],
+            testes: [],
+          },
+        },
+      };
+
+      expect(avaliarConformidade(diagrama([no("f", { ttl: 100, backoff: 200 })]), config, semFator)).toHaveLength(1);
+      expect(avaliarConformidade(diagrama([no("f", { ttl: 300, backoff: 200 })]), config, semFator)).toEqual([]);
+    });
   });
 
   it("violacoesDoNo separa por nó — é o que o semáforo mostra no popover", () => {
