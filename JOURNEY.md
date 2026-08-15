@@ -7223,3 +7223,52 @@ ter feito: **cortar por intervalo pressupõe que o intervalo é homogêneo**, e
 código quase nunca é. Refiz removendo cada bloco por texto exato.
 
 514 web · 72/72 E2E (dois a menos, os da spec removida) · lint e build limpos.
+
+## 244. "Não vi nenhuma mudança" — a capacidade nascia dormente
+
+Feedback do usuário depois de sete rodadas construindo em cima da avaliação do
+SimArch: *"não entendi o que acabamos implementando, pois não vi nenhuma
+mudança"*.
+
+**Fui olhar o banco dele em vez de explicar.** 18 quebras, **zero** com
+necessidade declarada; documento de regras com **zero** `checagem`. Ou seja:
+tudo o que construí estava lá e invisível — e por decisão minha.
+
+**A primeira metade é desenho, e continua certa.** Cada dimensão nova só
+aparece quando é usada: sem necessidade declarada não há indicador de propósito;
+sem padrão conferível não há indicador de conformidade. Isso existe para não
+acusar quem nunca usou a régua (§230, §239). O preço é que quem não sabe que a
+régua existe nunca a vê. Aceito para o propósito (declarar necessidade é ato
+explícito de quem usa) — **inaceitável para a conformidade**, porque ali a régua
+vem do produto, não do usuário.
+
+**A segunda metade é defeito meu, e tem nome.** Eu adicionei a `checagem` ao
+`config/regras.example.json` acreditando que a capacidade "nasceria viva". Só
+que o documento de regras vive no BANCO desde a SPEC-36, e o arquivo só é
+template de primeira carga: **instalação existente nunca lê o arquivo de novo**.
+Então a fatia B inteira ficou dormente em toda instalação que já existia — que
+é 100% delas.
+
+O engraçado é que o produto **já tem** o mecanismo para exatamente isso: o
+diagnóstico do §108, que compara a config em uso com o template desta versão e
+**comenta sem sobrescrever**. Ele não pegou porque contava *entradas por seção*,
+e o padrão conferível é um **atributo** de um requisito que já existia — o
+`checklistTecnico` estava cheio, e o diagnóstico achou tudo em ordem.
+
+Corrigido: o resumo passa a contar `requisitosConferiveis`, e o mecanismo
+genérico faz o resto. Na stack do usuário, agora:
+
+> *A sua configuração de "regras" não tem nenhuma entrada de padrão conferível
+> (a régua que o motor avalia sozinho) (2 no padrão desta versão). Isso costuma
+> indicar um arquivo de uma versão anterior…*
+
+Aparece na aba **Regras de refinamento**, onde o alerta de config defasada já
+morava.
+
+**A régua que fica, e ela é maior que este conserto:** quando uma capacidade
+nova depende de config que já existe no banco, *acrescentar ao template não
+entrega nada*. Ou o diagnóstico acusa, ou a capacidade nasce morta — e ninguém
+descobre, porque o sintoma é ausência. Vale reler esta régua antes da fatia C e
+da E, que também vão querer campos novos em documentos já existentes.
+
+55 aplicação · 514 web · 72/72 E2E · lint e build limpos.

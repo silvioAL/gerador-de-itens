@@ -53,6 +53,19 @@ function contarRegras(documento: unknown): ResumoConfig {
       return total + (Array.isArray(lista) ? lista.length : 0);
     }, 0);
   }
+
+  // §244 — o padrão CONFERÍVEL (SPEC-57 fatia B) é um atributo do requisito,
+  // não uma seção nova. O diagnóstico contava entradas por seção, então uma
+  // config anterior à fatia B tinha `checklistTecnico` cheio e **zero**
+  // requisitos com `checagem` — e nada apontava. A capacidade nascia dormente
+  // em toda instalação existente, que é exatamente o defeito que este
+  // mecanismo (§108) foi criado para não deixar acontecer em silêncio.
+  resumo.requisitosConferiveis = Object.values(porTech).reduce((total, regrasDaTech) => {
+    const lista = (regrasDaTech as Record<string, unknown>)?.checklistTecnico;
+    if (!Array.isArray(lista)) return total;
+    return total + lista.filter((r) => (r as { checagem?: unknown })?.checagem).length;
+  }, 0);
+
   return resumo;
 }
 
@@ -86,6 +99,7 @@ const NOME_AMIGAVEL: Record<string, string> = {
   checklistProcesso: "checklist de processo",
   testes: "regras de teste",
   volumetria: "volumetria",
+  requisitosConferiveis: "padrão conferível (a régua que o motor avalia sozinho)",
   techs: "tecnologias",
   papeis: "papéis da esteira",
   papeisAtivos: "papéis ativos",

@@ -35,6 +35,11 @@ describe("diagnóstico de config desatualizada (SPEC-31 Fase 3)", () => {
       checklistProcesso: 1,
       testes: 2,
       volumetria: 1,
+      // §244 — o padrão conferível é ATRIBUTO do requisito, não seção. A
+      // fixture desta versão não tem nenhum, e é justamente por isso que ele
+      // precisa ser contado: config cheia de checklist e vazia de checagem era
+      // invisível para o diagnóstico.
+      requisitosConferiveis: 0,
     });
   });
 
@@ -48,6 +53,37 @@ describe("diagnóstico de config desatualizada (SPEC-31 Fase 3)", () => {
     ]);
     expect(diagnostico.mensagem).toContain("checklist técnico (3 no padrão desta versão)");
     expect(diagnostico.atual.testes).toBe(3);
+  });
+
+  it("§244 — acusa a config que tem checklist mas nenhum padrão CONFERÍVEL", () => {
+    // O caso real: toda instalação anterior à fatia B. O `checklistTecnico`
+    // está cheio, então o diagnóstico antigo achava tudo em ordem — e a
+    // conformidade nascia dormente, sem nada apontar.
+    const comChecagem = {
+      porTech: {
+        Backend: {
+          checklistTecnico: [
+            { texto: "Timeout", contextos: [], checagem: { campo: "t", operador: "lte", valor: 1 } },
+          ],
+          checklistProcesso: [],
+          testes: [],
+        },
+      },
+    };
+    const semChecagem = {
+      porTech: {
+        Backend: { checklistTecnico: [{ texto: "Timeout", contextos: [] }], checklistProcesso: [], testes: [] },
+      },
+    };
+
+    const diagnostico = diagnosticarConfig("regras", semChecagem, comChecagem);
+
+    expect(diagnostico.possivelmenteDesatualizada).toBe(true);
+    expect(diagnostico.secoesVazias).toContainEqual({ secao: "requisitosConferiveis", noTemplate: 1 });
+    expect(diagnostico.mensagem).toContain("padrão conferível");
+    // E não acusa o checklist, que está lá: o alerta é sobre o que falta, não
+    // sobre a config inteira.
+    expect(diagnostico.secoesVazias.some((s) => s.secao === "checklistTecnico")).toBe(false);
   });
 
   it("config em dia não vira alerta", () => {
