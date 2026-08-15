@@ -57,6 +57,31 @@ describe("DecisoesDoNo — o porquê ancorado no nó (SPEC-57 fatia C)", () => {
     expect(onAceitar).toHaveBeenCalledWith("d1");
   });
 
+  it("§253 — proposta de DEMONSTRAÇÃO leva a marca e não oferece aceite", () => {
+    // Botão que não faz nada é pior que botão ausente: foi o que produziu o
+    // "aceitei e o chip continua" do print. E §235: onde entra dado de
+    // demonstração, entra a marca — faltava justamente nas decisões.
+    const { onAceitar } = montar({
+      decisoes: [decisao({ id: "decisao-do-tour-2", status: "proposta", origem: "sugerido" })],
+      ehDeDemonstracao: (id) => id.startsWith("decisao-do-tour-"),
+    });
+
+    expect(screen.getByTestId("decisao-de-demonstracao")).toBeTruthy();
+    expect(screen.queryByTestId("aceitar-decisao-do-tour-2")).toBeNull();
+    expect(onAceitar).not.toHaveBeenCalled();
+  });
+
+  it("proposta REAL continua com o botão de aceite", () => {
+    const { onAceitar } = montar({
+      decisoes: [decisao({ id: "d-agente-1", status: "proposta", origem: "sugerido" })],
+      ehDeDemonstracao: (id) => id.startsWith("decisao-do-tour-"),
+    });
+
+    fireEvent.click(screen.getByTestId("aceitar-d-agente-1"));
+    expect(onAceitar).toHaveBeenCalledWith("d-agente-1");
+    expect(screen.queryByTestId("decisao-de-demonstracao")).toBeNull();
+  });
+
   it("decisão vigente sem porquê é apontada na cara, não escondida", () => {
     montar({ decisoes: [decisao({ id: "d1", porque: "" })] });
 

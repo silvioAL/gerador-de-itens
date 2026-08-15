@@ -7801,3 +7801,57 @@ gancho criado para o teste.
 a pausa e a retenção.
 
 316 engine · 567 web · 63 aplicação · 222 server · 75/75 E2E · build limpo.
+
+---
+
+## §253 — dois defeitos vistos em uso, e a causa comum de um deles
+
+Dois relatos com print, na mesma sessão.
+
+### 1. O campo de contexto espremido
+
+*"a barra de rolagem chega até o fim e o texto do último campo de texto é quase
+que tapado"* — o campo do contexto do épico aparecia com **uma linha**, com o
+texto cortado ao meio.
+
+Não era o rodapé cobrindo, que foi a primeira hipótese. O `textarea` é item de
+um flex column com altura definida, e **item flex encolhe por padrão**. Quando
+a lista de necessidades acima crescia, o campo era espremido a quase nada — em
+vez de o container rolar, que é exatamente para isso que ele tem `overflow:
+auto`. E `rows={8}` não protege: `rows` é altura *inicial*, não mínima.
+
+`flexShrink: 0` + `minHeight`. O teste é E2E e mede `boundingBox`, porque só o
+navegador faz layout: em jsdom, `rows={8}` continuaria escrito com o campo
+medindo 30 pixels, e conferir o estilo diria *"flexShrink está lá"* — não *"o
+campo tem tamanho"*.
+
+### 2. O chip "1 a decidir" que não sumia
+
+*"aceitei uma decisão proposta pelo agente e segue aparecendo o chip de
+pendente"*.
+
+A causa não estava no aceite, e sim na **saída do tour**. `ligarDemonstracao
+(false)` morava no `onEnter` do último passo — o que só cobre quem chega até o
+fim. **Quem PULAVA saía com a demonstração ligada**, e `DECISOES_DO_TOUR` (que
+tem uma proposta, de propósito, para ensinar a regra 2) continuava misturada
+aos dados de uma sessão real. Aceitá-la não fazia nada: o aceite grava em
+`quebra.decisoes`, e ela não vive lá.
+
+Dois consertos, em níveis diferentes:
+
+- **a garantia é da SAÍDA, não de um passo.** Passo pode não ser alcançado;
+  saída sempre acontece. `pular` e o fim do percurso desligam a demonstração;
+- **proposta de demonstração não oferece aceite**, e ganha a marca. Botão que
+  não faz nada é pior que botão ausente — e o §235 já mandava marcar todo dado
+  de demonstração. Eu não tinha marcado as decisões quando as criei no §246,
+  e essa omissão é metade do motivo de alguém tentar aceitar uma que não é sua.
+
+**A régua que fica:** dado de demonstração precisa de duas garantias, não uma —
+que ele **saia** (em toda saída, não na feliz) e que, enquanto está na tela, ele
+**se identifique**. Faltando qualquer uma, ele vira dado real na cabeça de quem
+está olhando.
+
+**Mordidas:** tirar `encerrar()` do `pular` → dois vermelhos; tirar a marca de
+demonstração → um. Ambas falham pelo motivo certo.
+
+316 engine · 572 web · 63 aplicação · 222 server · 76/76 E2E · build limpo.

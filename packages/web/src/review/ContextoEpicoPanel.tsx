@@ -193,6 +193,17 @@ export function ContextoEpicoPanel({
               fontFamily: "inherit",
               resize: "vertical",
               boxSizing: "border-box",
+              // §253 — ACHADO REAL (print do usuário): o campo aparecia com uma
+              // linha e o texto cortado ao meio.
+              //
+              // Não era sobreposição do rodapé: este `textarea` é item de um
+              // flex column com altura definida, e item flex ENCOLHE por padrão
+              // (`flex-shrink: 1`). Quando as necessidades acima cresciam, ele
+              // era espremido a quase nada — em vez de o container rolar, que é
+              // para isso que ele tem `overflow: auto`. `rows={8}` não protege:
+              // rows é altura *inicial*, não mínima.
+              flexShrink: 0,
+              minHeight: 140,
             }}
           />
 

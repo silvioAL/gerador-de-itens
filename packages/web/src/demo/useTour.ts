@@ -410,12 +410,30 @@ export function useTour(opts: UseTourOpts, montarPassos: (o: UseTourOpts) => Pas
     passos[0].onEnter?.();
   }
 
+  /**
+   * §253 — ACHADO REAL: **toda** saída do tour desliga a demonstração.
+   *
+   * Antes isso morava no `onEnter` do último passo, o que só cobria quem
+   * chegasse até o fim. Quem PULAVA saía com a demonstração ligada — e o dado
+   * de demonstração continuava na tela de uma sessão real. O sintoma que o
+   * usuário viu: um chip "1 a decidir" que não sumia nunca, porque a proposta
+   * era do tour e o aceite grava em `quebra.decisoes`, onde ela não existe.
+   *
+   * A garantia é da SAÍDA, não de um passo. Passo pode não ser alcançado;
+   * saída sempre acontece.
+   */
+  function encerrar() {
+    opts.ligarDemonstracao(false);
+    setPassoIndice(null);
+  }
+
   function proximo() {
     setPassoIndice((atual) => {
       if (atual === null) return null;
       const proximoIndice = atual + 1;
       if (proximoIndice >= passos.length) {
         opts.fecharRevisao();
+        opts.ligarDemonstracao(false);
         return null;
       }
       passos[proximoIndice].onEnter?.();
@@ -425,7 +443,7 @@ export function useTour(opts: UseTourOpts, montarPassos: (o: UseTourOpts) => Pas
 
   function pular() {
     opts.fecharJornada();
-    setPassoIndice(null);
+    encerrar();
   }
 
   const passoAtual = passoIndice !== null ? passos[passoIndice] : null;

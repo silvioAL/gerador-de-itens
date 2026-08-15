@@ -434,3 +434,49 @@ describe("useTour — o relógio (§252)", () => {
     expect(result.current.ativo).toBe(false);
   });
 });
+
+/**
+ * §253 — ACHADO REAL, relatado com print: um chip "1 a decidir" que não sumia
+ * por mais que a pessoa aceitasse a decisão.
+ *
+ * A causa não estava no aceite. Estava na SAÍDA do tour: `pular` não desligava
+ * a demonstração, então `DECISOES_DO_TOUR` — que tem uma proposta — continuava
+ * misturada aos dados reais de uma sessão real. E aceitar aquela proposta não
+ * fazia nada, porque o aceite grava em `quebra.decisoes` e ela não vive lá.
+ */
+describe("useTour — a demonstração NUNCA sobrevive ao tour (§253)", () => {
+  it("pular desliga a demonstração", () => {
+    const opts = montarOpts();
+    const { result } = renderHook(() => useTour(opts));
+    act(() => result.current.iniciar());
+
+    act(() => result.current.pular());
+
+    expect(opts.ligarDemonstracao).toHaveBeenCalledWith(false);
+  });
+
+  it("chegar ao fim clicando também desliga", () => {
+    const opts = montarOpts();
+    const { result } = renderHook(() => useTour(opts));
+    act(() => result.current.iniciar());
+    for (let i = 0; i < 40 && result.current.ativo; i++) act(() => result.current.proximo());
+
+    expect(result.current.ativo).toBe(false);
+    expect(opts.ligarDemonstracao).toHaveBeenCalledWith(false);
+  });
+
+  it("pular NO MEIO — que é quando o defeito aparecia — também desliga", () => {
+    // O último passo desligava no `onEnter`, e quem saía antes levava o dado
+    // de demonstração junto. Passo pode não ser alcançado; saída sempre é.
+    const opts = montarOpts();
+    const { result } = renderHook(() => useTour(opts));
+    act(() => result.current.iniciar());
+    act(() => result.current.proximo());
+    act(() => result.current.proximo());
+    expect(opts.ligarDemonstracao).not.toHaveBeenCalledWith(false);
+
+    act(() => result.current.pular());
+
+    expect(opts.ligarDemonstracao).toHaveBeenCalledWith(false);
+  });
+});
