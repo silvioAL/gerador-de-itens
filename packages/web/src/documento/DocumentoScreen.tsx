@@ -142,7 +142,22 @@ export function DocumentoScreen({
               data-testid="documento-diagrama"
               title="Diagrama da solução"
               srcDoc={diagramaHtml}
-              style={{ width: "100%", height: 460, border: "1px solid var(--borda)", borderRadius: 12 }}
+              // §254 — o diagrama ESCAPA da coluna de leitura.
+              //
+              // A largura de ~46rem é a régua certa para TEXTO, e errada para
+              // um desenho: espremido nela, o gerador (SPEC-21) empilhava o
+              // cabeçalho numa coluna de três letras e cortava o botão
+              // "Reproduzir em sequência" na borda. Desenho não é parágrafo, e
+              // obrigá-lo à medida do parágrafo não deixa nada legível.
+              style={{
+                width: "min(1100px, calc(100vw - 48px))",
+                marginLeft: "50%",
+                transform: "translateX(-50%)",
+                height: 560,
+                border: "1px solid var(--borda)",
+                borderRadius: 12,
+                background: "var(--painel)",
+              }}
             />
           ) : (
             <Vazio texto="Sem diagrama nesta demanda ainda." />
