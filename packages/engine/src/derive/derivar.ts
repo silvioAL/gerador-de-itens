@@ -7,10 +7,14 @@ import type {
   Tamanho,
   TipoItem,
 } from "../model/types.js";
-import type { DiagramaConfig, EdgeTypeConfig, NodeTypeConfig } from "../config/types.js";
+import type { DiagramaConfig, EdgeTypeConfig, NodeTypeConfig, RegrasConfig } from "../config/types.js";
+import { avaliarConformidade } from "../conformidade/conformidade.js";
 
 export interface ContextoQuebra {
   time?: string;
+  /** §240 — as regras do time. Sem elas não há padrão a conferir, e a
+   * derivação é exatamente a de antes. */
+  regras?: RegrasConfig;
 }
 
 /** Sufixo da chave da atividade de criação, por kind de `derives`. */
@@ -207,6 +211,42 @@ function rotular(atividades: Atividade[]): Atividade[] {
 }
 
 /** Diagrama (nós + arestas) → lista de atividades, na ordem de nodes[] seguida de edges[]. */
+/**
+ * §240 — o padrão chegando ao ITEM. Cada violação vira uma atividade, com o
+ * esperado e o atual na descrição: sem os dois números, quem for implementar
+ * tem que voltar ao desenho para descobrir o que ajustar.
+ *
+ * Duas decisões que valem registro:
+ *
+ * - **`Débito Técnico` só quando o nó já EXISTE.** Num nó novo o valor fora do
+ *   padrão ainda não foi construído — é decisão a corrigir, não dívida
+ *   herdada, e chamar tudo de débito esvazia a palavra.
+ * - **`independent`.** A correção não depende de nada declarado; inventar uma
+ *   ordem que ninguém escreveu seria pior que não ter ordem.
+ */
+function derivarConformidade(
+  diagrama: Diagrama,
+  config: DiagramaConfig,
+  quebra: ContextoQuebra
+): Atividade[] {
+  return avaliarConformidade(diagrama, config, quebra.regras).map((v) => {
+    const no = diagrama.nodes.find((n) => n.id === v.noId)!;
+    const cfg = config.nodeTypes[no.type];
+    return {
+      chave: `${v.noId}::padrao::${v.campo}`,
+      rotulo: "",
+      tipo: (no.status === "existente" ? "Débito Técnico" : "Task") as TipoItem,
+      tamanho: "PP" as Tamanho,
+      descricao: `Ajustar ${v.campo} de ${v.noLabel} para ${v.esperado} — está ${v.atual}. Padrão: ${v.texto}.`,
+      techs: [v.tech],
+      contextos: cfg?.contextos ?? [],
+      dependencias: [{ type: "independent" as const }],
+      origem: { nodeId: v.noId },
+      timesEnvolvidos: temposEnvolvidos([no], quebra),
+    };
+  });
+}
+
 export function derivar(
   diagrama: Diagrama,
   config: DiagramaConfig,
@@ -214,5 +254,6 @@ export function derivar(
 ): Atividade[] {
   const doNodes = diagrama.nodes.flatMap((no) => derivarNo(no, config, quebra));
   const doEdges = diagrama.edges.flatMap((edge) => derivarEdge(edge, diagrama, config, quebra));
-  return rotular([...doNodes, ...doEdges]);
+  const doPadrao = derivarConformidade(diagrama, config, quebra);
+  return rotular([...doNodes, ...doEdges, ...doPadrao]);
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { DiagramaConfig, RegrasConfig } from "../config/types.js";
 import type { Diagrama, No } from "../model/types.js";
 import { avaliarConformidade, violacoesDoNo } from "./conformidade.js";
+import { derivar } from "../derive/derivar.js";
 
 const config: DiagramaConfig = {
   nodeTypes: {
@@ -178,5 +179,53 @@ describe("avaliarConformidade — o padrão virando régua (SPEC-57 fatia B)", (
     expect(violacoes).toHaveLength(2);
     expect(violacoesDoNo(violacoes, "a")).toHaveLength(1);
     expect(violacoesDoNo(violacoes, "b")).toHaveLength(0);
+  });
+});
+
+/**
+ * §240 — o padrão chegando ao ITEM. Enquanto a violação só existia no placar,
+ * ela morria na tela: quem implementa lê o backlog, não o desenho.
+ */
+describe("derivar — violação de padrão vira item", () => {
+  it("cada violação vira uma atividade com o esperado E o atual na descrição", () => {
+    const atividades = derivar(diagrama([no("gateway", { timeout: 800 })]), config, { regras });
+
+    const doPadrao = atividades.filter((a) => a.chave.includes("::padrao::"));
+    expect(doPadrao).toHaveLength(1);
+    expect(doPadrao[0].chave).toBe("gateway::padrao::timeout");
+    // Os dois números: sem eles quem implementa volta ao desenho pra descobrir
+    // o que ajustar.
+    expect(doPadrao[0].descricao).toContain("≤ 500ms");
+    expect(doPadrao[0].descricao).toContain("está 800");
+    expect(doPadrao[0].descricao).toContain("Timeout de chamada externa");
+    expect(doPadrao[0].origem).toEqual({ nodeId: "gateway" });
+  });
+
+  it("sem regras, a derivação é EXATAMENTE a de antes", () => {
+    const semRegras = derivar(diagrama([no("n1", { timeout: 9999 })]), config, {});
+    expect(semRegras.some((a) => a.chave.includes("::padrao::"))).toBe(false);
+  });
+
+  it("dentro do padrão não gera item — a régua é sobre o valor", () => {
+    const atividades = derivar(diagrama([no("n1", { timeout: 300 })]), config, { regras });
+    expect(atividades.some((a) => a.chave.includes("::padrao::"))).toBe(false);
+  });
+
+  it("é Débito Técnico só quando o nó JÁ EXISTE; no nó novo é Task", () => {
+    // Num nó novo o valor fora do padrão ainda não foi construído — é decisão
+    // a corrigir, não dívida herdada. Chamar tudo de débito esvazia a palavra.
+    const novo = derivar(diagrama([no("n1", { timeout: 800 })]), config, { regras });
+    expect(novo.find((a) => a.chave.includes("::padrao::"))?.tipo).toBe("Task");
+
+    const existente: No = { ...no("n2", { timeout: 800 }), status: "existente" };
+    const herdado = derivar(diagrama([existente]), config, { regras });
+    expect(herdado.find((a) => a.chave.includes("::padrao::"))?.tipo).toBe("Débito Técnico");
+  });
+
+  it("a chave é estável — regerar não duplica nem renomeia", () => {
+    const d = diagrama([no("gateway", { timeout: 800 }), no("outro", { timeout: 700 })]);
+    const primeira = derivar(d, config, { regras }).map((a) => a.chave);
+    const segunda = derivar(d, config, { regras }).map((a) => a.chave);
+    expect(segunda).toEqual(primeira);
   });
 });

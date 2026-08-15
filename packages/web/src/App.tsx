@@ -517,7 +517,13 @@ function AppCarregado({
         if (r.momento) setEntrevistaPdca(r.ultimosItens);
       })
       .catch(() => {});
-    const atividades = derivar(quebra.diagrama, diagramaConfig, { time: quebra.time });
+    // §240 — as regras entram na derivação: é delas que saem os itens de
+    // conformidade. Sem passá-las aqui, a violação apareceria no placar e
+    // nunca chegaria ao backlog, que é justamente onde ela precisa chegar.
+    const atividades = derivar(quebra.diagrama, diagramaConfig, {
+      time: quebra.time,
+      regras: regrasConfig,
+    });
     setResultado(resolverDependencias(atividades));
     setPedindoNomeDaDemanda(false);
     if (salvarDepois) setAutoSalvarPendente(true);
