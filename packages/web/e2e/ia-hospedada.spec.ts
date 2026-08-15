@@ -435,3 +435,53 @@ test("o agente propõe o propósito, e o delta mostra o trabalho que aceitar cri
   await janela.getByRole("button", { name: "Salvar" }).click();
   await expect(page.getByTestId("proposito-resumo")).toBeVisible();
 });
+
+
+/**
+ * SPEC-57 fatia C (M4) — o agente PROPÕE decisões lendo o desenho medido.
+ *
+ * As unidades provam o pedido e o painel em separado. O que só o navegador
+ * prova é a costura inteira: o botão monta o pedido com a medição do motor,
+ * atravessa Fastify e gateway, o SSE volta, a proposta vira `status: proposta`
+ * na tela — e continua não valendo nada até alguém aceitar. Foi um vão desse
+ * tamanho que o §231 pagou caro (o `.text()` no lugar do streaming).
+ */
+test("o agente propõe uma decisão a partir do desenho, e ela não vale nada até ser aceita", async ({ page }) => {
+  test.setTimeout(90000);
+  await entrar(page);
+
+  await page.getByRole("button", { name: "+ Serviço", exact: true }).click();
+  await expect(page.locator(".react-flow__node")).toHaveCount(1);
+  await page.locator(".react-flow__node").first().click();
+
+  const painel = page.locator("aside");
+  const decisoes = painel.getByTestId("decisoes-do-no");
+  await expect(decisoes).toContainText("Nenhuma decisão registrada");
+
+  await decisoes.getByTestId("pedir-decisao-ao-agente").click();
+
+  // Diagnóstico no lugar certo: se o agente falhou, o painel diz — e é isso
+  // que precisa aparecer no relatório, não um "element not found" mudo.
+  await expect
+    .poll(async () => (await painel.innerText()).slice(0, 800), { timeout: 30000 })
+    .toContain(MARCA_GATEWAY_FALSO);
+
+  const proposta = painel.getByTestId("decisao-proposta").first();
+  await expect(proposta).toBeVisible();
+  await expect(proposta).toContainText("proposta");
+
+  // A régua da fatia: proposta sem alternativa descartada seria opinião
+  // vestida de decisão — o produto a descartaria antes de chegar aqui. Duas
+  // riscadas e não uma porque a "escolhida" do dublê não casa com nenhum
+  // título; o que importa é que as descartadas ATRAVESSARAM e são exibidas.
+  expect(await proposta.locator("s").count()).toBeGreaterThan(0);
+
+  // Regra 2 na tela: enquanto ninguém aceitou, o placar cobra em vez de contar.
+  await expect(page.getByTestId("decisoes-resumo")).toContainText("a decidir");
+  await expect(painel.getByTestId("decisao-vigente")).toHaveCount(0);
+
+  // Aceitar é ato da pessoa — e só aí ela passa a valer.
+  await proposta.getByRole("button", { name: "aceitar esta decisão" }).click();
+  await expect(painel.getByTestId("decisao-vigente")).toHaveCount(1);
+  await expect(painel.getByTestId("decisao-proposta")).toHaveCount(0);
+});

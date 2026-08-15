@@ -98,7 +98,14 @@ function schemaPedido(corpo: CorpoChat): unknown | null {
 function preencher(schema: unknown, caminho = "", sufixo = ""): unknown {
   const s = (schema ?? {}) as Record<string, unknown>;
   if (Array.isArray(s.enum)) return s.enum[0];
-  if (s.type === "array") return [preencher(s.items, `${caminho}[0]`, sufixo)];
+  if (s.type === "array") {
+    // `minItems` importa: a fatia C pede DUAS alternativas por decisão, e um
+    // dublê que devolve sempre um item faria o produto descartar a proposta
+    // inteira — o teste falharia por culpa do dublê, não do código. Cada item
+    // recebe índice próprio no caminho para os valores não saírem iguais.
+    const minimo = typeof s.minItems === "number" && s.minItems > 0 ? s.minItems : 1;
+    return Array.from({ length: minimo }, (_, i) => preencher(s.items, `${caminho}[${i}]`, sufixo));
+  }
   if (s.type === "boolean") return true;
   if (s.type === "number" || s.type === "integer") return 1;
   if (s.type === "object" || s.properties) {

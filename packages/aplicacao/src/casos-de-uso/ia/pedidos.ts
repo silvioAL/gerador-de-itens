@@ -714,6 +714,140 @@ export function montarPedidoConfigurarConversa({ mensagens, resumoConfig }: Entr
   return { prompt, esquema };
 }
 
+const MAX_DECISOES = 4;
+
+export interface EntradaDecisoes {
+  contextoEpico?: string;
+  contextoDoProduto?: string;
+  /** Os nós do desenho, com o que já está preenchido neles. */
+  componentes?: { id: string; rotulo: string; tipo: string; campos?: string }[];
+  /** §239 — o que o MOTOR já mediu: o desenho fora do padrão, com o porquê do
+   * padrão. É a diferença entre um agente que opina e um que explica. */
+  violacoes?: { noId: string; campo: string; esperado: string; atual: string; porque?: string }[];
+  /** SPEC-57 fatia A — propósitos sem componente que responda por eles. */
+  lacunas?: string[];
+  /** O que já foi decidido — para o agente não re-litigar decisão tomada. */
+  jaDecididas?: string[];
+}
+
+/**
+ * SPEC-57 fatia C (M4/M5) — o agente PROPÕE decisões a partir do desenho
+ * **medido**.
+ *
+ * A tese da SPEC-56 §0.7 é que o motor mede, o agente explica e a pessoa
+ * decide. Este pedido é o elo do meio, e três disciplinas o separam de "gerar
+ * ADRs com IA":
+ *
+ * 1. **Ele recebe a MEDIÇÃO, não só o desenho.** As violações de padrão (com o
+ *    porquê de cada padrão) e as lacunas de propósito entram no prompt. Um
+ *    agente que só vê o diagrama produz decisão genérica de blog; um que vê o
+ *    que está fora da régua produz decisão sobre este desenho.
+ * 2. **Ele é obrigado a dar as alternativas descartadas.** `minItems: 2` no
+ *    esquema, e não é formalidade: proposta com uma opção só é a opinião do
+ *    modelo vestida de decisão, e a pessoa não teria contra o que pesar.
+ * 3. **Nada disso conta ao chegar.** Vira `status: "proposta"`, `origem:
+ *    "sugerido"` — não vai à spec, não conta no placar de vigentes, e o
+ *    `porque` passa a ser de quem aceitar.
+ *
+ * Lista vazia é resposta correta e está dito no prompt: desenho sem escolha
+ * real em aberto não deve produzir decisão inventada para preencher a cota.
+ */
+export function montarPedidoDecisoes(entrada: EntradaDecisoes): PedidoIa {
+  const {
+    contextoEpico,
+    contextoDoProduto,
+    componentes = [],
+    violacoes = [],
+    lacunas = [],
+    jaDecididas = [],
+  } = entrada;
+
+  if (componentes.length === 0) {
+    throw new PedidoInvalido(
+      "não há componentes no desenho — decisão de arquitetura se ancora em um elemento; desenhe antes de pedir"
+    );
+  }
+
+  const idsDeComponente = componentes.map((c) => c.id);
+
+  const esquema = {
+    type: "object",
+    properties: {
+      decisoes: {
+        type: "array",
+        maxItems: MAX_DECISOES,
+        items: {
+          type: "object",
+          properties: {
+            noId: { enum: idsDeComponente },
+            titulo: { type: "string" },
+            contexto: { type: "string" },
+            alternativas: {
+              type: "array",
+              // Duas é a régua da fatia C: com uma só isto é um campo com
+              // comentário, não uma decisão.
+              minItems: 2,
+              maxItems: 4,
+              items: {
+                type: "object",
+                properties: { titulo: { type: "string" }, consequencia: { type: "string" } },
+                required: ["titulo", "consequencia"],
+              },
+            },
+            escolhida: { type: "string" },
+            porque: { type: "string" },
+          },
+          required: ["noId", "titulo", "alternativas", "escolhida", "porque"],
+        },
+      },
+    },
+    required: ["decisoes"],
+  } as EsquemaJson;
+
+  const prompt = [
+    `Você ajuda um time a registrar POR QUE o desenho é como é.`,
+    `Proponha DECISÕES DE ARQUITETURA para este desenho — escolhas entre alternativas, ancoradas em um componente.`,
+    ``,
+    ...(contextoDoProduto?.trim() ? [`Produto:`, contextoDoProduto.trim(), ``] : []),
+    ...(contextoEpico?.trim() ? [`Demanda:`, contextoEpico.trim(), ``] : []),
+    `Componentes desenhados (use exclusivamente estes ids em "noId"):`,
+    ...componentes.map((c) => `- ${c.id}: ${c.rotulo} (${c.tipo})${c.campos ? ` — ${c.campos}` : ""}`),
+    ``,
+    // O que o motor JÁ MEDIU. É isto que faz a proposta ser sobre este desenho
+    // e não sobre arquitetura em geral.
+    ...(violacoes.length > 0
+      ? [
+          `O motor já mediu e apontou fora do padrão:`,
+          ...violacoes.map(
+            (v) =>
+              `- ${v.noId}.${v.campo}: esperado ${v.esperado}, está ${v.atual}${v.porque ? ` — o padrão existe porque: ${v.porque}` : ""}`
+          ),
+          ``,
+        ]
+      : []),
+    ...(lacunas.length > 0
+      ? [`Propósitos ainda sem componente que responda por eles:`, ...lacunas.map((l) => `- ${l}`), ``]
+      : []),
+    ...(jaDecididas.length > 0
+      ? [`Já decidido (NÃO proponha de novo, nem o contrário sem motivo novo):`, ...jaDecididas.map((t) => `- ${t}`), ``]
+      : []),
+    `Regras:`,
+    `- Decisão é escolha ENTRE ALTERNATIVAS. Preencher um campo NÃO é decisão:`,
+    `  "definir timeout = 300ms" é valor, não ADR. "fila em vez de chamada síncrona" é ADR.`,
+    `- Cada proposta precisa de pelo menos DUAS alternativas, e cada descartada precisa da`,
+    `  "consequencia": o que custaria escolhê-la. É contra isso que a pessoa vai pesar a sua escolha.`,
+    `- "porque" é a razão que ainda vai valer daqui a um ano — o trade-off, não a repetição do título.`,
+    `- Prefira decisões que expliquem o que o motor apontou acima: um desenho fora do padrão ou é erro`,
+    `  (e vira correção) ou é escolha consciente (e vira decisão com motivo). Diga qual dos dois você acha.`,
+    `- Se não houver escolha real em aberto, devolva "decisoes" VAZIA. Lista vazia é resposta correta;`,
+    `  decisão inventada para preencher cota faz a pessoa parar de ler todas.`,
+    `- No máximo ${MAX_DECISOES}.`,
+    `- Responda em português.`,
+  ].join("\n");
+
+  return { prompt, esquema };
+}
+
 const MAX_NECESSIDADES = 8;
 
 export interface EntradaNecessidades {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { act, render, screen, fireEvent } from "@testing-library/react";
 import type { Decisao } from "@gerador/engine";
 import { DecisoesDoNo } from "./DecisoesDoNo";
 
@@ -117,6 +117,60 @@ describe("DecisoesDoNo — o porquê ancorado no nó (SPEC-57 fatia C)", () => {
 
     expect(onSubstituir).toHaveBeenCalled();
     expect(onSubstituir.mock.calls[0][0]).toBe("d1");
+  });
+
+  it("sem o callback do agente, o botão nem existe — e com ele, mostra que está lendo", async () => {
+    montar();
+    expect(screen.queryByTestId("pedir-decisao-ao-agente")).toBeNull();
+
+    let liberar: () => void = () => {};
+    const onPedirAoAgente = vi.fn(() => new Promise<void>((r) => (liberar = r)));
+    render(
+      <DecisoesDoNo
+        noId="n1"
+        decisoes={[]}
+        autor="silvio@exemplo"
+        onRegistrar={vi.fn()}
+        onAceitar={vi.fn()}
+        onSubstituir={vi.fn()}
+        onPedirAoAgente={onPedirAoAgente}
+      />
+    );
+
+    const botao = screen.getByTestId("pedir-decisao-ao-agente") as HTMLButtonElement;
+    fireEvent.click(botao);
+    // O rótulo diz o que ele LÊ, não só que está carregando: é a tese da
+    // SPEC-56 §0.7 na tela — o motor mede, o agente explica.
+    expect(screen.getByTestId("pedir-decisao-ao-agente").textContent).toContain("o motor mediu");
+    expect((screen.getByTestId("pedir-decisao-ao-agente") as HTMLButtonElement).disabled).toBe(true);
+
+    await act(async () => {
+      liberar();
+    });
+    expect((screen.getByTestId("pedir-decisao-ao-agente") as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("falha do agente aparece na tela, não some no console", async () => {
+    const onPedirAoAgente = vi.fn(() => Promise.reject(new Error("sem credencial de IA configurada")));
+    render(
+      <DecisoesDoNo
+        noId="n1"
+        decisoes={[]}
+        autor="silvio@exemplo"
+        onRegistrar={vi.fn()}
+        onAceitar={vi.fn()}
+        onSubstituir={vi.fn()}
+        onPedirAoAgente={onPedirAoAgente}
+      />
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("pedir-decisao-ao-agente"));
+    });
+
+    expect(screen.getByTestId("erro-decisao-agente").textContent).toContain("sem credencial");
+    // E o botão volta a funcionar: erro não pode deixar a tela travada.
+    expect((screen.getByTestId("pedir-decisao-ao-agente") as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("decisão de OUTRO nó não aparece neste painel", () => {

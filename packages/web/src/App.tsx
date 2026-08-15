@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import {
+  analisarLacunas,
+  avaliarConformidade,
   derivar,
   resolverDependencias,
+  violacoesEmAberto,
   type Atividade,
   type DiagramaConfig,
   type No,
@@ -561,6 +564,78 @@ function AppCarregado({
   }
 
   /** O Salvar do header: com título salva direto; sem, o agente pergunta. */
+  /**
+   * SPEC-57 M4 — o agente propõe decisões lendo o desenho **medido**.
+   *
+   * O que vai no pedido é o ponto da fatia: além do diagrama, vão as violações
+   * de padrão (com o porquê de cada padrão) e as lacunas de propósito. Um
+   * agente que recebe só o desenho devolve decisão genérica de blog; um que
+   * recebe o que está fora da régua devolve decisão sobre ESTE desenho — que é
+   * a tese da SPEC-56 §0.7, o motor mede e o agente explica.
+   *
+   * Chega como `proposta`/`sugerido`, sempre: a regra 2 cuida do resto.
+   */
+  async function pedirDecisoesAoAgente() {
+    const violacoes = violacoesEmAberto(
+      avaliarConformidade(quebra.diagrama, diagramaConfig, regrasConfig, quebra.excecoes ?? [])
+    );
+    const lacunas = analisarLacunas(quebra.diagrama, quebra.necessidades ?? []);
+    const textoDaLacuna = (id: string) => quebra.necessidades?.find((n) => n.id === id)?.texto ?? id;
+
+    const { decisoes } = await apiIa.proporDecisoes({
+      contextoEpico: quebra.demandInfo,
+      componentes: quebra.diagrama.nodes.map((n) => ({
+        id: n.id,
+        rotulo: n.label,
+        tipo: diagramaConfig.nodeTypes[n.type]?.label ?? n.type,
+        // Só os campos preenchidos, e resumidos: mandar o spec inteiro gastaria
+        // token descrevendo vazio.
+        campos:
+          Object.entries(n.spec)
+            .filter(([, v]) => v.valor !== undefined && v.valor !== "")
+            .map(([k, v]) => `${k}=${String(v.valor)}`)
+            .join(", ") || undefined,
+      })),
+      violacoes: violacoes.map((v) => ({
+        noId: v.noId,
+        campo: v.campo,
+        esperado: v.esperado,
+        atual: v.atual,
+        porque: v.porque,
+      })),
+      lacunas: lacunas.semElemento.map(textoDaLacuna),
+      // Sem isto o agente re-litiga o que já foi decidido, e a pessoa aprende a
+      // ignorar as propostas.
+      jaDecididas: (quebra.decisoes ?? []).filter((d) => d.status !== "substituida").map((d) => d.titulo),
+    });
+
+    // A régua das duas alternativas é do PRODUTO, não do modelo: `minItems` é
+    // removido do esquema antes de chegar ao provedor (Structured Outputs não
+    // o aceita — ver `provedorOpenAI`), então o prompt pede e nada garante.
+    // Proposta com uma opção só é opinião vestida de decisão, e ela para aqui.
+    const comAlternativaReal = decisoes.filter((p) => p.alternativas.length >= 2);
+
+    setQuebra((q) => ({
+      ...q,
+      decisoes: [
+        ...(q.decisoes ?? []),
+        ...comAlternativaReal.map((p, i) => ({
+          id: `d-agente-${Date.now()}-${i}`,
+          noId: p.noId,
+          titulo: p.titulo,
+          contexto: p.contexto,
+          alternativas: p.alternativas,
+          escolhida: p.escolhida,
+          porque: p.porque,
+          status: "proposta" as const,
+          origem: "sugerido" as const,
+          autor: "agente",
+          em: new Date().toISOString(),
+        })),
+      ],
+    }));
+  }
+
   function salvarQuebra() {
     if ((quebra.titulo ?? "").trim()) {
       void persistencia.salvar();
@@ -1024,6 +1099,7 @@ function AppCarregado({
             onSalvarStack={salvarComoStackConhecida}
             decisoes={decisoesVisiveis}
             autor={sessao.email}
+            onPedirDecisoesAoAgente={pedirDecisoesAoAgente}
             onRegistrarDecisao={(d) => setQuebra((q) => ({ ...q, decisoes: [...(q.decisoes ?? []), d] }))}
             onAceitarDecisao={(id) =>
               setQuebra((q) => ({
