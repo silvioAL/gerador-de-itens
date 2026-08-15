@@ -7542,3 +7542,56 @@ acusa uma violação inventada, e o teste do verde falso fica vermelho.
 
 **Ainda em aberto da fatia E:** o item derivado por violação de percurso (o
 equivalente do §240 para caminho) e a citação do percurso na spec.
+
+---
+
+## §249 — o caminho chega ao backlog e à spec (fecha a fatia E)
+
+O §248 deixou o percurso inferido, confirmado e medido — visível no placar e
+parado ali. Esta rodada fecha os dois últimos elos da cadeia: **item derivado**
+e **citação na spec**. É o equivalente do §240 e do §230, uma dimensão acima.
+
+**Três decisões no item derivado, e cada uma foi escolha entre alternativas
+defensáveis:**
+
+1. **Um item por violação de caminho, não um por nó do caminho.** O percurso
+   `a→b→c→d→e` estourar o orçamento é *um* problema — "este caminho é lento" —,
+   não cinco. Espalhá-lo em cinco itens faria cinco pessoas cortarem 50ms cada
+   uma sem ninguém olhar o total, que é exatamente o defeito que esta fatia
+   existe para tornar visível.
+2. **Sem `origem`.** Todo item deste projeto aponta para um nó ou uma aresta;
+   este não aponta para nenhum, e **a ausência é a afirmação certa**. O defeito
+   é do caminho, e fixá-lo num nó culparia um componente que está, ele mesmo,
+   dentro do padrão. O rótulo do percurso na descrição é o endereço.
+3. **`naoMedidos` NÃO vira item.** "Falta preencher `timeoutMs` em n2" já é
+   vermelho de completude no próprio nó. Um segundo item para o mesmo campo
+   seria a mesma cobrança duas vezes, em dois lugares — é assim que backlog
+   derivado perde a confiança de quem o lê.
+
+E nunca `Débito Técnico`, mesmo com nó existente: o caminho não é um artefato
+que já foi construído, é uma propriedade do desenho de agora.
+
+**Por que o caminho entra na spec e não fica só no placar.** Saber que um
+serviço está num caminho síncrono com orçamento de 2s **muda como ele é
+escrito** — e essa informação não está em nenhum campo dele, está na soma. Quem
+implementa lendo só a ficha do componente não teria como saber. Quando o caminho
+já está fora do padrão, a citação diz isso junto, porque é a informação mais
+útil das duas.
+
+**Terceira vez que o mesmo achado aparece,** e vale como régua: a citação só
+chega ao documento se a **tela de revisão** repassar. Passar no engine e esquecer
+no `ReviewScreen` faz a feature funcionar em teste unitário e em lugar nenhum —
+foi assim na fatia A (§230), na C (§246), e teria sido de novo aqui. O mesmo
+para a derivação: sem `percursos` no `ContextoQuebra` do `App`, a violação
+apareceria no placar e nunca chegaria ao backlog (o achado do §240).
+
+**Mordida:** tirar `percursosQueContam` da citação → o caminho não confirmado
+passa a ser citado num documento que sai para fora da equipe, e o teste da regra
+2 fica vermelho.
+
+301 engine · 536 web · 63 aplicação · 220 server · 73/73 E2E · build limpo.
+
+**A fatia E está fechada, e com ela a SPEC-57 inteira** (A propósito, B padrão
+conferível, C porquê, D proposta medida, E percurso). O que resta da spec são as
+três medições do §8.6 — que não são feature, são instrumentação para saber se o
+que foi construído está sendo usado.

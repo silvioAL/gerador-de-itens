@@ -5,11 +5,13 @@ import type {
   ExcecaoDePadrao,
   Endpoint,
   No,
+  Percurso,
   Tamanho,
   TipoItem,
 } from "../model/types.js";
 import type { DiagramaConfig, EdgeTypeConfig, NodeTypeConfig, RegrasConfig } from "../config/types.js";
 import { avaliarConformidade } from "../conformidade/conformidade.js";
+import { avaliarPercursos } from "../percurso/conformidadeDePercurso.js";
 
 export interface ContextoQuebra {
   time?: string;
@@ -20,6 +22,9 @@ export interface ContextoQuebra {
    * decididas por uma pessoa, e gerar trabalho para o que alguém resolveu
    * conscientemente é o jeito mais rápido de ensinar a ignorar o backlog. */
   excecoes?: ExcecaoDePadrao[];
+  /** §249 — os caminhos CONFIRMADOS. Só eles: derivar item de caminho que
+   * ninguém olhou seria gerar trabalho a partir de um palpite do motor. */
+  percursos?: Percurso[];
 }
 
 /** Sufixo da chave da atividade de criação, por kind de `derives`. */
@@ -254,6 +259,50 @@ function derivarConformidade(
     });
 }
 
+/**
+ * §249 — a régua de CAMINHO chegando ao item, que é o equivalente do §240 uma
+ * dimensão acima.
+ *
+ * Três decisões, e cada uma foi uma escolha entre alternativas defensáveis:
+ *
+ * - **um item por violação de caminho, não um por nó do caminho.** O percurso
+ *   `a→b→c→d→e` estourar o orçamento é UM problema — "este caminho é lento" —,
+ *   não cinco. Espalhá-lo em cinco itens faria cinco pessoas cortarem 50ms
+ *   cada uma sem ninguém olhar o total;
+ * - **sem `origem`.** Todo item deste projeto aponta para um nó ou uma aresta;
+ *   este não aponta para nenhum, e isso é a afirmação certa. O defeito é do
+ *   caminho, e fixá-lo num nó culparia um componente que está, ele mesmo,
+ *   dentro do padrão. O rótulo do percurso na descrição é o endereço;
+ * - **`naoMedidos` NÃO vira item.** "Falta preencher `timeoutMs` em n2" já é
+ *   vermelho de completude no próprio nó. Um segundo item para o mesmo campo
+ *   seria a mesma cobrança duas vezes, em dois lugares, e é assim que backlog
+ *   derivado perde a confiança de quem o lê.
+ */
+function derivarPercursos(diagrama: Diagrama, config: DiagramaConfig, quebra: ContextoQuebra): Atividade[] {
+  const { violacoes } = avaliarPercursos(diagrama, config, quebra.percursos, quebra.regras);
+
+  return violacoes.map((v) => {
+    const nos = diagrama.nodes.filter((n) => (quebra.percursos ?? []).find((p) => p.id === v.percursoId)?.nos.includes(n.id));
+    const techs = [...new Set(nos.flatMap((n) => config.nodeTypes[n.type]?.techs ?? []))];
+    const contextos = [...new Set(nos.flatMap((n) => config.nodeTypes[n.type]?.contextos ?? []))];
+    return {
+      chave: `${v.percursoId}::percurso::${v.campo ?? "saltos"}`,
+      rotulo: "",
+      // Nunca "Débito Técnico": o caminho não é um artefato que já existe, é
+      // uma propriedade do desenho de agora. Ver a régua do §240.
+      tipo: "Task" as TipoItem,
+      tamanho: "P" as Tamanho,
+      descricao: `Trazer o caminho ${v.rotulo} para ${v.esperado} — está ${v.atual}. Padrão: ${v.texto}.`,
+      techs,
+      contextos,
+      dependencias: [{ type: "independent" as const }],
+      // Ver o comentário acima: a ausência é a afirmação.
+      origem: {},
+      timesEnvolvidos: temposEnvolvidos(nos, quebra),
+    };
+  });
+}
+
 export function derivar(
   diagrama: Diagrama,
   config: DiagramaConfig,
@@ -262,5 +311,6 @@ export function derivar(
   const doNodes = diagrama.nodes.flatMap((no) => derivarNo(no, config, quebra));
   const doEdges = diagrama.edges.flatMap((edge) => derivarEdge(edge, diagrama, config, quebra));
   const doPadrao = derivarConformidade(diagrama, config, quebra);
-  return rotular([...doNodes, ...doEdges, ...doPadrao]);
+  const doPercurso = derivarPercursos(diagrama, config, quebra);
+  return rotular([...doNodes, ...doEdges, ...doPadrao, ...doPercurso]);
 }

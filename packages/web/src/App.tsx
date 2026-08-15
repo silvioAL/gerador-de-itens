@@ -532,6 +532,9 @@ function AppCarregado({
       regras: regrasConfig,
       // §242 — violação já decidida não vira item de novo.
       excecoes: quebra.excecoes,
+      // §249 — sem os caminhos aqui, a violação de percurso apareceria no
+      // placar e nunca chegaria ao backlog (mesmo achado do §240).
+      percursos: quebra.percursos,
     });
     setResultado(resolverDependencias(atividades));
     setPedindoNomeDaDemanda(false);
@@ -1154,6 +1157,7 @@ function AppCarregado({
           necessidades={quebra.necessidades}
           decisoes={quebra.decisoes}
           excecoes={quebra.excecoes}
+          percursos={quebra.percursos}
           anexosContexto={quebra.anexosContexto}
           contextoDoProduto={contextoDoProduto}
           time={quebra.time}

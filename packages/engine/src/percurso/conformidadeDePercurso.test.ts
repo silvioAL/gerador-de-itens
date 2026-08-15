@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { DiagramaConfig, RegrasConfig } from "../config/types.js";
 import type { Diagrama, No, Percurso, ValorSpec } from "../model/types.js";
 import { avaliarPercursos } from "./conformidadeDePercurso.js";
+import { derivar } from "../derive/derivar.js";
 
 const config: DiagramaConfig = {
   nodeTypes: {
@@ -158,5 +159,76 @@ describe("avaliarPercursos — a régua sobre o CAMINHO (SPEC-57 fatia E)", () =
     const { violacoes } = avaliarPercursos(d, config, [percurso(["a", "b"])], regra);
 
     expect(violacoes[0].atual).toContain("maior de timeoutMs = 900ms");
+  });
+});
+
+
+describe("derivarPercursos — a régua de caminho chegando ao ITEM (§249)", () => {
+  const nos = ["a", "b", "c", "d", "e"];
+
+  function comCaminho(valor: number) {
+    return diagrama(nos.map((id) => no(id, "service", valor)));
+  }
+
+  it("um item por VIOLAÇÃO de caminho, não um por nó do caminho", () => {
+    // Cinco itens fariam cinco pessoas cortarem 50ms cada uma sem ninguém
+    // olhar o total — que é exatamente o defeito que esta fatia existe para ver.
+    const atividades = derivar(comCaminho(450), config, {
+      regras: REGRA_SOMA,
+      percursos: [percurso(nos)],
+    });
+    const dePercurso = atividades.filter((a) => a.chave.includes("::percurso::"));
+
+    expect(dePercurso).toHaveLength(1);
+    expect(dePercurso[0].descricao).toContain("a → b → c → d → e");
+    expect(dePercurso[0].descricao).toContain("≤ 2000ms");
+    expect(dePercurso[0].descricao).toContain("2250ms");
+  });
+
+  it("o item de caminho NÃO tem origem — a ausência é a afirmação", () => {
+    // Todo item deste projeto aponta para um nó ou uma aresta. Este não aponta
+    // para nenhum, porque fixá-lo num nó culparia um componente que está, ele
+    // mesmo, dentro do padrão.
+    const [item] = derivar(comCaminho(450), config, { regras: REGRA_SOMA, percursos: [percurso(nos)] }).filter((a) =>
+      a.chave.includes("::percurso::")
+    );
+
+    expect(item.origem).toEqual({});
+    // E nunca Débito Técnico: o caminho é propriedade do desenho de agora.
+    expect(item.tipo).toBe("Task");
+  });
+
+  it("caminho NÃO confirmado não gera item — derivar de palpite é gerar trabalho falso", () => {
+    const atividades = derivar(comCaminho(450), config, {
+      regras: REGRA_SOMA,
+      percursos: [percurso(nos, false)],
+    });
+
+    expect(atividades.filter((a) => a.chave.includes("::percurso::"))).toEqual([]);
+  });
+
+  it("caminho dentro do padrão não gera item, e a derivação é a de antes", () => {
+    const semRegra = derivar(comCaminho(100), config, {});
+    const comRegra = derivar(comCaminho(100), config, { regras: REGRA_SOMA, percursos: [percurso(nos)] });
+
+    expect(comRegra).toEqual(semRegra);
+  });
+
+  it("`naoMedidos` NÃO vira item — isso já é vermelho de completude no nó", () => {
+    // Duas cobranças para o mesmo campo, em dois lugares, é como o backlog
+    // derivado perde a confiança de quem o lê.
+    const d = diagrama([no("a", "service", 400), no("b", "service"), no("c", "service", 400)]);
+
+    const atividades = derivar(d, config, { regras: REGRA_SOMA, percursos: [percurso(["a", "b", "c"])] });
+
+    expect(atividades.filter((a) => a.chave.includes("::percurso::"))).toEqual([]);
+  });
+
+  it("a chave é estável: rederivar o mesmo caminho não duplica o item", () => {
+    const contexto = { regras: REGRA_SOMA, percursos: [percurso(nos)] };
+    const primeira = derivar(comCaminho(450), config, contexto);
+    const segunda = derivar(comCaminho(450), config, contexto);
+
+    expect(primeira.map((a) => a.chave)).toEqual(segunda.map((a) => a.chave));
   });
 });

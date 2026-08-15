@@ -1,4 +1,6 @@
-import type { Atividade, Aresta, Decisao, Diagrama, ExcecaoDePadrao, Necessidade, No, Origem, StatusNo, ValorSpec } from "../model/types.js";
+import type { Atividade, Aresta, Decisao, Diagrama, ExcecaoDePadrao, Necessidade, No, Origem, Percurso, StatusNo, ValorSpec } from "../model/types.js";
+import { avaliarPercursos } from "../percurso/conformidadeDePercurso.js";
+import { percursosQueContam } from "../percurso/percursos.js";
 import { necessidadesDoElemento } from "../proposito/lacunas.js";
 import { decisoesDoElemento, excecoesComoDecisoes } from "../decisao/decisoes.js";
 import type { DiagramaConfig, FieldSpec, RegrasConfig } from "../config/types.js";
@@ -360,6 +362,9 @@ export const VARIAVEIS_ITEM = [
   /** SPEC-57 fatia C — POR QUE o elemento deste item é assim, com o que foi
    * descartado. Vazia quando não há decisão registrada, e a seção some. */
   "decisoes",
+  /** SPEC-57 fatia E — de que CAMINHOS o elemento deste item participa. Vazia
+   * quando nenhum percurso foi confirmado, e a seção some. */
+  "percursos",
   "historiaUsuario",
   "especificacaoTecnica",
   "contratoArquitetura",
@@ -394,6 +399,10 @@ export const TEMPLATE_ITEM_PADRAO = `### {{numero}}. {{rotulo}} — {{descricao}
 #### Por que este desenho é assim
 
 {{decisoes}}
+
+#### Caminhos de que participa
+
+{{percursos}}
 
 #### História de usuário
 
@@ -540,7 +549,12 @@ export function renderizarItemEspecificacao(
   /** SPEC-57 fatia C — as decisões da quebra, para o item carregar o PORQUÊ do
    * elemento que ele constrói. Mesma disciplina da fatia A: sem decisão
    * registrada a seção some e o documento sai igual ao de antes. */
-  decisoes?: Decisao[]
+  decisoes?: Decisao[],
+  /** SPEC-57 fatia E — os caminhos CONFIRMADOS que passam pelo elemento deste
+   * item. Já vêm filtrados por quem chama: saber de que caminho o componente
+   * faz parte muda como ele é implementado — um nó num caminho síncrono
+   * apertado não se escreve como um num caminho assíncrono. */
+  percursosDoItem?: { rotulo: string; regra?: string }[]
 ): string {
   const nos = nosDeOrigem(atividade, diagrama);
   const especificacaoTecnica =
@@ -639,6 +653,10 @@ ${MARCA_SUGERIDO}` : ""}`
   ];
   const textoDecisoes = decisoesCitadas.map(descreverDecisao).join("\n\n");
 
+  const textoPercursos = (percursosDoItem ?? [])
+    .map((p) => `- ${p.rotulo}${p.regra ? ` — ${p.regra}` : ""}`)
+    .join("\n");
+
   return aplicarTemplateDoItem(templateItem ?? TEMPLATE_ITEM_PADRAO, {
     numero: String(numero),
     rotulo: atividade.rotulo,
@@ -650,6 +668,7 @@ ${MARCA_SUGERIDO}` : ""}`
     dependencias: descreverDependencias(atividade),
     necessidades: textoNecessidades,
     decisoes: textoDecisoes,
+    percursos: textoPercursos,
     historiaUsuario,
     especificacaoTecnica,
     contratoArquitetura: contratoArquitetura ?? "",
@@ -833,6 +852,9 @@ export interface OpcoesGerarEspecificacao {
   /** SPEC-57 fatia C — `quebra.decisoes`, para cada item carregar o porquê do
    * elemento que constrói. */
   decisoes?: Decisao[];
+  /** SPEC-57 fatia E — `quebra.percursos`, para cada item dizer de que caminho
+   * o componente dele participa. */
+  percursos?: Percurso[];
   /** §242 — `quebra.excecoes`. Entram como decisões DERIVADAS (nunca
    * persistidas em duplicata): contrariar o padrão de propósito é decisão, e
    * quem lê a spec precisa dela junto das outras, não numa seção à parte. */
@@ -850,6 +872,43 @@ export interface OpcoesGerarEspecificacao {
  * é uma história de usuário, e repetir Contexto/Visão geral por atividade
  * produzia documentos rasos e repetitivos).
  */
+/**
+ * SPEC-57 fatia E (M8) — de que CAMINHOS o componente deste item participa, e
+ * que régua vale sobre cada um.
+ *
+ * Por que isto entra na spec e não fica só no placar: saber que um serviço está
+ * num caminho síncrono com orçamento de 2s **muda como ele é escrito**. Quem
+ * implementa lendo só a ficha do componente não tem como saber disso — o
+ * orçamento não está em nenhum campo dele, está na soma.
+ *
+ * Só caminhos CONFIRMADOS, pela regra 2: citar um palpite do motor num
+ * documento que vai para fora seria dar a ele um peso que ele não tem.
+ */
+function percursosDoItem(
+  atividade: Atividade,
+  diagrama: Diagrama,
+  config: DiagramaConfig,
+  opcoes: OpcoesGerarEspecificacao
+): { rotulo: string; regra?: string }[] {
+  const elemento = atividade.origem.nodeId ?? atividade.origem.edgeId;
+  if (!elemento) return [];
+
+  const confirmados = percursosQueContam(opcoes.percursos ?? []).filter((p) => p.nos.includes(elemento));
+  if (confirmados.length === 0) return [];
+
+  const { violacoes } = avaliarPercursos(diagrama, config, confirmados, opcoes.regras);
+
+  return confirmados.map((p) => {
+    // A violação, quando existe, é a informação mais útil: ela diz que o
+    // caminho JÁ está fora, e não só que existe uma régua sobre ele.
+    const fora = violacoes.find((v) => v.percursoId === p.id);
+    return {
+      rotulo: p.rotulo,
+      regra: fora ? `fora do padrão: ${fora.texto} (esperado ${fora.esperado}, está ${fora.atual})` : undefined,
+    };
+  });
+}
+
 export function gerarEspecificacaoEntrega(
   atividades: Atividade[],
   diagrama: Diagrama,
@@ -889,7 +948,8 @@ export function gerarEspecificacaoEntrega(
               opcoes.respostasItens?.[a.chave],
               opcoes.templateItem,
               opcoes.necessidades,
-              [...(opcoes.decisoes ?? []), ...excecoesComoDecisoes(opcoes.excecoes)]
+              [...(opcoes.decisoes ?? []), ...excecoesComoDecisoes(opcoes.excecoes)],
+              percursosDoItem(a, diagrama, config, opcoes)
             )
           )
           .join("\n\n---\n\n")
