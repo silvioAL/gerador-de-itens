@@ -7016,3 +7016,52 @@ lê** — a API suportar não significa que o cliente use.
 "item, salvo se não-decidida"), não há conflito aritmético entre campos
 (retry × timeout) e não há regra sobre topologia. Os três são incrementos sobre
 o mesmo `Checagem`, não mecanismo novo.
+
+## 240. O padrão chega ao item — a cadeia fechada de ponta a ponta
+
+Fatia B parava no placar. Violação que só existe na tela morre ali: **quem
+implementa lê o backlog, não o desenho**. Agora cada violação vira atividade,
+com o esperado e o atual dentro da descrição — sem os dois números a pessoa
+volta ao diagrama pra descobrir o que ajustar, e o item perde o motivo de
+existir.
+
+Com isso a cadeia da SPEC-57 §0.1 está inteira e verificável:
+
+```
+PROPÓSITO ──► DECISÃO ──► ELEMENTO ──► ITEM ──► SPEC
+(necessidade)  (padrão)   (nó/aresta)  (derivado) (gerada)
+    §230        §239/§240    já era      já era     §230/§232
+```
+
+O elo "decisão" ainda é o **padrão**, não o ADR (fatia C) — mas é decisão
+registrada e conferível, que era o que faltava para o resto engatar.
+
+**Duas escolhas de recorte que viraram teste:**
+
+- **`Débito Técnico` só quando o nó já EXISTE.** Num nó novo o valor fora do
+  padrão ainda não foi construído: é decisão a corrigir, não dívida herdada.
+  Chamar tudo de débito esvazia a palavra e mistura duas conversas diferentes
+  na hora de priorizar.
+- **`independent`.** A correção não depende de nada declarado; inventar uma
+  ordem que ninguém escreveu seria pior que não ter ordem nenhuma.
+
+E a chave é `${noId}::padrao::${campo}` — estável, como toda chave de atividade
+aqui: regerar não duplica nem renomeia, e o rastro de exportação sobrevive.
+
+**Três tentativas de seletor no E2E, e a lição é sobre `::`.** A chave da
+atividade contém `::`, e nem o CSS `[data-testid$="…"]` nem o `getByTestId` com
+regex casaram com ela. O valor exato casa — e o id do primeiro nó de uma mesa
+vazia é `n1`, determinístico como o resto da derivação. Perdi três ciclos
+tentando ser genérico onde o valor exato é estável por construção.
+
+Também troquei um `preencherRestante` que varria a tela por um
+`preencherObrigatorios` que preenche **por nome**: campo obrigatório novo no
+tipo deve QUEBRAR este teste, para alguém decidir o que ele vale ali — varrer
+faria o teste se adaptar em silêncio a uma mudança de contrato.
+
+249 engine · 517 web · 217 server · 72/72 E2E · lint e build limpos.
+
+**O que sobra da fatia B:** conflito aritmético entre campos (retry × timeout) e
+regra sobre topologia. Os dois são incrementos sobre o mesmo `Checagem` — o
+primeiro precisa de uma checagem que leia DOIS campos, o segundo de uma que leia
+arestas.
