@@ -50,7 +50,6 @@ describe("JourneyModal", () => {
         onAdicionarCenario={vi.fn()}
         onIniciarTour={vi.fn()}
         onIniciarTourDeConfiguracao={vi.fn()}
-        onIniciarDemoAutomatica={vi.fn()}
       />
     );
 
@@ -74,7 +73,6 @@ describe("JourneyModal", () => {
         onAdicionarCenario={vi.fn()}
         onIniciarTour={vi.fn()}
         onIniciarTourDeConfiguracao={vi.fn()}
-        onIniciarDemoAutomatica={vi.fn()}
       />
     );
 
@@ -101,7 +99,6 @@ describe("JourneyModal", () => {
         onAdicionarCenario={vi.fn()}
         onIniciarTour={vi.fn()}
         onIniciarTourDeConfiguracao={vi.fn()}
-        onIniciarDemoAutomatica={vi.fn()}
       />
     );
 
@@ -127,7 +124,6 @@ describe("JourneyModal", () => {
         onAdicionarCenario={onAdicionarCenario}
         onIniciarTour={vi.fn()}
         onIniciarTourDeConfiguracao={vi.fn()}
-        onIniciarDemoAutomatica={vi.fn()}
       />
     );
 
@@ -151,7 +147,6 @@ describe("JourneyModal", () => {
         onAdicionarCenario={vi.fn()}
         onIniciarTour={vi.fn()}
         onIniciarTourDeConfiguracao={vi.fn()}
-        onIniciarDemoAutomatica={vi.fn()}
       />
     );
 
@@ -161,6 +156,36 @@ describe("JourneyModal", () => {
     expect(screen.queryByText(/graph\.json/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "A jornada" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Cenários prontos/ })).toBeInTheDocument();
+  });
+
+  /**
+   * §243 — guarda de REMOÇÃO, no padrão do §212. A demonstração automática saiu
+   * porque fazia exatamente o que o tour faz (mesma lista de passos, mesmos
+   * `onEnter`), com a única diferença de avançar sozinha. Duas portas para o
+   * mesmo conteúdo custam manutenção dobrada e obrigam quem chega a escolher
+   * sem saber a diferença.
+   *
+   * Sem esta guarda, um merge distraído devolve o botão e ninguém percebe —
+   * ele parece uma feature legítima.
+   */
+  it("§243 — a demonstração automática não volta", () => {
+    render(
+      <JourneyModal
+        config={config}
+        cenarios={cenarios}
+        onFechar={vi.fn()}
+        onCarregarCenario={vi.fn()}
+        onAdicionarCenario={vi.fn()}
+        onIniciarTour={vi.fn()}
+        onIniciarTourDeConfiguracao={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByRole("button", { name: /Demonstração automática/i })).not.toBeInTheDocument();
+    // E os dois que ficaram continuam lá — a guarda é sobre ausência, não
+    // sobre ter esvaziado o header.
+    expect(screen.getByRole("button", { name: /Iniciar tour guiado/ })).toBeInTheDocument();
+    expect(screen.getByTestId("tour-configuracao")).toBeInTheDocument();
   });
 
   it("§236 — clicar em Tour de configuração chama o SEGUNDO tour, não o primeiro", async () => {
@@ -179,7 +204,6 @@ describe("JourneyModal", () => {
         onAdicionarCenario={vi.fn()}
         onIniciarTour={onIniciarTour}
         onIniciarTourDeConfiguracao={onIniciarTourDeConfiguracao}
-        onIniciarDemoAutomatica={vi.fn()}
       />
     );
 
@@ -201,7 +225,6 @@ describe("JourneyModal", () => {
         onAdicionarCenario={vi.fn()}
         onIniciarTour={onIniciarTour}
         onIniciarTourDeConfiguracao={vi.fn()}
-        onIniciarDemoAutomatica={vi.fn()}
       />
     );
 
@@ -209,25 +232,6 @@ describe("JourneyModal", () => {
     expect(onIniciarTour).toHaveBeenCalled();
   });
 
-  it("clicar em Demonstração automática chama onIniciarDemoAutomatica", async () => {
-    const user = userEvent.setup();
-    const onIniciarDemoAutomatica = vi.fn();
-    render(
-      <JourneyModal
-        config={config}
-        cenarios={cenarios}
-        onFechar={vi.fn()}
-        onCarregarCenario={vi.fn()}
-        onAdicionarCenario={vi.fn()}
-        onIniciarTour={vi.fn()}
-        onIniciarTourDeConfiguracao={vi.fn()}
-        onIniciarDemoAutomatica={onIniciarDemoAutomatica}
-      />
-    );
-
-    await user.click(screen.getByRole("button", { name: "▶ Demonstração automática" }));
-    expect(onIniciarDemoAutomatica).toHaveBeenCalled();
-  });
 
   it("fechar pelo X chama onFechar", async () => {
     const user = userEvent.setup();
@@ -241,7 +245,6 @@ describe("JourneyModal", () => {
         onAdicionarCenario={vi.fn()}
         onIniciarTour={vi.fn()}
         onIniciarTourDeConfiguracao={vi.fn()}
-        onIniciarDemoAutomatica={vi.fn()}
       />
     );
 

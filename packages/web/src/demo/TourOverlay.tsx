@@ -12,7 +12,7 @@ export interface TourOverlayProps {
 
 /** Reposiciona a cada 300ms — o alvo pode mudar de lugar entre passos (painel
  * abrindo, revisão substituindo o canvas) sem que o tour dispare um evento pra isso.
- * Exportado porque CursorFantasma.tsx (demo automática) reaproveita a mesma medição. */
+ * (Era exportado também para o cursor da demo automática, removida no §243.) */
 export function useRect(selector: string | null): DOMRect | null {
   const [rect, setRect] = useState<DOMRect | null>(null);
 

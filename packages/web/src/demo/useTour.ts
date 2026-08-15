@@ -8,10 +8,6 @@ export interface PassoTour {
   titulo: string;
   texto: string;
   onEnter?: () => void;
-  /** Piso de duração (ms) pra demonstração automática (useAutoDemo.ts) — usado
-   * quando o passo hospeda uma animação própria (ex.: o terminal digitando)
-   * que pode levar mais tempo que o cálculo padrão baseado no tamanho do texto. */
-  duracaoMinima?: number;
 }
 
 export interface UseTourOpts {
@@ -208,7 +204,7 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       selector: null,
       titulo: "Fim do tour",
       texto:
-        "Dá pra rever isto em ▶ Demonstração & tour — e lá também fica o ▶ Tour de configuração, que percorre o que se molda pro seu time: modelo de IA, esteira de agentes, regras de refinamento e campos de conexão.",
+        "Dá pra rever isto em ▶ Como funciona — e lá também fica o ▶ Tour de configuração, que percorre o que se molda pro seu time: modelo de IA, esteira de agentes, regras de refinamento e campos de conexão.",
       onEnter: () => {
         // Desligar é obrigatório: dado de demonstração que sobrevive ao tour
         // vira configuração fantasma na tela de quem for usar de verdade.
