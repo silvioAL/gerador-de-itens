@@ -252,6 +252,13 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await expect(listaDecisao).toContainText("opere o índice GIN");
   await chipDecisao.click();
 
+  // §251 — o ATO de pedir a decisão ao agente, não só o resultado dela.
+  await irAtePasso(page, "Peça ao agente");
+  await expect(page.getByTestId("pedir-decisao-ao-agente")).toBeVisible();
+  // O painel mostra a proposta pendente do agente junto do botão: é o "antes e
+  // depois" na mesma tela.
+  await expect(page.locator("aside").getByTestId("decisao-proposta")).toBeVisible();
+
   await irAtePasso(page, "Proveniência");
   // A janela flutuante FECHA: sem isso ela cobre o painel que o passo mostra.
   await expect(page.getByTestId("assistente-janela")).toHaveCount(0);
@@ -270,6 +277,22 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await irAtePasso(page, "Especificação de solução");
   await expect(page.getByRole("button", { name: "Gerar especificação de solução" })).toHaveCount(0);
   await expect(page.getByTestId("abrir-conversa-especificacao")).toBeVisible();
+
+  // §251 — a TELA do documento (SPEC-58), a lacuna que a avaliação encontrou.
+  //
+  // §234 aplicado de novo: cobrar CONTEÚDO. "Tela visível" passaria com o
+  // documento vazio, que é exatamente o que não pode acontecer aqui.
+  await irAtePasso(page, "O documento de desenho");
+  const documento = page.getByTestId("documento-screen");
+  await expect(documento).toBeVisible();
+  await expect(page.getByTestId("faixa-de-saude")).toBeVisible();
+  await expect(page.getByTestId("documento-diagrama")).toBeVisible();
+  // As decisões da demonstração chegam ao documento, com o descartado.
+  await expect(documento.getByTestId("documento-decisao").first()).toContainText("Mongo em vez de Postgres");
+  // E as duas seções que só uma pessoa escreve.
+  await expect(page.getByTestId("secao-tradeoffs")).toBeVisible();
+  await expect(page.getByTestId("secao-riscos")).toBeVisible();
+  await expect(page.getByTestId("status-documento")).toBeVisible();
 
   // SPEC-47/48 — os ITENS ESCRITOS, a tela que o tour não conhecia.
   //

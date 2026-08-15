@@ -25,6 +25,17 @@ export function useRect(selector: string | null): DOMRect | null {
       const el = document.querySelector(selector!);
       setRect(el ? el.getBoundingClientRect() : null);
     }
+    // §251 — trazer o alvo para a tela ANTES de medir, uma vez por passo.
+    //
+    // Sem isto, um passo que aponta para algo abaixo da dobra (o painel do nó
+    // rola) mede um retângulo fora da viewport, a carta é posicionada a partir
+    // dele e vai parar fora da tela — o tour trava, porque o "Próximo" existe e
+    // não dá para clicar. Uma vez só, e não a cada medição: rolar de 300 em 300
+    // ms brigaria com quem está lendo.
+    // `?.scrollIntoView?.` e não `?.scrollIntoView`: jsdom não implementa o
+    // método, e presumir que toda plataforma o tem quebraria o teste de quem
+    // nem está exercitando rolagem.
+    document.querySelector(selector)?.scrollIntoView?.({ block: "center", inline: "nearest" });
     medir();
     window.addEventListener("resize", medir);
     const id = setInterval(medir, 300);
@@ -37,10 +48,12 @@ export function useRect(selector: string | null): DOMRect | null {
   return rect;
 }
 
-function posicionarCard(rect: DOMRect): React.CSSProperties {
+export function posicionarCard(rect: DOMRect): React.CSSProperties {
   const margem = 14;
   const largura = 300;
-  const alturaEstimada = 170;
+  // Bate com o `maxHeight` da carta: subestimar aqui é o que a jogava para
+  // fora da tela quando o texto era longo.
+  const alturaEstimada = 240;
 
   let top = rect.bottom + margem;
   let left = Math.min(Math.max(rect.left, margem), window.innerWidth - largura - margem);
@@ -56,7 +69,14 @@ function posicionarCard(rect: DOMRect): React.CSSProperties {
     }
   }
 
-  return { position: "fixed", top, left };
+  // Cinto de segurança: mesmo com o alvo na tela, um retângulo alto pode jogar
+  // a carta para fora. Fora da viewport ela é inalcançável, e um tour que não
+  // avança é pior que um tour que aponta para o lugar errado.
+  return {
+    position: "fixed",
+    top: Math.max(margem, Math.min(top, window.innerHeight - alturaEstimada - margem)),
+    left: Math.max(margem, Math.min(left, window.innerWidth - largura - margem)),
+  };
 }
 
 export function TourOverlay({ passo, indice, total, ultimo, onProximo, onPular }: TourOverlayProps) {
@@ -97,6 +117,11 @@ export function TourOverlay({ passo, indice, total, ultimo, onProximo, onPular }
           boxShadow: "0 12px 30px rgba(15, 23, 42, 0.35)",
           padding: 16,
           width: 300,
+          // §251 — a carta não pode crescer além da tela. Texto longo empurrava
+          // o "Próximo" para fora da viewport, e o tour travava com o botão
+          // existindo e inalcançável. O texto rola; a navegação nunca sai.
+          maxHeight: "min(70vh, 420px)",
+          overflowY: "auto",
           fontFamily: "system-ui, sans-serif",
         }}
       >

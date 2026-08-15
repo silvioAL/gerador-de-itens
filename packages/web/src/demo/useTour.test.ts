@@ -26,6 +26,7 @@ function montarOpts() {
     fecharConfig: vi.fn(),
     abrirItens: vi.fn(),
     fecharItens: vi.fn(),
+  abrirDocumento: vi.fn(),
     abrirProposito: vi.fn(),
     fecharAssistente: vi.fn(),
     abrirConversa: vi.fn(),
@@ -138,6 +139,42 @@ describe("useTour", () => {
 
     expect(result.current.passoAtual?.selector).toBe("[data-testid=conformidade-resumo]");
     expect(opts.fecharAssistente).toHaveBeenCalled();
+  });
+
+  it("§251 — o tour passa pela TELA do documento, e ela é aberta pelo passo", () => {
+    // A lacuna que a avaliação do tour encontrou: a tela nova existia e o tour
+    // não a mencionava. Capacidade que o tour não mostra não existe para quem
+    // está avaliando a ferramenta (§244).
+    const opts = montarOpts();
+    const { result } = renderHook(() => useTour(opts));
+
+    act(() => result.current.iniciar());
+    andarAte(result, "O documento de desenho");
+
+    expect(result.current.passoAtual?.selector).toBe("[data-testid=documento-screen]");
+    expect(opts.abrirDocumento).toHaveBeenCalled();
+  });
+
+  it("§251 — o passo do documento vem ANTES dos itens, e não derruba a derivação", () => {
+    // `abrirDocumento` limpando `resultado` faria a tela de itens seguinte
+    // abrir vazia — o §234 de novo. A ordem é parte do contrato.
+    const titulos = passosDoProduto(montarOpts()).map((p) => p.titulo);
+
+    expect(titulos.indexOf("O documento de desenho")).toBeGreaterThan(-1);
+    expect(titulos.indexOf("O documento de desenho")).toBeLessThan(titulos.indexOf("Itens escritos"));
+  });
+
+  it("§251 — o passo que PEDE a decisão ao agente aponta o botão, com um nó selecionado", () => {
+    // A proposta aparecia como dado (o ⏳); o ato de pedi-la, não. O botão vive
+    // no painel do nó, então o passo precisa selecionar um.
+    const opts = montarOpts();
+    const { result } = renderHook(() => useTour(opts));
+
+    act(() => result.current.iniciar());
+    andarAte(result, "Peça ao agente");
+
+    expect(result.current.passoAtual?.selector).toBe("[data-testid=pedir-decisao-ao-agente]");
+    expect(opts.selecionarNo).toHaveBeenCalledWith("n1");
   });
 
   it("§248 — o passo do PERCURSO existe, aponta o 🛣 e fecha o assistente antes", () => {
