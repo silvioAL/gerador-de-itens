@@ -196,7 +196,9 @@ export function TourOverlay({
         <div data-testid="tour-titulo" style={{ fontSize: 14, fontWeight: 700, color: "var(--texto)", margin: "4px 0 6px" }}>
           {passo.titulo}
         </div>
-        <p style={{ fontSize: 12.5, color: "var(--texto-2)", lineHeight: 1.5, margin: 0 }}>{passo.texto}</p>
+        <p data-testid="tour-texto" style={{ fontSize: 12.5, color: "var(--texto-2)", lineHeight: 1.5, margin: 0 }}>
+          {passo.texto}
+        </p>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14 }}>
           <button onClick={onPular} style={linkEstilo}>
             Pular tour

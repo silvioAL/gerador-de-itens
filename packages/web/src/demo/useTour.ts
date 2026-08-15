@@ -75,6 +75,16 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       },
     },
     {
+      // §255 — o motor explicado ANTES de qualquer tela. Sem isto, o tour
+      // mostrava o que a ferramenta faz sem nunca dizer QUEM faz — e a divisão
+      // entre o que o motor calcula e o que a IA escreve é a tese do produto.
+      selector: null,
+      titulo: "Quem faz o quê",
+      segundos: 11,
+      texto:
+        "Duas partes trabalham aqui, e a divisão é a ideia toda. O MOTOR calcula: lê o seu desenho e a configuração do time, mede o que está pronto e o que sai do padrão, e deriva os itens com as dependências. Ele não conversa com IA nem vai à rede — mesmo desenho, mesmos itens, sempre. A IA escreve: a história do item, os critérios, o porquê de uma proposta. Nunca o contrário. E nada que ela propõe conta antes de você confirmar.",
+    },
+    {
       selector: "[data-testid=assistente-janela]",
       titulo: "Começar conversando",
       segundos: 9,

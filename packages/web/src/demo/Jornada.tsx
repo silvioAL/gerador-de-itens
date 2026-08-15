@@ -18,14 +18,14 @@ const ETAPAS: Etapa[] = [
     cor: "#f59e0b",
     titulo: "Prontidão",
     texto:
-      "Cada nó tem um semáforo: vermelho bloqueia a derivação, amarelo avisa mas não trava. Um campo pode virar N/A, mas só com motivo explícito — nada some em silêncio.",
+      "O motor mede o desenho a cada mudança, e não só se os campos estão cheios: se cada necessidade declarada tem um componente que responda por ela, se o desenho respeita os padrões do time, se algum caminho inteiro estoura a régua, e se as decisões tomadas têm o porquê registrado. Cada nó tem um semáforo — vermelho bloqueia a derivação, amarelo avisa e não trava. Um campo pode virar N/A, mas só com motivo explícito: nada some em silêncio.",
   },
   {
     numero: 3,
     cor: "#6366f1",
     titulo: "Derivar",
     texto:
-      "Um motor determinístico — não um LLM — transforma o diagrama em itens de trabalho reais. O mesmo diagrama sempre produz os mesmos itens. Dependências entre eles são calculadas automaticamente a partir das arestas, não digitadas à mão.",
+      "O motor transforma o desenho em itens de trabalho reais, e não sai só um tipo: um item por componente, um por conexão, um para cada padrão do time que o desenho contraria, e um para cada caminho que estoura a régua acordada. As dependências entre eles vêm das arestas — calculadas, não digitadas. O mesmo desenho sempre produz os mesmos itens, e a chave de cada um é estável: rederivar depois de mudar uma coisa não perde o que você já escreveu.",
   },
   {
     numero: 4,
@@ -44,6 +44,57 @@ const ETAPAS: Etapa[] = [
 ];
 
 /**
+ * §255 — O MOTOR, explicado antes das etapas.
+ *
+ * Pedido do usuário: *"sinto falta de uma explicação melhor sobre o que é o
+ * motor, como ele funciona do ponto de vista do usuário, como ele se conecta
+ * com o resto"*.
+ *
+ * O texto anterior dizia "um motor determinístico — não um LLM" e seguia em
+ * frente. Isso diz o que ele NÃO é. Quem chega precisa do contrário: o que ele
+ * é, o que ele decide, e onde a IA entra — porque a divisão entre os dois é a
+ * tese do produto inteiro, e ela não estava escrita em lugar nenhum que uma
+ * pessoa leia.
+ */
+function OMotor() {
+  return (
+    <section
+      data-testid="explicacao-do-motor"
+      style={{
+        border: "1px solid var(--borda)",
+        borderLeft: "3px solid #6366f1",
+        borderRadius: 12,
+        padding: "14px 16px",
+        marginBottom: 22,
+        maxWidth: 680,
+      }}
+    >
+      <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: "var(--texto)" }}>
+        Antes das etapas: o que é o motor
+      </h3>
+      <p style={{ fontSize: 13, color: "var(--texto-2)", lineHeight: 1.55, margin: "8px 0 0" }}>
+        O motor é a parte que <strong>calcula</strong>. Ele lê duas coisas — o seu desenho e a configuração do time
+        (tipos de componente, padrões, réguas, modelos de documento) — e faz três: <strong>mede</strong> o desenho a
+        cada mudança, <strong>deriva</strong> os itens de trabalho, e <strong>monta</strong> os textos a partir dos
+        modelos. Não conversa com IA, não vai à rede, não guarda estado.
+      </p>
+      <p style={{ fontSize: 13, color: "var(--texto-2)", lineHeight: 1.55, margin: "10px 0 0" }}>
+        <strong>A divisão de trabalho é toda a ideia:</strong> o motor decide a <em>estrutura</em> — que itens existem,
+        o que falta preencher, o que sai do padrão, em que ordem as coisas dependem umas das outras. A IA escreve o{" "}
+        <em>texto</em> — a história do usuário, os critérios, o porquê de uma proposta. Nunca o contrário. Por isso todo
+        valor carrega de onde veio, e nada que a IA propõe conta antes de você confirmar.
+      </p>
+      <p style={{ fontSize: 13, color: "var(--texto-2)", lineHeight: 1.55, margin: "10px 0 0" }}>
+        <strong>O que isso te dá na prática:</strong> o mesmo desenho produz sempre os mesmos itens, então dá para
+        mudar uma coisa e comparar o antes e o depois. Quando o motor aponta algo, existe uma regra explícita por trás
+        — e você pode discordar dela, mudá-la na configuração, ou registrar que decidiu contrariá-la de propósito. Uma
+        medida que ninguém consegue contestar vira ruído ou dogma; esta você contesta.
+      </p>
+    </section>
+  );
+}
+
+/**
  * Explicação de "como funciona" — usada tanto na aba "A jornada" da
  * JourneyModal (onboarding pós-login) quanto na landing page pública
  * (SPEC-11 §3, antes do login). Um componente só, pra não dessincronizar
@@ -52,6 +103,7 @@ const ETAPAS: Etapa[] = [
 export function Jornada() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <OMotor />
       {ETAPAS.map((etapa, i) => (
         <div key={etapa.numero} style={{ display: "flex", gap: 14 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>

@@ -7907,3 +7907,56 @@ clique.
 recebendo `646`; tirar o alvo do ponteiro → o E2E não o encontra.
 
 316 engine · 577 web · 63 aplicação · 222 server · 76/76 E2E · build limpo.
+
+---
+
+## §255 — o motor explicado, na demo e no README
+
+*"sinto falta de uma explicação melhor sobre o que é o motor, como ele funciona
+do ponto de vista do usuário, como ele se conecta com o resto"*.
+
+O que existia dizia **o que o motor não é**: *"um motor determinístico — não um
+LLM"*, e seguia em frente. Quem chega precisa do contrário — o que ele é, o que
+decide, e onde a IA entra. **A divisão entre os dois é a tese do produto
+inteiro, e não estava escrita em lugar nenhum que uma pessoa leia.**
+
+### O que passou a estar escrito, nos três lugares
+
+**Na jornada** (a aba "A jornada" da modal E a landing pública — um componente
+só, dois públicos): um bloco antes das etapas com três parágrafos. O que ele lê
+(o desenho **e** a configuração do time) e as três coisas que faz — mede,
+deriva, monta. A divisão de trabalho. E o que o determinismo dá na prática.
+
+**No tour**: um passo novo em segundo lugar, "Quem faz o quê", antes de
+qualquer tela. O tour mostrava o que a ferramenta faz sem nunca dizer quem faz.
+
+**No README**: uma seção com o desenho de entrada e saída, as três funções
+detalhadas (incluindo as quatro dimensões de medição, que nenhum texto de
+apresentação mencionava), e a divisão em citação.
+
+E movi a seção para **antes das instruções de instalação**: quem lê um README
+precisa entender o que a coisa é antes de aprender a subir o Docker.
+
+### Duas correções que apareceram junto
+
+O texto das etapas estava **desatualizado desde as fatias B e E**: "Prontidão"
+falava só do semáforo de campos, e "Derivar" prometia itens por nó e por
+aresta. Hoje o motor mede quatro dimensões e deriva quatro tipos de item.
+Explicação de produto envelhece em silêncio — ninguém recebe erro de
+compilação por um parágrafo que virou meia verdade.
+
+### A régua sobre como explicar
+
+Dizer que algo é *"determinístico"* é adjetivo de folheto. O que vale é a
+consequência, e é isso que os três textos agora dizem: **o mesmo desenho
+produz os mesmos itens** (dá para mudar uma coisa e comparar), **a chave do
+item é estável** (rederivar não perde o que você escreveu) e **dá para
+discordar** (existe uma regra explícita atrás de cada apontamento, e você pode
+mudá-la ou contrariá-la com motivo). Medida que ninguém consegue contestar vira
+ruído ou dogma.
+
+Os testes cobram exatamente isso: não que as palavras existam, mas que as três
+consequências e a divisão motor × IA estejam ditas. E o teste da modal, que
+cobrava a frase antiga, apontou sozinho que ela tinha mudado de lugar.
+
+316 engine · 583 web · 63 aplicação · 222 server · 76/76 E2E · build limpo.

@@ -198,6 +198,15 @@ describe("useTour", () => {
     expect(opts.selecionarNo).toHaveBeenCalledWith("n1");
   });
 
+  it("§255 — o tour diz QUEM FAZ O QUÊ antes de mostrar qualquer tela", () => {
+    // O tour mostrava o que a ferramenta faz sem nunca dizer quem faz. A
+    // divisão motor × IA é a tese do produto, e vinha só implícita.
+    const titulos = passosDoProduto(montarOpts()).map((p) => p.titulo);
+
+    expect(titulos.indexOf("Quem faz o quê")).toBe(1);
+    expect(titulos.indexOf("Quem faz o quê")).toBeLessThan(titulos.indexOf("O diagrama"));
+  });
+
   it("§248 — o passo do PERCURSO existe, aponta o 🛣 e fecha o assistente antes", () => {
     const opts = montarOpts();
     const { result } = renderHook(() => useTour(opts));
