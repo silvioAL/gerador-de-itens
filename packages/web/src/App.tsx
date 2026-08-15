@@ -448,6 +448,12 @@ function AppCarregado({
   const decisoesVisiveis = demonstracaoDoTour
     ? [...DECISOES_DO_TOUR, ...(quebra.decisoes ?? [])]
     : quebra.decisoes;
+  /** §251 — a régua da demonstração precisa chegar a TODA superfície que diz
+   * mostrá-la. O tour alimentava só o placar e o painel do nó; o documento
+   * lia a config real e saía sem decisão nenhuma, contradizendo o passo que
+   * acabara de prometê-las. Terceira vez que a demonstração fica pela metade
+   * (§244, §245) — daí uma variável só, em vez de um ternário por chamada. */
+  const regrasVisiveis = demonstracaoDoTour ? REGRAS_DO_TOUR : regrasConfig;
   // SPEC-37 M9 — "agora não" silencia o momento até a próxima mudança real de
   // estado (recarregar/derivar); condução dispensada não insiste.
   const [derivarDispensado, setDerivarDispensado] = useState(false);
@@ -692,13 +698,13 @@ function AppCarregado({
         demandInfo: quebra.demandInfo,
         contextoDoProduto,
         time: quebra.time,
-        regras: regrasConfig,
+        regras: regrasVisiveis,
         necessidades: quebra.necessidades,
-        decisoes: quebra.decisoes,
+        decisoes: decisoesVisiveis,
         excecoes: quebra.excecoes,
         percursos: quebra.percursos,
       }),
-    [atividadesDoDocumento, quebra, diagramaConfig, contextoDoProduto, regrasConfig]
+    [atividadesDoDocumento, quebra, diagramaConfig, contextoDoProduto, regrasVisiveis, decisoesVisiveis]
   );
 
   /** O diagrama animado que já existe (SPEC-21), embutido no documento — o
@@ -729,7 +735,7 @@ function AppCarregado({
   const markdownDoDocumento = useMemo(
     () =>
       gerarEspecificacaoEntrega(atividadesDoDocumento, quebra.diagrama, diagramaConfig, {
-        regras: regrasConfig,
+        regras: regrasVisiveis,
         demandInfo: quebra.demandInfo,
         contextoDoProduto,
         template: especificacaoTemplate.conteudo,
@@ -737,13 +743,13 @@ function AppCarregado({
         time: quebra.time,
         respostasItens: quebra.respostasItens,
         necessidades: quebra.necessidades,
-        decisoes: quebra.decisoes,
+        decisoes: decisoesVisiveis,
         excecoes: quebra.excecoes,
         percursos: quebra.percursos,
         tradeOffs: quebra.documentoEscrito?.tradeOffs,
         riscos: quebra.documentoEscrito?.riscos,
       }),
-    [atividadesDoDocumento, quebra, diagramaConfig, contextoDoProduto, regrasConfig, especificacaoTemplate, templateItem]
+    [atividadesDoDocumento, quebra, diagramaConfig, contextoDoProduto, regrasVisiveis, decisoesVisiveis, especificacaoTemplate, templateItem]
   );
 
   const documentoDesatualizado =
@@ -883,6 +889,11 @@ function AppCarregado({
       setResultado(null);
       navegar({ tela: "canvas" });
     },
+    // §251 — o tour passa pelo DOCUMENTO. NÃO limpa `resultado`: o passo
+    // seguinte é a tela de itens, que só tem o que mostrar se a derivação
+    // continuar de pé (§234). A revisão não atrapalha porque ela se esconde
+    // para o documento, como já fazia para os itens.
+    abrirDocumento: () => navegar({ tela: "documento" }),
     abrirProposito: () => setAbaAssistente("contexto"),
     fecharAssistente: () => setAbaAssistente(null),
     abrirConversa: () => setAbaAssistente("conversa"),
@@ -1208,7 +1219,7 @@ function AppCarregado({
         // §245 — no tour, o padrão vem da demonstração: a conformidade
         // depende de `regras` com `checagem`, e a config de quem está vendo
         // raramente tem uma (§244).
-        regras={demonstracaoDoTour ? REGRAS_DO_TOUR : regrasConfig}
+        regras={regrasVisiveis}
         onSelecionarViolacao={setSelecionadoId}
         excecoes={quebra.excecoes}
         decisoes={decisoesVisiveis}
@@ -1279,7 +1290,7 @@ function AppCarregado({
       {/* display:none (e não desmontar): a tela de itens cobre a revisão sem
           perder o estado dela — os balões da revisão (zIndex 62) não vazam. */}
       {resultado && (
-        <div style={{ display: mostrarItens ? "none" : "contents" }}>
+        <div style={{ display: mostrarItens || mostrarDocumento ? "none" : "contents" }}>
         <ReviewScreen
           onConfigurarModeloIa={() => abrirConfigNaAba("modeloIa")}
           onItensGerados={aoGerarItens}

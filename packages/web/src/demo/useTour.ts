@@ -21,6 +21,8 @@ export interface UseTourOpts {
   abrirItens: () => void;
   /** Volta ao canvas: os passos de configuração vêm depois dela. */
   fecharItens: () => void;
+  /** SPEC-58 — o documento de desenho (`#/documento`). */
+  abrirDocumento: () => void;
   /** SPEC-57 fatia A — abre o painel onde o PROPÓSITO da demanda vive
    * (📎 Contexto do épico). `null` fecha: os passos seguintes usam o painel de
    * propriedades, e a janela flutuante ficaria por cima dele. */
@@ -139,6 +141,16 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       },
     },
     {
+      // §251 — a proposta do agente aparecia como DADO (o ⏳ na lista), e o
+      // ato de pedi-la, não. É a interação que melhor mostra a tese da
+      // SPEC-56 §0.7 — o motor mede, o agente explica, a pessoa decide.
+      selector: "[data-testid=pedir-decisao-ao-agente]",
+      titulo: "Peça ao agente",
+      texto:
+        "Este botão não pede opinião sobre arquitetura: manda o agente ler o que o MOTOR já mediu — o que está fora do padrão e por quê, as lacunas, o que já foi decidido — e propor o que ainda está em aberto. Toda proposta vem com duas alternativas e o custo de cada uma. E não vale nada até você aceitar: aí o porquê passa a ser seu.",
+      onEnter: () => opts.selecionarNo("n1"),
+    },
+    {
       selector: "[data-tour=properties-panel]",
       titulo: "Proveniência",
       texto:
@@ -168,7 +180,17 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       selector: "[data-testid=abrir-conversa-especificacao]",
       titulo: "Especificação de solução",
       texto:
-        "O documento final sai pelo AGENTE: com tudo refinado ele oferece sozinho (balão), e a qualquer momento o balão \"gerar especificação\" baixa o markdown — mesmo parcial. Cada item do documento cita a necessidade que atende: é assim que o propósito declarado lá no começo chega até quem vai implementar.",
+        "O documento sai pelo AGENTE: com tudo refinado ele oferece sozinho (balão), e a qualquer momento você pede — mesmo parcial. Cada item cita a necessidade que atende, a decisão que segue e o caminho de que participa: é assim que o propósito declarado lá no começo chega a quem vai implementar. E ele não é só um arquivo para baixar — tem tela própria, que é o próximo passo.",
+    },
+    {
+      // §251 — a tela do documento não existia no tour, e o passo acima ainda
+      // descrevia o mundo anterior à SPEC-58 ("baixa o markdown"). Capacidade
+      // que o tour não mostra não existe para quem está avaliando (§244).
+      selector: "[data-testid=documento-screen]",
+      titulo: "O documento de desenho",
+      texto:
+        "A demanda vira um documento que circula — para quem nunca abriu esta ferramenta. A faixa de saúde no topo, o desenho animado junto, as decisões com o que foi descartado. E duas seções que só uma PESSOA escreve, trade-offs e riscos, que a máquina nunca sobrescreve: é onde mora a mudança que não moveu arquitetura. O estado encaixa no rito do time, e aprovar guarda uma foto — se o desenho mudar depois, o selo avisa em vez de mentir.",
+      onEnter: () => opts.abrirDocumento(),
     },
     {
       selector: "[data-testid=corpo-dos-itens]",

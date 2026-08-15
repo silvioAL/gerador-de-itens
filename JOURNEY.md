@@ -7673,3 +7673,62 @@ era "sobreviveu?" — e ela se responde no servidor.
 
 Uma falha isolada de `produto-contexto` apareceu numa execução completa; duas
 suítes seguidas depois deram 74/74 sem tocar em nada — flake de paralelismo.
+
+---
+
+## §251 — as lacunas que a avaliação do tour encontrou
+
+Pedido: *"avalia se a demonstração está cobrindo tudo"*. A avaliação achou três
+coisas, e a mais barata de arrumar foi a menos interessante.
+
+**Cobertura de telas: completa.** As 12 áreas de configuração de `rota.ts`
+aparecem em um dos dois tours; o fluxo principal está inteiro; as quatro
+dimensões novas têm passo próprio.
+
+**Lacuna 1 — a tela do documento não existia no tour, e o passo vizinho mentia.**
+O passo "Especificação de solução" ainda dizia *"o balão baixa o markdown"*,
+descrevendo o mundo anterior à SPEC-58 como se fosse a história toda. Dívida
+minha, e a mesma classe do §244: capacidade que o tour não mostra não existe
+para quem está avaliando a ferramenta.
+
+**Lacuna 2 — o ato de pedir a decisão ao agente nunca era exercido.** A proposta
+aparecia como DADO (o ⏳ na lista); o botão que a produz, não. É justamente a
+interação que melhor mostra a tese — o motor mede, o agente explica, a pessoa
+decide.
+
+**Achado estrutural, deixado para decisão do usuário:** o tour do produto voltou
+a ter 24 passos, 8 deles de administração — exatamente o que a divisão do §236
+existia para evitar.
+
+### O que a correção destas duas lacunas desenterrou
+
+**Um defeito do tour que valia mais que as lacunas.** O passo novo aponta um
+botão que fica **abaixo da dobra** no painel do nó. A carta era posicionada a
+partir de um retângulo fora da viewport e ia parar fora da tela: o "Próximo"
+existia e era inalcançável, e o tour travava. Três correções, e a honestidade
+sobre qual delas resolveu:
+
+- **os textos estavam longos demais** — 679 caracteres num cartão de 300px. Foi
+  **isto** que destravou, e é bom que seja: cartão de tour com seis linhas é
+  ruim independentemente de travar;
+- **a carta agora tem teto e rolagem própria**, e o clamp prende topo e esquerda
+  dentro da viewport;
+- **o alvo é trazido para a tela antes de ser medido**, uma vez por passo.
+
+**As duas últimas passaram na mordida**, ou seja: estavam sem cobertura. Em vez
+de deixá-las como fé, ganharam teste direto — `posicionarCard` foi exportado e
+tem caso para alvo colado no rodapé, na borda direita e acima da dobra; e
+`useRect` tem caso para a rolagem. Agora as três mordem.
+
+**A demonstração chegava pela metade, terceira vez.** `DECISOES_DO_TOUR` e
+`REGRAS_DO_TOUR` alimentavam o placar e o painel do nó, e **não o documento** —
+que lia a config real e saía sem decisão nenhuma, contradizendo o passo que
+acabara de prometê-las. Virou uma variável só (`regrasVisiveis`,
+`decisoesVisiveis`) em vez de um ternário por chamada, que é o que fazia a
+terceira superfície ser esquecida.
+
+**E uma nota de plataforma:** `scrollIntoView` não existe em jsdom. A chamada
+virou `?.scrollIntoView?.()` — presumir que toda plataforma tem o método
+quebrava o teste de quem nem estava exercitando rolagem.
+
+316 engine · 560 web · 63 aplicação · 222 server · 74/74 E2E · build limpo.
