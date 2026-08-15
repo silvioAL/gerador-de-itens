@@ -7184,3 +7184,42 @@ por chave, não capacidade morta. Conferi antes de repetir pela terceira vez.
 `porque` é a razão do padrão, não uma decisão de arquitetura), fatia E
 (percurso, e a regra de topologia que depende dela), vincular necessidade pelo
 painel do nó, e as três medições da SPEC-57 §8.6.
+
+## 243. Duas portas para o mesmo conteúdo — a demonstração automática sai
+
+Achado do usuário: *"notei que demonstração e tour fazem a mesma coisa, vamos
+remover um deles"*. Está certo, e o próprio código admitia: o comentário do
+`useAutoDemo` dizia **"aditiva ao tour clicável — mesma lista de passos, mesmos
+`onEnter`, só avança sozinha em vez de esperar clique"**. Duas portas para o
+mesmo conteúdo, com a única diferença sendo quem aperta "Próximo".
+
+**Removi a automática, não o tour**, por três razões: o tour é estritamente
+mais controlável com o mesmo conteúdo; a automática era a camada aditiva (por
+definição própria); e o tour de configuração que nasceu no §236 só tem a forma
+clicável — manter a automática deixaria os dois tours com modos diferentes sem
+motivo.
+
+Saíram `useAutoDemo.ts`, `CursorFantasma.tsx`, a spec de E2E, os controles de
+pausar/continuar e o `duracaoMinima` do passo, que existia **só** para a
+automática não cortar animação no meio (§46). Feature removida deixa campo
+órfão no modelo se ninguém varrer atrás.
+
+**Renomeei o que passou a mentir.** O botão do header dizia "▶ Demonstração &
+tour", com o `title` prometendo "demonstração automática e tour guiado", e o
+testid era `abrir-demonstracao`. Virou "▶ Como funciona" / `abrir-como-funciona`
+— mesma disciplina do §222 com o "canvas": nome que descreve o que não existe
+mais é pior que nome ruim.
+
+**Guarda de remoção, no padrão do §212:** um teste cobra que o botão da
+demonstração automática não voltou, **e** que os dois que ficaram continuam lá —
+a guarda é sobre ausência, não sobre ter esvaziado o header. Mordida: repondo o
+botão, ele cai.
+
+**Um susto que virou lição de ferramenta.** Meu primeiro corte usou índice de
+string entre a linha do hook e a última linha de `iniciarDemoAutomatica` — e
+levou junto `iniciarTour` e `iniciarTourDeConfiguracao`, que estavam no meio. O
+`tsc` pegou na hora (`Declaration or statement expected`), mas o certo era não
+ter feito: **cortar por intervalo pressupõe que o intervalo é homogêneo**, e
+código quase nunca é. Refiz removendo cada bloco por texto exato.
+
+514 web · 72/72 E2E (dois a menos, os da spec removida) · lint e build limpos.

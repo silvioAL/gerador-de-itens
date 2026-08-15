@@ -19,8 +19,6 @@ export interface JourneyModalProps {
   /** §236 — o segundo tour: o que se molda pro time (IA, esteira, regras,
    * campos de conexão). Separado do primeiro para ele não virar 25 passos. */
   onIniciarTourDeConfiguracao: () => void;
-  /** Demo autoplay (SPEC-17 Fase I) — aditiva ao tour clicável, mesma lista de passos. */
-  onIniciarDemoAutomatica: () => void;
   /** Troca a aba ativa de fora (usado pelo tour guiado pra abrir/navegar entre abas sem fechar e reabrir a modal). */
   abaForcada?: AbaJornada;
 }
@@ -33,7 +31,6 @@ export function JourneyModal({
   onAdicionarCenario,
   onIniciarTour,
   onIniciarTourDeConfiguracao,
-  onIniciarDemoAutomatica,
   abaForcada,
 }: JourneyModalProps) {
   const [aba, setAba] = useState<AbaJornada>(abaForcada ?? "jornada");
@@ -92,10 +89,7 @@ export function JourneyModal({
             </div>
           </div>
           <div style={{ flex: 1 }} />
-          <button onClick={onIniciarDemoAutomatica} style={botaoDemoAutomaticaEstilo}>
-            ▶ Demonstração automática
-          </button>
-          <button onClick={onIniciarTourDeConfiguracao} style={botaoDemoAutomaticaEstilo} data-testid="tour-configuracao">
+          <button onClick={onIniciarTourDeConfiguracao} style={botaoTourSecundarioEstilo} data-testid="tour-configuracao">
             ▶ Tour de configuração
           </button>
           <button onClick={onIniciarTour} style={botaoTourEstilo}>
@@ -280,7 +274,7 @@ const abaAtivaEstilo: React.CSSProperties = {
   borderBottom: "2px solid #4f46e5",
 };
 
-const botaoDemoAutomaticaEstilo: React.CSSProperties = {
+const botaoTourSecundarioEstilo: React.CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
   padding: "8px 14px",

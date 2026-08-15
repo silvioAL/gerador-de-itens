@@ -57,8 +57,6 @@ import { contextoDoProdutoEmTexto } from "@gerador/aplicacao";
 import { ConfigScreen, type AbaConfig } from "./config/ConfigScreen";
 import { TourOverlay } from "./demo/TourOverlay";
 import { useTour, passosDeConfiguracao } from "./demo/useTour";
-import { useAutoDemo } from "./demo/useAutoDemo";
-import { CursorFantasma } from "./demo/CursorFantasma";
 import { CONVERSA_DO_TOUR } from "./demo/dadosDoTour";
 import { LandingPage } from "./demo/LandingPage";
 import { EscolherTimeScreen } from "./auth/EscolherTimeScreen";
@@ -671,9 +669,6 @@ function AppCarregado({
   /** §236 — o segundo tour: o que se molda pro time. Separado para o primeiro
    * continuar respondendo "isto serve pra quê?" em vez de virar 25 passos. */
   const tourDeConfiguracao = useTour(opcoesTour, passosDeConfiguracao);
-  // Demonstração automática (aditiva ao tour clicável) — mesma lista de passos,
-  // mesmos onEnter, só avança sozinha em vez de esperar clique (SPEC-17 Fase I).
-  const demoAutomatica = useAutoDemo(opcoesTour);
 
   function iniciarTour() {
     fecharJornada();
@@ -683,11 +678,6 @@ function AppCarregado({
   function iniciarTourDeConfiguracao() {
     fecharJornada();
     tourDeConfiguracao.iniciar();
-  }
-
-  function iniciarDemoAutomatica() {
-    fecharJornada();
-    demoAutomatica.play();
   }
 
   // Os três caminhos que inserem nós em LOTE pedem enquadramento pelo mesmo
@@ -870,11 +860,11 @@ function AppCarregado({
             setAbaJornadaAlvo("jornada");
             setMostrarJornada(true);
           }}
-          data-testid="abrir-demonstracao"
-          title="Como o produto funciona — com demonstração automática e tour guiado"
+          data-testid="abrir-como-funciona"
+          title="Como o produto funciona — a jornada, os cenários prontos e os dois tours"
           style={botaoExperimentarEstilo}
         >
-          ▶ Demonstração &amp; tour
+          ▶ Como funciona
         </button>
 
         <div style={{ width: 1, height: 20, background: "var(--borda-forte)" }} />
@@ -1096,7 +1086,6 @@ function AppCarregado({
           onAdicionarCenario={adicionarCenario}
           onIniciarTour={iniciarTour}
           onIniciarTourDeConfiguracao={iniciarTourDeConfiguracao}
-          onIniciarDemoAutomatica={iniciarDemoAutomatica}
           abaForcada={abaJornadaAlvo}
         />
       )}
@@ -1337,42 +1326,10 @@ function AppCarregado({
         />
       )}
 
-      {demoAutomatica.ativo && demoAutomatica.passoAtual && (
-        <>
-          <TourOverlay
-            passo={demoAutomatica.passoAtual}
-            indice={demoAutomatica.indice}
-            total={demoAutomatica.total}
-            ultimo={demoAutomatica.ultimo}
-            onProximo={demoAutomatica.proximo}
-            onPular={demoAutomatica.pularPraFim}
-          />
-          <CursorFantasma selector={demoAutomatica.passoAtual.selector} />
-          <div style={{ position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)", zIndex: 82, display: "flex", gap: 8 }}>
-            <button onClick={demoAutomatica.rodando ? demoAutomatica.pausar : demoAutomatica.play} style={botaoDemoEstilo}>
-              {demoAutomatica.rodando ? "⏸ Pausar" : "▶ Continuar"}
-            </button>
-            <button onClick={demoAutomatica.pularPraFim} style={botaoDemoEstilo}>
-              Encerrar demo
-            </button>
-          </div>
-        </>
-      )}
     </div>
   );
 }
 
-const botaoDemoEstilo: React.CSSProperties = {
-  fontSize: 12,
-  fontWeight: 600,
-  padding: "7px 14px",
-  borderRadius: 999,
-  border: "1px solid var(--borda-forte)",
-  background: "var(--painel)",
-  color: "var(--texto)",
-  cursor: "pointer",
-  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.45)",
-};
 
 const telaCentralizadaEstilo: React.CSSProperties = {
   display: "flex",

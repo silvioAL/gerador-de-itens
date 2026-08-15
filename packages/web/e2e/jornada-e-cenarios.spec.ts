@@ -296,7 +296,7 @@ test("pular tour a qualquer momento encerra o overlay imediatamente", async ({ p
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   await entrar(page);
 
-  await page.getByTestId("abrir-demonstracao").click();
+  await page.getByTestId("abrir-como-funciona").click();
   await page.getByRole("button", { name: "▶ Iniciar tour guiado" }).click();
   await page.getByRole("button", { name: "Próximo" }).click();
   await page.getByRole("button", { name: "Pular tour" }).click();
@@ -318,7 +318,7 @@ test("tour de configuração percorre as quatro telas que o tour do produto não
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   await entrar(page);
 
-  await page.getByTestId("abrir-demonstracao").click();
+  await page.getByTestId("abrir-como-funciona").click();
   await page.getByTestId("tour-configuracao").click();
 
   await expect(page.getByTestId("tour-titulo")).toHaveText("Moldar pro seu time");
