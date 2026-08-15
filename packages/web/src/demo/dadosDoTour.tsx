@@ -1,3 +1,4 @@
+import type { RegrasConfig } from "@gerador/engine";
 import type { ConfigExportador, Produto } from "../api/client";
 import type { DiagramaProposto } from "../api/client";
 
@@ -60,6 +61,36 @@ export const EXPORTADOR_DO_TOUR: ConfigExportador = {
   endpoint: "https://agente-do-tracker.exemplo/itens",
   rotulo: "Jira do time (exemplo)",
   cabecalhos: {},
+};
+
+/**
+ * §245 — o PADRÃO do time, para o tour. Sem isto a dimensão de conformidade
+ * não aparecia na demonstração: ela depende de `regras` com `checagem`, e a
+ * config de quem está vendo raramente tem uma (foi exatamente o que o §244
+ * descobriu no banco do usuário).
+ *
+ * A regra escolhida não distorce o cenário: o nó Mongo do tour não declara
+ * chave de sharding, e a violação nasce do que já está desenhado. Demonstração
+ * que precisa piorar o exemplo para ter o que mostrar demonstra o exemplo, não
+ * a ferramenta.
+ */
+export const REGRAS_DO_TOUR: RegrasConfig = {
+  tipos: ["História", "Task", "Débito Técnico"],
+  tamanhos: ["PP", "P", "M", "G"],
+  porTech: {
+    Backend: {
+      checklistTecnico: [
+        {
+          texto: "Declarar a chave de sharding da coleção",
+          contextos: ["Backend-dados"],
+          porque:
+            "Coleção que cresce sem chave declarada vira migração de madrugada — foi o que aconteceu com o catálogo.",
+          checagem: { campo: "chaveDeSharding", operador: "preenchido" },
+        },
+      ],
+      testes: [],
+    },
+  },
 };
 
 /**

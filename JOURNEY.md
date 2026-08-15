@@ -7272,3 +7272,61 @@ descobre, porque o sintoma é ausência. Vale reler esta régua antes da fatia C
 da E, que também vão querer campos novos em documentos já existentes.
 
 55 aplicação · 514 web · 72/72 E2E · lint e build limpos.
+
+---
+
+## §245 — a régua que se vê funcionando (fatia B, no tour)
+
+*"sim, precisa aparecer funcionando no tour guiado"*
+
+O §244 explicou por que a conformidade estava invisível e ligou o diagnóstico
+que avisa. Faltava a outra metade da mesma resposta: **quem nunca viu a
+capacidade funcionando não sabe o que o diagnóstico está oferecendo.** Um aviso
+dizendo "sua config não tem padrão conferível" só convence quem já sabe o que um
+padrão conferível faz.
+
+Então o tour passou a mostrar. Passo novo, entre *"O agente propõe, o motor
+mede"* e *"Proveniência"*:
+
+> **O padrão do time, conferido** — Um padrão escrito em texto é uma opinião que
+> alguém precisa lembrar de conferir. Quando ele vira régua, o motor confere
+> sozinho e diz onde o desenho sai da linha. Clique no ⚖: a lista mostra o que
+> viola, o que se esperava e POR QUE o padrão existe. E aceita ser contrariada.
+
+**A decisão de projeto que isso forçou:** o tour não pode depender da config de
+quem está vendo — foi exatamente esse acoplamento que produziu o §244. Se o
+passo lesse `regrasConfig`, ele mostraria "0 fora do padrão" em 100% das
+instalações e ensinaria o oposto do que existe para ensinar. Então entrou
+`REGRAS_DO_TOUR` em `dadosDoTour.tsx`, ao lado do produto e da conversa de
+demonstração (§237): **o tour carrega o próprio mundo.**
+
+A regra escolhida não distorce o cenário — ela já era verdade nele. O nó mongo
+`n2` do diagrama do tour nunca teve `chaveDeSharding`, então a violação
+*emerge* do desenho que já estava lá; nada foi plantado para o ⚖ ter o que
+acusar. E o `porque` é o que separa ensinar de cobrar: *"coleção que cresce sem
+chave declarada vira migração de madrugada — foi o que aconteceu com o
+catálogo."*
+
+**A armadilha, pela quarta vez** (§221, §232, §233): o passo aponta para um chip
+no topo, e a janela flutuante do passo anterior o cobriria. `onEnter` fecha o
+assistente. Quatro ocorrências do mesmo bug em cinco passos novos é padrão, não
+azar — e o teste de unidade agora afirma o `fecharAssistente`, não só o
+seletor.
+
+**Verificado com dado real, não só no tour.** O `checagem` foi aplicado ao
+documento de regras do banco de desenvolvimento do usuário — pela API, com
+validação, não por SQL — sobre dois requisitos que já existiam ali ("timeout e
+política de retry", "retry e DLQ"). O engine rodando contra as 18 quebras reais
+acusa exatamente uma:
+
+> `Avaliação automática de crédito` → `bureau-credito-nacional` · `timeoutMs`:
+> esperado ≤ 500ms, atual 3000
+
+Ou seja: a régua não só aparece no tour, ela encontra um problema de verdade num
+desenho que já estava salvo. E o diagnóstico do §244 parou de reclamar, porque
+agora não há mais o que reclamar.
+
+**Mordida:** trocar `REGRAS_DO_TOUR` por `regrasConfig` no caminho do tour →
+`Expected substring: "1 fora do padrão"`. Falha pelo motivo certo.
+
+258 engine · 515 web · 72/72 E2E · build limpo em todos os workspaces.

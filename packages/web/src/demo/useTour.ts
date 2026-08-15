@@ -100,14 +100,24 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       onEnter: () => opts.abrirProposito(),
     },
     {
+      // §245 — a terceira dimensão da mesma barra: conformidade. Vem depois do
+      // propósito porque é a mesma ideia aplicada a outra pergunta — lá "para
+      // quê existe", aqui "está dentro do que combinamos".
+      selector: "[data-testid=conformidade-resumo]",
+      titulo: "O padrão do time, conferido",
+      texto:
+        "Um padrão escrito em texto é uma opinião que alguém precisa lembrar de conferir. Quando ele vira régua — \"declarar a chave de sharding\", \"timeout ≤ 500ms\" — o motor confere sozinho e diz onde o desenho sai da linha. Clique no ⚖: a lista mostra o que viola, o que se esperava e POR QUE o padrão existe. E aceita ser contrariada: às vezes violar é a decisão certa, e aí ela fica registrada com motivo e autor, sai do amarelo e não vira item.",
+      onEnter: () => {
+        opts.fecharAssistente();
+        opts.selecionarNo(null);
+      },
+    },
+    {
       selector: "[data-tour=properties-panel]",
       titulo: "Proveniência",
       texto:
         "Ao selecionar um nó, o painel mostra os campos do tipo — e a proveniência de cada valor: manual, extraído, inferido ou sugerido. É a mesma régua do propósito: o que o agente sugere não conta até alguém confirmar.",
-      onEnter: () => {
-        opts.fecharAssistente();
-        opts.selecionarNo("n2");
-      },
+      onEnter: () => opts.selecionarNo("n2"),
     },
     {
       selector: "[data-tour=derivar-button]",

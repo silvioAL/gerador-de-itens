@@ -127,6 +127,19 @@ describe("useTour", () => {
     expect(produto).not.toContain("Modelo de IA");
   });
 
+  it("§245 — o passo da CONFORMIDADE existe e fecha o assistente antes", () => {
+    // Ele aponta para o chip no topo; a janela flutuante aberta do passo
+    // anterior o cobriria (terceira aparição da armadilha, §221/§232/§233).
+    const opts = montarOpts();
+    const { result } = renderHook(() => useTour(opts));
+
+    act(() => result.current.iniciar());
+    andarAte(result, "O padrão do time, conferido");
+
+    expect(result.current.passoAtual?.selector).toBe("[data-testid=conformidade-resumo]");
+    expect(opts.fecharAssistente).toHaveBeenCalled();
+  });
+
   it("§235 — os três passos de espinha estão no tour, na ordem de uso", () => {
     const opts = montarOpts();
     const { result } = renderHook(() => useTour(opts));

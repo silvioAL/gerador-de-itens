@@ -57,7 +57,7 @@ import { contextoDoProdutoEmTexto } from "@gerador/aplicacao";
 import { ConfigScreen, type AbaConfig } from "./config/ConfigScreen";
 import { TourOverlay } from "./demo/TourOverlay";
 import { useTour, passosDeConfiguracao } from "./demo/useTour";
-import { CONVERSA_DO_TOUR } from "./demo/dadosDoTour";
+import { CONVERSA_DO_TOUR, REGRAS_DO_TOUR } from "./demo/dadosDoTour";
 import { LandingPage } from "./demo/LandingPage";
 import { EscolherTimeScreen } from "./auth/EscolherTimeScreen";
 import { lembrarTime, lerTimeLembrado } from "./auth/timeLembrado";
@@ -978,7 +978,10 @@ function AppCarregado({
         onSelecionar={setSelecionadoId}
         necessidades={quebra.necessidades}
         onAbrirProposito={() => setAbaAssistente("contexto")}
-        regras={regrasConfig}
+        // §245 — no tour, o padrão vem da demonstração: a conformidade
+        // depende de `regras` com `checagem`, e a config de quem está vendo
+        // raramente tem uma (§244).
+        regras={demonstracaoDoTour ? REGRAS_DO_TOUR : regrasConfig}
         onSelecionarViolacao={setSelecionadoId}
         excecoes={quebra.excecoes}
         onAceitarViolacao={(v, motivo) =>
