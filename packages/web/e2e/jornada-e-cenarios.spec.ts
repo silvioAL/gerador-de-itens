@@ -171,6 +171,9 @@ test("adicionar dois cenários à mesa de projeto (sem substituir) compõe um di
 async function pausarTour(page: import("@playwright/test").Page) {
   await page.getByTestId("tour-pausar").click();
   await expect(page.getByTestId("tour-pausar")).toHaveText("▶");
+  // Sair de cima da carta: o hover segura o relógio, e um teste que anda
+  // clicando não deve depender de onde o ponteiro parou.
+  await page.mouse.move(0, 0);
 }
 
 async function irAtePasso(page: import("@playwright/test").Page, titulo: string) {
@@ -349,6 +352,12 @@ test("o tour avança sozinho, e o botão de pausa segura de verdade", async ({ p
 
   await page.getByTestId("abrir-como-funciona").click();
   await page.getByRole("button", { name: "▶ Iniciar tour guiado" }).click();
+  // TIRAR O PONTEIRO DA CARTA antes de esperar. O ponteiro fica onde o último
+  // clique o deixou, e a carta do tour é posicionada por cima — se ela nascer
+  // debaixo dele, o hover SEGURA o relógio e o tour não anda. Não é
+  // preciosismo de teste: é o mesmo motivo pelo qual uma pessoa que deixou o
+  // mouse parado na tela veria o tour "travado".
+  await page.mouse.move(0, 0);
   const titulo = page.getByTestId("tour-titulo");
   await expect(titulo).toHaveText("Bem-vindo");
 
