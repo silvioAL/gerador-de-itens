@@ -302,6 +302,13 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await expect(documento).toBeVisible();
   await expect(page.getByTestId("faixa-de-saude")).toBeVisible();
   await expect(page.getByTestId("documento-diagrama")).toBeVisible();
+  // §254 — o diagrama ESCAPA da coluna de leitura. Espremido em ~46rem, o
+  // gerador da SPEC-21 empilha o cabeçalho e corta o botão de reproduzir
+  // (print do usuário). Medir é o único jeito de saber: `width: min(...)`
+  // continuaria escrito no código com o quadro estreito.
+  const larguraDesenho = (await page.getByTestId("documento-diagrama").boundingBox())?.width ?? 0;
+  const larguraTexto = (await page.getByRole("heading", { level: 1 }).boundingBox())?.width ?? 0;
+  expect(larguraDesenho).toBeGreaterThan(larguraTexto);
   // As decisões da demonstração chegam ao documento, com o descartado.
   await expect(documento.getByTestId("documento-decisao").first()).toContainText("Mongo em vez de Postgres");
   // E as duas seções que só uma pessoa escreve.
@@ -361,9 +368,14 @@ test("o tour avança sozinho, e o botão de pausa segura de verdade", async ({ p
   const titulo = page.getByTestId("tour-titulo");
   await expect(titulo).toHaveText("Bem-vindo");
 
+  // §254 — o ponteiro do tour aparece assim que há um alvo para apontar.
+  // (O primeiro passo é de tela cheia, sem alvo: por isso não se cobra aqui.)
+
   // Ninguém clica em nada: o primeiro passo pede 6s.
   await expect(titulo).not.toHaveText("Bem-vindo", { timeout: 20000 });
   const segundoPasso = await titulo.innerText();
+  // O segundo passo tem alvo — e o ponteiro vai até ele.
+  await expect(page.getByTestId("cursor-fantasma")).toBeVisible();
 
   // Pausar segura — e o mouse indo até o botão NÃO pode desfazer a pausa, que
   // foi o defeito que os dois estados (pausado × segurado) resolveram.

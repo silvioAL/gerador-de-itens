@@ -156,7 +156,10 @@ export function gerarDocumentoHtml(doc: DocumentoDeDesenho, opcoes: OpcoesDocume
   .item .cit { font-size: 12.5px; color: var(--texto-2); margin: 4px 0 0; }
   .item .cit span { display: inline-block; min-width: 5.5em; color: var(--texto-mudo);
     font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
-  .desenho { width: 100%; height: 460px; border: 1px solid var(--borda);
+  /* §254 — o desenho escapa da coluna de leitura: 46rem é a régua do TEXTO, e
+     nela o diagrama empilha o cabeçalho e corta o botão de reproduzir. */
+  .desenho { width: min(1100px, calc(100vw - 48px)); margin-left: 50%;
+    transform: translateX(-50%); height: 560px; border: 1px solid var(--borda);
     border-radius: 12px; background: var(--painel); }
   .vazio { color: var(--texto-mudo); font-size: 13px; font-style: italic; }
   footer { max-width: 46rem; margin: 18px auto 0; color: var(--texto-mudo); font-size: 12px; }
@@ -165,7 +168,8 @@ export function gerarDocumentoHtml(doc: DocumentoDeDesenho, opcoes: OpcoesDocume
     .folha { box-shadow: none; border: none; border-radius: 0; max-width: none; padding: 0; }
     h2 { break-after: avoid; }
     .decisao, .item, .conf { break-inside: avoid; }
-    .desenho { height: 380px; }
+    /* Na impressão não há viewport para escapar: volta à largura da página. */
+    .desenho { width: 100%; margin-left: 0; transform: none; height: 420px; }
   }
 </style>
 </head>

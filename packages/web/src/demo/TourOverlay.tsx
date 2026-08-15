@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { PassoTour } from "./useTour";
+import { CursorFantasma } from "./CursorFantasma";
 
 export interface TourOverlayProps {
   passo: PassoTour;
@@ -111,6 +112,9 @@ export function TourOverlay({
       {!rect && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.55)", zIndex: 79 }} />
       )}
+      {/* §254 — o ponteiro vai até onde o passo agiu. Antes do anel na ordem
+          de render só por clareza: os dois são `pointerEvents: none`. */}
+      <CursorFantasma alvo={rect} passo={indice} />
       {rect && (
         <div
           style={{

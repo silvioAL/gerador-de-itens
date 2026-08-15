@@ -7855,3 +7855,55 @@ está olhando.
 demonstração → um. Ambas falham pelo motivo certo.
 
 316 engine · 572 web · 63 aplicação · 222 server · 76/76 E2E · build limpo.
+
+---
+
+## §254 — o desenho escapa da coluna, e o ponteiro volta
+
+Dois pontos do mesmo print, e uma pergunta.
+
+**A pergunta:** *"o que acontece ao clicar naquele botão?"* — "Reproduzir em
+sequência" é o modo guiado do diagrama (SPEC-21): percorre as conexões uma a
+uma, animando a direção do fluxo, para quem vê o desenho pela primeira vez
+entender a ORDEM em que as coisas acontecem.
+
+### O botão cortado
+
+Ele estava cortado porque o diagrama foi espremido na coluna de leitura. As
+~46rem são a régua certa para **texto** e errada para um desenho: nela o
+gerador empilhava o cabeçalho numa coluna de três letras e o botão sumia na
+borda.
+
+O desenho passou a **escapar da coluna** (`width: min(1100px, calc(100vw -
+48px))` com centralização por margem negativa), na tela e no HTML exportado —
+e volta à largura da página na impressão, onde não há viewport para escapar.
+
+A régua: **largura de leitura vale para parágrafo, não para diagrama.**
+Obrigá-lo à medida do texto não deixa nada legível.
+
+O teste mede o `boundingBox` e compara com a largura do título. Só medir
+serve: `width: min(...)` continuaria escrito no código com o quadro estreito.
+
+### O ponteiro
+
+Pedido: *"seria importante mostrar um cursor como de mouse confirmando as
+coisas"*. O `CursorFantasma` existiu e foi removido no §243 junto com a
+demonstração automática; volta como parte do tour, não como segundo mecanismo
+— mesma disciplina do §252.
+
+**O que ele é, e o que ele deliberadamente não é:** ele **não simula clique**.
+Cada passo executa a ação de verdade no `onEnter` (abre a tela, seleciona o nó,
+deriva); o ponteiro vai até onde isso aconteceu e dá um pulso. Um cursor que
+fingisse clicar seria teatro — e teatro numa demonstração é a mesma família de
+mentira que o §234 pagou caro: a tela dizendo uma coisa e a ferramenta fazendo
+outra.
+
+Detalhes que os testes prendem: sem alvo ele não aparece (apontar para o nada é
+pior que não apontar); o deslocamento dentro do alvo é proporcional, para não
+sair de um alvo pequeno; o pulso reinicia a cada passo; e ele não intercepta
+clique.
+
+**Mordidas:** devolver o diagrama à largura da coluna → o E2E acusa `> 646`
+recebendo `646`; tirar o alvo do ponteiro → o E2E não o encontra.
+
+316 engine · 577 web · 63 aplicação · 222 server · 76/76 E2E · build limpo.
