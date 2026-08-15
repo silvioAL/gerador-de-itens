@@ -78,13 +78,89 @@ test("a relação entre DOIS campos vira violação, com o campo comparado na me
     await painel.getByRole("spinbutton", { name: "Número de partições" }).fill("1");
     const chip = page.getByTestId("conformidade-resumo");
     await expect(chip).toContainText("1 fora do padrão");
-    // A mensagem traz o NOME do campo comparado e o valor dele: sem o nome
-    // ninguém sabe o que mudar; sem o número, o quanto.
-    await expect(chip).toHaveAttribute("title", /fatorReplicacao \(= 3\)/);
+    // §242 — o detalhe saiu do `title` do chip e virou lista: número sozinho
+    // não ensina nada. A mensagem traz o NOME do campo comparado e o valor
+    // dele — sem o nome ninguém sabe o que mudar; sem o número, o quanto.
+    await chip.click();
+    await expect(page.getByTestId("conformidade-lista")).toContainText("fatorReplicacao (= 3)");
+    await chip.click();
 
     // Ajustar fecha a conta — a régua é sobre a RELAÇÃO, não sobre um valor.
     await painel.getByRole("spinbutton", { name: "Número de partições" }).fill("6");
     await expect(page.getByTestId("conformidade-resumo")).toHaveCount(0);
+  } finally {
+    await page.request.put(`${API}/config/regras`, { data: { documento: antes.documento } });
+  }
+});
+
+/**
+ * §242 — o padrão que ENSINA e que aceita ser contrariado.
+ *
+ * As duas metades que faltavam ao §239/§240: uma violação que só cobra, sem
+ * dizer por que o padrão existe e sem saída legítima, é uma multa sem lei
+ * publicada — e a SPEC-57 (regra 3) avisa o que acontece então: a pessoa
+ * aprende a ignorar o amarelo, e a medição inteira morre junto.
+ */
+test("a violação explica o padrão, e aceitar de propósito tira do placar sem apagar a decisão", async ({
+  page,
+}) => {
+  test.setTimeout(90000);
+  await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
+  await page.route(
+    (url) => url.pathname === "/ia/status",
+    (rota) => rota.fulfill({ json: { modelosChat: [], embeddingInstalado: false, capacidades: {} } })
+  );
+  await entrar(page);
+
+  const antes = await (await page.request.get(`${API}/config/regras`)).json();
+  const documento = JSON.parse(JSON.stringify(antes.documento));
+  documento.porTech = documento.porTech ?? {};
+  documento.porTech.Backend = documento.porTech.Backend ?? { checklistTecnico: [], testes: [] };
+  documento.porTech.Backend.checklistTecnico = [
+    ...(documento.porTech.Backend.checklistTecnico ?? []),
+    {
+      texto: "Definir timeout da chamada externa",
+      contextos: ["Backend-chamadas http"],
+      porque: "Veio do incidente em que o parceiro travou e derrubou o checkout junto.",
+      checagem: { campo: "timeoutMs", operador: "lte", valor: 500, unidade: "ms" },
+    },
+  ];
+  expect((await page.request.put(`${API}/config/regras`, { data: { documento } })).status()).toBe(200);
+
+  try {
+    await page.reload();
+    await page.getByRole("button", { name: "+ API Externa" }).click();
+    await page.locator(".react-flow__node", { hasText: "API Externa" }).click();
+    const painel = page.locator("aside");
+    await painel.getByRole("spinbutton", { name: /Timeout/ }).fill("800");
+
+    // A lista explica: sem o porquê, a régua é arbitrária.
+    await page.getByTestId("conformidade-resumo").click();
+    const lista = page.getByTestId("conformidade-lista");
+    await expect(lista).toContainText("derrubou o checkout junto");
+
+    // A válvula: aceitar exige motivo.
+    await lista.getByRole("button", { name: /Aceitar de propósito/ }).click();
+    await expect(lista.getByRole("button", { name: /Confirmar exceção/ })).toBeDisabled();
+    await lista.getByLabel(/Motivo para aceitar/).fill("O parceiro não suporta menos que 800ms.");
+    await lista.getByRole("button", { name: /Confirmar exceção/ }).click();
+
+    // Sai do placar — e o valor no desenho continua o mesmo: o que mudou foi
+    // haver uma decisão registrada, não o timeout.
+    await expect(page.getByTestId("conformidade-resumo")).toHaveCount(0);
+    await expect(painel.getByRole("spinbutton", { name: /Timeout/ })).toHaveValue("800");
+
+    // E não vira item: gerar trabalho para o que alguém resolveu de propósito
+    // é o jeito mais rápido de ensinar a ignorar o backlog.
+    await preencherObrigatorios(painel);
+    await page.locator('[data-tour="derivar-button"]').click();
+    const perguntaNome = page.getByLabel("ex.: Fatura mensal em lote");
+    if (await perguntaNome.count()) {
+      await perguntaNome.fill("Exceção registrada");
+      await page.getByTestId("assistente-balao-confirmar").click();
+    }
+    await expect(page.getByTestId("contagem-itens")).toBeVisible();
+    await expect(page.locator('[data-testid="item-n1::padrao::timeoutMs"]')).toHaveCount(0);
   } finally {
     await page.request.put(`${API}/config/regras`, { data: { documento: antes.documento } });
   }
@@ -149,7 +225,9 @@ test("valor fora do padrão aparece no placar, chega ao item, e some quando entr
   await timeout.fill("800");
   const chip = page.getByTestId("conformidade-resumo");
   await expect(chip).toContainText("1 fora do padrão");
-  await expect(chip).toHaveAttribute("title", /≤ 500ms/);
+  await chip.click();
+  await expect(page.getByTestId("conformidade-lista")).toContainText("≤ 500ms");
+  await chip.click();
 
   // §240 — e o padrão CHEGA AO ITEM: com o valor fora da régua, derivar produz
   // um item de ajuste, com o esperado e o atual dentro. Enquanto a violação só

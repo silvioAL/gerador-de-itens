@@ -81,6 +81,7 @@ export function testarContratoDeQuebras(nomeDoAdaptador: string, criarAmbiente: 
       expect(criada.demandInfo).toBe("");
       expect(criada.anexosContexto).toEqual([]);
       expect(criada.necessidades).toEqual([]);
+      expect(criada.excecoes).toEqual([]);
     });
 
     it("o PROPÓSITO sobrevive ao salvar e voltar, com vínculo e proveniência", async () => {
@@ -109,6 +110,25 @@ export function testarContratoDeQuebras(nomeDoAdaptador: string, criarAmbiente: 
       const lida = await repo.obter(criada.id);
 
       expect(lida?.necessidades).toEqual(necessidades);
+    });
+
+    it("§242 — a exceção de padrão sobrevive, com motivo e autor", async () => {
+      // Exceção sem motivo/autor é só o vermelho desligado. Se ela se perdesse
+      // entre a borda e o banco, o vermelho voltaria na próxima abertura e a
+      // decisão de alguém teria sido descartada em silêncio.
+      const repo = await comRepo();
+      const excecoes = [
+        {
+          noId: "n1",
+          campo: "timeoutMs",
+          motivo: "O parceiro não suporta menos que 800ms.",
+          autor: "silvio@exemplo",
+          em: "2026-08-15T10:00:00.000Z",
+        },
+      ];
+
+      const criada = await repo.criar(normalizarDadosQuebra({ diagrama: DIAGRAMA, excecoes }));
+      expect((await repo.obter(criada.id))?.excecoes).toEqual(excecoes);
     });
 
     it("atualizar troca as necessidades inteiras, sem mesclar com as antigas", async () => {

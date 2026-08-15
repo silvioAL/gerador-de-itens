@@ -1,4 +1,4 @@
-import type { Diagrama, Necessidade, ValorSpec } from "@gerador/engine";
+import type { Diagrama, ExcecaoDePadrao, Necessidade, ValorSpec } from "@gerador/engine";
 
 /**
  * SPEC-31 Fase 1 — a porta de Quebras.
@@ -34,6 +34,8 @@ export interface QuebraSalva {
   produtoId?: string | null;
   /** SPEC-57 fatia A — o propósito da demanda. Lista vazia = não declarou. */
   necessidades?: Necessidade[];
+  /** §242 — as violações de padrão aceitas de propósito. */
+  excecoes?: ExcecaoDePadrao[];
   /** §184 — o markdown da especificação gerada (null = nunca gerada). */
   especificacao?: string | null;
   /** ISO-8601. Quem cria decide o valor — o relógio é do adaptador. */
@@ -83,5 +85,6 @@ export function normalizarDadosQuebra(bruto: Partial<DadosQuebra> | undefined): 
     // (§184, SPEC-53): campo que não entra na normalização morre em silêncio
     // entre a borda e o banco, e ninguém descobre até salvar e perder.
     necessidades: bruto?.necessidades ?? [],
+    excecoes: bruto?.excecoes ?? [],
   };
 }

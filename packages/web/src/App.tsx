@@ -523,6 +523,8 @@ function AppCarregado({
     const atividades = derivar(quebra.diagrama, diagramaConfig, {
       time: quebra.time,
       regras: regrasConfig,
+      // §242 — violação já decidida não vira item de novo.
+      excecoes: quebra.excecoes,
     });
     setResultado(resolverDependencias(atividades));
     setPedindoNomeDaDemanda(false);
@@ -988,6 +990,18 @@ function AppCarregado({
         onAbrirProposito={() => setAbaAssistente("contexto")}
         regras={regrasConfig}
         onSelecionarViolacao={setSelecionadoId}
+        excecoes={quebra.excecoes}
+        onAceitarViolacao={(v, motivo) =>
+          setQuebra((q) => ({
+            ...q,
+            // Sem `em`/`autor` a exceção seria só o vermelho desligado — o
+            // registro é o que a torna aceitável (regra 3 da SPEC-57).
+            excecoes: [
+              ...(q.excecoes ?? []).filter((e) => !(e.noId === v.noId && e.campo === v.campo)),
+              { noId: v.noId, campo: v.campo, motivo, autor: sessao.email, em: new Date().toISOString() },
+            ],
+          }))
+        }
       />
 
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>

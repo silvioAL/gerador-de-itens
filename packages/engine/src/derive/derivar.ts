@@ -2,6 +2,7 @@ import type {
   Atividade,
   Dependencia,
   Diagrama,
+  ExcecaoDePadrao,
   Endpoint,
   No,
   Tamanho,
@@ -15,6 +16,10 @@ export interface ContextoQuebra {
   /** §240 — as regras do time. Sem elas não há padrão a conferir, e a
    * derivação é exatamente a de antes. */
   regras?: RegrasConfig;
+  /** §242 — as violações aceitas de propósito. Não viram item: já foram
+   * decididas por uma pessoa, e gerar trabalho para o que alguém resolveu
+   * conscientemente é o jeito mais rápido de ensinar a ignorar o backlog. */
+  excecoes?: ExcecaoDePadrao[];
 }
 
 /** Sufixo da chave da atividade de criação, por kind de `derives`. */
@@ -229,7 +234,9 @@ function derivarConformidade(
   config: DiagramaConfig,
   quebra: ContextoQuebra
 ): Atividade[] {
-  return avaliarConformidade(diagrama, config, quebra.regras).map((v) => {
+  return avaliarConformidade(diagrama, config, quebra.regras, quebra.excecoes)
+    .filter((v) => !v.excecao)
+    .map((v) => {
     const no = diagrama.nodes.find((n) => n.id === v.noId)!;
     const cfg = config.nodeTypes[no.type];
     return {
@@ -243,8 +250,8 @@ function derivarConformidade(
       dependencias: [{ type: "independent" as const }],
       origem: { nodeId: v.noId },
       timesEnvolvidos: temposEnvolvidos([no], quebra),
-    };
-  });
+      };
+    });
 }
 
 export function derivar(

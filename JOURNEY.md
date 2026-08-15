@@ -7123,3 +7123,64 @@ consumidor, caminho sem alternativa). Não é extensão do `Checagem` — ela l�
 arestas, não campos, e teria outra forma. Enfiá-la no mesmo tipo criaria uma
 linguagem com duas gramáticas disfarçadas de uma. Ela pertence perto da fatia E
 (percurso), que é quando "caminho" passa a existir como conceito.
+
+## 242. O padrão que ensina, e que aceita ser contrariado
+
+Pedido: avaliar e, se fizesse sentido, implementar. A avaliação achou algo mais
+urgente que as fatias C e E: **eu entreguei a acusação sem as duas coisas que a
+própria SPEC diz que a tornam sustentável.**
+
+O §239 fez o padrão virar régua e o §240 fez a violação virar item. Nenhum dos
+dois entregou:
+
+1. **por que o padrão existe** — a SPEC-56 §0.7 é explícita: *"forçar a decisão
+   sem explicar produz obediência; explicar produz critério"*;
+2. **a saída legítima** — a regra 3 da SPEC-57: *"violar é permitido, e fica
+   registrado. Sem essa saída, a pessoa aprende a ignorar o vermelho, e a
+   medição inteira morre junto."*
+
+Ou seja: eu tinha construído uma multa sem lei publicada e sem direito de
+defesa. Corrigido nas duas pontas.
+
+**O porquê.** `Requisito.porque` — uma frase, de preferência com a história.
+*"Veio do incidente em que o parceiro travou e derrubou o checkout junto"*
+convence de um jeito que *"é boa prática"* nunca vai convencer. Ele viaja com a
+violação até a lista do placar.
+
+**A válvula.** `ExcecaoDePadrao { noId, campo, motivo, autor, em }`, guardada na
+quebra. Três decisões que a definem:
+
+- **`motivo` e `autor` obrigatórios na borda.** Exceção sem justificativa é só o
+  vermelho desligado — exatamente o que a regra 3 existe para impedir. O botão
+  de confirmar fica desabilitado sem motivo, e o Zod recusa `min(1)`.
+- **Sai do vermelho, não do histórico.** `avaliarConformidade` continua
+  devolvendo a violação, agora *marcada*; quem conta o placar é
+  `violacoesEmAberto`. Apagar faria a decisão desaparecer junto, e o que se quer
+  é o oposto.
+- **Não vira item.** Gerar trabalho para o que alguém resolveu conscientemente é
+  o jeito mais rápido de ensinar a ignorar o backlog.
+
+**O chip virou lista, e isso é a mudança de UX que importa.** Antes: um número
+que levava ao nó. Agora: o que viola, o que se esperava, **por quê o padrão
+existe**, e "aceitar de propósito…". Número sozinho cobra; a lista ensina.
+
+**Efeito colateral que vale por si:** exceção repetida é dado de melhoria. Se
+cinco times violam o mesmo padrão, o padrão está errado, não os times — e é
+exatamente o que o PDCA já sabe processar. Deixei isso escrito na migração,
+junto com o motivo de ser `jsonb` e não tabela: a consulta transversal que
+justificaria a tabela ("quantas vezes este padrão foi violado?") ainda não
+existe, e quando existir ela se paga.
+
+**Correção de uma afirmação minha, duas vezes repetida.** Eu disse que "regras
+por time é config morta". Não é: o template de especificação usa escopo por time
+por outro caminho (`onSalvarEspecificacaoTemplate`, com toggle global/time na
+tela). O que existe é que o helper `configDe` — usado por `regras`,
+`pipeline-agentes` e `exportador` — nunca manda `timeId`. É decisão de produto
+por chave, não capacidade morta. Conferi antes de repetir pela terceira vez.
+
+258 engine · 520 web · 218 server · 74/74 E2E · lint e build limpos.
+
+**O que continua aberto:** fatia C completa (ADR com opções e status — o
+`porque` é a razão do padrão, não uma decisão de arquitetura), fatia E
+(percurso, e a regra de topologia que depende dela), vincular necessidade pelo
+painel do nó, e as três medições da SPEC-57 §8.6.

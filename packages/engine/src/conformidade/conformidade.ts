@@ -1,5 +1,5 @@
 import type { Checagem, DiagramaConfig, RegrasConfig } from "../config/types.js";
-import type { Diagrama, No } from "../model/types.js";
+import type { Diagrama, ExcecaoDePadrao, No } from "../model/types.js";
 import { condicaoBate, requisitosRelevantes } from "../refinamento/gerarRefinamento.js";
 
 /**
@@ -30,6 +30,10 @@ export interface Violacao {
   texto: string;
   esperado: string;
   atual: string;
+  /** §242 — por que este padrão existe. É o que transforma cobrança em ensino. */
+  porque?: string;
+  /** §242 — presente quando alguém aceitou esta violação de propósito. */
+  excecao?: ExcecaoDePadrao;
 }
 
 /**
@@ -111,7 +115,11 @@ function satisfaz(c: Checagem, valor: unknown, valorAlvo: unknown): boolean | un
 export function avaliarConformidade(
   diagrama: Diagrama,
   config: DiagramaConfig,
-  regras?: RegrasConfig
+  regras?: RegrasConfig,
+  /** §242 — as exceções registradas na quebra. Violação com exceção continua
+   * SENDO uma violação (some do vermelho, não do histórico): apagá-la aqui
+   * faria a decisão desaparecer junto, e o que se quer é o oposto. */
+  excecoes: ExcecaoDePadrao[] = []
 ): Violacao[] {
   if (!regras) return [];
   const violacoes: Violacao[] = [];
@@ -145,6 +153,8 @@ export function avaliarConformidade(
             texto: requisito.texto,
             esperado: descreverEsperado(c, alvo?.descricao ?? ""),
             atual: String(no.spec[c.campo]?.valor ?? "—"),
+            porque: requisito.porque,
+            excecao: excecoes.find((e) => e.noId === no.id && e.campo === c.campo),
           });
         }
       }
@@ -161,4 +171,14 @@ function rotuloDe(no: No): string {
 /** As violações deste nó — é o que o semáforo do nó mostra no popover. */
 export function violacoesDoNo(violacoes: Violacao[], noId: string): Violacao[] {
   return violacoes.filter((v) => v.noId === noId);
+}
+
+/** As que ainda cobram alguém — é este número que vai ao placar. */
+export function violacoesEmAberto(violacoes: Violacao[]): Violacao[] {
+  return violacoes.filter((v) => !v.excecao);
+}
+
+/** As aceitas de propósito. Aparecem, mas noutro lugar e com outra cor. */
+export function violacoesAceitas(violacoes: Violacao[]): Violacao[] {
+  return violacoes.filter((v) => v.excecao);
 }
