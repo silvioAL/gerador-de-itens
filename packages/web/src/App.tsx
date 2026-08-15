@@ -1067,6 +1067,8 @@ function AppCarregado({
         excecoes={quebra.excecoes}
         decisoes={decisoesVisiveis}
         onSelecionarDecisao={setSelecionadoId}
+        percursos={quebra.percursos}
+        onMudarPercursos={(percursos) => setQuebra((q) => ({ ...q, percursos }))}
         onAceitarViolacao={(v, motivo) =>
           setQuebra((q) => ({
             ...q,

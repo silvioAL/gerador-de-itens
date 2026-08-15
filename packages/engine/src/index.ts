@@ -25,6 +25,20 @@ export {
   excecoesComoDecisoes,
   type ResumoDeDecisoes,
 } from "./decisao/decisoes.js";
+export {
+  inferirPercursos,
+  conciliarPercursos,
+  percursoConta,
+  percursosQueContam,
+  MAX_PERCURSOS,
+  type PercursosInferidos,
+} from "./percurso/percursos.js";
+export {
+  avaliarPercursos,
+  type ViolacaoDePercurso,
+  type PercursoNaoMedido,
+  type ResultadoDePercursos,
+} from "./percurso/conformidadeDePercurso.js";
 export { validateConfig, validateRegras } from "./config/validator.js";
 export { derivar, type ContextoQuebra } from "./derive/derivar.js";
 export {

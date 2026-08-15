@@ -193,6 +193,36 @@ export interface Decisao {
   em: string;
 }
 
+/**
+ * SPEC-57 fatia E — o CAMINHO que uma requisição faz pelo desenho.
+ *
+ * Existe porque uma classe inteira de defeito não mora em elemento nenhum:
+ * cinco saltos de 400ms são cinco nós dentro do padrão e um percurso de dois
+ * segundos. Nenhuma medida por nó vê isso.
+ *
+ * `origem: "inferido"` é o caso normal — o motor lê o grafo e propõe. É a
+ * resposta à pergunta 4 do §5 da SPEC-57: declarar dá precisão e custa
+ * trabalho, inferir é grátis e erra, então **infere e pede confirmação**, que é
+ * o padrão de proveniência que a casa já usa.
+ */
+export interface Percurso {
+  /** Derivado dos nós do caminho, e por isso estável entre inferências. */
+  id: string;
+  /** "web → api-pedidos → fila → worker" — o caminho como alguém o reconhece. */
+  rotulo: string;
+  /** Ids de nó, em ordem de travessia. */
+  nos: string[];
+  origem: Origem;
+  /**
+   * Regra 2: `inferido` não conta até alguém confirmar. Três estados, e o
+   * terceiro importa: `undefined` = o motor inferiu e ninguém olhou; `true` =
+   * confirmado; `false` = **a pessoa disse que não é caminho**. Sem o terceiro,
+   * recusar um caminho não teria efeito nenhum — o inferidor o devolveria
+   * idêntico no render seguinte, para sempre.
+   */
+  confirmado?: boolean;
+}
+
 export interface Quebra {
   /** Curto, pra achar essa quebra depois numa lista/busca — diferente de
    * `demandInfo` (a descrição longa do contexto). Não é chave: duas quebras
@@ -233,6 +263,10 @@ export interface Quebra {
   /** SPEC-57 fatia C — as escolhas entre alternativas, com o porquê. Ausente em
    * quebra antiga, e nesse caso nada se afirma sobre ela. */
   decisoes?: Decisao[];
+  /** SPEC-57 fatia E — os caminhos do desenho, inferidos e confirmados. Só os
+   * confirmados são guardados: reguardar toda inferência encheria a quebra de
+   * caminho que ninguém olhou. */
+  percursos?: Percurso[];
 }
 
 export type TipoItem = "História" | "Task" | "Débito Técnico";

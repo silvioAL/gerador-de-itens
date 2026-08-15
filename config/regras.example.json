@@ -576,5 +576,29 @@
         }
       ]
     }
-  }
+  },
+  "percursos": [
+    {
+      "texto": "O caminho síncrono cabe no orçamento de latência do cliente",
+      "porque": "Cinco saltos de 400ms são cinco nós dentro do padrão e um caminho de dois segundos — nenhuma medida por componente vê isso, e é o que o cliente sente.",
+      "checagem": {
+        "campo": "timeoutMs",
+        "agregacao": "soma",
+        "operador": "lte",
+        "valor": 2000,
+        "unidade": "ms"
+      }
+    },
+    {
+      "texto": "Nenhum elo sozinho segura o caminho inteiro",
+      "porque": "Um salto muito mais lento que os outros é o gargalo real; cortar 50ms dos rápidos não muda nada enquanto ele existir.",
+      "checagem": {
+        "campo": "timeoutMs",
+        "agregacao": "maximo",
+        "operador": "lte",
+        "valor": 800,
+        "unidade": "ms"
+      }
+    }
+  ]
 }

@@ -232,6 +232,13 @@
       "when": 1754500000018,
       "tag": "0032_decisoes_de_arquitetura",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1754500000019,
+      "tag": "0033_percursos_do_desenho",
+      "breakpoints": true
     }
   ]
 }

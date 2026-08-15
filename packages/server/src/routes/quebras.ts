@@ -92,6 +92,21 @@ const corpoQuebra = z.object({
       })
     )
     .optional(),
+  /** SPEC-57 fatia E — os caminhos confirmados. Só a DECISÃO ("este caminho
+   * importa") atravessa a borda; a inferência roda a cada abertura, é pura, e
+   * guardá-la faria o caminho salvo descolar do desenho na primeira aresta que
+   * alguém mexesse. */
+  percursos: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        rotulo: z.string(),
+        nos: z.array(z.string()).min(2),
+        origem: z.enum(["manual", "extraido", "inferido", "sugerido"]),
+        confirmado: z.boolean().optional(),
+      })
+    )
+    .optional(),
 });
 
 /** Mesmo fallback de `.example.json` de `packages/web/vite.config.ts` (servirConfigEmDev)

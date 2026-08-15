@@ -227,6 +227,19 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await expect(listaPadrao).toContainText("migração de madrugada");
   await chipPadrao.click();
 
+  // §248 — a fatia E: o motor LEU o caminho do cenário (srv-catalogo →
+  // produtos) e pede confirmação. Nada inventado: o caminho emerge do desenho
+  // que o tour já carregava.
+  await irAtePasso(page, "O caminho, não só os componentes");
+  const chipPercurso = page.getByTestId("percursos-resumo");
+  await expect(chipPercurso).toContainText("a confirmar");
+  await chipPercurso.click();
+  const listaPercurso = page.getByTestId("percursos-lista");
+  await expect(listaPercurso).toContainText("srv-catalogo → produtos");
+  // A regra 2 dita na tela, não só no código.
+  await expect(listaPercurso).toContainText("Nada é medido antes de você confirmar");
+  await chipPercurso.click();
+
   // §246 — a fatia C na demonstração: o 🧭 com uma decisão aceita (com a
   // descartada) e uma proposta do agente esperando alguém.
   await irAtePasso(page, "Por que este desenho é assim");

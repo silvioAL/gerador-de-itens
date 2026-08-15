@@ -1,5 +1,5 @@
 import type { AppConfig, Condicao, DiagramaConfig, ErroValidacaoConfig, FieldSpec, RegrasConfig } from "./types.js";
-import { OPERADORES_CHECAGEM, TIPOS_CAMPO } from "./types.js";
+import { AGREGACOES_PERCURSO, OPERADORES_CHECAGEM, TIPOS_CAMPO } from "./types.js";
 
 const TEMPLATE_RE = /\{\{(\w+)\}\}/g;
 
@@ -255,6 +255,45 @@ export function validateRegras(regras: RegrasConfig, app: AppConfig): ErroValida
           });
         }
       }
+    }
+  }
+
+  // SPEC-57 fatia E — a régua de PERCURSO. Mesma disciplina do §239: config
+  // mal escrita aqui nunca acusaria nada, e ninguém saberia que o padrão
+  // declarado não está sendo conferido.
+  for (const [i, req] of (regras.percursos ?? []).entries()) {
+    const caminho = `percursos[${i}].checagem`;
+    const c = req.checagem;
+    if (!(AGREGACOES_PERCURSO as readonly string[]).includes(c.agregacao)) {
+      erros.push({
+        campo: `${caminho}.agregacao`,
+        mensagem: `agregação "${c.agregacao}" não existe (válidas: ${AGREGACOES_PERCURSO.join(", ")})`,
+      });
+    }
+    if (!(OPERADORES_CHECAGEM as readonly string[]).includes(c.operador)) {
+      erros.push({
+        campo: `${caminho}.operador`,
+        mensagem: `operador "${c.operador}" não existe (válidos: ${OPERADORES_CHECAGEM.join(", ")})`,
+      });
+    }
+    // "preenchido" não significa nada sobre um agregado: a soma de um caminho
+    // ou é um número ou não pôde ser apurada, e o segundo caso já tem lugar
+    // próprio (`naoMedidos`).
+    if (c.operador === "preenchido") {
+      erros.push({
+        campo: `${caminho}.operador`,
+        mensagem: '"preenchido" não se aplica a percurso — compare o valor apurado com um número',
+      });
+    } else if (typeof c.valor !== "number") {
+      erros.push({ campo: `${caminho}.valor`, mensagem: "checagem de percurso precisa de um `valor` numérico para comparar" });
+    }
+    // `saltos` conta nós; um campo ali seria lido por quem escreve como se
+    // filtrasse a contagem, e não filtra.
+    if (c.agregacao === "saltos" && c.campo) {
+      erros.push({ campo: `${caminho}.campo`, mensagem: '"saltos" conta os nós do caminho e não usa `campo` — remova-o' });
+    }
+    if (c.agregacao !== "saltos" && !c.campo?.trim()) {
+      erros.push({ campo: `${caminho}.campo`, mensagem: `agregação "${c.agregacao}" precisa de um \`campo\` para apurar` });
     }
   }
 
