@@ -786,3 +786,50 @@ describe("decisões citadas no item (SPEC-57 fatia C)", () => {
     expect(doc).toContain("O parceiro não suporta menos que 800ms.");
   });
 });
+
+/**
+ * SPEC-57 fatia E (M8) — o CAMINHO chegando à spec.
+ *
+ * Saber que um serviço está num caminho síncrono com orçamento de 2s muda como
+ * ele é escrito, e essa informação não está em nenhum campo dele — está na
+ * soma. Quem implementa lendo só a ficha do componente não teria como saber.
+ */
+describe("percursos citados no item (SPEC-57 fatia E)", () => {
+  const percursos = [
+    { id: "pc::n1>n2", rotulo: "srv-a → mongo", nos: ["n1", "n2"], origem: "inferido" as const, confirmado: true },
+  ];
+
+  it("o item cita o caminho de que o componente dele participa", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, config, { percursos });
+
+    expect(doc).toContain("#### Caminhos de que participa");
+    expect(doc).toContain("- srv-a → mongo");
+  });
+
+  it("caminho NÃO confirmado não é citado — a spec sai para fora da equipe", () => {
+    // Citar um palpite do motor num documento externo daria a ele um peso que
+    // ele não tem (regra 2).
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, config, {
+      percursos: [{ ...percursos[0], confirmado: false }],
+    });
+
+    expect(doc).not.toContain("Caminhos de que participa");
+  });
+
+  it("sem percurso nenhum, o documento é o de antes — a seção some inteira", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+
+    const semPercurso = gerarEspecificacaoEntrega(atividades, diagrama, config);
+    const comListaVazia = gerarEspecificacaoEntrega(atividades, diagrama, config, { percursos: [] });
+
+    expect(semPercurso).not.toContain("Caminhos de que participa");
+    expect(comListaVazia).toBe(semPercurso);
+  });
+});

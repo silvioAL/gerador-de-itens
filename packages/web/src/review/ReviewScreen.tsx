@@ -21,6 +21,7 @@ import {
   type Decisao,
   type ExcecaoDePadrao,
   type Necessidade,
+  type Percurso,
   type RegrasConfig,
   type ValorSpec,
   type ResultadoDependenciasDe,
@@ -77,6 +78,8 @@ export interface ReviewScreenProps {
   necessidades?: Necessidade[];
   /** SPEC-57 fatia C — as decisões da quebra, para a spec carregar o porquê. */
   decisoes?: Decisao[];
+  /** SPEC-57 fatia E — os caminhos confirmados, para o item dizer de qual participa. */
+  percursos?: Percurso[];
   /** §242 — as violações aceitas de propósito; viram decisões derivadas na spec. */
   excecoes?: ExcecaoDePadrao[];
   /** `quebra.respostasItens` — respostas já salvas aos placeholders de
@@ -276,6 +279,7 @@ export function ReviewScreen({
   necessidades,
   decisoes,
   excecoes,
+  percursos,
   onResponderItem,
   itemInicial,
   onFechar,
@@ -717,6 +721,9 @@ export function ReviewScreen({
       // aqui faz a feature funcionar em teste unitário e em lugar nenhum.
       decisoes,
       excecoes,
+      // Fatia E — mesmo achado da fatia A e da C, terceira vez: a citação só
+      // chega ao documento se ESTA tela repassar.
+      percursos,
     });
     baixarArquivoTexto(documento, "especificacao-de-solucao.md", "text/markdown");
     // §184 — o documento gerado (com TODO o material do momento) sobe pro App
