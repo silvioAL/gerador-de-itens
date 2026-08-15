@@ -200,8 +200,21 @@ export type OperadorChecagem = (typeof OPERADORES_CHECAGEM)[number];
 export interface Checagem {
   campo: string;
   operador: OperadorChecagem;
-  /** Ausente quando o operador é "preenchido". */
+  /** Ausente quando o operador é "preenchido" ou quando há `valorDe`. */
   valor?: number | string | boolean;
+  /**
+   * §241 — compara com OUTRO campo do mesmo nó em vez de um literal. É o que
+   * torna conferível a classe de defeito que nenhum campo isolado revela: dois
+   * valores individualmente razoáveis que se contradizem.
+   *
+   * O caso clássico: `ttl ≥ backoffInicialMs × retries`. Com `retries: 5` e
+   * `backoffInicialMs: 2000`, um `ttl` de 5s parece sensato e garante que a
+   * mensagem morre antes da última tentativa — ninguém percebe olhando um
+   * campo de cada vez.
+   */
+  valorDe?: string;
+  /** Multiplica `valorDe` por este campo. Só faz sentido com `valorDe`. */
+  multiplicadoPor?: string;
   /** Só para a mensagem ("≤ 500ms"). O motor não converte unidade. */
   unidade?: string;
 }

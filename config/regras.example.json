@@ -21,7 +21,14 @@
           "texto": "Definir estratégia de retry e DLQ (tentativas, backoff, destino da mensagem morta)",
           "contextos": [
             "Backend-mensagens"
-          ]
+          ],
+          "checagem": {
+            "campo": "ttl",
+            "operador": "gte",
+            "valorDe": "backoffInicialMs",
+            "multiplicadoPor": "retries",
+            "unidade": "ms"
+          }
         },
         {
           "texto": "Definir se o consumo é idempotente; se não, especificar a chave de deduplicação",
