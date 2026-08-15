@@ -12,6 +12,7 @@ import {
   montarPedidoAlterarItem,
   montarPedidoConfigurarConversa,
   montarPedidoDiagrama,
+  montarPedidoDecisoes,
   montarPedidoNecessidades,
   montarPedidoPipeline,
   montarPedidoSugerirConfig,
@@ -443,6 +444,15 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
     const pedido = comPedido(() => montarPedidoNecessidades((req.body ?? {}) as never), reply);
     if (!pedido) return reply;
     return executarPedido(reply, pedido, "ia/necessidades");
+  });
+
+  /** SPEC-57 fatia C — o agente propõe DECISÕES a partir do desenho medido.
+   * Sem RBAC pelo mesmo motivo das duas acima: receber proposta é leitura, e
+   * a proposta não vale nada até alguém aceitar (regra 2). */
+  app.post("/ia/decisoes", async (req, reply) => {
+    const pedido = comPedido(() => montarPedidoDecisoes((req.body ?? {}) as never), reply);
+    if (!pedido) return reply;
+    return executarPedido(reply, pedido, "ia/decisoes");
   });
 
   app.post("/ia/sugerir-config", async (req, reply) => {

@@ -33,6 +33,8 @@ export interface PropertiesPanelProps {
   onRegistrarDecisao?: (d: Decisao) => void;
   onAceitarDecisao?: (id: string) => void;
   onSubstituirDecisao?: (idAntiga: string, nova: Decisao) => void;
+  /** SPEC-57 M4 — pedir ao agente que proponha, lendo o desenho medido. */
+  onPedirDecisoesAoAgente?: () => Promise<void>;
 }
 
 export function PropertiesPanel({
@@ -48,6 +50,7 @@ export function PropertiesPanel({
   onRegistrarDecisao,
   onAceitarDecisao,
   onSubstituirDecisao,
+  onPedirDecisoesAoAgente,
 }: PropertiesPanelProps) {
   if (!no) {
     return (
@@ -148,6 +151,7 @@ export function PropertiesPanel({
             onRegistrar={onRegistrarDecisao}
             onAceitar={onAceitarDecisao}
             onSubstituir={onSubstituirDecisao}
+            onPedirAoAgente={onPedirDecisoesAoAgente}
           />
         </>
       )}

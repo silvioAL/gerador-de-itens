@@ -7403,3 +7403,67 @@ a valer sem aceite, a substituída volta à leitura de hoje, e a proposta do
 agente chega à spec. Falha pelos motivos certos.
 
 270 engine · 526 web · 55 aplicação · 219 server · 72/72 E2E · build limpo.
+
+---
+
+## §247 — o agente propõe decisões, lendo o desenho MEDIDO (fecha a fatia C)
+
+O §246 deixou o modelo aceitando `status: "proposta"` e a UI sabendo recebê-la —
+mas nada gerava proposta nenhuma. Este é o elo que faltava, e ele é a tese da
+SPEC-56 §0.7 executando: **o motor mede, o agente explica, a pessoa decide.**
+
+**O que vai no pedido é o ponto inteiro.** Além do diagrama, vão:
+
+- as **violações de padrão** que o motor já apontou, cada uma com o `porque` do
+  padrão que ela contraria;
+- as **lacunas de propósito** (necessidade sem componente que responda por ela);
+- o que **já foi decidido**, como proibição explícita.
+
+Um agente que recebe só o desenho devolve arquitetura de referência — o mesmo
+texto que devolveria para qualquer diagrama parecido. Um que recebe *o que está
+fora da régua deste desenho* devolve decisão sobre este desenho. A diferença
+entre as duas coisas é a diferença entre a mesa e um chat.
+
+E o `jaDecididas` não é detalhe: agente que re-litiga decisão tomada ensina a
+pessoa a ignorar as propostas, e aí a fatia inteira vira ruído.
+
+**A régua das duas alternativas é do PRODUTO, não do modelo — e isso foi um
+achado, não um plano.** O esquema declara `minItems: 2`, mas
+`provedorOpenAI` **remove `minItems`/`maxItems` antes de enviar**: Structured
+Outputs da OpenAI recusa esses campos (já documentado em §—, no teste do
+provedor). Ou seja: o prompt pede duas opções e *nada garante*. Então o filtro
+determinístico entrou no ponto onde a proposta vira `Decisao`:
+
+```ts
+const comAlternativaReal = decisoes.filter((p) => p.alternativas.length >= 2);
+```
+
+Proposta com uma opção só é a opinião do modelo vestida de decisão, e a pessoa
+não teria contra o que pesar. **A régua não pode morar num lugar que o
+transporte apaga.**
+
+**O dublê de gateway estava errado, e o E2E provou.** `preencher` devolvia
+sempre UM item por array, ignorando `minItems`. Com o filtro acima, a proposta
+era descartada antes de chegar à tela e o teste falharia *por culpa do dublê*.
+Corrigido: o dublê agora honra `minItems`, que é o mínimo que se espera de algo
+que finge obedecer um schema. É a segunda vez que este dublê aprende algo real
+(a primeira foi o `content` virando array de parts com imagem).
+
+**O que o E2E prova, e as unidades não podiam:** o botão monta o pedido com a
+medição, atravessa Fastify e gateway, o SSE volta pelo caminho de streaming
+(§231), a proposta aparece com `⏳`, o placar diz *"1 a decidir"* em vez de
+contar, **não existe nenhuma decisão vigente** — e só depois do aceite ela vira
+uma. A regra 2 inteira, no navegador.
+
+**Mordida:** devolver `minimo = 1` no dublê → a proposta é filtrada, nada chega
+à tela, e o teste falha em `Expected substring: "escrito-pelo-gateway-falso"`.
+Vermelho pelo motivo certo — o produto recusando a proposta malformada.
+
+Uma falha isolada apareceu na primeira execução completa depois do rebuild; três
+suítes completas seguidas passaram 73/73 sem tocar em nada, então era flake de
+subida de container, não regressão.
+
+270 engine · 528 web · 62 aplicação · 219 server · 73/73 E2E · build limpo.
+
+**A fatia C está fechada.** Restam da SPEC-57 a fatia E (percurso + regras de
+topologia) e as três medições do §8.6.

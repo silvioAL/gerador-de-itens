@@ -22,10 +22,23 @@ export interface DecisoesDoNoProps {
   onAceitar: (id: string) => void;
   /** Registrar uma nova decisão marcando a anterior como substituída. */
   onSubstituir: (idAntiga: string, nova: Decisao) => void;
+  /** SPEC-57 M4 — pedir ao agente que proponha, lendo o desenho MEDIDO.
+   * Ausente = o botão não aparece (sem credencial de IA, por exemplo). */
+  onPedirAoAgente?: () => Promise<void>;
 }
 
-export function DecisoesDoNo({ noId, decisoes, autor, onRegistrar, onAceitar, onSubstituir }: DecisoesDoNoProps) {
+export function DecisoesDoNo({
+  noId,
+  decisoes,
+  autor,
+  onRegistrar,
+  onAceitar,
+  onSubstituir,
+  onPedirAoAgente,
+}: DecisoesDoNoProps) {
   const [abrindo, setAbrindo] = useState<false | { substituindo?: string }>(false);
+  const [pensando, setPensando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
   const vigentes = decisoesDoElemento(noId, decisoes);
   const propostas = propostasPendentes(decisoes).filter((d) => d.noId === noId);
 
@@ -82,9 +95,40 @@ export function DecisoesDoNo({ noId, decisoes, autor, onRegistrar, onAceitar, on
           }}
         />
       ) : (
-        <button style={linkEstilo} onClick={() => setAbrindo({})} data-testid="registrar-decisao">
-          ＋ registrar uma decisão
-        </button>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <button style={linkEstilo} onClick={() => setAbrindo({})} data-testid="registrar-decisao">
+            ＋ registrar uma decisão
+          </button>
+          {onPedirAoAgente && (
+            <button
+              style={linkEstilo}
+              disabled={pensando}
+              data-testid="pedir-decisao-ao-agente"
+              // O texto diz o que ele LÊ, não só o que ele faz: um agente que
+              // "sugere decisões" é opinião; um que lê o que o motor mediu é
+              // a tese da SPEC-56 §0.7 na tela.
+              title="O agente lê o desenho, o que está fora do padrão e as lacunas de propósito, e propõe as escolhas que ainda estão em aberto."
+              onClick={async () => {
+                setPensando(true);
+                setErro(null);
+                try {
+                  await onPedirAoAgente();
+                } catch (e) {
+                  setErro(e instanceof Error ? e.message : "não foi possível propor agora");
+                } finally {
+                  setPensando(false);
+                }
+              }}
+            >
+              {pensando ? "lendo o que o motor mediu…" : "🤖 pedir ao agente"}
+            </button>
+          )}
+        </div>
+      )}
+      {erro && (
+        <p data-testid="erro-decisao-agente" style={{ fontSize: 11, color: "var(--vermelho)", margin: "4px 0 0" }}>
+          {erro}
+        </p>
       )}
     </section>
   );

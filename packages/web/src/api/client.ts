@@ -663,6 +663,42 @@ export const apiIa = {
     }
     return interpretarRespostaEstruturada<DiagramaProposto>(acumulado, "o diagrama");
   },
+  /** SPEC-57 fatia C — o agente propõe DECISÕES lendo o desenho MEDIDO (as
+   * violações de padrão e as lacunas, não só o diagrama). Chega como
+   * `proposta`/`sugerido`: não vai à spec nem conta no placar de vigentes até
+   * alguém aceitar, e aí o porquê passa a ser de quem aceitou. */
+  proporDecisoes: async (pedido: PedidoDecisoesIa): Promise<DecisoesPropostas> => {
+    const resposta = await fetch(`${BASE_URL}/ia/decisoes`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(pedido),
+    });
+    if (!resposta.ok) {
+      const corpo = await resposta.json().catch(() => ({}));
+      const mensagem =
+        typeof corpo.erro === "string"
+          ? corpo.erro
+          : `Não foi possível propor as decisões (HTTP ${resposta.status}, sem detalhe do servidor).`;
+      throw new Error(mensagem);
+    }
+    // Streaming, como toda rota de IA — ler `.text()` direto perde o
+    // tratamento de reinício e produz JSON que nunca casa (§231).
+    let acumulado = "";
+    const leitor = resposta.body?.getReader();
+    if (leitor) {
+      const decodificador = new TextDecoder();
+      for (;;) {
+        const { done, value } = await leitor.read();
+        if (done) break;
+        acumulado = soDepoisDoUltimoReinicio(acumulado + decodificador.decode(value, { stream: true }));
+      }
+      acumulado = soDepoisDoUltimoReinicio(acumulado + decodificador.decode());
+    } else {
+      acumulado = await resposta.text();
+    }
+    return interpretarRespostaEstruturada<DecisoesPropostas>(acumulado, "as decisões");
+  },
   /** SPEC-57 fatia D — o agente propõe o PROPÓSITO da demanda a partir do
    * contexto que já existe. Chega como `sugerido`: a regra 2 cuida do resto —
    * não fecha lacuna e não é citado no documento até alguém confirmar. */
@@ -1040,6 +1076,29 @@ export interface PapelAcesso {
  * `auth/niveis.ts` do servidor). */
 export type NivelTime = "visualizar" | "operar" | "owner";
 export const NIVEIS_TIME: NivelTime[] = ["visualizar", "operar", "owner"];
+
+export interface PedidoDecisoesIa {
+  contextoEpico?: string;
+  contextoDoProduto?: string;
+  componentes?: { id: string; rotulo: string; tipo: string; campos?: string }[];
+  /** §239 — o que o motor já mediu. É o que faz a proposta ser sobre ESTE desenho. */
+  violacoes?: { noId: string; campo: string; esperado: string; atual: string; porque?: string }[];
+  lacunas?: string[];
+  jaDecididas?: string[];
+}
+
+export interface DecisaoProposta {
+  noId: string;
+  titulo: string;
+  contexto?: string;
+  alternativas: { titulo: string; consequencia?: string }[];
+  escolhida: string;
+  porque: string;
+}
+
+export interface DecisoesPropostas {
+  decisoes: DecisaoProposta[];
+}
 
 export interface PedidoNecessidadesIa {
   contextoEpico?: string;
