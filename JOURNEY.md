@@ -7732,3 +7732,72 @@ virou `?.scrollIntoView?.()` — presumir que toda plataforma tem o método
 quebrava o teste de quem nem estava exercitando rolagem.
 
 316 engine · 560 web · 63 aplicação · 222 server · 74/74 E2E · build limpo.
+
+---
+
+## §252 — o tour anda sozinho, e volta a caber em si
+
+Dois pedidos: reorganizar a divisão dos tours, e *"que ele rode sozinho, sem
+depender de clicar em ok como a demo fazia, alguns trechos podem demorar mais
+do que outros para mostrar as partes que mais impressionam"*.
+
+### A divisão, devolvida
+
+Sete telas de administração saíram do tour do produto: contexto do produto,
+stacks, padrões por componente, níveis e acessos, modelos, exportação e PDCA.
+**Produto: 26 → 19 passos. Configuração: 6 → 13.**
+
+O §236 tinha dividido os tours exatamente por isso — *"para o primeiro
+continuar respondendo 'isto serve pra quê?' em vez de virar 25 passos onde
+metade é tela de administração"*. A deriva desfez isso um passo por vez, sem
+ninguém decidir nada. O que impede a próxima é um teste novo: **o tour do
+produto não pode chamar `abrirConfigNaAba` nenhuma vez**. Passo de
+administração que vazar de volta quebra no mesmo commit.
+
+O de configuração ganhou ordem por assunto: o que o produto é → o que os
+componentes e conexões declaram → as réguas e os modelos → quem escreve (IA) →
+quem pode, para onde vai, e como melhora.
+
+### O relógio
+
+A demonstração automática existiu e **foi removida no §243**, porque ela e o
+tour faziam a mesma coisa por dois caminhos. Isto não a traz de volta: traz o
+comportamento dela para dentro do único mecanismo que sobrou. Continua havendo
+um tour só — ele é que passou a andar.
+
+- **cada passo diz quanto quer durar** (`segundos`), e é a resposta ao pedido:
+  transição 6–8s; o agente medindo, o padrão conferido e o caminho, 12s; a tela
+  do documento montado, 14s. Ter que pedir tempo a mais é o que impede o tour
+  de virar uma sequência de telas paradas;
+- **"Próximo" continua existindo** — automático que sequestra o controle é pior
+  que manual;
+- **barra de progresso**, porque avanço automático sem sinal faz a pessoa achar
+  que a tela pulou por erro.
+
+### O defeito que quase passou, e é o mais bonito da rodada
+
+Pausar e **segurar** precisavam ser dois estados, não um. Com um só: o ponteiro
+entra na carta → pausa; o clique no botão → **despausa**. O botão de pausa não
+funcionava, e pelo motivo mais difícil de enxergar — o próprio movimento do
+mouse até ele já tinha feito o trabalho que o clique desfazia.
+
+Agora `pausado` é ato da pessoa (tem botão) e `segurado` é o ponteiro sobre a
+carta; o relógio anda só quando nenhum dos dois segura. E despausar **reinicia**
+o tempo do passo: continuar de onde parou faria quem pausou para ler perder o
+passo um segundo depois de voltar.
+
+### O que o E2E acrescentou
+
+Um teste que **não clica em nada** e vê o tour passar sozinho; depois pausa,
+move o mouse para longe, espera 14 segundos e cobra que nada mudou. Sem ele o
+modo automático seria uma afirmação de teste de unidade — o relógio existiria
+no hook e ninguém saberia se chega à tela.
+
+E os testes que já existiam pediram para pausar o tour antes de andar clicando:
+sem isso o teste andaria dois passos por clique. Pausar é botão de verdade, não
+gancho criado para o teste.
+
+**Mordida:** tirar `pausado || segurado` da guarda do relógio → dois vermelhos,
+a pausa e a retenção.
+
+316 engine · 567 web · 63 aplicação · 222 server · 75/75 E2E · build limpo.

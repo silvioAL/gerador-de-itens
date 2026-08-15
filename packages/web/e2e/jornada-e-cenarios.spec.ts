@@ -162,6 +162,17 @@ test("adicionar dois cenários à mesa de projeto (sem substituir) compõe um di
  * ganhava um passo novo (que é o que se quer que aconteça). O que importa é
  * que a etapa existe, na ordem, e que a tela certa abre com ela.
  */
+/**
+ * §252 — o tour anda SOZINHO agora, e um teste que clica "Próximo" enquanto o
+ * relógio corre andaria dois passos por clique. Pausar é o que dá ao teste o
+ * mesmo controle que uma pessoa tem — e é um botão de verdade, não um gancho
+ * criado para o teste.
+ */
+async function pausarTour(page: import("@playwright/test").Page) {
+  await page.getByTestId("tour-pausar").click();
+  await expect(page.getByTestId("tour-pausar")).toHaveText("▶");
+}
+
 async function irAtePasso(page: import("@playwright/test").Page, titulo: string) {
   for (let i = 0; i < 25; i++) {
     if (await page.getByTestId("tour-titulo").filter({ hasText: titulo }).count()) return;
@@ -177,6 +188,7 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await entrar(page);
 
   await page.getByRole("button", { name: "▶ Iniciar tour guiado" }).click();
+  await pausarTour(page);
 
   // Abertura, sem alvo (overlay centralizado).
   await expect(page.getByTestId("tour-titulo")).toHaveText("Bem-vindo");
@@ -312,38 +324,10 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await expect(page.locator('[data-tour="menu-botao"]')).toBeVisible();
   await expect(page.locator(".react-flow__node")).toHaveCount(2);
 
-  // As telas de configuração. `irAtePasso` só anda PARA A FRENTE, então a
-  // ordem aqui tem que ser a ordem do tour — pedir um passo já passado faz o
-  // laço ir até o fim, onde não existe mais "Próximo" (foi o que aconteceu).
-  //
-  // §235 — o contexto do PRODUTO vem primeiro, com dado de demonstração e a
-  // marca dizendo que é de demonstração: sem ela, alguém sai do tour achando
-  // que configurou um produto.
-  await irAtePasso(page, "Contexto do produto");
-  await expect(page.getByTestId("marca-demonstracao")).toBeVisible();
-  await expect(page.getByText("Catálogo (exemplo)")).toBeVisible();
-
-  await irAtePasso(page, "Stacks conhecidas");
-  const telaConfigNoTour = page.locator('[data-tour="config-screen-content"]');
-  await expect(telaConfigNoTour.getByText("Stacks conhecidas").first()).toBeVisible();
-
-  await irAtePasso(page, "Padrões por componente");
-  await expect(telaConfigNoTour.getByRole("button", { name: "sobrescrever" }).first()).toBeVisible();
-
-  await irAtePasso(page, "Níveis e acessos");
-  await expect(telaConfigNoTour.getByText(/visualizar.*lê as quebras/).first()).toBeVisible();
-
-  await irAtePasso(page, "Modelos: documento e item");
-  await expect(telaConfigNoTour.getByText(/\{\{titulo\}\}/).first()).toBeVisible();
-
-  // SPEC-45/48 — a jornada da melhoria contínua também entrou.
-  // §235 — o último elo da cadeia: o item virando issue no tracker.
-  await irAtePasso(page, "Do item à issue");
-  await expect(page.getByTestId("config-exportacao")).toBeVisible();
-  await expect(page.getByTestId("marca-demonstracao")).toBeVisible();
-
-  await irAtePasso(page, "Melhoria contínua (PDCA)");
-  await expect(telaConfigNoTour.getByTestId("feedbacks-do-ciclo")).toBeVisible();
+  // §252 — as telas de administração saíram deste tour. Ele voltou a
+  // responder "isto serve pra quê?", que é o que a divisão do §236 queria e a
+  // deriva de sete passos tinha desfeito. Elas são cobradas no tour de
+  // configuração, abaixo.
 
   await irAtePasso(page, "Fim do tour");
   await expect(page.locator('[data-tour="config-screen-content"]')).not.toBeVisible();
@@ -351,6 +335,39 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
 
   await expect(page.getByText(/PASSO \d+ DE \d+/)).not.toBeVisible();
   await expect(page.getByTestId("contagem-itens")).not.toBeVisible();
+});
+
+/**
+ * §252 — o tour ANDA SOZINHO. Sem este teste, o modo automático seria uma
+ * afirmação de teste de unidade: o relógio existe no hook, e o que ninguém
+ * saberia é se ele chega à tela.
+ */
+test("o tour avança sozinho, e o botão de pausa segura de verdade", async ({ page }) => {
+  test.setTimeout(90000);
+  await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
+  await entrar(page);
+
+  await page.getByTestId("abrir-como-funciona").click();
+  await page.getByRole("button", { name: "▶ Iniciar tour guiado" }).click();
+  const titulo = page.getByTestId("tour-titulo");
+  await expect(titulo).toHaveText("Bem-vindo");
+
+  // Ninguém clica em nada: o primeiro passo pede 6s.
+  await expect(titulo).not.toHaveText("Bem-vindo", { timeout: 20000 });
+  const segundoPasso = await titulo.innerText();
+
+  // Pausar segura — e o mouse indo até o botão NÃO pode desfazer a pausa, que
+  // foi o defeito que os dois estados (pausado × segurado) resolveram.
+  await page.getByTestId("tour-pausar").click();
+  await expect(page.getByTestId("tour-pausar")).toHaveText("▶");
+  await page.mouse.move(5, 5);
+  await page.waitForTimeout(14000);
+  await expect(titulo).toHaveText(segundoPasso);
+
+  // E retomar volta a andar.
+  await page.getByTestId("tour-pausar").click();
+  await page.mouse.move(5, 5);
+  await expect(titulo).not.toHaveText(segundoPasso, { timeout: 20000 });
 });
 
 test("pular tour a qualquer momento encerra o overlay imediatamente", async ({ page }) => {
@@ -381,28 +398,60 @@ test("tour de configuração percorre as quatro telas que o tour do produto não
 
   await page.getByTestId("abrir-como-funciona").click();
   await page.getByTestId("tour-configuracao").click();
+  await pausarTour(page);
 
   await expect(page.getByTestId("tour-titulo")).toHaveText("Moldar pro seu time");
 
   const telaConfig = page.locator('[data-tour="config-screen-content"]');
 
-  await irAtePasso(page, "Modelo de IA");
+  // §252 — as sete telas de administração migraram do tour do produto para cá.
+  // O de produto voltou a responder "serve pra quê" em 19 passos; este passou
+  // a ser o lugar de "como eu adapto", com 13.
+  // §252 — a ordem AQUI tem que ser a ordem do tour: `irAtePasso` só anda
+  // para a frente, e pedir um passo já passado leva o laço até o fim, onde
+  // não existe mais "Próximo". Foi o que aconteceu na migração.
+  //
+  // §235 — o contexto do PRODUTO vem com dado de demonstração E a marca que
+  // diz que é de demonstração: sem ela, alguém sai do tour achando que
+  // configurou um produto.
+  await irAtePasso(page, "Contexto do produto");
+  await expect(page.getByTestId("marca-demonstracao")).toBeVisible();
+  await expect(page.getByText("Catálogo (exemplo)")).toBeVisible();
+
+  await irAtePasso(page, "Stacks conhecidas");
+  await expect(telaConfig.getByText("Stacks conhecidas").first()).toBeVisible();
+
+  await irAtePasso(page, "Padrões por componente");
+  await expect(telaConfig.getByRole("button", { name: "sobrescrever" }).first()).toBeVisible();
+
+  await irAtePasso(page, "Campos por tipo de conexão");
   await expect(telaConfig).toBeVisible();
+
+  await irAtePasso(page, "Regras de refinamento");
+  await expect(telaConfig).toBeVisible();
+
+  await irAtePasso(page, "Modelos: documento e item");
+  await expect(telaConfig.getByText(/\{\{titulo\}\}/).first()).toBeVisible();
+
+  await irAtePasso(page, "Modelo de IA");
   // Sem credencial configurada — o estado de quem acabou de instalar, que é
   // exatamente quem faz o tour. §236: aqui a tela dizia para rodar
-  // `gerador ia instalar`, comando que a SPEC-33 apagou junto com a CLI, e o
-  // tour passa por esta tela — a mentira estaria DENTRO da demonstração.
+  // `gerador ia instalar`, comando que a SPEC-33 apagou junto com a CLI.
   await expect(page.getByTestId("ia-sem-gateway")).toBeVisible();
   await expect(page.getByText(/gerador ia instalar/)).toHaveCount(0);
 
   await irAtePasso(page, "Esteira de agentes");
   await expect(telaConfig).toBeVisible();
 
-  await irAtePasso(page, "Regras de refinamento");
-  await expect(telaConfig).toBeVisible();
+  await irAtePasso(page, "Níveis e acessos");
+  await expect(telaConfig.getByText(/visualizar.*lê as quebras/).first()).toBeVisible();
 
-  await irAtePasso(page, "Campos por tipo de conexão");
-  await expect(telaConfig).toBeVisible();
+  await irAtePasso(page, "Do item à issue");
+  await expect(page.getByTestId("config-exportacao")).toBeVisible();
+  await expect(page.getByTestId("marca-demonstracao")).toBeVisible();
+
+  await irAtePasso(page, "Melhoria contínua (PDCA)");
+  await expect(telaConfig.getByTestId("feedbacks-do-ciclo")).toBeVisible();
 
   // E o passo da DERIVAÇÃO não aparece aqui: são duas listas, não a mesma com
   // filtro — se um passo do produto vazasse, quem só quer configurar levaria a

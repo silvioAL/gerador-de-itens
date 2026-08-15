@@ -8,6 +8,14 @@ export interface TourOverlayProps {
   ultimo: boolean;
   onProximo: () => void;
   onPular: () => void;
+  /** §252 — pausa explícita, do botão. */
+  pausado?: boolean;
+  /** Relógio segurado porque o ponteiro está sobre a carta. */
+  segurado?: boolean;
+  onSegurar?: (segurar: boolean) => void;
+  /** Quanto dura o passo atual, em ms — a barra é lida disto. */
+  duracao?: number;
+  onAlternarPausa?: () => void;
 }
 
 /** Reposiciona a cada 300ms — o alvo pode mudar de lugar entre passos (painel
@@ -79,7 +87,19 @@ export function posicionarCard(rect: DOMRect): React.CSSProperties {
   };
 }
 
-export function TourOverlay({ passo, indice, total, ultimo, onProximo, onPular }: TourOverlayProps) {
+export function TourOverlay({
+  passo,
+  indice,
+  total,
+  ultimo,
+  onProximo,
+  onPular,
+  pausado,
+  segurado,
+  duracao,
+  onAlternarPausa,
+  onSegurar,
+}: TourOverlayProps) {
   const rect = useRect(passo.selector);
 
   const cardStyle: React.CSSProperties = rect
@@ -124,9 +144,50 @@ export function TourOverlay({ passo, indice, total, ultimo, onProximo, onPular }
           overflowY: "auto",
           fontFamily: "system-ui, sans-serif",
         }}
+        // §252 — SEGURAR, não pausar. Alternar a pausa aqui fazia o clique no
+        // botão desfazer a pausa que o próprio movimento do mouse tinha criado.
+        onMouseEnter={() => onSegurar?.(true)}
+        onMouseLeave={() => onSegurar?.(false)}
       >
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#a5b4fc", letterSpacing: 0.3 }}>
-          PASSO {indice + 1} DE {total}
+        {/* A barra é o que torna o avanço automático PREVISÍVEL: sem ela, a
+            tela troca sozinha e a pessoa não sabe se foi o tour ou um erro. */}
+        {onAlternarPausa && (
+          <div style={{ height: 3, borderRadius: 2, background: "var(--borda)", overflow: "hidden", marginBottom: 10 }}>
+            <div
+              data-testid="tour-progresso"
+              key={`${indice}-${(pausado || segurado) ? "p" : "r"}`}
+              style={{
+                height: "100%",
+                background: "#4f46e5",
+                width: (pausado || segurado) ? "100%" : "0%",
+                opacity: (pausado || segurado) ? 0.35 : 1,
+                transition: (pausado || segurado) ? "none" : `width ${duracao ?? 0}ms linear`,
+                animation: (pausado || segurado) ? "none" : "tour-progresso-anima 1ms",
+              }}
+              ref={(el) => {
+                // Dispara a transição no frame seguinte à montagem — sem isto o
+                // navegador aplica largura final e transição de uma vez só, e a
+                // barra pula direto para 100%.
+                if (el && !pausado) requestAnimationFrame(() => (el.style.width = "100%"));
+              }}
+            />
+          </div>
+        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#a5b4fc", letterSpacing: 0.3 }}>
+            PASSO {indice + 1} DE {total}
+          </div>
+          <div style={{ flex: 1 }} />
+          {onAlternarPausa && (
+            <button
+              data-testid="tour-pausar"
+              onClick={onAlternarPausa}
+              aria-label={(pausado || segurado) ? "Retomar o tour" : "Pausar o tour"}
+              style={{ ...linkEstilo, padding: "2px 6px", fontSize: 13 }}
+            >
+              {(pausado || segurado) ? "▶" : "⏸"}
+            </button>
+          )}
         </div>
         <div data-testid="tour-titulo" style={{ fontSize: 14, fontWeight: 700, color: "var(--texto)", margin: "4px 0 6px" }}>
           {passo.titulo}
