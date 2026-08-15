@@ -59,7 +59,11 @@ describe("JourneyModal", () => {
     expect(screen.getByText("Revisão")).toBeInTheDocument();
     expect(screen.getByText("Especificação de solução")).toBeInTheDocument();
     expect(screen.getByText(/gera um único markdown com tudo/)).toBeInTheDocument();
-    expect(screen.getByText(/motor determinístico/)).toBeInTheDocument();
+    // §255 — a frase "motor determinístico — não um LLM" dizia o que o motor
+    // NÃO é e seguia em frente. A modal agora abre explicando o que ele É, e
+    // isso vale aqui e na landing pública (mesmo componente).
+    expect(screen.getByTestId("explicacao-do-motor")).toBeInTheDocument();
+    expect(screen.getByTestId("explicacao-do-motor").textContent).toMatch(/A IA escreve o/);
   });
 
   it("troca para a aba de cenários e lista todos os cenários recebidos, com categoria e design patterns quando houver", async () => {

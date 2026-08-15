@@ -28,6 +28,101 @@ programa é, além disso, garantido pela Lei 9.609/98 e é irrenunciável.
 
 ---
 
+## O motor: o que ele é, e onde a IA entra
+
+O que o resto deste README chama de **motor** é a parte que **calcula**. Ele
+vive em `packages/engine` — TypeScript puro, sem `fs`, sem `http`, sem
+dependência de framework. Não conversa com IA, não vai à rede e não guarda
+estado: recebe dados, devolve dados.
+
+### O que entra, o que sai
+
+```
+     o seu DESENHO                      a CONFIG do time
+  (componentes, conexões,        (tipos de componente, padrões,
+   campos com proveniência)       réguas conferíveis, modelos)
+              \                          /
+               \                        /
+                ▼                      ▼
+        ┌──────────────────────────────────────┐
+        │               MOTOR                  │
+        │  mede  ·  deriva  ·  monta o texto   │
+        └──────────────────────────────────────┘
+                ▼                      ▼
+        MEDIÇÕES na tela        ITENS + DOCUMENTO
+   (semáforo por componente,   (com dependências reais,
+    🎯 propósito · ⚖ padrão      citando o que atendem,
+    🛣 caminho · 🧭 decisões)      seguem e contrariam)
+```
+
+### As três coisas que ele faz
+
+1. **Mede**, a cada mudança, e não só "os campos estão cheios?":
+   - **completude** — o que falta preencher em cada componente (o semáforo);
+   - **propósito** — cada necessidade declarada tem alguém que responda por ela?
+   - **padrão** — o desenho respeita as réguas conferíveis do time (`timeout ≤
+     500ms`, `ttl ≥ backoff × retries`, "declarar a chave de sharding")?
+   - **caminho** — algum percurso inteiro estoura o orçamento? Cinco saltos de
+     400 ms são cinco componentes dentro do padrão e uma resposta de dois
+     segundos, e nenhuma medida por componente enxerga isso;
+   - **decisões** — o que foi escolhido entre alternativas tem o porquê escrito?
+
+2. **Deriva** os itens de trabalho. Não sai um tipo só: um item por componente,
+   um por conexão, um para cada padrão contrariado e um para cada caminho fora
+   da régua. As dependências vêm das arestas — calculadas, não digitadas —, e
+   ciclos e conflitos aparecem antes de você seguir.
+
+3. **Monta** os textos: checklist de refinamento, critérios, o documento de
+   desenho — sempre a partir dos modelos configuráveis do time, nunca de um
+   formato embutido no código.
+
+### A divisão de trabalho, que é a ideia toda
+
+> O **motor** decide a **estrutura**: que itens existem, o que falta, o que sai
+> do padrão, o que depende do quê.
+> A **IA** escreve o **texto**: a história do item, os critérios, o porquê de
+> uma proposta.
+> **Nunca o contrário.**
+
+É por isso que todo valor carrega de onde veio (`manual`, `extraido`,
+`inferido`, `sugerido`) e nada que a IA propõe conta antes de alguém confirmar.
+A IA entra em exatamente dois lugares, e nos dois como **proposta**:
+
+- **propondo** — um desenho a partir da conversa ou de um print, as
+  necessidades da demanda, as decisões a partir do que o motor **já mediu**;
+- **escrevendo** — os campos textuais dos itens, na esteira de agentes.
+
+Um agente que só vê o diagrama devolve arquitetura de referência. O que
+alimenta o agente aqui é o desenho **medido** — as violações com o porquê de
+cada padrão, as lacunas, o que já foi decidido —, e é isso que faz a proposta
+ser sobre este desenho e não sobre arquitetura em geral.
+
+### Por que "determinístico" importa na prática
+
+Não é purismo. São três garantias que você usa:
+
+- **o mesmo desenho produz os mesmos itens** — dá para mudar uma coisa,
+  rederivar e comparar o antes e o depois;
+- **a chave de cada item é estável** — rederivar não perde o que você já
+  escreveu nele;
+- **dá para discordar** — quando o motor aponta algo, existe uma regra
+  explícita atrás. Você muda a regra na configuração, ou registra que decidiu
+  contrariá-la de propósito, com motivo e autor. Medida que ninguém consegue
+  contestar vira ruído ou dogma.
+
+### Como isso aparece na tela
+
+A faixa no topo da mesa de projeto é o motor falando: os contadores de
+vermelho/amarelo/verde e os chips 🎯 ⚖ 🛣 🧭. Cada um abre a lista do que está
+por trás do número, e leva ao componente. O mesmo cálculo alimenta o **documento
+de desenho** (`☰ Menu → Documento de desenho`), que é o que sai da ferramenta e
+circula.
+
+Quem preferir ver funcionando: **▶ Como funciona → Iniciar tour guiado**. Ele
+anda sozinho e o segundo passo é exatamente esta divisão.
+
+---
+
 ## Testes de ponta a ponta
 
 A suíte E2E (Playwright) usa uma **stack própria**, nunca o banco de
@@ -188,6 +283,8 @@ npm run dev --workspace=packages/web
 Abra `http://localhost:5173`.
 
 Também dá pra ver a jornada de linha de comando dentro do próprio app web: botão **"✦ Como funciona & cenários" → aba "Linha de comando"**.
+
+---
 
 ## O que você pode fazer
 

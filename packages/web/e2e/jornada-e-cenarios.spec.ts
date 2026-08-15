@@ -197,10 +197,19 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await expect(page.getByTestId("tour-titulo")).toHaveText("Bem-vindo");
   await expect(page.getByText(/PASSO 1 DE \d+/)).toBeVisible();
 
+  // §255 — a divisão motor × IA é dita ANTES de qualquer tela. O tour mostrava
+  // o que a ferramenta faz sem nunca dizer quem faz.
+  await irAtePasso(page, "Quem faz o quê");
+  await expect(page.getByTestId("tour-texto")).toContainText("MOTOR calcula");
+  await expect(page.getByTestId("tour-texto")).toContainText("IA escreve");
+
   // §235 — a porta de entrada real: o desenho nasce da conversa, e o tour
   // antes começava com ele já pronto.
   await irAtePasso(page, "Começar conversando");
   await expect(page.getByTestId("assistente-janela")).toBeVisible();
+  // §254 — o ponteiro aparece no primeiro passo que TEM alvo. Nos de tela
+  // cheia ele não existe, de propósito: apontar para o nada é pior.
+  await expect(page.getByTestId("cursor-fantasma")).toBeVisible();
   await expect(page.getByText(/serviço de catálogo de produtos/i)).toBeVisible();
 
   // O diagrama de verdade, com o cenário do tour já carregado.
@@ -374,8 +383,6 @@ test("o tour avança sozinho, e o botão de pausa segura de verdade", async ({ p
   // Ninguém clica em nada: o primeiro passo pede 6s.
   await expect(titulo).not.toHaveText("Bem-vindo", { timeout: 20000 });
   const segundoPasso = await titulo.innerText();
-  // O segundo passo tem alvo — e o ponteiro vai até ele.
-  await expect(page.getByTestId("cursor-fantasma")).toBeVisible();
 
   // Pausar segura — e o mouse indo até o botão NÃO pode desfazer a pausa, que
   // foi o defeito que os dois estados (pausado × segurado) resolveram.
