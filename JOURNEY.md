@@ -6956,3 +6956,63 @@ Mordida: tirando a sugerida do cenário, o E2E do tour cai — o passo fica sem 
 que apontar, que é precisamente o defeito do §234 (tela visível, vazia).
 
 515 web · 71/71 E2E · lint e build limpos.
+
+## 239. Fatia B — o padrão vira régua, e onde ele vive
+
+A pergunta que travava esta fatia desde a SPEC-57 §5 era *"padrão vive onde?"*,
+com o alerta que eu mesmo escrevi: já existem `regras.json`, `camposNo` e
+`perfis-time.json`, e **um quarto lugar provavelmente seria erro**. O usuário
+mandou seguir duas vezes sem responder, então decidi — e deixo a decisão
+explícita, para ser fácil de derrubar:
+
+> **Não é lugar novo. É um campo a mais no requisito que já existe.**
+
+Um `Requisito` do `checklistTecnico` já sabe a tech, os contextos e o `when`.
+Só lhe faltava uma afirmação que a máquina consiga avaliar. Então ganhou
+`checagem: { campo, operador, valor, unidade }`. O `texto` continua sendo o que
+a pessoa lê; a checagem é o que o motor confere. *"Chamada externa tem que ter
+timeout curto"* é opinião; `timeoutMs ≤ 500ms` é padrão.
+
+**O que isso evitou:** uma tela nova, uma tabela nova e uma segunda régua de
+"a qual nó esta regra se aplica" — que é a parte difícil e que o checklist já
+resolve. `avaliarConformidade` **importa** `requisitosRelevantes` e
+`condicaoBate` do refinamento em vez de reimplementá-los; duplicar faria as duas
+divergirem, e o sintoma seria um requisito que aparece no documento e não é
+conferido (ou o contrário).
+
+**Quatro decisões de recorte, todas viraram teste:**
+
+- **campo ausente no nó não vira violação.** A regra é por tech, e uma tech vale
+  para tipos de nó com specs diferentes — acusar ali seria acusar o desenho por
+  um descasamento de config.
+- **campo vazio não vira violação de comparação.** Vazio é trabalho da
+  prontidão; duas dimensões acusando a mesma coisa dobrariam o vermelho sem
+  dobrar a informação.
+- **amarelo, não vermelho.** Conformidade avisa; bloquear é decisão do portão.
+- **não converte unidade.** `unidade` é texto de mensagem. Somar ms com s
+  caladamente seria pior que não somar.
+
+E `validateRegras` passou a recusar checagem com operador inventado ou sem valor
+— regra conferível mal escrita nunca acusaria nada, e ninguém saberia que o
+padrão declarado não está em vigor. **Falha aberta com cara de padrão em vigor é
+pior que padrão nenhum.**
+
+**Achado de brinde, e ele é de produto:** montando o E2E descobri que o cliente
+web lê `/config/regras` **sem `timeId`** (`loadConfig.ts`), enquanto a API
+suporta documento por time e o PUT aceita `timeId`. Ou seja: **override de
+regras por time é config morta** — o que se grava para um time nunca chega à
+tela. Não consertei nesta rodada (é decisão de produto: regras são globais por
+desenho, ou o cliente é que está incompleto?), mas ficou registrado aqui e no
+comentário do próprio spec, que é onde a próxima pessoa vai tropeçar.
+
+O E2E custou quatro tentativas por causa disso: escrevi no documento do time,
+depois no de um time criado só para o teste, e só então descobri que nada disso
+é lido. Régua: **antes de semear estado num teste, confirme por onde o app o
+lê** — a API suportar não significa que o cliente use.
+
+244 engine · 517 web · 72/72 E2E · lint e build limpos.
+
+**O que a fatia B ainda não faz:** violação não vira item derivado (§M7 propôs
+"item, salvo se não-decidida"), não há conflito aritmético entre campos
+(retry × timeout) e não há regra sobre topologia. Os três são incrementos sobre
+o mesmo `Checagem`, não mecanismo novo.

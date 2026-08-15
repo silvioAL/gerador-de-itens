@@ -16,7 +16,11 @@ function contextoBate(contextosDoItem: string[], contextosDaAtividade: string[])
   );
 }
 
-function requisitosRelevantes(reqs: Requisito[], contextos: string[]): Requisito[] {
+/** Exportado desde a fatia B (§239): a conformidade precisa da MESMA régua de
+ * casamento tech×contexto que o checklist usa. Duplicá-la faria as duas
+ * divergirem — um requisito apareceria no documento e não seria conferido, ou
+ * o contrário. */
+export function requisitosRelevantes(reqs: Requisito[], contextos: string[]): Requisito[] {
   return reqs.filter((r) => contextoBate(r.contextos, contextos));
 }
 
@@ -180,7 +184,8 @@ export function gerarChecklistProcesso(
  * Compartilhado entre checklist técnico (`Requisito`) e de processo
  * (`ItemProcesso`) — os dois só diferem no `texto`/`contextos`, a regra de
  * avaliação do `when` é idêntica. */
-function condicaoBate(item: { when?: Condicao }, nos: No[], arestas: Aresta[]): boolean {
+/** Idem — o `when` de um requisito vale para conferir tanto quanto para listar. */
+export function condicaoBate(item: { when?: Condicao }, nos: No[], arestas: Aresta[]): boolean {
   if (!item.when) return true;
   return nos.some((no) => avaliarCondicao(item.when!, no, arestas));
 }

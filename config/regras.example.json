@@ -78,7 +78,13 @@
           "texto": "Definir timeout e política de retry",
           "contextos": [
             "Backend-chamadas http"
-          ]
+          ],
+          "checagem": {
+            "campo": "timeoutMs",
+            "operador": "lte",
+            "valor": 500,
+            "unidade": "ms"
+          }
         },
         {
           "texto": "Definir autenticação/autorização da chamada",

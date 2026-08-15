@@ -18,6 +18,38 @@ describe("validateConfig — config/diagrama.example.json + config/app.example.j
    * Config incorreta falhando ABERTA e em silêncio — o pior modo de falha, e o
    * que o "falhar alto" do CONTEXTO existe para impedir.
    */
+  it("§239 — recusa checagem com operador inventado, ou sem valor para comparar", () => {
+    // Regra conferível mal escrita nunca acusaria nada, e ninguém saberia que
+    // o padrão declarado não está sendo conferido — falha aberta com cara de
+    // padrão em vigor, que é pior que padrão nenhum.
+    const comOperadorRuim: RegrasConfig = {
+      ...regras,
+      porTech: {
+        ...regras.porTech,
+        [Object.keys(regras.porTech)[0]]: {
+          ...regras.porTech[Object.keys(regras.porTech)[0]],
+          checklistTecnico: [
+            { texto: "x", contextos: [], checagem: { campo: "timeout", operador: "menorzinho" as never, valor: 1 } },
+          ],
+        },
+      },
+    };
+    const erros = validateRegras(comOperadorRuim, app);
+    expect(erros.some((e) => e.mensagem.includes('operador "menorzinho" não existe'))).toBe(true);
+
+    const semValor: RegrasConfig = {
+      ...regras,
+      porTech: {
+        ...regras.porTech,
+        [Object.keys(regras.porTech)[0]]: {
+          ...regras.porTech[Object.keys(regras.porTech)[0]],
+          checklistTecnico: [{ texto: "x", contextos: [], checagem: { campo: "timeout", operador: "lte" } }],
+        },
+      },
+    };
+    expect(validateRegras(semValor, app).some((e) => e.mensagem.includes("precisa de um valor"))).toBe(true);
+  });
+
   it("recusa type de campo inventado, dizendo quais existem", () => {
     const quebrada: DiagramaConfig = {
       ...diagrama,

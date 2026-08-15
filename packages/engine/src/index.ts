@@ -4,6 +4,11 @@ export { avaliarCondicao } from "./spec/condicoes.js";
 export { camposVisiveis, camposVisiveisAresta, resolverDefault } from "./spec/campos.js";
 export { calcularProntidao } from "./readiness/prontidao.js";
 export {
+  avaliarConformidade,
+  violacoesDoNo,
+  type Violacao,
+} from "./conformidade/conformidade.js";
+export {
   analisarLacunas,
   necessidadeConta,
   necessidadesDoElemento,

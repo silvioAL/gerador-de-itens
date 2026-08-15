@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { Diagrama, DiagramaConfig, Necessidade } from "@gerador/engine";
-import { analisarLacunas } from "@gerador/engine";
+import type { Diagrama, DiagramaConfig, Necessidade, RegrasConfig } from "@gerador/engine";
+import { analisarLacunas, avaliarConformidade } from "@gerador/engine";
 import { ReadinessBadge } from "./ReadinessBadge";
 import { calcularResumoProntidao, type NoComProntidao } from "./prontidaoResumo";
 
@@ -13,6 +13,11 @@ export interface ReadinessSummaryProps {
   necessidades?: Necessidade[];
   /** Abre o painel onde a lacuna se resolve. Sem isto o número seria um beco. */
   onAbrirProposito?: () => void;
+  /** §239 — as regras do time; sem elas não há padrão a conferir, e o
+   * indicador de conformidade não aparece. */
+  regras?: RegrasConfig;
+  /** Leva ao primeiro nó que viola — o equivalente ao "Próximo pendente". */
+  onSelecionarViolacao?: (noId: string) => void;
 }
 
 export function ReadinessSummary({
@@ -21,6 +26,8 @@ export function ReadinessSummary({
   onSelecionar,
   necessidades,
   onAbrirProposito,
+  regras,
+  onSelecionarViolacao,
 }: ReadinessSummaryProps) {
   const { vermelhos, amarelos, verdes } = calcularResumoProntidao(diagrama, config);
   // Dimensão PROPÓSITO (SPEC-56 §0.6): mesma barra, mais uma razão. Amarelo e
@@ -28,6 +35,10 @@ export function ReadinessSummary({
   // — bloquear no primeiro dia ensinaria a ignorar a cor.
   const lacunas = analisarLacunas(diagrama, necessidades ?? []);
   const semElemento = lacunas.semElemento.length;
+  // §239 — dimensão CONFORMIDADE: quais padrões este desenho viola. Amarelo
+  // como o propósito: acusa, não bloqueia. Bloquear no primeiro dia ensinaria
+  // a ignorar a cor, e a decisão de bloquear é do portão, não da medida.
+  const violacoes = avaliarConformidade(diagrama, config, regras);
   const pendentes = [...vermelhos, ...amarelos];
   const indicePendenteRef = useRef(0);
 
@@ -69,6 +80,16 @@ export function ReadinessSummary({
           }}
         >
           🎯 {semElemento > 0 ? `${semElemento} sem componente` : "propósito coberto"}
+        </button>
+      )}
+      {violacoes.length > 0 && (
+        <button
+          data-testid="conformidade-resumo"
+          onClick={() => onSelecionarViolacao?.(violacoes[0].noId)}
+          title={violacoes.map((v) => `${v.noLabel}: ${v.texto} (${v.esperado}, está ${v.atual})`).join("\n")}
+          style={{ ...botaoProximoEstilo, borderColor: "var(--amarelo)", color: "var(--amarelo)" }}
+        >
+          ⚖ {violacoes.length} fora do padrão
         </button>
       )}
       {pendentes.length > 0 && (

@@ -1,5 +1,5 @@
 import type { AppConfig, Condicao, DiagramaConfig, ErroValidacaoConfig, FieldSpec, RegrasConfig } from "./types.js";
-import { TIPOS_CAMPO } from "./types.js";
+import { OPERADORES_CHECAGEM, TIPOS_CAMPO } from "./types.js";
 
 const TEMPLATE_RE = /\{\{(\w+)\}\}/g;
 
@@ -183,6 +183,29 @@ export function validateRegras(regras: RegrasConfig, app: AppConfig): ErroValida
       erros.push({ campo: `porTech.${tech}`, mensagem: `tech "${tech}" não existe em app.json` });
     }
     for (const [i, req] of porTech.checklistTecnico.entries()) {
+      // §239 — a checagem é o que torna o requisito CONFERÍVEL, então config
+      // mal escrita aqui não pode falhar em silêncio: uma regra com operador
+      // inventado simplesmente nunca acusaria nada, e ninguém saberia que o
+      // padrão declarado não está sendo conferido.
+      const c = req.checagem;
+      if (c) {
+        const caminho = `porTech.${tech}.checklistTecnico[${i}].checagem`;
+        if (!(OPERADORES_CHECAGEM as readonly string[]).includes(c.operador)) {
+          erros.push({
+            campo: `${caminho}.operador`,
+            mensagem: `operador "${c.operador}" não existe (válidos: ${OPERADORES_CHECAGEM.join(", ")})`,
+          });
+        }
+        if (c.operador !== "preenchido" && c.valor === undefined) {
+          erros.push({
+            campo: `${caminho}.valor`,
+            mensagem: `operador "${c.operador}" precisa de um valor para comparar`,
+          });
+        }
+        if (!c.campo?.trim()) {
+          erros.push({ campo: `${caminho}.campo`, mensagem: "checagem sem campo — não há o que conferir" });
+        }
+      }
       for (const contexto of req.contextos) {
         if (!app.contextos.some((c) => c.includes(contexto) || c.toLowerCase().includes(contexto.toLowerCase()))) {
           erros.push({
