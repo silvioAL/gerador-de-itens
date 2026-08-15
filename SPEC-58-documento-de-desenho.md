@@ -127,7 +127,80 @@ não o único acesso.
 A regeneração é explícita e diz o que vai fazer: *"o desenho, as medições e os
 itens serão reescritos; o que você escreveu fica"*.
 
-## 7. O que esta SPEC NÃO faz
+## 7. O documento precisa ser bonito — e o que isso significa aqui
+
+Pedido do usuário: *"o output deve ser visualmente bonito"*. Não é acabamento;
+é requisito, e por uma razão de produto: **este documento é o que sai da mesa e
+circula**. Ele vai para quem não abriu a ferramenta — outro time, um
+fornecedor, a liderança. Um bloco de markdown cru comunica "isto foi cuspido
+por uma máquina"; um documento bem composto comunica que alguém pensou.
+
+### 7.1 As três decisões técnicas, e a que as amarra
+
+**O projeto já resolveu este problema uma vez, e a solução fica.**
+`gerarDiagramaHtml` (SPEC-21) gera um HTML **único, autocontido, animado e
+interativo** — SVG + CSS + JS inline, **zero dependência nova**, função pura no
+engine. É o precedente, e ele é bom.
+
+1. **Nada de biblioteca de markdown.** `packages/web` tem seis dependências no
+   total, e essa magreza é escolha, não acaso. Um `react-markdown` +
+   `remark` + plugins traz uma árvore inteira para renderizar um documento cuja
+   estrutura **nós mesmos geramos** — não é markdown arbitrário da internet, é
+   markdown que sai do nosso template. Vamos compor o HTML das partes que já
+   conhecemos, em vez de reparsear o texto que acabamos de escrever.
+2. **Markdown continua sendo a verdade.** O template configurável (SPEC-47) é
+   markdown, a exportação para o tracker é markdown, o documento salvo na
+   quebra é markdown. O HTML é uma **renderização**, nunca a fonte — senão
+   passam a existir duas verdades e a primeira edição as separa.
+3. **A aparência vem dos tokens do app** (`--painel`, `--borda`, `--texto`,
+   `--verde`/`--amarelo`/`--vermelho`). Um segundo sistema visual dentro do
+   mesmo produto é como interface envelhece em seis meses.
+
+### 7.2 O que faz este documento bonito, concretamente
+
+Não é fonte bonita — é **a informação certa na forma certa**:
+
+- **O diagrama, dentro do documento.** É a maior diferença visual possível, e
+  o gerador já existe e já anima. Um design doc de arquitetura sem o desenho é
+  uma descrição de um quadro;
+- **A faixa de saúde no topo** — os mesmos chips do placar (🎯 propósito, ⚖
+  padrão, 🧭 decisões, 🛣 caminhos) como resumo visual do estado do desenho no
+  momento em que o documento foi gerado. Quem abre entende a situação em dois
+  segundos, antes de ler uma linha;
+- **Decisões como cartões**, com a escolhida em destaque e as descartadas
+  riscadas, do jeito que já aparecem na mesa. Uma lista de bullets perde
+  exatamente o contraste que faz a decisão ser lida;
+- **Proveniência como selo**, não como palavra numa coluna de tabela: manual,
+  extraído, inferido, sugerido têm peso visual diferente porque **têm confiança
+  diferente**;
+- **Violações como aviso, com o porquê junto** — a mesma composição do ⚖, onde
+  a razão do padrão é tão visível quanto a cobrança;
+- **Largura de leitura contida** (~72 caracteres), hierarquia tipográfica clara
+  e respiro entre seções. Documento largura-de-tela ninguém lê até o fim;
+- **As seções escritas por gente ficam visualmente distintas das geradas.**
+  Quem lê precisa saber o que uma pessoa afirmou e o que a máquina apurou — é
+  a mesma disciplina de proveniência, aplicada ao documento inteiro.
+
+### 7.3 Três saídas, uma composição
+
+| Saída | Para quê | Como |
+|---|---|---|
+| **Na tela** (`#/documento`) | ler, editar as seções escritas, revisar | React, tokens do app |
+| **HTML autocontido** | mandar por e-mail, anexar, arquivar | mesma composição, um arquivo só, como `gerarDiagramaHtml` |
+| **Markdown** | tracker, versionamento, quem prefere texto | o que já existe hoje |
+
+O HTML autocontido resolve o PDF de graça: `Ctrl+P` do navegador, com `@media
+print` cuidado. Gerar PDF de verdade exigiria um headless browser no servidor —
+peso desproporcional para o ganho.
+
+**A régua que impede as três de divergirem:** as três saem da **mesma estrutura
+de dados**, não de três montagens paralelas. O engine já devolve o documento
+estruturado antes de virar markdown (`FichaEspecificacaoNo`, `FichaItem`); é
+dessa estrutura que as três renderizações partem. Três montagens separadas
+divergem na primeira mudança — e o jeito de descobrir é alguém reclamar que o
+PDF não tem o que a tela tem.
+
+## 8. O que esta SPEC NÃO faz
 
 Dito em voz alta para não virar escopo por omissão:
 
@@ -141,22 +214,28 @@ Dito em voz alta para não virar escopo por omissão:
 - **não afrouxa a régua do ADR.** A fatia C continua exigindo escolha entre
   alternativas. O documento é o que dá casa ao que não é decisão.
 
-## 8. Fatiamento
+## 9. Fatiamento
 
 Cada fatia entrega um fluxo completo e usável.
 
 | Fatia | O que entrega | Vale sozinha? |
 |---|---|---|
-| **1 — O documento tem leitor** | tela `#/documento` mostrando o que já é gerado hoje, com exportação | **Sim.** Fecha o absurdo atual: o documento está no banco e ninguém o vê |
+| **1 — O documento tem leitor, e ele é bonito** | tela `#/documento` com o documento COMPOSTO (não markdown cru), a faixa de saúde, o diagrama embutido e a exportação | **Sim.** Fecha o absurdo atual: o documento está no banco e ninguém o vê |
 | **2 — O que a pessoa escreve** | seções escritas (trade-offs, riscos) que sobrevivem à regeneração | **Sim**, e é o que fecha o órfão |
 | **3 — O ciclo** | status + a regra de "aprovado → em revisão ao regenerar" | **Sim**, e é o "em termos de processo" |
 | **4 — As decisões sobem** | seção de decisões no topo, citação por item encurtada | Melhora 1–3, não vale sozinha |
+| **5 — O HTML que circula** | exportação autocontida (um arquivo, imprime bem), no molde de `gerarDiagramaHtml` | **Sim**, e é o que faz o documento sair da ferramenta com a cara que tem dentro dela |
 
 **Recomendação: 1 primeiro.** É a menor e a mais constrangedora de não ter — o
 documento existe, está salvo, e a aplicação finge que não. Depois 2, que é o
-pedido original. 3 e 4 seguem.
+pedido original. 3, 4 e 5 seguem.
 
-## 9. As perguntas que precisam de resposta antes do primeiro commit
+A composição visual entra **na fatia 1**, não como polimento depois. Fazer
+"primeiro funcionar, depois embelezar" com documento é como se aprende que
+embelezar nunca chega: a versão feia vira a versão, e o custo de trocá-la
+cresce a cada template que alguém configurou em cima dela.
+
+## 10. As perguntas que precisam de resposta antes do primeiro commit
 
 1. **As seções escritas moram onde?** Coluna própria na quebra
    (`documentoEscrito: Record<string, string>`) ou dentro do markdown com
@@ -168,7 +247,13 @@ pedido original. 3 e 4 seguem.
    fechada de `VARIAVEIS_ESPECIFICACAO`, e o diagnóstico do §108 conta —
    senão a fatia 2 nasce dormente em toda instalação, que é a lição do §244
    pela terceira vez.
-3. **Regenerar é manual ou automático?** **Proposta: manual, com aviso de
+3. **A composição parte de qual estrutura?** O engine hoje devolve markdown
+   pronto (`gerarEspecificacaoEntrega`) e, por dentro, já tem as fichas
+   estruturadas (`FichaEspecificacaoNo`, `FichaItem`). **Proposta:** expor a
+   estrutura do DOCUMENTO inteiro, e fazer markdown e HTML serem duas
+   renderizações dela — não duas montagens paralelas, que divergem na primeira
+   mudança.
+4. **Regenerar é manual ou automático?** **Proposta: manual, com aviso de
    defasagem.** Automático a cada mudança faria o documento piscar embaixo de
    quem está lendo; a procedência (SPEC-26) já sabe dizer "isto foi escrito
    sobre um desenho que já mudou".
