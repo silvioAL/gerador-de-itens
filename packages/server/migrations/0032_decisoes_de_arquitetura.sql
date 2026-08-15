@@ -1,0 +1,18 @@
+-- SPEC-57 fatia C — o PORQUÊ: a escolha entre alternativas, ancorada no
+-- elemento que ela decide.
+--
+-- A fatia B (0031) ensinou o motor a apontar onde o desenho sai do padrão.
+-- Sozinha ela é cobrança: o vermelho diz O QUÊ, nunca POR QUÊ, e vermelho sem
+-- porquê é ordem. Esta coluna guarda o que converte a mesma medição em ensino.
+--
+-- O que se guarda não é a escolha, é o LEQUE: `alternativas` inclui as
+-- descartadas com a consequência de cada uma. Registrar só a escolhida
+-- documenta o que foi feito e perde o que serve daqui a um ano — quem reabre a
+-- decisão sem as descartadas refaz a análise inteira, ou troca por uma opção
+-- que já tinha sido rejeitada por um motivo que ninguém escreveu.
+--
+-- jsonb pela mesma razão de `necessidades` (0030) e `excecoes` (0031): coleção
+-- que PERTENCE à quebra, sem consulta transversal que justifique tabela. A
+-- pergunta que justificaria — "quantas vezes a organização escolheu X sobre
+-- Y?" — é boa e ainda não existe; quando o PDCA a fizer, a tabela se paga.
+ALTER TABLE "quebras" ADD COLUMN "decisoes" jsonb DEFAULT '[]'::jsonb NOT NULL;

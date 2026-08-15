@@ -7330,3 +7330,76 @@ agora não há mais o que reclamar.
 `Expected substring: "1 fora do padrão"`. Falha pelo motivo certo.
 
 258 engine · 515 web · 72/72 E2E · build limpo em todos os workspaces.
+
+---
+
+## §246 — o porquê, ancorado no nó (SPEC-57 fatia C)
+
+A fatia B ensinou o motor a apontar onde o desenho sai do padrão. Sozinha ela é
+**cobrança**: o vermelho diz *o quê*, nunca *por quê*, e um vermelho sem porquê
+é uma ordem. A SPEC-57 §7 já dizia isso ao classificar a fatia C como *"o que
+transforma B de cobrança em ensino"*. Esta rodada é essa fatia.
+
+**A régua que impede ADR de virar wiki**, e ela está no modelo, no formulário e
+no texto do botão: decisão nasce de **escolha entre alternativas** ou de exceção
+consciente — nunca de "preencher um campo". `timeout = 300ms` continua sendo
+valor com proveniência. "Rabbit e não Kafka, porque X" é decisão. Sem essa
+régua, todo campo vira ADR e o mecanismo morre de excesso, que é como a maioria
+dos repositórios de ADR morre. O formulário exige **duas opções** para salvar.
+
+**O que se guarda não é a escolha, é o leque.** Registrar só a escolhida
+documenta o que foi feito e perde exatamente o que serve daqui a um ano: quem
+reabre a decisão sem as descartadas refaz a análise inteira, ou troca por uma
+opção que já tinha sido rejeitada por um motivo que ninguém escreveu. Por isso
+`alternativas` carrega a `consequencia` de cada uma, e as descartadas aparecem
+riscadas no painel, no placar e na spec gerada.
+
+**Três decisões de modelagem, todas herdadas de rodadas anteriores:**
+
+1. **Nada é limpo em cascata.** Apagar o nó sobre o qual se decidiu algo produz
+   uma decisão *órfã*, que aparece com ⚠ — mesma disciplina do vínculo quebrado
+   (§230) e do `ALVO_INEXISTENTE`. Ou a decisão está obsoleta e alguém a
+   substitui, ou o nó voltou com outro id e alguém religa; as duas exigem uma
+   pessoa, e o silêncio não resolve nenhuma.
+2. **Decisão revista não se apaga** — vira `substituida`, com `substituidaPor`.
+   Quem apaga a decisão revista faz o time repetir o ciclo que a produziu.
+3. **A exceção de padrão (§242) NÃO virou uma `Decisao` persistida.** A SPEC-57
+   chama o caso 3 de "emenda ao ADR do padrão", e a tentação era gravar as duas
+   coisas. Seriam duas cópias da mesma verdade, e a editada depois mentiria
+   sobre a outra. `excecoesComoDecisoes()` é **leitura derivada**: aparece na
+   mesma lista de "por que este desenho é assim", sem existir duas vezes.
+
+**O que o chip 🧭 conta, e o que ele recusa contar.** Não conta decisões — isso
+é volume, e premiar volume é o caminho mais curto para o cemitério de ADRs. Ele
+cobra duas coisas: **proposta pendente** (regra 2 — o agente propõe, a pessoa
+decide) e **decisão vigente sem o porquê**, que é o formato que faz alguém ler
+daqui a um ano e continuar sem saber se ainda faz sentido.
+
+**A lição do §244/§245 aplicada de primeira, não depois.** A fatia entrou no
+tour na mesma rodada, com `DECISOES_DO_TOUR`: uma decisão aceita (Mongo em vez
+de Postgres, com o custo do índice GIN que o time não sabe operar) e uma
+proposta do agente esperando alguém. As duas ancoradas nos nós que o cenário do
+tour **já tinha** — a demonstração não inventou desenho para ter o que mostrar.
+E elas se somam às reais em vez de substituí-las: quem registra uma decisão
+durante o tour precisa ver a própria aparecer, senão a demonstração ensina que
+o botão não funciona.
+
+**Um achado do E2E que virou UI melhor.** O passo do tour promete *"clique no
+🧭: cada decisão guarda a escolhida, o porquê, e o que foi descartado"* — e o
+popover não mostrava o descartado, só o painel do nó mostrava. O teste falhou
+com `Expected substring: "opere o índice GIN"`. A resposta certa não era ajustar
+a asserção: era a UI que estava incompleta, porque **essa lista é onde se lê
+"por que este desenho é assim" de uma vez só**, e resposta sem o rejeitado é
+meia resposta. A promessa do texto estava certa antes da tela.
+
+**A armadilha pela quinta vez** (§221, §232, §233, §245): passo que aponta chip
+no topo precisa de `fecharAssistente` no `onEnter`. Cinco de seis passos novos.
+Já não é azar, é característica do layout — a janela flutuante do assistente
+cobre a faixa do placar, ponto.
+
+**Mordida:** trocar `decisoesVigentes(decisoes)` por `decisoes` em
+`decisoesDoElemento` → três testes vermelhos, em dois pacotes: a proposta passa
+a valer sem aceite, a substituída volta à leitura de hoje, e a proposta do
+agente chega à spec. Falha pelos motivos certos.
+
+270 engine · 526 web · 55 aplicação · 219 server · 72/72 E2E · build limpo.

@@ -1,0 +1,309 @@
+import { useState } from "react";
+import { decisoesDoElemento, propostasPendentes, type Alternativa, type Decisao } from "@gerador/engine";
+
+/**
+ * SPEC-57 fatia C (M5 caso 2) — a ESCOLHA ENTRE ALTERNATIVAS, no lugar onde ela
+ * é tomada: o painel do nó.
+ *
+ * **Por que aqui e não numa tela de "ADRs".** Um repositório de ADR separado do
+ * desenho é onde ADR vai morrer: escrever custa uma navegação, ler custa outra,
+ * e em três semanas ninguém abre. Ancorado no nó, a decisão está exatamente
+ * onde alguém vai perguntar "por que isto é assim?".
+ *
+ * **A régua que impede o excesso** está no texto do botão e no formulário:
+ * exige duas alternativas para registrar. Sem isso, "preenchi um campo" viraria
+ * ADR — e ADR demais é o mesmo que ADR nenhum, só que mais caro.
+ */
+export interface DecisoesDoNoProps {
+  noId: string;
+  decisoes: Decisao[];
+  autor: string;
+  onRegistrar: (decisao: Decisao) => void;
+  onAceitar: (id: string) => void;
+  /** Registrar uma nova decisão marcando a anterior como substituída. */
+  onSubstituir: (idAntiga: string, nova: Decisao) => void;
+}
+
+export function DecisoesDoNo({ noId, decisoes, autor, onRegistrar, onAceitar, onSubstituir }: DecisoesDoNoProps) {
+  const [abrindo, setAbrindo] = useState<false | { substituindo?: string }>(false);
+  const vigentes = decisoesDoElemento(noId, decisoes);
+  const propostas = propostasPendentes(decisoes).filter((d) => d.noId === noId);
+
+  return (
+    <section data-testid="decisoes-do-no" style={{ marginTop: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <h3 style={{ fontSize: 12, fontWeight: 700, color: "var(--texto-2)", margin: 0 }}>Por que este desenho</h3>
+        {vigentes.length > 0 && <span style={contadorEstilo}>{vigentes.length}</span>}
+      </div>
+
+      {vigentes.length === 0 && propostas.length === 0 && (
+        <p style={{ fontSize: 11, color: "var(--texto-mudo)", margin: "6px 0 0" }}>
+          Nenhuma decisão registrada. Registre quando a escolha for <strong>entre alternativas</strong> — preencher um
+          campo não é decisão.
+        </p>
+      )}
+
+      {propostas.map((d) => (
+        <article key={d.id} data-testid="decisao-proposta" style={{ ...cartaoEstilo, borderColor: "var(--amarelo)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={selo("var(--amarelo)")}>proposta</span>
+            <strong style={{ fontSize: 12 }}>{d.titulo}</strong>
+          </div>
+          <CorpoDaDecisao decisao={d} />
+          {/* Regra 2: proposta não vale nada até alguém aceitar. */}
+          <button style={botaoPrimarioEstilo} onClick={() => onAceitar(d.id)} data-testid={`aceitar-${d.id}`}>
+            aceitar esta decisão
+          </button>
+        </article>
+      ))}
+
+      {vigentes.map((d) => (
+        <article key={d.id} data-testid="decisao-vigente" style={cartaoEstilo}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <strong style={{ fontSize: 12 }}>{d.titulo}</strong>
+          </div>
+          <CorpoDaDecisao decisao={d} />
+          <button style={linkEstilo} onClick={() => setAbrindo({ substituindo: d.id })}>
+            revisar esta decisão
+          </button>
+        </article>
+      ))}
+
+      {abrindo ? (
+        <Formulario
+          noId={noId}
+          autor={autor}
+          substituindo={abrindo.substituindo}
+          onCancelar={() => setAbrindo(false)}
+          onPronto={(nova) => {
+            if (abrindo.substituindo) onSubstituir(abrindo.substituindo, nova);
+            else onRegistrar(nova);
+            setAbrindo(false);
+          }}
+        />
+      ) : (
+        <button style={linkEstilo} onClick={() => setAbrindo({})} data-testid="registrar-decisao">
+          ＋ registrar uma decisão
+        </button>
+      )}
+    </section>
+  );
+}
+
+function CorpoDaDecisao({ decisao }: { decisao: Decisao }) {
+  const descartadas = decisao.alternativas.filter((a) => a.titulo !== decisao.escolhida);
+
+  return (
+    <>
+      {decisao.contexto && (
+        <p style={{ fontSize: 11, color: "var(--texto-fraco)", margin: "4px 0 0", fontStyle: "italic" }}>
+          {decisao.contexto}
+        </p>
+      )}
+      <p style={{ fontSize: 11, margin: "4px 0 0" }}>
+        <strong>{decisao.escolhida}</strong>
+        {decisao.porque.trim() ? ` — ${decisao.porque}` : ""}
+      </p>
+      {/* O que foi DESCARTADO é o que serve daqui a um ano: sem isto, quem
+          reabre a decisão troca por uma opção já rejeitada por um motivo que
+          ninguém escreveu. */}
+      {descartadas.length > 0 && (
+        <ul style={{ margin: "4px 0 0", paddingLeft: 16, fontSize: 11, color: "var(--texto-fraco)" }}>
+          {descartadas.map((a) => (
+            <li key={a.titulo}>
+              <s>{a.titulo}</s>
+              {a.consequencia ? ` — ${a.consequencia}` : ""}
+            </li>
+          ))}
+        </ul>
+      )}
+      {!decisao.porque.trim() && (
+        <p data-testid="decisao-sem-porque" style={{ fontSize: 11, color: "var(--amarelo)", margin: "4px 0 0" }}>
+          sem o porquê — quem ler isto daqui a um ano vai refazer a análise
+        </p>
+      )}
+    </>
+  );
+}
+
+function Formulario({
+  noId,
+  autor,
+  substituindo,
+  onCancelar,
+  onPronto,
+}: {
+  noId: string;
+  autor: string;
+  substituindo?: string;
+  onCancelar: () => void;
+  onPronto: (d: Decisao) => void;
+}) {
+  const [titulo, setTitulo] = useState("");
+  const [contexto, setContexto] = useState("");
+  const [alternativas, setAlternativas] = useState<Alternativa[]>([{ titulo: "" }, { titulo: "" }]);
+  const [escolhida, setEscolhida] = useState("");
+  const [porque, setPorque] = useState("");
+
+  const preenchidas = alternativas.filter((a) => a.titulo.trim());
+  // Duas alternativas é a régua: com uma só, isto seria um campo com comentário.
+  const podeSalvar = titulo.trim() !== "" && preenchidas.length >= 2 && escolhida.trim() !== "";
+
+  function salvar() {
+    onPronto({
+      id: `d-${noId}-${Date.now()}`,
+      noId,
+      titulo: titulo.trim(),
+      contexto: contexto.trim() || undefined,
+      alternativas: preenchidas.map((a) => ({
+        titulo: a.titulo.trim(),
+        consequencia: a.consequencia?.trim() || undefined,
+      })),
+      escolhida,
+      porque: porque.trim(),
+      status: "aceita",
+      origem: "manual",
+      autor,
+      em: new Date().toISOString(),
+    });
+  }
+
+  return (
+    <div data-testid="formulario-decisao" style={{ ...cartaoEstilo, borderColor: "#4f46e5" }}>
+      <input
+        placeholder="a decisão, em uma linha (ex.: fila em vez de chamada síncrona)"
+        value={titulo}
+        onChange={(e) => setTitulo(e.target.value)}
+        style={campoEstilo}
+      />
+      <input
+        placeholder="o que forçava a escolha (opcional)"
+        value={contexto}
+        onChange={(e) => setContexto(e.target.value)}
+        style={campoEstilo}
+      />
+      <p style={{ fontSize: 10, color: "var(--texto-mudo)", margin: "8px 0 2px" }}>
+        as opções que estavam na mesa — e o que cada descartada custaria
+      </p>
+      {alternativas.map((a, i) => (
+        <div key={i} style={{ display: "flex", gap: 4, marginTop: 4 }}>
+          <input
+            placeholder={`opção ${i + 1}`}
+            value={a.titulo}
+            onChange={(e) => {
+              const t = e.target.value;
+              setAlternativas((atual) => atual.map((x, j) => (j === i ? { ...x, titulo: t } : x)));
+              // Renomear a opção escolhida não pode desfazer a escolha.
+              setEscolhida((atual) => (atual === a.titulo && atual !== "" ? t : atual));
+            }}
+            style={{ ...campoEstilo, flex: 1, marginTop: 0 }}
+          />
+          <input
+            placeholder="por que não"
+            value={a.consequencia ?? ""}
+            onChange={(e) => {
+              const c = e.target.value;
+              setAlternativas((atual) => atual.map((x, j) => (j === i ? { ...x, consequencia: c } : x)));
+            }}
+            style={{ ...campoEstilo, flex: 1, marginTop: 0 }}
+          />
+        </div>
+      ))}
+      <button style={linkEstilo} onClick={() => setAlternativas((a) => [...a, { titulo: "" }])}>
+        ＋ outra opção
+      </button>
+
+      <select
+        value={escolhida}
+        onChange={(e) => setEscolhida(e.target.value)}
+        style={campoEstilo}
+        aria-label="alternativa escolhida"
+      >
+        <option value="">qual foi escolhida?</option>
+        {preenchidas.map((a) => (
+          <option key={a.titulo} value={a.titulo}>
+            {a.titulo}
+          </option>
+        ))}
+      </select>
+      <textarea
+        placeholder="por quê — é isto que ainda vai valer daqui a um ano"
+        value={porque}
+        onChange={(e) => setPorque(e.target.value)}
+        rows={2}
+        style={campoEstilo}
+      />
+
+      <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+        <button style={botaoPrimarioEstilo} disabled={!podeSalvar} onClick={salvar} data-testid="salvar-decisao">
+          {substituindo ? "substituir a anterior" : "registrar"}
+        </button>
+        <button style={linkEstilo} onClick={onCancelar}>
+          cancelar
+        </button>
+      </div>
+      {!podeSalvar && (
+        <p style={{ fontSize: 10, color: "var(--texto-mudo)", margin: "4px 0 0" }}>
+          Precisa de título, <strong>duas opções</strong> e a escolhida — decisão com uma opção só é campo, não decisão.
+        </p>
+      )}
+    </div>
+  );
+}
+
+const cartaoEstilo: React.CSSProperties = {
+  border: "1px solid var(--borda)",
+  borderRadius: 8,
+  padding: 8,
+  marginTop: 6,
+  background: "var(--painel-2, transparent)",
+};
+
+const campoEstilo: React.CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  marginTop: 6,
+  padding: "5px 8px",
+  fontSize: 11,
+  borderRadius: 6,
+  border: "1px solid var(--borda)",
+  background: "var(--painel)",
+  color: "var(--texto)",
+  fontFamily: "inherit",
+};
+
+const linkEstilo: React.CSSProperties = {
+  marginTop: 6,
+  fontSize: 11,
+  fontWeight: 600,
+  padding: 0,
+  border: "none",
+  background: "none",
+  color: "#a5b4fc",
+  cursor: "pointer",
+};
+
+const botaoPrimarioEstilo: React.CSSProperties = {
+  marginTop: 6,
+  fontSize: 11,
+  fontWeight: 700,
+  padding: "5px 10px",
+  borderRadius: 6,
+  border: "1px solid #4f46e5",
+  background: "#4f46e5",
+  color: "#fff",
+  cursor: "pointer",
+};
+
+const contadorEstilo: React.CSSProperties = {
+  fontSize: 10,
+  fontWeight: 700,
+  padding: "1px 6px",
+  borderRadius: 999,
+  background: "rgba(99, 102, 241, 0.18)",
+  color: "#a5b4fc",
+};
+
+function selo(cor: string): React.CSSProperties {
+  return { fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, border: `1px solid ${cor}`, color: cor };
+}

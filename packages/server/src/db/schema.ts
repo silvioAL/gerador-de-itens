@@ -36,6 +36,7 @@ export const quebras = pgTable("quebras", {
    * este padrão foi violado na organização?" virar pergunta do PDCA, aí sim
    * ela justifica tabela. */
   excecoes: jsonb("excecoes").notNull().default([]),
+  decisoes: jsonb("decisoes").notNull().default([]),
   especificacao: text("especificacao"),
   especificacaoGeradaEm: timestamp("especificacao_gerada_em", { withTimezone: true }),
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),

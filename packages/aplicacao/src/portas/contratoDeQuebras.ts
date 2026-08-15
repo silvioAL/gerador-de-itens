@@ -131,6 +131,37 @@ export function testarContratoDeQuebras(nomeDoAdaptador: string, criarAmbiente: 
       expect((await repo.obter(criada.id))?.excecoes).toEqual(excecoes);
     });
 
+    it("SPEC-57 fatia C — a decisão sobrevive COM as alternativas descartadas", async () => {
+      // O que se perde num round-trip mal feito não é a escolha (essa a pessoa
+      // lembra), é o leque. Uma decisão que volta do banco só com a escolhida
+      // documenta o que foi feito e perde exatamente o que serve daqui a um ano.
+      const repo = await comRepo();
+      const decisoes = [
+        {
+          id: "d1",
+          noId: "n1",
+          titulo: "Fila em vez de chamada síncrona",
+          contexto: "O parceiro cai duas vezes por semana.",
+          alternativas: [
+            { titulo: "Chamada síncrona", consequencia: "a queda do parceiro derruba o checkout junto" },
+            { titulo: "Fila com retry" },
+          ],
+          escolhida: "Fila com retry",
+          porque: "Desacopla a disponibilidade do parceiro da nossa.",
+          status: "aceita" as const,
+          origem: "manual" as const,
+          autor: "silvio@exemplo",
+          em: "2026-08-15T10:00:00.000Z",
+        },
+      ];
+
+      const criada = await repo.criar(normalizarDadosQuebra({ diagrama: DIAGRAMA, decisoes }));
+      const lida = await repo.obter(criada.id);
+
+      expect(lida?.decisoes).toEqual(decisoes);
+      expect(lida?.decisoes?.[0].alternativas[0].consequencia).toContain("derruba o checkout");
+    });
+
     it("atualizar troca as necessidades inteiras, sem mesclar com as antigas", async () => {
       // Coleção da quebra é substituída, não fundida: mesclar faria uma
       // necessidade apagada na tela voltar do banco, que é o tipo de

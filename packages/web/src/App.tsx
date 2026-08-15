@@ -57,7 +57,7 @@ import { contextoDoProdutoEmTexto } from "@gerador/aplicacao";
 import { ConfigScreen, type AbaConfig } from "./config/ConfigScreen";
 import { TourOverlay } from "./demo/TourOverlay";
 import { useTour, passosDeConfiguracao } from "./demo/useTour";
-import { CONVERSA_DO_TOUR, REGRAS_DO_TOUR } from "./demo/dadosDoTour";
+import { CONVERSA_DO_TOUR, DECISOES_DO_TOUR, REGRAS_DO_TOUR } from "./demo/dadosDoTour";
 import { LandingPage } from "./demo/LandingPage";
 import { EscolherTimeScreen } from "./auth/EscolherTimeScreen";
 import { lembrarTime, lerTimeLembrado } from "./auth/timeLembrado";
@@ -431,6 +431,12 @@ function AppCarregado({
    * exportação), elas mostram dado de DEMONSTRAÇÃO em vez de tela vazia — e
    * não escrevem nada. Desligado no fim do tour, sempre. */
   const [demonstracaoDoTour, setDemonstracaoDoTour] = useState(false);
+  /** §246 — no tour, as decisões de demonstração ENTRAM junto das reais em vez
+   * de substituí-las: quem registra uma decisão durante o tour precisa ver a
+   * própria aparecer, senão a demonstração ensina que o botão não funciona. */
+  const decisoesVisiveis = demonstracaoDoTour
+    ? [...DECISOES_DO_TOUR, ...(quebra.decisoes ?? [])]
+    : quebra.decisoes;
   // SPEC-37 M9 — "agora não" silencia o momento até a próxima mudança real de
   // estado (recarregar/derivar); condução dispensada não insiste.
   const [derivarDispensado, setDerivarDispensado] = useState(false);
@@ -984,6 +990,8 @@ function AppCarregado({
         regras={demonstracaoDoTour ? REGRAS_DO_TOUR : regrasConfig}
         onSelecionarViolacao={setSelecionadoId}
         excecoes={quebra.excecoes}
+        decisoes={decisoesVisiveis}
+        onSelecionarDecisao={setSelecionadoId}
         onAceitarViolacao={(v, motivo) =>
           setQuebra((q) => ({
             ...q,
@@ -1014,6 +1022,32 @@ function AppCarregado({
             sugestoesDeStack={sugestoesDeStack}
             time={quebra.time}
             onSalvarStack={salvarComoStackConhecida}
+            decisoes={decisoesVisiveis}
+            autor={sessao.email}
+            onRegistrarDecisao={(d) => setQuebra((q) => ({ ...q, decisoes: [...(q.decisoes ?? []), d] }))}
+            onAceitarDecisao={(id) =>
+              setQuebra((q) => ({
+                ...q,
+                decisoes: (q.decisoes ?? []).map((d) =>
+                  // Aceitar transfere a autoria: a proposta era do agente, a
+                  // decisão é de quem aceitou (regra 2 da SPEC-57).
+                  d.id === id ? { ...d, status: "aceita", autor: sessao.email, em: new Date().toISOString() } : d
+                ),
+              }))
+            }
+            onSubstituirDecisao={(idAntiga, nova) =>
+              setQuebra((q) => ({
+                ...q,
+                // A anterior NÃO é apagada — quem apaga a decisão revista faz o
+                // time repetir o ciclo que a produziu.
+                decisoes: [
+                  ...(q.decisoes ?? []).map((d) =>
+                    d.id === idAntiga ? { ...d, status: "substituida" as const, substituidaPor: nova.id } : d
+                  ),
+                  nova,
+                ],
+              }))
+            }
           />
         )}
       </div>
@@ -1040,6 +1074,8 @@ function AppCarregado({
           templateItem={templateItem?.conteudo}
           demandInfo={quebra.demandInfo}
           necessidades={quebra.necessidades}
+          decisoes={quebra.decisoes}
+          excecoes={quebra.excecoes}
           anexosContexto={quebra.anexosContexto}
           contextoDoProduto={contextoDoProduto}
           time={quebra.time}

@@ -1,4 +1,4 @@
-import type { Diagrama, ExcecaoDePadrao, Necessidade, OperacaoDeAjuste, PerfisConfig, Quebra, RegrasConfig, ValorSpec } from "@gerador/engine";
+import type { Decisao, Diagrama, ExcecaoDePadrao, Necessidade, OperacaoDeAjuste, PerfisConfig, Quebra, RegrasConfig, ValorSpec } from "@gerador/engine";
 
 /**
  * Base do @gerador/server — configurável em runtime via `VITE_API_URL`
@@ -60,6 +60,8 @@ export interface QuebraSalva {
   necessidades?: Necessidade[];
   /** §242 — as violações de padrão aceitas de propósito. */
   excecoes?: ExcecaoDePadrao[];
+  /** SPEC-57 fatia C — as escolhas entre alternativas, com o porquê. */
+  decisoes?: Decisao[];
   /** §184 — o markdown da especificação gerada (null = nunca gerada). */
   especificacao?: string | null;
   especificacaoGeradaEm?: string | null;

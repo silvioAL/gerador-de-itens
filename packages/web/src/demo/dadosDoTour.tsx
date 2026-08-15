@@ -1,4 +1,4 @@
-import type { RegrasConfig } from "@gerador/engine";
+import type { Decisao, RegrasConfig } from "@gerador/engine";
 import type { ConfigExportador, Produto } from "../api/client";
 import type { DiagramaProposto } from "../api/client";
 
@@ -92,6 +92,60 @@ export const REGRAS_DO_TOUR: RegrasConfig = {
     },
   },
 };
+
+/**
+ * §246 — as DECISÕES do tour: a fatia C mostrada funcionando.
+ *
+ * Duas, de propósito, porque elas ensinam coisas diferentes:
+ *
+ * 1. uma **aceita**, com a alternativa descartada e o custo dela — é o que
+ *    separa um ADR de um campo "observação". Quem lê daqui a um ano descobre
+ *    não só o que foi feito, mas o que já foi rejeitado e por quê;
+ * 2. uma **proposta pelo agente**, ainda esperando alguém. É a regra 2 da
+ *    SPEC-57 na tela: o agente propõe, o motor mede, a pessoa decide. Sem uma
+ *    proposta pendente à vista, essa regra vira parágrafo de documentação.
+ *
+ * Ancoradas nos nós que o cenário do tour já tem (`n1` srv-catálogo, `n2`
+ * mongo) — mesma disciplina do REGRAS_DO_TOUR: a demonstração não inventa
+ * desenho para ter o que mostrar.
+ */
+export const DECISOES_DO_TOUR: Decisao[] = [
+  {
+    id: "decisao-do-tour-1",
+    noId: "n2",
+    titulo: "Mongo em vez de Postgres para o catálogo",
+    contexto: "O catálogo é lido muito mais do que escrito, e o formato do produto muda por categoria.",
+    alternativas: [
+      { titulo: "Mongo" },
+      {
+        titulo: "Postgres com JSONB",
+        consequencia: "resolveria hoje, mas o time não tem quem opere o índice GIN quando ele degradar",
+      },
+    ],
+    escolhida: "Mongo",
+    porque: "O custo aqui é operacional, não de modelagem: é a stack que o time já sabe operar de madrugada.",
+    status: "aceita",
+    origem: "manual",
+    autor: "exemplo@demonstracao",
+    em: "2026-08-01T10:00:00.000Z",
+  },
+  {
+    id: "decisao-do-tour-2",
+    noId: "n1",
+    titulo: "Cache de leitura no serviço de catálogo",
+    contexto: "A vitrine lê o catálogo inteiro a cada render.",
+    alternativas: [
+      { titulo: "Cache em memória com TTL curto" },
+      { titulo: "Sem cache", consequencia: "cada render da vitrine vira uma consulta ao Mongo" },
+    ],
+    escolhida: "Cache em memória com TTL curto",
+    porque: "",
+    status: "proposta",
+    origem: "sugerido",
+    autor: "agente",
+    em: "2026-08-02T10:00:00.000Z",
+  },
+];
 
 /**
  * A marca. Pequena e sempre no topo do que ela qualifica — a pessoa precisa

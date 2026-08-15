@@ -707,3 +707,82 @@ describe("necessidades citadas no item (SPEC-57 fatia A)", () => {
     expect(doc).not.toContain("Necessidades atendidas");
   });
 });
+
+/**
+ * SPEC-57 fatia C (M5 caso 2) — o PORQUÊ chegando ao item.
+ *
+ * A fatia A levou o propósito ("para que serve"); esta leva a razão ("por que
+ * é assim, e o que foi descartado"). Sem ela, quem implementa recebe uma
+ * ordem: usa fila. Com ela, recebe um critério.
+ */
+describe("decisões citadas no item (SPEC-57 fatia C)", () => {
+  const decisao = {
+    id: "d1",
+    noId: "n1",
+    titulo: "Fila em vez de chamada síncrona",
+    contexto: "O parceiro cai duas vezes por semana.",
+    alternativas: [
+      { titulo: "Fila com retry" },
+      { titulo: "Chamada síncrona", consequencia: "a queda do parceiro derruba o checkout junto" },
+    ],
+    escolhida: "Fila com retry",
+    porque: "Desacopla a disponibilidade do parceiro da nossa.",
+    status: "aceita" as const,
+    origem: "manual" as const,
+    autor: "silvio@exemplo",
+    em: "2026-08-15T10:00:00.000Z",
+  };
+
+  it("o item cita a escolha, o porquê E o que foi descartado com o custo", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, config, { decisoes: [decisao] });
+
+    expect(doc).toContain("#### Por que este desenho é assim");
+    expect(doc).toContain("Desacopla a disponibilidade do parceiro");
+    // O descartado é o que serve daqui a um ano — é o elo que um "campo de
+    // observação" perderia.
+    expect(doc).toContain("~~Chamada síncrona~~");
+    expect(doc).toContain("derruba o checkout junto");
+  });
+
+  it("sem decisão registrada, o documento é o de antes — a seção some inteira", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+
+    const semDecisao = gerarEspecificacaoEntrega(atividades, diagrama, config);
+    const comListaVazia = gerarEspecificacaoEntrega(atividades, diagrama, config, { decisoes: [] });
+
+    expect(semDecisao).not.toContain("Por que este desenho é assim");
+    expect(comListaVazia).toBe(semDecisao);
+  });
+
+  it("decisão PROPOSTA pelo agente não chega à spec até alguém aceitar", () => {
+    // Regra 2: um item não pode alegar seguir uma decisão que ninguém tomou.
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, config, {
+      decisoes: [{ ...decisao, status: "proposta", origem: "sugerido" }],
+    });
+
+    expect(doc).not.toContain("Por que este desenho é assim");
+  });
+
+  it("§242 — a exceção aceita entra na MESMA seção, sem virar cópia persistida", () => {
+    // Contrariar o padrão de propósito é decisão. Quem lê a spec precisa dela
+    // junto das outras, não numa seção à parte que ninguém associa.
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, config, {
+      excecoes: [
+        { noId: "n1", campo: "timeoutMs", motivo: "O parceiro não suporta menos que 800ms.", autor: "ana", em: "2026-08-15T10:00:00.000Z" },
+      ],
+    });
+
+    expect(doc).toContain("Por que este desenho é assim");
+    expect(doc).toContain("O parceiro não suporta menos que 800ms.");
+  });
+});

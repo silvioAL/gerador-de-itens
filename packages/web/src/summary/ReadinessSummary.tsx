@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { Diagrama, DiagramaConfig, Necessidade, RegrasConfig } from "@gerador/engine";
 import type { ExcecaoDePadrao, Violacao } from "@gerador/engine";
-import { analisarLacunas, avaliarConformidade, violacoesEmAberto } from "@gerador/engine";
+import { analisarLacunas, avaliarConformidade, resumirDecisoes, violacoesEmAberto } from "@gerador/engine";
+import type { Decisao } from "@gerador/engine";
 import { ReadinessBadge } from "./ReadinessBadge";
 import { calcularResumoProntidao, type NoComProntidao } from "./prontidaoResumo";
 
@@ -23,6 +24,11 @@ export interface ReadinessSummaryProps {
   excecoes?: ExcecaoDePadrao[];
   /** §242 — aceitar uma violação, com motivo. Ausente = a válvula não aparece. */
   onAceitarViolacao?: (violacao: Violacao, motivo: string) => void;
+  /** SPEC-57 fatia C — as decisões da quebra. Sem nenhuma, o indicador não
+   * aparece: mesma disciplina do propósito e da conformidade. */
+  decisoes?: Decisao[];
+  /** Leva ao nó onde a decisão foi ancorada — sem isto o número seria um beco. */
+  onSelecionarDecisao?: (elementoId: string) => void;
 }
 
 export function ReadinessSummary({
@@ -35,6 +41,8 @@ export function ReadinessSummary({
   onSelecionarViolacao,
   excecoes,
   onAceitarViolacao,
+  decisoes,
+  onSelecionarDecisao,
 }: ReadinessSummaryProps) {
   const { vermelhos, amarelos, verdes } = calcularResumoProntidao(diagrama, config);
   // Dimensão PROPÓSITO (SPEC-56 §0.6): mesma barra, mais uma razão. Amarelo e
@@ -49,6 +57,10 @@ export function ReadinessSummary({
   // propósito continuam existindo (`avaliarConformidade` as devolve marcadas):
   // some do vermelho, não do histórico.
   const violacoes = violacoesEmAberto(avaliarConformidade(diagrama, config, regras, excecoes ?? []));
+  // Fatia C — dimensão POR QUÊ. O número que cobra não é "quantas decisões
+  // existem" (isso é volume, não qualidade): é quantas esperam alguém e
+  // quantas registraram a escolha sem a razão.
+  const resumoDecisoes = resumirDecisoes(diagrama, decisoes ?? []);
   const pendentes = [...vermelhos, ...amarelos];
   const indicePendenteRef = useRef(0);
 
@@ -95,10 +107,123 @@ export function ReadinessSummary({
       {violacoes.length > 0 && (
         <ListaDeViolacoes violacoes={violacoes} onSelecionar={onSelecionarViolacao} onAceitar={onAceitarViolacao} />
       )}
+      {(decisoes?.length ?? 0) > 0 && (
+        <ListaDeDecisoes
+          decisoes={decisoes ?? []}
+          resumo={resumoDecisoes}
+          onSelecionar={onSelecionarDecisao}
+        />
+      )}
       {pendentes.length > 0 && (
         <button onClick={irParaProximoPendente} style={botaoProximoEstilo}>
           ▶ Próximo pendente ({pendentes.length})
         </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * SPEC-57 fatia C — o POR QUÊ deste desenho, numa lista só.
+ *
+ * A cor sai de duas coisas, e nenhuma delas é o volume de decisões: proposta
+ * esperando alguém (regra 2 — o agente propõe, a pessoa decide) e decisão
+ * vigente sem o porquê preenchido. Contar decisões seria premiar quem escreve
+ * muitas, que é exatamente como repositório de ADR vira cemitério.
+ *
+ * Órfã aparece na lista porque apagar o nó sobre o qual se decidiu algo é o
+ * evento que precisa reaparecer, não ser silenciado.
+ */
+function ListaDeDecisoes({
+  decisoes,
+  resumo,
+  onSelecionar,
+}: {
+  decisoes: Decisao[];
+  resumo: ReturnType<typeof resumirDecisoes>;
+  onSelecionar?: (elementoId: string) => void;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const raizRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!aberto) return;
+    function aoClicarFora(e: MouseEvent) {
+      if (raizRef.current && !raizRef.current.contains(e.target as Node)) setAberto(false);
+    }
+    document.addEventListener("mousedown", aoClicarFora);
+    return () => document.removeEventListener("mousedown", aoClicarFora);
+  }, [aberto]);
+
+  const cobra = resumo.propostas + resumo.semPorque.length + resumo.orfas.length;
+  const visiveis = decisoes.filter((d) => d.status !== "substituida");
+
+  return (
+    <div ref={raizRef} style={{ position: "relative" }}>
+      <button
+        data-testid="decisoes-resumo"
+        onClick={() => setAberto((a) => !a)}
+        title="As escolhas entre alternativas registradas neste desenho"
+        style={{
+          ...botaoProximoEstilo,
+          borderColor: cobra > 0 ? "var(--amarelo)" : "var(--borda-forte)",
+          color: cobra > 0 ? "var(--amarelo)" : "var(--texto-fraco)",
+        }}
+      >
+        🧭{" "}
+        {resumo.propostas > 0
+          ? `${resumo.propostas} a decidir`
+          : resumo.semPorque.length > 0
+            ? `${resumo.semPorque.length} sem porquê`
+            : `${resumo.vigentes} decisões`}
+      </button>
+
+      {aberto && (
+        <div data-testid="decisoes-lista" style={popoverEstilo}>
+          {visiveis.map((d) => {
+            const orfa = resumo.orfas.includes(d.id);
+            const alvo = d.noId ?? d.arestaId;
+            return (
+              <div key={d.id} data-testid={`decisao-${d.id}`} style={{ padding: "8px 4px", borderBottom: "1px solid var(--borda)" }}>
+                <button onClick={() => alvo && onSelecionar?.(alvo)} style={{ ...itemPopoverEstilo, fontWeight: 600 }}>
+                  {d.status === "proposta" ? "⏳ " : ""}
+                  {orfa ? "⚠ " : ""}
+                  {d.titulo}
+                </button>
+                <div style={{ fontSize: 11, color: "var(--texto-fraco)", padding: "0 4px" }}>
+                  {d.escolhida}
+                  {d.porque.trim() ? ` — ${d.porque}` : ""}
+                </div>
+                {/* As descartadas também aqui, e não só no painel do nó: esta
+                    lista é onde se lê "por que este desenho é assim" de uma
+                    vez só, e a resposta sem o que foi rejeitado é meia
+                    resposta. */}
+                {d.alternativas.filter((a) => a.titulo !== d.escolhida).length > 0 && (
+                  <ul style={{ margin: "2px 0 0", paddingLeft: 20, fontSize: 11, color: "var(--texto-mudo)" }}>
+                    {d.alternativas
+                      .filter((a) => a.titulo !== d.escolhida)
+                      .map((a) => (
+                        <li key={a.titulo}>
+                          <s>{a.titulo}</s>
+                          {a.consequencia ? ` — ${a.consequencia}` : ""}
+                        </li>
+                      ))}
+                  </ul>
+                )}
+                {!d.porque.trim() && d.status === "aceita" && (
+                  <div style={{ fontSize: 11, color: "var(--amarelo)", padding: "2px 4px" }}>
+                    sem o porquê — quem ler isto daqui a um ano vai refazer a análise
+                  </div>
+                )}
+                {orfa && (
+                  <div style={{ fontSize: 11, color: "var(--amarelo)", padding: "2px 4px" }}>
+                    o elemento decidido não existe mais no desenho
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

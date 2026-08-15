@@ -1,5 +1,6 @@
-import type { Atividade, Aresta, Diagrama, Necessidade, No, Origem, StatusNo, ValorSpec } from "../model/types.js";
+import type { Atividade, Aresta, Decisao, Diagrama, ExcecaoDePadrao, Necessidade, No, Origem, StatusNo, ValorSpec } from "../model/types.js";
 import { necessidadesDoElemento } from "../proposito/lacunas.js";
+import { decisoesDoElemento, excecoesComoDecisoes } from "../decisao/decisoes.js";
 import type { DiagramaConfig, FieldSpec, RegrasConfig } from "../config/types.js";
 import { camposVisiveis } from "../spec/campos.js";
 import {
@@ -356,6 +357,9 @@ export const VARIAVEIS_ITEM = [
   /** SPEC-57 fatia A — o propósito que este item atende. Vazia quando a quebra
    * não declarou necessidade, e aí a seção some sozinha. */
   "necessidades",
+  /** SPEC-57 fatia C — POR QUE o elemento deste item é assim, com o que foi
+   * descartado. Vazia quando não há decisão registrada, e a seção some. */
+  "decisoes",
   "historiaUsuario",
   "especificacaoTecnica",
   "contratoArquitetura",
@@ -386,6 +390,10 @@ export const TEMPLATE_ITEM_PADRAO = `### {{numero}}. {{rotulo}} — {{descricao}
 #### Necessidades atendidas
 
 {{necessidades}}
+
+#### Por que este desenho é assim
+
+{{decisoes}}
 
 #### História de usuário
 
@@ -496,6 +504,24 @@ export function aplicarTemplateDoItem(template: string, valores: Record<string, 
  * conteúdo por item, expandido inline — nunca duas fontes de verdade pro
  * mesmo texto.
  */
+/**
+ * A decisão como quem VAI CONSTRUIR precisa ler: a escolha, o porquê, e —
+ * indentado logo abaixo — o que foi descartado com o custo de cada opção.
+ *
+ * As descartadas entram no documento de propósito. Um item que diz só "usar
+ * fila" produz alguém perguntando "por que não uma chamada simples?" na
+ * primeira dúvida; com a linha riscada e o motivo, a pergunta já vem
+ * respondida. É a fatia C inteira em três linhas de markdown.
+ */
+function descreverDecisao(d: Decisao): string {
+  const linhas = [`- **${d.titulo}:** ${d.escolhida}${d.porque.trim() ? ` — ${d.porque}` : ""}`];
+  if (d.contexto?.trim()) linhas.push(`  _${d.contexto.trim()}_`);
+  for (const a of d.alternativas.filter((a) => a.titulo !== d.escolhida)) {
+    linhas.push(`  - ~~${a.titulo}~~${a.consequencia ? ` — ${a.consequencia}` : ""}`);
+  }
+  return linhas.join("\n");
+}
+
 export function renderizarItemEspecificacao(
   numero: number,
   atividade: Atividade,
@@ -510,7 +536,11 @@ export function renderizarItemEspecificacao(
    * propósito que ele atende. Sem elas a seção some sozinha (a remoção de
    * seção vazia do `aplicarTemplateDoItem` já cuida), então quebra sem
    * propósito declarado gera o mesmo documento de antes. */
-  necessidades?: Necessidade[]
+  necessidades?: Necessidade[],
+  /** SPEC-57 fatia C — as decisões da quebra, para o item carregar o PORQUÊ do
+   * elemento que ele constrói. Mesma disciplina da fatia A: sem decisão
+   * registrada a seção some e o documento sai igual ao de antes. */
+  decisoes?: Decisao[]
 ): string {
   const nos = nosDeOrigem(atividade, diagrama);
   const especificacaoTecnica =
@@ -601,6 +631,14 @@ ${MARCA_SUGERIDO}` : ""}`
   ];
   const textoNecessidades = necessidadesCitadas.map((n) => `- ${n.texto}`).join("\n");
 
+  // Fatia C — a mesma régua de origem das necessidades, pelo mesmo motivo: um
+  // item de aresta não herdaria a decisão dos dois vizinhos.
+  const decisoesCitadas = [
+    ...decisoesDoElemento(atividade.origem.nodeId, decisoes),
+    ...decisoesDoElemento(atividade.origem.edgeId, decisoes),
+  ];
+  const textoDecisoes = decisoesCitadas.map(descreverDecisao).join("\n\n");
+
   return aplicarTemplateDoItem(templateItem ?? TEMPLATE_ITEM_PADRAO, {
     numero: String(numero),
     rotulo: atividade.rotulo,
@@ -611,6 +649,7 @@ ${MARCA_SUGERIDO}` : ""}`
     contextos: atividade.contextos.join(", ") || "—",
     dependencias: descreverDependencias(atividade),
     necessidades: textoNecessidades,
+    decisoes: textoDecisoes,
     historiaUsuario,
     especificacaoTecnica,
     contratoArquitetura: contratoArquitetura ?? "",
@@ -791,6 +830,13 @@ export interface OpcoesGerarEspecificacao {
   /** SPEC-57 fatia A — `quebra.necessidades`, para cada item citar o propósito
    * que atende. Ausente = documento idêntico ao de antes. */
   necessidades?: Necessidade[];
+  /** SPEC-57 fatia C — `quebra.decisoes`, para cada item carregar o porquê do
+   * elemento que constrói. */
+  decisoes?: Decisao[];
+  /** §242 — `quebra.excecoes`. Entram como decisões DERIVADAS (nunca
+   * persistidas em duplicata): contrariar o padrão de propósito é decisão, e
+   * quem lê a spec precisa dela junto das outras, não numa seção à parte. */
+  excecoes?: ExcecaoDePadrao[];
   /** `quebra.respostasItens` — respostas (humanas ou IA confirmada) aos
    * placeholders "<- ✍️ especificar" de cada atividade, chaveadas por
    * `Atividade.chave` (Fase 1, SPEC-23). */
@@ -842,7 +888,8 @@ export function gerarEspecificacaoEntrega(
               opcoes.regras,
               opcoes.respostasItens?.[a.chave],
               opcoes.templateItem,
-              opcoes.necessidades
+              opcoes.necessidades,
+              [...(opcoes.decisoes ?? []), ...excecoesComoDecisoes(opcoes.excecoes)]
             )
           )
           .join("\n\n---\n\n")

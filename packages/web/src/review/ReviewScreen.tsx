@@ -18,6 +18,8 @@ import {
   type FichaEspecificacaoNo,
   type FichaItem,
   type FichaPlaceholder,
+  type Decisao,
+  type ExcecaoDePadrao,
   type Necessidade,
   type RegrasConfig,
   type ValorSpec,
@@ -73,6 +75,10 @@ export interface ReviewScreenProps {
    * documento CITAR a necessidade que atende. Sem isto o elo final da cadeia
    * fica quebrado justamente no artefato que sai da ferramenta. */
   necessidades?: Necessidade[];
+  /** SPEC-57 fatia C — as decisões da quebra, para a spec carregar o porquê. */
+  decisoes?: Decisao[];
+  /** §242 — as violações aceitas de propósito; viram decisões derivadas na spec. */
+  excecoes?: ExcecaoDePadrao[];
   /** `quebra.respostasItens` — respostas já salvas aos placeholders de
    * refinamento (Fase 1, SPEC-23), pra saber o que já está confirmado e não
    * precisa mais aparecer pendente na ficha. */
@@ -268,6 +274,8 @@ export function ReviewScreen({
   time,
   respostasItens,
   necessidades,
+  decisoes,
+  excecoes,
   onResponderItem,
   itemInicial,
   onFechar,
@@ -704,6 +712,11 @@ export function ReviewScreen({
       time,
       respostasItens,
       necessidades,
+      // Fatia C — o achado da fatia A repetido de propósito: a citação só
+      // chega ao documento se ESTA tela repassar. Passar no engine e esquecer
+      // aqui faz a feature funcionar em teste unitário e em lugar nenhum.
+      decisoes,
+      excecoes,
     });
     baixarArquivoTexto(documento, "especificacao-de-solucao.md", "text/markdown");
     // §184 — o documento gerado (com TODO o material do momento) sobe pro App

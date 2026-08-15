@@ -1,0 +1,127 @@
+import { describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import type { Decisao } from "@gerador/engine";
+import { DecisoesDoNo } from "./DecisoesDoNo";
+
+function decisao(p: Partial<Decisao> & { id: string }): Decisao {
+  return {
+    noId: "n1",
+    titulo: `título de ${p.id}`,
+    alternativas: [{ titulo: "Fila com retry" }, { titulo: "Chamada síncrona", consequencia: "acopla a queda do parceiro" }],
+    escolhida: "Fila com retry",
+    porque: "desacopla a disponibilidade do parceiro",
+    status: "aceita",
+    origem: "manual",
+    autor: "quem decidiu",
+    em: "2026-08-15T12:00:00.000Z",
+    ...p,
+  };
+}
+
+function montar(props: Partial<React.ComponentProps<typeof DecisoesDoNo>> = {}) {
+  const onRegistrar = vi.fn();
+  const onAceitar = vi.fn();
+  const onSubstituir = vi.fn();
+  render(
+    <DecisoesDoNo
+      noId="n1"
+      decisoes={[]}
+      autor="silvio@exemplo"
+      onRegistrar={onRegistrar}
+      onAceitar={onAceitar}
+      onSubstituir={onSubstituir}
+      {...props}
+    />
+  );
+  return { onRegistrar, onAceitar, onSubstituir };
+}
+
+describe("DecisoesDoNo — o porquê ancorado no nó (SPEC-57 fatia C)", () => {
+  it("mostra a escolhida E as descartadas, com o custo de cada uma", () => {
+    // O que serve daqui a um ano é o descartado. Um painel que só mostra a
+    // escolhida documenta o que foi feito e perde exatamente isso.
+    montar({ decisoes: [decisao({ id: "d1" })] });
+
+    expect(screen.getByText(/Fila com retry/)).toBeTruthy();
+    expect(screen.getByText(/Chamada síncrona/)).toBeTruthy();
+    expect(screen.getByText(/acopla a queda do parceiro/)).toBeTruthy();
+  });
+
+  it("proposta do agente aparece separada e exige aceite", () => {
+    const { onAceitar } = montar({ decisoes: [decisao({ id: "d1", status: "proposta", origem: "sugerido" })] });
+
+    expect(screen.getByTestId("decisao-proposta")).toBeTruthy();
+    expect(screen.queryByTestId("decisao-vigente")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("aceitar-d1"));
+    expect(onAceitar).toHaveBeenCalledWith("d1");
+  });
+
+  it("decisão vigente sem porquê é apontada na cara, não escondida", () => {
+    montar({ decisoes: [decisao({ id: "d1", porque: "" })] });
+
+    expect(screen.getByTestId("decisao-sem-porque")).toBeTruthy();
+  });
+
+  it("não deixa registrar com uma opção só — isso é campo, não decisão", () => {
+    // A régua que impede ADR de virar wiki. Sem ela, "preenchi um campo" vira
+    // decisão e o mecanismo morre de excesso.
+    const { onRegistrar } = montar();
+    fireEvent.click(screen.getByTestId("registrar-decisao"));
+
+    fireEvent.change(screen.getByPlaceholderText(/a decisão, em uma linha/), { target: { value: "Fila" } });
+    fireEvent.change(screen.getByPlaceholderText("opção 1"), { target: { value: "Fila com retry" } });
+
+    const salvar = screen.getByTestId("salvar-decisao") as HTMLButtonElement;
+    expect(salvar.disabled).toBe(true);
+
+    fireEvent.change(screen.getByPlaceholderText("opção 2"), { target: { value: "Chamada síncrona" } });
+    fireEvent.change(screen.getByLabelText("alternativa escolhida"), { target: { value: "Fila com retry" } });
+    expect((screen.getByTestId("salvar-decisao") as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(screen.getByTestId("salvar-decisao"));
+    const registrada = onRegistrar.mock.calls[0][0] as Decisao;
+    expect(registrada.alternativas).toHaveLength(2);
+    expect(registrada.escolhida).toBe("Fila com retry");
+    expect(registrada.noId).toBe("n1");
+    expect(registrada.autor).toBe("silvio@exemplo");
+  });
+
+  it("renomear a opção já escolhida não desfaz a escolha", () => {
+    // Achado real de formulário: a escolha guarda o TÍTULO (para reordenar não
+    // trocar a decisão), então editar o título depois de escolher apagaria a
+    // seleção em silêncio e o botão salvar voltaria a ficar cinza sem motivo
+    // visível.
+    const { onRegistrar } = montar();
+    fireEvent.click(screen.getByTestId("registrar-decisao"));
+    fireEvent.change(screen.getByPlaceholderText(/a decisão, em uma linha/), { target: { value: "Fila" } });
+    fireEvent.change(screen.getByPlaceholderText("opção 1"), { target: { value: "Fila" } });
+    fireEvent.change(screen.getByPlaceholderText("opção 2"), { target: { value: "Síncrono" } });
+    fireEvent.change(screen.getByLabelText("alternativa escolhida"), { target: { value: "Fila" } });
+
+    fireEvent.change(screen.getByPlaceholderText("opção 1"), { target: { value: "Fila com retry" } });
+
+    fireEvent.click(screen.getByTestId("salvar-decisao"));
+    expect((onRegistrar.mock.calls[0][0] as Decisao).escolhida).toBe("Fila com retry");
+  });
+
+  it("revisar uma decisão substitui em vez de apagar", () => {
+    const { onSubstituir } = montar({ decisoes: [decisao({ id: "d1" })] });
+    fireEvent.click(screen.getByText("revisar esta decisão"));
+
+    fireEvent.change(screen.getByPlaceholderText(/a decisão, em uma linha/), { target: { value: "Voltar ao síncrono" } });
+    fireEvent.change(screen.getByPlaceholderText("opção 1"), { target: { value: "Síncrono" } });
+    fireEvent.change(screen.getByPlaceholderText("opção 2"), { target: { value: "Fila" } });
+    fireEvent.change(screen.getByLabelText("alternativa escolhida"), { target: { value: "Síncrono" } });
+    fireEvent.click(screen.getByTestId("salvar-decisao"));
+
+    expect(onSubstituir).toHaveBeenCalled();
+    expect(onSubstituir.mock.calls[0][0]).toBe("d1");
+  });
+
+  it("decisão de OUTRO nó não aparece neste painel", () => {
+    montar({ decisoes: [decisao({ id: "d1", noId: "n2" })] });
+
+    expect(screen.queryByTestId("decisao-vigente")).toBeNull();
+  });
+});

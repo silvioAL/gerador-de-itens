@@ -69,6 +69,29 @@ const corpoQuebra = z.object({
       })
     )
     .optional(),
+  /** SPEC-57 fatia C — a escolha entre alternativas. `porque` aceita vazio de
+   * propósito: exigir aqui faria a pessoa escrever "porque sim" para conseguir
+   * salvar, e um porquê fingido é pior que um porquê ausente — o ausente pelo
+   * menos aparece no placar (`semPorque`) e continua cobrando. */
+  decisoes: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        noId: z.string().optional(),
+        arestaId: z.string().optional(),
+        titulo: z.string().min(1),
+        contexto: z.string().optional(),
+        alternativas: z.array(z.object({ titulo: z.string().min(1), consequencia: z.string().optional() })),
+        escolhida: z.string(),
+        porque: z.string(),
+        status: z.enum(["proposta", "aceita", "substituida"]),
+        substituidaPor: z.string().optional(),
+        origem: z.enum(["manual", "extraido", "inferido", "sugerido"]),
+        autor: z.string().min(1),
+        em: z.string().min(1),
+      })
+    )
+    .optional(),
 });
 
 /** Mesmo fallback de `.example.json` de `packages/web/vite.config.ts` (servirConfigEmDev)

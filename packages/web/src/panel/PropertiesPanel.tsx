@@ -9,7 +9,9 @@ import {
 import type { UseQuebra } from "../state/useQuebra";
 import type { DiagramaConfig, Aresta } from "@gerador/engine";
 import type { SugestoesDeStack } from "../api/client";
+import type { Decisao } from "@gerador/engine";
 import { ProvenanceBadge } from "./ProvenanceBadge";
+import { DecisoesDoNo } from "./DecisoesDoNo";
 import { ReadinessBadge } from "../summary/ReadinessBadge";
 
 export interface PropertiesPanelProps {
@@ -24,6 +26,13 @@ export interface PropertiesPanelProps {
   time?: string;
   /** Captura os campos manuais do nó como stack CONHECIDA do catálogo global. */
   onSalvarStack?: (tipoNo: string, valores: Record<string, unknown>) => void;
+  /** SPEC-57 fatia C — as decisões da quebra; o painel mostra as deste nó. */
+  decisoes?: Decisao[];
+  /** Quem está decidindo. Decisão sem autor não é decisão de ninguém. */
+  autor?: string;
+  onRegistrarDecisao?: (d: Decisao) => void;
+  onAceitarDecisao?: (id: string) => void;
+  onSubstituirDecisao?: (idAntiga: string, nova: Decisao) => void;
 }
 
 export function PropertiesPanel({
@@ -34,6 +43,11 @@ export function PropertiesPanel({
   sugestoesDeStack,
   time,
   onSalvarStack,
+  decisoes,
+  autor,
+  onRegistrarDecisao,
+  onAceitarDecisao,
+  onSubstituirDecisao,
 }: PropertiesPanelProps) {
   if (!no) {
     return (
@@ -121,6 +135,22 @@ export function PropertiesPanel({
           sugestoesDeStack={sugestoesDeStack}
         />
       ))}
+
+      {onRegistrarDecisao && onAceitarDecisao && onSubstituirDecisao && (
+        <>
+          <hr style={{ margin: "14px 0", border: "none", borderTop: "1px solid var(--borda)" }} />
+          {/* SPEC-57 fatia C — logo abaixo dos campos, porque é exatamente aqui
+              que alguém pergunta "por que este nó é assim?". */}
+          <DecisoesDoNo
+            noId={no.id}
+            decisoes={decisoes ?? []}
+            autor={autor ?? "—"}
+            onRegistrar={onRegistrarDecisao}
+            onAceitar={onAceitarDecisao}
+            onSubstituir={onSubstituirDecisao}
+          />
+        </>
+      )}
 
       <hr style={{ margin: "14px 0", border: "none", borderTop: "1px solid var(--borda)" }} />
       <button

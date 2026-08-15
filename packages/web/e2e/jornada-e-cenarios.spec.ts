@@ -227,6 +227,18 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await expect(listaPadrao).toContainText("migração de madrugada");
   await chipPadrao.click();
 
+  // §246 — a fatia C na demonstração: o 🧭 com uma decisão aceita (com a
+  // descartada) e uma proposta do agente esperando alguém.
+  await irAtePasso(page, "Por que este desenho é assim");
+  const chipDecisao = page.getByTestId("decisoes-resumo");
+  await expect(chipDecisao).toContainText("1 a decidir");
+  await chipDecisao.click();
+  const listaDecisao = page.getByTestId("decisoes-lista");
+  await expect(listaDecisao).toContainText("Mongo em vez de Postgres");
+  // O porquê, que é a fatia inteira.
+  await expect(listaDecisao).toContainText("opere o índice GIN");
+  await chipDecisao.click();
+
   await irAtePasso(page, "Proveniência");
   // A janela flutuante FECHA: sem isso ela cobre o painel que o passo mostra.
   await expect(page.getByTestId("assistente-janela")).toHaveCount(0);
