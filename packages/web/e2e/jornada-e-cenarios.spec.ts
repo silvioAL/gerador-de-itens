@@ -214,6 +214,19 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   // E o placar NÃO conta a sugerida: só as três confirmadas, uma delas em lacuna.
   await expect(page.getByTestId("proposito-resumo")).toContainText("1 sem componente");
 
+  // §245 — a conformidade na demonstração: sem regra de demonstração o ⚖ não
+  // apareceria, porque ele depende de `regras` com `checagem` e a config de
+  // quem está vendo raramente tem uma (§244).
+  await irAtePasso(page, "O padrão do time, conferido");
+  const chipPadrao = page.getByTestId("conformidade-resumo");
+  await expect(chipPadrao).toContainText("1 fora do padrão");
+  await chipPadrao.click();
+  const listaPadrao = page.getByTestId("conformidade-lista");
+  await expect(listaPadrao).toContainText("chave de sharding");
+  // O porquê é o que separa ensinar de cobrar.
+  await expect(listaPadrao).toContainText("migração de madrugada");
+  await chipPadrao.click();
+
   await irAtePasso(page, "Proveniência");
   // A janela flutuante FECHA: sem isso ela cobre o painel que o passo mostra.
   await expect(page.getByTestId("assistente-janela")).toHaveCount(0);
