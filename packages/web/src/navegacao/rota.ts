@@ -27,7 +27,9 @@ export type Rota =
   | { tela: "canvas" }
   | { tela: "config"; area: AreaConfig }
   | { tela: "itens" }
-  | { tela: "documento" };
+  | { tela: "documento" }
+  /** SPEC-59 fatia A — a vista de leitura de como a ferramenta está montada. */
+  | { tela: "sistema" };
 
 /** id interno ↔ segmento legível da URL (o hash é interface, fala produto). */
 const SEGMENTO_DA_AREA: Record<AreaConfig, string> = {
@@ -52,6 +54,7 @@ export function hashDaRota(rota: Rota): string {
   if (rota.tela === "canvas") return "#/";
   if (rota.tela === "itens") return "#/itens";
   if (rota.tela === "documento") return "#/documento";
+  if (rota.tela === "sistema") return "#/sistema";
   return `#/config/${SEGMENTO_DA_AREA[rota.area]}`;
 }
 
@@ -60,6 +63,7 @@ export function rotaDoHash(hash: string): Rota {
   const partes = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
   if (partes[0] === "itens") return { tela: "itens" };
   if (partes[0] === "documento") return { tela: "documento" };
+  if (partes[0] === "sistema") return { tela: "sistema" };
   if (partes[0] === "config") {
     const area = AREA_DO_SEGMENTO[partes[1] ?? ""];
     if (area) return { tela: "config", area };

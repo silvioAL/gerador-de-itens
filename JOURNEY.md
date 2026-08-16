@@ -8039,3 +8039,69 @@ que a frase do passo removido esteja no que ficou — senão fundir viraria
 apagar.
 
 316 engine · 584 web · 63 aplicação · 222 server · 76/76 E2E · build limpo.
+
+---
+
+## §258 — o mapa do sistema (SPEC-59 fatias A e B)
+
+*"revise, planeje e implemente"* sobre a SPEC-59. Implementadas **A (ver) e B
+(avatares)** — que é o que a própria SPEC recomendou fazer primeiro, e o que o
+pedido original descrevia visualmente. **C, D e E ficaram de fora de propósito**
+(ver o fim desta entrada).
+
+### O que ficou de pé
+
+Uma tela nova, `#/sistema` ("Como está montada", no menu), em **leitura**:
+
+- **o que o motor confere** — regras por tech, separando `requisitos` de
+  `conferíveis`, mais as réguas de percurso;
+- **quem escreve** — a esteira como **sequência**, com avatar por papel;
+- **o laço do PDCA** — a seta de volta, que dá nome ao ciclo e não existia em
+  tela nenhuma;
+- **o item no centro**, que é o que os dois primeiros produzem.
+
+Cada bloco leva à tela que edita aquilo. **A vista não edita nada**, e essa
+restrição é o que a torna barata: config quebrada aqui quebraria a ferramenta
+inteira, não o desenho de uma demanda.
+
+### Os avatares, e o que os salva de serem adesivo
+
+O anel colorido **é o estado**, não enfeite: `ativo`, `desligado`,
+`sem-credencial`. O terceiro é o que responde *"por que meu item saiu vazio?"* —
+um papel ativo sem modelo configurado é o defeito mais silencioso que existe
+aqui, e hoje só se descobre olhando o resultado. E o aviso leva à solução: o
+avatar sem modelo tem um link para a tela de IA.
+
+**A ordem da checagem virou teste**, porque errá-la seria pior que não ter o
+estado: papel **desligado** não é "sem credencial". Dizer o contrário mandaria a
+pessoa configurar IA para resolver um problema que ela mesma criou.
+
+### O que eu NÃO implementei, e por quê
+
+**"Falhou na última execução"** está na SPEC-59 §4 e ficou de fora: o produto
+não guarda o resultado das execuções da esteira. Inventar esse estado a partir
+de nada seria um avatar mentindo sobre saúde — o oposto do que ele existe para
+fazer. Fica registrado como o que falta, não como o que foi entregue.
+
+**As fatias C, D e E** (separar `UseQuebra`, editar pelo canvas, aposentar as
+abas) seguem a recomendação da SPEC: *"A primeiro, e por bastante tempo"*. Se a
+vista não convencer em uso, as outras não merecem ser construídas — e terá
+custado uma fatia em vez de cinco.
+
+### Uma decisão que a implementação forçou
+
+A tela usa a config **real**, nunca a de demonstração do tour. Ela responde
+"como o MEU ambiente está montado", e mostrar a régua da demonstração ali seria
+mentir sobre o ambiente de quem olha — exatamente o oposto do §245, onde a
+demonstração era necessária porque a config de quem via não tinha o que mostrar.
+Mesma ferramenta, decisão contrária, e o critério é o mesmo: **o que a tela
+afirma ser**.
+
+**Mordida:** tirar `temCredencialDeIa` do cálculo do estado → vermelho em
+unidade *e* no navegador, porque a esteira do ambiente de teste não tem modelo e
+o avatar passaria a dizer "ativo".
+
+316 engine · 594 web · 72 aplicação · 222 server · 76/76 E2E · build limpo.
+
+Uma falha isolada de `produto-contexto` apareceu numa execução completa; em
+isolamento e na suíte seguinte passou — é o mesmo flake de paralelismo do §250.

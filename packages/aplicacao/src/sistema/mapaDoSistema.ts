@@ -1,0 +1,144 @@
+import type { RegrasConfig } from "@gerador/engine";
+import type { PapelConfigurado } from "../config/normalizacao.js";
+
+/**
+ * SPEC-59 fatia A — o MAPA DO SISTEMA: a ferramenta explicada a partir da
+ * própria configuração dela.
+ *
+ * ## O que este módulo existe para resolver
+ *
+ * Três telas de configuração descrevem um **fluxo**, e formulário mostra os
+ * campos escondendo a ligação: a esteira de agentes se chama esteira e é
+ * mostrada como lista; o motor de regras é uma cadeia (`tech × contexto →
+ * requisito → checagem → item`) partida em quatro abas; e o PDCA se chama
+ * *ciclo* sem que o ciclo apareça em lugar nenhum.
+ *
+ * Isto não desenha nada — devolve o **modelo de leitura** de que a tela
+ * precisa. Função pura, sem I/O, como o resto do que se pode testar sozinho.
+ *
+ * ## O que este módulo deliberadamente NÃO faz
+ *
+ * **Não edita.** A fatia A é vista, e essa restrição é o que a torna barata e
+ * sem risco: config quebrada aqui quebraria a ferramenta inteira, não o desenho
+ * de uma demanda. Editar pelo canvas é a fatia D, e só depois de a vista provar
+ * que vale.
+ */
+
+/**
+ * O estado do agente, que é metade da razão de existir um avatar.
+ *
+ * Um papel configurado que nunca roda é o defeito mais silencioso da esteira:
+ * hoje só se descobre olhando o item sair vazio. `sem-credencial` é justamente
+ * esse caso — o papel está ativo, e não existe modelo para ele falar.
+ *
+ * **O que falta, e é honesto dizer:** "falhou na última execução" está na
+ * SPEC-59 §4 e **não** entra aqui, porque o produto não guarda o resultado das
+ * execuções da esteira. Inventar o estado a partir de nada seria pior que não
+ * tê-lo — um avatar mentindo sobre saúde é o oposto do que ele existe para
+ * fazer.
+ */
+export type EstadoDoAgente = "ativo" | "desligado" | "sem-credencial";
+
+export interface AgenteDoMapa {
+  id: string;
+  nome: string;
+  /** O que ele escreve no item — é a resposta a "quem escreve os critérios?". */
+  escreve: string;
+  estado: EstadoDoAgente;
+  /** Vazio = vale em qualquer contexto. */
+  contextos: string[];
+  /** Ordem na esteira: é sequência, e a lista escondia isso. */
+  ordem: number;
+}
+
+export interface RegraDoMapa {
+  tech: string;
+  requisitos: number;
+  /** Quantos têm `checagem` — os que o motor confere sozinho (§239). */
+  conferiveis: number;
+  testes: number;
+}
+
+export interface MapaDoSistema {
+  agentes: AgenteDoMapa[];
+  regras: RegraDoMapa[];
+  /** SPEC-57 fatia E — as réguas que valem sobre o CAMINHO, não sobre o nó. */
+  regrasDePercurso: number;
+  pdca: {
+    feedbacksAbertos: number;
+    /** `true` quando o laço tem o que processar — é o que a seta de volta acende. */
+    temTrabalho: boolean;
+  };
+  /** O que impede o mapa de ser lido como "está tudo certo". */
+  avisos: string[];
+}
+
+export interface EntradaDoMapa {
+  papeis?: PapelConfigurado[];
+  regras?: RegrasConfig;
+  /** Há modelo configurado para os agentes falarem? */
+  temCredencialDeIa?: boolean;
+  feedbacksAbertos?: number;
+}
+
+const ESCREVE_POR_GRUPO: Record<string, string> = {
+  po: "história e critérios de aceite",
+  arquiteto: "contrato de arquitetura",
+  especialista: "refinamento técnico",
+  qa: "regras de teste e cenários",
+};
+
+export function montarMapaDoSistema(entrada: EntradaDoMapa = {}): MapaDoSistema {
+  const { papeis = [], regras, temCredencialDeIa = false, feedbacksAbertos = 0 } = entrada;
+
+  const agentes: AgenteDoMapa[] = papeis.map((p, i) => ({
+    id: p.id,
+    nome: p.nome,
+    escreve: ESCREVE_POR_GRUPO[p.grupo] ?? p.grupo,
+    // A ordem de checagem importa: um papel DESLIGADO não está esperando
+    // credencial — está desligado, e dizer "sem credencial" nele mandaria a
+    // pessoa configurar IA para resolver um problema que ela mesma criou.
+    estado: !p.ativo ? "desligado" : temCredencialDeIa ? "ativo" : "sem-credencial",
+    contextos: p.contextos,
+    ordem: i + 1,
+  }));
+
+  const regrasPorTech: RegraDoMapa[] = Object.entries(regras?.porTech ?? {}).map(([tech, r]) => ({
+    tech,
+    requisitos: r.checklistTecnico?.length ?? 0,
+    conferiveis: (r.checklistTecnico ?? []).filter((req) => req.checagem).length,
+    testes: r.testes?.length ?? 0,
+  }));
+
+  const regrasDePercurso = regras?.percursos?.length ?? 0;
+
+  // Os avisos são o que impede o mapa de virar um cartaz de "tudo certo". Cada
+  // um é uma pergunta que alguém faria olhando a tela — respondida antes.
+  const avisos: string[] = [];
+  const ativos = agentes.filter((a) => a.estado !== "desligado");
+  if (agentes.length === 0) {
+    avisos.push("Nenhum papel na esteira: os itens saem só com o que o motor deriva, sem texto escrito por agente.");
+  } else if (ativos.length === 0) {
+    avisos.push("Todos os papéis estão desligados — a esteira não escreve nada.");
+  } else if (!temCredencialDeIa) {
+    avisos.push(
+      `${ativos.length} papel(éis) ativo(s) e nenhum modelo configurado: a esteira não tem com quem falar, e o item sai vazio na parte escrita.`
+    );
+  }
+  if (regrasPorTech.length > 0 && regrasPorTech.every((r) => r.conferiveis === 0)) {
+    avisos.push(
+      "Nenhum padrão conferível: as regras existem como texto para alguém ler, e o motor não confere nenhuma sozinho."
+    );
+  }
+  if (regrasDePercurso === 0) {
+    avisos.push("Nenhuma régua de percurso: caminhos que estouram o orçamento inteiro não são medidos.");
+  }
+
+  return {
+    agentes,
+    regras: regrasPorTech,
+    regrasDePercurso,
+    pdca: { feedbacksAbertos, temTrabalho: feedbacksAbertos > 0 },
+    avisos,
+  };
+}

@@ -15,6 +15,7 @@ function montar(extras: Partial<Parameters<typeof MenuLateral>[0]> = {}) {
     onAbrirQuebras: vi.fn(),
     onItens: vi.fn(),
     onDocumento: vi.fn(),
+    onSistema: vi.fn(),
     onSair: vi.fn(),
     ...extras,
   };
