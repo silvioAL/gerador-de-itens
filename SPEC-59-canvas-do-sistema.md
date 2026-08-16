@@ -150,8 +150,48 @@ contexto, um desenho de referência) esbarra na mesma parede.
 | **A — Ver** | o canvas do sistema em **leitura**: os três fluxos desenhados a partir da config real, com o laço do PDCA fechado | **Sim.** Hoje ninguém consegue ver a esteira como sequência nem o ciclo como ciclo |
 | **B — Avatares** | papel + estado + escopo no nó do agente, incluindo "sem credencial" e "falhou na última" | **Sim**, e é o que responde "por que meu item saiu vazio?" |
 | **C — Separar o estado** | `UseDiagrama` extraído de `UseQuebra`; o canvas deixa de conhecer quebra | Não entrega tela, mas **destrava** D e qualquer segundo diagrama futuro |
-| **D — Editar** | mover, ligar, criar papel e regra pelo canvas, com preview do efeito antes de aplicar | **Sim**, e depende de C |
-| **E — Aposentar as abas** | as três telas que o canvas substitui saem do menu e do tour | **Sim**, e só depois de D |
+| **D — Editar** | **revisada no §260** — ver abaixo | **Sim**, e depende de C |
+| **E — Aposentar as abas** | as três telas que o canvas substitui saem do menu e do tour | **Não — ver §10** |
+
+### §260 — o que construir a fatia A ensinou sobre D e E
+
+**D foi entregue diferente do que estava escrito, e a diferença e deliberada.**
+"Mover, ligar, criar papel e regra pelo canvas" descrevia arrastar caixinha. Com
+a vista de pe ficou claro que isso seria o erro do §2 ("tudo vira no") um nivel
+mais fundo:
+
+- a esteira e **sequencia**; edita-la arrastando em duas dimensoes e pior que
+  as setas;
+- "criar regra" nao tem mapeamento honesto: regras sao arrays por tech com
+  `checagem`, nao caixas soltas;
+- e o que o usuario aprovou foi a vista em **blocos**, nao um canvas de
+  arrastar.
+
+Entregue: as **duas edicoes que o mapa provoca** — ligar/desligar um papel e
+reordenar a esteira —, feitas onde o problema e visto. Sem modal de "ver o
+efeito antes de aplicar", porque **o efeito e o mapa**: o avatar troca de estado
+na frente de quem clicou, e um clique desfaz. O portao que o §6 pedia existe
+para mudanca estrutural de regra, nao para um interruptor reversivel cujo
+resultado e imediato.
+
+O que **nao** e editavel pelo mapa continua nas telas: preambulo, contextos,
+requisitos, checagens.
+
+## 10. Por que a fatia E nao deve ser feita como esta escrita
+
+Aposentar as abas de esteira, regras e PDCA **removeria capacidade**. O mapa
+liga/desliga e reordena; a aba de pipeline edita preambulo e contextos, a de
+regras edita requisitos e checagens, a de PDCA aplica propostas. Tirar as telas
+hoje seria uma regressao vestida de limpeza.
+
+E se um dia o mapa fizer tudo o que elas fazem, ele tera virado as telas — com
+caixas em volta. O ganho da fatia A nao foi substituir formulario: foi mostrar a
+**ligacao** que o formulario escondia. As duas coisas convivem por merito, nao
+por transicao inacabada.
+
+**Recomendacao: E sai do plano.** Se a convivencia incomodar depois de uso real,
+o problema a resolver sera outro (descoberta, duplicacao de caminho) e merece
+sua propria conversa.
 
 **Recomendação: A primeiro, e por bastante tempo.** Ver o fluxo já resolve a
 maior parte da dor descrita ("tudo em sessões separadas") sem nenhum risco de

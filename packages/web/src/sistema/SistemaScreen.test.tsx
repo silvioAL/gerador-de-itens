@@ -14,10 +14,18 @@ function mapa(p: Partial<MapaDoSistema> = {}): MapaDoSistema {
   };
 }
 
-function montar(m: MapaDoSistema = mapa()) {
+function montar(m: MapaDoSistema = mapa(), extras: Partial<React.ComponentProps<typeof SistemaScreen>> = {}) {
   const onAbrirConfig = vi.fn();
-  render(<SistemaScreen mapa={m} onAbrirConfig={onAbrirConfig} onVoltar={vi.fn()} />);
+  render(<SistemaScreen mapa={m} onAbrirConfig={onAbrirConfig} onVoltar={vi.fn()} {...extras} />);
   return { onAbrirConfig };
+}
+
+/** §260 — com as duas ações ligadas: é o modo em que a tela de fato roda. */
+function montarEditavel(m: MapaDoSistema = mapa()) {
+  const onAlternarAgente = vi.fn();
+  const onMoverAgente = vi.fn();
+  const { onAbrirConfig } = montar(m, { onAlternarAgente, onMoverAgente });
+  return { onAbrirConfig, onAlternarAgente, onMoverAgente };
 }
 
 const PO = {
@@ -117,5 +125,42 @@ describe("SistemaScreen — a vista de leitura (SPEC-59 fatia A)", () => {
 
     expect(screen.getByText("Nenhum papel na esteira.")).toBeTruthy();
     expect(screen.getByText("Nenhuma regra configurada.")).toBeTruthy();
+  });
+});
+
+describe("as duas edições que o mapa provoca (SPEC-59 fatia D, §260)", () => {
+  it("ligar/desligar acontece ONDE se vê o problema", () => {
+    // Ver que um papel está desligado e ter que ir a outra tela para ligá-lo é
+    // o mapa apontando e cobrando pedágio.
+    const { onAlternarAgente } = montarEditavel(mapa({ agentes: [{ ...PO, estado: "desligado" }] }));
+
+    expect(screen.getByTestId("alternar-po").textContent).toBe("ligar");
+    fireEvent.click(screen.getByTestId("alternar-po"));
+    expect(onAlternarAgente).toHaveBeenCalledWith("po");
+  });
+
+  it("a esteira é SEQUÊNCIA, então se reordena — e as pontas não movem para fora", () => {
+    const { onMoverAgente } = montarEditavel(
+      mapa({ agentes: [PO, { ...PO, id: "qa", nome: "QA", ordem: 2 }] })
+    );
+
+    expect((screen.getByTestId("subir-po") as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByTestId("descer-qa") as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(screen.getByTestId("descer-po"));
+    expect(onMoverAgente).toHaveBeenCalledWith("po", 1);
+  });
+
+  it("sem os callbacks a tela volta a ser leitura — a fatia A continua de pé", () => {
+    montar(mapa({ agentes: [PO] }));
+
+    expect(screen.queryByTestId("alternar-po")).toBeNull();
+    expect(screen.getByText(/vista de leitura/)).toBeTruthy();
+  });
+
+  it("falha ao salvar APARECE — tela otimista sobre escrita que falhou é mentir com confiança", () => {
+    montar(mapa({ agentes: [PO] }), { onAlternarAgente: vi.fn(), onMoverAgente: vi.fn(), erroAoSalvar: "Não deu para salvar: 500" });
+
+    expect(screen.getByTestId("erro-ao-salvar-sistema").textContent).toContain("500");
   });
 });

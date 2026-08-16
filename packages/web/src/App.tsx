@@ -455,6 +455,37 @@ function AppCarregado({
     };
   }, [mostrarSistema]);
 
+  const [erroAoSalvarSistema, setErroAoSalvarSistema] = useState<string | null>(null);
+
+  /**
+   * §260 — as duas edições que o MAPA provoca, aplicadas de onde se vê o
+   * problema.
+   *
+   * Ver que um papel está desligado e ter que ir a outra tela para ligá-lo é o
+   * mapa apontando e cobrando pedágio. Estas duas ações fecham o laço ali.
+   *
+   * O estado local muda primeiro e o servidor confirma depois — é o padrão do
+   * resto do app. Mas a falha **não** pode sumir: sem o aviso, a tela mostraria
+   * o estado novo com o servidor guardando o velho, que é a pior combinação
+   * possível numa tela de configuração.
+   */
+  async function salvarPipeline(papeis: ConfigPipelineAgentes["papeis"]) {
+    const anterior = pipelineAgentes;
+    const novo = { ...pipelineAgentes, papeis };
+    setPipelineAgentes(novo);
+    setErroAoSalvarSistema(null);
+    try {
+      await apiPipelineAgentes.salvar(novo);
+    } catch (e) {
+      // Volta ao que era: deixar a tela otimista sobre uma escrita que falhou
+      // é mentir com mais confiança do que não ter salvado.
+      setPipelineAgentes(anterior);
+      setErroAoSalvarSistema(
+        e instanceof Error ? `Não deu para salvar: ${e.message}` : "Não deu para salvar a mudança na esteira."
+      );
+    }
+  }
+
   /** SPEC-59 fatia A — a ferramenta lida a partir da própria configuração.
    * Usa a config REAL, nunca a de demonstração: esta tela responde "como o meu
    * ambiente está montado", e a do tour mentiria sobre isso. */
@@ -1370,6 +1401,21 @@ function AppCarregado({
           mapa={mapaDoSistema}
           onAbrirConfig={(area) => abrirConfigNaAba(area)}
           onVoltar={() => navegar({ tela: "canvas" })}
+          erroAoSalvar={erroAoSalvarSistema}
+          onAlternarAgente={(id) =>
+            void salvarPipeline((pipelineAgentes.papeis ?? []).map((p) => (p.id === id ? { ...p, ativo: !p.ativo } : p)))
+          }
+          onMoverAgente={(id, direcao) => {
+            const papeis = [...(pipelineAgentes.papeis ?? [])];
+            const de = papeis.findIndex((p) => p.id === id);
+            const para = de + direcao;
+            // Fora da lista não é erro nem no-op silencioso: os botões das
+            // pontas já vêm desabilitados, e chegar aqui seria bug de quem
+            // chamou — não vale gravar por isso.
+            if (de < 0 || para < 0 || para >= papeis.length) return;
+            [papeis[de], papeis[para]] = [papeis[para], papeis[de]];
+            void salvarPipeline(papeis);
+          }}
         />
       )}
 
