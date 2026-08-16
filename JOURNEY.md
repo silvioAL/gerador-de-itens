@@ -7995,3 +7995,47 @@ mede isso: em jsdom, o `margin-left: 50%` estaria escrito e nada saberia dizer
 onde as duas coisas foram parar.
 
 316 engine · 583 web · 63 aplicação · 222 server · 76/76 E2E · build limpo.
+
+---
+
+## §257 — a folha virou a página, e o documento perdeu um passo repetido
+
+*"parece sobreposto e meio repetitivo em relação ao passo posterior"*.
+
+### A sobreposição
+
+A causa era estrutural, e minha: a faixa do desenho era **filha da folha** e
+saía dela por margem negativa. O cartão continuava com 46rem de largura e a
+faixa pintava por cima da borda dele — duas camadas se cruzando, que é
+exatamente a sensação de "sobreposto".
+
+O §254 fez o desenho escapar da coluna, o §256 fez o título escapar junto, e
+os dois consertos mantiveram a premissa errada: **que a folha é a coluna de
+leitura**. Ela não é.
+
+Invertido: **a folha é a PÁGINA, e o texto é que se limita a ~46rem**, centrado
+dentro dela. A faixa do desenho passa a usar a largura da folha, sem margem
+negativa. Nada escapa de nada, e a régua de leitura continua valendo onde ela
+importa — no parágrafo.
+
+A lição é sobre a forma dos dois consertos anteriores: eu estava resolvendo um
+sintoma por vez (largura, depois alinhamento) sem revisar a premissa que
+produzia os dois. O terceiro relato é que forçou a pergunta certa.
+
+### A repetição
+
+Havia dois passos seguidos sobre o mesmo artefato: "Especificação de solução" e
+"O documento de desenho" — e o primeiro **terminava anunciando o segundo**
+(*"tem tela própria, que é o próximo passo"*). Isso era resíduo do §251: quando
+a tela do documento entrou no tour, o passo antigo virou teaser em vez de sair.
+
+Fundidos. O que o passo removido tinha de próprio — *o agente oferece o
+documento sozinho quando tudo está refinado* — abre o passo que ficou. Produto:
+20 → 19 passos.
+
+**Mordidas:** devolver a folha a 46rem → o E2E acusa `> 646` recebendo `604`;
+e o teste da fusão cobra que "Especificação de solução" não exista mais **e**
+que a frase do passo removido esteja no que ficou — senão fundir viraria
+apagar.
+
+316 engine · 584 web · 63 aplicação · 222 server · 76/76 E2E · build limpo.

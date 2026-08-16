@@ -91,19 +91,21 @@ export function DocumentoScreen({
       </header>
 
       <article style={folhaEstilo}>
-        <h1 style={{ fontSize: 28, lineHeight: 1.25, margin: "0 0 10px", letterSpacing: "-0.02em" }}>
-          {documento.titulo}
-        </h1>
+        <div style={colunaDeTextoEstilo}>
+          <h1 style={{ fontSize: 28, lineHeight: 1.25, margin: "0 0 10px", letterSpacing: "-0.02em" }}>
+            {documento.titulo}
+          </h1>
 
-        {documento.saude.length > 0 && (
-          <div data-testid="faixa-de-saude" style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "16px 0 4px" }}>
+          {documento.saude.length > 0 && (
+            <div data-testid="faixa-de-saude" style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "16px 0 4px" }}>
             {documento.saude.map((i) => (
               <span key={i.icone} style={chipEstilo(i.nivel)}>
                 <span style={{ fontSize: 13 }}>{i.icone}</span> {i.rotulo}
-              </span>
-            ))}
-          </div>
-        )}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
 
         {documento.contexto.trim() && (
           <Secao titulo="Contexto">
@@ -286,7 +288,7 @@ function CicloDeStatus({
 
 function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <section>
+    <section style={colunaDeTextoEstilo}>
       <h2 style={tituloSecaoEstilo}>{titulo}</h2>
       {children}
     </section>
@@ -315,7 +317,7 @@ function SecaoEscrita({
   const [editando, setEditando] = useState(false);
 
   return (
-    <section data-testid={testid}>
+    <section data-testid={testid} style={colunaDeTextoEstilo}>
       <h2 style={tituloSecaoEstilo}>{titulo}</h2>
       <div style={{ borderLeft: "3px solid #4f46e5", padding: "2px 0 2px 16px", margin: "12px 0" }}>
         <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "#a5b4fc" }}>
@@ -448,9 +450,24 @@ const barraEstilo: React.CSSProperties = {
   background: "var(--painel)",
 };
 
-const folhaEstilo: React.CSSProperties = {
-  // ~72 caracteres: documento largura-de-tela ninguém lê até o fim.
+/**
+ * §257 — a coluna de LEITURA, dentro da folha.
+ *
+ * Antes a folha inteira media 46rem e o desenho escapava dela por margem
+ * negativa — pintando fora do cartão e cruzando a borda, o que lê como duas
+ * camadas sobrepostas. Invertido: a folha é a página, e o TEXTO é que se
+ * limita a 46rem, centrado. Nada mais precisa escapar de nada.
+ */
+const colunaDeTextoEstilo: React.CSSProperties = {
   maxWidth: "46rem",
+  marginLeft: "auto",
+  marginRight: "auto",
+};
+
+const folhaEstilo: React.CSSProperties = {
+  // A folha acompanha o que o desenho precisa; a régua de ~72 caracteres
+  // continua valendo, mas para o texto (ver `colunaDeTextoEstilo`).
+  maxWidth: "min(1100px, calc(100vw - 48px))",
   margin: "28px auto 80px",
   padding: "40px 44px",
   borderRadius: 16,
@@ -466,9 +483,9 @@ const folhaEstilo: React.CSSProperties = {
  * bloco solto. O teto de 1100px é o que o gerador do diagrama precisa para não
  * empilhar o cabeçalho; abaixo disso ele volta a caber na tela, seja qual for. */
 const faixaDoDesenhoEstilo: React.CSSProperties = {
-  width: "min(1100px, calc(100vw - 48px))",
-  marginLeft: "50%",
-  transform: "translateX(-50%)",
+  // §257 — largura da folha, sem margem negativa. Escapar do cartão era o que
+  // fazia a faixa pintar por cima da borda dele.
+  width: "100%",
   marginTop: 36,
   padding: "18px 20px 20px",
   borderRadius: 16,

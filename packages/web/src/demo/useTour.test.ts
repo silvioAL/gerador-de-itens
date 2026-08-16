@@ -162,6 +162,19 @@ describe("useTour", () => {
     expect(opts.fecharAssistente).toHaveBeenCalled();
   });
 
+  it("§257 — o documento tem UM passo, não dois", () => {
+    // Havia "Especificação de solução" e "O documento de desenho" seguidos, e
+    // o primeiro terminava anunciando o segundo. Dois passos sobre o mesmo
+    // artefato num tour de vinte é desperdício — e lê como repetição.
+    const titulos = passosDoProduto(montarOpts()).map((p) => p.titulo);
+
+    expect(titulos).not.toContain("Especificação de solução");
+    expect(titulos.filter((t) => t === "O documento de desenho")).toHaveLength(1);
+    // E o que o passo removido tinha de próprio não se perdeu.
+    const doc = passosDoProduto(montarOpts()).find((p) => p.titulo === "O documento de desenho");
+    expect(doc?.texto).toMatch(/o agente oferece este documento sozinho/i);
+  });
+
   it("§251 — o tour passa pela TELA do documento, e ela é aberta pelo passo", () => {
     // A lacuna que a avaliação do tour encontrou: a tela nova existia e o tour
     // não a mencionava. Capacidade que o tour não mostra não existe para quem

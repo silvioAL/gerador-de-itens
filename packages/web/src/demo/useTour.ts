@@ -216,13 +216,6 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
         "Quando a esteira escreve, cada resposta espera a sua assinatura. Esta barra diz quantas estão esperando e permite confirmar TODAS de uma vez — ou revisar uma a uma, no modo foco. Aceitar é barato; corrigir é que merece o clique.",
     },
     {
-      selector: "[data-testid=abrir-conversa-especificacao]",
-      titulo: "Especificação de solução",
-      segundos: 8,
-      texto:
-        "O documento sai pelo AGENTE: com tudo refinado ele oferece sozinho (balão), e a qualquer momento você pede — mesmo parcial. Cada item cita a necessidade que atende, a decisão que segue e o caminho de que participa: é assim que o propósito declarado lá no começo chega a quem vai implementar. E ele não é só um arquivo para baixar — tem tela própria, que é o próximo passo.",
-    },
-    {
       // §251 — a tela do documento não existia no tour, e o passo acima ainda
       // descrevia o mundo anterior à SPEC-58 ("baixa o markdown"). Capacidade
       // que o tour não mostra não existe para quem está avaliando (§244).
@@ -230,7 +223,7 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       titulo: "O documento de desenho",
       segundos: 14,
       texto:
-        "A demanda vira um documento que circula — para quem nunca abriu esta ferramenta. A faixa de saúde no topo, o desenho animado junto, as decisões com o que foi descartado. E duas seções que só uma PESSOA escreve, trade-offs e riscos, que a máquina nunca sobrescreve: é onde mora a mudança que não moveu arquitetura. O estado encaixa no rito do time, e aprovar guarda uma foto — se o desenho mudar depois, o selo avisa em vez de mentir.",
+        "Com tudo refinado o agente oferece este documento sozinho — e ele não é um arquivo que você baixa e perde: tem tela própria, e é o que circula para quem nunca abriu esta ferramenta. Faixa de saúde no topo, o desenho animado junto, as decisões com o que foi descartado. Duas seções que só uma PESSOA escreve, trade-offs e riscos, que a máquina nunca sobrescreve: é onde mora a mudança que não moveu arquitetura. E aprovar guarda uma foto — se o desenho mudar depois, o selo avisa em vez de mentir.",
       onEnter: () => opts.abrirDocumento(),
     },
     {
