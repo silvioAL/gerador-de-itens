@@ -157,9 +157,14 @@ export function gerarDocumentoHtml(doc: DocumentoDeDesenho, opcoes: OpcoesDocume
   .item .cit span { display: inline-block; min-width: 5.5em; color: var(--texto-mudo);
     font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
   /* §254 — o desenho escapa da coluna de leitura: 46rem é a régua do TEXTO, e
-     nela o diagrama empilha o cabeçalho e corta o botão de reproduzir. */
-  .desenho { width: min(1100px, calc(100vw - 48px)); margin-left: 50%;
-    transform: translateX(-50%); height: 560px; border: 1px solid var(--borda);
+     nela o diagrama empilha o cabeçalho e corta o botão de reproduzir.
+     §256 — e escapa LEVANDO O TÍTULO JUNTO: sozinho, o rótulo ficava na coluna
+     e o desenho ~280px à esquerda dele, o que lê como bloco fora do lugar. */
+  .faixa-desenho { width: min(1100px, calc(100vw - 48px)); margin: 36px 0 0 50%;
+    transform: translateX(-50%); padding: 18px 20px 20px; border-radius: 16px;
+    background: var(--painel-2); border: 1px solid var(--borda); }
+  .faixa-desenho h2 { margin-top: 0; }
+  .desenho { width: 100%; height: 560px; border: 1px solid var(--borda);
     border-radius: 12px; background: var(--painel); }
   .vazio { color: var(--texto-mudo); font-size: 13px; font-style: italic; }
   footer { max-width: 46rem; margin: 18px auto 0; color: var(--texto-mudo); font-size: 12px; }
@@ -169,7 +174,9 @@ export function gerarDocumentoHtml(doc: DocumentoDeDesenho, opcoes: OpcoesDocume
     h2 { break-after: avoid; }
     .decisao, .item, .conf { break-inside: avoid; }
     /* Na impressão não há viewport para escapar: volta à largura da página. */
-    .desenho { width: 100%; margin-left: 0; transform: none; height: 420px; }
+    .faixa-desenho { width: 100%; margin-left: 0; transform: none; padding: 0;
+      border: none; background: none; }
+    .desenho { height: 420px; }
   }
 </style>
 </head>
@@ -195,12 +202,14 @@ export function gerarDocumentoHtml(doc: DocumentoDeDesenho, opcoes: OpcoesDocume
       : ""
   }
 
-  <h2>O desenho</h2>
-  ${
-    opcoes.diagramaHtml
-      ? `<iframe class="desenho" title="Diagrama da solução" srcdoc="${esc(opcoes.diagramaHtml)}"></iframe>`
-      : `<p class="vazio">Diagrama não embutido nesta cópia.</p>`
-  }
+  <section class="faixa-desenho">
+    <h2>O desenho</h2>
+    ${
+      opcoes.diagramaHtml
+        ? `<iframe class="desenho" title="Diagrama da solução" srcdoc="${esc(opcoes.diagramaHtml)}"></iframe>`
+        : `<p class="vazio">Diagrama não embutido nesta cópia.</p>`
+    }
+  </section>
 
   ${
     doc.decisoes.length > 0

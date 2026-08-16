@@ -315,9 +315,16 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   // gerador da SPEC-21 empilha o cabeçalho e corta o botão de reproduzir
   // (print do usuário). Medir é o único jeito de saber: `width: min(...)`
   // continuaria escrito no código com o quadro estreito.
-  const larguraDesenho = (await page.getByTestId("documento-diagrama").boundingBox())?.width ?? 0;
+  const caixaDesenho = await page.getByTestId("documento-diagrama").boundingBox();
   const larguraTexto = (await page.getByRole("heading", { level: 1 }).boundingBox())?.width ?? 0;
-  expect(larguraDesenho).toBeGreaterThan(larguraTexto);
+  expect(caixaDesenho?.width ?? 0).toBeGreaterThan(larguraTexto);
+
+  // §256 — e o TÍTULO sai junto. Escapar sozinho deixava o rótulo na coluna de
+  // texto e o desenho ~280px à esquerda dele: largura resolvida, alinhamento
+  // quebrado. Compartilhar a borda esquerda é o que faz a faixa ler como
+  // figura deliberada em vez de bloco caído fora.
+  const caixaTitulo = await page.getByRole("heading", { name: "O desenho" }).boundingBox();
+  expect(Math.abs((caixaTitulo?.x ?? 0) - (caixaDesenho?.x ?? 0))).toBeLessThan(24);
   // As decisões da demonstração chegam ao documento, com o descartado.
   await expect(documento.getByTestId("documento-decisao").first()).toContainText("Mongo em vez de Postgres");
   // E as duas seções que só uma pessoa escreve.
