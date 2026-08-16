@@ -8361,3 +8361,64 @@ ele é quem carrega o caso.
 
 324 engine · 610 web · 72 aplicação · 222 server · 77/77 E2E · banco de e2e
 zerado ao fim da suíte.
+
+## §263 — a quarta batida do laço (SPEC-60 fatia A)
+
+*"implemente tudo o que acabou de apontar, as 3 sugestões"*. Escrevi a
+**SPEC-60** antes de mexer em código, porque as três melhorias que sobraram são
+o mesmo defeito em três lugares: o produto mede, mostra o número, e para ali.
+
+Esta é a primeira: **remedir**.
+
+### O buraco
+
+O §6 da SPEC-57 desenha *medir → conversar → decidir → remedir*, e a quarta
+batida existia num lugar só — o `delta-da-proposta` das necessidades. Aceitar
+uma decisão do agente e confirmar um caminho não diziam nada.
+
+O caso do caminho é o que dói: confirmar um percurso é o que faz a régua passar
+a valer sobre ele, e régua valendo **gera item** (§249). Isso acontecia depois
+do clique, sem aviso.
+
+### A régua: a moeda em que a consequência aparece
+
+Decisão se mede no placar de decisões. Caminho se mede no **backlog**. Usar o
+mesmo número nos dois seria simetria bonita e informação inútil — que é o
+defeito que a SPEC-60 combate. `deltaDePercurso` roda a **derivação inteira**
+duas vezes em vez de recalcular a conta: reimplementar aqui o que a derivação
+já faz é a receita de os dois números divergirem no dia em que ela mudar.
+
+### Três coisas que eu quebrei e o teste pegou
+
+**O botão de aceitar sumiu.** `Delta` não desenha caixa vazia — de propósito,
+uma caixa dizendo "se aceitar" e nada dentro sugere que a medição rodou e não
+achou nada. Só que eu pus o botão **dentro** dele, e onde não havia diagrama
+para medir o aceite desapareceu junto. Feature nova apagando feature antiga, e
+parecendo configuração. A garantia virou explícita: `AceiteComDelta` devolve o
+botão puro quando não há o que medir, e um teste guarda isso.
+
+**O tour não mostrava.** A decisão do tour é de demonstração, e o §253 tirou o
+aceite dela (gravaria numa quebra que não é a sua). Como o delta morava junto
+do botão, ele sumiu também — e capacidade que o tour não mostra não existe
+(§244). Separei: a demonstração **mede e mostra**, e não oferece o aceite. Os
+números são reais, medindo as decisões da demonstração contra o desenho da
+demonstração.
+
+**O alerta que evita o zero enganoso.** Confirmar um caminho a que falta campo
+mostra "itens no backlog 4 → 4" — e isso lê como "não custa nada", quando o que
+acontece é que a medição não acontece. O alerta diz `falta timeoutMs em 1
+componente(s)`.
+
+### A caixa virou uma só
+
+As necessidades passaram a usar o `Delta` compartilhado. Não é arrumação: três
+caixas parecidas divergem na terceira mudança, e divergência aqui é pior que
+feiúra — o delta é lido no meio de uma decisão, e um formato diferente por tela
+obriga a reaprender no pior momento.
+
+**Mordidas:** sumir com o alerta de "não dá para medir" → engine vermelho;
+desenhar a caixa vazia → unidade vermelha. E a melhor delas foi acidental: o
+E2E do tour ficou vermelho por causa do delta escondido na demonstração, antes
+de eu perceber o problema.
+
+333 engine · 620 web · 72 aplicação · 222 server · 77/77 E2E · build limpo.

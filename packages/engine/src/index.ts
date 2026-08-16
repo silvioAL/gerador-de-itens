@@ -39,6 +39,8 @@ export {
   type PercursoNaoMedido,
   type ResultadoDePercursos,
 } from "./percurso/conformidadeDePercurso.js";
+export { deltaDeDecisao, deltaDePercurso, piorou } from "./remedicao/remedicao.js";
+export type { LinhaDeDelta, Remedicao, ContextoDaRemedicao } from "./remedicao/remedicao.js";
 export {
   estruturarDocumento,
   type DocumentoDeDesenho,

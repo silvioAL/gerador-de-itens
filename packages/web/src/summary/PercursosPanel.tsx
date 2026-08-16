@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { Percurso, PercursoNaoMedido, ViolacaoDePercurso } from "@gerador/engine";
+import type { Percurso, PercursoNaoMedido, Remedicao, ViolacaoDePercurso } from "@gerador/engine";
+import { Delta } from "./Delta";
 
 /**
  * SPEC-57 fatia E — os CAMINHOS do desenho, no placar.
@@ -23,6 +24,10 @@ export interface PercursosPanelProps {
   truncado?: boolean;
   onConfirmar: (id: string) => void;
   onDescartar: (id: string) => void;
+  /** SPEC-60 fatia A — o que confirmar ESTE caminho põe no backlog. Devolver
+   * `undefined` (ou não passar) é dizer "não sei medir", e aí o botão fica
+   * como era: confirmar nunca depende de haver medição. */
+  remedirConfirmacao?: (id: string) => Remedicao | undefined;
   /** Leva ao primeiro nó do caminho — sem isto o número seria um beco. */
   onSelecionarNo?: (noId: string) => void;
 }
@@ -35,6 +40,7 @@ export function PercursosPanel({
   onConfirmar,
   onDescartar,
   onSelecionarNo,
+  remedirConfirmacao,
 }: PercursosPanelProps) {
   const [aberto, setAberto] = useState(false);
   const raizRef = useRef<HTMLDivElement>(null);
@@ -117,17 +123,28 @@ export function PercursosPanel({
                 O motor leu estes caminhos no desenho. Nada é medido antes de você confirmar — inferir é grátis e erra.
               </div>
               {aConfirmar.map((p) => (
-                <div key={p.id} data-testid="percurso-a-confirmar" style={{ display: "flex", gap: 6, alignItems: "center", padding: "3px 0" }}>
-                  <button style={linkEstilo} onClick={() => onSelecionarNo?.(p.nos[0])}>
-                    {p.rotulo}
-                  </button>
-                  <div style={{ flex: 1 }} />
-                  <button style={botaoMiniEstilo} onClick={() => onConfirmar(p.id)} data-testid={`confirmar-${p.id}`}>
-                    confirmar
-                  </button>
-                  <button style={linkEstilo} onClick={() => onDescartar(p.id)}>
-                    não é caminho
-                  </button>
+                <div key={p.id} data-testid="percurso-a-confirmar" style={{ padding: "3px 0" }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <button style={linkEstilo} onClick={() => onSelecionarNo?.(p.nos[0])}>
+                      {p.rotulo}
+                    </button>
+                    <div style={{ flex: 1 }} />
+                    <button style={botaoMiniEstilo} onClick={() => onConfirmar(p.id)} data-testid={`confirmar-${p.id}`}>
+                      confirmar
+                    </button>
+                    <button style={linkEstilo} onClick={() => onDescartar(p.id)}>
+                      não é caminho
+                    </button>
+                  </div>
+                  {/* §263 — o preço de confirmar, ANTES de confirmar. Aqui o
+                      delta é o único aviso possível: o item que a confirmação
+                      cria (§249) só apareceria depois, no backlog derivado. */}
+                  {(() => {
+                    const remedicao = remedirConfirmacao?.(p.id);
+                    return remedicao ? (
+                      <Delta data-testid={`delta-percurso-${p.id}`} titulo="Se confirmar este caminho" remedicao={remedicao} />
+                    ) : null;
+                  })()}
                 </div>
               ))}
             </div>

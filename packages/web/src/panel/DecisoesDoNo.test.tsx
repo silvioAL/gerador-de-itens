@@ -204,3 +204,60 @@ describe("DecisoesDoNo — o porquê ancorado no nó (SPEC-57 fatia C)", () => {
     expect(screen.queryByTestId("decisao-vigente")).toBeNull();
   });
 });
+
+/**
+ * SPEC-60 fatia A (§263) — a remedição no aceite da decisão.
+ */
+describe("DecisoesDoNo — o delta do aceite", () => {
+  const DIAGRAMA = { nodes: [{ id: "n1" }], edges: [] } as never;
+
+  it("diz o que aceitar move no placar, antes de mover", () => {
+    montar({
+      diagrama: DIAGRAMA,
+      decisoes: [decisao({ id: "d1", status: "proposta", origem: "sugerido" })],
+    });
+
+    const delta = screen.getByTestId("delta-decisao-d1");
+    expect(delta.textContent).toContain("propostas esperando 1 → 0");
+    expect(delta.textContent).toContain("decisões vigentes 0 → 1");
+  });
+
+  it("proposta sem o porquê avisa que aceitar cria dívida", () => {
+    montar({
+      diagrama: DIAGRAMA,
+      decisoes: [decisao({ id: "d1", status: "proposta", origem: "sugerido", porque: "" })],
+    });
+
+    expect(screen.getByTestId("delta-alerta").textContent).toContain("ninguém vai conseguir explicar");
+  });
+
+  it("SEM diagrama o aceite continua ali — a medição é acréscimo, não condição", () => {
+    // A regressão que eu mesmo escrevi na primeira versão: `Delta` não desenha
+    // caixa vazia, e o botão dentro dele sumia junto.
+    const { onAceitar } = montar({ decisoes: [decisao({ id: "d1", status: "proposta", origem: "sugerido" })] });
+
+    fireEvent.click(screen.getByTestId("aceitar-d1"));
+    expect(onAceitar).toHaveBeenCalledWith("d1");
+    expect(screen.queryByTestId("delta-decisao-d1")).toBeNull();
+  });
+});
+
+/**
+ * §263 — a demonstração mede, mas não oferece o aceite.
+ */
+describe("DecisoesDoNo — o delta na decisão de demonstração", () => {
+  it("mostra o delta e NÃO mostra o botão de aceitar", () => {
+    // §253 tirou o aceite da decisão de demonstração (ele gravaria numa quebra
+    // que não é a sua). A medição não grava nada — e escondê-la faria o tour
+    // deixar de mostrar a capacidade, que é o mesmo que ela não existir.
+    montar({
+      diagrama: { nodes: [{ id: "n1" }], edges: [] } as never,
+      decisoes: [decisao({ id: "d1", status: "proposta", origem: "sugerido" })],
+      ehDeDemonstracao: () => true,
+    });
+
+    expect(screen.getByTestId("delta-decisao-d1").textContent).toContain("propostas esperando 1 → 0");
+    expect(screen.queryByTestId("aceitar-d1")).toBeNull();
+    expect(screen.getByTestId("decisao-de-demonstracao")).toBeTruthy();
+  });
+});

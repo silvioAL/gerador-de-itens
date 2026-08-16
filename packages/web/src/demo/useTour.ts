@@ -160,7 +160,7 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       titulo: "O caminho, não só os componentes",
       segundos: 12,
       texto:
-        "Cinco saltos de 400ms são cinco componentes dentro do padrão e uma resposta de dois segundos — nenhuma medida por componente vê isso. Clique no 🛣: o motor LEU os caminhos do desenho e está pedindo confirmação, porque inferir é grátis e erra. Nada é medido antes de você confirmar. Depois disso as réguas de caminho valem: soma de timeout, elo mais lento, número de saltos. E se faltar um campo no meio, ele diz \"não dá para medir\" em vez de somar o que existe — meia soma vira um verde falso, que é o pior resultado possível de uma medição.",
+        "Cinco saltos de 400ms são cinco componentes dentro do padrão e uma resposta de dois segundos — nenhuma medida por componente vê isso. Clique no 🛣: o motor LEU os caminhos do desenho e está pedindo confirmação, porque inferir é grátis e erra. Nada é medido antes de você confirmar. Depois disso as réguas de caminho valem: soma de timeout, elo mais lento, número de saltos. E antes de confirmar, ele diz o preço: \"itens no backlog 4 → 5\" — porque confirmar um caminho fora da régua CRIA trabalho, e você decide sabendo disso. Se faltar um campo no meio, ele diz \"não dá para medir\" em vez de somar o que existe — meia soma vira um verde falso, que é o pior resultado possível de uma medição.",
       onEnter: () => {
         opts.fecharAssistente();
         opts.selecionarNo(null);
@@ -188,7 +188,7 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       titulo: "Peça ao agente",
       segundos: 10,
       texto:
-        "Este botão não pede opinião sobre arquitetura: manda o agente ler o que o MOTOR já mediu — o que está fora do padrão e por quê, as lacunas, o que já foi decidido — e propor o que ainda está em aberto. Toda proposta vem com duas alternativas e o custo de cada uma. E não vale nada até você aceitar: aí o porquê passa a ser seu.",
+        "Este botão não pede opinião sobre arquitetura: manda o agente ler o que o MOTOR já mediu — o que está fora do padrão e por quê, as lacunas, o que já foi decidido — e propor o que ainda está em aberto. Toda proposta vem com duas alternativas e o custo de cada uma. E não vale nada até você aceitar — o botão de aceite mostra o que o sim vai mover no placar antes de mover, e avisa se a proposta chegou sem o porquê: aceitar assim é registrar uma escolha que ninguém vai conseguir explicar depois.",
       onEnter: () => opts.selecionarNo("n1"),
     },
     {

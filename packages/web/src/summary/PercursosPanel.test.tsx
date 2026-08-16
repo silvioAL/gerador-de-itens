@@ -112,3 +112,35 @@ describe("PercursosPanel — a dimensão do CAMINHO (SPEC-57 fatia E)", () => {
     expect(screen.getByTestId("percursos-truncado")).toBeInTheDocument();
   });
 });
+
+/**
+ * SPEC-60 fatia A (§263) — o preço de confirmar, antes de confirmar.
+ */
+describe("PercursosPanel — o delta da confirmação", () => {
+  const A_CONFIRMAR = { id: "pc::a>b", rotulo: "a → b", nos: ["a", "b"], origem: "inferido" as const };
+
+  it("mostra o item que confirmar vai criar", () => {
+    montar({
+      percursos: [A_CONFIRMAR],
+      remedirConfirmacao: () => ({
+        linhas: [{ rotulo: "itens no backlog", antes: 3, depois: 4 }],
+        alerta: "Confirmar faz a régua valer sobre este caminho — e ele já está fora dela.",
+      }),
+    });
+
+    fireEvent.click(screen.getByTestId("percursos-resumo"));
+
+    const delta = screen.getByTestId("delta-percurso-pc::a>b");
+    expect(delta.textContent).toContain("itens no backlog 3 → 4");
+    expect(screen.getByTestId("delta-alerta").textContent).toContain("já está fora dela");
+  });
+
+  it("sem quem meça, confirmar continua sendo um clique — a medição é acréscimo", () => {
+    const { onConfirmar } = montar({ percursos: [A_CONFIRMAR] });
+    fireEvent.click(screen.getByTestId("percursos-resumo"));
+
+    fireEvent.click(screen.getByTestId("confirmar-pc::a>b"));
+    expect(onConfirmar).toHaveBeenCalledWith("pc::a>b");
+    expect(screen.queryByTestId("delta-percurso-pc::a>b")).toBeNull();
+  });
+});
