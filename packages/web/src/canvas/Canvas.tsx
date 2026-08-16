@@ -13,7 +13,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { DiagramaConfig, No } from "@gerador/engine";
-import type { UseQuebra } from "../state/useQuebra";
+import type { UseDiagrama } from "../state/useDiagrama";
 import { NodeCard, type NodeCardData } from "./NodeCard";
 
 const nodeTypes = { domNo: NodeCard };
@@ -80,13 +80,19 @@ export function handlesPadrao(origem: Pick<No, "x" | "y">, destino: Pick<No, "x"
 }
 
 export interface CanvasProps {
-  quebraState: UseQuebra;
+  /** SPEC-59 fatia C — o canvas depende de um DIAGRAMA, não de uma quebra.
+   * Era `UseQuebra`, e por isso qualquer segundo desenho esbarrava no domínio
+   * da demanda. `UseQuebra` continua servindo aqui por composição. */
+  diagramaState: UseDiagrama;
   config: DiagramaConfig;
+  /** Time padrão dos nós que não declaram o próprio — é da quebra, e por isso
+   * entra como valor, não como estado: o canvas não vai buscá-lo. */
+  timePadrao?: string;
 }
 
-export function Canvas({ quebraState, config }: CanvasProps) {
+export function Canvas({ diagramaState, config, timePadrao }: CanvasProps) {
   const {
-    quebra,
+    diagrama,
     selecionadoId,
     setSelecionadoId,
     arestaSelecionadaId,
@@ -98,7 +104,7 @@ export function Canvas({ quebraState, config }: CanvasProps) {
     pedirExclusao,
     cancelarExclusao,
     confirmarExclusao,
-  } = quebraState;
+  } = diagramaState;
 
   /**
    * ACHADO REAL do usuário: depois de "Aplicar à mesa de projeto" os componentes "não
@@ -126,7 +132,7 @@ export function Canvas({ quebraState, config }: CanvasProps) {
 
   const nodes: Node[] = useMemo(
     () =>
-      quebra.diagrama.nodes.map((no) => ({
+      diagrama.nodes.map((no) => ({
         id: no.id,
         type: "domNo",
         position: { x: no.x, y: no.y },
@@ -134,18 +140,18 @@ export function Canvas({ quebraState, config }: CanvasProps) {
         data: {
           no,
           config,
-          arestas: quebra.diagrama.edges,
-          quebraTime: quebra.time,
+          arestas: diagrama.edges,
+          quebraTime: timePadrao,
         } satisfies NodeCardData,
       })),
-    [quebra.diagrama.nodes, quebra.diagrama.edges, quebra.time, config, selecionadoId]
+    [diagrama.nodes, diagrama.edges, timePadrao, config, selecionadoId]
   );
 
   /**
    * ACHADO REAL do usuário: "o texto contido nas conexões (ex: publica) pisca
    * a cada conteúdo inserido" ao digitar no painel de propriedades.
    *
-   * A causa era este memo depender de `quebra.diagrama.nodes`. Digitar num
+   * A causa era este memo depender de `diagrama.nodes`. Digitar num
    * campo do nó produz um array `nodes` NOVO — e ainda que nenhuma aresta
    * mude, o memo invalidava e devolvia objetos `Edge` novos (com `style` e
    * `labelStyle` literais recriados), fazendo o React Flow repintar todo
@@ -156,14 +162,14 @@ export function Canvas({ quebraState, config }: CanvasProps) {
    * ser uma STRING de geometria — valor primitivo, que só muda quando um nó
    * de fato se move, entra ou sai. Digitar spec não mexe nela.
    */
-  const geometriaNos = quebra.diagrama.nodes.map((n) => `${n.id}:${n.x}:${n.y}`).join("|");
+  const geometriaNos = diagrama.nodes.map((n) => `${n.id}:${n.x}:${n.y}`).join("|");
   // Depende SÓ da string: ela é a identidade da geometria. Depender do array
   // de nós traria o piscar de volta — é literalmente o bug que se corrige aqui.
   const posicoes = useMemo(() => posicoesDaGeometria(geometriaNos), [geometriaNos]);
 
   const edges: Edge[] = useMemo(
     () =>
-      quebra.diagrama.edges.map((e) => {
+      diagrama.edges.map((e) => {
         const origem = posicoes.get(e.source);
         const destino = posicoes.get(e.target);
         const padrao = origem && destino ? handlesPadrao(origem, destino) : undefined;
@@ -182,7 +188,7 @@ export function Canvas({ quebraState, config }: CanvasProps) {
           labelBgStyle: LABEL_BG_STYLE,
         };
       }),
-    [posicoes, quebra.diagrama.edges, config, arestaSelecionadaId]
+    [posicoes, diagrama.edges, config, arestaSelecionadaId]
   );
 
   function onNodesChange(changes: NodeChange[]) {
@@ -253,8 +259,8 @@ export function Canvas({ quebraState, config }: CanvasProps) {
             exclusaoPendente.tipo === "no"
               ? {
                   tipo: "no",
-                  rotulo: quebra.diagrama.nodes.find((n) => n.id === exclusaoPendente.id)?.label ?? "este componente",
-                  conexoes: quebra.diagrama.edges.filter(
+                  rotulo: diagrama.nodes.find((n) => n.id === exclusaoPendente.id)?.label ?? "este componente",
+                  conexoes: diagrama.edges.filter(
                     (e) => e.source === exclusaoPendente.id || e.target === exclusaoPendente.id
                   ).length,
                 }

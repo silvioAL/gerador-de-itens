@@ -1282,7 +1282,7 @@ function AppCarregado({
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
         <div style={{ flex: 1 }}>
           <ReactFlowProvider>
-            <Canvas quebraState={quebraState} config={diagramaConfig} />
+            <Canvas diagramaState={quebraState} config={diagramaConfig} timePadrao={quebra.time} />
           </ReactFlowProvider>
         </div>
         {arestaSelecionada ? (

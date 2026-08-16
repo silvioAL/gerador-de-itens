@@ -1,18 +1,19 @@
 import { camposVisiveisAresta } from "@gerador/engine";
 import type { Aresta, DiagramaConfig } from "@gerador/engine";
-import type { UseQuebra } from "../state/useQuebra";
+import type { UseDiagrama } from "../state/useDiagrama";
 import { FieldControl } from "./PropertiesPanel";
 
 export interface EdgePanelProps {
   aresta: Aresta;
   config: DiagramaConfig;
-  quebraState: UseQuebra;
+  /** SPEC-59 fatia C — o painel edita o DIAGRAMA; quebra não é assunto dele. */
+  quebraState: UseDiagrama;
 }
 
 export function EdgePanel({ aresta, config, quebraState }: EdgePanelProps) {
-  const { quebra, definirTipoAresta, definirValorSpecAresta, pedirExclusao, setArestaSelecionadaId } = quebraState;
-  const origem = quebra.diagrama.nodes.find((n) => n.id === aresta.source);
-  const destino = quebra.diagrama.nodes.find((n) => n.id === aresta.target);
+  const { diagrama, definirTipoAresta, definirValorSpecAresta, pedirExclusao, setArestaSelecionadaId } = quebraState;
+  const origem = diagrama.nodes.find((n) => n.id === aresta.source);
+  const destino = diagrama.nodes.find((n) => n.id === aresta.target);
   const regra = destino ? (config.edgeRules[destino.type] ?? config.edgeRules._fallback) : undefined;
   const opcoesValidas = regra?.valid ?? [];
   const camposDoTipo = camposVisiveisAresta(config.edgeTypes[aresta.type]?.spec ?? []);

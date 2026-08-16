@@ -1,0 +1,303 @@
+import { useCallback, useState } from "react";
+import type { Aresta, Diagrama, DiagramaConfig, No } from "@gerador/engine";
+import { criarAresta, criarNo, mesclarDiagrama } from "./factory";
+
+export interface EdgeRejeitada {
+  motivo: string;
+}
+
+/**
+ * SPEC-59 fatia C — o estado de um DIAGRAMA, extraído do estado de uma QUEBRA.
+ *
+ * Tudo aqui já existia dentro de `useQuebra`, misturado com necessidades,
+ * decisões, percursos e respostas de item. O canvas era genérico na FORMA
+ * (recebe `DiagramaConfig` e desenha o que ele declarar) e acoplado ao DOMÍNIO
+ * (recebia `UseQuebra`), então qualquer segundo desenho esbarrava nessa parede.
+ *
+ * A separação é por dependência, não por arquivo: este hook não importa
+ * `Quebra` e não sabe que ela existe. `useQuebra` o compõe.
+ */
+
+/**
+ * Como este hook escreve: ele recebe o diagrama e a função que o substitui, e
+ * **não sabe onde ele mora**. É isso que o desacopla da quebra — o mesmo
+ * estado serve a um diagrama de demanda, a um mapa do sistema (SPEC-59) ou a
+ * qualquer segundo desenho que apareça.
+ */
+export type AplicarNoDiagrama = (mudar: (d: Diagrama) => Diagrama) => void;
+
+export function useDiagrama(diagrama: Diagrama, aplicar: AplicarNoDiagrama, config: DiagramaConfig) {
+  const [selecionadoId, setSelecionadoId] = useState<string | null>(null);
+  const [arestaSelecionadaId, setArestaSelecionadaId] = useState<string | null>(null);
+  const [edgeRejeitada, setEdgeRejeitada] = useState<EdgeRejeitada | null>(null);
+
+  const atualizarNo = useCallback((id: string, updater: (no: No) => No) => {
+    aplicar((d) => ({ ...d, nodes: d.nodes.map((n) => (n.id === id ? updater(n) : n)) }));
+  }, [aplicar]);
+
+  const moverNo = useCallback(
+    (id: string, x: number, y: number) => atualizarNo(id, (n) => ({ ...n, x, y })),
+    [atualizarNo]
+  );
+
+  const definirValorSpec = useCallback(
+    (noId: string, campoKey: string, valor: unknown) =>
+      atualizarNo(noId, (n) => ({
+        ...n,
+        spec: { ...n.spec, [campoKey]: { valor, origem: "manual" } },
+      })),
+    [atualizarNo]
+  );
+
+  const definirNA = useCallback(
+    (noId: string, campoKey: string, motivo: string) =>
+      atualizarNo(noId, (n) => ({
+        ...n,
+        specNA: { ...n.specNA, [campoKey]: { motivo } },
+      })),
+    [atualizarNo]
+  );
+
+  const removerNA = useCallback(
+    (noId: string, campoKey: string) =>
+      atualizarNo(noId, (n) => {
+        const specNA = { ...n.specNA };
+        delete specNA[campoKey];
+        return { ...n, specNA };
+      }),
+    [atualizarNo]
+  );
+
+  const confirmarValor = useCallback(
+    (noId: string, campoKey: string) =>
+      atualizarNo(noId, (n) => {
+        const atual = n.spec[campoKey];
+        if (!atual) return n;
+        return { ...n, spec: { ...n.spec, [campoKey]: { ...atual, confirmado: true } } };
+      }),
+    [atualizarNo]
+  );
+
+  const descartarValor = useCallback(
+    (noId: string, campoKey: string) =>
+      atualizarNo(noId, (n) => {
+        const spec = { ...n.spec };
+        delete spec[campoKey];
+        return { ...n, spec };
+      }),
+    [atualizarNo]
+  );
+
+  const renomearNo = useCallback(
+    (noId: string, label: string) => atualizarNo(noId, (n) => ({ ...n, label })),
+    [atualizarNo]
+  );
+
+  const alternarStatus = useCallback(
+    (noId: string) =>
+      atualizarNo(noId, (n) => ({ ...n, status: n.status === "novo" ? "existente" : "novo" })),
+    [atualizarNo]
+  );
+
+  const definirTime = useCallback(
+    (noId: string, time: string) => atualizarNo(noId, (n) => ({ ...n, time })),
+    [atualizarNo]
+  );
+
+  const adicionarNo = useCallback(
+    (tipo: string, x: number, y: number) => {
+      aplicar((d) => ({ ...d, nodes: [...d.nodes, criarNo(tipo, config, d.nodes, x, y)] }));
+    },
+    [config]
+  );
+
+  const removerNo = useCallback((id: string) => {
+    aplicar((d) => ({
+      nodes: d.nodes.filter((n) => n.id !== id),
+      edges: d.edges.filter((e) => e.source !== id && e.target !== id),
+    }));
+    setSelecionadoId((sel) => (sel === id ? null : sel));
+  }, [aplicar]);
+
+  const tentarConectar = useCallback(
+    (source: string, target: string, sourceHandle?: string | null, targetHandle?: string | null) => {
+      const alvo = diagrama.nodes.find((n) => n.id === target);
+      if (!alvo) return;
+      const regra = config.edgeRules[alvo.type] ?? config.edgeRules._fallback;
+      if (!regra) {
+        setEdgeRejeitada({
+          motivo: `Tipo de nó "${alvo.type}" não tem regras de conexão definidas.`,
+        });
+        return;
+      }
+      const tipoAresta = regra.default ?? regra.valid[0];
+      if (!tipoAresta) {
+        setEdgeRejeitada({ motivo: `Nenhum tipo de aresta válido para "${alvo.type}".` });
+        return;
+      }
+      aplicar((d) => ({
+        ...d,
+        edges: [
+          ...d.edges,
+          criarAresta(source, target, tipoAresta, d.edges, sourceHandle ?? undefined, targetHandle ?? undefined),
+        ],
+      }));
+    },
+    [config, diagrama.nodes, aplicar]
+  );
+
+  const definirTipoAresta = useCallback((edgeId: string, tipo: string) => {
+    aplicar((d) => ({ ...d, edges: d.edges.map((e) => (e.id === edgeId ? { ...e, type: tipo } : e)) }));
+  }, [aplicar]);
+
+  const atualizarAresta = useCallback((id: string, updater: (a: Aresta) => Aresta) => {
+    aplicar((d) => ({ ...d, edges: d.edges.map((e) => (e.id === id ? updater(e) : e)) }));
+  }, [aplicar]);
+
+  /** Valor de campo de `EdgeTypeConfig.spec` numa conexão específica (SPEC-21)
+   * — mesma forma de `definirValorSpec` pro nó, mas sem N/A/confirmar/descartar:
+   * arestas não têm prontidão calculada no engine (ninguém pediu o semáforo
+   * pra conexão ainda), então o mecanismo fica no essencial por ora. */
+  const definirValorSpecAresta = useCallback(
+    (arestaId: string, campoKey: string, valor: unknown) =>
+      atualizarAresta(arestaId, (a) => ({
+        ...a,
+        spec: { ...(a.spec ?? {}), [campoKey]: { valor, origem: "manual" } },
+      })),
+    [atualizarAresta]
+  );
+
+  const removerAresta = useCallback((edgeId: string) => {
+    aplicar((d) => ({ ...d, edges: d.edges.filter((e) => e.id !== edgeId) }));
+    setArestaSelecionadaId((sel) => (sel === edgeId ? null : sel));
+  }, [aplicar]);
+
+  /**
+   * SPEC-27 Fase 1 — aplica ao canvas o diagrama que a conversa propôs.
+   *
+   * Passa pelo MESMO caminho que carregar um cenário pronto (`mesclarDiagrama`
+   * sobre nós criados por `criarNo`): ids renumerados pra não colidir com o
+   * que já existe, posição deslocada pra não empilhar em cima, e o resultado é
+   * um nó comum — editável, apagável, indistinguível de um criado no clique.
+   * Nenhum canal paralelo de escrita (lição do JOURNEY §41).
+   *
+   * O que a proposta NÃO decide: o tipo de aresta quando ela cita um que não
+   * existe. Aí vale a regra de `edgeRules`, a mesma que valida um arrasto de
+   * mouse — proposta inválida vira conexão pelo tipo default, não erro.
+   */
+  /**
+   * ACHADO REAL do usuário: depois de "Aplicar à mesa de projeto", os componentes "não
+   * aparecem a menos que se clique em próximo pendente (1 por 1)", e com nós
+   * pré-existentes "não aparecem nem assim".
+   *
+   * O estado sempre esteve certo — os nós existiam, com id único e posição em
+   * grade. O que não acontecia era a VIEWPORT acompanhar: o `fitView` do
+   * ReactFlow, passado como prop booleana, só enquadra no primeiro render. Com
+   * nós pré-existentes fica pior por construção, porque `mesclarDiagrama`
+   * empurra os novos para `max(y) + 220` — cada vez mais longe do que se vê.
+   *
+   * Este contador é o pedido explícito de "enquadre agora". Explícito, e não
+   * "detecte que entraram nós", porque adicionar UM nó pela paleta não deve
+   * mexer no enquadramento: a pessoa acabou de escolher onde ele fica.
+   */
+  const [pedidoDeEnquadramento, setPedidoDeEnquadramento] = useState(0);
+  const pedirEnquadramento = useCallback(() => setPedidoDeEnquadramento((n) => n + 1), []);
+
+  /**
+   * Pedido do usuário: excluir componente deve perguntar antes.
+   *
+   * Mora AQUI, e não no Canvas, porque há três portas para a mesma exclusão: a
+   * tecla Delete sobre o nó selecionado, o botão do `PropertiesPanel` e o do
+   * `EdgePanel`. Confirmação implementada numa delas deixaria as outras duas
+   * apagando em silêncio — que é justamente a versão do defeito que o usuário
+   * encontrou (ele seleciona e exclui pelo painel).
+   *
+   * Guarda só `{tipo, id}`: rótulo e número de conexões são derivados de
+   * `quebra` na hora de desenhar, e assim não há como a mensagem descrever um
+   * estado que já mudou.
+   */
+  const [exclusaoPendente, setExclusaoPendente] = useState<{ tipo: "no" | "aresta"; id: string } | null>(null);
+  const pedirExclusao = useCallback((tipo: "no" | "aresta", id: string) => setExclusaoPendente({ tipo, id }), []);
+  const cancelarExclusao = useCallback(() => setExclusaoPendente(null), []);
+
+  const aplicarDiagramaProposto = useCallback(
+    (proposta: { nos: { id: string; tipo: string; rotulo: string }[]; arestas: { de: string; para: string; tipo: string }[] }) => {
+      aplicar((d) => {
+        const tiposValidos = new Set(Object.keys(config.nodeTypes));
+        // Ids locais da proposta ("n1", "n2") → nós de verdade. O
+        // `mesclarDiagrama` renumera depois; aqui só precisamos de um mapa
+        // interno consistente.
+        const mapa = new Map<string, No>();
+        const nos: No[] = [];
+        for (const p of proposta.nos) {
+          if (!tiposValidos.has(p.tipo)) continue; // o enum do servidor já evita, mas config pode ter mudado
+          const no = criarNo(p.tipo, config, nos, 120 + (nos.length % 3) * 280, 80 + Math.floor(nos.length / 3) * 200);
+          const comRotulo: No = { ...no, label: p.rotulo?.trim() || no.label };
+          nos.push(comRotulo);
+          mapa.set(p.id, comRotulo);
+        }
+
+        const arestas: Aresta[] = [];
+        for (const a of proposta.arestas) {
+          const origem = mapa.get(a.de);
+          const destino = mapa.get(a.para);
+          if (!origem || !destino) continue;
+          const regra = config.edgeRules[destino.type] ?? config.edgeRules._fallback;
+          const tipo = regra?.valid.includes(a.tipo) ? a.tipo : regra?.default ?? regra?.valid[0];
+          if (!tipo) continue;
+          arestas.push(criarAresta(origem.id, destino.id, tipo, arestas));
+        }
+
+        return mesclarDiagrama(d, { nodes: nos, edges: arestas });
+      });
+      pedirEnquadramento();
+    },
+    [config, pedirEnquadramento]
+  );
+
+  const confirmarExclusao = useCallback(() => {
+    setExclusaoPendente((pendente) => {
+      if (!pendente) return null;
+      if (pendente.tipo === "no") removerNo(pendente.id);
+      else removerAresta(pendente.id);
+      return null;
+    });
+  }, [removerNo, removerAresta]);
+
+  return {
+    // Devolvido junto: quem consome o estado precisa LER o diagrama, e ir
+    // buscá-lo noutro lugar recriaria o acoplamento que esta extração desfez.
+    diagrama,
+    selecionadoId,
+    setSelecionadoId,
+    arestaSelecionadaId,
+    setArestaSelecionadaId,
+    edgeRejeitada,
+    limparEdgeRejeitada: () => setEdgeRejeitada(null),
+    moverNo,
+    definirValorSpec,
+    definirNA,
+    removerNA,
+    confirmarValor,
+    descartarValor,
+    renomearNo,
+    alternarStatus,
+    definirTime,
+    adicionarNo,
+    removerNo,
+    tentarConectar,
+    definirTipoAresta,
+    definirValorSpecAresta,
+    removerAresta,
+    aplicarDiagramaProposto,
+    pedidoDeEnquadramento,
+    pedirEnquadramento,
+    exclusaoPendente,
+    pedirExclusao,
+    cancelarExclusao,
+    confirmarExclusao,
+  };
+}
+
+export type UseDiagrama = ReturnType<typeof useDiagrama>;
+export type { Aresta, No };

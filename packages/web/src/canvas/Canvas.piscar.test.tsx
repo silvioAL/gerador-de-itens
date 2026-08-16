@@ -55,23 +55,22 @@ const config = {
 } as unknown as DiagramaConfig;
 
 /**
- * Espelha o que `useQuebra.atualizarNo` faz de verdade:
- * `{...q, diagrama: {...d, nodes: nodes.map(...)}}` — ou seja, o array de
- * ARESTAS mantém a referência; só os nós são recriados. Um fake que também
- * recriasse as arestas testaria outra coisa (e passaria a impressão errada de
- * que o bug continua).
+ * Espelha o que `useDiagrama.atualizarNo` faz de verdade:
+ * `{...d, nodes: nodes.map(...)}` — ou seja, o array de ARESTAS mantém a
+ * referência; só os nós são recriados. Um fake que também recriasse as arestas
+ * testaria outra coisa (e passaria a impressão errada de que o bug continua).
+ *
+ * §259 — o fixture descrevia `{ quebra: { diagrama } }`, o contrato anterior à
+ * separação. Ele apontou sozinho que o canvas tinha deixado de conhecer quebra.
  */
 const ARESTAS = [{ id: "e1", source: "n1", target: "n2", type: "publishes" }];
 const N2 = { id: "n2", type: "kafka", label: "topico", x: 300, y: 0, spec: {} };
 
 function estado(specDoNo: Record<string, unknown>, n2 = N2) {
   return {
-    quebra: {
-      time: "local",
-      diagrama: {
-        nodes: [{ id: "n1", type: "service", label: "srv", x: 0, y: 0, spec: specDoNo }, n2],
-        edges: ARESTAS,
-      },
+    diagrama: {
+      nodes: [{ id: "n1", type: "service", label: "srv", x: 0, y: 0, spec: specDoNo }, n2],
+      edges: ARESTAS,
     },
     selecionadoId: null,
     setSelecionadoId: vi.fn(),
@@ -87,10 +86,10 @@ function estado(specDoNo: Record<string, unknown>, n2 = N2) {
 describe("Canvas — o rótulo da conexão não pode repintar quando se digita no nó", () => {
   it("digitar no spec de um nó NÃO troca as referências das arestas", () => {
     edgesRecebidos.length = 0;
-    const { rerender } = render(comProvider(<Canvas quebraState={estado({ nome: { valor: "a", origem: "manual" } })} config={config} />));
+    const { rerender } = render(comProvider(<Canvas diagramaState={estado({ nome: { valor: "a", origem: "manual" } })} config={config} />));
     // Cada tecla produz um objeto `spec` novo — é o que a UI real faz.
-    rerender(comProvider(<Canvas quebraState={estado({ nome: { valor: "ab", origem: "manual" } })} config={config} />));
-    rerender(comProvider(<Canvas quebraState={estado({ nome: { valor: "abc", origem: "manual" } })} config={config} />));
+    rerender(comProvider(<Canvas diagramaState={estado({ nome: { valor: "ab", origem: "manual" } })} config={config} />));
+    rerender(comProvider(<Canvas diagramaState={estado({ nome: { valor: "abc", origem: "manual" } })} config={config} />));
 
     expect(edgesRecebidos.length).toBeGreaterThanOrEqual(3);
     const primeiro = edgesRecebidos[0][0];
@@ -107,11 +106,11 @@ describe("Canvas — o rótulo da conexão não pode repintar quando se digita n
     // precisa continuar mudando a aresta.
     edgesRecebidos.length = 0;
     const spec = { nome: { valor: "a", origem: "manual" } };
-    const { rerender } = render(comProvider(<Canvas quebraState={estado(spec)} config={config} />));
+    const { rerender } = render(comProvider(<Canvas diagramaState={estado(spec)} config={config} />));
     expect(edgesRecebidos.at(-1)![0].sourceHandle).toBe("source-right");
 
     // n2 vai pra ESQUERDA de n1: o handle padrão tem que virar.
-    rerender(comProvider(<Canvas quebraState={estado(spec, { ...N2, x: -300 })} config={config} />));
+    rerender(comProvider(<Canvas diagramaState={estado(spec, { ...N2, x: -300 })} config={config} />));
     expect(edgesRecebidos.at(-1)![0].sourceHandle).toBe("source-left");
   });
 });
