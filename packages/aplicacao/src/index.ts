@@ -161,4 +161,5 @@ export {
   type RegraDoMapa,
   type EstadoDoAgente,
   type EntradaDoMapa,
+  type ExecucaoDoPapel,
 } from "./sistema/mapaDoSistema.js";

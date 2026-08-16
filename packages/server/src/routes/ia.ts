@@ -31,6 +31,7 @@ import { criarCofreInfisical, opcoesDoAmbiente } from "../adaptadores/cofreInfis
 import { exigirSessao } from "../auth/middleware.js";
 import { exigirPermissao, organizacaoPadraoDe } from "../auth/permissoes.js";
 import { registrarAuditoria } from "../auditoria.js";
+import { registrarExecucao, ultimaExecucaoPorPapel } from "../execucoes.js";
 import { organizacoes } from "../db/schema.js";
 
 /**
@@ -312,9 +313,27 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
    * `node-llama-cpp` lá, gateway aqui.
    */
   async function executarPedido(reply: FastifyReply, pedido: PedidoIa, rotulo: string) {
+    // §265 — o rastro. Aqui, e só aqui: este é o funil por onde passa toda
+    // chamada ao modelo. Registrar em cada rota seria garantir que a próxima
+    // rota esqueça, e um rastro com buraco lê-se como "não rodou".
+    const comecouEm = Date.now();
+    const papel = /^ia\/pipeline\/(.+)$/.exec(rotulo)?.[1];
+    const anotar = (ok: boolean, erro?: string) =>
+      registrarExecucao(db, {
+        rotulo,
+        papel,
+        ok,
+        erro,
+        duracaoMs: Date.now() - comecouEm,
+        email: reply.request.usuario?.email,
+      });
+
     const repo = await repositorio();
     const credencial = repo ? await repo.obter(ID_PROVEDOR_GATEWAY) : null;
     if (!credencial?.baseUrl || !credencial.chave) {
+      // Sem registro: não houve execução. "Sem credencial" já é um estado que o
+      // mapa sabe mostrar (§258), e anotá-lo como falha faria o avatar acusar o
+      // papel por uma configuração que não é dele.
       return reply.code(503).send({ erro: "IA não configurada — cadastre a credencial do gateway" });
     }
 
@@ -373,14 +392,20 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
         // Sem exceção e sem um único byte. Acontece quando o gateway aceita a
         // chamada e devolve resposta vazia — e é indistinguível de sucesso pra
         // quem só olha o status.
+        anotar(false, "o modelo respondeu sem nenhum texto");
         return reply.code(502).send({
           erro: `O modelo respondeu, mas não veio nenhum texto. Confira o modelo e o endereço na aba "Modelo de IA".`,
         });
       }
+      anotar(true);
       reply.raw.end();
     } catch (erro) {
       const mensagem = erro instanceof Error ? erro.message : String(erro);
       app.log.error(`[${rotulo}] falhou: ${mensagem}`);
+      // Antes do `if`: falha com cabeçalho já enviado continua sendo falha, e
+      // registrar só num dos ramos deixaria o avatar verde justamente no caso
+      // em que a pessoa viu o texto cortado na tela.
+      anotar(false, mensagem);
       if (!comecou) {
         // Nada foi enviado ainda: dá pra dizer o que houve, com status de erro.
         return reply.code(502).send({ erro: `A chamada ao modelo falhou: ${mensagem}`, rotulo });
@@ -405,6 +430,16 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
       throw erro;
     }
   }
+
+  /**
+   * §265 — a última execução de cada papel. É o que acende (ou apaga) o avatar
+   * no mapa do sistema.
+   *
+   * Sem `exigirSessao` pelo mesmo motivo de `/ia/status`: as duas respondem à
+   * pergunta "a esteira está de pé?" e a tela as chama antes de qualquer coisa.
+   * Não devolve prompt nem resposta — não há o que vazar.
+   */
+  app.get("/ia/execucoes", async () => ({ porPapel: await ultimaExecucaoPorPapel(db) }));
 
   app.post("/ia/pipeline/:papel", async (req, reply) => {
     const { papel } = req.params as { papel: string };

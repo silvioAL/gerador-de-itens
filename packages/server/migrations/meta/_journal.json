@@ -246,6 +246,13 @@
       "when": 1754500000020,
       "tag": "0034_documento_de_desenho",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1754500000021,
+      "tag": "0035_rastro_da_esteira",
+      "breakpoints": true
     }
   ]
 }

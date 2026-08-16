@@ -63,7 +63,7 @@ import { ConversaPanel } from "./conversa/ConversaPanel";
 import { AssistenteFlutuante, type AbaAssistente } from "./assistente/AssistenteFlutuante";
 import { ConfigurarPanel } from "./assistente/ConfigurarPanel";
 import { JourneyModal, type AbaJornada } from "./demo/JourneyModal";
-import { contextoDoProdutoEmTexto, montarMapaDoSistema } from "@gerador/aplicacao";
+import { contextoDoProdutoEmTexto, montarMapaDoSistema, type ExecucaoDoPapel } from "@gerador/aplicacao";
 import { ConfigScreen, type AbaConfig } from "./config/ConfigScreen";
 import { TourOverlay } from "./demo/TourOverlay";
 import { useTour, passosDeConfiguracao } from "./demo/useTour";
@@ -440,10 +440,21 @@ function AppCarregado({
    * "papel ativo e mudo", que é o defeito mais silencioso da configuração.
    * Buscado só quando a tela abre, como a exportação faz para os itens. */
   const [temCredencialDeIa, setTemCredencialDeIa] = useState(false);
+  /** §265 — o rastro da esteira. `undefined` = não foi lido (tela nunca aberta,
+   * chamada que falhou), e é diferente de lista vazia — que é "ninguém rodou
+   * nada ainda". O mapa trata os dois casos, e misturá-los faria um avatar
+   * dizer "nunca rodou" por causa de um erro de rede. */
+  const [execucoesDaEsteira, setExecucoesDaEsteira] = useState<ExecucaoDoPapel[] | undefined>(undefined);
 
   useEffect(() => {
     if (!mostrarSistema) return;
     let cancelado = false;
+    apiIa
+      .execucoes()
+      .then(({ porPapel }) => {
+        if (!cancelado) setExecucoesDaEsteira(porPapel);
+      })
+      .catch(() => {});
     apiIa
       .status()
       .then((st) => {
@@ -499,8 +510,9 @@ function AppCarregado({
         regras: regrasConfig,
         temCredencialDeIa,
         feedbacksAbertos: feedbacksNovos,
+        execucoes: execucoesDaEsteira,
       }),
-    [pipelineAgentes, regrasConfig, temCredencialDeIa, feedbacksNovos]
+    [pipelineAgentes, regrasConfig, temCredencialDeIa, feedbacksNovos, execucoesDaEsteira]
   );
 
   const [menuAberto, setMenuAberto] = useState(false);
