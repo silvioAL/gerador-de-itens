@@ -5,6 +5,7 @@ import {
   avaliarConformidade,
   avisosDaDerivacao,
   compararDocumentos,
+  exemploDeMedicao,
   derivar,
   estruturarDocumento,
   gerarDiagramaHtml,
@@ -98,7 +99,7 @@ function lerTokenConviteDaUrl(): string | null {
  * é que dá pra decidir, `EscolherTimeScreen`/`SemTimeScreen` abaixo).
  */
 export function App() {
-  const { sessao, modo, erro, entrar, sair } = useSessao();
+  const { sessao, modo, erro, expirou, entrar, sair } = useSessao();
   const [tokenConvite] = useState<string | null>(() => lerTokenConviteDaUrl());
   const [aceitandoConvite, setAceitandoConvite] = useState(false);
   const [erroConvite, setErroConvite] = useState<string | null>(null);
@@ -159,7 +160,11 @@ export function App() {
     return <div style={telaCentralizadaEstilo}>Aceitando convite…</div>;
   }
   if (sessao === null) {
-    if (!tokenConvite && !mostrarLogin) {
+    // §267 — quem teve a sessão expirada NÃO volta para a landing: ela é para
+    // quem está chegando, e mandar alguém que estava trabalhando ler a página
+    // de vendas esconde a única informação que importa naquele momento (que é
+    // só entrar de novo).
+    if (!tokenConvite && !mostrarLogin && !expirou) {
       return <LandingPage onEntrar={() => setMostrarLogin(true)} />;
     }
     return <LoginScreen erro={erro} modo={modo} aceitandoConvite={!!tokenConvite} onEntrar={entrar} />;
@@ -1477,6 +1482,17 @@ function AppCarregado({
       {mostrarSistema && (
         <SistemaScreen
           mapa={mapaDoSistema}
+          // §268 — a régua para explicar a cadeia. Os NÚMEROS do mapa seguem
+          // vindo da config real (esta tela responde "como o MEU ambiente está
+          // montado"); só o exemplo usa `regrasVisiveis`, porque durante o tour
+          // o time de quem assiste pode não ter régua conferível nenhuma — e um
+          // "não há o que explicar" no meio da demonstração não ensina nada.
+          //
+          // As duas coisas convivem porque a caixa DIZ quando o exemplo é de
+          // demonstração (§235). Sem essa marca isto seria a mentira que o
+          // §259 evitou de propósito.
+          exemploDeMedicao={exemploDeMedicao(regrasVisiveis)}
+          exemploDeDemonstracao={demonstracaoDoTour}
           onAbrirConfig={(area) => abrirConfigNaAba(area)}
           onVoltar={() => navegar({ tela: "canvas" })}
           erroAoSalvar={erroAoSalvarSistema}

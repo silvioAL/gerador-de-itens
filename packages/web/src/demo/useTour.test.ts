@@ -520,3 +520,39 @@ describe("useTour — a demonstração NUNCA sobrevive ao tour (§253)", () => {
     expect(opts.ligarDemonstracao).toHaveBeenCalledWith(false);
   });
 });
+
+/**
+ * §268 — os dois buracos que o usuário apontou na demonstração.
+ */
+describe("useTour — o motor explicado e o botão que fica na tela", () => {
+  it("existe um passo que MOSTRA a cadeia do motor, e ele abre o mapa", () => {
+    // "Medido pelo motor" era afirmado em vários passos e demonstrado em
+    // nenhum. Um passo que só repete a frase não fecha esse buraco: este tem
+    // que levar à tela onde a conta acontece.
+    const opts = montarOpts();
+    const passo = passosDoProduto(opts).find((p) => p.titulo === "O motor, por dentro");
+
+    expect(passo?.selector).toBe("[data-testid=motor-passo-a-passo]");
+    passo?.onEnter?.();
+    expect(opts.abrirSistema).toHaveBeenCalled();
+  });
+
+  it("o passo seguinte VOLTA ao canvas — senão aponta para uma tela que saiu", () => {
+    const opts = montarOpts();
+    const passos = passosDoProduto(opts);
+    const depois = passos[passos.findIndex((p) => p.titulo === "O motor, por dentro") + 1];
+
+    depois.onEnter?.();
+    expect(opts.fecharConfig).toHaveBeenCalled();
+  });
+
+  it("o botão flutuante é apresentado, e não só usado por dentro", () => {
+    // O tour abria e fechava a janela do assistente por chamadas internas; o ✦
+    // que fica por cima do desenho nunca foi apontado, e é por ele que se volta
+    // a chamar o agente depois que o tour acaba.
+    const passo = passosDoProduto(montarOpts()).find((p) => p.selector === "[data-testid=assistente-flutuante]");
+
+    expect(passo).toBeTruthy();
+    expect(passo?.texto).toContain("por cima do desenho");
+  });
+});

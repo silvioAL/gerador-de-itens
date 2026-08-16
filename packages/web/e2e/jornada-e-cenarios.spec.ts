@@ -212,6 +212,15 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await expect(page.getByTestId("tour-texto")).toContainText("MOTOR calcula");
   await expect(page.getByTestId("tour-texto")).toContainText("IA escreve");
 
+  // §268 — a cadeia do motor DEMONSTRADA, não só afirmada. O passo abre o mapa
+  // do sistema e mostra a conta com uma régua real do time; cobrar o conteúdo
+  // (§234) é o que separa isto de "a caixa apareceu".
+  await irAtePasso(page, "O motor, por dentro");
+  await expect(page.getByTestId("motor-passo-a-passo")).toBeVisible();
+  await expect(page.getByTestId("motor-passo-3")).toContainText("Sem IA, sem rede");
+  // E o foco anda sozinho: o primeiro elo cede a vez sem ninguém clicar.
+  await expect(page.getByTestId("motor-passo-1")).toHaveAttribute("data-ativo", "false", { timeout: 8000 });
+
   // §235 — a porta de entrada real: o desenho nasce da conversa, e o tour
   // antes começava com ele já pronto.
   await irAtePasso(page, "Começar conversando");
@@ -222,6 +231,10 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await expect(page.getByText(/serviço de catálogo de produtos/i)).toBeVisible();
 
   // O diagrama de verdade, com o cenário do tour já carregado.
+  // §268 — o ✦ que fica por cima do desenho, apresentado em vez de só usado.
+  await irAtePasso(page, "O agente fica sempre à mão");
+  await expect(page.getByTestId("assistente-flutuante")).toBeVisible();
+
   await irAtePasso(page, "O diagrama");
   await expect(page.locator(".react-flow__node")).toHaveCount(2);
 

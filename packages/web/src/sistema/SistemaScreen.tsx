@@ -1,4 +1,6 @@
 import type { AgenteDoMapa, EstadoDoAgente, MapaDoSistema } from "@gerador/aplicacao";
+import type { MedicaoDeExemplo } from "@gerador/engine";
+import { MotorPassoAPasso } from "./MotorPassoAPasso";
 
 /**
  * SPEC-59 fatia A — o CANVAS DO SISTEMA, em leitura.
@@ -39,6 +41,12 @@ export interface SistemaScreenProps {
    *
    * Ausentes = a tela volta a ser só leitura, que é como a fatia A nasceu.
    */
+  /** §268 — um requisito conferível DA CONFIGURAÇÃO REAL, para explicar a
+   * cadeia com um caso do próprio time. Ausente = a explicação diz que não há
+   * régua conferível, em vez de inventar uma. */
+  exemploDeMedicao?: MedicaoDeExemplo;
+  /** §235 — o exemplo acima é de demonstração (tour), e a caixa diz isso. */
+  exemploDeDemonstracao?: boolean;
   onAlternarAgente?: (id: string) => void;
   onMoverAgente?: (id: string, direcao: -1 | 1) => void;
   /** Erro do último salvamento. Falha de escrita não pode sumir: a tela
@@ -97,6 +105,8 @@ export function SistemaScreen({
   mapa,
   onAbrirConfig,
   onVoltar,
+  exemploDeMedicao,
+  exemploDeDemonstracao,
   onAlternarAgente,
   onMoverAgente,
   erroAoSalvar,
@@ -169,6 +179,17 @@ export function SistemaScreen({
               <div style={{ fontSize: 12, color: mapa.regrasDePercurso > 0 ? "var(--texto-fraco)" : "var(--amarelo)" }}>
                 {mapa.regrasDePercurso} régua(s) de percurso
               </div>
+            </div>
+            {/* §268 — a cadeia acontecendo, e não só contada. O bloco diz
+                "tech × contexto → requisito → régua" desde o §258; a conta em
+                si continuava invisível, e "medido pelo motor" é a frase que
+                mais aparece no produto. */}
+            <div style={{ marginTop: 10 }}>
+              <MotorPassoAPasso
+                exemplo={exemploDeMedicao}
+                demonstracao={exemploDeDemonstracao}
+                onConfigurarRegras={() => onAbrirConfig("regras")}
+              />
             </div>
           </Bloco>
 

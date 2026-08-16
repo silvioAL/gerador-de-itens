@@ -8597,3 +8597,101 @@ concluía que o botão não funciona. Carrega uma vez; depois disso quem manda �
 formulário.
 
 340 engine · 630 web · 78 aplicação · 229 server · 78/78 E2E · build limpo.
+
+## §267 — a sessão morre e o app finge que não
+
+*"entrar em contexto do produto apareceu que falta sessão"* — com print: a tela
+vazia, um `sessão inválida ou ausente` vermelho no canto, e o cabeçalho ainda
+mostrando o time ativo, como se estivesse tudo bem.
+
+### O que estava acontecendo
+
+A sessão era conferida **uma vez**, no boot (`GET /auth/me`). O cookie dura 12h.
+Passado o prazo com a aba aberta, o app continuava se achando logado — menu
+funcionando, time no cabeçalho — e cada chamada virava uma linha vermelha na
+tela onde calhasse de ser mostrada.
+
+> Um problema do **app inteiro** dito uma vez por tela, e em nenhuma delas onde
+> se resolve. Cinco telas, cinco avisos, zero caminhos de volta.
+
+### Um ouvinte, e não um erro novo
+
+`requisitar` avisa quem estiver ouvindo quando o servidor responde 401. A opção
+óbvia — um tipo de erro especial — dependeria de **todos** os chamadores
+cooperarem, e engolir erro com catch vazio aparece bastante no código: o ouvinte
+funciona até onde o erro é engolido, que é justamente onde a sessão morta
+ficaria invisível por mais tempo.
+
+**A régua: 401 só é "expirou" se HAVIA sessão.** Uma chamada atrasada
+respondendo 401 para quem nunca entrou arrancaria o visitante da landing com
+"sua sessão expirou" — mentira, e das que fazem achar que o app está quebrado.
+
+E quem expirou **não volta para a landing**: ela é para quem está chegando.
+Mandar alguém que estava trabalhando reler a página de apresentação esconde a
+única informação que importa ali (que é só entrar de novo).
+
+### O teste que eu escrevi errado primeiro
+
+O caso "401 de quem nunca entrou" passava **sem o guarda** — porque
+`apiAuth.me()` não passa pelo `requisitar` (devolve `null` no 401, por
+desenho). O teste tinha o nome certo e não guardava nada. Reescrito para o
+cenário real (401 sem sessão, depois de sair), a mordida ficou vermelha.
+
+### E o E2E que virou flake na hora
+
+Limpar o cookie e clicar no menu passou isolado e falhou na suíte cheia: sob
+carga, **uma chamada de fundo** dispara o 401 antes do clique — que é o
+comportamento certo, derrubando um teste que insistia em ser ele o gatilho.
+Qualquer chamada serve; o teste passou a afirmar o **destino**, não o caminho.
+
+## §268 — "medido pelo motor", agora mostrado
+
+*"fala em 'medido pelo motor', sem explicar como isso ocorre ou demonstrar algo
+de forma animada"* e *"na demo não integra com o botão que aparece em tela
+sobre o desenho"*.
+
+### A frase mais repetida e a menos demonstrada
+
+O produto diz "o motor mede" em quase toda tela. Quem lê ou acredita ou não — e
+um número cuja origem não se conhece vale o mesmo que número nenhum. Pior:
+"motor" **soa a IA**, que é exatamente a leitura que este produto passa o tempo
+inteiro desfazendo.
+
+`MotorPassoAPasso` mostra a cadeia com o foco andando de elo em elo: o campo que
+você preencheu → a régua que alguém do time escreveu → a comparação → o item que
+sai. Quatro elos, e a pergunta "onde entra a IA?" fica respondida sem ninguém
+escrever a resposta: em lugar nenhum.
+
+**Animado e não parágrafo**, porque a ordem entre os elos é a explicação
+inteira. Empilhados num texto viram lista de conceitos; ver o foco andar é ver
+um mecanismo.
+
+### O exemplo é do time, e quando não é, ele diz
+
+`exemploDeMedicao` pega o primeiro requisito **conferível** da configuração —
+sem nenhum, a caixa diz isso e não desenha conta, porque explicar a régua de um
+time que não a tem ensina algo falso sobre o próprio ambiente de quem olha.
+
+No tour isso apareceu na cara: o time do E2E não tem régua conferível, e o passo
+mostrou o estado vazio. A saída não foi fingir — foi usar a régua **da
+demonstração** com a marca do §235 na caixa. Os números do mapa continuam vindo
+da config real (§259); só o exemplo é de demonstração, e ele diz que é.
+
+### Duas correções de rota minhas
+
+**`preenchido` ficou de fora da primeira versão.** Eu exigi um literal, e com
+isso a régua mais simples de todas — "este campo tem que estar preenchido" —
+não podia ser o exemplo. É justamente a que se entende primeiro. Sem o
+tratamento próprio ela sairia como "≥ undefined" no meio da explicação de como
+as contas fecham.
+
+**O passo do motor virou o primeiro a mostrar demonstração**, então é ele quem
+liga a marca agora — antes quem ligava era a conversa, que passou a vir depois.
+
+### O botão que estava lá o tempo todo
+
+O tour abria e fechava a janela do assistente **por dentro** e nunca apontou o
+✦ que fica por cima do desenho. Quem termina a demonstração precisa saber como
+chamar o agente de novo — e o botão é a resposta. Ganhou passo próprio.
+
+346 engine · 643 web · 78 aplicação · 229 server · 79/79 E2E · build limpo.
