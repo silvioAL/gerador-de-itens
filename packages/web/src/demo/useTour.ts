@@ -91,23 +91,65 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
         "Duas partes trabalham aqui, e a divisão é a ideia toda. O MOTOR calcula: lê o seu desenho e a configuração do time, mede o que está pronto e o que sai do padrão, e deriva os itens com as dependências. Ele não conversa com IA nem vai à rede — mesmo desenho, mesmos itens, sempre. A IA escreve: a história do item, os critérios, o porquê de uma proposta. Nunca o contrário. E nada que ela propõe conta antes de você confirmar.",
     },
     {
+      // §268 — o passo anterior AFIRMA que o motor calcula; este mostra a conta.
+      //
+      // "Medido pelo motor" é a frase mais repetida do produto e a menos
+      // demonstrada: quem lê ou acredita ou não, e acreditar num número cuja
+      // origem não se conhece é o mesmo que ignorá-lo. Pior, "motor" soa a IA —
+      // que é justamente a leitura que o produto passa o tempo todo desfazendo.
+      //
+      // O exemplo é da configuração REAL de quem está vendo, e não da
+      // demonstração: aqui a pergunta é "como o MEU ambiente mede", e um
+      // exemplo de mentira responderia outra coisa.
+      selector: "[data-testid=motor-passo-a-passo]",
+      titulo: "O motor, por dentro",
+      // A animação dá uma volta completa em ~6,5s; este passo mostra duas.
+      segundos: 16,
+      texto:
+        "Aqui está a conta inteira, com uma régua do SEU time: o campo que você preencheu, a régua que alguém escreveu, a comparação, e o item que sai dela. Quatro elos, nenhum deles com IA no meio — é aritmética sobre o seu desenho e a sua configuração, e por isso o mesmo desenho dá sempre os mesmos itens. Se aqui disser que não há régua conferível, é literal: o motor só confere o que tem checagem, e o resto é texto para uma pessoa ler.",
+      onEnter: () => {
+        // Este passo passou a ser o PRIMEIRO a mostrar dado de demonstração, e
+        // por isso liga a marca aqui: o time de quem assiste pode não ter régua
+        // conferível nenhuma, e "não há o que explicar" no meio da explicação
+        // não ensina nada. A caixa diz que o exemplo é de demonstração (§235).
+        opts.ligarDemonstracao(true);
+        opts.abrirSistema();
+      },
+    },
+    {
       selector: "[data-testid=assistente-janela]",
       titulo: "Começar conversando",
       segundos: 9,
       texto:
         "A porta de entrada não é arrastar caixa: você descreve a demanda — por texto, voz ou um print de lousa — e o agente propõe os componentes USANDO OS TIPOS que este projeto tem configurados. Nada é aplicado sozinho: a proposta vem com o motivo de cada peça, e você decide. Este desenho na mesa nasceu da conversa ao lado.",
       onEnter: () => {
-        // Ligar aqui, e não só no passo do produto: a conversa de demonstração
-        // é o primeiro dado falso que o tour mostra.
+        // §268 — voltar do mapa: o passo anterior saiu do canvas, e a conversa
+        // aparece por cima dele. Sem isto o passo apontaria para uma janela que
+        // não está na tela que está aberta.
+        opts.fecharConfig();
+        // Continua ligada (o passo do motor já ligou): a conversa é dado de
+        // demonstração também, e quem chega aqui por outro caminho precisa da
+        // marca do mesmo jeito.
         opts.ligarDemonstracao(true);
         opts.abrirConversa();
       },
     },
     {
+      // §268 — o botão que fica SEMPRE por cima do desenho, e que o tour usava
+      // sem nunca apresentar: ele abria e fechava a janela por dentro
+      // (`abrirConversa`/`fecharAssistente`) e o ✦ no canto nunca foi apontado.
+      // Quem termina o tour precisa saber como voltar a chamar o agente.
+      selector: "[data-testid=assistente-flutuante]",
+      titulo: "O agente fica sempre à mão",
+      segundos: 8,
+      texto:
+        "Este ✦ acompanha você por cima do desenho, em qualquer tela. É por ele que se volta a conversar, colar o contexto do épico ou pedir uma configuração — por texto ou por voz. Ele pisca quando tem algo a dizer, e nunca aplica nada sozinho: tudo o que vier dali passa por uma confirmação sua.",
+      onEnter: () => opts.fecharAssistente(),
+    },
+    {
       selector: ".react-flow",
       titulo: "O diagrama",
       segundos: 8,
-      onEnter: () => opts.fecharAssistente(),
       texto:
         "Um serviço novo escrevendo numa coleção Mongo nova. Cada nó já foi preenchido e ficou verde — pronto para virar item de trabalho.",
     },

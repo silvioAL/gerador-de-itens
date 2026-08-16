@@ -8,6 +8,37 @@ import type { Decisao, Diagrama, DocumentoEscrito, ExcecaoDePadrao, Necessidade,
  */
 const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 
+/**
+ * §267 — quem avisar quando a sessão morrer no meio do caminho.
+ *
+ * ## O defeito que isto fecha
+ *
+ * A sessão era conferida UMA vez, no boot (`GET /auth/me`). O cookie dura 12h;
+ * quando ele expira com a aba aberta, o app continua achando que está logado —
+ * o cabeçalho mostra o time ativo, o menu funciona — e cada chamada vira uma
+ * linha vermelha "sessão inválida ou ausente" onde calhar de ser mostrada. Foi
+ * assim que a tela de Contexto do produto apareceu vazia, com um aviso que não
+ * diz o que fazer.
+ *
+ * Um erro por tela é o pior formato possível para um problema que é do app
+ * inteiro: ele aparece cinco vezes em cinco lugares diferentes e nenhuma delas
+ * é onde a pessoa resolve.
+ *
+ * ## Por que um ouvinte e não um `throw` especial
+ *
+ * Cada chamador já trata o erro do seu jeito (alguns mostram, outros engolem —
+ * `.catch(() => {})` aparece bastante). Um tipo novo de erro dependeria de
+ * TODOS eles cooperarem; o ouvinte funciona mesmo onde o erro é engolido, que é
+ * justamente onde a sessão morta ficaria invisível por mais tempo.
+ */
+let aoPerderSessaoOuvinte: (() => void) | null = null;
+
+/** Registra quem reage à sessão perdida. Um só: quem manda na tela é o `App`,
+ * e dois ouvintes discordando sobre para onde ir seria pior que nenhum. */
+export function aoPerderSessao(ouvinte: (() => void) | null): void {
+  aoPerderSessaoOuvinte = ouvinte;
+}
+
 async function requisitar<T>(caminho: string, opcoes?: RequestInit): Promise<T> {
   const resposta = await fetch(`${BASE_URL}${caminho}`, {
     ...opcoes,
@@ -24,6 +55,11 @@ async function requisitar<T>(caminho: string, opcoes?: RequestInit): Promise<T> 
     headers: opcoes?.body !== undefined ? { "Content-Type": "application/json", ...opcoes?.headers } : opcoes?.headers,
   });
   if (!resposta.ok) {
+    // §267 — antes de qualquer tratamento local: 401 é problema do app inteiro,
+    // não daquela tela. Quem decide se isso é "expirou" ou "nunca esteve
+    // logado" é o `App` — aqui só se avisa que o servidor recusou.
+    if (resposta.status === 401) aoPerderSessaoOuvinte?.();
+
     const corpo = await resposta.json().catch(() => ({}));
     // As rotas devolvem `{ erro: "mensagem em português" }` pro caso comum
     // (ver packages/server/src/routes/*.ts) — mostra só isso, nunca o dump
