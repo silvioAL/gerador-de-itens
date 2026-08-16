@@ -30,6 +30,20 @@ export interface SistemaScreenProps {
   mapa: MapaDoSistema;
   onAbrirConfig: (area: "pipeline" | "regras" | "pdca" | "modeloIa") => void;
   onVoltar: () => void;
+  /**
+   * SPEC-59 fatia D (revisada, §260) — as DUAS edições que o mapa provoca.
+   *
+   * Ver que um papel está desligado e ter que ir a outra tela para ligá-lo é
+   * o mapa apontando um problema e cobrando um pedágio. Estas duas ações
+   * fecham o laço onde ele se abre.
+   *
+   * Ausentes = a tela volta a ser só leitura, que é como a fatia A nasceu.
+   */
+  onAlternarAgente?: (id: string) => void;
+  onMoverAgente?: (id: string, direcao: -1 | 1) => void;
+  /** Erro do último salvamento. Falha de escrita não pode sumir: a tela
+   * mostraria o estado novo com o servidor guardando o velho. */
+  erroAoSalvar?: string | null;
 }
 
 const ROTULO_ESTADO: Record<EstadoDoAgente, string> = {
@@ -54,7 +68,15 @@ const ROSTO_POR_GRUPO: Record<string, string> = {
   "regras de teste e cenários": "🧪",
 };
 
-export function SistemaScreen({ mapa, onAbrirConfig, onVoltar }: SistemaScreenProps) {
+export function SistemaScreen({
+  mapa,
+  onAbrirConfig,
+  onVoltar,
+  onAlternarAgente,
+  onMoverAgente,
+  erroAoSalvar,
+}: SistemaScreenProps) {
+  const podeEditar = Boolean(onAlternarAgente && onMoverAgente);
   return (
     <div data-testid="sistema-screen" style={fundoEstilo}>
       <header style={barraEstilo}>
@@ -63,7 +85,9 @@ export function SistemaScreen({ mapa, onAbrirConfig, onVoltar }: SistemaScreenPr
         </button>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 11, color: "var(--texto-mudo)" }}>
-          vista de leitura — cada bloco leva à tela que edita
+          {podeEditar
+            ? "ligar/desligar e reordenar valem na hora — o resto se edita nas telas"
+            : "vista de leitura — cada bloco leva à tela que edita"}
         </span>
       </header>
 
@@ -73,6 +97,12 @@ export function SistemaScreen({ mapa, onAbrirConfig, onVoltar }: SistemaScreenPr
           O que o <strong>motor</strong> confere, quem <strong>escreve</strong> cada parte do item, e como o que o time
           responde depois volta a mudar os dois.
         </p>
+
+        {erroAoSalvar && (
+          <p data-testid="erro-ao-salvar-sistema" style={{ ...avisoEstilo, color: "var(--vermelho)", borderLeftColor: "var(--vermelho)", marginBottom: 14 }}>
+            {erroAoSalvar}
+          </p>
+        )}
 
         {mapa.avisos.length > 0 && (
           <ul data-testid="avisos-do-sistema" style={{ listStyle: "none", padding: 0, margin: "0 0 22px", display: "flex", flexDirection: "column", gap: 6 }}>
@@ -126,7 +156,17 @@ export function SistemaScreen({ mapa, onAbrirConfig, onVoltar }: SistemaScreenPr
             {mapa.agentes.length === 0 ? (
               <Vazio texto="Nenhum papel na esteira." />
             ) : (
-              mapa.agentes.map((a) => <Agente key={a.id} agente={a} onConfigurarIa={() => onAbrirConfig("modeloIa")} />)
+              mapa.agentes.map((a, i) => (
+                <Agente
+                  key={a.id}
+                  agente={a}
+                  onConfigurarIa={() => onAbrirConfig("modeloIa")}
+                  onAlternar={onAlternarAgente}
+                  onMover={onMoverAgente}
+                  primeiro={i === 0}
+                  ultimo={i === mapa.agentes.length - 1}
+                />
+              ))
             )}
           </Bloco>
         </div>
@@ -169,7 +209,21 @@ export function SistemaScreen({ mapa, onAbrirConfig, onVoltar }: SistemaScreenPr
   );
 }
 
-function Agente({ agente, onConfigurarIa }: { agente: AgenteDoMapa; onConfigurarIa: () => void }) {
+function Agente({
+  agente,
+  onConfigurarIa,
+  onAlternar,
+  onMover,
+  primeiro,
+  ultimo,
+}: {
+  agente: AgenteDoMapa;
+  onConfigurarIa: () => void;
+  onAlternar?: (id: string) => void;
+  onMover?: (id: string, direcao: -1 | 1) => void;
+  primeiro?: boolean;
+  ultimo?: boolean;
+}) {
   const cor = COR_ESTADO[agente.estado];
   return (
     <div data-testid={`agente-${agente.id}`} data-estado={agente.estado} style={{ ...linhaEstilo, flexDirection: "row", gap: 12, alignItems: "flex-start" }}>
@@ -212,6 +266,41 @@ function Agente({ agente, onConfigurarIa }: { agente: AgenteDoMapa; onConfigurar
           <button onClick={onConfigurarIa} style={{ ...linkEstilo, fontSize: 11, marginTop: 2 }}>
             configurar o modelo de IA →
           </button>
+        )}
+        {/* §260 — as duas ações que o mapa provoca. Não há modal de "ver o
+            efeito antes de aplicar" aqui de propósito: o efeito É o mapa. O
+            avatar troca de estado e a ordem se reorganiza na frente de quem
+            clicou, e um clique desfaz. O portão que a SPEC-59 pedia existe
+            para mudança estrutural de regra, não para um interruptor cujo
+            resultado é visível no mesmo instante. */}
+        {onAlternar && onMover && (
+          <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 4 }}>
+            <button
+              data-testid={`alternar-${agente.id}`}
+              onClick={() => onAlternar(agente.id)}
+              style={{ ...linkEstilo, fontSize: 11 }}
+            >
+              {agente.estado === "desligado" ? "ligar" : "desligar"}
+            </button>
+            <button
+              data-testid={`subir-${agente.id}`}
+              onClick={() => onMover(agente.id, -1)}
+              disabled={primeiro}
+              aria-label={`Subir ${agente.nome} na esteira`}
+              style={{ ...linkEstilo, fontSize: 11, opacity: primeiro ? 0.35 : 1 }}
+            >
+              ↑
+            </button>
+            <button
+              data-testid={`descer-${agente.id}`}
+              onClick={() => onMover(agente.id, 1)}
+              disabled={ultimo}
+              aria-label={`Descer ${agente.nome} na esteira`}
+              style={{ ...linkEstilo, fontSize: 11, opacity: ultimo ? 0.35 : 1 }}
+            >
+              ↓
+            </button>
+          </div>
         )}
       </div>
     </div>

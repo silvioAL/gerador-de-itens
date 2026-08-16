@@ -8153,3 +8153,58 @@ arquivo e a razão.
 **O que isto destrava:** a fatia D (editar o mapa do sistema pelo canvas de
 verdade) deixou de exigir um refactor antes de começar. E o próximo diagrama que
 alguém quiser — qualquer um — nasce sem pedir licença ao domínio da demanda.
+
+---
+
+## §260 — editar onde se vê o problema (SPEC-59 fatia D, revisada)
+
+*"pode seguir, gostei"* — sobre a vista. Então: fatia D. E construir a fatia A
+mudou o que D deveria ser, então **revisei a SPEC antes de implementar** em vez
+de executar o que estava escrito.
+
+### O que estava escrito, e por que não fiz assim
+
+D dizia *"mover, ligar, criar papel e regra pelo canvas"* — ou seja, arrastar
+caixinha. Com a vista de pé, isso é o erro do §2 da própria SPEC ("tudo vira
+nó") um nível mais fundo:
+
+- a esteira é **sequência**, e editá-la arrastando em duas dimensões é pior que
+  ↑↓;
+- "criar regra" não tem mapeamento honesto — regras são arrays por tech com
+  `checagem`, não caixas soltas;
+- e o que foi aprovado em uso foi a vista em **blocos**, não um canvas.
+
+### O que fiz
+
+As **duas edições que o mapa provoca**: ligar/desligar um papel e reordenar a
+esteira, ali mesmo. Ver que um papel está desligado e ter que ir a outra tela
+para ligá-lo é o mapa apontando um problema e cobrando pedágio.
+
+**Sem modal de "ver o efeito antes de aplicar", e isso é decisão, não atalho.**
+O efeito **é o mapa**: o avatar troca de estado na frente de quem clicou, a
+ordem se reorganiza, e um clique desfaz. O portão que o §6 pedia existe para
+mudança estrutural de regra, não para um interruptor reversível de resultado
+imediato.
+
+**A falha de escrita não some.** O estado local muda primeiro (padrão do resto
+do app), mas se o servidor recusar, ele **volta atrás** e o erro aparece: tela
+otimista sobre uma escrita que falhou é mentir com mais confiança do que não ter
+salvado.
+
+### A fatia E sai do plano, e o motivo é de produto
+
+Aposentar as abas **removeria capacidade**: o mapa liga/desliga e reordena; as
+telas editam preâmbulo, contextos, requisitos, checagens e aplicam propostas do
+PDCA. Tirá-las hoje seria regressão vestida de limpeza.
+
+E se um dia o mapa fizer tudo o que elas fazem, ele **terá virado as telas** —
+com caixas em volta. O ganho da fatia A nunca foi substituir formulário: foi
+mostrar a **ligação** que o formulário escondia. As duas coisas convivem por
+mérito.
+
+**Mordida:** tirar o `salvar` do fluxo → o E2E acusa `Expected: false /
+Received: true` lendo o servidor. É a mordida que importa aqui: um toggle que
+pinta a tela e não grava é a pior versão desta feature, porque a pessoa sai
+achando que configurou.
+
+316 engine · 604 web · 72 aplicação · 222 server · 77/77 E2E · build limpo.
