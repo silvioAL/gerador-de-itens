@@ -8281,3 +8281,83 @@ do `App` → o E2E do tour não acha `aviso-decisao`. A terceira é a que import
 porque é a única que prova que o diálogo mostra dado **de verdade**.
 
 324 engine · 610 web · 72 aplicação · 222 server · 77/77 E2E · build limpo.
+
+## §262 — o flake era um verde falso disfarçado
+
+*"e em seguida sanar a dívida de teste"*. O flake do `produto-contexto` falhou
+em duas execuções completas (§250, §258) e passou isolado nas duas. Fui atrás
+da causa em vez de re-rodar.
+
+### O que estava no banco
+
+```
+Portabilidade e2e 1786853010699 | Levar a conta do cliente para outro banco.
+```
+
+Um resíduo de execução interrompida, vivo no banco de e2e. O `finally` apagava
+por nome **exato** — e o nome carrega `Date.now()`, então nenhuma execução
+seguinte conseguia apagá-lo. Limpar só o que se criou é limpeza que não limpa.
+
+E aí vem a parte pior. A tela reabre no **primeiro produto da lista** (ordenada
+por nome) quando não sabe qual estava aberto, e o resíduo ordenava antes. O
+teste recarregava e afirmava direto sobre o campo:
+
+- resíduo vazio → vermelho, o flake que eu via;
+- resíduo **com o mesmo texto** → **verde lendo a linha errada**.
+
+Estava verde pelo segundo motivo quando fui olhar. Um flake é barulhento; um
+verde falso é silencioso, e os dois eram a mesma falha.
+
+### A causa real não era ordenação
+
+Reproduzi inserindo um concorrente vazio: vermelho na hora. Corrigi a ordenação
+— abrir o produto pelo nome depois do F5 — e continuou vermelho. Com o banco
+limpo, passava. Com dois produtos, **o próprio salvamento gravava vazio**, com
+`200` no PUT e "salvo" na tela.
+
+O motivo estava numa linha que parecia inofensiva:
+
+```ts
+await page.getByTestId("criar-produto").click();
+await expect(page.getByTestId("editor-do-produto")).toBeVisible();
+```
+
+Com outro produto no banco, o editor **já estava aberto** — no primeiro da
+lista — antes do clique. A espera passava instantaneamente, no editor errado. O
+texto era digitado ali, o `recarregar` do criar chegava depois e substituía o
+rascunho, e o que subia era vazio.
+
+> Afirmar sobre um estado que já era verdadeiro antes da ação não espera por
+> nada. Mesma classe do §250 (`toHaveValue` num componente controlado), outra
+> fachada: lá o DOM guardava o que o teste tinha escrito, aqui a tela já estava
+> visível por outro motivo.
+
+A espera agora é por **identidade**: `Nome do produto` com o valor do produto
+criado. Com `exact`, porque "Nome do produto" também casava com "Nome do
+produto novo" — o campo de criar, que o criar acabou de limpar.
+
+### O concorrente ficou
+
+Ele não é andaime de diagnóstico: virou parte do teste. Organização real tem
+vários produtos, e este teste vinha provando tudo num banco de um produto só —
+premissa que ele nunca declarou e que qualquer resíduo quebrava. Trazer a
+situação real para dentro do teste é melhor do que torcer para ela não
+acontecer.
+
+Tirando o concorrente, tudo passa: é a medida exata do que ele sustenta.
+
+### O que fica anotado e NÃO foi mexido
+
+`recarregar()` substitui o rascunho depois de toda gravação. Quem digitar entre
+o clique em Salvar e a resposta perde o que digitou, sem aviso. O guarda óbvio
+— não substituir o rascunho quando o id é o mesmo — **quebra o glossário**, que
+depende justamente dessa releitura para aparecer. Tem conserto, tem tamanho, e
+não é conserto de dívida de teste: fica registrado aqui em vez de entrar de
+carona.
+
+**Mordidas:** tirar a espera por identidade → vermelho; tirar a abertura pelo
+nome após o F5 → vermelho; tirar o concorrente → verde, que é a prova de que
+ele é quem carrega o caso.
+
+324 engine · 610 web · 72 aplicação · 222 server · 77/77 E2E · banco de e2e
+zerado ao fim da suíte.
