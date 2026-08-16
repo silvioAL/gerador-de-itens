@@ -8422,3 +8422,56 @@ E2E do tour ficou vermelho por causa do delta escondido na demonstração, antes
 de eu perceber o problema.
 
 333 engine · 620 web · 72 aplicação · 222 server · 77/77 E2E · build limpo.
+
+## §264 — o aviso que agora diz o quê (SPEC-60 fatia C)
+
+`documentoDesatualizado` era `especificacao !== markdownDoDocumento`: um
+booleano. A tela dizia *"o desenho mudou depois da aprovação"* e parava ali.
+
+O problema não é a frase estar errada — é ela ser **verdadeira e inútil**. Quem
+lê tem que reler o documento inteiro para descobrir se mudou uma vírgula do
+preâmbulo ou a lista de itens, e o custo disso não é neutro: um aviso que não
+diz o que mudou **treina a reaprovar sem olhar**, que é exatamente o carimbo
+que o §233 quis evitar.
+
+### Por seção, não por linha
+
+"Mudou a seção Itens" leva a uma ação. "A linha 340 mudou" não leva — ninguém
+tem o documento aprovado aberto noutra janela com os números de linha à mão. A
+seção é a unidade em que o documento foi escrito **e** em que ele é revisado.
+
+Três decisões pequenas que o teste guardou:
+
+- **espaço em branco não é mudança.** O booleano acusa qualquer byte; se a
+  comparação repetisse isso, a tela diria "mudou" e listaria nada — pior que o
+  aviso de antes. Quando isso acontece ela diz *"só espaço em branco"*, porque
+  um amarelo sem explicação é a mesma armadilha noutra roupa;
+- **entrou e saiu são coisas diferentes de mudou.** Seção nova pede leitura;
+  seção que sumiu pede pergunta;
+- **a abertura tem nome.** O que vem antes do primeiro `##` é título e
+  preâmbulo do template, e "mudou o começo do documento" é informação distinta
+  de "mudou uma seção".
+
+### Nenhuma linha nova no banco
+
+Não é versionamento, e continua não sendo — a SPEC-58 adiou histórico com
+razão. Isto compara **duas** coisas que já estavam na mão: a foto da aprovação
+(`quebra.especificacao`) e o texto de agora.
+
+### O tour narra, e não mostra — de propósito
+
+Para **mostrar**, o tour teria que aprovar o documento, voltar, mudar um campo
+e voltar de novo: três passos numa demonstração de dezenove, e o selo
+"aprovado" contradiria o resto da narrativa (o documento nasce rascunho). O
+passo do documento passou a nomear o comportamento, e quem prova de ponta a
+ponta é o E2E, que aprova de verdade, renomeia o serviço de verdade e cobra a
+palavra **Itens** no aviso.
+
+É exceção consciente ao §244, não esquecimento — e está escrita aqui para que
+a próxima vez que alguém encontre uma capacidade fora do tour saiba se foi
+decisão ou descuido.
+
+**Mordidas:** tratar seção nova como "mudou" → dois testes vermelhos; tirar o
+`trim` → o teste de espaço em branco vermelho.
+
+340 engine · 623 web · 72 aplicação · 222 server · 77/77 E2E · build limpo.

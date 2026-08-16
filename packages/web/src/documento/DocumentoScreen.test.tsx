@@ -184,3 +184,39 @@ describe("as saídas (SPEC-58 fatia 5)", () => {
     expect(onBaixarMarkdown).toHaveBeenCalled();
   });
 });
+
+/**
+ * SPEC-60 fatia C (§264) — o aviso que diz O QUE mudou.
+ */
+describe("DocumentoScreen — a comparação com a foto aprovada", () => {
+  it("lista as seções que mudaram, entraram e saíram", () => {
+    montar({
+      status: "aprovado",
+      desatualizado: true,
+      mudancasDesdeAprovacao: [
+        { titulo: "Itens", tipo: "mudou" },
+        { titulo: "Riscos", tipo: "entrou" },
+      ],
+    });
+
+    const texto = screen.getByTestId("mudancas-desde-aprovacao").textContent ?? "";
+    expect(texto).toContain("mudou");
+    expect(texto).toContain("Itens");
+    expect(texto).toContain("entrou");
+    expect(texto).toContain("Riscos");
+  });
+
+  it("desatualizado sem nenhuma seção diferente diz que é só espaço em branco", () => {
+    // O booleano acusa qualquer byte e a comparação por seção não. Calar aqui
+    // deixaria um amarelo sem nada que o explique — pior que o aviso de antes.
+    montar({ status: "aprovado", desatualizado: true, mudancasDesdeAprovacao: [] });
+
+    expect(screen.getByTestId("mudancas-desde-aprovacao").textContent).toContain("só espaço em branco");
+  });
+
+  it("documento em dia não mostra comparação nenhuma", () => {
+    montar({ status: "aprovado", desatualizado: false, mudancasDesdeAprovacao: [{ titulo: "x", tipo: "mudou" }] });
+
+    expect(screen.queryByTestId("mudancas-desde-aprovacao")).toBeNull();
+  });
+});
