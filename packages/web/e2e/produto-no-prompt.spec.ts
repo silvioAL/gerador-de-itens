@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { entrar } from "./auth";
+import { derivarNaMesa } from "./derivar";
 
 const API = "http://localhost:4100";
 
@@ -48,7 +49,7 @@ test("o contexto do produto entra no prompt da esteira, separado do contexto da 
     await janela.getByLabel("Contexto do épico (texto)").fill("Nesta entrega, só o fechamento mensal.");
     await janela.getByRole("button", { name: "Salvar" }).click();
 
-    await page.locator('[data-tour="derivar-button"]').click();
+    await derivarNaMesa(page);
     await page.getByTestId("assistente-balao-secundaria").click(); // sem título
 
     await page.getByTestId("abrir-simulacao").click();

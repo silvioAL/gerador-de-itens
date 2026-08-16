@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { entrar } from "./auth";
+import { derivarNaMesa } from "./derivar";
 
 /**
  * §184 — a especificação gerada fica SALVA na quebra, e reabrir a demanda
@@ -33,7 +34,7 @@ test("gerar salva a especificação na quebra; reabrir conduz à revisão com a 
   await painel.getByRole("combobox", { name: "Ack" }).selectOption("manual");
 
   const titulo = `Espec persistida ${Math.random().toString(36).slice(2, 7)}`;
-  await page.locator('[data-tour="derivar-button"]').click();
+  await derivarNaMesa(page);
   await page.getByLabel("ex.: Fatura mensal em lote").fill(titulo);
   await page.getByTestId("assistente-balao-confirmar").click();
 

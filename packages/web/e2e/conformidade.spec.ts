@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { entrar } from "./auth";
+import { derivarNaMesa } from "./derivar";
 
 const API = "http://localhost:4100";
 
@@ -153,7 +154,7 @@ test("a violação explica o padrão, e aceitar de propósito tira do placar sem
     // E não vira item: gerar trabalho para o que alguém resolveu de propósito
     // é o jeito mais rápido de ensinar a ignorar o backlog.
     await preencherObrigatorios(painel);
-    await page.locator('[data-tour="derivar-button"]').click();
+    await derivarNaMesa(page);
     const perguntaNome = page.getByLabel("ex.: Fatura mensal em lote");
     if (await perguntaNome.count()) {
       await perguntaNome.fill("Exceção registrada");
@@ -234,7 +235,7 @@ test("valor fora do padrão aparece no placar, chega ao item, e some quando entr
   // existia no placar, ela morria na tela — quem implementa lê o backlog.
   await timeout.fill("800");
   await preencherObrigatorios(painel);
-  await page.locator('[data-tour="derivar-button"]').click();
+  await derivarNaMesa(page);
   const perguntaNome = page.getByLabel("ex.: Fatura mensal em lote");
   if (await perguntaNome.count()) {
     await perguntaNome.fill("Chamada fora do padrão");

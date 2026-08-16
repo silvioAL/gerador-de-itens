@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { entrar } from "./auth";
+import { derivarNaMesa } from "./derivar";
 import {
   BASE_URL_GATEWAY_FALSO,
   CHAVE_GATEWAY_FALSO,
@@ -133,7 +134,7 @@ test("a esteira roda no navegador e o texto do gateway chega nos campos (o defei
 
   // O título não se digita mais (campo removido — só via agente): derivar
   // pergunta o nome e o "Derivar e salvar" segue com auto-save.
-  await page.locator('[data-tour="derivar-button"]').click();
+  await derivarNaMesa(page);
   await page.getByLabel("ex.: Fatura mensal em lote").fill("Esteira com gateway falso");
   await page.getByTestId("assistente-balao-confirmar").click();
   await expect(page.getByTestId("contagem-itens")).toHaveText("1 itens");
@@ -420,9 +421,15 @@ test("o agente propõe o propósito, e o delta mostra o trabalho que aceitar cri
   const delta = janela.getByTestId("delta-da-proposta");
   // Diagnóstico no lugar certo: se o agente falhou, o painel diz — e é isso
   // que precisa aparecer no relatório, não um "element not found" mudo.
-  await expect
-    .poll(async () => (await janela.innerText()).slice(0, 600), { timeout: 20000 })
-    .toContain("sugerida(s)");
+  //
+  // §261 — a região, não a janela inteira. O corte em 600 caracteres sobre a
+  // janela toda era uma bomba-relógio: bastou o seletor de produto do SPEC-58
+  // nascer acima para o delta cair para fora do corte, e o teste passou a
+  // acusar ausência de algo que ESTAVA na tela. A região das necessidades
+  // contém o delta e contém o erro da proposta — que é tudo que este
+  // diagnóstico precisa mostrar — e não cresce por causa de vizinhos.
+  const regiaoNecessidades = janela.getByLabel("Necessidades da demanda");
+  await expect.poll(async () => regiaoNecessidades.innerText(), { timeout: 20000 }).toContain("sugerida(s)");
   await expect(delta).toBeVisible();
   await expect(delta).toContainText("sugerida(s), ainda sem efeito");
 

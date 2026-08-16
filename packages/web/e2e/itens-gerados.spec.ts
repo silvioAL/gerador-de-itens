@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { entrar } from "./auth";
+import { derivarNaMesa } from "./derivar";
 
 /**
  * SPEC-41 Parte B — o ciclo dos itens de trabalho visto no navegador: derivar,
@@ -19,7 +20,7 @@ test("gerar itens na revisão abre a tela #/itens com cards e completude", async
 
   await page.getByTestId("abrir-cenarios").click();
   await page.getByRole("button", { name: "Carregar cenário: Dados não-relacionais" }).click();
-  await page.locator('[data-tour="derivar-button"]').click();
+  await derivarNaMesa(page);
   // Sem título: derivar sem salvar (exploração) — os itens ficam locais.
   await page.getByTestId("assistente-balao-secundaria").click();
 
@@ -107,7 +108,7 @@ test("§210 — trocar de demanda NÃO leva junto os itens da anterior", async (
   // persistidos nela.
   await page.getByTestId("abrir-cenarios").click();
   await page.getByRole("button", { name: "Carregar cenário: Dados não-relacionais" }).click();
-  await page.locator('[data-tour="derivar-button"]').click();
+  await derivarNaMesa(page);
   await page.getByLabel("ex.: Fatura mensal em lote").fill(`demanda com itens ${Date.now()}`);
   await page.getByTestId("assistente-balao-confirmar").click();
 
@@ -202,7 +203,7 @@ test("§210 — demanda NOVA (sem id) não herda os itens escritos da anterior",
 
   await page.getByTestId("abrir-cenarios").click();
   await page.getByRole("button", { name: "Carregar cenário: Dados não-relacionais" }).click();
-  await page.locator('[data-tour="derivar-button"]').click();
+  await derivarNaMesa(page);
   await page.getByTestId("assistente-balao-secundaria").click(); // sem título: fica local
 
   await page.getByTestId("balao-sem-ia").getByRole("button", { name: "Dispensar sugestão" }).click();

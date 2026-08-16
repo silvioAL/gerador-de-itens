@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { entrar } from "./auth";
+import { derivarNaMesa } from "./derivar";
 
 /**
  * SPEC-44 — a revisão pós-IA sem os 30 cliques: sugestões geradas (mock de
@@ -22,7 +23,7 @@ test("barra de pendências, confirmar todas, fila guiada e o deep-link da tela d
 
   await page.getByTestId("abrir-cenarios").click();
   await page.getByRole("button", { name: "Carregar cenário: Dados não-relacionais" }).click();
-  await page.locator('[data-tour="derivar-button"]').click();
+  await derivarNaMesa(page);
   await page.getByTestId("assistente-balao-secundaria").click();
 
   // Antes de qualquer sugestão: a barra existe (campos vazios), sem "aguardando".

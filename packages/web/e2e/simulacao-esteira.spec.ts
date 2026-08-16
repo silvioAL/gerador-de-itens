@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { entrar } from "./auth";
+import { derivarNaMesa } from "./derivar";
 
 /**
  * #299 — a simulação vista no navegador, com uma quebra de verdade.
@@ -28,7 +29,7 @@ test("simular mostra as chamadas e o prompt real, sem chamar o modelo", async ({
   await entrar(page);
   await page.getByTestId("abrir-cenarios").click();
   await page.getByRole("button", { name: "Carregar cenário: Dados não-relacionais" }).click();
-  await page.locator('[data-tour="derivar-button"]').click();
+  await derivarNaMesa(page);
   // Cenário sem título → o assistente pergunta o nome; simulação é exploração.
   await page.getByTestId("assistente-balao-secundaria").click();
 

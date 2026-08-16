@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { entrar } from "./auth";
+import { derivarNaMesa } from "./derivar";
 
 const API = "http://localhost:4100";
 
@@ -39,7 +40,7 @@ test("configurar destino, exportar os prontos e mostrar o motivo — item com pe
     // Cenário + derivar COM nome: a quebra é salva, e só quebra salva exporta.
     await page.getByTestId("abrir-cenarios").click();
     await page.getByRole("button", { name: "Carregar cenário: Dados não-relacionais" }).click();
-    await page.locator('[data-tour="derivar-button"]').click();
+    await derivarNaMesa(page);
     await page.getByLabel("ex.: Fatura mensal em lote").fill(`exportação e2e ${Date.now()}`);
     await page.getByTestId("assistente-balao-confirmar").click();
 

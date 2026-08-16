@@ -28,6 +28,7 @@ function montarOpts() {
     fecharItens: vi.fn(),
   abrirDocumento: vi.fn(),
   abrirSistema: vi.fn(),
+  mostrarAvisos: vi.fn(),
     abrirProposito: vi.fn(),
     fecharAssistente: vi.fn(),
     abrirConversa: vi.fn(),
