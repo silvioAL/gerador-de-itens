@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import type { MapaDoSistema } from "@gerador/aplicacao";
 import { SistemaScreen } from "./SistemaScreen";
@@ -162,5 +162,64 @@ describe("as duas edições que o mapa provoca (SPEC-59 fatia D, §260)", () => 
     montar(mapa({ agentes: [PO] }), { onAlternarAgente: vi.fn(), onMoverAgente: vi.fn(), erroAoSalvar: "Não deu para salvar: 500" });
 
     expect(screen.getByTestId("erro-ao-salvar-sistema").textContent).toContain("500");
+  });
+});
+
+/**
+ * SPEC-60 fatia B (§265) — o estado que faltava no avatar.
+ */
+describe("SistemaScreen — a última execução no avatar", () => {
+  const AGORA = new Date("2026-08-16T12:00:00.000Z").getTime();
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(AGORA);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("papel que falhou fica vermelho e mostra o que o gateway disse", () => {
+    // O erro do gateway inteiro, e não um código nosso: quem abre o mapa por
+    // causa de uma falha precisa da frase que resolve.
+    montar(
+      mapa({
+        agentes: [
+          {
+            ...PO,
+            estado: "falhou",
+            ultimaExecucao: {
+              ok: false,
+              em: "2026-08-16T11:57:00.000Z",
+              duracaoMs: 1234,
+              erro: "Credencial recusada pelo gateway (HTTP 401)",
+            },
+          },
+        ],
+      })
+    );
+
+    expect(screen.getByTestId("estado-po").textContent).toBe("falhou");
+    const linha = screen.getByTestId("ultima-execucao-po").textContent ?? "";
+    expect(linha).toContain("há 3 min");
+    expect(linha).toContain("1,2 s");
+    expect(linha).toContain("HTTP 401");
+  });
+
+  it("execução recente e bem-sucedida aparece sem erro nenhum", () => {
+    montar(
+      mapa({
+        agentes: [{ ...PO, ultimaExecucao: { ok: true, em: "2026-08-16T11:59:50.000Z", duracaoMs: 340 } }],
+      })
+    );
+
+    const linha = screen.getByTestId("ultima-execucao-po").textContent ?? "";
+    expect(linha).toContain("há segundos");
+    expect(linha).toContain("340 ms");
+    expect(screen.getByTestId("estado-po").textContent).toBe("ativo");
+  });
+
+  it("papel sem rastro não inventa linha — nunca rodou é diferente de rodou bem", () => {
+    montar(mapa({ agentes: [PO] }));
+
+    expect(screen.queryByTestId("ultima-execucao-po")).toBeNull();
   });
 });

@@ -1,3 +1,4 @@
+import type { ExecucaoDoPapel } from "@gerador/aplicacao";
 import type { Decisao, Diagrama, DocumentoEscrito, ExcecaoDePadrao, Necessidade, OperacaoDeAjuste, PerfisConfig, Percurso, Quebra, RegrasConfig, StatusDocumento, ValorSpec } from "@gerador/engine";
 
 /**
@@ -475,6 +476,9 @@ export const apiIa = {
    * disparar a geração ao vivo (Fase 1d, SPEC-23) sem forçar IA em quem não
    * instalou os modelos. */
   status: () => requisitar<StatusIa>("/ia/status"),
+  /** §265 — a última execução de cada papel da esteira. Não traz prompt nem
+   * resposta: o rastro guarda só o que responde "rodou? deu certo? quando?". */
+  execucoes: () => requisitar<{ porPapel: ExecucaoDoPapel[] }>("/ia/execucoes"),
   /** SPEC-25 Fase 2 — grava a credencial do gateway em `~/.gerador`, NUNCA em
    * `config/` (que é versionável). Chave vazia = manter a que já está lá. */
   salvarCredencial: (dados: { baseUrl: string; chave: string; modelo: string; baseUrlTranscricao?: string; visao?: boolean }) =>

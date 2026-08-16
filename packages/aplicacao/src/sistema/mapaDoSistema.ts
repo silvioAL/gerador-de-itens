@@ -31,13 +31,13 @@ import type { PapelConfigurado } from "../config/normalizacao.js";
  * hoje só se descobre olhando o item sair vazio. `sem-credencial` é justamente
  * esse caso — o papel está ativo, e não existe modelo para ele falar.
  *
- * **O que falta, e é honesto dizer:** "falhou na última execução" está na
- * SPEC-59 §4 e **não** entra aqui, porque o produto não guarda o resultado das
- * execuções da esteira. Inventar o estado a partir de nada seria pior que não
- * tê-lo — um avatar mentindo sobre saúde é o oposto do que ele existe para
- * fazer.
+ * **`falhou` chegou na SPEC-60 fatia B (§265).** Ele estava previsto na
+ * SPEC-59 §4 e ficou de fora porque o produto não guardava resultado nenhum de
+ * execução — e inventar o estado a partir de nada seria pior que não tê-lo, um
+ * avatar mentindo sobre saúde é o oposto do que ele existe para fazer. Agora a
+ * esteira deixa rastro, e o estado vem de uma linha gravada, não de um palpite.
  */
-export type EstadoDoAgente = "ativo" | "desligado" | "sem-credencial";
+export type EstadoDoAgente = "ativo" | "desligado" | "sem-credencial" | "falhou";
 
 export interface AgenteDoMapa {
   id: string;
@@ -49,6 +49,9 @@ export interface AgenteDoMapa {
   contextos: string[];
   /** Ordem na esteira: é sequência, e a lista escondia isso. */
   ordem: number;
+  /** §265 — a última vez que este papel rodou. Ausente = nunca rodou desde que
+   * o rastro existe, que é diferente de "rodou e deu certo". */
+  ultimaExecucao?: { ok: boolean; em: string; duracaoMs: number; erro?: string };
 }
 
 export interface RegraDoMapa {
@@ -73,12 +76,24 @@ export interface MapaDoSistema {
   avisos: string[];
 }
 
+/** §265 — a última execução de cada papel, vinda do rastro. */
+export interface ExecucaoDoPapel {
+  papel: string;
+  ok: boolean;
+  em: string;
+  duracaoMs: number;
+  erro?: string;
+}
+
 export interface EntradaDoMapa {
   papeis?: PapelConfigurado[];
   regras?: RegrasConfig;
   /** Há modelo configurado para os agentes falarem? */
   temCredencialDeIa?: boolean;
   feedbacksAbertos?: number;
+  /** Ausente = o rastro não foi lido (tela velha, chamada que falhou). Diferente
+   * de lista vazia, que é "ninguém rodou nada ainda". */
+  execucoes?: ExecucaoDoPapel[];
 }
 
 const ESCREVE_POR_GRUPO: Record<string, string> = {
@@ -89,19 +104,41 @@ const ESCREVE_POR_GRUPO: Record<string, string> = {
 };
 
 export function montarMapaDoSistema(entrada: EntradaDoMapa = {}): MapaDoSistema {
-  const { papeis = [], regras, temCredencialDeIa = false, feedbacksAbertos = 0 } = entrada;
+  const { papeis = [], regras, temCredencialDeIa = false, feedbacksAbertos = 0, execucoes } = entrada;
 
-  const agentes: AgenteDoMapa[] = papeis.map((p, i) => ({
-    id: p.id,
-    nome: p.nome,
-    escreve: ESCREVE_POR_GRUPO[p.grupo] ?? p.grupo,
-    // A ordem de checagem importa: um papel DESLIGADO não está esperando
-    // credencial — está desligado, e dizer "sem credencial" nele mandaria a
-    // pessoa configurar IA para resolver um problema que ela mesma criou.
-    estado: !p.ativo ? "desligado" : temCredencialDeIa ? "ativo" : "sem-credencial",
-    contextos: p.contextos,
-    ordem: i + 1,
-  }));
+  const ultimaPorPapel = new Map((execucoes ?? []).map((e) => [e.papel, e]));
+
+  const agentes: AgenteDoMapa[] = papeis.map((p, i) => {
+    // §265 — o rastro é casado pelo ID do papel, que é o que a rota usa na URL
+    // (`/ia/pipeline/:papel`). Casar por nome pareceria mais amigável e
+    // quebraria no dia em que alguém renomeasse o papel na tela — o rastro
+    // antigo ficaria órfão e o avatar voltaria a verde sem nada ter melhorado.
+    const ultimaExecucao = ultimaPorPapel.get(p.id);
+    return {
+      id: p.id,
+      nome: p.nome,
+      escreve: ESCREVE_POR_GRUPO[p.grupo] ?? p.grupo,
+      // A ordem de checagem importa: um papel DESLIGADO não está esperando
+      // credencial — está desligado, e dizer "sem credencial" nele mandaria a
+      // pessoa configurar IA para resolver um problema que ela mesma criou.
+      //
+      // `falhou` entra DEPOIS de desligado e de sem-credencial, e antes de
+      // ativo: falha antiga de um papel que hoje está desligado não é notícia,
+      // e sem credencial a falha é consequência, não causa.
+      estado: !p.ativo
+        ? "desligado"
+        : !temCredencialDeIa
+          ? "sem-credencial"
+          : ultimaExecucao && !ultimaExecucao.ok
+            ? "falhou"
+            : "ativo",
+      contextos: p.contextos,
+      ordem: i + 1,
+      ...(ultimaExecucao
+        ? { ultimaExecucao: { ok: ultimaExecucao.ok, em: ultimaExecucao.em, duracaoMs: ultimaExecucao.duracaoMs, ...(ultimaExecucao.erro ? { erro: ultimaExecucao.erro } : {}) } }
+        : {}),
+    };
+  });
 
   const regrasPorTech: RegraDoMapa[] = Object.entries(regras?.porTech ?? {}).map(([tech, r]) => ({
     tech,
@@ -128,6 +165,14 @@ export function montarMapaDoSistema(entrada: EntradaDoMapa = {}): MapaDoSistema 
   if (regrasPorTech.length > 0 && regrasPorTech.every((r) => r.conferiveis === 0)) {
     avisos.push(
       "Nenhum padrão conferível: as regras existem como texto para alguém ler, e o motor não confere nenhuma sozinho."
+    );
+  }
+  // O aviso que o rastro tornou possível: um papel que falhou não se anuncia
+  // sozinho, e o item sai com um pedaço faltando sem ninguém perceber.
+  const falharam = agentes.filter((a) => a.estado === "falhou");
+  if (falharam.length > 0) {
+    avisos.push(
+      `${falharam.length} papel(éis) falhou(aram) na última execução (${falharam.map((a) => a.nome).join(", ")}): o item sai sem a parte que eles escrevem.`
     );
   }
   if (regrasDePercurso === 0) {

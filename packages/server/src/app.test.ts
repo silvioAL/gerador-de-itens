@@ -1,9 +1,10 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { and, eq, sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { resolve } from "node:path";
 import { buildApp } from "./app.js";
+import { LIMITE_DE_HISTORICO, registrarExecucao, ultimaExecucaoPorPapel } from "./execucoes.js";
 import { criarBancoDeDados, type BancoDeDados } from "./db/client.js";
 import { exigirBancoDescartavel, garantirBancoDeTeste, URL_BANCO_DE_TESTE } from "./test-support/bancoDeTeste.js";
 import {
@@ -14,6 +15,8 @@ import {
   credenciaisIa,
   especificacaoTemplates,
   organizacoes,
+  credenciaisIa,
+  execucoesIa,
   papeisAcesso,
   papelPermissao,
   produtos,
@@ -2930,5 +2933,128 @@ describe("produtos (SPEC-53)", () => {
 
   it("sem sessão, nem ler — é vocabulário e regra de negócio da empresa, não config técnica pública", async () => {
     expect((await app.inject({ method: "GET", url: "/produtos" })).statusCode).toBe(401);
+  });
+});
+
+/**
+ * SPEC-60 fatia B (§265) — o rastro da esteira.
+ *
+ * O que se prova aqui é o contrato do rastro contra o banco de verdade: a poda
+ * que impede o histórico de crescer para sempre, a leitura que devolve a ÚLTIMA
+ * de cada papel, e a regra de que "sem credencial" não é execução.
+ */
+describe("rastro das execuções da esteira", () => {
+  beforeEach(async () => {
+    await db.delete(execucoesIa);
+  });
+
+  async function anotar(dados: Parameters<typeof registrarExecucao>[1]) {
+    registrarExecucao(db, dados);
+    // `registrarExecucao` é fire-and-forget de propósito (nunca derruba a
+    // resposta ao usuário). O teste espera a linha aparecer em vez de dormir.
+    await vi.waitFor(async () => {
+      expect((await db.select().from(execucoesIa)).length).toBeGreaterThan(0);
+    });
+  }
+
+  it("guarda o que responde à pergunta, e nada além", async () => {
+    await anotar({ rotulo: "ia/pipeline/po", papel: "po", ok: true, duracaoMs: 1234, email: "quem@exemplo" });
+
+    const [linha] = await db.select().from(execucoesIa);
+    expect(linha).toMatchObject({ rotulo: "ia/pipeline/po", papel: "po", ok: true, duracaoMs: 1234 });
+    // A régua da fatia escrita como teste: prompt e resposta NÃO estão aqui, e
+    // é isso que dispensa esta tabela de ter uma conversa sobre privacidade.
+    expect(Object.keys(linha)).toEqual(["id", "rotulo", "papel", "ok", "erro", "duracaoMs", "email", "em"]);
+  });
+
+  it("a leitura devolve a ÚLTIMA de cada papel, não o histórico", async () => {
+    await anotar({ rotulo: "ia/pipeline/po", papel: "po", ok: false, erro: "502", duracaoMs: 10 });
+    await anotar({ rotulo: "ia/pipeline/po", papel: "po", ok: true, duracaoMs: 20 });
+    await anotar({ rotulo: "ia/pipeline/qa", papel: "qa", ok: false, erro: "timeout", duracaoMs: 30 });
+
+    await vi.waitFor(async () => {
+      const porPapel = await ultimaExecucaoPorPapel(db);
+      expect(porPapel).toHaveLength(2);
+      expect(porPapel.find((e) => e.papel === "po")).toMatchObject({ ok: true, duracaoMs: 20 });
+      expect(porPapel.find((e) => e.papel === "qa")).toMatchObject({ ok: false, erro: "timeout" });
+    });
+  });
+
+  it("chamada que não é de papel fica registrada e NÃO aparece por papel", async () => {
+    // O funil é um só: `ia/sugerir` também deixa rastro. Ele só não acende
+    // avatar nenhum, porque não é papel da esteira.
+    await anotar({ rotulo: "ia/sugerir", ok: true, duracaoMs: 5 });
+
+    expect(await ultimaExecucaoPorPapel(db)).toEqual([]);
+    expect((await db.select().from(execucoesIa)).length).toBe(1);
+  });
+
+  it("o histórico é podado — rastro que cresce para sempre vira problema de operação", async () => {
+    for (let i = 0; i < LIMITE_DE_HISTORICO + 15; i++) {
+      registrarExecucao(db, { rotulo: "ia/sugerir", ok: true, duracaoMs: i });
+    }
+
+    await vi.waitFor(
+      async () => {
+        const linhas = await db.select().from(execucoesIa);
+        expect(linhas.length).toBeGreaterThan(0);
+        expect(linhas.length).toBeLessThanOrEqual(LIMITE_DE_HISTORICO);
+      },
+      { timeout: 15000 }
+    );
+  });
+
+  it("a rota devolve a última por papel", async () => {
+    await anotar({ rotulo: "ia/pipeline/po", papel: "po", ok: false, erro: "502 do gateway", duracaoMs: 40 });
+
+    await vi.waitFor(async () => {
+      const resposta = await app.inject({ method: "GET", url: "/ia/execucoes" });
+      expect(resposta.statusCode).toBe(200);
+      expect(resposta.json().porPapel).toMatchObject([{ papel: "po", ok: false, erro: "502 do gateway" }]);
+    });
+  });
+
+  /** A rota do diagrama, e não a do papel: o funil é o MESMO
+   * (`executarPedido`), e a rota do papel lê a config da esteira antes de
+   * chegar nele — sujaria o estado de outro teste deste arquivo para provar
+   * exatamente a mesma coisa. */
+  const pedirDiagrama = () =>
+    app.inject({
+      method: "POST",
+      url: "/ia/diagrama",
+      payload: { descricao: "um serviço de crédito", tiposDeNo: [{ id: "servico", rotulo: "Serviço" }] },
+    });
+
+  it("falha do gateway VIRA rastro — é o que acende o avatar", async () => {
+    // A credencial gravada por um teste anterior aponta para um gateway que
+    // recusa: 502 de verdade, atravessando o provedor. É o caminho que o
+    // usuário vive quando a chave expira, e o que precisa deixar marca.
+    const resposta = await pedirDiagrama();
+    expect(resposta.statusCode).toBe(502);
+
+    await vi.waitFor(async () => {
+      const [linha] = await db.select().from(execucoesIa);
+      expect(linha).toMatchObject({ rotulo: "ia/diagrama", ok: false });
+      expect(linha.erro).toBeTruthy();
+      // A duração é medida, não inventada: um zero aqui significaria que o
+      // cronômetro nasceu no lugar errado.
+      expect(linha.duracaoMs).toBeGreaterThan(0);
+    });
+  });
+
+  it("sem credencial NÃO é execução — o avatar não pode acusar o papel por uma config que não é dele", async () => {
+    const guardadas = await db.select().from(credenciaisIa);
+    await db.delete(credenciaisIa);
+    try {
+      const resposta = await pedirDiagrama();
+
+      expect(resposta.statusCode).toBe(503);
+      expect(await db.select().from(execucoesIa)).toEqual([]);
+    } finally {
+      // Devolve o que estava lá: este bloco é o último do arquivo, mas contar
+      // com isso é o tipo de aposta que estraga a suíte quando alguém
+      // acrescenta um `describe` embaixo.
+      if (guardadas.length > 0) await db.insert(credenciaisIa).values(guardadas);
+    }
   });
 });

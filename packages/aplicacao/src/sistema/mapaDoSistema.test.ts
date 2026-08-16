@@ -106,3 +106,76 @@ describe("montarMapaDoSistema — a ferramenta lida a partir da própria config 
     expect(mapa.avisos.length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * SPEC-60 fatia B (§265) — o estado que faltava, agora vindo de linha gravada.
+ */
+describe("montarMapaDoSistema — falhou na última execução", () => {
+  const PO = papel({ id: "po", nome: "PO", grupo: "po" });
+  const FALHA = { papel: "po", ok: false, em: "2026-08-16T10:00:00.000Z", duracaoMs: 1200, erro: "502 do gateway" };
+
+  it("papel cuja última execução falhou aparece como `falhou`", () => {
+    const mapa = montarMapaDoSistema({ papeis: [PO], temCredencialDeIa: true, execucoes: [FALHA] });
+
+    expect(mapa.agentes[0].estado).toBe("falhou");
+    expect(mapa.agentes[0].ultimaExecucao).toEqual(FALHA_SEM_PAPEL);
+  });
+
+  it("execução que deu certo devolve o papel a `ativo`, e a última fica visível", () => {
+    // O avatar tem que APAGAR o vermelho quando a próxima roda bem — um estado
+    // que só acende é um alarme que se aprende a ignorar.
+    const mapa = montarMapaDoSistema({
+      papeis: [PO],
+      temCredencialDeIa: true,
+      execucoes: [{ papel: "po", ok: true, em: "2026-08-16T11:00:00.000Z", duracaoMs: 900 }],
+    });
+
+    expect(mapa.agentes[0].estado).toBe("ativo");
+    expect(mapa.agentes[0].ultimaExecucao?.duracaoMs).toBe(900);
+  });
+
+  it("desligado e sem-credencial ganham de `falhou` — nessa ordem", () => {
+    // Falha antiga de papel hoje desligado não é notícia; e sem credencial a
+    // falha é consequência, não causa. Dizer "falhou" nos dois casos mandaria a
+    // pessoa investigar o lugar errado.
+    const desligado = montarMapaDoSistema({
+      papeis: [papel({ id: "po", ativo: false })],
+      temCredencialDeIa: true,
+      execucoes: [FALHA],
+    });
+    const semCredencial = montarMapaDoSistema({ papeis: [PO], temCredencialDeIa: false, execucoes: [FALHA] });
+
+    expect(desligado.agentes[0].estado).toBe("desligado");
+    expect(semCredencial.agentes[0].estado).toBe("sem-credencial");
+  });
+
+  it("o rastro casa pelo ID do papel, não pelo nome", () => {
+    // Casar por nome quebraria no dia em que alguém renomeasse o papel: o
+    // rastro ficaria órfão e o avatar voltaria a verde sem nada ter melhorado.
+    const mapa = montarMapaDoSistema({
+      papeis: [papel({ id: "po", nome: "Product Owner" })],
+      temCredencialDeIa: true,
+      execucoes: [{ ...FALHA, papel: "Product Owner" }],
+    });
+
+    expect(mapa.agentes[0].estado).toBe("ativo");
+    expect(mapa.agentes[0].ultimaExecucao).toBeUndefined();
+  });
+
+  it("papel que falhou vira AVISO — falha que não se anuncia sai como item incompleto", () => {
+    const mapa = montarMapaDoSistema({ papeis: [PO], temCredencialDeIa: true, execucoes: [FALHA] });
+
+    expect(mapa.avisos.some((a) => a.includes("falhou") && a.includes("PO"))).toBe(true);
+  });
+
+  it("sem rastro nenhum, o mapa é exatamente o de antes", () => {
+    // A régua de toda dimensão nova: quem não a usa não é acusado por ela.
+    const mapa = montarMapaDoSistema({ papeis: [PO], temCredencialDeIa: true });
+
+    expect(mapa.agentes[0].estado).toBe("ativo");
+    expect(mapa.agentes[0].ultimaExecucao).toBeUndefined();
+    expect(mapa.avisos.some((a) => a.includes("falhou"))).toBe(false);
+  });
+});
+
+const FALHA_SEM_PAPEL = { ok: false, em: "2026-08-16T10:00:00.000Z", duracaoMs: 1200, erro: "502 do gateway" };

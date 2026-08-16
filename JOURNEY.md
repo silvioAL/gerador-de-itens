@@ -8475,3 +8475,81 @@ decisão ou descuido.
 `trim` → o teste de espaço em branco vermelho.
 
 340 engine · 623 web · 72 aplicação · 222 server · 77/77 E2E · build limpo.
+
+## §265 — a esteira deixa rastro (SPEC-60 fatia B)
+
+O comentário que eu tinha escrito no `mapaDoSistema` dizia em voz alta o que
+faltava:
+
+> *"falhou na última execução" está na SPEC-59 §4 e **não** entra aqui, porque
+> o produto não guarda o resultado das execuções da esteira. Inventar o estado
+> a partir de nada seria pior que não tê-lo.*
+
+Esta fatia é o que torna aquele comentário obsoleto: agora o estado vem de uma
+linha gravada, não de um palpite.
+
+### Um lugar só para registrar
+
+`executarPedido` é o funil por onde passa **toda** chamada ao modelo, e já
+recebia um `rotulo` (`ia/pipeline/refinador`, `ia/sugerir`). O registro entrou
+ali. Registrar em cada rota seria garantir que a próxima rota esqueça — e um
+rastro com buraco é pior que rastro nenhum, porque o buraco se lê como "não
+rodou".
+
+Três decisões de borda que os testes fixaram:
+
+- **"sem credencial" não é execução.** Já é um estado que o mapa mostra, e
+  anotá-lo como falha faria o avatar acusar o papel por uma configuração que
+  não é dele;
+- **falha com o cabeçalho já enviado continua sendo falha.** O `anotar` ficou
+  ANTES do `if`, senão o avatar ficaria verde justamente no caso em que a
+  pessoa viu o texto cortado na tela;
+- **o rastro casa pelo ID do papel**, não pelo nome. Casar por nome quebraria
+  no dia em que alguém renomeasse o papel: o rastro ficaria órfão e o avatar
+  voltaria a verde sem nada ter melhorado.
+
+### O que a tabela NÃO guarda
+
+Sem prompt, sem resposta, sem token, sem custo. Prompt e resposta carregam o
+contexto do produto e da demanda, e acender um avatar não justifica criar um
+problema de privacidade. Um teste ancora a lista de colunas exatamente para que
+alguém que queira acrescentar "só o prompt, pra depurar" tropece nela primeiro.
+
+E o histórico é podado em 200 linhas, junto do insert. Parece caro e não é: a
+tabela nunca passa disso, então a varredura é sobre duzentas linhas — a
+alternativa era criar uma peça de infraestrutura nova para o que cabe numa
+cláusula.
+
+### O avatar
+
+Vermelho, e é o único vermelho do mapa: aqui alguma coisa realmente deu errado
+contra um gateway de verdade. Embaixo do nome, `última execução: há 3 min ·
+1,2 s`, e o erro **que o gateway disse** — quem abre o mapa por causa de uma
+falha precisa da frase que resolve, não de um código nosso. O aviso do mapa
+ganhou a consequência: *"o item sai sem a parte que eles escrevem"*.
+
+### O E2E não podia quebrar a credencial
+
+Para provar isso ponta a ponta é preciso uma falha de verdade. A saída óbvia —
+gravar uma credencial quebrada — mexe num estado da **organização inteira**, e
+com specs rodando em paralelo seria um teste derrubando os vizinhos. Então a
+falha passou a viajar no **pedido**: o gateway falso responde 500 quando vê
+`FALHAR_DE_PROPOSITO`. Só quem pede para falhar falha.
+
+O teste ainda prova o outro lado: a execução seguinte, boa, **apaga** o
+vermelho. Estado que só acende é alarme que se aprende a ignorar.
+
+### Dois tropeços meus, do mesmo tipo
+
+**`git checkout` num arquivo com trabalho não commitado.** Usei-o para desfazer
+uma mordida e ele reverteu o arquivo inteiro, levando a fatia junto. Terceira
+vez nesta sessão. A regra que passa a valer: mordida se desfaz aplicando o
+patch inverso, nunca com checkout — ou se commita antes.
+
+**`DATABASE_URL` do e2e num `npm test`.** Rodei a suíte de unidade apontando
+para o banco de **e2e**, e os testes do servidor comeram o seed dele: seis
+specs quebraram por "6 do time" ter virado outro número. Meia hora perseguindo
+um defeito que eu mesmo tinha plantado dois comandos antes. O banco de e2e se
+recria com `e2e:down && e2e:up`, e a variável só pertence ao `test:e2e`.
+
+340 engine · 626 web · 78 aplicação · 229 server · 78/78 E2E · build limpo.

@@ -374,6 +374,29 @@ export const especificacaoTemplates = pgTable(
  * um sistema de histórico/diff. Gravado fire-and-forget depois de uma escrita
  * já ter tido sucesso nas rotas protegidas por `exigirSessao`/`exigirTime`.
  */
+/**
+ * SPEC-60 fatia B — o rastro das execuções da esteira.
+ *
+ * Série temporal, e por isso TABELA e não jsonb numa quebra: é consultada por
+ * papel atravessando todas as demandas, cresce sozinha e é podada. Guarda o que
+ * responde à pergunta que alguém faz olhando o mapa — este papel rodou? deu
+ * certo? quando? demorou quanto? — e nada além: sem prompt, sem resposta, sem
+ * token. Prompt e resposta carregam o contexto do produto, e acender um avatar
+ * não justifica guardá-los.
+ */
+export const execucoesIa = pgTable("execucoes_ia", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  /** O mesmo rótulo que a rota já usava no log: `ia/pipeline/refinador`. */
+  rotulo: text("rotulo").notNull(),
+  /** Só quando a chamada É de um papel da esteira — as outras não acendem avatar. */
+  papel: text("papel"),
+  ok: boolean("ok").notNull(),
+  erro: text("erro"),
+  duracaoMs: integer("duracao_ms").notNull(),
+  email: text("email"),
+  em: timestamp("em", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const auditoria = pgTable("auditoria", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull(),

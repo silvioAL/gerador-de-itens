@@ -43,6 +43,18 @@ export const BASE_URL_GATEWAY_FALSO = `http://127.0.0.1:${PORTA_GATEWAY_FALSO}/v
 
 export const MODELO_GATEWAY_FALSO = "modelo-de-mentira";
 
+/**
+ * §265 — a palavra que faz o dublê FALHAR de propósito.
+ *
+ * O rastro da esteira só tem o que provar se existir uma falha de verdade
+ * atravessando servidor e gateway. A alternativa era gravar uma credencial
+ * quebrada, e isso mexe num estado que é da organização inteira — com specs
+ * rodando em paralelo, seria um teste sabotando os vizinhos.
+ *
+ * Assim a falha viaja no PEDIDO: só quem pede para falhar falha.
+ */
+export const PEDIR_FALHA_AO_GATEWAY = "FALHAR_DE_PROPOSITO";
+
 /** SPEC-30 Fase 1a — o que o gateway falso "ouve", sempre. Uma frase que soa
  * como demanda ditada, pra o teste conferir que ela chegou no campo certo. */
 /** SPEC-30 Fase 2 — aparece na resposta quando o pedido trouxe imagem. */
@@ -184,6 +196,14 @@ export function criarGatewayFalso(): Server {
       const temImagem = (corpo.messages ?? []).some(
         (m) => Array.isArray(m.content) && m.content.some((p: { type?: string }) => p?.type === "image_url")
       );
+
+      // §265 — a falha pedida. 500 e não 401: o que se quer provar é o caminho
+      // de "o modelo quebrou", não o de credencial recusada (que já tem dono).
+      if (bruto.includes(PEDIR_FALHA_AO_GATEWAY)) {
+        res.writeHead(500, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: "o gateway falso falhou porque pediram" }));
+        return;
+      }
 
       const schema = schemaPedido(corpo);
       const texto = schema

@@ -50,13 +50,38 @@ const ROTULO_ESTADO: Record<EstadoDoAgente, string> = {
   ativo: "ativo",
   desligado: "desligado",
   "sem-credencial": "sem modelo",
+  // §265 — "falhou" e não "erro": o papel não está quebrado, a última tentativa
+  // dele foi. A próxima pode dar certo, e o rótulo tem que caber nas duas.
+  falhou: "falhou",
 };
 
 const COR_ESTADO: Record<EstadoDoAgente, string> = {
   ativo: "var(--verde)",
   desligado: "var(--texto-mudo)",
   "sem-credencial": "var(--amarelo)",
+  // Vermelho, e é o único vermelho do mapa: aqui alguma coisa REALMENTE deu
+  // errado, contra um gateway de verdade. Amarelo seria o mesmo peso de "falta
+  // configurar", que é um problema de outra natureza.
+  falhou: "var(--vermelho)",
 };
+
+/** §265 — "há 3 min", e não a data. Quem olha o mapa quer saber se a falha é de
+ * agora ou de semana passada; a data obriga a fazer a conta de cabeça. */
+function haQuantoTempo(iso: string, agora = Date.now()): string {
+  const segundos = Math.max(0, Math.round((agora - new Date(iso).getTime()) / 1000));
+  if (segundos < 60) return "há segundos";
+  const minutos = Math.round(segundos / 60);
+  if (minutos < 60) return `há ${minutos} min`;
+  const horas = Math.round(minutos / 60);
+  if (horas < 24) return `há ${horas} h`;
+  return `há ${Math.round(horas / 24)} d`;
+}
+
+/** 1,2 s lê melhor que 1234 ms para o que demora, e 340 ms lê melhor que 0,3 s
+ * para o que é rápido. */
+function duracaoLegivel(ms: number): string {
+  return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1).replace(".", ",")} s`;
+}
 
 /** O rosto do papel. Emoji e não ilustração: é o único jeito de ter avatar sem
  * arrastar arquivo de imagem nem dependência nova — e ele lê igual em qualquer
@@ -260,6 +285,17 @@ function Agente({
         <div style={{ fontSize: 12, color: "var(--texto-fraco)" }}>escreve: {agente.escreve}</div>
         {agente.contextos.length > 0 && (
           <div style={{ fontSize: 11, color: "var(--texto-mudo)" }}>só em: {agente.contextos.join(", ")}</div>
+        )}
+        {/* §265 — a última execução, embaixo do nome. Sem isto o avatar dizia
+            "ativo" para um papel que nunca rodou e para um que acabou de rodar
+            bem, que são situações diferentes para quem está diagnosticando. */}
+        {agente.ultimaExecucao && (
+          <div data-testid={`ultima-execucao-${agente.id}`} style={{ fontSize: 11, color: agente.estado === "falhou" ? "var(--vermelho)" : "var(--texto-mudo)" }}>
+            última execução: {haQuantoTempo(agente.ultimaExecucao.em)} · {duracaoLegivel(agente.ultimaExecucao.duracaoMs)}
+            {/* O que o gateway disse, e não um código nosso: quem abre o mapa
+                por causa de uma falha precisa da frase que resolve. */}
+            {agente.ultimaExecucao.erro && ` · ${agente.ultimaExecucao.erro}`}
+          </div>
         )}
         {agente.estado === "sem-credencial" && (
           // O aviso leva à solução, em vez de só nomear o problema.
