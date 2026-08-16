@@ -52,7 +52,6 @@ export {
   type IndicadorDeSaude,
   type OpcoesEstruturarDocumento,
 } from "./documento/estruturarDocumento.js";
-export { gerarDocumentoHtml, type OpcoesDocumentoHtml } from "./documento/gerarDocumentoHtml.js";
 export { validateConfig, validateRegras } from "./config/validator.js";
 export { derivar, type ContextoQuebra } from "./derive/derivar.js";
 export {

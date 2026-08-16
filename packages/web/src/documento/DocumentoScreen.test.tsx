@@ -21,7 +21,6 @@ function doc(p: Partial<DocumentoDeDesenho> = {}): DocumentoDeDesenho {
 function montar(props: Partial<React.ComponentProps<typeof DocumentoScreen>> = {}) {
   const onMudarEscrito = vi.fn();
   const onMudarStatus = vi.fn();
-  const onBaixarHtml = vi.fn();
   const onBaixarMarkdown = vi.fn();
   render(
     <DocumentoScreen
@@ -32,12 +31,11 @@ function montar(props: Partial<React.ComponentProps<typeof DocumentoScreen>> = {
       onMudarEscrito={onMudarEscrito}
       onMudarStatus={onMudarStatus}
       onBaixarMarkdown={onBaixarMarkdown}
-      onBaixarHtml={onBaixarHtml}
       onVoltar={vi.fn()}
       {...props}
     />
   );
-  return { onMudarEscrito, onMudarStatus, onBaixarHtml, onBaixarMarkdown };
+  return { onMudarEscrito, onMudarStatus, onBaixarMarkdown };
 }
 
 describe("DocumentoScreen — o documento tem leitor (SPEC-58 fatia 1)", () => {
@@ -173,14 +171,16 @@ describe("o ciclo (SPEC-58 fatia 3)", () => {
   });
 });
 
-describe("as saídas (SPEC-58 fatia 5)", () => {
-  it("HTML e markdown são dois botões — o markdown deixou de ser o único acesso", () => {
-    const { onBaixarHtml, onBaixarMarkdown } = montar();
+describe("as saídas (SPEC-58 fatia 5, revista no §269)", () => {
+  it("markdown, e só ele — o HTML era a própria tela num arquivo", () => {
+    // §269 — o download de HTML saiu. Ele nasceu antes desta tela existir; com
+    // ela de pé virou uma segunda renderização do MESMO documento, mantida à
+    // parte e livre para divergir. O markdown fica porque tem destino próprio
+    // (Confluence, Jira, repositório) que a tela não alcança.
+    const { onBaixarMarkdown } = montar();
 
-    fireEvent.click(screen.getByTestId("baixar-html"));
+    expect(screen.queryByTestId("baixar-html")).toBeNull();
     fireEvent.click(screen.getByTestId("baixar-markdown"));
-
-    expect(onBaixarHtml).toHaveBeenCalled();
     expect(onBaixarMarkdown).toHaveBeenCalled();
   });
 });

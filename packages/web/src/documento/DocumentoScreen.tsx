@@ -50,7 +50,6 @@ export interface DocumentoScreenProps {
    * branco, e dizer isso é melhor do que mostrar um amarelo sem explicação. */
   mudancasDesdeAprovacao?: MudancaDeSecao[];
   onBaixarMarkdown: () => void;
-  onBaixarHtml: () => void;
   onVoltar: () => void;
 }
 
@@ -73,7 +72,6 @@ export function DocumentoScreen({
   desatualizado,
   mudancasDesdeAprovacao,
   onBaixarMarkdown,
-  onBaixarHtml,
   onVoltar,
 }: DocumentoScreenProps) {
   const { violacoes, aceitas, violacoesDePercurso, naoMedidos, percursos } = documento.conferencias;
@@ -93,9 +91,6 @@ export function DocumentoScreen({
           desatualizado={desatualizado}
           mudancas={mudancasDesdeAprovacao}
         />
-        <button onClick={onBaixarHtml} style={botaoEstilo} data-testid="baixar-html">
-          ⬇ HTML
-        </button>
         <button onClick={onBaixarMarkdown} style={botaoEstilo} data-testid="baixar-markdown">
           ⬇ Markdown
         </button>

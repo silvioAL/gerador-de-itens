@@ -9,7 +9,6 @@ import {
   derivar,
   estruturarDocumento,
   gerarDiagramaHtml,
-  gerarDocumentoHtml,
   gerarEspecificacaoEntrega,
   resolverDependencias,
   violacoesEmAberto,
@@ -910,21 +909,6 @@ function AppCarregado({
     baixarArquivoTexto(markdownDoDocumento, "documento-de-desenho.md", "text/markdown");
   }
 
-  function baixarDocumentoHtml() {
-    baixarArquivoTexto(
-      gerarDocumentoHtml(documentoDaDemanda, {
-        diagramaHtml: diagramaHtmlDaDemanda,
-        status: quebra.documentoStatus ?? undefined,
-        escritas: [
-          { titulo: "Trade-offs e o que ficou de fora", texto: quebra.documentoEscrito?.tradeOffs ?? "" },
-          { titulo: "Riscos e o que pode dar errado", texto: quebra.documentoEscrito?.riscos ?? "" },
-        ],
-      }),
-      "documento-de-desenho.html",
-      "text/html"
-    );
-  }
-
   function salvarQuebra() {
     if ((quebra.titulo ?? "").trim()) {
       void persistencia.salvar();
@@ -1439,6 +1423,7 @@ function AppCarregado({
       {resultado && (
         <div style={{ display: mostrarItens || mostrarDocumento ? "none" : "contents" }}>
         <ReviewScreen
+          onDocumento={() => navegar({ tela: "documento" })}
           onConfigurarModeloIa={() => abrirConfigNaAba("modeloIa")}
           onItensGerados={aoGerarItens}
           especificacaoJaGerada={!!quebra.especificacao}
@@ -1525,13 +1510,13 @@ function AppCarregado({
           desatualizado={documentoDesatualizado}
           mudancasDesdeAprovacao={mudancasDesdeAprovacao}
           onBaixarMarkdown={baixarDocumentoMarkdown}
-          onBaixarHtml={baixarDocumentoHtml}
           onVoltar={() => navegar({ tela: "canvas" })}
         />
       )}
 
       {mostrarItens && (
         <ItensScreen
+          onDocumento={() => navegar({ tela: "documento" })}
           itens={itensGerados}
           tituloDaQuebra={quebra.titulo ?? null}
           onAbrirMenu={() => setMenuAberto(true)}
