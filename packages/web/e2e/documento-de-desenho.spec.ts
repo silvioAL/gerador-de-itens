@@ -156,6 +156,11 @@ test("o documento tem leitor, guarda o que a pessoa escreveu, e o aprovado para 
   await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByTestId("menu-documento").click();
   await expect(page.getByTestId("documento-desatualizado")).toBeVisible();
+  // §264 — e o aviso diz O QUÊ mudou. Renomear o serviço muda o corpo dos
+  // itens derivados, então a seção "Itens" tem que aparecer nominalmente: o
+  // aviso genérico de antes obrigava a reler o documento inteiro, e é assim que
+  // se aprende a reaprovar sem olhar.
+  await expect(page.getByTestId("mudancas-desde-aprovacao")).toContainText("Itens");
   // E continua "aprovado": o trabalho de revisão não se perdeu, só deixou de
   // valer para o desenho de agora.
   await expect(page.getByTestId("status-documento")).toContainText("aprovado");

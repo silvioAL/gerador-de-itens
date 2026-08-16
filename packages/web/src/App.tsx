@@ -4,6 +4,7 @@ import {
   analisarLacunas,
   avaliarConformidade,
   avisosDaDerivacao,
+  compararDocumentos,
   derivar,
   estruturarDocumento,
   gerarDiagramaHtml,
@@ -868,6 +869,13 @@ function AppCarregado({
   const documentoDesatualizado =
     quebra.documentoStatus === "aprovado" && !!quebra.especificacao && quebra.especificacao !== markdownDoDocumento;
 
+  // §264 — e O QUÊ mudou. Só quando há o que comparar: rodar a comparação num
+  // documento em dia seria trabalho para produzir lista vazia a cada render.
+  const mudancasDesdeAprovacao = useMemo(
+    () => (documentoDesatualizado ? compararDocumentos(quebra.especificacao ?? "", markdownDoDocumento) : undefined),
+    [documentoDesatualizado, quebra.especificacao, markdownDoDocumento]
+  );
+
   function mudarStatusDoDocumento(documentoStatus: StatusDocumento) {
     setQuebra((q) => ({
       ...q,
@@ -1487,6 +1495,7 @@ function AppCarregado({
           onMudarEscrito={(documentoEscrito) => setQuebra((q) => ({ ...q, documentoEscrito }))}
           onMudarStatus={mudarStatusDoDocumento}
           desatualizado={documentoDesatualizado}
+          mudancasDesdeAprovacao={mudancasDesdeAprovacao}
           onBaixarMarkdown={baixarDocumentoMarkdown}
           onBaixarHtml={baixarDocumentoHtml}
           onVoltar={() => navegar({ tela: "canvas" })}

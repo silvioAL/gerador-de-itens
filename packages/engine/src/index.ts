@@ -40,6 +40,8 @@ export {
   type ResultadoDePercursos,
 } from "./percurso/conformidadeDePercurso.js";
 export { deltaDeDecisao, deltaDePercurso, piorou } from "./remedicao/remedicao.js";
+export { compararDocumentos } from "./documento/compararDocumentos.js";
+export type { MudancaDeSecao } from "./documento/compararDocumentos.js";
 export type { LinhaDeDelta, Remedicao, ContextoDaRemedicao } from "./remedicao/remedicao.js";
 export {
   estruturarDocumento,

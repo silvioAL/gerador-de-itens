@@ -241,7 +241,7 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       titulo: "O documento de desenho",
       segundos: 14,
       texto:
-        "Com tudo refinado o agente oferece este documento sozinho — e ele não é um arquivo que você baixa e perde: tem tela própria, e é o que circula para quem nunca abriu esta ferramenta. Faixa de saúde no topo, o desenho animado junto, as decisões com o que foi descartado. Duas seções que só uma PESSOA escreve, trade-offs e riscos, que a máquina nunca sobrescreve: é onde mora a mudança que não moveu arquitetura. E aprovar guarda uma foto — se o desenho mudar depois, o selo avisa em vez de mentir.",
+        "Com tudo refinado o agente oferece este documento sozinho — e ele não é um arquivo que você baixa e perde: tem tela própria, e é o que circula para quem nunca abriu esta ferramenta. Faixa de saúde no topo, o desenho animado junto, as decisões com o que foi descartado. Duas seções que só uma PESSOA escreve, trade-offs e riscos, que a máquina nunca sobrescreve: é onde mora a mudança que não moveu arquitetura. E aprovar guarda uma foto — se o desenho mudar depois, o selo avisa em vez de mentir, e diz QUAL seção mudou: \"mudou Itens, entrou Riscos\". Um aviso que não diz o que mudou obriga a reler tudo, e é assim que se aprende a reaprovar sem olhar.",
       onEnter: () => opts.abrirDocumento(),
     },
     {

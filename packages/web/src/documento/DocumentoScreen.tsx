@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import type { MudancaDeSecao } from "@gerador/engine";
 import type {
   Decisao,
   DiagramaConfig,
@@ -44,6 +45,10 @@ export interface DocumentoScreenProps {
    * "aprovado" de virar carimbo: o trabalho de revisão não se perdeu, mas
    * dizer que continua aprovado depois que o desenho mudou seria mentira. */
   desatualizado?: boolean;
+  /** SPEC-60 fatia C — o QUE mudou desde a aprovação, por seção. Lista vazia
+   * com `desatualizado` verdadeiro é caso real: a diferença é só espaço em
+   * branco, e dizer isso é melhor do que mostrar um amarelo sem explicação. */
+  mudancasDesdeAprovacao?: MudancaDeSecao[];
   onBaixarMarkdown: () => void;
   onBaixarHtml: () => void;
   onVoltar: () => void;
@@ -66,6 +71,7 @@ export function DocumentoScreen({
   onMudarEscrito,
   onMudarStatus,
   desatualizado,
+  mudancasDesdeAprovacao,
   onBaixarMarkdown,
   onBaixarHtml,
   onVoltar,
@@ -81,7 +87,12 @@ export function DocumentoScreen({
           ← Voltar à mesa de projeto
         </button>
         <div style={{ flex: 1 }} />
-        <CicloDeStatus status={status} onMudar={onMudarStatus} desatualizado={desatualizado} />
+        <CicloDeStatus
+          status={status}
+          onMudar={onMudarStatus}
+          desatualizado={desatualizado}
+          mudancas={mudancasDesdeAprovacao}
+        />
         <button onClick={onBaixarHtml} style={botaoEstilo} data-testid="baixar-html">
           ⬇ HTML
         </button>
@@ -247,10 +258,12 @@ function CicloDeStatus({
   status,
   onMudar,
   desatualizado,
+  mudancas,
 }: {
   status: StatusDocumento | null;
   onMudar: (s: StatusDocumento) => void;
   desatualizado?: boolean;
+  mudancas?: MudancaDeSecao[];
 }) {
   const [aberto, setAberto] = useState(false);
   const atual = status ?? "rascunho";
@@ -260,6 +273,26 @@ function CicloDeStatus({
       {desatualizado && (
         <span data-testid="documento-desatualizado" style={{ fontSize: 11, color: "var(--amarelo)" }}>
           o desenho mudou depois da aprovação
+          {/* §264 — e O QUÊ mudou. Sem isto o aviso é verdadeiro e inútil: quem
+              lê releria o documento inteiro para achar a diferença, e é assim
+              que se aprende a reaprovar sem olhar. */}
+          {mudancas !== undefined &&
+            (mudancas.length > 0 ? (
+              <span data-testid="mudancas-desde-aprovacao">
+                {": "}
+                {mudancas.map((m, i) => (
+                  <span key={`${m.tipo}-${m.titulo}`}>
+                    {i > 0 && ", "}
+                    {m.tipo} <strong>{m.titulo}</strong>
+                  </span>
+                ))}
+              </span>
+            ) : (
+              // O booleano acusa qualquer byte; a comparação por seção não. As
+              // duas convivem, e calar a segunda deixaria um amarelo sem nada
+              // que o explique.
+              <span data-testid="mudancas-desde-aprovacao"> — só espaço em branco</span>
+            ))}
         </span>
       )}
       <button data-testid="status-documento" onClick={() => setAberto((a) => !a)} style={seloStatusEstilo(atual)}>
