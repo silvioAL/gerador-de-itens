@@ -8105,3 +8105,51 @@ o avatar passaria a dizer "ativo".
 
 Uma falha isolada de `produto-contexto` apareceu numa execução completa; em
 isolamento e na suíte seguinte passou — é o mesmo flake de paralelismo do §250.
+
+---
+
+## §259 — a parede caiu: estado de diagrama × estado de quebra (SPEC-59 fatia C)
+
+A SPEC-59 §5 chamou isto de *"o trabalho real"*, e era: o `Canvas` já era
+genérico na FORMA (recebe `DiagramaConfig` e desenha o que ele declarar) e
+acoplado ao DOMÍNIO (recebia `UseQuebra`). Qualquer segundo desenho — o mapa do
+sistema, um diagrama de referência, o que vier — esbarrava nessa parede.
+
+**`useDiagrama` extraído.** Ele recebe o diagrama e **a função que o
+substitui**, e não sabe onde ele mora. `useQuebra` o compõe, e só um callback de
+três linhas sabe que o diagrama vive dentro de uma quebra.
+
+**Composição, e não genérico por parâmetro de tipo** — que era a proposta da
+SPEC §9.3 e continua certa: genérico espalharia o domínio dentro do canvas, e o
+que se queria era exatamente tirá-lo de lá.
+
+**O canvas e os painéis passaram a declarar o que usam.** `Canvas` recebe
+`diagramaState` e `timePadrao`: ele precisava do time da quebra para o rótulo do
+nó, e agora recebe isso como **valor**, não vai buscar num estado que não é
+dele.
+
+### O teste que faz a separação valer
+
+Um hook que continuasse importando `Quebra` e "por acaso" não a usasse seria a
+mesma parede, esperando a próxima adição para reaparecer. Então há um teste que
+**lê o arquivo** e cobra que o código não mencione `Quebra` nem os campos dela.
+
+Ele já se corrigiu uma vez sozinho: a primeira versão casava com as menções em
+**comentário** — que são justamente as que explicam a fronteira. Proibir a
+palavra proibiria a documentação dela. Passou a olhar o código com comentários
+removidos.
+
+### Dois fixtures apontaram a mudança antes de mim
+
+O fixture do teste de repintura descrevia `{ quebra: { diagrama } }`, e o do
+`EdgePanel` lia `quebra.diagrama.nodes`. Nenhum dos dois falhou por acaso: eles
+descreviam o contrato anterior, e é para isso que servem.
+
+**Mordida:** reimportar `Quebra` no hook → vermelho imediato, com o nome do
+arquivo e a razão.
+
+316 engine · 600 web · 72 aplicação · 222 server · 76/76 E2E · build limpo.
+
+**O que isto destrava:** a fatia D (editar o mapa do sistema pelo canvas de
+verdade) deixou de exigir um refactor antes de começar. E o próximo diagrama que
+alguém quiser — qualquer um — nasce sem pedir licença ao domínio da demanda.

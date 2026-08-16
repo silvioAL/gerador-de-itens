@@ -6,7 +6,7 @@ import {
   type FieldSpec,
   type No,
 } from "@gerador/engine";
-import type { UseQuebra } from "../state/useQuebra";
+import type { UseDiagrama } from "../state/useDiagrama";
 import type { DiagramaConfig, Aresta } from "@gerador/engine";
 import type { SugestoesDeStack } from "../api/client";
 import type { Decisao } from "@gerador/engine";
@@ -18,7 +18,8 @@ export interface PropertiesPanelProps {
   no: No | undefined;
   arestas: Aresta[];
   config: DiagramaConfig;
-  quebraState: UseQuebra;
+  /** SPEC-59 fatia C — o painel edita o DIAGRAMA; quebra não é assunto dele. */
+  quebraState: UseDiagrama;
   /** SPEC-43 — os valores conhecidos do catálogo global de stacks: viram os
    * chips de sugestão em campo vazio (todas as stacks, sem filtro por time). */
   sugestoesDeStack?: SugestoesDeStack;
@@ -177,7 +178,8 @@ interface FieldRowProps {
   no: No;
   campo: FieldSpec;
   prontidao: ReturnType<typeof calcularProntidao>;
-  quebraState: UseQuebra;
+  /** SPEC-59 fatia C — o painel edita o DIAGRAMA; quebra não é assunto dele. */
+  quebraState: UseDiagrama;
   sugestoesDeStack?: SugestoesDeStack;
 }
 

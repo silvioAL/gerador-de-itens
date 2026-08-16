@@ -53,7 +53,7 @@ describe("excluir pelo painel de propriedades (composição real)", () => {
     const no = estado.quebra.diagrama.nodes[0];
     return (
       <div>
-        <Canvas quebraState={estado} config={config} />
+        <Canvas diagramaState={estado} config={config} />
         {no ? (
           <PropertiesPanel
             no={no}

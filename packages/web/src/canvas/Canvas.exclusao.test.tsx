@@ -108,7 +108,7 @@ describe("confirmação antes de excluir (canvas)", () => {
       return (
         <ReactFlowProvider>
           <button onClick={() => estado.pedirExclusao("no", "n1")}>excluir n1</button>
-          <Canvas quebraState={estado} config={config} />
+          <Canvas diagramaState={estado} config={config} />
         </ReactFlowProvider>
       );
     }
@@ -131,7 +131,7 @@ describe("confirmação antes de excluir (canvas)", () => {
       return (
         <ReactFlowProvider>
           <button onClick={() => estado.pedirExclusao("no", "n1")}>excluir</button>
-          <Canvas quebraState={estado} config={config} />
+          <Canvas diagramaState={estado} config={config} />
         </ReactFlowProvider>
       );
     }
