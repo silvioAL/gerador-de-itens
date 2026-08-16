@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { entrar } from "./auth";
+import { derivarNaMesa } from "./derivar";
 
 const API = "http://localhost:4100";
 
@@ -61,7 +62,7 @@ test("cadastrar produto com contexto e glossário, e ligar a demanda a ele", asy
 
     // O vínculo atravessa a persistência — o campo que morria na borda (SPEC-31).
     const salva = page.waitForResponse((r) => r.url().includes("/quebras") && r.request().method() === "POST");
-    await page.locator('[data-tour="derivar-button"]').click();
+    await derivarNaMesa(page);
     await page.getByLabel("ex.: Fatura mensal em lote").fill(`demanda com produto ${Date.now()}`);
     await page.getByTestId("assistente-balao-confirmar").click();
     const corpo = await (await salva).json();

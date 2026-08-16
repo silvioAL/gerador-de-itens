@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { entrar } from "./auth";
+import { derivarNaMesa } from "./derivar";
 
 const API = "http://localhost:4100";
 
@@ -32,7 +33,7 @@ test("entrevista, geração pelo agente e feedback — o ciclo inteiro com cadê
     await painel.getByRole("spinbutton", { name: "TTL da mensagem (ms)" }).fill("60000");
     await painel.getByRole("combobox", { name: "Ack" }).selectOption("manual");
 
-    await page.locator('[data-tour="derivar-button"]').click();
+    await derivarNaMesa(page);
     await page.getByTestId("assistente-balao-secundaria").click(); // sem título
 
     // Geração pelo agente: M4 e M5 dispensados, M12 baixa.

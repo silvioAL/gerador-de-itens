@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { entrar } from "./auth";
+import { derivarNaMesa } from "./derivar";
 
 const API = "http://localhost:4100";
 
@@ -53,7 +54,7 @@ test("regra criada pelo componente grava o contexto certo e chega no item deriva
     await painel.getByRole("spinbutton", { name: "TTL da mensagem (ms)" }).fill("60000");
     await painel.getByRole("combobox", { name: "Ack" }).selectOption("manual");
 
-    await page.locator('[data-tour="derivar-button"]').click();
+    await derivarNaMesa(page);
     await page.getByTestId("assistente-balao-secundaria").click(); // sem título: derivar sem salvar
 
     await page.locator('[data-testid^="item-"]').first().click();

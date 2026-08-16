@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { entrar } from "./auth";
+import { reconhecerAvisos } from "./derivar";
 
 // Este arquivo testa fluxos determinísticos SEM IA (cenários, tour) — mas a
 // credencial do gateway é da organização e outros specs a criam em paralelo
@@ -43,6 +44,10 @@ test("carregar um cenário pronto popula a mesa de projeto e deriva sem ciclos/c
   const botaoDerivar = page.locator('[data-tour="derivar-button"]');
   await expect(botaoDerivar).toBeEnabled();
   await botaoDerivar.click();
+  // §261 — o cenário mongo traz uma necessidade sem dono, então o
+  // reconhecimento aparece antes do balão do nome. Compor cenários pela mesa
+  // NÃO traz necessidade (só o diagrama é mesclado), e por isso é condicional.
+  await reconhecerAvisos(page);
 
   // Cenário carregado não tem título → o assistente pergunta o nome antes.
   // Aqui é exploração, não registro: "Derivar sem salvar" segue direto.
@@ -143,6 +148,10 @@ test("adicionar dois cenários à mesa de projeto (sem substituir) compõe um di
   const botaoDerivar = page.locator('[data-tour="derivar-button"]');
   await expect(botaoDerivar).toBeEnabled();
   await botaoDerivar.click();
+  // §261 — o cenário mongo traz uma necessidade sem dono, então o
+  // reconhecimento aparece antes do balão do nome. Compor cenários pela mesa
+  // NÃO traz necessidade (só o diagrama é mesclado), e por isso é condicional.
+  await reconhecerAvisos(page);
 
   // Sem título → pergunta do nome; composição de cenários é exploração.
   await expect(page.getByTestId("assistente-balao")).toContainText("qual é o nome da demanda");
@@ -287,6 +296,20 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   // A janela flutuante FECHA: sem isso ela cobre o painel que o passo mostra.
   await expect(page.getByTestId("assistente-janela")).toHaveCount(0);
   await expect(page.locator('[data-tour="properties-panel"]')).toBeVisible();
+
+  // §261 — o reconhecimento do que fica para trás, antes de virar backlog. O
+  // cenário do tour produz um aviso de verdade (a proposta de decisão que o
+  // agente fez e ninguém aceitou), então o diálogo aparece por mérito e não
+  // por mock.
+  await irAtePasso(page, "O que fica para trás");
+  await expect(page.getByTestId("avisos-da-derivacao")).toBeVisible();
+  // A proposta do agente que ninguém aceitou: ela NÃO vira item, e sem este
+  // diálogo sumiria do fluxo. A violação de padrão não aparece aqui de
+  // propósito — ela vira item, e a derivação a trata.
+  await expect(page.getByTestId("aviso-decisao")).toBeVisible();
+  await expect(page.getByTestId("aviso-padrao")).toHaveCount(0);
+  // Não bloqueia: é o que separa reconhecer de proibir.
+  await expect(page.getByText(/Nada aqui impede a derivação/)).toBeVisible();
 
   // Derivação de verdade — a revisão abre com os itens calculados.
   await irAtePasso(page, "Revisão");

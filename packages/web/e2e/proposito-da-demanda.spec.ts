@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { entrar } from "./auth";
+import { derivarNaMesa } from "./derivar";
 
 /**
  * SPEC-57 fatia A — a cadeia PROPÓSITO → ELEMENTO → ITEM → SPEC, ponta a ponta
@@ -74,7 +75,7 @@ test("declarar propósito, ligar ao componente e ver a citação chegar no docum
     await expect(page.getByTestId("assistente-janela")).toHaveCount(0);
   }
 
-  await page.locator('[data-tour="derivar-button"]').click();
+  await derivarNaMesa(page);
   // Quebra sem título: o assistente pergunta o nome antes de derivar.
   const perguntaNome = page.getByLabel("ex.: Fatura mensal em lote");
   if (await perguntaNome.count()) {

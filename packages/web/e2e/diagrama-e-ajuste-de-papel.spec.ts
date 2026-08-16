@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { entrar } from "./auth";
+import { derivarNaMesa } from "./derivar";
 
 const API = "http://localhost:4100";
 
@@ -29,7 +30,7 @@ test("baixar o diagrama completo entrega um HTML com os componentes desenhados",
 
   await page.getByTestId("abrir-cenarios").click();
   await page.getByRole("button", { name: "Carregar cenário: Dados não-relacionais" }).click();
-  await page.locator('[data-tour="derivar-button"]').click();
+  await derivarNaMesa(page);
   await page.getByTestId("assistente-balao-secundaria").click(); // sem título
 
   await page.getByRole("button", { name: "🔍 Ver diagrama completo" }).click();

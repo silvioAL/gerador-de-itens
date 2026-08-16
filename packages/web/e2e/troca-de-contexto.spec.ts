@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { entrar } from "./auth";
+import { derivarNaMesa } from "./derivar";
 
 const API = "http://localhost:4100";
 
@@ -55,7 +56,7 @@ test("§214 — trocar o produto da demanda troca o contexto que vai no prompt",
     };
 
     await escolherProduto(nomeA);
-    await page.locator('[data-tour="derivar-button"]').click();
+    await derivarNaMesa(page);
     await page.getByTestId("assistente-balao-secundaria").click(); // sem título
 
     await page.getByTestId("abrir-simulacao").click();
@@ -67,7 +68,7 @@ test("§214 — trocar o produto da demanda troca o contexto que vai no prompt",
     // que o modelo lê para escrever o item.
     await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
     await escolherProduto(nomeB);
-    await page.locator('[data-tour="derivar-button"]').click();
+    await derivarNaMesa(page);
     await page.getByTestId("assistente-balao-secundaria").click();
 
     await page.getByTestId("abrir-simulacao").click();

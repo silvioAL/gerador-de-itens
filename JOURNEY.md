@@ -8208,3 +8208,76 @@ pinta a tela e não grava é a pior versão desta feature, porque a pessoa sai
 achando que configurou.
 
 316 engine · 604 web · 72 aplicação · 222 server · 77/77 E2E · build limpo.
+
+## §261 — o clique que diz o que está ignorando
+
+*"não removeremos, tem alguma melhoria sugerida por vc?"* — sugeri três, e a
+resposta foi *"vamos a 1"*. A 1 era: **o botão de derivar dizer o que está
+deixando para trás**.
+
+### O buraco
+
+A SPEC-57 M7 prometia *"vermelho bloqueia, amarelo avisa — agora sobre todas as
+dimensões"*, e entregou metade. O portão consulta só completude
+(`vermelhos.length > 0`). Propósito, padrão, decisão e caminho — tudo o que foi
+construído do §230 em diante — é amarelo. E amarelo que ninguém lê **no momento
+da decisão** é medida nenhuma: derivar com uma necessidade órfã e uma proposta
+do agente pendente acontecia em silêncio absoluto.
+
+Não é sobre bloquear. Bloquear cedo ensina a ignorar a cor, e essa régua vale
+desde o §230. É sobre o silêncio virar **reconhecimento**: seguir sabendo, ao
+preço de um clique.
+
+### A régua que descobri no meio, corrigindo a mim mesmo
+
+Comecei avisando sobre as quatro dimensões. Os 12 E2E que quebraram me fizeram
+olhar de novo, e o erro era de desenho, não de teste:
+
+> **violação de padrão vira item (§240). Caminho fora da régua vira item
+> (§249).** Avisar sobre eles é avisar sobre exatamente aquilo que o clique
+> está prestes a resolver.
+
+Um diálogo que aparece toda vez para anunciar o que já vai ser tratado é a
+receita mais rápida de ensinar alguém a fechá-lo sem ler. Então o critério
+virou **só o que a derivação NÃO resolve**: necessidade sem dono, caminho que
+não dá para medir por falta de campo, proposta que ninguém aceitou, decisão sem
+o porquê. Nenhum vira item. Nenhum reaparece depois. A dimensão `padrao` saiu
+do tipo — e a ausência dela no `Record` é a régua escrita em código.
+
+### O que não é
+
+"Derivar assim mesmo" é a ação **primária**, à direita, e um clique basta.
+Clicar fora fecha. O texto diz o que fica para trás, não o que a pessoa fez de
+errado — às vezes derivar com um caminho fora da régua é a decisão certa, e ela
+não precisa de permissão, precisa de informação.
+
+### Três coisas que os testes cobraram
+
+**O helper condicional (e a corrida dentro dele).** O diálogo aparece *por
+mérito*: o cenário `mongo.json` traz necessidade órfã, e compor cenários pela
+mesa não traz (só o diagrama é mesclado). Um clique cravado quebrava o segundo
+caso. Mas a primeira versão do helper usava `isVisible()`, que responde no
+mesmo instante — logo após o clique o React ainda não montou nada, dava `false`,
+e o diálogo abria **em cima do teste seguinte**. Em arquivo serial isso derruba
+quem vem depois, que é o pior tipo de falha: aparece longe da causa. `waitFor`
+com janela curta resolve.
+
+**O tour passava por fora.** `derivarQuebra` do tour chama `executarDerivacao`
+direto. Sem um `mostrarAvisos` explícito, a capacidade existiria e não seria
+demonstrada — §244 de novo.
+
+**Um diagnóstico virou falso negativo.** `ia-hospedada` afirmava sobre
+`janela.innerText().slice(0, 600)`. O seletor de produto do SPEC-58 nasceu
+acima, empurrou o delta para fora do corte, e o teste passou a acusar ausência
+de algo que **estava na tela** (o snapshot mostrava `1 sugerida(s)` em `e102`).
+Corte por posição é bomba-relógio; ancorei na região das necessidades, que
+contém o delta e contém o erro da proposta.
+
+### Mordidas
+
+Três, uma por camada: sumir com o aviso de caminho não-medido → engine vermelho;
+o botão primário chamando `onVoltar` → unidade vermelha; `decisoes: []` no memo
+do `App` → o E2E do tour não acha `aviso-decisao`. A terceira é a que importa,
+porque é a única que prova que o diálogo mostra dado **de verdade**.
+
+324 engine · 610 web · 72 aplicação · 222 server · 77/77 E2E · build limpo.

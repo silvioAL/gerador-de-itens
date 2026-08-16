@@ -50,6 +50,11 @@ export { gerarDocumentoHtml, type OpcoesDocumentoHtml } from "./documento/gerarD
 export { validateConfig, validateRegras } from "./config/validator.js";
 export { derivar, type ContextoQuebra } from "./derive/derivar.js";
 export {
+  avisosDaDerivacao,
+  type AvisoDaDerivacao,
+  type EntradaDosAvisos,
+} from "./derive/avisosDaDerivacao.js";
+export {
   resolverDependencias,
   type AtividadeComDependencias,
   type ResultadoDependenciasDe,

@@ -3,6 +3,7 @@ import { ReactFlowProvider } from "@xyflow/react";
 import {
   analisarLacunas,
   avaliarConformidade,
+  avisosDaDerivacao,
   derivar,
   estruturarDocumento,
   gerarDiagramaHtml,
@@ -68,6 +69,7 @@ import { useTour, passosDeConfiguracao } from "./demo/useTour";
 import { CONVERSA_DO_TOUR, DECISOES_DO_TOUR, REGRAS_DO_TOUR, ehDecisaoDeDemonstracao } from "./demo/dadosDoTour";
 import { DocumentoScreen } from "./documento/DocumentoScreen";
 import { SistemaScreen } from "./sistema/SistemaScreen";
+import { AvisosDaDerivacao } from "./summary/AvisosDaDerivacao";
 import { baixarArquivoTexto } from "./persistence/baixarArquivo";
 import { LandingPage } from "./demo/LandingPage";
 import { EscolherTimeScreen } from "./auth/EscolherTimeScreen";
@@ -624,6 +626,28 @@ function AppCarregado({
     if (salvarDepois) setAutoSalvarPendente(true);
   }
 
+  /**
+   * §261 — o que se está IGNORANDO ao derivar.
+   *
+   * O portão consultava só completude, e as quatro dimensões novas (propósito,
+   * padrão, caminho, decisões) eram amarelas que ninguém lia no momento da
+   * decisão — o que é o mesmo que medida nenhuma.
+   *
+   * Não bloqueia: a régua de que bloquear cedo ensina a ignorar a cor continua
+   * valendo desde o §230. O que muda é o silêncio virar **reconhecimento**.
+   */
+  const avisosParaDerivar = useMemo(
+    () =>
+      avisosDaDerivacao(quebra.diagrama, diagramaConfig, {
+        regras: regrasVisiveis,
+        necessidades: quebra.necessidades,
+        decisoes: decisoesVisiveis,
+        percursos: quebra.percursos,
+      }),
+    [quebra, diagramaConfig, regrasVisiveis, decisoesVisiveis]
+  );
+  const [avisosPendentes, setAvisosPendentes] = useState(false);
+
   function derivarQuebra() {
     // SPEC-38 — visualizar deriva (é leitura computada do diagrama), mas sem a
     // pergunta do nome nem auto-save: salvar seria 403 no servidor.
@@ -631,9 +655,29 @@ function AppCarregado({
       executarDerivacao(false);
       return;
     }
+    // O reconhecimento vem ANTES da pergunta do nome: nomear a demanda para só
+    // depois descobrir o que ficou para trás inverteria a ordem das decisões.
+    if (avisosParaDerivar.length > 0) {
+      setAvisosPendentes(true);
+      return;
+    }
     if (!(quebra.titulo ?? "").trim()) {
       // O balão só existe com o assistente fechado — fechar garante que a
       // pergunta apareça mesmo se o chat estava aberto.
+      setAbaAssistente(null);
+      setPedindoNomeDaDemanda("derivar");
+      return;
+    }
+    executarDerivacao(true);
+  }
+
+  /** Seguir depois de ver os avisos: é um clique, e não um formulário. O preço
+   * do reconhecimento tem que ser baixo, senão ele vira obstáculo e a pessoa
+   * aprende a odiar a medição em vez de usá-la. */
+  function derivarMesmoAssim() {
+    setAvisosPendentes(false);
+    if (somenteLeitura) return executarDerivacao(false);
+    if (!(quebra.titulo ?? "").trim()) {
       setAbaAssistente(null);
       setPedindoNomeDaDemanda("derivar");
       return;
@@ -930,8 +974,14 @@ function AppCarregado({
     carregarCenario: (q: Quebra) => aoAbrir(q),
     selecionarNo: setSelecionadoId,
     // O tour/demo deriva DIRETO, sem a pergunta do nome nem auto-save — é uma
-    // demonstração, não uma quebra de verdade para registrar.
-    derivarQuebra: () => executarDerivacao(false),
+    // demonstração, não uma quebra de verdade para registrar. Fecha o
+    // reconhecimento junto: o passo anterior o abriu de propósito, e deixá-lo
+    // aberto sobre a revisão seria o tour se atropelando.
+    derivarQuebra: () => {
+      setAvisosPendentes(false);
+      executarDerivacao(false);
+    },
+    mostrarAvisos: () => setAvisosPendentes(true),
     fecharRevisao: () => setResultado(null),
     abrirConfigNaAba,
     // SPEC-48 — o tour passa pela tela dos itens escritos. GERA os itens antes
@@ -1394,6 +1444,14 @@ function AppCarregado({
           onSelecionarNo={setSelecionadoId}
         />
         </div>
+      )}
+
+      {avisosPendentes && (
+        <AvisosDaDerivacao
+          avisos={avisosParaDerivar}
+          onDerivar={derivarMesmoAssim}
+          onVoltar={() => setAvisosPendentes(false)}
+        />
       )}
 
       {mostrarSistema && (

@@ -40,6 +40,10 @@ export interface UseTourOpts {
   abrirDocumento: () => void;
   /** SPEC-59 — a vista de como a ferramenta está montada (`#/sistema`). */
   abrirSistema: () => void;
+  /** §261 — abre o reconhecimento do que fica para trás. O tour deriva por um
+   * atalho próprio (`derivarQuebra`), então precisa pedir o diálogo de forma
+   * explícita — senão o passo apontaria para algo que nunca aparece. */
+  mostrarAvisos: () => void;
   /** SPEC-57 fatia A — abre o painel onde o PROPÓSITO da demanda vive
    * (📎 Contexto do épico). `null` fecha: os passos seguintes usam o painel de
    * propriedades, e a janela flutuante ficaria por cima dele. */
@@ -201,6 +205,18 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       segundos: 9,
       texto:
         "Com tudo verde, o botão libera. Ele roda um motor determinístico — não uma IA — que sempre produz os mesmos itens para o mesmo diagrama.",
+    },
+    {
+      // §261 — o passo existe porque o cenário do tour PRODUZ avisos (o padrão
+      // que o desenho contraria, a proposta do agente esperando). Escondê-los
+      // com um atalho faria a demonstração mostrar um caminho que não é o de
+      // quem usa — que é a mentira que o §234 cobrou caro.
+      selector: "[data-testid=avisos-da-derivacao]",
+      titulo: "O que fica para trás",
+      segundos: 11,
+      texto:
+        "Derivar não é bloqueado por nada disto — os itens saem igual. Mas o que o motor mediu e você não resolveu aparece aqui, uma vez, antes de virar backlog: a necessidade sem dono, o padrão contrariado, o caminho fora da régua, a decisão que o agente propôs e ninguém aceitou. Seguir é um clique. O que não pode é isso acontecer em silêncio.",
+      onEnter: () => opts.mostrarAvisos(),
     },
     {
       selector: "[data-tour=review-table]",
