@@ -38,6 +38,9 @@ export interface MenuLateralProps {
   /** SPEC-58 — o documento de desenho da demanda aberta. Ao lado dos itens
    * porque são as duas saídas da mesma demanda: o que fazer e por quê. */
   onDocumento: () => void;
+  /** SPEC-59 — como a FERRAMENTA está montada. Não é da demanda, então não
+   * entra no grupo dela: é o mapa do que as telas de configuração configuram. */
+  onSistema: () => void;
   onSair: () => void;
 }
 
@@ -91,6 +94,7 @@ export function MenuLateral({
   onAbrirQuebras,
   onItens,
   onDocumento,
+  onSistema,
   onSair,
 }: MenuLateralProps) {
   if (!aberto) return null;
@@ -125,6 +129,11 @@ export function MenuLateral({
         <button onClick={acao(onDocumento)} style={itemEstilo} data-testid="menu-documento">
           Documento de desenho
         </button>
+        <p style={tituloGrupoEstilo}>A ferramenta</p>
+        <button onClick={acao(onSistema)} style={itemEstilo} data-testid="menu-sistema">
+          Como está montada
+        </button>
+
         {/* §198 — "cenários" e "demonstração & tour" viraram dois botões
             fixos no header: são portas de EXPERIMENTAR, não de administrar. */}
 

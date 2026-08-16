@@ -38,6 +38,8 @@ export interface UseTourOpts {
   fecharItens: () => void;
   /** SPEC-58 — o documento de desenho (`#/documento`). */
   abrirDocumento: () => void;
+  /** SPEC-59 — a vista de como a ferramenta está montada (`#/sistema`). */
+  abrirSistema: () => void;
   /** SPEC-57 fatia A — abre o painel onde o PROPÓSITO da demanda vive
    * (📎 Contexto do épico). `null` fecha: os passos seguintes usam o painel de
    * propriedades, e a janela flutuante ficaria por cima dele. */
@@ -274,6 +276,17 @@ export function passosDeConfiguracao(opts: UseTourOpts): PassoTour[] {
       texto:
         "O outro tour mostra o que a ferramenta FAZ. Este mostra o que ela aprende do seu time: de onde vem a IA, quem escreve cada parte do item, quais perguntas cada tecnologia obriga e o que uma conexão precisa declarar. Nada aqui é obrigatório para usar — é o que faz o resultado parecer escrito por vocês.",
       onEnter: () => opts.fecharRevisao(),
+    },
+    {
+      // §258 — a vista antes das telas. O tour de configuração percorre onze
+      // telas e nunca mostrava como elas se ligam; quem chega aqui vê primeiro
+      // o mapa, e depois cada peça dele.
+      selector: "[data-testid=sistema-screen]",
+      titulo: "Como a ferramenta está montada",
+      segundos: 13,
+      texto:
+        "Antes das telas, o mapa. De um lado o que o MOTOR confere — as regras por tecnologia e as réguas de caminho. Do outro, quem ESCREVE cada parte do item: a esteira, em sequência, com o estado de cada agente (um papel ativo sem modelo configurado é o defeito mais silencioso que existe aqui). Os dois produzem o item, e o que o time responde depois volta a mudar os dois: é o laço do PDCA, que dá nome ao ciclo e não aparecia em tela nenhuma. Esta vista não edita — cada bloco leva à tela que edita.",
+      onEnter: () => opts.abrirSistema(),
     },
     {
       selector: "[data-tour=config-screen-content]",

@@ -153,3 +153,12 @@ export {
   type ParteDoPromptPipeline,
   type PedidoIa,
 } from "./casos-de-uso/ia/pedidos.js";
+
+export {
+  montarMapaDoSistema,
+  type MapaDoSistema,
+  type AgenteDoMapa,
+  type RegraDoMapa,
+  type EstadoDoAgente,
+  type EntradaDoMapa,
+} from "./sistema/mapaDoSistema.js";

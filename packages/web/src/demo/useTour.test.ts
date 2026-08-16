@@ -27,6 +27,7 @@ function montarOpts() {
     abrirItens: vi.fn(),
     fecharItens: vi.fn(),
   abrirDocumento: vi.fn(),
+  abrirSistema: vi.fn(),
     abrirProposito: vi.fn(),
     fecharAssistente: vi.fn(),
     abrirConversa: vi.fn(),
@@ -95,6 +96,22 @@ describe("useTour", () => {
 
     expect(opts.derivarQuebra).toHaveBeenCalled();
     expect(result.current.passoAtual?.selector).toBe("[data-tour=review-table]");
+  });
+
+  it("§258 — o tour de configuração abre pelo MAPA, antes das telas", () => {
+    // Ele percorria onze telas sem nunca mostrar como elas se ligam.
+    const opts = montarOpts();
+    const { result } = renderHook(() => useTour(opts, passosDeConfiguracao));
+
+    act(() => result.current.iniciar());
+    andarAte(result, "Como a ferramenta está montada");
+
+    expect(result.current.passoAtual?.selector).toBe("[data-testid=sistema-screen]");
+    expect(opts.abrirSistema).toHaveBeenCalled();
+
+    // E vem ANTES das telas que ele mapeia: mapa depois das peças não é mapa.
+    const titulos = passosDeConfiguracao(montarOpts()).map((p) => p.titulo);
+    expect(titulos.indexOf("Como a ferramenta está montada")).toBeLessThan(titulos.indexOf("Contexto do produto"));
   });
 
   it("§252 — o tour de CONFIGURAÇÃO percorre TODAS as telas de administração", () => {

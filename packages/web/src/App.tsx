@@ -61,12 +61,13 @@ import { ConversaPanel } from "./conversa/ConversaPanel";
 import { AssistenteFlutuante, type AbaAssistente } from "./assistente/AssistenteFlutuante";
 import { ConfigurarPanel } from "./assistente/ConfigurarPanel";
 import { JourneyModal, type AbaJornada } from "./demo/JourneyModal";
-import { contextoDoProdutoEmTexto } from "@gerador/aplicacao";
+import { contextoDoProdutoEmTexto, montarMapaDoSistema } from "@gerador/aplicacao";
 import { ConfigScreen, type AbaConfig } from "./config/ConfigScreen";
 import { TourOverlay } from "./demo/TourOverlay";
 import { useTour, passosDeConfiguracao } from "./demo/useTour";
 import { CONVERSA_DO_TOUR, DECISOES_DO_TOUR, REGRAS_DO_TOUR, ehDecisaoDeDemonstracao } from "./demo/dadosDoTour";
 import { DocumentoScreen } from "./documento/DocumentoScreen";
+import { SistemaScreen } from "./sistema/SistemaScreen";
 import { baixarArquivoTexto } from "./persistence/baixarArquivo";
 import { LandingPage } from "./demo/LandingPage";
 import { EscolherTimeScreen } from "./auth/EscolherTimeScreen";
@@ -412,6 +413,7 @@ function AppCarregado({
   const mostrarConfig = rota.tela === "config";
   const mostrarItens = rota.tela === "itens";
   const mostrarDocumento = rota.tela === "documento";
+  const mostrarSistema = rota.tela === "sistema";
   // SPEC-41 Parte B — os itens materializados da quebra aberta. A fonte de
   // verdade é o server (persistem por quebra); o estado local é o espelho da
   // última geração/carga desta sessão.
@@ -431,6 +433,42 @@ function AppCarregado({
   // SPEC-45 — quantos feedbacks do ciclo ainda esperam alguém: é o que faz o
   // assistente chamar pra tratar (M15) em vez de o texto morrer no banco.
   const [feedbacksNovos, setFeedbacksNovos] = useState(0);
+  /** SPEC-59 — a esteira tem com quem falar? É o que separa "papel ativo" de
+   * "papel ativo e mudo", que é o defeito mais silencioso da configuração.
+   * Buscado só quando a tela abre, como a exportação faz para os itens. */
+  const [temCredencialDeIa, setTemCredencialDeIa] = useState(false);
+
+  useEffect(() => {
+    if (!mostrarSistema) return;
+    let cancelado = false;
+    apiIa
+      .status()
+      .then((st) => {
+        // `pronto` cobre os dois modos: gateway configurado ou modelo local
+        // instalado. Perguntar por um só deixaria metade das instalações
+        // acusando falta de credencial que existe.
+        if (!cancelado) setTemCredencialDeIa(Boolean(st.pronto || st.gateway));
+      })
+      .catch(() => {});
+    return () => {
+      cancelado = true;
+    };
+  }, [mostrarSistema]);
+
+  /** SPEC-59 fatia A — a ferramenta lida a partir da própria configuração.
+   * Usa a config REAL, nunca a de demonstração: esta tela responde "como o meu
+   * ambiente está montado", e a do tour mentiria sobre isso. */
+  const mapaDoSistema = useMemo(
+    () =>
+      montarMapaDoSistema({
+        papeis: pipelineAgentes.papeis,
+        regras: regrasConfig,
+        temCredencialDeIa,
+        feedbacksAbertos: feedbacksNovos,
+      }),
+    [pipelineAgentes, regrasConfig, temCredencialDeIa, feedbacksNovos]
+  );
+
   const [menuAberto, setMenuAberto] = useState(false);
   const [mostrarAbrir, setMostrarAbrir] = useState(false);
   // #298 — a conversa do desenho (SPEC-27 Fase 1) e o contexto do épico moram
@@ -894,6 +932,7 @@ function AppCarregado({
     // continuar de pé (§234). A revisão não atrapalha porque ela se esconde
     // para o documento, como já fazia para os itens.
     abrirDocumento: () => navegar({ tela: "documento" }),
+    abrirSistema: () => navegar({ tela: "sistema" }),
     abrirProposito: () => setAbaAssistente("contexto"),
     fecharAssistente: () => setAbaAssistente(null),
     abrirConversa: () => setAbaAssistente("conversa"),
@@ -1189,6 +1228,7 @@ function AppCarregado({
         }}
         onItens={() => navegar({ tela: "itens" })}
         onDocumento={() => navegar({ tela: "documento" })}
+        onSistema={() => navegar({ tela: "sistema" })}
         onSair={() => void onSair()}
       />
 
@@ -1323,6 +1363,14 @@ function AppCarregado({
           onSelecionarNo={setSelecionadoId}
         />
         </div>
+      )}
+
+      {mostrarSistema && (
+        <SistemaScreen
+          mapa={mapaDoSistema}
+          onAbrirConfig={(area) => abrirConfigNaAba(area)}
+          onVoltar={() => navegar({ tela: "canvas" })}
+        />
       )}
 
       {mostrarDocumento && (

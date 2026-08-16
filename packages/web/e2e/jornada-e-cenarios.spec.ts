@@ -432,6 +432,20 @@ test("tour de configuração percorre as quatro telas que o tour do produto não
 
   await expect(page.getByTestId("tour-titulo")).toHaveText("Moldar pro seu time");
 
+  // §258 — o MAPA vem antes das telas que ele mapeia. E cobra CONTEÚDO, não
+  // só a tela: uma vista vazia passaria em `toBeVisible` e não explicaria nada.
+  await irAtePasso(page, "Como a ferramenta está montada");
+  await expect(page.getByTestId("sistema-screen")).toBeVisible();
+  await expect(page.getByTestId("bloco-esteira")).toBeVisible();
+  await expect(page.getByTestId("bloco-regras")).toBeVisible();
+  await expect(page.getByTestId("bloco-pdca")).toBeVisible();
+  // A esteira de fábrica tem quatro papéis, e eles aparecem como sequência.
+  await expect(page.getByTestId("agente-po")).toBeVisible();
+  await expect(page.getByTestId("agente-qa")).toBeVisible();
+  // Sem credencial de IA neste teste: o avatar diz isso em vez de fingir que a
+  // esteira está de pé.
+  await expect(page.getByTestId("agente-po")).toHaveAttribute("data-estado", "sem-credencial");
+
   const telaConfig = page.locator('[data-tour="config-screen-content"]');
 
   // §252 — as sete telas de administração migraram do tour do produto para cá.
