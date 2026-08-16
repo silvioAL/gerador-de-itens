@@ -8553,3 +8553,47 @@ um defeito que eu mesmo tinha plantado dois comandos antes. O banco de e2e se
 recria com `e2e:down && e2e:up`, e a variável só pertence ao `test:e2e`.
 
 340 engine · 626 web · 78 aplicação · 229 server · 78/78 E2E · build limpo.
+
+## §266 — o rascunho é de quem digita
+
+O §262 achou isto perseguindo outra coisa e **anotou em vez de consertar de
+carona**: `recarregar()` roda depois de toda gravação e trocava o rascunho pelo
+que voltava do servidor. Quem digitasse entre o clique em Salvar e a resposta
+perdia o texto — sem erro, sem aviso, e com "salvo" na tela.
+
+### Por que não foi consertado na hora
+
+O guarda óbvio — *não substituir o rascunho quando o id é o mesmo* — **quebra o
+glossário**: o termo novo aparece justamente porque a releitura traz a lista do
+servidor. Guardar o rascunho inteiro salvaria o texto e congelaria a lista, e
+trocar um defeito por outro num PR de dívida de teste teria sido pior do que
+deixar escrito.
+
+### A régua
+
+> O que a **pessoa** digita é dela; o que só o **servidor** sabe é dele.
+
+Texto (nome e as cinco seções) vem do rascunho; coleções (glossário, times) vêm
+da resposta. Trocar de produto continua substituindo tudo — aí a pessoa pediu
+por isso, e manter o texto do anterior seria pior que o defeito original.
+
+### Os dois testes têm que existir juntos
+
+Cada um sozinho autoriza o conserto errado:
+
+- só o do texto → passa guardando o rascunho inteiro, e o glossário congela;
+- só o do glossário → passa substituindo tudo, e o texto se perde.
+
+As mordidas provam exatamente isso: voltar a substituir derruba o primeiro,
+guardar tudo derruba o segundo. Um par de testes em que cada um sozinho aceita
+uma solução errada é o formato certo para uma regra que tem dois lados.
+
+### E a mesma régua na tela vizinha
+
+O `PdcaTab` tinha o defeito de novo: `recarregar()` roda depois de **toda** ação
+daquela tela (tratar feedback, aplicar ajuste), e sobrescrevia a cadência que a
+pessoa acabou de mudar. Quem trocasse 5 por 9 e salvasse via o 5 voltar — e
+concluía que o botão não funciona. Carrega uma vez; depois disso quem manda é o
+formulário.
+
+340 engine · 630 web · 78 aplicação · 229 server · 78/78 E2E · build limpo.

@@ -93,3 +93,66 @@ describe("ProdutosTab (SPEC-53 Fase 1)", () => {
     await waitFor(() => expect(screen.getByLabelText("Termo")).toHaveValue(""));
   });
 });
+
+/**
+ * §266 — a releitura não pode apagar o que a pessoa está digitando.
+ *
+ * O defeito foi achado no §262 e anotado lá em vez de consertado de carona: o
+ * guarda óbvio (não substituir o rascunho quando o id é o mesmo) quebra o
+ * glossário, que aparece justamente por causa da releitura. Estes dois testes
+ * são os dois lados da régua, e precisam existir juntos — cada um sozinho
+ * autoriza o conserto errado.
+ */
+describe("ProdutosTab — o que a releitura pode e não pode substituir", () => {
+  it("texto digitado DEPOIS do Salvar sobrevive à resposta do servidor", async () => {
+    // A gravação demora; a pessoa continua escrevendo. Antes, o que voltava do
+    // servidor (sem as teclas novas) apagava tudo, com "salvo" na tela.
+    let concluirSalvamento: (p: Produto) => void = () => {};
+    (apiProdutos.atualizar as Mock).mockReturnValue(
+      new Promise<Produto>((resolve) => {
+        concluirSalvamento = resolve;
+      })
+    );
+    montar();
+    await screen.findByTestId("editor-do-produto");
+
+    fireEvent.change(screen.getByLabelText("Restrições"), { target: { value: "Resolução 4.753." } });
+    fireEvent.click(screen.getByTestId("salvar-produto"));
+
+    // Enquanto o servidor não respondeu, a pessoa escreve mais.
+    fireEvent.change(screen.getByLabelText("O que é"), { target: { value: "Texto novo, digitado durante o salvamento." } });
+    concluirSalvamento(produto);
+
+    await waitFor(() => expect(screen.getByTestId("produto-salvo")).toBeInTheDocument());
+    expect(screen.getByLabelText("O que é")).toHaveValue("Texto novo, digitado durante o salvamento.");
+  });
+
+  it("o glossário CONTINUA vindo do servidor — é o que o conserto óbvio quebrava", async () => {
+    (apiProdutos.salvarTermo as Mock).mockResolvedValue({ id: "t2", termo: "SPB", definicao: "Liquidação", ordem: 1 });
+    (apiProdutos.listar as Mock)
+      .mockResolvedValueOnce([produto])
+      .mockResolvedValue([
+        { ...produto, glossario: [...produto.glossario, { id: "t2", termo: "SPB", definicao: "Liquidação", ordem: 1 }] },
+      ]);
+    montar();
+    await screen.findByTestId("editor-do-produto");
+
+    fireEvent.change(screen.getByLabelText("Termo"), { target: { value: "SPB" } });
+    fireEvent.change(screen.getByLabelText("Definição"), { target: { value: "Liquidação" } });
+    fireEvent.click(screen.getByTestId("salvar-termo"));
+
+    await waitFor(() => expect(screen.getAllByTestId("termo-do-glossario")).toHaveLength(2));
+  });
+
+  it("TROCAR de produto substitui tudo — aí a pessoa pediu por isso", async () => {
+    const outro: Produto = { ...produto, id: "p2", nome: "Cobrança", objetivo: "Cobrar.", glossario: [] };
+    (apiProdutos.listar as Mock).mockResolvedValue([produto, outro]);
+    montar();
+    await screen.findByTestId("editor-do-produto");
+
+    fireEvent.change(screen.getByLabelText("O que é"), { target: { value: "rascunho do primeiro" } });
+    fireEvent.click(screen.getByRole("button", { name: "Cobrança" }));
+
+    expect(screen.getByLabelText("O que é")).toHaveValue("Cobrar.");
+  });
+});
