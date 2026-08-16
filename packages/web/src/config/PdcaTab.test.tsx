@@ -369,3 +369,23 @@ describe("PdcaTab — o ajuste alcança a FICHA (SPEC-52)", () => {
     expect(screen.getByLabelText("Componente da ficha").textContent).not.toContain("Fila Rabbit");
   });
 });
+
+/**
+ * §266 — a mesma régua do `ProdutosTab`, na outra tela que tinha o defeito.
+ */
+describe("PdcaTab — a releitura não apaga a cadência que a pessoa mudou", () => {
+  it("mudar a cadência e salvar não devolve o valor antigo", async () => {
+    // `recarregar` roda depois de TODA ação desta tela, e trazia o valor do
+    // servidor por cima do campo. Quem mudasse 5 → 9 e clicasse em salvar via
+    // o 5 voltar, sem erro nenhum — e concluía que o botão não funciona.
+    (apiPdca.salvarConfig as Mock).mockResolvedValue({ cadenciaUsos: 9, cadenciaFeedback: 3 });
+    montar();
+
+    const campo = await screen.findByLabelText("Cadência da entrevista (usos)");
+    fireEvent.change(campo, { target: { value: "9" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar cadência" }));
+
+    await waitFor(() => expect(apiPdca.salvarConfig).toHaveBeenCalledWith({ cadenciaUsos: 9, cadenciaFeedback: 3 }));
+    expect(screen.getByLabelText("Cadência da entrevista (usos)")).toHaveValue(9);
+  });
+});

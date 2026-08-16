@@ -68,7 +68,12 @@ export function PdcaTab({ config, timeAtivo, onAbrirArea, onFichaMudou }: PdcaTa
       // SPEC-50 — o outro documento que o ajuste alcança: os papéis da esteira.
       apiPipelineAgentes.obter().catch(() => null),
     ]);
-    setCadencia(cfg);
+    // §266 — mesma régua do `ProdutosTab`: o formulário é de quem digita. O
+    // `recarregar` roda depois de TODA ação desta tela (tratar feedback,
+    // aplicar ajuste), e sobrescrever aqui apagaria a cadência que a pessoa
+    // acabou de mudar por causa de um clique noutro canto da tela. Carrega uma
+    // vez; depois disso, quem manda é o formulário.
+    setCadencia((atual) => atual ?? cfg);
     setFeedbacks(fbs);
     setAjustes(ajs);
     setRegras(regs);

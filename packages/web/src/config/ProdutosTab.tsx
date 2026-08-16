@@ -57,6 +57,39 @@ const SECOES: { chave: keyof Pick<Produto, "objetivo" | "quemUsa" | "regrasDeNeg
   },
 ];
 
+/**
+ * §266 — a releitura NÃO apaga o que a pessoa está digitando.
+ *
+ * ## O defeito
+ *
+ * `recarregar()` roda depois de toda gravação e trocava o rascunho pelo que
+ * voltou do servidor. Quem digitasse entre o clique em Salvar e a resposta
+ * perdia o texto — sem erro, sem aviso, e com "salvo" na tela. Achado enquanto
+ * eu caçava outra coisa no §262, e anotado lá porque o conserto óbvio não
+ * servia.
+ *
+ * ## Por que o conserto óbvio não servia
+ *
+ * "Não substituir quando o id é o mesmo" **quebra o glossário**: o termo novo
+ * aparece justamente porque a releitura traz a lista do servidor. Guardar o
+ * rascunho inteiro salvaria o texto e congelaria a lista.
+ *
+ * ## A régua
+ *
+ * > O que a PESSOA digita é dela; o que só o SERVIDOR sabe é dele.
+ *
+ * Texto (nome e as cinco seções) vem do rascunho; coleções (glossário, times)
+ * vêm da resposta. Trocar de produto continua substituindo tudo — aí a pessoa
+ * pediu outro produto, e manter o texto do anterior seria pior que o defeito
+ * original.
+ */
+function reconciliar(atual: Produto | null, doServidor: Produto | null): Produto | null {
+  if (!doServidor) return null;
+  // Produto diferente: é uma TROCA, e a pessoa pediu por ela.
+  if (!atual || atual.id !== doServidor.id) return doServidor;
+  return { ...atual, glossario: doServidor.glossario, timeIds: doServidor.timeIds };
+}
+
 export function ProdutosTab({ timeIds, demonstracao }: ProdutosTabProps) {
   const [produtos, setProdutos] = useState<Produto[] | null>(null);
   const [selecionadoId, setSelecionadoId] = useState<string | null>(null);
@@ -76,7 +109,9 @@ export function ProdutosTab({ timeIds, demonstracao }: ProdutosTabProps) {
       const alvo = idParaSelecionar ?? selecionadoId;
       const escolhido = lista.find((p) => p.id === alvo) ?? lista[0] ?? null;
       setSelecionadoId(escolhido?.id ?? null);
-      setRascunho(escolhido ?? null);
+      // §266 — reconcilia em vez de substituir: o texto é de quem digita, as
+      // coleções são de quem as guarda. Ver `reconciliar`.
+      setRascunho((atual) => reconciliar(atual, escolhido));
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
     }
