@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Necessidade } from "@gerador/engine";
 import { analisarLacunas, necessidadeConta } from "@gerador/engine";
+import { Delta } from "../summary/Delta";
 
 export interface ElementoVinculavel {
   id: string;
@@ -109,28 +110,24 @@ export function NecessidadesPanel({
         </div>
       )}
 
-      {/* O delta: o efeito de aceitar, ANTES de aceitar. */}
+      {/* O delta: o efeito de aceitar, ANTES de aceitar.
+          §263 — passou a usar o `Delta` compartilhado. Era a caixa original, e
+          agora é uma das três: decisão e caminho ganharam a mesma. Manter três
+          cópias parecidas garantiria divergirem na terceira mudança. */}
       {pendentes.length > 0 && (
-        <div
+        <Delta
           data-testid="delta-da-proposta"
-          style={{
-            border: "1px solid var(--borda-forte)",
-            borderRadius: 8,
-            padding: "8px 10px",
-            marginBottom: 10,
-            fontSize: 12,
-            background: "var(--fundo)",
+          titulo={`${pendentes.length} sugerida(s), ainda sem efeito`}
+          remedicao={{
+            linhas: [{ rotulo: "Se aceitar tudo: lacunas", antes: lacunasAgora, depois: lacunasSeAceitar }],
+            alerta:
+              lacunasSeAceitar > lacunasAgora ? "Cuidado: aceitar propósito sem componente cria trabalho." : undefined,
           }}
         >
-          <strong style={{ fontSize: 12 }}>{pendentes.length} sugerida(s), ainda sem efeito</strong>
-          <div style={{ marginTop: 4, color: "var(--texto-fraco)" }}>
-            Se aceitar tudo: lacunas {lacunasAgora} → <strong>{lacunasSeAceitar}</strong>
-            {lacunasSeAceitar > lacunasAgora && " — aceitar propósito sem componente cria trabalho"}
-          </div>
           <button onClick={confirmarTodas} style={{ ...botaoEstilo, marginTop: 6 }}>
             Confirmar todas
           </button>
-        </div>
+        </Delta>
       )}
 
       <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>

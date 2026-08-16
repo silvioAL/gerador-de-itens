@@ -150,6 +150,9 @@ export function PropertiesPanel({
               que alguém pergunta "por que este nó é assim?". */}
           <DecisoesDoNo
             noId={no.id}
+            // §263 — o desenho, para a remedição medir sobre ele. Vem do
+            // `quebraState` que o painel já tem: nada novo atravessa o App.
+            diagrama={quebraState.diagrama}
             decisoes={decisoes ?? []}
             autor={autor ?? "—"}
             onRegistrar={onRegistrarDecisao}

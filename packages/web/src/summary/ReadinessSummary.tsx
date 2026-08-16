@@ -6,6 +6,7 @@ import {
   avaliarConformidade,
   avaliarPercursos,
   conciliarPercursos,
+  deltaDePercurso,
   inferirPercursos,
   resumirDecisoes,
   violacoesEmAberto,
@@ -138,6 +139,12 @@ export function ReadinessSummary({
           naoMedidos={naoMedidos}
           truncado={inferidos.truncado}
           onSelecionarNo={onSelecionar}
+          // §263 — o preço de confirmar. Tudo o que o motor precisa já está
+          // aqui (desenho, config, regras, exceções), então a medição não pede
+          // nenhuma prop nova: ela é a mesma derivação, rodada duas vezes.
+          remedirConfirmacao={(id) =>
+            deltaDePercurso(diagrama, config, [...percursosVivos, ...obsoletos], id, { regras, excecoes })
+          }
           // Confirmar guarda o caminho; descartar o tira da lista até o desenho
           // mudar de novo — dizer "não é caminho" não pode virar uma briga com
           // o inferidor a cada render, então o descarte grava a recusa.

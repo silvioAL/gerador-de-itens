@@ -271,6 +271,10 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await expect(listaPercurso).toContainText("srv-catalogo → produtos");
   // A regra 2 dita na tela, não só no código.
   await expect(listaPercurso).toContainText("Nada é medido antes de você confirmar");
+  // §263 — e o PREÇO de confirmar, na mesma lista. Confirmar um caminho é o
+  // que faz a régua valer sobre ele, e régua valendo vira item (§249): sem
+  // este número, o custo só apareceria depois, no backlog.
+  await expect(listaPercurso.getByTestId(/^delta-percurso-/).first()).toContainText("itens no backlog");
   await chipPercurso.click();
 
   // §246 — a fatia C na demonstração: o 🧭 com uma decisão aceita (com a
@@ -290,7 +294,13 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await expect(page.getByTestId("pedir-decisao-ao-agente")).toBeVisible();
   // O painel mostra a proposta pendente do agente junto do botão: é o "antes e
   // depois" na mesma tela.
-  await expect(page.locator("aside").getByTestId("decisao-proposta")).toBeVisible();
+  const propostaNoPainel = page.locator("aside").getByTestId("decisao-proposta");
+  await expect(propostaNoPainel).toBeVisible();
+  // §263 — a remedição: o aceite diz o que vai mover no placar ANTES de mover.
+  // Cobrar o CONTEÚDO e não a caixa (§234): "delta visível" passaria com a
+  // caixa vazia, que é justamente o estado que não pode existir.
+  await expect(propostaNoPainel.getByTestId(/^delta-decisao-/)).toContainText("propostas esperando 1 → 0");
+  await expect(propostaNoPainel.getByTestId(/^delta-decisao-/)).toContainText("decisões vigentes");
 
   await irAtePasso(page, "Proveniência");
   // A janela flutuante FECHA: sem isso ela cobre o painel que o passo mostra.

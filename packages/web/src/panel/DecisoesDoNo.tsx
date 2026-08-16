@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { decisoesDoElemento, propostasPendentes, type Alternativa, type Decisao } from "@gerador/engine";
+import { decisoesDoElemento, deltaDeDecisao, propostasPendentes, type Alternativa, type Decisao, type Diagrama } from "@gerador/engine";
+import { Delta } from "../summary/Delta";
 
 /**
  * SPEC-57 fatia C (M5 caso 2) — a ESCOLHA ENTRE ALTERNATIVAS, no lugar onde ela
@@ -17,6 +18,10 @@ import { decisoesDoElemento, propostasPendentes, type Alternativa, type Decisao 
 export interface DecisoesDoNoProps {
   noId: string;
   decisoes: Decisao[];
+  /** SPEC-60 fatia A — o desenho, porque a remedição precisa medir sobre ele
+   * (uma decisão órfã só é órfã em relação a um diagrama). Ausente = sem delta:
+   * é o caso do teste de unidade que só olha o formulário. */
+  diagrama?: Diagrama;
   autor: string;
   onRegistrar: (decisao: Decisao) => void;
   onAceitar: (id: string) => void;
@@ -31,9 +36,52 @@ export interface DecisoesDoNoProps {
   ehDeDemonstracao?: (id: string) => boolean;
 }
 
+/**
+ * §263 — o aceite, com o delta em volta QUANDO há delta.
+ *
+ * A garantia que este componente carrega é a que eu quebrei ao escrever a
+ * primeira versão: **o botão de aceitar não depende da medição**. `Delta` não
+ * renderiza caixa vazia (de propósito), e enfiar o botão dentro dele fez o
+ * aceite sumir onde não havia diagrama para medir — uma feature nova apagando
+ * uma antiga, que é o pior tipo de regressão porque parece configuração.
+ */
+function AceiteComDelta({
+  decisao,
+  decisoes,
+  diagrama,
+  onAceitar,
+}: {
+  decisao: Decisao;
+  decisoes: Decisao[];
+  diagrama?: Diagrama;
+  /** Ausente = demonstração: mede e mostra, mas não oferece o aceite (§253). */
+  onAceitar?: () => void;
+}) {
+  const remedicao = diagrama ? deltaDeDecisao(diagrama, decisoes, decisao.id) : { linhas: [] };
+  const botao = onAceitar ? (
+    <button
+      style={{ ...botaoPrimarioEstilo, marginTop: remedicao.linhas.length > 0 ? 6 : undefined }}
+      onClick={onAceitar}
+      data-testid={`aceitar-${decisao.id}`}
+    >
+      aceitar esta decisão
+    </button>
+  ) : null;
+
+  if (remedicao.linhas.length === 0) return botao;
+  // Dentro da caixa: ler o efeito num canto e agir noutro é o que produz o
+  // clique sem leitura.
+  return (
+    <Delta data-testid={`delta-decisao-${decisao.id}`} titulo="Se aceitar esta decisão" remedicao={remedicao}>
+      {botao}
+    </Delta>
+  );
+}
+
 export function DecisoesDoNo({
   noId,
   decisoes,
+  diagrama,
   autor,
   onRegistrar,
   onAceitar,
@@ -72,14 +120,29 @@ export function DecisoesDoNo({
             // §235 — onde entra dado de demonstração, entra a marca. Faltava
             // nas decisões do tour, e a ausência dela é metade do porquê de
             // alguém tentar aceitar uma proposta que não é sua.
-            <p data-testid="decisao-de-demonstracao" style={{ fontSize: 11, color: "var(--texto-fraco)", fontStyle: "italic", margin: "6px 0 0" }}>
-              Exemplo da demonstração — o aceite vale nas suas decisões, não nesta.
-            </p>
+            <>
+              <p data-testid="decisao-de-demonstracao" style={{ fontSize: 11, color: "var(--texto-fraco)", fontStyle: "italic", margin: "6px 0 0" }}>
+                Exemplo da demonstração — o aceite vale nas suas decisões, não nesta.
+              </p>
+              {/* §263 — o delta APARECE na demonstração, sem o botão.
+                  O §253 tirou o aceite daqui porque ele gravaria numa quebra
+                  que não é a sua; a medição não grava nada, e escondê-la faria
+                  o tour não mostrar a capacidade — que é o mesmo que ela não
+                  existir (§244). Os números são reais: medem as decisões da
+                  demonstração contra o desenho da demonstração. */}
+              <AceiteComDelta decisao={d} decisoes={decisoes} diagrama={diagrama} />
+            </>
           ) : (
-            /* Regra 2: proposta não vale nada até alguém aceitar. */
-            <button style={botaoPrimarioEstilo} onClick={() => onAceitar(d.id)} data-testid={`aceitar-${d.id}`}>
-              aceitar esta decisão
-            </button>
+            /* Regra 2: proposta não vale nada até alguém aceitar.
+               §263 — e agora o aceite diz o que vai mudar antes de mudar. O
+               botão mora DENTRO da caixa do delta de propósito: ler o efeito
+               num canto e agir noutro é o que produz o clique sem leitura. */
+            <AceiteComDelta
+              decisao={d}
+              decisoes={decisoes}
+              diagrama={diagrama}
+              onAceitar={() => onAceitar(d.id)}
+            />
           )}
         </article>
       ))}
