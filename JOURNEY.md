@@ -7960,3 +7960,38 @@ consequências e a divisão motor × IA estejam ditas. E o teste da modal, que
 cobrava a frase antiga, apontou sozinho que ela tinha mudado de lugar.
 
 316 engine · 583 web · 63 aplicação · 222 server · 76/76 E2E · build limpo.
+
+---
+
+## §256 — o desenho escapou sozinho, e deixou o título para trás
+
+*"essa parte dá uma sensação de desalinhamento ou algo fora do lugar"*.
+
+O §254 fez o diagrama sair da coluna de leitura — necessário, porque 46rem é a
+régua do texto e nela o gerador do diagrama empilhava o cabeçalho e cortava o
+botão. **Mas ele saiu sozinho.** O título "O desenho" ficou na coluna e o
+conteúdo que ele rotula começava ~280 pixels à esquerda dele. Largura
+resolvida, alinhamento quebrado — e o resultado lê como um bloco que caiu fora
+da folha.
+
+A correção é que **título e conteúdo saem juntos**, compartilhando a borda
+esquerda. Com isso a largura maior deixa de parecer acidente e passa a ler como
+figura deliberada — reforçada por fundo e respiro próprios, que anunciam "isto
+é uma faixa, não um parágrafo que vazou".
+
+Na impressão a faixa volta à largura da página e perde o fundo: lá não há
+viewport de onde escapar, e a moldura só gastaria tinta.
+
+**A régua que fica, e ela é sobre correções em geral:** quando um elemento
+precisa quebrar a grade, ele quebra **com o rótulo dele**. Um pedaço fora da
+grade e outro dentro não é meio-conserto — é um desalinhamento novo, e foi
+exatamente o que a correção anterior produziu.
+
+**Mordida:** empurrar o título 300px para dentro → o E2E acusa
+`Expected: < 24 / Received: 300`, que é o número do print.
+
+O teste compara a coordenada `x` do título com a do diagrama. Só o navegador
+mede isso: em jsdom, o `margin-left: 50%` estaria escrito e nada saberia dizer
+onde as duas coisas foram parar.
+
+316 engine · 583 web · 63 aplicação · 222 server · 76/76 E2E · build limpo.

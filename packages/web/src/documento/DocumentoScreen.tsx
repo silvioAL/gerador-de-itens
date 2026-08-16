@@ -134,7 +134,16 @@ export function DocumentoScreen({
           </Secao>
         )}
 
-        <Secao titulo="O desenho">
+        {/* §256 — a faixa do DESENHO, e por que ela não é uma `<Secao>`.
+            O §254 fez o diagrama escapar da coluna de leitura (46rem é a régua
+            do texto, e nela o desenho quebrava). Mas escapou sozinho: o título
+            "O desenho" continuou na coluna, ~280px à direita do que ele rotula,
+            e o resultado parecia um bloco que caiu fora da folha.
+            Título e conteúdo saem JUNTOS, compartilhando a mesma borda
+            esquerda — aí a largura maior lê como figura deliberada, não como
+            desalinhamento. */}
+        <section style={faixaDoDesenhoEstilo}>
+          <h2 style={{ ...tituloSecaoEstilo, marginTop: 0 }}>O desenho</h2>
           {diagramaHtml ? (
             // iframe + srcDoc: reusa o gerador animado que já existe (SPEC-21)
             // sem dependência nova e sem o CSS do app vazar para dentro dele.
@@ -142,17 +151,8 @@ export function DocumentoScreen({
               data-testid="documento-diagrama"
               title="Diagrama da solução"
               srcDoc={diagramaHtml}
-              // §254 — o diagrama ESCAPA da coluna de leitura.
-              //
-              // A largura de ~46rem é a régua certa para TEXTO, e errada para
-              // um desenho: espremido nela, o gerador (SPEC-21) empilhava o
-              // cabeçalho numa coluna de três letras e cortava o botão
-              // "Reproduzir em sequência" na borda. Desenho não é parágrafo, e
-              // obrigá-lo à medida do parágrafo não deixa nada legível.
               style={{
-                width: "min(1100px, calc(100vw - 48px))",
-                marginLeft: "50%",
-                transform: "translateX(-50%)",
+                width: "100%",
                 height: 560,
                 border: "1px solid var(--borda)",
                 borderRadius: 12,
@@ -162,7 +162,7 @@ export function DocumentoScreen({
           ) : (
             <Vazio texto="Sem diagrama nesta demanda ainda." />
           )}
-        </Secao>
+        </section>
 
         <Secao titulo="Decisões">
           {documento.decisoes.length > 0 ? (
@@ -459,6 +459,21 @@ const folhaEstilo: React.CSSProperties = {
   color: "var(--texto)",
   lineHeight: 1.6,
   boxShadow: "0 10px 40px rgba(15,23,42,.20)",
+};
+
+/** A faixa larga do desenho: sai da coluna de leitura levando o título junto,
+ * e se anuncia como figura (fundo e respiro próprios) em vez de parecer um
+ * bloco solto. O teto de 1100px é o que o gerador do diagrama precisa para não
+ * empilhar o cabeçalho; abaixo disso ele volta a caber na tela, seja qual for. */
+const faixaDoDesenhoEstilo: React.CSSProperties = {
+  width: "min(1100px, calc(100vw - 48px))",
+  marginLeft: "50%",
+  transform: "translateX(-50%)",
+  marginTop: 36,
+  padding: "18px 20px 20px",
+  borderRadius: 16,
+  background: "var(--painel-2, rgba(148,163,184,.06))",
+  border: "1px solid var(--borda)",
 };
 
 const tituloSecaoEstilo: React.CSSProperties = {
