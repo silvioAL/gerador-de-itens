@@ -68,6 +68,14 @@ test("o contexto do produto entra no prompt da esteira, separado do contexto da 
     const texto = (await prompt.textContent()) ?? "";
     expect(texto.indexOf("Contexto do PRODUTO")).toBeLessThan(texto.indexOf("Contexto desta demanda"));
   } finally {
-    if (produtoId) await page.request.delete(`${API}/produtos/${produtoId}`);
+    // §262 — varrer por PREFIXO, e não só o id desta rodada. O nome carrega
+    // `Date.now()`: uma execução interrompida antes daqui deixa uma linha que
+    // nenhuma execução seguinte apaga, e produto é estado GLOBAL — o resíduo
+    // vira o primeiro item da lista de outro teste. Foi assim que o flake do
+    // `produto-contexto` nasceu.
+    const produtos = (await (await page.request.get(`${API}/produtos`)).json()) as { id: string; nome: string }[];
+    for (const p of produtos.filter((p) => p.nome.startsWith("Produto no prompt "))) {
+      await page.request.delete(`${API}/produtos/${p.id}`);
+    }
   }
 });

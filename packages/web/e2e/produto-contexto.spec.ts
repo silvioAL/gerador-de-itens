@@ -22,13 +22,33 @@ test("cadastrar produto com contexto e glossário, e ligar a demanda a ele", asy
   await entrar(page);
 
   const nome = `Portabilidade e2e ${Date.now()}`;
+  // §262 — um SEGUNDO produto, de propósito, criado antes de abrir a tela.
+  //
+  // Organização real tem vários produtos, e este teste vinha provando tudo num
+  // banco de um produto só — premissa que ele nunca declarou e que o resíduo de
+  // uma execução interrompida quebrava. O concorrente traz a situação real para
+  // dentro do teste em vez de deixá-la acontecer por acidente.
+  const CONCORRENTE = "Aaa concorrente e2e";
   try {
+    await page.request.post(`${API}/produtos`, { data: { nome: CONCORRENTE } });
     await page.getByRole("button", { name: "☰ Menu" }).click();
     await page.getByRole("button", { name: "Contexto do produto" }).click();
 
     await page.getByLabel("Nome do produto novo").fill(nome);
     await page.getByTestId("criar-produto").click();
+    // §262 — esperar pelo produto CERTO, não por "o editor está visível".
+    //
+    // Com outro produto no banco o editor já estava aberto (no primeiro da
+    // lista) quando se clicou em criar: a espera por visibilidade passava na
+    // hora, no editor ERRADO. O texto era digitado ali, e o recarregar do criar
+    // chegava depois e substituía o rascunho — a gravação ia vazia, com 200 e
+    // "salvo" na tela. Mesma classe do §250: afirmar sobre um estado que já era
+    // verdadeiro antes da ação não espera por nada.
+    //
+    // `exact` no rótulo porque "Nome do produto" também casa com "Nome do
+    // produto novo", o campo de criar — que o próprio criar acabou de limpar.
     await expect(page.getByTestId("editor-do-produto")).toBeVisible();
+    await expect(page.getByLabel("Nome do produto", { exact: true })).toHaveValue(nome);
 
     // As seções do contexto — o que vai junto com toda demanda deste produto.
     await page.getByLabel("O que é").fill("Levar a conta do cliente para outro banco.");
@@ -43,7 +63,13 @@ test("cadastrar produto com contexto e glossário, e ligar a demanda a ele", asy
     await expect(page.getByTestId("termo-do-glossario")).toContainText("A que venceu e não foi paga");
 
     // Sobrevive ao F5 — é banco, não estado de tela.
+    //
+    // §262 — abrir o produto pelo NOME depois do F5. A tela reabre no primeiro
+    // da lista quando não sabe qual estava aberto, então afirmar direto sobre o
+    // campo lia outro produto: vazio, ficava vermelho; com o mesmo texto de uma
+    // execução anterior, ficava VERDE lendo a linha errada — o pior dos dois.
     await page.reload();
+    await page.getByRole("button", { name: nome, exact: true }).click();
     await expect(page.getByLabel("O que é")).toHaveValue("Levar a conta do cliente para outro banco.");
 
     // E a DEMANDA aponta pro produto, pelo painel de contexto do épico.
@@ -68,8 +94,14 @@ test("cadastrar produto com contexto e glossário, e ligar a demanda a ele", asy
     const corpo = await (await salva).json();
     expect(corpo.produtoId).toBeTruthy();
   } finally {
+    // §262 — varre por PREFIXO, não por nome exato. O nome carrega `Date.now()`,
+    // então uma execução interrompida deixa para trás uma linha que nenhuma
+    // execução seguinte consegue apagar — foi assim que o resíduo que envenenou
+    // este teste chegou ao banco. Limpar só o que se criou nesta rodada é
+    // limpeza que não limpa.
     const produtos = (await (await page.request.get(`${API}/produtos`)).json()) as { id: string; nome: string }[];
-    for (const p of produtos.filter((p) => p.nome === nome)) {
+    const meus = produtos.filter((p) => p.nome.startsWith("Portabilidade e2e ") || p.nome === CONCORRENTE);
+    for (const p of meus) {
       await page.request.delete(`${API}/produtos/${p.id}`);
     }
   }
