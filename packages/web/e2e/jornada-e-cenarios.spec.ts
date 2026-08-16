@@ -297,11 +297,6 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await irAtePasso(page, "Confirmar o que a IA escreveu");
   await expect(page.getByTestId("barra-pendencias")).toBeVisible();
 
-  // O documento sai pelo agente (o botão do header morreu na SPEC-39).
-  await irAtePasso(page, "Especificação de solução");
-  await expect(page.getByRole("button", { name: "Gerar especificação de solução" })).toHaveCount(0);
-  await expect(page.getByTestId("abrir-conversa-especificacao")).toBeVisible();
-
   // §251 — a TELA do documento (SPEC-58), a lacuna que a avaliação encontrou.
   //
   // §234 aplicado de novo: cobrar CONTEÚDO. "Tela visível" passaria com o

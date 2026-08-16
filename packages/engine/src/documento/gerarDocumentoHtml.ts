@@ -112,10 +112,16 @@ export function gerarDocumentoHtml(doc: DocumentoDeDesenho, opcoes: OpcoesDocume
     color: var(--texto); background: var(--painel-2);
     line-height: 1.6;
   }
-  /* Largura de leitura contida: documento largura-de-tela ninguém lê até o fim. */
-  .folha { max-width: 46rem; margin: 0 auto; background: var(--painel);
+  /* §257 — a folha é a PÁGINA; o TEXTO é que se limita à largura de leitura
+     (ver a regra .folha > * abaixo). Antes a folha media 46rem e o desenho escapava
+     dela por margem negativa, pintando por cima da borda do cartão. */
+  .folha { max-width: min(1100px, calc(100vw - 48px)); margin: 0 auto; background: var(--painel);
     border: 1px solid var(--borda); border-radius: 16px; padding: 40px 44px;
     box-shadow: 0 10px 40px rgba(15,23,42,.06); }
+  /* Tudo é coluna de leitura, MENOS a faixa do desenho — que é figura, e
+     figura não obedece a régua de ~72 caracteres. */
+  .folha > * { max-width: 46rem; margin-left: auto; margin-right: auto; }
+  .folha > .faixa-desenho { max-width: none; }
   h1 { font-size: 28px; line-height: 1.25; margin: 0 0 6px; letter-spacing: -.02em; }
   h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .08em;
     color: var(--texto-fraco); margin: 40px 0 12px; padding-bottom: 6px;
@@ -160,8 +166,7 @@ export function gerarDocumentoHtml(doc: DocumentoDeDesenho, opcoes: OpcoesDocume
      nela o diagrama empilha o cabeçalho e corta o botão de reproduzir.
      §256 — e escapa LEVANDO O TÍTULO JUNTO: sozinho, o rótulo ficava na coluna
      e o desenho ~280px à esquerda dele, o que lê como bloco fora do lugar. */
-  .faixa-desenho { width: min(1100px, calc(100vw - 48px)); margin: 36px 0 0 50%;
-    transform: translateX(-50%); padding: 18px 20px 20px; border-radius: 16px;
+  .faixa-desenho { width: 100%; margin: 36px 0 0; padding: 18px 20px 20px; border-radius: 16px;
     background: var(--painel-2); border: 1px solid var(--borda); }
   .faixa-desenho h2 { margin-top: 0; }
   .desenho { width: 100%; height: 560px; border: 1px solid var(--borda);
@@ -174,8 +179,8 @@ export function gerarDocumentoHtml(doc: DocumentoDeDesenho, opcoes: OpcoesDocume
     h2 { break-after: avoid; }
     .decisao, .item, .conf { break-inside: avoid; }
     /* Na impressão não há viewport para escapar: volta à largura da página. */
-    .faixa-desenho { width: 100%; margin-left: 0; transform: none; padding: 0;
-      border: none; background: none; }
+    .folha > * { max-width: none; }
+    .faixa-desenho { padding: 0; border: none; background: none; }
     .desenho { height: 420px; }
   }
 </style>
