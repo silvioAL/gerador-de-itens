@@ -18,6 +18,8 @@ export interface ItensScreenProps {
   onFechar: () => void;
   /** Regenerar = voltar pra revisão, onde o material mora. */
   onIrParaRevisao?: () => void;
+  /** §269 — a outra saída da mesma demanda. Ausente = o botão não aparece. */
+  onDocumento?: () => void;
   /** SPEC-44 — deep-link: abre a revisão JÁ no item deste card. */
   onRevisarItem?: (chave: string) => void;
   /** SPEC-49 — manda os itens PRONTOS pro tracker (via agente configurado).
@@ -50,6 +52,7 @@ export function ItensScreen({
   onAbrirMenu,
   onFechar,
   onIrParaRevisao,
+  onDocumento,
   onRevisarItem,
   onExportar,
   destinoDaExportacao,
@@ -76,6 +79,13 @@ export function ItensScreen({
           {tituloDaQuebra ? `Demanda: ${tituloDaQuebra}` : "O texto final de cada item da demanda"}
         </span>
         <div style={{ flex: 1 }} />
+        {/* §269 — as duas saídas da mesma demanda, uma ao lado da outra: o que
+            fazer (aqui) e por quê (lá). Estavam separadas por um menu. */}
+        {onDocumento && (
+          <button onClick={onDocumento} style={botaoEstilo} data-testid="ir-ao-documento">
+            Ver o documento →
+          </button>
+        )}
         <button onClick={onFechar} style={{ ...botaoEstilo, ...botaoPrimarioEstilo }}>
           Voltar à mesa de projeto
         </button>

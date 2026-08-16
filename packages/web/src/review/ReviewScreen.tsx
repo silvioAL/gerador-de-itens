@@ -91,6 +91,9 @@ export interface ReviewScreenProps {
   /** SPEC-44 — deep-link da tela de itens: seleciona este item ao abrir. */
   itemInicial?: string | null;
   onFechar: () => void;
+  /** §269 — leva ao documento de desenho. Ausente = o botão não aparece (é o
+   * caso do teste de unidade e de quem abre a revisão sem o App em volta). */
+  onDocumento?: () => void;
   /** SPEC-37 F3 (M4) — abre Configurações na aba Modelo de IA por cima da revisão. */
   onConfigurarModeloIa?: () => void;
   /** §184 — o markdown gerado sobe pro App, que o salva NA QUEBRA. */
@@ -283,6 +286,7 @@ export function ReviewScreen({
   onResponderItem,
   itemInicial,
   onFechar,
+  onDocumento,
   onConfigurarModeloIa,
   onEspecificacaoGerada,
   onItensGerados,
@@ -896,6 +900,15 @@ export function ReviewScreen({
               geração é ação do agente (chip do M7 quando tudo refinado; M12
               nos demais casos). O contêiner fica pro spotlight do tour. */}
         </div>
+        {/* §269 — a saída que faltava no FLUXO. O documento só era alcançável
+            pelo ☰ Menu: quem seguia desenhar → derivar → revisar nunca passava
+            por ele, e uma tela que só existe no menu é uma tela que a maioria
+            nunca abre. Aqui é o lugar: acabou de revisar, é o que se mostra. */}
+        {onDocumento && (
+          <button onClick={onDocumento} style={botaoEstilo} data-testid="ir-ao-documento">
+            Ver o documento →
+          </button>
+        )}
         <button onClick={onFechar} style={botaoEstilo}>
           Voltar à mesa de projeto
         </button>

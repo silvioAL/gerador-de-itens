@@ -8695,3 +8695,55 @@ O tour abria e fechava a janela do assistente **por dentro** e nunca apontou o
 chamar o agente de novo — e o botão é a resposta. Ganhou passo próprio.
 
 346 engine · 643 web · 78 aplicação · 229 server · 79/79 E2E · build limpo.
+
+## §269 — o documento fora do fluxo, e um HTML que era a própria tela
+
+*"seguindo o fluxo de preenchimento não consigo chegar nesse passo, também não
+vejo necessidade do html já que temos tudo aqui, avalie a coesão"*.
+
+### Uma tela que só o menu alcançava
+
+O fluxo é desenhar → derivar → **revisar** → confirmar → **itens escritos**. O
+documento não estava em lugar nenhum dele: só no ☰ Menu. E tela que só o menu
+alcança é tela que a maioria nunca abre — o tour a mostrava no passo 19, o que
+tornava a lacuna invisível para mim e óbvia para quem usa.
+
+Agora as duas telas que TERMINAM o fluxo levam a ele. Na revisão porque é onde a
+pergunta "e o porquê disso tudo?" aparece; nos itens porque são as duas saídas
+da mesma demanda — o que fazer e por quê — e estavam separadas por um menu.
+
+### O HTML era uma segunda renderização do mesmo documento
+
+Ele nasceu antes da tela existir (SPEC-58 fatia 5), quando "o documento" era um
+arquivo. Com a tela de pé virou o que o usuário nomeou: a mesma coisa, de novo,
+mantida à parte e livre para divergir. **282 linhas de gerador e 115 de teste
+foram embora.**
+
+O markdown fica, e a diferença é de destino, não de formato: ele vai para
+Confluence, Jira, repositório — lugares que a tela não alcança. O HTML ia para
+"abrir no navegador", que é exatamente o que a tela é.
+
+E há um ganho de coesão junto: o bloco do desenho tem clique em nó e
+"reproduzir em sequência". Isso nunca funcionou de verdade num arquivo baixado.
+Com uma saída só, o que a tela oferece de melhor deixa de competir com uma
+cópia pior de si mesma.
+
+### A coesão, avaliada
+
+O que ficou **certo** e não vou mexer: a ordem das seções conta uma história
+(contexto → o que precisa ser verdade → o desenho → decisões → o que foi
+conferido → trade-offs → riscos → os itens). Ela vai do porquê ao que fazer, e
+termina no trabalho — que é a conclusão, não o assunto.
+
+O que ficou **anotado**, e não entrou porque é decisão de produto e não
+conserto:
+
+- **a faixa de saúde mistura problema e inventário.** "1 necessidade sem
+  componente" e "1 fora do padrão" cobram ação; "1 decisão(ões)" é contagem. Os
+  três chips têm o mesmo peso visual e só a cor os separa;
+- **o bloco do desenho é interativo dentro de um documento.** É a melhor parte
+  da tela e é também a única que não sobrevive a um print ou a um copiar-colar.
+  Hoje isso é aceitável porque a tela é o veículo; se um dia o documento
+  precisar circular fora dela, essa é a costura que vai doer.
+
+335 engine · 645 web · 78 aplicação · 229 server · 79/79 E2E · build limpo.

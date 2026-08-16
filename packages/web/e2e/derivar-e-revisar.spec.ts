@@ -61,6 +61,14 @@ test("derivar quebra abre a revisão com a atividade esperada e exporta", async 
 
   await expect(page.getByTestId("contagem-itens")).toHaveText("1 itens");
 
+  // §269 — o documento ALCANÇÁVEL pelo fluxo. Ele só existia atrás do ☰ Menu:
+  // quem seguia desenhar → derivar → revisar nunca passava por ele, e tela que
+  // só o menu alcança é tela que a maioria nunca abre. Aqui, logo depois de
+  // revisar, é onde a pergunta "e o porquê disso tudo?" aparece.
+  await page.getByTestId("ir-ao-documento").click();
+  await expect(page.getByTestId("documento-screen")).toBeVisible();
+  await page.getByRole("button", { name: "← Voltar à mesa de projeto" }).click();
+
   // SPEC-37 M4 — este spec declara "sem gateway" no /ia/status: o balão mais
   // bloqueante da revisão aparece, com o chip da aba certa.
   await expect(page.getByTestId("balao-sem-ia")).toContainText("sem credencial de gateway");
