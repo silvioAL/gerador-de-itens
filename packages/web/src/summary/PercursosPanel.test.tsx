@@ -144,3 +144,23 @@ describe("PercursosPanel — o delta da confirmação", () => {
     expect(screen.queryByTestId("delta-percurso-pc::a>b")).toBeNull();
   });
 });
+
+/**
+ * §275 — o texto que supunha vocabulário que ninguém deu.
+ */
+describe("PercursosPanel — o que é 'caminho'", () => {
+  it("define o termo antes de usá-lo", () => {
+    // Relato do usuário: "que motor? o que significa caminho? fluxo
+    // informacional? ciclomático?". Nomear a coisa custa uma linha e economiza
+    // a pergunta — e quem lê no meio do trabalho não vai atrás do glossário.
+    montar({ percursos: [percurso({ id: "pc::n1>n2" })] });
+    fireEvent.click(screen.getByTestId("percursos-resumo"));
+
+    const lista = screen.getByTestId("percursos-lista").textContent ?? "";
+    expect(lista).toContain("sequência de componentes por onde uma requisição passa");
+    // E diz de onde vieram, sem a palavra "motor" solta: quem não leu a
+    // jornada não sabe o que ela nomeia.
+    expect(lista).toContain("lidos do seu desenho");
+    expect(lista).toContain("sem IA");
+  });
+});

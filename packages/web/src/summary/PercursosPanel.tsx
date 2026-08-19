@@ -67,7 +67,7 @@ export function PercursosPanel({
       <button
         data-testid="percursos-resumo"
         onClick={() => setAberto((a) => !a)}
-        title="Os caminhos que uma requisição faz pelo desenho, e as réguas que valem sobre eles"
+        title="Caminho = a sequência de componentes por onde uma requisição passa. Aqui ficam os que o desenho sugere e as réguas de tempo/saltos que valem sobre eles."
         style={{
           ...botaoEstilo,
           borderColor: cobra > 0 ? "var(--amarelo)" : "var(--borda-forte)",
@@ -120,7 +120,15 @@ export function PercursosPanel({
           {aConfirmar.length > 0 && (
             <div style={{ ...linhaEstilo, borderBottom: "none" }}>
               <div style={{ fontSize: 11, color: "var(--texto-mudo)", marginBottom: 4 }}>
-                O motor leu estes caminhos no desenho. Nada é medido antes de você confirmar — inferir é grátis e erra.
+                {/* §275 — o texto dizia "o motor leu estes caminhos" e supunha
+                    que a pessoa soubesse o que é "motor" e o que é "caminho".
+                    Relato do usuário: "que motor? o que significa caminho?
+                    fluxo informacional? ciclomático?". Nomear a coisa pelo que
+                    ela é custa uma linha e economiza a pergunta. */}
+                <strong>Caminho</strong> = a sequência de componentes por onde uma requisição passa, de ponta a ponta
+                (aqui: {aConfirmar[0]?.rotulo}). Estes foram <strong>lidos do seu desenho</strong> seguindo as setas —
+                cálculo, sem IA. Confirmar é dizer “este trajeto existe de verdade”; só depois disso as réguas de tempo
+                e de número de saltos passam a valer sobre ele.
               </div>
               {aConfirmar.map((p) => (
                 <div key={p.id} data-testid="percurso-a-confirmar" style={{ padding: "3px 0" }}>
