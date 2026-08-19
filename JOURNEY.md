@@ -9041,3 +9041,49 @@ consertado em cinco linhas, com o raciocínio inteiro no comentário do próprio
 arquivo. Se a próxima mexida na CI for de estrutura, ela ganha a SPEC.
 
 335 engine · 653 web · 84 aplicação · 233 server · 79/79 E2E · build limpo.
+
+## §276 — a caixa que não podia fazer nada, e o histórico que não vendia o ciclo
+
+*"por qual motivo aparece nenhum em 'vale só nos contextos deste componente
+(nenhum)'?"* e *"da forma que está como uma lista simples vai ficar ruim de ver
+ao longo do tempo, e também não vende bem o valor disso"*.
+
+### O "(nenhum)" é literal, e por isso mesmo era um defeito
+
+A caixa lista os contextos do tipo de componente escolhido. "Serviço" é **o
+único dos 16 tipos** que não declara contexto nenhum na configuração de
+diagrama (`contextos: []`) — então a frase estava certa e a opção, não: marcar
+a caixa restringiria o item a uma lista **vazia**, e lista vazia significa
+"vale sempre" pela régua do motor. Uma caixa marcada, com aparência de decisão,
+que não muda nada.
+
+Agora ela só aparece quando há contexto para restringir. Sem contexto, o lugar
+dela é ocupado por uma frase que diz o que vai acontecer (o item vale para toda
+a tecnologia) e onde se declara contexto.
+
+> Opção que não pode fazer nada não é opção: é ruído com cara de decisão.
+
+### O histórico contava linhas, não resultado
+
+*"O que disseram (0 sem tratar)"* seguido de cinco linhas iguais responde "o que
+foi dito" e não responde **o que isso mudou** — que é o único motivo de guardar
+o histórico de um ciclo de melhoria. E com cem linhas fica pior.
+
+O que entra em cima agora é o placar: **"4 de 5 viraram mudança na
+configuração"**, com o descarte dito como decisão (*"foram lidos e descartados —
+decidir não mudar também é decisão"*) e não como perda. A lista continua
+embaixo, recente primeiro, cortada em oito: o que aconteceu ontem explica o item
+de hoje, o de seis meses atrás é arqueologia — e arqueologia se pede.
+
+### O flake do `abas-de-configuracao` voltou, e agora tem endereço
+
+O §272 registrou a primeira ocorrência sem capturar o erro. Na segunda eu
+capturei: *"não achei `regras-grupo-Frontend`"*, com o snapshot mostrando o
+**canvas** — ou seja, o clique aconteceu antes de a navegação terminar, e o
+erro apontava para o grupo em vez de apontar para a navegação.
+
+Pus a espera pela tela antes do clique. **A causa raiz continua aberta** (por
+que a navegação demora só em suíte cheia?), e digo isso em vez de dar por
+resolvido: o que mudou é que a próxima falha vai dizer a verdade.
+
+335 engine · 655 web · 84 aplicação · 233 server · 79/79 E2E · build limpo.

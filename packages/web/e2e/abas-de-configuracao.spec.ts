@@ -61,6 +61,13 @@ test("Regras: criar um grupo pela tela (§165) e marcar contexto por clique — 
   try {
   await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: /Regras de refinamento/ }).click();
+  // §276 — esperar a TELA antes de clicar no que mora nela. Este spec falhou
+  // duas vezes em suíte cheia (§272 registrou a primeira) com "não achei
+  // regras-grupo-Frontend", e o snapshot mostrava o CANVAS: o clique tinha
+  // acontecido antes de a navegação concluir, então o erro apontava para o
+  // grupo em vez de apontar para a navegação. A causa raiz continua aberta —
+  // isto ao menos faz a próxima falha dizer a verdade.
+  await expect(page.getByTestId("novo-grupo-Frontend")).toBeVisible();
 
   // §165 — a instalação limpa nasce sem grupo nenhum; o clique cria.
   await page.getByTestId("novo-grupo-Frontend").click();

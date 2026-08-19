@@ -389,3 +389,47 @@ describe("PdcaTab — a releitura não apaga a cadência que a pessoa mudou", ()
     expect(screen.getByLabelText("Cadência da entrevista (usos)")).toHaveValue(9);
   });
 });
+
+/**
+ * §276 — o histórico do ciclo, e a caixa que não podia fazer nada.
+ */
+describe("PdcaTab — o histórico conta o que o ciclo produziu", () => {
+  function feedbackTratado(i: number, estado: "virou-ajuste" | "descartado") {
+    return {
+      id: `f${i}`,
+      email: "dev@empresa",
+      texto: `feedback ${i}`,
+      estado,
+      criadoEm: new Date(2026, 0, i + 1).toISOString(),
+      timeId: null,
+    };
+  }
+
+  it("o placar diz quantos viraram mudança — é o que justifica guardar isso", async () => {
+    // Como lista simples, o histórico piora com o tempo e não diz o que o ciclo
+    // produziu, que é o único motivo de existir.
+    (apiPdca.listarFeedback as Mock).mockResolvedValue([
+      feedbackTratado(1, "virou-ajuste"),
+      feedbackTratado(2, "virou-ajuste"),
+      feedbackTratado(3, "descartado"),
+    ]);
+    montar();
+
+    const placar = await screen.findByTestId("historico-do-ciclo");
+    expect(placar.textContent).toContain("2 de 3 viraram mudança");
+    expect(placar.textContent).toContain("1 foram lidos e descartados");
+  });
+
+  it("com muitos tratados, corta — e o resto se pede", async () => {
+    (apiPdca.listarFeedback as Mock).mockResolvedValue(
+      Array.from({ length: 12 }, (_, i) => feedbackTratado(i, "virou-ajuste"))
+    );
+    montar();
+
+    await screen.findByTestId("historico-do-ciclo");
+    expect(screen.getAllByTestId(/^tratado-/)).toHaveLength(8);
+
+    fireEvent.click(screen.getByTestId("ver-todo-o-historico"));
+    expect(screen.getAllByTestId(/^tratado-/)).toHaveLength(12);
+  });
+});
