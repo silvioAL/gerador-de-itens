@@ -8,9 +8,11 @@ vi.mock("../api/client", () => ({
     salvarConfig: vi.fn(),
     listarFeedback: vi.fn(),
     descartarFeedback: vi.fn(),
+    reabrirFeedback: vi.fn(),
     listarAjustes: vi.fn(),
     criarAjuste: vi.fn(),
     decidirAjuste: vi.fn(),
+    reconsiderarAjuste: vi.fn(),
     aplicarAjuste: vi.fn(),
   },
   apiRegras: { obter: vi.fn() },
@@ -170,6 +172,116 @@ describe("PdcaTab — a jornada do PDCA (SPEC-45)", () => {
     montar();
     fireEvent.click(await screen.findByTestId("descartar-f1"));
     await waitFor(() => expect(apiPdca.descartarFeedback).toHaveBeenCalledWith("f1"));
+  });
+});
+
+/**
+ * SPEC-62 — quem decide decidia no escuro, e o "não" era um beco.
+ *
+ * RELATO REAL: *"só aparece direto para aprovar antes de conseguir ver o pdca
+ * (não gerei nenhuma nova), e se rejeito simplesmente some para sempre"*.
+ */
+describe("PdcaTab — o card de quem DECIDE", () => {
+  function pendente(extra: Record<string, unknown> = {}) {
+    return {
+      id: "s9",
+      timeId: "time-pagamentos",
+      solicitante: "dev@empresa.com",
+      recurso: "regras",
+      descricao: "Adicionar DLQ ao checklist",
+      estado: "pendente",
+      operacao: { tipo: "adicionar-checklist", tech: "Backend", contextos: [], texto: "Política de DLQ monitorada" },
+      criadoEm: new Date("2026-08-12T10:00:00Z").toISOString(),
+      ...extra,
+    };
+  }
+
+  it("§278 — diz QUANDO foi pedido: um de três semanas atrás era idêntico a um de hoje", async () => {
+    (apiPdca.listarAjustes as Mock).mockResolvedValue([pendente()]);
+    montar();
+
+    const card = await screen.findByTestId("ajuste-s9");
+    expect(card.textContent).toContain("12/08/2026");
+  });
+
+  it("§278 — mostra DE ONDE veio: o feedback que gerou o pedido", async () => {
+    // O dado sempre existiu (`pdca_feedback.solicitacao_id`) e nunca chegava a
+    // quem decide.
+    (apiPdca.listarFeedback as Mock).mockResolvedValue([{ ...feedback, estado: "virou-ajuste", solicitacaoId: "s9" }]);
+    (apiPdca.listarAjustes as Mock).mockResolvedValue([pendente()]);
+    montar();
+
+    const origem = await screen.findByTestId("origem-s9");
+    expect(origem.textContent).toContain("faltou item de DLQ nas filas");
+  });
+
+  it("§278 — pedido escrito direto DIZ que não passou pelo ciclo", async () => {
+    // Não é defeito (a SPEC-51 cria pedido em texto), mas é confiança diferente.
+    (apiPdca.listarFeedback as Mock).mockResolvedValue([]);
+    (apiPdca.listarAjustes as Mock).mockResolvedValue([pendente()]);
+    montar();
+
+    expect((await screen.findByTestId("sem-origem-s9")).textContent).toContain("sem passar pelo ciclo");
+  });
+
+  it("§278 — mostra O EFEITO num item de exemplo, que só quem PROPÕE via", async () => {
+    (apiPdca.listarAjustes as Mock).mockResolvedValue([pendente()]);
+    montar();
+
+    fireEvent.click(await screen.findByTestId("ver-efeito-s9"));
+    expect(screen.getByTestId("efeito-s9").textContent).toContain("Política de DLQ monitorada");
+  });
+
+  it("§278 — pedido só em texto avisa que aprovar NÃO aplica nada", async () => {
+    // `POST /aplicar` recusa com "este pedido é só texto"; o botão prometia o
+    // fechamento do ciclo e entregava um bilhete.
+    (apiPdca.listarAjustes as Mock).mockResolvedValue([pendente({ operacao: null })]);
+    montar();
+
+    expect((await screen.findByTestId("so-texto-s9")).textContent).toContain("a mudança é à mão");
+  });
+
+  it("§278 — recusar pede o PORQUÊ, e o motivo vai junto na decisão", async () => {
+    (apiPdca.listarAjustes as Mock).mockResolvedValue([pendente()]);
+    (apiPdca.decidirAjuste as Mock).mockResolvedValue({ id: "s9", estado: "rejeitada" });
+    montar();
+
+    fireEvent.click(await screen.findByTestId("recusar-s9"));
+    fireEvent.change(screen.getByLabelText("Motivo da recusa"), {
+      target: { value: "já existe um item equivalente em observabilidade" },
+    });
+    fireEvent.click(screen.getByTestId("confirmar-recusa-s9"));
+
+    await waitFor(() =>
+      expect(apiPdca.decidirAjuste).toHaveBeenCalledWith("s9", false, "já existe um item equivalente em observabilidade")
+    );
+  });
+
+  it("§278 — o recusado tem volta, e o 'não' anterior continua à vista", async () => {
+    (apiPdca.listarAjustes as Mock).mockResolvedValue([
+      pendente({ estado: "rejeitada", decididoPor: "ana@empresa.com", motivoDaDecisao: "duplicado" }),
+    ]);
+    (apiPdca.reconsiderarAjuste as Mock).mockResolvedValue({ id: "s9", estado: "pendente" });
+    montar();
+
+    expect((await screen.findByTestId("motivo-s9")).textContent).toContain("duplicado");
+    fireEvent.click(screen.getByTestId("reconsiderar-s9"));
+    await waitFor(() => expect(apiPdca.reconsiderarAjuste).toHaveBeenCalledWith("s9"));
+  });
+
+  it("§278 — o invalidado também reconsidera: a mensagem manda reavaliar e não havia como", async () => {
+    (apiPdca.listarAjustes as Mock).mockResolvedValue([pendente({ estado: "invalida" })]);
+    montar();
+
+    expect(await screen.findByTestId("reconsiderar-s9")).toBeInTheDocument();
+  });
+
+  it("§278 — aprovada e aplicada não oferecem reconsiderar: não há o que desdizer", async () => {
+    (apiPdca.listarAjustes as Mock).mockResolvedValue([pendente({ estado: "aplicada", aplicadaPor: "ana" })]);
+    montar();
+
+    await screen.findByTestId("ajuste-s9");
+    expect(screen.queryByTestId("reconsiderar-s9")).toBeNull();
   });
 
   it("SPEC-46 — dá pra ajustar o checklist de PROCESSO, e a prévia mostra no item de exemplo", async () => {
@@ -394,30 +506,61 @@ describe("PdcaTab — a releitura não apaga a cadência que a pessoa mudou", ()
  * §276 — o histórico do ciclo, e a caixa que não podia fazer nada.
  */
 describe("PdcaTab — o histórico conta o que o ciclo produziu", () => {
-  function feedbackTratado(i: number, estado: "virou-ajuste" | "descartado") {
+  function feedbackTratado(i: number, estado: "virou-ajuste" | "descartado", solicitacaoId: string | null = null) {
     return {
       id: `f${i}`,
       email: "dev@empresa",
       texto: `feedback ${i}`,
       estado,
+      solicitacaoId,
       criadoEm: new Date(2026, 0, i + 1).toISOString(),
       timeId: null,
     };
   }
 
-  it("o placar diz quantos viraram mudança — é o que justifica guardar isso", async () => {
-    // Como lista simples, o histórico piora com o tempo e não diz o que o ciclo
-    // produziu, que é o único motivo de existir.
+  function pedido(id: string, estado: string) {
+    return {
+      id,
+      timeId: "time-pagamentos",
+      solicitante: "dev@empresa",
+      recurso: "regras",
+      descricao: `pedido ${id}`,
+      estado,
+      operacao: null,
+      criadoEm: new Date(2026, 0, 5).toISOString(),
+    };
+  }
+
+  /**
+   * SPEC-62 §4 — o placar contava `virou-ajuste` como "virou mudança", e um
+   * feedback cujo pedido foi RECUSADO entrava na conta. O placar nasceu para
+   * responder "o que isto mudou"; assim ele respondia o contrário.
+   */
+  it("§278 — só conta como mudança o que foi APLICADO; recusa conta como recusa", async () => {
     (apiPdca.listarFeedback as Mock).mockResolvedValue([
-      feedbackTratado(1, "virou-ajuste"),
-      feedbackTratado(2, "virou-ajuste"),
+      feedbackTratado(1, "virou-ajuste", "a1"),
+      feedbackTratado(2, "virou-ajuste", "a2"),
       feedbackTratado(3, "descartado"),
     ]);
+    (apiPdca.listarAjustes as Mock).mockResolvedValue([pedido("a1", "aplicada"), pedido("a2", "rejeitada")]);
     montar();
 
     const placar = await screen.findByTestId("historico-do-ciclo");
-    expect(placar.textContent).toContain("2 de 3 viraram mudança");
+    expect(placar.textContent).toContain("1 de 3 viraram mudança aplicada");
     expect(placar.textContent).toContain("1 foram lidos e descartados");
+    expect(placar.textContent).toContain("1 viraram pedido e foram recusados");
+  });
+
+  it("§278 — o feedback descartado tem caminho de volta", async () => {
+    // Ele sumia da tela (ia para dentro deste histórico fechado) e não voltava
+    // a "sem tratar": descarte silencioso ensina o time a parar de responder.
+    (apiPdca.listarFeedback as Mock).mockResolvedValue([feedbackTratado(3, "descartado")]);
+    (apiPdca.reabrirFeedback as Mock).mockResolvedValue({ id: "f3", estado: "novo" });
+    montar();
+
+    await screen.findByTestId("historico-do-ciclo");
+    fireEvent.click(screen.getByTestId("reabrir-f3"));
+    await waitFor(() => expect(apiPdca.reabrirFeedback).toHaveBeenCalledWith("f3"));
   });
 
   it("com muitos tratados, corta — e o resto se pede", async () => {

@@ -253,6 +253,13 @@
       "when": 1754500000021,
       "tag": "0035_rastro_da_esteira",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1754500000022,
+      "tag": "0036_o_nao_do_ciclo",
+      "breakpoints": true
     }
   ]
 }

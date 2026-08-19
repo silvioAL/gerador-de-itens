@@ -1,0 +1,13 @@
+-- SPEC-62 — o "não" do ciclo passa a dizer por quê.
+--
+-- Recusar uma solicitação gravava `estado: rejeitada`, `decididoPor` e
+-- `decididoEm` — quem, quando, e nunca por quê. O produto já sabe fazer melhor
+-- em todo o resto: a exceção de padrão carrega `motivo`, a decisão substituída
+-- guarda `substituidaPor`, a necessidade órfã continua aparecendo (§57). O ciclo
+-- de melhoria era o único lugar onde o "não" era mudo.
+--
+-- Uma coluna e não uma tabela de histórico de decisões: uma solicitação é
+-- decidida poucas vezes (recusada, reconsiderada, decidida de novo), e o que
+-- interessa a quem reabre é o ÚLTIMO motivo — o rastro completo já mora na
+-- auditoria, que registra cada decisão com autor e instante.
+ALTER TABLE "solicitacoes_ajuste" ADD COLUMN IF NOT EXISTS "motivo_da_decisao" text;

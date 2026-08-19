@@ -1490,6 +1490,163 @@ describe("SPEC-45 — a jornada do PDCA (feedback → ajuste → aplicado)", () 
     expect(r.json().estado).toBe("descartado");
   });
 
+  /**
+   * SPEC-62 — os dois "não" do ciclo tinham volta em lugar nenhum.
+   *
+   * RELATO REAL do usuário: *"se rejeito simplesmente some para sempre"*. O
+   * feedback descartado sumia da tela (ia para o histórico fechado) e a
+   * solicitação recusada devolvia 409 a qualquer nova decisão — nem pela API
+   * havia caminho de volta.
+   */
+  it("§278 — o feedback descartado REABRE; o que já virou ajuste, não", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const feedback = (
+      await app.inject({ method: "POST", url: "/pdca/feedback", cookies: { gerador_sessao: cookie }, payload: { texto: "pensando melhor, faz falta" } })
+    ).json();
+
+    await app.inject({ method: "POST", url: `/pdca/feedback/${feedback.id}/descartar`, cookies: { gerador_sessao: cookie } });
+    const reaberto = await app.inject({
+      method: "POST",
+      url: `/pdca/feedback/${feedback.id}/reabrir`,
+      cookies: { gerador_sessao: cookie },
+    });
+    expect(reaberto.statusCode).toBe(200);
+    expect(reaberto.json().estado).toBe("novo");
+
+    // Reabrir o que já virou solicitação criaria dois pedidos para a mesma frase.
+    const dobrado = await app.inject({
+      method: "POST",
+      url: `/pdca/feedback/${feedback.id}/reabrir`,
+      cookies: { gerador_sessao: cookie },
+    });
+    expect(dobrado.statusCode).toBe(409);
+  });
+
+  it("§278 — recusar GRAVA o motivo, e reconsiderar devolve a pendente sem apagar o 'não'", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const criada = (
+      await app.inject({
+        method: "POST",
+        url: "/ajustes",
+        cookies: { gerador_sessao: cookie },
+        payload: {
+          recurso: "regras",
+          descricao: "Adicionar DLQ ao checklist",
+          operacao: { tipo: "adicionar-checklist", tech: "java", contextos: [], texto: "DLQ monitorada" },
+        },
+      })
+    ).json();
+
+    const recusa = await app.inject({
+      method: "POST",
+      url: `/ajustes/${criada.id}/decidir`,
+      cookies: { gerador_sessao: cookie },
+      payload: { aprovar: false, motivo: "já existe um item equivalente em 'observabilidade'" },
+    });
+    expect(recusa.statusCode).toBe(200);
+    expect(recusa.json().estado).toBe("rejeitada");
+
+    const depoisDaRecusa = (await app.inject({ method: "GET", url: "/ajustes", cookies: { gerador_sessao: cookie } }))
+      .json()
+      .find((a: { id: string }) => a.id === criada.id);
+    expect(depoisDaRecusa.motivoDaDecisao).toContain("já existe um item equivalente");
+    expect(depoisDaRecusa.decididoPor).toBe(EMAIL_DEV);
+
+    const reconsiderada = await app.inject({
+      method: "POST",
+      url: `/ajustes/${criada.id}/reconsiderar`,
+      cookies: { gerador_sessao: cookie },
+    });
+    expect(reconsiderada.statusCode).toBe(200);
+    expect(reconsiderada.json().estado).toBe("pendente");
+
+    // O "não" anterior NÃO se apaga — mesma disciplina de `substituidaPor`
+    // (SPEC-57): quem apaga a decisão revista faz o time repetir o ciclo.
+    const voltou = (await app.inject({ method: "GET", url: "/ajustes", cookies: { gerador_sessao: cookie } }))
+      .json()
+      .find((a: { id: string }) => a.id === criada.id);
+    expect(voltou.estado).toBe("pendente");
+    expect(voltou.motivoDaDecisao).toContain("já existe um item equivalente");
+  });
+
+  it("§278 — só recusada ou invalidada reconsidera; pendente e aplicada, não", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const criada = (
+      await app.inject({
+        method: "POST",
+        url: "/ajustes",
+        cookies: { gerador_sessao: cookie },
+        payload: { recurso: "regras", descricao: "pedido só em texto" },
+      })
+    ).json();
+
+    const cedo = await app.inject({
+      method: "POST",
+      url: `/ajustes/${criada.id}/reconsiderar`,
+      cookies: { gerador_sessao: cookie },
+    });
+    expect(cedo.statusCode).toBe(409);
+    expect(cedo.json().erro).toMatch(/pendente/);
+  });
+
+  /**
+   * A mensagem do 409 de invalidação manda *"reavalie sobre o estado atual"* —
+   * e não havia como reavaliar. Reconsiderar retoma a versão-alvo de AGORA;
+   * sem isso o pedido voltaria a pendente só para invalidar de novo, para
+   * sempre.
+   */
+  it("§278 — pedido invalidado reconsidera e passa a valer sobre a config de agora", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    await app.inject({
+      method: "PUT",
+      url: "/config/regras",
+      cookies: { gerador_sessao: cookie },
+      payload: { documento: { porTech: { java: { checklistTecnico: [], testes: [] } } } },
+    });
+    const criada = (
+      await app.inject({
+        method: "POST",
+        url: "/ajustes",
+        cookies: { gerador_sessao: cookie },
+        payload: {
+          recurso: "regras",
+          descricao: "Adicionar item",
+          operacao: { tipo: "adicionar-checklist", tech: "java", contextos: [], texto: "item novo" },
+        },
+      })
+    ).json();
+
+    // A config muda entre o pedido e a decisão: aprovar invalida.
+    await app.inject({
+      method: "PUT",
+      url: "/config/regras",
+      cookies: { gerador_sessao: cookie },
+      payload: { documento: { porTech: { java: { checklistTecnico: [{ texto: "outro", contextos: [] }], testes: [] } } } },
+    });
+    const invalidada = await app.inject({
+      method: "POST",
+      url: `/ajustes/${criada.id}/decidir`,
+      cookies: { gerador_sessao: cookie },
+      payload: { aprovar: true },
+    });
+    expect(invalidada.statusCode).toBe(409);
+    expect(invalidada.json().estado).toBe("invalida");
+
+    expect(
+      (await app.inject({ method: "POST", url: `/ajustes/${criada.id}/reconsiderar`, cookies: { gerador_sessao: cookie } }))
+        .statusCode
+    ).toBe(200);
+    // E agora a aprovação passa: a validade foi retomada sobre o estado novo.
+    const aprovada = await app.inject({
+      method: "POST",
+      url: `/ajustes/${criada.id}/decidir`,
+      cookies: { gerador_sessao: cookie },
+      payload: { aprovar: true },
+    });
+    expect(aprovada.statusCode).toBe(200);
+    expect(aprovada.json().estado).toBe("aprovada");
+  });
+
   it("aprovada + aplicar MUDA o documento de regras de verdade — o Act que faltava", async () => {
     const cookie = await logarComo(EMAIL_DEV);
     // O documento precisa existir (a validade compara a versão dele).

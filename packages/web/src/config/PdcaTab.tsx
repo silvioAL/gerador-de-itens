@@ -121,10 +121,28 @@ export function PdcaTab({ config, timeAtivo, onAbrirArea, onFichaMudou }: PdcaTa
 
   const novos = feedbacks.filter((f) => f.estado === "novo");
   const tratados = feedbacks.filter((f) => f.estado !== "novo");
-  const viraramAjuste = tratados.filter((f) => f.estado === "virou-ajuste");
   const descartados = tratados.filter((f) => f.estado !== "virou-ajuste");
   const pendentes = ajustes.filter((a) => a.estado === "pendente");
   const decididos = ajustes.filter((a) => a.estado !== "pendente");
+
+  /**
+   * SPEC-62 §4 — o placar mentia. Ele contava `virou-ajuste` como *"viraram
+   * mudança na configuração"*, e um feedback cujo pedido foi RECUSADO entrava
+   * na conta. O placar do §276 nasceu para responder "o que isto mudou";
+   * contando recusa como mudança, respondia errado.
+   *
+   * "Virou mudança" passa a significar **solicitação aplicada**. O resto
+   * aparece pelo que é — cada estado é uma pergunta diferente para uma pessoa
+   * diferente, e somá-los é o que fazia a resposta ser falsa.
+   */
+  const estadoDoPedido = useMemo(() => new Map(ajustes.map((a) => [a.id, a.estado])), [ajustes]);
+  const estadoDaOrigem = (f: FeedbackPdca) => (f.solicitacaoId ? estadoDoPedido.get(f.solicitacaoId) : undefined);
+  const viraramMudanca = tratados.filter((f) => estadoDaOrigem(f) === "aplicada");
+  const emAndamento = tratados.filter((f) => {
+    const e = estadoDaOrigem(f);
+    return e === "pendente" || e === "aprovada";
+  });
+  const recusados = tratados.filter((f) => estadoDaOrigem(f) === "rejeitada" || estadoDaOrigem(f) === "invalida");
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
@@ -175,13 +193,18 @@ export function PdcaTab({ config, timeAtivo, onAbrirArea, onFichaMudou }: PdcaTa
         {tratados.length > 0 && (
           <div style={{ marginTop: 10 }} data-testid="historico-do-ciclo">
             <div style={placarEstilo}>
-              <strong style={{ fontSize: 13 }}>
-                {viraramAjuste.length} de {tratados.length} viraram mudança na configuração
+              <strong style={{ fontSize: 13 }} data-testid="placar-do-ciclo">
+                {viraramMudanca.length} de {tratados.length} viraram mudança aplicada na configuração
               </strong>
               <div style={{ fontSize: 11.5, color: "var(--texto-fraco)", marginTop: 2 }}>
                 {descartados.length > 0
                   ? `${descartados.length} foram lidos e descartados — decidir não mudar também é decisão.`
                   : "Nenhum feedback foi descartado até agora."}
+                {emAndamento.length > 0 && ` ${emAndamento.length} viraram pedido e ainda esperam decisão ou aplicação.`}
+                {/* Recusa contada como recusa. Ela entrava na conta de
+                    "virou mudança" e fazia o placar afirmar o contrário do que
+                    tinha acontecido. */}
+                {recusados.length > 0 && ` ${recusados.length} viraram pedido e foram recusados.`}
               </div>
             </div>
 
@@ -197,9 +220,22 @@ export function PdcaTab({ config, timeAtivo, onAbrirArea, onFichaMudou }: PdcaTa
                 .map((f) => (
                   <p key={f.id} style={{ ...metaEstilo, marginTop: 6 }} data-testid={`tratado-${f.id}`}>
                     <span style={{ color: f.estado === "virou-ajuste" ? "var(--verde)" : "var(--texto-mudo)" }}>
-                      {f.estado === "virou-ajuste" ? "→ virou mudança" : "· descartado"}
+                      {f.estado === "virou-ajuste" ? `→ virou pedido (${estadoDaOrigem(f) ?? "sem rastro"})` : "· descartado"}
                     </span>{" "}
                     “{f.texto}”
+                    {/* SPEC-62 §3 — descartar tinha volta em lugar nenhum: o
+                        feedback sumia da tela (para dentro deste histórico) e
+                        não voltava a "sem tratar". Descarte silencioso é o que
+                        ensina o time a parar de responder. */}
+                    {f.estado === "descartado" && (
+                      <button
+                        onClick={() => void executar(() => apiPdca.reabrirFeedback(f.id))}
+                        style={{ ...linkEstilo, marginLeft: 8 }}
+                        data-testid={`reabrir-${f.id}`}
+                      >
+                        reabrir
+                      </button>
+                    )}
                   </p>
                 ))}
               {!verTudoNoHistorico && tratados.length > TETO_DO_HISTORICO && (
@@ -237,54 +273,28 @@ export function PdcaTab({ config, timeAtivo, onAbrirArea, onFichaMudou }: PdcaTa
         <h3 style={tituloEstilo}>Solicitações de ajuste ({pendentes.length} aguardando decisão)</h3>
         {ajustes.length === 0 && <p style={vazioEstilo}>Nenhuma solicitação ainda.</p>}
         {[...pendentes, ...decididos].map((a) => (
-          <article key={a.id} style={cardEstilo} data-testid={`ajuste-${a.id}`}>
-            <p style={{ margin: 0, fontSize: 13 }}>{a.descricao}</p>
-            {a.operacao && <p style={{ ...metaEstilo, color: "var(--texto-2)" }}>{descreverOperacao(a.operacao)}</p>}
-            <p style={metaEstilo}>
-              {a.solicitante} · {a.recurso} · <strong>{a.estado}</strong>
-              {a.aplicadaPor ? ` · aplicada por ${a.aplicadaPor}` : ""}
-            </p>
-            <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-              {a.estado === "pendente" && (
-                <>
-                  <button
-                    onClick={() => void executar(() => apiPdca.decidirAjuste(a.id, true))}
-                    style={botaoPrimarioEstilo}
-                    data-testid={`aprovar-${a.id}`}
-                  >
-                    Aprovar
-                  </button>
-                  <button onClick={() => void executar(() => apiPdca.decidirAjuste(a.id, false))} style={botaoEstilo}>
-                    Recusar
-                  </button>
-                </>
-              )}
-              {a.estado === "aprovada" && a.operacao && (
-                <button
-                  onClick={() =>
-                    void executar(async () => {
-                      const resultado = await apiPdca.aplicarAjuste(a.id);
-                      // SPEC-52 — ajuste de ficha muda os campos que a app já
-                      // tem em memória: sem avisar, a pessoa aplica, volta ao
-                      // canvas e o campo aprovado não está lá.
-                      if (a.recurso === "campos-no" || a.recurso === "campos-aresta") onFichaMudou?.();
-                      return resultado;
-                    })
-                  }
-                  style={botaoPrimarioEstilo}
-                  data-testid={`aplicar-${a.id}`}
-                  title="Aplica a mudança no documento de configuração e fecha o ciclo"
-                >
-                  Aplicar agora
-                </button>
-              )}
-              {a.estado === "aprovada" && !a.operacao && onAbrirArea && AREA_DO_RECURSO[a.recurso] && (
-                <button onClick={() => onAbrirArea(AREA_DO_RECURSO[a.recurso])} style={botaoEstilo}>
-                  Abrir a configuração ↗
-                </button>
-              )}
-            </div>
-          </article>
+          <CartaoDeSolicitacao
+            key={a.id}
+            ajuste={a}
+            // SPEC-62 §2 — de onde o pedido veio. O dado sempre existiu
+            // (`pdca_feedback.solicitacao_id`) e nunca chegava a quem decide.
+            origem={feedbacks.find((f) => f.solicitacaoId === a.id)}
+            config={config}
+            regras={regras}
+            onDecidir={(aprovar, motivo) => void executar(() => apiPdca.decidirAjuste(a.id, aprovar, motivo))}
+            onReconsiderar={() => void executar(() => apiPdca.reconsiderarAjuste(a.id))}
+            onAplicar={() =>
+              void executar(async () => {
+                const resultado = await apiPdca.aplicarAjuste(a.id);
+                // SPEC-52 — ajuste de ficha muda os campos que a app já tem em
+                // memória: sem avisar, a pessoa aplica, volta ao canvas e o
+                // campo aprovado não está lá.
+                if (a.recurso === "campos-no" || a.recurso === "campos-aresta") onFichaMudou?.();
+                return resultado;
+              })
+            }
+            onAbrirArea={onAbrirArea}
+          />
         ))}
       </section>
 
@@ -326,6 +336,195 @@ export function PdcaTab({ config, timeAtivo, onAbrirArea, onFichaMudou }: PdcaTa
         )}
       </section>
     </div>
+  );
+}
+
+/** Data curta — pedido de três semanas atrás era visualmente idêntico a um de
+ * hoje, e foi por isso que o relato dizia "não gerei nenhuma nova". */
+function quando(iso: string): string {
+  return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
+
+/**
+ * SPEC-62 §2 e §3 — o card de quem DECIDE.
+ *
+ * Ele mostrava `descricao`, `solicitante · recurso · estado` e dois botões.
+ * Faltava tudo que uma decisão precisa:
+ *
+ * - **quando** o pedido foi feito;
+ * - **de onde ele veio** — o feedback que o gerou, que o banco já ligava
+ *   (`pdca_feedback.solicitacao_id`) e a tela nunca mostrou;
+ * - **o efeito**, que o estúdio calcula para quem PROPÕE e sumia para quem
+ *   DECIDE, ou seja, exatamente ao contrário de quem precisa dele;
+ * - e o **porquê** de uma recusa, que não existia em lugar nenhum.
+ *
+ * Pedido sem `operacao` (o caminho da SPEC-51, "pedir ajuste" na tela sem
+ * permissão) diz que aprovar registra a decisão e a mudança é à mão — o botão
+ * parava de prometer o *Act* que `POST /aplicar` recusa com "este pedido é só
+ * texto".
+ */
+function CartaoDeSolicitacao({
+  ajuste,
+  origem,
+  config,
+  regras,
+  onDecidir,
+  onReconsiderar,
+  onAplicar,
+  onAbrirArea,
+}: {
+  ajuste: SolicitacaoAjuste;
+  origem?: FeedbackPdca;
+  config: DiagramaConfig;
+  regras: RegrasConfig | null;
+  onDecidir: (aprovar: boolean, motivo?: string) => void;
+  onReconsiderar: () => void;
+  onAplicar: () => void;
+  onAbrirArea?: (area: AreaConfig) => void;
+}) {
+  const [recusando, setRecusando] = useState(false);
+  const [motivo, setMotivo] = useState("");
+
+  /**
+   * O componente que serve de exemplo para a prévia: o primeiro cuja tech é a
+   * do pedido. Escolha explicável (a régua é por tech) e não arbitrária — e se
+   * nenhum componente usa aquela tech, a ausência de prévia é o próprio aviso.
+   */
+  const efeito = useMemo(() => {
+    const op = ajuste.operacao;
+    if (!op || !regras || recursoAlvoDaOperacao(op) !== "regras") return null;
+    const tech = (op as { tech?: string }).tech;
+    if (!tech) return null;
+    const tipoNo = Object.keys(config.nodeTypes).find((t) => (config.nodeTypes[t].techs ?? []).includes(tech));
+    if (!tipoNo) return null;
+    const previa = simularItemComAjuste(config, regras, tipoNo, op);
+    return previa ? { previa, rotulo: config.nodeTypes[tipoNo]?.label ?? tipoNo } : null;
+  }, [ajuste.operacao, config, regras]);
+
+  const podeReconsiderar = ajuste.estado === "rejeitada" || ajuste.estado === "invalida";
+
+  return (
+    <article style={cardEstilo} data-testid={`ajuste-${ajuste.id}`}>
+      <p style={{ margin: 0, fontSize: 13 }}>{ajuste.descricao}</p>
+      {ajuste.operacao && <p style={{ ...metaEstilo, color: "var(--texto-2)" }}>{descreverOperacao(ajuste.operacao)}</p>}
+      <p style={metaEstilo}>
+        {ajuste.solicitante} · {quando(ajuste.criadoEm)} · {ajuste.recurso} · <strong>{ajuste.estado}</strong>
+        {ajuste.aplicadaPor ? ` · aplicada por ${ajuste.aplicadaPor}` : ""}
+      </p>
+
+      {origem ? (
+        <p style={{ ...metaEstilo, color: "var(--texto-2)" }} data-testid={`origem-${ajuste.id}`}>
+          nasceu do feedback de {origem.email}: “{origem.texto}”
+        </p>
+      ) : (
+        // Não é defeito: a SPEC-51 cria pedido em texto a partir da tela sem
+        // permissão. Dizer isso é o que separa "veio pelo ciclo" de "veio
+        // direto", que são pedidos de confiança diferente.
+        <p style={{ ...metaEstilo, fontStyle: "italic" }} data-testid={`sem-origem-${ajuste.id}`}>
+          escrito direto, sem passar pelo ciclo — não há feedback por trás dele
+        </p>
+      )}
+
+      {ajuste.operacao ? (
+        efeito && (efeito.previa.adicionados.length > 0 || efeito.previa.removidos.length > 0) ? (
+          <details style={{ marginTop: 6 }}>
+            <summary style={{ fontSize: 11.5, color: "#a5b4fc", cursor: "pointer" }} data-testid={`ver-efeito-${ajuste.id}`}>
+              ver o efeito num item de {efeito.rotulo}
+            </summary>
+            <div style={{ marginTop: 6 }} data-testid={`efeito-${ajuste.id}`}>
+              {efeito.previa.adicionados.map((l) => (
+                <p key={l} style={{ ...diffEstilo, color: "var(--verde, #3ecf8e)" }}>
+                  + {l.replace(/^- /, "")}
+                </p>
+              ))}
+              {efeito.previa.removidos.map((l) => (
+                <p key={l} style={{ ...diffEstilo, color: "var(--vermelho, #f87171)" }}>
+                  − {l.replace(/^- /, "")}
+                </p>
+              ))}
+            </div>
+          </details>
+        ) : null
+      ) : (
+        <p style={{ ...metaEstilo, color: "var(--amarelo)" }} data-testid={`so-texto-${ajuste.id}`}>
+          pedido em texto: aprovar registra a decisão, mas a mudança é à mão na tela de configuração.
+        </p>
+      )}
+
+      {ajuste.motivoDaDecisao && (
+        <p style={{ ...metaEstilo, color: "var(--texto-2)" }} data-testid={`motivo-${ajuste.id}`}>
+          {ajuste.estado === "pendente" ? "recusada antes" : "recusada"}
+          {ajuste.decididoPor ? ` por ${ajuste.decididoPor}` : ""}: “{ajuste.motivoDaDecisao}”
+        </p>
+      )}
+
+      <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+        {ajuste.estado === "pendente" &&
+          (recusando ? (
+            <div style={{ width: "100%" }}>
+              <label style={labelEstilo}>Por que não? (quem escreveu o pedido lê isto)</label>
+              <textarea
+                aria-label="Motivo da recusa"
+                autoFocus
+                value={motivo}
+                onChange={(e) => setMotivo(e.target.value)}
+                rows={2}
+                placeholder="ex.: já existe um item equivalente em observabilidade"
+                style={{ ...inputEstilo, resize: "vertical" }}
+              />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => {
+                    setRecusando(false);
+                    onDecidir(false, motivo);
+                  }}
+                  style={botaoEstilo}
+                  data-testid={`confirmar-recusa-${ajuste.id}`}
+                >
+                  Confirmar recusa
+                </button>
+                <button onClick={() => setRecusando(false)} style={botaoEstilo}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <button onClick={() => onDecidir(true)} style={botaoPrimarioEstilo} data-testid={`aprovar-${ajuste.id}`}>
+                Aprovar
+              </button>
+              <button onClick={() => setRecusando(true)} style={botaoEstilo} data-testid={`recusar-${ajuste.id}`}>
+                Recusar
+              </button>
+            </>
+          ))}
+
+        {ajuste.estado === "aprovada" && ajuste.operacao && (
+          <button
+            onClick={onAplicar}
+            style={botaoPrimarioEstilo}
+            data-testid={`aplicar-${ajuste.id}`}
+            title="Aplica a mudança no documento de configuração e fecha o ciclo"
+          >
+            Aplicar agora
+          </button>
+        )}
+        {ajuste.estado === "aprovada" && !ajuste.operacao && onAbrirArea && AREA_DO_RECURSO[ajuste.recurso] && (
+          <button onClick={() => onAbrirArea(AREA_DO_RECURSO[ajuste.recurso])} style={botaoEstilo}>
+            Abrir a configuração ↗
+          </button>
+        )}
+
+        {/* SPEC-62 §3 — o caminho de volta. Recusar devolvia 409 a qualquer
+            nova decisão: o pedido morria ali. E `invalida` era pior, porque a
+            própria mensagem manda reavaliar sobre o estado atual. */}
+        {podeReconsiderar && (
+          <button onClick={onReconsiderar} style={botaoEstilo} data-testid={`reconsiderar-${ajuste.id}`}>
+            Reconsiderar
+          </button>
+        )}
+      </div>
+    </article>
   );
 }
 

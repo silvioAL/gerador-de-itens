@@ -265,6 +265,33 @@ export async function registrarRotasPdca(app: FastifyInstance, { db }: OpcoesApp
     return { id, estado: atualizado.estado };
   });
 
+  /**
+   * SPEC-62 §3 — descartar tinha volta em lugar nenhum.
+   *
+   * O feedback descartado ia para dentro do histórico fechado e sumia da tela
+   * (medido). Descartar é decisão, e por isso fica gravado; mas decisão que não
+   * pode ser revista é descarte, e descarte silencioso é o que ensina o time a
+   * parar de responder.
+   *
+   * Só volta o que foi DESCARTADO: o que já virou solicitação tem estado
+   * próprio, e devolvê-lo a "novo" criaria dois pedidos para a mesma frase.
+   */
+  app.post("/pdca/feedback/:id/reabrir", { preHandler: exigirSessao }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const [atual] = await db.select().from(pdcaFeedback).where(eq(pdcaFeedback.id, id)).limit(1);
+    if (!atual) return reply.code(404).send({ erro: "feedback não encontrado" });
+    if (atual.estado !== "descartado") {
+      return reply.code(409).send({ erro: `só feedback descartado reabre — este está "${atual.estado}"` });
+    }
+    const [reaberto] = await db
+      .update(pdcaFeedback)
+      .set({ estado: "novo" })
+      .where(eq(pdcaFeedback.id, id))
+      .returning();
+    registrarAuditoria(db, { email: req.usuario!.email, acao: "atualizar", recurso: "pdca_feedback", recursoId: id });
+    return { id, estado: reaberto.estado };
+  });
+
   // ── Solicitações de ajuste (o caminho de quem NÃO pode editar) ──
   app.post("/ajustes", { preHandler: exigirSessao }, async (req, reply) => {
     const corpo = z
@@ -483,7 +510,11 @@ export async function registrarRotasPdca(app: FastifyInstance, { db }: OpcoesApp
 
   app.post("/ajustes/:id/decidir", { preHandler: exigirSessao }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    const corpo = z.object({ aprovar: z.boolean() }).safeParse(req.body);
+    // SPEC-62 §3 — `motivo` é o POR QUÊ da recusa. Opcional e não obrigatório:
+    // exigir texto para dizer "não" transformaria a recusa num formulário, e o
+    // que acontece com formulário obrigatório é gente escrevendo "não" no campo.
+    // A tela pede; a API aceita sem.
+    const corpo = z.object({ aprovar: z.boolean(), motivo: z.string().trim().max(500).optional() }).safeParse(req.body);
     if (!corpo.success) return reply.code(400).send({ erro: corpo.error.flatten() });
 
     const [pedido] = await db.select().from(solicitacoesAjuste).where(eq(solicitacoesAjuste.id, id)).limit(1);
@@ -517,9 +548,66 @@ export async function registrarRotasPdca(app: FastifyInstance, { db }: OpcoesApp
     const estado = corpo.data.aprovar ? "aprovada" : "rejeitada";
     await db
       .update(solicitacoesAjuste)
-      .set({ estado, decididoPor: req.usuario!.email, decididoEm: new Date() })
+      .set({
+        estado,
+        decididoPor: req.usuario!.email,
+        decididoEm: new Date(),
+        // Aprovar limpa o motivo de uma recusa anterior: ele descrevia um "não"
+        // que deixou de valer. Quem quer o rastro completo tem a auditoria.
+        motivoDaDecisao: corpo.data.aprovar ? null : corpo.data.motivo ?? null,
+      })
       .where(eq(solicitacoesAjuste.id, id));
     registrarAuditoria(db, { email: req.usuario!.email, acao: estado, recurso: "solicitacoes_ajuste", recursoId: id });
-    return { id, estado };
+    return { id, estado, motivoDaDecisao: corpo.data.aprovar ? null : corpo.data.motivo ?? null };
+  });
+
+  /**
+   * SPEC-62 §3 — o caminho de volta.
+   *
+   * Recusar devolvia 409 para qualquer nova decisão: o pedido morria ali, sem
+   * volta nem pela API. E `invalida` era pior — a própria mensagem manda
+   * *"reavalie sobre o estado atual"* e não havia como reavaliar.
+   *
+   * O "não" anterior **não se apaga**: `decididoPor`, `decididoEm` e
+   * `motivoDaDecisao` continuam gravados quando o pedido volta a `pendente`.
+   * Mesma disciplina de `substituidaPor` na decisão de arquitetura (SPEC-57) —
+   * quem apaga a decisão revista faz o time repetir o ciclo que a produziu.
+   *
+   * Mesmo gate da decisão: quem pode dizer não é quem pode desdizer.
+   */
+  app.post("/ajustes/:id/reconsiderar", { preHandler: exigirSessao }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const [pedido] = await db.select().from(solicitacoesAjuste).where(eq(solicitacoesAjuste.id, id)).limit(1);
+    if (!pedido) return reply.code(404).send({ erro: "solicitação não encontrada" });
+    if (pedido.estado !== "rejeitada" && pedido.estado !== "invalida") {
+      return reply.code(409).send({ erro: `só solicitação recusada ou invalidada reconsidera — esta está "${pedido.estado}"` });
+    }
+
+    const gate = exigirPermissao(db, organizacaoId, recursoDaSolicitacao(pedido), "editar", () => pedido.timeId);
+    await gate(req, reply);
+    if (reply.sent) return;
+
+    /**
+     * A versão-alvo é RETOMADA do estado de agora. Reconsiderar um pedido
+     * `invalida` sem isso o deixaria invalidando de novo na primeira aprovação,
+     * para sempre — o pedido voltaria a pendente só para morrer igual.
+     */
+    const [reaberta] = await db
+      .update(solicitacoesAjuste)
+      .set({
+        estado: "pendente",
+        versaoAlvo: await versaoDoDocumento(
+          pedido.operacao ? recursoAlvoDaOperacao(pedido.operacao as OperacaoDeAjuste) : pedido.recurso
+        ),
+      })
+      .where(eq(solicitacoesAjuste.id, id))
+      .returning();
+    registrarAuditoria(db, {
+      email: req.usuario!.email,
+      acao: "reconsiderar",
+      recurso: "solicitacoes_ajuste",
+      recursoId: id,
+    });
+    return { id, estado: reaberta.estado };
   });
 }
