@@ -175,13 +175,13 @@ describe("ItensScreen — o caminho até o documento", () => {
       />
     );
 
-    fireEvent.click(screen.getByTestId("ir-ao-documento"));
+    fireEvent.click(screen.getByTestId("itens-ir-ao-documento"));
     expect(onDocumento).toHaveBeenCalled();
   });
 
   it("sem o caminho ligado, o botão não aparece — nada de botão que não leva a lugar nenhum", () => {
     render(<ItensScreen itens={[]} tituloDaQuebra="demanda" onAbrirMenu={vi.fn()} onFechar={vi.fn()} />);
 
-    expect(screen.queryByTestId("ir-ao-documento")).toBeNull();
+    expect(screen.queryByTestId("itens-ir-ao-documento")).toBeNull();
   });
 });

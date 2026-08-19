@@ -82,7 +82,7 @@ export function ItensScreen({
         {/* §269 — as duas saídas da mesma demanda, uma ao lado da outra: o que
             fazer (aqui) e por quê (lá). Estavam separadas por um menu. */}
         {onDocumento && (
-          <button onClick={onDocumento} style={botaoEstilo} data-testid="ir-ao-documento">
+          <button onClick={onDocumento} style={botaoEstilo} data-testid="itens-ir-ao-documento">
             Ver o documento →
           </button>
         )}

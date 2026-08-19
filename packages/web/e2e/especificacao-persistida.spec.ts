@@ -3,11 +3,16 @@ import { entrar } from "./auth";
 import { derivarNaMesa } from "./derivar";
 
 /**
- * §184 — a especificação gerada fica SALVA na quebra, e reabrir a demanda
+ * §184, revisto no §270 — o material fica SALVO na quebra e reabrir a demanda
  * reconhece isso: balão no canvas (M14) conduz à revisão, e o chat abre
  * sozinho com a fala adaptada (mesma mecânica do M1, outra fala).
+ *
+ * O que mudou no §270 foi QUEM grava. Era o botão "Gerar especificação de
+ * solução", que montava o markdown do documento de desenho por outra porta e
+ * escrevia por cima da foto da aprovação. Agora quem grava é **aprovar o
+ * documento** — e a foto passou a ter um dono só.
  */
-test("gerar salva a especificação na quebra; reabrir conduz à revisão com a fala de demanda já especificada", async ({ page }) => {
+test("aprovar o documento salva a foto na quebra; reabrir conduz à revisão reconhecendo isso", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   // O contador de usos do PDCA é global do ambiente: quando a cadência bate,
   // o balão da ENTREVISTA tem prioridade e rouba o momento que este spec mede.
@@ -38,14 +43,18 @@ test("gerar salva a especificação na quebra; reabrir conduz à revisão com a 
   await page.getByLabel("ex.: Fatura mensal em lote").fill(titulo);
   await page.getByTestId("assistente-balao-confirmar").click();
 
-  // Gera pelo agente (M4 e M5 dispensados) — o markdown vai pra quebra e o
-  // auto-save grava a versão.
+  // §270 — aprovar o documento é o que grava a foto. O caminho até ele é o do
+  // §269: sai da revisão, sem passar pelo menu.
   await page.getByTestId("balao-sem-ia").getByRole("button", { name: "Dispensar sugestão" }).click();
   await page.getByTestId("balao-sem-contexto").getByRole("button", { name: "Dispensar sugestão" }).click();
-  const download = page.waitForEvent("download");
-  await page.getByTestId("balao-gerar-acao").click();
-  await download;
-  await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
+  await page.getByTestId("ir-ao-documento").click();
+  await page.getByTestId("status-documento").click();
+  await page.getByTestId("status-aprovado").click();
+  await expect(page.getByTestId("status-documento")).toContainText("aprovado");
+  // Voltar do documento cai na REVISÃO (é de onde se veio), e só o botão dela
+  // leva à mesa — dois passos, como no uso real.
+  await page.getByRole("button", { name: "← Voltar à mesa de projeto" }).click();
+  await page.getByRole("button", { name: "Voltar à mesa de projeto", exact: true }).click();
   await expect(page.getByText(/· salva$/)).toBeVisible();
 
   // Recomeça do zero e REABRE a demanda: o material salvo volta inteiro.
@@ -59,10 +68,10 @@ test("gerar salva a especificação na quebra; reabrir conduz à revisão com a 
 
   // M14 — o agente reconhece a demanda já especificada e conduz à revisão.
   const balao = page.getByTestId("assistente-balao");
-  await expect(balao).toContainText("já tem a especificação de solução completa");
+  await expect(balao).toContainText("já teve o documento de desenho aprovado");
   await balao.getByTestId("assistente-balao-acao").click();
 
   // O chat da revisão abre SOZINHO com a fala adaptada (não a do M1).
   await expect(page.getByTestId("conversa-especificacao")).toBeVisible();
-  await expect(page.getByTestId("conversa-especificacao")).toContainText(/já tem a especificação de solução completa/);
+  await expect(page.getByTestId("conversa-especificacao")).toContainText(/já teve o documento de desenho aprovado/);
 });

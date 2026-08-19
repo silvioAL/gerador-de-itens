@@ -87,15 +87,19 @@ test("declarar propósito, ligar ao componente e ver a citação chegar no docum
   // depois de o anterior ser dispensado. Checar os dois de uma vez (o que eu
   // tinha feito) só dispensa o primeiro e trava esperando a ação de geração.
   for (let i = 0; i < 4; i++) {
-    if (await page.getByTestId("balao-gerar-acao").count()) break;
+    if (await page.getByTestId("ir-ao-documento").count()) break;
     const dispensar = page.getByRole("button", { name: "Dispensar sugestão" });
     if (await dispensar.count()) await dispensar.first().click();
     else await page.waitForTimeout(300);
   }
-  await expect(page.getByTestId("balao-gerar-acao")).toBeVisible();
 
+  // §270 — o markdown vem do DOCUMENTO agora. Era baixado por um botão do
+  // balão que montava o mesmo texto com outro nome de arquivo; o que este
+  // teste sempre quis provar (a citação do propósito chega ao markdown)
+  // continua igual, e agora pelo caminho que existe.
+  await page.getByTestId("ir-ao-documento").click();
   const baixando = page.waitForEvent("download");
-  await page.getByTestId("balao-gerar-acao").click();
+  await page.getByTestId("baixar-markdown").click();
   const md = await baixando;
   const conteudo = await readFile(await md.path(), "utf-8");
 

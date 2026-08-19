@@ -22,7 +22,7 @@ export function LandingPage({ onEntrar }: LandingPageProps) {
       </header>
 
       <div style={conteudoEstilo}>
-        <h1 style={{ fontSize: 24, color: "var(--texto)", margin: "0 0 6px" }}>Do diagrama à especificação de solução, sem inventar nada</h1>
+        <h1 style={{ fontSize: 24, color: "var(--texto)", margin: "0 0 6px" }}>Do diagrama ao backlog, sem inventar nada</h1>
         <p style={{ fontSize: 14, color: "var(--texto-2)", lineHeight: 1.6, maxWidth: 640, marginBottom: 32 }}>
           Não é um gerador de prompt de IA — é um mecanismo determinístico. O mesmo diagrama sempre produz os mesmos
           itens, com proveniência em cada campo e nada virando "pronto" sem alguém confirmar.

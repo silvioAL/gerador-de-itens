@@ -578,7 +578,10 @@ function AppCarregado({
     vermelhos: vermelhos.length,
     temResultado: !!resultado,
     aplicouProposta,
-    temEspecificacaoSalva: !!quebra.especificacao,
+    // §270 — passou a significar "documento já aprovado alguma vez": aprovar é
+    // o único escritor de `especificacao` desde que a geração de especificação
+    // saiu (era o mesmo markdown por outra porta).
+    temDocumentoAprovado: !!quebra.especificacao,
     dispensados: derivarDispensado ? [...momentosDispensados, "m9"] : momentosDispensados,
   });
   useEffect(() => {
@@ -1426,13 +1429,7 @@ function AppCarregado({
           onDocumento={() => navegar({ tela: "documento" })}
           onConfigurarModeloIa={() => abrirConfigNaAba("modeloIa")}
           onItensGerados={aoGerarItens}
-          especificacaoJaGerada={!!quebra.especificacao}
-          onEspecificacaoGerada={(md) => {
-            setQuebra((q) => ({ ...q, especificacao: md }));
-            // Fica salvo de verdade quando a quebra tem nome (mesmo tick-de-
-            // render do auto-save); sem nome, mora no estado até salvar.
-            setSalvarAposNome(true);
-          }}
+          documentoJaAprovado={!!quebra.especificacao}
           resultado={resultado}
           diagrama={quebra.diagrama}
           config={diagramaConfig}
@@ -1661,7 +1658,11 @@ function AppCarregado({
                 ? undefined
                 : momentoCanvas === "m14"
                   ? {
-                      texto: "Esta demanda já tem a especificação de solução completa. Quer abrir a revisão? Se algo mudou, eu aplico os ajustes e gero a especificação de novo.",
+                      // §270 — o campo `especificacao` perdeu o outro escritor:
+                      // agora ele só guarda a FOTO DA APROVAÇÃO do documento
+                      // (§264). O texto passou a dizer isso, em vez de citar um
+                      // artefato que não existe mais.
+                      texto: "Esta demanda já teve o documento de desenho aprovado. Quer abrir a revisão? Se algo mudou, eu aplico os ajustes e o documento acusa o que ficou diferente.",
                       acao: { rotulo: "Abrir revisão", onExecutar: derivarQuebra },
                       onDispensar: () => dispensar("m14"),
                     }

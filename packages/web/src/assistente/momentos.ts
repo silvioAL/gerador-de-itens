@@ -15,14 +15,16 @@ export function momentoDoCanvas(p: {
   vermelhos: number;
   temResultado: boolean;
   aplicouProposta: boolean;
-  /** §184 — a quebra aberta já tem especificação gerada e salva. */
-  temEspecificacaoSalva?: boolean;
+  /** §184, renomeado no §270 — a quebra aberta já teve o documento de desenho
+   * APROVADO (a única coisa que grava `especificacao` desde que a geração de
+   * especificação saiu). */
+  temDocumentoAprovado?: boolean;
   dispensados: readonly string[];
 }): MomentoDoCanvas {
   if (p.temResultado) return null;
-  // M14 (§184) — a demanda reaberta JÁ TEM especificação completa: o caminho
+  // M14 (§184) — a demanda reaberta já teve o documento aprovado: o caminho
   // natural é a revisão dela, não recomeçar o desenho.
-  if (p.temEspecificacaoSalva && p.nodes > 0 && p.vermelhos === 0 && !p.dispensados.includes("m14")) return "m14";
+  if (p.temDocumentoAprovado && p.nodes > 0 && p.vermelhos === 0 && !p.dispensados.includes("m14")) return "m14";
   // M9 — tudo verde: o mais valioso, porque destrava a saída.
   if (p.nodes > 0 && p.vermelhos === 0 && !p.dispensados.includes("m9")) return "m9";
   // M3 — proposta aplicada, campos por preencher: a continuação do desenho.

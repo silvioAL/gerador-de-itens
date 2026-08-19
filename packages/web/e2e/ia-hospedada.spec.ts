@@ -162,9 +162,16 @@ test("a esteira roda no navegador e o texto do gateway chega nos campos (o defei
     await confirmar.first().click();
   }
   await expect(page.getByTestId("balao-especificacao")).toContainText("Tudo refinado");
+  // §270 — o fechamento do ciclo aqui é gerar os ITENS. O markdown do desenho
+  // saiu desta tela: ele é o documento, e o documento tem tela e download
+  // próprios.
   const download = page.waitForEvent("download");
-  await page.getByTestId("balao-especificacao-acao").click();
-  expect((await download).suggestedFilename()).toBe("especificacao-de-solucao.md");
+  await page.getByTestId("balao-especificacao-itens").click();
+  // Gerar itens leva à tela dos itens — e é de lá que se vai ao documento
+  // (as duas saídas da mesma demanda, §269).
+  await page.getByTestId("itens-ir-ao-documento").click();
+  await page.getByTestId("baixar-markdown").click();
+  expect((await download).suggestedFilename()).toBe("documento-de-desenho.md");
 
   await page.screenshot({ path: "e2e/screenshots/ia-hospedada.png", fullPage: true });
 
