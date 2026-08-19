@@ -8845,3 +8845,60 @@ ter pedido ajuda — o oposto de ajudar.
 prompt a separação entre regra do produto e regra da entrega → vermelho.
 
 335 engine · 647 web · 80 aplicação · 229 server · 79/79 E2E · build limpo.
+
+## §272 — a seção que o documento nem tinha nasce preenchida
+
+*"apareceu esse aviso, preciso que vc ajuste a massa"* — o aviso do §108,
+dizendo que a configuração de regras não tem **nenhuma** régua de percurso, com
+duas no padrão desta versão.
+
+### O aviso estava certo, e era o fim da linha
+
+O documento foi gravado antes de a seção existir. E a própria frase do
+diagnóstico descrevia o beco: *"a ferramenta nunca sobrescreve o que você
+editou, então uma seção criada depois do seu arquivo fica vazia **para
+sempre**"*. A única saída era digitar à mão o que o padrão já traz.
+
+### A régua: AUSENTE não é VAZIO
+
+`undefined` é uma seção que **não existia** quando aquele documento foi criado
+— não há edição a preservar, e completar com o padrão é exatamente o que a
+pessoa faria à mão. `[]` é alguém que esvaziou de propósito: continua vazio, e
+o diagnóstico continua avisando.
+
+A promessa de nunca sobrescrever fica intacta, porque nada aqui toca em chave
+que exista. E é **só o primeiro nível**: mesclar `porTech` tech a tech
+devolveria a regra que alguém apagou.
+
+### Por que não foi migração SQL
+
+O usuário autorizou apagar e recriar ("não temos nada em produção"). Não
+precisou: uma migração conserta **um** banco e duplica o padrão dentro de um
+arquivo `.sql` que vai envelhecer sozinho. Completar na leitura conserta toda
+instalação, inclusive as que ninguém abriu ainda — e sem gravar no meio de um
+GET, que é o tipo de efeito colateral que ninguém procura depois. O próximo
+Salvar persiste.
+
+### O teste que passava por sorte
+
+O `beforeEach` do servidor truncava dez tabelas e **não** `config_documentos`.
+Config gravada por um teste sobrevivia à execução inteira e à seguinte: o
+"nunca editada devolve o template" passava contra banco novo e falhava na
+segunda rodada, sem nada ter mudado no produto. Foi o que me confundiu no §265,
+quando culpei a chamada de pipeline.
+
+Mesma classe do resíduo do §262, e o mesmo estrago: um vermelho que depende de
+quantas vezes a suíte já rodou ensina a reexecutar em vez de ler.
+
+### Uma suspeita registrada, e não resolvida
+
+Numa das rodadas completas, `abas-de-configuracao` falhou sozinha e não
+reproduziu em duas rodadas seguintes — e eu não capturei o erro. O suspeito é
+uma corrida que já existia: quatro specs escrevem o **mesmo** documento de
+regras da organização em paralelo, e esse spec faz setup/restore próprio
+justamente por isso. Não é dívida nova, mas passa a estar escrita.
+
+**Mordidas:** completar sobrescrevendo o que existe → dois vermelhos; tirar a
+completude da leitura → vermelho.
+
+335 engine · 647 web · 84 aplicação · 230 server · 79/79 E2E · build limpo.

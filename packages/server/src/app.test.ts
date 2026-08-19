@@ -91,7 +91,14 @@ beforeEach(async () => {
   // para trás liga o RBAC da organização (SPEC-28 §4.3) e faria todos os
   // outros testes — que assumem o modo aberto — falharem com 403.
   await db.execute(
-    sql`truncate table ${quebras}, ${stacks}, ${camposNo}, ${convitesTime}, ${auditoria}, ${usuarioPapel}, ${papelPermissao}, ${papeisAcesso}, ${timePapel}, ${produtos} cascade`
+    // §272 — `configDocumentos` entrou aqui. Ele não era limpo, e config
+    // gravada por um teste sobrevivia à execução INTEIRA e à seguinte: o
+    // "nunca editada devolve o template" passava na primeira rodada contra um
+    // banco novo e falhava na segunda, sem nada ter mudado no produto. Mesma
+    // classe do resíduo do §262 — e o mesmo estrago, porque um vermelho que
+    // depende de quantas vezes a suíte já rodou ensina a reexecutar em vez de
+    // ler.
+    sql`truncate table ${quebras}, ${stacks}, ${camposNo}, ${convitesTime}, ${auditoria}, ${usuarioPapel}, ${papelPermissao}, ${papeisAcesso}, ${timePapel}, ${produtos}, ${configDocumentos} cascade`
   );
 });
 
@@ -562,9 +569,32 @@ describe("/config/:chave (SPEC-31 Fase 3)", () => {
     expect(put.statusCode).toBe(200);
 
     const get = await app.inject({ method: "GET", url: "/config/regras" });
-    expect(get.json().documento).toEqual(documento);
+    // O que foi gravado volta intacto…
+    expect(get.json().documento).toMatchObject(documento);
     expect(get.json().personalizado).toBe(true);
     expect(get.json().diagnostico).toHaveProperty("possivelmenteDesatualizada");
+    // …e as seções que este documento NEM TEM vêm do padrão (§272). É o que
+    // conserta a config gravada antes de a seção existir, sem tocar em nada
+    // que alguém tenha editado.
+    expect(get.json().documento.percursos.length).toBeGreaterThan(0);
+  });
+
+  it("§272: seção ESVAZIADA de propósito continua vazia — ausente é uma coisa, zerada é outra", async () => {
+    // Sem esta distinção, completar viraria "devolver o que você apagou", que
+    // é o oposto da promessa de nunca sobrescrever a edição de ninguém.
+    const cookieDev = await logarComo(EMAIL_DEV);
+    await app.inject({
+      method: "PUT",
+      url: "/config/regras",
+      cookies: { gerador_sessao: cookieDev },
+      payload: { documento: { porTech: {}, percursos: [] } },
+    });
+
+    const get = await app.inject({ method: "GET", url: "/config/regras" });
+
+    expect(get.json().documento.percursos).toEqual([]);
+    // E o diagnóstico volta a avisar: é a única coisa que ele ainda tem a dizer.
+    expect(get.json().diagnostico.possivelmenteDesatualizada).toBe(true);
   });
 
   it("PUT sem sessão é rejeitado — ler config é aberto, escrever não", async () => {
