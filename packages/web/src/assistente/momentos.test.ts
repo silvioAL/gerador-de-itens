@@ -19,9 +19,9 @@ describe("momentoDoCanvas (SPEC-37 F3 — M2/M3/M9 e a prioridade entre eles)", 
   });
 
   it("§184: demanda reaberta com especificação salva → M14 ganha até do M9 (o caminho é REVISITAR)", () => {
-    expect(momentoDoCanvas({ ...base, nodes: 3, vermelhos: 0, temEspecificacaoSalva: true })).toBe("m14");
+    expect(momentoDoCanvas({ ...base, nodes: 3, vermelhos: 0, temDocumentoAprovado: true })).toBe("m14");
     // Dispensado, o M9 volta a valer — a demanda continua derivável.
-    expect(momentoDoCanvas({ ...base, nodes: 3, vermelhos: 0, temEspecificacaoSalva: true, dispensados: ["m14"] })).toBe("m9");
+    expect(momentoDoCanvas({ ...base, nodes: 3, vermelhos: 0, temDocumentoAprovado: true, dispensados: ["m14"] })).toBe("m9");
   });
 
   it("dispensar silencia AQUELE momento, não os outros", () => {

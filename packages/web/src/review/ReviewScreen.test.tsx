@@ -197,18 +197,20 @@ describe("ReviewScreen — fixture 01 (sem ciclos/conflitos)", () => {
         especificacaoTemplate={templateFixture}
         onFechar={vi.fn()}
         onSelecionarNo={vi.fn()}
-        especificacaoJaGerada
+        documentoJaAprovado
       />
     );
 
     await waitFor(() => expect(screen.getByTestId("conversa-especificacao")).toBeInTheDocument());
     expect(screen.getByTestId("conversa-especificacao")).toHaveTextContent(
-      /já tem a especificação de solução completa/
+      /já teve o documento de desenho aprovado/
     );
   });
 
-  it("§184: gerar sobe o markdown pro App com TODO o material — inclusive a resposta confirmada", async () => {
-    const onEspecificacaoGerada = vi.fn();
+  it("§270: o balão oferece ITENS, e não há mais como gerar a especificação daqui", async () => {
+    // A especificação de solução era o markdown do documento de desenho por
+    // outra porta — mesma função, mesmas opções, outro nome de arquivo. E a
+    // porta de trás ainda gravava por cima da foto da aprovação (§264).
     const user = userEvent.setup();
     const resultado = resultadoFixture01();
     const chave = resultado.atividades[0].chave;
@@ -220,7 +222,7 @@ describe("ReviewScreen — fixture 01 (sem ciclos/conflitos)", () => {
         especificacaoTemplate={templateFixture}
         onFechar={vi.fn()}
         onSelecionarNo={vi.fn()}
-        onEspecificacaoGerada={onEspecificacaoGerada}
+        onItensGerados={vi.fn()}
         respostasItens={{
           [chave]: { _historiaUsuario: { valor: "Como cobrança, quero enfileirar propostas.", origem: "manual" } },
         }}
@@ -229,11 +231,13 @@ describe("ReviewScreen — fixture 01 (sem ciclos/conflitos)", () => {
 
     fireEvent.click(within(await screen.findByTestId("balao-sem-ia")).getByRole("button", { name: "Dispensar sugestão" }));
     fireEvent.click(within(await screen.findByTestId("balao-sem-contexto")).getByRole("button", { name: "Dispensar sugestão" }));
-    await user.click((await screen.findByTestId("balao-gerar")).querySelector('[data-testid="balao-gerar-acao"]') as HTMLElement);
+    const balao = await screen.findByTestId("balao-gerar");
 
-    expect(onEspecificacaoGerada).toHaveBeenCalled();
-    const md = onEspecificacaoGerada.mock.calls.at(-1)![0] as string;
-    expect(md).toContain("Como cobrança, quero enfileirar propostas.");
+    expect(balao.querySelector('[data-testid="balao-gerar-acao"]')).toBeNull();
+    expect(balao.querySelector('[data-testid="balao-gerar-itens"]')).not.toBeNull();
+    // E nada é baixado por esta tela: o markdown tem um lugar só, o documento.
+    await user.click(balao.querySelector('[data-testid="balao-gerar-itens"]') as HTMLElement);
+    expect(baixarArquivoTextoMock).not.toHaveBeenCalled();
   });
 
   it("nenhum item selecionado inicialmente — ficha mostra estado vazio", () => {
@@ -323,10 +327,11 @@ describe("ReviewScreen — fixture 01 (sem ciclos/conflitos)", () => {
     fireEvent.click(within(await screen.findByTestId("balao-sem-ia")).getByRole("button", { name: "Dispensar sugestão" }));
     // …e o M5 (sem contexto do épico) fala em seguida — dispensado também.
     fireEvent.click(within(await screen.findByTestId("balao-sem-contexto")).getByRole("button", { name: "Dispensar sugestão" }));
-    await user.click((await screen.findByTestId("balao-gerar")).querySelector('[data-testid="balao-gerar-acao"]') as HTMLElement);
-
-    expect(baixarArquivoTextoMock).toHaveBeenCalled();
-    expect(baixarArquivoTextoMock.mock.calls.at(-1)).toContain("especificacao-de-solucao.md");
+    // §270 — o balão do M12 perdeu a geração de especificação junto: ela era a
+    // mesma coisa do documento de desenho, com outro nome de arquivo.
+    const balao = await screen.findByTestId("balao-gerar");
+    expect(balao.querySelector('[data-testid="balao-gerar-acao"]')).toBeNull();
+    expect(balao.textContent).toContain("itens de trabalho");
   });
 
   it("não existe botão de copiar — a única saída é o download do documento completo", () => {
@@ -1721,7 +1726,7 @@ describe("ReviewScreen — sinais que o usuário leu como falha (relato com prin
     // Aponta pro modo que tem o recurso, senão o aviso só constata o problema.
     expect(aviso).toHaveTextContent(/gerador open/);
     // E deixa claro que o resto do produto não depende disso.
-    expect(aviso).toHaveTextContent(/especificação de solução continuam funcionando/i);
+    expect(aviso).toHaveTextContent(/documento de desenho continuam funcionando/i);
   });
 
   it("modelo não instalado é motivo DIFERENTE de rota ausente — a ação de quem lê é outra", async () => {

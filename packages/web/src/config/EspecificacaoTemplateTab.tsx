@@ -91,8 +91,8 @@ export function EspecificacaoTemplateTab({
 
       {alvo === "documento" ? (
         <p style={introTextoEstilo}>
-          A especificação de solução da quebra (botão "Gerar especificação de solução" na revisão) é um documento só,
-          montado a partir deste template. Placeholders válidos:{" "}
+          O documento de desenho da quebra (☰ Menu ou "Ver o documento →" na revisão) é um documento só, montado a
+          partir deste template. Placeholders válidos:{" "}
           {VARIAVEIS_ESPECIFICACAO.map((v) => (
             <code key={v} style={codigoEstilo}>{`{{${v}}}`}</code>
           ))}

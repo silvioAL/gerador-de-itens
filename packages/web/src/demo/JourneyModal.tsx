@@ -85,7 +85,7 @@ export function JourneyModal({
           <div>
             <div style={{ fontSize: 16, fontWeight: 700, color: "var(--texto)" }}>Como funciona o Gerador de Itens</div>
             <div style={{ fontSize: 12, color: "var(--texto-fraco)", marginTop: 2 }}>
-              Não é um gerador de prompt de IA — é um mecanismo determinístico, do diagrama à especificação de solução.
+              Não é um gerador de prompt de IA — é um mecanismo determinístico, do diagrama ao documento de desenho e aos itens de trabalho.
             </div>
           </div>
           <div style={{ flex: 1 }} />

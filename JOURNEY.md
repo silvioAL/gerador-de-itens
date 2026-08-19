@@ -8747,3 +8747,52 @@ conserto:
   precisar circular fora dela, essa é a costura que vai doer.
 
 335 engine · 645 web · 78 aplicação · 229 server · 79/79 E2E · build limpo.
+
+## §270 — duas portas para o mesmo markdown, e a de trás escrevia na foto
+
+*"no fluxo de gerar itens de trabalho já temos um markdown que deve ter tudo,
+não vejo mais necessidade dessa opção de gerar especificação da solução"*.
+
+### Eram a mesma coisa, literalmente
+
+`baixarEspecificacao` chamava `gerarEspecificacaoEntrega` com o mesmo conjunto
+de opções que o documento de desenho usa para montar o `⬇ Markdown`. Mesma
+função, mesmas opções, mesmo texto — e dois nomes de arquivo diferentes
+(`especificacao-de-solucao.md` × `documento-de-desenho.md`), que é a única
+coisa que fazia parecerem artefatos distintos.
+
+### O defeito que só apareceu ao remover
+
+Gerar a especificação também gravava em `quebra.especificacao`. Desde o §264
+esse campo é a **foto da aprovação** — a referência contra a qual o documento
+diz "mudou a seção Itens". Ou seja: **um botão de gerar reescrevia a foto de
+uma aprovação que ninguém tinha revisto**, zerando em silêncio o aviso do §264.
+
+Dois escritores para um campo com dois significados. Agora tem um só, e o
+significado é o que o nome do §264 promete.
+
+### O que mudou de nome, e por quê
+
+`temEspecificacaoSalva` e `especificacaoJaGerada` passaram a
+`temDocumentoAprovado` e `documentoJaAprovado`. Não é cosmético: com a geração
+fora, o campo só é escrito por aprovar, e um nome que descrevia o escritor
+antigo mandaria a próxima pessoa procurar um botão que não existe.
+
+As falas seguiram: o balão do canvas (M14) e a condução da revisão diziam *"já
+tem a especificação de solução completa"*. Agora dizem que o **documento foi
+aprovado**, e que ele mesmo acusa o que ficou diferente.
+
+E a varredura pegou quatro textos que prometiam o artefato removido — a aba do
+template, o modal da jornada, a landing e o aviso de "os agentes não rodam
+neste modo". Todos falavam de uma saída que deixou de existir.
+
+### Um efeito de fluxo que o E2E revelou
+
+Gerar itens **abre a tela dos itens**; a especificação só baixava e deixava a
+pessoa na revisão. O balão de feedback do PDCA mora na revisão, então ele passou
+a esperar a volta — o que é o comportamento certo: pedir opinião por cima do
+resultado que a pessoa acabou de abrir interromperia a leitura.
+
+**Mordida:** devolver o botão ao balão → dois testes vermelhos.
+
+335 engine · 645 web · 78 aplicação · 229 server · 79/79 E2E · build limpo.

@@ -97,12 +97,11 @@ export interface ReviewScreenProps {
   /** SPEC-37 F3 (M4) — abre Configurações na aba Modelo de IA por cima da revisão. */
   onConfigurarModeloIa?: () => void;
   /** §184 — o markdown gerado sobe pro App, que o salva NA QUEBRA. */
-  onEspecificacaoGerada?: (md: string) => void;
   /** SPEC-41 Parte B — os itens materializados sobem pro App, que persiste e
    * abre a tela `#/itens`. Mesmo material do documento (fonte única). */
   onItensGerados?: (itens: ItemDeTrabalho[]) => void;
   /** §184 — a demanda reaberta já tem especificação: o chat abre com a fala adaptada. */
-  especificacaoJaGerada?: boolean;
+  documentoJaAprovado?: boolean;
   onSelecionarNo: (id: string) => void;
 }
 
@@ -238,7 +237,7 @@ function contextoEpicoCompleto(demandInfo?: string, anexos?: { nome: string; con
  */
 
 /**
- * Revisão e especificação de solução são uma coisa só (achado do usuário: o
+ * Revisão e documento de desenho são uma coisa só (achado do usuário: o
  * fluxo anterior — tabela resumida + botão separado "Especificação de
  * entrega" com preview em texto puro + "copiar" — não fazia sentido; ninguém
  * precisa copiar nada à mão). A única saída é o documento completo
@@ -288,9 +287,8 @@ export function ReviewScreen({
   onFechar,
   onDocumento,
   onConfigurarModeloIa,
-  onEspecificacaoGerada,
   onItensGerados,
-  especificacaoJaGerada = false,
+  documentoJaAprovado = false,
   onSelecionarNo,
 }: ReviewScreenProps) {
   const [mostrarDiagrama, setMostrarDiagrama] = useState(false);
@@ -649,16 +647,16 @@ export function ReviewScreen({
   // Congelado na CHEGADA: gerar a especificação durante ESTA sessão da
   // revisão não pode reabrir o chat por cima do que a pessoa está fazendo —
   // a fala é pra quem REABRE uma demanda já especificada.
-  const jaGeradaNaChegada = useRef(especificacaoJaGerada);
+  const jaGeradaNaChegada = useRef(documentoJaAprovado);
   useEffect(() => {
     if (!jaGeradaNaChegada.current || conduziuJaEspecificada.current || esteira.rodando) return;
     conduziuJaEspecificada.current = true;
     setFalaDeConducao(
-      "Esta demanda já tem a especificação de solução completa. Revise os itens; se algo precisar mudar, me diga aqui (por texto ou por voz 🎤) que eu aplico a alteração, reviso a consistência dos itens que dependem — e gero a especificação de novo."
+      "Esta demanda já teve o documento de desenho aprovado. Revise os itens; se algo precisar mudar, me diga aqui (por texto ou por voz 🎤) que eu aplico a alteração e reviso a consistência dos itens que dependem — o documento acusa sozinho o que ficou diferente da aprovação."
     );
     if (!selecionada) setSelecionada(resultado.atividades[0]?.chave ?? null);
     setMostrarConversa(true);
-  }, [especificacaoJaGerada, esteira.rodando, resultado.atividades, selecionada]);
+  }, [documentoJaAprovado, esteira.rodando, resultado.atividades, selecionada]);
 
   const chaveParaNodeId = Object.fromEntries(
     resultado.atividades.filter((a) => a.origem.nodeId).map((a) => [a.chave, a.origem.nodeId!])
@@ -706,35 +704,18 @@ export function ReviewScreen({
       .catch(() => {});
   }
 
-  function baixarEspecificacao() {
-    registrarUsoDeEspecificacao();
-    const documento = gerarEspecificacaoEntrega(resultado.atividades, diagrama, config, {
-      regras,
-      demandInfo,
-      // SPEC-53 — o documento também diz de que produto se trata: quem o
-      // recebe (outro time, um fornecedor, um agente) não tem o contexto que
-      // quem escreveu tinha na cabeça.
-      contextoDoProduto,
-      template: especificacaoTemplate.conteudo,
-      templateItem,
-      time,
-      respostasItens,
-      necessidades,
-      // Fatia C — o achado da fatia A repetido de propósito: a citação só
-      // chega ao documento se ESTA tela repassar. Passar no engine e esquecer
-      // aqui faz a feature funcionar em teste unitário e em lugar nenhum.
-      decisoes,
-      excecoes,
-      // Fatia E — mesmo achado da fatia A e da C, terceira vez: a citação só
-      // chega ao documento se ESTA tela repassar.
-      percursos,
-    });
-    baixarArquivoTexto(documento, "especificacao-de-solucao.md", "text/markdown");
-    // §184 — o documento gerado (com TODO o material do momento) sobe pro App
-    // e fica salvo na quebra: gerar é publicar uma versão, não só baixar.
-    onEspecificacaoGerada?.(documento);
-  }
-
+  /**
+   * §270 — `baixarEspecificacao` saiu.
+   *
+   * Ela montava o MESMO markdown que o documento de desenho monta (mesma
+   * `gerarEspecificacaoEntrega`, mesmas opções), baixava com outro nome de
+   * arquivo e gravava em `quebra.especificacao`. Dois caminhos para o mesmo
+   * artefato — e o segundo escrevia por cima da FOTO DA APROVAÇÃO (§264), que
+   * passou a ser o único sentido daquele campo.
+   *
+   * O que sobrou nesta tela é gerar os ITENS. O documento tem tela própria e
+   * um ⬇ Markdown lá.
+   */
   // SPEC-41 Parte B — os itens de trabalho, do MESMO material do documento.
   function gerarItens() {
     registrarUsoDeEspecificacao();
@@ -981,8 +962,8 @@ export function ReviewScreen({
           {iaIndisponivel === "sem-rota" ? (
             <>
               <strong>Os agentes não rodam neste modo.</strong> Este servidor não expõe as rotas de IA — elas
-              existem só no modo local (<code>gerador open</code>). A derivação, a revisão determinística e a
-              especificação de solução continuam funcionando aqui; o que não roda é o preenchimento assistido.
+              existem só no modo local (<code>gerador open</code>). A derivação, a revisão determinística e o
+              documento de desenho continuam funcionando aqui; o que não roda é o preenchimento assistido.
             </>
           ) : (
             <>
@@ -1364,10 +1345,10 @@ export function ReviewScreen({
           botão "✦ Refinar conversando" que morava no header. zIndex 62: acima
           da própria JanelaConversa (60), senão a janela aberta cobriria o
           botão que a fecha. */}
-      {/* SPEC-37 M7 — tudo refinado: o fechamento natural do ciclo é gerar a
-          especificação de solução, e o chip executa o MESMO baixarEspecificacao
-          do botão do header. Só com o chat fechado (aberto, quem fala é ele) e
-          com a esteira parada — no meio da corrida os números ainda mudam. */}
+      {/* SPEC-37 M7 — tudo refinado: o fechamento natural do ciclo é gerar os
+          ITENS (§270 tirou daqui a especificação, que era o documento de
+          desenho por outra porta). Só com o chat fechado (aberto, quem fala é
+          ele) e com a esteira parada — no meio da corrida os números mudam. */}
       {filaAberta && (
         <FilaDeRevisao
           pendentes={filaAberta}
@@ -1379,12 +1360,13 @@ export function ReviewScreen({
       {momentoM7Ativo && (
         <div className="assistente-janela" style={balaoM7Estilo} data-testid="balao-especificacao" role="status">
           <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: "var(--texto-2)" }}>
-            Tudo refinado — os {contagens?.refinado} itens estão prontos. Quer gerar a especificação de solução?
+            Tudo refinado — os {contagens?.refinado} itens estão prontos. Quer gerar os itens de trabalho?
           </p>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-            <button onClick={baixarEspecificacao} style={chipM7Estilo} data-testid="balao-especificacao-acao">
-              Gerar especificação de solução
-            </button>
+            {/* §270 — uma saída só. O "Gerar especificação de solução" produzia
+                o mesmo markdown do documento de desenho, com outro nome de
+                arquivo: duas portas para o mesmo artefato, e a de trás ainda
+                escrevia por cima da foto da aprovação. */}
             {onItensGerados && (
               <button onClick={gerarItens} style={chipM7Estilo} data-testid="balao-especificacao-itens">
                 Gerar itens de trabalho
@@ -1447,12 +1429,9 @@ export function ReviewScreen({
       {momentoRevisao === "m12" && !pedindoFeedback && (
         <div className="assistente-janela" style={balaoM7Estilo} data-testid="balao-gerar" role="status">
           <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: "var(--texto-2)" }}>
-            Quando quiser, eu gero a especificação de solução — mesmo com itens ainda em revisão.
+            Quando quiser, eu gero os itens de trabalho — mesmo com itens ainda em revisão.
           </p>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-            <button onClick={baixarEspecificacao} style={chipM7Estilo} data-testid="balao-gerar-acao">
-              Gerar especificação de solução
-            </button>
             {onItensGerados && (
               <button onClick={gerarItens} style={chipM7Estilo} data-testid="balao-gerar-itens">
                 Gerar itens de trabalho
