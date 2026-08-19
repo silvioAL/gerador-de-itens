@@ -40,6 +40,47 @@ function normalizarNaLeitura(chave: ChaveConfig, documento: unknown): unknown {
   return chave === "regras" ? documento : normalizarDocumentoConfig(chave, documento);
 }
 
+/**
+ * §272 — a seção que o documento NEM TEM nasce preenchida.
+ *
+ * ## O problema, relatado com print
+ *
+ * O diagnóstico do §108 avisava *"a sua configuração de regras não tem nenhuma
+ * régua de percurso (2 no padrão desta versão)"*. Ele estava certo: o
+ * documento foi gravado antes de a seção existir. Mas o aviso era o fim da
+ * linha — a única saída era escrever à mão as duas réguas que o padrão já traz,
+ * e a frase *"fica vazia para sempre"* descrevia literalmente o que acontecia.
+ *
+ * ## A régua: AUSENTE não é VAZIO
+ *
+ * `undefined` é uma seção que não existia quando este documento foi criado —
+ * não há edição a preservar, e completar com o padrão é o que a pessoa faria à
+ * mão. `[]` é alguém que esvaziou de propósito, e isso se respeita: continua
+ * vazio, e o diagnóstico continua avisando.
+ *
+ * A promessa de "nunca sobrescrever o que você editou" fica intacta, porque
+ * nada aqui toca em chave que exista.
+ *
+ * ## Só o primeiro nível
+ *
+ * Nada de mesclar `porTech` tech a tech: config enxuta é escolha legítima de
+ * time (é o que o próprio diagnóstico diz ao não acusar "menos que o
+ * template"), e completar por dentro devolveria regra que alguém apagou.
+ *
+ * Não grava: completa na leitura, e o próximo Salvar persiste. Escrever no
+ * meio de um GET é o tipo de efeito colateral que ninguém procura depois.
+ */
+function completarSecoesAusentes(documento: unknown, template: unknown): unknown {
+  if (!documento || typeof documento !== "object" || Array.isArray(documento)) return documento;
+  if (!template || typeof template !== "object" || Array.isArray(template)) return documento;
+
+  const completo = { ...(documento as Record<string, unknown>) };
+  for (const [chave, valor] of Object.entries(template as Record<string, unknown>)) {
+    if (completo[chave] === undefined) completo[chave] = valor;
+  }
+  return completo;
+}
+
 export function criarCasosDeUsoDeConfig(repo: RepositorioDeConfig): CasosDeUsoDeConfig {
   return {
     async obter(chave, template, timeId) {
@@ -50,7 +91,12 @@ export function criarCasosDeUsoDeConfig(repo: RepositorioDeConfig): CasosDeUsoDe
       // acusa nada, que é a resposta certa.
       // Normalizar na LEITURA também: arquivo editado à mão é entrada tão
       // externa quanto um PUT, e a esteira nunca deve chegar vazia à UI.
-      const documento = normalizarNaLeitura(chave, salvo ? salvo.documento : template);
+      // §272 — o documento salvo entra completado com as seções que ele nem
+      // tem. O template nunca precisa disso: ele É o padrão.
+      const documento = normalizarNaLeitura(
+        chave,
+        salvo ? completarSecoesAusentes(salvo.documento, template) : template
+      );
 
       return {
         documento,
