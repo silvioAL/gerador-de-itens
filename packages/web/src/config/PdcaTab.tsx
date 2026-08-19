@@ -63,7 +63,7 @@ export function PdcaTab({ config, timeAtivo, onAbrirArea, onFichaMudou }: PdcaTa
     const [cfg, fbs, ajs, regs, pipe] = await Promise.all([
       apiPdca.config().catch(() => CADENCIA_PADRAO),
       apiPdca.listarFeedback().catch(() => []),
-      apiPdca.listarAjustes().catch(() => []),
+      apiPdca.listarAjustes(timeAtivo).catch(() => []),
       apiRegras.obter().catch(() => null),
       // SPEC-50 — o outro documento que o ajuste alcança: os papéis da esteira.
       apiPipelineAgentes.obter().catch(() => null),

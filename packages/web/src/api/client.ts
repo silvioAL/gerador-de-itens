@@ -1018,7 +1018,11 @@ export const apiPdca = {
     feedbackId?: string;
   }) =>
     requisitar<SolicitacaoAjuste>("/ajustes", { method: "POST", body: JSON.stringify(dados) }),
-  listarAjustes: () => requisitar<SolicitacaoAjuste[]>("/ajustes"),
+  /** §273 — do time ATIVO. Sem o parâmetro, o servidor devolve os dos times da
+   * sessão (nunca os de terceiros), mas a tela sabe em qual está e dizer é
+   * melhor do que deixar o servidor adivinhar. */
+  listarAjustes: (timeId?: string) =>
+    requisitar<SolicitacaoAjuste[]>(`/ajustes${timeId ? `?timeId=${encodeURIComponent(timeId)}` : ""}`),
   decidirAjuste: (id: string, aprovar: boolean) =>
     requisitar<{ id: string; estado: string }>(`/ajustes/${id}/decidir`, {
       method: "POST",

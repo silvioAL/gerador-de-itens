@@ -82,7 +82,9 @@ test("aba Membros mostra e edita níveis, e a mudança persiste no servidor", as
   // O seletor de time mora no MENU (SPEC-40); trocar o time recarrega o app
   // (key={timeAtivo}) e o menu fecha junto — reabre pra navegar.
   await page.getByRole("button", { name: "☰ Menu" }).click();
-  await page.getByLabel("Time", { exact: true }).selectOption(timeId);
+  // §273 — trocar de time é abrir a lista e escolher.
+  await page.getByTestId("time-ativo").click();
+  await page.getByTestId(`time-${timeId}`).click();
   await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: /Membros/ }).click();
 

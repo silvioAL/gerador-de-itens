@@ -31,12 +31,15 @@ test("trocar de time e recarregar mantém o NOVO time, não o primeiro da lista"
   // SPEC-40 — o seletor de time mora no MENU. Trocar de time remonta o app
   // (key={timeAtivo}), o que fecha o menu: cada leitura reabre.
   await page.getByRole("button", { name: "☰ Menu" }).click();
-  await page.getByRole("combobox", { name: /time/i }).selectOption("time-checkout");
+  // §273 — o `<select>` virou indicador + lista a pedido (sessenta times não
+  // cabem num dropdown).
+  await page.getByTestId("time-ativo").click();
+  await page.getByTestId("time-time-checkout").click();
   await page.getByRole("button", { name: "☰ Menu" }).click();
-  await expect(page.getByRole("combobox", { name: /time/i })).toHaveValue("time-checkout");
+  await expect(page.getByTestId("time-ativo")).toHaveText(/time-checkout/);
 
   await page.reload();
 
   await page.getByRole("button", { name: "☰ Menu" }).click();
-  await expect(page.getByRole("combobox", { name: /time/i })).toHaveValue("time-checkout", { timeout: 10000 });
+  await expect(page.getByTestId("time-ativo")).toHaveText(/time-checkout/, { timeout: 10000 });
 });
