@@ -857,7 +857,15 @@ export interface PedidoConfigurarIa {
 /** Alvos que a conversa de configuração propõe (SPEC-34 §4). Os dois de regras
  * entraram na Fase 2 — `teste-automatizado` fica fora até o mapeamento para
  * `regras.testes` ser medido, não suposto. */
-export type AlvoConversaConfig = "campo-no" | "campo-aresta" | "papel" | "regra-refinamento" | "item-processo";
+export type AlvoConversaConfig =
+  | "campo-no"
+  | "campo-aresta"
+  | "papel"
+  | "regra-refinamento"
+  | "item-processo"
+  /** §274 — o contexto do produto passou a ser proposto pela CONVERSA, e não
+   * só por um campo de instrução única. */
+  | "contexto-do-produto";
 
 export interface RespostaConfigurar {
   texto: string;
