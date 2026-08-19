@@ -910,7 +910,18 @@ export type AlvoSugestaoConfig =
   | "papel"
   | "regra-refinamento"
   | "item-processo"
-  | "teste-automatizado";
+  | "teste-automatizado"
+  | "contexto-do-produto";
+
+/** §271 — o que a IA devolve para o alvo "contexto-do-produto": as cinco
+ * seções de uma vez, porque elas são um texto só partido em pedaços. */
+export interface SugestaoContextoDoProduto {
+  objetivo: string;
+  quemUsa: string;
+  regrasDeNegocio: string;
+  sistemas: string;
+  restricoes: string;
+}
 
 /** O que a IA devolve pro alvo "teste-automatizado". */
 export interface SugestaoTeste {

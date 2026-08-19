@@ -8796,3 +8796,52 @@ resultado que a pessoa acabou de abrir interromperia a leitura.
 **Mordida:** devolver o botão ao balão → dois testes vermelhos.
 
 335 engine · 645 web · 78 aplicação · 229 server · 79/79 E2E · build limpo.
+
+## §271 — a tela contava a história do produto, e não o que ela faz
+
+*"aqui faz referência a versões antigas do sistema, não faz sentido, estou
+testando ele ainda, também sinto falta de poder usar o assistente para
+preencher os campos"*.
+
+### O texto que falava de um produto que ninguém usou
+
+> *"O que a ferramenta **sabia** era tecnologia, processo e forma dos itens —
+> nunca de que produto a demanda falava."*
+
+Está no passado, e o passado é o **meu**: descreve uma versão anterior desta
+ferramenta para alguém que a está abrindo pela primeira vez. Quem lê não tem
+como saber o que ela sabia antes, e a frase gasta a atenção da abertura
+explicando uma ausência que já não existe.
+
+O JOURNEY é onde a história do produto mora. A tela diz o que a coisa **é**.
+
+Varri as outras abas de configuração e as telas principais atrás do mesmo
+padrão: só o passo do tour sobre produto repetia a mesma frase (era a mesma
+origem). Os "antes" que sobraram são do usuário — *"nada é medido antes de você
+confirmar"* —, e esses continuam certos.
+
+### O assistente escreve o contexto do produto
+
+O mecanismo já existia (`SugerirComIa`, SPEC-23 Fluxo 2) e a aba de produto era
+a única superfície de configuração sem ele. Faltava um alvo.
+
+**As cinco seções de uma vez, e não uma por vez.** Elas são um texto só partido
+em pedaços — quem descreve um produto descreve as cinco juntas, e cinco pedidos
+seguidos dariam cinco respostas que não se conhecem.
+
+Duas réguas no prompt, cada uma contra um jeito específico de estragar o campo:
+
+- **"regras que valem SEMPRE, não as desta entrega"** — regra de uma demanda
+  escrita como se valesse para o produto contamina todas as demandas seguintes;
+- **campo sem informação volta VAZIO** — contexto de negócio inventado vira
+  item errado com cara de item certo.
+
+E a fronteira de sempre: a IA preenche o **rascunho**, quem grava é o Salvar.
+Com um detalhe que virou teste: campo vazio na resposta **não apaga** o que já
+estava escrito. A sugestão acrescenta; subtrair seria a pessoa perder texto por
+ter pedido ajuda — o oposto de ajudar.
+
+**Mordidas:** deixar a sugestão sobrescrever com vazio → vermelho; tirar do
+prompt a separação entre regra do produto e regra da entrega → vermelho.
+
+335 engine · 647 web · 80 aplicação · 229 server · 79/79 E2E · build limpo.

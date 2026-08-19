@@ -350,7 +350,7 @@ export function passosDeConfiguracao(opts: UseTourOpts): PassoTour[] {
       selector: "[data-tour=config-screen-content]",
       titulo: "Contexto do produto",
       texto:
-        "A ferramenta sabia tecnologia e processo, e não sabia DE QUE PRODUTO a demanda falava. O que estiver aqui — objetivo, quem usa, regras, glossário — viaja junto com toda demanda ligada a este produto, e é o que separa um item tecnicamente correto de um item que entende o negócio. É o par do propósito: lá o \"para quê\", aqui o \"de que negócio\".",
+        "Aqui mora o que a demanda sozinha não diz: DE QUE PRODUTO ela fala. Objetivo, quem usa, regras que valem sempre, glossário — tudo isso viaja junto com cada demanda ligada a este produto, e é o que separa um item tecnicamente correto de um item que entende o negócio. É o par do propósito: lá o \"para quê\" desta entrega, aqui o \"de que negócio\" que não muda.",
       onEnter: () => {
         opts.ligarDemonstracao(true);
         opts.abrirConfigNaAba("produtos");
