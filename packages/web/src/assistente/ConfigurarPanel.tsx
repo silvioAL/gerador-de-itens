@@ -25,9 +25,24 @@ export interface ConfigurarPanelProps {
   /** Techs do time (appConfig) — destino dos alvos de regras. */
   techs?: string[];
   timeAtivo?: string;
+  /** §274 — os produtos da organização: o destino do alvo `contexto-do-produto`.
+   * Vazio = o alvo não tem para onde ir, e o cartão diz isso. */
+  produtos?: { id: string; nome: string }[];
   onCriarCampoNo: (dados: DadosCampoNo) => Promise<void>;
   onCriarCampoAresta: (dados: DadosCampoAresta) => Promise<void>;
   onSalvarPipelineAgentes: (dados: ConfigPipelineAgentes) => Promise<void>;
+  /** §274 — grava as cinco seções no produto escolhido. Ausente = o cartão
+   * aparece sem o botão de aplicar (mesma disciplina dos outros alvos). */
+  onAplicarContextoDoProduto?: (produtoId: string, contexto: ObjetoContextoDoProduto) => Promise<void>;
+}
+
+/** §274 — o que o passo 2 devolve para `contexto-do-produto`. */
+export interface ObjetoContextoDoProduto {
+  objetivo: string;
+  quemUsa: string;
+  regrasDeNegocio: string;
+  sistemas: string;
+  restricoes: string;
 }
 
 /** O objeto que o passo 2 devolve — os três alvos compartilham a forma de
@@ -62,7 +77,7 @@ interface Cartao {
   alvo: AlvoConversaConfig;
   instrucao: string;
   estado: "materializando" | "pronta" | "aplicando" | "aplicada" | "erro";
-  objeto?: ObjetoCampo | ObjetoPapel | ObjetoRegra;
+  objeto?: ObjetoCampo | ObjetoPapel | ObjetoRegra | ObjetoContextoDoProduto;
   erro?: string;
   /** tipoNo/tipoAresta para campos; grupo da ficha para papel; tech para regras. */
   destino: string;
@@ -82,6 +97,7 @@ const RECURSO_DO_ALVO: Record<AlvoConversaConfig, string> = {
   papel: "pipeline-agentes",
   "regra-refinamento": "regras.checklistTecnico",
   "item-processo": "regras.checklistProcesso",
+  "contexto-do-produto": "produtos",
 };
 
 const ROTULO_DO_ALVO: Record<AlvoConversaConfig, string> = {
@@ -90,6 +106,7 @@ const ROTULO_DO_ALVO: Record<AlvoConversaConfig, string> = {
   papel: "papel da esteira",
   "regra-refinamento": "requisito de refinamento",
   "item-processo": "item de checklist de processo",
+  "contexto-do-produto": "contexto do produto",
 };
 
 /**
@@ -104,6 +121,8 @@ const ROTULO_DO_ALVO: Record<AlvoConversaConfig, string> = {
  */
 export function ConfigurarPanel({
   config,
+  produtos,
+  onAplicarContextoDoProduto,
   camposNo,
   camposAresta,
   pipelineAgentes,
@@ -156,6 +175,7 @@ export function ConfigurarPanel({
     if (alvo === "campo-no") return tiposDeNo[0]?.id ?? "";
     if (alvo === "campo-aresta") return tiposDeAresta[0]?.id ?? "";
     if (alvo === "regra-refinamento" || alvo === "item-processo") return techs?.[0] ?? "";
+    if (alvo === "contexto-do-produto") return produtos?.[0]?.id ?? "";
     return "especialista";
   }
 
@@ -221,7 +241,10 @@ export function ConfigurarPanel({
     if (!cartao.objeto) return;
     atualizarCartao(indiceMensagem, indiceCartao, { estado: "aplicando" });
     try {
-      if (cartao.alvo === "campo-no") {
+      if (cartao.alvo === "contexto-do-produto") {
+        // As cinco seções de uma vez, no produto escolhido no cartão.
+        await onAplicarContextoDoProduto?.(cartao.destino, cartao.objeto as ObjetoContextoDoProduto);
+      } else if (cartao.alvo === "campo-no") {
         const o = cartao.objeto as ObjetoCampo;
         await onCriarCampoNo({
           timeId: timeAtivo,
@@ -290,6 +313,7 @@ export function ConfigurarPanel({
     if (cartao.alvo === "regra-refinamento" || cartao.alvo === "item-processo") {
       return (techs ?? []).map((t) => ({ id: t, rotulo: t }));
     }
+    if (cartao.alvo === "contexto-do-produto") return (produtos ?? []).map((p) => ({ id: p.id, rotulo: p.nome }));
     return (["po", "arquiteto", "especialista", "qa"] as const).map((g) => ({ id: g, rotulo: g }));
   }
 
@@ -313,6 +337,29 @@ export function ConfigurarPanel({
                   )}
                   {cartao.estado === "erro" && (
                     <div style={{ fontSize: 12, color: "var(--vermelho)" }}>{cartao.erro}</div>
+                  )}
+                  {objeto && cartao.alvo === "contexto-do-produto" && (
+                    <div style={{ fontSize: 12.5, lineHeight: 1.6 }} data-testid="proposta-contexto-do-produto">
+                      {/* As seções vazias não aparecem: o modelo devolve string
+                          vazia no que não sabe (§271), e listar rótulo sem
+                          conteúdo faria a proposta parecer maior do que é. */}
+                      {(
+                        [
+                          ["O que é", (objeto as ObjetoContextoDoProduto).objetivo],
+                          ["Quem usa", (objeto as ObjetoContextoDoProduto).quemUsa],
+                          ["Regras que valem sempre", (objeto as ObjetoContextoDoProduto).regrasDeNegocio],
+                          ["Sistemas", (objeto as ObjetoContextoDoProduto).sistemas],
+                          ["Restrições", (objeto as ObjetoContextoDoProduto).restricoes],
+                        ] as const
+                      )
+                        .filter(([, texto]) => (texto ?? "").trim() !== "")
+                        .map(([rotulo, texto]) => (
+                          <div key={rotulo} style={{ marginBottom: 4 }}>
+                            <strong style={{ fontSize: 11, color: "var(--texto-mudo)" }}>{rotulo}</strong>
+                            <div>{texto}</div>
+                          </div>
+                        ))}
+                    </div>
                   )}
                   {objeto && (cartao.alvo === "regra-refinamento" || cartao.alvo === "item-processo") && (
                     <div style={{ fontSize: 12.5, lineHeight: 1.6 }}>
@@ -383,6 +430,16 @@ export function ConfigurarPanel({
                       </button>
                       {/* Dizer o motivo, não esconder: quem não tem a permissão
                           precisa saber que a feature existe e a quem pedir (§144). */}
+                      {/* §274 — a MESMA régua para o outro motivo de o botão
+                          estar apagado: sem destino não há onde gravar, e um
+                          botão morto sem explicação lê como app quebrado. */}
+                      {podeAplicar && cartaoDestinos(cartao).length === 0 && (
+                        <span data-testid="sem-destino" style={{ fontSize: 11, color: "var(--texto-mudo)" }}>
+                          {cartao.alvo === "contexto-do-produto"
+                            ? "cadastre um produto antes — o contexto precisa de um dono"
+                            : `nenhum destino disponível para ${ROTULO_DO_ALVO[cartao.alvo]}`}
+                        </span>
+                      )}
                       {!podeAplicar && (
                         <span style={{ fontSize: 11, color: "var(--texto-mudo)" }}>
                           sem permissão para editar {ROTULO_DO_ALVO[cartao.alvo]}

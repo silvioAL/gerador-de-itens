@@ -1564,6 +1564,10 @@ function AppCarregado({
           timeAtivo={timeAtivo}
           timeIds={sessao.timeIds}
           onAbrirArea={(area) => abrirConfigNaAba(area)}
+          // §274 — o botão da aba de produto abre a MESMA conversa do FAB, na
+          // aba de configuração: um lugar só para pedir, e a proposta volta
+          // como cartão com "aplicar".
+          onConversarComAssistente={() => setAbaAssistente("configurar")}
           onPerfisMudaram={() => {
             void apiStacks.sugestoes().then(setSugestoesDeStack);
           }}
@@ -1756,6 +1760,18 @@ function AppCarregado({
             onCriarCampoNo={criarCampoNo}
             onCriarCampoAresta={criarCampoAresta}
             onSalvarPipelineAgentes={salvarPipelineAgentes}
+            // §274 — o contexto do produto proposto pela conversa do FAB.
+            produtos={produtos}
+            onAplicarContextoDoProduto={async (produtoId, contexto) => {
+              const atual = produtos.find((p) => p.id === produtoId);
+              if (!atual) throw new Error("produto não encontrado");
+              // Só o que veio preenchido, como no §271: a proposta acrescenta,
+              // nunca apaga o que já estava escrito.
+              const preenchidos = Object.fromEntries(
+                Object.entries(contexto).filter(([, v]) => String(v).trim() !== "")
+              );
+              await apiProdutos.atualizar(produtoId, { nome: atual.nome, ...preenchidos });
+            }}
           />
         )}
       </AssistenteFlutuante>

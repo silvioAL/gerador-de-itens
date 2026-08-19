@@ -8950,3 +8950,45 @@ outra roupa.
 no parâmetro da tela → vermelho.
 
 335 engine · 650 web · 84 aplicação · 233 server · 79/79 E2E · build limpo.
+
+## §274 — pedir ao assistente, e não a uma caixinha
+
+*"ao invés de sugerir minha expectativa é que houvesse um botão semelhante que
+levasse ao assistente, e fosse possível interagir com ele para gerar o conteúdo
+dos campos"* — e, na sequência: *"assistente do FAB"*.
+
+### O que o §271 acertou pela metade
+
+Ele pôs um campo de instrução única dentro da aba: *"descreva e eu preencho"*.
+Isso serve a quem já sabe dizer o produto inteiro numa frase — e esse é o caso
+**raro**. Escrever o que um produto É se faz por partes: perguntando,
+corrigindo, completando. Isso é conversa, e a conversa já existe no assistente
+do FAB.
+
+Manter a caixinha ali seria ensinar **dois jeitos** de pedir a mesma coisa, com
+o pior deles mais à mão.
+
+### O alvo entrou na conversa, não uma conversa nova
+
+`contexto-do-produto` já era alvo do passo 2 desde o §271; faltava estar no
+passo 1, o que decide sobre o que a conversa pode propor. Com ele lá, o cartão
+de proposta aparece como os outros — com destino (qual produto) e um "Aplicar"
+que é clique da pessoa.
+
+O cartão mostra **só as seções preenchidas**: o modelo devolve string vazia no
+que não sabe (§271), e listar rótulo sem conteúdo faria a proposta parecer
+maior do que é.
+
+### Um botão morto que não dizia por quê
+
+Sem produto cadastrado, o "Aplicar" já vinha desabilitado — e calado. Este
+arquivo tem a régua escrita para o outro caso (*"dizer o motivo, não esconder:
+quem não tem a permissão precisa saber que a feature existe e a quem pedir"*,
+§144) e não a aplicava aqui. Botão apagado sem explicação lê como app quebrado.
+
+Achei isso escrevendo um teste que **afirmava a coisa errada** — eu tinha posto
+um guarda dentro do `aplicar` que nunca rodava, porque o clique não chegava
+nele. O teste que não passava estava certo sobre o sintoma e errado sobre a
+causa.
+
+335 engine · 652 web · 84 aplicação · 233 server · 79/79 E2E · build limpo.

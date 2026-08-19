@@ -31,6 +31,8 @@ export type AbaConfig =
   | "modeloIa" | "pdca" | "exportacao";
 
 export interface ConfigScreenProps {
+  /** §274 — abre o assistente do FAB na conversa de configuração. */
+  onConversarComAssistente?: () => void;
   /** §235 — o tour percorre estas telas com dado de demonstração, para não
    * mostrar tela vazia nem escrever na configuração de quem só quis ver. */
   demonstracao?: boolean;
@@ -92,6 +94,7 @@ function podeVerAba(id: AbaConfig, pode: (recurso: string, acao?: string) => boo
  */
 export function ConfigScreen({
   demonstracao,
+  onConversarComAssistente,
   config,
   camposNo,
   camposAresta,
@@ -244,7 +247,11 @@ export function ConfigScreen({
           <ExportacaoTab demonstracao={demonstracao ? EXPORTADOR_DO_TOUR : undefined} />
         )}
         {abaAtiva === "produtos" && (
-          <ProdutosTab timeIds={timeIds} demonstracao={demonstracao ? PRODUTO_DO_TOUR : undefined} />
+          <ProdutosTab
+            timeIds={timeIds}
+            demonstracao={demonstracao ? PRODUTO_DO_TOUR : undefined}
+            onConversarComAssistente={onConversarComAssistente}
+          />
         )}
         {abaAtiva === "perfis" && (
           <PerfisStackTab config={config} onPerfisMudaram={onPerfisMudaram} />

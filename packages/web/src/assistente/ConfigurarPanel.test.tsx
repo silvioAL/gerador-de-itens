@@ -219,3 +219,61 @@ describe("ConfigurarPanel — botão de falar (SPEC-30, achado real: a fala prom
     expect(screen.queryByTestId("voz-falar")).toBeNull();
   });
 });
+
+/**
+ * §274 — o contexto do produto proposto pela CONVERSA.
+ *
+ * O §271 tinha uma caixinha de instrução única dentro da aba de produto. Ela
+ * serve a quem já sabe dizer o produto inteiro numa frase, que é o caso raro;
+ * escrever o que um produto É se faz por partes, e isso é conversa.
+ */
+describe("ConfigurarPanel — contexto do produto", () => {
+  const CONTEXTO = {
+    objetivo: "Levar a conta do cliente para outro banco.",
+    quemUsa: "Cliente PF que troca de banco.",
+    regrasDeNegocio: "",
+    sistemas: "",
+    restricoes: "Resolução 4.753 do BACEN.",
+  };
+
+  it("a proposta mostra só as seções preenchidas, e aplicar grava no produto escolhido", async () => {
+    configurarMock.mockResolvedValue({
+      texto: "Posso escrever o contexto da Portabilidade.",
+      propostas: [{ alvo: "contexto-do-produto", instrucao: "portabilidade de conta salário" }],
+    });
+    sugerirConfigMock.mockResolvedValue(CONTEXTO);
+    const onAplicarContextoDoProduto = vi.fn().mockResolvedValue(undefined);
+    montar({ produtos: [{ id: "p1", nome: "Portabilidade" }], onAplicarContextoDoProduto });
+
+    await enviarIntencao("quero descrever a portabilidade");
+
+    const cartao = await screen.findByTestId("proposta-contexto-do-produto");
+    expect(cartao.textContent).toContain("Levar a conta do cliente para outro banco.");
+    // Seção vazia não vira rótulo solto: listar "Sistemas" sem conteúdo faria a
+    // proposta parecer maior do que é.
+    expect(cartao.textContent).not.toContain("Sistemas");
+
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+
+    await waitFor(() => expect(onAplicarContextoDoProduto).toHaveBeenCalledWith("p1", CONTEXTO));
+  });
+
+  it("sem produto cadastrado, não há para onde aplicar", async () => {
+    configurarMock.mockResolvedValue({
+      texto: "Posso escrever o contexto.",
+      propostas: [{ alvo: "contexto-do-produto", instrucao: "portabilidade" }],
+    });
+    sugerirConfigMock.mockResolvedValue(CONTEXTO);
+    const onAplicarContextoDoProduto = vi.fn().mockResolvedValue(undefined);
+    montar({ produtos: [], onAplicarContextoDoProduto });
+
+    await enviarIntencao("quero descrever a portabilidade");
+    await screen.findByTestId("proposta-contexto-do-produto");
+
+    // O botão fica apagado — e DIZ por quê. Botão morto sem explicação lê como
+    // app quebrado (a régua do §144, que este arquivo já aplicava à permissão).
+    expect(screen.getByRole("button", { name: "Aplicar" })).toBeDisabled();
+    expect(screen.getByTestId("sem-destino").textContent).toContain("cadastre um produto antes");
+    expect(onAplicarContextoDoProduto).not.toHaveBeenCalled();
+  });
+});

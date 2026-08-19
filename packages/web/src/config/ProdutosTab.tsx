@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiProdutos, type Produto } from "../api/client";
 import { MarcaDeDemonstracao } from "../demo/dadosDoTour";
-import { SugerirComIa } from "./SugerirComIa";
-import type { SugestaoContextoDoProduto } from "../api/client";
 
 /**
  * SPEC-53 Fase 1 — o contexto do produto.
@@ -18,6 +16,9 @@ import type { SugestaoContextoDoProduto } from "../api/client";
  * já pede muita configuração de quem chega.
  */
 export interface ProdutosTabProps {
+  /** §274 — abre o assistente do FAB na conversa de configuração. Ausente = o
+   * botão não aparece (é o caso do teste de unidade e do tour). */
+  onConversarComAssistente?: () => void;
   /** Os times aos quais um produto pode ser amarrado. */
   timeIds: string[];
   /** §235 — produto EXCLUSIVO do tour: substitui a lista do servidor e desliga
@@ -92,7 +93,7 @@ function reconciliar(atual: Produto | null, doServidor: Produto | null): Produto
   return { ...atual, glossario: doServidor.glossario, timeIds: doServidor.timeIds };
 }
 
-export function ProdutosTab({ timeIds, demonstracao }: ProdutosTabProps) {
+export function ProdutosTab({ timeIds, demonstracao, onConversarComAssistente }: ProdutosTabProps) {
   const [produtos, setProdutos] = useState<Produto[] | null>(null);
   const [selecionadoId, setSelecionadoId] = useState<string | null>(null);
   const [nomeNovo, setNomeNovo] = useState("");
@@ -210,31 +211,19 @@ export function ProdutosTab({ timeIds, demonstracao }: ProdutosTabProps) {
 
       {rascunho && (
         <section data-testid="editor-do-produto">
-          {/* §271 — escrever as cinco seções com apoio do assistente.
-              As cinco de uma vez, e não uma por vez: elas são um texto só
-              partido em pedaços, e cinco pedidos seguidos dariam cinco
-              respostas que não se conhecem.
-              A fronteira de sempre (SPEC-23 Fluxo 2): a IA preenche o
-              RASCUNHO, quem grava é o Salvar. */}
-          {!demonstracao && (
-            <SugerirComIa<SugestaoContextoDoProduto>
-              alvo="contexto-do-produto"
-              contexto={rascunho.nome}
-              exemplo="ex.: portabilidade de conta salário para clientes PF, com prazo regulatório"
-              onSugestao={(sugestao) =>
-                setRascunho((atual) =>
-                  atual
-                    ? {
-                        ...atual,
-                        // Só o que veio preenchido: campo vazio na resposta não
-                        // apaga o que a pessoa já tinha escrito — a sugestão
-                        // acrescenta, nunca subtrai.
-                        ...Object.fromEntries(Object.entries(sugestao).filter(([, v]) => String(v).trim() !== "")),
-                      }
-                    : atual
-                )
-              }
-            />
+          {/* §274 — o botão leva ao ASSISTENTE, e não a um campo de instrução
+              única aqui dentro.
+              O §271 tinha posto uma caixinha de "descreva e eu preencho": ela
+              resolve o caso de quem já sabe dizer o produto inteiro numa
+              frase, e é justamente esse o caso raro. Escrever o que um produto
+              É se faz por partes — perguntando, corrigindo, completando —, e
+              isso é conversa. O assistente do FAB já é o lugar da conversa;
+              duplicá-lo aqui em versão pobre seria ensinar dois jeitos de
+              pedir a mesma coisa. */}
+          {!demonstracao && onConversarComAssistente && (
+            <button onClick={onConversarComAssistente} style={botaoAssistenteEstilo} data-testid="conversar-sobre-o-produto">
+              ✦ Escrever com o assistente
+            </button>
           )}
           <label style={labelEstilo}>Nome</label>
           <input
@@ -402,3 +391,15 @@ const abaEstilo: React.CSSProperties = {
   cursor: "pointer",
 };
 const abaAtivaEstilo: React.CSSProperties = { ...abaEstilo, background: "var(--acento)", color: "#fff", border: "none" };
+
+const botaoAssistenteEstilo: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 700,
+  padding: "8px 14px",
+  marginBottom: 12,
+  borderRadius: 8,
+  border: "1px solid #4f46e5",
+  background: "#4f46e5",
+  color: "#fff",
+  cursor: "pointer",
+};

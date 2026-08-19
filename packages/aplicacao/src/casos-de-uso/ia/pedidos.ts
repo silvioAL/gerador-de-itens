@@ -671,6 +671,11 @@ export const ALVOS_DA_CONVERSA_DE_CONFIG = [
   "papel",
   "regra-refinamento",
   "item-processo",
+  // §274 — o contexto do produto entrou na CONVERSA. Ele já existia como alvo
+  // do passo 2 (§271), num campo de instrução única dentro da aba: escrever o
+  // que um produto é numa linha só é a parte difícil, e a conversa é onde se
+  // chega lá aos poucos — perguntando, corrigindo, completando.
+  "contexto-do-produto",
 ] as const;
 
 export interface MensagemConfigurar {

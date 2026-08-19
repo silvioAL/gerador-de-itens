@@ -159,51 +159,29 @@ describe("ProdutosTab — o que a releitura pode e não pode substituir", () => 
 });
 
 /**
- * §271 — escrever o contexto com apoio do assistente.
+ * §274 — o caminho para escrever o contexto é o ASSISTENTE.
+ *
+ * O §271 tinha posto aqui uma caixinha de instrução única ("descreva e eu
+ * preencho"). Ela só serve a quem já sabe dizer o produto inteiro numa frase —
+ * e esse é o caso raro. Escrever o que um produto É se faz por partes, e isso
+ * é conversa.
  */
-describe("ProdutosTab — o assistente preenche o rascunho, e só ele", () => {
-  it("a sugestão cai nos campos SEM gravar — quem grava é o Salvar", async () => {
-    // A fronteira da SPEC-23 Fluxo 2, que é o que impede a assistência de
-    // virar um canal paralelo de escrita.
-    (apiIa.sugerirConfig as Mock).mockResolvedValue({
-      objetivo: "Levar a conta do cliente para outro banco.",
-      quemUsa: "Cliente PF que troca de banco.",
-      regrasDeNegocio: "",
-      sistemas: "",
-      restricoes: "Resolução 4.753 do BACEN.",
-    });
-    montar();
+describe("ProdutosTab — o botão que leva ao assistente", () => {
+  it("leva ao assistente, e não preenche nada sozinho", async () => {
+    const onConversarComAssistente = vi.fn();
+    render(<ProdutosTab timeIds={["time-a"]} onConversarComAssistente={onConversarComAssistente} />);
     await screen.findByTestId("editor-do-produto");
 
-    fireEvent.change(screen.getByPlaceholderText(/portabilidade de conta salário/i), {
-      target: { value: "portabilidade" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "✨ Sugerir" }));
+    fireEvent.click(screen.getByTestId("conversar-sobre-o-produto"));
 
-    await waitFor(() =>
-      expect(screen.getByLabelText("O que é")).toHaveValue("Levar a conta do cliente para outro banco.")
-    );
-    expect(screen.getByLabelText("Restrições")).toHaveValue("Resolução 4.753 do BACEN.");
+    expect(onConversarComAssistente).toHaveBeenCalled();
     expect(apiProdutos.atualizar).not.toHaveBeenCalled();
   });
 
-  it("campo vazio na resposta NÃO apaga o que já estava escrito", async () => {
-    // A sugestão acrescenta; subtrair seria a pessoa perder texto por ter
-    // pedido ajuda — o oposto de ajudar.
-    (apiIa.sugerirConfig as Mock).mockResolvedValue({
-      objetivo: "",
-      quemUsa: "Cliente PF.",
-      regrasDeNegocio: "",
-      sistemas: "",
-      restricoes: "",
-    });
+  it("sem o caminho ligado, o botão não aparece", async () => {
     montar();
     await screen.findByTestId("editor-do-produto");
 
-    fireEvent.change(screen.getByPlaceholderText(/portabilidade de conta salário/i), { target: { value: "x" } });
-    fireEvent.click(screen.getByRole("button", { name: "✨ Sugerir" }));
-
-    await waitFor(() => expect(screen.getByLabelText("Quem usa")).toHaveValue("Cliente PF."));
-    expect(screen.getByLabelText("O que é")).toHaveValue("Levar a conta para outro banco.");
+    expect(screen.queryByTestId("conversar-sobre-o-produto")).toBeNull();
   });
 });
