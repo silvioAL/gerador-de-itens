@@ -93,3 +93,92 @@ lugar comunica antes de cor.
 A fusão vem por último de propósito: ela é a única que mexe em rota, e rota
 quebrada é o tipo de erro que só aparece no caminho de quem tinha um link
 salvo.
+
+---
+
+## 6. Revisão da SPEC — o que faltava para ela ser executável
+
+Reli isto contra o que a implementação de fato precisa decidir. Sete lacunas, e
+a primeira é de dados, não de tela.
+
+### 6.1 São DUAS listas de itens, não uma
+
+O documento monta `itens` a partir de `estruturarDocumento(atividades…)` — a
+**derivação**, que existe sempre. Os cards vêm de `gerarItensDeTrabalho` e são
+gravados como `ItemGerado`, com `estado`, `criadoEm` e `linkExterno` — a
+**escrita**, que só existe depois que alguém pediu.
+
+Juntar as duas sem dizer qual manda produziria uma seção que às vezes tem
+quatro itens e às vezes sete, sem ninguém entender por quê.
+
+> **A derivação manda; a escrita enfeita.** A seção lista sempre os itens
+> derivados — eles são o que o desenho produz. Onde houver escrita para aquela
+> `chave`, o card abre com o texto final; onde não houver, o card diz *"ainda
+> não escrito"*.
+
+A junção é pela `chave`, que é estável por construção (é a mesma que sobrevive
+a rederivar). Item escrito cuja chave sumiu da derivação **aparece no fim,
+marcado como órfão** — pela mesma razão do §57: sumir em silêncio esconde
+justamente o evento que interessa.
+
+### 6.2 O documento não gera — mostra
+
+Gerar continua sendo ato da revisão (o balão do M7/M12, §270). O documento
+nunca ganha um botão de gerar: ele é onde se lê o resultado, e uma tela que
+gera e mostra a mesma coisa é a confusão que esta SPEC está desfazendo.
+
+Consequência: **depois de gerar, a navegação vai para o documento**, na seção
+dos itens — hoje ela vai para `#/itens`, que deixará de existir.
+
+### 6.3 O tour tem um passo que aponta para a rota que morre
+
+`useTour` tem o passo **"Itens escritos"** com `opts.abrirItens()` e
+`opts.fecharItens()`. Com a rota fundida, o passo passa a apontar para a seção
+do documento, e os dois opts viram um só (`abrirDocumento`, que já existe).
+
+Capacidade que o tour não mostra não existe (§244) — mas passo que aponta para
+tela que não existe é pior: quebra a demonstração inteira no meio.
+
+### 6.4 O canvas em leitura precisa de um modo, não de boa vontade
+
+`Canvas` recebe `UseDiagrama` (o hook), não um `Diagrama`. Para o documento:
+
+- instanciar `useDiagrama(documento.diagrama, () => {}, config)` — o `aplicar`
+  vazio já impede qualquer escrita, porque é por ele que toda mutação passa;
+- **e ainda assim um `somenteLeitura` explícito no `Canvas`**, desligando
+  arrastar, conectar e o atalho de exclusão. Depender só do `aplicar` vazio
+  deixaria a interface convidando a ações que não acontecem, que é pior do que
+  não convidar;
+- `fitView` ao montar: figura se enquadra sozinha.
+
+### 6.5 O gerador de HTML do diagrama SOBREVIVE
+
+O §269 tirou o download de HTML **do documento**. O `gerarDiagramaHtml`
+continua vivo e usado pelo botão *"Baixar diagrama (.html)"* da revisão — que é
+o artefato que se manda para quem não tem acesso à ferramenta. Sai da tela do
+documento; não sai do produto.
+
+### 6.6 Quais chips vão para cada lado da faixa
+
+Sem esta tabela, a divisão vira julgamento na hora de implementar:
+
+| Pede atenção | Já tem |
+|---|---|
+| 🎯 necessidade sem componente | 🎯 necessidades cobertas |
+| ⚖ fora do padrão | ⚖ exceções aceitas (com motivo) |
+| 🛣 caminho fora da régua · sem medir · a confirmar | 🛣 caminhos confirmados |
+| 🧭 proposta esperando · decisão sem porquê | 🧭 decisões vigentes |
+
+A régua que gerou a tabela: **está de um lado o que alguém precisa resolver, do
+outro o que já foi resolvido.** "A confirmar" fica à esquerda porque é trabalho
+de uma pessoa que ninguém fez (§261).
+
+### 6.7 A rota morta redireciona, e o menu perde a entrada
+
+`Rota` continua **entendendo** `#/itens` — e resolvendo para `documento`. Rota
+que some sem redirecionar dá tela branca para quem tinha o link salvo, e link
+salvo é justamente o de quem mais usa.
+
+O item "Itens escritos" sai do menu. Os E2E que navegam por `menu-itens`,
+`itens-screen` e `corpo-dos-itens` passam a navegar pelo documento; o
+`itens-ir-ao-documento` (§269) some junto com a tela que o hospedava.
