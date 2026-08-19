@@ -88,7 +88,7 @@ export interface ReviewScreenProps {
   respostasItens?: Record<string, Record<string, ValorSpec>>;
   /** SPEC-44: `undefined` remove a resposta (Descartar da fila guiada). */
   onResponderItem?: (atividadeChave: string, chavePlaceholder: string, resposta: ValorSpec | undefined) => void;
-  /** SPEC-44 — deep-link da tela de itens: seleciona este item ao abrir. */
+  /** SPEC-44 — deep-link da seção dos itens: seleciona este item ao abrir. */
   itemInicial?: string | null;
   onFechar: () => void;
   /** §269 — leva ao documento de desenho. Ausente = o botão não aparece (é o
@@ -98,7 +98,8 @@ export interface ReviewScreenProps {
   onConfigurarModeloIa?: () => void;
   /** §184 — o markdown gerado sobe pro App, que o salva NA QUEBRA. */
   /** SPEC-41 Parte B — os itens materializados sobem pro App, que persiste e
-   * abre a tela `#/itens`. Mesmo material do documento (fonte única). */
+   * abre o documento na seção deles (SPEC-61). Gerar é ato DAQUI: o documento
+   * é onde se lê o resultado, nunca onde se pede por ele. */
   onItensGerados?: (itens: ItemDeTrabalho[]) => void;
   /** §184 — a demanda reaberta já tem especificação: o chat abre com a fala adaptada. */
   documentoJaAprovado?: boolean;
@@ -739,7 +740,7 @@ export function ReviewScreen({
     }
   }
 
-  // Deep-link da tela de itens: chegar com um item alvo seleciona ele.
+  // Deep-link da seção dos itens: chegar com um item alvo seleciona ele.
   useEffect(() => {
     if (itemInicial) setSelecionada(itemInicial);
   }, [itemInicial]);
@@ -1167,7 +1168,7 @@ export function ReviewScreen({
                     {a.tipo} · {a.tamanho}
                     {a.dependencias.length > 0 && ` · depende de ${descreverDependencia(a)}`}
                   </div>
-                  {/* SPEC-44 — a MESMA frase de completude da tela de itens,
+                  {/* SPEC-44 — a MESMA frase de completude da seção dos itens,
                       e o lote por item: assinar tudo deste item num clique. */}
                   {(() => {
                     const doItem = pendenciasDaRevisao([{ chave: a.chave, rotulo: a.rotulo, ficha }]);

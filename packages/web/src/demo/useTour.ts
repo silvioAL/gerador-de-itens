@@ -32,11 +32,17 @@ export interface UseTourOpts {
   derivarQuebra: () => void;
   fecharRevisao: () => void;
   abrirConfigNaAba: (aba: AbaConfig) => void;
-  /** SPEC-48 — a tela dos itens escritos (o tour não a conhecia). */
-  abrirItens: () => void;
-  /** Volta ao canvas: os passos de configuração vêm depois dela. */
-  fecharItens: () => void;
-  /** SPEC-58 — o documento de desenho (`#/documento`). */
+  /**
+   * SPEC-58 — o documento de desenho (`#/documento`).
+   *
+   * SPEC-61 §6.3 — `abrirItens`/`fecharItens` viraram este. O passo "Itens
+   * escritos" apontava para `#/itens`, e passo que aponta para tela que não
+   * existe quebra a demonstração inteira no meio. Como o documento agora
+   * mostra os itens numa seção, quem abre o documento já abre os itens — e por
+   * isso a ESCRITA deles acontece aqui (ver `App.tsx`): sem ela, o passo
+   * prometeria cards e mostraria "ainda não escrito", que é o defeito do §234
+   * de volta.
+   */
   abrirDocumento: () => void;
   /** SPEC-59 — a vista de como a ferramenta está montada (`#/sistema`). */
   abrirSistema: () => void;
@@ -287,12 +293,14 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       onEnter: () => opts.abrirDocumento(),
     },
     {
-      selector: "[data-testid=corpo-dos-itens]",
+      // SPEC-61 — a seção do MESMO documento, e não uma segunda tela. O passo
+      // continua existindo porque a capacidade continua existindo: o que mudou
+      // é que ela deixou de ter endereço próprio.
+      selector: "[data-testid=secao-dos-itens]",
       titulo: "Itens escritos",
       segundos: 10,
       texto:
-        "Além do documento, o assistente gera os ITENS um a um — cada card traz a escrita final, o que falta especificar e o que fica pronto quando ele termina (a entrega final). É o que vai virar issue no seu tracker.",
-      onEnter: () => opts.abrirItens(),
+        "Descendo no mesmo documento, os ITENS um a um — cada card traz a escrita final, o que falta especificar e o que fica pronto quando ele termina (a entrega final). É o que vai virar issue no seu tracker, e sai daqui mesmo: era uma segunda tela até descobrirmos que era esta seção.",
     },
     {
       selector: "[data-tour=menu-botao]",
@@ -300,7 +308,12 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       segundos: 7,
       texto:
         "Tudo que é administração mora no menu ☰ — padrões do time, pessoas e acessos, IA. Cada item abre uma tela própria, com endereço: dá pra voltar por F5 ou colar o link. É o assunto do outro tour, o de configuração.",
-      onEnter: () => opts.fecharItens(),
+      // Fecha a REVISÃO junto e volta ao canvas: sem isso o passo falaria do
+      // menu ☰ numa tela que não tem menu ☰ (§234).
+      onEnter: () => {
+        opts.fecharRevisao();
+        opts.fecharConfig();
+      },
     },
     {
       selector: null,

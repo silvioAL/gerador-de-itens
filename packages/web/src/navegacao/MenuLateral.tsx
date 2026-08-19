@@ -35,10 +35,13 @@ export interface MenuLateralProps {
   podeEditarArea?: (area: AreaConfig) => boolean;
   onNovaQuebra: () => void;
   onAbrirQuebras: () => void;
-  /** SPEC-41 — a tela dos itens de trabalho gerados da demanda aberta. */
-  onItens: () => void;
-  /** SPEC-58 — o documento de desenho da demanda aberta. Ao lado dos itens
-   * porque são as duas saídas da mesma demanda: o que fazer e por quê. */
+  /**
+   * SPEC-58 — o documento de desenho da demanda aberta.
+   *
+   * SPEC-61 — e ele é a saída ÚNICA: "Itens escritos" saiu do menu, porque os
+   * itens viraram uma seção deste documento. Duas entradas para a mesma
+   * derivação faziam o menu parecer maior do que o produto.
+   */
   onDocumento: () => void;
   /** SPEC-59 — como a FERRAMENTA está montada. Não é da demanda, então não
    * entra no grupo dela: é o mapa do que as telas de configuração configuram. */
@@ -94,7 +97,6 @@ export function MenuLateral({
   podeEditarArea,
   onNovaQuebra,
   onAbrirQuebras,
-  onItens,
   onDocumento,
   onSistema,
   onSair,
@@ -128,9 +130,6 @@ export function MenuLateral({
         </button>
         <button onClick={acao(onAbrirQuebras)} style={itemEstilo}>
           Abrir…
-        </button>
-        <button onClick={acao(onItens)} style={itemEstilo}>
-          Itens escritos
         </button>
         <button onClick={acao(onDocumento)} style={itemEstilo} data-testid="menu-documento">
           Documento de desenho

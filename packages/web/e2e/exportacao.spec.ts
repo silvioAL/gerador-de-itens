@@ -66,9 +66,12 @@ test("configurar destino, exportar os prontos e mostrar o motivo — item com pe
     await botaoItens.waitFor({ timeout: 15000 });
     await page.waitForTimeout(500);
     await botaoItens.click();
-    await expect(page.getByTestId("itens-screen")).toBeVisible();
+    // SPEC-61 — a exportação veio junto com os cards para a seção do documento.
+    // Ela não morreu com a tela que a hospedava: exportar é o que se faz com o
+    // resultado pronto, e o documento é onde ele se lê.
+    await expect(page.getByTestId("secao-dos-itens")).toBeVisible();
 
-    // A tela diz o destino e conta só os prontos.
+    // A seção diz o destino e conta só os prontos.
     await expect(page.getByText(/destino: Agente de teste/)).toBeVisible();
     await expect(page.getByTestId("exportar-prontos")).toBeEnabled();
 

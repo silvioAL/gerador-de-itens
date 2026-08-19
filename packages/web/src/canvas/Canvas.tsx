@@ -88,9 +88,24 @@ export interface CanvasProps {
   /** Time padrão dos nós que não declaram o próprio — é da quebra, e por isso
    * entra como valor, não como estado: o canvas não vai buscá-lo. */
   timePadrao?: string;
+  /**
+   * SPEC-61 §3 — o mesmo desenho como FIGURA, dentro do documento.
+   *
+   * Não basta passar um `aplicar` vazio ao `useDiagrama`: por ele passa toda
+   * mutação, então nada seria de fato escrito — mas a interface continuaria
+   * CONVIDANDO a arrastar, a conectar e a apertar Delete, e ação convidada que
+   * não acontece é pior do que ação não convidada. Aqui os convites somem:
+   * sem arrastar, sem conectar, sem tecla de exclusão, sem seleção (o
+   * documento não tem painel para onde levar o clique) e sem os controles e o
+   * minimapa, que são instrumentos de quem navega, não de quem lê.
+   *
+   * O zoom por roda também sai — dentro de uma folha que se rola, um quadro
+   * que captura a roda faz a página travar sob o cursor.
+   */
+  somenteLeitura?: boolean;
 }
 
-export function Canvas({ diagramaState, config, timePadrao }: CanvasProps) {
+export function Canvas({ diagramaState, config, timePadrao, somenteLeitura }: CanvasProps) {
   const {
     diagrama,
     selecionadoId,
@@ -222,16 +237,28 @@ export function Canvas({ diagramaState, config, timePadrao }: CanvasProps) {
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
-      deleteKeyCode={TECLAS_DE_EXCLUSAO}
+      deleteKeyCode={somenteLeitura ? null : TECLAS_DE_EXCLUSAO}
+      nodesDraggable={!somenteLeitura}
+      nodesConnectable={!somenteLeitura}
+      elementsSelectable={!somenteLeitura}
+      panOnDrag={!somenteLeitura}
+      zoomOnScroll={!somenteLeitura}
+      zoomOnDoubleClick={!somenteLeitura}
+      // A folha rola por trás da figura: sem isto o React Flow engole a roda do
+      // mouse e a página trava enquanto o cursor estiver sobre o desenho.
+      preventScrolling={!somenteLeitura}
       onNodeClick={(_, node) => {
+        if (somenteLeitura) return;
         setSelecionadoId(node.id);
         setArestaSelecionadaId(null);
       }}
       onEdgeClick={(_, edge) => {
+        if (somenteLeitura) return;
         setArestaSelecionadaId(edge.id);
         setSelecionadoId(null);
       }}
       onPaneClick={() => {
+        if (somenteLeitura) return;
         setSelecionadoId(null);
         setArestaSelecionadaId(null);
       }}
@@ -240,19 +267,21 @@ export function Canvas({ diagramaState, config, timePadrao }: CanvasProps) {
       {/* Mesmos pontos do fundo do DiagramaCompacto (protótipo) — cor e
           espaçamento iguais pro canvas e a revisão lerem como um sistema só. */}
       <Background color="#1B2533" gap={26} size={1.4} />
-      <Controls />
-      <MiniMap
-        pannable
-        zoomable
-        bgColor="#101823"
-        maskColor="rgba(12, 17, 26, 0.72)"
-        nodeColor="#263344"
-        style={{
-          border: "1px solid #263344",
-          borderRadius: 8,
-          boxShadow: "0 4px 14px rgba(0,0,0,.4)",
-        }}
-      />
+      {!somenteLeitura && <Controls />}
+      {!somenteLeitura && (
+        <MiniMap
+          pannable
+          zoomable
+          bgColor="#101823"
+          maskColor="rgba(12, 17, 26, 0.72)"
+          nodeColor="#263344"
+          style={{
+            border: "1px solid #263344",
+            borderRadius: 8,
+            boxShadow: "0 4px 14px rgba(0,0,0,.4)",
+          }}
+        />
+      )}
       {exclusaoPendente && (
         <ConfirmarExclusao
           alvo={

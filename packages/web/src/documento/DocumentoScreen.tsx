@@ -1,13 +1,20 @@
 import { useMemo, useState } from "react";
+import { ReactFlowProvider } from "@xyflow/react";
 import type { MudancaDeSecao } from "@gerador/engine";
 import type {
   Decisao,
+  Diagrama,
   DiagramaConfig,
   DocumentoDeDesenho,
   DocumentoEscrito,
+  IndicadorDeSaude,
   ItemDoDocumento,
   StatusDocumento,
 } from "@gerador/engine";
+import { Canvas } from "../canvas/Canvas";
+import { useDiagrama, type AplicarNoDiagrama } from "../state/useDiagrama";
+import type { ItemGerado, ResultadoDaExportacao } from "../api/client";
+import { EscritaDoItem } from "./EscritaDoItem";
 
 /**
  * SPEC-58 — a tela do DOCUMENTO DE DESENHO (`#/documento`).
@@ -31,12 +38,22 @@ import type {
  * O que uma PESSOA escreveu tem marca visual própria (barra indigo + selo).
  * Quem lê precisa saber o que foi afirmado por gente e o que foi apurado pela
  * máquina — é a mesma disciplina de `Origem`, um nível acima.
+ *
+ * ## SPEC-61 — uma saída só
+ *
+ * `#/itens` e `#/documento` eram a mesma coisa vista duas vezes: as duas nascem
+ * da mesma derivação, sobre a mesma demanda, no mesmo instante, e o §269
+ * precisou criar links de uma para a outra. Quando duas telas precisam apontar
+ * uma para a outra o tempo todo, a pergunta certa não é onde pôr o link.
+ *
+ * A régua: **o documento é a tela; os itens são uma seção dele.** A folha é o
+ * que circula, o que se aprova, o que tem status; os cards são o detalhe da
+ * seção mais operacional. Não morreu a tela de REVISÃO — lá se *trabalha* o
+ * item, aqui se *lê* o resultado, e essa distinção se sustenta.
  */
 export interface DocumentoScreenProps {
   documento: DocumentoDeDesenho;
   config: DiagramaConfig;
-  /** HTML do diagrama (`gerarDiagramaHtml`), embutido via `srcDoc`. */
-  diagramaHtml?: string;
   escrito: DocumentoEscrito;
   status: StatusDocumento | null;
   onMudarEscrito: (escrito: DocumentoEscrito) => void;
@@ -51,6 +68,24 @@ export interface DocumentoScreenProps {
   mudancasDesdeAprovacao?: MudancaDeSecao[];
   onBaixarMarkdown: () => void;
   onVoltar: () => void;
+  /**
+   * SPEC-61 §6.1 — a ESCRITA dos itens (`gerarItensDeTrabalho` → `ItemGerado`),
+   * que só existe depois que alguém pediu. A DERIVAÇÃO (`documento.itens`)
+   * existe sempre.
+   *
+   * São duas listas, e juntá-las sem dizer qual manda produziria uma seção que
+   * às vezes tem quatro itens e às vezes sete, sem ninguém entender por quê.
+   * **A derivação manda; a escrita enfeita** — a junção é pela `chave`.
+   */
+  itensEscritos?: ItemGerado[];
+  /** SPEC-44 — deep-link: abre a revisão JÁ no item deste card. É onde se
+   * TRABALHA o item; aqui só se lê. */
+  onRevisarItem?: (chave: string) => void;
+  /** SPEC-49 — manda os itens PRONTOS pro tracker. Ausente = a quebra ainda
+   * não foi salva, e sem id não há o que exportar. */
+  onExportar?: () => Promise<ResultadoDaExportacao>;
+  /** Pra onde vai, como a configuração chamou ("Jira do time X"). */
+  destinoDaExportacao?: string | null;
 }
 
 const ROTULO_STATUS: Record<StatusDocumento, string> = {
@@ -64,7 +99,7 @@ const SEQUENCIA: StatusDocumento[] = ["rascunho", "em-revisao", "aprovado", "imp
 
 export function DocumentoScreen({
   documento,
-  diagramaHtml,
+  config,
   escrito,
   status,
   onMudarEscrito,
@@ -73,10 +108,16 @@ export function DocumentoScreen({
   mudancasDesdeAprovacao,
   onBaixarMarkdown,
   onVoltar,
+  itensEscritos,
+  onRevisarItem,
+  onExportar,
+  destinoDaExportacao,
 }: DocumentoScreenProps) {
   const { violacoes, aceitas, violacoesDePercurso, naoMedidos, percursos } = documento.conferencias;
   const temConferencia =
     violacoes.length + aceitas.length + violacoesDePercurso.length + naoMedidos.length + percursos.length > 0;
+  const pedemAtencao = documento.saude.filter((i) => i.lado === "atencao");
+  const jaTem = documento.saude.filter((i) => i.lado === "jaTem");
 
   return (
     <div data-testid="documento-screen" style={fundoEstilo}>
@@ -102,13 +143,15 @@ export function DocumentoScreen({
             {documento.titulo}
           </h1>
 
+          {/* §277 (SPEC-61 §4) — a faixa em DUAS partes, com títulos.
+              Os chips tinham o mesmo peso visual e só a cor os separava: `🎯 1
+              necessidade sem componente` e `⚖ 1 fora do padrão` cobram ação, `🧭
+              1 decisão(ões)` é contagem. Nada de cor nova — o que muda é onde a
+              coisa está, e lugar comunica antes de cor. */}
           {documento.saude.length > 0 && (
-            <div data-testid="faixa-de-saude" style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "16px 0 4px" }}>
-            {documento.saude.map((i) => (
-              <span key={i.icone} style={chipEstilo(i.nivel)}>
-                <span style={{ fontSize: 13 }}>{i.icone}</span> {i.rotulo}
-                </span>
-              ))}
+            <div data-testid="faixa-de-saude" style={{ display: "flex", flexWrap: "wrap", gap: 24, margin: "16px 0 4px" }}>
+              <ParteDaFaixa testid="saude-pede-atencao" titulo="o que ainda pede atenção" indicadores={pedemAtencao} />
+              <ParteDaFaixa testid="saude-ja-tem" titulo="o que este desenho já tem" indicadores={jaTem} />
             </div>
           )}
         </div>
@@ -152,21 +195,8 @@ export function DocumentoScreen({
             desalinhamento. */}
         <section style={faixaDoDesenhoEstilo}>
           <h2 style={{ ...tituloSecaoEstilo, marginTop: 0 }}>O desenho</h2>
-          {diagramaHtml ? (
-            // iframe + srcDoc: reusa o gerador animado que já existe (SPEC-21)
-            // sem dependência nova e sem o CSS do app vazar para dentro dele.
-            <iframe
-              data-testid="documento-diagrama"
-              title="Diagrama da solução"
-              srcDoc={diagramaHtml}
-              style={{
-                width: "100%",
-                height: 560,
-                border: "1px solid var(--borda)",
-                borderRadius: 12,
-                background: "var(--painel)",
-              }}
-            />
+          {documento.diagrama.nodes.length > 0 ? (
+            <FiguraDoDesenho diagrama={documento.diagrama} config={config} />
           ) : (
             <Vazio texto="Sem diagrama nesta demanda ainda." />
           )}
@@ -232,14 +262,88 @@ export function DocumentoScreen({
           onMudar={(texto) => onMudarEscrito({ ...escrito, riscos: texto })}
         />
 
-        <Secao titulo="Os itens">
-          {documento.itens.length > 0 ? (
-            documento.itens.map((i) => <CartaoItem key={i.chave} item={i} />)
-          ) : (
-            <Vazio texto="Nenhum item derivado ainda — derive a quebra na mesa de projeto." />
-          )}
-        </Secao>
+        <SecaoDosItens
+          derivados={documento.itens}
+          escritos={itensEscritos ?? []}
+          onRevisarItem={onRevisarItem}
+          onExportar={onExportar}
+          destinoDaExportacao={destinoDaExportacao}
+        />
       </article>
+    </div>
+  );
+}
+
+/**
+ * SPEC-61 §3 — o desenho como FIGURA.
+ *
+ * Era um `iframe` com o HTML animado da SPEC-21, e ele trazia junto um painel
+ * lateral que muda de tamanho conforme a seleção. Dentro de um documento, isso
+ * é um corpo estranho que se mexe sozinho (relato do usuário: *"a lista fica
+ * mudando de tamanho"*).
+ *
+ * **Figura não muda de tamanho, não pede clique e não tem painel lateral.** O
+ * que entra é o MESMO React Flow da mesa, em leitura — é mais bonito porque é o
+ * mesmo desenho que a pessoa acabou de compor, e não uma segunda renderização
+ * parecida.
+ *
+ * O que se perde é a exploração ("clique num nó para ver os itens
+ * relacionados") e o "reproduzir em sequência". Os dois continuam na REVISÃO,
+ * que é a tela de trabalhar: documento é para ler, e quem quer explorar volta
+ * para a mesa. O `gerarDiagramaHtml` também não morre — ele continua sendo o
+ * *"Baixar diagrama (.html)"* da revisão, o artefato que se manda para quem não
+ * tem acesso à ferramenta.
+ */
+function FiguraDoDesenho({ diagrama, config }: { diagrama: Diagrama; config: DiagramaConfig }) {
+  // Toda mutação do hook passa pelo `aplicar` — um que não faz nada é o que
+  // torna a escrita impossível, e não só desencorajada. O `somenteLeitura` do
+  // Canvas é a outra metade: sem ele a interface continuaria convidando a
+  // arrastar e a conectar, e convite que não acontece é pior que convite nenhum.
+  const estado = useDiagrama(diagrama, NAO_APLICA, config);
+  return (
+    <div data-testid="documento-diagrama" className="figura-do-desenho" style={figuraEstilo}>
+      <ReactFlowProvider>
+        <Canvas diagramaState={estado} config={config} somenteLeitura />
+      </ReactFlowProvider>
+    </div>
+  );
+}
+
+const NAO_APLICA: AplicarNoDiagrama = () => {};
+
+function ParteDaFaixa({
+  testid,
+  titulo,
+  indicadores,
+}: {
+  testid: string;
+  titulo: string;
+  indicadores: IndicadorDeSaude[];
+}) {
+  // Parte vazia não aparece: "o que ainda pede atenção — (nada)" é um título
+  // pedindo para ser lido como problema.
+  if (indicadores.length === 0) return null;
+  return (
+    <div data-testid={testid}>
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: ".08em",
+          color: "var(--texto-mudo)",
+          margin: "0 0 6px",
+        }}
+      >
+        {titulo}
+      </p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {indicadores.map((i) => (
+          <span key={`${i.icone}-${i.rotulo}`} style={chipEstilo(i.nivel)}>
+            <span style={{ fontSize: 13 }}>{i.icone}</span> {i.rotulo}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -407,7 +511,216 @@ function CartaoDecisao({ decisao }: { decisao: Decisao }) {
   );
 }
 
-function CartaoItem({ item }: { item: ItemDoDocumento }) {
+/**
+ * SPEC-61 §2 e §6.1 — a seção "Os itens", que absorveu a tela `#/itens`.
+ *
+ * ## São DUAS listas, e uma delas manda
+ *
+ * A **derivação** (`documento.itens`, de `estruturarDocumento`) existe sempre;
+ * a **escrita** (`ItemGerado`, de `gerarItensDeTrabalho`) só existe depois que
+ * alguém pediu. A seção lista sempre os DERIVADOS — eles são o que o desenho
+ * produz —, e onde houver escrita para aquela `chave` o card abre com o texto
+ * final. Onde não houver, o card diz "ainda não escrito".
+ *
+ * Item escrito cuja chave sumiu da derivação aparece **no fim, marcado como
+ * órfão**, pela mesma razão do §57: sumir em silêncio esconde justamente o
+ * evento que interessa.
+ *
+ * ## O que ela NÃO faz: gerar
+ *
+ * Gerar continua sendo ato da revisão (o balão do M7/M12, §270). Uma tela que
+ * gera e mostra a mesma coisa é a confusão que esta SPEC está desfazendo.
+ * Exportar é outra coisa — é o que se faz com o resultado pronto, e por isso
+ * veio junto com os cards em vez de morrer com a tela que os hospedava.
+ */
+function SecaoDosItens({
+  derivados,
+  escritos,
+  onRevisarItem,
+  onExportar,
+  destinoDaExportacao,
+}: {
+  derivados: ItemDoDocumento[];
+  escritos: ItemGerado[];
+  onRevisarItem?: (chave: string) => void;
+  onExportar?: () => Promise<ResultadoDaExportacao>;
+  destinoDaExportacao?: string | null;
+}) {
+  const [exportando, setExportando] = useState(false);
+  const [resultado, setResultado] = useState<ResultadoDaExportacao | null>(null);
+  const [erroExportacao, setErroExportacao] = useState<string | null>(null);
+  // SPEC-47 §196 — a escrita REAL aparece por padrão: o que interessa a quem
+  // vai executar é o texto. Quem quiser varrer a lista fecha; o estado guarda
+  // quem está FECHADO.
+  const [fechados, setFechados] = useState<string[]>([]);
+
+  const linhas = useMemo(() => {
+    const porChave = new Map(escritos.map((i) => [i.chave, i]));
+    const derivadas = new Set(derivados.map((i) => i.chave));
+    return [
+      ...derivados.map((d) => ({ chave: d.chave, derivado: d, escrito: porChave.get(d.chave), orfao: false })),
+      ...escritos
+        .filter((e) => !derivadas.has(e.chave))
+        .map((e) => ({ chave: e.chave, derivado: undefined, escrito: e, orfao: true })),
+    ];
+  }, [derivados, escritos]);
+
+  const prontos = escritos.filter((i) => i.pendencias === 0 && i.sugestoes === 0).length;
+  const geradoEm = escritos[0]?.criadoEm ? new Date(escritos[0].criadoEm) : null;
+
+  return (
+    <section data-testid="secao-dos-itens" style={colunaDeTextoEstilo}>
+      <h2 style={tituloSecaoEstilo}>Os itens</h2>
+
+      {linhas.length === 0 ? (
+        // §2 — a mensagem de vazio herdou o que a tela de itens conduzia: sem
+        // derivação não há item nenhum, e a escrita nasce na revisão. O botão
+        // "Ir para a demanda" não veio junto porque a barra do documento já tem
+        // "← Voltar à mesa de projeto" — dois botões para o mesmo lugar.
+        <Vazio texto="Nenhum item ainda — derive a demanda na mesa de projeto e, na revisão, peça ao assistente para escrever os itens. Cada um vira um card aqui, com o texto final que vai pro seu tracker." />
+      ) : (
+        <>
+          {escritos.length > 0 && (
+            <div style={resumoEstilo} data-testid="itens-resumo">
+              <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+                <strong style={{ fontSize: 14 }}>
+                  {prontos} de {escritos.length} {escritos.length === 1 ? "item pronto" : "itens prontos"} pra exportar
+                </strong>
+                {geradoEm && (
+                  <span style={{ fontSize: 11.5, color: "var(--texto-mudo)" }}>
+                    escritos em {geradoEm.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+                  </span>
+                )}
+              </div>
+              <div style={trilhoEstilo} aria-hidden="true">
+                <div style={{ ...barraDeProntosEstilo, width: `${(prontos / escritos.length) * 100}%` }} />
+              </div>
+              <p style={{ fontSize: 12, color: "var(--texto-fraco)", margin: "6px 0 0" }}>
+                Um item fica pronto quando nenhum campo pede “✍️ especificar” e nenhuma sugestão da esteira está sem
+                confirmação. Só os prontos vão pro tracker — item pela metade não vira issue meia-boca.
+              </p>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+                <button
+                  onClick={async () => {
+                    if (!onExportar) return;
+                    setExportando(true);
+                    setErroExportacao(null);
+                    setResultado(null);
+                    try {
+                      setResultado(await onExportar());
+                    } catch (e) {
+                      setErroExportacao(e instanceof Error ? e.message : String(e));
+                    } finally {
+                      setExportando(false);
+                    }
+                  }}
+                  disabled={!onExportar || exportando || prontos === 0}
+                  data-testid="exportar-prontos"
+                  title={
+                    !onExportar
+                      ? "Salve a quebra antes de exportar"
+                      : prontos === 0
+                        ? "Nenhum item pronto ainda"
+                        : `Manda os ${prontos} itens prontos pro tracker`
+                  }
+                  style={prontos > 0 && onExportar ? { ...botaoEstilo, ...botaoPrimarioEstilo } : { ...botaoEstilo, opacity: 0.55 }}
+                >
+                  {exportando ? "exportando…" : `Exportar prontos (${prontos})`}
+                </button>
+                <span style={{ fontSize: 11.5, color: "var(--texto-mudo)" }}>
+                  {destinoDaExportacao
+                    ? `destino: ${destinoDaExportacao}`
+                    : "sem destino configurado (Configurações → Exportação)"}
+                </span>
+              </div>
+
+              {erroExportacao && (
+                <p style={{ fontSize: 12, color: "var(--vermelho)", margin: "8px 0 0" }} data-testid="erro-exportacao">
+                  {erroExportacao}
+                </p>
+              )}
+              {resultado && (
+                <div style={{ marginTop: 8 }} data-testid="resultado-exportacao">
+                  <p style={{ fontSize: 12.5, color: "var(--verde, #4ade80)", margin: 0 }}>
+                    {resultado.exportados.length} item(ns) no {resultado.destino}.
+                  </p>
+                  {resultado.erros.map((e) => (
+                    <p key={e.chave} style={{ fontSize: 12, color: "var(--vermelho)", margin: "4px 0 0" }}>
+                      {e.chave}: {e.erro}
+                    </p>
+                  ))}
+                  {resultado.ignorados.length > 0 && (
+                    <p style={{ fontSize: 11.5, color: "var(--texto-mudo)", margin: "4px 0 0" }}>
+                      {resultado.ignorados.length} ficaram de fora por ainda ter pendência.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {linhas.map((linha, i) => (
+            <CartaoItem
+              key={linha.chave}
+              indice={i}
+              derivado={linha.derivado}
+              escrito={linha.escrito}
+              orfao={linha.orfao}
+              expandido={!fechados.includes(linha.chave)}
+              onAlternar={() =>
+                setFechados((atuais) =>
+                  atuais.includes(linha.chave)
+                    ? atuais.filter((c) => c !== linha.chave)
+                    : [...atuais, linha.chave]
+                )
+              }
+              onRevisar={onRevisarItem}
+            />
+          ))}
+        </>
+      )}
+    </section>
+  );
+}
+
+/** A régua de completude do card — quantos ✍️ restam e quantas sugestões da
+ * esteira esperam confirmação (SPEC-41 Parte B). */
+function completudeDoItem(item: ItemGerado): { rotulo: string; cor: string; fundo: string } {
+  if (item.estado === "exportado")
+    return { rotulo: "Exportado", cor: "var(--verde, #4ade80)", fundo: "rgba(74, 222, 128, 0.12)" };
+  if (item.pendencias === 0 && item.sugestoes === 0)
+    return { rotulo: "Pronto pra exportar", cor: "var(--verde, #4ade80)", fundo: "rgba(74, 222, 128, 0.12)" };
+  if (item.pendencias === 0)
+    return {
+      rotulo: `${item.sugestoes} ${item.sugestoes === 1 ? "sugestão" : "sugestões"} a confirmar`,
+      cor: "var(--amarelo, #facc15)",
+      fundo: "rgba(250, 204, 21, 0.12)",
+    };
+  return {
+    rotulo: `✍️ ${item.pendencias} campo${item.pendencias === 1 ? "" : "s"} a especificar`,
+    cor: "var(--laranja, #fb923c)",
+    fundo: "rgba(251, 146, 60, 0.12)",
+  };
+}
+
+function CartaoItem({
+  indice,
+  derivado,
+  escrito,
+  orfao,
+  expandido,
+  onAlternar,
+  onRevisar,
+}: {
+  indice: number;
+  derivado?: ItemDoDocumento;
+  escrito?: ItemGerado;
+  orfao: boolean;
+  expandido: boolean;
+  onAlternar: () => void;
+  onRevisar?: (chave: string) => void;
+}) {
   const citacao = (rotulo: string, valores: string[]) =>
     valores.length > 0 ? (
       <p style={{ fontSize: 12.5, color: "var(--texto-2)", margin: "4px 0 0" }}>
@@ -418,19 +731,87 @@ function CartaoItem({ item }: { item: ItemDoDocumento }) {
       </p>
     ) : null;
 
+  const completude = escrito ? completudeDoItem(escrito) : null;
+  const pendente = !!escrito && escrito.estado !== "exportado" && (escrito.pendencias > 0 || escrito.sugestoes > 0);
+
   return (
-    <article data-testid="documento-item" style={cartaoEstilo()}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-        <span style={{ flex: "none", fontSize: 12, fontWeight: 700, color: "var(--texto-mudo)" }}>{item.numero}</span>
-        <h3 style={{ fontSize: 15, margin: 0 }}>{item.descricao}</h3>
+    <article data-testid={`item-gerado-${indice}`} style={cartaoEstilo(orfao ? "var(--amarelo)" : undefined)}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+        <span style={{ flex: "none", fontSize: 12, fontWeight: 700, color: "var(--texto-mudo)", marginTop: 3 }}>
+          {derivado ? derivado.numero : "—"}
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h3 style={{ fontSize: 15, margin: 0, lineHeight: 1.4 }}>{derivado?.descricao ?? escrito?.titulo}</h3>
+          <p style={metaEstilo}>
+            {derivado ? `${derivado.tipo} · ${derivado.tamanho}` : `${escrito?.tipo} · ${escrito?.tamanho}`}
+            {derivado && derivado.techs.length > 0 ? ` · ${derivado.techs.join(", ")}` : ""}
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+            {orfao && (
+              // §57 — o item escrito que perdeu o lugar no desenho. Some em
+              // silêncio e o evento que precisava ser visto some junto.
+              <span data-testid={`item-orfao-${indice}`} style={{ ...chipDoItemEstilo, color: "var(--amarelo)" }}>
+                órfão — não sai mais do desenho de agora
+              </span>
+            )}
+            {completude &&
+              (pendente && onRevisar ? (
+                // SPEC-44 — o chip do item não-pronto é o caminho de VOLTA pra
+                // revisão daquele item, não um beco.
+                <button
+                  onClick={() => onRevisar(escrito!.chave)}
+                  title="Abrir a revisão já neste item pra resolver as pendências"
+                  data-testid={`item-completude-${indice}`}
+                  style={{ ...chipDoItemEstilo, color: completude.cor, background: completude.fundo, borderColor: "transparent", cursor: "pointer" }}
+                >
+                  {completude.rotulo} ↩
+                </button>
+              ) : (
+                <span
+                  data-testid={`item-completude-${indice}`}
+                  style={{ ...chipDoItemEstilo, color: completude.cor, background: completude.fundo, borderColor: "transparent" }}
+                >
+                  {completude.rotulo}
+                </span>
+              ))}
+            {escrito?.estado === "exportado" && escrito.linkExterno && (
+              <a href={escrito.linkExterno} target="_blank" rel="noreferrer" style={{ ...chipDoItemEstilo, textDecoration: "none" }}>
+                abrir no tracker ↗
+              </a>
+            )}
+          </div>
+          {escrito && escrito.dependencias.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+              {escrito.dependencias.map((dep) => (
+                <span key={dep} style={depEstilo} title="Este item depende do outro — puxe na ordem.">
+                  ⛓ {dep}
+                </span>
+              ))}
+            </div>
+          )}
+          {derivado && citacao("atende", derivado.necessidades)}
+          {derivado && citacao("segue", derivado.decisoes)}
+          {derivado && citacao("no caminho", derivado.percursos)}
+        </div>
+        {escrito && (
+          <button onClick={onAlternar} style={botaoEstilo} aria-expanded={expandido} data-testid={`item-expandir-${indice}`}>
+            {expandido ? "Recolher" : "Ver a escrita"}
+          </button>
+        )}
       </div>
-      <p style={metaEstilo}>
-        {item.tipo} · {item.tamanho}
-        {item.techs.length > 0 ? ` · ${item.techs.join(", ")}` : ""}
-      </p>
-      {citacao("atende", item.necessidades)}
-      {citacao("segue", item.decisoes)}
-      {citacao("no caminho", item.percursos)}
+      {escrito ? (
+        expandido && (
+          <div style={corpoDoItemEstilo} data-testid={`item-corpo-${indice}`}>
+            <EscritaDoItem markdown={escrito.corpoMarkdown} />
+          </div>
+        )
+      ) : (
+        // A derivação manda: o item existe porque o desenho o produz. Só o
+        // TEXTO ainda não foi escrito, e dizer isso é diferente de omitir o item.
+        <p data-testid={`item-sem-escrita-${indice}`} style={{ ...miudoEstilo, fontStyle: "italic", margin: "10px 0 0" }}>
+          ainda não escrito — a escrita nasce na revisão da demanda
+        </p>
+      )}
     </article>
   );
 }
@@ -608,6 +989,73 @@ const botaoEstilo: React.CSSProperties = {
   background: "var(--painel)",
   color: "var(--texto-2)",
   cursor: "pointer",
+};
+
+/** Altura FIXA — é o que faz dela uma figura. O quadro que crescia com a
+ * seleção era o incômodo relatado ("a lista fica mudando de tamanho"). */
+const figuraEstilo: React.CSSProperties = {
+  height: 460,
+  borderRadius: 12,
+  border: "1px solid var(--borda)",
+  background: "var(--painel)",
+  overflow: "hidden",
+};
+
+const resumoEstilo: React.CSSProperties = {
+  padding: "14px 16px",
+  borderRadius: 12,
+  border: "1px solid var(--borda)",
+  background: "var(--painel-2, rgba(148,163,184,.06))",
+  margin: "12px 0 16px",
+};
+
+const trilhoEstilo: React.CSSProperties = {
+  height: 6,
+  borderRadius: 999,
+  background: "var(--fundo)",
+  marginTop: 10,
+  overflow: "hidden",
+};
+
+const barraDeProntosEstilo: React.CSSProperties = {
+  height: "100%",
+  borderRadius: 999,
+  background: "var(--verde, #4ade80)",
+  transition: "width 300ms ease",
+};
+
+const botaoPrimarioEstilo: React.CSSProperties = {
+  background: "var(--acento)",
+  borderColor: "var(--acento)",
+  color: "#fff",
+};
+
+const chipDoItemEstilo: React.CSSProperties = {
+  fontSize: 11,
+  padding: "3px 9px",
+  borderRadius: 999,
+  border: "1px solid var(--borda-forte)",
+  color: "var(--texto-2)",
+  background: "var(--fundo)",
+};
+
+const depEstilo: React.CSSProperties = {
+  fontSize: 11,
+  padding: "3px 9px",
+  borderRadius: 999,
+  border: "1px dashed var(--borda-forte)",
+  color: "var(--texto-fraco)",
+  background: "transparent",
+};
+
+const corpoDoItemEstilo: React.CSSProperties = {
+  marginTop: 12,
+  padding: "12px 14px",
+  borderRadius: 8,
+  border: "1px solid var(--borda)",
+  background: "var(--fundo)",
+  maxHeight: 520,
+  overflow: "auto",
 };
 
 const textareaEstilo: React.CSSProperties = {

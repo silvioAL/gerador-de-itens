@@ -21,12 +21,18 @@ export type AreaConfig =
   | "pdca"
   | "exportacao";
 
-/** SPEC-58 — `documento` é tela própria da demanda, ao lado de `itens`: o
- * documento deixou de ser uma saída da revisão e virou o artefato de trabalho. */
+/**
+ * SPEC-58 — `documento` é tela própria da demanda: o documento deixou de ser
+ * uma saída da revisão e virou o artefato de trabalho.
+ *
+ * SPEC-61 — e `itens` sumiu daqui. Ele mostrava a MESMA derivação que o
+ * documento já mostra numa seção; as duas telas precisavam apontar uma para a
+ * outra o tempo todo (§269), que é o sintoma de serem uma só. `#/itens`
+ * continua sendo ENTENDIDO em `rotaDoHash` — ver lá.
+ */
 export type Rota =
   | { tela: "canvas" }
   | { tela: "config"; area: AreaConfig }
-  | { tela: "itens" }
   | { tela: "documento" }
   /** SPEC-59 fatia A — a vista de leitura de como a ferramenta está montada. */
   | { tela: "sistema" };
@@ -52,7 +58,6 @@ const AREA_DO_SEGMENTO = Object.fromEntries(
 
 export function hashDaRota(rota: Rota): string {
   if (rota.tela === "canvas") return "#/";
-  if (rota.tela === "itens") return "#/itens";
   if (rota.tela === "documento") return "#/documento";
   if (rota.tela === "sistema") return "#/sistema";
   return `#/config/${SEGMENTO_DA_AREA[rota.area]}`;
@@ -61,7 +66,11 @@ export function hashDaRota(rota: Rota): string {
 /** Hash desconhecido cai no canvas — link velho nunca vira tela em branco. */
 export function rotaDoHash(hash: string): Rota {
   const partes = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
-  if (partes[0] === "itens") return { tela: "itens" };
+  // SPEC-61 §6.7 — a rota que morreu REDIRECIONA. Rota que some sem
+  // redirecionar dá tela branca para quem tinha o link salvo, e link salvo é
+  // justamente o de quem mais usa. O destino é o documento porque é lá que os
+  // itens passaram a morar, numa seção.
+  if (partes[0] === "itens") return { tela: "documento" };
   if (partes[0] === "documento") return { tela: "documento" };
   if (partes[0] === "sistema") return { tela: "sistema" };
   if (partes[0] === "config") {

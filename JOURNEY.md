@@ -9087,3 +9087,102 @@ que a navegação demora só em suíte cheia?), e digo isso em vez de dar por
 resolvido: o que mudou é que a próxima falha vai dizer a verdade.
 
 335 engine · 655 web · 84 aplicação · 233 server · 79/79 E2E · build limpo.
+
+## §277 — uma saída só: os itens eram uma seção do documento o tempo todo
+
+*"não vejo vantagem de manter `#/itens` e `#/documento` como features e telas
+separadas, faça uma revisão delas e unifique"* e *"esse trecho do print de o
+desenho me incomoda bastante, a lista fica mudando de tamanho, seria melhor ter
+o mesmo diagrama da tela anterior"*.
+
+A SPEC-61 saiu em três fatias, e a ordem foi de propósito: as duas isoladas
+primeiro, a que mexe em rota por último.
+
+### O sintoma tinha aparecido antes, e eu tratei como navegação
+
+No §269 eu precisei **criar links de uma tela para a outra** — "Ver o documento
+→" nos itens, e o contrário. Quando duas telas precisam apontar uma para a
+outra o tempo todo, a pergunta certa não é onde pôr o link.
+
+As duas nascem da mesma derivação, sobre a mesma demanda, no mesmo instante. O
+documento **já tinha** uma seção "Os itens". O custo não era só de navegação:
+dois caminhos para o mesmo texto (`itensGerados` × `documento.itens`), duas
+respostas para "cadê o que eu gerei?", e o menu carregando as duas — o que faz
+o menu parecer maior do que o produto.
+
+> **O documento é a tela. Os itens são uma seção dele.**
+
+Não o contrário: a folha é o que circula, o que se aprova, o que tem status.
+
+**A tela de REVISÃO não morreu.** Lá se *trabalha* o item; no documento se *lê*
+o resultado. Essa distinção se sustenta; a de "itens" × "documento" não se
+sustentava.
+
+### São duas listas, e sem dizer qual manda a seção mentiria
+
+A lacuna que só apareceu quando fui implementar: `documento.itens` vem de
+`estruturarDocumento` (a **derivação**, que existe sempre) e os cards vêm de
+`gerarItensDeTrabalho` (a **escrita**, que só existe depois que alguém pediu).
+Juntar as duas sem hierarquia produziria uma seção que às vezes tem quatro itens
+e às vezes sete, sem ninguém entender por quê.
+
+> **A derivação manda; a escrita enfeita.** A seção lista sempre os derivados;
+> onde há escrita para aquela `chave`, o card abre com o texto final; onde não
+> há, ele diz *"ainda não escrito"*.
+
+Item escrito cuja chave sumiu da derivação **aparece no fim, marcado como
+órfão** — §57 de novo: sumir em silêncio esconde justamente o evento que
+interessa.
+
+E o documento **não ganhou botão de gerar**: gerar continua sendo ato da
+revisão. Uma tela que gera e mostra a mesma coisa é a confusão que esta rodada
+está desfazendo. Exportar veio junto, porque é outra coisa — é o que se faz com
+o resultado pronto.
+
+### O desenho virou figura, e a figura é o mesmo canvas
+
+O incômodo era literal: o `iframe` do `gerarDiagramaHtml` trazia junto um painel
+lateral que mudava de tamanho conforme a seleção. Dentro de um documento, um
+corpo estranho que se mexe sozinho.
+
+> **Figura não muda de tamanho, não pede clique e não tem painel lateral.**
+
+O que entra é o mesmo React Flow da mesa, em leitura. E não bastou passar um
+`aplicar` vazio ao `useDiagrama` — isso impede a escrita, mas a interface
+continuaria **convidando** a arrastar, conectar e apertar Delete. Convite que
+não acontece é pior do que convite nenhum: entrou um `somenteLeitura` explícito
+no `Canvas`, que também tira controles, minimapa e o zoom por roda (um quadro
+que engole a roda trava a folha que rola atrás dele).
+
+Duas coisas só o navegador me contou, e as duas foram print:
+
+- as **alças de conexão** continuam sendo desenhadas mesmo com
+  `nodesConnectable={false}` — bolinhas de "puxe daqui" num quadro que não
+  aceita conexão;
+- e escondê-las com `display: none` **apagou a aresta junto**, porque ela ancora
+  na posição da alça. Virou `opacity: 0`.
+
+O `gerarDiagramaHtml` não morreu: continua sendo o *"Baixar diagrama (.html)"*
+da revisão, o artefato para quem não tem acesso à ferramenta.
+
+### A faixa separa problema de inventário
+
+Ficou anotado no §269: `🎯 1 necessidade sem componente`, `⚖ 1 fora do padrão` e
+`🧭 1 decisão(ões)` tinham o mesmo peso visual, e só a cor os separava. Os dois
+primeiros **cobram ação**; o terceiro é **contagem**.
+
+Agora são duas partes com título — *o que ainda pede atenção* e *o que este
+desenho já tem*. Nada de cor nova: **lugar comunica antes de cor**. E com um
+lado dedicado ao que cobra, duas coisas que a cascata escondia passaram a
+aparecer: *"N caminho(s) a confirmar"* (§261 — trabalho de uma pessoa que
+ninguém fez) e *"N proposta(s) esperando"*.
+
+### A rota morta redireciona
+
+`#/itens` **continua sendo entendida**, e resolve para `documento`. Rota que
+some sem redirecionar dá tela branca para quem tinha o link salvo — e link salvo
+é justamente o de quem mais usa. O passo "Itens escritos" do tour passou a
+apontar para a seção; passo que aponta para tela que não existe quebra a
+demonstração inteira no meio.
+
+339 engine · 655 web · 84 aplicação · 233 server · 80/80 E2E · build limpo.

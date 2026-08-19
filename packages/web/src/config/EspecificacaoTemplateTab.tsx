@@ -100,8 +100,7 @@ export function EspecificacaoTemplateTab({
         </p>
       ) : (
         <p style={introTextoEstilo}>
-          Cada item do documento — e cada card da tela <strong>Itens escritos</strong> — é escrito a partir deste
-          template. É aqui que se muda a ordem das seções, os títulos, e o que fecha o item: a{" "}
+          Cada card da seção <strong>Os itens</strong> do documento de desenho é escrito a partir deste template. É aqui que se muda a ordem das seções, os títulos, e o que fecha o item: a{" "}
           <code style={codigoEstilo}>{"{{entregaFinal}}"}</code> diz o que fica pronto quando ele termina. Seção cujo
           conteúdo estiver vazio some inteira, título junto. Placeholders válidos:{" "}
           {VARIAVEIS_ITEM.map((v) => (

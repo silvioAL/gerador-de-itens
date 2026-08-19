@@ -61,7 +61,8 @@ test("barra de pendências, confirmar todas, fila guiada e o deep-link da tela d
   const botaoItens = page.getByTestId("balao-gerar-itens").or(page.getByTestId("balao-especificacao-itens"));
   await botaoItens.first().waitFor({ timeout: 10000 });
   await botaoItens.first().click();
-  await expect(page.getByTestId("itens-screen")).toBeVisible();
+  // SPEC-61 — os cards vivem na seção "Os itens" do documento.
+  await expect(page.getByTestId("secao-dos-itens")).toBeVisible();
 
   // §199 — a entrega final agora TEM onde ser escrita (é do PO): com os três
   // campos do item respondidos, ele fecha como pronto. Antes desta correção
@@ -69,6 +70,6 @@ test("barra de pendências, confirmar todas, fila guiada e o deep-link da tela d
   // existia na tela. O chip de quem AINDA tem pendência é o link de volta.
   await expect(page.getByTestId("item-completude-0")).toContainText("Pronto pra exportar");
   await page.getByTestId("item-completude-1").click();
-  await expect(page.getByTestId("itens-screen")).not.toBeVisible();
+  await expect(page.getByTestId("documento-screen")).toHaveCount(0);
   await expect(page.locator('[data-testid^="item-"][aria-pressed="true"]').first()).toBeVisible();
 });
