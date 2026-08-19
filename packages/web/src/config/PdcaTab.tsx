@@ -39,6 +39,28 @@ export interface PdcaTabProps {
   onFichaMudou?: () => void;
 }
 
+/** §276 — quantos tratados a lista mostra antes de pedir para ver o resto.
+ * Oito cabe na tela e conta a história recente; o resto é arqueologia, e
+ * arqueologia se pede. */
+const TETO_DO_HISTORICO = 8;
+
+const placarEstilo: React.CSSProperties = {
+  padding: "10px 12px",
+  borderRadius: 10,
+  border: "1px solid var(--borda)",
+  background: "var(--fundo)",
+};
+
+const linkEstilo: React.CSSProperties = {
+  fontSize: 11.5,
+  fontWeight: 600,
+  padding: 0,
+  border: "none",
+  background: "none",
+  color: "#a5b4fc",
+  cursor: "pointer",
+};
+
 const CADENCIA_PADRAO = { cadenciaUsos: 5, cadenciaFeedback: 3 };
 
 /** A área da configuração de cada recurso solicitável — o "abrir e editar". */
@@ -52,6 +74,9 @@ const AREA_DO_RECURSO: Record<string, AreaConfig> = {
 
 export function PdcaTab({ config, timeAtivo, onAbrirArea, onFichaMudou }: PdcaTabProps) {
   const [cadencia, setCadencia] = useState<typeof CADENCIA_PADRAO | null>(null);
+  /** §276 — o histórico começa cortado: ele cresce para sempre, e a tela não é
+   * um arquivo morto. */
+  const [verTudoNoHistorico, setVerTudoNoHistorico] = useState(false);
   const [feedbacks, setFeedbacks] = useState<FeedbackPdca[]>([]);
   const [ajustes, setAjustes] = useState<SolicitacaoAjuste[]>([]);
   const [regras, setRegras] = useState<RegrasConfig | null>(null);
@@ -96,6 +121,8 @@ export function PdcaTab({ config, timeAtivo, onAbrirArea, onFichaMudou }: PdcaTa
 
   const novos = feedbacks.filter((f) => f.estado === "novo");
   const tratados = feedbacks.filter((f) => f.estado !== "novo");
+  const viraramAjuste = tratados.filter((f) => f.estado === "virou-ajuste");
+  const descartados = tratados.filter((f) => f.estado !== "virou-ajuste");
   const pendentes = ajustes.filter((a) => a.estado === "pendente");
   const decididos = ajustes.filter((a) => a.estado !== "pendente");
 
@@ -140,17 +167,52 @@ export function PdcaTab({ config, timeAtivo, onAbrirArea, onFichaMudou }: PdcaTa
           </article>
         ))}
 
+        {/* §276 — o histórico deixou de ser uma lista solta.
+            Como lista simples, ele piora com o tempo (cem linhas iguais) e não
+            diz o que o ciclo produziu — que é o único motivo de guardá-lo. O
+            que fica em cima é o PLACAR: quantos viraram mudança de verdade.
+            A lista continua embaixo, recente primeiro e com teto. */}
         {tratados.length > 0 && (
-          <details style={{ marginTop: 8 }}>
-            <summary style={{ fontSize: 12, color: "var(--texto-fraco)", cursor: "pointer" }}>
-              {tratados.length} já tratado(s)
-            </summary>
-            {tratados.map((f) => (
-              <p key={f.id} style={{ ...metaEstilo, marginTop: 6 }}>
-                {f.estado === "virou-ajuste" ? "→ virou solicitação" : "descartado"}: “{f.texto}”
-              </p>
-            ))}
-          </details>
+          <div style={{ marginTop: 10 }} data-testid="historico-do-ciclo">
+            <div style={placarEstilo}>
+              <strong style={{ fontSize: 13 }}>
+                {viraramAjuste.length} de {tratados.length} viraram mudança na configuração
+              </strong>
+              <div style={{ fontSize: 11.5, color: "var(--texto-fraco)", marginTop: 2 }}>
+                {descartados.length > 0
+                  ? `${descartados.length} foram lidos e descartados — decidir não mudar também é decisão.`
+                  : "Nenhum feedback foi descartado até agora."}
+              </div>
+            </div>
+
+            <details style={{ marginTop: 8 }}>
+              <summary style={{ fontSize: 12, color: "var(--texto-fraco)", cursor: "pointer" }}>
+                ver os {tratados.length} tratado(s)
+              </summary>
+              {/* Recente primeiro: o que aconteceu ontem explica o item de
+                  hoje; o de seis meses atrás é arqueologia. */}
+              {[...tratados]
+                .sort((a, b) => (a.criadoEm < b.criadoEm ? 1 : -1))
+                .slice(0, verTudoNoHistorico ? undefined : TETO_DO_HISTORICO)
+                .map((f) => (
+                  <p key={f.id} style={{ ...metaEstilo, marginTop: 6 }} data-testid={`tratado-${f.id}`}>
+                    <span style={{ color: f.estado === "virou-ajuste" ? "var(--verde)" : "var(--texto-mudo)" }}>
+                      {f.estado === "virou-ajuste" ? "→ virou mudança" : "· descartado"}
+                    </span>{" "}
+                    “{f.texto}”
+                  </p>
+                ))}
+              {!verTudoNoHistorico && tratados.length > TETO_DO_HISTORICO && (
+                <button
+                  onClick={() => setVerTudoNoHistorico(true)}
+                  style={{ ...linkEstilo, marginTop: 6 }}
+                  data-testid="ver-todo-o-historico"
+                >
+                  ver os {tratados.length - TETO_DO_HISTORICO} mais antigos
+                </button>
+              )}
+            </details>
+          </div>
         )}
       </section>
 
@@ -808,12 +870,25 @@ function EstudioDeAjuste({
             </>
           )}
 
-          {acao === "adicionar" && (
-            <label style={{ ...labelEstilo, display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
-              <input type="checkbox" checked={contextual} onChange={(e) => setContextual(e.target.checked)} />
-              vale só nos contextos deste componente ({(config.nodeTypes[tipoNo]?.contextos ?? []).join(", ") || "nenhum"})
-            </label>
-          )}
+          {/* §276 — a caixa só aparece quando há contexto para restringir.
+              Relato do usuário: "por qual motivo aparece nenhum?". Porque é
+              literal — "Serviço" é o único dos 16 tipos que não declara
+              contexto —, e uma caixa marcada que restringe a uma lista VAZIA
+              não restringe nada (lista vazia = vale sempre, pela régua do
+              motor). Opção que não pode fazer nada não é opção: é ruído com
+              cara de decisão. */}
+          {acao === "adicionar" &&
+            ((config.nodeTypes[tipoNo]?.contextos ?? []).length > 0 ? (
+              <label style={{ ...labelEstilo, display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
+                <input type="checkbox" checked={contextual} onChange={(e) => setContextual(e.target.checked)} />
+                vale só nos contextos deste componente ({(config.nodeTypes[tipoNo]?.contextos ?? []).join(", ")})
+              </label>
+            ) : (
+              <p style={{ ...labelEstilo, marginTop: 10 }} data-testid="sem-contexto-para-restringir">
+                Este componente não tem contexto declarado, então o item vale para <strong>todo item</strong> da
+                tecnologia escolhida. Contextos se declaram no tipo de componente, na configuração do diagrama.
+              </p>
+            ))}
 
           </>
           )}
