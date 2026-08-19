@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach, type Mock } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 vi.mock("../api/client", () => ({
+  apiIa: { sugerirConfig: vi.fn() },
   apiProdutos: {
     listar: vi.fn(),
     criar: vi.fn(),
@@ -12,7 +13,7 @@ vi.mock("../api/client", () => ({
   },
 }));
 
-import { apiProdutos, type Produto } from "../api/client";
+import { apiIa, apiProdutos, type Produto } from "../api/client";
 import { ProdutosTab } from "./ProdutosTab";
 
 const produto: Produto = {
@@ -154,5 +155,55 @@ describe("ProdutosTab — o que a releitura pode e não pode substituir", () => 
     fireEvent.click(screen.getByRole("button", { name: "Cobrança" }));
 
     expect(screen.getByLabelText("O que é")).toHaveValue("Cobrar.");
+  });
+});
+
+/**
+ * §271 — escrever o contexto com apoio do assistente.
+ */
+describe("ProdutosTab — o assistente preenche o rascunho, e só ele", () => {
+  it("a sugestão cai nos campos SEM gravar — quem grava é o Salvar", async () => {
+    // A fronteira da SPEC-23 Fluxo 2, que é o que impede a assistência de
+    // virar um canal paralelo de escrita.
+    (apiIa.sugerirConfig as Mock).mockResolvedValue({
+      objetivo: "Levar a conta do cliente para outro banco.",
+      quemUsa: "Cliente PF que troca de banco.",
+      regrasDeNegocio: "",
+      sistemas: "",
+      restricoes: "Resolução 4.753 do BACEN.",
+    });
+    montar();
+    await screen.findByTestId("editor-do-produto");
+
+    fireEvent.change(screen.getByPlaceholderText(/portabilidade de conta salário/i), {
+      target: { value: "portabilidade" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "✨ Sugerir" }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("O que é")).toHaveValue("Levar a conta do cliente para outro banco.")
+    );
+    expect(screen.getByLabelText("Restrições")).toHaveValue("Resolução 4.753 do BACEN.");
+    expect(apiProdutos.atualizar).not.toHaveBeenCalled();
+  });
+
+  it("campo vazio na resposta NÃO apaga o que já estava escrito", async () => {
+    // A sugestão acrescenta; subtrair seria a pessoa perder texto por ter
+    // pedido ajuda — o oposto de ajudar.
+    (apiIa.sugerirConfig as Mock).mockResolvedValue({
+      objetivo: "",
+      quemUsa: "Cliente PF.",
+      regrasDeNegocio: "",
+      sistemas: "",
+      restricoes: "",
+    });
+    montar();
+    await screen.findByTestId("editor-do-produto");
+
+    fireEvent.change(screen.getByPlaceholderText(/portabilidade de conta salário/i), { target: { value: "x" } });
+    fireEvent.click(screen.getByRole("button", { name: "✨ Sugerir" }));
+
+    await waitFor(() => expect(screen.getByLabelText("Quem usa")).toHaveValue("Cliente PF."));
+    expect(screen.getByLabelText("O que é")).toHaveValue("Levar a conta para outro banco.");
   });
 });

@@ -109,6 +109,40 @@ const ALVOS_SUGESTAO_CONFIG: Record<string, AlvoSugestaoConfig> = {
       `"contextos" limita onde o requisito aparece; lista vazia = vale sempre que a tech estiver presente.`,
     ],
   },
+  /**
+   * §271 — o CONTEXTO DO PRODUTO escrito com apoio do assistente.
+   *
+   * É o único alvo que devolve o registro inteiro em vez de uma linha de uma
+   * lista, e a razão é a natureza do que se escreve: as cinco seções são um
+   * texto só partido em pedaços — quem descreve o produto descreve as cinco de
+   * uma vez, e pedir cinco vezes seguidas daria cinco respostas que não se
+   * conhecem.
+   */
+  "contexto-do-produto": {
+    descricao:
+      "o CONTEXTO DE NEGÓCIO de um produto de software — o que vale para toda demanda dele, não para uma demanda específica",
+    schema: {
+      type: "object",
+      properties: {
+        objetivo: { type: "string" },
+        quemUsa: { type: "string" },
+        regrasDeNegocio: { type: "string" },
+        sistemas: { type: "string" },
+        restricoes: { type: "string" },
+      },
+      required: ["objetivo", "quemUsa", "regrasDeNegocio", "sistemas", "restricoes"],
+    },
+    regras: [
+      `"objetivo" diz o que o produto É e para que serve, em duas ou três frases.`,
+      `"quemUsa" nomeia as personas e o que cada uma quer dali.`,
+      `"regrasDeNegocio" traz as que valem SEMPRE, não as de uma demanda —`,
+      `se a frase começa com "nesta entrega", ela não pertence a este campo.`,
+      `"sistemas" diz com quem o produto conversa e para quê.`,
+      `"restricoes" é o que não se negocia: regulatório, compliance, contrato.`,
+      `Escreva em português, em prosa curta. Campo sem informação suficiente`,
+      `volta como string vazia — inventar contexto de negócio é pior que deixar em branco.`,
+    ],
+  },
   "item-processo": {
     descricao:
       "um ITEM DE CHECKLIST DE PROCESSO — algo que o time precisa FAZER pra conseguir executar e testar o item",

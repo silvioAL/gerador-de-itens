@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { apiProdutos, type Produto } from "../api/client";
 import { MarcaDeDemonstracao } from "../demo/dadosDoTour";
+import { SugerirComIa } from "./SugerirComIa";
+import type { SugestaoContextoDoProduto } from "../api/client";
 
 /**
  * SPEC-53 Fase 1 — o contexto do produto.
@@ -164,9 +166,9 @@ export function ProdutosTab({ timeIds, demonstracao }: ProdutosTabProps) {
     <div data-testid="config-produtos">
       {demonstracao && <MarcaDeDemonstracao />}
       <p style={proseEstilo}>
-        O que a ferramenta sabia era tecnologia, processo e forma dos itens — nunca <strong>de que produto</strong> a
-        demanda falava. O que estiver aqui vai junto com toda demanda ligada a este produto, e é o que separa um item
-        tecnicamente correto de um item que entende o negócio.
+        O contexto de negócio que vale para <strong>todas</strong> as demandas deste produto: o que ele é, quem usa,
+        as regras que valem sempre e o vocabulário da casa. Vai junto com cada demanda ligada a ele — é o que separa
+        um item tecnicamente correto de um item que entende o negócio.
       </p>
 
       <div style={{ display: "flex", gap: 8, alignItems: "center", margin: "12px 0" }}>
@@ -208,6 +210,32 @@ export function ProdutosTab({ timeIds, demonstracao }: ProdutosTabProps) {
 
       {rascunho && (
         <section data-testid="editor-do-produto">
+          {/* §271 — escrever as cinco seções com apoio do assistente.
+              As cinco de uma vez, e não uma por vez: elas são um texto só
+              partido em pedaços, e cinco pedidos seguidos dariam cinco
+              respostas que não se conhecem.
+              A fronteira de sempre (SPEC-23 Fluxo 2): a IA preenche o
+              RASCUNHO, quem grava é o Salvar. */}
+          {!demonstracao && (
+            <SugerirComIa<SugestaoContextoDoProduto>
+              alvo="contexto-do-produto"
+              contexto={rascunho.nome}
+              exemplo="ex.: portabilidade de conta salário para clientes PF, com prazo regulatório"
+              onSugestao={(sugestao) =>
+                setRascunho((atual) =>
+                  atual
+                    ? {
+                        ...atual,
+                        // Só o que veio preenchido: campo vazio na resposta não
+                        // apaga o que a pessoa já tinha escrito — a sugestão
+                        // acrescenta, nunca subtrai.
+                        ...Object.fromEntries(Object.entries(sugestao).filter(([, v]) => String(v).trim() !== "")),
+                      }
+                    : atual
+                )
+              }
+            />
+          )}
           <label style={labelEstilo}>Nome</label>
           <input
             aria-label="Nome do produto"
