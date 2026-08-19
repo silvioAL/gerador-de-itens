@@ -3088,3 +3088,71 @@ describe("rastro das execuções da esteira", () => {
     }
   });
 });
+
+/**
+ * §273 — a lista de ajustes é dos SEUS times.
+ *
+ * ACHADO REAL (print do usuário): a tela do PDCA mostrava solicitações de um
+ * time que a pessoa não tinha escolhido, e agir sobre uma delas trazia um 403
+ * citando esse time. O 403 estava certo — a lista é que não deveria ter
+ * colocado aquilo ali.
+ */
+describe("GET /ajustes — escopo por time", () => {
+  beforeEach(async () => {
+    await db.delete(solicitacoesAjuste);
+  });
+
+  async function pedir(cookie: string, timeId: string | null, descricao: string) {
+    const resposta = await app.inject({
+      method: "POST",
+      url: "/ajustes",
+      cookies: { gerador_sessao: cookie },
+      payload: {
+        recurso: "regras",
+        descricao,
+        ...(timeId ? { timeId } : {}),
+        operacao: { tipo: "adicionar-checklist", tech: "java", contextos: [], texto: descricao },
+      },
+    });
+    expect(resposta.statusCode).toBe(201);
+  }
+
+  it("com `timeId`, devolve só o daquele time — e o da organização inteira", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    await pedir(cookie, TIME_A, "do time A");
+    await pedir(cookie, TIME_B, "do time B");
+    await pedir(cookie, null, "da organização");
+
+    const lista = (
+      await app.inject({ method: "GET", url: `/ajustes?timeId=${TIME_A}`, cookies: { gerador_sessao: cookie } })
+    ).json() as { descricao: string }[];
+
+    expect(lista.map((s) => s.descricao).sort()).toEqual(["da organização", "do time A"]);
+  });
+
+  it("`timeId` de time que não é seu não abre porta nenhuma", async () => {
+    // A interseção com os times da SESSÃO é a garantia que não depende de a
+    // tela mandar o parâmetro certo.
+    const cookie = await logarComo(EMAIL_DEV);
+    await pedir(cookie, TIME_A, "do time A");
+    const cookieDeFora = await logarComo("de-fora@gerador.local");
+
+    const lista = (
+      await app.inject({ method: "GET", url: `/ajustes?timeId=${TIME_A}`, cookies: { gerador_sessao: cookieDeFora } })
+    ).json() as unknown[];
+
+    expect(lista).toEqual([]);
+  });
+
+  it("sem `timeId`, devolve os dos times da sessão", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    await pedir(cookie, TIME_A, "do time A");
+    await pedir(cookie, TIME_B, "do time B");
+
+    const lista = (await app.inject({ method: "GET", url: "/ajustes", cookies: { gerador_sessao: cookie } })).json() as {
+      descricao: string;
+    }[];
+
+    expect(lista.map((s) => s.descricao).sort()).toEqual(["do time A", "do time B"]);
+  });
+});

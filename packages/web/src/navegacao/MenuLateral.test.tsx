@@ -30,7 +30,8 @@ describe("MenuLateral (SPEC-40 F1 — gestão no menu, frequência no header)", 
       expect(screen.getByText(grupo)).toBeInTheDocument();
     }
     expect(screen.getByText("dev@gerador.local")).toBeInTheDocument();
-    expect(screen.getByLabelText("Time")).toHaveValue("time-pagamentos");
+    // §273 — o rodapé mostra o time ATIVO; a lista só aparece a pedido.
+    expect(screen.getByTestId("time-ativo")).toHaveTextContent("time-pagamentos");
   });
 
   it("clicar num item navega pra ÁREA certa e fecha o menu", () => {
@@ -97,5 +98,40 @@ describe("MenuLateral — o que ela não edita não aparece (§221)", () => {
     expect(screen.getByRole("button", { name: "Contexto do produto" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Modelo de IA/ })).toBeInTheDocument();
     expect(screen.queryByText("🔒")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * §273 — o seletor que não escalava.
+ */
+describe("MenuLateral — trocar de time com muitos times", () => {
+  const SESSENTA = Array.from({ length: 60 }, (_, i) => `time-${String(i).padStart(2, "0")}`);
+
+  it("a lista NÃO fica aberta: o rodapé mostra o ativo e nada mais", () => {
+    // Sessenta itens abertos no rodapé empurram o resto do menu para fora — é
+    // o defeito original com outra roupa.
+    montar({ timeIds: SESSENTA, timeAtivo: "time-07" });
+
+    expect(screen.getByTestId("time-ativo")).toHaveTextContent("time-07");
+    expect(screen.queryByTestId("lista-de-times")).toBeNull();
+  });
+
+  it("abrir dá busca, e escolher troca o time", () => {
+    const { onTrocarTime } = montar({ timeIds: SESSENTA, timeAtivo: "time-07" });
+
+    fireEvent.click(screen.getByTestId("time-ativo"));
+    fireEvent.change(screen.getByLabelText("Buscar time"), { target: { value: "42" } });
+    fireEvent.click(screen.getByTestId("time-time-42"));
+
+    expect(onTrocarTime).toHaveBeenCalledWith("time-42");
+    // E fecha: a lista cumpriu o que tinha a fazer.
+    expect(screen.queryByTestId("lista-de-times")).toBeNull();
+  });
+
+  it("com um time só não oferece troca — não há para onde ir", () => {
+    montar({ timeIds: ["time-silvio"], timeAtivo: "time-silvio" });
+
+    fireEvent.click(screen.getByTestId("time-ativo"));
+    expect(screen.queryByTestId("lista-de-times")).toBeNull();
   });
 });

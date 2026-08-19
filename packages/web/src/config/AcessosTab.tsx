@@ -29,7 +29,7 @@ export function AcessosTab({ timeAtivo }: { timeAtivo: string }) {
     const [lista, minhas, pedidos] = await Promise.all([
       apiAcessos.papeis(),
       apiAcessos.minhas(timeAtivo),
-      apiPdca.listarAjustes().catch(() => []),
+      apiPdca.listarAjustes(timeAtivo).catch(() => []),
     ]);
     setPapeis(lista);
     setRbacAtivo(minhas.rbacAtivo);
@@ -45,7 +45,7 @@ export function AcessosTab({ timeAtivo }: { timeAtivo: string }) {
       apiAcessos.catalogo(),
       apiAcessos.papeis(),
       apiAcessos.minhas(timeAtivo),
-      apiPdca.listarAjustes().catch(() => []),
+      apiPdca.listarAjustes(timeAtivo).catch(() => []),
     ])
       .then(([cat, lista, minhas, pedidos]) => {
         if (cancelado) return;

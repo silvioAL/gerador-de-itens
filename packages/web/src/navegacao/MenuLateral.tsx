@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { ListaDeTimes } from "../auth/ListaDeTimes";
 import type { AreaConfig } from "./rota";
 
 /**
@@ -97,6 +99,10 @@ export function MenuLateral({
   onSistema,
   onSair,
 }: MenuLateralProps) {
+  // §273 — fechado por padrão: trocar de time é raro, e a lista aberta o tempo
+  // todo é o paredão de volta.
+  const [trocandoTime, setTrocandoTime] = useState(false);
+
   if (!aberto) return null;
 
   const acao = (fn: () => void) => () => {
@@ -157,21 +163,38 @@ export function MenuLateral({
 
         <div style={{ flex: 1 }} />
         <div style={rodapeEstilo}>
+          {/* §273 — o `<select>` saiu. Ele nascia legível com dois times e
+              virava um paredão com sessenta (relato do usuário). O que fica é
+              o INDICADOR do time ativo; a lista só aparece a pedido, e com
+              busca quando o número justifica. */}
           <label style={{ fontSize: 11, color: "var(--texto-fraco)", display: "block", marginBottom: 4 }}>
             Time
           </label>
-          <select
+          <button
             aria-label="Time"
-            value={timeAtivo}
-            onChange={(e) => onTrocarTime(e.target.value)}
+            data-testid="time-ativo"
+            onClick={() => setTrocandoTime((t) => !t)}
+            aria-expanded={trocandoTime}
             style={seletorTimeEstilo}
           >
-            {timeIds.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+            {timeAtivo}
+            <span style={{ fontSize: 11, color: "var(--texto-mudo)", marginLeft: 6 }}>
+              {timeIds.length > 1 ? "· trocar" : ""}
+            </span>
+          </button>
+          {trocandoTime && timeIds.length > 1 && (
+            <div style={{ marginTop: 6 }}>
+              <ListaDeTimes
+                timeIds={timeIds}
+                ativo={timeAtivo}
+                autoFocus
+                onEscolher={(t) => {
+                  setTrocandoTime(false);
+                  onTrocarTime(t);
+                }}
+              />
+            </div>
+          )}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
             <span style={{ fontSize: 11, color: "var(--texto-mudo)", overflow: "hidden", textOverflow: "ellipsis" }}>
               {email}

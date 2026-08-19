@@ -1,3 +1,4 @@
+import { ListaDeTimes } from "./ListaDeTimes";
 export interface EscolherTimeScreenProps {
   timeIds: string[];
   onEscolher: (timeId: string) => void;
@@ -19,13 +20,9 @@ export function EscolherTimeScreen({ timeIds, onEscolher, onSair }: EscolherTime
           Você pertence a mais de um time — escolha qual fica ativo agora. Dá pra trocar depois, a qualquer momento.
         </p>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {timeIds.map((timeId) => (
-            <button key={timeId} onClick={() => onEscolher(timeId)} style={botaoTimeEstilo}>
-              {timeId}
-            </button>
-          ))}
-        </div>
+        {/* §273 — um botão por time virava um paredão com sessenta. A mesma
+            lista do menu, com busca quando o número justifica. */}
+        <ListaDeTimes timeIds={timeIds} onEscolher={onEscolher} autoFocus />
 
         <button onClick={() => void onSair()} style={botaoSairEstilo}>
           Sair

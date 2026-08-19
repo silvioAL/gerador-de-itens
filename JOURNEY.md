@@ -8902,3 +8902,51 @@ justamente por isso. Não é dívida nova, mas passa a estar escrita.
 completude da leitura → vermelho.
 
 335 engine · 647 web · 84 aplicação · 230 server · 79/79 E2E · build limpo.
+
+## §273 — sessenta times num dropdown, e a lista que mostrava o que não é seu
+
+*"essa parte do menu precisa ser revista, no meu contexto existem mais de 60
+times"* e *"apareceu esse warning, mas parece não fazer sentido, pois não estou
+querendo editar nada relacionado ao time de pagamentos"*.
+
+### O warning fazia sentido — a lista é que não
+
+O 403 dizia a verdade: aquela solicitação de ajuste é do `time-pagamentos`, e
+quem está em `time-silvio` não tem nível para editar as regras de lá. O defeito
+estava um passo antes: **`GET /ajustes` devolvia as solicitações da instalação
+inteira**, sem filtro nenhum. A tela colocava na frente da pessoa um pedido que
+não era dela, e o erro só aparecia depois do clique.
+
+Dois filtros, e os dois importam:
+
+- **`?timeId=`** é a tela dizendo em que time se está;
+- **a interseção com os times da SESSÃO** é a garantia que não depende de a
+  tela mandar o parâmetro certo. Pedido de time alheio não volta nem com
+  `?timeId=` forjado — e é isso que a mordida do "confia só no parâmetro"
+  prova.
+
+Solicitação sem time é da organização e continua aparecendo para todo mundo:
+`null` ali significa "de todos", não "de ninguém".
+
+### O `<select>` que nascia legível e virava paredão
+
+Um `<option>` por time no menu, um `<button>` por time na tela de escolha do
+login. Com dois ou três, ótimo; com sessenta, os dois quebram — e o segundo é
+pior, porque é a primeira coisa que alguém vê ao entrar.
+
+**Um componente para os dois lugares.** São a mesma pergunta ("qual time?")
+feita em momentos diferentes; duas implementações divergiriam na terceira
+mudança, e a que ficaria para trás seria justamente a do login.
+
+**A busca aparece quando vale a pena.** Com poucos times, um campo de filtro é
+fricção pura — a pessoa vê a lista e clica. Acima de oito, rolar custa mais que
+digitar, e o componente decide sozinho: quem o usa não configura nada.
+
+E no menu a lista **não fica aberta**. Trocar de time é raro; o rodapé mostra o
+ativo, e a lista vem a pedido. Deixá-la aberta seria o paredão de volta com
+outra roupa.
+
+**Mordidas:** a lista de ajustes ignorando o time → dois vermelhos; confiar só
+no parâmetro da tela → vermelho.
+
+335 engine · 650 web · 84 aplicação · 233 server · 79/79 E2E · build limpo.

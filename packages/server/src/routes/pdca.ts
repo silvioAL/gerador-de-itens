@@ -361,8 +361,28 @@ export async function registrarRotasPdca(app: FastifyInstance, { db }: OpcoesApp
     return reply.code(201).send(criada);
   });
 
-  app.get("/ajustes", { preHandler: exigirSessao }, async () => {
-    return db.select().from(solicitacoesAjuste).orderBy(desc(solicitacoesAjuste.criadoEm));
+  /**
+   * §273 — a lista é dos SEUS times, e do time ATIVO quando ele é dito.
+   *
+   * ACHADO REAL (print do usuário): a tela do PDCA mostrava solicitações de
+   * `time-pagamentos` para quem estava em `time-silvio`, e agir sobre uma
+   * delas trazia um 403 citando um time que a pessoa nunca escolheu. O erro
+   * estava certo; a lista é que não deveria tê-lo colocado ali.
+   *
+   * Dois filtros, e os dois importam: `timeId` é a tela dizendo em que time se
+   * está; a interseção com os times da SESSÃO é a garantia que não depende da
+   * tela mandar o parâmetro certo — pedido de time alheio não volta nem com
+   * `?timeId=` forjado.
+   *
+   * Solicitação sem time (`null`) é da organização: aparece para todo mundo.
+   */
+  app.get("/ajustes", { preHandler: exigirSessao }, async (req) => {
+    const { timeId } = req.query as { timeId?: string };
+    const meus = req.usuario!.timeIds;
+    const visiveis = timeId ? meus.filter((t) => t === timeId) : meus;
+
+    const todas = await db.select().from(solicitacoesAjuste).orderBy(desc(solicitacoesAjuste.criadoEm));
+    return todas.filter((s) => s.timeId === null || visiveis.includes(s.timeId));
   });
 
   /**
