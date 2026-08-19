@@ -1,8 +1,25 @@
 name: CI
 
+# §275 — `push` só na main.
+#
+# Com `on: push` sem filtro, todo push numa branch de PR disparava DOIS runs
+# idênticos (um por evento) sobre o mesmo commit. Eles competem pelo mesmo pool
+# de runners, e o segundo ficou pendurado duas vezes seguidas — 74 minutos numa,
+# sem sequer atualizar o status depois de criado. Cancelei os dois na mão e
+# fundi pelo run do `pull_request`, que é a definição de contornar em vez de
+# consertar.
+#
+# Agora: `pull_request` cobre as branches, `push` cobre a main depois do merge.
 on:
   push:
+    branches: [main]
   pull_request:
+
+# E se alguém empurrar duas vezes seguidas, o run velho morre em vez de disputar
+# runner com o novo: o resultado que interessa é sempre o do último commit.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:

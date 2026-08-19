@@ -282,8 +282,11 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await chipPercurso.click();
   const listaPercurso = page.getByTestId("percursos-lista");
   await expect(listaPercurso).toContainText("srv-catalogo → produtos");
-  // A regra 2 dita na tela, não só no código.
-  await expect(listaPercurso).toContainText("Nada é medido antes de você confirmar");
+  // A regra 2 dita na tela, não só no código — e, desde o §275, com o termo
+  // definido antes de ser usado (o usuário perguntou "o que significa
+  // caminho? fluxo informacional? ciclomático?").
+  await expect(listaPercurso).toContainText("sequência de componentes por onde uma requisição passa");
+  await expect(listaPercurso).toContainText("as réguas de tempo e de número de saltos passam a valer");
   // §263 — e o PREÇO de confirmar, na mesma lista. Confirmar um caminho é o
   // que faz a régua valer sobre ele, e régua valendo vira item (§249): sem
   // este número, o custo só apareceria depois, no backlog.

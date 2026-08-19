@@ -8992,3 +8992,52 @@ nele. O teste que não passava estava certo sobre o sintoma e errado sobre a
 causa.
 
 335 engine · 652 web · 84 aplicação · 233 server · 79/79 E2E · build limpo.
+
+## §275 — a palavra que ninguém definiu, e a CI que eu vinha contornando
+
+*"aqui acho a informação pouco clara, que motor? e o que significa caminho?
+fluxo informacional? ciclomático? precisamos melhorar as explicações para
+reduzir a fricção cognitiva"*.
+
+### O texto usava um vocabulário que a tela nunca deu
+
+> *"O motor leu estes caminhos no desenho."*
+
+Duas palavras carregadas numa frase de dez. **Motor** está explicado — na
+jornada ("Como funciona"), que a pessoa pode não ter aberto. **Caminho** não
+estava explicado em lugar nenhum da interface, e a leitura errada é fácil:
+ciclomático? fluxo de informação? diagrama de sequência?
+
+Agora o painel **define antes de usar**: *"Caminho = a sequência de componentes
+por onde uma requisição passa, de ponta a ponta (aqui: srv-catalogo →
+produtos)"* — com o exemplo do próprio desenho, que é o que dispensa a
+abstração. E troquei "o motor leu" por **"lidos do seu desenho seguindo as
+setas — cálculo, sem IA"**: diz a mesma coisa sem exigir que a palavra "motor"
+tenha sido apresentada, e responde de passagem a pergunta que sempre vem depois.
+
+O tooltip do chip seguiu a mesma régua.
+
+### A régua que fica
+
+> Termo do produto se define **onde ele aparece**, não num glossário. Quem lê
+> no meio do trabalho não vai atrás da definição — ou entende ali, ou desiste
+> e clica no que parece seguro.
+
+### E a CI que eu vinha contornando em vez de consertar
+
+Duas vezes seguidas o merge dependeu de eu cancelar um run travado na mão. A
+causa estava no gatilho: `on: push` sem filtro **mais** `on: pull_request` faz
+todo push numa branch de PR disparar **dois runs idênticos** sobre o mesmo
+commit, competindo pelo mesmo pool de runners. Um deles ficou pendurado 74
+minutos sem sequer atualizar o status.
+
+`push` passou a valer só na main (verificação pós-merge), `pull_request` cobre
+as branches, e um `concurrency` com `cancel-in-progress` mata o run velho quando
+chega commit novo.
+
+**Não abri SPEC para isto**, e digo por quê: a régua de "mudança de CI/CD ganha
+SPEC" existe para mudança estrutural, e o que houve aqui foi um gatilho errado
+consertado em cinco linhas, com o raciocínio inteiro no comentário do próprio
+arquivo. Se a próxima mexida na CI for de estrutura, ela ganha a SPEC.
+
+335 engine · 653 web · 84 aplicação · 233 server · 79/79 E2E · build limpo.
