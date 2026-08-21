@@ -984,6 +984,12 @@ export interface SolicitacaoAjuste {
   /** SPEC-45 — a mudança como dado; nulo = pedido só em texto (SPEC-39). */
   operacao: OperacaoDeAjuste | null;
   criadoEm: string;
+  /** SPEC-62 — quem decidiu, quando, e por quê. O card mostrava só o estado, e
+   * quem escreveu o pedido nunca ficava sabendo o que faria dele um pedido
+   * aceitável. Sobrevive a `reconsiderar`: o "não" anterior é história. */
+  decididoPor?: string | null;
+  decididoEm?: string | null;
+  motivoDaDecisao?: string | null;
   aplicadaEm?: string | null;
   aplicadaPor?: string | null;
 }
@@ -1016,6 +1022,9 @@ export const apiPdca = {
   listarFeedback: () => requisitar<FeedbackPdca[]>("/pdca/feedback"),
   descartarFeedback: (id: string) =>
     requisitar<{ id: string; estado: string }>(`/pdca/feedback/${id}/descartar`, { method: "POST" }),
+  /** SPEC-62 — descartar tinha volta em lugar nenhum. */
+  reabrirFeedback: (id: string) =>
+    requisitar<{ id: string; estado: string }>(`/pdca/feedback/${id}/reabrir`, { method: "POST" }),
   aplicarAjuste: (id: string) =>
     requisitar<{ id: string; estado: string; aplicadaPor: string | null }>(`/ajustes/${id}/aplicar`, { method: "POST" }),
   criarAjuste: (dados: {
@@ -1031,11 +1040,16 @@ export const apiPdca = {
    * melhor do que deixar o servidor adivinhar. */
   listarAjustes: (timeId?: string) =>
     requisitar<SolicitacaoAjuste[]>(`/ajustes${timeId ? `?timeId=${encodeURIComponent(timeId)}` : ""}`),
-  decidirAjuste: (id: string, aprovar: boolean) =>
+  /** SPEC-62 — `motivo` acompanha a recusa: um "não" sem porquê é carimbo. */
+  decidirAjuste: (id: string, aprovar: boolean, motivo?: string) =>
     requisitar<{ id: string; estado: string }>(`/ajustes/${id}/decidir`, {
       method: "POST",
-      body: JSON.stringify({ aprovar }),
+      body: JSON.stringify({ aprovar, ...(motivo?.trim() ? { motivo: motivo.trim() } : {}) }),
     }),
+  /** SPEC-62 — devolve a `pendente` o que foi recusado ou invalidado, sem
+   * apagar o "não" anterior. */
+  reconsiderarAjuste: (id: string) =>
+    requisitar<{ id: string; estado: string }>(`/ajustes/${id}/reconsiderar`, { method: "POST" }),
 };
 
 /** SPEC-43 — uma stack conhecida: valores nomeados de UM componente. */

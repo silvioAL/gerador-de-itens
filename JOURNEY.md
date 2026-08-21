@@ -9186,3 +9186,94 @@ apontar para a seção; passo que aponta para tela que não existe quebra a
 demonstração inteira no meio.
 
 339 engine · 655 web · 84 aplicação · 233 server · 80/80 E2E · build limpo.
+
+## §278 — o "não" do ciclo, e a entrada que pulava o Check
+
+*"na parte de sugestões não sei se é a massa ou o que, ali no ciclo pdca, mas só
+aparece direto para aprovar antes de conseguir ver o pdca (não gerei nenhuma
+nova), e se rejeito simplesmente some para sempre"*.
+
+**Reproduzi contra a stack antes de escrever uma linha de código**, e o primeiro
+achado foi que a pergunta do usuário tinha resposta: **não é massa** — não
+existe seed de solicitação neste produto. O que aparecia foi criado pelo próprio
+caminho de entrada.
+
+### O pedido nascia no fim do ciclo
+
+O balão da entrevista, para quem não é owner, chamava `criarAjuste` direto com o
+texto digitado — sem operação, sem `feedbackId`, e **sem gravar feedback
+nenhum**. A tela então dizia, ao mesmo tempo:
+
+```
+O que disseram (0 sem tratar) — Ninguém deixou feedback ainda.
+Solicitações de ajuste (1 aguardando decisão) — [Aprovar] [Recusar]
+```
+
+O ciclo tem quatro tempos e a entrada pulava dois. O que uma pessoa diz é
+*Check*; virar mudança é *Plan*; decidir é *Act*. Escrever direto na fila de
+decisão é entregar o *Act* sem que o *Check* tenha existido.
+
+> **Tudo que uma pessoa diz entra pelo mesmo lugar.** Solicitação não se escreve
+> à mão — ela nasce de um feedback, no estúdio, com prévia do efeito.
+
+A promessa não encolheu: o texto continua chegando a quem configura. Mudou a
+porta, não o destino. E o M15 (*"tem N feedbacks esperando"*), que existia desde
+a SPEC-45 e **nunca acendia por este caminho**, passou a acender.
+
+### Quem decide decidia no escuro
+
+O card mostrava `descricao`, `solicitante · recurso · estado`. Não mostrava
+**quando** (por isso o "não gerei nenhuma nova": um pedido de três semanas atrás
+era visualmente idêntico a um de hoje), não mostrava **de que feedback nasceu**
+— com o dado ali, ligado no banco desde a SPEC-45 —, e não mostrava **o efeito**,
+que o estúdio calcula para quem PROPÕE e sumia para quem DECIDE. Exatamente ao
+contrário de quem precisa dele.
+
+E pedido sem operação oferecia **"Aprovar"** enquanto `POST /aplicar` responde
+*"este pedido é só texto — edite à mão"*. O botão prometia o *Act* e entregava
+um bilhete.
+
+### Os dois "não" eram becos
+
+| O "não" | O que acontecia | O que mudou |
+|---|---|---|
+| **Recusar** um pedido | virava `rejeitada`, sem motivo, e o servidor devolvia `409` a qualquer nova decisão — nem pela API havia volta | grava o motivo e ganhou `reconsiderar`, que devolve a `pendente` **sem apagar o "não" anterior** |
+| **Descartar** um feedback | sumia da tela (medido: `visível: false`) para dentro do histórico fechado, sem caminho de volta | ganhou `reabrir` |
+
+O produto já sabia fazer isto direito em todo o resto — a decisão substituída da
+SPEC-57 não se apaga, a exceção de padrão carrega motivo, a necessidade órfã
+continua aparecendo (§57). O ciclo de melhoria era o único lugar onde o "não"
+era mudo e definitivo.
+
+> **Um "não" que não diz por quê e não pode ser revisto não é decisão: é
+> descarte.** E descarte silencioso é o que ensina o time a parar de responder.
+
+`invalida` reconsidera junto, e retomando a versão-alvo de agora — a própria
+mensagem do 409 manda *"reavalie sobre o estado atual"*, e não havia como. Sem
+retomar a versão, o pedido voltaria a pendente só para invalidar de novo.
+
+### O placar mentia
+
+Ele contava `virou-ajuste` como *"viraram mudança na configuração"* — e um
+feedback cujo pedido foi **recusado** entrava na conta. O placar do §276 nasceu
+para responder "o que isto mudou"; assim respondia o contrário. "Virou mudança"
+passou a significar **solicitação aplicada**, e o resto aparece pelo que é.
+
+### O teste que quebrou três vizinhos
+
+Duas contaminações minhas, as duas encontradas rodando a suíte inteira e não o
+spec isolado:
+
+- o spec novo baixava a **cadência global** para 1 para provocar a entrevista, e
+  três specs vizinhos passaram a receber o balão de feedback no meio do fluxo
+  deles. O contador de usos é POR USUÁRIO — gastar quatro usos do membro
+  recém-criado faz o quinto cair na cadência padrão, sem tocar em nada global;
+- e ele **sobrescrevia o documento de regras** para ter o que comparar na
+  prévia. Não precisava: a operação proposta aparece no diff mesmo sem régua
+  prévia, e o que a sobrescrita fazia era apagar o que `exportacao` e
+  `revisao-em-lote` esperavam encontrar.
+
+Config global em suíte paralela é estado compartilhado. Restaurar no `finally`
+não basta — a janela entre mexer e restaurar é o teste do vizinho.
+
+339 engine · 665 web · 84 aplicação · 237 server · 83/83 E2E · build limpo.

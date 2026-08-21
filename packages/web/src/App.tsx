@@ -1608,15 +1608,36 @@ function AppCarregado({
               }
             : entrevistaPdca !== null && !mostrarConfig && !resultado
               ? {
-                  texto: `Já usamos a derivação algumas vezes${entrevistaPdca.length > 0 ? ` (últimos itens do time: ${entrevistaPdca.join(", ")})` : ""}. Sentiu falta — ou sobra — de algum item de checklist, regra de refinamento ou campo do formulário? ${somenteLeitura || permissoes.nivel !== "owner" ? "Descreva o ajuste que eu encaminho pra aprovação de quem configura." : "Posso ajustar com você, conversando."}`,
+                  texto: `Já usamos a derivação algumas vezes${entrevistaPdca.length > 0 ? ` (últimos itens do time: ${entrevistaPdca.join(", ")})` : ""}. Sentiu falta — ou sobra — de algum item de checklist, regra de refinamento ou campo do formulário? ${somenteLeitura || permissoes.nivel !== "owner" ? "Escreva aqui: entra no ciclo do time, e quem configura transforma em ajuste vendo o efeito num item antes de aplicar." : "Posso ajustar com você, conversando."}`,
                   ...(permissoes.nivel === "owner"
                     ? { acao: { rotulo: "Revisar configurações", onExecutar: () => { setEntrevistaPdca(null); setAbaAssistente("configurar"); } } }
                     : {
                         entrada: {
                           placeholder: "ex.: faltou item de DLQ no checklist",
-                          rotulo: "Pedir ajuste",
+                          rotulo: "Enviar ao ciclo",
+                          /**
+                           * SPEC-62 §1 — grava FEEDBACK, e não solicitação.
+                           *
+                           * Isto chamava `criarAjuste` direto: o texto pulava o
+                           * *Check* e caía na fila de decisão como pedido
+                           * `pendente`, sem operação e sem prévia. A tela do
+                           * ciclo então dizia "Ninguém deixou feedback ainda" e,
+                           * logo abaixo, "1 aguardando decisão" (relato do
+                           * usuário: *"só aparece direto para aprovar antes de
+                           * conseguir ver o pdca"*).
+                           *
+                           * A promessa não encolhe — o texto continua chegando a
+                           * quem configura. Muda a porta, não o destino: agora
+                           * ele entra por "O que disseram" e vira pedido no
+                           * estúdio, com o efeito à vista.
+                           */
                           onConfirmar: (texto: string) => {
-                            void apiPdca.criarAjuste({ descricao: texto, timeId: timeAtivo }).catch(() => {});
+                            void apiPdca.feedback(texto, timeAtivo).catch(() => {});
+                            // O M15 ("tem N feedbacks esperando") nunca acendia
+                            // por este caminho, porque feedback nenhum era
+                            // criado. Contar o que acabou de entrar é o que faz
+                            // a condução seguinte existir.
+                            setFeedbacksNovos((n) => n + 1);
                             setEntrevistaPdca(null);
                           },
                         },

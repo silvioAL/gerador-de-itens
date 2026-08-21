@@ -324,6 +324,11 @@ export const solicitacoesAjuste = pgTable("solicitacoes_ajuste", {
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
   decididoPor: text("decidido_por"),
   decididoEm: timestamp("decidido_em", { withTimezone: true }),
+  /** SPEC-62 — o POR QUÊ da recusa. Sem ele, "rejeitada" é um carimbo: quem
+   * escreveu o pedido não fica sabendo o que faria dele um pedido aceitável, e
+   * é assim que o time aprende a parar de pedir. Sobrevive a `reconsiderar`
+   * de propósito — o "não" anterior é história, não rascunho. */
+  motivoDaDecisao: text("motivo_da_decisao"),
   aplicadaEm: timestamp("aplicada_em", { withTimezone: true }),
   aplicadaPor: text("aplicada_por"),
 });
