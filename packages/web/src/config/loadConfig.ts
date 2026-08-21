@@ -89,11 +89,10 @@ function mesclarCamposCustomizadosAresta(diagramaConfig: DiagramaConfig, campos:
 
 /**
  * Carrega config/ em runtime (fetch, nunca import estático) — o mesmo bundle
- * de `packages/web/dist` precisa servir qualquer projeto que rode `gerador open`
- * nele, não só o config de exemplo deste repositório. Quem expõe config/*.json
- * em `/config/` muda por ambiente (middleware do Vite em dev, `gerador open` em
- * modo CLI, volume montado no nginx no Docker) — este módulo não sabe nem
- * precisa saber qual dos três está servindo.
+ * estático precisa servir qualquer instalação, não só o config de exemplo deste
+ * repositório. Quem expõe `config/*.json` em `/config/` muda por ambiente
+ * (middleware do Vite em dev, volume montado no nginx no Docker) — este módulo
+ * não sabe nem precisa saber qual dos dois está servindo.
  *
  * `timeAtivo` mescla os campos customizados desse time (SPEC-08 §3) por cima do
  * `spec` estático — recarregar com um `timeAtivo` novo é como o app reage a
@@ -112,12 +111,22 @@ export async function carregarConfig(timeAtivo?: string): Promise<ConfigCarregad
       .then((envelope) => envelope.documento as RegrasConfig)
       .catch(() => buscarJsonOpcional<RegrasConfig>("/config/regras.json")),
     apiCamposNo.listar(timeAtivo),
-    // /campos-aresta só existe no modo local (openApiLocal.ts) — packages/server
-    // fica dormente de propósito, sem essa rota (SPEC-21 §2). Achado real: sem
-    // esse catch, o 404 no modo hospedado rejeitava o Promise.all inteiro e
-    // quebrava o carregamento da config pra todo mundo, não só quem usaria o
-    // editor de campos de aresta. Ausência da rota = "nenhum campo customizado
-    // de aresta", nunca um erro fatal.
+    /**
+     * O `catch` não é sobre rota faltando — é sobre BLAST RADIUS.
+     *
+     * §280: este comentário dizia que `/campos-aresta` "só existe no modo
+     * local" e que `packages/server` ficava dormente sem essa rota. As duas
+     * coisas deixaram de ser verdade (o modo local morreu na SPEC-33, e
+     * `routes/camposAresta.ts` existe), e um comentário que descreve o
+     * contrário do código manda a próxima pessoa remover o `catch` — ou
+     * escrever uma rota que já está lá.
+     *
+     * O que se preserva é o achado real que o pôs aqui: qualquer falha nesta
+     * chamada rejeitava o `Promise.all` inteiro e derrubava o carregamento da
+     * config para TODO MUNDO, não só para quem usaria o editor de campos de
+     * aresta. Falha aqui = "nenhum campo customizado de aresta", nunca uma
+     * tela em branco.
+     */
     apiCamposAresta.listar(timeAtivo).catch(() => []),
   ]);
   const comCamposNo = mesclarCamposCustomizados(diagramaConfig, camposCustomizados);
