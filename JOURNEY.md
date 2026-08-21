@@ -9450,3 +9450,72 @@ que só existe enquanto a tela está lá, não entra.
 339 engine · 667 web · 84 aplicação · 237 server · 83/83 E2E · build limpo — e o
 `npm test -w packages/web` sai em 0 em cinco rodadas seguidas, onde antes falhava
 em uma a cada três.
+
+## §282 — a próxima spec não precisou de opinião: a ordem já estava declarada
+
+*"e depois avaliar a próxima spec"*.
+
+A tentação era propor o que parecesse mais bonito. Em vez disso, fui ver o que o
+próprio usuário já tinha ordenado — a **SPEC-56 §0.4**, a tabela de oito passos
+que ele escreveu depois de corrigir o rumo daquela avaliação — e cruzei com o que
+foi construído desde então:
+
+| # | Passo declarado | Estado |
+|---|---|---|
+| 1 | requisito + rastreabilidade + gap analysis | ✅ SPEC-57 fatia A |
+| 2 | **padrão como regra sobre topologia e valor** | ⚠️ **só a metade do valor** |
+| 3 | ADR ancorado no nó | ✅ SPEC-57 fatia C |
+| 4 | percurso | ✅ SPEC-57 fatia E |
+| 5 | número com unidade | ✅ `Checagem` com `valorDe` (§241) |
+| 6–8 | modo de operação, variante A×B, dialeto | ❌ |
+
+O #2 é o único dos quatro primeiros ainda aberto — e a SPEC-56 §10 tinha dito
+por que ele esperava: *"as regras mais valiosas precisam de P1 (caminho) e de P2
+(número). Com as duas, P8 é config"*. **As duas ficaram prontas.** A dependência
+que o segurava caiu sem ninguém reparar.
+
+### O que o levantamento mudou na SPEC antes de ela ser escrita
+
+Fui conferir os pontos de encaixe em vez de escrever de cabeça, e dois achados
+mudaram o desenho:
+
+**1. As violações de percurso não têm válvula de escape.** Eu ia seguir o
+precedente (topologia também sem exceção, como percurso). Aí reli o §242:
+*"violar o padrão é permitido — e fica registrado. Sem essa saída, a pessoa
+aprende a ignorar o vermelho, e a medição inteira morre junto."* Para forma o
+argumento é **mais** forte, não menos: "fila sem consumidor porque o consumidor
+vem na próxima demanda" é o caso comum. A válvula entrou na fatia C, e a dívida
+do percurso ficou nomeada em vez de copiada.
+
+**2. A exceção precisa de chave estável.** `ExcecaoDePadrao` identifica por
+`(noId, campo)`, e uma regra de forma não tem campo. Se a exceção apontasse para
+o `texto` da regra, renomear a regra desligaria em silêncio as exceções que
+alguém registrou com motivo. Daí o `RequisitoDeTopologia.id` obrigatório — é a
+mesma disciplina de `Atividade.chave` × `rotulo` que o projeto tem desde a
+SPEC-01.
+
+### A régua que impede isto de virar linter
+
+> **A regra de topologia responde à MESMA pergunta das outras duas — "este
+> desenho contraria o padrão do time?" — e nunca a "este grafo é válido?".**
+
+Sem essa linha, o passo seguinte seria cobrar ciclo, nó solto e componente
+desconectado por serem feios, e a mesa viraria um validador de grafo com opinião
+própria. Regra de forma só existe se o time a declarou.
+
+### Dois operadores, e a recusa do terceiro
+
+`exige-conexao` e `proibe-conexao` cobrem os três casos canônicos da SPEC-56 §10.
+O terceiro que quase entrou — `exige-intermediario`, "toda escrita no banco passa
+por um serviço" — **já é expressável**: é proibir a conexão direta. O caminho
+desejado não precisa ser afirmado, precisa ser o único que sobra.
+
+### E a fatia que não é opcional
+
+As réguas de percurso vivem no documento e **não têm editor** — só se configuram
+por API. É aceitável para nascer e ruim para viver. A fatia D (seção na
+`RegrasTab` + operação no PDCA) está escrita como não-opcional justamente por
+causa do §194, quando o feedback que o agente coletava não aparecia em tela
+nenhuma: capacidade que só se configura por JSON é capacidade que o time não usa.
+
+Sem mudança de código: a SPEC é documento. A implementação vem na próxima rodada.
