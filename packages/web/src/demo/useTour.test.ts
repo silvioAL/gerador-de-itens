@@ -140,6 +140,29 @@ describe("useTour", () => {
     }
   });
 
+  /**
+   * §280 — o passo do PDCA mostrava só a metade que dá certo.
+   *
+   * A SPEC-62 pôs o "não" de pé (motivo, reconsiderar, reabrir) e ele não
+   * aparecia em tour nenhum. Pela régua do §244, capacidade que o tour não
+   * mostra não existe para quem está avaliando a ferramenta — e o "não" é
+   * justamente a parte que decide se um time continua respondendo.
+   */
+  it("§280 — o passo do PDCA mostra o CICLO INTEIRO: o sim e o não", () => {
+    const passo = passosDeConfiguracao(montarOpts()).find((p) => p.titulo === "Melhoria contínua (PDCA)");
+
+    expect(passo).toBeDefined();
+    // O sim: de onde o pedido veio, o efeito, e aplicar de verdade.
+    expect(passo?.texto).toMatch(/de que feedback nasceu/i);
+    expect(passo?.texto).toMatch(/item de exemplo/i);
+    // O não: com porquê, e com volta.
+    expect(passo?.texto).toMatch(/recusar pede o porquê/i);
+    expect(passo?.texto).toMatch(/reconsiderado/i);
+    expect(passo?.texto).toMatch(/descartado volta/i);
+    // Passo longo com 7s é passo que ninguém termina de ler.
+    expect(passo?.segundos ?? SEGUNDOS_PADRAO).toBeGreaterThan(SEGUNDOS_PADRAO);
+  });
+
   it("§252 — e o tour do PRODUTO não abre tela de configuração nenhuma", () => {
     // O outro lado da mesma régua: se um passo de administração vazar de volta
     // para cá, a divisão derrete de novo, um passo por vez.

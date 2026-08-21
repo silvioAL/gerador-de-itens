@@ -9316,3 +9316,65 @@ código.
 
 Sem mudança de código: 339 engine · 665 web · 84 aplicação · 237 server ·
 83/83 E2E seguem como no §278.
+
+## §280 — o tour mostrava só a metade do ciclo que dá certo
+
+Duas pontas soltas que eu mesmo deixei nas rodadas anteriores, e que só
+apareceram quando o usuário perguntou *"faltou algo?"*.
+
+### O "não" existia e não aparecia em tour nenhum
+
+A SPEC-62 pôs o "não" do ciclo de pé — recusar pede o porquê, o pedido recusado
+pode ser reconsiderado, o feedback descartado volta a esperar tratamento. E o
+passo "Melhoria contínua (PDCA)" do tour de configuração continuou contando só a
+metade que dá certo: *"vira sugestão de ajuste, você vê o efeito, aprova — e a
+configuração muda de verdade"*.
+
+> Pela régua do §244, **capacidade que o tour não mostra não existe** para quem
+> está avaliando a ferramenta. E o "não" é justamente a parte que decide se um
+> time continua respondendo.
+
+O passo passou a contar o ciclo inteiro, incluindo o que quem decide vê antes de
+decidir (de que feedback o pedido nasceu, quando, e o que ele muda num item de
+exemplo). Texto maior pediu tempo maior: 7s era o padrão, e passo longo com 7s é
+passo que ninguém termina de ler — foi para 14s.
+
+**Um passo novo, e não dois.** A tentação era dar ao "não" um passo próprio, mas
+ele apontaria para o MESMO seletor, na MESMA aba: o realce não se moveria e só o
+texto trocaria, o que lê como tour travado. O §236 também já tinha decidido que
+este tour não vira uma sequência de telas paradas.
+
+### Um comentário que descrevia o contrário do código
+
+Em `loadConfig.ts`:
+
+> *"`/campos-aresta` só existe no modo local (`openApiLocal.ts`) —
+> `packages/server` fica dormente de propósito, sem essa rota"*
+
+As duas afirmações morreram na SPEC-33: o modo local não existe mais e
+`routes/camposAresta.ts` está lá. O comentário sobreviveu porque nada quebra
+quando um comentário mente — e é por isso que ele é perigoso: a próxima pessoa
+lê, conclui que o `catch` protege de uma rota ausente, e ou remove o `catch` ou
+escreve uma rota que já existe.
+
+O que se preservou foi o achado real que pôs o `catch` ali, e que continua
+valendo: **o `catch` não é sobre rota faltando, é sobre blast radius.** Qualquer
+falha naquela chamada rejeitava o `Promise.all` inteiro e derrubava o
+carregamento da config para todo mundo, não só para quem usaria o editor de
+campos de aresta.
+
+Não saí corrigindo as outras 45 ocorrências de "modo local" no repositório: a
+maioria é **história legítima** ("isto nasceu no modo local"), e apagá-la
+custaria o porquê. A régua que usei para separar: corrige-se o comentário que
+afirma algo **falso sobre o comportamento de hoje**; preserva-se o que conta de
+onde a coisa veio.
+
+### Um ruído que fica anotado, não resolvido
+
+Numa das rodadas da suíte do web o vitest terminou com *"unhandled errors"* e
+código 1, com **os 666 testes passando**. Duas execuções seguintes saíram limpas
+(exit 0). Não é do que mudei aqui — texto de tour e comentário não criam promessa
+pendente. Fica registrado em vez de virar "passou": intermitência que ninguém
+anota é a que ensina a ignorar vermelho.
+
+339 engine · 666 web · 84 aplicação · 237 server · 83/83 E2E · build limpo.

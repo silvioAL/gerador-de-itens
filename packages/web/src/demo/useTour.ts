@@ -433,10 +433,16 @@ export function passosDeConfiguracao(opts: UseTourOpts): PassoTour[] {
       onEnter: () => opts.abrirConfigNaAba("exportacao"),
     },
     {
+      // §280 — o passo mostrava só a metade que dá certo. A SPEC-62 pôs o "não"
+      // de pé (motivo, reconsiderar, reabrir) e ele não aparecia em tour
+      // nenhum: pela régua do §244, capacidade que o tour não mostra não existe
+      // para quem está avaliando. Texto maior pede tempo maior — passo longo
+      // com 7s é passo que ninguém termina de ler.
       selector: "[data-tour=config-screen-content]",
       titulo: "Melhoria contínua (PDCA)",
+      segundos: 14,
       texto:
-        "Depois de gerar, o assistente pergunta o que faltou ou sobrou. O que as pessoas respondem aparece aqui: vira sugestão de ajuste, você vê o efeito num item de exemplo antes de decidir, aprova — e a configuração muda de verdade, com registro de quem aplicou.",
+        "Depois de gerar, o assistente pergunta o que faltou ou sobrou — e o que as pessoas respondem entra aqui, em \"O que disseram\". Dali vira uma proposta de ajuste no estúdio, e quem decide não decide no escuro: o pedido chega dizendo de que feedback nasceu, quando, e o que ele muda num item de exemplo. Aprovar aplica de verdade, com registro de quem aplicou. E o \"não\" também é decisão: recusar pede o porquê — quem escreveu o pedido lê —, o pedido recusado pode ser reconsiderado, e o feedback descartado volta a esperar tratamento. Um \"não\" mudo e definitivo é o que ensina um time a parar de responder.",
       onEnter: () => opts.abrirConfigNaAba("pdca"),
     },
     {
