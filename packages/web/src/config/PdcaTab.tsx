@@ -21,6 +21,7 @@ import {
   type SolicitacaoAjuste,
 } from "../api/client";
 import type { AreaConfig } from "../navegacao/rota";
+import { useMontado } from "../state/useMontado";
 import { simularItemComAjuste } from "./previaDoAjuste";
 
 /**
@@ -84,6 +85,13 @@ export function PdcaTab({ config, timeAtivo, onAbrirArea, onFichaMudou }: PdcaTa
   const [emEstudio, setEmEstudio] = useState<FeedbackPdca | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
+  /**
+   * §281 — `recarregar` roda depois de TODA ação desta tela, e a resposta pode
+   * chegar com a tela já fechada. Ref e não flag de efeito: a escrita nasce
+   * fora do efeito (ver `useMontado`).
+   */
+  const montado = useMontado();
+
   async function recarregar() {
     const [cfg, fbs, ajs, regs, pipe] = await Promise.all([
       apiPdca.config().catch(() => CADENCIA_PADRAO),
@@ -98,6 +106,7 @@ export function PdcaTab({ config, timeAtivo, onAbrirArea, onFichaMudou }: PdcaTa
     // aplicar ajuste), e sobrescrever aqui apagaria a cadência que a pessoa
     // acabou de mudar por causa de um clique noutro canto da tela. Carrega uma
     // vez; depois disso, quem manda é o formulário.
+    if (!montado.current) return;
     setCadencia((atual) => atual ?? cfg);
     setFeedbacks(fbs);
     setAjustes(ajs);

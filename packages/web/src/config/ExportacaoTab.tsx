@@ -25,12 +25,16 @@ export function ExportacaoTab({ demonstracao }: ExportacaoTabProps = {}) {
   const [erro, setErro] = useState<string | null>(null);
   const [salvo, setSalvo] = useState(false);
 
+  // §281 — a resposta que chega depois da tela sair não escreve nada (ver
+  // `useMontado`).
   useEffect(() => {
     // Em demonstração não se busca nem se grava nada.
     if (demonstracao) return;
+    let cancelado = false;
     apiExportador
       .obter()
       .then((c) => {
+        if (cancelado) return;
         setConfig(c);
         setCabecalhosTexto(
           Object.entries(c.cabecalhos ?? {})
@@ -38,7 +42,12 @@ export function ExportacaoTab({ demonstracao }: ExportacaoTabProps = {}) {
             .join("\n")
         );
       })
-      .catch((e) => setErro(e instanceof Error ? e.message : String(e)));
+      .catch((e) => {
+        if (!cancelado) setErro(e instanceof Error ? e.message : String(e));
+      });
+    return () => {
+      cancelado = true;
+    };
   }, [demonstracao]);
 
   if (erro && !config) return <p style={{ fontSize: 12.5, color: "var(--vermelho)" }}>{erro}</p>;

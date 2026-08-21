@@ -9378,3 +9378,75 @@ pendente. Fica registrado em vez de virar "passou": intermitência que ninguém
 anota é a que ensina a ignorar vermelho.
 
 339 engine · 666 web · 84 aplicação · 237 server · 83/83 E2E · build limpo.
+
+## §281 — o vermelho que não era teste quebrado, e a corrida na terceira aparição
+
+O §280 anotou sem resolver: numa rodada em três, o vitest do web saía com código
+**1** e a mensagem *"Vitest caught 5 unhandled errors"* — com os **666 testes
+passando**. Agora com o log capturado, os cinco erros diziam a mesma coisa:
+
+```
+ReferenceError: window is not defined
+ ❯ dispatchSetState react-dom.development.js
+ ❯ src/config/RegrasTab.tsx:80    .catch((e) => setErro(...))
+ ❯ src/config/MembrosTab.tsx:35   .catch((e) => setErro(...))
+ ❯ src/config/ExportacaoTab.tsx:41
+ ❯ recarregar src/config/PdcaTab.tsx:101
+This error was caught after test environment was torn down.
+```
+
+Todos vindos de `ConfigScreen.test.tsx`. O padrão é sempre o mesmo:
+`useEffect` → busca → `.then(setEstado)`. A resposta chega quando chega; se a
+tela já saiu — e no teste o ambiente inteiro já foi derrubado —, o `setEstado`
+roda sobre um React sem `window` e estoura fora de qualquer teste.
+
+**Não era teste ruim: era o produto escrevendo estado que não interessa mais.**
+
+### A casa já tinha decidido isto
+
+Medi antes de escolher: **7 arquivos já usavam guarda de cancelamento**
+(`App.tsx`, `AcessosTab`, `ModeloIaTab`, `ConversaPanel`, `ReviewScreen`,
+`usePermissoes`, `useVozNaEntrada`) e **6 não** — e os 4 que estouraram estavam
+exatamente entre os 6. Ou seja: não havia decisão nova a tomar, havia um padrão
+aplicado pela metade. Consertar só os 4 que perderam a corrida deixaria os
+outros 2 esperando a vez.
+
+Duas formas, e a diferença importa:
+
+- **flag local no efeito** (`RegrasTab`, `MembrosTab`, `ExportacaoTab`,
+  `useSessao`) — serve quando o efeito é o único a escrever;
+- **ref de montado** (`PdcaTab`, `ProdutosTab`, via `useMontado`) — a mesma
+  função de recarga roda também depois de cada ação, então a escrita nasce fora
+  do efeito e a flag daquele efeito não a alcança.
+
+### E uma delas não era ruído de teste
+
+`MembrosTab` busca por `[timeAtivo]`. Trocar de time com a busca no ar deixava a
+resposta **antiga** chegar depois e sobrescrever a nova: a lista mostraria os
+membros do time anterior com o nome do time novo em volta.
+
+> É a **terceira aparição da mesma corrida**: §210 foram os itens da demanda
+> anterior, §213 foi o canvas da demanda anterior, e agora os membros do time
+> anterior. Três vezes já não é azar — é o padrão que faltava aplicar.
+
+O teste novo força a ordem que o defeito precisa (a busca antiga resolve por
+último) e **falha sem a guarda** — conferido revertendo o arquivo e rodando.
+Ausência de erro em cinco rodadas seguidas não prova corrida nenhuma; um teste
+que quebra sem a correção, sim.
+
+### De brinde, um `.then` sem `catch`
+
+`useSessao` fazia `apiAuth.modo().then(setModo)` sem tratamento nenhum. Uma
+queda de rede ali virava rejeição não tratada **em produção** e deixava `modo`
+indefinido para sempre — e é dele que a `LoginScreen` decide qual formulário
+mostrar. Agora o erro aparece, em vez de a tela esperar um valor que não vem.
+
+### O que não fiz
+
+Não saí pondo guarda em toda chamada assíncrona do app. A régua foi o
+**gatilho**: efeito que busca e escreve estado. Chamada disparada por clique,
+que só existe enquanto a tela está lá, não entra.
+
+339 engine · 667 web · 84 aplicação · 237 server · 83/83 E2E · build limpo — e o
+`npm test -w packages/web` sai em 0 em cinco rodadas seguidas, onde antes falhava
+em uma a cada três.

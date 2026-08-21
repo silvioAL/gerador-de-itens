@@ -70,14 +70,23 @@ export function RegrasTab({ podeSecao, contextos, componentesPorTech, techs: tec
   const [salvando, setSalvando] = useState(false);
   const [diagnostico, setDiagnostico] = useState<DiagnosticoConfig | null>(null);
 
+  // §281 — a resposta que chega depois da tela sair não escreve nada. Ver
+  // `useMontado` para o porquê desta guarda existir em toda busca de efeito.
   useEffect(() => {
+    let cancelado = false;
     apiRegras
       .obterComDiagnostico()
       .then((envelope) => {
+        if (cancelado) return;
         setRegras(envelope.documento);
         setDiagnostico(envelope.diagnostico);
       })
-      .catch((e) => setErro(e instanceof Error ? e.message : String(e)));
+      .catch((e) => {
+        if (!cancelado) setErro(e instanceof Error ? e.message : String(e));
+      });
+    return () => {
+      cancelado = true;
+    };
   }, []);
 
   if (erro && !regras) return <p style={erroEstilo}>{erro}</p>;

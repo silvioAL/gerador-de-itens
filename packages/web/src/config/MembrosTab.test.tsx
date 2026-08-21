@@ -59,6 +59,35 @@ describe("MembrosTab — níveis de participação (SPEC-38 Fase 1)", () => {
     expect(criarConvite).toHaveBeenCalledWith("time-pagamentos", "visualizar");
   });
 
+  /**
+   * §281 — a terceira aparição da MESMA corrida.
+   *
+   * §210 foi "os itens da demanda anterior"; §213 foi "o canvas da demanda
+   * anterior". Aqui é a lista de membros: trocar de time com a busca no ar
+   * deixava a resposta ANTIGA chegar depois e sobrescrever a nova — a tela
+   * mostraria os membros do time anterior com o nome do time novo em volta.
+   *
+   * O teste força a ordem que o defeito precisa (a antiga resolve por ÚLTIMO);
+   * sem a guarda de cancelamento ele falha, e é isso que o torna teste.
+   */
+  it("§281 — trocar de time com a busca no ar NÃO deixa a resposta antiga sobrescrever a nova", async () => {
+    let resolverAntiga: ((v: unknown) => void) | undefined;
+    listarMembros.mockImplementation((timeId: string) => {
+      if (timeId === "time-antigo") return new Promise((r) => (resolverAntiga = r));
+      return Promise.resolve([{ email: "do-time-novo@gerador.local", nivel: "operar" }]);
+    });
+
+    const { rerender } = render(<MembrosTab timeAtivo="time-antigo" />);
+    rerender(<MembrosTab timeAtivo="time-novo" />);
+    await waitFor(() => expect(screen.getByText("do-time-novo@gerador.local")).toBeInTheDocument());
+
+    // Só AGORA a busca do time anterior responde.
+    resolverAntiga?.([{ email: "do-time-antigo@gerador.local", nivel: "owner" }]);
+    await waitFor(() => expect(screen.getByText("do-time-novo@gerador.local")).toBeInTheDocument());
+
+    expect(screen.queryByText("do-time-antigo@gerador.local")).toBeNull();
+  });
+
   it("servidor negando (403 de quem não é owner) vira erro VISÍVEL, não silêncio", async () => {
     alterarNivel.mockRejectedValue(new Error("esta ação exige nível owner"));
     const user = userEvent.setup();

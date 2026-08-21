@@ -27,12 +27,29 @@ export function MembrosTab({ timeAtivo }: MembrosTabProps) {
   const [linkConvite, setLinkConvite] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
 
+  /**
+   * §281 — aqui a guarda não é higiene de teste, é a corrida de verdade.
+   *
+   * O efeito depende de `timeAtivo`. Trocar de time com a busca no ar deixava a
+   * resposta ANTIGA chegar depois e sobrescrever a nova: a tela mostraria os
+   * membros do time anterior, com o nome do time novo no cabeçalho. É o mesmo
+   * defeito do §210 (itens da demanda anterior) e do §213 (canvas da demanda
+   * anterior) — a terceira aparição da mesma corrida, agora fechada na origem.
+   */
   useEffect(() => {
+    let cancelado = false;
     setMembros(null);
     apiTimes
       .listarMembros(timeAtivo)
-      .then(setMembros)
-      .catch((e: unknown) => setErro(e instanceof Error ? e.message : String(e)));
+      .then((lista) => {
+        if (!cancelado) setMembros(lista);
+      })
+      .catch((e: unknown) => {
+        if (!cancelado) setErro(e instanceof Error ? e.message : String(e));
+      });
+    return () => {
+      cancelado = true;
+    };
   }, [timeAtivo]);
 
   async function adicionar() {
