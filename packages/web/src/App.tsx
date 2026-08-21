@@ -8,7 +8,6 @@ import {
   exemploDeMedicao,
   derivar,
   estruturarDocumento,
-  gerarDiagramaHtml,
   gerarEspecificacaoEntrega,
   resolverDependencias,
   violacoesEmAberto,
@@ -79,7 +78,6 @@ import { SemTimeScreen } from "./auth/SemTimeScreen";
 import { RECURSO_DA_ABA, RECURSO_DA_SECAO_DE_REGRAS, usePermissoes } from "./auth/usePermissoes";
 import { momentoDaConfig, momentoDoCanvas } from "./assistente/momentos";
 import { MenuLateral } from "./navegacao/MenuLateral";
-import { ItensScreen } from "./itens/ItensScreen";
 import { useRotaHash } from "./navegacao/rota";
 
 const CHAVE_JORNADA_VISTA = "gerador:jornada-vista";
@@ -418,25 +416,24 @@ function AppCarregado({
   // (☰) é o caminho pra ela. F5 mantém o lugar; condutores navegam por rota.
   const { rota, navegar } = useRotaHash();
   const mostrarConfig = rota.tela === "config";
-  const mostrarItens = rota.tela === "itens";
   const mostrarDocumento = rota.tela === "documento";
   const mostrarSistema = rota.tela === "sistema";
   // SPEC-41 Parte B — os itens materializados da quebra aberta. A fonte de
   // verdade é o server (persistem por quebra); o estado local é o espelho da
   // última geração/carga desta sessão.
   const [itensGerados, setItensGerados] = useState<ItemGerado[]>([]);
-  // SPEC-44 — deep-link da tela de itens pra revisão: o item a selecionar.
+  // SPEC-44 — deep-link da seção dos itens pra revisão: o item a selecionar.
   const [itemInicialRevisao, setItemInicialRevisao] = useState<string | null>(null);
   // SPEC-49 — pra onde os itens vão; só pra tela DIZER o destino (a exportação
   // em si é do servidor, que lê a mesma config).
   const [destinoDaExportacao, setDestinoDaExportacao] = useState<string | null>(null);
   useEffect(() => {
-    if (!mostrarItens) return;
+    if (!mostrarDocumento) return;
     apiExportador
       .obter()
       .then((c) => setDestinoDaExportacao(c.endpoint ? c.rotulo || c.endpoint : null))
       .catch(() => setDestinoDaExportacao(null));
-  }, [mostrarItens]);
+  }, [mostrarDocumento]);
   // SPEC-45 — quantos feedbacks do ciclo ainda esperam alguém: é o que faz o
   // assistente chamar pra tratar (M15) em vez de o texto morrer no banco.
   const [feedbacksNovos, setFeedbacksNovos] = useState(0);
@@ -840,18 +837,11 @@ function AppCarregado({
     [atividadesDoDocumento, quebra, diagramaConfig, contextoDoProduto, regrasVisiveis, decisoesVisiveis]
   );
 
-  /** O diagrama animado que já existe (SPEC-21), embutido no documento — o
-   * maior ganho visual possível, e sem gerador novo. Só quando há nó: um
-   * `iframe` com diagrama vazio é pior que a frase que explica a ausência. */
-  const diagramaHtmlDaDemanda = useMemo(
-    () =>
-      quebra.diagrama.nodes.length > 0
-        ? gerarDiagramaHtml(atividadesDoDocumento, quebra.diagrama, diagramaConfig, {
-            titulo: quebra.titulo ?? "Diagrama da solução",
-          })
-        : undefined,
-    [atividadesDoDocumento, quebra.diagrama, quebra.titulo, diagramaConfig]
-  );
+  /* SPEC-61 §3 — o `gerarDiagramaHtml` deixou de alimentar o documento: o
+     desenho lá é FIGURA (o mesmo React Flow da mesa, em leitura), e o iframe
+     animado trazia junto um painel lateral que mudava de tamanho sozinho. Ele
+     não morreu — continua sendo o "Baixar diagrama (.html)" da revisão (§6.5),
+     que é o artefato para quem não tem acesso à ferramenta. */
 
   /**
    * SPEC-58 §5 — o CARIMBO da aprovação, e o que ele resolve.
@@ -939,14 +929,14 @@ function AppCarregado({
     }
   }, [salvarAposNome, quebra.titulo]);
 
-  // Entrar na tela de itens (menu, deep-link ou F5) recarrega do server — o
-  // que está salvo é o que vale; a geração local só espelha na hora.
+  // Entrar no documento (menu, deep-link ou F5) recarrega os itens do server —
+  // o que está salvo é o que vale; a geração local só espelha na hora.
   useEffect(() => {
     // Demanda sem id não tem o que buscar: o que estiver na tela são os itens
     // LOCAIS desta mesma demanda (gerados antes de ela ser salva), e apagá-los
     // aqui seria perder trabalho — a limpeza de §210 mora em `aoAbrir`, que é
     // o evento "troquei de demanda".
-    if (!mostrarItens || !persistencia.quebraId) return;
+    if (!mostrarDocumento || !persistencia.quebraId) return;
     let cancelado = false;
     apiItensGerados
       .listar(persistencia.quebraId)
@@ -957,11 +947,17 @@ function AppCarregado({
     return () => {
       cancelado = true;
     };
-  }, [mostrarItens, persistencia.quebraId]);
+  }, [mostrarDocumento, persistencia.quebraId]);
 
-  /** SPEC-41 Parte B — o clique "Gerar itens" da revisão: persiste o conjunto
-   * (quando a quebra está salva) e abre a tela `#/itens`. Sem id ainda, os
-   * itens vivem no estado — salvos na próxima geração com a quebra salva. */
+  /**
+   * SPEC-41 Parte B — o clique "Gerar itens" da revisão: persiste o conjunto
+   * (quando a quebra está salva) e leva a quem os mostra. Sem id ainda, os
+   * itens vivem no estado — salvos na próxima geração com a quebra salva.
+   *
+   * SPEC-61 §6.2 — o destino passou a ser `#/documento`, na seção dos itens.
+   * `#/itens` deixou de existir, e gerar continua sendo ato da REVISÃO: o
+   * documento é onde se lê o resultado, nunca onde se pede por ele.
+   */
   function aoGerarItens(itens: ItemDeTrabalho[]) {
     const locais: ItemGerado[] = itens.map((it) => ({
       ...it,
@@ -978,7 +974,7 @@ function AppCarregado({
         .then(setItensGerados)
         .catch(() => {});
     }
-    navegar({ tela: "itens" });
+    navegar({ tela: "documento" });
   }
 
   const opcoesTour = {
@@ -996,11 +992,18 @@ function AppCarregado({
     mostrarAvisos: () => setAvisosPendentes(true),
     fecharRevisao: () => setResultado(null),
     abrirConfigNaAba,
-    // SPEC-48 — o tour passa pela tela dos itens escritos. GERA os itens antes
-    // de abrir, como faz o botão da revisão: `navegar({tela:"itens"})` sozinho
-    // abria a tela vazia ("ainda não existe nenhum item"), contradizendo o
-    // texto do passo, que promete os cards (§234).
-    abrirItens: () => {
+    /**
+     * §251 — o tour passa pelo DOCUMENTO. NÃO limpa `resultado`: o passo
+     * seguinte é a SEÇÃO dos itens, que só tem o que mostrar se a derivação
+     * continuar de pé (§234). A revisão não atrapalha porque ela se esconde
+     * para o documento.
+     *
+     * SPEC-48 + SPEC-61 §6.3 — e ele ESCREVE os itens antes de abrir, como o
+     * `abrirItens` fazia antes da fusão e como faz o botão da revisão. Navegar
+     * sozinho mostraria uma seção de "ainda não escrito", contradizendo o texto
+     * do passo, que promete os cards (§234).
+     */
+    abrirDocumento: () => {
       if (resultado) {
         aoGerarItens(
           gerarItensDeTrabalho(resultado.atividades, quebra.diagrama, diagramaConfig, {
@@ -1010,21 +1013,9 @@ function AppCarregado({
           })
         );
       } else {
-        navegar({ tela: "itens" });
+        navegar({ tela: "documento" });
       }
     },
-    // Fechar a REVISÃO junto: sem isso, sair dos itens caía de volta na
-    // revisão (o `resultado` continua setado e ela cobre o canvas), e o passo
-    // seguinte falava do menu ☰ numa tela que não tem menu ☰ (§234).
-    fecharItens: () => {
-      setResultado(null);
-      navegar({ tela: "canvas" });
-    },
-    // §251 — o tour passa pelo DOCUMENTO. NÃO limpa `resultado`: o passo
-    // seguinte é a tela de itens, que só tem o que mostrar se a derivação
-    // continuar de pé (§234). A revisão não atrapalha porque ela se esconde
-    // para o documento, como já fazia para os itens.
-    abrirDocumento: () => navegar({ tela: "documento" }),
     abrirSistema: () => navegar({ tela: "sistema" }),
     abrirProposito: () => setAbaAssistente("contexto"),
     fecharAssistente: () => setAbaAssistente(null),
@@ -1159,10 +1150,7 @@ function AppCarregado({
             administração/aprendizado mora atrás do ☰. */}
         {/* Só quando o canvas é a tela — a tela de config tem o SEU ☰; dois
             no DOM viravam strict-violation em todo clique de menu. */}
-        {/* §197 — e nem com a tela de ITENS: dois ☰ no DOM foi o defeito que a
-            SPEC-40 corrigiu pra config, e a tela nova repetiu (achado do
-            smoke: strict violation em todo clique de menu). */}
-        {!mostrarConfig && !mostrarItens && (
+        {!mostrarConfig && (
           <button onClick={() => setMenuAberto(true)} data-tour="menu-botao" style={botaoEstilo}>
             ☰ Menu
           </button>
@@ -1319,7 +1307,6 @@ function AppCarregado({
           navegar({ tela: "canvas" });
           setMostrarAbrir(true);
         }}
-        onItens={() => navegar({ tela: "itens" })}
         onDocumento={() => navegar({ tela: "documento" })}
         onSistema={() => navegar({ tela: "sistema" })}
         onSair={() => void onSair()}
@@ -1421,10 +1408,10 @@ function AppCarregado({
         )}
       </div>
 
-      {/* display:none (e não desmontar): a tela de itens cobre a revisão sem
+      {/* display:none (e não desmontar): o documento cobre a revisão sem
           perder o estado dela — os balões da revisão (zIndex 62) não vazam. */}
       {resultado && (
-        <div style={{ display: mostrarItens || mostrarDocumento ? "none" : "contents" }}>
+        <div style={{ display: mostrarDocumento ? "none" : "contents" }}>
         <ReviewScreen
           onDocumento={() => navegar({ tela: "documento" })}
           onConfigurarModeloIa={() => abrirConfigNaAba("modeloIa")}
@@ -1499,7 +1486,6 @@ function AppCarregado({
         <DocumentoScreen
           documento={documentoDaDemanda}
           config={diagramaConfig}
-          diagramaHtml={diagramaHtmlDaDemanda}
           escrito={quebra.documentoEscrito ?? {}}
           status={quebra.documentoStatus ?? null}
           onMudarEscrito={(documentoEscrito) => setQuebra((q) => ({ ...q, documentoEscrito }))}
@@ -1508,17 +1494,8 @@ function AppCarregado({
           mudancasDesdeAprovacao={mudancasDesdeAprovacao}
           onBaixarMarkdown={baixarDocumentoMarkdown}
           onVoltar={() => navegar({ tela: "canvas" })}
-        />
-      )}
-
-      {mostrarItens && (
-        <ItensScreen
-          onDocumento={() => navegar({ tela: "documento" })}
-          itens={itensGerados}
-          tituloDaQuebra={quebra.titulo ?? null}
-          onAbrirMenu={() => setMenuAberto(true)}
-          onFechar={() => navegar({ tela: "canvas" })}
-          onIrParaRevisao={() => navegar({ tela: "canvas" })}
+          // SPEC-61 — o que era a tela `#/itens`, agora seção deste documento.
+          itensEscritos={itensGerados}
           onExportar={
             persistencia.quebraId
               ? async () => {

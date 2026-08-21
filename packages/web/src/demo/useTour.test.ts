@@ -24,8 +24,6 @@ function montarOpts() {
     abrirConfigNaAba: vi.fn(),
     fecharJornada: vi.fn(),
     fecharConfig: vi.fn(),
-    abrirItens: vi.fn(),
-    fecharItens: vi.fn(),
   abrirDocumento: vi.fn(),
   abrirSistema: vi.fn(),
   mostrarAvisos: vi.fn(),
@@ -208,8 +206,8 @@ describe("useTour", () => {
   });
 
   it("§251 — o passo do documento vem ANTES dos itens, e não derruba a derivação", () => {
-    // `abrirDocumento` limpando `resultado` faria a tela de itens seguinte
-    // abrir vazia — o §234 de novo. A ordem é parte do contrato.
+    // `abrirDocumento` limpando `resultado` faria a seção dos itens abrir
+    // vazia — o §234 de novo. A ordem é parte do contrato.
     const titulos = passosDoProduto(montarOpts()).map((p) => p.titulo);
 
     expect(titulos.indexOf("O documento de desenho")).toBeGreaterThan(-1);
@@ -330,8 +328,12 @@ describe("useTour", () => {
     andarAte(result, "Confirmar o que a IA escreveu");
     expect(result.current.passoAtual?.selector).toBe("[data-testid=barra-pendencias]");
 
+    // SPEC-61 §6.3 — o passo continua existindo; o que mudou é para onde ele
+    // aponta. Era `#/itens`, e passo apontando para tela que não existe quebra
+    // a demonstração inteira no meio.
     andarAte(result, "Itens escritos");
-    expect(opts.abrirItens).toHaveBeenCalled();
+    expect(result.current.passoAtual?.selector).toBe("[data-testid=secao-dos-itens]");
+    expect(opts.abrirDocumento).toHaveBeenCalled();
   });
 
   it("passa por Padrões por componente e pelos Modelos (documento e item), abrindo a aba certa em cada um", () => {

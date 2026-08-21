@@ -79,7 +79,7 @@ export function ExportacaoTab({ demonstracao }: ExportacaoTabProps = {}) {
     <div data-testid="config-exportacao">
       {demonstracao && <MarcaDeDemonstracao />}
       <p style={proseEstilo}>
-        Os itens prontos da tela <strong>Itens escritos</strong> são enviados para um <strong>agente</strong> que fala
+        Os itens prontos da seção <strong>Os itens</strong> do documento são enviados para um <strong>agente</strong> que fala
         com o seu tracker (MCP, n8n, uma função interna — o que a empresa já tiver). O gerador não implementa Jira:
         implementar um tracker seria escolher o tracker de todo mundo.
       </p>
@@ -98,7 +98,7 @@ export function ExportacaoTab({ demonstracao }: ExportacaoTabProps = {}) {
         style={inputEstilo}
       />
       <p style={{ fontSize: 11, color: "var(--texto-mudo)", margin: "4px 0 0" }}>
-        Vazio desliga a exportação — a tela dos itens diz isso em vez de oferecer um botão que falharia.
+        Vazio desliga a exportação — a seção dos itens diz isso em vez de oferecer um botão que falharia.
       </p>
 
       <label style={labelEstilo}>Como chamar o destino (aparece na tela)</label>

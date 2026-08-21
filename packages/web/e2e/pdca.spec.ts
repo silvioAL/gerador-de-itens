@@ -42,11 +42,12 @@ test("entrevista, geração pelo agente e feedback — o ciclo inteiro com cadê
     await page.getByTestId("balao-sem-ia").getByRole("button", { name: "Dispensar sugestão" }).click();
     await page.getByTestId("balao-sem-contexto").getByRole("button", { name: "Dispensar sugestão" }).click();
     await page.getByTestId("balao-gerar-itens").click();
-    // Gerar itens ABRE a tela dos itens (a especificação só baixava e ficava).
-    // O balão do feedback mora na revisão, então voltar é parte do fluxo — e
-    // o balão espera lá, que é o comportamento certo: pedir opinião por cima
-    // do resultado que a pessoa acabou de abrir seria interromper a leitura.
-    await page.getByTestId("itens-screen").getByRole("button", { name: "Voltar à mesa de projeto" }).click();
+    // Gerar itens ABRE o documento, na seção dos itens (SPEC-61; a
+    // especificação só baixava e ficava). O balão do feedback mora na revisão,
+    // então voltar é parte do fluxo — e o balão espera lá, que é o
+    // comportamento certo: pedir opinião por cima do resultado que a pessoa
+    // acabou de abrir seria interromper a leitura.
+    await page.getByTestId("documento-screen").getByRole("button", { name: /Voltar à mesa de projeto/ }).click();
 
     // M13 — cadência de feedback 1: o balão pergunta o que faltou/sobrou, e o
     // texto chega no servidor (201).

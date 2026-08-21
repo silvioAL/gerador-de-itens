@@ -3,7 +3,8 @@ import type { FichaItem, FichaPlaceholder } from "@gerador/engine";
 
 /**
  * SPEC-44 — a contagem de pendências da revisão, pura. É a régua ÚNICA:
- * a barra da revisão, os chips dos cards e a tela de itens falam a partir
+ * a barra da revisão, os chips dos cards e a seção dos itens do documento
+ * falam a partir
  * daqui — "sugestão aguardando" (a esteira escreveu, ninguém assinou) e
  * "campo vazio" (ninguém escreveu) são coisas diferentes e a frase diz qual.
  */

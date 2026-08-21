@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DiagramaConfig } from "../config/types.js";
+import type { DiagramaConfig, RegrasConfig } from "../config/types.js";
 import type { Atividade, Diagrama, No } from "../model/types.js";
 import { estruturarDocumento } from "./estruturarDocumento.js";
 import { gerarEspecificacaoEntrega } from "../especificacao/gerarEspecificacaoEntrega.js";
@@ -61,6 +61,94 @@ describe("estruturarDocumento — a fonte única das três saídas (SPEC-58)", (
     expect(comProposito.saude.map((s) => s.icone)).toEqual(["🎯"]);
     expect(comProposito.saude[0].nivel).toBe("amarelo");
   });
+});
+
+/**
+ * SPEC-61 §4 e §6.6 — a faixa separa PROBLEMA de INVENTÁRIO.
+ *
+ * Os chips tinham o mesmo peso visual e só a cor os distinguia: dois cobravam
+ * ação e o terceiro era contagem. A régua que decide o lado: está em `atencao`
+ * o que alguém precisa resolver, em `jaTem` o que já foi resolvido.
+ */
+describe("a faixa de saúde, em dois lados", () => {
+  it("necessidade sem componente cobra; a coberta é inventário — e as duas convivem", () => {
+    const doc = estruturarDocumento([atividade], diagrama, config, {
+      necessidades: [
+        { id: "r1", texto: "sem dono", origem: "manual", atendidaPor: [] },
+        { id: "r2", texto: "com dono", origem: "manual", atendidaPor: ["n1"] },
+      ],
+    });
+
+    expect(doc.saude).toEqual([
+      { icone: "🎯", rotulo: "1 necessidade(s) sem componente", nivel: "amarelo", lado: "atencao" },
+      { icone: "🎯", rotulo: "1 necessidade(s) coberta(s)", nivel: "verde", lado: "jaTem" },
+    ]);
+  });
+
+  it("a exceção aceita fica do lado do que JÁ TEM — ela é escolha com motivo, não violação menor", () => {
+    const regras: RegrasConfig = {
+      porTech: {
+        Backend: {
+          checklistTecnico: [
+            { texto: "Timeout de chamada externa", contextos: [], checagem: { campo: "timeout", operador: "lte", valor: 500, unidade: "ms" } },
+          ],
+          testes: [],
+        },
+      },
+    };
+    const foraDaRegua: Diagrama = {
+      nodes: [{ ...no("n1"), spec: { timeout: { valor: 900, origem: "manual" } } }],
+      edges: [],
+    };
+
+    const semExcecao = estruturarDocumento([atividade], foraDaRegua, config, { regras });
+    expect(semExcecao.saude.find((s) => s.icone === "⚖")).toMatchObject({ lado: "atencao", rotulo: "1 fora do padrão" });
+
+    const comExcecao = estruturarDocumento([atividade], foraDaRegua, config, {
+      regras,
+      excecoes: [{ noId: "n1", campo: "timeout", motivo: "o parceiro é lento", autor: "ana", em: "2026-08-15T10:00:00.000Z" }],
+    });
+    expect(comExcecao.saude.find((s) => s.icone === "⚖")).toMatchObject({
+      lado: "jaTem",
+      rotulo: "1 exceção(ões) aceita(s)",
+    });
+  });
+
+  it("proposta esperando e decisão sem porquê COBRAM; a vigente conta", () => {
+    const doc = estruturarDocumento([atividade], diagrama, config, {
+      decisoes: [
+        { ...DECISAO, id: "d1", porque: "" },
+        { ...DECISAO, id: "d2", status: "proposta" as const },
+      ],
+    });
+
+    expect(doc.saude.filter((s) => s.lado === "atencao").map((s) => s.rotulo)).toEqual([
+      "1 proposta(s) esperando",
+      "1 decisão(ões) sem porquê",
+    ]);
+    expect(doc.saude.filter((s) => s.lado === "jaTem").map((s) => s.rotulo)).toEqual(["1 decisão(ões) vigente(s)"]);
+  });
+
+  it("caminho inferido que ninguém olhou É trabalho de alguém — fica à esquerda (§261)", () => {
+    // Recusado (`confirmado: false`) não entra: a pessoa já resolveu, dizendo
+    // que aquilo não é caminho.
+    const doc = estruturarDocumento([atividade], diagrama, config, {
+      percursos: [
+        { id: "p1", rotulo: "n1 → n2", nos: ["n1", "n2"], origem: "inferido" },
+        { id: "p2", rotulo: "n2 → n1", nos: ["n2", "n1"], origem: "inferido", confirmado: false },
+        { id: "p3", rotulo: "n1 → n1", nos: ["n1"], origem: "inferido", confirmado: true },
+      ],
+    });
+
+    const caminhos = doc.saude.filter((s) => s.icone === "🛣");
+    expect(caminhos).toEqual([
+      { icone: "🛣", rotulo: "1 caminho(s) a confirmar", nivel: "amarelo", lado: "atencao" },
+      { icone: "🛣", rotulo: "1 caminho(s) confirmado(s)", nivel: "verde", lado: "jaTem" },
+    ]);
+  });
+});
+
+describe("estruturarDocumento — o resto da estrutura", () => {
 
   it("necessidade sem componente aparece marcada como não atendida", () => {
     const doc = estruturarDocumento([atividade], diagrama, config, {

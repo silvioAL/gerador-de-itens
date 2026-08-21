@@ -167,9 +167,10 @@ test("a esteira roda no navegador e o texto do gateway chega nos campos (o defei
   // próprios.
   const download = page.waitForEvent("download");
   await page.getByTestId("balao-especificacao-itens").click();
-  // Gerar itens leva à tela dos itens — e é de lá que se vai ao documento
-  // (as duas saídas da mesma demanda, §269).
-  await page.getByTestId("itens-ir-ao-documento").click();
+  // SPEC-61 — gerar itens leva DIRETO ao documento: o "Ver o documento →" do
+  // §269 morreu junto com a tela que o hospedava, porque não há mais para onde
+  // ir. Uma saída só.
+  await expect(page.getByTestId("secao-dos-itens")).toBeVisible();
   await page.getByTestId("baixar-markdown").click();
   expect((await download).suggestedFilename()).toBe("documento-de-desenho.md");
 

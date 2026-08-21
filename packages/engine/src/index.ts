@@ -50,6 +50,7 @@ export {
   type DocumentoDeDesenho,
   type ItemDoDocumento,
   type IndicadorDeSaude,
+  type LadoDaSaude,
   type OpcoesEstruturarDocumento,
 } from "./documento/estruturarDocumento.js";
 export { validateConfig, validateRegras } from "./config/validator.js";

@@ -376,19 +376,22 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await expect(page.getByTestId("secao-riscos")).toBeVisible();
   await expect(page.getByTestId("status-documento")).toBeVisible();
 
-  // SPEC-47/48 — os ITENS ESCRITOS, a tela que o tour não conhecia.
+  // SPEC-47/48 — os ITENS ESCRITOS. SPEC-61: eles são uma SEÇÃO deste mesmo
+  // documento, e não a segunda tela por onde o tour passava.
   //
   // §234 — cobrar CONTEÚDO, não só a tela: o passo abria a tela vazia
   // ("ainda não existe nenhum item") enquanto o texto prometia os cards, e a
   // asserção de visibilidade passava assim mesmo. Tela visível não é a mesma
   // coisa que tela útil.
   await irAtePasso(page, "Itens escritos");
-  await expect(page.getByTestId("itens-screen")).toBeVisible();
-  await expect(page.getByTestId("itens-vazio")).toHaveCount(0);
+  await expect(page.getByTestId("secao-dos-itens")).toBeVisible();
   await expect(page.getByTestId("itens-resumo")).toBeVisible();
+  await expect(page.getByTestId("item-gerado-0")).toBeVisible();
+  // E continua sendo o MESMO documento — o passo não trocou de tela.
+  await expect(page.getByTestId("documento-screen")).toBeVisible();
 
-  // §234 — e o passo do MENU precisa estar numa tela que TEM menu: sair dos
-  // itens caía de volta na revisão (o resultado seguia setado, cobrindo o
+  // §234 — e o passo do MENU precisa estar numa tela que TEM menu: sair do
+  // documento caía de volta na revisão (o resultado seguia setado, cobrindo o
   // canvas), e o ☰ não existe lá.
   await irAtePasso(page, "O menu");
   await expect(page.locator('[data-tour="menu-botao"]')).toBeVisible();

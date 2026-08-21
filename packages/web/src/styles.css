@@ -101,6 +101,21 @@ textarea::placeholder {
   fill: var(--painel);
 }
 
+/* SPEC-61 §3 — o desenho DENTRO do documento é uma figura.
+   As alças de conexão continuam sendo desenhadas mesmo com
+   `nodesConnectable={false}` (o React Flow só tira a interação delas), e uma
+   bolinha de "puxe daqui" num quadro que não aceita conexão é o convite sem
+   destino que o §6.4 existe para evitar. Some com elas — o resto do modo de
+   leitura mora nas props do `Canvas`.
+
+   `opacity` e não `display: none`: a aresta ancora na POSIÇÃO da alça, e tirar
+   a alça do layout apagava a conexão inteira junto (visto no print). Some com o
+   convite, mantém a geometria. */
+.figura-do-desenho .react-flow__handle {
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* Expansão suave do item na revisão (ReviewScreen) — anima sozinha ao
    montar, sem precisar de JS medindo altura. */
 @keyframes expandir-item {

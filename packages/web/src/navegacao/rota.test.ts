@@ -27,9 +27,13 @@ describe("rota em hash (SPEC-40 F1)", () => {
     expect(hashDaRota({ tela: "config", area: "campos" })).toBe("#/config/componentes");
   });
 
-  it("SPEC-41: #/itens vai e volta pela tela de itens", () => {
-    expect(hashDaRota({ tela: "itens" })).toBe("#/itens");
-    expect(rotaDoHash("#/itens")).toEqual({ tela: "itens" });
+  it("SPEC-61: a rota morta #/itens REDIRECIONA pro documento, não dá tela branca", () => {
+    // A tela de itens virou uma seção do documento. Quem some com uma rota tem
+    // que redirecionar: link salvo é justamente o de quem mais usa.
+    expect(rotaDoHash("#/itens")).toEqual({ tela: "documento" });
+    // E ninguém mais PRODUZ esse hash — a saída é uma só.
+    expect(hashDaRota({ tela: "documento" })).toBe("#/documento");
+    expect(rotaDoHash("#/documento")).toEqual({ tela: "documento" });
   });
 
   it("hash desconhecido/velho cai no canvas — nunca tela em branco", () => {

@@ -3,13 +3,21 @@ import { entrar } from "./auth";
 import { derivarNaMesa } from "./derivar";
 
 /**
- * SPEC-41 Parte B — o ciclo dos itens de trabalho visto no navegador: derivar,
- * pedir "Gerar itens de trabalho" ao agente da revisão e cair na tela
- * `#/itens` com os cards e a régua de completude. A IA fica desligada de
- * propósito (mock do /ia/status): o caminho passa pelos balões M4→M5→M12, que
- * é exatamente a condução de quem abre a revisão sem esteira.
+ * SPEC-41 Parte B, revisada pela SPEC-61 — o ciclo dos itens de trabalho visto
+ * no navegador.
+ *
+ * Era `#/itens`, uma tela própria. A SPEC-61 a fundiu na seção "Os itens" do
+ * documento: as duas nasciam da mesma derivação, sobre a mesma demanda, no
+ * mesmo instante, e o §269 tinha precisado criar links de uma para a outra.
+ * Este spec navega pelo documento; o que ele exercita é o mesmo — derivar,
+ * pedir "Gerar itens de trabalho" ao agente da revisão e encontrar os cards com
+ * a régua de completude.
+ *
+ * A IA fica desligada de propósito (mock do /ia/status): o caminho passa pelos
+ * balões M4→M5→M12, que é exatamente a condução de quem abre a revisão sem
+ * esteira.
  */
-test("gerar itens na revisão abre a tela #/itens com cards e completude", async ({ page }) => {
+test("gerar itens na revisão abre o DOCUMENTO, na seção dos itens", async ({ page }) => {
   test.setTimeout(60000);
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   await page.route(
@@ -34,32 +42,30 @@ test("gerar itens na revisão abre a tela #/itens com cards e completude", async
   await expect(page.getByTestId("balao-gerar")).toBeVisible();
   await page.getByTestId("balao-gerar-itens").click();
 
-  // A tela dos itens, na rota própria.
-  await expect(page.getByTestId("itens-screen")).toBeVisible();
-  expect(page.url()).toContain("#/itens");
-  // §197 — UM ☰ só no DOM: o do canvas se esconde atrás da tela (a SPEC-40
-  // corrigiu isso pra config e a tela nova tinha repetido o defeito).
+  // Uma saída só: o documento, com os itens dentro dele.
+  await expect(page.getByTestId("documento-screen")).toBeVisible();
+  expect(page.url()).toContain("#/documento");
+  // §197 — UM ☰ só no DOM.
   await expect(page.getByRole("button", { name: "☰ Menu" })).toHaveCount(1);
+  await expect(page.getByTestId("secao-dos-itens")).toBeVisible();
   await expect(page.getByTestId("itens-resumo")).toContainText(/de \d+ itens? prontos? pra exportar/);
 
   // Cards com a régua de completude — material recém-derivado tem ✍️ pendentes.
-  const primeiro = page.getByTestId("item-gerado-0");
-  await expect(primeiro).toBeVisible();
+  await expect(page.getByTestId("item-gerado-0")).toBeVisible();
   await expect(page.getByTestId("item-completude-0")).toContainText(/especificar|confirmar|Pronto/);
 
-  // SPEC-47 — a escrita do item está À VISTA (era "Ver corpo" colapsado), e
-  // termina na entrega final.
+  // SPEC-47 — a escrita do item está À VISTA, e termina na entrega final.
   await expect(page.getByTestId("item-corpo-0")).toContainText("História de usuário");
   await expect(page.getByTestId("item-corpo-0")).toContainText("Entrega final");
   await page.getByTestId("item-expandir-0").click(); // recolher é o que é sob demanda
   await expect(page.getByTestId("item-corpo-0")).toHaveCount(0);
 
   // Voltar à mesa de projeto devolve a revisão (escondida, não desmontada).
-  await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
-  await expect(page.getByTestId("itens-screen")).not.toBeVisible();
+  await page.getByTestId("documento-screen").getByRole("button", { name: /Voltar à mesa de projeto/ }).click();
+  await expect(page.getByTestId("documento-screen")).toHaveCount(0);
 });
 
-test("menu ☰ leva à tela de itens; sem geração, o vazio conduz", async ({ page }) => {
+test("menu ☰ leva ao documento; sem geração, a seção dos itens conduz", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   await page.route(
     (url) => url.pathname === "/ia/status",
@@ -67,13 +73,38 @@ test("menu ☰ leva à tela de itens; sem geração, o vazio conduz", async ({ p
   );
   await entrar(page);
 
+  // §6.7 — "Itens escritos" saiu do menu: duas entradas para a mesma derivação
+  // faziam o menu parecer maior do que o produto.
   await page.getByRole("button", { name: "☰ Menu" }).click();
-  await page.getByRole("button", { name: "Itens escritos" }).click();
+  await expect(page.getByRole("button", { name: "Itens escritos" })).toHaveCount(0);
+  await page.getByTestId("menu-documento").click();
 
-  await expect(page.getByTestId("itens-screen")).toBeVisible();
-  await expect(page.getByTestId("itens-vazio")).toContainText("Nenhum item escrito ainda");
-  await page.getByRole("button", { name: "Ir para a demanda" }).click();
-  await expect(page.getByTestId("itens-screen")).not.toBeVisible();
+  await expect(page.getByTestId("documento-screen")).toBeVisible();
+  await expect(page.getByTestId("secao-dos-itens")).toContainText("derive a demanda na mesa de projeto");
+  await page.getByTestId("documento-screen").getByRole("button", { name: /Voltar à mesa de projeto/ }).click();
+  await expect(page.getByTestId("documento-screen")).toHaveCount(0);
+});
+
+/**
+ * SPEC-61 §6.7 — a rota morta redireciona.
+ *
+ * Rota que some sem redirecionar dá tela branca para quem tinha o link salvo, e
+ * link salvo é justamente o de quem mais usa. Este é o caminho de quem tinha
+ * `#/itens` no favorito.
+ */
+test("§6.7 — quem chega por #/itens cai no documento, não numa tela branca", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
+  await page.route(
+    (url) => url.pathname === "/ia/status",
+    (rota) => rota.fulfill({ json: { modelosChat: [], embeddingInstalado: false, capacidades: {} } })
+  );
+  await entrar(page);
+
+  await page.evaluate(() => {
+    window.location.hash = "#/itens";
+  });
+
+  await expect(page.getByTestId("documento-screen")).toBeVisible();
 });
 
 /**
@@ -86,6 +117,8 @@ test("menu ☰ leva à tela de itens; sem geração, o vazio conduz", async ({ p
  * outra demanda e vê o trabalho da anterior não conclui "a tela está velha" —
  * conclui que a ferramenta misturou o material de duas coisas diferentes, que
  * é o pior que uma ferramenta de especificação pode fazer.
+ *
+ * A tela mudou de nome (o documento), o relato continua valendo igual.
  */
 test("§210 — trocar de demanda NÃO leva junto os itens da anterior", async ({ page }) => {
   test.setTimeout(90000);
@@ -97,7 +130,8 @@ test("§210 — trocar de demanda NÃO leva junto os itens da anterior", async (
   await entrar(page);
 
   // Uma demanda VAZIA já salva, para abrir depois — é o "escolhi outra
-  // demanda" do relato.
+  // demanda" do relato. Sem diagrama, ela também não DERIVA item nenhum, o que
+  // mantém a leitura de "zero itens na tela" inequívoca.
   const outra = `demanda sem itens ${Date.now()}`;
   const criada = await page.request.post("http://localhost:4100/quebras", {
     data: { titulo: outra, time: "time-pagamentos", diagrama: { nodes: [], edges: [] } },
@@ -119,18 +153,18 @@ test("§210 — trocar de demanda NÃO leva junto os itens da anterior", async (
   const botaoItens = page.getByTestId("balao-gerar-itens").or(page.getByTestId("balao-especificacao-itens")).first();
   await botaoItens.waitFor({ timeout: 15000 });
   await botaoItens.click();
-  await expect(page.getByTestId("itens-screen")).toBeVisible();
-  const quantosNaPrimeira = await page.locator('[data-testid^="item-"]').count();
+  await expect(page.getByTestId("documento-screen")).toBeVisible();
+  const quantosNaPrimeira = await page.locator('[data-testid^="item-gerado-"]').count();
   expect(quantosNaPrimeira).toBeGreaterThan(0);
 
-  // Agora o caminho exato do relato: Abrir → outra demanda → Itens escritos.
+  // Agora o caminho exato do relato: Abrir → outra demanda → o documento.
   //
   // Voltar até o canvas LIMPO, uma tela por vez e esperando cada uma sumir: a
-  // primeira volta fecha os itens, a segunda fecha a revisão. Encadear os dois
-  // cliques sem esperar falhou na CI (mais lenta que a máquina local) com
+  // primeira volta fecha o documento, a segunda fecha a revisão. Encadear os
+  // dois cliques sem esperar falhou na CI (mais lenta que a máquina local) com
   // "click timeout" — a revisão ainda estava por cima e interceptava o ☰.
-  await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
-  await expect(page.getByTestId("itens-screen")).toBeHidden();
+  await page.getByTestId("documento-screen").getByRole("button", { name: /Voltar à mesa de projeto/ }).click();
+  await expect(page.getByTestId("documento-screen")).toHaveCount(0);
   const fecharRevisao = page.getByRole("button", { name: "Voltar à mesa de projeto" });
   if (await fecharRevisao.isVisible().catch(() => false)) {
     await fecharRevisao.click();
@@ -162,8 +196,8 @@ test("§210 — trocar de demanda NÃO leva junto os itens da anterior", async (
   );
 
   await page.getByRole("button", { name: "☰ Menu" }).click();
-  await page.getByRole("button", { name: "Itens escritos" }).click();
-  await expect(page.getByTestId("itens-screen")).toBeVisible();
+  await page.getByTestId("menu-documento").click();
+  await expect(page.getByTestId("documento-screen")).toBeVisible();
 
   // AQUI: com a resposta ainda no ar, a tela não pode mostrar o trabalho da
   // demanda anterior. Item pertence a uma quebra — o de outra não é "dado
@@ -174,14 +208,14 @@ test("§210 — trocar de demanda NÃO leva junto os itens da anterior", async (
   // exatamente o instante que o usuário viu. Um teste que espera o defeito
   // sumir não testa o defeito.
   expect(
-    await page.locator('[data-testid^="item-"]').count(),
-    "com a busca ainda no ar, a tela não pode exibir os itens da demanda anterior"
+    await page.locator('[data-testid^="item-gerado-"]').count(),
+    "com a busca ainda no ar, o documento não pode exibir os itens da demanda anterior"
   ).toBe(0);
 
   // E, quando a resposta chega, o vazio se confirma (a demanda aberta não tem
-  // item nenhum).
-  await expect(page.getByTestId("itens-vazio")).toBeVisible();
-  await expect(page.locator('[data-testid^="item-"]')).toHaveCount(0);
+  // desenho nem item nenhum).
+  await expect(page.getByTestId("secao-dos-itens")).toContainText("derive a demanda na mesa de projeto");
+  await expect(page.locator('[data-testid^="item-gerado-"]')).toHaveCount(0);
 });
 
 /**
@@ -211,19 +245,19 @@ test("§210 — demanda NOVA (sem id) não herda os itens escritos da anterior",
     await page.getByTestId("balao-sem-contexto").getByRole("button", { name: "Dispensar sugestão" }).click();
   }
   await page.getByTestId("balao-gerar-itens").click();
-  await expect(page.getByTestId("itens-screen")).toBeVisible();
-  expect(await page.locator('[data-testid^="item-"]').count()).toBeGreaterThan(0);
+  await expect(page.getByTestId("documento-screen")).toBeVisible();
+  expect(await page.locator('[data-testid^="item-gerado-"]').count()).toBeGreaterThan(0);
 
   // Começar outra demanda do zero — o "Nova quebra" do menu.
-  await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
+  await page.getByTestId("documento-screen").getByRole("button", { name: /Voltar à mesa de projeto/ }).click();
   await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
   await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: "Nova quebra" }).click();
 
   await page.getByRole("button", { name: "☰ Menu" }).click();
-  await page.getByRole("button", { name: "Itens escritos" }).click();
+  await page.getByTestId("menu-documento").click();
 
-  await expect(page.getByTestId("itens-screen")).toBeVisible();
-  await expect(page.locator('[data-testid^="item-"]')).toHaveCount(0);
-  await expect(page.getByTestId("itens-vazio")).toBeVisible();
+  await expect(page.getByTestId("documento-screen")).toBeVisible();
+  await expect(page.locator('[data-testid^="item-gerado-"]')).toHaveCount(0);
+  await expect(page.getByTestId("secao-dos-itens")).toContainText("derive a demanda na mesa de projeto");
 });
