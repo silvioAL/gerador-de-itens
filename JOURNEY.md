@@ -9277,3 +9277,42 @@ Config global em suíte paralela é estado compartilhado. Restaurar no `finally`
 não basta — a janela entre mexer e restaurar é o teste do vizinho.
 
 339 engine · 665 web · 84 aplicação · 237 server · 83/83 E2E · build limpo.
+
+## §279 — a base que toda spec assume como lida ainda dizia "ferramenta local"
+
+*"precisamos atualizar esse documento de contexto e arquitetura"*.
+
+O `CONTEXTO-E-ARQUITETURA.md` se declara **a base que toda spec nova assume como
+lida**. Ele estava parado na era da SPEC-07, e o que ele afirmava tinha virado o
+contrário do produto:
+
+| O que dizia | O que é desde |
+|---|---|
+| *"não é SaaS multi-tenant; é uma ferramenta local, com estado em arquivo versionável em git"* | SPEC-33 — servidor Fastify + Postgres + navegador, com organização, times e RBAC |
+| árvore com `packages/cli` e sem `aplicacao`/`server`/`llm` | SPEC-31/33 — o hexágono e o modo único |
+| *"multi-tenant: nenhum — tenant é o próprio repositório git"* | SPEC-08/13/28 — organização, times, níveis, papéis, auditoria |
+| *"persistência via File System Access API"* | Postgres, atrás de portas |
+| *"o que ainda não existe: campos estruturados"* | SPEC-18 fez o campo tipo lista |
+
+Um documento de referência errado é pior que documento nenhum: quem chega
+confia nele, e ele manda a pessoa para o lugar errado com autoridade.
+
+**O que a reescrita fez de diferente da anterior:** ela era um retrato de
+implementação (árvore de pastas + tabela de divergências do plano original).
+Agora as **réguas** vêm antes da estrutura — mecanismo nunca caso particular,
+nada da máquina vale sem uma pessoa, o desenho é medido e a medida ensina, nada
+some em silêncio, ver o efeito antes de aplicar, capacidade que o tour não
+mostra não existe. É o que sobrevive à próxima refatoração; a árvore de pastas,
+não.
+
+Entraram também duas coisas que só se descobre lendo código: **onde mora a
+configuração** (o `diagrama.json` é arquivo, as regras e os campos são banco — e
+já houve o defeito das duas fontes disputando) e **as telas com o endereço de
+cada uma**, agora que `#/itens` morreu e redireciona.
+
+O que NÃO entrou: histórico. Isso é do JOURNEY, e duplicá-lo aqui criaria duas
+versões da mesma verdade — exatamente o que a SPEC-31 mostrou dar errado com
+código.
+
+Sem mudança de código: 339 engine · 665 web · 84 aplicação · 237 server ·
+83/83 E2E seguem como no §278.
