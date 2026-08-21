@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiProdutos, type Produto } from "../api/client";
+import { useMontado } from "../state/useMontado";
 import { MarcaDeDemonstracao } from "../demo/dadosDoTour";
 
 /**
@@ -103,11 +104,16 @@ export function ProdutosTab({ timeIds, demonstracao, onConversarComAssistente }:
   const [salvo, setSalvo] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
+  /** §281 — `recarregar` também roda depois de cada ação, então a guarda é um
+   * ref e não a flag do efeito (ver `useMontado`). */
+  const montado = useMontado();
+
   async function recarregar(idParaSelecionar?: string) {
     try {
       // §235 — em demonstração não se busca nem se grava: o tour mostra um
       // produto de exemplo, não a configuração real de quem está vendo.
       const lista = demonstracao ? [demonstracao] : await apiProdutos.listar();
+      if (!montado.current) return;
       setProdutos(lista);
       const alvo = idParaSelecionar ?? selecionadoId;
       const escolhido = lista.find((p) => p.id === alvo) ?? lista[0] ?? null;
@@ -116,7 +122,7 @@ export function ProdutosTab({ timeIds, demonstracao, onConversarComAssistente }:
       // coleções são de quem as guarda. Ver `reconciliar`.
       setRascunho((atual) => reconciliar(atual, escolhido));
     } catch (e) {
-      setErro(e instanceof Error ? e.message : String(e));
+      if (montado.current) setErro(e instanceof Error ? e.message : String(e));
     }
   }
 

@@ -54,14 +54,35 @@ export function useSessao(): EstadoSessao {
   }, []);
 
   useEffect(() => {
+    // §281 — a resposta do boot que chega depois da tela sair não escreve nada.
+    let cancelado = false;
     apiAuth
       .me()
-      .then(setSessao)
+      .then((s) => {
+        if (!cancelado) setSessao(s);
+      })
       .catch((e: unknown) => {
+        if (cancelado) return;
         setErro(e instanceof Error ? e.message : String(e));
         setSessao(null);
       });
-    apiAuth.modo().then(setModo);
+    apiAuth
+      .modo()
+      .then((m) => {
+        if (!cancelado) setModo(m);
+      })
+      // §281 — este `.then` não tinha `catch` NENHUM: um 500 ou uma queda de
+      // rede em `/auth/modo` virava rejeição não tratada e deixava `modo`
+      // indefinido para sempre, e é dele que a LoginScreen decide qual UI
+      // mostrar (§ do achado real em `EstadoSessao.modo`). Cair no modo `dev` é
+      // errado; ficar em branco também. O erro aparece, e a tela para de
+      // esperar por um valor que não vem.
+      .catch((e: unknown) => {
+        if (!cancelado) setErro(e instanceof Error ? e.message : String(e));
+      });
+    return () => {
+      cancelado = true;
+    };
   }, []);
 
   const entrar = useCallback(async (email: string) => {
