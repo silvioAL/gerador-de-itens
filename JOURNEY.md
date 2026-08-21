@@ -9519,3 +9519,104 @@ causa do §194, quando o feedback que o agente coletava não aparecia em tela
 nenhuma: capacidade que só se configura por JSON é capacidade que o time não usa.
 
 Sem mudança de código: a SPEC é documento. A implementação vem na próxima rodada.
+
+## §283 — o caminho confirmado por engano, e o recusado que sumia
+
+*"aqui nessa parte de o usuário errar não consegue ajustar"* — com print do
+painel de caminhos mostrando dois `✓` e nada clicável.
+
+O print mostrava um dos três defeitos. Fui ver o código e achei os outros dois.
+
+### 1. Confirmado não tinha volta
+
+`PercursosPanel` desenhava o caminho confirmado como texto puro — `✓ {rotulo}`,
+sem botão. E confirmar **não é clique inócuo**: liga as réguas de tempo e de
+saltos sobre aquele trajeto e põe item no backlog (§249). O próprio painel
+mostra um `Delta` avisando disso *antes* de confirmar — e depois não oferecia
+saída. Pior: o botão fica a um pixel do "não é caminho".
+
+### 2. Recusado sumia da interface inteira
+
+Os filtros liam três estados e a tela desenhava dois:
+
+```ts
+const aConfirmar = percursos.filter((p) => p.confirmado === undefined);
+const confirmados = percursos.filter((p) => p.confirmado === true);
+```
+
+`confirmado === false` não estava em nenhuma das duas. O registro continuava
+gravado em `quebra.percursos` — o descarte grava `false` de propósito, senão o
+inferidor reofereceria o mesmo caminho a cada render — e **nenhuma tela do
+produto o mostrava**. Recusando todos, o chip passava a dizer "0 caminho(s)" e
+abrir o popover não mostrava nada: nem os caminhos, nem o motivo de não haver
+nenhum.
+
+É o §278 na letra: *"se rejeito simplesmente some para sempre"*.
+
+### 3. O obsoleto se passava por caminho vivo
+
+Esse não estava no print e é o mais silencioso. O `conciliarPercursos` promete,
+no próprio comentário, que *"caminho confirmado que sumiu do desenho vira
+obsoleto em vez de desaparecer"*. O `ReadinessSummary` separava os dois — e os
+**concatenava** ao passar adiante:
+
+```tsx
+percursos={[...percursosVivos, ...obsoletos]}
+```
+
+Como o obsoleto tem `confirmado === true`, caía em `confirmados` e ganhava o
+mesmo `✓` de um caminho que existe. A distinção que o engine calculou morria na
+renderização, e o `✓` afirmava que um trajeto existe no desenho quando ele já
+não existe.
+
+### A correção: um handler, três casos
+
+O que faltava era apagar a **decisão** registrada — e no modelo os três casos
+sempre foram a mesma operação. `onReabrir(id)` tira o registro guardado, e o que
+sobra sai sozinho do `conciliarPercursos`:
+
+| Estado | Depois de reabrir |
+|---|---|
+| confirmado | volta a "a confirmar" — o desenho ainda o produz |
+| recusado | volta a "a confirmar", pelo mesmo caminho |
+| obsoleto | some de vez — o desenho não o produz mais |
+
+Uma linha no `ReadinessSummary` (`percursos.filter((p) => p.id !== id)`), três
+comportamentos, nenhum caso especial. Quando o conserto sai assim, é sinal de
+que o modelo estava certo e só a tela não o usava.
+
+E o recusado ganhou lista própria, **fechada mas alcançável** — mesmo desenho do
+histórico do ciclo (§276/§278): o resumo em cima, a lista atrás de um clique,
+cada linha com a volta. Ele continua fora da fila de confirmação de propósito;
+o que mudou é que deixou de estar fora da existência.
+
+### Quarta aparição, e o que isso significa
+
+§278 recusar ajuste. §278 descartar feedback. §281 a resposta antiga que
+sobrescrevia a nova. Agora o caminho. A régua já estava escrita —
+`CONTEXTO-E-ARQUITETURA` §4.4, *"nada some em silêncio… e o 'não' também é
+decisão: fica registrado, e pode ser reconsiderado"*.
+
+> **Quando a mesma correção aparece quatro vezes, ela deixou de ser correção e
+> virou régua a aplicar por varredura.** O §281 fez isso para a corrida da
+> resposta tardia (medi os 13 arquivos, corrigi os 6 que faltavam). Aqui o
+> equivalente seria varrer toda decisão de mão única do produto — fica anotado
+> como a próxima varredura, e não como mais um conserto pontual quando o próximo
+> print chegar.
+
+### Um teste que afirmava o defeito
+
+`"caminho RECUSADO some da fila de confirmação"` existia e passava. A intenção
+era certa (não voltar para a fila), mas a asserção parava aí — e o caminho sumia
+da interface inteira sem que nada reclamasse. O teste ganhou a segunda metade:
+sumiu da fila **e** continua alcançável.
+
+### Um flake diferente do §280
+
+Numa rodada da suíte cheia, `useEsteiraDeAgentes.test.ts` falhou (1 de 671).
+Isolado passa 20/20, e três rodadas seguintes da suíte inteira saíram em 0.
+**Não é o flake do §280** — aquele era "unhandled errors com todos os testes
+passando", e foi fechado no §281; este é um teste que de fato falha sob carga.
+Fica anotado com o nome, para a próxima ocorrência ter de onde partir.
+
+339 engine · 671 web · 84 aplicação · 237 server · 84/84 E2E · build limpo.
