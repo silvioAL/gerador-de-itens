@@ -17,13 +17,35 @@ import { Delta } from "./Delta";
  *   produziria um verde falso, e verde falso encerra a pergunta.
  */
 export interface PercursosPanelProps {
+  /** Os caminhos que o desenho de AGORA produz, em qualquer estado. */
   percursos: Percurso[];
+  /**
+   * §283 — confirmados que sumiram do desenho. Chegam separados porque
+   * concatená-los aos vivos (como se fazia) os desenhava com o mesmo `✓` de um
+   * caminho que existe: o `conciliarPercursos` promete "vira obsoleto em vez de
+   * desaparecer", e a promessa morria aqui na renderização.
+   */
+  obsoletos?: Percurso[];
   violacoes: ViolacaoDePercurso[];
   naoMedidos: PercursoNaoMedido[];
   /** `true` quando a inferência parou no teto — a lista está incompleta. */
   truncado?: boolean;
   onConfirmar: (id: string) => void;
   onDescartar: (id: string) => void;
+  /**
+   * §283 — apaga a DECISÃO registrada sobre um caminho, e é o que faltava para
+   * confirmar e recusar deixarem de ser portas de mão única.
+   *
+   * Um handler só para os três casos, porque no modelo é a mesma operação —
+   * esquecer o que foi decidido —, e o que muda é só o que sobra depois:
+   *
+   * - **confirmado** → volta a "a confirmar" (o inferidor o reoferece);
+   * - **recusado** → volta a "a confirmar", pelo mesmo caminho;
+   * - **obsoleto** → some de vez, porque o desenho não o produz mais.
+   *
+   * Ausente = os botões não aparecem (mesma disciplina do `onSelecionarNo`).
+   */
+  onReabrir?: (id: string) => void;
   /** SPEC-60 fatia A — o que confirmar ESTE caminho põe no backlog. Devolver
    * `undefined` (ou não passar) é dizer "não sei medir", e aí o botão fica
    * como era: confirmar nunca depende de haver medição. */
@@ -34,11 +56,13 @@ export interface PercursosPanelProps {
 
 export function PercursosPanel({
   percursos,
+  obsoletos = [],
   violacoes,
   naoMedidos,
   truncado,
   onConfirmar,
   onDescartar,
+  onReabrir,
   onSelecionarNo,
   remedirConfirmacao,
 }: PercursosPanelProps) {
@@ -60,7 +84,19 @@ export function PercursosPanel({
   // o inferidor devolveria o mesmo caminho no render seguinte, para sempre.
   const aConfirmar = percursos.filter((p) => p.origem === "inferido" && p.confirmado === undefined);
   const confirmados = percursos.filter((p) => p.confirmado === true);
-  const cobra = violacoes.length + naoMedidos.length + aConfirmar.length;
+  /**
+   * §283 — os recusados PRECISAM ter uma lista, mesmo que fechada.
+   *
+   * Eles não voltam para a fila de confirmação (senão o descarte viraria uma
+   * briga com o inferidor a cada render, que é a razão de o estado `false`
+   * existir) — mas ficar fora das duas listas os fazia sumir da interface para
+   * sempre, com o registro vivo no banco. É o relato do §278 outra vez: "se
+   * rejeito simplesmente some para sempre".
+   */
+  const recusados = percursos.filter((p) => p.confirmado === false);
+  // O obsoleto cobra: você confirmou um trajeto que o desenho não produz mais,
+  // e ou o desenho regrediu ou a confirmação venceu. As duas pedem uma pessoa.
+  const cobra = violacoes.length + naoMedidos.length + aConfirmar.length + obsoletos.length;
 
   return (
     <div ref={raizRef} style={{ position: "relative" }}>
@@ -82,7 +118,9 @@ export function PercursosPanel({
             ? `${naoMedidos.length} sem medir`
             : aConfirmar.length > 0
               ? `${aConfirmar.length} caminho(s) a confirmar`
-              : `${confirmados.length} caminho(s)`}
+              : obsoletos.length > 0
+                ? `${obsoletos.length} caminho(s) que sumiram do desenho`
+                : `${confirmados.length} caminho(s)`}
       </button>
 
       {aberto && (
@@ -158,14 +196,83 @@ export function PercursosPanel({
             </div>
           )}
 
-          {confirmados.length > 0 && violacoes.length === 0 && naoMedidos.length === 0 && (
-            <div style={{ ...linhaEstilo, borderBottom: "none", fontSize: 11, color: "var(--texto-fraco)" }}>
-              {confirmados.map((p) => (
-                <div key={p.id} data-testid="percurso-confirmado">
-                  ✓ {p.rotulo}
+          {/* §283 — o obsoleto deixa de se passar por caminho vivo. O engine já
+              o separava; a tela é que o desenhava com o mesmo ✓, afirmando que
+              um trajeto existe no desenho quando ele já não existe. */}
+          {obsoletos.length > 0 && (
+            <div style={linhaEstilo}>
+              <div style={{ fontSize: 11, color: "var(--texto-mudo)", marginBottom: 4 }}>
+                Confirmados que <strong>sumiram do desenho</strong> — ou o desenho mudou, ou a confirmação venceu. As
+                réguas não valem mais sobre eles.
+              </div>
+              {obsoletos.map((p) => (
+                <div key={p.id} data-testid="percurso-obsoleto" style={itemEstilo}>
+                  <span style={{ fontSize: 11, color: "var(--amarelo)" }}>⚠ {p.rotulo}</span>
+                  <div style={{ flex: 1 }} />
+                  {onReabrir && (
+                    <button
+                      style={linkEstilo}
+                      onClick={() => onReabrir(p.id)}
+                      data-testid={`remover-${p.id}`}
+                      title="Esquece este registro. Como o desenho não produz mais este caminho, ele não volta."
+                    >
+                      remover
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
+          )}
+
+          {confirmados.length > 0 && violacoes.length === 0 && naoMedidos.length === 0 && (
+            <div style={{ ...linhaEstilo, borderBottom: "none", fontSize: 11, color: "var(--texto-fraco)" }}>
+              {confirmados.map((p) => (
+                <div key={p.id} data-testid="percurso-confirmado" style={itemEstilo}>
+                  <span>✓ {p.rotulo}</span>
+                  <div style={{ flex: 1 }} />
+                  {/* §283 — confirmar deixou de ser porta de mão única. Não é
+                      clique inócuo: ele liga as réguas de tempo e de saltos
+                      sobre o caminho e põe item no backlog (§249), e ficava a um
+                      pixel do "não é caminho". */}
+                  {onReabrir && (
+                    <button
+                      style={linkEstilo}
+                      onClick={() => onReabrir(p.id)}
+                      data-testid={`desfazer-${p.id}`}
+                      title="Volta para 'a confirmar' — as réguas param de valer sobre este caminho"
+                    >
+                      desfazer
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* §283 — os recusados, fechados mas alcançáveis. Mesmo desenho do
+              histórico do ciclo (§276/§278): o placar em cima, a lista atrás de
+              um clique, e cada linha com o caminho de volta. */}
+          {recusados.length > 0 && (
+            <details style={{ ...linhaEstilo, borderBottom: "none" }} data-testid="percursos-recusados">
+              <summary style={{ fontSize: 11, color: "var(--texto-mudo)", cursor: "pointer" }}>
+                {recusados.length} recusado(s) — “não é caminho”
+              </summary>
+              <div style={{ fontSize: 11, color: "var(--texto-mudo)", margin: "4px 0" }}>
+                Continuam recusados de propósito: sem isso o desenho os reofereceria a cada render. Reabrir devolve
+                cada um para a fila de confirmação.
+              </div>
+              {recusados.map((p) => (
+                <div key={p.id} data-testid="percurso-recusado" style={itemEstilo}>
+                  <span style={{ fontSize: 11, color: "var(--texto-fraco)" }}>{p.rotulo}</span>
+                  <div style={{ flex: 1 }} />
+                  {onReabrir && (
+                    <button style={linkEstilo} onClick={() => onReabrir(p.id)} data-testid={`reabrir-${p.id}`}>
+                      reabrir
+                    </button>
+                  )}
+                </div>
+              ))}
+            </details>
           )}
 
           {truncado && (
@@ -207,6 +314,14 @@ const popoverEstilo: React.CSSProperties = {
   background: "var(--painel)",
   boxShadow: "0 12px 32px rgba(15, 23, 42, 0.35)",
   textAlign: "left",
+};
+
+/** Linha de um caminho: rótulo à esquerda, ação à direita. */
+const itemEstilo: React.CSSProperties = {
+  display: "flex",
+  gap: 6,
+  alignItems: "center",
+  padding: "2px 0",
 };
 
 const linhaEstilo: React.CSSProperties = {

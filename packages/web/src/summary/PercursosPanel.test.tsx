@@ -10,6 +10,7 @@ function percurso(p: Partial<Percurso> & { id: string }): Percurso {
 function montar(props: Partial<React.ComponentProps<typeof PercursosPanel>> = {}) {
   const onConfirmar = vi.fn();
   const onDescartar = vi.fn();
+  const onReabrir = vi.fn();
   const onSelecionarNo = vi.fn();
   render(
     <PercursosPanel
@@ -18,11 +19,12 @@ function montar(props: Partial<React.ComponentProps<typeof PercursosPanel>> = {}
       naoMedidos={[]}
       onConfirmar={onConfirmar}
       onDescartar={onDescartar}
+      onReabrir={onReabrir}
       onSelecionarNo={onSelecionarNo}
       {...props}
     />
   );
-  return { onConfirmar, onDescartar, onSelecionarNo };
+  return { onConfirmar, onDescartar, onReabrir, onSelecionarNo };
 }
 
 describe("PercursosPanel — a dimensão do CAMINHO (SPEC-57 fatia E)", () => {
@@ -46,11 +48,20 @@ describe("PercursosPanel — a dimensão do CAMINHO (SPEC-57 fatia E)", () => {
     expect(onDescartar).toHaveBeenCalledWith("pc::n1>n2");
   });
 
-  it("caminho RECUSADO some da fila de confirmação", () => {
+  it("caminho RECUSADO some da fila de confirmação — mas NÃO some da tela", () => {
+    // A primeira metade é de propósito: se o recusado voltasse para a fila, o
+    // descarte viraria uma briga com o inferidor a cada render.
+    //
+    // §283 — a segunda metade é o defeito que este teste deixava passar. Ele
+    // afirmava só "sumiu da fila", e o caminho sumia da INTERFACE INTEIRA com o
+    // registro vivo no banco: relato do usuário, "o usuário errar não consegue
+    // ajustar".
     montar({ percursos: [percurso({ id: "pc::n1>n2", confirmado: false })] });
 
     expect(screen.getByTestId("percursos-resumo")).toHaveTextContent("0 caminho(s)");
+    fireEvent.click(screen.getByTestId("percursos-resumo"));
     expect(screen.queryByTestId("percurso-a-confirmar")).toBeNull();
+    expect(screen.getByTestId("percurso-recusado")).toBeInTheDocument();
   });
 
   it("violação de caminho ganha o chip, com a conta e o porquê", () => {
@@ -110,6 +121,73 @@ describe("PercursosPanel — a dimensão do CAMINHO (SPEC-57 fatia E)", () => {
     fireEvent.click(screen.getByTestId("percursos-resumo"));
 
     expect(screen.getByTestId("percursos-truncado")).toBeInTheDocument();
+  });
+});
+
+/**
+ * §283 — errar aqui não podia ser definitivo.
+ *
+ * RELATO REAL do usuário, sobre o print do painel com dois `✓`: *"aqui nessa
+ * parte de o usuário errar não consegue ajustar"*.
+ *
+ * Quarta aparição da mesma família: §278 recusar ajuste, §278 descartar
+ * feedback, §281 a resposta antiga, e agora o caminho. A régua já estava
+ * escrita (CONTEXTO §4.4) — faltava aplicá-la aqui.
+ */
+describe("PercursosPanel — nenhuma decisão sobre caminho é de mão única", () => {
+  it("confirmado ganha 'desfazer' — e confirmar não é clique inócuo", () => {
+    // Confirmar liga as réguas de tempo e de saltos sobre o caminho e põe item
+    // no backlog (§249), e o botão fica a um pixel do "não é caminho".
+    const { onReabrir } = montar({ percursos: [percurso({ id: "pc::a>b", confirmado: true })] });
+    fireEvent.click(screen.getByTestId("percursos-resumo"));
+
+    fireEvent.click(screen.getByTestId("desfazer-pc::a>b"));
+    expect(onReabrir).toHaveBeenCalledWith("pc::a>b");
+  });
+
+  it("recusado fica atrás de um clique, com o caminho de volta", () => {
+    const { onReabrir } = montar({ percursos: [percurso({ id: "pc::a>b", confirmado: false })] });
+    fireEvent.click(screen.getByTestId("percursos-resumo"));
+
+    expect(screen.getByTestId("percursos-recusados").textContent).toContain("1 recusado(s)");
+    fireEvent.click(screen.getByTestId("reabrir-pc::a>b"));
+    expect(onReabrir).toHaveBeenCalledWith("pc::a>b");
+  });
+
+  it("obsoleto NÃO se passa por caminho vivo — e dá para removê-lo", () => {
+    // O `conciliarPercursos` promete "vira obsoleto em vez de desaparecer"; a
+    // tela concatenava os dois e desenhava o mesmo ✓, afirmando que um trajeto
+    // existe no desenho quando ele já não existe.
+    const { onReabrir } = montar({
+      percursos: [],
+      obsoletos: [percurso({ id: "pc::sumiu", rotulo: "web → antigo", confirmado: true })],
+    });
+
+    expect(screen.getByTestId("percursos-resumo")).toHaveTextContent("1 caminho(s) que sumiram do desenho");
+    fireEvent.click(screen.getByTestId("percursos-resumo"));
+
+    const obsoleto = screen.getByTestId("percurso-obsoleto");
+    expect(obsoleto.textContent).toContain("web → antigo");
+    expect(screen.queryByTestId("percurso-confirmado")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("remover-pc::sumiu"));
+    expect(onReabrir).toHaveBeenCalledWith("pc::sumiu");
+  });
+
+  it("sem quem trate a reabertura, os botões não aparecem — nada de botão morto", () => {
+    render(
+      <PercursosPanel
+        percursos={[percurso({ id: "pc::a>b", confirmado: true })]}
+        violacoes={[]}
+        naoMedidos={[]}
+        onConfirmar={vi.fn()}
+        onDescartar={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByTestId("percursos-resumo"));
+
+    expect(screen.getByTestId("percurso-confirmado")).toBeInTheDocument();
+    expect(screen.queryByTestId("desfazer-pc::a>b")).toBeNull();
   });
 });
 

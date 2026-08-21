@@ -134,7 +134,10 @@ export function ReadinessSummary({
       )}
       {onMudarPercursos && percursosVivos.length + obsoletos.length > 0 && (
         <PercursosPanel
-          percursos={[...percursosVivos, ...obsoletos]}
+          // §283 — separados, e não concatenados: juntos, o obsoleto era
+          // desenhado com o mesmo ✓ de um caminho que existe no desenho.
+          percursos={percursosVivos}
+          obsoletos={obsoletos}
           violacoes={violacoesDePercurso}
           naoMedidos={naoMedidos}
           truncado={inferidos.truncado}
@@ -160,6 +163,15 @@ export function ReadinessSummary({
               ...percursosVivos.filter((p) => p.id === id).map((p) => ({ ...p, confirmado: false })),
             ])
           }
+          /**
+           * §283 — apagar a decisão é só tirar o registro guardado. O que sobra
+           * depois sai sozinho do `conciliarPercursos`: caminho que o desenho
+           * ainda produz volta como `inferido` sem confirmação (ou seja, para a
+           * fila); caminho que sumiu simplesmente não é reinferido.
+           *
+           * Uma linha, três casos — porque no modelo eles sempre foram o mesmo.
+           */
+          onReabrir={(id) => onMudarPercursos((percursos ?? []).filter((p) => p.id !== id))}
         />
       )}
       {(decisoes?.length ?? 0) > 0 && (
