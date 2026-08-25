@@ -5,6 +5,7 @@ import type {
   OperacaoDeAjuste,
   RecursoDeAjuste,
   RegrasConfig,
+  RequisitoDeTopologia,
   SecaoDeRegras,
   TipoDeCampoProposto,
 } from "@gerador/engine";
@@ -23,6 +24,7 @@ import {
 import type { AreaConfig } from "../navegacao/rota";
 import { useMontado } from "../state/useMontado";
 import { simularItemComAjuste } from "./previaDoAjuste";
+import { ConstrutorDeForma, descreverForma } from "./FormaDoDesenho";
 
 /**
  * SPEC-45 — a tela do ciclo, na ordem em que se anda: o que disseram →
@@ -570,7 +572,14 @@ function EstudioDeAjuste({
   // esteira de agentes ("esse papel sobra nos meus itens" é feedback comum).
   // SPEC-52 — e a FICHA: "falta um campo de SLA no serviço" é o pedido mais
   // comum de todos, e era o único que ainda terminava em "edite à mão".
-  const [alvo, setAlvo] = useState<RecursoDeAjuste>("regras");
+  /**
+   * SPEC-63 — `"forma"` não é um `RecursoDeAjuste`: no RBAC ela cai em
+   * `regras` como as outras seções. É um alvo DA TELA, porque o formulário é
+   * outro — e misturá-la no seletor de seção do checklist faria uma régua de
+   * forma virar uma linha de texto por tech, que é o oposto do que ela é.
+   */
+  const [alvo, setAlvo] = useState<RecursoDeAjuste | "forma">("regras");
+  const [regraDeForma, setRegraDeForma] = useState<RequisitoDeTopologia | null>(null);
   const [chaveDaFicha, setChaveDaFicha] = useState("");
   const [fichaAtual, setFichaAtual] = useState<CampoDaFicha[]>([]);
   const [campoKey, setCampoKey] = useState("");
@@ -580,7 +589,14 @@ function EstudioDeAjuste({
   const [campoObrigatorio, setCampoObrigatorio] = useState(false);
   const [papelId, setPapelId] = useState("");
   const [ligarPapel, setLigarPapel] = useState(false);
-  const [secao, setSecao] = useState<SecaoDeRegras>("checklistTecnico");
+  /**
+   * SPEC-63 — as seções que este seletor de fato oferece, e não `SecaoDeRegras`
+   * inteiro. A régua de FORMA virou uma seção do RBAC, mas ela não é uma lista
+   * por tech: tem forma própria, e entra pelo seletor de ALVO logo acima. Deixar
+   * o tipo largo fazia `topologia` escorregar para dentro de uma operação de
+   * checklist, que não sabe o que fazer com ela.
+   */
+  const [secao, setSecao] = useState<Exclude<SecaoDeRegras, "topologia">>("checklistTecnico");
   const [acao, setAcao] = useState<"adicionar" | "remover">("adicionar");
   const [validacao, setValidacao] = useState("");
   const [dev, setDev] = useState(true);
@@ -601,6 +617,7 @@ function EstudioDeAjuste({
 
   const contextos = contextual ? config.nodeTypes[tipoNo]?.contextos ?? [] : [];
   const ehFicha = alvo === "campos-no" || alvo === "campos-aresta";
+  const ehForma = alvo === "forma";
 
   /** As chaves de componente (ou de conexão) que a ficha aceita — sai do
    * diagrama configurado, não de uma lista escrita à mão aqui. */
@@ -639,6 +656,8 @@ function EstudioDeAjuste({
   }, [alvo, chaveDaFicha, chavesDaFicha, timeAtivo, ehFicha]);
 
   const operacao: OperacaoDeAjuste | null = useMemo(() => {
+    // SPEC-63 — a régua de FORMA vem montada pelo construtor compartilhado.
+    if (ehForma) return regraDeForma ? { tipo: "adicionar-topologia", requisito: regraDeForma } : null;
     if (ehFicha) {
       if (!chaveDaFicha) return null;
       if (acao === "remover") {
@@ -683,6 +702,8 @@ function EstudioDeAjuste({
   }, [
     alvo,
     ehFicha,
+    ehForma,
+    regraDeForma,
     chaveDaFicha,
     campoKey,
     campoLabel,
@@ -823,7 +844,7 @@ function EstudioDeAjuste({
             aria-label="Documento a ajustar"
             value={alvo}
             onChange={(e) => {
-              setAlvo(e.target.value as RecursoDeAjuste);
+              setAlvo(e.target.value as RecursoDeAjuste | "forma");
               // A chave da ficha é de outro vocabulário (componente ou
               // conexão): manter a anterior ao trocar de alvo produziria um
               // pedido sobre algo que não existe do outro lado.
@@ -836,9 +857,12 @@ function EstudioDeAjuste({
             <option value="pipeline-agentes">Esteira de agentes (quem escreve o quê)</option>
             <option value="campos-no">Ficha do componente (o que se preenche em cada nó)</option>
             <option value="campos-aresta">Ficha da conexão (o que se preenche em cada seta)</option>
+            <option value="forma">Forma do desenho (o que a arquitetura precisa respeitar)</option>
           </select>
 
-          {ehFicha ? (
+          {ehForma ? (
+            <ConstrutorDeForma config={config} onMudou={setRegraDeForma} />
+          ) : ehFicha ? (
             <>
               <label style={labelEstilo}>{alvo === "campos-aresta" ? "Tipo de conexão" : "Componente"}</label>
               <select
@@ -989,7 +1013,7 @@ function EstudioDeAjuste({
             aria-label="Seção das regras"
             value={secao}
             onChange={(e) => {
-              setSecao(e.target.value as SecaoDeRegras);
+              setSecao(e.target.value as Exclude<SecaoDeRegras, "topologia">);
               setTexto("");
             }}
             style={inputEstilo}
@@ -1123,7 +1147,38 @@ function EstudioDeAjuste({
 
         {/* Coluna 2 — a prévia iterativa */}
         <div style={{ flex: "1 1 320px", minWidth: 300 }} data-testid="previa-do-ajuste">
-          {ehFicha ? (
+          {ehForma ? (
+            /**
+             * SPEC-63 §7 pedia a prévia como "quantos elementos do desenho ATUAL
+             * a regra acusaria". Ela não entra assim, e o motivo é honesto: esta
+             * tela é de CONFIGURAÇÃO e não tem demanda aberta — não há desenho
+             * para contar. Inventar um número sobre um desenho de exemplo seria
+             * pior que não dar número, porque a pessoa decidiria sobre uma
+             * medida que não é dela.
+             *
+             * O que dá para afirmar sem mentir é a frase: o que a régua vai
+             * conferir, e onde ela vai aparecer.
+             */
+            <div data-testid="previa-da-forma">
+              <h3 style={tituloEstilo}>O que esta régua vai conferir</h3>
+              {regraDeForma ? (
+                <>
+                  <p style={proseEstilo}>{descreverForma(regraDeForma.checagem, config)}</p>
+                  <p style={{ ...proseEstilo, color: "var(--texto-mudo)" }}>
+                    Ela passa a valer sobre <strong>todas as demandas</strong> deste ambiente, e aparece no placar da
+                    mesa (⚖) e no reconhecimento antes de derivar. Quem tiver o caso legítimo aceita a violação com
+                    motivo, e ela sai do que cobra sem sair do histórico.
+                  </p>
+                  <p style={{ ...proseEstilo, color: "var(--texto-mudo)" }}>
+                    Quantos pontos ela acusa depende do desenho de cada demanda — esta tela não tem uma aberta, e um
+                    número sobre um desenho de exemplo não seria o seu.
+                  </p>
+                </>
+              ) : (
+                <p style={vazioEstilo}>Escreva a régua para ver o que ela vai conferir.</p>
+              )}
+            </div>
+          ) : ehFicha ? (
             <div data-testid="previa-da-ficha">
               <h3 style={tituloEstilo}>
                 Como fica a ficha de {chavesDaFicha.find(([k]) => k === chaveDaFicha)?.[1] ?? chaveDaFicha}

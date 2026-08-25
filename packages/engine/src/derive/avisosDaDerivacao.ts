@@ -1,7 +1,8 @@
 import type { DiagramaConfig, RegrasConfig } from "../config/types.js";
-import type { Decisao, Diagrama, Necessidade, Percurso } from "../model/types.js";
+import type { Decisao, Diagrama, ExcecaoDePadrao, Necessidade, Percurso } from "../model/types.js";
 import { analisarLacunas } from "../proposito/lacunas.js";
 import { avaliarPercursos } from "../percurso/conformidadeDePercurso.js";
+import { avaliarTopologia, violacoesDeFormaEmAberto } from "../conformidade/topologia.js";
 import { percursosQueContam } from "../percurso/percursos.js";
 import { propostasPendentes, resumirDecisoes } from "../decisao/decisoes.js";
 
@@ -36,21 +37,33 @@ import { propostasPendentes, resumirDecisoes } from "../decisao/decisoes.js";
  * dá para medir, decisão proposta que ninguém aceitou, decisão sem porquê.
  * Nenhum deles vira item, e nenhum deles reaparece depois.
  *
+ * **SPEC-63 — e a violação de FORMA entra, apesar de ser "padrão".** A régua
+ * acima não é "padrão não entra": é "o que a derivação resolve não entra".
+ * Violação de valor vira item porque ela é sobre um campo de um elemento que a
+ * derivação percorre. Uma fila sem consumidor não tem campo a preencher e não
+ * vira item nenhum — ela é sobre o que **não** está desenhado, e derivar por
+ * cima dela produz backlog para um desenho torto. É o momento em que ela mais
+ * importa.
+ *
  * Função pura, sem I/O, como o resto do engine.
  */
 export interface AvisoDaDerivacao {
   /**
    * A dimensão, para a tela agrupar e para o teste não depender do texto.
    *
-   * `padrao` NÃO está aqui, e a ausência é a régua: violação de padrão vira
-   * item (§240), então ela não passa batido — a derivação a trata.
+   * `padrao` de VALOR não está aqui, e a ausência é a régua: ela vira item
+   * (§240), então não passa batida. `forma` está, porque não vira item nenhum
+   * — ver o cabeçalho do arquivo.
    */
-  dimensao: "proposito" | "caminho" | "decisao";
+  dimensao: "proposito" | "caminho" | "decisao" | "forma";
   texto: string;
 }
 
 export interface EntradaDosAvisos {
   regras?: RegrasConfig;
+  /** SPEC-63 — as violações de forma já aceitas de propósito não avisam: quem
+   * escreveu o motivo já reconheceu o que está deixando para trás. */
+  excecoes?: ExcecaoDePadrao[];
   necessidades?: Necessidade[];
   decisoes?: Decisao[];
   percursos?: Percurso[];
@@ -97,6 +110,16 @@ export function avisosDaDerivacao(
   const semPorque = resumirDecisoes(diagrama, entrada.decisoes ?? []).semPorque.length;
   if (semPorque > 0) {
     avisos.push({ dimensao: "decisao", texto: `${semPorque} decisão(ões) registrada(s) sem o porquê` });
+  }
+
+  // FORMA — o que não está desenhado. Não vira item (não há campo a preencher),
+  // e derivar por cima dela produz backlog para um desenho torto.
+  const deForma = violacoesDeFormaEmAberto(avaliarTopologia(diagrama, config, entrada.regras, entrada.excecoes ?? []));
+  if (deForma.length > 0) {
+    avisos.push({
+      dimensao: "forma",
+      texto: `${deForma.length} ponto(s) em que o desenho contraria a forma que o padrão pede`,
+    });
   }
 
   return avisos;

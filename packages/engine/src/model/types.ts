@@ -126,10 +126,20 @@ export interface Necessidade {
  * exatamente o que o PDCA (SPEC-39/45) sabe processar.
  */
 export interface ExcecaoDePadrao {
-  /** Nó onde a violação foi aceita. */
+  /** Elemento onde a violação foi aceita. Nó, ou ARESTA (SPEC-63: uma conexão
+   * proibida é uma violação que mora na seta). */
   noId: string;
-  /** Campo conferido — junto com `noId`, identifica a violação. */
+  /** Campo conferido — junto com `noId`, identifica a violação de VALOR.
+   * Vazio quando a exceção é de FORMA: ali quem identifica é `regraId`. */
   campo: string;
+  /**
+   * SPEC-63 — id da regra de topologia aceita.
+   *
+   * Aponta para o `id` da regra, e não para o `texto`, porque texto é
+   * editável: renomear a regra desligaria em silêncio as exceções que alguém
+   * registrou com motivo. Mesma disciplina de `Atividade.chave` × `rotulo`.
+   */
+  regraId?: string;
   /** Por que foi aceita. Sem isto a exceção é só o vermelho desligado. */
   motivo: string;
   autor: string;

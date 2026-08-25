@@ -293,6 +293,9 @@ export function ConfigScreen({
             componentesPorTech={componentesPorTech}
             techs={techs}
             nodeTypes={config.nodeTypes}
+            // SPEC-63 — a régua de FORMA precisa dos tipos de NÓ e de CONEXÃO.
+            diagramaConfig={config}
+            onRegrasMudaram={onFichaMudou}
           />
         )}
         {abaAtiva === "membros" && <MembrosTab timeAtivo={timeAtivo} />}

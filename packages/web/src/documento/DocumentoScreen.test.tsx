@@ -34,7 +34,7 @@ function doc(p: Partial<DocumentoDeDesenho> = {}): DocumentoDeDesenho {
     saude: [],
     necessidades: [],
     decisoes: [],
-    conferencias: { violacoes: [], aceitas: [], percursos: [], violacoesDePercurso: [], naoMedidos: [] },
+    conferencias: { violacoes: [], aceitas: [], percursos: [], violacoesDePercurso: [], naoMedidos: [], violacoesDeForma: [], formaAceitas: [] },
     itens: [],
     ...p,
   };

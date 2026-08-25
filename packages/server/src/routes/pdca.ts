@@ -333,6 +333,34 @@ export async function registrarRotasPdca(app: FastifyInstance, { db }: OpcoesApp
               contextos: z.array(z.string()).default([]),
             }),
             z.object({ tipo: z.literal("remover-volumetria"), tech: z.string().min(1) }),
+            // SPEC-63 — a régua sobre a FORMA do desenho. `id` é obrigatório e
+            // vem do cliente porque é a chave estável a que as exceções se
+            // prendem: gerá-lo aqui faria o mesmo pedido aplicado duas vezes
+            // criar duas regras, e as exceções se dividiriam entre elas.
+            z.object({
+              tipo: z.literal("adicionar-topologia"),
+              requisito: z.object({
+                id: z.string().trim().min(1),
+                texto: z.string().trim().min(1),
+                porque: z.string().trim().optional(),
+                checagem: z.discriminatedUnion("tipo", [
+                  z.object({
+                    tipo: z.literal("exige-conexao"),
+                    tipoNo: z.string().min(1),
+                    direcao: z.enum(["entra", "sai"]),
+                    tipoAresta: z.string().min(1).optional(),
+                    tipoNoOposto: z.string().min(1).optional(),
+                  }),
+                  z.object({
+                    tipo: z.literal("proibe-conexao"),
+                    deTipoNo: z.string().min(1),
+                    paraTipoNo: z.string().min(1),
+                    tipoAresta: z.string().min(1).optional(),
+                  }),
+                ]),
+              }),
+            }),
+            z.object({ tipo: z.literal("remover-topologia"), id: z.string().min(1), texto: z.string().optional() }),
             // SPEC-50 — papel da esteira: o outro documento que o feedback cita.
             z.object({ tipo: z.literal("ativar-papel"), papelId: z.string().min(1), papelNome: z.string().optional() }),
             z.object({ tipo: z.literal("desativar-papel"), papelId: z.string().min(1), papelNome: z.string().optional() }),

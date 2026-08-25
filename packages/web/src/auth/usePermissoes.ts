@@ -126,4 +126,6 @@ export const RECURSO_DA_SECAO_DE_REGRAS: Record<string, string> = {
   processo: "regras.checklistProcesso",
   testes: "regras.testes",
   volumetria: "regras.volumetria",
+  // SPEC-63 — a régua sobre a forma do desenho tem dono próprio.
+  forma: "regras.topologia",
 };

@@ -5,14 +5,16 @@ import {
   analisarLacunas,
   avaliarConformidade,
   avaliarPercursos,
+  avaliarTopologia,
   conciliarPercursos,
   deltaDePercurso,
   inferirPercursos,
   resumirDecisoes,
+  violacoesDeFormaEmAberto,
   violacoesEmAberto,
 } from "@gerador/engine";
 import { PercursosPanel } from "./PercursosPanel";
-import type { Decisao, Percurso } from "@gerador/engine";
+import type { Decisao, Percurso, ViolacaoDeTopologia } from "@gerador/engine";
 import { ReadinessBadge } from "./ReadinessBadge";
 import { calcularResumoProntidao, type NoComProntidao } from "./prontidaoResumo";
 
@@ -38,6 +40,14 @@ export interface ReadinessSummaryProps {
   excecoes?: ExcecaoDePadrao[];
   /** §242 — aceitar uma violação, com motivo. Ausente = a válvula não aparece. */
   onAceitarViolacao?: (violacao: Violacao, motivo: string) => void;
+  /**
+   * SPEC-63 fatia C — aceitar uma violação de FORMA, com motivo.
+   *
+   * A válvula entra JUNTO com a régua, e não numa fatia depois: "fila sem
+   * consumidor hoje porque o consumidor vem na próxima demanda" é o caso comum,
+   * não o exótico. Sem ela, a primeira semana ensina o time a ignorar o ⚖.
+   */
+  onAceitarViolacaoDeForma?: (violacao: ViolacaoDeTopologia, motivo: string) => void;
   /** SPEC-57 fatia C — as decisões da quebra. Sem nenhuma, o indicador não
    * aparece: mesma disciplina do propósito e da conformidade. */
   decisoes?: Decisao[];
@@ -68,6 +78,7 @@ export function ReadinessSummary({
   onSelecionarAresta,
   excecoes,
   onAceitarViolacao,
+  onAceitarViolacaoDeForma,
   decisoes,
   onSelecionarDecisao,
   percursos,
@@ -88,6 +99,9 @@ export function ReadinessSummary({
   // propósito continuam existindo (`avaliarConformidade` as devolve marcadas):
   // some do vermelho, não do histórico.
   const violacoes = violacoesEmAberto(avaliarConformidade(diagrama, config, regras, excecoes ?? []));
+  // SPEC-63 — a terceira dimensão do padrão: a FORMA. Mesma disciplina das
+  // outras duas — sem regra declarada, não acusa nada e não aparece.
+  const violacoesDeForma = violacoesDeFormaEmAberto(avaliarTopologia(diagrama, config, regras, excecoes ?? []));
   // Fatia C — dimensão POR QUÊ. O número que cobra não é "quantas decisões
   // existem" (isso é volume, não qualidade): é quantas esperam alguém e
   // quantas registraram a escolha sem a razão.
@@ -145,8 +159,15 @@ export function ReadinessSummary({
           🎯 {semElemento > 0 ? `${semElemento} sem componente` : "propósito coberto"}
         </button>
       )}
-      {violacoes.length > 0 && (
-        <ListaDeViolacoes violacoes={violacoes} onSelecionar={onSelecionarViolacao} onAceitar={onAceitarViolacao} />
+      {violacoes.length + violacoesDeForma.length > 0 && (
+        <ListaDeViolacoes
+          violacoes={violacoes}
+          violacoesDeForma={violacoesDeForma}
+          onSelecionar={onSelecionarViolacao}
+          onSelecionarAresta={onSelecionarAresta}
+          onAceitar={onAceitarViolacao}
+          onAceitarForma={onAceitarViolacaoDeForma}
+        />
       )}
       {/* SPEC-64 — o chip também aparece quando NÃO há caminho lido, desde que
           dê para declarar um: senão o desenho que o inferidor não sabe ler
@@ -330,12 +351,23 @@ function ListaDeDecisoes({
  */
 function ListaDeViolacoes({
   violacoes,
+  violacoesDeForma = [],
   onSelecionar,
+  onSelecionarAresta,
   onAceitar,
+  onAceitarForma,
 }: {
   violacoes: Violacao[];
+  /**
+   * SPEC-63 — as violações de FORMA, no mesmo chip. É a mesma pergunta ("este
+   * desenho está fora do padrão do time?"), e dois chips separados dividiriam a
+   * atenção sem dividir o assunto.
+   */
+  violacoesDeForma?: ViolacaoDeTopologia[];
   onSelecionar?: (noId: string) => void;
+  onSelecionarAresta?: (arestaId: string) => void;
   onAceitar?: (violacao: Violacao, motivo: string) => void;
+  onAceitarForma?: (violacao: ViolacaoDeTopologia, motivo: string) => void;
 }) {
   const [aberto, setAberto] = useState(false);
   const [aceitando, setAceitando] = useState<string | null>(null);
@@ -358,7 +390,7 @@ function ListaDeViolacoes({
         onClick={() => setAberto((a) => !a)}
         style={{ ...botaoProximoEstilo, borderColor: "var(--amarelo)", color: "var(--amarelo)" }}
       >
-        ⚖ {violacoes.length} fora do padrão
+        ⚖ {violacoes.length + violacoesDeForma.length} fora do padrão
       </button>
 
       {aberto && (
@@ -396,6 +428,67 @@ function ListaDeViolacoes({
                         disabled={motivo.trim() === ""}
                         onClick={() => {
                           onAceitar(v, motivo.trim());
+                          setAceitando(null);
+                          setMotivo("");
+                        }}
+                        style={{ ...botaoProximoEstilo, fontSize: 11 }}
+                      >
+                        Registrar
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      aria-label={`Aceitar de propósito: ${v.texto}`}
+                      onClick={() => {
+                        setAceitando(id);
+                        setMotivo("");
+                      }}
+                      style={{ ...itemPopoverEstilo, fontSize: 11, color: "var(--texto-fraco)" }}
+                    >
+                      aceitar de propósito…
+                    </button>
+                  ))}
+              </div>
+            );
+          })}
+
+          {/* SPEC-63 — as violações de FORMA, na mesma lista. O elemento que
+              elas acusam pode ser um NÓ (falta a conexão) ou uma ARESTA (a
+              conexão não devia existir), e o clique tem que levar ao painel
+              certo — senão o endereço aponta para o nada. */}
+          {violacoesDeForma.map((v) => {
+            const elementoId = v.noId ?? v.arestaId ?? "";
+            const id = `forma::${v.regraId}::${elementoId}`;
+            return (
+              <div key={id} data-testid={`violacao-${id}`} style={{ padding: "8px 4px", borderBottom: "1px solid var(--borda)" }}>
+                <button
+                  onClick={() => (v.arestaId ? onSelecionarAresta?.(v.arestaId) : onSelecionar?.(elementoId))}
+                  style={{ ...itemPopoverEstilo, fontWeight: 600 }}
+                >
+                  {v.rotulo}: esperado {v.esperado} — está {v.atual}
+                </button>
+                <div style={{ fontSize: 11, color: "var(--texto-fraco)", padding: "2px 6px" }}>{v.texto}</div>
+                {v.porque && (
+                  <div data-testid={`porque-${id}`} style={{ fontSize: 11, color: "var(--texto-mudo)", padding: "2px 6px" }}>
+                    Por quê: {v.porque}
+                  </div>
+                )}
+
+                {onAceitarForma &&
+                  (aceitando === id ? (
+                    <div style={{ display: "flex", gap: 4, padding: "4px 6px" }}>
+                      <input
+                        aria-label={`Motivo para aceitar: ${v.texto}`}
+                        value={motivo}
+                        onChange={(e) => setMotivo(e.target.value)}
+                        placeholder="ex.: o consumidor entra na próxima demanda"
+                        style={{ flex: 1, fontSize: 11, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--borda-forte)", background: "var(--fundo)", color: "var(--texto)" }}
+                      />
+                      <button
+                        aria-label={`Confirmar exceção: ${v.texto}`}
+                        disabled={motivo.trim() === ""}
+                        onClick={() => {
+                          onAceitarForma(v, motivo.trim());
                           setAceitando(null);
                           setMotivo("");
                         }}

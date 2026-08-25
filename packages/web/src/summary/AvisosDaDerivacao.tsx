@@ -35,6 +35,10 @@ const ICONE: Record<AvisoDaDerivacao["dimensao"], string> = {
   proposito: "🎯",
   caminho: "🛣",
   decisao: "🧭",
+  // SPEC-63 — a forma usa o MESMO ⚖ do padrão de valor, porque é a mesma
+  // pergunta ("este desenho contraria o padrão do time?"). Ícone novo faria
+  // parecer uma dimensão nova, e ela não é: é a outra metade da que já existia.
+  forma: "⚖",
 };
 
 export function AvisosDaDerivacao({ avisos, onDerivar, onVoltar }: AvisosDaDerivacaoProps) {

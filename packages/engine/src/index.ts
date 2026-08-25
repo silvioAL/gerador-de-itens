@@ -41,6 +41,13 @@ export {
   type ResultadoDePercursos,
 } from "./percurso/conformidadeDePercurso.js";
 export { percursoManual } from "./percurso/percursos.js";
+export {
+  avaliarTopologia,
+  violacoesDeFormaAceitas,
+  violacoesDeFormaEmAberto,
+  type ViolacaoDeTopologia,
+} from "./conformidade/topologia.js";
+export type { ChecagemDeTopologia, RequisitoDeTopologia } from "./config/types.js";
 export { deltaDeDecisao, deltaDePercurso, piorou } from "./remedicao/remedicao.js";
 export { compararDocumentos } from "./documento/compararDocumentos.js";
 export { exemploDeMedicao, valorQueEstoura } from "./conformidade/exemploDeMedicao.js";
