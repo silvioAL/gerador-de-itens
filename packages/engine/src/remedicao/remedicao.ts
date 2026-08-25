@@ -142,7 +142,11 @@ export function deltaDePercurso(
   return {
     linhas,
     alerta: naoMedido
-      ? `Confirmar não vai medir este caminho: falta ${naoMedido.campo} em ${naoMedido.nosSemValor.length} componente(s).`
+      ? // SPEC-64 — o motivo pode não ser "faltou preencher" (par com mais de
+        // uma conexão declarando o campo), e aí quem explica é o próprio motivo.
+        naoMedido.motivo
+        ? `Confirmar não vai medir este caminho: ${naoMedido.motivo}.`
+        : `Confirmar não vai medir este caminho: falta ${naoMedido.campo} em ${naoMedido.elementosSemValor.length} elemento(s) do trajeto.`
       : linhas[0].depois > linhas[0].antes
         ? "Confirmar faz a régua valer sobre este caminho — e ele já está fora dela."
         : undefined,

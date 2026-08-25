@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Aresta, Diagrama, No, Percurso } from "../model/types.js";
-import { conciliarPercursos, inferirPercursos, MAX_PERCURSOS, percursosQueContam } from "./percursos.js";
+import { conciliarPercursos, inferirPercursos, MAX_PERCURSOS, percursoManual, percursosQueContam } from "./percursos.js";
 
 function no(id: string, label = id): No {
   return { id, type: "service", x: 0, y: 0, label, status: "novo", spec: {}, specNA: {} };
@@ -135,5 +135,69 @@ describe("percursoConta / conciliarPercursos", () => {
     const { obsoletos } = conciliarPercursos([], [inferido]);
 
     expect(obsoletos).toEqual([]);
+  });
+});
+
+/**
+ * SPEC-64 fatia B — o caminho declarado à MÃO.
+ *
+ * O achado que motivou a mudança na conciliação: ela montava a lista de vivos a
+ * partir dos INFERIDOS, e um manual nunca é inferido. Com o código anterior ele
+ * cairia direto em `obsoletos` — apareceria para sempre como "sumiu do
+ * desenho", recém-criado.
+ */
+describe("conciliarPercursos — o caminho declarado à mão (SPEC-64)", () => {
+  const desenho = (ids: string[]): Diagrama => ({
+    nodes: ids.map((id) => ({ id, type: "service", x: 0, y: 0, label: id.toUpperCase(), status: "novo" as const, spec: {}, specNA: {} })),
+    edges: [],
+  });
+
+  it("manual sobrevive à conciliação mesmo sem o inferidor produzi-lo", () => {
+    const manual = percursoManual(["a", "c"], desenho(["a", "b", "c"]));
+
+    const { percursos, obsoletos } = conciliarPercursos([], [manual], desenho(["a", "b", "c"]));
+
+    expect(percursos.map((p) => p.id)).toEqual(["pc::a>c"]);
+    expect(obsoletos).toEqual([]);
+  });
+
+  it("manual conta sem precisar de confirmação — quem o desenhou já disse que existe", () => {
+    const manual = percursoManual(["a", "c"], desenho(["a", "c"]));
+
+    expect(percursosQueContam([manual])).toHaveLength(1);
+  });
+
+  it("manual que perdeu um nó vira OBSOLETO — a mesma disciplina do inferido", () => {
+    const manual = percursoManual(["a", "c"], desenho(["a", "c"]));
+
+    const { percursos, obsoletos } = conciliarPercursos([], [manual], desenho(["a"]));
+
+    expect(percursos).toEqual([]);
+    expect(obsoletos.map((p) => p.id)).toEqual(["pc::a>c"]);
+  });
+
+  it("nó renomeado atualiza o rótulo do manual, como já fazia com o inferido", () => {
+    const manual = percursoManual(["a", "c"], desenho(["a", "c"]));
+    const renomeado: Diagrama = {
+      nodes: [
+        { id: "a", type: "service", x: 0, y: 0, label: "web", status: "novo", spec: {}, specNA: {} },
+        { id: "c", type: "service", x: 0, y: 0, label: "worker", status: "novo", spec: {}, specNA: {} },
+      ],
+      edges: [],
+    };
+
+    const { percursos } = conciliarPercursos([], [manual], renomeado);
+
+    expect(percursos[0].rotulo).toBe("web → worker");
+  });
+
+  it("manual que COINCIDE com um inferido é o mesmo caminho — a lista não duplica", () => {
+    // O id sai da mesma fórmula de propósito.
+    const manual = percursoManual(["a", "b"], desenho(["a", "b"]));
+    const inferidoIgual: Percurso = { id: "pc::a>b", rotulo: "A → B", nos: ["a", "b"], origem: "inferido" };
+
+    const { percursos } = conciliarPercursos([inferidoIgual], [manual], desenho(["a", "b"]));
+
+    expect(percursos).toHaveLength(1);
   });
 });

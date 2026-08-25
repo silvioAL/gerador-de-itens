@@ -93,7 +93,7 @@ describe("PercursosPanel — a dimensão do CAMINHO (SPEC-57 fatia E)", () => {
     const { onSelecionarNo } = montar({
       percursos: [percurso({ id: "pc::a>b", confirmado: true })],
       naoMedidos: [
-        { percursoId: "pc::a>b", rotulo: "web → api", texto: "O caminho cabe no orçamento", campo: "timeoutMs", nosSemValor: ["n2"] },
+        { percursoId: "pc::a>b", rotulo: "web → api", texto: "O caminho cabe no orçamento", campo: "timeoutMs", elementosSemValor: [{ tipo: "no", id: "n2", rotulo: "n2" }] },
       ],
     });
 
@@ -110,7 +110,7 @@ describe("PercursosPanel — a dimensão do CAMINHO (SPEC-57 fatia E)", () => {
     montar({
       percursos: [percurso({ id: "pc::a>b", confirmado: true })],
       violacoes: [{ percursoId: "pc::a>b", rotulo: "a → b", texto: "t", esperado: "≤ 1", atual: "2" }],
-      naoMedidos: [{ percursoId: "pc::c>d", rotulo: "c → d", texto: "t", campo: "x", nosSemValor: ["n9"] }],
+      naoMedidos: [{ percursoId: "pc::c>d", rotulo: "c → d", texto: "t", campo: "x", elementosSemValor: [{ tipo: "no", id: "n9", rotulo: "n9" }] }],
     });
 
     expect(screen.getByTestId("percursos-resumo")).toHaveTextContent("fora do padrão");
@@ -188,6 +188,124 @@ describe("PercursosPanel — nenhuma decisão sobre caminho é de mão única", 
 
     expect(screen.getByTestId("percurso-confirmado")).toBeInTheDocument();
     expect(screen.queryByTestId("desfazer-pc::a>b")).toBeNull();
+  });
+});
+
+/**
+ * SPEC-64 fatia A — o que falta pode estar na CONEXÃO.
+ */
+describe("PercursosPanel — o endereço do que falta", () => {
+  it("conexão sem valor é clicável, e leva à ARESTA — não a um nó que não existe", () => {
+    const onSelecionarAresta = vi.fn();
+    render(
+      <PercursosPanel
+        percursos={[percurso({ id: "pc::a>b", confirmado: true })]}
+        violacoes={[]}
+        naoMedidos={[
+          {
+            percursoId: "pc::a>b",
+            rotulo: "web → api",
+            texto: "O caminho cabe no orçamento",
+            campo: "timeoutMs",
+            elementosSemValor: [{ tipo: "aresta", id: "e1", rotulo: "web → api" }],
+          },
+        ]}
+        onConfirmar={vi.fn()}
+        onDescartar={vi.fn()}
+        onSelecionarAresta={onSelecionarAresta}
+      />
+    );
+    fireEvent.click(screen.getByTestId("percursos-resumo"));
+
+    const alvo = screen.getByTestId("elemento-sem-valor-e1");
+    expect(alvo.textContent).toContain("conexão web → api");
+    fireEvent.click(alvo);
+    expect(onSelecionarAresta).toHaveBeenCalledWith("e1");
+  });
+
+  it("desenho ambíguo diz o MOTIVO, em vez de listar elemento nenhum", () => {
+    // Par ligado por duas conexões que declaram o campo: não há valor faltando,
+    // há desenho que não diz por onde a requisição passa.
+    montar({
+      percursos: [percurso({ id: "pc::a>b", confirmado: true })],
+      naoMedidos: [
+        {
+          percursoId: "pc::a>b",
+          rotulo: "web → api",
+          texto: "O caminho cabe no orçamento",
+          campo: "timeoutMs",
+          elementosSemValor: [],
+          motivo: 'há mais de uma conexão de "web" para "api" que declara timeoutMs',
+        },
+      ],
+    });
+    fireEvent.click(screen.getByTestId("percursos-resumo"));
+
+    expect(screen.getByTestId("percurso-motivo").textContent).toContain("mais de uma conexão");
+    expect(screen.getByTestId("percurso-nao-medido").textContent).not.toContain("falta timeoutMs em");
+  });
+});
+
+/**
+ * SPEC-64 fatias B e C — declarar e corrigir.
+ *
+ * Até aqui só existiam dois verbos, `confirmar` e `não é caminho`. Um trajeto
+ * quase certo só podia ser recusado, e recusar não dizia o que era certo.
+ */
+describe("PercursosPanel — declarar e ajustar", () => {
+  it("a porta de declarar à mão existe, e diz para que serve", () => {
+    const onDeclarar = vi.fn();
+    montar({ percursos: [percurso({ id: "pc::a>b", confirmado: true })], onDeclarar });
+    fireEvent.click(screen.getByTestId("percursos-resumo"));
+
+    const botao = screen.getByTestId("declarar-caminho");
+    fireEvent.click(botao);
+    expect(onDeclarar).toHaveBeenCalled();
+    expect(screen.getByTestId("percursos-lista").textContent).toContain("clique os componentes na ordem");
+  });
+
+  it("o caminho a confirmar ganha o verbo do MEIO — ajustar", () => {
+    const onAjustar = vi.fn();
+    montar({ percursos: [percurso({ id: "pc::a>b" })], onAjustar });
+    fireEvent.click(screen.getByTestId("percursos-resumo"));
+
+    // Recebe o PERCURSO inteiro: o inferido não está guardado na quebra, e um
+    // id sozinho fazia o App procurar onde não havia (achado do E2E).
+    fireEvent.click(screen.getByTestId("ajustar-pc::a>b"));
+    expect(onAjustar).toHaveBeenCalledWith(expect.objectContaining({ id: "pc::a>b", nos: ["n1", "n2"] }));
+  });
+
+  it("§286 — o declarado à mão APARECE, conta, e diz que foi declarado", () => {
+    // Achado do E2E: o manual conta (`percursoConta`) mas nasce com
+    // `confirmado: undefined`, e o painel filtrava por `=== true`. Ele não caía
+    // nem em "confirmados" nem em "a confirmar" — nascia invisível, com o
+    // registro vivo na quebra. O §283 de volta, pela porta da fatia B.
+    montar({ percursos: [percurso({ id: "pc::a>c", rotulo: "web → worker", origem: "manual" })] });
+
+    expect(screen.getByTestId("percursos-resumo")).toHaveTextContent("1 caminho(s)");
+    fireEvent.click(screen.getByTestId("percursos-resumo"));
+
+    const linha = screen.getByTestId("percurso-confirmado");
+    expect(linha.textContent).toContain("web → worker");
+    expect(linha.textContent).toContain("declarado à mão");
+    // E o verbo de desfazer diz a verdade: apagar, porque ele não volta.
+    expect(screen.getByTestId("desfazer-pc::a>c").textContent).toBe("apagar");
+  });
+
+  it("sem quem trate, nem 'declarar' nem 'ajustar' aparecem — nada de botão morto", () => {
+    render(
+      <PercursosPanel
+        percursos={[percurso({ id: "pc::a>b" })]}
+        violacoes={[]}
+        naoMedidos={[]}
+        onConfirmar={vi.fn()}
+        onDescartar={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByTestId("percursos-resumo"));
+
+    expect(screen.queryByTestId("declarar-caminho")).toBeNull();
+    expect(screen.queryByTestId("ajustar-pc::a>b")).toBeNull();
   });
 });
 

@@ -9766,3 +9766,82 @@ A SPEC-63 (régua sobre a forma) e esta são independentes. Se for para escolher
 acrescentar uma medida nova.
 
 Sem mudança de código: a SPEC é documento.
+
+## §286 — a régua do caminho passou a enxergar o caminho
+
+Implementação da SPEC-64, as três fatias.
+
+### A: a medição enxergava metade
+
+`declaraCampo` lia `config.nodeTypes`. `timeoutMs` é declarado em
+`edgeTypes.http` e `edgeTypes.grpc`. Num caminho `web → api → worker` ligado por
+HTTP a soma dava **zero**, e a régua se calava no ramo comentado como *"silêncio
+legítimo"*.
+
+Agora o campo é procurado em **quem o declara** — nó ou conexão atravessada — e
+cada elemento contribui uma vez. A conta que aparece diz de onde veio: *"soma de
+timeoutMs = 2400ms em 2 conexões"*, e não *"em 5 elementos"*. Essa frase é o que
+o §4.3 da SPEC pedia como aviso de que a régua mudou — sem precisar de um estado
+"é a primeira vez que você vê isto", que seria memória para uma preocupação
+passageira. **Anotado como desvio consciente da SPEC.**
+
+Duas decisões finas:
+
+- **par com mais de uma conexão que declara o campo** não é medido, e diz por
+  quê. Escolher uma seria inventar; somar as duas inflaria o caminho. É a
+  terceira resposta do §248 num caso novo;
+- a ambiguidade é resolvida **por campo**, não por caminho: um par com duas
+  conexões só é ambíguo para a régua que mede um campo que as duas declaram.
+  Resolver antes do campo produziria "não medido" em régua que nem olha conexão.
+
+`nosSemValor` virou `elementosSemValor` — campo chamado "nós" carregando aresta
+é a mentira por nome que o §280 corrigiu noutro lugar. E o endereço do que falta
+passou a levar à aresta (`onSelecionarAresta`), que é onde se preenche.
+
+### B e C: declarar e corrigir
+
+O verbo do meio existe agora. **Ajustar é recusar com resposta**: grava o manual
+certo e deixa o inferido como `confirmado: false` — apagá-lo faria o inferidor
+devolvê-lo no render seguinte, e a pessoa corrigiria a mesma sugestão para
+sempre.
+
+A barra do modo vive **fora** do popover dos caminhos, e isso não é estética: o
+gesto é clicar nós no canvas, e o popover fecha no primeiro clique fora dele.
+Uma barra dentro dele sumiria no primeiro nó.
+
+### Três defeitos que os testes pegaram, e um que a SPEC já previa
+
+1. **A SPEC previa:** `conciliarPercursos` montava a lista de vivos a partir dos
+   INFERIDOS, e um manual nunca é inferido — cairia direto em "obsoleto",
+   recém-criado. Corrigido junto, como a SPEC mandava;
+2. **o E2E pegou:** `ajustar` recebia o `id` e o App procurava o percurso em
+   `quebra.percursos` — onde o inferido **não está**, porque ele é recalculado a
+   cada render. A correção começava vazia. O painel passou a entregar o percurso
+   inteiro;
+3. **o E2E pegou:** o caminho manual **conta** mas nasce com
+   `confirmado: undefined`, e o painel filtrava a lista por `confirmado ===
+   true`. Ele não caía em lista nenhuma: **nascia invisível**, com o registro
+   vivo na quebra. É o §283 de volta, pela porta da fatia B. O filtro passou a
+   ser `percursoConta` — quem decide o que conta é o engine;
+4. e o chip só aparecia havendo caminho lido, o que deixava sem porta de entrada
+   justamente o desenho que o inferidor não sabe ler — o caso que a fatia B
+   existe para atender.
+
+> O terceiro é o mais instrutivo: eu tinha acabado de consertar essa família no
+> §283 e reintroduzi um caso dela ao acrescentar um estado novo. **Régua aplicada
+> não fica aplicada sozinha** — cada estado novo passa por ela de novo.
+
+### O E2E da fatia A não existe, e o motivo fica escrito
+
+Medi: o documento de regras do deploy E2E vem **vazio** (`percursos: null`).
+Para exercitar a régua ponta a ponta eu teria de gravar uma régua **global** — e
+o §281 custou três specs vizinhos ensinando que config global em suíte paralela
+é estado compartilhado. Pior: uma régua de percurso ligada faria violação
+aparecer, e o `caminho-tem-volta` (§283) espera a lista de confirmados, que a
+tela esconde quando há violação. Eu quebraria meu próprio spec da rodada
+anterior.
+
+A fatia A é função pura e está coberta onde mora: sete casos novos no engine,
+incluindo o caminho ligado por HTTP que antes somava zero.
+
+351 engine · 679 web · 84 aplicação · 237 server · 85/85 E2E · build limpo.

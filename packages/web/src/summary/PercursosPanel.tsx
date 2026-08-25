@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { percursoConta } from "@gerador/engine";
 import type { Percurso, PercursoNaoMedido, Remedicao, ViolacaoDePercurso } from "@gerador/engine";
 import { Delta } from "./Delta";
 
@@ -46,12 +47,31 @@ export interface PercursosPanelProps {
    * Ausente = os botões não aparecem (mesma disciplina do `onSelecionarNo`).
    */
   onReabrir?: (id: string) => void;
+  /**
+   * SPEC-64 fatia B — começa a declarar um caminho à mão. Ausente = o produto
+   * segue só aceitando ou recusando o que o motor leu.
+   */
+  onDeclarar?: () => void;
+  /**
+   * SPEC-64 fatia C — corrigir o que o motor sugeriu, usando a sequência dele
+   * como ponto de partida. É o verbo que faltava: sem ele, um trajeto quase
+   * certo só podia ser recusado.
+   *
+   * Recebe o PERCURSO, e não o id: o caminho inferido é recalculado a cada
+   * render e **não está guardado na quebra** — quem o tem em mãos é este
+   * painel. Passar o id fazia o App procurar em `quebra.percursos` e achar
+   * nada, e a correção começava vazia (achado do E2E).
+   */
+  onAjustar?: (percurso: Percurso) => void;
   /** SPEC-60 fatia A — o que confirmar ESTE caminho põe no backlog. Devolver
    * `undefined` (ou não passar) é dizer "não sei medir", e aí o botão fica
    * como era: confirmar nunca depende de haver medição. */
   remedirConfirmacao?: (id: string) => Remedicao | undefined;
   /** Leva ao primeiro nó do caminho — sem isto o número seria um beco. */
   onSelecionarNo?: (noId: string) => void;
+  /** SPEC-64 — o campo que falta pode estar na CONEXÃO (o `timeoutMs` de uma
+   * chamada síncrona mora lá). Sem isto, o endereço apontaria para o nada. */
+  onSelecionarAresta?: (arestaId: string) => void;
 }
 
 export function PercursosPanel({
@@ -63,7 +83,10 @@ export function PercursosPanel({
   onConfirmar,
   onDescartar,
   onReabrir,
+  onDeclarar,
+  onAjustar,
   onSelecionarNo,
+  onSelecionarAresta,
   remedirConfirmacao,
 }: PercursosPanelProps) {
   const [aberto, setAberto] = useState(false);
@@ -83,7 +106,16 @@ export function PercursosPanel({
   // `false` como "a confirmar" faria o botão "não é caminho" não fazer nada —
   // o inferidor devolveria o mesmo caminho no render seguinte, para sempre.
   const aConfirmar = percursos.filter((p) => p.origem === "inferido" && p.confirmado === undefined);
-  const confirmados = percursos.filter((p) => p.confirmado === true);
+  /**
+   * Os que CONTAM — e o filtro é `percursoConta`, não `confirmado === true`.
+   *
+   * SPEC-64: o caminho declarado à mão conta sem confirmação (quem o desenhou
+   * já disse que existe) e por isso nasce com `confirmado: undefined`. Com o
+   * filtro anterior ele não caía nem aqui nem em "a confirmar": nascia
+   * invisível, com o registro vivo na quebra — o §283 de volta, e foi o E2E que
+   * pegou. A lista é dos que contam; quem decide isso é o engine.
+   */
+  const confirmados = percursos.filter((p) => percursoConta(p));
   /**
    * §283 — os recusados PRECISAM ter uma lista, mesmo que fechada.
    *
@@ -140,17 +172,32 @@ export function PercursosPanel({
             <div key={`n-${n.percursoId}-${n.campo}`} data-testid="percurso-nao-medido" style={linhaEstilo}>
               <strong style={{ fontSize: 12 }}>{n.rotulo}</strong>
               <div style={{ fontSize: 11, color: "var(--texto-fraco)" }}>
-                {/* Dizer o que falta, e não só que falhou: sem os ids, "não deu
-                    para medir" é uma reclamação sem endereço. */}
-                não dá para medir "{n.texto}" — falta <strong>{n.campo}</strong> em{" "}
-                {n.nosSemValor.map((id, i) => (
-                  <span key={id}>
-                    {i > 0 && ", "}
-                    <button style={linkEstilo} onClick={() => onSelecionarNo?.(id)}>
-                      {id}
-                    </button>
-                  </span>
-                ))}
+                {/* Dizer o que falta, e não só que falhou: sem os endereços,
+                    "não deu para medir" é uma reclamação sem endereço. */}
+                não dá para medir "{n.texto}" —{" "}
+                {n.motivo ? (
+                  /* SPEC-64 — nem todo "não medido" é campo vazio. O par ligado
+                     por duas conexões que declaram o campo não tem valor
+                     faltando: tem desenho ambíguo, e a frase precisa dizer isso
+                     em vez de listar elemento nenhum. */
+                  <span data-testid="percurso-motivo">{n.motivo}</span>
+                ) : (
+                  <>
+                    falta <strong>{n.campo}</strong> em{" "}
+                    {n.elementosSemValor.map((e, i) => (
+                      <span key={`${e.tipo}-${e.id}`}>
+                        {i > 0 && ", "}
+                        <button
+                          style={linkEstilo}
+                          data-testid={`elemento-sem-valor-${e.id}`}
+                          onClick={() => (e.tipo === "aresta" ? onSelecionarAresta?.(e.id) : onSelecionarNo?.(e.id))}
+                        >
+                          {e.tipo === "aresta" ? `conexão ${e.rotulo}` : e.rotulo}
+                        </button>
+                      </span>
+                    ))}
+                  </>
+                )}
               </div>
             </div>
           ))}
@@ -178,6 +225,19 @@ export function PercursosPanel({
                     <button style={botaoMiniEstilo} onClick={() => onConfirmar(p.id)} data-testid={`confirmar-${p.id}`}>
                       confirmar
                     </button>
+                    {/* SPEC-64 fatia C — o verbo do meio. Um trajeto quase
+                        certo só podia ser recusado, e recusar não dizia o que
+                        era certo. */}
+                    {onAjustar && (
+                      <button
+                        style={linkEstilo}
+                        onClick={() => onAjustar(p)}
+                        data-testid={`ajustar-${p.id}`}
+                        title="Usa esta sequência como ponto de partida e deixa você corrigi-la no desenho"
+                      >
+                        ajustar
+                      </button>
+                    )}
                     <button style={linkEstilo} onClick={() => onDescartar(p.id)}>
                       não é caminho
                     </button>
@@ -228,7 +288,15 @@ export function PercursosPanel({
             <div style={{ ...linhaEstilo, borderBottom: "none", fontSize: 11, color: "var(--texto-fraco)" }}>
               {confirmados.map((p) => (
                 <div key={p.id} data-testid="percurso-confirmado" style={itemEstilo}>
-                  <span>✓ {p.rotulo}</span>
+                  <span>
+                    ✓ {p.rotulo}
+                    {/* Declarado à mão é outra coisa de confirmado: ninguém o
+                        leu do desenho, alguém o afirmou. Dizer isso é o que
+                        permite entender por que ele conta sem ✓ de aceite. */}
+                    {p.origem === "manual" && (
+                      <span style={{ marginLeft: 6, fontSize: 10, color: "var(--texto-mudo)" }}>declarado à mão</span>
+                    )}
+                  </span>
                   <div style={{ flex: 1 }} />
                   {/* §283 — confirmar deixou de ser porta de mão única. Não é
                       clique inócuo: ele liga as réguas de tempo e de saltos
@@ -239,9 +307,13 @@ export function PercursosPanel({
                       style={linkEstilo}
                       onClick={() => onReabrir(p.id)}
                       data-testid={`desfazer-${p.id}`}
-                      title="Volta para 'a confirmar' — as réguas param de valer sobre este caminho"
+                      title={
+                        p.origem === "manual"
+                          ? "Apaga esta declaração. Como o desenho não produz este caminho sozinho, ele não volta."
+                          : "Volta para 'a confirmar' — as réguas param de valer sobre este caminho"
+                      }
                     >
-                      desfazer
+                      {p.origem === "manual" ? "apagar" : "desfazer"}
                     </button>
                   )}
                 </div>
@@ -273,6 +345,20 @@ export function PercursosPanel({
                 </div>
               ))}
             </details>
+          )}
+
+          {/* SPEC-64 fatia B — o caminho que o desenho não produz, mas que a
+              pessoa sabe que existe. Fica no fim: é a saída para quando a
+              leitura automática não serve, não a porta principal. */}
+          {onDeclarar && (
+            <div style={{ ...linhaEstilo, borderBottom: "none" }}>
+              <button style={linkEstilo} onClick={onDeclarar} data-testid="declarar-caminho">
+                + declarar um caminho à mão
+              </button>
+              <div style={{ fontSize: 11, color: "var(--texto-mudo)" }}>
+                Para o trajeto que o desenho não deixa ler sozinho — clique os componentes na ordem.
+              </div>
+            </div>
           )}
 
           {truncado && (

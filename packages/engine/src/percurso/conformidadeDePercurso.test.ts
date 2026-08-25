@@ -45,6 +45,141 @@ const REGRA_SOMA: RegrasConfig = {
   ],
 };
 
+/**
+ * SPEC-64 fatia A — a régua enxerga o que o caminho ATRAVESSA.
+ *
+ * A pergunta do usuário foi *"o que acontece quando o usuário altera um
+ * conector?"*. Medindo, o achado foi outro e pior: `timeoutMs` é declarado em
+ * `edgeTypes.http` e `edgeTypes.grpc`, a apuração media só `nodeTypes`, e a
+ * régua que promete "a soma dos timeouts do percurso" devolvia **zero** num
+ * caminho ligado por HTTP — silêncio onde havia o que somar.
+ */
+describe("avaliarPercursos — o caminho é nó, conexão, nó (SPEC-64)", () => {
+  const comConexoes: DiagramaConfig = {
+    nodeTypes: {
+      service: { label: "Serviço", derives: "service", techs: ["Backend"], contextos: [], spec: [] },
+      externo: {
+        label: "API Externa",
+        derives: "external",
+        techs: ["Backend"],
+        contextos: [],
+        spec: [{ key: "timeoutMs", label: "Timeout (ms)", type: "number" }],
+      },
+    },
+    edgeTypes: {
+      http: { label: "HTTP", spec: [{ key: "timeoutMs", label: "Timeout (ms)", type: "number" }] },
+      le: { label: "lê" },
+    },
+    edgeRules: {},
+  };
+
+  function aresta(id: string, source: string, target: string, tipo = "http", timeoutMs?: number) {
+    const spec: Record<string, ValorSpec> = {};
+    if (timeoutMs !== undefined) spec.timeoutMs = { valor: timeoutMs, origem: "manual" };
+    return { id, source, target, type: tipo, spec };
+  }
+
+  it("o timeout que mora na CONEXÃO entra na soma — era zero e silêncio", () => {
+    const d: Diagrama = {
+      nodes: [no("a", "service"), no("b", "service"), no("c", "service")],
+      edges: [aresta("e1", "a", "b", "http", 1200), aresta("e2", "b", "c", "http", 1200)],
+    };
+
+    const { violacoes, naoMedidos } = avaliarPercursos(d, comConexoes, [percurso(["a", "b", "c"])], REGRA_SOMA);
+
+    expect(naoMedidos).toEqual([]);
+    expect(violacoes).toHaveLength(1);
+    expect(violacoes[0].atual).toContain("2400ms");
+    // A conta diz de onde veio: "2 conexões", e não "5 elementos".
+    expect(violacoes[0].atual).toContain("2 conexões");
+  });
+
+  it("nó e conexão somam JUNTOS — são dois lugares onde há espera", () => {
+    const d: Diagrama = {
+      nodes: [no("a", "service"), { ...no("ext", "externo"), spec: { timeoutMs: { valor: 400, origem: "manual" } } }],
+      edges: [aresta("e1", "a", "ext", "http", 900)],
+    };
+
+    const { violacoes } = avaliarPercursos(d, comConexoes, [percurso(["a", "ext"])], REGRA_SOMA);
+
+    expect(violacoes).toEqual([]); // 1300 ≤ 2000
+    const solto = avaliarPercursos(
+      d,
+      comConexoes,
+      [percurso(["a", "ext"])],
+      { ...REGRA_SOMA, percursos: [{ ...REGRA_SOMA.percursos![0], checagem: { ...REGRA_SOMA.percursos![0].checagem, valor: 1000 } }] }
+    );
+    expect(solto.violacoes[0].atual).toContain("1300ms");
+    expect(solto.violacoes[0].atual).toContain("1 nó e 1 conexão");
+  });
+
+  it("conexão cujo TIPO não declara o campo continua sendo silêncio legítimo", () => {
+    // A diferença entre "não se aplica" e "aplica-se e está vazio" continua
+    // sendo a fatia inteira — agora sobre o elemento certo.
+    const d: Diagrama = {
+      nodes: [no("a", "service"), no("b", "service")],
+      edges: [aresta("e1", "a", "b", "le")],
+    };
+
+    expect(avaliarPercursos(d, comConexoes, [percurso(["a", "b"])], REGRA_SOMA)).toEqual({
+      violacoes: [],
+      naoMedidos: [],
+    });
+  });
+
+  it("conexão que DECLARA e não preencheu vira não medido, com a conexão na lista", () => {
+    const d: Diagrama = {
+      nodes: [no("a", "service"), no("b", "service")],
+      edges: [aresta("e1", "a", "b", "http")],
+    };
+
+    const { naoMedidos } = avaliarPercursos(d, comConexoes, [percurso(["a", "b"])], REGRA_SOMA);
+
+    expect(naoMedidos[0].elementosSemValor).toEqual([{ tipo: "aresta", id: "e1", rotulo: "a → b" }]);
+  });
+
+  it("a DIREÇÃO importa: conexão no sentido contrário não entra no caminho", () => {
+    // `source → target` é a direção lógica em todo o engine; `reversed` é só
+    // como o canvas desenha a seta.
+    const d: Diagrama = {
+      nodes: [no("a", "service"), no("b", "service")],
+      edges: [aresta("e1", "b", "a", "http", 5000)],
+    };
+
+    expect(avaliarPercursos(d, comConexoes, [percurso(["a", "b"])], REGRA_SOMA)).toEqual({
+      violacoes: [],
+      naoMedidos: [],
+    });
+  });
+
+  it("par ligado por DUAS conexões que declaram o campo não é medido — e diz por quê", () => {
+    // Escolher uma seria inventar; somar as duas inflaria o caminho. O desenho
+    // é que não diz por onde a requisição passa (§248, terceira resposta).
+    const d: Diagrama = {
+      nodes: [no("a", "service"), no("b", "service")],
+      edges: [aresta("e1", "a", "b", "http", 300), aresta("e2", "a", "b", "http", 900)],
+    };
+
+    const { violacoes, naoMedidos } = avaliarPercursos(d, comConexoes, [percurso(["a", "b"])], REGRA_SOMA);
+
+    expect(violacoes).toEqual([]);
+    expect(naoMedidos[0].motivo).toContain("mais de uma conexão");
+    expect(naoMedidos[0].elementosSemValor).toEqual([]);
+  });
+
+  it("duas conexões, só uma declarando o campo: não há ambiguidade, e mede", () => {
+    const d: Diagrama = {
+      nodes: [no("a", "service"), no("b", "service")],
+      edges: [aresta("e1", "a", "b", "http", 2500), aresta("e2", "a", "b", "le")],
+    };
+
+    const { violacoes, naoMedidos } = avaliarPercursos(d, comConexoes, [percurso(["a", "b"])], REGRA_SOMA);
+
+    expect(naoMedidos).toEqual([]);
+    expect(violacoes[0].atual).toContain("2500ms");
+  });
+});
+
 describe("avaliarPercursos — a régua sobre o CAMINHO (SPEC-57 fatia E)", () => {
   it("sem regra de percurso, não mede nada", () => {
     const d = diagrama([no("a", "service", 400), no("b", "service", 400)]);
@@ -89,7 +224,7 @@ describe("avaliarPercursos — a régua sobre o CAMINHO (SPEC-57 fatia E)", () =
 
     expect(violacoes).toEqual([]);
     expect(naoMedidos).toHaveLength(1);
-    expect(naoMedidos[0].nosSemValor).toEqual(["b"]);
+    expect(naoMedidos[0].elementosSemValor.map((e) => e.id)).toEqual(["b"]);
     expect(naoMedidos[0].campo).toBe("timeoutMs");
   });
 
@@ -119,7 +254,7 @@ describe("avaliarPercursos — a régua sobre o CAMINHO (SPEC-57 fatia E)", () =
 
     const { naoMedidos } = avaliarPercursos(d, config, [percurso(["a", "sumiu"])], REGRA_SOMA);
 
-    expect(naoMedidos[0].nosSemValor).toEqual(["sumiu"]);
+    expect(naoMedidos[0].elementosSemValor.map((e) => e.id)).toEqual(["sumiu"]);
   });
 
   it("`saltos` conta ARESTAS percorridas, não nós — `a → b` é um salto", () => {

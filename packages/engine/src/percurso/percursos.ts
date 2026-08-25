@@ -105,10 +105,28 @@ function montar(nos: string[], rotuloDe: Map<string, string>): Percurso {
   };
 }
 
-/** Regra 2 da SPEC-57 aplicada ao percurso: inferido não conta até confirmar. */
+/** Regra 2 da SPEC-57 aplicada ao percurso: inferido não conta até confirmar.
+ * O declarado à MÃO conta sempre — quem o desenhou já disse que ele existe. */
 export function percursoConta(p: Percurso): boolean {
   if (p.origem === "inferido" || p.origem === "sugerido") return p.confirmado === true;
   return true;
+}
+
+/**
+ * SPEC-64 fatia B — o caminho declarado à mão.
+ *
+ * O id sai da MESMA fórmula do inferido, e isso dá duas coisas de graça: um
+ * manual que coincide com um caminho que o desenho produz é o **mesmo**
+ * caminho (não duplica a lista), e ele sobrevive a rederivar.
+ */
+export function percursoManual(nos: string[], diagrama: Diagrama): Percurso {
+  const rotuloDe = new Map(diagrama.nodes.map((n) => [n.id, n.label?.trim() || n.id]));
+  return {
+    id: `pc::${nos.join(">")}`,
+    rotulo: nos.map((id) => rotuloDe.get(id) ?? id).join(" → "),
+    nos: [...nos],
+    origem: "manual",
+  };
 }
 
 /** Os que valem — é sobre estes que a régua de caminho é aplicada. */
@@ -119,22 +137,35 @@ export function percursosQueContam(percursos: Percurso[] = []): Percurso[] {
 /**
  * Junta o que o motor acabou de inferir com o que já está guardado na quebra.
  *
- * As três situações que isto resolve, e nenhuma delas é cosmética:
+ * As situações que isto resolve, e nenhuma delas é cosmética:
  *
  * - **inferido de novo, já confirmado antes** → mantém a confirmação. Sem isto,
  *   cada edição no desenho desconfirmaria todos os caminhos e a pessoa
  *   reconfirmaria a mesma coisa para sempre;
- * - **guardado que o desenho não produz mais** → continua na lista, marcado
- *   como `obsoleto`. Mesma disciplina do vínculo quebrado (§230) e da decisão
- *   órfã (§246): o caminho que sumiu é o evento que precisa ser visto;
- * - **inferido novo** → entra como `inferido`, sem confirmação.
+ * - **inferido guardado que o desenho não produz mais** → continua na lista,
+ *   marcado como `obsoleto`. Mesma disciplina do vínculo quebrado (§230) e da
+ *   decisão órfã (§246): o caminho que sumiu é o evento que precisa ser visto;
+ * - **inferido novo** → entra como `inferido`, sem confirmação;
+ * - **SPEC-64 — declarado à MÃO** → não depende do inferidor. Ele vale
+ *   enquanto todos os seus nós existirem, e vira obsoleto quando um sumir.
+ *
+ * ## Por que o `diagrama` entra aqui
+ *
+ * Sem ele, um caminho manual cairia direto em `obsoletos`: a lista de vivos era
+ * montada a partir dos INFERIDOS, e um manual nunca é inferido. Ele apareceria
+ * para sempre como "sumiu do desenho", recém-criado. O diagrama responde as
+ * duas perguntas que faltavam — os nós dele ainda existem? e como eles se
+ * chamam agora?
  */
 export function conciliarPercursos(
   inferidos: Percurso[],
-  guardados: Percurso[] = []
+  guardados: Percurso[] = [],
+  diagrama?: Diagrama
 ): { percursos: Percurso[]; obsoletos: Percurso[] } {
   const porId = new Map(guardados.map((p) => [p.id, p]));
   const idsInferidos = new Set(inferidos.map((p) => p.id));
+  const rotuloDe = new Map((diagrama?.nodes ?? []).map((n) => [n.id, n.label?.trim() || n.id]));
+  const temTodosOsNos = (p: Percurso) => p.nos.every((id) => rotuloDe.has(id));
 
   const percursos = inferidos.map((novo) => {
     const antigo = porId.get(novo.id);
@@ -144,9 +175,24 @@ export function conciliarPercursos(
     return { ...antigo, rotulo: novo.rotulo, nos: novo.nos };
   });
 
-  // Só os que a pessoa tinha confirmado: um inferido não confirmado que sumiu
-  // do desenho não perdeu nada — nunca foi de ninguém.
-  const obsoletos = guardados.filter((p) => !idsInferidos.has(p.id) && percursoConta(p));
+  /**
+   * SPEC-64 — os manuais entram por fora do inferidor, com o rótulo refeito
+   * pelos nomes de agora (pelo mesmo motivo do inferido: nó renomeado precisa
+   * aparecer renomeado).
+   *
+   * Sem `diagrama` não dá para afirmar que os nós existem, e afirmar no escuro
+   * seria pior: nesse caso o manual passa direto, sem virar obsoleto.
+   */
+  const manuaisVivos = guardados
+    .filter((p) => p.origem === "manual" && !idsInferidos.has(p.id) && (!diagrama || temTodosOsNos(p)))
+    .map((p) => (diagrama ? { ...p, rotulo: p.nos.map((id) => rotuloDe.get(id) ?? id).join(" → ") } : p));
 
-  return { percursos, obsoletos };
+  const idsVivos = new Set([...percursos, ...manuaisVivos].map((p) => p.id));
+
+  // Só os que CONTAVAM: um inferido não confirmado que sumiu do desenho não
+  // perdeu nada — nunca foi de ninguém. O manual conta sempre, então um manual
+  // que perdeu um nó sempre aparece.
+  const obsoletos = guardados.filter((p) => !idsVivos.has(p.id) && percursoConta(p));
+
+  return { percursos: [...percursos, ...manuaisVivos], obsoletos };
 }
