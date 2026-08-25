@@ -9681,3 +9681,88 @@ cobrar a frase em vez da equação, e ganhou `not.toHaveTextContent("→")`: a
 ausência da seta é parte do que se está afirmando.
 
 339 engine · 673 web · 84 aplicação · 237 server · 84/84 E2E · build limpo.
+
+## §285 — a pergunta sobre o conector desenterrou uma régua que devolvia zero
+
+*"o que acontece quando o usuário altera um conector? exemplo, era lê, e agora lê
+e escreve, como deveria impactar essa parte da confirmação? e se não for o que
+foi sugerido, como ajustar?"*
+
+Fui medir antes de opinar, e a resposta é **"hoje não acontece nada"** — em um
+dos casos porque está certo, no outro porque a medição é cega.
+
+### O que está certo, e por que não deve mudar
+
+`Percurso.id` é `pc::${nos.join(">")}` — dos nós, não das arestas — e nem
+`inferirPercursos` nem `avaliarPercursos` leem `Aresta.type`. Trocar `lê` por
+`lê e escreve` tem efeito zero sobre a confirmação.
+
+E deve ter: a confirmação afirma *"este trajeto existe de verdade"*, e trocar o
+verbo do conector não desfaz a passagem da requisição por ali. Invalidar a cada
+troca de rótulo obrigaria a reconfirmar o tempo todo, e o §242 já mostrou aonde
+isso leva — a pessoa aprende a clicar sem ler.
+
+### O que não está: a régua não vê o que o caminho atravessa
+
+As duas réguas de percurso do exemplo somam `timeoutMs`. E `timeoutMs` é
+declarado em **`edgeTypes.http` e `edgeTypes.grpc`** — entre os nós, só em
+`external`. A apuração mede apenas nós:
+
+```ts
+function declaraCampo(no: No, config: DiagramaConfig, campo: string) {
+  return (config.nodeTypes[no.type]?.spec ?? []).some((c) => c.key === campo);
+}
+```
+
+Num caminho `web → api → worker` ligado por HTTP, a soma dá **zero** e a régua se
+cala, no ramo comentado como *"a régua não se aplica aqui, e isso é silêncio
+legítimo"*.
+
+> **O silêncio não é legítimo, é cego.** O caminho tem timeouts, eles moram nas
+> arestas, e a medição não os enxerga. O cabeçalho do próprio arquivo promete "a
+> soma dos timeouts do percurso" — e o §248, sobre este mesmo código, escreveu
+> que "um verde falso é o pior resultado possível de uma medição".
+
+Trocar `lê` por `HTTP` com `timeoutMs: 900` deveria mudar tudo, e não muda nada.
+O dado nem falta: `Aresta` tem `spec?: Record<string, ValorSpec>`, a mesma forma
+do nó. Falta a apuração olhar.
+
+### E a segunda pergunta: não dá para ajustar
+
+Só existem `confirmar` e `não é caminho`. Se o trajeto real passa por um nó a
+mais, não há verbo. O modelo já prevê — `Percurso.origem` aceita `manual` e
+`percursoConta()` conta manual sempre — e nada no produto cria um. Mesma
+assimetria do §283 um degrau acima: lá faltava **desfazer**, aqui falta
+**corrigir**.
+
+### Dois fatos que o levantamento mudou na SPEC
+
+Como no §282, fui conferir os encaixes antes de escrever, e dois achados
+entraram no desenho:
+
+1. **`Aresta` já tem `spec`.** Eu ia propor um lugar novo para o valor do campo
+   de conexão. Ele existe desde sempre, com a forma do nó — a fatia A é
+   apuração, não modelo;
+2. **`conciliarPercursos` mandaria todo caminho manual para "obsoleto".** Ele
+   monta `percursos` a partir dos INFERIDOS e joga em `obsoletos` todo guardado
+   que não foi inferido. Um manual nunca é inferido: apareceria para sempre como
+   *"sumiu do desenho"*, recém-criado. A fatia B leva a conciliação junto, senão
+   nasce quebrada.
+
+### A costura fina: ajustar é recusar com resposta
+
+Corrigir um caminho sugerido não pode apagar a sugestão — o inferidor a
+devolveria a cada render, e a pessoa corrigiria a mesma coisa para sempre. Então
+ajustar grava duas coisas: o manual com a sequência certa, e o inferido como
+`confirmado: false`, que desde o §283 tem lista própria e caminho de volta.
+
+> O produto já sabia que o "não" precisa de motivo (§278). Aqui o motivo é o
+> caminho certo.
+
+### Prioridade
+
+A SPEC-63 (régua sobre a forma) e esta são independentes. Se for para escolher,
+**esta primeiro**: corrigir uma medida que devolve zero vale mais do que
+acrescentar uma medida nova.
+
+Sem mudança de código: a SPEC é documento.
