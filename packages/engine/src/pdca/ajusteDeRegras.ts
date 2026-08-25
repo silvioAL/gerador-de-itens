@@ -1,4 +1,4 @@
-import type { RegrasConfig } from "../config/types.js";
+import type { RegrasConfig, RequisitoDeTopologia } from "../config/types.js";
 
 /**
  * SPEC-45/46 — um ajuste de configuração como DADO, não como texto solto.
@@ -16,7 +16,7 @@ import type { RegrasConfig } from "../config/types.js";
  * `checklistTecnico`: solicitação gravada antes desta fase continua válida
  * e aplicável.
  */
-export type SecaoDeRegras = "checklistTecnico" | "checklistProcesso" | "testes" | "volumetria";
+export type SecaoDeRegras = "checklistTecnico" | "checklistProcesso" | "testes" | "volumetria" | "topologia";
 
 /** As duas seções que compartilham a forma "um texto por item". */
 export type SecaoDeChecklist = "checklistTecnico" | "checklistProcesso";
@@ -39,7 +39,18 @@ export type OperacaoDeRegras =
     }
   | { tipo: "remover-teste"; tech: string; tipoTeste: string }
   | { tipo: "definir-volumetria"; tech: string; contextos: string[] }
-  | { tipo: "remover-volumetria"; tech: string };
+  | { tipo: "remover-volumetria"; tech: string }
+  /**
+   * SPEC-63 fatia D — a régua sobre a FORMA nasce do ciclo, como as outras.
+   *
+   * Sem isto ela só se configuraria editando JSON, e o §194 já mostrou o que
+   * acontece com capacidade que não tem porta na tela: ninguém a usa. `id`
+   * entra na operação porque é a chave estável a que as exceções se prendem —
+   * gerá-lo na aplicação faria o mesmo pedido aplicado duas vezes criar duas
+   * regras.
+   */
+  | { tipo: "adicionar-topologia"; requisito: RequisitoDeTopologia }
+  | { tipo: "remover-topologia"; id: string; texto?: string };
 
 /** SPEC-50 — o ajuste sai das regras: papel da esteira que sobra (ou que
  * falta) é feedback tão comum quanto item de checklist, e até então só dava
@@ -137,6 +148,9 @@ export function secaoDaOperacao(op: OperacaoDeAjuste): SecaoDeRegras {
     case "definir-volumetria":
     case "remover-volumetria":
       return "volumetria";
+    case "adicionar-topologia":
+    case "remover-topologia":
+      return "topologia";
     default:
       // Operação de outro alvo (pipeline, campos): a resposta não significa
       // nada, e o chamador tem que checar `recursoAlvoDaOperacao` ANTES. Era
@@ -173,6 +187,7 @@ const ROTULO_SECAO: Record<SecaoDeRegras, string> = {
   checklistProcesso: "checklist de processo",
   testes: "ciclos de teste",
   volumetria: "requisitos de volumetria",
+  topologia: "forma do desenho",
 };
 
 /** A frase que a solicitação mostra a quem decide — sem jargão de estrutura. */
@@ -212,6 +227,12 @@ export function descreverOperacao(op: OperacaoDeAjuste): string {
       }`;
     case "remover-campo-aresta":
       return `Remover da ficha da conexão ${op.tipoAresta} o campo "${op.label ?? op.key}"`;
+    // SPEC-63 — a frase descreve a FORMA, e não a estrutura da checagem: quem
+    // lê o pedido precisa saber o que o desenho passa a ter de respeitar.
+    case "adicionar-topologia":
+      return `Passar a exigir do desenho: "${op.requisito.texto}"`;
+    case "remover-topologia":
+      return `Deixar de exigir do desenho: "${op.texto ?? op.id}"`;
   }
 }
 
@@ -277,6 +298,25 @@ export function aplicarOperacao(regras: RegrasConfig, op: OperacaoDeAjuste): Reg
   // (checagem pelo `tipo` e não por `recursoAlvoDaOperacao`: é o que estreita
   // a união pro resto da função enxergar `tech`.)
   if (!ehOperacaoDeRegras(op)) return regras;
+
+  /**
+   * SPEC-63 — a régua de FORMA mora no topo do documento, e não em `porTech`.
+   * Ela sai antes do `op.tech` abaixo porque simplesmente não tem tech: uma
+   * regra sobre a forma atravessa techs por definição.
+   */
+  if (op.tipo === "adicionar-topologia") {
+    const topologia = [...(regras.topologia ?? [])];
+    const i = topologia.findIndex((t) => t.id === op.requisito.id);
+    // Idempotente por `id`: aplicar o mesmo pedido duas vezes atualiza, não
+    // duplica — e duplicar dividiria as exceções entre duas regras iguais.
+    if (i >= 0) topologia[i] = op.requisito;
+    else topologia.push(op.requisito);
+    return { ...regras, topologia };
+  }
+  if (op.tipo === "remover-topologia") {
+    return { ...regras, topologia: (regras.topologia ?? []).filter((t) => t.id !== op.id) };
+  }
+
   const porTech = { ...regras.porTech };
   const daTech = { ...(porTech[op.tech] ?? { checklistTecnico: [], testes: [] }) };
 

@@ -9,6 +9,12 @@ import type {
 } from "../model/types.js";
 import { analisarLacunas, necessidadesDoElemento } from "../proposito/lacunas.js";
 import { avaliarConformidade, violacoesAceitas, violacoesEmAberto, type Violacao } from "../conformidade/conformidade.js";
+import {
+  avaliarTopologia,
+  violacoesDeFormaAceitas,
+  violacoesDeFormaEmAberto,
+  type ViolacaoDeTopologia,
+} from "../conformidade/topologia.js";
 import { decisoesDoElemento, decisoesVigentes, excecoesComoDecisoes, propostasPendentes } from "../decisao/decisoes.js";
 import { avaliarPercursos, type PercursoNaoMedido, type ViolacaoDePercurso } from "../percurso/conformidadeDePercurso.js";
 import { percursoConta, percursosQueContam } from "../percurso/percursos.js";
@@ -110,6 +116,9 @@ export interface DocumentoDeDesenho {
     percursos: Percurso[];
     violacoesDePercurso: ViolacaoDePercurso[];
     naoMedidos: PercursoNaoMedido[];
+    /** SPEC-63 — a terceira dimensão do padrão: o que o DESENHO contraria. */
+    violacoesDeForma: ViolacaoDeTopologia[];
+    formaAceitas: ViolacaoDeTopologia[];
   };
   itens: ItemDoDocumento[];
 }
@@ -143,6 +152,10 @@ export function estruturarDocumento(
   const todasViolacoes = avaliarConformidade(diagrama, config, opcoes.regras, opcoes.excecoes ?? []);
   const violacoes = violacoesEmAberto(todasViolacoes);
   const aceitas = violacoesAceitas(todasViolacoes);
+  // SPEC-63 — a régua sobre a FORMA, na mesma seção de conferências.
+  const todasDeForma = avaliarTopologia(diagrama, config, opcoes.regras, opcoes.excecoes ?? []);
+  const violacoesDeForma = violacoesDeFormaEmAberto(todasDeForma);
+  const formaAceitas = violacoesDeFormaAceitas(todasDeForma);
   const percursos = percursosQueContam(opcoes.percursos ?? []);
   const { violacoes: violacoesDePercurso, naoMedidos } = avaliarPercursos(diagrama, config, percursos, opcoes.regras);
   const decisoes = [...decisoesVigentes(opcoes.decisoes ?? []), ...excecoesComoDecisoes(opcoes.excecoes)];
@@ -169,12 +182,23 @@ export function estruturarDocumento(
       pedeAtencao("🎯", `${lacunas.semElemento.length} necessidade(s) sem componente`);
     if (cobertas > 0) jaTem("🎯", `${cobertas} necessidade(s) coberta(s)`);
   }
-  if ((opcoes.regras?.porTech && Object.keys(opcoes.regras.porTech).length > 0) || violacoes.length + aceitas.length > 0) {
-    if (violacoes.length > 0) pedeAtencao("⚖", `${violacoes.length} fora do padrão`);
+  /**
+   * SPEC-63 — valor e forma somam no MESMO chip `⚖`. É a mesma pergunta
+   * ("este desenho está fora do padrão do time?"), e dois chips dividiriam a
+   * atenção sem dividir o assunto — a mesma decisão que o placar da mesa tomou.
+   */
+  const foraDoPadrao = violacoes.length + violacoesDeForma.length;
+  const excecoesAceitas = aceitas.length + formaAceitas.length;
+  const temReguaDePadrao =
+    (opcoes.regras?.porTech && Object.keys(opcoes.regras.porTech).length > 0) ||
+    (opcoes.regras?.topologia?.length ?? 0) > 0 ||
+    foraDoPadrao + excecoesAceitas > 0;
+  if (temReguaDePadrao) {
+    if (foraDoPadrao > 0) pedeAtencao("⚖", `${foraDoPadrao} fora do padrão`);
     // A exceção aceita não é uma violação menor: é uma escolha registrada com
     // motivo. Somá-la ao vermelho apagaria justamente o que ela tem de bom.
-    if (aceitas.length > 0) jaTem("⚖", `${aceitas.length} exceção(ões) aceita(s)`);
-    if (violacoes.length + aceitas.length === 0) jaTem("⚖", "dentro do padrão");
+    if (excecoesAceitas > 0) jaTem("⚖", `${excecoesAceitas} exceção(ões) aceita(s)`);
+    if (foraDoPadrao + excecoesAceitas === 0) jaTem("⚖", "dentro do padrão");
   }
   if (percursos.length > 0 || percursosAConfirmar > 0) {
     // Três chips e não um em cascata: "fora do padrão", "sem medir" e "a
@@ -231,7 +255,7 @@ export function estruturarDocumento(
       atendida: !lacunas.semElemento.includes(n.id),
     })),
     decisoes,
-    conferencias: { violacoes, aceitas, percursos, violacoesDePercurso, naoMedidos },
+    conferencias: { violacoes, aceitas, percursos, violacoesDePercurso, naoMedidos, violacoesDeForma, formaAceitas },
     itens,
   };
 }

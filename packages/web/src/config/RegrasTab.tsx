@@ -1,9 +1,18 @@
 import { useEffect, useState } from "react";
-import type { DiagramaConfig, ItemProcesso, RegrasConfig, RegrasPorTech, Requisito, TesteAutomatizado } from "@gerador/engine";
+import type {
+  DiagramaConfig,
+  ItemProcesso,
+  RegrasConfig,
+  RegrasPorTech,
+  Requisito,
+  RequisitoDeTopologia,
+  TesteAutomatizado,
+} from "@gerador/engine";
 import { apiRegras, type DiagnosticoConfig, type SugestaoRegra, type SugestaoTeste } from "../api/client";
 import { SugerirComIa } from "./SugerirComIa";
 import { SeletorDeContextos } from "./SeletorDeContextos";
 import { componentesAlcancados, escoposDoComponente } from "./regraPorComponente";
+import { FormaDoDesenho } from "./FormaDoDesenho";
 
 /**
  * SPEC-23 fluxo 5 — editor de `config/regras.json`.
@@ -21,13 +30,15 @@ import { componentesAlcancados, escoposDoComponente } from "./regraPorComponente
  * sutil da configuração, e uma UI ingênua pra ela induziria erro silencioso.
  * Item que já tem `when` aparece com selo e é preservado intacto.
  */
-type Secao = "tecnico" | "processo" | "testes" | "volumetria";
+type Secao = "tecnico" | "processo" | "testes" | "volumetria" | "forma";
 
 const SECOES: { id: Secao; rotulo: string }[] = [
   { id: "tecnico", rotulo: "Técnico" },
   { id: "processo", rotulo: "Processo" },
   { id: "testes", rotulo: "Testes" },
   { id: "volumetria", rotulo: "Volumetria" },
+  // SPEC-63 — a régua que não é por tecnologia: ela atravessa o desenho.
+  { id: "forma", rotulo: "Forma do desenho" },
 ];
 
 export interface RegrasTabProps {
@@ -44,6 +55,11 @@ export interface RegrasTabProps {
    * COMPONENTE do formulário de criação (o vocabulário do produto), que
    * deriva tech + contexto sozinho. */
   nodeTypes?: DiagramaConfig["nodeTypes"];
+  /** SPEC-63 — a régua de FORMA fala de tipos de nó E de conexão, então ela
+   * precisa da config inteira, não só dos 
+odeTypes. Ausente = a seção não
+   * aparece: editor que não sabe os tipos deixaria a régua nascer quebrada. */
+  diagramaConfig?: DiagramaConfig;
   /** Os contextos conhecidos (`appConfig.contextos`) — viram o seletor por
    * clique no lugar do campo "separados por vírgula", que exigia digitar
    * valores como "Backend-mensagens rabbitmq" de cabeça (e um typo não
@@ -59,11 +75,27 @@ export interface RegrasTabProps {
    * grupo novo. Achado da §165: numa instalação limpa a aba nascia vazia e SEM
    * COMO começar (o select antigo só listava o que já existia no documento). */
   techs?: string[];
+  /** SPEC-63 — a régua gravada tem que valer na MESA sem F5. Quem segura a
+   * config em memória (o App) precisa reler; mesma disciplina do
+   * onFichaMudou da SPEC-52. */
+  onRegrasMudaram?: () => void;
 }
 
-export function RegrasTab({ podeSecao, contextos, componentesPorTech, techs: techsDoApp, nodeTypes }: RegrasTabProps = {}) {
+export function RegrasTab({
+  podeSecao,
+  contextos,
+  componentesPorTech,
+  techs: techsDoApp,
+  nodeTypes,
+  diagramaConfig,
+  onRegrasMudaram,
+}: RegrasTabProps = {}) {
   const todasAsOpcoes = contextos ?? [];
-  const secoesVisiveis = SECOES.filter((s) => podeSecao?.(s.id) ?? true);
+  // A seção de FORMA some quando não há como oferecer os tipos: sem eles o
+  // editor produziria régua apontando para tipo inexistente.
+  const secoesVisiveis = SECOES.filter((s) => (s.id === "forma" ? !!diagramaConfig : true)).filter(
+    (s) => podeSecao?.(s.id) ?? true
+  );
   const [regras, setRegras] = useState<RegrasConfig | null>(null);
   const [secao, setSecao] = useState<Secao>(secoesVisiveis[0]?.id ?? "tecnico");
   const [erro, setErro] = useState<string | null>(null);
@@ -115,6 +147,7 @@ export function RegrasTab({ podeSecao, contextos, componentesPorTech, techs: tec
     setErro(null);
     try {
       await apiRegras.salvar(novo);
+      onRegrasMudaram?.();
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
     } finally {
@@ -168,6 +201,7 @@ export function RegrasTab({ podeSecao, contextos, componentesPorTech, techs: tec
               {s.id === "tecnico" && ` (${totalDe("checklistTecnico")})`}
               {s.id === "processo" && ` (${totalDe("checklistProcesso")})`}
               {s.id === "testes" && ` (${totalDe("testes")})`}
+              {s.id === "forma" && ` (${regras.topologia?.length ?? 0})`}
             </button>
           ))}
         </div>
@@ -222,7 +256,24 @@ export function RegrasTab({ podeSecao, contextos, componentesPorTech, techs: tec
         );
       })()}
 
-      {techs.map((tech) => (
+      {/* SPEC-63 — a régua de FORMA fica FORA do laço por tech, e isso não é
+          detalhe de layout: ela atravessa techs por definição ("fila sem
+          consumidor" é sobre a fila e sobre quem consome, que quase nunca são
+          da mesma tech). Repeti-la em cada grupo faria parecer que existe uma
+          por tecnologia. */}
+      {secao === "forma" && diagramaConfig && (
+        <div style={{ marginTop: 16 }}>
+          <FormaDoDesenho
+            config={diagramaConfig}
+            requisitos={regras.topologia ?? []}
+            onMudar={(topologia: RequisitoDeTopologia[]) => void gravar({ ...regras, topologia })}
+            somenteLeitura={podeSecao ? !podeSecao("forma") : false}
+          />
+        </div>
+      )}
+
+      {secao !== "forma" &&
+        techs.map((tech) => (
         <section key={tech} data-testid={`regras-grupo-${tech}`} style={{ marginTop: 16 }}>
           <h3 style={{ margin: "0 0 2px", fontSize: 13.5, color: "var(--texto)" }}>{tech}</h3>
           {valePara(tech) && (
@@ -277,7 +328,7 @@ export function RegrasTab({ podeSecao, contextos, componentesPorTech, techs: tec
             />
           )}
         </section>
-      ))}
+        ))}
     </div>
   );
 }

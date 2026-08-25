@@ -9845,3 +9845,97 @@ A fatia A é função pura e está coberta onde mora: sete casos novos no engine
 incluindo o caminho ligado por HTTP que antes somava zero.
 
 351 engine · 679 web · 84 aplicação · 237 server · 85/85 E2E · build limpo.
+
+## §287 — a régua que olha a forma, e não o preenchimento
+
+A SPEC-63, inteira. Até aqui toda régua deste produto perguntava a mesma coisa:
+**este campo está preenchido?** A régua de forma pergunta outra: **este desenho
+está ligado do jeito que combinamos?** Fila sem consumidor, app falando direto
+com o banco de outro time — nada disso é campo em branco. É desenho errado, e o
+produto não tinha como dizer isso.
+
+Foram quatro fatias, e o eixo delas é sempre o mesmo: a régua nasce do time,
+mede o desenho de verdade, acusa com o porquê, e aceita exceção com motivo.
+
+### A — o motor
+
+`avaliarTopologia` é função pura sobre o diagrama e duas checagens:
+`exige-conexao` (todo X precisa de conexão entrando/saindo) e `proibe-conexao`
+(nenhuma conexão liga X a Y). Duas, não dez: são as que cobrem os casos que
+motivaram a SPEC, e cada checagem nova é uma superfície nova no editor.
+
+A violação aponta o **elemento**, não a régua: `noId` quando falta conexão,
+`arestaId` quando a conexão é a proibida. É o que faz o clique no placar levar a
+pessoa ao lugar onde se conserta — a mesma disciplina do `onSelecionarAresta` do
+§286.
+
+### B e C — onde ela aparece, e a válvula
+
+A régua de forma entra no mesmo chip ⚖ das outras, somando. Não criei um placar
+segundo: dois placares fariam a pessoa perguntar "qual dos dois manda?", e a
+resposta seria "os dois", que é a pior resposta possível.
+
+A exceção se prende ao par **(elemento, regraId)** — não ao campo, porque não há
+campo. Isso obrigou `ExcecaoDePadrao` a ganhar `regraId?`, e o `campo` a ficar
+vazio nas exceções de forma. Considerei um tipo separado; desisti porque a
+exceção é a mesma ideia ("aceito de propósito, e digo por quê") e dois tipos
+divergiriam na primeira mudança.
+
+### D — a régua nasce pela tela
+
+O que separa esta rodada de uma régua de arquivo: `ConstrutorDeForma` só oferece
+**tipos que existem** no diagrama daquele time. Não dá para apontar para um
+componente inexistente — melhor que validar depois. O `validateRegras` segue
+guardando quem edita o JSON à mão, mas ninguém precisa mais fazê-lo.
+
+O id da régua é derivado do texto (`forma-toda-fila-tem-consumidor`), estável, e
+regravar o mesmo texto **atualiza** em vez de duplicar. Pedir à pessoa que
+invente um identificador seria pedir a coisa errada na hora errada — e as
+exceções se prendem a esse id.
+
+O mesmo construtor serve o estúdio do PDCA, com prévia antes de aplicar. Duas
+cópias do formulário divergiriam na primeira mudança; é a lição do `Delta`
+(§263).
+
+### O defeito que só o E2E acharia: a régua que não valia até o F5
+
+A régua gravava certo, chegava certo ao documento do deploy, e **a mesa não
+mudava**. `regrasConfig` era **prop** de `AppCarregado`: entrava uma vez, no
+carregamento, e nunca mais era relida. Quem criasse a régua veria a tela dizer
+"gravado" e o placar seguir mudo — e concluiria, com razão, que o produto
+mentiu.
+
+Virou estado, e `RegrasTab` passou a avisar quem segura a config
+(`onRegrasMudaram` → `recarregarConfig`), pelo mesmo caminho que o
+`onFichaMudou` da §52 já usava.
+
+> Isto é a mesma família do §283 e do §281 por um ângulo novo: não é decisão de
+> mão única, é **decisão que não chega**. O padrão vale a mesma varredura que o
+> §283 já pediu: config lida uma vez e guardada em prop é uma promessa de que
+> ela nunca muda — e neste produto ela muda o tempo todo.
+
+### O que o E2E prova, e por que ele pôde existir aqui
+
+O §286 não teve E2E de régua e escreveu o motivo: mexer em regras globais numa
+suíte paralela quebra vizinho. Aqui deu para fazer, e a diferença fica registrada:
+**nenhum outro spec lê `regras.topologia`** — é seção nova, sem vizinho. Mesmo
+assim o `finally` restaura o documento, porque a janela existe.
+
+O spec percorre o ciclo fechado: cria a régua pela tela → confere que ela chegou
+ao servidor → desenha a fila no canvas → o chip acusa com o porquê → aceita com
+motivo → o chip some. Nenhuma etapa mockada.
+
+### Decisões que tomei sozinho
+
+O usuário se ausentou pedindo a implementação pronta, então registro as chamadas
+que fiz sem perguntar:
+
+- **duas checagens, não um mini-idioma de regras.** Um DSL cobriria mais e
+  ninguém escreveria a segunda régua;
+- **um placar só**, somando forma e valor, pelo motivo acima;
+- **`ExcecaoDePadrao` reaproveitada** em vez de tipo novo;
+- **`onRegrasMudaram` genérico**, não específico de forma: o defeito era de
+  toda a config de regras, não da seção nova.
+
+369 engine · 687 web · 84 aplicação · 237 server · 129 llm · 86/86 E2E · build e
+lint limpos.

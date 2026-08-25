@@ -33,6 +33,9 @@ export const RECURSOS = [
   "regras.checklistProcesso",
   "regras.testes",
   "regras.volumetria",
+  // SPEC-63 — a régua sobre a FORMA do desenho tem dono próprio: quem decide
+  // que "toda fila tem consumidor" não é quem cuida do checklist de uma tech.
+  "regras.topologia",
   "especificacao-template",
   // SPEC-53 — o contexto do produto tem dono próprio: quem responde pelo
   // vocabulário e pelas regras de negócio não é quem cuida de stack nem de
@@ -93,6 +96,7 @@ export const SECOES_DE_REGRAS = {
   checklistProcesso: "regras.checklistProcesso",
   testes: "regras.testes",
   volumetria: "regras.volumetria",
+  topologia: "regras.topologia",
 } as const satisfies Record<string, Recurso>;
 
 /**
@@ -229,6 +233,12 @@ export function secoesDeRegrasAlteradas(antes: unknown, depois: unknown): Recurs
       if (canonico(a[tech]?.[chave]) !== canonico(d[tech]?.[chave])) alteradas.add(recurso);
     }
   }
+
+  // SPEC-63 — 	opologia mora no TOPO do documento, não dentro de porTech:
+  // uma regra de forma atravessa techs por definição. Por isso ela não entra no
+  // laço acima, e sim aqui.
+  const forma = (doc: unknown) => canonico((doc as { topologia?: unknown } | null | undefined)?.topologia ?? null);
+  if (forma(antes) !== forma(depois)) alteradas.add("regras.topologia");
 
   const taxonomia = (doc: unknown) => {
     const d = doc as { tipos?: unknown; tamanhos?: unknown } | null | undefined;

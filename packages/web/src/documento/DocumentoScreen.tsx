@@ -113,9 +113,17 @@ export function DocumentoScreen({
   onExportar,
   destinoDaExportacao,
 }: DocumentoScreenProps) {
-  const { violacoes, aceitas, violacoesDePercurso, naoMedidos, percursos } = documento.conferencias;
+  const { violacoes, aceitas, violacoesDePercurso, naoMedidos, percursos, violacoesDeForma, formaAceitas } =
+    documento.conferencias;
   const temConferencia =
-    violacoes.length + aceitas.length + violacoesDePercurso.length + naoMedidos.length + percursos.length > 0;
+    violacoes.length +
+      aceitas.length +
+      violacoesDePercurso.length +
+      naoMedidos.length +
+      percursos.length +
+      violacoesDeForma.length +
+      formaAceitas.length >
+    0;
   const pedemAtencao = documento.saude.filter((i) => i.lado === "atencao");
   const jaTem = documento.saude.filter((i) => i.lado === "jaTem");
 
@@ -215,6 +223,26 @@ export function DocumentoScreen({
 
         {temConferencia && (
           <Secao titulo="O que foi conferido">
+            {/* SPEC-63 — o que o DESENHO contraria, antes do que os campos
+                contrariam: a forma é o que se lê primeiro num documento de
+                arquitetura, e é a que não vira item para ser resolvida depois. */}
+            {violacoesDeForma.map((v) => (
+              <div key={`f-${v.regraId}-${v.noId ?? v.arestaId}`} data-testid="documento-forma" style={cartaoEstilo("var(--amarelo)")}>
+                <strong style={{ fontSize: 14 }}>{v.rotulo}</strong> — {v.texto}: esperado {v.esperado}, está {v.atual}
+                {v.porque && <p style={{ ...miudoEstilo, margin: "6px 0 0" }}>{v.porque}</p>}
+              </div>
+            ))}
+            {formaAceitas.map((v) => (
+              <div key={`fa-${v.regraId}-${v.noId ?? v.arestaId}`} data-testid="documento-forma-aceita" style={cartaoEstilo()}>
+                <strong style={{ fontSize: 14 }}>{v.rotulo}</strong> — {v.texto}:{" "}
+                <em>aceito de propósito</em>
+                {v.excecao && (
+                  <p style={{ ...miudoEstilo, margin: "6px 0 0" }}>
+                    “{v.excecao.motivo}” — {v.excecao.autor}
+                  </p>
+                )}
+              </div>
+            ))}
             {violacoes.map((v) => (
               <div key={`${v.noId}-${v.campo}`} data-testid="documento-violacao" style={cartaoEstilo("var(--amarelo)")}>
                 <strong style={{ fontSize: 14 }}>{v.noLabel}</strong> · {v.campo} {v.esperado} — está {v.atual}

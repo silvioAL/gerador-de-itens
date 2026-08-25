@@ -174,8 +174,21 @@ export function validateConfig(diagrama: DiagramaConfig, app: AppConfig): ErroVa
   return erros;
 }
 
-/** Mesmo princípio de `validateConfig`: tech/contexto de `regras.json` que não existe em `app.json` falha alto. */
-export function validateRegras(regras: RegrasConfig, app: AppConfig): ErroValidacaoConfig[] {
+/**
+ * Mesmo princípio de `validateConfig`: tech/contexto de `regras.json` que não
+ * existe em `app.json` falha alto.
+ *
+ * SPEC-63 — `diagrama` é opcional porque só as réguas de FORMA precisam dele
+ * (elas falam de tipos de nó e de conexão, que moram em `diagrama.json`).
+ * Ausente, as outras validações rodam igual e as de forma se calam: validar
+ * pela metade é melhor que exigir um argumento que a maioria dos chamadores não
+ * tem por que conhecer.
+ */
+export function validateRegras(
+  regras: RegrasConfig,
+  app: AppConfig,
+  diagrama?: DiagramaConfig
+): ErroValidacaoConfig[] {
   const erros: ErroValidacaoConfig[] = [];
 
   for (const [tech, porTech] of Object.entries(regras.porTech)) {
@@ -294,6 +307,46 @@ export function validateRegras(regras: RegrasConfig, app: AppConfig): ErroValida
     }
     if (c.agregacao !== "saltos" && !c.campo?.trim()) {
       erros.push({ campo: `${caminho}.campo`, mensagem: `agregação "${c.agregacao}" precisa de um \`campo\` para apurar` });
+    }
+  }
+
+  /**
+   * SPEC-63 §3.2 — a régua de FORMA. Mesma disciplina: regra que aponta para um
+   * tipo que não existe não é regra frouxa, é regra que nunca dispara — e
+   * descobrir isso por silêncio é o pior jeito.
+   */
+  const idsVistos = new Set<string>();
+  for (const [i, req] of (regras.topologia ?? []).entries()) {
+    const caminho = `topologia[${i}]`;
+    if (!req.id?.trim()) {
+      erros.push({ campo: `${caminho}.id`, mensagem: "regra de forma precisa de um `id` estável (a exceção aponta para ele)" });
+    } else if (idsVistos.has(req.id)) {
+      // Id repetido faria duas regras dividirem as mesmas exceções: aceitar
+      // uma silenciaria a outra, e ninguém entenderia por quê.
+      erros.push({ campo: `${caminho}.id`, mensagem: `id "${req.id}" está repetido em topologia` });
+    } else {
+      idsVistos.add(req.id);
+    }
+
+    if (!diagrama) continue;
+    const c = req.checagem;
+    const conferirNo = (tipo: string | undefined, campo: string) => {
+      if (tipo && !diagrama.nodeTypes[tipo]) {
+        erros.push({ campo: `${caminho}.checagem.${campo}`, mensagem: `tipo de componente "${tipo}" não existe em diagrama.json` });
+      }
+    };
+    if (c.tipoAresta && !diagrama.edgeTypes[c.tipoAresta]) {
+      erros.push({
+        campo: `${caminho}.checagem.tipoAresta`,
+        mensagem: `tipo de conexão "${c.tipoAresta}" não existe em diagrama.json`,
+      });
+    }
+    if (c.tipo === "exige-conexao") {
+      conferirNo(c.tipoNo, "tipoNo");
+      conferirNo(c.tipoNoOposto, "tipoNoOposto");
+    } else {
+      conferirNo(c.deTipoNo, "deTipoNo");
+      conferirNo(c.paraTipoNo, "paraTipoNo");
     }
   }
 

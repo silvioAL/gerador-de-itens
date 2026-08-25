@@ -326,6 +326,47 @@ export interface RequisitoDePercurso {
   checagem: ChecagemDePercurso;
 }
 
+/**
+ * SPEC-63 — a régua sobre a FORMA do desenho.
+ *
+ * Dois operadores, e a recusa explícita de um terceiro. `exige-intermediario`
+ * ("toda escrita no banco passa por um serviço") **não entra** porque já é
+ * expressável: é proibir a conexão direta. O caminho desejado não precisa ser
+ * afirmado — precisa ser o único que sobra.
+ */
+export type ChecagemDeTopologia =
+  /** "Todo nó do tipo X precisa de uma conexão {entrando|saindo}, [do tipo A],
+   *  [ligada a um nó do tipo Y]." Ex.: fila sem consumidor. */
+  | {
+      tipo: "exige-conexao";
+      tipoNo: string;
+      direcao: "entra" | "sai";
+      tipoAresta?: string;
+      tipoNoOposto?: string;
+    }
+  /** "Nenhuma conexão [do tipo A] pode ligar um nó do tipo X a um do tipo Y."
+   *  Ex.: app falando direto com o banco. */
+  | {
+      tipo: "proibe-conexao";
+      deTipoNo: string;
+      paraTipoNo: string;
+      tipoAresta?: string;
+    };
+
+export interface RequisitoDeTopologia {
+  /**
+   * Chave ESTÁVEL, e é o que separa esta regra do seu próprio texto. `texto` é
+   * editável; a exceção aceita aponta para o `id`, e renomear a regra não pode
+   * desligar em silêncio as exceções que alguém registrou com motivo. Mesma
+   * disciplina de `Atividade.chave` × `rotulo`.
+   */
+  id: string;
+  texto: string;
+  /** §242 — por que este padrão existe. É o que transforma cobrança em ensino. */
+  porque?: string;
+  checagem: ChecagemDeTopologia;
+}
+
 export interface RegrasConfig {
   tipos: string[];
   tamanhos: string[];
@@ -334,6 +375,14 @@ export interface RegrasConfig {
   /** SPEC-57 fatia E — as réguas que valem sobre o CAMINHO. Ausente = a
    * dimensão de percurso não mede nada, e não aparece. */
   percursos?: RequisitoDePercurso[];
+  /**
+   * SPEC-63 — as réguas que valem sobre a FORMA. Fora de `porTech` pela mesma
+   * razão que o percurso ficou fora: uma regra de forma atravessa techs por
+   * definição ("fila sem consumidor" é sobre o tipo da fila e sobre quem
+   * consome, que quase nunca é da mesma tech), e enfiá-la ali obrigaria a
+   * escolher uma arbitrariamente.
+   */
+  topologia?: RequisitoDeTopologia[];
 }
 
 /**

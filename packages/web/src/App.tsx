@@ -279,7 +279,7 @@ function AppComSessao({
 function AppCarregado({
   diagramaConfig: diagramaConfigInicial,
   appConfig,
-  regrasConfig,
+  regrasConfig: regrasConfigInicial,
   cenarios,
   sugestoesDeStack: sugestoesInicial,
   camposNo: camposNoInicial,
@@ -307,6 +307,9 @@ function AppCarregado({
   onSair: () => Promise<void>;
 }) {
   const [diagramaConfig, setDiagramaConfig] = useState<DiagramaConfig>(diagramaConfigInicial);
+  /** SPEC-63 — estado, e não prop: uma régua criada na tela de configuração
+   * precisa valer na mesa sem F5. Ver `recarregarConfig`. */
+  const [regrasConfig, setRegrasConfig] = useState(regrasConfigInicial);
   // SPEC-38 — o nível no time ativo. `visualizar` esconde o Salvar (a negação
   // real mora no servidor; aqui é só não oferecer o que seria 403).
   const permissoes = usePermissoes({ hospedado: true, timeId: timeAtivo });
@@ -667,6 +670,9 @@ function AppCarregado({
     () =>
       avisosDaDerivacao(quebra.diagrama, diagramaConfig, {
         regras: regrasVisiveis,
+        // SPEC-63 — quem já aceitou a violação de forma com motivo não precisa
+        // reconhecê-la de novo a cada derivação.
+        excecoes: quebra.excecoes,
         necessidades: quebra.necessidades,
         decisoes: decisoesVisiveis,
         percursos: quebra.percursos,
@@ -1088,6 +1094,12 @@ function AppCarregado({
   async function recarregarConfig() {
     const nova = await carregarConfig(timeAtivo);
     setDiagramaConfig(nova.diagramaConfig);
+    // SPEC-63 — as REGRAS também. Elas eram prop e nunca eram relidas: uma
+    // régua criada na tela de configuração só passava a valer depois de um F5,
+    // e régua que não vale quando se cria é régua em que o time não confia. É
+    // o mesmo buraco que a SPEC-52 fechou para a ficha (onFichaMudou), na
+    // outra metade da config.
+    setRegrasConfig(nova.regrasConfig);
   }
 
   async function criarCampoNo(dadosCampo: DadosCampoNo) {
@@ -1421,6 +1433,32 @@ function AppCarregado({
           quebraState.setArestaSelecionadaId(id);
         }}
         excecoes={quebra.excecoes}
+        /**
+         * SPEC-63 fatia C — a exceção de FORMA mora na mesma coleção das de
+         * valor. O que as separa é o par que identifica: `(noId, campo)` para
+         * valor, `(elemento, regraId)` para forma. Duas coleções seriam duas
+         * verdades sobre o mesmo assunto.
+         *
+         * `noId` recebe o id da ARESTA quando a violação mora na seta — o campo
+         * se chama `noId` por história, e generalizá-lo é dívida anotada, não
+         * paga aqui.
+         */
+        onAceitarViolacaoDeForma={(v, motivo) =>
+          setQuebra((q) => ({
+            ...q,
+            excecoes: [
+              ...(q.excecoes ?? []),
+              {
+                noId: v.noId ?? v.arestaId ?? "",
+                campo: "",
+                regraId: v.regraId,
+                motivo,
+                autor: sessao.email,
+                em: new Date().toISOString(),
+              },
+            ],
+          }))
+        }
         decisoes={decisoesVisiveis}
         onSelecionarDecisao={setSelecionadoId}
         percursos={quebra.percursos}
