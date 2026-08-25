@@ -103,9 +103,18 @@ export interface CanvasProps {
    * que captura a roda faz a página travar sob o cursor.
    */
   somenteLeitura?: boolean;
+  /**
+   * SPEC-64 fatia B — quando declarar um caminho está em curso, o clique no nó
+   * ACRESCENTA à sequência em vez de selecionar.
+   *
+   * Prop e não modo interno: quem sabe que há uma declaração acontecendo é o
+   * App, e o canvas não deveria aprender um estado do domínio para isso. Sem
+   * ela, tudo continua como era.
+   */
+  aoClicarNo?: (id: string) => void;
 }
 
-export function Canvas({ diagramaState, config, timePadrao, somenteLeitura }: CanvasProps) {
+export function Canvas({ diagramaState, config, timePadrao, somenteLeitura, aoClicarNo }: CanvasProps) {
   const {
     diagrama,
     selecionadoId,
@@ -249,6 +258,11 @@ export function Canvas({ diagramaState, config, timePadrao, somenteLeitura }: Ca
       preventScrolling={!somenteLeitura}
       onNodeClick={(_, node) => {
         if (somenteLeitura) return;
+        // SPEC-64 — declarar caminho em curso: o clique compõe a sequência.
+        if (aoClicarNo) {
+          aoClicarNo(node.id);
+          return;
+        }
         setSelecionadoId(node.id);
         setArestaSelecionadaId(null);
       }}

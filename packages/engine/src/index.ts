@@ -37,8 +37,10 @@ export {
   avaliarPercursos,
   type ViolacaoDePercurso,
   type PercursoNaoMedido,
+  type ElementoDoCaminho,
   type ResultadoDePercursos,
 } from "./percurso/conformidadeDePercurso.js";
+export { percursoManual } from "./percurso/percursos.js";
 export { deltaDeDecisao, deltaDePercurso, piorou } from "./remedicao/remedicao.js";
 export { compararDocumentos } from "./documento/compararDocumentos.js";
 export { exemploDeMedicao, valorQueEstoura } from "./conformidade/exemploDeMedicao.js";

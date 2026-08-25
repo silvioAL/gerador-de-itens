@@ -237,8 +237,10 @@ export function DocumentoScreen({
             ))}
             {naoMedidos.map((n) => (
               <div key={`nm-${n.percursoId}-${n.campo}`} style={cartaoEstilo()}>
-                <strong style={{ fontSize: 14 }}>{n.rotulo}</strong> — não dá para medir "{n.texto}": falta {n.campo} em{" "}
-                {n.nosSemValor.join(", ")}
+                <strong style={{ fontSize: 14 }}>{n.rotulo}</strong> — não dá para medir "{n.texto}":{" "}
+                {/* SPEC-64 — o motivo existe quando a causa não é campo vazio
+                    (par ligado por mais de uma conexão que declara o campo). */}
+                {n.motivo ?? `falta ${n.campo} em ${n.elementosSemValor.map((e) => e.rotulo).join(", ")}`}
               </div>
             ))}
             {percursos.length > 0 && (

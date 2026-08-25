@@ -18,6 +18,7 @@ import {
   type StatusDocumento,
   type ResultadoDependenciasDe,
   gerarItensDeTrabalho,
+  percursoManual,
   type ItemDeTrabalho,
 } from "@gerador/engine";
 import { carregarConfig, type ConfigCarregada } from "./config/loadConfig";
@@ -424,6 +425,15 @@ function AppCarregado({
   const [itensGerados, setItensGerados] = useState<ItemGerado[]>([]);
   // SPEC-44 — deep-link da seção dos itens pra revisão: o item a selecionar.
   const [itemInicialRevisao, setItemInicialRevisao] = useState<string | null>(null);
+  /**
+   * SPEC-64 fatias B e C — a declaração de caminho em curso.
+   *
+   * `nos` é a sequência clicada até agora. `corrigindo` guarda o id do caminho
+   * INFERIDO que originou a correção: ao concluir, ele fica recusado — senão o
+   * inferidor o devolveria a cada render e a pessoa corrigiria a mesma
+   * sugestão para sempre.
+   */
+  const [declaracaoDeCaminho, setDeclaracaoDeCaminho] = useState<{ nos: string[]; corrigindo?: string } | null>(null);
   // SPEC-49 — pra onde os itens vão; só pra tela DIZER o destino (a exportação
   // em si é do servidor, que lê a mesma config).
   const [destinoDaExportacao, setDestinoDaExportacao] = useState<string | null>(null);
@@ -1330,6 +1340,69 @@ function AppCarregado({
         </div>
       )}
 
+      {/* SPEC-64 fatias B e C — a declaração em curso mora AQUI, e não dentro
+          do popover dos caminhos: o gesto é clicar nós no canvas, e o popover
+          fecha ao primeiro clique fora dele. Uma barra que sumisse no primeiro
+          nó seria uma barra inútil. */}
+      {declaracaoDeCaminho && (
+        <div data-testid="declaracao-de-caminho" style={barraDeDeclaracaoEstilo}>
+          <strong style={{ fontSize: 12 }}>
+            {declaracaoDeCaminho.corrigindo ? "Corrigindo o caminho" : "Declarando um caminho"}
+          </strong>
+          <span style={{ fontSize: 11.5, color: "var(--texto-2)" }}>
+            {declaracaoDeCaminho.nos.length === 0
+              ? "clique os componentes na ordem em que a requisição passa"
+              : declaracaoDeCaminho.nos
+                  .map((id) => quebra.diagrama.nodes.find((n) => n.id === id)?.label || id)
+                  .join(" → ")}
+          </span>
+          <div style={{ flex: 1 }} />
+          {declaracaoDeCaminho.nos.length > 0 && (
+            <button
+              onClick={() => setDeclaracaoDeCaminho((d) => d && { ...d, nos: d.nos.slice(0, -1) })}
+              style={botaoEstilo}
+              data-testid="declaracao-desfazer"
+            >
+              ← tirar o último
+            </button>
+          )}
+          <button
+            onClick={() => {
+              const declaracao = declaracaoDeCaminho;
+              setDeclaracaoDeCaminho(null);
+              if (declaracao.nos.length < 2) return;
+              const manual = percursoManual(declaracao.nos, quebra.diagrama);
+              setQuebra((q) => ({
+                ...q,
+                percursos: [
+                  // O que já havia sobre ESTE caminho sai (o manual manda), e o
+                  // inferido que originou a correção fica recusado — não
+                  // apagado: apagá-lo faria o inferidor devolvê-lo no render
+                  // seguinte, e a pessoa corrigiria a mesma sugestão para sempre.
+                  ...(q.percursos ?? [])
+                    .filter((p) => p.id !== manual.id)
+                    .map((p) => (p.id === declaracao.corrigindo ? { ...p, confirmado: false } : p)),
+                  manual,
+                ],
+              }));
+            }}
+            disabled={declaracaoDeCaminho.nos.length < 2}
+            title={declaracaoDeCaminho.nos.length < 2 ? "Um caminho precisa de pelo menos dois componentes" : undefined}
+            style={
+              declaracaoDeCaminho.nos.length < 2
+                ? { ...botaoEstilo, opacity: 0.5 }
+                : { ...botaoEstilo, background: "var(--acento)", borderColor: "var(--acento)", color: "#fff" }
+            }
+            data-testid="declaracao-concluir"
+          >
+            Concluir
+          </button>
+          <button onClick={() => setDeclaracaoDeCaminho(null)} style={botaoEstilo} data-testid="declaracao-cancelar">
+            Cancelar
+          </button>
+        </div>
+      )}
+
       <ReadinessSummary
         diagrama={quebra.diagrama}
         config={diagramaConfig}
@@ -1341,11 +1414,24 @@ function AppCarregado({
         // raramente tem uma (§244).
         regras={regrasVisiveis}
         onSelecionarViolacao={setSelecionadoId}
+        // SPEC-64 — o `timeoutMs` que falta pode ser da CONEXÃO; selecionar a
+        // aresta abre o painel dela, que é onde se preenche.
+        onSelecionarAresta={(id) => {
+          setSelecionadoId(null);
+          quebraState.setArestaSelecionadaId(id);
+        }}
         excecoes={quebra.excecoes}
         decisoes={decisoesVisiveis}
         onSelecionarDecisao={setSelecionadoId}
         percursos={quebra.percursos}
         onMudarPercursos={(percursos) => setQuebra((q) => ({ ...q, percursos }))}
+        // SPEC-64 fatias B e C — declarar do zero, ou corrigir o que o motor
+        // leu usando a sequência dele como ponto de partida.
+        onDeclarar={() => setDeclaracaoDeCaminho({ nos: [] })}
+        // O percurso vem inteiro, e não pelo id: o inferido é recalculado a
+        // cada render e NÃO está em `quebra.percursos` — procurá-lo lá achava
+        // nada, e a correção começava vazia (achado do E2E).
+        onAjustar={(percurso) => setDeclaracaoDeCaminho({ nos: [...percurso.nos], corrigindo: percurso.id })}
         onAceitarViolacao={(v, motivo) =>
           setQuebra((q) => ({
             ...q,
@@ -1362,7 +1448,25 @@ function AppCarregado({
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
         <div style={{ flex: 1 }}>
           <ReactFlowProvider>
-            <Canvas diagramaState={quebraState} config={diagramaConfig} timePadrao={quebra.time} />
+            <Canvas
+              diagramaState={quebraState}
+              config={diagramaConfig}
+              timePadrao={quebra.time}
+              // SPEC-64 — com uma declaração em curso, o clique no nó compõe a
+              // sequência em vez de selecionar. Fora dela, `undefined`: o canvas
+              // volta a ser o de sempre.
+              aoClicarNo={
+                declaracaoDeCaminho
+                  ? (id) =>
+                      setDeclaracaoDeCaminho((d) =>
+                        // Clicar duas vezes no mesmo nó em sequência é engano de
+                        // clique, não um trajeto que passa duas vezes seguidas
+                        // pelo mesmo lugar.
+                        d && d.nos[d.nos.length - 1] === id ? d : d && { ...d, nos: [...d.nos, id] }
+                      )
+                  : undefined
+              }
+            />
           </ReactFlowProvider>
         </div>
         {arestaSelecionada ? (
@@ -1842,6 +1946,18 @@ const botaoEstilo: React.CSSProperties = {
   color: "var(--texto-2)",
   cursor: "pointer",
   whiteSpace: "nowrap",
+};
+
+/** SPEC-64 — a barra da declaração de caminho em curso. Acento na borda porque
+ * ela muda o que o clique no canvas faz, e isso precisa ser visível o tempo
+ * todo — não é um painel a mais, é um MODO. */
+const barraDeDeclaracaoEstilo: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  padding: "8px 12px",
+  borderBottom: "1px solid var(--acento)",
+  background: "var(--painel-alto)",
 };
 
 /** §198 — as portas de experimentar: contorno de acento e fundo tingido, pra

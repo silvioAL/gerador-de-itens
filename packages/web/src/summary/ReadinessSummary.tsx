@@ -30,6 +30,10 @@ export interface ReadinessSummaryProps {
   regras?: RegrasConfig;
   /** Leva ao nó que viola — o equivalente ao "Próximo pendente". */
   onSelecionarViolacao?: (noId: string) => void;
+  /** SPEC-64 — o campo que falta no caminho pode estar na CONEXÃO (o
+   * `timeoutMs` de uma chamada síncrona mora lá), e o endereço tem que levar
+   * até ela. */
+  onSelecionarAresta?: (arestaId: string) => void;
   /** §242 — as violações já aceitas de propósito. */
   excecoes?: ExcecaoDePadrao[];
   /** §242 — aceitar uma violação, com motivo. Ausente = a válvula não aparece. */
@@ -45,6 +49,12 @@ export interface ReadinessSummaryProps {
   percursos?: Percurso[];
   /** Confirmar/descartar um caminho inferido. Ausente = a dimensão não aparece. */
   onMudarPercursos?: (percursos: Percurso[]) => void;
+  /** SPEC-64 fatia B — começar a declarar um caminho à mão. */
+  onDeclarar?: () => void;
+  /** SPEC-64 fatia C — corrigir o que o motor leu, a partir da sequência dele.
+   * Recebe o PERCURSO: o inferido é recalculado a cada render e não está
+   * guardado na quebra. */
+  onAjustar?: (percurso: Percurso) => void;
 }
 
 export function ReadinessSummary({
@@ -55,12 +65,15 @@ export function ReadinessSummary({
   onAbrirProposito,
   regras,
   onSelecionarViolacao,
+  onSelecionarAresta,
   excecoes,
   onAceitarViolacao,
   decisoes,
   onSelecionarDecisao,
   percursos,
   onMudarPercursos,
+  onDeclarar,
+  onAjustar,
 }: ReadinessSummaryProps) {
   const { vermelhos, amarelos, verdes } = calcularResumoProntidao(diagrama, config);
   // Dimensão PROPÓSITO (SPEC-56 §0.6): mesma barra, mais uma razão. Amarelo e
@@ -84,7 +97,10 @@ export function ReadinessSummary({
   // reinferir não pode desconfirmar, e caminho confirmado que sumiu do desenho
   // vira obsoleto em vez de desaparecer.
   const inferidos = inferirPercursos(diagrama);
-  const { percursos: percursosVivos, obsoletos } = conciliarPercursos(inferidos.percursos, percursos ?? []);
+  // SPEC-64 — o diagrama entra na conciliação: é ele que diz se os nós de um
+  // caminho MANUAL ainda existem (e como se chamam agora). Sem ele, todo manual
+  // cairia em "obsoleto", porque a lista de vivos vinha só dos inferidos.
+  const { percursos: percursosVivos, obsoletos } = conciliarPercursos(inferidos.percursos, percursos ?? [], diagrama);
   const { violacoes: violacoesDePercurso, naoMedidos } = avaliarPercursos(diagrama, config, percursosVivos, regras);
   const pendentes = [...vermelhos, ...amarelos];
   const indicePendenteRef = useRef(0);
@@ -132,7 +148,12 @@ export function ReadinessSummary({
       {violacoes.length > 0 && (
         <ListaDeViolacoes violacoes={violacoes} onSelecionar={onSelecionarViolacao} onAceitar={onAceitarViolacao} />
       )}
-      {onMudarPercursos && percursosVivos.length + obsoletos.length > 0 && (
+      {/* SPEC-64 — o chip também aparece quando NÃO há caminho lido, desde que
+          dê para declarar um: senão o desenho que o inferidor não sabe ler
+          (o caso que a fatia B existe para atender) nunca teria por onde
+          começar. Dois nós é o mínimo de um caminho. */}
+      {onMudarPercursos &&
+        (percursosVivos.length + obsoletos.length > 0 || (onDeclarar && diagrama.nodes.length >= 2)) && (
         <PercursosPanel
           // §283 — separados, e não concatenados: juntos, o obsoleto era
           // desenhado com o mesmo ✓ de um caminho que existe no desenho.
@@ -142,6 +163,9 @@ export function ReadinessSummary({
           naoMedidos={naoMedidos}
           truncado={inferidos.truncado}
           onSelecionarNo={onSelecionar}
+          onSelecionarAresta={onSelecionarAresta}
+          onDeclarar={onDeclarar}
+          onAjustar={onAjustar}
           // §263 — o preço de confirmar. Tudo o que o motor precisa já está
           // aqui (desenho, config, regras, exceções), então a medição não pede
           // nenhuma prop nova: ela é a mesma derivação, rodada duas vezes.
