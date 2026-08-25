@@ -9620,3 +9620,64 @@ passando", e foi fechado no §281; este é um teste que de fato falha sob carga.
 Fica anotado com o nome, para a próxima ocorrência ter de onde partir.
 
 339 engine · 671 web · 84 aplicação · 237 server · 84/84 E2E · build limpo.
+
+## §284 — a seta que apontava para o mesmo lugar
+
+*"o que me estranha aqui é 4 → 4, acho que ninguém entende instintivamente o que
+é 4 → 4"* — com print da caixa **"Se confirmar este caminho"** mostrando
+`itens no backlog 4 → 4`.
+
+Está certo, e o incômodo tem nome: a caixa promete uma **consequência** no
+título e entregava uma **equação para resolver** antes de a pessoa concluir que
+não há nenhuma.
+
+### O que estava certo e eu quase estraguei
+
+A primeira ideia foi esconder a linha que não muda. Seria perder informação boa:
+"não muda" é o **preço sendo zero**, e mostrar o preço antes do clique é
+literalmente o que o §263 construiu. O `Remedicao` do motor já trata isso com
+cuidado — o campo `alerta` tem no comentário *"ausente é afirmação: não piora
+nada"*.
+
+O defeito não era mostrar. Era **escrever a não-mudança na gramática da
+mudança**.
+
+> **A seta promete travessia.** Onde não houve travessia, ela mente por forma,
+> mesmo com os números certos.
+
+### E a casa já falava a língua certa
+
+Duas prévias da `PdcaTab` já resolviam o mesmo caso em português — *"Nada muda —
+esse campo já está exatamente assim"* (`previa-ficha-sem-efeito`) e *"Nenhuma
+mudança neste item"* (`previa-sem-efeito`). O `Delta` era o único dos três que
+respondia com aritmética. Agora:
+
+| Situação | Antes | Agora |
+|---|---|---|
+| nada muda | `itens no backlog 4 → 4` | *Nada muda — itens no backlog continua em 4.* |
+| linha parada entre linhas que andaram | `itens no backlog 4 → 4` | `itens no backlog: 4 (não muda)`, sem seta |
+| linha que muda | `lacunas 0 → 2` | igual — a seta ficou para quem a merece |
+
+A linha parada **não some** no caso misto: sumir esconderia uma medida que foi
+tomada. Ela perde a seta, que é o que prometia travessia, e ganha peso menor.
+
+Onde o conserto mora também foi decisão: no `Delta`, não no motor. O
+`remedicao.ts` diz em voz alta que *"não montam frase… a redação é da tela"* — e
+motor que devolve texto pronto é motor que a próxima tela não reaproveita.
+
+### Um teste que codificava a forma, e não a intenção
+
+`NecessidadesPanel.test` tinha:
+
+```
+it("sugestão que JÁ vem vinculada não cria lacuna — e o delta diz isso")
+  expect(delta).toHaveTextContent("lacunas 0 → 0");
+```
+
+O **nome** do teste estava certo desde sempre: *"o delta diz isso"*. A asserção é
+que tinha congelado a forma antiga — a mesma armadilha do §283, onde
+`"caminho RECUSADO some da fila"` afirmava metade de um defeito. O teste passou a
+cobrar a frase em vez da equação, e ganhou `not.toHaveTextContent("→")`: a
+ausência da seta é parte do que se está afirmando.
+
+339 engine · 673 web · 84 aplicação · 237 server · 84/84 E2E · build limpo.

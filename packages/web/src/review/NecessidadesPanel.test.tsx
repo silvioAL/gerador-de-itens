@@ -196,10 +196,16 @@ describe("NecessidadesPanel — a proposta do agente, medida (fatia D)", () => {
   });
 
   it("sugestão que JÁ vem vinculada não cria lacuna — e o delta diz isso", () => {
+    // §284 — a intenção deste teste sempre foi "o delta DIZ que não cria
+    // lacuna". A asserção é que codificava a forma antiga (`lacunas 0 → 0`), e
+    // o relato do usuário foi exatamente sobre ela: "ninguém entende
+    // instintivamente o que é 4 → 4". Agora o delta diz em português, e o teste
+    // cobra a frase em vez da equação.
     montarComProposta([necessidade({ id: "r1", origem: "sugerido", atendidaPor: ["n1"] })]);
 
     const delta = screen.getByTestId("delta-da-proposta");
-    expect(delta).toHaveTextContent("lacunas 0 → 0");
+    expect(delta).toHaveTextContent("lacunas continua em 0");
+    expect(delta).not.toHaveTextContent("→");
     expect(delta).not.toHaveTextContent("cria trabalho");
   });
 
