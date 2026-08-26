@@ -37,14 +37,14 @@ export type Rota =
   /** SPEC-59 fatia A — a vista de leitura de como a ferramenta está montada. */
   | { tela: "sistema" }
   /**
-   * SPEC-66 — a bancada de ensaio: "e se o bureau ficar lento?".
+   * SPEC-66/68 — a bancada de ENSAIOS: "e se…?".
    *
    * ROTA, e não aba do assistente. O assistente é onde se CONVERSA para
    * produzir desenho, e aqui não se produz nada — se ensaia. E rota é
    * linkável: *"olha o que acontece se o bureau cair"* é uma URL que se manda
    * para alguém, e isso é metade do valor.
    */
-  | { tela: "simulacao" };
+  | { tela: "ensaios" };
 
 /** id interno ↔ segmento legível da URL (o hash é interface, fala produto). */
 const SEGMENTO_DA_AREA: Record<AreaConfig, string> = {
@@ -69,7 +69,7 @@ export function hashDaRota(rota: Rota): string {
   if (rota.tela === "canvas") return "#/";
   if (rota.tela === "documento") return "#/documento";
   if (rota.tela === "sistema") return "#/sistema";
-  if (rota.tela === "simulacao") return "#/simulacao";
+  if (rota.tela === "ensaios") return "#/ensaios";
   return `#/config/${SEGMENTO_DA_AREA[rota.area]}`;
 }
 
@@ -83,7 +83,12 @@ export function rotaDoHash(hash: string): Rota {
   if (partes[0] === "itens") return { tela: "documento" };
   if (partes[0] === "documento") return { tela: "documento" };
   if (partes[0] === "sistema") return { tela: "sistema" };
-  if (partes[0] === "simulacao") return { tela: "simulacao" };
+  if (partes[0] === "ensaios") return { tela: "ensaios" };
+  // SPEC-68 §4.2 — `#/simulacao` era "e se ficar lento?", e o nome estreito
+  // fechava a porta para retry, pico e disjuntor. Rota que some sem
+  // redirecionar dá tela branca para quem tinha o link salvo — e a SPEC-66 §5
+  // apostou justamente em o endereço ser mandável para alguém.
+  if (partes[0] === "simulacao") return { tela: "ensaios" };
   if (partes[0] === "config") {
     const area = AREA_DO_SEGMENTO[partes[1] ?? ""];
     if (area) return { tela: "config", area };

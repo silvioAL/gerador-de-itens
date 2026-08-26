@@ -2,6 +2,22 @@ import { test, expect } from "@playwright/test";
 import { entrar } from "./auth";
 import { derivarNaMesa } from "./derivar";
 
+/**
+ * §297 — grava a régua do teste SEM acumular.
+ *
+ * Estes specs escrevem no documento GLOBAL e restauram no `finally`. Se o
+ * restore falhar uma vez (queda, timeout, execução interrompida), a régua fica
+ * lá — e a execução seguinte a acrescenta de novo, produzindo DUAS violações
+ * onde o teste espera uma. Foi o que aconteceu, e o sintoma ("2 fora do
+ * padrão") não aponta para a causa.
+ *
+ * Filtrar pelo texto antes de concatenar torna a gravação idempotente: o
+ * resíduo de ontem não soma com o de hoje.
+ */
+function comRegraDoTeste<T extends { texto?: string }>(lista: T[] | undefined, nova: T): T[] {
+  return [...(lista ?? []).filter((i) => i.texto !== nova.texto), nova];
+}
+
 const API = "http://localhost:4100";
 
 /**
@@ -52,19 +68,16 @@ test("a relação entre DOIS campos vira violação, com o campo comparado na me
   const documento = JSON.parse(JSON.stringify(antes.documento));
   documento.porTech = documento.porTech ?? {};
   documento.porTech.Backend = documento.porTech.Backend ?? { checklistTecnico: [], testes: [] };
-  documento.porTech.Backend.checklistTecnico = [
-    ...(documento.porTech.Backend.checklistTecnico ?? []),
-    // A regra é do TESTE, e exercita o mecanismo — não é política que um time
-    // real precise adotar. Kafka e não Rabbit porque os campos de retry do
-    // Rabbit só aparecem depois de DLQ + estratégia, que por sua vez dependem
-    // de uma aresta de consumo: montar isso pelo canvas testaria arrastar
-    // conexão, não conformidade.
-    {
-      texto: "Partições pelo menos iguais ao fator de replicação",
-      contextos: ["Backend-mensagens kafka"],
-      checagem: { campo: "particoes", operador: "gte", valorDe: "fatorReplicacao" },
-    },
-  ];
+  // A regra é do TESTE, e exercita o mecanismo — não é política que um time
+  // real precise adotar. Kafka e não Rabbit porque os campos de retry do
+  // Rabbit só aparecem depois de DLQ + estratégia, que por sua vez dependem
+  // de uma aresta de consumo: montar isso pelo canvas testaria arrastar
+  // conexão, não conformidade.
+  documento.porTech.Backend.checklistTecnico = comRegraDoTeste(documento.porTech.Backend.checklistTecnico, {
+    texto: "Partições pelo menos iguais ao fator de replicação",
+    contextos: ["Backend-mensagens kafka"],
+    checagem: { campo: "particoes", operador: "gte", valorDe: "fatorReplicacao" },
+  });
   expect((await page.request.put(`${API}/config/regras`, { data: { documento } })).status()).toBe(200);
 
   try {
@@ -117,15 +130,12 @@ test("a violação explica o padrão, e aceitar de propósito tira do placar sem
   const documento = JSON.parse(JSON.stringify(antes.documento));
   documento.porTech = documento.porTech ?? {};
   documento.porTech.Backend = documento.porTech.Backend ?? { checklistTecnico: [], testes: [] };
-  documento.porTech.Backend.checklistTecnico = [
-    ...(documento.porTech.Backend.checklistTecnico ?? []),
-    {
-      texto: "Definir timeout da chamada externa",
-      contextos: ["Backend-chamadas http"],
-      porque: "Veio do incidente em que o parceiro travou e derrubou o checkout junto.",
-      checagem: { campo: "timeoutMs", operador: "lte", valor: 500, unidade: "ms" },
-    },
-  ];
+  documento.porTech.Backend.checklistTecnico = comRegraDoTeste(documento.porTech.Backend.checklistTecnico, {
+    texto: "Definir timeout da chamada externa",
+    contextos: ["Backend-chamadas http"],
+    porque: "Veio do incidente em que o parceiro travou e derrubou o checkout junto.",
+    checagem: { campo: "timeoutMs", operador: "lte", valor: 500, unidade: "ms" },
+  });
   expect((await page.request.put(`${API}/config/regras`, { data: { documento } })).status()).toBe(200);
 
   try {
@@ -198,14 +208,11 @@ test("valor fora do padrão aparece no placar, chega ao item, e some quando entr
   documento.porTech.Backend = documento.porTech.Backend ?? { checklistTecnico: [], testes: [] };
   // Escopado em "Backend-chamadas http": nenhum outro spec desenha API Externa,
   // então a janela em que o padrão existe não muda o resultado de ninguém.
-  documento.porTech.Backend.checklistTecnico = [
-    ...(documento.porTech.Backend.checklistTecnico ?? []),
-    {
-      texto: "Definir timeout da chamada externa",
-      contextos: ["Backend-chamadas http"],
-      checagem: { campo: "timeoutMs", operador: "lte", valor: 500, unidade: "ms" },
-    },
-  ];
+  documento.porTech.Backend.checklistTecnico = comRegraDoTeste(documento.porTech.Backend.checklistTecnico, {
+    texto: "Definir timeout da chamada externa",
+    contextos: ["Backend-chamadas http"],
+    checagem: { campo: "timeoutMs", operador: "lte", valor: 500, unidade: "ms" },
+  });
   expect((await page.request.put(`${API}/config/regras`, { data: { documento } })).status()).toBe(200);
 
   try {

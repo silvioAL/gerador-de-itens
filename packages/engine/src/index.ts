@@ -67,6 +67,13 @@ export {
   type TerceiroNoCaminho,
 } from "./leitura/lerDesenho.js";
 export {
+  avaliarResiliencia,
+  insistenciaDe,
+  CAMPOS_DE_RESILIENCIA,
+  type ContradicaoDeResiliencia,
+  type Insistencia,
+} from "./leitura/resiliencia.js";
+export {
   elementosComTempo,
   simularCenario,
   simularCenarios,

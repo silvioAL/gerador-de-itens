@@ -110,6 +110,18 @@
             ]
           },
           "ajuda": "Queries/mutations/tipos expostos — cole o SDL ou descreva."
+        },
+        {
+          "key": "chamadasSimultaneas",
+          "label": "Chamadas simultâneas que aguenta",
+          "type": "number",
+          "ajuda": "O limite de concorrência (pool, bulkhead, threads). Com a taxa esperada e o tempo de resposta, a mesa confere se ele dá conta: concorrência = taxa × tempo."
+        },
+        {
+          "key": "taxaEsperadaRps",
+          "label": "Taxa esperada (req/s)",
+          "type": "number",
+          "ajuda": "Quantas requisições por segundo este componente recebe no pico. É o que permite calcular a concorrência necessária — sem ela, o limite acima não tem com o que ser comparado."
         }
       ],
       "cenarioGherkinPadrao": "```gherkin\nDado que a requisição é válida\nQuando o endpoint é chamado\nEntão a resposta retorna 2xx com o corpo esperado\n\nDado que a requisição é inválida ou não autorizada\nQuando o endpoint é chamado\nEntão a resposta retorna o status 4xx apropriado (400/401/403/404), sem expor detalhe interno\n\nDado que ocorre um erro inesperado no processamento (ex.: exceção não tratada, dependência interna indisponível)\nQuando o endpoint é chamado\nEntão a resposta retorna 500, sem vazar stack trace ou detalhe interno no corpo\n```",
@@ -1228,6 +1240,12 @@
             }
           },
           "ajuda": "Integração que já existe: como a mudança é compatível com quem já consome hoje (versionamento, breaking change)."
+        },
+        {
+          "key": "chamadasSimultaneas",
+          "label": "Chamadas simultâneas permitidas",
+          "type": "number",
+          "ajuda": "Quantas chamadas em paralelo o provedor aceita (ou que vocês se permitem fazer)."
         }
       ],
       "specResumo": [
@@ -1930,6 +1948,24 @@
           "label": "Timeout (ms)",
           "type": "number",
           "ajuda": "Timeout da chamada, em milissegundos — usado no diagrama exportável e na especificação, quando preenchido."
+        },
+        {
+          "key": "tentativas",
+          "label": "Tentativas (incluindo a primeira)",
+          "type": "number",
+          "ajuda": "Quantas vezes a chamada é feita no total antes de desistir. 1 = sem retry. É o que decide por quanto tempo o sistema insiste."
+        },
+        {
+          "key": "esperaEntreMs",
+          "label": "Espera entre tentativas (ms)",
+          "type": "number",
+          "ajuda": "Backoff entre uma tentativa e a seguinte. Entra na conta de quanto tempo o sistema insiste antes de desistir."
+        },
+        {
+          "key": "disjuntor",
+          "label": "Tem circuit breaker?",
+          "type": "boolean",
+          "ajuda": "Se o destino falhar repetidamente, as chamadas seguintes falham na hora em vez de esperar o timeout. Sem ele, insistência longa vira fila de espera na origem."
         }
       ],
       "espera": true
@@ -1945,6 +1981,24 @@
           "label": "Timeout (ms)",
           "type": "number",
           "ajuda": "Timeout da chamada, em milissegundos — usado no diagrama exportável e na especificação, quando preenchido."
+        },
+        {
+          "key": "tentativas",
+          "label": "Tentativas (incluindo a primeira)",
+          "type": "number",
+          "ajuda": "Quantas vezes a chamada é feita no total antes de desistir. 1 = sem retry. É o que decide por quanto tempo o sistema insiste."
+        },
+        {
+          "key": "esperaEntreMs",
+          "label": "Espera entre tentativas (ms)",
+          "type": "number",
+          "ajuda": "Backoff entre uma tentativa e a seguinte. Entra na conta de quanto tempo o sistema insiste antes de desistir."
+        },
+        {
+          "key": "disjuntor",
+          "label": "Tem circuit breaker?",
+          "type": "boolean",
+          "ajuda": "Se o destino falhar repetidamente, as chamadas seguintes falham na hora em vez de esperar o timeout. Sem ele, insistência longa vira fila de espera na origem."
         }
       ],
       "espera": true

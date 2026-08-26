@@ -17,8 +17,13 @@ const API = "http://localhost:4100";
  * ## Sobre config global
  *
  * Este spec GRAVA em `regras.topologia`, e o §281 custou três specs vizinhos
- * ensinando o preço disso. O `finally` restaura o documento inteiro, e a régua
- * criada é de grau — nenhum outro spec depende dela.
+ * ensinando o preço disso.
+ *
+ * §297 — e o restore **devolve só `topologia`**, relendo o documento na hora.
+ * Restaurar o documento INTEIRO (lido no começo) apaga o que um spec vizinho
+ * escreveu no intervalo: o `conformidade` grava no `checklistTecnico`, e via a
+ * própria régua sumir no meio do teste dele. O sintoma aparecia no vizinho, a
+ * causa estava aqui — que é a assinatura do §281.
  */
 test("§295 — do fato à régua num clique, e o desenho que a gerou passa a ser acusado", async ({ page }) => {
   test.setTimeout(150000);
@@ -29,7 +34,7 @@ test("§295 — do fato à régua num clique, e o desenho que a gerou passa a se
   );
   await entrar(page);
 
-  const antes = await (await page.request.get(`${API}/config/regras`)).json();
+  const topologiaAntes = ((await (await page.request.get(`${API}/config/regras`)).json()).documento ?? {}).topologia;
   try {
     // O cenário do §290: `srv-credito-api` faz três chamadas que esperam.
     await page.getByTestId("abrir-cenarios").click();
@@ -78,7 +83,13 @@ test("§295 — do fato à régua num clique, e o desenho que a gerou passa a se
     // quanto é o excesso.
     await expect(lista).toContainText("3 conexões que esperam");
   } finally {
-    await page.request.put(`${API}/config/regras`, { data: { documento: antes.documento } });
+    // Relê AGORA e devolve só o campo que este spec mexeu: o resto do
+    // documento pode ter mudado no intervalo, e sobrescrevê-lo apagaria a
+    // régua de um vizinho no meio do teste dele.
+    const atual = (await (await page.request.get(`${API}/config/regras`)).json()).documento ?? {};
+    await page.request.put(`${API}/config/regras`, {
+      data: { documento: { ...atual, topologia: topologiaAntes ?? [] } },
+    });
   }
 });
 

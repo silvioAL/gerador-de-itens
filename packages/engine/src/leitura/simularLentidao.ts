@@ -1,6 +1,13 @@
 import type { DiagramaConfig } from "../config/types.js";
 import type { Diagrama, ValorSpec } from "../model/types.js";
-import { CAMPO_DE_TEMPO_PADRAO, lerDesenho, type ElementoDaLeitura, type LeituraDoDesenho } from "./lerDesenho.js";
+import {
+  CAMPO_DE_TEMPO_PADRAO,
+  arestaEspera,
+  lerDesenho,
+  type ElementoDaLeitura,
+  type LeituraDoDesenho,
+} from "./lerDesenho.js";
+import { avaliarResiliencia, insistenciaDe, type ContradicaoDeResiliencia } from "./resiliencia.js";
 
 /**
  * SPEC-66 fatia A — a mesa como bancada de ensaio.
@@ -34,6 +41,17 @@ export interface AjusteDeCenario {
   fator?: number;
   /** Valor absoluto em ms — a pergunta "e se o SLA fosse 500 ms?". */
   ms?: number;
+  /**
+   * SPEC-68 — as condições que NÃO são lentidão.
+   *
+   * A SPEC-66 acertou o mecanismo e errou o escopo pelo nome: retry não é
+   * lentidão, pico de tráfego não é lentidão, disjuntor desligado não é
+   * lentidão. São **condições**, e o tempo é só uma delas.
+   */
+  tentativas?: number;
+  disjuntor?: boolean;
+  /** req/s no nó — o λ da Lei de Little (SPEC-68 §3.3). */
+  taxaRps?: number;
 }
 
 export interface CenarioDeLentidao {
@@ -70,6 +88,16 @@ export interface ResultadoDoCenario {
   /** Ajustes que não encontraram elemento — o desenho mudou depois do cenário.
    * §57: um ensaio que ignorou parte do que lhe pediram tem que dizer. */
   ajustesSemAlvo: AjusteDeCenario[];
+  /**
+   * SPEC-68 — o que este ensaio faz o desenho passar a contradizer.
+   *
+   * É a coluna que transforma a tabela de placar em ferramenta: "com o pico de
+   * 100 req/s, o pool de 10 satura" é uma consequência que ninguém enxerga
+   * olhando dois campos em telas diferentes.
+   */
+  contradicoes: ContradicaoDeResiliencia[];
+  /** Por quanto tempo o trecho mais demorado INSISTE antes de desistir. */
+  insistenciaMs?: number;
 }
 
 export interface ElementoAjustavel {
@@ -137,6 +165,21 @@ function aplicar(atual: number | undefined, ajuste: AjusteDeCenario): number | u
 }
 
 /**
+ * SPEC-68 — os campos que o ensaio sobrescreve além do tempo.
+ *
+ * Só entram os que o ajuste DECLARA: um ensaio sobre taxa não deve zerar o
+ * retry que a pessoa configurou no desenho, e omissão aqui significa "como
+ * está", nunca "nenhum".
+ */
+function outrosCampos(ajuste: AjusteDeCenario): Record<string, ValorSpec> {
+  const campos: Record<string, ValorSpec> = {};
+  if (ajuste.tentativas !== undefined) campos.tentativas = { valor: ajuste.tentativas, origem: "manual" };
+  if (ajuste.disjuntor !== undefined) campos.disjuntor = { valor: ajuste.disjuntor, origem: "manual" };
+  if (ajuste.taxaRps !== undefined) campos.taxaEsperadaRps = { valor: ajuste.taxaRps, origem: "manual" };
+  return campos;
+}
+
+/**
  * Roda o cenário e devolve o que a tabela mostra.
  *
  * `hoje` entra como parâmetro (e não é recalculado aqui) porque a tabela
@@ -167,11 +210,18 @@ export function simularCenario(
         continue;
       }
       const novo = aplicar(valorNumerico(no.spec?.[campoDeTempo]), ajuste);
-      if (novo === undefined) continue;
+      const extras = outrosCampos(ajuste);
+      if (novo === undefined && Object.keys(extras).length === 0) continue;
       const i = nodes.findIndex((n) => n.id === ajuste.id);
       nodes[i] = {
         ...no,
-        spec: { ...no.spec, [campoDeTempo]: { ...no.spec?.[campoDeTempo], valor: novo, origem: "manual" } },
+        spec: {
+          ...no.spec,
+          ...(novo === undefined
+            ? {}
+            : { [campoDeTempo]: { ...no.spec?.[campoDeTempo], valor: novo, origem: "manual" } }),
+          ...extras,
+        },
       };
     } else {
       const aresta = arestasPorId.get(ajuste.id);
@@ -180,18 +230,34 @@ export function simularCenario(
         continue;
       }
       const novo = aplicar(valorNumerico(aresta.spec?.[campoDeTempo]), ajuste);
-      if (novo === undefined) continue;
+      const extras = outrosCampos(ajuste);
+      if (novo === undefined && Object.keys(extras).length === 0) continue;
       const i = edges.findIndex((e) => e.id === ajuste.id);
       edges[i] = {
         ...aresta,
-        spec: { ...aresta.spec, [campoDeTempo]: { ...aresta.spec?.[campoDeTempo], valor: novo, origem: "manual" } },
+        spec: {
+          ...aresta.spec,
+          ...(novo === undefined
+            ? {}
+            : { [campoDeTempo]: { ...aresta.spec?.[campoDeTempo], valor: novo, origem: "manual" } }),
+          ...extras,
+        },
       };
     }
   }
 
-  const leitura = lerDesenho({ ...diagrama, nodes, edges }, config, { campoDeTempo });
+  const ensaiado = { ...diagrama, nodes, edges };
+  const leitura = lerDesenho(ensaiado, config, { campoDeTempo });
   const t = leitura.tempoDoPiorTrecho;
   const base = hoje?.tempoDoPiorTrecho?.ms;
+
+  // SPEC-68 — a insistência do trecho que responde, e o que este ensaio faz o
+  // desenho passar a contradizer. É o que separa "ficou mais lento" de "agora
+  // isto não pode dar certo".
+  const insistencias = edges
+    .filter((e) => arestaEspera(e, config) === true)
+    .map((e) => insistenciaDe(e))
+    .filter((i): i is NonNullable<typeof i> => i !== undefined && i.insiste);
 
   return {
     cenarioId: cenario.id,
@@ -202,6 +268,8 @@ export function simularCenario(
     dominantes: t?.dominantes ?? [],
     delta: t?.ms !== undefined && base !== undefined ? t.ms - base : undefined,
     ajustesSemAlvo,
+    contradicoes: avaliarResiliencia(ensaiado, config),
+    insistenciaMs: insistencias.length > 0 ? Math.max(...insistencias.map((i) => i.ms)) : undefined,
   };
 }
 
