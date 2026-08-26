@@ -10811,3 +10811,60 @@ erro do extra acima.
 
 448 engine · 725 web · 84 aplicação · 237 server · 129 llm · 95/95 E2E · build e
 lint limpos.
+
+## §300 — eles não sumiram; a câmera é que não os seguiu
+
+Relato: *"peguei um cenário pronto qualquer, fui em 'e se ficar lento', voltei
+em 'como funciona' e carreguei o cenário de aprovação de crédito — os
+componentes apareceram, mas sumiram do nada do canvas em seguida"*.
+
+### A primeira medição não reproduziu, e o motivo ensina
+
+Refiz a sequência exata e contei `.react-flow__node`: **8 nós, sempre 8**. Nada
+sumia. Tentei três variações (com ensaio criado, com a quebra salva, com os
+dois) e todas passavam.
+
+O erro era da régua, não do produto: **o DOM tem os nós mesmo quando a câmera
+aponta para outro lugar.** Troquei a medida para geometria — quantos nós caem
+dentro do retângulo visível do canvas — e o defeito apareceu na primeira
+tentativa:
+
+```
+total=8  dentro=4   transform: translate(-120px, 67px) scale(2)
+```
+
+Metade do desenho fora da tela, com o zoom **2×** que era o enquadramento do
+desenho anterior. Dois nós cabem com zoom 2; oito, não.
+
+> "Sumiram do canvas" era literal, e eu quase o descartei como não-reproduzível
+> por estar contando a coisa errada.
+
+### E os Ensaios não tinham nada a ver
+
+Medi as duas sequências lado a lado — passando pelos Ensaios e sem sair da mesa
+— e o resultado foi **idêntico**. O defeito era trocar de desenho, e existia
+desde antes desta rodada. O caminho do relato só foi por onde o usuário passou.
+
+### A causa estava escrita, e era um comentário que mentia
+
+O `adicionarCenario` diz: *"os **TRÊS** caminhos que inserem nós em lote pedem
+enquadramento"*. Só **dois** pediam — adicionar à mesa e a proposta da IA.
+
+**Trocar a demanda inteira (`aoAbrir`) ficou de fora** — e é o caso mais forte
+de todos: o desenho não é uma adição ao que havia, é outro desenho. Herdar a
+câmera do anterior não faz sentido em nenhuma leitura.
+
+Vale para carregar cenário **e** para abrir uma quebra salva: os dois passam
+por ali, e os dois herdavam o enquadramento de quem estava aberto antes.
+
+### O teste tinha que falhar antes
+
+Desliguei a correção e rodei o spec novo: `dentro: 4` em vez de `8`. Religuei:
+`8`. Sem esse passo eu teria um teste que passa dos dois lados e não trava nada
+— foi exatamente o que a primeira versão da minha medição fazia.
+
+E o spec é E2E de propósito: **a régua é geométrica**, e JSDOM não posiciona
+nada. Contar nós no DOM passaria com folga sobre o bug.
+
+448 engine · 725 web · 84 aplicação · 237 server · 129 llm · 97/97 E2E · build e
+lint limpos.
