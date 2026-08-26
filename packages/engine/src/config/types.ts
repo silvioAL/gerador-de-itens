@@ -142,6 +142,22 @@ export interface EdgeTypeConfig {
    * "bidirectional" (as duas direções ao mesmo tempo, ex.: `readwrite`/`pubsub`).
    */
   fluxo?: "forward" | "reverse" | "bidirectional";
+  /**
+   * SPEC-65 fatia A — quem chama por esta conexão **espera a resposta** antes
+   * de seguir. É o que torna a latência somável e a falha propagável, e é o
+   * que separa "quatro saltos" de "quatro saltos que o usuário sente".
+   *
+   * Ausente = **não se afirma nada**: a leitura pula a conexão e diz que
+   * pulou, em vez de chutar. Sincronia não se infere de `fluxo` (que é
+   * direção: `consumes` é `reverse` e assíncrono, `reads` é `reverse` e
+   * síncrono) nem do nome do tipo (`http` normalmente espera, e `http`
+   * fire-and-forget existe).
+   *
+   * Este é o PADRÃO do tipo. Uma conexão pode contrariá-lo respondendo o campo
+   * `sincrono` no próprio `spec` — que já existe em `consumes` desde a
+   * SPEC-21, e passa a valer aqui.
+   */
+  espera?: boolean;
 }
 
 export interface EdgeRule {

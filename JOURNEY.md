@@ -10149,3 +10149,86 @@ para não virar zelo daqui a três rodadas.
 Só a SPEC nesta rodada; nenhum código de produto mudou. As fatias estão em
 ordem, e **B antes de C não é negociável**: desenhar a marca antes de ter o que
 ela diz produz um número bonito que ninguém sabe explicar.
+
+## §291 — o tempo que só existe através do que espera
+
+Pedido: *"precisa aparecer em algum lugar sem precisar abrir e especificar
+tudo, apenas o necessário — o tempo geral das operações mapeadas, e se houver
+parte síncrona ver o que interessa quanto a isso"*.
+
+As fatias A, B e C da SPEC-65, com a superfície mais barata que atende o pedido:
+o número **na** faixa, não atrás dela.
+
+### A percepção que organizou o código
+
+Tempo e sincronia pareciam duas perguntas e são **uma**. O timeout de uma
+chamada só entra na conta da resposta se quem chamou estiver esperando — quem
+publica numa fila não espera, e a soma **para ali**.
+
+Isso virou `trechosQueEsperam`, que quebra o caminho nos trechos contínuos de
+conexões que esperam. Num desenho `api →http(300)→ srv →publica→ fila
+→consome→ worker →http(5000)→ externo`, a leitura devolve **dois trechos**
+(5000 e 300) e nunca 5300. Somar o caminho inteiro daria um número que ninguém
+experimenta — e um número grande e confiante sobre uma cadeia que responde na
+hora é pior que número nenhum.
+
+### O dado que não existia, e a instância que sabe mais que o tipo
+
+Nada no produto declarava o que é uma chamada síncrona. Entrou `espera?:
+boolean` no `EdgeTypeConfig` — e ausente significa **não se afirma nada**: a
+conexão sai da conta e aparece na lista de ignorados (§57).
+
+O detalhe que rendeu: `consumes` já trazia um campo `sincrono` por conexão
+desde a SPEC-21. Então a **instância manda sobre o tipo** — quem respondeu
+aquele campo disse algo mais específico do que o padrão do tipo sabe, e
+ignorá-lo seria descartar o dado mais confiável que existe sobre aquela
+conexão.
+
+### A frase precisou aprender a degradar
+
+O primeiro desenho do chip falava em milissegundos. Medi o cenário
+`credito-completo` e ele tinha **um** timeout preenchido — e esse é o estado
+normal de quem acabou de desenhar. Um chip que só soubesse falar de tempo
+ficaria mudo justamente para a pessoa que a SPEC existe para atender.
+
+`resumirLeitura` passou a ter três degraus, sempre dizendo o que sabe:
+
+| estado | frase |
+|---|---|
+| números completos | `até 1,1 s de resposta` |
+| pela metade | `≥ 300 ms de resposta · 1 por preencher` |
+| sem número | `3 saltos que esperam` |
+| nada a dizer | **sem chip** |
+
+O `≥` é o §248 na largura de um caractere: a soma é piso, e a frase não deixa
+lê-la como total. E o último degrau importa tanto quanto os outros — chip que
+aparece sempre vira moldura, e some da vista junto com o que deveria mostrar.
+O E2E prova os dois lados: mensageria pura **não** ganha chip.
+
+### O que o E2E flagrou, e era melhor que o esperado
+
+Escrevi o spec esperando `"saltos que esperam"` e a tela devolveu **`≥ 3,0 s de
+resposta · 1 por preencher`**. Fui ver: o único tempo declarado no cenário é o
+`timeoutMs: 3000` do **nó** `bureau-credito-nacional`, e a conexão `http` que
+leva até ele está vazia.
+
+Ou seja, no mesmo desenho que dizia *"VERDE 8 — pronta para derivar"*, a mesa
+passou a dizer: **a resposta leva pelo menos três segundos por causa de um
+sistema que não é de vocês, e falta um dado para fechar a conta.** A
+expectativa errada era minha; o produto estava mais certo do que eu tinha
+escrito.
+
+> Também é a prova de que o timeout do NÓ precisava entrar na soma junto com o
+> da conexão. Uma leitura que olhasse só arestas devolveria zero aqui — o mesmo
+> defeito que o §285 achou na régua de percurso, pelo outro lado.
+
+### A linha que não foi cruzada
+
+Nada disto entra no placar ⚖, bloqueia derivação, vira item ou pede exceção com
+motivo. O chip é neutro de propósito: vermelho e âmbar já significam "errado" e
+"atenção" na gramática da mesa, e pintar um fato de âmbar transformaria leitura
+em cobrança — que é o linter de grafo que a §287 recusou. O popover abre
+dizendo isso em voz alta: *"isto é leitura, não régua"*.
+
+400 engine · 696 web · 84 aplicação · 237 server · 129 llm · 88/88 E2E · build e
+lint limpos.

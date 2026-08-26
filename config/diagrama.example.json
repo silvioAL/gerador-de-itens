@@ -1931,7 +1931,8 @@
           "type": "number",
           "ajuda": "Timeout da chamada, em milissegundos — usado no diagrama exportável e na especificação, quando preenchido."
         }
-      ]
+      ],
+      "espera": true
     },
     "grpc": {
       "label": "gRPC",
@@ -1945,13 +1946,15 @@
           "type": "number",
           "ajuda": "Timeout da chamada, em milissegundos — usado no diagrama exportável e na especificação, quando preenchido."
         }
-      ]
+      ],
+      "espera": true
     },
     "graphql": {
       "label": "GraphQL",
       "color": "#e10098",
       "verbo": "consulta via GraphQL",
-      "tamanhoPadrao": "P"
+      "tamanhoPadrao": "P",
+      "espera": true
     },
     "publishes": {
       "label": "publica",
@@ -1965,7 +1968,8 @@
           "type": "text",
           "ajuda": "Routing key ou nome do tópico/fila de destino, quando relevante — usado no diagrama exportável e na especificação, quando preenchido."
         }
-      ]
+      ],
+      "espera": false
     },
     "consumes": {
       "label": "consome",
@@ -1980,7 +1984,8 @@
           "type": "boolean",
           "ajuda": "Se o consumo bloqueia até processar (síncrono) ou processa em background (assíncrono) — usado no diagrama exportável e na especificação, quando preenchido."
         }
-      ]
+      ],
+      "espera": false
     },
     "pubsub": {
       "label": "publica+consome",
@@ -1995,33 +2000,38 @@
           "type": "text",
           "ajuda": "Routing key ou nome do tópico/fila, quando relevante — usado no diagrama exportável e na especificação, quando preenchido."
         }
-      ]
+      ],
+      "espera": false
     },
     "reads": {
       "label": "lê",
       "color": "#10b981",
       "verbo": "lê de",
       "tamanhoPadrao": "P",
-      "fluxo": "reverse"
+      "fluxo": "reverse",
+      "espera": true
     },
     "writes": {
       "label": "escreve",
       "color": "#0ea5e9",
       "verbo": "escreve em",
-      "tamanhoPadrao": "P"
+      "tamanhoPadrao": "P",
+      "espera": true
     },
     "readwrite": {
       "label": "lê e escreve",
       "color": "#0d9488",
       "verbo": "lê e escreve em",
       "tamanhoPadrao": "P",
-      "fluxo": "bidirectional"
+      "fluxo": "bidirectional",
+      "espera": true
     },
     "orchestrates": {
       "label": "orquestra",
       "color": "#a855f7",
       "verbo": "orquestra",
-      "tamanhoPadrao": "M"
+      "tamanhoPadrao": "M",
+      "espera": true
     },
     "binding": {
       "label": "binding",
@@ -2032,13 +2042,15 @@
       "label": "dispara",
       "color": "#6b7280",
       "verbo": "dispara",
-      "tamanhoPadrao": "P"
+      "tamanhoPadrao": "P",
+      "espera": false
     },
     "validates": {
       "label": "valida",
       "color": "#8b5cf6",
       "verbo": "usa a validação de",
-      "tamanhoPadrao": "P"
+      "tamanhoPadrao": "P",
+      "espera": true
     }
   },
   "edgeRules": {
