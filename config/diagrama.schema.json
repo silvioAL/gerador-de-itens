@@ -36,7 +36,26 @@
         "contextos": { "type": "array", "items": { "type": "string" } },
         "color": { "type": "string" },
         "icon": { "type": "string" },
-        "spec": { "type": "array", "items": { "$ref": "#/$defs/fieldSpec" } }
+        "spec": { "type": "array", "items": { "$ref": "#/$defs/fieldSpec" } },
+        "specResumo": {
+          "description": "Chaves de `spec` a resumir na atividade de CRIAÇÃO deste nó (ver NodeTypeConfig).",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "specResumoPorAresta": {
+          "description": "Como `specResumo`, mas para a atividade derivada de uma aresta que tem este nó como alvo, por tipo de aresta.",
+          "type": "object",
+          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+        },
+        "cenarioGherkinPadrao": {
+          "description": "Molde de critério de aceite deste tipo de nó (SPEC-14 §4/§9) — padrão de integração, nunca o cenário de negócio real.",
+          "type": "string"
+        },
+        "cenarioGherkinPorAresta": {
+          "description": "Override de `cenarioGherkinPadrao` por tipo de aresta de entrada.",
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
       }
     },
     "fieldSpec": {

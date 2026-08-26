@@ -23,13 +23,15 @@ test("paleta completa de tipos, criação de nó, preenchimento e prontidão ver
 
   // A paleta é montada a partir de `config/diagrama.json` — a contagem é o que
   // prova que ela vem do config e não de uma lista fixa no código. O número
-  // sobe quando um tipo novo entra (foi 11, hoje é 16, com cache/storage/batch
-  // e os dois de mobile); quem adiciona o tipo atualiza aqui, de propósito.
+  // sobe quando um tipo novo entra (foi 11, depois 16 com cache/storage/batch
+  // e os dois de mobile, hoje é 17 com o Motor de Regras); quem adiciona o
+  // tipo atualiza aqui, de propósito.
   const botoesDeTipo = page.locator("header button", { hasText: "+" });
-  await expect(botoesDeTipo).toHaveCount(16);
+  await expect(botoesDeTipo).toHaveCount(17);
   await expect(page.getByRole("button", { name: "+ Fila Rabbit" })).toBeVisible();
   await expect(page.getByRole("button", { name: "+ Tópico Kafka" })).toBeVisible();
   await expect(page.getByRole("button", { name: "+ Processo Camunda" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "+ Motor de Regras" })).toBeVisible();
 
   await page.getByRole("button", { name: "+ Fila Rabbit" }).click();
 

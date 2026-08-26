@@ -3,6 +3,7 @@ import {
   Boxes,
   Clock,
   Cloud,
+  Cog,
   Database,
   FileText,
   GitBranch,
@@ -47,6 +48,10 @@ export const MAPA_ICONES: Record<string, LucideIcon> = {
   Globe,
   Clock,
   Scale,
+  // §289 — a engrenagem é do Motor de Regras. `Scale` (a balança) já é da
+  // Regra de Negócio, e usar o mesmo nos dois apagaria no canvas justamente a
+  // distinção que o tipo novo existe para fazer.
+  Cog,
   Boxes,
   Shield,
   Bell,
