@@ -1,5 +1,6 @@
 import type { ChecagemDeTopologia, DiagramaConfig, RegrasConfig } from "../config/types.js";
 import type { Aresta, Diagrama, ExcecaoDePadrao, No } from "../model/types.js";
+import { arestaEspera } from "../leitura/lerDesenho.js";
 
 /**
  * SPEC-63 — a régua sobre a FORMA do desenho.
@@ -89,6 +90,17 @@ function descreverProibicao(c: Extract<ChecagemDeTopologia, { tipo: "proibe-cone
   )}`;
 }
 
+/** "no máximo 2 conexões que esperam saindo" — a frase do que o padrão pede. */
+function descreverLimite(c: Extract<ChecagemDeTopologia, { tipo: "limita-grau" }>, config: DiagramaConfig): string {
+  const partes = [`no máximo ${c.maximo}`];
+  const aresta = rotuloDoTipoAresta(config, c.tipoAresta);
+  partes.push(c.maximo === 1 ? "conexão" : "conexões");
+  if (aresta) partes.push(`"${aresta}"`);
+  if (c.apenasQueEsperam) partes.push("que esperam resposta");
+  partes.push(c.direcao === "sai" ? "saindo" : "entrando");
+  return partes.join(" ");
+}
+
 /**
  * §242 aplicado à forma: a exceção identifica o par `(elemento, regra)`.
  *
@@ -143,6 +155,47 @@ export function avaliarTopologia(
           rotulo: rotuloDoNo(no),
           esperado,
           atual: "nenhuma",
+          excecao: excecaoDe(excecoes, no.id, requisito.id),
+        });
+      }
+      continue;
+    }
+
+    if (c.tipo === "limita-grau") {
+      const esperado = descreverLimite(c, config);
+      for (const no of diagrama.nodes) {
+        if (no.type !== c.tipoNo) continue;
+
+        const contadas = diagrama.edges.filter((e) => {
+          const ponta = c.direcao === "sai" ? e.source : e.target;
+          if (ponta !== no.id) return false;
+          // Auto-laço não é chamada a outro componente: contá-lo inflaria o
+          // grau por uma seta que não sai do lugar.
+          if (e.source === e.target) return false;
+          if (c.tipoAresta && e.type !== c.tipoAresta) return false;
+          // §3.1 — `=== true`, e não "diferente de false": conexão de tipo sem
+          // `espera` declarado fica de FORA. Contar o que não se sabe inflaria
+          // o grau e acusaria por ignorância, que é o oposto do §248.
+          if (c.apenasQueEsperam && arestaEspera(e, config) !== true) return false;
+          return true;
+        });
+        if (contadas.length <= c.maximo) continue;
+
+        violacoes.push({
+          regraId: requisito.id,
+          texto: requisito.texto,
+          porque: requisito.porque,
+          // O EXCESSO é propriedade do nó, não de uma aresta. Apontar quatro
+          // arestas obrigaria a pessoa a escolher qual sobra — e essa decisão é
+          // dela, não da régua.
+          noId: no.id,
+          rotulo: rotuloDoNo(no),
+          esperado,
+          // O número real, e não "acima do máximo": sem ele, a frase não diz de
+          // quanto é o excesso.
+          atual: `${contadas.length} ${contadas.length === 1 ? "conexão" : "conexões"}${
+            c.apenasQueEsperam ? " que esperam" : ""
+          }`,
           excecao: excecaoDe(excecoes, no.id, requisito.id),
         });
       }

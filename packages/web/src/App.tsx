@@ -22,6 +22,8 @@ import {
   lerDesenho,
   marcasPorNo,
   percursoManual,
+  reguaDaLeitura,
+  type RequisitoDeTopologia,
   type ItemDeTrabalho,
 } from "@gerador/engine";
 import { carregarConfig, type ConfigCarregada } from "./config/loadConfig";
@@ -65,6 +67,7 @@ import { ContextoEpicoPanel } from "./review/ContextoEpicoPanel";
 import { ConversaPanel } from "./conversa/ConversaPanel";
 import { AssistenteFlutuante, type AbaAssistente } from "./assistente/AssistenteFlutuante";
 import { SimulacaoScreen } from "./simulacao/SimulacaoScreen";
+import { idDaRegraDeForma } from "./config/FormaDoDesenho";
 import { ConfigurarPanel } from "./assistente/ConfigurarPanel";
 import { JourneyModal, type AbaJornada } from "./demo/JourneyModal";
 import { contextoDoProdutoEmTexto, montarMapaDoSistema, type ExecucaoDoPapel } from "@gerador/aplicacao";
@@ -442,6 +445,10 @@ function AppCarregado({
    * sugestão para sempre.
    */
   const [declaracaoDeCaminho, setDeclaracaoDeCaminho] = useState<{ nos: string[]; corrigindo?: string } | null>(null);
+  /** SPEC-67 — a régua montada a partir de um fato, esperando o construtor.
+   * Some ao ser consumida: ponto de partida que persiste viraria formulário
+   * que reabre preenchido com a régua da semana passada. */
+  const [reguaDePartida, setReguaDePartida] = useState<RequisitoDeTopologia | null>(null);
   // SPEC-49 — pra onde os itens vão; só pra tela DIZER o destino (a exportação
   // em si é do servidor, que lê a mesma config).
   const [destinoDaExportacao, setDestinoDaExportacao] = useState<string | null>(null);
@@ -1457,6 +1464,28 @@ function AppCarregado({
          * formulário onde a regra não cabe é pior que botão nenhum (§244) — a
          * prop fica de pé no painel, esperando a checagem.
          */
+        /**
+         * SPEC-67 — o "um clique" que a SPEC-65 §6.3 prometeu e o §292 não
+         * entregou, porque `limita-grau` não existia.
+         *
+         * A régua é montada a partir do FATO e guardada; a navegação leva à
+         * tela de regras, onde o construtor abre preenchido. Navegar (e não
+         * abrir um construtor na mesa) é decisão do §7.1 da SPEC: uma régua
+         * nova sem ver as que já existem é como se cria a segunda que
+         * contradiz a primeira.
+         *
+         * Nada é GRAVADO aqui: "um clique" é sobre não reconstruir à mão o que
+         * o produto acabou de medir, não sobre pular a decisão de publicar.
+         */
+        onVirarRegua={(m) => {
+          const no = quebra.diagrama.nodes.find((n) => n.id === m.noId);
+          if (!no) return;
+          const rotulo = diagramaConfig.nodeTypes[no.type]?.label ?? no.type;
+          const partida = reguaDaLeitura(m, no.type, rotulo);
+          if (!partida) return;
+          setReguaDePartida({ id: idDaRegraDeForma(partida.texto), ...partida });
+          navegar({ tela: "config", area: "regras" });
+        }}
         leiturasDispensadas={quebra.leiturasDispensadas}
         onDispensarLeitura={(m) =>
           setQuebra((q) => ({
@@ -1793,6 +1822,10 @@ function AppCarregado({
 
       {mostrarConfig && (
         <ConfigScreen
+          // SPEC-67 — a régua que veio do clique da leitura, a caminho do
+          // construtor. Ela não é gravada por chegar: conferir e publicar
+          // continuam sendo gestos de quem assina.
+          reguaDePartida={reguaDePartida ?? undefined}
           config={diagramaConfig}
           camposNo={camposNo}
           camposAresta={camposAresta}

@@ -54,6 +54,7 @@ export {
   dispensasComEfeito,
   lerDesenho,
   marcasPorNo,
+  reguaDaLeitura,
   resumirLeitura,
   CAMPO_DE_TEMPO_PADRAO,
   type CadeiaQueEspera,

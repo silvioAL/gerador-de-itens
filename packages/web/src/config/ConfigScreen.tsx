@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { DiagramaConfig } from "@gerador/engine";
+import type { DiagramaConfig, RequisitoDeTopologia } from "@gerador/engine";
 import { TEMPLATE_ITEM_PADRAO } from "@gerador/engine";
 import type { CampoAresta, CampoNo, ConfigPipelineAgentes, DadosCampoAresta, DadosCampoNo, EspecificacaoTemplate } from "../api/client";
 import { PerfisStackTab } from "./PerfisStackTab";
@@ -53,6 +53,8 @@ export interface ConfigScreenProps {
   /** SPEC-52 — a ficha mudou por um ajuste APLICADO na tela do PDCA (e não
    * pela tela de campos, que já tem os callbacks próprios). */
   onFichaMudou?: () => void;
+  /** SPEC-67 — a régua vinda do clique da leitura, a caminho do construtor. */
+  reguaDePartida?: RequisitoDeTopologia;
   onCriarCampoNo: (dados: DadosCampoNo) => Promise<void>;
   onAtualizarCampoNo: (id: string, dados: Partial<DadosCampoNo>) => Promise<void>;
   onExcluirCampoNo: (id: string) => Promise<void>;
@@ -105,6 +107,7 @@ export function ConfigScreen({
   timeIds,
   onPerfisMudaram,
   onFichaMudou,
+  reguaDePartida,
   onCriarCampoNo,
   onAtualizarCampoNo,
   onExcluirCampoNo,
@@ -295,6 +298,7 @@ export function ConfigScreen({
             nodeTypes={config.nodeTypes}
             // SPEC-63 — a régua de FORMA precisa dos tipos de NÓ e de CONEXÃO.
             diagramaConfig={config}
+            reguaDePartida={reguaDePartida}
             onRegrasMudaram={onFichaMudou}
           />
         )}

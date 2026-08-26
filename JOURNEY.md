@@ -10478,3 +10478,113 @@ ajuste com id desconhecido é descartado antes de virar linha.
 
 415 engine · 711 web · 84 aplicação · 237 server · 129 llm · 91/91 E2E · build e
 lint limpos.
+
+## §295 — a convergência medida, e a dívida de uma palavra
+
+Duas coisas do usuário na mesma mensagem: *"na SPEC-56 fizemos uma avaliação do
+SimArch, acho que estamos chegando em um ponto de convergência, avalie"* e
+*"você falou de 'em um clique' na resposta anterior, reavalie"*.
+
+### A convergência, com números
+
+A SPEC-56 §0.4 declarou oito passos. O estado real, cruzado com o código:
+
+| # | Passo | Estado |
+|---|---|---|
+| 1 | P3 requisito + gap | ✅ SPEC-57 A |
+| 2 | **P8 padrão sobre topologia e valor** | ⚠️ **quase** — faltava GRAU |
+| 3 | P4 ADR | ✅ SPEC-57 C |
+| 4 | P1 percurso | ✅ SPEC-57 E, SPEC-64 |
+| 5 | P2 número com unidade | ✅ §241, §291 |
+| 6 | P5 modo de operação | ❌ |
+| 7 | P6 variante A vs B | ❌ |
+| 8 | P7 dialeto de provedor | ⚠️ parcial |
+
+**Cinco de oito fechados.** E a convergência não veio da lista — veio de a
+cadeia da §0.1 (*propósito → decisão → padrão → item*) ter sido construída elo a
+elo, cada um com sua SPEC.
+
+Duas coisas que a SPEC-56 **não previu** e hoje são centrais: a **leitura do
+desenho** (§291) — a §0.6 dizia "medir o desenho, não o runtime", e a leitura é
+isso levado a sério, chegando a quem não configurou nada — e a **bancada de
+ensaio** (§294), que é, sem eu ter percebido enquanto a escrevia, **metade do
+P5**.
+
+### A dívida tinha nome, e era uma checagem
+
+A SPEC-65 §6.3 prometeu em texto: *"virar régua — abre o construtor
+pré-preenchido; é a resposta à pergunta 'e daí?'"*. O §292 não entregou, e
+escreveu o motivo: `limita-grau` não existia, e botão que abre formulário onde a
+regra não cabe é pior que botão nenhum.
+
+A decisão de não entregar botão morto estava certa. **O erro foi parar ali.** A
+leitura sabia dizer "este serviço faz 3 chamadas que esperam" e o time não tinha
+como transformar isso em régua — o fato ficava sendo fato para sempre.
+
+> `exige-conexao` e `proibe-conexao` cobrem **presença e ausência**. Faltava a
+> terceira forma que um padrão de topologia assume: **quantidade** — e é
+> justamente a que a leitura mais produz.
+
+### O campo que impede a régua de nascer errada
+
+`apenasQueEsperam` não é detalhe de configuração:
+
+> Um serviço que **publica em quatro filas** faz exatamente o que se recomenda.
+> Um que **chama quatro serviços síncronos** antes de responder é o problema.
+> **Os dois têm grau de saída 4.**
+
+Uma régua de grau que não distingue os dois é o linter de grafo que a SPEC-63 §1
+recusou. O campo é o que a mantém sendo *"o desenho contraria o padrão do
+time?"*. E `=== true`, não "diferente de false": conexão de tipo sem `espera`
+declarado fica **de fora** — contar o que não se sabe inflaria o grau e acusaria
+por ignorância, que é o oposto do §248.
+
+### O clique, e o que ele não é
+
+- **`maximo` nasce em `atual - 1`.** A régua existe para cobrar o desenho que a
+  motivou; nascer permitindo-o faria o primeiro uso parecer quebrado;
+- **texto e porquê nascem prontos e editáveis.** A frase da leitura é um bom
+  começo e não é a régua do time — quem publica assina, e assinar exige poder
+  mudar;
+- **nada é gravado pelo clique.** Ele abre o construtor; publicar segue sendo um
+  segundo gesto, com o RBAC valendo. "Um clique" é sobre não reconstruir à mão o
+  que o produto acabou de medir, não sobre pular a decisão;
+- **a tela DIZ de onde a régua veio**, senão parece que o produto inventou uma
+  régua sozinho.
+
+E a leitura de **cadeia não oferece o verbo**: profundidade é sobre caminho, e
+caminho já tem escopo próprio (`percursos[]`). O verbo aparece só onde leva a
+algum lugar — o §244 aplicado campo a campo, e não à tela inteira. O E2E prova
+os dois lados na mesma tela.
+
+### Três achados
+
+1. **o elo faltou no meio.** `onVirarRegua` ia do App ao `ReadinessSummary` e
+   parava lá — o painel nunca o recebia. Os dois lados corretos, o meio vazio, e
+   só o E2E acharia;
+2. **`conexãoões`.** O template concatenava `conexão` + `ões` para o plural. Um
+   teste de frase pegou; sem ele, a régua nasceria com erro de português na cara
+   de quem lê;
+3. **o `build` pegou o que o `typecheck` não pegou** — um tipo não importado no
+   `ConfigScreen`. É o §"checar o que a CI checa" outra vez: os dois comandos
+   não olham o mesmo conjunto de arquivos.
+
+### O que ficou fora, e por que não é preguiça
+
+**P5 (modo de operação).** A SPEC-56 §7 estimou *"custo quase zero — é `when`,
+que o engine já avalia"*. **Medi, e não é**: `avaliarCondicao` é chamado por
+`camposVisiveis`, e este por seis lugares (prontidão, especificação,
+refinamento, revisão, painel, engine). Não é caro por ser difícil, é caro por
+ser **transversal** — e trabalho transversal feito junto com trabalho novo é
+como se erra nos dois.
+
+**P6 (variante A vs B).** A própria SPEC-56 §8 aponta o risco: copiar a quebra e
+editar faz as duas divergirem sem ninguém saber qual venceu. Fazer certo é uma
+quebra com duas variantes, decisão registrada, modelo, servidor, tela e
+migração. É uma SPEC inteira.
+
+**P7 (dialeto de provedor).** A SPEC-56 §9 já o chamou de *"o que mais parece
+impressionante numa demo e o que menos muda o item derivado"*. Segue valendo.
+
+431 engine · 717 web · 84 aplicação · 237 server · 129 llm · 93/93 E2E · build e
+lint limpos.

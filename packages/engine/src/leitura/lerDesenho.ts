@@ -438,6 +438,42 @@ export function marcasPorNo(
  * sem exigir limpeza: o registro fica na quebra, mas a tela só mostra o que
  * tem efeito.
  */
+/**
+ * SPEC-67 — o FATO virando a régua que o time pode assinar.
+ *
+ * É o "um clique" que a SPEC-65 §6.3 prometeu e o §292 não entregou, porque a
+ * checagem de grau não existia. Agora existe, e a conversão é direta:
+ *
+ * | leitura | régua |
+ * |---|---|
+ * | faz **3** chamadas que esperam | `limita-grau` · `maximo: 2` · `apenasQueEsperam` |
+ * | **4 saltos** até o bureau | *(nenhuma — ver abaixo)* |
+ *
+ * **`maximo` nasce em `numero - 1`**, e não em `numero`: a régua existe para
+ * cobrar o desenho que a motivou, e nascer permitindo-o faria o primeiro uso
+ * parecer quebrado.
+ *
+ * **Cadeia não vira régua, e `undefined` é a resposta.** Profundidade é sobre
+ * CAMINHO, e caminho já tem escopo próprio (`percursos[]`, com
+ * `ChecagemDePercurso`). Criar uma checagem de topologia para isso seria a
+ * mesma pergunta em dois lugares. Quem chama usa o `undefined` para não
+ * oferecer o verbo onde ele não leva a lugar nenhum (§244).
+ */
+export function reguaDaLeitura(
+  marca: MarcaDaLeitura,
+  tipoDoNo: string,
+  rotuloDoTipo: string
+): { texto: string; porque: string; checagem: import("../config/types.js").ChecagemDeTopologia } | undefined {
+  if (marca.tipo !== "fan-out") return undefined;
+  const maximo = Math.max(0, marca.numero - 1);
+  return {
+    texto: `${rotuloDoTipo} faz no máximo ${maximo} chamada${maximo === 1 ? "" : "s"} antes de responder`,
+    porque:
+      "A resposta é a soma das chamadas que esperam, e qualquer uma que falhe derruba as outras.",
+    checagem: { tipo: "limita-grau", tipoNo: tipoDoNo, direcao: "sai", maximo, apenasQueEsperam: true },
+  };
+}
+
 export function dispensasComEfeito(
   leitura: LeituraDoDesenho,
   dispensadas: LeituraDispensada[] = []

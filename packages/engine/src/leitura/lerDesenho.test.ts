@@ -8,6 +8,7 @@ import {
   formatarDuracao,
   lerDesenho,
   marcasPorNo,
+  reguaDaLeitura,
   resumirLeitura,
 } from "./lerDesenho.js";
 
@@ -419,5 +420,62 @@ describe("resumirLeitura — a frase que se lê sem abrir nada", () => {
   it("sem nada a dizer, NÃO devolve frase — chip que aparece sempre vira moldura", () => {
     expect(ler([no("a", "service"), no("f", "rabbit")], [aresta("e1", "a", "f", "publishes")])).toBeUndefined();
     expect(ler([], [])).toBeUndefined();
+  });
+});
+
+/**
+ * SPEC-67 — o fato virando a régua que o time pode assinar.
+ *
+ * É o "um clique" que a SPEC-65 §6.3 prometeu e o §292 não entregou, porque a
+ * checagem de grau não existia.
+ */
+describe("reguaDaLeitura — do fato à régua", () => {
+  const marca = (tipo: "fan-out" | "cadeia", numero: number) => ({
+    noId: "api",
+    numero,
+    titulo: "",
+    arestasIds: [],
+    tipo,
+  });
+
+  it("o máximo nasce em N-1 — a régua tem que cobrar o desenho que a motivou", () => {
+    // Nascer permitindo o desenho que a produziu faria o primeiro uso da régua
+    // parecer quebrado: ela apareceria e não acusaria nada.
+    const r = reguaDaLeitura(marca("fan-out", 3), "service", "Serviço")!;
+
+    expect(r.checagem).toEqual({
+      tipo: "limita-grau",
+      tipoNo: "service",
+      direcao: "sai",
+      maximo: 2,
+      apenasQueEsperam: true,
+    });
+  });
+
+  it("`apenasQueEsperam` vem ligado — senão a régua acusaria o desenho assíncrono certo", () => {
+    const r = reguaDaLeitura(marca("fan-out", 4), "service", "Serviço")!;
+    expect(r.checagem).toMatchObject({ apenasQueEsperam: true });
+  });
+
+  it("texto e porquê nascem prontos, e citam o componente", () => {
+    // §242 — sem o porquê, a régua cobra sem ensinar.
+    const r = reguaDaLeitura(marca("fan-out", 3), "service", "Serviço")!;
+
+    expect(r.texto).toBe("Serviço faz no máximo 2 chamadas antes de responder");
+    expect(r.porque).toContain("qualquer uma que falhe derruba as outras");
+  });
+
+  it("com 2 chamadas o máximo é 1, sem tratamento especial", () => {
+    // §7.2 da SPEC: severa, mas é o que a leitura mediu — e o campo é editável
+    // antes de gravar.
+    expect(reguaDaLeitura(marca("fan-out", 2), "service", "Serviço")!.checagem).toMatchObject({ maximo: 1 });
+  });
+
+  it("CADEIA não vira régua de forma — e `undefined` é a resposta", () => {
+    // §4.2: profundidade é sobre CAMINHO, e caminho já tem escopo próprio
+    // (`percursos[]`). Criar checagem de topologia para isso seria a mesma
+    // pergunta em dois lugares. Quem chama usa o `undefined` para não oferecer
+    // o verbo onde ele não leva a lugar nenhum (§244).
+    expect(reguaDaLeitura(marca("cadeia", 4), "service", "Serviço")).toBeUndefined();
   });
 });

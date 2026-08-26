@@ -172,7 +172,9 @@ export function LeituraDoDesenhoPanel({
                   <Verbos
                     marca={marcaDe(leitura.cadeiaMaisFunda.inicioNoId, "cadeia")}
                     onDispensar={onDispensar}
-                    onVirarRegua={onVirarRegua}
+                    // SPEC-67 §4.2 — cadeia NÃO vira régua de forma: é sobre
+                    // caminho, e caminho já tem escopo próprio (`percursos[]`).
+                    // O verbo só aparece onde leva a algum lugar (§244).
                   />
                 }
               >
