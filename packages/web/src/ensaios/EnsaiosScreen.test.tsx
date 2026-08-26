@@ -295,3 +295,53 @@ describe("EnsaiosScreen — as condições que não são lentidão", () => {
     ]);
   });
 });
+
+/**
+ * §298 — a espera tem que parecer construção.
+ *
+ * O botão dizia "sugerindo…" e mais nada — três pontos parados num produto que
+ * já tem uma gramática para "a IA está trabalhando".
+ */
+describe("EnsaiosScreen — a espera da sugestão", () => {
+  /** Uma promessa que não resolve: é o estado "enquanto monta". */
+  const nuncaResolve = () => new Promise<never>(() => {});
+
+  it("enquanto monta, a TABELA abre o lugar — é o que dá sensação de construção", async () => {
+    montar([], { onSugerir: nuncaResolve });
+
+    expect(screen.queryAllByTestId("ensaio-fantasma")).toHaveLength(0);
+    fireEvent.click(screen.getByTestId("sugerir-cenarios"));
+
+    const fantasmas = await screen.findAllByTestId("ensaio-fantasma");
+    expect(fantasmas).toHaveLength(3);
+    // O atraso ESCALONADO é o que separa "construindo" de "piscando junto".
+    expect(fantasmas.map((l) => (l as HTMLElement).style.animationDelay)).toEqual(["0ms", "90ms", "180ms"]);
+  });
+
+  it("o botão respira com a mesma classe do resto do produto", async () => {
+    // `pensando-ao-vivo` é como a esteira diz "estou trabalhando" antes do
+    // primeiro token. Uma animação nova aqui seria a segunda gramática.
+    montar([], { onSugerir: nuncaResolve });
+    fireEvent.click(screen.getByTestId("sugerir-cenarios"));
+
+    const botao = await screen.findByTestId("sugerir-cenarios");
+    expect(botao.querySelector(".pensando-ao-vivo")).not.toBeNull();
+    expect(botao).toHaveTextContent("montando");
+  });
+
+  it("o convite de tabela vazia SOME enquanto monta — os dois juntos se contradizem", async () => {
+    montar([], { onSugerir: nuncaResolve });
+    fireEvent.click(screen.getByTestId("sugerir-cenarios"));
+
+    await screen.findAllByTestId("ensaio-fantasma");
+    expect(screen.queryByTestId("sem-cenarios")).toBeNull();
+  });
+
+  it("a fantasma é invisível para leitor de tela — ela não é conteúdo", async () => {
+    montar([], { onSugerir: nuncaResolve });
+    fireEvent.click(screen.getByTestId("sugerir-cenarios"));
+
+    const [linha] = await screen.findAllByTestId("ensaio-fantasma");
+    expect(linha).toHaveAttribute("aria-hidden", "true");
+  });
+});

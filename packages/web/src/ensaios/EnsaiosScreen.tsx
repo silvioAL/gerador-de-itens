@@ -163,7 +163,17 @@ export function EnsaiosScreen({
         </button>
         {onSugerir && (
           <button onClick={sugerir} disabled={sugerindo} style={botaoNeutroEstilo} data-testid="sugerir-cenarios">
-            {sugerindo ? "sugerindo…" : "✦ sugerir cenários"}
+            {sugerindo ? (
+              <>
+                {/* §298 — a mesma gramática do resto do produto: `●●●` com
+                    `pip-pulso` é como a esteira diz "estou trabalhando" antes
+                    do primeiro token chegar. Três pontos PARADOS eram a única
+                    espera do sistema que não respirava. */}
+                ✨ montando <span className="pensando-ao-vivo">●●●</span>
+              </>
+            ) : (
+              "✦ sugerir cenários"
+            )}
           </button>
         )}
       </div>
@@ -323,7 +333,12 @@ export function EnsaiosScreen({
             );
           })}
 
-          {resultados.length === 0 && (
+          {/* §298 — o lugar se abre ANTES de a resposta chegar. É o que dá a
+              sensação de construção que o produto já tem no streaming: aqui a
+              resposta chega inteira, então quem constrói é a tabela. */}
+          {sugerindo && <LinhasFantasma />}
+
+          {resultados.length === 0 && !sugerindo && (
             <tr>
               <td colSpan={6} style={{ ...tdEstilo, color: "var(--texto-mudo)" }} data-testid="sem-cenarios">
                 Nenhum cenário ainda. Comece por um: "e se o componente mais lento ficar 3× pior?".
@@ -363,6 +378,49 @@ function Delta({ ms }: { ms?: number }) {
       {pior ? "+" : "−"}
       {formatarDuracao(Math.abs(ms))}
     </span>
+  );
+}
+
+/**
+ * §298 — as linhas que estão sendo montadas.
+ *
+ * Três, e não o número que vai chegar: ninguém sabe quantos cenários o modelo
+ * vai propor, e fingir saber seria a fantasma **afirmando** uma quantidade.
+ * Três é o suficiente para o gesto ler como "uma lista sendo construída".
+ *
+ * As larguras variam de propósito — barras do mesmo tamanho leem como barra de
+ * progresso, e não como conteúdo tomando forma.
+ */
+function LinhasFantasma() {
+  const larguras = [
+    ["58%", "42%", "30%", "38%", "64%"],
+    ["44%", "50%", "26%", "44%", "52%"],
+    ["66%", "38%", "34%", "34%", "58%"],
+  ];
+  return (
+    <>
+      {larguras.map((linha, i) => (
+        <tr
+          key={i}
+          className="ensaio-fantasma-linha"
+          data-testid="ensaio-fantasma"
+          aria-hidden="true"
+          // O atraso entre as linhas é o que separa "construindo" de "piscando
+          // junto": em uníssono, três linhas parecem erro de render.
+          style={{ animationDelay: `${i * 90}ms` }}
+        >
+          {linha.map((largura, j) => (
+            <td key={j} style={tdEstilo}>
+              <div
+                className="ensaio-fantasma"
+                style={{ width: largura, height: 10, animationDelay: `${i * 160 + j * 60}ms` }}
+              />
+            </td>
+          ))}
+          <td style={tdEstilo} />
+        </tr>
+      ))}
+    </>
   );
 }
 
