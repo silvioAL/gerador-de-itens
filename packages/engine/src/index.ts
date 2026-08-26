@@ -48,6 +48,20 @@ export {
   type ViolacaoDeTopologia,
 } from "./conformidade/topologia.js";
 export type { ChecagemDeTopologia, RequisitoDeTopologia } from "./config/types.js";
+export {
+  arestaEspera,
+  formatarDuracao,
+  lerDesenho,
+  resumirLeitura,
+  CAMPO_DE_TEMPO_PADRAO,
+  type CadeiaQueEspera,
+  type ElementoDaLeitura,
+  type FanOutQueEspera,
+  type LeituraDoDesenho,
+  type LimiaresDaLeitura,
+  type TempoDoTrecho,
+  type TerceiroNoCaminho,
+} from "./leitura/lerDesenho.js";
 export { deltaDeDecisao, deltaDePercurso, piorou } from "./remedicao/remedicao.js";
 export { compararDocumentos } from "./documento/compararDocumentos.js";
 export { exemploDeMedicao, valorQueEstoura } from "./conformidade/exemploDeMedicao.js";

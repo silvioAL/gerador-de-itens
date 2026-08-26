@@ -139,7 +139,28 @@
       "type": "object",
       "required": ["label"],
       "additionalProperties": false,
-      "properties": { "label": { "type": "string" }, "color": { "type": "string" } }
+      "properties": {
+        "label": { "type": "string" },
+        "color": { "type": "string" },
+        "verbo": {
+          "description": "Verbo usado na descrição da atividade derivada (\"publica em\", \"lê de\"). Sem isso, usa `label`.",
+          "type": "string"
+        },
+        "tamanhoPadrao": { "type": "string" },
+        "gerarAtividade": {
+          "description": "`false` para arestas puramente topológicas (ex.: `binding`) que não viram atividade própria — o padrão é gerar.",
+          "type": "boolean"
+        },
+        "spec": { "type": "array", "items": { "$ref": "#/$defs/fieldSpec" } },
+        "fluxo": {
+          "description": "Direção do fluxo de dados, usada só na animação do diagrama exportável — nunca pelo motor de derivação. Direção NÃO é sincronia: ver `espera`.",
+          "enum": ["forward", "reverse", "bidirectional"]
+        },
+        "espera": {
+          "description": "SPEC-65 — quem chama por esta conexão espera a resposta antes de seguir. Ausente = nada se afirma, e a leitura do desenho pula a conexão dizendo que pulou. Uma conexão pode contrariar o padrão do tipo respondendo o campo `sincrono` no próprio `spec`.",
+          "type": "boolean"
+        }
+      }
     },
     "edgeRule": {
       "type": "object",

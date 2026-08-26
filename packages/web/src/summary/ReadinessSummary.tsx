@@ -9,11 +9,13 @@ import {
   conciliarPercursos,
   deltaDePercurso,
   inferirPercursos,
+  lerDesenho,
   resumirDecisoes,
   violacoesDeFormaEmAberto,
   violacoesEmAberto,
 } from "@gerador/engine";
 import { PercursosPanel } from "./PercursosPanel";
+import { LeituraDoDesenhoPanel } from "./LeituraDoDesenhoPanel";
 import type { Decisao, Percurso, ViolacaoDeTopologia } from "@gerador/engine";
 import { ReadinessBadge } from "./ReadinessBadge";
 import { calcularResumoProntidao, type NoComProntidao } from "./prontidaoResumo";
@@ -145,6 +147,18 @@ export function ReadinessSummary({
       <span style={{ color: "var(--verde)" }}>
         <ReadinessBadge nivel="verde" /> {verdes.length}
       </span>
+      {/**
+       * SPEC-65 — logo depois das três cores, e por um motivo: elas respondem
+       * "os campos estão preenchidos?" e são lidas como "o desenho está bom?".
+       * Medido no §290: um desenho com três chamadas síncronas e um bureau de
+       * terceiro dizia "VERDE 8 — pronta para derivar" e mais nada. A leitura
+       * fica ao lado do número que estava respondendo sozinho.
+       */}
+      <LeituraDoDesenhoPanel
+        leitura={lerDesenho(diagrama, config)}
+        onSelecionarNo={onSelecionar}
+        onSelecionarAresta={onSelecionarAresta}
+      />
       {(necessidades?.length ?? 0) > 0 && (
         <button
           data-testid="proposito-resumo"
