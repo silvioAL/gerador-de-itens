@@ -10400,3 +10400,81 @@ tem, e produziriam número com cara de precisão e conteúdo de chute. Só soma 
 tempo pelo caminho que espera.
 
 Só a SPEC nesta rodada; nenhum código de produto mudou.
+
+## §294 — o painel que crescia por acréscimo, e a bancada de ensaio
+
+A SPEC-66 inteira (A→D), e antes dela uma correção no que a antecedeu.
+
+### O painel tinha virado uma parede de texto
+
+Pedido: *"revisitando a leitura em voz alta, deve ser simples de usar"*. Medi
+antes de mexer: **146 palavras e 424px de conteúdo num popover de 320px** — ele
+rolava, e "profundidade" e "terceiros" ficavam abaixo da dobra.
+
+A causa não foi descuido: cada fatia acrescentou um bloco, e **cada bloco
+repetia a explicação inteira em prosa**. "A resposta dele é a soma delas, e
+qualquer uma que falhe derruba as outras" aparecia uma vez por nó.
+
+A forma passou a ser uma só: **número em destaque, frase curta, consequência no
+título**. Quem quer o porquê passa o mouse; quem quer o número o lê de relance.
+Resultado medido: **33 palavras, 261px, sem rolagem**.
+
+O chip encolheu junto: `≥ 3,0 s de resposta · 1 por preencher` virou
+`resposta ≥ 3,0 s`. O `≥` **já é** o aviso de que a soma é piso, e dizê-lo
+também em palavras dobrava o chip para repetir a mesma coisa.
+
+> O usuário depois esclareceu que não tinha pedido enxugar — só que continuasse
+> fácil de usar. Mantive porque a medição mostrava um defeito real de
+> usabilidade (metade do painel abaixo da dobra), e disse isso em vez de
+> apresentar como se tivesse sido pedido.
+
+### A bancada: o cálculo é do motor, a pauta é da IA
+
+`simularCenario` aplica ajustes sobre uma **cópia** e recorre `lerDesenho`. Três
+decisões que o teste trava:
+
+- **o cenário nunca escreve no desenho.** Um "e se" que altera o diagrama de
+  verdade transformaria ensaio em mudança, e a pessoa perderia o original no
+  primeiro clique;
+- **multiplicar o que ninguém declarou não fabrica número.** Um fator sobre um
+  campo vazio daria um valor inventado com cara de medida; o elemento segue sem
+  valor, e a soma segue sendo piso;
+- **ajuste que perdeu o alvo é declarado**, não engolido (§57): o desenho mudou
+  depois do cenário, e a tabela diz quantos ficaram de fora da conta.
+
+`quemDomina` saiu **de graça** — `somarTempo` já percorria os contribuintes.
+Empate devolve os dois: escolher um seria inventar, que é a terceira resposta do
+§248 num caso novo.
+
+### A tabela, e por que o Δ é contra hoje
+
+A linha de **hoje** fica ancorada no topo: sem a referência na mesma tabela,
+"12 s" não diz nada a quem não sabe que hoje são 3 s. E o Δ compara sempre com
+ela, **nunca com a linha de cima** — em cadeia, a ORDEM das linhas mudaria o
+significado dos números.
+
+O `≥` sobrevive ao cenário: ele não inventa número que o desenho não deu.
+
+### A prova de que a tela não nasceu dependente da IA
+
+O E2E percorre o ciclo inteiro — abrir pelo chip, criar cenário, arrastar o
+fator, ver o Δ, salvar, F5 — **sem uma chamada de modelo**. Era o motivo de a
+SPEC ordenar B antes de D, e agora está travado por teste em vez de por
+intenção.
+
+O modelo devolve **ajustes, nunca tempos**: o esquema JSON não tem campo para
+resultado, e a regra também está escrita no prompt. Além disso o `tipo` (nó ou
+conexão) vem do **desenho**, não da resposta — o modelo só devolve o id, e
+ajuste com id desconhecido é descartado antes de virar linha.
+
+### Dois achados do navegador
+
+1. **o popover ficava flutuando sobre a tela nova.** A faixa de saúde vive nas
+   duas telas, então "e se ficar lento? →" navegava e deixava o painel aberto
+   por cima da simulação. Fecha antes de navegar;
+2. **dois nós com fan-out, um testid só.** Depois do enxugamento cada fan-out
+   virou uma linha própria, e o `data-testid="leitura-fanout"` passou a casar
+   com duas coisas diferentes. Passou a carregar o nó.
+
+415 engine · 711 web · 84 aplicação · 237 server · 129 llm · 91/91 E2E · build e
+lint limpos.

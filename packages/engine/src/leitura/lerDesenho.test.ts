@@ -287,7 +287,7 @@ describe("lerDesenho — o cenário que motivou a SPEC", () => {
     expect(t.ms).toBe(3000);
     expect(t.completo).toBe(false);
     expect(t.semValor).toHaveLength(1);
-    expect(resumirLeitura(leitura)).toBe("≥ 3,0 s de resposta · 1 por preencher");
+    expect(resumirLeitura(leitura)).toBe("resposta ≥ 3,0 s");
   });
 });
 
@@ -382,7 +382,7 @@ describe("resumirLeitura — a frase que se lê sem abrir nada", () => {
         [no("a", "service"), no("b", "sql")],
         [aresta("e1", "a", "b", "http", { timeoutMs: 1100 })]
       )
-    ).toBe("até 1,1 s de resposta");
+    ).toBe("resposta até 1,1 s");
   });
 
   it("com números pela metade, o '≥' impede ler a soma como total", () => {
@@ -392,7 +392,7 @@ describe("resumirLeitura — a frase que se lê sem abrir nada", () => {
         [no("a", "service"), no("b", "service"), no("c", "sql")],
         [aresta("e1", "a", "b", "http", { timeoutMs: 300 }), aresta("e2", "b", "c", "http")]
       )
-    ).toBe("≥ 300 ms de resposta · 1 por preencher");
+    ).toBe("resposta ≥ 300 ms");
   });
 
   it("SEM número nenhum ainda diz o que sabe — é o estado de quem acabou de desenhar", () => {

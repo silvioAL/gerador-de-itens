@@ -65,6 +65,15 @@ export {
   type TempoDoTrecho,
   type TerceiroNoCaminho,
 } from "./leitura/lerDesenho.js";
+export {
+  elementosComTempo,
+  simularCenario,
+  simularCenarios,
+  type AjusteDeCenario,
+  type CenarioDeLentidao,
+  type ElementoAjustavel,
+  type ResultadoDoCenario,
+} from "./leitura/simularLentidao.js";
 export { deltaDeDecisao, deltaDePercurso, piorou } from "./remedicao/remedicao.js";
 export { compararDocumentos } from "./documento/compararDocumentos.js";
 export { exemploDeMedicao, valorQueEstoura } from "./conformidade/exemploDeMedicao.js";

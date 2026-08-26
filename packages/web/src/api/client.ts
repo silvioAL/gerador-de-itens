@@ -745,6 +745,44 @@ export const apiIa = {
     }
     return interpretarRespostaEstruturada<DecisoesPropostas>(acumulado, "as decisões");
   },
+  /**
+   * SPEC-66 fatia D — o agente propõe a PAUTA do ensaio de lentidão.
+   *
+   * Devolve ajustes (que componente fica quantas vezes mais lento), nunca
+   * tempos calculados: quem calcula é o engine. O esquema do pedido nem tem
+   * onde encaixar um número de resposta — mas se um modelo insistir, o
+   * `simularCenario` ignora o que não conhece.
+   */
+  proporCenariosDeLentidao: async (pedido: PedidoCenariosDeLentidaoIa): Promise<CenariosPropostos> => {
+    const resposta = await fetch(`${BASE_URL}/ia/cenarios-de-lentidao`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(pedido),
+    });
+    if (!resposta.ok) {
+      const corpo = await resposta.json().catch(() => ({}));
+      const mensagem =
+        typeof corpo.erro === "string"
+          ? corpo.erro
+          : `Não foi possível sugerir cenários (HTTP ${resposta.status}, sem detalhe do servidor).`;
+      throw new Error(mensagem);
+    }
+    let acumulado = "";
+    const leitor = resposta.body?.getReader();
+    if (leitor) {
+      const decodificador = new TextDecoder();
+      for (;;) {
+        const { done, value } = await leitor.read();
+        if (done) break;
+        acumulado = soDepoisDoUltimoReinicio(acumulado + decodificador.decode(value, { stream: true }));
+      }
+      acumulado = soDepoisDoUltimoReinicio(acumulado + decodificador.decode());
+    } else {
+      acumulado = await resposta.text();
+    }
+    return interpretarRespostaEstruturada<CenariosPropostos>(acumulado, "os cenários");
+  },
   /** SPEC-57 fatia D — o agente propõe o PROPÓSITO da demanda a partir do
    * contexto que já existe. Chega como `sugerido`: a regra 2 cuida do resto —
    * não fecha lacuna e não é citado no documento até alguém confirmar. */
@@ -1159,6 +1197,21 @@ export interface PapelAcesso {
  * `auth/niveis.ts` do servidor). */
 export type NivelTime = "visualizar" | "operar" | "owner";
 export const NIVEIS_TIME: NivelTime[] = ["visualizar", "operar", "owner"];
+
+/** SPEC-66 fatia D — o que o modelo precisa saber para propor a pauta. */
+export interface PedidoCenariosDeLentidaoIa {
+  contextoEpico?: string;
+  contextoDoProduto?: string;
+  elementos?: { tipo: "no" | "aresta"; id: string; rotulo: string; msAtual?: number; externo?: boolean }[];
+  respostaAtualMs?: number;
+  respostaEhPiso?: boolean;
+  jaExistentes?: string[];
+}
+
+/** O que ele devolve: ajustes, nunca tempos. Quem calcula é o engine. */
+export interface CenariosPropostos {
+  cenarios: { nome: string; porque?: string; ajustes: { id: string; fator: number }[] }[];
+}
 
 export interface PedidoDecisoesIa {
   contextoEpico?: string;

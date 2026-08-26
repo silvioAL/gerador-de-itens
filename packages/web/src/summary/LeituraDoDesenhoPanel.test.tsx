@@ -32,6 +32,7 @@ const tempoCompleto = {
   completo: true,
   semValor: [],
   contribuintes: 2,
+  dominantes: [],
 };
 
 /**
@@ -44,7 +45,7 @@ describe("LeituraDoDesenhoPanel — o número fica NO chip, não atrás dele", (
     // informação, e escondê-la seria voltar ao "precisa abrir para saber".
     render(<LeituraDoDesenhoPanel leitura={leitura({ tempoDoPiorTrecho: tempoCompleto, tempos: [tempoCompleto] })} />);
 
-    expect(screen.getByTestId("leitura-resumo")).toHaveTextContent("até 1,1 s de resposta");
+    expect(screen.getByTestId("leitura-resumo")).toHaveTextContent("resposta até 1,1 s");
     // E nada foi aberto para isso.
     expect(screen.queryByTestId("leitura-lista")).toBeNull();
   });
@@ -77,6 +78,7 @@ describe("LeituraDoDesenhoPanel — o detalhe, e os endereços", () => {
     completo: false,
     semValor: [{ tipo: "aresta" as const, id: "e2", rotulo: "srv → banco" }],
     contribuintes: 2,
+    dominantes: [],
   };
 
   it("diz que a soma é PISO, e de quem está esperando o dado", () => {
@@ -89,7 +91,7 @@ describe("LeituraDoDesenhoPanel — o detalhe, e os endereços", () => {
       />
     );
 
-    expect(screen.getByTestId("leitura-resumo")).toHaveTextContent("≥ 300 ms de resposta · 1 por preencher");
+    expect(screen.getByTestId("leitura-resumo")).toHaveTextContent("resposta ≥ 300 ms");
     fireEvent.click(screen.getByTestId("leitura-resumo"));
 
     // O endereço leva à CONEXÃO, que é onde o timeoutMs se preenche (SPEC-64).
@@ -117,9 +119,9 @@ describe("LeituraDoDesenhoPanel — o detalhe, e os endereços", () => {
     );
     fireEvent.click(screen.getByTestId("leitura-resumo"));
 
-    const bloco = screen.getByTestId("leitura-fanout");
+    const bloco = screen.getByTestId("leitura-fanout-api");
     expect(bloco).toHaveTextContent("3");
-    expect(bloco).toHaveTextContent("a soma delas");
+    expect(bloco.getAttribute("title") ?? bloco.querySelector("[title]")?.getAttribute("title") ?? "").toContain("a soma");
   });
 
   it("declara o que ficou de fora por ninguém ter dito se espera", () => {
@@ -183,6 +185,6 @@ describe("LeituraDoDesenhoPanel — o detalhe, e os endereços", () => {
     render(<LeituraDoDesenhoPanel leitura={leitura({ tempoDoPiorTrecho: tempoCompleto, tempos: [tempoCompleto] })} />);
     fireEvent.click(screen.getByTestId("leitura-resumo"));
 
-    expect(screen.getByTestId("leitura-lista")).toHaveTextContent("sem nada a corrigir");
+    expect(screen.getByTestId("leitura-lista")).toHaveTextContent("leitura, não régua");
   });
 });

@@ -887,6 +887,129 @@ export function montarPedidoDecisoes(entrada: EntradaDecisoes): PedidoIa {
   return { prompt, esquema };
 }
 
+const MAX_CENARIOS = 5;
+
+export interface EntradaCenariosDeLentidao {
+  contextoEpico?: string;
+  contextoDoProduto?: string;
+  /**
+   * Os elementos que PODEM ficar lentos — os que declaram tempo. Só eles, e o
+   * `enum` do esquema fecha em cima disso: um ajuste sobre um elemento que não
+   * tem duração seria um controle que não controla nada.
+   */
+  elementos?: { tipo: "no" | "aresta"; id: string; rotulo: string; msAtual?: number; externo?: boolean }[];
+  /** O que o motor JÁ leu do desenho — é o que faz a proposta ser sobre ESTE
+   * desenho, e não sobre arquitetura em geral. */
+  respostaAtualMs?: number;
+  respostaEhPiso?: boolean;
+  /** Para não propor de novo o mesmo ensaio. */
+  jaExistentes?: string[];
+}
+
+/**
+ * SPEC-66 fatia D — o modelo propõe a PAUTA do ensaio, nunca o resultado.
+ *
+ * A divisão é a que sustenta a SPEC inteira: "se o bureau responder em 8 s,
+ * quanto demora a resposta?" é aritmética sobre o grafo — determinística, e
+ * **a mesma resposta toda vez**. Um modelo trocaria uma resposta exata por uma
+ * plausível, e ninguém deveria decidir arquitetura com número que muda entre
+ * execuções.
+ *
+ * O que ele faz melhor é saber QUE cenários merecem ensaio: bureau em pico,
+ * cache frio depois do deploy, timeout do cliente menor que a soma dos
+ * internos. Conhecimento de mundo, não conta.
+ *
+ * Por isso o esquema **não tem campo para tempo de resposta**. Um modelo
+ * prestativo devolveria "resultadoMs" por conta própria, e um número inventado
+ * ao lado dos calculados corrói a confiança na tabela inteira — então ele não
+ * cabe na forma da resposta, e a regra também está escrita no prompt.
+ */
+export function montarPedidoCenariosDeLentidao(entrada: EntradaCenariosDeLentidao): PedidoIa {
+  const { contextoEpico, contextoDoProduto, elementos = [], respostaAtualMs, respostaEhPiso, jaExistentes = [] } =
+    entrada;
+
+  if (elementos.length === 0) {
+    throw new PedidoInvalido(
+      "nenhum componente deste desenho declara tempo — não há o que ficar lento; preencha ao menos um timeout antes de pedir cenários"
+    );
+  }
+
+  const ids = elementos.map((e) => e.id);
+
+  const esquema = {
+    type: "object",
+    properties: {
+      cenarios: {
+        type: "array",
+        maxItems: MAX_CENARIOS,
+        items: {
+          type: "object",
+          properties: {
+            nome: { type: "string" },
+            porque: { type: "string" },
+            ajustes: {
+              type: "array",
+              minItems: 1,
+              maxItems: 4,
+              items: {
+                type: "object",
+                properties: {
+                  id: { enum: ids },
+                  // Só multiplicador. Valor absoluto convidaria o modelo a
+                  // afirmar um SLA que ele não tem como conhecer.
+                  fator: { type: "number" },
+                },
+                required: ["id", "fator"],
+              },
+            },
+          },
+          required: ["nome", "porque", "ajustes"],
+        },
+      },
+    },
+    required: ["cenarios"],
+  } as EsquemaJson;
+
+  const prompt = [
+    `Você ajuda um time a ensaiar o que acontece com a resposta de um sistema quando algo fica lento.`,
+    `Proponha CENÁRIOS DE LENTIDÃO plausíveis para este desenho.`,
+    ``,
+    ...(contextoDoProduto?.trim() ? [`Produto:`, contextoDoProduto.trim(), ``] : []),
+    ...(contextoEpico?.trim() ? [`Demanda:`, contextoEpico.trim(), ``] : []),
+    `Componentes que podem ficar lentos (use exclusivamente estes ids):`,
+    ...elementos.map(
+      (e) =>
+        `- ${e.id}: ${e.rotulo}${e.externo ? " [de terceiro]" : ""}${
+          e.msAtual !== undefined ? ` — hoje ${e.msAtual} ms` : " — sem tempo declarado"
+        }`
+    ),
+    ``,
+    ...(respostaAtualMs !== undefined
+      ? [`Hoje a resposta de ponta a ponta soma ${respostaAtualMs} ms${respostaEhPiso ? " (no mínimo)" : ""}.`, ``]
+      : []),
+    ...(jaExistentes.length > 0
+      ? [`Cenários que já existem (NÃO repita):`, ...jaExistentes.map((n) => `- ${n}`), ``]
+      : []),
+    `Regras:`,
+    `- NÃO calcule nem devolva tempo de resposta. Quem calcula é o motor, e um número seu ao lado`,
+    `  dos calculados faria a tabela inteira deixar de ser confiável. Devolva só QUAL componente`,
+    `  fica lento e QUANTAS VEZES pior ("fator").`,
+    `- Prefira o que acontece de verdade em produção: dependência de terceiro degradada em horário`,
+    `  de pico, cache frio depois do deploy, banco em failover, vizinho barulhento.`,
+    `- "porque" é o que faz alguém levar o cenário a sério: a circunstância real em que ele ocorre.`,
+    `  Um nome bonito sem circunstância é um cenário que ninguém sabe avaliar.`,
+    `- Componente de terceiro merece atenção especial: é o que o time não controla.`,
+    `- Fator entre 2 e 20. Abaixo de 2 não é lentidão, acima de 20 é indisponibilidade — e para`,
+    `  indisponibilidade a pergunta certa é outra.`,
+    `- Se o desenho não sugerir nenhum cenário digno, devolva "cenarios" VAZIA. Lista vazia é`,
+    `  resposta correta; cenário inventado para preencher cota faz a pessoa parar de ler todos.`,
+    `- No máximo ${MAX_CENARIOS}.`,
+    `- Responda em português.`,
+  ].join("\n");
+
+  return { prompt, esquema };
+}
+
 const MAX_NECESSIDADES = 8;
 
 export interface EntradaNecessidades {

@@ -17,6 +17,7 @@ import {
   type Quebra,
   type StatusDocumento,
   type ResultadoDependenciasDe,
+  elementosComTempo,
   gerarItensDeTrabalho,
   lerDesenho,
   marcasPorNo,
@@ -63,6 +64,7 @@ import { ReviewScreen } from "./review/ReviewScreen";
 import { ContextoEpicoPanel } from "./review/ContextoEpicoPanel";
 import { ConversaPanel } from "./conversa/ConversaPanel";
 import { AssistenteFlutuante, type AbaAssistente } from "./assistente/AssistenteFlutuante";
+import { SimulacaoScreen } from "./simulacao/SimulacaoScreen";
 import { ConfigurarPanel } from "./assistente/ConfigurarPanel";
 import { JourneyModal, type AbaJornada } from "./demo/JourneyModal";
 import { contextoDoProdutoEmTexto, montarMapaDoSistema, type ExecucaoDoPapel } from "@gerador/aplicacao";
@@ -424,6 +426,7 @@ function AppCarregado({
   const mostrarConfig = rota.tela === "config";
   const mostrarDocumento = rota.tela === "documento";
   const mostrarSistema = rota.tela === "sistema";
+  const mostrarSimulacao = rota.tela === "simulacao";
   // SPEC-41 Parte B — os itens materializados da quebra aberta. A fonte de
   // verdade é o server (persistem por quebra); o estado local é o espelho da
   // última geração/carga desta sessão.
@@ -1472,6 +1475,7 @@ function AppCarregado({
             ),
           }))
         }
+        onSimular={() => navegar({ tela: "simulacao" })}
         onSelecionar={setSelecionadoId}
         necessidades={quebra.necessidades}
         onAbrirProposito={() => setAbaAssistente("contexto")}
@@ -1678,6 +1682,63 @@ function AppCarregado({
             if (de < 0 || para < 0 || para >= papeis.length) return;
             [papeis[de], papeis[para]] = [papeis[para], papeis[de]];
             void salvarPipeline(papeis);
+          }}
+        />
+      )}
+
+      {/* SPEC-66 — a bancada de ensaio. Rota própria: o assistente é onde se
+          CONVERSA para produzir desenho, e aqui não se produz nada, se ensaia.
+          E rota é linkável, que é metade do valor. */}
+      {mostrarSimulacao && (
+        <SimulacaoScreen
+          diagrama={quebra.diagrama}
+          config={diagramaConfig}
+          cenarios={quebra.cenariosDeLentidao ?? []}
+          onMudar={(cenariosDeLentidao) => setQuebra((q) => ({ ...q, cenariosDeLentidao }))}
+          onVoltar={() => navegar({ tela: "canvas" })}
+          /**
+           * SPEC-66 fatia D — a pauta vem do modelo; a conta, do motor.
+           *
+           * O botão está sempre presente, e isso NÃO contraria o §244: sem
+           * modelo configurado ele não fica inerte, devolve o motivo escrito
+           * pelo servidor, que a tela mostra. O que o §244 proíbe é o botão que
+           * não faz nada — não o que explica por que não deu.
+           *
+           * A tela inteira segue funcionando sem ele: cenário à mão é o caminho
+           * principal, sugestão é atalho.
+           */
+          onSugerir={async () => {
+            const elementos = elementosComTempo(quebra.diagrama, diagramaConfig);
+            const t = leituraDoDesenho.tempoDoPiorTrecho;
+            const { cenarios } = await apiIa.proporCenariosDeLentidao({
+              contextoEpico: quebra.demandInfo,
+              elementos: elementos.map((e) => ({
+                tipo: e.tipo,
+                id: e.id,
+                rotulo: e.rotulo,
+                msAtual: e.msAtual,
+                externo: e.externo,
+              })),
+              respostaAtualMs: t?.ms,
+              respostaEhPiso: t ? !t.completo : undefined,
+              jaExistentes: (quebra.cenariosDeLentidao ?? []).map((c) => c.nome),
+            });
+            // O `tipo` vem do DESENHO, não do modelo: ele devolve só o id, e
+            // quem sabe se aquele id é nó ou conexão é quem montou a lista.
+            // Ajuste com id desconhecido é descartado — `simularCenario` também
+            // o declararia, mas deixá-lo entrar encheria a tabela de linha que
+            // não mede nada.
+            const porId = new Map(elementos.map((e) => [e.id, e.tipo]));
+            return cenarios.map((c, i) => ({
+              id: `cen-ia-${i}-${c.nome.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 24)}`,
+              nome: c.nome,
+              porque: c.porque,
+              origem: "sugerido" as const,
+              aceito: false,
+              ajustes: c.ajustes
+                .filter((a) => porId.has(a.id))
+                .map((a) => ({ tipo: porId.get(a.id)!, id: a.id, fator: a.fator })),
+            }));
           }}
         />
       )}

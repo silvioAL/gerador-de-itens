@@ -36,18 +36,17 @@ test("§291 — a leitura aparece sem confirmar caminho nem configurar régua", 
   const chip = page.getByTestId("leitura-resumo");
   await expect(chip).toBeVisible();
   /**
-   * "≥ 3,0 s de resposta · 1 por preencher".
+   * "resposta ≥ 3,0 s".
    *
    * O único tempo declarado no cenário é o `timeoutMs: 3000` do **nó**
    * `bureau-credito-nacional`; a conexão `http` que leva até ele está vazia.
-   * Então a leitura diz as duas coisas ao mesmo tempo, e é o §248 na tela: a
-   * soma é **piso** (`≥`), nunca total, e a pessoa sabe quantos elementos
-   * faltam para fechar a conta.
+   * O `≥` é o §248 na largura de um caractere: a soma é **piso**, nunca total.
+   * Quantos elementos faltam fica no detalhe, com o endereço de cada um — no
+   * chip isso dobrava o comprimento para dizer a mesma coisa duas vezes (§294).
    *
    * Este mesmo desenho dizia "VERDE 8 — pronta para derivar" e mais nada.
    */
-  await expect(chip).toContainText("≥ 3,0 s de resposta");
-  await expect(chip).toContainText("1 por preencher");
+  await expect(chip).toContainText("resposta ≥ 3,0 s");
   // E os caminhos seguem por confirmar — a leitura não esperou por eles.
   await expect(page.getByTestId("percursos-resumo")).toContainText("a confirmar");
 
@@ -55,11 +54,12 @@ test("§291 — a leitura aparece sem confirmar caminho nem configurar régua", 
   await chip.click();
   const lista = page.getByTestId("leitura-lista");
   // A frase que impede ler a leitura como cobrança (SPEC-65 §3).
-  await expect(lista).toContainText("sem nada a corrigir");
+  // §294 — a frase inteira virou o título do rótulo; o rótulo é o resumo dela.
+  await expect(lista).toContainText("leitura, não régua");
 
   // O fan-out do relato: o serviço de entrada faz três chamadas que esperam.
-  await expect(page.getByTestId("leitura-fanout")).toContainText("srv-credito-api");
-  await expect(page.getByTestId("leitura-fanout")).toContainText("3");
+  await expect(page.getByTestId("leitura-fanout-n1")).toContainText("srv-credito-api");
+  await expect(page.getByTestId("leitura-fanout-n1")).toContainText("3");
 
   // O terceiro dentro do trecho que espera — o que o "VERDE 8" não dizia.
   await expect(page.getByTestId("leitura-terceiros")).toContainText("bureau-credito-nacional");

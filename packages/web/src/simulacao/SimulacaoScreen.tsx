@@ -1,0 +1,509 @@
+import { useMemo, useState } from "react";
+import { elementosComTempo, formatarDuracao, simularCenarios } from "@gerador/engine";
+import type {
+  AjusteDeCenario,
+  CenarioDeLentidao,
+  Diagrama,
+  DiagramaConfig,
+  ElementoAjustavel,
+} from "@gerador/engine";
+
+/**
+ * SPEC-66 fatias B e C — a bancada de ensaio.
+ *
+ * ## Ela funciona inteira sem IA
+ *
+ * A sugestão de cenários é um botão a mais, nunca o caminho principal. É o §244
+ * pelo avesso: capacidade que só existe com IA ligada é capacidade que metade
+ * dos times não tem — e "e se o bureau ficar lento?" é uma pergunta que
+ * qualquer um faz sem ajuda nenhuma.
+ *
+ * ## Por que a linha de "hoje" fica ancorada
+ *
+ * Sem a referência na mesma tabela, todo número vira solto: "9 s" não diz nada
+ * a quem não sabe que hoje são 3 s. E o Δ é sempre contra hoje, nunca contra a
+ * linha de cima — comparar em cadeia faria a ORDEM das linhas mudar o
+ * significado dos números.
+ */
+export interface SimulacaoScreenProps {
+  diagrama: Diagrama;
+  config: DiagramaConfig;
+  cenarios: CenarioDeLentidao[];
+  onMudar: (cenarios: CenarioDeLentidao[]) => void;
+  onVoltar: () => void;
+  /** SPEC-66 fatia D — sugerir a pauta. Ausente = o botão não aparece, e a
+   * tela segue inteira (§244). */
+  onSugerir?: () => Promise<CenarioDeLentidao[]>;
+}
+
+/** Um id estável e legível, derivado do nome — a mesma disciplina do §289. */
+function idDoCenario(nome: string, existentes: CenarioDeLentidao[]): string {
+  const base =
+    "cen-" +
+    (nome
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "cenario");
+  if (!existentes.some((c) => c.id === base)) return base;
+  let i = 2;
+  while (existentes.some((c) => c.id === `${base}-${i}`)) i++;
+  return `${base}-${i}`;
+}
+
+export function SimulacaoScreen({
+  diagrama,
+  config,
+  cenarios,
+  onMudar,
+  onVoltar,
+  onSugerir,
+}: SimulacaoScreenProps) {
+  const [editando, setEditando] = useState<string | null>(null);
+  const [nome, setNome] = useState("");
+  const [sugerindo, setSugerindo] = useState(false);
+  const [erroSugestao, setErroSugestao] = useState<string | null>(null);
+
+  // O cálculo é puro e local: recalcular a cada arrastar de slider não custa
+  // rede nenhuma, e é o que faz o número acompanhar o gesto.
+  const { hoje, resultados } = useMemo(
+    () => simularCenarios(diagrama, config, cenarios),
+    [diagrama, config, cenarios]
+  );
+
+  // Só quem PODE ter tempo entra na lista de ajustáveis — a mesma função que
+  // monta o pedido à IA, para os dois lados oferecerem exatamente o mesmo
+  // conjunto.
+  const elementos = useMemo(() => elementosComTempo(diagrama, config), [diagrama, config]);
+
+  function criar() {
+    const texto = nome.trim();
+    if (!texto) return;
+    const id = idDoCenario(texto, cenarios);
+    onMudar([...cenarios, { id, nome: texto, origem: "manual", ajustes: [] }]);
+    setNome("");
+    setEditando(id);
+  }
+
+  function mudarCenario(id: string, muda: (c: CenarioDeLentidao) => CenarioDeLentidao) {
+    onMudar(cenarios.map((c) => (c.id === id ? muda(c) : c)));
+  }
+
+  async function sugerir() {
+    if (!onSugerir) return;
+    setSugerindo(true);
+    setErroSugestao(null);
+    try {
+      const propostos = await onSugerir();
+      // Proposta não vira fato: chegam DESMARCADOS, para alguém aceitar
+      // (regra 2 da SPEC-57 — inferir é grátis e erra, e modelo não é exceção).
+      onMudar([...cenarios, ...propostos.map((p) => ({ ...p, origem: "sugerido" as const, aceito: false }))]);
+    } catch (e) {
+      setErroSugestao(e instanceof Error ? e.message : "não deu para sugerir agora");
+    } finally {
+      setSugerindo(false);
+    }
+  }
+
+  const semTempo = hoje.tempoDoPiorTrecho === undefined;
+
+  return (
+    <div style={telaEstilo} data-testid="tela-simulacao">
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <button onClick={onVoltar} style={botaoNeutroEstilo} data-testid="simulacao-voltar">
+          ← Voltar à mesa de projeto
+        </button>
+        <h2 style={{ margin: 0, fontSize: 17 }}>E se ficar lento?</h2>
+      </div>
+
+      <p style={{ fontSize: 12, color: "var(--texto-2)", maxWidth: 760, lineHeight: 1.5 }}>
+        Cada cenário troca o tempo de um ou mais componentes e mostra o efeito na{" "}
+        <strong>resposta de ponta a ponta</strong>. Só conta o trecho em que quem chama espera — o que passa por fila
+        não segura ninguém. Nada aqui altera o desenho.
+      </p>
+
+      {/* §248 — sem número declarado não há o que ensaiar, e dizer isso é
+          melhor do que uma tabela de zeros que parece uma medição. */}
+      {semTempo && (
+        <div style={avisoEstilo} data-testid="simulacao-sem-tempo">
+          Nenhum componente do desenho tem tempo preenchido, então não há o que somar. Preencha o{" "}
+          <strong>Timeout (ms)</strong> de ao menos uma chamada e volte — o ensaio parte dos números reais, nunca de
+          números inventados.
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", margin: "6px 0 2px" }}>
+        <input
+          value={nome}
+          onChange={(e) => setNome(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && criar()}
+          placeholder="Nome do cenário (ex.: bureau degradado)"
+          aria-label="Nome do cenário"
+          style={campoEstilo}
+        />
+        <button onClick={criar} disabled={!nome.trim()} style={botaoEstilo} data-testid="criar-cenario">
+          + cenário
+        </button>
+        {onSugerir && (
+          <button onClick={sugerir} disabled={sugerindo} style={botaoNeutroEstilo} data-testid="sugerir-cenarios">
+            {sugerindo ? "sugerindo…" : "✦ sugerir cenários"}
+          </button>
+        )}
+      </div>
+      {erroSugestao && (
+        <div style={{ fontSize: 11, color: "var(--amarelo)" }} data-testid="erro-sugestao">
+          {erroSugestao}
+        </div>
+      )}
+
+      <table style={tabelaEstilo} data-testid="tabela-cenarios">
+        <thead>
+          <tr>
+            <th style={thEstilo}>Cenário</th>
+            <th style={thEstilo}>Resposta</th>
+            <th style={thEstilo}>Δ</th>
+            <th style={thEstilo} title="Quem mais pesa na soma — o total diz que dói, isto diz onde">
+              Quem domina
+            </th>
+            <th style={thEstilo} />
+          </tr>
+        </thead>
+        <tbody>
+          {/* A âncora. Sem ela na MESMA tabela, todo número é solto. */}
+          <tr data-testid="linha-hoje" style={{ background: "var(--painel-alto)" }}>
+            <td style={{ ...tdEstilo, fontWeight: 700 }}>hoje</td>
+            <td style={tdEstilo}>
+              {hoje.tempoDoPiorTrecho ? (
+                <Resposta ms={hoje.tempoDoPiorTrecho.ms} completo={hoje.tempoDoPiorTrecho.completo} />
+              ) : (
+                <span style={{ color: "var(--texto-mudo)" }}>—</span>
+              )}
+            </td>
+            <td style={tdEstilo}>—</td>
+            <td style={tdEstilo}>
+              <Dominantes lista={hoje.tempoDoPiorTrecho?.dominantes ?? []} />
+            </td>
+            <td style={tdEstilo} />
+          </tr>
+
+          {resultados.map((r) => {
+            const cenario = cenarios.find((c) => c.id === r.cenarioId)!;
+            const proposto = cenario.origem === "sugerido" && !cenario.aceito;
+            return (
+              <Fragmento key={r.cenarioId}>
+                <tr data-testid={`linha-${r.cenarioId}`} style={proposto ? { opacity: 0.75 } : undefined}>
+                  <td style={tdEstilo}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      <span style={{ fontWeight: 600 }}>{cenario.nome}</span>
+                      {cenario.origem === "sugerido" && (
+                        <span style={tagSugeridoEstilo} title="Proposto pelo modelo — ninguém olhou ainda">
+                          sugerido
+                        </span>
+                      )}
+                    </div>
+                    {/* §242 — o porquê é o que separa ensinar de cobrar, e sem
+                        ele um nome bonito é um cenário que ninguém sabe avaliar. */}
+                    {cenario.porque && (
+                      <div style={{ fontSize: 10.5, color: "var(--texto-mudo)" }}>{cenario.porque}</div>
+                    )}
+                  </td>
+                  <td style={tdEstilo}>
+                    {r.ms === undefined ? (
+                      <span style={{ color: "var(--texto-mudo)" }}>—</span>
+                    ) : (
+                      <Resposta ms={r.ms} completo={r.completo} />
+                    )}
+                  </td>
+                  <td style={tdEstilo}>
+                    <Delta ms={r.delta} />
+                  </td>
+                  <td style={tdEstilo}>
+                    <Dominantes lista={r.dominantes} />
+                  </td>
+                  <td style={{ ...tdEstilo, whiteSpace: "nowrap" }}>
+                    {proposto && (
+                      <button
+                        style={acaoEstilo}
+                        data-testid={`aceitar-${r.cenarioId}`}
+                        onClick={() => mudarCenario(r.cenarioId, (c) => ({ ...c, aceito: true }))}
+                      >
+                        aceitar
+                      </button>
+                    )}
+                    <button
+                      style={acaoEstilo}
+                      data-testid={`ajustar-${r.cenarioId}`}
+                      onClick={() => setEditando(editando === r.cenarioId ? null : r.cenarioId)}
+                    >
+                      {editando === r.cenarioId ? "fechar" : "ajustar"}
+                    </button>
+                    <button
+                      style={acaoEstilo}
+                      data-testid={`apagar-${r.cenarioId}`}
+                      onClick={() => onMudar(cenarios.filter((c) => c.id !== r.cenarioId))}
+                    >
+                      apagar
+                    </button>
+                  </td>
+                </tr>
+
+                {editando === r.cenarioId && (
+                  <tr data-testid={`ajustes-${r.cenarioId}`}>
+                    <td colSpan={5} style={{ ...tdEstilo, background: "var(--painel-alto)" }}>
+                      <Ajustes
+                        elementos={elementos}
+                        cenario={cenario}
+                        onMudar={(ajustes) => mudarCenario(r.cenarioId, (c) => ({ ...c, ajustes }))}
+                      />
+                    </td>
+                  </tr>
+                )}
+
+                {/* §57 — o desenho mudou depois do cenário. Um ensaio que
+                    ignorou parte do que lhe pediram tem que dizer. */}
+                {r.ajustesSemAlvo.length > 0 && (
+                  <tr data-testid={`sem-alvo-${r.cenarioId}`}>
+                    <td colSpan={5} style={{ ...tdEstilo, fontSize: 10.5, color: "var(--amarelo)" }}>
+                      {r.ajustesSemAlvo.length} ajuste(s) deste cenário apontam para elementos que não existem mais no
+                      desenho, e ficaram de fora da conta.
+                    </td>
+                  </tr>
+                )}
+              </Fragmento>
+            );
+          })}
+
+          {resultados.length === 0 && (
+            <tr>
+              <td colSpan={5} style={{ ...tdEstilo, color: "var(--texto-mudo)" }} data-testid="sem-cenarios">
+                Nenhum cenário ainda. Comece por um: "e se o componente mais lento ficar 3× pior?".
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Sem `<>` para o React 18 aceitar `key` sem `Fragment` importado à parte. */
+function Fragmento({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
+}
+
+/** O `≥` sobrevive ao cenário: ele não inventa número que o desenho não deu. */
+function Resposta({ ms, completo }: { ms: number; completo: boolean }) {
+  return (
+    <span
+      style={{ fontWeight: 700 }}
+      title={completo ? undefined : "É um PISO: nem todo elemento do trecho tem o tempo preenchido."}
+    >
+      {completo ? "" : "≥ "}
+      {formatarDuracao(ms)}
+    </span>
+  );
+}
+
+function Delta({ ms }: { ms?: number }) {
+  if (ms === undefined) return <span style={{ color: "var(--texto-mudo)" }}>—</span>;
+  if (ms === 0) return <span style={{ color: "var(--texto-mudo)" }}>igual</span>;
+  const pior = ms > 0;
+  return (
+    <span style={{ fontWeight: 700, color: pior ? "var(--amarelo)" : "var(--verde)" }}>
+      {pior ? "+" : "−"}
+      {formatarDuracao(Math.abs(ms))}
+    </span>
+  );
+}
+
+function Dominantes({ lista }: { lista: { elemento: { rotulo: string }; ms: number }[] }) {
+  if (lista.length === 0) return <span style={{ color: "var(--texto-mudo)" }}>—</span>;
+  return (
+    <span style={{ fontSize: 11 }}>
+      {lista.map((d) => d.elemento.rotulo).join(", ")}{" "}
+      <span style={{ color: "var(--texto-mudo)" }}>({formatarDuracao(lista[0].ms)})</span>
+    </span>
+  );
+}
+
+/**
+ * Os sliders — fatia C.
+ *
+ * Um por elemento ajustado, e a tabela recalcula **enquanto se arrasta**:
+ * o cálculo é puro e local, então não há rede entre o gesto e o número.
+ */
+function Ajustes({
+  elementos,
+  cenario,
+  onMudar,
+}: {
+  elementos: ElementoAjustavel[];
+  cenario: CenarioDeLentidao;
+  onMudar: (ajustes: AjusteDeCenario[]) => void;
+}) {
+  const [alvo, setAlvo] = useState(elementos[0]?.id ?? "");
+
+  function acrescentar() {
+    const el = elementos.find((e) => e.id === alvo);
+    if (!el || cenario.ajustes.some((a) => a.id === el.id)) return;
+    onMudar([...cenario.ajustes, { tipo: el.tipo, id: el.id, fator: 2 }]);
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {cenario.ajustes.map((a) => {
+        const el = elementos.find((e) => e.id === a.id);
+        return (
+          <div key={a.id} style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ fontSize: 11.5, minWidth: 200 }}>{el?.rotulo ?? a.id}</span>
+            <input
+              type="range"
+              min={1}
+              max={10}
+              step={0.5}
+              value={a.fator ?? 1}
+              aria-label={`Multiplicador de ${el?.rotulo ?? a.id}`}
+              data-testid={`fator-${a.id}`}
+              onChange={(e) =>
+                onMudar(
+                  cenario.ajustes.map((x) =>
+                    x.id === a.id ? { ...x, fator: Number(e.target.value), ms: undefined } : x
+                  )
+                )
+              }
+              style={{ flex: "1 1 160px", maxWidth: 260 }}
+            />
+            <strong style={{ fontSize: 12, minWidth: 42 }}>{(a.fator ?? 1).toFixed(1)}×</strong>
+            <button
+              style={acaoEstilo}
+              data-testid={`remover-ajuste-${a.id}`}
+              onClick={() => onMudar(cenario.ajustes.filter((x) => x.id !== a.id))}
+            >
+              remover
+            </button>
+          </div>
+        );
+      })}
+
+      {elementos.length === 0 ? (
+        <span style={{ fontSize: 11, color: "var(--texto-mudo)" }}>
+          Nenhum componente deste desenho declara tempo, então não há o que ajustar.
+        </span>
+      ) : (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <select
+            value={alvo}
+            onChange={(e) => setAlvo(e.target.value)}
+            aria-label="Componente a ajustar"
+            style={campoEstilo}
+          >
+            {elementos.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.rotulo}
+              </option>
+            ))}
+          </select>
+          <button onClick={acrescentar} style={acaoEstilo} data-testid={`add-ajuste-${cenario.id}`}>
+            + ajustar este
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const telaEstilo: React.CSSProperties = {
+  padding: "18px 22px",
+  display: "flex",
+  flexDirection: "column",
+  gap: 10,
+  fontFamily: "system-ui, sans-serif",
+  color: "var(--texto)",
+  overflow: "auto",
+  height: "100%",
+};
+
+const tabelaEstilo: React.CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+  fontSize: 12.5,
+  marginTop: 4,
+};
+
+const thEstilo: React.CSSProperties = {
+  textAlign: "left",
+  padding: "6px 8px",
+  borderBottom: "1px solid var(--borda-forte)",
+  fontSize: 11,
+  color: "var(--texto-mudo)",
+  fontWeight: 600,
+  textTransform: "uppercase",
+  letterSpacing: 0.4,
+};
+
+const tdEstilo: React.CSSProperties = {
+  padding: "8px",
+  borderBottom: "1px solid var(--borda)",
+  verticalAlign: "top",
+};
+
+const campoEstilo: React.CSSProperties = {
+  padding: "5px 9px",
+  borderRadius: 7,
+  border: "1px solid var(--borda-forte)",
+  background: "var(--painel)",
+  color: "var(--texto)",
+  fontSize: 12,
+  minWidth: 220,
+};
+
+const botaoEstilo: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 600,
+  padding: "5px 12px",
+  borderRadius: 7,
+  border: "1px solid var(--acento)",
+  background: "var(--acento)",
+  color: "#fff",
+  cursor: "pointer",
+};
+
+const botaoNeutroEstilo: React.CSSProperties = {
+  ...botaoEstilo,
+  border: "1px solid var(--borda-forte)",
+  background: "transparent",
+  color: "var(--texto-fraco)",
+};
+
+const acaoEstilo: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: 600,
+  padding: "3px 6px",
+  marginRight: 6,
+  borderRadius: 6,
+  border: "1px solid transparent",
+  background: "none",
+  color: "#a5b4fc",
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+};
+
+const tagSugeridoEstilo: React.CSSProperties = {
+  fontSize: 10,
+  fontWeight: 700,
+  padding: "1px 6px",
+  borderRadius: 999,
+  border: "1px solid var(--acento)",
+  color: "var(--acento)",
+};
+
+const avisoEstilo: React.CSSProperties = {
+  fontSize: 11.5,
+  padding: "8px 10px",
+  borderRadius: 8,
+  border: "1px solid var(--amarelo)",
+  color: "var(--texto-2)",
+  background: "rgba(245, 158, 11, 0.08)",
+  maxWidth: 760,
+};

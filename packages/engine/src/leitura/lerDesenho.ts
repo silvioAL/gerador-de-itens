@@ -56,6 +56,16 @@ export interface TempoDoTrecho {
   semValor: ElementoDaLeitura[];
   /** Quantos elementos entraram na soma; sem isto "0 ms" é ambíguo. */
   contribuintes: number;
+  /**
+   * SPEC-66 — quem mais pesa na soma.
+   *
+   * O total diz **que** dói; isto diz **onde**, e é o que separa um placar de
+   * uma ferramenta. Sai de graça: `somarTempo` já percorre os contribuintes.
+   *
+   * Empate devolve os dois. Escolher um seria inventar — a terceira resposta
+   * do §248 num caso novo.
+   */
+  dominantes: { elemento: ElementoDaLeitura; ms: number }[];
 }
 
 export interface FanOutQueEspera {
@@ -182,19 +192,29 @@ function somarTempo(
   diagrama: Diagrama,
   config: DiagramaConfig,
   campo: string
-): { ms: number; semValor: ElementoDaLeitura[]; contribuintes: number } {
+): {
+  ms: number;
+  semValor: ElementoDaLeitura[];
+  contribuintes: number;
+  dominantes: { elemento: ElementoDaLeitura; ms: number }[];
+} {
   const porId = new Map(diagrama.nodes.map((n) => [n.id, n]));
   let ms = 0;
   let contribuintes = 0;
   const semValor: ElementoDaLeitura[] = [];
+  const comValor: { elemento: ElementoDaLeitura; ms: number }[] = [];
 
   for (const id of trecho.nos) {
     const no = porId.get(id);
     if (!no || !declaraTempo(no, config.nodeTypes[no.type]?.spec, campo)) continue;
     contribuintes++;
     const valor = numeroDe(no.spec[campo]?.valor);
-    if (valor === undefined) semValor.push({ tipo: "no", id, rotulo: rotuloDoNo(no, id) });
-    else ms += valor;
+    const elemento = { tipo: "no" as const, id, rotulo: rotuloDoNo(no, id) };
+    if (valor === undefined) semValor.push(elemento);
+    else {
+      ms += valor;
+      comValor.push({ elemento, ms: valor });
+    }
   }
 
   for (const aresta of trecho.arestas) {
@@ -205,11 +225,16 @@ function somarTempo(
       porId.get(aresta.target),
       aresta.target
     )}`;
-    if (valor === undefined) semValor.push({ tipo: "aresta", id: aresta.id, rotulo });
-    else ms += valor;
+    const elemento = { tipo: "aresta" as const, id: aresta.id, rotulo };
+    if (valor === undefined) semValor.push(elemento);
+    else {
+      ms += valor;
+      comValor.push({ elemento, ms: valor });
+    }
   }
 
-  return { ms, semValor, contribuintes };
+  const maior = Math.max(0, ...comValor.map((c) => c.ms));
+  return { ms, semValor, contribuintes, dominantes: comValor.filter((c) => c.ms === maior && maior > 0) };
 }
 
 export function lerDesenho(
@@ -231,7 +256,7 @@ export function lerDesenho(
 
   for (const percurso of percursos) {
     for (const trecho of trechosQueEsperam(percurso, diagrama, config)) {
-      const { ms, semValor, contribuintes } = somarTempo(trecho, diagrama, config, campo);
+      const { ms, semValor, contribuintes, dominantes } = somarTempo(trecho, diagrama, config, campo);
       const rotulo = trecho.nos.map((id) => rotuloDoNo(porId.get(id), id)).join(" → ");
       if (contribuintes > 0) {
         tempos.push({
@@ -241,6 +266,7 @@ export function lerDesenho(
           completo: semValor.length === 0,
           semValor,
           contribuintes,
+          dominantes,
         });
       }
 
@@ -333,8 +359,11 @@ export function formatarDuracao(ms: number): string {
 export function resumirLeitura(leitura: LeituraDoDesenho): string | undefined {
   const t = leitura.tempoDoPiorTrecho;
   if (t && t.ms > 0) {
-    const base = t.completo ? `até ${formatarDuracao(t.ms)} de resposta` : `≥ ${formatarDuracao(t.ms)} de resposta`;
-    return t.completo ? base : `${base} · ${t.semValor.length} por preencher`;
+    // §294 — "resposta ≥ 3,0 s", e não "≥ 3,0 s de resposta · 1 por preencher".
+    // O `≥` já É o aviso de que a soma é piso; repeti-lo em palavras dobrava o
+    // comprimento do chip para dizer a mesma coisa duas vezes. Quantos faltam
+    // continua no detalhe, com o endereço de cada um.
+    return `resposta ${t.completo ? "até" : "≥"} ${formatarDuracao(t.ms)}`;
   }
   if (leitura.cadeiaMaisFunda) return `${leitura.cadeiaMaisFunda.saltos} saltos que esperam`;
   if (leitura.fanOut.length > 0) {
