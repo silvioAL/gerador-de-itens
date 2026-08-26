@@ -10328,3 +10328,75 @@ que pulou (§248).
 
 405 engine · 699 web · 84 aplicação · 237 server · 129 llm · 89/89 E2E · build e
 lint limpos.
+
+## §293 — a IA não calcula, ela escolhe a pergunta
+
+Pedido: *"tem como interagir usando IA? A intenção seria simular cenários de
+lentidão, abrir algum lugar que não existe ainda e ver uma tabela com cenários,
+tudo interativo, bonito e útil."*
+
+A avaliação inteira gira numa distinção, e errá-la contaminaria a tela toda:
+
+> **O cálculo não é da IA. A pauta é.**
+
+"Se o bureau responder em 8 s em vez de 3 s, quanto demora a resposta?" é
+aritmética sobre o grafo — trocar um número e recorrer `lerDesenho`. Já está
+implementado, roda em microssegundos e **dá o mesmo resultado toda vez**. Pedir
+isso a um modelo trocaria uma resposta exata por uma plausível, e ninguém
+deveria decidir arquitetura com um número que muda entre execuções.
+
+O que um modelo faz melhor que o motor é **saber que cenários merecem ensaio**:
+"bureau degradado em pico", "cache frio depois do deploy", "timeout do cliente
+menor que a soma dos internos". Conhecimento de mundo, não conta.
+
+É a divisão que o produto já pratica: **`/ia/sugerir` propõe, o engine decide.**
+A IA escreve a pauta; o motor roda o ensaio; a tabela mostra.
+
+### A consequência que isso impõe à tela
+
+**Ela funciona inteira sem IA.** Sem modelo configurado, a pessoa cria cenários
+à mão e a tabela responde igual — a sugestão é um botão a mais, nunca o caminho
+principal. É o §244 pelo avesso: capacidade que só existe com IA ligada é
+capacidade que metade dos times não tem.
+
+Daí a ordem das fatias não ser estilo: **B antes de D**. Entregar a IA primeiro
+faria a tela nascer dependente dela, e a fatia B existe justamente para provar
+que não é.
+
+### Quatro decisões sobre a tabela
+
+- **a linha de "hoje" fica ancorada no topo.** Sem a referência, todo número é
+  solto;
+- **"quem domina" é a coluna que ensina.** O total diz que dói; ela diz **onde**
+  — e vem de graça, é o maior contribuinte que `somarTempo` já percorre;
+- **o Δ é contra hoje**, nunca contra a linha anterior: comparar em cadeia faria
+  a ordem das linhas mudar o significado dos números;
+- **o `≥` sobrevive** (§248). Se o desenho não tem os timeouts, o cenário
+  também não tem, e cenário nenhum inventa número que o desenho não deu.
+
+### Rota própria, e a porta certa
+
+`#/simulacao`, não uma aba do assistente: o assistente é onde se **conversa**
+para produzir desenho, e aqui não se produz nada, se ensaia. Além disso a tabela
+precisa de largura, e — o que mais importa — **rota é linkável**: *"olha o que
+acontece se o bureau cair"* é uma URL que se manda para alguém, e isso é metade
+do valor.
+
+A porta de entrada é o chip da leitura: quem está lendo "≥ 3,0 s de resposta" é
+exatamente quem quer perguntar "e se piorar?", e é o único momento em que a
+pergunta ocorre sozinha.
+
+### A guarda contra a prestatividade do modelo
+
+O modelo devolve **ajustes, nunca tempos calculados**. Se mandar um número de
+resposta, é ignorado — e isso está escrito no prompt e no parser, porque é
+exatamente o tipo de coisa que um modelo faz por querer ajudar, e que corrói a
+confiança na tabela inteira.
+
+### O que ficou fora, escrito antes de alguém pedir
+
+Throughput, fila, contenção e percentil. Todos exigiriam dados que o desenho não
+tem, e produziriam número com cara de precisão e conteúdo de chute. Só soma de
+tempo pelo caminho que espera.
+
+Só a SPEC nesta rodada; nenhum código de produto mudou.
