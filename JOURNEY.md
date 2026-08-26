@@ -10702,3 +10702,57 @@ ser legível, não para limitar a busca.
 
 448 engine · 721 web · 84 aplicação · 237 server · 129 llm · 95/95 E2E · build e
 lint limpos.
+
+## §298 — a única espera do sistema que não respirava
+
+Relato com captura: *"aqui ao invés de só 3 pontos precisamos de algo animado,
+que dê a sensação de construção que já temos em geral nas interações com IA no
+sistema"*.
+
+Antes de desenhar, fui ver que gramática o produto **já tem** para "a IA está
+trabalhando" — inventar uma segunda seria o problema, não a solução:
+
+| onde | como |
+|---|---|
+| antes do primeiro token | `●●●` com `pip-pulso` (`.pensando-ao-vivo`) |
+| durante o streaming | caret piscando no fim do texto (`.texto-ao-vivo`) |
+| quem está trabalhando | `✨ <papel> escrevendo…` |
+
+O botão de sugerir ensaios dizia **"sugerindo…"** e mais nada. Era a única
+espera do sistema que não respirava.
+
+### Mas o botão não era o lugar principal
+
+Aqui não há stream a mostrar: a resposta chega inteira. E o lugar onde ela vai
+cair é uma **tabela**. Então a metáfora certa não é "pensando" — é **a linha
+abrindo espaço e sendo preenchida**.
+
+O botão ganhou a gramática de sempre (`✨ montando ●●●`), e a tabela ganhou
+linhas-fantasma: células que nascem como barras respirando, e que o conteúdo
+substitui.
+
+### Três decisões finas
+
+- **três linhas, não o número que vai chegar.** Ninguém sabe quantos cenários o
+  modelo vai propor, e fingir saber seria a fantasma **afirmando** uma
+  quantidade que ela não conhece;
+- **o atraso é escalonado** (90 ms entre linhas, 60 ms entre células). Em
+  uníssono, três linhas piscando leem como erro de render — o escalonamento é
+  literalmente o que separa "construindo" de "piscando junto";
+- **as larguras variam.** Barras do mesmo tamanho leem como barra de progresso;
+  variadas, leem como conteúdo tomando forma.
+
+E o convite de tabela vazia (*"nenhum cenário ainda…"*) **some** enquanto monta:
+os dois juntos se contradizem — um diz que não há nada, o outro mostra algo
+chegando.
+
+`aria-hidden` nas fantasmas, porque elas não são conteúdo: um leitor de tela
+anunciando três linhas vazias seria pior que silêncio.
+
+> Medi o resultado com duas capturas separadas por 700 ms: as barras aparecem em
+> brilhos diferentes nas duas, que é a prova de que a animação roda e de que ela
+> **não está em uníssono**. Animação é coisa de olhar — o teste de unidade trava
+> a causa (a classe, o atraso, o `aria-hidden`), e o olho confere o efeito.
+
+448 engine · 725 web · 84 aplicação · 237 server · 129 llm · 95/95 E2E · build e
+lint limpos.

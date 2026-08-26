@@ -16,14 +16,12 @@ const API = "http://localhost:4100";
  *
  * ## Sobre config global
  *
- * Este spec GRAVA em `regras.topologia`, e o §281 custou três specs vizinhos
- * ensinando o preço disso.
+ * Este spec GRAVA em `regras.topologia`, e o `forma-do-desenho` também.
  *
- * §297 — e o restore **devolve só `topologia`**, relendo o documento na hora.
- * Restaurar o documento INTEIRO (lido no começo) apaga o que um spec vizinho
- * escreveu no intervalo: o `conformidade` grava no `checklistTecnico`, e via a
- * própria régua sumir no meio do teste dele. O sintoma aparecia no vizinho, a
- * causa estava aqui — que é a assinatura do §281.
+ * §299 — por isso o restore remove **só o item que este spec criou**, relendo o
+ * documento na hora. Restaurar a LISTA que se leu no começo apaga o que o
+ * vizinho gravou no intervalo: o sintoma aparece no teste dele, e a causa está
+ * aqui — a assinatura do §281.
  */
 test("§295 — do fato à régua num clique, e o desenho que a gerou passa a ser acusado", async ({ page }) => {
   test.setTimeout(150000);
@@ -34,7 +32,6 @@ test("§295 — do fato à régua num clique, e o desenho que a gerou passa a se
   );
   await entrar(page);
 
-  const topologiaAntes = ((await (await page.request.get(`${API}/config/regras`)).json()).documento ?? {}).topologia;
   try {
     // O cenário do §290: `srv-credito-api` faz três chamadas que esperam.
     await page.getByTestId("abrir-cenarios").click();
@@ -83,12 +80,23 @@ test("§295 — do fato à régua num clique, e o desenho que a gerou passa a se
     // quanto é o excesso.
     await expect(lista).toContainText("3 conexões que esperam");
   } finally {
-    // Relê AGORA e devolve só o campo que este spec mexeu: o resto do
-    // documento pode ter mudado no intervalo, e sobrescrevê-lo apagaria a
-    // régua de um vizinho no meio do teste dele.
+    // Remove só o PRÓPRIO item, relendo agora.
+    //
+    // §299 — devolver "só o campo `topologia`" não bastou: o
+    // `forma-do-desenho` também mexe nele, e restaurar a LISTA que este spec
+    // leu no começo apaga a régua que o vizinho gravou no intervalo. Passou
+    // local por sorte de timing e falhou na CI. A unidade certa de restauração
+    // é o item, não o campo.
     const atual = (await (await page.request.get(`${API}/config/regras`)).json()).documento ?? {};
     await page.request.put(`${API}/config/regras`, {
-      data: { documento: { ...atual, topologia: topologiaAntes ?? [] } },
+      data: {
+        documento: {
+          ...atual,
+          topologia: (atual.topologia ?? []).filter(
+            (r: { checagem?: { tipo?: string } }) => r.checagem?.tipo !== "limita-grau"
+          ),
+        },
+      },
     });
   }
 });

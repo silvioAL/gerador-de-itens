@@ -3,6 +3,7 @@ import { entrar } from "./auth";
 
 const API = "http://localhost:4100";
 
+
 /**
  * SPEC-63 — a régua sobre a FORMA do desenho, do ciclo inteiro.
  *
@@ -13,10 +14,17 @@ const API = "http://localhost:4100";
  * ## Sobre mexer em config global
  *
  * O §281 custou três specs vizinhos ensinando que config global em suíte
- * paralela é estado compartilhado. Aqui a régua criada é de FORMA, e as réguas
- * de forma **não existem em nenhum outro spec** — nenhum vizinho lê
- * `regras.topologia`, e o desenho que ela acusa é o desta demanda. Ainda assim
- * o `finally` restaura, porque a janela existe e o próximo spec a herda.
+ * paralela é estado compartilhado.
+ *
+ * §299 — quando isto foi escrito, a nota aqui dizia que "as réguas de forma não
+ * existem em nenhum outro spec". **Deixou de ser verdade** no §295, e o custo
+ * apareceu na CI: dois specs disputando `regras.topologia`, cada um restaurando
+ * a LISTA que leu no começo — e o `finally` de um apagava o que o outro tinha
+ * acabado de gravar.
+ *
+ * O remédio é o `finally` abaixo: ele remove **só o item que este spec criou**,
+ * relendo o documento na hora. Restaurar por campo não serve quando dois specs
+ * disputam o mesmo campo; a unidade certa é o item.
  */
 test("§287 — a régua de forma nasce na tela, acusa o desenho e a exceção a silencia", async ({ page }) => {
   test.setTimeout(120000);
@@ -27,7 +35,6 @@ test("§287 — a régua de forma nasce na tela, acusa o desenho e a exceção a
   );
   await entrar(page);
 
-  const topologiaAntes = ((await (await page.request.get(`${API}/config/regras`)).json()).documento ?? {}).topologia;
   try {
     // ── A régua nasce pela TELA, não por JSON (fatia D) ──
     await page.goto("/#/config/regras");
@@ -72,12 +79,20 @@ test("§287 — a régua de forma nasce na tela, acusa o desenho e a exceção a
     // Sai do vermelho sem sair do histórico: o chip some porque nada mais cobra.
     await expect(page.getByTestId("conformidade-resumo")).toHaveCount(0);
   } finally {
-    // §297 — devolve só `topologia`, relendo o documento na hora. Restaurar o
-    // documento INTEIRO (lido no começo) apaga o que um vizinho escreveu no
-    // intervalo, e o sintoma aparece no teste dele, não neste.
+    // §299 — remove só o PRÓPRIO item, relendo agora. Restaurar a lista
+    // `topologia` que este spec leu no começo apagaria a régua que o
+    // `da-leitura-a-regua` gravou no intervalo: os dois mexem no mesmo campo,
+    // e a unidade certa de restauração é o item, não o campo.
     const atual = (await (await page.request.get(`${API}/config/regras`)).json()).documento ?? {};
     await page.request.put(`${API}/config/regras`, {
-      data: { documento: { ...atual, topologia: topologiaAntes ?? [] } },
+      data: {
+        documento: {
+          ...atual,
+          topologia: (atual.topologia ?? []).filter(
+            (r: { id?: string }) => r.id !== "forma-toda-fila-tem-consumidor"
+          ),
+        },
+      },
     });
   }
 });
