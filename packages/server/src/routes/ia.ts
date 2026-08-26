@@ -12,6 +12,7 @@ import {
   montarPedidoAlterarItem,
   montarPedidoConfigurarConversa,
   montarPedidoDiagrama,
+  montarPedidoCenariosDeLentidao,
   montarPedidoDecisoes,
   montarPedidoNecessidades,
   montarPedidoPipeline,
@@ -488,6 +489,22 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
     const pedido = comPedido(() => montarPedidoDecisoes((req.body ?? {}) as never), reply);
     if (!pedido) return reply;
     return executarPedido(reply, pedido, "ia/decisoes");
+  });
+
+  /**
+   * SPEC-66 fatia D — o agente propõe a PAUTA do ensaio de lentidão.
+   *
+   * Sem RBAC pelo mesmo motivo das três acima: receber proposta é leitura, e a
+   * proposta chega desmarcada — a escrita acontece no `PUT /quebras/:id`, que
+   * já tem o portão.
+   *
+   * O modelo devolve ajustes, nunca tempos: quem calcula é o engine
+   * (`simularCenario`), e o esquema não tem onde encaixar um número inventado.
+   */
+  app.post("/ia/cenarios-de-lentidao", async (req, reply) => {
+    const pedido = comPedido(() => montarPedidoCenariosDeLentidao((req.body ?? {}) as never), reply);
+    if (!pedido) return reply;
+    return executarPedido(reply, pedido, "ia/cenarios-de-lentidao");
   });
 
   app.post("/ia/sugerir-config", async (req, reply) => {

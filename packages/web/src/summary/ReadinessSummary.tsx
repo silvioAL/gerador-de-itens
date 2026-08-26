@@ -51,6 +51,8 @@ export interface ReadinessSummaryProps {
   leiturasDispensadas?: LeituraDispensada[];
   onDispensarLeitura?: (marca: MarcaDaLeitura) => void;
   onRestaurarLeitura?: (dispensa: LeituraDispensada) => void;
+  /** SPEC-66 — leva à bancada de ensaio. Ausente = a porta não aparece. */
+  onSimular?: () => void;
   /** §242 — as violações já aceitas de propósito. */
   excecoes?: ExcecaoDePadrao[];
   /** §242 — aceitar uma violação, com motivo. Ausente = a válvula não aparece. */
@@ -95,6 +97,7 @@ export function ReadinessSummary({
   leiturasDispensadas,
   onDispensarLeitura,
   onRestaurarLeitura,
+  onSimular,
   excecoes,
   onAceitarViolacao,
   onAceitarViolacaoDeForma,
@@ -181,6 +184,7 @@ export function ReadinessSummary({
         dispensadas={leiturasDispensadas}
         onDispensar={onDispensarLeitura}
         onRestaurar={onRestaurarLeitura}
+        onSimular={onSimular}
       />
       {(necessidades?.length ?? 0) > 0 && (
         <button

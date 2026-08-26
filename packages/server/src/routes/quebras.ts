@@ -131,6 +131,28 @@ const corpoQuebra = z.object({
       })
     )
     .optional(),
+  /** SPEC-66 — os ensaios de lentidão. Só a DEFINIÇÃO atravessa a borda:
+   * nenhum tempo calculado é guardado, senão a tabela mostraria o número de um
+   * desenho que já mudou. */
+  cenariosDeLentidao: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        nome: z.string().min(1),
+        origem: z.enum(["manual", "sugerido"]),
+        porque: z.string().optional(),
+        aceito: z.boolean().optional(),
+        ajustes: z.array(
+          z.object({
+            tipo: z.enum(["no", "aresta"]),
+            id: z.string().min(1),
+            fator: z.number().positive().optional(),
+            ms: z.number().nonnegative().optional(),
+          })
+        ),
+      })
+    )
+    .optional(),
 });
 
 /** Mesmo fallback de `.example.json` de `packages/web/vite.config.ts` (servirConfigEmDev)

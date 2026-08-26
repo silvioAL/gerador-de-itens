@@ -134,6 +134,7 @@ export {
   montarPedidoAlterarItem,
   montarPedidoConfigurarConversa,
   montarPedidoDiagrama,
+  montarPedidoCenariosDeLentidao,
   montarPedidoDecisoes,
   montarPedidoNecessidades,
   montarPedidoPipeline,

@@ -41,6 +41,14 @@ export interface LeituraDoDesenhoPanelProps {
    * regra vira régua de forma, com porquê, placar e exceção.
    */
   onVirarRegua?: (marca: MarcaDaLeitura) => void;
+  /**
+   * SPEC-66 — a porta para a bancada de ensaio.
+   *
+   * Fica aqui, e não no menu, porque quem está lendo "resposta ≥ 3,0 s" é
+   * exatamente quem quer perguntar "e se piorar?" — é o único momento em que a
+   * pergunta ocorre sozinha.
+   */
+  onSimular?: () => void;
 }
 
 export function LeituraDoDesenhoPanel({
@@ -51,6 +59,7 @@ export function LeituraDoDesenhoPanel({
   onDispensar,
   onRestaurar,
   onVirarRegua,
+  onSimular,
 }: LeituraDoDesenhoPanelProps) {
   const [aberto, setAberto] = useState(false);
   const raizRef = useRef<HTMLDivElement>(null);
@@ -95,25 +104,31 @@ export function LeituraDoDesenhoPanel({
 
       {aberto && (
         <div data-testid="leitura-lista" style={popoverEstilo}>
-          <div style={{ fontSize: 11, color: "var(--texto-mudo)", margin: "4px 0 8px" }}>
-            Isto é <strong>leitura</strong>, não régua: o desenho dito em voz alta, sem nada a corrigir. Só entra o
-            trecho em que <strong>quem chama espera a resposta</strong> — o que passa por fila não segura ninguém.
+          {/* §294 — era um parágrafo de 35 palavras. A frase inteira virou o
+              título: quem precisa dela lê passando o mouse, e quem já entendeu
+              não a relê toda vez que abre o painel. */}
+          <div
+            title="Só entra o trecho em que quem chama espera a resposta — o que passa por fila não segura ninguém. Nada aqui cobra: é o desenho dito em voz alta."
+            style={{ fontSize: 10.5, color: "var(--texto-mudo)", margin: "2px 0 6px", cursor: "help" }}
+          >
+            leitura, não régua ⓘ
           </div>
 
           {t && (
             <div style={linhaEstilo} data-testid="leitura-tempo">
-              <strong style={{ fontSize: 12 }}>
-                {t.completo ? "Resposta no pior caso" : "Resposta no pior caso (parcial)"}
-              </strong>
-              <div style={{ fontSize: 11 }}>
-                {t.completo ? "" : "pelo menos "}
-                <strong>{formatarDuracao(t.ms)}</strong> em <span style={{ color: "var(--texto-fraco)" }}>{t.rotulo}</span>
-              </div>
+              <Linha
+                numero={formatarDuracao(t.ms)}
+                titulo={`A soma dos tempos declarados ao longo de ${t.rotulo}.${
+                  t.completo ? "" : " É um PISO: nem todo elemento do trecho respondeu o tempo dele."
+                }`}
+              >
+                resposta {t.completo ? "até" : "no mínimo"}
+              </Linha>
               {/* §248 — dizer de quem se está esperando o dado é o que separa
                   "não consegui medir" de uma reclamação sem endereço. */}
               {t.semValor.length > 0 && (
-                <div style={{ fontSize: 11, color: "var(--texto-fraco)" }}>
-                  falta o tempo de{" "}
+                <div style={{ fontSize: 10.5, color: "var(--texto-mudo)" }}>
+                  falta{t.semValor.length > 1 ? "m" : ""}{" "}
                   {t.semValor.map((e, i) => (
                     <span key={e.id}>
                       {i > 0 && ", "}
@@ -127,55 +142,82 @@ export function LeituraDoDesenhoPanel({
             </div>
           )}
 
-          {leitura.fanOut.length > 0 && (
-            <div style={linhaEstilo} data-testid="leitura-fanout">
-              <strong style={{ fontSize: 12 }}>Chamadas antes de responder</strong>
-              {leitura.fanOut.map((f) => (
-                <div key={f.noId} style={{ fontSize: 11 }}>
-                  <button style={linkEstilo} onClick={() => onSelecionarNo?.(f.noId)}>
-                    {f.rotulo}
-                  </button>{" "}
-                  faz <strong>{f.chamadas.length}</strong> chamadas que esperam — a resposta dele é a soma delas, e
-                  qualquer uma que falhe derruba as outras.
-                  <Verbos
-                    marca={marcaDe(f.noId, "fan-out")}
-                    onDispensar={onDispensar}
-                    onVirarRegua={onVirarRegua}
-                  />
-                </div>
-              ))}
+          {leitura.fanOut.map((f) => (
+            // §294 — o testid carrega o nó: depois do enxugamento cada fan-out
+            // virou UMA linha, e um id repetido faria qualquer busca por ele
+            // casar com duas coisas diferentes.
+            <div key={f.noId} style={linhaEstilo} data-testid={`leitura-fanout-${f.noId}`}>
+              <Linha
+                numero={String(f.chamadas.length)}
+                titulo="A resposta dele é a soma dessas chamadas, e qualquer uma que falhe derruba as outras."
+                acoes={
+                  <Verbos marca={marcaDe(f.noId, "fan-out")} onDispensar={onDispensar} onVirarRegua={onVirarRegua} />
+                }
+              >
+                chamadas antes de{" "}
+                <button style={linkEstilo} onClick={() => onSelecionarNo?.(f.noId)}>
+                  {f.rotulo}
+                </button>{" "}
+                responder
+              </Linha>
             </div>
-          )}
+          ))}
 
           {leitura.cadeiaMaisFunda && (
             <div style={linhaEstilo} data-testid="leitura-cadeia">
-              <strong style={{ fontSize: 12 }}>Profundidade</strong>
-              <div style={{ fontSize: 11 }}>
-                <strong>{leitura.cadeiaMaisFunda.saltos} saltos</strong> que esperam até{" "}
+              <Linha
+                numero={String(leitura.cadeiaMaisFunda.saltos)}
+                titulo="O tempo é a soma dos saltos, e a disponibilidade é o produto deles."
+                acoes={
+                  <Verbos
+                    marca={marcaDe(leitura.cadeiaMaisFunda.inicioNoId, "cadeia")}
+                    onDispensar={onDispensar}
+                    onVirarRegua={onVirarRegua}
+                  />
+                }
+              >
+                saltos que esperam até{" "}
                 <button style={linkEstilo} onClick={() => onSelecionarNo?.(leitura.cadeiaMaisFunda!.fim.id)}>
                   {leitura.cadeiaMaisFunda.fim.rotulo}
-                </button>{" "}
-                — o tempo é a soma dos saltos, e a disponibilidade é o produto deles.
-                <Verbos
-                  marca={marcaDe(leitura.cadeiaMaisFunda.inicioNoId, "cadeia")}
-                  onDispensar={onDispensar}
-                  onVirarRegua={onVirarRegua}
-                />
-              </div>
+                </button>
+              </Linha>
             </div>
           )}
 
           {leitura.terceiros.length > 0 && (
             <div style={linhaEstilo} data-testid="leitura-terceiros">
-              <strong style={{ fontSize: 12 }}>De quem não é de vocês</strong>
-              {leitura.terceiros.map((x) => (
-                <div key={x.noId} style={{ fontSize: 11 }}>
-                  <button style={linkEstilo} onClick={() => onSelecionarNo?.(x.noId)}>
-                    {x.rotulo}
-                  </button>{" "}
-                  está dentro do trecho que espera: a resposta depende de um sistema de terceiro.
-                </div>
-              ))}
+              <Linha
+                numero={String(leitura.terceiros.length)}
+                titulo="Estão dentro do trecho que espera: a resposta depende de sistemas que não são de vocês."
+              >
+                de terceiro no caminho —{" "}
+                {leitura.terceiros.map((x, i) => (
+                  <span key={x.noId}>
+                    {i > 0 && ", "}
+                    <button style={linkEstilo} onClick={() => onSelecionarNo?.(x.noId)}>
+                      {x.rotulo}
+                    </button>
+                  </span>
+                ))}
+              </Linha>
+            </div>
+          )}
+
+          {onSimular && (
+            <div style={{ ...linhaEstilo, borderBottom: "none", paddingTop: 8 }}>
+              <button
+                style={acaoEstilo}
+                // Fecha ANTES de navegar: a faixa de saúde vive nas duas telas,
+                // então um popover deixado aberto vira uma folha flutuando por
+                // cima da tela nova. Achado do E2E.
+                onClick={() => {
+                  setAberto(false);
+                  onSimular();
+                }}
+                data-testid="abrir-simulacao"
+              >
+                e se ficar lento? →
+              </button>
             </div>
           )}
 
@@ -218,6 +260,39 @@ export function LeituraDoDesenhoPanel({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * §294 — uma leitura, uma linha.
+ *
+ * Medi o painel depois da fatia D: **146 palavras e 424px de conteúdo num
+ * popover de 320px** — ele rolava, e "profundidade" e "terceiros" ficavam
+ * abaixo da dobra. Cada fatia tinha acrescentado um bloco que repetia a
+ * explicação inteira em prosa, e a frase "a resposta dele é a soma delas…"
+ * aparecia uma vez por nó.
+ *
+ * A forma passa a ser sempre a mesma: **número em destaque, frase curta, e a
+ * consequência no título**. Quem quer entender o porquê passa o mouse; quem só
+ * quer o número o lê de relance — que é o pedido do relato.
+ */
+function Linha({
+  numero,
+  titulo,
+  acoes,
+  children,
+}: {
+  numero: string;
+  titulo: string;
+  acoes?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap", rowGap: 2 }} title={titulo}>
+      <strong style={{ fontSize: 14, color: "var(--texto)", flexShrink: 0 }}>{numero}</strong>
+      <span style={{ fontSize: 11, color: "var(--texto-2)", flex: "1 1 auto", minWidth: 0 }}>{children}</span>
+      {acoes}
     </div>
   );
 }
@@ -295,7 +370,7 @@ const popoverEstilo: React.CSSProperties = {
 };
 
 const linhaEstilo: React.CSSProperties = {
-  padding: "8px 4px",
+  padding: "6px 4px",
   borderBottom: "1px solid var(--borda)",
   display: "flex",
   flexDirection: "column",

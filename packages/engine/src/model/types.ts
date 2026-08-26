@@ -325,6 +325,25 @@ export interface Quebra {
    * sinal em ruído aceito.
    */
   leiturasDispensadas?: LeituraDispensada[];
+  /**
+   * SPEC-66 — os ensaios de lentidão desta demanda.
+   *
+   * Persistidos pelo mesmo motivo dos percursos: "bureau degradado" é o mesmo
+   * ensaio toda sprint, e refazê-lo à mão é atrito puro. O RESULTADO nunca é
+   * guardado — ele é recalculado do desenho de agora, senão a tabela mostraria
+   * o número de um desenho que já mudou.
+   */
+  cenariosDeLentidao?: CenarioDeLentidaoGuardado[];
+}
+
+/** SPEC-66 — a definição do ensaio, sem nenhum número calculado. */
+export interface CenarioDeLentidaoGuardado {
+  id: string;
+  nome: string;
+  origem: "manual" | "sugerido";
+  porque?: string;
+  aceito?: boolean;
+  ajustes: { tipo: "no" | "aresta"; id: string; fator?: number; ms?: number }[];
 }
 
 /** SPEC-65 fatia D — o silêncio pedido, com dono e data. */
