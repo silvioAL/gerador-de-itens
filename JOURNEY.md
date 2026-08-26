@@ -10069,3 +10069,83 @@ o `when`, `derivar` produzindo o item), pela mesma razão do
 
 377 engine · 689 web · 84 aplicação · 237 server · 129 llm · 86/86 E2E · build e
 lint limpos.
+
+## §290 — o verde que respondia a pergunta errada
+
+Relato: *"senti falta de um feedback em tempo real — um serviço recebendo uma
+chamada e fazendo diversas antes de responder não tem nenhum feedback disso
+enquanto está desenhando"*.
+
+Antes de opinar, medi. Carreguei o cenário `credito-completo` na pilha real, e
+ele é — sem eu ter escolhido — exatamente o exemplo do relato: três saídas do
+serviço de entrada, cadeia de quatro saltos, e um **bureau de terceiro** no fim
+dela.
+
+A faixa disse **VERMELHO 0 · AMARELO 0 · VERDE 8**, e o balão completou: *"Tudo
+verde — a quebra está pronta para derivar os itens de trabalho."*
+
+### O diagnóstico
+
+**Verde responde "todos os campos estão preenchidos?" e é lido como "o desenho
+está bom?".** A cor não mente sobre o que mede. Ela mente por omissão sobre o
+que não mede — e a frase "pronta para derivar" fecha a pergunta que a pessoa
+ainda deveria estar fazendo.
+
+Levantei os cinco mecanismos de feedback que existem e nenhum cobre isto:
+`calcularProntidao` é sobre **um** nó; `avaliarTopologia` (§287) é binária e
+pontual; `avaliarPercursos` exige caminho **confirmado** e régua configurada;
+`avisosDaDerivacao` (§261) só aparece **no clique de derivar**, que é tarde
+demais — a decisão de desenho já foi tomada; `detectarConflitos` olha o grafo de
+atividades, não o desenho.
+
+> Todo feedback deste produto é ou **por elemento** (a cor do nó) ou **por
+> momento** (o diálogo de derivar). Nenhum é **pela forma, enquanto ela nasce**.
+
+### A linha da SPEC-63, e como atravessá-la sem quebrá-la
+
+A SPEC-63 §1 escreveu: *"é a linha que impede isto de virar um linter de grafo
+genérico — não vamos cobrar ciclo, nó órfão ou componente desconectado por serem
+'feios'"*. Ela continua valendo, e foi o obstáculo real desta avaliação.
+
+A saída não é uma exceção à linha, é uma distinção:
+
+> **Uma régua diz "isto está errado". Uma leitura diz "isto é o que você
+> desenhou".**
+
+"Este serviço faz três chamadas que esperam resposta; a latência da resposta é a
+soma das três" não é julgamento de ninguém — é o desenho, dito em voz alta. Por
+isso a leitura não entra no placar ⚖, não bloqueia derivação, não vira item e
+**não pede exceção com motivo**: não há o que excepcionar num fato. O que ela
+ganha é um caminho de um clique para virar régua no `ConstrutorDeForma` da §287,
+quando o time decidir que aquele fato é uma regra.
+
+É também o que a impede de virar mais uma cor para ignorar (§230): ela não tem
+cor de erro, porque não é erro.
+
+### O achado que decidiu o desenho
+
+Para dizer "três chamadas **antes de responder**" é preciso saber quais arestas
+esperam resposta. **Nada no produto declara isso.** `EdgeTypeConfig.fluxo`
+existe, mas é direção, e o próprio comentário diz que serve *"só pra animação do
+diagrama exportável"*.
+
+Direção não é sincronia: `consumes` é `reverse` e assíncrono, `reads` é
+`reverse` e síncrono. E o nome do tipo não basta — `http` normalmente espera, e
+`http` fire-and-forget existe. Chutar aqui produziria a pior saída possível: uma
+frase confiante e errada sobre a arquitetura de alguém.
+
+Daí `espera?: boolean`, declarativo — e a lacuna que se declara: tipo sem
+`espera` sai da conta **e aparece na lista de ignorados**, com o caminho para
+resolver. Leitura que ignorou metade do desenho sem dizer é pior que leitura
+nenhuma (§57).
+
+### O que ficou fora, escrito antes de alguém pedir
+
+Ciclo, nó órfão, componente desconectado, profundidade assíncrona, contagem de
+tipos. Todas detectáveis, nenhuma com consequência dizível numa frase sem virar
+julgamento estético — que é o linter que a §287 recusou. Registrado na SPEC §5.5
+para não virar zelo daqui a três rodadas.
+
+Só a SPEC nesta rodada; nenhum código de produto mudou. As fatias estão em
+ordem, e **B antes de C não é negociável**: desenhar a marca antes de ter o que
+ela diz produz um número bonito que ninguém sabe explicar.
