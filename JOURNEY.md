@@ -10756,3 +10756,58 @@ anunciando três linhas vazias seria pior que silêncio.
 
 448 engine · 725 web · 84 aplicação · 237 server · 129 llm · 95/95 E2E · build e
 lint limpos.
+
+## §299 — a correção que consertou, o extra que quebrou, e o buraco que apareceu
+
+A rodada da animação (§298) levou quatro tentativas até fechar, e nenhuma delas
+foi sobre a animação. Fica registrado porque o que apareceu no caminho é maior
+que o que eu estava fazendo.
+
+### O que eu quebrei
+
+**1. O extra que custou caro.** A CI acusou o `da-leitura-a-regua`: a régua não
+chegava ao servidor. A causa era o §281 outra vez — meus dois specs de régua
+gravam em `regras.topologia`, e o `finally` de um restaurava a **lista** que leu
+no começo, apagando o que o outro tinha acabado de gravar. Passou local por
+sorte de timing.
+
+A correção certa foi trocar a unidade de restauração: **por item, não por
+campo** — relê o documento na hora e tira só o que aquele spec criou.
+
+Mas eu fiz um extra: juntei os dois arquivos num `describe.serial`. Isso mudou o
+escalonamento dos workers e **derrubou o `regras-por-componente`**, que vinha
+passando havia quatro PRs. Desfiz a fusão, e a CI ficou verde — provando que
+quem consertava era o restore por item.
+
+> **O extra não era gratuito, e eu tratei como se fosse.** Numa PR cujo assunto
+> era uma animação, mexer no arranjo dos arquivos de teste foi escopo que
+> ninguém pediu e que custou duas execuções de CI.
+
+**2. O ambiente.** Tentando limpar, derrubei o volume do banco E2E com o
+servidor de pé. As duas execuções seguintes mentiram (23 falhas, depois
+timeout do webServer), e gastei duas rodadas diagnosticando um problema que eu
+mesmo tinha criado dois comandos antes.
+
+### O buraco que apareceu, e que não é meu
+
+**Cinco specs escrevem no MESMO documento global de regras** —
+`abas-de-configuracao`, `conformidade`, `pdca-jornada`,
+`regras-por-componente` e os de régua de forma — com **seis workers em
+paralelo**.
+
+É a classe do §281 remendada spec a spec desde então: cada vez que ela estoura,
+conserta-se o spec que gritou. Nenhuma dessas correções tocou a causa, e por
+isso a próxima mudança de escalonamento a traz de volta noutro lugar.
+
+**A correção de raiz é isolar a config por time**, e o mecanismo já existe:
+`PUT /config/:chave` aceita `timeId`, e a tela lê pelo time ativo. É uma rodada
+própria — enfiá-la no fim de uma rodada de animação seria repetir exatamente o
+erro do extra acima.
+
+> A lição das duas metades desta entrada é a mesma, e ela é sobre disciplina de
+> escopo: **quando o teste falha, corrija o que falhou.** A vontade de "já que
+> estou aqui, arrumo isto também" foi o que quebrou o vizinho — e o que teria
+> quebrado mais três se eu tivesse ido adiante com o isolamento por time.
+
+448 engine · 725 web · 84 aplicação · 237 server · 129 llm · 95/95 E2E · build e
+lint limpos.
