@@ -117,6 +117,20 @@ const corpoQuebra = z.object({
    * gerada tem `null`, e distinguir isso de "não mandou o campo" é o que
    * permite o PUT não apagar um status por omissão. */
   documentoStatus: z.enum(["rascunho", "em-revisao", "aprovado", "implementado"]).nullish(),
+  /** SPEC-65 fatia D — as leituras caladas neste desenho. Só a DECISÃO
+   * atravessa a borda, como nos percursos: a leitura em si é pura e roda a cada
+   * render. `tipo` é string livre de propósito — leitura nova não deveria
+   * exigir migração de schema para poder ser calada. */
+  leiturasDispensadas: z
+    .array(
+      z.object({
+        noId: z.string().min(1),
+        tipo: z.string().min(1),
+        autor: z.string().optional(),
+        em: z.string().optional(),
+      })
+    )
+    .optional(),
 });
 
 /** Mesmo fallback de `.example.json` de `packages/web/vite.config.ts` (servirConfigEmDev)

@@ -51,10 +51,13 @@ export type { ChecagemDeTopologia, RequisitoDeTopologia } from "./config/types.j
 export {
   arestaEspera,
   formatarDuracao,
+  dispensasComEfeito,
   lerDesenho,
+  marcasPorNo,
   resumirLeitura,
   CAMPO_DE_TEMPO_PADRAO,
   type CadeiaQueEspera,
+  type MarcaDaLeitura,
   type ElementoDaLeitura,
   type FanOutQueEspera,
   type LeituraDoDesenho,

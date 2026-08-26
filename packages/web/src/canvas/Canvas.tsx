@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
   Controls,
@@ -12,7 +12,7 @@ import {
   useReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import type { DiagramaConfig, No } from "@gerador/engine";
+import type { DiagramaConfig, MarcaDaLeitura, No } from "@gerador/engine";
 import type { UseDiagrama } from "../state/useDiagrama";
 import { NodeCard, type NodeCardData } from "./NodeCard";
 
@@ -66,6 +66,24 @@ function estiloPorTipo(config: DiagramaConfig, tipo: string): { stroke: string }
   return estilo;
 }
 
+/**
+ * SPEC-65 fatia C — acesa ou esmaecida, enquanto se olha uma marca.
+ *
+ * Cache pelo mesmo motivo de `estiloPorTipo`: um literal aqui seria objeto novo
+ * a cada render, e é disso que o React Flow decide repintar.
+ */
+const estilosDeRealce = new Map<string, { stroke: string; strokeWidth?: number; opacity?: number }>();
+function estiloDeRealce(config: DiagramaConfig, tipo: string, acesa: boolean) {
+  const cor = config.edgeTypes[tipo]?.color ?? "#5c6a7e";
+  const chave = `${cor}:${acesa}`;
+  let estilo = estilosDeRealce.get(chave);
+  if (!estilo) {
+    estilo = acesa ? { stroke: cor, strokeWidth: 2.5 } : { stroke: cor, opacity: 0.18 };
+    estilosDeRealce.set(chave, estilo);
+  }
+  return estilo;
+}
+
 export function handlesPadrao(origem: Pick<No, "x" | "y">, destino: Pick<No, "x" | "y">) {
   const dx = destino.x - origem.x;
   const dy = destino.y - origem.y;
@@ -112,9 +130,17 @@ export interface CanvasProps {
    * ela, tudo continua como era.
    */
   aoClicarNo?: (id: string) => void;
+  /**
+   * SPEC-65 fatia C — as marcas de leitura a pendurar nos nós.
+   *
+   * Vem de fora porque quem lê o desenho é o App (a mesma leitura alimenta o
+   * chip da faixa), e calcular duas vezes daria duas verdades sobre o mesmo
+   * desenho na mesma tela. Ausente = canvas como sempre foi.
+   */
+  marcas?: MarcaDaLeitura[];
 }
 
-export function Canvas({ diagramaState, config, timePadrao, somenteLeitura, aoClicarNo }: CanvasProps) {
+export function Canvas({ diagramaState, config, timePadrao, somenteLeitura, aoClicarNo, marcas }: CanvasProps) {
   const {
     diagrama,
     selecionadoId,
@@ -154,21 +180,44 @@ export function Canvas({ diagramaState, config, timePadrao, somenteLeitura, aoCl
   }, [pedidoDeEnquadramento, fitView]);
 
 
+  /**
+   * SPEC-65 fatia C — qual leitura está sob o olhar.
+   *
+   * Estado local, e não do App: é hover, não decisão. Subi-lo faria toda
+   * passada de mouse no canvas re-renderizar a tela inteira, incluindo o painel
+   * lateral — pelo mesmo raciocínio que o §"piscar" já tinha ensinado aqui.
+   */
+  const [marcaOlhada, setMarcaOlhada] = useState<string | null>(null);
+  const olhar = useCallback((noId: string) => setMarcaOlhada(noId), []);
+  const desviar = useCallback(() => setMarcaOlhada(null), []);
+  const marcaPorNo = useMemo(() => new Map((marcas ?? []).map((m) => [m.noId, m])), [marcas]);
+
   const nodes: Node[] = useMemo(
     () =>
-      diagrama.nodes.map((no) => ({
-        id: no.id,
-        type: "domNo",
-        position: { x: no.x, y: no.y },
-        selected: no.id === selecionadoId,
-        data: {
-          no,
-          config,
-          arestas: diagrama.edges,
-          quebraTime: timePadrao,
-        } satisfies NodeCardData,
-      })),
-    [diagrama.nodes, diagrama.edges, timePadrao, config, selecionadoId]
+      diagrama.nodes.map((no) => {
+        const m = marcaPorNo.get(no.id);
+        return {
+          id: no.id,
+          type: "domNo",
+          position: { x: no.x, y: no.y },
+          selected: no.id === selecionadoId,
+          data: {
+            no,
+            config,
+            arestas: diagrama.edges,
+            quebraTime: timePadrao,
+            marca: m
+              ? {
+                  numero: m.numero,
+                  titulo: m.titulo,
+                  onOlhar: () => olhar(no.id),
+                  onDesviar: desviar,
+                }
+              : undefined,
+          } satisfies NodeCardData,
+        };
+      }),
+    [diagrama.nodes, diagrama.edges, timePadrao, config, selecionadoId, marcaPorNo, olhar, desviar]
   );
 
   /**
@@ -191,29 +240,40 @@ export function Canvas({ diagramaState, config, timePadrao, somenteLeitura, aoCl
   // de nós traria o piscar de volta — é literalmente o bug que se corrige aqui.
   const posicoes = useMemo(() => posicoesDaGeometria(geometriaNos), [geometriaNos]);
 
-  const edges: Edge[] = useMemo(
-    () =>
-      diagrama.edges.map((e) => {
-        const origem = posicoes.get(e.source);
-        const destino = posicoes.get(e.target);
-        const padrao = origem && destino ? handlesPadrao(origem, destino) : undefined;
-        return {
-          id: e.id,
-          source: e.source,
-          target: e.target,
-          sourceHandle: e.sourceHandle ?? padrao?.sourceHandle,
-          targetHandle: e.targetHandle ?? padrao?.targetHandle,
-          selected: e.id === arestaSelecionadaId,
-          label: config.edgeTypes[e.type]?.label ?? e.type,
-          style: estiloPorTipo(config, e.type),
-          // Constantes de módulo: literais aqui seriam objetos novos a cada
-          // render, e é isso que o React Flow usa pra decidir se repinta.
-          labelStyle: LABEL_STYLE,
-          labelBgStyle: LABEL_BG_STYLE,
-        };
-      }),
-    [posicoes, diagrama.edges, config, arestaSelecionadaId]
-  );
+  /**
+   * SPEC-65 fatia C — os ids a acender, como STRING.
+   *
+   * Valor primitivo pela mesma razão do `geometriaNos` logo acima: o memo das
+   * arestas é o que causou o piscar dos rótulos, e uma dependência de array
+   * (novo a cada render) traria o defeito de volta pela porta nova.
+   */
+  const acesas = marcaOlhada ? (marcaPorNo.get(marcaOlhada)?.arestasIds ?? []).join("|") : "";
+
+  const edges: Edge[] = useMemo(() => {
+    const acesasSet = acesas ? new Set(acesas.split("|")) : null;
+    return diagrama.edges.map((e) => {
+      const origem = posicoes.get(e.source);
+      const destino = posicoes.get(e.target);
+      const padrao = origem && destino ? handlesPadrao(origem, destino) : undefined;
+      return {
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        sourceHandle: e.sourceHandle ?? padrao?.sourceHandle,
+        targetHandle: e.targetHandle ?? padrao?.targetHandle,
+        selected: e.id === arestaSelecionadaId,
+        label: config.edgeTypes[e.type]?.label ?? e.type,
+        // Olhando uma marca, as conexões dela acendem e as demais esmaecem: a
+        // leitura vira visível NA figura, que é onde a pessoa está olhando.
+        style: acesasSet ? estiloDeRealce(config, e.type, acesasSet.has(e.id)) : estiloPorTipo(config, e.type),
+        animated: acesasSet ? acesasSet.has(e.id) : false,
+        // Constantes de módulo: literais aqui seriam objetos novos a cada
+        // render, e é isso que o React Flow usa pra decidir se repinta.
+        labelStyle: LABEL_STYLE,
+        labelBgStyle: LABEL_BG_STYLE,
+      };
+    });
+  }, [posicoes, diagrama.edges, config, arestaSelecionadaId, acesas]);
 
   function onNodesChange(changes: NodeChange[]) {
     for (const change of changes) {

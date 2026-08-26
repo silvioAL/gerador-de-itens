@@ -230,7 +230,23 @@ export function CamposArestaTab({ config, camposAresta, timeAtivo, onCriar, onAt
 
           return (
             <div key={tipoAresta} style={cardEstilo}>
-              <strong style={{ fontSize: 13, color: "var(--texto)" }}>{config.edgeTypes[tipoAresta]?.label ?? tipoAresta}</strong>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <strong style={{ fontSize: 13, color: "var(--texto)" }}>
+                  {config.edgeTypes[tipoAresta]?.label ?? tipoAresta}
+                </strong>
+                {/**
+                 * SPEC-65 — o que o produto ASSUME sobre esta conexão.
+                 *
+                 * Estava só no `diagrama.json`, e um pressuposto invisível é um
+                 * pressuposto que ninguém confere: é ele que decide se o
+                 * `timeoutMs` desta conexão entra na conta do tempo de resposta
+                 * (a leitura do desenho) ou não entra.
+                 *
+                 * "não declarado" não é falha a esconder — é a terceira
+                 * resposta (§248): a leitura pula a conexão E diz que pulou.
+                 */}
+                <EsperaDoTipo espera={config.edgeTypes[tipoAresta]?.espera} />
+              </div>
               {camposPadrao.length === 0 && camposCustom.length === 0 && (
                 <p style={{ fontSize: 11.5, color: "var(--texto-mudo)", margin: "6px 0 0" }}>Nenhum campo ainda.</p>
               )}
@@ -459,6 +475,50 @@ const introTextoEstilo: React.CSSProperties = {
   marginTop: 0,
   maxWidth: 680,
 };
+
+/**
+ * SPEC-65 — quem chama por esta conexão espera a resposta?
+ *
+ * Só leitura por enquanto, e de propósito: `espera` mora no `diagrama.json`
+ * GLOBAL, e esta aba edita campos POR TIME. Trocá-lo daqui exigiria um editor
+ * de config global no meio de um editor de campos de time — duas coisas
+ * diferentes no mesmo lugar, que é como se constrói a tela que ninguém
+ * entende. Enquanto isso, ao menos o pressuposto deixa de ser invisível.
+ */
+function EsperaDoTipo({ espera }: { espera?: boolean }) {
+  const texto =
+    espera === true
+      ? "espera resposta"
+      : espera === false
+        ? "não espera"
+        : "não declarado";
+  const titulo =
+    espera === true
+      ? "Quem chama por esta conexão bloqueia até a resposta: o tempo dela SOMA no tempo de resposta de quem chamou, e a falha dela derruba a chamada."
+      : espera === false
+        ? "Quem chama segue sem esperar: o que acontece depois desta conexão não entra no tempo de resposta de quem chamou."
+        : "Ninguém declarou. A leitura do desenho pula esta conexão em vez de chutar — e diz que pulou.";
+  const cor =
+    espera === true ? "var(--acento-indigo)" : espera === false ? "var(--texto-fraco)" : "var(--amarelo)";
+  return (
+    <span
+      title={titulo}
+      data-testid="espera-do-tipo"
+      style={{
+        fontSize: 10.5,
+        fontWeight: 600,
+        padding: "1px 7px",
+        borderRadius: 999,
+        border: `1px solid ${cor}`,
+        color: cor,
+        cursor: "help",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {texto}
+    </span>
+  );
+}
 
 const cardEstilo: React.CSSProperties = {
   border: "1px solid var(--borda)",

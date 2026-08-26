@@ -1,5 +1,5 @@
 import type { DiagramaConfig } from "../config/types.js";
-import type { Aresta, Diagrama, No, Percurso } from "../model/types.js";
+import type { Aresta, Diagrama, LeituraDispensada, No, Percurso } from "../model/types.js";
 import { inferirPercursos } from "../percurso/percursos.js";
 
 /**
@@ -72,6 +72,11 @@ export interface CadeiaQueEspera {
   saltos: number;
   /** O nó do fim da cadeia, que é o endereço para onde olhar. */
   fim: ElementoDaLeitura;
+  /** SPEC-65 fatia C — as conexões a acender no canvas. A leitura vira
+   * visível NA FIGURA, que é onde a pessoa está olhando. */
+  arestasIds: string[];
+  /** O começo da cadeia — é dele que a marca no canvas pendura. */
+  inicioNoId: string;
 }
 
 export interface TerceiroNoCaminho {
@@ -247,6 +252,8 @@ export function lerDesenho(
           rotulo,
           saltos,
           fim: { tipo: "no", id: ultimoId, rotulo: rotuloDoNo(porId.get(ultimoId), ultimoId) },
+          arestasIds: trecho.arestas.map((a) => a.id),
+          inicioNoId: trecho.nos[0],
         };
       }
 
@@ -335,4 +342,79 @@ export function resumirLeitura(leitura: LeituraDoDesenho): string | undefined {
     return `${maior.chamadas.length} chamadas antes de responder`;
   }
   return undefined;
+}
+
+/** SPEC-65 fatia C — o que uma marca no canvas precisa saber. */
+export interface MarcaDaLeitura {
+  noId: string;
+  /** O número que se lê no nó: chamadas, ou saltos. */
+  numero: number;
+  /** A frase do tooltip — o número sozinho não ensina nada. */
+  titulo: string;
+  /** As conexões a acender quando se olha para a marca. */
+  arestasIds: string[];
+  /** A chave da dispensa, estável por (nó, tipo de leitura). */
+  tipo: "fan-out" | "cadeia";
+}
+
+/**
+ * As marcas por nó, prontas para o canvas.
+ *
+ * **Uma marca por nó, nunca duas.** Um nó pode ser fan-out E começo da cadeia
+ * mais funda; duas marcas no mesmo canto viram enfeite, e enfeite é o que se
+ * para de ver. Quando os dois coincidem, o fan-out ganha: ele é sobre o nó em
+ * si ("este componente faz N chamadas"), enquanto a cadeia é sobre o caminho
+ * que passa por ele — e o canto de um nó fala do nó.
+ */
+export function marcasPorNo(
+  leitura: LeituraDoDesenho,
+  dispensadas: LeituraDispensada[] = []
+): MarcaDaLeitura[] {
+  const marcas = new Map<string, MarcaDaLeitura>();
+
+  if (leitura.cadeiaMaisFunda) {
+    const c = leitura.cadeiaMaisFunda;
+    marcas.set(c.inicioNoId, {
+      noId: c.inicioNoId,
+      numero: c.saltos,
+      titulo: `${c.saltos} saltos que esperam até ${c.fim.rotulo} — o tempo é a soma deles, e a disponibilidade é o produto deles`,
+      arestasIds: c.arestasIds,
+      tipo: "cadeia",
+    });
+  }
+
+  for (const f of leitura.fanOut) {
+    marcas.set(f.noId, {
+      noId: f.noId,
+      numero: f.chamadas.length,
+      titulo: `${f.chamadas.length} chamadas que esperam antes de responder — a resposta é a soma delas, e qualquer uma que falhe derruba as outras`,
+      arestasIds: f.chamadas.map((c) => c.id),
+      tipo: "fan-out",
+    });
+  }
+
+  // A dispensa é por PAR (nó, tipo). Filtrar no fim, e não na hora de montar,
+  // mantém a regra de "uma marca por nó" valendo antes de qualquer silêncio:
+  // do contrário, dispensar o fan-out faria a cadeia reaparecer no mesmo canto
+  // como se fosse a mesma marca voltando.
+  const calada = (m: MarcaDaLeitura) => dispensadas.some((d) => d.noId === m.noId && d.tipo === m.tipo);
+  return [...marcas.values()].filter((m) => !calada(m));
+}
+
+/**
+ * As dispensas que ainda dizem respeito ao desenho de agora.
+ *
+ * §283 aplicado aqui: dispensa de uma leitura que não existe mais não deve
+ * aparecer na lista de "caladas" — ela não está calando nada. E some sozinha,
+ * sem exigir limpeza: o registro fica na quebra, mas a tela só mostra o que
+ * tem efeito.
+ */
+export function dispensasComEfeito(
+  leitura: LeituraDoDesenho,
+  dispensadas: LeituraDispensada[] = []
+): { dispensa: LeituraDispensada; marca: MarcaDaLeitura }[] {
+  const vivas = new Map(marcasPorNo(leitura).map((m) => [`${m.noId}::${m.tipo}`, m]));
+  return dispensadas
+    .map((d) => ({ dispensa: d, marca: vivas.get(`${d.noId}::${d.tipo}`) }))
+    .filter((x): x is { dispensa: LeituraDispensada; marca: MarcaDaLeitura } => x.marca !== undefined);
 }

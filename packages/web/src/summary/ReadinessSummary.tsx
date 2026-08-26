@@ -16,7 +16,7 @@ import {
 } from "@gerador/engine";
 import { PercursosPanel } from "./PercursosPanel";
 import { LeituraDoDesenhoPanel } from "./LeituraDoDesenhoPanel";
-import type { Decisao, Percurso, ViolacaoDeTopologia } from "@gerador/engine";
+import type { Decisao, LeituraDispensada, LeituraDoDesenho, MarcaDaLeitura, Percurso, ViolacaoDeTopologia } from "@gerador/engine";
 import { ReadinessBadge } from "./ReadinessBadge";
 import { calcularResumoProntidao, type NoComProntidao } from "./prontidaoResumo";
 
@@ -38,6 +38,19 @@ export interface ReadinessSummaryProps {
    * `timeoutMs` de uma chamada síncrona mora lá), e o endereço tem que levar
    * até ela. */
   onSelecionarAresta?: (arestaId: string) => void;
+  /**
+   * SPEC-65 — a leitura do desenho, quando quem chama já a calculou.
+   *
+   * O App a passa porque ela também alimenta as marcas do canvas, e dois
+   * objetos iguais em valor e diferentes em identidade custam repintura lá.
+   * Ausente, calcula aqui: o documento monta a faixa sem passar pelo App.
+   */
+  leitura?: LeituraDoDesenho;
+  /** SPEC-65 fatia D — as leituras caladas, e os dois verbos. Ausentes = o
+   * painel só lê, sem oferecer ação que ninguém trata. */
+  leiturasDispensadas?: LeituraDispensada[];
+  onDispensarLeitura?: (marca: MarcaDaLeitura) => void;
+  onRestaurarLeitura?: (dispensa: LeituraDispensada) => void;
   /** §242 — as violações já aceitas de propósito. */
   excecoes?: ExcecaoDePadrao[];
   /** §242 — aceitar uma violação, com motivo. Ausente = a válvula não aparece. */
@@ -78,6 +91,10 @@ export function ReadinessSummary({
   regras,
   onSelecionarViolacao,
   onSelecionarAresta,
+  leitura,
+  leiturasDispensadas,
+  onDispensarLeitura,
+  onRestaurarLeitura,
   excecoes,
   onAceitarViolacao,
   onAceitarViolacaoDeForma,
@@ -155,9 +172,15 @@ export function ReadinessSummary({
        * fica ao lado do número que estava respondendo sozinho.
        */}
       <LeituraDoDesenhoPanel
-        leitura={lerDesenho(diagrama, config)}
+        // Vem de fora quando quem chama já a tem (o App, que também alimenta as
+        // marcas do canvas): duas chamadas dariam dois objetos iguais em valor e
+        // diferentes em identidade, e no canvas isso custa repintura.
+        leitura={leitura ?? lerDesenho(diagrama, config)}
         onSelecionarNo={onSelecionar}
         onSelecionarAresta={onSelecionarAresta}
+        dispensadas={leiturasDispensadas}
+        onDispensar={onDispensarLeitura}
+        onRestaurar={onRestaurarLeitura}
       />
       {(necessidades?.length ?? 0) > 0 && (
         <button
