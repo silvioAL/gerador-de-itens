@@ -217,30 +217,35 @@ export function PercursosPanel({
               </div>
               {aConfirmar.map((p) => (
                 <div key={p.id} data-testid="percurso-a-confirmar" style={{ padding: "3px 0" }}>
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <button style={linkEstilo} onClick={() => onSelecionarNo?.(p.nos[0])}>
+                  <div style={itemEstilo}>
+                    <button style={{ ...linkEstilo, ...rotuloEstilo }} onClick={() => onSelecionarNo?.(p.nos[0])}>
                       {p.rotulo}
                     </button>
-                    <div style={{ flex: 1 }} />
-                    <button style={botaoMiniEstilo} onClick={() => onConfirmar(p.id)} data-testid={`confirmar-${p.id}`}>
-                      confirmar
-                    </button>
-                    {/* SPEC-64 fatia C — o verbo do meio. Um trajeto quase
-                        certo só podia ser recusado, e recusar não dizia o que
-                        era certo. */}
-                    {onAjustar && (
+                    <div style={acoesEstilo}>
                       <button
-                        style={linkEstilo}
-                        onClick={() => onAjustar(p)}
-                        data-testid={`ajustar-${p.id}`}
-                        title="Usa esta sequência como ponto de partida e deixa você corrigi-la no desenho"
+                        style={botaoMiniEstilo}
+                        onClick={() => onConfirmar(p.id)}
+                        data-testid={`confirmar-${p.id}`}
                       >
-                        ajustar
+                        confirmar
                       </button>
-                    )}
-                    <button style={linkEstilo} onClick={() => onDescartar(p.id)}>
-                      não é caminho
-                    </button>
+                      {/* SPEC-64 fatia C — o verbo do meio. Um trajeto quase
+                          certo só podia ser recusado, e recusar não dizia o que
+                          era certo. */}
+                      {onAjustar && (
+                        <button
+                          style={acaoEstilo}
+                          onClick={() => onAjustar(p)}
+                          data-testid={`ajustar-${p.id}`}
+                          title="Usa esta sequência como ponto de partida e deixa você corrigi-la no desenho"
+                        >
+                          ajustar
+                        </button>
+                      )}
+                      <button style={acaoEstilo} onClick={() => onDescartar(p.id)}>
+                        não é caminho
+                      </button>
+                    </div>
                   </div>
                   {/* §263 — o preço de confirmar, ANTES de confirmar. Aqui o
                       delta é o único aviso possível: o item que a confirmação
@@ -267,11 +272,10 @@ export function PercursosPanel({
               </div>
               {obsoletos.map((p) => (
                 <div key={p.id} data-testid="percurso-obsoleto" style={itemEstilo}>
-                  <span style={{ fontSize: 11, color: "var(--amarelo)" }}>⚠ {p.rotulo}</span>
-                  <div style={{ flex: 1 }} />
+                  <span style={{ fontSize: 11, color: "var(--amarelo)", ...rotuloEstilo }}>⚠ {p.rotulo}</span>
                   {onReabrir && (
                     <button
-                      style={linkEstilo}
+                      style={acaoUnicaEstilo}
                       onClick={() => onReabrir(p.id)}
                       data-testid={`remover-${p.id}`}
                       title="Esquece este registro. Como o desenho não produz mais este caminho, ele não volta."
@@ -288,7 +292,7 @@ export function PercursosPanel({
             <div style={{ ...linhaEstilo, borderBottom: "none", fontSize: 11, color: "var(--texto-fraco)" }}>
               {confirmados.map((p) => (
                 <div key={p.id} data-testid="percurso-confirmado" style={itemEstilo}>
-                  <span>
+                  <span style={rotuloEstilo}>
                     ✓ {p.rotulo}
                     {/* Declarado à mão é outra coisa de confirmado: ninguém o
                         leu do desenho, alguém o afirmou. Dizer isso é o que
@@ -297,14 +301,13 @@ export function PercursosPanel({
                       <span style={{ marginLeft: 6, fontSize: 10, color: "var(--texto-mudo)" }}>declarado à mão</span>
                     )}
                   </span>
-                  <div style={{ flex: 1 }} />
                   {/* §283 — confirmar deixou de ser porta de mão única. Não é
                       clique inócuo: ele liga as réguas de tempo e de saltos
                       sobre o caminho e põe item no backlog (§249), e ficava a um
                       pixel do "não é caminho". */}
                   {onReabrir && (
                     <button
-                      style={linkEstilo}
+                      style={acaoUnicaEstilo}
                       onClick={() => onReabrir(p.id)}
                       data-testid={`desfazer-${p.id}`}
                       title={
@@ -335,10 +338,13 @@ export function PercursosPanel({
               </div>
               {recusados.map((p) => (
                 <div key={p.id} data-testid="percurso-recusado" style={itemEstilo}>
-                  <span style={{ fontSize: 11, color: "var(--texto-fraco)" }}>{p.rotulo}</span>
-                  <div style={{ flex: 1 }} />
+                  <span style={{ fontSize: 11, color: "var(--texto-fraco)", ...rotuloEstilo }}>{p.rotulo}</span>
                   {onReabrir && (
-                    <button style={linkEstilo} onClick={() => onReabrir(p.id)} data-testid={`reabrir-${p.id}`}>
+                    <button
+                      style={acaoUnicaEstilo}
+                      onClick={() => onReabrir(p.id)}
+                      data-testid={`reabrir-${p.id}`}
+                    >
                       reabrir
                     </button>
                   )}
@@ -402,13 +408,34 @@ const popoverEstilo: React.CSSProperties = {
   textAlign: "left",
 };
 
-/** Linha de um caminho: rótulo à esquerda, ação à direita. */
+/**
+ * Linha de um caminho: rótulo à esquerda, ações à direita.
+ *
+ * §288 — o rótulo é `a → b → c`: cresce com o desenho e não tem teto. Sem
+ * `flexWrap` ele espremia as ações até "não é caminho" quebrar no meio. Quando
+ * não couber, o grupo de ações desce inteiro em vez de se estreitar.
+ */
 const itemEstilo: React.CSSProperties = {
   display: "flex",
   gap: 6,
+  rowGap: 4,
+  flexWrap: "wrap",
   alignItems: "center",
   padding: "2px 0",
 };
+
+/** O rótulo cede espaço; as ações, não. `minWidth: 0` é o que autoriza. */
+const rotuloEstilo: React.CSSProperties = { flex: "1 1 auto", minWidth: 0 };
+
+/** As ações andam juntas: ou cabem todas na linha do rótulo, ou descem todas. */
+const acoesEstilo: React.CSSProperties = {
+  display: "flex",
+  gap: 10,
+  alignItems: "center",
+  marginLeft: "auto",
+  flexShrink: 0,
+};
+
 
 const linhaEstilo: React.CSSProperties = {
   padding: "8px 4px",
@@ -429,6 +456,27 @@ const linkEstilo: React.CSSProperties = {
   textAlign: "left",
 };
 
+/**
+ * §288 — a ação que não é pílula continua sendo ação.
+ *
+ * "ajustar" e "não é caminho" herdavam o `linkEstilo` do RÓTULO, que existe
+ * para texto corrido: `padding: 0` e quebra livre. Ao lado de um botão sólido
+ * isso dava um alvo de clique de onze pixels sem folga, e o rótulo mais longo
+ * partia "não é caminho" ao meio. São coisas diferentes e passam a ter estilos
+ * diferentes.
+ */
+const acaoEstilo: React.CSSProperties = {
+  ...linkEstilo,
+  padding: "3px 6px",
+  borderRadius: 6,
+  border: "1px solid transparent",
+  whiteSpace: "nowrap",
+};
+
+/** Linha de ação única: o empurrão para a direita sem o `display: flex` do
+ *  container — que num `<button>` mudaria o alinhamento do próprio texto. */
+const acaoUnicaEstilo: React.CSSProperties = { ...acaoEstilo, marginLeft: "auto", flexShrink: 0 };
+
 const botaoMiniEstilo: React.CSSProperties = {
   fontSize: 10,
   fontWeight: 700,
@@ -438,4 +486,5 @@ const botaoMiniEstilo: React.CSSProperties = {
   background: "#4f46e5",
   color: "#fff",
   cursor: "pointer",
+  whiteSpace: "nowrap",
 };
