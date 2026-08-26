@@ -9988,3 +9988,84 @@ Nos dois, as ações desceram inteiras em vez de estreitar.
 > o papel, o código junta coisas que precisavam ficar separadas.
 
 689 web · 12/12 E2E de caminho · demais suítes intocadas.
+
+## §289 — o motor de regras vira componente, e não campo de texto
+
+Relato: *"é muito comum inclusive na nossa implementação que o fluxo seja
+implementado em um motor e que existam vários"* — precificação, renda, catálogo
+de produto, elegibilidade de produto, elegibilidade de crédito, configuração e
+estratégia de produto, limites.
+
+Medi o catálogo antes de desenhar. Havia dois vizinhos e um buraco entre eles:
+**Regra de Negócio** (a regra solta), **Fluxo Decisão (FICO)** (o fluxo de um
+produto específico) — e o conceito de motor existindo só como **texto livre**,
+num campo do FICO chamado `motorPadrao`. O produto já sabia que motores existem
+e não sabia perguntar nada sobre eles.
+
+### Um tipo, não sete
+
+A pergunta de desenho era essa, e a resposta veio do próprio catálogo: **todo
+tipo existente é uma categoria técnica** — "Tabela SQL", "Serviço", "Cache" —, e
+a instância é o nó. Nenhum tipo carrega domínio de negócio.
+
+Precificação e limites não são artefatos técnicos diferentes: são o mesmo motor
+de regras decidindo coisas diferentes. Sete tipos de paleta seriam **sete cópias
+do mesmo `spec`**, divergindo na primeira mudança (a lição do `Delta`, §263), a
+paleta saltaria de 16 para 23 botões numa lista plana, e um motor de fraude
+amanhã exigiria editar configuração. Um tipo com o domínio como campo resolve os
+três, e um domínio novo nasce escolhendo `outro`.
+
+### As perguntas que o tipo faz
+
+Cada campo obrigatório teve de justificar por que um item de backlog o pede:
+
+- **quem publica mudança de regra neste motor.** Motor é quase sempre
+  compartilhado, e quem desenha o fluxo raramente é quem altera a regra. Sem
+  este nome o item chega à sprint dependendo de alguém que não sabe disso;
+- **decisões já tomadas na versão anterior** — valem congeladas, são
+  reavaliadas, ou convivem. Mudar regra de motor **muda o passado**, e essa
+  pergunta só aparece em produção se não for feita aqui;
+- **comportamento se o motor não decidir** — timeout, indisponibilidade, ou
+  caso sem regra.
+
+O tipo aponta para `Backend-regras`, e não foi escolha estética: é o contexto
+cujo checklist já cobra "descrever os motores, rulesets ou fluxos de decisão
+modificados" e o versionamento das regras. Apontar para contexto sem régua faria
+o tipo nascer sem ciclo de teste — exatamente a lacuna que o
+`coberturaConfigPadrao` existe para pegar.
+
+### Dois achados no caminho
+
+**O schema mentia.** `config/diagrama.schema.json` não é validado por código
+nenhum — é documentação do formato — e não declarava `specResumo`,
+`specResumoPorAresta`, `cenarioGherkinPadrao` nem `cenarioGherkinPorAresta`,
+todos em uso por quatro tipos com `additionalProperties: false`. Quem lesse o
+schema para escrever um tipo novo escreveria um tipo pobre. As quatro chaves
+entraram.
+
+**A engrenagem contra a balança.** O motor caiu no badge de letra ("M") porque
+o catálogo de ícones não tinha nada que dissesse "motor". `Scale` já é da Regra
+de Negócio; usar o mesmo apagaria no canvas justamente a distinção que o tipo
+novo existe para fazer. `Cog` entrou no catálogo.
+
+### O que foi medido, e o que não precisou de E2E
+
+Probe descartável contra a pilha real: o botão na paleta, o nó com a engrenagem,
+o select com os sete domínios na ordem do relato, e `Qual domínio` **ausente**
+com "Precificação" e **presente** com "outro".
+
+Não escrevi E2E permanente do motor, e o motivo fica escrito: a paleta é um
+`map` sobre `nodeTypes` e o formulário é um `map` sobre `spec` — um E2E do
+motor testaria o mecanismo genérico outra vez. O risco específico é a config, e
+ele está travado no engine com as funções **reais** (`camposVisiveis` avaliando
+o `when`, `derivar` produzindo o item), pela mesma razão do
+`coberturaConfigPadrao`: se a regra mudar, o teste acompanha em vez de mentir.
+
+> O `fluxo-basico` cobrava `toHaveCount(16)` na paleta e quebrou — de propósito.
+> O comentário dele já dizia "quem adiciona o tipo atualiza aqui". Contagem
+> exata como essa costuma ser teste frágil; aqui ela é o que prova que a paleta
+> vem do config e não de uma lista fixa no código, e o custo de mantê-la é uma
+> linha por tipo novo.
+
+377 engine · 689 web · 84 aplicação · 237 server · 129 llm · 86/86 E2E · build e
+lint limpos.

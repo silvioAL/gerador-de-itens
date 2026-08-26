@@ -1020,6 +1020,119 @@
       ],
       "cenarioGherkinPadrao": "```gherkin\nDado um conjunto de variáveis de entrada válidas\nQuando a decisão é avaliada\nEntão o resultado é o esperado e fica registrado, se a decisão for auditável\n\nDado que o motor de regras não responde ou expira o timeout\nQuando isso ocorre\nEntão o comportamento de fallback definido é aplicado, sem travar o fluxo\n```"
     },
+    "motor": {
+      "label": "Motor de Regras",
+      "derives": "motor",
+      "icon": "Cog",
+      "techs": [
+        "Backend"
+      ],
+      "contextos": [
+        "Backend-regras"
+      ],
+      "spec": [
+        {
+          "key": "nome",
+          "label": "Nome do motor",
+          "type": "text",
+          "required": true,
+          "identificador": true
+        },
+        {
+          "key": "dominio",
+          "label": "Domínio que este motor decide",
+          "type": "select",
+          "options": [
+            "Precificação",
+            "Renda",
+            "Catálogo de produto",
+            "Elegibilidade de produto",
+            "Elegibilidade de crédito",
+            "Configuração e estratégia de produto",
+            "Limites",
+            "outro"
+          ],
+          "required": true,
+          "ajuda": "Motores costumam existir aos vários, e o que os separa é o domínio da decisão. Sem isto, dois motores no mesmo desenho viram dois retângulos iguais."
+        },
+        {
+          "key": "dominioOutro",
+          "label": "Qual domínio",
+          "type": "text",
+          "required": true,
+          "when": {
+            "field": "dominio",
+            "equals": "outro"
+          },
+          "ajuda": "A lista traz os domínios mais comuns; a casa sempre tem os seus."
+        },
+        {
+          "key": "donoDasRegras",
+          "label": "Quem publica mudança de regra neste motor",
+          "type": "text",
+          "required": true,
+          "ajuda": "Motor é quase sempre compartilhado: quem desenha o fluxo raramente é quem altera a regra. Sem este nome, o item chega à sprint dependendo de alguém que não sabe disso."
+        },
+        {
+          "key": "versionamento",
+          "label": "Decisões já tomadas na versão anterior",
+          "type": "select",
+          "options": [
+            "valem como estavam (a decisão é congelada)",
+            "são reavaliadas pela regra nova",
+            "convivem: regra nova só para casos novos"
+          ],
+          "required": true,
+          "ajuda": "Mudar regra de motor muda o passado, não só o futuro. É a pergunta que só aparece em produção se não for feita aqui."
+        },
+        {
+          "key": "auditoria",
+          "label": "Decisão precisa ser auditável?",
+          "type": "boolean",
+          "required": true,
+          "ajuda": "Rastrear quem/quando/com qual versão da regra o motor decidiu X — exigência comum em crédito, preço e limites."
+        },
+        {
+          "key": "fallback",
+          "label": "Comportamento se o motor não decidir",
+          "type": "text",
+          "required": true,
+          "ajuda": "Timeout, indisponibilidade ou caso sem regra: o fluxo bloqueia, segue com um padrão, ou escala para humano?"
+        },
+        {
+          "key": "descricao",
+          "label": "O que este motor decide",
+          "type": "text",
+          "required": false,
+          "permiteNA": true
+        },
+        {
+          "key": "logicaDecisao",
+          "label": "Entradas, saídas e a política aplicada",
+          "type": "textarea",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "As variáveis que entram, o que sai e a política entre elas — \"descricao\" é o resumo, isto é o que o código precisa consultar."
+        },
+        {
+          "key": "migracao",
+          "label": "Plano de migração",
+          "type": "text",
+          "required": true,
+          "when": {
+            "not": {
+              "nodeStatus": "novo"
+            }
+          },
+          "ajuda": "Motor que já existe: como a mudança convive com integrações que já consomem a decisão antiga."
+        }
+      ],
+      "specResumo": [
+        "dominio",
+        "donoDasRegras"
+      ],
+      "cenarioGherkinPadrao": "```gherkin\nDado um caso com as variáveis de entrada esperadas pelo motor\nQuando a decisão do domínio é solicitada\nEntão a resposta segue a política vigente e registra a versão da regra usada, se a decisão for auditável\n\nDado que o motor não responde, expira o timeout ou não encontra regra para o caso\nQuando isso ocorre\nEntão o comportamento de fallback definido é aplicado, sem travar o fluxo\n\nDado que a regra do motor foi alterada\nQuando uma decisão anterior é consultada\nEntão ela se comporta conforme o combinado para decisões da versão anterior\n```"
+    },
     "external": {
       "label": "API Externa",
       "derives": "external",
@@ -1979,6 +2092,14 @@
     "fico": {
       "valid": [
         "http",
+        "orchestrates"
+      ],
+      "default": "http"
+    },
+    "motor": {
+      "valid": [
+        "http",
+        "grpc",
         "orchestrates"
       ],
       "default": "http"
