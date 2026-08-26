@@ -4,110 +4,6 @@ import { entrar } from "./auth";
 const API = "http://localhost:4100";
 
 /**
- * §299 — os dois specs desta suíte gravam em `regras.topologia`, e por isso
- * moram no MESMO arquivo, em série.
- *
- * Estavam separados, cada um restaurando a lista que leu no começo — e o
- * `finally` de um apagava a régua que o outro tinha acabado de gravar. Passou
- * local por sorte de timing e falhou na CI. Restaurar "só o campo" não resolve
- * quando dois specs disputam o mesmo campo: a única garantia é não disputá-lo.
- *
- * Mesma disciplina (e mesmo remédio) do `conformidade` e do
- * `rbac-cadeado-e-pedido`: um por vez.
- */
-test.describe.configure({ mode: "serial" });
-
-
-/**
- * SPEC-63 — a régua sobre a FORMA do desenho, do ciclo inteiro.
- *
- * O que só o navegador prova: a régua criada **pela tela** chega ao documento
- * de regras do deploy, o motor a aplica sobre um desenho de verdade, ela acusa
- * no placar, e a exceção com motivo a silencia sem apagá-la.
- *
- * ## Sobre mexer em config global
- *
- * O §281 custou três specs vizinhos ensinando que config global em suíte
- * paralela é estado compartilhado.
- *
- * §299 — quando isto foi escrito, a nota aqui dizia que "as réguas de forma não
- * existem em nenhum outro spec". **Deixou de ser verdade** no §295, e o custo
- * apareceu na CI: dois specs disputando `regras.topologia`, cada um restaurando
- * a lista que leu no começo. Por isso os dois moram neste arquivo, em série —
- * ver a nota do topo.
- */
-test("§287 — a régua de forma nasce na tela, acusa o desenho e a exceção a silencia", async ({ page }) => {
-  test.setTimeout(120000);
-  await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
-  await page.route(
-    (url) => url.pathname === "/ia/status",
-    (rota) => rota.fulfill({ json: { modelosChat: [], embeddingInstalado: false, capacidades: {} } })
-  );
-  await entrar(page);
-
-  try {
-    // ── A régua nasce pela TELA, não por JSON (fatia D) ──
-    await page.goto("/#/config/regras");
-    await page.getByTestId("secao-forma").click();
-    await expect(page.getByTestId("forma-vazia")).toBeVisible();
-
-    await page.getByLabel("Texto da régua de forma").fill("Toda fila tem consumidor");
-    await page
-      .getByLabel("Por que esta régua existe")
-      .fill("fila sem quem consuma acumula em silêncio até estourar o disco");
-    await page.getByLabel("Componente da régua").selectOption({ label: "Fila Rabbit" });
-    // A frase que a pessoa vai ler no placar, montada antes de gravar.
-    await expect(page.getByTestId("forma-previa")).toContainText("Todo Fila Rabbit precisa de uma conexão");
-    await page.getByTestId("adicionar-forma").click();
-
-    await expect(page.getByTestId("forma-regra-forma-toda-fila-tem-consumidor")).toBeVisible();
-    // Chegou ao documento de regras do deploy — não só ao estado da tela.
-    await expect
-      .poll(async () => {
-        const doc = await (await page.request.get(`${API}/config/regras`)).json();
-        return (doc.documento?.topologia ?? []).length;
-      }, { timeout: 10000 })
-      .toBe(1);
-
-    // ── O motor aplica sobre um desenho de verdade (fatias A e B) ──
-    await page.getByRole("button", { name: /Voltar à mesa de projeto/ }).click();
-    await page.getByRole("button", { name: "+ Fila Rabbit" }).click();
-
-    const chip = page.getByTestId("conformidade-resumo");
-    await expect(chip).toContainText("fora do padrão");
-    await chip.click();
-    const lista = page.getByTestId("conformidade-lista");
-    await expect(lista).toContainText("Toda fila tem consumidor");
-    // §242 — o porquê é o que separa ensinar de cobrar.
-    await expect(lista).toContainText("acumula em silêncio");
-
-    // ── A válvula: aceitar com motivo tira do que cobra (fatia C) ──
-    await lista.getByRole("button", { name: /Aceitar de propósito/ }).first().click();
-    await lista.getByLabel(/Motivo para aceitar/).first().fill("o consumidor entra na próxima demanda");
-    await lista.getByRole("button", { name: /Confirmar exceção/ }).first().click();
-
-    // Sai do vermelho sem sair do histórico: o chip some porque nada mais cobra.
-    await expect(page.getByTestId("conformidade-resumo")).toHaveCount(0);
-  } finally {
-    // §299 — remove só o PRÓPRIO item, relendo agora. Restaurar a lista
-    // `topologia` que este spec leu no começo apagaria a régua que o
-    // `da-leitura-a-regua` gravou no intervalo: os dois mexem no mesmo campo,
-    // e a unidade certa de restauração é o item, não o campo.
-    const atual = (await (await page.request.get(`${API}/config/regras`)).json()).documento ?? {};
-    await page.request.put(`${API}/config/regras`, {
-      data: {
-        documento: {
-          ...atual,
-          topologia: (atual.topologia ?? []).filter(
-            (r: { id?: string }) => r.id !== "forma-toda-fila-tem-consumidor"
-          ),
-        },
-      },
-    });
-  }
-});
-
-/**
  * SPEC-67 — o clique que faltava.
  *
  * O ciclo que nenhum teste de unidade prova: o produto **lê** um fato do
@@ -120,9 +16,12 @@ test("§287 — a régua de forma nasce na tela, acusa o desenho e a exceção a
  *
  * ## Sobre config global
  *
- * Este spec GRAVA em `regras.topologia`. O restore devolve **só o próprio
- * item**, relendo o documento na hora — e o arquivo inteiro roda em série,
- * porque o vizinho acima disputa o mesmo campo (§299).
+ * Este spec GRAVA em `regras.topologia`, e o `forma-do-desenho` também.
+ *
+ * §299 — por isso o restore remove **só o item que este spec criou**, relendo o
+ * documento na hora. Restaurar a LISTA que se leu no começo apaga o que o
+ * vizinho gravou no intervalo: o sintoma aparece no teste dele, e a causa está
+ * aqui — a assinatura do §281.
  */
 test("§295 — do fato à régua num clique, e o desenho que a gerou passa a ser acusado", async ({ page }) => {
   test.setTimeout(150000);
