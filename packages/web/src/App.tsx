@@ -415,8 +415,28 @@ function AppCarregado({
        * conversa e a de configurar têm rascunho pelo mesmo motivo.
        */
       setAbaAssistente(null);
+      /**
+       * §300 — RELATO REAL: *"carreguei um cenário pronto, os componentes do
+       * novo desenho apareceram, mas sumiram do nada do canvas em seguida"*.
+       *
+       * Eles não sumiram: ficaram **fora da vista**. Medido — 8 nós no DOM, 4
+       * dentro da área visível, e a câmera em `scale(2)`, que era o
+       * enquadramento do desenho ANTERIOR (dois nós cabem com zoom 2×; oito,
+       * não).
+       *
+       * O comentário do `adicionarCenario` dizia "os TRÊS caminhos que inserem
+       * nós em lote pedem enquadramento", e só dois pediam: adicionar à mesa e
+       * a proposta da IA. **Trocar a demanda inteira ficou de fora** — e é o
+       * caso mais forte de todos, porque o desenho não é uma adição ao que
+       * havia, é outro desenho.
+       *
+       * Vale para carregar cenário E para abrir uma quebra salva: os dois
+       * passam por aqui, e os dois herdavam a câmera de quem estava aberto
+       * antes.
+       */
+      quebraState.pedirEnquadramento();
     },
-    [setQuebra, setSelecionadoId]
+    [setQuebra, setSelecionadoId, quebraState.pedirEnquadramento]
   );
 
   const persistencia = usePersistencia(quebra, aoAbrir);
