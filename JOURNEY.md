@@ -9939,3 +9939,52 @@ que fiz sem perguntar:
 
 369 engine · 687 web · 84 aplicação · 237 server · 129 llm · 86/86 E2E · build e
 lint limpos.
+
+## §288 — a ação que não era pílula virou texto solto
+
+Relato, com captura: *"os botões ficaram com pouco espaço (os sem chips)"*. Na
+imagem, **"não é caminho" partido ao meio** — "não é" numa linha, "caminho" na
+outra — e "ajustar" colado nele.
+
+Duas causas, e a segunda é a que interessa.
+
+**A rasa:** `linkEstilo` era usado por duas coisas diferentes. Ele nasceu para o
+**rótulo** do caminho, que é texto corrido e precisa quebrar: `padding: 0`,
+quebra livre. Depois "ajustar", "não é caminho", "desfazer", "reabrir" e
+"remover" foram herdando o mesmo estilo porque pareciam links. Ao lado de um
+botão sólido, isso dava um alvo de clique de onze pixels sem folga nenhuma — e
+a quebra livre, feita para o rótulo, partia o rótulo da ação.
+
+O rótulo e a ação passaram a ter estilos separados: `acaoEstilo` com folga,
+cantos e `nowrap`.
+
+**A que interessa:** o rótulo é `a → b → c` e **cresce com o desenho, sem
+teto**. Um layout que confia na largura de um texto sem teto vai quebrar — a
+única questão é em qual desenho. O do relato tinha 40 caracteres; medi também
+um de 67.
+
+A linha ganhou `flexWrap`, o rótulo `minWidth: 0` (é o que autoriza um filho de
+flex a encolher abaixo do próprio conteúdo), e as ações viraram um grupo com
+`flexShrink: 0`. Agora **ou cabem todas na linha do rótulo, ou descem todas
+juntas** — nunca se espremem.
+
+### Medido, não olhado
+
+JSDOM não calcula layout, então um teste unitário aqui só consegue travar a
+*causa* (o `nowrap`, o `minWidth: 0`, o `flexShrink: 0`) — e é o que ele faz.
+A prova de que o sintoma sumiu veio de um probe Playwright descartável contra a
+pilha real, medindo `getBoundingClientRect` com os dois rótulos:
+
+| rótulo | linhas do rótulo | "não é caminho" |
+|---|---|---|
+| 40 caracteres (o do relato) | 1 | 23px de altura, uma linha |
+| 67 caracteres | 2 | 23px de altura, uma linha |
+
+Nos dois, as ações desceram inteiras em vez de estreitar.
+
+> A lição não é sobre CSS. É que **`linkEstilo` era um nome sobre aparência**
+> ("parece um link"), não sobre papel, e nome sobre aparência atrai usos que não
+> têm nada em comum. É o §280 outra vez, por outra porta: quando o nome não diz
+> o papel, o código junta coisas que precisavam ficar separadas.
+
+689 web · 12/12 E2E de caminho · demais suítes intocadas.

@@ -312,6 +312,41 @@ describe("PercursosPanel — declarar e ajustar", () => {
 /**
  * SPEC-60 fatia A (§263) — o preço de confirmar, antes de confirmar.
  */
+describe("PercursosPanel — a ação sem pílula continua sendo ação (§288)", () => {
+  it("'ajustar' e 'não é caminho' não quebram no meio, e têm folga de clique", () => {
+    // Elas herdavam o estilo do RÓTULO, que existe para texto corrido:
+    // `padding: 0` e quebra livre. O rótulo é `a → b → c` e cresce com o
+    // desenho, então ele espremia as ações até partir "não é caminho" em duas
+    // linhas. JSDOM não mede layout; o que dá para travar é a causa.
+    montar({
+      percursos: [percurso({ id: "p1", rotulo: "job-fatura-mensal → tb_pedidos_pendentes" })],
+      onAjustar: vi.fn(),
+    });
+    fireEvent.click(screen.getByTestId("percursos-resumo"));
+
+    for (const acao of [screen.getByTestId("ajustar-p1"), screen.getByText("não é caminho")]) {
+      expect(acao.style.whiteSpace).toBe("nowrap");
+      expect(acao.style.padding).not.toBe("0px");
+    }
+  });
+
+  it("o rótulo cede espaço e as ações não — é o que faz a linha caber", () => {
+    // `minWidth: 0` é o que autoriza um filho de flex a encolher abaixo do
+    // próprio conteúdo. Sem ele o rótulo longo empurra e mais nada cede.
+    montar({ percursos: [percurso({ id: "p1", rotulo: "a → b → c → d → e" })] });
+    fireEvent.click(screen.getByTestId("percursos-resumo"));
+
+    const rotulo = screen.getByText("a → b → c → d → e");
+    expect(rotulo.style.minWidth).toBe("0");
+
+    // As ações andam juntas: ou cabem todas na linha do rótulo, ou descem
+    // todas. Estreitar-se para caber é o que produzia a quebra.
+    const acoes = screen.getByTestId("confirmar-p1").parentElement!;
+    expect(acoes.style.flexShrink).toBe("0");
+    expect(acoes.style.marginLeft).toBe("auto");
+  });
+});
+
 describe("PercursosPanel — o delta da confirmação", () => {
   const A_CONFIRMAR = { id: "pc::a>b", rotulo: "a → b", nos: ["a", "b"], origem: "inferido" as const };
 
