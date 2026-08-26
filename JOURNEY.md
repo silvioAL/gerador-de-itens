@@ -10588,3 +10588,117 @@ impressionante numa demo e o que menos muda o item derivado"*. Segue valendo.
 
 431 engine · 717 web · 84 aplicação · 237 server · 129 llm · 93/93 E2E · build e
 lint limpos.
+
+## §296 — o nome estreito fechava a porta, e a resiliência virou conta
+
+O usuário esclareceu o que queria dizer com *"temos outros cenários ali"*: duas
+linhas específicas da tabela §2 da SPEC-56 — **Engine** (circuit breaker,
+timeout, retry, bulkhead, queue) e **Controles** (duração, taxa, ramp-up, taxa
+de falha). Eu tinha avaliado a lista inteira; ele apontava duas linhas.
+
+### O que medi
+
+A SPEC-56 dizia *"existe como checklist, não como valor"*, e é literal:
+
+```
+Backend-chamadas http · "Definir timeout e política de retry"   [timeoutMs ≤ 500]
+Backend-chamadas http · "Definir circuit breaker ou fallback"   (sem checagem)
+Backend-mensagens     · "Definir estratégia de retry e DLQ"     [ttl ≥ backoff × retries]
+```
+
+Duas coisas saltam. **A mensageria já faz a conta** — o P2 funcionando desde o
+§241. E **a chamada HTTP não tem os campos**: o checklist manda "definir política
+de retry" e não existe onde escrever a política. Circuit breaker não é campo em
+lugar nenhum.
+
+> O padrão de resiliência da fila é conferível, e o da chamada síncrona — que é
+> o caminho da resposta — é um lembrete de texto.
+
+### A armadilha que eu quase construí
+
+O caminho óbvio era inflar o pior caso: `timeout × tentativas`. Números maiores,
+mais alarme. Mas a própria SPEC-56 §12.1.1 já tinha nomeado por que isso é ruim:
+
+> *"A aritmética de pior caso tem um defeito que eu não nomeei: **ela grita
+> lobo**… um alerta que aparece em todo caminho com mais de três nós é um
+> alerta que as pessoas aprendem a ignorar."*
+
+Multiplicar o pior caso por tentativas piora exatamente esse defeito.
+
+**A pergunta certa é outra:**
+
+> **Não é "quanto demora". É: o sistema desiste antes ou depois de quem
+> chamou?**
+
+Uma api que insiste por 1,5 s numa requisição que o cliente abandonou em 1 s
+joga meio segundo de trabalho fora — garantidamente, e justo quando o sistema já
+está em dificuldade, que é quando o retry dispara. Isso não é pior caso
+improvável: é uma **contradição entre dois números declarados**. Ou existe no
+desenho ou não existe, e quando existe está sempre errada.
+
+Por isso a insistência ganhou **coluna própria** em vez de ser somada à
+resposta: são duas perguntas, e ficam em duas colunas.
+
+### A Lei de Little, e o único "Controle" que é aritmética
+
+`concorrência = taxa × tempo de resposta`. Com `taxaEsperadaRps` e
+`chamadasSimultaneas` declarados, "a 100 req/s com 300 ms, você precisa de 30; o
+pool tem 10" é exato e se refaz no papel.
+
+**Duração, ramp-up e taxa de falha ficaram fora**, e o motivo não é preguiça:
+os três só produzem número através de amostragem, e dependem de distribuição que
+o desenho não declara. A §0.3 e a §12.1 já os recusaram.
+
+### O nome era o problema
+
+> *"seria uma repaginação do 'e se ficar lento' — pense em algo que tenha outro
+> nome, já que é mais genérico."*
+
+A SPEC-66 acertou o mecanismo e **errou o escopo pelo nome**. Retry não é
+lentidão, pico de tráfego não é lentidão, disjuntor desligado não é lentidão.
+
+**Um nome estreito não é enfeite errado: ele fecha a porta para o que cabe
+dentro.** Ninguém procura "e se ficar lento?" para perguntar "e se o pico for de
+Black Friday?".
+
+A tela virou **Ensaios** (`#/ensaios`), cada linha é um ensaio — uma condição
+aplicada ao desenho —, e o ajuste passou a mexer em tempo, **taxa**,
+**tentativas** e **disjuntor**. `#/simulacao` redireciona: rota que some sem
+redirecionar dá tela branca para quem tinha o link salvo, e a SPEC-66 §5 apostou
+justamente em o endereço ser mandável para alguém.
+
+Uma tela por dimensão pareceria três telas e é a mesma pergunta com entradas
+diferentes — e três tabelas obrigariam a pessoa a cruzar números na cabeça, que
+é o que a mesa existe para não pedir.
+
+## §297 — três testes que quebraram, e nenhum era sobre o que mediam
+
+A suíte E2E acusou três coisas nesta rodada, e as três valem mais que a
+correção.
+
+**1. A contaminação que ACUMULA.** O `conformidade` grava uma régua no documento
+global e restaura no `finally`. Se o restore falha uma vez — queda, timeout,
+execução interrompida —, a régua fica lá, e a execução seguinte **a acrescenta
+de novo**: duas violações onde o teste espera uma. O sintoma ("2 fora do
+padrão") não aponta para a causa. A gravação virou idempotente (filtra pelo
+texto antes de concatenar), e o resíduo foi limpo à mão.
+
+**2. O restore que apaga o vizinho.** Meus dois specs de régua liam o documento
+INTEIRO no começo e o devolviam no fim — apagando o que outro spec escreveu no
+intervalo. O `conformidade` via a própria régua sumir no meio do teste dele.
+**O sintoma aparecia no vizinho e a causa estava aqui**, que é a assinatura do
+§281. Os dois passaram a devolver só o campo que mexem, relendo o documento na
+hora.
+
+**3. A janela de 800 caracteres.** O `ia-hospedada` procurava a marca do gateway
+em `innerText().slice(0, 800)`. Dois campos novos na ficha do Serviço empurraram
+a proposta para além do corte, e o teste passou a falhar por um motivo que não
+tinha nada a ver com o que ele mede. O corte existia para a **mensagem de erro**
+ser legível, não para limitar a busca.
+
+> Os três são a mesma família: **teste que depende de estado ou de posição que
+> ninguém prometeu**. Nenhum falhou por o produto estar errado — e nos três o
+> lugar onde o erro apareceu não era o lugar onde ele estava.
+
+448 engine · 721 web · 84 aplicação · 237 server · 129 llm · 95/95 E2E · build e
+lint limpos.

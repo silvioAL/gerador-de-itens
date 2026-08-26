@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { elementosComTempo, formatarDuracao, simularCenarios } from "@gerador/engine";
+import { avaliarResiliencia, elementosComTempo, formatarDuracao, insistenciaDe, simularCenarios } from "@gerador/engine";
 import type {
   AjusteDeCenario,
   CenarioDeLentidao,
+  ContradicaoDeResiliencia,
   Diagrama,
   DiagramaConfig,
   ElementoAjustavel,
@@ -25,7 +26,7 @@ import type {
  * linha de cima — comparar em cadeia faria a ORDEM das linhas mudar o
  * significado dos números.
  */
-export interface SimulacaoScreenProps {
+export interface EnsaiosScreenProps {
   diagrama: Diagrama;
   config: DiagramaConfig;
   cenarios: CenarioDeLentidao[];
@@ -52,14 +53,14 @@ function idDoCenario(nome: string, existentes: CenarioDeLentidao[]): string {
   return `${base}-${i}`;
 }
 
-export function SimulacaoScreen({
+export function EnsaiosScreen({
   diagrama,
   config,
   cenarios,
   onMudar,
   onVoltar,
   onSugerir,
-}: SimulacaoScreenProps) {
+}: EnsaiosScreenProps) {
   const [editando, setEditando] = useState<string | null>(null);
   const [nome, setNome] = useState("");
   const [sugerindo, setSugerindo] = useState(false);
@@ -76,6 +77,17 @@ export function SimulacaoScreen({
   // monta o pedido à IA, para os dois lados oferecerem exatamente o mesmo
   // conjunto.
   const elementos = useMemo(() => elementosComTempo(diagrama, config), [diagrama, config]);
+
+  // O que o desenho de HOJE já contradiz e por quanto ele já insiste — a
+  // âncora tem que trazer as duas, senão uma contradição preexistente
+  // pareceria efeito do primeiro ensaio.
+  const contradicoesHoje = useMemo(() => avaliarResiliencia(diagrama, config), [diagrama, config]);
+  const insistenciaHoje = useMemo(() => {
+    const todas = diagrama.edges
+      .map((e) => insistenciaDe(e))
+      .filter((i): i is NonNullable<typeof i> => i !== undefined && i.insiste);
+    return todas.length > 0 ? Math.max(...todas.map((i) => i.ms)) : undefined;
+  }, [diagrama]);
 
   function criar() {
     const texto = nome.trim();
@@ -109,24 +121,28 @@ export function SimulacaoScreen({
   const semTempo = hoje.tempoDoPiorTrecho === undefined;
 
   return (
-    <div style={telaEstilo} data-testid="tela-simulacao">
+    <div style={telaEstilo} data-testid="tela-ensaios">
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <button onClick={onVoltar} style={botaoNeutroEstilo} data-testid="simulacao-voltar">
+        <button onClick={onVoltar} style={botaoNeutroEstilo} data-testid="ensaios-voltar">
           ← Voltar à mesa de projeto
         </button>
-        <h2 style={{ margin: 0, fontSize: 17 }}>E se ficar lento?</h2>
+        <h2 style={{ margin: 0, fontSize: 17 }}>Ensaios — e se…?</h2>
       </div>
 
-      <p style={{ fontSize: 12, color: "var(--texto-2)", maxWidth: 760, lineHeight: 1.5 }}>
-        Cada cenário troca o tempo de um ou mais componentes e mostra o efeito na{" "}
-        <strong>resposta de ponta a ponta</strong>. Só conta o trecho em que quem chama espera — o que passa por fila
-        não segura ninguém. Nada aqui altera o desenho.
+      {/* SPEC-68 §4.2 — o nome era "e se ficar lento?", e um nome estreito
+          fecha a porta para o que cabe dentro: retry não é lentidão, pico de
+          tráfego não é lentidão, disjuntor desligado não é lentidão. */}
+      <p style={{ fontSize: 12, color: "var(--texto-2)", maxWidth: 780, lineHeight: 1.5 }}>
+        Cada ensaio aplica uma <strong>condição</strong> ao desenho — um componente mais lento, um pico de tráfego,
+        mais tentativas — e mostra o efeito na <strong>resposta</strong>, em <strong>por quanto tempo o sistema
+        insiste</strong> e no que aquilo passa a <strong>contradizer</strong>. Só conta o trecho em que quem chama
+        espera. Nada aqui altera o desenho.
       </p>
 
       {/* §248 — sem número declarado não há o que ensaiar, e dizer isso é
           melhor do que uma tabela de zeros que parece uma medição. */}
       {semTempo && (
-        <div style={avisoEstilo} data-testid="simulacao-sem-tempo">
+        <div style={avisoEstilo} data-testid="ensaios-sem-tempo">
           Nenhum componente do desenho tem tempo preenchido, então não há o que somar. Preencha o{" "}
           <strong>Timeout (ms)</strong> de ao menos uma chamada e volte — o ensaio parte dos números reais, nunca de
           números inventados.
@@ -160,9 +176,15 @@ export function SimulacaoScreen({
       <table style={tabelaEstilo} data-testid="tabela-cenarios">
         <thead>
           <tr>
-            <th style={thEstilo}>Cenário</th>
+            <th style={thEstilo}>Ensaio</th>
             <th style={thEstilo}>Resposta</th>
             <th style={thEstilo}>Δ</th>
+            <th
+              style={thEstilo}
+              title="Por quanto tempo o sistema insiste antes de desistir: timeout × tentativas, mais as esperas entre elas"
+            >
+              Insiste até
+            </th>
             <th style={thEstilo} title="Quem mais pesa na soma — o total diz que dói, isto diz onde">
               Quem domina
             </th>
@@ -182,10 +204,23 @@ export function SimulacaoScreen({
             </td>
             <td style={tdEstilo}>—</td>
             <td style={tdEstilo}>
+              <Insistencia ms={insistenciaHoje} />
+            </td>
+            <td style={tdEstilo}>
               <Dominantes lista={hoje.tempoDoPiorTrecho?.dominantes ?? []} />
             </td>
             <td style={tdEstilo} />
           </tr>
+
+          {/* O que o desenho de HOJE já contradiz — antes de qualquer ensaio.
+              Sem isto, uma contradição preexistente pareceria efeito do ensaio. */}
+          {contradicoesHoje.length > 0 && (
+            <tr data-testid="contradicoes-hoje">
+              <td colSpan={6} style={{ ...tdEstilo, background: "var(--painel-alto)" }}>
+                <Contradicoes lista={contradicoesHoje} />
+              </td>
+            </tr>
+          )}
 
           {resultados.map((r) => {
             const cenario = cenarios.find((c) => c.id === r.cenarioId)!;
@@ -219,6 +254,9 @@ export function SimulacaoScreen({
                     <Delta ms={r.delta} />
                   </td>
                   <td style={tdEstilo}>
+                    <Insistencia ms={r.insistenciaMs} />
+                  </td>
+                  <td style={tdEstilo}>
                     <Dominantes lista={r.dominantes} />
                   </td>
                   <td style={{ ...tdEstilo, whiteSpace: "nowrap" }}>
@@ -248,9 +286,20 @@ export function SimulacaoScreen({
                   </td>
                 </tr>
 
+                {/* SPEC-68 — o que ESTE ensaio faz o desenho passar a
+                    contradizer. É o que separa "ficou mais lento" de "agora
+                    isto não pode dar certo". */}
+                {r.contradicoes.length > 0 && (
+                  <tr data-testid={`contradicoes-${r.cenarioId}`}>
+                    <td colSpan={6} style={{ ...tdEstilo, paddingTop: 0 }}>
+                      <Contradicoes lista={r.contradicoes} />
+                    </td>
+                  </tr>
+                )}
+
                 {editando === r.cenarioId && (
                   <tr data-testid={`ajustes-${r.cenarioId}`}>
-                    <td colSpan={5} style={{ ...tdEstilo, background: "var(--painel-alto)" }}>
+                    <td colSpan={6} style={{ ...tdEstilo, background: "var(--painel-alto)" }}>
                       <Ajustes
                         elementos={elementos}
                         cenario={cenario}
@@ -264,7 +313,7 @@ export function SimulacaoScreen({
                     ignorou parte do que lhe pediram tem que dizer. */}
                 {r.ajustesSemAlvo.length > 0 && (
                   <tr data-testid={`sem-alvo-${r.cenarioId}`}>
-                    <td colSpan={5} style={{ ...tdEstilo, fontSize: 10.5, color: "var(--amarelo)" }}>
+                    <td colSpan={6} style={{ ...tdEstilo, fontSize: 10.5, color: "var(--amarelo)" }}>
                       {r.ajustesSemAlvo.length} ajuste(s) deste cenário apontam para elementos que não existem mais no
                       desenho, e ficaram de fora da conta.
                     </td>
@@ -276,7 +325,7 @@ export function SimulacaoScreen({
 
           {resultados.length === 0 && (
             <tr>
-              <td colSpan={5} style={{ ...tdEstilo, color: "var(--texto-mudo)" }} data-testid="sem-cenarios">
+              <td colSpan={6} style={{ ...tdEstilo, color: "var(--texto-mudo)" }} data-testid="sem-cenarios">
                 Nenhum cenário ainda. Comece por um: "e se o componente mais lento ficar 3× pior?".
               </td>
             </tr>
@@ -314,6 +363,45 @@ function Delta({ ms }: { ms?: number }) {
       {pior ? "+" : "−"}
       {formatarDuracao(Math.abs(ms))}
     </span>
+  );
+}
+
+/**
+ * SPEC-68 — por quanto tempo o sistema insiste antes de desistir.
+ *
+ * Coluna própria, e não somada à resposta: inflar o pior caso por tentativas
+ * pioraria o defeito que a SPEC-56 §12.1.1 nomeou ("ela grita lobo"). São duas
+ * perguntas diferentes, e ficam em duas colunas.
+ */
+function Insistencia({ ms }: { ms?: number }) {
+  if (ms === undefined) return <span style={{ color: "var(--texto-mudo)" }}>—</span>;
+  return (
+    <span style={{ fontWeight: 600 }} title="timeout × tentativas, mais as esperas entre elas">
+      {formatarDuracao(ms)}
+    </span>
+  );
+}
+
+/**
+ * O que o desenho passa a contradizer.
+ *
+ * Contradição não é pior caso: são **dois números declarados que não podem
+ * estar os dois certos**. Por isso a cor é âmbar aqui e neutra na leitura —
+ * este bloco cobra, e a leitura não.
+ */
+function Contradicoes({ lista }: { lista: ContradicaoDeResiliencia[] }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {lista.map((c) => (
+        <div key={`${c.tipo}-${c.noId ?? c.arestaId}`} style={contradicaoEstilo}>
+          <div style={{ fontSize: 11.5 }}>
+            <strong>{c.rotulo}</strong> — {c.atual}, e o desenho promete {c.esperado}.
+          </div>
+          {/* §242 — o porquê é o que separa ensinar de cobrar. */}
+          <div style={{ fontSize: 10.5, color: "var(--texto-mudo)" }}>{c.porque}</div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -382,6 +470,77 @@ function Ajustes({
             >
               remover
             </button>
+
+            {/* SPEC-68 — as condições que NÃO são lentidão. Só aparecem no
+                elemento onde fazem sentido: taxa é de quem RECEBE carga (nó),
+                tentativas e disjuntor são de quem CHAMA (conexão). Oferecer os
+                três em tudo daria controle que não controla nada. */}
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", width: "100%" }}>
+              {a.tipo === "no" ? (
+                <label style={condicaoEstilo}>
+                  pico de
+                  <input
+                    type="number"
+                    min={0}
+                    aria-label={`Taxa em req/s de ${el?.rotulo ?? a.id}`}
+                    data-testid={`taxa-${a.id}`}
+                    value={a.taxaRps ?? ""}
+                    placeholder="—"
+                    onChange={(e) =>
+                      onMudar(
+                        cenario.ajustes.map((x) =>
+                          x.id === a.id
+                            ? { ...x, taxaRps: e.target.value === "" ? undefined : Number(e.target.value) }
+                            : x
+                        )
+                      )
+                    }
+                    style={{ ...campoEstilo, minWidth: 74, width: 74 }}
+                  />
+                  req/s
+                </label>
+              ) : (
+                <>
+                  <label style={condicaoEstilo}>
+                    <input
+                      type="number"
+                      min={1}
+                      aria-label={`Tentativas de ${el?.rotulo ?? a.id}`}
+                      data-testid={`tentativas-${a.id}`}
+                      value={a.tentativas ?? ""}
+                      placeholder="—"
+                      onChange={(e) =>
+                        onMudar(
+                          cenario.ajustes.map((x) =>
+                            x.id === a.id
+                              ? { ...x, tentativas: e.target.value === "" ? undefined : Number(e.target.value) }
+                              : x
+                          )
+                        )
+                      }
+                      style={{ ...campoEstilo, minWidth: 64, width: 64 }}
+                    />
+                    tentativas
+                  </label>
+                  <label style={condicaoEstilo}>
+                    <input
+                      type="checkbox"
+                      aria-label={`Disjuntor em ${el?.rotulo ?? a.id}`}
+                      data-testid={`disjuntor-${a.id}`}
+                      checked={a.disjuntor === true}
+                      onChange={(e) =>
+                        onMudar(
+                          cenario.ajustes.map((x) =>
+                            x.id === a.id ? { ...x, disjuntor: e.target.checked ? true : undefined } : x
+                          )
+                        )
+                      }
+                    />
+                    com disjuntor
+                  </label>
+                </>
+              )}
+            </div>
           </div>
         );
       })}
@@ -496,6 +655,22 @@ const tagSugeridoEstilo: React.CSSProperties = {
   borderRadius: 999,
   border: "1px solid var(--acento)",
   color: "var(--acento)",
+};
+
+const condicaoEstilo: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 5,
+  fontSize: 11,
+  color: "var(--texto-fraco)",
+  cursor: "pointer",
+};
+
+const contradicaoEstilo: React.CSSProperties = {
+  padding: "6px 9px",
+  borderRadius: 7,
+  borderLeft: "3px solid var(--amarelo)",
+  background: "rgba(245, 158, 11, 0.07)",
 };
 
 const avisoEstilo: React.CSSProperties = {

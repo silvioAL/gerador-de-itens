@@ -66,7 +66,7 @@ import { ReviewScreen } from "./review/ReviewScreen";
 import { ContextoEpicoPanel } from "./review/ContextoEpicoPanel";
 import { ConversaPanel } from "./conversa/ConversaPanel";
 import { AssistenteFlutuante, type AbaAssistente } from "./assistente/AssistenteFlutuante";
-import { SimulacaoScreen } from "./simulacao/SimulacaoScreen";
+import { EnsaiosScreen } from "./ensaios/EnsaiosScreen";
 import { idDaRegraDeForma } from "./config/FormaDoDesenho";
 import { ConfigurarPanel } from "./assistente/ConfigurarPanel";
 import { JourneyModal, type AbaJornada } from "./demo/JourneyModal";
@@ -429,7 +429,7 @@ function AppCarregado({
   const mostrarConfig = rota.tela === "config";
   const mostrarDocumento = rota.tela === "documento";
   const mostrarSistema = rota.tela === "sistema";
-  const mostrarSimulacao = rota.tela === "simulacao";
+  const mostrarEnsaios = rota.tela === "ensaios";
   // SPEC-41 Parte B — os itens materializados da quebra aberta. A fonte de
   // verdade é o server (persistem por quebra); o estado local é o espelho da
   // última geração/carga desta sessão.
@@ -1504,7 +1504,7 @@ function AppCarregado({
             ),
           }))
         }
-        onSimular={() => navegar({ tela: "simulacao" })}
+        onSimular={() => navegar({ tela: "ensaios" })}
         onSelecionar={setSelecionadoId}
         necessidades={quebra.necessidades}
         onAbrirProposito={() => setAbaAssistente("contexto")}
@@ -1718,8 +1718,8 @@ function AppCarregado({
       {/* SPEC-66 — a bancada de ensaio. Rota própria: o assistente é onde se
           CONVERSA para produzir desenho, e aqui não se produz nada, se ensaia.
           E rota é linkável, que é metade do valor. */}
-      {mostrarSimulacao && (
-        <SimulacaoScreen
+      {mostrarEnsaios && (
+        <EnsaiosScreen
           diagrama={quebra.diagrama}
           config={diagramaConfig}
           cenarios={quebra.cenariosDeLentidao ?? []}

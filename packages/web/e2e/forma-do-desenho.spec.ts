@@ -27,7 +27,7 @@ test("§287 — a régua de forma nasce na tela, acusa o desenho e a exceção a
   );
   await entrar(page);
 
-  const antes = await (await page.request.get(`${API}/config/regras`)).json();
+  const topologiaAntes = ((await (await page.request.get(`${API}/config/regras`)).json()).documento ?? {}).topologia;
   try {
     // ── A régua nasce pela TELA, não por JSON (fatia D) ──
     await page.goto("/#/config/regras");
@@ -72,6 +72,12 @@ test("§287 — a régua de forma nasce na tela, acusa o desenho e a exceção a
     // Sai do vermelho sem sair do histórico: o chip some porque nada mais cobra.
     await expect(page.getByTestId("conformidade-resumo")).toHaveCount(0);
   } finally {
-    await page.request.put(`${API}/config/regras`, { data: { documento: antes.documento } });
+    // §297 — devolve só `topologia`, relendo o documento na hora. Restaurar o
+    // documento INTEIRO (lido no começo) apaga o que um vizinho escreveu no
+    // intervalo, e o sintoma aparece no teste dele, não neste.
+    const atual = (await (await page.request.get(`${API}/config/regras`)).json()).documento ?? {};
+    await page.request.put(`${API}/config/regras`, {
+      data: { documento: { ...atual, topologia: topologiaAntes ?? [] } },
+    });
   }
 });

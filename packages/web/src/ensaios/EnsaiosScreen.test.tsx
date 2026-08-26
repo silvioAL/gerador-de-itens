@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { CenarioDeLentidao, Diagrama, DiagramaConfig } from "@gerador/engine";
-import { SimulacaoScreen } from "./SimulacaoScreen";
+import { EnsaiosScreen } from "./EnsaiosScreen";
 
 const config: DiagramaConfig = {
   nodeTypes: {
@@ -47,10 +47,10 @@ function diagrama(): Diagrama {
   } as unknown as Diagrama;
 }
 
-function montar(cenarios: CenarioDeLentidao[] = [], props: Partial<React.ComponentProps<typeof SimulacaoScreen>> = {}) {
+function montar(cenarios: CenarioDeLentidao[] = [], props: Partial<React.ComponentProps<typeof EnsaiosScreen>> = {}) {
   const onMudar = vi.fn();
   render(
-    <SimulacaoScreen
+    <EnsaiosScreen
       diagrama={diagrama()}
       config={config}
       cenarios={cenarios}
@@ -65,7 +65,7 @@ function montar(cenarios: CenarioDeLentidao[] = [], props: Partial<React.Compone
 /**
  * SPEC-66 fatias B, C e D — a bancada de ensaio.
  */
-describe("SimulacaoScreen — a âncora e o Δ", () => {
+describe("EnsaiosScreen — a âncora e o Δ", () => {
   it("a linha de HOJE fica na tabela — sem a referência, todo número é solto", () => {
     montar();
 
@@ -95,7 +95,7 @@ describe("SimulacaoScreen — a âncora e o Δ", () => {
   });
 });
 
-describe("SimulacaoScreen — mexer sem IA nenhuma", () => {
+describe("EnsaiosScreen — mexer sem IA nenhuma", () => {
   it("criar um cenário é escrever o nome e apertar — é o caminho principal", () => {
     // A sugestão é atalho; capacidade que só existe com IA ligada é capacidade
     // que metade dos times não tem.
@@ -125,7 +125,7 @@ describe("SimulacaoScreen — mexer sem IA nenhuma", () => {
   it("sem tempo nenhum no desenho, DIZ isso — melhor que uma tabela de zeros", () => {
     // §248: uma tabela de zeros pareceria medição, e não é.
     render(
-      <SimulacaoScreen
+      <EnsaiosScreen
         diagrama={{ nodes: [], edges: [] } as unknown as Diagrama}
         config={config}
         cenarios={[]}
@@ -134,11 +134,11 @@ describe("SimulacaoScreen — mexer sem IA nenhuma", () => {
       />
     );
 
-    expect(screen.getByTestId("simulacao-sem-tempo")).toBeInTheDocument();
+    expect(screen.getByTestId("ensaios-sem-tempo")).toBeInTheDocument();
   });
 });
 
-describe("SimulacaoScreen — a proposta do modelo", () => {
+describe("EnsaiosScreen — a proposta do modelo", () => {
   const sugerido: CenarioDeLentidao = {
     id: "c-ia",
     nome: "bureau em pico",
@@ -189,12 +189,109 @@ describe("SimulacaoScreen — a proposta do modelo", () => {
   });
 });
 
-describe("SimulacaoScreen — o desenho mudou debaixo do cenário", () => {
+describe("EnsaiosScreen — o desenho mudou debaixo do cenário", () => {
   it("ajuste sem alvo é DECLARADO, não engolido", () => {
     // §57 — um ensaio que ignorou parte do que lhe pediram tem que dizer,
     // senão o número mente por omissão.
     montar([{ id: "c1", nome: "velho", origem: "manual", ajustes: [{ tipo: "no", id: "sumiu", fator: 3 }] }]);
 
     expect(screen.getByTestId("sem-alvo-c1")).toHaveTextContent("não existem mais no desenho");
+  });
+});
+
+/**
+ * SPEC-68 — a repaginação: o ensaio deixa de ser só sobre tempo.
+ *
+ * O nome era "e se ficar lento?", e um nome estreito FECHA A PORTA para o que
+ * cabe dentro: retry não é lentidão, pico de tráfego não é lentidão, disjuntor
+ * desligado não é lentidão.
+ */
+describe("EnsaiosScreen — as condições que não são lentidão", () => {
+  it("a tela se chama ENSAIOS, e a frase diz o que cabe nela", () => {
+    montar();
+
+    expect(screen.getByText(/Ensaios — e se/)).toBeInTheDocument();
+    expect(screen.getByTestId("tela-ensaios")).toHaveTextContent("pico de tráfego");
+  });
+
+  it("um ensaio de TAXA faz a saturação aparecer — e ela não é lentidão", () => {
+    // Lei de Little: 100 req/s × 1000 ms = 100 simultâneas; o pool declara 10.
+    render(
+      <EnsaiosScreen
+        diagrama={
+          {
+            nodes: [
+              {
+                id: "api",
+                type: "service",
+                label: "api",
+                x: 0,
+                y: 0,
+                status: "novo",
+                spec: { chamadasSimultaneas: { valor: 10, origem: "manual" } },
+                specNA: {},
+              },
+              { id: "bureau", type: "external", label: "bureau", x: 0, y: 0, status: "novo", spec: {}, specNA: {} },
+            ],
+            edges: [
+              {
+                id: "e1",
+                source: "api",
+                target: "bureau",
+                type: "http",
+                spec: { timeoutMs: { valor: 1000, origem: "manual" } },
+              },
+            ],
+          } as unknown as Diagrama
+        }
+        config={config}
+        cenarios={[
+          {
+            id: "c1",
+            nome: "Black Friday",
+            origem: "manual",
+            ajustes: [{ tipo: "no", id: "api", taxaRps: 100 }],
+          },
+        ]}
+        onMudar={vi.fn()}
+        onVoltar={vi.fn()}
+      />
+    );
+
+    const bloco = screen.getByTestId("contradicoes-c1");
+    expect(bloco).toHaveTextContent("100 necessárias");
+    expect(bloco).toHaveTextContent("10 chamadas simultâneas");
+    // §242 — o porquê é o que separa ensinar de cobrar.
+    expect(bloco).toHaveTextContent("Lei de Little");
+  });
+
+  it("a insistência tem coluna PRÓPRIA — somá-la à resposta faria o alarme gritar lobo", () => {
+    // SPEC-56 §12.1.1: inflar o pior caso é o defeito que faz as pessoas
+    // aprenderem a ignorar o número. São duas perguntas, e ficam em duas colunas.
+    montar([
+      { id: "c1", nome: "com retry", origem: "manual", ajustes: [{ tipo: "aresta", id: "e1", tentativas: 3 }] },
+    ]);
+
+    // 1000 × 3 = 3000 de insistência, e a resposta segue sendo a soma dos
+    // timeouts (não multiplicada).
+    const linha = screen.getByTestId("linha-c1");
+    expect(linha).toHaveTextContent("3,0 s");
+  });
+
+  it("taxa só aparece em NÓ, tentativas e disjuntor só em CONEXÃO", () => {
+    // Oferecer os três em tudo daria controle que não controla nada.
+    const { onMudar } = montar([
+      { id: "c1", nome: "x", origem: "manual", ajustes: [{ tipo: "aresta", id: "e1", fator: 2 }] },
+    ]);
+    fireEvent.click(screen.getByTestId("ajustar-c1"));
+
+    expect(screen.getByTestId("tentativas-e1")).toBeInTheDocument();
+    expect(screen.getByTestId("disjuntor-e1")).toBeInTheDocument();
+    expect(screen.queryByTestId("taxa-e1")).toBeNull();
+
+    fireEvent.change(screen.getByTestId("tentativas-e1"), { target: { value: "4" } });
+    expect(onMudar).toHaveBeenCalledWith([
+      expect.objectContaining({ ajustes: [expect.objectContaining({ tentativas: 4 })] }),
+    ]);
   });
 });

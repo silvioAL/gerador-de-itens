@@ -475,11 +475,17 @@ test("o agente propõe uma decisão a partir do desenho, e ela não vale nada at
 
   await decisoes.getByTestId("pedir-decisao-ao-agente").click();
 
-  // Diagnóstico no lugar certo: se o agente falhou, o painel diz — e é isso
-  // que precisa aparecer no relatório, não um "element not found" mudo.
-  await expect
-    .poll(async () => (await painel.innerText()).slice(0, 800), { timeout: 30000 })
-    .toContain(MARCA_GATEWAY_FALSO);
+  /**
+   * Diagnóstico no lugar certo: se o agente falhou, o painel diz — e é isso
+   * que precisa aparecer no relatório, não um "element not found" mudo.
+   *
+   * §297 — era `.slice(0, 800)`, e o corte existia para a MENSAGEM DE ERRO ser
+   * legível, não para limitar a busca. Dois campos novos na ficha do Serviço
+   * (SPEC-68) empurraram a proposta para além do caractere 800, e o teste
+   * passou a falhar por um motivo que não tinha nada a ver com o que ele mede.
+   * A busca é no painel inteiro; quem corta é o relatório do Playwright.
+   */
+  await expect.poll(async () => await painel.innerText(), { timeout: 30000 }).toContain(MARCA_GATEWAY_FALSO);
 
   const proposta = painel.getByTestId("decisao-proposta").first();
   await expect(proposta).toBeVisible();
