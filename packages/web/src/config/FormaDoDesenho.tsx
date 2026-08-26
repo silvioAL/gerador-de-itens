@@ -31,6 +31,9 @@ export interface FormaDoDesenhoProps {
   onMudar: (requisitos: RequisitoDeTopologia[]) => void;
   /** Só leitura quando quem abriu não edita esta seção (RBAC por seção). */
   somenteLeitura?: boolean;
+  /** SPEC-67 — a régua montada a partir de um fato do desenho (SPEC-65),
+   * esperando conferência. Ausente = o construtor abre em branco, como sempre. */
+  partida?: RequisitoDeTopologia;
 }
 
 /** O id sai do texto, como a chave técnica do campo sai do rótulo (SPEC-52). */
@@ -55,6 +58,15 @@ export function descreverForma(c: ChecagemDeTopologia, config: DiagramaConfig): 
       c.direcao === "sai" ? "saindo" : "entrando"
     }${alvo}`.replace(/\s+/g, " ");
   }
+  if (c.tipo === "limita-grau") {
+    // SPEC-67 — "que esperam resposta" não é enfeite: é o que separa esta
+    // régua de um linter de grafo, e quem lê a frase precisa ver a diferença.
+    const quais = c.apenasQueEsperam ? "que esperam resposta " : "";
+    const quantas = c.maximo === 1 ? "conexão" : "conexões";
+    return `Todo ${no(c.tipoNo)} pode ter no máximo ${c.maximo} ${quantas} ${aresta(c.tipoAresta)} ${quais}${
+      c.direcao === "sai" ? "saindo" : "entrando"
+    }`.replace(/\s+/g, " ");
+  }
   return `Nenhuma conexão ${aresta(c.tipoAresta)} pode ligar ${no(c.deTipoNo)} a ${no(c.paraTipoNo)}`.replace(
     /\s+/g,
     " "
@@ -76,24 +88,50 @@ export function ConstrutorDeForma({
   config,
   onMudou,
   onAdicionar,
+  partida,
 }: {
   config: DiagramaConfig;
   onMudou?: (requisito: RequisitoDeTopologia | null) => void;
   /** Ausente = o construtor não tem botão próprio (quem hospeda salva). */
   onAdicionar?: (requisito: RequisitoDeTopologia) => void;
+  /**
+   * SPEC-67 — a régua já montada a partir de um FATO do desenho (a leitura da
+   * SPEC-65). É o que cumpre o "um clique" prometido: ninguém reconstrói à mão
+   * o que o produto acabou de medir.
+   *
+   * Tudo continua **editável**, e nada é gravado por vir preenchido: a frase da
+   * leitura é um bom começo e não é a régua do time — quem publica assina, e
+   * assinar exige poder mudar.
+   */
+  partida?: RequisitoDeTopologia;
 }) {
   const tiposNo = Object.entries(config.nodeTypes);
   const tiposAresta = Object.entries(config.edgeTypes ?? {});
+  const cp = partida?.checagem;
 
-  const [tipo, setTipo] = useState<ChecagemDeTopologia["tipo"]>("exige-conexao");
-  const [texto, setTexto] = useState("");
-  const [porque, setPorque] = useState("");
-  const [tipoNo, setTipoNo] = useState(tiposNo[0]?.[0] ?? "");
-  const [direcao, setDirecao] = useState<"entra" | "sai">("sai");
-  const [tipoAresta, setTipoAresta] = useState("");
-  const [tipoNoOposto, setTipoNoOposto] = useState("");
-  const [deTipoNo, setDeTipoNo] = useState(tiposNo[0]?.[0] ?? "");
-  const [paraTipoNo, setParaTipoNo] = useState(tiposNo[1]?.[0] ?? tiposNo[0]?.[0] ?? "");
+  const [tipo, setTipo] = useState<ChecagemDeTopologia["tipo"]>(cp?.tipo ?? "exige-conexao");
+  const [texto, setTexto] = useState(partida?.texto ?? "");
+  const [porque, setPorque] = useState(partida?.porque ?? "");
+  const [tipoNo, setTipoNo] = useState(
+    (cp && "tipoNo" in cp ? cp.tipoNo : undefined) ?? tiposNo[0]?.[0] ?? ""
+  );
+  const [direcao, setDirecao] = useState<"entra" | "sai">(
+    (cp && "direcao" in cp ? cp.direcao : undefined) ?? "sai"
+  );
+  const [tipoAresta, setTipoAresta] = useState(cp?.tipoAresta ?? "");
+  const [tipoNoOposto, setTipoNoOposto] = useState(
+    (cp && "tipoNoOposto" in cp ? cp.tipoNoOposto : undefined) ?? ""
+  );
+  const [deTipoNo, setDeTipoNo] = useState(
+    (cp && "deTipoNo" in cp ? cp.deTipoNo : undefined) ?? tiposNo[0]?.[0] ?? ""
+  );
+  const [paraTipoNo, setParaTipoNo] = useState(
+    (cp && "paraTipoNo" in cp ? cp.paraTipoNo : undefined) ?? tiposNo[1]?.[0] ?? tiposNo[0]?.[0] ?? ""
+  );
+  const [maximo, setMaximo] = useState(cp && "maximo" in cp ? cp.maximo : 2);
+  const [apenasQueEsperam, setApenasQueEsperam] = useState(
+    (cp && "apenasQueEsperam" in cp ? cp.apenasQueEsperam : undefined) ?? true
+  );
 
   const checagem: ChecagemDeTopologia =
     tipo === "exige-conexao"
@@ -104,7 +142,16 @@ export function ConstrutorDeForma({
           ...(tipoAresta ? { tipoAresta } : {}),
           ...(tipoNoOposto ? { tipoNoOposto } : {}),
         }
-      : { tipo: "proibe-conexao", deTipoNo, paraTipoNo, ...(tipoAresta ? { tipoAresta } : {}) };
+      : tipo === "limita-grau"
+        ? {
+            tipo: "limita-grau",
+            tipoNo,
+            direcao,
+            maximo,
+            ...(tipoAresta ? { tipoAresta } : {}),
+            ...(apenasQueEsperam ? { apenasQueEsperam: true } : {}),
+          }
+        : { tipo: "proibe-conexao", deTipoNo, paraTipoNo, ...(tipoAresta ? { tipoAresta } : {}) };
 
   const requisito: RequisitoDeTopologia | null = texto.trim()
     ? {
@@ -150,9 +197,59 @@ export function ConstrutorDeForma({
       >
         <option value="exige-conexao">Exigir uma conexão</option>
         <option value="proibe-conexao">Proibir uma conexão</option>
+        <option value="limita-grau">Limitar quantas conexões</option>
       </select>
 
-      {tipo === "exige-conexao" ? (
+      {tipo === "limita-grau" ? (
+        <>
+          <label style={labelEstilo}>Componente com o limite</label>
+          <select aria-label="Componente da régua" value={tipoNo} onChange={(e) => setTipoNo(e.target.value)} style={inputEstilo}>
+            {tiposNo.map(([k, v]) => (
+              <option key={k} value={k}>
+                {v.label ?? k}
+              </option>
+            ))}
+          </select>
+
+          <label style={labelEstilo}>Direção</label>
+          <select
+            aria-label="Direção da conexão"
+            value={direcao}
+            onChange={(e) => setDirecao(e.target.value as "entra" | "sai")}
+            style={inputEstilo}
+          >
+            <option value="sai">saindo dele</option>
+            <option value="entra">entrando nele</option>
+          </select>
+
+          <label style={labelEstilo}>No máximo quantas</label>
+          <input
+            aria-label="Máximo de conexões"
+            type="number"
+            min={0}
+            value={maximo}
+            onChange={(e) => setMaximo(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+            style={inputEstilo}
+          />
+
+          {/* SPEC-67 §3.1 — sem isto a régua acusaria o desenho assíncrono
+              CORRETO: publicar em quatro filas e chamar quatro serviços
+              síncronos têm o mesmo grau, e só um dos dois é problema. */}
+          <label style={{ ...labelEstilo, display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              aria-label="Contar só as conexões que esperam resposta"
+              checked={apenasQueEsperam}
+              onChange={(e) => setApenasQueEsperam(e.target.checked)}
+            />
+            contar só as que esperam resposta
+          </label>
+          <div style={{ fontSize: 10.5, color: "var(--texto-mudo)", marginTop: -4 }}>
+            Publicar em quatro filas é o desenho que se recomenda; chamar quatro serviços antes de responder é o
+            problema — e os dois têm quatro conexões saindo.
+          </div>
+        </>
+      ) : tipo === "exige-conexao" ? (
         <>
           <label style={labelEstilo}>Componente que precisa da conexão</label>
           <select aria-label="Componente da régua" value={tipoNo} onChange={(e) => setTipoNo(e.target.value)} style={inputEstilo}>
@@ -246,9 +343,19 @@ export function ConstrutorDeForma({
   );
 }
 
-export function FormaDoDesenho({ config, requisitos, onMudar, somenteLeitura }: FormaDoDesenhoProps) {
+export function FormaDoDesenho({ config, requisitos, onMudar, somenteLeitura, partida }: FormaDoDesenhoProps) {
   return (
     <div data-testid="forma-do-desenho">
+      {/* SPEC-67 — quem chegou pelo clique da leitura precisa saber POR QUE o
+          formulário abriu preenchido; senão parece que o produto inventou uma
+          régua sozinho. */}
+      {partida && (
+        <div style={vindoDaLeituraEstilo} data-testid="forma-veio-da-leitura">
+          Esta régua veio de um <strong>fato medido no seu desenho</strong>. Confira o texto e o limite antes de
+          publicá-la — o que o produto leu é um bom começo, e a régua do time é sua.
+        </div>
+      )}
+
       <p style={introEstilo}>
         O que o <strong>desenho</strong> precisa respeitar — a classe de problema que não mora em campo nenhum: uma
         fila sem consumidor, o app falando direto com o banco. Diferente das outras seções, a régua aqui não é por
@@ -285,13 +392,29 @@ export function FormaDoDesenho({ config, requisitos, onMudar, somenteLeitura }: 
 
       {!somenteLeitura && (
         <ConstrutorDeForma
+          // `key` pela partida: o construtor guarda o formulário em estado, e
+          // sem trocar a chave um segundo clique da leitura abriria o
+          // formulário com a régua do clique anterior.
+          key={partida?.id ?? "vazio"}
           config={config}
+          partida={partida}
           onAdicionar={(r) => onMudar([...requisitos.filter((x) => x.id !== r.id), r])}
         />
       )}
     </div>
   );
 }
+
+const vindoDaLeituraEstilo: React.CSSProperties = {
+  fontSize: 11.5,
+  lineHeight: 1.5,
+  padding: "8px 10px",
+  borderRadius: 8,
+  border: "1px solid var(--acento-indigo)",
+  background: "rgba(99, 102, 241, 0.10)",
+  color: "var(--texto-2)",
+  margin: "0 0 10px",
+};
 
 const introEstilo: React.CSSProperties = {
   fontSize: 12.5,

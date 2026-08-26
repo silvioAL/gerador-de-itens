@@ -357,6 +357,18 @@ export async function registrarRotasPdca(app: FastifyInstance, { db }: OpcoesApp
                     paraTipoNo: z.string().min(1),
                     tipoAresta: z.string().min(1).optional(),
                   }),
+                  // SPEC-67 — o padrão como quantidade. `int().nonnegative()`
+                  // porque máximo fracionário ou negativo é régua que nenhum
+                  // desenho satisfaz; zero é legítimo ("nenhuma chamada
+                  // síncrona daqui").
+                  z.object({
+                    tipo: z.literal("limita-grau"),
+                    tipoNo: z.string().min(1),
+                    direcao: z.enum(["entra", "sai"]),
+                    maximo: z.number().int().nonnegative(),
+                    tipoAresta: z.string().min(1).optional(),
+                    apenasQueEsperam: z.boolean().optional(),
+                  }),
                 ]),
               }),
             }),

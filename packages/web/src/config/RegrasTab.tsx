@@ -79,6 +79,13 @@ odeTypes. Ausente = a seção não
    * config em memória (o App) precisa reler; mesma disciplina do
    * onFichaMudou da SPEC-52. */
   onRegrasMudaram?: () => void;
+  /**
+   * SPEC-67 — a régua vinda do clique da leitura, esperando conferência.
+   *
+   * Chega pronta e **não é gravada**: "um clique" é sobre não reconstruir à mão
+   * o que o produto acabou de medir, não sobre pular a decisão de publicar.
+   */
+  reguaDePartida?: RequisitoDeTopologia;
 }
 
 export function RegrasTab({
@@ -89,6 +96,7 @@ export function RegrasTab({
   nodeTypes,
   diagramaConfig,
   onRegrasMudaram,
+  reguaDePartida,
 }: RegrasTabProps = {}) {
   const todasAsOpcoes = contextos ?? [];
   // A seção de FORMA some quando não há como oferecer os tipos: sem eles o
@@ -97,7 +105,16 @@ export function RegrasTab({
     (s) => podeSecao?.(s.id) ?? true
   );
   const [regras, setRegras] = useState<RegrasConfig | null>(null);
-  const [secao, setSecao] = useState<Secao>(secoesVisiveis[0]?.id ?? "tecnico");
+  /**
+   * SPEC-67 — chegando pelo clique da leitura, a seção de FORMA já abre.
+   *
+   * Sem isto o clique levaria a esta tela na primeira seção, e a régua
+   * preenchida ficaria escondida atrás de mais um clique — o que faria o
+   * "um clique" ser dois e parecer que nada aconteceu.
+   */
+  const [secao, setSecao] = useState<Secao>(
+    reguaDePartida && secoesVisiveis.some((s) => s.id === "forma") ? "forma" : secoesVisiveis[0]?.id ?? "tecnico"
+  );
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [diagnostico, setDiagnostico] = useState<DiagnosticoConfig | null>(null);
@@ -265,6 +282,7 @@ export function RegrasTab({
         <div style={{ marginTop: 16 }}>
           <FormaDoDesenho
             config={diagramaConfig}
+            partida={reguaDePartida}
             requisitos={regras.topologia ?? []}
             onMudar={(topologia: RequisitoDeTopologia[]) => void gravar({ ...regras, topologia })}
             somenteLeitura={podeSecao ? !podeSecao("forma") : false}

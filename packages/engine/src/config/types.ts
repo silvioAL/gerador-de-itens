@@ -367,6 +367,32 @@ export type ChecagemDeTopologia =
       deTipoNo: string;
       paraTipoNo: string;
       tipoAresta?: string;
+    }
+  /**
+   * SPEC-67 — o padrão como QUANTIDADE.
+   *
+   * As duas checagens acima cobrem presença e ausência. Falta a terceira forma
+   * que um padrão de topologia assume — grau: *"no máximo três chamadas que
+   * esperam saindo de um serviço"*. É justamente o padrão que a leitura do
+   * desenho (SPEC-65) mais produz, e sem ele o fato que ela mostra não tinha
+   * como virar régua do time.
+   */
+  | {
+      tipo: "limita-grau";
+      tipoNo: string;
+      direcao: "entra" | "sai";
+      maximo: number;
+      tipoAresta?: string;
+      /**
+       * Conta só as conexões em que quem chama ESPERA a resposta
+       * (`EdgeTypeConfig.espera`, SPEC-65).
+       *
+       * Não é detalhe: um serviço que publica em quatro filas faz exatamente o
+       * que se recomenda, e um que chama quatro serviços síncronos antes de
+       * responder é o problema — **os dois têm grau de saída 4**. Uma régua que
+       * não os distingue é o linter de grafo que a SPEC-63 §1 recusou.
+       */
+      apenasQueEsperam?: boolean;
     };
 
 export interface RequisitoDeTopologia {

@@ -344,6 +344,17 @@ export function validateRegras(
     if (c.tipo === "exige-conexao") {
       conferirNo(c.tipoNo, "tipoNo");
       conferirNo(c.tipoNoOposto, "tipoNoOposto");
+    } else if (c.tipo === "limita-grau") {
+      conferirNo(c.tipoNo, "tipoNo");
+      // SPEC-67 — máximo negativo ou fracionário é régua que ninguém consegue
+      // satisfazer nem entender. `0` é legítimo: "nenhuma chamada síncrona
+      // saindo daqui" é um padrão real.
+      if (!Number.isInteger(c.maximo) || c.maximo < 0) {
+        erros.push({
+          campo: `${caminho}.checagem.maximo`,
+          mensagem: `máximo precisa ser um inteiro ≥ 0 (recebi ${JSON.stringify(c.maximo)})`,
+        });
+      }
     } else {
       conferirNo(c.deTipoNo, "deTipoNo");
       conferirNo(c.paraTipoNo, "paraTipoNo");

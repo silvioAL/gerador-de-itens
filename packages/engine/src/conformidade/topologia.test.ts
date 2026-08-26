@@ -284,3 +284,199 @@ describe("avaliarTopologia — a exceção com motivo", () => {
     expect(violacoesDeFormaEmAberto(avaliarTopologia(d, config, APP_NAO_FALA_COM_BANCO, [naAresta]))).toEqual([]);
   });
 });
+
+/**
+ * SPEC-67 — a terceira forma que um padrão de topologia assume: QUANTIDADE.
+ *
+ * `exige-conexao` e `proibe-conexao` cobrem presença e ausência. O padrão que a
+ * leitura do desenho (SPEC-65) mais produz — "faz três chamadas antes de
+ * responder" — não é nem um nem outro: é grau.
+ */
+describe("avaliarTopologia — limita-grau (SPEC-67)", () => {
+  const configComEspera: DiagramaConfig = {
+    ...config,
+    edgeTypes: {
+      ...config.edgeTypes,
+      http: { label: "HTTP", espera: true },
+      publica: { label: "publica", espera: false },
+      naoDeclarada: { label: "sem declaração" },
+    },
+  };
+
+  const NO_MAXIMO_2: RegrasConfig = {
+    tipos: [],
+    tamanhos: [],
+    porTech: {},
+    topologia: [
+      {
+        id: "t-fanout",
+        texto: "No máximo 2 chamadas antes de responder",
+        porque: "A resposta é a soma delas, e qualquer uma que falhe derruba as outras.",
+        checagem: { tipo: "limita-grau", tipoNo: "service", direcao: "sai", maximo: 2, apenasQueEsperam: true },
+      },
+    ],
+  };
+
+  it("acusa o nó que passou do máximo, com o NÚMERO real", () => {
+    // Sem o número, "acima do máximo" não diz de quanto é o excesso.
+    const d = diagrama(
+      [no("api", "service"), no("a", "service"), no("b", "service"), no("c", "service")],
+      [aresta("e1", "api", "a", "http"), aresta("e2", "api", "b", "http"), aresta("e3", "api", "c", "http")]
+    );
+
+    const [v] = violacoesDeFormaEmAberto(avaliarTopologia(d, configComEspera, NO_MAXIMO_2));
+
+    // O excesso é propriedade do NÓ: apontar três arestas obrigaria a pessoa a
+    // escolher qual sobra, e essa decisão é dela.
+    expect(v.noId).toBe("api");
+    expect(v.arestaId).toBeUndefined();
+    expect(v.atual).toBe("3 conexões que esperam");
+    expect(v.esperado).toContain("no máximo 2");
+    expect(v.esperado).toContain("que esperam resposta");
+  });
+
+  it("no máximo em ponto é silêncio — 2 não viola 'no máximo 2'", () => {
+    const d = diagrama(
+      [no("api", "service"), no("a", "service"), no("b", "service")],
+      [aresta("e1", "api", "a", "http"), aresta("e2", "api", "b", "http")]
+    );
+
+    expect(avaliarTopologia(d, configComEspera, NO_MAXIMO_2)).toEqual([]);
+  });
+
+  it("PUBLICAR em quatro filas não viola — é o desenho que se recomenda", () => {
+    // §3.1: os dois casos têm grau de saída 4. Uma régua que não os distingue
+    // é o linter de grafo que a SPEC-63 §1 recusou.
+    const d = diagrama(
+      [no("api", "service"), no("f1", "fila"), no("f2", "fila"), no("f3", "fila"), no("f4", "fila")],
+      [
+        aresta("e1", "api", "f1", "publica"),
+        aresta("e2", "api", "f2", "publica"),
+        aresta("e3", "api", "f3", "publica"),
+        aresta("e4", "api", "f4", "publica"),
+      ]
+    );
+
+    expect(avaliarTopologia(d, configComEspera, NO_MAXIMO_2)).toEqual([]);
+  });
+
+  it("conexão de tipo sem `espera` declarado fica de FORA da conta", () => {
+    // Contar o que não se sabe inflaria o grau e acusaria por ignorância — o
+    // oposto do §248, que manda dizer "não deu para medir".
+    const d = diagrama(
+      [no("api", "service"), no("a", "service"), no("b", "service"), no("c", "service")],
+      [
+        aresta("e1", "api", "a", "http"),
+        aresta("e2", "api", "b", "http"),
+        aresta("e3", "api", "c", "naoDeclarada"),
+      ]
+    );
+
+    expect(avaliarTopologia(d, configComEspera, NO_MAXIMO_2)).toEqual([]);
+  });
+
+  it("auto-laço não conta — é seta que não sai do lugar", () => {
+    const d = diagrama(
+      [no("api", "service"), no("a", "service"), no("b", "service")],
+      [
+        aresta("e1", "api", "a", "http"),
+        aresta("e2", "api", "b", "http"),
+        aresta("e3", "api", "api", "http"),
+      ]
+    );
+
+    expect(avaliarTopologia(d, configComEspera, NO_MAXIMO_2)).toEqual([]);
+  });
+
+  it("sem `apenasQueEsperam`, conta TODAS — quem quer grau bruto pode pedir", () => {
+    const bruta: RegrasConfig = {
+      ...NO_MAXIMO_2,
+      topologia: [
+        {
+          id: "t-grau",
+          texto: "No máximo 2 conexões saindo",
+          checagem: { tipo: "limita-grau", tipoNo: "service", direcao: "sai", maximo: 2 },
+        },
+      ],
+    };
+    const d = diagrama(
+      [no("api", "service"), no("f1", "fila"), no("f2", "fila"), no("f3", "fila")],
+      [aresta("e1", "api", "f1", "publica"), aresta("e2", "api", "f2", "publica"), aresta("e3", "api", "f3", "publica")]
+    );
+
+    expect(violacoesDeFormaEmAberto(avaliarTopologia(d, configComEspera, bruta))[0].atual).toBe("3 conexões");
+  });
+
+  it("mede a direção pedida — 'entrando' é outra pergunta", () => {
+    const entrando: RegrasConfig = {
+      ...NO_MAXIMO_2,
+      topologia: [
+        {
+          id: "t-entra",
+          texto: "No máximo 1 chamada entrando",
+          checagem: { tipo: "limita-grau", tipoNo: "service", direcao: "entra", maximo: 1, apenasQueEsperam: true },
+        },
+      ],
+    };
+    const d = diagrama(
+      [no("alvo", "service"), no("a", "service"), no("b", "service")],
+      [aresta("e1", "a", "alvo", "http"), aresta("e2", "b", "alvo", "http")]
+    );
+
+    const [v] = violacoesDeFormaEmAberto(avaliarTopologia(d, configComEspera, entrando));
+    expect(v.noId).toBe("alvo");
+    expect(v.esperado).toContain("entrando");
+  });
+
+  it("a exceção com motivo cala a régua de grau como cala as outras", () => {
+    const d = diagrama(
+      [no("api", "service"), no("a", "service"), no("b", "service"), no("c", "service")],
+      [aresta("e1", "api", "a", "http"), aresta("e2", "api", "b", "http"), aresta("e3", "api", "c", "http")]
+    );
+    const aceita = {
+      noId: "api",
+      campo: "",
+      regraId: "t-fanout",
+      motivo: "as três são idempotentes e a soma cabe no SLA",
+      autor: "alguem@time",
+      em: "2026-08-26T00:00:00Z",
+    };
+
+    expect(violacoesDeFormaEmAberto(avaliarTopologia(d, configComEspera, NO_MAXIMO_2, [aceita]))).toEqual([]);
+    expect(violacoesDeFormaAceitas(avaliarTopologia(d, configComEspera, NO_MAXIMO_2, [aceita]))).toHaveLength(1);
+  });
+});
+
+describe("validateRegras — a régua de grau que não daria para satisfazer", () => {
+  const app = { techs: ["Backend"], contextos: [] };
+  const comMaximo = (maximo: number): RegrasConfig => ({
+    tipos: [],
+    tamanhos: [],
+    porTech: {},
+    topologia: [
+      { id: "t", texto: "x", checagem: { tipo: "limita-grau", tipoNo: "service", direcao: "sai", maximo } },
+    ],
+  });
+
+  it("máximo negativo é erro — nenhum desenho o satisfaz", () => {
+    const erros = validateRegras(comMaximo(-1), app, config);
+    expect(erros.some((e) => e.campo.includes("maximo"))).toBe(true);
+  });
+
+  it("máximo ZERO é legítimo — 'nenhuma chamada síncrona daqui' é padrão real", () => {
+    expect(validateRegras(comMaximo(0), app, config)).toEqual([]);
+  });
+
+  it("tipo de componente inexistente é pego antes de a régua nascer muda", () => {
+    const regras: RegrasConfig = {
+      tipos: [],
+      tamanhos: [],
+      porTech: {},
+      topologia: [
+        { id: "t", texto: "x", checagem: { tipo: "limita-grau", tipoNo: "naoExiste", direcao: "sai", maximo: 2 } },
+      ],
+    };
+
+    expect(validateRegras(regras, app, config).some((e) => e.campo.includes("tipoNo"))).toBe(true);
+  });
+});

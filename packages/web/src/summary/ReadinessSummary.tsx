@@ -50,6 +50,8 @@ export interface ReadinessSummaryProps {
    * painel só lê, sem oferecer ação que ninguém trata. */
   leiturasDispensadas?: LeituraDispensada[];
   onDispensarLeitura?: (marca: MarcaDaLeitura) => void;
+  /** SPEC-67 — o fato vira régua do time. Ausente = o verbo não aparece. */
+  onVirarRegua?: (marca: MarcaDaLeitura) => void;
   onRestaurarLeitura?: (dispensa: LeituraDispensada) => void;
   /** SPEC-66 — leva à bancada de ensaio. Ausente = a porta não aparece. */
   onSimular?: () => void;
@@ -96,6 +98,7 @@ export function ReadinessSummary({
   leitura,
   leiturasDispensadas,
   onDispensarLeitura,
+  onVirarRegua,
   onRestaurarLeitura,
   onSimular,
   excecoes,
@@ -183,6 +186,7 @@ export function ReadinessSummary({
         onSelecionarAresta={onSelecionarAresta}
         dispensadas={leiturasDispensadas}
         onDispensar={onDispensarLeitura}
+        onVirarRegua={onVirarRegua}
         onRestaurar={onRestaurarLeitura}
         onSimular={onSimular}
       />
