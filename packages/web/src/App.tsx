@@ -18,6 +18,8 @@ import {
   type StatusDocumento,
   type ResultadoDependenciasDe,
   gerarItensDeTrabalho,
+  lerDesenho,
+  marcasPorNo,
   percursoManual,
   type ItemDeTrabalho,
 } from "@gerador/engine";
@@ -574,6 +576,26 @@ function AppCarregado({
 
   const [resultado, setResultado] = useState<ResultadoDependenciasDe<Atividade> | null>(null);
   const { vermelhos } = calcularResumoProntidao(quebra.diagrama, diagramaConfig);
+
+  /**
+   * SPEC-65 fatia C — a leitura do desenho, calculada UMA vez.
+   *
+   * Ela alimenta o chip da faixa e as marcas do canvas. Duas chamadas
+   * produziriam dois objetos iguais em valor e diferentes em identidade — o que
+   * no canvas custa caro, porque o memo das arestas compara por referência (é o
+   * §"piscar" que já mordeu este arquivo).
+   */
+  const leituraDoDesenho = useMemo(
+    () => lerDesenho(quebra.diagrama, diagramaConfig),
+    [quebra.diagrama, diagramaConfig]
+  );
+  // As dispensas entram AQUI, e não só no painel: sem elas, calar uma leitura
+  // tirava a linha do popover e deixava a marca de pé no canvas — o silêncio
+  // pedido valendo em metade da tela. Foi o E2E que pegou.
+  const marcasDaLeitura = useMemo(
+    () => marcasPorNo(leituraDoDesenho, quebra.leiturasDispensadas),
+    [leituraDoDesenho, quebra.leiturasDispensadas]
+  );
 
   // SPEC-37 Fase 3 — M2 (canvas vazio), M3 (proposta aplicada, campos por
   // preencher) e M8 (config aberta sem padrões do time). A DECISÃO de qual
@@ -1418,6 +1440,38 @@ function AppCarregado({
       <ReadinessSummary
         diagrama={quebra.diagrama}
         config={diagramaConfig}
+        // SPEC-65 — a mesma leitura das marcas do canvas, calculada uma vez.
+        leitura={leituraDoDesenho}
+        /**
+         * SPEC-65 fatia D — calar uma leitura NESTE desenho.
+         *
+         * Registrada com quem e quando, e reversível pela lista de caladas: é
+         * decisão, e o §283 vale para toda decisão deste produto.
+         *
+         * `onVirarRegua` NÃO é passado, e a ausência é a mensagem. A régua de
+         * forma (§287) sabe `exige-conexao` e `proibe-conexao`; um fan-out
+         * viraria `limita-grau`, que não existe ainda. Um botão que abre um
+         * formulário onde a regra não cabe é pior que botão nenhum (§244) — a
+         * prop fica de pé no painel, esperando a checagem.
+         */
+        leiturasDispensadas={quebra.leiturasDispensadas}
+        onDispensarLeitura={(m) =>
+          setQuebra((q) => ({
+            ...q,
+            leiturasDispensadas: [
+              ...(q.leiturasDispensadas ?? []).filter((d) => !(d.noId === m.noId && d.tipo === m.tipo)),
+              { noId: m.noId, tipo: m.tipo, autor: sessao.email, em: new Date().toISOString() },
+            ],
+          }))
+        }
+        onRestaurarLeitura={(d) =>
+          setQuebra((q) => ({
+            ...q,
+            leiturasDispensadas: (q.leiturasDispensadas ?? []).filter(
+              (x) => !(x.noId === d.noId && x.tipo === d.tipo)
+            ),
+          }))
+        }
         onSelecionar={setSelecionadoId}
         necessidades={quebra.necessidades}
         onAbrirProposito={() => setAbaAssistente("contexto")}
@@ -1490,6 +1544,10 @@ function AppCarregado({
               diagramaState={quebraState}
               config={diagramaConfig}
               timePadrao={quebra.time}
+              // SPEC-65 fatia C — a mesma leitura que alimenta o chip da faixa.
+              // Calcular de novo aqui daria duas verdades sobre o mesmo desenho
+              // na mesma tela.
+              marcas={marcasDaLeitura}
               // SPEC-64 — com uma declaração em curso, o clique no nó compõe a
               // sequência em vez de selecionar. Fora dela, `undefined`: o canvas
               // volta a ser o de sempre.

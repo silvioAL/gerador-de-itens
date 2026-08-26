@@ -72,6 +72,61 @@ test("§291 — a leitura aparece sem confirmar caminho nem configurar régua", 
   await expect(page.getByText("Timeout (ms)")).toBeVisible();
 });
 
+test("§292 — a marca nasce no nó, acende as conexões, e cala com volta", async ({ page }) => {
+  test.setTimeout(120000);
+  await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
+  await page.route(
+    (url) => url.pathname === "/ia/status",
+    (rota) => rota.fulfill({ json: { modelosChat: [], embeddingInstalado: false, capacidades: {} } })
+  );
+  await entrar(page);
+
+  await page.getByTestId("abrir-cenarios").click();
+  await page.getByRole("button", { name: "Carregar cenário: Fluxo completo: aprovação de crédito" }).click();
+
+  // ── A marca no CANVAS, sem abrir nada ──
+  // O nó do relato faz três chamadas que esperam, e diz isso no próprio card.
+  const marca = page.locator('[data-testid^="marca-leitura-"]').first();
+  await expect(marca).toBeVisible();
+  await expect(marca).toContainText("3");
+  await expect(marca).toHaveAttribute("title", /chamadas que esperam|saltos que esperam/);
+
+  // ── Olhar a marca acende as conexões dela ──
+  // O realce é visual, e o que dá para afirmar sem medir pixel é que as
+  // conexões passaram a se distinguir: as de fora esmaecem.
+  const opacidadeAntes = await page.evaluate(
+    () => [...document.querySelectorAll(".react-flow__edge-path")].map((e) => (e as SVGElement).style.opacity)
+  );
+  expect(opacidadeAntes.every((o) => o === "")).toBe(true);
+
+  await marca.hover();
+  await expect
+    .poll(async () =>
+      page.evaluate(
+        () =>
+          [...document.querySelectorAll(".react-flow__edge-path")].filter(
+            (e) => (e as SVGElement).style.opacity !== ""
+          ).length
+      )
+    )
+    .toBeGreaterThan(0);
+
+  // ── Calar, e ouvir de novo (§283) ──
+  await page.getByTestId("leitura-resumo").click();
+  const dispensar = page.locator('[data-testid^="dispensar-leitura-"]').first();
+  const idDaMarca = (await dispensar.getAttribute("data-testid"))!.replace("dispensar-leitura-", "");
+  await dispensar.click();
+
+  // A marca some do canvas — é o efeito de calar, e ele é imediato.
+  await expect(page.getByTestId(`marca-leitura-${idDaMarca.split("-")[0]}`)).toHaveCount(0);
+
+  // E não some do histórico: a lista de caladas a devolve. O popover segue
+  // aberto — o clique em "não me mostre aqui" foi dentro dele.
+  await page.getByTestId("leitura-caladas").click();
+  await page.getByTestId(`restaurar-leitura-${idDaMarca}`).click();
+  await expect(page.locator('[data-testid^="marca-leitura-"]').first()).toBeVisible();
+});
+
 test("§291 — desenho que não espera por ninguém não ganha chip", async ({ page }) => {
   test.setTimeout(90000);
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));

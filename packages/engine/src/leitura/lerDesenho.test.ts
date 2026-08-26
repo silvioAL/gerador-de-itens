@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { DiagramaConfig } from "../config/types.js";
 import type { Diagrama } from "../model/types.js";
 import { readConfigFile } from "../test-support/fixtures.js";
-import { arestaEspera, formatarDuracao, lerDesenho, resumirLeitura } from "./lerDesenho.js";
+import {
+  arestaEspera,
+  dispensasComEfeito,
+  formatarDuracao,
+  lerDesenho,
+  marcasPorNo,
+  resumirLeitura,
+} from "./lerDesenho.js";
 
 /**
  * SPEC-65 — o desenho lido em voz alta.
@@ -281,6 +288,80 @@ describe("lerDesenho — o cenário que motivou a SPEC", () => {
     expect(t.completo).toBe(false);
     expect(t.semValor).toHaveLength(1);
     expect(resumirLeitura(leitura)).toBe("≥ 3,0 s de resposta · 1 por preencher");
+  });
+});
+
+describe("marcasPorNo — a marca do canvas (fatia C)", () => {
+  const fanOut = () =>
+    diagrama(
+      [no("api", "service"), no("a", "service"), no("b", "sql")],
+      [aresta("e1", "api", "a", "http"), aresta("e2", "api", "b", "writes")]
+    );
+
+  it("a marca carrega o número, a frase e as conexões a acender", () => {
+    // O número sozinho não ensina nada — quem lê "3" precisa saber que a
+    // resposta é a soma das três.
+    const [m] = marcasPorNo(lerDesenho(fanOut(), config));
+
+    expect(m.noId).toBe("api");
+    expect(m.numero).toBe(2);
+    expect(m.titulo).toContain("a soma delas");
+    expect(m.arestasIds).toEqual(["e1", "e2"]);
+  });
+
+  it("UMA marca por nó, mesmo sendo fan-out E começo de cadeia", () => {
+    // Duas marcas no mesmo canto viram enfeite, e enfeite é o que se para de
+    // ver. O fan-out ganha: o canto de um nó fala do nó.
+    const d = diagrama(
+      [no("api", "service"), no("b", "service"), no("c", "service"), no("d", "sql"), no("e", "sql")],
+      [
+        aresta("e1", "api", "b", "http"),
+        aresta("e2", "b", "c", "http"),
+        aresta("e3", "c", "d", "http"),
+        aresta("e4", "api", "e", "writes"),
+      ]
+    );
+
+    const marcas = marcasPorNo(lerDesenho(d, config));
+    expect(marcas.filter((m) => m.noId === "api")).toHaveLength(1);
+    expect(marcas.find((m) => m.noId === "api")!.tipo).toBe("fan-out");
+  });
+
+  it("dispensar cala o PAR (nó, tipo), não o nó inteiro", () => {
+    // Silenciar tudo de um nó de uma vez é o que transforma sinal em ruído
+    // aceito.
+    const semCala = marcasPorNo(lerDesenho(fanOut(), config));
+    const calada = marcasPorNo(lerDesenho(fanOut(), config), [{ noId: "api", tipo: "fan-out" }]);
+    const outroTipo = marcasPorNo(lerDesenho(fanOut(), config), [{ noId: "api", tipo: "cadeia" }]);
+
+    expect(semCala).toHaveLength(1);
+    expect(calada).toHaveLength(0);
+    expect(outroTipo).toHaveLength(1);
+  });
+});
+
+describe("dispensasComEfeito — o §283 aplicado às leituras", () => {
+  it("lista a dispensa que ainda cala alguma coisa, com o que ela cala", () => {
+    const d = diagrama(
+      [no("api", "service"), no("a", "service"), no("b", "sql")],
+      [aresta("e1", "api", "a", "http"), aresta("e2", "api", "b", "writes")]
+    );
+
+    const caladas = dispensasComEfeito(lerDesenho(d, config), [
+      { noId: "api", tipo: "fan-out", autor: "alguem@time" },
+    ]);
+
+    expect(caladas).toHaveLength(1);
+    expect(caladas[0].dispensa.autor).toBe("alguem@time");
+    expect(caladas[0].marca.titulo).toContain("chamadas que esperam");
+  });
+
+  it("dispensa de leitura que sumiu do desenho NÃO aparece — ela não cala nada", () => {
+    // O registro fica na quebra; a tela só mostra o que tem efeito. Listar
+    // dispensas mortas encheria a lista de fantasmas do desenho de ontem.
+    const d = diagrama([no("api", "service"), no("a", "service")], [aresta("e1", "api", "a", "http")]);
+
+    expect(dispensasComEfeito(lerDesenho(d, config), [{ noId: "api", tipo: "fan-out" }])).toEqual([]);
   });
 });
 

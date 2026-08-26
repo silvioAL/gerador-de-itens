@@ -316,6 +316,25 @@ export interface Quebra {
   documentoEscrito?: DocumentoEscrito;
   /** SPEC-58 fatia 3 — o estado do documento. Ausente = nunca gerado. */
   documentoStatus?: StatusDocumento;
+  /**
+   * SPEC-65 fatia D — as leituras que o time mandou calar NESTE desenho.
+   *
+   * Dispensar é decisão, e por isso fica registrada com quem e quando — e é
+   * reversível (§283: nenhuma decisão é de mão única). A chave é o par
+   * `(nó, tipo de leitura)`: silenciar todas de uma vez é o que transforma
+   * sinal em ruído aceito.
+   */
+  leiturasDispensadas?: LeituraDispensada[];
+}
+
+/** SPEC-65 fatia D — o silêncio pedido, com dono e data. */
+export interface LeituraDispensada {
+  noId: string;
+  /** `fan-out` | `cadeia` — o tipo, e não o número: o número muda quando o
+   * desenho muda, e a dispensa não deveria voltar por isso. */
+  tipo: string;
+  autor?: string;
+  em?: string;
 }
 
 export type TipoItem = "História" | "Task" | "Débito Técnico";

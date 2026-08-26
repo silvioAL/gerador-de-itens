@@ -13,6 +13,18 @@ function leitura(parcial: Partial<LeituraDoDesenho> = {}): LeituraDoDesenho {
   };
 }
 
+function fanOutDe(noId: string, chamadas: number) {
+  return {
+    noId,
+    rotulo: noId,
+    chamadas: Array.from({ length: chamadas }, (_, i) => ({
+      tipo: "aresta" as const,
+      id: `e${i}`,
+      rotulo: `${noId} → alvo${i}`,
+    })),
+  };
+}
+
 const tempoCompleto = {
   percursoId: "pc::a>b",
   rotulo: "api → banco",
@@ -125,6 +137,46 @@ describe("LeituraDoDesenhoPanel — o detalhe, e os endereços", () => {
     fireEvent.click(screen.getByTestId("leitura-resumo"));
 
     expect(screen.getByTestId("leitura-ignoradas")).toHaveTextContent("2× binding");
+  });
+
+  it("sem quem trate, o verbo de calar NÃO aparece — nada de botão morto", () => {
+    // §244 — a mesma disciplina do `onReabrir` do PercursosPanel.
+    render(<LeituraDoDesenhoPanel leitura={leitura({ fanOut: [fanOutDe("api", 3)] })} />);
+    fireEvent.click(screen.getByTestId("leitura-resumo"));
+
+    expect(screen.queryByTestId("dispensar-leitura-api-fan-out")).toBeNull();
+    // E "virar régua" também não: a régua de forma ainda não tem a checagem
+    // de grau, e abrir um formulário onde a regra não cabe é pior que nada.
+    expect(screen.queryByTestId("virar-regua-api-fan-out")).toBeNull();
+  });
+
+  it("calar devolve a MARCA, e ela carrega o par (nó, tipo) — não o nó inteiro", () => {
+    const onDispensar = vi.fn();
+    render(
+      <LeituraDoDesenhoPanel leitura={leitura({ fanOut: [fanOutDe("api", 3)] })} onDispensar={onDispensar} />
+    );
+    fireEvent.click(screen.getByTestId("leitura-resumo"));
+    fireEvent.click(screen.getByTestId("dispensar-leitura-api-fan-out"));
+
+    expect(onDispensar).toHaveBeenCalledWith(expect.objectContaining({ noId: "api", tipo: "fan-out" }));
+  });
+
+  it("§283 — o que foi calado tem volta, e diz quem calou", () => {
+    const onRestaurar = vi.fn();
+    const dispensa = { noId: "api", tipo: "fan-out", autor: "alguem@time" };
+    render(
+      <LeituraDoDesenhoPanel
+        leitura={leitura({ fanOut: [fanOutDe("api", 3)] })}
+        dispensadas={[dispensa]}
+        onRestaurar={onRestaurar}
+      />
+    );
+    fireEvent.click(screen.getByTestId("leitura-resumo"));
+
+    const caladas = screen.getByTestId("leitura-caladas");
+    expect(caladas).toHaveTextContent("alguem@time");
+    fireEvent.click(screen.getByTestId("restaurar-leitura-api-fan-out"));
+    expect(onRestaurar).toHaveBeenCalledWith(dispensa);
   });
 
   it("diz que é leitura, não régua — a frase que impede lê-la como cobrança", () => {

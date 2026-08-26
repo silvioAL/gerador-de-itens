@@ -10232,3 +10232,99 @@ dizendo isso em voz alta: *"isto é leitura, não régua"*.
 
 400 engine · 696 web · 84 aplicação · 237 server · 129 llm · 88/88 E2E · build e
 lint limpos.
+
+## §292 — a marca no desenho, o silêncio com volta, e o pressuposto que era invisível
+
+As fatias **C** e **D** da SPEC-65, mais um buraco que a pergunta do usuário
+desenterrou.
+
+### A marca, e a regra de uma por nó
+
+O nó que faz três chamadas que esperam agora diz isso **no próprio card**: um
+selo `⏱ 3`, em cor de tinta. Nunca vermelho nem âmbar — os dois já significam
+"errado" e "atenção" na mesa, e pintar um fato de âmbar transformaria leitura em
+cobrança, que é o linter de grafo que a §287 recusou.
+
+**Uma marca por nó, nunca duas.** Um nó pode ser fan-out *e* começo da cadeia
+mais funda; duas marcas no mesmo canto viram enfeite, e enfeite é o que se para
+de ver. Quando coincidem, o fan-out ganha — ele é sobre o nó em si ("este
+componente faz N chamadas"), enquanto a cadeia é sobre o caminho que passa por
+ele, e o canto de um nó fala do nó.
+
+Ao olhar a marca, as conexões dela **acendem e animam** e as demais esmaecem: a
+leitura vira visível **na figura**, que é onde a pessoa está olhando.
+
+### O piscar quase voltou pela porta nova
+
+O memo das arestas do `Canvas` carrega um comentário antigo sobre um achado
+real: digitar no painel fazia todo rótulo de conexão repintar, porque o memo
+dependia de um array recriado a cada render. A correção da época foi trocar a
+dependência por uma **string de geometria**.
+
+O realce precisa de uma dependência nova — quais arestas acender —, e um array
+ali reintroduziria exatamente aquele defeito. Então ele entra como string
+(`"e1|e2|e3"`), pela mesma razão e com o mesmo formato. E o `marcaOlhada` é
+estado **local do canvas**: hover não é decisão, e subi-lo ao App faria toda
+passada de mouse re-renderizar o painel lateral.
+
+### Calar é decisão, e decisão tem volta
+
+"Não me mostre aqui" cala o par **(nó, tipo de leitura)** — nunca o nó inteiro,
+porque silenciar tudo de uma vez é o que transforma sinal em ruído aceito. Fica
+registrado com quem e quando, e volta pela lista de caladas (§283).
+
+Duas decisões finas:
+
+- a dispensa se prende ao **tipo**, não ao número. Um fan-out que passa de 3
+  para 4 chamadas não deveria ressuscitar um silêncio que alguém pediu;
+- **dispensa de leitura que sumiu do desenho não aparece na lista** — ela não
+  está calando nada. O registro fica na quebra, mas a tela só mostra o que tem
+  efeito, senão a lista encheria de fantasmas do desenho de ontem.
+
+### O E2E pegou o silêncio pela metade
+
+`marcasPorNo` recebia as dispensas — e o App **não as passava**. Calar tirava a
+linha do popover e deixava a marca de pé no canvas: o silêncio pedido valendo em
+metade da tela, e a pessoa concluindo, com razão, que o botão não funciona.
+
+Só o navegador acharia isso: os dois lados estão corretos isoladamente, e o
+teste de unidade de cada um passava.
+
+### "virar régua" NÃO foi entregue, e a ausência é a mensagem
+
+A prop existe no painel; o App não a passa, então o botão não aparece. O motivo:
+a régua de forma (§287) sabe `exige-conexao` e `proibe-conexao`, e um fan-out
+viraria `limita-grau`, que **não existe**. Um botão que abre um formulário onde a
+regra não cabe é pior que botão nenhum (§244).
+
+A SPEC-65 §9.1 já recomendava `limita-grau` fora da fatia D. Fica de pé,
+esperando a checagem.
+
+### O pressuposto que ninguém conferia
+
+O usuário perguntou: *"uma chamada http é síncrona, uma mensagem kafka
+assíncrona — isso já está estruturado nas configurações?"*
+
+Está, desde o §291, e a resposta tem uma precisão que vale registrar: **é por
+conexão, não por componente.** Kafka e Rabbit são nós; o que é assíncrono é
+*publicar em* e *consumir de* — e por isso o mesmo Kafka pode ser consumido de
+forma bloqueante, que é a razão de `consumes` ter um `sincrono` por instância
+que sobrepõe o padrão do tipo.
+
+Mas medi e achei o buraco: **`espera` só existia no arquivo.** A aba de campos de
+conexão nunca o mostrou, e pressuposto invisível é pressuposto que ninguém
+confere — justo o que decide se o `timeoutMs` daquela conexão entra na conta do
+tempo de resposta.
+
+Cada tipo de conexão passou a exibir o selo: *espera resposta* · *não espera* ·
+*não declarado* — o terceiro em âmbar, porque ali a leitura pula a conexão e diz
+que pulou (§248).
+
+> **Editar ainda não dá, e o motivo fica escrito.** `espera` mora no
+> `diagrama.json` **global**, e aquela aba edita campos **por time**. Um editor
+> de config global no meio de um editor de campos de time são duas coisas
+> diferentes no mesmo lugar — que é como se constrói a tela que ninguém entende.
+> Enquanto isso, ao menos o pressuposto deixou de ser invisível.
+
+405 engine · 699 web · 84 aplicação · 237 server · 129 llm · 89/89 E2E · build e
+lint limpos.

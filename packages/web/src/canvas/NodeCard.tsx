@@ -8,6 +8,22 @@ export interface NodeCardData extends Record<string, unknown> {
   config: DiagramaConfig;
   arestas: Aresta[];
   quebraTime?: string;
+  /**
+   * SPEC-65 fatia C — a leitura DESTE nó, quando existe.
+   *
+   * Ausente na maioria dos nós, e é assim que ela significa algo quando
+   * aparece: marca que existe em todo nó vira moldura do card, e moldura
+   * ninguém lê.
+   */
+  marca?: MarcaNoCard;
+}
+
+export interface MarcaNoCard {
+  numero: number;
+  titulo: string;
+  /** Acende as conexões envolvidas — a leitura vira visível NA figura. */
+  onOlhar?: () => void;
+  onDesviar?: () => void;
 }
 
 const CORES_NIVEL: Record<string, string> = {
@@ -28,7 +44,7 @@ const handleEstilo: React.CSSProperties = {
 const LADOS = [Position.Top, Position.Right, Position.Bottom, Position.Left];
 
 export function NodeCard({ data, selected }: NodeProps & { data: NodeCardData }) {
-  const { no, config, arestas, quebraTime } = data;
+  const { no, config, arestas, quebraTime, marca } = data;
   const cfg = config.nodeTypes[no.type];
   const prontidao = cfg ? calcularProntidao(cfg.spec, no, arestas) : null;
   const corNivel = prontidao ? CORES_NIVEL[prontidao.nivel] : "#94a3b8";
@@ -108,6 +124,32 @@ export function NodeCard({ data, selected }: NodeProps & { data: NodeCardData })
           )}
         </span>
         <span style={{ flex: 1 }}>{cfg?.label ?? no.type}</span>
+        {/* SPEC-65 fatia C — a marca da leitura. Cor de tinta, nunca vermelho
+            nem âmbar: os dois já significam "errado" e "atenção" na mesa, e um
+            fato não é nem um nem outro. */}
+        {marca && (
+          <span
+            data-testid={`marca-leitura-${no.id}`}
+            title={marca.titulo}
+            onMouseEnter={marca.onOlhar}
+            onMouseLeave={marca.onDesviar}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 3,
+              fontSize: 10,
+              fontWeight: 700,
+              padding: "1px 6px",
+              borderRadius: 999,
+              border: "1px solid var(--acento-indigo)",
+              color: "var(--acento-indigo)",
+              background: "rgba(99, 102, 241, 0.12)",
+              cursor: "help",
+            }}
+          >
+            ⏱ {marca.numero}
+          </span>
+        )}
         <span
           style={{
             fontSize: 10,

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { formatarDuracao, resumirLeitura } from "@gerador/engine";
-import type { ElementoDaLeitura, LeituraDoDesenho } from "@gerador/engine";
+import { dispensasComEfeito, formatarDuracao, marcasPorNo, resumirLeitura } from "@gerador/engine";
+import type { ElementoDaLeitura, LeituraDispensada, LeituraDoDesenho, MarcaDaLeitura } from "@gerador/engine";
 
 /**
  * SPEC-65 fatia C — o que o desenho já diz, sem preparo.
@@ -27,12 +27,30 @@ export interface LeituraDoDesenhoPanelProps {
   leitura: LeituraDoDesenho;
   onSelecionarNo?: (noId: string) => void;
   onSelecionarAresta?: (arestaId: string) => void;
+  /**
+   * SPEC-65 fatia D — as leituras caladas neste desenho, e como calar/soltar.
+   *
+   * Ausentes = os verbos não aparecem. Mesma disciplina do `onReabrir` do
+   * `PercursosPanel`: botão que não faz nada é pior que botão que não existe.
+   */
+  dispensadas?: LeituraDispensada[];
+  onDispensar?: (marca: MarcaDaLeitura) => void;
+  onRestaurar?: (dispensa: LeituraDispensada) => void;
+  /**
+   * SPEC-65 §6.3 — a ponte para a SPEC-63: o fato que o time decidir que é
+   * regra vira régua de forma, com porquê, placar e exceção.
+   */
+  onVirarRegua?: (marca: MarcaDaLeitura) => void;
 }
 
 export function LeituraDoDesenhoPanel({
   leitura,
   onSelecionarNo,
   onSelecionarAresta,
+  dispensadas,
+  onDispensar,
+  onRestaurar,
+  onVirarRegua,
 }: LeituraDoDesenhoPanelProps) {
   const [aberto, setAberto] = useState(false);
   const raizRef = useRef<HTMLDivElement>(null);
@@ -45,6 +63,12 @@ export function LeituraDoDesenhoPanel({
     document.addEventListener("mousedown", aoClicarFora);
     return () => document.removeEventListener("mousedown", aoClicarFora);
   }, [aberto]);
+
+  // As marcas de agora, indexadas — é delas que os verbos pendem, e é o mesmo
+  // cálculo que o canvas usa: dois lugares, uma verdade.
+  const marcas = marcasPorNo(leitura);
+  const marcaDe = (noId: string, tipo: string) => marcas.find((m) => m.noId === noId && m.tipo === tipo);
+  const caladas = dispensasComEfeito(leitura, dispensadas ?? []);
 
   const resumo = resumirLeitura(leitura);
   // Nada a dizer = o chip não existe. Um chip permanente vira moldura: some da
@@ -113,6 +137,11 @@ export function LeituraDoDesenhoPanel({
                   </button>{" "}
                   faz <strong>{f.chamadas.length}</strong> chamadas que esperam — a resposta dele é a soma delas, e
                   qualquer uma que falhe derruba as outras.
+                  <Verbos
+                    marca={marcaDe(f.noId, "fan-out")}
+                    onDispensar={onDispensar}
+                    onVirarRegua={onVirarRegua}
+                  />
                 </div>
               ))}
             </div>
@@ -127,6 +156,11 @@ export function LeituraDoDesenhoPanel({
                   {leitura.cadeiaMaisFunda.fim.rotulo}
                 </button>{" "}
                 — o tempo é a soma dos saltos, e a disponibilidade é o produto deles.
+                <Verbos
+                  marca={marcaDe(leitura.cadeiaMaisFunda.inicioNoId, "cadeia")}
+                  onDispensar={onDispensar}
+                  onVirarRegua={onVirarRegua}
+                />
               </div>
             </div>
           )}
@@ -145,6 +179,33 @@ export function LeituraDoDesenhoPanel({
             </div>
           )}
 
+          {/* §283 — dispensar não é de mão única. Quem calou uma leitura tem
+              como ouvi-la de novo, e vê quem calou e quando. */}
+          {caladas.length > 0 && (
+            <details style={linhaEstilo} data-testid="leitura-caladas">
+              <summary style={{ fontSize: 11, color: "var(--texto-mudo)", cursor: "pointer" }}>
+                {caladas.length} calada(s) neste desenho
+              </summary>
+              {caladas.map(({ dispensa, marca }) => (
+                <div key={`${dispensa.noId}::${dispensa.tipo}`} style={{ fontSize: 11, padding: "4px 0" }}>
+                  <span style={{ color: "var(--texto-fraco)" }}>{marca.titulo}</span>
+                  {dispensa.autor && (
+                    <span style={{ color: "var(--texto-mudo)" }}> — calada por {dispensa.autor}</span>
+                  )}{" "}
+                  {onRestaurar && (
+                    <button
+                      style={acaoEstilo}
+                      onClick={() => onRestaurar(dispensa)}
+                      data-testid={`restaurar-leitura-${dispensa.noId}-${dispensa.tipo}`}
+                    >
+                      ouvir de novo
+                    </button>
+                  )}
+                </div>
+              ))}
+            </details>
+          )}
+
           {/* §57 — leitura que ignorou parte do desenho sem dizer é pior que
               leitura nenhuma. */}
           {leitura.conexoesNaoClassificadas.length > 0 && (
@@ -158,6 +219,49 @@ export function LeituraDoDesenhoPanel({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Os dois verbos de uma leitura.
+ *
+ * `marca` pode ser `undefined` quando aquela leitura já está calada: neste
+ * caso nada aparece, porque o bloco inteiro dela já não está sendo mostrado —
+ * e um "dispensar" pendurado no vazio seria botão morto.
+ */
+function Verbos({
+  marca,
+  onDispensar,
+  onVirarRegua,
+}: {
+  marca?: MarcaDaLeitura;
+  onDispensar?: (m: MarcaDaLeitura) => void;
+  onVirarRegua?: (m: MarcaDaLeitura) => void;
+}) {
+  if (!marca || (!onDispensar && !onVirarRegua)) return null;
+  return (
+    <span style={{ display: "inline-flex", gap: 10, marginLeft: 8 }}>
+      {onVirarRegua && (
+        <button
+          style={acaoEstilo}
+          onClick={() => onVirarRegua(marca)}
+          data-testid={`virar-regua-${marca.noId}-${marca.tipo}`}
+          title="Transforma este fato numa régua do time, com porquê, placar e exceção — é a SPEC-63 que passa a valer daqui em diante"
+        >
+          virar régua
+        </button>
+      )}
+      {onDispensar && (
+        <button
+          style={acaoEstilo}
+          onClick={() => onDispensar(marca)}
+          data-testid={`dispensar-leitura-${marca.noId}-${marca.tipo}`}
+          title="Cala esta leitura NESTE desenho. Fica registrado quem calou, e dá para ouvir de novo."
+        >
+          não me mostre aqui
+        </button>
+      )}
+    </span>
   );
 }
 
@@ -207,4 +311,13 @@ const linkEstilo: React.CSSProperties = {
   color: "#a5b4fc",
   cursor: "pointer",
   textAlign: "left",
+};
+
+/** §288 — ação não herda o estilo do rótulo: folga de clique e sem quebra. */
+const acaoEstilo: React.CSSProperties = {
+  ...linkEstilo,
+  padding: "3px 6px",
+  borderRadius: 6,
+  border: "1px solid transparent",
+  whiteSpace: "nowrap",
 };
