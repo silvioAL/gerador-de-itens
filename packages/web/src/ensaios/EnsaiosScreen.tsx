@@ -1,5 +1,13 @@
 import { useMemo, useState } from "react";
-import { avaliarResiliencia, elementosComTempo, formatarDuracao, insistenciaDe, simularCenarios } from "@gerador/engine";
+import {
+  avaliarResiliencia,
+  concluirEnsaio,
+  elementosComTempo,
+  estadoDoEnsaio,
+  formatarDuracao,
+  insistenciaDe,
+  simularCenarios,
+} from "@gerador/engine";
 import type {
   AjusteDeCenario,
   CenarioDeLentidao,
@@ -35,6 +43,14 @@ export interface EnsaiosScreenProps {
   /** SPEC-66 fatia D — sugerir a pauta. Ausente = o botão não aparece, e a
    * tela segue inteira (§244). */
   onSugerir?: () => Promise<CenarioDeLentidao[]>;
+  /**
+   * SPEC-69 — o que o NEGÓCIO exige desta demanda. É o que faz o número
+   * técnico decidir: "24 s" sozinho não decide nada, "24 s contra os 5 s que
+   * prometemos" decide. Sem prazo declarado, a conclusão compara com hoje.
+   */
+  necessidades?: { texto: string; limiteMs?: number }[];
+  /** Quem assume o débito — é o que separa débito consciente de anônimo. */
+  autor?: string;
 }
 
 /** Um id estável e legível, derivado do nome — a mesma disciplina do §289. */
@@ -60,8 +76,12 @@ export function EnsaiosScreen({
   onMudar,
   onVoltar,
   onSugerir,
+  necessidades,
+  autor,
 }: EnsaiosScreenProps) {
   const [editando, setEditando] = useState<string | null>(null);
+  const [assumindo, setAssumindo] = useState<string | null>(null);
+  const [motivo, setMotivo] = useState("");
   const [nome, setNome] = useState("");
   const [sugerindo, setSugerindo] = useState(false);
   const [erroSugestao, setErroSugestao] = useState<string | null>(null);
@@ -100,6 +120,20 @@ export function EnsaiosScreen({
 
   function mudarCenario(id: string, muda: (c: CenarioDeLentidao) => CenarioDeLentidao) {
     onMudar(cenarios.map((c) => (c.id === id ? muda(c) : c)));
+  }
+
+  /** §4.0 — assumir o débito: sai do placar, e fica registrado quem e por quê. */
+  function assumir(id: string) {
+    const texto = motivo.trim();
+    if (!texto) return;
+    mudarCenario(id, (c) => ({
+      ...c,
+      estado: "aceito",
+      aceito: true,
+      debito: { motivo: texto, autor, em: new Date().toISOString() },
+    }));
+    setAssumindo(null);
+    setMotivo("");
   }
 
   async function sugerir() {
@@ -234,23 +268,45 @@ export function EnsaiosScreen({
 
           {resultados.map((r) => {
             const cenario = cenarios.find((c) => c.id === r.cenarioId)!;
-            const proposto = cenario.origem === "sugerido" && !cenario.aceito;
+            const estado = estadoDoEnsaio(cenario);
+            const conclusao = concluirEnsaio(r, hoje.tempoDoPiorTrecho?.ms, necessidades ?? []);
             return (
               <Fragmento key={r.cenarioId}>
-                <tr data-testid={`linha-${r.cenarioId}`} style={proposto ? { opacity: 0.75 } : undefined}>
+                <tr
+                  data-testid={`linha-${r.cenarioId}`}
+                  // O assumido esmaece: ele não cobra mais, e continua na
+                  // tabela porque some do placar, não do histórico (§242).
+                  style={estado === "aceito" ? { opacity: 0.6 } : undefined}
+                >
                   <td style={tdEstilo}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       <span style={{ fontWeight: 600 }}>{cenario.nome}</span>
                       {cenario.origem === "sugerido" && (
-                        <span style={tagSugeridoEstilo} title="Proposto pelo modelo — ninguém olhou ainda">
+                        <span style={tagSugeridoEstilo} title="Proposto pelo modelo">
                           sugerido
                         </span>
                       )}
+                      <Estado estado={estado} />
                     </div>
                     {/* §242 — o porquê é o que separa ensinar de cobrar, e sem
-                        ele um nome bonito é um cenário que ninguém sabe avaliar. */}
+                        ele um nome bonito é um cenário que ninguém sabe avaliar.
+                        Este texto é do MODELO: a circunstância do mundo. */}
                     {cenario.porque && (
                       <div style={{ fontSize: 10.5, color: "var(--texto-mudo)" }}>{cenario.porque}</div>
+                    )}
+                    {/* §4.0.1 — a conclusão DERIVADA, que a pessoa não precisa
+                        montar cruzando quatro colunas. Nunca escrita pela IA:
+                        a circunstância é dela, a conta é do motor. */}
+                    {conclusao && (
+                      <div style={conclusaoEstilo} data-testid={`conclusao-${r.cenarioId}`}>
+                        {conclusao}
+                      </div>
+                    )}
+                    {estado === "aceito" && cenario.debito && (
+                      <div style={{ fontSize: 10.5, color: "var(--verde)" }} data-testid={`debito-${r.cenarioId}`}>
+                        Assumido: {cenario.debito.motivo}
+                        {cenario.debito.autor ? ` — ${cenario.debito.autor}` : ""}
+                      </div>
                     )}
                   </td>
                   <td style={tdEstilo}>
@@ -270,21 +326,52 @@ export function EnsaiosScreen({
                     <Dominantes lista={r.dominantes} />
                   </td>
                   <td style={{ ...tdEstilo, whiteSpace: "nowrap" }}>
-                    {proposto && (
+                    {/* §4.0 — o fluxo é avaliar → revisar → aceitar ou
+                        modificar. Cada estado oferece o verbo que faz sentido
+                        NELE; oferecer todos sempre seria de volta aos três
+                        botões soltos que não formavam processo. */}
+                    {estado !== "aceito" ? (
                       <button
                         style={acaoEstilo}
-                        data-testid={`aceitar-${r.cenarioId}`}
-                        onClick={() => mudarCenario(r.cenarioId, (c) => ({ ...c, aceito: true }))}
+                        data-testid={`assumir-${r.cenarioId}`}
+                        onClick={() => setAssumindo(r.cenarioId)}
+                        title="Assumir este débito: sai do placar e fica registrado com quem assumiu e por quê"
                       >
-                        aceitar
+                        assumir
+                      </button>
+                    ) : (
+                      // §283 — nenhuma decisão é de mão única. Reabrir devolve
+                      // o ensaio à cobrança sem apagar que alguém já o assumiu.
+                      <button
+                        style={acaoEstilo}
+                        data-testid={`reabrir-${r.cenarioId}`}
+                        onClick={() =>
+                          mudarCenario(r.cenarioId, (c) => ({
+                            ...c,
+                            estado: "por-avaliar",
+                            aceito: false,
+                            debito: undefined,
+                          }))
+                        }
+                        title="Volta a cobrar — o débito deixa de estar assumido"
+                      >
+                        reabrir
                       </button>
                     )}
                     <button
                       style={acaoEstilo}
                       data-testid={`ajustar-${r.cenarioId}`}
-                      onClick={() => setEditando(editando === r.cenarioId ? null : r.cenarioId)}
+                      onClick={() => {
+                        const abrindo = editando !== r.cenarioId;
+                        setEditando(abrindo ? r.cenarioId : null);
+                        // Mexer no ensaio é REVISAR: o estado acompanha o gesto,
+                        // senão o mapa do fluxo seria decoração.
+                        if (abrindo && estado === "por-avaliar") {
+                          mudarCenario(r.cenarioId, (c) => ({ ...c, estado: "em-revisao" }));
+                        }
+                      }}
                     >
-                      {editando === r.cenarioId ? "fechar" : "ajustar"}
+                      {editando === r.cenarioId ? "fechar" : "revisar"}
                     </button>
                     <button
                       style={acaoEstilo}
@@ -303,6 +390,38 @@ export function EnsaiosScreen({
                   <tr data-testid={`contradicoes-${r.cenarioId}`}>
                     <td colSpan={6} style={{ ...tdEstilo, paddingTop: 0 }}>
                       <Contradicoes lista={r.contradicoes} />
+                    </td>
+                  </tr>
+                )}
+
+                {/* §4.0 — assumir EXIGE motivo, como a exceção do §242. Sem
+                    ele isto vira um botão de silenciar, e quem abrir o
+                    documento depois não saberá se foi decisão ou cansaço. */}
+                {assumindo === r.cenarioId && (
+                  <tr data-testid={`assumir-linha-${r.cenarioId}`}>
+                    <td colSpan={6} style={{ ...tdEstilo, background: "var(--painel-alto)" }}>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        <input
+                          autoFocus
+                          value={motivo}
+                          onChange={(e) => setMotivo(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && assumir(r.cenarioId)}
+                          aria-label="Por que assumir este débito"
+                          placeholder="Por que assumimos isto? (ex.: o pico dura 2h/mês e o negócio aceita a espera)"
+                          style={{ ...campoEstilo, flex: "1 1 420px" }}
+                        />
+                        <button
+                          onClick={() => assumir(r.cenarioId)}
+                          disabled={!motivo.trim()}
+                          style={botaoEstilo}
+                          data-testid={`confirmar-assumir-${r.cenarioId}`}
+                        >
+                          assumir o débito
+                        </button>
+                        <button onClick={() => setAssumindo(null)} style={acaoEstilo}>
+                          cancelar
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )}
@@ -421,6 +540,41 @@ function LinhasFantasma() {
         </tr>
       ))}
     </>
+  );
+}
+
+/**
+ * SPEC-69 §4.0 — onde este ensaio está no fluxo.
+ *
+ * Sem isto os três verbos eram botões soltos; com isto a tela diz, em cada
+ * linha, o que se espera de quem está olhando. "aceito" é o único que não
+ * cobra, e por isso é o único em verde.
+ */
+function Estado({ estado }: { estado: "por-avaliar" | "em-revisao" | "aceito" }) {
+  const texto = { "por-avaliar": "por avaliar", "em-revisao": "em revisão", aceito: "débito assumido" }[estado];
+  const titulo = {
+    "por-avaliar": "Ninguém olhou ainda — e cobra no placar até alguém assumir ou apagar",
+    "em-revisao": "Alguém está mexendo nos ajustes. Ainda cobra: o que tira do placar é assumir, não olhar",
+    aceito: "O time assumiu este débito de propósito. Saiu do placar, e o motivo ficou registrado",
+  }[estado];
+  const cor = estado === "aceito" ? "var(--verde)" : "var(--amarelo)";
+  return (
+    <span
+      data-testid={`estado-${estado}`}
+      title={titulo}
+      style={{
+        fontSize: 10,
+        fontWeight: 700,
+        padding: "1px 6px",
+        borderRadius: 999,
+        border: `1px solid ${cor}`,
+        color: cor,
+        cursor: "help",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {texto}
+    </span>
   );
 }
 
@@ -722,6 +876,15 @@ const condicaoEstilo: React.CSSProperties = {
   fontSize: 11,
   color: "var(--texto-fraco)",
   cursor: "pointer",
+};
+
+/** A conclusão derivada: a frase que a pessoa leria montando quatro colunas. */
+const conclusaoEstilo: React.CSSProperties = {
+  fontSize: 11.5,
+  lineHeight: 1.45,
+  color: "var(--texto-2)",
+  marginTop: 3,
+  maxWidth: 620,
 };
 
 const contradicaoEstilo: React.CSSProperties = {

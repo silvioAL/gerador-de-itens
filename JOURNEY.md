@@ -10868,3 +10868,92 @@ nada. Contar nós no DOM passaria com folga sobre o bug.
 
 448 engine · 725 web · 84 aplicação · 237 server · 129 llm · 97/97 E2E · build e
 lint limpos.
+
+## §301 — o botão que não levava a lugar nenhum, e a inversão que o consertou
+
+Pergunta do usuário: *"não ficou claro o que acontece quando se clica em
+aceitar, recusar ou apagar. Qual é o valor do próximo passo nessa etapa da
+jornada?"*
+
+Fui ao código antes de responder, e a resposta era desconfortável: **`aceitar`
+trocava um booleano e mais nada.** Fui procurar quem lia aquele campo —
+ninguém. O ensaio aceito não virava item, não virava régua, não entrava no
+documento, não era citado. "Aceitar" significava *"eu li isto e não é lixo"*.
+
+Isso destoava de todo o resto do produto, onde aceitar tem consequência. E o
+pior é que a decisão de recusar as saídas óbvias estava certa e escrita
+(SPEC-66 §7: o produto não decide arquitetura pelo time) — mas **recusar uma
+saída não é o mesmo que não precisar de nenhuma**, e foi isso que eu deixei
+acontecer.
+
+### O propósito que faltava veio do usuário
+
+> *"o valor está em tornar visível e assim antecipar decisões e **débitos
+> técnicos inconscientes**."*
+
+Essa frase reordenou o desenho inteiro. O ensaio não existe para consertar nada:
+existe para que ninguém descubra em produção o que dava para saber na mesa.
+
+### A inversão
+
+Eu tinha desenhado "só o ensaio aceito cobra". O usuário corrigiu em cinco
+palavras — **"na realidade todo ensaio cobra"** — e ele estava certo pelo
+próprio propósito: se só o que alguém aceitou cobra, **o débito que ninguém
+olhou continua invisível**, que é exatamente o inconsciente a acabar.
+
+Com a inversão, os três verbos ganharam sentido de uma vez:
+
+| verbo | significa | efeito |
+|---|---|---|
+| *(existir)* | "este cenário é plausível" | **cobra** |
+| **assumir** | "sabemos e assumimos" | sai do placar, vira registro com quem e por quê |
+| **apagar** | "não nos interessa" | some |
+
+> É o §242 outra vez: a válvula da exceção com motivo, aplicada a um número que
+> ninguém tinha. Assumir não silencia — **converte** débito inconsciente em
+> decisão registrada, e é essa conversão que dá nome à SPEC.
+
+### O fluxo tinha que ser mapeado, não três botões
+
+> *"o fluxo é avaliar, revisar, e aceitar ou modificar — mas precisa ser um
+> processo muito bem mapeado."*
+
+O ensaio ganhou **estado** (`por avaliar` → `em revisão` → `assumido`), e cada
+um diz o que se espera de quem olha. Duas regras que o desenho impõe:
+
+- **"em revisão" cobra igual a "por avaliar".** O que tira do placar é
+  **assumir**, não olhar — sair da cobrança por ter aberto a linha seria a
+  fórmula de fazer as pessoas abrirem tudo sem ler;
+- **assumir exige motivo.** Sem ele isto vira um botão de silenciar, e quem
+  abrir o documento depois não saberá se foi decisão ou cansaço.
+
+E abrir a revisão **move o estado** — senão o mapa do fluxo seria decoração.
+
+### O número do negócio é o que faz o número técnico decidir
+
+> *"o negócio também exige um tempo."*
+
+**"24 s" sozinho não decide nada. "24 s contra os 5 s que o negócio pede"
+decide.** A `Necessidade` — que é o propósito do negócio na mesa — ganhou
+`limiteMs`.
+
+Ele não vai no percurso de propósito: o percurso já cobra tempo, mas aquilo é a
+régua **do time** ("isto segue o padrão da casa?"), e esta é a exigência **do
+negócio** para esta demanda ("isto entrega o que prometemos?"). Um desenho passa
+numa e falha na outra. Com várias promessas, vale a mais apertada.
+
+### Reduzir o esforço de avaliar
+
+> *"expor um porquê mais descritivo que reduza o esforço cognitivo."*
+
+A linha entregava números crus — `≥ 24 s`, `+21 s`, `bureau (24 s)` — e pedia
+que a pessoa cruzasse quatro colunas para chegar à conclusão que o motor já
+tinha. Agora a conclusão vem escrita, e os números viram a evidência dela.
+
+Três regras, e a terceira é a que importa: **a frase é derivada, nunca escrita
+pela IA.** O texto do modelo é a *circunstância do mundo* ("fins de semana
+concentram 40% das solicitações"); a conclusão sobre a conta é aritmética. Misturar
+as duas seria a IA opinando sobre o número.
+
+461 engine · 732 web · 84 aplicação · 237 server · 129 llm · build e lint
+limpos.

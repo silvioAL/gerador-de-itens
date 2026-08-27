@@ -3,7 +3,16 @@ import type { DiagramaConfig } from "../config/types.js";
 import type { Diagrama } from "../model/types.js";
 import { readConfigFile } from "../test-support/fixtures.js";
 import { lerDesenho } from "./lerDesenho.js";
-import { simularCenario, simularCenarios, type CenarioDeLentidao } from "./simularLentidao.js";
+import {
+  concluirEnsaio,
+  ensaioCobra,
+  estadoDoEnsaio,
+  prazoEstourado,
+  simularCenario,
+  simularCenarios,
+  type CenarioDeLentidao,
+  type ResultadoDoCenario,
+} from "./simularLentidao.js";
 
 /**
  * SPEC-66 fatia A — o "e se" sobre o desenho.
@@ -166,5 +175,132 @@ describe("simularCenarios — a tabela", () => {
 
     expect(resultados[0].ms).toBeUndefined();
     expect(resultados[0].delta).toBeUndefined();
+  });
+});
+
+/**
+ * SPEC-69 — o débito consciente.
+ *
+ * A inversão que reorganizou a SPEC veio do usuário: **todo ensaio cobra**. Se
+ * só o aceito cobrasse, o débito que ninguém olhou continuaria invisível — e é
+ * exatamente esse o inconsciente que a SPEC existe para acabar.
+ */
+describe("estadoDoEnsaio / ensaioCobra — o que tira do placar é ACEITAR, não olhar", () => {
+  const base = (p: Partial<CenarioDeLentidao>): CenarioDeLentidao => ({
+    id: "c1",
+    nome: "x",
+    origem: "manual",
+    ajustes: [],
+    ...p,
+  });
+
+  it("ensaio que ninguém olhou COBRA — é a inversão que dá nome à SPEC", () => {
+    expect(estadoDoEnsaio(base({}))).toBe("por-avaliar");
+    expect(ensaioCobra(base({}))).toBe(true);
+  });
+
+  it("estar EM REVISÃO não tira do placar", () => {
+    // Sair da cobrança por ter aberto a linha seria a fórmula de fazer as
+    // pessoas abrirem tudo sem ler.
+    expect(ensaioCobra(base({ estado: "em-revisao" }))).toBe(true);
+  });
+
+  it("aceitar é a válvula — e é o §242 aplicado a um número que ninguém tinha", () => {
+    expect(ensaioCobra(base({ estado: "aceito" }))).toBe(false);
+  });
+
+  it("quebra gravada ANTES do estado migra sozinha, e quem já aceitou não perde o gesto", () => {
+    expect(estadoDoEnsaio(base({ aceito: true }))).toBe("aceito");
+    expect(estadoDoEnsaio(base({ aceito: false }))).toBe("por-avaliar");
+    // O estado explícito manda sobre o campo antigo.
+    expect(estadoDoEnsaio(base({ aceito: true, estado: "em-revisao" }))).toBe("em-revisao");
+  });
+});
+
+describe("prazoEstourado — o número do negócio é o que faz o número técnico decidir", () => {
+  it("sem limite declarado, silêncio — ninguém prometeu nada", () => {
+    expect(prazoEstourado(24000, [{ texto: "aprovar crédito" }])).toBeUndefined();
+    expect(prazoEstourado(24000, [])).toBeUndefined();
+  });
+
+  it("acima do prazo, acusa citando a necessidade", () => {
+    const p = prazoEstourado(24000, [{ texto: "aprovar crédito na hora", limiteMs: 5000 }]);
+    expect(p).toEqual({ limiteMs: 5000, texto: "aprovar crédito na hora" });
+  });
+
+  it("dentro do prazo é silêncio, e o limite exato não estoura", () => {
+    expect(prazoEstourado(4000, [{ texto: "x", limiteMs: 5000 }])).toBeUndefined();
+    expect(prazoEstourado(5000, [{ texto: "x", limiteMs: 5000 }])).toBeUndefined();
+  });
+
+  it("com várias promessas, vale a MAIS APERTADA", () => {
+    // Basta uma promessa curta para o prazo ser furado — a mesma escolha que
+    // `avaliarResiliencia` faz com a paciência de quem chama.
+    const p = prazoEstourado(3000, [
+      { texto: "relatório mensal", limiteMs: 30000 },
+      { texto: "aprovar na hora", limiteMs: 2000 },
+    ]);
+    expect(p?.texto).toBe("aprovar na hora");
+  });
+});
+
+describe("concluirEnsaio — a conclusão escrita, para quem avalia não montá-la", () => {
+  const resultado = (p: Partial<ResultadoDoCenario>): ResultadoDoCenario => ({
+    cenarioId: "c1",
+    nome: "Bureau em pico",
+    leitura: { tempos: [], fanOut: [], terceiros: [], conexoesNaoClassificadas: [] },
+    completo: true,
+    dominantes: [],
+    ajustesSemAlvo: [],
+    contradicoes: [],
+    ...p,
+  });
+
+  it("com prazo do negócio, a frase COMPARA com o que foi prometido", () => {
+    const f = concluirEnsaio(resultado({ ms: 24000 }), 3000, [{ texto: "na hora", limiteMs: 5000 }])!;
+
+    expect(f).toContain("24 s");
+    expect(f).toContain("4,8×");
+    expect(f).toContain("prazo de 5,0 s");
+  });
+
+  it("sem prazo, compara com HOJE e não inventa julgamento", () => {
+    const f = concluirEnsaio(resultado({ ms: 24000 }), 3000, [])!;
+
+    expect(f).toContain("de 3,0 s para 24 s");
+    expect(f).not.toContain("acima");
+  });
+
+  it("nomeia o DOMINANTE — é o que vira 'está ruim por causa disto'", () => {
+    const f = concluirEnsaio(
+      resultado({
+        ms: 24000,
+        dominantes: [{ elemento: { tipo: "no", id: "b", rotulo: "bureau" }, ms: 24000 }],
+      }),
+      3000,
+      []
+    )!;
+
+    expect(f).toContain("bureau responde por 24 s");
+  });
+
+  it("avisa quando o ensaio CRIA contradição que hoje não existe", () => {
+    const f = concluirEnsaio(
+      resultado({
+        ms: 9000,
+        contradicoes: [
+          { tipo: "saturacao", noId: "api", rotulo: "api", esperado: "10", atual: "30", porque: "" },
+        ],
+      }),
+      3000,
+      []
+    )!;
+
+    expect(f).toContain("uma contradição que não existe hoje");
+  });
+
+  it("sem número não há conclusão — e `undefined` é a resposta", () => {
+    // §248: uma frase sobre um número que não existe seria a pior das saídas.
+    expect(concluirEnsaio(resultado({}), 3000, [])).toBeUndefined();
   });
 });

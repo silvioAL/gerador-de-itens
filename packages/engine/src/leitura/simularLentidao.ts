@@ -3,6 +3,7 @@ import type { Diagrama, ValorSpec } from "../model/types.js";
 import {
   CAMPO_DE_TEMPO_PADRAO,
   arestaEspera,
+  formatarDuracao,
   lerDesenho,
   type ElementoDaLeitura,
   type LeituraDoDesenho,
@@ -54,17 +55,68 @@ export interface AjusteDeCenario {
   taxaRps?: number;
 }
 
+/**
+ * SPEC-69 §4.0 — o estado do ensaio, e o que ele pede de quem olha.
+ *
+ * Três botões soltos numa linha não são um processo. O fluxo declarado é
+ * *avaliar → revisar → aceitar ou modificar*, e cada estado diz o que se espera.
+ *
+ * **`por-avaliar` e `em-revisao` cobram igual.** O que tira do placar é
+ * ACEITAR, não olhar — sair da cobrança por ter aberto a linha seria a fórmula
+ * de fazer as pessoas abrirem tudo sem ler.
+ */
+export type EstadoDoEnsaio = "por-avaliar" | "em-revisao" | "aceito";
+
+/**
+ * SPEC-69 — o débito assumido, com quem e quando.
+ *
+ * Mesma forma da `ExcecaoDePadrao` (§242), e pelo mesmo motivo: sem o motivo
+ * escrito, isto vira um botão de silenciar, e a próxima pessoa a abrir o
+ * documento não saberá se aquilo foi decisão ou cansaço.
+ */
+export interface DebitoAssumido {
+  motivo: string;
+  autor?: string;
+  em?: string;
+}
+
 export interface CenarioDeLentidao {
   id: string;
   nome: string;
   /**
-   * De onde veio. `sugerido` chega **desmarcado** para alguém aceitar: inferir
-   * é grátis e erra (regra 2 da SPEC-57), e proposta de modelo não é exceção.
+   * De onde veio. `sugerido` chega para alguém avaliar: inferir é grátis e erra
+   * (regra 2 da SPEC-57), e proposta de modelo não é exceção.
    */
   origem: "manual" | "sugerido";
   porque?: string;
+  /**
+   * SPEC-69 — ausente vale `por-avaliar`: ensaio de quebra antiga nasce
+   * cobrando, que é o comportamento certo. O antigo `aceito?: boolean` migra
+   * sozinho — ver `estadoDoEnsaio`.
+   */
+  estado?: EstadoDoEnsaio;
+  /** Só existe em `estado: "aceito"`. */
+  debito?: DebitoAssumido;
+  /** @deprecated SPEC-69 — lido só para migrar quebra gravada antes do estado. */
   aceito?: boolean;
   ajustes: AjusteDeCenario[];
+}
+
+/**
+ * O estado, tolerando a quebra gravada antes desta SPEC.
+ *
+ * `aceito: true` de antes vira `aceito` — quem já tinha marcado não perde o
+ * gesto. E ausência total vira `por-avaliar`: um ensaio que ninguém olhou
+ * cobra, que é a inversão que dá nome a esta SPEC.
+ */
+export function estadoDoEnsaio(c: CenarioDeLentidao): EstadoDoEnsaio {
+  if (c.estado) return c.estado;
+  return c.aceito === true ? "aceito" : "por-avaliar";
+}
+
+/** O que ainda cobra alguém — o que vai ao placar. */
+export function ensaioCobra(c: CenarioDeLentidao): boolean {
+  return estadoDoEnsaio(c) !== "aceito";
 }
 
 export interface ResultadoDoCenario {
@@ -271,6 +323,82 @@ export function simularCenario(
     contradicoes: avaliarResiliencia(ensaiado, config),
     insistenciaMs: insistencias.length > 0 ? Math.max(...insistencias.map((i) => i.ms)) : undefined,
   };
+}
+
+/**
+ * SPEC-69 §3 — o prazo do negócio estourado.
+ *
+ * "24 s" sozinho não decide nada; "24 s contra os 5 s que o negócio pede"
+ * decide. Sem `limiteMs` declarado não há confronto, e o silêncio é honesto:
+ * ninguém prometeu nada.
+ *
+ * Com várias necessidades, vale **a mais apertada** — a mesma escolha que
+ * `avaliarResiliencia` faz com a paciência de quem chama, e pelo mesmo motivo:
+ * basta uma promessa curta para o prazo ser furado.
+ */
+export function prazoEstourado(
+  ms: number | undefined,
+  necessidades: { texto: string; limiteMs?: number }[] = []
+): { limiteMs: number; texto: string } | undefined {
+  if (ms === undefined) return undefined;
+  const comPrazo = necessidades.filter((n) => typeof n.limiteMs === "number" && n.limiteMs > 0);
+  if (comPrazo.length === 0) return undefined;
+  const apertada = comPrazo.reduce((a, b) => (a.limiteMs! <= b.limiteMs! ? a : b));
+  return ms > apertada.limiteMs! ? { limiteMs: apertada.limiteMs!, texto: apertada.texto } : undefined;
+}
+
+/**
+ * SPEC-69 §4.0.1 — a conclusão escrita, para quem avalia não ter que montá-la.
+ *
+ * A linha entregava números crus (`≥ 24 s`, `+21 s`, `bureau (24 s)`) e pedia
+ * que a pessoa cruzasse quatro colunas para chegar ao que o motor já sabia.
+ *
+ * Três regras:
+ *
+ * 1. **compara com o que o negócio pediu** quando há prazo; sem ele, compara
+ *    com hoje e não inventa julgamento;
+ * 2. **nomeia o dominante** — é o que transforma "está ruim" em "está ruim por
+ *    causa disto";
+ * 3. **é derivada, nunca escrita pela IA.** O texto do modelo é o *porquê do
+ *    cenário* ("fins de semana concentram 40% das solicitações"), que é
+ *    conhecimento de mundo. A conclusão sobre a conta é aritmética, e misturar
+ *    as duas seria a IA opinando sobre o número.
+ */
+export function concluirEnsaio(
+  r: ResultadoDoCenario,
+  hojeMs: number | undefined,
+  necessidades: { texto: string; limiteMs?: number }[] = []
+): string | undefined {
+  if (r.ms === undefined) return undefined;
+  const dur = (n: number) => formatarDuracao(n);
+
+  const partes: string[] = [];
+  const prazo = prazoEstourado(r.ms, necessidades);
+  if (prazo) {
+    const vezes = r.ms / prazo.limiteMs;
+    partes.push(
+      `A resposta vai a ${dur(r.ms)} — ${
+        vezes >= 2 ? `${vezes.toFixed(1).replace(".", ",")}× ` : ""
+      }acima do prazo de ${dur(prazo.limiteMs)} que o negócio pede.`
+    );
+  } else if (hojeMs !== undefined && r.ms !== hojeMs) {
+    partes.push(`A resposta vai de ${dur(hojeMs)} para ${dur(r.ms)}.`);
+  } else {
+    partes.push(`A resposta fica em ${dur(r.ms)}.`);
+  }
+
+  if (r.dominantes.length > 0) {
+    const nomes = r.dominantes.map((d) => d.elemento.rotulo).join(" e ");
+    partes.push(`${nomes} responde${r.dominantes.length > 1 ? "m" : ""} por ${dur(r.dominantes[0].ms)} disso.`);
+  }
+
+  if (r.contradicoes.length > 0) {
+    partes.push(
+      `E ${r.contradicoes.length === 1 ? "aparece uma contradição" : `aparecem ${r.contradicoes.length} contradições`} que não existe${r.contradicoes.length === 1 ? "" : "m"} hoje.`
+    );
+  }
+
+  return partes.join(" ");
 }
 
 /**

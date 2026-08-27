@@ -1744,6 +1744,15 @@ function AppCarregado({
           config={diagramaConfig}
           cenarios={quebra.cenariosDeLentidao ?? []}
           onMudar={(cenariosDeLentidao) => setQuebra((q) => ({ ...q, cenariosDeLentidao }))}
+          /**
+           * SPEC-69 — o que o NEGÓCIO exige. É o que faz o número técnico
+           * decidir: "24 s" sozinho não decide nada, "24 s contra os 5 s que
+           * prometemos" decide. Sem necessidade com prazo, a conclusão do
+           * ensaio compara com hoje e não inventa julgamento.
+           */
+          necessidades={quebra.necessidades}
+          // Quem assume o débito — é o que separa consciente de anônimo.
+          autor={sessao.email}
           onVoltar={() => navegar({ tela: "canvas" })}
           /**
            * SPEC-66 fatia D — a pauta vem do modelo; a conta, do motor.
