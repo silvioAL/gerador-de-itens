@@ -1,5 +1,5 @@
 import type { DiagramaConfig } from "../config/types.js";
-import type { Aresta, Diagrama, No, ValorSpec, VolumetriaDaDemanda } from "../model/types.js";
+import type { Aresta, Diagrama, ExcecaoDePadrao, No, ValorSpec, VolumetriaDaDemanda } from "../model/types.js";
 import { arestaEspera } from "./lerDesenho.js";
 import { distribuirVolumetria, formatarRps } from "./volumetria.js";
 
@@ -113,6 +113,36 @@ export interface ContradicaoDeResiliencia {
   esperado: string;
   atual: string;
   porque: string;
+  /**
+   * §307 — a exceção que a tirou do placar, quando alguém a aceitou de
+   * propósito.
+   *
+   * Presente = some do vermelho, **não do histórico** (§242). É a mesma forma
+   * que `Violacao` carrega desde o §239, e de propósito: a válvula tem que ser
+   * a mesma em toda cobrança, senão a pessoa aprende que umas se aceitam e
+   * outras se ignoram.
+   */
+  excecao?: ExcecaoDePadrao;
+}
+
+/** As que ainda cobram alguém — é este número que vai ao placar. */
+export function contradicoesEmAberto(lista: ContradicaoDeResiliencia[]): ContradicaoDeResiliencia[] {
+  return lista.filter((c) => !c.excecao);
+}
+
+/** As aceitas de propósito. Continuam existindo, noutro lugar e com outra cor. */
+export function contradicoesAceitas(lista: ContradicaoDeResiliencia[]): ContradicaoDeResiliencia[] {
+  return lista.filter((c) => c.excecao);
+}
+
+/** A chave de uma contradição: o par elemento + tipo. Um dono só, porque quem
+ * marca e quem grava a exceção precisam concordar (§263). */
+export function chaveDaContradicao(c: {
+  tipo: ContradicaoDeResiliencia["tipo"];
+  noId?: string;
+  arestaId?: string;
+}): string {
+  return `${c.tipo}::${c.noId ?? c.arestaId ?? ""}`;
 }
 
 /**
@@ -258,8 +288,25 @@ export function avaliarResiliencia(
    * digitar a taxa nó a nó. Ausente = o comportamento de antes: só acusa onde
    * alguém declarou.
    */
-  volumetria?: { volume?: VolumetriaDaDemanda; fator?: number }
+  volumetria?: {
+    volume?: VolumetriaDaDemanda;
+    fator?: number;
+    /**
+     * §307 — as contradições aceitas de propósito nesta quebra.
+     *
+     * Marcadas aqui, e não filtradas: some do vermelho, não do histórico. É a
+     * mesma disciplina do `avaliarConformidade` desde o §239, e a razão é a
+     * mesma — quem lê o documento depois precisa saber que houve uma decisão,
+     * não encontrar um silêncio.
+     */
+    excecoes?: ExcecaoDePadrao[];
+  }
 ): ContradicaoDeResiliencia[] {
+  const aceitas = new Map(
+    (volumetria?.excecoes ?? [])
+      .filter((e) => e.contradicao)
+      .map((e) => [`${e.contradicao}::${e.noId}`, e])
+  );
   return [
     ...contradicoesDeInsistencia(diagrama, config, campos),
     ...contradicoesDeSaturacao(
@@ -268,5 +315,8 @@ export function avaliarResiliencia(
       campos,
       distribuirVolumetria(diagrama, config, volumetria?.volume, volumetria?.fator ?? 1)
     ),
-  ];
+  ].map((c) => {
+    const excecao = aceitas.get(chaveDaContradicao(c));
+    return excecao ? { ...c, excecao } : c;
+  });
 }

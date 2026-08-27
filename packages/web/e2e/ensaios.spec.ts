@@ -413,11 +413,24 @@ test("§306 — o volume da demanda faz a saturação aparecer, sem digitar taxa
   await page.getByTestId("assistente-flutuante").click();
 
   // ── E a conta fecha, sem ninguém ter digitado taxa em componente nenhum ──
-  await page.goto("/#/ensaios");
-  const contradicoes = page.getByTestId("contradicoes-hoje");
-  await expect(contradicoes).toBeVisible();
-  await expect(contradicoes).toContainText("chamadas simultâneas");
+  //
+  // §307 — no placar da MESA, e não só na bancada: quem está desenhando é quem
+  // precisa ver a contradição que o desenho de HOJE já tem.
+  const chip = page.getByTestId("conformidade-resumo");
+  await expect(chip).toBeVisible();
+  await chip.click();
+  const lista = page.getByTestId("conformidade-lista");
+  await expect(lista).toContainText("chamadas simultâneas");
   // A frase diz DE ONDE veio a taxa: apresentar o derivado como declarado seria
   // a ferramenta se atribuindo uma medição que ninguém fez.
-  await expect(contradicoes).toContainText("vindo do volume da demanda");
+  await expect(lista).toContainText("vindo do volume da demanda");
+  await expect(lista).toContainText("Lei de Little");
+
+  // ── §307 — a válvula do §242, igual à de toda outra cobrança ──
+  await lista.getByRole("button", { name: /Aceitar de propósito/ }).click();
+  await lista.getByLabel(/Motivo para aceitar/).fill("o pico dura 2h por mês e o negócio aceita a fila");
+  await lista.getByRole("button", { name: /Confirmar exceção/ }).click();
+
+  // Sai do vermelho sem sair do histórico: o chip some porque nada mais cobra.
+  await expect(page.getByTestId("conformidade-resumo")).toHaveCount(0);
 });

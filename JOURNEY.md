@@ -11533,3 +11533,57 @@ um campo de fio é migração, e não é o que este pedido é. A divergência es
 anotada aqui de propósito.
 
 499 engine · 760 web · 84 aplicação · 238 server · 129 llm · build e lint limpos.
+
+## §307 — a promessa que a SPEC-68 fez e ninguém tinha cumprido
+
+O §306 mediu de passagem, investigando outra coisa, e eu deixei anotado em vez
+de consertar no meio do pedido: **as contradições de resiliência não chegavam ao
+placar ⚖ da mesa.** `avaliarResiliencia` só era chamada na bancada de ensaios.
+
+A SPEC-68 §4.1 é explícita:
+
+> *Elas **não** são leitura (SPEC-65): leitura é fato, e isto é defeito — dois
+> números declarados que não podem estar os dois certos. Por isso vão para o
+> placar ⚖, **com o porquê e a válvula da exceção, como toda violação desde o
+> §239**.*
+
+Nada disso existia. A bancada é onde se pergunta *"e se"*; quem está
+**desenhando** perguntava *"como está"* e não recebia resposta — a contradição
+que o desenho de hoje já tem ficava numa tela que só se abre de propósito.
+
+### A válvula custava uma chave nova
+
+`ExcecaoDePadrao` tinha duas: `campo` (violação de valor, §239) e `regraId`
+(violação de forma, §287). Nenhuma das duas serve a uma contradição de
+resiliência:
+
+- **não é campo** — ela nasce da RELAÇÃO entre dois (taxa × tempo contra o pool;
+  insistência contra a paciência de quem chama);
+- **não é regra do time** — ela é aritmética, e vale em qualquer casa.
+
+O que a identifica é o par **elemento + tipo**, e é essa a terceira chave
+(`contradicao`). Guardá-la por campo faria um "aceito" calar o que ninguém
+olhou — e há teste para isso: aceitar a saturação de um nó não pode silenciar a
+insistência do mesmo nó.
+
+### A régua que isto guarda
+
+> **A válvula tem que ser a mesma em toda cobrança.**
+
+Se uma violação se aceita com motivo e outra só se ignora, a pessoa aprende que
+o placar é decorativo em parte — e a partir daí ele é decorativo inteiro. É o
+§230 dito ao contrário: não é bloquear cedo demais que ensina a ignorar a cor, é
+oferecer saída para umas coisas e não para outras.
+
+### O que isso diz sobre a SPEC como contrato
+
+A SPEC-68 descreveu a superfície com precisão, e a implementação parou no motor.
+Nada acusou: os testes da fatia cobriam a conta, e conta certa num lugar que
+ninguém vê é exatamente o tipo de coisa que passa em teste unitário.
+
+É a **terceira vez neste ciclo** (o §304 achou duas iguais: `ensaioCobra`
+exportado sem chamador, `limiteMs` sem tela). O padrão tem nome agora: **fatia
+que entrega motor sem superfície parece pronta no diff e não existe para quem
+usa.**
+
+502 engine · 764 web · 84 aplicação · 238 server · 129 llm · build e lint limpos.

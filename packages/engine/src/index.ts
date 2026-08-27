@@ -70,6 +70,9 @@ export {
   avaliarResiliencia,
   insistenciaDe,
   CAMPOS_DE_RESILIENCIA,
+  chaveDaContradicao,
+  contradicoesAceitas,
+  contradicoesEmAberto,
   type ContradicaoDeResiliencia,
   type Insistencia,
 } from "./leitura/resiliencia.js";

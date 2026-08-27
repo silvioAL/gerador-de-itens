@@ -531,3 +531,124 @@ describe("ReadinessSummary — o ensaio que ainda cobra", () => {
     expect(screen.queryByTestId("conformidade-resumo")).not.toBeInTheDocument();
   });
 });
+
+/**
+ * §307 — a contradição de resiliência chega ao PLACAR da mesa.
+ *
+ * A SPEC-68 §4.1 dizia que saturação e insistência vão ao chip ⚖ *"com o porquê
+ * e a válvula da exceção, como toda violação desde o §239"*. Medido no §306:
+ * `avaliarResiliencia` só era chamada na bancada de ensaios — quem estava
+ * DESENHANDO não via a contradição que o desenho de hoje já tem, e a bancada é
+ * onde se pergunta "e se", não "como está".
+ */
+describe("ReadinessSummary — a contradição de resiliência no placar", () => {
+  const configComTempo: DiagramaConfig = {
+    nodeTypes: {
+      service: {
+        label: "Serviço",
+        derives: "service",
+        techs: [],
+        contextos: [],
+        spec: [{ key: "chamadasSimultaneas", label: "Chamadas simultâneas", type: "number" }],
+      },
+      externo: { label: "API Externa", derives: "external", techs: [], contextos: [], spec: [] },
+    },
+    edgeTypes: {
+      http: { label: "HTTP", espera: true, spec: [{ key: "timeoutMs", label: "Timeout (ms)", type: "number" }] },
+    },
+    edgeRules: {},
+  };
+
+  /** srv (pool 10) →http(1000ms)→ bureau. 100 req/s × 1 s = 100 simultâneas. */
+  const desenho = (): Diagrama =>
+    ({
+      nodes: [
+        {
+          id: "srv",
+          type: "service",
+          status: "novo",
+          label: "srv-credito",
+          x: 0,
+          y: 0,
+          spec: { chamadasSimultaneas: { valor: 10, origem: "manual" } },
+          specNA: {},
+        },
+        { id: "bureau", type: "externo", status: "novo", label: "bureau", x: 0, y: 0, spec: {}, specNA: {} },
+      ],
+      edges: [
+        { id: "e1", source: "srv", target: "bureau", type: "http", spec: { timeoutMs: { valor: 1000, origem: "manual" } } },
+      ],
+    }) as unknown as Diagrama;
+
+  const volume = { quantidade: 100, por: "segundo" as const };
+
+  it("a saturação entra no chip da MESA, com a conta e o porquê", async () => {
+    render(
+      <ReadinessSummary
+        diagrama={desenho()}
+        config={configComTempo}
+        onSelecionar={vi.fn()}
+        volumetria={volume}
+      />
+    );
+
+    const chip = screen.getByTestId("conformidade-resumo");
+    expect(chip).toHaveTextContent("1 fora do padrão");
+
+    await userEvent.click(chip);
+    const lista = screen.getByTestId("conformidade-lista");
+    expect(lista).toHaveTextContent("100 necessárias");
+    expect(lista).toHaveTextContent("10 chamadas simultâneas");
+    // O porquê é a CONTA, não uma opinião — é o que separa ensinar de cobrar.
+    expect(lista).toHaveTextContent(/Lei de Little/);
+  });
+
+  it("aceitar de propósito EXIGE motivo, como toda violação desde o §239", async () => {
+    const onAceitarContradicao = vi.fn();
+    render(
+      <ReadinessSummary
+        diagrama={desenho()}
+        config={configComTempo}
+        onSelecionar={vi.fn()}
+        volumetria={volume}
+        onAceitarContradicao={onAceitarContradicao}
+      />
+    );
+
+    await userEvent.click(screen.getByTestId("conformidade-resumo"));
+    await userEvent.click(screen.getByRole("button", { name: /Aceitar de propósito/ }));
+    // Sem motivo isto seria um botão de silenciar, e a próxima pessoa a abrir o
+    // documento não saberia se foi decisão ou cansaço.
+    expect(screen.getByRole("button", { name: /Confirmar exceção/ })).toBeDisabled();
+
+    await userEvent.type(screen.getByLabelText(/Motivo para aceitar/), "o pico dura 2h/mês");
+    await userEvent.click(screen.getByRole("button", { name: /Confirmar exceção/ }));
+
+    expect(onAceitarContradicao).toHaveBeenCalledWith(
+      expect.objectContaining({ tipo: "saturacao", noId: "srv" }),
+      "o pico dura 2h/mês"
+    );
+  });
+
+  it("aceita, sai do vermelho — e o chip some quando não sobra mais nada", () => {
+    render(
+      <ReadinessSummary
+        diagrama={desenho()}
+        config={configComTempo}
+        onSelecionar={vi.fn()}
+        volumetria={volume}
+        excecoes={[
+          { noId: "srv", campo: "", contradicao: "saturacao", motivo: "assumido", autor: "ana", em: "2026-01-01" },
+        ]}
+      />
+    );
+
+    expect(screen.queryByTestId("conformidade-resumo")).not.toBeInTheDocument();
+  });
+
+  it("sem volume nem taxa declarada, não acusa — a conta não se faz (§248)", () => {
+    render(<ReadinessSummary diagrama={desenho()} config={configComTempo} onSelecionar={vi.fn()} />);
+
+    expect(screen.queryByTestId("conformidade-resumo")).not.toBeInTheDocument();
+  });
+});

@@ -4,7 +4,10 @@ import type { ExcecaoDePadrao, Violacao } from "@gerador/engine";
 import {
   analisarLacunas,
   avaliarConformidade,
+  avaliarResiliencia,
+  chaveDaContradicao,
   cobrancasDeEnsaio,
+  contradicoesEmAberto,
   faltaParaEnsaiar,
   avaliarPercursos,
   avaliarTopologia,
@@ -18,7 +21,7 @@ import {
 } from "@gerador/engine";
 import { PercursosPanel } from "./PercursosPanel";
 import { LeituraDoDesenhoPanel } from "./LeituraDoDesenhoPanel";
-import type { CenarioDeLentidao, CobrancaDeEnsaio, Decisao, VolumetriaDaDemanda, LeituraDispensada, LeituraDoDesenho, MarcaDaLeitura, Percurso, ViolacaoDeTopologia } from "@gerador/engine";
+import type { CenarioDeLentidao, CobrancaDeEnsaio, ContradicaoDeResiliencia, Decisao, VolumetriaDaDemanda, LeituraDispensada, LeituraDoDesenho, MarcaDaLeitura, Percurso, ViolacaoDeTopologia } from "@gerador/engine";
 import { ReadinessBadge } from "./ReadinessBadge";
 import { calcularResumoProntidao, type NoComProntidao } from "./prontidaoResumo";
 
@@ -80,6 +83,14 @@ export interface ReadinessSummaryProps {
    * não o exótico. Sem ela, a primeira semana ensina o time a ignorar o ⚖.
    */
   onAceitarViolacaoDeForma?: (violacao: ViolacaoDeTopologia, motivo: string) => void;
+  /**
+   * §307 — aceitar de propósito uma CONTRADIÇÃO de resiliência.
+   *
+   * A SPEC-68 §4.1 prometia a válvula e ela não existia. A régua que isto
+   * guarda: a exceção com motivo tem que ser a mesma em toda cobrança — senão
+   * a pessoa aprende que umas violações se aceitam e outras se ignoram (§230).
+   */
+  onAceitarContradicao?: (contradicao: ContradicaoDeResiliencia, motivo: string) => void;
   /** SPEC-57 fatia C — as decisões da quebra. Sem nenhuma, o indicador não
    * aparece: mesma disciplina do propósito e da conformidade. */
   decisoes?: Decisao[];
@@ -119,6 +130,7 @@ export function ReadinessSummary({
   excecoes,
   onAceitarViolacao,
   onAceitarViolacaoDeForma,
+  onAceitarContradicao,
   decisoes,
   onSelecionarDecisao,
   percursos,
@@ -154,6 +166,22 @@ export function ReadinessSummary({
    * placar de confundir *o que é* com *o que seria*.
    */
   const cobrancasDeEnsaios = cobrancasDeEnsaio(diagrama, config, cenarios ?? [], necessidades ?? [], undefined, volumetria);
+  /**
+   * §307 — as contradições de RESILIÊNCIA, no mesmo chip.
+   *
+   * A SPEC-68 §4.1 dizia que elas vão ao placar ⚖ "com o porquê e a válvula da
+   * exceção, como toda violação desde o §239". Medido no §306: `avaliarResiliencia`
+   * só era chamada na bancada de ensaios — quem estava DESENHANDO não via a
+   * contradição que o desenho de hoje já tem, e a bancada é justamente onde se
+   * pergunta "e se", não "como está".
+   *
+   * Não é leitura (SPEC-65): leitura é fato, e isto é defeito — dois números
+   * declarados que não podem estar os dois certos. Por isso vai ao placar e não
+   * ao chip de leitura.
+   */
+  const contradicoes = contradicoesEmAberto(
+    avaliarResiliencia(diagrama, config, undefined, { volume: volumetria, excecoes })
+  );
   const avisosDeEnsaio = cobrancasDeEnsaios.reduce((n, c) => n + c.avisos.length, 0);
   // Fatia C — dimensão POR QUÊ. O número que cobra não é "quantas decisões
   // existem" (isso é volume, não qualidade): é quantas esperam alguém e
@@ -236,10 +264,12 @@ export function ReadinessSummary({
           🎯 {semElemento > 0 ? `${semElemento} sem componente` : "propósito coberto"}
         </button>
       )}
-      {violacoes.length + violacoesDeForma.length + avisosDeEnsaio > 0 && (
+      {violacoes.length + violacoesDeForma.length + contradicoes.length + avisosDeEnsaio > 0 && (
         <ListaDeViolacoes
           violacoes={violacoes}
           violacoesDeForma={violacoesDeForma}
+          contradicoes={contradicoes}
+          onAceitarContradicao={onAceitarContradicao}
           cobrancasDeEnsaios={cobrancasDeEnsaios}
           onAbrirEnsaios={onSimular}
           onSelecionar={onSelecionarViolacao}
@@ -431,6 +461,8 @@ function ListaDeDecisoes({
 function ListaDeViolacoes({
   violacoes,
   violacoesDeForma = [],
+  contradicoes = [],
+  onAceitarContradicao,
   cobrancasDeEnsaios = [],
   onAbrirEnsaios,
   onSelecionar,
@@ -450,6 +482,14 @@ function ListaDeViolacoes({
    * e cada linha carrega o nome do ensaio: sem a marca, "o pool satura" seria
    * lido como fato do desenho de hoje.
    */
+  /**
+   * §307 — as contradições de resiliência que ainda cobram. Mesmo chip das
+   * outras dimensões: é a mesma pergunta ("o que está fora do padrão?"), e
+   * chips separados dividiriam a atenção sem dividir o assunto.
+   */
+  contradicoes?: ContradicaoDeResiliencia[];
+  /** A válvula do §242. Ausente = a lista só mostra, como no resto da tela. */
+  onAceitarContradicao?: (contradicao: ContradicaoDeResiliencia, motivo: string) => void;
   cobrancasDeEnsaios?: CobrancaDeEnsaio[];
   /** Leva à bancada, onde se assume o débito com motivo. O gesto de aceitar
    * mora junto da evidência, não aqui — aqui só se vê que existe. */
@@ -480,7 +520,11 @@ function ListaDeViolacoes({
         onClick={() => setAberto((a) => !a)}
         style={{ ...botaoProximoEstilo, borderColor: "var(--amarelo)", color: "var(--amarelo)" }}
       >
-        ⚖ {violacoes.length + violacoesDeForma.length + cobrancasDeEnsaios.reduce((n, c) => n + c.avisos.length, 0)}{" "}
+        ⚖{" "}
+        {violacoes.length +
+          violacoesDeForma.length +
+          contradicoes.length +
+          cobrancasDeEnsaios.reduce((n, c) => n + c.avisos.length, 0)}{" "}
         fora do padrão
       </button>
 
@@ -591,6 +635,71 @@ function ListaDeViolacoes({
                   ) : (
                     <button
                       aria-label={`Aceitar de propósito: ${v.texto}`}
+                      onClick={() => {
+                        setAceitando(id);
+                        setMotivo("");
+                      }}
+                      style={{ ...itemPopoverEstilo, fontSize: 11, color: "var(--texto-fraco)" }}
+                    >
+                      aceitar de propósito…
+                    </button>
+                  ))}
+              </div>
+            );
+          })}
+
+          {/* §307 — as contradições de RESILIÊNCIA: dois números declarados
+              que não podem estar os dois certos.
+
+              Com a mesma válvula das outras (§242): a exceção com motivo tem
+              que ser a MESMA em toda cobrança, senão a pessoa aprende que umas
+              se aceitam e outras se ignoram — e é assim que o placar inteiro
+              perde o sentido (§230). */}
+          {contradicoes.map((c) => {
+            const id = chaveDaContradicao(c);
+            return (
+              <div key={id} data-testid={`violacao-${id}`} style={{ padding: "8px 4px", borderBottom: "1px solid var(--borda)" }}>
+                <button
+                  onClick={() => (c.arestaId ? onSelecionarAresta?.(c.arestaId) : onSelecionar?.(c.noId ?? ""))}
+                  style={{ ...itemPopoverEstilo, fontWeight: 600 }}
+                >
+                  {c.rotulo}: {c.atual}
+                </button>
+                <div style={{ fontSize: 11, color: "var(--texto-fraco)", padding: "2px 6px" }}>
+                  esperado: {c.esperado}
+                </div>
+                {/* O porquê é o que separa ensinar de cobrar — e aqui ele é a
+                    conta, não uma opinião. */}
+                <div data-testid={`porque-${id}`} style={{ fontSize: 11, color: "var(--texto-mudo)", padding: "2px 6px" }}>
+                  Por quê: {c.porque}
+                </div>
+
+                {onAceitarContradicao &&
+                  (aceitando === id ? (
+                    <div style={{ display: "flex", gap: 4, padding: "4px 6px" }}>
+                      <input
+                        aria-label={`Motivo para aceitar: ${c.rotulo}`}
+                        value={motivo}
+                        onChange={(e) => setMotivo(e.target.value)}
+                        placeholder="ex.: o pico dura 2h/mês e o negócio aceita a fila"
+                        style={{ flex: 1, fontSize: 11, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--borda-forte)", background: "var(--fundo)", color: "var(--texto)" }}
+                      />
+                      <button
+                        aria-label={`Confirmar exceção: ${c.rotulo}`}
+                        disabled={motivo.trim() === ""}
+                        onClick={() => {
+                          onAceitarContradicao(c, motivo.trim());
+                          setAceitando(null);
+                          setMotivo("");
+                        }}
+                        style={{ ...botaoProximoEstilo, fontSize: 11 }}
+                      >
+                        Registrar
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      aria-label={`Aceitar de propósito: ${c.rotulo}`}
                       onClick={() => {
                         setAceitando(id);
                         setMotivo("");
