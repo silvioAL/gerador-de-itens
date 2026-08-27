@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { DiagramaConfig } from "../config/types.js";
 import type { Aresta, Diagrama } from "../model/types.js";
 import { readConfigFile } from "../test-support/fixtures.js";
-import { avaliarResiliencia, insistenciaDe } from "./resiliencia.js";
+import { avaliarResiliencia, contradicoesAceitas, contradicoesEmAberto, insistenciaDe } from "./resiliencia.js";
 
 /**
  * SPEC-68 — os padrões de resiliência como conta.
@@ -297,5 +297,78 @@ describe("avaliarResiliencia — a taxa vinda do volume da demanda", () => {
     expect(semPico).toEqual([]);
     expect(comPico).toHaveLength(1);
     expect(comPico[0].atual).toContain("50 necessárias");
+  });
+});
+
+/**
+ * §307 — a válvula do §242 chega às contradições de resiliência.
+ *
+ * A SPEC-68 §4.1 dizia que elas vão ao placar ⚖ *"com o porquê e a válvula da
+ * exceção, como toda violação desde o §239"*. Medido no §306: elas não iam a
+ * lugar nenhum além da bancada, e a válvula não existia.
+ *
+ * A régua que isto guarda: **a válvula tem que ser a mesma em toda cobrança**.
+ * Senão a pessoa aprende que umas violações se aceitam e outras se ignoram — e
+ * é assim que o placar inteiro perde o sentido (§230).
+ */
+describe("contradições aceitas de propósito (§307)", () => {
+  const desenho = () =>
+    diagrama(
+      [no("srv", "service", { chamadasSimultaneas: 10 }), no("bureau", "external")],
+      [aresta("e1", "srv", "bureau", "http", { timeoutMs: 1000 })]
+    );
+  const volume = { quantidade: 100, por: "segundo" as const };
+
+  it("a exceção MARCA, não apaga — some do vermelho, não do histórico", () => {
+    const achados = avaliarResiliencia(desenho(), config, undefined, {
+      volume,
+      excecoes: [
+        {
+          noId: "srv",
+          campo: "",
+          contradicao: "saturacao",
+          motivo: "o pico dura 2h/mês e o negócio aceita a fila",
+          autor: "ana@empresa.com",
+          em: "2026-08-27T10:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(achados).toHaveLength(1);
+    expect(achados[0].excecao?.motivo).toContain("o negócio aceita a fila");
+    expect(contradicoesEmAberto(achados)).toEqual([]);
+    expect(contradicoesAceitas(achados)).toHaveLength(1);
+  });
+
+  it("a chave é o par ELEMENTO + TIPO — aceitar a saturação não cala a insistência", () => {
+    // Uma contradição não é identificada por campo (nasce da RELAÇÃO entre
+    // dois) nem por regra do time (é aritmética). Confundir as duas faria um
+    // "aceito" silenciar o que ninguém olhou.
+    const d = diagrama(
+      [no("srv", "service", { chamadasSimultaneas: 10 }), no("bureau", "external")],
+      [aresta("e1", "srv", "bureau", "http", { timeoutMs: 1000 })]
+    );
+
+    const achados = avaliarResiliencia(d, config, undefined, {
+      volume,
+      excecoes: [
+        { noId: "srv", campo: "", contradicao: "insistencia", motivo: "outra coisa", autor: "a", em: "2026-01-01" },
+      ],
+    });
+
+    // A saturação do `srv` continua cobrando: a exceção era de outro tipo.
+    expect(contradicoesEmAberto(achados)).toHaveLength(1);
+    expect(contradicoesEmAberto(achados)[0].tipo).toBe("saturacao");
+  });
+
+  it("exceção de VALOR (sem `contradicao`) não interfere — são cobranças diferentes", () => {
+    // §242 gravou exceções de campo muito antes desta; uma exceção de
+    // `timeoutMs` não pode calar uma conta de concorrência.
+    const achados = avaliarResiliencia(desenho(), config, undefined, {
+      volume,
+      excecoes: [{ noId: "srv", campo: "timeoutMs", motivo: "x", autor: "a", em: "2026-01-01" }],
+    });
+
+    expect(contradicoesEmAberto(achados)).toHaveLength(1);
   });
 });

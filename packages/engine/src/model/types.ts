@@ -155,6 +155,16 @@ export interface ExcecaoDePadrao {
    * registrou com motivo. Mesma disciplina de `Atividade.chave` × `rotulo`.
    */
   regraId?: string;
+  /**
+   * §307 — o TIPO de contradição de resiliência aceita (SPEC-68).
+   *
+   * Terceira chave, pelo mesmo motivo das duas primeiras: uma contradição não é
+   * identificada por campo (ela nasce da RELAÇÃO entre dois) nem por regra do
+   * time (ela é aritmética). O que a identifica é o par elemento + tipo.
+   *
+   * Junto com `noId` — que aqui, como na forma, pode ser nó ou aresta.
+   */
+  contradicao?: "insistencia" | "saturacao";
   /** Por que foi aceita. Sem isto a exceção é só o vermelho desligado. */
   motivo: string;
   autor: string;

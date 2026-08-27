@@ -1611,6 +1611,32 @@ function AppCarregado({
         // cada render e NÃO está em `quebra.percursos` — procurá-lo lá achava
         // nada, e a correção começava vazia (achado do E2E).
         onAjustar={(percurso) => setDeclaracaoDeCaminho({ nos: [...percurso.nos], corrigindo: percurso.id })}
+        /**
+         * §307 — a válvula do §242 chegando às contradições de resiliência.
+         *
+         * A chave é o par ELEMENTO + TIPO: uma contradição não é identificada
+         * por campo (nasce da RELAÇÃO entre dois) nem por regra do time (é
+         * aritmética). Guardar por campo faria um "aceito" calar o que ninguém
+         * olhou.
+         */
+        onAceitarContradicao={(c, motivo) =>
+          setQuebra((q) => ({
+            ...q,
+            excecoes: [
+              ...(q.excecoes ?? []).filter(
+                (e) => !(e.noId === (c.noId ?? c.arestaId ?? "") && e.contradicao === c.tipo)
+              ),
+              {
+                noId: c.noId ?? c.arestaId ?? "",
+                campo: "",
+                contradicao: c.tipo,
+                motivo,
+                autor: sessao.email,
+                em: new Date().toISOString(),
+              },
+            ],
+          }))
+        }
         onAceitarViolacao={(v, motivo) =>
           setQuebra((q) => ({
             ...q,
