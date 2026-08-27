@@ -130,7 +130,7 @@ test("Especificação: apagar {{itens}} não deixa salvar e mostra o motivo (SPE
   // mesma aba — um template global sem ela abriria a corrida da §162.
   await conteudo.fill("# {{titulo}} — Template do E2E\n{{itens}}");
   await expect(page.getByTestId("template-erros")).toHaveCount(0);
-  await expect(page.getByTestId("template-avisos")).toContainText("Contexto do épico");
+  await expect(page.getByTestId("template-avisos")).toContainText("Contexto da demanda");
   await expect(salvar).toBeEnabled();
 
   // E salva DE VERDADE (pedido do usuário: o fluxo de uso desta parte tem que

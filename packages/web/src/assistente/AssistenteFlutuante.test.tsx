@@ -30,7 +30,7 @@ describe("AssistenteFlutuante (#298 — um ponto de entrada pra conversar com a 
     expect(screen.getByTestId("assistente-janela")).toBeInTheDocument();
     expect(screen.getByText("conteúdo da aba")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "📎 Contexto do épico" }));
+    await user.click(screen.getByRole("button", { name: "📎 Contexto da demanda" }));
     expect(onMudarAba).toHaveBeenCalledWith("contexto");
   });
 

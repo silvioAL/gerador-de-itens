@@ -417,11 +417,11 @@ test("o agente propõe o propósito, e o delta mostra o trabalho que aceitar cri
 
   await page.getByTestId("assistente-flutuante").click();
   const janela = page.getByTestId("assistente-janela");
-  await janela.getByRole("button", { name: "📎 Contexto do épico" }).click();
+  await janela.getByRole("button", { name: "📎 Contexto da demanda" }).click();
 
   // Sem contexto nenhum o pedido é recusado no servidor — e a recusa aparece
   // ali, não num alerta solto. Escrever o contexto é o que destrava.
-  await janela.getByLabel("Contexto do épico (texto)").fill("Cobrança recorrente com parceiro externo.");
+  await janela.getByLabel("Contexto da demanda (texto)").fill("Cobrança recorrente com parceiro externo.");
 
   await janela.getByRole("button", { name: "✦ Propor a partir do contexto" }).click();
 

@@ -50,7 +50,7 @@ test("§214 — trocar o produto da demanda troca o contexto que vai no prompt",
     const escolherProduto = async (nome: string) => {
       await page.getByTestId("assistente-flutuante").click();
       const janela = page.getByTestId("assistente-janela");
-      await janela.getByRole("button", { name: "📎 Contexto do épico" }).click();
+      await janela.getByRole("button", { name: "📎 Contexto da demanda" }).click();
       await janela.getByLabel("Produto desta demanda").selectOption({ label: nome });
       await janela.getByRole("button", { name: "Salvar" }).click();
     };
@@ -92,8 +92,8 @@ test("§214 — sair e entrar com outra pessoa não deixa a demanda da anterior 
 
   await page.getByTestId("assistente-flutuante").click();
   const janela = page.getByTestId("assistente-janela");
-  await janela.getByRole("button", { name: "📎 Contexto do épico" }).click();
-  await janela.getByLabel("Contexto do épico (texto)").fill(contexto);
+  await janela.getByRole("button", { name: "📎 Contexto da demanda" }).click();
+  await janela.getByLabel("Contexto da demanda (texto)").fill(contexto);
   await janela.getByRole("button", { name: "Salvar" }).click();
 
   // Sai e entra como OUTRA pessoa, no mesmo navegador.
@@ -106,6 +106,6 @@ test("§214 — sair e entrar com outra pessoa não deixa a demanda da anterior 
   // aparecendo para outra.
   await expect(page.locator(".react-flow__node")).toHaveCount(0);
   await page.getByTestId("assistente-flutuante").click();
-  await page.getByTestId("assistente-janela").getByRole("button", { name: "📎 Contexto do épico" }).click();
-  await expect(page.getByTestId("assistente-janela").getByLabel("Contexto do épico (texto)")).toHaveValue("");
+  await page.getByTestId("assistente-janela").getByRole("button", { name: "📎 Contexto da demanda" }).click();
+  await expect(page.getByTestId("assistente-janela").getByLabel("Contexto da demanda (texto)")).toHaveValue("");
 });

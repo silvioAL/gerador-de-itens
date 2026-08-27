@@ -95,6 +95,12 @@ export {
   type EstadoDoEnsaio,
   type ResultadoDoCenario,
 } from "./leitura/simularLentidao.js";
+export {
+  descreverVolumetria,
+  distribuirVolumetria,
+  emRequisicoesPorSegundo,
+  formatarRps,
+} from "./leitura/volumetria.js";
 export { deltaDeDecisao, deltaDePercurso, piorou } from "./remedicao/remedicao.js";
 export { compararDocumentos } from "./documento/compararDocumentos.js";
 export { exemploDeMedicao, valorQueEstoura } from "./conformidade/exemploDeMedicao.js";

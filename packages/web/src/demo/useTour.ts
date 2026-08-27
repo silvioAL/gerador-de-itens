@@ -51,7 +51,7 @@ export interface UseTourOpts {
    * explícita — senão o passo apontaria para algo que nunca aparece. */
   mostrarAvisos: () => void;
   /** SPEC-57 fatia A — abre o painel onde o PROPÓSITO da demanda vive
-   * (📎 Contexto do épico). `null` fecha: os passos seguintes usam o painel de
+   * (📎 Contexto da demanda). `null` fecha: os passos seguintes usam o painel de
    * propriedades, e a janela flutuante ficaria por cima dele. */
   abrirProposito: () => void;
   fecharAssistente: () => void;
@@ -149,7 +149,7 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       titulo: "O agente fica sempre à mão",
       segundos: 8,
       texto:
-        "Este ✦ acompanha você por cima do desenho, em qualquer tela. É por ele que se volta a conversar, colar o contexto do épico ou pedir uma configuração — por texto ou por voz. Ele pisca quando tem algo a dizer, e nunca aplica nada sozinho: tudo o que vier dali passa por uma confirmação sua.",
+        "Este ✦ acompanha você por cima do desenho, em qualquer tela. É por ele que se volta a conversar, colar o contexto da demanda ou pedir uma configuração — por texto ou por voz. Ele pisca quando tem algo a dizer, e nunca aplica nada sozinho: tudo o que vier dali passa por uma confirmação sua.",
       onEnter: () => opts.fecharAssistente(),
     },
     {

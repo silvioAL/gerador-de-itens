@@ -1,5 +1,5 @@
 import type { DiagramaConfig } from "../config/types.js";
-import type { Diagrama, ValorSpec } from "../model/types.js";
+import type { Diagrama, ValorSpec, VolumetriaDaDemanda } from "../model/types.js";
 import {
   CAMPO_DE_TEMPO_PADRAO,
   arestaEspera,
@@ -95,6 +95,18 @@ export interface CenarioDeLentidao {
    * sozinho — ver `estadoDoEnsaio`.
    */
   estado?: EstadoDoEnsaio;
+  /**
+   * SPEC-70 §5 — "neste ensaio, o volume da demanda é N× o normal".
+   *
+   * O pico de tráfego é uma condição do MUNDO, não propriedade de um componente
+   * escolhido a dedo: com o volume declarado na demanda, este fator chega a
+   * todos os nós de uma vez pela mesma propagação.
+   *
+   * O `taxaRps` por ajuste continua existindo, e não é redundante: ele responde
+   * "e se só ESTE componente receber uma rajada?", que não é dedutível do
+   * volume da demanda. Duas perguntas diferentes, dois mecanismos.
+   */
+  fatorDeVolume?: number;
   /** Só existe em `estado: "aceito"`. */
   debito?: DebitoAssumido;
   /** @deprecated SPEC-69 — lido só para migrar quebra gravada antes do estado. */
@@ -243,7 +255,11 @@ export function simularCenario(
   config: DiagramaConfig,
   cenario: CenarioDeLentidao,
   hoje?: LeituraDoDesenho,
-  campoDeTempo: string = CAMPO_DE_TEMPO_PADRAO
+  campoDeTempo: string = CAMPO_DE_TEMPO_PADRAO,
+  /** SPEC-70 — o volume da demanda, para a saturação não depender de alguém
+   * digitar a taxa nó a nó. O `fatorDeVolume` do cenário multiplica este
+   * número, e o pico chega a todos de uma vez. */
+  volumetria?: VolumetriaDaDemanda
 ): ResultadoDoCenario {
   const nosPorId = new Map(diagrama.nodes.map((n) => [n.id, n]));
   const arestasPorId = new Map(diagrama.edges.map((e) => [e.id, e]));
@@ -320,7 +336,10 @@ export function simularCenario(
     dominantes: t?.dominantes ?? [],
     delta: t?.ms !== undefined && base !== undefined ? t.ms - base : undefined,
     ajustesSemAlvo,
-    contradicoes: avaliarResiliencia(ensaiado, config),
+    contradicoes: avaliarResiliencia(ensaiado, config, undefined, {
+      volume: volumetria,
+      fator: cenario.fatorDeVolume,
+    }),
     insistenciaMs: insistencias.length > 0 ? Math.max(...insistencias.map((i) => i.ms)) : undefined,
   };
 }
@@ -411,12 +430,13 @@ export function simularCenarios(
   diagrama: Diagrama,
   config: DiagramaConfig,
   cenarios: CenarioDeLentidao[],
-  campoDeTempo: string = CAMPO_DE_TEMPO_PADRAO
+  campoDeTempo: string = CAMPO_DE_TEMPO_PADRAO,
+  volumetria?: VolumetriaDaDemanda
 ): { hoje: LeituraDoDesenho; resultados: ResultadoDoCenario[] } {
   const hoje = lerDesenho(diagrama, config, { campoDeTempo });
   return {
     hoje,
-    resultados: cenarios.map((c) => simularCenario(diagrama, config, c, hoje, campoDeTempo)),
+    resultados: cenarios.map((c) => simularCenario(diagrama, config, c, hoje, campoDeTempo, volumetria)),
   };
 }
 
@@ -466,11 +486,12 @@ export function ensaiosAssumidos(
   config: DiagramaConfig,
   cenarios: CenarioDeLentidao[],
   necessidades: { texto: string; limiteMs?: number }[] = [],
-  campoDeTempo: string = CAMPO_DE_TEMPO_PADRAO
+  campoDeTempo: string = CAMPO_DE_TEMPO_PADRAO,
+  volumetria?: VolumetriaDaDemanda
 ): EnsaioAssumido[] {
   const aceitos = cenarios.filter((c) => estadoDoEnsaio(c) === "aceito");
   if (aceitos.length === 0) return [];
-  const { hoje, resultados } = simularCenarios(diagrama, config, aceitos, campoDeTempo);
+  const { hoje, resultados } = simularCenarios(diagrama, config, aceitos, campoDeTempo, volumetria);
   return aceitos.map((c, i) => ({
     id: c.id,
     nome: c.nome,
@@ -529,7 +550,8 @@ export function cobrancasDeEnsaio(
   config: DiagramaConfig,
   cenarios: CenarioDeLentidao[],
   necessidades: { texto: string; limiteMs?: number }[] = [],
-  campoDeTempo: string = CAMPO_DE_TEMPO_PADRAO
+  campoDeTempo: string = CAMPO_DE_TEMPO_PADRAO,
+  volumetria?: VolumetriaDaDemanda
 ): CobrancaDeEnsaio[] {
   const cobram = cenarios.filter(ensaioCobra);
   if (cobram.length === 0) return [];
@@ -538,13 +560,20 @@ export function cobrancasDeEnsaio(
   // A assinatura de uma contradição é o par elemento+tipo: o texto muda com os
   // números, e comparar por texto faria "já existia" virar "é novo" só porque
   // o valor mudou.
+  //
+  // SPEC-70 — com o volume da demanda, mas SEM o fator do ensaio: o que já é
+  // verdade hoje é o desenho a 1× o volume. Incluir o pico aqui faria a
+  // saturação que o pico cria parecer preexistente, e o ensaio deixaria de
+  // acusar justamente o que ele revela.
   const jaExistia = new Set(
-    avaliarResiliencia(diagrama, config).map((c) => `${c.tipo}:${c.noId ?? c.arestaId ?? c.rotulo}`)
+    avaliarResiliencia(diagrama, config, undefined, { volume: volumetria }).map(
+      (c) => `${c.tipo}:${c.noId ?? c.arestaId ?? c.rotulo}`
+    )
   );
 
   return cobram
     .map((c) => {
-      const r = simularCenario(diagrama, config, c, hoje, campoDeTempo);
+      const r = simularCenario(diagrama, config, c, hoje, campoDeTempo, volumetria);
       const avisos = r.contradicoes
         .filter((x) => !jaExistia.has(`${x.tipo}:${x.noId ?? x.arestaId ?? x.rotulo}`))
         .map((x) => `${x.rotulo}: ${x.esperado}, e ${x.atual}`);

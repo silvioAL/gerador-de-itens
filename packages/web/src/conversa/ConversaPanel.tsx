@@ -12,7 +12,7 @@ export interface ConversaPanelProps {
   timeAtivo?: string;
   techs?: string[];
   contextos?: string[];
-  /** O que o usuário já escreveu no "Contexto do épico" — a conversa começa
+  /** O que o usuário já escreveu no "Contexto da demanda" — a conversa começa
    * com isso na caixa, em vez de pedir que ele digite tudo de novo. */
   contextoInicial?: string;
   /** §235 — conversa EXCLUSIVA do tour: uma troca já pronta, com a proposta
@@ -36,7 +36,7 @@ interface Mensagem {
  * A primitiva que faltava no produto: uma janela onde se descreve a demanda em
  * português e um agente responde com o DIAGRAMA proposto. Até aqui a ferramenta
  * ajudava a especificar o que já tinha sido desenhado, e não ajudava a desenhar
- * — o botão "Contexto do épico" só guardava o texto, ninguém o lia pra propor
+ * — o botão "Contexto da demanda" só guardava o texto, ninguém o lia pra propor
  * arquitetura.
  *
  * **Uma conversa por fase** (SPEC-27 §3): esta é só sobre o desenho. A da

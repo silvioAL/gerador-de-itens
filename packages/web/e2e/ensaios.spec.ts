@@ -211,7 +211,7 @@ test("§304 — o ensaio cobra, assumir com motivo tira do placar, e o débito c
   // ensaio não inventa julgamento, e não haveria o que cobrar.
   await page.getByTestId("assistente-flutuante").click();
   const janela = page.getByTestId("assistente-janela");
-  await janela.getByRole("button", { name: "📎 Contexto do épico" }).click();
+  await janela.getByRole("button", { name: "📎 Contexto da demanda" }).click();
   // `exact` porque "Prioridade da nova necessidade" também casa com o rótulo
   // solto, e o Playwright falha em modo estrito.
   await janela.getByLabel("Nova necessidade", { exact: true }).fill("Aprovar crédito na hora");
@@ -337,4 +337,87 @@ test("§305 — sem número declarado, a porta não leva à bancada: diz o que f
   await page.goto("/#/ensaios");
   await expect(page.getByTestId("ensaios-sem-tempo")).toContainText("zero não é uma medição");
   await expect(page.getByTestId("linha-hoje")).not.toContainText("0 ms");
+});
+
+/**
+ * SPEC-70 fatia D — o volume dito UMA vez, e a conta fechando sozinha.
+ *
+ * RELATO: *"talvez adicionar uma volumetria geral em algum lugar determinístico
+ * relacionado a demanda — distribuir já de forma determinística para o motor,
+ * **assim o usuário não precisa preencher**"*.
+ *
+ * O que só o navegador prova: o número entra na demanda, atravessa o motor e
+ * chega ao placar — sem ninguém digitar taxa em componente nenhum. Era o
+ * trabalho que a Lei de Little cobrava nó a nó.
+ */
+test("§306 — o volume da demanda faz a saturação aparecer, sem digitar taxa em nó nenhum", async ({ page }) => {
+  test.setTimeout(180000);
+  await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
+  await page.route(
+    (url) => url.pathname === "/ia/status",
+    (rota) => rota.fulfill({ json: { modelosChat: [], embeddingInstalado: false, capacidades: {} } })
+  );
+  await entrar(page);
+
+  // Um desenho mínimo, montado à mão: serviço → API externa, com a conexão
+  // ARRASTADA de verdade.
+  //
+  // O cenário pronto não serve aqui, e a medição disse por quê: nenhuma das
+  // conexões dele declara `timeoutMs`, e a Lei de Little soma o timeout das
+  // CONEXÕES que esperam. Sem esse número a conta não se faz, com ou sem
+  // volumetria — o teste ficaria verde-por-motivo-errado ou vermelho por algo
+  // que não é o que ele mede.
+  await page.getByRole("button", { name: "+ Serviço", exact: true }).click();
+  await page.getByRole("button", { name: "+ API Externa" }).click();
+  const svc = page.locator(".react-flow__node", { hasText: "Serviço" }).first();
+  const api = page.locator(".react-flow__node", { hasText: "API Externa" }).first();
+  await svc.waitFor();
+  await api.waitFor();
+  const origem = svc.locator(".react-flow__handle-right.source");
+  const destino = api.locator(".react-flow__handle-left.target");
+  const caixaOrigem = await origem.boundingBox();
+  const caixaDestino = await destino.boundingBox();
+  if (!caixaOrigem || !caixaDestino) throw new Error("handle de conexão não encontrado no DOM");
+  await page.mouse.move(caixaOrigem.x + caixaOrigem.width / 2, caixaOrigem.y + caixaOrigem.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(caixaDestino.x + caixaDestino.width / 2, caixaDestino.y + caixaDestino.height / 2, { steps: 15 });
+  await page.mouse.up();
+
+  // O timeout da CONEXÃO: é o "tempo de resposta" da Lei de Little.
+  await page.locator(".react-flow__edge").first().click();
+  await page.locator("aside").getByLabel(/Timeout/).first().fill("1000");
+
+  // O pool do serviço — o outro lado da conta, e o único número que continua
+  // sendo do COMPONENTE (quantas simultâneas ele aguenta).
+  await svc.click();
+  await page.getByLabel("Chamadas simultâneas que aguenta").fill("10");
+
+  // Sem volume declarado, a conta não se faz — e não se inventa (§248).
+  //
+  // A saturação aparece na BANCADA (`contradicoes-hoje`), e não no placar da
+  // mesa: `avaliarResiliencia` só é chamada lá. Afirmar sobre o placar aqui
+  // mediria outra coisa.
+  await page.goto("/#/ensaios");
+  await expect(page.getByTestId("contradicoes-hoje")).toHaveCount(0);
+  await page.goto("/#/");
+
+  // ── O número entra UMA vez, na demanda ──
+  await page.getByTestId("assistente-flutuante").click();
+  const janela = page.getByTestId("assistente-janela");
+  await janela.getByRole("button", { name: "📎 Contexto da demanda" }).click();
+  await janela.getByTestId("volumetria-quantidade").fill("100");
+  await janela.getByTestId("volumetria-por").selectOption("segundo");
+  // A prévia mostra o req/s da conta enquanto se digita.
+  await expect(janela.getByTestId("volumetria-derivada")).toContainText("100 req/s");
+  await janela.getByRole("button", { name: "Salvar" }).click();
+  await page.getByTestId("assistente-flutuante").click();
+
+  // ── E a conta fecha, sem ninguém ter digitado taxa em componente nenhum ──
+  await page.goto("/#/ensaios");
+  const contradicoes = page.getByTestId("contradicoes-hoje");
+  await expect(contradicoes).toBeVisible();
+  await expect(contradicoes).toContainText("chamadas simultâneas");
+  // A frase diz DE ONDE veio a taxa: apresentar o derivado como declarado seria
+  // a ferramenta se atribuindo uma medição que ninguém fez.
+  await expect(contradicoes).toContainText("vindo do volume da demanda");
 });

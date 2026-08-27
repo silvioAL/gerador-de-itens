@@ -647,7 +647,10 @@ describe("problemasDoTemplate (SPEC-35)", () => {
   it("template enxuto é escolha legítima: sem {{contexto}} é AVISO com a consequência, não erro", () => {
     const { erros, avisos } = problemasDoTemplate("{{itens}}");
     expect(erros).toEqual([]);
-    expect(avisos.some((a) => a.includes("{{contexto}}") && a.includes("Contexto do épico"))).toBe(true);
+    // SPEC-70 §7 — "épico" virou "demanda": o produto nunca foi sobre épicos, e
+    // um rótulo que nomeia o artefato de um processo específico diz a quem usa
+    // outro que a ferramenta não é para ele.
+    expect(avisos.some((a) => a.includes("{{contexto}}") && a.includes("Contexto da demanda"))).toBe(true);
     // SPEC-58 — três variáveis novas de topo (decisões + as duas seções
     // escritas) entram na mesma lista de recomendadas. O número aqui é guarda
     // de propósito: variável nova que não avisa ninguém nasce dormente, que é

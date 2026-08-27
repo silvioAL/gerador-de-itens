@@ -8,7 +8,7 @@ export type AbaAssistente = "conversa" | "contexto" | "configurar";
  * assim, como a SPEC-34 §3.1 previa). */
 const ABAS: { id: AbaAssistente; rotulo: string }[] = [
   { id: "conversa", rotulo: "✦ Desenhar conversando" },
-  { id: "contexto", rotulo: "📎 Contexto do épico" },
+  { id: "contexto", rotulo: "📎 Contexto da demanda" },
   { id: "configurar", rotulo: "⚙ Configurar" },
 ];
 
@@ -162,7 +162,7 @@ export function AssistenteFlutuante({
             ? undefined
             : abaPrimaria === "configurar"
               ? "Assistente: descreva o que o time precisa configurar — por texto ou por voz. Eu proponho, você aplica."
-              : "Assistente: converse por texto ou por voz — descreva a demanda, cole o contexto do épico ou peça configuração."
+              : "Assistente: converse por texto ou por voz — descreva a demanda, cole o contexto dela ou peça configuração."
         }
         style={{ ...fabEstilo, ...elevacao, ...estiloArrasto }}
         {...handlersDeArrasto}

@@ -297,6 +297,18 @@ export interface DocumentoEscrito {
   riscos?: string;
 }
 
+/**
+ * SPEC-70 §2 — o volume da demanda, na unidade em que o NEGÓCIO fala.
+ *
+ * Ninguém traz "23,1 req/s"; traz "2 milhões por dia". Obrigar a conversão na
+ * cabeça é onde o número entra errado — e um número errado aqui contamina toda
+ * a propagação. O motor normaliza; a pessoa escreve o que sabe.
+ */
+export interface VolumetriaDaDemanda {
+  quantidade: number;
+  por: "segundo" | "minuto" | "hora" | "dia";
+}
+
 export interface Quebra {
   /** Curto, pra achar essa quebra depois numa lista/busca — diferente de
    * `demandInfo` (a descrição longa do contexto). Não é chave: duas quebras
@@ -332,6 +344,20 @@ export interface Quebra {
    * nesse caso nada se afirma sobre ela: sem necessidade declarada não há
    * lacuna a apontar (ver `analisarLacunas`). */
   necessidades?: Necessidade[];
+  /**
+   * SPEC-70 — o VOLUME que esta demanda atende, dito uma vez.
+   *
+   * A Lei de Little precisa da taxa em cada nó, e pedi-la nó a nó é pedir oito
+   * vezes o número que se deduz uma vez: o volume entra pela porta da frente e
+   * o próprio grafo o leva adiante (`distribuirVolumetria`).
+   *
+   * Mora na demanda porque é propriedade do que se está construindo, não de
+   * cada peça — e quem sabe o número é quem trouxe a demanda.
+   *
+   * Ausente = nada se afirma. Sem volume declarado a saturação segue calada,
+   * como antes desta SPEC.
+   */
+  volumetria?: VolumetriaDaDemanda;
   /** §242 — as violações de padrão aceitas DE PROPÓSITO nesta quebra. */
   excecoes?: ExcecaoDePadrao[];
   /** SPEC-57 fatia C — as escolhas entre alternativas, com o porquê. Ausente em

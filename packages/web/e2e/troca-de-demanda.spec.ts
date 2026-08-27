@@ -70,8 +70,8 @@ test("§213 — o contexto do épico é o da demanda aberta, não o da anterior"
   // Demanda A recebe um contexto de épico digitado à mão.
   await page.getByTestId("assistente-flutuante").click();
   const janela = page.getByTestId("assistente-janela");
-  await janela.getByRole("button", { name: "📎 Contexto do épico" }).click();
-  await janela.getByLabel("Contexto do épico (texto)").fill(contextoDeA);
+  await janela.getByRole("button", { name: "📎 Contexto da demanda" }).click();
+  await janela.getByLabel("Contexto da demanda (texto)").fill(contextoDeA);
   await janela.getByRole("button", { name: "Salvar" }).click();
 
   // Reabre o painel e o DEIXA aberto durante a troca: é aqui que o vazamento
@@ -79,8 +79,8 @@ test("§213 — o contexto do épico é o da demanda aberta, não o da anterior"
   // se o painel não for desmontado ao abrir outra demanda, ele continua
   // exibindo (e salvando) o texto da anterior.
   await page.getByTestId("assistente-flutuante").click();
-  await page.getByTestId("assistente-janela").getByRole("button", { name: "📎 Contexto do épico" }).click();
-  await expect(page.getByTestId("assistente-janela").getByLabel("Contexto do épico (texto)")).toHaveValue(contextoDeA);
+  await page.getByTestId("assistente-janela").getByRole("button", { name: "📎 Contexto da demanda" }).click();
+  await expect(page.getByTestId("assistente-janela").getByLabel("Contexto da demanda (texto)")).toHaveValue(contextoDeA);
 
   await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: "Abrir…" }).click();
@@ -94,6 +94,6 @@ test("§213 — o contexto do épico é o da demanda aberta, não o da anterior"
 
   // E, ao reabrir, o contexto é o da demanda ABERTA — vazio, no caso.
   await page.getByTestId("assistente-flutuante").click();
-  await page.getByTestId("assistente-janela").getByRole("button", { name: "📎 Contexto do épico" }).click();
-  await expect(page.getByTestId("assistente-janela").getByLabel("Contexto do épico (texto)")).toHaveValue("");
+  await page.getByTestId("assistente-janela").getByRole("button", { name: "📎 Contexto da demanda" }).click();
+  await expect(page.getByTestId("assistente-janela").getByLabel("Contexto da demanda (texto)")).toHaveValue("");
 });

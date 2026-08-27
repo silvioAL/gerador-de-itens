@@ -46,7 +46,7 @@ test("declarar propósito, ligar ao componente e ver a citação chegar no docum
   // M1 — o propósito, no mesmo painel onde o contexto da demanda já vive.
   await page.getByTestId("assistente-flutuante").click();
   const janela = page.getByTestId("assistente-janela");
-  await janela.getByRole("button", { name: "📎 Contexto do épico" }).click();
+  await janela.getByRole("button", { name: "📎 Contexto da demanda" }).click();
   await janela.getByLabel("Nova necessidade", { exact: true }).fill(proposito);
   await janela.getByRole("button", { name: "+ Adicionar" }).click();
 
@@ -128,7 +128,7 @@ test("apagar o componente devolve a necessidade à condição de lacuna", async 
 
   await page.getByTestId("assistente-flutuante").click();
   const janela = page.getByTestId("assistente-janela");
-  await janela.getByRole("button", { name: "📎 Contexto do épico" }).click();
+  await janela.getByRole("button", { name: "📎 Contexto da demanda" }).click();
   await janela.getByLabel("Nova necessidade", { exact: true }).fill(proposito);
   await janela.getByRole("button", { name: "+ Adicionar" }).click();
   await janela.getByLabel(`Vincular componente a: ${proposito}`).selectOption({ index: 1 });
@@ -171,9 +171,9 @@ test("§253 — o campo do contexto mantém altura mesmo com a lista cheia acima
 
   await page.getByTestId("assistente-flutuante").click();
   const janela = page.getByTestId("assistente-janela");
-  await janela.getByRole("button", { name: "📎 Contexto do épico" }).click();
+  await janela.getByRole("button", { name: "📎 Contexto da demanda" }).click();
 
-  const campo = janela.getByLabel("Contexto do épico (texto)");
+  const campo = janela.getByLabel("Contexto da demanda (texto)");
   const alturaVazia = (await campo.boundingBox())?.height ?? 0;
   expect(alturaVazia).toBeGreaterThan(100);
 
