@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { CAMPO_GLOBAL, ConfigInvalida, criarCasosDeUsoDeConfig, ehChaveConfig, type ChaveConfig } from "@gerador/aplicacao";
 import type { OpcoesApp } from "../app.js";
@@ -13,6 +11,7 @@ import {
   type Recurso,
 } from "../auth/permissoes.js";
 import { registrarAuditoria } from "../auditoria.js";
+import { templateDaVersao as templateDeConfig } from "../config/templateDaVersao.js";
 
 /**
  * SPEC-31 Fase 3 — configuração no modo hospedado.
@@ -27,27 +26,14 @@ import { registrarAuditoria } from "../auditoria.js";
  * seção que o padrão preenche, isso aparece — em vez de o agente que depende
  * dela simplesmente não escrever nada.
  */
-const DEFAULTS_COMPILADOS: Record<ChaveConfig, unknown> = {
-  regras: { tipos: [], tamanhos: [], porTech: {} },
-  "pipeline-agentes": { confirmacaoObrigatoria: true, papeis: [] },
-  exportador: { endpoint: "", rotulo: "", cabecalhos: {} },
-};
-
 export async function registrarRotasConfig(app: FastifyInstance, { db, diretorioConfig }: OpcoesApp) {
   const casos = criarCasosDeUsoDeConfig(criarRepositorioDeConfigEmPostgres(db));
   const versaoAtual = process.env.npm_package_version ?? null;
 
-  /** O template de fábrica desta versão — o que a imagem traz em `config/`. */
-  async function templateDaVersao(chave: ChaveConfig): Promise<unknown> {
-    for (const nome of [`${chave}.json`, `${chave}.example.json`]) {
-      try {
-        return JSON.parse(await readFile(resolve(diretorioConfig, nome), "utf-8"));
-      } catch {
-        // tenta o próximo candidato
-      }
-    }
-    return DEFAULTS_COMPILADOS[chave];
-  }
+  /** §303 — mora num módulo próprio agora: a rota de PDCA precisa do MESMO
+   * template para aplicar um ajuste sobre uma organização que ainda não salvou
+   * config nenhuma. Ver `config/templateDaVersao.ts`. */
+  const templateDaVersao = (chave: ChaveConfig) => templateDeConfig(chave, diretorioConfig);
 
   const organizacaoPadrao = organizacaoPadraoDe(db);
 

@@ -19,6 +19,7 @@ import { CAMPO_GLOBAL, criarCasosDeUsoDeCamposAresta, criarCasosDeUsoDeCamposNo 
 import { criarRepositorioDeCamposNoEmPostgres } from "../adaptadores/camposNoEmPostgres.js";
 import { criarRepositorioDeCamposArestaEmPostgres } from "../adaptadores/camposArestaEmPostgres.js";
 import { aplicarOperacaoDeCampo, type PortaDeFicha } from "../pdca/aplicarNosCampos.js";
+import { templateDaVersao } from "../config/templateDaVersao.js";
 
 /**
  * SPEC-39 Fase 1 — o PDCA das configurações.
@@ -73,7 +74,7 @@ const RECURSO_DA_DECISAO: Record<(typeof RECURSOS_SOLICITAVEIS)[number], Recurso
   "campos-aresta": "campos-aresta",
 };
 
-export async function registrarRotasPdca(app: FastifyInstance, { db }: OpcoesApp) {
+export async function registrarRotasPdca(app: FastifyInstance, { db, diretorioConfig }: OpcoesApp) {
   const organizacaoId = organizacaoPadraoDe(db);
 
   /**
@@ -527,17 +528,50 @@ export async function registrarRotasPdca(app: FastifyInstance, { db }: OpcoesApp
       .from(configDocumentos)
       .where(and(eq(configDocumentos.chave, alvo), eq(configDocumentos.timeId, GLOBAL)))
       .limit(1);
-    if (!doc) return reply.code(409).send({ erro: `documento de ${alvo} não encontrado` });
+
+    /**
+     * §303 — sem linha gravada, a base é o TEMPLATE, não um 409.
+     *
+     * Aqui morava `if (!doc) return 409 "documento de <alvo> não encontrado"`.
+     * Mas "não encontrado" é o estado normal de toda organização que ainda não
+     * salvou config nenhuma: o `GET /config/:chave` sempre respondeu com o
+     * template nesse caso (`obter` resolve time → global → template), e só o
+     * `aplicar` tratava a ausência como erro.
+     *
+     * O efeito era um ajuste APROVADO que não aplicava — e a tela nem dizia
+     * por quê: o card ficava em "aprovada" e o botão parecia não ter feito
+     * nada (§244). Numa instalação nova, o PDCA inteiro era inalcançável até
+     * alguém salvar uma config à mão pela aba.
+     *
+     * Ficou invisível por muito tempo porque, na suíte E2E, algum spec vizinho
+     * sempre gravava o documento global antes deste rodar. Quando os specs de
+     * regras foram para times próprios, ninguém mais gravou o global — e a CI,
+     * com banco novo, reproduziu a instalação nova de verdade.
+     */
+    const base = doc?.documento ?? (await templateDaVersao(alvo, diretorioConfig));
 
     const documentoNovo =
       alvo === "pipeline-agentes"
-        ? aplicarOperacaoNoPipeline(doc.documento as PipelineComPapeis, operacao)
-        : aplicarOperacao(doc.documento as RegrasConfig, operacao);
+        ? aplicarOperacaoNoPipeline(base as PipelineComPapeis, operacao)
+        : aplicarOperacao(base as RegrasConfig, operacao);
 
-    await db
-      .update(configDocumentos)
-      .set({ documento: documentoNovo, atualizadoEm: new Date() })
-      .where(eq(configDocumentos.id, doc.id));
+    if (doc) {
+      await db
+        .update(configDocumentos)
+        .set({ documento: documentoNovo, atualizadoEm: new Date() })
+        .where(eq(configDocumentos.id, doc.id));
+    } else {
+      // A primeira gravação da organização. `onConflictDoUpdate` porque duas
+      // aplicações simultâneas nasceriam as duas sem linha, e a segunda
+      // estouraria na chave única em vez de gravar.
+      await db
+        .insert(configDocumentos)
+        .values({ chave: alvo, timeId: GLOBAL, documento: documentoNovo })
+        .onConflictDoUpdate({
+          target: [configDocumentos.chave, configDocumentos.timeId],
+          set: { documento: documentoNovo, atualizadoEm: new Date() },
+        });
+    }
     const [aplicada] = await db
       .update(solicitacoesAjuste)
       .set({ estado: "aplicada", aplicadaEm: new Date(), aplicadaPor: req.usuario!.email })

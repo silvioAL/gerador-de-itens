@@ -11242,5 +11242,43 @@ passaria a testar outra coisa que a máquina de quem desenvolve.
 > Duas rodadas verdes não provaram que estava certo. O que apareceu no diff foi
 > um número cruzando um limiar que ninguém tinha motivo para olhar.
 
-461 engine · 737 web · 84 aplicação · 237 server · 129 llm · 98/98 E2E · build e
+### A CI achou o que quatro rodadas locais não acharam
+
+Local: 98/98, duas vezes. Na CI, o `pdca-jornada` caiu — o card ficava em
+"aprovada" depois de clicar em **Aplicar agora**, sem mudar nada e sem dizer
+nada.
+
+O `POST /ajustes/:id/aplicar` lia a linha GLOBAL de `config_documentos` direto:
+
+```ts
+if (!doc) return reply.code(409).send({ erro: `documento de ${alvo} não encontrado` });
+```
+
+Mas *"não encontrado"* é o estado normal de **toda organização que ainda não
+salvou config nenhuma**. O `GET /config/:chave` sempre respondeu com o template
+nesse caso (`obter` resolve time → global → template); só o `aplicar` tratava a
+ausência como erro.
+
+Numa instalação nova, portanto, o PDCA inteiro era inalcançável: aprovar
+funcionava, aplicar nunca — e a tela nem contava por quê (§244).
+
+**Por que só apareceu agora.** Na suíte E2E, algum spec vizinho sempre gravava
+o documento global antes deste rodar. Quando os cinco specs de regras foram
+para times próprios, ninguém mais gravou o global — e a CI, com banco novo,
+reproduziu a instalação nova de verdade. O banco local, cheio de resíduo de
+anos, continuava escondendo.
+
+> A mesma separação que resolveu a colisão tirou o andaime que escondia este
+> defeito. Isolar não criou o problema: parou de disfarçá-lo.
+
+O `templateDaVersao` era uma função interna da rota de config — saiu para um
+módulo próprio, com um dono só, e o `aplicar` passou a partir dele quando não
+há linha gravada, gravando com `upsert` em vez de `update`.
+
+O teste que cobre isso é definido por uma **ausência**: ele não faz o
+`PUT /config/regras` que todos os outros testes de aplicar fazem. Está escrito
+lá em cima do caso, porque é o tipo de coisa que a próxima leitura "conserta"
+por engano.
+
+461 engine · 737 web · 84 aplicação · 238 server · 129 llm · 98/98 E2E · build e
 lint limpos.

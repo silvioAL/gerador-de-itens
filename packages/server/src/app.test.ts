@@ -1738,6 +1738,63 @@ describe("SPEC-45 — a jornada do PDCA (feedback → ajuste → aplicado)", () 
     expect(regras.documento.porTech.java.checklistTecnico).toEqual([]);
   });
 
+  /**
+   * §303 — aplicar numa organização que NUNCA salvou regras.
+   *
+   * Todos os testes de aplicar acima começam com um `PUT /config/regras`, e é
+   * por isso que nenhum pegava isto: o `aplicar` lia a linha GLOBAL direto e
+   * devolvia 409 quando ela não existia — o estado de toda instalação nova.
+   *
+   * O sintoma não era um erro na tela: era um ajuste APROVADO que ficava
+   * "aprovada" para sempre, com um botão que parecia não fazer nada (§244).
+   *
+   * A ausência do `PUT` aqui é o teste. Ela é fácil de "consertar" por engano
+   * na próxima leitura, então: NÃO grave config antes deste caso.
+   */
+  it("§303 — sem config gravada, aplicar parte do TEMPLATE em vez de recusar com 409", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+
+    const criada = (
+      await app.inject({
+        method: "POST",
+        url: "/ajustes",
+        cookies: { gerador_sessao: cookie },
+        payload: {
+          recurso: "regras",
+          descricao: "primeira régua da casa",
+          operacao: {
+            tipo: "adicionar-checklist",
+            secao: "checklistTecnico",
+            tech: "java",
+            contextos: [],
+            texto: "Definir política de DLQ",
+          },
+        },
+      })
+    ).json();
+    await app.inject({
+      method: "POST",
+      url: `/ajustes/${criada.id}/decidir`,
+      cookies: { gerador_sessao: cookie },
+      payload: { aprovar: true },
+    });
+
+    const aplicada = await app.inject({
+      method: "POST",
+      url: `/ajustes/${criada.id}/aplicar`,
+      cookies: { gerador_sessao: cookie },
+    });
+    expect(aplicada.statusCode, aplicada.body).toBe(200);
+    expect(aplicada.json().estado).toBe("aplicada");
+
+    // E a régua chegou ao documento de verdade — 200 sozinho não prova gravação.
+    const regras = (await app.inject({ method: "GET", url: "/config/regras" })).json();
+    expect(regras.documento.porTech.java.checklistTecnico).toContainEqual({
+      texto: "Definir política de DLQ",
+      contextos: [],
+    });
+  });
+
   it("SPEC-46 — ciclo de teste e volumetria também aplicam de verdade", async () => {
     const cookie = await logarComo(EMAIL_DEV);
     await app.inject({
