@@ -44,9 +44,9 @@ test("o contexto do produto entra no prompt da esteira, separado do contexto da 
     // dois no prompt que este teste existe pra provar.
     await page.getByTestId("assistente-flutuante").click();
     const janela = page.getByTestId("assistente-janela");
-    await janela.getByRole("button", { name: "📎 Contexto do épico" }).click();
+    await janela.getByRole("button", { name: "📎 Contexto da demanda" }).click();
     await janela.getByLabel("Produto desta demanda").selectOption({ label: nome });
-    await janela.getByLabel("Contexto do épico (texto)").fill("Nesta entrega, só o fechamento mensal.");
+    await janela.getByLabel("Contexto da demanda (texto)").fill("Nesta entrega, só o fechamento mensal.");
     await janela.getByRole("button", { name: "Salvar" }).click();
 
     await derivarNaMesa(page);

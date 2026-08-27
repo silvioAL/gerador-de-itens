@@ -325,7 +325,7 @@ export const VARIAVEIS_OBRIGATORIAS_ESPECIFICACAO = ["itens"] as const;
  * pediu para ver, e mora aqui para borda e tela dizerem a MESMA frase. */
 const CONSEQUENCIA_DA_AUSENCIA: Record<(typeof VARIAVEIS_ESPECIFICACAO)[number], string> = {
   titulo: "o documento sai sem título",
-  contexto: "o texto do Contexto do épico não entra no documento",
+  contexto: "o texto do Contexto da demanda não entra no documento",
   historiaPo: "a visão geral escrita pelo PO não entra no documento",
   itens: "o documento sai SEM os itens da quebra — os itens são o corpo do documento",
   definitionOfReady: "a seção Definition of Ready não entra no documento",

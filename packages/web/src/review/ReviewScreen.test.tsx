@@ -167,7 +167,7 @@ describe("ReviewScreen — fixture 01 (sem ciclos/conflitos)", () => {
     expect(onConfigurarModeloIa).toHaveBeenCalled();
   });
 
-  it("SPEC-37 M5: derivou sem Contexto do épico (e IA não é o problema) — aviso dispensável", async () => {
+  it("SPEC-37 M5: derivou sem Contexto da demanda (e IA não é o problema) — aviso dispensável", async () => {
     // Status rejeitado = "sem-rota" (modo sem IA): não é o M4; sobra o M5.
     apiIaStatusMock.mockRejectedValueOnce(new Error("sem rota"));
     render(
@@ -182,7 +182,7 @@ describe("ReviewScreen — fixture 01 (sem ciclos/conflitos)", () => {
     );
 
     const balao = await screen.findByTestId("balao-sem-contexto");
-    expect(balao).toHaveTextContent("Contexto do épico");
+    expect(balao).toHaveTextContent("Contexto da demanda");
 
     fireEvent.click(within(balao).getByRole("button", { name: "Dispensar sugestão" }));
     expect(screen.queryByTestId("balao-sem-contexto")).not.toBeInTheDocument();

@@ -11441,3 +11441,95 @@ renomeada e outra não: é a assinatura de §263 aplicada a texto.
 
 482 engine · 756 web · 84 aplicação · 238 server · 129 llm · 100/100 E2E · build
 e lint limpos.
+
+## §306 — o volume dito uma vez, e o épico que virou demanda (SPEC-70)
+
+Dois pedidos numa mensagem, olhando o campo `pico de [—] req/s` dentro de um
+ajuste de ensaio:
+
+> *"talvez adicionar uma volumetria geral em algum lugar determinístico
+> relacionado a demanda (hoje está descrito como épico, mas pode ser qualquer
+> demanda, vamos renomear para demanda) — distribuir já de forma determinística
+> para o motor, **assim o usuário não precisa preencher**."*
+
+### O que custava
+
+A Lei de Little (§3.3 da SPEC-68) é a única conta do produto que é aritmética
+pura, e ela pedia a **taxa nó a nó**:
+
+```ts
+const taxa = numeroDe(no.spec?.[campos.taxa]);   // por nó
+if (taxa === undefined) continue;                 // silêncio
+```
+
+Num desenho de oito componentes a conta só fechava se alguém digitasse oito
+números — e, quase sempre, **o mesmo número**: o volume que entra pela porta da
+frente, propagado adiante pelo próprio grafo.
+
+> Pedir oito vezes o que se deduz uma vez é a definição de trabalho que a
+> ferramenta deveria estar fazendo.
+
+### A regra é dedução, não estimativa
+
+Entrada recebe o volume; cada conexão que **espera** o leva adiante; quem é
+chamado por dois caminhos soma. É o mesmo passeio que a `lerDesenho` faz, com
+outro número na mochila — sem heurística, sem amostragem.
+
+O que o motor **não** adivinha está escrito na SPEC: quantas vezes por
+requisição uma chamada acontece. Um laço que consulta o bureau por item de uma
+lista de 50 multiplica a taxa por 50, e isso não está no desenho. Sem
+declaração, assume **uma** — e diz que assumiu.
+
+**Declarado vence derivado**, e a frase diz de onde o número veio: quem mediu um
+componente sabe mais que quem propagou da porta da frente, e apresentar o
+derivado como declarado seria a ferramenta se atribuindo uma medição que ninguém
+fez.
+
+### A regra de "entrada" estava errada na primeira versão
+
+Escrevi *"entrada é quem não recebe conexão síncrona"*, e o teste da conexão
+assíncrona pegou: uma **fila** ligada só por `publishes` não recebe nada
+síncrono, e virava porta da frente recebendo o volume inteiro da demanda. Nada
+no desenho diz isso — o `publishes` diz o contrário.
+
+A regra correta tem duas metades: **ninguém síncrono me chama E eu chamo
+alguém**. A segunda metade não é detalhe; é ela que separa "começo de corrente"
+de "estou fora da corrente".
+
+### O pico deixou de ser por elemento
+
+`fatorDeVolume` no ensaio: *"neste ensaio o volume da demanda é 10× o normal"*, e
+ele chega a todos os nós de uma vez. O `taxaRps` por ajuste continua existindo, e
+não é redundante — responde *"e se só ESTE componente receber uma rajada?"*, que
+não é dedutível do volume da demanda. Duas perguntas, dois mecanismos; o rótulo
+do campo passou a dizer isso ("só este a N req/s").
+
+### O E2E me obrigou a medir em vez de supor
+
+Escrevi o teste carregando o cenário de aprovação de crédito e esperando a
+saturação aparecer. Não apareceu. Duas causas, as duas encontradas medindo:
+
+1. **As contradições de resiliência não vão ao placar da mesa.** `avaliarResiliencia`
+   só é chamada na bancada de ensaios. A SPEC-68 §4.1 diz que elas vão ao placar
+   ⚖ — **não vão**. Ajustei a asserção para onde elas estão, em vez de mudar o
+   produto de passagem; fica anotado como lacuna real.
+2. **Nenhuma conexão daquele cenário declara `timeoutMs`**, e a Lei de Little
+   soma o timeout das CONEXÕES que esperam. Sem esse número a conta não se faz,
+   com ou sem volumetria.
+
+O teste passou a montar um desenho mínimo à mão, com a conexão arrastada de
+verdade e o timeout preenchido — e aí prova o que se propôs a provar: o volume
+entra uma vez, e a saturação aparece **sem ninguém digitar taxa em componente
+nenhum**.
+
+### O rename
+
+`📎 Contexto do épico` → `📎 Contexto da demanda`, em toda superfície. Não é
+cosmético: um rótulo que nomeia o artefato de um processo específico diz a quem
+usa outro processo que a ferramenta não é para ele.
+
+O campo interno `contextoEpico` (contrato do `/ia/sugerir`) **ficou**: renomear
+um campo de fio é migração, e não é o que este pedido é. A divergência está
+anotada aqui de propósito.
+
+499 engine · 760 web · 84 aplicação · 238 server · 129 llm · build e lint limpos.

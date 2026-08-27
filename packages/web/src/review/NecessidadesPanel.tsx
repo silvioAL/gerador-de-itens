@@ -25,7 +25,7 @@ export interface NecessidadesPanelProps {
 /**
  * SPEC-57 fatia A (M1 + M6) — o PROPÓSITO da demanda, e o que responde por ele.
  *
- * Mora dentro do "📎 Contexto do épico" porque é a mesma pergunta que o resto
+ * Mora dentro do "📎 Contexto da demanda" porque é a mesma pergunta que o resto
  * daquele painel faz — "do que esta demanda trata" —, só que respondida em
  * itens discretos em vez de prosa. Prosa não se liga a nó nenhum e não se
  * confere; é por isso que a necessidade é objeto e não parágrafo.

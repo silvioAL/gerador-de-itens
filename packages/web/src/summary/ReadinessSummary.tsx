@@ -18,7 +18,7 @@ import {
 } from "@gerador/engine";
 import { PercursosPanel } from "./PercursosPanel";
 import { LeituraDoDesenhoPanel } from "./LeituraDoDesenhoPanel";
-import type { CenarioDeLentidao, CobrancaDeEnsaio, Decisao, LeituraDispensada, LeituraDoDesenho, MarcaDaLeitura, Percurso, ViolacaoDeTopologia } from "@gerador/engine";
+import type { CenarioDeLentidao, CobrancaDeEnsaio, Decisao, VolumetriaDaDemanda, LeituraDispensada, LeituraDoDesenho, MarcaDaLeitura, Percurso, ViolacaoDeTopologia } from "@gerador/engine";
 import { ReadinessBadge } from "./ReadinessBadge";
 import { calcularResumoProntidao, type NoComProntidao } from "./prontidaoResumo";
 
@@ -63,6 +63,11 @@ export interface ReadinessSummaryProps {
    * ensaio que ninguém olhou seguiria invisível.
    */
   cenarios?: CenarioDeLentidao[];
+  /**
+   * SPEC-70 — o volume da demanda. A saturação passa a fechar sem ninguém
+   * digitar a taxa nó a nó: o número é dito uma vez e o grafo o carrega.
+   */
+  volumetria?: VolumetriaDaDemanda;
   /** §242 — as violações já aceitas de propósito. */
   excecoes?: ExcecaoDePadrao[];
   /** §242 — aceitar uma violação, com motivo. Ausente = a válvula não aparece. */
@@ -100,6 +105,7 @@ export function ReadinessSummary({
   onSelecionar,
   necessidades,
   cenarios,
+  volumetria,
   onAbrirProposito,
   regras,
   onSelecionarViolacao,
@@ -147,7 +153,7 @@ export function ReadinessSummary({
    * mesma pergunta ("o que está fora do padrão?"), e a marca é o que impede o
    * placar de confundir *o que é* com *o que seria*.
    */
-  const cobrancasDeEnsaios = cobrancasDeEnsaio(diagrama, config, cenarios ?? [], necessidades ?? []);
+  const cobrancasDeEnsaios = cobrancasDeEnsaio(diagrama, config, cenarios ?? [], necessidades ?? [], undefined, volumetria);
   const avisosDeEnsaio = cobrancasDeEnsaios.reduce((n, c) => n + c.avisos.length, 0);
   // Fatia C — dimensão POR QUÊ. O número que cobra não é "quantas decisões
   // existem" (isso é volume, não qualidade): é quantas esperam alguém e

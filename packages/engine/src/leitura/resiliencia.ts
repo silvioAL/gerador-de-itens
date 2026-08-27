@@ -1,6 +1,7 @@
 import type { DiagramaConfig } from "../config/types.js";
-import type { Aresta, Diagrama, No, ValorSpec } from "../model/types.js";
+import type { Aresta, Diagrama, No, ValorSpec, VolumetriaDaDemanda } from "../model/types.js";
 import { arestaEspera } from "./lerDesenho.js";
+import { distribuirVolumetria, formatarRps } from "./volumetria.js";
 
 /**
  * SPEC-68 — os padrões de resiliência como CONTA, não como checklist.
@@ -184,12 +185,27 @@ function contradicoesDeInsistencia(
 function contradicoesDeSaturacao(
   diagrama: Diagrama,
   config: DiagramaConfig,
-  campos: CamposDeResiliencia
+  campos: CamposDeResiliencia,
+  /**
+   * SPEC-70 §4 — a taxa DERIVADA do volume da demanda, por nó.
+   *
+   * Preenche o silêncio: quem não declarou taxa passa a ter a que o grafo
+   * carregou da porta da frente. Vazio = o comportamento de antes desta SPEC.
+   */
+  taxaDerivada: Map<string, number> = new Map()
 ): ContradicaoDeResiliencia[] {
   const achados: ContradicaoDeResiliencia[] = [];
 
   for (const no of diagrama.nodes) {
-    const taxa = numeroDe(no.spec?.[campos.taxa]);
+    /**
+     * §4 — DECLARADO vence DERIVADO.
+     *
+     * Quem mediu um componente sabe mais que quem propagou a partir da porta da
+     * frente — um serviço que também recebe tráfego de fora do desenho é o caso
+     * óbvio, e o número dele não é o da demanda.
+     */
+    const declarada = numeroDe(no.spec?.[campos.taxa]);
+    const taxa = declarada ?? taxaDerivada.get(no.id);
     const pool = numeroDe(no.spec?.[campos.pool]);
     if (taxa === undefined || pool === undefined || taxa <= 0 || pool <= 0) continue;
 
@@ -212,7 +228,11 @@ function contradicoesDeSaturacao(
       noId: no.id,
       rotulo: rotuloDoNo(no, no.id),
       esperado: `${pool} chamadas simultâneas`,
-      atual: `${Math.ceil(necessaria)} necessárias (${taxa} req/s × ${seguraMs} ms)`,
+      // A frase diz DE ONDE veio a taxa: um número derivado apresentado como
+      // declarado seria a ferramenta se atribuindo uma medição que ninguém fez.
+      atual: `${Math.ceil(necessaria)} necessárias (${formatarRps(taxa)}${
+        declarada === undefined ? ", vindo do volume da demanda" : ""
+      } × ${seguraMs} ms)`,
       porque:
         "Concorrência é taxa vezes tempo de resposta (Lei de Little). Com esses dois números declarados, a fila na entrada não é risco: é consequência.",
     });
@@ -232,10 +252,21 @@ function contradicoesDeSaturacao(
 export function avaliarResiliencia(
   diagrama: Diagrama,
   config: DiagramaConfig,
-  campos: CamposDeResiliencia = CAMPOS_DE_RESILIENCIA
+  campos: CamposDeResiliencia = CAMPOS_DE_RESILIENCIA,
+  /**
+   * SPEC-70 — o volume da demanda, para a saturação não depender de alguém
+   * digitar a taxa nó a nó. Ausente = o comportamento de antes: só acusa onde
+   * alguém declarou.
+   */
+  volumetria?: { volume?: VolumetriaDaDemanda; fator?: number }
 ): ContradicaoDeResiliencia[] {
   return [
     ...contradicoesDeInsistencia(diagrama, config, campos),
-    ...contradicoesDeSaturacao(diagrama, config, campos),
+    ...contradicoesDeSaturacao(
+      diagrama,
+      config,
+      campos,
+      distribuirVolumetria(diagrama, config, volumetria?.volume, volumetria?.fator ?? 1)
+    ),
   ];
 }

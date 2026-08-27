@@ -1,5 +1,6 @@
 import { useState } from "react";
-import type { Necessidade } from "@gerador/engine";
+import type { Necessidade, VolumetriaDaDemanda } from "@gerador/engine";
+import { descreverVolumetria } from "@gerador/engine";
 import { NecessidadesPanel, type ElementoVinculavel } from "./NecessidadesPanel";
 
 export interface AnexoContexto {
@@ -19,6 +20,14 @@ export interface ContextoEpicoPanelProps {
    * contexto: é a mesma pergunta ("do que esta demanda trata"), respondida em
    * itens em vez de prosa. */
   necessidades?: Necessidade[];
+  /**
+   * SPEC-70 — o VOLUME que esta demanda atende, dito uma vez.
+   *
+   * Mora aqui e não no componente: é propriedade do que se está construindo, e
+   * quem sabe o número é quem trouxe a demanda. O motor o distribui pelo grafo
+   * (`distribuirVolumetria`), então ninguém precisa digitar taxa nó a nó.
+   */
+  volumetria?: VolumetriaDaDemanda;
   /** Nós do desenho, para vincular. */
   elementos?: ElementoVinculavel[];
   /** SPEC-57 fatia D — pede a proposta de propósito ao agente. Injetada de
@@ -29,7 +38,8 @@ export interface ContextoEpicoPanelProps {
     demandInfo: string,
     anexosContexto: AnexoContexto[],
     produtoId: string | null,
-    necessidades: Necessidade[]
+    necessidades: Necessidade[],
+    volumetria: VolumetriaDaDemanda | undefined
   ) => void;
   onFechar: () => void;
 }
@@ -63,6 +73,7 @@ export function ContextoEpicoPanel({
   produtoId,
   produtos = [],
   necessidades: necessidadesIniciais,
+  volumetria: volumetriaInicial,
   elementos = [],
   onProporNecessidades,
   onSalvar,
@@ -73,6 +84,17 @@ export function ContextoEpicoPanel({
   const [produto, setProduto] = useState<string>(produtoId ?? "");
   const [erro, setErro] = useState<string | null>(null);
   const [necessidades, setNecessidades] = useState<Necessidade[]>(necessidadesIniciais ?? []);
+  // Strings, e não números: um campo numérico controlado por `number` engole o
+  // estado intermediário de quem está digitando ("2", "20", "200"…).
+  const [volQuantidade, setVolQuantidade] = useState(
+    volumetriaInicial ? String(volumetriaInicial.quantidade) : ""
+  );
+  const [volPor, setVolPor] = useState<VolumetriaDaDemanda["por"]>(volumetriaInicial?.por ?? "dia");
+  // A prévia mostra o req/s ENQUANTO se digita: é o número que a Lei de Little
+  // usa, e escondê-lo faria a acusação de saturação citar um valor que não está
+  // em lugar nenhum da tela.
+  const previaDaVolumetria =
+    Number(volQuantidade) > 0 ? { quantidade: Number(volQuantidade), por: volPor } : undefined;
   const [propondo, setPropondo] = useState(false);
   const [erroDaProposta, setErroDaProposta] = useState<string | null>(null);
 
@@ -117,18 +139,27 @@ export function ContextoEpicoPanel({
   }
 
   function salvar() {
-    onSalvar(texto, anexos, produto || null, necessidades);
+    const quantidade = Number(volQuantidade);
+    onSalvar(
+      texto,
+      anexos,
+      produto || null,
+      necessidades,
+      // Só vira volumetria quando é número positivo: "0 por dia" seria um
+      // volume que nenhuma conta usa, e um campo em branco não é uma promessa.
+      Number.isFinite(quantidade) && quantidade > 0 ? { quantidade, por: volPor } : undefined
+    );
     onFechar();
   }
 
   return (
     <div
-      aria-label="Contexto do épico"
+      aria-label="Contexto da demanda"
       style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
     >
       <div style={{ flex: 1, padding: "14px 16px", overflow: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
         <p style={{ margin: 0, fontSize: 12, color: "var(--texto-fraco)" }}>
-          Cole o estado atual da história/épico e anexe material de apoio (texto) — alimenta a seção "Contexto" do
+          Cole o estado atual da demanda — épico, história, spike, correção — e anexe material de apoio (texto). Alimenta a seção "Contexto" do
           documento exportado e a sugestão de IA real na aba Refinamento.
         </p>
 
@@ -169,6 +200,65 @@ export function ContextoEpicoPanel({
             </p>
           </div>
         )}
+        {/* SPEC-70 — o volume da demanda, dito UMA vez.
+            
+            Ao lado do produto e do propósito porque é a mesma pergunta ("do que
+            esta demanda trata"), respondida em número. E é daqui que o motor
+            distribui: sem este campo, a Lei de Little só fecha se alguém digitar
+            a taxa em cada nó — que é o trabalho que esta SPEC tira de quem usa. */}
+        <div>
+          <label
+            htmlFor="volumetria-quantidade"
+            style={{ display: "block", fontSize: 11, color: "var(--texto-fraco)", marginBottom: 2 }}
+          >
+            Volume que esta demanda atende
+          </label>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <input
+              id="volumetria-quantidade"
+              aria-label="Volume que esta demanda atende"
+              data-testid="volumetria-quantidade"
+              type="number"
+              min={0}
+              value={volQuantidade}
+              onChange={(e) => setVolQuantidade(e.target.value)}
+              placeholder="ex.: 2000000"
+              style={{
+                flex: 1,
+                padding: "7px 10px",
+                borderRadius: 8,
+                border: "1px solid var(--borda-forte)",
+                background: "var(--fundo)",
+                color: "var(--texto)",
+                fontSize: 13,
+              }}
+            />
+            <select
+              aria-label="Unidade do volume"
+              data-testid="volumetria-por"
+              value={volPor}
+              onChange={(e) => setVolPor(e.target.value as VolumetriaDaDemanda["por"])}
+              style={{
+                padding: "7px 8px",
+                borderRadius: 8,
+                border: "1px solid var(--borda-forte)",
+                background: "var(--fundo)",
+                color: "var(--texto)",
+                fontSize: 12,
+              }}
+            >
+              <option value="segundo">por segundo</option>
+              <option value="minuto">por minuto</option>
+              <option value="hora">por hora</option>
+              <option value="dia">por dia</option>
+            </select>
+          </div>
+          <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--texto-mudo)" }} data-testid="volumetria-derivada">
+            {descreverVolumetria(previaDaVolumetria) ??
+              "Opcional. Com ele, o motor distribui a taxa pelo desenho e a saturação passa a fechar sem ninguém digitar número em componente nenhum."}
+          </p>
+        </div>
+
         <NecessidadesPanel
           necessidades={necessidades}
           elementos={elementos}
@@ -179,7 +269,7 @@ export function ContextoEpicoPanel({
         />
 
           <textarea
-            aria-label="Contexto do épico (texto)"
+            aria-label="Contexto da demanda (texto)"
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
             placeholder="Ex.: história de usuário atual, decisões já tomadas, restrições conhecidas..."

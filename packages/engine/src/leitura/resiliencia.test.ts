@@ -224,3 +224,78 @@ describe("avaliarResiliencia — a Lei de Little", () => {
     expect(avaliarResiliencia(d, config)).toEqual([]);
   });
 });
+
+/**
+ * SPEC-70 fatia B — a saturação deixa de depender de alguém digitar a taxa
+ * NÓ A NÓ.
+ *
+ * Era o custo que o usuário apontou: *"assim o usuário não precisa preencher"*.
+ * O volume da demanda é dito uma vez e o grafo o carrega — e a Lei de Little,
+ * que já era exata, passa a ter com o que fechar.
+ */
+describe("avaliarResiliencia — a taxa vinda do volume da demanda", () => {
+  /** srv (pool 10) →http(1000ms)→ bureau. 100 req/s × 1 s = 100 simultâneas. */
+  const desenho = () =>
+    diagrama(
+      [no("srv", "service", { chamadasSimultaneas: 10 }), no("bureau", "external")],
+      [aresta("e1", "srv", "bureau", "http", { timeoutMs: 1000 })]
+    );
+
+  it("sem volume declarado, CALA — é o comportamento de antes desta SPEC", () => {
+    // Ninguém digitou taxa em nó nenhum. A conta não se faz, e inventar um
+    // número aqui seria o §248 na sua forma mais cara.
+    expect(avaliarResiliencia(desenho(), config)).toEqual([]);
+  });
+
+  it("com o volume da demanda, o MESMO desenho acusa — sem tocar em nó nenhum", () => {
+    const achados = avaliarResiliencia(desenho(), config, undefined, {
+      volume: { quantidade: 100, por: "segundo" },
+    });
+
+    expect(achados).toHaveLength(1);
+    expect(achados[0].tipo).toBe("saturacao");
+    expect(achados[0].atual).toContain("100 necessárias");
+    // A frase diz DE ONDE veio a taxa: apresentar o derivado como declarado
+    // seria a ferramenta se atribuindo uma medição que ninguém fez.
+    expect(achados[0].atual).toContain("vindo do volume da demanda");
+  });
+
+  it("volume pequeno não acusa — a conta é a conta, não um alarme", () => {
+    // 5 req/s × 1 s = 5 simultâneas, e o pool é 10.
+    expect(
+      avaliarResiliencia(desenho(), config, undefined, { volume: { quantidade: 5, por: "segundo" } })
+    ).toEqual([]);
+  });
+
+  it("DECLARADO vence derivado — quem mediu sabe mais que quem propagou", () => {
+    // O serviço também recebe tráfego de fora do desenho: 300 req/s medidos,
+    // contra os 5 que o volume da demanda propagaria.
+    const d = diagrama(
+      [no("srv", "service", { chamadasSimultaneas: 10, taxaEsperadaRps: 300 }), no("bureau", "external")],
+      [aresta("e1", "srv", "bureau", "http", { timeoutMs: 1000 })]
+    );
+
+    const achados = avaliarResiliencia(d, config, undefined, { volume: { quantidade: 5, por: "segundo" } });
+
+    expect(achados).toHaveLength(1);
+    expect(achados[0].atual).toContain("300 req/s");
+    // E não diz que veio do volume, porque não veio.
+    expect(achados[0].atual).not.toContain("vindo do volume");
+  });
+
+  it("§5 — o fator do ensaio multiplica o volume, e o pico chega a todos de uma vez", () => {
+    // 5 req/s não satura; 10× o volume satura. Ninguém digitou taxa em nó
+    // nenhum, e o pico é uma condição do mundo, não de um componente.
+    const semPico = avaliarResiliencia(desenho(), config, undefined, {
+      volume: { quantidade: 5, por: "segundo" },
+    });
+    const comPico = avaliarResiliencia(desenho(), config, undefined, {
+      volume: { quantidade: 5, por: "segundo" },
+      fator: 10,
+    });
+
+    expect(semPico).toEqual([]);
+    expect(comPico).toHaveLength(1);
+    expect(comPico[0].atual).toContain("50 necessárias");
+  });
+});

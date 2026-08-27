@@ -1406,13 +1406,13 @@ export function ReviewScreen({
           </div>
         </div>
       )}
-      {/* M5 — derivou sem Contexto do épico: aviso de chegada, sem chip (o
+      {/* M5 — derivou sem Contexto da demanda: aviso de chegada, sem chip (o
           material se cola na aba 📎 do assistente, no canvas). */}
       {momentoRevisao === "m5" && !pedindoFeedback && (
         <div className="assistente-janela" style={balaoM7Estilo} data-testid="balao-sem-contexto" role="status">
           <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: "var(--texto-2)" }}>
-            Sem o Contexto do épico, as sugestões de IA e o documento final saem mais pobres — quer colar o material
-            da demanda? Fica na aba “📎 Contexto do épico” do assistente, lá na mesa de projeto.
+            Sem o Contexto da demanda, as sugestões de IA e o documento final saem mais pobres — quer colar o material
+            dela? Fica na aba “📎 Contexto da demanda” do assistente, lá na mesa de projeto.
           </p>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
             <button
@@ -1682,7 +1682,7 @@ interface AbaRefinamentoProps {
    * resposta foi escrita. Ausente/vazio = alinhado com o desenho. */
   desatualizados?: Map<string, InsumoDivergente[]>;
   ficha: FichaItem;
-  /** Contexto do épico/demanda (Fase 1b, SPEC-23) — mandado junto no `/ia/sugerir` real. */
+  /** Contexto da demanda/demanda (Fase 1b, SPEC-23) — mandado junto no `/ia/sugerir` real. */
   contextoEpico?: string;
   /** SPEC-53 — o contexto do produto, no mesmo pedido e com rótulo próprio. */
   contextoDoProduto?: string;

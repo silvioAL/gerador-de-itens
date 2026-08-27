@@ -27,8 +27,8 @@ test("abre na conversa, e o contexto salvo numa aba pré-preenche a outra", asyn
 
   // Troca pra aba de contexto, escreve e salva. Salvar fecha a janela.
   const janela = page.getByTestId("assistente-janela");
-  await janela.getByRole("button", { name: "📎 Contexto do épico" }).click();
-  await janela.getByLabel("Contexto do épico (texto)").fill("migrar o faturamento para eventos");
+  await janela.getByRole("button", { name: "📎 Contexto da demanda" }).click();
+  await janela.getByLabel("Contexto da demanda (texto)").fill("migrar o faturamento para eventos");
   await janela.getByRole("button", { name: "Salvar" }).click();
   await expect(janela).toHaveCount(0);
 
@@ -66,5 +66,5 @@ test("os botões antigos saíram do header — um caminho só, não três", asyn
   // Se alguém devolver os botões ao header, este teste avisa que agora há
   // dois caminhos pra mesma coisa — a classe de defeito da §145/§148.
   await expect(page.locator("header").getByRole("button", { name: "✦ Desenhar conversando" })).toHaveCount(0);
-  await expect(page.locator("header").getByRole("button", { name: "📎 Contexto do épico" })).toHaveCount(0);
+  await expect(page.locator("header").getByRole("button", { name: "📎 Contexto da demanda" })).toHaveCount(0);
 });

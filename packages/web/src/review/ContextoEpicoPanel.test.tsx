@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ContextoEpicoPanel } from "./ContextoEpicoPanel";
 
@@ -17,7 +17,7 @@ describe("ContextoEpicoPanel (Fase 1b, SPEC-23)", () => {
       />
     );
 
-    const textarea = screen.getByLabelText("Contexto do épico (texto)");
+    const textarea = screen.getByLabelText("Contexto da demanda (texto)");
     expect(textarea).toHaveValue("Contexto anterior.");
     expect(screen.getByText("retro.md")).toBeInTheDocument();
 
@@ -34,7 +34,10 @@ describe("ContextoEpicoPanel (Fase 1b, SPEC-23)", () => {
       // SPEC-57 fatia A — o propósito viaja no mesmo salvar. Vazio aqui: este
       // teste é sobre o contexto em prosa, e o painel não pode inventar
       // necessidade nenhuma por conta própria.
-      []
+      [],
+      // SPEC-70 — a volumetria também viaja no mesmo salvar. `undefined` sem
+      // campo preenchido: em branco não é uma promessa.
+      undefined
     );
   });
 
@@ -51,7 +54,7 @@ describe("ContextoEpicoPanel (Fase 1b, SPEC-23)", () => {
     expect(await screen.findByText("material.txt")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Salvar" }));
-    expect(onSalvar).toHaveBeenCalledWith("", [{ nome: "material.txt", conteudo: "conteúdo do arquivo" }], null, []);
+    expect(onSalvar).toHaveBeenCalledWith("", [{ nome: "material.txt", conteudo: "conteúdo do arquivo" }], null, [], undefined);
   });
 
   it("remover um anexo já adicionado tira só aquele, preservando os demais", async () => {
@@ -74,7 +77,7 @@ describe("ContextoEpicoPanel (Fase 1b, SPEC-23)", () => {
     expect(screen.getByText("b.md")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Salvar" }));
-    expect(onSalvar).toHaveBeenCalledWith("", [{ nome: "b.md", conteudo: "conteúdo b" }], null, []);
+    expect(onSalvar).toHaveBeenCalledWith("", [{ nome: "b.md", conteudo: "conteúdo b" }], null, [], undefined);
   });
 
   it("Cancelar fecha sem chamar onSalvar", async () => {
@@ -109,7 +112,7 @@ describe("ContextoEpicoPanel — o produto da demanda (SPEC-53)", () => {
     await user.selectOptions(screen.getByLabelText("Produto desta demanda"), "p2");
     await user.click(screen.getByRole("button", { name: "Salvar" }));
 
-    expect(onSalvar).toHaveBeenCalledWith("", [], "p2", []);
+    expect(onSalvar).toHaveBeenCalledWith("", [], "p2", [], undefined);
   });
 
   it("sem produto cadastrado, o seletor NÃO aparece — lista vazia é pior que nada", () => {
@@ -129,7 +132,7 @@ describe("ContextoEpicoPanel — o produto da demanda (SPEC-53)", () => {
 
     await user.selectOptions(screen.getByLabelText("Produto desta demanda"), "");
     await user.click(screen.getByRole("button", { name: "Salvar" }));
-    expect(onSalvar).toHaveBeenCalledWith("", [], null, []);
+    expect(onSalvar).toHaveBeenCalledWith("", [], null, [], undefined);
   });
 });
 
@@ -220,5 +223,60 @@ describe("ContextoEpicoPanel — a proposta do agente (SPEC-57 fatia D)", () => 
   it("sem quem proponha, o botão não aparece", () => {
     render(<ContextoEpicoPanel onSalvar={vi.fn()} onFechar={vi.fn()} />);
     expect(screen.queryByRole("button", { name: /Propor a partir do contexto/ })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * SPEC-70 fatia D — o volume da demanda, dito UMA vez.
+ *
+ * Era o custo que o usuário apontou olhando o `pico de [—] req/s` dentro de um
+ * ajuste de ensaio: *"assim o usuário não precisa preencher"*. O número passa a
+ * ser dito onde ele é conhecido — na demanda —, e o motor o distribui.
+ */
+describe("ContextoEpicoPanel — a volumetria da demanda (SPEC-70)", () => {
+  it("o volume viaja no mesmo salvar, na unidade que a pessoa escolheu", () => {
+    const onSalvar = vi.fn();
+    render(<ContextoEpicoPanel onSalvar={onSalvar} onFechar={vi.fn()} />);
+
+    fireEvent.change(screen.getByTestId("volumetria-quantidade"), { target: { value: "2000000" } });
+    fireEvent.change(screen.getByTestId("volumetria-por"), { target: { value: "dia" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+
+    expect(onSalvar).toHaveBeenCalledWith("", [], null, [], { quantidade: 2000000, por: "dia" });
+  });
+
+  it("a prévia mostra o req/s ENQUANTO se digita — é o número que a conta usa", () => {
+    // Escondê-lo faria a acusação de saturação citar um valor que não está em
+    // lugar nenhum da tela.
+    render(<ContextoEpicoPanel onSalvar={vi.fn()} onFechar={vi.fn()} />);
+
+    fireEvent.change(screen.getByTestId("volumetria-quantidade"), { target: { value: "600" } });
+    fireEvent.change(screen.getByTestId("volumetria-por"), { target: { value: "minuto" } });
+
+    expect(screen.getByTestId("volumetria-derivada")).toHaveTextContent("10 req/s");
+  });
+
+  it("campo em branco não é uma promessa — sai `undefined`, não zero", () => {
+    const onSalvar = vi.fn();
+    render(<ContextoEpicoPanel onSalvar={onSalvar} onFechar={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+
+    expect(onSalvar).toHaveBeenCalledWith("", [], null, [], undefined);
+    // E, sem número, a linha explica para que serve em vez de mostrar conta.
+    expect(screen.getByTestId("volumetria-derivada")).toHaveTextContent(/sem ninguém digitar número/);
+  });
+
+  it("o volume já salvo volta preenchido — inclusive a unidade", () => {
+    render(
+      <ContextoEpicoPanel
+        volumetria={{ quantidade: 500, por: "hora" }}
+        onSalvar={vi.fn()}
+        onFechar={vi.fn()}
+      />
+    );
+
+    expect((screen.getByTestId("volumetria-quantidade") as HTMLInputElement).value).toBe("500");
+    expect((screen.getByTestId("volumetria-por") as HTMLSelectElement).value).toBe("hora");
   });
 });

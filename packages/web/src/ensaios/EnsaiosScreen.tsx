@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   avaliarResiliencia,
   concluirEnsaio,
+  descreverVolumetria,
   elementosComTempo,
   faltaParaEnsaiar,
   estadoDoEnsaio,
@@ -16,6 +17,7 @@ import type {
   Diagrama,
   DiagramaConfig,
   ElementoAjustavel,
+  VolumetriaDaDemanda,
 } from "@gerador/engine";
 
 /**
@@ -52,6 +54,12 @@ export interface EnsaiosScreenProps {
   necessidades?: { texto: string; limiteMs?: number }[];
   /** Quem assume o débito — é o que separa débito consciente de anônimo. */
   autor?: string;
+  /**
+   * SPEC-70 — o volume da demanda, para o ensaio de PICO não pedir "req/s" em
+   * cada elemento ajustado. Pico de tráfego é condição do mundo: com o volume
+   * declarado, um fator chega a todos os nós de uma vez.
+   */
+  volumetria?: VolumetriaDaDemanda;
   /**
    * SPEC-69 fatia D — as decisões da quebra, para o ensaio assumido poder se
    * ANEXAR a uma delas.
@@ -90,6 +98,7 @@ export function EnsaiosScreen({
   onSugerir,
   necessidades,
   autor,
+  volumetria,
   decisoes,
   onAnexar,
 }: EnsaiosScreenProps) {
@@ -103,8 +112,8 @@ export function EnsaiosScreen({
   // O cálculo é puro e local: recalcular a cada arrastar de slider não custa
   // rede nenhuma, e é o que faz o número acompanhar o gesto.
   const { hoje, resultados } = useMemo(
-    () => simularCenarios(diagrama, config, cenarios),
-    [diagrama, config, cenarios]
+    () => simularCenarios(diagrama, config, cenarios, undefined, volumetria),
+    [diagrama, config, cenarios, volumetria]
   );
 
   // Só quem PODE ter tempo entra na lista de ajustáveis — a mesma função que
@@ -115,7 +124,10 @@ export function EnsaiosScreen({
   // O que o desenho de HOJE já contradiz e por quanto ele já insiste — a
   // âncora tem que trazer as duas, senão uma contradição preexistente
   // pareceria efeito do primeiro ensaio.
-  const contradicoesHoje = useMemo(() => avaliarResiliencia(diagrama, config), [diagrama, config]);
+  const contradicoesHoje = useMemo(
+    () => avaliarResiliencia(diagrama, config, undefined, { volume: volumetria }),
+    [diagrama, config, volumetria]
+  );
   const insistenciaHoje = useMemo(() => {
     const todas = diagrama.edges
       .map((e) => insistenciaDe(e))
@@ -477,6 +489,40 @@ export function EnsaiosScreen({
                 {editando === r.cenarioId && (
                   <tr data-testid={`ajustes-${r.cenarioId}`}>
                     <td colSpan={6} style={{ ...tdEstilo, background: "var(--painel-alto)" }}>
+                      {/* SPEC-70 §5 — o pico da DEMANDA, antes dos ajustes por
+                          elemento.
+                          
+                          Pico de tráfego é condição do MUNDO, não propriedade de
+                          um componente escolhido a dedo: com o volume declarado
+                          na demanda, este fator chega a todos os nós de uma vez.
+                          É o "assim o usuário não precisa preencher" do relato.
+                          
+                          Sem volume declarado o controle não aparece: multiplicar
+                          um número que não existe daria um fator sem efeito, e
+                          controle que não controla nada é o §244. */}
+                      {volumetria && (
+                        <label style={{ ...condicaoEstilo, marginBottom: 8 }} data-testid={`pico-${r.cenarioId}`}>
+                          volume da demanda ×
+                          <input
+                            type="number"
+                            min={1}
+                            step={0.5}
+                            aria-label={`Fator de volume do ensaio ${cenario.nome}`}
+                            value={cenario.fatorDeVolume ?? ""}
+                            placeholder="1"
+                            onChange={(e) =>
+                              mudarCenario(r.cenarioId, (c) => ({
+                                ...c,
+                                fatorDeVolume: e.target.value === "" ? undefined : Number(e.target.value),
+                              }))
+                            }
+                            style={{ ...campoEstilo, minWidth: 64, width: 64 }}
+                          />
+                          <span style={{ color: "var(--texto-mudo)" }}>
+                            {descreverVolumetria(volumetria)} — chega a todo o desenho de uma vez
+                          </span>
+                        </label>
+                      )}
                       <Ajustes
                         elementos={elementos}
                         cenario={cenario}
@@ -799,7 +845,11 @@ function Ajustes({
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", width: "100%" }}>
               {a.tipo === "no" ? (
                 <label style={condicaoEstilo}>
-                  pico de
+                  {/* SPEC-70 §5 — este campo continua existindo porque responde
+                      "e se só ESTE componente receber uma rajada?", que não é
+                      dedutível do volume da demanda. O pico da demanda inteira
+                      mora no cabeçalho do ensaio, e não aqui. */}
+                  só este a
                   <input
                     type="number"
                     min={0}

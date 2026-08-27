@@ -938,9 +938,11 @@ function AppCarregado({
         quebra.diagrama,
         diagramaConfig,
         quebra.cenariosDeLentidao ?? [],
-        quebra.necessidades ?? []
+        quebra.necessidades ?? [],
+        undefined,
+        quebra.volumetria
       ),
-    [quebra.diagrama, diagramaConfig, quebra.cenariosDeLentidao, quebra.necessidades]
+    [quebra.diagrama, diagramaConfig, quebra.cenariosDeLentidao, quebra.necessidades, quebra.volumetria]
   );
 
   const markdownDoDocumento = useMemo(
@@ -1498,6 +1500,10 @@ function AppCarregado({
          * "inconsciente" que ela existe para acabar.
          */
         cenarios={quebra.cenariosDeLentidao}
+        /* SPEC-70 — o volume que a saturação usa. Sem ele a Lei de Little só
+           fecha onde alguém digitou a taxa, e era esse o trabalho que sobrava
+           para quem usa. */
+        volumetria={quebra.volumetria}
         // SPEC-65 — a mesma leitura das marcas do canvas, calculada uma vez.
         leitura={leituraDoDesenho}
         /**
@@ -1771,6 +1777,7 @@ function AppCarregado({
           diagrama={quebra.diagrama}
           config={diagramaConfig}
           cenarios={quebra.cenariosDeLentidao ?? []}
+          volumetria={quebra.volumetria}
           onMudar={(cenariosDeLentidao) => setQuebra((q) => ({ ...q, cenariosDeLentidao }))}
           /**
            * SPEC-69 — o que o NEGÓCIO exige. É o que faz o número técnico
@@ -2095,6 +2102,10 @@ function AppCarregado({
             produtoId={quebra.produtoId}
             produtos={produtos}
             necessidades={quebra.necessidades}
+            /* SPEC-70 — o volume da demanda, dito uma vez e distribuído pelo
+               motor. É o que faz a Lei de Little fechar sem ninguém digitar
+               taxa em componente nenhum. */
+            volumetria={quebra.volumetria}
             elementos={quebra.diagrama.nodes.map((n) => ({ id: n.id, label: n.label || n.id }))}
             onProporNecessidades={async (jaDeclaradas, contextoEpico) => {
               const { necessidades } = await apiIa.proporNecessidades({
@@ -2123,8 +2134,8 @@ function AppCarregado({
                 ),
               }));
             }}
-            onSalvar={(demandInfo, anexosContexto, produtoId, necessidades) =>
-              setQuebra((q) => ({ ...q, demandInfo, anexosContexto, produtoId, necessidades }))
+            onSalvar={(demandInfo, anexosContexto, produtoId, necessidades, volumetria) =>
+              setQuebra((q) => ({ ...q, demandInfo, anexosContexto, produtoId, necessidades, volumetria }))
             }
             onFechar={() => setAbaAssistente(null)}
           />

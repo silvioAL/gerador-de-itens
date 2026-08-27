@@ -82,7 +82,7 @@ test("cadastrar produto com contexto e glossário, e ligar a demanda a ele", asy
     await page.getByRole("button", { name: "Carregar cenário: Dados não-relacionais" }).click();
     await page.getByTestId("assistente-flutuante").click();
     const janela = page.getByTestId("assistente-janela");
-    await janela.getByRole("button", { name: "📎 Contexto do épico" }).click();
+    await janela.getByRole("button", { name: "📎 Contexto da demanda" }).click();
     await janela.getByLabel("Produto desta demanda").selectOption({ label: nome });
     await janela.getByRole("button", { name: "Salvar" }).click();
 
