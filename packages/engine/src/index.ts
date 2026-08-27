@@ -74,12 +74,18 @@ export {
   type Insistencia,
 } from "./leitura/resiliencia.js";
 export {
+  concluirEnsaio,
   elementosComTempo,
+  ensaioCobra,
+  estadoDoEnsaio,
+  prazoEstourado,
   simularCenario,
   simularCenarios,
   type AjusteDeCenario,
   type CenarioDeLentidao,
+  type DebitoAssumido,
   type ElementoAjustavel,
+  type EstadoDoEnsaio,
   type ResultadoDoCenario,
 } from "./leitura/simularLentidao.js";
 export { deltaDeDecisao, deltaDePercurso, piorou } from "./remedicao/remedicao.js";

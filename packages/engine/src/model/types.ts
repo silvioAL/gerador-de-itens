@@ -110,6 +110,21 @@ export interface Necessidade {
   confirmado?: boolean;
   /** ids de `No.id` ou `Aresta.id` que respondem por esta necessidade. */
   atendidaPor: string[];
+  /**
+   * SPEC-69 — o tempo que o NEGÓCIO exige desta necessidade, em ms.
+   *
+   * É o que transforma leitura em decisão: sem ele, "a resposta soma 3 s" é um
+   * fato sem consequência; com ele, é "3 s contra os 2 s que prometemos".
+   *
+   * **Por que aqui e não no percurso.** O percurso já sabe cobrar tempo
+   * (`ChecagemDePercurso`), mas aquilo é a régua **do time** — "isto segue o
+   * padrão da casa?". Esta é a exigência **do negócio** para ESTA demanda —
+   * "isto entrega o que prometemos?". Um desenho passa numa e falha na outra.
+   *
+   * Ausente = ninguém prometeu prazo, e nada se afirma. Um limite padrão seria
+   * o produto decidindo o SLA do time.
+   */
+  limiteMs?: number;
 }
 
 /**

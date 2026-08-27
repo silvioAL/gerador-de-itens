@@ -148,13 +148,16 @@ describe("EnsaiosScreen — a proposta do modelo", () => {
     ajustes: [{ tipo: "no", id: "bureau", fator: 4 }],
   };
 
-  it("chega MARCADO como sugerido e desmarcado — proposta não vira fato", () => {
-    // Regra 2 da SPEC-57: inferir é grátis e erra, e modelo não é exceção.
+  it("chega marcado como sugerido e POR AVALIAR — e por avaliar cobra", () => {
+    // §69 §4: todo ensaio cobra. Se só o assumido cobrasse, o débito que
+    // ninguém olhou continuaria invisível — que é o inconsciente que a SPEC
+    // existe para acabar.
     montar([sugerido]);
 
     const linha = screen.getByTestId("linha-c-ia");
     expect(linha).toHaveTextContent("sugerido");
-    expect(within(linha).getByTestId("aceitar-c-ia")).toBeInTheDocument();
+    expect(within(linha).getByTestId("estado-por-avaliar")).toBeInTheDocument();
+    expect(within(linha).getByTestId("assumir-c-ia")).toBeInTheDocument();
   });
 
   it("o porquê vem junto — nome bonito sem circunstância ninguém sabe avaliar", () => {
@@ -163,12 +166,30 @@ describe("EnsaiosScreen — a proposta do modelo", () => {
     expect(screen.getByTestId("linha-c-ia")).toHaveTextContent("fim de mês concentra consulta");
   });
 
-  it("aceitar tira o convite, e o cenário passa a ser do time", () => {
-    const { onMudar } = montar([sugerido]);
+  it("assumir EXIGE motivo — sem ele isto seria um botão de silenciar", () => {
+    // §242: sem o motivo escrito, quem abrir o documento depois não saberá se
+    // aquilo foi decisão ou cansaço.
+    const { onMudar } = montar([sugerido], { autor: "alguem@time" });
 
-    fireEvent.click(screen.getByTestId("aceitar-c-ia"));
+    fireEvent.click(screen.getByTestId("assumir-c-ia"));
+    const confirmar = screen.getByTestId("confirmar-assumir-c-ia");
+    expect(confirmar).toBeDisabled();
 
-    expect(onMudar).toHaveBeenCalledWith([expect.objectContaining({ id: "c-ia", aceito: true })]);
+    fireEvent.change(screen.getByLabelText("Por que assumir este débito"), {
+      target: { value: "o pico dura 2h/mês e o negócio aceita a espera" },
+    });
+    fireEvent.click(confirmar);
+
+    expect(onMudar).toHaveBeenCalledWith([
+      expect.objectContaining({
+        id: "c-ia",
+        estado: "aceito",
+        debito: expect.objectContaining({
+          motivo: "o pico dura 2h/mês e o negócio aceita a espera",
+          autor: "alguem@time",
+        }),
+      }),
+    ]);
   });
 
   it("sem quem sugira, o botão não aparece — e a tela segue inteira", () => {
@@ -343,5 +364,85 @@ describe("EnsaiosScreen — a espera da sugestão", () => {
 
     const [linha] = await screen.findAllByTestId("ensaio-fantasma");
     expect(linha).toHaveAttribute("aria-hidden", "true");
+  });
+});
+
+/**
+ * SPEC-69 — o débito consciente: o fluxo mapeado.
+ *
+ * *"o fluxo é avaliar, revisar, e aceitar ou modificar — mas precisa ser um
+ * processo muito bem mapeado."*
+ */
+describe("EnsaiosScreen — avaliar → revisar → assumir", () => {
+  const porAvaliar: CenarioDeLentidao = {
+    id: "c1",
+    nome: "Bureau em pico",
+    origem: "manual",
+    ajustes: [{ tipo: "no", id: "bureau", fator: 3 }],
+  };
+
+  it("revisar move o estado — senão o mapa do fluxo seria decoração", () => {
+    const { onMudar } = montar([porAvaliar]);
+
+    fireEvent.click(screen.getByTestId("ajustar-c1"));
+
+    expect(onMudar).toHaveBeenCalledWith([expect.objectContaining({ estado: "em-revisao" })]);
+  });
+
+  it("estar EM REVISÃO não tira do placar — o que tira é assumir", () => {
+    // Sair da cobrança por ter aberto a linha seria a fórmula de fazer as
+    // pessoas abrirem tudo sem ler.
+    montar([{ ...porAvaliar, estado: "em-revisao" }]);
+
+    expect(screen.getByTestId("estado-em-revisao")).toBeInTheDocument();
+    expect(screen.getByTestId("assumir-c1")).toBeInTheDocument();
+  });
+
+  it("§283 — assumido tem volta, e reabrir devolve à cobrança", () => {
+    const { onMudar } = montar([
+      { ...porAvaliar, estado: "aceito", debito: { motivo: "cabe no SLA", autor: "x@time" } },
+    ]);
+
+    expect(screen.getByTestId("estado-aceito")).toBeInTheDocument();
+    expect(screen.getByTestId("debito-c1")).toHaveTextContent("cabe no SLA");
+
+    fireEvent.click(screen.getByTestId("reabrir-c1"));
+    expect(onMudar).toHaveBeenCalledWith([
+      expect.objectContaining({ estado: "por-avaliar", debito: undefined }),
+    ]);
+  });
+
+  it("quebra gravada antes da SPEC migra: `aceito: true` vira débito assumido", () => {
+    montar([{ ...porAvaliar, aceito: true }]);
+
+    expect(screen.getByTestId("estado-aceito")).toBeInTheDocument();
+  });
+});
+
+describe("EnsaiosScreen — a conclusão escrita (§4.0.1)", () => {
+  it("com prazo do NEGÓCIO, a frase compara com o que foi prometido", () => {
+    // "24 s" sozinho não decide nada; "24 s contra os 5 s que prometemos" decide.
+    montar(
+      [{ id: "c1", nome: "pico", origem: "manual", ajustes: [{ tipo: "no", id: "bureau", fator: 4 }] }],
+      { necessidades: [{ texto: "aprovar na hora", limiteMs: 5000 }] }
+    );
+
+    // Hoje soma 3000 (1000 da conexão + 2000 do bureau); com o bureau 4× são
+    // 1000 + 8000 = 9000, acima dos 5000 prometidos.
+    expect(screen.getByTestId("conclusao-c1")).toHaveTextContent("acima do prazo de 5,0 s");
+  });
+
+  it("sem prazo declarado, compara com hoje e NÃO inventa julgamento", () => {
+    montar([{ id: "c1", nome: "pico", origem: "manual", ajustes: [{ tipo: "no", id: "bureau", fator: 4 }] }]);
+
+    const f = screen.getByTestId("conclusao-c1");
+    expect(f).toHaveTextContent("de 3,0 s para 9,0 s");
+    expect(f).not.toHaveTextContent("acima do prazo");
+  });
+
+  it("a conclusão nomeia o dominante — é o que vira 'ruim por causa disto'", () => {
+    montar([{ id: "c1", nome: "pico", origem: "manual", ajustes: [{ tipo: "no", id: "bureau", fator: 4 }] }]);
+
+    expect(screen.getByTestId("conclusao-c1")).toHaveTextContent("bureau responde por");
   });
 });
