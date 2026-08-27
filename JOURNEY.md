@@ -11359,3 +11359,85 @@ testes) e só quebraram no `tsc` do web; os rótulos só quebraram no navegador.
 
 478 engine · 750 web · 84 aplicação · 238 server · 129 llm · 99/99 E2E · build e
 lint limpos.
+
+## §305 — a guarda testava a coisa errada, e o nome fechava o escopo
+
+Dois relatos numa mensagem só: *"ele não está validando se as informações estão
+completas para navegar para a tela de ensaios"* e *"precisamos encontrar um nome
+melhor para substituir o texto 'e se ficar lento?'"*.
+
+### A medição, antes de escrever qualquer linha
+
+Reproduzi contra a stack local, com um desenho **legível e sem número nenhum**:
+carreguei o cenário de aprovação de crédito e apaguei todos os timeouts.
+
+```
+chip de leitura sem tempo nenhum? true
+chip diz: ⏱ 3 saltos que esperam
+porta diz: e se ficar lento? →   | desabilitada? false
+→ levou a: /ensaios
+aviso 'sem tempo'? false
+linha de HOJE diz: hoje  ≥ 0 ms  —  —  —
+linha do ensaio: Teste | por avaliar | A resposta fica em 0 ms.
+```
+
+A porta abriu, e a bancada mostrou **"≥ 0 ms"** com um ensaio concluindo *"a
+resposta fica em 0 ms"*.
+
+### A causa: a pergunta certa não era essa
+
+A SPEC-66 escreveu uma guarda exatamente para isto — *"sem número declarado não
+há o que ensaiar, e dizer isso é melhor do que uma tabela de zeros que parece
+uma medição"* (§248). Ela perguntava:
+
+```ts
+const semTempo = hoje.tempoDoPiorTrecho === undefined;
+```
+
+Só que um desenho com conexões que **esperam** e nenhum número declarado devolve
+`ms: 0`, e não `undefined`. **A guarda nunca disparou no caso que existe de
+verdade** — só no desenho totalmente vazio, que é justamente o caso em que
+ninguém vai à bancada.
+
+> A pergunta certa não é *"o motor devolveu alguma coisa?"*, é **"há número para
+> somar?"**. Uma guarda escrita contra a implementação e não contra o conceito
+> passa no teste que a acompanha e falha na tela.
+
+E o teste que ela tinha usava um diagrama vazio — verde, e medindo o caso que
+não acontece.
+
+### A validação subiu para a porta
+
+O relato pede validação **antes de navegar**, e está certo: levar alguém a uma
+tela que só sabe dizer "não há o que somar" é gastar a navegação para entregar a
+mesma frase mais tarde.
+
+No lugar do botão, a frase e o **endereço**: *"Nenhum componente tem o tempo
+preenchido… Preencha em `bureau-credito-nacional`, `decisao-score → bureau`."* —
+cada nome é um clique que abre o painel no campo. Dizer "falta preencher" sem
+dizer onde transfere a busca para quem já não sabia o que procurar (§57).
+
+Não é botão desabilitado com tooltip: tooltip não se lê no toque, e um botão
+morto continua parecendo caminho.
+
+`faltaParaEnsaiar` mora no motor, e a porta e a bancada chamam **a mesma
+função**. A rota é linkável de propósito, então quem chega por URL ou pelo placar
+recebe a frase idêntica — duas versões desta conta divergiriam na primeira
+mudança (§263).
+
+E a linha de "hoje" deixou de mostrar `≥ 0 ms` quando falta número: um zero logo
+abaixo de um aviso dizendo *"zero não é uma medição"* seria o produto se
+contradizendo na mesma tela.
+
+### O nome
+
+`e se ficar lento?` → **`ensaiar este desenho`**, na porta e no título da tela,
+escolha do usuário entre quatro opções.
+
+O §296 já tinha repaginado o título para "Ensaios — e se…?" pelo mesmo motivo (um
+nome estreito fecha a porta para retry, pico de tráfego e disjuntor, que não são
+lentidão) — **e a porta ficou para trás**. Duas superfícies da mesma coisa, uma
+renomeada e outra não: é a assinatura de §263 aplicada a texto.
+
+482 engine · 756 web · 84 aplicação · 238 server · 129 llm · 100/100 E2E · build
+e lint limpos.

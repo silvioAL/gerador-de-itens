@@ -563,3 +563,67 @@ export function cobrancasDeEnsaio(
     // ruído com aparência de problema.
     .filter((c) => c.avisos.length > 0);
 }
+
+/**
+ * §305 — o que FALTA para este desenho poder ser ensaiado.
+ *
+ * ## O defeito que isto fecha
+ *
+ * A SPEC-66 escreveu uma guarda para o §248 — *"sem número declarado não há o
+ * que ensaiar, e dizer isso é melhor do que uma tabela de zeros que parece uma
+ * medição"* — e a guarda testava `tempoDoPiorTrecho === undefined`.
+ *
+ * Só que um desenho com conexões que ESPERAM e nenhum número declarado devolve
+ * `ms: 0`, e não `undefined`. A guarda nunca disparava no caso que existe de
+ * verdade: medido, a bancada mostrava "hoje ≥ 0 ms" e um ensaio concluindo "a
+ * resposta fica em 0 ms" — exatamente a tabela de zeros que ela existia para
+ * impedir.
+ *
+ * A pergunta certa não é "o motor devolveu alguma coisa?", é **"há número para
+ * somar?"**.
+ *
+ * ## Por que devolve os ELEMENTOS, e não só um motivo
+ *
+ * §57 — dizer "falta preencher" sem dizer ONDE transfere a busca para quem já
+ * não sabia o que procurar. Com a lista, a mesma frase que barra a porta é a
+ * que leva ao campo.
+ *
+ * `undefined` = dá para ensaiar. Um dono só desta resposta: a porta e a
+ * bancada precisam concordar, e duas versões desta conta divergiriam na
+ * primeira mudança (§263).
+ */
+export interface FaltaParaEnsaiar {
+  /** A frase pronta, na voz do produto. */
+  motivo: string;
+  /** Onde preencher. Vazia quando não há nem onde — o desenho é todo assíncrono. */
+  ondePreencher: ElementoAjustavel[];
+}
+
+export function faltaParaEnsaiar(
+  diagrama: Diagrama,
+  config: DiagramaConfig,
+  campoDeTempo: string = CAMPO_DE_TEMPO_PADRAO
+): FaltaParaEnsaiar | undefined {
+  const ajustaveis = elementosComTempo(diagrama, config, campoDeTempo);
+
+  // Nem lugar para o número existir: um desenho só de mensageria não tem o que
+  // ser ensaiado em tempo, e isso não é um erro de preenchimento — é o desenho.
+  if (ajustaveis.length === 0) {
+    return {
+      motivo:
+        "Nenhum componente deste desenho declara tempo de resposta — não há o que somar. Ligue uma chamada que espera resposta e volte.",
+      ondePreencher: [],
+    };
+  }
+
+  const preenchidos = ajustaveis.filter((e) => e.msAtual !== undefined && e.msAtual > 0);
+  if (preenchidos.length === 0) {
+    return {
+      motivo:
+        "Nenhum componente tem o tempo preenchido, então o ensaio partiria de zero — e zero não é uma medição.",
+      ondePreencher: ajustaveis,
+    };
+  }
+
+  return undefined;
+}

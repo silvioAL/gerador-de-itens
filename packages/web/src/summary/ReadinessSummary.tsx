@@ -5,6 +5,7 @@ import {
   analisarLacunas,
   avaliarConformidade,
   cobrancasDeEnsaio,
+  faltaParaEnsaiar,
   avaliarPercursos,
   avaliarTopologia,
   conciliarPercursos,
@@ -210,6 +211,10 @@ export function ReadinessSummary({
         onVirarRegua={onVirarRegua}
         onRestaurar={onRestaurarLeitura}
         onSimular={onSimular}
+        /* §305 — a porta valida ANTES de navegar. Calculado aqui, onde o
+           desenho e a config já estão, e não dentro do painel: ele renderiza,
+           não mede. */
+        faltaParaEnsaiar={faltaParaEnsaiar(diagrama, config)}
       />
       {(necessidades?.length ?? 0) > 0 && (
         <button

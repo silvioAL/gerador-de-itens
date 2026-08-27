@@ -267,3 +267,74 @@ test("§304 — o ensaio cobra, assumir com motivo tira do placar, e o débito c
   await page.getByTestId("ensaios-voltar").click();
   await expect(page.getByTestId("conformidade-resumo")).toBeVisible();
 });
+
+/**
+ * §305 — RELATO REAL: *"ele não está validando se as informações estão
+ * completas para navegar para a tela de ensaios"*.
+ *
+ * Medido antes de escrever qualquer linha, contra a stack local: com o desenho
+ * legível ("3 saltos que esperam") e nenhum tempo declarado, a porta abria e a
+ * bancada mostrava **"hoje ≥ 0 ms"** com um ensaio concluindo *"a resposta fica
+ * em 0 ms"*.
+ *
+ * A guarda que devia impedir isso (SPEC-66, §248) perguntava
+ * `tempoDoPiorTrecho === undefined` — e um desenho que ESPERA sem declarar
+ * número devolve `ms: 0`. Ela nunca disparou no caso que existe de verdade.
+ *
+ * ## O que só o navegador prova
+ *
+ * Que a validação acontece ANTES da navegação: não é o caso de ir e voltar com
+ * a frase na mão.
+ */
+test("§305 — sem número declarado, a porta não leva à bancada: diz o que falta e onde", async ({ page }) => {
+  test.setTimeout(150000);
+  await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
+  await page.route(
+    (url) => url.pathname === "/ia/status",
+    (rota) => rota.fulfill({ json: { modelosChat: [], embeddingInstalado: false, capacidades: {} } })
+  );
+  await entrar(page);
+
+  await page.getByTestId("abrir-cenarios").click();
+  await page.getByRole("button", { name: "Carregar cenário: Fluxo completo: aprovação de crédito" }).click();
+
+  // Apaga TODO tempo declarado. O desenho continua legível — as conexões
+  // esperam, a cadeia existe —, só não há número para somar.
+  const nos = await page.locator(".react-flow__node").count();
+  for (let i = 0; i < nos; i++) {
+    await page.locator(".react-flow__node").nth(i).click();
+    const campos = page.locator('aside input[type="number"]');
+    for (let c = 0; c < (await campos.count()); c++) {
+      const nome = await campos.nth(c).getAttribute("aria-label");
+      if (nome && /Timeout/i.test(nome)) await campos.nth(c).fill("");
+    }
+  }
+
+  // O chip continua existindo: o desenho É legível, e essa parte estava certa.
+  const chip = page.getByTestId("leitura-resumo");
+  await expect(chip).toContainText("saltos que esperam");
+  await chip.click();
+
+  // A porta NÃO está lá — no lugar dela, o motivo e o endereço.
+  await expect(page.getByTestId("abrir-simulacao")).toHaveCount(0);
+  const falta = page.getByTestId("ensaiar-falta");
+  await expect(falta).toContainText("zero não é uma medição");
+  // §57 — dizer "falta preencher" sem dizer ONDE transfere a busca.
+  await expect(falta).toContainText("bureau-credito-nacional");
+
+  // E o endereço LEVA ao campo: clicar seleciona o componente a preencher.
+  // Pelo texto, e não pelo `testid`: o testid carrega o ID do elemento, e o que
+  // a pessoa lê é o RÓTULO — afirmar sobre o id provaria outra coisa.
+  // `exact` porque a CONEXÃO que chega nele ("decisao-score-credito →
+  // bureau-credito-nacional") também está na lista, e carrega o mesmo nome.
+  await falta.getByRole("button", { name: "bureau-credito-nacional", exact: true }).click();
+  // O que prova que o endereço serviu não é o painel abrir: é o CAMPO que falta
+  // preencher estar na tela, ao alcance de quem acabou de ler a frase.
+  await expect(page.locator("aside").getByLabel(/Timeout/).first()).toBeVisible();
+
+  // Quem chega por URL (a rota é linkável de propósito) recebe a mesma frase,
+  // e a linha de hoje não inventa "≥ 0 ms".
+  await page.goto("/#/ensaios");
+  await expect(page.getByTestId("ensaios-sem-tempo")).toContainText("zero não é uma medição");
+  await expect(page.getByTestId("linha-hoje")).not.toContainText("0 ms");
+});
