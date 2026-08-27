@@ -133,3 +133,49 @@ test("§296 — um ensaio de TAXA acusa saturação, e taxa não é lentidão", 
 
   await expect(page.getByTestId("tela-ensaios")).toContainText("pico de tráfego");
 });
+
+/**
+ * §302 — RELATO REAL: *"no canto direito consta um retângulo com uma barra de
+ * rolagem, e não é possível visualizar nada dentro dele"*.
+ *
+ * Era o **painel de propriedades** da mesa. A mesa fica montada o tempo todo e
+ * não é condicionada à rota; as telas de rota a cobrem. Esta nasceu no fluxo
+ * normal e **disputava espaço** com ela — o `aside` de 320px ficava espremido
+ * em 32px de altura, com o texto sem caber, e a barra de rolagem aparecia sobre
+ * um retângulo aparentemente vazio.
+ *
+ * ## Por que a régua é de OCLUSÃO
+ *
+ * O `aside` continua no DOM e continua "visível" para o CSS — ele só está
+ * atrás. `toBeVisible()` passaria dos dois lados. O que prova o conserto é
+ * perguntar **quem está no pixel**: no canto direito tem que estar a tela de
+ * ensaios, não o painel da mesa.
+ */
+test("§302 — a tela de ensaios cobre a mesa; nada da mesa vaza no canto", async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1900, height: 600 });
+  await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
+  await page.route(
+    (url) => url.pathname === "/ia/status",
+    (rota) => rota.fulfill({ json: { modelosChat: [], embeddingInstalado: false, capacidades: {} } })
+  );
+  await entrar(page);
+
+  await page.getByTestId("abrir-cenarios").click();
+  await page.getByRole("button", { name: "Carregar cenário: Fluxo completo: aprovação de crédito" }).click();
+  await page.goto("/#/ensaios");
+  await page.getByTestId("tela-ensaios").waitFor();
+
+  const quemEstaNoCanto = await page.evaluate(() => {
+    // O ponto onde o retângulo aparecia: canto direito, logo abaixo do topo.
+    const el = document.elementFromPoint(1750, 160);
+    const tela = document.querySelector('[data-testid="tela-ensaios"]');
+    return {
+      dentroDaTela: !!(el && tela && (tela === el || tela.contains(el))),
+      tag: el?.tagName.toLowerCase() ?? "?",
+    };
+  });
+
+  expect(quemEstaNoCanto.dentroDaTela).toBe(true);
+  expect(quemEstaNoCanto.tag).not.toBe("aside");
+});
