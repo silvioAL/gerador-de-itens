@@ -840,3 +840,125 @@ describe("percursos citados no item (SPEC-57 fatia E)", () => {
     expect(comListaVazia).toBe(semPercurso);
   });
 });
+
+/**
+ * SPEC-69 fatia D — o ensaio assumido viajando: uma origem, dois leitores.
+ *
+ * O §1 desta SPEC mediu que aceitar um ensaio não levava a lugar nenhum. Aqui
+ * está o lugar: quem aprova o desenho lê o risco medido na seção de riscos;
+ * quem implementa lê o número ao lado do critério de aceite. São duas leituras
+ * diferentes do MESMO fato — e é por isso que a evidência não pode ser
+ * recalculada em cada uma.
+ */
+describe("ensaios assumidos no documento e no item (SPEC-69 fatia D)", () => {
+  const ensaio = {
+    id: "en1",
+    nome: "Bureau degradado em pico",
+    conclusao: "A resposta vai a 24 s — 4,8× acima do prazo de 5,0 s que o negócio pede.",
+    motivo: "O parceiro não oferece SLA melhor no contrato atual.",
+    autor: "ana@empresa.com",
+    em: "2026-08-27T10:00:00.000Z",
+    porque: "Fins de semana concentram 40% das solicitações.",
+  };
+
+  const decisaoComEnsaio = {
+    id: "d1",
+    noId: "n1",
+    titulo: "Chamar o bureau de forma síncrona",
+    alternativas: [{ titulo: "Síncrono" }, { titulo: "Assíncrono", consequencia: "muda o contrato com o parceiro" }],
+    escolhida: "Síncrono",
+    porque: "O parceiro não oferece webhook.",
+    status: "aceita" as const,
+    origem: "manual" as const,
+    autor: "silvio@exemplo",
+    em: "2026-08-27T10:00:00.000Z",
+    ensaioIds: ["en1"],
+  };
+
+  it("a seção de RISCOS ganha o bloco derivado, sem encostar no texto de quem escreveu", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, config, {
+      riscos: "O time do bureau está sendo reestruturado.",
+      ensaios: [ensaio],
+      decisoes: [decisaoComEnsaio],
+    });
+
+    // §4.4 — os dois blocos, um ao lado do outro. O humano PRIMEIRO: quem lê
+    // uma seção de riscos quer o julgamento de quem escreveu, e o número é a
+    // evidência dele — não o contrário.
+    const humano = doc.indexOf("O time do bureau está sendo reestruturado.");
+    const derivado = doc.indexOf("Riscos medidos (ensaios assumidos)");
+    expect(humano).toBeGreaterThan(-1);
+    expect(derivado).toBeGreaterThan(humano);
+
+    expect(doc).toContain("**Bureau degradado em pico**");
+    expect(doc).toContain("4,8× acima do prazo");
+    // Quem assumiu e por quê: é o que separa débito consciente de anônimo.
+    expect(doc).toContain("Assumido por ana@empresa.com");
+    expect(doc).toContain("O parceiro não oferece SLA melhor");
+    // O porquê do CENÁRIO é outro porquê, e os dois aparecem.
+    expect(doc).toContain("Fins de semana concentram 40%");
+    expect(doc).toContain("Sustenta a decisão: **Chamar o bureau de forma síncrona**");
+  });
+
+  it("o ensaio assumido entra na seção de riscos mesmo SEM decisão anexada", () => {
+    // Um débito assumido é literalmente "o que você está aceitando correr" — a
+    // dica da própria seção. Exigir o anexo para ele aparecer devolveria o
+    // débito ao lugar de onde esta SPEC o tirou: visível só na tela certa.
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, config, { ensaios: [ensaio] });
+
+    expect(doc).toContain("Riscos medidos (ensaios assumidos)");
+    expect(doc).toContain("**Bureau degradado em pico**");
+    expect(doc).not.toContain("Sustenta a decisão");
+  });
+
+  it("o ITEM cita o número junto do porquê que ele já carregava", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, config, {
+      decisoes: [decisaoComEnsaio],
+      ensaios: [ensaio],
+    });
+
+    // A citação curta do item (§SPEC-58 fatia 4) ganha a linha da evidência.
+    expect(doc).toContain("⚖ Sob **Bureau degradado em pico** (assumido)");
+    expect(doc).toContain("O parceiro não oferece webhook.");
+  });
+
+  it("ensaio que a decisão não anexou NÃO aparece no item — o elo é o anexo", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, config, {
+      decisoes: [{ ...decisaoComEnsaio, ensaioIds: [] }],
+      ensaios: [ensaio],
+    });
+
+    expect(doc).not.toContain("⚖ Sob **Bureau degradado em pico**");
+    // Mas continua no bloco de riscos: assumir já é registro, anexar é o que
+    // leva ao item.
+    expect(doc).toContain("Riscos medidos (ensaios assumidos)");
+  });
+
+  it("sem ensaio assumido, o documento é BYTE A BYTE o de antes", () => {
+    // §248 — a garantia que impede esta fatia de mudar o documento de quem não
+    // usa ensaio nenhum. Comparar o texto inteiro, e não procurar ausências.
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+
+    const semNada = gerarEspecificacaoEntrega(atividades, diagrama, config, { decisoes: [decisaoComEnsaio] });
+    const comListaVazia = gerarEspecificacaoEntrega(atividades, diagrama, config, {
+      decisoes: [decisaoComEnsaio],
+      ensaios: [],
+    });
+
+    expect(comListaVazia).toBe(semNada);
+    expect(semNada).not.toContain("Riscos medidos");
+  });
+});

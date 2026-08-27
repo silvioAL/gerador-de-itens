@@ -51,6 +51,17 @@ export interface EnsaiosScreenProps {
   necessidades?: { texto: string; limiteMs?: number }[];
   /** Quem assume o débito — é o que separa débito consciente de anônimo. */
   autor?: string;
+  /**
+   * SPEC-69 fatia D — as decisões da quebra, para o ensaio assumido poder se
+   * ANEXAR a uma delas.
+   *
+   * É o elo que faz a evidência viajar: anexada, ela chega ao item que quem
+   * implementa lê. Sem decisão registrada a lista vem vazia e a tela diz isso
+   * em vez de oferecer um seletor sem opção (§244).
+   */
+  decisoes?: { id: string; titulo: string; ensaioIds?: string[] }[];
+  /** Anexa (ou desanexa, com `decisaoId` vazio) o ensaio a uma decisão. */
+  onAnexar?: (ensaioId: string, decisaoId: string) => void;
 }
 
 /** Um id estável e legível, derivado do nome — a mesma disciplina do §289. */
@@ -78,6 +89,8 @@ export function EnsaiosScreen({
   onSugerir,
   necessidades,
   autor,
+  decisoes,
+  onAnexar,
 }: EnsaiosScreenProps) {
   const [editando, setEditando] = useState<string | null>(null);
   const [assumindo, setAssumindo] = useState<string | null>(null);
@@ -307,6 +320,13 @@ export function EnsaiosScreen({
                         Assumido: {cenario.debito.motivo}
                         {cenario.debito.autor ? ` — ${cenario.debito.autor}` : ""}
                       </div>
+                    )}
+                    {estado === "aceito" && (
+                      <Anexo
+                        ensaioId={r.cenarioId}
+                        decisoes={decisoes ?? []}
+                        onAnexar={onAnexar}
+                      />
                     )}
                   </td>
                   <td style={tdEstilo}>
@@ -550,6 +570,67 @@ function LinhasFantasma() {
  * linha, o que se espera de quem está olhando. "aceito" é o único que não
  * cobra, e por isso é o único em verde.
  */
+/**
+ * SPEC-69 §4.3 — o passo que faltava depois de assumir.
+ *
+ * Assumir um ensaio já o põe na seção de riscos do documento. Anexá-lo a uma
+ * decisão é o que o leva ao **item**, ao lado do critério de aceite — e para
+ * quem implementa "sob pico esta chamada leva 24 s" muda como o código é
+ * escrito, enquanto o mesmo fato lido só no documento não muda nada.
+ *
+ * **Um seletor e não uma tela.** A decisão já existe, ancorada no nó onde foi
+ * tomada; inventar aqui um lugar de criar decisão seria a segunda porta para a
+ * mesma coisa, e a que ficasse para trás seria justamente esta.
+ *
+ * Sem decisão registrada não aparece seletor nenhum: um controle com zero
+ * opções é pior que a ausência dele (§244). O que aparece é a frase que diz
+ * onde o gesto existe.
+ */
+function Anexo({
+  ensaioId,
+  decisoes,
+  onAnexar,
+}: {
+  ensaioId: string;
+  decisoes: { id: string; titulo: string; ensaioIds?: string[] }[];
+  onAnexar?: (ensaioId: string, decisaoId: string) => void;
+}) {
+  if (!onAnexar) return null;
+  const atual = decisoes.find((d) => (d.ensaioIds ?? []).includes(ensaioId));
+
+  if (decisoes.length === 0) {
+    return (
+      <div style={anexoEstilo} data-testid={`sem-decisao-${ensaioId}`}>
+        Registre uma decisão no componente para este número chegar ao item de quem implementa.
+      </div>
+    );
+  }
+
+  return (
+    <div style={anexoEstilo}>
+      <label>
+        {atual ? "Sustenta a decisão:" : "Anexar a uma decisão:"}{" "}
+        <select
+          aria-label={`Decisão sustentada pelo ensaio ${ensaioId}`}
+          data-testid={`anexar-${ensaioId}`}
+          value={atual?.id ?? ""}
+          onChange={(e) => onAnexar(ensaioId, e.target.value)}
+          style={{ fontSize: 10.5, maxWidth: 260 }}
+        >
+          <option value="">— nenhuma</option>
+          {decisoes.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.titulo}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
+}
+
+const anexoEstilo: React.CSSProperties = { fontSize: 10.5, color: "var(--texto-2)", marginTop: 4 };
+
 function Estado({ estado }: { estado: "por-avaliar" | "em-revisao" | "aceito" }) {
   const texto = { "por-avaliar": "por avaliar", "em-revisao": "em revisão", aceito: "débito assumido" }[estado];
   const titulo = {

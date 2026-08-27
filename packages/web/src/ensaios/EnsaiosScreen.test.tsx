@@ -446,3 +446,72 @@ describe("EnsaiosScreen — a conclusão escrita (§4.0.1)", () => {
     expect(screen.getByTestId("conclusao-c1")).toHaveTextContent("bureau responde por");
   });
 });
+
+/**
+ * SPEC-69 fatia D — o passo que faltava depois de assumir.
+ *
+ * Assumir já põe o ensaio na seção de riscos do documento. Anexá-lo a uma
+ * decisão é o que o leva ao ITEM, ao lado do critério de aceite — e é ali que
+ * "sob pico esta chamada leva 24 s" muda como o código é escrito.
+ */
+describe("EnsaiosScreen — anexar o ensaio assumido a uma decisão", () => {
+  const assumido: CenarioDeLentidao = {
+    id: "cen-pico",
+    nome: "Bureau em pico",
+    origem: "manual",
+    estado: "aceito",
+    debito: { motivo: "o parceiro não tem SLA melhor", autor: "ana@empresa.com" },
+    ajustes: [{ tipo: "no", id: "bureau", ms: 24000 }],
+  };
+
+  it("o ensaio ASSUMIDO oferece o anexo; o que ainda cobra, não", () => {
+    // O anexo é sobre evidência de uma escolha feita. Oferecê-lo antes de
+    // alguém assumir seria pedir para anexar o que ninguém decidiu conviver.
+    montar([assumido, { id: "cen-novo", nome: "Outro", origem: "manual", estado: "por-avaliar", ajustes: [] }], {
+      decisoes: [{ id: "d1", titulo: "Chamar o bureau de forma síncrona" }],
+      onAnexar: vi.fn(),
+    });
+
+    expect(screen.getByTestId("anexar-cen-pico")).toBeTruthy();
+    expect(screen.queryByTestId("anexar-cen-novo")).toBeNull();
+  });
+
+  it("escolher a decisão anexa o ensaio a ela", () => {
+    const onAnexar = vi.fn();
+    montar([assumido], {
+      decisoes: [{ id: "d1", titulo: "Chamar o bureau de forma síncrona" }],
+      onAnexar,
+    });
+
+    fireEvent.change(screen.getByTestId("anexar-cen-pico"), { target: { value: "d1" } });
+
+    expect(onAnexar).toHaveBeenCalledWith("cen-pico", "d1");
+  });
+
+  it("já anexado, o seletor mostra QUAL decisão — e não volta a dizer 'anexar'", () => {
+    montar([assumido], {
+      decisoes: [{ id: "d1", titulo: "Chamar o bureau de forma síncrona", ensaioIds: ["cen-pico"] }],
+      onAnexar: vi.fn(),
+    });
+
+    expect((screen.getByTestId("anexar-cen-pico") as HTMLSelectElement).value).toBe("d1");
+    expect(screen.getByText(/Sustenta a decisão:/)).toBeTruthy();
+  });
+
+  it("sem decisão registrada, diz ONDE o gesto existe em vez de um seletor vazio", () => {
+    // §244 — um controle com zero opções é pior que a ausência dele: ele
+    // promete um caminho e não leva a lugar nenhum, que é o defeito que esta
+    // SPEC inteira existe para corrigir.
+    montar([assumido], { decisoes: [], onAnexar: vi.fn() });
+
+    expect(screen.queryByTestId("anexar-cen-pico")).toBeNull();
+    expect(screen.getByTestId("sem-decisao-cen-pico")).toHaveTextContent(/Registre uma decisão no componente/);
+  });
+
+  it("sem `onAnexar`, nada aparece — a tela segue inteira sem esta capacidade", () => {
+    montar([assumido], { decisoes: [{ id: "d1", titulo: "X" }] });
+
+    expect(screen.queryByTestId("anexar-cen-pico")).toBeNull();
+    expect(screen.queryByTestId("sem-decisao-cen-pico")).toBeNull();
+  });
+});

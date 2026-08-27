@@ -410,3 +410,124 @@ describe("ReadinessSummary — a dimensão conformidade", () => {
     expect(within(screen.getByTestId("decisoes-lista")).getByText(/não existe mais no desenho/)).toBeInTheDocument();
   });
 });
+
+/**
+ * SPEC-69 §4.1 — o ensaio COBRA no placar, marcado com o nome.
+ *
+ * A inversão que dá nome à SPEC, e que veio do usuário: *"na realidade todo
+ * ensaio cobra"*. Antes disto, um ensaio que ninguém olhou não aparecia em
+ * lugar nenhum fora da bancada — o débito inconsciente seguia inconsciente.
+ */
+describe("ReadinessSummary — o ensaio que ainda cobra", () => {
+  const configComTempo: DiagramaConfig = {
+    nodeTypes: {
+      externo: {
+        label: "API Externa",
+        derives: "external",
+        techs: [],
+        contextos: [],
+        spec: [{ key: "timeoutMs", label: "Timeout (ms)", type: "number" }],
+      },
+      service: { label: "Serviço", derives: "service", techs: [], contextos: [], spec: [] },
+    },
+    edgeTypes: { http: { label: "HTTP", espera: true, spec: [{ key: "timeoutMs", label: "Timeout (ms)", type: "number" }] } },
+    edgeRules: {},
+  };
+
+  const desenho = (): Diagrama =>
+    ({
+      nodes: [
+        { id: "api", type: "service", status: "novo", label: "api", x: 0, y: 0, spec: {}, specNA: {} },
+        {
+          id: "bureau",
+          type: "externo",
+          status: "novo",
+          label: "bureau",
+          x: 0,
+          y: 0,
+          spec: { timeoutMs: { valor: 2000, origem: "manual" } },
+          specNA: {},
+        },
+      ],
+      edges: [
+        { id: "e1", source: "api", target: "bureau", type: "http", spec: { timeoutMs: { valor: 300, origem: "manual" } } },
+      ],
+    }) as unknown as Diagrama;
+
+  const pico = (estado?: "por-avaliar" | "em-revisao" | "aceito") => [
+    {
+      id: "cen-pico",
+      nome: "Black Friday",
+      origem: "manual" as const,
+      estado,
+      ajustes: [{ tipo: "no" as const, id: "bureau", ms: 24000 }],
+    },
+  ];
+
+  // `atendidaPor` é obrigatório em `Necessidade` — a lacuna se mede por ele.
+  const prazo = [{ id: "nec1", texto: "aprovar na hora", limiteMs: 5000, atendidaPor: [], origem: "manual" as const }];
+
+  it("o ensaio por avaliar entra no chip, e a frase diz que é CONDICIONAL", async () => {
+    render(
+      <ReadinessSummary
+        diagrama={desenho()}
+        config={configComTempo}
+        onSelecionar={vi.fn()}
+        necessidades={prazo}
+        cenarios={pico()}
+      />
+    );
+
+    const chip = screen.getByTestId("conformidade-resumo");
+    expect(chip).toHaveTextContent("1 fora do padrão");
+
+    await userEvent.click(chip);
+    const lista = screen.getByTestId("conformidade-lista");
+    // A marca com o nome do ensaio é o que impede o placar de confundir *o que
+    // é* com *o que seria*.
+    expect(lista).toHaveTextContent("Sob “Black Friday”");
+    expect(lista).toHaveTextContent("acima do prazo de 5,0 s");
+    expect(lista).toHaveTextContent(/Condicional/);
+  });
+
+  it("assumido, sai do chip — e o chip some quando não sobra mais nada", () => {
+    render(
+      <ReadinessSummary
+        diagrama={desenho()}
+        config={configComTempo}
+        onSelecionar={vi.fn()}
+        necessidades={prazo}
+        cenarios={pico("aceito")}
+      />
+    );
+
+    expect(screen.queryByTestId("conformidade-resumo")).not.toBeInTheDocument();
+  });
+
+  it("clicar na linha leva à BANCADA — o gesto de assumir mora junto da evidência", async () => {
+    // §4.0 — assumir exige motivo e vira registro com autor e data. Oferecer
+    // isso aqui, longe do número, seria convidar a silenciar sem ler.
+    const onSimular = vi.fn();
+    render(
+      <ReadinessSummary
+        diagrama={desenho()}
+        config={configComTempo}
+        onSelecionar={vi.fn()}
+        necessidades={prazo}
+        cenarios={pico()}
+        onSimular={onSimular}
+      />
+    );
+
+    await userEvent.click(screen.getByTestId("conformidade-resumo"));
+    await userEvent.click(screen.getByText(/Sob “Black Friday”/));
+
+    expect(onSimular).toHaveBeenCalled();
+  });
+
+  it("sem prazo declarado, o ensaio não cobra nada — ninguém prometeu nada", () => {
+    render(<ReadinessSummary diagrama={desenho()} config={configComTempo} onSelecionar={vi.fn()} cenarios={pico()} />);
+
+    expect(screen.queryByTestId("conformidade-resumo")).not.toBeInTheDocument();
+  });
+});

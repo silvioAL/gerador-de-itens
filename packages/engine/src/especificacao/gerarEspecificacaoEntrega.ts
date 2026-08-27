@@ -3,6 +3,10 @@ import { avaliarPercursos } from "../percurso/conformidadeDePercurso.js";
 import { percursosQueContam } from "../percurso/percursos.js";
 import { necessidadesDoElemento } from "../proposito/lacunas.js";
 import { decisoesDoElemento, decisoesVigentes, excecoesComoDecisoes } from "../decisao/decisoes.js";
+// SPEC-69 fatia D — a evidência medida que viaja com a decisão. O tipo e o
+// filtro moram no motor do ensaio; aqui só se RENDERIZA, como todo o resto
+// deste arquivo.
+import { ensaiosDaDecisao, type EnsaioAssumido } from "../leitura/simularLentidao.js";
 import type { DiagramaConfig, FieldSpec, RegrasConfig } from "../config/types.js";
 import { camposVisiveis } from "../spec/campos.js";
 import {
@@ -568,13 +572,60 @@ export function aplicarTemplateDoItem(template: string, valores: Record<string, 
  * primeira dúvida; com a linha riscada e o motivo, a pergunta já vem
  * respondida. É a fatia C inteira em três linhas de markdown.
  */
-function descreverDecisao(d: Decisao): string {
+function descreverDecisao(d: Decisao, assumidos: EnsaioAssumido[] = []): string {
   const linhas = [`- **${d.titulo}:** ${d.escolhida}${d.porque.trim() ? ` — ${d.porque}` : ""}`];
   if (d.contexto?.trim()) linhas.push(`  _${d.contexto.trim()}_`);
   for (const a of d.alternativas.filter((a) => a.titulo !== d.escolhida)) {
     linhas.push(`  - ~~${a.titulo}~~${a.consequencia ? ` — ${a.consequencia}` : ""}`);
   }
+  // SPEC-69 §4.3 — a evidência MEDIDA que sustenta a escolha, logo abaixo dela.
+  // Uma decisão com número ao lado é outra conversa: "escolhemos síncrono" vira
+  // "escolhemos síncrono sabendo que sob pico isto vai a 24 s".
+  for (const e of ensaiosDaDecisao(d, assumidos)) {
+    linhas.push(`  - ⚖ **${e.nome}** (assumido)${e.conclusao ? ` — ${e.conclusao}` : ""}`);
+  }
   return linhas.join("\n");
+}
+
+/**
+ * SPEC-69 §4.4 — o bloco DERIVADO da seção de riscos.
+ *
+ * A seção é `documentoEscrito.riscos`, escrita por gente, e a SPEC-58 regra 3
+ * garante que ela sobrevive à regeneração. O ensaio entra **ao lado, nunca
+ * dentro**: dois blocos, uma seção, nenhum sobrescreve o outro — a mesma
+ * disciplina que separa o que o motor calcula do que a pessoa escreve em todo
+ * o resto do produto.
+ *
+ * Todo ensaio assumido entra, tenha decisão anexada ou não. A `dica` da seção
+ * é literalmente *"o que você está aceitando correr"*, e é exatamente isso que
+ * um ensaio aceito é. Deixar de fora os que ninguém anexou devolveria o débito
+ * ao lugar de onde esta SPEC o tirou: visível só para quem abre a tela certa.
+ */
+function blocoDeRiscosMedidos(assumidos: EnsaioAssumido[], decisoes: Decisao[]): string {
+  if (assumidos.length === 0) return "";
+  const decisaoDe = new Map<string, string>();
+  for (const d of decisoes) for (const id of d.ensaioIds ?? []) decisaoDe.set(id, d.titulo);
+
+  const linhas = assumidos.map((e) => {
+    const partes = [`- **${e.nome}**${e.conclusao ? ` — ${e.conclusao}` : ""}`];
+    // O porquê do CENÁRIO (conhecimento de mundo) e o porquê de ASSUMIR são
+    // coisas diferentes, e o documento perde sentido se as fundir: um explica
+    // por que isto aconteceria, o outro por que decidimos conviver com isso.
+    if (e.porque?.trim()) partes.push(`  _${e.porque.trim()}_`);
+    const quem = [e.autor, e.em ? new Date(e.em).toLocaleDateString("pt-BR") : undefined].filter(Boolean).join(" · ");
+    partes.push(`  Assumido${quem ? ` por ${quem}` : ""}: ${e.motivo}`);
+    const decisao = decisaoDe.get(e.id);
+    if (decisao) partes.push(`  Sustenta a decisão: **${decisao}**`);
+    return partes.join("\n");
+  });
+
+  return [
+    "**Riscos medidos (ensaios assumidos)**",
+    "",
+    "_Derivado dos ensaios — o texto acima é de quem escreveu, este bloco é do motor._",
+    "",
+    ...linhas,
+  ].join("\n");
 }
 
 /**
@@ -589,8 +640,16 @@ function descreverDecisao(d: Decisao): string {
  * `descreverDecisao` continua existindo e é quem monta o bloco completo do
  * topo — as duas formas são deliberadas, não duplicação.
  */
-function citarDecisao(d: Decisao): string {
-  return `- ${d.titulo}${d.porque.trim() ? ` — ${d.porque}` : ""}`;
+function citarDecisao(d: Decisao, assumidos: EnsaioAssumido[] = []): string {
+  const linhas = [`- ${d.titulo}${d.porque.trim() ? ` — ${d.porque}` : ""}`];
+  // SPEC-69 §4.3 — o número chega a quem IMPLEMENTA, ao lado do critério de
+  // aceite. "Sob pico esta chamada leva 24 s" muda como a pessoa escreve o
+  // código; o mesmo fato lido só no documento não muda nada, porque quem
+  // implementa lê o item.
+  for (const e of ensaiosDaDecisao(d, assumidos)) {
+    linhas.push(`  - ⚖ Sob **${e.nome}** (assumido)${e.conclusao ? `: ${e.conclusao}` : ""}`);
+  }
+  return linhas.join("\n");
 }
 
 export function renderizarItemEspecificacao(
@@ -616,7 +675,12 @@ export function renderizarItemEspecificacao(
    * item. Já vêm filtrados por quem chama: saber de que caminho o componente
    * faz parte muda como ele é implementado — um nó num caminho síncrono
    * apertado não se escreve como um num caminho assíncrono. */
-  percursosDoItem?: { rotulo: string; regra?: string }[]
+  percursosDoItem?: { rotulo: string; regra?: string }[],
+  /** SPEC-69 fatia D — os ensaios ASSUMIDOS da quebra. Só os anexados a uma
+   * decisão que este item cita chegam ao texto (`ensaiosDaDecisao` filtra), e
+   * por isso passar a lista inteira aqui é seguro: quem decide o que aparece é
+   * o elo, não o chamador. Ausente = o item sai igual ao de antes. */
+  ensaios?: EnsaioAssumido[]
 ): string {
   const nos = nosDeOrigem(atividade, diagrama);
   const especificacaoTecnica =
@@ -713,7 +777,7 @@ ${MARCA_SUGERIDO}` : ""}`
     ...decisoesDoElemento(atividade.origem.nodeId, decisoes),
     ...decisoesDoElemento(atividade.origem.edgeId, decisoes),
   ];
-  const textoDecisoes = decisoesCitadas.map(citarDecisao).join("\n");
+  const textoDecisoes = decisoesCitadas.map((d) => citarDecisao(d, ensaios)).join("\n");
 
   const textoPercursos = (percursosDoItem ?? [])
     .map((p) => `- ${p.rotulo}${p.regra ? ` — ${p.regra}` : ""}`)
@@ -925,6 +989,16 @@ export interface OpcoesGerarEspecificacao {
    * persistidas em duplicata): contrariar o padrão de propósito é decisão, e
    * quem lê a spec precisa dela junto das outras, não numa seção à parte. */
   excecoes?: ExcecaoDePadrao[];
+  /**
+   * SPEC-69 fatia D — os ensaios ASSUMIDOS da quebra, já com a conclusão
+   * calculada (`ensaiosAssumidos`).
+   *
+   * Prontos e não calculados aqui: rodar a simulação dentro da geração do
+   * documento faria um texto depender de uma conta cara, e a tela que mostra a
+   * mesma frase já a tem em mãos. O motor da conta tem um dono só — este tipo
+   * é só o transporte.
+   */
+  ensaios?: EnsaioAssumido[];
   /** `quebra.respostasItens` — respostas (humanas ou IA confirmada) aos
    * placeholders "<- ✍️ especificar" de cada atividade, chaveadas por
    * `Atividade.chave` (Fase 1, SPEC-23). */
@@ -1015,7 +1089,8 @@ export function gerarEspecificacaoEntrega(
               opcoes.templateItem,
               opcoes.necessidades,
               [...(opcoes.decisoes ?? []), ...excecoesComoDecisoes(opcoes.excecoes)],
-              percursosDoItem(a, diagrama, config, opcoes)
+              percursosDoItem(a, diagrama, config, opcoes),
+              opcoes.ensaios
             )
           )
           .join("\n\n---\n\n")
@@ -1046,7 +1121,7 @@ export function gerarEspecificacaoEntrega(
     ...decisoesVigentes(opcoes.decisoes ?? []),
     ...excecoesComoDecisoes(opcoes.excecoes),
   ]
-    .map(descreverDecisao)
+    .map((d) => descreverDecisao(d, opcoes.ensaios))
     .join("\n\n");
 
   const valores: Record<(typeof VARIAVEIS_ESPECIFICACAO)[number], string> = {
@@ -1057,7 +1132,13 @@ export function gerarEspecificacaoEntrega(
     // Vazias somem com a seção (`aplicarTemplate` já cuida): quem nunca
     // escreveu nada continua recebendo o documento de antes.
     tradeOffs: opcoes.tradeOffs?.trim() ?? "",
-    riscos: opcoes.riscos?.trim() ?? "",
+    // SPEC-69 §4.4 — o texto de quem escreveu PRIMEIRO, e o bloco derivado
+    // abaixo. Nunca dentro: a regeneração reescreve o que é do motor e não
+    // encosta no que é da pessoa. Os dois vazios fazem a seção sumir inteira,
+    // como antes.
+    riscos: [opcoes.riscos?.trim() ?? "", blocoDeRiscosMedidos(opcoes.ensaios ?? [], opcoes.decisoes ?? [])]
+      .filter((p) => p.trim())
+      .join("\n\n"),
     itens,
     definitionOfReady,
     definitionOfDone,

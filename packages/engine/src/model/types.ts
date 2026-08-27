@@ -216,6 +216,21 @@ export interface Decisao {
   autor: string;
   /** ISO-8601. */
   em: string;
+  /**
+   * SPEC-69 §4.3 — os ensaios ASSUMIDOS que sustentam esta decisão.
+   *
+   * O elo que faltava. Um ensaio aceito era um registro que não ia a lugar
+   * nenhum; anexado a uma decisão, ele viaja pelos caminhos que já existem —
+   * **sem superfície nova**: o topo do documento e a citação no item.
+   *
+   * Uma origem, dois leitores: quem aprova o desenho lê o risco medido no
+   * documento; quem implementa lê o número ao lado do critério de aceite, e
+   * "sob pico esta chamada leva 24 s" muda como essa pessoa escreve o código.
+   *
+   * Ids e não cópias: o ensaio continua vivo na quebra, e uma cópia aqui
+   * divergiria do número na primeira vez que alguém mexesse no desenho (§263).
+   */
+  ensaioIds?: string[];
 }
 
 /**

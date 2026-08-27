@@ -4,6 +4,7 @@ import type { ExcecaoDePadrao, Violacao } from "@gerador/engine";
 import {
   analisarLacunas,
   avaliarConformidade,
+  cobrancasDeEnsaio,
   avaliarPercursos,
   avaliarTopologia,
   conciliarPercursos,
@@ -16,7 +17,7 @@ import {
 } from "@gerador/engine";
 import { PercursosPanel } from "./PercursosPanel";
 import { LeituraDoDesenhoPanel } from "./LeituraDoDesenhoPanel";
-import type { Decisao, LeituraDispensada, LeituraDoDesenho, MarcaDaLeitura, Percurso, ViolacaoDeTopologia } from "@gerador/engine";
+import type { CenarioDeLentidao, CobrancaDeEnsaio, Decisao, LeituraDispensada, LeituraDoDesenho, MarcaDaLeitura, Percurso, ViolacaoDeTopologia } from "@gerador/engine";
 import { ReadinessBadge } from "./ReadinessBadge";
 import { calcularResumoProntidao, type NoComProntidao } from "./prontidaoResumo";
 
@@ -55,6 +56,12 @@ export interface ReadinessSummaryProps {
   onRestaurarLeitura?: (dispensa: LeituraDispensada) => void;
   /** SPEC-66 — leva à bancada de ensaio. Ausente = a porta não aparece. */
   onSimular?: () => void;
+  /**
+   * SPEC-69 §4.1 — os ensaios da quebra. Os que ninguém assumiu COBRAM no
+   * placar, marcados com o nome: é a inversão que dá nome à SPEC, e sem ela um
+   * ensaio que ninguém olhou seguiria invisível.
+   */
+  cenarios?: CenarioDeLentidao[];
   /** §242 — as violações já aceitas de propósito. */
   excecoes?: ExcecaoDePadrao[];
   /** §242 — aceitar uma violação, com motivo. Ausente = a válvula não aparece. */
@@ -91,6 +98,7 @@ export function ReadinessSummary({
   config,
   onSelecionar,
   necessidades,
+  cenarios,
   onAbrirProposito,
   regras,
   onSelecionarViolacao,
@@ -127,6 +135,19 @@ export function ReadinessSummary({
   // SPEC-63 — a terceira dimensão do padrão: a FORMA. Mesma disciplina das
   // outras duas — sem regra declarada, não acusa nada e não aparece.
   const violacoesDeForma = violacoesDeFormaEmAberto(avaliarTopologia(diagrama, config, regras, excecoes ?? []));
+  /**
+   * SPEC-69 §4.1 — o que os ENSAIOS fazem este desenho passar a contradizer.
+   *
+   * A inversão que dá nome à SPEC: **todo ensaio cobra** enquanto ninguém o
+   * assumiu. Se só o aceito cobrasse, o débito que ninguém olhou seguiria
+   * invisível — e é esse o "inconsciente" que a SPEC existe para acabar.
+   *
+   * No MESMO chip das outras dimensões, e marcado com o nome do ensaio: é a
+   * mesma pergunta ("o que está fora do padrão?"), e a marca é o que impede o
+   * placar de confundir *o que é* com *o que seria*.
+   */
+  const cobrancasDeEnsaios = cobrancasDeEnsaio(diagrama, config, cenarios ?? [], necessidades ?? []);
+  const avisosDeEnsaio = cobrancasDeEnsaios.reduce((n, c) => n + c.avisos.length, 0);
   // Fatia C — dimensão POR QUÊ. O número que cobra não é "quantas decisões
   // existem" (isso é volume, não qualidade): é quantas esperam alguém e
   // quantas registraram a escolha sem a razão.
@@ -204,10 +225,12 @@ export function ReadinessSummary({
           🎯 {semElemento > 0 ? `${semElemento} sem componente` : "propósito coberto"}
         </button>
       )}
-      {violacoes.length + violacoesDeForma.length > 0 && (
+      {violacoes.length + violacoesDeForma.length + avisosDeEnsaio > 0 && (
         <ListaDeViolacoes
           violacoes={violacoes}
           violacoesDeForma={violacoesDeForma}
+          cobrancasDeEnsaios={cobrancasDeEnsaios}
+          onAbrirEnsaios={onSimular}
           onSelecionar={onSelecionarViolacao}
           onSelecionarAresta={onSelecionarAresta}
           onAceitar={onAceitarViolacao}
@@ -397,6 +420,8 @@ function ListaDeDecisoes({
 function ListaDeViolacoes({
   violacoes,
   violacoesDeForma = [],
+  cobrancasDeEnsaios = [],
+  onAbrirEnsaios,
   onSelecionar,
   onSelecionarAresta,
   onAceitar,
@@ -409,6 +434,15 @@ function ListaDeViolacoes({
    * atenção sem dividir o assunto.
    */
   violacoesDeForma?: ViolacaoDeTopologia[];
+  /**
+   * SPEC-69 §4.1 — o que só seria verdade SOB um ensaio. Entra no mesmo chip,
+   * e cada linha carrega o nome do ensaio: sem a marca, "o pool satura" seria
+   * lido como fato do desenho de hoje.
+   */
+  cobrancasDeEnsaios?: CobrancaDeEnsaio[];
+  /** Leva à bancada, onde se assume o débito com motivo. O gesto de aceitar
+   * mora junto da evidência, não aqui — aqui só se vê que existe. */
+  onAbrirEnsaios?: () => void;
   onSelecionar?: (noId: string) => void;
   onSelecionarAresta?: (arestaId: string) => void;
   onAceitar?: (violacao: Violacao, motivo: string) => void;
@@ -435,7 +469,8 @@ function ListaDeViolacoes({
         onClick={() => setAberto((a) => !a)}
         style={{ ...botaoProximoEstilo, borderColor: "var(--amarelo)", color: "var(--amarelo)" }}
       >
-        ⚖ {violacoes.length + violacoesDeForma.length} fora do padrão
+        ⚖ {violacoes.length + violacoesDeForma.length + cobrancasDeEnsaios.reduce((n, c) => n + c.avisos.length, 0)}{" "}
+        fora do padrão
       </button>
 
       {aberto && (
@@ -557,6 +592,37 @@ function ListaDeViolacoes({
               </div>
             );
           })}
+
+          {/* SPEC-69 §4.1 — o que só seria verdade SOB um ensaio.
+              
+              A marca com o nome do ensaio não é enfeite: ela diz na própria
+              frase que aquilo é condicional, e é o que impede o placar de
+              confundir *o que é* com *o que seria*.
+              
+              Sem "aceitar de propósito…" aqui, e de propósito: assumir um
+              ensaio exige motivo e vira registro com autor e data (§4.0). Esse
+              gesto mora junto da evidência, na bancada — oferecê-lo aqui, longe
+              do número, seria convidar a silenciar sem ler. */}
+          {cobrancasDeEnsaios.map((c) =>
+            c.avisos.map((aviso, i) => (
+              <div
+                key={`${c.ensaioId}-${i}`}
+                data-testid={`violacao-ensaio::${c.ensaioId}::${i}`}
+                style={{ padding: "8px 4px", borderBottom: "1px solid var(--borda)" }}
+              >
+                <button
+                  onClick={() => onAbrirEnsaios?.()}
+                  disabled={!onAbrirEnsaios}
+                  style={{ ...itemPopoverEstilo, fontWeight: 600 }}
+                >
+                  Sob “{c.nome}”: {aviso}
+                </button>
+                <div style={{ fontSize: 11, color: "var(--texto-mudo)", padding: "2px 6px" }}>
+                  Condicional — só acontece neste ensaio. Assumir o débito (com motivo) tira do placar.
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
     </div>

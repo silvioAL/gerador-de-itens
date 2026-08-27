@@ -417,3 +417,65 @@ describe("DocumentoScreen — a comparação com a foto aprovada", () => {
     expect(screen.queryByTestId("mudancas-desde-aprovacao")).toBeNull();
   });
 });
+
+/**
+ * SPEC-69 §4.4 — o risco MEDIDO ao lado do risco escrito.
+ *
+ * Quem aprova o desenho lê esta seção. Até aqui ela só tinha o que alguém
+ * digitou; agora tem também o que foi medido e assumido de propósito — que é
+ * literalmente a definição da seção ("o que você está aceitando correr").
+ */
+describe("DocumentoScreen — riscos medidos (SPEC-69 fatia D)", () => {
+  const ensaio = {
+    id: "en1",
+    nome: "Bureau degradado em pico",
+    conclusao: "A resposta vai a 24 s — 4,8× acima do prazo de 5,0 s que o negócio pede.",
+    motivo: "O parceiro não oferece SLA melhor.",
+    autor: "ana@empresa.com",
+    em: "2026-08-27T10:00:00.000Z",
+    porque: "Fins de semana concentram 40% das solicitações.",
+  };
+
+  it("o bloco derivado aparece com a conclusão, quem assumiu e por quê", () => {
+    montar({ ensaios: [ensaio] });
+
+    const bloco = screen.getByTestId("risco-medido-en1");
+    expect(bloco).toHaveTextContent("Bureau degradado em pico");
+    expect(bloco).toHaveTextContent("4,8× acima do prazo");
+    expect(bloco).toHaveTextContent("Assumido por ana@empresa.com");
+    expect(bloco).toHaveTextContent("O parceiro não oferece SLA melhor.");
+  });
+
+  it("o texto de quem ESCREVEU continua editável e intacto ao lado do bloco", () => {
+    // §4.4 — a garantia que impede o motor de comer a seção: os dois blocos
+    // convivem, e o campo de texto segue sendo do humano.
+    const { onMudarEscrito } = montar({
+      ensaios: [ensaio],
+      escrito: { riscos: "O time do bureau está sendo reestruturado." },
+    });
+
+    const secao = screen.getByTestId("secao-riscos");
+    expect(within(secao).getByText(/reestruturado/)).toBeInTheDocument();
+    // O selo de proveniência continua ali: o bloco derivado ao lado não
+    // transforma o texto de alguém em saída de motor.
+    expect(within(secao).getByText("escrito por uma pessoa")).toBeInTheDocument();
+
+    fireEvent.click(within(secao).getByText(/reestruturado/));
+    fireEvent.change(screen.getByLabelText("Riscos e o que pode dar errado"), { target: { value: "outro texto" } });
+    expect(onMudarEscrito).toHaveBeenCalledWith(expect.objectContaining({ riscos: "outro texto" }));
+  });
+
+  it("diz qual decisão o ensaio sustenta, quando alguém anexou", () => {
+    montar({ ensaios: [ensaio], decisaoDoEnsaio: () => "Chamar o bureau de forma síncrona" });
+
+    expect(screen.getByTestId("risco-medido-en1")).toHaveTextContent(
+      "Sustenta a decisão: Chamar o bureau de forma síncrona"
+    );
+  });
+
+  it("sem ensaio assumido, a seção é a de antes — nenhuma caixa nova", () => {
+    montar();
+
+    expect(screen.queryByTestId("riscos-medidos")).toBeNull();
+  });
+});
