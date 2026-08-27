@@ -86,6 +86,14 @@ odeTypes. Ausente = a seção não
    * o que o produto acabou de medir, não sobre pular a decisão de publicar.
    */
   reguaDePartida?: RequisitoDeTopologia;
+  /**
+   * §303 — o time em que a régua é lida e gravada.
+   *
+   * O servidor resolve **time → global → template**, então um time sem régua
+   * própria segue lendo a da casa, e nada do que existe muda de lugar. Sem
+   * `timeAtivo`, o global — o comportamento de antes.
+   */
+  timeAtivo?: string;
 }
 
 export function RegrasTab({
@@ -97,6 +105,7 @@ export function RegrasTab({
   diagramaConfig,
   onRegrasMudaram,
   reguaDePartida,
+  timeAtivo,
 }: RegrasTabProps = {}) {
   const todasAsOpcoes = contextos ?? [];
   // A seção de FORMA some quando não há como oferecer os tipos: sem eles o
@@ -124,7 +133,7 @@ export function RegrasTab({
   useEffect(() => {
     let cancelado = false;
     apiRegras
-      .obterComDiagnostico()
+      .obterComDiagnostico(timeAtivo)
       .then((envelope) => {
         if (cancelado) return;
         setRegras(envelope.documento);
@@ -136,7 +145,9 @@ export function RegrasTab({
     return () => {
       cancelado = true;
     };
-  }, []);
+    // §303 — trocar de time recarrega: a régua é do time, e continuar com a do
+    // anterior na tela seria o §213 outra vez, noutro lugar.
+  }, [timeAtivo]);
 
   if (erro && !regras) return <p style={erroEstilo}>{erro}</p>;
   if (!regras) return <p style={{ color: "var(--texto-fraco)", fontSize: 13 }}>Carregando regras…</p>;
@@ -163,7 +174,7 @@ export function RegrasTab({
     setSalvando(true);
     setErro(null);
     try {
-      await apiRegras.salvar(novo);
+      await apiRegras.salvar(novo, timeAtivo);
       onRegrasMudaram?.();
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));

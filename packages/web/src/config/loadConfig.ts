@@ -106,8 +106,10 @@ export async function carregarConfig(timeAtivo?: string): Promise<ConfigCarregad
     // estático do bundle. Achado real do E2E da SPEC-36: a regra criada pela
     // aba nunca chegava na ficha do item, porque a revisão lia o arquivo
     // servido e a aba gravava no banco. O estático fica de fallback.
+    // §303 — com o time: o servidor resolve time → global → template, então um
+    // time sem régua própria segue lendo a da casa.
     apiRegras
-      .obterComDiagnostico()
+      .obterComDiagnostico(timeAtivo)
       .then((envelope) => envelope.documento as RegrasConfig)
       .catch(() => buscarJsonOpcional<RegrasConfig>("/config/regras.json")),
     apiCamposNo.listar(timeAtivo),

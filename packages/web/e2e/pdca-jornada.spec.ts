@@ -8,8 +8,21 @@ const API = "http://localhost:4100";
  * APARECE, vira solicitação com prévia num item de exemplo, é aprovada e
  * aplicada — e o documento de regras muda de verdade no fim.
  *
- * O documento de regras é global do ambiente: o teste restaura o original no
- * finally (mesma disciplina do §162).
+ * ## Por que este spec NÃO ganhou time próprio no §303
+ *
+ * Os outros cinco que escreviam regras foram para times exclusivos, e a classe
+ * de defeito do §281 morreu com isso. Este ficou no global de propósito: quem
+ * grava aqui não é a tela, é o `POST /ajustes/:id/aplicar`, e ele escreve em
+ * `configDocumentos` com `timeId: GLOBAL` fixo (`routes/pdca.ts`) — uma
+ * solicitação de ajuste vale para a organização, não para um time.
+ *
+ * Colocá-lo num time daria a ILUSÃO de isolamento: a tela leria o documento do
+ * time e o `aplicar` continuaria gravando no global. Um teste verde medindo a
+ * linha errada é pior que um teste que assume o global (§248).
+ *
+ * O que sobra é seguro porque ele passou a ser o ÚNICO escritor do global, e
+ * o que ele acrescenta é item de checklist sem `checagem` — não vira violação
+ * no placar de ninguém. Ainda assim restaura no `finally` (§162).
  */
 test("feedback → proposta com prévia → aprovar → aplicar muda a configuração", async ({ page }) => {
   test.setTimeout(60000);

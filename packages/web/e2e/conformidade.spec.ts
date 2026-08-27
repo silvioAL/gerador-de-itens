@@ -1,15 +1,15 @@
 import { test, expect } from "@playwright/test";
-import { entrar } from "./auth";
+import { entrarEmTimeProprio } from "./auth";
 import { derivarNaMesa } from "./derivar";
 
 /**
  * §297 — grava a régua do teste SEM acumular.
  *
- * Estes specs escrevem no documento GLOBAL e restauram no `finally`. Se o
- * restore falhar uma vez (queda, timeout, execução interrompida), a régua fica
- * lá — e a execução seguinte a acrescenta de novo, produzindo DUAS violações
- * onde o teste espera uma. Foi o que aconteceu, e o sintoma ("2 fora do
- * padrão") não aponta para a causa.
+ * Estes specs gravam uma régua e restauram no `finally`. Se o restore falhar
+ * uma vez (queda, timeout, execução interrompida), a régua fica lá — e a
+ * execução seguinte a acrescenta de novo, produzindo DUAS violações onde o
+ * teste espera uma. Foi o que aconteceu, e o sintoma ("2 fora do padrão") não
+ * aponta para a causa.
  *
  * Filtrar pelo texto antes de concatenar torna a gravação idempotente: o
  * resíduo de ontem não soma com o de hoje.
@@ -19,13 +19,25 @@ function comRegraDoTeste<T extends { texto?: string }>(lista: T[] | undefined, n
 }
 
 const API = "http://localhost:4100";
+/**
+ * §303 — o time SÓ deste arquivo.
+ *
+ * As réguas destes testes moram no documento do time, e não no global: o
+ * cliente web passou a mandar o `timeId` (o servidor sempre resolveu time →
+ * global → template), então nenhum spec vizinho enxerga o que se grava aqui.
+ * Antes disso a única defesa era o `finally`, e bastava um teste morrer no
+ * meio para a régua vazar para a rodada seguinte.
+ */
+// O valor vem de `entrarEmTimeProprio`, dentro de cada teste — aqui só o
+// sufixo, que é o que o helper pede.
+const SUFIXO = "conformidade";
 
 /**
- * Os testes deste arquivo mexem no MESMO documento de regras (global, §239).
- * Em paralelo, o `finally` de um restaura enquanto o outro ainda depende da
- * regra que escreveu — e o sintoma é uma violação que simplesmente não
- * aparece, sem nada apontar a causa. Mesma disciplina (e mesmo remédio) do
- * `rbac-cadeado-e-pedido`: um por vez.
+ * Os três testes deste arquivo mexem no MESMO documento — o do `TIME` acima.
+ * O §303 tirou os VIZINHOS de cima dele, não os irmãos: em paralelo, o
+ * `finally` de um restauraria enquanto o outro ainda depende da regra que
+ * escreveu, e o sintoma é uma violação que simplesmente não aparece. Por isso
+ * o serial fica.
  */
 test.describe.configure({ mode: "serial" });
 
@@ -62,9 +74,9 @@ test("a relação entre DOIS campos vira violação, com o campo comparado na me
     (url) => url.pathname === "/ia/status",
     (rota) => rota.fulfill({ json: { modelosChat: [], embeddingInstalado: false, capacidades: {} } })
   );
-  await entrar(page);
+  const TIME = await entrarEmTimeProprio(page, SUFIXO);
 
-  const antes = await (await page.request.get(`${API}/config/regras`)).json();
+  const antes = await (await page.request.get(`${API}/config/regras?timeId=${TIME}`)).json();
   const documento = JSON.parse(JSON.stringify(antes.documento));
   documento.porTech = documento.porTech ?? {};
   documento.porTech.Backend = documento.porTech.Backend ?? { checklistTecnico: [], testes: [] };
@@ -78,7 +90,11 @@ test("a relação entre DOIS campos vira violação, com o campo comparado na me
     contextos: ["Backend-mensagens kafka"],
     checagem: { campo: "particoes", operador: "gte", valorDe: "fatorReplicacao" },
   });
-  expect((await page.request.put(`${API}/config/regras`, { data: { documento } })).status()).toBe(200);
+  const gravou = await page.request.put(`${API}/config/regras`, { data: { documento, timeId: TIME } });
+  // O CORPO junto do status: um 403 que só diz "403" manda quem investiga
+  // adivinhar entre RBAC, nível do time e seção sem dono — três causas
+  // diferentes com o mesmo número.
+  expect(gravou.status(), await gravou.text()).toBe(200);
 
   try {
     await page.reload();
@@ -103,7 +119,7 @@ test("a relação entre DOIS campos vira violação, com o campo comparado na me
     await painel.getByRole("spinbutton", { name: "Número de partições" }).fill("6");
     await expect(page.getByTestId("conformidade-resumo")).toHaveCount(0);
   } finally {
-    await page.request.put(`${API}/config/regras`, { data: { documento: antes.documento } });
+    await page.request.put(`${API}/config/regras`, { data: { documento: antes.documento, timeId: TIME } });
   }
 });
 
@@ -124,9 +140,9 @@ test("a violação explica o padrão, e aceitar de propósito tira do placar sem
     (url) => url.pathname === "/ia/status",
     (rota) => rota.fulfill({ json: { modelosChat: [], embeddingInstalado: false, capacidades: {} } })
   );
-  await entrar(page);
+  const TIME = await entrarEmTimeProprio(page, SUFIXO);
 
-  const antes = await (await page.request.get(`${API}/config/regras`)).json();
+  const antes = await (await page.request.get(`${API}/config/regras?timeId=${TIME}`)).json();
   const documento = JSON.parse(JSON.stringify(antes.documento));
   documento.porTech = documento.porTech ?? {};
   documento.porTech.Backend = documento.porTech.Backend ?? { checklistTecnico: [], testes: [] };
@@ -136,7 +152,11 @@ test("a violação explica o padrão, e aceitar de propósito tira do placar sem
     porque: "Veio do incidente em que o parceiro travou e derrubou o checkout junto.",
     checagem: { campo: "timeoutMs", operador: "lte", valor: 500, unidade: "ms" },
   });
-  expect((await page.request.put(`${API}/config/regras`, { data: { documento } })).status()).toBe(200);
+  const gravou = await page.request.put(`${API}/config/regras`, { data: { documento, timeId: TIME } });
+  // O CORPO junto do status: um 403 que só diz "403" manda quem investiga
+  // adivinhar entre RBAC, nível do time e seção sem dono — três causas
+  // diferentes com o mesmo número.
+  expect(gravou.status(), await gravou.text()).toBe(200);
 
   try {
     await page.reload();
@@ -173,7 +193,7 @@ test("a violação explica o padrão, e aceitar de propósito tira do placar sem
     await expect(page.getByTestId("contagem-itens")).toBeVisible();
     await expect(page.locator('[data-testid="item-n1::padrao::timeoutMs"]')).toHaveCount(0);
   } finally {
-    await page.request.put(`${API}/config/regras`, { data: { documento: antes.documento } });
+    await page.request.put(`${API}/config/regras`, { data: { documento: antes.documento, timeId: TIME } });
   }
 });
 
@@ -196,13 +216,14 @@ test("valor fora do padrão aparece no placar, chega ao item, e some quando entr
     (url) => url.pathname === "/ia/status",
     (rota) => rota.fulfill({ json: { modelosChat: [], embeddingInstalado: false, capacidades: {} } })
   );
-  await entrar(page);
+  const TIME = await entrarEmTimeProprio(page, SUFIXO);
 
-  // O documento GLOBAL, e não o do time: o cliente web lê `/config/regras`
-  // SEM `timeId` (`loadConfig.ts`), então o override por time — que a API
-  // suporta — nunca chega à tela. Escrever no do time faria este teste
-  // configurar um padrão que o app jamais aplicaria.
-  const antes = await (await page.request.get(`${API}/config/regras`)).json();
+  // §303 — o documento do TIME. Esta nota dizia o contrário até aqui ("tem que
+  // ser o global, porque o cliente web lê `/config/regras` sem `timeId`"), e
+  // era verdade: o override por time existia na API e nunca chegava à tela.
+  // Agora `loadConfig.ts` manda o `timeId`, e o que se grava aqui é o que o
+  // app aplica — sem passar por cima de spec nenhum.
+  const antes = await (await page.request.get(`${API}/config/regras?timeId=${TIME}`)).json();
   const documento = JSON.parse(JSON.stringify(antes.documento));
   documento.porTech = documento.porTech ?? {};
   documento.porTech.Backend = documento.porTech.Backend ?? { checklistTecnico: [], testes: [] };
@@ -213,7 +234,11 @@ test("valor fora do padrão aparece no placar, chega ao item, e some quando entr
     contextos: ["Backend-chamadas http"],
     checagem: { campo: "timeoutMs", operador: "lte", valor: 500, unidade: "ms" },
   });
-  expect((await page.request.put(`${API}/config/regras`, { data: { documento } })).status()).toBe(200);
+  const gravou = await page.request.put(`${API}/config/regras`, { data: { documento, timeId: TIME } });
+  // O CORPO junto do status: um 403 que só diz "403" manda quem investiga
+  // adivinhar entre RBAC, nível do time e seção sem dono — três causas
+  // diferentes com o mesmo número.
+  expect(gravou.status(), await gravou.text()).toBe(200);
 
   try {
   await page.reload();
@@ -269,7 +294,8 @@ test("valor fora do padrão aparece no placar, chega ao item, e some quando entr
   await timeout.fill("450");
   await expect(page.getByTestId("conformidade-resumo")).toHaveCount(0);
   } finally {
-    // Regras são estado GLOBAL — devolver é a disciplina do §162 com os papéis.
-    await page.request.put(`${API}/config/regras`, { data: { documento: antes.documento } });
+    // Devolver o documento DO TIME: os outros dois testes deste arquivo leem o
+    // mesmo, e a régua daqui os faria contar violação a mais.
+    await page.request.put(`${API}/config/regras`, { data: { documento: antes.documento, timeId: TIME } });
   }
 });
