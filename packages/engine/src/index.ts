@@ -74,17 +74,22 @@ export {
   type Insistencia,
 } from "./leitura/resiliencia.js";
 export {
+  cobrancasDeEnsaio,
   concluirEnsaio,
   elementosComTempo,
   ensaioCobra,
+  ensaiosAssumidos,
+  ensaiosDaDecisao,
   estadoDoEnsaio,
   prazoEstourado,
   simularCenario,
   simularCenarios,
   type AjusteDeCenario,
   type CenarioDeLentidao,
+  type CobrancaDeEnsaio,
   type DebitoAssumido,
   type ElementoAjustavel,
+  type EnsaioAssumido,
   type EstadoDoEnsaio,
   type ResultadoDoCenario,
 } from "./leitura/simularLentidao.js";

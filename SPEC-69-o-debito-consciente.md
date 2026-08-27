@@ -243,6 +243,20 @@ O que já temos e é honesto é a coluna **"quem domina"**: *"o bureau responde 
 | **D** | `Decisao.ensaioIds` — a evidência viajando ao documento e ao item | unitário no `gerarEspecificacaoEntrega` |
 | **E** | As superfícies e o E2E | E2E: o ensaio cobra → aceitar com motivo tira do placar → reabrir devolve |
 
+**Todas entregues** (§304). Duas correções ao que as fatias anteriores deixaram
+pela metade, e que só apareceram ao procurar quem CONSUMIA o que elas
+produziram:
+
+- `ensaioCobra` estava exportado e ninguém o chamava — a inversão do §4 existia
+  como função pura e não chegava ao placar;
+- `Necessidade.limiteMs` não tinha onde ser declarado, o que tornava o §3 inteiro
+  inalcançável pela tela.
+
+E uma decisão de desenho que a SPEC não fechava: **todo ensaio assumido vai à
+seção de riscos**; o anexo a uma decisão é o que adicionalmente o leva ao item.
+Exigir o anexo para qualquer visibilidade devolveria o débito ao lugar de onde
+esta SPEC o tirou.
+
 **A ordem tem uma dependência dura:** B antes de E, porque a máquina de estados
 decide o que a tela mostra. E A antes de C, porque a frase da §4.0.1 cita o
 prazo do negócio — escrevê-la antes seria escrever metade dela duas vezes.

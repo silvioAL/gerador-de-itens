@@ -4,8 +4,11 @@ import type { Diagrama } from "../model/types.js";
 import { readConfigFile } from "../test-support/fixtures.js";
 import { lerDesenho } from "./lerDesenho.js";
 import {
+  cobrancasDeEnsaio,
   concluirEnsaio,
   ensaioCobra,
+  ensaiosAssumidos,
+  ensaiosDaDecisao,
   estadoDoEnsaio,
   prazoEstourado,
   simularCenario,
@@ -302,5 +305,159 @@ describe("concluirEnsaio — a conclusão escrita, para quem avalia não montá-
   it("sem número não há conclusão — e `undefined` é a resposta", () => {
     // §248: uma frase sobre um número que não existe seria a pior das saídas.
     expect(concluirEnsaio(resultado({}), 3000, [])).toBeUndefined();
+  });
+});
+
+/**
+ * SPEC-69 fatia D — o ensaio assumido pronto para viajar.
+ *
+ * Até aqui, aceitar um ensaio produzia um registro que não saía da tela de
+ * Ensaios — o "botão que não levava a lugar nenhum" do §1, uma casa adiante.
+ * Estas asserções são sobre o que o documento e o item vão conseguir ler.
+ */
+describe("ensaiosAssumidos — só o que alguém ASSUMIU vira registro", () => {
+  const assumido = (id: string, extra: Partial<CenarioDeLentidao> = {}) =>
+    cenario({
+      id,
+      nome: `Bureau em pico (${id})`,
+      estado: "aceito",
+      debito: { motivo: "o parceiro não tem SLA melhor", autor: "ana@empresa.com", em: "2026-08-27T10:00:00Z" },
+      ajustes: [{ tipo: "no", id: "bureau", ms: 24000 }],
+      ...extra,
+    });
+
+  it("o que ainda cobra fica de FORA — o documento não afirma que se assumiu o que ninguém olhou", () => {
+    const lista = ensaiosAssumidos(desenho(), config, [
+      assumido("aceito1"),
+      cenario({ id: "novo", estado: "por-avaliar" }),
+      cenario({ id: "mexendo", estado: "em-revisao" }),
+    ]);
+
+    expect(lista.map((e) => e.id)).toEqual(["aceito1"]);
+  });
+
+  it("traz a conclusão JÁ calculada, com o prazo do negócio dentro", () => {
+    const [e] = ensaiosAssumidos(desenho(), config, [assumido("a1")], [{ texto: "aprovar na hora", limiteMs: 5000 }]);
+
+    // A mesma frase da fatia C — recalculá-la na tela e no documento seria a
+    // segunda versão de uma verdade só.
+    expect(e.conclusao).toContain("acima do prazo de 5,0 s que o negócio pede");
+    expect(e.motivo).toBe("o parceiro não tem SLA melhor");
+    expect(e.autor).toBe("ana@empresa.com");
+  });
+
+  it("quebra antiga com `aceito: true` e sem motivo DIZ que não tem motivo, em vez de inventar um", () => {
+    // §57 — o campo `debito` nasceu com a máquina de estados; o que foi aceito
+    // antes dela existe e não tem porquê. Fingir que tem seria pior que a
+    // frase feia.
+    const [e] = ensaiosAssumidos(desenho(), config, [cenario({ id: "velho", aceito: true })]);
+
+    expect(e.motivo).toContain("antes de o motivo ser exigido");
+  });
+
+  it("sem nenhum aceito, nem roda a simulação — devolve lista vazia", () => {
+    expect(ensaiosAssumidos(desenho(), config, [cenario({ id: "x", estado: "por-avaliar" })])).toEqual([]);
+  });
+});
+
+describe("ensaiosDaDecisao — o elo", () => {
+  const assumidos = [
+    { id: "e1", nome: "Bureau em pico", motivo: "sem SLA melhor" },
+    { id: "e2", nome: "Fila cheia", motivo: "custo" },
+  ];
+
+  it("devolve na ORDEM em que a decisão anexou, não na ordem da quebra", () => {
+    // A ordem é da decisão porque é ela que conta a história: o primeiro
+    // ensaio citado é o que mais pesou na escolha.
+    const r = ensaiosDaDecisao({ ensaioIds: ["e2", "e1"] }, assumidos);
+    expect(r.map((e) => e.id)).toEqual(["e2", "e1"]);
+  });
+
+  it("id que não corresponde a nenhum assumido some, em vez de virar linha vazia", () => {
+    // Acontece de verdade: o ensaio foi apagado, ou reaberto e voltou a cobrar.
+    // Uma linha "undefined" no documento seria pior que a ausência.
+    expect(ensaiosDaDecisao({ ensaioIds: ["e1", "sumiu"] }, assumidos).map((e) => e.id)).toEqual(["e1"]);
+  });
+
+  it("decisão sem ensaio anexado devolve vazio — nada muda para quem não usa isto", () => {
+    expect(ensaiosDaDecisao({}, assumidos)).toEqual([]);
+  });
+});
+
+/**
+ * SPEC-69 §4.1 — a inversão: TODO ensaio cobra.
+ *
+ * Veio do usuário, corrigindo o desenho que eu tinha feito: *"na realidade todo
+ * ensaio cobra"*. Se só o aceito cobrasse, o débito que ninguém olhou seguiria
+ * invisível — e débito que ninguém olhou é exatamente o inconsciente que esta
+ * SPEC existe para acabar.
+ */
+describe("cobrancasDeEnsaio — o que tira do placar é ACEITAR, não olhar", () => {
+  const comPool = () =>
+    diagrama(
+      [
+        no("api", "service", { chamadasSimultaneas: 10 }),
+        no("bureau", "external", { timeoutMs: 2000 }),
+      ],
+      [aresta("e1", "api", "bureau", "http", { timeoutMs: 300 })]
+    );
+
+  const pico = (extra: Partial<CenarioDeLentidao> = {}) =>
+    cenario({
+      id: "cen-pico",
+      nome: "Black Friday",
+      ajustes: [{ tipo: "no", id: "bureau", ms: 24000 }],
+      ...extra,
+    });
+
+  it("um ensaio POR AVALIAR cobra o prazo do negócio, marcado com o nome dele", () => {
+    const [c] = cobrancasDeEnsaio(comPool(), config, [pico()], [{ texto: "aprovar na hora", limiteMs: 5000 }]);
+
+    expect(c.nome).toBe("Black Friday");
+    expect(c.avisos.join(" ")).toContain("acima do prazo de 5,0 s");
+    expect(c.avisos.join(" ")).toContain("aprovar na hora");
+  });
+
+  it("EM REVISÃO cobra igual — abrir a linha não é decidir nada", () => {
+    // Sair da cobrança por ter aberto seria a fórmula de fazer as pessoas
+    // abrirem tudo sem ler.
+    const r = cobrancasDeEnsaio(
+      comPool(),
+      config,
+      [pico({ estado: "em-revisao" })],
+      [{ texto: "aprovar na hora", limiteMs: 5000 }]
+    );
+
+    expect(r).toHaveLength(1);
+  });
+
+  it("ACEITO sai do placar — é a válvula, e é o que a converte em registro", () => {
+    const r = cobrancasDeEnsaio(
+      comPool(),
+      config,
+      [pico({ estado: "aceito", debito: { motivo: "assumimos" } })],
+      [{ texto: "aprovar na hora", limiteMs: 5000 }]
+    );
+
+    expect(r).toEqual([]);
+  });
+
+  it("sem prazo declarado, o ensaio não inventa julgamento sobre o número", () => {
+    // §3 — "24 s" sozinho não decide nada, e afirmar que está ruim sem ninguém
+    // ter prometido nada seria o produto decidindo o SLA do time.
+    const r = cobrancasDeEnsaio(comPool(), config, [pico()], []);
+
+    expect(r).toEqual([]);
+  });
+
+  it("ensaio que não cria NADA não vira linha vazia no placar", () => {
+    const r = cobrancasDeEnsaio(
+      comPool(),
+      config,
+      [cenario({ id: "cen-nada", nome: "Sem efeito", ajustes: [] })],
+      [{ texto: "aprovar na hora", limiteMs: 60000 }]
+    );
+
+    expect(r).toEqual([]);
   });
 });

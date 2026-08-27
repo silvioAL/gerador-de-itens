@@ -11282,3 +11282,80 @@ por engano.
 
 461 engine · 737 web · 84 aplicação · 238 server · 129 llm · 98/98 E2E · build e
 lint limpos.
+
+## §304 — o botão que agora leva a algum lugar (SPEC-69 D+E)
+
+A pergunta que abriu a SPEC-69 foi do usuário: *"o que acontece quando se clica
+em aceitar? qual é o valor do próximo passo?"* — e a resposta medida na época
+foi **nenhum**. Um cenário aceito trocava um booleano, saía da opacidade
+reduzida, e ninguém mais lia aquele campo.
+
+As fatias A, B e C entregaram a máquina de estados, o prazo do negócio no motor
+e a conclusão derivada. Faltavam D e E: a evidência viajando, e as superfícies.
+
+### O que a leitura do código revelou antes de escrever qualquer linha
+
+Duas coisas que as fatias anteriores deixaram pela metade, e que só apareceram
+ao procurar por quem consumia o que elas produziram:
+
+**`ensaioCobra` estava exportado e ninguém o chamava.** A inversão que dá nome à
+SPEC — *"na realidade todo ensaio cobra"*, correção que veio do usuário — existia
+como função pura e não chegava a lugar nenhum. Na prática, um ensaio que ninguém
+olhou continuava invisível: exatamente o débito inconsciente que a SPEC existe
+para acabar.
+
+**`Necessidade.limiteMs` não tinha onde ser declarado.** O tipo existia, o
+`prazoEstourado` existia, e nenhuma tela pedia o número. Sem ele, o §3 inteiro
+("24 s contra os 5 s que o negócio pede") era inalcançável — e é ele que
+transforma leitura em decisão.
+
+> Fatia que entrega motor sem superfície parece pronta no diff e não existe para
+> quem usa. As duas passaram porque a prova de cada fatia era unitária, e teste
+> unitário não sente falta de um chamador.
+
+### O que entrou
+
+- **`Decisao.ensaioIds`** — o elo. Ids e não cópias: o número continua vivo na
+  quebra, e uma cópia divergiria na primeira vez que alguém mexesse no desenho.
+- **`ensaiosAssumidos`** — um dono só para a conta. A tela de Ensaios, o
+  documento e o item leem a **mesma** frase; recalculá-la em cada lugar seria a
+  segunda versão de uma verdade, e ela divergiria em silêncio.
+- **A seção de riscos ganha um bloco derivado**, ao lado do texto humano e nunca
+  dentro dele (§4.4). O markdown e a tela mostram o mesmo — o arquivo baixado e
+  o que está na tela não podem discordar sobre o que se está aceitando correr.
+- **`cobrancasDeEnsaio`** — o ensaio no placar ⚖, marcado com o nome. A marca
+  não é enfeite: é o que impede o placar de confundir *o que é* com *o que
+  seria*.
+- **O campo do prazo do negócio**, junto da necessidade — e não no percurso, que
+  é a régua do time. São duas perguntas: "isto segue o padrão da casa?" e "isto
+  entrega o que prometemos ao cliente?".
+
+### A decisão de desenho que tomei sozinho, e por quê
+
+A SPEC diz que o ensaio aceito **pode** ser anexado a uma decisão, e aí viaja. Não
+diz o que acontece com o assumido que ninguém anexou.
+
+Escolhi: **todo ensaio assumido vai à seção de riscos**; o anexo à decisão é o
+que adicionalmente o leva ao **item**. A alternativa — exigir o anexo para
+qualquer visibilidade — devolveria o débito ao lugar de onde a SPEC o tirou:
+visível só para quem abre a tela certa. E a dica da própria seção é literalmente
+*"o que você está aceitando correr"*.
+
+### O gesto de assumir NÃO aparece no placar, de propósito
+
+O placar mostra a cobrança e leva à bancada; assumir acontece lá, junto do
+número. Oferecer "aceitar de propósito…" na lista, longe da evidência, seria
+convidar a silenciar sem ler — que é o §230 ao contrário.
+
+### Três fixtures que eu inventei
+
+`AjusteDeCenario.campo`, `Necessidade` sem `origem`, e três rótulos de tela que
+não existiam. Os dois primeiros passaram no motor (o tsconfig dele não checa os
+testes) e só quebraram no `tsc` do web; os rótulos só quebraram no navegador.
+
+> Escrever teste a partir do que eu achava que a tela tinha, e não do que ela
+> tem, custou três rodadas. O `grep` pelo rótulo antes de escrever a asserção é
+> mais barato que o Playwright descobrindo.
+
+478 engine · 750 web · 84 aplicação · 238 server · 129 llm · 99/99 E2E · build e
+lint limpos.

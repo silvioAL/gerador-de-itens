@@ -179,3 +179,91 @@ test("§302 — a tela de ensaios cobre a mesa; nada da mesa vaza no canto", asy
   expect(quemEstaNoCanto.dentroDaTela).toBe(true);
   expect(quemEstaNoCanto.tag).not.toBe("aside");
 });
+
+/**
+ * SPEC-69 fatia E — o ciclo do débito consciente, no navegador.
+ *
+ * A pergunta que originou a SPEC foi do usuário: *"o que acontece quando se
+ * clica em aceitar? qual é o valor do próximo passo?"* — e a resposta medida na
+ * época foi: nenhum. O cenário aceito trocava um booleano e não ia a lugar
+ * nenhum.
+ *
+ * O que só o navegador prova é a corrente inteira, que nenhum teste de unidade
+ * alcança: o ensaio **cobra** no placar da mesa → assumir com motivo o **tira**
+ * de lá → o débito aparece na seção de riscos do **documento** → reabrir devolve
+ * a cobrança (§283, nenhuma decisão é de mão única).
+ */
+test("§304 — o ensaio cobra, assumir com motivo tira do placar, e o débito chega ao documento", async ({ page }) => {
+  test.setTimeout(180000);
+  await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
+  await page.route(
+    (url) => url.pathname === "/ia/status",
+    (rota) => rota.fulfill({ json: { modelosChat: [], embeddingInstalado: false, capacidades: {} } })
+  );
+  await entrar(page);
+
+  await page.getByTestId("abrir-cenarios").click();
+  await page.getByRole("button", { name: "Carregar cenário: Fluxo completo: aprovação de crédito" }).click();
+
+  // ── O prazo do NEGÓCIO: sem ele "24 s" não decide nada ──
+  //
+  // §3 — é o que transforma a leitura em decisão. Sem `limiteMs` declarado o
+  // ensaio não inventa julgamento, e não haveria o que cobrar.
+  await page.getByTestId("assistente-flutuante").click();
+  const janela = page.getByTestId("assistente-janela");
+  await janela.getByRole("button", { name: "📎 Contexto do épico" }).click();
+  // `exact` porque "Prioridade da nova necessidade" também casa com o rótulo
+  // solto, e o Playwright falha em modo estrito.
+  await janela.getByLabel("Nova necessidade", { exact: true }).fill("Aprovar crédito na hora");
+  await janela.getByTestId("limite-da-necessidade").fill("5000");
+  await janela.getByRole("button", { name: "+ Adicionar" }).click();
+  // O prazo declarado fica VISÍVEL: um número que cobra sem aparecer é uma
+  // régua secreta.
+  await expect(janela.locator('[data-testid^="limite-nec-"]')).toContainText("5,0 s");
+  await janela.getByRole("button", { name: "Salvar" }).click();
+
+  // ── O ensaio nasce COBRANDO — é a inversão que dá nome à SPEC ──
+  await page.goto("/#/ensaios");
+  await page.getByLabel("Nome do cenário").fill("Bureau em pico");
+  await page.getByTestId("criar-cenario").click();
+  await page.getByTestId("add-ajuste-cen-bureau-em-pico").click();
+  const fator = page.locator('[data-testid^="fator-"]').first();
+  await fator.fill("8");
+
+  await page.getByTestId("ensaios-voltar").click();
+  const chip = page.getByTestId("conformidade-resumo");
+  await expect(chip).toBeVisible();
+  await chip.click();
+  const lista = page.getByTestId("conformidade-lista");
+  // Marcado com o nome: sem isso, "a resposta vai a 24 s" seria lido como fato
+  // do desenho de hoje, e não como condição.
+  await expect(lista).toContainText("Sob “Bureau em pico”");
+  await expect(lista).toContainText("acima do prazo de 5,0 s");
+  await chip.click();
+
+  // ── Assumir com motivo: a válvula do §242 sobre um número que ninguém tinha ──
+  await page.goto("/#/ensaios");
+  await page.getByTestId("assumir-cen-bureau-em-pico").click();
+  await page.getByLabel("Por que assumir este débito").fill("O parceiro não oferece SLA melhor no contrato atual.");
+  await page.getByTestId("confirmar-assumir-cen-bureau-em-pico").click();
+  await expect(page.getByTestId("debito-cen-bureau-em-pico")).toContainText("O parceiro não oferece SLA melhor");
+
+  // Sai do placar — e some, porque não sobra mais nada cobrando.
+  await page.getByTestId("ensaios-voltar").click();
+  await expect(page.getByTestId("conformidade-resumo")).toHaveCount(0);
+
+  // ── §4.4 — e o débito chega a quem APROVA o desenho ──
+  await page.goto("/#/documento");
+  const risco = page.getByTestId("risco-medido-cen-bureau-em-pico");
+  await expect(risco).toBeVisible();
+  await expect(risco).toContainText("Bureau em pico");
+  await expect(risco).toContainText("O parceiro não oferece SLA melhor");
+  // A conclusão derivada, não um número cru: é o §4.0.1 chegando ao documento.
+  await expect(risco).toContainText("acima do prazo de 5,0 s");
+
+  // ── §283 — reabrir devolve a cobrança, sem apagar que alguém assumiu ──
+  await page.goto("/#/ensaios");
+  await page.getByTestId("reabrir-cen-bureau-em-pico").click();
+  await page.getByTestId("ensaios-voltar").click();
+  await expect(page.getByTestId("conformidade-resumo")).toBeVisible();
+});

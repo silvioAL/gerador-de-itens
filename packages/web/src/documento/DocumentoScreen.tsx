@@ -4,6 +4,7 @@ import type { MudancaDeSecao } from "@gerador/engine";
 import type {
   Decisao,
   Diagrama,
+  EnsaioAssumido,
   DiagramaConfig,
   DocumentoDeDesenho,
   DocumentoEscrito,
@@ -86,6 +87,20 @@ export interface DocumentoScreenProps {
   onExportar?: () => Promise<ResultadoDaExportacao>;
   /** Pra onde vai, como a configuração chamou ("Jira do time X"). */
   destinoDaExportacao?: string | null;
+  /**
+   * SPEC-69 §4.4 — os ensaios ASSUMIDOS, ao lado da seção de riscos.
+   *
+   * O texto de riscos é de quem escreveu (SPEC-58 regra 3: sobrevive à
+   * regeneração). O ensaio entra **ao lado, nunca dentro**: dois blocos, uma
+   * seção, nenhum sobrescreve o outro.
+   *
+   * Vazio = a seção fica exatamente como era. Quem nunca assumiu um ensaio não
+   * ganha caixa nova.
+   */
+  ensaios?: EnsaioAssumido[];
+  /** Qual decisão cada ensaio sustenta — o que ele leva ao item de quem
+   * implementa. `undefined` para ensaio que ninguém anexou, e a linha some. */
+  decisaoDoEnsaio?: (ensaioId: string) => string | undefined;
 }
 
 const ROTULO_STATUS: Record<StatusDocumento, string> = {
@@ -112,6 +127,8 @@ export function DocumentoScreen({
   onRevisarItem,
   onExportar,
   destinoDaExportacao,
+  ensaios,
+  decisaoDoEnsaio,
 }: DocumentoScreenProps) {
   const { violacoes, aceitas, violacoesDePercurso, naoMedidos, percursos, violacoesDeForma, formaAceitas } =
     documento.conferencias;
@@ -291,6 +308,7 @@ export function DocumentoScreen({
           testid="secao-riscos"
           onMudar={(texto) => onMudarEscrito({ ...escrito, riscos: texto })}
         />
+        <RiscosMedidos ensaios={ensaios ?? []} decisaoDoEnsaio={decisaoDoEnsaio} />
 
         <SecaoDosItens
           derivados={documento.itens}
@@ -463,6 +481,74 @@ function Secao({ titulo, children }: { titulo: string; children: React.ReactNode
  * para outra tela para escrever duas frases é como a seção fica vazia para
  * sempre.
  */
+/**
+ * SPEC-69 §4.4 — o bloco DERIVADO da seção de riscos.
+ *
+ * O texto acima é de quem escreveu e sobrevive à regeneração (SPEC-58 regra 3).
+ * Este é do motor, e fica **ao lado, nunca dentro**: dois blocos, uma seção,
+ * nenhum sobrescreve o outro. É a mesma disciplina que separa o calculado do
+ * escrito em todo o resto do produto — e aqui ela importa mais, porque a
+ * tentação de "juntar tudo num campo de texto" é exatamente o que faria a
+ * regeneração apagar o julgamento de alguém.
+ *
+ * Sem ensaio assumido, nada aparece: quem não usa isto vê a tela de antes.
+ */
+function RiscosMedidos({
+  ensaios,
+  decisaoDoEnsaio,
+}: {
+  ensaios: EnsaioAssumido[];
+  decisaoDoEnsaio?: (ensaioId: string) => string | undefined;
+}) {
+  if (ensaios.length === 0) return null;
+  return (
+    <section style={{ marginTop: -8, marginBottom: 20 }} data-testid="riscos-medidos">
+      <p style={{ fontSize: 11.5, color: "var(--texto-mudo)", margin: "0 0 8px" }}>
+        <strong style={{ color: "var(--texto-2)" }}>Riscos medidos</strong> — derivado dos ensaios assumidos. O texto
+        acima é seu; este bloco é do motor.
+      </p>
+      {ensaios.map((e) => {
+        const decisao = decisaoDoEnsaio?.(e.id);
+        return (
+          <div
+            key={e.id}
+            data-testid={`risco-medido-${e.id}`}
+            style={{
+              border: "1px solid var(--borda)",
+              borderLeft: "3px solid var(--amarelo)",
+              borderRadius: 8,
+              padding: "8px 12px",
+              marginBottom: 6,
+              background: "var(--painel)",
+            }}
+          >
+            <strong style={{ fontSize: 13 }}>{e.nome}</strong>
+            {e.conclusao && (
+              <p style={{ fontSize: 12, color: "var(--texto-2)", margin: "4px 0 0", lineHeight: 1.5 }}>{e.conclusao}</p>
+            )}
+            {/* Os dois porquês são coisas diferentes: um diz por que isto
+                aconteceria, o outro por que decidimos conviver com isso. */}
+            {e.porque && (
+              <p style={{ fontSize: 11, color: "var(--texto-mudo)", margin: "4px 0 0", fontStyle: "italic" }}>
+                {e.porque}
+              </p>
+            )}
+            <p style={{ fontSize: 11, color: "var(--verde)", margin: "4px 0 0" }}>
+              Assumido{e.autor ? ` por ${e.autor}` : ""}
+              {e.em ? ` · ${new Date(e.em).toLocaleDateString("pt-BR")}` : ""}: {e.motivo}
+            </p>
+            {decisao && (
+              <p style={{ fontSize: 11, color: "var(--texto-mudo)", margin: "4px 0 0" }}>
+                Sustenta a decisão: <strong>{decisao}</strong>
+              </p>
+            )}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 function SecaoEscrita({
   titulo,
   dica,

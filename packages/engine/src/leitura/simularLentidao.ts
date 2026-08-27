@@ -419,3 +419,147 @@ export function simularCenarios(
     resultados: cenarios.map((c) => simularCenario(diagrama, config, c, hoje, campoDeTempo)),
   };
 }
+
+/**
+ * SPEC-69 §4.3 — o ensaio assumido, pronto para VIAJAR.
+ *
+ * Um ensaio aceito é um débito consciente: alguém leu o número, disse "sabemos
+ * e assumimos" e assinou o porquê. Até aqui isso morria na tela de Ensaios —
+ * era o "botão que não levava a lugar nenhum" do §1 desta SPEC, uma casa
+ * adiante.
+ *
+ * Esta forma é o que o documento e o item precisam ler, e nada além: o nome, a
+ * conclusão derivada (§4.0.1) e a assinatura. Deliberadamente **sem** a leitura
+ * inteira — quem lê o documento não vai reabrir a simulação, e carregar o
+ * `ResultadoDoCenario` inteiro para dentro do markdown seria oferecer detalhe
+ * onde se precisa de conclusão.
+ */
+export interface EnsaioAssumido {
+  id: string;
+  nome: string;
+  /** A conclusão derivada. Ausente quando o desenho não deu número. */
+  conclusao?: string;
+  /** O porquê de quem assumiu — obrigatório para aceitar (§4.0). */
+  motivo: string;
+  autor?: string;
+  /** ISO-8601. */
+  em?: string;
+  /** O que a pessoa escreveu sobre o CENÁRIO (conhecimento de mundo), não sobre
+   * a conta. Ver a regra 3 do §4.0.1. */
+  porque?: string;
+}
+
+/**
+ * Os ensaios ACEITOS de uma quebra, já com a conclusão calculada.
+ *
+ * Um dono só para esta conta: a tela de Ensaios, o documento e o item leem a
+ * mesma frase. Recalculá-la em cada lugar seria a segunda versão de uma
+ * verdade — e ela divergiria em silêncio, porque duas frases parecidas sobre o
+ * mesmo número não parecem um defeito ao lado uma da outra (§263).
+ *
+ * `aceito` e não "todos": o que ainda cobra pertence ao placar, não ao registro
+ * — misturar os dois faria o documento afirmar que se assumiu algo que ninguém
+ * olhou, que é o oposto do que esta SPEC existe para fazer.
+ */
+export function ensaiosAssumidos(
+  diagrama: Diagrama,
+  config: DiagramaConfig,
+  cenarios: CenarioDeLentidao[],
+  necessidades: { texto: string; limiteMs?: number }[] = [],
+  campoDeTempo: string = CAMPO_DE_TEMPO_PADRAO
+): EnsaioAssumido[] {
+  const aceitos = cenarios.filter((c) => estadoDoEnsaio(c) === "aceito");
+  if (aceitos.length === 0) return [];
+  const { hoje, resultados } = simularCenarios(diagrama, config, aceitos, campoDeTempo);
+  return aceitos.map((c, i) => ({
+    id: c.id,
+    nome: c.nome,
+    conclusao: concluirEnsaio(resultados[i], hoje.tempoDoPiorTrecho?.ms, necessidades),
+    // O motivo é exigido para aceitar; quebra gravada antes da máquina de
+    // estados pode ter `aceito: true` sem `debito` — e aí a frase diz isso em
+    // vez de inventar um porquê que ninguém escreveu (§57).
+    motivo: c.debito?.motivo ?? "assumido antes de o motivo ser exigido",
+    autor: c.debito?.autor,
+    em: c.debito?.em,
+    porque: c.porque,
+  }));
+}
+
+/** Os ensaios que sustentam uma decisão, na ordem em que ela os anexou. */
+export function ensaiosDaDecisao(
+  decisao: { ensaioIds?: string[] },
+  assumidos: EnsaioAssumido[]
+): EnsaioAssumido[] {
+  const porId = new Map(assumidos.map((e) => [e.id, e]));
+  return (decisao.ensaioIds ?? []).map((id) => porId.get(id)).filter((e): e is EnsaioAssumido => e !== undefined);
+}
+
+/**
+ * SPEC-69 §4.1 — o que um ensaio COBRA no placar.
+ *
+ * Esta é a inversão que dá nome à SPEC, e ela veio do usuário: **"na realidade
+ * todo ensaio cobra."** O desenho anterior era o contrário — só o aceito
+ * cobraria —, e estava errado pelo próprio propósito declarado: se só o que
+ * alguém aceitou cobra, o débito que ninguém olhou continua invisível. E débito
+ * que ninguém olhou é exatamente o inconsciente que esta SPEC existe para
+ * acabar.
+ *
+ * Duas regras que o desenho impõe:
+ *
+ * 1. **"por avaliar" e "em revisão" cobram igual.** O que tira do placar é
+ *    ACEITAR, não olhar — sair da cobrança por ter aberto a linha seria a
+ *    fórmula de fazer as pessoas abrirem tudo sem ler.
+ * 2. **Só o que o ensaio CRIA.** Contradição que já existe hoje é do desenho, e
+ *    atribuí-la ao ensaio faria o placar contar duas vezes o mesmo problema — e
+ *    pior, faria parecer condicional o que é atual.
+ *
+ * A marcação com o nome do ensaio não é enfeite: ela diz na própria frase que
+ * aquilo é **condicional**, e é o que impede o placar de confundir *o que é*
+ * com *o que seria* — a régua que a SPEC-65 traçou entre leitura e cobrança.
+ */
+export interface CobrancaDeEnsaio {
+  ensaioId: string;
+  nome: string;
+  /** Uma frase por cobrança, já com o nome do ensaio implícito no agrupamento. */
+  avisos: string[];
+}
+
+export function cobrancasDeEnsaio(
+  diagrama: Diagrama,
+  config: DiagramaConfig,
+  cenarios: CenarioDeLentidao[],
+  necessidades: { texto: string; limiteMs?: number }[] = [],
+  campoDeTempo: string = CAMPO_DE_TEMPO_PADRAO
+): CobrancaDeEnsaio[] {
+  const cobram = cenarios.filter(ensaioCobra);
+  if (cobram.length === 0) return [];
+
+  const hoje = lerDesenho(diagrama, config, { campoDeTempo });
+  // A assinatura de uma contradição é o par elemento+tipo: o texto muda com os
+  // números, e comparar por texto faria "já existia" virar "é novo" só porque
+  // o valor mudou.
+  const jaExistia = new Set(
+    avaliarResiliencia(diagrama, config).map((c) => `${c.tipo}:${c.noId ?? c.arestaId ?? c.rotulo}`)
+  );
+
+  return cobram
+    .map((c) => {
+      const r = simularCenario(diagrama, config, c, hoje, campoDeTempo);
+      const avisos = r.contradicoes
+        .filter((x) => !jaExistia.has(`${x.tipo}:${x.noId ?? x.arestaId ?? x.rotulo}`))
+        .map((x) => `${x.rotulo}: ${x.esperado}, e ${x.atual}`);
+
+      const prazo = prazoEstourado(r.ms, necessidades);
+      if (prazo) {
+        avisos.push(
+          `a resposta vai a ${formatarDuracao(r.ms!)} — acima do prazo de ${formatarDuracao(
+            prazo.limiteMs
+          )} de "${prazo.texto}"`
+        );
+      }
+      return { ensaioId: c.id, nome: c.nome, avisos };
+    })
+    // Ensaio que não cria nada não cobra nada: uma linha vazia no placar seria
+    // ruído com aparência de problema.
+    .filter((c) => c.avisos.length > 0);
+}

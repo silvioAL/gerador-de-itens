@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Necessidade } from "@gerador/engine";
-import { analisarLacunas, necessidadeConta } from "@gerador/engine";
+import { analisarLacunas, formatarDuracao, necessidadeConta } from "@gerador/engine";
 import { Delta } from "../summary/Delta";
 
 export interface ElementoVinculavel {
@@ -45,6 +45,22 @@ export function NecessidadesPanel({
 }: NecessidadesPanelProps) {
   const [texto, setTexto] = useState("");
   const [prioridade, setPrioridade] = useState<"alta" | "media" | "baixa">("media");
+  /**
+   * SPEC-69 §3 — o tempo que o NEGÓCIO exige desta necessidade.
+   *
+   * É o que transforma leitura em decisão: sem ele, "a resposta soma 3 s" é um
+   * fato sem consequência; com ele, é "3 s contra os 2 s que prometemos".
+   *
+   * **Aqui e não no percurso**, porque são duas perguntas: o percurso cobra o
+   * padrão DO TIME ("isto segue a régua da casa?"), e isto é a exigência DO
+   * NEGÓCIO para esta demanda ("isto entrega o que prometemos ao cliente?").
+   * Um desenho pode passar na primeira e falhar na segunda.
+   *
+   * Vazio é o normal, e o silêncio é honesto: ninguém prometeu nada, então não
+   * há o que confrontar. Um limite padrão seria o produto decidindo o SLA do
+   * time.
+   */
+  const [limite, setLimite] = useState("");
 
   function adicionar() {
     const limpo = texto.trim();
@@ -59,9 +75,14 @@ export function NecessidadesPanel({
         prioridade,
         origem: "manual",
         atendidaPor: [],
+        // Só entra quando é número positivo: "0 ms" seria uma promessa que
+        // nenhum desenho cumpre, e um campo digitado pela metade não pode
+        // virar um prazo que cobra.
+        ...(Number(limite) > 0 ? { limiteMs: Number(limite) } : {}),
       },
     ]);
     setTexto("");
+    setLimite("");
   }
 
   function alterar(id: string, muda: (n: Necessidade) => Necessidade) {
@@ -159,6 +180,17 @@ export function NecessidadesPanel({
           <option value="media">média</option>
           <option value="baixa">baixa</option>
         </select>
+        <input
+          aria-label="Tempo que o negócio exige (ms)"
+          data-testid="limite-da-necessidade"
+          type="number"
+          min={0}
+          value={limite}
+          onChange={(e) => setLimite(e.target.value)}
+          placeholder="prazo (ms)"
+          title="Opcional. Com ele, o ensaio confronta a resposta medida com o que o negócio pede."
+          style={{ width: 96, padding: "7px 8px", borderRadius: 8, border: "1px solid var(--borda-forte)", background: "var(--fundo)", color: "var(--texto)", fontSize: 12 }}
+        />
         <button onClick={adicionar} style={botaoEstilo}>
           + Adicionar
         </button>
@@ -191,6 +223,18 @@ export function NecessidadesPanel({
                 <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
                   <span style={{ flex: 1, fontSize: 13 }}>{n.texto}</span>
                   <span style={{ fontSize: 10, color: "var(--texto-mudo)" }}>{n.prioridade ?? "media"}</span>
+                  {/* SPEC-69 §3 — o prazo declarado fica visível: é ele que o
+                      ensaio confronta, e um número que cobra sem aparecer é o
+                      mesmo que uma régua secreta. */}
+                  {n.limiteMs !== undefined && (
+                    <span
+                      data-testid={`limite-${n.id}`}
+                      style={{ fontSize: 10, color: "var(--texto-2)" }}
+                      title="O tempo que o negócio exige desta necessidade"
+                    >
+                      ⏱ {formatarDuracao(n.limiteMs)}
+                    </span>
+                  )}
                   <button
                     aria-label={`Remover necessidade: ${n.texto}`}
                     onClick={() => onMudar(necessidades.filter((x) => x.id !== n.id))}

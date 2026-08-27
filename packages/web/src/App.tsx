@@ -8,6 +8,7 @@ import {
   exemploDeMedicao,
   derivar,
   estruturarDocumento,
+  ensaiosAssumidos,
   gerarEspecificacaoEntrega,
   resolverDependencias,
   violacoesEmAberto,
@@ -923,6 +924,25 @@ function AppCarregado({
    * "aprovado" não virar carimbo: *mudou algo depois?* Sem isso o selo diria
    * "aprovado" sobre um desenho que ninguém aprovou.
    */
+  /**
+   * SPEC-69 fatia D — os ensaios ASSUMIDOS, calculados uma vez.
+   *
+   * A conta roda uma simulação por ensaio aceito, e o documento é montado ao
+   * vivo a cada render — sem o `useMemo` isso seria refeito a cada tecla
+   * digitada na seção de riscos. Depende do desenho e dos ensaios, e de mais
+   * nada: mudar o texto do documento não muda o número.
+   */
+  const ensaiosDaQuebra = useMemo(
+    () =>
+      ensaiosAssumidos(
+        quebra.diagrama,
+        diagramaConfig,
+        quebra.cenariosDeLentidao ?? [],
+        quebra.necessidades ?? []
+      ),
+    [quebra.diagrama, diagramaConfig, quebra.cenariosDeLentidao, quebra.necessidades]
+  );
+
   const markdownDoDocumento = useMemo(
     () =>
       gerarEspecificacaoEntrega(atividadesDoDocumento, quebra.diagrama, diagramaConfig, {
@@ -939,8 +959,9 @@ function AppCarregado({
         percursos: quebra.percursos,
         tradeOffs: quebra.documentoEscrito?.tradeOffs,
         riscos: quebra.documentoEscrito?.riscos,
+        ensaios: ensaiosDaQuebra,
       }),
-    [atividadesDoDocumento, quebra, diagramaConfig, contextoDoProduto, regrasVisiveis, decisoesVisiveis, especificacaoTemplate, templateItem]
+    [atividadesDoDocumento, quebra, diagramaConfig, contextoDoProduto, regrasVisiveis, decisoesVisiveis, especificacaoTemplate, templateItem, ensaiosDaQuebra]
   );
 
   const documentoDesatualizado =
@@ -1470,6 +1491,13 @@ function AppCarregado({
       <ReadinessSummary
         diagrama={quebra.diagrama}
         config={diagramaConfig}
+        /**
+         * SPEC-69 §4.1 — os ensaios COBRAM no placar enquanto ninguém os
+         * assumiu. É a inversão que dá nome à SPEC: se só o aceito cobrasse, o
+         * débito que ninguém olhou seguiria invisível — e é esse o
+         * "inconsciente" que ela existe para acabar.
+         */
+        cenarios={quebra.cenariosDeLentidao}
         // SPEC-65 — a mesma leitura das marcas do canvas, calculada uma vez.
         leitura={leituraDoDesenho}
         /**
@@ -1753,6 +1781,27 @@ function AppCarregado({
           necessidades={quebra.necessidades}
           // Quem assume o débito — é o que separa consciente de anônimo.
           autor={sessao.email}
+          /**
+           * SPEC-69 fatia D — o elo. Assumir já põe o ensaio na seção de riscos
+           * do documento; ANEXAR a uma decisão é o que o leva ao item, ao lado
+           * do critério de aceite de quem vai implementar.
+           *
+           * Só as decisões VIGENTES: anexar evidência a uma decisão que já foi
+           * substituída seria juntar o número de hoje ao porquê de ontem.
+           */
+          decisoes={decisoesVisiveis}
+          onAnexar={(ensaioId, decisaoId) =>
+            setQuebra((q) => ({
+              ...q,
+              // O ensaio sai de qualquer outra decisão antes de entrar nesta:
+              // a mesma evidência sustentando duas escolhas diferentes é o tipo
+              // de coisa que só se descobre lendo o documento pronto.
+              decisoes: (q.decisoes ?? []).map((d) => {
+                const sem = (d.ensaioIds ?? []).filter((id) => id !== ensaioId);
+                return { ...d, ensaioIds: d.id === decisaoId ? [...sem, ensaioId] : sem };
+              }),
+            }))
+          }
           onVoltar={() => navegar({ tela: "canvas" })}
           /**
            * SPEC-66 fatia D — a pauta vem do modelo; a conta, do motor.
@@ -1825,6 +1874,16 @@ function AppCarregado({
               : undefined
           }
           destinoDaExportacao={destinoDaExportacao}
+          /**
+           * SPEC-69 §4.4 — o débito assumido chega a quem APROVA o desenho.
+           *
+           * A mesma lista que alimenta o markdown: a tela e o arquivo baixado
+           * não podem discordar sobre o que se está aceitando correr.
+           */
+          ensaios={ensaiosDaQuebra}
+          decisaoDoEnsaio={(ensaioId) =>
+            (decisoesVisiveis ?? []).find((d) => (d.ensaioIds ?? []).includes(ensaioId))?.titulo
+          }
           onRevisarItem={
             resultado
               ? (chave) => {
