@@ -188,3 +188,61 @@ describe("LeituraDoDesenhoPanel — o detalhe, e os endereços", () => {
     expect(screen.getByTestId("leitura-lista")).toHaveTextContent("leitura, não régua");
   });
 });
+
+/**
+ * §305 — RELATO REAL: *"ele não está validando se as informações estão
+ * completas para navegar para a tela de ensaios"*.
+ *
+ * Medido no navegador, contra a stack local: com o desenho legível ("3 saltos
+ * que esperam") e nenhum tempo declarado, a porta abria e a bancada mostrava
+ * "hoje ≥ 0 ms" — a tabela de zeros que o §248 mandou evitar.
+ */
+describe("LeituraDoDesenhoPanel — a porta valida antes de navegar (§305)", () => {
+  const falta = {
+    motivo: "Nenhum componente tem o tempo preenchido, então o ensaio partiria de zero — e zero não é uma medição.",
+    ondePreencher: [{ tipo: "no" as const, id: "bureau", rotulo: "bureau-credito" }],
+  };
+
+  it("com o que falta, NÃO há porta — há a frase e o endereço", () => {
+    const onSimular = vi.fn();
+    render(
+      <LeituraDoDesenhoPanel leitura={leitura({ tempoDoPiorTrecho: { percursoId: "p1", rotulo: "api → bureau", ms: 3000, completo: true, semValor: [], contribuintes: 2, dominantes: [] } })} onSimular={onSimular} faltaParaEnsaiar={falta} />
+    );
+    fireEvent.click(screen.getByTestId("leitura-resumo"));
+
+    expect(screen.queryByTestId("abrir-simulacao")).toBeNull();
+    expect(screen.getByTestId("ensaiar-falta")).toHaveTextContent("zero não é uma medição");
+    // §57 — "falta preencher" sem dizer ONDE transfere a busca para quem já não
+    // sabia o que procurar.
+    expect(screen.getByTestId("ensaiar-falta-bureau")).toHaveTextContent("bureau-credito");
+  });
+
+  it("o endereço LEVA ao campo — clicar seleciona o componente a preencher", () => {
+    const onSelecionarNo = vi.fn();
+    render(
+      <LeituraDoDesenhoPanel
+        leitura={leitura({ tempoDoPiorTrecho: { percursoId: "p1", rotulo: "api → bureau", ms: 3000, completo: true, semValor: [], contribuintes: 2, dominantes: [] } })}
+        onSimular={vi.fn()}
+        onSelecionarNo={onSelecionarNo}
+        faltaParaEnsaiar={falta}
+      />
+    );
+    fireEvent.click(screen.getByTestId("leitura-resumo"));
+    fireEvent.click(screen.getByTestId("ensaiar-falta-bureau"));
+
+    expect(onSelecionarNo).toHaveBeenCalledWith("bureau");
+  });
+
+  it("sem nada faltando, a porta existe — e o nome não fala mais em lentidão", () => {
+    const onSimular = vi.fn();
+    render(<LeituraDoDesenhoPanel leitura={leitura({ tempoDoPiorTrecho: { percursoId: "p1", rotulo: "api → bureau", ms: 3000, completo: true, semValor: [], contribuintes: 2, dominantes: [] } })} onSimular={onSimular} />);
+    fireEvent.click(screen.getByTestId("leitura-resumo"));
+
+    const porta = screen.getByTestId("abrir-simulacao");
+    expect(porta).toHaveTextContent("ensaiar este desenho");
+    expect(porta).not.toHaveTextContent(/lento/i);
+
+    fireEvent.click(porta);
+    expect(onSimular).toHaveBeenCalled();
+  });
+});

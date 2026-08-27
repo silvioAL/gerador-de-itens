@@ -228,10 +228,12 @@ describe("EnsaiosScreen — o desenho mudou debaixo do cenário", () => {
  * desligado não é lentidão.
  */
 describe("EnsaiosScreen — as condições que não são lentidão", () => {
-  it("a tela se chama ENSAIOS, e a frase diz o que cabe nela", () => {
+  it("a tela se chama ENSAIAR ESTE DESENHO, e a frase diz o que cabe nela", () => {
     montar();
 
-    expect(screen.getByText(/Ensaios — e se/)).toBeInTheDocument();
+    // §305 — o nome deixou de ser uma pergunta sobre lentidão. A porta na faixa
+    // de saúde diz a MESMA coisa: um nome só, e ele não fecha o escopo.
+    expect(screen.getByText("Ensaiar este desenho")).toBeInTheDocument();
     expect(screen.getByTestId("tela-ensaios")).toHaveTextContent("pico de tráfego");
   });
 
@@ -513,5 +515,50 @@ describe("EnsaiosScreen — anexar o ensaio assumido a uma decisão", () => {
 
     expect(screen.queryByTestId("anexar-cen-pico")).toBeNull();
     expect(screen.queryByTestId("sem-decisao-cen-pico")).toBeNull();
+  });
+});
+
+/**
+ * §305 — a guarda que nunca disparava.
+ *
+ * A SPEC-66 escreveu `ensaios-sem-tempo` para impedir "uma tabela de zeros que
+ * parece uma medição" (§248), e perguntou `tempoDoPiorTrecho === undefined`.
+ * Um desenho com conexões que ESPERAM e nenhum número devolve `ms: 0` — medido
+ * no navegador, a bancada mostrava "hoje ≥ 0 ms" e um ensaio concluindo "a
+ * resposta fica em 0 ms".
+ */
+describe("EnsaiosScreen — o desenho que espera e não declara número", () => {
+  /** api →http→ bureau, os dois SEM tempo. É o caso que a guarda antiga
+   *  deixava passar: `lerDesenho` devolve `ms: 0`, não `undefined`. */
+  const semNumeros = () =>
+    ({
+      nodes: [
+        { id: "api", type: "service", label: "api", x: 0, y: 0, status: "novo", spec: {}, specNA: {} },
+        { id: "bureau", type: "external", label: "bureau", x: 0, y: 0, status: "novo", spec: {}, specNA: {} },
+      ],
+      edges: [{ id: "e1", source: "api", target: "bureau", type: "http", spec: {} }],
+    }) as unknown as Diagrama;
+
+  it("avisa — e o aviso diz ONDE preencher, não só que falta", () => {
+    montar([], { diagrama: semNumeros() });
+
+    const aviso = screen.getByTestId("ensaios-sem-tempo");
+    expect(aviso).toHaveTextContent("zero não é uma medição");
+    expect(aviso).toHaveTextContent("bureau");
+  });
+
+  it("a linha de HOJE não mostra '≥ 0 ms' — seria o produto se contradizendo", () => {
+    // O aviso logo acima diz "zero não é uma medição"; um número zero na mesma
+    // tela desmentiria a frase.
+    montar([], { diagrama: semNumeros() });
+
+    expect(screen.getByTestId("linha-hoje")).not.toHaveTextContent("0 ms");
+  });
+
+  it("com um número declarado, o aviso some e a resposta aparece", () => {
+    montar();
+
+    expect(screen.queryByTestId("ensaios-sem-tempo")).toBeNull();
+    expect(screen.getByTestId("linha-hoje")).toHaveTextContent("3,0 s");
   });
 });

@@ -10,6 +10,7 @@ import {
   ensaiosAssumidos,
   ensaiosDaDecisao,
   estadoDoEnsaio,
+  faltaParaEnsaiar,
   prazoEstourado,
   simularCenario,
   simularCenarios,
@@ -459,5 +460,54 @@ describe("cobrancasDeEnsaio — o que tira do placar é ACEITAR, não olhar", ()
     );
 
     expect(r).toEqual([]);
+  });
+});
+
+/**
+ * §305 — a guarda do §248 testava a coisa errada.
+ *
+ * A SPEC-66 quis impedir "uma tabela de zeros que parece uma medição" e
+ * perguntou `tempoDoPiorTrecho === undefined`. Um desenho com conexões que
+ * ESPERAM e nenhum número devolve `ms: 0` — a guarda nunca disparava, e a
+ * bancada mostrava "hoje ≥ 0 ms". Medido no navegador, contra a stack real.
+ */
+describe("faltaParaEnsaiar — a pergunta certa é 'há número para somar?'", () => {
+  it("desenho que ESPERA mas não declara número nenhum: o `ms: 0` não é medição", () => {
+    // Exatamente o caso que a guarda antiga deixava passar.
+    const d = diagrama(
+      [no("api", "service"), no("bureau", "external")],
+      [aresta("e1", "api", "bureau", "http")]
+    );
+
+    // A prova de que a guarda VELHA não pegava: o motor devolve algo, com zero.
+    expect(lerDesenho(d, config).tempoDoPiorTrecho?.ms).toBe(0);
+
+    const falta = faltaParaEnsaiar(d, config)!;
+    expect(falta.motivo).toContain("zero não é uma medição");
+    // §57 — e diz ONDE preencher, senão a frase transfere a busca.
+    expect(falta.ondePreencher.map((e) => e.id)).toContain("bureau");
+  });
+
+  it("com um número declarado, não falta nada — a porta abre", () => {
+    expect(faltaParaEnsaiar(desenho(), config)).toBeUndefined();
+  });
+
+  it("desenho sem lugar para o número: diz que é o DESENHO, não o preenchimento", () => {
+    // Só mensageria. Não há campo de tempo em nada — mandar "preencha o
+    // timeout" seria mandar preencher um campo que não existe.
+    const d = diagrama([no("api", "service"), no("f", "rabbit")], [aresta("e1", "api", "f", "publishes")]);
+
+    const falta = faltaParaEnsaiar(d, config)!;
+    expect(falta.motivo).toContain("declara tempo de resposta");
+    expect(falta.ondePreencher).toEqual([]);
+  });
+
+  it("zero DIGITADO conta como não preenchido — 0 ms não é uma promessa", () => {
+    const d = diagrama(
+      [no("api", "service"), no("bureau", "external", { timeoutMs: 0 })],
+      [aresta("e1", "api", "bureau", "http", { timeoutMs: 0 })]
+    );
+
+    expect(faltaParaEnsaiar(d, config)).toBeDefined();
   });
 });

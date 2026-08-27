@@ -3,6 +3,7 @@ import {
   avaliarResiliencia,
   concluirEnsaio,
   elementosComTempo,
+  faltaParaEnsaiar,
   estadoDoEnsaio,
   formatarDuracao,
   insistenciaDe,
@@ -165,7 +166,20 @@ export function EnsaiosScreen({
     }
   }
 
-  const semTempo = hoje.tempoDoPiorTrecho === undefined;
+  /**
+   * §305 — a guarda do §248 testava a coisa errada, e por isso nunca disparava.
+   *
+   * Era `hoje.tempoDoPiorTrecho === undefined`. Um desenho com conexões que
+   * ESPERAM e nenhum número declarado devolve `ms: 0` — medido no navegador, a
+   * tela mostrava "hoje ≥ 0 ms" e um ensaio concluindo "a resposta fica em
+   * 0 ms", que é exatamente a tabela de zeros com cara de medição que ela
+   * existia para impedir.
+   *
+   * A mesma função que a PORTA usa: as duas precisam concordar sobre o que é
+   * "dá para ensaiar", e duas versões desta conta divergiriam na primeira
+   * mudança (§263).
+   */
+  const falta = faltaParaEnsaiar(diagrama, config);
 
   return (
     <div style={telaEstilo} data-testid="tela-ensaios">
@@ -173,7 +187,7 @@ export function EnsaiosScreen({
         <button onClick={onVoltar} style={botaoNeutroEstilo} data-testid="ensaios-voltar">
           ← Voltar à mesa de projeto
         </button>
-        <h2 style={{ margin: 0, fontSize: 17 }}>Ensaios — e se…?</h2>
+        <h2 style={{ margin: 0, fontSize: 17 }}>Ensaiar este desenho</h2>
       </div>
 
       {/* SPEC-68 §4.2 — o nome era "e se ficar lento?", e um nome estreito
@@ -187,12 +201,22 @@ export function EnsaiosScreen({
       </p>
 
       {/* §248 — sem número declarado não há o que ensaiar, e dizer isso é
-          melhor do que uma tabela de zeros que parece uma medição. */}
-      {semTempo && (
+          melhor do que uma tabela de zeros que parece uma medição.
+          
+          §305 — a porta já barra este caso; isto continua aqui porque a rota é
+          linkável de propósito (SPEC-66), e quem chega por URL ou pelo placar
+          merece a mesma frase. */}
+      {falta && (
         <div style={avisoEstilo} data-testid="ensaios-sem-tempo">
-          Nenhum componente do desenho tem tempo preenchido, então não há o que somar. Preencha o{" "}
-          <strong>Timeout (ms)</strong> de ao menos uma chamada e volte — o ensaio parte dos números reais, nunca de
-          números inventados.
+          {falta.motivo}
+          {falta.ondePreencher.length > 0 && (
+            <>
+              {" "}
+              O ensaio parte dos números reais, nunca de números inventados — preencha o{" "}
+              <strong>Timeout (ms)</strong> de{" "}
+              {falta.ondePreencher.map((e) => e.rotulo).join(", ")} e volte.
+            </>
+          )}
         </div>
       )}
 
@@ -253,7 +277,11 @@ export function EnsaiosScreen({
           <tr data-testid="linha-hoje" style={{ background: "var(--painel-alto)" }}>
             <td style={{ ...tdEstilo, fontWeight: 700 }}>hoje</td>
             <td style={tdEstilo}>
-              {hoje.tempoDoPiorTrecho ? (
+              {/* §305 — `falta` cala o número. `tempoDoPiorTrecho` existe com
+                  `ms: 0` num desenho que espera e não declara nada, e "≥ 0 ms"
+                  logo abaixo de um aviso dizendo "zero não é uma medição" seria
+                  o produto se contradizendo na mesma tela. */}
+              {hoje.tempoDoPiorTrecho && !falta ? (
                 <Resposta ms={hoje.tempoDoPiorTrecho.ms} completo={hoje.tempoDoPiorTrecho.completo} />
               ) : (
                 <span style={{ color: "var(--texto-mudo)" }}>—</span>

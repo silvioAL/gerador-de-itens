@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { dispensasComEfeito, formatarDuracao, marcasPorNo, resumirLeitura } from "@gerador/engine";
-import type { ElementoDaLeitura, LeituraDispensada, LeituraDoDesenho, MarcaDaLeitura } from "@gerador/engine";
+import type { ElementoDaLeitura, FaltaParaEnsaiar, LeituraDispensada, LeituraDoDesenho, MarcaDaLeitura } from "@gerador/engine";
 
 /**
  * SPEC-65 fatia C — o que o desenho já diz, sem preparo.
@@ -25,6 +25,15 @@ import type { ElementoDaLeitura, LeituraDispensada, LeituraDoDesenho, MarcaDaLei
  */
 export interface LeituraDoDesenhoPanelProps {
   leitura: LeituraDoDesenho;
+  /**
+   * §305 — o que impede este desenho de ser ensaiado, se algo impedir.
+   *
+   * Presente = a porta NÃO leva à bancada; ela diz o que falta e onde
+   * preencher. Levar alguém a uma tela que só sabe dizer "não há o que somar"
+   * é gastar a navegação para entregar a mesma frase mais tarde — e é a
+   * família do §244: um caminho que promete e não cumpre.
+   */
+  faltaParaEnsaiar?: FaltaParaEnsaiar;
   onSelecionarNo?: (noId: string) => void;
   onSelecionarAresta?: (arestaId: string) => void;
   /**
@@ -60,6 +69,7 @@ export function LeituraDoDesenhoPanel({
   onRestaurar,
   onVirarRegua,
   onSimular,
+  faltaParaEnsaiar,
 }: LeituraDoDesenhoPanelProps) {
   const [aberto, setAberto] = useState(false);
   const raizRef = useRef<HTMLDivElement>(null);
@@ -207,19 +217,58 @@ export function LeituraDoDesenhoPanel({
 
           {onSimular && (
             <div style={{ ...linhaEstilo, borderBottom: "none", paddingTop: 8 }}>
-              <button
-                style={acaoEstilo}
-                // Fecha ANTES de navegar: a faixa de saúde vive nas duas telas,
-                // então um popover deixado aberto vira uma folha flutuando por
-                // cima da tela nova. Achado do E2E.
-                onClick={() => {
-                  setAberto(false);
-                  onSimular();
-                }}
-                data-testid="abrir-simulacao"
-              >
-                e se ficar lento? →
-              </button>
+              {faltaParaEnsaiar ? (
+                /* §305 — a validação ANTES de navegar.
+                
+                   Medido no navegador: com o desenho legível e nenhum tempo
+                   declarado, a porta abria e a bancada mostrava "hoje ≥ 0 ms".
+                   A guarda que devia impedir isso testava `undefined`, e o caso
+                   real devolve `0`.
+                
+                   Aqui não há botão desabilitado com tooltip: há a frase e o
+                   ENDEREÇO. Dizer "falta preencher" sem dizer onde transfere a
+                   busca para quem já não sabia o que procurar (§57). */
+                <div data-testid="ensaiar-falta" style={{ fontSize: 11, color: "var(--texto-mudo)", lineHeight: 1.5 }}>
+                  {faltaParaEnsaiar.motivo}
+                  {faltaParaEnsaiar.ondePreencher.length > 0 && (
+                    <>
+                      {" "}
+                      Preencha em{" "}
+                      {faltaParaEnsaiar.ondePreencher.map((e, i) => (
+                        <span key={`${e.tipo}-${e.id}`}>
+                          {i > 0 && ", "}
+                          <button
+                            style={linkEstilo}
+                            data-testid={`ensaiar-falta-${e.id}`}
+                            onClick={() => {
+                              setAberto(false);
+                              if (e.tipo === "aresta") onSelecionarAresta?.(e.id);
+                              else onSelecionarNo?.(e.id);
+                            }}
+                          >
+                            {e.rotulo}
+                          </button>
+                        </span>
+                      ))}
+                      .
+                    </>
+                  )}
+                </div>
+              ) : (
+                <button
+                  style={acaoEstilo}
+                  // Fecha ANTES de navegar: a faixa de saúde vive nas duas telas,
+                  // então um popover deixado aberto vira uma folha flutuando por
+                  // cima da tela nova. Achado do E2E.
+                  onClick={() => {
+                    setAberto(false);
+                    onSimular();
+                  }}
+                  data-testid="abrir-simulacao"
+                >
+                  ensaiar este desenho →
+                </button>
+              )}
             </div>
           )}
 
