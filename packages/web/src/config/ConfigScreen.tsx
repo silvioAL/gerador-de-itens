@@ -299,6 +299,9 @@ export function ConfigScreen({
             // SPEC-63 — a régua de FORMA precisa dos tipos de NÓ e de CONEXÃO.
             diagramaConfig={config}
             reguaDePartida={reguaDePartida}
+            // §303 — a régua é do TIME, como os campos da ficha e os produtos
+            // já são. Sem isto, editar no time A mudava a régua do time B.
+            timeAtivo={timeAtivo}
             onRegrasMudaram={onFichaMudou}
           />
         )}

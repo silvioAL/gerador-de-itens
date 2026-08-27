@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiProdutos, type Produto } from "../api/client";
 import { useMontado } from "../state/useMontado";
 import { MarcaDeDemonstracao } from "../demo/dadosDoTour";
@@ -108,12 +108,33 @@ export function ProdutosTab({ timeIds, demonstracao, onConversarComAssistente }:
    * ref e não a flag do efeito (ver `useMontado`). */
   const montado = useMontado();
 
+  /**
+   * §303 — qual releitura é a VIGENTE.
+   *
+   * `recarregar` roda depois de CADA ação, e duas ações seguidas põem duas
+   * releituras no ar ao mesmo tempo. Nada garantia a ordem de chegada: se a da
+   * ação anterior responde por último, ela reinstala a lista velha e a seleção
+   * velha por cima do que a ação nova acabou de estabelecer.
+   *
+   * O estrago não é visual — `reconciliar` preserva o texto digitado, então a
+   * tela continua mostrando o nome certo. É o ALVO que troca: o `Salvar`
+   * seguinte vai para o produto ERRADO, com "salvo" verde na tela. É a mesma
+   * ferida do §262, agora pela raiz.
+   *
+   * É o §266 outra vez (resposta velha por cima de estado novo), desta vez
+   * entre duas leituras em vez de leitura contra digitação.
+   */
+  const releituraVigente = useRef(0);
+
   async function recarregar(idParaSelecionar?: string) {
+    const minha = ++releituraVigente.current;
     try {
       // §235 — em demonstração não se busca nem se grava: o tour mostra um
       // produto de exemplo, não a configuração real de quem está vendo.
       const lista = demonstracao ? [demonstracao] : await apiProdutos.listar();
-      if (!montado.current) return;
+      // Chegou atrasada: outra releitura já começou depois desta, e o que ela
+      // trouxe é mais novo. Aplicar isto aqui seria voltar no tempo.
+      if (!montado.current || minha !== releituraVigente.current) return;
       setProdutos(lista);
       const alvo = idParaSelecionar ?? selecionadoId;
       const escolhido = lista.find((p) => p.id === alvo) ?? lista[0] ?? null;

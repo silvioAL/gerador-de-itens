@@ -290,13 +290,18 @@ export function ConfigurarPanel({
         // (`secoesDeRegrasAlteradas`), então o 403 vem certo por construção.
         const o = cartao.objeto as ObjetoRegra;
         const secao = cartao.alvo === "regra-refinamento" ? "checklistTecnico" : "checklistProcesso";
-        const documento = await apiRegras.obter();
+        //
+        // §303 — no documento DO TIME, como a aba de Regras. Enquanto isto lia
+        // e gravava o global e a aba lia o do time, a régua aplicada aqui
+        // simplesmente não aparecia lá: some em silêncio (§57), e a pessoa não
+        // tem como saber que ela foi para outro lugar.
+        const documento = await apiRegras.obter(timeAtivo);
         const porTech = { ...(documento.porTech ?? {}) };
         const daTech = { ...(porTech[cartao.destino] ?? {}) };
         const lista = [...(daTech[secao] ?? [])];
         lista.push({ texto: o.texto, contextos: o.contextos ?? [] });
         porTech[cartao.destino] = { ...daTech, [secao]: lista };
-        await apiRegras.salvar({ ...documento, porTech });
+        await apiRegras.salvar({ ...documento, porTech }, timeAtivo);
       }
       atualizarCartao(indiceMensagem, indiceCartao, { estado: "aplicada" });
     } catch (e) {

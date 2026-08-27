@@ -99,6 +99,11 @@ export function PdcaTab({ config, timeAtivo, onAbrirArea, onFichaMudou }: PdcaTa
       apiPdca.config().catch(() => CADENCIA_PADRAO),
       apiPdca.listarFeedback().catch(() => []),
       apiPdca.listarAjustes(timeAtivo).catch(() => []),
+      // §303 — SEM `timeAtivo`, e de propósito: esta tela mostra a PRÉVIA de
+      // uma solicitação de ajuste, e quem a aplica (`POST /ajustes/:id/aplicar`)
+      // grava em `configDocumentos` com `timeId: GLOBAL` fixo — um pedido de
+      // ajuste vale para a organização. Ler o documento do time aqui mostraria
+      // uma prévia sobre uma base que não é a que vai ser alterada.
       apiRegras.obter().catch(() => null),
       // SPEC-50 — o outro documento que o ajuste alcança: os papéis da esteira.
       apiPipelineAgentes.obter().catch(() => null),

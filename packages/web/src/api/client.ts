@@ -1346,12 +1346,35 @@ export interface ConfigComDiagnostico<T> {
 /** Chamadas de config: `obter` desembrulha o envelope (os chamadores só
  * querem o documento) e `obterComDiagnostico` entrega o envelope inteiro,
  * para quem vai avisar o usuário. */
+/**
+ * §303 — a config passa a viajar com o TIME, como o resto do produto já faz.
+ *
+ * `campos-no`, `campos-aresta`, `ajustes`, `produtos`, `especificacao-template`
+ * e `permissoes` todos mandam `timeId`. As configs do `configDe` eram as
+ * únicas que não — liam e gravavam sempre no global, apesar de o servidor
+ * modelar tudo por time desde a SPEC-31.
+ *
+ * O servidor resolve **time → global → template**: um time sem documento
+ * próprio segue lendo o da casa, e nada do que existe hoje muda de lugar. A
+ * mudança é aditiva, e o global continua sendo o padrão.
+ *
+ * `timeId` opcional em todas as três: quem não tem time (a tela de login, o
+ * carregamento inicial) continua falando com o global, como antes.
+ */
 function configDe<T>(chave: string) {
+  const url = (timeId?: string) =>
+    `/config/${chave}${timeId ? `?timeId=${encodeURIComponent(timeId)}` : ""}`;
   return {
-    obterComDiagnostico: () => requisitar<ConfigComDiagnostico<T>>(`/config/${chave}`),
-    obter: async (): Promise<T> => (await requisitar<ConfigComDiagnostico<T>>(`/config/${chave}`)).documento,
-    salvar: async (documento: T): Promise<T> => {
-      await requisitar(`/config/${chave}`, { method: "PUT", body: JSON.stringify({ documento }) });
+    obterComDiagnostico: (timeId?: string) => requisitar<ConfigComDiagnostico<T>>(url(timeId)),
+    obter: async (timeId?: string): Promise<T> =>
+      (await requisitar<ConfigComDiagnostico<T>>(url(timeId))).documento,
+    salvar: async (documento: T, timeId?: string): Promise<T> => {
+      // O `timeId` vai no CORPO no PUT: é o que a rota lê (`corpo.timeId`), e
+      // é ele que decide em qual linha o documento é gravado.
+      await requisitar(`/config/${chave}`, {
+        method: "PUT",
+        body: JSON.stringify({ documento, ...(timeId ? { timeId } : {}) }),
+      });
       return documento;
     },
   };

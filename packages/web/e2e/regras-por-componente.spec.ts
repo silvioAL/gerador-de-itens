@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { entrar } from "./auth";
+import { entrarEmTimeProprio } from "./auth";
 import { derivarNaMesa } from "./derivar";
 
 const API = "http://localhost:4100";
@@ -7,9 +7,12 @@ const API = "http://localhost:4100";
 /**
  * SPEC-36 Opção A — a projeção por componente, de ponta a ponta: criar a
  * regra escolhendo "Fila Rabbit" (sem digitar tech nem contexto) e vê-la
- * chegar no item derivado de uma Fila Rabbit. O documento de regras é global
- * do ambiente: o teste restaura o original no finally (mesma disciplina do
- * §162 — estado sujo em config compartilhada derruba os specs vizinhos).
+ * chegar no item derivado de uma Fila Rabbit.
+ *
+ * §303 — a régua criada aqui mora no documento de um time SÓ DESTE SPEC. Foi o
+ * remédio para a classe do §281: este teste passou quatro PRs seguidos e caiu
+ * na CI porque um vizinho restaurava o documento compartilhado no meio dele. O
+ * `finally` continua, mas agora limpa o próprio quintal, não o de todos.
  */
 test("regra criada pelo componente grava o contexto certo e chega no item derivado", async ({ page }) => {
   test.setTimeout(60000); // fluxo longo (config + reload + derivação) — 30s estourava com a stack fria
@@ -18,9 +21,9 @@ test("regra criada pelo componente grava o contexto certo e chega no item deriva
     (url) => url.pathname === "/ia/status",
     (rota) => rota.fulfill({ json: { modelosChat: [], embeddingInstalado: false, capacidades: {} } })
   );
-  await entrar(page);
+  const TIME = await entrarEmTimeProprio(page, "por-componente");
 
-  const original = (await (await page.request.get(`${API}/config/regras`)).json()).documento;
+  const original = (await (await page.request.get(`${API}/config/regras?timeId=${TIME}`)).json()).documento;
   try {
     await page.getByRole("button", { name: "☰ Menu" }).click();
     await page.getByRole("button", { name: /Regras de refinamento/ }).click();
@@ -60,6 +63,6 @@ test("regra criada pelo componente grava o contexto certo e chega no item deriva
     await page.locator('[data-testid^="item-"]').first().click();
     await expect(page.getByText(/Política de DLQ definida e documentada/).first()).toBeVisible();
   } finally {
-    await page.request.put(`${API}/config/regras`, { data: { documento: original } });
+    await page.request.put(`${API}/config/regras`, { data: { documento: original, timeId: TIME } });
   }
 });

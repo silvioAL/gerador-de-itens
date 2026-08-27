@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, type Mock } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 vi.mock("../api/client", () => ({
   apiIa: { sugerirConfig: vi.fn() },
@@ -183,5 +183,72 @@ describe("ProdutosTab — o botão que leva ao assistente", () => {
     await screen.findByTestId("editor-do-produto");
 
     expect(screen.queryByTestId("conversar-sobre-o-produto")).toBeNull();
+  });
+});
+
+/**
+ * §303 — a listagem lenta que engolia o produto recém-criado.
+ *
+ * Encontrado por uma falha do `produto-contexto.spec.ts`: depois de criar um
+ * produto, o editor mostrava OUTRO — o primeiro da lista — e ficava lá.
+ *
+ * A causa é uma corrida entre duas chamadas de `recarregar`: a do `useEffect`
+ * de montagem (sem alvo) e a do `criar` (com o id do novo). Quando a primeira
+ * demora mais que a segunda, ela responde por último e escolhe
+ * `lista.find(selecionadoId) ?? lista[0]` com um `selecionadoId` que a closure
+ * capturou ainda em `null` — ou seja, o primeiro produto da lista.
+ *
+ * O estrago não é de teste: quem criou o produto passa a digitar no editor de
+ * outro, com "salvo" verde na tela. É a mesma família do §262, que tratou o
+ * sintoma no spec; aqui está a causa.
+ */
+describe("ProdutosTab — a resposta que chega atrasada", () => {
+  it("a releitura lenta de uma ação anterior não rouba a seleção do produto recém-criado", async () => {
+    const concorrente: Produto = { ...produto, id: "p0", nome: "Aaa concorrente" };
+    const novo: Produto = { ...produto, id: "p2", nome: "Portabilidade nova", glossario: [] };
+
+    // 1ª: a montagem, que responde na hora. 2ª: a do salvar-termo, que trava.
+    // 3ª: a do criar, que responde rápido — e por isso chega ANTES da 2ª.
+    let liberarLenta: (v: Produto[]) => void = () => {};
+    const lenta = new Promise<Produto[]>((r) => (liberarLenta = r));
+    (apiProdutos.listar as Mock)
+      .mockResolvedValueOnce([concorrente])
+      .mockImplementationOnce(() => lenta)
+      .mockResolvedValue([concorrente, novo]);
+    (apiProdutos.salvarTermo as Mock).mockResolvedValue(undefined);
+    (apiProdutos.criar as Mock).mockResolvedValue(novo);
+
+    render(<ProdutosTab timeIds={["time-pagamentos"]} />);
+    await screen.findByTestId("editor-do-produto");
+
+    // A ação lenta sai primeiro e fica pendurada.
+    fireEvent.change(screen.getByLabelText("Termo", { selector: "input" }), { target: { value: "Fatura" } });
+    fireEvent.change(screen.getByLabelText("Definição"), { target: { value: "A que venceu" } });
+    fireEvent.click(screen.getByTestId("salvar-termo"));
+
+    // E o criar acontece por cima dela.
+    fireEvent.change(screen.getByLabelText("Nome do produto novo"), { target: { value: "Portabilidade nova" } });
+    fireEvent.click(screen.getByTestId("criar-produto"));
+    await waitFor(() =>
+      expect((screen.getByLabelText("Nome do produto") as HTMLInputElement).value).toBe("Portabilidade nova")
+    );
+
+    // Agora a lenta responde, com a lista de antes e sem alvo: sem guarda ela
+    // escolhe `lista[0]` e o produto recém-criado some do editor.
+    //
+    // §250 — a espera precisa ser PELA resposta atrasada. Um `waitFor` sobre o
+    // nome passaria de imediato, porque a condição já era verdadeira antes de
+    // ela chegar: o teste ficaria verde com e sem a guarda.
+    await act(async () => {
+      liberarLenta([concorrente]);
+      await lenta;
+    });
+
+    // O estrago que isso causava não é visual — o `reconciliar` preserva o
+    // texto digitado. É o ALVO: a tela passava a estar editando o produto
+    // errado, e o Salvar ia para ele com "salvo" verde na tela (§262).
+    fireEvent.click(screen.getByTestId("salvar-produto"));
+    await waitFor(() => expect(apiProdutos.atualizar as Mock).toHaveBeenCalled());
+    expect((apiProdutos.atualizar as Mock).mock.calls[0][0]).toBe("p2");
   });
 });

@@ -11002,3 +11002,283 @@ nada.
 
 461 engine · 732 web · 84 aplicação · 237 server · 129 llm · 98/98 E2E · build e
 lint limpos.
+
+## §303 — a régua era de todo mundo, e a limpeza da suíte não rodava havia seis migrações
+
+Pela terceira vez em poucos PRs, a CI ficou vermelha num spec diferente a cada
+rodada — `regras-por-componente`, depois `forma-do-desenho`, depois
+`da-leitura-a-regua`. Nenhum deles tinha sido tocado. O §281 já tinha nomeado a
+classe ("config global em suíte paralela é estado compartilhado") e o §299 já
+tinha tentado o remédio óbvio: cada spec restaurando **só o item que criou**, em
+vez do documento inteiro.
+
+Não bastou. E a tentativa de melhorar aquilo derrubou um vizinho que vinha
+passando havia quatro PRs.
+
+### A medição: quem escreve no documento de regras
+
+Seis specs. Seis workers em paralelo. Um documento.
+
+O que mudou desta vez foi olhar para o **produto** em vez de para os testes. As
+outras configurações — `campos-no`, `campos-aresta`, `ajustes`, `produtos`,
+`especificacao-template`, `permissoes` — todas mandam `timeId`. O servidor
+sempre resolveu config por time (`obter` faz time → global → template) e o `PUT
+/config/:chave` sempre aceitou `timeId` no corpo.
+
+`regras` era a **única** que não mandava.
+
+> O defeito não era de teste. Dois times não conseguiam ter réguas diferentes, e
+> nada na tela dizia isso. A suíte E2E foi só o lugar onde isso ficou impossível
+> de ignorar — seis clientes concorrentes gravando no mesmo lugar é exatamente o
+> que dois times fazem, só que devagar.
+
+### A correção é uma linha, e é invisível
+
+O cliente passou a mandar o `timeId` no GET (query) e no PUT (corpo), e as três
+superfícies que leem/gravam regras passaram a informar o time ativo:
+`loadConfig`, `RegrasTab` e o `ConfigurarPanel` do assistente.
+
+Não muda um pixel. Some o parâmetro e tudo continua funcionando — compartilhado
+de novo, calado. Por isso os testes novos afirmam a **URL** e o **corpo**, e não
+o efeito na tela: é a única régua que uma refatoração desatenta não consegue
+apagar sem ficar vermelha. Desliguei cada metade separadamente para ver as duas
+falharem antes de dar por feito.
+
+### O que apareceu no caminho
+
+O `ConfigurarPanel` lia e gravava o documento **global**. Com a aba de Regras
+lendo o do time, a régua aplicada pelo assistente iria para um lugar e a tela
+mostraria outro: ela **some em silêncio** (§57), e a pessoa não tem como
+descobrir para onde foi. Foi corrigido junto — e só apareceu porque a mudança
+obrigou a olhar todos os chamadores.
+
+### O que continua global, e por quê
+
+O `pdca-jornada` não ganhou time próprio. Quem grava ali não é a tela: é o `POST
+/ajustes/:id/aplicar`, que escreve com `timeId: GLOBAL` fixo, porque uma
+solicitação de ajuste vale para a organização, não para um time.
+
+Colocá-lo num time daria a **ilusão** de isolamento — a tela leria o documento do
+time e o `aplicar` continuaria gravando no global. Um teste verde medindo a
+linha errada é pior que um teste que assume o global (§248). Pelo mesmo motivo o
+`PdcaTab` continua lendo o global: a prévia tem que ser sobre a base que vai ser
+alterada.
+
+E, sozinho no global, ele não disputa com ninguém.
+
+### A diferença entre remendo e conserto
+
+Os `finally` que restauravam o documento eram a única defesa, e defesa que
+depende de o teste chegar ao fim falha exatamente quando mais importa — quando
+o teste morre no meio. Onde o time é exclusivo do arquivo, o `finally` saiu:
+não há o que restaurar. Onde três testes irmãos dividem o mesmo time
+(`conformidade`), ele ficou, escopado no time.
+
+> §299 tentou fazer o remendo caber melhor. §303 tirou o motivo de existir
+> remendo. A separação não torna a colisão improvável — torna impossível.
+
+### E aí a separação não funcionou — e o motivo era muito pior
+
+Criei os times no `globalSetup`, rodei a suíte, e os **seis** specs falharam na
+mesma linha: a tela de escolher time não tinha nenhum dos times novos.
+
+O primeiro diagnóstico foi trivial: `usuario_time.time_id` tem chave estrangeira
+para `times`, e eu tinha inserido o vínculo sem criar o time. Mas o `INSERT`
+falhou com erro **23503**, e o `globalSetup` tem um `catch` que só tolera
+**42P01**. Ele deveria ter estourado a suíte inteira. Não estourou.
+
+Instrumentei o setup passo a passo. A primeira linha já morria:
+
+```
+A: truncate
+CATCH code=42P01 igual42P01=true
+```
+
+`TRUNCATE TABLE "quebras", "perfis_time", "campos_no"` — e **`perfis_time` não
+existe**. A migração **0020** a apagou (o perfil de stack virou catálogo, e o
+0026 o transformou em `stacks`/`stack_valores`).
+
+> Tabela apagada por migração devolve exatamente o mesmo 42P01 que tabela
+> ainda-não-criada. O `catch` foi escrito para deixar passar "banco novo, sem
+> tabelas" — e passou a deixar passar "código velho apontando para tabela
+> morta".
+
+**Desde a 0020, o `globalSetup` inteiro nunca rodou uma linha.** Nada de
+`TRUNCATE` em `quebras` e `campos_no`, nada de limpar `credenciais_ia`, nada de
+apagar os papéis do RBAC (§203) — nem a asserção escrita justamente para provar
+que essa limpeza aconteceu. Cada rodada da suíte começava com o resíduo de todas
+as anteriores. Encontrei seis stacks `stack e2e <timestamp>` de execuções
+antigas ainda no banco.
+
+Aquele `catch` tinha até um comentário dizendo que o `catch` vazio anterior tinha
+causado esse mesmo estrago — *"a suíte reportava 18 falhas espalhadas em vez de
+'o setup não rodou'"*. A correção da vez trocou "engolir tudo" por "engolir um
+código", e o defeito voltou pela porta que ficou aberta.
+
+### O conserto: perguntar, não adivinhar
+
+"Banco novo?" agora é uma **pergunta**, feita antes de tudo:
+
+```ts
+const bancoNovo = await client
+  .query(`SELECT to_regclass('public.quebras') AS t`)
+  .then((r) => r.rows[0].t === null);
+if (bancoNovo) return;
+```
+
+Respondida isso, **nenhum** erro é tolerado — o `catch` só relança. Um código de
+erro nunca vai distinguir dois mundos que o código de erro não distingue.
+
+E a criação dos times ganhou conta própria, porque `INSERT ... SELECT` que não
+casa nada insere zero linhas **sem erro**: um segundo jeito de o setup mentir,
+pela mesma família.
+
+### O terceiro achado: um time de teste não é um time
+
+Com o setup vivo, os times passaram a existir — e três specs levaram **403** no
+primeiro `PUT`. O corpo do erro dizia `sem permissão para "editar" em
+"regras.checklistTecnico"`, e a primeira suspeita (RBAC ligado por um vizinho)
+morreu na medição: `papeis_acesso` estava vazia.
+
+A causa estava em `primeiroRecursoNegado`:
+
+```ts
+const nivel = timeId ? await nivelNoTime(db, email, timeId) : await maiorNivel(db, email);
+if (nivel === "owner") return undefined;
+```
+
+Com o `timeId`, o nível conferido é o **daquele time** — e a coluna
+`usuario_time.nivel` tem default `operar`. Todos os times reais em que
+`dev@gerador.local` entra são `owner` (quem cria um time vira dono); os meus
+nasceram membros comuns.
+
+> Passar a mandar o `timeId` mudou o EIXO da autorização, de "maior nível em
+> qualquer time" para "nível naquele time". A correção do cliente estava certa;
+> o time de teste é que era um cidadão de segunda classe.
+
+E o 403 não dizia nada disso, porque a asserção só olhava o número. Agora ela
+carrega o corpo: RBAC, nível de time e seção sem dono são três causas diferentes
+com o mesmo 403, e escolher entre elas no escuro custou uma rodada.
+
+### O que isso diz sobre as três rodadas anteriores
+
+A instabilidade que o §281 e o §299 tentaram explicar tinha **duas** causas
+sobrepostas: o documento de regras compartilhado (real, e agora resolvido) e um
+banco de teste que nunca era limpo (invisível, e muito maior).
+
+A segunda foi encontrada por acidente — só porque a primeira correção falhou de
+um jeito que me obrigou a instrumentar o setup em vez de ler o código dele. Ler
+não teria bastado: o código está certo na aparência, e o comentário dele
+descreve com precisão o defeito que ele próprio tinha.
+
+Para não dar por feito, quebrei o `TRUNCATE` de propósito (uma tabela
+inventada) e conferi que o setup **estoura** em vez de seguir calado. Antes, a
+mesma quebra passava despercebida por seis migrações.
+
+### De quebra: o Salvar que ia para o produto errado
+
+Com o setup vivo, uma rodada derrubou o `produto-contexto` — o editor mostrava
+outro produto depois de criar um. Investigando o `ProdutosTab`, achei um defeito
+real e independente: `recarregar` roda depois de **cada** ação, duas ações
+seguidas põem duas releituras no ar, e nada garantia a ordem de chegada. A que
+responde por último reinstala a lista e a seleção velhas.
+
+O estrago é invisível, e é o pior tipo: `reconciliar` (§266) preserva o texto
+digitado, então a tela continua mostrando o nome certo — mas o **alvo** trocou,
+e o `Salvar` seguinte vai para outro produto com "salvo" verde na tela. É a
+ferida que o §262 tratou no spec, agora pela raiz.
+
+Uma guarda de "qual releitura é a vigente" resolve. E o teste que a cobre custou
+três tentativas:
+
+1. A primeira modelava uma corrida **inalcançável** (a tela nem renderiza
+   enquanto a listagem da montagem está pendente).
+2. A segunda passava com a guarda **desligada** — eu afirmava sobre o nome, que
+   o `reconciliar` protege de qualquer jeito.
+3. A terceira espera pela resposta atrasada (§250) e afirma sobre o **id** para
+   onde o `Salvar` vai: `expected 'p0' to be 'p2'` com a guarda desligada.
+
+> Duas versões verdes de um teste que não testava nada. O hábito de desligar a
+> correção e olhar o vermelho é o que separou uma delas da outra.
+
+Isto **não explica** a falha do `produto-contexto` — a causa daquela rodada
+segue em aberto. O que a investigação achou foi outra coisa, e valia por si.
+
+Também gastei uma rodada inteira de E2E editando o fonte com a suíte no ar: o
+Vite recarregou um estado intermediário sem um `import`, o app caiu no
+ErrorBoundary com "useRef is not defined" e o relatório acusou um spec de tour
+que não tinha nada a ver. Medição feita sobre a bancada em movimento não mede
+nada.
+
+### O último detalhe: o id do time morava em dois lugares
+
+`entrarEmTimeProprio(page, "forma")` recebia o sufixo, e o spec repetia
+`"time-e2e-forma"` numa constante para as chamadas de API que faz por fora do
+navegador. Duas cópias da mesma verdade, e §263 diz como isso termina: mudar o
+prefixo num lado deixaria o outro apontando para um time que não existe — e o
+teste ficaria verde lendo a linha errada, que é o pior desfecho possível para
+uma rodada que existiu justamente por causa disso.
+
+O helper passou a **devolver** o id. Nenhum spec de regras escreve
+`time-e2e-` na mão.
+
+### E o efeito colateral que quase passou: 6 times viraram 11
+
+Pendurei os cinco times novos no `dev@gerador.local`, que já tinha seis. Onze —
+e `ListaDeTimes` liga o campo de busca **acima de oito** (`LIMITE_SEM_BUSCA`).
+
+A suíte continuava verde, e é justamente por isso que quase passou: a tela de
+escolher time de **todos** os specs tinha mudado de forma, e o caminho que a
+maioria das pessoas percorre — poucos times, lista direta, sem busca — deixou
+de ser exercido por qualquer teste. Um dado de fixture mudando a UI que o resto
+da suíte mede é uma perda de cobertura que nada acusa.
+
+Um e-mail próprio para os times de regra devolve o `dev` aos seis dele e deixa
+o novo com cinco: os dois abaixo do limite, os dois vendo a tela que a maioria
+vê. E o setup agora apaga vínculos desses times feitos por qualquer outro
+e-mail — sem isso, o resíduo local sobreviveria para sempre e a CI (banco novo)
+passaria a testar outra coisa que a máquina de quem desenvolve.
+
+> Duas rodadas verdes não provaram que estava certo. O que apareceu no diff foi
+> um número cruzando um limiar que ninguém tinha motivo para olhar.
+
+### A CI achou o que quatro rodadas locais não acharam
+
+Local: 98/98, duas vezes. Na CI, o `pdca-jornada` caiu — o card ficava em
+"aprovada" depois de clicar em **Aplicar agora**, sem mudar nada e sem dizer
+nada.
+
+O `POST /ajustes/:id/aplicar` lia a linha GLOBAL de `config_documentos` direto:
+
+```ts
+if (!doc) return reply.code(409).send({ erro: `documento de ${alvo} não encontrado` });
+```
+
+Mas *"não encontrado"* é o estado normal de **toda organização que ainda não
+salvou config nenhuma**. O `GET /config/:chave` sempre respondeu com o template
+nesse caso (`obter` resolve time → global → template); só o `aplicar` tratava a
+ausência como erro.
+
+Numa instalação nova, portanto, o PDCA inteiro era inalcançável: aprovar
+funcionava, aplicar nunca — e a tela nem contava por quê (§244).
+
+**Por que só apareceu agora.** Na suíte E2E, algum spec vizinho sempre gravava
+o documento global antes deste rodar. Quando os cinco specs de regras foram
+para times próprios, ninguém mais gravou o global — e a CI, com banco novo,
+reproduziu a instalação nova de verdade. O banco local, cheio de resíduo de
+anos, continuava escondendo.
+
+> A mesma separação que resolveu a colisão tirou o andaime que escondia este
+> defeito. Isolar não criou o problema: parou de disfarçá-lo.
+
+O `templateDaVersao` era uma função interna da rota de config — saiu para um
+módulo próprio, com um dono só, e o `aplicar` passou a partir dele quando não
+há linha gravada, gravando com `upsert` em vez de `update`.
+
+O teste que cobre isso é definido por uma **ausência**: ele não faz o
+`PUT /config/regras` que todos os outros testes de aplicar fazem. Está escrito
+lá em cima do caso, porque é o tipo de coisa que a próxima leitura "conserta"
+por engano.
+
+461 engine · 737 web · 84 aplicação · 238 server · 129 llm · 98/98 E2E · build e
+lint limpos.

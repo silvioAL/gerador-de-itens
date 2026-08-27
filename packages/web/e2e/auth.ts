@@ -37,3 +37,43 @@ export async function entrar(page: Page, timeId = "time-pagamentos", email = "de
   // chama `entrar()` estava vermelha por um motivo que não era o dela.
   await expect(page.getByRole("button", { name: "+ Serviço", exact: true })).toBeVisible({ timeout: 10000 });
 }
+
+/**
+ * §303 — entra num time EXCLUSIVO deste spec.
+ *
+ * O documento de regras é por time desde que o cliente passou a mandar o
+ * `timeId` (o servidor sempre resolveu assim: time → global → template). Um
+ * spec que grava regras entrando no seu próprio time **não colide com vizinho
+ * nenhum, por construção** — não por ordem de execução, não por `finally` bem
+ * escrito, que foi o que o §281 e o §299 tentaram e não bastou.
+ *
+ * O time não precisa de régua própria para começar: sem documento dele, o
+ * servidor devolve o global, e o spec parte exatamente do mesmo estado de
+ * antes. O primeiro `PUT` é que cria a linha do time.
+ *
+ * Os times são criados no `globalSetup` — são de teste, e não têm por que
+ * existir num banco de produção.
+ *
+ * ## E-mail próprio, e não o `dev@gerador.local`
+ *
+ * Pendurar estes cinco times no `dev` levou a lista dele a 11, e `ListaDeTimes`
+ * liga o campo de busca acima de 8: a tela de escolher time da suíte INTEIRA
+ * mudava de forma por causa de um dado de teste, e o caminho comum — poucos
+ * times, sem busca — deixava de ser exercido por qualquer spec.
+ *
+ * Com e-mail próprio, o `dev` volta aos 6 dele e este fica com 5: os dois
+ * abaixo do limite, os dois vendo a mesma tela que a maioria vê.
+ *
+ * Devolve o id do time porque o spec precisa dele nas chamadas de API que faz
+ * por fora do navegador (`?timeId=`, e o `timeId` do corpo no `PUT`). Deixar o
+ * spec remontar a string a partir do sufixo seria a segunda cópia de uma
+ * verdade só (§263): mudar o prefixo aqui deixaria as duas metades apontando
+ * para times diferentes, e o teste ficaria verde lendo a linha errada.
+ */
+export const EMAIL_DAS_REGRAS = "regras-e2e@gerador.local";
+
+export async function entrarEmTimeProprio(page: Page, sufixo: string): Promise<string> {
+  const timeId = `time-e2e-${sufixo}`;
+  await entrar(page, timeId, EMAIL_DAS_REGRAS);
+  return timeId;
+}

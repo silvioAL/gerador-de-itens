@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { entrar } from "./auth";
+import { entrar, entrarEmTimeProprio } from "./auth";
 
 /**
  * #306 — as abas de Configurações que não tinham NENHUM teste de navegador.
@@ -43,19 +43,22 @@ test("Regras de refinamento: carrega o documento do servidor e mostra as seçõe
 });
 
 test("Regras: criar um grupo pela tela (§165) e marcar contexto por clique — o campo de vírgula saiu", async ({ page }) => {
-  await entrar(page);
+  // §303 — este é o único teste do arquivo que ESCREVE regras, e por isso é o
+  // único que entra num time próprio. Antes ele criava o grupo no documento da
+  // organização inteira, e a janela em que o grupo existia era vista por todos
+  // os specs que rodavam junto.
+  const TIME = await entrarEmTimeProprio(page, "abas");
 
-  // O documento de regras é da organização — guarda o vigente pra restaurar.
-  // Frontend de propósito: nenhum cenário dos outros specs deriva itens
-  // Frontend, então o grupo criado aqui não muda ficha de ninguém (§162).
+  // Guarda o vigente pra restaurar — o documento é do time agora, mas o teste
+  // continua não sendo dono dele.
   const API = "http://localhost:4100";
-  const antes = await (await page.request.get(`${API}/config/regras`)).json();
+  const antes = await (await page.request.get(`${API}/config/regras?timeId=${TIME}`)).json();
   // Setup determinístico: garante que Frontend NÃO tem grupo antes de testar a
   // criação — um run falho anterior pode ter deixado o grupo salvo (o restore
   // do fim não roda quando o teste morre no meio; por isso ele virou finally).
   const { Frontend: _f, ...porTechSemFrontend } = antes.documento.porTech ?? {};
   await page.request.put(`${API}/config/regras`, {
-    data: { documento: { ...antes.documento, porTech: porTechSemFrontend } },
+    data: { documento: { ...antes.documento, porTech: porTechSemFrontend }, timeId: TIME },
   });
 
   try {
@@ -97,7 +100,7 @@ test("Regras: criar um grupo pela tela (§165) e marcar contexto por clique — 
     // Restaura o documento como estava — regras é da organização, não do
     // teste; e `finally` porque um teste que falha no meio não pode deixar o
     // grupo pra trás (foi exatamente o que sujou a rodada anterior).
-    await page.request.put(`${API}/config/regras`, { data: { documento: antes.documento } });
+    await page.request.put(`${API}/config/regras`, { data: { documento: antes.documento, timeId: TIME } });
   }
 });
 
