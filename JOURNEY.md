@@ -10957,3 +10957,48 @@ as duas seria a IA opinando sobre o número.
 
 461 engine · 732 web · 84 aplicação · 237 server · 129 llm · build e lint
 limpos.
+
+## §302 — o retângulo vazio era o painel espremido
+
+Relato com captura: *"no canto direito consta um retângulo com uma barra de
+rolagem, e não é possível visualizar nada dentro dele"*.
+
+Medi com `elementsFromPoint` no canto onde ele aparecia, e a resposta veio
+inteira: um `<aside>` de **320×32 px**, com `overflow: auto` e o texto
+*"Selecione um nó para editar as propriedades"* — que não cabe em 32 px de
+altura, daí a barra de rolagem sobre um retângulo aparentemente vazio.
+
+Era o **painel de propriedades da mesa**.
+
+### A causa: uma tela fora do padrão
+
+A mesa (canvas + painel) fica montada o tempo todo e **não é condicionada à
+rota** — as telas de rota a cobrem. `ConfigScreen`, `SistemaScreen` e
+`DocumentoScreen` fazem isso com `position: fixed`, `inset: 0`, fundo e
+`zIndex`.
+
+A `EnsaiosScreen` nasceu no **fluxo normal**, e por isso não cobria a mesa:
+**disputava espaço** com ela. Os dois eram `flex: 1`, e o painel ficou com 32 px
+de altura.
+
+> Era a única das quatro fora do padrão. O defeito não foi de cálculo nem de
+> estado — foi de uma tela nova não ter herdado a convenção que as três
+> anteriores já seguiam, e nada no código obrigava a isso.
+
+### A régua tem que ser de OCLUSÃO
+
+O `aside` continua no DOM e continua "visível" para o CSS — ele só está atrás.
+`toBeVisible()` passaria dos dois lados e não travaria nada. O que prova o
+conserto é perguntar **quem está no pixel**: no canto direito tem que estar a
+tela de ensaios, não o painel da mesa.
+
+É a mesma lição do §300, dois relatos seguidos: **defeito de layout não se mede
+contando elementos.** Lá foram nós fora da vista com o DOM intacto; aqui, um
+painel visível por trás de uma tela que devia cobri-lo.
+
+E, como no §300, desliguei a correção para ver o teste falhar antes de dar por
+feito — na primeira tentativa o desligamento não pegou e o "passou" não valia
+nada.
+
+461 engine · 732 web · 84 aplicação · 237 server · 129 llm · 98/98 E2E · build e
+lint limpos.

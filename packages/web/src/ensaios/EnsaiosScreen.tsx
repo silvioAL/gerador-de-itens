@@ -784,7 +784,25 @@ function Ajustes({
   );
 }
 
+/**
+ * §302 — RELATO REAL: *"no canto direito consta um retângulo com uma barra de
+ * rolagem, e não é possível visualizar nada dentro dele"*.
+ *
+ * Era o **painel de propriedades**. A mesa (canvas + painel) fica montada o
+ * tempo todo e não é condicionada à rota; as telas de rota a cobrem. Só que
+ * esta tela nasceu no fluxo normal, e por isso **disputava espaço** com a mesa
+ * em vez de cobri-la: o `aside` de 320px ficava espremido em 32px de altura,
+ * com o texto "Selecione um nó…" sem caber — daí a barra de rolagem sobre um
+ * retângulo aparentemente vazio.
+ *
+ * `fixed` + `inset: 0` + fundo + `zIndex` é o padrão que `ConfigScreen`,
+ * `SistemaScreen` e `DocumentoScreen` já usam. Esta era a única fora dele.
+ */
 const telaEstilo: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "var(--painel)",
+  zIndex: 55,
   padding: "18px 22px",
   display: "flex",
   flexDirection: "column",
@@ -792,7 +810,6 @@ const telaEstilo: React.CSSProperties = {
   fontFamily: "system-ui, sans-serif",
   color: "var(--texto)",
   overflow: "auto",
-  height: "100%",
 };
 
 const tabelaEstilo: React.CSSProperties = {
