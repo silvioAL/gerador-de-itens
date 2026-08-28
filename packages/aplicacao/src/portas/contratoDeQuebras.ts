@@ -128,6 +128,41 @@ export function testarContratoDeQuebras(nomeDoAdaptador: string, criarAmbiente: 
       expect(lida?.anexosContexto).toEqual(anexosContexto);
     });
 
+    /**
+     * SPEC-72 fatia C — o carimbo diz a verdade.
+     *
+     * O autosave manda a quebra INTEIRA a cada 2 s de digitação, e toda
+     * gravação carimbava a linha. Com isso, "quando esta demanda mudou pela
+     * última vez" respondia *"quando alguém arrastou um nó"* — e é sobre esse
+     * carimbo que a SPEC-58 §5 constrói o "documento desatualizado" e que a
+     * tela de Abrir… ordena a lista.
+     */
+    it("SPEC-72: salvar duas vezes o MESMO conteúdo não mexe no carimbo", async () => {
+      const repo = await comRepo();
+      const dados = normalizarDadosQuebra({ titulo: "Crédito", diagrama: DIAGRAMA, demandInfo: "prosa" });
+      const criada = await repo.criar(dados);
+
+      const primeira = await repo.atualizar(criada.id, dados);
+      const segunda = await repo.atualizar(criada.id, dados);
+
+      expect(primeira?.atualizadoEm).toBe(criada.atualizadoEm);
+      expect(segunda?.atualizadoEm).toBe(criada.atualizadoEm);
+    });
+
+    it("SPEC-72: mas mudar QUALQUER conteúdo carimba — o silêncio não pode virar mudez", async () => {
+      // O controle negativo. Um carimbo que nunca mais se move é pior que um
+      // que se move demais: some o único dado que diz "isto está vivo".
+      const repo = await comRepo();
+      const criada = await repo.criar(normalizarDadosQuebra({ titulo: "Crédito", diagrama: DIAGRAMA }));
+
+      const depois = await repo.atualizar(
+        criada.id,
+        normalizarDadosQuebra({ titulo: "Crédito", diagrama: DIAGRAMA, demandInfo: "agora tem contexto" })
+      );
+
+      expect(depois?.atualizadoEm).not.toBe(criada.atualizadoEm);
+    });
+
     it("campos omitidos viram o mesmo default nos dois lados", async () => {
       // Antes, cada adaptador inventava o seu: arquivo caía em {}/""/[],
       // Postgres em undefined e depois null. O cliente via formas diferentes.

@@ -126,6 +126,24 @@ export function usePersistencia(quebra: Quebra, aoAbrir: (q: Quebra) => void) {
 
   // Autosave só depois da quebra já ter sido salva ao menos uma vez (tem id do
   // servidor) — sem isso, cada tecla criaria uma quebra nova em duplicata.
+  /**
+   * SPEC-72 fatia B — o que está pendente quando a aba fecha.
+   *
+   * O `clearTimeout` do cleanup cancela o salvamento a cada tecla, que é o
+   * objetivo do debounce. Mas fechar a aba com o timer armado **perde os
+   * últimos 2 s de trabalho, sem aviso** — e o campo mais afetado é justamente
+   * o que o usuário citou no pedido: o contexto da demanda, digitado em prosa
+   * longa.
+   *
+   * O timer vivia dentro do efeito, então não havia o que disparar de fora.
+   * Estes dois refs são o que torna o flush possível: o relógio, para saber se
+   * há algo pendente, e a quebra do momento, porque o listener é registrado uma
+   * vez e não pode ficar preso à renderização em que nasceu.
+   */
+  const relogioDoAutosaveRef = useRef<ReturnType<typeof setTimeout>>();
+  const quebraAtualRef = useRef(quebra);
+  quebraAtualRef.current = quebra;
+
   useEffect(() => {
     if (primeiraRenderRef.current) {
       primeiraRenderRef.current = false;
@@ -133,11 +151,46 @@ export function usePersistencia(quebra: Quebra, aoAbrir: (q: Quebra) => void) {
     }
     if (!quebraId) return;
     setStatus("nao-salvo");
-    const timer = setTimeout(() => {
+    relogioDoAutosaveRef.current = setTimeout(() => {
+      relogioDoAutosaveRef.current = undefined;
       void salvar(quebra);
     }, 2000);
-    return () => clearTimeout(timer);
+    return () => clearTimeout(relogioDoAutosaveRef.current);
   }, [quebra, quebraId, salvar]);
+
+  /**
+   * SPEC-72 fatia B — salvar o pendente ao sair.
+   *
+   * **Os dois eventos, com a mesma função** (§6.2 da SPEC): `beforeunload` é
+   * menos confiável em móvel, onde a aba costuma ser descartada sem ele;
+   * `visibilitychange` cobre "trocou de aba" e o descarte que vem depois. O
+   * custo de ter os dois é um listener, e o de ter só um é perder trabalho no
+   * ambiente que o outro cobria.
+   *
+   * Registrado uma vez, e lendo tudo por ref: reassinar a cada mudança da
+   * quebra trocaria os listeners a cada tecla, que é justamente a frequência
+   * que o debounce existe para evitar.
+   */
+  useEffect(() => {
+    const gravarPendente = () => {
+      if (!relogioDoAutosaveRef.current) return;
+      clearTimeout(relogioDoAutosaveRef.current);
+      relogioDoAutosaveRef.current = undefined;
+      void salvar(quebraAtualRef.current);
+    };
+    const aoEsconder = () => {
+      // Só quando a aba REALMENTE some. `visible` acontece o tempo todo (voltar
+      // do alt-tab), e salvar ali seria transformar troca de janela em escrita.
+      if (document.visibilityState === "hidden") gravarPendente();
+    };
+
+    window.addEventListener("beforeunload", gravarPendente);
+    document.addEventListener("visibilitychange", aoEsconder);
+    return () => {
+      window.removeEventListener("beforeunload", gravarPendente);
+      document.removeEventListener("visibilitychange", aoEsconder);
+    };
+  }, [salvar]);
 
   return {
     lista,

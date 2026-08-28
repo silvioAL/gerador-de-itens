@@ -30,6 +30,43 @@ import { exigirNivel } from "../auth/niveis.js";
  * descartava, sem erro, o trabalho da esteira e o contexto do épico.
  */
 /**
+ * SPEC-72 fatia A — o TETO dos anexos, declarado.
+ *
+ * ## Por que existe, e por que não é otimização
+ *
+ * A SPEC-72 mediu e **recusou** otimizar: 848 kB de tabela inteira, 27 quebras,
+ * maior contexto com 1 692 caracteres. Não há número que doa. O que a medição
+ * revelou foi outra coisa — `anexosContexto` guarda o conteúdo INTEIRO de cada
+ * arquivo dentro da linha da quebra, e **não havia limite em lugar nenhum**:
+ * nem no cliente, nem aqui, nem na coluna. Um `.md` de 20 MB colado entraria
+ * por completo, a cada 2 s de digitação.
+ *
+ * Isto não é sobre economizar bytes. É sobre **ter teto** — sem ele, o primeiro
+ * anexo grande vira um incidente que ninguém consegue diagnosticar pela tela.
+ *
+ * ## Por que a mensagem diz o número
+ *
+ * Um 413 seco (ou um "payload too large" do proxy) manda a pessoa adivinhar o
+ * que fazer. A frase diz o tamanho do arquivo, o limite e a saída — é a mesma
+ * disciplina do §57: dizer "falta preencher" sem dizer onde transfere a busca
+ * para quem já não sabia o que procurar.
+ *
+ * ## Os números, e o que eles são
+ *
+ * Generosos de propósito (§6.1 da SPEC): o teto existe para dar diagnóstico,
+ * não para apertar. Quem esbarrar é o caso que ainda não existe — e é ele que
+ * vai justificar a conversa sobre storage separado, que a SPEC recusa **até**
+ * alguém esbarrar aqui.
+ */
+const LIMITE_POR_ANEXO = 1_000_000;
+const LIMITE_TOTAL_ANEXOS = 4_000_000;
+
+/** Em MB com uma casa, que é como uma pessoa lê tamanho de arquivo. */
+function emMB(bytes: number): string {
+  return `${(bytes / 1_000_000).toFixed(1).replace(".", ",")} MB`;
+}
+
+/**
  * SPEC-71 fatia C — EXPORTADO para o teste de borda.
  *
  * `corpoQuebra.shape` é a única forma de perguntar, em runtime, quais chaves a
@@ -51,7 +88,29 @@ export const corpoQuebra = z.object({
    * respondia 400, e por isso qualquer demanda com um anexo não salvava nada —
    * nem o anexo, nem o diagrama, nem o resto. Medido contra o servidor real.
    */
-  anexosContexto: z.array(z.object({ nome: z.string(), conteudo: z.string() })).optional(),
+  anexosContexto: z
+    .array(z.object({ nome: z.string(), conteudo: z.string() }))
+    .optional()
+    .superRefine((anexos, ctx) => {
+      if (!anexos) return;
+      let total = 0;
+      for (const anexo of anexos) {
+        const bytes = Buffer.byteLength(anexo.conteudo, "utf8");
+        total += bytes;
+        if (bytes > LIMITE_POR_ANEXO) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `O anexo "${anexo.nome}" tem ${emMB(bytes)} e o limite por anexo é ${emMB(LIMITE_POR_ANEXO)}. Anexe só a parte que importa, ou cole o trecho no contexto da demanda.`,
+          });
+        }
+      }
+      if (total > LIMITE_TOTAL_ANEXOS) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Os anexos desta demanda somam ${emMB(total)} e o limite é ${emMB(LIMITE_TOTAL_ANEXOS)}. Remova algum antes de salvar.`,
+        });
+      }
+    }),
   especificacao: z.string().nullish(),
   /** SPEC-53 — o vínculo com o produto. */
   produtoId: z.string().uuid().nullish(),

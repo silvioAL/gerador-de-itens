@@ -3520,3 +3520,92 @@ describe("GET /ajustes — escopo por time", () => {
     expect(lista.map((s) => s.descricao).sort()).toEqual(["do time A", "do time B"]);
   });
 });
+
+/**
+ * SPEC-72 fatia A — o teto dos anexos.
+ *
+ * A SPEC mediu e RECUSOU otimizar: 848 kB de tabela, 27 quebras, maior
+ * contexto com 1 692 caracteres. O que ela pediu não foi economia de bytes —
+ * foi **ter teto**, porque não havia nenhum, e sem teto o primeiro anexo
+ * grande vira um incidente que ninguém diagnostica pela tela.
+ */
+describe("SPEC-72 — o teto dos anexos, com a frase que diz o número", () => {
+  const anexo = (nome: string, bytes: number) => ({ nome, conteudo: "a".repeat(bytes) });
+  const quebraCom = (anexos: { nome: string; conteudo: string }[]) => ({
+    titulo: "demanda com anexo",
+    time: TIME_A,
+    diagrama: { nodes: [], edges: [] },
+    anexosContexto: anexos,
+  });
+
+  it("anexo acima do limite é 400, e a mensagem traz o tamanho, o limite e a saída", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+
+    const resposta = await app.inject({
+      method: "POST",
+      url: "/quebras",
+      cookies: { gerador_sessao: cookie },
+      payload: quebraCom([anexo("ata-gigante.md", 1_500_000)]),
+    });
+
+    /**
+     * ACHADO ao escrever este teste: ele nasceu vermelho com **413**, não 400.
+     *
+     * O teto já existia — era o `bodyLimit` default do Fastify, 1 MB, que
+     * responde sem uma palavra. Ou seja, o produto já recusava anexo grande no
+     * limite que ninguém declarou e com a mensagem que a SPEC §3.1 recusa em
+     * voz alta. Ninguém tinha percebido porque, até a SPEC-71, anexo nenhum
+     * salvava: a borda rejeitava a FORMA antes de o tamanho importar.
+     *
+     * Este `toBe(400)` é o que impede a volta: baixar o `bodyLimit` para
+     * debaixo do teto declarado faz a resposta virar 413 de novo, e o teste cai.
+     */
+    expect(resposta.statusCode).toBe(400);
+    const mensagem = JSON.stringify(resposta.json());
+    // Um 413 seco manda a pessoa adivinhar. A frase precisa dizer QUAL arquivo,
+    // QUANTO ele tem, QUAL é o limite e O QUE fazer.
+    expect(mensagem).toContain("ata-gigante.md");
+    expect(mensagem).toContain("1,5 MB");
+    expect(mensagem).toContain("1,0 MB");
+    expect(mensagem).toContain("cole o trecho no contexto da demanda");
+  });
+
+  it("vários anexos pequenos que estouram o total também são recusados, pelo total", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+
+    const resposta = await app.inject({
+      method: "POST",
+      url: "/quebras",
+      cookies: { gerador_sessao: cookie },
+      payload: quebraCom([
+        anexo("a.md", 900_000),
+        anexo("b.md", 900_000),
+        anexo("c.md", 900_000),
+        anexo("d.md", 900_000),
+        anexo("e.md", 900_000),
+      ]),
+    });
+
+    expect(resposta.statusCode).toBe(400);
+    const mensagem = JSON.stringify(resposta.json());
+    expect(mensagem).toContain("4,5 MB");
+    expect(mensagem).toContain("o limite é 4,0 MB");
+  });
+
+  it("e o anexo de tamanho normal continua passando — o teto é generoso de propósito", async () => {
+    // §6.1 — o teto existe para dar diagnóstico, não para apertar. Quem
+    // esbarrar nele é o caso que ainda não existe, e é ele que vai justificar a
+    // conversa sobre storage separado que a SPEC recusa até lá.
+    const cookie = await logarComo(EMAIL_DEV);
+
+    const resposta = await app.inject({
+      method: "POST",
+      url: "/quebras",
+      cookies: { gerador_sessao: cookie },
+      payload: quebraCom([anexo("ata-refinamento.md", 200_000)]),
+    });
+
+    expect(resposta.statusCode).toBe(201);
+    expect(resposta.json().anexosContexto).toHaveLength(1);
+  });
+});

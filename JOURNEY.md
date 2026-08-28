@@ -12090,3 +12090,99 @@ as duas metades: o número aparece, e aprovar continua a um clique.
 
 513 engine · 133 llm · 84 aplicação · 780 web · 245 server · 39 gateway-falso ·
 103/103 E2E · build, typecheck e lint limpos.
+
+## §312 — o custo de salvar, e o teto que já existia sem ninguém saber (SPEC-72)
+
+O pedido: *"o sistema salva muitas informações, eventualmente grandes, como o
+contexto da demanda, portanto avaliar se as estratégias de salvamento estão
+corretas ou faltam otimizações."*
+
+### A rodada começou recusando o que foi pedido
+
+Remedido contra o banco de trabalho, agora:
+
+```
+pg_total_relation_size('quebras') .... 848 kB
+quebras ............................. 27
+maior demand_info ................... 1 692 caracteres
+maior diagrama (pg_column_size) ..... 3 629 bytes
+maior anexos_contexto ...............    59 bytes
+```
+
+Vinte e sete quebras ocupam **848 kB**. Otimizar isto seria trabalho contra um
+número que não dói, e a SPEC já tinha recusado a família inteira: salvamento
+incremental por campo, compressão, paginação de anexos, tabela separada para o
+contexto, reduzir o debounce. Nada disso entrou.
+
+> O número novo é o último: **o maior anexo do banco tem 59 bytes.** Praticamente
+> ninguém nunca conseguiu salvar um — o que é exatamente o defeito que a
+> SPEC-71 corrigiu na rodada anterior (a borda recusava a FORMA com 400). A
+> "bomba de tamanho" que a SPEC-72 §2.3 apontou nunca chegou a poder explodir.
+
+### O teto já existia, e era o pior possível
+
+O teste da fatia A nasceu vermelho — mas com **413**, não com o 400 que eu
+esperava.
+
+O `bodyLimit` default do Fastify é **1 MB**, e ele responde sem uma palavra.
+Ou seja: o produto já recusava anexo grande, num limite que ninguém declarou,
+com exatamente a mensagem que a SPEC §3.1 recusa em voz alta — *"recusados na
+borda com a frase que diz o número, não um 413 seco"*.
+
+Ninguém tinha percebido porque **anexo nenhum salvava**: a borda rejeitava a
+forma antes de o tamanho importar. Corrigida a forma na rodada anterior, o
+limite mudo apareceu.
+
+O `bodyLimit` subiu para 8 MB — acima do teto declarado, de propósito: quem
+recusa tem que ser a regra que sabe explicar, não a que só sabe cortar. E o
+`toBe(400)` do teste é o que impede a volta: baixar o limite do Fastify para
+debaixo do teto declarado faz a resposta virar 413 de novo, e o teste cai.
+
+A frase diz o arquivo, o tamanho, o limite e a saída:
+
+> *O anexo "ata-gigante.md" tem 1,5 MB e o limite por anexo é 1,0 MB. Anexe só a
+> parte que importa, ou cole o trecho no contexto da demanda.*
+
+### O flush ao sair era greenfield, e o timer estava preso
+
+`beforeunload`, `visibilitychange` e `pagehide` tinham **zero ocorrências** em
+todo o `packages/web`. Fechar a aba com o timer armado perdia os últimos 2 s de
+trabalho, sem aviso — e o campo mais afetado é justamente o que o pedido citou:
+o contexto da demanda, digitado em prosa longa.
+
+O obstáculo era estrutural: o timer vivia **dentro** do efeito, então não havia
+o que disparar de fora. Dois refs resolvem — o relógio, para saber se há algo
+pendente, e a quebra do momento, porque o listener é registrado uma vez e não
+pode ficar preso à renderização em que nasceu.
+
+Os **dois** eventos, com a mesma função (§6.2): `beforeunload` é menos confiável
+em móvel, `visibilitychange` cobre o descarte que vem depois. E uma guarda que
+custa uma linha e evita um defeito novo: só grava quando a aba fica `hidden` —
+voltar do alt-tab dispara `visibilitychange` também, e salvar ali transformaria
+troca de janela em escrita, que é a frequência que o debounce existe para evitar.
+
+### O carimbo passou a dizer a verdade
+
+Toda gravação carimbava `atualizadoEm`. Com o autosave mandando a quebra inteira
+a cada 2 s, "quando esta demanda mudou pela última vez" respondia *"quando
+alguém arrastou um nó"* — e é sobre esse carimbo que a SPEC-58 §5 constrói o
+"documento desatualizado" e que a tela de Abrir… ordena a lista.
+
+A SPEC deixou a escolha em aberto entre *o autosave para de reenviar o que não
+mudou* e *o carimbo passa a distinguir*. **A segunda**, e o motivo é o §4 da
+própria SPEC: ensinar o autosave a mandar só o diferente é o começo do
+salvamento incremental que ela recusa, e criaria a classe de defeito em que
+metade da quebra é de uma versão e metade de outra.
+
+A comparação é por JSON, e não campo a campo — campo novo entra na conta
+sozinho, e uma segunda lista de campos a manter em dia é exatamente o que a
+SPEC-71 acabou de provar que não se mantém. Com uma sutileza que só apareceu ao
+rodar: `jsonb` volta do Postgres com as chaves noutra ordem, então comparar o
+texto cru daria "mudou" sempre.
+
+De passagem, o mesmo raciocínio consertou o vizinho: `especificacaoGeradaEm` era
+recarimbado a cada autosave que tivesse especificação, fazendo "gerada em"
+responder pela última tecla digitada em qualquer campo.
+
+513 engine · 133 llm · 84 aplicação · 784 web · 250 server · 39 gateway-falso ·
+103/103 E2E · build, typecheck e lint limpos.
