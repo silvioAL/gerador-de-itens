@@ -45,6 +45,21 @@ export interface PresetGateway {
   /** Em quais modos este destino é alcançável. Ausente = nos dois (endereço na
    * internet vale de qualquer lugar). Ver `presetsDoModo`. */
   modos?: ("local" | "hospedado")[];
+  /**
+   * SPEC-74 — este destino NÃO consulta modelo nenhum: as respostas são
+   * inventadas pela própria stack, com a forma certa e conteúdo falso.
+   *
+   * Vive no preset, e não numa constante de endereço solta, porque é o preset
+   * que a tela já consulta para tudo o mais que é próprio do destino (dialeto,
+   * visão, transcrição). Ausente = destino de verdade.
+   */
+  simulado?: boolean;
+  /**
+   * Outros endereços que apontam para o MESMO destino. Viaja para a tela junto
+   * com o preset, para o navegador aplicar a mesma régua do servidor em vez de
+   * manter uma segunda cópia da lista (§263).
+   */
+  baseUrlsAlternativas?: string[];
 }
 
 /**
@@ -57,7 +72,60 @@ export const WHISPER_DO_MODO: Record<"local" | "hospedado", string> = {
   hospedado: "http://whisper:9000/v1",
 };
 
+/**
+ * SPEC-74 — o endereço do dublê dentro da rede do compose.
+ *
+ * `gateway-falso`, e não `localhost`, pelo mesmo motivo do `ollama-docker`
+ * logo abaixo: quem faz esta chamada é o CONTAINER do servidor, e ali
+ * `localhost` é ele mesmo.
+ */
+export const BASE_URL_SEM_CUSTO = "http://gateway-falso:4123/v1";
+
+/**
+ * SPEC-74 — os OUTROS endereços do mesmo dublê.
+ *
+ * O preset oferece o nome do serviço, porque é o servidor em container quem
+ * chama. Mas o mesmo processo também sobe fora do compose (é o que a suíte E2E
+ * faz, em `127.0.0.1:4123`), e um destino simulado que não é reconhecido como
+ * simulado é justamente o defeito que a fatia D existe para evitar: conteúdo
+ * inventado chegando à tela sem marca.
+ *
+ * Reconhecer por endereço e porta é uma heurística, e ela erra na direção
+ * barata: no pior caso alguém que colocou outro serviço em `4123` na própria
+ * máquina leva um aviso a mais. O erro caro é o contrário.
+ */
+export const ENDERECOS_ALTERNATIVOS_SEM_CUSTO = ["http://127.0.0.1:4123", "http://localhost:4123"];
+
 export const PRESETS_GATEWAY: PresetGateway[] = [
+  {
+    /**
+     * SPEC-74 — PRIMEIRO da lista de propósito.
+     *
+     * O pedido que originou a SPEC foi "o budget da API esgotou". Um destino
+     * que não gasta nada só cumpre esse papel se for o mais fácil de escolher:
+     * enterrá-lo no fim da lista devolveria o problema, porque a pessoa
+     * escolhe o primeiro que reconhece.
+     */
+    id: "sem-custo",
+    nome: "Sem custo (respostas simuladas)",
+    baseUrl: BASE_URL_SEM_CUSTO,
+    // O mesmo dublê responde chat e áudio — quem configurou um ganhou o outro.
+    modelos: ["modelo-de-mentira"],
+    // Ele aceita imagem e DIZ que aceitou (é como o E2E prova que o print
+    // atravessou o caminho inteiro), então esconder o botão seria mentira na
+    // direção contrária.
+    modelosComVisao: ["modelo-de-mentira"],
+    modeloPadrao: "modelo-de-mentira",
+    // Ele lê o schema do PROMPT, que é o que `json_object` produz — e é o
+    // mesmo dialeto que `formatoJsonPorBaseUrl` daria a um endereço
+    // desconhecido, então os dois caminhos concordam.
+    formatoJson: "json_object",
+    observacao:
+      "Não chama modelo nenhum: as respostas são inventadas pela própria stack, com a forma certa e conteúdo falso. Serve para desenvolver e demonstrar sem gastar API — e tudo o que sai daqui chega marcado como simulado. A chave é `chave-de-mentira-do-e2e`.",
+    modos: ["hospedado"],
+    simulado: true,
+    baseUrlsAlternativas: ENDERECOS_ALTERNATIVOS_SEM_CUSTO,
+  },
   {
     id: "anthropic",
     nome: "Claude (Anthropic)",
@@ -207,4 +275,28 @@ export function temVisao(baseUrl: string | undefined, modelo: string | undefined
   const alvo = baseUrl.replace(/\/+$/, "").toLowerCase();
   const preset = PRESETS_GATEWAY.find((p) => alvo.startsWith(p.baseUrl.replace(/\/+$/, "").toLowerCase()));
   return preset?.modelosComVisao?.includes(modelo.trim()) ?? false;
+}
+
+/**
+ * SPEC-74 fatia D — este destino INVENTA as respostas?
+ *
+ * Mesma mecânica de `temVisao` e `formatoJsonPorBaseUrl`, e pelo mesmo motivo:
+ * o endereço é o que o produto tem para responder, e a resposta mora onde a
+ * informação é conhecida — na lista de destinos, não espalhada por quem
+ * pergunta.
+ *
+ * Desconhecido responde `false`, e o erro é deliberado nessa direção: marcar
+ * como simulado o que veio de um modelo de verdade seria a ferramenta duvidando
+ * de trabalho legítimo. O caminho contrário (conteúdo simulado sem marca) é
+ * coberto pela `EVIDENCIA_SIMULADA` gravada no valor no momento da escrita, que
+ * viaja com o dado mesmo depois de alguém trocar de destino.
+ */
+export function ehSimulado(baseUrl: string | undefined): boolean {
+  if (!baseUrl) return false;
+  const alvo = baseUrl.replace(/\/+$/, "").toLowerCase();
+  return PRESETS_GATEWAY.some(
+    (p) =>
+      p.simulado === true &&
+      [p.baseUrl, ...(p.baseUrlsAlternativas ?? [])].some((e) => alvo.startsWith(e.replace(/\/+$/, "").toLowerCase()))
+  );
 }

@@ -11669,3 +11669,209 @@ o mesmo e diz a verdade.
 
 502 engine · 766 web · 84 aplicação · 238 server · 129 llm · 102/102 E2E · build
 e lint limpos.
+
+## §309 — o dublê saiu do teste e virou o padrão da casa (SPEC-74)
+
+O pedido veio no meio de outra conversa: *"quanto ao budget que esgotou para
+api, vc vai precisar montar mocks para que possamos seguir trabalhando sem
+gastar tokens."*
+
+### A medição desarmou a SPEC antes de ela começar
+
+Quase nada precisava ser inventado. `packages/web/e2e/gatewayFalso.ts` já tinha
+229 linhas cobrindo `/chat/completions` com SSE em pedaços,
+`/audio/transcriptions`, 401 de credencial recusada e falha sob comando. E o
+ponto de troca é **uma linha** — `provedorOpenAI.ts:352`, onde a URL nasce da
+`baseUrl` da credencial. Apontá-la para outro endereço faz as dez rotas `/ia/*`
+mudarem de destino sem uma linha de produto nova.
+
+> O trabalho era de **empacotamento**, não de invenção. O que faltava era um
+> utilitário de teste virar modo de desenvolvimento de primeira classe.
+
+### Pacote próprio, e o motivo é uma fronteira que já existia
+
+`packages/gateway-falso`, e não um subpath de `@gerador/llm`: o
+`packages/server/Dockerfile` copia o `llm` inteiro para dentro da imagem, e um
+dublê não pode ser dependência de produção. É a mesma fronteira que
+`gateway.fronteira.test.ts` guarda contra o binário nativo, pelo mesmo motivo.
+
+Ganho de passagem que não estava no plano: `packages/web/tsconfig.json` inclui
+só `src`, então **`e2e/` nunca foi typechecado**. No pacote novo é.
+
+### "Padrão" foi decisão do usuário, e não pode significar "sobrescreve"
+
+A SPEC propunha `--profile sem-custo`; o usuário escolheu o contrário — sem
+custo é o **padrão**, e modelo real se liga explicitamente. É coerente com a
+medição: o `--profile ia` existe porque são 4,7 GB de modelo, e este é um
+processo `node:http` sem uma dependência de runtime. Cobrar um passo extra para
+ligar o barato faria exatamente o que a SPEC existe para evitar — alguém
+esquecer e pagar.
+
+Mas a credencial é da **organização inteira**. Um padrão que apontasse a tela
+para o dublê por cima de um gateway já configurado trocaria o modelo de todo
+mundo sem pedir. Então o default só existe no vazio: credencial salva vence
+sempre, e há teste para as duas metades.
+
+### O serviço NÃO publica a porta, e isto foi medido
+
+A primeira versão publicava `4123:4123`, como o ollama e o whisper fazem. Com
+ela de pé, a stack de trabalho passa a disputar a porta com o `webServer` do
+Playwright — e a suíte E2E inteira morre no boot, sem artefato de falha nenhum.
+É o modo de falha que o §308 custou três rodadas para diagnosticar, e que o
+comentário de porta do `playwright.config.ts` já documentava para o servidor
+(4100, e não 4000).
+
+Quem alcança o dublê é o **container do servidor**, pelo nome na rede. Publicar
+não servia a ninguém e derrubava a rede de segurança de todo o resto.
+
+### Dois modos de resposta, porque são dois usos
+
+`ia-hospedada.spec.ts:379` afirma `escrito-pelo-gateway-falso.*\(label\)` — a
+suíte depende do texto **por caminho de campo**, e é assim que ela prova que o
+campo certo recebeu o texto certo. Trocar isso por respostas curadas quebraria a
+rede de segurança do repositório.
+
+Então o modo `esqueleto` continua sendo o default, e o `plausivel` é ligado por
+ambiente — pelo serviço do compose, nunca pelo Playwright. Não é inconsistência:
+o teste precisa de texto que diga QUAL campo foi preenchido, e quem desenvolve
+precisa de texto do tamanho de uma resposta de verdade, senão não dá para
+avaliar quebra de linha, lista com muitos itens nem estado de espera.
+
+O gerador plausível **passeia no schema recebido** em vez de guardar payloads
+prontos, e a razão é dura: os esquemas são montados a partir da config do time —
+os `enum` de tipo de nó e de id de componente mudam por instalação. Payload
+gravado à mão ficaria inválido na primeira config diferente, e inválido aqui
+significa retry do provedor e um teste lento sem motivo aparente.
+
+### A trava que impede o dublê e os pedidos de divergirem
+
+`respostas.test.ts` não inventa prompt: chama os oito `montarPedido*` de
+verdade, manda o que eles produzem ao dublê, e valida a resposta com o mesmo
+`validarContraSchema` que o provedor usa em produção. É o §263 resolvido por
+teste, e não por acoplamento — o pacote continua sem uma dependência fora do
+`node:http`; `@gerador/aplicacao` é devDependency.
+
+### A marca viaja com o DADO, não com o modo
+
+`origem: "sugerido"` já existia; o que faltava era dizer que nenhum modelo foi
+consultado. A `EVIDENCIA_SIMULADA` vai na `evidencia` do próprio `ValorSpec`, e
+não num sinalizador global de "o modo está ligado" — quem gerou no modo
+simulado, trocou para um gateway de verdade e exportou uma semana depois
+continua carregando um item cujo texto ninguém escreveu, e um estado de modo
+lido na hora da exportação diria que está tudo bem.
+
+Daí a `MARCA_SIMULADO` no documento, irmã da `MARCA_SUGERIDO` — e uma
+consequência que precisou ser escolhida: **confirmar tira a marca de "sugerido"
+e não tira a de "simulado"**. Quem confirmou assumiu o texto; o texto continua
+não tendo vindo de modelo nenhum. Marca, e não impede a exportação (§230).
+
+Na tela, `MarcaDeDemonstracao` com texto próprio — o componente do §235, sem
+inventar nada, e no lugar que a régua dele manda: acima do que qualifica, não ao
+lado de cada campo.
+
+### Cinco coisas que só apareceram medindo
+
+**1. O container respondia com a imagem velha, e eu quase reportei verde.**
+Testei contra a stack real e o dublê devolveu o texto do esqueleto, em 27 ms,
+com `plausivel` e 500 ms de latência configurados. A imagem tinha sido
+construída antes da fatia C. Sem o rebuild, o relato teria sido "funciona" sobre
+código que não estava rodando.
+
+**2. Um teste meu não tinha dentes.** Escrevi que a ordem da tabela de
+marcadores importava, e o teste que a guardava passava mesmo com a ordem
+invertida: a desambiguação real vinha do ponto final de um dos prompts. Tirei a
+pontuação dos marcadores (é a parte do texto que mais muda por revisão de
+escrita) — aí a ordem passou a importar de verdade, e o teste a falhar quando
+ela inverte.
+
+**3. O endereço mais exercitado do repositório ficaria sem marca.** O preset
+oferece `gateway-falso:4123` (o nome do serviço), mas a suíte E2E aponta para
+`127.0.0.1:4123`. `ehSimulado` não reconhecia, então o destino simulado mais
+usado da casa era justamente o que não recebia a marca. Os endereços
+alternativos passaram a viajar **dentro do preset**, para a tela aplicar a mesma
+régua do servidor em vez de manter uma segunda cópia da lista.
+
+**4. Um vazamento antigo, destapado por acaso.** Acrescentar seis testes num
+arquivo deixou a suíte web vermelha em outro: um `setTimeout` do `JourneyModal`
+chamava `setState` depois do teardown. O vazamento já existia — mudar a ordem de
+execução só encontrou a janela em que ele dói. Corrigido com `clearTimeout` na
+desmontagem.
+
+**5. O `npm install` do Dockerfile procurava os workspaces no registro.** As
+devDependencies do pacote novo incluem `@gerador/aplicacao` (só para o teste), e
+um install dentro do pacote, sem a raiz do monorepo, morre em 404. Instalar o
+compilador em `/repo` — ancestral do pacote — resolve dois problemas de uma vez;
+`-g` resolveria o `tsc` e não o `@types/node`.
+
+### E o E2E que fecha o laço achou um defeito de proveniência mais antigo
+
+O usuário perguntou por que eu não podia gravar a credencial simulada e apagar
+depois. A resposta certa não era "não posso": era que essa conferência **devia
+morar num teste**, e não numa checagem manual contra o banco de trabalho. Duas
+travas nasceram daí — uma em `app.test.ts` (credencial simulada gravada faz o
+`/ia/status` dizer `simulado: true`, com o controle negativo do destino de
+verdade) e uma no E2E, que baixa o markdown e afirma o par: **contém a marca de
+simulado e não contém a de sugerido**, depois de confirmar todos os campos.
+
+A do E2E ficou vermelha. E não por causa da SPEC-74.
+
+A sonda mostrou o documento inteiro com o texto da esteira, todo confirmado, e
+sem marca nenhuma — enquanto outra sonda, dentro do hook, provava que a
+evidência era gravada. O valor era perdido **entre a escrita e o documento**, e
+o culpado é uma linha em `ReviewScreen`:
+
+```ts
+onResponder?.(p.chave, { valor, origem: "manual" });
+```
+
+O botão "Confirmar" de cada campo **montava um `ValorSpec` novo do zero**.
+Confirmar um texto que a esteira escreveu, sem tocar nele, passava a afirmar
+que uma pessoa o escreveu — e junto iam a evidência, a confiança e o carimbo de
+insumos do §292.
+
+O mais revelador é que a régua certa já existia a dois arquivos de distância:
+`FilaDeRevisao` decide exatamente isto — *editou vira manual, não editou vira a
+mesma resposta, confirmada* —, e `confirmarTodas` usa `assinarSugestao`, que
+preserva. **Três superfícies confirmam a mesma coisa; duas preservavam e uma
+apagava.** É a assinatura do §263, e aqui ela custava um fato falso sobre quem
+escreveu o item.
+
+> E o teste que cobria essa linha era **cúmplice**: ele afirmava
+> `origem: "manual"` para uma resposta que a esteira tinha escrito. Nasceu para
+> provar outra coisa (que confirmar sem digitar não é no-op) e, de passagem,
+> fixou o defeito como comportamento esperado. É o mesmo padrão que este
+> arquivo já registra sobre o passo de reescolher time: *contornar um defeito
+> conhecido dentro do teste transforma a suíte em cúmplice dele.*
+
+Duas corridas no caminho, as duas do mesmo tipo e as duas achadas pelo E2E:
+`setIaSimulada` e `esteira.iniciar` acontecem no mesmo `.then`, então o ref
+ainda tinha o valor velho quando a esteira gravava. O arquivo já resolvia isso
+para os papéis — passando o valor resolvido explicitamente ao `iniciar` — e
+agora o `simulado` viaja pelo mesmo caminho.
+
+### Um aviso para a próxima rodada, encontrado de passagem
+
+Ao investigar isto, li a linha da quebra no banco do E2E:
+
+```
+titulo: Esteira com gateway falso | respostas_itens: {}
+```
+
+O documento na tela tinha todas as respostas da esteira; **o banco não tinha
+nenhuma.** É a SPEC-71 aparecendo antes da hora, e num campo que nem estava na
+lista dela. Não investiguei mais do que isto aqui — vira medição da rodada
+seguinte, e não afirmação desta.
+
+### Onde cada coisa foi verificada
+
+A stack real cobriu o caminho inteiro (tela → servidor → provedor → serviço do
+compose → SSE → volta) via `POST /ia/credencial/testar`, que aceita a credencial
+no corpo e **não persiste** — importante aqui, porque gravar a credencial
+simulada por cima da que está no banco de trabalho destruiria uma chave que não
+volta por HTTP. O modo com a credencial *gravada* é coberto por teste, que é
+onde ele devia estar: `app.test.ts` no banco descartável, e o E2E, que grava a
+credencial do dublê de verdade e confere as marcas na tela e no markdown
+baixado. Toda asserção nova foi vista falhando com a correção desligada.
+
+505 engine · 133 llm · 84 aplicação · 776 web · 240 server · 39 gateway-falso ·
+102/102 E2E · build e lint limpos.

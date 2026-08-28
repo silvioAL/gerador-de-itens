@@ -5,7 +5,7 @@ import {
   CHAVE_GATEWAY_FALSO,
   MODELO_GATEWAY_FALSO,
   PEDIR_FALHA_AO_GATEWAY,
-} from "./gatewayFalso";
+} from "@gerador/gateway-falso";
 
 const API = "http://localhost:4100";
 

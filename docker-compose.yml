@@ -55,6 +55,55 @@ services:
       db:
         condition: service_healthy
 
+  # SPEC-74 — o MODO SEM CUSTO: um gateway compatível com a OpenAI que responde
+  # sem chamar modelo nenhum.
+  #
+  # O motivo é direto: quem sobe a stack para trabalhar gastava token de API
+  # (ou budget que já acabou) só para ver uma tela de IA funcionando. O dublê
+  # já existia — mas vivia dentro do Playwright, e só existia enquanto a suíte
+  # rodava.
+  #
+  # SEM `profiles:`, ao contrário do `ollama` logo abaixo, e a diferença é
+  # medida: aquele são 4,7 GB de modelo, este é um processo `node:http` sem uma
+  # dependência de runtime. Cobrar um passo extra para ligar o barato faria
+  # exatamente o que esta SPEC existe para evitar — alguém esquecer e pagar.
+  #
+  # Quem quer modelo REAL troca o destino na aba "Modelo de IA"; uma credencial
+  # já salva nunca é sobrescrita por este serviço estar de pé.
+  gateway-falso:
+    build:
+      context: .
+      dockerfile: packages/gateway-falso/Dockerfile
+    environment:
+      # Dentro do container, `127.0.0.1` (o default do processo) o tornaria
+      # inalcançável pelo `server`, que fala com ele pelo nome do serviço.
+      GATEWAY_FALSO_HOST: 0.0.0.0
+      # A chave que a tela precisa informar. Fixa e obviamente falsa: se
+      # aparecer num log, ninguém confunde com segredo de verdade.
+      GATEWAY_FALSO_CHAVE: ${CHAVE_SEM_CUSTO:-chave-de-mentira-do-e2e}
+      # Aqui é `plausivel`, e no Playwright é o default `esqueleto`. Não é
+      # inconsistência: são dois usos diferentes do mesmo dublê. O teste precisa
+      # de texto que diga QUAL campo foi preenchido; quem desenvolve precisa de
+      # texto do tamanho de uma resposta de verdade, para a tela poder ser
+      # avaliada. Ligar o plausível na suíte quebraria as asserções dela.
+      GATEWAY_FALSO_RESPOSTAS: plausivel
+      # §2.4 — resposta instantânea esconde os estados de espera, e o produto
+      # tem animação de "construindo" que só se avalia com atraso. Meio segundo
+      # é o suficiente para vê-la sem tornar a ferramenta chata de usar.
+      GATEWAY_FALSO_LATENCIA_MS: ${LATENCIA_SEM_CUSTO:-500}
+    # SEM `ports:`, ao contrário do ollama e do whisper — e isto foi medido, não
+    # escolhido por gosto: quem alcança este serviço é o CONTAINER do servidor,
+    # pelo nome na rede do compose. Publicar 4123 no host o faria disputar a
+    # porta com o `webServer` do Playwright, e a stack de trabalho de pé
+    # derrubaria a suíte E2E inteira no boot — exatamente o modo de falha que o
+    # §308 custou três rodadas para diagnosticar, e que o comentário de porta do
+    # `playwright.config.ts` já documenta para o servidor (4100, não 4000).
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4123/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   # SPEC-31 — o modelo de IA rodando DENTRO da stack.
   #
   # O motivo é concreto: num ambiente corporativo que bloqueia a API do Claude,

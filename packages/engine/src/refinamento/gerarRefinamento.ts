@@ -59,6 +59,41 @@ export function respostaVisivel(resp: ValorSpec | undefined): resp is ValorSpec 
 export const MARCA_SUGERIDO = "_(sugerido pela esteira — confirmar)_";
 
 /**
+ * SPEC-74 fatia D — o que se grava na `evidencia` de um valor escrito pelo
+ * MODO SEM CUSTO, onde nenhum modelo foi consultado.
+ *
+ * Na `evidencia` do próprio valor, e não num estado global de "o modo está
+ * ligado": a proveniência tem que viajar COM o dado. Quem gerou no modo
+ * simulado, trocou para um gateway de verdade e exportou uma semana depois
+ * continua carregando um item cujo texto ninguém escreveu — e um sinalizador de
+ * modo, lido no momento da exportação, diria que está tudo bem.
+ */
+export const EVIDENCIA_SIMULADA = "modo sem custo — resposta simulada";
+
+/**
+ * SPEC-74 fatia D — a marca de conteúdo simulado NO DOCUMENTO, irmã da
+ * `MARCA_SUGERIDO` e pelo mesmo motivo: o §235 precisou de uma marca de
+ * demonstração porque a primeira captura de tela vira "olha o que a IA
+ * respondeu". Um item exportado com texto que nenhum modelo escreveu, sem
+ * dizer isso, vira dado real no backlog de alguém.
+ *
+ * Marca, e NÃO impede (§5.1 da SPEC): bloquear a exportação seria decidir pela
+ * pessoa, e é a mesma régua do §230.
+ */
+export const MARCA_SIMULADO = "_(simulado — modo sem custo)_";
+
+/** As marcas que uma resposta carrega, na mesma ordem sempre. */
+export function marcasDaResposta(r: { sugerida: boolean; simulada: boolean }): string {
+  return [r.sugerida ? MARCA_SUGERIDO : "", r.simulada ? MARCA_SIMULADO : ""].filter(Boolean).join(" ");
+}
+
+/** A mesma coisa, no formato de bloco separado que o documento usa. */
+export function blocoDeMarcas(r: { sugerida: boolean; simulada: boolean }): string {
+  const marcas = marcasDaResposta(r);
+  return marcas ? `\n\n${marcas}` : "";
+}
+
+/**
  * SPEC-41 §1 — o que o DOCUMENTO mostra (a prontidão continua com
  * `respostaVisivel`: confirmação humana é o que refina). Achado real: o
  * markdown saía com "(sem história definida)" e "✍️ especificar" ao lado de
@@ -67,9 +102,16 @@ export const MARCA_SUGERIDO = "_(sugerido pela esteira — confirmar)_";
  */
 export function respostaParaDocumento(
   resp: ValorSpec | undefined
-): { texto: string; sugerida: boolean } | null {
+): { texto: string; sugerida: boolean; simulada: boolean } | null {
   if (!resp || String(resp.valor ?? "").trim() === "") return null;
-  return { texto: String(resp.valor), sugerida: !respostaVisivel(resp) };
+  return {
+    texto: String(resp.valor),
+    sugerida: !respostaVisivel(resp),
+    // SPEC-74 — confirmar uma resposta simulada tira a marca de "sugerido" e
+    // NÃO tira a de "simulado": quem confirmou assumiu o texto, mas o texto
+    // continua não tendo vindo de modelo nenhum.
+    simulada: resp.evidencia === EVIDENCIA_SIMULADA,
+  };
 }
 
 /** Chaves fixas dos dois placeholders que toda atividade tem, independente
@@ -134,7 +176,7 @@ export function gerarChecklistTecnico(
     for (const r of relevantes) {
       const resp = respostaParaDocumento(respostas?.[chaveChecklistTecnico(tech, r.texto)]);
       // O marcador só em campo VAZIO; resposta sugerida entra com a marca.
-      if (resp) linhas.push(`- ${r.texto}: ${resp.texto}${resp.sugerida ? ` ${MARCA_SUGERIDO}` : ""}`);
+      if (resp) linhas.push(`- ${r.texto}: ${resp.texto}${marcasDaResposta(resp) ? ` ${marcasDaResposta(resp)}` : ""}`);
       else linhas.push(`- ${r.texto} ${MARCADOR_ESPECIFICAR}`);
     }
     blocos.push(linhas.join("\n"));
@@ -216,7 +258,7 @@ export function gerarVolumetria(
   const tech = techsAplicaveis[0];
   return CAMPOS_VOLUMETRIA.map((campo) => {
     const resp = respostaParaDocumento(respostas?.[chaveVolumetria(tech, campo)]);
-    if (resp) return `- ${campo}: ${resp.texto}${resp.sugerida ? ` ${MARCA_SUGERIDO}` : ""}`;
+    if (resp) return `- ${campo}: ${resp.texto}${marcasDaResposta(resp) ? ` ${marcasDaResposta(resp)}` : ""}`;
     return `- ${campo}: ___ ${MARCADOR_ESPECIFICAR}`;
   }).join("\n");
 }

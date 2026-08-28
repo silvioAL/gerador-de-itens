@@ -1,4 +1,5 @@
 import { createServer, type Server } from "node:http";
+import { respostaPlausivel } from "./respostas.js";
 
 /**
  * SPEC-31 — um gateway compatível com a OpenAI, falso e determinístico, pra
@@ -28,6 +29,18 @@ import { createServer, type Server } from "node:http";
  * {baseUrl}/chat/completions`, SSE, `Authorization: Bearer` — e responde sempre
  * a mesma coisa. O que ele NÃO faz é fingir: não há mock do `fetch`, o servidor
  * chama HTTP de verdade, e o navegador lê a resposta de verdade.
+ *
+ * ## SPEC-74 — por que ele deixou de morar no E2E
+ *
+ * Ele nasceu em `packages/web/e2e/gatewayFalso.ts`, e por isso só existia
+ * enquanto o Playwright estivesse rodando: quem sobe a stack pra TRABALHAR não
+ * o tinha, e continuava gastando token de API pra ver uma tela. Promovê-lo a
+ * pacote é o que permite subi-lo no `docker compose`.
+ *
+ * Pacote próprio, e não um subpath de `@gerador/llm`: o `packages/server`
+ * copia o `llm` inteiro pra dentro da imagem, e um dublê não pode ser
+ * dependência de produção. É a mesma fronteira que `gateway.fronteira.test.ts`
+ * guarda contra o binário nativo, pelo mesmo motivo.
  */
 
 /** Fixa e obviamente falsa: aparece no teste, no log e em nenhum lugar real. */
@@ -73,21 +86,29 @@ interface CorpoChat {
  * dialetos. Ler dali cobre `json_object` (que não manda o schema no corpo) e
  * `json_schema` com o mesmo código.
  */
-function schemaPedido(corpo: CorpoChat): unknown | null {
-  const doCorpo = corpo.response_format?.json_schema?.schema;
-  if (doCorpo) return doCorpo;
-
-  // ACHADO do próprio teste de imagem: com anexo, `content` deixa de ser
-  // string e vira array de parts. Concatenar direto virava "[object Object]",
-  // o dublê não achava o schema, caía no ramo de texto livre e devolvia algo
-  // que não era JSON — a tela mostrava "Unexpected token 'e'". O prompt (com o
-  // schema) mora na part de texto.
-  const texto =
+/**
+ * O texto do pedido, com as mensagens concatenadas.
+ *
+ * ACHADO do próprio teste de imagem: com anexo, `content` deixa de ser string e
+ * vira array de parts. Concatenar direto virava "[object Object]", o dublê não
+ * achava o schema, caía no ramo de texto livre e devolvia algo que não era JSON
+ * — a tela mostrava "Unexpected token 'e'". O prompt mora na part de texto.
+ */
+function textoDoPedido(corpo: CorpoChat): string {
+  return (
     corpo.messages
       ?.map((m) =>
         typeof m.content === "string" ? m.content : (m.content ?? []).map((parte) => parte?.text ?? "").join("\n")
       )
-      .join("\n") ?? "";
+      .join("\n") ?? ""
+  );
+}
+
+function schemaPedido(corpo: CorpoChat): unknown | null {
+  const doCorpo = corpo.response_format?.json_schema?.schema;
+  if (doCorpo) return doCorpo;
+
+  const texto = textoDoPedido(corpo);
   const marca = texto.lastIndexOf("obedeça exatamente a este schema:");
   if (marca < 0) return null;
   const inicio = texto.indexOf("{", marca);
@@ -137,7 +158,51 @@ function evento(conteudo: string): string {
   return `data: ${JSON.stringify({ choices: [{ delta: { content: conteudo } }] })}\n\n`;
 }
 
-export function criarGatewayFalso(): Server {
+/**
+ * SPEC-74 fatia B — o que muda entre "dublê da suíte" e "dublê da stack".
+ *
+ * As opções ficam aqui e o `process.env` fica no `bin.ts` de propósito: o
+ * módulo continua puro (o teste liga a porta 0 e escolhe a chave que quiser), e
+ * a leitura de ambiente acontece uma vez só, na borda do processo. Ler `env`
+ * aqui dentro faria as constantes exportadas significarem coisas diferentes no
+ * processo do teste e no do gateway — que é o tipo de divergência silenciosa
+ * que o §263 descreve.
+ */
+export interface OpcoesGatewayFalso {
+  /** Ausente = `CHAVE_GATEWAY_FALSO`. */
+  chave?: string;
+  /**
+   * SPEC-74 fatia C — o que ele escreve nas folhas de texto.
+   *
+   * `esqueleto` (default) devolve `escrito-pelo-gateway-falso (caminho.do.campo)`
+   * em cada string: é o que permite a um teste afirmar que o campo CERTO
+   * recebeu o texto certo, e a suíte E2E inteira depende disso.
+   *
+   * `plausivel` devolve frases com forma e tamanho de verdade — o que permite
+   * avaliar TELA (quebra de linha, lista com muitos itens, texto longo). É o
+   * modo do serviço do compose.
+   *
+   * O default é o antigo de propósito: a rede de segurança de todo o resto do
+   * repositório é a suíte, e ela não pode depender de uma variável de ambiente
+   * estar certa.
+   */
+  respostas?: "esqueleto" | "plausivel";
+  /**
+   * §2.4 — atraso antes de começar a responder, em ms.
+   *
+   * Resposta instantânea esconde os estados de espera, e o produto tem animação
+   * de "construindo" que só se avalia com atraso. Zero (o default) mantém a
+   * suíte no tempo que ela tem hoje.
+   */
+  latenciaMs?: number;
+}
+
+export function criarGatewayFalso(opcoes: OpcoesGatewayFalso = {}): Server {
+  const chaveEsperada = opcoes.chave ?? CHAVE_GATEWAY_FALSO;
+  const modo = opcoes.respostas ?? "esqueleto";
+  const latenciaMs = opcoes.latenciaMs ?? 0;
+  const depoisDaLatencia = (f: () => void) => (latenciaMs > 0 ? setTimeout(f, latenciaMs) : f());
+
   return createServer((req, res) => {
     // O Playwright espera por isto pra saber que o processo subiu.
     if (req.url === "/health") {
@@ -150,7 +215,7 @@ export function criarGatewayFalso(): Server {
     // porque é o mesmo dialeto e a mesma credencial: quem configurou o gateway
     // pra chat ganhou a transcrição junto, e o teste precisa provar isso.
     if (req.url?.endsWith("/audio/transcriptions") && req.method === "POST") {
-      if (req.headers.authorization !== `Bearer ${CHAVE_GATEWAY_FALSO}`) {
+      if (req.headers.authorization !== `Bearer ${chaveEsperada}`) {
         res.writeHead(401, { "content-type": "application/json" });
         res.end(JSON.stringify({ error: "credencial recusada pelo gateway falso" }));
         return;
@@ -174,7 +239,7 @@ export function criarGatewayFalso(): Server {
 
     // Credencial errada tem que doer: sem isto, o teste de "Testar conexão"
     // passaria mesmo se o server esquecesse de mandar a chave.
-    if (req.headers.authorization !== `Bearer ${CHAVE_GATEWAY_FALSO}`) {
+    if (req.headers.authorization !== `Bearer ${chaveEsperada}`) {
       res.writeHead(401, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: "credencial recusada pelo gateway falso" }));
       return;
@@ -206,24 +271,33 @@ export function criarGatewayFalso(): Server {
       }
 
       const schema = schemaPedido(corpo);
-      const texto = schema
-        // A marca de imagem entra TAMBÉM no caminho estruturado: `/ia/diagrama`
-        // responde JSON, e marcar só o texto livre deixaria o teste de imagem
-        // sem como afirmar nada (foi o que aconteceu).
-        ? JSON.stringify(preencher(schema, "", temImagem ? ` ${MARCA_VIU_IMAGEM}` : ""))
-        : `${MARCA_GATEWAY_FALSO}: ok${temImagem ? ` ${MARCA_VIU_IMAGEM}` : ""}`;
+      const texto =
+        modo === "plausivel"
+          ? respostaPlausivel(textoDoPedido(corpo), schema)
+          : schema
+            // A marca de imagem entra TAMBÉM no caminho estruturado:
+            // `/ia/diagrama` responde JSON, e marcar só o texto livre deixaria o
+            // teste de imagem sem como afirmar nada (foi o que aconteceu).
+            ? JSON.stringify(preencher(schema, "", temImagem ? ` ${MARCA_VIU_IMAGEM}` : ""))
+            : `${MARCA_GATEWAY_FALSO}: ok${temImagem ? ` ${MARCA_VIU_IMAGEM}` : ""}`;
 
       res.writeHead(200, {
         "content-type": "text/event-stream; charset=utf-8",
         "cache-control": "no-cache",
         connection: "keep-alive",
       });
-      // Em pedaços de verdade, não de uma vez: o caminho de streaming é
-      // justamente o que quebrou no navegador, e mandar o corpo inteiro num
-      // evento só deixaria de exercitar o buffer entre leituras.
-      for (let i = 0; i < texto.length; i += 64) res.write(evento(texto.slice(i, i + 64)));
-      res.write("data: [DONE]\n\n");
-      res.end();
+      // A latência é ANTES do primeiro evento, não entre eles: o que o produto
+      // mostra enquanto espera é o estado "construindo", e ele termina no
+      // primeiro pedaço que chega. Espalhar o atraso entre os eventos atrasaria
+      // o fim da resposta sem exercitar a espera que existe na tela.
+      depoisDaLatencia(() => {
+        // Em pedaços de verdade, não de uma vez: o caminho de streaming é
+        // justamente o que quebrou no navegador, e mandar o corpo inteiro num
+        // evento só deixaria de exercitar o buffer entre leituras.
+        for (let i = 0; i < texto.length; i += 64) res.write(evento(texto.slice(i, i + 64)));
+        res.write("data: [DONE]\n\n");
+        res.end();
+      });
     });
   });
 }

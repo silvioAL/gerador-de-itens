@@ -28,7 +28,7 @@ import {
   listarPlaceholders,
   respostaVisivel,
   respostaParaDocumento,
-  MARCA_SUGERIDO,
+  blocoDeMarcas,
   type PlaceholderRefinamento,
 } from "../refinamento/gerarRefinamento.js";
 
@@ -710,16 +710,12 @@ export function renderizarItemEspecificacao(
   const historiaResp = respostas?.[CHAVE_HISTORIA_USUARIO];
   const respHistoria = respostaParaDocumento(historiaResp);
   const historiaUsuario = respHistoria
-    ? `${respHistoria.texto}${respHistoria.sugerida ? `
-
-${MARCA_SUGERIDO}` : ""}`
+    ? `${respHistoria.texto}${blocoDeMarcas(respHistoria)}`
     : `_(sem história definida)_ ${MARCADOR_ESPECIFICAR}`;
   const criteriosContextuaisResp = respostas?.[CHAVE_CRITERIOS_ACEITE];
   const respCriterios = respostaParaDocumento(criteriosContextuaisResp);
   const criteriosContextuais = respCriterios
-    ? `${respCriterios.texto}${respCriterios.sugerida ? `
-
-${MARCA_SUGERIDO}` : ""}`
+    ? `${respCriterios.texto}${blocoDeMarcas(respCriterios)}`
     : undefined;
 
   // SPEC-24 — contrato de arquitetura (papel Arquiteto) e regras de teste +
@@ -741,24 +737,18 @@ ${MARCA_SUGERIDO}` : ""}`
   const regrasTesteResp = respostas?.[CHAVE_REGRAS_TESTE];
   const respRegrasTeste = respostaParaDocumento(regrasTesteResp);
   const regrasTeste = respRegrasTeste
-    ? `${respRegrasTeste.texto}${respRegrasTeste.sugerida ? `
-
-${MARCA_SUGERIDO}` : ""}`
+    ? `${respRegrasTeste.texto}${blocoDeMarcas(respRegrasTeste)}`
     : undefined;
   const cenarioFeatureResp = respostas?.[CHAVE_CENARIO_FEATURE];
   const respCenario = respostaParaDocumento(cenarioFeatureResp);
   const cenarioFeature = respCenario
-    ? `${respCenario.texto}${respCenario.sugerida ? `
-
-${MARCA_SUGERIDO}` : ""}`
+    ? `${respCenario.texto}${blocoDeMarcas(respCenario)}`
     : undefined;
 
   // SPEC-47 — a entrega final: o que fica PRONTO quando o item termina.
   const respEntrega = respostaParaDocumento(respostas?.[CHAVE_ENTREGA_FINAL]);
   const entregaFinal = respEntrega
-    ? `${respEntrega.texto}${respEntrega.sugerida ? `
-
-${MARCA_SUGERIDO}` : ""}`
+    ? `${respEntrega.texto}${blocoDeMarcas(respEntrega)}`
     : `_(a definir: o que fica pronto quando este item termina)_ ${MARCADOR_ESPECIFICAR}`;
 
   // A citação é da ORIGEM da atividade — o nó ou a aresta de onde ela nasceu.

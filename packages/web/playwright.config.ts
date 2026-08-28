@@ -87,12 +87,17 @@ export default defineConfig({
       timeout: 30000,
       env: { VITE_API_URL: "http://localhost:4100" },
     },
-    // Gateway de IA falso (ver e2e/gatewayFalso.ts). Sobe sempre, mesmo pros
-    // specs que não usam IA: é um processo de ~50 linhas sem estado, e deixá-lo
-    // condicional traria um modo de falha novo ("o spec de IA falha quando
-    // rodado sozinho") em troca de nada.
+    // Gateway de IA falso. Sobe sempre, mesmo pros specs que não usam IA: é um
+    // processo sem estado, e deixá-lo condicional traria um modo de falha novo
+    // ("o spec de IA falha quando rodado sozinho") em troca de nada.
+    //
+    // SPEC-74 — ele deixou de morar em `e2e/` e virou `packages/gateway-falso`,
+    // pra poder subir também no `docker compose` (quem trabalha na stack não
+    // tinha dublê nenhum, e gastava token de API pra ver uma tela). Daqui a
+    // única diferença é o endereço: mesmo processo, mesmas respostas.
     {
-      command: "npx tsx e2e/gatewayFalso.bin.ts",
+      command: "npm run dev --workspace=packages/gateway-falso",
+      cwd: "../..",
       url: "http://127.0.0.1:4123/health",
       reuseExistingServer: false,
       timeout: 30000,

@@ -1,4 +1,6 @@
+import { readFileSync } from "node:fs";
 import { test, expect, type Page } from "@playwright/test";
+import { MARCA_SIMULADO, MARCA_SUGERIDO } from "@gerador/engine";
 import { entrar } from "./auth";
 import { derivarNaMesa } from "./derivar";
 import {
@@ -8,7 +10,7 @@ import {
   MODELO_GATEWAY_FALSO,
   MARCA_VIU_IMAGEM,
   TEXTO_TRANSCRITO_FALSO,
-} from "./gatewayFalso";
+} from "@gerador/gateway-falso";
 
 /**
  * SPEC-31 Fase 4 — o modo hospedado exercitado NO NAVEGADOR.
@@ -19,7 +21,7 @@ import {
  * sem navegador, sem tela. Os quatro defeitos moravam justamente nesse vão.
  *
  * Aqui não há mock nenhum: o Chromium fala com o Fastify de verdade, que fala
- * HTTP de verdade com o gateway falso (`gatewayFalso.ts`), que responde SSE de
+ * HTTP de verdade com o gateway falso (`@gerador/gateway-falso`), que responde SSE de
  * verdade. A única mentira é o conteúdo da resposta, que precisa ser fixo pro
  * teste poder afirmar algo.
  */
@@ -65,6 +67,14 @@ test("configurar o gateway pela tela: testar antes de salvar, salvar, e a base U
   await card.getByLabel("Base URL do gateway").fill(BASE_URL_GATEWAY_FALSO);
   await card.getByLabel("Chave de API").fill(CHAVE_GATEWAY_FALSO);
   await card.getByLabel("Nome do modelo").fill(MODELO_GATEWAY_FALSO);
+
+  // SPEC-74 fatia D — o aviso aparece ao DIGITAR o endereço, antes de salvar
+  // qualquer coisa. É o momento em que a escolha ainda está sendo feita, e é o
+  // §235 outra vez: sem marca, a primeira captura de tela vira "olha o que a IA
+  // respondeu". Note que o endereço aqui é `127.0.0.1` — o dublê fora do
+  // compose —, então isto também prova que a marca não depende do preset ter
+  // sido escolhido no seletor.
+  await expect(card.getByTestId("avisos-do-destino")).toContainText("NÃO chama modelo nenhum");
 
   // ACHADO REAL: "Testar conexão" é o botão que se usa ANTES de salvar — é o
   // ponto dele. A primeira versão da rota só olhava a credencial gravada, então
@@ -146,6 +156,12 @@ test("a esteira roda no navegador e o texto do gateway chega nos campos (o defei
   // O resultado era o relato do usuário: "todos os campos vazios".
   await expect(page.getByText(new RegExp(MARCA_GATEWAY_FALSO)).first()).toBeVisible({ timeout: 60000 });
 
+  // SPEC-74 fatia D — e a tela DIZ que aquele texto não veio de modelo nenhum.
+  // Acima da esteira, e não ao lado de cada campo: a régua do §235 é "pequena e
+  // sempre no topo do que ela qualifica — a pessoa precisa ver antes de ler o
+  // conteúdo, não depois".
+  await expect(page.getByTestId("marca-demonstracao")).toContainText("Modo sem custo");
+
   // SPEC-37 M1 — a esteira que o usuário disparou TERMINOU: o chat do
   // refinamento abre sozinho, com a fala do momento. É a única conduta que
   // abre sem clique (régua da §2 da SPEC), e é exatamente o pedido original.
@@ -172,7 +188,22 @@ test("a esteira roda no navegador e o texto do gateway chega nos campos (o defei
   // ir. Uma saída só.
   await expect(page.getByTestId("secao-dos-itens")).toBeVisible();
   await page.getByTestId("baixar-markdown").click();
-  expect((await download).suggestedFilename()).toBe("documento-de-desenho.md");
+  const baixado = await download;
+  expect(baixado.suggestedFilename()).toBe("documento-de-desenho.md");
+
+  // SPEC-74 fatia D — "e o documento gerado também".
+  //
+  // No arquivo BAIXADO, e não no que a tela desenha: é ele que vai para o
+  // tracker, para o repositório de outra pessoa e para o agente que constrói.
+  // A marca de demonstração fica na tela; esta viaja.
+  //
+  // E repare no que já aconteceu acima: todo campo sugerido foi CONFIRMADO um
+  // a um. Confirmar tira a marca de "sugerido pela esteira" — quem confirmou
+  // assumiu o texto — e não tira esta. O texto continua não tendo vindo de
+  // modelo nenhum, e é isso que este par de asserções fixa.
+  const markdown = readFileSync(await baixado.path(), "utf-8");
+  expect(markdown).toContain(MARCA_SIMULADO);
+  expect(markdown).not.toContain(MARCA_SUGERIDO);
 
   await page.screenshot({ path: "e2e/screenshots/ia-hospedada.png", fullPage: true });
 

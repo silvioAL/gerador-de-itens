@@ -153,6 +153,29 @@ docker compose up --build
 
 Abra `http://localhost:8080`. Usa o config de exemplo deste repositório (rabbit, kafka, mongo, sql, camunda, fico, api externa, job, regra, cache, storage, batch — 14 tipos de nó, mais gRPC/GraphQL como tipos de conexão sobre "Serviço"). Sobe em `AUTH_MODE=dev` (login só com e-mail, sem senha — ver SPEC-08 §2.1), nunca precisa de segredo nenhum.
 
+#### IA sem custo — o padrão, e o que ele é honestamente
+
+O `docker compose up` sobe junto um **gateway falso**: ele fala o mesmo protocolo de um modelo de verdade (`/chat/completions` com streaming, `/audio/transcriptions`, `Authorization: Bearer`), e **não chama modelo nenhum**. As respostas têm a forma certa e o conteúdo inventado.
+
+É o padrão de propósito. Uma ferramenta que gasta chave de API só pra alguém ver uma tela funcionando cobra caro por curiosidade — e o modo real está a um clique de distância.
+
+Na aplicação, em **⚙ Configurações → Modelo de IA**, ele já vem escolhido quando não há credencial nenhuma:
+
+| campo | valor |
+|---|---|
+| Destino | **Sem custo (respostas simuladas)** |
+| Base URL | `http://gateway-falso:4123/v1` (já preenchida) |
+| Chave de API | `chave-de-mentira-do-e2e` |
+| Nome do modelo | `modelo-de-mentira` (já preenchido) |
+
+> **Ele nunca sobrescreve o que você já configurou.** Se já existe uma credencial salva, a tela mostra a sua — o padrão só vale no vazio. E tudo que sai do modo sem custo chega **marcado como simulado**, na tela e no documento: nenhuma captura de tela deste modo pode passar por "olha o que a IA respondeu".
+
+Para desligar, escolha outro destino na mesma tela. Se quiser subir a stack sem nem o serviço do dublê:
+
+```powershell
+docker compose up -d --scale gateway-falso=0
+```
+
 #### IA rodando dentro da stack (Qwen, sem sair da sua rede)
 
 Se o seu ambiente bloqueia a API do Claude — o caso comum em rede corporativa — dá pra rodar o modelo **num container ao lado do servidor**. Nada sai da máquina, e não é preciso chave de API nenhuma.

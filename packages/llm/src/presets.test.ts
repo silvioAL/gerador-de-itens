@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { presetsDoModo, PRESETS_GATEWAY, WHISPER_DO_MODO } from "./presets.js";
+import { ehSimulado, presetsDoModo, PRESETS_GATEWAY, WHISPER_DO_MODO } from "./presets.js";
 
 /**
  * ACHADO REAL do usuário: escolheu o preset da Anthropic, salvou, e ao testar o
@@ -58,5 +58,32 @@ describe("presetsDoModo — a voz sugerida (#291)", () => {
         expect(ids(modo).includes(p.id)).toBe(p.modos.includes(modo));
       }
     }
+  });
+});
+
+/**
+ * SPEC-74 fatia D — o produto precisa saber que o destino inventa as respostas
+ * para poder dizer isso na tela. Mesma dedução por endereço de `temVisao`.
+ */
+describe("ehSimulado (SPEC-74)", () => {
+  it("reconhece o destino sem custo", () => {
+    expect(ehSimulado("http://gateway-falso:4123/v1")).toBe(true);
+    // Barra final e caixa não podem mudar a resposta — a base URL é digitável.
+    expect(ehSimulado("http://GATEWAY-FALSO:4123/v1/")).toBe(true);
+  });
+
+  it("destino de verdade e desconhecido respondem false", () => {
+    expect(ehSimulado("https://api.anthropic.com/v1")).toBe(false);
+    expect(ehSimulado("https://gateway-interno.empresa/v1")).toBe(false);
+    expect(ehSimulado(undefined)).toBe(false);
+  });
+
+  it("o preset sem custo é o PRIMEIRO da lista — quem escolhe pega o primeiro que reconhece", () => {
+    expect(PRESETS_GATEWAY[0].id).toBe("sem-custo");
+    expect(PRESETS_GATEWAY[0].simulado).toBe(true);
+  });
+
+  it("e é o único simulado: nenhum destino de verdade pode estar marcado", () => {
+    expect(PRESETS_GATEWAY.filter((p) => p.simulado).map((p) => p.id)).toEqual(["sem-custo"]);
   });
 });

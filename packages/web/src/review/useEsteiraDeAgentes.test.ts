@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { EVIDENCIA_SIMULADA } from "@gerador/engine";
 import { TAM_LOTE_ESTEIRA, extrairRespostasParciaisAninhadas, useEsteiraDeAgentes, type ItemFilaEsteira } from "./useEsteiraDeAgentes";
 
 const apiIaSugerirPipelineMock = vi.hoisted(() => vi.fn());
@@ -124,6 +125,33 @@ describe("useEsteiraDeAgentes (SPEC-24 — orquestração por papel × lotes de 
     expect(onResponderItem).toHaveBeenCalledWith("a1", "_regrasTeste", {
       valor: "resposta qa/a1/_regrasTeste", origem: "sugerido", confirmado: false,
     });
+  });
+
+  it("SPEC-74 — com destino simulado, a resposta nasce com a evidência de que nenhum modelo foi consultado", async () => {
+    apiIaSugerirPipelineMock.mockImplementation(async (papel: string, pedido: PedidoLote) => respostaDoLote(papel, pedido));
+    const onResponderItem = vi.fn();
+    const { result } = renderHook(() => useEsteiraDeAgentes({ onResponderItem, simulado: true }));
+
+    act(() => result.current.iniciar([item(1)]));
+    await waitFor(() => expect(result.current.rodando).toBe(false));
+
+    expect(onResponderItem).toHaveBeenCalledWith("a1", "_historiaUsuario", {
+      valor: "resposta po/a1/_historiaUsuario",
+      origem: "sugerido",
+      confirmado: false,
+      evidencia: EVIDENCIA_SIMULADA,
+    });
+  });
+
+  it("e sem destino simulado a resposta sai limpa — marcar trabalho legítimo é o erro caro", async () => {
+    apiIaSugerirPipelineMock.mockImplementation(async (papel: string, pedido: PedidoLote) => respostaDoLote(papel, pedido));
+    const onResponderItem = vi.fn();
+    const { result } = renderHook(() => useEsteiraDeAgentes({ onResponderItem }));
+
+    act(() => result.current.iniciar([item(1)]));
+    await waitFor(() => expect(result.current.rodando).toBe(false));
+
+    expect(onResponderItem.mock.calls.every(([, , r]) => r.evidencia === undefined)).toBe(true);
   });
 
   it("item com MUITO mais placeholders que os outros no mesmo lote recebe todos — chaves com '::', espaços e acentos", async () => {

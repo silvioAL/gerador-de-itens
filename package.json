@@ -9,7 +9,8 @@
     "packages/llm",
     "packages/aplicacao",
     "packages/web",
-    "packages/server"
+    "packages/server",
+    "packages/gateway-falso"
   ],
   "scripts": {
     "test": "npm test --workspaces --if-present",
