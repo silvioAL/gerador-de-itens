@@ -23,7 +23,11 @@ test("jornada abre sozinha no primeiro acesso, explica as saídas, e some ao fec
   // saída está listada, não quantas vezes o nome aparece.
   await expect(page.getByText("Especificação de solução").first()).toBeVisible();
 
-  await page.getByRole("button", { name: "Fechar" }).click();
+  // `exact: true`: o × da modal tem `aria-label="Fechar"`, e o locator frouxo
+  // passou a casar também com o estágio "Fechar o ciclo" (SPEC-76). O botão
+  // que este teste quer é o da modal, e dizer isso é mais barato do que evitar
+  // a palavra "fechar" no resto do produto.
+  await page.getByRole("button", { name: "Fechar", exact: true }).click();
   await expect(page.getByText("Como funciona o Gerador de Itens")).not.toBeVisible();
 
   await page.reload();

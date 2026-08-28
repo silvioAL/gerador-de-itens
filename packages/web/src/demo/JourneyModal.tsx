@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { DiagramaConfig, No, Quebra } from "@gerador/engine";
 import type { Cenario } from "./scenarios";
+import { CicloDoProduto } from "./CicloDoProduto";
 import { Jornada } from "./Jornada";
 
 // "perfis" saiu daqui pra ConfigScreen.tsx — é config recorrente de time, não
@@ -110,7 +111,20 @@ export function JourneyModal({
         </div>
 
         <div style={{ flex: 1, overflow: "auto", padding: 24 }}>
-          {aba === "jornada" && <Jornada />}
+          {aba === "jornada" && (
+            <>
+              {/* SPEC-76 §7.1 — pré-login E de dentro, com um componente só.
+                  A pergunta em aberto da SPEC ("qual dos dois?") já tinha
+                  resposta implementada aqui: a `Jornada` sempre foi
+                  compartilhada, justamente "pra não dessincronizar duas
+                  explicações da mesma coisa". O ciclo entra pela mesma porta —
+                  quem já usa esquece o todo, e o §251 mostrou três vezes que
+                  demonstração pela metade custa caro. */}
+              <CicloDoProduto />
+              <div style={{ height: 28 }} />
+              <Jornada />
+            </>
+          )}
           {aba === "cenarios" && (
             <Cenarios cenarios={cenarios} config={config} onCarregar={carregar} onAdicionar={onAdicionarCenario} />
           )}
