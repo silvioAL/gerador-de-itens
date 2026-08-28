@@ -11587,3 +11587,85 @@ que entrega motor sem superfície parece pronta no diff e não existe para quem
 usa.**
 
 502 engine · 764 web · 84 aplicação · 238 server · 129 llm · build e lint limpos.
+
+## §308 — a aba cortada, e o rename que só piorou o que já estava quebrado
+
+Relato com captura: *"aqui cortou parte do texto da configuração"*. A terceira
+aba do assistente aparecia como **"⚙ Configura"**, sem o "r".
+
+### A medição
+
+Contra a stack local, antes de tocar em qualquer coisa:
+
+```
+janela: 420 px
+fileira: largura 418 · conteúdo 471 · flexWrap: nowrap · overflowX: visible
+abas: "✦ Desenhar conversando" 159 · "📎 Contexto da demanda" 159 · "⚙ Configurar" 92
+```
+
+**53 px a mais do que cabe**, com `nowrap` dentro de uma janela
+`overflow: hidden`. A terceira aba não estava truncada por CSS — ela estava
+**fora da moldura**, e a borda a cortava.
+
+### O rename não causou; agravou
+
+`Contexto do épico` → `Contexto da demanda` (§306) alargou o rótulo em ~7 px.
+O corte precisava de 53. **Já estava quebrado antes** — o rename só empurrou um
+pouco mais um botão que já vazava.
+
+> É a segunda vez neste ciclo que mexer num rótulo revela um layout que já não
+> cabia. Rótulo é a única parte da tela que muda de tamanho com o idioma, e um
+> `nowrap` numa fileira de largura fixa é uma aposta de que ninguém vai
+> traduzir, renomear ou acrescentar nada.
+
+### Quebrar, e não encolher
+
+Três saídas foram consideradas, e a escolha tem motivo:
+
+- **encolher com reticências** — uma aba com "⚙ Config…" continua ilegível;
+- **alargar a janela para 470** — número mágico que quebra de novo no próximo
+  rótulo, ou na primeira tradução;
+- **quebrar em duas linhas** — 26 px de uma janela de 620, e sobrevive a
+  qualquer rótulo futuro.
+
+A régua por trás: **aba invisível é caminho que não existe** (§244). Duas linhas
+são o preço mais barato da lista.
+
+O `minWidth: 0` na fileira não é enfeite — sem ele um filho flex não encolhe
+abaixo do próprio conteúdo, e a quebra nunca aconteceria.
+
+### A régua do teste é de GEOMETRIA, não de presença
+
+O botão continua no DOM e continua "visível" para o CSS — ele só está fora da
+moldura. `toBeVisible()` passaria dos dois lados, exatamente como no §302.
+
+O que prova o conserto é a conta: **nenhuma aba pode terminar depois da borda
+direita da janela**. Desliguei a quebra e vi o vermelho antes de dar por feito.
+
+### E a suíte local não estava medindo nada
+
+Três rodadas seguidas vermelhas, com falhas DIFERENTES a cada vez — sempre em
+specs sem relação com a mudança, sempre com forma de timeout, e a suíte passando
+de 2,9 para 6,7 minutos. `docker stats` respondeu em uma linha: um container
+`infisical`, alheio a este projeto, consumindo **152% de CPU** continuamente.
+
+Com ele parado: **102/102 em 3,7 min**.
+
+Dois erros meus de método no caminho, e os dois valem mais que o conserto:
+
+1. **Rodei sondas com Chromium e um rebuild de container em paralelo com a
+   suíte.** É o §304 outra vez com outra roupa: lá eu editei o fonte com a
+   bancada em movimento, aqui disputei a máquina. O efeito é o mesmo — a
+   medição não mede.
+2. **Matei uma suíte com `TaskStop` e não limpei o que ela subiu.** O
+   `TaskStop` mata o processo pai; os três `webServer` (Vite 5190, servidor
+   4100, gateway falso 4123) sobreviveram segurando as portas, e a rodada
+   seguinte morreu no boot — **sem artefato de falha nenhum**, que é o pior
+   diagnóstico possível.
+
+E um terceiro, que atrasou os dois primeiros: `| tail -8` num comando cujo
+motivo da falha está no MEIO da saída. Filtrar por `passed|failed|Error` custa
+o mesmo e diz a verdade.
+
+502 engine · 766 web · 84 aplicação · 238 server · 129 llm · 102/102 E2E · build
+e lint limpos.

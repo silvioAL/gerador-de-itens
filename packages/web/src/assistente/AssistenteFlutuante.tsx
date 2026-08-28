@@ -82,17 +82,34 @@ export function AssistenteFlutuante({
           data-testid="assistente-janela"
         >
           <header style={cabecalhoEstilo}>
-            {ABAS.map((a) => (
-              <button
-                key={a.id}
-                onClick={() => onMudarAba(a.id)}
-                style={{ ...abaEstilo, ...(a.id === aba ? abaAtivaEstilo : {}) }}
-                aria-pressed={a.id === aba}
-              >
-                {a.rotulo}
-              </button>
-            ))}
-            <div style={{ flex: 1 }} />
+            {/* §308 — as abas QUEBRAM em vez de serem cortadas.
+                
+                Relato com captura: "⚙ Configura" aparecia truncado. Medido: a
+                fileira tem 418 px e as três abas mais o × precisam de 471 —
+                com `nowrap` dentro de uma janela `overflow: hidden`, a terceira
+                simplesmente sumia pela borda.
+                
+                Já era assim antes de "Contexto do épico" virar "Contexto da
+                demanda"; o rótulo novo, ~7 px mais largo, só piorou um corte
+                que já existia.
+                
+                Quebrar e não encolher: uma aba com reticências continua ilegível,
+                e uma aba invisível é um caminho que não existe (§244). Duas
+                linhas ocupam 26 px de uma janela de 620 — é o preço mais barato
+                da lista, e a solução sobrevive a rótulo novo e a tradução, que é
+                onde um `width: 470` mágico quebraria de novo. */}
+            <div style={fileiraDeAbasEstilo}>
+              {ABAS.map((a) => (
+                <button
+                  key={a.id}
+                  onClick={() => onMudarAba(a.id)}
+                  style={{ ...abaEstilo, ...(a.id === aba ? abaAtivaEstilo : {}) }}
+                  aria-pressed={a.id === aba}
+                >
+                  {a.rotulo}
+                </button>
+              ))}
+            </div>
             <button
               onClick={() => onMudarAba(null)}
               style={fecharEstilo}
@@ -259,10 +276,22 @@ const dispensarEstilo: React.CSSProperties = {
 
 const cabecalhoEstilo: React.CSSProperties = {
   display: "flex",
-  alignItems: "center",
+  // `flex-start`: com as abas em duas linhas, centralizar deixaria o × no meio
+  // da altura da fileira em vez de alinhado com a primeira aba.
+  alignItems: "flex-start",
   gap: 6,
   padding: "10px 12px",
   borderBottom: "1px solid var(--borda)",
+};
+
+/** §308 — a fileira que quebra. `minWidth: 0` porque um filho flex não encolhe
+ * abaixo do próprio conteúdo sem isso, e a quebra nunca aconteceria. */
+const fileiraDeAbasEstilo: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 6,
+  flex: 1,
+  minWidth: 0,
 };
 
 const abaEstilo: React.CSSProperties = {
