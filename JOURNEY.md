@@ -12280,3 +12280,104 @@ a tela diz isso em voz alta, para ninguém esperar a saturação mudar sozinha.
 
 524 engine · 133 llm · 84 aplicação · 787 web · 254 server · 39 gateway-falso ·
 103/103 E2E · build, typecheck e lint limpos.
+
+## §314 — a página que explica o ciclo, e a medição que a SPEC errou sobre si mesma (SPEC-76)
+
+O pedido: *"hoje nosso sistema não 'se vende bem'. Precisamos avaliar se é
+preciso montar uma página de apresentação, talvez prévia ao login, que explique
+os conceitos gerais […] penso em um diagrama com um círculo, interativo, com a
+IA contida no meio como um círculo rígido."*
+
+### A SPEC media a própria landing errado
+
+Ela diz que a página tem 68 linhas e que *"o conteúdo inteiro"* é um `h1`, um
+`p` e dois botões. **Não é.** `LandingPage.tsx:30` renderiza `<Jornada />`, e
+`Jornada.tsx` (139 linhas) já traz cinco etapas descritas mais uma seção
+`OMotor()` que explica justamente a divisão motor determinístico × IA — a mesma
+que a SPEC §1 afirma que *"ninguém nunca escreveu"*.
+
+E a pergunta em aberto §7.1 (*"pré-login ou também de dentro?"*) já tinha
+resposta implementada: `Jornada.tsx:97-102` declara, em comentário, *"um
+componente só, pra não dessincronizar duas explicações da mesma coisa"*.
+
+> O diagnóstico continuava certo, por outro motivo. O conteúdo descrevia **um
+> fluxo de cinco passos, não um ciclo que fecha.** Um fluxo termina; este
+> produto não termina, ele volta. Foi isso que faltava escrever.
+
+Por isso o ciclo entrou **antes** da jornada, e não no lugar dela: o ciclo é o
+mapa (o todo, e o que ainda não existe), e a jornada continua sendo o passo a
+passo de quem vai usar. Dois públicos na mesma página, e a ordem diz qual vem
+primeiro.
+
+### Nove de doze viraram dez de treze, e é por isso que a lista é DADO
+
+A tabela da SPEC contava nove estágios existentes. São **dez** — porque a rodada
+da SPEC-77, entregue horas depois de a tabela ser escrita, fez a volumetria de
+produto que ela mesma listava como ausente.
+
+É exatamente o argumento para a lista não ser prosa: um parágrafo dizendo "nove
+de doze" continuaria dizendo isso depois de o décimo ficar pronto. Em
+`ciclo.ts`, cada estágio carrega `estado` e `rota` — e o teste da fatia D cruza
+cada estágio marcado como existente com o roteador de verdade
+(`hashDaRota`/`rotaDoHash`, funções puras). Estágio que perder a tela derruba a
+suíte no mesmo commit.
+
+> A régua da SPEC é uma frase: **a página não pode prometer o que o produto não
+> faz.** Escrita em prosa, ela envelhece calada. Escrita como dado conferido,
+> ela cobra.
+
+### O centro é a tese, e ele é uma ausência
+
+*"A IA contida no meio como um círculo rígido"* é uma imagem precisa, e virou o
+conceito central: **a IA está no meio de tudo, e é contida.** Ela propõe, nunca
+aplica; sugere, e alguém aceita; escreve o texto, e nunca a conta.
+
+É a coisa mais difícil de comunicar porque é uma **ausência de comportamento** —
+não existe tela que mostre "aqui a IA não fez nada". O substituto honesto está
+escrito no `CONCEITO.md`: tudo que a ferramenta afirma diz de onde veio. Um
+valor traz proveniência, uma lacuna traz o marcador que a torna contável, um
+número derivado nunca se apresenta como declarado.
+
+### O círculo é mapa, não primeira impressão — e o texto não cabe nele
+
+A SPEC avisou do risco: *"um círculo com doze fatias e setas para o centro é
+denso — e denso na primeira tela é a definição de não se vender bem"*. Trocar
+"uma frase e um botão" por "um infográfico que ninguém lê" seria o mesmo erro
+com outra roupa.
+
+Duas decisões saíram disso. A promessa continua sendo a primeira coisa (e há
+asserção de **geometria** no E2E provando que o círculo vem depois dela). E o
+texto dos treze estágios mora numa **lista ao lado**, não em rótulos em volta do
+círculo: treze rótulos num círculo de 350 px ou ficam ilegíveis ou exigem uma
+tela larga, e a página tem que funcionar em cinco segundos — inclusive no
+celular. O círculo mostra a FORMA (fecha, e tem um centro); a lista carrega o
+conteúdo.
+
+### O que a skill de dataviz mudou, em uma linha
+
+A SPEC recomendou usá-la para "bonito" não virar opinião. A régua acionável que
+ela deu aqui foi uma, e valeu a consulta: *"existe / parcial / ainda não existe"*
+é **status**, e status vem com **ícone e palavra, nunca com cor sozinha**. Quem
+não distingue as cores tem que ler a mesma coisa — e isso vale para daltonismo,
+impressão e alto contraste.
+
+O resto ela mandou não fazer: nenhuma paleta nova. As cores saem das variáveis
+que o produto já tem, que já têm modo claro e escuro. Duas paletas no mesmo app
+divergem na primeira mudança de tema.
+
+### Dois testes vizinhos quebraram, e os dois estavam frouxos
+
+O estágio **"Fechar o ciclo"** fez `getByRole("button", { name: "Fechar" })`
+casar com dois elementos, e o teste da jornada caiu em *strict mode violation*.
+O botão que aquele teste quer é o × da modal, cujo `aria-label` é exatamente
+"Fechar" — então o locator ganhou `exact: true`. Dizer qual botão se quer é mais
+barato do que evitar a palavra "fechar" no resto do produto.
+
+E numa das rodadas completas da suíte, `abas-de-configuracao` falhou no
+`entrar()` esperando o canvas. Ele passa sozinho, a máquina estava ociosa na
+medição, e a rodada seguinte fechou 104/104. Fica anotado como **observação, não
+diagnóstico**: se voltar, é sinal de que a landing ficou pesada demais para o
+caminho de login, e aí tem dono.
+
+524 engine · 133 llm · 84 aplicação · 800 web · 254 server · 39 gateway-falso ·
+104/104 E2E · build, typecheck e lint limpos.

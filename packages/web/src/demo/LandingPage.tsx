@@ -1,3 +1,4 @@
+import { CicloDoProduto } from "./CicloDoProduto";
 import { Jornada } from "./Jornada";
 
 export interface LandingPageProps {
@@ -9,6 +10,19 @@ export interface LandingPageProps {
  * saber o que a ferramenta é, em vez de cair direto num formulário de
  * credencial. Reaproveita `Jornada()` (mesma explicação usada na aba "A
  * jornada" pós-login) em vez de escrever uma segunda versão.
+ *
+ * ## SPEC-76 — a correção de medição que a rodada começou fazendo
+ *
+ * A SPEC dizia que esta página tinha "uma frase e um botão". Não tinha: ela já
+ * renderizava a `Jornada`, com cinco etapas e a explicação do motor. O
+ * diagnóstico continuava certo por outro motivo — **o conteúdo descrevia um
+ * fluxo de cinco passos, não um ciclo que fecha.** Um fluxo termina; o produto
+ * não termina, ele volta.
+ *
+ * Por isso o `CicloDoProduto` vem ANTES da `Jornada` e não no lugar dela: o
+ * ciclo é o mapa (o todo, e o que ainda não existe), e a jornada continua sendo
+ * o passo a passo de quem vai usar. São dois públicos na mesma página, e a
+ * ordem diz qual vem primeiro.
  */
 export function LandingPage({ onEntrar }: LandingPageProps) {
   return (
@@ -27,6 +41,8 @@ export function LandingPage({ onEntrar }: LandingPageProps) {
           Não é um gerador de prompt de IA — é um mecanismo determinístico. O mesmo diagrama sempre produz os mesmos
           itens, com proveniência em cada campo e nada virando "pronto" sem alguém confirmar.
         </p>
+        <CicloDoProduto />
+        <div style={{ height: 28 }} />
         <Jornada />
         <button onClick={onEntrar} style={{ ...botaoEntrarEstilo, marginTop: 24 }}>
           Entrar pra começar
