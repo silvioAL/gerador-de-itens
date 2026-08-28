@@ -76,9 +76,10 @@ const PEDIDOS: [TipoDePedido, PedidoIa][] = [
         {
           chave: "svc-cotacao::spec",
           rotulo: "Serviço de cotação",
+          contextoNo: "Serviço síncrono, chamado pela porta de entrada.",
           placeholders: [
-            { chave: "historia", rotulo: "História de usuário" },
-            { chave: "criterios", rotulo: "Critérios de aceite" },
+            { chave: "historia", tech: "Backend", rotulo: "História de usuário" },
+            { chave: "criterios", tech: "Backend", rotulo: "Critérios de aceite" },
           ],
         },
       ],
