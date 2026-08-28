@@ -267,6 +267,13 @@
       "when": 1754500000023,
       "tag": "0037_o_que_se_salva_volta",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1754500000024,
+      "tag": "0038_volumetria_de_produto",
+      "breakpoints": true
     }
   ]
 }

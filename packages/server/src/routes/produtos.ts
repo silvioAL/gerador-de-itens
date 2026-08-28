@@ -26,6 +26,25 @@ const corpoAtualizar = z.object({
   regrasDeNegocio: z.string().optional(),
   sistemas: z.string().optional(),
   restricoes: z.string().optional(),
+  /**
+   * SPEC-77 — o volume que o produto atende.
+   *
+   * `nullable` além de `optional`, e a diferença importa: **ausente** é "não
+   * mexi nisto" (o formulário de outra seção), **null** é "apaguei o número".
+   * Sem os dois, quem quisesse remover um volume declarado por engano não
+   * teria como dizer isso.
+   *
+   * `picoDe` sem teto de propósito — "5×" é conhecimento de negócio, e um
+   * limite inventado aqui seria o produto opinando sobre o pico de alguém.
+   */
+  volumetria: z
+    .object({
+      quantidade: z.number().int().positive(),
+      por: z.enum(["segundo", "minuto", "hora", "dia"]),
+      picoDe: z.number().positive().optional(),
+    })
+    .nullable()
+    .optional(),
 });
 
 const corpoTimes = z.object({ timeIds: z.array(z.string().min(1)) });

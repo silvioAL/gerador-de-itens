@@ -3609,3 +3609,103 @@ describe("SPEC-72 — o teto dos anexos, com a frase que diz o número", () => {
     expect(resposta.json().anexosContexto).toHaveLength(1);
   });
 });
+
+/**
+ * SPEC-77 — a volumetria que é do PRODUTO.
+ *
+ * Existiam duas volumetrias, e nenhuma era do produto: a do checklist é do
+ * ITEM, a da SPEC-70 é da DEMANDA. As duas morrem quando a demanda termina.
+ * "Este produto atende 2 milhões por dia" é perene — muda uma vez por
+ * trimestre, e quando muda, muda o julgamento de todas as demandas em aberto.
+ */
+describe("SPEC-77 — o volume do produto atravessa a borda, e a data sabe envelhecer", () => {
+  async function produtoNovo(cookie: string): Promise<string> {
+    const criado = await app.inject({
+      method: "POST",
+      url: "/produtos",
+      cookies: { gerador_sessao: cookie },
+      payload: { nome: `produto ${Date.now()}` },
+    });
+    expect(criado.statusCode).toBe(201);
+    return criado.json().id as string;
+  }
+
+  it("declarar o volume no produto sobrevive ao ida-e-volta, com o pico", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const id = await produtoNovo(cookie);
+
+    const salvo = await app.inject({
+      method: "PUT",
+      url: `/produtos/${id}`,
+      cookies: { gerador_sessao: cookie },
+      payload: { volumetria: { quantidade: 2_000_000, por: "dia", picoDe: 5 } },
+    });
+
+    expect(salvo.statusCode).toBe(200);
+    expect(salvo.json().volumetria).toMatchObject({ quantidade: 2_000_000, por: "dia", picoDe: 5 });
+    // A data nasce junto: sem ela o ciclo não tem como perguntar se ainda vale.
+    expect(salvo.json().volumetria.declaradoEm).toBeTruthy();
+  });
+
+  it("salvar OUTRA seção não mexe na data do volume", async () => {
+    // A mesma disciplina do `atualizadoEm` da quebra (§312): recarimbar a cada
+    // salvamento faria "declarado em" responder pela última vírgula corrigida
+    // no objetivo — e aí a pergunta do PDCA nunca dispararia, porque o número
+    // pareceria sempre novo.
+    const cookie = await logarComo(EMAIL_DEV);
+    const id = await produtoNovo(cookie);
+    const comVolume = await app.inject({
+      method: "PUT",
+      url: `/produtos/${id}`,
+      cookies: { gerador_sessao: cookie },
+      payload: { volumetria: { quantidade: 1000, por: "hora" } },
+    });
+    const declaradoEm = comVolume.json().volumetria.declaradoEm as string;
+
+    const soTexto = await app.inject({
+      method: "PUT",
+      url: `/produtos/${id}`,
+      cookies: { gerador_sessao: cookie },
+      payload: { objetivo: "outra coisa qualquer" },
+    });
+
+    expect(soTexto.json().volumetria.declaradoEm).toBe(declaradoEm);
+  });
+
+  it("e `null` APAGA o número — quem declarou por engano precisa poder desfazer", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const id = await produtoNovo(cookie);
+    await app.inject({
+      method: "PUT",
+      url: `/produtos/${id}`,
+      cookies: { gerador_sessao: cookie },
+      payload: { volumetria: { quantidade: 1000, por: "hora" } },
+    });
+
+    const apagado = await app.inject({
+      method: "PUT",
+      url: `/produtos/${id}`,
+      cookies: { gerador_sessao: cookie },
+      payload: { volumetria: null },
+    });
+
+    expect(apagado.json().volumetria).toBeUndefined();
+  });
+
+  it("produto sem volume nenhum continua salvando — não é lacuna (§230)", async () => {
+    // §6.3 da SPEC: nem todo produto tem esse número, e cobrar de todos
+    // ensinaria a ignorar a cor.
+    const cookie = await logarComo(EMAIL_DEV);
+    const id = await produtoNovo(cookie);
+
+    const salvo = await app.inject({
+      method: "PUT",
+      url: `/produtos/${id}`,
+      cookies: { gerador_sessao: cookie },
+      payload: { objetivo: "um produto sem volume declarado" },
+    });
+
+    expect(salvo.statusCode).toBe(200);
+    expect(salvo.json().volumetria).toBeUndefined();
+  });
+});

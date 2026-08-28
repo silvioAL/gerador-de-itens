@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { DiagramaConfig } from "../config/types.js";
 import type { Diagrama } from "../model/types.js";
 import { readConfigFile } from "../test-support/fixtures.js";
-import { descreverVolumetria, distribuirVolumetria, emRequisicoesPorSegundo } from "./volumetria.js";
+import {
+  descreverVolumetria,
+  descreverVolumetriaEmVigor,
+  distribuirVolumetria,
+  emRequisicoesPorSegundo,
+  volumetriaEmVigor,
+  volumeVencido,
+} from "./volumetria.js";
 
 /**
  * SPEC-70 fatia A — o volume dito uma vez, distribuído pelo grafo.
@@ -153,5 +160,99 @@ describe("distribuirVolumetria — o passeio pelo grafo", () => {
     expect(porNo.get("web")).toBe(100);
     expect(porNo.get("mobile")).toBe(100);
     expect(porNo.get("srv")).toBe(200);
+  });
+});
+
+/**
+ * SPEC-77 fatia B — **declarado vence herdado, e a tela diz qual é qual.**
+ *
+ * O que a régua impede é concreto: alguém ver "2 milhões/dia" numa demanda e
+ * não saber se foi digitado ali ou veio do produto — e, portanto, se mudar o
+ * produto muda aquele número ou não.
+ */
+describe("volumetriaEmVigor (SPEC-77 fatia B)", () => {
+  const doProduto = { quantidade: 2_000_000, por: "dia" as const };
+  const daDemanda = { quantidade: 100, por: "segundo" as const };
+
+  it("sem volume na demanda, herda o do produto — e diz que herdou", () => {
+    const vigor = volumetriaEmVigor(undefined, doProduto);
+
+    expect(vigor?.valor).toEqual(doProduto);
+    expect(vigor?.origem).toBe("herdada");
+    expect(descreverVolumetriaEmVigor(vigor)).toContain("herdado do produto");
+  });
+
+  it("com volume na demanda, ele manda — e a tela mostra OS DOIS números", () => {
+    const vigor = volumetriaEmVigor(daDemanda, doProduto);
+
+    expect(vigor?.valor).toEqual(daDemanda);
+    expect(vigor?.origem).toBe("declarada");
+    expect(vigor?.doProduto).toEqual(doProduto);
+    const frase = descreverVolumetriaEmVigor(vigor);
+    expect(frase).toContain("declarado nesta demanda");
+    expect(frase).toContain("2.000.000 por dia");
+  });
+
+  it("declarar o MESMO número do produto não é divergência", () => {
+    // Senão a tela acusaria discordância onde não há, e o aviso viraria ruído.
+    const vigor = volumetriaEmVigor({ ...doProduto }, doProduto);
+
+    expect(vigor?.origem).toBe("declarada");
+    expect(vigor?.doProduto).toBeUndefined();
+    expect(descreverVolumetriaEmVigor(vigor)).not.toContain("o produto diz");
+  });
+
+  it("sem produto, a demanda continua mandando sozinha", () => {
+    const vigor = volumetriaEmVigor(daDemanda, undefined);
+
+    expect(vigor?.origem).toBe("declarada");
+    expect(vigor?.doProduto).toBeUndefined();
+  });
+
+  it("ninguém declarou nada em lugar nenhum: `undefined`, e isso é uma afirmação", () => {
+    // Sem número, a Lei de Little não se faz — e inventar um seria o produto se
+    // atribuindo uma medição que ninguém fez (§248).
+    expect(volumetriaEmVigor(undefined, undefined)).toBeUndefined();
+    expect(descreverVolumetriaEmVigor(undefined)).toBeUndefined();
+  });
+
+  it("o volume em vigor alimenta a MESMA conversão — um dono só", () => {
+    // A prova que a fatia A pede: a conversão para req/s não ganha uma segunda
+    // implementação por causa do produto.
+    const vigor = volumetriaEmVigor(undefined, doProduto)!;
+
+    expect(emRequisicoesPorSegundo(vigor.valor)).toBeCloseTo(2_000_000 / 86400, 5);
+  });
+});
+
+/**
+ * SPEC-77 fatia D — o número envelhece sozinho, e nada avisava.
+ */
+describe("volumeVencido (SPEC-77 fatia D)", () => {
+  const agora = new Date("2026-08-28T00:00:00.000Z");
+
+  it("declarado há mais de N meses está vencido", () => {
+    expect(volumeVencido("2026-01-01T00:00:00.000Z", 6, agora)).toBe(true);
+  });
+
+  it("declarado há menos de N meses, não", () => {
+    expect(volumeVencido("2026-06-01T00:00:00.000Z", 6, agora)).toBe(false);
+  });
+
+  it("SEM data, nada se afirma — e isso é deliberado", () => {
+    // Volume de antes desta SPEC não tem carimbo. Tratá-lo como vencido
+    // encheria a primeira entrevista de todo mundo com perguntas sobre números
+    // que ninguém mexeu, que é a fórmula de ensinar a ignorar a cor.
+    expect(volumeVencido(undefined, 6, agora)).toBe(false);
+  });
+
+  it("N = 0 desliga a pergunta, em vez de vencer tudo", () => {
+    // Quem não quer a pergunta configura zero; se isso vencesse tudo, desligar
+    // seria impossível sem apagar o número.
+    expect(volumeVencido("2020-01-01T00:00:00.000Z", 0, agora)).toBe(false);
+  });
+
+  it("data ilegível não vira vencimento", () => {
+    expect(volumeVencido("nem-data", 6, agora)).toBe(false);
   });
 });

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { apiProdutos, type Produto } from "../api/client";
 import { useMontado } from "../state/useMontado";
 import { MarcaDeDemonstracao } from "../demo/dadosDoTour";
+import { descreverVolumetria } from "@gerador/engine";
 
 /**
  * SPEC-53 Fase 1 — o contexto do produto.
@@ -181,7 +182,19 @@ export function ProdutosTab({ timeIds, demonstracao, onConversarComAssistente }:
     if (!rascunho) return;
     const { id, nome, objetivo, quemUsa, regrasDeNegocio, sistemas, restricoes } = rascunho;
     const ok = await executar(
-      () => apiProdutos.atualizar(id, { nome, objetivo, quemUsa, regrasDeNegocio, sistemas, restricoes }),
+      () =>
+        apiProdutos.atualizar(id, {
+          nome,
+          objetivo,
+          quemUsa,
+          regrasDeNegocio,
+          sistemas,
+          restricoes,
+          // SPEC-77 — `null` APAGA. Sem quantidade não há volume, e mandar
+          // `undefined` aqui significaria "não mexi nisto" — o que impediria
+          // alguém de remover um número posto por engano.
+          volumetria: rascunho.volumetria?.quantidade ? rascunho.volumetria : null,
+        }),
       id
     );
     if (ok) setSalvo(true);
@@ -274,6 +287,90 @@ export function ProdutosTab({ timeIds, demonstracao, onConversarComAssistente }:
               />
             </div>
           ))}
+
+          {/* ── SPEC-77 — o volume que o PRODUTO atende ──
+              Aqui, e não na demanda, porque é perene: não muda a cada entrega,
+              muda uma vez por trimestre — e quando muda, muda o julgamento de
+              todas as demandas em aberto. A demanda continua podendo declarar
+              o seu, e aí ela manda e a tela diz que está divergindo. */}
+          <div>
+            <label style={labelEstilo}>Volume que este produto atende</label>
+            <p style={ajudaEstilo}>
+              O número perene, não o desta demanda. Toda demanda sem volume próprio herda este — e quem declarar um
+              diferente vai ver os dois lado a lado. Deixe em branco se ninguém sabe: número inventado alimentando a
+              conta é pior que número nenhum.
+            </p>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <input
+                type="number"
+                min={0}
+                aria-label="Volume do produto"
+                data-testid="volumetria-produto-quantidade"
+                value={rascunho.volumetria?.quantidade ?? ""}
+                onChange={(e) =>
+                  setRascunho({
+                    ...rascunho,
+                    volumetria: e.target.value
+                      ? { por: "dia", ...rascunho.volumetria, quantidade: Number(e.target.value) }
+                      : undefined,
+                  })
+                }
+                placeholder="ex.: 2000000"
+                style={{ ...inputEstilo, width: 160 }}
+              />
+              <select
+                aria-label="Por"
+                data-testid="volumetria-produto-por"
+                value={rascunho.volumetria?.por ?? "dia"}
+                onChange={(e) =>
+                  setRascunho({
+                    ...rascunho,
+                    volumetria: rascunho.volumetria
+                      ? { ...rascunho.volumetria, por: e.target.value as "segundo" | "minuto" | "hora" | "dia" }
+                      : undefined,
+                  })
+                }
+                style={{ ...inputEstilo, width: 130 }}
+              >
+                <option value="segundo">por segundo</option>
+                <option value="minuto">por minuto</option>
+                <option value="hora">por hora</option>
+                <option value="dia">por dia</option>
+              </select>
+              <input
+                type="number"
+                min={0}
+                aria-label="Pico"
+                data-testid="volumetria-produto-pico"
+                value={rascunho.volumetria?.picoDe ?? ""}
+                onChange={(e) =>
+                  setRascunho({
+                    ...rascunho,
+                    volumetria: rascunho.volumetria
+                      ? { ...rascunho.volumetria, picoDe: e.target.value ? Number(e.target.value) : undefined }
+                      : undefined,
+                  })
+                }
+                placeholder="pico (ex.: 5)"
+                style={{ ...inputEstilo, width: 130 }}
+              />
+            </div>
+            {descreverVolumetria(rascunho.volumetria) && (
+              <p style={ajudaEstilo} data-testid="volumetria-produto-derivada">
+                {descreverVolumetria(rascunho.volumetria)}
+                {rascunho.volumetria?.picoDe ? ` · pico de ${rascunho.volumetria.picoDe}×` : ""}
+                {/* O pico NÃO entra na conta do motor, e dizer isso evita que
+                    alguém espere ver a saturação mudar sozinha. Quem responde
+                    "e se for 5×?" é o ensaio, de propósito. */}
+                {rascunho.volumetria?.picoDe ? " — use este fator no ensaio para ver o efeito" : ""}
+              </p>
+            )}
+            {rascunho.volumetria?.declaradoEm && (
+              <p style={ajudaEstilo} data-testid="volumetria-produto-declarada-em">
+                Declarado em {new Date(rascunho.volumetria.declaradoEm).toLocaleDateString("pt-BR")}
+              </p>
+            )}
+          </div>
 
           {erro && <p style={{ fontSize: 12, color: "var(--vermelho)", marginTop: 8 }}>{erro}</p>}
           {salvo && !erro && (

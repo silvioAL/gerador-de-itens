@@ -129,3 +129,113 @@ export function distribuirVolumetria(
 
   return porNo;
 }
+
+/**
+ * SPEC-77 fatia B — de ONDE veio o volume que está valendo.
+ *
+ * ## A régua, e por que ela tem que ser explícita
+ *
+ * **Declarado vence herdado, e a tela diz qual é qual.** É a mesma régua do
+ * §306 (`resiliencia.ts`: declarado vence derivado, e a frase diz de onde veio)
+ * e a mesma forma do `obter(chave, timeId)` da config (time → global →
+ * template).
+ *
+ * O que ela impede é concreto: alguém ver "2 milhões/dia" numa demanda e não
+ * saber se foi digitado ali ou veio do produto — e, portanto, se mudar o
+ * produto muda aquele número ou não.
+ *
+ * ## Por que uma função, e não um `??` em cada tela
+ *
+ * O `quebra.volumetria` é lido em quatro lugares (documento, ensaios, placar,
+ * contexto). Um `??` repetido quatro vezes é a definição de duas versões da
+ * mesma régua — e o §263 já cobrou esse preço mais de uma vez neste projeto.
+ *
+ * ## Por que NÃO copiar o número do produto para dentro da quebra
+ *
+ * Seria mais simples, e é a armadilha que o `PipelineAgentesTab` já documenta
+ * para o preâmbulo herdado: *"herdado NÃO é salvo como cópia enquanto ninguém
+ * edita — senão o papel congela numa versão do padrão"*. Aqui é pior: o volume
+ * do produto muda uma vez por trimestre, e as demandas em aberto precisam
+ * mudar junto. Uma cópia faria cada demanda carregar o volume do dia em que
+ * foi criada.
+ */
+export interface VolumetriaEmVigor {
+  valor: VolumetriaDaDemanda;
+  /** `declarada` = alguém digitou nesta demanda. `herdada` = veio do produto. */
+  origem: "declarada" | "herdada";
+  /** Só quando a demanda DISCORDA do produto — é o que a tela mostra lado a
+   * lado. `undefined` quando não há produto, ou quando os dois concordam. */
+  doProduto?: VolumetriaDaDemanda;
+}
+
+/**
+ * O volume que vale para esta demanda, e de onde ele veio.
+ *
+ * `undefined` quando ninguém declarou nada em lugar nenhum — e isso é uma
+ * afirmação, não um buraco: sem número, a Lei de Little não se faz, e inventar
+ * um seria o produto se atribuindo uma medição que ninguém fez (§248).
+ */
+export function volumetriaEmVigor(
+  daDemanda: VolumetriaDaDemanda | undefined,
+  doProduto: VolumetriaDaDemanda | undefined
+): VolumetriaEmVigor | undefined {
+  if (daDemanda) {
+    const diverge = !!doProduto && (doProduto.quantidade !== daDemanda.quantidade || doProduto.por !== daDemanda.por);
+    return { valor: daDemanda, origem: "declarada", ...(diverge ? { doProduto } : {}) };
+  }
+  if (doProduto) return { valor: doProduto, origem: "herdada" };
+  return undefined;
+}
+
+/**
+ * A frase que a tela mostra, com a procedência dentro dela.
+ *
+ * A marca é uma sufixação na própria frase, e não um componente — é o padrão
+ * mais barato do repositório para dizer procedência (`resiliencia.ts:261`, "…
+ * vindo do volume da demanda") e o único que funciona igual na tela, no
+ * documento e num log.
+ */
+export function descreverVolumetriaEmVigor(vigor: VolumetriaEmVigor | undefined): string | undefined {
+  if (!vigor) return undefined;
+  const base = descreverVolumetria(vigor.valor);
+  if (!base) return undefined;
+  if (vigor.origem === "herdada") return `${base} — herdado do produto`;
+  if (vigor.doProduto) {
+    // Os DOIS números, porque é a divergência que precisa ser vista: quem
+    // digitou aqui pode ter tido um motivo, e quem lê depois precisa saber que
+    // este número não acompanha o do produto.
+    return `${base} — declarado nesta demanda (o produto diz ${descreverVolumetria(vigor.doProduto)})`;
+  }
+  return base;
+}
+
+/**
+ * SPEC-77 fatia D — este número ainda vale?
+ *
+ * ## Por que volume pertence ao PDCA, e as outras configs não tanto
+ *
+ * Uma regra de refinamento continua válida até alguém mudá-la. Um volume
+ * declarado há um ano provavelmente está errado hoje, e **nada avisa**: ele
+ * envelhece sozinho. E um número velho alimentando a Lei de Little não produz
+ * silêncio — produz saturação falsa, ou pior, silêncio falso.
+ *
+ * Daí o elo com o ciclo não ser enfeite: o PDCA é quem sabe perguntar *"isto
+ * ainda vale?"* e transformar a resposta em ajuste registrado.
+ *
+ * ## O que esta função NÃO faz
+ *
+ * Não decide o que acontece depois. Ela responde uma pergunta de fato — "faz
+ * mais de N meses?" — e quem lê decide se isso vira pergunta na entrevista. Um
+ * número velho não é violação: é assunto.
+ */
+export function volumeVencido(declaradoEm: string | undefined, meses: number, agora = new Date()): boolean {
+  // Sem data, nada se afirma. Volume de antes desta SPEC não tem carimbo, e
+  // tratá-lo como vencido encheria a primeira entrevista de todo mundo com
+  // perguntas sobre números que ninguém mexeu — a fórmula de ensinar a ignorar.
+  if (!declaradoEm || meses <= 0) return false;
+  const quando = new Date(declaradoEm);
+  if (Number.isNaN(quando.getTime())) return false;
+  const limite = new Date(quando);
+  limite.setMonth(limite.getMonth() + meses);
+  return agora >= limite;
+}

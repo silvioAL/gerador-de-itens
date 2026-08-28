@@ -5,7 +5,7 @@ import type { OpcoesApp } from "../app.js";
 import { registrarAuditoria } from "../auditoria.js";
 import { exigirSessao } from "../auth/middleware.js";
 import { exigirPermissao, organizacaoPadraoDe, SECOES_DE_REGRAS, type Recurso } from "../auth/permissoes.js";
-import { configDocumentos, pdcaFeedback, pdcaUsos, quebras, solicitacoesAjuste } from "../db/schema.js";
+import { configDocumentos, pdcaFeedback, pdcaUsos, quebras, solicitacoesAjuste, produtos } from "../db/schema.js";
 import {
   aplicarOperacao,
   aplicarOperacaoNoPipeline,
@@ -20,6 +20,7 @@ import { criarRepositorioDeCamposNoEmPostgres } from "../adaptadores/camposNoEmP
 import { criarRepositorioDeCamposArestaEmPostgres } from "../adaptadores/camposArestaEmPostgres.js";
 import { aplicarOperacaoDeCampo, type PortaDeFicha } from "../pdca/aplicarNosCampos.js";
 import { templateDaVersao } from "../config/templateDaVersao.js";
+import { volumeVencido } from "@gerador/engine";
 
 /**
  * SPEC-39 Fase 1 — o PDCA das configurações.
@@ -51,7 +52,16 @@ const campoProposto = z.object({
   opcoes: z.array(z.string()).optional(),
 });
 
-const CADENCIA_PADRAO = { cadenciaUsos: 5, cadenciaFeedback: 3 };
+/**
+ * SPEC-77 fatia D — `mesesParaRevisarVolume` entra aqui, junto da cadência, e
+ * é a resposta da pergunta em aberto §6.2 ("qual é o N?"): não há número de uso
+ * real para escolher, então ele é **configurável**, na mesma tela onde a
+ * cadência do PDCA já é. Seis meses é um começo, não uma régua.
+ *
+ * `0` desliga a pergunta — e desligar tinha que ser possível sem apagar o
+ * número declarado.
+ */
+const CADENCIA_PADRAO = { cadenciaUsos: 5, cadenciaFeedback: 3, mesesParaRevisarVolume: 6 };
 const CHAVE_CONFIG_PDCA = "pdca";
 const GLOBAL = "__global__";
 
@@ -175,7 +185,12 @@ export async function registrarRotasPdca(app: FastifyInstance, { db, diretorioCo
     { preHandler: exigirPermissao(db, organizacaoId, "acessos", "editar") },
     async (req, reply) => {
       const corpo = z
-        .object({ cadenciaUsos: z.number().int().min(1).max(100), cadenciaFeedback: z.number().int().min(1).max(100) })
+        .object({
+          cadenciaUsos: z.number().int().min(1).max(100),
+          cadenciaFeedback: z.number().int().min(1).max(100),
+          /** `0` desliga a pergunta sobre a idade do volume. */
+          mesesParaRevisarVolume: z.number().int().min(0).max(60).optional(),
+        })
         .safeParse(req.body);
       if (!corpo.success) return reply.code(400).send({ erro: corpo.error.flatten() });
 
@@ -213,7 +228,7 @@ export async function registrarRotasPdca(app: FastifyInstance, { db, diretorioCo
       })
       .returning();
 
-    const { cadenciaUsos, cadenciaFeedback } = await cadencia();
+    const { cadenciaUsos, cadenciaFeedback, mesesParaRevisarVolume } = await cadencia();
     const passo = corpo.data.tipo === "derivacao" ? cadenciaUsos : cadenciaFeedback;
     const momento = linha.contagem % passo === 0;
 
@@ -228,7 +243,26 @@ export async function registrarRotasPdca(app: FastifyInstance, { db, diretorioCo
       ultimosItens = recentes.map((r) => r.titulo!).filter(Boolean);
     }
 
-    return { contagem: linha.contagem, momento, ultimosItens };
+    /**
+     * SPEC-77 fatia D — os produtos cujo volume envelheceu.
+     *
+     * Só no MOMENTO da entrevista, junto com a âncora de memória (§39): fora
+     * dela isto seria um aviso permanente, e aviso permanente deixa de ser
+     * lido. E é uma PERGUNTA, não uma cobrança — número velho não é violação,
+     * é assunto. O ciclo é quem sabe transformar a resposta em ajuste.
+     */
+    let volumesParaRevisar: { produtoId: string; nome: string; declaradoEm: string }[] = [];
+    if (momento) {
+      const comVolume = await db
+        .select({ id: produtos.id, nome: produtos.nome, declaradoEm: produtos.volumetriaDeclaradaEm })
+        .from(produtos)
+        .where(isNotNull(produtos.volumetriaDeclaradaEm));
+      volumesParaRevisar = comVolume
+        .filter((p) => volumeVencido(p.declaradoEm?.toISOString(), mesesParaRevisarVolume))
+        .map((p) => ({ produtoId: p.id, nome: p.nome, declaradoEm: p.declaradoEm!.toISOString() }));
+    }
+
+    return { contagem: linha.contagem, momento, ultimosItens, volumesParaRevisar };
   });
 
   app.post("/pdca/feedback", { preHandler: exigirSessao }, async (req, reply) => {

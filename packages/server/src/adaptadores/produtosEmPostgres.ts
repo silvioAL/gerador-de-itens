@@ -2,6 +2,7 @@ import { asc, eq, inArray, sql } from "drizzle-orm";
 import type { DadosDoProduto, Produto, RepositorioDeProdutos } from "@gerador/aplicacao";
 import type { BancoDeDados } from "../db/client.js";
 import { produtoGlossario, produtoTime, produtos } from "../db/schema.js";
+import type { VolumetriaDoProduto } from "@gerador/engine";
 
 /**
  * SPEC-53 Fase 1 — o adaptador Postgres do produto. Só guarda e devolve: quem
@@ -46,6 +47,21 @@ export function criarRepositorioDeProdutosEmPostgres(db: BancoDeDados): Reposito
       regrasDeNegocio: linha.regrasDeNegocio,
       sistemas: linha.sistemas,
       restricoes: linha.restricoes,
+      // SPEC-77 — quatro colunas nomeadas viram um objeto só para quem
+      // consome. Sem `quantidade` não há volume nenhum: `por` sozinho não
+      // afirma nada, e devolver meio objeto faria o motor tratar como
+      // declarado o que ninguém declarou.
+      volumetria:
+        linha.volumetriaQuantidade !== null && linha.volumetriaPor !== null
+          ? {
+              quantidade: linha.volumetriaQuantidade,
+              // A coluna é `text` de propósito (unidade nova não deveria pedir
+              // migração de tipo enum); quem fecha a lista é o Zod da borda.
+              por: linha.volumetriaPor as VolumetriaDoProduto["por"],
+              picoDe: linha.volumetriaPicoDe ?? undefined,
+              declaradoEm: linha.volumetriaDeclaradaEm?.toISOString(),
+            }
+          : undefined,
       glossario,
       timeIds,
       criadoPor: linha.criadoPor,
@@ -82,13 +98,40 @@ export function criarRepositorioDeProdutosEmPostgres(db: BancoDeDados): Reposito
     async atualizar(id, dados: Partial<DadosDoProduto>) {
       // Sem campo nenhum, um UPDATE vazio explodiria no drizzle — e "não mudar
       // nada" é pedido válido (a tela salva o formulário inteiro).
-      const [linha] = Object.keys(dados).length
-        ? await db
-            .update(produtos)
-            .set({ ...dados, atualizadoEm: sql`now()` })
-            .where(eq(produtos.id, id))
-            .returning()
-        : await db.select().from(produtos).where(eq(produtos.id, id)).limit(1);
+      if (!Object.keys(dados).length) {
+        const [linha] = await db.select().from(produtos).where(eq(produtos.id, id)).limit(1);
+        return linha ? comAcessorios(linha) : null;
+      }
+
+      const { volumetria, ...campos } = dados;
+      const colunas: Record<string, unknown> = { ...campos };
+
+      if (volumetria !== undefined) {
+        const [antes] = await db.select().from(produtos).where(eq(produtos.id, id)).limit(1);
+        colunas.volumetriaQuantidade = volumetria?.quantidade ?? null;
+        colunas.volumetriaPor = volumetria?.por ?? null;
+        colunas.volumetriaPicoDe = volumetria?.picoDe ?? null;
+        /**
+         * SPEC-77 §3 — a data só se move quando o NÚMERO muda.
+         *
+         * É a mesma disciplina do `atualizadoEm` da quebra (§312): recarimbar a
+         * cada salvamento do formulário faria "declarado em" responder pela
+         * última vez que alguém corrigiu uma vírgula no objetivo — e aí a
+         * pergunta do PDCA ("este número ainda vale?") nunca dispararia,
+         * porque o número pareceria sempre novo.
+         */
+        const mudouONumero =
+          (antes?.volumetriaQuantidade ?? null) !== colunas.volumetriaQuantidade ||
+          (antes?.volumetriaPor ?? null) !== colunas.volumetriaPor ||
+          (antes?.volumetriaPicoDe ?? null) !== colunas.volumetriaPicoDe;
+        if (mudouONumero) colunas.volumetriaDeclaradaEm = volumetria ? sql`now()` : null;
+      }
+
+      const [linha] = await db
+        .update(produtos)
+        .set({ ...colunas, atualizadoEm: sql`now()` })
+        .where(eq(produtos.id, id))
+        .returning();
       return linha ? comAcessorios(linha) : null;
     },
 

@@ -532,6 +532,24 @@ export const produtos = pgTable("produtos", {
   regrasDeNegocio: text("regras_de_negocio").notNull().default(""),
   sistemas: text("sistemas").notNull().default(""),
   restricoes: text("restricoes").notNull().default(""),
+  /**
+   * SPEC-77 (migração 0038) — o volume que este PRODUTO atende.
+   *
+   * Colunas NOMEADAS e não um JSON, seguindo o comentário desta tabela: as
+   * seções do produto são fixas e escolhidas, e nomeá-las é o que deixa tela,
+   * prompt e documento falarem da mesma coisa sem combinar chave de JSON.
+   *
+   * Todas anuláveis, e isso é uma afirmação: **nem todo produto tem esse
+   * número**, e cobrar de todos ensinaria a ignorar a cor (§230, e a
+   * recomendação §6.3 da SPEC).
+   */
+  volumetriaQuantidade: integer("volumetria_quantidade"),
+  volumetriaPor: text("volumetria_por"),
+  /** `5` = "no pico, cinco vezes isto". Fato de negócio, nunca estimado. */
+  volumetriaPicoDe: integer("volumetria_pico_de"),
+  /** Quando o número foi declarado — é o que permite ao PDCA perguntar se
+   * ainda vale. Volume envelhece sozinho, e nada avisava. */
+  volumetriaDeclaradaEm: timestamp("volumetria_declarada_em", { withTimezone: true }),
   criadoPor: text("criado_por").notNull(),
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
   atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
