@@ -57,6 +57,24 @@ export async function buildApp(opcoes: OpcoesApp): Promise<FastifyInstance> {
   const app = Fastify({
     logger: { level: process.env.LOG_NIVEL ?? "info" },
     trustProxy: producao,
+    /**
+     * SPEC-72 fatia A — ACHADO ao escrever o teto de anexo: o teto já existia,
+     * e era o pior possível.
+     *
+     * O default do Fastify é **1 MB**, e ele responde `413` sem uma palavra.
+     * Ou seja: o produto já recusava anexo grande, num limite que ninguém
+     * declarou, com a mensagem que a SPEC §3.1 recusa em voz alta ("recusados
+     * na borda com a frase que diz o número — não um 413 seco").
+     *
+     * Ninguém tinha percebido porque, até a SPEC-71, anexo NENHUM salvava: a
+     * borda rejeitava a forma antes de o tamanho importar. Corrigida a forma,
+     * o limite mudo apareceu.
+     *
+     * Este número fica ACIMA do teto declarado (4 MB de anexos + o resto da
+     * quebra + o inchaço do JSON) de propósito: quem recusa tem que ser a regra
+     * que sabe explicar, não a que só sabe cortar.
+     */
+    bodyLimit: 8_000_000,
   });
 
   await app.register(cors, {

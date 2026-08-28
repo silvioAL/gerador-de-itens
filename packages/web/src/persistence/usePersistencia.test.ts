@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import type { Quebra } from "@gerador/engine";
 import { usePersistencia } from "./usePersistencia";
@@ -126,5 +126,91 @@ describe("usePersistencia.abrirPorId — reabrir não pode perder campo (§250)"
     expect(aberta.documentoStatus).toBeUndefined();
     expect(aberta.decisoes).toBeUndefined();
     expect(aberta.time).toBeUndefined();
+  });
+});
+
+/**
+ * SPEC-72 fatia B — o que está pendente quando a aba fecha.
+ *
+ * O debounce de 2 s cancela o salvamento a cada tecla, que é o objetivo. Mas
+ * fechar a aba com o timer armado perdia os últimos 2 s de trabalho, **sem
+ * aviso** — e o campo mais afetado é justamente o que o pedido citou: o
+ * contexto da demanda, digitado em prosa longa.
+ *
+ * Antes desta rodada, `beforeunload`, `visibilitychange` e `pagehide` tinham
+ * ZERO ocorrências em todo o `packages/web`.
+ */
+describe("usePersistencia — o flush ao sair (SPEC-72 fatia B)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.mocked(apiQuebras.listar).mockResolvedValue([]);
+    vi.mocked(apiQuebras.atualizar).mockResolvedValue({ id: "q1" } as never);
+    vi.mocked(apiQuebras.buscar).mockResolvedValue({
+      id: "q1",
+      titulo: "Catálogo",
+      diagrama: { nodes: [], edges: [] },
+      criadoEm: "2026-08-15T10:00:00.000Z",
+      atualizadoEm: "2026-08-15T10:00:00.000Z",
+    } as never);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  /** Abre uma quebra (para haver `quebraId`) e a edita, deixando o timer armado. */
+  async function comEdicaoPendente() {
+    const aoAbrir = vi.fn();
+    const { result, rerender } = renderHook(({ q }: { q: Quebra }) => usePersistencia(q, aoAbrir), {
+      initialProps: { q: VAZIA },
+    });
+    await act(async () => {
+      await result.current.abrirPorId("q1");
+    });
+    vi.mocked(apiQuebras.atualizar).mockClear();
+
+    // Uma edição: o efeito arma o relógio de 2 s e NÃO salva ainda.
+    rerender({ q: { ...VAZIA, titulo: "Catálogo", demandInfo: "prosa longa em andamento" } });
+    expect(apiQuebras.atualizar).not.toHaveBeenCalled();
+    return result;
+  }
+
+  it("fechar a aba grava o que o debounce ainda segurava", async () => {
+    await comEdicaoPendente();
+
+    window.dispatchEvent(new Event("beforeunload"));
+
+    expect(apiQuebras.atualizar).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(apiQuebras.atualizar).mock.calls[0][1].demandInfo).toBe("prosa longa em andamento");
+  });
+
+  it("a aba ficar oculta também grava — `beforeunload` não é confiável em móvel", async () => {
+    await comEdicaoPendente();
+
+    Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    expect(apiQuebras.atualizar).toHaveBeenCalledTimes(1);
+  });
+
+  it("mas VOLTAR para a aba não grava — trocar de janela não é escrever", async () => {
+    // Sem esta guarda, cada alt-tab viraria um PUT, que é exatamente a
+    // frequência que o debounce existe para evitar.
+    await comEdicaoPendente();
+
+    Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    expect(apiQuebras.atualizar).not.toHaveBeenCalled();
+  });
+
+  it("sem nada pendente, sair não dispara escrita nenhuma", async () => {
+    const aoAbrir = vi.fn();
+    const { result } = renderHook(() => usePersistencia(VAZIA, aoAbrir));
+    await act(async () => {
+      await result.current.abrirPorId("q1");
+    });
+    vi.mocked(apiQuebras.atualizar).mockClear();
+
+    window.dispatchEvent(new Event("beforeunload"));
+
+    expect(apiQuebras.atualizar).not.toHaveBeenCalled();
   });
 });
