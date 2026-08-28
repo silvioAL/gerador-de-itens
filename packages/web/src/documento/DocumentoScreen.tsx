@@ -67,6 +67,10 @@ export interface DocumentoScreenProps {
    * com `desatualizado` verdadeiro é caso real: a diferença é só espaço em
    * branco, e dizer isso é melhor do que mostrar um amarelo sem explicação. */
   mudancasDesdeAprovacao?: MudancaDeSecao[];
+  /** SPEC-73 fatia D — quantas lacunas o documento entrega. O número fica ao
+   * lado do selo: aprovar com lacuna CONTADA é decisão, aprovar com lacuna
+   * invisível é acidente. */
+  lacunas?: number;
   onBaixarMarkdown: () => void;
   onVoltar: () => void;
   /**
@@ -121,6 +125,7 @@ export function DocumentoScreen({
   onMudarStatus,
   desatualizado,
   mudancasDesdeAprovacao,
+  lacunas,
   onBaixarMarkdown,
   onVoltar,
   itensEscritos,
@@ -156,6 +161,7 @@ export function DocumentoScreen({
           onMudar={onMudarStatus}
           desatualizado={desatualizado}
           mudancas={mudancasDesdeAprovacao}
+          lacunas={lacunas}
         />
         <button onClick={onBaixarMarkdown} style={botaoEstilo} data-testid="baixar-markdown">
           ⬇ Markdown
@@ -186,6 +192,20 @@ export function DocumentoScreen({
             <Paragrafos texto={documento.contexto} />
           </Secao>
         )}
+
+        {/* SPEC-73 fatia B — a visão geral, ESCRITA por gente.
+            Ela nem aparecia nesta tela: era uma string do motor que só existia
+            no markdown baixado e no que a aprovação carimbava. A lacuna era
+            invisível duas vezes — ninguém a contava, e ninguém a via.
+            O esqueleto de antes virou a DICA: no lugar certo, ele diz o formato
+            esperado; no lugar errado, ele se passava por resposta. */}
+        <SecaoEscrita
+          titulo="Visão geral"
+          dica="Como <papel>, quero <ação> para que <benefício>. Papel e benefício não se deduzem do desenho — quem sabe é você."
+          valor={escrito.visaoGeral ?? ""}
+          testid="secao-visao-geral"
+          onMudar={(texto) => onMudarEscrito({ ...escrito, visaoGeral: texto })}
+        />
 
         {documento.necessidades.length > 0 && (
           <Secao titulo="O que precisa ser verdade">
@@ -406,11 +426,14 @@ function CicloDeStatus({
   onMudar,
   desatualizado,
   mudancas,
+  lacunas,
 }: {
   status: StatusDocumento | null;
   onMudar: (s: StatusDocumento) => void;
   desatualizado?: boolean;
   mudancas?: MudancaDeSecao[];
+  /** SPEC-73 fatia D — quantas lacunas o documento entrega. */
+  lacunas?: number;
 }) {
   const [aberto, setAberto] = useState(false);
   const atual = status ?? "rascunho";
@@ -440,6 +463,16 @@ function CicloDeStatus({
               // que o explique.
               <span data-testid="mudancas-desde-aprovacao"> — só espaço em branco</span>
             ))}
+        </span>
+      )}
+      {/* SPEC-73 fatia D — o número ao lado do selo, e só quando há o que
+          dizer. Aprovar com lacuna CONTADA é decisão; aprovar com lacuna
+          invisível é acidente. Não bloqueia (§230): um documento com três
+          lacunas declaradas pode ser aprovado de propósito, e o produto
+          inteiro é construído sobre essa distinção. */}
+      {!!lacunas && (
+        <span data-testid="lacunas-do-documento" style={{ fontSize: 11, color: "var(--amarelo)" }}>
+          ✍️ {lacunas} {lacunas === 1 ? "lacuna" : "lacunas"} no documento
         </span>
       )}
       <button data-testid="status-documento" onClick={() => setAberto((a) => !a)} style={seloStatusEstilo(atual)}>

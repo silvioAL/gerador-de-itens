@@ -5,6 +5,8 @@ import {
   avaliarConformidade,
   avisosDaDerivacao,
   compararDocumentos,
+  contar,
+  MARCADOR_ESPECIFICAR,
   exemploDeMedicao,
   derivar,
   estruturarDocumento,
@@ -959,6 +961,7 @@ function AppCarregado({
         decisoes: decisoesVisiveis,
         excecoes: quebra.excecoes,
         percursos: quebra.percursos,
+        visaoGeral: quebra.documentoEscrito?.visaoGeral,
         tradeOffs: quebra.documentoEscrito?.tradeOffs,
         riscos: quebra.documentoEscrito?.riscos,
         ensaios: ensaiosDaQuebra,
@@ -968,6 +971,23 @@ function AppCarregado({
 
   const documentoDesatualizado =
     quebra.documentoStatus === "aprovado" && !!quebra.especificacao && quebra.especificacao !== markdownDoDocumento;
+
+  /**
+   * SPEC-73 fatia D — quantas lacunas vão junto desta aprovação.
+   *
+   * A mesma contagem que já existia por ITEM, agora sobre o documento INTEIRO:
+   * a visão geral e o Gherkin genérico são de topo, e por isso nunca passavam
+   * por ela. Aprovar com lacuna **contada** é decisão; aprovar com lacuna
+   * invisível é acidente — e o §248 chama isso de verde falso.
+   *
+   * Não bloqueia (§230). Um documento com três lacunas declaradas pode ser
+   * aprovado de propósito, e o produto inteiro é construído sobre essa
+   * distinção. O que não pode é a lacuna ser invisível.
+   */
+  const lacunasDoDocumento = useMemo(
+    () => contar(markdownDoDocumento, MARCADOR_ESPECIFICAR),
+    [markdownDoDocumento]
+  );
 
   // §264 — e O QUÊ mudou. Só quando há o que comparar: rodar a comparação num
   // documento em dia seria trabalho para produzir lista vazia a cada render.
@@ -1892,6 +1912,7 @@ function AppCarregado({
           onMudarEscrito={(documentoEscrito) => setQuebra((q) => ({ ...q, documentoEscrito }))}
           onMudarStatus={mudarStatusDoDocumento}
           desatualizado={documentoDesatualizado}
+          lacunas={lacunasDoDocumento}
           mudancasDesdeAprovacao={mudancasDesdeAprovacao}
           onBaixarMarkdown={baixarDocumentoMarkdown}
           onVoltar={() => navegar({ tela: "canvas" })}

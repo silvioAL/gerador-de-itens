@@ -479,3 +479,41 @@ describe("DocumentoScreen — riscos medidos (SPEC-69 fatia D)", () => {
     expect(screen.queryByTestId("riscos-medidos")).toBeNull();
   });
 });
+
+/**
+ * SPEC-73 fatia D — a aprovação diz quantas lacunas vão junto.
+ *
+ * A régua da SPEC é `aprovar com lacuna CONTADA é decisão; aprovar com lacuna
+ * invisível é acidente`. E o cuidado que ela pede em voz alta é o §230: **não
+ * bloquear**. Um documento com três lacunas declaradas pode ser aprovado de
+ * propósito — o produto inteiro é construído sobre essa distinção.
+ */
+describe("DocumentoScreen — as lacunas na aprovação (SPEC-73 fatia D)", () => {
+  it("mostra o número ao lado do selo quando há lacunas", () => {
+    montar({ lacunas: 3 });
+
+    expect(screen.getByTestId("lacunas-do-documento")).toHaveTextContent("3 lacunas no documento");
+  });
+
+  it("uma lacuna fala no singular — plural em cima de 1 é ruído que se aprende a ignorar", () => {
+    montar({ lacunas: 1 });
+
+    expect(screen.getByTestId("lacunas-do-documento")).toHaveTextContent("1 lacuna no documento");
+  });
+
+  it("sem lacuna, não diz nada — aviso que aparece sempre deixa de ser lido", () => {
+    montar({ lacunas: 0 });
+
+    expect(screen.queryByTestId("lacunas-do-documento")).toBeNull();
+  });
+
+  it("e NÃO bloqueia: aprovar continua a um clique, com lacuna ou sem (§230)", () => {
+    const onMudarStatus = vi.fn();
+    montar({ lacunas: 5, onMudarStatus });
+
+    fireEvent.click(screen.getByTestId("status-documento"));
+    fireEvent.click(screen.getByTestId("status-aprovado"));
+
+    expect(onMudarStatus).toHaveBeenCalledWith("aprovado");
+  });
+});

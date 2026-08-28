@@ -13,6 +13,7 @@ import {
   nosDeOrigem,
 } from "./gerarEspecificacaoEntrega.js";
 import { EVIDENCIA_SIMULADA, MARCA_SIMULADO, MARCA_SUGERIDO } from "../refinamento/gerarRefinamento.js";
+import { lacunasSemMarcador } from "./lacunasDoDocumento.js";
 
 const config: DiagramaConfig = {
   nodeTypes: {
@@ -95,9 +96,15 @@ describe("gerarEspecificacaoEntrega", () => {
 
     const doc = gerarEspecificacaoEntrega(atividades, diagrama, config);
 
-    // Contexto e Visão geral aparecem uma vez só, não por atividade.
+    // Contexto aparece uma vez só, não por atividade.
     expect(doc.match(/## Contexto/g)).toHaveLength(1);
-    expect(doc.match(/## Visão geral/g)).toHaveLength(1);
+    // SPEC-73 fatia B — a Visão geral sai INTEIRA quando ninguém a escreveu,
+    // pelo mesmo `removerSecaoDaVariavel` que já cuida de Decisões,
+    // Trade-offs e Riscos. Antes ela vinha sempre, com um formulário em branco
+    // dentro (`Como <papel>, quero <ação>…`) que ninguém contava e nada
+    // acusava — em todo documento, inclusive no aprovado.
+    expect(doc).not.toContain("## Visão geral");
+    expect(doc).not.toContain("<papel>");
     expect(doc).toContain("# Especificação de solução");
     expect(doc).toContain("## Itens");
     expect(doc).toContain("### 1.");
@@ -1039,5 +1046,108 @@ describe("marca de conteúdo simulado (SPEC-74)", () => {
 
     expect(doc).not.toContain(MARCA_SIMULADO);
     expect(doc).toContain(MARCA_SUGERIDO);
+  });
+});
+
+/**
+ * SPEC-73 fatia A — **a validação completa que o pedido nomeia.**
+ *
+ * O relato foi: *"parece que gera algumas coisas como placeholder no markdown,
+ * exemplo: `Como <papel>, quero <ação> para que <benefício — detalhar>`.
+ * Preciso de validação completa disso."*
+ *
+ * Corrigir os dois casos conhecidos não é a validação completa: é preciso
+ * provar que não há um terceiro, e a prova tem que envelhecer bem. Por isso o
+ * teste que importa não cita `<papel>` — ele varre o documento GERADO e falha
+ * com o que encontrar, hoje e daqui a três SPECs.
+ */
+describe("o varredor de lacunas (SPEC-73 fatia A)", () => {
+  it("nenhum `<algo>` sai do documento sem o marcador que o torna contável", () => {
+    const diagrama = diagramaBase();
+    const doc = gerarEspecificacaoEntrega(derivar(diagrama, config, {}), diagrama, config, {});
+
+    const achadas = lacunasSemMarcador(doc);
+
+    // A mensagem é metade do teste: quem vir isto vermelho precisa do endereço,
+    // não de um `false !== true`.
+    expect(
+      achadas,
+      `lacunas sem marcador no documento gerado:\n${achadas
+        .map((l) => `  linha ${l.numeroDaLinha}: ${l.trecho}  —  ${l.linha}`)
+        .join("\n")}`
+    ).toEqual([]);
+  });
+
+  it("tem dentes: um esqueleto sem marcador é encontrado, com a linha", () => {
+    const achadas = lacunasSemMarcador("## Visão geral\nComo <papel>, quero <ação> para que <benefício>.");
+
+    expect(achadas.map((l) => l.trecho)).toEqual(["<papel>", "<ação>", "<benefício>"]);
+    expect(achadas[0].numeroDaLinha).toBe(2);
+  });
+
+  it("e o marcador na vizinhança silencia — é o que separa lacuna endereçada de esquecimento", () => {
+    expect(lacunasSemMarcador("_(sem história definida)_ <- ✍️ especificar")).toEqual([]);
+    // O marcador vale para o PARÁGRAFO, não para a linha: um bloco de código
+    // não pode recebê-lo dentro sem quebrar a sintaxe de quem o colar numa
+    // ferramenta de BDD.
+    expect(lacunasSemMarcador("```gherkin\nDado <contexto>\n```\n<- ✍️ especificar")).toEqual([]);
+  });
+
+  it("não confunde código com lacuna", () => {
+    // O que o motor escreve é português. Tipo, sigla, URL e tag citada não são
+    // "preencha aqui", e acusá-los faria a régua virar ruído — que é como uma
+    // régua morre.
+    const codigo = [
+      "```ts",
+      "const m = new Map<string, Endpoint>();",
+      "```",
+      "Veja <https://exemplo.test/spec>.",
+      "Use `<div>` para o container.",
+      "O tipo <T> é resolvido em tempo de compilação.",
+    ].join("\n");
+
+    expect(lacunasSemMarcador(codigo)).toEqual([]);
+  });
+});
+
+/**
+ * SPEC-73 fatia B — a visão geral é de quem sabe, não do motor.
+ *
+ * A SPEC recusou explicitamente as duas saídas fáceis: **fazer a IA preencher**
+ * (papel e benefício são conhecimento de negócio, e um modelo os inventaria de
+ * forma plausível — o pior resultado possível num texto que alguém vai aprovar)
+ * e **remover a seção** (ela tem valor; o que não tem é o esqueleto entregue
+ * como se fosse conteúdo).
+ */
+describe("a visão geral escrita (SPEC-73 fatia B)", () => {
+  it("escrita, ela entra no documento como está — sem marcador nenhum", () => {
+    const diagrama = diagramaBase();
+    const doc = gerarEspecificacaoEntrega(derivar(diagrama, config, {}), diagrama, config, {
+      visaoGeral: "Como analista de crédito, quero ver a proposta aprovada no mesmo dia para não perder o cliente.",
+    });
+
+    expect(doc).toContain("## Visão geral");
+    expect(doc).toContain("Como analista de crédito, quero ver a proposta aprovada no mesmo dia");
+    // Escrita por gente é conteúdo, não lacuna: o varredor não tem o que achar.
+    expect(lacunasSemMarcador(doc).map((l) => l.trecho)).not.toContain("<papel>");
+  });
+
+  it("não escrita, a seção some — e com ela o formulário em branco", () => {
+    const diagrama = diagramaBase();
+    const doc = gerarEspecificacaoEntrega(derivar(diagrama, config, {}), diagrama, config, {});
+
+    expect(doc).not.toContain("## Visão geral");
+    expect(doc).not.toContain("<papel>");
+  });
+
+  it("espaço em branco não conta como escrita", () => {
+    // Senão um clique acidental no editor faria a seção voltar, vazia, e o
+    // documento entregaria um título sem corpo — o ruído que o §188 tirou.
+    const diagrama = diagramaBase();
+    const doc = gerarEspecificacaoEntrega(derivar(diagrama, config, {}), diagrama, config, {
+      visaoGeral: "   \n  ",
+    });
+
+    expect(doc).not.toContain("## Visão geral");
   });
 });

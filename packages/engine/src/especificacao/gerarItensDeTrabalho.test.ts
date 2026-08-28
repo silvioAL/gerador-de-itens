@@ -5,6 +5,7 @@ import { derivar } from "../derive/derivar.js";
 import { resolverDependencias } from "../dependency/dependencias.js";
 import { gerarEspecificacaoEntrega } from "./gerarEspecificacaoEntrega.js";
 import { gerarItensDeTrabalho } from "./gerarItensDeTrabalho.js";
+import { MARCADOR_ESPECIFICAR } from "../refinamento/gerarRefinamento.js";
 
 const config: DiagramaConfig = {
   nodeTypes: {
@@ -111,5 +112,33 @@ describe("gerarItensDeTrabalho (SPEC-41 Parte B)", () => {
     for (const dep of comDep.flatMap((i) => i.dependencias)) {
       expect(dep).toMatch(/^\w+( → .+)?$/);
     }
+  });
+});
+
+/**
+ * SPEC-73 fatia C — o Gherkin genérico entra na CONTA.
+ *
+ * Ele era o único dos quatro casos medidos que chegava ao card do tracker: a
+ * exportação só manda itens com `pendencias === 0`, e ele não contava como
+ * pendência nenhuma. Um cenário de teste que diz `Dado <contexto>` viajando
+ * como se fosse escrito pelo time é o §248 na ponta mais cara.
+ */
+describe("o Gherkin genérico conta como pendência (SPEC-73 fatia C)", () => {
+  it("tipo sem cenário configurado: a contagem SOBE por causa do esqueleto", () => {
+    const diagrama = diagramaBase();
+    const semCenario = gerarItensDeTrabalho(derivar(diagrama, config, {}), diagrama, config, {});
+
+    // O item do serviço não tem `cenarioGherkinPadrao` no config deste teste,
+    // então cai no esqueleto — e ele agora carrega o marcador.
+    const doServico = semCenario.find((i) => i.chave.startsWith("n1"))!;
+    expect(doServico.corpoMarkdown).toContain("Dado <contexto>");
+    // O marcador colado à linha do esqueleto, e não em qualquer lugar do corpo:
+    // afirmar só `toContain(MARCADOR)` passaria com o marcador de outro campo.
+    expect(doServico.corpoMarkdown).toContain(`_(preencher com os cenários reais deste item)_ ${MARCADOR_ESPECIFICAR}`);
+    // E FORA do bloco ```gherkin — dentro dele, quem colar o trecho numa
+    // ferramenta de BDD recebe um arquivo que não parseia.
+    const blocos = doServico.corpoMarkdown.match(/```gherkin[\s\S]*?```/g) ?? [];
+    expect(blocos.some((b) => b.includes(MARCADOR_ESPECIFICAR))).toBe(false);
+    expect(doServico.pendencias).toBeGreaterThan(0);
   });
 });
