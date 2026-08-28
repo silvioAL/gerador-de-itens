@@ -1,12 +1,16 @@
 import type {
+  AnexoDeContexto,
+  CenarioDeLentidao,
   Decisao,
   Diagrama,
   DocumentoEscrito,
   ExcecaoDePadrao,
+  LeituraDispensada,
   Necessidade,
   Percurso,
   StatusDocumento,
   ValorSpec,
+  VolumetriaDaDemanda,
 } from "@gerador/engine";
 
 /**
@@ -35,8 +39,16 @@ export interface QuebraSalva {
   respostasItens: Record<string, Record<string, ValorSpec>>;
   /** Contexto do épico digitado à mão (SPEC-23 Fase 1b). */
   demandInfo: string;
-  /** Anexos colados junto do contexto do épico. */
-  anexosContexto: string[];
+  /**
+   * Anexos colados junto do contexto do épico.
+   *
+   * SPEC-71 §4 — o NOME do arquivo faz parte do dado, e a porta dizia
+   * `string[]`. O modelo sempre disse `{ nome, conteudo }[]`, a tela sempre
+   * mostrou o nome, e a divergência não era cosmética: o Zod da borda,
+   * escrito contra esta forma, recusava o corpo inteiro com 400 — qualquer
+   * demanda com um anexo não salvava NADA, nem o anexo nem o diagrama.
+   */
+  anexosContexto: AnexoDeContexto[];
   /** SPEC-53 — de que PRODUTO é esta demanda (null = nenhum). Opcional de
    * propósito: quem já usa a ferramenta não passa a precisar cadastrar produto
    * pra fazer o que fazia. */
@@ -53,6 +65,12 @@ export interface QuebraSalva {
   documentoEscrito?: DocumentoEscrito;
   /** SPEC-58 fatia 3 — o estado do documento (null = nunca gerado). */
   documentoStatus?: StatusDocumento | null;
+  /** SPEC-70 — o volume que a demanda atende. Ausente = nada se afirma. */
+  volumetria?: VolumetriaDaDemanda;
+  /** SPEC-65 fatia D — as leituras que o time mandou calar neste desenho. */
+  leiturasDispensadas?: LeituraDispensada[];
+  /** SPEC-66/68/69 — os ensaios desta demanda, com estado e débito assumido. */
+  cenariosDeLentidao?: CenarioDeLentidao[];
   /** §184 — o markdown da especificação gerada (null = nunca gerada). */
   especificacao?: string | null;
   /** ISO-8601. Quem cria decide o valor — o relógio é do adaptador. */
@@ -107,5 +125,13 @@ export function normalizarDadosQuebra(bruto: Partial<DadosQuebra> | undefined): 
     percursos: bruto?.percursos ?? [],
     documentoEscrito: bruto?.documentoEscrito ?? {},
     documentoStatus: bruto?.documentoStatus ?? null,
+    // SPEC-71 — a QUARTA e a QUINTA vez que esta lição aparece neste arquivo.
+    // Os comentários acima já a escreveram três vezes (§184, SPEC-53,
+    // SPEC-57), e mesmo assim três campos novos passaram direto. Por isso a
+    // rodada que os trouxe também trouxe o teste que falha quando o próximo
+    // for esquecido: repetir o aviso não bastou.
+    volumetria: bruto?.volumetria,
+    leiturasDispensadas: bruto?.leiturasDispensadas ?? [],
+    cenariosDeLentidao: bruto?.cenariosDeLentidao ?? [],
   };
 }

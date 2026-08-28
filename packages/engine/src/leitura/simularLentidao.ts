@@ -1,5 +1,12 @@
 import type { DiagramaConfig } from "../config/types.js";
-import type { Diagrama, ValorSpec, VolumetriaDaDemanda } from "../model/types.js";
+import type {
+  AjusteDeCenario,
+  CenarioDeLentidao,
+  Diagrama,
+  EstadoDoEnsaio,
+  ValorSpec,
+  VolumetriaDaDemanda,
+} from "../model/types.js";
 import {
   CAMPO_DE_TEMPO_PADRAO,
   arestaEspera,
@@ -33,86 +40,20 @@ import { avaliarResiliencia, insistenciaDe, type ContradicaoDeResiliencia } from
  * Função pura, sem I/O, como o resto do engine.
  */
 
-export interface AjusteDeCenario {
-  /** O mesmo par que `ElementoDaLeitura` usa: a leitura e o ajuste falam a
-   * mesma língua, e o realce de um serve ao outro. */
-  tipo: "no" | "aresta";
-  id: string;
-  /** `3` = "três vezes mais lento". Ignorado quando `ms` está presente. */
-  fator?: number;
-  /** Valor absoluto em ms — a pergunta "e se o SLA fosse 500 ms?". */
-  ms?: number;
-  /**
-   * SPEC-68 — as condições que NÃO são lentidão.
-   *
-   * A SPEC-66 acertou o mecanismo e errou o escopo pelo nome: retry não é
-   * lentidão, pico de tráfego não é lentidão, disjuntor desligado não é
-   * lentidão. São **condições**, e o tempo é só uma delas.
-   */
-  tentativas?: number;
-  disjuntor?: boolean;
-  /** req/s no nó — o λ da Lei de Little (SPEC-68 §3.3). */
-  taxaRps?: number;
-}
-
 /**
- * SPEC-69 §4.0 — o estado do ensaio, e o que ele pede de quem olha.
+ * SPEC-71 — estes quatro tipos MUDARAM DE CASA, e o motivo está em
+ * `model/types.ts`: o que é persistido é do modelo, e manter uma segunda
+ * versão lá fez o Zod da borda ser escrito contra a forma errada.
  *
- * Três botões soltos numa linha não são um processo. O fluxo declarado é
- * *avaliar → revisar → aceitar ou modificar*, e cada estado diz o que se espera.
- *
- * **`por-avaliar` e `em-revisao` cobram igual.** O que tira do placar é
- * ACEITAR, não olhar — sair da cobrança por ter aberto a linha seria a fórmula
- * de fazer as pessoas abrirem tudo sem ler.
+ * A reexportação existe para quem já importava daqui — que é praticamente
+ * toda a UI de ensaios — não precisar saber que a fronteira mudou.
  */
-export type EstadoDoEnsaio = "por-avaliar" | "em-revisao" | "aceito";
-
-/**
- * SPEC-69 — o débito assumido, com quem e quando.
- *
- * Mesma forma da `ExcecaoDePadrao` (§242), e pelo mesmo motivo: sem o motivo
- * escrito, isto vira um botão de silenciar, e a próxima pessoa a abrir o
- * documento não saberá se aquilo foi decisão ou cansaço.
- */
-export interface DebitoAssumido {
-  motivo: string;
-  autor?: string;
-  em?: string;
-}
-
-export interface CenarioDeLentidao {
-  id: string;
-  nome: string;
-  /**
-   * De onde veio. `sugerido` chega para alguém avaliar: inferir é grátis e erra
-   * (regra 2 da SPEC-57), e proposta de modelo não é exceção.
-   */
-  origem: "manual" | "sugerido";
-  porque?: string;
-  /**
-   * SPEC-69 — ausente vale `por-avaliar`: ensaio de quebra antiga nasce
-   * cobrando, que é o comportamento certo. O antigo `aceito?: boolean` migra
-   * sozinho — ver `estadoDoEnsaio`.
-   */
-  estado?: EstadoDoEnsaio;
-  /**
-   * SPEC-70 §5 — "neste ensaio, o volume da demanda é N× o normal".
-   *
-   * O pico de tráfego é uma condição do MUNDO, não propriedade de um componente
-   * escolhido a dedo: com o volume declarado na demanda, este fator chega a
-   * todos os nós de uma vez pela mesma propagação.
-   *
-   * O `taxaRps` por ajuste continua existindo, e não é redundante: ele responde
-   * "e se só ESTE componente receber uma rajada?", que não é dedutível do
-   * volume da demanda. Duas perguntas diferentes, dois mecanismos.
-   */
-  fatorDeVolume?: number;
-  /** Só existe em `estado: "aceito"`. */
-  debito?: DebitoAssumido;
-  /** @deprecated SPEC-69 — lido só para migrar quebra gravada antes do estado. */
-  aceito?: boolean;
-  ajustes: AjusteDeCenario[];
-}
+export type {
+  AjusteDeCenario,
+  CenarioDeLentidao,
+  DebitoAssumido,
+  EstadoDoEnsaio,
+} from "../model/types.js";
 
 /**
  * O estado, tolerando a quebra gravada antes desta SPEC.

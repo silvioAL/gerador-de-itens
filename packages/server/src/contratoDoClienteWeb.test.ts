@@ -55,7 +55,7 @@ let cliente: typeof import("../../web/src/api/client.js");
 function instalarPoteDeCookies() {
   const original = globalThis.fetch;
   let cookie = "";
-  globalThis.fetch = (async (entrada: RequestInfo | URL, init?: RequestInit) => {
+  globalThis.fetch = (async (entrada: Parameters<typeof fetch>[0], init?: RequestInit) => {
     const cabecalhos = new Headers(init?.headers);
     if (cookie) cabecalhos.set("cookie", cookie);
     const resposta = await original(entrada, { ...init, headers: cabecalhos });
@@ -171,7 +171,11 @@ describe("o cliente do web contra o servidor de verdade (#308)", () => {
   });
 
   it("listar quebras devolve array — a tela de abrir depende disso pra buscar", async () => {
-    const quebras = await cliente.apiQuebras.listar("time-pagamentos");
+    // SPEC-71 — o argumento saiu: `listar()` nunca recebeu time nenhum, e o
+    // cliente o ignorava em silêncio. Passá-lo aqui fazia este teste afirmar
+    // um filtro que não existe — e como nada typechecava este arquivo, a
+    // divergência entre a chamada e a assinatura sobreviveu.
+    const quebras = await cliente.apiQuebras.listar();
     expect(Array.isArray(quebras)).toBe(true);
   });
 });

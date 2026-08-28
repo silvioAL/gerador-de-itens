@@ -339,7 +339,7 @@ export interface Quebra {
    * arquivo + conteúdo já extraído (`FileReader.readAsText`, só arquivos de
    * texto). Junto com `demandInfo`, alimenta o prompt real de `/ia/sugerir`,
    * não só a seção "Contexto" do documento exportado. */
-  anexosContexto?: { nome: string; conteudo: string }[];
+  anexosContexto?: AnexoDeContexto[];
   /** SPEC-53 — de que PRODUTO é esta demanda (undefined/null = nenhum).
    *
    * Só o id: o contexto em si mora no produto, e copiá-lo para dentro da
@@ -399,17 +399,105 @@ export interface Quebra {
    * guardado — ele é recalculado do desenho de agora, senão a tabela mostraria
    * o número de um desenho que já mudou.
    */
-  cenariosDeLentidao?: CenarioDeLentidaoGuardado[];
+  cenariosDeLentidao?: CenarioDeLentidao[];
 }
 
-/** SPEC-66 — a definição do ensaio, sem nenhum número calculado. */
-export interface CenarioDeLentidaoGuardado {
+/**
+ * SPEC-66/68/69 — a definição do ensaio, sem nenhum número calculado.
+ *
+ * ## Por que isto mora no MODELO, e não em `leitura/simularLentidao.ts`
+ *
+ * Morava lá, junto de quem o consome — e `types.ts` guardava uma segunda
+ * versão, `CenarioDeLentidaoGuardado`, com a forma da SPEC-66. As duas
+ * divergiram: a UI passou a escrever `estado`, `debito`, `fatorDeVolume` e as
+ * condições da SPEC-68, e a cópia do modelo continuou com `aceito?: boolean`.
+ *
+ * O Zod da borda foi escrito contra a cópia. Ele não "ficou para trás" sozinho:
+ * ficou **em sincronia com um tipo que ficou para trás**, e por isso a SPEC-71
+ * mediu o ensaio inteiro sumindo no salvamento sem nada acusar.
+ *
+ * O que é PERSISTIDO é do modelo. `simularLentidao` reexporta daqui, para quem
+ * já importava de lá não precisar saber que a fronteira mudou.
+ */
+export interface AjusteDeCenario {
+  /** O mesmo par que `ElementoDaLeitura` usa: a leitura e o ajuste falam a
+   * mesma língua, e o realce de um serve ao outro. */
+  tipo: "no" | "aresta";
+  id: string;
+  /** `3` = "três vezes mais lento". Ignorado quando `ms` está presente. */
+  fator?: number;
+  /** Valor absoluto em ms — a pergunta "e se o SLA fosse 500 ms?". */
+  ms?: number;
+  /**
+   * SPEC-68 — as condições que NÃO são lentidão.
+   *
+   * A SPEC-66 acertou o mecanismo e errou o escopo pelo nome: retry não é
+   * lentidão, pico de tráfego não é lentidão, disjuntor desligado não é
+   * lentidão. São **condições**, e o tempo é só uma delas.
+   */
+  tentativas?: number;
+  disjuntor?: boolean;
+  /** req/s no nó — o λ da Lei de Little (SPEC-68 §3.3). */
+  taxaRps?: number;
+}
+
+/**
+ * SPEC-69 §4.0 — o estado do ensaio, e o que ele pede de quem olha.
+ *
+ * Três botões soltos numa linha não são um processo. O fluxo declarado é
+ * *avaliar → revisar → aceitar ou modificar*, e cada estado diz o que se espera.
+ *
+ * **`por-avaliar` e `em-revisao` cobram igual.** O que tira do placar é
+ * ACEITAR, não olhar — sair da cobrança por ter aberto a linha seria a fórmula
+ * de fazer as pessoas abrirem tudo sem ler.
+ */
+export type EstadoDoEnsaio = "por-avaliar" | "em-revisao" | "aceito";
+
+/**
+ * SPEC-69 — o débito assumido, com quem e quando.
+ *
+ * Mesma forma da `ExcecaoDePadrao` (§242), e pelo mesmo motivo: sem o motivo
+ * escrito, isto vira um botão de silenciar, e a próxima pessoa a abrir o
+ * documento não saberá se aquilo foi decisão ou cansaço.
+ */
+export interface DebitoAssumido {
+  motivo: string;
+  autor?: string;
+  em?: string;
+}
+
+export interface CenarioDeLentidao {
   id: string;
   nome: string;
+  /**
+   * De onde veio. `sugerido` chega para alguém avaliar: inferir é grátis e erra
+   * (regra 2 da SPEC-57), e proposta de modelo não é exceção.
+   */
   origem: "manual" | "sugerido";
   porque?: string;
+  /**
+   * SPEC-69 — ausente vale `por-avaliar`: ensaio de quebra antiga nasce
+   * cobrando, que é o comportamento certo. O antigo `aceito?: boolean` migra
+   * sozinho — ver `estadoDoEnsaio`.
+   */
+  estado?: EstadoDoEnsaio;
+  /**
+   * SPEC-70 §5 — "neste ensaio, o volume da demanda é N× o normal".
+   *
+   * O pico de tráfego é uma condição do MUNDO, não propriedade de um componente
+   * escolhido a dedo: com o volume declarado na demanda, este fator chega a
+   * todos os nós de uma vez pela mesma propagação.
+   *
+   * O `taxaRps` por ajuste continua existindo, e não é redundante: ele responde
+   * "e se só ESTE componente receber uma rajada?", que não é dedutível do
+   * volume da demanda. Duas perguntas diferentes, dois mecanismos.
+   */
+  fatorDeVolume?: number;
+  /** Só existe em `estado: "aceito"`. */
+  debito?: DebitoAssumido;
+  /** @deprecated SPEC-69 — lido só para migrar quebra gravada antes do estado. */
   aceito?: boolean;
-  ajustes: { tipo: "no" | "aresta"; id: string; fator?: number; ms?: number }[];
+  ajustes: AjusteDeCenario[];
 }
 
 /** SPEC-65 fatia D — o silêncio pedido, com dono e data. */
@@ -420,6 +508,18 @@ export interface LeituraDispensada {
   tipo: string;
   autor?: string;
   em?: string;
+}
+
+/**
+ * SPEC-23 1b — um anexo de texto do contexto da demanda.
+ *
+ * Tipo NOMEADO desde a SPEC-71: enquanto ele era inline aqui, a porta declarava
+ * `string[]` e o Zod da borda também — e as duas formas discordando custaram um
+ * 400 em toda demanda com anexo. Um nome só, num lugar só.
+ */
+export interface AnexoDeContexto {
+  nome: string;
+  conteudo: string;
 }
 
 export type TipoItem = "História" | "Task" | "Débito Técnico";

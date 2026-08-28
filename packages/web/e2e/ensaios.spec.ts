@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
 import { entrar } from "./auth";
 
+const API = "http://localhost:4100";
+
 /**
  * SPEC-66 — a bancada de ensaio.
  *
@@ -58,13 +60,154 @@ test("§296 — ensaiar pelo chip, sem IA, e o cenário sobrevive ao F5", async 
   // "Quem domina" aponta o culpado — o total diz que dói, isto diz onde.
   await expect(linha).toContainText("bureau-credito-nacional");
 
-  // ── Salvar e recarregar: o ensaio é do time, não da sessão ──
+  /**
+   * O F5 saiu DAQUI, e não por preguiça — por três medições.
+   *
+   * Este trecho terminava com `Salvar` + `page.goto("/#/ensaios")` e afirmava
+   * *"o ensaio é do time, não da sessão"*. Trocar o `goto` por um `reload()` de
+   * verdade descascou três mentiras empilhadas, todas verdes:
+   *
+   * 1. **`goto` de fragmento é same-document.** Não recarrega nada; o estado em
+   *    memória sobrevive, e a asserção lia a própria sessão. A armadilha já
+   *    estava documentada num spec vizinho (`regras-por-componente.spec.ts`).
+   * 2. **A demanda nunca era salva.** O cenário de demonstração vem sem título,
+   *    e `salvarQuebra` sem título abre a pergunta do nome. O teste conferia
+   *    `getByText(/salv/i)` — que casa com *"dê um título antes de salvar"* tão
+   *    bem quanto com *"salvo"*.
+   * 3. **E não poderia ser salva.** O cenário pronto é do `time-credito`, e o
+   *    usuário do E2E não tem nível `operar` nele: o POST volta 403.
+   *
+   * O que este teste prova de verdade — a porta pelo chip, o ajuste, o Δ e o
+   * "quem domina" — continua aqui inteiro. A prova de PERSISTÊNCIA virou teste
+   * próprio, logo abaixo, com uma demanda montada à mão no time de quem está
+   * logado: é a única forma de o F5 medir o que ele diz medir.
+   */
+});
+
+/**
+ * SPEC-71 fatia D — o F5 DE VERDADE.
+ *
+ * A pergunta: *assumir um ensaio, dar F5, e o débito continuar assumido?*
+ * Medido contra o servidor real antes desta rodada, a resposta era não — o
+ * `cenariosDeLentidao` inteiro sumia no salvamento, e com ele o estado, o
+ * débito, o autor e o motivo.
+ *
+ * Três decisões deste teste, e as três vieram de o anterior estar mentindo:
+ *
+ * - **`reload()`, nunca `goto` de fragmento.** Só o reload joga fora a memória.
+ * - **Reabrir pelo menu**, como quem volta no dia seguinte — é o caso real.
+ * - **Demanda montada à mão, no time de quem está logado.** O cenário de
+ *   demonstração é de outro time, e salvá-lo volta 403.
+ */
+test("SPEC-71 — o ensaio assumido sobrevive ao F5, com o débito e o motivo", async ({ page }) => {
+  test.setTimeout(180000);
+  await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
+  await page.route(
+    (url) => url.pathname === "/ia/status",
+    (rota) => rota.fulfill({ json: { modelosChat: [], embeddingInstalado: false, capacidades: {} } })
+  );
+  await entrar(page);
+
+  // Um desenho mínimo com tempo declarado — sem número, não há o que ensaiar
+  // (§305). Mesmo caminho do teste do §306, e pelo mesmo motivo: o cenário
+  // pronto não declara `timeoutMs` em conexão nenhuma.
+  await page.getByRole("button", { name: "+ Serviço", exact: true }).click();
+  await page.getByRole("button", { name: "+ API Externa" }).click();
+  const svc = page.locator(".react-flow__node", { hasText: "Serviço" }).first();
+  const api = page.locator(".react-flow__node", { hasText: "API Externa" }).first();
+  await svc.waitFor();
+  await api.waitFor();
+  const origem = svc.locator(".react-flow__handle-right.source");
+  const destino = api.locator(".react-flow__handle-left.target");
+  const caixaOrigem = await origem.boundingBox();
+  const caixaDestino = await destino.boundingBox();
+  if (!caixaOrigem || !caixaDestino) throw new Error("handle de conexão não encontrado no DOM");
+  await page.mouse.move(caixaOrigem.x + caixaOrigem.width / 2, caixaOrigem.y + caixaOrigem.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(caixaDestino.x + caixaDestino.width / 2, caixaDestino.y + caixaDestino.height / 2, { steps: 15 });
+  await page.mouse.up();
+  await page.locator(".react-flow__edge").first().click();
+  await page.locator("aside").getByLabel(/Timeout/).first().fill("1000");
+
+  // ── O ensaio, e o débito assumido com motivo ──
+  await page.goto("/#/ensaios");
+  await page.getByLabel("Nome do cenário").fill("Parceiro degradado");
+  await page.getByTestId("criar-cenario").click();
+  await page.getByTestId("add-ajuste-cen-parceiro-degradado").click();
+  const fator = page.locator('[data-testid^="fator-"]').first();
+  await expect(fator).toBeVisible();
+  await fator.fill("4");
+  // Antes de salvar: o ajuste está aplicado. A âncora é o VALOR do controle, e
+  // não o tempo formatado — o tempo depende da aritmética do desenho, e o que
+  // esta rodada mede é se o ajuste sobrevive ao banco, não quanto ele soma.
+  // Sem esta linha, um vermelho depois do F5 não diria se a perda foi no
+  // salvamento ou se o gesto nunca chegou a valer.
+  await expect(fator).toHaveValue("4");
+
+  const MOTIVO = "o pico dura 2h/mês e o negócio aceita a espera";
+  await page.getByTestId("assumir-cen-parceiro-degradado").click();
+  await page.getByLabel("Por que assumir este débito").fill(MOTIVO);
+  await page.getByTestId("confirmar-assumir-cen-parceiro-degradado").click();
+  await expect(page.getByTestId("debito-cen-parceiro-degradado")).toContainText(MOTIVO);
+
+  // A frase de resultado ANTES do F5 — é contra ela que a reaberta é
+  // comparada. Extraída em vez de escrita à mão: o número sai da aritmética do
+  // desenho, e fixá-lo aqui faria este teste falhar por uma mudança no motor
+  // que não tem nada a ver com persistência.
+  const frase = /A resposta fica em [^.]+\./;
+  const respostaAntes = (await page.getByTestId("linha-cen-parceiro-degradado").innerText()).match(frase)?.[0];
+  expect(respostaAntes).toBeTruthy();
+
+  // ── Salvar de verdade: com nome, porque sem nome o produto só pergunta ──
+  const TITULO = "Ensaio que sobrevive ao F5";
   await page.getByTestId("ensaios-voltar").click();
   await page.getByRole("button", { name: "Salvar" }).first().click();
-  await expect(page.getByText(/salv/i).first()).toBeVisible({ timeout: 15000 });
+  await page.getByLabel("ex.: Fatura mensal em lote").fill(TITULO);
+  await page.getByTestId("assistente-balao-confirmar").click();
+  await expect(page.getByTestId("titulo-da-quebra")).toContainText(TITULO);
+
+  // A conferência é NO SERVIDOR, e não na tela: é o único jeito de saber que o
+  // debounce de 2 s chegou ao banco antes de recarregar. Recarregar cedo
+  // testaria a memória mais uma vez.
+  const salvaNoServidor = async () => {
+    const lista = await (await page.request.get(`${API}/quebras`)).json();
+    const q = lista.find((x: { titulo?: string }) => x.titulo === TITULO);
+    if (!q) return null;
+    return (await (await page.request.get(`${API}/quebras/${q.id}`)).json()) as {
+      cenariosDeLentidao?: { estado?: string; debito?: { motivo?: string }; ajustes?: { fator?: number }[] }[];
+    };
+  };
+  await expect
+    .poll(async () => (await salvaNoServidor())?.cenariosDeLentidao?.[0]?.debito?.motivo, { timeout: 25000 })
+    .toBe(MOTIVO);
+
+  // E o ensaio chegou INTEIRO ao banco, não só o débito: o estado e o ajuste
+  // com o fator escolhido. São campos diferentes, perdidos por motivos
+  // diferentes — o estado morria no Zod, o ajuste na falta de coluna.
+  const noBanco = await salvaNoServidor();
+  expect(noBanco?.cenariosDeLentidao?.[0]?.estado).toBe("aceito");
+  expect(noBanco?.cenariosDeLentidao?.[0]?.ajustes?.[0]?.fator).toBe(4);
+
+  // ── O F5 ──
+  await page.reload();
+  await page.getByRole("button", { name: "☰ Menu" }).click();
+  await page.getByRole("button", { name: "Abrir…" }).click();
+  await page.getByPlaceholder("ex.: aprovação de crédito").fill(TITULO);
+  await page.getByRole("button", { name: new RegExp(TITULO) }).click();
+  await expect(page.getByTestId("titulo-da-quebra")).toContainText(TITULO);
 
   await page.goto("/#/ensaios");
-  await expect(page.getByTestId("linha-cen-bureau-degradado")).toContainText("12 s");
+  const reaberta = page.getByTestId("linha-cen-parceiro-degradado");
+  await expect(reaberta).toBeVisible({ timeout: 15000 });
+  // O ensaio voltou com o MESMO resultado — o que só acontece se o ajuste
+  // tiver voltado junto. (O controle de fator não aparece num ensaio já
+  // assumido: a linha fica em modo de leitura, e por isso o fator gravado é
+  // conferido no banco, acima.)
+  await expect(reaberta).toContainText(respostaAntes!);
+  // …e o DÉBITO, que é o que a SPEC-69 criou e a SPEC-71 mediu sumindo. Sem
+  // ele o ensaio volta cobrando quem já tinha decidido, e a decisão registrada
+  // — com autor e motivo — desaparece sem aviso.
+  await expect(page.getByTestId("debito-cen-parceiro-degradado")).toContainText(MOTIVO);
 });
 
 test("§296 — o desenho sem tempo nenhum DIZ que não há o que ensaiar", async ({ page }) => {

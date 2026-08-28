@@ -59,14 +59,73 @@ export function testarContratoDeQuebras(nomeDoAdaptador: string, criarAmbiente: 
           diagrama: DIAGRAMA,
           respostasItens,
           demandInfo: "Aprovação de crédito com bureau externo.",
-          anexosContexto: ["ata-refinamento.md", "contrato-bureau.pdf"],
+          anexosContexto: [
+            { nome: "ata-refinamento.md", conteudo: "o que ficou decidido" },
+            { nome: "contrato-bureau.md", conteudo: "as cláusulas de SLA" },
+          ],
         })
       );
 
       const lida = await repo.obter(criada.id);
       expect(lida?.respostasItens).toEqual(respostasItens);
       expect(lida?.demandInfo).toBe("Aprovação de crédito com bureau externo.");
-      expect(lida?.anexosContexto).toEqual(["ata-refinamento.md", "contrato-bureau.pdf"]);
+      expect(lida?.anexosContexto).toEqual([
+        { nome: "ata-refinamento.md", conteudo: "o que ficou decidido" },
+        { nome: "contrato-bureau.md", conteudo: "as cláusulas de SLA" },
+      ]);
+    });
+
+    /**
+     * SPEC-71 fatia A — a mesma pergunta do round-trip da borda, um nível
+     * abaixo: **a PORTA promete guardar o tipo inteiro?**
+     *
+     * Existe separado do teste de rota de propósito. Aquele atravessa Zod +
+     * normalizador + coluna + mapper de uma vez, e por isso não diz QUAL dos
+     * quatro perdeu. Este exercita porta e adaptador sem HTTP nenhum: se os
+     * dois ficarem vermelhos, o defeito é aqui; se só o de lá, é no Zod.
+     */
+    it("SPEC-71: os campos das últimas quatro SPECs sobrevivem à porta", async () => {
+      const repo = await comRepo();
+      const volumetria = { quantidade: 2_000_000, por: "dia" as const };
+      const cenariosDeLentidao = [
+        {
+          id: "cen-bureau",
+          nome: "Bureau lento no pico",
+          origem: "manual" as const,
+          estado: "aceito" as const,
+          fatorDeVolume: 10,
+          debito: { motivo: "vale até o próximo trimestre", autor: "ana", em: "2026-08-15T10:00:00.000Z" },
+          ajustes: [{ tipo: "no" as const, id: "n1", fator: 3, tentativas: 2, disjuntor: true, taxaRps: 50 }],
+        },
+      ];
+      const leiturasDispensadas = [{ noId: "n1", tipo: "fan-out", autor: "ana", em: "2026-08-15T10:00:00.000Z" }];
+
+      const criada = await repo.criar(
+        normalizarDadosQuebra({ diagrama: DIAGRAMA, volumetria, cenariosDeLentidao, leiturasDispensadas })
+      );
+      const lida = await repo.obter(criada.id);
+
+      expect(lida?.volumetria).toEqual(volumetria);
+      expect(lida?.cenariosDeLentidao).toEqual(cenariosDeLentidao);
+      expect(lida?.leiturasDispensadas).toEqual(leiturasDispensadas);
+    });
+
+    /**
+     * SPEC-71 §4 — a pergunta que a SPEC deixou em aberto ("não medi"), agora
+     * respondida por evidência: o modelo diz `{ nome, conteudo }[]` e a coluna
+     * dizia `string[]`. Não era divergência cosmética — era 400 no PUT inteiro,
+     * e demanda com anexo não salvava NADA.
+     */
+    it("SPEC-71: um anexo guarda o NOME do arquivo, não só o conteúdo", async () => {
+      const repo = await comRepo();
+      const anexosContexto = [{ nome: "ata-refinamento.md", conteudo: "o que ficou decidido na reunião" }];
+
+      const criada = await repo.criar(normalizarDadosQuebra({ diagrama: DIAGRAMA, anexosContexto }));
+      const lida = await repo.obter(criada.id);
+
+      // Perder o nome é perder o que a tela mostra e o que a pessoa usa para
+      // remover o anexo certo.
+      expect(lida?.anexosContexto).toEqual(anexosContexto);
     });
 
     it("campos omitidos viram o mesmo default nos dois lados", async () => {

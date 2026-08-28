@@ -1,5 +1,5 @@
 import type { ExecucaoDoPapel } from "@gerador/aplicacao";
-import type { Decisao, Diagrama, DocumentoEscrito, ExcecaoDePadrao, Necessidade, OperacaoDeAjuste, PerfisConfig, Percurso, Quebra, RegrasConfig, StatusDocumento, ValorSpec } from "@gerador/engine";
+import type { AnexoDeContexto, CenarioDeLentidao, Decisao, Diagrama, DocumentoEscrito, ExcecaoDePadrao, LeituraDispensada, Necessidade, OperacaoDeAjuste, PerfisConfig, Percurso, Quebra, RegrasConfig, StatusDocumento, ValorSpec, VolumetriaDaDemanda } from "@gerador/engine";
 
 /**
  * Base do @gerador/server — configurável em runtime via `VITE_API_URL`
@@ -90,7 +90,9 @@ export interface QuebraSalva {
    * do refinamento técnico/volumetria (Fase 1, SPEC-23). */
   respostasItens?: Record<string, Record<string, ValorSpec>>;
   demandInfo?: string;
-  anexosContexto?: string[];
+  /** SPEC-71 — com o NOME do arquivo. Era `string[]` aqui e objeto no modelo,
+   * e a discordância custava 400 em toda demanda com anexo. */
+  anexosContexto?: AnexoDeContexto[];
   /** SPEC-53 — de que produto é esta demanda (null = nenhum). */
   produtoId?: string | null;
   /** SPEC-57 fatia A — o propósito da demanda. */
@@ -105,6 +107,12 @@ export interface QuebraSalva {
   documentoEscrito?: DocumentoEscrito;
   /** SPEC-58 fatia 3 — o estado do documento. */
   documentoStatus?: StatusDocumento | null;
+  /** SPEC-70 — o volume que a demanda atende. */
+  volumetria?: VolumetriaDaDemanda;
+  /** SPEC-65 fatia D — as leituras caladas neste desenho. */
+  leiturasDispensadas?: LeituraDispensada[];
+  /** SPEC-66/68/69 — os ensaios, com estado e débito assumido. */
+  cenariosDeLentidao?: CenarioDeLentidao[];
   /** §184 — o markdown da especificação gerada (null = nunca gerada). */
   especificacao?: string | null;
   especificacaoGeradaEm?: string | null;

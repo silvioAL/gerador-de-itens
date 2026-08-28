@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  /**
+   * SPEC-71 fatia C — o portão que faltava.
+   *
+   * A trava contra "campo novo no tipo que não chega à borda"
+   * (`routes/quebras.borda.test.ts`) é METADE compilador: ela obriga o
+   * inventário a cobrir `keyof Quebra`, e campo novo sem entrada é erro de
+   * build. Só que nada rodava `tsc` sobre este pacote — o `build` é `tsup`,
+   * que não typecheca, e é exatamente o achado do §286 sobre a CLI, um pacote
+   * depois.
+   *
+   * `contratoDoClienteWeb.test.ts` fica de fora, e não é arbitrário: ele
+   * importa o cliente do NAVEGADOR de propósito (é o ponto dele — provar que o
+   * cliente real fala com o servidor real), e aquele arquivo depende de
+   * `import.meta.env` e de tipos de DOM que não existem sob a configuração de
+   * Node deste pacote. Typecheckar o web com a régua do server acusaria erro
+   * em código que está certo do outro lado da fronteira.
+   */
+  "exclude": ["src/contratoDoClienteWeb.test.ts"]
+}

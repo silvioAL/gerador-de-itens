@@ -36,7 +36,7 @@ describe("usePersistencia.abrirPorId — reabrir não pode perder campo (§250)"
     diagrama: { nodes: [], edges: [] },
     respostasItens: { "n1::criacao": {} },
     demandInfo: "Reduzir a latência.",
-    anexosContexto: ["conteúdo do anexo"],
+    anexosContexto: [{ nome: "ata-refinamento.md", conteudo: "conteúdo do anexo" }],
     produtoId: "produto-1",
     necessidades: [{ id: "r1", texto: "não cobrar duas vezes", origem: "manual" as const, atendidaPor: ["n1"] }],
     decisoes: [
@@ -57,6 +57,23 @@ describe("usePersistencia.abrirPorId — reabrir não pode perder campo (§250)"
     especificacao: "# doc",
     documentoEscrito: { tradeOffs: "aceitamos latência", riscos: "o parceiro muda o contrato" },
     documentoStatus: "aprovado" as const,
+    // SPEC-71 fatia A — os três campos que a fixture não citava, e que por isso
+    // o laço abaixo nunca conferia. O teste dizia "TODO campo que o servidor
+    // devolveu" e media só o que a fixture lembrava: uma prova que envelhece
+    // junto com quem a escreveu. Estes três somem no `abrirPorId` hoje.
+    volumetria: { quantidade: 2000000, por: "dia" as const },
+    cenariosDeLentidao: [
+      {
+        id: "cen-bureau",
+        nome: "Bureau lento no pico",
+        origem: "manual" as const,
+        estado: "aceito" as const,
+        fatorDeVolume: 10,
+        debito: { motivo: "vale a pena até o próximo trimestre", autor: "ana", em: "2026-08-15T10:00:00.000Z" },
+        ajustes: [{ tipo: "no" as const, id: "n1", fator: 3, tentativas: 2, disjuntor: true, taxaRps: 50 }],
+      },
+    ],
+    leiturasDispensadas: [{ noId: "n1", tipo: "fan-out", autor: "ana", em: "2026-08-15T10:00:00.000Z" }],
     criadoEm: "2026-08-15T10:00:00.000Z",
     atualizadoEm: "2026-08-15T10:00:00.000Z",
   };
@@ -75,15 +92,16 @@ describe("usePersistencia.abrirPorId — reabrir não pode perder campo (§250)"
 
     // A conferência é do CONJUNTO, não de campos escolhidos: é isso que faz o
     // teste pegar o campo que ainda nem existe hoje.
-    const ignorados = new Set(["id", "criadoEm", "atualizadoEm", "anexosContexto", "especificacaoGeradaEm"]);
+    // SPEC-71 — `anexosContexto` SAIU da lista de ignorados: ele estava aqui
+    // porque a leitura convertia `string[]` em `{ nome, conteudo }[]`, e essa
+    // conversão só existia de um lado — a escrita mandava objeto, e a borda
+    // respondia 400. Com as duas pontas falando a mesma forma, não há o que
+    // ignorar, e o campo passa a ser conferido pelo mesmo laço que os outros.
+    const ignorados = new Set(["id", "criadoEm", "atualizadoEm", "especificacaoGeradaEm"]);
     for (const [chave, valor] of Object.entries(salva)) {
       if (ignorados.has(chave)) continue;
       expect({ campo: chave, valor: (aberta as unknown as Record<string, unknown>)[chave] }).toEqual({ campo: chave, valor });
     }
-
-    // Anexos têm forma própria (o servidor guarda só o conteúdo; a tela quer
-    // nome + conteúdo), então são conferidos à parte em vez de ignorados.
-    expect(aberta.anexosContexto).toEqual([{ nome: "anexo-1.txt", conteudo: "conteúdo do anexo" }]);
   });
 
   it("campo ausente no servidor não vira string vazia nem objeto fantasma", async () => {
