@@ -170,3 +170,54 @@ describe("AssistenteFlutuante (#298 — um ponto de entrada pra conversar com a 
     expect(onMudarAba).toHaveBeenCalledWith(null);
   });
 });
+
+/**
+ * §308 — RELATO REAL, com captura: *"aqui cortou parte do texto da
+ * configuração"* — a aba "⚙ Configurar" aparecia como "⚙ Configura".
+ *
+ * Medido contra a stack local: a fileira tem 418 px e as três abas mais o ×
+ * precisam de 471. Com `nowrap` dentro de uma janela `overflow: hidden`, a
+ * terceira sumia pela borda.
+ *
+ * ## Por que a régua é de LARGURA, e não de presença
+ *
+ * O botão continua no DOM e continua "visível" para o CSS — ele só está fora da
+ * moldura. `toBeVisible()` passaria dos dois lados, como no §302. O que prova o
+ * conserto é a fileira caber: `scrollWidth` não pode passar de `clientWidth`.
+ *
+ * jsdom não faz layout, então a medição de verdade é a do E2E. O que este teste
+ * guarda é a ESTRUTURA que permite a quebra — e ela é fácil de desfazer sem
+ * querer, porque "um `<div>` a mais" parece ruído para quem não conhece a
+ * história.
+ */
+describe("AssistenteFlutuante — as abas não podem ser cortadas (§308)", () => {
+  it("as abas ficam numa fileira que QUEBRA, e o × fora dela", () => {
+    render(
+      <AssistenteFlutuante aba="conversa" onMudarAba={vi.fn()}>
+        <div>conteúdo</div>
+      </AssistenteFlutuante>
+    );
+
+    const fechar = screen.getByLabelText("Fechar assistente");
+    const fileira = screen.getByRole("button", { name: /Configurar/ }).parentElement!;
+
+    expect(fileira.style.flexWrap).toBe("wrap");
+    // Sem `minWidth: 0` um filho flex não encolhe abaixo do próprio conteúdo, e
+    // a quebra nunca aconteceria.
+    expect(fileira.style.minWidth).toBe("0");
+    // O × mora FORA da fileira: dentro dela, ele quebraria junto com as abas.
+    expect(fileira.contains(fechar)).toBe(false);
+  });
+
+  it("as três abas continuam lá — quebrar não é esconder", () => {
+    render(
+      <AssistenteFlutuante aba="conversa" onMudarAba={vi.fn()}>
+        <div>conteúdo</div>
+      </AssistenteFlutuante>
+    );
+
+    expect(screen.getByRole("button", { name: /Desenhar conversando/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Contexto da demanda/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Configurar/ })).toBeInTheDocument();
+  });
+});
