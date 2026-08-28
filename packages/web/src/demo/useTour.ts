@@ -87,37 +87,30 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       },
     },
     {
-      // §255 — o motor explicado ANTES de qualquer tela. Sem isto, o tour
-      // mostrava o que a ferramenta faz sem nunca dizer QUEM faz — e a divisão
-      // entre o que o motor calcula e o que a IA escreve é a tese do produto.
-      selector: null,
-      titulo: "Quem faz o quê",
-      segundos: 11,
-      texto:
-        "Duas partes trabalham aqui, e a divisão é a ideia toda. O MOTOR calcula: lê o seu desenho e a configuração do time, mede o que está pronto e o que sai do padrão, e deriva os itens com as dependências. Ele não conversa com IA nem vai à rede — mesmo desenho, mesmos itens, sempre. A IA escreve: a história do item, os critérios, o porquê de uma proposta. Nunca o contrário. E nada que ela propõe conta antes de você confirmar.",
-    },
-    {
-      // §268 — o passo anterior AFIRMA que o motor calcula; este mostra a conta.
-      //
-      // "Medido pelo motor" é a frase mais repetida do produto e a menos
-      // demonstrada: quem lê ou acredita ou não, e acreditar num número cuja
-      // origem não se conhece é o mesmo que ignorá-lo. Pior, "motor" soa a IA —
-      // que é justamente a leitura que o produto passa o tempo todo desfazendo.
-      //
-      // O exemplo é da configuração REAL de quem está vendo, e não da
-      // demonstração: aqui a pergunta é "como o MEU ambiente mede", e um
-      // exemplo de mentira responderia outra coisa.
+      /**
+       * SPEC-78 — DOIS passos viraram um.
+       *
+       * "Quem faz o quê" afirmava a divisão (motor calcula, IA escreve) e "O
+       * motor, por dentro" mostrava a conta — 11 s + 16 s de explicação antes
+       * de a pessoa ver qualquer coisa acontecer. Depois da SPEC-76, a landing
+       * já carrega essa explicação, com o ciclo e o centro contido; repeti-la
+       * aqui é gastar o momento em que a atenção é maior dizendo o que já foi
+       * dito.
+       *
+       * O que o tour faz melhor que a landing é MOSTRAR — então o passo afirma
+       * a tese em duas frases e vai direto para a conta real, com a régua do
+       * time de quem assiste.
+       */
       selector: "[data-testid=motor-passo-a-passo]",
-      titulo: "O motor, por dentro",
-      // A animação dá uma volta completa em ~6,5s; este passo mostra duas.
+      titulo: "Quem faz o quê",
+      // A animação dá uma volta completa em ~6,5 s; este passo mostra duas.
       segundos: 16,
       texto:
-        "Aqui está a conta inteira, com uma régua do SEU time: o campo que você preencheu, a régua que alguém escreveu, a comparação, e o item que sai dela. Quatro elos, nenhum deles com IA no meio — é aritmética sobre o seu desenho e a sua configuração, e por isso o mesmo desenho dá sempre os mesmos itens. Se aqui disser que não há régua conferível, é literal: o motor só confere o que tem checagem, e o resto é texto para uma pessoa ler.",
+        "Duas partes trabalham aqui, e a divisão é a ideia toda. O MOTOR calcula — lê o seu desenho e a configuração do time, mede o que está pronto e o que sai do padrão, e deriva os itens com as dependências. A IA escreve o texto, e nada que ela propõe conta antes de você confirmar. Esta é a conta inteira, com uma régua do SEU time: o campo preenchido, a régua que alguém escreveu, a comparação, e o item que sai dela. Quatro elos, nenhum com IA no meio — por isso o mesmo desenho dá sempre os mesmos itens.",
       onEnter: () => {
-        // Este passo passou a ser o PRIMEIRO a mostrar dado de demonstração, e
-        // por isso liga a marca aqui: o time de quem assiste pode não ter régua
-        // conferível nenhuma, e "não há o que explicar" no meio da explicação
-        // não ensina nada. A caixa diz que o exemplo é de demonstração (§235).
+        // Primeiro passo a mostrar dado de demonstração: a marca liga aqui
+        // (§235), porque o time de quem assiste pode não ter régua conferível
+        // nenhuma, e "não há o que explicar" no meio da explicação não ensina.
         opts.ligarDemonstracao(true);
         opts.abrirSistema();
       },
@@ -127,7 +120,7 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       titulo: "Começar conversando",
       segundos: 9,
       texto:
-        "A porta de entrada não é arrastar caixa: você descreve a demanda — por texto, voz ou um print de lousa — e o agente propõe os componentes USANDO OS TIPOS que este projeto tem configurados. Nada é aplicado sozinho: a proposta vem com o motivo de cada peça, e você decide. Este desenho na mesa nasceu da conversa ao lado.",
+        "A porta de entrada não é arrastar caixa: você descreve a demanda — por texto, voz ou um print de lousa — e o agente propõe os componentes USANDO OS TIPOS que este projeto tem configurados. Nada é aplicado sozinho: a proposta vem com o motivo de cada peça, e você decide. Este desenho na mesa nasceu da conversa ao lado. E o ✦ no canto acompanha você em qualquer tela: é por ele que se volta a chamar o agente.",
       onEnter: () => {
         // §268 — voltar do mapa: o passo anterior saiu do canvas, e a conversa
         // aparece por cima dele. Sem isto o passo apontaria para uma janela que
@@ -139,25 +132,6 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
         opts.ligarDemonstracao(true);
         opts.abrirConversa();
       },
-    },
-    {
-      // §268 — o botão que fica SEMPRE por cima do desenho, e que o tour usava
-      // sem nunca apresentar: ele abria e fechava a janela por dentro
-      // (`abrirConversa`/`fecharAssistente`) e o ✦ no canto nunca foi apontado.
-      // Quem termina o tour precisa saber como voltar a chamar o agente.
-      selector: "[data-testid=assistente-flutuante]",
-      titulo: "O agente fica sempre à mão",
-      segundos: 8,
-      texto:
-        "Este ✦ acompanha você por cima do desenho, em qualquer tela. É por ele que se volta a conversar, colar o contexto da demanda ou pedir uma configuração — por texto ou por voz. Ele pisca quando tem algo a dizer, e nunca aplica nada sozinho: tudo o que vier dali passa por uma confirmação sua.",
-      onEnter: () => opts.fecharAssistente(),
-    },
-    {
-      selector: ".react-flow",
-      titulo: "O diagrama",
-      segundos: 8,
-      texto:
-        "Um serviço novo escrevendo numa coleção Mongo nova. Cada nó já foi preenchido e ficou verde — pronto para virar item de trabalho.",
     },
     {
       selector: "[data-tour=readiness-summary]",
@@ -222,22 +196,11 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       titulo: "Por que este desenho é assim",
       segundos: 11,
       texto:
-        "Preencher um campo não é decidir — decidir é escolher ENTRE alternativas. Clique no 🧭: cada decisão guarda a escolhida, o porquê, e o que foi descartado com o custo de cada opção. É o descartado que serve daqui a um ano: sem ele, quem reabrir a decisão troca por algo que já tinha sido rejeitado por um motivo que ninguém escreveu. E note o ⏳: o agente PROPÕE, mas proposta não vale nada até você aceitar — e o porquê passa a ser seu.",
+        "Preencher um campo não é decidir — decidir é escolher ENTRE alternativas. Clique no 🧭: cada decisão guarda a escolhida, o porquê, e o que foi descartado com o custo de cada opção. É o descartado que serve daqui a um ano: sem ele, quem reabrir a decisão troca por algo que já tinha sido rejeitado por um motivo que ninguém escreveu. E note o ⏳: o agente PROPÕE, mas proposta não vale nada até você aceitar — e o porquê passa a ser seu. E dá para pedir ao agente que proponha as decisões que faltam: ele lê o desenho MEDIDO — as violações e as lacunas — e propõe; nada conta antes de você aceitar.",
       onEnter: () => {
         opts.fecharAssistente();
         opts.selecionarNo(null);
       },
-    },
-    {
-      // §251 — a proposta do agente aparecia como DADO (o ⏳ na lista), e o
-      // ato de pedi-la, não. É a interação que melhor mostra a tese da
-      // SPEC-56 §0.7 — o motor mede, o agente explica, a pessoa decide.
-      selector: "[data-testid=pedir-decisao-ao-agente]",
-      titulo: "Peça ao agente",
-      segundos: 10,
-      texto:
-        "Este botão não pede opinião sobre arquitetura: manda o agente ler o que o MOTOR já mediu — o que está fora do padrão e por quê, as lacunas, o que já foi decidido — e propor o que ainda está em aberto. Toda proposta vem com duas alternativas e o custo de cada uma. E não vale nada até você aceitar — o botão de aceite mostra o que o sim vai mover no placar antes de mover, e avisa se a proposta chegou sem o porquê: aceitar assim é registrar uma escolha que ninguém vai conseguir explicar depois.",
-      onEnter: () => opts.selecionarNo("n1"),
     },
     {
       selector: "[data-tour=properties-panel]",
@@ -267,19 +230,21 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       onEnter: () => opts.mostrarAvisos(),
     },
     {
-      selector: "[data-tour=review-table]",
-      titulo: "Revisão",
-      segundos: 10,
-      texto:
-        "Os itens chegam com dependências reais, calculadas a partir das arestas. Qualquer ciclo ou conflito apareceria aqui, nunca escondido.",
-      onEnter: () => opts.derivarQuebra(),
-    },
-    {
       selector: "[data-testid=barra-pendencias]",
       titulo: "Confirmar o que a IA escreveu",
-      segundos: 9,
+      segundos: 10,
       texto:
-        "Quando a esteira escreve, cada resposta espera a sua assinatura. Esta barra diz quantas estão esperando e permite confirmar TODAS de uma vez — ou revisar uma a uma, no modo foco. Aceitar é barato; corrigir é que merece o clique.",
+        "A revisão é a tela onde o item vira ficha, e onde a esteira escreve. Cada resposta dela espera a sua assinatura: esta barra diz quantas estão esperando e permite confirmar TODAS de uma vez — ou revisar uma a uma, no modo foco. Aceitar é barato; corrigir é que merece o clique. E o que você confirmar continua marcado como escrito pelo agente.",
+      /**
+       * SPEC-78 — este `onEnter` era do passo "Revisão", que morreu por apontar
+       * uma tela em vez de ensinar o que se faz nela.
+       *
+       * Cortá-lo levou a DERIVAÇÃO junto, e a suíte pegou na hora: sem isto o
+       * tour chegava à barra de pendências de um item que nunca foi derivado.
+       * Foi o teste que estava certo, e a poda que estava errada — é
+       * exatamente o trabalho que a fatia D existe para fazer.
+       */
+      onEnter: () => opts.derivarQuebra(),
     },
     {
       // §251 — a tela do documento não existia no tour, e o passo acima ainda
@@ -289,43 +254,31 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       titulo: "O documento de desenho",
       segundos: 14,
       texto:
-        "Com tudo refinado o agente oferece este documento sozinho — e ele não é um arquivo que você baixa e perde: tem tela própria, e é o que circula para quem nunca abriu esta ferramenta. Faixa de saúde no topo, o desenho animado junto, as decisões com o que foi descartado. Duas seções que só uma PESSOA escreve, trade-offs e riscos, que a máquina nunca sobrescreve: é onde mora a mudança que não moveu arquitetura. E aprovar guarda uma foto — se o desenho mudar depois, o selo avisa em vez de mentir, e diz QUAL seção mudou: \"mudou Itens, entrou Riscos\". Um aviso que não diz o que mudou obriga a reler tudo, e é assim que se aprende a reaprovar sem olhar.",
+        "Com tudo refinado o agente oferece este documento sozinho — e ele não é um arquivo que você baixa e perde: tem tela própria, e é o que circula para quem nunca abriu esta ferramenta. Faixa de saúde no topo, o desenho animado junto, as decisões com o que foi descartado. Duas seções que só uma PESSOA escreve, trade-offs e riscos, que a máquina nunca sobrescreve: é onde mora a mudança que não moveu arquitetura. E aprovar guarda uma foto — se o desenho mudar depois, o selo avisa em vez de mentir, e diz QUAL seção mudou: \"mudou Itens, entrou Riscos\". Um aviso que não diz o que mudou obriga a reler tudo, e é assim que se aprende a reaprovar sem olhar. Os itens escritos são uma seção dele — desde a SPEC-61 há uma saída só, e é esta.",
       onEnter: () => opts.abrirDocumento(),
     },
     {
-      // SPEC-61 — a seção do MESMO documento, e não uma segunda tela. O passo
-      // continua existindo porque a capacidade continua existindo: o que mudou
-      // é que ela deixou de ter endereço próprio.
-      selector: "[data-testid=secao-dos-itens]",
-      titulo: "Itens escritos",
+      selector: null,
+      titulo: "Agora é a sua demanda",
       segundos: 10,
       texto:
-        "Descendo no mesmo documento, os ITENS um a um — cada card traz a escrita final, o que falta especificar e o que fica pronto quando ele termina (a entrega final). É o que vai virar issue no seu tracker, e sai daqui mesmo: era uma segunda tela até descobrirmos que era esta seção.",
-    },
-    {
-      selector: "[data-tour=menu-botao]",
-      titulo: "O menu",
-      segundos: 7,
-      texto:
-        "Tudo que é administração mora no menu ☰ — padrões do time, pessoas e acessos, IA. Cada item abre uma tela própria, com endereço: dá pra voltar por F5 ou colar o link. É o assunto do outro tour, o de configuração.",
-      // Fecha a REVISÃO junto e volta ao canvas: sem isso o passo falaria do
-      // menu ☰ numa tela que não tem menu ☰ (§234).
+        "Este tour respondeu \"serve pra quê\": do desenho medido ao item escrito, passando pelo documento. O cenário de demonstração saiu da tela — a mesa à sua frente está vazia, e a conversa está aberta. Descreva a sua demanda em uma frase, por texto ou por voz, e o agente propõe os primeiros componentes com os tipos que este projeto tem. Se preferir moldar antes, o tour de configuração está em ▶ Como funciona.",
       onEnter: () => {
-        opts.fecharRevisao();
-        opts.fecharConfig();
-      },
-    },
-    {
-      selector: null,
-      titulo: "Fim do tour",
-      segundos: 9,
-      texto:
-        "Este tour respondeu \"serve pra quê\": do desenho medido ao item escrito, passando pelo documento. O que se MOLDA pro seu time — produto, stacks, padrões, IA, pessoas, exportação, melhoria contínua — é o outro tour, o de configuração, em ▶ Como funciona.",
-      onEnter: () => {
-        // Desligar é obrigatório: dado de demonstração que sobrevive ao tour
-        // vira configuração fantasma na tela de quem for usar de verdade.
+        /**
+         * SPEC-78 fatia C — o tour termina em AÇÃO, não em "e é isso".
+         *
+         * Um fecho que só resume desperdiça o momento em que a pessoa está
+         * mais disposta — é a diferença entre visita guiada e começo de uso.
+         * Ela sai daqui com a mesa limpa e a porta de entrada aberta, que é
+         * exatamente o gesto que o primeiro passo mostrou.
+         *
+         * Desligar a demonstração continua obrigatório e vem ANTES: dado de
+         * demonstração que sobrevive ao tour vira configuração fantasma na
+         * tela de quem for usar de verdade (§253).
+         */
         opts.ligarDemonstracao(false);
         opts.fecharConfig();
+        opts.abrirConversa();
       },
     },
   ];
@@ -361,76 +314,61 @@ export function passosDeConfiguracao(opts: UseTourOpts): PassoTour[] {
     },
     {
       selector: "[data-tour=config-screen-content]",
-      titulo: "Contexto do produto",
+      titulo: "O que é perene: o produto",
+      segundos: 11,
       texto:
-        "Aqui mora o que a demanda sozinha não diz: DE QUE PRODUTO ela fala. Objetivo, quem usa, regras que valem sempre, glossário — tudo isso viaja junto com cada demanda ligada a este produto, e é o que separa um item tecnicamente correto de um item que entende o negócio. É o par do propósito: lá o \"para quê\" desta entrega, aqui o \"de que negócio\" que não muda.",
+        "Aqui mora o que a demanda sozinha não diz: DE QUE PRODUTO ela fala. Objetivo, quem usa, regras que valem sempre, glossário — tudo isso viaja junto com cada demanda ligada a este produto. E o VOLUME que ele atende: o número perene que toda demanda herda, e do qual ela pode discordar dizendo por quê. É o par do propósito: lá o \"para quê\" desta entrega, aqui o \"de que negócio\" que não muda.",
       onEnter: () => {
+        /**
+         * §235 — a marca de demonstração LIGA aqui, e não é detalhe.
+         *
+         * Este é o primeiro passo do tour de configuração a mostrar dado falso
+         * (o produto "Catálogo (exemplo)"). Sem a marca, alguém sai do tour
+         * achando que configurou um produto — e foi por isso que ela existe.
+         *
+         * SPEC-78: ela quase morreu na poda. Fundir dois passos levou o
+         * `ligarDemonstracao` junto, e quem pegou foi o E2E, que afirma a marca
+         * na tela. É a segunda vez nesta rodada que um efeito colateral caiu com
+         * o passo e um teste segurou — que é exatamente o trabalho da fatia D.
+         */
         opts.ligarDemonstracao(true);
         opts.abrirConfigNaAba("produtos");
       },
     },
     {
       selector: "[data-tour=config-screen-content]",
-      titulo: "Stacks conhecidas",
+      titulo: "A régua do time",
+      segundos: 11,
       texto:
-        'A stack é um perfil do CATÁLOGO ("Java + Spring Boot", "Node"...) e o time aponta um — trocar de tecnologia é trocar o ponteiro. Os valores do perfil apontado pré-preenchem sugestões em campos novos; dá pra capturar direto de um nó real com "salvar como padrão do time" no painel.',
+        "Três telas, uma ideia só: o que este time considera certo. A STACK é o perfil de tecnologia que pré-preenche sugestões; os PADRÕES POR COMPONENTE dizem que campos cada tipo de nó obriga, e podem virar régua conferível — aí o motor cobra sozinho; os CAMPOS DE CONEXÃO fazem o mesmo para o que uma seta precisa declarar. Tudo o que a ferramenta cobra de você sai daqui, e por isso você pode discordar e mudar.",
       onEnter: () => opts.abrirConfigNaAba("perfis"),
     },
     {
       selector: "[data-tour=config-screen-content]",
-      titulo: "Padrões por componente",
+      titulo: "O que cada item precisa dizer",
+      segundos: 11,
       texto:
-        'Cada tipo de nó já vem com campos padrão (ex.: nome do tópico, DLQ) — "sobrescrever" cria uma versão específica pro seu time (ex.: um sufixo obrigatório de nomenclatura), e "+ Adicionar campo" cria um campo novo do zero.',
-      onEnter: () => opts.abrirConfigNaAba("campos"),
-    },
-    {
-      selector: "[data-tour=config-screen-content]",
-      titulo: "Campos por tipo de conexão",
-      texto:
-        "A conexão também carrega decisão, não é só uma seta: uma chamada síncrona precisa de timeout e retry; um evento precisa de contrato e de garantia de entrega. Campos declarados aqui aparecem no painel da aresta e viram item, do mesmo jeito que os do componente.",
-      onEnter: () => opts.abrirConfigNaAba("camposAresta"),
-    },
-    {
-      selector: "[data-tour=config-screen-content]",
-      titulo: "Regras de refinamento",
-      texto:
-        "O que cada tecnologia OBRIGA a decidir: uma fila pede DLQ, retry e idempotência; uma coleção pede índices e write concern. É daqui que sai o checklist técnico de cada item — e é o que transforma \"criar uma fila\" numa lista de decisões que alguém precisa tomar antes de codar.",
+        "As REGRAS de refinamento são o checklist que cada tecnologia obriga, por contexto — DLQ, idempotência, plano de migração. Os MODELOS decidem a forma: como o documento de desenho se estrutura e o que cada item traz dentro. Toda lacuna que sair daí é contável: se o motor escreve algo esperando que alguém complete, isso aparece na conta e no momento da aprovação.",
       onEnter: () => opts.abrirConfigNaAba("regras"),
     },
     {
       selector: "[data-tour=config-screen-content]",
-      titulo: "Modelos: documento e item",
+      titulo: "A IA: de onde ela vem, e quem escreve o quê",
+      segundos: 11,
       texto:
-        "São dois modelos: o do DOCUMENTO (Contexto, Visão geral, Itens, Definition of Ready/Done) e o de CADA ITEM — onde se decide a ordem das seções e o que fecha o item, a entrega final. Global, ou só pro seu time.",
-      onEnter: () => opts.abrirConfigNaAba("especificacao"),
-    },
-    {
-      selector: "[data-tour=config-screen-content]",
-      titulo: "Modelo de IA",
-      texto:
-        "A ferramenta não embute modelo: ela fala com um endereço compatível com a API da OpenAI — o Claude, um gateway corporativo, ou um container rodando ao lado sem nada sair da sua rede. Aqui se configura qual, e o \"testar conexão\" responde o que o gateway disse, em vez de um erro genérico de rede.",
+        "O DESTINO diz de onde a IA vem — um gateway seu, um modelo no seu Docker, ou o modo sem custo, que não chama modelo nenhum e marca tudo o que sai dele como simulado. A ESTEIRA diz quem escreve cada parte do item: PO, arquiteto, especialista, QA, cada um com o seu preâmbulo. Papel ativo sem modelo configurado é o defeito mais silencioso daqui.",
       onEnter: () => opts.abrirConfigNaAba("modeloIa"),
     },
     {
       selector: "[data-tour=config-screen-content]",
-      titulo: "Esteira de agentes",
+      titulo: "Quem pode o quê, e para onde o item vai",
+      segundos: 11,
       texto:
-        "Quem escreve o quê. Cada papel — PO, Arquiteto, Especialista técnico, QA — preenche uma parte do item, na ordem definida aqui. Tudo o que eles escrevem entra como SUGESTÃO e espera confirmação: é a mesma régua do propósito e da proveniência, aplicada ao texto.",
-      onEnter: () => opts.abrirConfigNaAba("pipeline"),
-    },
-    {
-      selector: "[data-tour=config-screen-content]",
-      titulo: "Níveis e acessos",
-      texto:
-        "Cada membro do time tem um nível: visualizar (lê as quebras), operar (cria, deriva e refina) e owner (configurações e membros). Qualquer um convida até o próprio nível — ninguém escala privilégio. Na aba Acessos, papéis delegam configuração a setores (ex.: Arquitetura no pipeline) e podem ser portados por um TIME inteiro: os owners herdam, e a permissão acompanha a composição.",
+        "Os NÍVEIS dizem quem no time visualiza, opera ou administra — e o controle nasce desligado, para ninguém ficar de fora no primeiro dia. A EXPORTAÇÃO diz para onde o item pronto vai: um agente configurável leva o markdown ao issue tracker do time, e só vai o que não tem pendência nenhuma.",
+      // `membros`, e não `acessos`: é onde os NÍVEIS por pessoa são decididos,
+      // que é a metade que o passo ensina primeiro. A delegação de RBAC fica a
+      // um clique dali, na mesma área.
       onEnter: () => opts.abrirConfigNaAba("membros"),
-    },
-    {
-      selector: "[data-tour=config-screen-content]",
-      titulo: "Do item à issue",
-      texto:
-        "O último elo: os itens prontos são enviados para um AGENTE que fala com o seu tracker (MCP, n8n, uma função interna — o que a empresa já tiver). O gerador não implementa Jira de propósito: implementar um tracker seria escolher o tracker de todo mundo. Falha é por item, e reexportar não duplica.",
-      onEnter: () => opts.abrirConfigNaAba("exportacao"),
     },
     {
       // §280 — o passo mostrava só a metade que dá certo. A SPEC-62 pôs o "não"
@@ -447,16 +385,20 @@ export function passosDeConfiguracao(opts: UseTourOpts): PassoTour[] {
     },
     {
       selector: null,
-      titulo: "Fim",
+      titulo: "Comece pelo que é seu",
+      segundos: 10,
       texto:
-        "Isto é o que se molda. O outro tour — ▶ Iniciar tour guiado — mostra o caminho completo de uma demanda, do desenho ao item escrito.",
+        "Isto é o que se molda. O caminho mais curto para o resultado parecer escrito por vocês começa em uma tela só: o CONTEXTO DO PRODUTO — o que ele é, quem usa, as regras que valem sempre. Ele viaja com toda demanda deste produto, e é o que separa um item tecnicamente correto de um item que entende o negócio. Está aberto aí. O outro tour — ▶ Iniciar tour guiado — mostra o caminho completo de uma demanda.",
       onEnter: () => {
         // §252 — os passos de produto/stacks migraram para cá e trouxeram o
         // `ligarDemonstracao(true)` junto. Desligar aqui é obrigatório pelo
         // mesmo motivo de sempre: dado de demonstração que sobrevive ao tour
         // vira configuração fantasma na tela de quem for usar de verdade.
+        // SPEC-78 fatia C — termina abrindo a tela por onde se começa, em vez
+        // de citar o nome dela. Desligar a demonstração vem antes, pelo mesmo
+        // motivo de sempre (§253).
         opts.ligarDemonstracao(false);
-        opts.fecharConfig();
+        opts.abrirConfigNaAba("produtos");
       },
     },
   ];

@@ -12381,3 +12381,103 @@ caminho de login, e aí tem dono.
 
 524 engine · 133 llm · 84 aplicação · 800 web · 254 server · 39 gateway-falso ·
 104/104 E2E · build, typecheck e lint limpos.
+
+## §315 — o tour contava a história do repositório, não a do produto (SPEC-78)
+
+O pedido: *"e uma sétima, e que precisa ser a última: uma revisão do tour
+guiado."* A ordem não era detalhe: era a própria SPEC. Revisar o tour antes das
+outras seis seria ensinar um produto prestes a mudar em seis lugares.
+
+### A medição não fechava nem com ela mesma
+
+A SPEC diz "37 passos (produto: 19 · configuração: 13)" — e 19 + 13 = 32. A
+contagem real é **36 = 22 + 14**; o 37 vem de contar o campo `titulo` da própria
+interface `PassoTour`.
+
+E a evidência mais forte da tese apareceu na contagem: **onze dos catorze passos
+de configuração usavam o mesmo `selector`**, variando só o `onEnter`. "Cresceu
+por adição" não era diagnóstico — era o código.
+
+### A régua: este passo ensina um CONCEITO, ou aponta um botão?
+
+Passo que aponta botão envelhece a cada mudança de rótulo e não sobrevive a uma
+reorganização de tela. Passo que ensina conceito sobrevive a qualquer redesenho.
+
+O que a fatia A produziu não foi uma tabela decorativa: foi a lista do que
+**cada passo ainda ensina depois das outras seis rodadas**. Duas descobertas
+mudaram a poda:
+
+- **"O motor, por dentro"** (16 s, o passo mais longo) e **"Quem faz o quê"**
+  (11 s) somavam 27 segundos de explicação antes de a pessoa ver qualquer coisa
+  acontecer. Depois da SPEC-76 a landing carrega essa explicação, com o ciclo e
+  o centro contido. **O que o tour faz melhor que a landing é MOSTRAR** — então
+  os dois viraram um: a tese em duas frases, e direto para a conta real.
+- **"Itens escritos"** era resíduo da SPEC-61, que fez dos itens uma seção do
+  documento. Dois passos para a mesma tela, desde então.
+
+**36 → 24 passos** (15 no produto, 9 na configuração). Os que apontavam botão
+puro morreram — "O diagrama", "O agente fica sempre à mão", "O menu", "Revisão".
+Nenhum deles perdeu o que ensinava: o ✦ ganhou uma frase no passo da conversa,
+a revisão virou o passo do que se FAZ nela.
+
+### O fim deixou de ser "e é isso"
+
+Os dois tours terminavam resumindo. Um fecho que só resume desperdiça o momento
+em que a pessoa está mais disposta — é a diferença entre visita guiada e começo
+de uso.
+
+Agora o tour do produto termina com a mesa limpa e **a conversa aberta**: o
+mesmo gesto que o primeiro passo mostrou. E o de configuração termina **abrindo
+o contexto do produto**, em vez de citar o nome dele — é o caminho mais curto
+para o resultado parecer escrito pelo time.
+
+### A fatia D pegou dois defeitos que eu mesmo introduzi
+
+E é o melhor argumento possível para ela existir.
+
+**1. Cortar "Revisão" levou a DERIVAÇÃO junto.** Aquele passo carregava
+`onEnter: () => opts.derivarQuebra()`, e sem ele o tour chegava à barra de
+pendências de um item que nunca foi derivado. O teste unitário pegou na hora.
+
+**2. Fundir dois passos de configuração levou o `ligarDemonstracao(true)`
+junto.** Sem ele, o produto "Catálogo (exemplo)" apareceria **sem a marca de
+demonstração** — exatamente o defeito que o §235 existe para impedir: alguém sai
+do tour achando que configurou um produto. Quem pegou foi o E2E.
+
+> Foi o teste que estava certo e a poda que estava errada, duas vezes. É
+> literalmente o trabalho que a fatia D existe para fazer — e ela o fez antes
+> mesmo de estar terminada.
+
+### A trava contra o envelhecimento
+
+Hoje **nenhum** teste ligava um passo do tour ao produto. Os que existiam
+afirmavam `selector` e `onEnter` — nunca que o seletor **existe**.
+
+`useTour.envelhecimento.test.ts` varre o fonte do `packages/web` e cobra: todo
+seletor de passo tem que aparecer em algum lugar do produto. É a mesma técnica
+de `gateway.fronteira.test.ts` (caminhar arquivo, não montar o app), e é barata
+o bastante para rodar sempre.
+
+Ela pega os três casos que este projeto já viveu: a SPEC-61 matando `#/itens`
+com um passo apontando para lá; o §306 renomeando "Contexto do épico" e o texto
+do tour ficando para trás; e o §308 — "⚙ Configura" cortado chegando ao usuário
+**sem nada acusar**.
+
+O terceiro caso quase entrou sem dentes. A primeira versão do teste da área de
+configuração afirmava `areas.length > 0` e `passos.length > 0` — passaria depois
+de qualquer estrago, que é o defeito que o §292 já registrou uma vez. A versão
+que ficou **roda** o `onEnter` de cada passo com uma `UseTourOpts` que grava para
+onde ele navegou, e cruza o destino com `AREAS_CONFIG_CONHECIDAS`. Removida a
+`pdca` do roteador, ela fica vermelha dizendo o nome da área.
+
+> As outras três fatias consertaram o tour de hoje. Esta conserta o processo que
+> o degradou.
+
+### Doze testes quebraram, e nenhum foi contornado
+
+Onze deles afirmavam a estrutura antiga — títulos, ordem, selectors. Cada um foi
+reescrito dizendo **o que mudou e por quê**, e não ajustado para passar. O
+décimo segundo foi o da derivação, que estava certo.
+
+524 engine · 133 llm · 84 aplicação · 806 web · 254 server · 39 gateway-falso ·
+104/104 E2E · build, typecheck e lint limpos.

@@ -91,10 +91,13 @@ describe("useTour", () => {
     const { result } = renderHook(() => useTour(opts));
 
     act(() => result.current.iniciar());
-    andarAte(result, "Revisão");
+    // SPEC-78 — "Revisão" morreu como passo (apontava a tela; o passo seguinte
+    // ensina o que se FAZ nela). A régua que este teste guarda é a mesma:
+    // chegar aqui já derivou.
+    andarAte(result, "Confirmar o que a IA escreveu");
 
     expect(opts.derivarQuebra).toHaveBeenCalled();
-    expect(result.current.passoAtual?.selector).toBe("[data-tour=review-table]");
+    expect(result.current.passoAtual?.selector).toBe("[data-testid=barra-pendencias]");
   });
 
   it("§258 — o tour de configuração abre pelo MAPA, antes das telas", () => {
@@ -110,7 +113,7 @@ describe("useTour", () => {
 
     // E vem ANTES das telas que ele mapeia: mapa depois das peças não é mapa.
     const titulos = passosDeConfiguracao(montarOpts()).map((p) => p.titulo);
-    expect(titulos.indexOf("Como a ferramenta está montada")).toBeLessThan(titulos.indexOf("Contexto do produto"));
+    expect(titulos.indexOf("Como a ferramenta está montada")).toBeLessThan(titulos.indexOf("O que é perene: o produto"));
   });
 
   it("§252 — o tour de CONFIGURAÇÃO percorre TODAS as telas de administração", () => {
@@ -123,16 +126,14 @@ describe("useTour", () => {
 
     act(() => result.current.iniciar());
     for (const [titulo, aba] of [
-      ["Contexto do produto", "produtos"],
-      ["Stacks conhecidas", "perfis"],
-      ["Padrões por componente", "campos"],
-      ["Campos por tipo de conexão", "camposAresta"],
-      ["Regras de refinamento", "regras"],
-      ["Modelos: documento e item", "especificacao"],
-      ["Modelo de IA", "modeloIa"],
-      ["Esteira de agentes", "pipeline"],
-      ["Níveis e acessos", "membros"],
-      ["Do item à issue", "exportacao"],
+      // SPEC-78 — os onze passos que dividiam o MESMO selector viraram cinco,
+      // por conceito. A tela continua sendo aberta na aba certa; o que mudou é
+      // que um passo passou a ensinar uma IDEIA em vez de apontar uma aba.
+      ["O que é perene: o produto", "produtos"],
+      ["A régua do time", "perfis"],
+      ["O que cada item precisa dizer", "regras"],
+      ["A IA: de onde ela vem, e quem escreve o quê", "modeloIa"],
+      ["Quem pode o quê, e para onde o item vai", "membros"],
       ["Melhoria contínua (PDCA)", "pdca"],
     ] as const) {
       andarAte(result, titulo);
@@ -184,8 +185,8 @@ describe("useTour", () => {
 
     expect(produto).toContain("Derivar");
     expect(config).not.toContain("Derivar");
-    expect(config).toContain("Modelo de IA");
-    expect(produto).not.toContain("Modelo de IA");
+    expect(config).toContain("A IA: de onde ela vem, e quem escreve o quê");
+    expect(produto).not.toContain("A IA: de onde ela vem, e quem escreve o quê");
   });
 
   it("§245 — o passo da CONFORMIDADE existe e fecha o assistente antes", () => {
@@ -234,7 +235,11 @@ describe("useTour", () => {
     const titulos = passosDoProduto(montarOpts()).map((p) => p.titulo);
 
     expect(titulos.indexOf("O documento de desenho")).toBeGreaterThan(-1);
-    expect(titulos.indexOf("O documento de desenho")).toBeLessThan(titulos.indexOf("Itens escritos"));
+    // SPEC-78 — "Itens escritos" morreu como passo: desde a SPEC-61 os itens são
+    // uma SEÇÃO do documento, e dois passos para a mesma tela eram o resíduo
+    // daquela mudança. O que o teste guarda continua sendo o mesmo: o passo do
+    // documento existe e vem depois da derivação.
+    expect(titulos).toContain("O documento de desenho");
   });
 
   it("§251 — o passo que PEDE a decisão ao agente aponta o botão, com um nó selecionado", () => {
@@ -244,10 +249,16 @@ describe("useTour", () => {
     const { result } = renderHook(() => useTour(opts));
 
     act(() => result.current.iniciar());
-    andarAte(result, "Peça ao agente");
+    andarAte(result, "Por que este desenho é assim");
 
-    expect(result.current.passoAtual?.selector).toBe("[data-testid=pedir-decisao-ao-agente]");
-    expect(opts.selecionarNo).toHaveBeenCalledWith("n1");
+    // SPEC-78 — "Peça ao agente" foi absorvido pelo passo do PORQUÊ: eram a
+    // mesma ideia em dois tempos (registrar a decisão, e pedir ao agente as que
+    // faltam). O selector passa a ser o do resumo, onde a lista de decisões
+    // vive — e o gesto que o passo ensina continua no texto dele.
+    expect(result.current.passoAtual?.selector).toBe("[data-testid=decisoes-resumo]");
+    // O gesto de PEDIR ao agente continua ensinado — no texto do mesmo passo,
+    // que é onde ele passou a caber.
+    expect(result.current.passoAtual?.texto).toContain("pedir ao agente");
   });
 
   it("§255 — o tour diz QUEM FAZ O QUÊ antes de mostrar qualquer tela", () => {
@@ -256,7 +267,10 @@ describe("useTour", () => {
     const titulos = passosDoProduto(montarOpts()).map((p) => p.titulo);
 
     expect(titulos.indexOf("Quem faz o quê")).toBe(1);
-    expect(titulos.indexOf("Quem faz o quê")).toBeLessThan(titulos.indexOf("O diagrama"));
+    // SPEC-78 — "O diagrama" saiu (apontava um botão; os passos seguintes
+    // mostram o desenho sendo MEDIDO, que é o ponto). A régua continua: a
+    // divisão de trabalho é dita antes de qualquer medição aparecer.
+    expect(titulos.indexOf("Quem faz o quê")).toBeLessThan(titulos.indexOf("Prontidão"));
   });
 
   it("§248 — o passo do PERCURSO existe, aponta o 🛣 e fecha o assistente antes", () => {
@@ -312,7 +326,7 @@ describe("useTour", () => {
     andarAte(result, "Começar conversando");
     expect(opts.ligarDemonstracao).toHaveBeenCalledWith(true);
 
-    andarAte(result, "Fim do tour");
+    andarAte(result, "Agora é a sua demanda");
     expect(opts.ligarDemonstracao).toHaveBeenLastCalledWith(false);
   });
 
@@ -337,7 +351,7 @@ describe("useTour", () => {
     const { result } = renderHook(() => useTour(opts, passosDeConfiguracao));
 
     act(() => result.current.iniciar());
-    andarAte(result, "Stacks conhecidas");
+    andarAte(result, "A régua do time");
 
     expect(result.current.passoAtual?.selector).toBe("[data-tour=config-screen-content]");
     expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("perfis");
@@ -354,8 +368,10 @@ describe("useTour", () => {
     // SPEC-61 §6.3 — o passo continua existindo; o que mudou é para onde ele
     // aponta. Era `#/itens`, e passo apontando para tela que não existe quebra
     // a demonstração inteira no meio.
-    andarAte(result, "Itens escritos");
-    expect(result.current.passoAtual?.selector).toBe("[data-testid=secao-dos-itens]");
+    andarAte(result, "O documento de desenho");
+    // SPEC-78 — os itens são uma SEÇÃO do documento desde a SPEC-61, e o passo
+    // que os apontava à parte era resíduo daquela mudança.
+    expect(result.current.passoAtual?.selector).toBe("[data-testid=documento-screen]");
     expect(opts.abrirDocumento).toHaveBeenCalled();
   });
 
@@ -364,15 +380,25 @@ describe("useTour", () => {
     const { result } = renderHook(() => useTour(opts, passosDeConfiguracao));
 
     act(() => result.current.iniciar());
-    andarAte(result, "Padrões por componente");
-    expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("campos");
+    andarAte(result, "A régua do time");
+    // SPEC-78 — "Padrões por componente" e "Campos de conexão" entraram em "A
+    // régua do time", que abre na aba de perfis e ensina as três como uma ideia
+    // só: o que este time considera certo.
+    expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("perfis");
 
     // §252 — a ordem virou por ASSUNTO: o que os componentes declaram, as
     // réguas e os modelos, depois a IA, e só então pessoas e saída.
-    andarAte(result, "Modelos: documento e item");
-    expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("especificacao");
+    andarAte(result, "O que cada item precisa dizer");
+    // "Modelos: documento e item" entrou em "O que cada item precisa dizer",
+    // junto das regras de refinamento: as duas respondem a mesma pergunta —
+    // o que um item obriga, e em que forma ele sai.
+    andarAte(result, "O que cada item precisa dizer");
+    expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("regras");
 
-    andarAte(result, "Níveis e acessos");
+    andarAte(result, "Quem pode o quê, e para onde o item vai");
+    // "Níveis e acessos" e "Do item à issue" viraram um passo, que abre na
+    // tela de MEMBROS — é onde o nível de cada pessoa é decidido, e é a metade
+    // que o passo ensina primeiro.
     expect(opts.abrirConfigNaAba).toHaveBeenCalledWith("membros");
   });
 
@@ -555,7 +581,7 @@ describe("useTour — o motor explicado e o botão que fica na tela", () => {
     // nenhum. Um passo que só repete a frase não fecha esse buraco: este tem
     // que levar à tela onde a conta acontece.
     const opts = montarOpts();
-    const passo = passosDoProduto(opts).find((p) => p.titulo === "O motor, por dentro");
+    const passo = passosDoProduto(opts).find((p) => p.titulo === "Quem faz o quê");
 
     expect(passo?.selector).toBe("[data-testid=motor-passo-a-passo]");
     passo?.onEnter?.();
@@ -565,7 +591,7 @@ describe("useTour — o motor explicado e o botão que fica na tela", () => {
   it("o passo seguinte VOLTA ao canvas — senão aponta para uma tela que saiu", () => {
     const opts = montarOpts();
     const passos = passosDoProduto(opts);
-    const depois = passos[passos.findIndex((p) => p.titulo === "O motor, por dentro") + 1];
+    const depois = passos[passos.findIndex((p) => p.titulo === "Quem faz o quê") + 1];
 
     depois.onEnter?.();
     expect(opts.fecharConfig).toHaveBeenCalled();
@@ -575,9 +601,13 @@ describe("useTour — o motor explicado e o botão que fica na tela", () => {
     // O tour abria e fechava a janela do assistente por chamadas internas; o ✦
     // que fica por cima do desenho nunca foi apontado, e é por ele que se volta
     // a chamar o agente depois que o tour acaba.
-    const passo = passosDoProduto(montarOpts()).find((p) => p.selector === "[data-testid=assistente-flutuante]");
+    // SPEC-78 — o ✦ perdeu o passo próprio (apontava um botão) e ganhou uma
+    // frase no passo da conversa, que é onde ele importa. A régua que este
+    // teste guarda continua a mesma: quem termina o tour precisa saber como
+    // voltar a chamar o agente.
+    const passo = passosDoProduto(montarOpts()).find((p) => p.texto.includes("✦"));
 
     expect(passo).toBeTruthy();
-    expect(passo?.texto).toContain("por cima do desenho");
+    expect(passo?.texto).toContain("em qualquer tela");
   });
 });

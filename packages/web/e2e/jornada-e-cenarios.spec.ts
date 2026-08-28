@@ -219,14 +219,6 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   // §268 — a cadeia do motor DEMONSTRADA, não só afirmada. O passo abre o mapa
   // do sistema e mostra a conta com uma régua real do time; cobrar o conteúdo
   // (§234) é o que separa isto de "a caixa apareceu".
-  await irAtePasso(page, "O motor, por dentro");
-  await expect(page.getByTestId("motor-passo-a-passo")).toBeVisible();
-  await expect(page.getByTestId("motor-passo-3")).toContainText("Sem IA, sem rede");
-  // E o foco anda sozinho: o primeiro elo cede a vez sem ninguém clicar.
-  await expect(page.getByTestId("motor-passo-1")).toHaveAttribute("data-ativo", "false", { timeout: 8000 });
-
-  // §235 — a porta de entrada real: o desenho nasce da conversa, e o tour
-  // antes começava com ele já pronto.
   await irAtePasso(page, "Começar conversando");
   await expect(page.getByTestId("assistente-janela")).toBeVisible();
   // §254 — o ponteiro aparece no primeiro passo que TEM alvo. Nos de tela
@@ -236,13 +228,6 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
 
   // O diagrama de verdade, com o cenário do tour já carregado.
   // §268 — o ✦ que fica por cima do desenho, apresentado em vez de só usado.
-  await irAtePasso(page, "O agente fica sempre à mão");
-  await expect(page.getByTestId("assistente-flutuante")).toBeVisible();
-
-  await irAtePasso(page, "O diagrama");
-  await expect(page.locator(".react-flow__node")).toHaveCount(2);
-
-  // Prontidão e proveniência.
   await irAtePasso(page, "Prontidão");
   await expect(page.locator('[data-tour="readiness-summary"]')).toBeVisible();
   // SPEC-57 — o passo do PROPÓSITO, entre a prontidão e a proveniência: é a
@@ -310,18 +295,6 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await chipDecisao.click();
 
   // §251 — o ATO de pedir a decisão ao agente, não só o resultado dela.
-  await irAtePasso(page, "Peça ao agente");
-  await expect(page.getByTestId("pedir-decisao-ao-agente")).toBeVisible();
-  // O painel mostra a proposta pendente do agente junto do botão: é o "antes e
-  // depois" na mesma tela.
-  const propostaNoPainel = page.locator("aside").getByTestId("decisao-proposta");
-  await expect(propostaNoPainel).toBeVisible();
-  // §263 — a remedição: o aceite diz o que vai mover no placar ANTES de mover.
-  // Cobrar o CONTEÚDO e não a caixa (§234): "delta visível" passaria com a
-  // caixa vazia, que é justamente o estado que não pode existir.
-  await expect(propostaNoPainel.getByTestId(/^delta-decisao-/)).toContainText("propostas esperando 1 → 0");
-  await expect(propostaNoPainel.getByTestId(/^delta-decisao-/)).toContainText("decisões vigentes");
-
   await irAtePasso(page, "Proveniência");
   // A janela flutuante FECHA: sem isso ela cobre o painel que o passo mostra.
   await expect(page.getByTestId("assistente-janela")).toHaveCount(0);
@@ -342,11 +315,6 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await expect(page.getByText(/Nada aqui impede a derivação/)).toBeVisible();
 
   // Derivação de verdade — a revisão abre com os itens calculados.
-  await irAtePasso(page, "Revisão");
-  await expect(page.locator('[data-tour="review-table"]')).toBeVisible();
-  await expect(page.getByTestId("contagem-itens")).toHaveText("4 itens");
-
-  // SPEC-44/48 — a confirmação em lote entrou no tour.
   await irAtePasso(page, "Confirmar o que a IA escreveu");
   await expect(page.getByTestId("barra-pendencias")).toBeVisible();
 
@@ -387,26 +355,7 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   // ("ainda não existe nenhum item") enquanto o texto prometia os cards, e a
   // asserção de visibilidade passava assim mesmo. Tela visível não é a mesma
   // coisa que tela útil.
-  await irAtePasso(page, "Itens escritos");
-  await expect(page.getByTestId("secao-dos-itens")).toBeVisible();
-  await expect(page.getByTestId("itens-resumo")).toBeVisible();
-  await expect(page.getByTestId("item-gerado-0")).toBeVisible();
-  // E continua sendo o MESMO documento — o passo não trocou de tela.
-  await expect(page.getByTestId("documento-screen")).toBeVisible();
-
-  // §234 — e o passo do MENU precisa estar numa tela que TEM menu: sair do
-  // documento caía de volta na revisão (o resultado seguia setado, cobrindo o
-  // canvas), e o ☰ não existe lá.
-  await irAtePasso(page, "O menu");
-  await expect(page.locator('[data-tour="menu-botao"]')).toBeVisible();
-  await expect(page.locator(".react-flow__node")).toHaveCount(2);
-
-  // §252 — as telas de administração saíram deste tour. Ele voltou a
-  // responder "isto serve pra quê?", que é o que a divisão do §236 queria e a
-  // deriva de sete passos tinha desfeito. Elas são cobradas no tour de
-  // configuração, abaixo.
-
-  await irAtePasso(page, "Fim do tour");
+  await irAtePasso(page, "Agora é a sua demanda");
   await expect(page.locator('[data-tour="config-screen-content"]')).not.toBeVisible();
   await page.getByRole("button", { name: "Concluir" }).click();
 
@@ -514,41 +463,28 @@ test("tour de configuração percorre as quatro telas que o tour do produto não
   // §235 — o contexto do PRODUTO vem com dado de demonstração E a marca que
   // diz que é de demonstração: sem ela, alguém sai do tour achando que
   // configurou um produto.
-  await irAtePasso(page, "Contexto do produto");
+  await irAtePasso(page, "O que é perene: o produto");
   await expect(page.getByTestId("marca-demonstracao")).toBeVisible();
   await expect(page.getByText("Catálogo (exemplo)")).toBeVisible();
 
-  await irAtePasso(page, "Stacks conhecidas");
+  // SPEC-78 — onze passos que dividiam o MESMO selector viraram cinco, por
+  // conceito. A tela continua sendo aberta na aba certa; o que mudou é que um
+  // passo passou a ensinar uma IDEIA em vez de apontar uma aba.
+  await irAtePasso(page, "A régua do time");
   await expect(telaConfig.getByText("Stacks conhecidas").first()).toBeVisible();
 
-  await irAtePasso(page, "Padrões por componente");
-  await expect(telaConfig.getByRole("button", { name: "sobrescrever" }).first()).toBeVisible();
-
-  await irAtePasso(page, "Campos por tipo de conexão");
+  await irAtePasso(page, "O que cada item precisa dizer");
   await expect(telaConfig).toBeVisible();
 
-  await irAtePasso(page, "Regras de refinamento");
-  await expect(telaConfig).toBeVisible();
-
-  await irAtePasso(page, "Modelos: documento e item");
-  await expect(telaConfig.getByText(/\{\{titulo\}\}/).first()).toBeVisible();
-
-  await irAtePasso(page, "Modelo de IA");
+  await irAtePasso(page, "A IA: de onde ela vem, e quem escreve o quê");
   // Sem credencial configurada — o estado de quem acabou de instalar, que é
   // exatamente quem faz o tour. §236: aqui a tela dizia para rodar
   // `gerador ia instalar`, comando que a SPEC-33 apagou junto com a CLI.
   await expect(page.getByTestId("ia-sem-gateway")).toBeVisible();
   await expect(page.getByText(/gerador ia instalar/)).toHaveCount(0);
 
-  await irAtePasso(page, "Esteira de agentes");
-  await expect(telaConfig).toBeVisible();
-
-  await irAtePasso(page, "Níveis e acessos");
+  await irAtePasso(page, "Quem pode o quê, e para onde o item vai");
   await expect(telaConfig.getByText(/visualizar.*lê as quebras/).first()).toBeVisible();
-
-  await irAtePasso(page, "Do item à issue");
-  await expect(page.getByTestId("config-exportacao")).toBeVisible();
-  await expect(page.getByTestId("marca-demonstracao")).toBeVisible();
 
   await irAtePasso(page, "Melhoria contínua (PDCA)");
   await expect(telaConfig.getByTestId("feedbacks-do-ciclo")).toBeVisible();
@@ -556,6 +492,6 @@ test("tour de configuração percorre as quatro telas que o tour do produto não
   // E o passo da DERIVAÇÃO não aparece aqui: são duas listas, não a mesma com
   // filtro — se um passo do produto vazasse, quem só quer configurar levaria a
   // ferramenta inteira junto.
-  await irAtePasso(page, "Fim");
-  await expect(page.getByTestId("tour-titulo")).toHaveText("Fim");
+  await irAtePasso(page, "Comece pelo que é seu");
+  await expect(page.getByTestId("tour-titulo")).toHaveText("Comece pelo que é seu");
 });
