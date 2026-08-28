@@ -280,3 +280,63 @@ describe("ContextoEpicoPanel — a volumetria da demanda (SPEC-70)", () => {
     expect((screen.getByTestId("volumetria-por") as HTMLSelectElement).value).toBe("hora");
   });
 });
+
+/**
+ * SPEC-77 fatia C — de onde veio o volume que está valendo.
+ *
+ * A régua é a do §306: **declarado vence herdado, e a tela diz qual é qual.**
+ * O que ela impede é concreto — alguém ver "2 milhões/dia" e não saber se foi
+ * digitado ali ou veio do produto, e portanto se mudar o produto muda aquele
+ * número ou não.
+ */
+describe("ContextoEpicoPanel — a procedência do volume (SPEC-77 fatia C)", () => {
+  const doProduto = { quantidade: 2_000_000, por: "dia" as const };
+
+  it("sem volume próprio, a tela diz que está HERDANDO — e os campos ficam vazios", () => {
+    render(
+      <ContextoEpicoPanel
+        volumetriaEmVigor={{ valor: doProduto, origem: "herdada" }}
+        onSalvar={vi.fn()}
+        onFechar={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId("volumetria-herdada")).toHaveTextContent("herdado do produto");
+    // Os campos vazios são o ponto: preenchê-los com o número herdado faria o
+    // próximo Salvar gravá-lo como declarado, e a demanda congelaria a versão
+    // do produto do dia em que foi aberta.
+    expect(screen.getByTestId("volumetria-quantidade")).toHaveValue(null);
+  });
+
+  it("quando a demanda DISCORDA do produto, os dois números aparecem", () => {
+    render(
+      <ContextoEpicoPanel
+        volumetria={{ quantidade: 100, por: "segundo" }}
+        volumetriaEmVigor={{ valor: { quantidade: 100, por: "segundo" }, origem: "declarada", doProduto }}
+        onSalvar={vi.fn()}
+        onFechar={vi.fn()}
+      />
+    );
+
+    const aviso = screen.getByTestId("volumetria-diverge");
+    expect(aviso).toHaveTextContent("2.000.000 por dia");
+    // E diz o que a divergência NÃO faz: mexer aqui não mexe no produto.
+    expect(aviso).toHaveTextContent("Mudar aqui não muda o produto");
+  });
+
+  it("declarar o mesmo número do produto não acusa divergência", () => {
+    // Aviso que aparece onde não há discordância vira ruído, e ruído se
+    // aprende a ignorar.
+    render(
+      <ContextoEpicoPanel
+        volumetria={doProduto}
+        volumetriaEmVigor={{ valor: doProduto, origem: "declarada" }}
+        onSalvar={vi.fn()}
+        onFechar={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByTestId("volumetria-diverge")).toBeNull();
+    expect(screen.queryByTestId("volumetria-herdada")).toBeNull();
+  });
+});

@@ -12186,3 +12186,97 @@ responder pela última tecla digitada em qualquer campo.
 
 513 engine · 133 llm · 84 aplicação · 784 web · 250 server · 39 gateway-falso ·
 103/103 E2E · build, typecheck e lint limpos.
+
+## §313 — o volume que é do produto, e a régua citada estava no § errado (SPEC-77)
+
+O pedido veio dentro do da página de apresentação, com instrução de virar SPEC
+própria: *"requisitos de volumetria (e também seria importante adicionar para
+produto, pois também deveria fazer parte do PDCA)"*.
+
+### A régua que a SPEC cita não é a que ela queria
+
+A SPEC-77 §2 diz que a herança segue "a mesma régua do §303". O §303 é sobre
+`timeId` nas regras de config — dois times não conseguiam ter réguas diferentes.
+Régua parecida, assunto diferente.
+
+A régua literal é do **§306**: *"declarado vence derivado, e a frase diz de onde
+o número veio: quem mediu um componente sabe mais que quem propagou da porta da
+frente, e apresentar o derivado como declarado seria a ferramenta se atribuindo
+uma medição que ninguém fez."*
+
+E ela já estava implementada, em dez linhas, em `resiliencia.ts:229-265` — com a
+marca de procedência sendo uma **sufixação condicional na própria frase**, e não
+um componente. É o padrão mais barato do repositório para dizer procedência, e
+o único que funciona igual na tela, no documento e num log. Foi o que se imitou.
+
+### Três volumetrias, e nenhuma era do produto
+
+- a do **checklist** (`config/types.ts`) é do ITEM: "que número este item precisa
+  cumprir";
+- a da **demanda** (SPEC-70) é do que esta entrega atende;
+- e as duas morrem quando a demanda termina.
+
+*"Este produto atende 2 milhões de consultas por dia"* não muda a cada demanda.
+Muda uma vez por trimestre — e quando muda, muda o julgamento de **todas** as
+demandas em aberto. É o tipo de fato que o contexto do produto (SPEC-53) existe
+para guardar: o que é perene.
+
+### A armadilha que o repositório já documentava, um nível acima
+
+O caminho fácil seria copiar o número do produto para dentro da quebra ao abrir.
+`PipelineAgentesTab` já documenta por que não, para o preâmbulo herdado:
+*"herdado NÃO é salvo como cópia enquanto ninguém edita — senão o papel congela
+numa versão do padrão"*. Aqui é pior: o volume muda uma vez por trimestre, e as
+demandas em aberto precisam mudar junto. Uma cópia faria cada demanda carregar o
+volume do dia em que foi aberta.
+
+Daí a decisão que atravessa a fatia inteira: **os campos do painel mostram só o
+que a DEMANDA declarou**, e o herdado aparece como frase logo abaixo. Preencher
+os campos com o número do produto faria o próximo autosave gravá-lo como
+declarado — em dois segundos, sem ninguém pedir.
+
+E quando os dois discordam, os **dois** números aparecem, com a frase que diz o
+que a divergência não faz: *"mudar aqui não muda o produto"*.
+
+### Um `??` em quatro lugares é duas versões da mesma régua
+
+`quebra.volumetria` era lido em quatro pontos (documento, ensaios, placar,
+contexto). Resolver a herança em cada um seria a definição do §263, e este
+projeto já pagou esse preço mais de uma vez. Quem decide é o engine —
+`volumetriaEmVigor(daDemanda, doProduto)` —, resolvido uma vez no `App` e
+distribuído.
+
+### Por que volume pertence ao PDCA, e as outras configs não tanto
+
+Uma regra de refinamento continua válida até alguém mudá-la. Um volume declarado
+há um ano provavelmente está errado hoje, e **nada avisa**: ele envelhece
+sozinho. E número velho alimentando a Lei de Little não produz silêncio — produz
+saturação falsa, ou pior, silêncio falso.
+
+Por isso a data de declaração é coluna própria, e ela **só se move quando o
+número muda** — a mesma disciplina do `atualizadoEm` da rodada anterior (§312).
+Recarimbar a cada salvamento do formulário faria "declarado em" responder pela
+última vírgula corrigida no objetivo, e a pergunta do ciclo nunca dispararia
+porque o número pareceria sempre novo.
+
+O `N meses` é **configurável**, junto da cadência do PDCA — é a resposta honesta
+à pergunta §6.2 ("qual é o N?"): não há número de uso real para escolher. Seis
+meses é um começo, não uma régua. E `0` desliga a pergunta, porque desligar
+tinha que ser possível sem apagar o número declarado.
+
+### O que NÃO entrou, e continua recusado
+
+**Medir volume de verdade** (telemetria, APM) — o produto nunca mediu nada do
+mundo real, e começar aqui mudaria o que ele é. **Volumetria por ambiente** —
+multiplica a superfície por três para um ganho não demonstrado. **Estimar o pico
+a partir da média** — "5×" é conhecimento de negócio, não constante.
+**Substituir a volumetria técnica do checklist** — são perguntas diferentes, e
+fundi-las perderia as duas.
+
+E o `picoDe` **não entra na conta do motor**, de propósito: quem responde *"e se
+o volume for 5×?"* continua sendo o `fatorDeVolume` do ensaio, porque aquilo é
+uma pergunta hipotética que alguém faz. Este é um fato que o produto declara — e
+a tela diz isso em voz alta, para ninguém esperar a saturação mudar sozinha.
+
+524 engine · 133 llm · 84 aplicação · 787 web · 254 server · 39 gateway-falso ·
+103/103 E2E · build, typecheck e lint limpos.

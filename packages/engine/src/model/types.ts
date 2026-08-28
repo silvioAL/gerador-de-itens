@@ -333,6 +333,47 @@ export interface VolumetriaDaDemanda {
   por: "segundo" | "minuto" | "hora" | "dia";
 }
 
+/**
+ * SPEC-77 — o volume que o PRODUTO atende, e que não se recola a cada demanda.
+ *
+ * ## Por que não é a mesma coisa que a volumetria da demanda
+ *
+ * Existiam duas volumetrias, e nenhuma era do produto: a do **checklist**
+ * (`config/types.ts`) é do item — "que número este item precisa cumprir"; a da
+ * **demanda** (SPEC-70) é do que esta entrega atende. As duas morrem quando a
+ * demanda termina.
+ *
+ * *"Este produto atende 2 milhões de consultas por dia"* não muda a cada
+ * demanda. Muda uma vez por trimestre — e quando muda, muda o julgamento de
+ * **todas** as demandas em aberto. É exatamente o tipo de fato que o contexto do
+ * produto (SPEC-53) existe para guardar: o que é **perene**.
+ *
+ * ## O pico
+ *
+ * `picoDe: 5` é *"no fim do mês o volume é 5× o normal"* — conhecimento de
+ * negócio, e por isso declarado, nunca estimado a partir da média (§4 da SPEC).
+ *
+ * Ele **não entra na conta do motor**, e isso é deliberado: o `fatorDeVolume`
+ * do ensaio continua sendo quem responde *"e se o volume for N×?"*, porque
+ * aquilo é uma pergunta hipotética que alguém faz de propósito. Este número é
+ * um fato que o produto declara, e ele aparece na tela junto do volume para
+ * quem for montar o ensaio saber que número usar.
+ */
+export interface VolumetriaDoProduto extends VolumetriaDaDemanda {
+  /** `5` = "no pico, cinco vezes isto". Ausente = ninguém declarou pico. */
+  picoDe?: number;
+  /**
+   * Quando este número foi declarado (ISO-8601).
+   *
+   * SPEC-77 §3 — volume **envelhece sozinho**: uma regra de refinamento
+   * continua válida até alguém mudá-la, mas um volume declarado há um ano
+   * provavelmente está errado hoje, e nada avisa. Um número desatualizado
+   * alimentando a Lei de Little produz saturação falsa — ou, pior, silêncio
+   * falso. Sem a data, não há como o ciclo perguntar "isto ainda vale?".
+   */
+  declaradoEm?: string;
+}
+
 export interface Quebra {
   /** Curto, pra achar essa quebra depois numa lista/busca — diferente de
    * `demandInfo` (a descrição longa do contexto). Não é chave: duas quebras

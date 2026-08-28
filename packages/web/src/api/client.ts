@@ -1,5 +1,5 @@
 import type { ExecucaoDoPapel } from "@gerador/aplicacao";
-import type { AnexoDeContexto, CenarioDeLentidao, Decisao, Diagrama, DocumentoEscrito, ExcecaoDePadrao, LeituraDispensada, Necessidade, OperacaoDeAjuste, PerfisConfig, Percurso, Quebra, RegrasConfig, StatusDocumento, ValorSpec, VolumetriaDaDemanda } from "@gerador/engine";
+import type { AnexoDeContexto, CenarioDeLentidao, VolumetriaDoProduto, Decisao, Diagrama, DocumentoEscrito, ExcecaoDePadrao, LeituraDispensada, Necessidade, OperacaoDeAjuste, PerfisConfig, Percurso, Quebra, RegrasConfig, StatusDocumento, ValorSpec, VolumetriaDaDemanda } from "@gerador/engine";
 
 /**
  * Base do @gerador/server — configurável em runtime via `VITE_API_URL`
@@ -1062,10 +1062,20 @@ export interface FeedbackPdca {
   criadoEm: string;
 }
 
+export interface CadenciaPdca {
+  cadenciaUsos: number;
+  cadenciaFeedback: number;
+  /** SPEC-77 fatia D — de quantos em quantos meses o ciclo pergunta se o volume
+   * declarado no produto ainda vale. `0` desliga. */
+  mesesParaRevisarVolume?: number;
+}
+
 export const apiPdca = {
-  config: () => requisitar<{ cadenciaUsos: number; cadenciaFeedback: number }>("/pdca/config"),
-  salvarConfig: (dados: { cadenciaUsos: number; cadenciaFeedback: number }) =>
-    requisitar<{ cadenciaUsos: number; cadenciaFeedback: number }>("/pdca/config", {
+  /** SPEC-77 — `mesesParaRevisarVolume` entrou junto da cadência: `0` desliga a
+   * pergunta sobre a idade do volume do produto. */
+  config: () => requisitar<CadenciaPdca>("/pdca/config"),
+  salvarConfig: (dados: CadenciaPdca) =>
+    requisitar<CadenciaPdca>("/pdca/config", {
       method: "PUT",
       body: JSON.stringify(dados),
     }),
@@ -1140,13 +1150,20 @@ export interface Produto {
   regrasDeNegocio: string;
   sistemas: string;
   restricoes: string;
+  /** SPEC-77 — o volume que este produto atende, e o pico dele. Ausente =
+   * ninguém declarou, e isso não é lacuna: nem todo produto tem esse número. */
+  volumetria?: VolumetriaDoProduto;
   glossario: TermoDeGlossario[];
   timeIds: string[];
   criadoPor: string;
   atualizadoEm: string;
 }
 
-export type DadosDoProduto = Pick<Produto, "nome" | "objetivo" | "quemUsa" | "regrasDeNegocio" | "sistemas" | "restricoes">;
+export type DadosDoProduto = Pick<Produto, "nome" | "objetivo" | "quemUsa" | "regrasDeNegocio" | "sistemas" | "restricoes"> & {
+  /** SPEC-77 — `null` APAGA o número declarado; ausente é "não mexi nisto".
+   * Sem os dois, remover um volume posto por engano seria impossível. */
+  volumetria?: VolumetriaDoProduto | null;
+};
 
 export const apiProdutos = {
   /** `timeId` restringe aos que interessam ao time — produto sem time amarrado

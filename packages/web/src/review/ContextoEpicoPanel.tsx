@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Necessidade, VolumetriaDaDemanda } from "@gerador/engine";
-import { descreverVolumetria } from "@gerador/engine";
+import { descreverVolumetria, descreverVolumetriaEmVigor, type VolumetriaEmVigor } from "@gerador/engine";
 import { NecessidadesPanel, type ElementoVinculavel } from "./NecessidadesPanel";
 
 export interface AnexoContexto {
@@ -28,6 +28,15 @@ export interface ContextoEpicoPanelProps {
    * (`distribuirVolumetria`), então ninguém precisa digitar taxa nó a nó.
    */
   volumetria?: VolumetriaDaDemanda;
+  /**
+   * SPEC-77 — o volume que VALE agora, com a procedência.
+   *
+   * Vem separado do `volumetria` acima, e a distinção é o ponto da fatia: os
+   * CAMPOS mostram só o que esta demanda declarou (herdado nos campos viraria
+   * cópia no próximo Salvar), e esta frase diz o que está valendo e de onde
+   * veio — inclusive quando os dois discordam.
+   */
+  volumetriaEmVigor?: VolumetriaEmVigor;
   /** Nós do desenho, para vincular. */
   elementos?: ElementoVinculavel[];
   /** SPEC-57 fatia D — pede a proposta de propósito ao agente. Injetada de
@@ -74,6 +83,7 @@ export function ContextoEpicoPanel({
   produtos = [],
   necessidades: necessidadesIniciais,
   volumetria: volumetriaInicial,
+  volumetriaEmVigor,
   elementos = [],
   onProporNecessidades,
   onSalvar,
@@ -257,6 +267,24 @@ export function ContextoEpicoPanel({
             {descreverVolumetria(previaDaVolumetria) ??
               "Opcional. Com ele, o motor distribui a taxa pelo desenho e a saturação passa a fechar sem ninguém digitar número em componente nenhum."}
           </p>
+          {/* SPEC-77 — o que está VALENDO, e de onde veio.
+              Sem esta linha, alguém vê os campos vazios e conclui que não há
+              volume nenhum — quando na verdade a demanda está herdando o do
+              produto, e a saturação já está sendo calculada com ele. E quando
+              os dois números discordam, os DOIS aparecem: quem digitou aqui
+              pode ter tido um motivo, e quem lê depois precisa saber que este
+              número não acompanha mais o do produto. */}
+          {!previaDaVolumetria && volumetriaEmVigor?.origem === "herdada" && (
+            <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--texto-2)" }} data-testid="volumetria-herdada">
+              {descreverVolumetriaEmVigor(volumetriaEmVigor)}
+            </p>
+          )}
+          {volumetriaEmVigor?.doProduto && (
+            <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--amarelo)" }} data-testid="volumetria-diverge">
+              Esta demanda declara um volume diferente do produto, que diz{" "}
+              {descreverVolumetria(volumetriaEmVigor.doProduto)}. Mudar aqui não muda o produto.
+            </p>
+          )}
         </div>
 
         <NecessidadesPanel

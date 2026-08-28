@@ -1,3 +1,5 @@
+import type { VolumetriaDoProduto } from "@gerador/engine";
+
 /**
  * SPEC-53 Fase 1 — a porta do PRODUTO.
  *
@@ -34,6 +36,15 @@ export interface Produto {
   sistemas: string;
   /** Regulatório, compliance, contratos — o que não se negocia. */
   restricoes: string;
+  /**
+   * SPEC-77 — o volume que este produto atende, e o pico dele.
+   *
+   * Mora no PRODUTO porque é perene: não muda a cada demanda, muda uma vez por
+   * trimestre — e quando muda, muda o julgamento de todas as demandas em
+   * aberto. Ausente = ninguém declarou, e isso não é lacuna (§230): nem todo
+   * produto tem esse número.
+   */
+  volumetria?: VolumetriaDoProduto;
   glossario: TermoDeGlossario[];
   /** Os times que trabalham neste produto (N:N). */
   timeIds: string[];
@@ -45,7 +56,15 @@ export interface Produto {
 export type DadosDoProduto = Pick<
   Produto,
   "nome" | "objetivo" | "quemUsa" | "regrasDeNegocio" | "sistemas" | "restricoes"
->;
+> & {
+  /**
+   * SPEC-77 — três estados, e os três significam coisas diferentes:
+   * **ausente** é "não mexi nisto" (o formulário de outra seção salvando),
+   * **null** é "apaguei o número", e um objeto é "é este". Sem os três,
+   * remover um volume posto por engano seria impossível.
+   */
+  volumetria?: VolumetriaDoProduto | null;
+};
 
 export interface RepositorioDeProdutos {
   listar(organizacaoId: string): Promise<Produto[]>;

@@ -98,6 +98,11 @@ export {
   descreverVolumetria,
   distribuirVolumetria,
   emRequisicoesPorSegundo,
+  /** SPEC-77 — declarado vence herdado, e a frase diz qual é qual. */
+  volumetriaEmVigor,
+  descreverVolumetriaEmVigor,
+  volumeVencido,
+  type VolumetriaEmVigor,
   formatarRps,
 } from "./leitura/volumetria.js";
 export { deltaDeDecisao, deltaDePercurso, piorou } from "./remedicao/remedicao.js";

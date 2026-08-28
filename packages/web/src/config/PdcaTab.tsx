@@ -20,6 +20,7 @@ import {
   type ConfigPipelineAgentes,
   type FeedbackPdca,
   type SolicitacaoAjuste,
+  type CadenciaPdca,
 } from "../api/client";
 import type { AreaConfig } from "../navegacao/rota";
 import { useMontado } from "../state/useMontado";
@@ -64,7 +65,14 @@ const linkEstilo: React.CSSProperties = {
   cursor: "pointer",
 };
 
-const CADENCIA_PADRAO = { cadenciaUsos: 5, cadenciaFeedback: 3 };
+/**
+ * SPEC-77 fatia D — `mesesParaRevisarVolume` fica aqui, junto da cadência.
+ *
+ * É a resposta da pergunta em aberto §6.2 ("qual é o N?"): não há número de uso
+ * real para escolher, então ele é configurável, na mesma tela onde a cadência
+ * já é. Seis meses é um começo, não uma régua.
+ */
+const CADENCIA_PADRAO = { cadenciaUsos: 5, cadenciaFeedback: 3, mesesParaRevisarVolume: 6 };
 
 /** A área da configuração de cada recurso solicitável — o "abrir e editar". */
 const AREA_DO_RECURSO: Record<string, AreaConfig> = {
@@ -76,7 +84,7 @@ const AREA_DO_RECURSO: Record<string, AreaConfig> = {
 };
 
 export function PdcaTab({ config, timeAtivo, onAbrirArea, onFichaMudou }: PdcaTabProps) {
-  const [cadencia, setCadencia] = useState<typeof CADENCIA_PADRAO | null>(null);
+  const [cadencia, setCadencia] = useState<CadenciaPdca | null>(null);
   /** §276 — o histórico começa cortado: ele cresce para sempre, e a tela não é
    * um arquivo morto. */
   const [verTudoNoHistorico, setVerTudoNoHistorico] = useState(false);
@@ -344,6 +352,19 @@ export function PdcaTab({ config, timeAtivo, onAbrirArea, onFichaMudou }: PdcaTa
                 onChange={(e) => setCadencia({ ...cadencia, cadenciaFeedback: Number(e.target.value) })}
                 style={{ ...inputEstilo, width: 70, marginLeft: 8 }}
               />
+            </label>
+            <label style={{ fontSize: 12, color: "var(--texto-2)" }}>
+              Revisar o volume do produto a cada
+              <input
+                type="number"
+                min={0}
+                aria-label="Meses para revisar o volume do produto"
+                data-testid="meses-revisar-volume"
+                value={cadencia.mesesParaRevisarVolume ?? 6}
+                onChange={(e) => setCadencia({ ...cadencia, mesesParaRevisarVolume: Number(e.target.value) })}
+                style={{ ...inputEstilo, width: 70, marginLeft: 8 }}
+              />
+              <span style={{ marginLeft: 6 }}>meses (0 desliga)</span>
             </label>
             <button onClick={() => void executar(() => apiPdca.salvarConfig(cadencia))} style={botaoPrimarioEstilo}>
               Salvar cadência

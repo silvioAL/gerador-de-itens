@@ -6,6 +6,8 @@ import {
   avisosDaDerivacao,
   compararDocumentos,
   contar,
+  volumetriaEmVigor,
+  type VolumetriaDoProduto,
   MARCADOR_ESPECIFICAR,
   exemploDeMedicao,
   derivar,
@@ -373,19 +375,46 @@ function AppCarregado({
    * cada boot para usar, no máximo, um.
    */
   const [contextoDoProduto, setContextoDoProduto] = useState<string | undefined>(undefined);
+  /**
+   * SPEC-77 — o volume PERENE, que a demanda herda quando não declara o seu.
+   *
+   * Vem do mesmo `obter` do contexto: uma busca só, e o número não precisa de
+   * uma segunda fonte. Guardado à parte do texto porque não é texto — ele
+   * alimenta a Lei de Little, e o contexto alimenta o prompt.
+   */
+  const [volumetriaDoProduto, setVolumetriaDoProduto] = useState<VolumetriaDoProduto | undefined>(undefined);
   useEffect(() => {
     if (!quebra.produtoId) {
       setContextoDoProduto(undefined);
+      setVolumetriaDoProduto(undefined);
       return;
     }
     apiProdutos
       .obter(quebra.produtoId)
-      .then((p) => setContextoDoProduto(contextoDoProdutoEmTexto(p) || undefined))
+      .then((p) => {
+        setContextoDoProduto(contextoDoProdutoEmTexto(p) || undefined);
+        setVolumetriaDoProduto(p.volumetria);
+      })
       // Produto apagado depois de a demanda apontar pra ele: a demanda
       // continua valendo, só sem o contexto (a FK é ON DELETE SET NULL, mas a
       // quebra em memória pode estar mais velha que o banco).
-      .catch(() => setContextoDoProduto(undefined));
+      .catch(() => {
+        setContextoDoProduto(undefined);
+        setVolumetriaDoProduto(undefined);
+      });
   }, [quebra.produtoId]);
+
+  /**
+   * SPEC-77 fatia B — o volume que VALE nesta demanda, e de onde ele veio.
+   *
+   * Resolvido UMA vez, aqui, e distribuído: o `quebra.volumetria` era lido em
+   * quatro lugares, e um `??` repetido quatro vezes é a definição de duas
+   * versões da mesma régua (§263). Quem decide é o engine.
+   */
+  const volumetriaEmVigorAgora = useMemo(
+    () => volumetriaEmVigor(quebra.volumetria, volumetriaDoProduto),
+    [quebra.volumetria, volumetriaDoProduto]
+  );
 
   const aoAbrir = useCallback(
     (q: Quebra) => {
@@ -942,9 +971,9 @@ function AppCarregado({
         quebra.cenariosDeLentidao ?? [],
         quebra.necessidades ?? [],
         undefined,
-        quebra.volumetria
+        volumetriaEmVigorAgora?.valor
       ),
-    [quebra.diagrama, diagramaConfig, quebra.cenariosDeLentidao, quebra.necessidades, quebra.volumetria]
+    [quebra.diagrama, diagramaConfig, quebra.cenariosDeLentidao, quebra.necessidades, volumetriaEmVigorAgora]
   );
 
   const markdownDoDocumento = useMemo(
@@ -1523,7 +1552,7 @@ function AppCarregado({
         /* SPEC-70 — o volume que a saturação usa. Sem ele a Lei de Little só
            fecha onde alguém digitou a taxa, e era esse o trabalho que sobrava
            para quem usa. */
-        volumetria={quebra.volumetria}
+        volumetria={volumetriaEmVigorAgora?.valor}
         // SPEC-65 — a mesma leitura das marcas do canvas, calculada uma vez.
         leitura={leituraDoDesenho}
         /**
@@ -1823,7 +1852,7 @@ function AppCarregado({
           diagrama={quebra.diagrama}
           config={diagramaConfig}
           cenarios={quebra.cenariosDeLentidao ?? []}
-          volumetria={quebra.volumetria}
+          volumetria={volumetriaEmVigorAgora?.valor}
           onMudar={(cenariosDeLentidao) => setQuebra((q) => ({ ...q, cenariosDeLentidao }))}
           /**
            * SPEC-69 — o que o NEGÓCIO exige. É o que faz o número técnico
@@ -2151,8 +2180,18 @@ function AppCarregado({
             necessidades={quebra.necessidades}
             /* SPEC-70 — o volume da demanda, dito uma vez e distribuído pelo
                motor. É o que faz a Lei de Little fechar sem ninguém digitar
-               taxa em componente nenhum. */
+               taxa em componente nenhum.
+
+               SPEC-77 — aqui vai o que a DEMANDA declarou, cru, e não o volume
+               em vigor. Este painel é o EDITOR: mostrar o número herdado nos
+               campos faria o próximo "Salvar" gravá-lo como declarado, e a
+               demanda congelaria a versão do produto do dia em que foi aberta.
+               É a armadilha que o `PipelineAgentesTab` já documenta para o
+               preâmbulo herdado, e aqui ela é pior — o volume do produto muda
+               uma vez por trimestre, e as demandas em aberto precisam mudar
+               junto. O herdado aparece como FRASE, logo abaixo. */
             volumetria={quebra.volumetria}
+            volumetriaEmVigor={volumetriaEmVigorAgora}
             elementos={quebra.diagrama.nodes.map((n) => ({ id: n.id, label: n.label || n.id }))}
             onProporNecessidades={async (jaDeclaradas, contextoEpico) => {
               const { necessidades } = await apiIa.proporNecessidades({
