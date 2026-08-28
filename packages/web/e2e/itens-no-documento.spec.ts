@@ -182,6 +182,19 @@ test("§210 — trocar de demanda NÃO leva junto os itens da anterior", async (
   // A tela de abrir some quando a demanda carrega — sem esta espera, o clique
   // seguinte no ☰ cai na lista ainda aberta.
   await expect(page.getByRole("button", { name: "+ Serviço", exact: true })).toBeVisible();
+  /**
+   * E a demanda aberta é MESMO a outra.
+   *
+   * Esta linha faltava, e o furo era do teste: `+ Serviço` está visível no
+   * canvas das DUAS demandas, então a espera acima não discrimina nada. Com um
+   * clique perdido na lista — mais provável na CI, que é mais lenta —, o teste
+   * seguia com a demanda anterior aberta, achava os 4 itens dela e acusava o
+   * produto por um defeito que não estava lá.
+   *
+   * Foi assim que ele quebrou na CI passando 15 vezes seguidas na máquina
+   * local: a asserção que ele fazia não era sobre o que ele precisava saber.
+   */
+  await expect(page.getByTestId("titulo-da-quebra")).toContainText(outra);
 
   // A busca dos itens da demanda nova fica LENTA de propósito: é na janela
   // entre abrir a outra demanda e a resposta chegar que o relato acontece.

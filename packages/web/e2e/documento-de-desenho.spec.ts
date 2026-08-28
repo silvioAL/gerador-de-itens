@@ -104,6 +104,30 @@ test("o documento tem leitor, guarda o que a pessoa escreveu, e o aprovado para 
     })
     .toBe(riscos);
 
+  /**
+   * SPEC-73 — a lacuna que o documento entrega é CONTÁVEL, e a aprovação a diz.
+   *
+   * Duas coisas aqui, e as duas só o navegador prova:
+   *
+   * - a **Visão geral** existe como seção escrita. Antes ela nem aparecia nesta
+   *   tela: era uma string do motor que só saía no markdown baixado, com um
+   *   `Como <papel>, quero <ação>…` que ninguém contava e nada acusava.
+   * - o número ao lado do selo, **sem bloquear** (§230): aprovar com lacuna
+   *   contada é decisão; aprovar com lacuna invisível é acidente.
+   */
+  await expect(page.getByTestId("lacunas-do-documento")).toContainText("lacunas no documento");
+  const visaoGeral = "Como analista de crédito, quero a proposta aprovada no mesmo dia para não perder o cliente.";
+  await page.getByTestId("secao-visao-geral").getByRole("button").click();
+  const campoVisao = page.getByTestId("secao-visao-geral").getByRole("textbox");
+  await campoVisao.pressSequentially(visaoGeral);
+  await campoVisao.blur();
+  await expect
+    .poll(
+      async () => (await (await page.request.get(`${API}/quebras/${idDaQuebra}`)).json()).documentoEscrito?.visaoGeral,
+      { timeout: 15000 }
+    )
+    .toBe(visaoGeral);
+
   // Fatia 3 — aprovar carimba o documento do momento.
   await page.getByTestId("status-documento").click();
   await page.getByTestId("status-aprovado").click();

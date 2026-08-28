@@ -24,7 +24,16 @@ export interface ItemDeTrabalho {
   sugestoes: number;
 }
 
-function contar(texto: string, trecho: string): number {
+/**
+ * SPEC-73 fatia D — exportada para a APROVAÇÃO poder dizer o número.
+ *
+ * A contagem de pendências sempre existiu, mas só por ITEM: o documento de
+ * topo nunca passava por aqui, e por isso o `<papel>` da visão geral era
+ * invisível para a conta. Com a mesma função servindo os dois níveis, "quantas
+ * lacunas vão junto desta aprovação?" tem uma resposta só — duas contas
+ * divergiriam na primeira mudança (§263).
+ */
+export function contar(texto: string, trecho: string): number {
   return texto.split(trecho).length - 1;
 }
 

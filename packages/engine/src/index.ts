@@ -178,7 +178,13 @@ export {
   type FichaPlaceholder,
   type FichaItem,
 } from "./especificacao/gerarEspecificacaoEntrega.js";
-export { gerarItensDeTrabalho, type ItemDeTrabalho } from "./especificacao/gerarItensDeTrabalho.js";
+export {
+  gerarItensDeTrabalho,
+  /** SPEC-73 fatia D — a mesma contagem serve o item e o documento inteiro. */
+  contar,
+  type ItemDeTrabalho,
+} from "./especificacao/gerarItensDeTrabalho.js";
+export { lacunasSemMarcador, type LacunaSemMarcador } from "./especificacao/lacunasDoDocumento.js";
 export {
   aplicarOperacao,
   descreverOperacao,

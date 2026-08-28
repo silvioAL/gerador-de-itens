@@ -301,6 +301,20 @@ export type StatusDocumento = "rascunho" | "em-revisao" | "aprovado" | "implemen
  * disputar quem manda na estrutura.
  */
 export interface DocumentoEscrito {
+  /**
+   * SPEC-73 fatia B — a visão geral: papel, ação e benefício desta demanda.
+   *
+   * Era uma string FIXA do motor (`Como <papel>, quero <ação>…`), e por isso
+   * todo documento — inclusive o aprovado e o exportado — saía com um
+   * formulário em branco no meio. O comentário que a produzia acertava o
+   * diagnóstico ("papel e benefício não são inferíveis a partir do modelo") e
+   * errava a conclusão: o que não é dedutível não vira texto do motor, vira
+   * campo de quem sabe.
+   *
+   * Chave fixa, como as duas abaixo — é o que o comentário deste tipo autoriza,
+   * e o que impede isto de virar um editor de documento.
+   */
+  visaoGeral?: string;
   /** O que se ganhou e o que se perdeu — e o que ficou de fora de propósito. */
   tradeOffs?: string;
   /** O que pode dar errado, e o que se está aceitando correr. */

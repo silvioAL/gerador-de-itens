@@ -3225,7 +3225,7 @@ describe("produtos (SPEC-53)", () => {
         },
       ],
       percursos: [{ id: "pc::n1>n2", rotulo: "a → b", nos: ["n1", "n2"], origem: "inferido", confirmado: true }],
-      documentoEscrito: { tradeOffs: "aceitamos latência", riscos: "o parceiro muda" },
+      documentoEscrito: { visaoGeral: "Como analista, quero…", tradeOffs: "aceitamos latência", riscos: "o parceiro muda" },
       documentoStatus: "aprovado",
       // SPEC-65 fatia D — as leituras caladas.
       leiturasDispensadas: [{ noId: "n1", tipo: "fan-out", autor: "ana", em: "2026-08-15T10:00:00.000Z" }],

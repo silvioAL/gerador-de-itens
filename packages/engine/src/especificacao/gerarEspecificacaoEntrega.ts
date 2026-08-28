@@ -184,8 +184,24 @@ function descreverEspecificacaoNo(ficha: FichaEspecificacaoNo): string {
   return linhas.join("\n");
 }
 
+/**
+ * SPEC-73 fatia C — o esqueleto de Gherkin, agora CONTÁVEL.
+ *
+ * Ele é útil e fica: dá a forma a quem nunca escreveu Gherkin. O que não podia
+ * continuar é sair **idêntico a um cenário de verdade** — ninguém distinguia
+ * "o time escreveu isto" de "o motor não tinha o que escrever". E como a
+ * contagem de pendências é por marcador (`gerarItensDeTrabalho`), ele viajava
+ * até o card do tracker sem contar como nada: dos quatro casos medidos, é o
+ * único que chega lá.
+ *
+ * O marcador vai **fora** do bloco, e não é gosto: `<- ✍️ especificar` dentro
+ * de ```` ```gherkin ```` quebra a sintaxe para quem colar o trecho numa
+ * ferramenta de BDD. O varredor de `lacunasDoDocumento` conhece essa regra — a
+ * vizinhança dele é o parágrafo, não a linha.
+ */
 const CENARIO_GHERKIN_GENERICO =
-  "```gherkin\nDado <contexto>\nQuando <ação>\nEntão <resultado esperado>\n```\n\n_(preencher com os cenários reais deste item)_";
+  "```gherkin\nDado <contexto>\nQuando <ação>\nEntão <resultado esperado>\n```\n" +
+  `_(preencher com os cenários reais deste item)_ ${MARCADOR_ESPECIFICAR}`;
 
 /**
  * Resolve o cenário Gherkin de boas práticas pro tipo de nó/aresta desta
@@ -973,6 +989,7 @@ export interface OpcoesGerarEspecificacao {
   percursos?: Percurso[];
   /** SPEC-58 fatia 2 — as seções que a pessoa escreveu. A máquina nunca as
    * sobrescreve; aqui elas só entram no texto montado. */
+  visaoGeral?: string;
   tradeOffs?: string;
   riscos?: string;
   /** §242 — `quebra.excecoes`. Entram como decisões DERIVADAS (nunca
@@ -1060,10 +1077,22 @@ export function gerarEspecificacaoEntrega(
   if (todosOsTimes.size > 0) partesContexto.push(`Times envolvidos: ${[...todosOsTimes].join(", ")}`);
   const contexto = partesContexto.length > 0 ? partesContexto.join("\n\n") : "_Sem contexto adicional informado._";
 
-  // Papel/benefício não são inferíveis a partir do modelo — o motor monta o
-  // esqueleto uma vez só (não repetido por item), quem preenche (humano ou o
-  // subagente de refino, SPEC-14 §3) decide o resto.
-  const historiaPo = "Como <papel>, quero <ação> para que <benefício — detalhar>.";
+  /**
+   * SPEC-73 fatia B — a visão geral é ESCRITA, não um esqueleto do motor.
+   *
+   * Papel e benefício não são inferíveis a partir do modelo — o comentário
+   * antigo acertava isso. O que ele errava era a conclusão: montava
+   * `Como <papel>, quero <ação>…` como CONTEÚDO, e com isso todo documento —
+   * inclusive o aprovado, inclusive o exportado — saía com um formulário em
+   * branco no meio, que ninguém contava e nada acusava.
+   *
+   * O esqueleto não morreu: virou a DICA do editor (ver `DocumentoScreen`),
+   * onde ele diz o formato esperado sem se passar por resposta. Vazio, a seção
+   * inteira sai do documento pelo mesmo `removerSecaoDaVariavel` que já cuida
+   * das outras três — e é isso que faz "documento sem visão geral escrita não
+   * contém `<papel>`" ser verdade por construção.
+   */
+  const historiaPo = opcoes.visaoGeral?.trim() ?? "";
 
   const itens =
     atividades.length > 0
@@ -1138,7 +1167,7 @@ export function gerarEspecificacaoEntrega(
   // uma demanda sem decisão sairia com "## Decisões" seguido de nada, que é
   // exatamente o ruído que o §188 mandou tirar do documento — e ele pesa
   // ainda mais aqui, porque quem lê é quem nunca abriu a ferramenta.
-  for (const nome of ["decisoes", "tradeOffs", "riscos"] as const) {
+  for (const nome of ["historiaPo", "decisoes", "tradeOffs", "riscos"] as const) {
     if (!valores[nome].trim()) template = removerSecaoDaVariavel(template, nome);
   }
 

@@ -136,7 +136,12 @@ export const corpoQuebra = z.object({
    * viraria um editor de documento, e aí o template configurável (SPEC-47) e o
    * texto solto disputariam quem manda na estrutura. */
   documentoEscrito: z
-    .object({ tradeOffs: z.string().optional(), riscos: z.string().optional() })
+    .object({
+      /** SPEC-73 fatia B — a visão geral deixou de ser string do motor. */
+      visaoGeral: z.string().optional(),
+      tradeOffs: z.string().optional(),
+      riscos: z.string().optional(),
+    })
     .optional(),
   /** SPEC-58 fatia 3 — o estado. `nullish` e não `optional`: quebra nunca
    * gerada tem `null`, e distinguir isso de "não mandou o campo" é o que

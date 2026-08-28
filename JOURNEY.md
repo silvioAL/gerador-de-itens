@@ -11998,3 +11998,95 @@ SPEC-72, e não afirmação desta.
 
 505 engine · 133 llm · 84 aplicação · 776 web · 245 server · 39 gateway-falso ·
 103/103 E2E · build, typecheck e lint limpos.
+
+## §311 — toda lacuna que o documento entrega virou contável (SPEC-73)
+
+O relato: *"o documento que estamos gerando parece ok, exceto por alguns pontos:
+parece que gera algumas coisas como placeholder no markdown, exemplo:
+`Como <papel>, quero <ação> para que <benefício — detalhar>`. Preciso de
+validação completa disso."*
+
+### A palavra que definiu a rodada foi "completa"
+
+Corrigir os dois casos conhecidos não é validação completa: é preciso provar que
+não há um terceiro, e a prova tem que envelhecer bem. Por isso a fatia A não é
+uma correção — é um **varredor** que procura a forma `<algo>` no documento
+gerado e falha com o que encontrar, hoje e daqui a três SPECs. Ele nasceu
+vermelho, apontando exatamente as duas famílias medidas, com linha e endereço:
+
+```
+linha  7: <papel>              —  Como <papel>, quero <ação> para que <benefício — detalhar>.
+linha  7: <ação>
+linha  7: <benefício — detalhar>
+linha 35: <contexto>           —  Dado <contexto>
+linha 36: <ação>               —  Quando <ação>
+linha 37: <resultado esperado> —  Então <resultado esperado>
+```
+
+### A régua do varredor custou três decisões, e a primeira contraria o instinto
+
+**Bloco de código NÃO é exceção.** O instinto é ignorar ```` ``` ```` — `<T>` num
+exemplo de código não é lacuna. Só que o Gherkin genérico, um dos dois casos que
+a SPEC mediu, sai justamente dentro de um bloco ```` ```gherkin ````. Uma régua
+que pula bloco de código passaria ao largo de metade do defeito que ela existe
+para pegar.
+
+**O marcador vale para o PARÁGRAFO, não para a linha.** `<- ✍️ especificar`
+dentro de um bloco gherkin quebra a sintaxe para quem colar o trecho numa
+ferramenta de BDD. Então a vizinhança é o trecho entre linhas em branco, e o
+marcador pode vir depois do bloco.
+
+**O `<` tem que estar solto na frase.** `Map<string, Endpoint>` é genérico e se
+reconhece pelo `<` colado a uma palavra; `` `<div>` `` é citação; `<https://…>`
+tem `:` e `/`. O que o motor escreve é português, e vem depois de um espaço.
+Sem esse recorte a régua vira ruído — e régua ruidosa morre.
+
+### A visão geral era uma string do motor, e a lacuna era invisível DUAS vezes
+
+O comentário que a produzia acertava o diagnóstico — *"papel e benefício não são
+inferíveis a partir do modelo"* — e errava a conclusão. O que não é dedutível
+não vira texto do motor: vira campo de quem sabe.
+
+E havia um segundo achado, que o mapeamento pegou: **a Visão geral nem aparecia
+na tela do documento.** Ela era uma variável de topo que só existia no markdown
+baixado e no que a aprovação carimbava. Ninguém a contava e ninguém a via.
+
+Agora ela é `SecaoEscrita`, como Trade-offs e Riscos — o mecanismo que a SPEC-58
+criou e que já sobrevive à regeneração. O esqueleto não morreu: virou a **dica**
+do editor. No lugar certo ele diz o formato esperado; no lugar errado, se passava
+por resposta. Vazia, a seção inteira sai do documento pelo mesmo
+`removerSecaoDaVariavel` que já cuida das outras três — e é isso que faz
+*"documento sem visão geral escrita não contém `<papel>`"* ser verdade por
+construção, e não por asserção.
+
+> A SPEC recusou em voz alta as duas saídas fáceis, e as duas continuam
+> recusadas: **fazer a IA preencher** (papel e benefício são conhecimento de
+> negócio, e um modelo os inventaria de forma plausível — o pior resultado
+> possível num texto que alguém vai aprovar) e **remover a seção** (ela tem
+> valor; o que não tinha é o esqueleto entregue como conteúdo).
+
+### O Gherkin genérico era o único que chegava ao tracker
+
+Ele fica — dá a forma a quem nunca escreveu Gherkin. O que não podia continuar é
+sair idêntico a um cenário de verdade.
+
+E ele era o mais caro dos quatro casos, por um motivo que só apareceu ao seguir a
+exportação: **a exportação só manda itens com `pendencias === 0`**, e a contagem
+é por marcador. Sem marcador, ele não contava como nada — e viajava para o card
+de alguém como se o time o tivesse escrito. O `<papel>`, por ser variável de
+topo, nunca chegou lá; este chegava sempre.
+
+### A aprovação passou a dizer o número, e a mesma conta serve os dois níveis
+
+`contar` era privada e só via o corpo do ITEM. O documento de topo nunca passava
+por ela — e é por isso que a visão geral era invisível para a contagem. Agora ela
+é exportada e serve os dois níveis: duas contas divergiriam na primeira mudança
+(§263).
+
+O número fica ao lado do selo, e **não bloqueia** (§230). Um documento com três
+lacunas declaradas pode ser aprovado de propósito; o produto inteiro é construído
+sobre essa distinção. O que não pode é a lacuna ser invisível — e há teste para
+as duas metades: o número aparece, e aprovar continua a um clique.
+
+513 engine · 133 llm · 84 aplicação · 780 web · 245 server · 39 gateway-falso ·
+103/103 E2E · build, typecheck e lint limpos.
