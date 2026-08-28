@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import {
   criarProvedorCompativelOpenAI,
+  ehSimulado,
   formatoJsonPorBaseUrl,
   presetsDoModo,
   temVisao,
@@ -166,6 +167,16 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
         },
       ],
       gateway: resumo,
+      /**
+       * SPEC-74 fatia D — o destino configurado INVENTA as respostas.
+       *
+       * Aqui, e não em `capacidades`: aquilo responde "o que este modelo
+       * consegue fazer", e isto responde "o que está saindo daqui é de
+       * verdade?". Misturar as duas perguntas faria a tela ler uma como a
+       * outra — que é literalmente o defeito que a §130 documenta neste
+       * mesmo endpoint.
+       */
+      simulado: ehSimulado(resumo.baseUrl),
       // Do modo HOSPEDADO: quem chama o gateway daqui é este container, então
       // o Ollama alcançável é `http://ollama:11434` (serviço do compose), não
       // `localhost`. Servir a lista do outro modo ofereceria um destino que

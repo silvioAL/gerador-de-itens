@@ -8,7 +8,7 @@ import {
   MODELO_GATEWAY_FALSO,
   MARCA_VIU_IMAGEM,
   TEXTO_TRANSCRITO_FALSO,
-} from "./gatewayFalso";
+} from "@gerador/gateway-falso";
 
 /**
  * SPEC-31 Fase 4 — o modo hospedado exercitado NO NAVEGADOR.
@@ -19,7 +19,7 @@ import {
  * sem navegador, sem tela. Os quatro defeitos moravam justamente nesse vão.
  *
  * Aqui não há mock nenhum: o Chromium fala com o Fastify de verdade, que fala
- * HTTP de verdade com o gateway falso (`gatewayFalso.ts`), que responde SSE de
+ * HTTP de verdade com o gateway falso (`@gerador/gateway-falso`), que responde SSE de
  * verdade. A única mentira é o conteúdo da resposta, que precisa ser fixo pro
  * teste poder afirmar algo.
  */
@@ -65,6 +65,14 @@ test("configurar o gateway pela tela: testar antes de salvar, salvar, e a base U
   await card.getByLabel("Base URL do gateway").fill(BASE_URL_GATEWAY_FALSO);
   await card.getByLabel("Chave de API").fill(CHAVE_GATEWAY_FALSO);
   await card.getByLabel("Nome do modelo").fill(MODELO_GATEWAY_FALSO);
+
+  // SPEC-74 fatia D — o aviso aparece ao DIGITAR o endereço, antes de salvar
+  // qualquer coisa. É o momento em que a escolha ainda está sendo feita, e é o
+  // §235 outra vez: sem marca, a primeira captura de tela vira "olha o que a IA
+  // respondeu". Note que o endereço aqui é `127.0.0.1` — o dublê fora do
+  // compose —, então isto também prova que a marca não depende do preset ter
+  // sido escolhido no seletor.
+  await expect(card.getByTestId("avisos-do-destino")).toContainText("NÃO chama modelo nenhum");
 
   // ACHADO REAL: "Testar conexão" é o botão que se usa ANTES de salvar — é o
   // ponto dele. A primeira versão da rota só olhava a credencial gravada, então
@@ -145,6 +153,12 @@ test("a esteira roda no navegador e o texto do gateway chega nos campos (o defei
   // cabeçalhos de CORS (o `reply.raw.writeHead` pulava os hooks do Fastify).
   // O resultado era o relato do usuário: "todos os campos vazios".
   await expect(page.getByText(new RegExp(MARCA_GATEWAY_FALSO)).first()).toBeVisible({ timeout: 60000 });
+
+  // SPEC-74 fatia D — e a tela DIZ que aquele texto não veio de modelo nenhum.
+  // Acima da esteira, e não ao lado de cada campo: a régua do §235 é "pequena e
+  // sempre no topo do que ela qualifica — a pessoa precisa ver antes de ler o
+  // conteúdo, não depois".
+  await expect(page.getByTestId("marca-demonstracao")).toContainText("Modo sem custo");
 
   // SPEC-37 M1 — a esteira que o usuário disparou TERMINOU: o chat do
   // refinamento abre sozinho, com a fala do momento. É a única conduta que

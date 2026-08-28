@@ -341,3 +341,107 @@ describe("ModeloIaTab — avisos do destino (SPEC-30)", () => {
     expect(screen.queryByTestId("avisos-do-destino")).toBeNull();
   });
 });
+
+/**
+ * SPEC-74 fatia B — o destino que não gasta nada já vem escolhido.
+ *
+ * A régua tem DUAS metades, e a segunda é a que importa: o padrão vale no
+ * vazio, e nunca por cima de quem já configurou. Uma credencial é da
+ * organização inteira; apontá-la para o dublê sozinha seria a ferramenta
+ * trocando o modelo de todo mundo sem pedir.
+ */
+const PRESET_SEM_CUSTO = {
+  id: "sem-custo",
+  nome: "Sem custo (respostas simuladas)",
+  baseUrl: "http://gateway-falso:4123/v1",
+  modelos: ["modelo-de-mentira"],
+  modeloPadrao: "modelo-de-mentira",
+  jsonNativo: true,
+  observacao: "Não chama modelo nenhum.",
+  simulado: true,
+  baseUrlsAlternativas: ["http://127.0.0.1:4123"],
+};
+
+function statusComSemCusto(over: Partial<StatusIa> = {}): StatusIa {
+  const base = status(over);
+  return { ...base, presetsGateway: [PRESET_SEM_CUSTO, ...(base.presetsGateway ?? [])] };
+}
+
+describe("ModeloIaTab — o modo sem custo como padrão (SPEC-74)", () => {
+  it("sem credencial nenhuma, o destino sem custo já vem escolhido e preenchido", async () => {
+    await montar(statusComSemCusto());
+
+    expect(screen.getByLabelText("Destino conhecido")).toHaveValue("sem-custo");
+    expect(screen.getByLabelText("Base URL do gateway")).toHaveValue("http://gateway-falso:4123/v1");
+    expect(screen.getByLabelText("Nome do modelo")).toHaveValue("modelo-de-mentira");
+  });
+
+  it("com credencial REAL salva, o padrão não encosta nela", async () => {
+    await montar(
+      statusComSemCusto({
+        gateway: {
+          configurado: true,
+          baseUrl: "https://gw.interno/v1",
+          modelo: "deepseek-chat",
+          chaveMascarada: "sk-…7890",
+        },
+      })
+    );
+
+    expect(screen.getByLabelText("Base URL do gateway")).toHaveValue("https://gw.interno/v1");
+    expect(screen.getByLabelText("Nome do modelo")).toHaveValue("deepseek-chat");
+    expect(screen.getByLabelText("Destino conhecido")).not.toHaveValue("sem-custo");
+  });
+
+  it("sem o preset na lista, nada muda — o padrão não inventa endereço", async () => {
+    // O servidor é quem manda a lista de destinos. Se ele não oferecer o
+    // sem-custo (stack sem o serviço de pé), a tela não pode apontar para um
+    // endereço que não responde.
+    await montar();
+
+    expect(screen.getByLabelText("Base URL do gateway")).toHaveValue("");
+    expect(screen.getByLabelText("Destino conhecido")).toHaveValue("");
+  });
+});
+
+describe("ModeloIaTab — a marca de destino simulado (SPEC-74 fatia D)", () => {
+  it("o destino sem custo avisa, em primeiro lugar, que inventa as respostas", async () => {
+    await montar(statusComSemCusto());
+
+    const avisos = screen.getByTestId("avisos-do-destino");
+    expect(avisos).toHaveTextContent("NÃO chama modelo nenhum");
+    expect(avisos).toHaveTextContent("marcado como simulado");
+  });
+
+  it("o aviso vale para quem COLA o endereço à mão, não só para quem escolhe na lista", async () => {
+    await montar(statusComSemCusto({ gateway: { configurado: true, baseUrl: "https://gw.interno/v1" } }));
+    expect(screen.queryByTestId("avisos-do-destino")).toBeNull();
+
+    fireEvent.change(screen.getByLabelText("Base URL do gateway"), {
+      target: { value: "http://gateway-falso:4123/v1" },
+    });
+
+    expect(screen.getByTestId("avisos-do-destino")).toHaveTextContent("NÃO chama modelo nenhum");
+  });
+
+  it("destino de verdade não ganha a marca — duvidar de trabalho legítimo é o erro caro", async () => {
+    await montar(statusComSemCusto());
+    fireEvent.change(screen.getByLabelText("Base URL do gateway"), {
+      target: { value: "https://api.anthropic.com/v1" },
+    });
+
+    expect(screen.queryByTestId("avisos-do-destino")).toBeNull();
+  });
+});
+
+it("o dublê fora do compose (127.0.0.1) também é reconhecido como simulado", async () => {
+  // A suíte E2E aponta para `127.0.0.1:4123`, e o preset oferece o nome do
+  // serviço do compose. Sem os endereços alternativos, o destino simulado mais
+  // exercitado do repositório seria justamente o que não recebe a marca.
+  await montar(statusComSemCusto());
+  fireEvent.change(screen.getByLabelText("Base URL do gateway"), {
+    target: { value: "http://127.0.0.1:4123/v1" },
+  });
+
+  expect(screen.getByTestId("avisos-do-destino")).toHaveTextContent("NÃO chama modelo nenhum");
+});

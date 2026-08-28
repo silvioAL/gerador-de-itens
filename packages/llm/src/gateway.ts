@@ -13,6 +13,7 @@
  */
 export type { EsquemaJson } from "./esquema.js";
 export {
+  ehSimulado,
   formatoJsonPorBaseUrl,
   PRESETS_GATEWAY,
   presetGatewayPorId,

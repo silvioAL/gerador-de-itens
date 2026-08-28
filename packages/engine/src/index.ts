@@ -148,6 +148,9 @@ export {
   CHAVE_REGRAS_TESTE,
   CHAVE_CENARIO_FEATURE,
   MARCADOR_ESPECIFICAR,
+  /** SPEC-74 — a proveniência do que o modo sem custo escreveu. */
+  EVIDENCIA_SIMULADA,
+  MARCA_SIMULADO,
   type PlaceholderRefinamento,
 } from "./refinamento/gerarRefinamento.js";
 export {

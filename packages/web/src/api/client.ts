@@ -362,6 +362,10 @@ export interface StatusIa {
    * servidor antigo, e a UI trata isso como "não faz": esconder um botão que
    * funcionaria custa um clique; mostrar um que falha custa a gravação. */
   capacidades?: { transcricao?: boolean; visao?: boolean };
+  /** SPEC-74 — o destino CONFIGURADO inventa as respostas. Ausente em servidor
+   * antigo, e a UI trata como `false`: é o servidor que sabe para onde a
+   * credencial aponta. */
+  simulado?: boolean;
 }
 
 /** Um destino conhecido do gateway — espelha `PresetGateway` de `@gerador/llm`,
@@ -380,6 +384,13 @@ export interface PresetGateway {
   jsonNativo: boolean;
   urlChave?: string;
   observacao: string;
+  /** SPEC-74 — este destino não consulta modelo nenhum: as respostas são
+   * inventadas pela própria stack. Ausente = destino de verdade. */
+  simulado?: boolean;
+  /** SPEC-74 — outros endereços do MESMO destino (o dublê fora do compose
+   * responde em `127.0.0.1`). Vem do servidor para a tela aplicar a mesma
+   * régua, em vez de manter uma segunda cópia da lista. */
+  baseUrlsAlternativas?: string[];
 }
 
 export interface ConfigIa {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DiagramaConfig, No, Quebra } from "@gerador/engine";
 import type { Cenario } from "./scenarios";
 import { Jornada } from "./Jornada";
@@ -139,11 +139,27 @@ function Cenarios({
   onAdicionar: (quebra: Quebra) => void;
 }) {
   const [adicionadoId, setAdicionadoId] = useState<string | null>(null);
+  /**
+   * O relógio do "adicionado ✓" precisa ser cancelável.
+   *
+   * Sem isto ele sobrevive ao fechamento da modal e chama `setAdicionadoId` num
+   * componente que já saiu — em produção é o aviso de update em componente
+   * desmontado, e na suíte é um `window is not defined` disparado DEPOIS que o
+   * ambiente do teste foi derrubado. Apareceu ao acrescentar testes noutro
+   * arquivo, que mudou a ordem de execução: o vazamento já existia e só não
+   * tinha encontrado a janela certa para doer.
+   */
+  const relogioRef = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(relogioRef.current), []);
 
   function adicionar(cenario: Cenario) {
     onAdicionar(cenario.quebra);
     setAdicionadoId(cenario.id);
-    setTimeout(() => setAdicionadoId((atual) => (atual === cenario.id ? null : atual)), 1500);
+    clearTimeout(relogioRef.current);
+    relogioRef.current = setTimeout(
+      () => setAdicionadoId((atual) => (atual === cenario.id ? null : atual)),
+      1500
+    );
   }
 
   return (

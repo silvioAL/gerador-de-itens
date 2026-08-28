@@ -12,6 +12,7 @@ import {
   montarFichaItem,
   nosDeOrigem,
 } from "./gerarEspecificacaoEntrega.js";
+import { EVIDENCIA_SIMULADA, MARCA_SIMULADO, MARCA_SUGERIDO } from "../refinamento/gerarRefinamento.js";
 
 const config: DiagramaConfig = {
   nodeTypes: {
@@ -963,5 +964,80 @@ describe("ensaios assumidos no documento e no item (SPEC-69 fatia D)", () => {
 
     expect(comListaVazia).toBe(semNada);
     expect(semNada).not.toContain("Riscos medidos");
+  });
+});
+
+/**
+ * SPEC-74 fatia D — o documento diz o que foi simulado.
+ *
+ * A marca vive na `evidencia` do valor, e não num sinalizador de "o modo estava
+ * ligado": quem gerou no modo sem custo, trocou para um gateway de verdade e
+ * exportou uma semana depois continua carregando um item cujo texto nenhum
+ * modelo escreveu.
+ */
+describe("marca de conteúdo simulado (SPEC-74)", () => {
+  const chaveDoMongo = (atividades: ReturnType<typeof derivar>) =>
+    atividades.find((a) => a.chave.startsWith("n2"))!.chave;
+
+  it("resposta escrita pelo modo sem custo sai marcada no documento", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, config, {
+      respostasItens: {
+        [chaveDoMongo(atividades)]: {
+          _historiaUsuario: {
+            valor: "Como analista, quero ver o catálogo atualizado.",
+            origem: "sugerido",
+            confirmado: true,
+            evidencia: EVIDENCIA_SIMULADA,
+          },
+        },
+      },
+    });
+
+    expect(doc).toContain("Como analista, quero ver o catálogo atualizado.");
+    expect(doc).toContain(MARCA_SIMULADO);
+  });
+
+  it("confirmar tira a marca de sugerido e NÃO tira a de simulado", () => {
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+    const chave = chaveDoMongo(atividades);
+    const valor = "Como analista, quero ver o catálogo atualizado.";
+
+    const naoConfirmada = gerarEspecificacaoEntrega(atividades, diagrama, config, {
+      respostasItens: {
+        [chave]: { _historiaUsuario: { valor, origem: "sugerido", evidencia: EVIDENCIA_SIMULADA } },
+      },
+    });
+    const confirmada = gerarEspecificacaoEntrega(atividades, diagrama, config, {
+      respostasItens: {
+        [chave]: { _historiaUsuario: { valor, origem: "sugerido", confirmado: true, evidencia: EVIDENCIA_SIMULADA } },
+      },
+    });
+
+    expect(naoConfirmada).toContain(MARCA_SUGERIDO);
+    expect(naoConfirmada).toContain(MARCA_SIMULADO);
+    // Quem confirmou assumiu o texto; o texto continua não tendo vindo de
+    // modelo nenhum.
+    expect(confirmada).not.toContain(MARCA_SUGERIDO);
+    expect(confirmada).toContain(MARCA_SIMULADO);
+  });
+
+  it("sem a evidência, o documento sai BYTE A BYTE como antes", () => {
+    // A régua que impede esta fatia de mexer em quem nunca usou o modo sem
+    // custo — o mesmo controle negativo do teste do ensaio assumido.
+    const diagrama = diagramaBase();
+    const atividades = derivar(diagrama, config, {});
+    const chave = chaveDoMongo(atividades);
+    const valor = "Como analista, quero ver o catálogo atualizado.";
+
+    const doc = gerarEspecificacaoEntrega(atividades, diagrama, config, {
+      respostasItens: { [chave]: { _historiaUsuario: { valor, origem: "sugerido" } } },
+    });
+
+    expect(doc).not.toContain(MARCA_SIMULADO);
+    expect(doc).toContain(MARCA_SUGERIDO);
   });
 });

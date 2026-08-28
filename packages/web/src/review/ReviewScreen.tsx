@@ -45,6 +45,7 @@ import { useArrastavel } from "../assistente/useArrastavel";
 import { momentoDaRevisao } from "../assistente/momentos";
 import { DiagramaCompacto } from "./DiagramaCompacto";
 import { EsteiraAgentes } from "./EsteiraAgentes";
+import { MarcaDeDemonstracao } from "../demo/dadosDoTour";
 import { SimulacaoEsteira } from "./SimulacaoEsteira";
 import { PAPEIS_PIPELINE, ROTULO_PAPEL, useEsteiraDeAgentes, type ItemFilaEsteira } from "./useEsteiraDeAgentes";
 
@@ -326,6 +327,14 @@ export function ReviewScreen({
   // SPEC-24 Fase E: default seguro (pausa pra confirmação manual) até o
   // valor real carregar — nunca aplica direto sem saber a config de verdade.
   const [confirmacaoObrigatoria, setConfirmacaoObrigatoria] = useState(true);
+  /**
+   * SPEC-74 fatia D — o destino de IA configurado inventa as respostas.
+   *
+   * `false` até `/ia/status` responder, e o erro é deliberado nessa direção:
+   * marcar como simulado o que veio de um modelo de verdade seria a ferramenta
+   * duvidando de trabalho legítimo.
+   */
+  const [iaSimulada, setIaSimulada] = useState(false);
   // SPEC-24 Fase F: papéis da esteira vindos da config (ordem/ativo/
   // contextos/prompt) — default de fábrica até (e se) a config carregar.
   const [papeisConfig, setPapeisConfig] = useState<PapelConfigurado[]>(PAPEIS_PADRAO);
@@ -492,6 +501,7 @@ export function ReviewScreen({
     contextoDoProduto,
     papeis: papeisAtivos,
     confirmacaoObrigatoria,
+    simulado: iaSimulada,
     // SPEC-26 Bloco 1: o que a esteira escreve também nasce carimbado.
     onResponderItem: responderComProcedencia,
   });
@@ -607,6 +617,9 @@ export function ReviewScreen({
         setIaIndisponivel("sem-rota");
         return;
       }
+      // SPEC-74 — antes do `pronto`, de propósito: um destino simulado que
+      // ainda não está pronto continua sendo simulado quando ficar.
+      setIaSimulada(status.value.simulado === true);
       if (!status.value.pronto) {
         setIaIndisponivel("sem-modelo");
         return;
@@ -941,6 +954,16 @@ export function ReviewScreen({
         </div>
       )}
 
+      {/* SPEC-74 fatia D — a marca de que a IA não é IA.
+          Reusa a marca de demonstração do §235, e pelo mesmo motivo dela: sem
+          isto a primeira captura de tela vira "olha o que a IA respondeu". Fica
+          acima da esteira, e não ao lado de cada campo, porque a régua do §235 é
+          "pequena e sempre no topo do que ela qualifica — a pessoa precisa ver
+          antes de ler o conteúdo, não depois". A marca por VALOR existe também,
+          e é outra: ela viaja no documento e no card exportado. */}
+      {!mostrarDiagrama && iaSimulada && (
+        <MarcaDeDemonstracao texto="✦ Modo sem custo — a esteira não está falando com modelo nenhum. O texto abaixo é simulado e chega marcado no documento." />
+      )}
       {!mostrarDiagrama && (
         <EsteiraAgentes
           papeis={papeisAtivos}

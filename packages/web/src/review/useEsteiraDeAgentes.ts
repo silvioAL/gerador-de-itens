@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ValorSpec } from "@gerador/engine";
+import { EVIDENCIA_SIMULADA, type ValorSpec } from "@gerador/engine";
 import {
   PAPEIS_PADRAO,
   apiIa,
@@ -73,6 +73,16 @@ export interface UseEsteiraDeAgentesParams {
    * de revisão manual. `false` aplica direto (`confirmado: true`), sem
    * pausa, igual ao protótipo de referência. */
   confirmacaoObrigatoria?: boolean;
+  /**
+   * SPEC-74 fatia D — o destino de IA configurado INVENTA as respostas.
+   *
+   * Vem de `/ia/status`, que resolve DEPOIS do auto-start da esteira — por isso
+   * é lido por ref, pelo mesmo motivo do `confirmacaoObrigatoria` logo acima.
+   * Marcar a proveniência no valor, e não guardar "o modo estava ligado" em
+   * algum lugar, é o que faz a marca sobreviver a alguém trocar de destino
+   * depois.
+   */
+  simulado?: boolean;
   onResponderItem?: (atividadeChave: string, chavePlaceholder: string, resposta: ValorSpec) => void;
 }
 
@@ -199,6 +209,7 @@ export function useEsteiraDeAgentes({
   contextoDoProduto,
   papeis = PAPEIS_PADRAO,
   confirmacaoObrigatoria = true,
+  simulado = false,
   onResponderItem,
 }: UseEsteiraDeAgentesParams): EstadoEsteiraDeAgentes {
   const [fila, setFila] = useState<ItemFilaEsteira[]>([]);
@@ -223,6 +234,10 @@ export function useEsteiraDeAgentes({
   useEffect(() => {
     confirmacaoObrigatoriaRef.current = confirmacaoObrigatoria;
   }, [confirmacaoObrigatoria]);
+  const simuladoRef = useRef(simulado);
+  useEffect(() => {
+    simuladoRef.current = simulado;
+  }, [simulado]);
   const papeisRef = useRef(papeis);
   useEffect(() => {
     papeisRef.current = papeis;
@@ -307,6 +322,7 @@ export function useEsteiraDeAgentes({
                   valor,
                   origem: "sugerido",
                   confirmado: !confirmacaoObrigatoriaRef.current,
+                  ...(simuladoRef.current ? { evidencia: EVIDENCIA_SIMULADA } : {}),
                 });
               }
             }
@@ -338,6 +354,7 @@ export function useEsteiraDeAgentes({
                     valor,
                     origem: "sugerido",
                     confirmado: false,
+                    ...(simuladoRef.current ? { evidencia: EVIDENCIA_SIMULADA } : {}),
                   });
                 }
               }

@@ -154,9 +154,23 @@ function CardGateway({
   onSelecionar: () => void;
   onSalvo: () => Promise<void>;
 }) {
-  const [baseUrl, setBaseUrl] = useState(gateway?.baseUrl ?? "");
+  /**
+   * SPEC-74 — o destino que já vem escolhido quando NÃO há credencial nenhuma.
+   *
+   * A decisão é "modo sem custo é o padrão, e modelo real se liga
+   * explicitamente": o pedido que originou a SPEC foi um budget de API que
+   * acabou, e um padrão que gasta devolve o problema à primeira pessoa que
+   * esquecer de trocar.
+   *
+   * O que ele **não** faz é sobrescrever: a credencial é da organização
+   * inteira, e quem já configurou um gateway de verdade não pode ver a tela
+   * apontar para o dublê sozinha. Por isso a reconhecida vence sempre, e este
+   * default só existe no vazio.
+   */
+  const padrao = gateway?.configurado ? undefined : presets.find((p) => p.id === "sem-custo");
+  const [baseUrl, setBaseUrl] = useState(gateway?.baseUrl ?? padrao?.baseUrl ?? "");
   const [chave, setChave] = useState("");
-  const [nomeModelo, setNomeModelo] = useState(gateway?.modelo ?? "");
+  const [nomeModelo, setNomeModelo] = useState(gateway?.modelo ?? padrao?.modeloPadrao ?? "");
   // SPEC-30 Fase 2 — marcação manual: nenhum preset conhece o modelo que a
   // empresa batizou, e sem isto gateway interno nunca teria visão.
   const [visaoManual, setVisaoManual] = useState(gateway?.visao === true);
@@ -165,7 +179,7 @@ function CardGateway({
   // Reconhece o destino pela base URL já salva, pra quem volta na tela não ver
   // "outro (preencher à mão)" numa credencial que veio de um preset.
   const [presetId, setPresetId] = useState(
-    () => presets.find((p) => p.baseUrl === gateway?.baseUrl)?.id ?? ""
+    () => presets.find((p) => p.baseUrl === gateway?.baseUrl)?.id ?? padrao?.id ?? ""
   );
   const preset = presets.find((p) => p.id === presetId);
 
@@ -309,7 +323,7 @@ function CardGateway({
             dizer o que cada destino realmente faz — e a pessoa só descobria na
             falha. Estes avisos são por DESTINO, e ficam antes dos campos: são
             o que muda a decisão de configuração, não uma nota de rodapé. */}
-        <AvisosDoDestino baseUrl={baseUrl} visaoMarcada={visaoManual} />
+        <AvisosDoDestino baseUrl={baseUrl} visaoMarcada={visaoManual} simulado={destinoSimulado(presets, baseUrl)} />
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
           <input
@@ -468,7 +482,35 @@ const avisoEstilo: React.CSSProperties = {
  * o sistema consegue. Aviso não é enfeite — é o que evita a pessoa gastar
  * tempo num caminho que não existe.
  */
-function AvisosDoDestino({ baseUrl, visaoMarcada }: { baseUrl: string; visaoMarcada: boolean }) {
+/**
+ * SPEC-74 — este endereço aponta para o dublê?
+ *
+ * Pelo ENDEREÇO digitado, e não pelo preset escolhido no seletor: quem colar a
+ * base URL à mão precisa do mesmo aviso de quem a escolheu na lista. E a lista
+ * de endereços vem do servidor dentro do preset, para esta função e o
+ * `ehSimulado` do `@gerador/llm` nunca terem duas versões da mesma régua — o
+ * `@gerador/llm` não pode entrar no bundle (arrasta o binário nativo), então a
+ * alternativa seria uma cópia, e cópia envelhece em silêncio (§263).
+ */
+function destinoSimulado(presets: PresetGateway[], baseUrl: string): boolean {
+  const alvo = baseUrl.trim().replace(/\/+$/, "").toLowerCase();
+  if (!alvo) return false;
+  return presets.some(
+    (p) =>
+      p.simulado === true &&
+      [p.baseUrl, ...(p.baseUrlsAlternativas ?? [])].some((e) => alvo.startsWith(e.replace(/\/+$/, "").toLowerCase()))
+  );
+}
+
+function AvisosDoDestino({
+  baseUrl,
+  visaoMarcada,
+  simulado,
+}: {
+  baseUrl: string;
+  visaoMarcada: boolean;
+  simulado?: boolean;
+}) {
   const alvo = baseUrl.trim().toLowerCase();
   if (!alvo) return null;
 
@@ -477,6 +519,14 @@ function AvisosDoDestino({ baseUrl, visaoMarcada }: { baseUrl: string; visaoMarc
   const ehLocal = ehOllama || alvo.includes("localhost") || alvo.includes("127.0.0.1") || alvo.includes("://whisper");
 
   const avisos: string[] = [];
+  // SPEC-74 — PRIMEIRO da lista, porque muda o que todo o resto significa: num
+  // destino simulado, "Testar conexão" passar não diz nada sobre um modelo, e
+  // o texto que aparecer nos itens não foi escrito por ninguém.
+  if (simulado) {
+    avisos.push(
+      "Este destino NÃO chama modelo nenhum: as respostas são inventadas pela própria stack, com a forma certa e conteúdo falso. Serve para desenvolver e demonstrar sem gastar API — e tudo o que sair daqui chega marcado como simulado, na tela e no documento."
+    );
+  }
   if (ehOllama) {
     avisos.push(
       "O Ollama não transcreve áudio. Para o botão de falar funcionar, suba o serviço de voz junto: `docker compose --profile ia up -d` (a transcrição vai pro Whisper, não pra cá)."
