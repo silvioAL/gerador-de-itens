@@ -1,4 +1,5 @@
 import { boolean, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import type { AnexoDeContexto, VolumetriaDaDemanda } from "@gerador/engine";
 
 /**
  * `diagrama` guarda { nodes, edges } exatamente como packages/engine espera
@@ -19,7 +20,16 @@ export const quebras = pgTable("quebras", {
    */
   respostasItens: jsonb("respostas_itens").notNull().default({}),
   demandInfo: text("demand_info").notNull().default(""),
-  anexosContexto: jsonb("anexos_contexto").$type<string[]>().notNull().default([]),
+  /**
+   * SPEC-71 — `{ nome, conteudo }[]`, e não `string[]`.
+   *
+   * A coluna dizia `string[]` desde a 0011 enquanto o modelo dizia objeto, e a
+   * discordância não era cosmética: o Zod da borda, escrito contra ela,
+   * recusava o corpo com 400 — demanda com anexo não salvava NADA. Perder o
+   * nome do arquivo é perder o que a tela mostra e o que a pessoa usa para
+   * remover o anexo certo.
+   */
+  anexosContexto: jsonb("anexos_contexto").$type<AnexoDeContexto[]>().notNull().default([]),
   /** §184 — o documento de especificação GERADO, com o material daquele
    * momento; a data marca a versão (setada pelo adaptador quando o texto vem). */
   /** SPEC-53 — de que produto é esta demanda. Opcional: quem já usa a
@@ -40,6 +50,18 @@ export const quebras = pgTable("quebras", {
   percursos: jsonb("percursos").notNull().default([]),
   documentoEscrito: jsonb("documento_escrito").notNull().default({}),
   documentoStatus: text("documento_status"),
+  /**
+   * SPEC-71 (migração 0037) — os três campos que existiam no tipo e não tinham
+   * onde morar. `jsonb` pelo mesmo raciocínio anotado em cada coleção acima:
+   * pertencem à quebra e não há consulta transversal que justifique tabela.
+   *
+   * `volumetria` é objeto e não lista, e por isso é o primeiro a aceitar NULL:
+   * "esta demanda não declarou volume" é uma afirmação diferente de "declarou
+   * uma lista vazia", e um default `{}` apagaria a diferença.
+   */
+  volumetria: jsonb("volumetria").$type<VolumetriaDaDemanda>(),
+  leiturasDispensadas: jsonb("leituras_dispensadas").notNull().default([]),
+  cenariosDeLentidao: jsonb("cenarios_de_lentidao").notNull().default([]),
   especificacao: text("especificacao"),
   especificacaoGeradaEm: timestamp("especificacao_gerada_em", { withTimezone: true }),
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),

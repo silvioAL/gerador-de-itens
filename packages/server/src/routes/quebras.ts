@@ -29,13 +29,29 @@ import { exigirNivel } from "../auth/niveis.js";
  * três, e `respostasItens`/`demandInfo`/`anexosContexto` morriam aqui — o Zod
  * descartava, sem erro, o trabalho da esteira e o contexto do épico.
  */
-const corpoQuebra = z.object({
+/**
+ * SPEC-71 fatia C — EXPORTADO para o teste de borda.
+ *
+ * `corpoQuebra.shape` é a única forma de perguntar, em runtime, quais chaves a
+ * borda conhece. O outro lado da pergunta — quais chaves o tipo `Quebra` tem —
+ * não existe em runtime, e por isso o teste cruza este `shape` com um
+ * inventário que o COMPILADOR verifica. Ver `quebras.borda.test.ts`.
+ */
+export const corpoQuebra = z.object({
   titulo: z.string().nullish(),
   time: z.string().nullish(),
   diagrama: z.object({ nodes: z.array(z.record(z.unknown())), edges: z.array(z.record(z.unknown())) }),
   respostasItens: z.record(z.record(z.unknown())).optional(),
   demandInfo: z.string().optional(),
-  anexosContexto: z.array(z.string()).optional(),
+  /**
+   * SPEC-71 §4 — `{ nome, conteudo }`, e não `string`.
+   *
+   * Era `z.array(z.string())` desde a 0011 enquanto o modelo dizia objeto, e
+   * `z.string()` recebendo objeto **não descarta em silêncio: falha**. A rota
+   * respondia 400, e por isso qualquer demanda com um anexo não salvava nada —
+   * nem o anexo, nem o diagrama, nem o resto. Medido contra o servidor real.
+   */
+  anexosContexto: z.array(z.object({ nome: z.string(), conteudo: z.string() })).optional(),
   especificacao: z.string().nullish(),
   /** SPEC-53 — o vínculo com o produto. */
   produtoId: z.string().uuid().nullish(),
@@ -52,6 +68,8 @@ const corpoQuebra = z.object({
         origem: z.enum(["manual", "extraido", "inferido", "sugerido"]),
         confirmado: z.boolean().optional(),
         atendidaPor: z.array(z.string()),
+        /** SPEC-69 fatia A — o prazo que o NEGÓCIO exige. */
+        limiteMs: z.number().optional(),
       })
     )
     .optional(),
@@ -62,7 +80,11 @@ const corpoQuebra = z.object({
     .array(
       z.object({
         noId: z.string().min(1),
-        campo: z.string().min(1),
+        /** SPEC-63 — vazio quando a exceção é de FORMA (quem identifica é `regraId`). */
+        campo: z.string(),
+        regraId: z.string().optional(),
+        /** §307 — a terceira chave: a contradição de resiliência aceita. */
+        contradicao: z.enum(["insistencia", "saturacao"]).optional(),
         motivo: z.string().min(1),
         autor: z.string().min(1),
         em: z.string().min(1),
@@ -89,6 +111,9 @@ const corpoQuebra = z.object({
         origem: z.enum(["manual", "extraido", "inferido", "sugerido"]),
         autor: z.string().min(1),
         em: z.string().min(1),
+        /** SPEC-69 fatia D — os ensaios que são a EVIDÊNCIA desta decisão.
+         * Sem eles a evidência para de viajar ao item. */
+        ensaioIds: z.array(z.string()).optional(),
       })
     )
     .optional(),
@@ -117,6 +142,12 @@ const corpoQuebra = z.object({
    * gerada tem `null`, e distinguir isso de "não mandou o campo" é o que
    * permite o PUT não apagar um status por omissão. */
   documentoStatus: z.enum(["rascunho", "em-revisao", "aprovado", "implementado"]).nullish(),
+  /**
+   * SPEC-70 — o volume que a demanda atende, dito UMA vez e distribuído pelo
+   * motor. Sem esta linha o número sumia na borda, e a saturação voltava a
+   * calar (a Lei de Little não se faz sem λ).
+   */
+  volumetria: z.object({ quantidade: z.number(), por: z.enum(["segundo", "minuto", "hora", "dia"]) }).optional(),
   /** SPEC-65 fatia D — as leituras caladas neste desenho. Só a DECISÃO
    * atravessa a borda, como nos percursos: a leitura em si é pura e roda a cada
    * render. `tipo` é string livre de propósito — leitura nova não deveria
@@ -141,6 +172,23 @@ const corpoQuebra = z.object({
         nome: z.string().min(1),
         origem: z.enum(["manual", "sugerido"]),
         porque: z.string().optional(),
+        /**
+         * SPEC-69 — o estado do ensaio e o débito assumido.
+         *
+         * Esta forma estava congelada na SPEC-66, e o tipo do modelo também: o
+         * Zod não ficou para trás sozinho, ficou **em sincronia com a cópia
+         * morta** que morava em `types.ts` (`CenarioDeLentidaoGuardado`).
+         * Enquanto isso a UI escrevia a forma viva. Por isso o ensaio inteiro
+         * sumia no salvamento sem nada acusar — e por isso a cópia morreu
+         * nesta rodada.
+         */
+        estado: z.enum(["por-avaliar", "em-revisao", "aceito"]).optional(),
+        debito: z
+          .object({ motivo: z.string().min(1), autor: z.string().optional(), em: z.string().optional() })
+          .optional(),
+        /** SPEC-70 §5 — "neste ensaio o volume da demanda é N× o normal". */
+        fatorDeVolume: z.number().positive().optional(),
+        /** @deprecated SPEC-69 — só para quebra gravada antes do estado existir. */
         aceito: z.boolean().optional(),
         ajustes: z.array(
           z.object({
@@ -148,6 +196,11 @@ const corpoQuebra = z.object({
             id: z.string().min(1),
             fator: z.number().positive().optional(),
             ms: z.number().nonnegative().optional(),
+            /** SPEC-68 — as condições que NÃO são lentidão: insistência, pico
+             * e disjuntor. Sem elas, as três somem no salvamento. */
+            tentativas: z.number().nonnegative().optional(),
+            disjuntor: z.boolean().optional(),
+            taxaRps: z.number().nonnegative().optional(),
           })
         ),
       })

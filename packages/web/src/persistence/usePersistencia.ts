@@ -69,7 +69,13 @@ export function usePersistencia(quebra: Quebra, aoAbrir: (q: Quebra) => void) {
           diagrama: salva.diagrama,
           respostasItens: salva.respostasItens,
           demandInfo: salva.demandInfo || undefined,
-          anexosContexto: (salva.anexosContexto ?? []).map((conteudo, i) => ({ nome: `anexo-${i + 1}.txt`, conteudo })),
+          // SPEC-71 — o servidor passou a guardar o NOME do arquivo, então
+          // esta conversão morreu. Ela era o único ponto do repositório que
+          // sabia da divergência de forma entre o modelo e a coluna, e existia
+          // só de um lado: a leitura convertia, a escrita não — e o PUT levava
+          // 400 com qualquer anexo. Migração 0037 converte o que já estava
+          // gravado, com o mesmo `anexo-N.txt` que se inventava aqui.
+          anexosContexto: salva.anexosContexto,
           especificacao: salva.especificacao ?? undefined,
           // §250 — ACHADO REAL, e é a terceira vez que esta lista fica para
           // trás. O §184 já tinha corrigido isto uma vez ("antes só vinham
@@ -90,6 +96,15 @@ export function usePersistencia(quebra: Quebra, aoAbrir: (q: Quebra) => void) {
           percursos: salva.percursos,
           documentoEscrito: salva.documentoEscrito,
           documentoStatus: salva.documentoStatus ?? undefined,
+          // SPEC-71 — o QUINTO funil, e o que torna a correção do servidor
+          // insuficiente sozinha: mesmo com Zod e colunas certos, estes três
+          // sumiam aqui, e o autosave de 2 s gravava o vazio por cima do que
+          // estava salvo. É a quarta vez que esta lista fica para trás — e é
+          // por isso que a trava desta rodada não é um aviso a mais no
+          // comentário acima, é um teste que compara o objeto INTEIRO.
+          volumetria: salva.volumetria,
+          leiturasDispensadas: salva.leiturasDispensadas,
+          cenariosDeLentidao: salva.cenariosDeLentidao,
         });
         setQuebraId(salva.id);
         setStatus("salvo");

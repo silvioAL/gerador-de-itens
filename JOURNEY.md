@@ -11875,3 +11875,126 @@ baixado. Toda asserção nova foi vista falhando com a correção desligada.
 
 505 engine · 133 llm · 84 aplicação · 776 web · 240 server · 39 gateway-falso ·
 102/102 E2E · build e lint limpos.
+
+## §310 — o que se salva volta, e a classe do defeito morreu junto (SPEC-71)
+
+O pedido do usuário, antes de abrir uma conversa nova: *"precisamos avaliar se
+existem testes a fim de garantir que todas informações salvas sejam
+recuperadas."*
+
+### A medição, contra o servidor real, antes de uma linha de código
+
+Uma quebra com todo campo do tipo preenchido, gravada e lida de volta:
+
+```
+PERDEU  volumetria
+PERDEU  cenariosDeLentidao (inteiro)
+PERDEU  leiturasDispensadas
+PERDEU  necessidades[].limiteMs
+PERDEU  decisoes[].ensaioIds
+PERDEU  excecoes[].contradicao
+POST 400  anexosContexto  ("Expected string, received object")
+```
+
+**Seis perdas silenciosas, e uma ruidosa.** A SPEC listava quatro; o mapeamento
+achou mais duas, e a sétima linha respondeu por evidência uma pergunta que a
+SPEC §4 tinha deixado em aberto ("não medi").
+
+> **Demanda com anexo não salvava nada.** Nem o anexo, nem o diagrama, nem o
+> resto. `z.array(z.string())` recebendo objeto não descarta em silêncio: falha,
+> e a rota devolve 400. O modelo diz `{ nome, conteudo }[]` desde sempre; a
+> coluna e o Zod diziam `string[]`. A conversão existia num lugar só — na
+> LEITURA (`usePersistencia`), que inventava `anexo-N.txt` —, e a escrita nunca
+> teve par.
+
+### O Zod não ficou para trás sozinho
+
+`types.ts` guardava uma segunda definição do ensaio, `CenarioDeLentidaoGuardado`,
+congelada na forma da SPEC-66. A UI escrevia a forma viva (`CenarioDeLentidao`,
+em `leitura/simularLentidao.ts`), com `estado`, `debito`, `fatorDeVolume` e as
+condições da SPEC-68. O Zod da borda foi escrito contra a cópia — e ficou **em
+sincronia com um tipo que ficou para trás**.
+
+Por isso a correção não foi "atualizar o Zod": os quatro tipos do ensaio mudaram
+de casa para `model/types.ts`, e a cópia morreu. **O que é persistido é do
+modelo**; `simularLentidao` reexporta, para quem já importava de lá não precisar
+saber que a fronteira mudou.
+
+### Cinco funis, e o quinto é o que tornava a correção do servidor insuficiente
+
+A SPEC descreve três causas. São cinco lugares, em série:
+
+| # | Onde | O que morria |
+|---|---|---|
+| 1 | Zod da borda | quatro campos, por chave desconhecida descartada em silêncio |
+| 2 | Tipo da porta | três campos nem existiam em `QuebraSalva` |
+| 3 | Normalizador (lista fechada de 13 campos) | o que passou pelo Zod e não estava na lista |
+| 4 | Colunas | não havia onde escrever |
+| 5 | **`usePersistencia.abrirPorId`** | reidratação campo a campo, sem os três |
+
+O quinto é o que faria a correção do servidor não bastar: com Zod e colunas
+certos, reabrir continuaria descartando — e o autosave de 2 s gravaria o vazio
+por cima do que estava salvo. O bloco de comentário naquele arquivo é
+literalmente o aviso de que isso ia se repetir. Repetiu.
+
+### A trava: aviso não bastou três vezes, agora falha
+
+`repositorioDeQuebras.ts` já repetia a lição três vezes, uma por SPEC. A
+migração 0011 avisa na própria tabela. Não bastou.
+
+`routes/quebras.borda.test.ts` troca a lembrança por uma falha, e precisa de
+duas metades porque `keyof Quebra` não existe em runtime e o Zod não existe em
+tempo de compilação:
+
+1. **o compilador** obriga um inventário a cobrir `keyof Quebra` — campo novo
+   sem entrada é erro de build;
+2. **o teste** confronta esse inventário com `corpoQuebra.shape`.
+
+Uma sem a outra não pega nada. E o que ela **não** pega — campo aninhado, como
+`ajustes[].taxaRps` — é coberto pelo round-trip por igualdade estrutural em
+`app.test.ts`, que compara o objeto inteiro. Dois testes porque são duas
+perguntas.
+
+> **A metade do compilador era decorativa, e isso teve que ser consertado
+> junto.** Nada rodava `tsc` sobre `packages/server`: o `build` é `tsup`, que
+> não typecheca. É o achado do §286 sobre a CLI, um pacote depois. O pacote
+> ganhou `typecheck`, e no caminho quatro erros de tipo antigos foram corrigidos
+> — um deles real: `contratoDoClienteWeb` chamava `apiQuebras.listar("time")`
+> com um argumento que a assinatura não tem, afirmando um filtro que não existe.
+
+### O E2E da fatia D mentia em QUATRO camadas
+
+O teste dizia *"o ensaio é do time, não da sessão"*. Cada camada era verde:
+
+1. **`goto("/#/ensaios")` é same-document.** Difere da URL atual só no
+   fragmento: não recarrega nada, e a asserção lia o estado em memória. A
+   armadilha já estava documentada num spec vizinho.
+2. **A demanda nunca era salva.** O cenário de demonstração vem sem título, e
+   salvar sem título abre a pergunta do nome. O teste conferia
+   `getByText(/salv/i)` — que casa com *"dê um título antes de salvar"* tão bem
+   quanto com *"salvo"*.
+3. **E não poderia ser salva.** O cenário pronto é do `time-credito`, e o
+   usuário do E2E não tem `operar` nele: o POST volta **403**.
+4. E, embaixo de tudo, **o ensaio inteiro sumia no banco** — o defeito que o
+   teste existia para pegar.
+
+Descascar isso levou o F5 para um teste próprio, com a demanda montada à mão no
+time de quem está logado. Ele assume um débito com motivo, confere **no
+servidor** que o ensaio chegou inteiro (estado, débito e o fator do ajuste),
+recarrega de verdade, reabre pelo menu — e o débito continua assumido, com autor
+e motivo.
+
+> Uma âncora antes de salvar evitou o diagnóstico errado: sem ela, um vermelho
+> depois do F5 não distingue "a persistência perdeu" de "o gesto nunca valeu".
+> Foi ela que mostrou que o meu primeiro desenho do teste estava errado — o
+> controle de fator não existe num ensaio já assumido, porque a linha fica em
+> modo de leitura.
+
+### O que ficou anotado para a rodada seguinte
+
+O banco do E2E mostrou uma quebra com `respostas_itens: {}` enquanto a tela
+tinha todas as respostas da esteira. Não investiguei aqui: vira medição da
+SPEC-72, e não afirmação desta.
+
+505 engine · 133 llm · 84 aplicação · 776 web · 245 server · 39 gateway-falso ·
+103/103 E2E · build, typecheck e lint limpos.

@@ -15,7 +15,6 @@ import {
   credenciaisIa,
   especificacaoTemplates,
   organizacoes,
-  credenciaisIa,
   execucoesIa,
   papeisAcesso,
   papelPermissao,
@@ -3170,6 +3169,98 @@ describe("produtos (SPEC-53)", () => {
 
     const relida = await app.inject({ method: "GET", url: `/quebras/${criada.json().id}`, cookies: { gerador_sessao: cookie } });
     expect(relida.json().necessidades).toEqual(necessidades);
+  });
+
+  /**
+   * SPEC-71 fatia A — o round-trip por IGUALDADE ESTRUTURAL.
+   *
+   * Os testes acima provam que os campos QUE ELES CITAM atravessam a borda.
+   * Nenhum pergunta *"e o que mais existe no tipo?"* — e é essa pergunta que
+   * faltou quatro vezes seguidas, por três SPECs diferentes, com o comentário
+   * da migração 0011 avisando na mesma tabela.
+   *
+   * Este é o único ponto do repositório onde Zod + normalizador + coluna +
+   * mapper de volta estão TODOS no caminho. A conferência é do objeto inteiro:
+   * o que sobrar na diferença é o que se perde.
+   *
+   * Medido contra o servidor real antes de escrever uma linha: seis campos
+   * sumiam em silêncio, e um sétimo derrubava o PUT inteiro com 400.
+   */
+  it("SPEC-71: uma quebra com TODO campo do tipo preenchido volta inteira", async () => {
+    const cookie = await logarComo(EMAIL_DEV);
+    const quebra = {
+      titulo: "demanda completa",
+      time: TIME_A,
+      diagrama: { nodes: [], edges: [] },
+      demandInfo: "contexto em prosa",
+      // SPEC-23 1b — a forma do MODELO: nome do arquivo + conteúdo. A coluna
+      // dizia `string[]`, e por isso qualquer demanda com anexo levava 400.
+      anexosContexto: [{ nome: "contexto.md", conteudo: "o material da demanda" }],
+      respostasItens: { "n1::criacao": { _historiaUsuario: { valor: "x", origem: "manual" } } },
+      especificacao: "# doc",
+      // SPEC-70 — o volume que a demanda atende.
+      volumetria: { quantidade: 2000000, por: "dia" },
+      // SPEC-69 fatia A — o prazo que o negócio exige.
+      necessidades: [
+        { id: "r1", texto: "não cobrar duas vezes", prioridade: "alta", origem: "manual", atendidaPor: ["n1"], limiteMs: 5000 },
+      ],
+      // §307 — a contradição de resiliência aceita com motivo.
+      excecoes: [
+        { noId: "n1", campo: "timeoutMs", motivo: "parceiro lento", autor: "ana", em: "2026-08-15T10:00:00.000Z", contradicao: "saturacao" },
+      ],
+      // SPEC-69 fatia D — a evidência que viaja ao item.
+      decisoes: [
+        {
+          id: "d1",
+          noId: "n1",
+          titulo: "Fila em vez de síncrono",
+          alternativas: [{ titulo: "Fila", consequencia: "desacopla" }, { titulo: "Síncrono" }],
+          escolhida: "Fila",
+          porque: "desacopla",
+          status: "aceita",
+          origem: "manual",
+          autor: "ana",
+          em: "2026-08-15T10:00:00.000Z",
+          ensaioIds: ["cen-bureau"],
+        },
+      ],
+      percursos: [{ id: "pc::n1>n2", rotulo: "a → b", nos: ["n1", "n2"], origem: "inferido", confirmado: true }],
+      documentoEscrito: { tradeOffs: "aceitamos latência", riscos: "o parceiro muda" },
+      documentoStatus: "aprovado",
+      // SPEC-65 fatia D — as leituras caladas.
+      leiturasDispensadas: [{ noId: "n1", tipo: "fan-out", autor: "ana", em: "2026-08-15T10:00:00.000Z" }],
+      // SPEC-66/68/69 — o ensaio inteiro, com o débito assumido e as condições.
+      cenariosDeLentidao: [
+        {
+          id: "cen-bureau",
+          nome: "Bureau lento no pico",
+          origem: "manual",
+          porque: "fim de mês",
+          estado: "aceito",
+          fatorDeVolume: 10,
+          debito: { motivo: "vale até o próximo trimestre", autor: "ana", em: "2026-08-15T10:00:00.000Z" },
+          ajustes: [{ tipo: "no", id: "n1", fator: 3, ms: 800, tentativas: 2, disjuntor: true, taxaRps: 50 }],
+        },
+      ],
+    };
+
+    const criada = await app.inject({
+      method: "POST",
+      url: "/quebras",
+      cookies: { gerador_sessao: cookie },
+      payload: quebra,
+    });
+    expect(criada.statusCode).toBe(201);
+
+    const relida = await app.inject({
+      method: "GET",
+      url: `/quebras/${criada.json().id}`,
+      cookies: { gerador_sessao: cookie },
+    });
+
+    // `toMatchObject` e não `toEqual`: a linha volta com id e carimbos que o
+    // payload não tinha. O que importa é que nada do que ENTROU tenha sumido.
+    expect(relida.json()).toMatchObject(quebra);
   });
 
   it("origem inventada numa necessidade é 400 — a lista é FECHADA como a de recursos", async () => {
