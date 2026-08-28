@@ -151,6 +151,10 @@ export {
   /** SPEC-74 — a proveniência do que o modo sem custo escreveu. */
   EVIDENCIA_SIMULADA,
   MARCA_SIMULADO,
+  /** Exportada junto porque o E2E afirma o PAR: confirmar tira esta e não
+   * tira a de simulado. Duas marcas com regras diferentes só se provam
+   * distintas se as duas puderem ser citadas pelo mesmo teste. */
+  MARCA_SUGERIDO,
   type PlaceholderRefinamento,
 } from "./refinamento/gerarRefinamento.js";
 export {

@@ -122,7 +122,15 @@ export interface EstadoEsteiraDeAgentes {
   /** `papeisOverride` (Fase F): o auto-start acabou de resolver a config e o
    * prop `papeis` ainda não re-renderizou — passa a lista fresca direto pra
    * esta corrida não largar com a antiga. */
-  iniciar: (fila: ItemFilaEsteira[], papeisOverride?: PapelConfigurado[]) => void;
+  /**
+   * `papeisOverride` e `simuladoOverride` existem pelo MESMO motivo: quem
+   * chama `iniciar` acabou de resolver esses dois valores num `.then` e ainda
+   * não re-renderizou, então o estado (e o ref, que só atualiza no efeito
+   * seguinte) ainda tem o valor antigo. Passar explicitamente é o que fecha a
+   * corrida — e ela não é teórica: sem isso a esteira gravava sem a marca de
+   * simulado, e só o E2E que confere o DOCUMENTO baixado pegou.
+   */
+  iniciar: (fila: ItemFilaEsteira[], papeisOverride?: PapelConfigurado[], simuladoOverride?: boolean) => void;
   pausar: () => void;
   continuar: () => void;
 }
@@ -396,8 +404,9 @@ export function useEsteiraDeAgentes({
   );
 
   const iniciar = useCallback(
-    (filaNova: ItemFilaEsteira[], papeisOverride?: PapelConfigurado[]) => {
+    (filaNova: ItemFilaEsteira[], papeisOverride?: PapelConfigurado[], simuladoOverride?: boolean) => {
       if (papeisOverride) papeisRef.current = papeisOverride;
+      if (simuladoOverride !== undefined) simuladoRef.current = simuladoOverride;
       setFalhas([]);
       const token = ++tokenRef.current;
       pausadoRef.current = false;

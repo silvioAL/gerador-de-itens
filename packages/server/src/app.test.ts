@@ -532,6 +532,65 @@ describe("/ia/* (SPEC-31 Fase 4)", () => {
     expect(status.body).not.toContain(chave);
     expect(status.json().pronto).toBe(true);
   });
+
+  /**
+   * SPEC-74 fatia D — com a credencial simulada GRAVADA, o servidor diz que é
+   * simulada.
+   *
+   * Este caminho não podia ser conferido à mão contra a stack de trabalho: a
+   * credencial é da organização inteira, e gravá-la ali por cima de um gateway
+   * de verdade destruiria a chave de quem estava usando (ela não volta por
+   * HTTP, por decisão do §... acima — então não haveria como restaurá-la).
+   * Aqui o banco é descartável e a gravação é o próprio teste, que é onde essa
+   * conferência deveria morar desde o começo.
+   */
+  it("credencial que aponta para o dublê chega ao /ia/status marcada como simulada", async () => {
+    const cookieDev = await logarComo(EMAIL_DEV);
+
+    const antes = await app.inject({ method: "GET", url: "/ia/status" });
+    expect(antes.json().simulado).toBe(false);
+
+    await app.inject({
+      method: "PUT",
+      url: "/ia/credencial",
+      cookies: { gerador_sessao: cookieDev },
+      payload: {
+        baseUrl: "http://gateway-falso:4123/v1",
+        chave: "chave-de-mentira-do-e2e",
+        modelo: "modelo-de-mentira",
+      },
+    });
+
+    const depois = await app.inject({ method: "GET", url: "/ia/status" });
+    expect(depois.json().simulado).toBe(true);
+    // E continua pronto: o modo sem custo não é um estado degradado, é um
+    // destino. A tela desenha tudo, e só acrescenta a marca.
+    expect(depois.json().pronto).toBe(true);
+  });
+
+  it("e o destino de verdade volta a NÃO ser simulado quando substitui o dublê", async () => {
+    // O controle negativo do teste acima. Sem ele, um `simulado: true` fixo
+    // passaria nos dois — e marcar como inventado o que veio de um modelo de
+    // verdade é o erro caro desta fatia.
+    const cookieDev = await logarComo(EMAIL_DEV);
+
+    await app.inject({
+      method: "PUT",
+      url: "/ia/credencial",
+      cookies: { gerador_sessao: cookieDev },
+      payload: { baseUrl: "http://gateway-falso:4123/v1", chave: "k", modelo: "modelo-de-mentira" },
+    });
+    expect((await app.inject({ method: "GET", url: "/ia/status" })).json().simulado).toBe(true);
+
+    await app.inject({
+      method: "PUT",
+      url: "/ia/credencial",
+      cookies: { gerador_sessao: cookieDev },
+      payload: { baseUrl: "https://api.anthropic.com/v1", chave: "sk-real", modelo: "claude-sonnet-5" },
+    });
+
+    expect((await app.inject({ method: "GET", url: "/ia/status" })).json().simulado).toBe(false);
+  });
 });
 
 describe("/config/:chave (SPEC-31 Fase 3)", () => {

@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import {
   carimbarInsumos,
   derivar,
+  EVIDENCIA_SIMULADA,
   insumosDoItem,
   resolverDependencias,
   TEMPLATE_ESPECIFICACAO_PADRAO,
@@ -646,7 +647,22 @@ describe("ReviewScreen — abas da ficha (Fase 1d-i, SPEC-23 — dado estruturad
     );
   });
 
-  it("achado real: Confirmar funciona SEM digitar nada, confirmando a resposta sugerida pela esteira", async () => {
+  /**
+   * ACHADO REAL (SPEC-74) — e este teste era CÚMPLICE do defeito.
+   *
+   * Ele nasceu para provar que "Confirmar sem digitar nada" não é um no-op, e
+   * acertou nisso. Mas afirmava `origem: "manual"` para um texto que a esteira
+   * escreveu — ou seja, fixava como esperado o fato de a confirmação APAGAR a
+   * proveniência. Com isso, confirmar uma sugestão passava a dizer que uma
+   * pessoa a tinha escrito, e junto iam a evidência, a confiança e o carimbo
+   * de insumos.
+   *
+   * A régua certa já existia em `FilaDeRevisao`, a dois arquivos daqui:
+   * editou vira manual, não editou vira a MESMA resposta, confirmada. Duas
+   * superfícies confirmando a mesma coisa de formas diferentes é a assinatura
+   * do §263 — e aqui ela custava um fato falso sobre quem escreveu.
+   */
+  it("Confirmar sem editar mantém a resposta da esteira e sua proveniência — só a confirma", async () => {
     const resultado = resultadoFixture01();
     const atividade = atividadeComPlaceholder(resultado);
     const onResponderItem = vi.fn();
@@ -661,11 +677,17 @@ describe("ReviewScreen — abas da ficha (Fase 1d-i, SPEC-23 — dado estruturad
         especificacaoTemplate={templateFixture}
         respostasItens={{
           [atividade.chave]: {
-            // Resposta que a esteira gravou: sugerida, ainda NÃO confirmada —
-            // o textarea mostra ela como fallback, e o Confirmar precisa
-            // enxergar o MESMO fallback (o bug era ler só o rascunho digitado
-            // e virar um no-op silencioso).
-            "Backend::DLQ configurada e monitorada": { valor: "sim, via DLQ dedicada", origem: "sugerido", confirmado: false },
+            // Resposta que a esteira gravou: sugerida, ainda NÃO confirmada, e
+            // com a evidência de que nenhum modelo foi consultado (SPEC-74). O
+            // textarea a mostra como fallback, e o Confirmar precisa enxergar o
+            // MESMO fallback — o bug original era ler só o rascunho digitado e
+            // virar um no-op silencioso.
+            "Backend::DLQ configurada e monitorada": {
+              valor: "sim, via DLQ dedicada",
+              origem: "sugerido",
+              confirmado: false,
+              evidencia: EVIDENCIA_SIMULADA,
+            },
           },
         }}
         onResponderItem={onResponderItem}
@@ -681,8 +703,59 @@ describe("ReviewScreen — abas da ficha (Fase 1d-i, SPEC-23 — dado estruturad
     expect(onResponderItem).toHaveBeenCalledWith(
       atividade.chave,
       "Backend::DLQ configurada e monitorada",
-      expect.objectContaining({ valor: "sim, via DLQ dedicada", origem: "manual" })
+      expect.objectContaining({
+        valor: "sim, via DLQ dedicada",
+        origem: "sugerido",
+        confirmado: true,
+        // O que o defeito apagava, e é o que faz a marca chegar ao documento.
+        evidencia: EVIDENCIA_SIMULADA,
+      })
     );
+  });
+
+  it("mas EDITAR o texto vira manual de verdade — a pessoa passou a ser a autora", async () => {
+    // O controle negativo do teste acima: se tudo virasse "sugerido
+    // confirmado", o produto passaria a dizer que a IA escreveu o que uma
+    // pessoa digitou, que é o mesmo erro na direção contrária.
+    const resultado = resultadoFixture01();
+    const atividade = atividadeComPlaceholder(resultado);
+    const onResponderItem = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        regras={regras}
+        especificacaoTemplate={templateFixture}
+        respostasItens={{
+          [atividade.chave]: {
+            "Backend::DLQ configurada e monitorada": {
+              valor: "sim, via DLQ dedicada",
+              origem: "sugerido",
+              confirmado: false,
+              evidencia: EVIDENCIA_SIMULADA,
+            },
+          },
+        }}
+        onResponderItem={onResponderItem}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+      />
+    );
+
+    await selecionarEIrPraAba(user, atividade.chave, "Refinamento");
+    const linhaDlq = screen.getByTestId(`placeholder-Backend::DLQ configurada e monitorada`);
+    await user.type(within(linhaDlq).getByRole("textbox"), " e alarme no painel");
+    await user.click(within(linhaDlq).getByRole("button", { name: "Confirmar" }));
+
+    expect(onResponderItem).toHaveBeenCalledWith(
+      atividade.chave,
+      "Backend::DLQ configurada e monitorada",
+      expect.objectContaining({ origem: "manual" })
+    );
+    expect(onResponderItem.mock.calls.at(-1)?.[2].evidencia).toBeUndefined();
   });
 
   it("achado real: resposta já confirmada aparece como texto fixo, sem campo de edição nem botão Sugerir", async () => {

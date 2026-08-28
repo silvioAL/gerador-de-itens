@@ -11803,17 +11803,75 @@ um install dentro do pacote, sem a raiz do monorepo, morre em 404. Instalar o
 compilador em `/repo` — ancestral do pacote — resolve dois problemas de uma vez;
 `-g` resolveria o `tsc` e não o `@types/node`.
 
-### O que ficou de fora, e é a única lacuna desta rodada
+### E o E2E que fecha o laço achou um defeito de proveniência mais antigo
 
-A validação contra a stack real cobriu o caminho inteiro (tela → servidor →
-provedor → serviço do compose → SSE → volta) via `POST /ia/credencial/testar`,
-que aceita a credencial no corpo e **não persiste**. O que não foi exercido no
-ambiente do usuário é o modo com a credencial simulada *gravada*, porque isso
-exigiria sobrescrever a credencial da Anthropic que está no banco de trabalho —
-e a chave não volta do servidor, então eu não teria como restaurá-la. Esse
-caminho está coberto pelos 102 E2E, que gravam a credencial do dublê de verdade
-e conferem as duas marcas; as duas asserções novas foram vistas falhando com a
-marca desligada.
+O usuário perguntou por que eu não podia gravar a credencial simulada e apagar
+depois. A resposta certa não era "não posso": era que essa conferência **devia
+morar num teste**, e não numa checagem manual contra o banco de trabalho. Duas
+travas nasceram daí — uma em `app.test.ts` (credencial simulada gravada faz o
+`/ia/status` dizer `simulado: true`, com o controle negativo do destino de
+verdade) e uma no E2E, que baixa o markdown e afirma o par: **contém a marca de
+simulado e não contém a de sugerido**, depois de confirmar todos os campos.
 
-505 engine · 133 llm · 84 aplicação · 773 web · 238 server · 39 gateway-falso ·
+A do E2E ficou vermelha. E não por causa da SPEC-74.
+
+A sonda mostrou o documento inteiro com o texto da esteira, todo confirmado, e
+sem marca nenhuma — enquanto outra sonda, dentro do hook, provava que a
+evidência era gravada. O valor era perdido **entre a escrita e o documento**, e
+o culpado é uma linha em `ReviewScreen`:
+
+```ts
+onResponder?.(p.chave, { valor, origem: "manual" });
+```
+
+O botão "Confirmar" de cada campo **montava um `ValorSpec` novo do zero**.
+Confirmar um texto que a esteira escreveu, sem tocar nele, passava a afirmar
+que uma pessoa o escreveu — e junto iam a evidência, a confiança e o carimbo de
+insumos do §292.
+
+O mais revelador é que a régua certa já existia a dois arquivos de distância:
+`FilaDeRevisao` decide exatamente isto — *editou vira manual, não editou vira a
+mesma resposta, confirmada* —, e `confirmarTodas` usa `assinarSugestao`, que
+preserva. **Três superfícies confirmam a mesma coisa; duas preservavam e uma
+apagava.** É a assinatura do §263, e aqui ela custava um fato falso sobre quem
+escreveu o item.
+
+> E o teste que cobria essa linha era **cúmplice**: ele afirmava
+> `origem: "manual"` para uma resposta que a esteira tinha escrito. Nasceu para
+> provar outra coisa (que confirmar sem digitar não é no-op) e, de passagem,
+> fixou o defeito como comportamento esperado. É o mesmo padrão que este
+> arquivo já registra sobre o passo de reescolher time: *contornar um defeito
+> conhecido dentro do teste transforma a suíte em cúmplice dele.*
+
+Duas corridas no caminho, as duas do mesmo tipo e as duas achadas pelo E2E:
+`setIaSimulada` e `esteira.iniciar` acontecem no mesmo `.then`, então o ref
+ainda tinha o valor velho quando a esteira gravava. O arquivo já resolvia isso
+para os papéis — passando o valor resolvido explicitamente ao `iniciar` — e
+agora o `simulado` viaja pelo mesmo caminho.
+
+### Um aviso para a próxima rodada, encontrado de passagem
+
+Ao investigar isto, li a linha da quebra no banco do E2E:
+
+```
+titulo: Esteira com gateway falso | respostas_itens: {}
+```
+
+O documento na tela tinha todas as respostas da esteira; **o banco não tinha
+nenhuma.** É a SPEC-71 aparecendo antes da hora, e num campo que nem estava na
+lista dela. Não investiguei mais do que isto aqui — vira medição da rodada
+seguinte, e não afirmação desta.
+
+### Onde cada coisa foi verificada
+
+A stack real cobriu o caminho inteiro (tela → servidor → provedor → serviço do
+compose → SSE → volta) via `POST /ia/credencial/testar`, que aceita a credencial
+no corpo e **não persiste** — importante aqui, porque gravar a credencial
+simulada por cima da que está no banco de trabalho destruiria uma chave que não
+volta por HTTP. O modo com a credencial *gravada* é coberto por teste, que é
+onde ele devia estar: `app.test.ts` no banco descartável, e o E2E, que grava a
+credencial do dublê de verdade e confere as marcas na tela e no markdown
+baixado. Toda asserção nova foi vista falhando com a correção desligada.
+
+505 engine · 133 llm · 84 aplicação · 776 web · 240 server · 39 gateway-falso ·
 102/102 E2E · build e lint limpos.

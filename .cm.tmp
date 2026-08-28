@@ -1,0 +1,28 @@
+fix: confirmar uma sugestão deixa de apagar a proveniência (SPEC-74, §309)
+
+O pedido do usuário — "configure a IA falsa e apague no próprio teste" —
+levou a mover a conferência do modo simulado gravado para onde ela devia
+estar: dois testes em `app.test.ts` (com o controle negativo do destino
+de verdade) e um no E2E, que baixa o markdown e afirma o par "contém a
+marca de simulado, não contém a de sugerido".
+
+O do E2E ficou vermelho, e não por causa da SPEC-74.
+
+`ReviewScreen.confirmar` montava um `ValorSpec` novo do zero
+(`{ valor, origem: "manual" }`). Confirmar um texto que a esteira
+escreveu, sem tocar nele, passava a afirmar que uma pessoa o escreveu — e
+junto iam a evidência, a confiança e o carimbo de insumos do §292. A
+régua certa já existia em `FilaDeRevisao` (editou vira manual, não editou
+vira a mesma resposta confirmada) e em `confirmarTodas`
+(`assinarSugestao`): três superfícies, duas preservavam e uma apagava.
+
+O teste que cobria a linha era cúmplice — afirmava `origem: "manual"`
+para uma resposta da esteira. Reescrito, com o controle negativo.
+
+Também: `simulado` passa explicitamente ao `esteira.iniciar`, pela mesma
+corrida que os papéis já resolviam assim.
+
+505 engine · 133 llm · 84 aplicação · 776 web · 240 server ·
+39 gateway-falso · 102/102 E2E · build e lint limpos.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>

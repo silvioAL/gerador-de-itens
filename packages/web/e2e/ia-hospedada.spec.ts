@@ -1,4 +1,6 @@
+import { readFileSync } from "node:fs";
 import { test, expect, type Page } from "@playwright/test";
+import { MARCA_SIMULADO, MARCA_SUGERIDO } from "@gerador/engine";
 import { entrar } from "./auth";
 import { derivarNaMesa } from "./derivar";
 import {
@@ -186,7 +188,22 @@ test("a esteira roda no navegador e o texto do gateway chega nos campos (o defei
   // ir. Uma saída só.
   await expect(page.getByTestId("secao-dos-itens")).toBeVisible();
   await page.getByTestId("baixar-markdown").click();
-  expect((await download).suggestedFilename()).toBe("documento-de-desenho.md");
+  const baixado = await download;
+  expect(baixado.suggestedFilename()).toBe("documento-de-desenho.md");
+
+  // SPEC-74 fatia D — "e o documento gerado também".
+  //
+  // No arquivo BAIXADO, e não no que a tela desenha: é ele que vai para o
+  // tracker, para o repositório de outra pessoa e para o agente que constrói.
+  // A marca de demonstração fica na tela; esta viaja.
+  //
+  // E repare no que já aconteceu acima: todo campo sugerido foi CONFIRMADO um
+  // a um. Confirmar tira a marca de "sugerido pela esteira" — quem confirmou
+  // assumiu o texto — e não tira esta. O texto continua não tendo vindo de
+  // modelo nenhum, e é isso que este par de asserções fixa.
+  const markdown = readFileSync(await baixado.path(), "utf-8");
+  expect(markdown).toContain(MARCA_SIMULADO);
+  expect(markdown).not.toContain(MARCA_SUGERIDO);
 
   await page.screenshot({ path: "e2e/screenshots/ia-hospedada.png", fullPage: true });
 

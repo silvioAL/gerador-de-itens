@@ -619,14 +619,15 @@ export function ReviewScreen({
       }
       // SPEC-74 — antes do `pronto`, de propósito: um destino simulado que
       // ainda não está pronto continua sendo simulado quando ficar.
-      setIaSimulada(status.value.simulado === true);
+      const simuladoAgora = status.value.simulado === true;
+      setIaSimulada(simuladoAgora);
       if (!status.value.pronto) {
         setIaIndisponivel("sem-modelo");
         return;
       }
       const ativos = papeisResolvidos.filter((p) => p.ativo);
       const filaInicial = montarFilaEsteira(true, ativos);
-      if (filaInicial.length > 0) esteira.iniciar(filaInicial, ativos);
+      if (filaInicial.length > 0) esteira.iniciar(filaInicial, ativos, simuladoAgora);
     });
     return () => {
       cancelado = true;
@@ -1797,9 +1798,27 @@ function AbaRefinamento({
     // O textarea mostra o rascunho digitado OU a resposta sugerida pela IA
     // (fallback). O handler precisa do MESMO fallback: sem ele, confirmar uma
     // sugestão da esteira que o usuário não editou virava um no-op silencioso.
-    const valor = rascunhos[p.chave] ?? (typeof p.resposta?.valor === "string" ? p.resposta.valor : undefined);
+    const original = typeof p.resposta?.valor === "string" ? p.resposta.valor : undefined;
+    const valor = rascunhos[p.chave] ?? original;
     if (typeof valor !== "string" || valor.trim() === "") return;
-    onResponder?.(p.chave, { valor, origem: "manual" });
+
+    /**
+     * ACHADO REAL (SPEC-74) — este botão jogava a PROVENIÊNCIA fora.
+     *
+     * Ele montava `{ valor, origem: "manual" }` do zero, então confirmar um
+     * texto que a esteira escreveu, sem tocar nele, passava a dizer que uma
+     * pessoa o escreveu. A evidência, a confiança e o carimbo de insumos iam
+     * junto — e foi assim que a marca de "simulado" sumia do documento: o
+     * caminho de escrita a punha, e o de confirmação a apagava.
+     *
+     * A régua certa já existia a dois arquivos de distância: `FilaDeRevisao`
+     * decide exatamente isto — editou vira manual, não editou vira a mesma
+     * resposta confirmada. Duas superfícies confirmando a mesma coisa de
+     * formas diferentes é a assinatura do §263, e aqui ela custava um fato
+     * falso sobre quem escreveu.
+     */
+    const editou = valor !== original;
+    onResponder?.(p.chave, editou || !p.resposta ? { valor, origem: "manual" } : assinarSugestao(p.resposta));
   }
 
   return (
