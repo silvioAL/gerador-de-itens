@@ -61,6 +61,11 @@ const SEGMENTO_DA_AREA: Record<AreaConfig, string> = {
   pdca: "pdca",
   exportacao: "exportacao",
 };
+/** SPEC-78 fatia D — as áreas de config, em runtime. O tipo `AreaConfig` não
+ * existe depois da compilação, e o teste que impede o tour de apontar para uma
+ * área morta precisa da lista de verdade. */
+export const AREAS_CONFIG_CONHECIDAS = Object.keys(SEGMENTO_DA_AREA) as AreaConfig[];
+
 const AREA_DO_SEGMENTO = Object.fromEntries(
   Object.entries(SEGMENTO_DA_AREA).map(([area, seg]) => [seg, area as AreaConfig])
 );
