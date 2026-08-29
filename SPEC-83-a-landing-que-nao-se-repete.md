@@ -211,6 +211,89 @@ código — o que falta é alguém dizer que existem:
 > sempre dá os mesmos itens, e por isso que discordar de um apontamento é mudar
 > uma regra — não apagar uma linha.
 
+### 2.3 O vocabulário — e a ironia que a medição encontrou
+
+> *"tenho impressão que parte do vocabulário precisa ser enriquecido, me chama
+> atenção por exemplo a questão de **modelo canônico**, **processos**, e os
+> **schema dos processos** que colocam a IA no centro, **IA driven**."* — o
+> usuário.
+
+A medição confirma a impressão, e de um jeito que vale registrar:
+
+- **"canônico" já aparece 4× no repositório** — `repositorioDeQuebras.ts:27`
+  ("a forma canônica aqui é a do produto"), `estruturarDocumento.ts:39` ("o
+  markdown permanece a renderização textual canônica"), `RegrasTab.tsx:74` ("as
+  techs canônicas"). **Sempre em sentido local, nunca como o conceito.** A ideia
+  está no código há tempo; a palavra nunca foi promovida a vocabulário.
+- E a ironia: **`Produto` tem um campo `glossario`.** A ferramenta exige que toda
+  organização declare o glossário dela — *"o glossário da casa"*, nas palavras do
+  próprio estágio `contexto` — **e não tem um.**
+
+A fatia A passa a produzir esse glossário. Cada termo com uma definição de uma
+frase e a **âncora no código** — porque termo sem âncora vira jargão, e jargão é
+o que esta página não pode ter.
+
+| Termo | O que é | Onde vive |
+|---|---|---|
+| **Modelo canônico** | a representação estruturada única de que **tudo o mais é projeção**: itens, documento, apontamentos, spec. É por isso que o mesmo desenho dá sempre os mesmos itens — não há segunda fonte para divergir | `Diagrama` + `DiagramaConfig` |
+| **Processo** | o jeito da casa de fazer: o que se confere, em que ordem, em que contexto, com que prova | `checklistProcesso: ItemProcesso[]` |
+| **Schema de processo** | esse jeito escrito como **estrutura versionada e medível**, não como texto: exigência com contexto, com o porquê, e com checagem quando é calculável | `Requisito`, `Checagem`, `TesteAutomatizado`, `Condicao` |
+| **Camada perene** | o que não se recola a cada demanda | as áreas de configuração, com PDCA |
+| **Apontamento** | o que o motor **calcula** e não guarda como verdade — some quando a causa some | prontidão, lacunas, itens derivados |
+| **Proveniência** | de onde cada valor veio, viajando junto com ele | `ValorSpec.origem` |
+| **Governança executável** | regra que **roda**, em vez de regra que está documentada | a diferença entre `Requisito` com e sem `checagem` |
+
+### 2.4 "IA no centro" — a ambiguidade que precisa ser resolvida, não evitada
+
+O usuário juntou duas coisas que parecem opostas: *schemas de processo* e *IA no
+centro, IA driven*. **Não são opostas — é a tese inteira em quatro palavras**, e
+o diagrama já a desenha literalmente.
+
+Mas "centro" tem duas leituras, e a página vai ser lida das duas:
+
+- **centro como protagonista** — a IA decide, o resto serve a ela. É o que a
+  maior parte do mercado quer dizer com *AI-driven*, e **não é este produto**;
+- **centro como contido** — a IA no meio, e a borda em volta. É o que o círculo
+  desenha, e é o que o texto "propõe, nunca aplica sozinha" diz.
+
+> A frase que resolve, e que a página precisa: **IA no centro só é seguro quando
+> existe borda.** Sem schema de processo, IA no meio do trabalho é caos com boa
+> redação. Com ele, é a parte mais valiosa do trabalho feita rápido, dentro de
+> limites que alguém pode conferir. **O schema não é o que restringe a IA — é o
+> que torna possível colocá-la no meio.**
+
+E uma honestidade de linhagem, que vale a página inteira: a ascendência disto
+**não é engenharia de prompt — é engenharia dirigida a modelo** (a família
+MDA/MDE). Vale dizer, e vale dizer também por que não é aquilo: **aquelas
+tentativas queriam gerar a implementação**, e foi nisso que quebraram. Esta gera
+a **especificação e a medição**, e deixa a implementação para gente e IA. É a
+mesma divisão de trabalho do §2.2, aplicada à história do próprio campo.
+
+### 2.5 Os ganhos — e a régua que impede isto de virar folheto
+
+> *"e os ganhos/benefícios também precisam ser explicados"* — o usuário.
+
+Faltava mesmo: a página descreve mecanismo e nunca diz o que a pessoa **ganha**.
+
+**A régua, e ela é dura:** *todo ganho aponta para um mecanismo que já existe.*
+Ganho sem mecanismo é promessa, e esta página não pode prometer o que o produto
+não faz — é a régua da SPEC-76, aplicada à parte do texto onde é mais tentador
+esquecê-la.
+
+| O ganho | O mecanismo que o sustenta |
+|---|---|
+| **Dá para discordar sem refazer** — mudar uma coisa e comparar antes/depois | derivação determinística: mesmo desenho, mesmos itens |
+| **A medida é contestável** — e medida que ninguém contesta vira ruído ou dogma | toda cobrança tem regra explícita atrás, e a regra é editável |
+| **Dá para usar IA onde há auditoria** — sem apostar a conformidade no modelo | nada que a IA propõe conta antes da confirmação, e a marca viaja com o valor |
+| **"Está pronto?" deixa de ser opinião** | lacuna contável (SPEC-73): o documento diz o número |
+| **A demanda não começa do zero** | a camada perene não se recola a cada vez — é onde o atrito cognitivo realmente mora |
+| **Seis meses depois dá para saber quem disse o quê** | proveniência por campo, e decisão com o que foi recusado |
+| **A régua da casa não fossiliza** | PDCA sobre a própria configuração |
+
+> O ganho que amarra os outros: **o conhecimento para de morar em pessoas e em
+> conversas de IA, e passa a morar numa camada que dá para versionar, medir e
+> discutir.** É a resposta direta ao *"isso não tem sido o suficiente"* da §1.1.
+
 ## 3. Os diagramas — mais de um, e cada um com um trabalho
 
 O usuário pediu *"mais diagrama que explique os conceitos e as camadas"*. Três,
@@ -300,6 +383,18 @@ as variáveis CSS existentes, como o `CicloDoProduto` já faz.
 
 **Prova social inventada.** Sem clientes, sem números, sem depoimento.
 
+**Ganho sem mecanismo.** A §2.5 é uma tabela de duas colunas de propósito: se a
+coluna da direita fica vazia, a linha não entra. É o único jeito de ter uma seção
+de benefícios num produto cuja tese é que promessa não confirmada não conta.
+
+**Termo sem âncora.** Vale para o glossário da §2.3: *modelo canônico*, *schema
+de processo*, *governança executável* são palavras fortes, e palavra forte sem
+código atrás é jargão. Cada uma aponta para onde vive — ou sai.
+
+**Vender "IA driven" no sentido que o mercado usa.** A §2.4 resolve a
+ambiguidade em favor de *contido*; usar o termo na leitura de protagonista
+venderia melhor e descreveria outro produto.
+
 **Uma quinta cópia da tese.** Se um conteúdo novo repetir o `CONCEITO.md`, ou ele
 substitui a fonte ou não entra. Seria constrangedor recriar, nesta rodada, o
 defeito que ela existe para consertar.
@@ -317,10 +412,12 @@ leitor que esta página quer.
 ## 9. Fatias
 
 - **A — o conceito escrito, e não é código.** `CONCEITO.md` ganha a evolução
-  (§1.2), o SDD nos dois sentidos (§2.1) e as quatro camadas (§2.2). É a fatia A
-  da SPEC-76 outra vez, e pelo mesmo motivo: **texto sem régua vira reescrita
-  infinita**, e a régua aqui é que a página não pode prometer o que o produto não
-  faz.
+  (§1.2), o SDD nos dois sentidos (§2.1), as quatro camadas (§2.2), **o glossário
+  do produto** (§2.3), a resolução do "IA no centro" (§2.4) e os ganhos com o
+  mecanismo de cada um (§2.5). É a fatia A da SPEC-76 outra vez, e pelo mesmo
+  motivo: **texto sem régua vira reescrita infinita.** Aqui são duas réguas — a
+  página não pode prometer o que o produto não faz, e **todo termo tem âncora no
+  código, todo ganho tem mecanismo.**
 - **B — a poda.** A landing para de renderizar `Jornada`; `OMotor` sai dela.
   Prova: um teste passa a **contar** — se uma seção nova repetir um `titulo` de
   `ESTAGIOS_DO_CICLO`, vermelho.

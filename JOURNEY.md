@@ -12633,3 +12633,70 @@ onde precisa aparecer o problema.
 
 A SPEC-83 fechou com **seis fatias**, e diz em voz alta que é mais de uma rodada.
 Fingir que cabe numa só é como as três rodadas do §251 acabaram pela metade.
+
+### Adendo 2 — o vocabulário, e os ganhos
+
+> *"tenho impressão que parte do vocabulário precisa ser enriquecido, me chama
+> atenção por exemplo a questão de modelo canônico, processos, e os schema dos
+> processos que colocam a IA no centro, IA driven."*
+>
+> *"e os ganhos/benefícios também precisam ser explicados."*
+
+A medição confirmou a impressão, e por um caminho que ninguém esperava:
+**"canônico" já aparece quatro vezes no repositório** — `repositorioDeQuebras.ts:27`,
+`estruturarDocumento.ts:39`, `RegrasTab.tsx:74` — **sempre em sentido local, e
+nunca como o conceito.** A ideia está no código há muito tempo; a palavra nunca
+foi promovida a vocabulário.
+
+E a ironia que fecha o argumento: **`Produto` tem um campo `glossario`.** A
+ferramenta cobra de toda organização que declare *"o glossário da casa"* — e não
+tem um.
+
+O glossário do produto nasce na fatia A, com uma régua: **todo termo tem âncora
+no código.** *Modelo canônico* é `Diagrama` + `DiagramaConfig`, e a definição é o
+que explica o determinismo — tudo o mais é projeção, e não há segunda fonte para
+divergir. *Schema de processo* é `Requisito` + `Checagem` + `Condicao` +
+`TesteAutomatizado`. *Governança executável* é literalmente a diferença entre um
+`Requisito` com e sem `checagem`. Palavra forte sem código atrás é jargão.
+
+### "IA no centro" é ambíguo, e a ambiguidade se resolve — não se evita
+
+O usuário juntou *schemas de processo* e *IA no centro, IA driven*, que parecem
+opostos. Não são: é a tese em quatro palavras, e o círculo já a desenha.
+
+Mas "centro" se lê de dois jeitos, e a página vai ser lida dos dois: **centro
+como protagonista** (a IA decide — é o que o mercado quer dizer com *AI-driven*,
+e não é este produto) e **centro como contido** (a IA no meio, a borda em volta —
+é o que o diagrama mostra).
+
+> **IA no centro só é seguro quando existe borda.** Sem schema de processo, IA no
+> meio do trabalho é caos com boa redação. Com ele, é a parte mais valiosa do
+> trabalho feita rápido, dentro de limites que alguém pode conferir. **O schema
+> não é o que restringe a IA — é o que torna possível colocá-la no meio.**
+
+Ficou registrada também a linhagem, porque ela é honesta e posiciona: a
+ascendência disto **não é engenharia de prompt, é engenharia dirigida a modelo**
+(MDA/MDE). E por que não é aquilo: **aquelas tentativas queriam gerar a
+implementação**, e foi nisso que quebraram. Esta gera a especificação e a
+medição, e deixa a implementação para gente e IA — a mesma divisão de trabalho do
+produto, aplicada à história do próprio campo.
+
+### Os ganhos, com a coluna que impede o folheto
+
+A página descrevia mecanismo e nunca dizia o que a pessoa ganha. A seção nova é
+uma tabela de **duas** colunas de propósito — o ganho e o mecanismo que o
+sustenta —, e a régua é que **linha sem a coluna da direita não entra.**
+
+É o único jeito defensável de ter seção de benefícios num produto cuja tese é que
+promessa não confirmada não conta. "Dá para discordar sem refazer" existe porque
+a derivação é determinística; "está pronto? deixa de ser opinião" existe porque a
+lacuna é contável desde o §311; "dá para usar IA onde há auditoria" existe porque
+nada que a IA propõe conta antes da confirmação.
+
+O ganho que amarra os outros, e que responde direto ao *"isso não tem sido o
+suficiente"*: **o conhecimento para de morar em pessoas e em conversas de IA, e
+passa a morar numa camada que dá para versionar, medir e discutir.**
+
+Três recusas novas saíram daí: **ganho sem mecanismo**, **termo sem âncora**, e
+**vender "IA driven" no sentido que o mercado usa** — que venderia melhor e
+descreveria outro produto.
