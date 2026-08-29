@@ -5,6 +5,7 @@ import { apiIa, type DiagramaProposto } from "../api/client";
 import { AnexoDeImagem, type ImagemAnexada } from "./AnexoDeImagem";
 import { BotaoFalar } from "./BotaoFalar";
 import { useVozNaEntrada } from "./useVozNaEntrada";
+import { useAdrNaEntrada } from "./useAdrNaEntrada";
 
 export interface ConversaPanelProps {
   config: DiagramaConfig;
@@ -20,6 +21,14 @@ export interface ConversaPanelProps {
    * mostraria uma caixa de texto e nada mais — e chamar o modelo de verdade
    * faria a demonstração depender de credencial e de rede. */
   mensagensDeDemonstracao?: Mensagem[];
+  /**
+   * SPEC-81 fatia D — a demanda aberta, para trazer os ADRs da casa.
+   *
+   * Ausente = demanda ainda não salva, e sem id não há o que perguntar ao
+   * gateway. O botão simplesmente não aparece — como o de falar quando o
+   * provedor não transcreve.
+   */
+  quebraId?: string | null;
   onAplicar: (proposta: DiagramaProposto) => void;
 }
 
@@ -59,6 +68,7 @@ export function ConversaPanel({
   contextos,
   contextoInicial,
   mensagensDeDemonstracao,
+  quebraId,
   onAplicar,
 }: ConversaPanelProps) {
   const [mensagens, setMensagens] = useState<Mensagem[]>(
@@ -75,6 +85,7 @@ export function ConversaPanel({
   // mesmo campo, editável antes de enviar. A config vai junto: é dela que sai o
   // vocabulário técnico que a transcrição precisa conhecer.
   const { podeFalar, gravacao } = useVozNaEntrada(setEntrada, { config });
+  const adr = useAdrNaEntrada(setEntrada, quebraId ?? null);
   // SPEC-30 Fase 2 — prints anexados a esta conversa.
   const [imagens, setImagens] = useState<ImagemAnexada[]>([]);
   const [podeAnexar, setPodeAnexar] = useState(false);
@@ -219,9 +230,38 @@ export function ConversaPanel({
           pedido nasceu ("botão falar, com animações em Desenhar conversando"),
           e esta janela não reusa a `JanelaConversa`: as duas plugam o mesmo
           hook, cada uma no seu rodapé. */}
-      {(podeFalar || podeAnexar) && (
+      {(podeFalar || podeAnexar || adr.podeTrazerAdr) && (
         <div style={{ padding: "0 12px 6px", display: "flex", flexDirection: "column", gap: 6 }}>
           {podeFalar && <BotaoFalar gravacao={gravacao} />}
+          {/**
+           * SPEC-81 fatia D — o ADR da casa entra por aqui, **como a voz entra**.
+           *
+           * Ele não vira decisão flutuante: vira texto nesta caixa, editável, e
+           * segue o caminho que já existe — a pessoa conversa, o motor propõe o
+           * desenho, e a decisão nasce ancorada nos nós que ela criou.
+           */}
+          {adr.podeTrazerAdr && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <button
+                onClick={() => void adr.trazer()}
+                disabled={adr.trazendo || pensando}
+                data-testid="trazer-adr"
+                style={botaoDeInsumoEstilo}
+              >
+                {adr.trazendo ? "buscando…" : "↙ Decisões da casa"}
+              </button>
+              {adr.ultimoTotal !== null && (
+                <span style={{ fontSize: 11, color: "var(--texto-fraco)" }} data-testid="adr-trazidos">
+                  {adr.ultimoTotal === 0 ? "nenhuma decisão nova" : `${adr.ultimoTotal} na caixa — revise antes de enviar`}
+                </span>
+              )}
+              {adr.erro && (
+                <span style={{ fontSize: 11, color: "var(--vermelho)" }} data-testid="adr-erro">
+                  {adr.erro}
+                </span>
+              )}
+            </div>
+          )}
           {/* SPEC-30 Fase 2: um print de diagrama vira proposta de nós, com os
               tipos que existem na config. A imagem é insumo, não saída nova. */}
           {podeAnexar && (
@@ -346,3 +386,13 @@ const botaoEnviarEstilo: React.CSSProperties = {
   whiteSpace: "nowrap",
 };
 
+/** SPEC-81 fatia D — insumo, não envio: mesmo peso visual do botão de falar. */
+const botaoDeInsumoEstilo: React.CSSProperties = {
+  fontSize: 12,
+  padding: "5px 10px",
+  borderRadius: 7,
+  border: "1px solid var(--borda-forte)",
+  background: "transparent",
+  color: "var(--texto)",
+  cursor: "pointer",
+};

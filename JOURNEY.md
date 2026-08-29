@@ -13703,3 +13703,61 @@ A rota e o cliente ficam prontos e alcançáveis; o que falta é a decisão.
 
 579 engine · 133 llm · 122 aplicação · 839 web · 291 server · 39 gateway-falso ·
 104/104 E2E · build, typecheck e lint limpos.
+## §326 — o ADR entra pela conversa, e o problema do §325 deixa de existir (SPEC-81 fatia D)
+
+O §325 entregou as telas de importação e parou numa pergunta que ele mesmo se
+recusou a responder por conta própria: **onde mora uma decisão importada?** Um ADR
+que vem do repositório da casa nasce sem âncora, e no produto as decisões só são
+editadas por nó, em `DecisoesDoNo`. Construir uma gaveta de decisões soltas era a
+saída óbvia — e era grande, e criava um lugar novo que ninguém tinha pedido.
+
+A resposta do usuário não resolveu o problema: **dissolveu**.
+
+> *"seria a fatia D, mas entenda que pode funcionar como o comando de voz no
+> sentido de passar para a IA, como o desenhar conversando."*
+
+O ADR não vira decisão flutuante. Vira **texto na caixa da conversa**. Daí segue o
+caminho que já existe há dezenas de rodadas: a pessoa conversa, o motor propõe o
+desenho, e a decisão **nasce ancorada** nos nós que aquele desenho criou. A gaveta
+de decisões sem nó não precisou existir porque decisão sem nó deixou de existir.
+
+### O gêmeo, e por que não é economia de código
+
+`useAdrNaEntrada` é o irmão de `useVozNaEntrada`, e a razão de imitá-lo estava
+escrita lá desde a SPEC-30 — são as mesmas três disciplinas, pelo mesmo motivo:
+
+- **cai no mesmo campo, editável** — transcrição erra sigla, ADR alheio vem em
+  formato que ninguém controla. Nos dois casos, texto que chega ao modelo sem
+  passar pelo olho de alguém vira nó errado no diagrama;
+- **anexa, não substitui** — trazer o ADR depois de digitar é complementar;
+- **não é enviado sozinho** — quem aperta enviar é a pessoa.
+
+O botão só aparece com demanda salva e destino de ADR configurado. Sem `quebraId`
+não há o que perguntar ao gateway, e um botão que busca e morre desperdiça o tempo
+de quem clica — a mesma régua do `podeFalar`.
+
+### O que eu precisei construir para poder medir
+
+A regra desta casa é não reportar "pronto" com verde de teste: tem que rodar contra
+a stack. Só que **o botão só aparece com destino configurado**, e configurar um
+destino de verdade exigiria um gateway de verdade do outro lado. O dublê
+(`packages/gateway-falso`) não respondia ADR.
+
+Então ele passou a responder: `POST .../adr` → `{ adrs: [...] }`, o contrato exato
+que `criarLeitorDeAdrViaGateway` lê. Três ADRs desiguais de propósito — um
+completo, um **sem o porquê** (o caso comum, que vira lacuna contável em vez de
+invenção) e um `substituida`. Não é andaime de teste: é o que torna a SPEC-81
+inteira validável sem credencial de ninguém.
+
+O E2E novo atravessa os quatro processos de uma vez — tela pergunta ao servidor,
+servidor lê a configuração de destinos, monta o adaptador, faz o POST de verdade, e
+o texto cai no campo. Desliguei a rota do dublê e o teste ficou vermelho na
+asserção certa (§248): a caixa continha o que a pessoa digitou e **nada** do ADR.
+
+### O que não entrou
+
+Publicar decisão de volta ao repositório da casa. A SPEC-81 não pede, e a via de
+mão dupla é outra pergunta — quem é dono da decisão depois que ela vira desenho.
+
+579 engine · 133 llm · 122 aplicação · 855 web · 291 server · 42 gateway-falso ·
+105/105 E2E · build, typecheck e lint limpos.

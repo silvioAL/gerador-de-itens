@@ -292,10 +292,18 @@ export const apiQuebras = {
    * `importadoDe`) com as lacunas de cada uma. Quem escolhe o que entra é a
    * pessoa, e o `atualizar` acima é quem leva as escolhidas.
    *
-   * **Falta a tela.** Um ADR importado nasce SEM âncora — a âncora nasce quando
-   * o desenho nasce dele (fatia D) —, e hoje as decisões só são editadas por
-   * nó, em `DecisoesDoNo`. Onde mora uma decisão sem nó é decisão de produto, e
-   * está registrada no §325 em vez de resolvida por conta própria.
+   * ## Onde ele desemboca (fatia D, §326)
+   *
+   * O §325 travou aqui: um ADR importado nasce **sem âncora**, e as decisões só
+   * são editadas por nó — não havia onde uma decisão solta aparecer. A saída não
+   * foi construir esse lugar, foi dissolver a necessidade dele:
+   *
+   * > *"pode funcionar como o comando de voz no sentido de passar para a IA,
+   * > como o desenhar conversando."*
+   *
+   * Quem consome isto é o `useAdrNaEntrada`, que transforma as decisões em
+   * **texto na caixa da conversa**. A decisão nunca fica flutuando: ela nasce
+   * ancorada, quando o desenho nasce da conversa.
    */
   importarAdr: (id: string) =>
     requisitar<{ decisoes: { decisao: Decisao; lacunas: string[] }[]; origem: string }>(

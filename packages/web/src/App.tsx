@@ -2197,6 +2197,9 @@ function AppCarregado({
       >
         {abaAssistente === "conversa" && (
           <ConversaPanel
+            // SPEC-81 fatia D — sem demanda salva não há o que perguntar ao
+            // gateway, e o botão de trazer as decisões da casa não aparece.
+            quebraId={persistencia.quebraId}
             config={diagramaConfig}
             sugestoesDeStack={sugestoesDeStack}
             timeAtivo={quebra.time}
