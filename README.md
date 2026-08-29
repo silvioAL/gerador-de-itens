@@ -12,9 +12,33 @@
 >
 > Motivo, medições e roteiro: [`SPEC-33-modo-unico-hospedado.md`](SPEC-33-modo-unico-hospedado.md).
 
-Ferramenta de quebra técnica: desenhe um diagrama de arquitetura (serviços, filas, bancos, processos de negócio, regras...) na **mesa de projeto**, preencha um painel de propriedades dirigido por config, e derive **deterministicamente** itens de trabalho com dependências reais — agnóstico de qual sistema de tracking recebe isso depois. Nada aqui é gerado por um LLM adivinhando a partir de uma descrição solta — sempre por regras explícitas em `config/diagrama.json`.
+## O problema
 
-Não é um gerador de prompt de IA. O mesmo diagrama sempre produz os mesmos itens.
+Organizações já têm agentes de IA, skills, assistentes de código — e **isso não
+tem sido suficiente**. O que falta é o lugar onde a regra da casa mora de um
+jeito que a IA possa ser **medida contra ela**: governança e padrão corporativo
+vivem em cabeça de gente, wiki desatualizada e costume de time, e cada agente
+reconstrói esse contexto do zero em cada conversa sem que ninguém consiga
+conferir se reconstruiu certo.
+
+Este produto é a **camada perene** dentro da qual a IA trabalha: configuração,
+padrões, checklists e specs viram dado consultável e medível, versionado e
+evoluído pelo time.
+
+Você desenha a arquitetura na **mesa de projeto**, o motor **mede** o desenho a
+cada mudança e **deriva** itens de trabalho com dependências reais, e a IA
+escreve o texto — nunca a estrutura, e nada dela conta antes de alguém
+confirmar.
+
+Não é um gerador de prompt. **O mesmo diagrama sempre produz os mesmos itens.**
+
+> **O conceito inteiro — a evolução do trabalho com IA, as quatro camadas, SDD
+> nos dois sentidos, o vocabulário e os ganhos — está em
+> [`CONCEITO.md`](CONCEITO.md), que é a fonte canônica.**
+
+> Este README é um resumo que aponta para lá, e não uma segunda explicação: a
+> SPEC-83 mediu a mesma tese escrita em quatro lugares, nenhum canônico, e o
+> §263 já tinha registrado o que isso custa.
 
 ---
 
@@ -28,100 +52,24 @@ programa é, além disso, garantido pela Lei 9.609/98 e é irrenunciável.
 
 ---
 
-## O motor: o que ele é, e onde a IA entra
+## O motor, as camadas e o vocabulário
 
-O que o resto deste README chama de **motor** é a parte que **calcula**. Ele
-vive em `packages/engine` — TypeScript puro, sem `fs`, sem `http`, sem
-dependência de framework. Não conversa com IA, não vai à rede e não guarda
-estado: recebe dados, devolve dados.
+Tudo isso mora em **[`CONCEITO.md`](CONCEITO.md)**: o que o motor calcula e o
+que ele não calcula, as quatro camadas (perene · da demanda · apontamentos · IA
+generativa), SDD nos dois sentidos, o vocabulário com âncora no código, e os
+ganhos com o mecanismo de cada um.
 
-### O que entra, o que sai
+**Não está repetido aqui de propósito.** A SPEC-83 §0.2 mediu esta mesma
+explicação escrita em quatro lugares — `Jornada.tsx`, este README, o
+`CONCEITO.md` e o próprio círculo da página inicial —, **nenhum canônico**. Cada
+uma estava certa isoladamente, e foi por isso que ninguém notou; é o §263
+chegando pelo lado que ninguém vigiava.
 
-```
-     o seu DESENHO                      a CONFIG do time
-  (componentes, conexões,        (tipos de componente, padrões,
-   campos com proveniência)       réguas conferíveis, modelos)
-              \                          /
-               \                        /
-                ▼                      ▼
-        ┌──────────────────────────────────────┐
-        │               MOTOR                  │
-        │  mede  ·  deriva  ·  monta o texto   │
-        └──────────────────────────────────────┘
-                ▼                      ▼
-        MEDIÇÕES na tela        ITENS + DOCUMENTO
-   (semáforo por componente,   (com dependências reais,
-    🎯 propósito · ⚖ padrão      citando o que atendem,
-    🛣 caminho · 🧭 decisões)      seguem e contrariam)
-```
+A régua que saiu daquela rodada, e que vale daqui em diante: **o `CONCEITO.md` é
+a fonte; todo outro lugar é resumo que aponta para ele.**
 
-### As três coisas que ele faz
-
-1. **Mede**, a cada mudança, e não só "os campos estão cheios?":
-   - **completude** — o que falta preencher em cada componente (o semáforo);
-   - **propósito** — cada necessidade declarada tem alguém que responda por ela?
-   - **padrão** — o desenho respeita as réguas conferíveis do time (`timeout ≤
-     500ms`, `ttl ≥ backoff × retries`, "declarar a chave de sharding")?
-   - **caminho** — algum percurso inteiro estoura o orçamento? Cinco saltos de
-     400 ms são cinco componentes dentro do padrão e uma resposta de dois
-     segundos, e nenhuma medida por componente enxerga isso;
-   - **decisões** — o que foi escolhido entre alternativas tem o porquê escrito?
-
-2. **Deriva** os itens de trabalho. Não sai um tipo só: um item por componente,
-   um por conexão, um para cada padrão contrariado e um para cada caminho fora
-   da régua. As dependências vêm das arestas — calculadas, não digitadas —, e
-   ciclos e conflitos aparecem antes de você seguir.
-
-3. **Monta** os textos: checklist de refinamento, critérios, o documento de
-   desenho — sempre a partir dos modelos configuráveis do time, nunca de um
-   formato embutido no código.
-
-### A divisão de trabalho, que é a ideia toda
-
-> O **motor** decide a **estrutura**: que itens existem, o que falta, o que sai
-> do padrão, o que depende do quê.
-> A **IA** escreve o **texto**: a história do item, os critérios, o porquê de
-> uma proposta.
-> **Nunca o contrário.**
-
-É por isso que todo valor carrega de onde veio (`manual`, `extraido`,
-`inferido`, `sugerido`) e nada que a IA propõe conta antes de alguém confirmar.
-A IA entra em exatamente dois lugares, e nos dois como **proposta**:
-
-- **propondo** — um desenho a partir da conversa ou de um print, as
-  necessidades da demanda, as decisões a partir do que o motor **já mediu**;
-- **escrevendo** — os campos textuais dos itens, na esteira de agentes.
-
-Um agente que só vê o diagrama devolve arquitetura de referência. O que
-alimenta o agente aqui é o desenho **medido** — as violações com o porquê de
-cada padrão, as lacunas, o que já foi decidido —, e é isso que faz a proposta
-ser sobre este desenho e não sobre arquitetura em geral.
-
-### Por que "determinístico" importa na prática
-
-Não é purismo. São três garantias que você usa:
-
-- **o mesmo desenho produz os mesmos itens** — dá para mudar uma coisa,
-  rederivar e comparar o antes e o depois;
-- **a chave de cada item é estável** — rederivar não perde o que você já
-  escreveu nele;
-- **dá para discordar** — quando o motor aponta algo, existe uma regra
-  explícita atrás. Você muda a regra na configuração, ou registra que decidiu
-  contrariá-la de propósito, com motivo e autor. Medida que ninguém consegue
-  contestar vira ruído ou dogma.
-
-### Como isso aparece na tela
-
-A faixa no topo da mesa de projeto é o motor falando: os contadores de
-vermelho/amarelo/verde e os chips 🎯 ⚖ 🛣 🧭. Cada um abre a lista do que está
-por trás do número, e leva ao componente. O mesmo cálculo alimenta o **documento
-de desenho** (`☰ Menu → Documento de desenho`), que é o que sai da ferramenta e
-circula.
-
-Quem preferir ver funcionando: **▶ Como funciona → Iniciar tour guiado**. Ele
-anda sozinho e o segundo passo é exatamente esta divisão.
-
----
+O que segue neste README é o **operacional** — como subir, como configurar, como
+resolver problema. Isso está bom e não é o assunto de lá.
 
 ## Testes de ponta a ponta
 

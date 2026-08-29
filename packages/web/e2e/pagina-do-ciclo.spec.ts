@@ -40,9 +40,21 @@ test("a landing mostra o ciclo, marca o que ainda não existe, e desdobra ao cli
   await page.getByTestId(`estagio-item-${ausente.id}`).click();
   await expect(page.getByTestId(`estagio-detalhe-${ausente.id}`)).toContainText("O que falta");
 
-  // A promessa continua sendo a primeira coisa: o círculo é MAPA, não primeira
-  // impressão. Denso na primeira tela é a definição de não se vender bem.
-  const promessa = page.getByRole("heading", { name: /Do diagrama ao backlog/ });
+  /**
+   * A promessa continua sendo a primeira coisa: o círculo é MAPA, não primeira
+   * impressão. Denso na primeira tela é a definição de não se vender bem.
+   *
+   * SPEC-83 — a manchete mudou, e o assunto deste trecho não. Era
+   * *"Do diagrama ao backlog"*, que prometia um DESTINO: o mesmo defeito que o
+   * §314 achou no corpo da página, sobrevivendo no título. O usuário decidiu
+   * trocá-la — *"não é até o backlog, é esse conceito que acompanha
+   * processos"* — e agora ela fala de permanência.
+   *
+   * O seletor passou a ser o `h1`, e não o texto: prender a ORDEM da página ao
+   * enunciado exato faria toda revisão de copy quebrar um teste que não é sobre
+   * copy. `landing.travas.test.tsx` é quem afirma o conteúdo da manchete.
+   */
+  const promessa = page.getByRole("heading", { level: 1 });
   await expect(promessa).toBeVisible();
   const caixaPromessa = await promessa.boundingBox();
   const caixaCiclo = await ciclo.boundingBox();

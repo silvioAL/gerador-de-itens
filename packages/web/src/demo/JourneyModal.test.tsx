@@ -60,10 +60,18 @@ describe("JourneyModal", () => {
     expect(screen.getByText("Especificação de solução")).toBeInTheDocument();
     expect(screen.getByText(/gera um único markdown com tudo/)).toBeInTheDocument();
     // §255 — a frase "motor determinístico — não um LLM" dizia o que o motor
-    // NÃO é e seguia em frente. A modal agora abre explicando o que ele É, e
-    // isso vale aqui e na landing pública (mesmo componente).
-    expect(screen.getByTestId("explicacao-do-motor")).toBeInTheDocument();
-    expect(screen.getByTestId("explicacao-do-motor").textContent).toMatch(/A IA escreve o/);
+    /**
+     * SPEC-83 — a explicação do motor SAIU daqui.
+     *
+     * Ela morava dentro da `Jornada`, e a `Jornada` é renderizada por dois
+     * pais. Com a landing passando a mostrar o motor como peça própria, mantê-la
+     * aqui recriaria a tese em dois lugares — que é o defeito que o §0.2 da
+     * SPEC-83 mediu e que `landing.travas.test.tsx` agora impede.
+     *
+     * O modal fica com o que é dele: o passo a passo de USO, para quem já
+     * entrou e quer saber por onde começar.
+     */
+    expect(screen.queryByTestId("explicacao-do-motor")).toBeNull();
   });
 
   it("troca para a aba de cenários e lista todos os cenários recebidos, com categoria e design patterns quando houver", async () => {

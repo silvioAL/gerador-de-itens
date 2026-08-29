@@ -13501,3 +13501,94 @@ sido inventar trabalho.
 
 579 engine · 133 llm · 113 aplicação · 823 web · 277 server · 39 gateway-falso ·
 104/104 E2E · build, typecheck (agora **6 de 6**) e lint limpos.
+
+## §323 — a landing que explica o problema (SPEC-83, fatias B a F)
+
+A última rodada do bloco do §316, e a que o próprio usuário tinha aberto: *"a
+parte após o ciclo com todos pontos verdes precisa ser revista, pois está meio
+repetitiva"*.
+
+### A poda, e por que a repetição era invisível
+
+A página renderizava o círculo de 13 estágios e, logo abaixo, a `Jornada` —
+cujas etapas 1, 2, 3 e 5 são `desenho`, `prontidao`, `itens` e `especificacao`,
+**ditos de novo em outro formato**. E o `OMotor` recontava a divisão motor × IA
+pela terceira vez na mesma rolagem.
+
+> Não era excesso de conteúdo: era **uma narrativa contada três vezes**, e cada
+> versão estava certa isoladamente. Foi por isso que ninguém notou — o §263
+> chegando pelo lado que ninguém vigiava.
+
+A `Jornada` não morreu: ela é passo a passo de USO e continua pós-login, que é
+onde está quem já entrou. O `OMotor` saiu de dentro dela e virou peça própria,
+com uma casa só.
+
+### O que entrou no lugar
+
+Três peças, dirigidas por dado (`conceito.ts`) pela mesma razão do `ciclo.ts`:
+diagrama que lista o que não existe é o defeito que a SPEC-76 impediu na prosa.
+
+- **A evolução** — prompt → agente/skill → camada. É a única que fala do mundo
+  antes de falar da ferramenta. O estágio 2 está escrito como **progresso real**:
+  uma página que tratasse agente e skill como erro perderia exatamente o leitor
+  que já os usa.
+- **As quatro camadas**, com recuo crescente — as de fora contêm as de dentro, e
+  a IA é a mais interna. É o círculo visto de lado.
+- **O mapa de conexões**, com as bordas **marcadas**. Cinco caminhos, e só três
+  existem: desenhá-los todos acesos seria a maior promessa falsa que esta página
+  já teria feito.
+
+E o layout ganhou **ritmo**: faixas de largura total com fundos alternados, em
+vez da coluna única de 760 px que o §0.3 mediu — estrutura de documento, que
+nenhuma troca de texto conserta.
+
+### A manchete que sobreviveu ao §314
+
+Era *"Do diagrama ao backlog, sem inventar nada"* — uma promessa com **destino**.
+É o mesmo defeito que o §314 encontrou no corpo da página (*"descrevia um fluxo,
+não um ciclo que fecha"*) **sobrevivendo no título**: a SPEC-76 consertou o
+conteúdo e não olhou para a manchete. Decisão do usuário: *"não é até o backlog,
+é esse conceito que acompanha processos"*.
+
+### A marca ganhou o segundo cliente, e no mesmo dia
+
+O §316 previu o problema: com os 13 estágios verdes, o círculo teria 13 marcas
+iguais, e a tentação seria apagar a máquina de marcação. Ela não se apagou — e
+agora o mapa de conexões a usa, num diagrama em que as marcas **voltam a ser
+variadas**, que é onde ela comunica. Deixou de ser argumento de princípio e virou
+necessidade.
+
+### Duas travas que eu escrevi errado antes de escrever certo
+
+**A da repetição tolerava uma ocorrência por estágio**, supondo que o círculo
+citasse cada título uma vez. Ele cita **duas** — no círculo e na lista ao lado —
+e o teste acusou os treze de uma vez. O número certo não é 1 nem 2: é **o que o
+`CicloDoProduto` produzir**. Medir a linha de base contra o próprio componente faz
+a trava sobreviver a ele mudar de forma.
+
+**A da `Jornada` acusou o próprio comentário** que explica a poda, porque regex
+não distingue comentário de código.
+
+> Uma trava que proíbe documentar o que ela guarda ensina a apagar o comentário —
+> então os comentários saem antes de medir.
+
+### O README deixou de ser a quarta cópia
+
+358 → 306 linhas. Abre com **o problema**, e a seção do motor virou ponteiro para
+o `CONCEITO.md`. O operacional — Docker, IA sem custo, Qwen, voz, produção —
+ficou intacto: está bom e não é o assunto.
+
+A régua que sai daqui e vale daqui em diante: **o `CONCEITO.md` é a fonte; todo
+outro lugar é resumo que aponta para ele.**
+
+### Os testes que mudaram de casa
+
+Cinco quebraram, todos por causa da extração do `OMotor`, e nenhum foi
+contornado: quatro foram para `OMotor.test.tsx` sem uma vírgula mudada — o que
+mudou foi o dono —, e um voltou para a `Jornada` com a afirmação atualizada. O
+`JourneyModal` deixou de mostrar o motor, e o E2E parou de prender a ORDEM da
+página ao enunciado exato da manchete: prender copy em teste de layout faz toda
+revisão de texto quebrar um teste que não é sobre texto.
+
+579 engine · 133 llm · 113 aplicação · 831 web · 277 server · 39 gateway-falso ·
+104/104 E2E · build, typecheck e lint limpos.
