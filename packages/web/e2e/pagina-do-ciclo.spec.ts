@@ -30,15 +30,39 @@ test("a landing mostra o ciclo, marca o que ainda não existe, e desdobra ao cli
     `${existem} dos ${ESTAGIOS_DO_CICLO.length} estágios existem hoje`
   );
 
-  // O que não existe está MARCADO, com palavra e não só cor.
-  const ausente = ESTAGIOS_DO_CICLO.find((e) => e.estado === "ausente")!;
-  await expect(page.getByTestId(`estagio-item-${ausente.id}`)).toContainText("ainda não existe");
+  /**
+   * O estado está MARCADO com PALAVRA, e não só com cor — vale para daltonismo,
+   * impressão e alto contraste.
+   *
+   * **SPEC-84: este trecho fazia `find(e => e.estado === "ausente")!`**, e a
+   * SPEC-84 fechou o último buraco do ciclo: o `!` virou `undefined.id` e o
+   * teste quebrou por acerto, não por defeito. Era a segunda vez — a SPEC-79
+   * tinha feito o mesmo com o último `parcial`.
+   *
+   * A versão nova percorre o que existe em vez de caçar um estado específico.
+   * Ela continua valendo no dia em que um estágio novo nascer incompleto, que é
+   * justamente quando ela vai importar. A prova da MÁQUINA de marcar ausência,
+   * com um estágio fabricado, é do unitário — aqui o navegador prova o que só
+   * ele prova: que a página pública mostra isso antes do login.
+   */
+  for (const estagio of ESTAGIOS_DO_CICLO) {
+    const item = page.getByTestId(`estagio-item-${estagio.id}`);
+    if (estagio.estado === "completo") {
+      // O completo NÃO ganha palavra: marcar o que está certo é a definição de
+      // ruído, e ruído se aprende a ignorar junto com o que importava.
+      await expect(item).not.toContainText("ainda não existe");
+      await expect(item).not.toContainText("parcial");
+    } else {
+      await expect(item).toContainText(estagio.estado === "parcial" ? "parcial" : "ainda não existe");
+    }
+  }
 
   // E o desdobramento abre ao clique — foi o que o pedido chamou de
   // "interativo", e é o que impede o círculo de ser um infográfico que
   // ninguém lê.
-  await page.getByTestId(`estagio-item-${ausente.id}`).click();
-  await expect(page.getByTestId(`estagio-detalhe-${ausente.id}`)).toContainText("O que falta");
+  const primeiro = ESTAGIOS_DO_CICLO[0];
+  await page.getByTestId(`estagio-item-${primeiro.id}`).click();
+  await expect(page.getByTestId(`estagio-detalhe-${primeiro.id}`)).toContainText(primeiro.detalhe.slice(0, 40));
 
   /**
    * A promessa continua sendo a primeira coisa: o círculo é MAPA, não primeira

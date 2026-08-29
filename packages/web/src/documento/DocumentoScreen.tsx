@@ -654,7 +654,16 @@ function RiscosMedidos({
   );
 }
 
-function SecaoEscrita({
+/**
+ * SPEC-84 fatia A — exportada para a tela da spec.
+ *
+ * Não é reuso por economia: o que este componente carrega é a **semântica** de
+ * "isto foi escrito por uma pessoa" — a marca, o clique que abre a edição, e a
+ * dica no lugar do vazio. As três seções de julgamento da spec são a mesma coisa
+ * pela mesma razão (SPEC-80 §2), e duas cópias divergiriam na primeira mudança
+ * de comportamento (§263).
+ */
+export function SecaoEscrita({
   titulo,
   dica,
   valor,

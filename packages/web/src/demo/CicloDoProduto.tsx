@@ -56,10 +56,22 @@ function posicaoNoCirculo(indice: number, total: number): { x: number; y: number
   return { x: CENTRO + RAIO * Math.cos(angulo), y: CENTRO + RAIO * Math.sin(angulo) };
 }
 
-export function CicloDoProduto() {
+/**
+ * SPEC-84 fatia B — a lista entra por fora, **e é o teste que precisa disso.**
+ *
+ * A tela nunca passa `estagios`: quem chama é a landing, e a landing mostra o
+ * ciclo real. O parâmetro existe porque a máquina de marcar o que falta agora só
+ * se prova com um dado que os dados reais não têm mais — todos os treze estágios
+ * ficaram verdes, e uma trava que fizesse `find(estado === "ausente")!` quebraria
+ * com `undefined.id`.
+ *
+ * Foi exatamente o que aconteceu duas vezes: a SPEC-79 zerou o último `parcial` e
+ * a trava caiu; a SPEC-84 zerou o último `ausente` e ela caiu de novo. Na terceira
+ * repetição, a régua deixa de ser comentário e vira entrada.
+ */
+export function CicloDoProduto({ estagios = ESTAGIOS_DO_CICLO }: { estagios?: EstagioDoCiclo[] } = {}) {
   const [aberto, setAberto] = useState<string | null>(null);
-  const estagios = ESTAGIOS_DO_CICLO;
-  const { existem, total } = contagemDoCiclo();
+  const { existem, total } = contagemDoCiclo(estagios);
   const detalhe = estagios.find((e) => e.id === aberto);
 
   return (

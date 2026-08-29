@@ -43,6 +43,8 @@ export interface MenuLateralProps {
    * derivação faziam o menu parecer maior do que o produto.
    */
   onDocumento: () => void;
+  /** SPEC-84 fatia A — a spec da demanda, para quem (ou o que) implementa. */
+  onSpec: () => void;
   /** SPEC-59 — como a FERRAMENTA está montada. Não é da demanda, então não
    * entra no grupo dela: é o mapa do que as telas de configuração configuram. */
   onSistema: () => void;
@@ -101,6 +103,7 @@ export function MenuLateral({
   onNovaQuebra,
   onAbrirQuebras,
   onDocumento,
+  onSpec,
   onSistema,
   onSair,
 }: MenuLateralProps) {
@@ -136,6 +139,12 @@ export function MenuLateral({
         </button>
         <button onClick={acao(onDocumento)} style={itemEstilo} data-testid="menu-documento">
           Documento de desenho
+        </button>
+        {/* Ao lado do documento, e não dentro dele: o documento é lido por
+            quem decide, a spec por quem implementa. Mesma demanda, leitores
+            diferentes. */}
+        <button onClick={acao(onSpec)} style={itemEstilo} data-testid="menu-spec">
+          Spec para construir
         </button>
         <p style={tituloGrupoEstilo}>A ferramenta</p>
         <button onClick={acao(onSistema)} style={itemEstilo} data-testid="menu-sistema">

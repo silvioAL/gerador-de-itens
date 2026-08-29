@@ -180,18 +180,36 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
     titulo: "Gerar specs para construir com IA",
     resumo: "O documento vira instrução executável para um agente de código.",
     detalhe:
-      "O documento de desenho já é o insumo de quem implementa. O passo que falta é o formato que um agente de código consome direto — a ponte entre 'está especificado' e 'está sendo construído'.",
-    estado: "ausente",
-    oQueFalta: "Avaliado na SPEC-75, ainda não construído.",
+      "O documento é lido por quem decide; a spec é lida por quem — ou o que — implementa. Ela leva o contexto do produto, o que o motor mediu no desenho e os itens que cobre, mais três seções que nenhum modelo escreve: de onde veio o pedido, o que NÃO entra, e como se prova cada fatia. Spec com lacuna diz quantas tem, antes de você baixá-la.",
+    /**
+     * SPEC-84 — deixou de ser `ausente`.
+     *
+     * A SPEC-80 tinha entregue o motor inteiro (§312–§315) e nenhuma das suas
+     * quatro fatias era a tela — então havia gerador de spec sem consumidor
+     * nenhum, e este ponto ficou vermelho com razão por três rodadas. O que
+     * mudou foi a porta, não o motor.
+     */
+    estado: "completo",
+    rota: { tela: "spec" },
   },
   {
     id: "mcp",
     titulo: "Integrar com as ferramentas do time",
     resumo: "Publicar e consumir por MCP, além do tracker.",
     detalhe:
-      "Hoje o item sai para o issue tracker por um agente configurável. Falta o caminho de mão dupla com as ferramentas onde o time já trabalha.",
-    estado: "ausente",
-    oQueFalta: "Não avaliado ainda.",
+      "O caminho é de mão dupla, e por gateways configuráveis — um na frente do issue tracker, outro da base de conhecimento, outro dos ADRs. O item sai para o tracker, o documento é publicado onde a casa documenta, e o que já foi decidido volta: uma ADR entra pela conversa como texto editável, e a arquitetura de negócio da casa chega como proposta campo a campo. O produto não implementa MCP — quem fala MCP é o gateway.",
+    /**
+     * SPEC-84 §0.1 — deixou de ser `ausente`, e a marca estava velha havia
+     * quatro rodadas: §321 (a tela dos destinos), §324 (ler a arquitetura de
+     * negócio), §325 (as telas de importação) e §326 (o ADR pela conversa).
+     *
+     * O comentário do topo deste arquivo previa a página em prosa envelhecer
+     * dizendo "não existe" sobre algo entregue. O dado envelheceu igual — e a
+     * trava não pegava, porque ela só cobrava a direção otimista. A da SPEC-84
+     * fatia C cobra as duas.
+     */
+    estado: "completo",
+    rota: { tela: "config", area: "exportacao" },
   },
   {
     id: "pdca",
@@ -204,10 +222,17 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
   },
 ];
 
-/** Quantos estágios existem, para a página dizer o número sem contá-lo à mão. */
-export function contagemDoCiclo(): { existem: number; total: number } {
+/**
+ * Quantos estágios existem, para a página dizer o número sem contá-lo à mão.
+ *
+ * SPEC-84 fatia B — passou a receber a lista. A tela ganhou uma entrada para o
+ * teste poder montar um ciclo com buraco (ver `CicloDoProduto`), e uma segunda
+ * conta lá dentro divergiria desta na primeira mudança (§263). O default é o
+ * ciclo real, então quem só quer o número continua chamando sem argumento.
+ */
+export function contagemDoCiclo(estagios: EstagioDoCiclo[] = ESTAGIOS_DO_CICLO): { existem: number; total: number } {
   return {
-    existem: ESTAGIOS_DO_CICLO.filter((e) => e.estado !== "ausente").length,
-    total: ESTAGIOS_DO_CICLO.length,
+    existem: estagios.filter((e) => e.estado !== "ausente").length,
+    total: estagios.length,
   };
 }
