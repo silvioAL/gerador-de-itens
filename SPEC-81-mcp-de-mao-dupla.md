@@ -145,6 +145,45 @@ confirma.**
 > repositório de ADR da casa é a fonte da verdade, este produto não pode agir
 > como se fosse.** Vale o §306: declarado vence herdado, e a tela diz qual é qual.
 
+#### O fluxo que fecha: ADR → conversa → desenho
+
+> *"uma ADR deveria poder vir do MCP e conversar com o assistente e virar
+> desenho."* — o usuário.
+
+Isto muda o papel do ADR nesta SPEC: eu o tinha escrito como **contexto** (entra,
+informa, evita repropor o que foi decidido contra). O usuário o coloca como
+**ponto de partida** — e é mais forte, porque a peça do meio já existe.
+
+O assistente é literalmente onde se conversa para produzir desenho, e
+`montarPedidoDiagrama` e `montarPedidoNecessidades` já são os pedidos que fazem
+isso. **O ADR entra como semente:** ele carrega intenção de arquitetura
+(*"fila em vez de chamada síncrona, porque…"*), a conversa a desdobra, e sai
+diagrama.
+
+E há um ganho estrutural que cai de graça: hoje `Decisao.noId`/`arestaId` é
+preenchido à mão, ligando a decisão ao elemento depois que alguém desenhou. Se o
+desenho **nasce** do ADR, **o vínculo nasce junto** — a decisão já chega ancorada
+no nó que ela criou.
+
+**O risco, e ele é real:** um ADR é uma decisão, não um desenho. Ele
+**subdetermina** o diagrama, e tudo o que ele não diz o modelo vai preencher — que
+é exatamente onde o plausível-mas-vazio da SPEC-80 §2 morde. A mitigação já é a
+tese do produto, e aqui ela precisa ser visível no resultado:
+
+- o que veio do ADR chega como **importado**, com o ADR de origem apontado;
+- o que o modelo completou chega como **sugerido**;
+- o que nenhum dos dois respondeu chega como **lacuna contável** (SPEC-73).
+
+> Um desenho nascido de ADR tem que dizer, olhando para ele, **quanto dele foi
+> decidido e quanto foi preenchido.** Sem essa distinção, importar ADR produz
+> arquitetura com aparência de aprovada — e é pior que desenhar do zero.
+
+E o uso mais valioso talvez nem seja um ADR: é o **conjunto** deles. Ler o
+repositório inteiro dá as restrições acumuladas da casa, e a pergunta que o
+produto passa a poder responder é *"o que estou desenhando contraria alguma
+decisão que já foi tomada?"* — que é uma medição, não uma opinião, e é o tipo de
+coisa que hoje só um arquiteto com memória longa percebe.
+
 ## 2. O que o `ExportadorDeItens` já acertou, e o que ele não previu
 
 A porta nasceu certa em duas coisas: não acopla em Jira, e trata **falha parcial
@@ -214,6 +253,12 @@ de "nada vira pronto sem alguém confirmar" — a porta MCP não pode ser a exce
   como decisão local**; `origem` distingue, e desligar a marca tem que derrubar
   o teste (§248). Segunda prova: um ADR que a casa marcou como substituído não
   volta a valer aqui.
+- **G — o ADR vira desenho.** O fluxo da §1.3: importar, conversar com o
+  assistente, sair diagrama com a decisão já ancorada nos nós que ela criou.
+  Prova, e é a que impede a fatia de mentir: o desenho resultante **distingue na
+  tela** o que veio do ADR (`importado`), o que o modelo completou (`sugerido`) e
+  o que ninguém respondeu (lacuna contável). Segunda prova, a de maior valor:
+  desenhar algo que contraria um ADR aceito da casa **produz apontamento**.
 - **F — arquitetura de negócio como contexto.** Alimentar `objetivo`,
   `regrasDeNegocio`, `sistemas`, `restricoes` e `glossario` a partir do
   repositório da casa. Ataca o gargalo do *"alguém tem que digitar o contexto"*
@@ -239,8 +284,10 @@ de "nada vira pronto sem alguém confirmar" — a porta MCP não pode ser a exce
    **fatia E é a de maior valor da SPEC** — ADR é o artefato de governança que a
    casa já tem, o produto já o produz nativamente, e é o que faz "camada perene"
    deixar de ser só a configuração *deste* produto. **Recomendação: A → B → E →
-   C → F → D**, e não a ordem alfabética. A fatia A (a fronteira) continua
-   primeiro porque nada entra ou sai antes de o escopo por organização existir.
+   G → C → F → D**, e não a ordem alfabética. A fatia A (a fronteira) continua
+   primeiro porque nada entra ou sai antes de o escopo por organização existir, e
+   a G vem colada na E porque *"ADR vira desenho"* é o que dá razão de ser à
+   importação — sem ela, importar ADR é encher um repositório.
 5. **Qual formato de ADR na saída?** MADR, Nygard, o template da casa? Não
    medimos, e não dá para escolher por argumento. A saída é markdown, então
    **template configurável** é a resposta provável — e aí é o mesmo problema de

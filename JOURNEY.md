@@ -12921,3 +12921,38 @@ Consequência para a landing, registrada na SPEC-83: quando a página disser
 *camada perene*, o leitor de organização grande vai perguntar *"e o que eu já
 tenho?"*. A resposta honesta hoje é **"conversa com o que você já tem"** — e não
 "substitui".
+
+### Adendo 7 — o ADR não é contexto, é semente
+
+> *"uma ADR deveria poder vir do MCP e conversar com o assistente e virar
+> desenho."*
+
+O adendo anterior escreveu o ADR como **contexto** — entra, informa, evita
+repropor o que já foi decidido contra. O usuário o coloca como **ponto de
+partida**, e é mais forte, porque a peça do meio já existe: o assistente é
+literalmente onde se conversa para produzir desenho, e `montarPedidoDiagrama` e
+`montarPedidoNecessidades` já são os pedidos que fazem isso.
+
+O ADR carrega intenção de arquitetura (*"fila em vez de chamada síncrona,
+porque…"*), a conversa desdobra, sai diagrama. E cai um ganho estrutural de
+graça: hoje `Decisao.noId`/`arestaId` é preenchido à mão, ligando a decisão ao
+elemento **depois** que alguém desenhou. Se o desenho nasce do ADR, **o vínculo
+nasce junto.**
+
+O risco é real e ficou escrito: **um ADR é uma decisão, não um desenho.** Ele
+subdetermina o diagrama, e tudo o que não diz o modelo preenche — que é onde o
+plausível-mas-vazio morde. A mitigação é a tese do produto, e aqui precisa ser
+visível no resultado: o que veio do ADR chega `importado`, o que o modelo
+completou chega `sugerido`, o que ninguém respondeu chega como lacuna contável.
+
+> Um desenho nascido de ADR tem que dizer, olhando para ele, **quanto dele foi
+> decidido e quanto foi preenchido.** Sem isso, importar ADR produz arquitetura
+> com aparência de aprovada — pior que desenhar do zero.
+
+E o uso de maior valor talvez nem seja um ADR: é o **conjunto**. Lido inteiro, o
+repositório dá as restrições acumuladas da casa, e o produto passa a responder
+*"o que estou desenhando contraria alguma decisão já tomada?"* — que é medição, e
+não opinião. Hoje isso só existe na memória de um arquiteto veterano.
+
+Virou a fatia G, colada na E, porque *"ADR vira desenho"* é o que dá razão de ser
+à importação — sem ela, importar ADR é encher um repositório.
