@@ -19,7 +19,9 @@ export type AreaConfig =
   | "pipeline"
   | "modeloIa"
   | "pdca"
-  | "exportacao";
+  | "exportacao"
+  /** SPEC-79 fatia A — os tokens do design system do time. */
+  | "tokens";
 
 /**
  * SPEC-58 — `documento` é tela própria da demanda: o documento deixou de ser
@@ -60,6 +62,7 @@ const SEGMENTO_DA_AREA: Record<AreaConfig, string> = {
   modeloIa: "modelo-ia",
   pdca: "pdca",
   exportacao: "exportacao",
+  tokens: "design-system",
 };
 /** SPEC-78 fatia D — as áreas de config, em runtime. O tipo `AreaConfig` não
  * existe depois da compilação, e o teste que impede o tour de apontar para uma

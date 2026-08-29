@@ -13118,3 +13118,89 @@ fosse escrito.
 
 548 engine · 133 llm · 84 aplicação · 806 web · 258 server · 39 gateway-falso ·
 104/104 E2E · build, typecheck e lint limpos.
+
+## §318 — o design system vira régua, e o E2E vetou o que eu ia enviar junto (SPEC-79)
+
+Segunda das quatro rodadas do §316. Ela fecha o único estágio `parcial` do
+ciclo: *"um design system de verdade — tokens, componentes de interface, régua
+visual — ainda não é modelado aqui."*
+
+### A medição que mudou o tamanho do trabalho
+
+A máquina de medir **já existia**. `Requisito` + `Checagem` + `Condicao`
+(`config/types.ts`) fazem, desde o §239, a diferença entre *"chamada externa tem
+que ter timeout curto"* (opinião) e *`timeout ≤ 500ms`* (padrão). O que faltava
+não era motor: era **vocabulário de interface entrando nos tipos que o motor já
+lê.**
+
+E a parte que decide se isso é produto ou enfeite: **boa parte de "está de acordo
+com o design system?" é computável.** Contraste é razão entre luminâncias
+relativas — aritmética da WCAG, não impressão. Pertencer ao sistema é
+pertencimento a uma lista. O que não é computável — hierarquia visual, tom, se a
+tela "parece nossa" — continua sendo `Requisito` **sem** `checagem`, item de
+checklist que uma pessoa responde. A régua ficou literal: *se não dá para
+calcular, não é checagem.*
+
+### O elo que faltava, e ele estava a uma linha
+
+`derivarConformidade` chamava `avaliarConformidade` **sem tokens**. Sem isso, a
+violação de design system apareceria no placar de prontidão e **nunca viraria
+item de trabalho** — e a SPEC-79 §2 declara o critério com todas as letras: *se
+não deriva item, não está verde.* É a terceira vez que este achado aparece (§240
+com as regras, §249 com os percursos, agora com os tokens), e o comentário no
+tipo diz isso para a quarta.
+
+### Duas coisas que se calam, e uma que não
+
+- **Pertencimento** se cala sem lista: cobrar "use um token declarado" de quem
+  não declarou nenhum acusaria todo mundo, e a primeira reação a uma ferramenta
+  que reclama de tudo é silenciá-la.
+- **Cor que o motor não sabe ler** (`var(--painel)`, um alias) se cala: acusar
+  ali seria reclamar de desenho certo.
+- **Contraste NÃO se cala** por falta de tokens, e a primeira escrita do teste
+  errou isso. Ele é auto-contido: o time escreveu a regra, o desenho tem as duas
+  cores, a conta fecha. Condicioná-lo a uma configuração que não tem nada a ver
+  com ele seria arbitrário.
+
+### O E2E vetou metade da fatia B, e estava certo
+
+A fatia B ia enviar um tipo de nó `Tela` e regras de Frontend no template de
+fábrica. Dois testes ficaram vermelhos, e o segundo é o que importa:
+`abas-de-configuracao` codifica que **uma instalação limpa nasce sem grupo de
+Frontend** — e eu tinha mudado isso em silêncio, para toda organização.
+
+> Não era teste velho: era propriedade real de instalação nova, e o único aviso
+> de que eu estava impondo a régua da casa como se fosse de todo mundo.
+
+E a própria SPEC-79 §5 já tinha recomendado o contrário — *"régua nova nasce como
+aviso, e o time promove a erro quando quiser"* —, promoção que esta rodada não
+construiu. Enviar regras ligadas é mais forte que a recomendação da SPEC.
+
+**Revertido.** O tipo de componente de interface o time declara como declara
+qualquer outro; a ferramenta entrega a régua, não a régua preenchida. Fica
+registrado como o que a fatia B virou: *o mecanismo, sem o conteúdo* — e o
+conteúdo, quando vier, precisa da promoção aviso→erro que a §5 pediu.
+
+### O resto
+
+`Token` é quatro campos, e a contenção é deliberada: um token é um nome e um
+valor, e modelar tipografia/escala/breakpoint criaria um vocabulário que nenhum
+time usa igual. `valorEscuro` no MESMO token, e não dois conjuntos, porque dois
+conjuntos dessincronizam na primeira cor nova (§263).
+
+O import/export é do formato do **W3C**, que Figma, Style Dictionary e Tokens
+Studio exportam — cobre o caso sem acoplar em ferramenta, que era a recusa da
+§3. Alias entra literal e não resolvido, e isso está escrito: uma cor que é alias
+não é legível como cor, e a checagem se cala — comportamento certo, não silêncio
+acidental. O caminho de volta existe porque sem ele esta tela viraria mais um
+lugar onde a verdade se bifurca.
+
+`tokens` entrou em `CHAVES_CONFIG` e ganhou GET/PUT **de graça** — a rota de
+config é genérica por chave desde a SPEC-31 —, e o compilador cobrou o default e
+o resumo do diagnóstico. Cobrou também dois `switch` exaustivos sobre os
+operadores que eu não tinha previsto, e o validador de config, que recusava
+`valor` + `valorDe` juntos: para `contraste-gte` os dois são necessários e
+significam coisas diferentes (a outra cor, e a razão mínima).
+
+574 engine · 133 llm · 84 aplicação · 813 web · 258 server · 39 gateway-falso ·
+104/104 E2E · build, typecheck e lint limpos.

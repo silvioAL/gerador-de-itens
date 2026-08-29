@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { Diagrama, DiagramaConfig, Necessidade, RegrasConfig } from "@gerador/engine";
+import type { Diagrama, DiagramaConfig, Necessidade, RegrasConfig, Token } from "@gerador/engine";
 import type { ExcecaoDePadrao, Violacao } from "@gerador/engine";
 import {
   analisarLacunas,
@@ -37,6 +37,10 @@ export interface ReadinessSummaryProps {
   /** §239 — as regras do time; sem elas não há padrão a conferir, e o
    * indicador de conformidade não aparece. */
   regras?: RegrasConfig;
+  /** SPEC-79 fatia C — os tokens do design system do time. Sem eles a checagem
+   * de pertencimento se cala, que é o comportamento certo para quem ainda não
+   * configurou design system nenhum. */
+  tokens?: Token[];
   /** Leva ao nó que viola — o equivalente ao "Próximo pendente". */
   onSelecionarViolacao?: (noId: string) => void;
   /** SPEC-64 — o campo que falta no caminho pode estar na CONEXÃO (o
@@ -119,6 +123,7 @@ export function ReadinessSummary({
   volumetria,
   onAbrirProposito,
   regras,
+  tokens,
   onSelecionarViolacao,
   onSelecionarAresta,
   leitura,
@@ -150,7 +155,7 @@ export function ReadinessSummary({
   // §242 — o placar conta só as que ainda cobram alguém. As aceitas de
   // propósito continuam existindo (`avaliarConformidade` as devolve marcadas):
   // some do vermelho, não do histórico.
-  const violacoes = violacoesEmAberto(avaliarConformidade(diagrama, config, regras, excecoes ?? []));
+  const violacoes = violacoesEmAberto(avaliarConformidade(diagrama, config, regras, excecoes ?? [], tokens ?? []));
   // SPEC-63 — a terceira dimensão do padrão: a FORMA. Mesma disciplina das
   // outras duas — sem regra declarada, não acusa nada e não aparece.
   const violacoesDeForma = violacoesDeFormaEmAberto(avaliarTopologia(diagrama, config, regras, excecoes ?? []));

@@ -292,6 +292,9 @@ function AppCarregado({
   diagramaConfig: diagramaConfigInicial,
   appConfig,
   regrasConfig: regrasConfigInicial,
+  /** SPEC-79 fatia A — os tokens do design system do time. Vazio = não
+   * configurado, e a régua de pertencimento se cala sozinha. */
+  tokens,
   cenarios,
   sugestoesDeStack: sugestoesInicial,
   camposNo: camposNoInicial,
@@ -734,6 +737,9 @@ function AppCarregado({
       // §249 — sem os caminhos aqui, a violação de percurso apareceria no
       // placar e nunca chegaria ao backlog (mesmo achado do §240).
       percursos: quebra.percursos,
+      // SPEC-79 fatia C — mesmo achado, terceira vez: sem os tokens aqui, a
+      // violação de design system apareceria no placar e nunca viraria item.
+      tokens,
     });
     setResultado(resolverDependencias(atividades));
     setPedindoNomeDaDemanda(false);
@@ -824,7 +830,7 @@ function AppCarregado({
    */
   async function pedirDecisoesAoAgente() {
     const violacoes = violacoesEmAberto(
-      avaliarConformidade(quebra.diagrama, diagramaConfig, regrasConfig, quebra.excecoes ?? [])
+      avaliarConformidade(quebra.diagrama, diagramaConfig, regrasConfig, quebra.excecoes ?? [], tokens)
     );
     const lacunas = analisarLacunas(quebra.diagrama, quebra.necessidades ?? []);
     const textoDaLacuna = (id: string) => quebra.necessidades?.find((n) => n.id === id)?.texto ?? id;
@@ -914,6 +920,7 @@ function AppCarregado({
         regras: regrasConfig,
         excecoes: quebra.excecoes,
         percursos: quebra.percursos,
+        tokens,
       });
     } catch {
       // Diagrama que a config atual não sabe ler não é motivo para a tela

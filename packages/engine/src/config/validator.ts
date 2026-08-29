@@ -209,10 +209,41 @@ export function validateRegras(
             mensagem: `operador "${c.operador}" não existe (válidos: ${OPERADORES_CHECAGEM.join(", ")})`,
           });
         }
-        // §241 — o alvo da comparação é literal OU outro campo, nunca os dois
-        // nem nenhum. "Nenhum" nunca acusaria nada; "os dois" faria a regra
-        // significar coisas diferentes conforme quem lê.
-        if (c.operador !== "preenchido") {
+        /**
+         * SPEC-79 fatia C — os dois operadores do design system têm regra
+         * própria, e é por uma razão de significado, não de conveniência.
+         *
+         * - `contraste-gte` precisa dos DOIS: `valorDe` nomeia a outra cor,
+         *   `valor` é a razão mínima. Não são dois alvos concorrentes — são
+         *   coisas diferentes, e recusá-los juntos tornaria o operador
+         *   inexprimível.
+         * - `pertence-aos-tokens` não precisa de NENHUM: o alvo é a lista de
+         *   tokens do time, que não mora na regra.
+         */
+        if (c.operador === "contraste-gte") {
+          if (!c.valorDe) {
+            erros.push({
+              campo: `${caminho}.valorDe`,
+              mensagem: '"contraste-gte" precisa de "valorDe" — o campo com a outra cor da comparação',
+            });
+          }
+          if (typeof c.valor !== "number") {
+            erros.push({
+              campo: `${caminho}.valor`,
+              mensagem: '"contraste-gte" precisa de "valor" numérico — a razão mínima de contraste (ex.: 4.5)',
+            });
+          }
+        } else if (c.operador === "pertence-aos-tokens") {
+          if (c.valor !== undefined || c.valorDe) {
+            erros.push({
+              campo: `${caminho}.valor`,
+              mensagem: '"pertence-aos-tokens" não compara com nada — o alvo é a lista de tokens do time',
+            });
+          }
+        } else if (c.operador !== "preenchido") {
+          // §241 — o alvo da comparação é literal OU outro campo, nunca os dois
+          // nem nenhum. "Nenhum" nunca acusaria nada; "os dois" faria a regra
+          // significar coisas diferentes conforme quem lê.
           if (c.valor === undefined && !c.valorDe) {
             erros.push({
               campo: `${caminho}.valor`,

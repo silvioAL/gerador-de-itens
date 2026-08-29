@@ -14,9 +14,10 @@ import { RegrasTab } from "./RegrasTab";
 import { RECURSO_DA_ABA, RECURSO_DA_SECAO_DE_REGRAS, usePermissoes } from "../auth/usePermissoes";
 import { apiPdca } from "../api/client";
 import { PdcaTab } from "./PdcaTab";
+import { TokensTab } from "./TokensTab";
 import { ExportacaoTab } from "./ExportacaoTab";
 import { ProdutosTab } from "./ProdutosTab";
-import { EXPORTADOR_DO_TOUR, PRODUTO_DO_TOUR } from "../demo/dadosDoTour";
+import { EXPORTADOR_DO_TOUR, TOKENS_DO_TOUR, PRODUTO_DO_TOUR } from "../demo/dadosDoTour";
 
 export type AbaConfig =
   | "produtos"
@@ -28,7 +29,7 @@ export type AbaConfig =
   | "acessos"
   | "especificacao"
   | "pipeline"
-  | "modeloIa" | "pdca" | "exportacao";
+  | "modeloIa" | "pdca" | "exportacao" | "tokens";
 
 export interface ConfigScreenProps {
   /** §274 — abre o assistente do FAB na conversa de configuração. */
@@ -191,6 +192,7 @@ export function ConfigScreen({
       { id: "modeloIa", rotulo: "Modelo de IA", existe: true },
       { id: "pdca", rotulo: "PDCA — melhoria contínua", existe: true },
       { id: "exportacao", rotulo: "Exportação", existe: true },
+      { id: "tokens", rotulo: "Design system", existe: true },
     ] satisfies { id: AbaConfig; rotulo: string; existe: boolean }[]
   ).filter((a) => a.existe && podeVerAba(a.id, permissoes.pode));
 
@@ -249,6 +251,7 @@ export function ConfigScreen({
         {abaAtiva === "exportacao" && (
           <ExportacaoTab demonstracao={demonstracao ? EXPORTADOR_DO_TOUR : undefined} />
         )}
+        {abaAtiva === "tokens" && <TokensTab demonstracao={demonstracao ? TOKENS_DO_TOUR : undefined} />}
         {abaAtiva === "produtos" && (
           <ProdutosTab
             timeIds={timeIds}

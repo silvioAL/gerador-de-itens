@@ -1,4 +1,4 @@
-import type { Decisao, RegrasConfig } from "@gerador/engine";
+import type { Decisao, RegrasConfig, Token } from "@gerador/engine";
 import type { ConfigExportador, Produto } from "../api/client";
 import type { DiagramaProposto } from "../api/client";
 
@@ -55,6 +55,18 @@ export const CONVERSA_DO_TOUR: {
       arestas: [{ de: "n1", para: "n2", tipo: "writes", motivo: "O serviço mantém o catálogo atualizado." }],
     },
   },
+];
+
+/**
+ * §235 — os tokens do TOUR. Dado exclusivo da demonstração, como os vizinhos:
+ * semear via API faria o tour ESCREVER no design system de quem só quis ver.
+ */
+export const TOKENS_DO_TOUR: Token[] = [
+  { nome: "cor.texto.padrao", valor: "#0f172a", valorEscuro: "#e5e7eb", grupo: "cor" },
+  { nome: "cor.fundo.painel", valor: "#ffffff", valorEscuro: "#0f172a", grupo: "cor" },
+  { nome: "cor.marca", valor: "#4f46e5", grupo: "cor" },
+  { nome: "espaco.2", valor: "8px", grupo: "espaco" },
+  { nome: "raio.md", valor: "10px", grupo: "raio" },
 ];
 
 export const EXPORTADOR_DO_TOUR: ConfigExportador = {

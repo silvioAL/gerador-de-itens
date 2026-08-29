@@ -194,6 +194,18 @@ function descreverEsperado(c: ChecagemDePercurso): string {
     case "preenchido":
       // Não faz sentido sobre um agregado, e a validação de config recusa.
       return "preenchido";
+    /**
+     * SPEC-79 fatia C — os dois operadores do design system não se aplicam a
+     * PERCURSO, e a razão é a mesma do `preenchido` acima: um percurso é uma
+     * soma sobre um caminho, e nem contraste nem pertencimento a token são
+     * agregáveis. "A soma das cores do caminho" não quer dizer nada.
+     *
+     * Chegar aqui é config incorreta, não desenho errado — e por isso a frase
+     * descreve o operador em vez de acusar quem desenhou.
+     */
+    case "contraste-gte":
+    case "pertence-aos-tokens":
+      return c.operador;
   }
 }
 

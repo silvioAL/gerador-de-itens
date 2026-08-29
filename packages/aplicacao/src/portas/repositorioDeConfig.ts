@@ -21,7 +21,12 @@ export { CAMPO_GLOBAL };
 /** SPEC-49 — `exportador` é o endereço do AGENTE que fala com o tracker: o
  * gerador não implementa Jira, chama quem implementa (mesma disciplina do
  * gateway de IA). */
-export const CHAVES_CONFIG = ["regras", "pipeline-agentes", "exportador"] as const;
+/** SPEC-79 fatia A — `tokens` entra aqui e ganha GET/PUT de graça: a rota de
+ * config é genérica por chave desde a SPEC-31. Documento novo e não tabela
+ * nova pelo mesmo motivo que os outros três: `config_documentos` já é chaveado
+ * por (chave, timeId), e uma tabela por tipo de configuração seria a quarta
+ * forma de guardar a mesma coisa. */
+export const CHAVES_CONFIG = ["regras", "pipeline-agentes", "exportador", "tokens"] as const;
 
 export type ChaveConfig = (typeof CHAVES_CONFIG)[number];
 

@@ -1,5 +1,5 @@
 import type { ExecucaoDoPapel } from "@gerador/aplicacao";
-import type { AnexoDeContexto, CenarioDeLentidao, VolumetriaDoProduto, Decisao, Diagrama, ArtefatosEscritos, ExcecaoDePadrao, LeituraDispensada, Necessidade, OperacaoDeAjuste, PerfisConfig, Percurso, Quebra, RegrasConfig, StatusDocumento, ValorSpec, VolumetriaDaDemanda } from "@gerador/engine";
+import type { AnexoDeContexto, CenarioDeLentidao, VolumetriaDoProduto, Decisao, Diagrama, ArtefatosEscritos, ExcecaoDePadrao, LeituraDispensada, Necessidade, OperacaoDeAjuste, PerfisConfig, Percurso, Quebra, RegrasConfig, StatusDocumento, TokensConfig, ValorSpec, VolumetriaDaDemanda } from "@gerador/engine";
 
 /**
  * Base do @gerador/server — configurável em runtime via `VITE_API_URL`
@@ -1423,6 +1423,11 @@ export const apiPipelineAgentes = configDe<ConfigPipelineAgentes>("pipeline-agen
  * refinamento por tech/contexto). Era o único arquivo de configuração sem
  * rota nem UI: só dava pra editar à mão. O tipo é o do engine, sem cópia. */
 export const apiRegras = configDe<RegrasConfig>("regras");
+
+/** SPEC-79 fatia A — os tokens do time. Mesma fábrica genérica: a rota de
+ * config é por chave desde a SPEC-31, e o servidor resolve time → global →
+ * template sozinho. */
+export const apiTokens = configDe<TokensConfig>("tokens");
 
 /** SPEC-49 — pra onde os itens vão: o AGENTE que fala com o tracker (o
  * gerador não implementa Jira, chama quem implementa). */

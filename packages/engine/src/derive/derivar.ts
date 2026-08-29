@@ -9,7 +9,7 @@ import type {
   Tamanho,
   TipoItem,
 } from "../model/types.js";
-import type { DiagramaConfig, EdgeTypeConfig, NodeTypeConfig, RegrasConfig } from "../config/types.js";
+import type { DiagramaConfig, EdgeTypeConfig, NodeTypeConfig, RegrasConfig, Token } from "../config/types.js";
 import { avaliarConformidade } from "../conformidade/conformidade.js";
 import { avaliarPercursos } from "../percurso/conformidadeDePercurso.js";
 
@@ -25,6 +25,17 @@ export interface ContextoQuebra {
   /** §249 — os caminhos CONFIRMADOS. Só eles: derivar item de caminho que
    * ninguém olhou seria gerar trabalho a partir de um palpite do motor. */
   percursos?: Percurso[];
+  /**
+   * SPEC-79 fatia C — os tokens do design system do time.
+   *
+   * **É o que faz a régua visual chegar ao backlog.** Sem esta linha, contraste
+   * e pertencimento produziriam violação na tela de prontidão e **nenhum item de
+   * trabalho** — e a SPEC-79 §2 diz, com todas as letras, qual é o critério para
+   * o estágio `padroes` ficar verde: *se não deriva item, não está verde.*
+   *
+   * Ausente ou vazio faz as duas checagens se calarem, como em toda a cadeia.
+   */
+  tokens?: Token[];
 }
 
 /** Sufixo da chave da atividade de criação, por kind de `derives`. */
@@ -239,7 +250,7 @@ function derivarConformidade(
   config: DiagramaConfig,
   quebra: ContextoQuebra
 ): Atividade[] {
-  return avaliarConformidade(diagrama, config, quebra.regras, quebra.excecoes)
+  return avaliarConformidade(diagrama, config, quebra.regras, quebra.excecoes, quebra.tokens)
     .filter((v) => !v.excecao)
     .map((v) => {
     const no = diagrama.nodes.find((n) => n.id === v.noId)!;
