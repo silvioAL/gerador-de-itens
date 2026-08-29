@@ -1,10 +1,12 @@
-import type { AppConfig, DiagramaConfig, FieldSpec, RegrasConfig } from "@gerador/engine";
-import { apiCamposAresta, apiCamposNo, type CampoAresta, type CampoNo, apiRegras } from "../api/client";
+import type { AppConfig, DiagramaConfig, FieldSpec, RegrasConfig, Token } from "@gerador/engine";
+import { apiCamposAresta, apiCamposNo, type CampoAresta, type CampoNo, apiRegras, apiTokens } from "../api/client";
 
 export interface ConfigCarregada {
   diagramaConfig: DiagramaConfig;
   appConfig: AppConfig;
   regrasConfig?: RegrasConfig;
+  /** SPEC-79 fatia A — os tokens do design system do time (vazio = nao configurado). */
+  tokens: Token[];
 }
 
 async function buscarJson<T>(caminho: string): Promise<T> {
@@ -99,7 +101,7 @@ function mesclarCamposCustomizadosAresta(diagramaConfig: DiagramaConfig, campos:
  * troca de time ativo (App.tsx chama de novo quando isso muda).
  */
 export async function carregarConfig(timeAtivo?: string): Promise<ConfigCarregada> {
-  const [diagramaConfig, appConfig, regrasConfig, camposCustomizados, camposArestaCustomizados] = await Promise.all([
+  const [diagramaConfig, appConfig, regrasConfig, camposCustomizados, camposArestaCustomizados, tokens] = await Promise.all([
     buscarJson<DiagramaConfig>("/config/diagrama.json"),
     buscarJson<AppConfig>("/config/app.json"),
     // O DOCUMENTO editável (banco, com override da RegrasTab) — não o JSON
@@ -130,8 +132,21 @@ export async function carregarConfig(timeAtivo?: string): Promise<ConfigCarregad
      * tela em branco.
      */
     apiCamposAresta.listar(timeAtivo).catch(() => []),
+    /**
+     * SPEC-79 fatia A — os tokens do design system do time.
+     *
+     * `catch` pelo mesmo motivo de blast radius do vizinho acima, e com um
+     * agravante: **time sem design system configurado é o caso comum**, não a
+     * exceção. Falha aqui significa "nenhum token declarado", e a régua se cala
+     * sozinha em `avaliarConformidade` — nunca uma tela em branco, e nunca uma
+     * organização acusada por não ter configurado algo que acabou de existir.
+     */
+    apiTokens
+      .obter(timeAtivo)
+      .then((c) => c?.tokens ?? [])
+      .catch(() => [] as Token[]),
   ]);
   const comCamposNo = mesclarCamposCustomizados(diagramaConfig, camposCustomizados);
   const comCamposAresta = mesclarCamposCustomizadosAresta(comCamposNo, camposArestaCustomizados);
-  return { diagramaConfig: comCamposAresta, appConfig, regrasConfig };
+  return { diagramaConfig: comCamposAresta, appConfig, regrasConfig, tokens };
 }

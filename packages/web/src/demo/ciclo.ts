@@ -70,13 +70,28 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
   {
     id: "padroes",
     titulo: "Analisar o contexto técnico",
-    resumo: "As stacks conhecidas, os padrões por componente, os campos de cada tipo.",
+    resumo: "As stacks, os padrões por componente, os campos de cada tipo — e o design system.",
     detalhe:
-      "Que tecnologias o time usa, que padrão cada tipo de componente precisa seguir, que campos uma fila ou um banco tem que declarar. É a configuração determinística que o motor lê para medir o seu desenho — e é dela que sai toda cobrança que a ferramenta faz.",
-    estado: "parcial",
-    rota: { tela: "config", area: "campos" },
-    oQueFalta:
-      "Um design system de verdade — tokens, componentes de interface, régua visual — ainda não é modelado aqui. O que existe é a régua de arquitetura e de dados.",
+      "Que tecnologias o time usa, que padrão cada tipo de componente precisa seguir, que campos uma fila ou um banco tem que declarar, e quais são os tokens do design system da casa. É a configuração determinística que o motor lê para medir o seu desenho — e é dela que sai toda cobrança que a ferramenta faz. A parte visual entra pela mesma porta das outras: contraste é aritmética, e pertencer ao sistema é conferível. O que não dá para calcular continua sendo checklist de gente.",
+    /**
+     * SPEC-79 — deixou de ser `parcial`.
+     *
+     * O que faltava era nomeado: *"um design system de verdade — tokens,
+     * componentes de interface, régua visual — ainda não é modelado aqui"*. O
+     * que estava ausente era a **régua**: tokens não eram dado, e nada do lado
+     * visual era conferível. Os dois existem agora, e o critério que a SPEC-79
+     * §2 declarou para esta marca virar está sob teste: **um desenho que
+     * contraria o design system deriva item de trabalho**, como qualquer outro
+     * padrão. Régua que acusa e não gera trabalho é régua que o time aprende a
+     * ignorar.
+     *
+     * O *tipo* de componente de interface o time declara como declara qualquer
+     * outro — a ferramenta não envia um pronto, e a rodada mediu por que: pôr
+     * regras de Frontend no template de fábrica muda, em silêncio, o que uma
+     * instalação limpa é. A própria SPEC-79 §5 já recomendava o contrário.
+     */
+    estado: "completo",
+    rota: { tela: "config", area: "tokens" },
   },
   {
     id: "desenho",

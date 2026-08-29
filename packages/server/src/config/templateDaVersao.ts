@@ -26,6 +26,10 @@ const DEFAULTS_COMPILADOS: Record<ChaveConfig, unknown> = {
   regras: { tipos: [], tamanhos: [], porTech: {} },
   "pipeline-agentes": { confirmacaoObrigatoria: true, papeis: [] },
   exportador: { endpoint: "", rotulo: "", cabecalhos: {} },
+  /** SPEC-79 fatia A — time sem design system começa com a lista VAZIA, e a
+   * régua se cala (ver `avaliarConformidade`). Semear tokens de exemplo faria
+   * toda organização nascer cobrando pertencimento a cores que não são dela. */
+  tokens: { tokens: [] },
 };
 
 export async function templateDaVersao(chave: ChaveConfig, diretorioConfig: string): Promise<unknown> {

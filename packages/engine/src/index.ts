@@ -256,3 +256,10 @@ export {
   montarVocabularioTranscricao,
   type OpcoesVocabulario,
 } from "./transcricao/vocabulario.js";
+
+/** SPEC-79 fatia A — o design system do time como dado, no formato que as
+ * ferramentas já falam. */
+export { deTokensW3C, paraTokensW3C } from "./config/tokensW3C.js";
+
+/** SPEC-79 fatia C — a parte do design system que é aritmética. */
+export { contraste, contrasteArredondado, rgbDe } from "./conformidade/contraste.js";

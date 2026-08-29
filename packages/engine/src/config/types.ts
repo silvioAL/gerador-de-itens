@@ -179,6 +179,46 @@ export interface AppConfig {
 }
 
 /**
+ * SPEC-79 fatia A — **o design system como dado.**
+ *
+ * O produto já usa tokens (`var(--painel)`, `var(--texto)`, `var(--borda)`) —
+ * mas eles vivem no CSS, e o motor não os enxerga. Enquanto for assim, "está de
+ * acordo com o design system do time?" é pergunta que a ferramenta não sabe
+ * responder, e o estágio `padroes` do ciclo continua `parcial`.
+ *
+ * ## Por que tão pouco campo
+ *
+ * A tentação é modelar tipografia, escala, breakpoint, elevação. Um token é
+ * **um nome e um valor**; tudo o mais é agrupamento, e `grupo` dá conta. Modelar
+ * a mais aqui criaria um vocabulário que nenhum time usa igual, e a fatia C
+ * precisa apenas de duas coisas: saber quais valores são declarados, e conseguir
+ * ler cor.
+ *
+ * ## Por que `valorEscuro` e não dois conjuntos
+ *
+ * Modo claro e escuro são o MESMO token com dois valores — é assim que o produto
+ * já funciona, e é assim que todo design system que tem os dois modelou. Dois
+ * conjuntos separados dessincronizam na primeira cor nova (§263).
+ */
+export interface Token {
+  /** Como o time o chama: `cor.fundo.painel`, `espaco.2`, `raio.md`. */
+  nome: string;
+  /** O valor no modo claro — ou o único, quando não há dois modos. */
+  valor: string;
+  /** O valor no modo escuro, quando o time tem os dois. */
+  valorEscuro?: string;
+  /** `cor`, `espaco`, `tipografia`, `raio`… — livre de propósito: é o
+   * vocabulário do time, e fechá-lo aqui obrigaria todo mundo ao nosso. */
+  grupo?: string;
+  /** Para que ele serve, quando o nome não basta. */
+  ajuda?: string;
+}
+
+export interface TokensConfig {
+  tokens: Token[];
+}
+
+/**
  * Item de refinamento técnico por tech. `contextos: []` aplica sempre que a tech
  * estiver presente; caso contrário, só aparece quando um dos contextos da
  * atividade contém (ou é contido por) algum destes — mesmo casamento parcial
@@ -192,7 +232,31 @@ export interface AppConfig {
  * renderiza igual agora, o campo não tinha mais efeito nenhum que fizesse
  * sentido manter.
  */
-export const OPERADORES_CHECAGEM = ["lte", "lt", "gte", "gt", "eq", "ne", "preenchido"] as const;
+/**
+ * SPEC-79 fatia C — dois operadores novos, e os dois existem pelo mesmo motivo:
+ * são a parte do design system que **dá para calcular**.
+ *
+ * - `contraste-gte` — a razão WCAG entre o campo e o campo nomeado em `valorDe`
+ *   é pelo menos `valor`. Contraste é aritmética sobre luminância, não gosto.
+ * - `pertence-aos-tokens` — o valor do campo é um dos tokens declarados. É o que
+ *   transforma "use as cores do sistema" de recomendação em cobrança.
+ *
+ * O que NÃO virou operador está dito na SPEC-79 §3: hierarquia visual, tom, se a
+ * tela "parece nossa". Isso continua sendo `Requisito` **sem** `checagem` — um
+ * item de checklist que uma pessoa responde. A régua é literal: *se não dá para
+ * calcular, não é checagem.*
+ */
+export const OPERADORES_CHECAGEM = [
+  "lte",
+  "lt",
+  "gte",
+  "gt",
+  "eq",
+  "ne",
+  "preenchido",
+  "contraste-gte",
+  "pertence-aos-tokens",
+] as const;
 export type OperadorChecagem = (typeof OPERADORES_CHECAGEM)[number];
 
 /**

@@ -1,6 +1,7 @@
-import type { Checagem, DiagramaConfig, RegrasConfig } from "../config/types.js";
+import type { Checagem, DiagramaConfig, RegrasConfig, Token } from "../config/types.js";
 import type { Diagrama, ExcecaoDePadrao, No } from "../model/types.js";
 import { condicaoBate, requisitosRelevantes } from "../refinamento/gerarRefinamento.js";
+import { contrasteArredondado } from "./contraste.js";
 
 /**
  * SPEC-57 fatia B (§239) — o padrão virando régua.
@@ -80,7 +81,50 @@ function descreverEsperado(c: Checagem, alvo: string): string {
       return `≠ ${alvo}`;
     case "preenchido":
       return "preenchido";
+    case "contraste-gte":
+      return `contraste ≥ ${alvo}`;
+    case "pertence-aos-tokens":
+      return "um token declarado";
   }
+}
+
+/**
+ * SPEC-79 fatia C — os dois operadores do design system.
+ *
+ * Ficam FORA de `satisfaz` de propósito: aquela função compara um valor com um
+ * alvo já resolvido para número, e nenhum destes dois cabe nisso. Contraste
+ * precisa da OUTRA cor crua (`valorDe` nomeia um campo, não um número), e
+ * pertencimento precisa da lista de tokens, que não é do nó. Espremê-los lá
+ * dentro faria `alvoDa` coagir cor para número e devolver `undefined` sempre —
+ * a checagem se calaria em silêncio, que é o pior desfecho possível: regra
+ * escrita, nada medido, ninguém avisado.
+ */
+function satisfazDesignSystem(
+  c: Checagem,
+  no: No,
+  tokens: Token[]
+): { ok: boolean; atual: string } | undefined {
+  const valor = no.spec[c.campo]?.valor;
+  if (valor === undefined || valor === null || valor === "") return undefined;
+  const texto = String(valor);
+
+  if (c.operador === "contraste-gte") {
+    if (!c.valorDe) return undefined;
+    const fundo = no.spec[c.valorDe]?.valor;
+    if (fundo === undefined || fundo === null || fundo === "") return undefined;
+
+    const razao = contrasteArredondado(texto, String(fundo));
+    // Cor que o motor não sabe ler (`var(--painel)`, um nome, um token ainda não
+    // resolvido) faz a checagem se calar — a mesma disciplina de `numeroDe`.
+    if (razao === undefined) return undefined;
+
+    const minimo = numeroDe(c.valor);
+    if (minimo === undefined) return undefined;
+    return { ok: razao >= minimo, atual: `${razao}` };
+  }
+
+  const declarados = new Set(tokens.map((t) => t.nome));
+  return { ok: declarados.has(texto), atual: texto };
 }
 
 /** `undefined` = não dá para afirmar nada (campo ausente ou valor de outro tipo). */
@@ -119,7 +163,12 @@ export function avaliarConformidade(
   /** §242 — as exceções registradas na quebra. Violação com exceção continua
    * SENDO uma violação (some do vermelho, não do histórico): apagá-la aqui
    * faria a decisão desaparecer junto, e o que se quer é o oposto. */
-  excecoes: ExcecaoDePadrao[] = []
+  excecoes: ExcecaoDePadrao[] = [],
+  /** SPEC-79 fatia C — os tokens do time, para `pertence-aos-tokens`. Ausente
+   * ou vazio faz essa checagem se calar: cobrar pertencimento a uma lista que
+   * ninguém declarou acusaria todo desenho de um time que ainda não configurou
+   * design system nenhum. */
+  tokens: Token[] = []
 ): Violacao[] {
   if (!regras) return [];
   const violacoes: Violacao[] = [];
@@ -138,6 +187,31 @@ export function avaliarConformidade(
 
       for (const requisito of relevantes) {
         const c = requisito.checagem!;
+
+        // SPEC-79 fatia C — os dois do design system saem antes, porque não
+        // passam por `alvoDa` (ver `satisfazDesignSystem`).
+        if (c.operador === "contraste-gte" || c.operador === "pertence-aos-tokens") {
+          // Lista vazia = time sem design system configurado. Calar é a única
+          // resposta honesta: a regra existe, o material contra o qual medir não.
+          if (c.operador === "pertence-aos-tokens" && tokens.length === 0) continue;
+
+          const resultado = satisfazDesignSystem(c, no, tokens);
+          if (resultado && !resultado.ok) {
+            violacoes.push({
+              noId: no.id,
+              noLabel: rotuloDe(no),
+              tech,
+              campo: c.campo,
+              texto: requisito.texto,
+              esperado: descreverEsperado(c, String(c.valor ?? "")),
+              atual: resultado.atual,
+              porque: requisito.porque,
+              excecao: excecoes.find((e) => e.noId === no.id && e.campo === c.campo),
+            });
+          }
+          continue;
+        }
+
         const alvo = alvoDa(c, no);
         // Alvo indeterminado (campo comparado ausente ou não numérico): a
         // checagem se cala, como faz com o campo ausente. Acusar aqui seria

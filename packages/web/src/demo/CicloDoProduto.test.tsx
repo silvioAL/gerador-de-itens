@@ -29,15 +29,33 @@ describe("CicloDoProduto (SPEC-76)", () => {
     expect(screen.getByTestId(`estagio-item-${ausente.id}`)).toHaveTextContent("ainda não existe");
   });
 
-  it("o parcial diz que é parcial, e o completo não vira ruído", () => {
+  it("todo estágio incompleto diz o que é, e o completo não vira ruído", () => {
+    /**
+     * **Reescrito na SPEC-79, e o motivo é o próprio produto avançando.**
+     *
+     * A versão anterior fazia `find((e) => e.estado === "parcial")!` e assumia
+     * que sempre existiria um. A SPEC-79 zerou o único que havia (`padroes`), e
+     * o `!` virou `undefined.id` — teste vermelho por acerto, não por defeito.
+     *
+     * A versão nova não depende de QUAL estado ocorre nos dados: ela cobra a
+     * mecânica. Todo estágio não-completo carrega a sua palavra; nenhum completo
+     * carrega marca. Isso continua valendo no dia em que um `parcial` voltar — e
+     * a SPEC-83 §4 explica por que a máquina não se apaga quando as marcas ficam
+     * todas iguais.
+     */
     render(<CicloDoProduto />);
-    const parcial = ESTAGIOS_DO_CICLO.find((e) => e.estado === "parcial")!;
-    const completo = ESTAGIOS_DO_CICLO.find((e) => e.estado === "completo")!;
 
-    expect(screen.getByTestId(`estagio-item-${parcial.id}`)).toHaveTextContent("parcial");
+    const incompletos = ESTAGIOS_DO_CICLO.filter((e) => e.estado !== "completo");
+    for (const estagio of incompletos) {
+      const palavra = estagio.estado === "parcial" ? "parcial" : "não existe";
+      expect(screen.getByTestId(`estagio-item-${estagio.id}`)).toHaveTextContent(palavra);
+    }
+
     // Marcar o que está certo é a definição de ruído — e ruído se aprende a
     // ignorar, junto com o que importava.
-    expect(screen.getByTestId(`estagio-item-${completo.id}`)).not.toHaveTextContent("existe");
+    for (const estagio of ESTAGIOS_DO_CICLO.filter((e) => e.estado === "completo")) {
+      expect(screen.getByTestId(`estagio-item-${estagio.id}`)).not.toHaveTextContent("existe");
+    }
   });
 
   it("clicar num estágio abre o desdobramento; clicar de novo fecha", () => {

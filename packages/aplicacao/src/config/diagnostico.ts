@@ -99,6 +99,17 @@ export function resumirConfig(chave: ChaveConfig, documento: unknown): ResumoCon
     // não configurar exportação é escolha, não desatualização.
     case "exportador":
       return { destino: typeof (documento as { endpoint?: string })?.endpoint === "string" && (documento as { endpoint: string }).endpoint.trim() ? 1 : 0 };
+    /**
+     * SPEC-79 fatia A — os tokens, contados.
+     *
+     * O diagnóstico compara o documento do time com o template da versão para
+     * dizer *"a versão nova traz seções que você não tem"*. Aqui o template vem
+     * VAZIO de propósito (ver `templateDaVersao`), então este número nunca acusa
+     * desatualização — como no exportador, e pelo mesmo motivo: **não ter design
+     * system configurado é escolha, não atraso.**
+     */
+    case "tokens":
+      return { tokens: Array.isArray((documento as { tokens?: unknown[] })?.tokens) ? (documento as { tokens: unknown[] }).tokens.length : 0 };
   }
 }
 
