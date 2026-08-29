@@ -12700,3 +12700,66 @@ passa a morar numa camada que dá para versionar, medir e discutir.**
 Três recusas novas saíram daí: **ganho sem mecanismo**, **termo sem âncora**, e
 **vender "IA driven" no sentido que o mercado usa** — que venderia melhor e
 descreveria outro produto.
+
+### Adendo 3 — o conceito aplicado a processo de negócio, e o gap que a medição achou
+
+> *"precisamos da explicação que mostra o conceito sendo aplicado aos processos,
+> que incluem a parte de negócios… ou seja, como conectar tudo isso colocando a
+> IA no centro como facilitadora e aceleradora. **Esse é o desafio corporativo
+> que queremos resolver.**"*
+
+Conceito em abstrato não convence: as quatro camadas são verdadeiras e não fazem
+ver. A página passa a precisar de **um processo real atravessando as quatro**.
+
+E a medição foi melhor do que eu supunha em metade, e pior na outra.
+
+**A metade boa:** o produto **já modela negócio como tipo de nó de primeira
+classe.** Em `config/diagrama.example.json`: `rule` → *Regra de Negócio*, `motor`
+→ *Motor de Regras*, `fico` → *Fluxo Decisão (FICO)*, `camunda` → *Processo
+Camunda*. E há cenário de crédito semeado. **O desafio corporativo já tem
+vocabulário no produto** — a página pode mostrar o conceito aplicado a negócio
+sem inventar nada.
+
+**A metade ruim, e é achado novo que não estava em SPEC nenhuma:** os treze
+`contextos` de `app.example.json` são **todos técnicos** — começam com
+`Backend-`, `Mobile-` ou `Frontend`. `Backend-regras` é um contexto técnico que
+por acaso guarda regra de negócio. **Não existe eixo de domínio** — nada de
+"Crédito", "Cobrança", "Onboarding". O campo é string livre, então um time *pode*
+escrever `Credito-regras`; mas **poder não é modelar**: nada impede dois times de
+grafarem o mesmo domínio de dois jeitos, e nada cruza "todas as regras de
+Crédito" independentemente de onde foram implementadas.
+
+Um checklist "por processo de negócio" — que é literalmente o que o usuário
+listou como parte da camada — hoje sai por **convenção de nome**, não por
+estrutura. Isso virou a pergunta 5 da SPEC-83, com a recomendação de que
+provavelmente é uma **SPEC-84**, e com a decisão de escopo: a página mostra o
+conceito aplicado a negócio (verdade) e **não** afirma organização por domínio
+(que não existe). Recusa nova, explícita.
+
+### A IA no centro, dita pelo lado positivo
+
+O §316 anterior tinha resolvido "IA no centro" pelo lado defensivo — *contida*.
+Está certo e é **insuficiente**: descreve o limite e não o valor, e uma página
+que só diz o que a IA não pode fazer vende uma limitação.
+
+O usuário deu a formulação que faltava: **facilitadora e aceleradora**. Ela está
+no centro porque **toca todos os estágios** — lê o contexto, propõe o desenho,
+escreve o texto, sugere configuração — e é a razão de o ciclo caber num dia em
+vez de numa sprint.
+
+> **A borda não existe para conter a IA. Existe para que valha a pena colocá-la no
+> meio.** Sem schema de processo, acelerar é acelerar na direção errada com boa
+> redação. Com ele, a velocidade da IA vira velocidade do time — porque tudo o que
+> ela produz nasce medido, com proveniência, e some se a causa sumir.
+
+Daí a recusa nova: **vender a IA só pelo que ela não faz.** A página precisa dos
+dois, nessa ordem — primeiro por que vale colocá-la no meio, depois por que é
+seguro.
+
+O exemplo que a página vai andar é a **concessão de crédito**, porque é o cenário
+que o repositório já semeia: a regra de negócio deixa de morar num parágrafo de
+wiki e vira nó tipado com campos obrigatórios, medido a cada mudança; os
+apontamentos dizem que o caminho estoura a régua de latência e que a política não
+tem porquê registrado; e a IA escreve história, contrato e cenários de teste em
+minutos, dentro do que as camadas determinaram. **É isso que "governança perene"
+quer dizer quando sai do slide.**

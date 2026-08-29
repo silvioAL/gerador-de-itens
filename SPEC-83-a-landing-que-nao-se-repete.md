@@ -294,6 +294,84 @@ esquecê-la.
 > conversas de IA, e passa a morar numa camada que dá para versionar, medir e
 > discutir.** É a resposta direta ao *"isso não tem sido o suficiente"* da §1.1.
 
+### 2.6 O conceito aplicado a um processo corporativo — e o que a medição achou
+
+> *"precisamos da explicação que mostra o conceito sendo aplicado aos processos,
+> que incluem a parte de negócios… ou seja, como conectar tudo isso colocando a
+> **IA no centro como facilitadora e aceleradora**. Esse é o **desafio
+> corporativo** que queremos resolver."* — o usuário.
+
+Conceito explicado em abstrato não convence ninguém: as camadas da §2.2 são
+verdadeiras e não fazem ver. **A página precisa de um processo real atravessando
+as quatro.**
+
+#### O que a medição encontrou, e é melhor do que eu supunha
+
+O produto **já modela o lado de negócio como tipo de nó de primeira classe** —
+não é aspiração, está em `config/diagrama.example.json`:
+
+| Tipo | Rótulo |
+|---|---|
+| `rule` | **Regra de Negócio** |
+| `motor` | **Motor de Regras** |
+| `fico` | **Fluxo Decisão (FICO)** |
+| `camunda` | **Processo Camunda** (orquestração de processo) |
+
+E há cenário de crédito semeado (`config/cenarios/credito-completo.json`,
+`fico.json`). **O desafio corporativo já tem vocabulário no produto.**
+
+#### E o que ela achou de gap, que a página não pode disfarçar
+
+**Os `contextos` são todos técnicos.** `app.example.json` traz treze, e todos
+começam com `Backend-`, `Mobile-` ou `Frontend`. `Backend-regras` é um contexto
+**técnico** que por acaso guarda regra de negócio.
+
+Não existe eixo de **domínio de negócio** — nada de "Crédito", "Cobrança",
+"Onboarding". O campo é string livre, então um time *pode* escrever
+`Credito-regras`; mas **poder não é modelar**, e um checklist "por processo de
+negócio" hoje sai por convenção de nome, não por estrutura.
+
+> Isto é achado desta rodada e **não estava em SPEC nenhuma**. A página pode
+> mostrar o conceito aplicado a negócio com honestidade — os nós existem —, mas
+> **não** pode dizer que o produto organiza o trabalho por domínio de negócio.
+> Ver a §10, pergunta 5.
+
+#### O exemplo que a página deve andar, ponta a ponta
+
+Concessão de crédito, porque é o cenário que o repositório já semeia:
+
+| Camada | O que aparece no exemplo |
+|---|---|
+| **Perene** | o que um Fluxo de Decisão **precisa declarar** — política, versão, quem aprova mudança de régua, o que fazer quando o bureau externo não responde. É a `spec` do tipo `fico`, e vale para toda proposta de crédito que a casa desenhar |
+| **Da demanda** | *esta* mudança: o motor de regras novo, a fila que o alimenta, o volume declarado, o ensaio "e se o bureau ficar lento?" |
+| **Apontamentos** | o caminho inteiro estoura a régua de latência acordada; a política não tem porquê registrado; falta declarar o comportamento na queda do bureau |
+| **IA** | escreve a história de usuário, o contrato da conexão, os cenários de teste do processo — **em minutos, e dentro do que as três camadas acima determinaram** |
+
+**A regra de negócio deixa de morar num parágrafo de wiki e passa a ser nó
+tipado, com campos obrigatórios, medido a cada mudança.** É isso que "governança
+perene" quer dizer quando sai do slide.
+
+#### A IA no centro, dita pelo lado positivo
+
+A §2.4 resolveu a ambiguidade de "centro" pelo lado defensivo — *contida*. Isso
+está certo e é insuficiente: **descreve o limite e não o valor**, e uma página que
+só diz o que a IA não pode fazer vende uma limitação.
+
+O usuário deu a formulação que faltava: **facilitadora e aceleradora**.
+
+Ela está no centro porque **toca todos os estágios** — lê o contexto, propõe o
+desenho, escreve o texto, sugere configuração, ajuda a refinar. É de longe a
+parte mais rápida do trabalho, e é a razão de o ciclo inteiro caber num dia em
+vez de numa sprint.
+
+> **A borda não existe para conter a IA. Existe para que valha a pena colocá-la no
+> meio.** Sem schema de processo, acelerar é acelerar na direção errada com boa
+> redação. Com ele, a velocidade da IA vira velocidade do time — porque tudo o
+> que ela produz nasce medido, com proveniência, e some se a causa sumir.
+
+Os dois lados juntos, e a página precisa dos dois: **a IA acelera; a camada
+responde.**
+
 ## 3. Os diagramas — mais de um, e cada um com um trabalho
 
 O usuário pediu *"mais diagrama que explique os conceitos e as camadas"*. Três,
@@ -306,6 +384,10 @@ e nenhum decorativo:
    concreto em vez de adjetivo.
 3. **O ciclo** — o `CicloDoProduto`, que já existe e fica. Agora legendado com o
    que ele significa, e não só com o que ele lista.
+4. **O processo atravessando as camadas** (§2.6) — a concessão de crédito
+   descendo pelas quatro, com a IA no meio acelerando. É o único dos quatro que
+   mostra **um caso**, e provavelmente o que mais convence: os outros três
+   explicam o produto, este mostra o **problema de quem chega** já resolvido.
 
 A régua para os três, herdada da SPEC-82: **dirigidos pelos mesmos dados da
 página, para que não consigam mentir.** Um diagrama de camadas que liste uma
@@ -391,6 +473,16 @@ de benefícios num produto cuja tese é que promessa não confirmada não conta.
 de processo*, *governança executável* são palavras fortes, e palavra forte sem
 código atrás é jargão. Cada uma aponta para onde vive — ou sai.
 
+**Afirmar organização por domínio de negócio.** A §2.6 mediu: existem **nós** de
+negócio e só existem **contextos** técnicos. A página mostra o conceito aplicado a
+um processo de negócio — isso é verdade — e não diz que o produto organiza o
+trabalho por domínio, que não é.
+
+**Vender a IA só pelo que ela não faz.** *"Propõe, nunca aplica sozinha"* é o
+limite, e sozinho ele vende uma limitação. **Facilitadora e aceleradora** é o
+valor. A página precisa dos dois, nessa ordem: primeiro por que vale colocá-la no
+meio, depois por que é seguro.
+
 **Vender "IA driven" no sentido que o mercado usa.** A §2.4 resolve a
 ambiguidade em favor de *contido*; usar o termo na leitura de protagonista
 venderia melhor e descreveria outro produto.
@@ -452,6 +544,16 @@ leitor que esta página quer.
    pé.
 4. **A landing precisa de rota própria?** Ela é renderizada em `App.tsx` **antes**
    de qualquer roteador; seções linkáveis viram trabalho real. Medir na fatia D.
-5. **O `CONCEITO.md` deveria ser publicado como página?** Se ele é a fonte
+5. **O eixo de domínio de negócio deveria existir como modelo?** É o achado da
+   §2.6, e é o maior desta rodada: o produto tem **nós** de negócio e só tem
+   **contextos** técnicos. Um checklist "por processo de negócio" sai hoje por
+   convenção de nome (`Credito-regras`), não por estrutura — então nada impede
+   dois times de escreverem o mesmo domínio de dois jeitos, e nada cruza "todas as
+   regras de Crédito" independentemente de onde foram implementadas.
+   **Se o desafio corporativo é o que o usuário diz que é, isto provavelmente é
+   uma SPEC-84** — e é decisão dele, não desta SPEC. O que esta SPEC assume: a
+   página mostra o conceito aplicado a negócio (honesto: os nós existem) e **não**
+   afirma organização por domínio (que não existe).
+6. **O `CONCEITO.md` deveria ser publicado como página?** Se ele é a fonte
    canônica, uma versão navegável evita que a landing tente ser o documento
    inteiro — que é como ela virou uma coluna de 760 px.
