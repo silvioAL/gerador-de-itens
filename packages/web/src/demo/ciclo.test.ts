@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ESTAGIOS_DO_CICLO, contagemDoCiclo } from "./ciclo";
+import { CONEXOES } from "./conceito";
 import { AREAS_CONFIG_CONHECIDAS, hashDaRota, rotaDoHash } from "../navegacao/rota";
 
 /**
@@ -37,13 +38,9 @@ describe("o ciclo não promete o que o produto não faz (SPEC-76 fatia D)", () =
     expect(ausenteComRota.map((e) => e.id)).toEqual([]);
   });
 
-  it("o que não está completo DIZ o que falta", () => {
-    // Marcar como parcial ou ausente sem explicar é o mesmo que não marcar:
-    // quem lê fica sabendo que há um buraco e não sabe qual.
-    const semExplicacao = ESTAGIOS_DO_CICLO.filter((e) => e.estado !== "completo" && !e.oQueFalta?.trim());
-
-    expect(semExplicacao.map((e) => e.id)).toEqual([]);
-  });
+  /* "o que não está completo DIZ o que falta" mudou de lugar: virou uma das
+     duas asserções do laço `AFIRMACOES`, no fim do arquivo, porque `CONEXOES`
+     precisa exatamente da mesma. Ver o comentário de lá (SPEC-85 §0.4). */
 
   it("a contagem sai do dado, não da prosa", () => {
     /**
@@ -85,22 +82,53 @@ describe("o ciclo não promete o que o produto não faz (SPEC-76 fatia D)", () =
     expect(areasFantasma.map((e) => e.id)).toEqual([]);
   });
 
-  it("estágio marcado como ausente não pode ter uma SPEC entregue com o mesmo assunto", () => {
-    /**
-     * Não dá para o teste ler o JOURNEY. O que dá é cobrar a única coisa que a
-     * marca de ausência precisa carregar para não apodrecer: **uma frase que
-     * envelhece visivelmente.** "Não avaliado ainda" era exatamente a frase que
-     * não envelhece — continuou plausível por quatro rodadas depois de falsa.
-     */
-    const semData = ESTAGIOS_DO_CICLO.filter(
-      (e) => e.estado === "ausente" && !/SPEC-\d+|§\d+/.test(e.oQueFalta ?? "")
-    );
+  /**
+   * SPEC-85 §0.4 — **a trava do §327 era estreita demais, e a prova disso levou
+   * três horas.**
+   *
+   * Ela cobrava `ESTAGIOS_DO_CICLO`. `CONEXOES` mora no arquivo vizinho, é a
+   * mesma pergunta ("isto existe?") sobre outra coisa, usa o **mesmo tipo de
+   * estado** — e duas das cinco estavam mentindo na página no ar: "ADRs da casa"
+   * dizia *"falta a tela para importar"* depois de §325 e §326, e "Spec →
+   * desenvolvimento com IA" dizia *"falta a tela para escrevê-lo"* no dia
+   * seguinte ao §327 tê-la construído.
+   *
+   * Escrever a trava para a **instância** em vez de para a **classe** foi o
+   * defeito. Agora as duas listas passam pelo mesmo laço, e a próxima lista que
+   * nascer com `EstadoDoEstagio` entra aqui por uma linha.
+   */
+  const AFIRMACOES = [
+    { nome: "ESTAGIOS_DO_CICLO", itens: ESTAGIOS_DO_CICLO as { id: string; estado: string; oQueFalta?: string }[] },
+    { nome: "CONEXOES", itens: CONEXOES as { id: string; estado: string; oQueFalta?: string }[] },
+  ];
 
-    expect(
-      semData.map((e) => e.id),
-      "estágio ausente tem que citar a SPEC ou o § que responde por ele — frase vaga não envelhece"
-    ).toEqual([]);
-  });
+  for (const { nome, itens } of AFIRMACOES) {
+    it(`${nome}: o que não está completo DIZ o que falta`, () => {
+      // Marcar sem explicar é o mesmo que não marcar: quem lê fica sabendo que
+      // há um buraco e não sabe qual.
+      const semExplicacao = itens.filter((e) => e.estado !== "completo" && !e.oQueFalta?.trim());
+
+      expect(semExplicacao.map((e) => e.id)).toEqual([]);
+    });
+
+    it(`${nome}: a marca de ausência cita a SPEC ou o § que responde por ela`, () => {
+      /**
+       * Não dá para o teste ler o JOURNEY. O que dá é cobrar a única coisa que a
+       * marca precisa carregar para não apodrecer: **uma frase que envelhece
+       * visivelmente.**
+       *
+       * "Não avaliado ainda" e "Avaliado e adiado" são exatamente as frases que
+       * não envelhecem — continuam plausíveis para sempre, inclusive depois de
+       * falsas. Uma que cita `§324` fica errada de um jeito que dá para ver.
+       */
+      const semData = itens.filter((e) => e.estado === "ausente" && !/SPEC-\d+|§\d+/.test(e.oQueFalta ?? ""));
+
+      expect(
+        semData.map((e) => e.id),
+        `em ${nome}, o ausente tem que citar a SPEC ou o § que responde por ele — frase vaga não envelhece`
+      ).toEqual([]);
+    });
+  }
 
   it("os ids são únicos — é por eles que o desdobramento abre", () => {
     const ids = ESTAGIOS_DO_CICLO.map((e) => e.id);

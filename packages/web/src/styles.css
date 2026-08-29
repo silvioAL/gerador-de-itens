@@ -504,3 +504,101 @@ textarea::placeholder {
 .ensaio-fantasma-linha {
   animation: ensaio-fantasma-entrar 260ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
+
+/* ==========================================================================
+   SPEC-85 fatia C — o passo contido, e a guarda de movimento reduzido.
+   ========================================================================== */
+
+/*
+  A tese do produto é uma AUSÊNCIA de comportamento: a IA propõe e não aplica.
+  Ausência é o mais difícil de comunicar, porque não há o que apontar — e é
+  exatamente o que o tempo mostra e o texto só afirma.
+
+  A proposta sai da IA, chega ao portão e ESPERA. A espera é a informação: ela
+  ocupa 40% do ciclo, e é a única parte da animação em que nada acontece.
+  Encurtá-la para "ficar mais fluido" apagaria o que a peça existe para dizer.
+*/
+@keyframes proposta-ate-o-portao {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  /* Chega ao portão a 45% do tempo e fica parada até 85%: a espera. */
+  45%,
+  85% {
+    offset-distance: 46%;
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 1;
+  }
+}
+
+/* O carimbo humano só aparece no fim da espera — é ele que destrava, e a ordem
+   importa: primeiro alguém confirma, depois a coisa passa. */
+@keyframes carimbo-humano {
+  0%,
+  70% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  /*
+    78%, e o portão só abre em 85%: o carimbo aparece SETE PONTOS ANTES.
+
+    A primeira escrita punha o carimbo em 88%, depois de a proposta já ter
+    começado a sair — e o teste acusou. Invertida, a animação contava a história
+    de um produto diferente: algo que passa e depois é carimbado.
+  */
+  78% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.passo-contido-proposta {
+  animation: proposta-ate-o-portao 5.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.passo-contido-carimbo {
+  animation: carimbo-humano 5.2s ease-out infinite;
+  transform-origin: center;
+}
+
+/*
+  A guarda que faltava no produto inteiro.
+
+  Havia catorze `@keyframes` aqui e nenhuma pergunta sobre `prefers-reduced-motion`
+  — medido na SPEC-85 fatia C. Quem pede menos movimento pede por vestíbulo,
+  enxaqueca ou distração, e o sistema operacional já sabe a resposta: só ninguém
+  estava perguntando.
+
+  A peça do passo contido não perde nada: sem movimento ela mostra a proposta
+  PARADA no portão, que é o quadro que carrega a tese. O resto do produto perde
+  animação de espera, que é o que sobra quando se tira o enfeite.
+*/
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  /* Sem movimento, a proposta fica ONDE a tese acontece: no portão, esperando. */
+  .passo-contido-proposta {
+    offset-distance: 46% !important;
+    opacity: 1 !important;
+  }
+  .passo-contido-carimbo {
+    opacity: 0.35 !important;
+  }
+}

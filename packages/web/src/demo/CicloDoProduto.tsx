@@ -81,12 +81,22 @@ export function CicloDoProduto({ estagios = ESTAGIOS_DO_CICLO }: { estagios?: Es
         Da captação do que é perene até o aprendizado que volta e muda as regras. Clique num estágio para ver o que ele
         faz.
       </p>
-      {/* A contagem sai do DADO, não de um número digitado aqui: uma prosa
-          dizendo "nove de doze" continuaria dizendo isso depois de o décimo
-          ficar pronto. */}
+      {/**
+       * A contagem sai do DADO, não de um número digitado aqui: uma prosa
+       * dizendo "nove de doze" continuaria dizendo isso depois de o décimo ficar
+       * pronto.
+       *
+       * SPEC-85 §0.3 — **a segunda frase mudou.** Ela dizia *"os que ainda não
+       * existem estão marcados"* e ficou falando de um conjunto vazio quando o
+       * §327 fechou o último buraco. Agora as duas versões são frases sobre o
+       * MECANISMO, e nenhuma delas fica estranha do outro lado — que é o ponto:
+       * a marcação não é um estado a que se chega, é o que se mantém.
+       */}
       <p style={{ fontSize: 12, color: "var(--texto-fraco)", margin: "0 0 14px" }} data-testid="ciclo-contagem">
-        {existem} dos {total} estágios existem hoje. Os que ainda não existem estão marcados — eles dizem para onde isto
-        vai, e marcá-los é o que os torna honestos.
+        {existem} dos {total} estágios existem hoje.{" "}
+        {existem === total
+          ? "Quando um não existir, ele aparece aqui marcado — é assim que esta página não envelhece mentindo."
+          : "Os que ainda não existem estão marcados — eles dizem para onde isto vai, e marcá-los é o que os torna honestos."}
       </p>
 
       <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "flex-start" }}>
@@ -128,22 +138,63 @@ export function CicloDoProduto({ estagios = ESTAGIOS_DO_CICLO }: { estagios?: Es
                 <circle
                   cx={x}
                   cy={y}
-                  r={selecionado ? 11 : 8}
+                  r={selecionado ? 13 : 11}
                   fill={estagio.estado === "ausente" ? "var(--painel)" : marca.cor}
                   stroke={marca.cor}
                   strokeWidth={2}
                 />
-                <title>{`${estagio.titulo} — ${marca.rotulo}`}</title>
+                {/**
+                 * SPEC-85 fatia A — **o número é o que torna o círculo
+                 * consultável.**
+                 *
+                 * Sem ele, os treze pontos eram idênticos e o nome de cada um só
+                 * existia no `<title>` — ou seja, no hover, ou seja, não existia
+                 * para quem lê. O círculo mostrava a forma e não dizia nada; a
+                 * lista dizia tudo e não tinha forma. O número liga as duas, e é
+                 * a única coisa que cabe ali dentro (o comentário da lista, logo
+                 * abaixo, mede por que o rótulo não cabe).
+                 */}
+                <text
+                  x={x}
+                  y={y + 3.5}
+                  textAnchor="middle"
+                  aria-hidden="true"
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    fill: estagio.estado === "ausente" ? marca.cor : "var(--painel)",
+                    pointerEvents: "none",
+                  }}
+                >
+                  {i + 1}
+                </text>
+                <title>{`${i + 1}. ${estagio.titulo} — ${marca.rotulo}`}</title>
               </g>
             );
           })}
         </svg>
 
-        {/* A LISTA, ao lado do círculo e não dentro dele.
-            Treze rótulos em volta de um círculo de 300px ou ficam ilegíveis ou
-            exigem uma tela larga — e a página tem que funcionar em cinco
-            segundos, inclusive no celular. O círculo mostra a FORMA (fecha, e
-            tem um centro); a lista carrega o texto. */}
+        {/**
+         * A LISTA, ao lado do círculo e não dentro dele.
+         *
+         * Treze rótulos em volta de um círculo de 300px ou ficam ilegíveis ou
+         * exigem uma tela larga — e a página tem que funcionar em cinco
+         * segundos, inclusive no celular. O círculo mostra a FORMA (fecha, e tem
+         * um centro) e o NÚMERO; a lista carrega o texto.
+         *
+         * ## SPEC-85 fatia A — o `resumo` saiu daqui
+         *
+         * A medição contra a stack: a seção tinha 1051 px, a maior de uma página
+         * de 4073 px, porque cada um dos treze trazia título **e** resumo, todos
+         * abertos. Era a "lista vertical de 13 itens para ler" que a SPEC-83 §5
+         * tinha pedido para não existir — construída ao lado do círculo que
+         * deveria substituí-la.
+         *
+         * O resumo desceu para o desdobramento. Não é economia de pixel: o
+         * clique **passou a entregar alguma coisa**. Antes ele acrescentava o
+         * `detalhe` embaixo de um `resumo` que já dizia metade — e um clique que
+         * não muda o que você sabe ensina a não clicar.
+         */}
         <ol style={{ listStyle: "none", margin: 0, padding: 0, flex: "1 1 320px", minWidth: 300 }}>
           {estagios.map((estagio) => {
             const marca = MARCA_DE_ESTADO[estagio.estado];
@@ -167,6 +218,10 @@ export function CicloDoProduto({ estagios = ESTAGIOS_DO_CICLO }: { estagios?: Es
                     font: "inherit",
                   }}
                 >
+                  {/* O mesmo número do ponto no círculo — é o que liga os dois. */}
+                  <span aria-hidden="true" style={{ color: "var(--texto-fraco)", fontSize: 11, fontWeight: 700, minWidth: 16 }}>
+                    {estagios.indexOf(estagio) + 1}
+                  </span>
                   <span aria-hidden="true" style={{ color: marca.cor, fontSize: 11 }}>
                     {marca.icone}
                   </span>
@@ -176,13 +231,18 @@ export function CicloDoProduto({ estagios = ESTAGIOS_DO_CICLO }: { estagios?: Es
                       /* A PALAVRA junto do ícone: status nunca é só cor. */
                       <span style={{ fontSize: 11, color: marca.cor, marginLeft: 8 }}>{marca.rotulo}</span>
                     )}
-                    <span style={{ display: "block", fontSize: 12.5, color: "var(--texto-2)", marginTop: 2 }}>
-                      {estagio.resumo}
-                    </span>
+                  </span>
+                  <span aria-hidden="true" style={{ color: "var(--texto-fraco)", fontSize: 11 }}>
+                    {selecionado ? "−" : "+"}
                   </span>
                 </button>
                 {selecionado && (
-                  <div data-testid={`estagio-detalhe-${estagio.id}`} style={{ padding: "0 2px 12px 23px" }}>
+                  <div data-testid={`estagio-detalhe-${estagio.id}`} style={{ padding: "0 2px 12px 40px" }}>
+                    {/* O resumo veio da lista para cá (SPEC-85 §0.2): aqui ele
+                        abre o detalhe em vez de competir com ele. */}
+                    <p style={{ fontSize: 12.5, color: "var(--texto)", lineHeight: 1.6, margin: "0 0 6px" }}>
+                      {estagio.resumo}
+                    </p>
                     <p style={{ fontSize: 12.5, color: "var(--texto-2)", lineHeight: 1.6, margin: 0 }}>
                       {estagio.detalhe}
                     </p>

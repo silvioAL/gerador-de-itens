@@ -13843,3 +13843,115 @@ quem vai construir — e não temos medição disso.
 
 579 engine · 133 llm · 122 aplicação · 868 web · 291 server · 42 gateway-falso ·
 106/106 E2E · build, typecheck e lint limpos. **13 de 13 estágios do ciclo.**
+## §328 — a landing depois do verde, e a trava que eu tinha escrito estreita demais (SPEC-85)
+
+O usuário pediu a parte pós-ciclo revista: *"está meio repetitiva… cara de
+landing page de verdade… mantendo em alguma parte a idéia do círculo e dos pontos
+verdes, mas também ter outros elementos"*. Subi a stack, capturei a página inteira
+(1280×4073) e medi em vez de opinar.
+
+### A repetição era literal, e dava para apontar
+
+`LandingPage.tsx:102` renderizava `<h2>O ciclo, e o que dele já existe</h2>` e o
+`CicloDoProduto`, três linhas de rolagem abaixo, o seu: `<h2>O ciclo, e onde a IA
+entra</h2>`. **Dois títulos sobre a mesma coisa, empilhados.** Cada um certo
+isoladamente — a landing não sabia que o componente traz o dele.
+
+E o círculo não era mapa: treze pontos **sem rótulo** (o nome só existia no
+`<title>`, ou seja, no hover, ou seja, não existia) e, ao lado, a lista vertical
+inteira com título **e** resumo, sempre aberta. A SPEC-83 §5 tinha pedido
+exatamente o contrário — *"o círculo como mapa compacto e consultável, não como
+lista vertical de 13 itens para ler"* — e a tela entregava as duas coisas ao mesmo
+tempo. A seção media 1051 px, a maior da página.
+
+O conserto não foi encolher: os pontos ganharam **número**, a lista ganhou o mesmo
+número, e o `resumo` desceu para o desdobramento. Não foi economia de pixel — **o
+clique passou a entregar alguma coisa.** Antes ele acrescentava o `detalhe`
+embaixo de um `resumo` que já dizia metade, e um clique que não muda o que você
+sabe ensina a não clicar. Medido depois: 1051 → 623 px.
+
+### A trava do §327 era estreita demais, e a prova levou três horas
+
+Ontem escrevi que estágio ausente tem que citar a SPEC ou o § que responde por
+ele. A captura de hoje mostrou **duas das cinco conexões mentindo na página no
+ar**:
+
+| Conexão | O que dizia | Desde quando é falso |
+|---|---|---|
+| ADRs da casa | *"falta a tela para importar"* | §325 e §326 |
+| Spec → desenvolvimento com IA | *"falta a tela para escrevê-lo"* | §327, ontem |
+
+`CONEXOES` mora no arquivo vizinho, usa o **mesmo tipo de estado**, faz a **mesma
+pergunta** — e nada a vigiava. Eu tinha escrito a trava para a *instância* em vez
+de para a *classe*. As duas listas agora passam pelo mesmo laço, e a próxima que
+nascer entra por uma linha.
+
+E a terceira que estava lá: `"Avaliado e adiado"`, na arquitetura de negócio, era
+outra frase que não envelhece. Agora cita o §324 — que entregou a leitura por
+gateway; o que falta é a casa ter isso em formato legível, e disso não temos
+medição.
+
+### A trava nova pegou, na segunda tentativa
+
+Escrevi uma trava de "dois títulos não abrem com o mesmo assunto" usando as **três**
+primeiras palavras significativas. Desliguei a correção para ver o vermelho (§248)
+e ela **ficou verde com o defeito de volta**: "o ciclo e o que dele ja existe" abre
+em `ciclo que dele`, "o ciclo e onde a ia entra" abre em `ciclo onde ia`.
+
+Três palavras foi engenhosidade a mais que mediu a coisa errada. O que colidia era
+**a palavra em que o olho bate ao rolar**. Com a primeira palavra, a trava acusa e
+nomeia os dois títulos.
+
+### O movimento, e a régua que o separa de enfeite
+
+Fase 1 da SPEC-82. `grep` por `animation|keyframes|transition` nas peças de
+conceito: **nenhuma ocorrência**. E, no produto inteiro, catorze `@keyframes` e
+**zero** `prefers-reduced-motion` — ninguém estava perguntando.
+
+Uma peça só se move, e a régua é: *movimento que não carrega informação que o
+estático não carrega, não entra*. Camadas, evolução e conexões são estrutura, e
+estrutura se lê parada.
+
+`OPassoContido` existe porque a tese do produto é uma **ausência de comportamento**
+— a IA propõe e não aplica. Ausência não tem o que apontar: o estático só pode
+afirmá-la, o tempo pode mostrá-la. A proposta anda, chega ao portão, e **para**. A
+espera ocupa 40% do ciclo e é a única parte em que nada acontece. Esse vazio é a
+peça inteira, e há teste para ele — a pressão futura é previsível: alguém vai achar
+"lento" e encurtar a pausa.
+
+**E o teste pegou um defeito meu.** O carimbo humano aparecia em 88% e o portão
+abria em 85% — a proposta saía *antes* de alguém confirmar. Invertida, a animação
+contava a história de um produto diferente. Foi para 78%.
+
+Movimento reduzido não recebe versão degradada: recebe **o quadro que carrega a
+tese**, a proposta parada no portão. Uma peça cuja versão estática não diz nada é
+uma peça que não estava dizendo nada.
+
+### O veredito do "então olhar" (SPEC-82 §4.2), e ele não é um sim redondo
+
+A avaliação mandava construir e **olhar**, porque *"não se faz por argumento — se
+faz vendo"*. Olhei as capturas.
+
+**O que passou:** o ciclo virou índice consultável — número no ponto, número na
+linha, uma linha por estágio. A peça de movimento é legível e a pausa se entende
+sem legenda.
+
+**O que não passou:** isto não parece material de apresentação corporativa. É
+limpo, contido e honesto; não é rico. E a SPEC-82 §3 já tinha nomeado a razão sem
+rodeio: *"profissional e não envelhece puxam em direções opostas"* — acabamento
+alto vem de produção externa, que é justamente o que não se rerenderiza.
+
+Então a §2.3 daquela avaliação (vídeo por código) **não fica arquivada**: fica
+registrada como próxima, com o que faltou dito em voz alta. O que a fase 1 comprou
+foi o direito de decidir isso vendo, em vez de discutindo.
+
+### Um achado lateral, dito e não consertado
+
+As capturas em `colorScheme: dark` e `light` saíram **byte a byte idênticas**
+(313.094 bytes as duas): `styles.css` tem um `:root` só, sem
+`prefers-color-scheme`. Não é defeito da landing e não se conserta de passagem — o
+produto inteiro depende daquele `:root`. Fica na SPEC-85 §5 como pergunta aberta,
+porque toda peça nova nasce só no escuro e quem escolher cor precisa saber.
+
+579 engine · 133 llm · 122 aplicação · 877 web · 291 server · 42 gateway-falso ·
+106/106 E2E · build, typecheck e lint limpos.
