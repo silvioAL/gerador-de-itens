@@ -47,6 +47,18 @@ export {
   type LeitorDeAdr,
 } from "./portas/leitorDeAdr.js";
 
+/** SPEC-81 fatia F — a arquitetura de negócio da casa vira PROPOSTA. */
+export {
+  CAMPOS_DA_ARQUITETURA,
+  decisoesNaProposta,
+  propostaDeArquitetura,
+  type ArquiteturaDeNegocioExterna,
+  type CampoDaArquitetura,
+  type CampoProposto,
+  type LeitorDeArquiteturaDeNegocio,
+  type PropostaDeArquitetura,
+} from "./portas/leitorDeArquiteturaDeNegocio.js";
+
 /** SPEC-81 fatia E — a decisão daqui volta para o repositório da casa. */
 export { decisoesQuePodemVoltar, type AdrParaPublicar, type EscritorDeAdr } from "./portas/escritorDeAdr.js";
 
