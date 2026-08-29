@@ -12481,3 +12481,529 @@ décimo segundo foi o da derivação, que estava certo.
 
 524 engine · 133 llm · 84 aplicação · 806 web · 254 server · 39 gateway-falso ·
 104/104 E2E · build, typecheck e lint limpos.
+
+## §316 — cinco SPECs para os três pontos que faltam, e para a página que os mostra
+
+O pedido: *"criar spec para que todos itens fiquem verde, ou seja, implementar
+tudo o que falta"*, mais *"a parte após o ciclo com todos pontos verdes precisa
+ser revista, pois está meio repetitiva… que fique com cara de landing page de
+verdade"*.
+
+Perguntado sobre profundidade, o usuário escolheu **ambição completa**. Sobre
+mídia, recusou a resposta fácil: *"precisa ser algo profissional de apresentação
+que **explique os conceitos**, não necessariamente telas do sistema em si."*
+
+### Por que cinco documentos, e não um
+
+O `ciclo.ts` tem **13 estágios: 10 completos, 1 parcial, 2 ausentes**. Os três
+não-verdes são domínios distintos — régua de design, geração de artefato,
+protocolo de integração — e cada um tem risco próprio. Enfiá-los num SPEC só
+faria o de maior valor ficar refém do de maior risco, que é a mesma armadilha
+que a SPEC-75 §5 já tinha nomeado.
+
+| SPEC | Estágio | O que a medição mudou |
+|---|---|---|
+| 79 | `padroes` (parcial) | **a máquina de medir já existe** — `Requisito` + `Checagem` + `Condicao`; falta o vocabulário de interface entrando nos tipos |
+| 80 | `specs-para-ia` (ausente) | o que impede N artefatos é **um índice único em `time_id` sozinho**, não o motor |
+| 81 | `mcp` (ausente) | "MCP" aparece **7× no fonte, 6 em comentário e 1 na tela, e 0 em código executável** |
+| 82 | — | avaliação de mídia |
+| 83 | a landing | **4 das 5 etapas da `Jornada` são estágios que o círculo acabou de mostrar** |
+
+### A repetição tinha causa medível
+
+Não era excesso de conteúdo. A landing renderiza o círculo de 13 estágios e
+logo abaixo a `Jornada`, cujas etapas 1, 2, 3 e 5 são `desenho`, `prontidao`,
+`itens` e `especificacao` — ditos de novo, em outro formato. E o `OMotor()`
+reconta a divisão motor × IA pela terceira vez na mesma rolagem.
+
+Era o **§263 — duas explicações da mesma coisa dessincronizam** — chegando pelo
+lado que ninguém vigiava, porque as duas estavam certas isoladamente.
+
+Segundo achado, e é o que responde "cara de landing page": a página inteira é
+**uma coluna de 760 px**. Sem seção de largura total, sem alternância, sem
+ritmo. É a estrutura de um documento — e nenhuma troca de texto conserta isso.
+
+### O problema que as três primeiras rodadas criam
+
+Com tudo verde, o círculo terá **13 marcas iguais**. O que hoje é a informação
+mais interessante da página — *eles dizem o que ainda não existe* — vira ruído
+uniforme, e a tentação vai ser apagar a máquina de marcação.
+
+**Não se apaga.** Ela é a trava da SPEC-76 fatia D, e a honestidade da página
+não é um estado a que se chega: é um mecanismo que se mantém. O que muda é o
+peso visual, e isso é design, não texto.
+
+### O que estas SPECs recusam
+
+A recusa mais importante é a que se aplica a elas mesmas: **ponto verde sobre
+coisa que mal existe** seria o produto violando, na porta de entrada, a única
+régua que ele cobra de todo mundo lá dentro. Por isso cada uma declara o que
+significa "verde" para o seu estágio — e a SPEC-79 é explícita: *se não deriva
+item de trabalho, não está verde.*
+
+A avaliação de mídia recusou a saída barata. O Playwright já grava vídeo da
+stack real, e teria sido de graça — mas captura de tela explica **onde clicar**,
+não **por que o produto é assim**. Ela também nomeia a tensão em vez de fingir
+que a resolve: *"profissional" e "não envelhece" puxam em direções opostas*, e a
+saída é dar prazo de validade ao que não se rerenderiza.
+
+### Três correções que a própria escrita sofreu
+
+Escrever SPEC medida cobra o mesmo preço de executá-la.
+
+1. Afirmei "MCP aparece em quatro comentários". São **sete**, e uma delas **não
+   é comentário — é texto na tela**. A frase da `ExportacaoTab` está honesta
+   hoje (descreve o agente externo, não promete que o Gerador fala MCP) e vai
+   precisar ser reescrita sem prometer demais.
+2. Citei `gerarEspecificacaoEntrega.test.ts:952` como molde de comparação byte a
+   byte. **Esse molde não existe** com esse nome no arquivo. Trocado pela
+   descrição da técnica.
+3. A contagem de estados por regex deu 14 num arquivo de 13 estágios — a linha
+   do próprio tipo `estado: "completo" | …` casava. Conferido contra
+   `contagemDoCiclo()`: 11 de 13.
+
+Ordem de execução: **82** (avaliação, barata, decide o que a 83 pode usar) →
+**79** → **80** → **81** → **83** por último, porque as três anteriores mudam as
+marcas que a página mostra. É a mesma razão que fez a SPEC-78 vir por último no
+bloco anterior.
+
+Nenhum código mudou nesta rodada — cinco documentos e esta entrada. As suítes
+seguem em 524 engine · 133 llm · 84 aplicação · 806 web · 254 server ·
+39 gateway-falso · 104/104 E2E.
+
+### Adendo — o que a SPEC-83 virou depois de três mensagens
+
+A primeira versão desta rodada tratava a landing como problema de layout e
+repetição. Três mensagens do usuário mudaram isso, e a SPEC-83 foi reescrita:
+
+> *"precisa constar que nessa página devemos resolver a explicação conceitual dos
+> problemas que o sistema resolve, no sentido de tornar governança e os padrões
+> corporativos em algo perene para trabalhar com suporte de IA… muitas
+> [organizações] têm acesso a ferramentas e estão com seus agentes de IA e skills
+> do Claude, mas isso não tem sido o suficiente."*
+
+**O gargalo declarado não é falta de IA.** É que governança e padrão corporativo
+vivem onde a IA não alcança de forma verificável, e cada agente reconstrói esse
+contexto do zero em cada conversa sem que ninguém possa conferir. A página passa
+a ter que contar a **evolução**: prompt → agente/skill → camada. O agente é
+progresso real, e continua sendo texto dizendo ao modelo o que fazer — não mede,
+não deriva, e dois agentes que se contradizem não acusam o conflito. Na camada, o
+que persiste não é o prompt: **é a régua.**
+
+E o usuário fez a ligação que faltava: *"se conecta com o conceito que estamos
+explicando naquele diagrama da tela inicial"*. O círculo com **"IA — propõe,
+nunca aplica sozinha"** no meio **já é** esse terceiro estágio desenhado. O
+diagrama está certo há uma rodada inteira e ninguém tinha dito o que ele
+significa — ele vinha sendo lido como mapa de funcionalidades.
+
+Depois vieram os conceitos: **SDD**, e a exigência de explicar que *"o desenho
+também é dirigido por specs"*. Isso não é retórica — é `FieldSpec` e
+`NodeTypeConfig`: um componente **precisa** declarar o que a spec do seu tipo
+exige, o que falta vira apontamento e o que contraria vira item. São dois
+sentidos, e a página deve os dois: **para dentro**, a spec do time dirige o
+desenho; **para fora** (SPEC-80), o produto gera spec consumível por agente de
+código.
+
+E as **quatro camadas**, todas já no código e nenhuma nomeada em lugar nenhum:
+perene · da demanda · **apontamentos** · IA generativa. A de apontamentos é a que
+explica o produto e a que ninguém desenha: ela não é guardada como verdade, é
+**recalculada** — por isso o mesmo desenho dá sempre os mesmos itens, e por isso
+discordar de um apontamento é mudar uma regra, não apagar uma linha.
+
+### A quarta cópia, e a manchete que sobreviveu ao §314
+
+Medindo para escrever a §7 (o README entra na mesma rodada, a pedido), apareceu
+o achado que amarra tudo: a tese está escrita em **quatro** lugares —
+`Jornada.tsx:82`, `README.md:79`, `CONCEITO.md:27` e o próprio círculo — e
+**nenhum é canônico**. O `OMotor()` da landing não era a segunda cópia: era a
+quarta. Sai daí a regra permanente: **o `CONCEITO.md` é a fonte; todo o resto é
+resumo que aponta para ele, nunca uma segunda explicação.**
+
+E o usuário decidiu a última pergunta em aberto:
+
+> *"e sim, precisamos reformular: não é até o backlog, é esse conceito que
+> acompanha processos."*
+
+O `<h1>` — *"Do diagrama ao backlog, sem inventar nada"* — promete um trajeto com
+**destino**. É exatamente o defeito que o §314 encontrou no corpo da página
+(*"descrevia um fluxo de cinco passos, não um ciclo que fecha"*) **sobrevivendo
+na manchete**: a SPEC-76 consertou o conteúdo e não olhou para o título. Ele
+erra duas vezes — anuncia um fim onde o produto volta, e descreve o mecanismo
+onde precisa aparecer o problema.
+
+A SPEC-83 fechou com **seis fatias**, e diz em voz alta que é mais de uma rodada.
+Fingir que cabe numa só é como as três rodadas do §251 acabaram pela metade.
+
+### Adendo 2 — o vocabulário, e os ganhos
+
+> *"tenho impressão que parte do vocabulário precisa ser enriquecido, me chama
+> atenção por exemplo a questão de modelo canônico, processos, e os schema dos
+> processos que colocam a IA no centro, IA driven."*
+>
+> *"e os ganhos/benefícios também precisam ser explicados."*
+
+A medição confirmou a impressão, e por um caminho que ninguém esperava:
+**"canônico" já aparece quatro vezes no repositório** — `repositorioDeQuebras.ts:27`,
+`estruturarDocumento.ts:39`, `RegrasTab.tsx:74` — **sempre em sentido local, e
+nunca como o conceito.** A ideia está no código há muito tempo; a palavra nunca
+foi promovida a vocabulário.
+
+E a ironia que fecha o argumento: **`Produto` tem um campo `glossario`.** A
+ferramenta cobra de toda organização que declare *"o glossário da casa"* — e não
+tem um.
+
+O glossário do produto nasce na fatia A, com uma régua: **todo termo tem âncora
+no código.** *Modelo canônico* é `Diagrama` + `DiagramaConfig`, e a definição é o
+que explica o determinismo — tudo o mais é projeção, e não há segunda fonte para
+divergir. *Schema de processo* é `Requisito` + `Checagem` + `Condicao` +
+`TesteAutomatizado`. *Governança executável* é literalmente a diferença entre um
+`Requisito` com e sem `checagem`. Palavra forte sem código atrás é jargão.
+
+### "IA no centro" é ambíguo, e a ambiguidade se resolve — não se evita
+
+O usuário juntou *schemas de processo* e *IA no centro, IA driven*, que parecem
+opostos. Não são: é a tese em quatro palavras, e o círculo já a desenha.
+
+Mas "centro" se lê de dois jeitos, e a página vai ser lida dos dois: **centro
+como protagonista** (a IA decide — é o que o mercado quer dizer com *AI-driven*,
+e não é este produto) e **centro como contido** (a IA no meio, a borda em volta —
+é o que o diagrama mostra).
+
+> **IA no centro só é seguro quando existe borda.** Sem schema de processo, IA no
+> meio do trabalho é caos com boa redação. Com ele, é a parte mais valiosa do
+> trabalho feita rápido, dentro de limites que alguém pode conferir. **O schema
+> não é o que restringe a IA — é o que torna possível colocá-la no meio.**
+
+Ficou registrada também a linhagem, porque ela é honesta e posiciona: a
+ascendência disto **não é engenharia de prompt, é engenharia dirigida a modelo**
+(MDA/MDE). E por que não é aquilo: **aquelas tentativas queriam gerar a
+implementação**, e foi nisso que quebraram. Esta gera a especificação e a
+medição, e deixa a implementação para gente e IA — a mesma divisão de trabalho do
+produto, aplicada à história do próprio campo.
+
+### Os ganhos, com a coluna que impede o folheto
+
+A página descrevia mecanismo e nunca dizia o que a pessoa ganha. A seção nova é
+uma tabela de **duas** colunas de propósito — o ganho e o mecanismo que o
+sustenta —, e a régua é que **linha sem a coluna da direita não entra.**
+
+É o único jeito defensável de ter seção de benefícios num produto cuja tese é que
+promessa não confirmada não conta. "Dá para discordar sem refazer" existe porque
+a derivação é determinística; "está pronto? deixa de ser opinião" existe porque a
+lacuna é contável desde o §311; "dá para usar IA onde há auditoria" existe porque
+nada que a IA propõe conta antes da confirmação.
+
+O ganho que amarra os outros, e que responde direto ao *"isso não tem sido o
+suficiente"*: **o conhecimento para de morar em pessoas e em conversas de IA, e
+passa a morar numa camada que dá para versionar, medir e discutir.**
+
+Três recusas novas saíram daí: **ganho sem mecanismo**, **termo sem âncora**, e
+**vender "IA driven" no sentido que o mercado usa** — que venderia melhor e
+descreveria outro produto.
+
+### Adendo 3 — o conceito aplicado a processo de negócio, e o gap que a medição achou
+
+> *"precisamos da explicação que mostra o conceito sendo aplicado aos processos,
+> que incluem a parte de negócios… ou seja, como conectar tudo isso colocando a
+> IA no centro como facilitadora e aceleradora. **Esse é o desafio corporativo
+> que queremos resolver.**"*
+
+Conceito em abstrato não convence: as quatro camadas são verdadeiras e não fazem
+ver. A página passa a precisar de **um processo real atravessando as quatro**.
+
+E a medição foi melhor do que eu supunha em metade, e pior na outra.
+
+**A metade boa:** o produto **já modela negócio como tipo de nó de primeira
+classe.** Em `config/diagrama.example.json`: `rule` → *Regra de Negócio*, `motor`
+→ *Motor de Regras*, `fico` → *Fluxo Decisão (FICO)*, `camunda` → *Processo
+Camunda*. E há cenário de crédito semeado. **O desafio corporativo já tem
+vocabulário no produto** — a página pode mostrar o conceito aplicado a negócio
+sem inventar nada.
+
+**A metade ruim, e é achado novo que não estava em SPEC nenhuma:** os treze
+`contextos` de `app.example.json` são **todos técnicos** — começam com
+`Backend-`, `Mobile-` ou `Frontend`. `Backend-regras` é um contexto técnico que
+por acaso guarda regra de negócio. **Não existe eixo de domínio** — nada de
+"Crédito", "Cobrança", "Onboarding". O campo é string livre, então um time *pode*
+escrever `Credito-regras`; mas **poder não é modelar**: nada impede dois times de
+grafarem o mesmo domínio de dois jeitos, e nada cruza "todas as regras de
+Crédito" independentemente de onde foram implementadas.
+
+Um checklist "por processo de negócio" — que é literalmente o que o usuário
+listou como parte da camada — hoje sai por **convenção de nome**, não por
+estrutura. Isso virou a pergunta 5 da SPEC-83, com a recomendação de que
+provavelmente é uma **SPEC-84**, e com a decisão de escopo: a página mostra o
+conceito aplicado a negócio (verdade) e **não** afirma organização por domínio
+(que não existe). Recusa nova, explícita.
+
+### A IA no centro, dita pelo lado positivo
+
+O §316 anterior tinha resolvido "IA no centro" pelo lado defensivo — *contida*.
+Está certo e é **insuficiente**: descreve o limite e não o valor, e uma página
+que só diz o que a IA não pode fazer vende uma limitação.
+
+O usuário deu a formulação que faltava: **facilitadora e aceleradora**. Ela está
+no centro porque **toca todos os estágios** — lê o contexto, propõe o desenho,
+escreve o texto, sugere configuração — e é a razão de o ciclo caber num dia em
+vez de numa sprint.
+
+> **A borda não existe para conter a IA. Existe para que valha a pena colocá-la no
+> meio.** Sem schema de processo, acelerar é acelerar na direção errada com boa
+> redação. Com ele, a velocidade da IA vira velocidade do time — porque tudo o que
+> ela produz nasce medido, com proveniência, e some se a causa sumir.
+
+Daí a recusa nova: **vender a IA só pelo que ela não faz.** A página precisa dos
+dois, nessa ordem — primeiro por que vale colocá-la no meio, depois por que é
+seguro.
+
+O exemplo que a página vai andar é a **concessão de crédito**, porque é o cenário
+que o repositório já semeia: a regra de negócio deixa de morar num parágrafo de
+wiki e vira nó tipado com campos obrigatórios, medido a cada mudança; os
+apontamentos dizem que o caminho estoura a régua de latência e que a política não
+tem porquê registrado; e a IA escreve história, contrato e cenários de teste em
+minutos, dentro do que as camadas determinaram. **É isso que "governança perene"
+quer dizer quando sai do slide.**
+
+### Adendo 4 — "negócio" era outra coisa, e a correção melhorou o argumento
+
+O adendo anterior leu *negócio* como domínio modelado no diagrama — `rule`,
+`fico`, `camunda` — e montou o exemplo da página em cima de concessão de crédito.
+**Estava errado**, e o usuário corrigiu:
+
+> *"quando estou falando de negócio eu nem me refiro a FICO e Camunda, e sim aos
+> **processos de construção do software**: as informações de produto e negócio
+> sendo configuradas no sistema, todos os processos de desenho e especificação, o
+> uso das specs no desenvolvimento com IA, o uso dos checklists e informações de
+> negócio na construção dos itens, e a melhoria das configurações, evolução e
+> ajuste dessas coisas com o uso do assistente — ou seja, tudo assistido por IA."*
+
+FICO e Camunda são o **assunto** que a ferramenta ajuda a desenhar. O que
+interessa é o **jeito da casa de construir software**, e o conhecimento de
+produto que alimenta esse jeito. Remedido nessa direção, o argumento ficou mais
+forte, não mais fraco:
+
+**O conhecimento de negócio já é configurado.** `Produto` guarda `objetivo`,
+`quemUsa`, `regrasDeNegocio`, `sistemas`, `restricoes`, `volumetria` e
+`glossario` — perene, por organização, citado por tudo que se gera. Não é anexo
+de demanda: é a camada.
+
+**O processo de construção já é configurado.** `checklistProcesso` e
+`checklistTecnico` (o §20 já os separava), `TesteAutomatizado` com `dev`/`hlg`,
+os templates de especificação, o pipeline de agentes.
+
+**E o achado que fecha "tudo assistido por IA":** dos **oito** tipos de pedido em
+`pedidos.ts`, **dois não falam da entrega — falam da configuração.**
+`montarPedidoSugerirConfig` e `montarPedidoConfigurarConversa` operam sobre a
+própria camada. Os outros seis (diagrama, necessidades, decisões, cenários de
+lentidão, alterar item, pipeline) assistem o trabalho.
+
+> **A IA não assiste só a entrega: ela ajuda a construir e a evoluir a régua.**
+> Somado ao PDCA, que transforma feedback de uso em ajuste aprovado da
+> configuração, o laço fecha — e é o laço que nenhuma skill e nenhum agente solto
+> conseguem fechar, porque não existe camada para eles ajustarem.
+
+Isso responde diretamente ao *"isso não tem sido o suficiente"* do adendo 1, e
+com dado em vez de retórica: a diferença entre agente e camada não é que a camada
+seja mais rígida — é que **ela tem quem a evolua, e a evolução também é
+assistida.**
+
+O exemplo que a página vai andar deixa de ser crédito e passa a ser **o processo
+de especificação da própria casa**, atravessando as quatro camadas com a IA em
+cada passo, inclusive no de melhorar a configuração. E os apontamentos ganharam
+uma leitura nova nessa tabela: **é a camada onde a IA não escreve** — ela é
+calculada, e é o que dá ao modelo um alvo em vez de uma folha em branco.
+
+Duas recusas novas: **afirmar organização de checklist por domínio de negócio**
+(os treze contextos semeados são todos técnicos — gap real, virou a pergunta 5 e
+talvez uma SPEC-84) e **reduzir "negócio" a diagrama de domínio**, que foi
+exatamente o erro desta rodada.
+
+### Adendo 5 — o eixo que falta é o produto, e o diagrama que conecta
+
+Segunda correção do usuário, e mais precisa que a minha:
+
+> *"na realidade acho que o que tem é checklist **por processo**, mas uma das
+> demandas que precisamos atender também é **estender para produto**."*
+
+Medido, e é exatamente isso. O que existe é `checklistProcesso: ItemProcesso[]`,
+ao lado do técnico — o §20 já os separava —, escopado por **time → tech →
+contexto → condição por nó**. Quatro eixos, e nenhum é o produto.
+
+O bloqueio é concreto, e tem uma simetria que só apareceu porque as duas
+medições ficaram lado a lado:
+
+```
+config_documentos_chave_unica        UNIQUE (chave, time_id)   -- as regras
+especificacao_templates_chave_unica  UNIQUE (time_id)          -- os templates
+```
+
+**Duas tabelas de configuração, o mesmo bloqueio: o índice para no time.** A
+SPEC-80 já vai mexer no segundo para caber N tipos de artefato; estender o
+primeiro ao produto é a mesma classe de migração.
+
+E o caminho já está pavimentado: **a SPEC-77 construiu essa escada para
+volumetria** — o produto declara, a demanda herda, *declarado vence herdado* e a
+tela diz qual é qual (§306). Estender checklist ao produto é a **mesma escada
+aplicada a regra**. Virou a pergunta 5 da SPEC-83, com recomendação de SPEC-84.
+
+Corrigida também a recusa que eu tinha escrito errado duas vezes: não é "afirmar
+organização por domínio de negócio", é **afirmar checklist por produto** — que é
+demanda reconhecida, e até existir a página não anuncia.
+
+### O quinto diagrama, e a régua que impede o álbum
+
+> *"se faz necessário também escrever na página diagrama mostrando tudo isso se
+> conectando."*
+
+Entra o **mapa que conecta tudo**: a informação de produto e o processo
+configurado alimentando o desenho; o desenho produzindo apontamentos; os
+apontamentos virando itens, documento e spec; a spec indo para o desenvolvimento
+com IA; e o uso voltando como ajuste da configuração. **A IA aparece em cada
+aresta**, e a volta fecha no ponto de partida.
+
+Ele é o **diagrama-herói**, e os outros quatro viram apoio. Mas cinco diagramas
+numa página é muito, e ninguém lê cinco — então a régua ficou declarada na SPEC:
+**um é a manchete visual, os outros aparecem quando a seção deles chega.** Sem
+isso a página vira álbum de diagramas, que é a versão gráfica exata do problema
+que esta SPEC existe para consertar: conteúdo certo, repetido, sem hierarquia.
+
+### Adendo 6 — o conector de ADR, e o achado que o torna barato
+
+> *"seria interessante ter conector para o MCP em determinado estágio interagir
+> com **arquitetura de negócio** e **ADR (arquitetura técnica)**: fazem parte da
+> camada perene/determinística de processos corporativos."*
+
+Direção que **não estava na SPEC-81** e que é, provavelmente, a de maior valor
+das três — porque ataca o gargalo que o adendo 1 nomeou: a governança da casa
+mora fora do alcance verificável da IA.
+
+E a medição achou algo que muda o custo dela por completo: **o produto já produz
+ADR.** A palavra aparece no repositório só em comentário —
+`model/types.ts:179` (*"a régua que impede isto de virar wiki: ADR nasce de
+escolha entre alternativas"*), `decisoes.ts:65` e `:101`, e `pedidos.ts:875`, que
+ensina o modelo a distinguir *"'definir timeout = 300ms' é valor, não ADR"* — mas
+o conceito está inteiro no tipo:
+
+```
+titulo · contexto · alternativas · escolhida · porque · status · substituidaPor · autor · em
+```
+
+`status` + `substituidaPor` **é o ciclo de vida do ADR**. E há dois campos que um
+ADR comum não tem: `noId`/`arestaId`, que ancora a decisão no elemento do
+desenho, e `ensaioIds` (§307), que a liga à conta que a justificou.
+
+> **O produto não precisa aprender ADR: ele já escreve ADR ancorado em modelo e
+> em medição, e nunca chamou isso pelo nome na superfície.** O conector não
+> inventa conceito — liga um que já existe ao repositório onde a casa guarda os
+> dela.
+
+Do outro lado, `Produto` já tem forma de registro de arquitetura de negócio
+(`objetivo`, `quemUsa`, `regrasDeNegocio`, `sistemas`, `restricoes`,
+`glossario`), hoje preenchido à mão — e um conector que leia o repositório da
+casa ataca o *"alguém tem que digitar o contexto"* que a SPEC-75 §3.1 apontou
+como o gargalo real.
+
+A régua já tem campo: **`Decisao.origem`.** ADR importado entra marcado, nunca
+como fato local — do mesmo jeito que a IA entra como `sugerido`. Prosa de ADR
+alheio virando `Decisao` estruturada é trabalho de modelo, com o risco de
+plausível-mas-vazio do §2 da SPEC-80; a mitigação é a mesma.
+
+Três recusas novas: **ADR importado virando decisão local**, **prosa alheia
+virando `Decisao` sem confirmação**, e **virar repositório de ADR da
+organização** — o produto conversa com o repositório da casa, não o substitui.
+
+**E a ordem da SPEC-81 mudou**, dito em voz alta: a fatia nova (E) passa a ser a
+de maior valor, e a recomendação vira **A → B → E → C → F → D**, com a fronteira
+por organização continuando em primeiro porque nada entra ou sai antes do escopo
+existir.
+
+Consequência para a landing, registrada na SPEC-83: quando a página disser
+*camada perene*, o leitor de organização grande vai perguntar *"e o que eu já
+tenho?"*. A resposta honesta hoje é **"conversa com o que você já tem"** — e não
+"substitui".
+
+### Adendo 7 — o ADR não é contexto, é semente
+
+> *"uma ADR deveria poder vir do MCP e conversar com o assistente e virar
+> desenho."*
+
+O adendo anterior escreveu o ADR como **contexto** — entra, informa, evita
+repropor o que já foi decidido contra. O usuário o coloca como **ponto de
+partida**, e é mais forte, porque a peça do meio já existe: o assistente é
+literalmente onde se conversa para produzir desenho, e `montarPedidoDiagrama` e
+`montarPedidoNecessidades` já são os pedidos que fazem isso.
+
+O ADR carrega intenção de arquitetura (*"fila em vez de chamada síncrona,
+porque…"*), a conversa desdobra, sai diagrama. E cai um ganho estrutural de
+graça: hoje `Decisao.noId`/`arestaId` é preenchido à mão, ligando a decisão ao
+elemento **depois** que alguém desenhou. Se o desenho nasce do ADR, **o vínculo
+nasce junto.**
+
+O risco é real e ficou escrito: **um ADR é uma decisão, não um desenho.** Ele
+subdetermina o diagrama, e tudo o que não diz o modelo preenche — que é onde o
+plausível-mas-vazio morde. A mitigação é a tese do produto, e aqui precisa ser
+visível no resultado: o que veio do ADR chega `importado`, o que o modelo
+completou chega `sugerido`, o que ninguém respondeu chega como lacuna contável.
+
+> Um desenho nascido de ADR tem que dizer, olhando para ele, **quanto dele foi
+> decidido e quanto foi preenchido.** Sem isso, importar ADR produz arquitetura
+> com aparência de aprovada — pior que desenhar do zero.
+
+E o uso de maior valor talvez nem seja um ADR: é o **conjunto**. Lido inteiro, o
+repositório dá as restrições acumuladas da casa, e o produto passa a responder
+*"o que estou desenhando contraria alguma decisão já tomada?"* — que é medição, e
+não opinião. Hoje isso só existe na memória de um arquiteto veterano.
+
+Virou a fatia G, colada na E, porque *"ADR vira desenho"* é o que dá razão de ser
+à importação — sem ela, importar ADR é encher um repositório.
+
+### Adendo 8 — as saídas, e o diagrama que ganhou bordas
+
+> *"também é necessário revisar as saídas… deveria ser possível, via alguma
+> chamada exclusiva ao MCP (separada das de publicação/criação dos itens no issue
+> tracker), também publicar os design docs no Confluence."*
+>
+> *"isso tudo precisa estar diagramado na landing."*
+
+Medido, e a revisão se justifica sozinha: **o produto tem uma porta de saída e
+quatro artefatos.** `exportadorDeItens.ts` é a única em `portas/` que publica; o
+resto é repositório e contrato. E o **documento de desenho** — artefato de
+trabalho da demanda desde a SPEC-58 — sai por `baixar-markdown` no navegador. O
+comentário em `DocumentoScreen.tsx:26` já registrava o sintoma: *"o markdown ia
+para o download e sumia"*.
+
+A instrução de separar está certa, e por quatro motivos de contrato, não de
+gosto: **ciclo de vida** (issue nasce uma vez; página é viva), **idempotência**
+(exportar duas vezes duplica — publicar duas vezes tem que atualizar no lugar),
+**modo de falhar** (parcial por item × publica-ou-não) e **permissão** (quem abre
+issue não é quem escreve na wiki da casa). Porta nova: `PublicadorDeDocumento`.
+
+E o risco é o defeito que este repositório mais conhece: **página publicada é
+cópia, e cópia envelhece** — o §263 em escala de documento, logo depois de a
+SPEC-83 medir a versão pequena dele (a tese em quatro lugares). Três das quatro
+travas já existem: identidade estável para atualizar no lugar, a página dizendo
+de onde veio e apontando de volta, e — a melhor — **o estado de frescor**, porque
+o produto já sabe quando o documento está desatualizado em relação ao desenho
+(SPEC-58 §5, com o `atualizadoEm` que o §312 tornou honesto). Uma página que diga
+*"gerada de um documento que mudou desde então"* é mais honesta que a maioria das
+wikis corporativas.
+
+### E a máquina de marcação ganhou o segundo cliente
+
+O diagrama que conecta tudo passa a ter **bordas**: ADR e arquitetura de negócio
+entrando, itens/documento/spec saindo. **E quase nenhuma dessas bordas existe
+hoje** — uma é real (itens → tracker), as outras quatro são SPEC-80 e SPEC-81.
+Diagramar as cinco acesas seria a maior promessa falsa que esta página já teria
+feito.
+
+A solução já estava no repositório: **o diagrama de conexões usa a mesma marcação
+existe/parcial/ausente do ciclo.**
+
+> A máquina que o adendo 1 dizia que ficaria sem uso quando os 13 estágios
+> ficassem verdes **ganhou o segundo cliente no mesmo dia** — e um em que as
+> marcas voltam a ser variadas, que é onde ela comunica. Deixou de ser argumento
+> de princípio ("não se apaga porque um dia serve") e virou necessidade concreta.
+
+E dá à página uma honestidade que vende mais que a promessa: **"é para cá que
+isto vai, e é daqui que já estamos"** é frase em que um arquiteto de organização
+grande acredita. Cinco setas todas acesas, não.
