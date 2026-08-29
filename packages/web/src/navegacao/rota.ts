@@ -46,7 +46,17 @@ export type Rota =
    * linkável: *"olha o que acontece se o bureau cair"* é uma URL que se manda
    * para alguém, e isso é metade do valor.
    */
-  | { tela: "ensaios" };
+  | { tela: "ensaios" }
+  /**
+   * SPEC-84 fatia A — a spec que um agente de código consome.
+   *
+   * Tela própria, e não uma seção do documento, porque o público é outro: o
+   * documento é lido por quem decide, a spec é lida por quem (ou o que)
+   * implementa. Fundi-las faria as duas carregarem o que só a outra precisa —
+   * e é a mesma razão pela qual `#/itens` foi embora no §269, só que ao
+   * contrário.
+   */
+  | { tela: "spec" };
 
 /** id interno ↔ segmento legível da URL (o hash é interface, fala produto). */
 const SEGMENTO_DA_AREA: Record<AreaConfig, string> = {
@@ -78,6 +88,7 @@ export function hashDaRota(rota: Rota): string {
   if (rota.tela === "documento") return "#/documento";
   if (rota.tela === "sistema") return "#/sistema";
   if (rota.tela === "ensaios") return "#/ensaios";
+  if (rota.tela === "spec") return "#/spec";
   return `#/config/${SEGMENTO_DA_AREA[rota.area]}`;
 }
 
@@ -92,6 +103,8 @@ export function rotaDoHash(hash: string): Rota {
   if (partes[0] === "documento") return { tela: "documento" };
   if (partes[0] === "sistema") return { tela: "sistema" };
   if (partes[0] === "ensaios") return { tela: "ensaios" };
+  if (partes[0] === "spec") return { tela: "spec" };
+
   // SPEC-68 §4.2 — `#/simulacao` era "e se ficar lento?", e o nome estreito
   // fechava a porta para retry, pico e disjuntor. Rota que some sem
   // redirecionar dá tela branca para quem tinha o link salvo — e a SPEC-66 §5

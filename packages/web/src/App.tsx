@@ -14,6 +14,8 @@ import {
   estruturarDocumento,
   ensaiosAssumidos,
   gerarEspecificacaoEntrega,
+  gerarSpec,
+  coberturaDaSpec,
   resolverDependencias,
   violacoesEmAberto,
   type Atividade,
@@ -21,6 +23,7 @@ import {
   type No,
   type Quebra,
   type StatusDocumento,
+  type SpecEscrita,
   type ResultadoDependenciasDe,
   elementosComTempo,
   gerarItensDeTrabalho,
@@ -85,6 +88,7 @@ import { DocumentoScreen } from "./documento/DocumentoScreen";
 import { SistemaScreen } from "./sistema/SistemaScreen";
 import { AvisosDaDerivacao } from "./summary/AvisosDaDerivacao";
 import { baixarArquivoTexto } from "./persistence/baixarArquivo";
+import { SpecScreen } from "./spec/SpecScreen";
 import { LandingPage } from "./demo/LandingPage";
 import { EscolherTimeScreen } from "./auth/EscolherTimeScreen";
 import { lembrarTime, lerTimeLembrado } from "./auth/timeLembrado";
@@ -486,6 +490,7 @@ function AppCarregado({
   const mostrarDocumento = rota.tela === "documento";
   const mostrarSistema = rota.tela === "sistema";
   const mostrarEnsaios = rota.tela === "ensaios";
+  const mostrarSpec = rota.tela === "spec";
   // SPEC-41 Parte B — os itens materializados da quebra aberta. A fonte de
   // verdade é o server (persistem por quebra); o estado local é o espelho da
   // última geração/carga desta sessão.
@@ -1040,6 +1045,60 @@ function AppCarregado({
     [markdownDoDocumento]
   );
 
+  /**
+   * SPEC-84 fatia A — a spec, montada no cliente como o documento é.
+   *
+   * O mesmo desenho do §313: motor determinístico dentro de um `useMemo`, e o
+   * markdown que a tela mostra é o MESMO que o download entrega. Duas montagens
+   * fariam o arquivo baixado divergir do que a pessoa leu antes de baixar.
+   *
+   * A `medicao` reusa o que o documento já apurou (`saude`, lado "atencao") em
+   * vez de recalcular: duas leituras da mesma pergunta divergem na primeira
+   * mudança, e é a régua do §263.
+   */
+  const specDaDemanda = quebra.artefatosEscritos?.spec ?? {};
+
+  const coberturaDaSpecAtual = useMemo(
+    () => coberturaDaSpec(atividadesDoDocumento, specDaDemanda),
+    [atividadesDoDocumento, specDaDemanda]
+  );
+
+  const markdownDaSpec = useMemo(
+    () =>
+      gerarSpec({
+        titulo: quebra.titulo?.trim() || "Spec",
+        escrita: specDaDemanda,
+        contexto: [contextoDoProduto, quebra.demandInfo].filter((t) => t?.trim()).join("\n\n"),
+        medicao: documentoDaDemanda.saude.filter((s) => s.lado === "atencao").map((s) => s.rotulo),
+        itens: atividadesDoDocumento,
+      }),
+    [quebra.titulo, quebra.demandInfo, specDaDemanda, contextoDoProduto, documentoDaDemanda, atividadesDoDocumento]
+  );
+
+  /** A mesma régua do §313, no segundo artefato: lacuna contada, nunca estimada. */
+  const lacunasDaSpec = useMemo(() => contar(markdownDaSpec, MARCADOR_ESPECIFICAR), [markdownDaSpec]);
+
+  function mudarSpecEscrita(spec: SpecEscrita) {
+    setQuebra((q) => ({ ...q, artefatosEscritos: { ...q.artefatosEscritos, spec } }));
+  }
+
+  /**
+   * Marcar e desmarcar são o MESMO gesto, de propósito: a lista de itens
+   * cobertos é um conjunto, e dar dois botões para entrar e sair dele
+   * duplicaria a regra de "o que já está lá" em dois lugares.
+   */
+  function alternarItemDaSpec(chave: string) {
+    const cobertos = specDaDemanda.itensCobertos ?? [];
+    mudarSpecEscrita({
+      ...specDaDemanda,
+      itensCobertos: cobertos.includes(chave) ? cobertos.filter((c) => c !== chave) : [...cobertos, chave],
+    });
+  }
+
+  function baixarSpecMarkdown() {
+    baixarArquivoTexto(markdownDaSpec, "spec.md", "text/markdown");
+  }
+
   // §264 — e O QUÊ mudou. Só quando há o que comparar: rodar a comparação num
   // documento em dia seria trabalho para produzir lista vazia a cada render.
   const mudancasDesdeAprovacao = useMemo(
@@ -1493,6 +1552,7 @@ function AppCarregado({
           setMostrarAbrir(true);
         }}
         onDocumento={() => navegar({ tela: "documento" })}
+          onSpec={() => navegar({ tela: "spec" })}
         onSistema={() => navegar({ tela: "sistema" })}
         onSair={() => void onSair()}
       />
@@ -1886,6 +1946,22 @@ function AppCarregado({
       {/* SPEC-66 — a bancada de ensaio. Rota própria: o assistente é onde se
           CONVERSA para produzir desenho, e aqui não se produz nada, se ensaia.
           E rota é linkável, que é metade do valor. */}
+      {/* SPEC-84 fatia A — a spec. Tela própria pelo mesmo motivo do documento:
+          rota é linkável, e "olha a spec desta demanda" é uma URL que se manda. */}
+      {mostrarSpec && (
+        <SpecScreen
+          titulo={quebra.titulo?.trim() || "Spec"}
+          markdown={markdownDaSpec}
+          escrita={specDaDemanda}
+          onMudarEscrita={mudarSpecEscrita}
+          cobertura={coberturaDaSpecAtual}
+          onAlternarItem={alternarItemDaSpec}
+          lacunas={lacunasDaSpec}
+          onBaixarMarkdown={baixarSpecMarkdown}
+          onVoltar={() => navegar({ tela: "canvas" })}
+        />
+      )}
+
       {mostrarEnsaios && (
         <EnsaiosScreen
           diagrama={quebra.diagrama}

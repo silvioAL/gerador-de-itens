@@ -1,7 +1,33 @@
 import { describe, expect, it } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { CicloDoProduto } from "./CicloDoProduto";
-import { ESTAGIOS_DO_CICLO } from "./ciclo";
+import { ESTAGIOS_DO_CICLO, type EstagioDoCiclo } from "./ciclo";
+
+/**
+ * SPEC-84 fatia B — dois estágios inventados, para provar a MÁQUINA.
+ *
+ * Não são dados de demonstração: são o mínimo para a marca de ausência continuar
+ * verificável depois que o ciclo real ficou todo verde. O dia em que um estágio
+ * novo nascer incompleto, a garantia já está de pé — em vez de ter apodrecido
+ * junto com a última linha vermelha.
+ */
+const FALTANDO: EstagioDoCiclo = {
+  id: "inventado",
+  titulo: "Um estágio que não existe",
+  resumo: "existe só neste teste",
+  detalhe: "o desdobramento de um estágio ausente",
+  estado: "ausente",
+  oQueFalta: "a porta ainda não foi construída",
+};
+
+const EXISTINDO: EstagioDoCiclo = {
+  id: "real",
+  titulo: "Um estágio que existe",
+  resumo: "existe só neste teste",
+  detalhe: "o desdobramento de um estágio completo",
+  estado: "completo",
+  rota: { tela: "canvas" },
+};
 
 /**
  * SPEC-76 fatias B e C — a página que explica o ciclo.
@@ -20,13 +46,27 @@ describe("CicloDoProduto (SPEC-76)", () => {
   });
 
   it("o que não existe vem MARCADO — e a marca é palavra, não só cor", () => {
-    // Status vem com ícone e palavra, nunca com cor sozinha: quem não distingue
-    // as cores tem que ler a mesma coisa. Vale para daltonismo, impressão e
-    // alto contraste.
-    render(<CicloDoProduto />);
-    const ausente = ESTAGIOS_DO_CICLO.find((e) => e.estado === "ausente")!;
+    /**
+     * Status vem com ícone e palavra, nunca com cor sozinha: quem não distingue
+     * as cores tem que ler a mesma coisa. Vale para daltonismo, impressão e alto
+     * contraste.
+     *
+     * ## Por que o estágio é fabricado aqui (SPEC-84 fatia B)
+     *
+     * A versão anterior fazia `ESTAGIOS_DO_CICLO.find(e => e.estado ===
+     * "ausente")!` — e a SPEC-84 fechou o último buraco do ciclo, então o `!`
+     * virou `undefined.id`. É a **segunda** vez: a SPEC-79 tinha feito o mesmo
+     * com o último `parcial` (ver o teste abaixo).
+     *
+     * A lição, na terceira repetição, deixou de ser comentário: a máquina de
+     * marcar o que falta tem que continuar provável **depois** que os dados
+     * ficam todos verdes, senão a garantia some justamente quando ninguém está
+     * olhando. É o §263 aplicado ao teste em vez de ao produto.
+     */
+    render(<CicloDoProduto estagios={[FALTANDO, EXISTINDO]} />);
 
-    expect(screen.getByTestId(`estagio-item-${ausente.id}`)).toHaveTextContent("ainda não existe");
+    expect(screen.getByTestId("estagio-item-inventado")).toHaveTextContent("ainda não existe");
+    expect(screen.getByTestId("estagio-item-real")).not.toHaveTextContent("ainda não existe");
   });
 
   it("todo estágio incompleto diz o que é, e o completo não vira ruído", () => {
@@ -70,12 +110,24 @@ describe("CicloDoProduto (SPEC-76)", () => {
   });
 
   it("o desdobramento do que falta DIZ o que falta", () => {
-    render(<CicloDoProduto />);
-    const ausente = ESTAGIOS_DO_CICLO.find((e) => e.estado === "ausente")!;
+    // Mesmo motivo do de cima: o ciclo real não tem mais buraco, e a máquina de
+    // exibir o buraco precisa continuar provável para o dia em que tiver.
+    render(<CicloDoProduto estagios={[FALTANDO, EXISTINDO]} />);
 
-    fireEvent.click(screen.getByTestId(`estagio-item-${ausente.id}`));
+    fireEvent.click(screen.getByTestId("estagio-item-inventado"));
 
-    expect(screen.getByTestId(`estagio-detalhe-${ausente.id}`)).toHaveTextContent("O que falta");
+    expect(screen.getByTestId("estagio-detalhe-inventado")).toHaveTextContent("O que falta");
+    expect(screen.getByTestId("estagio-detalhe-inventado")).toHaveTextContent("a porta ainda não foi construída");
+  });
+
+  it("estágio completo NÃO ganha a caixa de 'o que falta'", () => {
+    // Marcar o que está certo é a definição de ruído, e a caixa vazia sugeriria
+    // um buraco que não existe.
+    render(<CicloDoProduto estagios={[FALTANDO, EXISTINDO]} />);
+
+    fireEvent.click(screen.getByTestId("estagio-item-real"));
+
+    expect(screen.getByTestId("estagio-detalhe-real")).not.toHaveTextContent("O que falta");
   });
 
   it("a contagem sai do dado — prosa continuaria mentindo depois da próxima entrega", () => {

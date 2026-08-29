@@ -13761,3 +13761,85 @@ mão dupla é outra pergunta — quem é dono da decisão depois que ela vira de
 
 579 engine · 133 llm · 122 aplicação · 855 web · 291 server · 42 gateway-falso ·
 105/105 E2E · build, typecheck e lint limpos.
+## §327 — o motor que ninguém tinha ligado, e a marca que envelheceu para o lado de baixo (SPEC-84)
+
+O pedido era *"que todos os itens fiquem verdes"*. Dois estágios do ciclo estavam
+marcados como ausentes na landing, e **as duas marcas estavam erradas por motivos
+opostos** — o que já é o achado da rodada.
+
+### `mcp` — a marca estava velha havia quatro rodadas
+
+`ciclo.ts` dizia `estado: "ausente"`, `oQueFalta: "Não avaliado ainda."` A SPEC-81
+inteira já tinha sido entregue: §321 (a tela dos destinos), §324 (ler a
+arquitetura de negócio), §325 (as telas de importação), §326 (o ADR pela
+conversa). Tela, rota, E2E — tudo lá, e a página pública dizendo que não existia.
+
+O comentário no topo daquele arquivo previa exatamente isso: *"uma página em prosa
+continuaria dizendo 'não existe' sobre algo entregue."* Foi escrito para justificar
+o conceito virar **dado**. E o dado envelheceu igual, porque a trava só cobrava a
+direção otimista — estágio que promete sem ter rota. Envelhecer para o lado de
+baixo é a mesma mentira, e mais difícil de notar: ninguém abre a landing
+procurando o que ela está escondendo.
+
+### `specs-para-ia` — a marca estava certa, o motivo escrito estava errado
+
+Dizia *"avaliado na SPEC-75, ainda não construído"*. Foi construído: a SPEC-80
+entregou as quatro fatias (§312–§315). A medição:
+
+```
+$ grep -rn "gerarSpec(\|coberturaDaSpec(" packages/ --include=*.ts --include=*.tsx | grep -v "\.test\." | grep -v "index.ts"
+packages/engine/src/especificacao/gerarSpec.ts:166:export function coberturaDaSpec(...)
+packages/engine/src/especificacao/gerarSpec.ts:219:export function gerarSpec(...)
+```
+
+**Só as próprias definições.** Motor exportado, testado, e com zero consumidores.
+O desconfortável é que a culpa não é de esquecimento: as quatro fatias da SPEC-80
+descrevem modelo, template, vínculo e trava — **nenhuma delas é a tela**. A SPEC
+nunca pediu a porta, então ninguém a construiu, e o ponto ficou vermelho com razão
+por três rodadas.
+
+### A porta
+
+`SpecScreen`, rota `#/spec`, entrada no menu ao lado do documento. As três seções
+de julgamento editáveis, a cobertura de itens com as **órfãs** à vista (a única das
+três listas que ninguém pensa em olhar, e a que faz a spec parecer completa
+apontando para item que sumiu), a conta de lacunas no cabeçalho — antes do clique
+de baixar, não depois — e o download.
+
+O que ela **não** tem, e é o teste mais importante do arquivo: nenhum botão de
+"✦ escrever para mim". A SPEC-80 fatia D trava o motor, mas nada impediria a tela
+de chamar `/ia/sugerir` e colar o resultado em `origem`. O botão que não existe é o
+que mantém a trava de pé.
+
+### A terceira vez, e a lição que virou entrada
+
+Três travas ficaram vermelhas ao fechar o último buraco, e duas delas pelo **mesmo
+padrão**: `ESTAGIOS_DO_CICLO.find(e => e.estado === "ausente")!`. A SPEC-79 já
+tinha quebrado assim ao zerar o último `parcial`; o comentário de então dizia a
+lição e o código ao lado continuou fazendo igual.
+
+Na terceira repetição ela deixou de ser comentário. `CicloDoProduto` passou a
+aceitar a lista por fora — a landing nunca passa nada, mas o teste monta um ciclo
+com buraco e prova a **máquina** de marcar ausência. Ela precisa continuar de pé
+depois que os dados ficam todos verdes, senão a garantia some justamente quando
+ninguém está olhando. `contagemDoCiclo` recebeu a lista pelo mesmo motivo: duas
+contas da mesma pergunta divergem na primeira mudança (§263).
+
+A trava nova, essa sim inédita: **estágio ausente tem que citar a SPEC ou o § que
+responde por ele.** "Não avaliado ainda" era exatamente a frase que não envelhece —
+continuou plausível por quatro rodadas depois de falsa.
+
+### O que eu errei no caminho
+
+Escrevi um E2E que fazia F5 e esperava a demanda voltar sozinha. Não volta — o
+E2E do documento reabre pelo menu, e está escrito lá desde o §250 por quê. Corrigi
+a suposição, não o teste.
+
+### O que não entra
+
+A spec no ciclo de aprovação do documento, e publicá-la no tracker. As duas estão
+na SPEC-84 §2 como recusa, com o motivo: quem aprova uma spec, no fluxo real, é
+quem vai construir — e não temos medição disso.
+
+579 engine · 133 llm · 122 aplicação · 868 web · 291 server · 42 gateway-falso ·
+106/106 E2E · build, typecheck e lint limpos. **13 de 13 estágios do ciclo.**
