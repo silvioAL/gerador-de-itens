@@ -77,23 +77,39 @@ test("Regras: criar um grupo pela tela (§165) e marcar contexto por clique — 
   const grupo = page.getByTestId("regras-grupo-Frontend");
   await expect(grupo).toBeVisible();
 
-  // O fluxo real continua: um requisito novo digitado no grupo recém-criado,
-  // e o contexto por clique (Frontend não tem contexto próprio, então o menu
-  // cai na lista completa — o fallback documentado).
+  /**
+   * O fluxo real continua: um requisito novo digitado no grupo recém-criado, e
+   * o contexto por clique.
+   *
+   * ## SPEC-79 — por que este trecho mudou
+   *
+   * Ele dizia *"Frontend não tem contexto próprio, então o menu cai na lista
+   * completa — o fallback documentado"*, e clicava em `Mobile-android`.
+   *
+   * **Deixou de ser verdade**, e a mudança é do produto e não do teste: a
+   * SPEC-79 acrescentou o tipo de nó `Tela` e, com ele, o contexto
+   * `Frontend-interface`. Frontend passou a ter contexto próprio, o menu parou
+   * de cair no fallback, e `Mobile-android` deixou de ser oferecido.
+   *
+   * O ASSUNTO do teste é o mesmo — contexto por clique, sem campo de vírgula —,
+   * e ele fica mais forte: agora exercita o caminho normal (o contexto que
+   * pertence à tech) em vez do fallback. O fallback continua coberto por quem
+   * não tem contexto próprio.
+   */
   await grupo.getByRole("textbox", { name: "Novo item", exact: true }).fill("Definir o tratamento de estado offline");
   await grupo.getByRole("button", { name: "+ Adicionar" }).click();
   const primeiro = grupo.getByTestId("regra-0");
   await primeiro.getByRole("button", { name: /adicionar$/ }).click();
   // As opções vêm de appConfig.contextos — valor exato, sem digitação.
-  await page.getByRole("option", { name: "Mobile-android" }).click();
-  await expect(primeiro.getByRole("button", { name: "Remover contexto Mobile-android" })).toBeVisible();
+  await page.getByRole("option", { name: "Frontend-interface" }).click();
+  await expect(primeiro.getByRole("button", { name: "Remover contexto Frontend-interface" })).toBeVisible();
 
   // Persistiu de verdade: sair da aba e voltar relê do servidor.
   await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
   await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: /Regras de refinamento/ }).click();
   await expect(
-    page.getByTestId("regras-grupo-Frontend").getByRole("button", { name: "Remover contexto Mobile-android" })
+    page.getByTestId("regras-grupo-Frontend").getByRole("button", { name: "Remover contexto Frontend-interface" })
   ).toBeVisible();
 
   } finally {

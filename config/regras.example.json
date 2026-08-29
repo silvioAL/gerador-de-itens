@@ -575,6 +575,55 @@
           "hlg": false
         }
       ]
+    },
+    "Frontend": {
+      "checklistTecnico": [
+        {
+          "texto": "Texto legível sobre o fundo (contraste WCAG AA)",
+          "contextos": [
+            "Frontend-interface"
+          ],
+          "porque": "abaixo de 4.5 a leitura falha para parte das pessoas — é medida, não gosto",
+          "severidade": "aviso",
+          "checagem": {
+            "campo": "corDoTexto",
+            "operador": "contraste-gte",
+            "valorDe": "corDeFundo",
+            "valor": 4.5
+          }
+        },
+        {
+          "texto": "As cores saem do design system, não do olho",
+          "contextos": [
+            "Frontend-interface"
+          ],
+          "porque": "cor solta é a forma mais rápida de o sistema visual se dissolver",
+          "severidade": "aviso",
+          "checagem": {
+            "campo": "corDoTexto",
+            "operador": "pertence-aos-tokens"
+          }
+        },
+        {
+          "texto": "A hierarquia visual conduz o olho ao que importa primeiro",
+          "contextos": [
+            "Frontend-interface"
+          ],
+          "porque": "é julgamento, e por isso NÃO tem checagem: o que não dá para calcular é checklist de gente",
+          "severidade": "aviso"
+        }
+      ],
+      "testes": [
+        {
+          "tipo": "Teste de interface",
+          "validacao": "a tela renderiza os estados de carregamento, vazio e erro, e o foco é visível",
+          "contextos": [
+            "Frontend-interface"
+          ],
+          "dev": true,
+          "hlg": true
+        }
+      ]
     }
   },
   "percursos": [

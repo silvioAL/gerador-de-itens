@@ -1934,6 +1934,72 @@
         "autenticacao"
       ],
       "cenarioGherkinPadrao": "```gherkin\nDado que o dispositivo está online e autenticado\nQuando a tela chama a API do backend\nEntão os dados retornados são exibidos corretamente, dentro do timeout esperado\n\nDado que o dispositivo está offline ou a chamada falha\nQuando o usuário abre a tela\nEntão o app mostra o cache local (quando existir) ou um estado de erro claro, sem travar\n```"
+    },
+    "tela": {
+      "label": "Tela",
+      "derives": "service",
+      "techs": [
+        "Frontend"
+      ],
+      "contextos": [
+        "Frontend-interface"
+      ],
+      "color": "#6366f1",
+      "spec": [
+        {
+          "key": "rota",
+          "label": "Rota",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "corDoTexto",
+          "label": "Cor do texto",
+          "type": "text",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "Um token do design system, ou o valor. É contra ela que o contraste é medido."
+        },
+        {
+          "key": "corDeFundo",
+          "label": "Cor de fundo",
+          "type": "text",
+          "required": false,
+          "permiteNA": true
+        },
+        {
+          "key": "estadoDeCarregamento",
+          "label": "Estado de carregamento",
+          "type": "text",
+          "required": false,
+          "permiteNA": true,
+          "ajuda": "O que a pessoa vê enquanto espera. N/A com motivo, se a tela é instantânea."
+        },
+        {
+          "key": "estadoVazio",
+          "label": "Estado vazio",
+          "type": "text",
+          "required": false,
+          "permiteNA": true
+        },
+        {
+          "key": "estadoDeErro",
+          "label": "Estado de erro",
+          "type": "text",
+          "required": false,
+          "permiteNA": true
+        },
+        {
+          "key": "rotuloAcessivel",
+          "label": "Rótulo acessível",
+          "type": "text",
+          "required": false,
+          "permiteNA": true
+        }
+      ],
+      "specResumo": [
+        "rota"
+      ]
     }
   },
   "edgeTypes": {

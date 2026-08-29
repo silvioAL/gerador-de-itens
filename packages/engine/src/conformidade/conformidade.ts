@@ -35,6 +35,15 @@ export interface Violacao {
   porque?: string;
   /** §242 — presente quando alguém aceitou esta violação de propósito. */
   excecao?: ExcecaoDePadrao;
+  /**
+   * SPEC-79 §5 — quanto esta violação cobra. Ausente = `erro`, que é o
+   * comportamento de sempre.
+   *
+   * Viaja NA violação em vez de ser reconsultada na regra por quem a exibe: a
+   * tela e a derivação precisam da MESMA resposta, e reler a config em dois
+   * lugares é como as duas divergem na primeira mudança (§263).
+   */
+  severidade?: "aviso" | "erro";
 }
 
 /**
@@ -206,6 +215,7 @@ export function avaliarConformidade(
               esperado: descreverEsperado(c, String(c.valor ?? "")),
               atual: resultado.atual,
               porque: requisito.porque,
+              severidade: requisito.severidade,
               excecao: excecoes.find((e) => e.noId === no.id && e.campo === c.campo),
             });
           }
@@ -228,6 +238,7 @@ export function avaliarConformidade(
             esperado: descreverEsperado(c, alvo?.descricao ?? ""),
             atual: String(no.spec[c.campo]?.valor ?? "—"),
             porque: requisito.porque,
+            severidade: requisito.severidade,
             excecao: excecoes.find((e) => e.noId === no.id && e.campo === c.campo),
           });
         }
