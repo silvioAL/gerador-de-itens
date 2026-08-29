@@ -1,9 +1,11 @@
 import type {
   AdrExterno,
+  ArquiteturaDeNegocioExterna,
   DestinoResolvido,
   DocumentoParaPublicar,
   DocumentoPublicado,
   LeitorDeAdr,
+  LeitorDeArquiteturaDeNegocio,
   PublicadorDeDocumento,
 } from "@gerador/aplicacao";
 
@@ -142,4 +144,63 @@ export function criarPublicadorDeDocumentoViaGateway(
       return { linkExterno: link, atualizada: corpo.atualizada === true };
     },
   };
+}
+
+/**
+ * SPEC-81 fatia F — a arquitetura de negócio da casa.
+ *
+ * Contrato do gateway:
+ *   POST {endpoint}  {}
+ *   → 200 { objetivo?, quemUsa?, regrasDeNegocio?, sistemas?, restricoes?,
+ *           glossario?: [{ termo, definicao }] }
+ *
+ * **`undefined` em vez de objeto vazio** quando não há o que trazer: quem chama
+ * distingue "o gateway respondeu e não tem nada" de "não consegui perguntar", e
+ * a tela diz coisas diferentes nos dois casos.
+ *
+ * Degrada como o leitor de ADR, e pelo mesmo motivo: ninguém pode ficar
+ * impedido de descrever o produto à mão porque um sistema de terceiro caiu.
+ */
+export function criarLeitorDeArquiteturaViaGateway(
+  destino: DestinoResolvido,
+  fetchImpl: typeof fetch = fetch
+): LeitorDeArquiteturaDeNegocio {
+  return {
+    async ler(): Promise<ArquiteturaDeNegocioExterna | undefined> {
+      let resposta: Response;
+      try {
+        resposta = await postar(destino, {}, fetchImpl);
+      } catch {
+        return undefined;
+      }
+      if (!resposta.ok) return undefined;
+
+      const corpo = (await resposta.json().catch(() => ({}))) as Record<string, unknown>;
+      const lida: ArquiteturaDeNegocioExterna = {
+        objetivo: texto(corpo.objetivo),
+        quemUsa: texto(corpo.quemUsa),
+        regrasDeNegocio: texto(corpo.regrasDeNegocio),
+        sistemas: texto(corpo.sistemas),
+        restricoes: texto(corpo.restricoes),
+        glossario: glossarioDe(corpo.glossario),
+      };
+
+      // Resposta 200 sem nada aproveitável é o mesmo que não ter respondido, do
+      // ponto de vista de quem chama — e devolver `{}` faria a tela abrir uma
+      // proposta vazia, que é pior que dizer "não achei nada".
+      const temAlgo = Object.values(lida).some((v) => (Array.isArray(v) ? v.length > 0 : !!v));
+      return temAlgo ? lida : undefined;
+    },
+  };
+}
+
+function glossarioDe(v: unknown): { termo: string; definicao: string }[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const lidos = v
+    .filter((t): t is Record<string, unknown> => !!t && typeof t === "object")
+    .map((t) => ({ termo: texto(t.termo) ?? "", definicao: texto(t.definicao) ?? "" }))
+    // Termo sem definição não é termo de glossário: é uma palavra solta, e o
+    // glossário existe justamente para dizer o que a palavra significa aqui.
+    .filter((t) => t.termo && t.definicao);
+  return lidos.length > 0 ? lidos : undefined;
 }

@@ -13592,3 +13592,54 @@ revisão de texto quebrar um teste que não é sobre texto.
 
 579 engine · 133 llm · 113 aplicação · 831 web · 277 server · 39 gateway-falso ·
 104/104 E2E · build, typecheck e lint limpos.
+
+## §324 — a arquitetura de negócio, construída sobre uma premissa declarada (SPEC-81 fatia F)
+
+A §7 desta SPEC recomendava **adiar**: *"depende de a organização ter arquitetura
+de negócio em formato legível, e não temos medição disso"*. Levantei a recomendação
+duas vezes; o usuário decidiu construir. A decisão é dele, e a premissa fica
+escrita — se ela cair, é este código que sobra sem uso.
+
+O desenho tenta ser **barato de descartar**: nenhuma coluna nova, nenhuma
+migração, e o produto continua idêntico para quem não configurar o destino.
+
+### A decisão que dispensou seis campos de proveniência
+
+`Produto` não tem onde guardar de onde um texto veio — `objetivo` é uma `string`,
+não um `ValorSpec`. Escrever direto faria texto de terceiro ficar
+indistinguível do que alguém desta casa digitou, que é o defeito que a fatia C
+evita nos ADRs.
+
+A saída não foi acrescentar proveniência a seis campos: foi **não escrever**. A
+importação devolve uma **proposta**, campo a campo, e quem aceita é a pessoa.
+
+> É a tese do produto — *nada que a IA propõe conta antes da confirmação* —
+> aplicada a dado de terceiro. E resolve de graça a pergunta que um `overwrite`
+> teria que responder: **o que acontece quando os dois lados discordam?** Aqui a
+> divergência é mostrada, não resolvida. É o §306.
+
+Três situações, e só duas viram decisão: `novo` (vazio aqui, veio de lá — aceitar
+é ganho puro), `diverge` (**a única que exige leitura**, e por isso os dois lados
+voltam) e `igual`, que não aparece. Pedir decisão sobre o que não muda é a
+definição de ruído, e ruído se aprende a ignorar junto com o que importava.
+
+### Três recusas pequenas, e o motivo de cada uma
+
+**O `nome` do produto não é alcançado.** É como a casa chama o produto aqui
+dentro; um sistema de terceiro renomeá-lo quebraria toda referência humana ao
+trabalho sem ninguém ter pedido.
+
+**Termo de glossário que já existe não é sobrescrito.** O glossário é o que
+impede a IA de usar a palavra da casa com o sentido errado — trocá-lo em lote
+mudaria o sentido de tudo que já foi escrito. Redefinir um termo é decisão maior
+que importar, e não cabe num botão de "trazer".
+
+**200 sem nada aproveitável devolve `undefined`, não `{}`.** Objeto vazio faria a
+tela abrir uma proposta em branco, que é pior que dizer "não achei nada" — a
+pessoa gasta a atenção antes de descobrir.
+
+E o leitor degrada como o de ADR: gateway fora do ar não pode impedir ninguém de
+descrever o produto à mão.
+
+579 engine · 133 llm · 122 aplicação · 831 web · 281 server · 39 gateway-falso ·
+104/104 E2E · build, typecheck e lint limpos.
