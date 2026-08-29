@@ -277,21 +277,34 @@ export function testarContratoDeQuebras(nomeDoAdaptador: string, criarAmbiente: 
       expect(lida?.percursos?.[0].nos).toEqual(["n1", "n2", "n3"]);
     });
 
-    it("SPEC-58 — o que a PESSOA escreveu no documento sobrevive, com o status", async () => {
+    it("SPEC-58 — o que a PESSOA escreveu sobrevive, em TODO artefato, com o status", async () => {
       // A regra 3 da SPEC-58: se a ida e volta apagar isto uma única vez,
       // ninguém escreve de novo — e o documento volta a ser o export de antes.
+      //
+      // SPEC-80 fatia A — este teste afirmava um conjunto de seções só, porque
+      // até então a quebra produzia um artefato só. Reescrito, e não ajustado
+      // para passar: ele agora escreve nos DOIS artefatos e cobra os dois de
+      // volta. Um mapa que atravessasse a borda perdendo uma das chaves
+      // passaria na versão antiga — é justamente o defeito que a fatia A pode
+      // introduzir, e o que este teste passa a impedir.
       const repo = await comRepo();
-      const documentoEscrito = {
-        tradeOffs: "Aceitamos latência maior na escrita para a leitura ficar barata.",
-        riscos: "O parceiro pode mudar o contrato sem aviso.",
+      const artefatosEscritos = {
+        documento: {
+          tradeOffs: "Aceitamos latência maior na escrita para a leitura ficar barata.",
+          riscos: "O parceiro pode mudar o contrato sem aviso.",
+        },
+        spec: {
+          origem: "Pedido do time de operações, na reunião de refinamento.",
+          recusas: "Não entra cache distribuído: a medição não achou número que doesse.",
+        },
       };
 
       const criada = await repo.criar(
-        normalizarDadosQuebra({ diagrama: DIAGRAMA, documentoEscrito, documentoStatus: "aprovado" })
+        normalizarDadosQuebra({ diagrama: DIAGRAMA, artefatosEscritos, documentoStatus: "aprovado" })
       );
       const lida = await repo.obter(criada.id);
 
-      expect(lida?.documentoEscrito).toEqual(documentoEscrito);
+      expect(lida?.artefatosEscritos).toEqual(artefatosEscritos);
       expect(lida?.documentoStatus).toBe("aprovado");
     });
 
@@ -302,7 +315,7 @@ export function testarContratoDeQuebras(nomeDoAdaptador: string, criarAmbiente: 
       const criada = await repo.criar(normalizarDadosQuebra({ diagrama: DIAGRAMA }));
 
       expect((await repo.obter(criada.id))?.documentoStatus).toBeNull();
-      expect((await repo.obter(criada.id))?.documentoEscrito).toEqual({});
+      expect((await repo.obter(criada.id))?.artefatosEscritos).toEqual({});
     });
 
     it("atualizar troca as necessidades inteiras, sem mesclar com as antigas", async () => {

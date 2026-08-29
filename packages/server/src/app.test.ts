@@ -3225,7 +3225,14 @@ describe("produtos (SPEC-53)", () => {
         },
       ],
       percursos: [{ id: "pc::n1>n2", rotulo: "a → b", nos: ["n1", "n2"], origem: "inferido", confirmado: true }],
-      documentoEscrito: { visaoGeral: "Como analista, quero…", tradeOffs: "aceitamos latência", riscos: "o parceiro muda" },
+      // SPEC-80 fatia A — as seções passaram a viver POR artefato. Este teste
+      // cobra a quebra INTEIRA de volta, então preenche os dois tipos: um mapa
+      // que perdesse uma das chaves entre a borda e o banco passaria batido se
+      // só o `documento` fosse escrito aqui.
+      artefatosEscritos: {
+        documento: { visaoGeral: "Como analista, quero…", tradeOffs: "aceitamos latência", riscos: "o parceiro muda" },
+        spec: { origem: "pedido do time", recusas: "não entra cache", fatias: "A: a borda; B: o template" },
+      },
       documentoStatus: "aprovado",
       // SPEC-65 fatia D — as leituras caladas.
       leiturasDispensadas: [{ noId: "n1", tipo: "fan-out", autor: "ana", em: "2026-08-15T10:00:00.000Z" }],

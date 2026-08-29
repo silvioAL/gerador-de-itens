@@ -990,9 +990,9 @@ function AppCarregado({
         decisoes: decisoesVisiveis,
         excecoes: quebra.excecoes,
         percursos: quebra.percursos,
-        visaoGeral: quebra.documentoEscrito?.visaoGeral,
-        tradeOffs: quebra.documentoEscrito?.tradeOffs,
-        riscos: quebra.documentoEscrito?.riscos,
+        visaoGeral: quebra.artefatosEscritos?.documento?.visaoGeral,
+        tradeOffs: quebra.artefatosEscritos?.documento?.tradeOffs,
+        riscos: quebra.artefatosEscritos?.documento?.riscos,
         ensaios: ensaiosDaQuebra,
       }),
     [atividadesDoDocumento, quebra, diagramaConfig, contextoDoProduto, regrasVisiveis, decisoesVisiveis, especificacaoTemplate, templateItem, ensaiosDaQuebra]
@@ -1936,9 +1936,11 @@ function AppCarregado({
         <DocumentoScreen
           documento={documentoDaDemanda}
           config={diagramaConfig}
-          escrito={quebra.documentoEscrito ?? {}}
+          escrito={quebra.artefatosEscritos?.documento ?? {}}
           status={quebra.documentoStatus ?? null}
-          onMudarEscrito={(documentoEscrito) => setQuebra((q) => ({ ...q, documentoEscrito }))}
+          onMudarEscrito={(documento) =>
+            setQuebra((q) => ({ ...q, artefatosEscritos: { ...q.artefatosEscritos, documento } }))
+          }
           onMudarStatus={mudarStatusDoDocumento}
           desatualizado={documentoDesatualizado}
           lacunas={lacunasDoDocumento}

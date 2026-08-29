@@ -21,18 +21,46 @@ estruturado, com template configurável, seções escritas por gente que sobrevi
 à regeneração, proveniência por campo, lacunas contáveis (SPEC-73) e PDCA sobre
 o próprio template.
 
-**O que esta rodada mediu e a SPEC-75 não tinha** — e muda a fatia B:
+### ⚠ Correção do §0 — a medição da primeira escrita estava errada
+
+> A primeira versão desta SPEC afirmou: *"o que impede N artefatos é um índice
+> único em `time_id` sozinho"*, citando a migração 0004. **É falso.** Eu li a
+> primeira migração da tabela e parei nela.
+
+A migração **0028** (SPEC-47) já resolveu isso:
 
 ```sql
--- packages/server/migrations/0004_especificacao_templates.sql:8
+DROP INDEX IF EXISTS "especificacao_templates_chave_unica";
 CREATE UNIQUE INDEX "especificacao_templates_chave_unica"
-  ON "especificacao_templates" USING btree ("time_id");
+  ON "especificacao_templates" ("time_id", "tipo");
 ```
 
-**Um template por time. Índice único em `time_id` sozinho.** A SPEC-75 §2.2 diz
-que falta *"produzir N artefatos de tipos diferentes, cada um com template
-próprio"* — e o que impede isso não é o motor, é **este índice**. É migração de
-banco, não refactor: o índice passa a ser `(time_id, tipo_de_artefato)`.
+E a porta acompanha: `TipoDeTemplate` já é união (`"documento" | "item"`),
+`obter(timeId, tipo)` e `salvar(timeId, conteudo, tipo)` já recebem o tipo, e o
+comentário da porta chama `(timeId, tipo)` de chave natural.
+
+**O lado do template já sabe ter N tipos. Acrescentar `"spec"` é acrescentar um
+valor a uma união — não é migração.**
+
+> Registrado aqui e não apagado, porque a SPEC-83 §0.2 usou essa medição errada
+> como metade de uma simetria bonita ("duas tabelas, o mesmo bloqueio"). **A
+> simetria não existe** — em `config_documentos` o índice `(chave, time_id)` é
+> real e o eixo de produto de fato falta; aqui não. Um argumento elegante e falso
+> é pior que nenhum.
+
+### O bloqueio real é do outro lado: o que se PRODUZ
+
+Medido agora, na direção certa:
+
+| Onde | O que está lá |
+|---|---|
+| `db/schema.ts:51` | `documentoEscrito: jsonb("documento_escrito")` — **uma** coluna |
+| `repositorioDeQuebras.ts:65` | `documentoEscrito?: DocumentoEscrito` — **singular** |
+| `model/types.ts:303` | `DocumentoEscrito` = **três chaves fixas** |
+
+**O template já sabe ter N tipos; a quebra produz um só.** E as seções que uma
+spec precisa — origem, recusas, fatias com prova (§1) — não são `visaoGeral`,
+`tradeOffs` nem `riscos`.
 
 E do outro lado da cadeia, `DocumentoEscrito`
 (`packages/engine/src/model/types.ts:303`) tem hoje **três chaves fixas** —
@@ -125,13 +153,17 @@ própria: a **SPEC-81**.
 
 ## 5. Fatias
 
-- **A — o artefato deixa de ser um.** Migração: o índice único passa a ser
-  `(time_id, tipo)`. `TipoDeArtefato` nasce com dois valores — `documento` (o de
-  hoje, sem mudança de comportamento) e `spec`. Prova, e é a mais importante da
-  rodada: **o documento gerado hoje sai idêntico, caractere a caractere**, depois
-  da migração — gerar antes, guardar a saída inteira, migrar, gerar de novo e
-  comparar as duas strings. Nada de `toContain` por seção: comparação por trecho
-  deixa passar exatamente a mudança que esta fatia arrisca introduzir.
+- **A — o que a quebra produz deixa de ser um.** Não é o template (esse já sabe,
+  ver a correção do §0): é o **lado produzido**. `documentoEscrito` singular vira
+  seções escritas **por tipo de artefato**, sem virar editor de documento — as
+  chaves continuam fixas, o que muda é que **cada tipo tem o seu conjunto fixo**.
+  Prova, e é a mais importante da rodada: **o documento gerado hoje sai idêntico,
+  caractere a caractere.** Gerar antes, guardar a saída inteira, mudar, gerar de
+  novo, comparar as duas strings. Nada de `toContain` por seção — comparação por
+  trecho deixa passar exatamente a mudança que esta fatia arrisca introduzir.
+  Segunda prova, a da SPEC-71: as seções novas **voltam depois de um F5**, e o
+  teste de borda `keyof Quebra` do §310 cobra isso sozinho se o campo não
+  alcançar o Zod.
 - **B — o template da spec.** As seções, com `problemasDoTemplate` já separando
   erros × avisos. As de julgamento nascem como `SecaoEscrita` com o marcador da
   SPEC-73, e portanto **contáveis**: uma spec com 7 lacunas diz que tem 7.

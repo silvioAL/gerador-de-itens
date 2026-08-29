@@ -1,5 +1,5 @@
 import type { ExecucaoDoPapel } from "@gerador/aplicacao";
-import type { AnexoDeContexto, CenarioDeLentidao, VolumetriaDoProduto, Decisao, Diagrama, DocumentoEscrito, ExcecaoDePadrao, LeituraDispensada, Necessidade, OperacaoDeAjuste, PerfisConfig, Percurso, Quebra, RegrasConfig, StatusDocumento, ValorSpec, VolumetriaDaDemanda } from "@gerador/engine";
+import type { AnexoDeContexto, CenarioDeLentidao, VolumetriaDoProduto, Decisao, Diagrama, ArtefatosEscritos, ExcecaoDePadrao, LeituraDispensada, Necessidade, OperacaoDeAjuste, PerfisConfig, Percurso, Quebra, RegrasConfig, StatusDocumento, ValorSpec, VolumetriaDaDemanda } from "@gerador/engine";
 
 /**
  * Base do @gerador/server — configurável em runtime via `VITE_API_URL`
@@ -103,8 +103,9 @@ export interface QuebraSalva {
   decisoes?: Decisao[];
   /** SPEC-57 fatia E — os caminhos confirmados. */
   percursos?: Percurso[];
-  /** SPEC-58 fatia 2 — o que a pessoa escreveu no documento. */
-  documentoEscrito?: DocumentoEscrito;
+  /** SPEC-58 fatia 2 — o que a pessoa escreveu. SPEC-80 fatia A — um conjunto
+   * de seções POR artefato, não mais um só. */
+  artefatosEscritos?: ArtefatosEscritos;
   /** SPEC-58 fatia 3 — o estado do documento. */
   documentoStatus?: StatusDocumento | null;
   /** SPEC-70 — o volume que a demanda atende. */

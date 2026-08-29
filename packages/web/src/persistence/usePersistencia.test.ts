@@ -55,7 +55,14 @@ describe("usePersistencia.abrirPorId — reabrir não pode perder campo (§250)"
     excecoes: [{ noId: "n1", campo: "timeoutMs", motivo: "parceiro lento", autor: "ana", em: "2026-08-15T10:00:00.000Z" }],
     percursos: [{ id: "pc::n1>n2", rotulo: "a → b", nos: ["n1", "n2"], origem: "inferido" as const, confirmado: true }],
     especificacao: "# doc",
-    documentoEscrito: { tradeOffs: "aceitamos latência", riscos: "o parceiro muda o contrato" },
+    // SPEC-80 fatia A — as seções passaram a viver POR artefato, e a fixture
+    // preenche os DOIS: este teste itera a quebra salva inteira, então um mapa
+    // que a reidratação copiasse pela metade só é pego se houver mais de uma
+    // chave dentro dele.
+    artefatosEscritos: {
+      documento: { tradeOffs: "aceitamos latência", riscos: "o parceiro muda o contrato" },
+      spec: { origem: "pedido do time de operações", recusas: "não entra cache distribuído" },
+    },
     documentoStatus: "aprovado" as const,
     // SPEC-71 fatia A — os três campos que a fixture não citava, e que por isso
     // o laço abaixo nunca conferia. O teste dizia "TODO campo que o servidor

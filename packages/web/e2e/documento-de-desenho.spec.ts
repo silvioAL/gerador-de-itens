@@ -99,7 +99,7 @@ test("o documento tem leitor, guarda o que a pessoa escreveu, e o aprovado para 
   // 3 da SPEC-58. Conferir no servidor separa as duas causas possíveis de
   // falha: não salvou, ou salvou e não voltou.
   await expect
-    .poll(async () => (await (await page.request.get(`${API}/quebras/${idDaQuebra}`)).json()).documentoEscrito?.riscos, {
+    .poll(async () => (await (await page.request.get(`${API}/quebras/${idDaQuebra}`)).json()).artefatosEscritos?.documento?.riscos, {
       timeout: 15000,
     })
     .toBe(riscos);
@@ -123,7 +123,7 @@ test("o documento tem leitor, guarda o que a pessoa escreveu, e o aprovado para 
   await campoVisao.blur();
   await expect
     .poll(
-      async () => (await (await page.request.get(`${API}/quebras/${idDaQuebra}`)).json()).documentoEscrito?.visaoGeral,
+      async () => (await (await page.request.get(`${API}/quebras/${idDaQuebra}`)).json()).artefatosEscritos?.documento?.visaoGeral,
       { timeout: 15000 }
     )
     .toBe(visaoGeral);

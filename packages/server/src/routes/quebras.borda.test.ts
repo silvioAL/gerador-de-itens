@@ -58,7 +58,7 @@ const CAMPOS_DA_QUEBRA = {
   excecoes: "atravessa",
   decisoes: "atravessa",
   percursos: "atravessa",
-  documentoEscrito: "atravessa",
+  artefatosEscritos: "atravessa",
   documentoStatus: "atravessa",
   leiturasDispensadas: "atravessa",
   cenariosDeLentidao: "atravessa",

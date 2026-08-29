@@ -322,6 +322,82 @@ export interface DocumentoEscrito {
 }
 
 /**
+ * SPEC-80 fatia B — as seções de uma **spec**, e elas não são as do documento.
+ *
+ * A SPEC-75 §2.2 nomeou duas coisas que uma spec tem e um documento de solução
+ * não: as **recusas** e as **fatias com prova**. A escrita da SPEC-80 §1.3
+ * acrescentou a terceira: a **origem**.
+ *
+ * As três têm o mesmo traço, e é ele que decide que elas moram aqui e não saem
+ * do motor: **carregam julgamento.** Não são deriváveis do desenho, e por isso
+ * são exatamente as que o §2 da SPEC-80 proíbe o modelo de escrever. Ele
+ * preenche o que é calculável; isto é de gente, com lacuna contável enquanto
+ * ninguém escreve.
+ *
+ * Chaves fixas, como as do `DocumentoEscrito` — pela mesma razão que o
+ * comentário de lá dá, e que continua valendo: é o que impede isto de virar um
+ * editor de documento.
+ */
+export interface SpecEscrita {
+  /** Quem pediu, e com que palavras. Não é formalidade: é o que permite, meses
+   * depois, saber se o que foi construído responde ao que foi pedido. */
+  origem?: string;
+  /** O que NÃO entra, e por quê. Recusa sem motivo é opinião; com motivo é
+   * projeto — e é o que impede uma spec de virar lista de desejos. */
+  recusas?: string;
+  /** O que fica verdade em cada fatia, e como se prova. Fatia sem prova
+   * declarada é promessa (§248). */
+  fatias?: string;
+  /**
+   * SPEC-80 fatia C — as `Atividade.chave` que esta spec cobre.
+   *
+   * Chaves e não índices, pela mesma razão da SPEC-23: a chave é estável a
+   * rederivações, e o índice não é. Uma spec que apontasse "o item 3" passaria
+   * a cobrir outro item no instante em que alguém acrescentasse um nó antes
+   * dele — e ninguém notaria.
+   *
+   * **É `string[]` e não `Record`**: a SPEC-80 §6 pergunta se o vínculo deveria
+   * ser N-para-N (várias specs por item). Não temos medição, e esta forma
+   * responde 1-para-N hoje **sem impedir** a outra amanhã — o contrário exigiria
+   * migração. Fazer a escolha reversível é a resposta certa a uma pergunta que
+   * ainda não foi medida.
+   */
+  itensCobertos?: string[];
+}
+
+/**
+ * SPEC-80 fatia A — **a quebra deixa de produzir um artefato só.**
+ *
+ * ## Por que um mapa, e não um campo por tipo
+ *
+ * `documentoEscrito` sozinho ao lado de `specEscrita` ao lado de `adrEscrito`
+ * (SPEC-81) seria o mesmo tratamento repetido três vezes nos cinco funis que o
+ * §310 mapeou — Zod, porta, normalizador, coluna e reidratação. É a repetição
+ * que o §263 pune, e a SPEC-77 já pagou para desfazer em caso menor.
+ *
+ * E não é especulação: os três tipos já estão nomeados em SPEC escrita. Um mapa
+ * chaveado por tipo faz o campo novo custar uma linha em vez de cinco.
+ *
+ * ## O que ele NÃO é
+ *
+ * Não é um saco de chaves livres. Cada tipo aponta para uma interface de
+ * **chaves fixas próprias** — o mapa generaliza o transporte, não o conteúdo. A
+ * régua do `DocumentoEscrito` sobrevive inteira: quem quiser uma seção nova
+ * declara o campo, e o compilador cobra a borda.
+ */
+export interface ArtefatosEscritos {
+  /** As seções escritas do documento de solução — o artefato de hoje. */
+  documento?: DocumentoEscrito;
+  /** As seções de julgamento da spec de SDD (SPEC-80). */
+  spec?: SpecEscrita;
+}
+
+/** As chaves de `ArtefatosEscritos`, em runtime. O tipo não sobrevive à
+ * compilação, e a borda precisa da lista de verdade — mesma técnica do §310. */
+export const TIPOS_DE_ARTEFATO = ["documento", "spec"] as const;
+export type TipoDeArtefato = (typeof TIPOS_DE_ARTEFATO)[number];
+
+/**
  * SPEC-70 §2 — o volume da demanda, na unidade em que o NEGÓCIO fala.
  *
  * Ninguém traz "23,1 req/s"; traz "2 milhões por dia". Obrigar a conversão na
@@ -432,9 +508,16 @@ export interface Quebra {
    * confirmados são guardados: reguardar toda inferência encheria a quebra de
    * caminho que ninguém olhou. */
   percursos?: Percurso[];
-  /** SPEC-58 fatia 2 — as seções escritas por gente. Sobrevivem à regeneração:
-   * é a regra 3 da SPEC-58, e sem ela a fatia inteira não existe. */
-  documentoEscrito?: DocumentoEscrito;
+  /**
+   * SPEC-58 fatia 2 — as seções escritas por gente. Sobrevivem à regeneração:
+   * é a regra 3 da SPEC-58, e sem ela a fatia inteira não existe.
+   *
+   * SPEC-80 fatia A — deixou de ser **um** conjunto de seções e passou a ser um
+   * **por artefato**. A coluna manteve o nome `documento_escrito`: renomear
+   * coluna custa migração e não compra nada, e o mapeamento de nome já era
+   * frouxo (o drizzle sempre separou campo de coluna aqui).
+   */
+  artefatosEscritos?: ArtefatosEscritos;
   /** SPEC-58 fatia 3 — o estado do documento. Ausente = nunca gerado. */
   documentoStatus?: StatusDocumento;
   /**

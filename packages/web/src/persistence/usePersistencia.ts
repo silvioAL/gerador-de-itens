@@ -94,7 +94,7 @@ export function usePersistencia(quebra: Quebra, aoAbrir: (q: Quebra) => void) {
           decisoes: salva.decisoes,
           excecoes: salva.excecoes,
           percursos: salva.percursos,
-          documentoEscrito: salva.documentoEscrito,
+          artefatosEscritos: salva.artefatosEscritos,
           documentoStatus: salva.documentoStatus ?? undefined,
           // SPEC-71 — o QUINTO funil, e o que torna a correção do servidor
           // insuficiente sozinha: mesmo com Zod e colunas certos, estes três
