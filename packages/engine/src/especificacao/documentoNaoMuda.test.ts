@@ -81,6 +81,8 @@ const config: DiagramaConfig = {
 };
 
 const regras: RegrasConfig = {
+  tipos: [],
+  tamanhos: [],
   porTech: {
     Backend: {
       checklistTecnico: [

@@ -30,7 +30,7 @@ describe("montarPedidoConfigurarConversa (SPEC-34 Fase 1)", () => {
 
   it("o schema restringe o alvo ao enum — teste-automatizado fica fora até o mapeamento pra regras.testes ser medido", () => {
     const { esquema } = montarPedidoConfigurarConversa({ mensagens });
-    const propostas = (esquema as { properties: { propostas: { items: { properties: { alvo: { enum: string[] } } } } } })
+    const propostas = (esquema as unknown as { properties: { propostas: { items: { properties: { alvo: { enum: string[] } } } } } })
       .properties.propostas.items.properties.alvo.enum;
     expect(propostas).toEqual([...ALVOS_DA_CONVERSA_DE_CONFIG]);
     expect(propostas).toContain("regra-refinamento");
@@ -59,7 +59,7 @@ describe("montarPedidoConfigurarConversa (SPEC-34 Fase 1)", () => {
 
   it("lista vazia de propostas é resposta válida do schema — perguntar de volta não é falha", () => {
     const { esquema, prompt } = montarPedidoConfigurarConversa({ mensagens });
-    const propostas = (esquema as { properties: { propostas: { minItems?: number } } }).properties.propostas;
+    const propostas = (esquema as unknown as { properties: { propostas: { minItems?: number } } }).properties.propostas;
     expect(propostas.minItems).toBeUndefined();
     expect(prompt).toContain("Lista vazia é resposta correta");
   });
@@ -77,7 +77,7 @@ describe("montarPedidoSugerirConfig — alvo contexto-do-produto", () => {
       instrucao: "portabilidade de conta salário",
     });
 
-    const props = (esquema as { properties: Record<string, unknown>; required: string[] });
+    const props = (esquema as unknown as { properties: Record<string, unknown>; required: string[] });
     expect(Object.keys(props.properties).sort()).toEqual(
       ["objetivo", "quemUsa", "regrasDeNegocio", "restricoes", "sistemas"].sort()
     );

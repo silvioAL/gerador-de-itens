@@ -65,6 +65,9 @@ const GRUPOS: { titulo: string; itens: { area: AreaConfig; rotulo: string }[] }[
       { area: "campos", rotulo: "Padrões por componente" },
       { area: "camposAresta", rotulo: "Campos por tipo de conexão" },
       { area: "regras", rotulo: "Regras de refinamento" },
+      // SPEC-79 — a aba existia e não tinha porta: dava para chegar por URL e
+      // não pelo menu, que é como ninguém descobre um recurso.
+      { area: "tokens", rotulo: "Design system" },
       { area: "especificacao", rotulo: "Especificação de solução" },
       { area: "exportacao", rotulo: "Exportação (tracker)" },
     ],

@@ -52,6 +52,8 @@ const config: DiagramaConfig = {
 };
 
 const regras: RegrasConfig = {
+  tipos: [],
+  tamanhos: [],
   porTech: {
     Backend: {
       checklistTecnico: [{ texto: "Logs relevantes emitidos", contextos: ["Backend-dados"] }],

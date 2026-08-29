@@ -189,6 +189,19 @@ export const corpoQuebra = z.object({
         /** SPEC-69 fatia D — os ensaios que são a EVIDÊNCIA desta decisão.
          * Sem eles a evidência para de viajar ao item. */
         ensaioIds: z.array(z.string()).optional(),
+        /**
+         * SPEC-81 fatia C — de onde veio o ADR importado.
+         *
+         * **Sem esta linha, a régua central da SPEC-81 não valia**: o campo
+         * morria aqui, e um ADR trazido do repositório da casa voltava do banco
+         * indistinguível de uma decisão tomada aqui dentro. `origem: "extraido"`
+         * sobreviveria sozinho e diria "veio de algum lugar" sem dizer de onde.
+         *
+         * O guarda do §310 não pegaria: ele cruza `keyof Quebra` com a borda, e
+         * este campo mora dentro de `Decisao`. Foi a varredura de pontas soltas
+         * do §322 que o encontrou.
+         */
+        importadoDe: z.string().optional(),
       })
     )
     .optional(),

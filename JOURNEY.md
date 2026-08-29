@@ -13440,3 +13440,64 @@ três morreram no primeiro build — que é exatamente onde deviam morrer.
 
 579 engine · 133 llm · 113 aplicação · 823 web · 275 server · 39 gateway-falso ·
 104/104 E2E · build, typecheck e lint limpos.
+
+## §322 — a varredura de pontas soltas, e o portão que checava um terço
+
+O §321 registrou uma ponta e o usuário mandou consertá-las antes de avançar. A
+varredura achou quatro suspeitas, **três eram reais e uma era minha, errada**.
+
+### O portão era pior do que eu tinha escrito
+
+O §321 disse *"o `packages/web` não tem script de typecheck"*. Medido de verdade:
+**só 2 dos 6 pacotes tinham.** `engine`, `aplicacao`, `llm` e `web` não. E como
+o `build` desses pacotes é `tsup`, que **não typechecka**, o `src` deles nunca
+passou por `tsc` — nem em produção, nem em teste.
+
+`npm run typecheck --workspaces --if-present` respondia **zero** checando um
+terço do repositório, em silêncio, porque o `--if-present` pula quem não tem o
+script sem dizer nada.
+
+Ligados os quatro, apareceram **18 erros — todos em arquivo de teste**, o que é
+ao mesmo tempo alívio e diagnóstico: o código de produção estava certo, e as
+*fixtures* é que vinham divergindo dos tipos há tempo. Três famílias:
+
+- fixture de `RegrasConfig` sem `tipos`/`tamanhos`, e de `No` sem `status`/`specNA`;
+- `as const` produzindo `readonly` onde o tipo pede array mutável;
+- um `import type { FieldSpec }` apontando para `model/types` em vez de `config/types`.
+
+> **Fixture frouxa é como um teste dá falsa confiança**, e este repositório já
+> pagou por isso: o §310 encontrou o defeito porque a fixture de
+> `usePersistencia.test.ts` não citava os campos que o tipo tinha. Agora o
+> compilador cobra.
+
+### A ponta que apagava proveniência
+
+`Decisao.importadoDe` nasceu na SPEC-81 fatia C e **não chegou ao Zod**. O campo
+morria na borda, e um ADR trazido do repositório da casa voltava do banco
+indistinguível de uma decisão tomada aqui dentro — que é **a régua central**
+daquela fatia, virada do avesso.
+
+Pior que perder tudo: `origem: "extraido"` sobreviveria sozinho, dizendo *"veio
+de algum lugar"* sem dizer de onde. É a metade de informação que faz alguém
+confiar no dado errado.
+
+E o guarda do §310 não pegaria: ele cruza `keyof Quebra` com a borda, e este
+campo mora **dentro** de `Decisao`. O guarda cobre a primeira camada; a segunda
+continua sendo por atenção — então a atenção virou trava para o caso que doeu.
+
+### A aba sem porta
+
+A aba "Design system" da SPEC-79 existia, tinha teste, tinha rota — e **não
+estava no menu**. Dava para chegar por URL, que é como ninguém descobre um
+recurso.
+
+### E a que eu contei errado
+
+A quarta suspeita era *"os operadores novos não aparecem na tela de regras"*.
+Medida: **não existe seletor de operador em lugar nenhum do web.** `checagem`
+nunca foi editável pela tela — é config de arquivo e PDCA. Não é regressão da
+SPEC-79; é um limite antigo do produto, e afirmá-lo como ponta solta minha teria
+sido inventar trabalho.
+
+579 engine · 133 llm · 113 aplicação · 823 web · 277 server · 39 gateway-falso ·
+104/104 E2E · build, typecheck (agora **6 de 6**) e lint limpos.
