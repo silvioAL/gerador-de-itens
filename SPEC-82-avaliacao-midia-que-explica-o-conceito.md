@@ -40,13 +40,23 @@ movimento explica bem:
 
 | Conceito | O que a mídia precisa fazer ver |
 |---|---|
+| **A evolução do trabalho com IA** | prompt → agente/skill → **camada**: o que persiste deixa de ser o texto da instrução e passa a ser a régua medível |
+| **As camadas** | perene · da demanda · apontamentos · IA generativa — e a de apontamentos sendo **recalculada**, não guardada |
 | **Determinismo** | o mesmo desenho, duas vezes, produzindo saída idêntica — e um desenho mudado produzindo a diferença, isolada |
 | **O centro contido** | a IA **dentro** de um limite que ela não atravessa: o motor decide a estrutura, ela escreve o texto |
 | **Proveniência** | um valor carregando de onde veio, e a marca não se perdendo quando ele viaja |
 | **O ciclo que fecha** | o retorno — a coleta vira ajuste, o ajuste muda a regra, a regra muda o próximo documento |
 
-O quarto já existe como `CicloDoProduto`. Os três primeiros **não existem em
-lugar nenhum** que uma pessoa que não fez login consiga ver.
+O último já existe como `CicloDoProduto`. Os **cinco** primeiros não existem em
+lugar nenhum que uma pessoa que não fez login consiga ver.
+
+> Os dois primeiros entraram depois, quando o usuário disse o que a página tem
+> que resolver: *"tornar governança e os padrões corporativos em algo perene para
+> trabalhar com suporte de IA"*, e *"ter mais diagrama que explique os conceitos e
+> as camadas"*. Eles são de natureza diferente dos outros três — **falam do mundo
+> antes de falar da ferramenta**, e são os únicos que uma pessoa que nunca ouviu
+> falar do produto consegue reconhecer como o problema dela. Ver SPEC-83 §1.2 e
+> §2.2.
 
 > Note o que os quatro têm em comum: são **relações e restrições**, não telas.
 > Diagrama animado é a forma natural deles. Isso já elimina metade das opções

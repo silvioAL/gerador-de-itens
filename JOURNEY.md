@@ -12570,3 +12570,66 @@ bloco anterior.
 Nenhum código mudou nesta rodada — cinco documentos e esta entrada. As suítes
 seguem em 524 engine · 133 llm · 84 aplicação · 806 web · 254 server ·
 39 gateway-falso · 104/104 E2E.
+
+### Adendo — o que a SPEC-83 virou depois de três mensagens
+
+A primeira versão desta rodada tratava a landing como problema de layout e
+repetição. Três mensagens do usuário mudaram isso, e a SPEC-83 foi reescrita:
+
+> *"precisa constar que nessa página devemos resolver a explicação conceitual dos
+> problemas que o sistema resolve, no sentido de tornar governança e os padrões
+> corporativos em algo perene para trabalhar com suporte de IA… muitas
+> [organizações] têm acesso a ferramentas e estão com seus agentes de IA e skills
+> do Claude, mas isso não tem sido o suficiente."*
+
+**O gargalo declarado não é falta de IA.** É que governança e padrão corporativo
+vivem onde a IA não alcança de forma verificável, e cada agente reconstrói esse
+contexto do zero em cada conversa sem que ninguém possa conferir. A página passa
+a ter que contar a **evolução**: prompt → agente/skill → camada. O agente é
+progresso real, e continua sendo texto dizendo ao modelo o que fazer — não mede,
+não deriva, e dois agentes que se contradizem não acusam o conflito. Na camada, o
+que persiste não é o prompt: **é a régua.**
+
+E o usuário fez a ligação que faltava: *"se conecta com o conceito que estamos
+explicando naquele diagrama da tela inicial"*. O círculo com **"IA — propõe,
+nunca aplica sozinha"** no meio **já é** esse terceiro estágio desenhado. O
+diagrama está certo há uma rodada inteira e ninguém tinha dito o que ele
+significa — ele vinha sendo lido como mapa de funcionalidades.
+
+Depois vieram os conceitos: **SDD**, e a exigência de explicar que *"o desenho
+também é dirigido por specs"*. Isso não é retórica — é `FieldSpec` e
+`NodeTypeConfig`: um componente **precisa** declarar o que a spec do seu tipo
+exige, o que falta vira apontamento e o que contraria vira item. São dois
+sentidos, e a página deve os dois: **para dentro**, a spec do time dirige o
+desenho; **para fora** (SPEC-80), o produto gera spec consumível por agente de
+código.
+
+E as **quatro camadas**, todas já no código e nenhuma nomeada em lugar nenhum:
+perene · da demanda · **apontamentos** · IA generativa. A de apontamentos é a que
+explica o produto e a que ninguém desenha: ela não é guardada como verdade, é
+**recalculada** — por isso o mesmo desenho dá sempre os mesmos itens, e por isso
+discordar de um apontamento é mudar uma regra, não apagar uma linha.
+
+### A quarta cópia, e a manchete que sobreviveu ao §314
+
+Medindo para escrever a §7 (o README entra na mesma rodada, a pedido), apareceu
+o achado que amarra tudo: a tese está escrita em **quatro** lugares —
+`Jornada.tsx:82`, `README.md:79`, `CONCEITO.md:27` e o próprio círculo — e
+**nenhum é canônico**. O `OMotor()` da landing não era a segunda cópia: era a
+quarta. Sai daí a regra permanente: **o `CONCEITO.md` é a fonte; todo o resto é
+resumo que aponta para ele, nunca uma segunda explicação.**
+
+E o usuário decidiu a última pergunta em aberto:
+
+> *"e sim, precisamos reformular: não é até o backlog, é esse conceito que
+> acompanha processos."*
+
+O `<h1>` — *"Do diagrama ao backlog, sem inventar nada"* — promete um trajeto com
+**destino**. É exatamente o defeito que o §314 encontrou no corpo da página
+(*"descrevia um fluxo de cinco passos, não um ciclo que fecha"*) **sobrevivendo
+na manchete**: a SPEC-76 consertou o conteúdo e não olhou para o título. Ele
+erra duas vezes — anuncia um fim onde o produto volta, e descreve o mecanismo
+onde precisa aparecer o problema.
+
+A SPEC-83 fechou com **seis fatias**, e diz em voz alta que é mais de uma rodada.
+Fingir que cabe numa só é como as três rodadas do §251 acabaram pela metade.
