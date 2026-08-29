@@ -440,19 +440,49 @@ e nenhum decorativo:
    **inclusive no de melhorar a própria configuração**. É o que mostra o
    **trabalho de quem chega**, e provavelmente o que mais convence: os outros
    explicam o produto, este mostra o problema do leitor já resolvido.
-5. **O mapa que conecta tudo** — pedido explícito: *"se faz necessário também
-   escrever na página diagrama mostrando tudo isso se conectando."* É o único
-   que mostra o sistema **inteiro ligado**: a informação de produto e o processo
-   configurado alimentando o desenho; o desenho produzindo apontamentos; os
-   apontamentos virando itens, documento e spec; a spec indo para o
-   desenvolvimento com IA; e o uso voltando como ajuste da configuração. A IA
-   aparece **em cada aresta**, e a volta fecha no ponto de partida.
+5. **O mapa que conecta tudo, com as bordas** — pedido explícito, em duas
+   mensagens: *"se faz necessário também escrever na página diagrama mostrando
+   tudo isso se conectando"* e, depois de a SPEC-81 ganhar entradas e saídas,
+   *"isso tudo precisa estar diagramado na landing"*.
+
+   O miolo: informação de produto e processo configurado alimentando o desenho;
+   o desenho produzindo apontamentos; os apontamentos virando itens, documento e
+   spec; e o uso voltando como ajuste da configuração. **A IA em cada aresta**, e
+   a volta fechando no ponto de partida.
+
+   E as **bordas**, que são o que a SPEC-81 acrescentou:
+
+   | Entra | Sai |
+   |---|---|
+   | ADR da casa → vira desenho (§1.3 da SPEC-81) | itens → issue tracker |
+   | arquitetura de negócio → vira contexto do produto | documento de desenho → base de conhecimento |
+   | | spec → desenvolvimento com IA |
 
    > **Este é o diagrama-herói**, e os quatro anteriores são apoio. Cinco
    > diagramas numa página é muito, e ninguém lê cinco — a régua tem que ser
    > declarada: **um é a manchete visual, os outros aparecem quando a seção deles
    > chega.** Sem isso, a página vira álbum de diagramas, que é a versão gráfica
    > exata do problema que esta SPEC existe para consertar.
+
+   #### E aqui a máquina de marcação salva a página
+
+   **Quase nenhuma dessas bordas existe hoje.** Uma delas (itens → tracker) é
+   real; as outras quatro são SPEC-80 e SPEC-81, não construídas. Diagramar as
+   cinco como se funcionassem seria a maior promessa falsa que esta página já
+   teria feito — e a §5 da SPEC-76 existe exatamente para impedir isso.
+
+   A solução já está no repositório, e é a resposta à §4 desta SPEC: **o
+   diagrama de conexões usa a mesma marcação existe/parcial/ausente do ciclo.**
+
+   > A máquina que a §4 dizia que ficaria sem uso quando os 13 estágios ficassem
+   > verdes **ganha o segundo cliente no mesmo dia** — e um em que as marcas são
+   > variadas de novo, que é onde ela comunica. Isso deixa de ser argumento de
+   > princípio ("não se apaga porque um dia serve") e vira necessidade concreta,
+   > o que é bem melhor.
+
+   E dá à página uma honestidade que vende mais que a promessa: **"é para cá que
+   isto vai, e é daqui que já estamos"** é uma frase que um arquiteto de
+   organização grande acredita. Cinco setas todas acesas, não.
 
 A régua para os três, herdada da SPEC-82: **dirigidos pelos mesmos dados da
 página, para que não consigam mentir.** Um diagrama de camadas que liste uma

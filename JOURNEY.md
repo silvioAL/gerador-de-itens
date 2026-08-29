@@ -12956,3 +12956,54 @@ não opinião. Hoje isso só existe na memória de um arquiteto veterano.
 
 Virou a fatia G, colada na E, porque *"ADR vira desenho"* é o que dá razão de ser
 à importação — sem ela, importar ADR é encher um repositório.
+
+### Adendo 8 — as saídas, e o diagrama que ganhou bordas
+
+> *"também é necessário revisar as saídas… deveria ser possível, via alguma
+> chamada exclusiva ao MCP (separada das de publicação/criação dos itens no issue
+> tracker), também publicar os design docs no Confluence."*
+>
+> *"isso tudo precisa estar diagramado na landing."*
+
+Medido, e a revisão se justifica sozinha: **o produto tem uma porta de saída e
+quatro artefatos.** `exportadorDeItens.ts` é a única em `portas/` que publica; o
+resto é repositório e contrato. E o **documento de desenho** — artefato de
+trabalho da demanda desde a SPEC-58 — sai por `baixar-markdown` no navegador. O
+comentário em `DocumentoScreen.tsx:26` já registrava o sintoma: *"o markdown ia
+para o download e sumia"*.
+
+A instrução de separar está certa, e por quatro motivos de contrato, não de
+gosto: **ciclo de vida** (issue nasce uma vez; página é viva), **idempotência**
+(exportar duas vezes duplica — publicar duas vezes tem que atualizar no lugar),
+**modo de falhar** (parcial por item × publica-ou-não) e **permissão** (quem abre
+issue não é quem escreve na wiki da casa). Porta nova: `PublicadorDeDocumento`.
+
+E o risco é o defeito que este repositório mais conhece: **página publicada é
+cópia, e cópia envelhece** — o §263 em escala de documento, logo depois de a
+SPEC-83 medir a versão pequena dele (a tese em quatro lugares). Três das quatro
+travas já existem: identidade estável para atualizar no lugar, a página dizendo
+de onde veio e apontando de volta, e — a melhor — **o estado de frescor**, porque
+o produto já sabe quando o documento está desatualizado em relação ao desenho
+(SPEC-58 §5, com o `atualizadoEm` que o §312 tornou honesto). Uma página que diga
+*"gerada de um documento que mudou desde então"* é mais honesta que a maioria das
+wikis corporativas.
+
+### E a máquina de marcação ganhou o segundo cliente
+
+O diagrama que conecta tudo passa a ter **bordas**: ADR e arquitetura de negócio
+entrando, itens/documento/spec saindo. **E quase nenhuma dessas bordas existe
+hoje** — uma é real (itens → tracker), as outras quatro são SPEC-80 e SPEC-81.
+Diagramar as cinco acesas seria a maior promessa falsa que esta página já teria
+feito.
+
+A solução já estava no repositório: **o diagrama de conexões usa a mesma marcação
+existe/parcial/ausente do ciclo.**
+
+> A máquina que o adendo 1 dizia que ficaria sem uso quando os 13 estágios
+> ficassem verdes **ganhou o segundo cliente no mesmo dia** — e um em que as
+> marcas voltam a ser variadas, que é onde ela comunica. Deixou de ser argumento
+> de princípio ("não se apaga porque um dia serve") e virou necessidade concreta.
+
+E dá à página uma honestidade que vende mais que a promessa: **"é para cá que
+isto vai, e é daqui que já estamos"** é frase em que um arquiteto de organização
+grande acredita. Cinco setas todas acesas, não.

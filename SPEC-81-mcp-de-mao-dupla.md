@@ -184,6 +184,66 @@ produto passa a poder responder é *"o que estou desenhando contraria alguma
 decisão que já foi tomada?"* — que é uma medição, não uma opinião, e é o tipo de
 coisa que hoje só um arquiteto com memória longa percebe.
 
+### 1.4 As saídas — uma porta, quatro artefatos
+
+> *"também é necessário revisar as saídas. Acho que, além das specs, deveria ser
+> possível — via alguma chamada **exclusiva** ao MCP, no sentido de ser
+> **separada** das de publicação/criação dos itens no issue tracker — também
+> publicar os **design docs no Confluence** via MCP."* — o usuário.
+
+Medido, e a revisão que ele pede se justifica sozinha:
+
+| O que o produto produz | Por onde sai hoje |
+|---|---|
+| **Itens de trabalho** | `ExportadorDeItens` → agente → tracker |
+| **Documento de desenho** | **`baixar-markdown` no navegador** — sem porta |
+| **Spec para SDD** | não existe ainda (SPEC-80) |
+| **ADR** | não existe ainda (§1.3) |
+
+**Uma porta de saída, quatro artefatos.** E o documento — que é o artefato de
+trabalho da demanda desde a SPEC-58 — sai por download. O comentário em
+`DocumentoScreen.tsx:26` já registrava o sintoma: *"o markdown ia para o download
+e sumia"*.
+
+#### Por que uma chamada separada, e não um parâmetro na existente
+
+A instrução do usuário está certa, e por quatro motivos que são de contrato, não
+de gosto:
+
+| | Itens → tracker | Documento → base de conhecimento |
+|---|---|---|
+| **Ciclo de vida** | criado uma vez, vive lá | **página viva**, republicada a cada mudança |
+| **Idempotência** | exportar duas vezes **duplica** (defeito) | publicar duas vezes tem que **atualizar no lugar** |
+| **Falha** | parcial, por item — é o acerto do §2 | é uma coisa só: publica ou não |
+| **Permissão** | quem abre issue | quem escreve na wiki da casa — **não são as mesmas pessoas** |
+
+Enfiar os dois no `exportar(itens)` faria a porta mentir sobre os quatro. **Porta
+nova: `PublicadorDeDocumento`.**
+
+#### O risco, e ele é o defeito que este repositório mais conhece
+
+Uma página publicada é uma **cópia**, e cópia envelhece. É exatamente o §263 —
+duas explicações da mesma coisa dessincronizam — em escala de documento. A
+SPEC-83 §0.2 acabou de medir a versão pequena disso: a tese do produto escrita em
+quatro lugares, nenhum canônico.
+
+Publicar no Confluence sem cuidado cria a quinta cópia da demanda inteira, e
+dessa vez fora do alcance do repositório.
+
+**As travas, e três das quatro já existem:**
+
+- **atualiza no lugar, nunca duplica** — a página tem identidade estável, como a
+  chave do item já tem;
+- **a página diz que foi gerada**, de que demanda, quando, e **aponta de volta**
+  para o documento vivo;
+- **a página carrega o estado de frescor** — o produto **já sabe** quando o
+  documento está desatualizado em relação ao desenho (SPEC-58 §5, o
+  `atualizadoEm` que a SPEC-72 fatia C tornou honesto). Uma página publicada que
+  diga *"gerada de um documento que mudou desde então"* é mais honesta que a
+  maioria das wikis corporativas;
+- **e o que não existe ainda:** republicar tem que ser barato e óbvio, ou a
+  cópia congela na primeira versão — que é como toda wiki morre.
+
 ## 2. O que o `ExportadorDeItens` já acertou, e o que ele não previu
 
 A porta nasceu certa em duas coisas: não acopla em Jira, e trata **falha parcial
@@ -220,6 +280,15 @@ alheia e a reapresenta como sua corrompe o registro dos dois lados.
 formato livre para `alternativas`/`escolhida`/`porque` é trabalho de modelo, com
 o risco de plausível-mas-vazio da SPEC-80 §2. Chega como proposta, com lacuna
 contável — nunca como fato.
+
+**Publicar documento pela porta dos itens.** A §1.4 mediu: ciclo de vida,
+idempotência, modo de falhar e permissão são diferentes nos quatro. Um parâmetro
+a mais no `exportar(itens)` faria a porta mentir sobre todos.
+
+**Publicar cópia que não sabe que envelheceu.** Uma página no Confluence gerada e
+esquecida é a quinta cópia da demanda, fora do alcance do repositório — o §263 em
+escala de documento. Publica atualizando no lugar, dizendo de onde veio e se o
+original mudou desde então, ou não publica.
 
 **Virar repositório de ADR da organização.** O produto escreve ADR ancorado em
 modelo e em medição, e conversa com o repositório da casa. Substituí-lo é outro
@@ -259,6 +328,12 @@ de "nada vira pronto sem alguém confirmar" — a porta MCP não pode ser a exce
   tela** o que veio do ADR (`importado`), o que o modelo completou (`sugerido`) e
   o que ninguém respondeu (lacuna contável). Segunda prova, a de maior valor:
   desenhar algo que contraria um ADR aceito da casa **produz apontamento**.
+- **H — o documento de desenho publicado** (§1.4). Porta própria,
+  `PublicadorDeDocumento`, e **não** um parâmetro do `exportar(itens)`. Prova
+  dupla, e as duas são o que impede a cópia de virar mentira: publicar duas vezes
+  **atualiza a mesma página** em vez de criar a segunda; e a página publicada
+  carrega de que demanda veio, quando, e **se o documento mudou desde então** —
+  usando o `atualizadoEm` que a SPEC-72 fatia C tornou honesto.
 - **F — arquitetura de negócio como contexto.** Alimentar `objetivo`,
   `regrasDeNegocio`, `sistemas`, `restricoes` e `glossario` a partir do
   repositório da casa. Ataca o gargalo do *"alguém tem que digitar o contexto"*
