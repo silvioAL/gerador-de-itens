@@ -12481,3 +12481,92 @@ décimo segundo foi o da derivação, que estava certo.
 
 524 engine · 133 llm · 84 aplicação · 806 web · 254 server · 39 gateway-falso ·
 104/104 E2E · build, typecheck e lint limpos.
+
+## §316 — cinco SPECs para os três pontos que faltam, e para a página que os mostra
+
+O pedido: *"criar spec para que todos itens fiquem verde, ou seja, implementar
+tudo o que falta"*, mais *"a parte após o ciclo com todos pontos verdes precisa
+ser revista, pois está meio repetitiva… que fique com cara de landing page de
+verdade"*.
+
+Perguntado sobre profundidade, o usuário escolheu **ambição completa**. Sobre
+mídia, recusou a resposta fácil: *"precisa ser algo profissional de apresentação
+que **explique os conceitos**, não necessariamente telas do sistema em si."*
+
+### Por que cinco documentos, e não um
+
+O `ciclo.ts` tem **13 estágios: 10 completos, 1 parcial, 2 ausentes**. Os três
+não-verdes são domínios distintos — régua de design, geração de artefato,
+protocolo de integração — e cada um tem risco próprio. Enfiá-los num SPEC só
+faria o de maior valor ficar refém do de maior risco, que é a mesma armadilha
+que a SPEC-75 §5 já tinha nomeado.
+
+| SPEC | Estágio | O que a medição mudou |
+|---|---|---|
+| 79 | `padroes` (parcial) | **a máquina de medir já existe** — `Requisito` + `Checagem` + `Condicao`; falta o vocabulário de interface entrando nos tipos |
+| 80 | `specs-para-ia` (ausente) | o que impede N artefatos é **um índice único em `time_id` sozinho**, não o motor |
+| 81 | `mcp` (ausente) | "MCP" aparece **7× no fonte, 6 em comentário e 1 na tela, e 0 em código executável** |
+| 82 | — | avaliação de mídia |
+| 83 | a landing | **4 das 5 etapas da `Jornada` são estágios que o círculo acabou de mostrar** |
+
+### A repetição tinha causa medível
+
+Não era excesso de conteúdo. A landing renderiza o círculo de 13 estágios e
+logo abaixo a `Jornada`, cujas etapas 1, 2, 3 e 5 são `desenho`, `prontidao`,
+`itens` e `especificacao` — ditos de novo, em outro formato. E o `OMotor()`
+reconta a divisão motor × IA pela terceira vez na mesma rolagem.
+
+Era o **§263 — duas explicações da mesma coisa dessincronizam** — chegando pelo
+lado que ninguém vigiava, porque as duas estavam certas isoladamente.
+
+Segundo achado, e é o que responde "cara de landing page": a página inteira é
+**uma coluna de 760 px**. Sem seção de largura total, sem alternância, sem
+ritmo. É a estrutura de um documento — e nenhuma troca de texto conserta isso.
+
+### O problema que as três primeiras rodadas criam
+
+Com tudo verde, o círculo terá **13 marcas iguais**. O que hoje é a informação
+mais interessante da página — *eles dizem o que ainda não existe* — vira ruído
+uniforme, e a tentação vai ser apagar a máquina de marcação.
+
+**Não se apaga.** Ela é a trava da SPEC-76 fatia D, e a honestidade da página
+não é um estado a que se chega: é um mecanismo que se mantém. O que muda é o
+peso visual, e isso é design, não texto.
+
+### O que estas SPECs recusam
+
+A recusa mais importante é a que se aplica a elas mesmas: **ponto verde sobre
+coisa que mal existe** seria o produto violando, na porta de entrada, a única
+régua que ele cobra de todo mundo lá dentro. Por isso cada uma declara o que
+significa "verde" para o seu estágio — e a SPEC-79 é explícita: *se não deriva
+item de trabalho, não está verde.*
+
+A avaliação de mídia recusou a saída barata. O Playwright já grava vídeo da
+stack real, e teria sido de graça — mas captura de tela explica **onde clicar**,
+não **por que o produto é assim**. Ela também nomeia a tensão em vez de fingir
+que a resolve: *"profissional" e "não envelhece" puxam em direções opostas*, e a
+saída é dar prazo de validade ao que não se rerenderiza.
+
+### Três correções que a própria escrita sofreu
+
+Escrever SPEC medida cobra o mesmo preço de executá-la.
+
+1. Afirmei "MCP aparece em quatro comentários". São **sete**, e uma delas **não
+   é comentário — é texto na tela**. A frase da `ExportacaoTab` está honesta
+   hoje (descreve o agente externo, não promete que o Gerador fala MCP) e vai
+   precisar ser reescrita sem prometer demais.
+2. Citei `gerarEspecificacaoEntrega.test.ts:952` como molde de comparação byte a
+   byte. **Esse molde não existe** com esse nome no arquivo. Trocado pela
+   descrição da técnica.
+3. A contagem de estados por regex deu 14 num arquivo de 13 estágios — a linha
+   do próprio tipo `estado: "completo" | …` casava. Conferido contra
+   `contagemDoCiclo()`: 11 de 13.
+
+Ordem de execução: **82** (avaliação, barata, decide o que a 83 pode usar) →
+**79** → **80** → **81** → **83** por último, porque as três anteriores mudam as
+marcas que a página mostra. É a mesma razão que fez a SPEC-78 vir por último no
+bloco anterior.
+
+Nenhum código mudou nesta rodada — cinco documentos e esta entrada. As suítes
+seguem em 524 engine · 133 llm · 84 aplicação · 806 web · 254 server ·
+39 gateway-falso · 104/104 E2E.
