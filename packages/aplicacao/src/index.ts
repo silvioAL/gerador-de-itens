@@ -29,6 +29,34 @@ export type { ExportadorDeItens, ItemExportado } from "./portas/exportadorDeIten
 export { criarCasosDeUsoDeItensGerados, type CasosDeUsoDeItensGerados } from "./casos-de-uso/itensGerados.js";
 export { normalizarExportador, type ConfigExportador } from "./config/normalizacao.js";
 
+/** SPEC-81 — os destinos do gateway do time: vários endereços, um por operação. */
+export {
+  destinosDaOperacao,
+  OPERACOES_DO_GATEWAY,
+  type DestinoDoGateway,
+  type DestinoResolvido,
+  type OperacaoDoGateway,
+} from "./config/normalizacao.js";
+
+/** SPEC-81 fatia C — ler os ADRs da casa, marcados como importados. */
+export {
+  comoDecisao,
+  lacunasDaDecisaoImportada,
+  statusDe,
+  type AdrExterno,
+  type LeitorDeAdr,
+} from "./portas/leitorDeAdr.js";
+
+/** SPEC-81 fatia E — a decisão daqui volta para o repositório da casa. */
+export { decisoesQuePodemVoltar, type AdrParaPublicar, type EscritorDeAdr } from "./portas/escritorDeAdr.js";
+
+/** SPEC-81 fatia B — publicar o documento na base de conhecimento. */
+export type {
+  DocumentoParaPublicar,
+  DocumentoPublicado,
+  PublicadorDeDocumento,
+} from "./portas/publicadorDeDocumento.js";
+
 export {
   CAMPO_GLOBAL,
   camposEfetivos,

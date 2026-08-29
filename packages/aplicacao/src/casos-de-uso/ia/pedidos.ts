@@ -452,6 +452,30 @@ export interface EntradaDiagrama {
   techs?: string[];
   contextos?: string[];
   perfilTime?: string;
+  /**
+   * SPEC-81 fatia D — as DECISÕES JÁ TOMADAS pela casa, vindas do repositório
+   * de ADR pelo gateway.
+   *
+   * ## Por que elas entram no pedido do desenho
+   *
+   * É onde elas mudam alguma coisa. Um ADR que diga *"fila em vez de chamada
+   * síncrona, porque desacopla o tempo do parceiro"* deve impedir que a
+   * proposta nasça com a chamada síncrona — e hoje o modelo não tem como saber
+   * disso, porque a decisão vive num repositório que ele nunca viu.
+   *
+   * ## Por que só as ACEITAS
+   *
+   * Uma decisão em proposta ainda não é a posição da casa. Mandá-la junto
+   * daria a um rascunho o mesmo peso de um acordo — e é o mesmo erro que
+   * `statusDe` evita na importação, aqui do outro lado.
+   *
+   * ## O que isto NÃO faz
+   *
+   * Não confere se o desenho contraria alguma. O modelo é orientado, não
+   * medido — e a diferença importa: o que sai daqui continua chegando como
+   * `sugerido`, e nada disso conta antes de alguém confirmar.
+   */
+  decisoesDaCasa?: { titulo: string; escolhida?: string; porque?: string }[];
 }
 
 /** ACHADO REAL (SPEC-27 Fase 1): array de tamanho aberto na grammar deixa a
@@ -461,7 +485,7 @@ const MAX_NOS = 10;
 const MAX_ARESTAS = 15;
 
 export function montarPedidoDiagrama(entrada: EntradaDiagrama & { imagens?: string[] }): PedidoIa {
-  const { descricao, tiposDeNo, tiposDeConexao, techs, contextos, perfilTime, imagens } = entrada;
+  const { descricao, tiposDeNo, tiposDeConexao, techs, contextos, perfilTime, imagens, decisoesDaCasa } = entrada;
 
   // SPEC-30 Fase 2: um print de diagrama JÁ É a descrição. Exigir texto junto
   // obrigaria a pessoa a redigitar o que a imagem mostra — que é exatamente o
@@ -521,6 +545,16 @@ export function montarPedidoDiagrama(entrada: EntradaDiagrama & { imagens?: stri
     `Demanda:`,
     descricao.trim(),
     ...(perfilTime?.trim() ? ["", `Stack que este time usa (respeite-a):`, perfilTime.trim()] : []),
+    ...(decisoesDaCasa?.length
+      ? [
+          ``,
+          `Decisões de arquitetura JÁ TOMADAS nesta casa — respeite-as, e não proponha o que elas descartaram:`,
+          ...decisoesDaCasa.map(
+            (d) =>
+              `- ${d.titulo}${d.escolhida ? `: ${d.escolhida}` : ""}${d.porque ? ` — porque ${d.porque}` : ""}`
+          ),
+        ]
+      : []),
     ...(techs?.length ? ["", `Tecnologias do time: ${techs.join(", ")}`] : []),
     ...(contextos?.length ? [`Contextos usados: ${contextos.join(", ")}`] : []),
     ``,
