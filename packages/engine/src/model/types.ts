@@ -241,6 +241,29 @@ export interface Decisao {
    * divergiria do número na primeira vez que alguém mexesse no desenho (§263).
    */
   ensaioIds?: string[];
+  /**
+   * SPEC-81 fatia C — de onde este ADR veio, quando ele veio de fora.
+   *
+   * ## Por que não um valor novo em `Origem`
+   *
+   * `Origem` é `manual | extraido | inferido | sugerido` e atravessa todo o
+   * produto. **`extraido` já significa exatamente isto** — o valor foi extraído
+   * de uma fonte, não decidido aqui —, e alargar a união faria toda tela e todo
+   * teste que a percorre ter que aprender um caso a mais para descrever uma
+   * situação que ela já descreve. A SPEC-74 tomou a mesma decisão com o
+   * `MARCA_SIMULADO`: marca, não valor novo na união.
+   *
+   * O que faltava era **qual** fonte. Este campo é o endereço do ADR na casa —
+   * a URL ou o identificador que o gateway devolveu.
+   *
+   * ## A régua que ele existe para sustentar
+   *
+   * **ADR importado não pode aparecer como decisão local.** Se a casa tem
+   * repositório de ADR, ele é a fonte; um produto que absorve a decisão alheia e
+   * a reapresenta como sua corrompe o registro dos dois lados. Presente aqui = a
+   * tela mostra de onde veio, e a decisão não se confunde com as tomadas aqui.
+   */
+  importadoDe?: string;
 }
 
 /**

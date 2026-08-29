@@ -13204,3 +13204,105 @@ significam coisas diferentes (a outra cor, e a razão mínima).
 
 574 engine · 133 llm · 84 aplicação · 813 web · 258 server · 39 gateway-falso ·
 104/104 E2E · build, typecheck e lint limpos.
+
+## §319 — o gateway do time, e a correção que dissolveu metade da SPEC (SPEC-81)
+
+Terceira das quatro rodadas do §316. Ela começou bloqueada pela própria SPEC e
+foi destravada por uma frase do usuário.
+
+### A SPEC estava se autobloqueando por um erro de leitura meu
+
+A primeira escrita tratava MCP como **protocolo a implementar**: o produto viraria
+servidor MCP, escolheria SDK, resolveria transporte atrás do nginx. A §5 chegava a
+dizer *"não medimos qual SDK; não escrever a fatia A antes disso"* — e eu tinha
+parado a rodada por causa disso.
+
+> *"não é isso, vou chamar um gateway via REST normalmente, nele tem o MCP. É
+> mais simples."*
+
+Some o SDK, some o transporte, some o servidor MCP, e some a pergunta que travava
+a rodada. **E não é arquitetura nova: é a que o produto já usava duas vezes**, e
+estava escrita desde a SPEC-49 no comentário do adaptador de exportação —
+*"o produto chama um endereço configurável (bridge de MCP, n8n, função interna) e
+quem sabe criar issue é quem está do outro lado."*
+
+O gateway de IA é um endereço. O exportador é um endereço. Este é o terceiro. A
+única razão de eu ter inventado complexidade foi ler "MCP" como implementação em
+vez de como **o que está do outro lado do endereço**.
+
+E a segunda correção mudou a forma do dado:
+
+> *"pode ter diferentes rotas, pode ser mais de um endpoint: um do gateway
+> configurado para falar com o MCP do Jira, outro para agentes, e outro para
+> Confluence."*
+
+Não é um gateway com N operações — é **N endereços**. Por isso `destinos` é
+lista, e não `Record<operacao, destino>`: o mapa caberia em um por operação, e
+nada garante que a casa tenha um só (dois trackers numa migração, dois espaços de
+documentação). Lista degrada para um-por-operação sem migração; o contrário
+exigiria uma.
+
+### O que ficou pronto
+
+**A configuração** (fatia A) — quatro operações num conjunto fechado, herança de
+cabeçalhos com *declarado vence herdado* (§306), e a garantia que mais importa:
+**quem já configurou exportação não reconfigura nada.** O `endpoint` de topo
+continua sendo o destino de itens, e entra na lista resolvida como se sempre
+tivesse estado lá.
+
+**Ler ADR** (fatia C). E o achado que barateou tudo: **o produto já produz ADR** —
+`Decisao` tem contexto, alternativas, escolhida, porque, status e
+`substituidaPor`, que é o ciclo de vida do ADR, mais duas coisas que um ADR comum
+não tem (a âncora no elemento e o vínculo com o ensaio). A palavra só existia em
+comentário.
+
+**Publicar o documento** (fatia B), com porta própria e não parâmetro do
+`exportar(itens)` — os dois diferem em ciclo de vida, idempotência, modo de falhar
+e permissão, e um parâmetro a mais faria a porta mentir sobre os quatro.
+
+**Escrever ADR de volta** (fatia E) e **orientar o desenho pelas decisões da casa**
+(fatia D).
+
+### Quatro decisões que o código teve que tomar, e o motivo de cada uma
+
+**`extraido` em vez de um valor novo em `Origem`.** A união atravessa o produto
+inteiro, e `extraido` já significa exatamente isto. O que faltava era **qual**
+fonte — virou `Decisao.importadoDe`. Mesma escolha que a SPEC-74 fez com o
+`MARCA_SIMULADO`: marca, não valor novo na união.
+
+**Status nunca sobe de força.** Um status que a casa chame de outra coisa vira
+`proposta`, o mais fraco dos três. Presumir "aceita" daria peso a uma decisão que
+ninguém aqui conferiu.
+
+**Nada é inventado na importação.** Campo que a casa não registrou fica vazio e
+vira lacuna contável — é a régua da SPEC-80 §2 aplicada a dado alheio. ADR pobre
+é o caso comum, e preenchê-lo com texto plausível produziria decisão com
+aparência de fundamentada e conteúdo nenhum.
+
+**Modos de falhar opostos, de propósito.** Ler ADR **degrada para lista vazia**:
+repositório de decisões fora do ar não pode impedir alguém de desenhar. Publicar
+documento **estoura**: "publicou pela metade" não existe, e engolir a falha faria
+a pessoa achar que a página está lá. E resposta 200 sem link também estoura —
+publicação que ninguém consegue conferir não aconteceu.
+
+### O teste que amarra as duas pontas
+
+O ciclo do ADR **não pode se morder**: o que entra importado não volta. Sem essa
+trava, cada importação seguida de publicação criaria uma cópia da decisão da casa
+dentro da casa, com outro identificador — e mais uma a cada rodada. `importadoDe`
+é o campo que torna isso verificável em vez de convencional.
+
+### O que NÃO ficou pronto, e por quê
+
+A **fatia F** (ler arquitetura de negócio) fica. Não é falta de tempo: a §7 da
+própria SPEC recomenda *"fazer A→E, e só então perguntar a quem usa"* — ela
+depende de a organização ter arquitetura de negócio em formato legível, e **não
+temos medição disso**.
+
+E o que existe é porta e adaptador: **falta a tela**. Configurar destinos e
+apertar "publicar" ainda não tem por onde, do mesmo jeito que a SPEC-79 entregou
+a régua antes da aba. É a próxima rodada, e está dito aqui para não parecer
+entregue.
+
+574 engine · 133 llm · 113 aplicação · 813 web · 267 server · 39 gateway-falso ·
+104/104 E2E · build, typecheck e lint limpos.

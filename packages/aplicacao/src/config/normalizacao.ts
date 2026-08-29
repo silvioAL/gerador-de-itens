@@ -134,18 +134,144 @@ export interface ConfigExportador {
   rotulo: string;
   /** Token/autenticação do agente — cabeçalhos livres, como o gateway de IA. */
   cabecalhos: Record<string, string>;
+  /**
+   * SPEC-81 — os demais destinos, e eles são uma LISTA.
+   *
+   * Não é "um gateway com N operações": é **N endereços**, cada um podendo
+   * estar na frente de um MCP diferente. Um gateway configurado para falar com
+   * o MCP do Jira; outro para o do Confluence; outro para os agentes da casa.
+   * Rotas diferentes, payloads diferentes, autenticações possivelmente
+   * diferentes.
+   *
+   * Lista e não `Record<operacao, destino>` porque o mapa **cabe em um por
+   * operação**, e nada garante que a organização tenha um só — dois trackers em
+   * migração, dois espaços de documentação por unidade de negócio. Lista degrada
+   * para um-por-operação sem migração; o contrário exigiria uma.
+   *
+   * O `endpoint` de topo continua sendo o dos itens: quem já configurou
+   * exportação não reconfigura nada.
+   */
+  destinos?: DestinoDoGateway[];
+}
+
+/**
+ * SPEC-81 §1.1 — o que o produto sabe MANDAR, e são coisas diferentes porque
+ * diferem em ciclo de vida, idempotência, modo de falhar e permissão.
+ *
+ * O destino declara qual é a sua: sem isso o produto teria um endereço e nenhuma
+ * ideia de que payload montar. É o `operacao` que torna a lista utilizável — um
+ * endereço sem propósito declarado é um endereço que ninguém consegue chamar.
+ */
+export const OPERACOES_DO_GATEWAY = ["itens", "documento", "adr", "arquiteturaDeNegocio"] as const;
+export type OperacaoDoGateway = (typeof OPERACOES_DO_GATEWAY)[number];
+
+export interface DestinoDoGateway {
+  /** Estável, e é por ele que a tela lembra qual destino foi escolhido. */
+  id: string;
+  /** O que o produto manda (ou busca) aqui. */
+  operacao: OperacaoDoGateway;
+  endpoint: string;
+  /** Como se chama para quem lê a tela: "Confluence de Engenharia". */
+  rotulo: string;
+  /**
+   * Ausente = usa os cabeçalhos compartilhados.
+   *
+   * **Declarado vence herdado** (§306, reafirmado pela SPEC-77): a organização
+   * com um gateway só configura a autenticação uma vez; a que aponta para três
+   * MCPs distintos declara por destino, e a tela diz qual é qual.
+   */
+  cabecalhos?: Record<string, string>;
+}
+
+function normalizarCabecalhos(bruto: unknown): Record<string, string> | undefined {
+  if (!bruto || typeof bruto !== "object") return undefined;
+  return Object.fromEntries(Object.entries(bruto as Record<string, unknown>).map(([k, v]) => [k, String(v)]));
 }
 
 export function normalizarExportador(documento: unknown): ConfigExportador {
   const bruto = (documento ?? {}) as Partial<ConfigExportador>;
+  const operacoesValidas: readonly string[] = OPERACOES_DO_GATEWAY;
+
+  const destinos: DestinoDoGateway[] = [];
+  const idsVistos = new Set<string>();
+  for (const cru of Array.isArray(bruto.destinos) ? bruto.destinos : []) {
+    if (!cru || typeof cru !== "object") continue;
+    const endpoint = typeof cru.endpoint === "string" ? cru.endpoint.trim() : "";
+    const id = typeof cru.id === "string" ? cru.id.trim() : "";
+    // Três razões de descartar, e as três são a mesma: o que sobra não dá para
+    // chamar. Endereço vazio não tem para onde ir; operação desconhecida não
+    // tem payload que o produto saiba montar; id repetido faria a tela guardar
+    // uma escolha que aponta para dois destinos.
+    if (!endpoint || !id || idsVistos.has(id)) continue;
+    if (!operacoesValidas.includes(cru.operacao as string)) continue;
+    idsVistos.add(id);
+    const cabecalhos = normalizarCabecalhos(cru.cabecalhos);
+    destinos.push({
+      id,
+      operacao: cru.operacao,
+      endpoint,
+      rotulo: typeof cru.rotulo === "string" ? cru.rotulo.trim() : "",
+      ...(cabecalhos ? { cabecalhos } : {}),
+    });
+  }
+
   return {
     endpoint: typeof bruto.endpoint === "string" ? bruto.endpoint.trim() : "",
     rotulo: typeof bruto.rotulo === "string" ? bruto.rotulo.trim() : "",
-    cabecalhos:
-      bruto.cabecalhos && typeof bruto.cabecalhos === "object"
-        ? Object.fromEntries(Object.entries(bruto.cabecalhos).map(([k, v]) => [k, String(v)]))
-        : {},
+    cabecalhos: normalizarCabecalhos(bruto.cabecalhos) ?? {},
+    ...(destinos.length > 0 ? { destinos } : {}),
   };
+}
+
+/** Um destino com os cabeçalhos já resolvidos — é o que o adaptador chama. */
+export interface DestinoResolvido {
+  id: string;
+  operacao: OperacaoDoGateway;
+  endpoint: string;
+  rotulo: string;
+  cabecalhos: Record<string, string>;
+}
+
+/**
+ * Os destinos de uma operação, com a herança de cabeçalhos já aplicada.
+ *
+ * Devolve **lista**, e não o primeiro: a organização pode ter dois trackers numa
+ * migração ou dois espaços de documentação. Quem chama decide — e a tela, tendo
+ * mais de um, pergunta em vez de escolher sozinha. Escolher por ela publicaria
+ * no lugar errado em silêncio, que é o pior desfecho de uma publicação.
+ *
+ * Mora aqui, e não na tela nem no adaptador, pela razão de sempre (§263): a tela
+ * precisa saber se oferece o botão e o adaptador precisa saber para onde mandar.
+ * Duas leituras da mesma pergunta divergem na primeira mudança, e esta
+ * divergência seria muda — o botão apareceria e a chamada iria para outro lugar.
+ */
+export function destinosDaOperacao(config: ConfigExportador, operacao: OperacaoDoGateway): DestinoResolvido[] {
+  const daLista = (config.destinos ?? [])
+    .filter((d) => d.operacao === operacao)
+    .map((d) => ({
+      id: d.id,
+      operacao: d.operacao,
+      endpoint: d.endpoint,
+      rotulo: d.rotulo,
+      cabecalhos: d.cabecalhos ?? config.cabecalhos,
+    }));
+
+  /**
+   * O `endpoint` de topo é o destino de ITENS de quem configurou antes da
+   * SPEC-81, e continua valendo sem migração nenhuma. Entra no fim: se a
+   * organização declarou destinos de item na lista, os dela vêm primeiro.
+   */
+  if (operacao === "itens" && config.endpoint) {
+    daLista.push({
+      id: "exportador",
+      operacao: "itens",
+      endpoint: config.endpoint,
+      rotulo: config.rotulo,
+      cabecalhos: config.cabecalhos,
+    });
+  }
+
+  return daLista;
 }
 
 /** O portão de escrita por chave — chamado só no `salvar` dos casos de uso. */
