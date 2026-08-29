@@ -12817,3 +12817,52 @@ Duas recusas novas: **afirmar organização de checklist por domínio de negóci
 (os treze contextos semeados são todos técnicos — gap real, virou a pergunta 5 e
 talvez uma SPEC-84) e **reduzir "negócio" a diagrama de domínio**, que foi
 exatamente o erro desta rodada.
+
+### Adendo 5 — o eixo que falta é o produto, e o diagrama que conecta
+
+Segunda correção do usuário, e mais precisa que a minha:
+
+> *"na realidade acho que o que tem é checklist **por processo**, mas uma das
+> demandas que precisamos atender também é **estender para produto**."*
+
+Medido, e é exatamente isso. O que existe é `checklistProcesso: ItemProcesso[]`,
+ao lado do técnico — o §20 já os separava —, escopado por **time → tech →
+contexto → condição por nó**. Quatro eixos, e nenhum é o produto.
+
+O bloqueio é concreto, e tem uma simetria que só apareceu porque as duas
+medições ficaram lado a lado:
+
+```
+config_documentos_chave_unica        UNIQUE (chave, time_id)   -- as regras
+especificacao_templates_chave_unica  UNIQUE (time_id)          -- os templates
+```
+
+**Duas tabelas de configuração, o mesmo bloqueio: o índice para no time.** A
+SPEC-80 já vai mexer no segundo para caber N tipos de artefato; estender o
+primeiro ao produto é a mesma classe de migração.
+
+E o caminho já está pavimentado: **a SPEC-77 construiu essa escada para
+volumetria** — o produto declara, a demanda herda, *declarado vence herdado* e a
+tela diz qual é qual (§306). Estender checklist ao produto é a **mesma escada
+aplicada a regra**. Virou a pergunta 5 da SPEC-83, com recomendação de SPEC-84.
+
+Corrigida também a recusa que eu tinha escrito errado duas vezes: não é "afirmar
+organização por domínio de negócio", é **afirmar checklist por produto** — que é
+demanda reconhecida, e até existir a página não anuncia.
+
+### O quinto diagrama, e a régua que impede o álbum
+
+> *"se faz necessário também escrever na página diagrama mostrando tudo isso se
+> conectando."*
+
+Entra o **mapa que conecta tudo**: a informação de produto e o processo
+configurado alimentando o desenho; o desenho produzindo apontamentos; os
+apontamentos virando itens, documento e spec; a spec indo para o desenvolvimento
+com IA; e o uso voltando como ajuste da configuração. **A IA aparece em cada
+aresta**, e a volta fecha no ponto de partida.
+
+Ele é o **diagrama-herói**, e os outros quatro viram apoio. Mas cinco diagramas
+numa página é muito, e ninguém lê cinco — então a régua ficou declarada na SPEC:
+**um é a manchete visual, os outros aparecem quando a seção deles chega.** Sem
+isso a página vira álbum de diagramas, que é a versão gráfica exata do problema
+que esta SPEC existe para consertar: conteúdo certo, repetido, sem hierarquia.

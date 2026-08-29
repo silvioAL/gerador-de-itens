@@ -356,17 +356,38 @@ O processo de especificação da casa, atravessando as quatro camadas:
 conversas, e passa a ser configuração versionada, medida e evoluída — com a IA
 ajudando em cada passo, inclusive no passo de melhorar a própria configuração.**
 
-#### Um gap relacionado, que a página não pode disfarçar
+#### O eixo que falta: o checklist é por processo, e precisa alcançar o produto
 
-Os treze `contextos` de `app.example.json` são **todos técnicos** — começam com
-`Backend-`, `Mobile-` ou `Frontend`. Um checklist contextual "por processo de
-negócio" sai hoje por **convenção de nome** (`Credito-regras`), não por
-estrutura: o campo é string livre, então nada impede dois times de grafarem o
-mesmo domínio de dois jeitos.
+> *"na realidade acho que o que tem é checklist **por processo**, mas uma das
+> demandas que precisamos atender também é **estender para produto**."* — o
+> usuário, corrigindo de novo, e com precisão.
 
-> Achado desta rodada, não estava em SPEC nenhuma. A página descreve o
-> conceito aplicado ao processo de construção — o que é verdade — e **não** afirma
-> que o produto organiza checklist por domínio de negócio. Ver §10, pergunta 5.
+Medido, e é isso mesmo. O que existe é o **checklist de processo**
+(`checklistProcesso: ItemProcesso[]`), ao lado do técnico — o §20 já os separava
+— escopado por **time → tech → contexto → condição por nó**. Quatro eixos, e
+**nenhum deles é o produto.**
+
+O bloqueio é concreto, e tem uma simetria que vale registrar:
+
+```
+config_documentos_chave_unica  UNIQUE (chave, time_id)   -- as regras
+especificacao_templates_chave_unica  UNIQUE (time_id)    -- os templates (SPEC-80)
+```
+
+**Duas tabelas de configuração, o mesmo bloqueio: o índice para no time.** A
+SPEC-80 já vai mexer no segundo para caber N tipos de artefato; estender o
+primeiro para o produto é o mesmo tipo de migração.
+
+E o caminho já está aberto: **a SPEC-77 acabou de construir essa escada para
+volumetria** — `Produto.volumetria` herdada pela demanda, com *declarado vence
+herdado* e a tela dizendo qual é qual (§306). Estender checklist ao produto é a
+**mesma escada aplicada a regra**: o produto declara o que sempre vale para ele,
+a demanda herda, e quem discorda declara e aparece.
+
+> Achado desta rodada, não estava em SPEC nenhuma. **Provavelmente é a SPEC-84**
+> (§10, pergunta 5). O que esta SPEC assume: a página descreve o conceito aplicado
+> ao processo de construção — verdade, e medida acima — e **não** afirma que
+> checklist se organiza por produto, porque hoje não se organiza.
 
 #### A IA no centro, dita pelo lado positivo
 
@@ -403,9 +424,22 @@ e nenhum decorativo:
    que ele significa, e não só com o que ele lista.
 4. **O processo de construção atravessando as camadas** (§2.6) — o jeito da casa
    de especificar software descendo pelas quatro, com a IA em cada passo,
-   **inclusive no de melhorar a própria configuração**. É o único dos quatro que
-   mostra o **trabalho de quem chega**, e provavelmente o que mais convence: os
-   outros três explicam o produto, este mostra o problema do leitor já resolvido.
+   **inclusive no de melhorar a própria configuração**. É o que mostra o
+   **trabalho de quem chega**, e provavelmente o que mais convence: os outros
+   explicam o produto, este mostra o problema do leitor já resolvido.
+5. **O mapa que conecta tudo** — pedido explícito: *"se faz necessário também
+   escrever na página diagrama mostrando tudo isso se conectando."* É o único
+   que mostra o sistema **inteiro ligado**: a informação de produto e o processo
+   configurado alimentando o desenho; o desenho produzindo apontamentos; os
+   apontamentos virando itens, documento e spec; a spec indo para o
+   desenvolvimento com IA; e o uso voltando como ajuste da configuração. A IA
+   aparece **em cada aresta**, e a volta fecha no ponto de partida.
+
+   > **Este é o diagrama-herói**, e os quatro anteriores são apoio. Cinco
+   > diagramas numa página é muito, e ninguém lê cinco — a régua tem que ser
+   > declarada: **um é a manchete visual, os outros aparecem quando a seção deles
+   > chega.** Sem isso, a página vira álbum de diagramas, que é a versão gráfica
+   > exata do problema que esta SPEC existe para consertar.
 
 A régua para os três, herdada da SPEC-82: **dirigidos pelos mesmos dados da
 página, para que não consigam mentir.** Um diagrama de camadas que liste uma
@@ -491,10 +525,9 @@ de benefícios num produto cuja tese é que promessa não confirmada não conta.
 de processo*, *governança executável* são palavras fortes, e palavra forte sem
 código atrás é jargão. Cada uma aponta para onde vive — ou sai.
 
-**Afirmar organização de checklist por domínio de negócio.** A §2.6 mediu: os
-contextos semeados são todos técnicos. A página descreve o conceito aplicado ao
-processo de construção — verdade — e não diz que o produto organiza o trabalho por
-domínio, que não é.
+**Afirmar checklist por produto.** A §2.6 mediu: o checklist é de **processo**,
+escopado por time → tech → contexto → nó. Estender ao produto é demanda
+reconhecida (§10, pergunta 5) — e até existir, a página não a anuncia.
 
 **Reduzir "negócio" a diagrama de domínio.** Foi o erro da primeira versão desta
 seção: ler *negócio* como `fico`/`camunda` — o **assunto** que a ferramenta ajuda
@@ -567,13 +600,14 @@ leitor que esta página quer.
    pé.
 4. **A landing precisa de rota própria?** Ela é renderizada em `App.tsx` **antes**
    de qualquer roteador; seções linkáveis viram trabalho real. Medir na fatia D.
-5. **O eixo de domínio de negócio deveria existir como modelo?** Achado da §2.6:
-   os treze `contextos` semeados são todos técnicos. Um checklist contextual "por
-   processo de negócio" sai por convenção de nome, não por estrutura — nada impede
-   dois times de grafarem o mesmo domínio de dois jeitos. **Talvez seja uma
-   SPEC-84**, e é decisão do usuário, não desta SPEC. O que esta assume: a página
-   descreve o conceito aplicado ao **processo de construção** (verdade, e medida
-   na §2.6) e **não** afirma organização de checklist por domínio de negócio.
+5. **Quando o checklist alcança o produto?** Achado da §2.6, e o usuário já o
+   nomeou como demanda: o que existe é checklist **de processo**, escopado por
+   time → tech → contexto → nó, e **falta o eixo do produto**. O bloqueio é o
+   índice `(chave, time_id)` de `config_documentos`, irmão do que a SPEC-80 vai
+   mexer em `especificacao_templates`. A escada já existe: a **SPEC-77** fez
+   exatamente isso para volumetria (*declarado vence herdado, e a tela diz qual é
+   qual*). **Provavelmente é a SPEC-84**, e é decisão do usuário — esta SPEC só
+   garante que a página não afirme o que ainda não existe.
 6. **O `CONCEITO.md` deveria ser publicado como página?** Se ele é a fonte
    canônica, uma versão navegável evita que a landing tente ser o documento
    inteiro — que é como ela virou uma coluna de 760 px.
