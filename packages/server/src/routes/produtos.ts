@@ -1,8 +1,16 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { criarCasosDeUsoDeProdutos } from "@gerador/aplicacao";
+import {
+  criarCasosDeUsoDeConfig,
+  criarCasosDeUsoDeProdutos,
+  destinosDaOperacao,
+  normalizarExportador,
+  propostaDeArquitetura,
+} from "@gerador/aplicacao";
 import type { OpcoesApp } from "../app.js";
 import { criarRepositorioDeProdutosEmPostgres } from "../adaptadores/produtosEmPostgres.js";
+import { criarRepositorioDeConfigEmPostgres } from "../adaptadores/configEmPostgres.js";
+import { criarLeitorDeArquiteturaViaGateway } from "../adaptadores/gatewayDoTime.js";
 import { exigirSessao } from "../auth/middleware.js";
 import { exigirPermissao, organizacaoPadraoDe } from "../auth/permissoes.js";
 import { registrarAuditoria } from "../auditoria.js";
@@ -111,6 +119,54 @@ export async function registrarRotasProdutos(app: FastifyInstance, { db }: Opcoe
     if (!produto) return reply.code(404).send({ erro: "produto não encontrado" });
     registrarAuditoria(db, { email: req.usuario!.email, acao: "atualizar", recurso: "produtos", recursoId: id });
     return produto;
+  });
+
+  /**
+   * SPEC-81 fatia F — **traz a arquitetura de negócio da casa como PROPOSTA.**
+   *
+   * ## Por que ela não escreve nada
+   *
+   * `Produto` não tem onde guardar de onde um texto veio: `objetivo` é uma
+   * `string`, não um `ValorSpec`. Escrever aqui faria texto de terceiro ficar
+   * indistinguível do que alguém desta casa digitou.
+   *
+   * A rota **lê e compara**. Quem escreve continua sendo o `PUT /produtos/:id`,
+   * com o texto que a pessoa aceitou — o mesmo caminho de sempre, com a mesma
+   * auditoria. Nada de novo grava, e por isso nada de novo pode apagar.
+   *
+   * É `POST` e não `GET` porque ela **chama um sistema externo**: não é cacheável,
+   * não é idempotente do ponto de vista do gateway, e um `GET` convidaria
+   * navegador e proxy a repeti-la sozinhos.
+   */
+  app.post("/produtos/:id/arquitetura/importar", { preHandler: podeEditar }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const produto = await casos.obter(id);
+    if (!produto) return reply.code(404).send({ erro: "produto não encontrado" });
+
+    const config = normalizarExportador(
+      (
+        await criarCasosDeUsoDeConfig(criarRepositorioDeConfigEmPostgres(db)).obter("exportador", {
+          endpoint: "",
+          rotulo: "",
+          cabecalhos: {},
+        })
+      ).documento
+    );
+    const destinos = destinosDaOperacao(config, "arquiteturaDeNegocio");
+    if (destinos.length === 0) {
+      return reply.code(409).send({
+        erro: "nenhum destino de arquitetura de negócio configurado — cadastre o endereço em Configurações → Exportação, em “Outros destinos”",
+      });
+    }
+
+    const externa = await criarLeitorDeArquiteturaViaGateway(destinos[0]).ler();
+    // `undefined` não é erro: o gateway respondeu e não tinha nada, ou está
+    // fora do ar. Nos dois casos a resposta é uma proposta vazia, e a tela diz
+    // isso — em vez de um 500 que manda a pessoa procurar defeito onde não há.
+    return {
+      ...propostaDeArquitetura(externa, produto),
+      origem: destinos[0].rotulo || destinos[0].endpoint,
+    };
   });
 
   app.post("/produtos/:id/glossario", { preHandler: podeEditar }, async (req, reply) => {

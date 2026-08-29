@@ -1,4 +1,5 @@
 import type { ExecucaoDoPapel } from "@gerador/aplicacao";
+import type { PropostaDeArquitetura } from "@gerador/aplicacao";
 import type { AnexoDeContexto, CenarioDeLentidao, VolumetriaDoProduto, Decisao, Diagrama, ArtefatosEscritos, ExcecaoDePadrao, LeituraDispensada, Necessidade, OperacaoDeAjuste, PerfisConfig, Percurso, Quebra, RegrasConfig, StatusDocumento, TokensConfig, ValorSpec, VolumetriaDaDemanda } from "@gerador/engine";
 
 /**
@@ -284,6 +285,23 @@ export const apiQuebras = {
    * quando há mais de um destino configurado — e nesse caso o servidor recusa
    * escolher sozinho, devolvendo a lista.
    */
+  /**
+   * SPEC-81 fatia C — os ADRs da casa, já marcados como importados.
+   *
+   * Não grava: devolve as decisões convertidas (`origem: "extraido"` +
+   * `importadoDe`) com as lacunas de cada uma. Quem escolhe o que entra é a
+   * pessoa, e o `atualizar` acima é quem leva as escolhidas.
+   *
+   * **Falta a tela.** Um ADR importado nasce SEM âncora — a âncora nasce quando
+   * o desenho nasce dele (fatia D) —, e hoje as decisões só são editadas por
+   * nó, em `DecisoesDoNo`. Onde mora uma decisão sem nó é decisão de produto, e
+   * está registrada no §325 em vez de resolvida por conta própria.
+   */
+  importarAdr: (id: string) =>
+    requisitar<{ decisoes: { decisao: Decisao; lacunas: string[] }[]; origem: string }>(
+      `/quebras/${id}/adr/importar`,
+      { method: "POST" }
+    ),
   publicarDocumento: (id: string, corpo: { markdown: string; desatualizado: boolean; destinoId?: string }) =>
     requisitar<{ linkExterno: string; atualizada: boolean; destino: string }>(`/quebras/${id}/documento/publicar`, {
       method: "POST",
@@ -1190,6 +1208,15 @@ export const apiProdutos = {
     requisitar<Produto>(`/produtos/${id}`, { method: "PUT", body: JSON.stringify(dados) }),
   definirTimes: (id: string, timeIds: string[]) =>
     requisitar<Produto>(`/produtos/${id}/times`, { method: "PUT", body: JSON.stringify({ timeIds }) }),
+  /**
+   * SPEC-81 fatia F — a arquitetura de negócio da casa, como PROPOSTA.
+   *
+   * Não grava nada: devolve o que veio e o que já está aqui, campo a campo.
+   * Quem escreve continua sendo o `atualizar` acima, com o texto que a pessoa
+   * aceitou — o mesmo caminho de sempre, com a mesma auditoria.
+   */
+  importarArquitetura: (id: string) =>
+    requisitar<PropostaDeArquitetura & { origem: string }>(`/produtos/${id}/arquitetura/importar`, { method: "POST" }),
   salvarTermo: (id: string, termo: string, definicao: string) =>
     requisitar<TermoDeGlossario>(`/produtos/${id}/glossario`, {
       method: "POST",
