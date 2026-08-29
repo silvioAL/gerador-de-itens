@@ -13007,3 +13007,114 @@ existe/parcial/ausente do ciclo.**
 E dá à página uma honestidade que vende mais que a promessa: **"é para cá que
 isto vai, e é daqui que já estamos"** é frase em que um arquiteto de organização
 grande acredita. Cinco setas todas acesas, não.
+
+## §317 — a spec de SDD, e a SPEC que estava errada sobre si mesma (SPEC-80)
+
+Primeira das quatro rodadas de implementação sequenciadas no §316. Ela entrega o
+estágio `specs-para-ia` do ciclo, que a SPEC-75 §2 já tinha julgado como *"o
+valor maior, e a primeira coisa a fazer"*.
+
+### A correção veio antes da primeira linha de código
+
+A SPEC-80 afirmava, com SQL citado, que o bloqueio para N artefatos era o índice
+único em `time_id` de `especificacao_templates`. **É falso.** A migração **0028**
+(SPEC-47) já o derrubou e recriou como `(time_id, tipo)`, `TipoDeTemplate` já é
+união, e `obter`/`salvar` já recebem o tipo.
+
+Eu li a primeira migração da tabela e parei nela. É o mesmo erro de método que o
+§316 registrou três vezes na escrita das SPECs — e desta vez ele tinha produzido
+uma **simetria bonita e falsa**: *"duas tabelas de configuração, o mesmo bloqueio:
+o índice para no time"*, que a SPEC-83 usou como argumento. Corrigido nos dois
+lugares. Em `config_documentos` o bloqueio é real; ali não era.
+
+**O bloqueio real é do outro lado — o que se PRODUZ.** Uma coluna
+`documento_escrito`, um `DocumentoEscrito` de três chaves fixas, e o comentário
+do tipo dizendo por que são fixas. As seções que uma spec precisa — origem,
+recusas, fatias com prova — não são `visaoGeral`, `tradeOffs` nem `riscos`.
+
+### O mapa, e por que não três campos irmãos
+
+`artefatosEscritos` substitui `documentoEscrito`: um conjunto de seções **por
+artefato**, cada tipo com as **suas** chaves fixas. O mapa generaliza o
+transporte, não o conteúdo — a régua que impedia isto de virar editor de
+documento sobrevive inteira.
+
+A alternativa era `documentoEscrito` ao lado de `specEscrita` ao lado de
+`adrEscrito` (SPEC-81): o mesmo tratamento repetido três vezes nos cinco funis
+do §310. É o §263, e a SPEC-77 já pagou para desfazer isso em caso menor. E não
+é especulação — os três tipos já estão nomeados em SPEC escrita.
+
+### Duas provas que este repositório não tinha
+
+**A de caracterização.** `documentoNaoMuda.test.ts` congela a saída de hoje em
+snapshot de arquivo — um `.md` que dá para abrir e ler. Ele não afirma que o
+documento está certo: afirma que está **como estava**. As dezenas de asserções
+por trecho de `gerarEspecificacaoEntrega.test.ts` continuariam verdes com o
+documento estragado, porque `toContain("## Contexto")` não vê a vizinhança. Um
+espaço a mais num título derruba, verificado. E ele passou depois da mudança: **o
+documento saiu idêntico.**
+
+**A de migração, e é a primeira do repositório.** São **39 migrações e nenhuma
+testada**. Passou despercebido porque quase todas só acrescentam coluna, e
+`ADD COLUMN` errado quebra alto e na hora. Duas não são assim: a 0037 (§310, que
+converteu `anexos_contexto`) e esta.
+
+> **Conversão que erra não quebra: ela apaga.** O servidor sobe, a tela abre, e o
+> que a pessoa escreveu simplesmente não está mais lá. É o pior modo de falhar
+> que este produto tem, e é exatamente o que a SPEC-71 gastou uma rodada inteira
+> consertando.
+
+A suíte de contrato roda contra banco recém-migrado, onde **não existe linha em
+formato antigo** — ela prova que a forma nova funciona, não que a antiga chega
+nela. `artefatosEscritos.test.ts` escreve a forma antiga por SQL cru (o drizzle
+não deixaria, e é esse o ponto) e cobre os quatro casos: converte, não inventa
+artefato para quem nunca escreveu, **não aninha quando roda duas vezes**, e não
+reembrulha o que já está novo. Tirar a guarda de idempotência derruba dois.
+
+### As seções de julgamento, e por que a trava é de arquitetura
+
+A régua da SPEC-75 §2.3, executada: *origem, recusas e fatias não podem ser
+escritas pelo modelo* — porque uma spec com aparência de spec deste repositório e
+conteúdo plausível-mas-vazio é **pior que nenhuma**.
+
+Hoje isso é verdade por arquitetura, não por disciplina: a esteira escreve em
+`respostasItens[chave][campo]`, e as seções de julgamento moram em
+`artefatosEscritos.spec`. São dois caminhos que não se tocam. **E é justamente
+esse não-se-tocar que envelhece calado** — basta alguém achar razoável pedir ao
+modelo um rascunho das recusas, e é razoável à primeira vista.
+
+`gerarSpec.trava.test.ts` varre os três arquivos que orquestram IA e cobra que
+nenhum cite seção de julgamento nem alcance `artefatosEscritos`. Tem um controle
+positivo junto, porque três testes negativos ficariam verdes se o recurso inteiro
+sumisse. E diz em voz alta o que **não** dá para varrer: `origem` é palavra
+sobrecarregada aqui (`ValorSpec.origem`, `Decisao.origem`), e varrer por ela
+produziria ruído em vez de sinal.
+
+### Duas distinções que o gerador precisou fazer
+
+**Seção derivável vazia não é lacuna.** `medicao` sem nada é uma afirmação
+legítima — *o motor não apontou nada neste desenho* — e não leva marcador.
+Seção de julgamento vazia é trabalho que ninguém fez, e leva. Tratar as duas
+igual encheria a conta de lacuna falsa e ensinaria a ignorar o número, que é o
+defeito que o §311 consertou.
+
+**Chave órfã aparece marcada, não some.** Uma spec que aponta para item removido
+do desenho continua *parecendo* completa. É o mesmo envelhecimento silencioso que
+o §315 consertou no tour, agora do lado do artefato — e por isso
+`coberturaDaSpec` devolve três listas, não duas: cobertas, descobertas e órfãs.
+
+E o vínculo é `string[]` de chaves, não `Record`: a SPEC-80 §6 pergunta se
+deveria ser N-para-N e **não temos medição**. Esta forma responde 1-para-N hoje
+sem impedir a outra amanhã; o contrário exigiria migração. Fazer a escolha
+reversível é a resposta certa a uma pergunta ainda não medida.
+
+### Os testes que quebraram
+
+Sete, e todos os cinco funis do §310 cobraram — inclusive o guarda
+`keyof Quebra`, que apontou o campo novo antes de qualquer teste rodar.
+Reescritos com o motivo dito, e todos passaram a preencher os **dois** artefatos:
+um mapa que atravessasse a borda pela metade passaria batido se só o `documento`
+fosse escrito.
+
+548 engine · 133 llm · 84 aplicação · 806 web · 258 server · 39 gateway-falso ·
+104/104 E2E · build, typecheck e lint limpos.

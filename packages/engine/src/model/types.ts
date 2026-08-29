@@ -348,6 +348,21 @@ export interface SpecEscrita {
   /** O que fica verdade em cada fatia, e como se prova. Fatia sem prova
    * declarada é promessa (§248). */
   fatias?: string;
+  /**
+   * SPEC-80 fatia C — as `Atividade.chave` que esta spec cobre.
+   *
+   * Chaves e não índices, pela mesma razão da SPEC-23: a chave é estável a
+   * rederivações, e o índice não é. Uma spec que apontasse "o item 3" passaria
+   * a cobrir outro item no instante em que alguém acrescentasse um nó antes
+   * dele — e ninguém notaria.
+   *
+   * **É `string[]` e não `Record`**: a SPEC-80 §6 pergunta se o vínculo deveria
+   * ser N-para-N (várias specs por item). Não temos medição, e esta forma
+   * responde 1-para-N hoje **sem impedir** a outra amanhã — o contrário exigiria
+   * migração. Fazer a escolha reversível é a resposta certa a uma pergunta que
+   * ainda não foi medida.
+   */
+  itensCobertos?: string[];
 }
 
 /**

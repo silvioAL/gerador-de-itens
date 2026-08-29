@@ -217,6 +217,8 @@ export const corpoQuebra = z.object({
           origem: z.string().optional(),
           recusas: z.string().optional(),
           fatias: z.string().optional(),
+          /** SPEC-80 fatia C — as `Atividade.chave` que esta spec cobre. */
+          itensCobertos: z.array(z.string()).optional(),
         })
         .optional(),
     })

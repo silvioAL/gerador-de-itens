@@ -190,6 +190,23 @@ export {
   type ItemDeTrabalho,
 } from "./especificacao/gerarItensDeTrabalho.js";
 export { lacunasSemMarcador, type LacunaSemMarcador } from "./especificacao/lacunasDoDocumento.js";
+
+/** SPEC-80 — a spec de SDD como artefato do motor. */
+export {
+  coberturaDaSpec,
+  extrairVariaveisSpec,
+  gerarSpec,
+  problemasDoTemplateSpec,
+  SECOES_DE_JULGAMENTO,
+  TEMPLATE_SPEC_PADRAO,
+  VARIAVEIS_OBRIGATORIAS_SPEC,
+  VARIAVEIS_SPEC,
+  type CoberturaDaSpec,
+  type OpcoesGerarSpec,
+  type ProblemasDoTemplateSpec,
+  type SecaoDeJulgamento,
+  type VariavelSpec,
+} from "./especificacao/gerarSpec.js";
 export {
   aplicarOperacao,
   descreverOperacao,
