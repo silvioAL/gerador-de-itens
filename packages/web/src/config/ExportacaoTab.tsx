@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { OPERACOES_DO_GATEWAY, type DestinoDoGateway, type OperacaoDoGateway } from "@gerador/aplicacao";
 import { apiExportador, type ConfigExportador } from "../api/client";
 import { MarcaDeDemonstracao } from "../demo/dadosDoTour";
 
@@ -129,6 +130,12 @@ export function ExportacaoTab({ demonstracao }: ExportacaoTabProps = {}) {
         style={{ ...inputEstilo, resize: "vertical", fontFamily: "ui-monospace, monospace" }}
       />
 
+      <Destinos
+        destinos={config.destinos ?? []}
+        onMudar={(destinos) => setConfig({ ...config, destinos })}
+        somenteLeitura={!!demonstracao}
+      />
+
       {erro && <p style={{ fontSize: 12, color: "var(--vermelho)", marginTop: 8 }}>{erro}</p>}
       {salvo && !erro && <p style={{ fontSize: 12, color: "var(--verde, #3ecf8e)", marginTop: 8 }}>Destino salvo.</p>}
 
@@ -138,6 +145,130 @@ export function ExportacaoTab({ demonstracao }: ExportacaoTabProps = {}) {
     </div>
   );
 }
+
+/**
+ * SPEC-81 fatia A — **os outros destinos do gateway do time.**
+ *
+ * ## Por que uma lista, e não três campos fixos
+ *
+ * São N endereços, não um gateway com N operações: um na frente do MCP do Jira,
+ * outro do Confluence, outro dos agentes da casa. E a organização pode ter dois
+ * do mesmo tipo — dois trackers numa migração, dois espaços de documentação por
+ * unidade de negócio. Três campos fixos capariam isso.
+ *
+ * ## Por que o endereço de cima continua separado
+ *
+ * Ele é o destino de itens de quem configurou antes desta SPEC, e continua
+ * valendo sem ninguém reconfigurar nada. Puxá-lo para dentro da lista obrigaria
+ * uma migração de dado para não ganhar coisa nenhuma.
+ */
+function Destinos({
+  destinos,
+  onMudar,
+  somenteLeitura,
+}: {
+  destinos: DestinoDoGateway[];
+  onMudar: (destinos: DestinoDoGateway[]) => void;
+  somenteLeitura: boolean;
+}) {
+  function mudar(i: number, campo: keyof DestinoDoGateway, valor: string) {
+    onMudar(destinos.map((d, j) => (i === j ? { ...d, [campo]: valor } : d)));
+  }
+
+  return (
+    <section data-testid="destinos-do-gateway" style={{ marginTop: 22 }}>
+      <strong style={{ fontSize: 13, color: "var(--texto)" }}>Outros destinos</strong>
+      <p style={{ ...proseEstilo, marginTop: 6 }}>
+        O mesmo desenho serve para o resto: publicar o <strong>documento</strong> numa base de conhecimento, ler os{" "}
+        <strong>ADRs</strong> da casa e trazer a <strong>arquitetura de negócio</strong>. Cada um é um endereço, e podem
+        ser gateways diferentes — um na frente do MCP do Jira, outro do Confluence, outro dos agentes.
+      </p>
+      <p style={{ fontSize: 11, color: "var(--texto-mudo)", margin: "0 0 8px" }}>
+        Sem cabeçalhos próprios, o destino usa os de cima. Operação sem endereço não aparece na tela que a usaria.
+      </p>
+
+      {destinos.map((d, i) => (
+        <div
+          key={d.id || i}
+          data-testid={`destino-${i}`}
+          style={{ border: "1px solid var(--borda)", borderRadius: 8, padding: 10, marginBottom: 8, maxWidth: 560 }}
+        >
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ ...labelEstilo, margin: "0 0 2px" }}>O que vai por aqui</label>
+              <select
+                aria-label={`Operação do destino ${i + 1}`}
+                value={d.operacao}
+                onChange={(e) => mudar(i, "operacao", e.target.value)}
+                disabled={somenteLeitura}
+                style={{ ...inputEstilo, maxWidth: "none" }}
+              >
+                {OPERACOES_DO_GATEWAY.map((op) => (
+                  <option key={op} value={op}>
+                    {ROTULO_DA_OPERACAO[op]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={() => onMudar(destinos.filter((_, j) => j !== i))}
+              disabled={somenteLeitura}
+              aria-label={`Remover destino ${i + 1}`}
+              style={{ ...botaoPrimarioEstilo, marginTop: 0, background: "transparent", color: "var(--texto-2)", border: "1px solid var(--borda)" }}
+            >
+              remover
+            </button>
+          </div>
+
+          <label style={labelEstilo}>Endereço</label>
+          <input
+            aria-label={`Endereço do destino ${i + 1}`}
+            value={d.endpoint}
+            onChange={(e) => mudar(i, "endpoint", e.target.value)}
+            disabled={somenteLeitura}
+            placeholder="https://gateway.empresa/confluence"
+            style={inputEstilo}
+          />
+
+          <label style={labelEstilo}>Como chamar (aparece na tela)</label>
+          <input
+            aria-label={`Rótulo do destino ${i + 1}`}
+            value={d.rotulo}
+            onChange={(e) => mudar(i, "rotulo", e.target.value)}
+            disabled={somenteLeitura}
+            placeholder="ex.: Confluence de Engenharia"
+            style={inputEstilo}
+          />
+        </div>
+      ))}
+
+      <button
+        onClick={() =>
+          onMudar([
+            ...destinos,
+            // O id é estável e é por ele que a tela lembra qual destino foi
+            // escolhido quando há mais de um da mesma operação. Nasce do
+            // tamanho da lista mais o instante, porque duas adições no mesmo
+            // render colidiriam só com o tamanho.
+            { id: `destino-${destinos.length}-${Date.now()}`, operacao: "documento", endpoint: "", rotulo: "" },
+          ])
+        }
+        disabled={somenteLeitura}
+        data-testid="adicionar-destino"
+        style={{ ...botaoPrimarioEstilo, marginTop: 0, background: "transparent", color: "var(--texto)", border: "1px solid var(--borda-forte)" }}
+      >
+        + destino
+      </button>
+    </section>
+  );
+}
+
+const ROTULO_DA_OPERACAO: Record<OperacaoDoGateway, string> = {
+  itens: "Itens → issue tracker",
+  documento: "Documento de desenho → base de conhecimento",
+  adr: "ADRs da casa → ler",
+  arquiteturaDeNegocio: "Arquitetura de negócio → ler",
+};
 
 const proseEstilo: React.CSSProperties = {
   fontSize: 12.5,

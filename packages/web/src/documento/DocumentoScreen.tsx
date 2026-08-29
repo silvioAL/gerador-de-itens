@@ -72,6 +72,14 @@ export interface DocumentoScreenProps {
    * invisível é acidente. */
   lacunas?: number;
   onBaixarMarkdown: () => void;
+  /**
+   * SPEC-81 fatia B — publicar o documento na base de conhecimento.
+   *
+   * **Ausente = nenhum destino configurado**, e o botão não aparece. É a mesma
+   * disciplina da SPEC-49: oferecer um botão que falharia é pior que não
+   * oferecer, porque a pessoa descobre o problema depois de esperar.
+   */
+  onPublicar?: () => Promise<{ linkExterno: string; destino: string }>;
   onVoltar: () => void;
   /**
    * SPEC-61 §6.1 — a ESCRITA dos itens (`gerarItensDeTrabalho` → `ItemGerado`),
@@ -107,6 +115,61 @@ export interface DocumentoScreenProps {
   decisaoDoEnsaio?: (ensaioId: string) => string | undefined;
 }
 
+/**
+ * SPEC-81 fatia B — o botão de publicar, com o resultado ao lado.
+ *
+ * Componente próprio porque ele tem estado (publicando, link, erro) e a tela do
+ * documento não deveria ganhar três `useState` por causa de um botão.
+ *
+ * **O resultado fica na tela em vez de virar alerta**: a URL da página publicada
+ * é o que a pessoa vai querer copiar e mandar para alguém, e um alerta some
+ * antes disso. É a mesma escolha que a exportação de itens já fez.
+ */
+function BotaoPublicar({ onPublicar }: { onPublicar: () => Promise<{ linkExterno: string; destino: string }> }) {
+  const [publicando, setPublicando] = useState(false);
+  const [resultado, setResultado] = useState<{ linkExterno: string; destino: string } | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+
+  async function publicar() {
+    setPublicando(true);
+    setErro(null);
+    try {
+      setResultado(await onPublicar());
+    } catch (e) {
+      // O 409 de "há mais de um destino" chega aqui como mensagem: a escolha
+      // entre dois espaços de documentação é da pessoa, e o servidor recusa
+      // escolher por ela.
+      setErro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPublicando(false);
+    }
+  }
+
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+      <button onClick={() => void publicar()} disabled={publicando} style={botaoEstilo} data-testid="publicar-documento">
+        {publicando ? "publicando…" : "↗ Publicar"}
+      </button>
+      {resultado && (
+        <a
+          href={resultado.linkExterno}
+          target="_blank"
+          rel="noreferrer"
+          data-testid="documento-publicado"
+          style={{ fontSize: 11.5, color: "var(--acento)" }}
+        >
+          publicado em {resultado.destino} ↗
+        </a>
+      )}
+      {erro && (
+        <span data-testid="erro-ao-publicar" style={{ fontSize: 11.5, color: "var(--vermelho)", maxWidth: 320 }}>
+          {erro}
+        </span>
+      )}
+    </span>
+  );
+}
+
 const ROTULO_STATUS: Record<StatusDocumento, string> = {
   rascunho: "rascunho",
   "em-revisao": "em revisão",
@@ -127,6 +190,7 @@ export function DocumentoScreen({
   mudancasDesdeAprovacao,
   lacunas,
   onBaixarMarkdown,
+  onPublicar,
   onVoltar,
   itensEscritos,
   onRevisarItem,
@@ -166,6 +230,14 @@ export function DocumentoScreen({
         <button onClick={onBaixarMarkdown} style={botaoEstilo} data-testid="baixar-markdown">
           ⬇ Markdown
         </button>
+        {/**
+         * SPEC-81 fatia B — publicar na base de conhecimento da casa.
+         *
+         * Só aparece quando há para onde publicar: `onPublicar` ausente = nenhum
+         * destino de documento configurado, e a mesma disciplina da SPEC-49 vale
+         * aqui — botão que falharia não se oferece.
+         */}
+        {onPublicar && <BotaoPublicar onPublicar={onPublicar} />}
       </header>
 
       <article style={folhaEstilo}>
