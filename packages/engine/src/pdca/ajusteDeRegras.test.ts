@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RegrasConfig } from "../config/types.js";
+import type { OperacaoDeAjuste } from "./ajusteDeRegras.js";
 import {
   aplicarOperacao,
   aplicarOperacaoNoPipeline,
@@ -41,7 +42,7 @@ describe("ajusteDeRegras (SPEC-45 — o ajuste como dado)", () => {
   });
 
   it("adicionar o MESMO texto duas vezes não duplica — duas aprovações parecidas não sujam o checklist", () => {
-    const op = { tipo: "adicionar-checklist", tech: "Backend", contextos: [], texto: "Política de DLQ definida" } as const;
+    const op: OperacaoDeAjuste = { tipo: "adicionar-checklist", tech: "Backend", contextos: [], texto: "Política de DLQ definida" };
     const uma = aplicarOperacao(base, op);
     const duas = aplicarOperacao(uma, op);
     expect(duas.porTech.Backend.checklistTecnico).toHaveLength(2);
@@ -90,7 +91,7 @@ describe("ajusteDeRegras (SPEC-45 — o ajuste como dado)", () => {
   });
 
   it("SPEC-46 — sem `secao`, continua sendo o checklist técnico: pedido antigo segue aplicável", () => {
-    const op = { tipo: "adicionar-checklist", tech: "Backend", contextos: [], texto: "X" } as const;
+    const op: OperacaoDeAjuste = { tipo: "adicionar-checklist", tech: "Backend", contextos: [], texto: "X" };
     expect(secaoDaOperacao(op)).toBe("checklistTecnico");
     expect(aplicarOperacao(base, op).porTech.Backend.checklistTecnico).toHaveLength(2);
   });
@@ -308,7 +309,7 @@ describe("o alvo e a descrição das operações de campo (SPEC-52)", () => {
   });
 
   it("aplicar uma operação de campo nas REGRAS é no-op — cada documento tem seu caminho", () => {
-    const regras: RegrasConfig = { porTech: { Java: { checklistTecnico: [{ texto: "x", contextos: [] }], testes: [] } } };
+    const regras: RegrasConfig = { tipos: [], tamanhos: [], porTech: { Java: { checklistTecnico: [{ texto: "x", contextos: [] }], testes: [] } } };
     expect(aplicarOperacao(regras, { tipo: "remover-campo-no", tipoNo: "service", key: "sla" })).toEqual(regras);
   });
 });

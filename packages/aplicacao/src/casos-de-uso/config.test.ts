@@ -17,7 +17,7 @@ function repoCom(documento: unknown): RepositorioDeConfig {
     async obter() {
       return documento === null
         ? null
-        : ({ chave: "regras", timeId: CAMPO_GLOBAL, documento, versaoTemplate: null, atualizadoEm: null } as DocumentoConfig);
+        : ({ chave: "regras", timeId: CAMPO_GLOBAL, documento, versaoTemplate: null, atualizadoEm: null } as unknown as DocumentoConfig);
     },
     async salvar() {
       throw new Error("não usado neste teste");

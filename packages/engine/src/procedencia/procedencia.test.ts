@@ -13,6 +13,8 @@ const diagrama = (timeout = "300ms"): Diagrama => ({
     {
       id: "n1",
       type: "service",
+      status: "novo",
+      specNA: {},
       label: "srv-checkout",
       x: 0,
       y: 0,
@@ -25,6 +27,8 @@ const diagrama = (timeout = "300ms"): Diagrama => ({
     {
       id: "n2",
       type: "service",
+      status: "novo",
+      specNA: {},
       label: "srv-fidelidade",
       x: 200,
       y: 0,

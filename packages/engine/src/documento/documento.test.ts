@@ -87,6 +87,8 @@ describe("a faixa de saúde, em dois lados", () => {
 
   it("a exceção aceita fica do lado do que JÁ TEM — ela é escolha com motivo, não violação menor", () => {
     const regras: RegrasConfig = {
+  tipos: [],
+  tamanhos: [],
       porTech: {
         Backend: {
           checklistTecnico: [

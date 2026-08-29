@@ -29,9 +29,12 @@ const config: DiagramaConfig = {
 };
 
 const regras: RegrasConfig = {
+  tipos: [],
+  tamanhos: [],
   porTech: {
     Backend: {
       checklistTecnico: [{ texto: "Logs relevantes emitidos", contextos: ["Backend-dados"] }],
+      testes: [],
     },
   },
 };
@@ -39,8 +42,8 @@ const regras: RegrasConfig = {
 function diagramaBase(): Diagrama {
   return {
     nodes: [
-      { id: "n1", type: "service", status: "novo", label: "srv-catalogo", x: 0, y: 0, spec: { nome: { valor: "srv-catalogo", origem: "manual" } } },
-      { id: "n2", type: "mongo", status: "novo", label: "produtos", x: 0, y: 0, spec: { collection: { valor: "produtos", origem: "manual" } } },
+      { id: "n1", type: "service", status: "novo", label: "srv-catalogo", x: 0, y: 0, spec: { nome: { valor: "srv-catalogo", origem: "manual" } }, specNA: {} },
+      { id: "n2", type: "mongo", status: "novo", label: "produtos", x: 0, y: 0, spec: { collection: { valor: "produtos", origem: "manual" } }, specNA: {} },
     ],
     edges: [{ id: "e1", source: "n1", target: "n2", type: "writes" }],
   };

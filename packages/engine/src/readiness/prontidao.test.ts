@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { FieldSpec, No } from "../model/types.js";
+import type { No } from "../model/types.js";
+import type { FieldSpec } from "../config/types.js";
 import { calcularProntidao } from "./prontidao.js";
 
 const spec: FieldSpec[] = [{ key: "nome", label: "Nome", type: "text", required: true }];
