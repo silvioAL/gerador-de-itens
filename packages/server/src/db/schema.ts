@@ -48,7 +48,12 @@ export const quebras = pgTable("quebras", {
   excecoes: jsonb("excecoes").notNull().default([]),
   decisoes: jsonb("decisoes").notNull().default([]),
   percursos: jsonb("percursos").notNull().default([]),
-  documentoEscrito: jsonb("documento_escrito").notNull().default({}),
+  /**
+   * SPEC-80 fatia A — passou a guardar um conjunto de secoes POR artefato
+   * (`{ documento: {...}, spec: {...} }`). A coluna manteve o nome: renomear
+   * custa migracao e nao compra nada.
+   */
+  artefatosEscritos: jsonb("documento_escrito").notNull().default({}),
   documentoStatus: text("documento_status"),
   /**
    * SPEC-71 (migração 0037) — os três campos que existiam no tipo e não tinham

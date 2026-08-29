@@ -3,7 +3,7 @@ import type {
   CenarioDeLentidao,
   Decisao,
   Diagrama,
-  DocumentoEscrito,
+  ArtefatosEscritos,
   ExcecaoDePadrao,
   LeituraDispensada,
   Necessidade,
@@ -61,8 +61,9 @@ export interface QuebraSalva {
   decisoes?: Decisao[];
   /** SPEC-57 fatia E — os caminhos CONFIRMADOS. A inferência não se guarda. */
   percursos?: Percurso[];
-  /** SPEC-58 fatia 2 — o que a pessoa escreveu no documento. */
-  documentoEscrito?: DocumentoEscrito;
+  /** SPEC-58 fatia 2 — o que a pessoa escreveu. SPEC-80 fatia A — um conjunto
+   * de seções POR artefato, não mais um só. */
+  artefatosEscritos?: ArtefatosEscritos;
   /** SPEC-58 fatia 3 — o estado do documento (null = nunca gerado). */
   documentoStatus?: StatusDocumento | null;
   /** SPEC-70 — o volume que a demanda atende. Ausente = nada se afirma. */
@@ -123,7 +124,7 @@ export function normalizarDadosQuebra(bruto: Partial<DadosQuebra> | undefined): 
     excecoes: bruto?.excecoes ?? [],
     decisoes: bruto?.decisoes ?? [],
     percursos: bruto?.percursos ?? [],
-    documentoEscrito: bruto?.documentoEscrito ?? {},
+    artefatosEscritos: bruto?.artefatosEscritos ?? {},
     documentoStatus: bruto?.documentoStatus ?? null,
     // SPEC-71 — a QUARTA e a QUINTA vez que esta lição aparece neste arquivo.
     // Os comentários acima já a escreveram três vezes (§184, SPEC-53,

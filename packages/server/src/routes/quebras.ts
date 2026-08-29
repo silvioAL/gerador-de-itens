@@ -194,12 +194,31 @@ export const corpoQuebra = z.object({
   /** SPEC-58 fatia 2 — o que a PESSOA escreveu. Chaves fixas: seção arbitrária
    * viraria um editor de documento, e aí o template configurável (SPEC-47) e o
    * texto solto disputariam quem manda na estrutura. */
-  documentoEscrito: z
+  /**
+   * SPEC-80 fatia A — um conjunto de seções POR artefato.
+   *
+   * Cada tipo declara as SUAS chaves. `z.object` sem `passthrough` continua
+   * derrubando chave desconhecida em silêncio, que é o comportamento certo
+   * aqui: seção que não foi declarada não é seção, é lixo — e o §310 existe
+   * porque campo que a borda não conhece morre calado.
+   */
+  artefatosEscritos: z
     .object({
-      /** SPEC-73 fatia B — a visão geral deixou de ser string do motor. */
-      visaoGeral: z.string().optional(),
-      tradeOffs: z.string().optional(),
-      riscos: z.string().optional(),
+      documento: z
+        .object({
+          /** SPEC-73 fatia B — a visão geral deixou de ser string do motor. */
+          visaoGeral: z.string().optional(),
+          tradeOffs: z.string().optional(),
+          riscos: z.string().optional(),
+        })
+        .optional(),
+      spec: z
+        .object({
+          origem: z.string().optional(),
+          recusas: z.string().optional(),
+          fatias: z.string().optional(),
+        })
+        .optional(),
     })
     .optional(),
   /** SPEC-58 fatia 3 — o estado. `nullish` e não `optional`: quebra nunca

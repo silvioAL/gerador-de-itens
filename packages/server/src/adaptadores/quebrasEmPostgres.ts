@@ -37,7 +37,7 @@ function comoQuebraSalva(linha: LinhaQuebra): QuebraSalva {
     excecoes: (linha.excecoes ?? []) as QuebraSalva["excecoes"],
     decisoes: (linha.decisoes ?? []) as QuebraSalva["decisoes"],
     percursos: (linha.percursos ?? []) as QuebraSalva["percursos"],
-    documentoEscrito: (linha.documentoEscrito ?? {}) as QuebraSalva["documentoEscrito"],
+    artefatosEscritos: (linha.artefatosEscritos ?? {}) as QuebraSalva["artefatosEscritos"],
     documentoStatus: (linha.documentoStatus ?? null) as QuebraSalva["documentoStatus"],
     // SPEC-71 — `volumetria` sem `?? {}`: ausência é afirmação aqui ("ninguém
     // declarou volume"), e um objeto vazio faria o motor tratar como declarado.
@@ -121,7 +121,7 @@ export function criarRepositorioDeQuebrasEmPostgres(db: BancoDeDados): Repositor
           excecoes: dados.excecoes ?? [],
           decisoes: dados.decisoes ?? [],
           percursos: dados.percursos ?? [],
-          documentoEscrito: dados.documentoEscrito ?? {},
+          artefatosEscritos: dados.artefatosEscritos ?? {},
           documentoStatus: dados.documentoStatus ?? null,
           volumetria: dados.volumetria ?? null,
           leiturasDispensadas: dados.leiturasDispensadas ?? [],
@@ -172,7 +172,7 @@ export function criarRepositorioDeQuebrasEmPostgres(db: BancoDeDados): Repositor
         excecoes: dados.excecoes ?? [],
         decisoes: dados.decisoes ?? [],
         percursos: dados.percursos ?? [],
-        documentoEscrito: dados.documentoEscrito ?? {},
+        artefatosEscritos: dados.artefatosEscritos ?? {},
         documentoStatus: dados.documentoStatus ?? null,
         volumetria: dados.volumetria ?? null,
         leiturasDispensadas: dados.leiturasDispensadas ?? [],

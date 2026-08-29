@@ -380,16 +380,16 @@ Medido, e é isso mesmo. O que existe é o **checklist de processo**
 — escopado por **time → tech → contexto → condição por nó**. Quatro eixos, e
 **nenhum deles é o produto.**
 
-O bloqueio é concreto, e tem uma simetria que vale registrar:
+O bloqueio é concreto:
 
 ```
 config_documentos_chave_unica  UNIQUE (chave, time_id)   -- as regras
-especificacao_templates_chave_unica  UNIQUE (time_id)    -- os templates (SPEC-80)
 ```
 
-**Duas tabelas de configuração, o mesmo bloqueio: o índice para no time.** A
-SPEC-80 já vai mexer no segundo para caber N tipos de artefato; estender o
-primeiro para o produto é o mesmo tipo de migração.
+> **Correção.** Uma versão anterior desta seção emparelhava isso com
+> `especificacao_templates` — *"duas tabelas, o mesmo bloqueio"*. **A simetria era
+> falsa:** a migração 0028 já tornou aquele índice `(time_id, tipo)`. Ver a
+> correção do §0 da SPEC-80. Aqui o bloqueio é real; lá não era.
 
 E o caminho já está aberto: **a SPEC-77 acabou de construir essa escada para
 volumetria** — `Produto.volumetria` herdada pela demanda, com *declarado vence
