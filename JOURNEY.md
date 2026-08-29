@@ -13381,3 +13381,62 @@ comentário dele já pedia isso de quem acrescentasse um tipo.
 
 579 engine · 133 llm · 113 aplicação · 813 web · 267 server · 39 gateway-falso ·
 104/104 E2E · build, typecheck e lint limpos.
+
+## §321 — a tela do gateway, e a cópia de tipo que estava calada (SPEC-81)
+
+O §319 entregou porta e adaptador e disse, em voz alta, o que faltava: *"o que
+existe é porta e adaptador — falta a tela"*. Esta rodada paga isso.
+
+### Configurar os destinos
+
+A `ExportacaoTab` ganhou a lista. O endereço de cima continua sendo o dos itens e
+**ninguém reconfigura nada**; embaixo entram os outros, cada um com operação,
+endereço e cabeçalhos opcionais que herdam os de cima.
+
+Lista, e não três campos fixos, porque a organização pode ter **dois destinos da
+mesma operação** — dois espaços de documentação por unidade de negócio, dois
+trackers numa migração. Três campos capariam isso, e trocar depois exigiria
+migração.
+
+### Publicar o documento
+
+Rota própria (`POST /quebras/:id/documento/publicar`), pelas quatro razões de
+contrato que o §319 já tinha medido. E uma decisão que vale registrar:
+
+> **Com mais de um destino, o servidor NÃO escolhe.** Ele devolve 409 com a
+> lista. Publicar no primeiro silenciosamente colocaria a página no espaço
+> errado — o pior desfecho de uma publicação, porque ninguém vai procurar no
+> lugar em que ela foi parar.
+
+O markdown vem do cliente, e é o mesmo que o download entrega e que o carimbo da
+aprovação usa. Remontá-lo no servidor seria uma segunda implementação da geração
+(§263). Falha do outro lado é **502 e não 500** — a distinção muda onde a pessoa
+vai procurar o problema.
+
+Na tela, o resultado **fica**, em vez de virar alerta: a URL da página é o que a
+pessoa vai querer copiar e mandar para alguém, e alerta some antes disso.
+
+### O achado: o `packages/web` não tem `typecheck`
+
+Acrescentei `destinos` ao `ConfigExportador` do pacote de aplicação, e **a cópia
+do web ficou para trás sem nada acusar**. Rodei `npm run typecheck --workspaces
+--if-present` e deu zero — porque o web **não tem esse script**, e o `--if-present`
+o pula em silêncio. Quem typechecka o web é o `build`, e só quando ele roda.
+
+Eram os mesmos três campos declarados duas vezes, e o §263 cobrou na primeira
+mudança. Agora o web **reexporta a canônica**: quem acrescentar campo lá o ganha
+aqui, e não há duas verdades para divergirem.
+
+> O buraco maior continua aberto e vale dizer: **um `typecheck` que passa sem
+> checar um dos seis pacotes é um portão que mente.** Não é desta rodada
+> consertar, mas está registrado.
+
+### Três suposições que o build derrubou
+
+`persistencia.idAtual` (é `quebraId`), `avisar()` (não existe — o padrão da tela é
+a própria `DocumentoScreen` mostrar o resultado, como já faz com a exportação), e
+um `apiQuebras` que eu usei sem importar. As três eram chute sobre nomes, e as
+três morreram no primeiro build — que é exatamente onde deviam morrer.
+
+579 engine · 133 llm · 113 aplicação · 823 web · 275 server · 39 gateway-falso ·
+104/104 E2E · build, typecheck e lint limpos.

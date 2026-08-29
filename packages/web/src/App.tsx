@@ -50,6 +50,7 @@ import {
   type SessaoUsuario,
   apiPdca,
   apiItensGerados,
+  apiQuebras,
   type ItemGerado,
   apiStacks,
   apiExportador,
@@ -507,12 +508,26 @@ function AppCarregado({
   // SPEC-49 — pra onde os itens vão; só pra tela DIZER o destino (a exportação
   // em si é do servidor, que lê a mesma config).
   const [destinoDaExportacao, setDestinoDaExportacao] = useState<string | null>(null);
+  /**
+   * SPEC-81 fatia B — há para onde publicar o documento?
+   *
+   * Vem da MESMA busca do destino de itens: são o mesmo documento de
+   * configuração, e duas chamadas trariam o mesmo dado duas vezes. Falso = o
+   * botão não aparece, em vez de aparecer e falhar (a disciplina da SPEC-49).
+   */
+  const [podePublicarDocumento, setPodePublicarDocumento] = useState(false);
   useEffect(() => {
     if (!mostrarDocumento) return;
     apiExportador
       .obter()
-      .then((c) => setDestinoDaExportacao(c.endpoint ? c.rotulo || c.endpoint : null))
-      .catch(() => setDestinoDaExportacao(null));
+      .then((c) => {
+        setDestinoDaExportacao(c.endpoint ? c.rotulo || c.endpoint : null);
+        setPodePublicarDocumento((c.destinos ?? []).some((d) => d.operacao === "documento" && !!d.endpoint));
+      })
+      .catch(() => {
+        setDestinoDaExportacao(null);
+        setPodePublicarDocumento(false);
+      });
   }, [mostrarDocumento]);
   // SPEC-45 — quantos feedbacks do ciclo ainda esperam alguém: é o que faz o
   // assistente chamar pra tratar (M15) em vez de o texto morrer no banco.
@@ -1047,6 +1062,23 @@ function AppCarregado({
     // O MESMO markdown que o carimbo usa: duas montagens fariam o arquivo
     // baixado divergir da foto da aprovação sem ninguém notar.
     baixarArquivoTexto(markdownDoDocumento, "documento-de-desenho.md", "text/markdown");
+  }
+
+  /**
+   * SPEC-81 fatia B — manda o documento para a base de conhecimento da casa.
+   *
+   * O markdown é o MESMO que o download entrega e que o carimbo da aprovação
+   * usa: remontá-lo no servidor seria uma segunda implementação da geração, e as
+   * duas divergiriam na primeira mudança (§263).
+   *
+   * O 409 de "há mais de um destino" chega como mensagem — a escolha entre dois
+   * espaços de documentação é da pessoa, e o servidor recusa escolher por ela.
+   */
+  async function publicarDocumento() {
+    return apiQuebras.publicarDocumento(persistencia.quebraId!, {
+      markdown: markdownDoDocumento,
+      desatualizado: !!documentoDesatualizado,
+    });
   }
 
   function salvarQuebra() {
@@ -1953,6 +1985,7 @@ function AppCarregado({
           lacunas={lacunasDoDocumento}
           mudancasDesdeAprovacao={mudancasDesdeAprovacao}
           onBaixarMarkdown={baixarDocumentoMarkdown}
+          onPublicar={podePublicarDocumento && persistencia.quebraId ? publicarDocumento : undefined}
           onVoltar={() => navegar({ tela: "canvas" })}
           // SPEC-61 — o que era a tela `#/itens`, agora seção deste documento.
           itensEscritos={itensGerados}

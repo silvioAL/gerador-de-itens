@@ -276,6 +276,19 @@ export const apiQuebras = {
     requisitar<QuebraSalva>("/quebras", { method: "POST", body: JSON.stringify(quebra) }),
   atualizar: (id: string, quebra: Quebra) =>
     requisitar<QuebraSalva>(`/quebras/${id}`, { method: "PUT", body: JSON.stringify(quebra) }),
+  /**
+   * SPEC-81 fatia B — publica o documento na base de conhecimento da casa.
+   *
+   * O markdown vai daqui porque é aqui que ele é montado, e a mesma string
+   * alimenta o download e o carimbo da aprovação. `destinoId` só é necessário
+   * quando há mais de um destino configurado — e nesse caso o servidor recusa
+   * escolher sozinho, devolvendo a lista.
+   */
+  publicarDocumento: (id: string, corpo: { markdown: string; desatualizado: boolean; destinoId?: string }) =>
+    requisitar<{ linkExterno: string; atualizada: boolean; destino: string }>(`/quebras/${id}/documento/publicar`, {
+      method: "POST",
+      body: JSON.stringify(corpo),
+    }),
 };
 
 /** SPEC-41 Parte B — um item de trabalho materializado (persistido no server). */
@@ -1429,13 +1442,22 @@ export const apiRegras = configDe<RegrasConfig>("regras");
  * template sozinho. */
 export const apiTokens = configDe<TokensConfig>("tokens");
 
-/** SPEC-49 — pra onde os itens vão: o AGENTE que fala com o tracker (o
- * gerador não implementa Jira, chama quem implementa). */
-export interface ConfigExportador {
-  endpoint: string;
-  rotulo: string;
-  cabecalhos: Record<string, string>;
-}
+/**
+ * SPEC-49 — pra onde os itens vão: o AGENTE que fala com o tracker (o gerador
+ * não implementa Jira, chama quem implementa).
+ *
+ * ## SPEC-81 — deixou de ser cópia
+ *
+ * Era uma segunda declaração dos mesmos três campos, e a SPEC-81 mostrou o
+ * preço: acrescentei `destinos` no pacote de aplicação e esta ficou para trás
+ * **sem nada acusar** — o `packages/web` não tem script de `typecheck`, então
+ * quem checa é o `build`, e só na hora dele.
+ *
+ * Agora é a mesma: quem acrescentar campo lá o ganha aqui, e não há duas
+ * verdades para divergirem (§263).
+ */
+export type { ConfigExportador } from "@gerador/aplicacao";
+import type { ConfigExportador } from "@gerador/aplicacao";
 
 export const apiExportador = configDe<ConfigExportador>("exportador");
 

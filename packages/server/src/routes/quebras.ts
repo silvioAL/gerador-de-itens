@@ -14,12 +14,14 @@ import {
   criarCasosDeUsoDeQuebras,
   criarCasosDeUsoDeItensGerados,
   criarCasosDeUsoDeConfig,
+  destinosDaOperacao,
   normalizarExportador,
 } from "@gerador/aplicacao";
 import type { OpcoesApp } from "../app.js";
 import { criarRepositorioDeQuebrasEmPostgres } from "../adaptadores/quebrasEmPostgres.js";
 import { criarRepositorioDeItensGeradosEmPostgres } from "../adaptadores/itensGeradosEmPostgres.js";
 import { criarExportadorViaAgente } from "../adaptadores/exportadorViaAgente.js";
+import { criarPublicadorDeDocumentoViaGateway } from "../adaptadores/gatewayDoTime.js";
 import { criarRepositorioDeConfigEmPostgres } from "../adaptadores/configEmPostgres.js";
 import { registrarAuditoria } from "../auditoria.js";
 import { exigirNivel } from "../auth/niveis.js";
@@ -74,6 +76,20 @@ function emMB(bytes: number): string {
  * não existe em runtime, e por isso o teste cruza este `shape` com um
  * inventário que o COMPILADOR verifica. Ver `quebras.borda.test.ts`.
  */
+/**
+ * SPEC-81 fatia B — o corpo da publicação de documento.
+ *
+ * `markdown` vem do cliente porque é lá que ele é montado (ver a rota).
+ * `desatualizado` também: o web já calcula o estado do documento em relação ao
+ * desenho, e recalcular aqui seria uma segunda implementação da mesma pergunta.
+ */
+const corpoPublicarDocumento = z.object({
+  markdown: z.string().min(1, "markdown vazio — não há documento para publicar"),
+  desatualizado: z.boolean().default(false),
+  /** Qual destino, quando há mais de um configurado para documento. */
+  destinoId: z.string().optional(),
+});
+
 export const corpoQuebra = z.object({
   titulo: z.string().nullish(),
   time: z.string().nullish(),
@@ -406,6 +422,86 @@ export async function registrarRotasQuebras(app: FastifyInstance, { db, diretori
       recursoId: id,
     });
     return { ...resultado, destino: config.rotulo || config.endpoint };
+  });
+
+  /**
+   * SPEC-81 fatia B — **publicar o documento de desenho na base de conhecimento.**
+   *
+   * ## Por que rota própria, e não um parâmetro da exportação de itens
+   *
+   * As duas diferem em ciclo de vida (issue nasce uma vez; página é viva),
+   * idempotência (exportar duas vezes duplica; publicar duas vezes atualiza no
+   * lugar), modo de falhar (parcial por item × publica ou não) e permissão (quem
+   * abre issue não é quem escreve na wiki). Um parâmetro a mais faria a rota
+   * mentir sobre os quatro.
+   *
+   * ## O que vai no corpo, e por que o markdown vem do cliente
+   *
+   * O documento é montado no web a partir do template, da config e da quebra —
+   * é lá que a mesma string que a pessoa vê e baixa existe. Remontá-lo aqui
+   * seria uma segunda implementação da geração, e as duas divergiriam na
+   * primeira mudança (§263). O servidor guarda a fronteira e o carimbo; o texto
+   * é do cliente.
+   */
+  app.post("/quebras/:id/documento/publicar", { preHandler: podeOperarNaQuebra }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const quebra = await casos.obter(id);
+    if (!quebra) return reply.code(404).send({ erro: "quebra não encontrada" });
+
+    const corpo = corpoPublicarDocumento.safeParse(req.body);
+    if (!corpo.success) {
+      return reply.code(400).send({ erro: "corpo inválido", detalhes: corpo.error.issues });
+    }
+
+    const config = normalizarExportador(
+      (await criarCasosDeUsoDeConfig(criarRepositorioDeConfigEmPostgres(db)).obter("exportador", { endpoint: "", rotulo: "", cabecalhos: {} }))
+        .documento
+    );
+    const destinos = destinosDaOperacao(config, "documento");
+    if (destinos.length === 0) {
+      return reply.code(409).send({
+        erro: "nenhum destino de documento configurado — cadastre o endereço em Configurações → Exportação, em “Outros destinos”",
+      });
+    }
+    /**
+     * Com mais de um destino, quem escolhe é a tela — e enquanto ela não
+     * escolher, o servidor **não escolhe por ela**. Publicar no primeiro
+     * silenciosamente colocaria a página no espaço errado, que é o pior desfecho
+     * de uma publicação.
+     */
+    const escolhido = corpo.data.destinoId
+      ? destinos.find((d) => d.id === corpo.data.destinoId)
+      : destinos.length === 1
+        ? destinos[0]
+        : undefined;
+    if (!escolhido) {
+      return reply.code(409).send({
+        erro: "há mais de um destino de documento — diga em qual publicar",
+        destinos: destinos.map((d) => ({ id: d.id, rotulo: d.rotulo || d.endpoint })),
+      });
+    }
+
+    try {
+      const publicado = await criarPublicadorDeDocumentoViaGateway(escolhido).publicar({
+        demandaId: id,
+        demandaTitulo: quebra.titulo ?? "(sem título)",
+        markdown: corpo.data.markdown,
+        geradoEm: new Date().toISOString(),
+        demandaAtualizadaEm: quebra.atualizadoEm,
+        desatualizado: corpo.data.desatualizado,
+      });
+      registrarAuditoria(db, {
+        email: req.usuario!.email,
+        acao: "publicar-documento",
+        recurso: "quebras",
+        recursoId: id,
+      });
+      return { ...publicado, destino: escolhido.rotulo || escolhido.endpoint };
+    } catch (erro) {
+      // 502 e não 500: a falha é de quem está do outro lado, e a distinção muda
+      // onde a pessoa vai procurar o problema.
+      return reply.code(502).send({ erro: erro instanceof Error ? erro.message : String(erro) });
+    }
   });
 
   app.put("/quebras/:id/itens", { preHandler: podeOperarNaQuebra }, async (req, reply) => {
