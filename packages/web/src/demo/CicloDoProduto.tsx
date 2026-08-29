@@ -38,7 +38,12 @@ const RAIO = 148;
 const CENTRO = 176;
 
 /** Status com ícone e palavra — a cor é reforço, nunca o portador. */
-const MARCA_DE_ESTADO: Record<EstagioDoCiclo["estado"], { icone: string; rotulo: string; cor: string }> = {
+/**
+ * SPEC-83 — exportada porque ganhou um segundo cliente: o mapa de conexões faz
+ * a mesma pergunta sobre outra coisa, e duas legendas para o mesmo vocabulário
+ * obrigariam quem lê a aprender as duas (§263).
+ */
+export const MARCA_DE_ESTADO: Record<EstagioDoCiclo["estado"], { icone: string; rotulo: string; cor: string }> = {
   completo: { icone: "●", rotulo: "existe", cor: "var(--verde, #3ecf8e)" },
   parcial: { icone: "◐", rotulo: "parcial", cor: "var(--amarelo, #eab308)" },
   ausente: { icone: "○", rotulo: "ainda não existe", cor: "var(--texto-mudo, #94a3b8)" },

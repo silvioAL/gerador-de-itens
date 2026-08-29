@@ -31,6 +31,16 @@ import type { Rota } from "../navegacao/rota";
  * por isso a lista é circular na tela, e o último estágio aponta para o
  * primeiro.
  */
+/**
+ * `completo` — existe e está inteiro. `parcial` — existe e a SPEC diz onde ele
+ * para. `ausente` — não existe, e a página diz isso em voz alta.
+ *
+ * SPEC-83 — virou tipo nomeado porque ganhou um **segundo cliente**: as conexões
+ * do mapa (`conceito.ts`) fazem a mesma pergunta sobre outra coisa. Responder
+ * com duas escalas diferentes obrigaria quem lê a aprender duas legendas.
+ */
+export type EstadoDoEstagio = "completo" | "parcial" | "ausente";
+
 export interface EstagioDoCiclo {
   id: string;
   titulo: string;
@@ -46,7 +56,7 @@ export interface EstagioDoCiclo {
    * e incompleta; mostrar tudo sem distinguir seria mentira. A marca é o que
    * torna o mapa honesto — e ela diz para onde o produto vai.
    */
-  estado: "completo" | "parcial" | "ausente";
+  estado: EstadoDoEstagio;
   /**
    * Para onde este estágio leva, depois do login. Obrigatório em tudo que não
    * é `ausente`: estágio que existe e não tem endereço é promessa sem porta, e

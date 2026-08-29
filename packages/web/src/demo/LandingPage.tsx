@@ -1,28 +1,54 @@
 import { CicloDoProduto } from "./CicloDoProduto";
-import { Jornada } from "./Jornada";
+import { AEvolucao, AsCamadas, OMapaDeConexoes } from "./PecasDoConceito";
+import { OMotor } from "./OMotor";
 
 export interface LandingPageProps {
   onEntrar: () => void;
 }
 
 /**
- * Página pública, antes do login (SPEC-11) — contexto pra quem chega sem
- * saber o que a ferramenta é, em vez de cair direto num formulário de
- * credencial. Reaproveita `Jornada()` (mesma explicação usada na aba "A
- * jornada" pós-login) em vez de escrever uma segunda versão.
+ * Página pública, antes do login (SPEC-11) — contexto pra quem chega sem saber o
+ * que a ferramenta é, em vez de cair direto num formulário de credencial.
  *
- * ## SPEC-76 — a correção de medição que a rodada começou fazendo
+ * ## SPEC-83 — o que esta rodada mudou, e por quê
  *
- * A SPEC dizia que esta página tinha "uma frase e um botão". Não tinha: ela já
- * renderizava a `Jornada`, com cinco etapas e a explicação do motor. O
- * diagnóstico continuava certo por outro motivo — **o conteúdo descrevia um
- * fluxo de cinco passos, não um ciclo que fecha.** Um fluxo termina; o produto
- * não termina, ele volta.
+ * ### A poda (fatia B)
  *
- * Por isso o `CicloDoProduto` vem ANTES da `Jornada` e não no lugar dela: o
- * ciclo é o mapa (o todo, e o que ainda não existe), e a jornada continua sendo
- * o passo a passo de quem vai usar. São dois públicos na mesma página, e a
- * ordem diz qual vem primeiro.
+ * A página renderizava `<Jornada />` logo abaixo do círculo, e **4 das 5 etapas
+ * dela eram estágios que o círculo acabava de mostrar** — `desenho`,
+ * `prontidao`, `itens` e `especificacao`, ditos de novo em outro formato. O
+ * `OMotor()` recontava a divisão motor × IA pela terceira vez na mesma rolagem.
+ *
+ * Não era excesso de conteúdo: era **uma narrativa contada três vezes**. O §263
+ * chegando pelo lado que ninguém vigiava, porque cada versão estava certa
+ * isoladamente.
+ *
+ * A `Jornada` não morreu — ela é um passo a passo de USO, e continua na aba "A
+ * jornada" pós-login, que é onde está quem já entrou e quer saber por onde
+ * começar. O `OMotor` saiu de dentro dela para ter uma casa só.
+ *
+ * ### A ordem (fatia D)
+ *
+ * **O problema vem antes da solução.** A página começava dizendo o que a
+ * ferramenta faz, para quem ainda não sabia por que precisaria dela. Agora:
+ *
+ * 1. a promessa — e ela mudou (ver abaixo);
+ * 2. **o problema**: você já tem IA, falta onde a regra mora;
+ * 3. as quatro camadas, e a IA no meio;
+ * 4. o motor — o que calcula e o que não calcula;
+ * 5. o ciclo, que é o mapa;
+ * 6. as conexões com o que a casa já tem, **marcadas**;
+ * 7. o convite.
+ *
+ * ### A manchete
+ *
+ * Era *"Do diagrama ao backlog, sem inventar nada"* — uma promessa com
+ * **destino**. É o mesmo defeito que o §314 encontrou no corpo da página
+ * (*"descrevia um fluxo, não um ciclo que fecha"*) **sobrevivendo no título**: a
+ * SPEC-76 consertou o conteúdo e não olhou para a manchete.
+ *
+ * A nova fala de **permanência**, não de trajeto — foi decisão do usuário:
+ * *"não é até o backlog, é esse conceito que acompanha processos"*.
  */
 export function LandingPage({ onEntrar }: LandingPageProps) {
   return (
@@ -35,19 +61,65 @@ export function LandingPage({ onEntrar }: LandingPageProps) {
         </button>
       </header>
 
-      <div style={conteudoEstilo}>
-        <h1 style={{ fontSize: 24, color: "var(--texto)", margin: "0 0 6px" }}>Do diagrama ao backlog, sem inventar nada</h1>
-        <p style={{ fontSize: 14, color: "var(--texto-2)", lineHeight: 1.6, maxWidth: 640, marginBottom: 32 }}>
-          Não é um gerador de prompt de IA — é um mecanismo determinístico. O mesmo diagrama sempre produz os mesmos
-          itens, com proveniência em cada campo e nada virando "pronto" sem alguém confirmar.
+      <section style={{ ...faixaEstilo, paddingTop: 56, paddingBottom: 40 }}>
+        <div style={colunaEstilo}>
+          <h1 style={{ fontSize: 30, lineHeight: 1.2, color: "var(--texto)", margin: "0 0 10px", maxWidth: 640 }}>
+            A camada que faz o padrão da casa sobreviver às demandas — e a IA trabalhar dentro dele
+          </h1>
+          <p style={{ fontSize: 15, color: "var(--texto-2)", lineHeight: 1.6, maxWidth: 620, margin: 0 }}>
+            Configuração, padrões e specs viram <strong>dado medível</strong>, versionado e evoluído pelo time. O motor
+            calcula; a IA escreve; nada vira “pronto” sem alguém confirmar.
+          </p>
+          <button onClick={onEntrar} style={{ ...botaoEntrarEstilo, marginTop: 22, padding: "10px 20px", fontSize: 14 }}>
+            Entrar
+          </button>
+        </div>
+      </section>
+
+      {/* Faixa com fundo próprio: é o problema, e ele precisa de peso visual
+          diferente do resto. O §0.3 mediu que a página inteira era UMA coluna de
+          760px — estrutura de documento, não de página. */}
+      <section style={{ ...faixaEstilo, background: "var(--painel-alto, transparent)", borderTop: "1px solid var(--borda)", borderBottom: "1px solid var(--borda)" }}>
+        <div style={colunaEstilo}>
+          <AEvolucao />
+        </div>
+      </section>
+
+      <section style={faixaEstilo}>
+        <div style={colunaEstilo}>
+          <AsCamadas />
+        </div>
+      </section>
+
+      <section style={{ ...faixaEstilo, background: "var(--painel-alto, transparent)", borderTop: "1px solid var(--borda)", borderBottom: "1px solid var(--borda)" }}>
+        <div style={colunaEstilo}>
+          <OMotor />
+        </div>
+      </section>
+
+      <section style={faixaEstilo}>
+        <div style={{ ...colunaEstilo, maxWidth: 760 }}>
+          <h2 style={{ fontSize: 19, fontWeight: 700, color: "var(--texto)", margin: "0 0 8px" }}>
+            O ciclo, e o que dele já existe
+          </h2>
+          <CicloDoProduto />
+        </div>
+      </section>
+
+      <section style={{ ...faixaEstilo, background: "var(--painel-alto, transparent)", borderTop: "1px solid var(--borda)" }}>
+        <div style={colunaEstilo}>
+          <OMapaDeConexoes />
+        </div>
+      </section>
+
+      <section style={{ ...faixaEstilo, textAlign: "center", paddingBottom: 64 }}>
+        <p style={{ fontSize: 14, color: "var(--texto-2)", margin: "0 0 14px" }}>
+          Comece pelo que é seu: o contexto do produto e as regras do time.
         </p>
-        <CicloDoProduto />
-        <div style={{ height: 28 }} />
-        <Jornada />
-        <button onClick={onEntrar} style={{ ...botaoEntrarEstilo, marginTop: 24 }}>
+        <button onClick={onEntrar} style={{ ...botaoEntrarEstilo, padding: "10px 20px", fontSize: 14 }}>
           Entrar pra começar
         </button>
-      </div>
+      </section>
     </div>
   );
 }
@@ -66,11 +138,11 @@ const headerEstilo: React.CSSProperties = {
   background: "var(--painel)",
 };
 
-const conteudoEstilo: React.CSSProperties = {
-  maxWidth: 760,
-  margin: "0 auto",
-  padding: "48px 24px",
-};
+/** SPEC-83 §5 — o RITMO. Faixas de largura total com fundos alternados; a coluna
+ * é uma delas, e não a página inteira. */
+const faixaEstilo: React.CSSProperties = { padding: "40px 24px" };
+
+const colunaEstilo: React.CSSProperties = { maxWidth: 700, margin: "0 auto" };
 
 const botaoEntrarEstilo: React.CSSProperties = {
   fontSize: 13,
