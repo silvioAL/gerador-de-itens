@@ -79,6 +79,72 @@ O produto já tem régua para isso, e ela é do §306, reafirmada pela SPEC-77:
 declarado; o tracker é o herdado. Uma sincronização que sobrescreve em silêncio
 seria o produto violando a própria régua na integração mais visível que ele tem.
 
+### 1.3 A terceira direção — a camada perene da organização
+
+> *"seria interessante ter conector para o MCP em determinado estágio interagir
+> com **arquitetura de negócio** e **ADR (arquitetura técnica)**: fazem parte da
+> camada perene/determinística de processos corporativos."* — o usuário.
+
+Esta direção **não estava nesta SPEC** e é, provavelmente, a de maior valor das
+três — porque ataca o gargalo que a SPEC-83 §1.1 nomeia: a governança da casa
+mora fora do alcance verificável da IA. Aqui ela entra.
+
+#### O achado que muda o custo: o produto já produz ADR
+
+Medido, e é mais forte do que eu esperava. A palavra "ADR" aparece no
+repositório **só em comentário** — mas o conceito está implementado:
+
+| Onde | O que diz |
+|---|---|
+| `model/types.ts:179` | *"a régua que impede isto de virar wiki: ADR nasce de escolha entre alternativas"* |
+| `decisao/decisoes.ts:65` | *"registra a escolha e omite a razão é o formato que fez repositório de ADR…"* |
+| `decisao/decisoes.ts:101` | *"a SPEC-57 chama o caso 3 de emenda ao ADR do padrão"* |
+| `ia/pedidos.ts:875` | ensina o modelo a distinguir: *"'definir timeout = 300ms' é valor, não ADR"* |
+
+E os campos de `Decisao` são o schema de ADR quase termo a termo:
+
+```
+titulo · contexto · alternativas · escolhida · porque · status · substituidaPor · autor · em
+```
+
+`status` + `substituidaPor` **é o ciclo de vida do ADR** (proposto → aceito →
+substituído). E há dois campos que um ADR comum não tem: `noId`/`arestaId`, que
+ancora a decisão no elemento do desenho, e `ensaioIds` (SPEC-69), que a liga à
+conta que a justificou.
+
+> **O produto não precisa aprender ADR: ele já escreve ADR ancorado em modelo e
+> em medição — e nunca chamou isso pelo nome na superfície.** O conector não
+> inventa conceito; ele liga um conceito que já existe ao repositório onde a casa
+> guarda os dela.
+
+#### Arquitetura de negócio
+
+Do outro lado, `Produto` já guarda `objetivo`, `quemUsa`, `regrasDeNegocio`,
+`sistemas`, `restricoes` e `glossario` — um registro de forma
+arquitetura-de-negócio, hoje **preenchido à mão**. Um conector que leia o
+repositório de arquitetura da casa alimenta exatamente esses campos, e ataca o
+"alguém tem que digitar o contexto" que a SPEC-75 §3.1 identificou como o gargalo
+real.
+
+#### As duas direções, e a régua que as governa
+
+- **Ler** — os ADRs e a arquitetura de negócio da casa entram como **contexto**,
+  para que a IA não proponha o que já foi decidido contra, e para que o desenho
+  nasça sabendo das restrições que já existem.
+- **Escrever** — a `Decisao` tomada aqui volta para o repositório de ADR da casa,
+  no formato dela.
+
+**A régua é a mesma de sempre, e o campo já existe:** `Decisao.origem`. ADR
+importado entra marcado como importado — **nunca como fato local** —, exatamente
+como a IA entra como `sugerido`. Prosa de ADR alheio virando `Decisao`
+estruturada é trabalho de modelo, com o mesmo risco de plausível-mas-vazio da
+SPEC-80 §2. A mitigação é a mesma: **importa marcado, e vira fato quando alguém
+confirma.**
+
+> E a pergunta de arbitragem da §1.2 aparece aqui de novo, mais afiada: **se o
+> repositório de ADR da casa é a fonte da verdade, este produto não pode agir
+> como se fosse.** Vale o §306: declarado vence herdado, e a tela diz qual é qual.
+
 ## 2. O que o `ExportadorDeItens` já acertou, e o que ele não previu
 
 A porta nasceu certa em duas coisas: não acopla em Jira, e trata **falha parcial
@@ -106,6 +172,20 @@ seria uma superfície gigante que ninguém consegue revisar. As ferramentas são
 poucas e nomeadas pelo que a pessoa quer — *"o que falta nesta demanda"* —, não
 pelo que a tabela guarda.
 
+**ADR importado virando decisão local.** É a recusa mais importante da §1.3. Se
+a casa tem repositório de ADR, ele é a fonte; o que entra aqui entra marcado, e
+`origem` é o campo que já existe para isso. Um produto que absorve a decisão
+alheia e a reapresenta como sua corrompe o registro dos dois lados.
+
+**Prosa alheia virando `Decisao` estruturada sem confirmação.** Mapear ADR em
+formato livre para `alternativas`/`escolhida`/`porque` é trabalho de modelo, com
+o risco de plausível-mas-vazio da SPEC-80 §2. Chega como proposta, com lacuna
+contável — nunca como fato.
+
+**Virar repositório de ADR da organização.** O produto escreve ADR ancorado em
+modelo e em medição, e conversa com o repositório da casa. Substituí-lo é outro
+produto, e um que ninguém pediu.
+
 **Escrita destrutiva via MCP.** Um agente pode criar e comentar; apagar demanda
 ou sobrescrever documento aprovado, não. O produto inteiro é construído em cima
 de "nada vira pronto sem alguém confirmar" — a porta MCP não pode ser a exceção.
@@ -127,6 +207,19 @@ de "nada vira pronto sem alguém confirmar" — a porta MCP não pode ser a exce
   divergência **sem resolver sozinho**, exatamente como a SPEC-77 fatia C fez
   com volumetria declarada × herdada. Prova: tracker e item discordando produzem
   divergência visível, e o item local não muda sozinho.
+- **E — ADR de mão dupla** (§1.3). Ler os ADRs da casa como contexto, e devolver
+  a `Decisao` tomada aqui no formato dela. **É a fatia de maior valor da SPEC**,
+  e a mais barata em conceito — o tipo já existe inteiro, inclusive `status` e
+  `substituidaPor`. Prova, e ela é dura: um ADR importado **não pode aparecer
+  como decisão local**; `origem` distingue, e desligar a marca tem que derrubar
+  o teste (§248). Segunda prova: um ADR que a casa marcou como substituído não
+  volta a valer aqui.
+- **F — arquitetura de negócio como contexto.** Alimentar `objetivo`,
+  `regrasDeNegocio`, `sistemas`, `restricoes` e `glossario` a partir do
+  repositório da casa. Ataca o gargalo do *"alguém tem que digitar o contexto"*
+  (SPEC-75 §3.1). Prova: o que veio de fora chega marcado e **contável como
+  lacuna enquanto ninguém confirma** — a máquina da SPEC-73 aplicada a contexto
+  importado.
 
 ## 5. Perguntas em aberto
 
@@ -139,11 +232,20 @@ de "nada vira pronto sem alguém confirmar" — a porta MCP não pode ser a exce
    dependência vazar para a imagem de produção. Mas ali o dublê **não** era
    produção. Aqui é. Recomendação fraca: dentro do `server`, atrás da mesma
    autenticação, até haver motivo medido para separar.
-3. **Consumir status vale a pena?** É a fatia D, a mais cara e a de valor menos
-   certo. As fatias B e C entregam sozinhas. **Recomendação: fatiar a decisão** —
-   fazer A, B, C, e só então perguntar a quem usa se a volta faz falta. Se não
-   fizer, o ponto verde já está justificado por mão dupla de fato (o produto
-   responde perguntas E publica), e a fatia D não precisa existir.
+3. **Consumir status do tracker vale a pena?** É a fatia D, a mais cara e a de
+   valor menos certo. **Recomendação: fatiar a decisão** — fazer A, B, C, e só
+   então perguntar a quem usa se a volta faz falta.
+4. **A ordem mudou com a §1.3, e vale dizer em voz alta.** Escrita assim, a
+   **fatia E é a de maior valor da SPEC** — ADR é o artefato de governança que a
+   casa já tem, o produto já o produz nativamente, e é o que faz "camada perene"
+   deixar de ser só a configuração *deste* produto. **Recomendação: A → B → E →
+   C → F → D**, e não a ordem alfabética. A fatia A (a fronteira) continua
+   primeiro porque nada entra ou sai antes de o escopo por organização existir.
+5. **Qual formato de ADR na saída?** MADR, Nygard, o template da casa? Não
+   medimos, e não dá para escolher por argumento. A saída é markdown, então
+   **template configurável** é a resposta provável — e aí é o mesmo problema de
+   template que a SPEC-80 resolve. Vale conferir se as duas podem dividir o
+   mecanismo antes de construir dois.
 4. **O que fica marcado no ciclo se a D não for feita?** Honestamente: `completo`
    é defensável com A+B+C, porque a mão dupla existe — entra e sai. Mas o texto
    do estágio precisa ser reescrito para dizer o que faz, não o que se sonhou.

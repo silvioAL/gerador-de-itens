@@ -12866,3 +12866,58 @@ numa página é muito, e ninguém lê cinco — então a régua ficou declarada 
 **um é a manchete visual, os outros aparecem quando a seção deles chega.** Sem
 isso a página vira álbum de diagramas, que é a versão gráfica exata do problema
 que esta SPEC existe para consertar: conteúdo certo, repetido, sem hierarquia.
+
+### Adendo 6 — o conector de ADR, e o achado que o torna barato
+
+> *"seria interessante ter conector para o MCP em determinado estágio interagir
+> com **arquitetura de negócio** e **ADR (arquitetura técnica)**: fazem parte da
+> camada perene/determinística de processos corporativos."*
+
+Direção que **não estava na SPEC-81** e que é, provavelmente, a de maior valor
+das três — porque ataca o gargalo que o adendo 1 nomeou: a governança da casa
+mora fora do alcance verificável da IA.
+
+E a medição achou algo que muda o custo dela por completo: **o produto já produz
+ADR.** A palavra aparece no repositório só em comentário —
+`model/types.ts:179` (*"a régua que impede isto de virar wiki: ADR nasce de
+escolha entre alternativas"*), `decisoes.ts:65` e `:101`, e `pedidos.ts:875`, que
+ensina o modelo a distinguir *"'definir timeout = 300ms' é valor, não ADR"* — mas
+o conceito está inteiro no tipo:
+
+```
+titulo · contexto · alternativas · escolhida · porque · status · substituidaPor · autor · em
+```
+
+`status` + `substituidaPor` **é o ciclo de vida do ADR**. E há dois campos que um
+ADR comum não tem: `noId`/`arestaId`, que ancora a decisão no elemento do
+desenho, e `ensaioIds` (§307), que a liga à conta que a justificou.
+
+> **O produto não precisa aprender ADR: ele já escreve ADR ancorado em modelo e
+> em medição, e nunca chamou isso pelo nome na superfície.** O conector não
+> inventa conceito — liga um que já existe ao repositório onde a casa guarda os
+> dela.
+
+Do outro lado, `Produto` já tem forma de registro de arquitetura de negócio
+(`objetivo`, `quemUsa`, `regrasDeNegocio`, `sistemas`, `restricoes`,
+`glossario`), hoje preenchido à mão — e um conector que leia o repositório da
+casa ataca o *"alguém tem que digitar o contexto"* que a SPEC-75 §3.1 apontou
+como o gargalo real.
+
+A régua já tem campo: **`Decisao.origem`.** ADR importado entra marcado, nunca
+como fato local — do mesmo jeito que a IA entra como `sugerido`. Prosa de ADR
+alheio virando `Decisao` estruturada é trabalho de modelo, com o risco de
+plausível-mas-vazio do §2 da SPEC-80; a mitigação é a mesma.
+
+Três recusas novas: **ADR importado virando decisão local**, **prosa alheia
+virando `Decisao` sem confirmação**, e **virar repositório de ADR da
+organização** — o produto conversa com o repositório da casa, não o substitui.
+
+**E a ordem da SPEC-81 mudou**, dito em voz alta: a fatia nova (E) passa a ser a
+de maior valor, e a recomendação vira **A → B → E → C → F → D**, com a fronteira
+por organização continuando em primeiro porque nada entra ou sai antes do escopo
+existir.
+
+Consequência para a landing, registrada na SPEC-83: quando a página disser
+*camada perene*, o leitor de organização grande vai perguntar *"e o que eu já
+tenho?"*. A resposta honesta hoje é **"conversa com o que você já tem"** — e não
+"substitui".

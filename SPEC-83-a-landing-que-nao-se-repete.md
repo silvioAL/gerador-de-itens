@@ -211,6 +211,19 @@ código — o que falta é alguém dizer que existem:
 > sempre dá os mesmos itens, e por isso que discordar de um apontamento é mudar
 > uma regra — não apagar uma linha.
 
+**E a camada perene não termina neste produto.** O repositório de ADR da casa e a
+arquitetura de negócio dela são perenes pelos mesmos motivos, e hoje vivem fora —
+que é precisamente o *"a governança mora onde a IA não alcança"* da §1.1. A
+**SPEC-81 §1.3** liga os dois, e o achado que a torna barata vale a esta página:
+**o produto já escreve ADR** — `Decisao` tem `contexto`, `alternativas`,
+`escolhida`, `porque`, `status` e `substituidaPor` — ancorado no elemento do
+desenho e no ensaio que o justificou. A palavra nunca chegou à superfície.
+
+> Consequência para o texto da landing: quando ela disser *camada perene*, o
+> leitor de organização grande vai perguntar *"e o que eu já tenho?"*. A resposta
+> honesta hoje é **"conversa com o que você já tem, e isso é a SPEC-81"** — não
+> "substitui".
+
 ### 2.3 O vocabulário — e a ironia que a medição encontrou
 
 > *"tenho impressão que parte do vocabulário precisa ser enriquecido, me chama
