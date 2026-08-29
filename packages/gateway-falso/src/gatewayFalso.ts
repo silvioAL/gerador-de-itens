@@ -75,6 +75,54 @@ export const MARCA_VIU_IMAGEM = "viu-a-imagem";
 
 export const TEXTO_TRANSCRITO_FALSO = "criar uma fila do rabbit para propostas aprovadas";
 
+/**
+ * SPEC-81 — as decisões que a "casa" já tomou.
+ *
+ * O dublê responde ADR pelo mesmo motivo que responde chat: sem isto **não há
+ * como validar a SPEC-81 contra a stack local** — o botão de trazer decisões só
+ * aparece com um destino configurado, e configurar um destino real exigiria um
+ * gateway de verdade só para dar um clique.
+ *
+ * As três são propositalmente desiguais: uma completa, uma **sem o porquê** (o
+ * caso comum de ADR pobre, que vira lacuna contável em vez de invenção) e uma
+ * `substituida` — para a tela ter o que distinguir.
+ */
+export const ADRS_DO_GATEWAY_FALSO = [
+  {
+    id: "ADR-014",
+    titulo: "Fila entre o checkout e o bureau",
+    contexto: "o bureau responde em segundos e o checkout não pode esperar",
+    alternativas: [
+      { titulo: "Chamada síncrona", consequencia: "o checkout cai junto quando o bureau cai" },
+      { titulo: "Fila", consequencia: "resposta assíncrona, e o pedido nasce pendente" },
+    ],
+    escolhida: "Fila",
+    porque: "desacopla o tempo do parceiro do tempo do cliente",
+    status: "aceita",
+    autor: "arquitetura",
+    em: "2026-03-11",
+    link: "https://exemplo.invalido/adr/014",
+  },
+  {
+    id: "ADR-021",
+    titulo: "Postgres como banco padrão",
+    escolhida: "Postgres",
+    status: "aceita",
+    autor: "arquitetura",
+    em: "2026-05-02",
+  },
+  {
+    id: "ADR-007",
+    titulo: "Sessão em cookie assinado",
+    escolhida: "Cookie assinado",
+    porque: "não exige estado no servidor",
+    status: "substituida",
+    substituidaPor: "ADR-019",
+    autor: "seguranca",
+    em: "2025-09-30",
+  },
+];
+
 interface CorpoChat {
   messages?: { role: string; content: string | { type?: string; text?: string }[] }[];
   response_format?: { type?: string; json_schema?: { schema?: unknown } };
@@ -227,6 +275,21 @@ export function criarGatewayFalso(opcoes: OpcoesGatewayFalso = {}): Server {
       req.on("end", () => {
         res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
         res.end(TEXTO_TRANSCRITO_FALSO);
+      });
+      return;
+    }
+
+    // SPEC-81 — o destino de ADR. O contrato é o de `criarLeitorDeAdrViaGateway`:
+    // POST vazio, `{ adrs: [...] }` de volta. Não pede credencial porque o
+    // destino do gateway do time tem cabeçalhos próprios e configuráveis — não a
+    // chave do provedor de IA, que é o que `chaveEsperada` guarda.
+    if (req.url?.endsWith("/adr") && req.method === "POST") {
+      req.resume();
+      req.on("end", () => {
+        depoisDaLatencia(() => {
+          res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ adrs: ADRS_DO_GATEWAY_FALSO }));
+        });
       });
       return;
     }

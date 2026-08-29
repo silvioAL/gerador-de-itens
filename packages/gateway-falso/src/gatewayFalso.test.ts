@@ -165,3 +165,48 @@ describe("gateway falso (SPEC-74 fatia A — o mesmo dublê, noutro endereço)",
     expect(eventos.length).toBeGreaterThan(1);
   });
 });
+
+/**
+ * SPEC-81 — o destino de ADR.
+ *
+ * Existe para a SPEC-81 ser **validável contra a stack local**: o botão de trazer
+ * decisões só aparece com destino configurado, e sem este endereço a única forma
+ * de dar aquele clique seria ter um gateway de verdade do outro lado.
+ *
+ * O que se afirma aqui é o **contrato de fio** que `criarLeitorDeAdrViaGateway`
+ * lê — não o comportamento do leitor, que é do `packages/server`. A asserção de
+ * `id` e `titulo` não é decorativa: é exatamente o filtro que o leitor aplica, e
+ * um dublê que os perdesse devolveria lista vazia sem nada acusar.
+ */
+describe("o destino de ADR (SPEC-81)", () => {
+  it("responde `{ adrs }` a um POST vazio, sem exigir a chave do provedor de IA", async () => {
+    const r = await fetch(`${base}/adr`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    expect(r.status).toBe(200);
+    const corpo = (await r.json()) as { adrs: { id: string; titulo: string }[] };
+    expect(Array.isArray(corpo.adrs)).toBe(true);
+    expect(corpo.adrs.length).toBeGreaterThan(0);
+    // O filtro do leitor, repetido aqui de propósito.
+    for (const a of corpo.adrs) {
+      expect(typeof a.id === "string" && a.id.trim()).toBeTruthy();
+      expect(typeof a.titulo === "string" && a.titulo.trim()).toBeTruthy();
+    }
+  });
+
+  it("traz um ADR SEM o porquê — é o caso comum, e vira lacuna em vez de invenção", async () => {
+    const r = await fetch(`${base}/adr`, { method: "POST", body: "{}" });
+    const { adrs } = (await r.json()) as { adrs: { porque?: string; status?: string }[] };
+
+    expect(adrs.some((a) => !a.porque)).toBe(true);
+    expect(adrs.some((a) => a.status === "substituida")).toBe(true);
+  });
+
+  it("GET no mesmo endereço continua 404 — o contrato é POST", async () => {
+    const r = await fetch(`${base}/adr`);
+    expect(r.status).toBe(404);
+  });
+});
