@@ -1,6 +1,7 @@
 import { CicloDoProduto } from "./CicloDoProduto";
 import { AEvolucao, AsCamadas, OMapaDeConexoes } from "./PecasDoConceito";
 import { OMotor } from "./OMotor";
+import { OPassoContido } from "./OPassoContido";
 
 export interface LandingPageProps {
   onEntrar: () => void;
@@ -91,17 +92,42 @@ export function LandingPage({ onEntrar }: LandingPageProps) {
         </div>
       </section>
 
+      {/**
+       * SPEC-85 fatia C — a peça com movimento entra AQUI, entre o motor e o
+       * ciclo, e o lugar é argumento.
+       *
+       * O `OMotor` acabou de dizer, em prosa, o que o motor calcula e o que a IA
+       * escreve. A pergunta que sobra é *"e o que impede a IA de aplicar?"* — e a
+       * resposta é uma ausência de comportamento, que é o que esta peça mostra em
+       * vez de afirmar. Depois dela vem o ciclo, onde essa contenção se repete
+       * treze vezes.
+       */}
       <section style={{ ...faixaEstilo, background: "var(--painel-alto, transparent)", borderTop: "1px solid var(--borda)", borderBottom: "1px solid var(--borda)" }}>
         <div style={colunaEstilo}>
           <OMotor />
         </div>
       </section>
 
+      <section style={{ ...faixaEstilo, paddingTop: 34, paddingBottom: 34 }}>
+        <div style={colunaEstilo}>
+          <OPassoContido />
+        </div>
+      </section>
+
       <section style={faixaEstilo}>
+        {/**
+         * SPEC-85 §0.1 — **o `h2` daqui morreu.**
+         *
+         * A página dizia "O ciclo, e o que dele já existe" e o componente, três
+         * linhas de rolagem abaixo, dizia "O ciclo, e onde a IA entra". Dois
+         * títulos sobre a mesma coisa, empilhados — o §263 pelo lado que ninguém
+         * vigiava: cada um estava certo isoladamente, e a landing não sabia que
+         * o componente traz o seu.
+         *
+         * Quem fica é o do componente, e não é escolha de gosto: ele acompanha a
+         * peça para onde ela for, e é o mais específico dos dois.
+         */}
         <div style={{ ...colunaEstilo, maxWidth: 760 }}>
-          <h2 style={{ fontSize: 19, fontWeight: 700, color: "var(--texto)", margin: "0 0 8px" }}>
-            O ciclo, e o que dele já existe
-          </h2>
           <CicloDoProduto />
         </div>
       </section>

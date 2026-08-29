@@ -64,6 +64,58 @@ describe("a landing não pode se repetir (SPEC-83 fatia F)", () => {
     expect(repetidos, `estágios contados FORA do círculo:\n${repetidos.join("\n")}`).toEqual([]);
   });
 
+  it("dois títulos da página não abrem com o mesmo assunto", () => {
+    /**
+     * SPEC-85 §0.1 — **o defeito que a trava de cima não pegava.**
+     *
+     * A página trazia `<h2>O ciclo, e o que dele já existe</h2>` e, três linhas
+     * de rolagem abaixo, o componente trazia o seu: `<h2>O ciclo, e onde a IA
+     * entra</h2>`. A trava do §323 compara títulos de ESTÁGIO, e "O ciclo" não é
+     * estágio nenhum — então a repetição mais visível da página passou batida
+     * por uma trava escrita para pegar repetição.
+     *
+     * ## Por que a PRIMEIRA palavra, e não "títulos parecidos"
+     *
+     * Similaridade de texto pede um limiar, e limiar é opinião com número.
+     *
+     * A primeira escrita desta trava usou as **três** primeiras palavras
+     * significativas, e ela deixou o defeito passar: "o ciclo e o que dele ja
+     * existe" abre em `ciclo que dele` e "o ciclo e onde a ia entra" abre em
+     * `ciclo onde ia`. Provei desligando a correção — a trava ficou verde com o
+     * `h2` duplicado de volta na página. Três palavras foi engenhosidade a mais
+     * que mediu a coisa errada.
+     *
+     * O que realmente colidia era **a palavra em que o olho bate ao rolar**.
+     * Dois títulos abrindo em "ciclo" é a repetição, e é mecânico de checar.
+     *
+     * Não pega tudo — dois títulos sobre o mesmo assunto com aberturas
+     * diferentes passam. Pega o que dá para provar sem arbitrar, e pegaria este.
+     */
+    render(<LandingPage onEntrar={() => {}} />);
+    const titulos = [...document.querySelectorAll("h1, h2")].map((h) => h.textContent ?? "");
+
+    const abertura = (t: string) =>
+      t
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}\s]/gu, " ")
+        .split(/\s+/)
+        .filter((p) => p.length > 2)
+        .slice(0, 1)
+        .join(" ");
+
+    const vistos = new Map<string, string>();
+    const colisoes: string[] = [];
+    for (const titulo of titulos) {
+      const chave = abertura(titulo);
+      if (!chave) continue;
+      const anterior = vistos.get(chave);
+      if (anterior) colisoes.push(`"${anterior}" × "${titulo}"`);
+      else vistos.set(chave, titulo);
+    }
+
+    expect(colisoes, `títulos que abrem igual:\n${colisoes.join("\n")}`).toEqual([]);
+  });
+
   it("a `Jornada` NÃO é renderizada aqui — ela é passo a passo de uso, e o lugar dela é pós-login", () => {
     /**
      * A poda da fatia B, afirmada. Sem isto, alguém a traz de volta "porque

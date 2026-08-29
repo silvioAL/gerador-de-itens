@@ -127,9 +127,16 @@ export const CONEXOES: Conexao[] = [
     sentido: "entra",
     titulo: "ADRs da casa",
     detalhe:
-      "As decisões que já foram tomadas entram como contexto e como ponto de partida: um ADR pode virar desenho, e o que veio de fora chega marcado como importado.",
-    estado: "parcial",
-    oQueFalta: "A porta e o adaptador existem; falta a tela para importar.",
+      "As decisões que já foram tomadas entram pela conversa, como texto editável — do mesmo jeito que a voz entra. A pessoa lê antes de enviar, e o que veio de fora chega marcado como importado. A decisão nasce ancorada no desenho que ela ajudou a criar, nunca solta.",
+    /**
+     * SPEC-85 §0.4 — **deixou de ser `parcial`.**
+     *
+     * Dizia *"falta a tela para importar"* e continuou dizendo isso depois de o
+     * §325 entregar a tela e o §326 entregar a importação pela conversa. A trava
+     * da SPEC-84 fatia C cobrava `ESTAGIOS_DO_CICLO`; esta lista mora no arquivo
+     * vizinho, e ninguém a vigiava.
+     */
+    estado: "completo",
   },
   {
     id: "arquitetura-entra",
@@ -137,7 +144,20 @@ export const CONEXOES: Conexao[] = [
     titulo: "Arquitetura de negócio",
     detalhe: "Objetivo, regras permanentes, sistemas e restrições vindos de onde a casa já os guarda.",
     estado: "ausente",
-    oQueFalta: "Avaliado e adiado: depende de a organização ter isso em formato legível, e não medimos.",
+    /**
+     * SPEC-85 fatia B — a frase passou a citar o § que responde por ela.
+     *
+     * *"Avaliado e adiado"* era exatamente o tipo de frase que não envelhece:
+     * continua plausível para sempre, inclusive depois de falsa. É a mesma
+     * lição do §327, aplicada à lista vizinha.
+     *
+     * (E aqui é preciso ser exato: o §324 entregou a PORTA — ler a arquitetura
+     * de negócio da casa por gateway, com proposta campo a campo. O que não
+     * existe é o caminho de entrada automático, porque depende de a organização
+     * guardar isso em formato legível, e disso não temos medição.)
+     */
+    oQueFalta:
+      "O §324 entregou a leitura por gateway e a proposta campo a campo. O que falta é a casa ter isso em formato legível — e disso não temos medição.",
   },
   {
     id: "itens-sai",
@@ -160,9 +180,9 @@ export const CONEXOES: Conexao[] = [
     sentido: "sai",
     titulo: "Spec → desenvolvimento com IA",
     detalhe:
-      "O documento vira instrução executável para um agente de código, com as seções que um documento não tem: a origem, as recusas e as fatias com prova.",
-    estado: "parcial",
-    oQueFalta: "O artefato existe; falta a tela para escrevê-lo e o vínculo aparecer.",
+      "A spec é o que um agente de código consome direto, com as seções que um documento não tem: a origem, as recusas e as fatias com prova. Ela diz quantas lacunas carrega antes de você baixá-la, e nenhum modelo escreve as três — recusar é decidir.",
+    // SPEC-85 §0.4 — deixou de ser `parcial` no §327, que construiu a tela.
+    estado: "completo",
   },
 ];
 
