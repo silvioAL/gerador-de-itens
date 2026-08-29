@@ -12763,3 +12763,57 @@ apontamentos dizem que o caminho estoura a régua de latência e que a política
 tem porquê registrado; e a IA escreve história, contrato e cenários de teste em
 minutos, dentro do que as camadas determinaram. **É isso que "governança perene"
 quer dizer quando sai do slide.**
+
+### Adendo 4 — "negócio" era outra coisa, e a correção melhorou o argumento
+
+O adendo anterior leu *negócio* como domínio modelado no diagrama — `rule`,
+`fico`, `camunda` — e montou o exemplo da página em cima de concessão de crédito.
+**Estava errado**, e o usuário corrigiu:
+
+> *"quando estou falando de negócio eu nem me refiro a FICO e Camunda, e sim aos
+> **processos de construção do software**: as informações de produto e negócio
+> sendo configuradas no sistema, todos os processos de desenho e especificação, o
+> uso das specs no desenvolvimento com IA, o uso dos checklists e informações de
+> negócio na construção dos itens, e a melhoria das configurações, evolução e
+> ajuste dessas coisas com o uso do assistente — ou seja, tudo assistido por IA."*
+
+FICO e Camunda são o **assunto** que a ferramenta ajuda a desenhar. O que
+interessa é o **jeito da casa de construir software**, e o conhecimento de
+produto que alimenta esse jeito. Remedido nessa direção, o argumento ficou mais
+forte, não mais fraco:
+
+**O conhecimento de negócio já é configurado.** `Produto` guarda `objetivo`,
+`quemUsa`, `regrasDeNegocio`, `sistemas`, `restricoes`, `volumetria` e
+`glossario` — perene, por organização, citado por tudo que se gera. Não é anexo
+de demanda: é a camada.
+
+**O processo de construção já é configurado.** `checklistProcesso` e
+`checklistTecnico` (o §20 já os separava), `TesteAutomatizado` com `dev`/`hlg`,
+os templates de especificação, o pipeline de agentes.
+
+**E o achado que fecha "tudo assistido por IA":** dos **oito** tipos de pedido em
+`pedidos.ts`, **dois não falam da entrega — falam da configuração.**
+`montarPedidoSugerirConfig` e `montarPedidoConfigurarConversa` operam sobre a
+própria camada. Os outros seis (diagrama, necessidades, decisões, cenários de
+lentidão, alterar item, pipeline) assistem o trabalho.
+
+> **A IA não assiste só a entrega: ela ajuda a construir e a evoluir a régua.**
+> Somado ao PDCA, que transforma feedback de uso em ajuste aprovado da
+> configuração, o laço fecha — e é o laço que nenhuma skill e nenhum agente solto
+> conseguem fechar, porque não existe camada para eles ajustarem.
+
+Isso responde diretamente ao *"isso não tem sido o suficiente"* do adendo 1, e
+com dado em vez de retórica: a diferença entre agente e camada não é que a camada
+seja mais rígida — é que **ela tem quem a evolua, e a evolução também é
+assistida.**
+
+O exemplo que a página vai andar deixa de ser crédito e passa a ser **o processo
+de especificação da própria casa**, atravessando as quatro camadas com a IA em
+cada passo, inclusive no de melhorar a configuração. E os apontamentos ganharam
+uma leitura nova nessa tabela: **é a camada onde a IA não escreve** — ela é
+calculada, e é o que dá ao modelo um alvo em vez de uma folha em branco.
+
+Duas recusas novas: **afirmar organização de checklist por domínio de negócio**
+(os treze contextos semeados são todos técnicos — gap real, virou a pergunta 5 e
+talvez uma SPEC-84) e **reduzir "negócio" a diagrama de domínio**, que foi
+exatamente o erro desta rodada.

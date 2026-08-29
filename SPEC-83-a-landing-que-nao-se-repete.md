@@ -294,62 +294,79 @@ esquecê-la.
 > conversas de IA, e passa a morar numa camada que dá para versionar, medir e
 > discutir.** É a resposta direta ao *"isso não tem sido o suficiente"* da §1.1.
 
-### 2.6 O conceito aplicado a um processo corporativo — e o que a medição achou
+### 2.6 O conceito aplicado ao processo de construção de software
 
-> *"precisamos da explicação que mostra o conceito sendo aplicado aos processos,
-> que incluem a parte de negócios… ou seja, como conectar tudo isso colocando a
-> **IA no centro como facilitadora e aceleradora**. Esse é o **desafio
-> corporativo** que queremos resolver."* — o usuário.
+> *"quando estou falando de negócio eu nem me refiro a FICO e Camunda, e sim aos
+> **processos de construção do software**: as informações de produto e negócio
+> sendo configuradas no sistema, todos os processos de desenho e especificação, o
+> uso das specs no desenvolvimento com IA, o uso dos checklists e informações de
+> negócio na construção dos itens, e a melhoria das configurações, evolução e
+> ajuste dessas coisas com o uso do assistente — ou seja, **tudo assistido por
+> IA**."* — o usuário, corrigindo.
 
-Conceito explicado em abstrato não convence ninguém: as camadas da §2.2 são
-verdadeiras e não fazem ver. **A página precisa de um processo real atravessando
-as quatro.**
+**A correção importa, e a primeira leitura desta seção estava errada.** Eu tinha
+ido procurar nós de domínio — `rule`, `fico`, `camunda` — e montado o exemplo em
+cima de concessão de crédito. Aquilo é o **assunto** que a ferramenta ajuda a
+desenhar. O que o usuário chama de negócio é o **jeito da casa de construir
+software**, e o conhecimento de produto que alimenta esse jeito.
 
-#### O que a medição encontrou, e é melhor do que eu supunha
+É outro exemplo, e é o certo: **o processo de especificação da própria
+organização.**
 
-O produto **já modela o lado de negócio como tipo de nó de primeira classe** —
-não é aspiração, está em `config/diagrama.example.json`:
+#### O que já existe, medido
 
-| Tipo | Rótulo |
+**O conhecimento de negócio já é configurado.** `Produto`
+(`repositorioDeProdutos.ts`) guarda `objetivo`, `quemUsa`, `regrasDeNegocio`,
+`sistemas`, `restricoes`, `volumetria` e `glossario` — perene, por organização,
+citado por tudo que se gera. Não é anexo de demanda: é a camada.
+
+**O processo de construção já é configurado.** `checklistProcesso` e
+`checklistTecnico` (SPEC-20, *"dois checklists: processo e técnico, com condição
+por nó"*), `TesteAutomatizado` com `dev`/`hlg`, os templates de especificação, e
+o pipeline de agentes. É o "como este time refina" escrito como estrutura.
+
+**E — o achado desta medição — a IA já opera sobre a própria camada.** Dos oito
+tipos de pedido em `pedidos.ts`, **dois não falam da entrega, falam da
+configuração**:
+
+| Pedido | O que ele faz |
 |---|---|
-| `rule` | **Regra de Negócio** |
-| `motor` | **Motor de Regras** |
-| `fico` | **Fluxo Decisão (FICO)** |
-| `camunda` | **Processo Camunda** (orquestração de processo) |
+| `montarPedidoDiagrama` · `Necessidades` · `Decisoes` · `CenariosDeLentidao` · `AlterarItem` · `Pipeline` | assistem **o trabalho** — desenho, decisões, ensaios, itens, especificação |
+| **`montarPedidoSugerirConfig`** · **`montarPedidoConfigurarConversa`** | assistem **a camada** — sugerem e ajustam a configuração do time |
 
-E há cenário de crédito semeado (`config/cenarios/credito-completo.json`,
-`fico.json`). **O desafio corporativo já tem vocabulário no produto.**
+> **É essa a frase que faltava para "tudo assistido por IA".** A IA não assiste só
+> a entrega: ela ajuda a **construir e a evoluir a régua**. Somado ao PDCA, que
+> transforma feedback de uso em ajuste aprovado da configuração, o laço fecha —
+> e é o laço que nenhuma skill e nenhum agente solto conseguem fechar, porque não
+> existe camada para eles ajustarem.
 
-#### E o que ela achou de gap, que a página não pode disfarçar
+#### O exemplo que a página deve andar
 
-**Os `contextos` são todos técnicos.** `app.example.json` traz treze, e todos
-começam com `Backend-`, `Mobile-` ou `Frontend`. `Backend-regras` é um contexto
-**técnico** que por acaso guarda regra de negócio.
+O processo de especificação da casa, atravessando as quatro camadas:
 
-Não existe eixo de **domínio de negócio** — nada de "Crédito", "Cobrança",
-"Onboarding". O campo é string livre, então um time *pode* escrever
-`Credito-regras`; mas **poder não é modelar**, e um checklist "por processo de
-negócio" hoje sai por convenção de nome, não por estrutura.
+| Camada | O que aparece | Onde a IA entra |
+|---|---|---|
+| **Perene** | o produto (objetivo, personas, regras permanentes, glossário, volumetria) e o processo (o que se confere, em que contexto, com que prova) | sugere configuração a partir do que ela leu, e o assistente ajusta em conversa |
+| **Da demanda** | o desenho desta mudança, as decisões com o que foi recusado, os ensaios | propõe o desenho e as necessidades; nada é aplicado sozinho |
+| **Apontamentos** | o que falta, o que contraria o padrão do time, o que estoura a régua, quantas lacunas o documento entrega | não escreve aqui — **isto é calculado**, e é o que dá à IA um alvo em vez de uma folha em branco |
+| **Entrega** | itens de trabalho com checklist do contexto certo, documento, e a spec que um agente de código consome (SPEC-80) | escreve o texto todo: história, contrato, critérios, cenários |
+| **Volta** | o uso vira feedback, o feedback vira ajuste aprovado da configuração | ajuda a redigir o ajuste; **a aprovação é de gente** |
 
-> Isto é achado desta rodada e **não estava em SPEC nenhuma**. A página pode
-> mostrar o conceito aplicado a negócio com honestidade — os nós existem —, mas
-> **não** pode dizer que o produto organiza o trabalho por domínio de negócio.
-> Ver a §10, pergunta 5.
+**O conhecimento de como a casa constrói software para de morar em pessoas e em
+conversas, e passa a ser configuração versionada, medida e evoluída — com a IA
+ajudando em cada passo, inclusive no passo de melhorar a própria configuração.**
 
-#### O exemplo que a página deve andar, ponta a ponta
+#### Um gap relacionado, que a página não pode disfarçar
 
-Concessão de crédito, porque é o cenário que o repositório já semeia:
+Os treze `contextos` de `app.example.json` são **todos técnicos** — começam com
+`Backend-`, `Mobile-` ou `Frontend`. Um checklist contextual "por processo de
+negócio" sai hoje por **convenção de nome** (`Credito-regras`), não por
+estrutura: o campo é string livre, então nada impede dois times de grafarem o
+mesmo domínio de dois jeitos.
 
-| Camada | O que aparece no exemplo |
-|---|---|
-| **Perene** | o que um Fluxo de Decisão **precisa declarar** — política, versão, quem aprova mudança de régua, o que fazer quando o bureau externo não responde. É a `spec` do tipo `fico`, e vale para toda proposta de crédito que a casa desenhar |
-| **Da demanda** | *esta* mudança: o motor de regras novo, a fila que o alimenta, o volume declarado, o ensaio "e se o bureau ficar lento?" |
-| **Apontamentos** | o caminho inteiro estoura a régua de latência acordada; a política não tem porquê registrado; falta declarar o comportamento na queda do bureau |
-| **IA** | escreve a história de usuário, o contrato da conexão, os cenários de teste do processo — **em minutos, e dentro do que as três camadas acima determinaram** |
-
-**A regra de negócio deixa de morar num parágrafo de wiki e passa a ser nó
-tipado, com campos obrigatórios, medido a cada mudança.** É isso que "governança
-perene" quer dizer quando sai do slide.
+> Achado desta rodada, não estava em SPEC nenhuma. A página descreve o
+> conceito aplicado ao processo de construção — o que é verdade — e **não** afirma
+> que o produto organiza checklist por domínio de negócio. Ver §10, pergunta 5.
 
 #### A IA no centro, dita pelo lado positivo
 
@@ -384,10 +401,11 @@ e nenhum decorativo:
    concreto em vez de adjetivo.
 3. **O ciclo** — o `CicloDoProduto`, que já existe e fica. Agora legendado com o
    que ele significa, e não só com o que ele lista.
-4. **O processo atravessando as camadas** (§2.6) — a concessão de crédito
-   descendo pelas quatro, com a IA no meio acelerando. É o único dos quatro que
-   mostra **um caso**, e provavelmente o que mais convence: os outros três
-   explicam o produto, este mostra o **problema de quem chega** já resolvido.
+4. **O processo de construção atravessando as camadas** (§2.6) — o jeito da casa
+   de especificar software descendo pelas quatro, com a IA em cada passo,
+   **inclusive no de melhorar a própria configuração**. É o único dos quatro que
+   mostra o **trabalho de quem chega**, e provavelmente o que mais convence: os
+   outros três explicam o produto, este mostra o problema do leitor já resolvido.
 
 A régua para os três, herdada da SPEC-82: **dirigidos pelos mesmos dados da
 página, para que não consigam mentir.** Um diagrama de camadas que liste uma
@@ -473,10 +491,15 @@ de benefícios num produto cuja tese é que promessa não confirmada não conta.
 de processo*, *governança executável* são palavras fortes, e palavra forte sem
 código atrás é jargão. Cada uma aponta para onde vive — ou sai.
 
-**Afirmar organização por domínio de negócio.** A §2.6 mediu: existem **nós** de
-negócio e só existem **contextos** técnicos. A página mostra o conceito aplicado a
-um processo de negócio — isso é verdade — e não diz que o produto organiza o
-trabalho por domínio, que não é.
+**Afirmar organização de checklist por domínio de negócio.** A §2.6 mediu: os
+contextos semeados são todos técnicos. A página descreve o conceito aplicado ao
+processo de construção — verdade — e não diz que o produto organiza o trabalho por
+domínio, que não é.
+
+**Reduzir "negócio" a diagrama de domínio.** Foi o erro da primeira versão desta
+seção: ler *negócio* como `fico`/`camunda` — o **assunto** que a ferramenta ajuda
+a desenhar — quando o que importa é o **jeito da casa de construir software** e o
+conhecimento de produto que o alimenta. A página tem que falar do segundo.
 
 **Vender a IA só pelo que ela não faz.** *"Propõe, nunca aplica sozinha"* é o
 limite, e sozinho ele vende uma limitação. **Facilitadora e aceleradora** é o
@@ -544,16 +567,13 @@ leitor que esta página quer.
    pé.
 4. **A landing precisa de rota própria?** Ela é renderizada em `App.tsx` **antes**
    de qualquer roteador; seções linkáveis viram trabalho real. Medir na fatia D.
-5. **O eixo de domínio de negócio deveria existir como modelo?** É o achado da
-   §2.6, e é o maior desta rodada: o produto tem **nós** de negócio e só tem
-   **contextos** técnicos. Um checklist "por processo de negócio" sai hoje por
-   convenção de nome (`Credito-regras`), não por estrutura — então nada impede
-   dois times de escreverem o mesmo domínio de dois jeitos, e nada cruza "todas as
-   regras de Crédito" independentemente de onde foram implementadas.
-   **Se o desafio corporativo é o que o usuário diz que é, isto provavelmente é
-   uma SPEC-84** — e é decisão dele, não desta SPEC. O que esta SPEC assume: a
-   página mostra o conceito aplicado a negócio (honesto: os nós existem) e **não**
-   afirma organização por domínio (que não existe).
+5. **O eixo de domínio de negócio deveria existir como modelo?** Achado da §2.6:
+   os treze `contextos` semeados são todos técnicos. Um checklist contextual "por
+   processo de negócio" sai por convenção de nome, não por estrutura — nada impede
+   dois times de grafarem o mesmo domínio de dois jeitos. **Talvez seja uma
+   SPEC-84**, e é decisão do usuário, não desta SPEC. O que esta assume: a página
+   descreve o conceito aplicado ao **processo de construção** (verdade, e medida
+   na §2.6) e **não** afirma organização de checklist por domínio de negócio.
 6. **O `CONCEITO.md` deveria ser publicado como página?** Se ele é a fonte
    canônica, uma versão navegável evita que a landing tente ser o documento
    inteiro — que é como ela virou uma coluna de 760 px.
