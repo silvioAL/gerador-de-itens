@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import type { PropostaDeArquitetura } from "@gerador/aplicacao";
+import { PainelDeProposta } from "./PropostaDeArquitetura";
 import { apiProdutos, type Produto } from "../api/client";
 import { useMontado } from "../state/useMontado";
 import { MarcaDeDemonstracao } from "../demo/dadosDoTour";
@@ -100,6 +102,16 @@ export function ProdutosTab({ timeIds, demonstracao, onConversarComAssistente }:
   const [selecionadoId, setSelecionadoId] = useState<string | null>(null);
   const [nomeNovo, setNomeNovo] = useState("");
   const [rascunho, setRascunho] = useState<Produto | null>(null);
+  /**
+   * SPEC-81 fatia F — a proposta vinda do gateway da casa.
+   *
+   * `null` = ninguém pediu ainda. Aceitar um campo escreve **no rascunho**, e
+   * não no servidor: o texto aparece no campo acima, a pessoa vê antes de
+   * salvar, e o Salvar de sempre é quem grava. Importar não é aceitar, e
+   * aceitar ainda não é gravar.
+   */
+  const [proposta, setProposta] = useState<(PropostaDeArquitetura & { origem: string }) | null>(null);
+  const [importando, setImportando] = useState(false);
   const [termo, setTermo] = useState("");
   const [definicao, setDefinicao] = useState("");
   const [salvo, setSalvo] = useState(false);
@@ -378,9 +390,35 @@ export function ProdutosTab({ timeIds, demonstracao, onConversarComAssistente }:
               Contexto salvo.
             </p>
           )}
+          <button
+            onClick={() => {
+              setImportando(true);
+              void apiProdutos
+                .importarArquitetura(rascunho.id)
+                .then(setProposta)
+                .catch((e: unknown) => setErro(e instanceof Error ? e.message : String(e)))
+                .finally(() => setImportando(false));
+            }}
+            disabled={importando || !!demonstracao}
+            style={botaoFracoEstilo}
+            data-testid="importar-arquitetura"
+          >
+            {importando ? "buscando…" : "↙ Trazer da casa"}
+          </button>
           <button onClick={() => void salvar()} style={botaoPrimarioEstilo} data-testid="salvar-produto">
             Salvar contexto
           </button>
+          {proposta && (
+            <PainelDeProposta
+              proposta={proposta}
+              origem={proposta.origem}
+              onFechar={() => setProposta(null)}
+              onAceitarCampo={(campo) => setRascunho((r) => (r ? { ...r, [campo.campo]: campo.proposto } : r))}
+              onAceitarTermo={(t) => {
+                void executar(() => apiProdutos.salvarTermo(rascunho.id, t.termo, t.definicao), rascunho.id);
+              }}
+            />
+          )}
 
           {/* ── Glossário: a seção que mais muda a escrita ── */}
           <h4 style={subtituloEstilo}>Glossário ({rascunho.glossario.length})</h4>
@@ -526,4 +564,12 @@ const botaoAssistenteEstilo: React.CSSProperties = {
   background: "#4f46e5",
   color: "#fff",
   cursor: "pointer",
+};
+
+/** SPEC-81 — secundário ao lado do Salvar: trazer não é gravar. */
+const botaoFracoEstilo: React.CSSProperties = {
+  ...botaoPrimarioEstilo,
+  background: "transparent",
+  color: "var(--texto)",
+  border: "1px solid var(--borda-forte)",
 };

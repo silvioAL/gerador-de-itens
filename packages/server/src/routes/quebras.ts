@@ -14,14 +14,16 @@ import {
   criarCasosDeUsoDeQuebras,
   criarCasosDeUsoDeItensGerados,
   criarCasosDeUsoDeConfig,
+  comoDecisao,
   destinosDaOperacao,
+  lacunasDaDecisaoImportada,
   normalizarExportador,
 } from "@gerador/aplicacao";
 import type { OpcoesApp } from "../app.js";
 import { criarRepositorioDeQuebrasEmPostgres } from "../adaptadores/quebrasEmPostgres.js";
 import { criarRepositorioDeItensGeradosEmPostgres } from "../adaptadores/itensGeradosEmPostgres.js";
 import { criarExportadorViaAgente } from "../adaptadores/exportadorViaAgente.js";
-import { criarPublicadorDeDocumentoViaGateway } from "../adaptadores/gatewayDoTime.js";
+import { criarLeitorDeAdrViaGateway, criarPublicadorDeDocumentoViaGateway } from "../adaptadores/gatewayDoTime.js";
 import { criarRepositorioDeConfigEmPostgres } from "../adaptadores/configEmPostgres.js";
 import { registrarAuditoria } from "../auditoria.js";
 import { exigirNivel } from "../auth/niveis.js";
@@ -515,6 +517,54 @@ export async function registrarRotasQuebras(app: FastifyInstance, { db, diretori
       // onde a pessoa vai procurar o problema.
       return reply.code(502).send({ erro: erro instanceof Error ? erro.message : String(erro) });
     }
+  });
+
+  /**
+   * SPEC-81 fatia C — **traz os ADRs da casa, marcados.**
+   *
+   * ## O que ela NÃO faz
+   *
+   * Não grava. Devolve as decisões já convertidas e marcadas
+   * (`origem: "extraido"` + `importadoDe`), e quem escolhe o que entra é a
+   * pessoa — o `PUT /quebras/:id` de sempre leva as escolhidas junto do resto.
+   *
+   * Escrever aqui pareceria conveniente e criaria o problema que a fatia inteira
+   * existe para evitar: decisão de terceiro entrando na demanda sem ninguém ter
+   * lido. **Importar não é aceitar.**
+   *
+   * ## As lacunas viajam junto
+   *
+   * ADR pobre é o caso comum, e a tela precisa poder dizer *"esta decisão vem
+   * sem o porquê"* antes de a pessoa aceitá-la. Calcular isso aqui evita que a
+   * tela reimplemente a mesma conta (§263).
+   */
+  app.post("/quebras/:id/adr/importar", { preHandler: podeOperarNaQuebra }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const quebra = await casos.obter(id);
+    if (!quebra) return reply.code(404).send({ erro: "quebra não encontrada" });
+
+    const config = normalizarExportador(
+      (await criarCasosDeUsoDeConfig(criarRepositorioDeConfigEmPostgres(db)).obter("exportador", { endpoint: "", rotulo: "", cabecalhos: {} }))
+        .documento
+    );
+    const destinos = destinosDaOperacao(config, "adr");
+    if (destinos.length === 0) {
+      return reply.code(409).send({
+        erro: "nenhum destino de ADR configurado — cadastre o endereço em Configurações → Exportação, em “Outros destinos”",
+      });
+    }
+
+    const agora = new Date().toISOString();
+    const jaTem = new Set((quebra.decisoes ?? []).map((d) => d.importadoDe).filter(Boolean));
+    const decisoes = (await criarLeitorDeAdrViaGateway(destinos[0]).listar())
+      .map((adr) => comoDecisao(adr, agora))
+      // O que já foi importado não volta na lista: reimportar criaria uma
+      // segunda cópia da mesma decisão da casa, com outro id, e a partir daí
+      // ninguém sabe qual é a original.
+      .filter((d) => !jaTem.has(d.importadoDe))
+      .map((d) => ({ decisao: d, lacunas: lacunasDaDecisaoImportada(d) }));
+
+    return { decisoes, origem: destinos[0].rotulo || destinos[0].endpoint };
   });
 
   app.put("/quebras/:id/itens", { preHandler: podeOperarNaQuebra }, async (req, reply) => {

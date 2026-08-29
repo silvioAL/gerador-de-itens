@@ -13643,3 +13643,63 @@ descrever o produto à mão.
 
 579 engine · 133 llm · 122 aplicação · 831 web · 281 server · 39 gateway-falso ·
 104/104 E2E · build, typecheck e lint limpos.
+
+## §325 — as telas de importação, e a que eu não construí
+
+O §324 entregou porta e adaptador da fatia F e disse, em voz alta, o que faltava:
+*"as telas de importar ADR e de importar arquitetura de negócio não existem"*.
+Esta rodada paga uma e **recusa a outra**, com motivo.
+
+### A régua que une as duas rotas: importar não é aceitar
+
+Nenhuma das duas grava. Elas leem do gateway, comparam com o que já está aqui, e
+devolvem — quem escreve continua sendo o `PUT` de sempre, com a auditoria de
+sempre. Gravar direto pareceria conveniente e criaria exatamente o problema que
+as fatias existem para evitar: **dado de terceiro entrando sem ninguém ter
+lido.**
+
+E as duas são `POST`, não `GET`, porque **chamam sistema externo**: não são
+cacheáveis, não são idempotentes do lado de lá, e um `GET` convidaria navegador e
+proxy a repeti-las sozinhos.
+
+### A arquitetura de negócio, campo a campo
+
+O painel não tem **"aceitar tudo"**, e a ausência é a decisão de projeto da
+rodada. Um botão único transformaria a importação num `overwrite` com passo
+extra: a pessoa clicaria sem ler, e o texto que alguém desta casa escreveu
+sumiria sem ninguém notar.
+
+Três situações, e só duas viram linha na tela:
+
+- `novo` mostra **só o lado de lá** — repetir "(vazio)" para o lado de cá seria
+  ruído, porque é justamente por estar vazio que a linha apareceu;
+- `diverge` mostra **os dois**, e é a única em que existe algo a perder. É onde a
+  régua do §306 vale: *declarado vence herdado, e a tela diz qual é qual*;
+- `igual` não aparece, e a caixa diz *"nada a trazer"* — pedir decisão sobre o
+  que não muda é a definição de ruído.
+
+E **aceitar escreve no rascunho, não no servidor**: o texto aparece no campo
+acima, a pessoa vê antes de salvar, e o Salvar de sempre é quem grava. Importar
+não é aceitar, e aceitar ainda não é gravar.
+
+### A tela que eu NÃO construí, e por quê
+
+A de importar ADR fica. Não é falta de tempo:
+
+> Um ADR importado nasce **sem âncora** — de propósito, porque a âncora nasce
+> quando o desenho nasce dele (fatia D). E hoje as decisões só são editadas **por
+> nó**, em `DecisoesDoNo`. **Não existe lugar onde uma decisão sem nó apareça.**
+
+Onde mora uma decisão não ancorada é decisão de produto, não detalhe de
+implementação — e inventá-la ao fim de uma sequência longa seria eu decidir
+sozinho a forma de uma tela que ainda não existe. As duas saídas plausíveis:
+
+1. **Um painel no contexto da demanda** — "o que a casa já decidiu", ao lado do
+   contexto do épico. É onde um ADR importado *é* contexto.
+2. **A fatia D primeiro** — importar já virando desenho, e a decisão nascendo
+   ancorada. Some o problema em vez de resolvê-lo, mas é mais trabalho.
+
+A rota e o cliente ficam prontos e alcançáveis; o que falta é a decisão.
+
+579 engine · 133 llm · 122 aplicação · 839 web · 291 server · 39 gateway-falso ·
+104/104 E2E · build, typecheck e lint limpos.
