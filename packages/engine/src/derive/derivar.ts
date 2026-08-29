@@ -252,6 +252,19 @@ function derivarConformidade(
 ): Atividade[] {
   return avaliarConformidade(diagrama, config, quebra.regras, quebra.excecoes, quebra.tokens)
     .filter((v) => !v.excecao)
+    /**
+     * SPEC-79 §5 — **`aviso` aparece na prontidão e não vira item.**
+     *
+     * É a única diferença de comportamento entre as duas severidades, e é onde
+     * ela precisa estar: o §318 tentou enviar regras de design system no
+     * template de fábrica e o E2E barrou, porque isso faria o backlog de toda
+     * organização crescer por uma régua que ela nunca escreveu.
+     *
+     * Ausente = `erro`, o comportamento de sempre. Régua que algum time já
+     * escreveu continua cobrando exatamente como cobrava — enfraquecer o que
+     * existe seria pior que não ter o campo, porque ninguém perceberia.
+     */
+    .filter((v) => v.severidade !== "aviso")
     .map((v) => {
     const no = diagrama.nodes.find((n) => n.id === v.noId)!;
     const cfg = config.nodeTypes[no.type];

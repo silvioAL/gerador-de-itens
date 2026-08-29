@@ -13306,3 +13306,78 @@ entregue.
 
 574 engine · 133 llm · 113 aplicação · 813 web · 267 server · 39 gateway-falso ·
 104/104 E2E · build, typecheck e lint limpos.
+
+## §320 — aviso e erro, e a correção de um diagnóstico que eu tinha errado (SPEC-79 §5)
+
+Esta rodada existe por causa de um veto: o §318 tentou enviar a régua de design
+system no template de fábrica, o E2E barrou, e eu reverti. O que faltava era o
+mecanismo que a SPEC-79 §5 já tinha recomendado — *"régua nova nasce como aviso,
+e o time promove a erro quando quiser"*.
+
+### O mecanismo
+
+`Requisito.severidade`, e a diferença é só uma: **`aviso` aparece na prontidão e
+não vira item de trabalho.** `erro` deriva item, como sempre foi.
+
+**Ausente é `erro`**, e a escolha de default é a decisão mais importante do
+campo. `aviso` como default silenciaria régua que algum time já escreveu de
+propósito — e **ninguém perceberia**: as cobranças simplesmente sumiriam do
+backlog. Um default que enfraquece o que já existe é pior que a ausência do
+campo.
+
+A severidade viaja **na violação**, e não é reconsultada na regra por quem a
+exibe: a tela e a derivação precisam da mesma resposta, e reler a config em dois
+lugares é como as duas divergem na primeira mudança (§263).
+
+E ela respeita a exceção do §242 como qualquer outra violação. Se a válvula só
+valesse para `erro`, a pessoa aprenderia que umas violações se aceitam e outras
+se ignoram — que é o §230 ao contrário.
+
+### O diagnóstico do §318 estava errado, e a medição custou três tentativas
+
+O §318 afirma que o E2E barrou porque *"uma instalação limpa nasce sem grupo de
+Frontend, e eu tinha mudado isso"*. **Não era isso.**
+
+Com a régua reenviada, o teste falhou de novo — e aí a medição foi feita direito:
+
+1. **Primeiro erro meu:** presumi que o servidor mesclava o template na leitura.
+   Medido contra a stack real, o fallback é **por documento**: time sem
+   documento recebe o template; time com documento recebe o dele. O `strip` do
+   teste funcionava.
+2. **Segundo:** o teste guarda estado entre execuções, e as minhas rodadas falhas
+   nunca chegavam ao `finally` que restaura. Limpei o documento do time no banco
+   de E2E e rodei de novo — falhou igual, o que descartou a poluição.
+3. **A causa real** estava escrita no próprio comentário do teste, três linhas
+   acima do ponto que eu vinha olhando:
+
+> *"o contexto por clique (**Frontend não tem contexto próprio**, então o menu
+> cai na lista completa — o fallback documentado)"*
+
+A SPEC-79 acrescentou o tipo de nó `Tela` e, com ele, o contexto
+`Frontend-interface`. Frontend passou a ter contexto próprio, o menu parou de
+cair no fallback, e `Mobile-android` deixou de ser oferecido. O teste esperava
+por uma opção que não existe mais.
+
+> **Nada a ver com grupo, nem com template, nem com backlog.** Eu tinha lido o
+> vermelho, construído uma explicação plausível e a escrito no JOURNEY como se
+> fosse medição. O snapshot do Playwright dizia a verdade desde a primeira
+> falha — o grupo `Frontend` estava lá, **criado com sucesso pelo clique do
+> teste**, o que sozinho já refutava a minha explicação.
+
+O teste foi reescrito com o motivo dito, e ficou **mais forte**: agora exercita o
+caminho normal (o contexto que pertence à tech) em vez do fallback.
+
+### O que entrou junto
+
+Com `severidade` existindo, o que o §318 reverteu volta — desta vez marcado como
+`aviso`: o tipo de nó `Tela` com os estados que uma interface precisa declarar, o
+contexto `Frontend-interface`, e as três regras de design system. **Duas
+computáveis e uma sem checagem**, que é a régua da SPEC-79 §1.3 em forma de
+configuração: contraste é aritmética, pertencimento é conferível, e *"a
+hierarquia visual conduz o olho"* é checklist de gente.
+
+A paleta foi de 17 para 18 tipos, e o teste que a conta foi atualizado — o
+comentário dele já pedia isso de quem acrescentasse um tipo.
+
+579 engine · 133 llm · 113 aplicação · 813 web · 267 server · 39 gateway-falso ·
+104/104 E2E · build, typecheck e lint limpos.

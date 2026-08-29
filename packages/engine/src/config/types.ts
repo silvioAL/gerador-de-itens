@@ -322,6 +322,33 @@ export interface Requisito {
    * de migração") — achado real: os dois apareciam juntos pra todo nó do
    * contexto, novo ou existente. */
   when?: Condicao;
+  /**
+   * SPEC-79 §5 — **quanto esta régua cobra.**
+   *
+   * `erro` — a violação vira **item de trabalho derivado**, como sempre foi.
+   * `aviso` — a violação aparece na prontidão e **não gera item**.
+   *
+   * ## Por que isto precisou existir
+   *
+   * O §318 tentou enviar regras de design system no template de fábrica e o E2E
+   * barrou, com razão: uma regra nova no template muda, **em silêncio**, o que
+   * uma instalação limpa é — e toda organização que atualizasse passaria a ver
+   * o backlog crescer por uma régua que ela nunca escreveu.
+   *
+   * A SPEC-79 §5 já tinha recomendado a saída: *"régua nova nasce como aviso, e
+   * o time promove a erro quando quiser"*. `problemasDoTemplate` já separava
+   * erros de avisos para o template; isto é a mesma distinção, um nível abaixo.
+   *
+   * ## Por que o default é `erro`, e não `aviso`
+   *
+   * Porque é o comportamento de hoje, e **mudá-lo silenciaria régua que algum
+   * time já escreveu de propósito.** Um default que enfraquece o que já existe
+   * é pior que a ausência do campo: ninguém percebe, e as cobranças somem.
+   *
+   * Quem nasce `aviso` é o que **nós** enviamos — a régua da casa continua
+   * cobrando como sempre cobrou.
+   */
+  severidade?: "aviso" | "erro";
 }
 
 export interface TesteAutomatizado {
