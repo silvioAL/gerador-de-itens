@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { ChecklistDoProduto } from "./ChecklistDoProduto";
 import type { PropostaDeArquitetura } from "@gerador/aplicacao";
 import { PainelDeProposta } from "./PropostaDeArquitetura";
 import { apiProdutos, type Produto } from "../api/client";
@@ -383,6 +384,22 @@ export function ProdutosTab({ timeIds, demonstracao, onConversarComAssistente }:
               </p>
             )}
           </div>
+
+          {/**
+           * SPEC-86 fatia C — o checklist deste produto.
+           *
+           * Aqui, e não na tela de regras do time, pelo mesmo motivo que a
+           * volumetria acima: é do PRODUTO, é perene, e quem o edita está
+           * pensando no produto — não no processo da casa.
+           *
+           * Só aparece com o produto salvo: sem `id` não há onde gravar, e um
+           * campo que perde o que se digita é pior que campo nenhum.
+           */}
+          {rascunho.id && (
+            <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px solid var(--borda)" }}>
+              <ChecklistDoProduto produtoId={rascunho.id} timeId={timeIds[0]} />
+            </div>
+          )}
 
           {erro && <p style={{ fontSize: 12, color: "var(--vermelho)", marginTop: 8 }}>{erro}</p>}
           {salvo && !erro && (

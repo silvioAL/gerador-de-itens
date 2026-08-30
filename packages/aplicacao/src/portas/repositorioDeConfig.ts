@@ -50,10 +50,31 @@ export interface DocumentoConfig {
 export interface RepositorioDeConfig {
   /** O do time, se houver; senão o global; senão `null` (nunca editado). */
   obter(chave: ChaveConfig, timeId?: string): Promise<DocumentoConfig | null>;
+  /**
+   * SPEC-86 fatia B — o documento de um PRODUTO, sem escada nenhuma.
+   *
+   * Método próprio, e não um parâmetro a mais no `obter`, **porque a semântica é
+   * outra**: o `obter` resolve `time → global → template`, que é substituição —
+   * quem tem o próprio não vê o de cima. Aqui não há degrau: ou o produto
+   * declarou o documento, ou não declarou (`null`), e quem soma as duas coisas é
+   * `regrasEmVigor`, no engine.
+   *
+   * Enfiar isto no `obter` faria o produto herdar por substituição, que é
+   * exatamente o congelamento que a SPEC-86 §1 existe para evitar.
+   */
+  obterDoProduto(chave: ChaveConfig, timeId: string, produtoId: string): Promise<DocumentoConfig | null>;
   /** Upsert pela chave natural (`chave`, `timeId`). */
   salvar(
     chave: ChaveConfig,
     timeId: string,
+    documento: unknown,
+    versaoTemplate: string | null
+  ): Promise<DocumentoConfig>;
+  /** Upsert do documento de um produto — chave natural (`chave`, `timeId`, `produtoId`). */
+  salvarDoProduto(
+    chave: ChaveConfig,
+    timeId: string,
+    produtoId: string,
     documento: unknown,
     versaoTemplate: string | null
   ): Promise<DocumentoConfig>;

@@ -5,7 +5,7 @@ import type { OpcoesApp } from "../app.js";
 import { registrarAuditoria } from "../auditoria.js";
 import { exigirSessao } from "../auth/middleware.js";
 import { exigirPermissao, organizacaoPadraoDe, SECOES_DE_REGRAS, type Recurso } from "../auth/permissoes.js";
-import { configDocumentos, pdcaFeedback, pdcaUsos, quebras, solicitacoesAjuste, produtos } from "../db/schema.js";
+import { ALVO_CONFLITO_CONFIG, configDocumentos, pdcaFeedback, pdcaUsos, quebras, solicitacoesAjuste, produtos } from "../db/schema.js";
 import {
   aplicarOperacao,
   aplicarOperacaoNoPipeline,
@@ -198,7 +198,7 @@ export async function registrarRotasPdca(app: FastifyInstance, { db, diretorioCo
         .insert(configDocumentos)
         .values({ chave: CHAVE_CONFIG_PDCA, timeId: GLOBAL, documento: corpo.data })
         .onConflictDoUpdate({
-          target: [configDocumentos.chave, configDocumentos.timeId],
+          target: [...ALVO_CONFLITO_CONFIG],
           set: { documento: corpo.data, atualizadoEm: sql`now()` },
         });
       registrarAuditoria(db, { email: req.usuario!.email, acao: "atualizar", recurso: "pdca_config", recursoId: GLOBAL });
@@ -602,7 +602,7 @@ export async function registrarRotasPdca(app: FastifyInstance, { db, diretorioCo
         .insert(configDocumentos)
         .values({ chave: alvo, timeId: GLOBAL, documento: documentoNovo })
         .onConflictDoUpdate({
-          target: [configDocumentos.chave, configDocumentos.timeId],
+          target: [...ALVO_CONFLITO_CONFIG],
           set: { documento: documentoNovo, atualizadoEm: new Date() },
         });
     }

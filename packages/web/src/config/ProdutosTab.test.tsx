@@ -11,6 +11,20 @@ vi.mock("../api/client", () => ({
     salvarTermo: vi.fn(),
     excluirTermo: vi.fn(),
   },
+  /**
+   * SPEC-86 fatia C — a aba passou a renderizar `ChecklistDoProduto`, que
+   * consulta as regras em vigor ao montar.
+   *
+   * Sem isto no mock, `apiRegrasDoProduto` chega `undefined` e a aba inteira
+   * estoura — foram doze specs vermelhas que não têm nada a ver com checklist.
+   * Completar o mock é o certo: **mock incompleto é uma mentira sobre o
+   * contrato**, e a resposta vazia mantém estas specs no cenário que elas
+   * descrevem (produto sem regra própria declarada).
+   */
+  apiRegrasDoProduto: {
+    obter: async () => ({ documento: { tipos: [], tamanhos: [], porTech: {} }, origemDe: {}, doProduto: 0, declaradoNoProduto: null }),
+    salvar: vi.fn(),
+  },
 }));
 
 import { apiIa, apiProdutos, type Produto } from "../api/client";
