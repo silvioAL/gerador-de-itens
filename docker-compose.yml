@@ -112,7 +112,17 @@ services:
     # §308 custou três rodadas para diagnosticar, e que o comentário de porta do
     # `playwright.config.ts` já documenta para o servidor (4100, não 4000).
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:4123/health || exit 1"]
+      # `127.0.0.1`, e NÃO `localhost` — a diferença não é estilo.
+      #
+      # O processo escuta em `0.0.0.0` (IPv4). Na imagem `node:alpine`,
+      # `localhost` resolve `::1` (IPv6) primeiro, e o `wget` recebe "connection
+      # refused" contra um endereço em que ninguém está ouvindo. O serviço
+      # subia, respondia, e o compose o marcava `unhealthy` para sempre.
+      #
+      # Achado olhando `docker compose ps` depois do §336: `wget` de dentro do
+      # container contra `127.0.0.1` devolvia `ok` enquanto o healthcheck falhava
+      # — que é a assinatura exata deste defeito.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4123/health || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 10

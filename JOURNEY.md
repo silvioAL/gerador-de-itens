@@ -14524,3 +14524,42 @@ O critério continua sendo o pior caso, não a média.
 
 609 engine · 133 llm · 122 aplicação · 910 web · 311 server · 42 gateway-falso ·
 113/113 E2E · build, typecheck e lint limpos.
+## §337 — o dublê estava saudável e o compose dizia que não
+
+Achado ao conferir a stack depois do §336, olhando `docker compose ps`:
+
+```
+gateway-falso   Up 7 minutes (unhealthy)
+```
+
+E ele **não estava quebrado.** De dentro do container:
+
+```
+$ wget -qO- http://localhost:4123/health   → can't connect to remote host: Connection refused
+$ wget -qO- http://127.0.0.1:4123/health   → ok
+```
+
+O processo escuta em `0.0.0.0` (IPv4, por `GATEWAY_FALSO_HOST`). Na imagem
+`node:alpine`, **`localhost` resolve `::1` primeiro** — e ninguém está ouvindo em
+IPv6. O healthcheck batia num endereço vazio e marcava como doente um serviço que
+respondia normalmente.
+
+### Por que isso importava mais depois do §332
+
+Enquanto o dublê era só conveniência de desenvolvimento, um `unhealthy` cosmético
+incomodava e não fazia mal. Desde a SPEC-89 ele é o que faz **uma instalação nova
+responder** — então `docker compose up --wait` passa a esperar por um serviço que
+nunca vai ser declarado saudável, e quem lê `ps` conclui que a peça central da
+demonstração está fora do ar.
+
+Um sinal de saúde errado é pior que sinal nenhum: ele ensina a ignorar o painel.
+
+### O que a rodada não fez, e é decisão
+
+**Não escrevi teste para isto.** A verificação é `docker compose ps` depois de
+subir, e travá-la exigiria a suíte controlar o ciclo de vida do compose — que é
+justamente o que o §308 mediu como caro e frágil. O que sobra é a prova manual,
+feita e registrada aqui: `127.0.0.1` responde, `localhost` recusa, e o status
+virou `healthy` no rebuild.
+
+Rodada de uma linha, com o diagnóstico escrito ao lado dela.
