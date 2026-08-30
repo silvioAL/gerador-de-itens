@@ -32,30 +32,19 @@ export const PRODUTO_DO_TOUR: Produto = {
   atualizadoEm: "2026-01-01T00:00:00.000Z",
 };
 
-/** A conversa que "produziu" o desenho que o tour já tem na mesa. */
-export const CONVERSA_DO_TOUR: {
-  autor: "voce" | "agente";
-  texto: string;
-  proposta?: DiagramaProposto;
-}[] = [
-  {
-    autor: "voce",
-    texto:
-      "Preciso de um serviço de catálogo de produtos, otimizado para leitura, guardando os dados numa coleção nova.",
-  },
-  {
-    autor: "agente",
-    texto:
-      "Proponho dois componentes: um serviço que expõe o catálogo por API e uma coleção Mongo para os produtos. O serviço escreve na coleção.",
-    proposta: {
-      nos: [
-        { id: "n1", tipo: "service", rotulo: "srv-catalogo", motivo: "Expõe o catálogo por API versionada." },
-        { id: "n2", tipo: "mongo", rotulo: "produtos", motivo: "Guarda o catálogo, otimizado para leitura." },
-      ],
-      arestas: [{ de: "n1", para: "n2", tipo: "writes", motivo: "O serviço mantém o catálogo atualizado." }],
-    },
-  },
-];
+/**
+ * SPEC-89 fatia C — a `CONVERSA_DO_TOUR` foi embora daqui.
+ *
+ * Era uma transcrição escrita à mão, com a proposta de diagrama inventada, e o
+ * passo do tour afirmava que o desenho na mesa *"nasceu da conversa ao lado"*.
+ * Nada nascia de nada — e o passo final convidava a pessoa a digitar, o que numa
+ * instalação sem credencial devolvia 503.
+ *
+ * Com o dublê declarado (SPEC-89 fatia A), a conversa roda de verdade. O que
+ * fica aqui é só o que **não tem como** vir do produto numa instalação nova: o
+ * produto de exemplo, as regras e as decisões, que precisariam ser escritas por
+ * alguém antes de existirem.
+ */
 
 /**
  * §235 — os tokens do TOUR. Dado exclusivo da demonstração, como os vizinhos:

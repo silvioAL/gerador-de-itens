@@ -85,7 +85,7 @@ import { contextoDoProdutoEmTexto, montarMapaDoSistema, type ExecucaoDoPapel } f
 import { ConfigScreen, type AbaConfig } from "./config/ConfigScreen";
 import { TourOverlay } from "./demo/TourOverlay";
 import { useTour, passosDeConfiguracao } from "./demo/useTour";
-import { CONVERSA_DO_TOUR, DECISOES_DO_TOUR, REGRAS_DO_TOUR, ehDecisaoDeDemonstracao } from "./demo/dadosDoTour";
+import { DECISOES_DO_TOUR, REGRAS_DO_TOUR, ehDecisaoDeDemonstracao } from "./demo/dadosDoTour";
 import { DocumentoScreen } from "./documento/DocumentoScreen";
 import { SistemaScreen } from "./sistema/SistemaScreen";
 import { AvisosDaDerivacao } from "./summary/AvisosDaDerivacao";
@@ -2285,7 +2285,6 @@ function AppCarregado({
             techs={appConfig.techs}
             contextos={appConfig.contextos}
             contextoInicial={quebra.demandInfo}
-            mensagensDeDemonstracao={demonstracaoDoTour ? CONVERSA_DO_TOUR : undefined}
             onAplicar={(proposta) => {
               aplicarDiagramaProposto(proposta);
               // SPEC-37 M3 — a proposta aplicada é o gatilho da fala de

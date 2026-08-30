@@ -20,7 +20,6 @@ export interface ConversaPanelProps {
    * que "produziu" o desenho que a mesa já tem. Abrir a conversa vazia no tour
    * mostraria uma caixa de texto e nada mais — e chamar o modelo de verdade
    * faria a demonstração depender de credencial e de rede. */
-  mensagensDeDemonstracao?: Mensagem[];
   /**
    * SPEC-81 fatia D — a demanda aberta, para trazer os ADRs da casa.
    *
@@ -67,12 +66,20 @@ export function ConversaPanel({
   techs,
   contextos,
   contextoInicial,
-  mensagensDeDemonstracao,
   quebraId,
   onAplicar,
 }: ConversaPanelProps) {
   const [mensagens, setMensagens] = useState<Mensagem[]>(
-    mensagensDeDemonstracao ?? [
+    /**
+     * SPEC-89 fatia C — a conversa de demonstração SAIU.
+     *
+     * Havia uma prop `mensagensDeDemonstracao` que o tour preenchia com uma
+     * transcrição escrita à mão, enquanto o passo afirmava que o desenho na mesa
+     * "nasceu da conversa ao lado". Com o dublê declarado, a conversa roda de
+     * verdade e a frase fica verdadeira — a prop virou código morto e foi
+     * embora com ela.
+     */
+    [
       {
         autor: "agente",
         texto:

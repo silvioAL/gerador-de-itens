@@ -27,7 +27,20 @@ services:
     environment:
       DATABASE_URL: postgres://gerador:gerador@db:5432/gerador
       CONFIG_DIR: /app/config
-      ORIGEM_WEB: http://localhost:8080
+      ORIGEM_WEB: http://localhost:8080
+      # SPEC-89 — DECLARA que o dublê está nesta implantação.
+      #
+      # Com esta variável, uma instalação nova já responde: sem credencial
+      # cadastrada, o servidor usa o gateway falso e marca tudo como simulado.
+      # É o que faz a última frase do tour ("descreva a sua demanda e o agente
+      # propõe") ser verdadeira desde o primeiro `docker compose up`.
+      #
+      # **Uma implantação de produção NÃO define esta variável**, e aí o 503 de
+      # "IA não configurada" continua sendo o comportamento. Adivinhar o dublê
+      # em vez de exigir a declaração faria o produto responder com texto
+      # inventado onde ninguém configurou gateway — e ninguém notaria até
+      # alguém aprovar um documento escrito por um dublê.
+      GATEWAY_FALSO_URL: http://gateway-falso:4123/v1
       # AUTH_MODE=dev é o padrão local/E2E: login aceita só o e-mail, sem IdP
       # (ver SPEC-08 §2.1). O botão "entrar com Google" da LoginScreen só
       # aparece quando o servidor responde `oidc` em /auth/modo — então nesta
