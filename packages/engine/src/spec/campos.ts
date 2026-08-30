@@ -1,6 +1,6 @@
 import type { Aresta, No } from "../model/types.js";
 import type { FieldSpec, PerfilTime } from "../config/types.js";
-import { avaliarCondicao } from "./condicoes.js";
+import { avaliarCondicao, type ContextoDaCondicao } from "./condicoes.js";
 
 const TEMPLATE_RE = /\{\{(\w+)\}\}/g;
 
@@ -8,10 +8,12 @@ const TEMPLATE_RE = /\{\{(\w+)\}\}/g;
 export function camposVisiveis(
   specDoTipo: FieldSpec[],
   no: No,
-  arestasDoDiagrama: Aresta[]
+  arestasDoDiagrama: Aresta[],
+  /** SPEC-87 — o regime da demanda. Ausente = como sempre foi. */
+  contexto: ContextoDaCondicao = {}
 ): FieldSpec[] {
   return specDoTipo.filter(
-    (campo) => !campo.when || avaliarCondicao(campo.when, no, arestasDoDiagrama)
+    (campo) => !campo.when || avaliarCondicao(campo.when, no, arestasDoDiagrama, contexto)
   );
 }
 

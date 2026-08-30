@@ -2341,8 +2341,10 @@ function AppCarregado({
                 ),
               }));
             }}
-            onSalvar={(demandInfo, anexosContexto, produtoId, necessidades, volumetria) =>
-              setQuebra((q) => ({ ...q, demandInfo, anexosContexto, produtoId, necessidades, volumetria }))
+            modoDeOperacao={quebra.modoDeOperacao}
+            modosDoTime={regrasVisiveis?.modos ?? []}
+            onSalvar={(demandInfo, anexosContexto, produtoId, necessidades, volumetria, modoDeOperacao) =>
+              setQuebra((q) => ({ ...q, demandInfo, anexosContexto, produtoId, necessidades, volumetria, modoDeOperacao }))
             }
             onFechar={() => setAbaAssistente(null)}
           />

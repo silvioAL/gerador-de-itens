@@ -522,6 +522,24 @@ export interface Quebra {
    * como antes desta SPEC.
    */
   volumetria?: VolumetriaDaDemanda;
+  /**
+   * SPEC-87 (P5) — **o regime em que este desenho opera.**
+   *
+   * Um perfil nomeado pelo time — "tráfego de Black Friday", "batch noturno",
+   * "interno de baixo volume". Não é carga simulada e não é hipótese: é uma
+   * afirmação sobre esta demanda, e é ela que faz uma régua com
+   * `when: { modo: [...] }` valer ou não.
+   *
+   * **Um só, e não lista.** Um desenho "que vale para normal E para pico" é um
+   * desenho para pico — o regime mais severo manda, e deixar marcar os dois
+   * produziria a pergunta "e quando discordam?" sem resposta. Comparar dois
+   * regimes é P6 (variante), que é outra SPEC.
+   *
+   * Ausente é o padrão: régua sem `modo` continua aparecendo sempre; régua com
+   * `modo` não aparece. Ver `avaliarCondicao`, que documenta por que "sem modo"
+   * não vale como "vale tudo".
+   */
+  modoDeOperacao?: string;
   /** §242 — as violações de padrão aceitas DE PROPÓSITO nesta quebra. */
   excecoes?: ExcecaoDePadrao[];
   /** SPEC-57 fatia C — as escolhas entre alternativas, com o porquê. Ausente em

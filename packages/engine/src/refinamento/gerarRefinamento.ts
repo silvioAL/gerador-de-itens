@@ -1,6 +1,6 @@
 import type { Aresta, No, ValorSpec } from "../model/types.js";
 import type { Condicao, ItemProcesso, RegrasConfig, Requisito, TesteAutomatizado } from "../config/types.js";
-import { avaliarCondicao } from "../spec/condicoes.js";
+import { avaliarCondicao, type ContextoDaCondicao } from "../spec/condicoes.js";
 
 /**
  * Casamento parcial e sem case, igual ao legado: um requisito com
@@ -155,7 +155,9 @@ export function gerarChecklistTecnico(
   contextos: string[],
   nos: No[],
   arestas: Aresta[],
-  respostas?: Record<string, ValorSpec>
+  respostas?: Record<string, ValorSpec>,
+  /** SPEC-87 (P5) — o regime da demanda, para as réguas condicionadas por modo. */
+  contexto: ContextoDaCondicao = {}
 ): string {
   const blocos: string[] = [];
   for (const tech of techs) {
@@ -168,7 +170,7 @@ export function gerarChecklistTecnico(
     // `?? []` trata "faltando" como "nenhum item técnico pra essa tech", nunca
     // como erro fatal de renderização.
     const relevantes = requisitosRelevantes(porTech.checklistTecnico ?? [], contextos).filter((r) =>
-      condicaoBate(r, nos, arestas)
+      condicaoBate(r, nos, arestas, contexto)
     );
     if (relevantes.length === 0) continue;
 
@@ -202,14 +204,16 @@ export function gerarChecklistProcesso(
   techs: string[],
   contextos: string[],
   nos: No[],
-  arestas: Aresta[]
+  arestas: Aresta[],
+  /** SPEC-87 (P5) — o regime da demanda. */
+  contexto: ContextoDaCondicao = {}
 ): string {
   const blocos: string[] = [];
   for (const tech of techs) {
     const porTech = regras.porTech[tech];
     if (!porTech?.checklistProcesso) continue;
     const relevantes = porTech.checklistProcesso.filter(
-      (item) => contextoBate(item.contextos, contextos) && condicaoBate(item, nos, arestas)
+      (item) => contextoBate(item.contextos, contextos) && condicaoBate(item, nos, arestas, contexto)
     );
     if (relevantes.length === 0) continue;
 
@@ -227,9 +231,29 @@ export function gerarChecklistProcesso(
  * (`ItemProcesso`) — os dois só diferem no `texto`/`contextos`, a regra de
  * avaliação do `when` é idêntica. */
 /** Idem — o `when` de um requisito vale para conferir tanto quanto para listar. */
-export function condicaoBate(item: { when?: Condicao }, nos: No[], arestas: Aresta[]): boolean {
+export function condicaoBate(
+  item: { when?: Condicao },
+  nos: No[],
+  arestas: Aresta[],
+  /** SPEC-87 — o regime da demanda, para o `when` poder olhá-lo. */
+  contexto: ContextoDaCondicao = {}
+): boolean {
   if (!item.when) return true;
-  return nos.some((no) => avaliarCondicao(item.when!, no, arestas));
+  /**
+   * SPEC-87 — **o nó de mentira foi tentado aqui, e o teste o derrubou.**
+   *
+   * A ideia era: uma condição de modo não olha o nó, então com o desenho vazio
+   * ela deveria poder valer. Escrevi um `NO_VAZIO` para isso — e ele nascia com
+   * `status: "novo"`, que é um status REAL. Toda régua condicionada por
+   * `nodeStatus: "novo"` passou a bater contra um nó que não existe, e o
+   * `exportar.test.ts` acusou na hora.
+   *
+   * Não era só o status: qualquer valor que eu escolhesse seria um valor que
+   * alguma régua pode perguntar. E o caso nem existe — `nos` são os nós de
+   * ORIGEM de uma atividade, e atividade sem nó não é derivada. Era risco puro
+   * por um caso que o produto não produz.
+   */
+  return nos.some((no) => avaliarCondicao(item.when!, no, arestas, contexto));
 }
 
 /** Campos fixos do bloco de volumetria — nome e ordem exigidos pelo agente de
@@ -319,7 +343,11 @@ export function listarPlaceholders(
   techs: string[],
   contextos: string[],
   nos: No[],
-  arestas: Aresta[]
+  arestas: Aresta[],
+  /** SPEC-87 (P5) — o regime da demanda. Os placeholders têm que ser os MESMOS
+   * que o checklist mostra: uma régua condicionada por modo que não aparecesse
+   * aqui viraria pergunta sem lugar para a resposta. */
+  contexto: ContextoDaCondicao = {}
 ): PlaceholderRefinamento[] {
   // Toda atividade precisa de história + critérios de aceite, independente
   // de ter regra técnica configurada pra sua tech (Fase 1d-ii, SPEC-23) — o
@@ -342,7 +370,7 @@ export function listarPlaceholders(
     const porTech = regras.porTech[tech];
     if (!porTech) continue;
     const relevantes = requisitosRelevantes(porTech.checklistTecnico ?? [], contextos).filter((r) =>
-      condicaoBate(r, nos, arestas)
+      condicaoBate(r, nos, arestas, contexto)
     );
     for (const r of relevantes) {
       placeholders.push({ chave: chaveChecklistTecnico(tech, r.texto), tech, secao: "checklistTecnico", rotulo: r.texto });

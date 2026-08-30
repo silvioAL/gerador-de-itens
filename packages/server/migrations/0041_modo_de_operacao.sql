@@ -1,0 +1,20 @@
+-- SPEC-87 (P5) — o REGIME em que o desenho opera.
+--
+-- Um perfil nomeado pelo time ("tráfego de Black Friday", "batch noturno"), que
+-- faz uma régua com `when: { modo: [...] }` valer ou não. Não é carga simulada
+-- e não é hipótese: é uma afirmação sobre esta demanda.
+--
+-- ## Por que `text` e não enum
+--
+-- Os modos são do TIME, guardados em `RegrasConfig.modos` — pela mesma razão que
+-- `tipos` e `tamanhos` são. Um enum no banco obrigaria uma migração a cada
+-- palavra nova que um time inventar, e o vocabulário de regime é exatamente o
+-- tipo de coisa que cada casa nomeia do seu jeito.
+--
+-- ## Por que NULL, e não um default textual
+--
+-- "Esta demanda não declarou regime" é o padrão e é uma afirmação legítima: a
+-- régua sem `modo` continua valendo, a régua com `modo` não aparece. Um default
+-- ('normal', '') faria toda demanda existente passar a afirmar um regime que
+-- ninguém escolheu — e réguas condicionadas começariam a aparecer sozinhas.
+ALTER TABLE "quebras" ADD COLUMN "modo_de_operacao" text;

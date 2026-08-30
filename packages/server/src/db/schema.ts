@@ -65,6 +65,10 @@ export const quebras = pgTable("quebras", {
    * uma lista vazia", e um default `{}` apagaria a diferença.
    */
   volumetria: jsonb("volumetria").$type<VolumetriaDaDemanda>(),
+  /** SPEC-87 (P5) — o regime da demanda (migração 0041). Texto e não enum: os
+   * modos são do TIME, e um enum no banco obrigaria migração a cada palavra
+   * nova que um time inventar. */
+  modoDeOperacao: text("modo_de_operacao"),
   leiturasDispensadas: jsonb("leituras_dispensadas").notNull().default([]),
   cenariosDeLentidao: jsonb("cenarios_de_lentidao").notNull().default([]),
   especificacao: text("especificacao"),

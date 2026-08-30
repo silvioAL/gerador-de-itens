@@ -264,6 +264,8 @@ export const corpoQuebra = z.object({
    * calar (a Lei de Little não se faz sem λ).
    */
   volumetria: z.object({ quantidade: z.number(), por: z.enum(["segundo", "minuto", "hora", "dia"]) }).optional(),
+  /** SPEC-87 (P5) — o regime declarado da demanda. */
+  modoDeOperacao: z.string().optional(),
   /** SPEC-65 fatia D — as leituras caladas neste desenho. Só a DECISÃO
    * atravessa a borda, como nos percursos: a leitura em si é pura e roda a cada
    * render. `tipo` é string livre de propósito — leitura nova não deveria

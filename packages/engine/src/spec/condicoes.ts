@@ -10,13 +10,30 @@ function isPreenchido(valor: unknown): boolean {
 }
 
 /**
+ * SPEC-87 (P5) — **o que a condição sabe além do nó.**
+ *
+ * Contexto, e não um quarto parâmetro posicional: quatro posicionais já é o
+ * ponto em que quem chama troca a ordem e o compilador não vê (`no` e `arestas`
+ * são tipos distintos; um `string` a mais ao lado deles não seria). E o eixo
+ * seguinte — se houver — entra aqui sem mexer em assinatura nenhuma.
+ *
+ * Opcional inteiro de propósito: **toda chamada de hoje continua válida**, e uma
+ * condição de modo simplesmente não bate quando ninguém informou o regime.
+ */
+export interface ContextoDaCondicao {
+  /** O regime declarado da demanda. Ausente = nenhum, e é o padrão. */
+  modo?: string | null;
+}
+
+/**
  * `hasIncomingEdge` considera apenas arestas cujo `target` é o nó — aresta saindo não conta.
  * `field/equals` compara o valor, ignorando origem.
  */
 export function avaliarCondicao(
   condicao: Condicao,
   no: No,
-  arestasDoDiagrama: Aresta[]
+  arestasDoDiagrama: Aresta[],
+  contexto: ContextoDaCondicao = {}
 ): boolean {
   if ("field" in condicao && "equals" in condicao) {
     return valorDoCampo(no, condicao.field) === condicao.equals;
@@ -53,14 +70,25 @@ export function avaliarCondicao(
     const valor = valorDoCampo(no, field);
     return Array.isArray(valor) && valor.some((item) => (item as Record<string, unknown>)?.[sub] === equals);
   }
+  if ("modo" in condicao) {
+    /**
+     * Demanda sem regime declarado **não satisfaz** uma condição de modo.
+     *
+     * A alternativa — "sem modo, vale tudo" — faria toda régua condicionada
+     * aparecer em toda demanda antiga no dia do deploy, que é o oposto do que o
+     * eixo existe para fazer. E é a mesma escolha que `notEquals` já faz para
+     * campo não preenchido, logo acima: pergunta não respondida não satisfaz.
+     */
+    return !!contexto.modo && condicao.modo.includes(contexto.modo);
+  }
   if ("allOf" in condicao) {
-    return condicao.allOf.every((c) => avaliarCondicao(c, no, arestasDoDiagrama));
+    return condicao.allOf.every((c) => avaliarCondicao(c, no, arestasDoDiagrama, contexto));
   }
   if ("anyOf" in condicao) {
-    return condicao.anyOf.some((c) => avaliarCondicao(c, no, arestasDoDiagrama));
+    return condicao.anyOf.some((c) => avaliarCondicao(c, no, arestasDoDiagrama, contexto));
   }
   if ("not" in condicao) {
-    return !avaliarCondicao(condicao.not, no, arestasDoDiagrama);
+    return !avaliarCondicao(condicao.not, no, arestasDoDiagrama, contexto);
   }
   throw new Error(`Operador de condição desconhecido: ${JSON.stringify(condicao)}`);
 }

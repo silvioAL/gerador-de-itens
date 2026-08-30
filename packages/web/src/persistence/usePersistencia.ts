@@ -103,6 +103,9 @@ export function usePersistencia(quebra: Quebra, aoAbrir: (q: Quebra) => void) {
           // por isso que a trava desta rodada não é um aviso a mais no
           // comentário acima, é um teste que compara o objeto INTEIRO.
           volumetria: salva.volumetria,
+          // `null` do banco vira ausência no modelo: `Quebra.modoDeOperacao` é
+          // `string | undefined`, e "não declarou" tem uma forma só do lado de cá.
+          modoDeOperacao: salva.modoDeOperacao ?? undefined,
           leiturasDispensadas: salva.leiturasDispensadas,
           cenariosDeLentidao: salva.cenariosDeLentidao,
         });
