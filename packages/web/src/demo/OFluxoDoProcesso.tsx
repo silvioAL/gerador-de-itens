@@ -55,7 +55,19 @@ const COLUNA_RAIA = 96;
 const LARGURA_FASES = 1260;
 const LARGURA = COLUNA_RAIA + LARGURA_FASES;
 
-const ALTURA_CAIXA_FORA = 24;
+/**
+ * 30 e não 24: a palavra de estado desceu para uma SEGUNDA linha.
+ *
+ * "Arquitetura de negócio · ainda não existe" numa linha só vazava a caixa —
+ * ~168 px de texto em ~160 px de caixa. Encolher a fonte resolveria hoje e
+ * quebraria no próximo nome mais longo; tirar a palavra não é opção, porque
+ * status sem palavra é só cor (SPEC-76), e cor sozinha não serve para quem não
+ * a distingue.
+ *
+ * Duas linhas cabem para qualquer nome, e a altura é uniforme para as caixas
+ * empilharem alinhadas.
+ */
+const ALTURA_CAIXA_FORA = 30;
 const ESPACO_CAIXA = 6;
 
 function estagiosDa(fase: FaseDaJornada) {
@@ -204,10 +216,18 @@ export function OFluxoDoProcesso() {
                       stroke={marca.cor}
                       strokeDasharray={c.estado === "completo" ? undefined : "4 3"}
                     />
-                    <text x={esquerdaCaixa + 6} y={yCaixa + 15} style={{ fontSize: 8.5, fill: marca.cor, fontWeight: 700 }}>
+                    <text
+                      x={esquerdaCaixa + 6}
+                      y={c.estado === "completo" ? yCaixa + 18 : yCaixa + 13}
+                      style={{ fontSize: 8.5, fill: marca.cor, fontWeight: 700 }}
+                    >
                       {c.titulo}
-                      {c.estado !== "completo" ? ` · ${marca.rotulo}` : ""}
                     </text>
+                    {c.estado !== "completo" && (
+                      <text x={esquerdaCaixa + 6} y={yCaixa + 24} style={{ fontSize: 8, fill: marca.cor }}>
+                        {marca.rotulo}
+                      </text>
+                    )}
 
                     {/* A ponta diz o sentido: quem SAI aponta para a caixa de
                         fora; quem ENTRA aponta para a fase. */}
