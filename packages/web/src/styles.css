@@ -21,6 +21,128 @@
   --verde: #3ecf8e;
   --vermelho: #f87171;
   --amarelo: #fbbf24;
+
+  /* SPEC-93 — os que faltavam, e a medição diz por que estes.
+     `#4f46e5` aparecia 64 vezes em 26 arquivos e `#a5b4fc` 35 vezes em 26: são
+     a cor de "escrito por gente" e o texto dela. Sem token, o modo claro os
+     deixaria escuros em 99 lugares. */
+  --acento-gente: #4f46e5;
+  --acento-gente-texto: #a5b4fc;
+  --branco: #ffffff;
+
+  /* SPEC-93 — as duas superfícies TRANSLÚCIDAS, que o varredor de hex não
+     alcançava porque estão escritas em `rgba()`.
+
+     Elas existem separadas do `--painel` porque precisam deixar passar o que
+     está atrás (o minimapa cobre o canvas; a legenda flutua sobre o diagrama),
+     e uma cor opaca perderia esse efeito.
+
+     Não confundir com o VÉU de modal (`rgba(15, 23, 42, .45)` em cinco telas):
+     véu escuro sobre conteúdo claro é o comportamento certo nos dois temas —
+     escurecer o que está atrás do diálogo. Esses ficam como estão, de propósito. */
+  --mascara-minimapa: rgba(12, 17, 26, 0.72);
+  --painel-flutuante: rgba(12, 17, 26, 0.7);
+
+  /* A família do vermelho OPACO, que a trava da fatia A achou em três telas.
+
+     `--vermelho` é tinta de texto; estes dois são SUPERFÍCIE, e por isso não
+     podem ser o mesmo valor: a faixa de aviso pinta `#3a1d1d` de fundo com
+     `var(--vermelho)` em cima, e no claro isso seria vermelho escuro sobre
+     vermelho escuro. O `--destrutivo` é o único que não muda entre os temas —
+     ele existe para aceitar texto branco, e vermelho claro não aceita. */
+  --vermelho-fundo: #3a1d1d;
+  --vermelho-borda: #7f1d1d;
+  --destrutivo: #b91c1c;
+
+  /* Estas duas estavam sendo usadas como `var(--laranja, #fb923c)` e
+     `var(--acento-claro, #818cf8)` SEM nunca terem sido declaradas: o fallback
+     é que pintava, e ninguém sabia. Agora existem, e mudam de tom no claro.
+
+     (`--dim` e `--mist` eram do mesmo tipo, mas o valor delas era cópia exata
+     de `--texto-fraco` e `--texto-2` — viraram as variáveis de verdade em vez
+     de ganhar nome próprio.) */
+  --laranja: #fb923c;
+  --acento-claro: #818cf8;
+}
+
+/*
+  SPEC-93 — **o modo claro.**
+
+  ## Por que os MESMOS nomes, com outros valores
+
+  Duas listas de variáveis divergiriam na primeira mudança (§263). Aqui há uma
+  lista só: `[data-tema="claro"]` reescreve os valores, e nenhum componente sabe
+  que existe tema.
+
+  ## Por que não é o escuro invertido
+
+  A hierarquia de superfície se INVERTE. No escuro, o painel é mais claro que o
+  fundo (a luz vem do conteúdo); no claro, o painel é mais claro e o fundo é que
+  recua para o cinza. Inverter mecanicamente produziria painéis cinza-escuro
+  sobre fundo branco, que é o oposto de "o conteúdo está aqui".
+
+  ## Os acentos mudam de tom, não de cor
+
+  `--acento`, `--verde`, `--vermelho` e `--amarelo` funcionam sobre escuro e
+  ficariam berrantes sobre branco. Cada um desce para o passo que passa em WCAG
+  AA contra a superfície clara — e há teste que prova isso com a função de
+  contraste do PRÓPRIO motor (`conformidade/contraste.ts`, SPEC-79).
+
+  O indigo de "escrito por gente" é a exceção deliberada: ele funciona nos dois,
+  e trocá-lo mudaria a marca em 26 arquivos por nada.
+*/
+[data-tema="claro"] {
+  --fundo: #f3f5f9;
+  --painel: #ffffff;
+  --painel-alto: #eef1f7;
+  --borda: #dde3ec;
+  --borda-forte: #c3ccda;
+  --texto: #101823;
+  --texto-2: #37475e;
+  --texto-fraco: #5a6b83;
+  --texto-mudo: #6b7a90;
+  --acento: #0369a1;
+  --acento-indigo: #4f46e5;
+  --verde: #047857;
+  --vermelho: #b91c1c;
+  --amarelo: #926a00;
+
+  --acento-gente: #4f46e5;
+  /* No escuro este é o texto CLARO do indigo; no claro precisa do escuro, ou
+     ficaria lavanda ilegível sobre branco. */
+  --acento-gente-texto: #3730a3;
+  --branco: #ffffff;
+
+  /* ACHADO da verificação contra a stack real: no claro, o `maskColor` fixo do
+     minimapa pintava de quase preto tudo fora do viewport — um bloco escuro no
+     canto de uma tela branca. Foi o lugar que a §5.2 da SPEC-93 previu. */
+  --mascara-minimapa: rgba(220, 227, 238, 0.78);
+  --painel-flutuante: rgba(255, 255, 255, 0.82);
+
+  --vermelho-fundo: #fee2e2;
+  --vermelho-borda: #fca5a5;
+  /* O único que não muda: texto branco precisa de vermelho escuro nos dois. */
+  --destrutivo: #b91c1c;
+
+  --laranja: #c2410c;
+  --acento-claro: #4338ca;
+}
+
+/* `color-scheme` faz o navegador acertar sozinho o que não é nosso: barra de
+   rolagem, autofill, e o tema padrão dos controles de formulário. Sem isto o
+   modo claro tem barra de rolagem escura, que denuncia que o tema é pintura. */
+[data-tema="claro"] {
+  color-scheme: light;
+}
+[data-tema="escuro"] {
+  color-scheme: dark;
+}
+
+/* No modo claro, os campos param de herdar o fundo escuro do bloco lá de cima. */
+[data-tema="claro"] input,
+[data-tema="claro"] textarea,
+[data-tema="claro"] select {
+  color-scheme: light;
 }
 
 html,
@@ -65,8 +187,11 @@ textarea::placeholder {
   color: var(--texto-mudo);
 }
 
-/* React Flow (canvas da tela inicial) no tema escuro — o pacote traz tema
-   claro por default; sobrescrever aqui evita tocar em props do componente. */
+/* React Flow (canvas da tela inicial). Estas regras nasceram para escurecer o
+   tema claro que o pacote traz por default; desde a SPEC-93 elas leem as
+   variáveis, então servem aos DOIS temas sem duplicar seletor. O que ficou de
+   fora daqui — porque é prop e não CSS — está em `Canvas.tsx` (`bgColor`,
+   `maskColor`, `nodeColor`), e também aponta para as variáveis. */
 .react-flow {
   background: var(--fundo);
 }

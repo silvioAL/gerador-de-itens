@@ -771,7 +771,7 @@ const linhaEstilo: React.CSSProperties = {
   border: "1px solid var(--borda)",
   borderRadius: 6,
   padding: 8,
-  background: "var(--painel-alto, #15202D)",
+  background: "var(--painel-alto)",
 };
 
 const textareaEstilo: React.CSSProperties = {

@@ -612,7 +612,7 @@ const tagOrigemEstilo: React.CSSProperties = {
   flexShrink: 0,
 };
 
-const tagGlobalEstilo: React.CSSProperties = { background: "rgba(99, 102, 241, 0.16)", color: "#a5b4fc" };
+const tagGlobalEstilo: React.CSSProperties = { background: "rgba(99, 102, 241, 0.16)", color: "var(--acento-gente-texto)" };
 const tagTimeEstilo: React.CSSProperties = { background: "rgba(62, 207, 142, 0.16)", color: "var(--verde)" };
 const tagPadraoEstilo: React.CSSProperties = { background: "var(--painel-alto)", color: "var(--texto-fraco)" };
 
@@ -621,8 +621,8 @@ const botaoAdicionarEstilo: React.CSSProperties = {
   fontWeight: 600,
   padding: "8px 12px",
   borderRadius: 7,
-  border: "1px solid #4f46e5",
-  background: "#4f46e5",
+  border: "1px solid var(--acento-gente)",
+  background: "var(--acento-gente)",
   color: "#fff",
   cursor: "pointer",
 };
@@ -674,8 +674,8 @@ const botaoSalvarEstilo: React.CSSProperties = {
   fontWeight: 600,
   padding: "7px 12px",
   borderRadius: 7,
-  border: "1px solid #4f46e5",
-  background: "#4f46e5",
+  border: "1px solid var(--acento-gente)",
+  background: "var(--acento-gente)",
   color: "#fff",
 };
 
@@ -691,7 +691,7 @@ const botaoCancelarEstilo: React.CSSProperties = {
 
 const linkBotaoEstilo: React.CSSProperties = {
   fontSize: 11,
-  color: "#a5b4fc",
+  color: "var(--acento-gente-texto)",
   background: "none",
   border: "none",
   cursor: "pointer",

@@ -146,7 +146,7 @@ export function ChecklistDoProduto({ produtoId, timeId }: ChecklistDoProdutoProp
               style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--borda)" }}
             >
               <span
-                style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: doProduto ? "#4f46e5" : "var(--texto-fraco)", minWidth: 56 }}
+                style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: doProduto ? "var(--acento-gente)" : "var(--texto-fraco)", minWidth: 56 }}
               >
                 {doProduto ? "produto" : "do time"}
               </span>
@@ -218,8 +218,8 @@ const botaoEstilo: React.CSSProperties = {
   fontSize: 12,
   padding: "6px 12px",
   borderRadius: 7,
-  border: "1px solid #4f46e5",
-  background: "#4f46e5",
+  border: "1px solid var(--acento-gente)",
+  background: "var(--acento-gente)",
   color: "#fff",
   cursor: "pointer",
 };

@@ -41,7 +41,7 @@ export function AEvolucao() {
               border: "1px solid var(--borda)",
               // O terceiro ganha a barra da marca: é onde este produto opera, e
               // dizer isso com cor é mais honesto que dizer com adjetivo.
-              borderLeft: e.aqui ? "3px solid #4f46e5" : "1px solid var(--borda)",
+              borderLeft: e.aqui ? "3px solid var(--acento-gente)" : "1px solid var(--borda)",
               borderRadius: 10,
               padding: "12px 14px",
             }}
@@ -52,7 +52,7 @@ export function AEvolucao() {
               </span>
               <strong style={{ fontSize: 14, color: "var(--texto)" }}>{e.titulo}</strong>
               {e.aqui && (
-                <span style={{ fontSize: 11, color: "#4f46e5", fontWeight: 700 }}>← é aqui que esta ferramenta está</span>
+                <span style={{ fontSize: 11, color: "var(--acento-gente)", fontWeight: 700 }}>← é aqui que esta ferramenta está</span>
               )}
             </div>
             <p style={{ ...proseEstilo, margin: "6px 0 0" }}>
@@ -106,7 +106,7 @@ export function AsCamadas() {
                   ...proseEstilo,
                   margin: "8px 0 0",
                   paddingLeft: 10,
-                  borderLeft: "2px solid #4f46e5",
+                  borderLeft: "2px solid var(--acento-gente)",
                   color: "var(--texto-2)",
                 }}
               >

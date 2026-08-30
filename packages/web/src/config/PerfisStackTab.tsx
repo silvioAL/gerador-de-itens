@@ -274,7 +274,7 @@ const linkBotaoEstilo: React.CSSProperties = {
   fontSize: 11.5,
   border: "none",
   background: "transparent",
-  color: "var(--acento-claro, #818cf8)",
+  color: "var(--acento-claro)",
   cursor: "pointer",
   padding: 0,
 };

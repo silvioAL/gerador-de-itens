@@ -181,9 +181,9 @@ function statusDoItem(ficha: FichaItem): StatusItem {
 }
 
 const CORES_STATUS: Record<StatusItem, string> = {
-  rascunho: "#5C6A7E",
-  revisar: "#e8b339",
-  refinado: "#3ecf8e",
+  rascunho: "var(--texto-mudo)",
+  revisar: "var(--amarelo)",
+  refinado: "var(--verde)",
 };
 
 const ROTULO_STATUS: Record<StatusItem, string> = {
@@ -810,7 +810,7 @@ export function ReviewScreen({
             />
           </div>
         ) : (
-          <span data-testid="contagem-itens" style={{ fontSize: 12, color: "var(--dim, #8D9BB0)" }}>
+          <span data-testid="contagem-itens" style={{ fontSize: 12, color: "var(--texto-fraco)" }}>
             {filtroNoId ? (
               <>
                 {atividadesFiltradas.length} de {resultado.atividades.length} itens · {noFiltrado?.label ?? filtroNoId}{" "}
@@ -1133,7 +1133,7 @@ export function ReviewScreen({
             )}
 
             {filtroNoId && atividadesFiltradas.length === 0 && (
-              <div style={{ fontSize: 12, color: "var(--dim, #8D9BB0)", padding: "8px 4px" }}>
+              <div style={{ fontSize: 12, color: "var(--texto-fraco)", padding: "8px 4px" }}>
                 Nenhum item derivado desse nó.
               </div>
             )}
@@ -1173,7 +1173,7 @@ export function ReviewScreen({
                   ]
                     .filter(Boolean)
                     .join(" ")}
-                  style={{ ...itemRailEstilo, ...(sel ? itemRailSelEstilo : {}), ...(cruzaOutroTime ? { borderColor: "#e8b339" } : {}) }}
+                  style={{ ...itemRailEstilo, ...(sel ? itemRailSelEstilo : {}), ...(cruzaOutroTime ? { borderColor: "var(--amarelo)" } : {}) }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <i style={{ width: 6, height: 6, borderRadius: "50%", background: CORES_STATUS[status], flexShrink: 0 }} />
@@ -1188,7 +1188,7 @@ export function ReviewScreen({
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: 11, color: "var(--dim, #8D9BB0)", marginTop: 3 }}>
+                  <div style={{ fontSize: 11, color: "var(--texto-fraco)", marginTop: 3 }}>
                     {a.tipo} · {a.tamanho}
                     {a.dependencias.length > 0 && ` · depende de ${descreverDependencia(a)}`}
                   </div>
@@ -1220,7 +1220,7 @@ export function ReviewScreen({
                     );
                   })()}
                   {a.timesEnvolvidos?.length ? (
-                    <div style={{ fontSize: 11, color: cruzaOutroTime ? "#e8b339" : "var(--dim, #8D9BB0)", marginTop: 2 }}>
+                    <div style={{ fontSize: 11, color: cruzaOutroTime ? "var(--amarelo)" : "var(--texto-fraco)", marginTop: 2 }}>
                       {a.timesEnvolvidos.join(", ")}
                     </div>
                   ) : null}
@@ -1601,7 +1601,7 @@ function FichaIdentificacao({ ficha }: { ficha: FichaItem }) {
 function Insumos({ ficha }: { ficha: FichaItem }) {
   const [aberto, setAberto] = useState(false);
   return (
-    <div style={{ marginTop: 22, borderTop: "1px solid #1B2533", paddingTop: 12 }}>
+    <div style={{ marginTop: 22, borderTop: "1px solid var(--borda)", paddingTop: 12 }}>
       <button onClick={() => setAberto((a) => !a)} style={insumosBotaoEstilo} data-testid="alternar-insumos">
         {aberto ? "▾" : "▸"} Insumos — o que os agentes receberam
       </button>
@@ -1673,7 +1673,7 @@ function AbaContrato({ ficha }: { ficha: FichaItem }) {
                   ) : c.itens.length === 0 ? (
                     <p style={proseEstilo}>(nenhum item)</p>
                   ) : (
-                    <ol style={{ margin: "6px 0", paddingLeft: 20, fontSize: 12.5, color: "var(--mist, #C5CEDA)" }}>
+                    <ol style={{ margin: "6px 0", paddingLeft: 20, fontSize: 12.5, color: "var(--texto-2)" }}>
                       {c.itens.map((item, i) => (
                         <li key={i}>
                           {c.itemSpec.map((s) => `${s.label}: ${formatarValorCampo(item[s.key])}`).join(" · ")}
@@ -1823,7 +1823,7 @@ function AbaRefinamento({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {erro && <div style={{ fontSize: 11, color: "#f87171" }}>{erro}</div>}
+      {erro && <div style={{ fontSize: 11, color: "var(--vermelho)" }}>{erro}</div>}
       {/* Achado do usuário: *"isso deveria ser flexível, se amanhã o usuário
           quiser configurar outro agente ou mudar a ordem, os outputs devem
           aparecer ali na ordem que o fluxo foi configurado"*. Antes esta lista
@@ -1917,7 +1917,7 @@ function AbaRefinamento({
                             ●●●
                           </pre>
                         )}
-                        <span style={{ fontSize: 10.5, color: "#38bdf8" }}>✨ {nomePapelEmGeracao ?? ROTULO_PAPEL[papel]} escrevendo…</span>
+                        <span style={{ fontSize: 10.5, color: "var(--acento)" }}>✨ {nomePapelEmGeracao ?? ROTULO_PAPEL[papel]} escrevendo…</span>
                       </div>
                     ) : (
                       <div style={{ marginTop: 8 }}>
@@ -1975,8 +1975,8 @@ function AbaTestes({ ficha }: { ficha: FichaItem }) {
 const telaEstilo: React.CSSProperties = {
   position: "fixed",
   inset: 0,
-  background: "#0C111A",
-  color: "#E8EEF8",
+  background: "var(--fundo)",
+  color: "var(--texto)",
   zIndex: 50,
   display: "flex",
   flexDirection: "column",
@@ -1988,13 +1988,13 @@ const headerEstilo: React.CSSProperties = {
   alignItems: "center",
   gap: 14,
   padding: "12px 16px",
-  borderBottom: "1px solid #1B2533",
-  background: "#0C111A",
+  borderBottom: "1px solid var(--borda)",
+  background: "var(--fundo)",
 };
 
 const avisoDesatualizadoEstilo: React.CSSProperties = {
   fontSize: 11,
-  color: "var(--amarelo, #fbbf24)",
+  color: "var(--amarelo)",
   border: "1px solid var(--borda-forte)",
   borderRadius: 6,
   padding: "3px 8px",
@@ -2003,8 +2003,8 @@ const avisoDesatualizadoEstilo: React.CSSProperties = {
 
 const seloDesatualizadoEstilo: React.CSSProperties = {
   fontSize: 10,
-  color: "var(--amarelo, #fbbf24)",
-  border: "1px solid var(--amarelo, #fbbf24)",
+  color: "var(--amarelo)",
+  border: "1px solid var(--amarelo)",
   borderRadius: 4,
   padding: "1px 5px",
   whiteSpace: "nowrap",
@@ -2013,15 +2013,15 @@ const seloDesatualizadoEstilo: React.CSSProperties = {
 const motivoDesatualizadoEstilo: React.CSSProperties = {
   marginTop: 6,
   fontSize: 11,
-  color: "var(--amarelo, #fbbf24)",
+  color: "var(--amarelo)",
   lineHeight: 1.5,
 };
 
 const contadoresEstilo: React.CSSProperties = {
   display: "flex",
   gap: 10,
-  background: "#101823",
-  border: "1px solid #1B2533",
+  background: "var(--painel)",
+  border: "1px solid var(--borda)",
   borderRadius: 8,
   padding: "4px 10px",
 };
@@ -2048,19 +2048,19 @@ const progressoTrilhoEstilo: React.CSSProperties = {
   maxWidth: 320,
   height: 3,
   borderRadius: 2,
-  background: "#1B2533",
+  background: "var(--borda)",
   overflow: "hidden",
 };
 
 const progressoBarraEstilo: React.CSSProperties = {
   height: "100%",
-  background: "#38bdf8",
+  background: "var(--acento)",
   transition: "width 200ms ease",
 };
 
 const seguindoBadgeEstilo: React.CSSProperties = {
   fontSize: 10.5,
-  color: "#38bdf8",
+  color: "var(--acento)",
   fontWeight: 600,
 };
 
@@ -2070,14 +2070,14 @@ const semDonoEstilo: React.CSSProperties = {
   marginTop: 6,
   fontSize: 11,
   lineHeight: 1.5,
-  color: "#e8b339",
+  color: "var(--amarelo)",
 };
 
 const pipEstilo: React.CSSProperties = {
   width: 14,
   height: 4,
   borderRadius: 2,
-  background: "#1B2533",
+  background: "var(--borda)",
   display: "inline-block",
 };
 
@@ -2091,14 +2091,14 @@ const pipSemTrabalhoEstilo: React.CSSProperties = {
 };
 
 const pipOnEstilo: React.CSSProperties = {
-  background: "#3ecf8e",
+  background: "var(--verde)",
 };
 
 const listaEstilo: React.CSSProperties = {
   width: "30%",
   minWidth: 260,
   maxWidth: 380,
-  borderRight: "1px solid #1B2533",
+  borderRight: "1px solid var(--borda)",
   overflowY: "auto",
   padding: 12,
   display: "flex",
@@ -2114,8 +2114,8 @@ const divisoriaEstilo: React.CSSProperties = {
   display: "grid",
   placeItems: "center",
   cursor: "ns-resize",
-  background: "#0C111A",
-  borderBottom: "1px solid #1B2533",
+  background: "var(--fundo)",
+  borderBottom: "1px solid var(--borda)",
   touchAction: "none",
 };
 
@@ -2123,7 +2123,7 @@ const divisoriaGripEstilo: React.CSSProperties = {
   width: 44,
   height: 3,
   borderRadius: 2,
-  background: "#263344",
+  background: "var(--borda-forte)",
 };
 
 const railEstilo: React.CSSProperties = {
@@ -2137,16 +2137,16 @@ const itemRailEstilo: React.CSSProperties = {
   width: "100%",
   padding: "10px 12px",
   borderRadius: 10,
-  border: "1px solid #1B2533",
-  background: "#101823",
-  color: "#E8EEF8",
+  border: "1px solid var(--borda)",
+  background: "var(--painel)",
+  color: "var(--texto)",
   cursor: "pointer",
   fontFamily: "inherit",
 };
 
 const itemRailSelEstilo: React.CSSProperties = {
-  borderColor: "#38bdf8",
-  background: "#15202D",
+  borderColor: "var(--acento)",
+  background: "var(--painel-alto)",
 };
 
 const fichaWrapEstilo: React.CSSProperties = {
@@ -2159,7 +2159,7 @@ const fichaWrapEstilo: React.CSSProperties = {
 
 const fichaVaziaEstilo: React.CSSProperties = {
   margin: "auto",
-  color: "#5C6A7E",
+  color: "var(--texto-mudo)",
   fontSize: 13,
   maxWidth: 300,
   textAlign: "center",
@@ -2167,8 +2167,8 @@ const fichaVaziaEstilo: React.CSSProperties = {
 
 const fichaHeaderEstilo: React.CSSProperties = {
   padding: "16px 24px 0",
-  borderBottom: "1px solid #1B2533",
-  background: "#0C111A",
+  borderBottom: "1px solid var(--borda)",
+  background: "var(--fundo)",
 };
 
 const fichaBodyEstilo: React.CSSProperties = {
@@ -2181,7 +2181,7 @@ const tabBotaoEstilo: React.CSSProperties = {
   background: "none",
   border: "none",
   borderBottom: "2px solid transparent",
-  color: "#8D9BB0",
+  color: "var(--texto-fraco)",
   padding: "9px 4px",
   marginRight: 16,
   fontSize: 12.5,
@@ -2190,16 +2190,16 @@ const tabBotaoEstilo: React.CSSProperties = {
 };
 
 const tabBotaoOnEstilo: React.CSSProperties = {
-  color: "#E8EEF8",
-  borderBottom: "2px solid #38bdf8",
+  color: "var(--texto)",
+  borderBottom: "2px solid var(--acento)",
 };
 
 const metaGridEstilo: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
   gap: 1,
-  background: "#1B2533",
-  border: "1px solid #1B2533",
+  background: "var(--borda)",
+  border: "1px solid var(--borda)",
   borderRadius: 10,
   overflow: "hidden",
   marginBottom: 20,
@@ -2239,7 +2239,7 @@ const lblEstilo: React.CSSProperties = {
   fontWeight: 600,
   letterSpacing: "0.08em",
   textTransform: "uppercase",
-  color: "#5C6A7E",
+  color: "var(--texto-mudo)",
   marginBottom: 4,
 };
 
@@ -2248,7 +2248,7 @@ const valEstilo: React.CSSProperties = {
   fontFamily: "ui-monospace, monospace",
   fontSize: 12.5,
   padding: "9px 12px",
-  background: "#0C111A",
+  background: "var(--fundo)",
 };
 
 const secaoEstilo: React.CSSProperties = {
@@ -2257,7 +2257,7 @@ const secaoEstilo: React.CSSProperties = {
 
 const proseEstilo: React.CSSProperties = {
   margin: 0,
-  color: "#8D9BB0",
+  color: "var(--texto-fraco)",
   fontSize: 13,
   lineHeight: 1.6,
 };
@@ -2267,10 +2267,10 @@ const preEstilo: React.CSSProperties = {
   fontFamily: "inherit",
   fontSize: 12,
   margin: 0,
-  color: "#C5CEDA",
+  color: "var(--texto-2)",
   padding: "10px 12px",
-  background: "#0C111A",
-  border: "1px solid #1B2533",
+  background: "var(--fundo)",
+  border: "1px solid var(--borda)",
   borderRadius: 8,
 };
 
@@ -2282,45 +2282,45 @@ const tabelaEstilo: React.CSSProperties = {
 
 const thEstilo: React.CSSProperties = {
   textAlign: "left",
-  borderBottom: "1px solid #1B2533",
+  borderBottom: "1px solid var(--borda)",
   padding: "6px 8px",
-  color: "#5C6A7E",
+  color: "var(--texto-mudo)",
   fontWeight: 600,
 };
 
 const tdEstilo: React.CSSProperties = {
-  borderBottom: "1px solid #1B2533",
+  borderBottom: "1px solid var(--borda)",
   padding: "6px 8px",
-  color: "#C5CEDA",
+  color: "var(--texto-2)",
 };
 
 const reqEstilo: React.CSSProperties = {
-  border: "1px solid #1B2533",
+  border: "1px solid var(--borda)",
   borderRadius: 10,
-  background: "#101823",
+  background: "var(--painel)",
   padding: "10px 12px",
 };
 
 const reqPreenchidoEstilo: React.CSSProperties = {
-  borderColor: "#3ecf8e55",
+  borderColor: "var(--verde)55",
 };
 
 const marcaEstilo: React.CSSProperties = {
   width: 15,
   height: 15,
   borderRadius: 4,
-  border: "1px solid #1B2533",
+  border: "1px solid var(--borda)",
   flexShrink: 0,
   display: "grid",
   placeItems: "center",
   fontSize: 10,
-  color: "#3ecf8e",
+  color: "var(--verde)",
   marginTop: 2,
 };
 
 const marcaOnEstilo: React.CSSProperties = {
-  background: "#3ecf8e30",
-  borderColor: "#3ecf8e70",
+  background: "var(--verde)30",
+  borderColor: "var(--verde)70",
 };
 
 const origemEstilo: React.CSSProperties = {
@@ -2328,8 +2328,8 @@ const origemEstilo: React.CSSProperties = {
   fontWeight: 600,
   letterSpacing: "0.08em",
   textTransform: "uppercase",
-  color: "#5C6A7E",
-  border: "1px solid #1B2533",
+  color: "var(--texto-mudo)",
+  border: "1px solid var(--borda)",
   borderRadius: 4,
   padding: "1px 5px",
   flexShrink: 0,
@@ -2344,9 +2344,9 @@ const textareaEstilo: React.CSSProperties = {
   fontSize: 12,
   padding: "8px 10px",
   borderRadius: 6,
-  border: "1px solid #263344",
-  background: "#0C111A",
-  color: "#E8EEF8",
+  border: "1px solid var(--borda-forte)",
+  background: "var(--fundo)",
+  color: "var(--texto)",
   fontFamily: "inherit",
   resize: "vertical",
   boxSizing: "border-box",
@@ -2402,16 +2402,16 @@ const botaoEstilo: React.CSSProperties = {
   fontSize: 12,
   padding: "6px 10px",
   borderRadius: 6,
-  border: "1px solid #263344",
-  background: "#101823",
-  color: "#E8EEF8",
+  border: "1px solid var(--borda-forte)",
+  background: "var(--painel)",
+  color: "var(--texto)",
   cursor: "pointer",
 };
 
 const botaoPrimarioEstilo: React.CSSProperties = {
-  background: "#38bdf8",
+  background: "var(--acento)",
   color: "#0A0D14",
-  border: "1px solid #38bdf8",
+  border: "1px solid var(--acento)",
   fontWeight: 600,
 };
 
@@ -2419,19 +2419,19 @@ const linkEstilo: React.CSSProperties = {
   background: "none",
   border: "none",
   cursor: "pointer",
-  color: "#38bdf8",
+  color: "var(--acento)",
   padding: 0,
   fontSize: "inherit",
   textDecoration: "underline",
 };
 
 const avisoEstilo: React.CSSProperties = {
-  background: "#3a1d1d",
-  border: "1px solid #7f1d1d",
+  background: "var(--vermelho-fundo)",
+  border: "1px solid var(--vermelho-borda)",
   borderRadius: 8,
   padding: "10px 12px",
   marginBottom: 6,
-  color: "#fca5a5",
+  color: "var(--vermelho)",
 };
 
 const listaDeAchadosEstilo: React.CSSProperties = {
@@ -2469,7 +2469,7 @@ const trilhoPendenciasEstilo: React.CSSProperties = {
 const barraProgressoPendenciasEstilo: React.CSSProperties = {
   height: "100%",
   borderRadius: 999,
-  background: "var(--verde, #3ecf8e)",
+  background: "var(--verde)",
   transition: "width 250ms ease",
 };
 
@@ -2510,7 +2510,7 @@ const confirmarItemEstilo: React.CSSProperties = {
   borderRadius: 999,
   border: "none",
   background: "rgba(62, 207, 142, 0.15)",
-  color: "var(--verde, #3ecf8e)",
+  color: "var(--verde)",
   cursor: "pointer",
 };
 
@@ -2521,5 +2521,5 @@ const faixaFalhaEstilo: React.CSSProperties = {
   padding: "8px 16px",
   borderBottom: "1px solid var(--borda)",
   background: "rgba(248, 113, 113, 0.12)",
-  color: "#f87171",
+  color: "var(--vermelho)",
 };

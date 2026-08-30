@@ -84,8 +84,8 @@ const faixaEstilo: React.CSSProperties = {
   alignItems: "stretch",
   height: 62,
   padding: "0 20px",
-  background: "#101823",
-  borderBottom: "1px solid #1B2533",
+  background: "var(--painel)",
+  borderBottom: "1px solid var(--borda)",
   flexShrink: 0,
 };
 
@@ -115,21 +115,21 @@ const agenteEstilo: React.CSSProperties = {
 };
 
 const agenteAtivoEstilo: React.CSSProperties = {
-  borderBottomColor: "#38bdf8",
+  borderBottomColor: "var(--acento)",
   background: "rgba(56, 189, 248, 0.08)",
 };
 
 const numeroEstilo: React.CSSProperties = {
   fontFamily: "ui-monospace, monospace",
   fontSize: 11,
-  color: "#5C6A7E",
+  color: "var(--texto-mudo)",
   width: 20,
   flexShrink: 0,
   transition: "color 300ms ease",
 };
 
-const numeroAtivoEstilo: React.CSSProperties = { color: "#38bdf8" };
-const numeroFeitoEstilo: React.CSSProperties = { color: "#8D9BB0" };
+const numeroAtivoEstilo: React.CSSProperties = { color: "var(--acento)" };
+const numeroFeitoEstilo: React.CSSProperties = { color: "var(--texto-fraco)" };
 
 const quemEstilo: React.CSSProperties = { minWidth: 0, flex: 1 };
 
@@ -137,27 +137,27 @@ const nomeEstilo: React.CSSProperties = {
   display: "block",
   fontSize: 13,
   fontWeight: 600,
-  color: "#5C6A7E",
+  color: "var(--texto-mudo)",
   letterSpacing: "-0.01em",
   whiteSpace: "nowrap",
   transition: "color 300ms ease",
 };
 
-const nomeAtivoEstilo: React.CSSProperties = { color: "#E8EEF8" };
-const nomeFeitoEstilo: React.CSSProperties = { color: "#8D9BB0" };
+const nomeAtivoEstilo: React.CSSProperties = { color: "var(--texto)" };
+const nomeFeitoEstilo: React.CSSProperties = { color: "var(--texto-fraco)" };
 
 const subtituloEstilo: React.CSSProperties = {
   display: "block",
   fontFamily: "ui-monospace, monospace",
   fontSize: 10.5,
-  color: "#263344",
+  color: "var(--borda-forte)",
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
   transition: "color 300ms ease",
 };
 
-const subtituloAtivoEstilo: React.CSSProperties = { color: "#8D9BB0" };
+const subtituloAtivoEstilo: React.CSSProperties = { color: "var(--texto-fraco)" };
 
 const tickBaseEstilo: React.CSSProperties = {
   width: 15,
@@ -173,12 +173,12 @@ const tickBaseEstilo: React.CSSProperties = {
 
 const tickPendenteEstilo: React.CSSProperties = {
   ...tickBaseEstilo,
-  border: "1px solid #263344",
+  border: "1px solid var(--borda-forte)",
 };
 
 const tickAtivoEstilo: React.CSSProperties = {
   ...tickBaseEstilo,
-  border: "1.5px solid #38bdf8",
+  border: "1.5px solid var(--acento)",
   borderTopColor: "transparent",
 };
 
@@ -186,7 +186,7 @@ const tickFeitoEstilo: React.CSSProperties = {
   ...tickBaseEstilo,
   border: "1px solid rgba(62, 207, 142, 0.45)",
   background: "rgba(62, 207, 142, 0.14)",
-  color: "#3ecf8e",
+  color: "var(--verde)",
 };
 
 const hopEstilo: React.CSSProperties = {
@@ -195,7 +195,7 @@ const hopEstilo: React.CSSProperties = {
   position: "relative",
   alignSelf: "center",
   height: 1,
-  background: "#263344",
+  background: "var(--borda-forte)",
 };
 
 /** Ponta de seta do conector, em CSS puro (mesma técnica do `.hop::after`
@@ -206,7 +206,7 @@ const hopSetaEstilo: React.CSSProperties = {
   top: -3,
   width: 0,
   height: 0,
-  borderLeft: "5px solid #263344",
+  borderLeft: "5px solid var(--borda-forte)",
   borderTop: "3.5px solid transparent",
   borderBottom: "3.5px solid transparent",
 };
@@ -219,9 +219,9 @@ const hopTokenEstilo: React.CSSProperties = {
   whiteSpace: "nowrap",
   fontFamily: "ui-monospace, monospace",
   fontSize: 10,
-  color: "#38bdf8",
-  background: "#15202D",
-  border: "1px solid #263344",
+  color: "var(--acento)",
+  background: "var(--painel-alto)",
+  border: "1px solid var(--borda-forte)",
   padding: "2px 7px",
   borderRadius: 20,
 };

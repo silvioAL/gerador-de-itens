@@ -145,7 +145,7 @@ const chipEstilo: React.CSSProperties = {
   padding: "3px 6px",
   borderRadius: 6,
   border: "1px solid var(--borda)",
-  background: "var(--painel-alto, #15202D)",
+  background: "var(--painel-alto)",
   fontSize: 11.5,
   color: "var(--texto-2)",
 };

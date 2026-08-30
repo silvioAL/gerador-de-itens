@@ -448,7 +448,7 @@ const tagContextoEstilo: React.CSSProperties = {
 
 const tagPromptEstilo: React.CSSProperties = {
   fontSize: 10.5,
-  color: "#a5b4fc",
+  color: "var(--acento-gente-texto)",
   background: "rgba(99, 102, 241, 0.16)",
   borderRadius: 999,
   padding: "1px 8px",

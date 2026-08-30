@@ -1,9 +1,9 @@
 import type { NivelProntidao } from "@gerador/engine";
 
 const CORES: Record<NivelProntidao, { bg: string; fg: string; label: string }> = {
-  vermelho: { bg: "rgba(248, 113, 113, 0.16)", fg: "#f87171", label: "vermelho" },
-  amarelo: { bg: "rgba(251, 191, 36, 0.14)", fg: "#fbbf24", label: "amarelo" },
-  verde: { bg: "rgba(62, 207, 142, 0.16)", fg: "#3ecf8e", label: "verde" },
+  vermelho: { bg: "rgba(248, 113, 113, 0.16)", fg: "var(--vermelho)", label: "vermelho" },
+  amarelo: { bg: "rgba(251, 191, 36, 0.14)", fg: "var(--amarelo)", label: "amarelo" },
+  verde: { bg: "rgba(62, 207, 142, 0.16)", fg: "var(--verde)", label: "verde" },
 };
 
 export function ReadinessBadge({ nivel }: { nivel: NivelProntidao }) {

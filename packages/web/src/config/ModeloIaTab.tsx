@@ -414,7 +414,7 @@ const campoEstilo: React.CSSProperties = {
   padding: "6px 9px",
   borderRadius: 6,
   border: "1px solid var(--borda-forte)",
-  background: "var(--painel-alto, #15202D)",
+  background: "var(--painel-alto)",
   color: "var(--texto)",
   fontSize: 12.5,
 };

@@ -44,9 +44,9 @@ const CENTRO = 176;
  * obrigariam quem lê a aprender as duas (§263).
  */
 export const MARCA_DE_ESTADO: Record<EstagioDoCiclo["estado"], { icone: string; rotulo: string; cor: string }> = {
-  completo: { icone: "●", rotulo: "existe", cor: "var(--verde, #3ecf8e)" },
-  parcial: { icone: "◐", rotulo: "parcial", cor: "var(--amarelo, #eab308)" },
-  ausente: { icone: "○", rotulo: "ainda não existe", cor: "var(--texto-mudo, #94a3b8)" },
+  completo: { icone: "●", rotulo: "existe", cor: "var(--verde)" },
+  parcial: { icone: "◐", rotulo: "parcial", cor: "var(--amarelo)" },
+  ausente: { icone: "○", rotulo: "ainda não existe", cor: "var(--texto-mudo)" },
 };
 
 function posicaoNoCirculo(indice: number, total: number): { x: number; y: number } {
@@ -111,7 +111,7 @@ export function CicloDoProduto({ estagios = ESTAGIOS_DO_CICLO }: { estagios?: Es
             strokeDasharray="4 6"
           />
           {/* O centro RÍGIDO — a IA está no meio de tudo, e é contida. */}
-          <circle cx={CENTRO} cy={CENTRO} r={62} fill="var(--painel-alto, rgba(99,102,241,.08))" stroke="#6366f1" strokeWidth={2} />
+          <circle cx={CENTRO} cy={CENTRO} r={62} fill="var(--painel-alto, rgba(99,102,241,.08))" stroke="var(--acento-indigo)" strokeWidth={2} />
           <text x={CENTRO} y={CENTRO - 12} textAnchor="middle" style={{ fontSize: 13, fontWeight: 700, fill: "var(--texto)" }}>
             IA
           </text>

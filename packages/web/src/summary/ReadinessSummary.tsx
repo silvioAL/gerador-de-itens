@@ -879,7 +879,7 @@ const botaoProximoEstilo: React.CSSProperties = {
   borderRadius: 999,
   border: "1px solid rgba(99, 102, 241, 0.45)",
   background: "rgba(99, 102, 241, 0.14)",
-  color: "#a5b4fc",
+  color: "var(--acento-gente-texto)",
   cursor: "pointer",
   whiteSpace: "nowrap",
 };

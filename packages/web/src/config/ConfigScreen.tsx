@@ -344,9 +344,9 @@ const botaoEstilo: React.CSSProperties = {
 };
 
 const botaoPrimarioEstilo: React.CSSProperties = {
-  background: "#4f46e5",
+  background: "var(--acento-gente)",
   color: "#fff",
-  border: "1px solid #4f46e5",
+  border: "1px solid var(--acento-gente)",
 };
 
 const abaEstilo: React.CSSProperties = {
@@ -363,8 +363,8 @@ const abaEstilo: React.CSSProperties = {
 
 const abaAtivaEstilo: React.CSSProperties = {
   ...abaEstilo,
-  color: "#a5b4fc",
-  borderBottom: "2px solid #4f46e5",
+  color: "var(--acento-gente-texto)",
+  borderBottom: "2px solid var(--acento-gente)",
 };
 
 /** Recurso do RBAC → recurso SOLICITÁVEL (a lista fechada do servidor). Nem
@@ -406,7 +406,7 @@ function SemPermissao({ area }: { area: AbaConfig }) {
       <strong style={{ fontSize: 13.5 }}>🔒 Você não tem permissão para editar esta área.</strong>
       {recurso ? (
         enviado ? (
-          <p style={{ fontSize: 12.5, color: "var(--verde, #3ecf8e)", margin: "8px 0 0" }} data-testid="pedido-enviado">
+          <p style={{ fontSize: 12.5, color: "var(--verde)", margin: "8px 0 0" }} data-testid="pedido-enviado">
             Pedido enviado — quem cuida desta configuração vê e decide em Configurações → PDCA.
           </p>
         ) : (

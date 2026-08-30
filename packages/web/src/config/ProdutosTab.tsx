@@ -403,7 +403,7 @@ export function ProdutosTab({ timeIds, demonstracao, onConversarComAssistente }:
 
           {erro && <p style={{ fontSize: 12, color: "var(--vermelho)", marginTop: 8 }}>{erro}</p>}
           {salvo && !erro && (
-            <p style={{ fontSize: 12, color: "var(--verde, #3ecf8e)", marginTop: 8 }} data-testid="produto-salvo">
+            <p style={{ fontSize: 12, color: "var(--verde)", marginTop: 8 }} data-testid="produto-salvo">
               Contexto salvo.
             </p>
           )}
@@ -577,8 +577,8 @@ const botaoAssistenteEstilo: React.CSSProperties = {
   padding: "8px 14px",
   marginBottom: 12,
   borderRadius: 8,
-  border: "1px solid #4f46e5",
-  background: "#4f46e5",
+  border: "1px solid var(--acento-gente)",
+  background: "var(--acento-gente)",
   color: "#fff",
   cursor: "pointer",
 };

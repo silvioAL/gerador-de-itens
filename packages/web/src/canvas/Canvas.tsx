@@ -49,15 +49,15 @@ function posicoesDaGeometria(geometria: string): Map<string, { x: number; y: num
  */
 const TECLAS_DE_EXCLUSAO = ["Delete", "Backspace"];
 
-const LABEL_STYLE = { fontSize: 11, fill: "#c5ceda" };
-const LABEL_BG_STYLE = { fill: "#101823" };
+const LABEL_STYLE = { fontSize: 11, fill: "var(--texto-2)" };
+const LABEL_BG_STYLE = { fill: "var(--painel)" };
 
 /** Um objeto de estilo por COR, reaproveitado entre renders — o React Flow
  * compara por referência, e um literal novo a cada render faz o rótulo da
  * aresta repintar sem nada ter mudado. */
 const estilosDeTraco = new Map<string, { stroke: string }>();
 function estiloPorTipo(config: DiagramaConfig, tipo: string): { stroke: string } {
-  const cor = config.edgeTypes[tipo]?.color ?? "#5c6a7e";
+  const cor = config.edgeTypes[tipo]?.color ?? "var(--texto-mudo)";
   let estilo = estilosDeTraco.get(cor);
   if (!estilo) {
     estilo = { stroke: cor };
@@ -74,7 +74,7 @@ function estiloPorTipo(config: DiagramaConfig, tipo: string): { stroke: string }
  */
 const estilosDeRealce = new Map<string, { stroke: string; strokeWidth?: number; opacity?: number }>();
 function estiloDeRealce(config: DiagramaConfig, tipo: string, acesa: boolean) {
-  const cor = config.edgeTypes[tipo]?.color ?? "#5c6a7e";
+  const cor = config.edgeTypes[tipo]?.color ?? "var(--texto-mudo)";
   const chave = `${cor}:${acesa}`;
   let estilo = estilosDeRealce.get(chave);
   if (!estilo) {
@@ -340,17 +340,20 @@ export function Canvas({ diagramaState, config, timePadrao, somenteLeitura, aoCl
     >
       {/* Mesmos pontos do fundo do DiagramaCompacto (protótipo) — cor e
           espaçamento iguais pro canvas e a revisão lerem como um sistema só. */}
-      <Background color="#1B2533" gap={26} size={1.4} />
+      <Background color="var(--borda)" gap={26} size={1.4} />
       {!somenteLeitura && <Controls />}
       {!somenteLeitura && (
         <MiniMap
           pannable
           zoomable
-          bgColor="#101823"
-          maskColor="rgba(12, 17, 26, 0.72)"
-          nodeColor="#263344"
+          bgColor="var(--painel)"
+          maskColor="var(--mascara-minimapa)"
+          // `--borda-forte` some no claro: ele é feito para separar superfícies
+          // vizinhas, e sobre o branco do minimapa vira branco. `--texto-mudo`
+          // é o cinza que aparece nos dois — o minimapa precisa MOSTRAR os nós.
+          nodeColor="var(--texto-mudo)"
           style={{
-            border: "1px solid #263344",
+            border: "1px solid var(--borda-forte)",
             borderRadius: 8,
             boxShadow: "0 4px 14px rgba(0,0,0,.4)",
           }}
@@ -462,8 +465,8 @@ const botaoNeutroEstilo: React.CSSProperties = {
 const botaoDestrutivoEstilo: React.CSSProperties = {
   padding: "7px 14px",
   borderRadius: 8,
-  border: "1px solid #7f1d1d",
-  background: "#b91c1c",
+  border: "1px solid var(--destrutivo)",
+  background: "var(--destrutivo)",
   color: "#fff",
   fontSize: 13,
   fontWeight: 600,

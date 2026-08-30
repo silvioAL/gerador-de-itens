@@ -290,7 +290,7 @@ function Formulario({
   }
 
   return (
-    <div data-testid="formulario-decisao" style={{ ...cartaoEstilo, borderColor: "#4f46e5" }}>
+    <div data-testid="formulario-decisao" style={{ ...cartaoEstilo, borderColor: "var(--acento-gente)" }}>
       <input
         placeholder="a decisão, em uma linha (ex.: fila em vez de chamada síncrona)"
         value={titulo}
@@ -400,7 +400,7 @@ const linkEstilo: React.CSSProperties = {
   padding: 0,
   border: "none",
   background: "none",
-  color: "#a5b4fc",
+  color: "var(--acento-gente-texto)",
   cursor: "pointer",
 };
 
@@ -410,8 +410,8 @@ const botaoPrimarioEstilo: React.CSSProperties = {
   fontWeight: 700,
   padding: "5px 10px",
   borderRadius: 6,
-  border: "1px solid #4f46e5",
-  background: "#4f46e5",
+  border: "1px solid var(--acento-gente)",
+  background: "var(--acento-gente)",
   color: "#fff",
   cursor: "pointer",
 };
@@ -422,7 +422,7 @@ const contadorEstilo: React.CSSProperties = {
   padding: "1px 6px",
   borderRadius: 999,
   background: "rgba(99, 102, 241, 0.18)",
-  color: "#a5b4fc",
+  color: "var(--acento-gente-texto)",
 };
 
 function selo(cor: string): React.CSSProperties {

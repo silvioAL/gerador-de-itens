@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SeletorDeTema } from "../tema/SeletorDeTema";
 import { ListaDeTimes } from "../auth/ListaDeTimes";
 import type { AreaConfig } from "./rota";
 
@@ -129,6 +130,13 @@ export function MenuLateral({
             ×
           </button>
         </header>
+
+        {/* SPEC-93 — o tema fica no menu, junto do rodapé de sessão: é ajuste
+            de quem usa, não configuração do time, e não merece uma aba. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <span style={{ fontSize: 11, color: "var(--texto-fraco)" }}>Tema</span>
+          <SeletorDeTema />
+        </div>
 
         <p style={tituloGrupoEstilo}>Demanda</p>
         <button onClick={acao(onNovaQuebra)} style={itemEstilo}>

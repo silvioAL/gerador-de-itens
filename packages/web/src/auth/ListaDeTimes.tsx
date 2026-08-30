@@ -66,7 +66,7 @@ export function ListaDeTimes({ timeIds, ativo, onEscolher, autoFocus }: ListaDeT
             aria-current={timeId === ativo ? "true" : undefined}
             style={{
               ...itemEstilo,
-              ...(timeId === ativo ? { borderColor: "#4f46e5", color: "var(--texto)" } : {}),
+              ...(timeId === ativo ? { borderColor: "var(--acento-gente)", color: "var(--texto)" } : {}),
             }}
           >
             {timeId}

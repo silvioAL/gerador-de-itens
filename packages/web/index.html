@@ -4,6 +4,29 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Gerador de Itens</title>
+    <!--
+      SPEC-93 — o tema é aplicado ANTES da primeira pintura.
+
+      Se isto ficasse no React, a página abriria com o tema padrão e trocaria no
+      primeiro efeito: um flash branco em quem escolheu escuro, e o contrário —
+      que é pior, porque acontece a cada carregamento e ninguém consegue
+      "desver".
+
+      Script inline e sem dependência de propósito: ele precisa rodar antes do
+      bundle, e o bundle é justamente o que demora.
+    -->
+    <script>
+      (function () {
+        try {
+          var p = localStorage.getItem("gerador:tema");
+          if (p !== "claro" && p !== "escuro" && p !== "sistema") p = "sistema";
+          var claro = p === "claro" || (p === "sistema" && window.matchMedia("(prefers-color-scheme: light)").matches);
+          document.documentElement.setAttribute("data-tema", claro ? "claro" : "escuro");
+        } catch (e) {
+          document.documentElement.setAttribute("data-tema", "escuro");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

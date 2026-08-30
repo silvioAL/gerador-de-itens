@@ -272,7 +272,7 @@ function AppComSessao({
     return (
       <div style={telaCentralizadaEstilo}>
         <div style={{ maxWidth: 480, textAlign: "center" }}>
-          <strong style={{ fontSize: 15, color: "#b91c1c" }}>Não foi possível carregar a configuração</strong>
+          <strong style={{ fontSize: 15, color: "var(--vermelho)" }}>Não foi possível carregar a configuração</strong>
           <p style={{ fontSize: 13, color: "var(--texto-2)", marginTop: 8 }}>{erroConfig}</p>
         </div>
       </div>
@@ -1584,7 +1584,7 @@ function AppCarregado({
         <div
           style={{
             padding: "6px 16px",
-            background: "#3a1d1d",
+            background: "var(--vermelho-fundo)",
             color: "var(--vermelho)",
             fontSize: 12,
             display: "flex",
@@ -2540,7 +2540,7 @@ const botaoPrimarioEstilo: React.CSSProperties = {
 
 const botaoJornadaEstilo: React.CSSProperties = {
   background: "rgba(99, 102, 241, 0.14)",
-  color: "#a5b4fc",
+  color: "var(--acento-gente-texto)",
   border: "1px solid rgba(99, 102, 241, 0.45)",
   fontWeight: 600,
 };

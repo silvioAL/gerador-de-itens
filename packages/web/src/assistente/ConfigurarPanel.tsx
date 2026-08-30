@@ -526,7 +526,7 @@ const balaoBase: React.CSSProperties = {
 
 const balaoAgenteEstilo: React.CSSProperties = {
   ...balaoBase,
-  background: "var(--painel-alto, #15202D)",
+  background: "var(--painel-alto)",
   color: "var(--texto-2)",
 };
 
@@ -570,7 +570,7 @@ const entradaEstilo: React.CSSProperties = {
   padding: "7px 9px",
   borderRadius: 6,
   border: "1px solid var(--borda-forte)",
-  background: "var(--painel-alto, #15202D)",
+  background: "var(--painel-alto)",
   color: "var(--texto)",
   fontSize: 12.5,
   resize: "vertical",

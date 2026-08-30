@@ -84,7 +84,7 @@ export function PainelDeProposta({
                 style={{
                   fontSize: 10.5,
                   fontWeight: 700,
-                  color: campo.situacao === "diverge" ? "var(--amarelo, #eab308)" : "var(--verde, #3ecf8e)",
+                  color: campo.situacao === "diverge" ? "var(--amarelo)" : "var(--verde)",
                 }}
               >
                 {campo.situacao === "diverge" ? "diverge do que está aqui" : "está vazio aqui"}
@@ -96,7 +96,7 @@ export function PainelDeProposta({
             {campo.situacao === "diverge" && (
               <div style={{ marginTop: 6 }}>
                 <div style={legendaEstilo}>aqui</div>
-                <div style={{ ...textoEstilo, borderLeft: "2px solid #4f46e5" }}>{campo.atual}</div>
+                <div style={{ ...textoEstilo, borderLeft: "2px solid var(--acento-gente)" }}>{campo.atual}</div>
               </div>
             )}
 
@@ -177,8 +177,8 @@ const botaoEstilo: React.CSSProperties = {
   fontSize: 12,
   padding: "5px 10px",
   borderRadius: 7,
-  border: "1px solid #4f46e5",
-  background: "#4f46e5",
+  border: "1px solid var(--acento-gente)",
+  background: "var(--acento-gente)",
   color: "#fff",
   cursor: "pointer",
 };

@@ -59,7 +59,7 @@ export function CursorFantasma({ alvo, passo }: CursorFantasmaProps) {
           width: 28,
           height: 28,
           borderRadius: "50%",
-          border: "2px solid #a5b4fc",
+          border: "2px solid var(--acento-gente-texto)",
           animation: "cursor-pulso .7s ease-out",
         }}
       />

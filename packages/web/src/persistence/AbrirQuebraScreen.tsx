@@ -164,9 +164,9 @@ const botaoEstilo: React.CSSProperties = {
 };
 
 const botaoPrimarioEstilo: React.CSSProperties = {
-  background: "#4f46e5",
+  background: "var(--acento-gente)",
   color: "#fff",
-  border: "1px solid #4f46e5",
+  border: "1px solid var(--acento-gente)",
 };
 
 const labelEstilo: React.CSSProperties = {
@@ -193,7 +193,7 @@ const inputDataEstilo: React.CSSProperties = {
 
 const linkLimparEstilo: React.CSSProperties = {
   fontSize: 12,
-  color: "#a5b4fc",
+  color: "var(--acento-gente-texto)",
   background: "none",
   border: "none",
   cursor: "pointer",

@@ -681,8 +681,8 @@ export function SecaoEscrita({
   return (
     <section data-testid={testid} style={colunaDeTextoEstilo}>
       <h2 style={tituloSecaoEstilo}>{titulo}</h2>
-      <div style={{ borderLeft: "3px solid #4f46e5", padding: "2px 0 2px 16px", margin: "12px 0" }}>
-        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "#a5b4fc" }}>
+      <div style={{ borderLeft: "3px solid var(--acento-gente)", padding: "2px 0 2px 16px", margin: "12px 0" }}>
+        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--acento-gente-texto)" }}>
           escrito por uma pessoa
         </span>
         {editando ? (
@@ -872,7 +872,7 @@ function SecaoDosItens({
               )}
               {resultado && (
                 <div style={{ marginTop: 8 }} data-testid="resultado-exportacao">
-                  <p style={{ fontSize: 12.5, color: "var(--verde, #4ade80)", margin: 0 }}>
+                  <p style={{ fontSize: 12.5, color: "var(--verde)", margin: 0 }}>
                     {resultado.exportados.length} item(ns) no {resultado.destino}.
                   </p>
                   {resultado.erros.map((e) => (
@@ -918,18 +918,18 @@ function SecaoDosItens({
  * esteira esperam confirmação (SPEC-41 Parte B). */
 function completudeDoItem(item: ItemGerado): { rotulo: string; cor: string; fundo: string } {
   if (item.estado === "exportado")
-    return { rotulo: "Exportado", cor: "var(--verde, #4ade80)", fundo: "rgba(74, 222, 128, 0.12)" };
+    return { rotulo: "Exportado", cor: "var(--verde)", fundo: "rgba(74, 222, 128, 0.12)" };
   if (item.pendencias === 0 && item.sugestoes === 0)
-    return { rotulo: "Pronto pra exportar", cor: "var(--verde, #4ade80)", fundo: "rgba(74, 222, 128, 0.12)" };
+    return { rotulo: "Pronto pra exportar", cor: "var(--verde)", fundo: "rgba(74, 222, 128, 0.12)" };
   if (item.pendencias === 0)
     return {
       rotulo: `${item.sugestoes} ${item.sugestoes === 1 ? "sugestão" : "sugestões"} a confirmar`,
-      cor: "var(--amarelo, #facc15)",
+      cor: "var(--amarelo)",
       fundo: "rgba(250, 204, 21, 0.12)",
     };
   return {
     rotulo: `✍️ ${item.pendencias} campo${item.pendencias === 1 ? "" : "s"} a especificar`,
-    cor: "var(--laranja, #fb923c)",
+    cor: "var(--laranja)",
     fundo: "rgba(251, 146, 60, 0.12)",
   };
 }
@@ -1073,7 +1073,7 @@ const fundoEstilo: React.CSSProperties = {
   inset: 0,
   zIndex: 55,
   overflow: "auto",
-  background: "var(--fundo, #0b1220)",
+  background: "var(--fundo)",
   fontFamily: "system-ui, sans-serif",
 };
 
@@ -1168,7 +1168,7 @@ function chipEstilo(nivel: "verde" | "amarelo" | "vermelho"): React.CSSPropertie
 }
 
 function seloStatusEstilo(status: StatusDocumento): React.CSSProperties {
-  const cor = status === "aprovado" || status === "implementado" ? "var(--verde)" : "#a5b4fc";
+  const cor = status === "aprovado" || status === "implementado" ? "var(--verde)" : "var(--acento-gente-texto)";
   return {
     fontSize: 11,
     fontWeight: 700,
@@ -1205,7 +1205,7 @@ const linkEstilo: React.CSSProperties = {
   padding: 0,
   border: "none",
   background: "none",
-  color: "#a5b4fc",
+  color: "var(--acento-gente-texto)",
   cursor: "pointer",
   textAlign: "left",
 };
@@ -1250,7 +1250,7 @@ const trilhoEstilo: React.CSSProperties = {
 const barraDeProntosEstilo: React.CSSProperties = {
   height: "100%",
   borderRadius: 999,
-  background: "var(--verde, #4ade80)",
+  background: "var(--verde)",
   transition: "width 300ms ease",
 };
 

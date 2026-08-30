@@ -434,7 +434,7 @@ const linkEstilo: React.CSSProperties = {
   padding: 0,
   border: "none",
   background: "none",
-  color: "#a5b4fc",
+  color: "var(--acento-gente-texto)",
   cursor: "pointer",
   textAlign: "left",
 };

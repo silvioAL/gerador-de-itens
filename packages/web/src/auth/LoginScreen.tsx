@@ -168,8 +168,8 @@ const botaoEstilo: React.CSSProperties = {
   fontWeight: 600,
   padding: "9px 12px",
   borderRadius: 7,
-  border: "1px solid #4f46e5",
-  background: "#4f46e5",
+  border: "1px solid var(--acento-gente)",
+  background: "var(--acento-gente)",
   color: "#fff",
   cursor: "pointer",
 };

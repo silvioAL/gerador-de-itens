@@ -214,7 +214,7 @@ export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, on
       >
         <defs>
           <pattern id="diagrama-pontos" width={26} height={26} patternUnits="userSpaceOnUse">
-            <circle cx={1} cy={1} r={1} fill="#1B2533" opacity={0.55} />
+            <circle cx={1} cy={1} r={1} fill="var(--borda)" opacity={0.55} />
           </pattern>
         </defs>
         <rect x="-5000" y="-5000" width="10000" height="10000" fill="url(#diagrama-pontos)" />
@@ -245,7 +245,7 @@ export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, on
                   d={d}
                   pathLength={100}
                   fill="none"
-                  stroke="#e0f2fe"
+                  stroke="var(--acento)"
                   strokeWidth={2.6}
                   strokeLinecap="round"
                   className="diagrama-cometa"
@@ -257,7 +257,7 @@ export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, on
                 width={larguraRotulo}
                 height={16}
                 rx={4}
-                fill="#0C111A"
+                fill="var(--fundo)"
               />
               <text x={meio.x} y={meio.y + 3.5} textAnchor="middle" style={rotuloArestaEstilo}>
                 {e.rotulo}
@@ -299,8 +299,8 @@ export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, on
                 width={LARGURA_NO}
                 height={ALTURA_NO}
                 rx={10}
-                fill="#151b28"
-                stroke={ativo ? n.cor : "#263344"}
+                fill="var(--painel-alto)"
+                stroke={ativo ? n.cor : "var(--borda-forte)"}
                 strokeWidth={ativo ? 1.6 : 1}
                 className={ativo && animado ? "diagrama-no-ativo" : undefined}
               />
@@ -316,7 +316,7 @@ export function DiagramaCompacto({ diagrama, config, noAtivoId, noFiltradoId, on
                   return tipo.length > teto ? `${tipo.slice(0, teto - 1)}…` : tipo;
                 })()}
                 {n.existente && (
-                  <tspan dx={8} fill="#5C6A7E">
+                  <tspan dx={8} fill="var(--texto-mudo)">
                     EXISTENTE
                   </tspan>
                 )}
@@ -364,8 +364,8 @@ const palcoEstilo: React.CSSProperties = {
   height: "30vh",
   minHeight: 180,
   flexShrink: 0,
-  borderBottom: "1px solid #1B2533",
-  background: "radial-gradient(1100px 340px at 50% -8%, rgba(56, 189, 248, 0.09), transparent 70%), #0C111A",
+  borderBottom: "1px solid var(--borda)",
+  background: "radial-gradient(1100px 340px at 50% -8%, rgba(56, 189, 248, 0.09), transparent 70%), var(--fundo)",
   overflow: "hidden",
 };
 
@@ -374,7 +374,7 @@ const rotuloArestaEstilo: React.CSSProperties = {
   fontSize: 10,
   fontWeight: 600,
   letterSpacing: "0.1em",
-  fill: "#5C6A7E",
+  fill: "var(--texto-mudo)",
 };
 
 const tipoNoEstilo: React.CSSProperties = {
@@ -387,7 +387,7 @@ const tipoNoEstilo: React.CSSProperties = {
 const nomeNoEstilo: React.CSSProperties = {
   fontFamily: "ui-monospace, monospace",
   fontSize: 12.5,
-  fill: "#E8EEF8",
+  fill: "var(--texto)",
 };
 
 const contagemEstilo: React.CSSProperties = {
@@ -405,8 +405,8 @@ const legendaEstilo: React.CSSProperties = {
   flexWrap: "wrap",
   padding: "6px 11px",
   borderRadius: 10,
-  background: "rgba(12, 17, 26, 0.7)",
-  border: "1px solid #1B2533",
+  background: "var(--painel-flutuante)",
+  border: "1px solid var(--borda)",
   backdropFilter: "blur(6px)",
 };
 
@@ -417,7 +417,7 @@ const legendaItemEstilo: React.CSSProperties = {
   fontSize: 10,
   fontWeight: 600,
   letterSpacing: "0.1em",
-  color: "#8D9BB0",
+  color: "var(--texto-fraco)",
 };
 
 const legendaTracoEstilo: React.CSSProperties = {
@@ -431,5 +431,5 @@ const dicaEstilo: React.CSSProperties = {
   right: 16,
   bottom: 12,
   fontSize: 11.5,
-  color: "#5C6A7E",
+  color: "var(--texto-mudo)",
 };
