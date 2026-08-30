@@ -13,6 +13,7 @@ import { ESTAGIOS_DO_CICLO, type EstagioDoCiclo } from "./ciclo";
  */
 const FALTANDO: EstagioDoCiclo = {
   id: "inventado",
+  fase: "entrega",
   titulo: "Um estágio que não existe",
   resumo: "existe só neste teste",
   detalhe: "o desdobramento de um estágio ausente",
@@ -22,6 +23,7 @@ const FALTANDO: EstagioDoCiclo = {
 
 const EXISTINDO: EstagioDoCiclo = {
   id: "real",
+  fase: "entrega",
   titulo: "Um estágio que existe",
   resumo: "existe só neste teste",
   detalhe: "o desdobramento de um estágio completo",

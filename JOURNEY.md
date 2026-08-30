@@ -14260,3 +14260,73 @@ não convencer no tour, isso é medição para outra rodada — e é medição, 
 
 609 engine · 133 llm · 122 aplicação · 897 web · 311 server · 42 gateway-falso ·
 108/108 E2E · build, typecheck e lint limpos.
+## §333 — a jornada, e onde ela fala com fora (SPEC-90)
+
+O usuário, duas vezes. Primeiro: *"falta diagrama dos fluxos que já falei, que
+conecta a parte de produto e arquitetura de negócio → técnica → design da solução
+→ ensaio, etc."* Depois, precisando: *"acho que já temos algo nesse sentido na
+landing, mas falta uma explicação em forma de diagrama que demonstre o processo,
+mostre em forma de fluxo quando vai para o MCP"* — e, no meio da rodada: *"uma
+visão de jornada, o objetivo é mostrar como o sistema funciona."*
+
+### Ele estava certo nas duas metades
+
+Tem algo nesse sentido, e o que falta é o fluxo. Medi as cinco peças da página, e
+nenhuma responde *"em que ponto isto sai para o gateway?"*:
+
+- `AsCamadas` é **corte transversal** — o que existe, não em que ordem;
+- `CicloDoProduto` é **índice** — quais são os estágios e o que já existe;
+- `OMapaDeConexoes` é **lista** — diz que há ADR entrando e item saindo, nunca
+  **onde**.
+
+O mapa de conexões era o "algo nesse sentido" que ele identificou. O que faltava
+nele era o ponto do processo em que cada caminho acontece.
+
+### O dado ganhou o lugar, e é isso que impede o desenho de mentir
+
+Cada estágio ganhou a **fase** a que pertence; cada conexão ganhou **em qual
+estágio ela acontece**. O diagrama é desenhado dessas duas listas, que já são
+guardadas por travas (§327, §328).
+
+Consequência, e é o ponto: uma fase sem estágio não vira caixa; uma conexão
+ancorada no vazio quebra o teste. É o mecanismo da SPEC-76 aplicado ao desenho em
+vez de à prosa.
+
+### A trava do §323 disparou, e ela estava certa
+
+O fluxo nomeia os treze estágios — sem os nomes não há percurso, só caixas com
+rótulo de fase. A trava de repetição acusou os treze de uma vez.
+
+**Não afrouxei o número.** A linha de base passou a ser medida contra os **dois**
+componentes que legitimamente nomeiam estágios, declarados numa lista. Quem
+quiser um terceiro tem que vir ali e escrever por quê — que é o atrito que a
+trava existe para criar.
+
+E o que impede o fluxo de virar a `Jornada` que o §323 tirou daqui é outra trava,
+no próprio arquivo dele: **nenhum resumo nem detalhe de estágio pode aparecer**.
+Nome é percurso; prosa é índice, e o índice já está no círculo.
+
+### Duas coisas que só a captura contra a stack mostrou
+
+**Os rótulos viraram borrão.** Os três saltos da fase de entrega saíam do mesmo
+lugar e escreviam uns por cima dos outros — ilegível. Passaram a descer um degrau
+por salto: a faixa tinha altura, e o que faltava era usá-la.
+
+**A caixa transbordava.** A fase de entrega tem cinco estágios, e a altura era um
+número fixo — os dois últimos nomes ficavam fora da borda. A altura passou a sair
+do dado, e cresce sozinha quando uma fase crescer.
+
+Nenhuma das duas apareceria em teste: os dois são verdes com o texto sobreposto,
+porque `textContent` não sabe de pixel. Foi olhar.
+
+### O que ficou de fora, declarado
+
+O MCP **não** é desenhado como caixa nossa: o produto não implementa o protocolo,
+chama um gateway configurável, e quem fala MCP está do outro lado (SPEC-81). O que
+sai vai para uma faixa marcada como **fora**.
+
+E móvel não foi medido — cinco fases lado a lado não cabem em tela estreita, e a
+SPEC-90 §5.2 registra isso em vez de fingir que resolveu.
+
+609 engine · 133 llm · 122 aplicação · 907 web · 311 server · 42 gateway-falso ·
+108/108 E2E · build, typecheck e lint limpos.

@@ -118,12 +118,23 @@ export interface Conexao {
   titulo: string;
   detalhe: string;
   estado: EstadoDoEstagio;
+  /**
+   * SPEC-90 — **em que estágio do ciclo este salto acontece.**
+   *
+   * É o que faltava para o diagrama de fluxo poder desenhar o desvio no ponto
+   * certo, em vez de listar os caminhos ao lado. Aponta para um `id` de
+   * `ESTAGIOS_DO_CICLO`, e há teste que falha se o estágio não existir — uma
+   * conexão que aponta para o vazio é um caminho que a página promete e o
+   * produto não tem.
+   */
+  noEstagio: string;
   oQueFalta?: string;
 }
 
 export const CONEXOES: Conexao[] = [
   {
     id: "adr-entra",
+    noEstagio: "desenho",
     sentido: "entra",
     titulo: "ADRs da casa",
     detalhe:
@@ -140,6 +151,7 @@ export const CONEXOES: Conexao[] = [
   },
   {
     id: "arquitetura-entra",
+    noEstagio: "contexto",
     sentido: "entra",
     titulo: "Arquitetura de negócio",
     detalhe: "Objetivo, regras permanentes, sistemas e restrições vindos de onde a casa já os guarda.",
@@ -161,6 +173,7 @@ export const CONEXOES: Conexao[] = [
   },
   {
     id: "itens-sai",
+    noEstagio: "itens",
     sentido: "sai",
     titulo: "Itens → issue tracker",
     detalhe:
@@ -169,6 +182,7 @@ export const CONEXOES: Conexao[] = [
   },
   {
     id: "documento-sai",
+    noEstagio: "especificacao",
     sentido: "sai",
     titulo: "Documento → base de conhecimento",
     detalhe:
@@ -177,6 +191,7 @@ export const CONEXOES: Conexao[] = [
   },
   {
     id: "spec-sai",
+    noEstagio: "specs-para-ia",
     sentido: "sai",
     titulo: "Spec → desenvolvimento com IA",
     detalhe:
