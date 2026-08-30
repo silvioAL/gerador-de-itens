@@ -15,6 +15,8 @@ import {
   ensaiosAssumidos,
   gerarEspecificacaoEntrega,
   gerarSpec,
+  adotarVariante,
+  guardarComoVariante,
   coberturaDaSpec,
   resolverDependencias,
   violacoesEmAberto,
@@ -89,6 +91,7 @@ import { SistemaScreen } from "./sistema/SistemaScreen";
 import { AvisosDaDerivacao } from "./summary/AvisosDaDerivacao";
 import { baixarArquivoTexto } from "./persistence/baixarArquivo";
 import { SpecScreen } from "./spec/SpecScreen";
+import { PainelDeVariantes } from "./variante/PainelDeVariantes";
 import { LandingPage } from "./demo/LandingPage";
 import { EscolherTimeScreen } from "./auth/EscolherTimeScreen";
 import { lembrarTime, lerTimeLembrado } from "./auth/timeLembrado";
@@ -2292,6 +2295,44 @@ function AppCarregado({
             }}
           />
         )}
+        {/**
+         * SPEC-88 (P6) fatia D — as alternativas de desenho.
+         *
+         * Aqui, no assistente, e não numa rota própria: guardar e comparar são
+         * gestos feitos COM o desenho na frente, e uma tela cheia esconderia
+         * justamente o que se está comparando.
+         */}
+        {abaAssistente === "variantes" && (
+          <PainelDeVariantes
+            tituloAtual={quebra.titulo?.trim() || "Desenho de agora"}
+            diagramaAtual={quebra.diagrama}
+            variantes={quebra.variantes ?? []}
+            config={diagramaConfig}
+            onGuardar={(titulo) =>
+              setQuebra((q) =>
+                guardarComoVariante(q, titulo, q.diagrama, { id: crypto.randomUUID(), em: new Date().toISOString() })
+              )
+            }
+            onAdotar={(varianteId, porque) =>
+              setQuebra((q) => {
+                // O motor recusa sem `porque` (`AdocaoSemPorque`), e o botão já
+                // não habilita — mas a guarda fica dos dois lados de propósito:
+                // a tela pode mudar, e a regra é do produto.
+                try {
+                  return adotarVariante(q, varianteId, porque, {
+                    id: crypto.randomUUID(),
+                    em: new Date().toISOString(),
+                    autor: sessao?.email ?? "desconhecido",
+                  }).quebra;
+                } catch {
+                  return q;
+                }
+              })
+            }
+            onFechar={() => setAbaAssistente(null)}
+          />
+        )}
+
         {abaAssistente === "contexto" && (
           <ContextoEpicoPanel
             demandInfo={quebra.demandInfo}

@@ -266,6 +266,24 @@ export const corpoQuebra = z.object({
   volumetria: z.object({ quantidade: z.number(), por: z.enum(["segundo", "minuto", "hora", "dia"]) }).optional(),
   /** SPEC-87 (P5) — o regime declarado da demanda. */
   modoDeOperacao: z.string().optional(),
+  /**
+   * SPEC-88 (P6) — as alternativas de desenho NÃO adotadas.
+   *
+   * `diagrama` passa como `unknown` aqui pelo mesmo motivo que o da quebra: quem
+   * sabe interpretar um diagrama é o engine, e um Zod que o descrevesse campo a
+   * campo viraria a sexta declaração da mesma forma.
+   */
+  variantes: z
+    .array(
+      z.object({
+        id: z.string(),
+        titulo: z.string(),
+        diagrama: z.unknown(),
+        criadaEm: z.string(),
+        motivo: z.string().optional(),
+      })
+    )
+    .optional(),
   /** SPEC-65 fatia D — as leituras caladas neste desenho. Só a DECISÃO
    * atravessa a borda, como nos percursos: a leitura em si é pura e roda a cada
    * render. `tipo` é string livre de propósito — leitura nova não deveria

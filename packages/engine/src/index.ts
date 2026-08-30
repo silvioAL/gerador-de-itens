@@ -1,5 +1,16 @@
 export * from "./model/types.js";
-export * from "./config/types.js";
+export * from "./config/types.js";
+/** SPEC-88 (P6) — as alternativas de desenho, e a decisão que nasce ao adotar. */
+export {
+  AdocaoSemPorque,
+  VarianteInexistente,
+  adotarVariante,
+  compararVariantes,
+  guardarComoVariante,
+  type ComparacaoDeVariantes,
+  type LadoDaComparacao,
+  type ResultadoDaAdocao,
+} from "./variante/variantes.js";
 /** SPEC-86 — a soma das regras do time com as do produto, com procedência. */
 export {
   chaveDaRegra,

@@ -188,6 +188,25 @@ export interface ExcecaoDePadrao {
  * refaz a análise inteira, ou pior, troca por uma opção que já tinha sido
  * rejeitada por um motivo que ninguém escreveu.
  */
+/**
+ * SPEC-88 (P6) — um desenho alternativo guardado, com o motivo de existir.
+ *
+ * Diferente de `Alternativa`, que é um TÍTULO dentro de uma decisão: aqui há um
+ * diagrama inteiro, e é sobre ele que `lerDesenho` roda para a comparação sair
+ * calculada em vez de digitada.
+ */
+export interface Variante {
+  id: string;
+  /** O nome pelo qual se compara. Sem ele a lista vira "alternativa 1, 2, 3". */
+  titulo: string;
+  diagrama: Diagrama;
+  /** ISO-8601. Quem cria decide o valor — o motor não lê relógio. */
+  criadaEm: string;
+  /** Por que ela existe, ou por que não foi adotada. Opcional: meia memória é
+   * melhor que nenhuma, a mesma régua de `Alternativa.consequencia`. */
+  motivo?: string;
+}
+
 export interface Alternativa {
   titulo: string;
   /** Por que não foi escolhida. Vazio é permitido — meia memória é melhor que nenhuma. */
@@ -540,6 +559,19 @@ export interface Quebra {
    * não vale como "vale tudo".
    */
   modoDeOperacao?: string;
+  /**
+   * SPEC-88 (P6) — **as alternativas de desenho NÃO adotadas.**
+   *
+   * A quebra continua tendo um `diagrama`, e ele é sempre o adotado. Isto guarda
+   * o que ficou de fora, com o motivo — e adotar uma delas é uma troca atômica
+   * que registra uma `Decisao` (`adotarVariante`).
+   *
+   * A SPEC-56 §8 escreveu a armadilha antes de alguém cair nela: *"variante não
+   * pode ser copiar a quebra e editar, ou as duas divergem e ninguém sabe qual
+   * venceu."* Contexto, necessidades, produto e volume são da DEMANDA, não do
+   * desenho — duplicá-los criaria dois lugares para editar a mesma coisa.
+   */
+  variantes?: Variante[];
   /** §242 — as violações de padrão aceitas DE PROPÓSITO nesta quebra. */
   excecoes?: ExcecaoDePadrao[];
   /** SPEC-57 fatia C — as escolhas entre alternativas, com o porquê. Ausente em

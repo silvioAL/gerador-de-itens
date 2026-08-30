@@ -56,6 +56,7 @@ const CAMPOS_DA_QUEBRA = {
   necessidades: "atravessa",
   volumetria: "atravessa",
   modoDeOperacao: "atravessa",
+  variantes: "atravessa",
   excecoes: "atravessa",
   decisoes: "atravessa",
   percursos: "atravessa",

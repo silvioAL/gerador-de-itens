@@ -14107,3 +14107,83 @@ declara regime não vê o seletor.
 
 598 engine · 133 llm · 122 aplicação · 888 web · 299 server · 42 gateway-falso ·
 106/106 E2E · build, typecheck e lint limpos.
+## §331 — a variante, e o sexto funil que engolia campo só no autosave (SPEC-88, P6)
+
+O último passo aberto da SPEC-56 com valor medido. O §295 o deixou de fora com a
+frase que virou o escopo desta rodada: *"fazer certo é uma quebra com duas
+variantes e uma decisão registrada de qual foi adotada — modelo, servidor, tela e
+migração. É uma SPEC inteira, não uma fatia."*
+
+### O motor de comparação já existia, e é puro
+
+`lerDesenho(diagrama, config)` é função pura sobre um diagrama, e devolve
+exatamente o que a SPEC-56 §8 disse que a comparação seria: pior caso de
+latência, pontos que esperam por mais de um, e o que ficou sem medir. **Comparar
+A e B é chamar a mesma função duas vezes.** Não entrou motor novo — entrou um
+segundo diagrama para chamá-la.
+
+### A armadilha estava escrita antes de alguém cair nela
+
+> *"variante não pode ser 'copiar a quebra e editar', ou as duas divergem e
+> ninguém sabe qual venceu."*
+
+A quebra continua tendo **um** `diagrama`, e ele é sempre o adotado. `variantes`
+guarda as não adotadas. Adotar troca os dois de lugar e **registra uma `Decisao`**
+com as duas na lista e o porquê — e o porquê é obrigatório, no motor e na tela.
+
+Sem ele, adotar seria "copiar e editar" com um passo a mais: daqui a três meses
+ninguém sabe por que o desenho é este, e a alternativa guardada parece rascunho
+esquecido em vez de opção descartada com razão.
+
+### O achado da rodada: existe um SEXTO funil, e ele só derruba no `atualizar`
+
+O E2E falhou dizendo que a variante não chegava ao servidor. Sondei em camadas —
+primeiro o POST (passou), depois o PUT (falhou) — e o defeito apareceu:
+`quebrasEmPostgres.atualizar` monta um objeto `conteudo` **campo a campo**, uma
+segunda whitelist separada da do `criar`.
+
+Campo que entra na criação e não ali **salva e some no autosave**. É o pior modo
+de falhar: a pessoa vê "salvo", recarrega, e perdeu.
+
+**E ele já tinha me pegado.** O `modoDeOperacao` do §330 foi mergeado assim
+ontem: a borda tinha, a coluna tinha, o `criar` tinha, e o `atualizar` não. Nada
+acusou — a trava do §310 cruza `keyof Quebra` com o **Zod**, e o Zod estava
+certo. Os dois campos foram corrigidos nesta rodada.
+
+A trava nova cruza o Zod com o **bloco do UPDATE**, lendo o fonte. É grosseiro e
+é honesto sobre o que faz: não custa um Postgres para acusar um campo esquecido,
+e a lista de exceções legítimas é curta e justificada uma a uma.
+
+### Dois enganos meus, e o que cada um ensinou
+
+**A escolha congelada.** O painel fazia `useState(variantes[0]?.id)`: montado com
+a lista vazia, ficava `null` para sempre, e a primeira alternativa guardada não
+abria comparação nenhuma. Os sete unitários do arquivo passavam — todos montam
+com a lista já cheia. Quem pegou foi o E2E, que exercita a **transição** de zero
+para um. Virou unitário, e o comentário diz por quê.
+
+**A sonda que sujou a fixture.** Para separar POST de PUT, sondei o PUT na própria
+demanda do teste — e deixei uma variante nela, derrubando a asserção de "nenhuma
+alternativa guardada" três passos adiante. Sonda que suja a fixture inventa um
+defeito. Foi para uma quebra descartável.
+
+### O que ficou de fora, declarado
+
+Merge entre variantes, variante de variante, comparar mais de duas por vez, e
+derivar itens de uma não adotada — as quatro estão na SPEC-88 §3 com o motivo. E
+o tamanho: cada variante é um diagrama inteiro dentro da linha da quebra; a
+SPEC-72 mediu 848 kB em 24 quebras e não achou número que doesse, mas o teto de
+anexo dela **não** cobre este caso. Registrado para medir quando houver uso real.
+
+609 engine · 133 llm · 122 aplicação · 897 web · 300 server · 42 gateway-falso ·
+107/107 E2E · build, typecheck e lint limpos.
+
+### Anotado a pedido do usuário, para a sequência
+
+- **A demonstração não usa o gateway falso, e deveria.** O dublê já responde
+  chat, transcrição e ADR — a demo mostraria o produto funcionando em vez de
+  fixture estática.
+- **Falta o diagrama do FLUXO** que liga produto e arquitetura de negócio →
+  arquitetura técnica → design da solução → ensaio → itens. Os quatro diagramas
+  de hoje mostram camadas, evolução, bordas e o ciclo; nenhum mostra essa cadeia
+  se conectando.

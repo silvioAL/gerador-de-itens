@@ -295,6 +295,13 @@
       "when": 1754500000027,
       "tag": "0041_modo_de_operacao",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1754500000028,
+      "tag": "0042_variantes",
+      "breakpoints": true
     }
   ]
 }

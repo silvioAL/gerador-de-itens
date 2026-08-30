@@ -106,6 +106,7 @@ export function usePersistencia(quebra: Quebra, aoAbrir: (q: Quebra) => void) {
           // `null` do banco vira ausência no modelo: `Quebra.modoDeOperacao` é
           // `string | undefined`, e "não declarou" tem uma forma só do lado de cá.
           modoDeOperacao: salva.modoDeOperacao ?? undefined,
+          variantes: salva.variantes,
           leiturasDispensadas: salva.leiturasDispensadas,
           cenariosDeLentidao: salva.cenariosDeLentidao,
         });

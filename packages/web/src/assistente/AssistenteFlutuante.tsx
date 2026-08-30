@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useArrastavel } from "./useArrastavel";
 
-export type AbaAssistente = "conversa" | "contexto" | "configurar";
+export type AbaAssistente = "conversa" | "contexto" | "configurar" | "variantes";
 
 /** A ordem aqui é a ordem visual das abas. Entrada nova = aba nova — foi
  * exatamente pra isso que o invólucro existe (o "configurar" do #297 nasceu
@@ -10,6 +10,9 @@ const ABAS: { id: AbaAssistente; rotulo: string }[] = [
   { id: "conversa", rotulo: "✦ Desenhar conversando" },
   { id: "contexto", rotulo: "📎 Contexto da demanda" },
   { id: "configurar", rotulo: "⚙ Configurar" },
+  /** SPEC-88 (P6) — as alternativas de desenho. Entrada nova = aba nova, que é
+   * exatamente para isto que este invólucro existe (SPEC-34 §3.1). */
+  { id: "variantes", rotulo: "⇄ Alternativas" },
 ];
 
 export interface AssistenteFlutuanteProps {
