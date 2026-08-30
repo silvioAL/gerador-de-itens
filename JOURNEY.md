@@ -14563,3 +14563,59 @@ feita e registrada aqui: `127.0.0.1` responde, `localhost` recusa, e o status
 virou `healthy` no rebuild.
 
 Rodada de uma linha, com o diagnóstico escrito ao lado dela.
+## §339 — o tour mostrava a credencial de quem demonstra falhando
+
+Relato do usuário, com print, no meio de uma demonstração: os quatro papéis da
+esteira em vermelho, cada um com o erro cru do provedor —
+
+> *"Gateway respondeu HTTP 400: Your credit balance is too low to access the
+> Anthropic API."*
+
+E a frase que importa: *"eu já mencionei que devemos usar mock na demonstração,
+estou sem tokens e fica aparecendo isso."*
+
+### O diagnóstico não é o que parecia, e isso muda o conserto
+
+**Não havia chamada nenhuma acontecendo.** O mapa do sistema mostra a *última
+execução* de cada papel, e ele lê o histórico REAL — por decisão escrita no §268:
+*"esta tela responde 'como o MEU ambiente está montado'"*. As linhas vermelhas
+eram registros de um dia antes, exibidos corretamente.
+
+Ou seja: a ferramenta estava **relatando com precisão um problema que não é
+dela**, no pior lugar possível. Quem assiste a demonstração não lê "a credencial
+desta casa está sem crédito" — lê "isto está quebrado".
+
+E o §332 não cobria: ele fez *sem credencial → dublê*. Aqui **há** credencial, e
+ela é real e está falhando.
+
+### O que mudou, e o que deliberadamente não mudou
+
+No tour, só o **histórico de execução** passa a ser de demonstração. A config
+continua sendo a real, e o comentário do §268 segue valendo intacto — porque é
+verdade: a tela responde como o ambiente está montado, e falsear isso seria a
+mentira que aquele § evitou de propósito.
+
+O histórico é o **único pedaço desta tela que depende de a credencial de alguém
+estar em dia** — e por isso é o único que o tour substitui. E chega marcado pela
+mesma `MarcaDeDemonstracao` de todo dado de tour (§235).
+
+As quatro execuções têm **durações diferentes e data fixa**, e há teste para as
+duas coisas: quatro números iguais parecem inventados porque seriam, e "há 3
+segundos" numa demonstração de outro dia seria mentira sobre quando aquilo
+aconteceu.
+
+### Um conserto de posição que o compilador pegou
+
+`demonstracaoDoTour` era declarado **depois** do `useMemo` do mapa. Mover foi o
+certo, e a direção da dependência diz por quê: o mapa depende do modo, nunca o
+contrário.
+
+### O que eu não verifiquei, e é honesto dizer
+
+Tentei dirigir o tour por script para ver o passo com os olhos, e o script travou
+navegando os passos. **A verificação desta rodada é por teste**, não por captura —
+os cinco unitários novos, os 915 do pacote e os 113 E2E. A conferência visual do
+passo específico fica pendente, e não vou chamá-la de feita.
+
+609 engine · 133 llm · 122 aplicação · 915 web · 311 server · 42 gateway-falso ·
+113/113 E2E · build, typecheck e lint limpos.

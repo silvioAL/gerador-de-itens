@@ -113,6 +113,33 @@ export const REGRAS_DO_TOUR: RegrasConfig = {
 /** Prefixo dos ids de decisão de demonstração. É por ele que a tela sabe que
  * uma decisão é do tour — e não pode ser aceita, porque o aceite grava na
  * quebra e ela não vive lá (§253). */
+/**
+ * SPEC-92 — **as execuções que o tour mostra, e por que elas não são as suas.**
+ *
+ * O mapa do sistema mostra a última execução de cada papel lendo o histórico
+ * REAL, por decisão escrita: *"esta tela responde 'como o meu ambiente está
+ * montado'"*. Está certo fora do tour.
+ *
+ * Dentro do tour, não. O usuário abriu a demonstração com a credencial da casa
+ * sem crédito e viu os quatro papéis em vermelho, com o erro cru do provedor —
+ * *"Your credit balance is too low to access the Anthropic API"*. Quem assiste
+ * conclui que a ferramenta está quebrada, quando ela está relatando com precisão
+ * um problema que não é dela.
+ *
+ * Estas execuções chegam **marcadas** pela mesma `MarcaDeDemonstracao` do resto
+ * do tour (§235): não é a tela mentindo, é a tela dizendo em voz alta que aquilo
+ * é exemplo — como já faz com o produto, a conversa e a exportação.
+ *
+ * As durações são diferentes de propósito: quatro números iguais parecem
+ * inventados, porque seriam.
+ */
+export const EXECUCOES_DO_TOUR = [
+  { papel: "po", ok: true, em: "2026-01-01T09:00:00.000Z", duracaoMs: 2400 },
+  { papel: "arquiteto", ok: true, em: "2026-01-01T09:00:03.000Z", duracaoMs: 3100 },
+  { papel: "especialista", ok: true, em: "2026-01-01T09:00:07.000Z", duracaoMs: 1900 },
+  { papel: "qa", ok: true, em: "2026-01-01T09:00:10.000Z", duracaoMs: 2200 },
+];
+
 export const PREFIXO_DECISAO_DO_TOUR = "decisao-do-tour-";
 
 export function ehDecisaoDeDemonstracao(id: string): boolean {
