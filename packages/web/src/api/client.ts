@@ -111,6 +111,15 @@ export interface QuebraSalva {
   documentoStatus?: StatusDocumento | null;
   /** SPEC-70 — o volume que a demanda atende. */
   volumetria?: VolumetriaDaDemanda;
+  /**
+   * SPEC-87 (P5) — o regime declarado da demanda.
+   *
+   * Esta é a QUINTA declaração da forma de uma quebra (modelo, porta, Zod,
+   * coluna e esta), e é a que o §250 pegou ficando para trás: o campo salva, não
+   * volta, e o autosave grava o vazio por cima. Aqui o `tsc` acusou — porque a
+   * reidratação já copia campo a campo e o campo novo não existia neste tipo.
+   */
+  modoDeOperacao?: string | null;
   /** SPEC-65 fatia D — as leituras caladas neste desenho. */
   leiturasDispensadas?: LeituraDispensada[];
   /** SPEC-66/68/69 — os ensaios, com estado e débito assumido. */

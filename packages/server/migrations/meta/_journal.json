@@ -288,6 +288,13 @@
       "when": 1754500000026,
       "tag": "0040_eixo_do_produto_nas_regras",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1754500000027,
+      "tag": "0041_modo_de_operacao",
+      "breakpoints": true
     }
   ]
 }

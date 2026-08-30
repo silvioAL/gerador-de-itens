@@ -53,6 +53,15 @@ export interface QuebraSalva {
    * propósito: quem já usa a ferramenta não passa a precisar cadastrar produto
    * pra fazer o que fazia. */
   produtoId?: string | null;
+  /**
+   * SPEC-87 (P5) — o regime declarado desta demanda.
+   *
+   * Aqui **e** em `DadosDaQuebra`, e não em uma só: a de leitura é o que volta
+   * do banco, a de escrita é o que se manda. O §250 mediu o preço de acertar só
+   * um dos lados — o campo salva e não volta, e o autosave grava o vazio por
+   * cima do que estava lá.
+   */
+  modoDeOperacao?: string | null;
   /** SPEC-57 fatia A — o propósito da demanda. Lista vazia = não declarou. */
   necessidades?: Necessidade[];
   /** §242 — as violações de padrão aceitas de propósito. */
@@ -132,6 +141,7 @@ export function normalizarDadosQuebra(bruto: Partial<DadosQuebra> | undefined): 
     // rodada que os trouxe também trouxe o teste que falha quando o próximo
     // for esquecido: repetir o aviso não bastou.
     volumetria: bruto?.volumetria,
+    modoDeOperacao: bruto?.modoDeOperacao,
     leiturasDispensadas: bruto?.leiturasDispensadas ?? [],
     cenariosDeLentidao: bruto?.cenariosDeLentidao ?? [],
   };

@@ -14034,3 +14034,76 @@ vocabulário do time: um produto que os redefinisse criaria dialeto interno.
 
 590 engine · 133 llm · 122 aplicação · 884 web · 299 server · 42 gateway-falso ·
 106/106 E2E · build, typecheck e lint limpos.
+## §330 — o regime de operação, e o nó de mentira que durou dez minutos (SPEC-87, P5)
+
+O §295 mediu oito passos da SPEC-56 e fechou só o #2. Três ficaram: P5 (modo de
+operação), P6 (variante A vs B) e P7 (dialeto de provedor). Esta rodada fecha o
+**P5**, e os outros dois seguem declarados — o P6 a própria SPEC-67 chamou de
+*"uma SPEC inteira, não uma fatia"*, e o P7 a SPEC-56 §9 já tinha classificado
+como *"o que mais parece impressionante numa demo e o que menos muda o item
+derivado"*.
+
+### A medição corrigiu a estimativa do §295, e para melhor
+
+A SPEC-67 §5 dizia que o custo era transversal porque `camposVisiveis` é chamado
+*"por seis lugares"*, incluindo refinamento. **São quatro, e refinamento não é um
+deles:**
+
+```
+gerarEspecificacaoEntrega.ts:116 · prontidao.ts:54 · checagens.ts:116 · PropertiesPanel.tsx:78
+```
+
+O refinamento tem o **seu próprio** `condicaoBate` (`gerarRefinamento.ts:230`),
+usado em três pontos, e a conformidade num quarto. Então não são seis assinaturas
+a atravessar: são **duas portas**, e as duas terminam em `avaliarCondicao`.
+
+O eixo entrou por **contexto**, não por um quarto parâmetro posicional. Quatro
+posicionais é onde quem chama troca a ordem sem o compilador ver — `no` e
+`arestas` são tipos distintos, mas um `string` ao lado deles não seria.
+
+### A escolha que define o eixo: sem regime, a régua não aparece
+
+Demanda sem modo declarado **não satisfaz** uma condição de modo. A alternativa —
+"sem modo, vale tudo" — faria toda régua condicionada aparecer em toda demanda
+antiga no dia do deploy, que é o oposto do que o eixo existe para fazer. É a mesma
+escolha que `notEquals` já fazia para campo não preenchido, e desligá-la derruba
+quatro testes.
+
+### O nó de mentira, e o teste que o matou em dez minutos
+
+Escrevi um `NO_VAZIO` para o caso "condição de modo com desenho vazio" — a
+condição não olha o nó, então deveria poder valer sem nós. Ele nascia com
+`status: "novo"`, que é um status **real**: toda régua condicionada por
+`nodeStatus: "novo"` passou a bater contra um nó que não existe, e o
+`exportar.test.ts` acusou na primeira rodada.
+
+Não era só o status. Qualquer valor que eu escolhesse seria um valor que alguma
+régua pode perguntar. E o caso **nem existe**: `nos` são os nós de ORIGEM de uma
+atividade, e atividade sem nó não é derivada. Era risco puro por um caso que o
+produto não produz. Saiu, e o comentário no lugar dele conta a história.
+
+### A quinta declaração da forma de uma quebra
+
+`modoDeOperacao` teve que atravessar modelo, Zod da borda, porta, coluna,
+adaptador, reidratação — e uma quinta: **o `packages/web` tem a sua própria
+`QuebraSalva`** (`api/client.ts:85`), separada da porta. É o funil 5 que o §250
+mediu, ainda de pé.
+
+Desta vez nada passou batido, e por dois motivos que já existiam: a trava do §310
+(`satisfies Record<keyof Quebra, …>`) acusou no `tsc` — não em runtime, o que me
+enganou por um minuto quando o teste passou verde —, e a reidratação copia campo a
+campo, então o campo que falta vira erro de tipo em vez de sumir calado.
+
+### O que ficou de fora, e está escrito
+
+O modo **não** reescreve a volumetria. A SPEC-56 §7 sugeria que trocar de "normal"
+para "pico" trocaria a taxa na origem; a volumetria já tem dono (SPEC-70/77), e um
+segundo lugar que a altera criaria duas verdades sobre o mesmo número. O modo pode
+condicionar uma régua de volumetria; não pode reescrever o número.
+
+E os modos são do **time** (`RegrasConfig.modos`), nunca de fábrica: embutir
+"Black Friday" no produto seria escolher o negócio de todo mundo. Time que não
+declara regime não vê o seletor.
+
+598 engine · 133 llm · 122 aplicação · 888 web · 299 server · 42 gateway-falso ·
+106/106 E2E · build, typecheck e lint limpos.

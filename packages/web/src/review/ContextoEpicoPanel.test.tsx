@@ -37,6 +37,10 @@ describe("ContextoEpicoPanel (Fase 1b, SPEC-23)", () => {
       [],
       // SPEC-70 — a volumetria também viaja no mesmo salvar. `undefined` sem
       // campo preenchido: em branco não é uma promessa.
+      undefined,
+      // SPEC-87 — e o REGIME, pelo mesmo motivo e no mesmo lugar: uma diz
+      // quanto, a outra diz em que condições. `undefined` = nenhum declarado,
+      // que é o padrão e é uma afirmação legítima.
       undefined
     );
   });
@@ -54,7 +58,7 @@ describe("ContextoEpicoPanel (Fase 1b, SPEC-23)", () => {
     expect(await screen.findByText("material.txt")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Salvar" }));
-    expect(onSalvar).toHaveBeenCalledWith("", [{ nome: "material.txt", conteudo: "conteúdo do arquivo" }], null, [], undefined);
+    expect(onSalvar).toHaveBeenCalledWith("", [{ nome: "material.txt", conteudo: "conteúdo do arquivo" }], null, [], undefined, undefined);
   });
 
   it("remover um anexo já adicionado tira só aquele, preservando os demais", async () => {
@@ -77,7 +81,7 @@ describe("ContextoEpicoPanel (Fase 1b, SPEC-23)", () => {
     expect(screen.getByText("b.md")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Salvar" }));
-    expect(onSalvar).toHaveBeenCalledWith("", [{ nome: "b.md", conteudo: "conteúdo b" }], null, [], undefined);
+    expect(onSalvar).toHaveBeenCalledWith("", [{ nome: "b.md", conteudo: "conteúdo b" }], null, [], undefined, undefined);
   });
 
   it("Cancelar fecha sem chamar onSalvar", async () => {
@@ -112,7 +116,7 @@ describe("ContextoEpicoPanel — o produto da demanda (SPEC-53)", () => {
     await user.selectOptions(screen.getByLabelText("Produto desta demanda"), "p2");
     await user.click(screen.getByRole("button", { name: "Salvar" }));
 
-    expect(onSalvar).toHaveBeenCalledWith("", [], "p2", [], undefined);
+    expect(onSalvar).toHaveBeenCalledWith("", [], "p2", [], undefined, undefined);
   });
 
   it("sem produto cadastrado, o seletor NÃO aparece — lista vazia é pior que nada", () => {
@@ -132,7 +136,7 @@ describe("ContextoEpicoPanel — o produto da demanda (SPEC-53)", () => {
 
     await user.selectOptions(screen.getByLabelText("Produto desta demanda"), "");
     await user.click(screen.getByRole("button", { name: "Salvar" }));
-    expect(onSalvar).toHaveBeenCalledWith("", [], null, [], undefined);
+    expect(onSalvar).toHaveBeenCalledWith("", [], null, [], undefined, undefined);
   });
 });
 
@@ -242,7 +246,7 @@ describe("ContextoEpicoPanel — a volumetria da demanda (SPEC-70)", () => {
     fireEvent.change(screen.getByTestId("volumetria-por"), { target: { value: "dia" } });
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
 
-    expect(onSalvar).toHaveBeenCalledWith("", [], null, [], { quantidade: 2000000, por: "dia" });
+    expect(onSalvar).toHaveBeenCalledWith("", [], null, [], { quantidade: 2000000, por: "dia" }, undefined);
   });
 
   it("a prévia mostra o req/s ENQUANTO se digita — é o número que a conta usa", () => {
@@ -262,7 +266,7 @@ describe("ContextoEpicoPanel — a volumetria da demanda (SPEC-70)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
 
-    expect(onSalvar).toHaveBeenCalledWith("", [], null, [], undefined);
+    expect(onSalvar).toHaveBeenCalledWith("", [], null, [], undefined, undefined);
     // E, sem número, a linha explica para que serve em vez de mostrar conta.
     expect(screen.getByTestId("volumetria-derivada")).toHaveTextContent(/sem ninguém digitar número/);
   });
@@ -338,5 +342,54 @@ describe("ContextoEpicoPanel — a procedência do volume (SPEC-77 fatia C)", ()
 
     expect(screen.queryByTestId("volumetria-diverge")).toBeNull();
     expect(screen.queryByTestId("volumetria-herdada")).toBeNull();
+  });
+});
+
+describe("ContextoEpicoPanel — o regime de operação (SPEC-87 fatia D)", () => {
+  it("sem regimes declarados pelo time, o seletor NÃO aparece", () => {
+    // Um seletor com só a opção vazia ensina que o campo não serve para nada —
+    // e time que não usa o eixo não deve nem saber que ele existe.
+    render(<ContextoEpicoPanel onSalvar={vi.fn()} onFechar={vi.fn()} />);
+
+    expect(screen.queryByTestId("modo-de-operacao")).toBeNull();
+  });
+
+  it("com regimes do time, escolher um o manda no MESMO salvar da volumetria", async () => {
+    /**
+     * Vai junto porque é o par natural: uma diz QUANTO, a outra diz EM QUE
+     * REGIME, e as duas são declarações sobre esta demanda feitas no mesmo lugar.
+     */
+    const user = userEvent.setup();
+    const onSalvar = vi.fn();
+    render(<ContextoEpicoPanel onSalvar={onSalvar} onFechar={vi.fn()} modosDoTime={["normal", "pico"]} />);
+
+    await user.selectOptions(screen.getByLabelText("Regime de operação"), "pico");
+    await user.click(screen.getByRole("button", { name: "Salvar" }));
+
+    expect(onSalvar).toHaveBeenCalledWith("", [], null, [], undefined, "pico");
+  });
+
+  it("'nenhum declarado' devolve `undefined`, não string vazia", async () => {
+    // "Não declarou regime" é o padrão e é uma afirmação: régua sem modo
+    // continua valendo, régua com modo não aparece. String vazia atravessaria a
+    // borda como um regime chamado "".
+    const user = userEvent.setup();
+    const onSalvar = vi.fn();
+    render(
+      <ContextoEpicoPanel onSalvar={onSalvar} onFechar={vi.fn()} modosDoTime={["normal"]} modoDeOperacao="normal" />
+    );
+
+    await user.selectOptions(screen.getByLabelText("Regime de operação"), "");
+    await user.click(screen.getByRole("button", { name: "Salvar" }));
+
+    expect(onSalvar).toHaveBeenCalledWith("", [], null, [], undefined, undefined);
+  });
+
+  it("o regime já declarado vem pré-selecionado", () => {
+    render(
+      <ContextoEpicoPanel onSalvar={vi.fn()} onFechar={vi.fn()} modosDoTime={["normal", "pico"]} modoDeOperacao="pico" />
+    );
+
+    expect(screen.getByLabelText("Regime de operação")).toHaveValue("pico");
   });
 });

@@ -20,6 +20,21 @@ export type Condicao =
   | { nodeStatus: StatusNo }
   | { nodeType: string[] }
   | { listaContem: { field: string; sub: string; equals: unknown } }
+  /**
+   * SPEC-87 (P5) — **o regime em que este desenho opera.**
+   *
+   * O único caso da união que não olha o nó: ele olha a DEMANDA. É o que
+   * permite uma régua existir só em certos regimes — *"idempotência no consumo"*
+   * com `{ modo: ["pico"] }` some do refinamento de uma manutenção e aparece na
+   * demanda de Black Friday.
+   *
+   * Sem isso, a alternativa real é uma régua sempre visível que quase nunca se
+   * aplica — que é como um checklist ensina a ser ignorado.
+   *
+   * Os valores são do TIME (`RegrasConfig.modos`), nunca de fábrica: embutir
+   * "Black Friday" aqui seria escolher o negócio de todo mundo.
+   */
+  | { modo: string[] }
   | { allOf: Condicao[] }
   | { anyOf: Condicao[] }
   | { not: Condicao };
@@ -503,6 +518,17 @@ export interface RequisitoDeTopologia {
 export interface RegrasConfig {
   tipos: string[];
   tamanhos: string[];
+  /**
+   * SPEC-87 (P5) — os REGIMES que este time reconhece.
+   *
+   * "tráfego de Black Friday", "batch noturno", "interno de baixo volume". No
+   * molde de `tipos` e `tamanhos`, e pela mesma razão: é vocabulário da casa, e
+   * embutir uma lista de fábrica seria escolher o negócio de todo mundo.
+   *
+   * Ausente = o time não usa o eixo, e nenhuma régua condicionada por modo faz
+   * sentido — a tela não oferece o seletor.
+   */
+  modos?: string[];
   /** Checklist de refinamento técnico + ciclos de teste, por tech. */
   porTech: Record<string, RegrasPorTech>;
   /** SPEC-57 fatia E — as réguas que valem sobre o CAMINHO. Ausente = a

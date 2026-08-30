@@ -42,6 +42,7 @@ function comoQuebraSalva(linha: LinhaQuebra): QuebraSalva {
     // SPEC-71 — `volumetria` sem `?? {}`: ausência é afirmação aqui ("ninguém
     // declarou volume"), e um objeto vazio faria o motor tratar como declarado.
     volumetria: (linha.volumetria ?? undefined) as QuebraSalva["volumetria"],
+    modoDeOperacao: linha.modoDeOperacao ?? undefined,
     leiturasDispensadas: (linha.leiturasDispensadas ?? []) as QuebraSalva["leiturasDispensadas"],
     cenariosDeLentidao: (linha.cenariosDeLentidao ?? []) as QuebraSalva["cenariosDeLentidao"],
     especificacao: linha.especificacao ?? null,
@@ -124,6 +125,7 @@ export function criarRepositorioDeQuebrasEmPostgres(db: BancoDeDados): Repositor
           artefatosEscritos: dados.artefatosEscritos ?? {},
           documentoStatus: dados.documentoStatus ?? null,
           volumetria: dados.volumetria ?? null,
+          modoDeOperacao: dados.modoDeOperacao ?? null,
           leiturasDispensadas: dados.leiturasDispensadas ?? [],
           cenariosDeLentidao: dados.cenariosDeLentidao ?? [],
           especificacao: dados.especificacao ?? null,

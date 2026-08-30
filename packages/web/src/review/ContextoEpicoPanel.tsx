@@ -28,6 +28,12 @@ export interface ContextoEpicoPanelProps {
    * (`distribuirVolumetria`), então ninguém precisa digitar taxa nó a nó.
    */
   volumetria?: VolumetriaDaDemanda;
+  /** SPEC-87 (P5) — o regime declarado desta demanda. */
+  modoDeOperacao?: string;
+  /** SPEC-87 fatia C — os regimes que o time reconhece. Vazio = o time não usa
+   * o eixo, e o seletor nem aparece: oferecer uma lista vazia é pior que não
+   * oferecer nada. */
+  modosDoTime?: string[];
   /**
    * SPEC-77 — o volume que VALE agora, com a procedência.
    *
@@ -48,7 +54,11 @@ export interface ContextoEpicoPanelProps {
     anexosContexto: AnexoContexto[],
     produtoId: string | null,
     necessidades: Necessidade[],
-    volumetria: VolumetriaDaDemanda | undefined
+    volumetria: VolumetriaDaDemanda | undefined,
+    /** SPEC-87 — vai junto da volumetria porque é o par natural: uma diz
+     * QUANTO, a outra diz EM QUE REGIME, e as duas são declarações sobre esta
+     * demanda feitas no mesmo lugar. */
+    modoDeOperacao: string | undefined
   ) => void;
   onFechar: () => void;
 }
@@ -83,6 +93,8 @@ export function ContextoEpicoPanel({
   produtos = [],
   necessidades: necessidadesIniciais,
   volumetria: volumetriaInicial,
+  modoDeOperacao: modoInicial,
+  modosDoTime = [],
   volumetriaEmVigor,
   elementos = [],
   onProporNecessidades,
@@ -100,6 +112,7 @@ export function ContextoEpicoPanel({
     volumetriaInicial ? String(volumetriaInicial.quantidade) : ""
   );
   const [volPor, setVolPor] = useState<VolumetriaDaDemanda["por"]>(volumetriaInicial?.por ?? "dia");
+  const [modo, setModo] = useState(modoInicial ?? "");
   // A prévia mostra o req/s ENQUANTO se digita: é o número que a Lei de Little
   // usa, e escondê-lo faria a acusação de saturação citar um valor que não está
   // em lugar nenhum da tela.
@@ -157,7 +170,8 @@ export function ContextoEpicoPanel({
       necessidades,
       // Só vira volumetria quando é número positivo: "0 por dia" seria um
       // volume que nenhuma conta usa, e um campo em branco não é uma promessa.
-      Number.isFinite(quantidade) && quantidade > 0 ? { quantidade, por: volPor } : undefined
+      Number.isFinite(quantidade) && quantidade > 0 ? { quantidade, por: volPor } : undefined,
+      modo || undefined
     );
     onFechar();
   }
@@ -263,6 +277,43 @@ export function ContextoEpicoPanel({
               <option value="dia">por dia</option>
             </select>
           </div>
+          {/**
+           * SPEC-87 (P5) fatia D — **o regime em que este desenho opera.**
+           *
+           * Ao lado da volumetria porque é o par natural: uma diz QUANTO, a
+           * outra diz EM QUE REGIME. E aqui, e não na tela de regras, porque é
+           * declaração sobre esta demanda — a mesma razão pela qual o volume da
+           * demanda mora neste painel desde a SPEC-70.
+           *
+           * Só aparece quando o time declarou regimes: um seletor com uma opção
+           * vazia ensina que o campo não serve para nada.
+           */}
+          {modosDoTime.length > 0 && (
+            <div style={{ marginTop: 12 }} data-testid="modo-de-operacao">
+              <label style={{ fontSize: 12, fontWeight: 700, color: "var(--texto)" }} htmlFor="modo-de-operacao-select">
+                Regime de operação
+              </label>
+              <select
+                id="modo-de-operacao-select"
+                value={modo}
+                onChange={(e) => setModo(e.target.value)}
+                style={{ display: "block", marginTop: 4, fontSize: 12.5, padding: "6px 8px", borderRadius: 7, border: "1px solid var(--borda)", background: "var(--painel)", color: "var(--texto)" }}
+              >
+                {/* "Nenhum" é o padrão e é uma escolha legítima: régua sem modo
+                    continua valendo, régua com modo não aparece. */}
+                <option value="">nenhum declarado</option>
+                {modosDoTime.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+              <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--texto-mudo)" }}>
+                Muda quais réguas do time são cobradas. Sem regime declarado, só valem as que não dependem de um.
+              </p>
+            </div>
+          )}
+
           <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--texto-mudo)" }} data-testid="volumetria-derivada">
             {descreverVolumetria(previaDaVolumetria) ??
               "Opcional. Com ele, o motor distribui a taxa pelo desenho e a saturação passa a fechar sem ninguém digitar número em componente nenhum."}
