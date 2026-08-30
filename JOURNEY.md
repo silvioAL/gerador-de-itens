@@ -14443,3 +14443,84 @@ medições anteriores minhas. **Os oito passos da SPEC-56 estão fechados.**
 
 609 engine · 133 llm · 122 aplicação · 908 web · 311 server · 42 gateway-falso ·
 108/108 E2E. Rodada sem mudança de produto: só o registro.
+## §336 — o móvel medido, o que nem sempre se aplica, e um teste meu que era cego (SPEC-91)
+
+O usuário, olhando a landing: *"tem como medir pelo Playwright, pode implementar;
+também preciso que esse diagrama seja maior, e de expandir ou reduzir esses itens
+exista animação."* E, no meio da rodada: *"nem sempre uma demanda se trata de uma
+decisão que muda o fluxo de negócio ou arquitetural — precisamos deixar claro,
+inclusive no diagrama, que pode ser aplicável ou não."*
+
+### A pergunta que eu tinha declarado como não medível estava a uma linha
+
+A SPEC-90 §5.2 dizia: *"não medimos em aparelho real, e isso fica dito."* Foi
+honesto e ficou pela metade. **O Playwright emula viewport**, a suíte já roda com
+ele, e a régua que importa é mecânica: `scrollWidth` contra `innerWidth`.
+
+Declarar "não medimos" pode virar desculpa quando o custo da medição não foi
+conferido. O usuário conferiu por mim.
+
+**O resultado surpreendeu:** já cabia. Em 360 px e em 768 px, zero vazamento — o
+SVG escala por `width: 100%`, e eu tinha assumido o contrário sem olhar.
+
+### O teste passou verde sem ter olhado nada, e a sonda mostrou
+
+Sabotei o fluxo (`width` fixo em vez de `100%`) para ver o vermelho, e **o teste
+continuou verde**. Não acreditei, e escrevi uma sonda que imprimia os números:
+
+```
+SONDA {"scrollWidth":360,"innerWidth":360,"svgW":-1}
+```
+
+`svgW: -1` — o `querySelector` do SVG devolvia `null`. **Eu media antes de o React
+pintar.** O `page.goto` resolve no `load`, e a landing ainda não existia; o teste
+media uma página quase vazia e confirmava, com confiança, que ela cabia.
+
+Com a espera pelo elemento antes de medir, a mesma sabotagem acusa **1020 px de
+vazamento**. O teste tinha dentes zero e agora tem.
+
+É a terceira vez nesta sequência que a verificação do §248 pega o teste em vez do
+produto — e desta vez ela pegou um teste que eu teria mergeado como prova.
+
+### O que nem sempre se aplica
+
+O ponto do usuário não é conceito novo: **é o produto sendo coerente consigo.** O
+documento já diz *"nem toda mudança move arquitetura"* quando não há decisão, e há
+teste para a frase. O diagrama é que desenhava as seis fases como se todas
+acontecessem sempre — o que promete processo pesado e afasta a demanda pequena,
+que é a maioria.
+
+Quatro estágios ganharam `quando-se-aplica`, e a régua para marcar foi estreita de
+propósito: **só entra o que o produto JÁ declara como opcional em algum lugar do
+código**, não o que me parece dispensável.
+
+| Estágio | Onde o produto já dizia |
+|---|---|
+| Registrar o porquê | *"nem toda mudança move arquitetura"* (`DocumentoScreen.tsx:329`) |
+| Declarar o volume | *"Ausente = nada se afirma. Sem volume declarado a saturação segue calada"* |
+| Ensaiar o que pode dar errado | o E2E afirma que *"o desenho sem tempo nenhum DIZ que não há o que ensaiar"* |
+| Integrar com as ferramentas do time | destino de gateway é por time; sem destino o botão nem aparece |
+
+E há trava: condicional sem o porquê quebra, e estágio que acontece sempre **não**
+ganha marca — marcar tudo é não marcar nada.
+
+### A animação, e a trava que mudou de asserção
+
+Para animar o **fechamento**, o elemento não pode ser desmontado: não há o que
+animar num nó que já não existe. Ele fica montado, colapsa por
+`grid-template-rows: 0fr → 1fr` (que anima até a altura real, sem o teto
+arbitrário do `max-height`), e sai da árvore de acessibilidade por `aria-hidden` +
+`inert`.
+
+A trava do §319 afirmava que fechar **remove** o detalhe do DOM. Passou a afirmar
+que ele fica **fora do leitor de tela e fora do caminho do teclado** — que é a
+garantia que interessava desde o começo, e é mais forte que a anterior.
+
+### O diagrama maior
+
+O §334 tinha encolhido a fonte para 8,5 px porque o pior nome não cabia. Era o
+conserto pelo lado errado: a largura cresceu (1010 → 1260) e a fonte voltou a 10.
+O critério continua sendo o pior caso, não a média.
+
+609 engine · 133 llm · 122 aplicação · 910 web · 311 server · 42 gateway-falso ·
+113/113 E2E · build, typecheck e lint limpos.

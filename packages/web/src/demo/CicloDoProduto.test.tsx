@@ -101,14 +101,30 @@ describe("CicloDoProduto (SPEC-76)", () => {
   });
 
   it("clicar num estágio abre o desdobramento; clicar de novo fecha", () => {
+    /**
+     * **SPEC-91 fatia C — esta asserção mudou, e a SPEC previu que mudaria.**
+     *
+     * Ela afirmava que fechar REMOVE o detalhe do DOM (`queryByTestId` nulo).
+     * Para animar o fechamento, o elemento precisa continuar montado — não há o
+     * que animar num nó que já não existe.
+     *
+     * O que interessava desde o começo não era a remoção: era que o conteúdo
+     * fechado **não conte como presente**. Então a asserção passou a ser sobre a
+     * árvore de acessibilidade, que é o que um leitor de tela enxerga — e ela é
+     * mais forte que a anterior, porque cobre também o teclado (`inert`).
+     */
     render(<CicloDoProduto />);
     const alvo = ESTAGIOS_DO_CICLO[0];
+    const invólucro = () => screen.getByTestId(`estagio-detalhe-${alvo.id}`).parentElement!;
 
     fireEvent.click(screen.getByTestId(`estagio-item-${alvo.id}`));
-    expect(screen.getByTestId(`estagio-detalhe-${alvo.id}`)).toBeInTheDocument();
+    expect(invólucro()).toHaveAttribute("data-aberto", "true");
+    expect(invólucro()).toHaveAttribute("aria-hidden", "false");
 
     fireEvent.click(screen.getByTestId(`estagio-item-${alvo.id}`));
-    expect(screen.queryByTestId(`estagio-detalhe-${alvo.id}`)).toBeNull();
+    expect(invólucro()).toHaveAttribute("data-aberto", "false");
+    expect(invólucro(), "fechado tem que sair do leitor de tela").toHaveAttribute("aria-hidden", "true");
+    expect(invólucro(), "e do caminho do teclado").toHaveAttribute("inert");
   });
 
   it("o desdobramento do que falta DIZ o que falta", () => {
@@ -130,6 +146,36 @@ describe("CicloDoProduto (SPEC-76)", () => {
     fireEvent.click(screen.getByTestId("estagio-item-real"));
 
     expect(screen.getByTestId("estagio-detalhe-real")).not.toHaveTextContent("O que falta");
+  });
+
+  it("estágio condicional DIZ que é condicional, e diz por quê", () => {
+    /**
+     * SPEC-91 §2.1 — o usuário: *"nem sempre uma demanda se trata de uma decisão
+     * que muda o fluxo de negócio ou arquitetural — precisamos deixar claro que
+     * pode ser aplicável ou não."*
+     *
+     * Marcar sem explicar é o mesmo que não marcar: quem lê fica sabendo que
+     * algo é opcional e não sabe quando. É a mesma disciplina que o §327 aplicou
+     * às marcas de ausência.
+     */
+    const semMotivo = ESTAGIOS_DO_CICLO.filter(
+      (e) => e.aplicacao === "quando-se-aplica" && !e.porQueCondicional?.trim()
+    );
+
+    expect(semMotivo.map((e) => e.id)).toEqual([]);
+
+    render(<CicloDoProduto />);
+    for (const e of ESTAGIOS_DO_CICLO.filter((x) => x.aplicacao === "quando-se-aplica")) {
+      expect(screen.getByTestId(`estagio-item-${e.id}`)).toHaveTextContent("quando se aplica");
+    }
+  });
+
+  it("estágio que acontece SEMPRE não ganha marca — marcar tudo é não marcar nada", () => {
+    render(<CicloDoProduto />);
+
+    for (const e of ESTAGIOS_DO_CICLO.filter((x) => x.aplicacao !== "quando-se-aplica")) {
+      expect(screen.getByTestId(`estagio-item-${e.id}`)).not.toHaveTextContent("quando se aplica");
+    }
   });
 
   it("a contagem sai do dado — prosa continuaria mentindo depois da próxima entrega", () => {

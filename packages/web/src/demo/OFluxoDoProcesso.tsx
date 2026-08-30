@@ -52,7 +52,7 @@ import { MARCA_DE_ESTADO } from "./CicloDoProduto";
  */
 
 const COLUNA_RAIA = 96;
-const LARGURA_FASES = 1010;
+const LARGURA_FASES = 1260;
 const LARGURA = COLUNA_RAIA + LARGURA_FASES;
 
 const ALTURA_CAIXA_FORA = 24;
@@ -86,7 +86,7 @@ export function OFluxoDoProcesso() {
   const largura = LARGURA_FASES / FASES.length;
 
   return (
-    <section data-testid="fluxo-do-processo" style={{ maxWidth: 1060, margin: "0 auto" }}>
+    <section data-testid="fluxo-do-processo" style={{ maxWidth: 1320, margin: "0 auto" }}>
       <h2 style={{ fontSize: 19, fontWeight: 700, color: "var(--texto)", margin: "0 0 8px", lineHeight: 1.3 }}>
         Do negócio ao item, e de volta
       </h2>
@@ -158,12 +158,16 @@ export function OFluxoDoProcesso() {
                   x={centro}
                   y={TOPO_FASES + 38 + j * 13}
                   textAnchor="middle"
-                  // 8.5 e não 9: "Conferir processo, técnica e testes" é o nome
-                  // mais longo do conjunto e escapava da caixa a 9px. O tamanho
-                  // sai do pior caso, não do que fica bem na média.
-                  style={{ fontSize: 8.5, fill: "var(--texto-2)" }}
+                  // SPEC-91 fatia B — voltou a 10 porque a LARGURA cresceu. O
+                  // §334 encolheu a fonte para o pior nome caber; o certo era a
+                  // caixa crescer, e o critério continua sendo o pior caso.
+                  style={{ fontSize: 10, fill: estagio.aplicacao === "quando-se-aplica" ? "var(--texto-fraco)" : "var(--texto-2)" }}
                 >
                   {estagio.titulo}
+                  {/* SPEC-91 §2.1 — o que não acontece em toda demanda vai
+                      marcado, em vez de a página prometer processo pesado para
+                      quem chegou com uma mudança pequena. */}
+                  {estagio.aplicacao === "quando-se-aplica" ? " ◇" : ""}
                 </text>
               ))}
 
@@ -235,6 +239,10 @@ export function OFluxoDoProcesso() {
           strokeWidth={2}
           markerEnd="url(#seta-indigo)"
         />
+        {/* A legenda do ◇: sem ela o símbolo é enfeite. */}
+        <text x={COLUNA_RAIA + 8} y={TOPO_FASES + ALTURA_FASE + 42} style={{ fontSize: 9.5, fill: "var(--texto-fraco)" }}>
+          ◇ acontece quando se aplica — nem toda demanda passa por todas as paradas
+        </text>
         <text
           x={COLUNA_RAIA + LARGURA_FASES / 2}
           y={TOPO_FASES + ALTURA_FASE + 42}
