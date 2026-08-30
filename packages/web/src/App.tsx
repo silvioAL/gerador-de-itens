@@ -85,7 +85,7 @@ import { contextoDoProdutoEmTexto, montarMapaDoSistema, type ExecucaoDoPapel } f
 import { ConfigScreen, type AbaConfig } from "./config/ConfigScreen";
 import { TourOverlay } from "./demo/TourOverlay";
 import { useTour, passosDeConfiguracao } from "./demo/useTour";
-import { DECISOES_DO_TOUR, REGRAS_DO_TOUR, ehDecisaoDeDemonstracao } from "./demo/dadosDoTour";
+import { DECISOES_DO_TOUR, EXECUCOES_DO_TOUR, REGRAS_DO_TOUR, ehDecisaoDeDemonstracao } from "./demo/dadosDoTour";
 import { DocumentoScreen } from "./documento/DocumentoScreen";
 import { SistemaScreen } from "./sistema/SistemaScreen";
 import { AvisosDaDerivacao } from "./summary/AvisosDaDerivacao";
@@ -604,6 +604,14 @@ function AppCarregado({
     }
   }
 
+  /**
+   * SPEC-92 — declarado ANTES do mapa do sistema, que passou a consultá-lo.
+   *
+   * Estava depois, e o `useMemo` do mapa não o enxergava (TDZ). Mover é o
+   * conserto certo: o mapa depende do modo, não o contrário.
+   */
+  const [demonstracaoDoTour, setDemonstracaoDoTour] = useState(false);
+
   /** SPEC-59 fatia A — a ferramenta lida a partir da própria configuração.
    * Usa a config REAL, nunca a de demonstração: esta tela responde "como o meu
    * ambiente está montado", e a do tour mentiria sobre isso. */
@@ -614,9 +622,22 @@ function AppCarregado({
         regras: regrasConfig,
         temCredencialDeIa,
         feedbacksAbertos: feedbacksNovos,
-        execucoes: execucoesDaEsteira,
+        /**
+         * SPEC-92 — no TOUR, as execuções são de demonstração.
+         *
+         * O usuário abriu a demonstração com a credencial da casa sem crédito e
+         * viu os quatro papéis em vermelho com o erro cru do provedor. Quem
+         * assiste conclui que a ferramenta está quebrada — quando ela está
+         * relatando com precisão um problema que não é dela.
+         *
+         * A config continua sendo a REAL (o comentário acima explica por quê, e
+         * segue valendo): o que muda é só o histórico de execução, que é o único
+         * pedaço desta tela que depende de a credencial de alguém estar em dia.
+         * E ele chega marcado, como todo dado de tour (§235).
+         */
+        execucoes: demonstracaoDoTour ? EXECUCOES_DO_TOUR : execucoesDaEsteira,
       }),
-    [pipelineAgentes, regrasConfig, temCredencialDeIa, feedbacksNovos, execucoesDaEsteira]
+    [pipelineAgentes, regrasConfig, temCredencialDeIa, feedbacksNovos, execucoesDaEsteira, demonstracaoDoTour]
   );
 
   const [menuAberto, setMenuAberto] = useState(false);
@@ -629,7 +650,6 @@ function AppCarregado({
   /** §235 — enquanto o tour percorre telas que leem do servidor (produto,
    * exportação), elas mostram dado de DEMONSTRAÇÃO em vez de tela vazia — e
    * não escrevem nada. Desligado no fim do tour, sempre. */
-  const [demonstracaoDoTour, setDemonstracaoDoTour] = useState(false);
   /** §246 — no tour, as decisões de demonstração ENTRAM junto das reais em vez
    * de substituí-las: quem registra uma decisão durante o tour precisa ver a
    * própria aparecer, senão a demonstração ensina que o botão não funciona. */
