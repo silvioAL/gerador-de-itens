@@ -1,5 +1,13 @@
 export * from "./model/types.js";
-export * from "./config/types.js";
+export * from "./config/types.js";
+/** SPEC-86 — a soma das regras do time com as do produto, com procedência. */
+export {
+  chaveDaRegra,
+  regrasEmVigor,
+  type ListaDeRegra,
+  type OrigemDaRegra,
+  type RegrasEmVigor,
+} from "./config/regrasEmVigor.js";
 export { avaliarCondicao } from "./spec/condicoes.js";
 export { camposVisiveis, camposVisiveisAresta, resolverDefault } from "./spec/campos.js";
 export { calcularProntidao } from "./readiness/prontidao.js";

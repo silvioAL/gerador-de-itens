@@ -453,12 +453,38 @@ export const configDocumentos = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     chave: text("chave").notNull(),
     timeId: text("time_id").notNull().default(CAMPO_GLOBAL),
+    /**
+     * SPEC-86 (migração 0040) — o eixo do PRODUTO.
+     *
+     * `null` é o documento de sempre, e é o que toda linha existente é: "não é
+     * de produto nenhum". O que o produto guarda aqui **soma** ao do time em vez
+     * de substituí-lo — a resolução é `regrasEmVigor`, no engine, e não a escada
+     * de substituição do `obter` abaixo.
+     */
+    produtoId: uuid("produto_id").references(() => produtos.id, { onDelete: "cascade" }),
     documento: jsonb("documento").notNull(),
     versaoTemplate: text("versao_template"),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("config_documentos_chave_unica").on(t.chave, t.timeId)]
+  (t) => [uniqueIndex("config_documentos_chave_unica").on(t.chave, t.timeId, t.produtoId)]
 );
+
+/**
+ * SPEC-86 fatia B — **a chave natural de `config_documentos`, num lugar só.**
+ *
+ * O `onConflictDoUpdate` precisa listar exatamente as colunas do índice único, e
+ * essa lista estava repetida em **quatro** lugares — o adaptador, duas rotas do
+ * PDCA e dois testes. Acrescentar `produto_id` ao índice quebrou os que ficaram
+ * para trás, e **o `tsc` não acusou nenhum**: o alvo é só um array de colunas,
+ * e um array errado é um array válido.
+ *
+ * Quem importa daqui não tem como divergir do índice sem mudar o índice.
+ */
+export const ALVO_CONFLITO_CONFIG = [
+  configDocumentos.chave,
+  configDocumentos.timeId,
+  configDocumentos.produtoId,
+] as const;
 
 /**
  * SPEC-31 Fase 4 — credencial do provedor de IA, por organização.

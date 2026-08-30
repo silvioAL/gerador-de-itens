@@ -13955,3 +13955,82 @@ porque toda peça nova nasce só no escuro e quem escolher cor precisa saber.
 
 579 engine · 133 llm · 122 aplicação · 877 web · 291 server · 42 gateway-falso ·
 106/106 E2E · build, typecheck e lint limpos.
+## §329 — o eixo do produto nas regras, e o índice que estava copiado em quatro lugares (SPEC-86)
+
+A demanda estava órfã havia duas rodadas. O usuário disse, na rodada da SPEC-83:
+
+> *"o que tem é checklist por processo, mas uma das demandas que precisamos
+> atender também é estender para produto."*
+
+A SPEC-83 §10.5 apostou que viraria a SPEC-84 — e a SPEC-84 virou *a porta da
+spec*. Ninguém pegou essa. Medi antes de escrever: `RegrasConfig` tem eixo de
+tech, de contexto, de nó, de percurso e de forma. **É tudo processo de
+construção.** Nada ali sabe se a demanda é da vitrine pública ou do backoffice.
+
+### A decisão que definiu a rodada: soma, não substituição
+
+O degrau que já existia (`time → global`, em `configEmPostgres.obter`)
+**substitui**: um time com documento próprio não vê o da casa. Está certo lá,
+porque as duas respondem à mesma pergunta.
+
+Aqui não é a mesma pergunta. O checklist do time responde *"como se constrói
+software nesta casa"*; o do produto responde *"o que é verdade sobre ESTE
+produto"*. **Os dois valem.** Um produto que declarasse regras e com isso
+perdesse as do time ficaria pior do que antes — e seria o congelamento que o
+§306 mediu no `PipelineAgentesTab`.
+
+Por isso o eixo do produto **não** entrou pela escada existente. Reusá-la porque
+ela estava ali seria pegar o mecanismo errado por conveniência.
+
+### O que o banco de verdade pegou, e nenhum unitário pegaria
+
+A migração 0040 põe o documento do produto na mesma tabela, com a **mesma chave
+e o mesmo time**. Duas consequências, e as duas apareceram rodando:
+
+**Primeira:** `buscar` não filtrava por produto. Sem `isNull(produtoId)`, a
+consulta do time passaria a devolver ora uma linha, ora outra, conforme o plano —
+o time receberia o checklist de um produto qualquer sem nada acusar. Desliguei o
+filtro depois de pronto e o teste acusou exatamente isso: `expected '…' not to
+contain 'SÓ DO PRODUTO'`.
+
+**Segunda, e essa eu não previ:** o `onConflictDoUpdate` precisa listar as
+colunas do índice único, e essa lista estava copiada em **quatro** lugares — o
+adaptador, duas rotas do PDCA e dois testes. Acrescentar `produto_id` ao índice
+quebrou os que ficaram para trás, e **o `tsc` não acusou nenhum**: o alvo é um
+array de colunas, e um array errado é um array válido.
+
+Só a suíte contra Postgres viu. Virou `ALVO_CONFLITO_CONFIG`, exportado do
+schema: quem importa daqui não tem como divergir do índice sem mudar o índice.
+
+### O que a tela grava, e por que é a linha mais importante
+
+`ChecklistDoProduto` mostra as regras do time e as do produto **na mesma lista**,
+cada uma marcada — separar obrigaria quem refina a refazer de cabeça a soma que o
+motor já faz. O que veio do time aparece **sem botão**: editar regra de time é na
+tela do time, e a ausência do botão é o que diz isso.
+
+E ela grava **só o que é do produto**, nunca a lista somada. Mandar a lista
+inteira congelaria o checklist da casa dentro do produto no primeiro clique — e o
+congelamento seria invisível: a tela mostraria a mesma coisa no dia seguinte, e só
+pararia de acompanhar as regras novas. Há teste para essa linha, e ele é o mais
+importante do arquivo.
+
+### Dois enganos meus no caminho
+
+Escrevi a tela recebendo `techs` por prop e ia passar uma constante da aba de
+produtos — a quinta cópia de "quais techs existem". A lista sai do documento.
+
+E o mock de `ProdutosTab.test.tsx` ficou incompleto: `apiRegrasDoProduto` chegava
+`undefined` e derrubava doze specs que não têm nada a ver com checklist. Completei
+o mock em vez de tornar o componente defensivo — mock incompleto é uma mentira
+sobre o contrato, e componente defensivo esconde a mentira.
+
+### O que ficou de fora, declarado
+
+Herança entre produtos (produto-pai, família), produto como eixo dentro de
+`porTech` (a explosão combinatória), e permissão escopada por produto — as três
+estão na SPEC-86 §3 e §5.2 com o motivo. `tipos` e `tamanhos` continuam sendo o
+vocabulário do time: um produto que os redefinisse criaria dialeto interno.
+
+590 engine · 133 llm · 122 aplicação · 884 web · 299 server · 42 gateway-falso ·
+106/106 E2E · build, typecheck e lint limpos.

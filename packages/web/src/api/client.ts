@@ -1494,7 +1494,29 @@ export const apiTokens = configDe<TokensConfig>("tokens");
 export type { ConfigExportador } from "@gerador/aplicacao";
 import type { ConfigExportador } from "@gerador/aplicacao";
 
-export const apiExportador = configDe<ConfigExportador>("exportador");
+export const apiExportador = configDe<ConfigExportador>("exportador");
+
+/**
+ * SPEC-86 fatia C — as regras EM VIGOR para um produto.
+ *
+ * Cliente próprio e não `configDe`: a resposta carrega `origemDe` e
+ * `doProduto`, que a config genérica não tem. Enfiar as duas formas numa função
+ * só obrigaria todo chamador a saber qual das duas veio.
+ */
+export const apiRegrasDoProduto = {
+  obter: (produtoId: string, timeId?: string) =>
+    requisitar<{
+      documento: unknown;
+      origemDe: Record<string, "time" | "produto">;
+      doProduto: number;
+      declaradoNoProduto: unknown | null;
+    }>(`/config/regras/produto/${produtoId}${timeId ? `?timeId=${encodeURIComponent(timeId)}` : ""}`),
+  salvar: (produtoId: string, documento: unknown, timeId?: string) =>
+    requisitar(`/config/regras/produto/${produtoId}`, {
+      method: "PUT",
+      body: JSON.stringify({ documento, ...(timeId ? { timeId } : {}) }),
+    }),
+};
 
 export interface ConviteTime {
   token: string;

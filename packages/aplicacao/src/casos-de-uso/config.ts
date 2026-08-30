@@ -26,11 +26,26 @@ export interface ConfigComDiagnostico {
 
 export interface CasosDeUsoDeConfig {
   obter(chave: ChaveConfig, template: unknown, timeId?: string): Promise<ConfigComDiagnostico>;
+  /**
+   * SPEC-86 fatia B — o documento que um PRODUTO declara.
+   *
+   * `null` quando ele não declarou nada, e isso é o normal: a maioria dos
+   * produtos vive só com o checklist do time. Quem SOMA os dois é
+   * `regrasEmVigor`, no engine — aqui não há escada, de propósito (§1 da SPEC).
+   */
+  obterDoProduto(chave: ChaveConfig, timeId: string, produtoId: string): Promise<DocumentoConfig | null>;
   salvar(
     chave: ChaveConfig,
     documento: unknown,
     versaoAtual: string | null,
     timeId?: string
+  ): Promise<DocumentoConfig>;
+  salvarDoProduto(
+    chave: ChaveConfig,
+    documento: unknown,
+    versaoAtual: string | null,
+    timeId: string,
+    produtoId: string
   ): Promise<DocumentoConfig>;
 }
 
@@ -105,6 +120,22 @@ export function criarCasosDeUsoDeConfig(repo: RepositorioDeConfig): CasosDeUsoDe
         atualizadoEm: salvo?.atualizadoEm ?? null,
         diagnostico: diagnosticarConfig(chave, documento, template),
       };
+    },
+
+    obterDoProduto: (chave, timeId, produtoId) => repo.obterDoProduto(chave, timeId, produtoId),
+
+    salvarDoProduto: (chave, documento, versaoAtual, timeId, produtoId) => {
+      // A MESMA validação da escrita do time: documento de produto é entrada
+      // externa igual, e um segundo caminho de gravação sem validação é como
+      // campo inválido entra sem ninguém ver.
+      validarEscritaConfig(chave, documento);
+      return repo.salvarDoProduto(
+        chave,
+        timeId || CAMPO_GLOBAL,
+        produtoId,
+        normalizarDocumentoConfig(chave, documento),
+        versaoAtual
+      );
     },
 
     // Gravar carimba a versão de quem gravou. É o que permite, no futuro,

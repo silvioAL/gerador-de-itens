@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
+import { regrasEmVigor, type RegrasConfig } from "@gerador/engine";
 import { CAMPO_GLOBAL, ConfigInvalida, criarCasosDeUsoDeConfig, ehChaveConfig, type ChaveConfig } from "@gerador/aplicacao";
 import type { OpcoesApp } from "../app.js";
 import { criarRepositorioDeConfigEmPostgres } from "../adaptadores/configEmPostgres.js";
@@ -81,6 +82,78 @@ export async function registrarRotasConfig(app: FastifyInstance, { db, diretorio
 
     const { timeId } = req.query as { timeId?: string };
     return casos.obter(chave, await templateDaVersao(chave), timeId);
+  });
+
+  /**
+   * SPEC-86 fatia B — as regras EM VIGOR para um produto: as do time mais as
+   * dele, com a procedência de cada item.
+   *
+   * Rota própria e não um parâmetro do `GET /config/:chave` porque a resposta é
+   * de outra forma — ela carrega `origemDe` e `doProduto`, que a config genérica
+   * não tem o que fazer com. Enfiar os dois formatos numa rota só obrigaria todo
+   * consumidor a saber qual dos dois veio.
+   */
+  app.get("/config/:chave/produto/:produtoId", async (req, reply) => {
+    const { chave, produtoId } = req.params as { chave: string; produtoId: string };
+    if (chave !== "regras") {
+      // Só `regras` tem eixo de produto hoje, e dizer isso é melhor que devolver
+      // um documento somado que ninguém sabe interpretar.
+      return reply.code(404).send({ erro: `a configuração "${chave}" não tem eixo de produto` });
+    }
+
+    const { timeId } = req.query as { timeId?: string };
+    const doTime = await casos.obter("regras", await templateDaVersao("regras"), timeId);
+    const doProduto = await casos.obterDoProduto("regras", timeId ?? CAMPO_GLOBAL, produtoId);
+
+    const vigor = regrasEmVigor(
+      doTime.documento as RegrasConfig,
+      (doProduto?.documento as RegrasConfig | undefined) ?? null
+    );
+
+    return {
+      documento: vigor.regras,
+      origemDe: vigor.origemDe,
+      doProduto: vigor.doProduto,
+      /** O que o produto declarou, cru — é o que a tela edita. */
+      declaradoNoProduto: (doProduto?.documento as RegrasConfig | null) ?? null,
+      diagnostico: doTime.diagnostico,
+    };
+  });
+
+  app.put("/config/:chave/produto/:produtoId", { preHandler: exigirSessao }, async (req, reply) => {
+    const { chave, produtoId } = req.params as { chave: string; produtoId: string };
+    if (chave !== "regras") {
+      return reply.code(404).send({ erro: `a configuração "${chave}" não tem eixo de produto` });
+    }
+
+    const corpo = req.body as { documento?: unknown; timeId?: string } | null;
+    if (!corpo || corpo.documento === undefined) {
+      return reply.code(400).send({ erro: "corpo precisa ter `documento`" });
+    }
+
+    // SPEC-86 §5.2 — a permissão continua sendo a de `regras`, e isso está dito
+    // em voz alta: escopar permissão por produto é outra pergunta, e não temos
+    // medição de que a casa queira separar.
+    const negado = await recursoNegadoPara(req, "regras", corpo.documento, corpo.timeId);
+    if (negado) {
+      return reply.code(403).send({ erro: `sem permissão para "editar" em "${negado}"`, recurso: negado, acao: "editar" });
+    }
+
+    let salvo;
+    try {
+      salvo = await casos.salvarDoProduto("regras", corpo.documento, versaoAtual, corpo.timeId ?? CAMPO_GLOBAL, produtoId);
+    } catch (erro) {
+      if (erro instanceof ConfigInvalida) return reply.code(400).send({ erro: erro.message });
+      throw erro;
+    }
+
+    registrarAuditoria(db, {
+      email: req.usuario!.email,
+      acao: "atualizar",
+      recurso: "config_documentos",
+      recursoId: `regras:${salvo.timeId}:${produtoId}`,
+    });
+    return salvo;
   });
 
   app.put("/config/:chave", { preHandler: exigirSessao }, async (req, reply) => {

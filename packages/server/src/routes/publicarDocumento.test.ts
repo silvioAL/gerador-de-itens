@@ -3,7 +3,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { resolve } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { criarBancoDeDados, type BancoDeDados } from "../db/client.js";
-import { configDocumentos, organizacoes, quebras, times, usuarioTime } from "../db/schema.js";
+import { ALVO_CONFLITO_CONFIG, configDocumentos, organizacoes, quebras, times, usuarioTime } from "../db/schema.js";
 import { exigirBancoDescartavel, garantirBancoDeTeste, URL_BANCO_DE_TESTE } from "../test-support/bancoDeTeste.js";
 import { buildApp } from "../app.js";
 
@@ -33,7 +33,7 @@ async function configurarDestinos(destinos: unknown[]) {
     .insert(configDocumentos)
     .values({ chave: "exportador", documento: { endpoint: "", rotulo: "", cabecalhos: {}, destinos } })
     .onConflictDoUpdate({
-      target: [configDocumentos.chave, configDocumentos.timeId],
+      target: [...ALVO_CONFLITO_CONFIG],
       set: { documento: { endpoint: "", rotulo: "", cabecalhos: {}, destinos } },
     });
 }
