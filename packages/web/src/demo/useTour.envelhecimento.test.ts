@@ -138,3 +138,44 @@ describe("o tour não pode apontar para o que não existe (SPEC-78 fatia D)", ()
     expect(citando, `passos citando rótulo que o produto já renomeou:\n${citando.join("\n")}`).toEqual([]);
   });
 });
+/**
+ * §340 — **todo passo que abre uma tela com dado REAL de execução tem que ligar
+ * a demonstração.**
+ *
+ * O defeito veio de print do usuário: no tour de configuração, o passo do mapa
+ * do sistema mostrava os quatro agentes em vermelho com o erro de crédito da
+ * credencial da casa. O passo equivalente do tour de PRODUTO liga o modo antes
+ * de abrir o mapa; este não ligava.
+ *
+ * O §339 tinha trocado o histórico por dados de demonstração e **não bastou** —
+ * a correção existia e não alcançava a tela em que o defeito foi visto. Esta
+ * trava é o que faz a próxima esquecer doer no CI em vez de numa demonstração.
+ */
+describe("§340 — quem abre o mapa do sistema liga a demonstração", () => {
+  it("nos DOIS tours, o passo que chama `abrirSistema` liga antes", () => {
+    const fonte = readFileSync(resolve(import.meta.dirname, "useTour.ts"), "utf-8");
+
+    // Cada `abrirSistema()` precisa de um `ligarDemonstracao(true)` no MESMO
+    // `onEnter`. Ler o fonte é grosseiro e é honesto sobre o que faz: o que se
+    // guarda aqui é textual, e não custa montar o app inteiro para acusá-lo.
+    /**
+     * O recorte é o MESMO no filtro e na asserção.
+     *
+     * A primeira escrita filtrava pelo pedaço inteiro (que vai até o próximo
+     * `onEnter:`, varrendo os passos seguintes) e afirmava só até o primeiro
+     * `},` — então acusava um passo que nem abre o mapa. Falso positivo do meu
+     * teste, não defeito do produto, e ele apareceu no primeiro `npm test`.
+     */
+    const corpos = fonte
+      .split("onEnter:")
+      .slice(1)
+      .map((b) => b.slice(0, b.indexOf("},") + 2))
+      .filter((b) => b.includes("abrirSistema"));
+
+    expect(corpos.length, "ninguém abre o mapa? o passo sumiu").toBeGreaterThan(0);
+    for (const corpo of corpos) {
+      expect(corpo, `um passo abre o mapa sem ligar a demonstração:
+${corpo}`).toContain("ligarDemonstracao(true)");
+    }
+  });
+});
