@@ -14330,3 +14330,49 @@ SPEC-90 §5.2 registra isso em vez de fingir que resolveu.
 
 609 engine · 133 llm · 122 aplicação · 907 web · 311 server · 42 gateway-falso ·
 108/108 E2E · build, typecheck e lint limpos.
+## §334 — as raias, e o defeito conceitual que só apareceu olhando (SPEC-90, 2ª rodada)
+
+O §333 entregou o diagrama do fluxo. O usuário abriu o produto, olhou, e apontou
+dois defeitos — os dois reais, e o segundo é o que importa:
+
+> *"setas sobre o texto, e não discrimina o que é feito dentro × fora do sistema,
+> como em diagramas mais didáticos de BPM que têm as personas."*
+
+### O segundo era conceitual, e reorganizou a peça
+
+A primeira versão tinha uma **faixa** de "FORA" no topo. Ela era decorativa: dizia
+que existia um lado de fora, e não dizia **de que lado cada coisa acontece**.
+
+Viraram **raias**, com a coluna de rótulo à esquerda como em BPM. A fronteira
+deixou de ser enfeite e passou a ser a linha que as setas atravessam — que é
+exatamente o que uma raia comunica e uma faixa não comunica.
+
+### O primeiro sumiu por consequência, e a lição é sobre a ordem do conserto
+
+O conserto óbvio para "seta sobre texto" seria mover a seta. Não foi isso: cada
+salto virou **caixa dentro da raia de fora**, com o nome dentro dela, e a seta
+sai pela lateral por um canal próprio.
+
+**O texto saiu do caminho da seta, em vez de a seta desviar do texto.** Um deles
+resolve o caso de hoje; o outro faz o problema deixar de existir para qualquer
+número de saltos — e o número de saltos é dado, então ele cresce.
+
+### O que só se descobre olhando, de novo
+
+Além dos dois que o usuário apontou, a captura mostrou o nome mais longo do
+conjunto — *"Conferir processo, técnica e testes"* — escapando da caixa. O
+tamanho da fonte passou a sair do **pior caso**, não do que fica bem na média.
+
+Nenhum dos três apareceria em teste: os três são verdes com o texto sobreposto,
+porque `textContent` não sabe de pixel. Três rodadas seguidas em que a captura
+contra a stack encontrou o que a suíte não encontra.
+
+### A trava mudou junto, e ela mudou de assunto
+
+`"a faixa de fora nomeia o gateway"` virou **`"as duas raias são nomeadas"`** mais
+**`"o MCP não é desenhado como caixa nossa"`**. A primeira cobrava um texto; as
+duas novas cobram a estrutura e a recusa — e a recusa é a que valia desde o
+começo (o produto não implementa MCP, chama um gateway configurável, SPEC-81).
+
+609 engine · 133 llm · 122 aplicação · 908 web · 311 server · 42 gateway-falso ·
+108/108 E2E · build, typecheck e lint limpos.

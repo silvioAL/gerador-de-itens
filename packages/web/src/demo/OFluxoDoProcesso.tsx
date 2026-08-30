@@ -3,118 +3,142 @@ import { ESTAGIOS_DO_CICLO, FASES_DA_JORNADA, ROTULO_DA_FASE, type FaseDaJornada
 import { MARCA_DE_ESTADO } from "./CicloDoProduto";
 
 /**
- * SPEC-90 — **a jornada, e onde ela fala com fora.**
+ * SPEC-90 — **a jornada, em raias: o que é feito aqui dentro e o que é feito
+ * fora.**
  *
- * ## O pedido, e por que ele não era repetição
+ * ## O pedido, e o que a primeira versão errou
  *
  * > *"falta uma explicação em forma de diagrama que demonstre o processo, mostre
- * > em forma de fluxo quando vai para o MCP, etc. — nesse sentido semelhante a
- * > arquitetura técnica."* E: *"uma visão de jornada, o objetivo é mostrar como o
- * > sistema funciona."*
+ * > em forma de fluxo quando vai para o MCP"* … *"uma visão de jornada, o
+ * > objetivo é mostrar como o sistema funciona."*
  *
- * A landing já tinha o círculo e a lista de conexões. O círculo responde *"quais
- * são os estágios, e o que já existe?"* — é **índice**. A lista responde *"que
- * caminhos existem para fora?"*, e nunca **onde**.
+ * A primeira versão desenhou o percurso e os saltos. O usuário olhou o resultado
+ * rodando e apontou dois defeitos, os dois reais:
  *
- * Isto responde a pergunta que faltava: *"por onde a coisa passa, e em que ponto
- * ela sai para o gateway?"* É percurso, não inventário.
+ * 1. **setas por cima do texto** — os rótulos ficavam soltos na faixa e as linhas
+ *    verticais passavam por dentro deles;
+ * 2. **não discriminava dentro × fora**, *"como em diagramas mais didáticos de
+ *    BPM que têm as personas"*.
+ *
+ * O segundo é conceitual, e é o que reorganizou a peça: **raias**. Uma para o que
+ * este sistema faz, outra para o que já é da casa. A fronteira deixa de ser uma
+ * faixa decorativa e passa a ser a linha que as setas atravessam — que é
+ * exatamente o que uma raia de BPM comunica.
+ *
+ * O primeiro deixou de existir por consequência: cada salto virou **caixa dentro
+ * da raia de fora**, com o nome dentro dela. Seta e texto não disputam mais o
+ * mesmo pixel porque o texto saiu do caminho da seta — em vez de a seta desviar
+ * do texto.
  *
  * ## Por que ele não repete o círculo
  *
  * Existiu uma `Jornada` nesta página, e o §323 a tirou daqui porque **4 das 5
- * etapas dela eram estágios que o círculo acabava de mostrar** — a mesma
- * narrativa contada três vezes.
- *
- * A diferença aqui é deliberada e é o que a trava cobra: **nenhum resumo de
- * estágio aparece.** Só os nomes, agrupados por fase, com as setas e os desvios.
- * Se este diagrama passar a explicar o que cada estágio faz, virou a `Jornada`
- * de novo com outro nome.
+ * etapas dela eram estágios que o círculo acabava de mostrar**. A trava em
+ * `OFluxoDoProcesso.test.tsx` cobra a diferença: aqui aparecem os **nomes** das
+ * paradas, nunca os resumos nem os detalhes. Nome é percurso; prosa é índice, e
+ * o índice já está no círculo.
  *
  * ## Por que ele não consegue mentir
  *
- * É desenhado a partir de `ESTAGIOS_DO_CICLO` e `CONEXOES` — as duas listas que
- * já são guardadas por travas (§327, §328). Uma fase sem estágio não aparece; uma
- * conexão que aponte para estágio inexistente quebra o teste. É o mesmo mecanismo
- * que a SPEC-76 usou na prosa, aplicado ao desenho.
+ * Desenhado a partir de `ESTAGIOS_DO_CICLO` e `CONEXOES`, que já são guardadas
+ * por travas (§327, §328). Fase sem estágio não vira caixa; conexão ancorada em
+ * estágio inexistente quebra o teste.
  *
  * ## O MCP não é caixa nossa
  *
- * O produto **não implementa MCP**: ele chama um gateway configurável, e quem
- * fala MCP é quem está do outro lado (SPEC-81). Por isso o que sai do fluxo vai
- * para uma faixa marcada como **fora**, e não para uma caixa desenhada como se o
- * protocolo morasse aqui dentro.
+ * O produto **não implementa MCP**: chama um gateway configurável, e quem fala
+ * MCP está do outro lado (SPEC-81). Por isso o que sai atravessa para a raia de
+ * fora, em vez de haver uma caixa de protocolo desenhada aqui dentro.
  */
 
-const LARGURA = 900;
-/**
- * A altura da caixa SAI do dado, não de um número escolhido.
- *
- * A captura contra a stack mostrou a fase de entrega — cinco estágios —
- * transbordando a caixa: os dois últimos nomes ficavam fora da borda. Um número
- * fixo funciona até o dia em que uma fase cresce, e aí quebra em silêncio.
- */
-const ALTURA_MINIMA_FASE = 74;
-const alturaDaFase = (quantos: number) => Math.max(ALTURA_MINIMA_FASE, 42 + quantos * 12);
-const ALTURA_FASE = Math.max(
-  ...["negocio", "tecnica", "desenho", "ensaio", "entrega", "volta"].map((f) =>
-    alturaDaFase(ESTAGIOS_DO_CICLO.filter((e) => e.fase === f).length)
-  )
-);
-const TOPO_FAIXA = 26;
-const TOPO_FASES = 150;
+const COLUNA_RAIA = 96;
+const LARGURA_FASES = 1010;
+const LARGURA = COLUNA_RAIA + LARGURA_FASES;
 
-/** As fases que têm ao menos um estágio — fase vazia não vira caixa bonita. */
-function fasesComEstagio(): FaseDaJornada[] {
-  return FASES_DA_JORNADA.filter((f) => ESTAGIOS_DO_CICLO.some((e) => e.fase === f));
-}
+const ALTURA_CAIXA_FORA = 24;
+const ESPACO_CAIXA = 6;
 
 function estagiosDa(fase: FaseDaJornada) {
   return ESTAGIOS_DO_CICLO.filter((e) => e.fase === fase);
 }
 
-/** Em que fase este salto acontece — via o estágio a que ele está ancorado. */
 function faseDaConexao(conexao: Conexao): FaseDaJornada | undefined {
   return ESTAGIOS_DO_CICLO.find((e) => e.id === conexao.noEstagio)?.fase;
 }
 
+/** As fases que têm ao menos um estágio — fase vazia não vira caixa bonita. */
+const FASES = FASES_DA_JORNADA.filter((f) => estagiosDa(f).length > 0);
+
+/**
+ * As alturas saem do DADO, e não de números escolhidos.
+ *
+ * A captura contra a stack mostrou a fase de entrega — cinco estágios —
+ * transbordando a caixa. Número fixo funciona até o dia em que uma fase cresce, e
+ * aí quebra em silêncio.
+ */
+const MAIS_SALTOS = Math.max(1, ...FASES.map((f) => CONEXOES.filter((c) => faseDaConexao(c) === f).length));
+const ALTURA_FORA = 18 + MAIS_SALTOS * (ALTURA_CAIXA_FORA + ESPACO_CAIXA) + 12;
+const ALTURA_FASE = Math.max(...FASES.map((f) => Math.max(74, 44 + estagiosDa(f).length * 13)));
+const TOPO_FASES = ALTURA_FORA + 16;
+const ALTURA = TOPO_FASES + ALTURA_FASE + 52;
+
 export function OFluxoDoProcesso() {
-  const fases = fasesComEstagio();
-  const largura = LARGURA / fases.length;
+  const largura = LARGURA_FASES / FASES.length;
 
   return (
-    <section data-testid="fluxo-do-processo" style={{ maxWidth: 940, margin: "0 auto" }}>
+    <section data-testid="fluxo-do-processo" style={{ maxWidth: 1060, margin: "0 auto" }}>
       <h2 style={{ fontSize: 19, fontWeight: 700, color: "var(--texto)", margin: "0 0 8px", lineHeight: 1.3 }}>
         Do negócio ao item, e de volta
       </h2>
       <p style={{ fontSize: 13.5, color: "var(--texto-2)", lineHeight: 1.6, margin: "0 0 4px" }}>
-        A mesma coisa que o círculo mostra como mapa, vista como percurso — com os pontos em que o processo{" "}
-        <strong>fala com o que a casa já tem</strong>. O que entra chega marcado como importado; o que sai vai por um
-        endereço que o time configura.
+        A mesma coisa que o círculo mostra como mapa, vista como percurso — e em duas raias:{" "}
+        <strong>o que este sistema faz</strong> e <strong>o que já é da casa</strong>. Toda seta que cruza a linha é um
+        ponto em que o produto fala com fora, por um endereço que o time configura.
       </p>
 
       <svg
-        viewBox={`0 0 ${LARGURA} ${TOPO_FASES + ALTURA_FASE + 60}`}
+        viewBox={`0 0 ${LARGURA} ${ALTURA}`}
         width="100%"
         style={{ display: "block", margin: "12px auto 0" }}
         role="img"
-        aria-label="A jornada em fases, do negócio à entrega, com a volta do PDCA e os pontos em que o processo troca informação com sistemas de fora."
+        aria-label="A jornada em duas raias: fora, as ferramentas que a casa já tem; dentro, as fases do processo, do negócio à entrega, com a volta do aprendizado. As setas que cruzam a linha entre as raias são os pontos em que o produto troca informação com sistemas de fora."
       >
-        {/* A faixa de FORA, acima: é onde o gateway vive, e ela é declarada como
-            de fora justamente porque o produto não implementa MCP. */}
-        <rect x={0} y={TOPO_FAIXA} width={LARGURA} height={40} rx={8} fill="var(--painel-alto, rgba(99,102,241,.06))" stroke="var(--borda)" strokeDasharray="5 5" />
-        <text x={12} y={TOPO_FAIXA + 16} style={{ fontSize: 10.5, fontWeight: 700, fill: "var(--texto-fraco)" }}>
-          FORA — o gateway do time (Jira, Confluence, ADRs, agentes)
+        {/* ── AS RAIAS ──────────────────────────────────────────────────────
+            A linha entre elas é a fronteira do sistema, e é ela que as setas
+            atravessam. Antes isto era uma faixa solta no topo: bonita, e sem
+            dizer de que lado cada coisa acontece. */}
+        <rect x={0} y={0} width={LARGURA} height={ALTURA_FORA} fill="var(--painel-alto, rgba(99,102,241,.05))" />
+        <rect x={0} y={0} width={LARGURA} height={ALTURA} fill="none" stroke="var(--borda)" />
+        <line x1={0} y1={ALTURA_FORA} x2={LARGURA} y2={ALTURA_FORA} stroke="var(--borda)" strokeWidth={2} />
+        <line x1={COLUNA_RAIA} y1={0} x2={COLUNA_RAIA} y2={ALTURA} stroke="var(--borda)" strokeWidth={2} />
+
+        <text
+          x={COLUNA_RAIA / 2}
+          y={ALTURA_FORA / 2}
+          textAnchor="middle"
+          transform={`rotate(-90 ${COLUNA_RAIA / 2} ${ALTURA_FORA / 2})`}
+          style={{ fontSize: 10.5, fontWeight: 700, fill: "var(--texto-fraco)" }}
+        >
+          FORA · a casa
+        </text>
+        <text
+          x={COLUNA_RAIA / 2}
+          y={(ALTURA_FORA + ALTURA) / 2}
+          textAnchor="middle"
+          transform={`rotate(-90 ${COLUNA_RAIA / 2} ${(ALTURA_FORA + ALTURA) / 2})`}
+          style={{ fontSize: 10.5, fontWeight: 700, fill: "var(--texto)" }}
+        >
+          DENTRO · este sistema
         </text>
 
-        {fases.map((fase, i) => {
-          const x = i * largura;
+        {FASES.map((fase, i) => {
+          const x = COLUNA_RAIA + i * largura;
           const centro = x + largura / 2;
           const daFase = estagiosDa(fase);
           const conexoes = CONEXOES.filter((c) => faseDaConexao(c) === fase);
 
           return (
             <g key={fase} data-testid={`fase-${fase}`}>
-              {/* A caixa da fase. */}
               <rect
                 x={x + 8}
                 y={TOPO_FASES}
@@ -132,69 +156,69 @@ export function OFluxoDoProcesso() {
                 <text
                   key={estagio.id}
                   x={centro}
-                  y={TOPO_FASES + 36 + j * 12}
+                  y={TOPO_FASES + 38 + j * 13}
                   textAnchor="middle"
-                  style={{ fontSize: 9.5, fill: "var(--texto-2)" }}
+                  // 8.5 e não 9: "Conferir processo, técnica e testes" é o nome
+                  // mais longo do conjunto e escapava da caixa a 9px. O tamanho
+                  // sai do pior caso, não do que fica bem na média.
+                  style={{ fontSize: 8.5, fill: "var(--texto-2)" }}
                 >
                   {estagio.titulo}
                 </text>
               ))}
 
-              {/* A seta para a fase seguinte — a jornada anda para a direita. */}
-              {i < fases.length - 1 && (
+              {i < FASES.length - 1 && (
                 <path
-                  d={`M ${x + largura - 8} ${TOPO_FASES + ALTURA_FASE / 2} L ${x + largura + 8} ${TOPO_FASES + ALTURA_FASE / 2}`}
+                  d={`M ${x + largura - 8} ${TOPO_FASES + ALTURA_FASE / 2} L ${x + largura + 7} ${TOPO_FASES + ALTURA_FASE / 2}`}
                   stroke="var(--texto-fraco)"
                   strokeWidth={2}
                   markerEnd="url(#seta)"
                 />
               )}
 
-              {/* Os DESVIOS: cada conexão sobe (sai) ou desce (entra) da faixa de
-                  fora, no ponto do processo em que acontece. É o que a lista de
-                  conexões nunca conseguiu dizer. */}
+              {/* ── OS SALTOS ─────────────────────────────────────────────────
+                  Cada um é uma CAIXA na raia de fora, com o nome dentro dela, e a
+                  seta sai pela lateral por um canal próprio — à esquerda de todas
+                  as caixas, para nunca cruzar nenhuma. */}
               {conexoes.map((c, k) => {
                 const marca = MARCA_DE_ESTADO[c.estado];
-                const xc = centro + (k - (conexoes.length - 1) / 2) * 30;
+                const yCaixa = 14 + k * (ALTURA_CAIXA_FORA + ESPACO_CAIXA);
+                const meioCaixa = yCaixa + ALTURA_CAIXA_FORA / 2;
+                const xCanal = x + 14 + k * 9;
+                const esquerdaCaixa = x + 16 + MAIS_SALTOS * 9;
                 const sobe = c.sentido === "sai";
+
                 return (
                   <g key={c.id} data-testid={`salto-${c.id}`}>
-                    <path
-                      d={`M ${xc} ${sobe ? TOPO_FASES : TOPO_FAIXA + 40} L ${xc} ${sobe ? TOPO_FAIXA + 40 : TOPO_FASES}`}
+                    <rect
+                      x={esquerdaCaixa}
+                      y={yCaixa}
+                      width={x + largura - 8 - esquerdaCaixa}
+                      height={ALTURA_CAIXA_FORA}
+                      rx={6}
+                      fill="var(--painel)"
                       stroke={marca.cor}
-                      strokeWidth={2}
-                      // Caminho que ainda não existe vai tracejado, e ainda assim
-                      // aparece: esconder o que falta seria uma história forte e
-                      // incompleta (SPEC-76).
-                      strokeDasharray={c.estado === "completo" ? undefined : "4 4"}
-                      markerEnd="url(#seta)"
+                      strokeDasharray={c.estado === "completo" ? undefined : "4 3"}
                     />
-                    {/**
-                     * O rótulo DESCE um degrau por salto.
-                     *
-                     * A primeira captura contra a stack mostrou os três da fase
-                     * de entrega escritos uns por cima dos outros — borrão
-                     * ilegível. Empilhar em degraus é o que cabe: a faixa tem
-                     * altura, e o que faltava era usá-la.
-                     */}
-                    <text
-                      x={xc}
-                      y={TOPO_FAIXA + 58 + k * 22}
-                      textAnchor="middle"
-                      style={{ fontSize: 9, fill: marca.cor, fontWeight: 700 }}
-                    >
-                      {sobe ? "↑" : "↓"} {c.titulo}
+                    <text x={esquerdaCaixa + 6} y={yCaixa + 15} style={{ fontSize: 8.5, fill: marca.cor, fontWeight: 700 }}>
+                      {c.titulo}
+                      {c.estado !== "completo" ? ` · ${marca.rotulo}` : ""}
                     </text>
-                    {c.estado !== "completo" && (
-                      <text
-                        x={xc}
-                        y={TOPO_FAIXA + 68 + k * 22}
-                        textAnchor="middle"
-                        style={{ fontSize: 8.5, fill: marca.cor }}
-                      >
-                        {marca.rotulo}
-                      </text>
-                    )}
+
+                    {/* A ponta diz o sentido: quem SAI aponta para a caixa de
+                        fora; quem ENTRA aponta para a fase. */}
+                    <path
+                      d={
+                        sobe
+                          ? `M ${xCanal} ${TOPO_FASES} L ${xCanal} ${meioCaixa} L ${esquerdaCaixa - 3} ${meioCaixa}`
+                          : `M ${esquerdaCaixa - 3} ${meioCaixa} L ${xCanal} ${meioCaixa} L ${xCanal} ${TOPO_FASES - 3}`
+                      }
+                      fill="none"
+                      stroke={marca.cor}
+                      strokeWidth={1.6}
+                      strokeDasharray={c.estado === "completo" ? undefined : "4 3"}
+                      markerEnd={c.estado === "completo" ? "url(#seta-verde)" : "url(#seta-fraca)"}
+                    />
                   </g>
                 );
               })}
@@ -202,16 +226,21 @@ export function OFluxoDoProcesso() {
           );
         })}
 
-        {/* A VOLTA: o que se aprende usando muda a camada perene. É o que faz
-            disto um ciclo e não uma esteira, e por isso é desenhada. */}
+        {/* A VOLTA, dentro da raia do sistema: o que se aprende usando muda a
+            camada perene. É o que faz disto um ciclo e não uma esteira. */}
         <path
-          d={`M ${LARGURA - 40} ${TOPO_FASES + ALTURA_FASE + 6} L ${LARGURA - 40} ${TOPO_FASES + ALTURA_FASE + 34} L 40 ${TOPO_FASES + ALTURA_FASE + 34} L 40 ${TOPO_FASES + ALTURA_FASE + 6}`}
+          d={`M ${LARGURA - 44} ${TOPO_FASES + ALTURA_FASE + 6} L ${LARGURA - 44} ${TOPO_FASES + ALTURA_FASE + 26} L ${COLUNA_RAIA + 40} ${TOPO_FASES + ALTURA_FASE + 26} L ${COLUNA_RAIA + 40} ${TOPO_FASES + ALTURA_FASE + 6}`}
           fill="none"
           stroke="#6366f1"
           strokeWidth={2}
           markerEnd="url(#seta-indigo)"
         />
-        <text x={LARGURA / 2} y={TOPO_FASES + ALTURA_FASE + 48} textAnchor="middle" style={{ fontSize: 10, fill: "#a5b4fc" }}>
+        <text
+          x={COLUNA_RAIA + LARGURA_FASES / 2}
+          y={TOPO_FASES + ALTURA_FASE + 42}
+          textAnchor="middle"
+          style={{ fontSize: 9.5, fill: "#a5b4fc" }}
+        >
           o que se aprende usando vira ajuste na camada perene — e muda o próximo desenho
         </text>
 
@@ -221,6 +250,12 @@ export function OFluxoDoProcesso() {
           </marker>
           <marker id="seta-indigo" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
             <path d="M0,0 L6,3 L0,6 Z" fill="#6366f1" />
+          </marker>
+          <marker id="seta-verde" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 Z" fill="var(--verde, #3ecf8e)" />
+          </marker>
+          <marker id="seta-fraca" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 Z" fill="var(--texto-mudo, #94a3b8)" />
           </marker>
         </defs>
       </svg>

@@ -108,15 +108,34 @@ describe("o fluxo NÃO é a `Jornada` de volta (SPEC-90 §1.1)", () => {
 });
 
 describe("o que está FORA é dito como fora (SPEC-90 §3)", () => {
-  it("a faixa de fora nomeia o gateway, e não o MCP como caixa nossa", () => {
+  it("as DUAS raias são nomeadas — dentro e fora do sistema", () => {
     /**
-     * O produto **não implementa MCP**: ele chama um gateway configurável, e quem
-     * fala MCP é quem está do outro lado (SPEC-81). Desenhar o protocolo como
-     * peça daqui seria afirmar uma capacidade que não existe.
+     * O usuário olhou a primeira versão rodando: *"não discrimina o que é feito
+     * dentro x fora do sistema, como em diagramas mais didáticos de BPM que têm
+     * as personas."* Estava certo — havia uma faixa no topo, bonita, e ela não
+     * dizia de que lado cada coisa acontece.
+     *
+     * A asserção mudou com o desenho: antes cobrava o texto da faixa
+     * (`"FORA — o gateway do time"`), agora cobra que **as duas raias existem e
+     * são nomeadas**. É a fronteira que comunica, não a legenda.
+     */
+    render(<OFluxoDoProcesso />);
+    const fluxo = screen.getByTestId("fluxo-do-processo");
+
+    expect(fluxo).toHaveTextContent("FORA");
+    expect(fluxo).toHaveTextContent("DENTRO · este sistema");
+  });
+
+  it("o MCP não é desenhado como caixa nossa", () => {
+    /**
+     * O produto **não implementa MCP**: chama um gateway configurável, e quem
+     * fala MCP está do outro lado (SPEC-81). Desenhar o protocolo como peça daqui
+     * seria afirmar uma capacidade que não existe — e "MCP" numa caixa é
+     * exatamente como isso apareceria.
      */
     render(<OFluxoDoProcesso />);
 
-    expect(screen.getByTestId("fluxo-do-processo")).toHaveTextContent("FORA — o gateway do time");
+    expect(screen.getByTestId("fluxo-do-processo")).not.toHaveTextContent(/MCP/);
   });
 
   it("a volta do PDCA é desenhada — é o que faz disto um ciclo e não uma esteira", () => {
