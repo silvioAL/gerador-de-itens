@@ -22,7 +22,7 @@ um, cruzado com o código de hoje:
 | 5 | **P2** número com unidade | ✅ | `Checagem` com `valorDe`/`multiplicadoPor` (§241); `lerDesenho` somando tempo (§291) |
 | 6 | **P5** modo de operação | ❌ | — |
 | 7 | **P6** variante A vs B | ❌ | — |
-| 8 | **P7** dialeto de provedor | ⚠️ parcial | techs e perfis de stack existem; o eixo "provedor" não |
+| 8 | **P7** dialeto de provedor | ✅ **corrigido no §335** | o eixo do provedor EXISTE, e é automático: `nodeTypes.kafka.contextos` e `.rabbit` já trazem `Backend-mensagens kafka/rabbitmq`, e o checklist de fábrica já condiciona por eles |
 
 **Cinco de oito fechados, um quase, dois ausentes.** A convergência que o
 usuário percebeu é real, e ela não veio da lista: veio de a cadeia da §0.1
@@ -165,6 +165,31 @@ quebra com duas variantes** e uma decisão registrada de qual foi adotada —
 modelo, servidor, tela e migração. É uma SPEC inteira, não uma fatia.
 
 ### P7 — dialeto de provedor
+
+> **§335 — esta seção estava errada sobre o próprio produto, e a medição
+> corrigiu.**
+>
+> O texto abaixo dizia que o eixo do provedor não existia. **Existe, e é
+> automático.** `config/diagrama.example.json` traz
+> `kafka → contextos: ["Backend-mensagens kafka"]` e
+> `rabbit → ["Backend-mensagens rabbitmq"]`, e o `regras` de fábrica já
+> condiciona por eles — *"dimensionar prefetch"* só no Rabbit, *"definir chave de
+> particionamento"* e *"consumer group e política de offset"* só no Kafka.
+>
+> Ou seja: pôr um tópico Kafka na mesa **já traz as perguntas do Kafka e não as do
+> Rabbit**, sem ninguém configurar nada. Que é exatamente o valor que a SPEC-56 §9
+> atribuiu ao passo: *"saber que a fila é SQS e não RabbitMQ muda as perguntas do
+> painel… e isso é config, não engine."* É config, e a config já faz.
+>
+> O que sobra é o **mapeamento de equivalência** entre nuvens (SQS ≡ Service Bus
+> ≡ Pub/Sub) — e é a parte que a própria SPEC-56 §9 examinou e reprovou no
+> original: *"o mapeamento deles é ingênuo — pega o primeiro componente da mesma
+> categoria."*
+>
+> **Decisão do usuário: fechar o P7 como atendido**, sem construir a
+> equivalência. Ela tem um uso legítimo que o P7 não nomeia — *"desenhei com
+> Rabbit e vamos para SQS: o que muda no meu checklist?"* —, mas isso é pergunta
+> de MIGRAÇÃO, e seria uma SPEC própria com outro escopo.
 
 A SPEC-56 §9 já o chamou de *"menor prioridade da lista — o que mais parece
 impressionante numa demo e o que menos muda o item derivado"*. Segue valendo.
