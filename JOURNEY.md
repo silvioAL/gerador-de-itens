@@ -14376,3 +14376,70 @@ começo (o produto não implementa MCP, chama um gateway configurável, SPEC-81)
 
 609 engine · 133 llm · 122 aplicação · 908 web · 311 server · 42 gateway-falso ·
 108/108 E2E · build, typecheck e lint limpos.
+## §335 — o P7 fecha sem código, porque a medição disse que ele já estava feito
+
+O último dos oito passos da SPEC-56, e a rodada terminou **sem escrever produto**
+— o que é resultado, não desistência.
+
+### O que eu ia construir, e o que a medição encontrou
+
+A SPEC-56 §9 descreve o P7 assim:
+
+> *"o mesmo componente com nome de cada nuvem (fila = SQS = Service Bus =
+> Pub/Sub), e o mapeamento entre elas. **O que temos:** techs e perfis de stack —
+> o eixo existe, só não tem a dimensão 'provedor'."*
+
+Fui medir antes de escrever, e a segunda frase está errada sobre o próprio
+produto. `config/diagrama.example.json`:
+
+```
+kafka  → contextos: ["Backend-mensagens kafka"]
+rabbit → contextos: ["Backend-mensagens rabbitmq"]
+```
+
+E o `regras` de fábrica já condiciona por eles: *"dimensionar prefetch"* só no
+Rabbit; *"definir chave e estratégia de particionamento"* e *"consumer group e
+política de offset"* só no Kafka.
+
+**O eixo do provedor existe, e é automático.** Pôr um tópico Kafka na mesa já traz
+as perguntas do Kafka e não as do Rabbit, sem ninguém configurar nada — que é
+exatamente o valor que a SPEC-56 atribuiu ao passo: *"saber que a fila é SQS e não
+RabbitMQ muda as perguntas do painel… e isso é config, não engine."*
+
+É config. E a config já faz.
+
+### O que sobrava, e por que não entra
+
+O **mapeamento de equivalência** entre nuvens. É a metade que a própria SPEC-56 §9
+examinou e reprovou no original: *"o mapeamento deles é ingênuo — pega o primeiro
+componente da mesma categoria."*
+
+Construí-lo agora seria escrever o pedaço que o projeto mediu como o de menor
+valor (*"o que menos muda o item derivado"*), copiando a ideia que ele mesmo
+chamou de ingênua. O usuário decidiu fechar sem construir.
+
+**Fica registrado o uso legítimo que o P7 não nomeia:** *"desenhei com Rabbit e
+vamos para SQS — o que muda no meu checklist?"* Isso é pergunta de MIGRAÇÃO, e
+seria uma SPEC própria com outro escopo. Não é o dialeto.
+
+### A correção no registro
+
+A tabela da SPEC-67 §1 dizia `⚠️ parcial — o eixo "provedor" não [existe]`. Foi
+corrigida com a evidência, do mesmo jeito que o §320, o §323 e o §327 corrigiram
+medições anteriores minhas. **Os oito passos da SPEC-56 estão fechados.**
+
+### O que isso encerra
+
+| # | Passo | Onde fechou |
+|---|---|---|
+| 1 | P3 requisito + rastreabilidade | SPEC-57 A |
+| 2 | P8 padrão sobre topologia **e valor** | §295 (SPEC-67) |
+| 3 | P4 ADR ancorado no nó | SPEC-57 C |
+| 4 | P1 percurso | SPEC-57 E, SPEC-64 |
+| 5 | P2 número com unidade | §241, §291 |
+| 6 | **P5 modo de operação** | **§330** (SPEC-87) |
+| 7 | **P6 variante A vs B** | **§331** (SPEC-88) |
+| 8 | **P7 dialeto de provedor** | **§335 — já estava feito** |
+
+609 engine · 133 llm · 122 aplicação · 908 web · 311 server · 42 gateway-falso ·
+108/108 E2E. Rodada sem mudança de produto: só o registro.
