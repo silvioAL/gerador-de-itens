@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
+import { credencialEmVigor } from "../ia/credencialEmVigor.js";
 import { z } from "zod";
 import {
   criarProvedorCompativelOpenAI,
@@ -143,10 +144,23 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
     const repo = await repositorio();
     const resumo = repo ? await repo.resumir(ID_PROVEDOR_GATEWAY) : { configurado: false };
 
+    /**
+     * SPEC-89 — **o status tem que contar a MESMA história das rotas.**
+     *
+     * Com o dublê declarado, `/ia/diagrama` e as irmãs respondem. Se este
+     * endpoint continuasse dizendo `pronto: false`, a tela esconderia os botões
+     * de uma IA que está funcionando — e o passo do tour prometeria algo que a
+     * própria interface acabou de desligar. Duas leituras da mesma pergunta
+     * divergindo é o §263, e aqui ela apareceria como "não tem IA" numa
+     * instalação que tem.
+     */
+    const emVigor = credencialEmVigor(repo ? await repo.obter(ID_PROVEDOR_GATEWAY) : null);
+    const respondendo = resumo.configurado || !!emVigor;
+
     return {
-      pronto: resumo.configurado,
+      pronto: respondendo,
       provedor: ID_PROVEDOR_GATEWAY,
-      chatInstalado: resumo.configurado,
+      chatInstalado: respondendo,
       // Não há embedding aqui, e não é pendência: é a decisão de não carregar
       // modelo local em container. `true` porque a pergunta que a tela faz com
       // este campo — "falta instalar algo?" — tem resposta "não".
@@ -176,7 +190,15 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
        * outra — que é literalmente o defeito que a §130 documenta neste
        * mesmo endpoint.
        */
-      simulado: ehSimulado(resumo.baseUrl),
+      /**
+       * SPEC-89 — a marca sai do que está EM VIGOR, não só do que está salvo.
+       *
+       * Sem credencial e com o dublê declarado, `resumo.baseUrl` é vazio e
+       * `ehSimulado` diria `false` — a instalação nova responderia com texto
+       * inventado **sem marca nenhuma**, que é exatamente o defeito que a
+       * SPEC-74 fatia D existe para evitar.
+       */
+      simulado: emVigor?.simulado || ehSimulado(resumo.baseUrl),
       // Do modo HOSPEDADO: quem chama o gateway daqui é este container, então
       // o Ollama alcançável é `http://ollama:11434` (serviço do compose), não
       // `localhost`. Servir a lista do outro modo ofereceria um destino que
@@ -280,10 +302,13 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
    */
   app.post("/ia/sugerir", async (req, reply) => {
     const repo = await repositorio();
-    const credencial = repo ? await repo.obter(ID_PROVEDOR_GATEWAY) : null;
-    if (!credencial?.baseUrl || !credencial.chave) {
+    // SPEC-89 — a salva, ou a do dublê quando a implantação declara que ele está
+    // aqui. Sem as duas, o 503 de sempre, com a mesma frase de sempre.
+    const emVigor = credencialEmVigor(repo ? await repo.obter(ID_PROVEDOR_GATEWAY) : null);
+    if (!emVigor) {
       return reply.code(503).send({ erro: "IA não configurada — cadastre a credencial do gateway" });
     }
+    const credencial = emVigor.credencial;
 
     const { tech, rotulo, contextoNo, contextoEpico, contextoDoProduto } = (req.body ?? {}) as {
       tech?: string;
@@ -341,13 +366,14 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
       });
 
     const repo = await repositorio();
-    const credencial = repo ? await repo.obter(ID_PROVEDOR_GATEWAY) : null;
-    if (!credencial?.baseUrl || !credencial.chave) {
+    const emVigor = credencialEmVigor(repo ? await repo.obter(ID_PROVEDOR_GATEWAY) : null);
+    if (!emVigor) {
       // Sem registro: não houve execução. "Sem credencial" já é um estado que o
       // mapa sabe mostrar (§258), e anotá-lo como falha faria o avatar acusar o
       // papel por uma configuração que não é dele.
       return reply.code(503).send({ erro: "IA não configurada — cadastre a credencial do gateway" });
     }
+    const credencial = emVigor.credencial;
 
     const provedor = comoProvedor(credencial);
     // Streaming de verdade (não "junta tudo e manda"): a esteira mostra o
@@ -552,10 +578,13 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
 
   app.post("/ia/transcrever", async (req, reply) => {
     const repo = await repositorio();
-    const credencial = repo ? await repo.obter(ID_PROVEDOR_GATEWAY) : null;
-    if (!credencial?.baseUrl || !credencial.chave) {
+    // SPEC-89 — a salva, ou a do dublê quando a implantação declara que ele está
+    // aqui. Sem as duas, o 503 de sempre, com a mesma frase de sempre.
+    const emVigor = credencialEmVigor(repo ? await repo.obter(ID_PROVEDOR_GATEWAY) : null);
+    if (!emVigor) {
       return reply.code(503).send({ erro: "IA não configurada — cadastre a credencial do gateway" });
     }
+    const credencial = emVigor.credencial;
 
     const audio = req.body as Buffer | undefined;
     if (!audio?.length) return reply.code(400).send({ erro: "nenhum áudio recebido" });

@@ -77,7 +77,12 @@ export default defineConfig({
         DATABASE_URL: DATABASE_URL_TESTE,
         PORT: "4100",
         RATE_LIMIT_LOGIN_MAX: "1000",
-        RATE_LIMIT_GLOBAL_MAX: "10000",
+        RATE_LIMIT_GLOBAL_MAX: "10000",
+        // SPEC-89 — a suíte roda como uma instalação de DEMONSTRAÇÃO roda:
+        // com o dublê declarado. Sem isto, o E2E provaria um produto que
+        // ninguém usa — o `docker-compose.yml` declara, e é ele que descreve o
+        // ambiente que a pessoa recebe.
+        GATEWAY_FALSO_URL: "http://127.0.0.1:4123/v1",
       },
     },
     {

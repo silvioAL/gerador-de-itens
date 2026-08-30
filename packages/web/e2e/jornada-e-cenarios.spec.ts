@@ -224,7 +224,20 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   // §254 — o ponteiro aparece no primeiro passo que TEM alvo. Nos de tela
   // cheia ele não existe, de propósito: apontar para o nada é pior.
   await expect(page.getByTestId("cursor-fantasma")).toBeVisible();
-  await expect(page.getByText(/serviço de catálogo de produtos/i)).toBeVisible();
+  /**
+   * SPEC-89 fatia C — **a transcrição fixa saiu, e esta asserção mudou com ela.**
+   *
+   * Isto afirmava um texto que vinha de `CONVERSA_DO_TOUR`, escrito à mão, e o
+   * passo dizia que o desenho na mesa "nasceu da conversa ao lado". Nada nascia
+   * de nada.
+   *
+   * O que se guarda agora é o que o passo realmente promete: a conversa está
+   * **aberta e utilizável**. Que ela responde de verdade sem ninguém configurar
+   * credencial é o assunto de `ia-sem-configurar.spec.ts` — aqui seria acoplar
+   * o tour inteiro à latência do dublê.
+   */
+  await expect(page.getByLabel("Descreva a demanda")).toBeVisible();
+  await expect(page.getByLabel("Descreva a demanda")).toBeEnabled();
 
   // O diagrama de verdade, com o cenário do tour já carregado.
   // §268 — o ✦ que fica por cima do desenho, apresentado em vez de só usado.

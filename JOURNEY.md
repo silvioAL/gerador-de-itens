@@ -14187,3 +14187,76 @@ anexo dela **não** cobre este caso. Registrado para medir quando houver uso rea
   arquitetura técnica → design da solução → ensaio → itens. Os quatro diagramas
   de hoje mostram camadas, evolução, bordas e o ciclo; nenhum mostra essa cadeia
   se conectando.
+## §332 — instalação nova já responde, e o tour deixou de ser um vídeo (SPEC-89)
+
+O usuário, olhando o produto rodando: *"quanto a demo notei que não usa o mock,
+deveria."* A medição reenquadrou o achado, e o tornou mais grave do que a frase
+sugeria.
+
+### O tour prometia o que a instalação nova não fazia
+
+`useTour.ts:122` afirmava: *"este desenho na mesa nasceu da conversa ao lado"*. A
+conversa ao lado era `CONVERSA_DO_TOUR` — uma transcrição escrita à mão, com a
+proposta de diagrama inventada. **Nada nascia de nada.**
+
+E o passo final fechava convidando: *"a mesa à sua frente está vazia, e a conversa
+está aberta. Descreva a sua demanda e o agente propõe os primeiros
+componentes."* Sem credencial cadastrada, isso devolvia **503** em três rotas.
+
+É a régua da SPEC-76 sendo violada pelo próprio tour, e no pior lugar: a última
+frase que a pessoa lê antes de tentar.
+
+### A decisão: o fallback é DECLARADO, nunca adivinhado
+
+"Sem credencial, use o dublê" seria fácil e perigoso. Numa implantação de produção
+sem gateway, o produto passaria a responder com **texto inventado** em vez de
+recusar — e ninguém notaria até alguém aprovar um documento escrito por um dublê.
+
+Então o fallback só existe onde a implantação declara `GATEWAY_FALSO_URL`. O
+`docker-compose.yml` declara; produção não declara, e o 503 continua idêntico ao
+de hoje. Três testes guardam exatamente essa metade, e desligá-la derruba os três.
+
+### O que a medição pegou no caminho
+
+**O status contava outra história.** `/ia/status` deriva `simulado` de
+`resumo.baseUrl`, que é vazio quando não há credencial gravada — a instalação nova
+responderia **calada**, sem marca nenhuma, que é o defeito que a SPEC-74 fatia D
+existe para evitar. E diria `pronto: false` enquanto as rotas respondiam: a tela
+esconderia os botões de uma IA funcionando. Os dois campos agora saem do que está
+em vigor.
+
+**O import quebrou o build, e eu não vi de primeira.** Escrevi
+`import { PRESETS_GATEWAY } from "@gerador/llm"` — a raiz, que alcança o modelo
+local. O build do servidor caiu com *"top-level await não é suportado com cjs"*, e
+eu só percebi porque comparei o `exit` com a `main` limpa em vez de confiar no meu
+próprio `grep`. O subpath `@gerador/llm/gateway` existe exatamente para essa
+fronteira, e `routes/ia.ts` já o usava.
+
+**E o dublê quase entrou na imagem de produção.** A primeira escrita importava
+`CHAVE_GATEWAY_FALSO` de `@gerador/gateway-falso` — o pacote que a SPEC-74 fatia A
+separou justamente para ele **não** ser copiado pelo `Dockerfile` do servidor.
+
+### O tour deixou de ser um vídeo
+
+`CONVERSA_DO_TOUR` saiu, e com ela a prop `mensagensDeDemonstracao`, que virou
+código morto. O passo roda a conversa de verdade — o que a pessoa vê ali é o que
+ela vai ver quando digitar.
+
+O E2E do tour afirmava o texto da transcrição, e quebrou de propósito. Foi
+reescrito para guardar o que o passo realmente promete: **a conversa está aberta e
+utilizável**. Que ela responde sem ninguém configurar credencial virou um E2E
+próprio — e ele é o único da suíte que **não** configura nada antes, porque é
+justamente essa ausência que ele afirma.
+
+Duas vezes cacei `data-testid` que não existem nesse painel (`conversa-proposta`
+foi invenção minha; `proposta-0` é do painel de configuração). A asserção final é
+sobre a **frase** que a tela escreve — que é o que a pessoa lê.
+
+### O que ficou de fora, declarado
+
+Melhorar as respostas do dublê. A fatia C da SPEC-74 já o deixou plausível; se ele
+não convencer no tour, isso é medição para outra rodada — e é medição, não opinião
+(SPEC-89 §5.1).
+
+609 engine · 133 llm · 122 aplicação · 897 web · 311 server · 42 gateway-falso ·
+108/108 E2E · build, typecheck e lint limpos.

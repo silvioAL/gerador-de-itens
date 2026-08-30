@@ -107,7 +107,18 @@ O `docker compose up` sobe junto um **gateway falso**: ele fala o mesmo protocol
 
 É o padrão de propósito. Uma ferramenta que gasta chave de API só pra alguém ver uma tela funcionando cobra caro por curiosidade — e o modo real está a um clique de distância.
 
-Na aplicação, em **⚙ Configurações → Modelo de IA**, ele já vem escolhido quando não há credencial nenhuma:
+**Desde a SPEC-89, você não precisa nem escolher.** Sem nenhuma credencial cadastrada, o servidor já responde pelo dublê — é o que faz a última frase do tour ("descreva a sua demanda e o agente propõe os primeiros componentes") ser verdadeira desde o primeiro `docker compose up`.
+
+Quem manda nisso é uma variável, e ela é **declarada, nunca adivinhada**:
+
+```yaml
+# docker-compose.yml, no serviço `server`
+GATEWAY_FALSO_URL: http://gateway-falso:4123/v1
+```
+
+> **Uma implantação de produção NÃO define essa variável** — e aí o `503 IA não configurada` continua sendo o comportamento, igual ao de sempre. Adivinhar o dublê faria o produto responder com texto inventado onde ninguém configurou gateway, e ninguém notaria até alguém aprovar um documento escrito por um dublê. Por isso é a implantação que diz "o dublê está aqui", nunca o produto que supõe.
+
+Na aplicação, em **⚙ Configurações → Modelo de IA**, ele também aparece escolhido quando não há credencial nenhuma:
 
 | campo | valor |
 |---|---|
