@@ -39,6 +39,27 @@ import type { Rota } from "../navegacao/rota";
  * do mapa (`conceito.ts`) fazem a mesma pergunta sobre outra coisa. Responder
  * com duas escalas diferentes obrigaria quem lê a aprender duas legendas.
  */
+/**
+ * SPEC-90 — **as fases da jornada**, na cadeia que o usuário nomeou:
+ * *"produto e arquitetura de negócio → técnica → design da solução → ensaio,
+ * etc."*
+ *
+ * Fase é AGRUPAMENTO do que existe, nunca uma caixa vazia bonita: há teste que
+ * falha se uma fase declarada não tiver estágio nenhum.
+ */
+export const FASES_DA_JORNADA = ["negocio", "tecnica", "desenho", "ensaio", "entrega", "volta"] as const;
+export type FaseDaJornada = (typeof FASES_DA_JORNADA)[number];
+
+/** O rótulo de cada fase — o que a pessoa lê no diagrama. */
+export const ROTULO_DA_FASE: Record<FaseDaJornada, string> = {
+  negocio: "Negócio e produto",
+  tecnica: "Arquitetura técnica",
+  desenho: "Desenho da solução",
+  ensaio: "Ensaio e decisão",
+  entrega: "Entrega",
+  volta: "A volta",
+};
+
 export type EstadoDoEstagio = "completo" | "parcial" | "ausente";
 
 export interface EstagioDoCiclo {
@@ -56,6 +77,8 @@ export interface EstagioDoCiclo {
    * e incompleta; mostrar tudo sem distinguir seria mentira. A marca é o que
    * torna o mapa honesto — e ela diz para onde o produto vai.
    */
+  /** SPEC-90 — em que ponto da jornada este estágio acontece. */
+  fase: FaseDaJornada;
   estado: EstadoDoEstagio;
   /**
    * Para onde este estágio leva, depois do login. Obrigatório em tudo que não
@@ -70,6 +93,7 @@ export interface EstagioDoCiclo {
 export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
   {
     id: "contexto",
+    fase: "negocio",
     titulo: "Captar o que é perene",
     resumo: "O que o produto é, quem usa, as regras que valem sempre.",
     detalhe:
@@ -79,6 +103,7 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
   },
   {
     id: "padroes",
+    fase: "tecnica",
     titulo: "Analisar o contexto técnico",
     resumo: "As stacks, os padrões por componente, os campos de cada tipo — e o design system.",
     detalhe:
@@ -105,6 +130,7 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
   },
   {
     id: "desenho",
+    fase: "desenho",
     titulo: "Desenhar a solução",
     resumo: "A mesa de projeto: componentes tipados, conexões com regra própria.",
     detalhe:
@@ -114,6 +140,7 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
   },
   {
     id: "prontidao",
+    fase: "desenho",
     titulo: "Medir o que está pronto",
     resumo: "O motor mede a cada mudança, e diz o que falta e onde.",
     detalhe:
@@ -123,6 +150,7 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
   },
   {
     id: "volumetria",
+    fase: "negocio",
     titulo: "Declarar o volume",
     resumo: "Quanto o produto atende, e quanto esta demanda atende.",
     detalhe:
@@ -132,6 +160,7 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
   },
   {
     id: "ensaios",
+    fase: "ensaio",
     titulo: "Ensaiar o que pode dar errado",
     resumo: "E se o parceiro ficar lento? E se o volume for cinco vezes?",
     detalhe:
@@ -141,6 +170,7 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
   },
   {
     id: "decisoes",
+    fase: "ensaio",
     titulo: "Registrar o porquê",
     resumo: "As escolhas entre alternativas, com o que foi descartado.",
     detalhe:
@@ -150,6 +180,7 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
   },
   {
     id: "itens",
+    fase: "entrega",
     titulo: "Derivar os itens",
     resumo: "O desenho vira backlog — calculado, não digitado.",
     detalhe:
@@ -159,6 +190,7 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
   },
   {
     id: "especificacao",
+    fase: "entrega",
     titulo: "Especificar com a IA",
     resumo: "A esteira de agentes escreve o texto; você confirma.",
     detalhe:
@@ -168,6 +200,7 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
   },
   {
     id: "checklists",
+    fase: "entrega",
     titulo: "Conferir processo, técnica e testes",
     resumo: "As regras de refinamento do time, aplicadas por tecnologia e contexto.",
     detalhe:
@@ -177,6 +210,7 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
   },
   {
     id: "specs-para-ia",
+    fase: "entrega",
     titulo: "Gerar specs para construir com IA",
     resumo: "O documento vira instrução executável para um agente de código.",
     detalhe:
@@ -194,6 +228,7 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
   },
   {
     id: "mcp",
+    fase: "entrega",
     titulo: "Integrar com as ferramentas do time",
     resumo: "Publicar e consumir por MCP, além do tracker.",
     detalhe:
@@ -213,6 +248,7 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
   },
   {
     id: "pdca",
+    fase: "volta",
     titulo: "Fechar o ciclo",
     resumo: "O que se aprendeu vira ajuste na camada determinística.",
     detalhe:

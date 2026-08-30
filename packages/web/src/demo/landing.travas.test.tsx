@@ -4,6 +4,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { LandingPage } from "./LandingPage";
 import { CicloDoProduto } from "./CicloDoProduto";
+import { OFluxoDoProcesso } from "./OFluxoDoProcesso";
 import { ESTAGIOS_DO_CICLO } from "./ciclo";
 import { CAMADAS, CONEXOES, EVOLUCAO, contagemDasConexoes } from "./conceito";
 
@@ -45,23 +46,48 @@ describe("a landing não pode se repetir (SPEC-83 fatia F)", () => {
      * círculo citasse cada título uma vez. **Ele cita duas** — no círculo e na
      * lista ao lado —, e o teste acusou os treze de uma vez.
      *
-     * O número certo não é 1 nem 2: é **o que o `CicloDoProduto` produzir**.
-     * Medir a linha de base contra o próprio componente faz a trava sobreviver a
-     * ele mudar de forma, e mede o que ela quer medir — repetição **fora** do
-     * círculo, não dentro dele.
+     * O número certo não é 1 nem 2: é **o que os componentes produzirem**. Medir
+     * a linha de base contra eles mesmos faz a trava sobreviver a eles mudarem de
+     * forma, e mede o que ela quer medir — repetição **fora** deles.
+     *
+     * ## SPEC-90 — a linha de base ganhou um SEGUNDO componente, e isso é decisão
+     *
+     * O fluxo da jornada também nomeia os treze estágios, porque sem os nomes não
+     * há percurso — só caixas com rótulo de fase. A trava disparou, e estava
+     * certa em disparar: acrescentar um lugar que repete os nomes é uma decisão,
+     * e ela não pode acontecer em silêncio.
+     *
+     * A escolha foi **declarar os dois**, e não afrouxar o número. Quem quiser um
+     * terceiro tem que vir aqui e escrever por quê — que é exatamente o atrito
+     * que esta trava existe para criar.
+     *
+     * O que ela continua pegando: uma seção que reintroduza os estágios **fora**
+     * destes dois. E o que impede o fluxo de virar a `Jornada` outra vez não é
+     * esta trava e sim a de `OFluxoDoProcesso.test.tsx`: lá, nenhum RESUMO nem
+     * DETALHE de estágio pode aparecer. Nome é percurso; prosa é o índice, e o
+     * índice já está no círculo.
      */
-    const { unmount } = render(<CicloDoProduto />);
-    const base = new Map(
-      ESTAGIOS_DO_CICLO.map((e) => [e.titulo, (document.body.textContent ?? "").split(e.titulo).length - 1])
-    );
-    unmount();
+    const NOMEIAM_ESTAGIOS = [
+      { nome: "CicloDoProduto", elemento: <CicloDoProduto /> },
+      { nome: "OFluxoDoProcesso", elemento: <OFluxoDoProcesso /> },
+    ];
+
+    const base = new Map(ESTAGIOS_DO_CICLO.map((e) => [e.titulo, 0]));
+    for (const { elemento } of NOMEIAM_ESTAGIOS) {
+      const { unmount } = render(elemento);
+      const texto = document.body.textContent ?? "";
+      for (const e of ESTAGIOS_DO_CICLO) {
+        base.set(e.titulo, (base.get(e.titulo) ?? 0) + (texto.split(e.titulo).length - 1));
+      }
+      unmount();
+    }
 
     const texto = textoDaLanding();
     const repetidos = ESTAGIOS_DO_CICLO.filter(
       (e) => texto.split(e.titulo).length - 1 > (base.get(e.titulo) ?? 0)
-    ).map((e) => `${e.titulo}: ${texto.split(e.titulo).length - 1}× na página, ${base.get(e.titulo)}× no círculo`);
+    ).map((e) => `${e.titulo}: ${texto.split(e.titulo).length - 1}× na página, ${base.get(e.titulo)}× nos componentes que nomeiam`);
 
-    expect(repetidos, `estágios contados FORA do círculo:\n${repetidos.join("\n")}`).toEqual([]);
+    expect(repetidos, `estágios contados FORA do círculo e do fluxo:\n${repetidos.join("\n")}`).toEqual([]);
   });
 
   it("dois títulos da página não abrem com o mesmo assunto", () => {

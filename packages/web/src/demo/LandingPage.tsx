@@ -2,6 +2,7 @@ import { CicloDoProduto } from "./CicloDoProduto";
 import { AEvolucao, AsCamadas, OMapaDeConexoes } from "./PecasDoConceito";
 import { OMotor } from "./OMotor";
 import { OPassoContido } from "./OPassoContido";
+import { OFluxoDoProcesso } from "./OFluxoDoProcesso";
 
 export interface LandingPageProps {
   onEntrar: () => void;
@@ -130,6 +131,17 @@ export function LandingPage({ onEntrar }: LandingPageProps) {
         <div style={{ ...colunaEstilo, maxWidth: 760 }}>
           <CicloDoProduto />
         </div>
+      </section>
+
+      {/**
+       * SPEC-90 — a jornada, DEPOIS do ciclo.
+       *
+       * O índice antes do percurso: o círculo diz quais são os estágios, e este
+       * diz por onde a coisa passa e em que ponto sai para o gateway. Inverter a
+       * ordem faria a pessoa ver o caminho antes de saber o que são as paradas.
+       */}
+      <section style={{ ...faixaEstilo, paddingTop: 30, paddingBottom: 30 }}>
+        <OFluxoDoProcesso />
       </section>
 
       <section style={{ ...faixaEstilo, background: "var(--painel-alto, transparent)", borderTop: "1px solid var(--borda)" }}>
