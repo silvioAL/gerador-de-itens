@@ -310,7 +310,26 @@ export function passosDeConfiguracao(opts: UseTourOpts): PassoTour[] {
       segundos: 13,
       texto:
         "Antes das telas, o mapa. De um lado o que o MOTOR confere — as regras por tecnologia e as réguas de caminho. Do outro, quem ESCREVE cada parte do item: a esteira, em sequência, com o estado de cada agente (um papel ativo sem modelo configurado é o defeito mais silencioso que existe aqui). Os dois produzem o item, e o que o time responde depois volta a mudar os dois: é o laço do PDCA, que dá nome ao ciclo e não aparecia em tela nenhuma. Esta vista não edita — cada bloco leva à tela que edita.",
-      onEnter: () => opts.abrirSistema(),
+      /**
+       * §340 — **liga a demonstração, e o motivo veio de um print do usuário.**
+       *
+       * Este passo mostra o mapa, e o mapa mostra a última execução de cada
+       * agente lendo o histórico REAL. Quem demonstra com a credencial da casa
+       * sem crédito via os quatro papéis em vermelho, com o erro cru do
+       * provedor — e quem assiste conclui que a ferramenta está quebrada.
+       *
+       * O §339 trocou o histórico por dados de demonstração, e não bastou: o
+       * passo equivalente do tour de PRODUTO liga o modo antes de abrir o mapa
+       * (`ligarDemonstracao(true); abrirSistema()`), e este não ligava. A
+       * correção existia e não alcançava a tela em que o defeito foi visto.
+       *
+       * O desligamento continua obrigatório e continua onde estava (§253):
+       * demonstração que sobrevive ao tour vira configuração fantasma.
+       */
+      onEnter: () => {
+        opts.ligarDemonstracao(true);
+        opts.abrirSistema();
+      },
     },
     {
       selector: "[data-tour=config-screen-content]",
