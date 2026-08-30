@@ -227,6 +227,16 @@ export function CicloDoProduto({ estagios = ESTAGIOS_DO_CICLO }: { estagios?: Es
                   </span>
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--texto)" }}>{estagio.titulo}</span>
+                    {/* SPEC-91 §2.1 — nem toda demanda passa por todas as
+                        paradas, e a lista diz isso onde a pessoa lê o nome. */}
+                    {estagio.aplicacao === "quando-se-aplica" && (
+                      <span
+                        title="Acontece quando se aplica — nem toda demanda passa por aqui"
+                        style={{ fontSize: 11, color: "var(--texto-fraco)", marginLeft: 8 }}
+                      >
+                        ◇ quando se aplica
+                      </span>
+                    )}
                     {estagio.estado !== "completo" && (
                       /* A PALAVRA junto do ícone: status nunca é só cor. */
                       <span style={{ fontSize: 11, color: marca.cor, marginLeft: 8 }}>{marca.rotulo}</span>
@@ -236,7 +246,29 @@ export function CicloDoProduto({ estagios = ESTAGIOS_DO_CICLO }: { estagios?: Es
                     {selecionado ? "−" : "+"}
                   </span>
                 </button>
-                {selecionado && (
+                {/**
+                 * SPEC-91 fatia C — **fica montado, para poder FECHAR animando.**
+                 *
+                 * Antes era `{selecionado && …}`: o conteúdo entrava e saía do
+                 * DOM instantaneamente, e não há o que animar num nó que já não
+                 * existe.
+                 *
+                 * Como ele fica, sai da árvore de acessibilidade por
+                 * `aria-hidden` e `inert` — senão a lista de treze itens vira
+                 * uma parede de texto para quem usa leitor de tela, que é
+                 * exatamente quem não vê a animação.
+                 */}
+                <div
+                  className="desdobramento"
+                  data-aberto={selecionado}
+                  aria-hidden={!selecionado}
+                  /* `inert` ainda não está nos tipos desta versão do React, e
+                     ele é o que impede o TECLADO de entrar no que está fechado —
+                     `aria-hidden` sozinho esconde do leitor de tela e deixa o
+                     Tab cair lá dentro. O espalhamento é o mínimo para passar
+                     pelo tipo sem desligar a checagem do resto do elemento. */
+                  {...(selecionado ? {} : ({ inert: "" } as Record<string, string>))}
+                >
                   <div data-testid={`estagio-detalhe-${estagio.id}`} style={{ padding: "0 2px 12px 40px" }}>
                     {/* O resumo veio da lista para cá (SPEC-85 §0.2): aqui ele
                         abre o detalhe em vez de competir com ele. */}
@@ -252,7 +284,7 @@ export function CicloDoProduto({ estagios = ESTAGIOS_DO_CICLO }: { estagios?: Es
                       </p>
                     )}
                   </div>
-                )}
+                </div>
               </li>
             );
           })}

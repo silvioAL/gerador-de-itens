@@ -602,3 +602,42 @@ textarea::placeholder {
     opacity: 0.35 !important;
   }
 }
+
+/* ==========================================================================
+   SPEC-91 fatia C — o desdobramento que se move.
+   ========================================================================== */
+
+/*
+  O detalhe de um estágio do ciclo abria e fechava seco: entrava e saía do DOM
+  instantaneamente. Numa lista de treze itens, abrir e fechar é O gesto — e a
+  mesma página já tinha uma peça que se move com propósito (`OPassoContido`).
+
+  ## Por que `grid-template-rows`, e não `max-height`
+
+  `max-height` exige um teto arbitrário: se for baixo demais corta o conteúdo, se
+  for alto demais a transição fica com um "tempo morto" no fim, porque a maior
+  parte da animação percorre altura que não existe. `0fr → 1fr` anima até a
+  altura REAL do conteúdo, sem número inventado.
+
+  ## Por que o elemento continua montado
+
+  Não há o que animar num nó que já não existe — animar o FECHAMENTO exige que
+  ele fique. E como fica, sai da árvore de acessibilidade por `aria-hidden` e
+  `inert`: quem enxerga ganha a transição, quem usa leitor de tela continua
+  ouvindo só o que está aberto.
+*/
+.desdobramento {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 220ms cubic-bezier(0.2, 0.7, 0.3, 1), opacity 160ms ease-out;
+  opacity: 0;
+}
+.desdobramento[data-aberto="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+/* O filho precisa de `min-height: 0` para o `fr` poder chegar a zero de verdade. */
+.desdobramento > * {
+  overflow: hidden;
+  min-height: 0;
+}

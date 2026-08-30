@@ -60,6 +60,25 @@ export const ROTULO_DA_FASE: Record<FaseDaJornada, string> = {
   volta: "A volta",
 };
 
+/**
+ * SPEC-91 §2.1 — **nem todo estágio acontece em toda demanda.**
+ *
+ * O usuário: *"nem sempre uma demanda se trata de uma decisão que muda o fluxo de
+ * negócio ou arquitetural — precisamos deixar claro, inclusive no diagrama, que
+ * pode ser aplicável ou não."*
+ *
+ * Não é conceito novo: é o produto sendo coerente consigo. O documento já diz
+ * *"nem toda mudança move arquitetura"* quando não há decisão, e há teste para a
+ * frase. O que faltava era o diagrama parar de desenhar tudo como se acontecesse
+ * sempre — o que promete processo pesado e afasta a demanda pequena, que é a
+ * maioria.
+ *
+ * **A régua para marcar como condicional:** só entra o que o produto JÁ declara
+ * como opcional em algum lugar do código. Não é opinião sobre o que parece
+ * dispensável — e o `porQueCondicional` é obrigatório para provar isso.
+ */
+export type AplicacaoDoEstagio = "sempre" | "quando-se-aplica";
+
 export type EstadoDoEstagio = "completo" | "parcial" | "ausente";
 
 export interface EstagioDoCiclo {
@@ -77,6 +96,14 @@ export interface EstagioDoCiclo {
    * e incompleta; mostrar tudo sem distinguir seria mentira. A marca é o que
    * torna o mapa honesto — e ela diz para onde o produto vai.
    */
+  /**
+   * SPEC-91 — este estágio acontece em toda demanda, ou só quando cabe?
+   *
+   * Ausente = `sempre`, que é o caso da maioria e evita ruído no dado.
+   */
+  aplicacao?: AplicacaoDoEstagio;
+  /** Obrigatório em `quando-se-aplica`: marcar sem explicar é não marcar. */
+  porQueCondicional?: string;
   /** SPEC-90 — em que ponto da jornada este estágio acontece. */
   fase: FaseDaJornada;
   estado: EstadoDoEstagio;
@@ -150,6 +177,9 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
   },
   {
     id: "volumetria",
+    aplicacao: "quando-se-aplica",
+    porQueCondicional:
+      "Uma demanda sem volume próprio herda o do produto — e sem volume nenhum a saturação segue calada, em vez de inventar número.",
     fase: "negocio",
     titulo: "Declarar o volume",
     resumo: "Quanto o produto atende, e quanto esta demanda atende.",
@@ -160,6 +190,9 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
   },
   {
     id: "ensaios",
+    aplicacao: "quando-se-aplica",
+    porQueCondicional:
+      "Ensaio responde a um “e se…?”, e um desenho sem tempo declarado não tem o que ensaiar — a ferramenta diz isso em vez de cobrar.",
     fase: "ensaio",
     titulo: "Ensaiar o que pode dar errado",
     resumo: "E se o parceiro ficar lento? E se o volume for cinco vezes?",
@@ -170,6 +203,9 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
   },
   {
     id: "decisoes",
+    aplicacao: "quando-se-aplica",
+    porQueCondicional:
+      "Nem toda mudança move arquitetura. Demanda sem decisão entre alternativas não fica incompleta por isso.",
     fase: "ensaio",
     titulo: "Registrar o porquê",
     resumo: "As escolhas entre alternativas, com o que foi descartado.",
@@ -228,6 +264,9 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
   },
   {
     id: "mcp",
+    aplicacao: "quando-se-aplica",
+    porQueCondicional:
+      "Os destinos do gateway são configurados por time. Sem destino, o caminho simplesmente não se oferece.",
     fase: "entrega",
     titulo: "Integrar com as ferramentas do time",
     resumo: "Publicar e consumir por MCP, além do tracker.",
