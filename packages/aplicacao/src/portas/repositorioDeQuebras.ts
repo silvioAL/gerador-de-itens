@@ -11,6 +11,7 @@ import type {
   StatusDocumento,
   ValorSpec,
   VolumetriaDaDemanda,
+  Variante,
 } from "@gerador/engine";
 
 /**
@@ -62,6 +63,8 @@ export interface QuebraSalva {
    * cima do que estava lá.
    */
   modoDeOperacao?: string | null;
+  /** SPEC-88 (P6) — as alternativas de desenho guardadas. */
+  variantes?: Variante[];
   /** SPEC-57 fatia A — o propósito da demanda. Lista vazia = não declarou. */
   necessidades?: Necessidade[];
   /** §242 — as violações de padrão aceitas de propósito. */
@@ -142,6 +145,7 @@ export function normalizarDadosQuebra(bruto: Partial<DadosQuebra> | undefined): 
     // for esquecido: repetir o aviso não bastou.
     volumetria: bruto?.volumetria,
     modoDeOperacao: bruto?.modoDeOperacao,
+    variantes: bruto?.variantes,
     leiturasDispensadas: bruto?.leiturasDispensadas ?? [],
     cenariosDeLentidao: bruto?.cenariosDeLentidao ?? [],
   };

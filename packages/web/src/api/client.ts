@@ -1,6 +1,8 @@
 import type { ExecucaoDoPapel } from "@gerador/aplicacao";
 import type { PropostaDeArquitetura } from "@gerador/aplicacao";
-import type { AnexoDeContexto, CenarioDeLentidao, VolumetriaDoProduto, Decisao, Diagrama, ArtefatosEscritos, ExcecaoDePadrao, LeituraDispensada, Necessidade, OperacaoDeAjuste, PerfisConfig, Percurso, Quebra, RegrasConfig, StatusDocumento, TokensConfig, ValorSpec, VolumetriaDaDemanda } from "@gerador/engine";
+import type { AnexoDeContexto, CenarioDeLentidao, VolumetriaDoProduto, Decisao, Diagrama, ArtefatosEscritos, ExcecaoDePadrao, LeituraDispensada, Necessidade, OperacaoDeAjuste, PerfisConfig, Percurso, Quebra, RegrasConfig, StatusDocumento, TokensConfig, ValorSpec, VolumetriaDaDemanda,
+  Variante,
+} from "@gerador/engine";
 
 /**
  * Base do @gerador/server — configurável em runtime via `VITE_API_URL`
@@ -120,6 +122,8 @@ export interface QuebraSalva {
    * reidratação já copia campo a campo e o campo novo não existia neste tipo.
    */
   modoDeOperacao?: string | null;
+  /** SPEC-88 (P6) — as alternativas de desenho. */
+  variantes?: Variante[];
   /** SPEC-65 fatia D — as leituras caladas neste desenho. */
   leiturasDispensadas?: LeituraDispensada[];
   /** SPEC-66/68/69 — os ensaios, com estado e débito assumido. */

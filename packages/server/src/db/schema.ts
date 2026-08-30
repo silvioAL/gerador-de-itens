@@ -69,6 +69,10 @@ export const quebras = pgTable("quebras", {
    * modos são do TIME, e um enum no banco obrigaria migração a cada palavra
    * nova que um time inventar. */
   modoDeOperacao: text("modo_de_operacao"),
+  /** SPEC-88 (P6) — as alternativas de desenho (migração 0042). `jsonb` pelo
+   * mesmo raciocínio das seis irmãs: pertencem à quebra e não há consulta
+   * transversal que justifique tabela. */
+  variantes: jsonb("variantes").notNull().default([]),
   leiturasDispensadas: jsonb("leituras_dispensadas").notNull().default([]),
   cenariosDeLentidao: jsonb("cenarios_de_lentidao").notNull().default([]),
   especificacao: text("especificacao"),

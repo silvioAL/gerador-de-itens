@@ -1,0 +1,29 @@
+-- SPEC-88 (P6) — as VARIANTES de desenho de uma demanda.
+--
+-- A quebra continua tendo um `diagrama`, e ele é sempre o adotado. Isto guarda
+-- as alternativas que ficaram de fora, cada uma com o seu diagrama e o motivo.
+-- Adotar uma delas é uma troca atômica que registra uma `Decisao` — nunca
+-- "copiar a quebra e editar", que é a armadilha que a SPEC-56 §8 nomeou.
+--
+-- ## Por que `jsonb`, e não tabela
+--
+-- O mesmo raciocínio das seis colunas irmãs (`necessidades`, `excecoes`,
+-- `decisoes`, `percursos`, `leituras_dispensadas`, `cenarios_de_lentidao`): é
+-- uma coleção que pertence à quebra, e não há consulta transversal que a
+-- justifique como tabela. "Quantas variantes esta organização descartou?" não é
+-- pergunta que alguém faça hoje — quando for, ela justifica a tabela.
+--
+-- ## Por que default `[]`, e não NULL
+--
+-- Aqui, ao contrário de `volumetria` e `modo_de_operacao`, não há diferença
+-- entre "não declarou" e "declarou vazio": nenhuma alternativa guardada É a
+-- lista vazia. O default evita `?? []` espalhado por todo leitor.
+--
+-- ## O tamanho, dito em voz alta
+--
+-- Cada variante é um diagrama INTEIRO dentro da linha da quebra. A SPEC-72
+-- mediu 848 kB em 24 quebras e concluiu que não havia número que doesse; com
+-- variantes isso cresce, e o teto de anexo daquela SPEC não cobre este caso.
+-- Registrado na SPEC-88 §5.3 para medir quando houver uso real, em vez de
+-- otimizar contra um número que ninguém tem.
+ALTER TABLE "quebras" ADD COLUMN "variantes" jsonb DEFAULT '[]'::jsonb NOT NULL;

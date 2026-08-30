@@ -43,6 +43,7 @@ function comoQuebraSalva(linha: LinhaQuebra): QuebraSalva {
     // declarou volume"), e um objeto vazio faria o motor tratar como declarado.
     volumetria: (linha.volumetria ?? undefined) as QuebraSalva["volumetria"],
     modoDeOperacao: linha.modoDeOperacao ?? undefined,
+    variantes: (linha.variantes ?? []) as QuebraSalva["variantes"],
     leiturasDispensadas: (linha.leiturasDispensadas ?? []) as QuebraSalva["leiturasDispensadas"],
     cenariosDeLentidao: (linha.cenariosDeLentidao ?? []) as QuebraSalva["cenariosDeLentidao"],
     especificacao: linha.especificacao ?? null,
@@ -126,6 +127,7 @@ export function criarRepositorioDeQuebrasEmPostgres(db: BancoDeDados): Repositor
           documentoStatus: dados.documentoStatus ?? null,
           volumetria: dados.volumetria ?? null,
           modoDeOperacao: dados.modoDeOperacao ?? null,
+          variantes: dados.variantes ?? [],
           leiturasDispensadas: dados.leiturasDispensadas ?? [],
           cenariosDeLentidao: dados.cenariosDeLentidao ?? [],
           especificacao: dados.especificacao ?? null,
@@ -177,6 +179,19 @@ export function criarRepositorioDeQuebrasEmPostgres(db: BancoDeDados): Repositor
         artefatosEscritos: dados.artefatosEscritos ?? {},
         documentoStatus: dados.documentoStatus ?? null,
         volumetria: dados.volumetria ?? null,
+        /**
+         * SPEC-88 — **o sexto funil, e ele só derruba no `atualizar`.**
+         *
+         * Este objeto é uma SEGUNDA whitelist, separada da do `criar`. Campo que
+         * entra lá e não aqui salva na criação e some no autosave — que é o pior
+         * modo de falhar: a pessoa vê "salvo", recarrega, e perdeu.
+         *
+         * O `modoDeOperacao` chegou a ser mergeado assim no §330: a borda tinha,
+         * a coluna tinha, o `criar` tinha, e este não. Nada acusou porque a trava
+         * do §310 cruza `keyof Quebra` com o **Zod**, e o Zod estava certo.
+         */
+        modoDeOperacao: dados.modoDeOperacao ?? null,
+        variantes: dados.variantes ?? [],
         leiturasDispensadas: dados.leiturasDispensadas ?? [],
         cenariosDeLentidao: dados.cenariosDeLentidao ?? [],
         especificacao: dados.especificacao ?? null,
