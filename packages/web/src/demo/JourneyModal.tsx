@@ -188,7 +188,7 @@ function Cenarios({
         <div
           key={cenario.id}
           style={{
-            border: cenario.destaque ? "1.5px solid #4f46e5" : "1px solid var(--borda)",
+            border: cenario.destaque ? "1.5px solid var(--acento-gente)" : "1px solid var(--borda)",
             borderRadius: 12,
             padding: 14,
             display: "flex",
@@ -205,7 +205,7 @@ function Cenarios({
                   fontWeight: 700,
                   padding: "1px 7px",
                   borderRadius: 999,
-                  background: "#4f46e5",
+                  background: "var(--acento-gente)",
                   color: "#fff",
                 }}
               >
@@ -300,8 +300,8 @@ const abaEstilo: React.CSSProperties = {
 
 const abaAtivaEstilo: React.CSSProperties = {
   ...abaEstilo,
-  color: "#a5b4fc",
-  borderBottom: "2px solid #4f46e5",
+  color: "var(--acento-gente-texto)",
+  borderBottom: "2px solid var(--acento-gente)",
 };
 
 const botaoTourSecundarioEstilo: React.CSSProperties = {
@@ -311,7 +311,7 @@ const botaoTourSecundarioEstilo: React.CSSProperties = {
   borderRadius: 8,
   border: "1px solid var(--borda)",
   background: "var(--painel)",
-  color: "#a5b4fc",
+  color: "var(--acento-gente-texto)",
   cursor: "pointer",
   whiteSpace: "nowrap",
 };
@@ -321,8 +321,8 @@ const botaoTourEstilo: React.CSSProperties = {
   fontWeight: 700,
   padding: "8px 14px",
   borderRadius: 8,
-  border: "1px solid #4f46e5",
-  background: "#4f46e5",
+  border: "1px solid var(--acento-gente)",
+  background: "var(--acento-gente)",
   color: "#fff",
   cursor: "pointer",
   whiteSpace: "nowrap",
@@ -345,8 +345,8 @@ const botaoCarregarEstilo: React.CSSProperties = {
   fontWeight: 600,
   padding: "7px 10px",
   borderRadius: 7,
-  border: "1px solid #4f46e5",
-  background: "#4f46e5",
+  border: "1px solid var(--acento-gente)",
+  background: "var(--acento-gente)",
   color: "#fff",
   cursor: "pointer",
 };
@@ -358,6 +358,6 @@ const botaoAdicionarEstilo: React.CSSProperties = {
   borderRadius: 7,
   border: "1px solid rgba(99, 102, 241, 0.45)",
   background: "var(--painel)",
-  color: "#a5b4fc",
+  color: "var(--acento-gente-texto)",
   cursor: "pointer",
 };

@@ -110,7 +110,7 @@ export function NodeCard({ data, selected }: NodeProps & { data: NodeCardData })
             height: 16,
             borderRadius: 4,
             background: corTipo,
-            color: "#ffffff",
+            color: "var(--branco)",
             fontSize: 9.5,
             fontWeight: 700,
             lineHeight: 1,

@@ -9,7 +9,7 @@ vi.mock("../api/client", () => ({
 
 const W3C = JSON.stringify({
   cor: {
-    fundo: { painel: { $value: "#ffffff", $type: "color" } },
+    fundo: { painel: { $value: "var(--branco)", $type: "color" } },
     texto: { padrao: { $value: "#0f172a", $type: "color" } },
   },
   espaco: { "2": { $value: "8px" } },
@@ -101,7 +101,7 @@ describe("a aba de design system (SPEC-79 fatia A)", () => {
     await waitFor(() =>
       expect(apiTokens.salvar).toHaveBeenCalledWith({
         tokens: [
-          { nome: "cor.fundo.painel", valor: "#ffffff", grupo: "cor" },
+          { nome: "cor.fundo.painel", valor: "var(--branco)", grupo: "cor" },
           { nome: "cor.texto.padrao", valor: "#0f172a", grupo: "cor" },
           { nome: "espaco.2", valor: "8px", grupo: "espaco" },
         ],
@@ -110,7 +110,7 @@ describe("a aba de design system (SPEC-79 fatia A)", () => {
   });
 
   it("em demonstração não busca nem grava (§235)", async () => {
-    render(<TokensTab demonstracao={[{ nome: "cor.marca", valor: "#4f46e5", grupo: "cor" }]} />);
+    render(<TokensTab demonstracao={[{ nome: "cor.marca", valor: "var(--acento-gente)", grupo: "cor" }]} />);
 
     expect(screen.getByText("cor.marca")).toBeInTheDocument();
     expect(apiTokens.obter).not.toHaveBeenCalled();

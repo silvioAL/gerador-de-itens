@@ -137,7 +137,7 @@ export function ExportacaoTab({ demonstracao }: ExportacaoTabProps = {}) {
       />
 
       {erro && <p style={{ fontSize: 12, color: "var(--vermelho)", marginTop: 8 }}>{erro}</p>}
-      {salvo && !erro && <p style={{ fontSize: 12, color: "var(--verde, #3ecf8e)", marginTop: 8 }}>Destino salvo.</p>}
+      {salvo && !erro && <p style={{ fontSize: 12, color: "var(--verde)", marginTop: 8 }}>Destino salvo.</p>}
 
       <button onClick={() => void salvar()} disabled={salvando} style={botaoPrimarioEstilo} data-testid="salvar-exportacao">
         {salvando ? "salvando…" : "Salvar destino"}

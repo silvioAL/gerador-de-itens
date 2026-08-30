@@ -87,7 +87,7 @@ const caixaEstilo: React.CSSProperties = {
   borderRadius: 8,
   padding: 10,
   marginBottom: 12,
-  background: "var(--painel-alto, #15202D)",
+  background: "var(--painel-alto)",
 };
 
 const inputEstilo: React.CSSProperties = {

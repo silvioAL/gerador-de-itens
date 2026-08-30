@@ -1,4 +1,5 @@
 import { CicloDoProduto } from "./CicloDoProduto";
+import { SeletorDeTema } from "../tema/SeletorDeTema";
 import { AEvolucao, AsCamadas, OMapaDeConexoes } from "./PecasDoConceito";
 import { OMotor } from "./OMotor";
 import { OPassoContido } from "./OPassoContido";
@@ -58,7 +59,11 @@ export function LandingPage({ onEntrar }: LandingPageProps) {
       <header style={headerEstilo}>
         <strong style={{ fontSize: 16, color: "var(--texto)" }}>Gerador de Itens</strong>
         <div style={{ flex: 1 }} />
-        <button onClick={onEntrar} style={botaoEntrarEstilo}>
+        {/* SPEC-93 — o tema também ANTES do login: quem chega pela landing pode
+            preferir claro, e mandá-la entrar para poder escolher seria pedir
+            uma credencial em troca de conforto de leitura. */}
+        <SeletorDeTema />
+        <button onClick={onEntrar} style={{ ...botaoEntrarEstilo, marginLeft: 10 }}>
           Entrar
         </button>
       </header>
@@ -187,8 +192,8 @@ const botaoEntrarEstilo: React.CSSProperties = {
   fontWeight: 600,
   padding: "8px 16px",
   borderRadius: 7,
-  border: "1px solid #4f46e5",
-  background: "#4f46e5",
+  border: "1px solid var(--acento-gente)",
+  background: "var(--acento-gente)",
   color: "#fff",
   cursor: "pointer",
 };

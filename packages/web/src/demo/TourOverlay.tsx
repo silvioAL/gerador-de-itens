@@ -124,7 +124,7 @@ export function TourOverlay({
             width: rect.width + 12,
             height: rect.height + 12,
             borderRadius: 12,
-            border: "2px solid #4f46e5",
+            border: "2px solid var(--acento-gente)",
             boxShadow: "0 0 0 9999px rgba(15, 23, 42, 0.55)",
             pointerEvents: "none",
             zIndex: 80,
@@ -162,7 +162,7 @@ export function TourOverlay({
               key={`${indice}-${(pausado || segurado) ? "p" : "r"}`}
               style={{
                 height: "100%",
-                background: "#4f46e5",
+                background: "var(--acento-gente)",
                 width: (pausado || segurado) ? "100%" : "0%",
                 opacity: (pausado || segurado) ? 0.35 : 1,
                 transition: (pausado || segurado) ? "none" : `width ${duracao ?? 0}ms linear`,
@@ -178,7 +178,7 @@ export function TourOverlay({
           </div>
         )}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#a5b4fc", letterSpacing: 0.3 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--acento-gente-texto)", letterSpacing: 0.3 }}>
             PASSO {indice + 1} DE {total}
           </div>
           <div style={{ flex: 1 }} />
@@ -217,8 +217,8 @@ const botaoEstilo: React.CSSProperties = {
   fontWeight: 600,
   padding: "7px 14px",
   borderRadius: 7,
-  border: "1px solid #4f46e5",
-  background: "#4f46e5",
+  border: "1px solid var(--acento-gente)",
+  background: "var(--acento-gente)",
   color: "#fff",
   cursor: "pointer",
 };

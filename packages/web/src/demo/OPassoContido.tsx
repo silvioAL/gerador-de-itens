@@ -67,19 +67,19 @@ export function OPassoContido() {
         <path d={CAMINHO} stroke="var(--borda)" strokeWidth={2} strokeDasharray="5 6" fill="none" />
 
         {/* A origem: a IA. */}
-        <circle cx={62} cy={66} r={30} fill="var(--painel-alto, rgba(99,102,241,.08))" stroke="#6366f1" strokeWidth={2} />
+        <circle cx={62} cy={66} r={30} fill="var(--painel-alto, rgba(99,102,241,.08))" stroke="var(--acento-indigo)" strokeWidth={2} />
         <text x={62} y={70} textAnchor="middle" style={{ fontSize: 13, fontWeight: 700, fill: "var(--texto)" }}>
           IA
         </text>
 
         {/* O PORTÃO, no meio do caminho. É o objeto mais importante do desenho, e
             por isso tem peso: linha cheia, cor de gente. */}
-        <line x1={266} y1={30} x2={266} y2={102} stroke="#4f46e5" strokeWidth={3} strokeLinecap="round" />
-        <text x={266} y={22} textAnchor="middle" style={{ fontSize: 10.5, fontWeight: 700, fill: "#a5b4fc" }}>
+        <line x1={266} y1={30} x2={266} y2={102} stroke="var(--acento-gente)" strokeWidth={3} strokeLinecap="round" />
+        <text x={266} y={22} textAnchor="middle" style={{ fontSize: 10.5, fontWeight: 700, fill: "var(--acento-gente-texto)" }}>
           alguém confirma
         </text>
         <g className="passo-contido-carimbo">
-          <circle cx={266} cy={116} r={9} fill="#4f46e5" />
+          <circle cx={266} cy={116} r={9} fill="var(--acento-gente)" />
           <text x={266} y={120} textAnchor="middle" style={{ fontSize: 11, fontWeight: 700, fill: "#fff" }}>
             ✓
           </text>
@@ -99,7 +99,7 @@ export function OPassoContido() {
         <circle
           className="passo-contido-proposta"
           r={7}
-          fill="#6366f1"
+          fill="var(--acento-indigo)"
           style={{ offsetPath: `path("${CAMINHO}")`, offsetRotate: "0deg" }}
         />
       </svg>

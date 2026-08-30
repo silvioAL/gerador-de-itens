@@ -61,7 +61,7 @@ const linkEstilo: React.CSSProperties = {
   padding: 0,
   border: "none",
   background: "none",
-  color: "#a5b4fc",
+  color: "var(--acento-gente-texto)",
   cursor: "pointer",
 };
 
@@ -465,17 +465,17 @@ function CartaoDeSolicitacao({
       {ajuste.operacao ? (
         efeito && (efeito.previa.adicionados.length > 0 || efeito.previa.removidos.length > 0) ? (
           <details style={{ marginTop: 6 }}>
-            <summary style={{ fontSize: 11.5, color: "#a5b4fc", cursor: "pointer" }} data-testid={`ver-efeito-${ajuste.id}`}>
+            <summary style={{ fontSize: 11.5, color: "var(--acento-gente-texto)", cursor: "pointer" }} data-testid={`ver-efeito-${ajuste.id}`}>
               ver o efeito num item de {efeito.rotulo}
             </summary>
             <div style={{ marginTop: 6 }} data-testid={`efeito-${ajuste.id}`}>
               {efeito.previa.adicionados.map((l) => (
-                <p key={l} style={{ ...diffEstilo, color: "var(--verde, #3ecf8e)" }}>
+                <p key={l} style={{ ...diffEstilo, color: "var(--verde)" }}>
                   + {l.replace(/^- /, "")}
                 </p>
               ))}
               {efeito.previa.removidos.map((l) => (
-                <p key={l} style={{ ...diffEstilo, color: "var(--vermelho, #f87171)" }}>
+                <p key={l} style={{ ...diffEstilo, color: "var(--vermelho)" }}>
                   − {l.replace(/^- /, "")}
                 </p>
               ))}
@@ -1230,7 +1230,7 @@ function EstudioDeAjuste({
                   return (
                     <li
                       key={c.key}
-                      style={entrando ? { color: "var(--verde, #3ecf8e)" } : undefined}
+                      style={entrando ? { color: "var(--verde)" } : undefined}
                       data-testid={entrando ? "ficha-campo-novo" : "ficha-campo"}
                     >
                       {entrando ? "+ " : ""}
@@ -1242,7 +1242,7 @@ function EstudioDeAjuste({
                 {(previaDaFicha?.removidos ?? []).map((c) => (
                   <li
                     key={c.key}
-                    style={{ color: "var(--vermelho, #f87171)", textDecoration: "line-through" }}
+                    style={{ color: "var(--vermelho)", textDecoration: "line-through" }}
                     data-testid="ficha-campo-removido"
                   >
                     {c.label}
@@ -1299,12 +1299,12 @@ function EstudioDeAjuste({
               ) : (
                 <div style={{ marginBottom: 10 }}>
                   {previa.adicionados.map((l) => (
-                    <p key={l} style={{ ...diffEstilo, color: "var(--verde, #3ecf8e)" }} data-testid="previa-adicionado">
+                    <p key={l} style={{ ...diffEstilo, color: "var(--verde)" }} data-testid="previa-adicionado">
                       + {l.replace(/^- /, "")}
                     </p>
                   ))}
                   {previa.removidos.map((l) => (
-                    <p key={l} style={{ ...diffEstilo, color: "var(--vermelho, #f87171)" }} data-testid="previa-removido">
+                    <p key={l} style={{ ...diffEstilo, color: "var(--vermelho)" }} data-testid="previa-removido">
                       − {l.replace(/^- /, "")}
                     </p>
                   ))}

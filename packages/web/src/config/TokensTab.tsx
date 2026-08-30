@@ -131,7 +131,7 @@ export function TokensTab({ demonstracao }: TokensTabProps = {}) {
           data-testid="tokens-colar-claro"
           value={colado}
           onChange={(e) => setColado(e.target.value)}
-          placeholder='{ "cor": { "fundo": { "$value": "#ffffff", "$type": "color" } } }'
+          placeholder='{ "cor": { "fundo": { "$value": "var(--branco)", "$type": "color" } } }'
           style={area}
         />
         <textarea
@@ -241,8 +241,8 @@ const botao: React.CSSProperties = {
   fontWeight: 600,
   padding: "6px 12px",
   borderRadius: 7,
-  border: "1px solid #4f46e5",
-  background: "#4f46e5",
+  border: "1px solid var(--acento-gente)",
+  background: "var(--acento-gente)",
   color: "#fff",
   cursor: "pointer",
 };

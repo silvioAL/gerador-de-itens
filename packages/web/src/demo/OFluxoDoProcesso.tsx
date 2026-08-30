@@ -158,7 +158,7 @@ export function OFluxoDoProcesso() {
                 height={ALTURA_FASE}
                 rx={10}
                 fill="var(--painel)"
-                stroke={fase === "volta" ? "#6366f1" : "var(--borda)"}
+                stroke={fase === "volta" ? "var(--acento-indigo)" : "var(--borda)"}
                 strokeWidth={fase === "volta" ? 2 : 1}
               />
               <text x={centro} y={TOPO_FASES + 20} textAnchor="middle" style={{ fontSize: 11.5, fontWeight: 700, fill: "var(--texto)" }}>
@@ -255,7 +255,7 @@ export function OFluxoDoProcesso() {
         <path
           d={`M ${LARGURA - 44} ${TOPO_FASES + ALTURA_FASE + 6} L ${LARGURA - 44} ${TOPO_FASES + ALTURA_FASE + 26} L ${COLUNA_RAIA + 40} ${TOPO_FASES + ALTURA_FASE + 26} L ${COLUNA_RAIA + 40} ${TOPO_FASES + ALTURA_FASE + 6}`}
           fill="none"
-          stroke="#6366f1"
+          stroke="var(--acento-indigo)"
           strokeWidth={2}
           markerEnd="url(#seta-indigo)"
         />
@@ -267,7 +267,7 @@ export function OFluxoDoProcesso() {
           x={COLUNA_RAIA + LARGURA_FASES / 2}
           y={TOPO_FASES + ALTURA_FASE + 42}
           textAnchor="middle"
-          style={{ fontSize: 9.5, fill: "#a5b4fc" }}
+          style={{ fontSize: 9.5, fill: "var(--acento-gente-texto)" }}
         >
           o que se aprende usando vira ajuste na camada perene — e muda o próximo desenho
         </text>
@@ -277,13 +277,13 @@ export function OFluxoDoProcesso() {
             <path d="M0,0 L6,3 L0,6 Z" fill="var(--texto-fraco)" />
           </marker>
           <marker id="seta-indigo" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-            <path d="M0,0 L6,3 L0,6 Z" fill="#6366f1" />
+            <path d="M0,0 L6,3 L0,6 Z" fill="var(--acento-indigo)" />
           </marker>
           <marker id="seta-verde" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-            <path d="M0,0 L6,3 L0,6 Z" fill="var(--verde, #3ecf8e)" />
+            <path d="M0,0 L6,3 L0,6 Z" fill="var(--verde)" />
           </marker>
           <marker id="seta-fraca" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-            <path d="M0,0 L6,3 L0,6 Z" fill="var(--texto-mudo, #94a3b8)" />
+            <path d="M0,0 L6,3 L0,6 Z" fill="var(--texto-mudo)" />
           </marker>
         </defs>
       </svg>

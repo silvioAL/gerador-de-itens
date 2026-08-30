@@ -22,7 +22,7 @@ const ETAPAS: Etapa[] = [
   },
   {
     numero: 3,
-    cor: "#6366f1",
+    cor: "var(--acento-indigo)",
     titulo: "Derivar",
     texto:
       "O motor transforma o desenho em itens de trabalho reais, e não sai só um tipo: um item por componente, um por conexão, um para cada padrão do time que o desenho contraria, e um para cada caminho que estoura a régua acordada. As dependências entre eles vêm das arestas — calculadas, não digitadas. O mesmo desenho sempre produz os mesmos itens, e a chave de cada um é estável: rederivar depois de mudar uma coisa não perde o que você já escreveu.",

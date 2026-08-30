@@ -424,7 +424,7 @@ describe("ReviewScreen — filtro por nó no diagrama compacto (Fase D, SPEC-24)
 
     // O destaque usa a cor do PRÓPRIO tipo do nó (fiel ao protótipo); este
     // config de teste não define cores, então cai no fallback cinza — o que
-    // importa é ter saído do traço de repouso (#263344).
+    // importa é ter saído do traço de repouso (var(--borda-forte)).
     const noAtivo = screen.getByTestId("diagrama-compacto-no-n3").querySelector("rect");
     expect(noAtivo?.getAttribute("stroke")).toBe("#64748b");
   });

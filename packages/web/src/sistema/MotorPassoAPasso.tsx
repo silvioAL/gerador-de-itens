@@ -143,7 +143,7 @@ export function MotorPassoAPasso({ exemplo, demonstracao, intervaloMs = 1600, on
               // transformaria a cadeia em quatro fatos soltos, que é o formato
               // que esta tela existe para não ser.
               opacity: i === ativo ? 1 : 0.45,
-              borderColor: i === ativo ? "#4f46e5" : "var(--borda)",
+              borderColor: i === ativo ? "var(--acento-gente)" : "var(--borda)",
               transition: "opacity .35s ease, border-color .35s ease",
             }}
           >
@@ -186,6 +186,6 @@ const linkEstilo: React.CSSProperties = {
   marginTop: 6,
   border: "none",
   background: "none",
-  color: "#a5b4fc",
+  color: "var(--acento-gente-texto)",
   cursor: "pointer",
 };

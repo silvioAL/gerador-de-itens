@@ -403,7 +403,7 @@ const fundoEstilo: React.CSSProperties = {
   inset: 0,
   zIndex: 55,
   overflow: "auto",
-  background: "var(--fundo, #0b1220)",
+  background: "var(--fundo)",
   fontFamily: "system-ui, sans-serif",
 };
 
@@ -468,7 +468,7 @@ const linkEstilo: React.CSSProperties = {
   padding: 0,
   border: "none",
   background: "none",
-  color: "#a5b4fc",
+  color: "var(--acento-gente-texto)",
   cursor: "pointer",
   textAlign: "left",
 };

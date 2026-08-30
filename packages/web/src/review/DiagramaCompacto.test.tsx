@@ -14,7 +14,7 @@ function eventoPonteiro(tipo: string, props: Record<string, unknown>) {
 
 const config: DiagramaConfig = {
   nodeTypes: {
-    service: { label: "Serviço", derives: "service", techs: [], contextos: [], spec: [], color: "#38bdf8" },
+    service: { label: "Serviço", derives: "service", techs: [], contextos: [], spec: [], color: "var(--acento)" },
     rabbit: { label: "Fila Rabbit", derives: "queue", techs: [], contextos: [], spec: [], color: "#f59e0b" },
   },
   edgeTypes: { publishes: { label: "publica", color: "#94a3b8" } },
@@ -44,7 +44,7 @@ describe("DiagramaCompacto (Fase 1d, SPEC-23)", () => {
     // n2 é rabbit (#f59e0b) — a borda e o drop-shadow herdam essa cor.
     expect(ativo?.getAttribute("stroke")).toBe("#f59e0b");
     expect(grupoAtivo.style.filter).toContain("#f59e0b");
-    expect(inativo?.getAttribute("stroke")).toBe("#263344");
+    expect(inativo?.getAttribute("stroke")).toBe("var(--borda-forte)");
   });
 
   it("card mostra o TIPO do nó (e a marca EXISTENTE quando for o caso), como no protótipo", () => {
@@ -62,7 +62,7 @@ describe("DiagramaCompacto (Fase 1d, SPEC-23)", () => {
       ...config,
       nodeTypes: {
         ...config.nodeTypes,
-        batch: { label: "Serviço de Batch (Spring Batch)", derives: "service", techs: [], contextos: [], spec: [], color: "#38bdf8" },
+        batch: { label: "Serviço de Batch (Spring Batch)", derives: "service", techs: [], contextos: [], spec: [], color: "var(--acento)" },
       },
     };
     const diag: Diagrama = {
@@ -81,7 +81,7 @@ describe("DiagramaCompacto (Fase 1d, SPEC-23)", () => {
   it("aresta colorida pela cor do nó de origem, com o rótulo da conexão em caps no meio", () => {
     render(<DiagramaCompacto diagrama={diagrama} config={config} />);
     const aresta = screen.getByTestId("diagrama-aresta-e1");
-    expect(aresta.getAttribute("stroke")).toBe("#38bdf8"); // cor de n1 (service), a origem
+    expect(aresta.getAttribute("stroke")).toBe("var(--acento)"); // cor de n1 (service), a origem
     expect(screen.getByText("PUBLICA")).toBeInTheDocument();
   });
 

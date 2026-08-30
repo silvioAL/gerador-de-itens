@@ -545,7 +545,7 @@ const statusBotaoEstilo: React.CSSProperties = {
 
 const linkBotaoEstilo: React.CSSProperties = {
   fontSize: 11,
-  color: "#a5b4fc",
+  color: "var(--acento-gente-texto)",
   background: "none",
   border: "none",
   cursor: "pointer",

@@ -239,8 +239,8 @@ const botaoEstilo: React.CSSProperties = {
   fontWeight: 600,
   padding: "7px 12px",
   borderRadius: 7,
-  border: "1px solid #4f46e5",
-  background: "#4f46e5",
+  border: "1px solid var(--acento-gente)",
+  background: "var(--acento-gente)",
   color: "#fff",
   cursor: "pointer",
 };
@@ -252,7 +252,7 @@ const botaoSecundarioEstilo: React.CSSProperties = {
   borderRadius: 7,
   border: "1px solid rgba(99, 102, 241, 0.45)",
   background: "var(--painel)",
-  color: "#a5b4fc",
+  color: "var(--acento-gente-texto)",
   cursor: "pointer",
 };
 

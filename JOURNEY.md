@@ -14619,3 +14619,120 @@ passo específico fica pendente, e não vou chamá-la de feita.
 
 609 engine · 133 llm · 122 aplicação · 915 web · 311 server · 42 gateway-falso ·
 113/113 E2E · build, typecheck e lint limpos.
+
+## §340 — o modo claro, e as cores que o varredor de hex não alcançava (SPEC-93)
+
+O usuário pediu: *"implemente o modo branco, assim ficamos com o atual como dark
+e o branco"* — e, quando perguntei qual dos dois seria o padrão: *"o usuário
+decide qual agrada mais."* São três estados, então: `sistema` (o padrão, que segue
+`prefers-color-scheme`), `claro` e `escuro`.
+
+### A medição que definiu o tamanho da rodada
+
+`styles.css` tinha **um `:root` só**, com 14 variáveis. Capturas em `colorScheme`
+claro e escuro saem byte a byte idênticas: o tema claro não estava escondido, ele
+não existia.
+
+Mas o obstáculo não era o `:root`. Varrendo `packages/web/src`:
+
+| O que | Ocorrências |
+|---|---|
+| Hex que era **cópia literal** de uma variável existente | **147** |
+| Hex **sem variável** nenhuma | **165** |
+
+`#1b2533` (que é `--borda`) aparecia 22 vezes; `#4f46e5`, o indigo de "escrito por
+gente", 64 vezes em 26 arquivos. **Trocar o `:root` sem mexer nisso deixaria 312
+lugares escuros dentro de um tema claro.** Daí a ordem: tokenizar primeiro, e a
+paleta como consequência.
+
+### O que a stack real pegou e a varredura não
+
+Depois de 220 substituições e de os 916 testes do pacote passarem, abri o produto
+no tema claro. O minimapa do canvas era um **bloco quase preto** no canto de uma
+tela branca.
+
+A causa: `maskColor="rgba(12, 17, 26, 0.72)"`. É o `--fundo` escuro — escrito em
+`rgba()`. **Meu varredor só conhecia `#rrggbb`.** O mesmo valia para o fundo da
+legenda do diagrama compacto.
+
+É a §5.2 da própria SPEC-93 se cumprindo (*"o canvas do React Flow é o lugar mais
+provável de sobrar escuro"*) — mas ela acertou o lugar pelo motivo errado: não foi
+o tema próprio do pacote, foi notação de cor que eu não tinha procurado.
+
+### A trava, e por que ela precisou de dois critérios
+
+`tema/corFixa.test.ts` — e escrevê-la foi a parte que mais achou coisa:
+
+1. **Regra 1** — nenhum hex do código pode repetir um valor já declarado. Achou
+   três, sendo um `#0C111A` em maiúscula, que o script case-sensitive tinha pulado.
+2. **Regra 2** — o que pinta superfície aponta para variável. A primeira versão
+   reprovava **toda** cor crua e veio com 37 achados, quase todos
+   `rgba(<acento>, 0.14)`: uma *lavagem* translúcida sobre o painel, que funciona
+   nos dois temas justamente porque deixa o tema de baixo mandar.
+
+   O critério certo não é a notação, é a **densidade**: acima de 25% de opacidade
+   a cor deixa de deixar o tema passar e passa a impô-lo. Com isso a lista caiu
+   para o que era defeito de verdade — e os dois casos originais (`0.72` e `0.7`)
+   continuam vermelhos.
+
+A trava também tinha um vão que ela mesma revelou: `fill=` de SVG pinta superfície
+igual a `background`, e o diagrama compacto é SVG. Ao incluir `fill`/`stroke`,
+apareceram um card `#151b28` e um rastro `#e0f2fe` — invisível sobre branco.
+
+### As quatro variáveis que nunca existiram
+
+Havia 50 usos de `var(--x, #hex)`. O fallback é código morto quando a variável
+existe — e um landmine, porque guarda o valor **escuro**. Removi os 50; antes,
+conferi que cada nome estava declarado.
+
+**Quatro não estavam:** `--dim`, `--mist`, `--laranja` e `--acento-claro`. Nesses,
+quem pintava era o fallback, e ninguém sabia. `--dim` e `--mist` eram nomes do
+protótipo cujo valor era cópia exata de `--texto-fraco` e `--texto-2`; os outros
+dois viraram variáveis de verdade, com tom próprio no claro.
+
+Foi a asserção antes do replace que pegou isso — o §338 de novo, em outra forma.
+
+### O que ficou escuro de propósito
+
+Oito arquivos têm `rgba` densa e continuam assim: são **véus de modal**. Escurecer
+o que está atrás de um diálogo é o comportamento certo nos dois temas — um véu
+claro sobre conteúdo claro não separa nada. A lista está no teste, por arquivo e
+com o motivo, e há um caso que falha se uma entrada dela virar letra morta.
+
+Mesma coisa para as quatro cores do "G" do Google no botão de login: mudar a cor
+de uma marca de outro por causa do nosso tema seria falsificá-la.
+
+### A paleta é provada pela régua que o produto cobra dos outros
+
+A SPEC-79 construiu `contraste()` para o motor cobrar contraste no design system
+**do time**. A paleta clara passa pela mesma função: 10 pares × 2 temas, 4,5:1
+para texto e 3:1 para os cinzas de apoio, com o teste dizendo qual par usou qual.
+Um produto que mede o contraste dos outros e não mede o próprio é a incoerência
+que o §327 e o §328 já pegaram em outras formas.
+
+### Um detalhe que só apareceu porque olhei
+
+`nodeColor="var(--borda-forte)"` no minimapa: no escuro mostra os nós, no claro
+some — `--borda-forte` existe para separar superfícies vizinhas, e sobre o branco
+do minimapa ele é branco. Virou `--texto-mudo`, que aparece nos dois. O minimapa
+existe para **mostrar** os nós.
+
+### Dois achados que eu vi e NÃO consertei
+
+Digo em voz alta em vez de deixar passar:
+
+1. O botão "Carregar na mesa de projeto" tem `aria-label="Carregar cenário: X"`,
+   que **substitui** o texto visível. Meus localizadores falharam três vezes por
+   isso — e um leitor de tela anuncia coisa diferente do que está escrito.
+2. Num time recém-criado, derivar traz oito avisos de `HTTP 401` do gateway. Não
+   é desta rodada (só mexi em cor), mas é o mesmo tipo de coisa que o §339 tratou
+   no tour, agora na tela de revisão.
+
+### Verificação
+
+Contra a stack real, no tema claro: landing, login, entrada de time, canvas com
+nós, modal de cenários e a tela de revisão com o diagrama compacto. E o escuro
+conferido depois das 220 substituições, para provar que ele não mudou.
+
+609 engine · 133 llm · 122 aplicação · 949 web · 311 server · 42 gateway-falso ·
+113/113 E2E · build, typecheck e lint limpos.

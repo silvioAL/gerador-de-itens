@@ -82,7 +82,7 @@ export function SpecScreen({
          * spec para dar a um agente precisa ver o número ANTES do clique. É a
          * mesma escolha do §313, do lado do documento.
          */}
-        <span data-testid="lacunas-da-spec" style={{ fontSize: 11.5, color: lacunas > 0 ? "var(--amarelo, #eab308)" : "var(--texto-fraco)" }}>
+        <span data-testid="lacunas-da-spec" style={{ fontSize: 11.5, color: lacunas > 0 ? "var(--amarelo)" : "var(--texto-fraco)" }}>
           {lacunas === 0 ? "nenhuma lacuna" : `✍️ ${lacunas} a especificar`}
         </span>
         <button onClick={onBaixarMarkdown} style={botaoEstilo} data-testid="baixar-spec">

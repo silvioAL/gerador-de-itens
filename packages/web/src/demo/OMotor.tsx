@@ -24,7 +24,7 @@ export function OMotor() {
       data-testid="explicacao-do-motor"
       style={{
         border: "1px solid var(--borda)",
-        borderLeft: "3px solid #6366f1",
+        borderLeft: "3px solid var(--acento-indigo)",
         borderRadius: 12,
         padding: "14px 16px",
         marginBottom: 22,

@@ -1031,7 +1031,7 @@ const acaoEstilo: React.CSSProperties = {
   borderRadius: 6,
   border: "1px solid transparent",
   background: "none",
-  color: "#a5b4fc",
+  color: "var(--acento-gente-texto)",
   cursor: "pointer",
   whiteSpace: "nowrap",
 };
