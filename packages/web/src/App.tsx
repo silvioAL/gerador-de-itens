@@ -92,7 +92,9 @@ import { AvisosDaDerivacao } from "./summary/AvisosDaDerivacao";
 import { baixarArquivoTexto } from "./persistence/baixarArquivo";
 import { SpecScreen } from "./spec/SpecScreen";
 import { PainelDeVariantes } from "./variante/PainelDeVariantes";
-import { LandingPage } from "./demo/LandingPage";
+import { Site } from "./site/Site";
+import { CAPA } from "./site/paginas";
+import { useRotaDoSite } from "./site/useRotaDoSite";
 import { EscolherTimeScreen } from "./auth/EscolherTimeScreen";
 import { lembrarTime, lerTimeLembrado } from "./auth/timeLembrado";
 import { SemTimeScreen } from "./auth/SemTimeScreen";
@@ -118,6 +120,9 @@ function lerTokenConviteDaUrl(): string | null {
  */
 export function App() {
   const { sessao, modo, erro, expirou, entrar, sair } = useSessao();
+  /** SPEC-95 fatia A — a página pública, se o hash for de uma. `null` quando o
+   *  endereço é do app, e aí quem decide é o resto desta função. */
+  const paginaPublica = useRotaDoSite();
   const [tokenConvite] = useState<string | null>(() => lerTokenConviteDaUrl());
   const [aceitandoConvite, setAceitandoConvite] = useState(false);
   const [erroConvite, setErroConvite] = useState<string | null>(null);
@@ -171,6 +176,33 @@ export function App() {
     window.location.href = window.location.pathname;
   }, []);
 
+  /**
+   * Entrar a partir de uma página do site.
+   *
+   * O hash precisa sair primeiro: sem isso a pessoa clica "Entrar" em
+   * `#/site/arquitetura`, o estado muda, e ela continua vendo o site — porque o
+   * espaço público é resolvido antes de tudo, logo abaixo.
+   */
+  const entrarPeloSite = useCallback(() => {
+    window.location.hash = "";
+    setMostrarLogin(true);
+  }, []);
+
+  /**
+   * SPEC-95 fatia A (§342) — **o espaço público decide primeiro.**
+   *
+   * `#/site/…` é resolvido **antes** de verificar sessão: quem abre
+   * `#/site/arquitetura` vindo de um link recebe a página, e não a tela
+   * "Verificando sessão…". Saber se há sessão é detalhe de um botão do canto,
+   * não pré-requisito do conteúdo — e uma página pública que espera rede para
+   * aparecer é uma página pública pela metade.
+   *
+   * Vale logado também: quem já entrou pode querer ler a página de segurança sem
+   * sair do produto, e o botão vira "Ir para o app".
+   */
+  if (paginaPublica) {
+    return <Site pagina={paginaPublica} onEntrar={entrarPeloSite} temSessao={!!sessao} />;
+  }
   if (sessao === undefined) {
     return <div style={telaCentralizadaEstilo}>Verificando sessão…</div>;
   }
@@ -178,12 +210,13 @@ export function App() {
     return <div style={telaCentralizadaEstilo}>Aceitando convite…</div>;
   }
   if (sessao === null) {
-    // §267 — quem teve a sessão expirada NÃO volta para a landing: ela é para
-    // quem está chegando, e mandar alguém que estava trabalhando ler a página
-    // de vendas esconde a única informação que importa naquele momento (que é
-    // só entrar de novo).
+    // §267 — quem teve a sessão expirada NÃO volta para o site: ele é para quem
+    // está chegando, e mandar alguém que estava trabalhando ler a página de
+    // vendas esconde a única informação que importa naquele momento (que é só
+    // entrar de novo).
     if (!tokenConvite && !mostrarLogin && !expirou) {
-      return <LandingPage onEntrar={() => setMostrarLogin(true)} />;
+      // Sem hash nenhum e sem sessão: a capa. É o endereço de quem chega.
+      return <Site pagina={CAPA} onEntrar={() => setMostrarLogin(true)} />;
     }
     return <LoginScreen erro={erro} modo={modo} aceitandoConvite={!!tokenConvite} onEntrar={entrar} />;
   }

@@ -14916,3 +14916,137 @@ diagnóstico de maturidade como feature de produto, não só narrativa):
 609 engine · 133 llm · 122 aplicação · 953 web · 311 server · 42 gateway-falso ·
 121/121 E2E · build, typecheck e lint limpos. Verificado contra `:8080` nos dois
 temas, e em 360/768/1440.
+
+## §342 — o site em páginas, e o erro de leitura que a §341 tinha (SPEC-95)
+
+O usuário, depois de receber a landing virada apresentação:
+
+> *"quanto a estar ficando longo estava me referindo a ser reorganizada em mais
+> páginas, eventualmente com menu próprio. Ainda me parece distante de uma página
+> que entro para comprar um software profissional caro… está muito simples,
+> podemos incrementar bastante."*
+
+### O erro, e por que ele não era de acabamento
+
+A §341 leu *"está ficando longa"* como excesso numa página só, e respondeu com
+âncoras internas. **Estava errado.** A diferença entre âncora e página é de
+arquitetura:
+
+| | Âncora (`#o-ciclo`) | Página (`#/site/o-ciclo`) |
+|---|---|---|
+| endereço | rola dentro de um documento | **é um destino** |
+| carga | traz a página inteira junto | traz o assunto |
+| crescer | a página fica mais longa | **nasce outra página** |
+
+A última linha é a que decide: com âncoras, todo conteúdo novo que a SPEC-94
+trouxer **pioraria** o problema relatado.
+
+### O que a mudança fez com o número
+
+| | §341 | §342 |
+|---|---|---|
+| Capa | 4800 px · 5,3 telas | **1017 px · 1,1 tela** |
+| Maior página | — | 2758 px (arquitetura, densa de propósito) |
+| Média das seis | — | ~1470 px |
+
+**É a primeira vez nesta série que *"está ficando longa"* tem uma prova numérica
+que o atende.** A §341 tinha entregue saída; esta entregou o encurtamento.
+
+### As decisões que tomei sozinho, e por quê
+
+O usuário se ausentou. Digo cada uma em voz alta:
+
+1. **Cinco páginas, não as nove que a SPEC-95 §2.1 listou.** A barra de cinco já
+   rola em 360 px (§341). Arquitetura e segurança viraram uma — quem pergunta *"o
+   que roda onde?"* é quem pergunta *"quem pode ver o quê?"*. E `o-metodo` e
+   `a-maturidade` ficaram de fora porque dependem da SPEC-94, que não está
+   implementada: **item de menu para conteúdo que não existe é a versão de
+   navegação da promessa falsa que a SPEC-76 impede.**
+
+2. **Aposentei o caminho curto** (*"ver em 60 segundos"*), que a §341 tinha
+   construído. A SPEC-95 fatia E deixava a decisão em aberto, e a razão dela vale:
+   **manter dois mecanismos de percurso é o §263 esperando acontecer.** Num site,
+   o menu e o *"a seguir →"* do rodapé já são o percurso — e um botão que troca de
+   página sozinho não é rolagem suave, é sequestro de navegação.
+
+3. **Apaguei o que ficou órfão:** `LandingPage`, `atos.ts`, `MolduraDoAto`,
+   `NavegacaoDosAtos`, `useCaminhoCurto`, `useAncoraInicial`. Deixar componente
+   sem dono é o que a trava *"o `OMotor` tem UMA casa"* existe para impedir, e
+   valeria contra mim.
+
+4. **O `h1` de cada página é a PERGUNTA**, não o nome. As páginas de conteúdo não
+   tinham `h1` nenhum — as peças trazem `h2` e o chapéu é rótulo —, e um documento
+   sem `h1` não tem nome para quem navega por cabeçalhos. Usar o nome colidiria:
+   *"O ciclo"* e *"O ciclo, e onde a IA entra"* abrem igual, que é o defeito do
+   §333 reconstruído uma vez por página.
+
+5. **O teto de prosa passou a ser por página**, com 120 de padrão, 220 na capa
+   (que apresenta cinco resumos) e 950 na arquitetura (que **é** prosa autoral —
+   ela não emoldura peça nenhuma). Escolhas, não medições, e ditas como escolhas.
+
+### A ideia que dá a densidade pedida: a página cita a prova
+
+O usuário escolheu **profundidade técnica** em vez de capturas de tela ou preço. A
+página de arquitetura afirma seis coisas e, ao lado de cada uma, **o arquivo que a
+sustenta** — `documentoNaoMuda.test.ts` para o determinismo,
+`permissoes.cobertura.test.ts` para o RBAC, `paleta.contraste.test.ts` para a
+régua visual.
+
+Quase nenhuma landing pode fazer isso, e a razão é boa: **se a prova sumir, a
+suíte cai no mesmo commit.** É a régua da SPEC-76 virada argumento de venda.
+
+O que ela **não** faz é despejar *"2.173 testes!"*. Quantidade de teste não é
+qualidade de produto, e quem avalia sabe.
+
+### A trava que pegou o próprio autor, no commit em que nasceu
+
+`toda PROVA citada existe no repositório` ficou vermelha na primeira execução: eu
+tinha renomeado `landing.travas.test.tsx` para `site.travas.test.tsx` **e citado o
+nome velho**. Uma citação quebrada seria pior que nenhuma — seria uma promessa
+falsa *sobre o mecanismo de não fazer promessas falsas*, que é justamente o
+argumento da página.
+
+### Três defeitos que só o pixel pegou
+
+Nenhum apareceria em `textContent`:
+
+1. **O azul do browser no meio da paleta.** Os cartões da capa são `<a>` sem
+   `color`, e um `<a>` sem cor herda `rgb(0,0,238)` no claro e `rgb(158,158,255)`
+   no escuro — **do agente de usuário, não do tema**. Os filhos tinham cor
+   própria, então o texto principal estava certo; qualquer coisa acrescentada
+   depois sairia azul-Netscape. **A trava de `corFixa.test.ts` não pega isto**: ela
+   procura cor escrita no código, e esta não está escrita em lugar nenhum. Achado
+   com `getComputedStyle` contra a stack.
+2. **A capa terminava com o convite de última página.** `findIndex` devolve `-1`
+   para ela, e o `-1` caía no ramo do "não há próxima" — quem chegava ao fim da
+   capa não recebia por onde começar, que é a única coisa que uma capa dá.
+3. **As páginas sem `h1`** (acima).
+
+### Dois erros meus, nos testes
+
+- **Li a variável CSS antes de navegar.** `alturaDoCabecalho` rodava em
+  `about:blank`, onde não há folha de estilo: o teste falhava com `NaN` acusando
+  uma variável que está declarada.
+- **`pagina-do-ciclo.spec.ts` esperava o ciclo na raiz.** Ele prova coisas que
+  continuam valendo — que o ciclo é público, que a contagem sai do dado, que o
+  desdobramento abre. **Mudou o endereço, não a régua**, e foi isso que editei.
+
+### O que NÃO foi feito
+
+- **A demanda real ponta a ponta**, que é a minha recomendação de maior valor e
+  não depende de código. Continua sendo o primeiro item.
+- **SPEC-94** (método de quebra e maturidade) e o resto da **SPEC-96**. As duas
+  páginas que faltam no menu são delas.
+- **URL limpa, sem `#`.** Fica a dívida consciente registrada na SPEC-95 §2.2:
+  rota com hash **não é indexada por buscador**, e para um produto que quer ser
+  achado isso importa. A saída é uma linha no `Caddyfile` mais um `basename`.
+- **Leitor de tela de verdade.** `aria-current="page"`, `aria-labelledby` e o `h1`
+  por página estão no código e no teste; ninguém ouviu o site.
+- **Ninguém de fora leu as páginas.** A régua dos dois públicos (SPEC-95 §1.1) foi
+  aplicada na escrita — abertura sem jargão, depois o mecanismo — e **não foi
+  verificada com uma pessoa**. É o tipo de coisa que só a leitura de alguém prova,
+  e é a primeira que eu faria com o usuário presente.
+
+609 engine · 133 llm · 122 aplicação · 956 web · 311 server · 42 gateway-falso ·
+125/125 E2E · build, typecheck e lint limpos. As seis páginas capturadas contra
+`:8080` nos dois temas, e o site inteiro medido em 360/768/1440.

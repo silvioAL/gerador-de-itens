@@ -840,27 +840,54 @@ html {
   gap: 10px;
 }
 
-/* O botão do caminho curto: encostado à direita, e inteiro. */
-.landing-cabecalho-navegacao > button {
-  flex: 0 0 auto;
-  margin-left: auto;
+/*
+  SPEC-95 (§342) — a MARCA do cabeçalho, que leva à capa.
+
+  Num site em páginas é o que se espera; numa página só, seria um link para o
+  topo — inútil, e por isso ela não existia no §341.
+*/
+.landing-marca {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--texto);
+  text-decoration: none;
+}
+.landing-marca:hover {
+  color: var(--acento-gente-texto);
+}
+.landing-marca:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 3px;
+  border-radius: 4px;
 }
 
 /*
-  As pontas do rótulo do caminho curto, que somem quando a tela aperta.
+  Os cartões da capa: eles são LINKS, e precisam parecer clicáveis sem parecer
+  botões. A borda muda no hover e no foco — a mesma disciplina do menu.
 
-  640 px é onde a barra das cinco partes começa a perder espaço para o botão —
-  não é um breakpoint de catálogo, é o ponto medido. Acima dele o rótulo é
-  inteiro; abaixo, sobram "60 segundos" e "Parar", que são subcadeias do inteiro
-  e por isso continuam dentro do nome acessível (WCAG 2.5.3).
+  ## O `color` não é decoração: é correção de um defeito medido
+
+  Um `<a>` sem `color` herda o azul do BROWSER, não o do tema — `rgb(0,0,238)` no
+  claro e `rgb(158,158,255)` no escuro. Os filhos aqui têm cor própria, então o
+  texto principal estava certo; mas qualquer coisa acrescentada ao cartão sem cor
+  explícita sairia azul-Netscape no meio da paleta.
+
+  A trava de `tema/corFixa.test.ts` não pega isto: ela procura cor fixa ESCRITA
+  no código, e esta não está escrita em lugar nenhum — é o padrão do agente de
+  usuário. Achado medindo `getComputedStyle` contra a stack (§342).
 */
-@media (max-width: 640px) {
-  /* Só no CABEÇALHO. O botão da capa não disputa espaço com nada, e lá "60
-     segundos" sozinho, ao lado de "Entrar", lê como um segundo destino em vez
-     de um convite — encolher o que não aperta é perder texto de graça. */
-  .landing-cabecalho .so-no-largo {
-    display: none;
-  }
+.capa-cartao,
+.landing-rodape a {
+  color: var(--texto-2);
+}
+
+.capa-cartao:hover {
+  border-color: var(--borda-forte);
+  background: var(--painel-alto);
+}
+.capa-cartao:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
 }
 
 .landing-ato {
