@@ -14,6 +14,11 @@ vi.mock("../api/client", () => ({
     decidirAjuste: vi.fn(),
     reconsiderarAjuste: vi.fn(),
     aplicarAjuste: vi.fn(),
+    /** SPEC-94 fatia Z. Sem esta entrada o mock quebrava a tela INTEIRA, e o
+     *  modo de falha vale registrar: `apiPdca.metricas(…).catch(…)` lança de
+     *  forma síncrona quando o método não existe — o `.catch` nem chega a ser
+     *  chamado. Foi assim que seis casos desta suíte caíram de uma vez. */
+    metricas: vi.fn(),
   },
   apiRegras: { obter: vi.fn() },
   apiCamposNo: { listar: vi.fn() },
@@ -64,6 +69,13 @@ beforeEach(() => {
   (apiPdca.config as Mock).mockResolvedValue({ cadenciaUsos: 5, cadenciaFeedback: 3 });
   (apiPdca.listarFeedback as Mock).mockResolvedValue([feedback]);
   (apiPdca.listarAjustes as Mock).mockResolvedValue([]);
+  /**
+   * SPEC-94 fatia Z. `vi.fn()` sem valor devolve `undefined`, e
+   * `undefined.catch(…)` lança de forma síncrona — derrubando o `recarregar`
+   * inteiro, e com ele toda a tela. É por isso que a ausência deste `mock`
+   * apagava seis casos que nada têm a ver com métricas.
+   */
+  (apiPdca.metricas as Mock).mockResolvedValue(null);
   (apiRegras.obter as Mock).mockResolvedValue(regras);
   (apiCamposNo.listar as Mock).mockResolvedValue([
     { id: "c1", timeId: "__global__", tipoNo: "fila", key: "nome", label: "Nome da fila", type: "text", required: true, ajuda: null },

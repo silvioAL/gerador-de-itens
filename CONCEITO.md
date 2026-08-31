@@ -223,10 +223,31 @@ Ganho sem mecanismo é promessa. A coluna da direita é obrigatória.
 | **A demanda não começa do zero** | a camada perene não se recola a cada vez — é onde o atrito cognitivo realmente mora |
 | **Seis meses depois dá para saber quem disse o quê** | proveniência por campo, e decisão com o que foi recusado |
 | **A régua da casa não fossiliza** | PDCA sobre a própria configuração |
+| **Times diferentes entregam do mesmo jeito** | a derivação é determinística e a configuração é da organização: dois times com desenhos equivalentes produzem itens com a mesma estrutura, sem combinar nada |
 
 O ganho que amarra os outros: **o conhecimento para de morar em pessoas e em
 conversas de IA, e passa a morar numa camada que dá para versionar, medir e
 discutir.**
+
+### O nivelamento entre times, e a válvula que ele exige
+
+A última linha da tabela é a única que fala do time **em relação a outro**, e ela
+é a que um diretor entende primeiro: se vários times trabalham dentro da mesma
+camada, as quebras deles ficam **niveladas** — mesma estrutura, mesmos campos
+obrigatórios, mesmos checklists por contexto.
+
+E o mecanismo não é adesão: **é o padrão ser o que produz o artefato.** O
+catálogo de stacks é da organização, não do time; o modelo do item é
+configuração; a derivação é determinística. A consistência não depende de
+ninguém lembrar do guia.
+
+> **Mas padronizar o que deve variar é o defeito clássico da governança
+> corporativa** — é o que faz um time inventar um caminho paralelo para dar conta
+> do trabalho. Por isso a saída existe e é registrada: **discordar de um padrão
+> é aceitar a exceção com motivo e autor, ou mudar a regra pelo ciclo.** Nunca
+> burlar em silêncio.
+>
+> Uniformidade sem essa válvula não é governança; é só rigidez com relatório.
 
 ## A régua desta página
 

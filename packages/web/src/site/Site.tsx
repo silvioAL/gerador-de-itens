@@ -4,6 +4,7 @@ import { OMotor } from "../demo/OMotor";
 import { OPassoContido } from "../demo/OPassoContido";
 import { CicloDoProduto } from "../demo/CicloDoProduto";
 import { OFluxoDoProcesso } from "../demo/OFluxoDoProcesso";
+import { TimesNivelados } from "../demo/TimesNivelados";
 import { MarcaDoSite, MenuDoSite } from "./MenuDoSite";
 import { PaginaArquitetura } from "./PaginaArquitetura";
 import { PaginaCapa } from "./PaginaCapa";
@@ -186,6 +187,12 @@ function ConteudoDaPagina({ pagina }: { pagina: PaginaDoSite }) {
           <AsCamadas />
           <OMotor />
           <OPassoContido />
+          {/* SPEC-94 §6.1 — o ganho que a página deixava passar: o que muda
+              quando VÁRIOS times trabalham dentro da mesma camada. Vem por
+              último porque é consequência das três acima — a camada existe, o
+              motor deriva dela, e a IA é contida; então o resultado é o mesmo
+              em qualquer time. */}
+          <TimesNivelados />
         </div>
       );
     case "o-ciclo":

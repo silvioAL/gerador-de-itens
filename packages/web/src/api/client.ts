@@ -1123,10 +1123,38 @@ export interface CadenciaPdca {
   mesesParaRevisarVolume?: number;
 }
 
+/**
+ * SPEC-94 fatia Z — o ciclo de configuração, medido.
+ *
+ * Os `null` são deliberados e a tela precisa respeitá-los: `null` é *"ainda não
+ * há o que medir"*, e `0` é uma afirmação. Trocar um pelo outro faz um conjunto
+ * vazio parecer um resultado bom.
+ */
+export interface MetricasDoCiclo {
+  solicitacoes: number;
+  porEstado: Record<string, number>;
+  horasAteDecisaoMediana: number | null;
+  pendentes: number;
+  diasDaEsperaMaisVelha: number | null;
+  taxaDeInvalidacao: number | null;
+  rejeitadasSemMotivo: number;
+  concentracaoPorRecurso: { recurso: string; total: number }[];
+  feedback: {
+    total: number;
+    porEstado: Record<string, number>;
+    conversaoEmAjuste: number | null;
+    sinalQueMorre: number;
+  };
+}
+
 export const apiPdca = {
   /** SPEC-77 — `mesesParaRevisarVolume` entrou junto da cadência: `0` desliga a
    * pergunta sobre a idade do volume do produto. */
   config: () => requisitar<CadenciaPdca>("/pdca/config"),
+  /** SPEC-94 fatia Z — a única entrada da análise crítica que não depende de
+   *  canal externo: o dado já está gravado. */
+  metricas: (timeId?: string) =>
+    requisitar<MetricasDoCiclo>(`/pdca/metricas${timeId ? `?timeId=${encodeURIComponent(timeId)}` : ""}`),
   salvarConfig: (dados: CadenciaPdca) =>
     requisitar<CadenciaPdca>("/pdca/config", {
       method: "PUT",
@@ -1507,8 +1535,8 @@ export const apiTokens = configDe<TokensConfig>("tokens");
 export type { ConfigExportador } from "@gerador/aplicacao";
 import type { ConfigExportador } from "@gerador/aplicacao";
 
-export const apiExportador = configDe<ConfigExportador>("exportador");
-
+export const apiExportador = configDe<ConfigExportador>("exportador");
+
 /**
  * SPEC-86 fatia C — as regras EM VIGOR para um produto.
  *
