@@ -302,6 +302,137 @@ tradução é justamente o trabalho do adaptador.
 
 ---
 
+## 6.4 As duas derivações, e a camada analítica
+
+> Proposta do usuário: *"é possível ter 2 derivações: uma que capta qualitativo
+> de forma estruturada e governada, e outra via algum adaptador (provavelmente vai
+> ter que fazer várias chamadas ao eazyBI — é o que temos de verdade),
+> consolidar, e pôr uma camada analítica com IA."*
+
+O desenho está certo, e resolve duas coisas que esta avaliação tinha deixado em
+aberto: o **atrito silencioso** que o dado de sistema não alcança (§4.2) e a
+**decisão sobre survey** (§9.6), que deixa de ser survey e vira captação
+governada.
+
+### 6.4.1 Derivação A — o qualitativo, estruturado e governado
+
+**Ela não começa do zero.** `pdca_feedback` já existe e já é governada:
+
+```
+email · timeId · texto · estado (novo | virou-ajuste | descartado) ·
+solicitacaoId · criadoEm
+```
+
+Tem autor, time, ciclo de vida e **ligação com a solicitação de ajuste** — ou
+seja, o feedback já sabe se virou mudança. Isso é mais do que a maioria das
+ferramentas de pesquisa interna consegue.
+
+**O que falta é a palavra "estruturada":** hoje é `texto` livre. Para virar
+medida, precisa de **âncora e escala**:
+
+| Acrescentar | Por quê |
+|---|---|
+| **em que handoff** o atrito aconteceu | é a unidade do §2 e §3 — sem isso o dado não consolida com o quantitativo |
+| **que tipo de carga** — extrínseca, intrínseca ou germane (§4.0.1) | separa o que é nosso do que é de treino e contratação |
+| uma escala curta, e **o texto continua** | número sem texto não diz o que fazer; texto sem número não agrega |
+
+> **A régua que já existe e vale aqui:** `ValorSpec.origem` distingue declarado de
+> derivado. **Um dado qualitativo é declarado, e entra marcado como declarado** —
+> nunca somado a um número medido como se fosse do mesmo tipo. É a mesma
+> disciplina de proveniência do resto do produto.
+
+E é o que responde à ressalva do §4.2 sem cair no survey solto que o §9.6 recusa:
+a captação acontece **no fluxo de trabalho, ancorada num handoff**, e não numa
+pesquisa trimestral que ninguém responde.
+
+### 6.4.2 Derivação B — o adaptador, e o eazyBI é a realidade
+
+*"é o que temos de verdade"* é a restrição mais valiosa desta conversa: ela troca
+um adaptador hipotético por um concreto.
+
+**O que o eazyBI muda a favor:**
+
+- **Ele já tem o histórico.** O Jira guarda o changelog e o eazyBI o modela como
+  dimensão de tempo — transições de estado, quando, quantas vezes. **A série
+  temporal do lado externo já existe**, e não precisamos construí-la (§10, passo
+  4, encolhe muito).
+- **O contrato é um relatório, não uma query.** A API exporta o resultado de um
+  relatório definido lá dentro. Então **o adaptador não escreve MDX** — ele
+  consome um relatório nomeado que devolve colunas acordadas.
+
+Isso último é uma sorte de desenho, e vale explicitar por quê:
+
+> **A query fica com quem conhece o cubo; nós consumimos um contrato tabular.**
+> Escrever MDX aqui dentro seria acoplar o produto ao modelo dimensional de uma
+> instalação — e cada organização modela o dela de um jeito. Um relatório nomeado
+> por time é configuração, que é o padrão que o produto já usa para destino de
+> gateway.
+
+**O que ele impõe de limite, e está documentado:**
+
+| Limite | Consequência de desenho |
+|---|---|
+| **10 queries MDX concorrentes**; as demais esperam | o adaptador é **assíncrono e em lote** — nunca no caminho de uma tela |
+| timeout de até **180 s** por query | idem, e com retentativa |
+| autenticação por token de API | vai para o **cofre de segredos**, que já existe (SPEC-12) |
+| os dados são importados periodicamente, não são tempo real | **a medida tem data de referência**, e a tela precisa dizer qual |
+
+A última linha é régua, não detalhe: uma medida apresentada sem dizer de quando
+ela é envelhece mentindo — que é o defeito que o §327 e o §328 já pegaram na
+prosa da landing.
+
+> **E o adaptador é UM, não O.** A porta continua agnóstica (§6.3, quatro campos).
+> eazyBI é a primeira implementação porque é o que existe; se ele fosse o modelo,
+> o produto passaria a exigir eazyBI para medir impacto — o que seria trocar uma
+> dependência de tracker por uma dependência de BI.
+
+### 6.4.3 A consolidação: o handoff é onde as duas se encontram
+
+As duas derivações precisam de uma chave comum, e ela já está escolhida pelo §2:
+
+- o **qualitativo** é ancorado em `(time, handoff)`;
+- o **quantitativo** chega por item, e `Atividade.chave` é **estável** e viaja no
+  item exportado — de item para handoff é agregação simples.
+
+> **A consolidação acontece no handoff**, que é a unidade do fluxo de valor. Não é
+> escolha de conveniência: é o que faz o número (*"18% dos itens voltaram"*) e a
+> frase (*"a regra do time X não estava clara"*) falarem da mesma coisa.
+
+### 6.4.4 A camada analítica com IA — e a contenção que ela exige
+
+Esta é a parte mais valiosa da proposta e **a mais perigosa**, e a régua do
+produto resolve, se for aplicada com rigor:
+
+> ### **O motor calcula. A IA escreve. Ninguém decide sem confirmar.**
+>
+> É a tese do produto (`CONCEITO.md`, *"A divisão de trabalho"*) aplicada à
+> análise. Aqui ela não é preferência de arquitetura: é o que separa uma leitura
+> útil de uma alucinação com aparência de relatório.
+
+O que a IA **pode** fazer:
+
+- **narrar** o que os números consolidados dizem, em linguagem que o público não
+  técnico entende (e isso liga direto à SPEC-95 §1.1);
+- **propor hipóteses** de causa, marcadas como proposta;
+- **apontar onde olhar** — que handoff, que regra, que time.
+
+O que ela **não pode**, e precisa de trava:
+
+- **produzir número.** Toda cifra vem do motor. Uma IA que soma é uma IA que erra
+  em silêncio, e o produto inteiro existe para que a conta seja conferível.
+- **afirmar causa.** Correlação apresentada como causa já está recusada no §8;
+  um modelo de linguagem é excelente em produzir exatamente isso.
+- **valer sem confirmação.** Nada que ela conclui vira ajuste de regra sozinho —
+  o caminho é o PDCA, com prévia e aprovação (SPEC-39).
+
+**A régua mecânica, e ela é implementável:** toda afirmação da camada analítica
+carrega **de que medida saiu**. Uma frase sem medida atrás não é análise — é
+opinião gerada, e é descartada antes de chegar à tela. É a mesma disciplina de
+proveniência que o resto do produto aplica a valor de campo, aplicada a texto de
+análise.
+
+---
+
 ## 7. O vocabulário de mercado, pesquisado
 
 | Framework | O que traz |
@@ -365,9 +496,17 @@ com o que importava.
    fluxo.
 5. **A calibração é feature ou instrumento interno?** As duas são legítimas, e a
    segunda vem primeiro: se a prontidão não calibrar, não há o que mostrar.
-6. **Survey entra?** Sem ele se perde o atrito silencioso (§4.2). Mas survey dentro
-   de ferramenta de trabalho é intrusivo, e mal feito produz dado pior que nenhum.
-   **Recomendação: fora desta avaliação**, com o limite dito.
+6. ~~**Survey entra?**~~ **✅ Respondida pela proposta das duas derivações
+   (§6.4.1): não é survey, é captação estruturada e governada no fluxo.** O
+   `pdca_feedback` já existe com autor, time e ciclo de vida; o que falta é
+   âncora (em que handoff) e tipo de carga. Isso resolve o atrito silencioso do
+   §4.2 sem a pesquisa trimestral que ninguém responde.
+
+7. **O relatório do eazyBI é contrato nosso ou deles?** O adaptador consome um
+   relatório nomeado (§6.4.2), então alguém precisa criá-lo do lado do eazyBI com
+   as colunas acordadas. **Recomendação:** publicar a especificação do relatório
+   como parte do produto — uma página do site técnico (SPEC-95), não um item de
+   suporte. E ela é curta, porque a porta tem quatro campos.
 7. **O que fazer quando a medição disser que uma regra não serve?** É o caso de
    sucesso, e o mais desconfortável — alguém escreveu aquela regra. O PDCA tem o
    caminho; **a conversa social não se resolve por código.**
@@ -383,14 +522,24 @@ pelo tracker.** A ordem:
    handoff, feito com o time. **Barato, e é o que diz onde instrumentar.** Sem
    isto, qualquer métrica é palpite com número.
 2. **A porta de volta** — simétrica ao `exportadorDeItens`, quatro campos (§6.3),
-   **um** adaptador para começar, escolhido pelo handoff que o passo 1 apontar.
+   e **o adaptador de eazyBI como primeira implementação** (§6.4.2), porque é o
+   que existe de verdade. Assíncrono e em lote, com data de referência declarada.
 3. **A calibração da prontidão** (§4.1) — o menor experimento que produz
    conhecimento real: *o número que emitimos prevê alguma coisa?* Se não prevê,
    essa é a descoberta mais valiosa desta linha, e é melhor sabê-la cedo.
-4. **Série temporal**, quando houver o que guardar.
-5. **A regra como unidade de análise** (§5) — o diferencial, e o que paga a
+4. **A derivação qualitativa estruturada** (§6.4.1) — âncora de handoff e tipo de
+   carga sobre o `pdca_feedback` que já existe. **Barata**, e é o que alcança o
+   atrito silencioso que nenhum tracker vê.
+5. ~~Série temporal~~ — **encolheu:** o eazyBI já guarda o histórico do lado
+   externo. O que sobra é guardar **o que nós emitimos** (a previsão do §4.1) para
+   poder confrontá-la depois.
+6. **A regra como unidade de análise** (§5) — o diferencial, e o que paga a
    promessa dos cinco times.
-6. **GQM como configuração** — depois de existir dado, nunca antes.
+7. **A camada analítica com IA** (§6.4.4) — **por último, e com a contenção
+   escrita antes do primeiro prompt.** Ela é a parte que mais impressiona numa
+   demonstração e a que mais rápido destrói a credibilidade do resto se afirmar um
+   número que ninguém calculou.
+8. **GQM como configuração** — depois de existir dado, nunca antes.
 
 > **E enquanto isso não existir, a página pública não afirma impacto.** Ela afirma
 > o que o produto faz, que é bastante — e a conexão de volta aparece **marcada
@@ -414,8 +563,11 @@ pelo tracker.** A ordem:
   contraste com a retrospectiva que falta.
 - `packages/engine/src/decisao/decisoes.ts`, `ExcecaoDePadrao` — as exceções com
   motivo e autor: o dado mais valioso do §5, ainda não analisado.
+- `packages/server/src/db/schema.ts`, tabela `pdca_feedback` — a captação
+  qualitativa que **já é governada**, e onde a derivação A do §6.4.1 encosta.
 - `SPEC-31` (portas e adaptadores) · `SPEC-81` (MCP de mão dupla) · `SPEC-39`
-  (PDCA, onde a conclusão vira ajuste).
+  (PDCA, onde a conclusão vira ajuste) · `SPEC-12` (cofre de segredos, onde o
+  token do eazyBI mora).
 - `CONCEITO.md`, *"Por que é um ciclo, e não uma esteira"* — a promessa dos cinco
   times, ainda sem mecanismo.
 
@@ -428,4 +580,6 @@ pelo tracker.** A ordem:
 - **Measuring Program Comprehension: A Large-Scale Field Study with Professionals** (Xia et al., IEEE TSE) — <https://baolingfeng.github.io/papers/tsecomprehension.pdf>
 - Carga cognitiva de time (Sweller aplicado por *Team Topologies*) — <https://itrevolution.com/articles/cognitive-load/> · <https://www.devopsinstitute.com/team-cognitive-load/>
 - Ticket bounce-back rate — <https://www.minware.com/guide/metrics/ticket-bounce-back-rate>
+- eazyBI, *Report results export API* (auth, formato, limites) — <https://docs.eazybi.com/eazybi/set-up-and-administer/customization/report-results-export-api>
+- eazyBI, limites de consulta (10 MDX concorrentes, timeout) — <https://docs.eazybi.com/eazybi/set-up-and-administer/atlassian-data-center/advanced-settings>
 - DORA × SPACE × DX Core 4 — <https://www.swarmia.com/blog/comparing-developer-productivity-frameworks/>
