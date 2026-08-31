@@ -16,31 +16,64 @@
 
 ---
 
+> ## ⚠️ Correção do §341 — o que a remedição contradisse
+>
+> A SPEC foi escrita antes da rodada §340, e o §341 a remediu contra a stack
+> antes de escrever a primeira linha. **O §0 estava certo em quase tudo e errado
+> no número que mais importava**, e as correções estão marcadas ao longo do
+> texto. As três que mudam decisão:
+>
+> 1. **A contagem de palavras media 41% de texto que ninguém lê** (§0, corrigido
+>    abaixo). O teto da fatia A era inalcançável e mirava a coisa errada.
+> 2. **O modo claro existe** desde o §340 (SPEC-93). A §0.2 e a §5 estão
+>    desatualizadas, e ficam corrigidas onde aparecem.
+> 3. **O link *"ler o conceito inteiro →"* da §3 não foi feito**, com motivo: o
+>    `CONCEITO.md` não é servido pela web, e apontar para um endereço que pode
+>    dar 404 é a promessa vazia que a régua desta página proíbe.
+
 ## 0. A medição de hoje
 
 Contra a stack real (`docker compose`, web em `:8080`), viewport 1440×900,
 `document.body.scrollHeight` e contagem de nós:
 
-| O que | Quanto |
+| O que | Quanto | §341 remediu |
+|---|---|---|
+| Altura total | **4693 px** | 4693 ✅ |
+| Em telas de 900 px | **5,2 telas** de rolagem | 5,2 ✅ |
+| Seções (`<section>`) | **16** | 16 ✅ |
+| Palavras no corpo | **2326** | **2244** — e ver abaixo |
+| Diagramas (SVG) | 3 (`OPassoContido`, `CicloDoProduto`, `OFluxoDoProcesso`) | 3 ✅ |
+| Imagens (`<img>`) | **0** | 0 ✅ |
+| Âncoras de navegação (`a[href^="#"]`) | **0** | 0 ✅ |
+| Botões "Entrar" | 3 | 3 ✅ |
+| Títulos (`h1`/`h2`) | 7 | 7 ✅ |
+
+### ⚠️ §341 — a contagem de palavras não media o que esta SPEC pensou
+
+Medindo o `innerText` **por seção**, e não a página inteira:
+
+| Onde | Palavras |
 |---|---|
-| Altura total | **4693 px** |
-| Em telas de 900 px | **5,2 telas** de rolagem |
-| Seções (`<section>`) | **16** |
-| Palavras no corpo | **2326** |
-| Diagramas (SVG) | 3 (`OPassoContido`, `CicloDoProduto`, `OFluxoDoProcesso`) |
-| Imagens (`<img>`) | **0** |
-| Âncoras de navegação (`a[href^="#"]`) | **0** |
-| Botões "Entrar" | 3 |
-| Títulos (`h1`/`h2`) | 7 |
+| **Fora das peças** — a prosa que a landing escreve por si | **66** |
+| Dentro das sete peças, desenhadas de `ciclo.ts`/`conceito.ts` | 2178 |
+| Destas, em **desdobramentos fechados de 12 px de altura** | **921** |
 
-**Os três números que definem o problema:**
+Duas conclusões, e as duas derrubam a fatia A como escrita:
 
-1. **2326 palavras** — é um artigo, não uma apresentação. A leitura completa leva
-   ~9 minutos, e ninguém dá 9 minutos a uma ferramenta que ainda não conhece.
+1. **Não havia prosa para cortar.** 97% do texto sai do dado. Podar até 400
+   exigiria apagar `ciclo.ts` — a régua da SPEC-76 ao contrário.
+2. **41% do que a métrica contava, ninguém lê.** O `innerText` enxerga os treze
+   desdobramentos que a SPEC-91 fatia C deixou montados de propósito, para poder
+   animar o fechamento. A leitura real são **~1323 palavras**, não 2326.
+
+**Os três números que definem o problema** (com o primeiro corrigido):
+
+1. ~~2326 palavras~~ → **5,2 telas com tudo aberto ao mesmo tempo**. O problema
+   nunca foi prosa: era não haver ordem declarada nem saída. A frase *"a leitura
+   leva ~9 minutos"* foi construída sobre a medida inflada e não se sustenta.
 2. **zero âncoras** — não há como navegar. Só existe rolar do começo ao fim, e o
-   usuário pediu *"partes para navegar"* exatamente por isso.
-3. **zero imagens** — tudo é texto ou SVG desenhado por código. Não há respiro
-   visual entre 16 seções de prosa.
+   usuário pediu *"partes para navegar"* exatamente por isso. ✅ confirmado
+3. **zero imagens** — tudo é texto ou SVG desenhado por código. ✅ confirmado
 
 ### 0.1 O que está BOM e não se toca
 
@@ -68,9 +101,11 @@ Quem implementar não precisa refazer estas medições — elas são desta seman
   (`e2e/landing-movel.spec.ts`, §336). *Cuidado:* aquele teste só passou a ter
   valor quando aprendeu a **esperar o React pintar** antes de medir — sem a
   espera ele media uma página vazia e passava sempre.
-- **Modo claro: não existe.** `packages/web/src/styles.css` tem **um `:root` só**.
-  Capturas em `colorScheme: dark` e `light` saem byte a byte idênticas. Isso é do
-  produto inteiro, não da landing (ver §5.4).
+- ~~**Modo claro: não existe.**~~ **⚠️ §340 (SPEC-93) o construiu.** Há dois temas
+  e um seletor de três estados (`auto`/`claro`/`escuro`) no cabeçalho da landing,
+  e as cores são variáveis CSS com valores por tema. Toda peça nova precisa
+  funcionar nos dois, e há uma trava (`tema/corFixa.test.ts`) que reprova cor
+  fixa densa em superfície. O §341 verificou a landing nova nos dois temas.
 - **Movimento reduzido** já é respeitado globalmente (`prefers-reduced-motion`,
   §328).
 - **Repetição:** há travas em `demo/landing.travas.test.tsx` que reprovam repetir
@@ -223,18 +258,31 @@ esta rodada construir se joga fora.
   as marcas parecem inúteis; no dia do 14º elas voltam a ser necessárias. A
   honestidade da página não é um estado a que se chega, é um mecanismo que se
   mantém (SPEC-83 §4).
-- **Modo claro nesta rodada.** É do produto inteiro (`:root` único) e merece SPEC
-  própria — fazer só na landing criaria uma segunda paleta, que é o defeito que a
-  §0.2 do `styles.css` já documenta.
+- ~~**Modo claro nesta rodada.**~~ **⚠️ Cumprido antes, e como esta SPEC pediu:**
+  a recusa dizia que ele merecia SPEC própria, e mereceu — a SPEC-93, executada
+  no §340. A recomendação estava certa; só chegou primeiro.
 
 ---
 
 ## 6. Fatias
 
-- **A — o inventário e o corte.** Classificar as 2326 palavras em *fica na página*
-  / *vai para o `CONCEITO.md`* / *morre por repetição*. **É a fatia que decide o
-  resto**, e ela é texto, não código. Prova: a contagem de palavras do corpo cai
-  para ≤ 400, medida pelo mesmo `innerText` do §0.
+- **A — o inventário e o corte.** ⚠️ **A medição do §341 mudou esta fatia.** Não
+  havia 2326 palavras para classificar: **66** eram autorais e o resto sai do
+  dado. O corte que existia era um só — o `OMotor`, a única peça feita de prosa,
+  e a **terceira** escrita da seção *"A divisão de trabalho"* do `CONCEITO.md`.
+  Foi de 207 para 111 palavras, e o texto não precisou "ir para o `CONCEITO.md`":
+  **já estava lá**, e o que havia na landing era a cópia.
+
+  A prova também mudou de denominador: `≤ 400 no innerText` é inalcançável sem
+  apagar dado e mede 41% de texto invisível. O teto implementado é sobre a
+  **prosa autoral** (a página menos as peças), e vale **160** — a página gasta
+  102, e um teto de 320 permitiria triplicá-la antes de ficar vermelho.
+
+  **A lição:** o primeiro corte foi a 62 palavras e derrubou dois testes do
+  `OMotor` que guardavam o argumento de valor (*"o mesmo desenho produz sempre os
+  mesmos itens"*, *"você pode discordar"*). Numa rodada cujo pedido foi *"uma cara
+  mais comercial"*, cortar o argumento de valor é o corte errado — e a régua que
+  sobrou é que **os quatro testes da peça passam sem uma vírgula mudada**.
 - **B — os cinco atos e a navegação.** A estrutura, as âncoras, a barra fixa com
   indicação de posição. Prova: E2E que clica cada âncora e afirma que a seção
   correspondente entrou na viewport; e que as cinco existem como `id`.
@@ -255,6 +303,31 @@ esta rodada construir se joga fora.
 > C+D noutra, E+F na terceira.** Fingir que cabe numa só é como as três rodadas do
 > §251 acabaram pela metade.
 
+### ⚠️ O que o §341 entregou, e o que não
+
+| Fatia | Estado |
+|---|---|
+| **A** — o corte | ✅ feito, com o denominador corrigido (acima) |
+| **B** — os cinco atos e a navegação | ✅ feito |
+| **C** — as molduras | ✅ feito. Nenhuma peça mudou por dentro; os testes de cada uma passam sem alteração |
+| **D** — as figuras | ❌ **não feito** — ver abaixo |
+| **E** — o caminho curto | ✅ feito (`useCaminhoCurto`, 60 s / 5 paradas) |
+| **F** — as travas | ✅ feito: âncora que resolve, nada em `#/`, um link e uma seção por ato, e o teto de prosa |
+
+**Por que a fatia D ficou de fora**, dito como escolha e não como medição: os
+atos 1 e 2 já têm `AEvolucao` e `AsCamadas`, que são exatamente *"figuras que
+explicam"* no vocabulário dos diagramas. Acrescentar outra ao lado delas é a
+repetição que a trava do §323 existe para impedir. **E o pedido mudou no meio da
+rodada:** o usuário pediu três explicações novas — o método de quebra, o valor
+para a organização e os **níveis de maturidade de processo, com diagrama animado**
+—, e é ali que a mídia nova tem trabalho a fazer. Foi para a **SPEC-94**.
+
+**Vídeo: nenhum, e a decisão é desta rodada.** A pergunta da SPEC-82 §6.2 —
+*"a necessidade é dentro ou fora do app?"* — continua sem resposta medida. O
+caminho curto (fatia E) atende à de dentro sem produzir artefato que envelheça em
+separado da página; gravação de tela já estava recusada pelo próprio usuário
+(§4.1); e vídeo por código é biblioteca nova, que a §5 recusa.
+
 ---
 
 ## 7. Perguntas em aberto
@@ -264,11 +337,18 @@ esta rodada construir se joga fora.
    (compliance, auditoria, trilha) abre portas em organização grande e afasta time
    pequeno. **Recomendação:** falar o problema em português claro no corpo, e
    deixar o jargão para uma seção própria que se acrescenta sem reescrever nada.
-2. **A landing precisa de rota própria?** Ela é renderizada em `App.tsx` **antes
-   de qualquer roteador** — então âncoras `#/algo` colidiriam com o `rotaDoHash`.
-   As âncoras propostas (`#o-problema`) não colidem porque não começam com `#/`,
-   mas **isso precisa ser conferido na implementação**, e há teste de rota
-   (`navegacao/rota.test.ts`) que pode ser estendido.
+2. **A landing precisa de rota própria?** ⚠️ **Respondida no §341: não.** As
+   âncoras `#o-problema` não colidem — `rotaDoHash` só lê o que começa com `#/`,
+   e um hash desconhecido cai no `canvas`, que é o fallback certo. Há trava para
+   o formato da promessa (*nenhuma âncora começa com `#/`*).
+
+   **Mas apareceu um defeito que a pergunta não previa, e ele era real:** abrir
+   `/#o-percurso` direto **não rolava nada** — a seção ficava em `y=3302`. O
+   browser processa o hash quando o documento carrega, e nesse instante a landing
+   ainda não existe: ela é React, e pinta depois. É o mesmo erro de ordem que o
+   §336 achou no teste de móvel, agora do lado do produto. Corrigido em
+   `useAncoraInicial`, que reaplica a rolagem enquanto o layout se assenta e
+   solta no primeiro gesto da pessoa.
 3. **Quanto texto é pouco demais?** O teto de 400 palavras é escolha, não medição.
    Se a página ficar incompreensível, o número sobe — mas com o texto que voltar
    sendo escolhido, não o que sobrou.

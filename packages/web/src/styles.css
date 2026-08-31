@@ -766,3 +766,179 @@ textarea::placeholder {
   overflow: hidden;
   min-height: 0;
 }
+
+/* ==========================================================================
+   SPEC-92 fatia B — a landing como apresentação: o cabeçalho e as âncoras.
+   ========================================================================== */
+
+/*
+  A rolagem suave mora AQUI, e não no JavaScript, e isso não é preferência de
+  estilo: é o que faz as âncoras `<a href="#…">`, o `scrollIntoView` do caminho
+  curto e o `Ctrl+F` do browser concordarem sobre como a página se move.
+
+  Uma fonte só — e ela já cai dentro da guarda de `prefers-reduced-motion` mais
+  abaixo, que o §328 criou. Quem pede menos movimento recebe o salto seco, que
+  é o comportamento que o browser sempre teve.
+*/
+html {
+  scroll-behavior: smooth;
+}
+
+/* A guarda global mais acima trata `animation` e `transition`, que não alcançam
+   rolagem — e ela vem ANTES desta regra no arquivo, então precisa ser dita de
+   novo aqui em vez de contar com a ordem. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/*
+  ## O número que os dois lados precisam conhecer
+
+  O cabeçalho é fixo, então uma âncora rolaria o título da seção para debaixo
+  dele — a pessoa clica em "O ciclo" e chega numa seção decapitada. É o defeito
+  clássico deste padrão, e ele não aparece em teste de `textContent`.
+
+  `--altura-do-cabecalho` existe para que a barra e a margem de rolagem leiam o
+  mesmo valor. Separá-los garante que um mude sem o outro.
+*/
+:root {
+  /**
+   * 100 é o PIOR CASO medido, não a altura do desktop.
+   *
+   * A primeira escrita usou 94, que é o que a barra mede em 1440 px. Medindo em
+   * 360 px contra a stack: **99 px** — o cabeçalho engorda quando os controles
+   * apertam. A âncora chegava 5 px atrás da barra no telefone, que é o mesmo
+   * defeito que esta variável existe para impedir, só que na tela em que
+   * ninguém olha.
+   *
+   * Sobrar alguns pixels no desktop é inofensivo: a seção começa um pouco mais
+   * abaixo. Faltar um só corta o chapéu. O E2E compara a altura REAL com esta,
+   * nos três tamanhos, para o pior caso não envelhecer em silêncio.
+   */
+  --altura-do-cabecalho: 100px;
+}
+
+.landing-cabecalho {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--painel);
+  border-bottom: 1px solid var(--borda);
+}
+
+.landing-cabecalho-linha {
+  display: flex;
+  align-items: center;
+  padding: 10px 24px;
+}
+
+.landing-cabecalho-navegacao {
+  padding-top: 0;
+  padding-bottom: 8px;
+  gap: 10px;
+}
+
+/* O botão do caminho curto: encostado à direita, e inteiro. */
+.landing-cabecalho-navegacao > button {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+/*
+  As pontas do rótulo do caminho curto, que somem quando a tela aperta.
+
+  640 px é onde a barra das cinco partes começa a perder espaço para o botão —
+  não é um breakpoint de catálogo, é o ponto medido. Acima dele o rótulo é
+  inteiro; abaixo, sobram "60 segundos" e "Parar", que são subcadeias do inteiro
+  e por isso continuam dentro do nome acessível (WCAG 2.5.3).
+*/
+@media (max-width: 640px) {
+  /* Só no CABEÇALHO. O botão da capa não disputa espaço com nada, e lá "60
+     segundos" sozinho, ao lado de "Entrar", lê como um segundo destino em vez
+     de um convite — encolher o que não aperta é perder texto de graça. */
+  .landing-cabecalho .so-no-largo {
+    display: none;
+  }
+}
+
+.landing-ato {
+  /* A margem de rolagem: o que impede a âncora de esconder o topo da seção. */
+  scroll-margin-top: var(--altura-do-cabecalho);
+}
+
+/*
+  A barra das partes.
+
+  `overflow-x: auto` no ELEMENTO, e não na página: em 360 px os cinco nomes não
+  cabem lado a lado, e a alternativa seria quebrá-los em duas linhas — que come
+  a tela de quem tem menos tela. Rolar a barra não produz rolagem horizontal no
+  documento, que é o que o E2E de móvel (§336) mede.
+*/
+.landing-atos {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  /* A barra fica com o espaço que sobra, e o botão ao lado dela não encolhe:
+     "Parar — 3 de 5" quebrado em duas linhas seria pior que a barra rolar. */
+  flex: 1 1 auto;
+  min-width: 0;
+  /* A barra de rolagem da nav é ruído: a lista é curta e o gesto é óbvio. */
+  scrollbar-width: none;
+}
+.landing-atos::-webkit-scrollbar {
+  display: none;
+}
+
+.landing-atos a {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  color: var(--texto-fraco);
+  border: 1px solid transparent;
+}
+
+.landing-atos a:hover {
+  color: var(--texto);
+  background: var(--painel-alto);
+}
+
+/*
+  O foco de teclado é DESENHADO, e não herdado do browser: os itens têm fundo
+  próprio quando marcados, e o anel padrão some contra ele em um dos dois temas.
+  Navegar esta barra pelo teclado é metade do motivo de ela ser feita de links.
+*/
+.landing-atos a:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+}
+
+/*
+  "Você está aqui" — e nunca só pela cor (SPEC-76). A borda muda, o peso do
+  texto muda, e o `aria-current` no componente diz a mesma coisa para quem ouve
+  a página em vez de vê-la.
+*/
+.landing-atos a[aria-current="location"] {
+  color: var(--texto);
+  background: var(--painel-alto);
+  border-color: var(--acento-gente);
+}
+
+.landing-ato-numero {
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--texto-mudo);
+}
+
+.landing-atos a[aria-current="location"] .landing-ato-numero {
+  color: var(--acento-gente-texto);
+}
