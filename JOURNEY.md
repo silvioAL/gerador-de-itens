@@ -14787,11 +14787,22 @@ passou a ser: os quatro testes verdes **sem uma vírgula mudada**.
 
 Primeira montagem dos cinco atos: **4693 → 4968 px**. Cresceu — o oposto do
 pedido. Os cinco chapéus custam ~350 px, e um `padding` de 56 os pagava duas
-vezes. Com 38 px a página fechou em **4730**, empatada com a original.
+vezes. Com 38 px a página fechou em **4800 px, +2,3% sobre a original**.
+
+> **Correção de um número que eu tinha escrito errado.** A primeira versão desta
+> entrada dizia 4730, e eu tinha medido isso de verdade — só que **contra um
+> container que não era o final**: naquele momento o `OMotor` ainda estava na
+> versão de 62 palavras. Ao restaurar o argumento de valor, a peça voltou de 150
+> para **218 px**, e a página com ela. Medi de novo depois do rebuild final e
+> corrigi. É a régua do §337 se aplicando a mim: **o número vale pelo binário que
+> estava rodando quando ele foi lido.**
 
 Então o que esta rodada entrega **não é uma página mais curta: é uma página com
 saída.** Cinco âncoras linkáveis, marca de onde a pessoa está, e um caminho curto
-de 60 s. Ninguém precisa mais rolar 5,3 telas para achar o que veio ver.
+de 60 s. Ninguém precisa mais rolar 5,3 telas para achar o que veio ver — e o
+pedido *"está ficando longa"* fica **parcialmente atendido**, o que é diferente de
+atendido. Encurtar de verdade exigiria mexer nas peças, e o usuário disse que
+gostou delas.
 
 ### O defeito que só o E2E pegou: o link direto não funcionava
 
