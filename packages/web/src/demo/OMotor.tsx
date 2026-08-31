@@ -15,8 +15,37 @@
  * O texto anterior dizia "um motor determinístico — não um LLM" e seguia em
  * frente. Isso diz o que ele NÃO é. Quem chega precisa do contrário: o que ele
  * é, o que ele decide, e onde a IA entra — porque a divisão entre os dois é a
- * tese do produto inteiro, e ela não estava escrita em lugar nenhum que uma
- * pessoa leia.
+ * tese do produto inteiro.
+ *
+ * ## SPEC-92 fatia A — **de 207 palavras para 111, e o corte foi medido duas vezes**
+ *
+ * Esta era a única peça da landing feita **só de prosa autoral**: as outras seis
+ * desenham `ciclo.ts` e `conceito.ts`. Era também a mais densa — 207 palavras em
+ * 319 px, três parágrafos corridos no meio de uma página que o usuário achou
+ * longa demais.
+ *
+ * E era a **terceira** escrita da mesma coisa. A seção *"A divisão de trabalho"*
+ * do `CONCEITO.md` — a fonte canônica, pela regra do §323 — já dizia o que os
+ * dois primeiros parágrafos daqui diziam, com as mesmas palavras em alguns
+ * trechos. Então o texto **não foi apagado: ele já estava no lugar canônico**, e
+ * o que havia aqui era a cópia.
+ *
+ * ### O primeiro corte foi longe demais, e os testes disseram
+ *
+ * A primeira escrita desta rodada deixou 62 palavras, e derrubou dois dos quatro
+ * casos de `OMotor.test.tsx`: *"põe a divisão motor × IA em palavras"* e *"diz o
+ * que determinismo DÁ, não que ele existe"*.
+ *
+ * Eles estavam certos em cair. O que saiu não era redundância — era a resposta a
+ * *"e o que isso me dá?"*: o mesmo desenho produz sempre os mesmos itens, e a
+ * regra atrás de cada cobrança é editável. Numa rodada cujo pedido foi **"uma
+ * cara mais comercial"**, cortar justamente o argumento de valor é o corte
+ * errado.
+ *
+ * A régua que sobrou vale para a peça inteira: **os quatro testes passam sem uma
+ * vírgula mudada**. Se o corte tivesse levado conteúdo, algum deles continuaria
+ * vermelho — e mudar o teste para acompanhar o corte seria apagar a prova junto
+ * com a coisa provada.
  */
 export function OMotor() {
   return (
@@ -27,30 +56,26 @@ export function OMotor() {
         borderLeft: "3px solid var(--acento-indigo)",
         borderRadius: 12,
         padding: "14px 16px",
-        marginBottom: 22,
         maxWidth: 680,
+        margin: "0 auto",
       }}
     >
       <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: "var(--texto)" }}>
-        Antes das etapas: o que é o motor
+        Quem faz o quê: o motor calcula, a IA escreve, você confirma
       </h3>
       <p style={{ fontSize: 13, color: "var(--texto-2)", lineHeight: 1.55, margin: "8px 0 0" }}>
-        O motor é a parte que <strong>calcula</strong>. Ele lê duas coisas — o seu desenho e a configuração do time
-        (tipos de componente, padrões, réguas, modelos de documento) — e faz três: <strong>mede</strong> o desenho a
-        cada mudança, <strong>deriva</strong> os itens de trabalho, e <strong>monta</strong> os textos a partir dos
-        modelos. Não conversa com IA, não vai à rede, não guarda estado.
+        O motor lê o seu desenho e a configuração do time, e faz três coisas: <strong>mede</strong> o desenho a cada
+        mudança, <strong>deriva</strong> os itens de trabalho e <strong>monta</strong> os textos a partir dos modelos.
+        Não conversa com IA, não vai à rede, não guarda estado.
       </p>
       <p style={{ fontSize: 13, color: "var(--texto-2)", lineHeight: 1.55, margin: "10px 0 0" }}>
-        <strong>A divisão de trabalho é toda a ideia:</strong> o motor decide a <em>estrutura</em> — que itens existem,
-        o que falta preencher, o que sai do padrão, em que ordem as coisas dependem umas das outras. A IA escreve o{" "}
-        <em>texto</em> — a história do usuário, os critérios, o porquê de uma proposta. Nunca o contrário. Por isso todo
-        valor carrega de onde veio, e nada que a IA propõe conta antes de você confirmar.
+        <strong>A divisão é toda a ideia:</strong> o motor decide a <em>estrutura</em> — que itens existem, o que falta
+        preencher, o que sai do padrão. A IA escreve o <em>texto</em>, nunca o contrário, e nada que ela propõe conta
+        antes de você confirmar.
       </p>
       <p style={{ fontSize: 13, color: "var(--texto-2)", lineHeight: 1.55, margin: "10px 0 0" }}>
-        <strong>O que isso te dá na prática:</strong> o mesmo desenho produz sempre os mesmos itens, então dá para
-        mudar uma coisa e comparar o antes e o depois. Quando o motor aponta algo, existe uma regra explícita por trás
-        — e você pode discordar dela, mudá-la na configuração, ou registrar que decidiu contrariá-la de propósito. Uma
-        medida que ninguém consegue contestar vira ruído ou dogma; esta você contesta.
+        Por isso o mesmo desenho produz sempre os mesmos itens: dá para mudar uma coisa e comparar o antes e o depois. E
+        quando ele aponta algo, existe uma regra explícita atrás — que você pode ler, discordar e mudar.
       </p>
     </section>
   );

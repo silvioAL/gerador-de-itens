@@ -14736,3 +14736,172 @@ conferido depois das 220 substituições, para provar que ele não mudou.
 
 609 engine · 133 llm · 122 aplicação · 949 web · 311 server · 42 gateway-falso ·
 113/113 E2E · build, typecheck e lint limpos.
+
+## §341 — a landing como apresentação, e a métrica que media texto invisível (SPEC-92)
+
+O pedido do usuário, olhando a página rodando: *"o que hoje é a landing page vai
+precisar ser transformado com uma cara mais comercial, de explicar o conceito, ter
+partes para navegar… está ficando longa"* e *"mais semelhante a uma apresentação,
+**mas gostei dos diagramas**"*.
+
+### A remedição, e o número que estava errado
+
+A SPEC-92 foi escrita antes do §340, então comecei remedindo contra `:8080`.
+Altura, seções, SVGs, âncoras, botões e títulos: **todos confirmados**. Palavras:
+2326 na SPEC, **2244** medidas.
+
+O problema não era a diferença de 82. Era o que a métrica contava. Medindo o
+`innerText` por seção em vez de a página inteira:
+
+| Onde | Palavras |
+|---|---|
+| **Fora das peças** — a prosa que a landing escreve por si | **66** |
+| Dentro das sete peças, desenhadas de `ciclo.ts`/`conceito.ts` | 2178 |
+| Destas, em **desdobramentos fechados de 12 px de altura** | **921** |
+
+**41% do texto que a métrica contava, ninguém lê.** São os treze desdobramentos
+do ciclo, que a SPEC-91 fatia C deixou montados de propósito para poder animar o
+fechamento — `display` não é `none`, então o `innerText` os enxerga. A leitura
+real são ~1323 palavras.
+
+Isso derrubou a fatia A inteira. A SPEC mandava cortar 2326 → 400 supondo prosa;
+havia **66 palavras de prosa**, e podar o resto seria apagar dado — a régua da
+SPEC-76 ao contrário. **O problema nunca foi comprimento de texto: era tudo
+aberto ao mesmo tempo, sem ordem declarada e sem saída.**
+
+### O único corte que existia, e o primeiro corte foi longe demais
+
+O `OMotor` era a única peça feita só de prosa autoral, e a **terceira** escrita da
+seção *"A divisão de trabalho"* do `CONCEITO.md` — que é a fonte canônica pela
+regra do §323. O texto não precisou "migrar": já estava lá, e o que havia na
+landing era a cópia.
+
+Cortei para 62 palavras e **dois dos quatro testes da peça caíram**: *"põe a
+divisão motor × IA em palavras"* e *"diz o que determinismo DÁ"*. Eles estavam
+certos em cair — o que saiu não era redundância, era a resposta a *"e o que isso
+me dá?"*. Numa rodada cujo pedido foi "uma cara mais comercial", **cortar o
+argumento de valor é o corte errado**. Refiz para 111 palavras (de 207), e a régua
+passou a ser: os quatro testes verdes **sem uma vírgula mudada**.
+
+### A página não encolheu, e isso está dito
+
+Primeira montagem dos cinco atos: **4693 → 4968 px**. Cresceu — o oposto do
+pedido. Os cinco chapéus custam ~350 px, e um `padding` de 56 os pagava duas
+vezes. Com 38 px a página fechou em **4730**, empatada com a original.
+
+Então o que esta rodada entrega **não é uma página mais curta: é uma página com
+saída.** Cinco âncoras linkáveis, marca de onde a pessoa está, e um caminho curto
+de 60 s. Ninguém precisa mais rolar 5,3 telas para achar o que veio ver.
+
+### O defeito que só o E2E pegou: o link direto não funcionava
+
+`/#o-percurso` aberto direto **não rolava nada** — a seção ficava em `y=3302`. O
+browser processa o hash quando o documento carrega, e nesse instante a landing
+ainda não existe: ela é React e pinta depois; `getElementById` devolve `null` e o
+browser desiste. É o erro de ordem do §336 — medir antes de o React pintar —
+agora do lado do produto.
+
+E rolar uma vez não bastou: caiu para `y=1458`, porque **a altura da página muda
+depois da primeira pintura** (os sete SVGs assentam). `useAncoraInicial` reaplica
+a rolagem enquanto o corpo muda de tamanho, por 1,5 s, e **solta no primeiro
+gesto** — insistir depois seria o scroll-jacking que a SPEC-92 §1 recusa por nome.
+
+### Dois erros meus, nos testes, que valem mais que o código
+
+1. **Medi o caminho, não o destino.** Duas escritas do teste de clique falharam
+   por corrida: a primeira esperava a posição virar inteira (viu o ciclo em
+   `y=426`, no meio da rolagem); a segunda esperava o `scrollY` parar de mudar
+   por 120 ms — e entre o clique e o início da rolagem suave existe um intervalo
+   que, com seis workers, passa disso. **O teste media a página antes de ela
+   começar a andar.** Sondando a stack de 200 em 200 ms, os cinco atos param em
+   `y=100`: o defeito era do teste. `expect.poll` não pergunta "já parou?",
+   pergunta "já chegou?".
+
+2. **Quase repeti o defeito que o §340 registrou.** O rótulo do botão do caminho
+   curto precisava encolher no telefone, e a saída óbvia — dois textos
+   alternativos — quebra a WCAG 2.5.3: "Parar 3/5" não é pedaço de "Parar — 3 de
+   5". É exatamente o `aria-label` do "Carregar na mesa de projeto". Escondendo só
+   as **pontas**, o visível continua sendo subcadeia do inteiro nos dois estados.
+
+### O que mais o pixel pegou, e o `textContent` não pegaria
+
+- **Chapéu desalinhado da peça:** no ato do percurso o chapéu começava em `x=370`
+  e o diagrama em `x=60` — 310 px. Duas larguras que precisavam concordar moravam
+  em arquivos diferentes; viraram uma prop só.
+- **`--altura-do-cabecalho` medida no lugar errado:** 94 px é a altura em 1440.
+  Em 360 a barra tem **99** — os controles apertam e ela engorda. A âncora chegava
+  5 px atrás da barra no telefone. Agora vale 100, e há E2E comparando a altura
+  real com a declarada nas três larguras.
+- **A barra de navegação espremida:** um `div` com `flex: 1` entre ela e o botão
+  roubava o espaço dela — 174 px de 467 num telefone, um nome e meio visível.
+
+### As travas, e cada uma vista vermelha antes (§248)
+
+Quatro novas em `landing.travas.test.tsx`: toda âncora resolve para uma seção que
+existe (a régua "não prometer o que não existe" aplicada à navegação), nenhuma
+começa com `#/`, um link e uma seção por ato, e o **teto de prosa autoral**.
+
+O teto merece nota: a SPEC pedia `≤ 400 no innerText`, que mede 41% de texto
+invisível. O implementado mede a página **menos as peças**, e vale **160** — não
+os 320 que a SPEC orçou, porque a página gasta 102 e um teto de 320 permitiria
+**triplicar** a prosa antes de ficar vermelho. Trava que só morde depois do triplo
+daria verde durante toda a rodada que a tornasse necessária.
+
+Desliguei cada correção e vi as quatro falharem: `id` fora do lugar, âncora em
+`#/`, prosa de volta na página (182 > 160), e o `useAncoraInicial` comentado
+(`y=3302`).
+
+### As escolhas que não são medição, ditas como escolhas
+
+- **Vídeo: nenhum.** A pergunta da SPEC-82 §6.2 — *"a necessidade é dentro ou fora
+  do app?"* — continua sem resposta medida. O caminho curto atende à de dentro;
+  gravação de tela já era recusa do usuário; vídeo por código é biblioteca nova.
+- **A fatia D (figuras) não foi feita.** Os atos 1 e 2 já têm `AEvolucao` e
+  `AsCamadas`, que são figuras que explicam — outra ao lado é a repetição que a
+  trava do §323 impede. E o lugar onde falta mídia mudou no meio da rodada (abaixo).
+- **O link "ler o conceito inteiro →" da SPEC §3 não existe.** O `CONCEITO.md` não
+  é servido pela web, e apontar para um endereço que pode dar 404 é a promessa
+  vazia que a régua desta página proíbe.
+- **Os cinco atos não têm `h2`.** O chapéu é numeral e nome, do tamanho de um
+  rótulo. Um `h2` de ato sobre o `h2` da peça reconstruiria o defeito do §333
+  cinco vezes.
+
+### O pedido novo, chegado no meio da rodada
+
+O usuário pediu três explicações que faltam: **o método de quebra em histórias e
+tasks**, **como o sistema agrega valor à organização**, e **os níveis de maturidade
+de processo** — com diagrama animado, conversando com o resto da narrativa e
+*"muito bem mapeado no sistema"*. Pediu também que eu pesquisasse vocabulário de
+mercado.
+
+Três achados, que vão para a **SPEC-94** (decisão do usuário: SPEC própria, com o
+diagnóstico de maturidade como feature de produto, não só narrativa):
+
+1. **A intuição dele é a tese do mercado em 2026.** O CMMI Institute lançou o
+   **CMMI AIM** dizendo que *"a adoção de IA está acelerando mais rápido que a
+   maturidade de governança"*. Há vocabulário consolidado — CMMI (5 níveis), MITRE
+   AI Maturity Model, CMU SEI + Accenture (8 dimensões) — e a distinção
+   **maturity × readiness**.
+2. **O método de quebra é código, e tem uma tensão real para contar.** `derivar.ts`
+   fatia por **elemento** do desenho (nó → setup + um item por endpoint). Na
+   literatura de *story splitting* (Richard Lawrence, vertical slicing), fatiar por
+   componente é o anti-padrão — e o contraponto no próprio sistema são os
+   **percursos confirmados**, que são fatias ponta a ponta.
+3. **"Níveis" já é palavra ocupada.** `auth/niveis.ts` é *nível de acesso*
+   (visualizar · operar · administrar), da SPEC-38. Maturidade de processo precisa
+   de nome próprio, senão colide no vocabulário e no código.
+
+### O que eu NÃO verifiquei
+
+- **Aparelho real.** A medição de móvel é viewport emulada, como no §336.
+- **Leitor de tela de verdade.** `aria-current`, `aria-labelledby` e a régua da
+  2.5.3 estão no código e no teste; ninguém ouviu a página.
+- **O caminho curto inteiro, de ponta a ponta.** O E2E prova que ele sai do lugar,
+  mostra a parada e para quando pedem — não que os cinco temporizadores disparam
+  em 60 s. Gastar 60 s de suíte para provar `setTimeout` seria caro pelo que vale.
+- **`prefers-reduced-motion` na rolagem.** A regra está no CSS, junto da guarda do
+  §328; não medi com a preferência ligada.
+
+609 engine · 133 llm · 122 aplicação · 953 web · 311 server · 42 gateway-falso ·
+121/121 E2E · build, typecheck e lint limpos. Verificado contra `:8080` nos dois
+temas, e em 360/768/1440.

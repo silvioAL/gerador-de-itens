@@ -7,6 +7,7 @@ import { CicloDoProduto } from "./CicloDoProduto";
 import { OFluxoDoProcesso } from "./OFluxoDoProcesso";
 import { ESTAGIOS_DO_CICLO } from "./ciclo";
 import { CAMADAS, CONEXOES, EVOLUCAO, contagemDasConexoes } from "./conceito";
+import { ATOS, ancoraDoAto } from "./atos";
 
 /**
  * SPEC-83 fatia F — **as travas que impedem esta rodada de ser necessária de
@@ -230,6 +231,119 @@ describe("e não pode prometer o que o produto não faz (SPEC-83 fatia F)", () =
 
     expect(texto).not.toContain("Do diagrama ao backlog");
     expect(texto.toLowerCase()).toMatch(/sobreviv|perene|acompanha/);
+  });
+});
+
+describe("a apresentação tem partes, e elas existem (SPEC-92 fatia F)", () => {
+  it("toda âncora do menu resolve para uma seção que existe", () => {
+    /**
+     * **É a régua "não prometer o que o produto não faz" (SPEC-76) aplicada à
+     * navegação.** Um item de menu é a promessa de que há algo do outro lado, e
+     * uma âncora quebrada é a versão mais barata de mentir que uma página tem:
+     * ela não dá erro, não some, não avisa — só não rola.
+     *
+     * A trava vai do LINK para a seção, e não da lista `ATOS` para o link: o que
+     * pode divergir é a página, não o dado. Renomear um ato quebra os dois lados
+     * de uma vez e nada acusa; apagar a `<section>` de um deles é o defeito real,
+     * e é este caso que aqui fica vermelho.
+     */
+    render(<LandingPage onEntrar={() => {}} />);
+
+    const links = [...document.querySelectorAll<HTMLAnchorElement>('a[href^="#"]')];
+    expect(links.length, "a página não tem âncora nenhuma — foi assim que ela chegou aqui").toBe(ATOS.length);
+
+    const quebradas = links
+      .map((a) => a.getAttribute("href") ?? "")
+      .filter((href) => !document.getElementById(href.slice(1)));
+
+    expect(quebradas, `âncoras sem seção:\n${quebradas.join("\n")}`).toEqual([]);
+  });
+
+  it("nenhuma âncora começa com `#/` — esse espaço é do roteador", () => {
+    /**
+     * SPEC-92 §7.2 deixou isto como pergunta para a implementação, e ela tem
+     * resposta: a landing é renderizada **antes** de qualquer roteador, e
+     * `rotaDoHash` lê tudo que começa com `#/`. Uma âncora `#/o-ciclo` faria a
+     * pessoa clicar num item de menu e trocar de tela.
+     *
+     * `rotaDoHash("#o-ciclo")` cai no `canvas` por ser desconhecido, que é o
+     * fallback certo — mas isso vale para o que ela devolve, não para o que a
+     * página promete. O que esta trava guarda é o formato da promessa.
+     */
+    render(<LandingPage onEntrar={() => {}} />);
+
+    const comBarra = [...document.querySelectorAll<HTMLAnchorElement>("a[href]")]
+      .map((a) => a.getAttribute("href") ?? "")
+      .filter((href) => href.startsWith("#/"));
+
+    expect(comBarra).toEqual([]);
+  });
+
+  it("cada ato aparece uma vez no menu e uma vez como seção", () => {
+    // Dois links para o mesmo ato, ou duas seções com o mesmo `id`, são HTML
+    // inválido que o browser aceita em silêncio — e a segunda âncora passa a
+    // apontar para a primeira seção, que é um defeito impossível de ver olhando.
+    render(<LandingPage onEntrar={() => {}} />);
+
+    for (const ato of ATOS) {
+      expect(document.querySelectorAll(`a[href="${ancoraDoAto(ato)}"]`), `menu: ${ato.nome}`).toHaveLength(1);
+      expect(document.querySelectorAll(`[id="${ato.id}"]`), `seção: ${ato.nome}`).toHaveLength(1);
+    }
+  });
+
+  it("o texto que a landing escreve por si cabe no teto", () => {
+    /**
+     * SPEC-92 fatia A — **o teto, com o denominador que a medição corrigiu.**
+     *
+     * A SPEC pediu "o corpo cai para ≤ 400 palavras, medido pelo mesmo
+     * `innerText` do §0". Remedindo contra a stack antes de escrever qualquer
+     * linha, esse teto é inalcançável e mede a coisa errada:
+     *
+     * | Onde | Palavras |
+     * |---|---|
+     * | **Fora das peças** — o que a landing escreve por si | **66** |
+     * | Dentro das sete peças, desenhadas do dado | 2178 |
+     * | Destas, em desdobramentos FECHADOS de 12 px de altura | **921** |
+     *
+     * Duas coisas seguem daí. A primeira: **não havia prosa para cortar** — 97%
+     * do texto sai de `ciclo.ts` e `conceito.ts`, e podar até 400 exigiria
+     * apagar dado, que é a régua da SPEC-76 ao contrário. A segunda: **41% do
+     * que a métrica contava, ninguém lê** — o `innerText` enxerga os treze
+     * desdobramentos que a SPEC-91 fatia C deixou montados de propósito.
+     *
+     * Então o teto é sobre o que ele sempre quis medir: **a prosa autoral**, a
+     * que cerca as peças. Ela é o que cresce quando alguém quer explicar mais, e
+     * é a única que uma rodada futura pode inflar sem tocar em dado nenhum.
+     *
+     * ## O número, e por que não é o da SPEC
+     *
+     * A SPEC-92 §3 orçou 320 para os cinco atos somados (80+80+60+60+40). A
+     * página construída gasta **102** — a prosa de abertura por ato virou uma
+     * pergunta de uma linha, e as peças carregam o resto.
+     *
+     * Um teto de 320 sobre 102 permite **triplicar** a prosa antes de ficar
+     * vermelho, e uma trava que só morde depois do triplo não trava nada: ela
+     * daria verde durante toda a rodada que a fizesse necessária.
+     *
+     * **160** deixa ~58 palavras de folga — um ato novo com pergunta e uma frase,
+     * ou uma legenda em cada peça. É o suficiente para crescer de propósito e
+     * pouco para inchar por descuido. Escolha, não medição, e dita como escolha:
+     * quem precisar de mais vem aqui e escreve por quê, que é o atrito para o
+     * qual esta trava existe.
+     */
+    render(<LandingPage onEntrar={() => {}} />);
+
+    const conta = (t: string) => t.split(/\s+/).filter((p) => /[\p{L}\p{N}]/u.test(p)).length;
+    const pagina = conta(document.body.textContent ?? "");
+    const nasPecas = [...document.querySelectorAll<HTMLElement>("section[data-testid]")]
+      // Só as PEÇAS: as molduras dos atos também são `section[data-testid]`, e
+      // contá-las descontaria a página inteira de si mesma.
+      .filter((s) => !s.dataset.testid?.startsWith("ato-"))
+      .reduce((a, s) => a + conta(s.textContent ?? ""), 0);
+
+    const autoral = pagina - nasPecas;
+
+    expect(autoral, `a landing escreve ${autoral} palavras por si — o teto é 160`).toBeLessThanOrEqual(160);
   });
 });
 
