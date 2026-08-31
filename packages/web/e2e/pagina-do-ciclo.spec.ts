@@ -9,11 +9,15 @@ import { ESTAGIOS_DO_CICLO } from "../src/demo/ciclo";
  * existente tem rota; este prova o que só o navegador prova — que a página
  * pública mostra o ciclo antes do login, e que o desdobramento abre.
  */
-test("a landing mostra o ciclo, marca o que ainda não existe, e desdobra ao clique", async ({ page }) => {
+test("o site mostra o ciclo, marca o que ainda não existe, e desdobra ao clique", async ({ page }) => {
   test.setTimeout(90000);
   // Sem `entrar`: o ponto é justamente a página ANTES do login. Quem chega aqui
   // não sabe o que a ferramenta é.
-  await page.goto("/");
+  //
+  // SPEC-95 (§342) — o ciclo deixou de morar na capa e ganhou página própria. O
+  // que este teste prova não mudou: que ele é público, que a contagem sai do
+  // dado e que o desdobramento abre. Mudou o endereço.
+  await page.goto("/#/site/o-ciclo");
 
   const ciclo = page.getByTestId("ciclo-do-produto");
   await expect(ciclo).toBeVisible();
@@ -65,22 +69,20 @@ test("a landing mostra o ciclo, marca o que ainda não existe, e desdobra ao cli
   await expect(page.getByTestId(`estagio-detalhe-${primeiro.id}`)).toContainText(primeiro.detalhe.slice(0, 40));
 
   /**
-   * A promessa continua sendo a primeira coisa: o círculo é MAPA, não primeira
+   * O título da página vem ANTES do círculo: o diagrama é MAPA, não primeira
    * impressão. Denso na primeira tela é a definição de não se vender bem.
    *
-   * SPEC-83 — a manchete mudou, e o assunto deste trecho não. Era
-   * *"Do diagrama ao backlog"*, que prometia um DESTINO: o mesmo defeito que o
-   * §314 achou no corpo da página, sobrevivendo no título. O usuário decidiu
-   * trocá-la — *"não é até o backlog, é esse conceito que acompanha
-   * processos"* — e agora ela fala de permanência.
+   * O seletor é o `h1`, e não o texto: prender a ORDEM da página ao enunciado
+   * exato faria toda revisão de copy quebrar um teste que não é sobre copy —
+   * `site.travas.test.tsx` é quem afirma o conteúdo.
    *
-   * O seletor passou a ser o `h1`, e não o texto: prender a ORDEM da página ao
-   * enunciado exato faria toda revisão de copy quebrar um teste que não é sobre
-   * copy. `landing.travas.test.tsx` é quem afirma o conteúdo da manchete.
+   * **SPEC-95 (§342) — e o `h1` desta página é a pergunta**, não a manchete do
+   * produto: cada página do site tem título próprio, e a manchete ficou na capa,
+   * que é onde ela é a primeira coisa que alguém lê.
    */
-  const promessa = page.getByRole("heading", { level: 1 });
-  await expect(promessa).toBeVisible();
-  const caixaPromessa = await promessa.boundingBox();
+  const titulo = page.getByRole("heading", { level: 1 });
+  await expect(titulo).toBeVisible();
+  const caixaTitulo = await titulo.boundingBox();
   const caixaCiclo = await ciclo.boundingBox();
-  expect(caixaPromessa!.y).toBeLessThan(caixaCiclo!.y);
+  expect(caixaTitulo!.y).toBeLessThan(caixaCiclo!.y);
 });
