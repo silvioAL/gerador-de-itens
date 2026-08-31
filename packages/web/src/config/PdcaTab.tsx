@@ -21,9 +21,11 @@ import {
   type FeedbackPdca,
   type SolicitacaoAjuste,
   type CadenciaPdca,
+  type MetricasDoCiclo,
 } from "../api/client";
 import type { AreaConfig } from "../navegacao/rota";
 import { useMontado } from "../state/useMontado";
+import { PainelDaAnalise } from "./PainelDaAnalise";
 import { simularItemComAjuste } from "./previaDoAjuste";
 import { ConstrutorDeForma, descreverForma } from "./FormaDoDesenho";
 
@@ -94,6 +96,9 @@ export function PdcaTab({ config, timeAtivo, onAbrirArea, onFichaMudou }: PdcaTa
   const [pipeline, setPipeline] = useState<ConfigPipelineAgentes | null>(null);
   const [emEstudio, setEmEstudio] = useState<FeedbackPdca | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  /** SPEC-94 fatia Z — o ciclo medido. Recalculado a cada ação desta tela:
+   *  decidir um pedido muda a fila e o tempo até a decisão. */
+  const [metricas, setMetricas] = useState<MetricasDoCiclo | null>(null);
 
   /**
    * §281 — `recarregar` roda depois de TODA ação desta tela, e a resposta pode
@@ -103,7 +108,7 @@ export function PdcaTab({ config, timeAtivo, onAbrirArea, onFichaMudou }: PdcaTa
   const montado = useMontado();
 
   async function recarregar() {
-    const [cfg, fbs, ajs, regs, pipe] = await Promise.all([
+    const [cfg, fbs, ajs, regs, pipe, mets] = await Promise.all([
       apiPdca.config().catch(() => CADENCIA_PADRAO),
       apiPdca.listarFeedback().catch(() => []),
       apiPdca.listarAjustes(timeAtivo).catch(() => []),
@@ -115,6 +120,10 @@ export function PdcaTab({ config, timeAtivo, onAbrirArea, onFichaMudou }: PdcaTa
       apiRegras.obter().catch(() => null),
       // SPEC-50 — o outro documento que o ajuste alcança: os papéis da esteira.
       apiPipelineAgentes.obter().catch(() => null),
+      // SPEC-94 fatia Z — as métricas do ciclo. `null` no erro, e não um objeto
+      // zerado: o painel precisa distinguir "não deu para medir" de "não há o
+      // que medir", e um zero fabricado aqui apagaria a diferença.
+      apiPdca.metricas(timeAtivo).catch(() => null),
     ]);
     // §266 — mesma régua do `ProdutosTab`: o formulário é de quem digita. O
     // `recarregar` roda depois de TODA ação desta tela (tratar feedback,
@@ -127,6 +136,7 @@ export function PdcaTab({ config, timeAtivo, onAbrirArea, onFichaMudou }: PdcaTa
     setAjustes(ajs);
     setRegras(regs);
     setPipeline(pipe);
+    setMetricas(mets);
   }
 
   useEffect(() => {
@@ -171,6 +181,17 @@ export function PdcaTab({ config, timeAtivo, onAbrirArea, onFichaMudou }: PdcaTa
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
       {erro && <p style={{ fontSize: 12, color: "var(--vermelho)", margin: 0 }}>{erro}</p>}
+
+      {/**
+       * ── 0. Como o ciclo está andando (SPEC-94 fatia Z) ──
+       *
+       * **Vem antes das listas, e a ordem é argumento.** As seções abaixo
+       * mostram os itens um a um — é o material da decisão. Esta mostra o que só
+       * se vê no conjunto: o que está parado, o que se repete, e o que foi
+       * coletado e ninguém leu. Uma análise que começa pelo primeiro card da
+       * lista é a que o §3 da SPEC-94 descreve como inexistente.
+       */}
+      <PainelDaAnalise metricas={metricas} />
 
       {/* ── 1. O que disseram (o Check que não existia) ── */}
       <section data-testid="feedbacks-do-ciclo">

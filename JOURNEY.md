@@ -15050,3 +15050,152 @@ Nenhum apareceria em `textContent`:
 609 engine · 133 llm · 122 aplicação · 956 web · 311 server · 42 gateway-falso ·
 125/125 E2E · build, typecheck e lint limpos. As seis páginas capturadas contra
 `:8080` nos dois temas, e o site inteiro medido em 360/768/1440.
+
+## §343 — a etapa de análise que faltava ao PDCA, e o ganho que a página deixava passar (SPEC-94)
+
+Rodada autônoma: o usuário revisou a SPEC-94 comigo, pediu para eu seguir sozinho
+e se ausentou. As decisões que tomei estão ditas abaixo.
+
+### O que a revisão da SPEC mediu, antes de qualquer código
+
+Quatro correções do usuário, e a primeira reorganizou tudo:
+
+> *"não é PDCA sem análise crítica muito bem estruturada"*
+
+Medido contra a SPEC-39 e o código, o ciclo do produto é:
+
+```
+alguém SENTE algo → escreve um texto → vira solicitação → alguém APROVA → aplica
+```
+
+com gatilho de **cadência de uso individual** (*"a cada 5 usos do mesmo
+usuário"*). **Isso é Plan, Do e Act.** Ninguém pergunta quantos pediram a mesma
+coisa, nem se o ajuste anterior funcionou. O gatilho ser uso individual é a
+evidência: ele mede que alguém usou o produto, não que algo mereça ser discutido.
+
+E há vocabulário para isso. **Deming recusava a própria sigla** — *"I don't use
+check. Check is too closely associated with inspection"* —; para ele é **Study**:
+prever, estudar o resultado, revisar a teoria. O produto tem 3 das 4 peças para
+Study de verdade (a regra é hipótese, `pendencias` é previsão, o PDCA revisa a
+teoria); falta o resultado real, que é **a mesma peça que a SPEC-96 pede**.
+
+As outras três correções: **são dois PDCAs aninhados** (o de configuração é uma
+das fontes do de melhoria, não o errado); **ele precisa de métricas próprias**; e
+**o site deixava passar o valor de nivelar times**.
+
+### O que implementei: a fatia Z
+
+**As métricas do ciclo de baixo — e elas são calculáveis hoje**, sem a porta de
+volta que a SPEC-96 pede, porque o dado já está em `solicitacoes_ajuste` e
+`pdca_feedback`.
+
+`engine/src/pdca/metricas.ts`, função pura: tempo até a decisão (mediana), fila e
+a espera mais velha, taxa de invalidação, recusa sem motivo, **concentração por
+recurso**, conversão de sinal em ajuste, e **o sinal que morre**.
+
+Duas escolhas de cálculo que valem registro:
+
+- **Mediana, não média.** Um pedido esquecido por meses puxa a média para um
+  número que não descreve nenhum caso real. A espera extrema tem métrica própria,
+  em vez de contaminar esta.
+- **A taxa de invalidação conta sobre TODAS as decididas, inclusive as
+  aplicadas.** Com denominador menor, o número **pioraria sozinho** conforme os
+  pedidos aprovados fossem aplicados — que é o pior defeito que uma métrica pode
+  ter.
+
+E o relógio entra por parâmetro: `Date.now()` escondido num cálculo é estado, faz
+o mesmo dado produzir números diferentes conforme o dia, e obriga o teste a
+mockar tempo. A suíte prova tudo com data fixa.
+
+### A métrica que vale contra nós
+
+`sinalQueMorre` conta o feedback que ficou em `novo` por mais de um mês. O produto
+**interrompe quem trabalha a cada 3 gerações** para perguntar *"o que faltou ou
+sobrou?"* — se a resposta apodrece, estamos gastando a atenção de quem trabalha
+para alimentar um arquivo.
+
+Ela fica em destaque quando é maior que zero, e o texto diz as duas saídas
+honestas: **responder, ou parar de perguntar.** Deixar como está não é uma delas.
+Esconder isso num rodapé seria coletar sinal e sonegar o resultado a quem o deu.
+
+### A régua que governa o painel: `null` ≠ `0`
+
+**Um conjunto vazio não pode parecer um resultado bom.** `0%` de invalidação
+sobre um ciclo em que ninguém decidiu nada lê como *"está tudo ótimo"* — é a
+forma mais barata de um painel mentir. Cada medida sem dado diz **"ainda não
+há"**, e há teste para isso; desliguei a régua (trocando o texto por `0%`) e vi o
+caso ficar vermelho.
+
+Mesmo motivo para o painel **não renderizar nada** quando a chamada falha:
+falhar em medir não é medir zero.
+
+### O ganho que a página deixava passar (§6.1)
+
+> *"as páginas iniciais deixam passar que o sistema também entrega valor ao
+> padronizar as quebras: se diversos times usarem, ficam nivelados."*
+
+**Conferido, e ele tinha razão:** as sete linhas da tabela *"Os ganhos, e o
+mecanismo de cada um"* do `CONCEITO.md` falavam todas do time **consigo mesmo**.
+Nenhuma falava de um time em relação a outro — e o site herdou o buraco, porque
+desenha o que a fonte canônica diz.
+
+A linha entrou no `CONCEITO.md`, e a peça `TimesNivelados` entrou na página do
+conceito. **O mecanismo é estrutural, não treinamento:** o catálogo de stacks é da
+organização e não tem ponteiro de time (SPEC-43), o modelo do item é configuração,
+e a derivação é determinística — *o padrão é o que produz o artefato*.
+
+E a **válvula entra na mesma peça, com o mesmo peso**: padronizar o que deve
+variar é o defeito clássico da governança, e é o que faz um time construir um
+caminho paralelo. Mostrar o nivelamento sem a saída seria vender o defeito.
+
+### O que a stack real mostrou e o teste não mostraria
+
+- **"0 h" no tempo até decidir.** Verdade — pedidos decididos no mesmo instante em
+  que nasceram — e lê como defeito. O número estava certo; a palavra, errada.
+  Virou *"menos de 1 h"*, com caso próprio.
+- **A concentração funciona com dado de verdade:** `regras: 7 pedidos`,
+  `pipeline-agentes: 1`. É a promessa dos cinco times do `CONCEITO.md` —
+  *"se cinco times violam o mesmo padrão, o padrão está errado"* — que a SPEC-94
+  §2.3 mediu como ganho sem mecanismo, agora computada.
+
+### Um erro meu que derrubou seis casos alheios
+
+Acrescentar `apiPdca.metricas` quebrou seis casos da `PdcaTab.test.tsx` que nada
+têm a ver com métricas. A causa: `apiPdca.metricas(…).catch(…)` **lança de forma
+síncrona** quando o método não existe no mock — o `.catch` nem chega a ser
+chamado, e o `recarregar` inteiro morre junto com a tela. Vale como aviso: um
+`.catch()` protege a promessa, não a chamada.
+
+### As decisões que tomei sozinho
+
+1. **Implementei a fatia Z e o §6.1, não a escala de maturidade.** É a ordem que a
+   própria SPEC revisada estabeleceu: maturidade não é retrato, é mecanismo — e
+   publicar a escada antes da análise entrega um selo que ninguém sabe como mudar.
+2. **A leitura das métricas é aberta a qualquer sessão**, como o `GET
+   /pdca/feedback` já é. O ciclo de melhoria é do time; e uma das métricas mede o
+   próprio produto — escondê-la de quem responde ao balão seria pedir sinal e
+   sonegar o resultado.
+3. **30 dias para o sinal "morrer"** é escolha, não medição, e é parâmetro da
+   função — é o tipo de número que a primeira análise de verdade vai querer
+   discutir.
+4. **O painel vem ANTES das listas**, e há E2E que afirma isso por coordenada. As
+   listas mostram os itens um a um; ele mostra o que só se vê no conjunto.
+
+### O que NÃO foi feito, e o que não verifiquei
+
+- **As fatias Y (coleta qualitativa estruturada), X (a análise como objeto) e W
+  (o dashboard sobre o fluxo)** da SPEC-94. A Y exige migração de banco e mudança
+  na coleta; preferi entregar a Z inteira e verificada a três pela metade.
+- **A escala de maturidade** (fatias A–G) e as páginas do site que dependem dela.
+- **A demanda real ponta a ponta** continua sendo o primeiro item da recomendação,
+  e continua sem acontecer — é o único que não depende de código.
+- **Um E2E falhou uma vez e não reproduziu.** `jornada-e-cenarios.spec.ts:91`
+  (stacks globais) caiu numa execução completa, passou isolado e passou na
+  repetição completa. Não toquei em stacks, e **não consegui atribuir a causa** —
+  fica dito como observado, não como diagnosticado.
+- **Leitor de tela.** O painel usa texto e estrutura, sem depender de cor; ninguém
+  o ouviu.
+
+618 engine · 133 llm · 122 aplicação · 966 web · 311 server · 42 gateway-falso ·
+128/128 E2E · build, typecheck e lint limpos. Painel verificado contra `:8080`
+nos dois temas, com dado real do banco de trabalho.

@@ -10,7 +10,7 @@ export {
   type ComparacaoDeVariantes,
   type LadoDaComparacao,
   type ResultadoDaAdocao,
-} from "./variante/variantes.js";
+} from "./variante/variantes.js";
 /** SPEC-86 — a soma das regras do time com as do produto, com procedência. */
 export {
   chaveDaRegra,
@@ -249,6 +249,16 @@ export {
   type SecaoDeRegras,
   type SecaoDeChecklist,
 } from "./pdca/ajusteDeRegras.js";
+/** SPEC-94 fatia Z — o ciclo de configuração, medido. A entrada da análise
+ *  crítica que não depende de canal externo nenhum. */
+export {
+  metricasDoCiclo,
+  DIAS_PARA_SINAL_MORRER,
+  type MetricasDoCiclo,
+  type SolicitacaoParaMetrica,
+  type FeedbackParaMetrica,
+  type ContagemDeRecurso,
+} from "./pdca/metricas.js";
 export { gerarDiagramaHtml, type OpcoesGerarDiagramaHtml } from "./diagrama-html/gerarDiagramaHtml.js";
 export {
   hashCurto,

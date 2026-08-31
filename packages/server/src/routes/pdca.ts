@@ -9,6 +9,7 @@ import { ALVO_CONFLITO_CONFIG, configDocumentos, pdcaFeedback, pdcaUsos, quebras
 import {
   aplicarOperacao,
   aplicarOperacaoNoPipeline,
+  metricasDoCiclo,
   recursoAlvoDaOperacao,
   secaoDaOperacao,
   type OperacaoDeAjuste,
@@ -325,6 +326,52 @@ export async function registrarRotasPdca(app: FastifyInstance, { db, diretorioCo
       .returning();
     registrarAuditoria(db, { email: req.usuario!.email, acao: "atualizar", recurso: "pdca_feedback", recursoId: id });
     return { id, estado: reaberto.estado };
+  });
+
+  /**
+   * SPEC-94 fatia Z (§343) — **o ciclo de configuração, medido.**
+   *
+   * O usuário: *"o da configuração faz parte, precisamos de métricas dele."*
+   *
+   * Das três entradas que uma análise crítica precisa (SPEC-94 §4.4), esta é a
+   * única calculável **hoje**: o dado já está gravado, e não depende da porta de
+   * volta que a SPEC-96 pede.
+   *
+   * **Leitura aberta a qualquer sessão**, pelo mesmo motivo do `GET
+   * /pdca/feedback`: o ciclo de melhoria é do time, não de quem administra. E
+   * uma das métricas mede o próprio produto — esconder isso de quem responde ao
+   * balão seria pedir sinal e sonegar o resultado.
+   *
+   * O cálculo é do engine, puro; aqui só se lê o banco e se passa o relógio.
+   */
+  app.get("/pdca/metricas", { preHandler: exigirSessao }, async (req) => {
+    const { timeId } = req.query as { timeId?: string };
+    const meus = req.usuario!.timeIds;
+    const visiveis = timeId ? meus.filter((t) => t === timeId) : meus;
+
+    const [todasSolicitacoes, todosFeedbacks] = await Promise.all([
+      db.select().from(solicitacoesAjuste),
+      db.select().from(pdcaFeedback),
+    ]);
+
+    // O mesmo recorte do `GET /ajustes` (§273): pedido sem time é da
+    // organização e aparece para todo mundo; com time, só para quem é dele.
+    // Duas listagens com regras de visibilidade diferentes fariam a métrica
+    // contar o que a tela não mostra.
+    const solicitacoes = todasSolicitacoes.filter((s) => s.timeId === null || visiveis.includes(s.timeId));
+    const feedbacks = todosFeedbacks.filter((f) => f.timeId === null || visiveis.includes(f.timeId));
+
+    return metricasDoCiclo(
+      solicitacoes.map((s) => ({
+        recurso: s.recurso,
+        estado: s.estado,
+        criadoEm: s.criadoEm,
+        decididoEm: s.decididoEm,
+        motivoDaDecisao: s.motivoDaDecisao,
+      })),
+      feedbacks.map((f) => ({ estado: f.estado, criadoEm: f.criadoEm })),
+      new Date(),
+    );
   });
 
   // ── Solicitações de ajuste (o caminho de quem NÃO pode editar) ──
