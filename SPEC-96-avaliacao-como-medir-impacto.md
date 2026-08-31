@@ -140,6 +140,58 @@ A métrica de mercado é o **ticket bounce-back rate**: o item volta por falta d
 informação. Que é `%C&A` medido num handoff específico — a mesma família, e é
 por isso que ela encaixa no §2 em vez de competir com ele.
 
+### 4.0 ⚠️ A ressalva ao DevEx, e por que ela reordena esta seção
+
+> Do usuário: *"DevEx parece falar de produtividade, mas tenho certas ressalvas:
+> se passa muito mais tempo tentando entender o que deve ser feito — em reuniões,
+> codebase atual, regras — do que apertando botões."*
+
+**A ressalva procede em duas frentes, e a segunda muda o vocabulário desta SPEC.**
+
+**Primeira: o enquadramento é mesmo de produtividade.** O paper se chama *"DevEx:
+What Actually Drives Productivity"*, e o framework é vendido por fornecedores de
+*developer productivity*. Nesse enquadramento a carga cognitiva entra como
+**variável explicativa da saída** — mede-se para explicar por que a saída não sobe.
+Aqui ela não é meio: **é o objeto**.
+
+**Segunda, e a que importa: a premissa do usuário é empiricamente verdadeira.**
+
+| Estudo | Achado |
+|---|---|
+| Xia et al. (2018), 3.148 horas de 78 profissionais | **~58%** do tempo em compreensão de programa |
+| Minelli et al. (2015), 740 sessões de 18 desenvolvedores | **~70%** |
+
+E os dois medem apenas o que acontece **dentro da IDE**. Reunião, caça à regra da
+casa e descoberta de decisão anterior **não entram nessas contas** — o que empurra
+o total ainda mais para cima. *"Apertar botões"* é a minoria clara do tempo, e
+otimizá-la é otimizar o pedaço pequeno.
+
+### 4.0.1 O vocabulário que serve melhor: os três tipos de carga
+
+O DevEx trata *cognitive load* como **uma coisa só**, e por isso não diz o que
+fazer com ela. **Sweller distingue três**, e o *Team Topologies* (Skelton & Pais)
+as aplica a times de software — é essa distinção que torna a coisa acionável:
+
+| Tipo | O que é | Como se trata | O produto |
+|---|---|---|---|
+| **Intrínseca** | fundamental ao problema — *"como funciona uma classe Java?"* | treino, escolha de tecnologia, contratação | **não toca**, e não deveria |
+| **Extrínseca** | do ambiente — *"como configuro este serviço mesmo?", "qual a regra da casa para isto?", "onde ficou registrado que decidimos X?"* | **eliminar**; boa parte é automatizável | **é exatamente o que ele ataca** |
+| **Germane** | o pensamento que agrega valor — *"como este serviço deve conversar com o ABC?"* | **liberar espaço para ela** | é o que sobra quando a extrínseca sai |
+
+> ### A tese fica mais precisa: **o produto reduz carga extrínseca para liberar germane.**
+
+Isso é literalmente a receita do *Team Topologies* — *minimizar a intrínseca,
+eliminar a extrínseca, deixar espaço para a germane* — e as perguntas que a camada
+perene responde são todas da coluna do meio: *qual é o padrão da casa · que campos
+este tipo exige · o que já foi decidido e recusado · este caminho estoura a régua*.
+
+**Cada uma dessas é uma pergunta que hoje se responde em reunião ou lendo código.**
+
+E há uma consequência de escopo: **a unidade certa não é o desenvolvedor.** A
+compreensão que este produto ataca acontece antes e fora dele — no negócio, na
+arquitetura, na decisão. *Team Topologies* fala em **carga cognitiva do time**, e é
+essa a unidade. É a mesma correção do §3, chegando por outro caminho.
+
 ### 4.1 A calibração — a melhor ideia desta avaliação
 
 O usuário disse *"onde por algum grau de confiança"*, e **o produto já emite esse
@@ -256,7 +308,8 @@ tradução é justamente o trabalho do adaptador.
 |---|---|
 | **VSM** (lead/process time, flow efficiency, **%C&A**, rolled %C&A) | **a espinha desta avaliação** — e o número que desmonta "dev mais rápido" (§2.1) |
 | **GQM / GQ(I)M** (Basili) | o método: objetivo → perguntas → métricas, **ancorado no fluxo** |
-| **DevEx** (feedback loops · cognitive load · flow state) | o vocabulário do §4, e o alerta de que dado de sistema não basta |
+| **Carga cognitiva** (Sweller: intrínseca · extrínseca · germane) via **Team Topologies** | **o vocabulário central do §4** — e a única distinção que torna "custo cognitivo" acionável, porque separa o que se trata com treino do que se elimina com design |
+| **DevEx** (feedback loops · cognitive load · flow state) | os *feedback loops* e o alerta de que dado de sistema não basta. **Com ressalva (§4.0):** o enquadramento é de produtividade, e trata carga cognitiva como uma coisa só |
 | **DORA** (deploy, lead time, taxa de falha, restauração) | o padrão que um CTO conhece — e **as quatro exigem dado de fora**, confirmando o §6.1 |
 | **SPACE** | o alerta contra **métrica única** e contra medir **indivíduo** |
 | **EBM** (Scrum.org) | valor e capacidade em linguagem de gestão — **fala com o público não técnico** da SPEC-95 §1.1 |
@@ -273,7 +326,12 @@ com o que importava.
 
 ## 8. O que esta SPEC RECUSA
 
-- **"Desenvolvedor mais rápido" como tese de valor.** O §2.1 mostra por quê.
+- **"Desenvolvedor mais rápido" como tese de valor.** O §2.1 mostra por quê pelo
+  lado do fluxo, e o §4.0 pelo lado do tempo: **58–70% dele é compreensão**, e
+  esses estudos nem contam reunião.
+- **Tratar "carga cognitiva" como uma coisa só.** Sem separar extrínseca de
+  intrínseca (§4.0.1), a medida não diz o que fazer — e o produto passaria a
+  reivindicar redução de carga que é de treino e contratação, não dele.
 - **Uso apresentado como impacto.** "500 itens derivados" é atividade.
 - **Métrica por pessoa.** DORA e SPACE são explícitos, e aqui o risco é concreto:
   *"quem escreveu itens que voltaram"* é fácil de extrair do modelo do §6.3, e é a
@@ -367,5 +425,7 @@ pelo tracker.** A ordem:
 - VSM + GQM (métricas ancoradas no fluxo) — <https://arxiv.org/pdf/2601.03574>
 - GQM, Basili — <https://en.wikipedia.org/wiki/GQM>
 - **DevEx: What Actually Drives Productivity** (Noda, Storey, Forsgren, Greiler), ACM — <https://cacm.acm.org/practice/devex-what-actually-drives-productivity/>
+- **Measuring Program Comprehension: A Large-Scale Field Study with Professionals** (Xia et al., IEEE TSE) — <https://baolingfeng.github.io/papers/tsecomprehension.pdf>
+- Carga cognitiva de time (Sweller aplicado por *Team Topologies*) — <https://itrevolution.com/articles/cognitive-load/> · <https://www.devopsinstitute.com/team-cognitive-load/>
 - Ticket bounce-back rate — <https://www.minware.com/guide/metrics/ticket-bounce-back-rate>
 - DORA × SPACE × DX Core 4 — <https://www.swarmia.com/blog/comparing-developer-productivity-frameworks/>
