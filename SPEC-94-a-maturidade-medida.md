@@ -142,13 +142,83 @@ obrigação: sem ela, o patamar é adjetivo.
 | 1 | **Tácito** | a regra existe na cabeça das pessoas | as áreas de configuração estão vazias | 1 — *Initial* |
 | 2 | **Escrito** | existe wiki, PDF, documento — texto que ninguém consulta na hora de decidir | há contexto de produto preenchido, mas nenhum tipo/padrão estruturado | 2 — *Managed* |
 | 3 | **Estruturado** | a regra virou **dado**: tipos de componente, campos obrigatórios, templates, checklists | há `NodeTypeConfig`/`RegrasConfig`/`checklistProcesso` povoados | 3 — *Defined* |
-| 4 | **Executável** | a regra **roda**: réguas com número, checagens que produzem apontamento e derivam item | há `Requisito` **com** `checagem`, e tokens de design system | 4 — *Quantitatively Managed* |
-| 5 | **Evoluído** | a régua muda a partir do uso, com prévia e aprovação | há ajustes de PDCA **aplicados** sobre a configuração (SPEC-39) | 5 — *Optimizing* |
+| 4 | **Executável** | a regra **roda**: réguas com número, checagens que produzem apontamento e derivam item | há `Requisito` **com** `checagem`, e tokens de design system | 3 consolidado, **tocando** o 4 |
+| 5 | **Evoluído** | a régua muda a partir do uso, **e dá para provar que melhorou** | ⚠️ **não é medível hoje** — ver §2.3 | 5 — *Optimizing* |
+
+### 2.2.1 ⚠️ Correção: o mapeamento para CMMI 4 e 5 era otimista
+
+A primeira escrita desta SPEC alinhou o patamar 4 com *Quantitatively Managed* e o
+5 com *Optimizing*. **O usuário apontou o buraco** — *"o sistema ainda conta com
+pouca coisa relacionada a métricas"* — e a medição lhe deu razão (§2.3).
+
+- **Patamar 4 não é CMMI 4.** Régua com número é **conformidade contra um alvo**;
+  CMMI 4 pede *baseline de performance do processo* e previsibilidade
+  estatística — *"nossa taxa é 2,3 ± 0,4"*. São coisas diferentes, e o produto só
+  tem a primeira.
+- **Patamar 5 não é medível hoje.** O produto tem o **mecanismo** da otimização
+  (o PDCA da SPEC-39) sem a **evidência** dela. "A regra mudou" é um evento
+  registrado; "a mudança melhorou" precisa de linha de base, e não há nenhuma.
+
+Isso responde a pergunta em aberto §7.5 antes de a fatia A começar: **sim, o
+patamar 5 é uma casa vazia — e por falta de infraestrutura, não por falta de
+uso.**
 
 > **A escada não é uma nota, e isso é decisão.** O MITRE e o CMU/Accenture avaliam
 > por dimensão justamente porque uma organização é nível 4 em teste e nível 1 em
 > arquitetura ao mesmo tempo. **O patamar é por área de configuração**, e o do
 > time é o mínimo — não a média. Média esconde o buraco, e o buraco é o produto.
+
+### 2.3 O que existe de métrica, medido — e o que falta para o topo da escada
+
+> Pergunta do usuário: *"quanto ao nível 4 que vc citou de CMMI, o que
+> precisaríamos ter para chegar no nível 5? entendo que o sistema ainda conta com
+> pouca coisa relacionada a métricas."*
+
+Medido contra o repositório, e não de memória:
+
+| O que existe | O que faz | O que **não** faz |
+|---|---|---|
+| `engine/src/remedicao/remedicao.ts` | roda o motor duas vezes — *como está* × *como ficaria* | é **prospectivo e em memória** (funções puras, sem I/O): responde *"o que acontece **se** eu aceitar"*, nunca *"o que aconteceu **depois** que aceitei"* |
+| `quebras.diagrama` (jsonb) | guarda o estado corrente | não é snapshot datado — salvar **sobrescreve**, e o histórico se perde |
+| `auditoria` | `email · acao · recurso · timestamp` | guarda **ação**, nunca **valor de métrica** |
+| `execucoes_ia` | histórico de chamadas, com `LIMITE_DE_HISTORICO` | é telemetria de IA, não medida de processo |
+| `pdca_feedback`, `solicitacoes_ajuste` | o laço de decisão (SPEC-39) | ninguém mede o **efeito** do ajuste depois de aplicado |
+
+**Nenhuma das 11 tabelas guarda série temporal de medição.** Nada no sistema sabe
+que a prontidão do time era 0,72 em março.
+
+#### O que precisaria existir, em ordem de dependência
+
+1. **`medicoes` — a tabela que não existe.** `(time, quebra, indicador, valor,
+   versão da config, timestamp)`. É a fundação: **sem série, nada abaixo é
+   possível**, e é por isso que ela vem antes de qualquer tela.
+2. **Baseline por indicador.** Média e variação num período. É o que transforma
+   *"0,72"* em *"0,72, dentro da sua faixa de 0,65–0,80"* — e é literalmente o que
+   separa CMMI 3 de CMMI 4.
+3. **Remedição retrospectiva.** Hoje só existe a prospectiva. Provar que uma
+   mudança melhorou exige comparar contra a linha de base **real**, depois do
+   fato. É o mecanismo que falta para o patamar 5 deixar de ser casa vazia.
+4. **Análise causal entre times** — *Causal Analysis and Resolution*, a prática
+   que define o CMMI 5.
+
+#### ⚠️ E aqui há um ganho sem mecanismo, dentro do documento canônico
+
+O `CONCEITO.md` promete, na seção *"Por que é um ciclo, e não uma esteira"*:
+
+> *"Se cinco times violam o mesmo padrão, o padrão está errado, não os times."*
+
+**Procurei o código que computa isso. Não existe.** `violacoesEmAberto()` é por
+quebra, e nada no engine nem no server agrega violações entre times.
+
+É a régua da SPEC-83 §2 — *todo ganho tem mecanismo* — sendo violada **pelo
+próprio arquivo que a estabelece**, e passou porque nenhuma trava lê o
+`CONCEITO.md`. A frase descreve exatamente a prática que define o CMMI 5, e é
+promessa até alguém a construir.
+
+**Duas saídas, e as duas são honestas:** construir a agregação (fatia própria,
+depende do item 1), ou marcar a frase como direção declarada. Enquanto nenhuma
+das duas acontecer, ela é o tipo de coisa que esta SPEC existe para não deixar
+passar.
 
 ### 2.2 O que isso responde da pergunta do usuário
 
@@ -354,10 +424,17 @@ usuário trouxe sobre o passo curto e o caminho longo.
    a equivalência com CMMI aparece como **nota lateral**, para quem procura por
    ela.
 
-5. **Quanto do patamar 5 é mensurável hoje?** O PDCA existe (SPEC-39), mas não
-   medi quantos ajustes aplicados um time real acumula. **Se for raro, o patamar 5
-   é uma casa quase sempre vazia** — e uma escala cujo topo ninguém alcança
-   desmotiva em vez de guiar. Isto precisa ser medido **antes** da fatia A.
+5. ~~**Quanto do patamar 5 é mensurável hoje?**~~ **✅ Respondida, e a resposta é
+   "nada".** O §2.3 mediu: não existe série temporal no sistema, então não há
+   linha de base, e sem linha de base não há como provar melhoria. **O patamar 5
+   é casa vazia por falta de infraestrutura, não por falta de uso** — e a
+   pergunta certa passou a ser: **a fatia da tabela `medicoes` vem antes da
+   escala?**
+
+   **Recomendação: vem.** Publicar uma escada cujo topo é inalcançável por
+   construção é vender um degrau que não existe — a mesma promessa falsa que a
+   SPEC-76 impediu na prosa. Ou a escala nasce com quatro patamares e o quinto
+   declarado como "ainda não medimos isto", ou a `medicoes` vem primeiro.
 
 ---
 
