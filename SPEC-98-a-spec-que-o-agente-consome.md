@@ -197,6 +197,60 @@ Então o rastro cresce de um campo para dois — *o issue existe* e *a spec cheg
 e a tela diz os dois. É o que permite **reenviar só o que falta**, em vez de
 repetir a exportação inteira e arriscar duplicar issue.
 
+#### A espera não é opcional: a segunda chamada depende do RETORNO da primeira
+
+> *"provavelmente depois de gerar o item é necessário aguardar o retorno da
+> primeira chamada, pois ele vai ter um id do issue tracker, e só depois subir a
+> spec."*
+
+**É dependência de dado, não de preferência** — e isso fecha algumas portas de
+implementação que pareceriam otimizações:
+
+- **Não há como paralelizar as duas chamadas.** O id só existe depois que o issue
+  existe. Disparar as duas juntas seria mandar a spec para um destino que ainda
+  não tem endereço.
+- **Não há como pré-calcular o id.** Quem o gera é o tracker, não nós — e inventar
+  um identificador local para "corrigir depois" é o tipo de atalho que produz
+  anexo órfão.
+
+##### O elo entre os dois mundos já existe
+
+`Atividade.chave` é **estável entre regenerações** (SPEC-41), e a SPEC-49 já grava
+o rastro `chave → link`. É esse par que casa cada spec com o issue certo:
+
+```
+chave local  ──1ª chamada──▶  id do tracker  ──2ª chamada──▶  spec anexada
+```
+
+Sem ele, um lote de cinco itens que volta com cinco ids não teria como saber
+**qual id é de qual item** — e anexar a spec no issue errado é pior que não
+anexar, porque parece certo.
+
+##### O lote parcial manda só o que ganhou id
+
+Se a primeira chamada cria três de cinco, **só três specs sobem**. Os dois que
+falharam continuam sem issue e sem spec — estado coerente, e reenviável. É a régua
+da SPEC-49 estendida: falha por item, agora em duas etapas.
+
+##### ⚠️ E se o agente não devolver o id na hora?
+
+Esta é a pergunta de contrato que a implementação precisa responder antes de
+escrever a primeira linha. Um agente pode criar o issue de forma **assíncrona** e
+só ter o id depois.
+
+As saídas, e nenhuma é gratuita:
+
+| Saída | Custo |
+|---|---|
+| **Exigir id síncrono no contrato** | simples, e recusa agentes que trabalham em fila |
+| **Aceitar retorno depois** (callback/polling) | fecha o caso geral, e traz estado pendente para guardar e reconciliar |
+| **Deixar a spec pendente até o id chegar** | honesto, e exige uma fila própria — que é trabalho de verdade |
+
+**Recomendação: exigir id síncrono na primeira versão, e dizer isso no contrato.**
+A SPEC-49 já assume resposta síncrona por item (`linkExterno` ou `erro`), então
+não é regra nova — é a mesma, dita em voz alta. Quem tiver agente assíncrono
+resolve do lado dele, que é onde o protocolo mora.
+
 #### E isso muda o §4
 
 O lote deixa de ser um problema do envio inteiro e passa a ser **da segunda
@@ -309,10 +363,11 @@ contagem real (*"lote 3 de 7"*), que é honesta por construção.
 - **B — EARS nos critérios de aceite.** Um validador que reconhece os cinco
   padrões e aponta o que não casa. **Prova:** critério fora de padrão vira aviso
   — nunca erro, porque a régua nasce como sugestão (a mesma escada da SPEC-63).
-- **C — a saída em DUAS chamadas** (§3.2). Subir a história, e **depois** anexar a
-  spec ao issue criado. **Prova:** o rastro tem dois campos, não um; um item com
-  issue e sem spec aparece como tal, e reenviar manda **só o que falta** — sem
-  duplicar issue.
+- **C — a saída em DUAS chamadas** (§3.2). Subir a história, **aguardar o id** que
+  ela devolve, e só então anexar a spec. **Prova:** o rastro tem dois campos, não
+  um; um item com issue e sem spec aparece como tal; reenviar manda **só o que
+  falta**; e num lote parcial **sobem apenas as specs dos itens que ganharam id**
+  — casadas pela `Atividade.chave`, nunca pela ordem da lista.
 - **D — os lotes, só na segunda chamada.** Fatiamento por item, ordem por
   dependência, tamanho configurável. **Prova:** um desenho grande produz N lotes,
   nenhum item é partido, a ordem respeita `resolverDependencias`, e **uma falha
