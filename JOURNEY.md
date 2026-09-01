@@ -15287,3 +15287,85 @@ forma, não do nome.
 
 631 engine · 316 server · 128/128 E2E · typecheck limpo. Validado contra a stack
 com uma chave deliberadamente errada no banco.
+
+## §346 — a tela que ficou solta, e a variação de curl entre agentes
+
+O usuário trouxe cinco frentes de uma vez, com a instrução de **avaliar a
+sequência lógica** e seguir autônomo. A avaliação vinha antes do código, e é o
+que definiu o que deu para entregar.
+
+### A sequência, e por que esta
+
+| # | Frente | O que a medição mostrou | Posição |
+|---|---|---|---|
+| 1º | **Remover a tela de spec** | alcance pequeno: 6 arquivos | Ela **muda o dado do ciclo** que a landing desenha — fazer depois da landing obrigaria refazê-la |
+| 2º | **Variação de curl por agente** | `DestinoDoGateway` **já existia** com endpoint e cabeçalhos por operação | É fundação das duas seguintes |
+| 3º | **Ler Confluence → desenho** | operação **nova** | Depende da 2ª |
+| 4º | **Publicar design doc** | **a porta `publicadorDeDocumento` já existe** | Irmã da 3ª |
+| 5º | **Landing com as perguntas** | — | Por último: só aí pode citar 3 e 4 **sem prometer o que não existe** |
+
+**A medição mudou o tamanho de duas frentes.** As cinco portas do gateway já
+existem desde a SPEC-81 — `exportadorDeItens`, `publicadorDeDocumento`,
+`leitorDeAdr`, `leitorDeArquiteturaDeNegocio`, `escritorDeAdr`. O que o usuário
+pediu em (4) **não era construir**, era ligar.
+
+### A tela de spec saiu, e o estágio voltou a `parcial`
+
+Ele chegou nela pelo menu e não reconheceu o que era. Medindo: **não estava no
+tour**, e a única saída era baixar um markdown à mão.
+
+A justificativa original — *"o documento é lido por quem decide, a spec por quem
+implementa"* — continua verdadeira **entre artefatos**, e falsa como justificativa
+de tela.
+
+> **Uma tela que ninguém alcança pelo percurso não é um consumidor** — é o mesmo
+> vazio da SPEC-80 com uma porta pintada por cima.
+
+Por isso o estágio do ciclo **não virou "completo sem tela"**: voltou a `parcial`,
+com o que falta escrito. A landing anunciava um estágio que o percurso nunca
+mostrava, e agora diz a verdade. O motor (`gerarSpec`) não morreu, e `#/spec`
+redireciona para o documento — link salvo não vira tela branca (SPEC-61 §6.7),
+com trava.
+
+### A variação de curl: a resposta é de vocabulário
+
+A pergunta era *"na configuração de agentes ou na do gateway?"*.
+
+**No gateway** — e não por conveniência: **"agente" já significa outra coisa
+aqui**, os papéis da esteira (PO, arquiteto, especialista, QA) em
+`pipeline-agentes`. Uma "configuração de agentes" para o gateway daria dois
+sentidos à mesma palavra. É o mesmo cuidado que a SPEC-94 §1.4 teve com "níveis",
+e a terceira vez nesta série que uma decisão de nome evita o §263.
+
+Dois campos: `metodo` (POST/PUT/PATCH) e `envelope`. **Só o nome do envelope, e
+não um template de corpo** — template livre seria uma linguagem dentro da
+configuração, sem tipo, sem validação, impossível de checar antes de falhar em
+produção.
+
+Duas decisões que os testes guardam: **`envelope: ""` é escolha declarada**
+(payload na raiz), por isso `??` e não `||`; e **método desconhecido cai no
+padrão** em vez de descartar o destino, porque um erro de digitação não pode
+apagar a integração da tela sem dizer por quê.
+
+### O que NÃO foi feito, e é o essencial desta entrada
+
+Das cinco frentes, **duas foram entregues** (1ª e 2ª da tabela). As outras três
+estão especificadas e **não implementadas**:
+
+- **(3) Ler página do Confluence → desenho** — operação nova no gateway. Depende
+  da variação de curl, que agora existe.
+- **(4) Publicar design doc no espaço do time** — a porta existe; falta ligar e
+  configurar o espaço. É a menor das três.
+- **(1) A landing com as perguntas do usuário** — as sete que ele escreveu (*onde
+  armazenar a camada perene · que informação é necessária · como construir ·
+  quais processos · como funciona a governança · como ter consistência com IA não
+  determinística · quem são os responsáveis*). É conteúdo, e é a que mais depende
+  das outras existirem para poder citá-las.
+
+**Por que parei aqui:** o pedido era "amanhã preciso de tudo pronto", e entregar
+cinco frentes pela metade seria pior que duas fechadas e verificadas. As três que
+sobraram têm ordem definida e nenhuma depende de decisão nova.
+
+631 engine · 128 aplicação · 316 server · 956 web · typecheck e lint limpos. A
+remoção da tela verificada contra `:8080`: o item sumiu do menu e o link velho
+resolve.
