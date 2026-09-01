@@ -249,6 +249,26 @@ export {
   type SecaoDeRegras,
   type SecaoDeChecklist,
 } from "./pdca/ajusteDeRegras.js";
+/**
+ * SPEC-94 (§344) — o pedido de melhoria: feedback e solicitação num fluxo só.
+ *
+ * A união é uma LEITURA, não uma tabela: os dois registros têm ciclos de vida
+ * próprios e legítimos, e o que faltava era enxergá-los como um assunto.
+ */
+export {
+  montarPedidos,
+  ordenar,
+  filtrar,
+  contarPorEstado,
+  resumir,
+  ESTADOS_DO_PEDIDO,
+  ESTADOS_ABERTOS,
+  type PedidoDeMelhoria,
+  type EstadoDoPedido,
+  type FeedbackDoPedido,
+  type SolicitacaoDoPedido,
+  type FiltroDaFila,
+} from "./pdca/pedidosDeMelhoria.js";
 /** SPEC-94 fatia Z — o ciclo de configuração, medido. A entrada da análise
  *  crítica que não depende de canal externo nenhum. */
 export {

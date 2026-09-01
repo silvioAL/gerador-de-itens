@@ -15199,3 +15199,91 @@ chamado, e o `recarregar` inteiro morre junto com a tela. Vale como aviso: um
 618 engine · 133 llm · 122 aplicação · 966 web · 311 server · 42 gateway-falso ·
 128/128 E2E · build, typecheck e lint limpos. Painel verificado contra `:8080`
 nos dois temas, com dado real do banco de trabalho.
+
+## §345 — a credencial que apontava para o próprio dublê (SPEC-89)
+
+O usuário, bloqueado: *"por algum motivo a demo não está usando os mocks conforme
+eu disse que deveria ser, está tentando fazer chamadas reais e estou sem tokens,
+o que quebra tudo"*. E, adiante: *"talvez já esteja implementado e esteja chamando
+devido a configuração"* — que era exatamente o caso.
+
+### Nunca foram chamadas reais
+
+O log do servidor:
+
+```
+[ia/pipeline/arquiteto] falhou: Credencial recusada pelo gateway (HTTP 401).
+Confira a chave de API na aba "Modelo de IA".
+```
+
+**Era o dublê recusando a chave.** A credencial gravada já apontava para
+`gateway-falso:4123/v1` com `modelo-de-mentira` — o destino certo. O que não batia
+era a **chave**: o serviço exige `chave-de-mentira-do-e2e` (do compose), e a
+gravada no banco era outra.
+
+E a mensagem que chegava à tela — *"confira a chave de API"* — fazia parecer
+problema de token de verdade. Daí a impressão de estar gastando chamada.
+
+### O defeito, e por que o 401 era o menor dos dois problemas
+
+`credencialEmVigor` tinha esta linha:
+
+```ts
+if (salva?.baseUrl && salva.chave) return { credencial: salva, simulado: false };
+```
+
+Ela trata **qualquer** credencial gravada como credencial de verdade — inclusive
+uma cujo destino é o dublê declarado pela própria implantação.
+
+O 401 falhava alto. **A chave certa teria falhado em silêncio:** com
+`simulado: false`, o texto escrito pelo dublê chegaria à tela **sem a marca de
+simulado** — exatamente o defeito que a SPEC-74 fatia D existe para impedir, e
+que o comentário do próprio arquivo chama de risco inteiro da rodada
+(*"ninguém notaria até alguém aprovar um documento escrito por um dublê"*).
+
+### A regra nova: se o destino é o dublê, é dublê
+
+Não importa quem gravou. A chave passa a vir **do ambiente** — a mesma fonte que
+o serviço lê, então não há como divergirem — e o resultado vem marcado.
+
+Um gateway real continua vencendo, porque o endereço dele não é o declarado em
+`GATEWAY_FALSO_URL`. A régua do §306 (*declarado vence herdado*) fica de pé; o que
+muda é que ela para de valer para um destino que nunca foi "real".
+
+Barra final e caixa não decidem: `…/v1` e `…/v1/` são o mesmo lugar, e quem
+digitou na tela não tem como saber qual forma o compose usou.
+
+### Como foi provado
+
+Cinco casos novos em `credencialEmVigor.test.ts`, e o desligamento: removi o
+desvio e vi três ficarem vermelhos — inclusive o do `simulado`.
+
+E contra a stack: **gravei de propósito uma chave errada** (`chave-completamente-errada`)
+e a IA continuou respondendo. É a prova que interessa — o produto deixou de
+depender do que alguém gravou um dia.
+
+### Dois achados que NÃO consertei
+
+- **A tela de spec não está no tour.** O usuário chegou nela pelo menu e não
+  entendeu como se conecta. O ciclo promete o estágio *"Gerar specs para
+  construir com IA"* como completo, com rota para ela — e o percurso guiado nunca
+  passa lá. A única ocorrência de "spec" em `useTour.ts` é uma frase sobre
+  preâmbulo. **Fica para avaliação:** ele levantou que os itens já cobrem a
+  necessidade de MCP e *"bastaria organizar"*, e isso é decisão de produto.
+- **`ia-hospedada.spec.ts` › "falar preenche o campo"** falha quando rodado
+  isolado e passa na suíte completa — dependência entre specs. **Não é regressão
+  desta rodada:** reverti a correção, rodei de novo, e ele falha igual com o
+  código original.
+
+### Também nesta rodada, ainda sem tela
+
+O módulo da **fila de pedidos de melhoria** (`engine/src/pdca/pedidosDeMelhoria.ts`,
+13 casos): une feedback e solicitação num fluxo só, ordena por quem espera há mais
+tempo, e filtra. Nasceu de outro incômodo do usuário — *"os pedidos ficam ali
+colapsados"* —, medido em 1086 px de cards para 8 pedidos, sem filtro, busca ou
+ordenação. **A tela vem na próxima**, e o vocabulário levou uma correção dele no
+meio: *"não são chamados, apenas quis passar o conceito"* — a metáfora era da
+forma, não do nome.
+
+631 engine · 316 server · 128/128 E2E · typecheck limpo. Validado contra a stack
+com uma chave deliberadamente errada no banco.

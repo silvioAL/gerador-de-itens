@@ -60,6 +60,72 @@ describe("a credencial de VERDADE sempre vence (SPEC-89 §1)", () => {
   });
 });
 
+describe("a credencial salva que aponta para o PRÓPRIO dublê (§345)", () => {
+  /**
+   * **O defeito que o usuário relatou como "a demo está fazendo chamadas
+   * reais".** Não eram chamadas reais: era o dublê recusando a chave gravada com
+   * `HTTP 401`, e a mensagem da tela — *"confira a chave de API"* — fazia parecer
+   * problema de token de verdade.
+   *
+   * A causa: `if (salva?.baseUrl && salva.chave)` tratava qualquer credencial
+   * gravada como real, inclusive uma apontando para o dublê desta implantação.
+   */
+  const SALVA_NO_DUBLE = {
+    baseUrl: "http://gateway-falso:4123/v1",
+    chave: "chave-velha-que-nao-bate",
+    modelo: "modelo-de-mentira",
+  } as CredencialIa;
+
+  it("**vem marcado como simulado** — era o pior dos dois problemas", () => {
+    /**
+     * O 401 falhava alto. A chave CERTA teria falhado em silêncio: texto escrito
+     * pelo dublê chegando à tela sem marca, que é o defeito que a SPEC-74 fatia D
+     * existe para impedir e que o topo deste arquivo chama de risco inteiro da
+     * rodada.
+     */
+    expect(credencialEmVigor(SALVA_NO_DUBLE, COM_DUBLE)?.simulado).toBe(true);
+  });
+
+  it("a chave vem do AMBIENTE, não da salva — é o que impede as pontas de divergirem", () => {
+    // A chave gravada envelhece; a variável é a mesma que o serviço do dublê lê.
+    const vigor = credencialEmVigor(SALVA_NO_DUBLE, { ...COM_DUBLE, GATEWAY_FALSO_CHAVE: "a-do-compose" } as NodeJS.ProcessEnv);
+
+    expect(vigor?.credencial.chave).toBe("a-do-compose");
+    expect(vigor?.credencial.chave).not.toBe("chave-velha-que-nao-bate");
+  });
+
+  it("barra final e caixa não decidem se o conteúdo é marcado", () => {
+    // Quem digitou o endereço na tela não tem como saber qual forma o compose
+    // usou — e essa diferença não pode governar a marca de simulado.
+    const comBarra = { ...SALVA_NO_DUBLE, baseUrl: "http://gateway-falso:4123/v1/" } as CredencialIa;
+    const comCaixa = { ...SALVA_NO_DUBLE, baseUrl: "HTTP://Gateway-Falso:4123/v1" } as CredencialIa;
+
+    expect(credencialEmVigor(comBarra, COM_DUBLE)?.simulado).toBe(true);
+    expect(credencialEmVigor(comCaixa, COM_DUBLE)?.simulado).toBe(true);
+  });
+
+  it("e o gateway REAL continua vencendo — a régua do §306 não afrouxou", () => {
+    /**
+     * A prova de que a correção não abriu a porta que a SPEC-89 fechou: só o
+     * endereço **declarado como dublê** recebe este tratamento. Qualquer outro
+     * continua sendo credencial de verdade, sem marca.
+     */
+    const vigor = credencialEmVigor(SALVA, COM_DUBLE);
+
+    expect(vigor?.simulado).toBe(false);
+    expect(vigor?.credencial.chave).toBe("chave-de-verdade");
+  });
+
+  it("sem dublê declarado, a mesma credencial é tratada como real", () => {
+    // Numa implantação que não declara o dublê, `gateway-falso:4123` é só um
+    // endereço qualquer — e o produto não tem por que desconfiar dele.
+    const vigor = credencialEmVigor(SALVA_NO_DUBLE, SEM_NADA);
+
+    expect(vigor?.simulado).toBe(false);
+    expect(vigor?.credencial.chave).toBe("chave-velha-que-nao-bate");
+  });
+});
+
 describe("com a declaração, a instalação nova já responde (SPEC-89 §0.1)", () => {
   it("sem credencial, cai no dublê — e vem MARCADO como simulado", () => {
     /**
