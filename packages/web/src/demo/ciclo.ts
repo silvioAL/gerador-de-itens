@@ -323,9 +323,27 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
  * conta lá dentro divergiria desta na primeira mudança (§263). O default é o
  * ciclo real, então quem só quer o número continua chamando sem argumento.
  */
-export function contagemDoCiclo(estagios: EstagioDoCiclo[] = ESTAGIOS_DO_CICLO): { existem: number; total: number } {
+export function contagemDoCiclo(estagios: EstagioDoCiclo[] = ESTAGIOS_DO_CICLO): {
+  existem: number;
+  total: number;
+  parciais: number;
+} {
   return {
     existem: estagios.filter((e) => e.estado !== "ausente").length,
     total: estagios.length,
+    /**
+     * §346 — **os parciais precisavam ser contados à parte, e a falta disso era
+     * um defeito que a própria rodada criou.**
+     *
+     * `existem` conta `!== "ausente"`, então um estágio `parcial` entra nele — e
+     * está certo: parcial existe, incompleto. Mas a frase que a tela escolhia
+     * com `existem === total` era *"quando um não existir, ele aparece aqui
+     * marcado"*, no futuro — enquanto **já havia um marcado na tela**.
+     *
+     * Achado olhando a captura depois de o estágio da spec voltar a `parcial`.
+     * Nenhum teste pegaria: os dois números continuavam certos, e o que estava
+     * errado era a frase que eles escolhiam.
+     */
+    parciais: estagios.filter((e) => e.estado === "parcial").length,
   };
 }

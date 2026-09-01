@@ -71,7 +71,7 @@ function posicaoNoCirculo(indice: number, total: number): { x: number; y: number
  */
 export function CicloDoProduto({ estagios = ESTAGIOS_DO_CICLO }: { estagios?: EstagioDoCiclo[] } = {}) {
   const [aberto, setAberto] = useState<string | null>(null);
-  const { existem, total } = contagemDoCiclo(estagios);
+  const { existem, total, parciais } = contagemDoCiclo(estagios);
   const detalhe = estagios.find((e) => e.id === aberto);
 
   return (
@@ -94,9 +94,23 @@ export function CicloDoProduto({ estagios = ESTAGIOS_DO_CICLO }: { estagios?: Es
        */}
       <p style={{ fontSize: 12, color: "var(--texto-fraco)", margin: "0 0 14px" }} data-testid="ciclo-contagem">
         {existem} dos {total} estágios existem hoje.{" "}
-        {existem === total
+        {/**
+         * §346 — **três frases, e não duas.**
+         *
+         * Havia só `existem === total ? … : …`, e a primeira dizia *"quando um
+         * não existir, ele aparece aqui marcado"* — no futuro. No dia em que um
+         * estágio virou `parcial`, os treze continuaram "existindo" (parcial não
+         * é ausente) e a página passou a prometer uma marcação **enquanto exibia
+         * uma**.
+         *
+         * Nenhum teste pegaria: os dois números estavam certos, e o errado era a
+         * frase que eles escolhiam. Achado olhando a captura.
+         */}
+        {existem === total && parciais === 0
           ? "Quando um não existir, ele aparece aqui marcado — é assim que esta página não envelhece mentindo."
-          : "Os que ainda não existem estão marcados — eles dizem para onde isto vai, e marcá-los é o que os torna honestos."}
+          : parciais > 0 && existem === total
+            ? `${parciais === 1 ? "Um está" : `${parciais} estão`} pela metade, e ${parciais === 1 ? "diz" : "dizem"} o que falta — marcar o incompleto é o que impede esta página de envelhecer mentindo.`
+            : "Os que ainda não existem estão marcados — eles dizem para onde isto vai, e marcá-los é o que os torna honestos."}
       </p>
 
       <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "flex-start" }}>
