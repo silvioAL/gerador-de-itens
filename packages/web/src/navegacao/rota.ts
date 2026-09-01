@@ -46,17 +46,27 @@ export type Rota =
    * linkável: *"olha o que acontece se o bureau cair"* é uma URL que se manda
    * para alguém, e isso é metade do valor.
    */
-  | { tela: "ensaios" }
-  /**
-   * SPEC-84 fatia A — a spec que um agente de código consome.
-   *
-   * Tela própria, e não uma seção do documento, porque o público é outro: o
-   * documento é lido por quem decide, a spec é lida por quem (ou o que)
-   * implementa. Fundi-las faria as duas carregarem o que só a outra precisa —
-   * e é a mesma razão pela qual `#/itens` foi embora no §269, só que ao
-   * contrário.
-   */
-  | { tela: "spec" };
+  | { tela: "ensaios" };
+
+/**
+ * ~~SPEC-84 fatia A — `{ tela: "spec" }`.~~ **§346 — a tela saiu.**
+ *
+ * O usuário chegou nela pelo menu e não reconheceu o que era: *"não entendi como
+ * ela se conecta com o resto do sistema, pode ter sido feita devido algum
+ * equívoco… isso já está razoável nos itens, bastaria organizar"*.
+ *
+ * A justificativa original — *"o documento é lido por quem decide, a spec por
+ * quem implementa"* — continua verdadeira **como distinção de artefato**, e
+ * falsa como justificativa de tela: a spec não é um lugar aonde se vai, é **o
+ * que acompanha o item quando ele sobe** (SPEC-98 §3.2).
+ *
+ * Medido antes de remover: ela **não estava no tour**, e a única saída que
+ * oferecia era baixar um markdown. O artefato não morreu — `gerarSpec` continua,
+ * e é a SPEC-98 que diz para onde ele vai.
+ *
+ * `#/spec` continua sendo ENTENDIDO em `rotaDoHash`, e redireciona para o
+ * documento: link salvo não pode virar tela em branco (SPEC-61 §6.7).
+ */
 
 /** id interno ↔ segmento legível da URL (o hash é interface, fala produto). */
 const SEGMENTO_DA_AREA: Record<AreaConfig, string> = {
@@ -88,7 +98,6 @@ export function hashDaRota(rota: Rota): string {
   if (rota.tela === "documento") return "#/documento";
   if (rota.tela === "sistema") return "#/sistema";
   if (rota.tela === "ensaios") return "#/ensaios";
-  if (rota.tela === "spec") return "#/spec";
   return `#/config/${SEGMENTO_DA_AREA[rota.area]}`;
 }
 
@@ -103,7 +112,10 @@ export function rotaDoHash(hash: string): Rota {
   if (partes[0] === "documento") return { tela: "documento" };
   if (partes[0] === "sistema") return { tela: "sistema" };
   if (partes[0] === "ensaios") return { tela: "ensaios" };
-  if (partes[0] === "spec") return { tela: "spec" };
+  // §346 — a tela da spec saiu, e o link salvo REDIRECIONA em vez de morrer.
+  // Vai para o documento porque é lá que os itens vivem, e é o item que a spec
+  // acompanha (SPEC-98 §3.2). Mesma disciplina do `#/itens` no §269.
+  if (partes[0] === "spec") return { tela: "documento" };
 
   // SPEC-68 §4.2 — `#/simulacao` era "e se ficar lento?", e o nome estreito
   // fechava a porta para retry, pico e disjuntor. Rota que some sem

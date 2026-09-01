@@ -250,17 +250,35 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
     titulo: "Gerar specs para construir com IA",
     resumo: "O documento vira instrução executável para um agente de código.",
     detalhe:
-      "O documento é lido por quem decide; a spec é lida por quem — ou o que — implementa. Ela leva o contexto do produto, o que o motor mediu no desenho e os itens que cobre, mais três seções que nenhum modelo escreve: de onde veio o pedido, o que NÃO entra, e como se prova cada fatia. Spec com lacuna diz quantas tem, antes de você baixá-la.",
+      "O documento é lido por quem decide; a spec é lida por quem — ou o que — implementa. Ela leva o contexto do produto, o que o motor mediu no desenho e os itens que cobre, mais três seções que nenhum modelo escreve: de onde veio o pedido, o que NÃO entra, e como se prova cada fatia. O motor que a monta existe e é conferido por teste; o que ainda não existe é o caminho dela até quem constrói.",
     /**
-     * SPEC-84 — deixou de ser `ausente`.
+     * §346 — voltou a ser `parcial`, e a marca é honesta.
      *
-     * A SPEC-80 tinha entregue o motor inteiro (§312–§315) e nenhuma das suas
-     * quatro fatias era a tela — então havia gerador de spec sem consumidor
-     * nenhum, e este ponto ficou vermelho com razão por três rodadas. O que
-     * mudou foi a porta, não o motor.
+     * ## A história das três marcas deste estágio
+     *
+     * `ausente` (SPEC-80): o motor existia — `gerarSpec`, `coberturaDaSpec`, a
+     * trava do que a IA não escreve — e **nenhum consumidor**.
+     *
+     * `completo` (SPEC-84): ganhou uma tela. E era verdade, no sentido estreito
+     * de que havia por onde chegar.
+     *
+     * **`parcial` (§346): a tela saiu.** O usuário chegou nela pelo menu e não
+     * reconheceu o que era — *"não entendi como ela se conecta com o resto do
+     * sistema… isso já está razoável nos itens, bastaria organizar"*. Medindo:
+     * ela **não estava no tour**, e a única saída que oferecia era baixar um
+     * markdown à mão.
+     *
+     * **Uma tela que ninguém alcança pelo percurso não é um consumidor** — é o
+     * mesmo vazio da SPEC-80 com uma porta pintada por cima. O honesto é dizer
+     * que o motor existe e o caminho não.
+     *
+     * A rota aponta para o `documento`: é onde os itens vivem, e é o item que a
+     * spec vai acompanhar quando o caminho existir (SPEC-98 §3.2).
      */
-    estado: "completo",
-    rota: { tela: "spec" },
+    estado: "parcial",
+    rota: { tela: "documento" },
+    oQueFalta:
+      "A spec sai como anexo do item, numa segunda chamada ao gateway depois que o issue existe — é a SPEC-98. Hoje o motor monta a spec e ninguém a leva para fora automaticamente.",
   },
   {
     id: "mcp",

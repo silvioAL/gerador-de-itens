@@ -44,8 +44,6 @@ export interface MenuLateralProps {
    * derivação faziam o menu parecer maior do que o produto.
    */
   onDocumento: () => void;
-  /** SPEC-84 fatia A — a spec da demanda, para quem (ou o que) implementa. */
-  onSpec: () => void;
   /** SPEC-59 — como a FERRAMENTA está montada. Não é da demanda, então não
    * entra no grupo dela: é o mapa do que as telas de configuração configuram. */
   onSistema: () => void;
@@ -104,7 +102,6 @@ export function MenuLateral({
   onNovaQuebra,
   onAbrirQuebras,
   onDocumento,
-  onSpec,
   onSistema,
   onSair,
 }: MenuLateralProps) {
@@ -148,12 +145,17 @@ export function MenuLateral({
         <button onClick={acao(onDocumento)} style={itemEstilo} data-testid="menu-documento">
           Documento de desenho
         </button>
-        {/* Ao lado do documento, e não dentro dele: o documento é lido por
-            quem decide, a spec por quem implementa. Mesma demanda, leitores
-            diferentes. */}
-        <button onClick={acao(onSpec)} style={itemEstilo} data-testid="menu-spec">
-          Spec para construir
-        </button>
+        {/* §346 — "Spec para construir" saiu daqui.
+
+            Ela ficava ao lado do documento com o argumento de que "o documento é
+            lido por quem decide, a spec por quem implementa". A distinção é
+            verdadeira entre ARTEFATOS e não justificava um destino: o usuário
+            chegou nela pelo menu e não reconheceu o que era, ela não estava no
+            tour, e a única saída que oferecia era baixar um markdown à mão.
+
+            O motor da spec continua (`gerarSpec`); o que muda é que ela deixa de
+            ser um lugar aonde se vai e passa a acompanhar o item quando ele sobe
+            (SPEC-98 §3.2). */}
         <p style={tituloGrupoEstilo}>A ferramenta</p>
         <button onClick={acao(onSistema)} style={itemEstilo} data-testid="menu-sistema">
           Como está montada

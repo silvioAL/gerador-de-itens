@@ -90,7 +90,6 @@ import { DocumentoScreen } from "./documento/DocumentoScreen";
 import { SistemaScreen } from "./sistema/SistemaScreen";
 import { AvisosDaDerivacao } from "./summary/AvisosDaDerivacao";
 import { baixarArquivoTexto } from "./persistence/baixarArquivo";
-import { SpecScreen } from "./spec/SpecScreen";
 import { PainelDeVariantes } from "./variante/PainelDeVariantes";
 import { Site } from "./site/Site";
 import { CAPA } from "./site/paginas";
@@ -526,7 +525,6 @@ function AppCarregado({
   const mostrarDocumento = rota.tela === "documento";
   const mostrarSistema = rota.tela === "sistema";
   const mostrarEnsaios = rota.tela === "ensaios";
-  const mostrarSpec = rota.tela === "spec";
   // SPEC-41 Parte B — os itens materializados da quebra aberta. A fonte de
   // verdade é o server (persistem por quebra); o estado local é o espelho da
   // última geração/carga desta sessão.
@@ -1608,7 +1606,6 @@ function AppCarregado({
           setMostrarAbrir(true);
         }}
         onDocumento={() => navegar({ tela: "documento" })}
-          onSpec={() => navegar({ tela: "spec" })}
         onSistema={() => navegar({ tela: "sistema" })}
         onSair={() => void onSair()}
       />
@@ -2002,22 +1999,6 @@ function AppCarregado({
       {/* SPEC-66 — a bancada de ensaio. Rota própria: o assistente é onde se
           CONVERSA para produzir desenho, e aqui não se produz nada, se ensaia.
           E rota é linkável, que é metade do valor. */}
-      {/* SPEC-84 fatia A — a spec. Tela própria pelo mesmo motivo do documento:
-          rota é linkável, e "olha a spec desta demanda" é uma URL que se manda. */}
-      {mostrarSpec && (
-        <SpecScreen
-          titulo={quebra.titulo?.trim() || "Spec"}
-          markdown={markdownDaSpec}
-          escrita={specDaDemanda}
-          onMudarEscrita={mudarSpecEscrita}
-          cobertura={coberturaDaSpecAtual}
-          onAlternarItem={alternarItemDaSpec}
-          lacunas={lacunasDaSpec}
-          onBaixarMarkdown={baixarSpecMarkdown}
-          onVoltar={() => navegar({ tela: "canvas" })}
-        />
-      )}
-
       {mostrarEnsaios && (
         <EnsaiosScreen
           diagrama={quebra.diagrama}
