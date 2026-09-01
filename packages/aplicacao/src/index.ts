@@ -36,6 +36,10 @@ export {
   type DestinoDoGateway,
   type DestinoResolvido,
   type OperacaoDoGateway,
+  /** §346 — a variação de curl por destino: verbo e envelope do payload. */
+  METODOS_DO_GATEWAY,
+  METODO_PADRAO,
+  type MetodoDoGateway,
 } from "./config/normalizacao.js";
 
 /** SPEC-81 fatia C — ler os ADRs da casa, marcados como importados. */
