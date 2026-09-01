@@ -246,10 +246,60 @@ As saídas, e nenhuma é gratuita:
 | **Aceitar retorno depois** (callback/polling) | fecha o caso geral, e traz estado pendente para guardar e reconciliar |
 | **Deixar a spec pendente até o id chegar** | honesto, e exige uma fila própria — que é trabalho de verdade |
 
-**Recomendação: exigir id síncrono na primeira versão, e dizer isso no contrato.**
-A SPEC-49 já assume resposta síncrona por item (`linkExterno` ou `erro`), então
-não é regra nova — é a mesma, dita em voz alta. Quem tiver agente assíncrono
-resolve do lado dele, que é onde o protocolo mora.
+~~**Recomendação: exigir id síncrono na primeira versão.**~~
+
+##### ⚠️ Corrigido: **o agente demora**, e isso derruba a recomendação acima
+
+> *"o agente demora para criar os itens e subir."*
+
+Escrevi "exigir id síncrono" antes de saber disso, e a informação muda o desenho.
+Uma chamada síncrona longa é frágil por três motivos, e nenhum é teórico:
+**estoura timeout de HTTP**, **prende a tela sem dizer o que está acontecendo**, e
+**perde tudo se cair no meio**.
+
+E ela explica retroativamente o §5: **o pedido de "feedback bonito e animado" não
+era estética — era a resposta à espera.** A animação existe porque isto demora.
+
+##### O desenho que a demora pede: **pipeline por item, não fases**
+
+A primeira escrita imaginava duas fases — *"sobe todas as histórias, depois sobe
+todas as specs"*. Com um agente lento, isso é o pior arranjo possível: ninguém vê
+nada até o fim da primeira fase.
+
+O certo é **item a item, com as duas etapas encadeadas**:
+
+```
+item 1: história ──▶ id ──▶ spec ✓
+item 2:            história ──▶ id ──▶ spec ✓
+item 3:                       história ──▶ (esperando)
+```
+
+**A spec de um item sobe assim que o id DAQUELE item chega** — não espera os
+outros. Três consequências, e as três importam:
+
+| | |
+|---|---|
+| **O primeiro resultado aparece cedo** | e não depois de todos os itens |
+| **A tela tem o que mostrar o tempo todo** | é o §5 com informação real, não barra fingida |
+| **Parar no meio deixa estado coerente** | os que passaram estão completos; os que não começaram estão intactos |
+
+##### O que sobra de decisão
+
+**Uma chamada por item continua podendo demorar.** As saídas:
+
+| Saída | Quando serve |
+|---|---|
+| **Síncrona por item, com timeout generoso** | se o agente responde em segundos por item |
+| **Assíncrona com acompanhamento** | se responde em minutos, ou trabalha em fila |
+
+**Recomendação corrigida: começar síncrono por item — nunca por lote — e medir.**
+Uma chamada por item é ordens de grandeza menor que uma por lote, e pode bastar. Se
+não bastar, o acompanhamento entra **sem refazer o desenho**, porque o pipeline por
+item já é o formato que ele exige.
+
+> **E a régua que não muda:** o que estoura contexto de token continua sendo a
+> **spec** de um item grande (§4). Esse fatiamento é de dentro da segunda chamada,
+> e é independente desta decisão.
 
 #### E isso muda o §4
 
@@ -314,6 +364,10 @@ que transforma um palpite em medição.
 O pedido é legítimo e tem um risco conhecido nesta casa. A régua da SPEC-85 §2:
 **movimento que não carrega informação que o estático não carrega, não entra.**
 
+> **E o §3.2 explicou por que o pedido existe:** *"o agente demora para criar os
+> itens e subir"*. A animação **é a resposta à espera** — não decoração. Sem ela,
+> uma operação de minutos parece uma tela travada, e a pessoa recarrega no meio.
+
 Aqui ele carrega, e é fácil dizer o quê:
 
 | O que a animação mostra | Por que não é enfeite |
@@ -322,6 +376,7 @@ Aqui ele carrega, e é fácil dizer o quê:
 | **o item atravessando** para o destino | envio em lote é lento e opaco; sem isso a tela parece travada |
 | **o que já chegou fica marcado** | o parcial é resultado, não estado intermediário — e a pessoa pode parar sabendo o que foi |
 | **a falha para o lote e diz qual** | erro que passa correndo numa animação é erro escondido |
+| **em que ETAPA cada item está** — história ou spec | com o pipeline do §3.2, dois itens estão em pontos diferentes ao mesmo tempo, e a tela precisa mostrar isso sem virar log |
 
 **E o que ela NÃO pode fazer:** barra de progresso falsa. Se a estimativa de lotes
 for um palpite (§4.2), a barra precisa dizer que é — ou ser substituída por
