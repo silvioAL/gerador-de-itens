@@ -160,7 +160,55 @@ fala Jira; fala com quem fala.
 a configuração do destino e o tratamento de erro por item já existem e são
 reaproveitáveis.
 
-### 3.2 As três regras que a SPEC-49 já provou, e valem aqui
+### 3.2 ⚠️ São DUAS chamadas, e não uma
+
+> Correção do usuário, e ela desfaz uma mistura que a primeira escrita fez:
+>
+> > *"precisa entender que talvez faça sentido não misturar as coisas: uma coisa
+> > é a história que vai subir, e depois provavelmente precisa de outra chamada
+> > para anexar a spec."*
+
+**Ele está certo, e a razão é dura, não estilística.** São duas operações com
+naturezas diferentes:
+
+| | **Subir a história** | **Anexar a spec** |
+|---|---|---|
+| O que cria | o issue no tracker | um anexo/comentário **num issue que já existe** |
+| Precisa de quê | o item pronto | **a chave que a primeira chamada devolveu** |
+| Tamanho | pequeno — cabe numa chamada | grande — é o que exige lote (§4) |
+| Quem consome | o tracker | o agente de código, ou quem lê o issue |
+| Se falhar | o issue não existe | **o issue existe sem a spec** |
+
+**A dependência é sequencial e não tem volta:** não há o que anexar antes de o
+issue existir. Tratar as duas como uma chamada só seria inventar uma transação
+que o destino não oferece — e a SPEC-49 já aprendeu essa lição no plural
+(*"falha é por item, nunca tudo-ou-nada"*).
+
+#### O estado que nasce daí, e ele precisa ser visível
+
+A combinação nova é **"história subiu, spec não"**. Ela não é erro nem sucesso:
+
+> Um item exportado **sem** a spec anexada é um issue que existe e está incompleto
+> para quem vai construir. Se a tela mostrar só "exportado", ela mente pelo mesmo
+> mecanismo que o placar do §276 mentia: **somando dois estados diferentes num
+> rótulo só.**
+
+Então o rastro cresce de um campo para dois — *o issue existe* e *a spec chegou* —
+e a tela diz os dois. É o que permite **reenviar só o que falta**, em vez de
+repetir a exportação inteira e arriscar duplicar issue.
+
+#### E isso muda o §4
+
+O lote deixa de ser um problema do envio inteiro e passa a ser **da segunda
+chamada apenas**. A primeira é curta por natureza: um item pronto é pequeno. Quem
+estoura contexto é a spec — e agora ela é fatiável sozinha, sem arrastar a criação
+do issue junto a cada tentativa.
+
+> **Consequência prática boa:** uma falha de token na spec **não desfaz** o issue
+> criado. Antes, com uma chamada só, ou se tentava tudo de novo ou se aceitava
+> duplicar.
+
+### 3.3 As três regras que a SPEC-49 já provou, e valem aqui
 
 1. **Só sai o que está pronto.** Item com `✍️ especificar` não vira issue
    meia-boca — e spec com lacuna não vira instrução para agente. A contagem de
@@ -244,6 +292,10 @@ contagem real (*"lote 3 de 7"*), que é honesta por construção.
   preenchíveis por modelo.
 - **Enviar spec com lacuna.** Mesma régua do item: o que não está pronto não sai.
 - **Barra de progresso que estima sem dizer que estima.**
+- **Misturar a criação do issue com o anexo da spec** (§3.2). São duas chamadas,
+  e juntá-las inventaria uma transação que o destino não oferece.
+- **Chamar de "exportado" o item cuja spec não chegou.** É somar dois estados num
+  rótulo só — o mesmo mecanismo pelo qual o placar do §276 mentia.
 - **Manter a tela fora do tour** — se o ciclo promete o estágio, o percurso passa
   por ele. É a régua da SPEC-76 aplicada à navegação.
 
@@ -257,11 +309,14 @@ contagem real (*"lote 3 de 7"*), que é honesta por construção.
 - **B — EARS nos critérios de aceite.** Um validador que reconhece os cinco
   padrões e aponta o que não casa. **Prova:** critério fora de padrão vira aviso
   — nunca erro, porque a régua nasce como sugestão (a mesma escada da SPEC-63).
-- **C — a saída pelo agente.** O caminho da SPEC-49, agora para a spec. **Prova:**
-  E2E contra um agente falso, com falha por lote.
-- **D — os lotes.** Fatiamento por item, ordem por dependência, tamanho
-  configurável. **Prova:** um desenho grande produz N lotes, nenhum item é
-  partido, e a ordem respeita `resolverDependencias`.
+- **C — a saída em DUAS chamadas** (§3.2). Subir a história, e **depois** anexar a
+  spec ao issue criado. **Prova:** o rastro tem dois campos, não um; um item com
+  issue e sem spec aparece como tal, e reenviar manda **só o que falta** — sem
+  duplicar issue.
+- **D — os lotes, só na segunda chamada.** Fatiamento por item, ordem por
+  dependência, tamanho configurável. **Prova:** um desenho grande produz N lotes,
+  nenhum item é partido, a ordem respeita `resolverDependencias`, e **uma falha
+  de token não desfaz o issue já criado**.
 - **E — o feedback animado.** **Prova:** a contagem exibida é real; e o teste de
   movimento reduzido continua verde.
 - **F — a tela entra no tour.** **Prova:** a trava do §332 (o tour não aponta para
@@ -286,7 +341,14 @@ contagem real (*"lote 3 de 7"*), que é honesta por construção.
 3. **O agente do destino é o mesmo dos itens?** A SPEC-49 configura um endereço
    para itens. Spec e item podem ir para destinos diferentes (o item para o
    tracker, a spec para o agente de código). **Recomendação:** destino próprio,
-   com o mesmo formato de configuração.
+   com o mesmo formato de configuração — e o §3.2 reforça, porque **são duas
+   chamadas de qualquer forma**: nada obriga as duas a saírem pelo mesmo lugar.
+
+5. **O anexo é anexo, comentário ou campo?** Depende do tracker, e é justamente o
+   que o produto não deve saber (a régua da SPEC-49: *o gerador não fala Jira*).
+   **Recomendação:** a segunda chamada manda `{ chaveExterna, conteudo }` e **o
+   agente decide a forma** — se vira attachment, comentário ou custom field é
+   problema de quem fala o protocolo, e essa é a fronteira que já existe.
 4. **Quem consome a spec do outro lado?** Nunca medimos. Se for um agente de
    código, EARS ajuda muito; se for uma pessoa lendo no repositório, a prioridade
    muda. **Isto é o que mais falta**, e é a mesma lacuna da recomendação geral: o
