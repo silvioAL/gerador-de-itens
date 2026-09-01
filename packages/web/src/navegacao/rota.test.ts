@@ -27,6 +27,20 @@ describe("rota em hash (SPEC-40 F1)", () => {
     expect(hashDaRota({ tela: "config", area: "campos" })).toBe("#/config/componentes");
   });
 
+  it("§346: a rota morta #/spec REDIRECIONA pro documento", () => {
+    /**
+     * A tela da spec saiu (§346): o usuário chegou nela pelo menu e não
+     * reconheceu o que era, ela não estava no tour, e a única saída que oferecia
+     * era baixar um markdown à mão.
+     *
+     * Vai para o documento porque é lá que os itens vivem, e é o item que a spec
+     * acompanha quando o caminho existir (SPEC-98 §3.2). Cair no `canvas` — o
+     * destino padrão do desconhecido — seria pior: perderia a demanda aberta e
+     * pareceria que o link estava errado.
+     */
+    expect(rotaDoHash("#/spec")).toEqual({ tela: "documento" });
+  });
+
   it("SPEC-61: a rota morta #/itens REDIRECIONA pro documento, não dá tela branca", () => {
     // A tela de itens virou uma seção do documento. Quem some com uma rota tem
     // que redirecionar: link salvo é justamente o de quem mais usa.

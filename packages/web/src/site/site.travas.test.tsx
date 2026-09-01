@@ -288,7 +288,6 @@ describe("o site em páginas (SPEC-95 fatia G)", () => {
       hashDaRota({ tela: "documento" }),
       hashDaRota({ tela: "sistema" }),
       hashDaRota({ tela: "ensaios" }),
-      hashDaRota({ tela: "spec" }),
       ...AREAS_CONFIG_CONHECIDAS.map((area) => hashDaRota({ tela: "config", area })),
     ];
 
