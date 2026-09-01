@@ -292,10 +292,54 @@ outros. Três consequências, e as três importam:
 | **Síncrona por item, com timeout generoso** | se o agente responde em segundos por item |
 | **Assíncrona com acompanhamento** | se responde em minutos, ou trabalha em fila |
 
-**Recomendação corrigida: começar síncrono por item — nunca por lote — e medir.**
-Uma chamada por item é ordens de grandeza menor que uma por lote, e pode bastar. Se
-não bastar, o acompanhamento entra **sem refazer o desenho**, porque o pipeline por
-item já é o formato que ele exige.
+~~**Recomendação corrigida: começar síncrono por item e medir.**~~
+
+##### ✅ **Decidido pelo usuário: assíncrono.**
+
+> *"pode ser assíncrona, sem problemas, sabemos que demora."*
+
+A decisão está tomada, e ela é a certa para o que foi descrito. O que ela traz de
+consequência precisa ser desenhado antes da primeira linha:
+
+**1. O estado do envio mora no BANCO, não na tela.**
+
+É a consequência que decide todas as outras. Um envio que demora minutos não pode
+viver na memória de uma aba: a pessoa fecha o navegador, troca de tela, ou o F5
+acontece. **A régua desta casa já é essa** — "sobrevive ao F5" é prova exigida em
+meia dúzia de specs — e aqui ela deixa de ser cortesia: sem persistência, um envio
+interrompido vira issues criados que o produto esqueceu, e ninguém sabe quais
+specs faltam.
+
+**2. Polling, não callback.**
+
+| | Custo |
+|---|---|
+| **Callback** (o agente chama de volta) | exige que o **produto seja alcançável** pelo agente — endereço público, autenticação de entrada, e uma porta nova na superfície de ataque |
+| **Polling** (o produto pergunta) | funciona atrás de firewall, não abre nada, e o custo é tráfego ocioso |
+
+**Recomendação: polling.** O produto já é quem chama para fora em todas as
+integrações (gateway de IA, exportador, ADRs) — e manter uma direção só é o que
+faz a instalação de quem compra não precisar publicar endereço nenhum. Callback
+fica como evolução, para quem quiser e puder.
+
+**3. O pipeline do item anterior continua valendo, e agora ele é o modelo do
+estado.** Cada item tem o seu ponto no percurso, e é isso que a tela lê:
+
+```
+item 1: história ✓  id ✓  spec ✓        (concluído)
+item 2: história ✓  id ✓  spec ⏳       (anexando)
+item 3: história ⏳                      (criando)
+item 4:                                  (na fila)
+```
+
+**4. Reabrir a tela mostra onde parou** — e é a prova mais importante da fatia. Não
+"recomeça": lê o estado e continua exibindo. Um envio de dez minutos que perde o
+rastro quando alguém troca de aba é pior que um envio síncrono, porque promete
+continuidade e não entrega.
+
+**5. E o "cancelar" passa a ser possível de verdade.** Com estado persistido, parar
+no meio é uma decisão registrada — os itens concluídos ficam, os que não começaram
+não começam. Sem persistência, "cancelar" seria só fechar a aba e torcer.
 
 > **E a régua que não muda:** o que estoura contexto de token continua sendo a
 > **spec** de um item grande (§4). Esse fatiamento é de dentro da segunda chamada,
@@ -427,8 +471,9 @@ contagem real (*"lote 3 de 7"*), que é honesta por construção.
   dependência, tamanho configurável. **Prova:** um desenho grande produz N lotes,
   nenhum item é partido, a ordem respeita `resolverDependencias`, e **uma falha
   de token não desfaz o issue já criado**.
-- **E — o feedback animado.** **Prova:** a contagem exibida é real; e o teste de
-  movimento reduzido continua verde.
+- **E — o feedback animado, sobre estado persistido.** **Prova:** a contagem
+  exibida é real; **fechar a tela e voltar mostra onde parou** (não recomeça, não
+  esquece); e o teste de movimento reduzido continua verde.
 - **F — a tela entra no tour.** **Prova:** a trava do §332 (o tour não aponta para
   área morta) passa a cobrir a spec.
 
