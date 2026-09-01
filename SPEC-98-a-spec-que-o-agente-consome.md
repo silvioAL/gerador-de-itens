@@ -197,6 +197,110 @@ Então o rastro cresce de um campo para dois — *o issue existe* e *a spec cheg
 e a tela diz os dois. É o que permite **reenviar só o que falta**, em vez de
 repetir a exportação inteira e arriscar duplicar issue.
 
+#### A espera não é opcional: a segunda chamada depende do RETORNO da primeira
+
+> *"provavelmente depois de gerar o item é necessário aguardar o retorno da
+> primeira chamada, pois ele vai ter um id do issue tracker, e só depois subir a
+> spec."*
+
+**É dependência de dado, não de preferência** — e isso fecha algumas portas de
+implementação que pareceriam otimizações:
+
+- **Não há como paralelizar as duas chamadas.** O id só existe depois que o issue
+  existe. Disparar as duas juntas seria mandar a spec para um destino que ainda
+  não tem endereço.
+- **Não há como pré-calcular o id.** Quem o gera é o tracker, não nós — e inventar
+  um identificador local para "corrigir depois" é o tipo de atalho que produz
+  anexo órfão.
+
+##### O elo entre os dois mundos já existe
+
+`Atividade.chave` é **estável entre regenerações** (SPEC-41), e a SPEC-49 já grava
+o rastro `chave → link`. É esse par que casa cada spec com o issue certo:
+
+```
+chave local  ──1ª chamada──▶  id do tracker  ──2ª chamada──▶  spec anexada
+```
+
+Sem ele, um lote de cinco itens que volta com cinco ids não teria como saber
+**qual id é de qual item** — e anexar a spec no issue errado é pior que não
+anexar, porque parece certo.
+
+##### O lote parcial manda só o que ganhou id
+
+Se a primeira chamada cria três de cinco, **só três specs sobem**. Os dois que
+falharam continuam sem issue e sem spec — estado coerente, e reenviável. É a régua
+da SPEC-49 estendida: falha por item, agora em duas etapas.
+
+##### ⚠️ E se o agente não devolver o id na hora?
+
+Esta é a pergunta de contrato que a implementação precisa responder antes de
+escrever a primeira linha. Um agente pode criar o issue de forma **assíncrona** e
+só ter o id depois.
+
+As saídas, e nenhuma é gratuita:
+
+| Saída | Custo |
+|---|---|
+| **Exigir id síncrono no contrato** | simples, e recusa agentes que trabalham em fila |
+| **Aceitar retorno depois** (callback/polling) | fecha o caso geral, e traz estado pendente para guardar e reconciliar |
+| **Deixar a spec pendente até o id chegar** | honesto, e exige uma fila própria — que é trabalho de verdade |
+
+~~**Recomendação: exigir id síncrono na primeira versão.**~~
+
+##### ⚠️ Corrigido: **o agente demora**, e isso derruba a recomendação acima
+
+> *"o agente demora para criar os itens e subir."*
+
+Escrevi "exigir id síncrono" antes de saber disso, e a informação muda o desenho.
+Uma chamada síncrona longa é frágil por três motivos, e nenhum é teórico:
+**estoura timeout de HTTP**, **prende a tela sem dizer o que está acontecendo**, e
+**perde tudo se cair no meio**.
+
+E ela explica retroativamente o §5: **o pedido de "feedback bonito e animado" não
+era estética — era a resposta à espera.** A animação existe porque isto demora.
+
+##### O desenho que a demora pede: **pipeline por item, não fases**
+
+A primeira escrita imaginava duas fases — *"sobe todas as histórias, depois sobe
+todas as specs"*. Com um agente lento, isso é o pior arranjo possível: ninguém vê
+nada até o fim da primeira fase.
+
+O certo é **item a item, com as duas etapas encadeadas**:
+
+```
+item 1: história ──▶ id ──▶ spec ✓
+item 2:            história ──▶ id ──▶ spec ✓
+item 3:                       história ──▶ (esperando)
+```
+
+**A spec de um item sobe assim que o id DAQUELE item chega** — não espera os
+outros. Três consequências, e as três importam:
+
+| | |
+|---|---|
+| **O primeiro resultado aparece cedo** | e não depois de todos os itens |
+| **A tela tem o que mostrar o tempo todo** | é o §5 com informação real, não barra fingida |
+| **Parar no meio deixa estado coerente** | os que passaram estão completos; os que não começaram estão intactos |
+
+##### O que sobra de decisão
+
+**Uma chamada por item continua podendo demorar.** As saídas:
+
+| Saída | Quando serve |
+|---|---|
+| **Síncrona por item, com timeout generoso** | se o agente responde em segundos por item |
+| **Assíncrona com acompanhamento** | se responde em minutos, ou trabalha em fila |
+
+**Recomendação corrigida: começar síncrono por item — nunca por lote — e medir.**
+Uma chamada por item é ordens de grandeza menor que uma por lote, e pode bastar. Se
+não bastar, o acompanhamento entra **sem refazer o desenho**, porque o pipeline por
+item já é o formato que ele exige.
+
+> **E a régua que não muda:** o que estoura contexto de token continua sendo a
+> **spec** de um item grande (§4). Esse fatiamento é de dentro da segunda chamada,
+> e é independente desta decisão.
+
 #### E isso muda o §4
 
 O lote deixa de ser um problema do envio inteiro e passa a ser **da segunda
@@ -260,6 +364,10 @@ que transforma um palpite em medição.
 O pedido é legítimo e tem um risco conhecido nesta casa. A régua da SPEC-85 §2:
 **movimento que não carrega informação que o estático não carrega, não entra.**
 
+> **E o §3.2 explicou por que o pedido existe:** *"o agente demora para criar os
+> itens e subir"*. A animação **é a resposta à espera** — não decoração. Sem ela,
+> uma operação de minutos parece uma tela travada, e a pessoa recarrega no meio.
+
 Aqui ele carrega, e é fácil dizer o quê:
 
 | O que a animação mostra | Por que não é enfeite |
@@ -268,6 +376,7 @@ Aqui ele carrega, e é fácil dizer o quê:
 | **o item atravessando** para o destino | envio em lote é lento e opaco; sem isso a tela parece travada |
 | **o que já chegou fica marcado** | o parcial é resultado, não estado intermediário — e a pessoa pode parar sabendo o que foi |
 | **a falha para o lote e diz qual** | erro que passa correndo numa animação é erro escondido |
+| **em que ETAPA cada item está** — história ou spec | com o pipeline do §3.2, dois itens estão em pontos diferentes ao mesmo tempo, e a tela precisa mostrar isso sem virar log |
 
 **E o que ela NÃO pode fazer:** barra de progresso falsa. Se a estimativa de lotes
 for um palpite (§4.2), a barra precisa dizer que é — ou ser substituída por
@@ -309,10 +418,11 @@ contagem real (*"lote 3 de 7"*), que é honesta por construção.
 - **B — EARS nos critérios de aceite.** Um validador que reconhece os cinco
   padrões e aponta o que não casa. **Prova:** critério fora de padrão vira aviso
   — nunca erro, porque a régua nasce como sugestão (a mesma escada da SPEC-63).
-- **C — a saída em DUAS chamadas** (§3.2). Subir a história, e **depois** anexar a
-  spec ao issue criado. **Prova:** o rastro tem dois campos, não um; um item com
-  issue e sem spec aparece como tal, e reenviar manda **só o que falta** — sem
-  duplicar issue.
+- **C — a saída em DUAS chamadas** (§3.2). Subir a história, **aguardar o id** que
+  ela devolve, e só então anexar a spec. **Prova:** o rastro tem dois campos, não
+  um; um item com issue e sem spec aparece como tal; reenviar manda **só o que
+  falta**; e num lote parcial **sobem apenas as specs dos itens que ganharam id**
+  — casadas pela `Atividade.chave`, nunca pela ordem da lista.
 - **D — os lotes, só na segunda chamada.** Fatiamento por item, ordem por
   dependência, tamanho configurável. **Prova:** um desenho grande produz N lotes,
   nenhum item é partido, a ordem respeita `resolverDependencias`, e **uma falha
