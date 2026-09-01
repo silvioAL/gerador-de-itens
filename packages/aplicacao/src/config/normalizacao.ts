@@ -181,7 +181,48 @@ export interface DestinoDoGateway {
    * MCPs distintos declara por destino, e a tela diz qual é qual.
    */
   cabecalhos?: Record<string, string>;
+  /**
+   * §346 — **o verbo, quando o agente do outro lado não usa POST.**
+   *
+   * Pedido do usuário: *"é possível que existam diferentes agentes no gateway…
+   * o curl da chamada vai conter variações entre agentes"*.
+   *
+   * Ausente = `POST`, que é o que todo agente escrito para este produto usa
+   * hoje. Existe porque publicar uma **página viva** (o documento na base de
+   * conhecimento) é `PUT` em muitos wrappers — a operação é idempotente por
+   * natureza, e o verbo diz isso.
+   */
+  metodo?: MetodoDoGateway;
+  /**
+   * O nome do campo que **embrulha** o payload.
+   *
+   * Ausente = o nome da operação (`{ itens: [...] }`), que é o contrato da
+   * SPEC-49 e continua valendo para quem já configurou. Um agente que espera
+   * `{ data: [...] }` declara `envelope: "data"`.
+   *
+   * ## Por que só o NOME, e não um template de corpo
+   *
+   * Template livre seria uma linguagem dentro da configuração: sem tipo, sem
+   * validação, e impossível de checar antes de a chamada falhar em produção. O
+   * envelope cobre a variação que os wrappers realmente têm — como o payload é
+   * embrulhado — sem virar motor de template.
+   *
+   * **String vazia = sem envelope**: o payload vai na raiz do corpo. Há agentes
+   * assim, e a alternativa seria obrigá-los a um campo que ignoram.
+   */
+  envelope?: string;
 }
+
+/**
+ * §346 — os verbos que fazem sentido para as operações que existem.
+ *
+ * `GET` fica de fora **mesmo nas operações de leitura** (`adr`,
+ * `arquiteturaDeNegocio`): o produto manda um corpo com o que está pedindo — o
+ * link da página, o filtro — e corpo em `GET` é terreno onde proxies e
+ * bibliotecas discordam entre si. Quem lê, lê por `POST`, como já faz hoje.
+ */
+export const METODOS_DO_GATEWAY = ["POST", "PUT", "PATCH"] as const;
+export type MetodoDoGateway = (typeof METODOS_DO_GATEWAY)[number];
 
 function normalizarCabecalhos(bruto: unknown): Record<string, string> | undefined {
   if (!bruto || typeof bruto !== "object") return undefined;
@@ -206,12 +247,28 @@ export function normalizarExportador(documento: unknown): ConfigExportador {
     if (!operacoesValidas.includes(cru.operacao as string)) continue;
     idsVistos.add(id);
     const cabecalhos = normalizarCabecalhos(cru.cabecalhos);
+    /**
+     * §346 — método desconhecido **cai no padrão**, e não descarta o destino.
+     *
+     * As três razões de descarte acima são "o que sobra não dá para chamar". Um
+     * verbo estranho não é uma delas: o endereço continua chamável, e recusar o
+     * destino inteiro faria um erro de digitação apagar a integração da tela
+     * sem dizer por quê.
+     */
+    const metodo = (METODOS_DO_GATEWAY as readonly string[]).includes(cru.metodo as string)
+      ? (cru.metodo as MetodoDoGateway)
+      : undefined;
+    // `envelope: ""` é escolha declarada (payload na raiz), então o `typeof`
+    // vem antes de qualquer teste de vazio — `?? undefined` apagaria a decisão.
+    const envelope = typeof cru.envelope === "string" ? cru.envelope.trim() : undefined;
     destinos.push({
       id,
       operacao: cru.operacao,
       endpoint,
       rotulo: typeof cru.rotulo === "string" ? cru.rotulo.trim() : "",
       ...(cabecalhos ? { cabecalhos } : {}),
+      ...(metodo ? { metodo } : {}),
+      ...(envelope !== undefined ? { envelope } : {}),
     });
   }
 
@@ -230,7 +287,18 @@ export interface DestinoResolvido {
   endpoint: string;
   rotulo: string;
   cabecalhos: Record<string, string>;
+  /**
+   * §346 — já resolvidos, com o padrão aplicado. Quem chama não decide de novo:
+   * duas resoluções do mesmo default divergem na primeira mudança (§263).
+   */
+  metodo: MetodoDoGateway;
+  /** O nome do campo que embrulha o payload. `""` = payload na raiz. */
+  envelope: string;
 }
+
+/** Sem declaração, o contrato da SPEC-49: `POST` com o payload embrulhado no
+ *  nome da operação. Quem configurou antes desta rodada não muda nada. */
+export const METODO_PADRAO: MetodoDoGateway = "POST";
 
 /**
  * Os destinos de uma operação, com a herança de cabeçalhos já aplicada.
@@ -254,6 +322,10 @@ export function destinosDaOperacao(config: ConfigExportador, operacao: OperacaoD
       endpoint: d.endpoint,
       rotulo: d.rotulo,
       cabecalhos: d.cabecalhos ?? config.cabecalhos,
+      metodo: d.metodo ?? METODO_PADRAO,
+      // `?? operacao` e não `|| operacao`: `envelope: ""` é escolha declarada
+      // (payload na raiz), e `||` a transformaria de volta no padrão.
+      envelope: d.envelope ?? operacao,
     }));
 
   /**
@@ -268,6 +340,10 @@ export function destinosDaOperacao(config: ConfigExportador, operacao: OperacaoD
       endpoint: config.endpoint,
       rotulo: config.rotulo,
       cabecalhos: config.cabecalhos,
+      // O destino herdado é o da SPEC-49, e o contrato dele é exatamente o
+      // padrão — por isso ele não ganhou campos na configuração.
+      metodo: METODO_PADRAO,
+      envelope: "itens",
     });
   }
 

@@ -12,6 +12,8 @@ const DESTINO_ADR: DestinoResolvido = {
   endpoint: "https://gw.casa/adr",
   rotulo: "ADRs de Engenharia",
   cabecalhos: { Authorization: "Bearer x" },
+  metodo: "POST" as const,
+  envelope: "dados",
 };
 
 const DESTINO_DOC: DestinoResolvido = {
@@ -20,6 +22,8 @@ const DESTINO_DOC: DestinoResolvido = {
   endpoint: "https://gw.casa/confluence",
   rotulo: "Confluence",
   cabecalhos: { Authorization: "Bearer x" },
+  metodo: "POST" as const,
+  envelope: "dados",
 };
 
 const DOCUMENTO = {
@@ -186,6 +190,8 @@ const DESTINO_ARQ: DestinoResolvido = {
   endpoint: "https://gw.casa/arquitetura",
   rotulo: "Arquitetura de negócio",
   cabecalhos: {},
+  metodo: "POST" as const,
+  envelope: "dados",
 };
 
 describe("ler a arquitetura de negócio (SPEC-81 fatia F)", () => {
