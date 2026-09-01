@@ -42,6 +42,31 @@ describe("o ciclo não promete o que o produto não faz (SPEC-76 fatia D)", () =
      duas asserções do laço `AFIRMACOES`, no fim do arquivo, porque `CONEXOES`
      precisa exatamente da mesma. Ver o comentário de lá (SPEC-85 §0.4). */
 
+  it("§346: a frase da contagem não promete uma marcação enquanto exibe uma", () => {
+    /**
+     * **O defeito que a própria rodada criou, achado olhando a captura.**
+     *
+     * `existem` conta `!== "ausente"`, então `parcial` entra nele — e está certo:
+     * parcial existe, incompleto. Mas a tela escolhia a frase por
+     * `existem === total`, e a escolhida dizia *"quando um não existir, ele
+     * aparece aqui marcado"* — **no futuro, com um já marcado na tela**.
+     *
+     * Nenhum teste pegaria: os dois números continuavam certos, e o errado era a
+     * frase que eles selecionavam. Por isso a trava é sobre a **relação** entre a
+     * contagem e o que a lista mostra, não sobre os números.
+     */
+    const { existem, total, parciais } = contagemDoCiclo();
+    const marcados = ESTAGIOS_DO_CICLO.filter((e) => e.estado !== "completo").length;
+
+    // `parciais` é subconjunto do que `existem` conta — se isto quebrar, a
+    // definição de "existe" mudou e a frase precisa ser revista junto.
+    expect(parciais).toBeLessThanOrEqual(existem);
+    // E a promessa de "nada marcado" só pode ser feita quando de fato não há.
+    if (existem === total && parciais === 0) {
+      expect(marcados, "a tela diria 'quando um não existir' com estágio marcado na lista").toBe(0);
+    }
+  });
+
   it("a contagem sai do dado, não da prosa", () => {
     /**
      * A SPEC-76 contou "nove de doze". Viraram dez de treze quando a SPEC-77
