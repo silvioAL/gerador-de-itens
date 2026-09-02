@@ -27,7 +27,9 @@ test("a capa mostra o que é o produto e aponta para todas as páginas", async (
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 
   for (const id of PAGINAS) {
-    await expect(page.getByTestId(`capa-link-${id}`), `a capa não aponta para "${id}"`).toBeVisible();
+    /* §350 — a capa deixou de listar seções e passou a listar PERGUNTAS: o
+       destino é o mesmo, o que muda é o que a pessoa lê antes de clicar. */
+    await expect(page.getByTestId(`pergunta-${id}`).first(), `nenhuma pergunta leva a "${id}"`).toBeVisible();
   }
 });
 
