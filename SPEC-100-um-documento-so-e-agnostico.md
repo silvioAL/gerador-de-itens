@@ -50,9 +50,46 @@ E o alerta que vale para nós:
 > reais, você está escrevendo um Design Doc com rótulo de RFC. Nenhum dos dois é
 > errado — só seja honesto sobre qual está fazendo."*
 
-**A régua dos 10–20 minutos responde à pergunta das mudanças menores:** um ADR já
-nasceu para ser leve. Se está pesado, **o escopo está grande demais para um
-registro só** — o problema não é a mudança ser pequena, é o formato ter inchado.
+**A régua dos 10–20 minutos** diz algo útil sobre o formato: um ADR já nasceu para
+ser leve, e se está pesado, o escopo está grande demais para um registro só.
+
+### 1.1 ⚠️ Mas a pergunta das "mudanças menores" tem resposta melhor, e é do produto
+
+> Correção do usuário, e ela desfaz a premissa da minha primeira resposta:
+>
+> > *"quanto às alterações serem pequenas: isso é traduzido no desenho.
+> > Geralmente as pessoas falam de pequenas alterações **com esse tom**, mas o
+> > sistema resolve isso dando **a proporção que a alteração tiver**, e com as
+> > quebras padronizadas evita a armadilha de falar que é pouco e na realidade
+> > ter mais coisas."*
+
+Eu tinha tratado *"mudança menor"* como uma **categoria de entrada** — algo que a
+pessoa declara e que o processo precisa acomodar com um formato mais leve.
+
+**É o contrário.** *"É só uma mudancinha"* é uma afirmação **sem medida**, dita em
+tom, antes de alguém olhar. E é a origem da armadilha mais comum de estimativa:
+o tamanho é subestimado justamente porque **ainda não foi decomposto**.
+
+> **Neste produto o tamanho não é declarado — é derivado.** Você desenha, o motor
+> deriva, e **o número de itens é a resposta**. A proporção sai do dado, e não do
+> tom de quem pediu.
+
+E a padronização é o que dá sentido à comparação: como a derivação é
+determinística e a configuração é da organização (SPEC-94 §6.1), **dois desenhos
+equivalentes produzem quebras equivalentes** — então "pequeno" e "grande" passam a
+significar a mesma coisa entre times, em vez de refletirem quem fala.
+
+#### O que isso muda nesta SPEC
+
+O §3.2 abaixo continua valendo — o custo de **redigir** caiu com a IA. Mas a
+pergunta *"mudança pequena merece registro?"* estava **mal colocada**: não há
+formato leve e formato pesado a escolher na entrada.
+
+**O que decide é a proporção medida**, e ela aparece depois do desenho. Uma
+alteração que derivou dois itens e não moveu decisão nenhuma não precisa de nada;
+uma que se anunciou pequena e derivou onze **acabou de se explicar sozinha** — e é
+exatamente esse o momento em que o produto tem algo a dizer que ninguém tinha
+antes.
 
 ---
 
@@ -218,11 +255,16 @@ documento de Confluence tem, em média, mais informação sensível que um print
 1. **O rótulo é por organização ou por time?** A terminologia costuma ser da
    empresa, não do time. **Recomendação:** organização, com o mesmo formato de
    configuração dos outros documentos.
-2. **Mudança menor merece decisão registrada?** O §3.2 diz que o custo caiu e a
-   granularidade pode descer — mas **não medimos** quantas decisões um time real
-   registra. Descer a granularidade sem medir pode produzir ruído em vez de
-   memória. **Recomendação:** deixar o time decidir, e medir quantas decisões
-   viram registro (é entrada de análise crítica, SPEC-94 §4.4).
+2. ~~**Mudança menor merece decisão registrada?**~~ **Mal colocada — ver §1.1.**
+   Não há formato leve e pesado a escolher na entrada: **o tamanho é derivado, não
+   declarado**. A pergunta que sobra é outra, e é boa: **o produto deveria dizer
+   em voz alta quando a proporção contraria o tom?** *"Você chamou de ajuste
+   pequeno; o desenho derivou onze itens e moveu duas decisões."*
+
+   **Recomendação: sim, e é barato** — os dois números já existem no fim da
+   derivação. Mas o texto precisa de cuidado: informar, nunca repreender. Uma
+   ferramenta que parece estar corrigindo quem pediu é uma ferramenta que a
+   pessoa deixa de usar para pedir.
 3. **O que fazer com quem já configurou destino de ADR?** Ele continua valendo — a
    fatia B tira a obrigatoriedade, não o recurso.
 4. **Importar documento por link exige que ele esteja em markdown?** Um Confluence
