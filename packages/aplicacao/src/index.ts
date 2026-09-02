@@ -50,6 +50,8 @@ export {
   type AdrExterno,
   type LeitorDeAdr,
 } from "./portas/leitorDeAdr.js";
+/** §349 — ler um documento da casa por LINK, para virar desenho (SPEC-100 §4). */
+export type { LeitorDeDocumento, DocumentoExterno } from "./portas/leitorDeDocumento.js";
 
 /** SPEC-81 fatia F — a arquitetura de negócio da casa vira PROPOSTA. */
 export {

@@ -130,10 +130,29 @@ describe("os destinos do gateway (SPEC-81 fatia A)", () => {
     expect(config.endpoint).toBe("https://gw/jira");
   });
 
-  it("as quatro operações são o conjunto fechado", () => {
-    // Fechado pela mesma razão das variáveis de template: endereço com propósito
-    // que o produto não conhece é endereço que ninguém consegue chamar.
-    expect([...OPERACOES_DO_GATEWAY]).toEqual(["itens", "documento", "adr", "arquiteturaDeNegocio"]);
+  it("as operações são um conjunto fechado", () => {
+    /**
+     * Fechado pela mesma razão das variáveis de template: endereço com propósito
+     * que o produto não conhece é endereço que ninguém consegue chamar.
+     *
+     * **§349 — a quinta entrou, e a trava disparou primeiro.** Ela ficou
+     * vermelha ao acrescentarmos `documentoExterno`, e estava certa em ficar:
+     * uma operação nova é uma decisão, e não pode passar em silêncio. Isto é o
+     * atrito que ela existe para criar — obrigar alguém a vir aqui escrever por
+     * que a lista cresceu.
+     *
+     * A quinta é **leitura de um documento por link** (SPEC-100 §4), e difere
+     * das outras duas leituras em quem escolhe o alvo: `adr` e
+     * `arquiteturaDeNegocio` buscam num lugar que o gateway já conhece; aqui a
+     * pessoa manda o endereço.
+     */
+    expect([...OPERACOES_DO_GATEWAY]).toEqual([
+      "itens",
+      "documento",
+      "adr",
+      "arquiteturaDeNegocio",
+      "documentoExterno",
+    ]);
   });
 });
 

@@ -6,6 +6,8 @@ import type {
   DocumentoPublicado,
   LeitorDeAdr,
   LeitorDeArquiteturaDeNegocio,
+  LeitorDeDocumento,
+  DocumentoExterno,
   PublicadorDeDocumento,
 } from "@gerador/aplicacao";
 
@@ -234,4 +236,57 @@ function glossarioDe(v: unknown): { termo: string; definicao: string }[] | undef
     // glossário existe justamente para dizer o que a palavra significa aqui.
     .filter((t) => t.termo && t.definicao);
   return lidos.length > 0 ? lidos : undefined;
+}
+
+/**
+ * SPEC-100 fatia C (§349) — **buscar um documento da casa pelo link.**
+ *
+ * O contrato é o mais simples dos leitores, e de propósito: manda `{ link }`,
+ * recebe `{ conteudo, titulo?, atualizadoEm? }`. O que o gateway faz para
+ * chegar lá — API do Confluence, scraping autenticado, cache — não é problema
+ * do produto, e é a mesma fronteira do §348.
+ *
+ * ## Sem conteúdo é o mesmo que não ter achado
+ *
+ * Um 200 com `conteudo` vazio faria a tela abrir uma proposta a partir de nada,
+ * e o modelo inventaria o desenho inteiro para não devolver vazio. Mesma régua
+ * do leitor de arquitetura: **melhor dizer "não achei" do que entregar um
+ * começo falso.**
+ *
+ * ## O link que volta é o que foi pedido
+ *
+ * O gateway pode devolver o seu próprio (canônico, com id resolvido). Ele
+ * ganha, porque é o que aponta para o lugar de verdade; mas na ausência fica o
+ * pedido, para a proveniência nunca ficar vazia — um desenho importado sem
+ * origem é pior que um desenho digitado.
+ */
+export function criarLeitorDeDocumentoViaGateway(
+  destino: DestinoResolvido,
+  fetchImpl: typeof fetch = fetch
+): LeitorDeDocumento {
+  return {
+    async ler(link: string): Promise<DocumentoExterno | undefined> {
+      const pedido = link.trim();
+      if (!pedido) return undefined;
+
+      let resposta: Response;
+      try {
+        resposta = await postar(destino, { link: pedido }, fetchImpl);
+      } catch {
+        return undefined;
+      }
+      if (!resposta.ok) return undefined;
+
+      const corpo = (await resposta.json().catch(() => ({}))) as Record<string, unknown>;
+      const conteudo = texto(corpo.conteudo);
+      if (!conteudo) return undefined;
+
+      return {
+        conteudo,
+        link: texto(corpo.link) || pedido,
+        ...(texto(corpo.titulo) ? { titulo: texto(corpo.titulo) } : {}),
+        ...(texto(corpo.atualizadoEm) ? { atualizadoEm: texto(corpo.atualizadoEm) } : {}),
+      };
+    },
+  };
 }

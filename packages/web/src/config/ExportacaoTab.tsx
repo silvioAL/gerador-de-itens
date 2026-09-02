@@ -299,6 +299,9 @@ function Destinos({
 const ROTULO_DA_OPERACAO: Record<OperacaoDoGateway, string> = {
   itens: "Itens → issue tracker",
   documento: "Documento de desenho → base de conhecimento",
+  /** §349 — a leitura por LINK. O rótulo diz "documento da casa" e não
+   *  "Confluence": o produto é agnóstico de ferramenta (SPEC-100). */
+  documentoExterno: "Documento da casa → ler por link",
   adr: "ADRs da casa → ler",
   arquiteturaDeNegocio: "Arquitetura de negócio → ler",
 };
