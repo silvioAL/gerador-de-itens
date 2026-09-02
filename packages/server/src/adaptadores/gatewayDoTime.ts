@@ -32,11 +32,42 @@ import type {
  * pessoa achar que a página está lá.
  */
 
+/**
+ * §348 — a chamada honra o **método**, o **envelope** e o **espaço** do destino.
+ *
+ * ## O que estava pela metade
+ *
+ * O §346 criou `metodo` e `envelope` na configuração e parou ali: `postar`
+ * continuava com `POST` fixo e o corpo cru. **A tela oferecia escolher `PUT` e o
+ * produto mandava `POST` de qualquer jeito** — meia integração é pior que
+ * nenhuma, porque promete o que não faz.
+ *
+ * ## O `espaco`, e por que ele é opaco de propósito
+ *
+ * Pedido do usuário: *"seria importante também ser possível configurar o link de
+ * um espaço do time no confluence e ele postar o design doc lá"*.
+ *
+ * O produto **não sabe o que é um espaço**. Para ele é uma etiqueta que o gateway
+ * entende — *space* no Confluence, *workspace* no Notion, *site* no SharePoint.
+ * Saber seria implementar o Confluence de todo mundo, que é exatamente o que a
+ * SPEC-49 recusou para o Jira: *"implementar um tracker específico seria escolher
+ * o tracker de todo mundo"*.
+ *
+ * Ele viaja **dentro do payload**, junto do documento, e não como cabeçalho ou
+ * query: é dado do pedido — *publique isto ali* —, não metadado de transporte.
+ */
 async function postar(destino: DestinoResolvido, corpo: unknown, fetchImpl: typeof fetch): Promise<Response> {
+  const comEspaco =
+    destino.espaco && corpo && typeof corpo === "object" ? { ...(corpo as object), espaco: destino.espaco } : corpo;
+  // `envelope: ""` é escolha declarada — payload na raiz. Por isso o teste é de
+  // string vazia, e não de valor falso: `!destino.envelope` trataria a ausência
+  // e a escolha como a mesma coisa.
+  const payload = destino.envelope === "" ? comEspaco : { [destino.envelope]: comEspaco };
+
   return fetchImpl(destino.endpoint, {
-    method: "POST",
+    method: destino.metodo,
     headers: { "Content-Type": "application/json", ...destino.cabecalhos },
-    body: JSON.stringify(corpo),
+    body: JSON.stringify(payload),
   });
 }
 

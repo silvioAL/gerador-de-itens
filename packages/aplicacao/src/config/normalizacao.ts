@@ -211,6 +211,26 @@ export interface DestinoDoGateway {
    * assim, e a alternativa seria obrigá-los a um campo que ignoram.
    */
   envelope?: string;
+  /**
+   * §348 — **onde**, do outro lado, este destino deve escrever.
+   *
+   * Pedido do usuário: *"configurar o link de um espaço do time no confluence e
+   * ele postar o design doc lá"*.
+   *
+   * ## É uma etiqueta OPACA, e isso é a decisão
+   *
+   * O produto não sabe o que é um espaço. Para ele é um texto que o gateway
+   * entende — *space* no Confluence, *workspace* no Notion, *site* no SharePoint,
+   * ou o caminho de uma pasta. Saber seria implementar o Confluence de todo
+   * mundo, que é o que a SPEC-49 recusou para o Jira.
+   *
+   * Por isso não há validação de formato: uma chave (`ENG`), uma URL inteira ou
+   * um id numérico são todos válidos, porque quem decide é o outro lado.
+   *
+   * Ausente = o gateway usa o padrão dele. Uma organização com um espaço só não
+   * precisa declarar nada.
+   */
+  espaco?: string;
 }
 
 /**
@@ -261,6 +281,10 @@ export function normalizarExportador(documento: unknown): ConfigExportador {
     // `envelope: ""` é escolha declarada (payload na raiz), então o `typeof`
     // vem antes de qualquer teste de vazio — `?? undefined` apagaria a decisão.
     const envelope = typeof cru.envelope === "string" ? cru.envelope.trim() : undefined;
+    // §348 — vazio é ausência aqui, ao contrário do envelope: um espaço em
+    // branco não é "escreva na raiz", é "não declarei" — e o gateway usa o
+    // padrão dele.
+    const espaco = typeof cru.espaco === "string" ? cru.espaco.trim() : "";
     destinos.push({
       id,
       operacao: cru.operacao,
@@ -269,6 +293,7 @@ export function normalizarExportador(documento: unknown): ConfigExportador {
       ...(cabecalhos ? { cabecalhos } : {}),
       ...(metodo ? { metodo } : {}),
       ...(envelope !== undefined ? { envelope } : {}),
+      ...(espaco ? { espaco } : {}),
     });
   }
 
@@ -294,11 +319,36 @@ export interface DestinoResolvido {
   metodo: MetodoDoGateway;
   /** O nome do campo que embrulha o payload. `""` = payload na raiz. */
   envelope: string;
+  /** §348 — onde escrever do outro lado. `""` = o gateway usa o padrão dele. */
+  espaco: string;
 }
 
-/** Sem declaração, o contrato da SPEC-49: `POST` com o payload embrulhado no
- *  nome da operação. Quem configurou antes desta rodada não muda nada. */
+/** Sem declaração, `POST` — o verbo que todo agente escrito para este produto
+ *  usa hoje. */
 export const METODO_PADRAO: MetodoDoGateway = "POST";
+
+/**
+ * §348 — **o envelope padrão é POR OPERAÇÃO, e isso foi um defeito corrigido.**
+ *
+ * O §346 fez o padrão ser *"o nome da operação"* — elegante, e **errado**: o
+ * único contrato que embrulha é o de itens (`{ itens: [...] }`, SPEC-49). O de
+ * documento, ADR e arquitetura sempre mandou o **corpo cru na raiz**, e é isso
+ * que os agentes já escritos esperam.
+ *
+ * Com o padrão uniforme, `POST /documento/publicar` passou a mandar
+ * `{ documento: {...} }` — **quebrando todo gateway já configurado**, em
+ * silêncio, sem ninguém mudar configuração nenhuma.
+ *
+ * Dois testes existentes pegaram: um na rota, outro no adaptador. É exatamente o
+ * que uma suíte de contrato existe para fazer — a mudança parecia interna e
+ * atravessava a fronteira.
+ */
+export const ENVELOPE_PADRAO: Record<OperacaoDoGateway, string> = {
+  itens: "itens",
+  documento: "",
+  adr: "",
+  arquiteturaDeNegocio: "",
+};
 
 /**
  * Os destinos de uma operação, com a herança de cabeçalhos já aplicada.
@@ -325,7 +375,8 @@ export function destinosDaOperacao(config: ConfigExportador, operacao: OperacaoD
       metodo: d.metodo ?? METODO_PADRAO,
       // `?? operacao` e não `|| operacao`: `envelope: ""` é escolha declarada
       // (payload na raiz), e `||` a transformaria de volta no padrão.
-      envelope: d.envelope ?? operacao,
+      envelope: d.envelope ?? ENVELOPE_PADRAO[operacao],
+      espaco: d.espaco ?? "",
     }));
 
   /**
@@ -344,6 +395,7 @@ export function destinosDaOperacao(config: ConfigExportador, operacao: OperacaoD
       // padrão — por isso ele não ganhou campos na configuração.
       metodo: METODO_PADRAO,
       envelope: "itens",
+      espaco: "",
     });
   }
 

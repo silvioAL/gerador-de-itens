@@ -239,6 +239,39 @@ function Destinos({
             placeholder="ex.: Confluence de Engenharia"
             style={inputEstilo}
           />
+
+          {/**
+           * §348 — **onde escrever, do outro lado.**
+           *
+           * Pedido do usuário: *"configurar o link de um espaço do time no
+           * confluence e ele postar o design doc lá"*.
+           *
+           * Só aparece nas operações que ESCREVEM. Um leitor de ADR não publica
+           * nada, e oferecer o campo ali seria pedir uma informação que não vai
+           * a lugar nenhum — o tipo de campo que faz a pessoa duvidar se
+           * entendeu a tela.
+           *
+           * O produto não valida o formato porque não sabe o que é um espaço:
+           * uma chave (`ENG`), uma URL inteira ou um id numérico são todos
+           * válidos, e quem decide é o gateway. Saber seria implementar o
+           * Confluence de todo mundo — o que a SPEC-49 recusou para o Jira.
+           */}
+          {(d.operacao === "documento" || d.operacao === "itens") && (
+            <>
+              <label style={labelEstilo}>Onde escrever (opcional)</label>
+              <input
+                aria-label={`Espaço do destino ${i + 1}`}
+                value={d.espaco ?? ""}
+                onChange={(e) => mudar(i, "espaco", e.target.value)}
+                disabled={somenteLeitura}
+                placeholder="ex.: ENG — o espaço, projeto ou pasta do outro lado"
+                style={inputEstilo}
+              />
+              <p style={{ fontSize: 11, color: "var(--texto-fraco)", margin: "2px 0 0" }}>
+                Vai junto no pedido. Em branco, o gateway usa o padrão dele.
+              </p>
+            </>
+          )}
         </div>
       ))}
 
