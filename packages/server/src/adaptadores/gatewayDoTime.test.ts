@@ -3,6 +3,7 @@ import type { DestinoResolvido } from "@gerador/aplicacao";
 import {
   criarLeitorDeAdrViaGateway,
   criarLeitorDeArquiteturaViaGateway,
+  criarLeitorDeDocumentoViaGateway,
   criarPublicadorDeDocumentoViaGateway,
 } from "./gatewayDoTime.js";
 
@@ -320,5 +321,103 @@ describe("o curl que o destino declara (§348)", () => {
     const { corpo } = await publicar({ envelope: "" });
 
     expect("espaco" in corpo).toBe(false);
+  });
+});
+
+/**
+ * SPEC-100 fatia C (§349) — **buscar um documento da casa pelo link.**
+ *
+ * O pedido do usuário: *"passar o link de uma página Confluence para que ele
+ * consulte e traga as informações, e assim o assistente já monte o desenho"*.
+ *
+ * Diferente dos outros dois leitores em quem escolhe o alvo: ali o gateway sabe
+ * onde o repositório mora; aqui **a pessoa manda o endereço**.
+ */
+describe("ler um documento da casa pelo link (§349)", () => {
+  const DESTINO_DOC_EXTERNO: DestinoResolvido = {
+    id: "confluence-leitura",
+    operacao: "documentoExterno",
+    endpoint: "https://gw.casa/ler",
+    rotulo: "Confluence",
+    cabecalhos: {},
+    metodo: "POST" as const,
+    envelope: "",
+    espaco: "",
+  };
+
+  const respondendo = (corpo: unknown, status = 200) =>
+    vi.fn(async () => new Response(JSON.stringify(corpo), { status }));
+
+  it("manda o LINK no pedido — é a pessoa que escolhe o alvo", async () => {
+    const rede = respondendo({ conteudo: "# Proposta de arquitetura" });
+
+    await criarLeitorDeDocumentoViaGateway(DESTINO_DOC_EXTERNO, rede).ler("https://wiki.casa/p/42");
+
+    const [, init] = rede.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({ link: "https://wiki.casa/p/42" });
+  });
+
+  it("devolve o conteúdo e a origem", async () => {
+    const rede = respondendo({ conteudo: "texto da página", titulo: "Pagamentos v2", atualizadoEm: "2026-01-05" });
+
+    const lido = await criarLeitorDeDocumentoViaGateway(DESTINO_DOC_EXTERNO, rede).ler("https://wiki.casa/p/42");
+
+    expect(lido).toEqual({
+      conteudo: "texto da página",
+      titulo: "Pagamentos v2",
+      link: "https://wiki.casa/p/42",
+      atualizadoEm: "2026-01-05",
+    });
+  });
+
+  it("o link canônico do gateway VENCE o pedido — ele aponta para o lugar de verdade", async () => {
+    const rede = respondendo({ conteudo: "x", link: "https://wiki.casa/pages/42/pagamentos-v2" });
+
+    const lido = await criarLeitorDeDocumentoViaGateway(DESTINO_DOC_EXTERNO, rede).ler("https://wiki.casa/p/42");
+
+    expect(lido?.link).toBe("https://wiki.casa/pages/42/pagamentos-v2");
+  });
+
+  it("mas a proveniência nunca fica vazia: sem link no corpo, fica o pedido", async () => {
+    // Um desenho importado sem origem é pior que um desenho digitado — daqui a
+    // um mês, "de onde saiu esse componente?" precisa ter resposta.
+    const rede = respondendo({ conteudo: "x" });
+
+    expect((await criarLeitorDeDocumentoViaGateway(DESTINO_DOC_EXTERNO, rede).ler("https://wiki/p/1"))?.link).toBe(
+      "https://wiki/p/1",
+    );
+  });
+
+  it("**200 com conteúdo vazio é o mesmo que não achar**", async () => {
+    /**
+     * A régua que mais importa aqui. Uma página vazia que virasse "proposta"
+     * faria o modelo inventar o desenho inteiro para não devolver nada — e o
+     * resultado pareceria importado, com a autoridade de um documento da casa
+     * que ninguém escreveu.
+     */
+    const vazio = respondendo({ conteudo: "   " });
+    const semCampo = respondendo({ titulo: "só o título" });
+
+    expect(await criarLeitorDeDocumentoViaGateway(DESTINO_DOC_EXTERNO, vazio).ler("https://wiki/p/1")).toBeUndefined();
+    expect(await criarLeitorDeDocumentoViaGateway(DESTINO_DOC_EXTERNO, semCampo).ler("https://wiki/p/1")).toBeUndefined();
+  });
+
+  it("link em branco não vira chamada — não há o que buscar", async () => {
+    const rede = respondendo({ conteudo: "x" });
+
+    expect(await criarLeitorDeDocumentoViaGateway(DESTINO_DOC_EXTERNO, rede).ler("   ")).toBeUndefined();
+    expect(rede).not.toHaveBeenCalled();
+  });
+
+  it("rede fora e HTTP de erro devolvem `undefined`, nunca exceção", async () => {
+    // Importar é caminho auxiliar: derrubar a tela porque uma página não
+    // respondeu transformaria um atalho em obstáculo.
+    const caiu = vi.fn(async () => {
+      throw new Error("ECONNREFUSED");
+    });
+    const http404 = respondendo({}, 404);
+
+    expect(await criarLeitorDeDocumentoViaGateway(DESTINO_DOC_EXTERNO, caiu).ler("https://wiki/p/1")).toBeUndefined();
+    expect(await criarLeitorDeDocumentoViaGateway(DESTINO_DOC_EXTERNO, http404).ler("https://wiki/p/1")).toBeUndefined();
   });
 });

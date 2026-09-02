@@ -162,7 +162,20 @@ export interface ConfigExportador {
  * ideia de que payload montar. É o `operacao` que torna a lista utilizável — um
  * endereço sem propósito declarado é um endereço que ninguém consegue chamar.
  */
-export const OPERACOES_DO_GATEWAY = ["itens", "documento", "adr", "arquiteturaDeNegocio"] as const;
+export const OPERACOES_DO_GATEWAY = [
+  "itens",
+  "documento",
+  "adr",
+  "arquiteturaDeNegocio",
+  /**
+   * §349 — **ler um documento da casa, por link.**
+   *
+   * Diferente de `documento`, que ESCREVE: esta busca. E diferente de `adr` e
+   * `arquiteturaDeNegocio`, que trazem tipos de coisa de um lugar que o gateway
+   * conhece — aqui **quem escolhe o alvo é a pessoa**, mandando o endereço.
+   */
+  "documentoExterno",
+] as const;
 export type OperacaoDoGateway = (typeof OPERACOES_DO_GATEWAY)[number];
 
 export interface DestinoDoGateway {
@@ -348,6 +361,8 @@ export const ENVELOPE_PADRAO: Record<OperacaoDoGateway, string> = {
   documento: "",
   adr: "",
   arquiteturaDeNegocio: "",
+  /** §349 — leitura, como as outras: o pedido vai cru, com o link dentro. */
+  documentoExterno: "",
 };
 
 /**
