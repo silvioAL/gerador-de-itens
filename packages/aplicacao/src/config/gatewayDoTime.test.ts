@@ -38,6 +38,7 @@ describe("os destinos do gateway (SPEC-81 fatia A)", () => {
         cabecalhos: { Authorization: "Bearer x" },
         metodo: "POST",
         envelope: "itens",
+        espaco: "",
       },
     ]);
   });
@@ -160,13 +161,27 @@ describe("a variação de curl por destino (§346)", () => {
       destinos: [{ id: "d1", operacao: "documento", endpoint: "https://gw/doc", rotulo: "Confluence", ...extra }],
     });
 
-  it("sem declarar nada, o contrato é o de sempre: POST e envelope pelo nome da operação", () => {
-    // A garantia mais importante: quem configurou antes desta rodada não muda
-    // nada, e o adaptador continua mandando `{ documento: … }` por POST.
-    const [d] = destinosDaOperacao(comDestino({}), "documento");
+  it("sem declarar nada, o contrato é o QUE JÁ EXISTIA — e ele não é uniforme", () => {
+    /**
+     * **O defeito que dois testes existentes pegaram.**
+     *
+     * A primeira escrita fez o padrão ser "o nome da operação" — elegante, e
+     * errado: o único contrato que embrulha é o de ITENS (`{ itens: [...] }`,
+     * SPEC-49). Documento, ADR e arquitetura sempre mandaram o corpo **cru na
+     * raiz**, e é isso que os agentes já escritos esperam.
+     *
+     * Com o padrão uniforme, `POST /documento/publicar` passou a mandar
+     * `{ documento: {...} }` — **quebrando todo gateway já configurado**, em
+     * silêncio, sem ninguém mudar configuração nenhuma.
+     */
+    expect(destinosDaOperacao(comDestino({}), "documento")[0].envelope).toBe("");
+    expect(destinosDaOperacao(comDestino({}), "documento")[0].metodo).toBe("POST");
 
-    expect(d.metodo).toBe("POST");
-    expect(d.envelope).toBe("documento");
+    const itens = normalizarExportador({
+      endpoint: "",
+      destinos: [{ id: "j", operacao: "itens", endpoint: "https://gw/jira", rotulo: "Jira" }],
+    });
+    expect(destinosDaOperacao(itens, "itens")[0].envelope).toBe("itens");
   });
 
   it("aceita PUT — publicar página VIVA é idempotente, e o verbo diz isso", () => {

@@ -15369,3 +15369,78 @@ sobraram têm ordem definida e nenhuma depende de decisão nova.
 631 engine · 128 aplicação · 316 server · 956 web · typecheck e lint limpos. A
 remoção da tela verificada contra `:8080`: o item sumiu do menu e o link velho
 resolve.
+
+## §348 — o espaço do time, e o padrão de envelope que quebraria todo gateway
+
+Fecha a frente (4) das cinco: *"configurar o link de um espaço do time no
+confluence e ele postar o design doc lá via chamada gateway"*.
+
+### O que já existia, e o que faltava
+
+A medição do §346 tinha mostrado que a porta `publicadorDeDocumento` existe desde
+a SPEC-81. Olhando mais perto: **a rota também** — `POST
+/quebras/:id/documento/publicar`, com testes no server e na tela.
+
+Faltavam duas coisas, e a primeira era um débito que eu mesmo deixei:
+
+1. **O §346 parou na configuração.** Criou `metodo` e `envelope` no destino e não
+   mexeu em `postar`, que continuava com `POST` fixo e o corpo cru. **A tela
+   oferecia escolher `PUT` e o produto mandava `POST` de qualquer jeito** — meia
+   integração é pior que nenhuma, porque promete o que não faz.
+2. **Não havia como dizer ONDE escrever.** O `espaco` é o campo que faltava.
+
+### O espaço é uma etiqueta opaca, e isso é a decisão
+
+O produto **não sabe o que é um espaço**. Para ele é um texto que o gateway
+entende — *space* no Confluence, *workspace* no Notion, *site* no SharePoint, o
+caminho de uma pasta. Não há validação de formato porque quem decide é o outro
+lado.
+
+Saber seria implementar o Confluence de todo mundo, que é exatamente o que a
+SPEC-49 recusou para o Jira: *"implementar um tracker específico seria escolher o
+tracker de todo mundo"*.
+
+Ele viaja **dentro do payload**, e **dentro do envelope** quando há um: ao lado,
+um agente que lê só o envelope perderia o espaço em silêncio — e publicaria no
+padrão dele achando que obedeceu.
+
+E o campo só aparece nas operações que **escrevem**. Um leitor de ADR não publica
+nada; oferecer o campo ali seria pedir informação que não vai a lugar nenhum.
+
+### ⚠️ O defeito que dois testes existentes pegaram
+
+O §346 fez o envelope padrão ser **"o nome da operação"**. Elegante, e errado.
+
+**O único contrato que embrulha é o de itens** (`{ itens: [...] }`, SPEC-49).
+Documento, ADR e arquitetura sempre mandaram o **corpo cru na raiz** — e é isso
+que os agentes já escritos esperam.
+
+Com o padrão uniforme, `POST /documento/publicar` passou a mandar
+`{ documento: {...} }`: **quebraria todo gateway já configurado, em silêncio, sem
+ninguém mudar configuração nenhuma.**
+
+Dois testes acusaram — um na rota, outro no adaptador. É o que uma suíte de
+contrato existe para fazer: a mudança parecia interna e atravessava a fronteira.
+O padrão virou `ENVELOPE_PADRAO` **por operação**, refletindo o que já existia.
+
+> **E houve um segundo erro meu, do mesmo tipo:** ao preencher os fixtures do
+> adaptador com os campos novos, escolhi `envelope: "dados"` arbitrariamente — e
+> mudei o contrato que aqueles testes guardavam. Eles ficaram vermelhos, e
+> estavam certos. Preencher fixture com valor inventado é uma forma silenciosa de
+> reescrever a asserção.
+
+### Como foi provado
+
+Sete casos novos no adaptador. Desliguei o `postar` novo (voltando ao `POST` fixo
+com corpo cru) e vi quatro ficarem vermelhos — método, envelope, espaço e o
+espaço dentro do envelope.
+
+631 engine · 128 aplicação · 323 server · 958 web · 127/127 E2E · typecheck e
+lint limpos.
+
+### O que falta das cinco frentes
+
+- **(3) Ler página do Confluence → desenho** — operação nova; agora tem a
+  variação de curl de que precisa.
+- **(1) A landing com as sete perguntas** — é a última por depender das outras
+  existirem para poder citá-las.

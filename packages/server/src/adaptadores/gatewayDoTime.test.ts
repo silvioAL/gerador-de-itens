@@ -13,7 +13,8 @@ const DESTINO_ADR: DestinoResolvido = {
   rotulo: "ADRs de Engenharia",
   cabecalhos: { Authorization: "Bearer x" },
   metodo: "POST" as const,
-  envelope: "dados",
+  envelope: "",
+  espaco: "",
 };
 
 const DESTINO_DOC: DestinoResolvido = {
@@ -23,7 +24,8 @@ const DESTINO_DOC: DestinoResolvido = {
   rotulo: "Confluence",
   cabecalhos: { Authorization: "Bearer x" },
   metodo: "POST" as const,
-  envelope: "dados",
+  envelope: "",
+  espaco: "",
 };
 
 const DOCUMENTO = {
@@ -191,7 +193,8 @@ const DESTINO_ARQ: DestinoResolvido = {
   rotulo: "Arquitetura de negócio",
   cabecalhos: {},
   metodo: "POST" as const,
-  envelope: "dados",
+  envelope: "",
+  espaco: "",
 };
 
 describe("ler a arquitetura de negócio (SPEC-81 fatia F)", () => {
@@ -242,5 +245,80 @@ describe("ler a arquitetura de negócio (SPEC-81 fatia F)", () => {
 
     expect(await criarLeitorDeArquiteturaViaGateway(DESTINO_ARQ, rede).ler()).toBeUndefined();
     expect(await criarLeitorDeArquiteturaViaGateway(DESTINO_ARQ, http500).ler()).toBeUndefined();
+  });
+});
+
+/**
+ * §348 — **a chamada honra o que o destino declara.**
+ *
+ * O §346 criou `metodo` e `envelope` na configuração e parou ali: `postar`
+ * continuava com `POST` fixo e o corpo cru. A tela oferecia escolher `PUT` e o
+ * produto mandava `POST` de qualquer jeito — **meia integração é pior que
+ * nenhuma**, porque promete o que não faz.
+ *
+ * E o `espaco` responde ao pedido do usuário: *"configurar o link de um espaço do
+ * time no confluence e ele postar o design doc lá"*.
+ */
+describe("o curl que o destino declara (§348)", () => {
+  const respostaOk = () =>
+    vi.fn(async () => new Response(JSON.stringify({ linkExterno: "https://wiki/p/1" }), { status: 200 }));
+
+  const publicar = async (destino: Partial<DestinoResolvido>) => {
+    const rede = respostaOk();
+    await criarPublicadorDeDocumentoViaGateway({ ...DESTINO_DOC, ...destino }, rede).publicar(DOCUMENTO);
+    const [url, init] = rede.mock.calls[0] as unknown as [string, RequestInit];
+    return { url, metodo: init.method, corpo: JSON.parse(init.body as string) };
+  };
+
+  it("usa o MÉTODO declarado — publicar página viva é idempotente, e o verbo diz isso", async () => {
+    expect((await publicar({ metodo: "PUT" })).metodo).toBe("PUT");
+    expect((await publicar({ metodo: "PATCH" })).metodo).toBe("PATCH");
+  });
+
+  it("sem declarar, continua POST — quem configurou antes não muda nada", async () => {
+    expect((await publicar({})).metodo).toBe("POST");
+  });
+
+  it("embrulha o payload no ENVELOPE declarado", async () => {
+    const { corpo } = await publicar({ envelope: "data" });
+
+    expect(Object.keys(corpo)).toEqual(["data"]);
+    expect(corpo.data.demandaId).toBe("q-1");
+  });
+
+  it("envelope VAZIO manda o payload na raiz — é escolha, não ausência", async () => {
+    /**
+     * O caso que um `!destino.envelope` teria quebrado: ele trataria a ausência e
+     * a escolha como a mesma coisa. Há agentes que esperam o corpo cru, e
+     * obrigá-los a um campo que ignoram seria inventar contrato.
+     */
+    const { corpo } = await publicar({ envelope: "" });
+
+    expect(corpo.demandaId).toBe("q-1");
+    expect(corpo.data).toBeUndefined();
+  });
+
+  it("manda o ESPAÇO junto do documento, quando o destino o declara", async () => {
+    // É dado do pedido — *publique isto ali* —, não metadado de transporte: por
+    // isso vai no payload, e não em cabeçalho ou query.
+    const { corpo } = await publicar({ espaco: "ENG", envelope: "" });
+
+    expect(corpo.espaco).toBe("ENG");
+    expect(corpo.demandaId).toBe("q-1");
+  });
+
+  it("o espaço entra DENTRO do envelope, não ao lado dele", async () => {
+    // Ao lado, um agente que lê só o envelope perderia o espaço em silêncio — e
+    // publicaria no padrão dele achando que obedeceu.
+    const { corpo } = await publicar({ espaco: "ENG", envelope: "data" });
+
+    expect(corpo.data.espaco).toBe("ENG");
+    expect(corpo.espaco).toBeUndefined();
+  });
+
+  it("sem espaço declarado, nada é inventado — o gateway usa o padrão dele", async () => {
+    const { corpo } = await publicar({ envelope: "" });
+
+    expect("espaco" in corpo).toBe(false);
   });
 });
