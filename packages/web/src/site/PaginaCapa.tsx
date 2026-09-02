@@ -1,4 +1,5 @@
 import { PAGINAS, rotaDaPagina } from "./paginas";
+import { PerguntasDeQuemChega } from "./PerguntasDeQuemChega";
 
 /**
  * SPEC-95 fatia C — **a capa encolhe.**
@@ -41,54 +42,17 @@ export function PaginaCapa({ onEntrar }: { onEntrar: () => void }) {
         </div>
       </section>
 
-      <section style={{ maxWidth: 700, margin: "44px auto 0" }} data-testid="capa-paginas">
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: 0.8,
-            textTransform: "uppercase",
-            color: "var(--texto-fraco)",
-            marginBottom: 12,
-          }}
-        >
-          O que tem aqui
-        </div>
-        <ol style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 8 }}>
-          {PAGINAS.map((pagina, i) => (
-            <li key={pagina.id}>
-              <a
-                href={rotaDaPagina(pagina)}
-                data-testid={`capa-link-${pagina.id}`}
-                className="capa-cartao"
-                style={{
-                  display: "block",
-                  border: "1px solid var(--borda)",
-                  borderRadius: 10,
-                  padding: "12px 14px",
-                  textDecoration: "none",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                  <span
-                    aria-hidden="true"
-                    style={{ fontSize: 11, fontWeight: 700, color: "var(--texto-mudo)", fontVariantNumeric: "tabular-nums" }}
-                  >
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <strong style={{ fontSize: 14, color: "var(--texto)" }}>{pagina.nome}</strong>
-                </div>
-                {/* O RESUMO, e não a pergunta: a pergunta é o chapéu da página, e
-                    repeti-la aqui faria a capa e a página abrirem igual — que é a
-                    repetição que a trava do §323 existe para pegar. */}
-                <p style={{ fontSize: 13, color: "var(--texto-2)", lineHeight: 1.55, margin: "4px 0 0" }}>
-                  {pagina.resumo}
-                </p>
-              </a>
-            </li>
-          ))}
-        </ol>
-      </section>
+      {/**
+       * §350 — a capa responde PERGUNTAS, em vez de anunciar seções.
+       *
+       * Listar "O problema · O conceito · O ciclo" é um índice do que NÓS
+       * construímos. Quem chega não procura seção: procura resposta para o que
+       * está pensando — e uma das perguntas não tem resposta ainda, o que
+       * aparece marcado em vez de omitido.
+       */}
+      <div style={{ marginTop: 44 }} data-testid="capa-paginas">
+        <PerguntasDeQuemChega />
+      </div>
     </div>
   );
 }

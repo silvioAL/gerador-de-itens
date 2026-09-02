@@ -60,25 +60,25 @@ export const PAGINAS: PaginaDoSite[] = [
   {
     id: "o-problema",
     nome: "O problema",
-    pergunta: "Por que a IA que você já tem não basta?",
+    pergunta: "Por que a IA que a gente já usa não resolveu isso?",
     resumo: "Agentes e assistentes não resolveram: falta onde a regra da casa mora.",
   },
   {
     id: "o-conceito",
     nome: "O conceito",
-    pergunta: "O que é essa camada, e o que ela contém?",
+    pergunta: "Onde a camada perene fica guardada, e que informação ela precisa ter?",
     resumo: "Quatro camadas, a divisão entre motor e IA, e a contenção que é a tese.",
   },
   {
     id: "o-ciclo",
     nome: "O ciclo",
-    pergunta: "O que a ferramenta faz, do começo ao fim?",
+    pergunta: "Como eu construo isso, e que processos preciso ter?",
     resumo: "Treze estágios, do que é perene até o aprendizado que volta e muda as regras.",
   },
   {
     id: "o-percurso",
     nome: "O percurso",
-    pergunta: "Por onde passa, e quando fala com o que você já tem?",
+    pergunta: "E quando eu preciso falar com o que a casa já tem?",
     resumo: "A jornada em raias, e os caminhos que entram e saem — com o que falta marcado.",
   },
   {

@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { Site } from "./Site";
 import { PAGINAS, CAPA, paginaDoSite, rotaDaPagina, PREFIXO_DO_SITE } from "./paginas";
 import { PROVAS } from "./provas";
+import { PERGUNTAS } from "./perguntas";
 import { CicloDoProduto } from "../demo/CicloDoProduto";
 import { OFluxoDoProcesso } from "../demo/OFluxoDoProcesso";
 import { ESTAGIOS_DO_CICLO } from "../demo/ciclo";
@@ -307,13 +308,56 @@ describe("o site em páginas (SPEC-95 fatia G)", () => {
     expect(paginaDoSite("")).toBeNull();
   });
 
+  it("§350: toda pergunta com página aponta para uma que EXISTE", () => {
+    /**
+     * A capa passou a responder perguntas em vez de anunciar seções. Uma
+     * pergunta que apontasse para página inexistente seria pior que a lista
+     * antiga: ela promete resposta e leva a lugar nenhum.
+     */
+    const quebradas = PERGUNTAS.filter((q) => q.pagina !== null && !PAGINAS.some((p) => p.id === q.pagina)).map(
+      (q) => `${q.texto} → ${q.pagina}`,
+    );
+
+    expect(quebradas, `perguntas que apontam para página inexistente: ${quebradas.join(" · ")}`).toEqual([]);
+  });
+
+  it("§350: pergunta SEM resposta diz o que falta — marcar sem explicar é não marcar", () => {
+    /**
+     * A régua da SPEC-76 aplicada à capa: esconder a pergunta sem resposta seria
+     * fácil e seria a página envelhecendo mentindo. Mas marcá-la sem dizer o que
+     * falta é só um aviso vago — a mesma disciplina que `porQueCondicional` já
+     * cobra dos estágios do ciclo.
+     */
+    const semExplicacao = PERGUNTAS.filter((q) => q.pagina === null && !q.oQueFalta?.trim()).map((q) => q.texto);
+
+    expect(semExplicacao).toEqual([]);
+  });
+
+  it("§350: a capa mostra as perguntas, e a sem resposta NÃO vira link", () => {
+    // Um item clicável que não leva a lugar nenhum é pior que um que diz por que
+    // não leva.
+    renderizar(CAPA);
+
+    for (const q of PERGUNTAS.filter((x) => x.pagina)) {
+      expect(screen.getAllByTestId(`pergunta-${q.pagina}`).length).toBeGreaterThan(0);
+    }
+    const semResposta = PERGUNTAS.filter((q) => !q.pagina);
+    expect(screen.getAllByTestId("pergunta-sem-resposta")).toHaveLength(semResposta.length);
+  });
+
   it("a capa aponta para TODAS as páginas — nenhuma fica órfã", () => {
     // Uma página só alcançável pelo menu é uma página que quem chega pela capa
     // nunca vê. O menu é para quem já está navegando; a capa é para quem chegou.
     renderizar(CAPA);
 
     for (const pagina of PAGINAS) {
-      expect(screen.getByTestId(`capa-link-${pagina.id}`), `a capa não aponta para "${pagina.nome}"`).toBeTruthy();
+      /* §350 — a capa deixou de listar seções e passou a listar PERGUNTAS, então
+         a cobertura se mede por elas: uma página que nenhuma pergunta alcança é
+         uma página que quem chega pela capa nunca vê. */
+      expect(
+        PERGUNTAS.some((q) => q.pagina === pagina.id),
+        `nenhuma pergunta leva a "${pagina.nome}"`,
+      ).toBe(true);
     }
   });
 

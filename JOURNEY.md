@@ -15444,3 +15444,74 @@ lint limpos.
   variação de curl de que precisa.
 - **(1) A landing com as sete perguntas** — é a última por depender das outras
   existirem para poder citá-las.
+
+## §349–350 — o documento por link, e a capa que responde perguntas
+
+Fecha as duas frentes que restavam das cinco.
+
+### O documento por link (§349)
+
+A decisão da SPEC-100 generalizou o pedido original: não é *"ler ADR"*, é **ler um
+documento** — o sistema é agnóstico de ferramenta e de terminologia.
+
+**Porta nova, e não um parâmetro no leitor de ADR.** As leituras que já existiam
+buscam *tipos de coisa* num lugar que o gateway conhece; aqui **a pessoa manda o
+endereço**, e volta texto que ninguém prometeu formatar. Contratos diferentes em
+quem escolhe o alvo, no que volta e no que fazer com o resultado.
+
+**A régua que mais importa:** `200` com conteúdo vazio é o mesmo que não achar.
+Uma página vazia virando "proposta" faria o modelo **inventar o desenho inteiro**
+para não devolver nada — e o resultado pareceria importado, com a autoridade de um
+documento da casa que ninguém escreveu.
+
+**A trava do conjunto fechado de operações disparou primeiro**, e estava certa:
+operação nova é decisão e não passa em silêncio. O motivo ficou escrito nela.
+
+### A capa que responde perguntas (§350)
+
+O usuário: *"não comunicamos bem no sentido de demonstrar com perguntas que
+surgem"* — e listou sete.
+
+A capa anunciava seções: *"O problema · O conceito · O ciclo"*. **Isso é um índice
+do que nós construímos**; quem chega não procura seção, procura resposta para o
+que está pensando. As perguntas do site também eram do ponto de vista do produto
+(*"o que é essa camada?"*); as dele são de quem decide adotar (*"onde guardo, o
+que preciso, quem responde"*).
+
+**E uma das sete não tem resposta**: *"como funciona a governança disso, e quem são
+os responsáveis?"* — é a SPEC-97, ainda não escrita.
+
+> Ela **fica na lista, marcada**, com o que falta escrito ao lado. Esconder seria
+> fácil e seria o defeito que a SPEC-76 impede. E a honestidade aqui vende: *"é
+> para cá que isto vai, e é daqui que já estamos"* é a única frase que um
+> arquiteto consegue conferir.
+
+As perguntas são **dado**, não texto na capa — senão, no dia em que a governança
+ganhar página, alguém acrescenta a página e esquece de tirar a marca. Duas travas
+novas: toda pergunta com página aponta para uma que existe, e pergunta sem
+resposta **precisa dizer o que falta** (marcar sem explicar é não marcar).
+
+### Os testes que precisaram mudar, e por quê
+
+Três — e nenhum por afrouxamento: a capa deixou de ter um link por página, então a
+cobertura passou a ser medida pelas **perguntas**. *"Uma página que nenhuma
+pergunta alcança é uma página que quem chega pela capa nunca vê"* guarda a mesma
+coisa que *"a capa aponta para todas"*, sobre a estrutura nova.
+
+631 engine · 128 aplicação · 330 server · 961 web · 127/127 E2E · typecheck e lint
+limpos. Capa verificada contra `:8080`.
+
+### As cinco frentes, fechadas
+
+| | Frente | Estado |
+|---|---|---|
+| 1 | A landing com as perguntas | ✅ §350 |
+| 2 | Variação de curl por agente | ✅ §346 · §348 |
+| 3 | Ler documento por link | ✅ §349 |
+| 4 | Publicar design doc no espaço do time | ✅ §348 |
+| 5 | Remover a tela de spec | ✅ §346 |
+
+**O que fica na fila:** a avaliação do desenho que atravessa **múltiplos times**, e
+ela é de modelo, não de tela — `quebras.time` é coluna única, os destinos do
+gateway são por organização, e o RBAC é por time. Um escopo multi-time esbarra
+nos três.
