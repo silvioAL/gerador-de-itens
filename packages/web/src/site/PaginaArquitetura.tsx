@@ -85,9 +85,8 @@ export function PaginaArquitetura() {
       <section data-testid="arquitetura-provas">
         <h2 style={tituloEstilo}>E aqui está como conferir</h2>
         <p style={{ ...proseEstilo, marginBottom: 18 }}>
-          Cada afirmação acima tem um teste no repositório que a sustenta. Não é uma lista de quantos testes existem —
-          esse número não diria nada. São <strong>estas</strong> afirmações, com <strong>este</strong> arquivo ao lado:
-          se a prova sumir, a suíte cai no mesmo commit.
+          Cada afirmação acima é verificada por um teste automatizado — não por revisão, não por promessa. Se o
+          comportamento mudar, a suíte quebra no mesmo commit em que a mudança entrar.
         </p>
 
         <ol style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 12 }}>
@@ -104,22 +103,26 @@ export function PaginaArquitetura() {
             >
               <strong style={{ fontSize: 14, color: "var(--texto)", lineHeight: 1.4 }}>{p.afirmacao}</strong>
               <p style={{ ...proseEstilo, margin: "6px 0 0" }}>{p.porque}</p>
-              {/* O caminho é `code` porque é um caminho: quem for conferir vai
-                  copiá-lo, e um caminho em fonte proporcional se lê pior e se
-                  copia com erro. */}
-              <p style={{ margin: "8px 0 0" }}>
-                <code
-                  style={{
-                    fontSize: 11.5,
-                    color: "var(--acento-gente-texto)",
-                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-                    wordBreak: "break-all",
-                  }}
-                >
-                  {p.arquivo}
-                </code>
-              </p>
-              <p style={{ fontSize: 12, color: "var(--texto-fraco)", lineHeight: 1.6, margin: "4px 0 0" }}>
+              {/**
+               * §347 — **o caminho do arquivo saiu daqui.**
+               *
+               * A primeira escrita mostrava `packages/engine/src/…/x.test.ts` ao
+               * lado de cada afirmação, com o argumento de que a página cita a
+               * prova (SPEC-95 §3). O usuário apontou o erro: *"colocamos
+               * referências de código, quando não faz sentido apresentar isso aos
+               * usuários, não deveria fazer parte do story telling"*.
+               *
+               * Ele está certo, e o erro foi de **público**: quem visita o site
+               * não tem o repositório aberto. Um caminho que ninguém pode abrir
+               * não é evidência — é ruído no meio da narrativa, e ainda expõe a
+               * estrutura interna sem que isso sirva a alguém.
+               *
+               * **O que era bom continua:** a afirmação, o porquê, e a descrição
+               * do que o teste garante. O caminho segue em `provas.ts` como dado,
+               * e a trava que confere se ele existe continua rodando — o
+               * mecanismo não afrouxou; ele deixou de ser conteúdo de página.
+               */}
+              <p style={{ fontSize: 12, color: "var(--texto-fraco)", lineHeight: 1.6, margin: "8px 0 0" }}>
                 {p.oQueEleProva}
               </p>
             </li>
