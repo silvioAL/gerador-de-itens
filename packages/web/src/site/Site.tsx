@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { SeletorDeTema } from "../tema/SeletorDeTema";
 import { AEvolucao, AsCamadas, OMapaDeConexoes } from "../demo/PecasDoConceito";
 import { OMotor } from "../demo/OMotor";
@@ -37,6 +38,20 @@ import { PAGINAS, rotaDaPagina, type PaginaDoSite } from "./paginas";
  * `--altura-do-cabecalho` foram medidas em 360, 768 e 1440 px na rodada passada,
  * com E2E que compara a altura real com a declarada. Reusá-las herda a medição;
  * escrever um cabeçalho novo jogaria fora a única parte já verificada em pixel.
+ *
+ * ## SPEC-103 — e a medição deixou de ser à mão
+ *
+ * O `100px` do §341 era *"o pior caso medido"* — e era, **naquela máquina**. Na
+ * CI a mesma barra mede **113 px** em 360 px de largura, e o E2E ficou vermelho
+ * por 25 merges seguidos.
+ *
+ * A causa não é a CI ser diferente: é a constante supor que não seria. A marca
+ * quebra em duas linhas no telefone (21 px → 42 px), e **quanto** ela cresce ao
+ * quebrar depende da métrica da fonte. A folga que sobrava aqui era de 1 px.
+ *
+ * Trocar 100 por um número maior seria o mesmo número à mão com mais sorte.
+ * Agora a altura é **medida**, e a constante do CSS vira só o valor de partida
+ * do primeiro quadro.
  */
 export function Site({
   pagina,
@@ -51,10 +66,11 @@ export function Site({
   temSessao?: boolean;
 }) {
   const naCapa = pagina.id === "";
+  const cabecalhoRef = useAlturaDoCabecalho();
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--painel)", fontFamily: "system-ui, sans-serif" }}>
-      <header className="landing-cabecalho">
+      <header className="landing-cabecalho" ref={cabecalhoRef}>
         <div className="landing-cabecalho-linha">
           <MarcaDoSite />
           <div style={{ flex: 1 }} />
@@ -88,6 +104,66 @@ export function Site({
       <RodapeDaPagina pagina={pagina} onEntrar={onEntrar} />
     </div>
   );
+}
+
+/**
+ * SPEC-103 fatia A — **a barra diz a própria altura.**
+ *
+ * ## Por que medir, e não escrever um número maior
+ *
+ * `--altura-do-cabecalho` nasceu no §341 como constante, e a régua dela é
+ * assimétrica de propósito: sobrar empurra a seção alguns pixels para baixo
+ * (inofensivo), faltar esconde o título atrás da barra (o defeito que a variável
+ * existe para impedir).
+ *
+ * Uma constante só funciona enquanto a altura real for previsível, e ela não é:
+ * a marca quebra linha no telefone, e o quanto ela cresce depende da fonte
+ * disponível. Aqui sobrava 1 px; no runner da CI faltavam 13. Subir para 120
+ * compraria sorte, não garantia — o próximo rótulo de marca, locale ou zoom
+ * traria o defeito de volta, e traria em silêncio.
+ *
+ * ## Por que isto não entra em laço
+ *
+ * A variável tem **um consumidor só**: o `scroll-margin-top` de `.landing-ato`
+ * (`styles.css`). Ela nunca alimenta o tamanho do próprio cabeçalho — então
+ * medir → escrever → medir estabiliza no primeiro passo, sem realimentação.
+ * Se algum dia ela passar a valer para o layout da barra, este hook precisa
+ * mudar junto.
+ *
+ * ## Por que `Math.ceil`
+ *
+ * `getBoundingClientRect` devolve fração (92,33 px). Arredondar para baixo
+ * declararia menos que o real e recriaria o defeito por um terço de pixel —
+ * exatamente a classe de erro que esta fatia veio remover.
+ */
+function useAlturaDoCabecalho() {
+  const ref = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const barra = ref.current;
+    if (!barra) return;
+
+    const aplicar = () => {
+      const altura = Math.ceil(barra.getBoundingClientRect().height);
+      // Zero acontece enquanto o elemento está oculto (troca de página, por
+      // exemplo). Escrever zero faria a âncora colar no topo e esconder o
+      // título — pior que manter o valor anterior, que ao menos foi real.
+      if (altura > 0) document.documentElement.style.setProperty("--altura-do-cabecalho", `${altura}px`);
+    };
+
+    aplicar();
+
+    // `ResizeObserver` e não `window.resize`: a barra também engorda sem a
+    // janela mudar de tamanho — fonte que termina de carregar, rótulo que muda
+    // ao ganhar sessão ("Entrar" → "Ir para o app"), tradução. O `resize`
+    // perderia os três.
+    if (typeof ResizeObserver === "undefined") return;
+    const observador = new ResizeObserver(aplicar);
+    observador.observe(barra);
+    return () => observador.disconnect();
+  }, []);
+
+  return ref;
 }
 
 /**

@@ -15640,3 +15640,69 @@ qualquer chave, e uma linha por time seria gravada e **nunca lida**; (b)
 `regras` por time **substitui** o global, então arquitetura e DBA não têm como
 impor piso — o único eixo que **soma** é o de produto (SPEC-86), e é ele o
 precedente; (c) as três correções de autorização acima.
+
+---
+
+## §353 — O número medido à mão, e o portão que não fecha
+
+Rodada de CI, pedida no fechamento do §352: *"precisa ajustar o CI, avalie"*.
+
+### O que estava vermelho, e há quanto tempo
+
+Um teste só, sempre o mesmo: `--altura-do-cabecalho` medindo **113 px** em 360 px
+enquanto a variável dizia **100**. Rastreado nas execuções da `main`: última verde
+em **30/08 23:54**, primeira vermelha em **31/08 01:43**, quando a landing entrou.
+**25 merges seguidos com o E2E vermelho** — o teste mudou de arquivo no caminho
+(`landing-apresentacao` → `site-navegacao`), nunca de diagnóstico.
+
+### O teste estava certo; o número é que foi medido à mão
+
+`--altura-do-cabecalho` tem um consumidor só — o `scroll-margin-top` das seções —
+e a régua dela é assimétrica de propósito: sobrar empurra a seção alguns pixels
+para baixo, faltar esconde o título atrás da barra. `real ≤ declarada` é a régua
+certa.
+
+O problema é como o `100` nasceu. Medido contra a stack, nesta máquina: **99 px**
+em 360, 92 nos demais. **Um pixel de folga.** E o mecanismo do crescimento: a
+marca "Gerador de Itens" quebra em duas linhas no telefone (21 px → 42 px), e
+*quanto* ela cresce ao quebrar depende da métrica da fonte. A fonte do runner
+Linux não é a desta máquina; lá a mesma quebra dá 113.
+
+> O comentário do §341 chamava 100 de *"o PIOR CASO medido"*. Era o pior caso
+> **daquele ambiente**. Nenhuma constante à mão sobrevive a troca de fonte, de
+> locale, de zoom ou de rótulo da marca — e as quatro mudam.
+
+**Entregue:** a altura passou a ser **medida**. Um `ResizeObserver` no
+`.landing-cabecalho` escreve a altura real na variável, com `Math.ceil`
+(arredondar para baixo recriaria o defeito por fração de pixel). Não há laço de
+realimentação porque a variável nunca alimenta o tamanho da própria barra — e o
+`100px` do CSS virou o valor de partida do primeiro quadro.
+
+Recusado subir a constante para ~120: seria o mesmo número à mão com mais sorte.
+Tínhamos **dois** pontos (99 e 113) e nenhuma razão para crer que 120 sobreviveria
+à próxima fonte.
+
+### O §248 provou o argumento inteiro
+
+Com o observador desligado, o teste NOVO falha (`Expected: 99, Received: 100`) e
+**o teste antigo continua passando** — porque nesta máquina 99 ≤ 100. É
+literalmente o mecanismo que deixou o defeito sobreviver 25 merges: a régua
+antiga passa **por sorte** no ambiente de quem desenvolve.
+
+Por isso o teste antigo não mudou (ele é o contrato) e um novo entrou ao lado
+dele, afirmando que a variável **acompanha** a barra em vez de torcer para caber.
+
+### O achado maior: o portão não era portão
+
+```
+gh api repos/.../branches/main/protection → {"message":"Branch not protected"}
+```
+
+A `main` não tinha proteção nenhuma. Nenhum check obrigatório — é por isso que 25
+merges passaram por cima de um E2E vermelho sem resistência, **inclusive o do
+§352, ontem**. Consertar o teste sem consertar isto deixaria intacto o mecanismo
+que escondeu o defeito por três dias.
+
+`test` e `e2e` passaram a ser obrigatórios. A ordem — corrigir antes de proteger —
+não foi preferência: ligar o portão com a `main` vermelha trancaria o repositório
+na hora.

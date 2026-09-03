@@ -192,3 +192,56 @@ test("`--altura-do-cabecalho` cobre a barra em toda largura, inclusive telefone"
     expect(real, `em ${largura}px a barra tem ${real}px e a variável diz ${declarada}px`).toBeLessThanOrEqual(declarada);
   }
 });
+
+/**
+ * SPEC-103 fatia A — a altura é MEDIDA, não escrita à mão.
+ *
+ * O teste acima afirma a régua (`real ≤ declarada`) e continua igual: ele é o
+ * contrato, e mudá-lo para acomodar a implementação seria o defeito virando
+ * configuração.
+ *
+ * Este afirma o MECANISMO. Sem ele, a régua acima volta a passar por sorte —
+ * foi assim que o `100px` do §341 sobreviveu aqui com 1 px de folga enquanto
+ * faltavam 13 no runner da CI, por 25 merges.
+ */
+test("a variável do cabeçalho ACOMPANHA a barra, em vez de torcer para caber", async ({ page }) => {
+  const medidas: { largura: number; real: number; declarada: number }[] = [];
+
+  for (const largura of [360, 768, 1440]) {
+    await page.setViewportSize({ width: largura, height: 800 });
+    await page.goto("/#/site/o-ciclo");
+    await expect(page.getByTestId("ciclo-do-produto")).toBeVisible();
+    // O ResizeObserver corre depois da pintura; sem esperar, mede-se o valor
+    // de partida do CSS e o teste passaria a afirmar o contrário do que quer.
+    await expect
+      .poll(async () =>
+        page.evaluate(() =>
+          parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--altura-do-cabecalho"))
+        )
+      )
+      .toBe(
+        await page.evaluate(() =>
+          Math.ceil(document.querySelector(".landing-cabecalho")!.getBoundingClientRect().height)
+        )
+      );
+
+    medidas.push(
+      await page.evaluate(() => ({
+        largura: window.innerWidth,
+        real: Math.ceil(document.querySelector(".landing-cabecalho")!.getBoundingClientRect().height),
+        declarada: parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--altura-do-cabecalho")),
+      }))
+    );
+  }
+
+  // E a prova de que o valor é medido e não um número fixo que por acaso bate:
+  // a barra é mais alta no telefone (a marca quebra em duas linhas), então a
+  // declarada TEM que variar junto. Um `100px` constante passaria na régua de
+  // cima nas três larguras e falharia aqui.
+  const noTelefone = medidas.find((m) => m.largura === 360)!;
+  const noDesktop = medidas.find((m) => m.largura === 1440)!;
+  expect(
+    noTelefone.declarada,
+    `a barra engorda no telefone (${noTelefone.real}px vs ${noDesktop.real}px) e a variável precisa engordar junto`
+  ).toBeGreaterThan(noDesktop.declarada);
+});
