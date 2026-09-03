@@ -2171,6 +2171,13 @@
       "verbo": "usa a validação de",
       "tamanhoPadrao": "P",
       "espera": true
+    },
+    "interno": {
+      "label": "interno",
+      "color": "#0891b2",
+      "verbo": "decide internamente com",
+      "tamanhoPadrao": "P",
+      "espera": true
     }
   },
   "edgeRules": {
@@ -2224,17 +2231,19 @@
     "fico": {
       "valid": [
         "http",
-        "orchestrates"
+        "orchestrates",
+        "interno"
       ],
       "default": "http"
     },
     "motor": {
       "valid": [
+        "interno",
         "http",
         "grpc",
         "orchestrates"
       ],
-      "default": "http"
+      "default": "interno"
     },
     "service": {
       "valid": [

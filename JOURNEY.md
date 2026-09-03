@@ -15551,3 +15551,92 @@ São dois eixos, desenhados no mesmo lugar, e se leem como uma escala só. **A
 intuição dele estava certa** — *"talvez não esteja aparecendo por não estar
 configurado"* é literalmente o `porQueCondicional` do estágio. Fica anotado; não
 foi mexido.
+
+---
+
+## §352 — A conexão que não é chamada, e a SPEC-101 que encolheu na medição
+
+Rodada com duas metades: uma **avaliação que desmontou a SPEC-101** e um
+**conserto entregue** (SPEC-102).
+
+### A SPEC-101 mediu com escopo estreito — e construiria o que já existe
+
+A §0 declarava *"Varredura em `packages/server/src/db/schema.ts`"*. Só isso — e o
+eixo de time **do desenho** não mora no schema: mora no modelo do engine, dentro
+do jsonb `diagrama`. A varredura não tinha como enxergar o que já estava pronto.
+
+Três achados, cada um invalidando uma peça:
+
+- **As fatias C e D já existiam.** `No.time` está em `model/types.ts:54`, com
+  campo na tela (`PropertiesPanel.tsx:114`, com a tooltip que diz literalmente a
+  semântica que a §3.1 propunha como nova), propagado a toda atividade por
+  `temposEnvolvidos()` (`derivar.ts:64`) e já chegando ao documento e à
+  exportação. A §0.2 afirmava *"o produto não sabe de quem é cada pedaço"*.
+  Sabe. Implementar como escrito criaria um `No.timeId` ao lado do `No.time`.
+- **A fatia A provava algo que já passa.** A §2 dizia que `GET /quebras`
+  *"deixa de filtrar por igualdade de string"*. Ele nunca filtrou: o `listar()`
+  não tem `WHERE`. **Não há isolamento de leitura nenhum** — toda pessoa logada
+  vê toda demanda de todo time. `quebras.time` é rótulo, não fronteira.
+- **O furo real está onde a SPEC não olhou.** O único gate de escrita em quebra
+  lê o time **do corpo da requisição** (`quebras.ts:382`): quem chama escolhe
+  contra qual time é conferido, e no `PUT` o mesmo corpo reescreve o time da
+  linha. E `POST /quebras/:id/derivar` não tem `preHandler` nenhum.
+
+O usuário então mudou o enquadramento inteiro: multi-time não é problema de
+modelo, é de **documento** — cada time produz o seu design doc e publica no seu
+espaço. Medido: `destino.espaco` já existe por destino (§348) e
+`destinosDaOperacao` já devolve lista. Falta só o recorte do documento por time
+e a identidade da página, que hoje é só o `demandaId` — dois times publicando a
+mesma demanda colidem.
+
+### SPEC-102 — o HTTP entre o fluxo FICO e o motor
+
+Relato com print: `aprovacao-credito-fico → Motor de Regras` marcado **HTTP**.
+
+Não era fixture: **nenhum exemplo do repositório tem essa aresta.** Era a
+inferência de `edgeRules` — a mesma que faz serviço→exchange nascer "publica" —
+respondendo certo a uma tabela errada. `edgeRules.motor.default` era `http`, e
+**não existia tipo de aresta que significasse "não atravessa a rede"**.
+
+O dano não era o rótulo: `edgeTypes.http` carrega `timeoutMs`, `tentativas`,
+`esperaEntreMs` e `disjuntor`. Chamar de `http` o que roda em processo fazia a
+ferramenta **cobrar as quatro** e a leitura de latência raciocinar sobre backoff
+de uma chamada que nunca sai do processo.
+
+**Entregue:** o tipo `interno` (`espera: true` — invocação interna soma latência,
+só não soma latência *de rede*; **sem `spec`**, que é a afirmação inteira),
+`edgeRules.motor.default = "interno"` com `http` preservado em `valid` (motor
+exposto por HTTP existe), e `interno` acrescentado ao `valid` do `fico`.
+
+Decisão do usuário que fechou a §7.2: *"precisa de nós que desdobra em tasks,
+assim mantemos a unidade de medida"*. O campo de texto `fico.motorPadrao` nomeia
+o motor e **não produz item nenhum**. Com o §248 desligado, o teste mostrou o
+custo exato: sem o tipo `interno`, `derivarEdge` devolve `[]` e o trabalho de
+integrar os dois **some do backlog em silêncio**.
+
+**Também entregue (fatia C):** anexar imagem no assistente de **configuração**.
+A peça já existia inteira — `AnexoDeImagem`, `image_url` no provedor, a flag
+`capacidades.visao` — ligada em UMA das três janelas de conversa (a do desenho).
+É a repetição literal do achado do microfone: capacidade construída e não
+distribuída.
+
+### O que NÃO foi feito, e por quê
+
+A fatia D — o assistente sabendo **aplicar** a correção — parou na medição:
+**`edgeRules` não tem caminho de escrita nenhum.** `CHAVES_CONFIG` é lista
+fechada (`regras`, `pipeline-agentes`, `exportador`, `tokens`); `edgeTypes`,
+`edgeRules` e `nodeTypes` vivem só no `config/diagrama.json` estático.
+
+Construir a superfície exige decidir **de quem é o vocabulário de conexão** —
+por time ou organizacional, quem cura, se o time pode contrariar a arquitetura.
+É a mesma pergunta que o usuário levantou sobre a config de MCP/tracker
+(*"acho que o adequado seria que fizesse parte da governança global"*).
+
+**O que fica na fila:** a **SPEC-97** (governança), que segue prometida e não
+escrita. Ela ganhou conteúdo medido nesta rodada: (a) o escopo por chave de
+config não é declarado — a aba de Exportação salva em `__global__` e as quatro
+leituras do servidor ignoram time, mas `PUT /config/:chave` aceita `timeId` para
+qualquer chave, e uma linha por time seria gravada e **nunca lida**; (b)
+`regras` por time **substitui** o global, então arquitetura e DBA não têm como
+impor piso — o único eixo que **soma** é o de produto (SPEC-86), e é ele o
+precedente; (c) as três correções de autorização acima.

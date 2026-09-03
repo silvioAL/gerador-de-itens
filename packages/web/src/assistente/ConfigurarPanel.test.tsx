@@ -221,6 +221,76 @@ describe("ConfigurarPanel — botão de falar (SPEC-30, achado real: a fala prom
 });
 
 /**
+ * SPEC-102 fatia C — **anexar o print da configuração errada.**
+ *
+ * Relato: *"é necessário que o usuário possa usar o agente para ajustar isso
+ * (…) já existe suporte a configurar no assistente, mas nao temos como colocar
+ * a imagem"*.
+ *
+ * Medido: a peça inteira já existia — `AnexoDeImagem`, `image_url` no provedor,
+ * a flag `capacidades.visao` — e estava ligada em UMA das três janelas de
+ * conversa (a do desenho). É a repetição literal do achado do bloco acima, com
+ * o microfone: a capacidade construída e não distribuída.
+ */
+describe("ConfigurarPanel — anexar imagem (SPEC-102 fatia C)", () => {
+  it("aparece quando o provedor enxerga imagem — mesma regra do microfone", async () => {
+    statusIaMock.mockResolvedValue({ capacidades: { visao: true } });
+    montar();
+    expect(await screen.findByRole("button", { name: "🖼 Anexar imagem" })).toBeTruthy();
+  });
+
+  it("não aparece quando o modelo não enxerga — oferecer o que não funciona custa mais que esconder", async () => {
+    statusIaMock.mockResolvedValue({ capacidades: { visao: false } });
+    montar();
+    await waitFor(() => expect(statusIaMock).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: "🖼 Anexar imagem" })).toBeNull();
+  });
+
+  it("o print viaja junto do pedido de configuração", async () => {
+    statusIaMock.mockResolvedValue({ capacidades: { visao: true } });
+    montar();
+    await screen.findByRole("button", { name: "🖼 Anexar imagem" });
+
+    const entrada = screen.getByLabelText("Escolher imagem") as HTMLInputElement;
+    const arquivo = new File(["print-do-canvas"], "conexao-errada.png", { type: "image/png" });
+    fireEvent.change(entrada, { target: { files: [arquivo] } });
+
+    // O anexo é assíncrono (FileReader): espera o chip do arquivo aparecer.
+    await screen.findByRole("button", { name: "Remover conexao-errada.png" });
+
+    await enviarIntencao("a conexão entre o fluxo e o motor está como HTTP");
+
+    await waitFor(() => expect(configurarMock).toHaveBeenCalled());
+    const pedido = configurarMock.mock.calls[0][0];
+    expect(pedido.imagens).toHaveLength(1);
+    expect(pedido.imagens[0]).toContain("data:image/png;base64,");
+  });
+
+  it("um print SOZINHO já é o pedido — não exige redigitar o que a imagem mostra", async () => {
+    statusIaMock.mockResolvedValue({ capacidades: { visao: true } });
+    montar();
+    await screen.findByRole("button", { name: "🖼 Anexar imagem" });
+
+    // Sem digitar nada, o Enviar está desabilitado…
+    expect(screen.getByRole("button", { name: "Enviar" }).hasAttribute("disabled")).toBe(true);
+
+    const entrada = screen.getByLabelText("Escolher imagem") as HTMLInputElement;
+    fireEvent.change(entrada, {
+      target: { files: [new File(["x"], "print.png", { type: "image/png" })] },
+    });
+    await screen.findByRole("button", { name: "Remover print.png" });
+
+    // …e passa a valer só com a imagem.
+    expect(screen.getByRole("button", { name: "Enviar" }).hasAttribute("disabled")).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+
+    await waitFor(() => expect(configurarMock).toHaveBeenCalled());
+    const falada = configurarMock.mock.calls[0][0].mensagens.at(-1);
+    expect(falada.texto).toBe("(1 imagem(ns) anexada(s))");
+  });
+});
+
+/**
  * §274 — o contexto do produto proposto pela CONVERSA.
  *
  * O §271 tinha uma caixinha de instrução única dentro da aba de produto. Ela

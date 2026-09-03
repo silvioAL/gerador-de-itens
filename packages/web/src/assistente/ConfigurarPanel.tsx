@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DiagramaConfig } from "@gerador/engine";
 import {
   apiIa,
@@ -14,6 +14,7 @@ import {
   type PapelConfigurado,
 } from "../api/client";
 import { usePermissoes } from "../auth/usePermissoes";
+import { AnexoDeImagem, type ImagemAnexada } from "../conversa/AnexoDeImagem";
 import { BotaoFalar } from "../conversa/BotaoFalar";
 import { useVozNaEntrada } from "../conversa/useVozNaEntrada";
 
@@ -145,6 +146,37 @@ export function ConfigurarPanel({
   // armadilha que o comentário do useVozNaEntrada descreve ("duas janelas"),
   // repetida na terceira janela, que nasceu depois dele.
   const { podeFalar, gravacao } = useVozNaEntrada(setEntrada, { config });
+  /**
+   * SPEC-102 fatia C — o print da configuração errada.
+   *
+   * Exatamente o mesmo par de estados do `ConversaPanel`, e pela mesma razão do
+   * comentário do `useVozNaEntrada` logo acima: a peça já existia e estava
+   * ligada em UMA das três janelas de conversa. O relato que trouxe esta fatia
+   * é de configuração — um print do canvas com a conexão tipada errado —, e era
+   * justamente aqui que não dava para anexar.
+   */
+  const [imagens, setImagens] = useState<ImagemAnexada[]>([]);
+  const [podeAnexar, setPodeAnexar] = useState(false);
+  const [destinoIa, setDestinoIa] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    let cancelado = false;
+    apiIa
+      .status()
+      .then((s) => {
+        if (cancelado) return;
+        setPodeAnexar(s.capacidades?.visao === true);
+        setDestinoIa(s.gateway?.baseUrl);
+      })
+      // Sem status = sem anexo, como no ConversaPanel: oferecer o que o sistema
+      // não faz custa mais que esconder.
+      .catch(() => {
+        if (!cancelado) setPodeAnexar(false);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, []);
   const [pensando, setPensando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const fimRef = useRef<HTMLDivElement>(null);
@@ -191,14 +223,20 @@ export function ConfigurarPanel({
 
   async function enviar() {
     const texto = entrada.trim();
-    if (!texto || pensando) return;
-    const transcript = [...mensagens.map(({ autor, texto: t }) => ({ autor, texto: t })), { autor: "voce" as const, texto }];
-    setMensagens((m) => [...m, { autor: "voce", texto }]);
+    // SPEC-102 — um print sozinho já é o pedido (mesma regra do ConversaPanel).
+    if ((!texto && imagens.length === 0) || pensando) return;
+    const falado = texto || `(${imagens.length} imagem(ns) anexada(s))`;
+    const transcript = [...mensagens.map(({ autor, texto: t }) => ({ autor, texto: t })), { autor: "voce" as const, texto: falado }];
+    setMensagens((m) => [...m, { autor: "voce", texto: falado }]);
     setEntrada("");
     setPensando(true);
     setErro(null);
     try {
-      const resposta = await apiIa.configurar({ mensagens: transcript, resumoConfig: resumoConfig() });
+      const resposta = await apiIa.configurar({
+        mensagens: transcript,
+        resumoConfig: resumoConfig(),
+        imagens: imagens.length ? imagens.map((i) => i.dataUrl) : undefined,
+      });
       const cartoes: Cartao[] = resposta.propostas.map((p) => ({
         alvo: p.alvo,
         instrucao: p.instrucao,
@@ -233,6 +271,9 @@ export function ConfigurarPanel({
       setMensagens((m) => [...m, { autor: "agente", texto: `Não consegui: ${mensagem}` }]);
     } finally {
       setPensando(false);
+      // Os anexos são do TURNO, não da conversa: mantê-los reenviaria a mesma
+      // imagem (e o mesmo custo de tokens) a cada mensagem seguinte.
+      setImagens([]);
       fimRef.current?.scrollIntoView?.({ behavior: "smooth" });
     }
   }
@@ -492,7 +533,14 @@ export function ConfigurarPanel({
           style={entradaEstilo}
         />
         {podeFalar && <BotaoFalar gravacao={gravacao} />}
-        <button onClick={() => void enviar()} disabled={pensando || !entrada.trim()} style={botaoEnviarEstilo}>
+        {podeAnexar && (
+          <AnexoDeImagem imagens={imagens} onMudar={setImagens} destino={destinoIa} desabilitado={pensando} />
+        )}
+        <button
+          onClick={() => void enviar()}
+          disabled={pensando || (!entrada.trim() && imagens.length === 0)}
+          style={botaoEnviarEstilo}
+        >
           {pensando ? "pensando…" : "Enviar"}
         </button>
       </div>
