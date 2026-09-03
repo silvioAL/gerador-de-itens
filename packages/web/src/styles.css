@@ -805,17 +805,25 @@ html {
 */
 :root {
   /**
-   * 100 é o PIOR CASO medido, não a altura do desktop.
+   * SPEC-103 — **este valor é o ponto de partida, não a verdade.**
    *
-   * A primeira escrita usou 94, que é o que a barra mede em 1440 px. Medindo em
-   * 360 px contra a stack: **99 px** — o cabeçalho engorda quando os controles
-   * apertam. A âncora chegava 5 px atrás da barra no telefone, que é o mesmo
-   * defeito que esta variável existe para impedir, só que na tela em que
-   * ninguém olha.
+   * Quem manda aqui é `useAlturaDoCabecalho` (`site/Site.tsx`): um
+   * `ResizeObserver` escreve a altura REAL da barra nesta variável. O número
+   * abaixo vale só para o primeiro quadro, antes de o observador rodar — e
+   * âncora só é usada depois de um clique, então não há janela em que ele fique
+   * valendo por engano.
    *
-   * Sobrar alguns pixels no desktop é inofensivo: a seção começa um pouco mais
-   * abaixo. Faltar um só corta o chapéu. O E2E compara a altura REAL com esta,
-   * nos três tamanhos, para o pior caso não envelhecer em silêncio.
+   * ## Por que deixou de ser constante
+   *
+   * O §341 escreveu 100 como *"o pior caso medido"*: 99 px em 360 px, contra a
+   * stack. Era o pior caso **daquela máquina**. No runner da CI a mesma barra
+   * mede **113 px** — a marca quebra em duas linhas no telefone, e o quanto ela
+   * cresce ao quebrar depende da métrica da fonte. O E2E ficou vermelho por 25
+   * merges seguidos.
+   *
+   * A régua continua a mesma, e continua assimétrica: sobrar empurra a seção
+   * alguns pixels para baixo (inofensivo); faltar esconde o título atrás da
+   * barra. É por isso que o hook usa `Math.ceil`.
    */
   --altura-do-cabecalho: 100px;
 }
