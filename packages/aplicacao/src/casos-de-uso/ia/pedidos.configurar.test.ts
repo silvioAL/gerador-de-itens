@@ -63,6 +63,42 @@ describe("montarPedidoConfigurarConversa (SPEC-34 Fase 1)", () => {
     expect(propostas.minItems).toBeUndefined();
     expect(prompt).toContain("Lista vazia é resposta correta");
   });
+
+  /**
+   * SPEC-102 fatia C — o print da configuração errada.
+   *
+   * O caminho de imagem já existia inteiro para a conversa do DESENHO
+   * (`montarPedidoDiagrama`). Aqui ele passa a existir também para a conversa
+   * de CONFIGURAÇÃO, que é de onde veio o relato: um print do canvas mostrando
+   * uma conexão tipada errado.
+   */
+  it("as imagens seguem com o pedido — quem as manda ao modelo é o adaptador", () => {
+    const pedido = montarPedidoConfigurarConversa({
+      mensagens,
+      imagens: ["data:image/png;base64,AAA"],
+    });
+    expect(pedido.imagens).toEqual(["data:image/png;base64,AAA"]);
+  });
+
+  it("avisa o modelo de que há imagem — sem isso ele responde só o texto", () => {
+    const { prompt } = montarPedidoConfigurarConversa({
+      mensagens,
+      imagens: ["data:image/png;base64,AAA"],
+    });
+    expect(prompt).toContain("anexou 1 imagem(ns)");
+    // Sem imagem, o prompt não ganha linha nenhuma — a conversa de sempre.
+    expect(montarPedidoConfigurarConversa({ mensagens }).prompt).not.toContain("anexou");
+  });
+
+  it("um print SOZINHO passa na guarda — exigir texto junto anularia o anexo", () => {
+    // Mesmo raciocínio do `montarPedidoDiagrama`: obrigar a pessoa a redigitar
+    // o que a imagem mostra é o trabalho que anexar existe para evitar.
+    expect(() =>
+      montarPedidoConfigurarConversa({ mensagens: [], imagens: ["data:image/png;base64,AAA"] })
+    ).not.toThrow();
+    // E a guarda continua valendo quando não há nem texto nem imagem.
+    expect(() => montarPedidoConfigurarConversa({ mensagens: [], imagens: [] })).toThrow(PedidoInvalido);
+  });
 });
 
 /**

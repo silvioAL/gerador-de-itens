@@ -722,6 +722,16 @@ export interface EntradaConfigurarConversa {
   /** Resumo da config atual do time — é o que faz o modelo propor MUDANÇA,
    * não duplicata do que já existe. */
   resumoConfig?: string;
+  /**
+   * SPEC-102 fatia C — o print da configuração errada.
+   *
+   * A SPEC-30 Fase 2 construiu imagem para a conversa do DESENHO, e parou ali.
+   * O relato que originou esta fatia é de configuração: um print do canvas
+   * mostrando uma conexão com o tipo errado. Sem isto, a pessoa que vê o erro
+   * numa imagem tem que descrevê-lo por escrito — o trabalho que anexar existe
+   * para evitar (mesma frase do `montarPedidoDiagrama`).
+   */
+  imagens?: string[];
 }
 
 /** Mesmo motivo do teto de nós no diagrama: array aberto deixa a geração sem
@@ -736,10 +746,17 @@ const MAX_PROPOSTAS_CONFIG = 3;
  * com o schema estrito do alvo — aqui o schema é fixo de propósito (schema
  * condicional por alvo é o que um gateway `json_object` não garante).
  */
-export function montarPedidoConfigurarConversa({ mensagens, resumoConfig }: EntradaConfigurarConversa): PedidoIa {
+export function montarPedidoConfigurarConversa({
+  mensagens,
+  resumoConfig,
+  imagens,
+}: EntradaConfigurarConversa): PedidoIa {
   const faladas = (mensagens ?? []).filter((m) => m?.texto?.trim());
-  if (!faladas.some((m) => m.autor === "voce")) {
-    throw new PedidoInvalido("conversa vazia — descreva o que quer configurar");
+  // SPEC-102 fatia C — um print de configuração errada JÁ É o pedido, pelo
+  // mesmo raciocínio do `montarPedidoDiagrama`: exigir texto junto obrigaria a
+  // pessoa a redigitar o que a imagem mostra.
+  if (!faladas.some((m) => m.autor === "voce") && !imagens?.length) {
+    throw new PedidoInvalido("conversa vazia — descreva o que quer configurar (ou anexe uma imagem)");
   }
 
   const esquema = {
@@ -782,9 +799,14 @@ export function montarPedidoConfigurarConversa({ mensagens, resumoConfig }: Entr
     `- Se a conversa ainda não dá uma proposta concreta, devolva "propostas" VAZIA e use "texto"`,
     `  para perguntar o que falta. Lista vazia é resposta correta, não falha.`,
     `- No máximo ${MAX_PROPOSTAS_CONFIG} propostas por resposta.`,
+    ...(imagens?.length
+      ? [`- A pessoa anexou ${imagens.length} imagem(ns): leia o que está nela antes de propor.`]
+      : []),
   ].join("\n");
 
-  return { prompt, esquema };
+  // As imagens seguem com o pedido — quem as manda pro modelo é o adaptador
+  // (mesma divisão do `montarPedidoDiagrama`).
+  return { prompt, esquema, imagens };
 }
 
 const MAX_DECISOES = 4;

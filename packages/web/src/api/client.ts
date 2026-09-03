@@ -962,6 +962,10 @@ export const apiIa = {
 export interface PedidoConfigurarIa {
   mensagens: { autor: "voce" | "agente"; texto: string }[];
   resumoConfig?: string;
+  /** SPEC-102 fatia C — prints (data URLs) da configuração errada. Mesmo
+   * caminho do `proporDiagrama`: o servidor repassa ao provedor, que anexa só
+   * na última mensagem. */
+  imagens?: string[];
 }
 
 /** Alvos que a conversa de configuração propõe (SPEC-34 §4). Os dois de regras
