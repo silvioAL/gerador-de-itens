@@ -15515,3 +15515,39 @@ limpos. Capa verificada contra `:8080`.
 ela é de modelo, não de tela — `quebras.time` é coluna única, os destinos do
 gateway são por organização, e o RBAC é por time. Um escopo multi-time esbarra
 nos três.
+
+---
+
+## §351 — A SPEC do desenho multi-times, e duas leituras da tela do ciclo
+
+Rodada de avaliação: **nenhuma linha de produção mudou.** O que mudou foi o que
+está escrito, e o que passamos a saber.
+
+### A SPEC-101
+
+O usuário destravou o tamanho da resposta: *"ainda não estamos rodando em
+produção, temos liberdade de ajustar modelo"*. Sem migração a preservar, a
+pergunta deixa de ser *"como contornar"* e passa a ser *"qual é o modelo certo"*.
+
+A medição achou o argumento: **`produto_time` já é N:N** — o produto já atravessa
+times, e a SPEC-53 justificou por quê. **`quebras.time` é `text`, singular.** É a
+mesma falha de abstração que a SPEC-42 desfez entre time e stack, sobrevivendo
+num lugar diferente.
+
+E separou três perguntas que pareciam uma: **quem enxerga** (relação, não coluna),
+**de quem é cada parte** (o time vai no **nó**, e o item herda o dono pelo
+`origem.nodeId` que já existe), e **qual regra vale** — esta com recomendação de
+**não resolver**, porque criaria uma terceira camada de resolução e faria o mesmo
+desenho produzir itens diferentes conforme o dono do nó.
+
+### O que a tela do ciclo ensinou, sem estar errada
+
+O usuário leu *"Integrar com as ferramentas do time"* como pendente. Ele está
+`completo` desde a SPEC-84. O que ele viu foi a marca de **aplicação**
+(`quando-se-aplica`, SPEC-91) ao lado da marca de **estado** (`parcial`, no
+estágio de cima).
+
+São dois eixos, desenhados no mesmo lugar, e se leem como uma escala só. **A
+intuição dele estava certa** — *"talvez não esteja aparecendo por não estar
+configurado"* é literalmente o `porQueCondicional` do estágio. Fica anotado; não
+foi mexido.
