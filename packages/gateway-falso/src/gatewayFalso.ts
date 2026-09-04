@@ -123,6 +123,67 @@ export const ADRS_DO_GATEWAY_FALSO = [
   },
 ];
 
+/**
+ * §355 — **o documento da casa, para a jornada do §349 ter o que ler.**
+ *
+ * Markdown de propósito, e desigual de propósito: tem componentes nomeados, uma
+ * ligação entre eles e um número de volume — o suficiente para o desenho que
+ * nascer dele não ser vazio, e para a proveniência ter o que citar.
+ */
+export const DOCUMENTO_DO_GATEWAY_FALSO = {
+  titulo: "Aprovação de crédito — desenho de solução",
+  conteudo: [
+    "# Aprovação de crédito",
+    "",
+    "O **checkout** envia a proposta para o **serviço de aprovação**, que consulta o",
+    "**bureau de crédito** e publica o resultado na fila `propostas-aprovadas`.",
+    "",
+    "O bureau responde em segundos e não pode segurar o checkout.",
+    "",
+    "Volume: cerca de 300 propostas por minuto, com pico de 5x no fim do mês.",
+  ].join("\n"),
+  atualizadoEm: "2026-08-20T10:00:00.000Z",
+};
+
+/** §355 — a arquitetura de negócio da casa (SPEC-81 fatia F). Uma seção
+ * ausente (`restricoes`) de propósito: a tela precisa ter o que marcar como
+ * lacuna em vez de receber tudo preenchido e nunca exercitar esse caminho. */
+export const ARQUITETURA_DO_GATEWAY_FALSO = {
+  objetivo: "Aprovar crédito para vendas parceladas no e-commerce",
+  quemUsa: "Analistas de crédito e o próprio checkout, sem gente no meio",
+  regrasDeNegocio: "Proposta acima de R$ 5.000 exige análise manual",
+  sistemas: "Checkout, bureau de crédito nacional, esteira de aprovação",
+  glossario: [
+    { termo: "Proposta", definicao: "o pedido de crédito de um cliente para uma compra" },
+    { termo: "Bureau", definicao: "o parceiro externo que devolve o score" },
+  ],
+};
+
+/** As páginas já publicadas, por `demandaId`. Existe para o dublê provar a
+ * IDEMPOTÊNCIA que o contrato promete: publicar duas vezes atualiza no lugar e
+ * devolve `atualizada: true`, em vez de criar uma segunda página. */
+const paginasPublicadas = new Map<string, string>();
+
+/** Zera o estado entre testes — sem isto, a segunda suíte veria a página da
+ * primeira e "criada" viraria "atualizada" sem ninguém ter publicado duas vezes. */
+export function limparPaginasDoGatewayFalso(): void {
+  paginasPublicadas.clear();
+}
+
+function lerCorpo(req: import("node:http").IncomingMessage): Promise<unknown> {
+  return new Promise((resolve) => {
+    let bruto = "";
+    req.on("data", (p) => (bruto += p));
+    req.on("end", () => {
+      try {
+        resolve(JSON.parse(bruto || "{}"));
+      } catch {
+        resolve({});
+      }
+    });
+  });
+}
+
 interface CorpoChat {
   messages?: { role: string; content: string | { type?: string; text?: string }[] }[];
   response_format?: { type?: string; json_schema?: { schema?: unknown } };
@@ -289,6 +350,83 @@ export function criarGatewayFalso(opcoes: OpcoesGatewayFalso = {}): Server {
         depoisDaLatencia(() => {
           res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
           res.end(JSON.stringify({ adrs: ADRS_DO_GATEWAY_FALSO }));
+        });
+      });
+      return;
+    }
+
+    /**
+     * §355 — **as quatro operações que faltavam.**
+     *
+     * O gateway tem cinco (`OPERACOES_DO_GATEWAY`) e este dublê implementava
+     * UMA (`/adr`). Medido ao tentar percorrer a jornada inteira contra a stack:
+     * configurar o gateway, ler um documento da casa, virar desenho, derivar e
+     * subir os itens — **quatro dos cinco passos não tinham para onde apontar.**
+     *
+     * Nenhuma delas pede credencial, pelo mesmo motivo já escrito em `/adr`: o
+     * destino do gateway do TIME tem cabeçalhos próprios e configuráveis, e não
+     * a chave do provedor de IA que `chaveEsperada` guarda.
+     */
+
+    // SPEC-49 — os itens para o tracker. Devolve um resultado POR ITEM, e o
+    // último falha de propósito: falha parcial é o modo de falhar deste
+    // contrato, e um dublê que sempre acerta nunca exercita a tela que a mostra.
+    if (req.url?.endsWith("/itens") && req.method === "POST") {
+      void lerCorpo(req).then((corpo) => {
+        const itens = ((corpo as { itens?: { chave?: string }[] }).itens ?? []).filter((i) => i?.chave);
+        const resultados = itens.map((item, i) =>
+          i === itens.length - 1 && itens.length > 1
+            ? { chave: item.chave, erro: "campo obrigatório ausente no tracker (recusa simulada)" }
+            : { chave: item.chave, linkExterno: `https://exemplo.invalido/browse/${item.chave}` }
+        );
+        depoisDaLatencia(() => {
+          res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ resultados }));
+        });
+      });
+      return;
+    }
+
+    // SPEC-81 fatia B — publicar o documento. IDEMPOTENTE por `demandaId`, que é
+    // a promessa central do contrato: publicar 2x atualiza no lugar.
+    if (req.url?.endsWith("/documento") && req.method !== "GET") {
+      void lerCorpo(req).then((corpo) => {
+        const { demandaId, espaco } = corpo as { demandaId?: string; espaco?: string };
+        const id = demandaId ?? "sem-id";
+        const jaExistia = paginasPublicadas.has(id);
+        const link = jaExistia
+          ? paginasPublicadas.get(id)!
+          : `https://exemplo.invalido/wiki/${espaco ? `${espaco}/` : ""}${id}`;
+        paginasPublicadas.set(id, link);
+        depoisDaLatencia(() => {
+          res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ linkExterno: link, atualizada: jaExistia }));
+        });
+      });
+      return;
+    }
+
+    // §349 — ler um documento da casa pelo LINK. `link` volta como eco: a
+    // proveniência do desenho cita de onde veio, e inventar aqui seria mentir
+    // sobre a origem.
+    if (req.url?.endsWith("/documento-externo") && req.method === "POST") {
+      void lerCorpo(req).then((corpo) => {
+        const { link } = corpo as { link?: string };
+        depoisDaLatencia(() => {
+          res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ ...DOCUMENTO_DO_GATEWAY_FALSO, link: link ?? "" }));
+        });
+      });
+      return;
+    }
+
+    // SPEC-81 fatia F — a arquitetura de negócio da casa.
+    if (req.url?.endsWith("/arquitetura") && req.method === "POST") {
+      req.resume();
+      req.on("end", () => {
+        depoisDaLatencia(() => {
+          res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify(ARQUITETURA_DO_GATEWAY_FALSO));
         });
       });
       return;
