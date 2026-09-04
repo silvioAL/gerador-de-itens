@@ -1,6 +1,15 @@
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { regrasEmVigor, type RegrasConfig } from "@gerador/engine";
-import { CAMPO_GLOBAL, ConfigInvalida, criarCasosDeUsoDeConfig, ehChaveConfig, type ChaveConfig } from "@gerador/aplicacao";
+import {
+  aplicarRegrasDeConexao,
+  CAMPO_GLOBAL,
+  ConfigInvalida,
+  criarCasosDeUsoDeConfig,
+  ehChaveConfig,
+  type ChaveConfig,
+} from "@gerador/aplicacao";
 import type { OpcoesApp } from "../app.js";
 import { criarRepositorioDeConfigEmPostgres } from "../adaptadores/configEmPostgres.js";
 import { exigirSessao } from "../auth/middleware.js";
@@ -8,6 +17,7 @@ import {
   exigirPermissao,
   organizacaoPadraoDe,
   primeiroRecursoNegado,
+  RECURSO_DA_CHAVE_DE_CONFIG,
   secoesDeRegrasAlteradas,
   type Recurso,
 } from "../auth/permissoes.js";
@@ -27,6 +37,27 @@ import { templateDaVersao as templateDeConfig } from "../config/templateDaVersao
  * seção que o padrão preenche, isso aparece — em vez de o agente que depende
  * dela simplesmente não escrever nada.
  */
+/** O que esta rota precisa saber do diagrama: só o bloco que ela resolve. O
+ * resto passa adiante intacto — quem interpreta um `DiagramaConfig` é o engine,
+ * e redeclará-lo aqui seria a segunda descrição da mesma forma. */
+interface DiagramaResolvido {
+  edgeRules?: Record<string, { valid: string[]; default?: string }>;
+}
+
+/** Mesmo fallback `.json` → `.example.json` do `templateDaVersao` e do
+ * `lerJsonDeConfig` de `routes/quebras.ts`: este repositório só tem os
+ * templates de exemplo na raiz. */
+async function lerJsonDeConfig<T>(diretorio: string, nome: string): Promise<T | null> {
+  for (const candidato of [nome, nome.replace(/\.json$/, ".example.json")]) {
+    try {
+      return JSON.parse(await readFile(resolve(diretorio, candidato), "utf-8")) as T;
+    } catch {
+      // tenta o próximo candidato
+    }
+  }
+  return null;
+}
+
 export async function registrarRotasConfig(app: FastifyInstance, { db, diretorioConfig }: OpcoesApp) {
   const casos = criarCasosDeUsoDeConfig(criarRepositorioDeConfigEmPostgres(db));
   const versaoAtual = process.env.npm_package_version ?? null;
@@ -63,7 +94,10 @@ export async function registrarRotasConfig(app: FastifyInstance, { db, diretorio
     const email = req.usuario!.email;
 
     if (chave !== "regras") {
-      return primeiroRecursoNegado(db, orgId, email, ["pipeline-agentes"], "editar", timeId ?? null);
+      // O dono de cada chave é DADO (`RECURSO_DA_CHAVE_DE_CONFIG`), não um ramo
+      // aqui: chave nova não compila sem declarar de quem ela é.
+      const recurso = RECURSO_DA_CHAVE_DE_CONFIG[chave];
+      return primeiroRecursoNegado(db, orgId, email, recurso ? [recurso] : [], "editar", timeId ?? null);
     }
 
     const atual = await casos.obter("regras", await templateDaVersao("regras"), timeId);
@@ -82,6 +116,29 @@ export async function registrarRotasConfig(app: FastifyInstance, { db, diretorio
 
     const { timeId } = req.query as { timeId?: string };
     return casos.obter(chave, await templateDaVersao(chave), timeId);
+  });
+
+  /**
+   * §354 — **o diagrama RESOLVIDO: o arquivo da imagem + o que a organização
+   * sobrescreveu.**
+   *
+   * Existe porque a resolução de configuração é do servidor, e estava indo para
+   * o cliente. O web fazia `fetch("/config/diagrama.json")` no host estático e
+   * mesclava as sobreposições sozinho — uma segunda fonte de verdade sobre o
+   * mesmo documento, e a que o `validateConfig` do servidor não enxergava.
+   *
+   * Leitura aberta, como o `/config/:chave` vizinho: o diagrama é vocabulário,
+   * não dado de ninguém.
+   */
+  app.get("/config/diagrama", async (_req, reply) => {
+    const estatico = await lerJsonDeConfig<DiagramaResolvido>(diretorioConfig, "diagrama.json");
+    if (!estatico) {
+      // Sem o arquivo não há vocabulário nenhum, e devolver `{}` faria o canvas
+      // nascer sem tipo de nó em vez de dizer o que houve.
+      return reply.code(500).send({ erro: "config/diagrama.json não encontrado no servidor" });
+    }
+    const conexoes = await casos.obter("conexoes", await templateDaVersao("conexoes"));
+    return aplicarRegrasDeConexao(estatico, conexoes.documento);
   });
 
   /**

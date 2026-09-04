@@ -41,3 +41,61 @@ describe("carregarConfig (SPEC-21) — /campos-aresta ausente não pode derrubar
     ]);
   });
 });
+
+/**
+ * §354 — quem RESOLVE o diagrama é o servidor.
+ *
+ * O web chegou a mesclar as sobreposições de conexão sozinho. O usuário
+ * apontou (*"coisas do backend precisam ficar no backend"*), e a mescla foi
+ * para `aplicacao/config/diagnostico.ts` — testada lá. O que sobra de
+ * responsabilidade aqui é só: pedir ao servidor, e não ficar sem vocabulário
+ * quando ele não responde.
+ */
+describe("carregarConfig — o diagrama vem resolvido do servidor", () => {
+  let fetchOriginal: typeof fetch;
+
+  const resolvido = {
+    ...diagramaConfig,
+    edgeRules: { motor: { valid: ["interno", "http"], default: "interno" } },
+  };
+
+  beforeEach(() => {
+    fetchOriginal = global.fetch;
+  });
+  afterEach(() => {
+    global.fetch = fetchOriginal;
+    vi.restoreAllMocks();
+  });
+
+  it("usa `/config/diagrama` — não o arquivo estático", async () => {
+    const pedidos: string[] = [];
+    global.fetch = vi.fn((url: string) => {
+      const u = String(url);
+      pedidos.push(u);
+      if (u.includes("/config/diagrama.json")) return respostaJson(diagramaConfig);
+      if (u.endsWith("/config/diagrama")) return respostaJson(resolvido);
+      if (u.includes("/config/app.json")) return respostaJson(appConfig);
+      if (u.includes("/campos-no") || u.includes("/campos-aresta")) return respostaJson([]);
+      return respostaJson(undefined, false, 404);
+    }) as unknown as typeof fetch;
+
+    const { diagramaConfig: cfg } = await carregarConfig("time-x");
+
+    expect(cfg.edgeRules.motor).toEqual({ valid: ["interno", "http"], default: "interno" });
+    expect(pedidos.some((u) => u.endsWith("/config/diagrama"))).toBe(true);
+  });
+
+  it("servidor fora do ar cai no arquivo estático — o canvas nunca fica sem vocabulário", async () => {
+    global.fetch = vi.fn((url: string) => {
+      const u = String(url);
+      if (u.includes("/config/diagrama.json")) return respostaJson(diagramaConfig);
+      if (u.includes("/config/app.json")) return respostaJson(appConfig);
+      if (u.includes("/campos-no") || u.includes("/campos-aresta")) return respostaJson([]);
+      return respostaJson(undefined, false, 500);
+    }) as unknown as typeof fetch;
+
+    const { diagramaConfig: cfg } = await carregarConfig("time-x");
+
+    expect(cfg.nodeTypes.service.label).toBe("Serviço");
+  });
+});

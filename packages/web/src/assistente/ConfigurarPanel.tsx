@@ -12,6 +12,8 @@ import {
   type DadosCampoNo,
   type GrupoFicha,
   type PapelConfigurado,
+  apiConexoes,
+  type ConexoesConfig,
 } from "../api/client";
 import { usePermissoes } from "../auth/usePermissoes";
 import { AnexoDeImagem, type ImagemAnexada } from "../conversa/AnexoDeImagem";
@@ -74,11 +76,26 @@ interface ObjetoRegra {
   contextos?: string[];
 }
 
+/**
+ * SPEC-102 fatia D — o que o passo 2 devolve para `regra-de-conexao`.
+ *
+ * `tipoNo` vem no objeto E vira o `destino` do cartão: o modelo propõe o
+ * destino, e a pessoa pode trocá-lo no select antes de aplicar — como nos
+ * outros alvos. `porque` não é gravado; é o que o cartão MOSTRA para a decisão
+ * ser informada.
+ */
+interface ObjetoRegraDeConexao {
+  tipoNo: string;
+  default: string;
+  valid: string[];
+  porque?: string;
+}
+
 interface Cartao {
   alvo: AlvoConversaConfig;
   instrucao: string;
   estado: "materializando" | "pronta" | "aplicando" | "aplicada" | "erro";
-  objeto?: ObjetoCampo | ObjetoPapel | ObjetoRegra | ObjetoContextoDoProduto;
+  objeto?: ObjetoCampo | ObjetoPapel | ObjetoRegra | ObjetoContextoDoProduto | ObjetoRegraDeConexao;
   erro?: string;
   /** tipoNo/tipoAresta para campos; grupo da ficha para papel; tech para regras. */
   destino: string;
@@ -99,6 +116,8 @@ const RECURSO_DO_ALVO: Record<AlvoConversaConfig, string> = {
   "regra-refinamento": "regras.checklistTecnico",
   "item-processo": "regras.checklistProcesso",
   "contexto-do-produto": "produtos",
+  // SPEC-102 fatia D — dono próprio (ver RECURSOS em auth/permissoes.ts).
+  "regra-de-conexao": "conexoes",
 };
 
 const ROTULO_DO_ALVO: Record<AlvoConversaConfig, string> = {
@@ -108,6 +127,7 @@ const ROTULO_DO_ALVO: Record<AlvoConversaConfig, string> = {
   "regra-refinamento": "requisito de refinamento",
   "item-processo": "item de checklist de processo",
   "contexto-do-produto": "contexto do produto",
+  "regra-de-conexao": "regra de conexão",
 };
 
 /**
@@ -200,6 +220,13 @@ export function ConfigurarPanel({
       }`,
       `Campos de conexão já existentes: ${camposAresta.map((c) => `${c.tipoAresta}.${c.key}`).join(", ") || "nenhum"}`,
       `Papéis da esteira: ${papeisAtuais.map((p) => p.nome).join(", ")}`,
+      // SPEC-102 fatia D — sem as regras EM VIGOR o modelo proporia o default
+      // que já existe, como se fosse mudança.
+      `Regra de conexão por destino (o que nasce ao ligar algo nele): ${
+        Object.entries(config.edgeRules ?? {})
+          .map(([tipoNo, r]) => `${tipoNo}→${(r as { default?: string }).default ?? "?"}`)
+          .join(", ") || "nenhuma"
+      }`,
     ].join("\n");
   }
 
@@ -208,6 +235,9 @@ export function ConfigurarPanel({
     if (alvo === "campo-aresta") return tiposDeAresta[0]?.id ?? "";
     if (alvo === "regra-refinamento" || alvo === "item-processo") return techs?.[0] ?? "";
     if (alvo === "contexto-do-produto") return produtos?.[0]?.id ?? "";
+    // O destino real vem do objeto (`tipoNo`) quando o passo 2 responde; até lá,
+    // o primeiro tipo de nó evita um select vazio.
+    if (alvo === "regra-de-conexao") return tiposDeNo[0]?.id ?? "";
     return "especialista";
   }
 
@@ -257,7 +287,18 @@ export function ConfigurarPanel({
             instrucao: cartoes[j].instrucao,
             contexto: timeAtivo ? `Time: ${timeAtivo}` : undefined,
           });
-          atualizarCartao(indiceMensagem, j, { estado: "pronta", objeto });
+          // SPEC-102 fatia D — o modelo propõe o DESTINO junto do objeto, e é
+          // ele que o select passa a mostrar. Sem isto o cartão aplicaria no
+          // primeiro tipo de nó da lista, que quase nunca é o certo.
+          const propostoPeloModelo =
+            cartoes[j].alvo === "regra-de-conexao" ? (objeto as { tipoNo?: string }).tipoNo : undefined;
+          atualizarCartao(indiceMensagem, j, {
+            estado: "pronta",
+            objeto,
+            ...(propostoPeloModelo && tiposDeNo.some((t) => t.id === propostoPeloModelo)
+              ? { destino: propostoPeloModelo }
+              : {}),
+          });
         } catch (e) {
           atualizarCartao(indiceMensagem, j, {
             estado: "erro",
@@ -310,6 +351,22 @@ export function ConfigurarPanel({
           opcoes: o.type === "select" ? o.opcoes : undefined,
           ajuda: o.ajuda,
         });
+      } else if (cartao.alvo === "regra-de-conexao") {
+        /**
+         * SPEC-102 fatia D — grava a SOBREPOSIÇÃO, nunca o `edgeRules` inteiro.
+         *
+         * O documento guarda só os destinos que a organização mudou; o resto
+         * continua vindo do `config/diagrama.json`. Copiar as regras de fábrica
+         * para dentro dele congelaria o catálogo — correção de default numa
+         * versão nova não chegaria a quem tem cópia por cima.
+         *
+         * Sem `timeAtivo`: a chave é ORGANIZACIONAL (SPEC-102 §5.3).
+         */
+        const o = cartao.objeto as ObjetoRegraDeConexao;
+        const documento = await apiConexoes.obter().catch(() => ({ regras: {} }) as ConexoesConfig);
+        const regras = { ...(documento?.regras ?? {}) };
+        regras[cartao.destino] = { default: o.default, valid: o.valid };
+        await apiConexoes.salvar({ ...documento, regras });
       } else if (cartao.alvo === "papel") {
         const o = cartao.objeto as ObjetoPapel;
         const novo: PapelConfigurado = {
@@ -360,6 +417,7 @@ export function ConfigurarPanel({
       return (techs ?? []).map((t) => ({ id: t, rotulo: t }));
     }
     if (cartao.alvo === "contexto-do-produto") return (produtos ?? []).map((p) => ({ id: p.id, rotulo: p.nome }));
+    if (cartao.alvo === "regra-de-conexao") return tiposDeNo;
     return (["po", "arquiteto", "especialista", "qa"] as const).map((g) => ({ id: g, rotulo: g }));
   }
 
@@ -405,6 +463,22 @@ export function ConfigurarPanel({
                             <div>{texto}</div>
                           </div>
                         ))}
+                    </div>
+                  )}
+                  {objeto && cartao.alvo === "regra-de-conexao" && (
+                    <div style={{ fontSize: 12.5, lineHeight: 1.6 }} data-testid="proposta-regra-de-conexao">
+                      <div>
+                        ao ligar algo em <strong>{cartao.destino}</strong>, nasce{" "}
+                        <strong>{(objeto as ObjetoRegraDeConexao).default}</strong>
+                      </div>
+                      <div style={{ color: "var(--texto-2)", fontSize: 11.5 }}>
+                        aceitos: {((objeto as ObjetoRegraDeConexao).valid ?? []).join(", ") || "—"}
+                      </div>
+                      {(objeto as ObjetoRegraDeConexao).porque && (
+                        <div style={{ color: "var(--texto-mudo)", fontSize: 11.5, marginTop: 2 }}>
+                          {(objeto as ObjetoRegraDeConexao).porque}
+                        </div>
+                      )}
                     </div>
                   )}
                   {objeto && (cartao.alvo === "regra-refinamento" || cartao.alvo === "item-processo") && (

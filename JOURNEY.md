@@ -15706,3 +15706,84 @@ que escondeu o defeito por três dias.
 `test` e `e2e` passaram a ser obrigatórios. A ordem — corrigir antes de proteger —
 não foi preferência: ligar o portão com a `main` vermelha trancaria o repositório
 na hora.
+
+---
+
+## §354 — O vocabulário de conexão, configurável (SPEC-102 fatia D)
+
+Pedido: *"pode fazer o necessário para fechar a 102"*. A fatia D era a que o §352
+adiou, e fechá-la obrigou a responder a pergunta de escopo que estava reservada
+para a SPEC-97.
+
+### A decisão que a fatia exigia
+
+**O vocabulário de conexão é ORGANIZACIONAL, sem sobreposição por time.** Três
+razões, e a terceira decide: é o que já vale (um arquivo só para todos); há
+precedente assinado (as `stacks` perderam o vínculo por time na 0026, a pedido do
+usuário); e por time quebraria o determinismo — *"esta chamada não atravessa a
+rede"* é fato da arquitetura, e dois times discordando fariam o **mesmo desenho
+produzir itens diferentes**, que é o argumento com que a SPEC-101 §4 recusou
+regra por time do nó.
+
+### O bug que a fatia desenterrou
+
+Ao acrescentar a chave `conexoes` apareceu que **`tokens` (SPEC-79) estava
+inteiramente morta**, medido contra o servidor real:
+
+- `PUT /config/tokens` → **500**: `null value in column "documento" violates
+  not-null constraint`;
+- `GET /config/tokens` → resposta **sem o campo `documento`**;
+- e o `loadConfig` fazia `.then((c) => c?.tokens ?? [])` — o `c?.` transformava a
+  ausência em *"design system não configurado"*, indistinguível do estado
+  legítimo.
+
+Causa: `normalizarDocumentoConfig` é um `switch` que devolve `unknown`, **sem
+`default`**. Chave sem `case` devolvia `undefined` e o compilador não piscava — e
+o comentário da função já prometia *"o que não tem regra própria passa como
+veio"*, que o código não cumpria. Nenhum teste pegou porque **nenhum teste
+chamava a função**.
+
+Corrigido com o `default` que a documentação sempre prometeu, mais um guarda que
+varre a lista FECHADA de chaves em vez de nomeá-las — chave nova entra sozinha.
+§248: desligando o `default`, o guarda reprova `tokens` **e** `conexoes`.
+
+### Duas correções de rumo, do usuário
+
+**O `if` que era modelo de dados.** A escolha do recurso saiu como
+`chave === "conexoes" ? … : "pipeline-agentes"`. *"Cuidado com esses ifs,
+precisamos de um modelo de dados consistente."* Virou
+`RECURSO_DA_CHAVE_DE_CONFIG`, `Record<ChaveConfig, …>` exaustivo: chave nova não
+compila sem declarar o dono. O `else` anterior concedia em silêncio a permissão
+de outra área — e revelou que `exportador` e `tokens` são gateadas hoje pela
+permissão da esteira, o que está errado e ficou **declarado** em vez de
+implícito.
+
+**A resolução que estava no cliente.** A primeira escrita mesclou as
+sobreposições no `loadConfig.ts`. *"Coisas do backend precisam ficar no
+backend."* O motivo concreto: `validateConfig` roda no servidor e confere
+`edgeRules` contra `edgeTypes` — com a mescla só no navegador, **o servidor
+validaria as regras do arquivo enquanto o canvas usa as sobrescritas**. A mescla
+foi para `aplicacao` (`aplicarRegrasDeConexao`) e o servidor ganhou
+`GET /config/diagrama`, que devolve o diagrama resolvido.
+
+> Fica anotado: `mesclarCamposCustomizados` e `mesclarCamposCustomizadosAresta`
+> continuam no web fazendo a mesma coisa. São a mesma classe, e a rota nova é
+> onde eles devem ir.
+
+### Cinco superfícies, nenhuma opcional
+
+Chave em `CHAVES_CONFIG` · recurso em `RECURSOS` (o guarda de cobertura lê o
+código das rotas e reprova recurso órfão) · resolução no servidor · alvo
+`regra-de-conexao` no assistente · aba em Configurações.
+
+A aba não era dispensável: o `ConfigurarPanel` é declaradamente *"um jeito novo
+de chegar ao caminho velho"*, e sem ela esta seria a primeira configuração do
+produto que só se muda conversando com um LLM.
+
+Colisão pega no caminho: `camposAresta` já usava o slug `conexoes` na URL; a área
+nova ficou `regras-de-conexao`, senão o link salvo abriria a tela errada.
+
+**Validado na stack real**, não só com teste verde: `PUT tokens → 200` e o
+documento voltando; sobrescrever `motor → grpc` e ver `GET /config/diagrama`
+refletir; e a aba, nos dois temas, mostrando **"Motor de Regras nasce como
+`interno`"** — o caso exato do print que originou a SPEC-102.

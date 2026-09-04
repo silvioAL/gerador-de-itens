@@ -139,6 +139,10 @@ export {
 export {
   diagnosticarConfig,
   resumirConfig,
+  /** SPEC-102 fatia D — a leitura ÚNICA das sobreposições de conexão, usada
+   * pelo diagnóstico e pela mescla no web. */
+  regrasDeConexaoDe,
+  aplicarRegrasDeConexao,
   type DiagnosticoConfig,
   type ResumoConfig,
   type SecaoVazia,

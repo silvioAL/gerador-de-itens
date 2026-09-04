@@ -26,7 +26,26 @@ export { CAMPO_GLOBAL };
  * nova pelo mesmo motivo que os outros três: `config_documentos` já é chaveado
  * por (chave, timeId), e uma tabela por tipo de configuração seria a quarta
  * forma de guardar a mesma coisa. */
-export const CHAVES_CONFIG = ["regras", "pipeline-agentes", "exportador", "tokens"] as const;
+/**
+ * SPEC-102 fatia D — `conexoes`: as regras de ligação por tipo de nó de destino.
+ *
+ * **Por que ela precisou existir.** `edgeTypes`/`edgeRules` moram em
+ * `config/diagrama.json`, um arquivo estático servido por `fetch`. Quando o
+ * `edgeRules.motor.default` estava errado (dizia `http` para uma invocação que
+ * não atravessa a rede), **não havia caminho de escrita nenhum**: a única saída
+ * era editar o arquivo e reconstruir a imagem.
+ *
+ * **É ORGANIZACIONAL, e o `timeId` aqui é sempre `CAMPO_GLOBAL`** (SPEC-102
+ * §5.3). Não é limitação de implementação, é a decisão: *"esta chamada não
+ * atravessa a rede"* é fato da arquitetura, não preferência de time. Dois times
+ * discordando fariam o MESMO desenho produzir itens diferentes — o determinismo
+ * que a SPEC-101 §4 usou para recusar regra por time do nó.
+ *
+ * O documento guarda só **sobreposições**: `{ regras: { [tipoNo]: { default,
+ * valid } } }`. O arquivo continua sendo a base, e o que não for sobrescrito
+ * continua vindo dele — mesmo molde de `campos_no` sobre o `spec` estático.
+ */
+export const CHAVES_CONFIG = ["regras", "pipeline-agentes", "exportador", "tokens", "conexoes"] as const;
 
 export type ChaveConfig = (typeof CHAVES_CONFIG)[number];
 

@@ -90,6 +90,41 @@ const ALVOS_SUGESTAO_CONFIG: Record<string, AlvoSugestaoConfig> = {
       `"opcoes" só faz sentido com type "select"; nos outros, devolva lista vazia.`,
     ],
   },
+  /**
+   * SPEC-102 fatia D — **a regra de conexão: o que nasce ao ligar dois nós.**
+   *
+   * O pedido que a originou veio com print: o usuário ligou um Fluxo Decisão
+   * (FICO) num Motor de Regras e a aresta nasceu **HTTP**, porque
+   * `edgeRules.motor.default` dizia isso. A correção precisou de nova imagem —
+   * e ele pediu, com todas as letras, para *"poder usar o agente para ajustar
+   * isso, pois eventualmente vai acontecer"*.
+   *
+   * O alvo é a regra do tipo de nó de DESTINO, que é como `edgeRules` é
+   * indexado. Sem isso o modelo proporia "mude a aresta X→Y", que não existe
+   * como configuração — regra é por destino, não por par.
+   */
+  "regra-de-conexao": {
+    descricao:
+      "a regra de ligação de um TIPO DE NÓ DE DESTINO: qual tipo de conexão nasce por padrão ao ligar algo nele, e quais são aceitos",
+    schema: {
+      type: "object",
+      properties: {
+        tipoNo: { type: "string" },
+        default: { type: "string" },
+        valid: { type: "array", items: { type: "string" } },
+        porque: { type: "string" },
+      },
+      required: ["tipoNo", "default", "valid", "porque"],
+    },
+    regras: [
+      `"tipoNo" é o id do tipo de nó de DESTINO (ex.: "motor", "fico", "rabbit"), nunca o rótulo.`,
+      `"default" e os itens de "valid" são ids de TIPO DE CONEXÃO já existentes (ex.: "http", "interno", "publishes").`,
+      `"default" PRECISA estar dentro de "valid" — um padrão fora dos aceitos é uma conexão que a validação recusa.`,
+      `"valid" é a lista COMPLETA que passa a valer para esse destino, não só o que muda: ela substitui a anterior.`,
+      `Não invente tipo de conexão: se o que a pessoa descreve não existe no vocabulário, diga isso em vez de propor um id novo.`,
+      `"porque" explica em uma frase o que a ligação É — o que justifica o padrão, não o que a pessoa pediu.`,
+    ],
+  },
   "regra-refinamento": {
     descricao:
       "um REQUISITO DE REFINAMENTO TÉCNICO — uma decisão que o time precisa tomar no desenho antes de implementar",
@@ -710,6 +745,10 @@ export const ALVOS_DA_CONVERSA_DE_CONFIG = [
   // que um produto é numa linha só é a parte difícil, e a conversa é onde se
   // chega lá aos poucos — perguntando, corrigindo, completando.
   "contexto-do-produto",
+  // SPEC-102 fatia D — o vocabulário de conexão entra na CONVERSA, e é o
+  // caminho que o relato do print pediu: mostrar a ligação errada e receber a
+  // correção, em vez de editar `config/diagrama.json` e reconstruir a imagem.
+  "regra-de-conexao",
 ] as const;
 
 export interface MensagemConfigurar {

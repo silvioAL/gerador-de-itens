@@ -196,12 +196,14 @@ não um 400 cru.
 
 ## 5. Fatia D — o assistente sabendo mexer em conexão
 
-> **NÃO IMPLEMENTADA nesta rodada. A medição durante a implementação mostrou que
-> ela é várias vezes maior do que esta SPEC supunha, e que a decisão que ela
-> exige não é técnica.**
+> **Adiada no §352, entregue no §354.** A medição durante a implementação mostrou
+> que ela é várias vezes maior do que esta SPEC supunha, e que a decisão que ela
+> exige não é técnica. O §353 fechou a CI; o §354 tomou a decisão de escopo
+> (§5.3) e construiu. As §§5.1–5.2 ficam como estavam — são o registro de por que
+> a fatia parou, e a razão continua verdadeira.
 
-A ideia era um terceiro objeto ao lado de `ObjetoCampo | ObjetoPapel`: a regra de
-conexão — para um tipo de nó de destino, qual o `default` e quais os `valid`.
+Um terceiro objeto ao lado de `ObjetoCampo | ObjetoPapel`: a regra de conexão —
+para um tipo de nó de destino, qual o `default` e quais os `valid`.
 
 ### 5.1 O que a implementação encontrou
 
@@ -239,10 +241,81 @@ o padrão da arquitetura?
 Decidir isso dentro de uma rodada de conserto de config seria escolher a
 governança do produto de passagem, sem a discussão que o usuário pediu.
 
-### 5.3 O que fica registrado
+> **O que mudou depois:** o usuário pediu para fechar a 102 primeiro. A §5.3
+> mostra que, para **esta** chave, a resposta não precisava da SPEC-97 — ela é
+> ler o que já vale e não inventar eixo novo. A pergunta geral de governança
+> continua aberta e continua sendo da 97.
 
-A fatia D volta **depois da SPEC-97**, e herda dela a resposta sobre escopo. O
-pedido do usuário que a originou continua válido e sem resposta:
+### 5.3 A decisão de escopo, tomada (§354)
+
+> **Atualização.** O usuário pediu para **fechar a 102 antes da 97**. Isso obriga
+> a responder aqui a pergunta que a §5.2 tinha reservado — e ela tem uma
+> resposta conservadora, que é preservar o que já vale hoje.
+
+**O vocabulário de conexão é ORGANIZACIONAL. Sem sobreposição por time.**
+
+Três razões, e a terceira é a que decide:
+
+1. **É o que já é.** `nodeTypes`, `edgeTypes` e `edgeRules` são servidos de **um
+   arquivo só** para todo mundo. Não existe versão por time e nunca existiu — a
+   decisão não inventa eixo, mantém o que há e só lhe dá caminho de escrita.
+2. **Há precedente assinado.** As `stacks` (SPEC-43) são organizacionais, e o
+   vínculo por time foi **removido** na migração 0026 a pedido do próprio
+   usuário (*"poderia simplesmente ter tudo"*). O mesmo raciocínio se aplica: um
+   catálogo compartilhado não melhora ao ser fatiado.
+3. **Por time quebraria o determinismo.** *"Esta chamada não atravessa a rede"* é
+   um fato da arquitetura, não uma preferência de time. Se o time A disser que
+   `fico → motor` é `interno` e o time B disser que é `http`, **o mesmo desenho
+   passa a produzir itens diferentes** — que é exatamente o argumento com que a
+   SPEC-101 §4 recusou regra por time do nó. Recusá-lo lá e aceitá-lo aqui seria
+   incoerente.
+
+**O que isto NÃO decide:** nada sobre `regras`, `campos_no`, `exportador` ou
+qualquer outra chave. A SPEC-97 continua dona da pergunta geral — inclusive da
+camada organizacional que **soma** (arquitetura/DBA impondo piso), que é problema
+diferente deste.
+
+### 5.4 O tamanho real, medido antes de construir
+
+Cinco superfícies, e nenhuma é opcional:
+
+| # | Superfície | Por que é obrigatória |
+|---|---|---|
+| 1 | Chave nova em `CHAVES_CONFIG` | é onde o documento passa a morar |
+| 2 | Recurso novo em `RECURSOS` | `permissoes.cobertura.test.ts` lê o código das rotas e **reprova** recurso que nenhuma rota exige |
+| 3 | **Resolução no SERVIDOR** (`GET /config/diagrama`) | o arquivo continua sendo a base; o documento **sobrepõe** por tipo de nó |
+| 4 | Aba em Configurações | o `ConfigurarPanel` é *"um jeito novo de chegar ao caminho velho"*; os cinco alvos existentes têm formulário, e um alvo sem aba seria a primeira config que **só se muda conversando com um LLM** |
+| 5 | Alvo no assistente | o pedido original |
+
+### 5.4.1 Duas correções de rumo durante a construção
+
+**O `if` que era modelo de dados.** A escolha do recurso saiu como
+`chave === "conexoes" ? … : "pipeline-agentes"`. O usuário apontou, e ele está
+certo: a relação chave→dono **é dado**. Virou
+`RECURSO_DA_CHAVE_DE_CONFIG`, um `Record<ChaveConfig, …>` exaustivo — chave nova
+não compila sem declarar de quem é. O `else` anterior concedia em silêncio a
+permissão de outra área.
+
+**A resolução que estava no cliente.** A primeira escrita mesclou as
+sobreposições no `loadConfig.ts`. *"Coisas do backend precisam ficar no
+backend"* — e o motivo concreto: `validateConfig` roda no servidor e confere
+`edgeRules` contra `edgeTypes`. Com a mescla só no navegador, **o servidor
+validaria as regras do arquivo enquanto o canvas usa as sobrescritas**, e uma
+sobreposição inválida nunca passaria pela validação.
+
+A mescla foi para `aplicacao/config/diagnostico.ts` (`aplicarRegrasDeConexao`) e
+o servidor ganhou `GET /config/diagrama`, que devolve o diagrama já resolvido. O
+web fetcha essa rota, com fallback para o arquivo estático se o servidor não
+responder.
+
+> **Fica anotado:** `mesclarCamposCustomizados` e `mesclarCamposCustomizadosAresta`
+> continuam no web, fazendo a mesma coisa para `campos_no`/`campos_aresta`. Não
+> foram movidos nesta rodada — mas são a mesma classe, e a rota nova é onde eles
+> devem ir.
+
+### 5.5 O que fica registrado
+
+O pedido do usuário que originou a fatia:
 
 > *"é necessário que o usuário possa usar o agente para ajustar isso, pois
 > eventualmente vai acontecer"*

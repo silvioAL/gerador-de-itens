@@ -12,6 +12,8 @@ export type AreaConfig =
   | "perfis"
   | "campos"
   | "camposAresta"
+  /** SPEC-102 fatia D — o vocabulário de conexão (organizacional). */
+  | "conexoes"
   | "membros"
   | "acessos"
   | "regras"
@@ -74,6 +76,10 @@ const SEGMENTO_DA_AREA: Record<AreaConfig, string> = {
   perfis: "perfis-stack",
   campos: "componentes",
   camposAresta: "conexoes",
+  /** SPEC-102 fatia D — `regras-de-conexao`, e não `conexoes`: o slug curto já é
+   * de `camposAresta` (os CAMPOS de uma conexão). Duas áreas com o mesmo
+   * segmento fariam o link salvo abrir a tela errada. */
+  conexoes: "regras-de-conexao",
   membros: "membros",
   acessos: "acessos",
   regras: "regras",
