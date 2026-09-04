@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { DiagramaConfig } from "@gerador/engine";
 import type { SugestoesDeStack } from "../api/client";
-import { apiIa, type DiagramaProposto } from "../api/client";
+import { apiIa, type DiagramaProposto, apiExportador } from "../api/client";
 import { AnexoDeImagem, type ImagemAnexada } from "./AnexoDeImagem";
 import { BotaoFalar } from "./BotaoFalar";
 import { useVozNaEntrada } from "./useVozNaEntrada";
@@ -118,6 +118,32 @@ export function ConversaPanel({
   }, []);
   const [pensando, setPensando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [linkImportado, setLinkImportado] = useState("");
+  /**
+   * §356 — o campo do link só aparece se HÁ destino de leitura cadastrado.
+   *
+   * Mesma régua do ADR logo abaixo (`useAdrNaEntrada`): oferecer um campo que
+   * sempre responderia 409 ensinaria a ignorar a oferta. Foi assim que o §349
+   * falhou — o destino era cadastrável e nada o consumia.
+   */
+  const [podeImportarDocumento, setPodeImportarDocumento] = useState(false);
+  useEffect(() => {
+    let cancelado = false;
+    apiExportador
+      .obter()
+      .then((c) => {
+        if (!cancelado) {
+          setPodeImportarDocumento((c.destinos ?? []).some((d) => d.operacao === "documentoExterno" && !!d.endpoint));
+        }
+      })
+      .catch(() => {
+        if (!cancelado) setPodeImportarDocumento(false);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+  const [importando, setImportando] = useState(false);
   const fimRef = useRef<HTMLDivElement>(null);
 
   const tiposDeNo = Object.entries(config.nodeTypes).map(([id, cfg]) => ({ id, rotulo: cfg.label ?? id }));
@@ -136,6 +162,42 @@ export function ConversaPanel({
         .map(([campo, valores]) => `${tipoNo}.${campo}: ${valores.join(" | ")}`)
     );
     return partes.length > 0 ? partes.join("; ") : undefined;
+  }
+
+  /**
+   * §356 — **o link da casa vira a descrição.**
+   *
+   * Fecha a frente (3) da SPEC-100 que o §349 deixou pela metade: *"passar o
+   * link de uma página Confluence para que ele consulte e traga as informações,
+   * e assim o assistente já monte o desenho"*. O §349 construiu porta, adaptador
+   * e o cadastro do destino — e nunca o campo que chama.
+   *
+   * ## Por que preenche a entrada em vez de desenhar direto
+   *
+   * O texto importado entra onde a pessoa digitaria, e ela **lê antes de
+   * mandar**. Desenhar direto do link esconderia o que foi lido: se o gateway
+   * trouxe a página errada, ou trouxe o storage format cru, o desenho sairia
+   * errado sem ninguém ter visto a causa. Importar não é aceitar — a mesma régua
+   * do ADR (SPEC-81 fatia C).
+   */
+  async function importarDoLink() {
+    const link = linkImportado.trim();
+    if (!link || importando) return;
+    setImportando(true);
+    setErro(null);
+    try {
+      const doc = await apiIa.lerDocumentoExterno(link);
+      // O título vai junto porque é contexto que a página tem e o corpo às
+      // vezes não repete — e a proveniência do desenho cita a origem.
+      setEntrada((atual) =>
+        [atual.trim(), doc.titulo ? `# ${doc.titulo}` : "", doc.conteudo].filter(Boolean).join("\n\n")
+      );
+      setLinkImportado("");
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não foi possível ler o documento.");
+    } finally {
+      setImportando(false);
+    }
   }
 
   async function enviar() {
@@ -237,7 +299,7 @@ export function ConversaPanel({
           pedido nasceu ("botão falar, com animações em Desenhar conversando"),
           e esta janela não reusa a `JanelaConversa`: as duas plugam o mesmo
           hook, cada uma no seu rodapé. */}
-      {(podeFalar || podeAnexar || adr.podeTrazerAdr) && (
+      {(podeFalar || podeAnexar || adr.podeTrazerAdr || podeImportarDocumento) && (
         <div style={{ padding: "0 12px 6px", display: "flex", flexDirection: "column", gap: 6 }}>
           {podeFalar && <BotaoFalar gravacao={gravacao} />}
           {/**
@@ -273,6 +335,37 @@ export function ConversaPanel({
               tipos que existem na config. A imagem é insumo, não saída nova. */}
           {podeAnexar && (
             <AnexoDeImagem imagens={imagens} onMudar={setImagens} destino={destinoIa} desabilitado={pensando} />
+          )}
+
+          {/* §356 — a frente (3) da SPEC-100: o link da casa vira a descrição.
+              O texto cai na entrada para a pessoa LER antes de mandar; desenhar
+              direto esconderia o que foi lido. */}
+          {podeImportarDocumento && (
+          <div style={{ display: "flex", gap: 6, marginTop: 8 }} data-testid="importar-documento">
+            <input
+              type="url"
+              value={linkImportado}
+              onChange={(e) => setLinkImportado(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void importarDoLink();
+                }
+              }}
+              placeholder="link de uma página da casa (Confluence, Notion…)"
+              aria-label="Link de um documento da casa"
+              disabled={importando || pensando}
+              style={{ flex: 1, fontSize: 12, padding: "5px 8px" }}
+            />
+            <button
+              onClick={() => void importarDoLink()}
+              disabled={!linkImportado.trim() || importando || pensando}
+              data-testid="botao-importar-documento"
+              style={{ fontSize: 12, whiteSpace: "nowrap" }}
+            >
+              {importando ? "lendo…" : "Trazer o documento"}
+            </button>
+          </div>
           )}
         </div>
       )}

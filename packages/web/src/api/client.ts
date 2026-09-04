@@ -749,6 +749,29 @@ export const apiIa = {
    * diagrama proposto. O `tipo` de cada nó/conexão é restrito no servidor aos
    * ids que a configuração REAL tem, então a proposta nunca cita um tipo que
    * a ferramenta não sabe criar. */
+  /**
+   * §356 — **lê um documento da casa pelo LINK.**
+   *
+   * A rota existia como porta e adaptador desde o §349 e **nunca teve rota nem
+   * tela**: dava para cadastrar o destino em Configurações → Exportação e nada
+   * jamais o chamava. O que volta é TEXTO, que alimenta `proporDiagrama` como
+   * descrição — o mesmo caminho de quem digita à mão.
+   */
+  lerDocumentoExterno: async (link: string): Promise<{ conteudo: string; titulo?: string; link?: string }> => {
+    const resposta = await fetch(`${BASE_URL}/ia/documento-externo`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ link }),
+    });
+    if (!resposta.ok) {
+      const corpo = await resposta.json().catch(() => ({}));
+      throw new Error(
+        typeof corpo.erro === "string" ? corpo.erro : `Não foi possível ler o documento (HTTP ${resposta.status}).`
+      );
+    }
+    return resposta.json();
+  },
   proporDiagrama: async (
     pedido: PedidoDiagramaIa,
     onTexto?: (acumulado: string) => void
