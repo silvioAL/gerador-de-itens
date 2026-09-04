@@ -430,7 +430,32 @@ export function validarEscritaConfig(chave: string, documento: unknown): void {
   }
 }
 
-/** Aplica a coerção da chave. O que não tem regra própria passa como veio. */
+/**
+ * Aplica a coerção da chave. O que não tem regra própria passa como veio.
+ *
+ * ## §354 — o `default` que faltava, e o que a falta dele matou
+ *
+ * A frase acima já estava escrita e o código **não a cumpria**: o `switch` não
+ * tinha `default`, e o tipo de retorno é `unknown` — então chave sem `case`
+ * devolvia `undefined` sem o compilador piscar.
+ *
+ * `tokens` (SPEC-79) entrou na `CHAVES_CONFIG` sem `case` e ficou **inteiramente
+ * morta no modo hospedado**, medido contra o servidor real:
+ *
+ * - `PUT /config/tokens` → **500**: `null value in column "documento" violates
+ *   not-null constraint`, porque o que chegava ao repositório era `undefined`;
+ * - `GET /config/tokens` → resposta **sem o campo `documento`**;
+ * - e `loadConfig.ts` fazia `.then((c) => c?.tokens ?? [])` — o `c?.` engolia a
+ *   ausência e a tela dizia *"design system não configurado"*, que é a mentira
+ *   perfeita: idêntica ao estado legítimo.
+ *
+ * Nada disso aparecia em teste porque os testes chamam as funções com as chaves
+ * que têm `case`. Foi encontrado ao acrescentar `conexoes`, que nasceria morta
+ * do mesmo jeito.
+ *
+ * O `default` é o que a documentação sempre prometeu, e é o que impede a próxima
+ * chave de repetir isto.
+ */
 export function normalizarDocumentoConfig(chave: ChaveConfig, documento: unknown): unknown {
   switch (chave) {
     case "regras":
@@ -439,5 +464,7 @@ export function normalizarDocumentoConfig(chave: ChaveConfig, documento: unknown
       return normalizarPipelineAgentes(documento);
     case "exportador":
       return normalizarExportador(documento);
+    default:
+      return documento;
   }
 }

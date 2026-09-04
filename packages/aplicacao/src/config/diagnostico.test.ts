@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { diagnosticarConfig, resumirConfig } from "./diagnostico.js";
+import { diagnosticarConfig, resumirConfig, aplicarRegrasDeConexao } from "./diagnostico.js";
 
 /**
  * SPEC-31 Fase 3 — o diagnóstico contra o caso real do JOURNEY §108.
@@ -147,5 +147,55 @@ describe("diagnóstico de config desatualizada (SPEC-31 Fase 3)", () => {
     expect(() => diagnosticarConfig("regras", null, REGRAS_DESTA_VERSAO)).not.toThrow();
     expect(() => diagnosticarConfig("regras", { porTech: "não é objeto" }, REGRAS_DESTA_VERSAO)).not.toThrow();
     expect(diagnosticarConfig("regras", undefined, REGRAS_DESTA_VERSAO).possivelmenteDesatualizada).toBe(true);
+  });
+});
+
+/**
+ * §354 / SPEC-102 fatia D — a resolução do diagrama, no BACKEND.
+ *
+ * Estes testes nasceram no `loadConfig.test.ts` do web, porque a mescla estava
+ * no cliente. Vieram para cá com a regra: quem resolve configuração é o
+ * servidor, e uma segunda resolução no navegador é a segunda fonte de verdade
+ * que diverge na primeira mudança (§263).
+ */
+describe("aplicarRegrasDeConexao (SPEC-102 fatia D)", () => {
+  const doArquivo = {
+    edgeRules: {
+      motor: { valid: ["http", "grpc"], default: "http" },
+      rabbit: { valid: ["publishes"], default: "publishes" },
+    },
+  };
+
+  it("o destino sobrescrito passa a nascer com o tipo declarado", () => {
+    const r = aplicarRegrasDeConexao(doArquivo, {
+      regras: { motor: { default: "interno", valid: ["interno", "http"] } },
+    });
+    expect(r.edgeRules.motor).toEqual({ valid: ["interno", "http"], default: "interno" });
+  });
+
+  it("o que a organização NÃO tocou continua vindo do arquivo", () => {
+    // É o que faz correção de default numa versão nova chegar a quem não
+    // sobrescreveu — copiar o catálogo para o documento congelaria isso.
+    const r = aplicarRegrasDeConexao(doArquivo, {
+      regras: { motor: { default: "interno", valid: ["interno"] } },
+    });
+    expect(r.edgeRules.rabbit).toEqual({ valid: ["publishes"], default: "publishes" });
+  });
+
+  it("documento vazio devolve o arquivo intacto — o comportamento de antes da fatia", () => {
+    expect(aplicarRegrasDeConexao(doArquivo, { regras: {} })).toEqual(doArquivo);
+    expect(aplicarRegrasDeConexao(doArquivo, null)).toEqual(doArquivo);
+  });
+
+  it("default fora dos válidos cai no primeiro válido — nunca se oferece o que a validação recusa", () => {
+    const r = aplicarRegrasDeConexao(doArquivo, {
+      regras: { motor: { default: "publishes", valid: ["interno", "http"] } },
+    });
+    expect(r.edgeRules.motor.default).toBe("interno");
+  });
+
+  it("lixo no documento não derruba nem entra — regra sem forma é ignorada", () => {
+    const r = aplicarRegrasDeConexao(doArquivo, { regras: { motor: "nao é objeto", outro: null } });
+    expect(r.edgeRules.motor).toEqual(doArquivo.edgeRules.motor);
   });
 });

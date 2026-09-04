@@ -110,7 +110,78 @@ export function resumirConfig(chave: ChaveConfig, documento: unknown): ResumoCon
      */
     case "tokens":
       return { tokens: Array.isArray((documento as { tokens?: unknown[] })?.tokens) ? (documento as { tokens: unknown[] }).tokens.length : 0 };
+    /**
+     * SPEC-102 fatia D — quantas regras de conexão a organização sobrescreveu.
+     *
+     * Como no exportador e nos tokens, o template vem VAZIO: o `diagrama.json`
+     * é a base, e este documento só guarda o que foi mudado. Zero é o estado
+     * normal, não atraso — não sobrescrever nada é a escolha da maioria.
+     */
+    case "conexoes":
+      return { conexoes: Object.keys(regrasDeConexaoDe(documento)).length };
   }
+}
+
+/**
+ * §354 — **a resolução do diagrama mora no BACKEND.**
+ *
+ * A primeira escrita desta fatia mesclou as sobreposições no `loadConfig.ts`, no
+ * web. O usuário apontou: *"coisas do backend precisam ficar no backend"*.
+ *
+ * Ele está certo, e vale ser exato sobre o porquê — a derivação **não** muda:
+ * `derivar()` lê `edgeTypes`, não `edgeRules`. O que muda é a **validação**:
+ * `validateConfig` (chamado por `POST /quebras/:id/derivar`) confere que todo
+ * `edgeRules.*.valid` e `.default` existe em `edgeTypes`. Com a mescla só no
+ * cliente, o servidor validaria as regras do ARQUIVO enquanto o canvas usa as
+ * sobrescritas — uma sobreposição inválida passaria pela validação sem nunca
+ * ser vista por ela.
+ *
+ * E a razão estrutural, que vale mesmo sem esse caso: o servidor já é quem
+ * resolve configuração (time → global → template). Uma segunda resolução no
+ * cliente é a segunda fonte de verdade que diverge na primeira mudança (§263).
+ * Aqui a regra existe uma vez, e os dois lados leem a mesma.
+ *
+ * Uma regra sobrescrita substitui INTEIRA a do arquivo naquele destino (não
+ * mescla `valid` item a item): meia regra — `default` novo com `valid` velho — é
+ * como se cria um padrão que não está entre os aceitos, e o canvas passaria a
+ * oferecer uma conexão que a validação recusa.
+ */
+export function aplicarRegrasDeConexao<T extends { edgeRules?: Record<string, { valid: string[]; default?: string }> }>(
+  diagrama: T,
+  documentoDeConexoes: unknown
+): T {
+  const sobreposicoes = regrasDeConexaoDe(documentoDeConexoes);
+  if (Object.keys(sobreposicoes).length === 0) return diagrama;
+
+  const edgeRules = { ...(diagrama.edgeRules ?? {}) };
+  for (const [tipoNo, regra] of Object.entries(sobreposicoes)) {
+    const base = edgeRules[tipoNo];
+    const valid = regra.valid ?? base?.valid ?? [];
+    const padrao = regra.default ?? base?.default;
+    edgeRules[tipoNo] = {
+      valid,
+      ...(padrao && valid.includes(padrao) ? { default: padrao } : valid[0] ? { default: valid[0] } : {}),
+    };
+  }
+  return { ...diagrama, edgeRules };
+}
+
+/** As sobreposições declaradas, saneadas — `{ [tipoNo]: { default?, valid? } }`.
+ * Exportada porque a mescla no web e o diagnóstico precisam ler a MESMA forma;
+ * duas leituras divergiriam na primeira mudança (§263). */
+export function regrasDeConexaoDe(documento: unknown): Record<string, { default?: string; valid?: string[] }> {
+  const regras = (documento as { regras?: unknown } | null | undefined)?.regras;
+  if (!regras || typeof regras !== "object" || Array.isArray(regras)) return {};
+  const saneadas: Record<string, { default?: string; valid?: string[] }> = {};
+  for (const [tipoNo, regra] of Object.entries(regras as Record<string, unknown>)) {
+    if (!regra || typeof regra !== "object") continue;
+    const { default: padrao, valid } = regra as { default?: unknown; valid?: unknown };
+    saneadas[tipoNo] = {
+      ...(typeof padrao === "string" && padrao.trim() ? { default: padrao } : {}),
+      ...(Array.isArray(valid) ? { valid: valid.filter((v): v is string => typeof v === "string" && !!v.trim()) } : {}),
+    };
+  }
+  return saneadas;
 }
 
 const NOME_AMIGAVEL: Record<string, string> = {
@@ -125,6 +196,7 @@ const NOME_AMIGAVEL: Record<string, string> = {
   papeisAtivos: "papéis ativos",
   caracteres: "conteúdo",
   destino: "destino de exportação",
+  conexoes: "regra de conexão sobrescrita",
 };
 
 /**

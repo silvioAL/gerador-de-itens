@@ -979,7 +979,9 @@ export type AlvoConversaConfig =
   | "item-processo"
   /** §274 — o contexto do produto passou a ser proposto pela CONVERSA, e não
    * só por um campo de instrução única. */
-  | "contexto-do-produto";
+  | "contexto-do-produto"
+  /** SPEC-102 fatia D — qual conexão nasce ao ligar algo num tipo de nó. */
+  | "regra-de-conexao";
 
 export interface RespostaConfigurar {
   texto: string;
@@ -1033,7 +1035,9 @@ export type AlvoSugestaoConfig =
   | "regra-refinamento"
   | "item-processo"
   | "teste-automatizado"
-  | "contexto-do-produto";
+  | "contexto-do-produto"
+  /** SPEC-102 fatia D — o passo 2 materializa `{ tipoNo, default, valid, porque }`. */
+  | "regra-de-conexao";
 
 /** §271 — o que a IA devolve para o alvo "contexto-do-produto": as cinco
  * seções de uma vez, porque elas são um texto só partido em pedaços. */
@@ -1521,6 +1525,28 @@ export const apiRegras = configDe<RegrasConfig>("regras");
  * config é por chave desde a SPEC-31, e o servidor resolve time → global →
  * template sozinho. */
 export const apiTokens = configDe<TokensConfig>("tokens");
+
+/**
+ * SPEC-102 fatia D — as sobreposições de regra de conexão.
+ *
+ * `configDe` sem `timeId` em nenhuma chamada: a chave é ORGANIZACIONAL
+ * (SPEC-102 §5.3), e o servidor grava em `__global__` quando o corpo não manda
+ * time. Passar time aqui criaria uma linha por time que ninguém leria.
+ */
+export interface ConexoesConfig {
+  regras: Record<string, { default?: string; valid?: string[] }>;
+}
+export const apiConexoes = configDe<ConexoesConfig>("conexoes");
+
+/**
+ * §354 — o diagrama JÁ RESOLVIDO pelo servidor (arquivo + sobreposições).
+ *
+ * O web lia `/config/diagrama.json` do host estático e mesclava sozinho. Quem
+ * resolve configuração é o backend — ver `aplicarRegrasDeConexao`.
+ */
+export const apiDiagrama = {
+  obter: <T>(): Promise<T> => requisitar<T>("/config/diagrama"),
+};
 
 /**
  * SPEC-49 — pra onde os itens vão: o AGENTE que fala com o tracker (o gerador

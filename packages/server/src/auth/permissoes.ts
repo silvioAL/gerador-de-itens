@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { OpcoesApp } from "../app.js";
+import type { ChaveConfig } from "@gerador/aplicacao";
 import { organizacoes, papeisAcesso, papelPermissao, timePapel, usuarioPapel, usuarioTime } from "../db/schema.js";
 import { exigirSessao } from "./middleware.js";
 import { maiorNivel, nivelNoTime } from "./niveis.js";
@@ -36,6 +37,16 @@ export const RECURSOS = [
   // SPEC-63 — a régua sobre a FORMA do desenho tem dono próprio: quem decide
   // que "toda fila tem consumidor" não é quem cuida do checklist de uma tech.
   "regras.topologia",
+  /**
+   * SPEC-102 fatia D — o VOCABULÁRIO DE CONEXÃO: qual tipo de aresta nasce ao
+   * ligar dois componentes, e quais são aceitos.
+   *
+   * Recurso próprio e não `pipeline-agentes` (onde as outras chaves sem dono
+   * caem hoje) porque quem decide que *"chamar o motor de regras não atravessa
+   * a rede"* é arquitetura, não quem cuida da esteira de agentes. Era o dono
+   * errado que faria a delegação mentir.
+   */
+  "conexoes",
   "especificacao-template",
   // SPEC-53 — o contexto do produto tem dono próprio: quem responde pelo
   // vocabulário e pelas regras de negócio não é quem cuida de stack nem de
@@ -51,6 +62,36 @@ export const RECURSOS = [
 ] as const;
 
 export type Recurso = (typeof RECURSOS)[number];
+
+/**
+ * §354 — **de quem é cada chave de configuração.** Mapa, não `if`.
+ *
+ * Isto nasceu como um ternário na rota (`chave === "conexoes" ? … : …`), e o
+ * usuário apontou o defeito: a relação chave→dono **é dado**, e escondê-la num
+ * ramo faz duas coisas ruins. A cada chave nova alguém precisa lembrar de
+ * acrescentar o ramo — e esquecer é silencioso, porque cai no `else`, que
+ * concede a permissão de outra área.
+ *
+ * `Record<ChaveConfig, …>` é exaustivo: chave nova **não compila** sem declarar
+ * o dono. É a mesma disciplina de `RECURSOS` ser lista fechada.
+ *
+ * `regras` é `null` porque é a exceção real: as quatro seções dela viajam no
+ * mesmo documento e o dono depende do que MUDOU (`secoesDeRegrasAlteradas`) —
+ * não dá para saber antes de ler o corpo.
+ *
+ * `exportador` e `tokens` apontam para `pipeline-agentes` porque é onde elas
+ * caíam pelo `else` — e isso está **errado**: nenhuma das duas é da esteira.
+ * Preservado de propósito: trocar o recurso de uma chave já concedida tiraria
+ * acesso de quem tem hoje. Fica declarado em vez de implícito, que é o que
+ * permite corrigi-lo de propósito na SPEC-97.
+ */
+export const RECURSO_DA_CHAVE_DE_CONFIG = {
+  regras: null,
+  "pipeline-agentes": "pipeline-agentes",
+  exportador: "pipeline-agentes",
+  tokens: "pipeline-agentes",
+  conexoes: "conexoes",
+} as const satisfies Record<ChaveConfig, Recurso | null>;
 
 /**
  * Recursos que NENHUMA rota exige, **de propósito**.

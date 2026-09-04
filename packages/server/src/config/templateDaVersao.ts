@@ -30,6 +30,16 @@ const DEFAULTS_COMPILADOS: Record<ChaveConfig, unknown> = {
    * régua se cala (ver `avaliarConformidade`). Semear tokens de exemplo faria
    * toda organização nascer cobrando pertencimento a cores que não são dela. */
   tokens: { tokens: [] },
+  /**
+   * SPEC-102 fatia D — nasce SEM sobreposição nenhuma, e isso é a afirmação.
+   *
+   * A base é o `edgeRules` do `config/diagrama.json`, que a imagem traz pronto.
+   * Este documento guarda só o que a organização decidiu mudar — semear uma
+   * cópia das regras de fábrica faria toda instalação nascer "personalizada" e
+   * congelaria o catálogo: correção de default numa versão nova não chegaria a
+   * ninguém, porque todos teriam uma cópia por cima.
+   */
+  conexoes: { regras: {} },
 };
 
 export async function templateDaVersao(chave: ChaveConfig, diretorioConfig: string): Promise<unknown> {

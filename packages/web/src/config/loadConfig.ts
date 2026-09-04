@@ -1,5 +1,13 @@
 import type { AppConfig, DiagramaConfig, FieldSpec, RegrasConfig, Token } from "@gerador/engine";
-import { apiCamposAresta, apiCamposNo, type CampoAresta, type CampoNo, apiRegras, apiTokens } from "../api/client";
+import {
+  apiCamposAresta,
+  apiCamposNo,
+  type CampoAresta,
+  type CampoNo,
+  apiRegras,
+  apiTokens,
+  apiDiagrama,
+} from "../api/client";
 
 export interface ConfigCarregada {
   diagramaConfig: DiagramaConfig;
@@ -101,8 +109,15 @@ function mesclarCamposCustomizadosAresta(diagramaConfig: DiagramaConfig, campos:
  * troca de time ativo (App.tsx chama de novo quando isso muda).
  */
 export async function carregarConfig(timeAtivo?: string): Promise<ConfigCarregada> {
-  const [diagramaConfig, appConfig, regrasConfig, camposCustomizados, camposArestaCustomizados, tokens] = await Promise.all([
-    buscarJson<DiagramaConfig>("/config/diagrama.json"),
+  const [diagramaConfig, appConfig, regrasConfig, camposCustomizados, camposArestaCustomizados, tokens] =
+    await Promise.all([
+    /**
+     * §354 — o diagrama vem RESOLVIDO do servidor (arquivo + o que a
+     * organização sobrescreveu). O `catch` cai no arquivo estático: servidor
+     * fora do ar não pode deixar o canvas sem vocabulário, e o arquivo é
+     * exatamente o comportamento de antes desta rota existir.
+     */
+    apiDiagrama.obter<DiagramaConfig>().catch(() => buscarJson<DiagramaConfig>("/config/diagrama.json")),
     buscarJson<AppConfig>("/config/app.json"),
     // O DOCUMENTO editável (banco, com override da RegrasTab) — não o JSON
     // estático do bundle. Achado real do E2E da SPEC-36: a regra criada pela
@@ -150,3 +165,4 @@ export async function carregarConfig(timeAtivo?: string): Promise<ConfigCarregad
   const comCamposAresta = mesclarCamposCustomizadosAresta(comCamposNo, camposArestaCustomizados);
   return { diagramaConfig: comCamposAresta, appConfig, regrasConfig, tokens };
 }
+

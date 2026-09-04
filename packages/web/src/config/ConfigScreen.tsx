@@ -16,6 +16,7 @@ import { apiPdca } from "../api/client";
 import { PdcaTab } from "./PdcaTab";
 import { TokensTab } from "./TokensTab";
 import { ExportacaoTab } from "./ExportacaoTab";
+import { ConexoesTab } from "./ConexoesTab";
 import { ProdutosTab } from "./ProdutosTab";
 import { EXPORTADOR_DO_TOUR, TOKENS_DO_TOUR, PRODUTO_DO_TOUR } from "../demo/dadosDoTour";
 
@@ -24,6 +25,7 @@ export type AbaConfig =
   | "perfis"
   | "campos"
   | "camposAresta"
+  | "conexoes"
   | "regras"
   | "membros"
   | "acessos"
@@ -171,6 +173,9 @@ export function ConfigScreen({
        */
       { id: "campos", rotulo: `Padrões por componente (${camposNo.length} do time)`, existe: true },
       { id: "camposAresta", rotulo: `Campos por tipo de conexão (${camposAresta.length})`, existe: true },
+      // SPEC-102 fatia D — vizinha da de campos de conexão de propósito: as duas
+      // falam de conexão, e separá-las faria procurar em dois lugares.
+      { id: "conexoes", rotulo: "Regras de conexão", existe: true },
       { id: "membros", rotulo: "Membros", existe: true },
       // SPEC-28 §2: acessos só existem no hospedado — no local não há login, e
       // permissão em arquivo seria convenção, não segurança.
@@ -272,6 +277,7 @@ export function ConfigScreen({
             onExcluir={onExcluirCampoNo}
           />
         )}
+        {abaAtiva === "conexoes" && <ConexoesTab config={config} />}
         {abaAtiva === "camposAresta" && (
           <CamposArestaTab
             config={config}
@@ -373,6 +379,7 @@ const abaAtivaEstilo: React.CSSProperties = {
 const RECURSO_SOLICITAVEL_DA_ABA: Record<string, string> = {
   campos: "campos-no",
   camposAresta: "campos-aresta",
+  conexoes: "conexoes",
   especificacao: "especificacao-template",
   pipeline: "pipeline-agentes",
   regras: "regras",
