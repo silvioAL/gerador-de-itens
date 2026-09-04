@@ -15837,3 +15837,64 @@ instalada — dá para configurar o destino e nada jamais o chama.
 construída, testada isolada, nunca ligada. O modo de falha é sempre o silêncio.
 
 > Fica como a próxima rodada, e é ela que responde à expectativa do usuário.
+
+---
+
+## §356 — A torneira que o §349 não instalou
+
+O §355 mediu a jornada e parou num achado. Esta rodada o conserta.
+
+### O que estava faltando
+
+O §349 ("ler um documento da casa pelo link, para virar desenho") entregou:
+a porta `LeitorDeDocumento`, o adaptador `criarLeitorDeDocumentoViaGateway`, a
+operação `documentoExterno` na lista fechada, 99 linhas de teste do adaptador, e
+**três linhas** na tela de Exportação para cadastrar o destino.
+
+Nunca entregou **rota** nem **campo**. `criarLeitorDeDocumentoViaGateway` era
+chamado só pelo próprio teste. Dava para configurar o destino, e nada jamais o
+chamava.
+
+O commit dele diz *"Fecha a frente (3)"* — a frente era, nas palavras do
+usuário, *"passar o link de uma página Confluence para que ele consulte e traga
+as informações, e assim o assistente já monte o desenho"*.
+
+> **Tudo estava verde o tempo todo.** Cada peça estava certa sozinha; o que
+> faltava era a costura. É a mesma classe do `tokens` do §354 e dos 14 recursos
+> sem rota da SPEC-28 — e o modo de falha é sempre o silêncio.
+
+**Entregue:** `POST /ia/documento-externo` e o campo de link no `ConversaPanel`.
+
+### Três decisões
+
+- **A rota devolve TEXTO, não desenho.** Ler e desenhar são dois passos, e
+  juntá-los esconderia o primeiro. O que volta alimenta `POST /ia/diagrama` como
+  `descricao` — o mesmo caminho de quem digita à mão, então o desenho importado e
+  o descrito passam pelo mesmo motor.
+- **O texto cai na CAIXA, não na mesa.** A pessoa lê antes de mandar. Desenhar
+  direto do link esconderia o que foi lido: gateway trazendo a página errada, ou
+  o storage format cru, produziria desenho errado sem ninguém ver a causa.
+  **Importar não é aceitar** — a mesma régua do ADR (SPEC-81 fatia C).
+- **O campo só aparece se há destino cadastrado.** Mesma régua do botão de ADR e
+  do microfone: oferecer o que sempre responderia 409 ensina a ignorar a oferta.
+  Foi exatamente assim que o §349 falhou.
+
+### A régua que o §248 provou
+
+*200 com conteúdo vazio é o mesmo que não achar* — do próprio §349, e é a que
+mais importa: uma página vazia virando descrição faria o modelo inventar o
+desenho inteiro para não devolver nada, e o resultado **pareceria importado**,
+com a autoridade de um documento da casa que ninguém escreveu.
+
+Desligando a checagem, o teste `endereço que o gateway não lê vira 404` reprova.
+
+### O E2E, e por que ele é a prova que faltava
+
+Nenhum teste de unidade poderia ter pego o defeito do §349, porque cada peça
+estava correta isolada. Costura é o que só o navegador prova.
+
+Os dois testes novos disputavam o MESMO estado global (a config de destinos) e
+alternavam verde/vermelho por ordem de execução. Viraram `describe.serial` — e a
+razão ficou escrita, porque "flaky" sem causa escrita volta.
+
+**130 E2E** (eram 128).

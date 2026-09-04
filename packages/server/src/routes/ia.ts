@@ -19,6 +19,8 @@ import {
   montarPedidoNecessidades,
   montarPedidoPipeline,
   montarPedidoSugerirConfig,
+  normalizarExportador,
+  destinosDaOperacao,
   normalizarPipelineAgentes,
   preambuloDoPapel,
   PedidoInvalido,
@@ -27,6 +29,7 @@ import {
   type PedidoIa,
   comCofreDeSegredos,
 } from "@gerador/aplicacao";
+import { criarLeitorDeDocumentoViaGateway } from "../adaptadores/gatewayDoTime.js";
 import { criarRepositorioDeConfigEmPostgres } from "../adaptadores/configEmPostgres.js";
 import type { OpcoesApp } from "../app.js";
 import { criarRepositorioDeCredenciaisEmPostgres } from "../adaptadores/credenciaisEmPostgres.js";
@@ -502,6 +505,75 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
     const pedido = comPedido(() => montarPedidoDiagrama((req.body ?? {}) as never), reply);
     if (!pedido) return reply;
     return executarPedido(reply, pedido, "ia/diagrama");
+  });
+
+  /**
+   * §356 — **a torneira que o §349 não instalou.**
+   *
+   * O §349 entregou a porta (`LeitorDeDocumento`), o adaptador
+   * (`criarLeitorDeDocumentoViaGateway`), a operação `documentoExterno` na lista
+   * fechada, os testes e a linha na tela de Exportação para cadastrar o destino.
+   * **Nunca entregou rota.** O adaptador era chamado só pelo próprio teste: dava
+   * para configurar o destino e nada jamais o chamava.
+   *
+   * O commit dele dizia *"Fecha a frente (3)"* — a frente era *"passar o link de
+   * uma página Confluence para que ele consulte e traga as informações, e assim
+   * o assistente já monte o desenho"*.
+   *
+   * ## Por que ela devolve TEXTO, e não um desenho
+   *
+   * Ler e desenhar são dois passos, e juntá-los esconderia o primeiro. O que
+   * volta aqui alimenta `POST /ia/diagrama` como `descricao` — o mesmo caminho
+   * de quem digita a descrição à mão. Assim o desenho importado e o descrito
+   * passam pelo mesmo motor, e a proveniência (`link`) viaja separada do
+   * conteúdo.
+   *
+   * ## Sem RBAC, pela razão dos vizinhos
+   *
+   * Receber texto é leitura. A escrita acontece no `PUT /quebras/:id`, que já
+   * tem o portão.
+   */
+  app.post("/ia/documento-externo", async (req, reply) => {
+    const corpo = z.object({ link: z.string().min(1) }).safeParse(req.body);
+    if (!corpo.success) {
+      return reply.code(400).send({ erro: "corpo precisa ter `link`" });
+    }
+
+    const config = normalizarExportador(
+      (
+        await criarCasosDeUsoDeConfig(criarRepositorioDeConfigEmPostgres(db)).obter("exportador", {
+          endpoint: "",
+          rotulo: "",
+          cabecalhos: {},
+        })
+      ).documento
+    );
+    const destinos = destinosDaOperacao(config, "documentoExterno");
+    if (destinos.length === 0) {
+      // Diz o que fazer, como as irmãs: um erro genérico manda a pessoa
+      // adivinhar onde configurar.
+      return reply.code(409).send({
+        erro: "nenhum destino de leitura de documento configurado — cadastre o endereço em Configurações → Exportação, em “Outros destinos”",
+      });
+    }
+
+    const lido = await criarLeitorDeDocumentoViaGateway(destinos[0]).ler(corpo.data.link);
+
+    /**
+     * §349 §6 — **200 com conteúdo vazio é o mesmo que não achar.**
+     *
+     * A régua é do próprio §349, e é a que mais importa aqui: uma página vazia
+     * virando "proposta" faria o modelo inventar o desenho inteiro para não
+     * devolver nada — e o resultado pareceria importado, com a autoridade de um
+     * documento da casa que ninguém escreveu.
+     */
+    if (!lido || !lido.conteudo.trim()) {
+      return reply.code(404).send({
+        erro: "não foi possível ler esse endereço, ou a página veio vazia — confira o link e se o gateway enxerga esse espaço",
+      });
+    }
+
+    return lido;
   });
 
   app.post("/ia/alterar-item", async (req, reply) => {
