@@ -15898,3 +15898,56 @@ alternavam verde/vermelho por ordem de execução. Viraram `describe.serial` —
 razão ficou escrita, porque "flaky" sem causa escrita volta.
 
 **130 E2E** (eram 128).
+
+---
+
+## §357 — SPEC-97: a governança deixa de ser promessa
+
+O usuário, ao pedir para fechar a SPEC-102: *"a parte de governança ok, acredito
+que já foi especificado"*. **Não tinha sido.** A SPEC-97 foi prometida há muito
+tempo, nunca escrita, e a capa do site declarava a lacuna em âmbar.
+
+Escrita como **avaliação**: mede o que existe e recomenda, sem implementar.
+
+### O que a medição achou
+
+**Dois eixos com defaults OPOSTOS, e nada declara qual vale onde.**
+`exigirPermissao` protege trabalho — owner sempre pode, ignorando o RBAC.
+`exigirEdicaoCurada` protege catálogo — se algum papel carrega o recurso, a
+curadoria **revoga o owner-bypass**. As duas são defensáveis, moram em arquivos
+vizinhos, e o conhecimento de qual se aplica onde existe só na cabeça de quem leu
+as duas.
+
+**Quatro defeitos, todos reconfirmados na `main` antes de escrever:**
+
+1. **Não há isolamento de leitura nenhum.** `GET /quebras` é um `select` sem
+   `WHERE`. O comentário de `RECURSOS_SEM_ROTA` afirma o contrário — *"quem quer
+   isolar quebra já tem o escopo por time"* —, e esse escopo não existe.
+2. **O escopo de autorização vem do CORPO.** Quem chama escolhe contra qual time
+   é conferido; no `PUT`, o mesmo corpo reescreve o time da quebra.
+3. **`POST /quebras/:id/derivar` não tem `preHandler`.**
+4. **`maiorNivel`** dá owner em qualquer operação sem escopo — declarado, mas o
+   docstring pressupõe escopo ausente, não escopo escolhido pelo chamador.
+
+E um quinto, que o §354 tornou visível: `exportador` e `tokens` gateadas pela
+permissão da esteira.
+
+### O pedido, e a peça que já existe
+
+*"É comum que a arquitetura queira colocar requisitos de refinamento /
+configurações obrigatórias e os DBAs também."*
+
+Hoje toda config é **substituição** (`time → global`, o time vence). Não existe
+*"vale para todos e o time não pode desligar"*.
+
+Mas o mecanismo existe: a **SPEC-86** resolveu esta forma para o eixo do produto —
+o que o produto guarda **soma** ao do time, com `origemDe` dizendo de onde cada
+item veio. Falta um terceiro nível usando a mesma soma. **Não é mecanismo novo,
+é um nível novo no mecanismo provado** — e a SPEC recusa inventar um segundo.
+
+### A capa continua em âmbar, e isso é o ponto
+
+Atualizei só o comentário que dizia *"a SPEC-97 ainda não foi escrita"*. O
+`oQueFalta` visível não mudou: **escrever a spec não constrói a capacidade**.
+Trocar a cor porque o documento nasceu seria a página envelhecendo mentindo — o
+defeito que a régua da SPEC-76 existe para impedir.

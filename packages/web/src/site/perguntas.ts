@@ -81,9 +81,15 @@ export const PERGUNTAS: PerguntaDeQuemChega[] = [
      * Sem resposta, e é a lacuna mais honesta desta lista.
      *
      * A SPEC-94 desenhou a análise crítica e a escala de maturidade; a SPEC-97
-     * — a sessão de governança, agrupada por quem responde — **ainda não foi
-     * escrita**. Marcar em vez de omitir é a régua da SPEC-76: a página que
-     * esconde o que falta é a que envelhece mentindo.
+     * — a sessão de governança, agrupada por quem responde — foi escrita no
+     * §357, como AVALIAÇÃO.
+     *
+     * **O âmbar continua, e é o ponto.** Escrever a spec não constrói a
+     * capacidade: a SPEC-97 mede o que existe (dois eixos de permissão com
+     * defaults opostos e nunca declarados), aponta três furos de autorização e
+     * recomenda o piso organizacional — e nada disso está implementado. Trocar
+     * a cor porque o documento nasceu seria exatamente a página envelhecendo
+     * mentindo que a régua da SPEC-76 existe para impedir.
      */
     texto: "Como funciona a governança disso, e quem são os responsáveis?",
     pagina: null,
