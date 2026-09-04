@@ -15787,3 +15787,53 @@ nova ficou `regras-de-conexao`, senão o link salvo abriria a tela errada.
 documento voltando; sobrescrever `motor → grpc` e ver `GET /config/diagrama`
 refletir; e a aba, nos dois temas, mostrando **"Motor de Regras nasce como
 `interno`"** — o caso exato do print que originou a SPEC-102.
+
+---
+
+## §355 — O dublê que servia uma das cinco operações
+
+Pedido: poder, amanhã, *"configurar meu api gateway (…), fazer ela ler o
+documento e gerar desenho, e depois subir o item para o api gateway, com as
+specs"*. Fui percorrer a jornada inteira contra a stack antes de mexer em nada.
+
+### O que a medição achou
+
+`OPERACOES_DO_GATEWAY` tem **cinco** — `itens`, `documento`, `adr`,
+`arquiteturaDeNegocio`, `documentoExterno`. O `gateway-falso` implementava
+**uma**: `/adr`.
+
+Ou seja: **quatro dos cinco passos da jornada não tinham para onde apontar.**
+Configurar o gateway, ler um documento da casa, publicar o desenho e subir os
+itens eram impossíveis de exercitar localmente — e de demonstrar.
+
+**Entregue:** as quatro rotas que faltavam, com os contratos que os adaptadores
+já declaravam. Três decisões que valem registro:
+
+- **`/itens` falha no último item, de propósito.** Falha PARCIAL é o modo de
+  falhar deste contrato (`{ chave, erro }` existe no tipo desde a SPEC-49), e um
+  dublê que sempre acerta nunca exercita a tela que mostra o que não subiu.
+- **`/documento` é idempotente por `demandaId`.** É a promessa central da porta
+  (*"publicar 2× atualiza no lugar"*), e uma segunda publicação que devolvesse
+  `criada` significaria duas páginas do mesmo documento na casa. §248: desligando
+  o `Map`, o teste da idempotência reprova sozinho.
+- **`/arquitetura` deixa `restricoes` de fora.** A tela precisa ter o que marcar
+  como lacuna; um dublê que preenche tudo nunca exercita esse caminho.
+
+### O achado que a jornada revelou, e que é maior
+
+Ao tentar o passo *"ler o documento e gerar desenho"*: **`POST /ia/documento-externo`
+não existe — nenhuma rota existe.**
+
+O §349 entregou a porta (`leitorDeDocumento.ts`), o adaptador
+(`criarLeitorDeDocumentoViaGateway`), a operação na lista fechada, os testes e
+**três linhas** na tela de Exportação para cadastrar o destino. Nunca entregou
+rota nem campo para colar o link. `criarLeitorDeDocumentoViaGateway` é chamado
+**só pelo próprio teste**.
+
+O commit diz *"Fecha a frente (3)"*. O encanamento está lá; a torneira nunca foi
+instalada — dá para configurar o destino e nada jamais o chama.
+
+É a mesma classe do `tokens` do §354 e dos 14 recursos sem rota da SPEC-28: peça
+construída, testada isolada, nunca ligada. O modo de falha é sempre o silêncio.
+
+> Fica como a próxima rodada, e é ela que responde à expectativa do usuário.

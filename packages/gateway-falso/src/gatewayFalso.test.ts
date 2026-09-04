@@ -7,6 +7,7 @@ import {
   MARCA_GATEWAY_FALSO,
   PEDIR_FALHA_AO_GATEWAY,
   TEXTO_TRANSCRITO_FALSO,
+  limparPaginasDoGatewayFalso,
 } from "./gatewayFalso.js";
 
 /**
@@ -208,5 +209,101 @@ describe("o destino de ADR (SPEC-81)", () => {
   it("GET no mesmo endereço continua 404 — o contrato é POST", async () => {
     const r = await fetch(`${base}/adr`);
     expect(r.status).toBe(404);
+  });
+});
+
+/**
+ * §355 — as quatro operações que faltavam.
+ *
+ * O gateway tem cinco (`OPERACOES_DO_GATEWAY`) e o dublê servia UMA. Medido ao
+ * tentar percorrer a jornada inteira contra a stack: **quatro dos cinco passos
+ * não tinham para onde apontar**, então configurar o gateway, ler um documento
+ * da casa, publicar o desenho e subir os itens eram impossíveis de exercitar
+ * localmente — e de demonstrar.
+ */
+describe("as cinco operações do gateway do time", () => {
+  let servidor: ReturnType<typeof criarGatewayFalso>;
+  let base: string;
+
+  beforeAll(async () => {
+    limparPaginasDoGatewayFalso();
+    servidor = criarGatewayFalso();
+    await new Promise<void>((r) => servidor.listen(0, "127.0.0.1", r));
+    const addr = servidor.address() as { port: number };
+    base = `http://127.0.0.1:${addr.port}`;
+  });
+  afterAll(() => new Promise<void>((r) => servidor.close(() => r())));
+
+  async function postar(caminho: string, corpo: unknown) {
+    const r = await fetch(`${base}${caminho}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(corpo),
+    });
+    return { status: r.status, corpo: (await r.json()) as Record<string, unknown> };
+  }
+
+  it("itens: um resultado POR item, com o link de cada um", async () => {
+    const { corpo } = await postar("/v1/itens", {
+      itens: [{ chave: "n1::setup" }, { chave: "n1::ep0" }, { chave: "e1::publish" }],
+    });
+    const resultados = corpo.resultados as { chave: string; linkExterno?: string; erro?: string }[];
+    expect(resultados).toHaveLength(3);
+    expect(resultados[0].linkExterno).toContain("n1::setup");
+  });
+
+  it("itens: o último falha de propósito — falha PARCIAL é o modo de falhar deste contrato", async () => {
+    // Um dublê que sempre acerta nunca exercita a tela que mostra o que não subiu.
+    const { corpo } = await postar("/v1/itens", { itens: [{ chave: "a" }, { chave: "b" }] });
+    const resultados = corpo.resultados as { chave: string; erro?: string }[];
+    expect(resultados[0].erro).toBeUndefined();
+    expect(resultados[1].erro).toBeTruthy();
+  });
+
+  it("documento: publicar duas vezes ATUALIZA no lugar, com o mesmo link", async () => {
+    // É a promessa central do contrato (`publicadorDeDocumento.ts`): uma segunda
+    // publicação que devolvesse `criada` significaria duas páginas do mesmo
+    // documento na casa, e é isso que transforma publicação em lixo.
+    const primeira = await postar("/v1/documento", { demandaId: "q-1", markdown: "# a" });
+    const segunda = await postar("/v1/documento", { demandaId: "q-1", markdown: "# a v2" });
+
+    expect(primeira.corpo.atualizada).toBe(false);
+    expect(segunda.corpo.atualizada).toBe(true);
+    expect(segunda.corpo.linkExterno).toBe(primeira.corpo.linkExterno);
+  });
+
+  it("documento: demandas diferentes são páginas diferentes", async () => {
+    const a = await postar("/v1/documento", { demandaId: "q-A", markdown: "#" });
+    const b = await postar("/v1/documento", { demandaId: "q-B", markdown: "#" });
+    expect(a.corpo.linkExterno).not.toBe(b.corpo.linkExterno);
+  });
+
+  it("documento: o espaço do destino entra no endereço da página (§348)", async () => {
+    const { corpo } = await postar("/v1/documento", { demandaId: "q-esp", espaco: "ARQ", markdown: "#" });
+    expect(corpo.linkExterno).toContain("ARQ");
+  });
+
+  it("documento-externo: devolve conteúdo e ECOA o link pedido", async () => {
+    // O eco é proveniência: o desenho que nascer disto diz de onde veio, e
+    // inventar o link aqui seria mentir sobre a origem.
+    const link = "https://confluence.invalido/pages/12345";
+    const { corpo } = await postar("/v1/documento-externo", { link });
+    expect(corpo.link).toBe(link);
+    expect(String(corpo.conteudo)).toContain("bureau");
+    expect(corpo.titulo).toBeTruthy();
+  });
+
+  it("arquitetura: traz as seções da casa, com uma AUSENTE de propósito", async () => {
+    // `restricoes` não vem: a tela precisa ter o que marcar como lacuna, e um
+    // dublê que preenche tudo nunca exercita esse caminho.
+    const { corpo } = await postar("/v1/arquitetura", {});
+    expect(corpo.objetivo).toBeTruthy();
+    expect(corpo.glossario).toBeTruthy();
+    expect(corpo.restricoes).toBeUndefined();
+  });
+
+  it("adr: continua como estava — a operação que já existia não muda", async () => {
+    const { corpo } = await postar("/v1/adr", {});
+    expect((corpo.adrs as unknown[]).length).toBeGreaterThan(0);
   });
 });
