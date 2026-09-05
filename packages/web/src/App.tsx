@@ -81,7 +81,8 @@ import { EnsaiosScreen } from "./ensaios/EnsaiosScreen";
 import { idDaRegraDeForma } from "./config/FormaDoDesenho";
 import { ConfigurarPanel } from "./assistente/ConfigurarPanel";
 import { JourneyModal, type AbaJornada } from "./demo/JourneyModal";
-import { contextoDoProdutoEmTexto, montarMapaDoSistema, type ExecucaoDoPapel } from "@gerador/aplicacao";
+import { contextoDoProdutoEmTexto, montarMapaDoSistema, type ExecucaoDoPapel, type FluxoDoMapa } from "@gerador/aplicacao";
+import { apiFluxosEmVigor } from "./api/client";
 import { FluxoScreen } from "./fluxo/FluxoScreen";
 import { ConfigScreen, type AbaConfig } from "./config/ConfigScreen";
 import { TourOverlay } from "./demo/TourOverlay";
@@ -609,6 +610,38 @@ function AppCarregado({
   const [erroAoSalvarSistema, setErroAoSalvarSistema] = useState<string | null>(null);
 
   /**
+   * SPEC-106 fatia E — o mapa lê os FLUXOS: o em-vigor (com a esteira
+   * derivada) mais a saúde da última execução de cada um. Carregado quando a
+   * tela abre, como a credencial logo acima — o mapa responde "como está
+   * montado AGORA", não "como estava quando o app subiu".
+   */
+  const [fluxosDoMapa, setFluxosDoMapa] = useState<FluxoDoMapa[]>([]);
+  useEffect(() => {
+    if (!mostrarSistema) return;
+    let cancelado = false;
+    void Promise.all([apiFluxosEmVigor.listar(quebra.time ?? timeAtivo), apiFluxosEmVigor.ultimas()])
+      .then(([vigor, saude]) => {
+        if (cancelado) return;
+        setFluxosDoMapa(
+          vigor.fluxos.map((f) => {
+            const ultima = saude.ultimas.find((u) => u.fluxoId === f.id);
+            return {
+              id: f.id,
+              nome: f.nome,
+              nos: f.nos.length,
+              origem: f.origem,
+              ...(ultima ? { ultimaExecucao: { em: ultima.em, ok: ultima.ok, ...(ultima.noComFalha ? { noComFalha: ultima.noComFalha } : {}) } } : {}),
+            };
+          })
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelado = true;
+    };
+  }, [mostrarSistema, quebra.time, timeAtivo]);
+
+  /**
    * §260 — as duas edições que o MAPA provoca, aplicadas de onde se vê o
    * problema.
    *
@@ -669,8 +702,11 @@ function AppCarregado({
          * E ele chega marcado, como todo dado de tour (§235).
          */
         execucoes: demonstracaoDoTour ? EXECUCOES_DO_TOUR : execucoesDaEsteira,
+        // SPEC-106 fatia E — sempre os REAIS, como a config: o tour não tem
+        // fluxo de demonstração, e um encanamento inventado mentiria.
+        fluxos: fluxosDoMapa,
       }),
-    [pipelineAgentes, regrasConfig, temCredencialDeIa, feedbacksNovos, execucoesDaEsteira, demonstracaoDoTour]
+    [pipelineAgentes, regrasConfig, temCredencialDeIa, feedbacksNovos, execucoesDaEsteira, demonstracaoDoTour, fluxosDoMapa]
   );
 
   const [menuAberto, setMenuAberto] = useState(false);
@@ -1984,6 +2020,7 @@ function AppCarregado({
           exemploDeMedicao={exemploDeMedicao(regrasVisiveis)}
           exemploDeDemonstracao={demonstracaoDoTour}
           onAbrirConfig={(area) => abrirConfigNaAba(area)}
+          onAbrirFluxos={() => navegar({ tela: "fluxo" })}
           onVoltar={() => navegar({ tela: "canvas" })}
           erroAoSalvar={erroAoSalvarSistema}
           onAlternarAgente={(id) =>

@@ -49,6 +49,8 @@ export interface SistemaScreenProps {
   exemploDeDemonstracao?: boolean;
   onAlternarAgente?: (id: string) => void;
   onMoverAgente?: (id: string, direcao: -1 | 1) => void;
+  /** SPEC-106 fatia E — o bloco de fluxos leva ao canvas deles. */
+  onAbrirFluxos?: () => void;
   /** Erro do último salvamento. Falha de escrita não pode sumir: a tela
    * mostraria o estado novo com o servidor guardando o velho. */
   erroAoSalvar?: string | null;
@@ -109,6 +111,7 @@ export function SistemaScreen({
   exemploDeDemonstracao,
   onAlternarAgente,
   onMoverAgente,
+  onAbrirFluxos,
   erroAoSalvar,
 }: SistemaScreenProps) {
   const podeEditar = Boolean(onAlternarAgente && onMoverAgente);
@@ -150,6 +153,46 @@ export function SistemaScreen({
         )}
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, alignItems: "start" }}>
+          {/* SPEC-106 fatia E — o encanamento declarado, com a saúde da última
+              rodada. O mapa LÊ; quem fia é o canvas de fluxos. */}
+          <Bloco
+            testid="bloco-fluxos"
+            titulo="Os fluxos de integração"
+            legenda="conector × agente → resultado, pelo desenho"
+            onAbrir={() => onAbrirFluxos?.()}
+          >
+            {mapa.fluxos.length === 0 ? (
+              <Vazio texto="Nenhum fluxo ainda — a esteira aparece aqui derivada quando houver papéis ativos." />
+            ) : (
+              mapa.fluxos.map((f) => (
+                <div key={f.id} data-testid={`fluxo-do-mapa-${f.id}`} style={linhaEstilo}>
+                  <strong style={{ fontSize: 13 }}>
+                    {f.nome}
+                    {f.origem === "fabrica" && (
+                      <span style={{ fontSize: 10.5, color: "var(--texto-mudo)", fontWeight: 400 }}> · derivado</span>
+                    )}
+                  </strong>
+                  <div style={{ fontSize: 12, color: "var(--texto-fraco)" }}>
+                    {f.nos} nó(s) ·{" "}
+                    {f.ultimaExecucao ? (
+                      f.ultimaExecucao.ok ? (
+                        <span style={{ color: "var(--verde)" }}>rodou {haQuantoTempo(f.ultimaExecucao.em)}</span>
+                      ) : (
+                        // O único vermelho além do papel que falhou, e pela
+                        // mesma razão: aqui algo REALMENTE deu errado.
+                        <span style={{ color: "var(--vermelho)" }}>
+                          falhou{f.ultimaExecucao.noComFalha ? ` no nó "${f.ultimaExecucao.noComFalha}"` : ""}{" "}
+                          {haQuantoTempo(f.ultimaExecucao.em)}
+                        </span>
+                      )
+                    ) : (
+                      <span style={{ color: "var(--texto-mudo)" }}>nunca rodou</span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </Bloco>
           <Bloco
             testid="bloco-regras"
             titulo="O motor confere"

@@ -122,6 +122,18 @@ test("fatia C: desenhar, ligar, mapear — e o ciclo trava com a mensagem do des
     await page.getByTestId("seletor-de-fluxo").selectOption("desenho-e2e");
     await expect(page.locator(".react-flow__node")).toHaveCount(2);
     await expect(page.getByText("conteudo→volumetria")).toBeVisible();
+
+    // SPEC-106 — a esteira aparece DERIVADA dos papéis: os quatro nós na
+    // ordem, banner de derivado, edição travada até "editar uma cópia".
+    await page.getByTestId("seletor-de-fluxo").selectOption("esteira-de-agentes");
+    await expect(page.locator(".react-flow__node")).toHaveCount(4);
+    await expect(page.getByTestId("fluxo-derivado")).toBeVisible();
+    await expect(page.getByTestId("adicionar-no-agente")).toBeDisabled();
+    await page.getByTestId("editar-copia").click();
+    await expect(page.getByTestId("fluxo-derivado")).toHaveCount(0);
+    // A cópia é editável — e é DECLARADA: some o selo, aparece o poder.
+    await page.getByLabel("Agente da paleta").selectOption("po");
+    await expect(page.getByTestId("adicionar-no-agente")).toBeEnabled();
   } finally {
     await page.request.put(`${API}/config/fluxos`, { data: { documento: original, timeId: "time-pagamentos" } });
     await limparMeusConectores(page);

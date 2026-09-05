@@ -253,6 +253,48 @@ describe("SPEC-105 fatia D — POST /fluxos/:id/executar", () => {
     });
   });
 
+  it("SPEC-106 — a esteira aparece DERIVADA no em-vigor, e executa pelo mesmo motor", async () => {
+    await comApp(async (app, cookies) => {
+      await prepararMundo(app, cookies);
+
+      const r = await app.inject({ method: "GET", url: "/fluxos" });
+      expect(r.statusCode).toBe(200);
+      const { fluxos } = r.json() as { fluxos: { id: string; origem: string; nos: { id: string }[] }[] };
+      const esteira = fluxos.find((f) => f.id === "esteira-de-agentes");
+      expect(esteira).toBeDefined();
+      expect(esteira!.origem).toBe("fabrica");
+      // Os quatro papéis de fábrica, na ordem — o desenho da mesma coisa.
+      expect(esteira!.nos.map((n) => n.id)).toEqual(["po", "arquiteto", "especialista", "qa"]);
+
+      // Ela EXECUTA pelo executor de fluxos (a resolução vem do em-vigor) — e
+      // o primeiro papel, sem entrada nenhuma mapeada, falha pela §9.3 em vez
+      // de rodar com um prompt vazio inventado.
+      const exec = await app.inject({ method: "POST", url: "/fluxos/esteira-de-agentes/executar", cookies, payload: { ateNo: "po" } });
+      expect(exec.statusCode).toBe(200);
+      const { nos } = exec.json() as { nos: { noId: string; estado: string; erro?: string }[] };
+      expect(nos).toHaveLength(1);
+      expect(nos[0].estado).toBe("falhou");
+      expect(nos[0].erro).toContain("entrada");
+    });
+  });
+
+  it("SPEC-106 fatia E — /fluxos/execucoes/ultimas devolve só a saúde, moldada", async () => {
+    await comApp(async (app, cookies) => {
+      await prepararMundo(app, cookies);
+      await app.inject({ method: "PUT", url: "/config/fluxos", cookies, payload: { documento: { fluxos: [FLUXO_JMETER] } } });
+      await app.inject({ method: "POST", url: "/fluxos/jmx/executar", cookies, payload: {} });
+
+      const r = await app.inject({ method: "GET", url: "/fluxos/execucoes/ultimas" });
+      expect(r.statusCode).toBe(200);
+      const { ultimas } = r.json() as { ultimas: { fluxoId: string; ok: boolean; noComFalha?: string; erro?: string }[] };
+      const doJmx = ultimas.find((u) => u.fluxoId === "jmx");
+      expect(doJmx).toBeDefined();
+      expect(doJmx!.ok).toBe(true);
+      // Só estados — nunca o texto do erro nem saídas (régua de /ia/execucoes).
+      expect(JSON.stringify(ultimas)).not.toContain("erro");
+    });
+  });
+
   it("executar exige sessão; fluxo desconhecido é 404", async () => {
     await comApp(async (app, cookies) => {
       expect((await app.inject({ method: "POST", url: "/fluxos/x/executar", payload: {} })).statusCode).toBe(401);

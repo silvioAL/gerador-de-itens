@@ -29,6 +29,13 @@ export interface RastroDoNo {
   estado: EstadoDoNo;
   erro?: string;
   duracaoMs: number;
+  /**
+   * SPEC-106 fatia A — o link do que SUBIU, guardado na execução: é a resposta
+   * de "onde foi parar?" depois que o rastro descartou as saídas (que são
+   * dado, não diagnóstico). Só existe quando a saída do nó trouxe
+   * `linkExterno`, que é o contrato de quem publica.
+   */
+  linkExterno?: string;
 }
 
 export interface ResultadoDoFluxo {
@@ -122,7 +129,14 @@ export async function executarFluxo(
           : await executores.agente(no, parametros);
       estado.set(noId, "sucesso");
       saidas[noId] = saida;
-      rastro.push({ noId, tipo: no.tipo, refId: no.refId, estado: "sucesso", duracaoMs: Date.now() - comecou });
+      rastro.push({
+        noId,
+        tipo: no.tipo,
+        refId: no.refId,
+        estado: "sucesso",
+        duracaoMs: Date.now() - comecou,
+        ...(typeof saida.linkExterno === "string" && saida.linkExterno ? { linkExterno: saida.linkExterno } : {}),
+      });
     } catch (erro) {
       // Regra 2 mora aqui, por omissão: nada de `throw` — o laço continua, e
       // só quem depende deste nó cai na regra 1.

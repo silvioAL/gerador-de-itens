@@ -8,6 +8,7 @@ function mapa(p: Partial<MapaDoSistema> = {}): MapaDoSistema {
     agentes: [],
     regras: [],
     regrasDePercurso: 0,
+    fluxos: [],
     pdca: { feedbacksAbertos: 0, temTrabalho: false },
     avisos: [],
     ...p,

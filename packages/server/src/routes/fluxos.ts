@@ -5,11 +5,12 @@ import {
   CAMPO_GLOBAL,
   criarCasosDeUsoDeConfig,
   executarFluxo,
+  fluxosEmVigor,
   mensagemDeCiclo,
-  normalizarFluxos,
   normalizarPipelineAgentes,
   preambuloDoPapel,
   type Fluxo,
+  type RastroDoNo,
 } from "@gerador/aplicacao";
 import type { OpcoesApp } from "../app.js";
 import { criarRepositorioDeConfigEmPostgres } from "../adaptadores/configEmPostgres.js";
@@ -61,6 +62,48 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
    * distinguir edições; não é segurança, é identidade. */
   const hashDoFluxo = (fluxo: Fluxo) => createHash("sha256").update(canonico(fluxo)).digest("hex").slice(0, 16);
 
+  /** Os fluxos EM VIGOR do time: declarados + a esteira derivada dos papéis.
+   * Resolvido AQUI (§263): a tela, o mapa e o executor leem a mesma soma. */
+  async function emVigor(timeId?: string) {
+    const [fluxosDoc, pipelineDoc] = await Promise.all([
+      casos.obter("fluxos", await templateDaVersao("fluxos", diretorioConfig), timeId),
+      casos.obter("pipeline-agentes", await templateDaVersao("pipeline-agentes", diretorioConfig), timeId),
+    ]);
+    const { papeis } = normalizarPipelineAgentes(pipelineDoc.documento);
+    return { fluxos: fluxosEmVigor(papeis, fluxosDoc.documento), papeis };
+  }
+
+  // Leitura aberta, como `GET /conectores`: a fiação é vocabulário do
+  // maquinário — e é aqui que a tela vê a esteira derivada sem ninguém copiar.
+  app.get("/fluxos", async (req) => {
+    const { timeId } = req.query as { timeId?: string };
+    return { fluxos: (await emVigor(timeId)).fluxos };
+  });
+
+  /**
+   * SPEC-106 fatia E — a última execução de cada fluxo, MOLDADA para o mapa:
+   * só estados (nunca o erro inteiro nem saídas), pela mesma régua de
+   * `/ia/execucoes` — aberta porque responde "o maquinário está de pé?".
+   */
+  app.get("/fluxos/execucoes/ultimas", async () => {
+    const linhas = await db
+      .selectDistinctOn([fluxoExecucoes.fluxoId])
+      .from(fluxoExecucoes)
+      .orderBy(fluxoExecucoes.fluxoId, desc(fluxoExecucoes.em));
+    return {
+      ultimas: linhas.map((linha) => {
+        const nos = linha.nos as RastroDoNo[];
+        const comFalha = nos.find((n) => n.estado === "falhou");
+        return {
+          fluxoId: linha.fluxoId,
+          em: linha.em,
+          ok: !comFalha && nos.every((n) => n.estado === "sucesso"),
+          ...(comFalha ? { noComFalha: comFalha.noId } : {}),
+        };
+      }),
+    };
+  });
+
   app.post("/fluxos/:id/executar", { preHandler: exigirNivel(db, "operar", timeDoCorpo) }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const { ateNo } = (req.body ?? {}) as { ateNo?: string };
@@ -80,19 +123,15 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
       }
     }
 
-    const { documento } = await casos.obter("fluxos", await templateDaVersao("fluxos", diretorioConfig), timeId);
-    const fluxo = normalizarFluxos(documento).fluxos.find((f) => f.id === id);
+    // Do EM VIGOR, não só dos declarados: a esteira derivada também executa.
+    const { fluxos, papeis } = await emVigor(timeId);
+    const fluxo = fluxos.find((f) => f.id === id);
     if (!fluxo) return reply.code(404).send({ erro: `não conheço o fluxo "${id}" neste time` });
     if (ateNo && !fluxo.nos.some((no) => no.id === ateNo)) {
       return reply.code(404).send({ erro: `o fluxo "${id}" não tem o nó "${ateNo}"` });
     }
 
-    const [catalogo, pipelineDoc, provedor] = await Promise.all([
-      catalogoDeConectores(db, diretorioConfig),
-      casos.obter("pipeline-agentes", await templateDaVersao("pipeline-agentes", diretorioConfig), timeId),
-      resolverProvedor(),
-    ]);
-    const { papeis } = normalizarPipelineAgentes(pipelineDoc.documento);
+    const [catalogo, provedor] = await Promise.all([catalogoDeConectores(db, diretorioConfig), resolverProvedor()]);
 
     let resultado;
     try {

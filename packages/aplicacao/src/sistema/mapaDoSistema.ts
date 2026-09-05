@@ -62,11 +62,25 @@ export interface RegraDoMapa {
   testes: number;
 }
 
+/**
+ * SPEC-106 fatia E — um fluxo de integração, do jeito que o mapa lê: contagem
+ * e última execução, nunca a fiação inteira (a fiação tem tela própria).
+ */
+export interface FluxoDoMapa {
+  id: string;
+  nome: string;
+  nos: number;
+  origem: "declarado" | "fabrica";
+  ultimaExecucao?: { em: string; ok: boolean; noComFalha?: string };
+}
+
 export interface MapaDoSistema {
   agentes: AgenteDoMapa[];
   regras: RegraDoMapa[];
   /** SPEC-57 fatia E — as réguas que valem sobre o CAMINHO, não sobre o nó. */
   regrasDePercurso: number;
+  /** SPEC-106 fatia E — o encanamento declarado, com a saúde da última rodada. */
+  fluxos: FluxoDoMapa[];
   pdca: {
     feedbacksAbertos: number;
     /** `true` quando o laço tem o que processar — é o que a seta de volta acende. */
@@ -94,6 +108,8 @@ export interface EntradaDoMapa {
   /** Ausente = o rastro não foi lido (tela velha, chamada que falhou). Diferente
    * de lista vazia, que é "ninguém rodou nada ainda". */
   execucoes?: ExecucaoDoPapel[];
+  /** SPEC-106 fatia E — já moldados por quem leu (`fluxosEmVigor` + rastro). */
+  fluxos?: FluxoDoMapa[];
 }
 
 const ESCREVE_POR_GRUPO: Record<string, string> = {
@@ -104,7 +120,7 @@ const ESCREVE_POR_GRUPO: Record<string, string> = {
 };
 
 export function montarMapaDoSistema(entrada: EntradaDoMapa = {}): MapaDoSistema {
-  const { papeis = [], regras, temCredencialDeIa = false, feedbacksAbertos = 0, execucoes } = entrada;
+  const { papeis = [], regras, temCredencialDeIa = false, feedbacksAbertos = 0, execucoes, fluxos = [] } = entrada;
 
   const ultimaPorPapel = new Map((execucoes ?? []).map((e) => [e.papel, e]));
 
@@ -178,11 +194,21 @@ export function montarMapaDoSistema(entrada: EntradaDoMapa = {}): MapaDoSistema 
   if (regrasDePercurso === 0) {
     avisos.push("Nenhuma régua de percurso: caminhos que estouram o orçamento inteiro não são medidos.");
   }
+  // SPEC-106 fatia E — fluxo que falhou não se anuncia sozinho, como o papel
+  // que falhou (§265): quem esperava o resultado dele ficou sem, em silêncio.
+  for (const fluxo of fluxos) {
+    if (fluxo.ultimaExecucao && !fluxo.ultimaExecucao.ok) {
+      avisos.push(
+        `O fluxo "${fluxo.nome}" falhou na última execução${fluxo.ultimaExecucao.noComFalha ? ` (no nó "${fluxo.ultimaExecucao.noComFalha}")` : ""} — quem dependia do resultado ficou sem.`
+      );
+    }
+  }
 
   return {
     agentes,
     regras: regrasPorTech,
     regrasDePercurso,
+    fluxos,
     pdca: { feedbacksAbertos, temTrabalho: feedbacksAbertos > 0 },
     avisos,
   };
