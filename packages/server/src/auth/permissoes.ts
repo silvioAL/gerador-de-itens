@@ -57,6 +57,18 @@ export const RECURSOS = [
    * executar (nível `operar`) é outra coisa, e tem outro portão.
    */
   "conectores",
+  /**
+   * SPEC-105 fatias C/D (§9.1) — **editar e EXECUTAR fluxo são poderes
+   * diferentes**, porque um fluxo com conector de escrita age no mundo.
+   *
+   * - `fluxos` — a fiação (chave de config do time).
+   * - `fluxos.executar` — disparar. O portão base é nível `operar` (trabalho
+   *   do dia, como exportar/publicar); este recurso existe para a organização
+   *   PODER restringir por papel — a rota confere o grant só quando algum
+   *   papel o carrega, no molde da curadoria (`exigirEdicaoCurada`).
+   */
+  "fluxos",
+  "fluxos.executar",
   "especificacao-template",
   // SPEC-53 — o contexto do produto tem dono próprio: quem responde pelo
   // vocabulário e pelas regras de negócio não é quem cuida de stack nem de
@@ -102,6 +114,7 @@ export const RECURSO_DA_CHAVE_DE_CONFIG = {
   tokens: "pipeline-agentes",
   conexoes: "conexoes",
   conectores: "conectores",
+  fluxos: "fluxos",
 } as const satisfies Record<ChaveConfig, Recurso | null>;
 
 /**

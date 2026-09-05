@@ -50,7 +50,14 @@ export type Rota =
    * linkável: *"olha o que acontece se o bureau cair"* é uma URL que se manda
    * para alguém, e isso é metade do valor.
    */
-  | { tela: "ensaios" };
+  | { tela: "ensaios" }
+  /**
+   * SPEC-105 fatia C — o FLUXO: o encanamento da ferramenta como grafo.
+   * Tela própria e não aba de config (§1): é o OUTRO grafo, com paleta
+   * própria — misturá-lo com a mesa destruiria a régua "estou desenhando o
+   * meu sistema ou a minha automação?".
+   */
+  | { tela: "fluxo" };
 
 /**
  * ~~SPEC-84 fatia A — `{ tela: "spec" }`.~~ **§346 — a tela saiu.**
@@ -107,6 +114,7 @@ export function hashDaRota(rota: Rota): string {
   if (rota.tela === "documento") return "#/documento";
   if (rota.tela === "sistema") return "#/sistema";
   if (rota.tela === "ensaios") return "#/ensaios";
+  if (rota.tela === "fluxo") return "#/fluxo";
   return `#/config/${SEGMENTO_DA_AREA[rota.area]}`;
 }
 
@@ -121,6 +129,7 @@ export function rotaDoHash(hash: string): Rota {
   if (partes[0] === "documento") return { tela: "documento" };
   if (partes[0] === "sistema") return { tela: "sistema" };
   if (partes[0] === "ensaios") return { tela: "ensaios" };
+  if (partes[0] === "fluxo") return { tela: "fluxo" };
   // §346 — a tela da spec saiu, e o link salvo REDIRECIONA em vez de morrer.
   // Vai para o documento porque é lá que os itens vivem, e é o item que a spec
   // acompanha (SPEC-98 §3.2). Mesma disciplina do `#/itens` no §269.
