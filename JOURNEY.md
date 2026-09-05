@@ -16267,3 +16267,40 @@ documento de desenho virando nó produtor + link armazenado na demanda — o
 segundo feedback dele: *"fica vazio, desconectado da jornada… apenas armazenar
 o link"*), e a régua herdada da 105 §7: **item de menu só sai com a prova da
 substituição verde.** As fatias E+F da 105 ficam atrás desse desenho.
+
+---
+
+## §365 — SPEC-106 rodada 1: o pipeline unificado no desenho, o stage e o mapa
+
+O usuário aprovou a SPEC-106 com uma ênfase: *"precisa ter o pipeline de IA
+também unificado nessa feature, se trata do desenho da mesma coisa"*. Esta
+rodada é essa unificação começando pelo jeito seguro — DERIVAR, nunca copiar.
+
+**A esteira como fluxo (fatia D-visível):** `fluxoDaEsteira` deriva dos papéis
+ativos de `pipeline-agentes`, na ordem do array (que sempre FOI a ordem de
+execução): o `texto` de cada papel entra no seguinte com a chave do papel de
+origem — o `acumuladas` da §0.4 da SPEC-105, agora visível e ligável. Abrir a
+tela de fluxos num time novo já mostra o pipeline desenhado, com os quatro
+papéis encadeados. Reordenar um papel na configuração reordena o fluxo
+sozinho, porque não existe cópia. Quem quiser fiar diferente clica **"editar
+uma cópia"** — a cópia declarada vence a derivada no mesmo id, o molde dos
+conectores de fábrica. **A revisão continua rodando pela esteira de sempre**:
+a troca de motor espera a prova da SPEC-105 F (resultado idêntico item a
+item), como a §7 manda.
+
+**O em-vigor tem um lugar só:** `GET /fluxos` resolve declarados + derivada no
+servidor (§263); a tela, o mapa e o executor leem a mesma soma — e executar a
+esteira derivada passa pelo MESMO `POST /fluxos/:id/executar`. O primeiro
+papel, sem entrada mapeada, falha pela §9.3 em vez de rodar com prompt vazio
+inventado — o teste diz isso em voz alta.
+
+**O stage (fatia A):** o rastro por nó ganhou o `linkExterno` de quem publicou
+(persistido — "onde foi parar?" depois que as saídas são descartadas) e o
+artefato do agente aparece como TEXTO corrido (o markdown antes de subir), não
+como JSON.
+
+**O mapa lê os fluxos (fatia E):** bloco novo em `#/sistema` com cada fluxo,
+origem (derivado ×  declarado) e a saúde da última execução —
+`GET /fluxos/execucoes/ultimas` devolve SÓ estados, moldados no servidor
+(nunca o erro inteiro nem saídas, a régua de `/ia/execucoes`). Fluxo que
+falhou vira aviso do mapa, porque fluxo que falha não se anuncia sozinho.
