@@ -376,9 +376,19 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
                 fitView
                 proOptions={{ hideAttribution: true }}
               >
-                <Background />
+                {/* As mesmas cores do canvas da mesa: os dois grafos são
+                    superfícies diferentes, mas a casa é uma — e o bgColor é o
+                    que impede o minimapa de ficar um retângulo branco no
+                    tema escuro (a lição do §351 da mesa, repetida aqui). */}
+                <Background color="var(--borda)" gap={26} size={1.4} />
                 <Controls />
-                <MiniMap nodeColor="var(--texto-mudo)" maskColor="var(--mascara-minimapa)" pannable zoomable />
+                <MiniMap
+                  pannable
+                  zoomable
+                  bgColor="var(--painel)"
+                  maskColor="var(--mascara-minimapa)"
+                  nodeColor="var(--texto-mudo)"
+                />
               </ReactFlow>
             </ReactFlowProvider>
           ) : null}
