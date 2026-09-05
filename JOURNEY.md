@@ -16178,3 +16178,61 @@ completo sozinho — **131 passaram** (130 + o novo), em 3.7m.
 `exportador`/`tokens` continuam com dono errado no mapa; a credencial do
 conector vive em `config_documentos` em claro — o cofre (SPEC-54) é a resposta
 quando doer.
+
+---
+
+## §363 — SPEC-105 fatias C+D: o fluxo como grafo, e a execução com rastro
+
+**A fatia C é a tela do OUTRO grafo.** `#/fluxo` nasce tela própria, com paleta
+própria (§1): os nós vêm do catálogo de conectores (fatia A) e dos papéis da
+esteira — nunca um tipo solto. Não reusa o `Canvas` da mesa de propósito: o
+motor (React Flow, `resolverDependencias`) é comum, a superfície não — misturar
+as duas destruiria a régua *"estou desenhando o meu sistema ou a minha
+automação?"*.
+
+**O mapeamento mora na aresta**, e uma aresta sem mapeamento é dita em voz alta
+("sem mapeamento"): é o que separa fluxo de DADOS de fluxograma (§4.1). O
+select de saídas é alimentado pela `saida` declarada do conector — a fatia A
+virando fiação.
+
+**Ciclo é o mesmo erro do desenho (§4.4)**: `planoDoFluxo` reusa
+`resolverDependencias`, e a mensagem é à letra a da mesa (`Ciclo: a → b → a`) —
+na tela (banner + Executar travado) e na ESCRITA (`validarEscritaFluxos`
+recusa o PUT com a mesma frase). §248 cumprido: recusa desligada → teste
+vermelho → restaurada.
+
+**A fatia D executa no servidor (§7)** — `POST /fluxos/:id/executar`:
+
+- a política de falha é a §9.3, na metade PURA (`executarFluxo`, testável sem
+  rede): o nó que falha para o RAMO; os independentes seguem; dependente de
+  falha vira `nao-executado` com o motivo apontando a ORIGEM; entrada ausente
+  nunca vira default.
+- nó `conector` roda pelo executor da fatia B; nó `agente` roda pelo MESMO
+  caminho de credencial da esteira (`provedorDaOrganizacao`, extraído de
+  `ia.ts` — que mantém a cópia dele porque o arquivo carrega um byte NUL que
+  torna edição ali arriscada; dívida anotada).
+- **o rastro persiste por nó** (`fluxo_execucoes`, migração 0043) com o hash
+  do fluxo que rodou (§9.5) — e SEM as saídas: rastro é diagnóstico, não
+  armazém.
+- só `conector` e `agente` nesta leva: `transformacao`/`saida` (§4.1) ficam
+  para quando houver executor que os honre — tipo oferecido sem executor é a
+  meia-integração do §346.
+
+**Prova da D**: o exemplo do JMeter (§4.2) roda ponta a ponta contra o dublê —
+no teste de rota E no navegador (conector lê → agente gera com a IA do dublê →
+conector publica e devolve o link), com os três nós verdes no rastro da tela.
+
+**O portão da execução (§9.1)**: nível `operar` (o mesmo de exportar/publicar,
+que também agem no mundo) + o recurso `fluxos.executar` no molde da curadoria —
+quando algum papel o carrega, só o grant dispara. Editar fluxo é a chave
+`fluxos` (por time), gateada como toda chave de config.
+
+**Achado de suíte**: os documentos de config globais (exportador, conectores)
+são reescritos inteiros por vários specs em paralelo — o spec novo escreve
+read-modify-write só dos próprios ids para não apagar destino de ninguém. A
+fragilidade é da suíte inteira e fica anotada.
+
+**E+F ficam para rodada própria, de propósito**: E exige matar a rota do §356
+sem o E2E dele mudar, e F exige resultado idêntico item a item — as duas provas
+pedem cuidado que não se compra às pressas no fim de uma noite. A SPEC diz o
+corte: A+B pagam a SPEC, C+D entregam o pedido visual.

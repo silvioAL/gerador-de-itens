@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { entrar } from "./auth";
-import { CHAVE_GATEWAY_FALSO } from "@gerador/gateway-falso";
+import { BASE_URL_GATEWAY_FALSO, CHAVE_GATEWAY_FALSO, MODELO_GATEWAY_FALSO } from "@gerador/gateway-falso";
 
 const API = "http://localhost:4100";
 const GATEWAY_FALSO = "http://localhost:4123";
@@ -145,9 +145,13 @@ test("fatia D: o exemplo do JMeter roda pela tela, com rastro por nó", async ({
         saida: [{ chave: "linkExterno", rotulo: "Link", tipo: "texto", caminho: "$.linkExterno", obrigatorio: true }],
       },
     ]);
-    // O agente roda de verdade: a credencial aponta para o dublê.
+    // O agente roda de verdade: a credencial aponta para o dublê. A credencial
+    // é UMA por organização e vários specs a gravam em paralelo — a convenção
+    // da suíte (ver ia-hospedada.spec.ts:260) é TODO save gravar a MESMA:
+    // mesmo modelo, com visão. Gravar outra derruba o botão de anexar de quem
+    // roda junto (flake real, e eu o causei uma vez).
     await page.request.put(`${API}/ia/credencial`, {
-      data: { baseUrl: `${GATEWAY_FALSO}/v1`, chave: CHAVE_GATEWAY_FALSO, modelo: "gateway-falso" },
+      data: { baseUrl: BASE_URL_GATEWAY_FALSO, chave: CHAVE_GATEWAY_FALSO, modelo: MODELO_GATEWAY_FALSO, visao: true },
     });
     await page.request.put(`${API}/config/fluxos`, {
       data: {
