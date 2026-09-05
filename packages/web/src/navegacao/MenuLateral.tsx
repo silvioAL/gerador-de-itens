@@ -47,6 +47,9 @@ export interface MenuLateralProps {
   /** SPEC-59 — como a FERRAMENTA está montada. Não é da demanda, então não
    * entra no grupo dela: é o mapa do que as telas de configuração configuram. */
   onSistema: () => void;
+  /** SPEC-105 fatia C — o encanamento da ferramenta como grafo. Vive ao lado
+   * do mapa do sistema porque os dois falam DA ferramenta, não da demanda. */
+  onFluxos: () => void;
   onSair: () => void;
 }
 
@@ -107,6 +110,7 @@ export function MenuLateral({
   onAbrirQuebras,
   onDocumento,
   onSistema,
+  onFluxos,
   onSair,
 }: MenuLateralProps) {
   // §273 — fechado por padrão: trocar de time é raro, e a lista aberta o tempo
@@ -163,6 +167,9 @@ export function MenuLateral({
         <p style={tituloGrupoEstilo}>A ferramenta</p>
         <button onClick={acao(onSistema)} style={itemEstilo} data-testid="menu-sistema">
           Como está montada
+        </button>
+        <button onClick={acao(onFluxos)} style={itemEstilo} data-testid="menu-fluxos">
+          Fluxos de integração
         </button>
 
         {/* §198 — "cenários" e "demonstração & tour" viraram dois botões

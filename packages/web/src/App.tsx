@@ -82,6 +82,7 @@ import { idDaRegraDeForma } from "./config/FormaDoDesenho";
 import { ConfigurarPanel } from "./assistente/ConfigurarPanel";
 import { JourneyModal, type AbaJornada } from "./demo/JourneyModal";
 import { contextoDoProdutoEmTexto, montarMapaDoSistema, type ExecucaoDoPapel } from "@gerador/aplicacao";
+import { FluxoScreen } from "./fluxo/FluxoScreen";
 import { ConfigScreen, type AbaConfig } from "./config/ConfigScreen";
 import { TourOverlay } from "./demo/TourOverlay";
 import { useTour, passosDeConfiguracao } from "./demo/useTour";
@@ -525,6 +526,7 @@ function AppCarregado({
   const mostrarDocumento = rota.tela === "documento";
   const mostrarSistema = rota.tela === "sistema";
   const mostrarEnsaios = rota.tela === "ensaios";
+  const mostrarFluxos = rota.tela === "fluxo";
   // SPEC-41 Parte B — os itens materializados da quebra aberta. A fonte de
   // verdade é o server (persistem por quebra); o estado local é o espelho da
   // última geração/carga desta sessão.
@@ -1607,6 +1609,7 @@ function AppCarregado({
         }}
         onDocumento={() => navegar({ tela: "documento" })}
         onSistema={() => navegar({ tela: "sistema" })}
+        onFluxos={() => navegar({ tela: "fluxo" })}
         onSair={() => void onSair()}
       />
 
@@ -1960,6 +1963,10 @@ function AppCarregado({
           onDerivar={derivarMesmoAssim}
           onVoltar={() => setAvisosPendentes(false)}
         />
+      )}
+
+      {mostrarFluxos && (
+        <FluxoScreen timeAtivo={quebra.time ?? timeAtivo} onFechar={() => navegar({ tela: "canvas" })} />
       )}
 
       {mostrarSistema && (

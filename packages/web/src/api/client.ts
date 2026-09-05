@@ -1601,6 +1601,33 @@ export interface ConectorDoCatalogo extends Omit<ConectorDaAplicacao, "cabecalho
   temCabecalhos: boolean;
 }
 
+/**
+ * SPEC-105 fatias C/D — os fluxos (chave POR TIME, ao contrário de
+ * `conectores`) e a execução. Tipos direto da aplicação, mesma cicatriz §263.
+ */
+export type { ArestaDoFluxo, ConfigFluxos, Fluxo, NoDoFluxo } from "@gerador/aplicacao";
+import type { ConfigFluxos } from "@gerador/aplicacao";
+
+export const apiFluxos = configDe<ConfigFluxos>("fluxos");
+
+export interface RastroDoNoExecutado {
+  noId: string;
+  tipo: "conector" | "agente";
+  refId: string;
+  estado: "sucesso" | "falhou" | "nao-executado";
+  erro?: string;
+  duracaoMs: number;
+}
+
+export const apiExecucaoDeFluxo = {
+  /** O executor é do SERVIDOR (§7): daqui só vai o disparo e o time. */
+  executar: (id: string, timeId?: string) =>
+    requisitar<{ fluxo: string; hash: string; nos: RastroDoNoExecutado[]; saidas: Record<string, Record<string, unknown>> }>(
+      `/fluxos/${encodeURIComponent(id)}/executar`,
+      { method: "POST", body: JSON.stringify(timeId ? { timeId } : {}) }
+    ),
+};
+
 export const apiCatalogoDeConectores = {
   /** O catálogo resolvido pelo servidor: declarados + derivados dos destinos. */
   listar: () => requisitar<{ conectores: ConectorDoCatalogo[] }>("/conectores"),

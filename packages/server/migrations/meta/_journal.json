@@ -302,6 +302,13 @@
       "when": 1754500000028,
       "tag": "0042_variantes",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1754500000029,
+      "tag": "0043_rastro_do_fluxo",
+      "breakpoints": true
     }
   ]
 }

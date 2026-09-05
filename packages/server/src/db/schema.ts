@@ -618,3 +618,30 @@ export const produtoTime = pgTable("produto_time", {
     .notNull()
     .references(() => times.id, { onDelete: "cascade" }),
 });
+
+/**
+ * SPEC-105 fatia D (migração 0043) — **o rastro de execução do fluxo, por nó.**
+ *
+ * Sem isto, um fluxo de sete nós que falha no terceiro é indiagnosticável
+ * (§9.3). Cada linha é UMA execução; `nos` guarda o rastro por nó (estado,
+ * erro, duração) — **não** guarda a saída dos nós: a resposta de um conector
+ * pode carregar dado de negócio do outro lado, e o rastro é diagnóstico, não
+ * armazém.
+ *
+ * `hash` é a impressão digital do fluxo que rodou (§9.5): fluxo editado depois
+ * de gerar coisas tornaria todo rastro anterior ambíguo — e ambiguidade de
+ * rastro é o que o §312 corrigiu no `atualizadoEm`. Custa uma coluna.
+ *
+ * `fluxo_id`/`time_id` são texto solto, não FK: o fluxo mora num documento
+ * jsonb de `config_documentos`, e o rastro precisa sobreviver ao fluxo que
+ * for apagado — apagar a fiação não apaga o fato de que ela rodou.
+ */
+export const fluxoExecucoes = pgTable("fluxo_execucoes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  fluxoId: text("fluxo_id").notNull(),
+  timeId: text("time_id").notNull(),
+  hash: text("hash").notNull(),
+  email: text("email"),
+  em: timestamp("em", { withTimezone: true }).notNull().defaultNow(),
+  nos: jsonb("nos").notNull(),
+});

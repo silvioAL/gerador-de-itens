@@ -1,17 +1,10 @@
 import type { FastifyInstance } from "fastify";
-import {
-  conectoresEmVigor,
-  criarCasosDeUsoDeConfig,
-  EntradaDoConectorInvalida,
-  normalizarExportador,
-  type ConectorEmVigor,
-} from "@gerador/aplicacao";
+import { EntradaDoConectorInvalida } from "@gerador/aplicacao";
 import type { OpcoesApp } from "../app.js";
-import { criarRepositorioDeConfigEmPostgres } from "../adaptadores/configEmPostgres.js";
 import { executarConector, FalhaDoConector } from "../adaptadores/executorDeConector.js";
 import { exigirNivel } from "../auth/niveis.js";
 import { registrarAuditoria } from "../auditoria.js";
-import { templateDaVersao } from "../config/templateDaVersao.js";
+import { catalogoDeConectores } from "../config/catalogoDeConectores.js";
 
 /**
  * SPEC-105 fatias A/B — o catálogo em vigor e o executor de um passo.
@@ -28,15 +21,7 @@ import { templateDaVersao } from "../config/templateDaVersao.js";
  * - `POST /conectores/:id/executar` — o passo único da fatia B.
  */
 export async function registrarRotasConectores(app: FastifyInstance, { db, diretorioConfig }: OpcoesApp) {
-  const casos = criarCasosDeUsoDeConfig(criarRepositorioDeConfigEmPostgres(db));
-
-  async function catalogoEmVigor(): Promise<ConectorEmVigor[]> {
-    const [exportador, conectores] = await Promise.all([
-      casos.obter("exportador", await templateDaVersao("exportador", diretorioConfig)),
-      casos.obter("conectores", await templateDaVersao("conectores", diretorioConfig)),
-    ]);
-    return conectoresEmVigor(normalizarExportador(exportador.documento), conectores.documento);
-  }
+  const catalogoEmVigor = () => catalogoDeConectores(db, diretorioConfig);
 
   // Leitura aberta, como `GET /config/:chave`: o catálogo é vocabulário. O que
   // NÃO sai é o segredo — cada conector vai sem `cabecalhos`, só com o aviso

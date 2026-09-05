@@ -131,6 +131,14 @@ export function resumirConfig(chave: ChaveConfig, documento: unknown): ResumoCon
           ? (documento as { conectores: unknown[] }).conectores.length
           : 0,
       };
+    /** SPEC-105 fatia C — template vazio, como os vizinhos: não ter fluxo é
+     * escolha, não atraso. */
+    case "fluxos":
+      return {
+        fluxos: Array.isArray((documento as { fluxos?: unknown[] })?.fluxos)
+          ? (documento as { fluxos: unknown[] }).fluxos.length
+          : 0,
+      };
   }
 }
 
@@ -210,6 +218,7 @@ const NOME_AMIGAVEL: Record<string, string> = {
   destino: "destino de exportação",
   conexoes: "regra de conexão sobrescrita",
   conectores: "conector cadastrado",
+  fluxos: "fluxo desenhado",
 };
 
 /**

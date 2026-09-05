@@ -46,6 +46,16 @@ describe("toda chave de config sobrevive à normalização", () => {
         },
       ],
     },
+    fluxos: {
+      fluxos: [
+        {
+          id: "jmx",
+          nome: "JMX a partir da volumetria",
+          nos: [{ id: "v", tipo: "conector", refId: "volumetria", posicao: { x: 0, y: 0 }, parametros: {} }],
+          arestas: [],
+        },
+      ],
+    },
   };
 
   it.each([...CHAVES_CONFIG])("`%s` não vira undefined ao ser normalizada", (chave) => {

@@ -48,6 +48,8 @@ const DEFAULTS_COMPILADOS: Record<ChaveConfig, unknown> = {
    * ninguém.
    */
   conectores: { conectores: [] },
+  /** SPEC-105 fatia C — fluxo se desenha, não se herda de template. */
+  fluxos: { fluxos: [] },
 };
 
 export async function templateDaVersao(chave: ChaveConfig, diretorioConfig: string): Promise<unknown> {
