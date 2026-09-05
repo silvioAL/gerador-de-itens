@@ -126,7 +126,12 @@ capacidade passa por ele, e só então a peça antiga morre.
 | **Botão "Publicar"** do documento | atalho que dispara a fiação semeada `mesa.markdown → conector(documento)` | E2E de publicação passa SEM a rota dedicada | `POST /quebras/:id/documento/publicar` + seu bloco em `quebras.ts` |
 | **Exportar prontos** (seção de itens) | atalho da fiação `mesa.itens → conector(itens)` | E2E de exportação passa pela fiação | `POST /quebras/:id/itens/exportar` + `exportadorViaAgente.ts` (o "forasteiro" da medição §0) |
 | **Importar ADR / documento por link** (conversa) | fiações `conector(adr) → mesa` e `conector(documentoExterno) → agente → mesa(destino)` — confirmação humana FICA | E2E do §356 e do ADR passam sem as rotas dedicadas | `POST /ia/documento-externo`, `POST /quebras/:id/adr/importar`, e os adaptadores de `gatewayDoTime.ts` (o executor genérico de conector os cobre) |
-| **Revisão/esteira** (`useEsteiraDeAgentes`, client) | o fluxo semeado da esteira com `mesa.itens` como fonte, executado no servidor | **resultado idêntico item a item** (SPEC-105 F — a prova mais dura) | o motor de orquestração client-side (`acumuladas`, lotes) |
+| **Revisão/esteira** (`useEsteiraDeAgentes` + a TELA de revisão) | o fluxo semeado com `mesa.itens` como fonte, executado no servidor — e **a execução AO VIVO no canvas**: o nó do agente pulsa enquanto roda, a aresta anima carregando o dado, o texto streama no painel do nó ("quero aquelas animações" — o vivo da revisão é UX conquistada, não se perde) | **resultado idêntico item a item** (SPEC-105 F) E o vivo equivalente: quem assiste à fiação rodando vê o MESMO acontecendo que via na revisão | o motor de orquestração client-side (`acumuladas`, lotes) e a tela de revisão como superfície própria |
+
+> Sobre a revisão: o que unifica no canvas é a **execução** (o grafo vivo). A
+> **confirmação campo a campo** (SPEC-35: cada sugestão pendente até a pessoa
+> aceitar) é outra natureza — julgamento, não fiação — e o lugar dela é
+> pergunta aberta (§5.5): no stage do nó, ou na demanda como hoje.
 | **`ENVELOPE_PADRAO`/`OPERACOES_DO_GATEWAY` como gargalo** | contratos no catálogo (105 A, feito) + peças por registro | já provado (§362) | crescimento da lista fechada como pré-requisito de integração |
 
 **O que NÃO substitui, por decisão:** a mesa de projeto (o desenho da demanda
@@ -149,7 +154,10 @@ prova item a item).
 - **C — a UX da mesa no fluxo**: `NodeCard` + `DiagramaConfig` próprio gerado
   do catálogo — *"a UX deve ser incrível como a da mesa"* é critério de
   aceite, não enfeite: cartões, cores por família (peça/conector/agente/mesa),
-  ícones e o mesmo cuidado de tema.
+  ícones e o mesmo cuidado de tema. **Inclui a execução AO VIVO**: nó pulsando
+  enquanto roda, aresta animada, texto streamando no painel — as animações da
+  revisão, portadas para o canvas (streaming por nó via a mesma técnica do
+  `executarPedido`).
 - **D — o tipo de dado `documento`** no contrato e preview no rastro.
 - **E — validação de compatibilidade de mapeamento** por tipo (aviso primeiro).
 
@@ -163,3 +171,5 @@ prova item a item).
    `pausarDepois`)?
 4. **Motor no fluxo: (a) ou (b) da §2.1?** É a decisão que define se a tese do
    §6 fica ou é reescrita.
+5. **A confirmação campo a campo da revisão mora onde**, quando a execução
+   unificar no canvas — no stage do nó, ou na demanda como hoje?
