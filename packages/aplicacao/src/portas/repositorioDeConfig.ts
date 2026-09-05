@@ -58,7 +58,13 @@ export { CAMPO_GLOBAL };
  * entram no catálogo em vigor por derivação (`conectoresDeFabrica`), nunca por
  * cópia — copiar congelaria o catálogo, mesma razão de `conexoes` não semear.
  */
-export const CHAVES_CONFIG = ["regras", "pipeline-agentes", "exportador", "tokens", "conexoes", "conectores"] as const;
+/**
+ * SPEC-105 fatia C — `fluxos`: a fiação (nós, arestas, mapeamento). É **DO
+ * TIME**, ao contrário de `conectores`: dois times podem enriquecer de formas
+ * diferentes sem ambiguidade, porque fluxo não deriva (§6). O `timeId` aqui é
+ * o time de verdade, como em `pipeline-agentes`.
+ */
+export const CHAVES_CONFIG = ["regras", "pipeline-agentes", "exportador", "tokens", "conexoes", "conectores", "fluxos"] as const;
 
 export type ChaveConfig = (typeof CHAVES_CONFIG)[number];
 

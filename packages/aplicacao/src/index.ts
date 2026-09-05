@@ -172,6 +172,26 @@ export {
   type TipoDeCampoDoConector,
 } from "./config/conectores.js";
 export { analisarCaminho, lerCaminho } from "./config/caminho.js";
+/** SPEC-105 fatias C/D — o fluxo como grafo, e a execução pura. */
+export {
+  TIPOS_DE_NO_DO_FLUXO,
+  mensagemDeCiclo,
+  normalizarFluxos,
+  planoDoFluxo,
+  validarEscritaFluxos,
+  type ArestaDoFluxo,
+  type ConfigFluxos,
+  type Fluxo,
+  type NoDoFluxo,
+  type TipoDeNoDoFluxo,
+} from "./config/fluxos.js";
+export {
+  executarFluxo,
+  type EstadoDoNo,
+  type ExecutoresDoFluxo,
+  type RastroDoNo,
+  type ResultadoDoFluxo,
+} from "./casos-de-uso/fluxos.js";
 export {
   EntradaDoConectorInvalida,
   montarChamadaDoConector,
