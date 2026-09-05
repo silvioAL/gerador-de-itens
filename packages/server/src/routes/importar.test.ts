@@ -91,55 +91,6 @@ function chamar(url: string) {
   return app.inject({ method: "POST", url, cookies: { gerador_sessao: sessao } });
 }
 
-describe("POST /produtos/:id/arquitetura/importar (SPEC-81 fatia F)", () => {
-  it("sem destino configurado, a resposta DIZ onde configurar", async () => {
-    const r = await chamar(`/produtos/${produtoId}/arquitetura/importar`);
-
-    expect(r.statusCode).toBe(409);
-    expect(r.json().erro).toMatch(/Outros destinos/);
-  });
-
-  it("devolve a proposta e NÃO grava no produto", async () => {
-    /**
-     * A régua da fatia. `Produto` não tem onde guardar proveniência, e escrever
-     * aqui faria texto de terceiro ficar indistinguível do que alguém desta casa
-     * digitou.
-     */
-    await configurarDestino("arquiteturaDeNegocio");
-    fetchFalso.mockResolvedValue(resposta({ objetivo: "Vender no atacado" }));
-
-    const r = await chamar(`/produtos/${produtoId}/arquitetura/importar`);
-
-    expect(r.statusCode).toBe(200);
-    expect(r.json().campos).toEqual([
-      { campo: "objetivo", atual: "", proposto: "Vender no atacado", situacao: "novo" },
-    ]);
-    // O produto continua como estava: a rota lê e compara, quem escreve é o PUT.
-    const [depois] = await db.select().from(produtos);
-    expect(depois.objetivo).toBe("");
-  });
-
-  it("gateway sem nada a dizer devolve proposta VAZIA, não erro", async () => {
-    // Nem 500 nem 404: o gateway respondeu e não tinha nada. A tela diz isso, e
-    // ninguém vai procurar defeito onde não há.
-    await configurarDestino("arquiteturaDeNegocio");
-    fetchFalso.mockResolvedValue(resposta({ versao: 3 }));
-
-    const r = await chamar(`/produtos/${produtoId}/arquitetura/importar`);
-
-    expect(r.statusCode).toBe(200);
-    expect(r.json()).toMatchObject({ campos: [], termosNovos: [] });
-  });
-
-  it("e diz de ONDE veio — a origem é parte da proposta", async () => {
-    await configurarDestino("arquiteturaDeNegocio");
-    fetchFalso.mockResolvedValue(resposta({ objetivo: "x" }));
-
-    expect((await chamar(`/produtos/${produtoId}/arquitetura/importar`)).json().origem).toBe(
-      "Gateway de arquiteturaDeNegocio"
-    );
-  });
-});
 
 describe("POST /quebras/:id/adr/importar (SPEC-81 fatia C)", () => {
   it("traz os ADRs já marcados como importados", async () => {

@@ -145,20 +145,6 @@ export const DOCUMENTO_DO_GATEWAY_FALSO = {
   atualizadoEm: "2026-08-20T10:00:00.000Z",
 };
 
-/** §355 — a arquitetura de negócio da casa (SPEC-81 fatia F). Uma seção
- * ausente (`restricoes`) de propósito: a tela precisa ter o que marcar como
- * lacuna em vez de receber tudo preenchido e nunca exercitar esse caminho. */
-export const ARQUITETURA_DO_GATEWAY_FALSO = {
-  objetivo: "Aprovar crédito para vendas parceladas no e-commerce",
-  quemUsa: "Analistas de crédito e o próprio checkout, sem gente no meio",
-  regrasDeNegocio: "Proposta acima de R$ 5.000 exige análise manual",
-  sistemas: "Checkout, bureau de crédito nacional, esteira de aprovação",
-  glossario: [
-    { termo: "Proposta", definicao: "o pedido de crédito de um cliente para uma compra" },
-    { termo: "Bureau", definicao: "o parceiro externo que devolve o score" },
-  ],
-};
-
 /** As páginas já publicadas, por `demandaId`. Existe para o dublê provar a
  * IDEMPOTÊNCIA que o contrato promete: publicar duas vezes atualiza no lugar e
  * devolve `atualizada: true`, em vez de criar uma segunda página. */
@@ -415,18 +401,6 @@ export function criarGatewayFalso(opcoes: OpcoesGatewayFalso = {}): Server {
         depoisDaLatencia(() => {
           res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
           res.end(JSON.stringify({ ...DOCUMENTO_DO_GATEWAY_FALSO, link: link ?? "" }));
-        });
-      });
-      return;
-    }
-
-    // SPEC-81 fatia F — a arquitetura de negócio da casa.
-    if (req.url?.endsWith("/arquitetura") && req.method === "POST") {
-      req.resume();
-      req.on("end", () => {
-        depoisDaLatencia(() => {
-          res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
-          res.end(JSON.stringify(ARQUITETURA_DO_GATEWAY_FALSO));
         });
       });
       return;

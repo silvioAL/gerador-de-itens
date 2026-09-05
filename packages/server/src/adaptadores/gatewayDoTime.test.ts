@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import type { DestinoResolvido } from "@gerador/aplicacao";
 import {
   criarLeitorDeAdrViaGateway,
-  criarLeitorDeArquiteturaViaGateway,
   criarLeitorDeDocumentoViaGateway,
   criarPublicadorDeDocumentoViaGateway,
 } from "./gatewayDoTime.js";
@@ -187,67 +186,7 @@ describe("publicar o documento pelo gateway (SPEC-81 fatia B)", () => {
   });
 });
 
-const DESTINO_ARQ: DestinoResolvido = {
-  id: "arq",
-  operacao: "arquiteturaDeNegocio",
-  endpoint: "https://gw.casa/arquitetura",
-  rotulo: "Arquitetura de negócio",
-  cabecalhos: {},
-  metodo: "POST" as const,
-  envelope: "",
-  espaco: "",
-};
 
-describe("ler a arquitetura de negócio (SPEC-81 fatia F)", () => {
-  it("traz os campos de prosa e o glossário", async () => {
-    const fetchFalso = vi.fn().mockResolvedValue(
-      respostaJson({
-        objetivo: "Vender no atacado",
-        sistemas: "ERP e bureau",
-        glossario: [{ termo: "Bureau", definicao: "quem responde pelo score" }],
-      })
-    );
-
-    const lida = await criarLeitorDeArquiteturaViaGateway(DESTINO_ARQ, fetchFalso).ler();
-
-    expect(lida?.objetivo).toBe("Vender no atacado");
-    expect(lida?.sistemas).toBe("ERP e bureau");
-    expect(lida?.glossario).toEqual([{ termo: "Bureau", definicao: "quem responde pelo score" }]);
-    // Campo que a casa não tem fica ausente, não vira string vazia — vazio
-    // viraria uma proposta de apagar o que já está escrito aqui.
-    expect(lida?.objetivo && lida.quemUsa).toBeUndefined();
-  });
-
-  it("termo sem definição não é termo de glossário", async () => {
-    // O glossário existe para dizer o que a palavra significa AQUI. Uma palavra
-    // solta não faz esse trabalho, e importá-la encheria a lista de nada.
-    const fetchFalso = vi.fn().mockResolvedValue(
-      respostaJson({ glossario: [{ termo: "SKU" }, { definicao: "sem termo" }, { termo: "Bureau", definicao: "ok" }] })
-    );
-
-    expect((await criarLeitorDeArquiteturaViaGateway(DESTINO_ARQ, fetchFalso).ler())?.glossario).toEqual([
-      { termo: "Bureau", definicao: "ok" },
-    ]);
-  });
-
-  it("resposta 200 SEM nada aproveitável é o mesmo que não ter respondido", async () => {
-    /**
-     * Devolver `{}` faria a tela abrir uma proposta vazia — que é pior que dizer
-     * "não achei nada", porque a pessoa gasta a atenção antes de descobrir.
-     */
-    const vazio = vi.fn().mockResolvedValue(respostaJson({ versao: 3 }));
-
-    expect(await criarLeitorDeArquiteturaViaGateway(DESTINO_ARQ, vazio).ler()).toBeUndefined();
-  });
-
-  it("gateway fora do ar degrada — ninguém fica impedido de escrever à mão", async () => {
-    const rede = vi.fn().mockRejectedValue(new Error("ECONNREFUSED"));
-    const http500 = vi.fn().mockResolvedValue(respostaJson({}, false, 500));
-
-    expect(await criarLeitorDeArquiteturaViaGateway(DESTINO_ARQ, rede).ler()).toBeUndefined();
-    expect(await criarLeitorDeArquiteturaViaGateway(DESTINO_ARQ, http500).ler()).toBeUndefined();
-  });
-});
 
 /**
  * §348 — **a chamada honra o que o destino declara.**

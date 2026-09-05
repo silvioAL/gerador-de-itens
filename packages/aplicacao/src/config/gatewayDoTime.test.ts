@@ -59,7 +59,6 @@ describe("os destinos do gateway (SPEC-81 fatia A)", () => {
     expect(destinosDaOperacao(config, "itens")[0].endpoint).toBe("https://gw.casa/jira");
     // Operação sem destino configurado devolve lista vazia — e é assim que a
     // tela sabe não oferecer o botão, em vez de oferecer um que falharia.
-    expect(destinosDaOperacao(config, "arquiteturaDeNegocio")).toEqual([]);
   });
 
   it("cabeçalhos ausentes no destino HERDAM os compartilhados", () => {
@@ -150,7 +149,6 @@ describe("os destinos do gateway (SPEC-81 fatia A)", () => {
       "itens",
       "documento",
       "adr",
-      "arquiteturaDeNegocio",
       "documentoExterno",
     ]);
   });

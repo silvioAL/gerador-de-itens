@@ -15951,3 +15951,62 @@ Atualizei só o comentário que dizia *"a SPEC-97 ainda não foi escrita"*. O
 `oQueFalta` visível não mudou: **escrever a spec não constrói a capacidade**.
 Trocar a cor porque o documento nasceu seria a página envelhecendo mentindo — o
 defeito que a régua da SPEC-76 existe para impedir.
+
+---
+
+## §358 — A arquitetura importada sai (SPEC-104)
+
+O usuário abriu a tela pela primeira vez, com o dublê do §355 respondendo, e
+reagiu: *"aqui ficou muito estranho, eu clico nos botões e não aparece nada"*,
+*"casa? que casa? o que isso significa?"* e, ao ser perguntado como consertar:
+**"não vi sentido na feature como está"**.
+
+### Por que não consertei
+
+Três defeitos reais, achados em um minuto de uso:
+
+1. **A escrita era invisível.** O painel em `ProdutosTab.tsx:429`; os campos que
+   ele preenche em `:289` — 140 linhas acima, fora da tela. O único retorno era o
+   rótulo virar `aceito`, que é **estado** e parecia botão morto.
+2. **Dois botões idênticos com semânticas diferentes.** Campo preenchia o
+   rascunho; termo do glossário **gravava no servidor na hora**. Um reversível,
+   outro não, e nada dizia qual.
+3. **"Casa" é jargão nosso** que vazou para 17 lugares visíveis.
+
+**Nada disso é coincidência: a tela não tinha E2E.** Terceira vez na semana com a
+mesma forma — o `tokens` (§354), o §349 inteiro (§356) e agora esta. Construído,
+testado isolado, nunca exercitado.
+
+### O achado que mudou a pergunta
+
+**Já existiam duas outras formas de preencher os mesmos campos**, e o alvo
+`contexto-do-produto` do assistente (§274) tem **schema idêntico**. Pior: o
+terceiro caminho **nasceu depois** — quando o §356 ligou a leitura por link,
+criou um caminho estritamente mais geral para o mesmo destino, e ninguém percebeu
+que isso tornava a fatia F redundante.
+
+E o contrato era o mais caro dos cinco: `/adr` devolve decisões e
+`/documento-externo` devolve texto — formas que qualquer sistema tem. Este exigia
+um JSON com a forma interna do nosso `Produto`, **para uma operação de uso único
+por produto**, enquanto as outras quatro se pagam por demanda.
+
+> O usuário fechou em uma linha: *"para contexto de produto existe confluence"*.
+> O contexto já mora onde o §356 sabe ler.
+
+**Removido:** porta, painel, adaptador, rota, fiação, a operação da lista FECHADA
+`OPERACOES_DO_GATEWAY`, o endpoint do dublê (que eu tinha acrescentado no §355) e
+os testes. ~320 linhas de código próprio, mais o que estava espalhado.
+
+### O descarte silencioso, registrado
+
+Um destino já cadastrado com `operacao: "arquiteturaDeNegocio"` **some sozinho**:
+`normalizarExportador` filtra pela lista fechada, então a linha deixa de ser lida
+e o próximo PUT a apaga de vez. É o comportamento certo para lista fechada —
+mesma disciplina de `ehChaveConfig` recusando chave órfã —, mas é descarte
+silencioso, e ficou dito em vez de descoberto.
+
+### O que NÃO saiu, e continua devendo
+
+**"Casa" ainda está em ~14 lugares visíveis** (a remoção levou 3 junto). A
+pergunta *"que casa?"* veio de quem usa o produto, e vale independente desta
+feature. É rodada própria, anotada na SPEC-104 §4 fatia B.

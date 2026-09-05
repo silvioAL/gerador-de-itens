@@ -293,14 +293,6 @@ describe("as cinco operações do gateway do time", () => {
     expect(corpo.titulo).toBeTruthy();
   });
 
-  it("arquitetura: traz as seções da casa, com uma AUSENTE de propósito", async () => {
-    // `restricoes` não vem: a tela precisa ter o que marcar como lacuna, e um
-    // dublê que preenche tudo nunca exercita esse caminho.
-    const { corpo } = await postar("/v1/arquitetura", {});
-    expect(corpo.objetivo).toBeTruthy();
-    expect(corpo.glossario).toBeTruthy();
-    expect(corpo.restricoes).toBeUndefined();
-  });
 
   it("adr: continua como estava — a operação que já existia não muda", async () => {
     const { corpo } = await postar("/v1/adr", {});
