@@ -53,17 +53,6 @@ export {
 /** §349 — ler um documento da casa por LINK, para virar desenho (SPEC-100 §4). */
 export type { LeitorDeDocumento, DocumentoExterno } from "./portas/leitorDeDocumento.js";
 
-/** SPEC-81 fatia F — a arquitetura de negócio da casa vira PROPOSTA. */
-export {
-  CAMPOS_DA_ARQUITETURA,
-  decisoesNaProposta,
-  propostaDeArquitetura,
-  type ArquiteturaDeNegocioExterna,
-  type CampoDaArquitetura,
-  type CampoProposto,
-  type LeitorDeArquiteturaDeNegocio,
-  type PropostaDeArquitetura,
-} from "./portas/leitorDeArquiteturaDeNegocio.js";
 
 /** SPEC-81 fatia E — a decisão daqui volta para o repositório da casa. */
 export { decisoesQuePodemVoltar, type AdrParaPublicar, type EscritorDeAdr } from "./portas/escritorDeAdr.js";

@@ -69,7 +69,7 @@ describe("os destinos do gateway na tela (SPEC-81 fatia A)", () => {
     render(<ExportacaoTab />);
     await waitFor(() => expect(screen.getByTestId("destinos-do-gateway")).toBeInTheDocument());
 
-    for (const [i, op] of [["1", "documento"], ["2", "adr"], ["3", "arquiteturaDeNegocio"]] as const) {
+    for (const [i, op] of [["1", "documento"], ["2", "adr"], ["3", "documentoExterno"]] as const) {
       fireEvent.click(screen.getByTestId("adicionar-destino"));
       fireEvent.change(screen.getByLabelText(`Operação do destino ${i}`), { target: { value: op } });
       fireEvent.change(screen.getByLabelText(`Endereço do destino ${i}`), { target: { value: `https://gw/${op}` } });
@@ -78,7 +78,7 @@ describe("os destinos do gateway na tela (SPEC-81 fatia A)", () => {
 
     await waitFor(() => expect(apiExportador.salvar).toHaveBeenCalled());
     const destinos = vi.mocked(apiExportador.salvar).mock.calls[0][0].destinos ?? [];
-    expect(destinos.map((d) => d.operacao)).toEqual(["documento", "adr", "arquiteturaDeNegocio"]);
+    expect(destinos.map((d) => d.operacao)).toEqual(["documento", "adr", "documentoExterno"]);
   });
 
   it("dois destinos da MESMA operação são legítimos", async () => {

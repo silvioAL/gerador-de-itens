@@ -180,7 +180,7 @@ function Destinos({
       <strong style={{ fontSize: 13, color: "var(--texto)" }}>Outros destinos</strong>
       <p style={{ ...proseEstilo, marginTop: 6 }}>
         O mesmo desenho serve para o resto: publicar o <strong>documento</strong> numa base de conhecimento, ler os{" "}
-        <strong>ADRs</strong> da casa e trazer a <strong>arquitetura de negócio</strong>. Cada um é um endereço, e podem
+        <strong>ADRs</strong> e ler um <strong>documento por link</strong>. Cada um é um endereço, e podem
         ser gateways diferentes — um na frente do MCP do Jira, outro do Confluence, outro dos agentes.
       </p>
       <p style={{ fontSize: 11, color: "var(--texto-mudo)", margin: "0 0 8px" }}>
@@ -303,7 +303,6 @@ const ROTULO_DA_OPERACAO: Record<OperacaoDoGateway, string> = {
    *  "Confluence": o produto é agnóstico de ferramenta (SPEC-100). */
   documentoExterno: "Documento da casa → ler por link",
   adr: "ADRs da casa → ler",
-  arquiteturaDeNegocio: "Arquitetura de negócio → ler",
 };
 
 const proseEstilo: React.CSSProperties = {

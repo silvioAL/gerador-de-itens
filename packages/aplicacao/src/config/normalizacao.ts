@@ -166,13 +166,12 @@ export const OPERACOES_DO_GATEWAY = [
   "itens",
   "documento",
   "adr",
-  "arquiteturaDeNegocio",
   /**
    * §349 — **ler um documento da casa, por link.**
    *
-   * Diferente de `documento`, que ESCREVE: esta busca. E diferente de `adr` e
-   * `arquiteturaDeNegocio`, que trazem tipos de coisa de um lugar que o gateway
-   * conhece — aqui **quem escolhe o alvo é a pessoa**, mandando o endereço.
+   * Diferente de `documento`, que ESCREVE: esta busca. E diferente de `adr`,
+   * que traz um TIPO de coisa de um lugar que o gateway conhece — aqui **quem
+   * escolhe o alvo é a pessoa**, mandando o endereço.
    */
   "documentoExterno",
 ] as const;
@@ -250,7 +249,7 @@ export interface DestinoDoGateway {
  * §346 — os verbos que fazem sentido para as operações que existem.
  *
  * `GET` fica de fora **mesmo nas operações de leitura** (`adr`,
- * `arquiteturaDeNegocio`): o produto manda um corpo com o que está pedindo — o
+ * `documentoExterno`): o produto manda um corpo com o que está pedindo — o
  * link da página, o filtro — e corpo em `GET` é terreno onde proxies e
  * bibliotecas discordam entre si. Quem lê, lê por `POST`, como já faz hoje.
  */
@@ -360,7 +359,6 @@ export const ENVELOPE_PADRAO: Record<OperacaoDoGateway, string> = {
   itens: "itens",
   documento: "",
   adr: "",
-  arquiteturaDeNegocio: "",
   /** §349 — leitura, como as outras: o pedido vai cru, com o link dentro. */
   documentoExterno: "",
 };
