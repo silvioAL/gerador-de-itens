@@ -1631,7 +1631,7 @@ function AppCarregado({
           // Regras é a exceção de sempre: uma tela, QUATRO recursos — quem
           // cuida de uma seção só continua entrando sem cadeado.
           if (area === "regras") return Object.values(RECURSO_DA_SECAO_DE_REGRAS).some((r) => permissoes.pode(r));
-          if (area === "pdca" || area === "exportacao") return true;
+          if (area === "pdca") return true;
           const recurso = RECURSO_DA_ABA[area];
           return recurso ? permissoes.pode(recurso) : true;
         }}

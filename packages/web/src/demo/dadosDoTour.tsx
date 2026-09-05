@@ -1,5 +1,5 @@
 import type { Decisao, RegrasConfig, Token } from "@gerador/engine";
-import type { ConfigExportador, Produto } from "../api/client";
+import type { ConectorDoCatalogo, Produto } from "../api/client";
 import type { DiagramaProposto } from "../api/client";
 
 /**
@@ -58,11 +58,33 @@ export const TOKENS_DO_TOUR: Token[] = [
   { nome: "raio.md", valor: "10px", grupo: "raio" },
 ];
 
-export const EXPORTADOR_DO_TOUR: ConfigExportador = {
-  endpoint: "https://agente-do-tracker.exemplo/itens",
-  rotulo: "Jira do time (exemplo)",
-  cabecalhos: {},
-};
+/** SPEC-106 fatia B — o tour mostra o CATÁLOGO (que absorveu a Exportação):
+ * dois endereços de exemplo, um destino do gateway e um conector livre. */
+export const CONECTORES_DO_TOUR: ConectorDoCatalogo[] = [
+  {
+    id: "tracker-exemplo",
+    nome: "Jira do time (exemplo)",
+    descricao: 'Destino "itens" do gateway do time',
+    endpoint: "https://agente-do-tracker.exemplo/itens",
+    metodo: "POST",
+    envelope: "itens",
+    entrada: [{ chave: "itens", rotulo: "Itens da quebra", tipo: "lista", obrigatorio: true }],
+    saida: [],
+    origem: "fabrica",
+    temCabecalhos: true,
+  },
+  {
+    id: "volumetria-exemplo",
+    nome: "Volumetria (exemplo)",
+    endpoint: "https://gateway.exemplo/volumetria",
+    metodo: "POST",
+    envelope: "",
+    entrada: [{ chave: "projetoId", rotulo: "Projeto", tipo: "texto", obrigatorio: true }],
+    saida: [{ chave: "rps", rotulo: "Requisições/s", tipo: "numero", caminho: "$.dados.rps" }],
+    origem: "declarado",
+    temCabecalhos: false,
+  },
+];
 
 /**
  * §245 — o PADRÃO do time, para o tour. Sem isto a dimensão de conformidade

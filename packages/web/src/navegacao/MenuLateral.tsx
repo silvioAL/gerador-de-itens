@@ -73,10 +73,9 @@ const GRUPOS: { titulo: string; itens: { area: AreaConfig; rotulo: string }[] }[
       // não pelo menu, que é como ninguém descobre um recurso.
       { area: "tokens", rotulo: "Design system" },
       { area: "especificacao", rotulo: "Especificação de solução" },
-      { area: "exportacao", rotulo: "Exportação (tracker)" },
-      // SPEC-105 fatia A — vizinho da exportação de propósito: os dois falam
-      // de endereços do gateway, e a aba sem porta no menu é como ninguém
-      // descobre um recurso (a lição da SPEC-79 logo acima).
+      // SPEC-106 fatia B — a Exportação foi ABSORVIDA pelo catálogo: destino
+      // do gateway é conector, e dois itens para "endereço que a empresa
+      // chama" era a duplicação que a SPEC mediu.
       { area: "conectores", rotulo: "Conectores (integrações)" },
     ],
   },

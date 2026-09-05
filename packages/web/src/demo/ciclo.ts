@@ -301,7 +301,9 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
      * fatia C cobra as duas.
      */
     estado: "completo",
-    rota: { tela: "config", area: "exportacao" },
+    // SPEC-106 fatia B — o catálogo de Conectores absorveu a aba Exportação:
+    // os destinos do gateway se cadastram e se editam num lugar só.
+    rota: { tela: "config", area: "conectores" },
   },
   {
     id: "pdca",
