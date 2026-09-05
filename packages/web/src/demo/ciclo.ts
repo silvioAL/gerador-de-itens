@@ -124,7 +124,7 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
     titulo: "Captar o que é perene",
     resumo: "O que o produto é, quem usa, as regras que valem sempre.",
     detalhe:
-      "O contexto do produto não se recola a cada demanda: objetivo, personas, regras de negócio permanentes, sistemas com quem conversa, restrições regulatórias e o glossário da casa. É o material que todo item gerado vai citar, e é o que impede a IA de inventar a razão de ser do que você está construindo. Aqui também mora o volume que o produto atende — o número perene que toda demanda herda.",
+      "O contexto do produto não se recola a cada demanda: objetivo, personas, regras de negócio permanentes, sistemas com quem conversa, restrições regulatórias e o glossário da empresa. É o material que todo item gerado vai citar, e é o que impede a IA de inventar a razão de ser do que você está construindo. Aqui também mora o volume que o produto atende — o número perene que toda demanda herda.",
     estado: "completo",
     rota: { tela: "config", area: "produtos" },
   },
@@ -134,7 +134,7 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
     titulo: "Analisar o contexto técnico",
     resumo: "As stacks, os padrões por componente, os campos de cada tipo — e o design system.",
     detalhe:
-      "Que tecnologias o time usa, que padrão cada tipo de componente precisa seguir, que campos uma fila ou um banco tem que declarar, e quais são os tokens do design system da casa. É a configuração determinística que o motor lê para medir o seu desenho — e é dela que sai toda cobrança que a ferramenta faz. A parte visual entra pela mesma porta das outras: contraste é aritmética, e pertencer ao sistema é conferível. O que não dá para calcular continua sendo checklist de gente.",
+      "Que tecnologias o time usa, que padrão cada tipo de componente precisa seguir, que campos uma fila ou um banco tem que declarar, e quais são os tokens do design system da empresa. É a configuração determinística que o motor lê para medir o seu desenho — e é dela que sai toda cobrança que a ferramenta faz. A parte visual entra pela mesma porta das outras: contraste é aritmética, e pertencer ao sistema é conferível. O que não dá para calcular continua sendo checklist de gente.",
     /**
      * SPEC-79 — deixou de ser `parcial`.
      *
@@ -289,7 +289,7 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
     titulo: "Integrar com as ferramentas do time",
     resumo: "Publicar e consumir por MCP, além do tracker.",
     detalhe:
-      "O caminho é de mão dupla, e por gateways configuráveis — um na frente do issue tracker, outro da base de conhecimento, outro dos ADRs. O item sai para o tracker, o documento é publicado onde a casa documenta, e o que já foi decidido volta: uma ADR entra pela conversa como texto editável, e a arquitetura de negócio da casa chega como proposta campo a campo. O produto não implementa MCP — quem fala MCP é o gateway.",
+      "O caminho é de mão dupla, e por gateways configuráveis — um na frente do issue tracker, outro da base de conhecimento, outro dos ADRs. O item sai para o tracker, o documento é publicado onde a empresa documenta, e o que já foi decidido volta: uma ADR entra pela conversa como texto editável, e a arquitetura de negócio chega como proposta campo a campo. O produto não implementa MCP — quem fala MCP é o gateway.",
     /**
      * SPEC-84 §0.1 — deixou de ser `ausente`, e a marca estava velha havia
      * quatro rodadas: §321 (a tela dos destinos), §324 (ler a arquitetura de

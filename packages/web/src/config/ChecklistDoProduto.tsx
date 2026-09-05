@@ -116,7 +116,7 @@ export function ChecklistDoProduto({ produtoId, timeId }: ChecklistDoProdutoProp
     <div data-testid="checklist-do-produto">
       <label style={labelEstilo}>Checklist deste produto</label>
       <p style={ajudaEstilo}>
-        O checklist do time diz <em>como esta casa constrói</em>. Este diz <em>o que é verdade sobre este produto</em> —
+        O checklist do time diz <em>como esta empresa constrói</em>. Este diz <em>o que é verdade sobre este produto</em> —
         e os dois valem. O que você acrescentar aqui entra <strong>junto</strong> com o do time, nunca no lugar dele.
       </p>
 

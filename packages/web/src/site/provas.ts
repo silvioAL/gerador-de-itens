@@ -48,7 +48,7 @@ export const PROVAS: Prova[] = [
       "Um teste de caracterização: ele afirma que o documento gerado é byte a byte o mesmo. Qualquer não-determinismo na cadeia o derruba.",
   },
   {
-    afirmacao: "A regra da casa roda, em vez de ficar documentada.",
+    afirmacao: "A regra da empresa roda, em vez de ficar documentada.",
     porque:
       "Uma regra em wiki depende de alguém lembrar. Uma regra com checagem é conferida a cada mudança do desenho, e o que ela acusa vira item de trabalho.",
     arquivo: "packages/engine/src/config/types.ts",

@@ -69,7 +69,7 @@ export const PERGUNTAS: PerguntaDeQuemChega[] = [
     pagina: "o-conceito",
   },
   {
-    texto: "E quando eu preciso falar com o que a casa já tem?",
+    texto: "E quando eu preciso falar com o que a empresa já tem?",
     pagina: "o-percurso",
   },
   {

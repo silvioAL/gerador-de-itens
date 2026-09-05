@@ -16010,3 +16010,35 @@ silencioso, e ficou dito em vez de descoberto.
 **"Casa" ainda está em ~14 lugares visíveis** (a remoção levou 3 junto). A
 pergunta *"que casa?"* veio de quem usa o produto, e vale independente desta
 feature. É rodada própria, anotada na SPEC-104 §4 fatia B.
+
+---
+
+## §359 — "Casa" sai da interface
+
+*"casa? que casa? o que isso significa?"* — a pergunta veio de quem usa o
+produto, sobre uma palavra que nós escrevemos.
+
+Nas SPECs, "a casa" significa *"os sistemas da própria empresa"*. Na tela, não
+significa nada. Vazou para **24 ocorrências visíveis**.
+
+E o refinamento do usuário, que é o que dá a solução: *"essas referências são
+ruins, pois indicam fluxo, precisamos ser genéricos, algo como importar do
+confluence"*. O rótulo descrevia o **gesto** (*"↙ Trazer da casa"*), não a
+**origem**.
+
+**A saída: o produto ecoa o nome que a própria pessoa deu ao destino.** O código
+continua genérico — não conhece Confluence nem Notion —, e a tela fica concreta:
+*"↙ Importar decisões do Confluence de Arquitetura"*. Sem rótulo cadastrado, cai
+numa frase neutra em vez de inventar nome.
+
+Isso exigiu que os dois hooks passassem a carregar o `rotulo` do destino, que
+eles nem buscavam: `useAdrNaEntrada` ganhou `rotuloDoDestino`, e o campo de link
+do §356 ganhou o equivalente.
+
+O resto virou "empresa" — texto explicativo não tem destino que ecoar.
+
+> Ficou uma ocorrência, e é falso positivo: *"a seção que **dá casa** à
+> mudança"*, no DocumentoScreen. É a expressão idiomática, outro sentido.
+
+**O E2E do §356 reprovou sozinho** ao procurar o `aria-label` antigo — que é
+exatamente o que ele existe para fazer.
