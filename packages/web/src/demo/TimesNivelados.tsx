@@ -46,7 +46,7 @@ export function TimesNivelados() {
 
       <div style={{ display: "grid", gap: 8 }}>
         <Passo
-          rotulo="A configuração é da casa"
+          rotulo="A configuração é da empresa"
           texto="O catálogo de tecnologias por componente é da organização, não do time. Quem desenha um serviço herda o mesmo padrão, em qualquer time."
         />
         <Passo

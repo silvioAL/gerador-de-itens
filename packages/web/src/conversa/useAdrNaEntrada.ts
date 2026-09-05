@@ -39,6 +39,19 @@ import { apiExportador, apiQuebras } from "../api/client";
 export interface AdrNaEntrada {
   /** `false` até a configuração responder, e para sempre se não há destino. */
   podeTrazerAdr: boolean;
+  /**
+   * §359 — **o nome que a pessoa deu ao destino**, para o botão dizer de ONDE
+   * importa.
+   *
+   * O rótulo dizia *"Decisões da casa"*, e o usuário perguntou: *"casa? que
+   * casa?"*. O produto não tem como saber o nome do sistema de terceiro — mas a
+   * pessoa que cadastrou o destino **já o nomeou**. Ecoar esse nome é o único
+   * jeito honesto: genérico no código, concreto na tela.
+   *
+   * Vazio quando o destino não tem rótulo — aí o botão cai para uma frase neutra
+   * em vez de inventar um nome.
+   */
+  rotuloDoDestino: string;
   trazendo: boolean;
   /** Quantas decisões vieram na última busca — a tela diz o número. */
   ultimoTotal: number | null;
@@ -65,11 +78,11 @@ export function comoTexto(decisoes: { decisao: Decisao; lacunas: string[] }[]): 
     const partes = [`- ${decisao.titulo}`];
     if (decisao.escolhida) partes.push(`: ${decisao.escolhida}`);
     if (decisao.porque) partes.push(` — porque ${decisao.porque}`);
-    if (lacunas.includes("porque")) partes.push(" — (a casa não registrou o porquê)");
+    if (lacunas.includes("porque")) partes.push(" — (a origem não registrou o porquê)");
     return partes.join("");
   });
   return [
-    "Decisões que esta casa já tomou, e que o desenho tem que respeitar:",
+    "Decisões que esta empresa já tomou, e que o desenho tem que respeitar:",
     ...linhas,
     "Não proponha o que elas descartaram.",
   ].join("\n");
@@ -83,16 +96,23 @@ export function useAdrNaEntrada(
   const [trazendo, setTrazendo] = useState(false);
   const [ultimoTotal, setUltimoTotal] = useState<number | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const [rotuloDoDestino, setRotuloDoDestino] = useState("");
 
   useEffect(() => {
     let cancelado = false;
     apiExportador
       .obter()
       .then((c) => {
-        if (!cancelado) setTemDestino((c.destinos ?? []).some((d) => d.operacao === "adr" && !!d.endpoint));
+        if (cancelado) return;
+        const destino = (c.destinos ?? []).find((d) => d.operacao === "adr" && !!d.endpoint);
+        setTemDestino(!!destino);
+        setRotuloDoDestino(destino?.rotulo?.trim() ?? "");
       })
       .catch(() => {
-        if (!cancelado) setTemDestino(false);
+        if (!cancelado) {
+          setTemDestino(false);
+          setRotuloDoDestino("");
+        }
       });
     return () => {
       cancelado = true;
@@ -119,5 +139,5 @@ export function useAdrNaEntrada(
     }
   }, [quebraId, setEntrada]);
 
-  return { podeTrazerAdr: temDestino && !!quebraId, trazendo, ultimoTotal, erro, trazer };
+  return { podeTrazerAdr: temDestino && !!quebraId, rotuloDoDestino, trazendo, ultimoTotal, erro, trazer };
 }

@@ -132,7 +132,7 @@ describe("o texto que vai para a caixa (SPEC-81 fatia D)", () => {
     // real para quem lê o desenho depois.
     const texto = comoTexto([{ decisao: decisao({ porque: "" }), lacunas: ["porque"] }]);
 
-    expect(texto).toContain("(a casa não registrou o porquê)");
+    expect(texto).toContain("(a origem não registrou o porquê)");
   });
 
   it("decisão só com título ainda orienta", () => {
