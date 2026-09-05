@@ -105,6 +105,30 @@ cores e ícones) e renderiza com o MESMO cartão. As telas continuam separadas
 vigiar: os dois grafos ficarem indistinguíveis — mitigação: paleta de cores
 própria e o cabeçalho dizendo o que se desenha.
 
+## 2.3 O vocabulário, revisado para ficar GENÉRICO
+
+> *"os nomes precisam ser adaptados para que fique genérico"* — o usuário.
+> A régua é a de sempre (§359/§368): **o id é estável e técnico; o rótulo da
+> interface nomeia a FUNÇÃO, nunca o jargão interno nem a instância.**
+
+| Conceito | id técnico (estável) | Rótulo na interface | O que substitui no falar |
+|---|---|---|---|
+| capacidade de I/O | `conector` | "Conector" | — (já genérico) |
+| transformação com IA | `agente` | "Agente" | "papel da esteira" some da tela |
+| a fonte/destino do desenho | `projeto` | "Projeto" | ~~`mesa`~~ — "mesa" é o nome DA TELA, não do componente; toda menção a `mesa` nesta SPEC lê-se `projeto` |
+| função do motor | `peca` | "Peça" + o nome da função | "engine" não aparece na interface |
+| geração determinística | peça `derivacao` | "Geração de itens (desenho → itens)" | ~~`derivar`~~ como rótulo |
+| bancada de cenários | peça `ensaio` | "Ensaio de cenários" | — |
+| transformação pura | `transformacao` | "Transformação" | — (reservado) |
+| a cadeia de agentes | fluxo semeado `sequencia-de-agentes` | "Sequência de agentes" | ~~"esteira"~~ sai da interface (fica no código/JOURNEY como história) |
+| forma de dado textual | tipo `documento` | "documento" | — |
+
+Dois efeitos práticos: (1) o fluxo semeado `esteira-de-agentes` ganha o rótulo
+novo mantendo o id (link/rastro não quebram; rótulo é interface); (2) nenhuma
+tela nova nasce dizendo "esteira", "mesa" ou "engine" — e as existentes
+migram o rótulo quando forem tocadas, nunca em varredura cega (a lição do
+§357: verificar a frase NOVA, não só remover a velha).
+
 ## 3. O que esta SPEC RECUSA
 
 - **Nó `documento`** — a SPEC-106 C fica emendada: o que era "documento como
