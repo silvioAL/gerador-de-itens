@@ -16412,3 +16412,20 @@ prompt de um agente é editar a esteira, esteja a tela que estiver.
 
 Prova no navegador: renomear o PO pelo painel do nó muda o card na hora e o
 `GET /config/pipeline-agentes` devolve o nome novo.
+
+---
+
+## §370 — SPEC-107 decidida: input/output, modo (b), confirmação desenhável
+
+O usuário respondeu as cinco perguntas da SPEC-107 e as respostas SUBIRAM o
+desenho: (1+2) a abstração universal é INPUT/OUTPUT — todo nó recebe e emite
+dados; `projeto` é nó de entrada com parâmetro, `transformacao` é consequência
+do modelo, não reserva; (3) "peça" vira **`funcao`** ("Função do sistema");
+(4) **modo (b)**: a função de geração aceita qualquer desenho mapeado, e a
+tese da 105 §6 fica REESCRITA — "mesma fiação + mesmas entradas → mesmos
+itens", com o rastro (hash + entradas) como âncora de auditoria; (5) a
+confirmação MORA NO DESENHO — gate desenhável que suspende e retoma (o
+Wait/approval do n8n), exigindo execução com estado retomável.
+
+Poucos conceitos, mais solidez: 5 tipos de nó, 2 mecânicas, e um placar — um
+conceito novo só entra aposentando um velho.

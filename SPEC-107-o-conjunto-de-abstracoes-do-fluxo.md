@@ -235,7 +235,45 @@ prova item a item).
 - **D — o tipo de dado `documento`** no contrato e preview no rastro.
 - **E — validação de compatibilidade de mapeamento** por tipo (aviso primeiro).
 
-## 5. Perguntas para o usuário
+## 5. As perguntas — RESPONDIDAS pelo usuário (§370)
+
+**1+2. O modelo é INPUT/OUTPUT, como no n8n.** *"Falta abstração na pergunta:
+precisamos de algo como input/output."* A abstração universal: **todo nó
+recebe entradas e emite saídas** (dados estruturados fluindo pelas arestas —
+os "items" do n8n são o nosso mapeamento). Consequências:
+- `projeto` NÃO é caso especial: é um nó de ENTRADA cujo parâmetro diz a
+  origem (demanda ativa por padrão; `demandaId` é só um parâmetro do nó —
+  `parametros` já existe no modelo).
+- `transformacao` deixa de ser "reservada": no modelo input/output ela é
+  consequência (um nó que só re-mapeia/combina dados — o Set/Code do n8n), e
+  entra com um executor simples na primeira leva.
+
+**3. "Peça" não é o melhor nome — avaliação:** candidatos: *bloco*, *ação*,
+*operação*, ***função***. **Recomendação: `funcao`** (rótulo "Função do
+sistema — Geração de itens/Ensaio de cenários"): é como quem trabalha fala
+("a função que gera os itens"), não colide com "operação" (do gateway) nem
+com "ação" (RBAC). Ids da SPEC migram `peca → funcao` antes de nascer código.
+
+**4. MODO (b) — decidido.** A peça de geração aceita QUALQUER `desenho`
+mapeado. **A tese da SPEC-105 §6 fica formalmente REESCRITA:** a promessa
+deixa de ser "mesmo desenho → mesmos itens, sempre" e passa a ser **"mesma
+fiação + mesmas entradas → mesmos itens"** — a reprodutibilidade ancora no
+rastro (hash do fluxo §9.5 + as entradas registradas por nó). O rastro deixa
+de ser diagnóstico e vira ÂNCORA de auditoria; gravar as entradas de cada
+execução da função de geração vira requisito da fatia A.
+
+**5. A confirmação MORA NO DESENHO.** *"Você pode desenhar para aguardar
+confirmação antes de seguir, ou para seguir automaticamente."* A parada
+(§368) se generaliza no **gate de confirmação desenhável** — o Wait/approval
+do n8n: um nó marcado "aguardar confirmação" suspende a execução ali, alguém
+revisa o stage e CONTINUA (ou descarta); sem a marca, segue automático.
+Consequência de implementação honesta: execução deixa de ser one-shot —
+precisa de **estado retomável** (a execução pausada persiste as saídas e um
+`continuar`), que é a evolução do `fluxo_execucoes`. A confirmação campo a
+campo da revisão vira instância disso quando a revisão migrar.
+
+> Com isso, nas palavras dele, *"resolvemos tudo ligado inclusive aos outputs
+> do sistema"* — outputs são nós de saída como quaisquer outros.
 
 1. O nó `demanda` aponta a demanda ATIVA ou recebe `demandaId` como parâmetro?
    (Recomendação: ativa na primeira leva — é onde a jornada está.)
