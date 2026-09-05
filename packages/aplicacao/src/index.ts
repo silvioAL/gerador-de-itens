@@ -157,6 +157,29 @@ export {
   type PapelConfigurado,
 } from "./config/normalizacao.js";
 
+/** SPEC-105 fatia A/B — o conector como dado, e a metade pura do executor. */
+export {
+  CONTRATO_DA_OPERACAO,
+  TIPOS_DE_CAMPO_DO_CONECTOR,
+  conectoresDeFabrica,
+  conectoresEmVigor,
+  normalizarConectores,
+  validarEscritaConectores,
+  type CampoDoConector,
+  type ConfigConectores,
+  type Conector,
+  type ConectorEmVigor,
+  type TipoDeCampoDoConector,
+} from "./config/conectores.js";
+export { analisarCaminho, lerCaminho } from "./config/caminho.js";
+export {
+  EntradaDoConectorInvalida,
+  montarChamadaDoConector,
+  mapearSaidaDoConector,
+  type ChamadaDoConector,
+  type SaidaDoConector,
+} from "./casos-de-uso/conectores.js";
+
 export {
   resumirCredencialIa,
   type CredencialIa,

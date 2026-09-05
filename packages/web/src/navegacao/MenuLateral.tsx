@@ -71,6 +71,10 @@ const GRUPOS: { titulo: string; itens: { area: AreaConfig; rotulo: string }[] }[
       { area: "tokens", rotulo: "Design system" },
       { area: "especificacao", rotulo: "Especificação de solução" },
       { area: "exportacao", rotulo: "Exportação (tracker)" },
+      // SPEC-105 fatia A — vizinho da exportação de propósito: os dois falam
+      // de endereços do gateway, e a aba sem porta no menu é como ninguém
+      // descobre um recurso (a lição da SPEC-79 logo acima).
+      { area: "conectores", rotulo: "Conectores (integrações)" },
     ],
   },
   {

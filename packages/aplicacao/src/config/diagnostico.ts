@@ -119,6 +119,18 @@ export function resumirConfig(chave: ChaveConfig, documento: unknown): ResumoCon
      */
     case "conexoes":
       return { conexoes: Object.keys(regrasDeConexaoDe(documento)).length };
+    /**
+     * SPEC-105 fatia A — quantos conectores a organização DECLAROU. Os de
+     * fábrica (derivados dos destinos do gateway) ficam fora da conta: eles
+     * não moram neste documento. Template vazio, como `conexoes` — não
+     * cadastrar conector é escolha, não atraso.
+     */
+    case "conectores":
+      return {
+        conectores: Array.isArray((documento as { conectores?: unknown[] })?.conectores)
+          ? (documento as { conectores: unknown[] }).conectores.length
+          : 0,
+      };
   }
 }
 
@@ -197,6 +209,7 @@ const NOME_AMIGAVEL: Record<string, string> = {
   caracteres: "conteúdo",
   destino: "destino de exportação",
   conexoes: "regra de conexão sobrescrita",
+  conectores: "conector cadastrado",
 };
 
 /**

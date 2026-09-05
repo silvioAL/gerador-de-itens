@@ -47,6 +47,16 @@ export const RECURSOS = [
    * errado que faria a delegação mentir.
    */
   "conexoes",
+  /**
+   * SPEC-105 fatia A — o CATÁLOGO DE CONECTORES: que endereços a organização
+   * sabe chamar, com entrada/saída declaradas.
+   *
+   * Recurso próprio pelo mesmo argumento de `conexoes`: quem decide "a empresa
+   * fala com este gateway" é infraestrutura, não quem cuida da esteira. E é
+   * catálogo — cadastrar conector é curadoria (§9.1), não trabalho do dia;
+   * executar (nível `operar`) é outra coisa, e tem outro portão.
+   */
+  "conectores",
   "especificacao-template",
   // SPEC-53 — o contexto do produto tem dono próprio: quem responde pelo
   // vocabulário e pelas regras de negócio não é quem cuida de stack nem de
@@ -91,6 +101,7 @@ export const RECURSO_DA_CHAVE_DE_CONFIG = {
   exportador: "pipeline-agentes",
   tokens: "pipeline-agentes",
   conexoes: "conexoes",
+  conectores: "conectores",
 } as const satisfies Record<ChaveConfig, Recurso | null>;
 
 /**
