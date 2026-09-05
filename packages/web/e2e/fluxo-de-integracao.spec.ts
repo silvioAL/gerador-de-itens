@@ -83,15 +83,17 @@ test("fatia C: desenhar, ligar, mapear — e o ciclo trava com a mensagem do des
     await page.getByLabel("Nome do fluxo novo").fill("Desenho E2E");
     await page.getByTestId("criar-fluxo").click();
 
-    // Dois nós da paleta: um conector do catálogo e um agente da esteira.
-    await page.getByLabel("Conector da paleta").selectOption("leitor-fluxo-e2e");
-    await page.getByTestId("adicionar-no-conector").click();
-    await page.getByLabel("Agente da paleta").selectOption("po");
-    await page.getByTestId("adicionar-no-agente").click();
+    // §368 — a paleta fala em COMPONENTES (como a mesa); o adaptador se
+    // escolhe nas propriedades do nó. "Chamada externa" + o conector
+    // declarado; "Agente" + o papel po.
+    await page.getByTestId("add-livre").click();
+    await page.getByTestId("adaptador-do-no").selectOption("leitor-fluxo-e2e");
+    await page.getByTestId("add-agente").click();
+    await page.getByTestId("adaptador-do-no").selectOption("po");
     await expect(page.locator(".react-flow__node")).toHaveCount(2);
 
     // Ligar: a aresta nasce SEM mapeamento, e a tela diz isso.
-    await ligar(page, "leitor-fluxo-e2e-1", "po-1");
+    await ligar(page, "chamada-1", "agente-1");
     await expect(page.getByText("sem mapeamento")).toBeVisible();
 
     // O mapeamento na aresta: a saída declarada do conector (fatia A) é o que
@@ -103,7 +105,7 @@ test("fatia C: desenhar, ligar, mapear — e o ciclo trava com a mensagem do des
     await expect(page.getByText("conteudo→volumetria")).toBeVisible();
 
     // O ciclo trava a execução com a MESMA mensagem do desenho (§4.4).
-    await ligar(page, "po-1", "leitor-fluxo-e2e-1");
+    await ligar(page, "agente-1", "chamada-1");
     await expect(page.getByTestId("aviso-de-ciclo")).toContainText("Ciclo: ");
     await expect(page.getByTestId("executar-fluxo")).toBeDisabled();
 
@@ -128,12 +130,11 @@ test("fatia C: desenhar, ligar, mapear — e o ciclo trava com a mensagem do des
     await page.getByTestId("seletor-de-fluxo").selectOption("esteira-de-agentes");
     await expect(page.locator(".react-flow__node")).toHaveCount(4);
     await expect(page.getByTestId("fluxo-derivado")).toBeVisible();
-    await expect(page.getByTestId("adicionar-no-agente")).toBeDisabled();
+    await expect(page.getByTestId("add-agente")).toBeDisabled();
     await page.getByTestId("editar-copia").click();
     await expect(page.getByTestId("fluxo-derivado")).toHaveCount(0);
     // A cópia é editável — e é DECLARADA: some o selo, aparece o poder.
-    await page.getByLabel("Agente da paleta").selectOption("po");
-    await expect(page.getByTestId("adicionar-no-agente")).toBeEnabled();
+    await expect(page.getByTestId("add-agente")).toBeEnabled();
   } finally {
     await page.request.put(`${API}/config/fluxos`, { data: { documento: original, timeId: "time-pagamentos" } });
     await limparMeusConectores(page);
@@ -148,7 +149,7 @@ test("fatia D: o exemplo do JMeter roda pela tela, com rastro por nó", async ({
       leitorDeVolumetria("volumetria-fluxo-e2e"),
       {
         id: "repo-fluxo-e2e",
-        nome: "Repo da casa (E2E)",
+        nome: "Publicação (E2E)",
         endpoint: `${GATEWAY_FALSO}/v1/documento`,
         entrada: [
           { chave: "demandaId", rotulo: "Id", tipo: "texto", obrigatorio: true },
@@ -203,13 +204,14 @@ test("fatia D: o exemplo do JMeter roda pela tela, com rastro por nó", async ({
     }
     await expect(page.getByTestId("rastro-publica")).toContainText("linkExterno");
 
-    // "Executar até aqui": clicando no agente, roda só leitor+agente — a
-    // publicação (que age no mundo) fica fora do rastro porque nem disparou.
+    // §368 — a parada é CONFIGURAÇÃO do nó, não um botão: marcada no agente,
+    // TODO Executar para ali — a publicação (que age no mundo) não dispara.
     await page.locator(`.react-flow__node[data-id="gera"]`).click();
-    await page.getByTestId("executar-ate-aqui").click();
+    await page.getByTestId("parar-depois").check();
+    await page.getByTestId("executar-fluxo").click();
     await expect(page.getByTestId("rastro-da-execucao")).toBeVisible({ timeout: 30000 });
     await expect(page.getByTestId("rastro-gera")).toContainText("✓");
-    await expect(page.getByTestId("rastro-publica")).toHaveCount(0);
+    await expect(page.getByTestId("rastro-publica")).toContainText("parada configurada");
   } finally {
     await page.request.put(`${API}/config/fluxos`, { data: { documento: original, timeId: "time-pagamentos" } });
     await limparMeusConectores(page);

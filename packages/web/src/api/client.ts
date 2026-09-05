@@ -1592,14 +1592,13 @@ export const apiExportador = configDe<ConfigExportador>("exportador");
  * como `conexoes`.
  */
 export type { CampoDoConector, ConfigConectores, Conector } from "@gerador/aplicacao";
-import type { ConfigConectores, Conector as ConectorDaAplicacao } from "@gerador/aplicacao";
+import type { ConfigConectores, ConectorEmVigor as ConectorEmVigorDaAplicacao } from "@gerador/aplicacao";
 
 export const apiConectores = configDe<ConfigConectores>("conectores");
 
 /** Um conector do catálogo EM VIGOR: sem `cabecalhos` (segredo fica no
  * servidor), com a origem e o aviso de que os tem. */
-export interface ConectorDoCatalogo extends Omit<ConectorDaAplicacao, "cabecalhos"> {
-  origem: "declarado" | "fabrica";
+export interface ConectorDoCatalogo extends Omit<ConectorEmVigorDaAplicacao, "cabecalhos"> {
   temCabecalhos: boolean;
 }
 
