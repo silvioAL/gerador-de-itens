@@ -86,6 +86,8 @@ export interface QuebraResumo {
 export interface QuebraSalva {
   id: string;
   titulo: string | null;
+  /** SPEC-106 fatia C — onde o documento publicado desta demanda mora. */
+  documentoLinkExterno?: string | null;
   time: string | null;
   diagrama: Diagrama;
   /** Respostas (humanas ou IA confirmada) aos placeholders "<- ✍️ especificar"

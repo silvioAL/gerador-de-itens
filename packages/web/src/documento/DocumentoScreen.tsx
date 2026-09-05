@@ -80,6 +80,9 @@ export interface DocumentoScreenProps {
    * oferecer, porque a pessoa descobre o problema depois de esperar.
    */
   onPublicar?: () => Promise<{ linkExterno: string; destino: string }>;
+  /** SPEC-106 fatia C — o link da ÚLTIMA publicação, persistido na demanda:
+   * sobrevive ao F5, ao contrário do resultado em memória do botão. */
+  linkPublicado?: string | null;
   onVoltar: () => void;
   /**
    * SPEC-61 §6.1 — a ESCRITA dos itens (`gerarItensDeTrabalho` → `ItemGerado`),
@@ -191,6 +194,7 @@ export function DocumentoScreen({
   lacunas,
   onBaixarMarkdown,
   onPublicar,
+  linkPublicado,
   onVoltar,
   itensEscritos,
   onRevisarItem,
@@ -238,6 +242,17 @@ export function DocumentoScreen({
          * aqui — botão que falharia não se oferece.
          */}
         {onPublicar && <BotaoPublicar onPublicar={onPublicar} />}
+        {linkPublicado && (
+          <a
+            data-testid="link-do-documento-publicado"
+            href={linkPublicado}
+            target="_blank"
+            rel="noreferrer"
+            style={{ fontSize: 12, color: "var(--acento-texto, var(--acento))", alignSelf: "center" }}
+          >
+            última publicação ↗
+          </a>
+        )}
       </header>
 
       <article style={folhaEstilo}>

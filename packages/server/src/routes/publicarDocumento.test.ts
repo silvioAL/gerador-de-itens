@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { resolve } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -108,6 +108,20 @@ describe("POST /quebras/:id/documento/publicar (SPEC-81 fatia B)", () => {
     const enviado = JSON.parse(fetchFalso.mock.calls[0][1].body);
     expect(enviado).toMatchObject({ demandaId: idDaQuebra, demandaTitulo: "Busca por SKU", desatualizado: true });
     expect(enviado.demandaAtualizadaEm).toBeTruthy();
+  });
+
+  it("SPEC-106 fatia C — o link publicado PERSISTE na demanda, não só na resposta", async () => {
+    await configurarDestinos([
+      { id: "conf", operacao: "documento", endpoint: "https://gw/confluence", rotulo: "Confluence" },
+    ]);
+    fetchFalso.mockResolvedValue(resposta({ linkExterno: "https://wiki/persistido", atualizada: false }));
+
+    await publicar({ markdown: "# doc" });
+
+    // A demanda LEMBRA onde o documento dela mora: é o "apenas armazenar o
+    // link no sistema" do pedido — o resultado em memória da tela morre no F5.
+    const [linha] = await db.select({ link: quebras.documentoLinkExterno }).from(quebras).where(eq(quebras.id, idDaQuebra));
+    expect(linha.link).toBe("https://wiki/persistido");
   });
 
   it("com DOIS destinos e nenhum escolhido, NÃO escolhe sozinha — devolve as opções", async () => {
