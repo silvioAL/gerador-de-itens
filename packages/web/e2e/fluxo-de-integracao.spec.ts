@@ -131,6 +131,19 @@ test("fatia C: desenhar, ligar, mapear — e o ciclo trava com a mensagem do des
     await expect(page.locator(".react-flow__node")).toHaveCount(4);
     await expect(page.getByTestId("fluxo-derivado")).toBeVisible();
     await expect(page.getByTestId("add-agente")).toBeDisabled();
+
+    // §369 — o PAPEL é editável de dentro do fluxo (mesmo no derivado: a
+    // fiação é derivada, a config do papel é dela mesma) e grava NO documento
+    // da aba Pipeline de IA — uma verdade só.
+    const pipelineOriginal = (await (await page.request.get(`${API}/config/pipeline-agentes?timeId=time-pagamentos`)).json()).documento;
+    await page.locator(`.react-flow__node[data-id="po"]`).click();
+    await page.getByTestId("papel-nome").fill("PO (editado no fluxo)");
+    await page.getByTestId("salvar-papel").click();
+    await expect(page.locator(`.react-flow__node[data-id="po"]`)).toContainText("PO (editado no fluxo)");
+    const pipelineDepois = (await (await page.request.get(`${API}/config/pipeline-agentes?timeId=time-pagamentos`)).json()).documento;
+    expect(pipelineDepois.papeis.find((p: { id: string }) => p.id === "po").nome).toBe("PO (editado no fluxo)");
+    await page.request.put(`${API}/config/pipeline-agentes`, { data: { documento: pipelineOriginal, timeId: "time-pagamentos" } });
+
     await page.getByTestId("editar-copia").click();
     await expect(page.getByTestId("fluxo-derivado")).toHaveCount(0);
     // A cópia é editável — e é DECLARADA: some o selo, aparece o poder.
