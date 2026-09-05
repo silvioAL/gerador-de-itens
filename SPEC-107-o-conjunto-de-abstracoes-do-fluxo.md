@@ -218,22 +218,82 @@ destino de cada uma); o PDCA; e a confirmação humana em toda escrita na mesa.
 documento → importar por link/ADR → ensaios → esteira (a última, atrás da
 prova item a item).
 
-## 4. Fatias
+## 4. Fatias — REESCRITAS com as decisões da §5
 
-- **A — o registro de PEÇAS + as duas primeiras** (`derivar`, `ensaio`):
-  contrato como dado, governança como atributo, executor em processo.
-  Prova: `mesa.desenho → derivar → agente → publicação` e
-  `mesa.desenho → ensaio → agente` rodam ponta a ponta.
-- **B — o nó `mesa`** (fonte primeiro; destino com confirmação depois).
-- **C — a UX da mesa no fluxo**: `NodeCard` + `DiagramaConfig` próprio gerado
-  do catálogo — *"a UX deve ser incrível como a da mesa"* é critério de
-  aceite, não enfeite: cartões, cores por família (peça/conector/agente/mesa),
-  ícones e o mesmo cuidado de tema. **Inclui a execução AO VIVO**: nó pulsando
-  enquanto roda, aresta animada, texto streamando no painel — as animações da
-  revisão, portadas para o canvas (streaming por nó via a mesma técnica do
-  `executarPedido`).
-- **D — o tipo de dado `documento`** no contrato e preview no rastro.
-- **E — validação de compatibilidade de mapeamento** por tipo (aviso primeiro).
+> `peca` → **`funcao`** em tudo abaixo (decisão §5.3). Cada fatia fecha com o
+> rito completo da casa (§6.2).
+
+- **A — o registro de FUNÇÕES + `derivacao` (modo b) + `ensaio`.**
+  Registro no código com contrato como DADO (`entrada`/`saida` em
+  `CampoDoConector` — o molde de `CONTRATO_DA_OPERACAO`) e governança como
+  atributo (recurso RBAC + nível). `derivacao` aceita qualquer `desenho`
+  mapeado — e por isso **grava as ENTRADAS de cada execução no rastro** (a
+  âncora da tese reescrita: "mesma fiação + mesmas entradas → mesmos itens").
+  **Prova:** `projeto.desenho → derivacao → agente → conector(escrita)` e
+  `projeto.desenho → ensaio → agente` rodam ponta a ponta contra o dublê, com
+  rastro auditável (hash + entradas), e derivar pelo botão da mesa ≡ derivar
+  pela função, byte a byte (§263).
+- **B — o nó de ENTRADA `projeto`**, nas duas direções. Saída: `desenho`,
+  `itens`, `markdown`, `volumetria`, `necessidades`; parâmetro `demandaId`
+  (default: a ativa). Destino (escrever desenho proposto) SEMPRE atrás de um
+  gate de confirmação (§2.4-14). **Prova:** as fiações da fatia A usando
+  `projeto` real; importar-por-link vira fiação sem o E2E do §356 mudar.
+- **C — o GATE DE CONFIRMAÇÃO desenhável + execução RETOMÁVEL.** `pausarDepois`
+  generaliza para `confirmacao: "aguardar" | "automatica"` no nó; execução
+  suspensa persiste as saídas (evolução de `fluxo_execucoes`: estado
+  `aguardando-confirmacao` + `POST /fluxos/execucoes/:id/continuar`), quem
+  revisa o stage continua ou descarta. **Prova:** fiação com gate suspende,
+  sobrevive a F5/outra máquina, e continua do ponto exato.
+- **D — a UX viva (o critério "incrível como a mesa").** `NodeCard` +
+  `DiagramaConfig` próprio gerado do catálogo; cores por família
+  (funcao/conector/agente/projeto), ícones, temas travados por `corFixa`;
+  **execução ao vivo**: nó pulsa enquanto roda, aresta anima o dado, texto
+  streama no painel (a técnica do `executarPedido`, por nó). **Prova:** quem
+  assiste vê o MESMO vivo da revisão; visual nos dois temas.
+- **E — `transformacao` com executor simples** (re-mapeio/combinação de
+  campos — o Set do n8n; consequência do modelo input/output, §5.2).
+- **F — o tipo de dado `documento`** no contrato + preview no rastro; e a
+  validação de compatibilidade de mapeamento por tipo (aviso, não bloqueio).
+- **G — as substituições, na ordem de morte da §3.1** (exportar → publicar →
+  importar → ensaios → revisão), cada uma com a prova da tabela — item de
+  menu/rota/código só morre com ela verde.
+
+## 6. Para quem implementar (numa conversa do zero)
+
+### 6.1 Leia antes, nesta ordem
+- **Esta SPEC inteira** — as decisões da §5 JÁ FORAM tomadas pelo usuário;
+  não as repergunte.
+- SPEC-105 (§§1, 6, 7, 9) e SPEC-106 (§§1–4) — as fronteiras herdadas; a tese
+  do 105 §6 está REESCRITA pela §5.4 desta.
+- JOURNEY §§360–370 — a história curta de como se chegou aqui.
+- Código: `packages/aplicacao/src/config/{fluxos,conectores,caminho}.ts`;
+  `packages/aplicacao/src/casos-de-uso/{fluxos,conectores}.ts` (o executor e o
+  `pausarDepois` que a fatia C generaliza); `packages/server/src/routes/
+  {fluxos,conectores}.ts`; `packages/server/src/ia/provedorDaOrganizacao.ts`
+  (o agente); `fluxo_execucoes` (migração 0043 — a fatia C a evolui);
+  `packages/web/src/fluxo/FluxoScreen.tsx`; `packages/web/src/canvas/
+  {Canvas,NodeCard}.tsx` e `styles.css` (a linguagem visual da fatia D);
+  `engine`: `derivar`, `simularLentidao`, `resolverDependencias`.
+
+### 6.2 O rito de toda fatia (não negociável)
+Branch + PR (nunca na main); medição da premissa ANTES de codar; 4 portões
+(`build`/`typecheck`/`test`/`lint` `--workspaces`); E2E completo SOZINHO
+(matar 5190/4100/4123 antes; banco descartável 5433 via
+`docker-compose.e2e.yml`); §248 (desligar a correção e ver o teste falhar);
+`docker compose up -d --build` + verificação visual em :8080 nos DOIS temas;
+entrada no JOURNEY; `graphify update .`; merge já autorizado; rebuild final.
+
+### 6.3 Avisos que o código não conta
+- `routes/ia.ts` e `web/src/api/client.ts` carregam um byte NUL — `grep -a`,
+  e edite por âncora exata, longe da região.
+- Os E2E rodam em paralelo e os documentos de config são globais: escreva
+  read-modify-write só dos SEUS ids (`fluxo-de-integracao.spec.ts` é o
+  molde) e grave a credencial de IA IDÊNTICA à convenção
+  (`ia-hospedada.spec.ts:260` — com visão).
+- Renomeie `peca → funcao` ANTES de nascer código (§5.3); ids estáveis,
+  rótulos genéricos (§2.3); as diretrizes §2.4 são critério de ACEITE.
+- Dívidas vizinhas que NÃO são desta SPEC: dono errado de `exportador`/
+  `tokens` no RBAC; SPEC-97 fatia B.
 
 ## 5. As perguntas — RESPONDIDAS pelo usuário (§370)
 
