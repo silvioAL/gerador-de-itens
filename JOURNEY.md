@@ -16042,3 +16042,64 @@ O resto virou "empresa" — texto explicativo não tem destino que ecoar.
 
 **O E2E do §356 reprovou sozinho** ao procurar o `aria-label` antigo — que é
 exatamente o que ele existe para fazer.
+
+---
+
+## §360 — SPEC-105: o fluxo como grafo
+
+Depois de cinco rodadas seguidas de conserto pontual em integrações, o usuário
+parou a linha: *"chega dessas coisas específicas, isso está me incomodando
+muito"*. O pedido: o sistema funcionando **de forma aberta, como um LangChain
+visual com grafos**, com suporte a plugar conectores — unificando importação,
+exportação e pipeline de IA num desenho parecido com o do n8n.
+
+### A medição que sustenta o pedido
+
+**`operacao` é uma lista FECHADA**, e acrescentar uma integração exige **sete
+lugares**: entrada na lista, porta, adaptador, rota, afordância na tela, endpoint
+no dublê, e testes em cada camada.
+
+Não é hipótese — é o que as rodadas desta semana mediram. O §349 acrescentou
+`documentoExterno` e **esqueceu a rota**; a capacidade ficou inalcançável por
+dias (§356). O §358 removeu `arquiteturaDeNegocio` tocando **16 arquivos**. O
+§355 achou o dublê servindo 1 de 5 operações.
+
+**O custo de uma integração é uma rodada inteira, e o modo de falhar é o
+silêncio** — nada obriga as sete peças a existirem juntas.
+
+### O que torna o pedido viável
+
+**O produto já É um editor de grafos.** Canvas, `nodeTypes`/`edgeTypes` dirigidos
+por configuração, `edgeRules`, `validateConfig`, campos por tipo editáveis sem
+código, e `resolverDependencias` com ordenação topológica testada.
+
+A máquina existe e é boa — só nunca foi apontada para o encanamento da própria
+ferramenta.
+
+E o dado **já flui** entre agentes: `acumuladas` leva a saída de um papel ao
+prompt do seguinte. Falta poder **desenhar** esse fluxo, ramificar, e encaixar um
+passo que não é agente.
+
+### O risco que decide o desenho
+
+**Dois grafos no mesmo produto.** A mesa desenha a arquitetura que o time vai
+construir; o fluxo desenha o encanamento da ferramenta. Compartilhar tela ou
+paleta destruiria a régua mais importante do produto.
+
+**Decidido:** reusar o **motor**, nunca a **superfície**.
+
+### A divisão que o usuário pediu
+
+Três camadas — Conector (o que sei falar), Fluxo (em que ordem, o que alimenta o
+quê) e Gatilho (quando roda). A camada I mata o gargalo; a II é o exemplo do
+JMeter; a III é o que transforma botão em automação, e fica para depois.
+
+### A tensão resolvida
+
+Fluxo livremente cabeado ameaça o determinismo. A resposta é a mesma fronteira
+que já existe: **`derivar()` continua determinística e continua fora do fluxo**.
+O fluxo governa enriquecimento, jamais derivação — só que agora declarado em vez
+de implícito.
+
+**Régua de aceite:** acrescentar integração passa a ser **uma linha de
+configuração**, não sete arquivos.
