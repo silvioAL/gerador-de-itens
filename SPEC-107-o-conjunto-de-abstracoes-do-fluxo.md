@@ -70,6 +70,38 @@ revogação; (b) fica a um passo, documentado, quando um caso real pedir.
 compatibilidade de mapeamento (saída `documento` → entrada `documento`) e
 renderizar preview no rastro — sem nenhum nó novo.
 
+## 2.2 A generalização pedida: **as engines como PEÇAS** (avaliação)
+
+> *"vamos transformar as engines em 'peças', abertas a depender da
+> governança, desenháveis no canvas com componentes visualmente iguais aos da
+> mesa de projeto"* — o usuário.
+
+**A avaliação: o modelo já comporta isso, e barato.** Um conector é "endereço
+com forma declarada"; uma **peça** é "função do motor com forma declarada" — o
+MESMO contrato (`entrada`/`saida` em `CampoDoConector`), trocando o transporte
+(chamada em processo, não HTTP). O nó vira UMA coisa só: *capacidade com
+contrato*, com quatro adaptadores — HTTP (conector), papel+LLM (agente),
+função do engine (peça), demanda (fonte).
+
+**As candidatas a peça já existem, puras e testadas:** `derivar`,
+`validateConfig`, `resolverDependencias`, `simularLentidao`,
+`conformidade`/`topologia`, `gerarEspecificacaoEntrega`, `lerDesenho`. O
+catálogo de peças nasce como os conectores de fábrica: **derivado de um
+registro no código com o contrato como dado** — peça nova entra por decisão
+(lista fechada, §242), nunca por acidente.
+
+**Governança:** cada peça declara o recurso RBAC que a abre (`derivar` no
+nível `operar`, como hoje; peças que tocam configuração, curadas) — a
+máquina de `exigirPermissao`/curadoria já existe e vira atributo do registro.
+
+**Visual igual à mesa:** paridade de LINGUAGEM, não de superfície. O
+`NodeCard` da mesa já é dirigido por `DiagramaConfig`; o fluxo ganha um
+`DiagramaConfig` PRÓPRIO gerado do catálogo (peças/conectores/agentes com
+cores e ícones) e renderiza com o MESMO cartão. As telas continuam separadas
+(a régua da 105 §1 fica); o que unifica é o vocabulário visual. Risco a
+vigiar: os dois grafos ficarem indistinguíveis — mitigação: paleta de cores
+própria e o cabeçalho dizendo o que se desenha.
+
 ## 3. O que esta SPEC RECUSA
 
 - **Nó `documento`** — a SPEC-106 C fica emendada: o que era "documento como
