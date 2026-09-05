@@ -431,7 +431,7 @@ export function ProdutosTab({ timeIds, demonstracao, onConversarComAssistente }:
               aria-label="Definição"
               value={definicao}
               onChange={(e) => setDefinicao(e.target.value)}
-              placeholder="O que ele quer dizer NESTA casa"
+              placeholder="O que ele quer dizer NESTA empresa"
               style={{ ...inputEstilo, maxWidth: 420 }}
             />
             <button

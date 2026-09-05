@@ -61,7 +61,7 @@ export const PAGINAS: PaginaDoSite[] = [
     id: "o-problema",
     nome: "O problema",
     pergunta: "Por que a IA que a gente já usa não resolveu isso?",
-    resumo: "Agentes e assistentes não resolveram: falta onde a regra da casa mora.",
+    resumo: "Agentes e assistentes não resolveram: falta onde a regra da empresa mora.",
   },
   {
     id: "o-conceito",
@@ -78,7 +78,7 @@ export const PAGINAS: PaginaDoSite[] = [
   {
     id: "o-percurso",
     nome: "O percurso",
-    pergunta: "E quando eu preciso falar com o que a casa já tem?",
+    pergunta: "E quando eu preciso falar com o que a empresa já tem?",
     resumo: "A jornada em raias, e os caminhos que entram e saem — com o que falta marcado.",
   },
   {

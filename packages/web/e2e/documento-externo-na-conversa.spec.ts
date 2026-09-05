@@ -5,7 +5,7 @@ const API = "http://localhost:4100";
 const GATEWAY_FALSO = "http://127.0.0.1:4123";
 
 /**
- * §356 — **o documento da casa entra na conversa, no navegador.**
+ * §356 — **o documento externo entra na conversa, no navegador.**
  *
  * ## Por que este teste é a prova que faltava
  *
@@ -34,8 +34,8 @@ const GATEWAY_FALSO = "http://127.0.0.1:4123";
  * A primeira escrita deste arquivo rodou paralela e falhou assim: numa execução
  * reprovou o positivo, na seguinte o negativo, sem nada ter mudado.
  */
-test.describe.serial("o documento da casa na conversa (§356)", () => {
-  test("trazer um documento da casa pelo link escreve na caixa, e NÃO envia sozinho", async ({
+test.describe.serial("o documento externo na conversa (§356)", () => {
+  test("trazer um documento externo pelo link escreve na caixa, e NÃO envia sozinho", async ({
     page,
   }) => {
     test.setTimeout(90000);
@@ -100,7 +100,7 @@ test.describe.serial("o documento da casa na conversa (§356)", () => {
     // ANEXAR a isso, nunca substituir.
     await campo.pressSequentially("quero desenhar a partir da página da wiki");
 
-    const link = page.getByLabel("Link de um documento da casa");
+    const link = page.getByLabel("Link de um documento externo");
     await expect(link).toBeVisible({ timeout: 15000 });
     await link.fill("https://confluence.invalido/pages/12345");
     await page.getByTestId("botao-importar-documento").click();

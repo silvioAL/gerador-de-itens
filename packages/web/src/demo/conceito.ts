@@ -136,7 +136,7 @@ export const CONEXOES: Conexao[] = [
     id: "adr-entra",
     noEstagio: "desenho",
     sentido: "entra",
-    titulo: "ADRs da casa",
+    titulo: "ADRs já registrados",
     detalhe:
       "As decisões que já foram tomadas entram pela conversa, como texto editável — do mesmo jeito que a voz entra. A pessoa lê antes de enviar, e o que veio de fora chega marcado como importado. A decisão nasce ancorada no desenho que ela ajudou a criar, nunca solta.",
     /**
@@ -154,7 +154,7 @@ export const CONEXOES: Conexao[] = [
     noEstagio: "contexto",
     sentido: "entra",
     titulo: "Arquitetura de negócio",
-    detalhe: "Objetivo, regras permanentes, sistemas e restrições vindos de onde a casa já os guarda.",
+    detalhe: "Objetivo, regras permanentes, sistemas e restrições vindos de onde a empresa já os guarda.",
     estado: "ausente",
     /**
      * SPEC-85 fatia B — a frase passou a citar o § que responde por ela.
@@ -169,7 +169,7 @@ export const CONEXOES: Conexao[] = [
      * guardar isso em formato legível, e disso não temos medição.)
      */
     oQueFalta:
-      "O §324 entregou a leitura por gateway e a proposta campo a campo. O que falta é a casa ter isso em formato legível — e disso não temos medição.",
+      "O §324 entregou a leitura por gateway e a proposta campo a campo. O que falta é a empresa ter isso em formato legível — e disso não temos medição.",
   },
   {
     id: "itens-sai",
@@ -177,7 +177,7 @@ export const CONEXOES: Conexao[] = [
     sentido: "sai",
     titulo: "Itens → issue tracker",
     detalhe:
-      "Os itens prontos sobem para o tracker da casa por um endereço configurável. O gerador não implementa Jira: implementar um tracker seria escolher o tracker de todo mundo.",
+      "Os itens prontos sobem para o tracker da empresa por um endereço configurável. O gerador não implementa Jira: implementar um tracker seria escolher o tracker de todo mundo.",
     estado: "completo",
   },
   {

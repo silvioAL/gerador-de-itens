@@ -104,7 +104,7 @@ export function OFluxoDoProcesso() {
       </h2>
       <p style={{ fontSize: 13.5, color: "var(--texto-2)", lineHeight: 1.6, margin: "0 0 4px" }}>
         A mesma coisa que o círculo mostra como mapa, vista como percurso — e em duas raias:{" "}
-        <strong>o que este sistema faz</strong> e <strong>o que já é da casa</strong>. Toda seta que cruza a linha é um
+        <strong>o que este sistema faz</strong> e <strong>o que já existe na empresa</strong>. Toda seta que cruza a linha é um
         ponto em que o produto fala com fora, por um endereço que o time configura.
       </p>
 
@@ -113,7 +113,7 @@ export function OFluxoDoProcesso() {
         width="100%"
         style={{ display: "block", margin: "12px auto 0" }}
         role="img"
-        aria-label="A jornada em duas raias: fora, as ferramentas que a casa já tem; dentro, as fases do processo, do negócio à entrega, com a volta do aprendizado. As setas que cruzam a linha entre as raias são os pontos em que o produto troca informação com sistemas de fora."
+        aria-label="A jornada em duas raias: fora, as ferramentas que a empresa já tem; dentro, as fases do processo, do negócio à entrega, com a volta do aprendizado. As setas que cruzam a linha entre as raias são os pontos em que o produto troca informação com sistemas de fora."
       >
         {/* ── AS RAIAS ──────────────────────────────────────────────────────
             A linha entre elas é a fronteira do sistema, e é ela que as setas

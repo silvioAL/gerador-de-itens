@@ -127,17 +127,22 @@ export function ConversaPanel({
    * falhou — o destino era cadastrável e nada o consumia.
    */
   const [podeImportarDocumento, setPodeImportarDocumento] = useState(false);
+  const [rotuloDoDocumento, setRotuloDoDocumento] = useState("");
   useEffect(() => {
     let cancelado = false;
     apiExportador
       .obter()
       .then((c) => {
-        if (!cancelado) {
-          setPodeImportarDocumento((c.destinos ?? []).some((d) => d.operacao === "documentoExterno" && !!d.endpoint));
-        }
+        if (cancelado) return;
+        const destino = (c.destinos ?? []).find((d) => d.operacao === "documentoExterno" && !!d.endpoint);
+        setPodeImportarDocumento(!!destino);
+        setRotuloDoDocumento(destino?.rotulo?.trim() ?? "");
       })
       .catch(() => {
-        if (!cancelado) setPodeImportarDocumento(false);
+        if (!cancelado) {
+          setPodeImportarDocumento(false);
+          setRotuloDoDocumento("");
+        }
       });
     return () => {
       cancelado = true;
@@ -317,7 +322,7 @@ export function ConversaPanel({
                 data-testid="trazer-adr"
                 style={botaoDeInsumoEstilo}
               >
-                {adr.trazendo ? "buscando…" : "↙ Decisões da casa"}
+                {adr.trazendo ? "buscando…" : `↙ Importar decisões${adr.rotuloDoDestino ? ` do ${adr.rotuloDoDestino}` : ""}`}
               </button>
               {adr.ultimoTotal !== null && (
                 <span style={{ fontSize: 11, color: "var(--texto-fraco)" }} data-testid="adr-trazidos">
@@ -352,8 +357,8 @@ export function ConversaPanel({
                   void importarDoLink();
                 }
               }}
-              placeholder="link de uma página da casa (Confluence, Notion…)"
-              aria-label="Link de um documento da casa"
+              placeholder={rotuloDoDocumento ? `link de uma página do ${rotuloDoDocumento}` : "link de uma página (Confluence, Notion…)"}
+              aria-label="Link de um documento externo"
               disabled={importando || pensando}
               style={{ flex: 1, fontSize: 12, padding: "5px 8px" }}
             />
@@ -363,7 +368,7 @@ export function ConversaPanel({
               data-testid="botao-importar-documento"
               style={{ fontSize: 12, whiteSpace: "nowrap" }}
             >
-              {importando ? "lendo…" : "Trazer o documento"}
+              {importando ? "lendo…" : `Importar${rotuloDoDocumento ? ` do ${rotuloDoDocumento}` : " o documento"}`}
             </button>
           </div>
           )}
