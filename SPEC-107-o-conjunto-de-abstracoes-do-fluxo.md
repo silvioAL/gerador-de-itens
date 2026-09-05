@@ -113,6 +113,32 @@ própria e o cabeçalho dizendo o que se desenha.
   fiação + adaptador, nunca tipo.
 - **Executor de `transformacao` antes do caso real** (§242).
 
+## 3.1 O que isto SUBSTITUI — o mapa, detalhado
+
+A régua é a da SPEC-106 (§3): **nada sai sem a prova da substituição verde.**
+"Vira fiação" significa: existe um fluxo semeado que faz o mesmo, o E2E da
+capacidade passa por ele, e só então a peça antiga morre.
+
+| Hoje | Vira | Prova de substituição | O que morre |
+|---|---|---|---|
+| **`#/ensaios` (EnsaiosScreen)** — bancada de cenários rodando no navegador | peça `ensaio` no canvas: `mesa.desenho → ensaio(cenario) → [agente]` | os cenários do E2E de ensaios passam pela fiação, com a MESMA leitura | a tela e a rota (redirect `#/ensaios → #/fluxo`), o código client-side de simulação |
+| **Botão "Derivar Quebra"** da mesa | continua na mesa (é a jornada) — mas dispara a MESMA peça `derivar` registrada | derivação pelo botão ≡ derivação pela peça, byte a byte | a segunda implementação do caminho de derivar (§263: um executor só) |
+| **Botão "Publicar"** do documento | atalho que dispara a fiação semeada `mesa.markdown → conector(documento)` | E2E de publicação passa SEM a rota dedicada | `POST /quebras/:id/documento/publicar` + seu bloco em `quebras.ts` |
+| **Exportar prontos** (seção de itens) | atalho da fiação `mesa.itens → conector(itens)` | E2E de exportação passa pela fiação | `POST /quebras/:id/itens/exportar` + `exportadorViaAgente.ts` (o "forasteiro" da medição §0) |
+| **Importar ADR / documento por link** (conversa) | fiações `conector(adr) → mesa` e `conector(documentoExterno) → agente → mesa(destino)` — confirmação humana FICA | E2E do §356 e do ADR passam sem as rotas dedicadas | `POST /ia/documento-externo`, `POST /quebras/:id/adr/importar`, e os adaptadores de `gatewayDoTime.ts` (o executor genérico de conector os cobre) |
+| **Revisão/esteira** (`useEsteiraDeAgentes`, client) | o fluxo semeado da esteira com `mesa.itens` como fonte, executado no servidor | **resultado idêntico item a item** (SPEC-105 F — a prova mais dura) | o motor de orquestração client-side (`acumuladas`, lotes) |
+| **`ENVELOPE_PADRAO`/`OPERACOES_DO_GATEWAY` como gargalo** | contratos no catálogo (105 A, feito) + peças por registro | já provado (§362) | crescimento da lista fechada como pré-requisito de integração |
+
+**O que NÃO substitui, por decisão:** a mesa de projeto (o desenho da demanda
+é a alma do produto — vira COMPONENTE, não refém do canvas de fluxo); a
+conversa/assistente (produção de desenho ≠ fiação); as abas de catálogo
+(Conectores, Pipeline como catálogo de papéis, regras — a 106 §2 já deu o
+destino de cada uma); o PDCA; e a confirmação humana em toda escrita na mesa.
+
+**Ordem de morte sugerida** (menor risco → maior): exportar itens → publicar
+documento → importar por link/ADR → ensaios → esteira (a última, atrás da
+prova item a item).
+
 ## 4. Fatias
 
 - **A — o registro de PEÇAS + as duas primeiras** (`derivar`, `ensaio`):
