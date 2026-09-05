@@ -1,12 +1,13 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ConectoresTab } from "./ConectoresTab";
-import { apiCatalogoDeConectores, apiConectores } from "../api/client";
+import { apiCatalogoDeConectores, apiConectores, apiExportador } from "../api/client";
 import { usePermissoes } from "../auth/usePermissoes";
 
 vi.mock("../api/client", () => ({
   apiConectores: { obter: vi.fn(), salvar: vi.fn() },
   apiCatalogoDeConectores: { listar: vi.fn(), executar: vi.fn() },
+  apiExportador: { obter: vi.fn(), salvar: vi.fn() },
 }));
 
 vi.mock("../auth/usePermissoes", () => ({
@@ -100,6 +101,28 @@ describe("o catálogo de conectores na tela (SPEC-105 fatia A)", () => {
     });
     expect(screen.getByTestId("saida-wiki-da-casa")).toHaveTextContent("o texto da página");
     expect(screen.getByTestId("saida-wiki-da-casa")).toHaveTextContent("A resposta não trouxe: titulo");
+  });
+
+  it("SPEC-106 B — criar um DESTINO do gateway pelo catálogo escreve no documento do exportador", async () => {
+    vi.mocked(apiExportador.obter).mockResolvedValue({ endpoint: "", rotulo: "", cabecalhos: {}, destinos: [] });
+    vi.mocked(apiExportador.salvar).mockResolvedValue({} as never);
+
+    render(<ConectoresTab />);
+    await waitFor(() => expect(screen.getByTestId("adicionar-destino-do-gateway")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId("adicionar-destino-do-gateway"));
+    fireEvent.change(screen.getByLabelText("Identificador"), { target: { value: "confluence-eng" } });
+    fireEvent.change(screen.getByLabelText("Rótulo (como se chama para quem lê)"), { target: { value: "Confluence" } });
+    fireEvent.change(screen.getByLabelText("Endereço (endpoint)"), { target: { value: "https://gw/doc" } });
+    fireEvent.click(screen.getByTestId("salvar-destino"));
+
+    await waitFor(() => expect(apiExportador.salvar).toHaveBeenCalled());
+    // O catálogo edita OS MESMOS registros da antiga aba: o destino entra na
+    // lista do exportador, não numa cópia paralela.
+    const doc = vi.mocked(apiExportador.salvar).mock.calls[0][0];
+    expect(doc.destinos).toEqual([
+      { id: "confluence-eng", operacao: "documento", endpoint: "https://gw/doc", rotulo: "Confluence", metodo: "POST" },
+    ]);
   });
 
   it("sem a permissão, a curadoria é dita — e não há botão de cadastrar", async () => {

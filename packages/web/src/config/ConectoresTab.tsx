@@ -281,7 +281,8 @@ export function ConectoresTab({ demonstracao }: { demonstracao?: ConectorDoCatal
       <p style={{ fontSize: 12.5, color: "var(--texto-2)", margin: "0 0 14px" }}>
         Um conector é um endereço que a organização sabe chamar, com a forma declarada: o que mandar
         (entrada) e como ler o que volta (saída). Uma integração nova entra aqui — sem código, sem release.
-        Os marcados como “do gateway” vêm dos destinos configurados na Exportação.
+        Os marcados como “do gateway” são destinos com operação conhecida (itens, documento, ADR…) — e se
+        criam e editam aqui mesmo.
       </p>
 
       {erro && (
