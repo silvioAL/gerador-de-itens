@@ -173,6 +173,28 @@ export {
   type TipoDeCampoDoConector,
 } from "./config/conectores.js";
 export { analisarCaminho, lerCaminho } from "./config/caminho.js";
+/** SPEC-107 fatia A — o registro de FUNÇÕES do sistema, com contrato e
+ * governança como dado, e o executor puro delas. */
+export {
+  FUNCOES_DO_SISTEMA,
+  funcaoDoSistema,
+  type FuncaoDoSistema,
+  type GovernancaDaFuncao,
+} from "./config/funcoes.js";
+export {
+  EntradaDaFuncaoInvalida,
+  executarFuncao,
+  type ContextoDasFuncoes,
+  type DesenhoMapeado,
+} from "./casos-de-uso/funcoes.js";
+/** SPEC-107 fatia A — o montador ÚNICO do vocabulário do diagrama (web e
+ * servidor mesclam os campos customizados pela mesma função, §263). */
+export {
+  comoFieldSpec,
+  mesclarCamposDeAresta,
+  mesclarCamposDeNo,
+  type CampoCustomizado,
+} from "./config/diagramaDoTime.js";
 /** SPEC-105 fatias C/D — o fluxo como grafo, e a execução pura. */
 export {
   ID_DO_FLUXO_DA_ESTEIRA,

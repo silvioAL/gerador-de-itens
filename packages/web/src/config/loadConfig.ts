@@ -1,4 +1,5 @@
-import type { AppConfig, DiagramaConfig, FieldSpec, RegrasConfig, Token } from "@gerador/engine";
+import type { AppConfig, DiagramaConfig, RegrasConfig, Token } from "@gerador/engine";
+import { mesclarCamposDeAresta, mesclarCamposDeNo } from "@gerador/aplicacao";
 import {
   apiCamposAresta,
   apiCamposNo,
@@ -37,64 +38,19 @@ async function buscarJsonOpcional<T>(caminho: string): Promise<T | undefined> {
   }
 }
 
-function comoFieldSpec(campo: CampoNo): FieldSpec {
-  return {
-    key: campo.key,
-    label: campo.label,
-    type: campo.type,
-    required: campo.required || undefined,
-    default: campo.valorPadrao ?? undefined,
-    options: campo.opcoes ?? undefined,
-    ajuda: campo.ajuda ?? undefined,
-    permiteNA: campo.permiteNA || undefined,
-    itemSpec: campo.itemSpec ?? undefined,
-  };
-}
-
-function comoFieldSpecAresta(campo: CampoAresta): FieldSpec {
-  return {
-    key: campo.key,
-    label: campo.label,
-    type: campo.type,
-    required: campo.required || undefined,
-    default: campo.valorPadrao ?? undefined,
-    options: campo.opcoes ?? undefined,
-    ajuda: campo.ajuda ?? undefined,
-  };
-}
-
 /**
- * Campos globais + do time ativo (`campos_no` no @gerador/server, SPEC-08 §3)
- * se sobrepõem ao `spec` estático de `diagrama.json` por `key` — mesma regra de
- * override que perfis de time já usa. Sem `timeAtivo` (ex.: tela de login ainda
- * não passou), mescla só o que é global.
+ * A mescla dos campos customizados (SPEC-08 §3 / SPEC-21) saiu daqui e virou
+ * `mesclarCamposDeNo`/`mesclarCamposDeAresta` na aplicação (SPEC-107 fatia A):
+ * o servidor passou a montar o MESMO vocabulário para a função `derivacao`, e
+ * duas mesclas divergiriam na primeira mudança (§263). `CampoNo`/`CampoAresta`
+ * do client já têm a forma estrutural que a mescla lê.
  */
 function mesclarCamposCustomizados(diagramaConfig: DiagramaConfig, campos: CampoNo[]): DiagramaConfig {
-  const nodeTypes = { ...diagramaConfig.nodeTypes };
-  for (const campo of campos) {
-    const cfg = nodeTypes[campo.tipoNo];
-    if (!cfg) continue; // tipo de nó desconhecido (campo órfão de um tipo removido) — ignora, não quebra a config
-    const fieldSpec = comoFieldSpec(campo);
-    const idx = cfg.spec.findIndex((f) => f.key === campo.key);
-    const spec = idx >= 0 ? cfg.spec.map((f, i) => (i === idx ? fieldSpec : f)) : [...cfg.spec, fieldSpec];
-    nodeTypes[campo.tipoNo] = { ...cfg, spec };
-  }
-  return { ...diagramaConfig, nodeTypes };
+  return mesclarCamposDeNo(diagramaConfig, campos);
 }
 
-/** Mesma regra de override de `mesclarCamposCustomizados`, pra `edgeTypes` (SPEC-21). */
 function mesclarCamposCustomizadosAresta(diagramaConfig: DiagramaConfig, campos: CampoAresta[]): DiagramaConfig {
-  const edgeTypes = { ...diagramaConfig.edgeTypes };
-  for (const campo of campos) {
-    const cfg = edgeTypes[campo.tipoAresta];
-    if (!cfg) continue;
-    const fieldSpec = comoFieldSpecAresta(campo);
-    const specAtual = cfg.spec ?? [];
-    const idx = specAtual.findIndex((f) => f.key === campo.key);
-    const spec = idx >= 0 ? specAtual.map((f, i) => (i === idx ? fieldSpec : f)) : [...specAtual, fieldSpec];
-    edgeTypes[campo.tipoAresta] = { ...cfg, spec };
-  }
-  return { ...diagramaConfig, edgeTypes };
+  return mesclarCamposDeAresta(diagramaConfig, campos);
 }
 
 /**

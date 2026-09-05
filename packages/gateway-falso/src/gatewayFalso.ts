@@ -145,6 +145,47 @@ export const DOCUMENTO_DO_GATEWAY_FALSO = {
   atualizadoEm: "2026-08-20T10:00:00.000Z",
 };
 
+/**
+ * SPEC-107 fatia A — **um DESENHO da casa, para o modo (b) ter o que derivar.**
+ *
+ * A função `derivacao` aceita qualquer desenho mapeado — inclusive um que um
+ * conector trouxe de fora. Este é esse desenho: dois serviços e uma chamada
+ * HTTP, no vocabulário do `diagrama.example.json`, com um campo obrigatório
+ * deliberadamente por preencher (`endpoints` do bureau) — derivar dele produz
+ * itens de completude, e um desenho que derivasse zero itens "com sucesso"
+ * não provaria nada.
+ */
+export const DESENHO_DO_GATEWAY_FALSO = {
+  diagrama: {
+    nodes: [
+      {
+        id: "aprovacao",
+        type: "service",
+        x: 80,
+        y: 80,
+        label: "Serviço de aprovação",
+        status: "novo",
+        spec: {
+          nome: { valor: "servico-de-aprovacao", origem: "manual" },
+          linguagem: { valor: "Kotlin", origem: "manual" },
+        },
+        specNA: {},
+      },
+      {
+        id: "bureau",
+        type: "service",
+        x: 380,
+        y: 80,
+        label: "Bureau de crédito",
+        status: "existente",
+        spec: {},
+        specNA: {},
+      },
+    ],
+    edges: [{ id: "consulta", source: "aprovacao", target: "bureau", type: "http", spec: {} }],
+  },
+};
+
 /** As páginas já publicadas, por `demandaId`. Existe para o dublê provar a
  * IDEMPOTÊNCIA que o contrato promete: publicar duas vezes atualiza no lugar e
  * devolve `atualizada: true`, em vez de criar uma segunda página. */
@@ -387,6 +428,21 @@ export function criarGatewayFalso(opcoes: OpcoesGatewayFalso = {}): Server {
         depoisDaLatencia(() => {
           res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
           res.end(JSON.stringify({ linkExterno: link, atualizada: jaExistia }));
+        });
+      });
+      return;
+    }
+
+    // SPEC-107 fatia A — o desenho da casa, para a fiação
+    // `conector(desenho) → derivacao → …` ter o que trazer de fora (modo b).
+    // Sem credencial, pela mesma razão de `/adr`: cabeçalho de destino é do
+    // time, não a chave do provedor de IA.
+    if (req.url?.endsWith("/desenho") && req.method === "POST") {
+      req.resume();
+      req.on("end", () => {
+        depoisDaLatencia(() => {
+          res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ desenho: DESENHO_DO_GATEWAY_FALSO }));
         });
       });
       return;

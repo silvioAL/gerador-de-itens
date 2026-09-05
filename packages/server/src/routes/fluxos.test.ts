@@ -4,7 +4,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { criarBancoDeDados, type BancoDeDados } from "../db/client.js";
 import { exigirBancoDescartavel, garantirBancoDeTeste, URL_BANCO_DE_TESTE } from "../test-support/bancoDeTeste.js";
 import { buildApp } from "../app.js";
-import { criarGatewayFalso, CHAVE_GATEWAY_FALSO } from "@gerador/gateway-falso";
+import { criarGatewayFalso, CHAVE_GATEWAY_FALSO, DESENHO_DO_GATEWAY_FALSO } from "@gerador/gateway-falso";
+import { executarFuncao } from "@gerador/aplicacao";
+import { contextoDasFuncoes } from "../config/contextoDasFuncoes.js";
 
 /**
  * SPEC-105 fatia D — **a prova da SPEC: o exemplo do JMeter (§4.2), ponta a
@@ -301,6 +303,193 @@ describe("SPEC-105 fatia D — POST /fluxos/:id/executar", () => {
       expect(
         (await app.inject({ method: "POST", url: "/fluxos/nao-existe/executar", cookies, payload: {} })).statusCode
       ).toBe(404);
+    });
+  });
+});
+
+/**
+ * SPEC-107 fatia A — **a prova da fatia: as fiações com FUNÇÃO, ponta a ponta
+ * contra o dublê.**
+ *
+ * `conector(desenho) → derivacao → agente → conector(escrita)` e
+ * `conector(desenho) → ensaio → agente`. O desenho vem DE FORA (modo b, §5.4)
+ * — e por isso o rastro grava as ENTRADAS do nó de função, a âncora da tese
+ * reescrita ("mesma fiação + mesmas entradas → mesmos itens").
+ */
+describe("SPEC-107 fatia A — o nó de FUNÇÃO no fluxo", () => {
+  async function declararLeitorDeDesenho(app: App, cookies: Cookies) {
+    await app.inject({
+      method: "PUT",
+      url: "/config/conectores",
+      cookies,
+      payload: {
+        documento: {
+          conectores: [
+            {
+              id: "leitor-de-desenho",
+              nome: "Desenho da casa",
+              endpoint: `${baseDoGateway}/desenho`,
+              entrada: [],
+              saida: [{ chave: "desenho", rotulo: "Desenho", tipo: "objeto", caminho: "$.desenho", obrigatorio: true }],
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  const FLUXO_DERIVACAO = {
+    id: "gera-itens-de-fora",
+    nome: "Itens de um desenho de fora",
+    nos: [
+      { id: "le-desenho", tipo: "conector", refId: "leitor-de-desenho", posicao: { x: 0, y: 0 }, parametros: {} },
+      { id: "gera-itens", tipo: "funcao", refId: "derivacao", posicao: { x: 200, y: 0 }, parametros: {} },
+      { id: "resume", tipo: "agente", refId: "especialista", posicao: { x: 400, y: 0 }, parametros: {} },
+      { id: "publica", tipo: "conector", refId: "publicar", posicao: { x: 600, y: 0 }, parametros: { demandaId: "itens-de-fora-teste" } },
+    ],
+    arestas: [
+      { de: "le-desenho", para: "gera-itens", mapeamento: [{ saida: "desenho", entrada: "desenho" }] },
+      { de: "gera-itens", para: "resume", mapeamento: [{ saida: "itens", entrada: "itens" }] },
+      { de: "resume", para: "publica", mapeamento: [{ saida: "texto", entrada: "markdown" }] },
+    ],
+  };
+
+  it("a fiação da derivação roda ponta a ponta, e o rastro guarda as ENTRADAS do nó de função", async () => {
+    await comApp(async (app, cookies) => {
+      await prepararMundo(app, cookies);
+      await declararLeitorDeDesenho(app, cookies);
+      const escrito = await app.inject({
+        method: "PUT",
+        url: "/config/fluxos",
+        cookies,
+        payload: { documento: { fluxos: [FLUXO_DERIVACAO] } },
+      });
+      expect(escrito.statusCode).toBe(200);
+
+      const r = await app.inject({ method: "POST", url: "/fluxos/gera-itens-de-fora/executar", cookies, payload: {} });
+      expect(r.statusCode).toBe(200);
+      const corpo = r.json() as {
+        nos: { noId: string; estado: string; erro?: string }[];
+        saidas: Record<string, Record<string, unknown>>;
+      };
+      expect(corpo.nos.map((n) => [n.noId, n.estado])).toEqual([
+        ["le-desenho", "sucesso"],
+        ["gera-itens", "sucesso"],
+        ["resume", "sucesso"],
+        ["publica", "sucesso"],
+      ]);
+      // O desenho de fora derivou itens de verdade (o fixture tem um campo
+      // obrigatório por preencher de propósito), e o artefato final subiu.
+      expect((corpo.saidas["gera-itens"].itens as unknown[]).length).toBeGreaterThan(0);
+      expect(String(corpo.saidas["publica"].linkExterno)).toContain("http");
+
+      // §5.4 — o rastro persistido guarda as ENTRADAS do nó de função (e só
+      // dele): é o que torna "mesma fiação + mesmas entradas" auditável.
+      const rastro = await app.inject({ method: "GET", url: "/fluxos/gera-itens-de-fora/execucoes", cookies });
+      const { execucoes } = rastro.json() as {
+        execucoes: { nos: { noId: string; entradas?: Record<string, unknown> }[] }[];
+      };
+      const nos = Object.fromEntries(execucoes[0].nos.map((n) => [n.noId, n]));
+      expect(nos["gera-itens"].entradas?.desenho).toBeDefined();
+      expect(nos["le-desenho"].entradas).toBeUndefined();
+      expect(nos["resume"].entradas).toBeUndefined();
+    });
+  });
+
+  it("§263 — a rota devolve EXATAMENTE o que o motor devolve com o vocabulário do servidor: um executor só", async () => {
+    await comApp(async (app, cookies) => {
+      await prepararMundo(app, cookies);
+      await declararLeitorDeDesenho(app, cookies);
+      await app.inject({ method: "PUT", url: "/config/fluxos", cookies, payload: { documento: { fluxos: [FLUXO_DERIVACAO] } } });
+
+      const r = await app.inject({
+        method: "POST",
+        url: "/fluxos/gera-itens-de-fora/executar",
+        cookies,
+        payload: { ateNo: "gera-itens" },
+      });
+      expect(r.statusCode).toBe(200);
+      const corpo = r.json() as { saidas: Record<string, Record<string, unknown>> };
+
+      const contexto = await contextoDasFuncoes(db, resolve(import.meta.dirname, "../../../../config"));
+      const direto = executarFuncao("derivacao", { desenho: DESENHO_DO_GATEWAY_FALSO }, contexto);
+      expect(corpo.saidas["gera-itens"].itens).toEqual(JSON.parse(JSON.stringify(direto.itens)));
+    });
+  });
+
+  it("a fiação do ensaio roda: desenho de fora + cenário fixo → leitura → agente", async () => {
+    await comApp(async (app, cookies) => {
+      await prepararMundo(app, cookies);
+      await declararLeitorDeDesenho(app, cookies);
+      await app.inject({
+        method: "PUT",
+        url: "/config/fluxos",
+        cookies,
+        payload: {
+          documento: {
+            fluxos: [
+              {
+                id: "ensaia-de-fora",
+                nome: "Ensaio de um desenho de fora",
+                nos: [
+                  { id: "le-desenho", tipo: "conector", refId: "leitor-de-desenho", posicao: { x: 0, y: 0 }, parametros: {} },
+                  {
+                    id: "ensaia",
+                    tipo: "funcao",
+                    refId: "ensaio",
+                    posicao: { x: 200, y: 0 },
+                    parametros: { cenario: { id: "pico", nome: "pico de fim de mês", ajustes: [] } },
+                  },
+                  { id: "avalia", tipo: "agente", refId: "qa", posicao: { x: 400, y: 0 }, parametros: {} },
+                ],
+                arestas: [
+                  { de: "le-desenho", para: "ensaia", mapeamento: [{ saida: "desenho", entrada: "desenho" }] },
+                  { de: "ensaia", para: "avalia", mapeamento: [{ saida: "leitura", entrada: "leitura" }] },
+                ],
+              },
+            ],
+          },
+        },
+      });
+
+      const r = await app.inject({ method: "POST", url: "/fluxos/ensaia-de-fora/executar", cookies, payload: {} });
+      expect(r.statusCode).toBe(200);
+      const corpo = r.json() as { nos: { noId: string; estado: string; erro?: string }[]; saidas: Record<string, Record<string, unknown>> };
+      expect(corpo.nos.map((n) => [n.noId, n.estado])).toEqual([
+        ["le-desenho", "sucesso"],
+        ["ensaia", "sucesso"],
+        ["avalia", "sucesso"],
+      ]);
+      const leitura = corpo.saidas["ensaia"].leitura as { hoje?: unknown; resultado?: { cenarioId: string } };
+      expect(leitura.hoje).toBeDefined();
+      expect(leitura.resultado?.cenarioId).toBe("pico");
+    });
+  });
+
+  it("escrever fluxo com função fora do registro é recusado com o nome dela", async () => {
+    await comApp(async (app, cookies) => {
+      const r = await app.inject({
+        method: "PUT",
+        url: "/config/fluxos",
+        cookies,
+        payload: {
+          documento: {
+            fluxos: [{ id: "f", nos: [{ id: "g", tipo: "funcao", refId: "telepatia", posicao: { x: 0, y: 0 }, parametros: {} }], arestas: [] }],
+          },
+        },
+      });
+      expect(r.statusCode).toBe(400);
+      expect((r.json() as { erro: string }).erro).toContain('"telepatia", que não existe');
+    });
+  });
+
+  it("GET /funcoes serve o registro, com contrato e governança como dado", async () => {
+    await comApp(async (app) => {
+      const r = await app.inject({ method: "GET", url: "/funcoes" });
+      expect(r.statusCode).toBe(200);
+      const { funcoes } = r.json() as { funcoes: { id: string; governanca: { nivel: string } }[] };
+      expect(funcoes.map((f) => f.id)).toEqual(["derivacao", "ensaio"]);
+      expect(funcoes.every((f) => f.governanca.nivel === "operar")).toBe(true);
     });
   });
 });
