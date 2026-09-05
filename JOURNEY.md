@@ -16304,3 +16304,28 @@ origem (derivado ×  declarado) e a saúde da última execução —
 `GET /fluxos/execucoes/ultimas` devolve SÓ estados, moldados no servidor
 (nunca o erro inteiro nem saídas, a régua de `/ia/execucoes`). Fluxo que
 falhou vira aviso do mapa, porque fluxo que falha não se anuncia sozinho.
+
+---
+
+## §366 — SPEC-106 fatia B: o catálogo absorve a Exportação
+
+A primeira SUBTRAÇÃO provada da SPEC-106. "Endereço que a empresa chama"
+existia em dois lugares — a aba Exportação (destinos do gateway) e o catálogo
+de Conectores (SPEC-105 A, que os DERIVA). A fatia B fecha a duplicação pelo
+lado certo: **o catálogo passa a criar, editar e remover os destinos**, por
+read-modify-write no MESMO documento do exportador — nenhuma cópia, nenhum
+formato novo. O endereço legado de itens (o `endpoint` de topo da SPEC-49)
+edita-se pelo cartão "exportador", e removê-lo é desligar a exportação, a
+semântica de sempre.
+
+Com a paridade no lugar, a aba e o item de menu SAEM — e a régua da remoção
+foi a da SPEC-61 §6.7: `#/config/exportacao` REDIRECIONA para o catálogo
+(link salvo nunca vira tela branca), o passo do ciclo/tour aponta para o
+catálogo (com dado de demonstração próprio, `CONECTORES_DO_TOUR`), e a
+mensagem 409 do leitor de documento aponta o lugar novo CITANDO o antigo —
+quem decorou o caminho velho é guiado, não abandonado.
+
+A prova da fatia (os E2E de exportação/publicação/ADR/documento-externo
+passando sem tocar na aba antiga) rodou na suíte completa. De quebra, saiu um
+`README.md` stub que alguma ferramenta gerou no pacote web prometendo um
+`npm install` que não existe mais (§ modo único hospedado).

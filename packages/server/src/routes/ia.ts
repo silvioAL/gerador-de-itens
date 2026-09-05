@@ -553,7 +553,7 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
       // Diz o que fazer, como as irmãs: um erro genérico manda a pessoa
       // adivinhar onde configurar.
       return reply.code(409).send({
-        erro: "nenhum destino de leitura de documento configurado — cadastre o endereço em Configurações → Exportação, em “Outros destinos”",
+        erro: "nenhum destino de leitura de documento configurado — cadastre o endereço em Configurações → Conectores (o catálogo absorveu a antiga aba Exportação)",
       });
     }
 

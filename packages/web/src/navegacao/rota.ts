@@ -21,7 +21,6 @@ export type AreaConfig =
   | "pipeline"
   | "modeloIa"
   | "pdca"
-  | "exportacao"
   /** SPEC-79 fatia A — os tokens do design system do time. */
   | "tokens"
   /** SPEC-105 fatia A — o catálogo de conectores (organizacional). */
@@ -96,7 +95,6 @@ const SEGMENTO_DA_AREA: Record<AreaConfig, string> = {
   pipeline: "pipeline",
   modeloIa: "modelo-ia",
   pdca: "pdca",
-  exportacao: "exportacao",
   tokens: "design-system",
   conectores: "conectores",
 };
@@ -141,6 +139,9 @@ export function rotaDoHash(hash: string): Rota {
   // apostou justamente em o endereço ser mandável para alguém.
   if (partes[0] === "simulacao") return { tela: "ensaios" };
   if (partes[0] === "config") {
+    // SPEC-106 fatia B — a aba Exportação foi absorvida pelo catálogo de
+    // Conectores; o link salvo REDIRECIONA (SPEC-61 §6.7), nunca vira branco.
+    if (partes[1] === "exportacao") return { tela: "config", area: "conectores" };
     const area = AREA_DO_SEGMENTO[partes[1] ?? ""];
     if (area) return { tela: "config", area };
   }

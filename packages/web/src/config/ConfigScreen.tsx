@@ -15,11 +15,10 @@ import { RECURSO_DA_ABA, RECURSO_DA_SECAO_DE_REGRAS, usePermissoes } from "../au
 import { apiPdca } from "../api/client";
 import { PdcaTab } from "./PdcaTab";
 import { TokensTab } from "./TokensTab";
-import { ExportacaoTab } from "./ExportacaoTab";
 import { ConexoesTab } from "./ConexoesTab";
 import { ConectoresTab } from "./ConectoresTab";
 import { ProdutosTab } from "./ProdutosTab";
-import { EXPORTADOR_DO_TOUR, TOKENS_DO_TOUR, PRODUTO_DO_TOUR } from "../demo/dadosDoTour";
+import { CONECTORES_DO_TOUR, TOKENS_DO_TOUR, PRODUTO_DO_TOUR } from "../demo/dadosDoTour";
 
 export type AbaConfig =
   | "produtos"
@@ -32,7 +31,7 @@ export type AbaConfig =
   | "acessos"
   | "especificacao"
   | "pipeline"
-  | "modeloIa" | "pdca" | "exportacao" | "tokens"
+  | "modeloIa" | "pdca" | "tokens"
   /** SPEC-105 fatia A — o catálogo de conectores (organizacional). */
   | "conectores";
 
@@ -199,9 +198,8 @@ export function ConfigScreen({
       { id: "pipeline", rotulo: "Pipeline de IA", existe: true },
       { id: "modeloIa", rotulo: "Modelo de IA", existe: true },
       { id: "pdca", rotulo: "PDCA — melhoria contínua", existe: true },
-      { id: "exportacao", rotulo: "Exportação", existe: true },
-      // SPEC-105 fatia A — vizinha da exportação: as duas falam de endereços
-      // do gateway. O catálogo é organizacional e curado.
+      // SPEC-106 fatia B — a Exportação foi absorvida: o catálogo é o único
+      // lugar de "endereço que a empresa chama" (organizacional e curado).
       { id: "conectores", rotulo: "Conectores", existe: true },
       { id: "tokens", rotulo: "Design system", existe: true },
     ] satisfies { id: AbaConfig; rotulo: string; existe: boolean }[]
@@ -259,9 +257,6 @@ export function ConfigScreen({
         {abaAtiva === "pdca" && (
           <PdcaTab config={config} timeAtivo={timeAtivo} onAbrirArea={onAbrirArea} onFichaMudou={onFichaMudou} />
         )}
-        {abaAtiva === "exportacao" && (
-          <ExportacaoTab demonstracao={demonstracao ? EXPORTADOR_DO_TOUR : undefined} />
-        )}
         {abaAtiva === "tokens" && <TokensTab demonstracao={demonstracao ? TOKENS_DO_TOUR : undefined} />}
         {abaAtiva === "produtos" && (
           <ProdutosTab
@@ -284,7 +279,7 @@ export function ConfigScreen({
           />
         )}
         {abaAtiva === "conexoes" && <ConexoesTab config={config} />}
-        {abaAtiva === "conectores" && <ConectoresTab />}
+        {abaAtiva === "conectores" && <ConectoresTab demonstracao={demonstracao ? CONECTORES_DO_TOUR : undefined} />}
         {abaAtiva === "camposAresta" && (
           <CamposArestaTab
             config={config}

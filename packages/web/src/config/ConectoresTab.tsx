@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { OPERACOES_DO_GATEWAY, type OperacaoDoGateway } from "@gerador/aplicacao";
 import {
   apiCatalogoDeConectores,
   apiConectores,
+  apiExportador,
   type CampoDoConector,
   type Conector,
   type ConectorDoCatalogo,
@@ -96,9 +98,35 @@ function comoConector(form: FormConector): Conector {
   };
 }
 
-export function ConectoresTab() {
+/**
+ * SPEC-106 fatia B — um DESTINO do gateway, editável daqui: o catálogo
+ * absorveu a aba Exportação, e "endereço que a empresa chama" tem um lugar só.
+ */
+interface FormDestino {
+  id: string;
+  operacao: OperacaoDoGateway;
+  rotulo: string;
+  endpoint: string;
+  metodo: "POST" | "PUT" | "PATCH";
+  envelope: string;
+  espaco: string;
+  cabecalhosTexto: string;
+}
+
+const FORM_DESTINO_VAZIO: FormDestino = {
+  id: "",
+  operacao: "documento",
+  rotulo: "",
+  endpoint: "",
+  metodo: "POST",
+  envelope: "",
+  espaco: "",
+  cabecalhosTexto: "",
+};
+
+export function ConectoresTab({ demonstracao }: { demonstracao?: ConectorDoCatalogo[] }) {
   const permissoes = usePermissoes({ hospedado: true });
-  const podeEditar = permissoes.pode("conectores", "editar");
+  const podeEditar = !demonstracao && permissoes.pode("conectores", "editar");
 
   const [catalogo, setCatalogo] = useState<ConectorDoCatalogo[] | null>(null);
   const [declarados, setDeclarados] = useState<Conector[]>([]);
@@ -107,8 +135,16 @@ export function ConectoresTab() {
   /** `null` = form fechado; `""` = criando; id = editando o declarado. */
   const [editando, setEditando] = useState<string | null>(null);
   const [form, setForm] = useState<FormConector>(FORM_VAZIO);
+  /** SPEC-106 fatia B — o form do DESTINO (mesma semântica do `editando`). */
+  const [editandoDestino, setEditandoDestino] = useState<string | null>(null);
+  const [formDestino, setFormDestino] = useState<FormDestino>(FORM_DESTINO_VAZIO);
 
   async function carregar() {
+    if (demonstracao) {
+      setCatalogo(demonstracao);
+      setDeclarados([]);
+      return;
+    }
     try {
       const [vigor, documento] = await Promise.all([apiCatalogoDeConectores.listar(), apiConectores.obter()]);
       setCatalogo(vigor.conectores);
@@ -148,6 +184,95 @@ export function ConectoresTab() {
     void salvar(declarados.filter((c) => c.id !== id));
   }
 
+  /**
+   * SPEC-106 fatia B — a escrita do DESTINO é read-modify-write no documento
+   * do exportador: o catálogo edita OS MESMOS registros que sempre valeram.
+   * O id "exportador" é o endereço legado de itens, que mora no topo.
+   */
+  async function salvarDestino() {
+    setSalvando(true);
+    setErro(null);
+    try {
+      const doc = (await apiExportador.obter()) ?? { endpoint: "", rotulo: "", cabecalhos: {} };
+      const cabecalhos = cabecalhosDoTexto(formDestino.cabecalhosTexto);
+      if (formDestino.id === "exportador") {
+        doc.endpoint = formDestino.endpoint.trim();
+        doc.rotulo = formDestino.rotulo.trim();
+        doc.cabecalhos = cabecalhos;
+      } else {
+        const destino = {
+          id: formDestino.id.trim(),
+          operacao: formDestino.operacao,
+          endpoint: formDestino.endpoint.trim(),
+          rotulo: formDestino.rotulo.trim(),
+          ...(Object.keys(cabecalhos).length > 0 ? { cabecalhos } : {}),
+          metodo: formDestino.metodo,
+          ...(formDestino.envelope.trim() !== "" ? { envelope: formDestino.envelope.trim() } : {}),
+          ...(formDestino.espaco.trim() ? { espaco: formDestino.espaco.trim() } : {}),
+        };
+        const semEle = (doc.destinos ?? []).filter((d) => d.id !== (editandoDestino || destino.id));
+        doc.destinos = [...semEle, destino];
+      }
+      await apiExportador.salvar(doc);
+      setEditandoDestino(null);
+      setFormDestino(FORM_DESTINO_VAZIO);
+      await carregar();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function removerDestino(id: string) {
+    setSalvando(true);
+    setErro(null);
+    try {
+      const doc = (await apiExportador.obter()) ?? { endpoint: "", rotulo: "", cabecalhos: {} };
+      if (id === "exportador") {
+        // Endereço vazio = exportação de itens desligada, a semântica de sempre.
+        doc.endpoint = "";
+      } else {
+        doc.destinos = (doc.destinos ?? []).filter((d) => d.id !== id);
+      }
+      await apiExportador.salvar(doc);
+      await carregar();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function abrirEdicaoDeDestino(id: string) {
+    const doc = (await apiExportador.obter()) ?? { endpoint: "", rotulo: "", cabecalhos: {} };
+    if (id === "exportador") {
+      setFormDestino({
+        ...FORM_DESTINO_VAZIO,
+        id: "exportador",
+        operacao: "itens",
+        rotulo: doc.rotulo,
+        endpoint: doc.endpoint,
+        cabecalhosTexto: textoDosCabecalhos(doc.cabecalhos ?? {}),
+      });
+    } else {
+      const destino = (doc.destinos ?? []).find((d) => d.id === id);
+      if (!destino) return;
+      setFormDestino({
+        id: destino.id,
+        operacao: destino.operacao,
+        rotulo: destino.rotulo,
+        endpoint: destino.endpoint,
+        metodo: (destino.metodo ?? "POST") as FormDestino["metodo"],
+        envelope: destino.envelope ?? "",
+        espaco: destino.espaco ?? "",
+        cabecalhosTexto: textoDosCabecalhos(destino.cabecalhos ?? {}),
+      });
+    }
+    setEditando(null);
+    setEditandoDestino(id);
+  }
+
   if (!catalogo) return <div data-testid="conectores-tab">carregando…</div>;
 
   return (
@@ -156,7 +281,8 @@ export function ConectoresTab() {
       <p style={{ fontSize: 12.5, color: "var(--texto-2)", margin: "0 0 14px" }}>
         Um conector é um endereço que a organização sabe chamar, com a forma declarada: o que mandar
         (entrada) e como ler o que volta (saída). Uma integração nova entra aqui — sem código, sem release.
-        Os marcados como “do gateway” vêm dos destinos configurados na Exportação.
+        Os marcados como “do gateway” são destinos com operação conhecida (itens, documento, ADR…) — e se
+        criam e editam aqui mesmo.
       </p>
 
       {erro && (
@@ -170,14 +296,23 @@ export function ConectoresTab() {
           <CartaoDeConector
             key={conector.id}
             conector={conector}
-            podeEditar={podeEditar && conector.origem === "declarado"}
+            podeEditar={podeEditar}
             onEditar={() => {
+              // Declarado edita a forma inteira; fábrica edita o DESTINO
+              // subjacente — os mesmos registros, um lugar só (SPEC-106 B).
               const declarado = declarados.find((c) => c.id === conector.id);
-              if (!declarado) return;
-              setEditando(conector.id);
-              setForm(comoForm(declarado));
+              if (declarado) {
+                setEditandoDestino(null);
+                setEditando(conector.id);
+                setForm(comoForm(declarado));
+              } else {
+                void abrirEdicaoDeDestino(conector.id);
+              }
             }}
-            onRemover={() => remover(conector.id)}
+            onRemover={() => {
+              if (declarados.some((c) => c.id === conector.id)) remover(conector.id);
+              else void removerDestino(conector.id);
+            }}
           />
         ))}
         {catalogo.length === 0 && (
@@ -187,17 +322,131 @@ export function ConectoresTab() {
         )}
       </div>
 
-      {podeEditar && editando === null && (
-        <button
-          data-testid="adicionar-conector"
-          onClick={() => {
-            setEditando("");
-            setForm(FORM_VAZIO);
-          }}
-          style={{ ...botao, marginTop: 14 }}
+      {podeEditar && editando === null && editandoDestino === null && (
+        <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+          <button
+            data-testid="adicionar-conector"
+            onClick={() => {
+              setEditando("");
+              setForm(FORM_VAZIO);
+            }}
+            style={botao}
+          >
+            + Conector (endereço livre)
+          </button>
+          <button
+            data-testid="adicionar-destino-do-gateway"
+            onClick={() => {
+              setEditandoDestino("");
+              setFormDestino(FORM_DESTINO_VAZIO);
+            }}
+            style={botao}
+          >
+            + Destino do gateway (operação conhecida)
+          </button>
+        </div>
+      )}
+
+      {editandoDestino !== null && (
+        <fieldset
+          disabled={salvando}
+          data-testid="form-destino"
+          style={{ marginTop: 14, border: "1px solid var(--borda-forte)", borderRadius: 10, padding: 14 }}
         >
-          + Cadastrar conector
-        </button>
+          <legend style={{ fontSize: 13, fontWeight: 600 }}>
+            {editandoDestino ? `Editando o destino "${editandoDestino}"` : "Novo destino do gateway"}
+          </legend>
+          <div style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1fr" }}>
+            <label style={rotulo}>
+              Identificador
+              <input
+                value={formDestino.id}
+                disabled={!!editandoDestino}
+                onChange={(e) => setFormDestino({ ...formDestino, id: e.target.value })}
+                placeholder="confluence-eng"
+                style={campo}
+              />
+            </label>
+            <label style={rotulo}>
+              Operação
+              <select
+                value={formDestino.operacao}
+                disabled={editandoDestino === "exportador"}
+                onChange={(e) => setFormDestino({ ...formDestino, operacao: e.target.value as OperacaoDoGateway })}
+                style={campo}
+              >
+                {OPERACOES_DO_GATEWAY.map((op) => (
+                  <option key={op} value={op}>
+                    {op}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={rotulo}>
+              Rótulo (como se chama para quem lê)
+              <input
+                value={formDestino.rotulo}
+                onChange={(e) => setFormDestino({ ...formDestino, rotulo: e.target.value })}
+                placeholder="Confluence de Engenharia"
+                style={campo}
+              />
+            </label>
+            <label style={rotulo}>
+              Endereço (endpoint)
+              <input
+                value={formDestino.endpoint}
+                onChange={(e) => setFormDestino({ ...formDestino, endpoint: e.target.value })}
+                placeholder="https://gateway.empresa/documento"
+                style={campo}
+              />
+            </label>
+            <label style={rotulo}>
+              Método
+              <select value={formDestino.metodo} onChange={(e) => setFormDestino({ ...formDestino, metodo: e.target.value as FormDestino["metodo"] })} style={campo}>
+                <option value="POST">POST</option>
+                <option value="PUT">PUT</option>
+                <option value="PATCH">PATCH</option>
+              </select>
+            </label>
+            <label style={rotulo}>
+              Espaço (onde escrever do outro lado — opcional)
+              <input
+                value={formDestino.espaco}
+                onChange={(e) => setFormDestino({ ...formDestino, espaco: e.target.value })}
+                placeholder="ENG"
+                style={campo}
+              />
+            </label>
+            <label style={{ ...rotulo, gridColumn: "1 / -1" }}>
+              Cabeçalhos (um por linha, “Nome: valor”)
+              <textarea
+                value={formDestino.cabecalhosTexto}
+                onChange={(e) => setFormDestino({ ...formDestino, cabecalhosTexto: e.target.value })}
+                rows={2}
+                style={{ ...campo, resize: "vertical" }}
+              />
+            </label>
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button
+              data-testid="salvar-destino"
+              onClick={() => void salvarDestino()}
+              disabled={!formDestino.id.trim() || !formDestino.endpoint.trim()}
+              style={botaoPrimario}
+            >
+              Salvar destino
+            </button>
+            <button
+              onClick={() => {
+                setEditandoDestino(null);
+                setFormDestino(FORM_DESTINO_VAZIO);
+              }}
+              style={botao}
+            >
+              Cancelar
+            </button>
+          </div>
+        </fieldset>
       )}
 
       {editando !== null && (
