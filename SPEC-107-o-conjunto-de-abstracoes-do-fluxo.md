@@ -40,6 +40,29 @@ contextual específica onde cabia dado numa superfície genérica.
 4. **`transformacao`** *(reservado, sem executor ainda)* — pura, sem IA
    (extrair campo, concatenar). Entra quando houver executor que a honre
    (§346: tipo oferecido sem executor é meia-integração).
+5. **`motor`** *(pedido do usuário: "um componente pode ser o próprio
+   motor")* — o `derivar()` como componente: entrada `desenho`, saída
+   `itens`/`avisos`/`conformidade`. Determinístico por natureza — mesmo
+   desenho, mesmos itens, sempre.
+
+### 2.1 O motor no fluxo × a tese do §6 — a decisão que só o usuário fecha
+
+A SPEC-105 §6 sustentou: *"a derivação continua determinística e continua fora
+do fluxo"* — porque dois times com fiações diferentes produzindo itens
+diferentes DO MESMO desenho quebraria a régua do produto. Expor o motor como
+componente é revisitar isso, e há dois desenhos honestos:
+
+- **(a) O motor só aceita o desenho vindo do nó `demanda`** (preserva a tese):
+  o fluxo decide QUANDO derivar e o que fazer com o resultado, nunca O QUE
+  entra na derivação. Flexibilidade: encadear derivação → agente → publicação
+  numa fiação só.
+- **(b) O motor aceita qualquer `desenho` mapeado** (revoga a tese §6): um
+  conector pode trazer um desenho de fora e derivá-lo — flexibilidade máxima,
+  e o rastro com hash (§9.5) vira a ÚNICA âncora de reprodutibilidade.
+  Requer reescrever a régua do produto em voz alta.
+
+**Recomendação: (a) na primeira leva** — entrega o encadeamento sem pagar a
+revogação; (b) fica a um passo, documentado, quando um caso real pedir.
 
 **E o tipo de dado ganha um nome:** `"documento"` entra em
 `TIPOS_DE_CAMPO_DO_CONECTOR` (texto com semântica de markdown + metadados
@@ -72,3 +95,5 @@ renderizar preview no rastro — sem nenhum nó novo.
 3. O conjunto acima cobre "os fins possíveis" que você enxerga, ou falta uma
    capacidade (ex.: espera/aprovação humana como nó — hoje coberta por
    `pausarDepois`)?
+4. **Motor no fluxo: (a) ou (b) da §2.1?** É a decisão que define se a tese do
+   §6 fica ou é reescrita.
