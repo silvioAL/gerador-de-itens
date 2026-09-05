@@ -129,6 +129,44 @@ tela nova nasce dizendo "esteira", "mesa" ou "engine" — e as existentes
 migram o rótulo quando forem tocadas, nunca em varredura cega (a lição do
 §357: verificar a frase NOVA, não só remover a velha).
 
+## 2.4 Diretrizes de UX — para quem vai TRABALHAR com o sistema
+
+Avaliação: quase todas já são leis da casa, pagas com defeito real — aqui
+viram checklist de aceite de TODA superfície do canvas. A pessoa-alvo é quem
+chega sem contexto: agilista, arquiteto, QA — não quem escreveu o código.
+
+1. **O rótulo nomeia a função; o jargão fica no código** (§2.3). Ninguém lê
+   "esteira", "engine" ou "refId" numa tela.
+2. **O vazio ensina o gesto** (§364): canvas sem nós mostra a dica do próximo
+   passo, nunca uma página em branco.
+3. **Nada aparece sem porta; nada some sem redirect** (SPEC-79 / SPEC-61
+   §6.7): capacidade nova tem caminho no menu ou na jornada; link antigo
+   nunca vira tela branca.
+4. **Quem age no mundo se anuncia**: conector de escrita marcado, credencial
+   sinalizada ("com credencial no servidor"), e a parada configurável ANTES
+   dele (§368) — susto de publicação indevida é defeito de UX, não do usuário.
+5. **Ausência nunca vira default, e o erro diz o NOME do que faltou** (§9.3) —
+   na tela, apontando onde consertar (a régua dos 403/409 da casa).
+6. **O implícito é dito em voz alta**: aresta sem mapeamento exibe "sem
+   mapeamento"; nó sem adaptador diz "escolha nas propriedades".
+7. **Derivado × declarado sempre visível** (selo + "editar uma cópia"):
+   ninguém edita sem saber SE aquilo é dele ou da configuração.
+8. **Um dado, um lugar — editado de onde se vê** (§260/§369): o painel do nó
+   edita a mesma verdade da aba; nunca uma cópia.
+9. **O vivo é feedback**: execução anima nó a nó, streaming visível, rastro
+   com estado/duração/porquê — "rodou" sem mostrar o quê é caixa-preta.
+10. **Escolha só quando há escolha**: um adaptador compatível já vem
+    selecionado; selects aparecem quando existem ≥2 opções reais.
+11. **Cores por família** (peça/conector/agente/projeto), legíveis nos DOIS
+    temas — travadas pelo teste de cor fixa.
+12. **Demonstração cobre a superfície nova** (§235): o tour nunca mostra tela
+    vazia nem escreve de verdade, e o dado de demo é marcado.
+13. **Rótulo visível = nome acessível** (WCAG 2.5.3 — a pendência antiga do
+    "Carregar na mesa" paga junto): quem usa voz ou leitor encontra o botão
+    pelo texto que vê.
+14. **Confirmação humana em toda escrita no projeto** — importar não é
+    aceitar, e nenhuma fiação muda isso por baixo.
+
 ## 3. O que esta SPEC RECUSA
 
 - **Nó `documento`** — a SPEC-106 C fica emendada: o que era "documento como
