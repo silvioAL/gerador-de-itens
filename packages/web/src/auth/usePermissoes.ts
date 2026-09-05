@@ -118,6 +118,8 @@ export const RECURSO_DA_ABA: Record<string, string> = {
   especificacao: "especificacao-template",
   pipeline: "pipeline-agentes",
   modeloIa: "credenciais-ia",
+  /** SPEC-105 fatia A — o catálogo de conectores tem recurso próprio. */
+  conectores: "conectores",
 };
 
 /** Sub-aba de `RegrasTab` → recurso. Espelha `SECOES_DE_REGRAS` do servidor. */

@@ -35,6 +35,17 @@ describe("toda chave de config sobrevive à normalização", () => {
     exportador: { endpoint: "https://exemplo.invalido/itens", rotulo: "", cabecalhos: {} },
     tokens: { tokens: [{ nome: "cor.primaria", valor: "#0891b2", tipo: "color" }] },
     conexoes: { regras: { motor: { default: "interno", valid: ["interno", "http"] } } },
+    conectores: {
+      conectores: [
+        {
+          id: "volumetria",
+          nome: "Volumetria (Dynatrace)",
+          endpoint: "https://gateway.exemplo/volumetria",
+          entrada: [{ chave: "projetoId", rotulo: "Projeto", tipo: "texto", obrigatorio: true }],
+          saida: [{ chave: "rps", rotulo: "Requisições/s", tipo: "numero", caminho: "$.dados.rps" }],
+        },
+      ],
+    },
   };
 
   it.each([...CHAVES_CONFIG])("`%s` não vira undefined ao ser normalizada", (chave) => {

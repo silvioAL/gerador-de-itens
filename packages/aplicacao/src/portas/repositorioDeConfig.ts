@@ -45,7 +45,20 @@ export { CAMPO_GLOBAL };
  * valid } } }`. O arquivo continua sendo a base, e o que não for sobrescrito
  * continua vindo dele — mesmo molde de `campos_no` sobre o `spec` estático.
  */
-export const CHAVES_CONFIG = ["regras", "pipeline-agentes", "exportador", "tokens", "conexoes"] as const;
+/**
+ * SPEC-105 fatia A — `conectores`: o catálogo de endereços que a organização
+ * sabe chamar, com `entrada`/`saida` declaradas.
+ *
+ * **É ORGANIZACIONAL, e o `timeId` aqui é sempre `CAMPO_GLOBAL`** (§9.2, o
+ * mesmo argumento de `conexoes` acima): "a empresa fala com este endereço" é
+ * fato da infraestrutura, não preferência de time — como as `stacks`, que
+ * perderam o vínculo por time na 0026.
+ *
+ * O documento guarda só os DECLARADOS; os destinos do gateway já configurados
+ * entram no catálogo em vigor por derivação (`conectoresDeFabrica`), nunca por
+ * cópia — copiar congelaria o catálogo, mesma razão de `conexoes` não semear.
+ */
+export const CHAVES_CONFIG = ["regras", "pipeline-agentes", "exportador", "tokens", "conexoes", "conectores"] as const;
 
 export type ChaveConfig = (typeof CHAVES_CONFIG)[number];
 

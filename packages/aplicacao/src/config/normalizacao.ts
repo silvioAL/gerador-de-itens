@@ -1,4 +1,7 @@
 import type { ChaveConfig } from "../portas/repositorioDeConfig.js";
+// Ciclo declarado e seguro: `conectores.ts` importa OS TIPOS do gateway daqui,
+// e daqui só se chamam as funções dele em runtime — nunca durante a carga.
+import { normalizarConectores, validarEscritaConectores } from "./conectores.js";
 
 /**
  * SPEC-31 Fase 3 — a coerção de entrada de cada documento de config.
@@ -418,6 +421,8 @@ export function destinosDaOperacao(config: ConfigExportador, operacao: OperacaoD
 /** O portão de escrita por chave — chamado só no `salvar` dos casos de uso. */
 export function validarEscritaConfig(chave: string, documento: unknown): void {
   if (chave === "pipeline-agentes") validarEscritaPipelineAgentes(documento);
+  // SPEC-105 fatia A — o catálogo de conectores recusa conector pela metade.
+  if (chave === "conectores") validarEscritaConectores(documento);
   if (chave === "exportador") {
     const { endpoint } = normalizarExportador(documento);
     // Endereço vazio é legítimo (desliga a exportação); endereço inválido
@@ -462,6 +467,8 @@ export function normalizarDocumentoConfig(chave: ChaveConfig, documento: unknown
       return normalizarPipelineAgentes(documento);
     case "exportador":
       return normalizarExportador(documento);
+    case "conectores":
+      return normalizarConectores(documento);
     default:
       return documento;
   }

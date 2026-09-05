@@ -17,6 +17,7 @@ import { PdcaTab } from "./PdcaTab";
 import { TokensTab } from "./TokensTab";
 import { ExportacaoTab } from "./ExportacaoTab";
 import { ConexoesTab } from "./ConexoesTab";
+import { ConectoresTab } from "./ConectoresTab";
 import { ProdutosTab } from "./ProdutosTab";
 import { EXPORTADOR_DO_TOUR, TOKENS_DO_TOUR, PRODUTO_DO_TOUR } from "../demo/dadosDoTour";
 
@@ -31,7 +32,9 @@ export type AbaConfig =
   | "acessos"
   | "especificacao"
   | "pipeline"
-  | "modeloIa" | "pdca" | "exportacao" | "tokens";
+  | "modeloIa" | "pdca" | "exportacao" | "tokens"
+  /** SPEC-105 fatia A — o catálogo de conectores (organizacional). */
+  | "conectores";
 
 export interface ConfigScreenProps {
   /** §274 — abre o assistente do FAB na conversa de configuração. */
@@ -197,6 +200,9 @@ export function ConfigScreen({
       { id: "modeloIa", rotulo: "Modelo de IA", existe: true },
       { id: "pdca", rotulo: "PDCA — melhoria contínua", existe: true },
       { id: "exportacao", rotulo: "Exportação", existe: true },
+      // SPEC-105 fatia A — vizinha da exportação: as duas falam de endereços
+      // do gateway. O catálogo é organizacional e curado.
+      { id: "conectores", rotulo: "Conectores", existe: true },
       { id: "tokens", rotulo: "Design system", existe: true },
     ] satisfies { id: AbaConfig; rotulo: string; existe: boolean }[]
   ).filter((a) => a.existe && podeVerAba(a.id, permissoes.pode));
@@ -278,6 +284,7 @@ export function ConfigScreen({
           />
         )}
         {abaAtiva === "conexoes" && <ConexoesTab config={config} />}
+        {abaAtiva === "conectores" && <ConectoresTab />}
         {abaAtiva === "camposAresta" && (
           <CamposArestaTab
             config={config}
@@ -380,6 +387,7 @@ const RECURSO_SOLICITAVEL_DA_ABA: Record<string, string> = {
   campos: "campos-no",
   camposAresta: "campos-aresta",
   conexoes: "conexoes",
+  conectores: "conectores",
   especificacao: "especificacao-template",
   pipeline: "pipeline-agentes",
   regras: "regras",

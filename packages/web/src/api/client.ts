@@ -1581,6 +1581,38 @@ import type { ConfigExportador } from "@gerador/aplicacao";
 export const apiExportador = configDe<ConfigExportador>("exportador");
 
 /**
+ * SPEC-105 fatia A — o catálogo de conectores.
+ *
+ * Tipos direto da aplicação, como o exportador logo acima e pela mesma cicatriz
+ * (§263): uma cópia aqui ficaria para trás sem nada acusar.
+ *
+ * `configDe` sem `timeId` em nenhuma chamada: a chave é ORGANIZACIONAL (§9.2),
+ * como `conexoes`.
+ */
+export type { CampoDoConector, ConfigConectores, Conector } from "@gerador/aplicacao";
+import type { ConfigConectores, Conector as ConectorDaAplicacao } from "@gerador/aplicacao";
+
+export const apiConectores = configDe<ConfigConectores>("conectores");
+
+/** Um conector do catálogo EM VIGOR: sem `cabecalhos` (segredo fica no
+ * servidor), com a origem e o aviso de que os tem. */
+export interface ConectorDoCatalogo extends Omit<ConectorDaAplicacao, "cabecalhos"> {
+  origem: "declarado" | "fabrica";
+  temCabecalhos: boolean;
+}
+
+export const apiCatalogoDeConectores = {
+  /** O catálogo resolvido pelo servidor: declarados + derivados dos destinos. */
+  listar: () => requisitar<{ conectores: ConectorDoCatalogo[] }>("/conectores"),
+  /** SPEC-105 fatia B — executa UM passo; o segredo nunca passa por aqui. */
+  executar: (id: string, parametros: Record<string, unknown>) =>
+    requisitar<{ conector: string; saida: Record<string, unknown>; ausentes: string[] }>(
+      `/conectores/${encodeURIComponent(id)}/executar`,
+      { method: "POST", body: JSON.stringify({ parametros }) }
+    ),
+};
+
+/**
  * SPEC-86 fatia C — as regras EM VIGOR para um produto.
  *
  * Cliente próprio e não `configDe`: a resposta carrega `origemDe` e
