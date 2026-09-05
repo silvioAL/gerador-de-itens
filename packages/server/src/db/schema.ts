@@ -11,6 +11,13 @@ export const quebras = pgTable("quebras", {
   id: uuid("id").primaryKey().defaultRandom(),
   titulo: text("titulo"),
   time: text("time"),
+  /**
+   * SPEC-106 fatia C (migração 0044) — o LINK do documento publicado. O
+   * pedido literal do usuário: *"apenas armazenar o link no sistema"*. A
+   * publicação sempre devolveu `linkExterno` e ele morria na memória da tela;
+   * agora a demanda lembra onde o documento dela mora.
+   */
+  documentoLinkExterno: text("documento_link_externo"),
   diagrama: jsonb("diagrama").notNull(),
   /**
    * SPEC-31 Fase 1 / migração 0011. Estes três existiam só no modo local: a

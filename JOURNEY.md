@@ -16329,3 +16329,29 @@ A prova da fatia (os E2E de exportação/publicação/ADR/documento-externo
 passando sem tocar na aba antiga) rodou na suíte completa. De quebra, saiu um
 `README.md` stub que alguma ferramenta gerou no pacote web prometendo um
 `npm install` que não existe mais (§ modo único hospedado).
+
+---
+
+## §367 — SPEC-106 fatia C: o documento entra pela demanda, e o link persiste
+
+O segundo feedback do usuário sobre o menu, resolvido pela raiz: *"documento de
+desenho no menu está muito estranho, fica vazio, desconectado da jornada… e
+sim apenas armazenar o link no sistema"*.
+
+**A porta sem contexto morreu.** "Documento de desenho" sai do menu — era a
+única entrada que abria a tela sem demanda derivada, ou seja, vazia. As portas
+que ficam são as da JORNADA: os balões pós-derivação, a seção de itens da
+revisão e o deep-link `#/documento` (que continua vivo, SPEC-61 §6.7). O
+estado vazio da tela já orientava ("derive a demanda na mesa…"); agora quase
+ninguém o verá, porque não há mais botão que leve até ele sem contexto.
+
+**E o pedido literal: a demanda GUARDA o link.** A publicação (SPEC-81) sempre
+devolveu `linkExterno` — e ele morria na memória da tela. Agora:
+`quebras.documento_link_externo` (migração 0044), gravado no
+`POST /quebras/:id/documento/publicar`, devolvido pela porta e mostrado como
+"última publicação ↗" — sobrevive ao F5 e à troca de máquina. §248 cumprido:
+gravação desligada → teste vermelho → restaurada.
+
+O nó `documento` no fluxo (produzir o markdown DENTRO da fiação) fica para
+quando a SPEC-106 §5.1 for decidida — produzir a partir da derivação preserva
+a tese do §6; a partir de qualquer entrada seria um motor de template.

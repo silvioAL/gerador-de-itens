@@ -615,6 +615,26 @@ function AppCarregado({
    * tela abre, como a credencial logo acima — o mapa responde "como está
    * montado AGORA", não "como estava quando o app subiu".
    */
+  /** SPEC-106 fatia C — o link persistido do documento desta demanda. Vem do
+   * registro SALVO (a quebra em memória é o desenho), e atualiza ao publicar. */
+  const [linkDoDocumento, setLinkDoDocumento] = useState<string | null>(null);
+  useEffect(() => {
+    if (!mostrarDocumento || !persistencia.quebraId) {
+      setLinkDoDocumento(null);
+      return;
+    }
+    let cancelado = false;
+    void apiQuebras
+      .buscar(persistencia.quebraId)
+      .then((salva) => {
+        if (!cancelado) setLinkDoDocumento(salva.documentoLinkExterno ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelado = true;
+    };
+  }, [mostrarDocumento, persistencia.quebraId]);
+
   const [fluxosDoMapa, setFluxosDoMapa] = useState<FluxoDoMapa[]>([]);
   useEffect(() => {
     if (!mostrarSistema) return;
@@ -1643,7 +1663,6 @@ function AppCarregado({
           navegar({ tela: "canvas" });
           setMostrarAbrir(true);
         }}
-        onDocumento={() => navegar({ tela: "documento" })}
         onSistema={() => navegar({ tela: "sistema" })}
         onFluxos={() => navegar({ tela: "fluxo" })}
         onSair={() => void onSair()}
@@ -2143,6 +2162,7 @@ function AppCarregado({
           mudancasDesdeAprovacao={mudancasDesdeAprovacao}
           onBaixarMarkdown={baixarDocumentoMarkdown}
           onPublicar={podePublicarDocumento && persistencia.quebraId ? publicarDocumento : undefined}
+          linkPublicado={linkDoDocumento}
           onVoltar={() => navegar({ tela: "canvas" })}
           // SPEC-61 — o que era a tela `#/itens`, agora seção deste documento.
           itensEscritos={itensGerados}

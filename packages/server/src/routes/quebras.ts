@@ -23,6 +23,8 @@ import type { OpcoesApp } from "../app.js";
 import { criarRepositorioDeQuebrasEmPostgres } from "../adaptadores/quebrasEmPostgres.js";
 import { criarRepositorioDeItensGeradosEmPostgres } from "../adaptadores/itensGeradosEmPostgres.js";
 import { criarExportadorViaAgente } from "../adaptadores/exportadorViaAgente.js";
+import { eq } from "drizzle-orm";
+import { quebras } from "../db/schema.js";
 import { criarLeitorDeAdrViaGateway, criarPublicadorDeDocumentoViaGateway } from "../adaptadores/gatewayDoTime.js";
 import { criarRepositorioDeConfigEmPostgres } from "../adaptadores/configEmPostgres.js";
 import { registrarAuditoria } from "../auditoria.js";
@@ -525,6 +527,9 @@ export async function registrarRotasQuebras(app: FastifyInstance, { db, diretori
         demandaAtualizadaEm: quebra.atualizadoEm,
         desatualizado: corpo.data.desatualizado,
       });
+      // SPEC-106 fatia C — a demanda LEMBRA onde o documento dela mora: o
+      // link sobrevive ao F5 e à troca de máquina, em vez de morrer na tela.
+      await db.update(quebras).set({ documentoLinkExterno: publicado.linkExterno }).where(eq(quebras.id, id));
       registrarAuditoria(db, {
         email: req.usuario!.email,
         acao: "publicar-documento",

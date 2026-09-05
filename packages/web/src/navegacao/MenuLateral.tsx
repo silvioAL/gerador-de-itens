@@ -43,7 +43,6 @@ export interface MenuLateralProps {
    * itens viraram uma seção deste documento. Duas entradas para a mesma
    * derivação faziam o menu parecer maior do que o produto.
    */
-  onDocumento: () => void;
   /** SPEC-59 — como a FERRAMENTA está montada. Não é da demanda, então não
    * entra no grupo dela: é o mapa do que as telas de configuração configuram. */
   onSistema: () => void;
@@ -107,7 +106,6 @@ export function MenuLateral({
   podeEditarArea,
   onNovaQuebra,
   onAbrirQuebras,
-  onDocumento,
   onSistema,
   onFluxos,
   onSair,
@@ -149,9 +147,10 @@ export function MenuLateral({
         <button onClick={acao(onAbrirQuebras)} style={itemEstilo}>
           Abrir…
         </button>
-        <button onClick={acao(onDocumento)} style={itemEstilo} data-testid="menu-documento">
-          Documento de desenho
-        </button>
+        {/* SPEC-106 fatia C — "Documento de desenho" SAIU do menu: abria uma
+            tela vazia, desconectada da jornada (feedback literal do usuário).
+            O documento nasce DA DEMANDA — as portas são os balões e a seção
+            de itens pós-derivação; o deep-link #/documento continua vivo. */}
         {/* §346 — "Spec para construir" saiu daqui.
 
             Ela ficava ao lado do documento com o argumento de que "o documento é

@@ -34,6 +34,9 @@ import type {
 export interface QuebraSalva {
   id: string;
   titulo: string | null;
+  /** SPEC-106 fatia C — onde o documento publicado desta demanda mora.
+   * Opcional: só a rota de publicar escreve; salvar a quebra não o toca. */
+  documentoLinkExterno?: string | null;
   time: string | null;
   diagrama: Diagrama;
   /** Respostas dos placeholders por item (SPEC-23 Fase 1). */

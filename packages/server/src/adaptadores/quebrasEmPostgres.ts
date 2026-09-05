@@ -27,6 +27,7 @@ function comoQuebraSalva(linha: LinhaQuebra): QuebraSalva {
   return {
     id: linha.id,
     titulo: linha.titulo ?? null,
+    documentoLinkExterno: linha.documentoLinkExterno ?? null,
     time: linha.time ?? null,
     diagrama: linha.diagrama as QuebraSalva["diagrama"],
     respostasItens: (linha.respostasItens ?? {}) as QuebraSalva["respostasItens"],

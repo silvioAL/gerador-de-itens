@@ -65,7 +65,7 @@ test("gerar itens na revisão abre o DOCUMENTO, na seção dos itens", async ({ 
   await expect(page.getByTestId("documento-screen")).toHaveCount(0);
 });
 
-test("menu ☰ leva ao documento; sem geração, a seção dos itens conduz", async ({ page }) => {
+test("o menu NÃO tem porta para o documento; sem geração, a seção dos itens conduz", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   await page.route(
     (url) => url.pathname === "/ia/status",
@@ -77,7 +77,12 @@ test("menu ☰ leva ao documento; sem geração, a seção dos itens conduz", as
   // faziam o menu parecer maior do que o produto.
   await page.getByRole("button", { name: "☰ Menu" }).click();
   await expect(page.getByRole("button", { name: "Itens escritos" })).toHaveCount(0);
-  await page.getByTestId("menu-documento").click();
+  // SPEC-106 fatia C — "Documento de desenho" também saiu: abria uma tela
+  // vazia, desconectada da jornada. O documento entra pela demanda (balões,
+  // seção de itens) ou pelo deep-link, que continua vivo.
+  await expect(page.getByRole("button", { name: "Documento de desenho" })).toHaveCount(0);
+  await page.goto("/#/documento");
+  await page.reload();
 
   await expect(page.getByTestId("documento-screen")).toBeVisible();
   await expect(page.getByTestId("secao-dos-itens")).toContainText("derive a demanda na mesa de projeto");
@@ -208,8 +213,7 @@ test("§210 — trocar de demanda NÃO leva junto os itens da anterior", async (
     }
   );
 
-  await page.getByRole("button", { name: "☰ Menu" }).click();
-  await page.getByTestId("menu-documento").click();
+  await page.goto("/#/documento"); // SPEC-106 C — o item de menu saiu; o documento entra pela demanda (balões) ou pelo link
   await expect(page.getByTestId("documento-screen")).toBeVisible();
 
   // AQUI: com a resposta ainda no ar, a tela não pode mostrar o trabalho da
@@ -267,8 +271,7 @@ test("§210 — demanda NOVA (sem id) não herda os itens escritos da anterior",
   await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: "Nova quebra" }).click();
 
-  await page.getByRole("button", { name: "☰ Menu" }).click();
-  await page.getByTestId("menu-documento").click();
+  await page.goto("/#/documento"); // SPEC-106 C — o item de menu saiu; o documento entra pela demanda (balões) ou pelo link
 
   await expect(page.getByTestId("documento-screen")).toBeVisible();
   await expect(page.locator('[data-testid^="item-gerado-"]')).toHaveCount(0);
