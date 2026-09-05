@@ -367,7 +367,106 @@ Ordenadas por **o que destrava o quê**, não por tamanho.
 
 ---
 
-## 9. Perguntas em aberto
+## 9. As decisões (§361)
+
+> Estavam em aberto na primeira escrita. O usuário precisou deixar a
+> implementação rodar sem acompanhar, e **pergunta aberta vira chute quando não
+> há quem responda**. Decididas aqui, cada uma com o precedente que a sustenta —
+> e todas revogáveis com evidência.
+
+### 9.1 Quem pode editar, e quem pode EXECUTAR
+
+**Três recursos, não um.** Editar e executar são poderes diferentes: um fluxo com
+conector de escrita **age no mundo** — abre issue, escreve na wiki, comita
+arquivo. Quem desenha não é necessariamente quem dispara.
+
+| Recurso | O quê | Escopo |
+|---|---|---|
+| `conectores` | o catálogo: que endereços a organização sabe falar | organizacional, **curado** |
+| `fluxos` | a fiação: em que ordem, alimentando o quê | do time |
+| `fluxos.executar` | disparar um fluxo | do time, nível `operar` |
+
+**Precedente:** `exigirEdicaoCurada` já inverte o owner-bypass para catálogos
+(SPEC-28) — cadastrar conector é curadoria de catálogo, não trabalho do dia.
+Desenhar fluxo é trabalho do dia, como criar quebra.
+
+> **A separação `executar` é a que não pode faltar.** Sem ela, ver um fluxo é
+> poder dispará-lo, e o produto ganha um botão que age no mundo sem portão
+> próprio. É o defeito da §0.2 da SPEC-97 (escopo vindo do corpo) repetido numa
+> superfície nova.
+
+### 9.2 Escopo: conector é da organização, fluxo é do time
+
+Direto da SPEC-102 §5.3: *"esta chamada não atravessa a rede"* é fato da
+arquitetura. Aqui o análogo é *"a empresa fala com este endereço"* — fato da
+infraestrutura, não preferência de time. Como as `stacks` (SPEC-43), que perderam
+o vínculo por time na 0026.
+
+O **fluxo**, não: dois times podem enriquecer de formas diferentes sem que isso
+torne o desenho ambíguo, porque **fluxo não deriva** (§6).
+
+### 9.3 Falha no meio: **para o ramo, preserva o resto, nunca substitui**
+
+Três regras, e a terceira é a que importa:
+
+1. **O nó que falha para**, e os que dependem dele não rodam.
+2. **Os ramos independentes seguem** — a ordenação topológica já sabe quem
+   depende de quem, e derrubar tudo perderia trabalho bom.
+3. **Entrada ausente NUNCA vira default.** Se um agente esperava `rps` e o
+   conector falhou, ele **não roda**. Substituir por vazio ou por um valor
+   plausível é como a invenção entra — a mesma régua do §349 §6 (*"200 com
+   conteúdo vazio é o mesmo que não achar"*), que o §356 provou com o §248.
+
+**Precedente:** a SPEC-49 já respondeu falha parcial por item, e o publicador de
+documento já estoura em vez de publicar pela metade. É a mesma disciplina, agora
+por nó.
+
+O rastro grava **por nó**: o que rodou, o que falhou e por quê. Sem isso, um
+fluxo de sete nós que falha no terceiro é indiagnosticável.
+
+### 9.4 `caminho`: subconjunto declarado, não JSONPath inteiro
+
+Só `$.a.b[0]` — campo, aninhamento e índice. **Sem** wildcard, filtro ou
+expressão.
+
+**Por quê:** JSONPath completo é uma dependência nova e uma superfície de erro
+grande; pior, é uma expressão que a pessoa **não consegue depurar na tela**. Uma
+limitação visível é melhor que um poder que falha em silêncio. Cresce quando
+doer, com o caso na mão — §242.
+
+### 9.5 Versionamento: fora, mas o rastro guarda a impressão digital
+
+Fluxo versionado fica para outra SPEC. **Mas cada execução grava o hash do fluxo
+que rodou.**
+
+Custa uma coluna e responde a pergunta que só aparece depois: *"este item saiu de
+qual fiação?"*. Sem o hash, um fluxo editado torna todo rastro anterior ambíguo —
+e ambiguidade de rastro é o que o §312 corrigiu no `atualizadoEm`.
+
+### 9.6 Tela do catálogo: lista simples
+
+Sem busca, sem categoria, com a contagem no título — o molde das abas que já
+existem. Construir busca para três conectores é especulação; a aba diz quantos
+são, e quando o número incomodar, ele terá aparecido com nome.
+
+### 9.7 O que continua em aberto, e é do usuário
+
+Nenhuma destas trava implementação:
+
+1. **Gatilhos** (§5) — `evento` e `agendado` mudam a natureza do produto, de
+   ferramenta para orquestrador. **Decisão de produto, não técnica.**
+2. **O fluxo pode escrever na mesa sem confirmação?** A §4.3 propõe a mesa como
+   destino. Hoje toda escrita vinda de fora passa por confirmação humana
+   (*"importar não é aceitar"*). Manter isso é o default seguro; afrouxar é
+   escolha.
+3. **Conector com credencial** — hoje `cabecalhos` guarda token em
+   `config_documentos`, em claro. A SPEC-54 já mandou credencial de IA para o
+   cofre. Conector de escrita provavelmente merece o mesmo, e isso é **rodada
+   própria**.
+
+---
+
+## 10. Perguntas que a implementação vai levantar
 
 1. **Quem pode editar fluxo?** É poder de execução, não de configuração — um
    fluxo com conector de escrita age no mundo. Recomendação: recurso RBAC
@@ -389,7 +488,7 @@ Ordenadas por **o que destrava o quê**, não por tamanho.
 
 ---
 
-## 10. Para quem implementar
+## 11. Para quem implementar
 
 **Leia antes:**
 - `packages/aplicacao/src/config/normalizacao.ts` — `DestinoDoGateway`,

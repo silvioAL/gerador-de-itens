@@ -16103,3 +16103,26 @@ de implícito.
 
 **Régua de aceite:** acrescentar integração passa a ser **uma linha de
 configuração**, não sete arquivos.
+
+---
+
+## §361 — As decisões da SPEC-105, tomadas para ela poder rodar sozinha
+
+O usuário precisou deixar a implementação correr sem acompanhar. **Pergunta
+aberta vira chute quando não há quem responda** — então as seis da §9 foram
+decididas, cada uma com o precedente que a sustenta.
+
+A que mais muda o desenho: **editar e EXECUTAR são poderes diferentes**. Um fluxo
+com conector de escrita age no mundo — abre issue, comita arquivo. Sem um recurso
+próprio para executar, ver um fluxo passa a ser poder dispará-lo, e o produto
+ganha um botão que age no mundo sem portão. É o defeito da SPEC-97 §0.2 (escopo
+vindo do corpo) repetido numa superfície nova.
+
+A que mais protege o produto: **entrada ausente NUNCA vira default**. Se o
+conector de volumetria falha, o agente que esperava `rps` **não roda**. Substituir
+por vazio ou por um valor plausível é como a invenção entra — a mesma régua do
+§349 §6 que o §356 provou com o §248.
+
+Três continuam abertas e são do usuário, não da implementação: gatilhos
+(muda a natureza do produto), se o fluxo pode escrever na mesa sem confirmação, e
+credencial de conector no cofre (SPEC-54 já mandou a de IA para lá).
