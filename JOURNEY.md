@@ -16126,3 +16126,55 @@ por vazio ou por um valor plausível é como a invenção entra — a mesma rég
 Três continuam abertas e são do usuário, não da implementação: gatilhos
 (muda a natureza do produto), se o fluxo pode escrever na mesa sem confirmação, e
 credencial de conector no cofre (SPEC-54 já mandou a de IA para lá).
+
+---
+
+## §362 — SPEC-105 fatias A+B: o conector como dado, e o executor de um passo
+
+**Medição antes de implementar, e ela estava SUBESTIMADA.** A §0.2 dizia sete
+lugares por integração; a contagem contra o código deu **oito** — a lista
+fechada (`OPERACOES_DO_GATEWAY` + `ENVELOPE_PADRAO` exaustivo) é um lugar
+próprio. E uma assimetria que a SPEC não viu: `itens` é a única operação que
+não passa por `destinosDaOperacao` nem pelo `postar()` — custa oito lugares
+*diferentes* dos das outras três.
+
+**O que entrou.**
+
+- **`Conector` com `entrada`/`saida` declaradas** (`config/conectores.ts` na
+  aplicação): a forma de um tipo é dado, não código — o mesmo raciocínio de
+  `camposNo`. Chave `conectores` em `CHAVES_CONFIG`, organizacional
+  (`CAMPO_GLOBAL`, §9.2), recurso RBAC próprio, dono declarado no
+  `RECURSO_DA_CHAVE_DE_CONFIG`. O CRUD é a rota genérica de config que já
+  existia — nenhuma rota nova para CADASTRAR.
+- **Conectores de fábrica DERIVADOS, não copiados**: cada destino do gateway já
+  configurado aparece no catálogo com o contrato que o adaptador correspondente
+  implementa hoje (`CONTRATO_DA_OPERACAO`, `Record` exaustivo — operação nova
+  não compila sem declarar contrato). Quem edita o destino vê a mudança aqui.
+- **`GET /conectores`** — o catálogo EM VIGOR, resolvido no servidor (§263), e
+  **sem cabeçalhos**: segredo não passeia.
+- **`POST /conectores/:id/executar`** (fatia B): monta o corpo só com o que a
+  `entrada` declara, lê a resposta pelos `caminho`s (subconjunto `$.a.b[0]`,
+  §9.4, parser próprio de 50 linhas — sem dependência). Obrigatório ausente é
+  400 com o nome do campo (§9.3); obrigatório que não voltou fica em
+  `ausentes`, visível — nunca inventado. Portão: nível `operar`, o mesmo das
+  operações do gateway que já agem no mundo.
+- **Aba "Conectores"** no molde das existentes: lista simples com contagem no
+  título (§9.6), origem de cada um (“cadastrado” × “do gateway”), CRUD dos
+  declarados e o Executar com a saída mapeada.
+
+**A prova da régua de aceite, como E2E**: o spec `conectores.spec.ts` cadastra
+um conector pela tela apontando para um endpoint que o dublê JÁ servia, executa
+e lê a saída mapeada — nenhuma porta, nenhum adaptador, nenhuma rota nova,
+nenhum endpoint novo no dublê. Se qualquer uma dessas peças tivesse sido
+necessária, a fatia A não teria terminado.
+
+**§248 cumprido**: a regra §9.3 foi trocada por `parametros[chave] ?? ""` e
+três testes ficaram vermelhos antes de a implementação voltar.
+
+**Portões**: build/typecheck/test/lint nos workspaces (2.294 testes) e o E2E
+completo sozinho — **131 passaram** (130 + o novo), em 3.7m.
+
+**Dívida vista e não paga aqui** (rodada própria, como manda a SPEC-97 §5):
+`exportador`/`tokens` continuam com dono errado no mapa; a credencial do
+conector vive em `config_documentos` em claro — o cofre (SPEC-54) é a resposta
+quando doer.
