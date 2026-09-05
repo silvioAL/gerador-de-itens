@@ -63,6 +63,7 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
 
   app.post("/fluxos/:id/executar", { preHandler: exigirNivel(db, "operar", timeDoCorpo) }, async (req, reply) => {
     const { id } = req.params as { id: string };
+    const { ateNo } = (req.body ?? {}) as { ateNo?: string };
     const timeId = timeDoCorpo(req) ?? undefined;
     const email = req.usuario!.email;
 
@@ -82,6 +83,9 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     const { documento } = await casos.obter("fluxos", await templateDaVersao("fluxos", diretorioConfig), timeId);
     const fluxo = normalizarFluxos(documento).fluxos.find((f) => f.id === id);
     if (!fluxo) return reply.code(404).send({ erro: `não conheço o fluxo "${id}" neste time` });
+    if (ateNo && !fluxo.nos.some((no) => no.id === ateNo)) {
+      return reply.code(404).send({ erro: `o fluxo "${id}" não tem o nó "${ateNo}"` });
+    }
 
     const [catalogo, pipelineDoc, provedor] = await Promise.all([
       catalogoDeConectores(db, diretorioConfig),
@@ -124,7 +128,7 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
           const texto = await provedor.completar(prompt);
           return { texto };
         },
-      });
+      }, { ateNo });
     } finally {
       await provedor?.descartar().catch(() => undefined);
     }

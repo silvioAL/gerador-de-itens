@@ -190,6 +190,14 @@ test("fatia D: o exemplo do JMeter roda pela tela, com rastro por nó", async ({
       await expect(page.getByTestId(`rastro-${no}`)).toContainText("✓");
     }
     await expect(page.getByTestId("rastro-publica")).toContainText("linkExterno");
+
+    // "Executar até aqui": clicando no agente, roda só leitor+agente — a
+    // publicação (que age no mundo) fica fora do rastro porque nem disparou.
+    await page.locator(`.react-flow__node[data-id="gera"]`).click();
+    await page.getByTestId("executar-ate-aqui").click();
+    await expect(page.getByTestId("rastro-da-execucao")).toBeVisible({ timeout: 30000 });
+    await expect(page.getByTestId("rastro-gera")).toContainText("✓");
+    await expect(page.getByTestId("rastro-publica")).toHaveCount(0);
   } finally {
     await page.request.put(`${API}/config/fluxos`, { data: { documento: original, timeId: "time-pagamentos" } });
     await limparMeusConectores(page);

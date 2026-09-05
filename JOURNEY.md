@@ -16236,3 +16236,34 @@ fragilidade é da suíte inteira e fica anotada.
 sem o E2E dele mudar, e F exige resultado idêntico item a item — as duas provas
 pedem cuidado que não se compra às pressas no fim de uma noite. A SPEC diz o
 corte: A+B pagam a SPEC, C+D entregam o pedido visual.
+
+---
+
+## §364 — O canvas que o usuário esperava, a execução parcial, e a SPEC-106
+
+O usuário abriu a tela de fluxo num time sem fluxos e viu uma frase no lugar de
+um canvas: *"aqui deveria ser uma canvas, eu dei como referência n8n e
+langchain"*. Ele tinha razão duas vezes — a referência era essa desde a origem
+da SPEC-105, e o estado vazio a traía.
+
+**O que entrou:**
+
+- **A tela abre NO CANVAS, sempre.** Sem fluxo salvo, nasce um rascunho
+  ("Fluxo 1") pronto para receber nós — persiste só no Salvar. Minimap, e uma
+  dica sobreposta no vazio que ensina o gesto (adicionar pela paleta, ligar,
+  mapear).
+- **"Executar até aqui" (`ateNo`)** — o pedido literal: *"ver o resultado de
+  um agente antes de rodar o próximo"*. Roda só o fecho de ancestrais do nó
+  escolhido; um conector de ESCRITA mais à frente nem dispara. Puro em
+  `executarFluxo` (testado sem rede), exposto na rota e no painel do nó.
+
+**O que NÃO entrou de propósito: a substituição do menu.** O usuário descreveu
+a visão inteira — a "parte invariante" onde se configura esteira, conectores,
+importação/exportação, e se OBSERVA o stage (o markdown antes de subir, a
+saída de um nó) — e ele mesmo disse: *"isso precisa ser bem desenhado"*. Virou
+a **SPEC-106**, com a medição das oito superfícies que hoje descrevem três
+ideias, o destino proposto de cada uma (Exportação absorvida pelo catálogo;
+documento de desenho virando nó produtor + link armazenado na demanda — o
+segundo feedback dele: *"fica vazio, desconectado da jornada… apenas armazenar
+o link"*), e a régua herdada da 105 §7: **item de menu só sai com a prova da
+substituição verde.** As fatias E+F da 105 ficam atrás desse desenho.
