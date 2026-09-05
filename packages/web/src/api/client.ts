@@ -1605,10 +1605,21 @@ export interface ConectorDoCatalogo extends Omit<ConectorDaAplicacao, "cabecalho
  * SPEC-105 fatias C/D — os fluxos (chave POR TIME, ao contrário de
  * `conectores`) e a execução. Tipos direto da aplicação, mesma cicatriz §263.
  */
-export type { ArestaDoFluxo, ConfigFluxos, Fluxo, NoDoFluxo } from "@gerador/aplicacao";
-import type { ConfigFluxos } from "@gerador/aplicacao";
+export type { ArestaDoFluxo, ConfigFluxos, Fluxo, FluxoEmVigor, NoDoFluxo } from "@gerador/aplicacao";
+import type { ConfigFluxos, FluxoEmVigor as FluxoEmVigorDaAplicacao } from "@gerador/aplicacao";
 
 export const apiFluxos = configDe<ConfigFluxos>("fluxos");
+
+/** SPEC-106 — os fluxos EM VIGOR (declarados + a esteira derivada dos papéis),
+ * resolvidos no servidor; e a saúde da última execução de cada um. */
+export const apiFluxosEmVigor = {
+  listar: (timeId?: string) =>
+    requisitar<{ fluxos: FluxoEmVigorDaAplicacao[] }>(`/fluxos${timeId ? `?timeId=${encodeURIComponent(timeId)}` : ""}`),
+  ultimas: () =>
+    requisitar<{ ultimas: { fluxoId: string; em: string; ok: boolean; noComFalha?: string }[] }>(
+      "/fluxos/execucoes/ultimas"
+    ),
+};
 
 export interface RastroDoNoExecutado {
   noId: string;
@@ -1617,6 +1628,8 @@ export interface RastroDoNoExecutado {
   estado: "sucesso" | "falhou" | "nao-executado";
   erro?: string;
   duracaoMs: number;
+  /** SPEC-106 fatia A — o link do que subiu, quando o nó publicou. */
+  linkExterno?: string;
 }
 
 export const apiExecucaoDeFluxo = {

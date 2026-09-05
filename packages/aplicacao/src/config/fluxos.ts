@@ -1,5 +1,5 @@
 import { resolverDependencias, type Dependencia } from "@gerador/engine";
-import { ConfigInvalida } from "./normalizacao.js";
+import { ConfigInvalida, type PapelConfigurado } from "./normalizacao.js";
 
 /**
  * SPEC-105 fatia C — **o FLUXO como grafo, sem execução.**
@@ -139,6 +139,69 @@ export function planoDoFluxo(fluxo: Fluxo): { ordem: string[]; ciclo?: string[] 
 /** A mensagem do desenho, à letra — é a prova da fatia C. */
 export function mensagemDeCiclo(caminho: string[]): string {
   return `Ciclo: ${caminho.join(" → ")}`;
+}
+
+/** No catálogo em vigor, cada fluxo diz de onde veio — o mesmo selo dos
+ * conectores. */
+export interface FluxoEmVigor extends Fluxo {
+  origem: "declarado" | "fabrica";
+}
+
+export const ID_DO_FLUXO_DA_ESTEIRA = "esteira-de-agentes";
+
+/**
+ * SPEC-106 (o pedido: *"precisa ter o pipeline de IA também unificado — se
+ * trata do desenho da mesma coisa"*) — **a esteira COMO fluxo, derivada.**
+ *
+ * Os papéis ativos de `pipeline-agentes`, na ordem do array (que sempre FOI a
+ * ordem de execução), encadeados: o `texto` de cada um entra no seguinte com a
+ * chave do papel de origem — exatamente o que `acumuladas` faz implícito na
+ * revisão (SPEC-105 §0.4), agora visível e ligável.
+ *
+ * DERIVADA, nunca copiada (a régua de `conectoresDeFabrica`): renomear ou
+ * reordenar um papel na configuração muda este fluxo sozinho. Um declarado com
+ * o mesmo id vence a fábrica — é o "editar uma cópia" da tela. **A revisão
+ * continua rodando pela esteira de sempre**: ela só troca de motor quando a
+ * prova da SPEC-105 F (resultado idêntico item a item) passar — a recusa da
+ * §7 segue de pé.
+ */
+export function fluxoDaEsteira(papeis: PapelConfigurado[]): FluxoEmVigor | null {
+  const ativos = papeis.filter((p) => p.ativo);
+  if (ativos.length === 0) return null;
+
+  const nos: NoDoFluxo[] = ativos.map((papel, i) => ({
+    id: papel.id,
+    tipo: "agente",
+    refId: papel.id,
+    posicao: { x: 60 + i * 260, y: 120 },
+    parametros: {},
+  }));
+  const arestas: ArestaDoFluxo[] = ativos.slice(1).map((papel, i) => ({
+    de: ativos[i].id,
+    para: papel.id,
+    // A chave de entrada é o papel de ORIGEM: no prompt do seguinte, o que
+    // chegou aparece como "- po: …" — a mesma forma do encadeamento da revisão.
+    mapeamento: [{ saida: "texto", entrada: ativos[i].id }],
+  }));
+
+  return {
+    id: ID_DO_FLUXO_DA_ESTEIRA,
+    nome: "Esteira de agentes (da configuração)",
+    nos,
+    arestas,
+    origem: "fabrica",
+  };
+}
+
+/** Declarados + a esteira derivada (declarado vence fábrica no mesmo id). */
+export function fluxosEmVigor(papeis: PapelConfigurado[], documentoFluxos: unknown): FluxoEmVigor[] {
+  const declarados: FluxoEmVigor[] = normalizarFluxos(documentoFluxos).fluxos.map((f) => ({
+    ...f,
+    origem: "declarado",
+  }));
+  const esteira = fluxoDaEsteira(papeis);
+  if (esteira && !declarados.some((f) => f.id === esteira.id)) declarados.push(esteira);
+  return declarados;
 }
 
 /** SPEC-35 — a escrita recusa o que a leitura tolera, ciclo incluído. */

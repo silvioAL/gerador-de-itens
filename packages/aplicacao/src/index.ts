@@ -174,7 +174,10 @@ export {
 export { analisarCaminho, lerCaminho } from "./config/caminho.js";
 /** SPEC-105 fatias C/D — o fluxo como grafo, e a execução pura. */
 export {
+  ID_DO_FLUXO_DA_ESTEIRA,
   TIPOS_DE_NO_DO_FLUXO,
+  fluxoDaEsteira,
+  fluxosEmVigor,
   mensagemDeCiclo,
   normalizarFluxos,
   planoDoFluxo,
@@ -182,6 +185,7 @@ export {
   type ArestaDoFluxo,
   type ConfigFluxos,
   type Fluxo,
+  type FluxoEmVigor,
   type NoDoFluxo,
   type TipoDeNoDoFluxo,
 } from "./config/fluxos.js";
@@ -242,6 +246,7 @@ export {
   montarMapaDoSistema,
   type MapaDoSistema,
   type AgenteDoMapa,
+  type FluxoDoMapa,
   type RegraDoMapa,
   type EstadoDoAgente,
   type EntradaDoMapa,

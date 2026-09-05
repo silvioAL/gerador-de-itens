@@ -17,8 +17,10 @@ import {
   apiCatalogoDeConectores,
   apiExecucaoDeFluxo,
   apiFluxos,
+  apiFluxosEmVigor,
   apiPipelineAgentes,
   type ConectorDoCatalogo,
+  type FluxoEmVigor,
   type PapelConfigurado,
   type RastroDoNoExecutado,
 } from "../api/client";
@@ -65,7 +67,7 @@ function NoDeFluxoCard({ data, selected }: NodeProps<Node<DadosDoNo>>) {
 
 const TIPOS_DE_NO = { noDeFluxo: NoDeFluxoCard };
 
-const FLUXO_VAZIO = (id: string, nome: string): Fluxo => ({ id, nome, nos: [], arestas: [] });
+const FLUXO_VAZIO = (id: string, nome: string): FluxoEmVigor => ({ id, nome, nos: [], arestas: [], origem: "declarado" });
 
 export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFechar: () => void }) {
   const permissoes = usePermissoes({ hospedado: true, timeId: timeAtivo });
@@ -73,7 +75,7 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
 
   const [catalogo, setCatalogo] = useState<ConectorDoCatalogo[]>([]);
   const [papeis, setPapeis] = useState<PapelConfigurado[]>([]);
-  const [fluxos, setFluxos] = useState<Fluxo[] | null>(null);
+  const [fluxos, setFluxos] = useState<FluxoEmVigor[] | null>(null);
   const [fluxoId, setFluxoId] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -87,14 +89,16 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
   useEffect(() => {
     void (async () => {
       try {
-        const [vigor, pipeline, documento] = await Promise.all([
+        const [vigor, pipeline, emVigor] = await Promise.all([
           apiCatalogoDeConectores.listar(),
           apiPipelineAgentes.obter(timeAtivo),
-          apiFluxos.obter(timeAtivo),
+          // SPEC-106 — o EM VIGOR: os declarados + a esteira DERIVADA dos
+          // papéis. Abrir a tela num time novo já mostra o pipeline desenhado.
+          apiFluxosEmVigor.listar(timeAtivo),
         ]);
         setCatalogo(vigor.conectores);
         setPapeis(pipeline.papeis ?? []);
-        const lidos = documento?.fluxos ?? [];
+        const lidos = emVigor.fluxos;
         // A tela abre NO CANVAS, sempre (referência: n8n) — sem fluxo salvo,
         // nasce um rascunho pronto para receber nós; ele só persiste no Salvar.
         if (lidos.length === 0) {
@@ -111,11 +115,14 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
   }, [timeAtivo]);
 
   const fluxo = useMemo(() => fluxos?.find((f) => f.id === fluxoId) ?? null, [fluxos, fluxoId]);
+  // Fluxo de fábrica é DERIVADO — editar exige uma cópia (que vence a fábrica
+  // no mesmo id), como um conector declarado vence um destino.
+  const editavel = podeEditar && fluxo?.origem === "declarado";
 
   // O ciclo é conferido a cada edição, com a MESMA mensagem do desenho (§4.4).
   const ciclo = useMemo(() => (fluxo ? planoDoFluxo(fluxo).ciclo : undefined), [fluxo]);
 
-  function mudarFluxo(mudar: (f: Fluxo) => Fluxo) {
+  function mudarFluxo(mudar: (f: FluxoEmVigor) => FluxoEmVigor) {
     if (!fluxoId) return;
     setFluxos((lista) => (lista ?? []).map((f) => (f.id === fluxoId ? mudar(f) : f)));
     setRastro(null);
@@ -177,7 +184,12 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
     setSalvando(true);
     setErro(null);
     try {
-      await apiFluxos.salvar({ fluxos }, timeAtivo);
+      // Só os DECLARADOS persistem: a esteira derivada continua nascendo da
+      // configuração dos papéis — salvar uma cópia dela congelaria o desenho.
+      await apiFluxos.salvar(
+        { fluxos: fluxos.filter((f) => f.origem === "declarado").map(({ origem: _origem, ...f }) => f) },
+        timeAtivo
+      );
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
     } finally {
@@ -244,6 +256,7 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
             {fluxos.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.nome}
+                {f.origem === "fabrica" ? " · derivado" : ""}
               </option>
             ))}
           </select>
@@ -286,7 +299,7 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
             </select>
             <button
               data-testid="adicionar-no-conector"
-              disabled={!fluxo || !novoConector}
+              disabled={!editavel || !novoConector}
               onClick={() => {
                 adicionarNo("conector", novoConector);
                 setNovoConector("");
@@ -305,7 +318,7 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
             </select>
             <button
               data-testid="adicionar-no-agente"
-              disabled={!fluxo || !novoPapel}
+              disabled={!editavel || !novoPapel}
               onClick={() => {
                 adicionarNo("agente", novoPapel);
                 setNovoPapel("");
@@ -330,6 +343,26 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
         </button>
       </div>
 
+      {fluxo?.origem === "fabrica" && (
+        <div data-testid="fluxo-derivado" style={{ ...avisoEstilo, color: "var(--texto-2)" }}>
+          Este fluxo é DERIVADO da configuração ({fluxo.id === "esteira-de-agentes" ? "os papéis da esteira, na ordem deles" : "da configuração"}) —
+          mudar lá muda aqui sozinho. Para fiar por conta própria,{" "}
+          <button
+            data-testid="editar-copia"
+            onClick={() =>
+              mudarFluxo((f) => ({
+                ...(f as FluxoEmVigor),
+                origem: "declarado",
+                nome: f.nome.replace(" (da configuração)", " (cópia)"),
+              }))
+            }
+            style={{ ...botaoMiudo, pointerEvents: "auto" }}
+          >
+            editar uma cópia
+          </button>{" "}
+          — a cópia vence a derivada no mesmo id.
+        </div>
+      )}
       {ciclo && (
         <div data-testid="aviso-de-ciclo" style={avisoEstilo}>
           Não é possível executar ainda — {mensagemDeCiclo(ciclo)}
@@ -364,8 +397,10 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
                     nos: f.nos.map((no) => (no.id === node.id ? { ...no, posicao: { x: node.position.x, y: node.position.y } } : no)),
                   }))
                 }
+                nodesDraggable={editavel}
+                nodesConnectable={editavel}
                 onConnect={(conexao) => {
-                  if (!conexao.source || !conexao.target || !podeEditar) return;
+                  if (!conexao.source || !conexao.target || !editavel) return;
                   mudarFluxo((f) =>
                     f.arestas.some((a) => a.de === conexao.source && a.para === conexao.target)
                       ? f
@@ -400,7 +435,8 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
               <PainelDoNo
                 no={noSelecionado}
                 catalogo={catalogo}
-                podeEditar={podeEditar}
+                podeEditar={editavel}
+                podeExecutar={podeEditar}
                 executando={executando}
                 temCiclo={!!ciclo}
                 onExecutarAteAqui={() => void executar(noSelecionado.id)}
@@ -421,7 +457,7 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
                 aresta={arestaSelecionada}
                 fluxo={fluxo}
                 catalogo={catalogo}
-                podeEditar={podeEditar}
+                podeEditar={editavel}
                 onMudar={(mapeamento) =>
                   mudarFluxo((f) => ({
                     ...f,
@@ -454,8 +490,24 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
                     </span>
                     <span style={{ color: "var(--texto-fraco)" }}> · {n.duracaoMs}ms</span>
                     {n.erro && <div style={{ color: "var(--vermelho)", fontSize: 11.5 }}>{n.erro}</div>}
-                    {rastro.saidas[n.noId] && (
-                      <pre style={saidaEstilo}>{JSON.stringify(rastro.saidas[n.noId], null, 2).slice(0, 1200)}</pre>
+                    {/* SPEC-106 fatia A — o link do que SUBIU, clicável. */}
+                    {n.linkExterno && (
+                      <div style={{ fontSize: 11.5 }}>
+                        <a href={n.linkExterno} target="_blank" rel="noreferrer" style={{ color: "var(--acento-texto, var(--acento))" }}>
+                          ver o que subiu ↗
+                        </a>
+                      </div>
+                    )}
+                    {/* O artefato do agente é MARKDOWN — mostra como texto
+                        corrido (o "antes de subir"), não como JSON. */}
+                    {n.tipo === "agente" && typeof rastro.saidas[n.noId]?.texto === "string" ? (
+                      <pre style={{ ...saidaEstilo, whiteSpace: "pre-wrap" }} data-testid={`artefato-${n.noId}`}>
+                        {String(rastro.saidas[n.noId].texto).slice(0, 4000)}
+                      </pre>
+                    ) : (
+                      rastro.saidas[n.noId] && (
+                        <pre style={saidaEstilo}>{JSON.stringify(rastro.saidas[n.noId], null, 2).slice(0, 1200)}</pre>
+                      )
                     )}
                   </div>
                 ))}
@@ -472,6 +524,7 @@ function PainelDoNo({
   no,
   catalogo,
   podeEditar,
+  podeExecutar,
   executando,
   temCiclo,
   onExecutarAteAqui,
@@ -481,6 +534,7 @@ function PainelDoNo({
   no: NoDoFluxo;
   catalogo: ConectorDoCatalogo[];
   podeEditar: boolean;
+  podeExecutar: boolean;
   executando: boolean;
   temCiclo: boolean;
   onExecutarAteAqui: () => void;
@@ -524,11 +578,11 @@ function PainelDoNo({
           As entradas de um agente vêm das arestas — o mapeamento diz o que ele recebe (§9.3: sem entrada, ele não roda).
         </p>
       )}
-      {podeEditar && (
-        <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-          {/* "Ver o resultado de um agente antes de rodar o próximo": roda só
-              o fecho de ancestrais deste nó — um conector de escrita mais à
-              frente NÃO dispara. */}
+      <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+        {/* "Ver o resultado de um agente antes de rodar o próximo": roda só
+            o fecho de ancestrais deste nó — um conector de escrita mais à
+            frente NÃO dispara. Vale também no fluxo DERIVADO (a esteira). */}
+        {podeExecutar && (
           <button
             data-testid="executar-ate-aqui"
             onClick={onExecutarAteAqui}
@@ -537,11 +591,13 @@ function PainelDoNo({
           >
             {executando ? "Executando…" : "Executar até aqui"}
           </button>
+        )}
+        {podeEditar && (
           <button onClick={onRemover} style={botao}>
             Remover nó
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
