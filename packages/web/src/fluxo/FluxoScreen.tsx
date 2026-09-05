@@ -81,6 +81,9 @@ const FLUXO_VAZIO = (id: string, nome: string): FluxoEmVigor => ({ id, nome, nos
 export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFechar: () => void }) {
   const permissoes = usePermissoes({ hospedado: true, timeId: timeAtivo });
   const podeEditar = permissoes.pode("fluxos", "editar");
+  // §369 — editar o PAPEL de dentro do fluxo é editar a esteira: a permissão
+  // é a dela, não a de fluxos.
+  const podeEditarPapel = permissoes.pode("pipeline-agentes", "editar");
 
   const [catalogo, setCatalogo] = useState<ConectorDoCatalogo[]>([]);
   const [papeis, setPapeis] = useState<PapelConfigurado[]>([]);
@@ -210,6 +213,33 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
         ],
       };
     });
+  }
+
+  /**
+   * §369 — o mesmo dado, editado de onde se vê (a régua do §260): o painel do
+   * nó-agente grava NO documento da esteira (`pipeline-agentes`), por
+   * read-modify-write do papel — a aba Pipeline de IA continua sendo o
+   * catálogo, e as duas superfícies leem a mesma verdade.
+   */
+  async function salvarPapel(refId: string, mudanca: { nome: string; descricao: string; preambulo: string }) {
+    setErro(null);
+    try {
+      const cfg = await apiPipelineAgentes.obter(timeAtivo);
+      const papeisNovos = (cfg.papeis ?? []).map((p) =>
+        p.id === refId
+          ? {
+              ...p,
+              nome: mudanca.nome.trim() || p.nome,
+              descricao: mudanca.descricao.trim() || undefined,
+              preambulo: mudanca.preambulo.trim() || undefined,
+            }
+          : p
+      );
+      await apiPipelineAgentes.salvar({ ...cfg, papeis: papeisNovos }, timeAtivo);
+      setPapeis(papeisNovos);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    }
   }
 
   async function salvar() {
@@ -446,6 +476,8 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
                 catalogo={catalogo}
                 papeis={papeis}
                 podeEditar={editavel}
+                podeEditarPapel={podeEditarPapel}
+                onSalvarPapel={salvarPapel}
                 onMudar={(mudanca) =>
                   mudarFluxo((f) => ({ ...f, nos: f.nos.map((n) => (n.id === noSelecionado.id ? { ...n, ...mudanca } : n)) }))
                 }
@@ -531,6 +563,8 @@ function PainelDoNo({
   catalogo,
   papeis,
   podeEditar,
+  podeEditarPapel,
+  onSalvarPapel,
   onMudar,
   onRemover,
 }: {
@@ -538,6 +572,8 @@ function PainelDoNo({
   catalogo: ConectorDoCatalogo[];
   papeis: PapelConfigurado[];
   podeEditar: boolean;
+  podeEditarPapel: boolean;
+  onSalvarPapel: (refId: string, mudanca: { nome: string; descricao: string; preambulo: string }) => Promise<void>;
   onMudar: (mudanca: Partial<NoDoFluxo>) => void;
   onRemover: () => void;
 }) {
@@ -613,9 +649,21 @@ function PainelDoNo({
         </>
       )}
       {no.tipo === "agente" && (
-        <p style={{ fontSize: 11.5, color: "var(--texto-fraco)" }}>
-          As entradas de um agente vêm das arestas — o mapeamento diz o que ele recebe (§9.3: sem entrada, ele não roda).
-        </p>
+        <>
+          <p style={{ fontSize: 11.5, color: "var(--texto-fraco)" }}>
+            As entradas vêm das arestas — o mapeamento diz o que ele recebe (§9.3: sem entrada, ele não roda).
+          </p>
+          {/* §369 — o PAPEL editável de onde se vê (régua do §260): grava no
+              mesmo documento da aba Pipeline de IA — uma verdade só. */}
+          {no.refId && papeis.some((p) => p.id === no.refId) && (
+            <EditorDoPapel
+              key={no.refId}
+              papel={papeis.find((p) => p.id === no.refId)!}
+              podeEditar={podeEditarPapel}
+              onSalvar={(mudanca) => onSalvarPapel(no.refId, mudanca)}
+            />
+          )}
+        </>
       )}
       {podeEditar && (
         <button onClick={onRemover} style={{ ...botao, marginTop: 8 }}>
@@ -623,6 +671,62 @@ function PainelDoNo({
         </button>
       )}
     </div>
+  );
+}
+
+function EditorDoPapel({
+  papel,
+  podeEditar,
+  onSalvar,
+}: {
+  papel: PapelConfigurado;
+  podeEditar: boolean;
+  onSalvar: (mudanca: { nome: string; descricao: string; preambulo: string }) => Promise<void>;
+}) {
+  const [nome, setNome] = useState(papel.nome);
+  const [descricao, setDescricao] = useState(papel.descricao ?? "");
+  const [preambulo, setPreambulo] = useState(papel.preambulo ?? "");
+  const [salvando, setSalvando] = useState(false);
+  const mudou = nome !== papel.nome || descricao !== (papel.descricao ?? "") || preambulo !== (papel.preambulo ?? "");
+
+  return (
+    <fieldset disabled={!podeEditar || salvando} style={{ border: "1px solid var(--borda)", borderRadius: 8, padding: 10, margin: "0 0 8px" }}>
+      <legend style={{ fontSize: 11, color: "var(--texto-fraco)" }}>O papel (o mesmo da aba Pipeline de IA)</legend>
+      <label style={{ fontSize: 11.5, display: "grid", gap: 2, marginBottom: 6 }}>
+        Nome
+        <input data-testid="papel-nome" value={nome} onChange={(e) => setNome(e.target.value)} style={campo} />
+      </label>
+      <label style={{ fontSize: 11.5, display: "grid", gap: 2, marginBottom: 6 }}>
+        Descrição
+        <input data-testid="papel-descricao" value={descricao} onChange={(e) => setDescricao(e.target.value)} style={campo} />
+      </label>
+      <label style={{ fontSize: 11.5, display: "grid", gap: 2, marginBottom: 6 }}>
+        Prompt do papel (preâmbulo)
+        <textarea
+          data-testid="papel-preambulo"
+          value={preambulo}
+          onChange={(e) => setPreambulo(e.target.value)}
+          rows={5}
+          style={{ ...campo, resize: "vertical" }}
+        />
+      </label>
+      <button
+        data-testid="salvar-papel"
+        disabled={!mudou}
+        onClick={() => {
+          setSalvando(true);
+          void onSalvar({ nome, descricao, preambulo }).finally(() => setSalvando(false));
+        }}
+        style={botaoMiudo}
+      >
+        {salvando ? "Salvando…" : "Salvar papel na esteira"}
+      </button>
+      {!podeEditar && (
+        <p style={{ fontSize: 10.5, color: "var(--texto-fraco)", margin: "6px 0 0" }}>
+          Editar o papel exige a permissão da esteira (pipeline-agentes).
+        </p>
+      )}
+    </fieldset>
   );
 }
 

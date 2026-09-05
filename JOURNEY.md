@@ -16392,3 +16392,23 @@ dado.**
 O diagnóstico do usuário fica como régua para o que vier: implementação
 contextual específica é dívida de flexibilidade; a pergunta de toda rodada
 passa a ser "isto podia ser dado dirigindo uma superfície genérica?".
+
+---
+
+## §369 — O papel editável de dentro do fluxo
+
+O usuário, olhando a aba Pipeline de IA depois da rodada §368: *"as mesmas
+informações não são configuráveis em fluxo de integração"* — nome, descrição e
+prompt do papel moravam numa superfície e apareciam noutra.
+
+A régua do §260 de novo (*"edita-se de onde se vê o problema"*): o painel do
+nó-agente ganhou o EDITOR DO PAPEL — nome, descrição e prompt (preâmbulo) —
+gravando por read-modify-write NO documento `pipeline-agentes`, o mesmo da
+aba. Uma verdade só; a aba continua sendo o catálogo (é onde se cria papel,
+se reordena a esteira e se liga a confirmação obrigatória). Vale inclusive no
+fluxo DERIVADO: a fiação é derivada, mas a config do papel é dela mesma. A
+permissão é a da esteira (`pipeline-agentes`), não a de fluxos — editar o
+prompt de um agente é editar a esteira, esteja a tela que estiver.
+
+Prova no navegador: renomear o PO pelo painel do nó muda o card na hora e o
+`GET /config/pipeline-agentes` devolve o nome novo.
