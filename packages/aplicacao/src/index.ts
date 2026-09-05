@@ -189,6 +189,7 @@ export {
   executarFluxo,
   type EstadoDoNo,
   type ExecutoresDoFluxo,
+  type OpcoesDeExecucao,
   type RastroDoNo,
   type ResultadoDoFluxo,
 } from "./casos-de-uso/fluxos.js";

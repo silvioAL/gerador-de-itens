@@ -1620,11 +1620,13 @@ export interface RastroDoNoExecutado {
 }
 
 export const apiExecucaoDeFluxo = {
-  /** O executor é do SERVIDOR (§7): daqui só vai o disparo e o time. */
-  executar: (id: string, timeId?: string) =>
+  /** O executor é do SERVIDOR (§7): daqui só vai o disparo e o time.
+   * `ateNo` = executar só até aquele nó (o fecho de ancestrais) — inspecionar
+   * o meio sem disparar o resto. */
+  executar: (id: string, timeId?: string, ateNo?: string) =>
     requisitar<{ fluxo: string; hash: string; nos: RastroDoNoExecutado[]; saidas: Record<string, Record<string, unknown>> }>(
       `/fluxos/${encodeURIComponent(id)}/executar`,
-      { method: "POST", body: JSON.stringify(timeId ? { timeId } : {}) }
+      { method: "POST", body: JSON.stringify({ ...(timeId ? { timeId } : {}), ...(ateNo ? { ateNo } : {}) }) }
     ),
 };
 

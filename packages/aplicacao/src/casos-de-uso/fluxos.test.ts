@@ -78,6 +78,30 @@ describe("executarFluxo (SPEC-105 fatia D — a metade pura)", () => {
     expect(porNo.independente.estado).toBe("sucesso");
   });
 
+  it("`ateNo` roda só o fecho de ancestrais — o resto nem dispara", async () => {
+    // "Ver o resultado de um agente antes de rodar o próximo": o commit (que
+    // AGE no mundo) não pode disparar quando só se quer inspecionar o meio.
+    const chamados: string[] = [];
+    const resultado = await executarFluxo(
+      JMETER,
+      {
+        conector: async (no) => {
+          chamados.push(no.id);
+          return { rps: 120 };
+        },
+        agente: async () => {
+          chamados.push("gerador");
+          return { texto: "jmx" };
+        },
+      },
+      { ateNo: "gerador" }
+    );
+
+    expect(chamados).toEqual(["volumetria", "gerador"]);
+    expect(resultado.nos.map((n) => n.noId)).toEqual(["volumetria", "gerador"]);
+    expect(resultado.saidas.commit).toBeUndefined();
+  });
+
   it("ciclo nem começa — recusa, não falha parcial", async () => {
     const fluxo = fluxoDe(
       [

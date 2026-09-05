@@ -225,6 +225,34 @@ describe("SPEC-105 fatia D — POST /fluxos/:id/executar", () => {
     });
   });
 
+  it("`ateNo` executa só o fecho de ancestrais — o publicador não dispara", async () => {
+    await comApp(async (app, cookies) => {
+      await prepararMundo(app, cookies);
+      await app.inject({ method: "PUT", url: "/config/fluxos", cookies, payload: { documento: { fluxos: [FLUXO_JMETER] } } });
+
+      const r = await app.inject({
+        method: "POST",
+        url: "/fluxos/jmx/executar",
+        cookies,
+        payload: { ateNo: "gera-jmx" },
+      });
+
+      expect(r.statusCode).toBe(200);
+      const corpo = r.json() as { nos: { noId: string; estado: string }[]; saidas: Record<string, unknown> };
+      // "Ver o resultado do agente antes de rodar o próximo": quem escreve no
+      // mundo (a publicação) fica de fora do rastro porque nem foi tentado.
+      expect(corpo.nos.map((n) => [n.noId, n.estado])).toEqual([
+        ["le-volumetria", "sucesso"],
+        ["gera-jmx", "sucesso"],
+      ]);
+      expect(corpo.saidas["publica"]).toBeUndefined();
+
+      // Nó que o fluxo não tem é 404, não um fluxo inteiro rodando por engano.
+      const errado = await app.inject({ method: "POST", url: "/fluxos/jmx/executar", cookies, payload: { ateNo: "fantasma" } });
+      expect(errado.statusCode).toBe(404);
+    });
+  });
+
   it("executar exige sessão; fluxo desconhecido é 404", async () => {
     await comApp(async (app, cookies) => {
       expect((await app.inject({ method: "POST", url: "/fluxos/x/executar", payload: {} })).statusCode).toBe(401);

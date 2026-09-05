@@ -39,9 +39,44 @@ export interface ResultadoDoFluxo {
   ciclo?: string[];
 }
 
-export async function executarFluxo(fluxo: Fluxo, executores: ExecutoresDoFluxo): Promise<ResultadoDoFluxo> {
+export interface OpcoesDeExecucao {
+  /**
+   * Executa só ATÉ este nó (ele incluso): o fecho de ancestrais, na mesma
+   * ordem. É o "ver o resultado de um agente antes de rodar o próximo" — quem
+   * está fiando quer inspecionar o meio sem pagar (nem disparar) o resto, e
+   * um conector de escrita no fim do fluxo age no mundo.
+   */
+  ateNo?: string;
+}
+
+/** O nó pedido e todo mundo de quem ele depende, transitivamente. */
+function ancestraisDe(fluxo: Fluxo, noId: string): Set<string> {
+  const dentro = new Set<string>([noId]);
+  let cresceu = true;
+  while (cresceu) {
+    cresceu = false;
+    for (const aresta of fluxo.arestas) {
+      if (dentro.has(aresta.para) && !dentro.has(aresta.de)) {
+        dentro.add(aresta.de);
+        cresceu = true;
+      }
+    }
+  }
+  return dentro;
+}
+
+export async function executarFluxo(
+  fluxo: Fluxo,
+  executores: ExecutoresDoFluxo,
+  opcoes: OpcoesDeExecucao = {}
+): Promise<ResultadoDoFluxo> {
   const plano = planoDoFluxo(fluxo);
   if (plano.ciclo) return { nos: [], saidas: {}, ciclo: plano.ciclo };
+
+  if (opcoes.ateNo) {
+    const dentro = ancestraisDe(fluxo, opcoes.ateNo);
+    plano.ordem = plano.ordem.filter((id) => dentro.has(id));
+  }
 
   const porId = new Map(fluxo.nos.map((no) => [no.id, no]));
   const estado = new Map<string, EstadoDoNo>();

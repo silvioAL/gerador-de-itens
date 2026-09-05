@@ -3,6 +3,7 @@ import {
   Background,
   Controls,
   Handle,
+  MiniMap,
   Position,
   ReactFlow,
   ReactFlowProvider,
@@ -94,8 +95,15 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
         setCatalogo(vigor.conectores);
         setPapeis(pipeline.papeis ?? []);
         const lidos = documento?.fluxos ?? [];
-        setFluxos(lidos);
-        setFluxoId(lidos[0]?.id ?? null);
+        // A tela abre NO CANVAS, sempre (referência: n8n) — sem fluxo salvo,
+        // nasce um rascunho pronto para receber nós; ele só persiste no Salvar.
+        if (lidos.length === 0) {
+          setFluxos([FLUXO_VAZIO("fluxo-1", "Fluxo 1")]);
+          setFluxoId("fluxo-1");
+        } else {
+          setFluxos(lidos);
+          setFluxoId(lidos[0].id);
+        }
       } catch (e) {
         setErro(e instanceof Error ? e.message : String(e));
       }
@@ -177,7 +185,7 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
     }
   }
 
-  async function executar() {
+  async function executar(ateNo?: string) {
     if (!fluxo) return;
     setExecutando(true);
     setErro(null);
@@ -185,7 +193,7 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
     try {
       // O que roda é o que está SALVO — executar rascunho seria rastro mentindo.
       await apiFluxos.salvar({ fluxos: fluxos! }, timeAtivo);
-      const resultado = await apiExecucaoDeFluxo.executar(fluxo.id, timeAtivo);
+      const resultado = await apiExecucaoDeFluxo.executar(fluxo.id, timeAtivo, ateNo);
       setRastro({ nos: resultado.nos, saidas: resultado.saidas, hash: resultado.hash });
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
@@ -314,7 +322,7 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
         </button>
         <button
           data-testid="executar-fluxo"
-          onClick={() => void executar()}
+          onClick={() => void executar(undefined)}
           disabled={!fluxo || !!ciclo || executando || !podeEditar}
           style={{ ...botao, background: "var(--acento)", color: "#fff", border: "1px solid var(--acento)" }}
         >
@@ -334,7 +342,13 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
       )}
 
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, position: "relative" }}>
+          {fluxo && fluxo.nos.length === 0 && (
+            <div style={dicaVaziaEstilo}>
+              Adicione um <strong>conector</strong> ou um <strong>agente</strong> pela paleta acima e ligue-os —
+              a aresta carrega o dado (saída → entrada), como no n8n.
+            </div>
+          )}
           {fluxo ? (
             <ReactFlowProvider>
               <ReactFlow
@@ -364,13 +378,10 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
               >
                 <Background />
                 <Controls />
+                <MiniMap nodeColor="var(--texto-mudo)" maskColor="var(--mascara-minimapa)" pannable zoomable />
               </ReactFlow>
             </ReactFlowProvider>
-          ) : (
-            <div style={{ padding: 24, fontSize: 12.5, color: "var(--texto-fraco)" }}>
-              Crie um fluxo para começar: a paleta nasce do catálogo de conectores e dos papéis da esteira.
-            </div>
-          )}
+          ) : null}
         </div>
 
         {(noSelecionado || arestaSelecionada || rastro) && (
@@ -380,6 +391,9 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
                 no={noSelecionado}
                 catalogo={catalogo}
                 podeEditar={podeEditar}
+                executando={executando}
+                temCiclo={!!ciclo}
+                onExecutarAteAqui={() => void executar(noSelecionado.id)}
                 onMudar={(mudanca) =>
                   mudarFluxo((f) => ({ ...f, nos: f.nos.map((n) => (n.id === noSelecionado.id ? { ...n, ...mudanca } : n)) }))
                 }
@@ -448,12 +462,18 @@ function PainelDoNo({
   no,
   catalogo,
   podeEditar,
+  executando,
+  temCiclo,
+  onExecutarAteAqui,
   onMudar,
   onRemover,
 }: {
   no: NoDoFluxo;
   catalogo: ConectorDoCatalogo[];
   podeEditar: boolean;
+  executando: boolean;
+  temCiclo: boolean;
+  onExecutarAteAqui: () => void;
   onMudar: (mudanca: Partial<NoDoFluxo>) => void;
   onRemover: () => void;
 }) {
@@ -495,9 +515,22 @@ function PainelDoNo({
         </p>
       )}
       {podeEditar && (
-        <button onClick={onRemover} style={{ ...botao, marginTop: 8 }}>
-          Remover nó
-        </button>
+        <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+          {/* "Ver o resultado de um agente antes de rodar o próximo": roda só
+              o fecho de ancestrais deste nó — um conector de escrita mais à
+              frente NÃO dispara. */}
+          <button
+            data-testid="executar-ate-aqui"
+            onClick={onExecutarAteAqui}
+            disabled={executando || temCiclo}
+            style={{ ...botao, background: "var(--acento)", color: "#fff", border: "1px solid var(--acento)" }}
+          >
+            {executando ? "Executando…" : "Executar até aqui"}
+          </button>
+          <button onClick={onRemover} style={botao}>
+            Remover nó
+          </button>
+        </div>
       )}
     </div>
   );
@@ -623,6 +656,23 @@ const painelEstilo: React.CSSProperties = {
   borderLeft: "1px solid var(--borda)",
   padding: 14,
   overflow: "auto",
+  background: "var(--painel)",
+};
+
+const dicaVaziaEstilo: React.CSSProperties = {
+  position: "absolute",
+  top: "42%",
+  left: "50%",
+  transform: "translate(-50%, -50%)",
+  zIndex: 5,
+  fontSize: 13,
+  color: "var(--texto-fraco)",
+  border: "1px dashed var(--borda-forte)",
+  borderRadius: 10,
+  padding: "14px 18px",
+  maxWidth: 420,
+  textAlign: "center",
+  pointerEvents: "none",
   background: "var(--painel)",
 };
 
