@@ -31,12 +31,12 @@ contextual específica onde cabia dado numa superfície genérica.
    paleta = operações + chamada externa (§368).
 2. **`agente`** — transforma texto com IA (papel da esteira como adaptador).
    Já existe.
-3. **`demanda`** *(a fatia E da 105, renomeada)* — a FONTE determinística: o
-   desenho, os itens derivados, o markdown do documento de desenho. Sem
-   entrada; `saida` declarada como a de um conector (`nos`, `arestas`,
-   `markdown`, `itens`, `volumetria`…). É o que faltava para "publicar o
-   documento" virar fiação: `demanda.markdown → conector(documento)`. A
-   derivação continua fora do fluxo (§6 da 105): o nó só EXPÕE o resultado.
+3. **`mesa`** *(a fatia E da 105 — "a própria mesa de projetos pode ser um
+   componente", o usuário)* — a demanda como NÓ, nas duas direções da 105
+   §4.3: **fonte** (`saida`: `desenho`, `itens`, `markdown`, `volumetria`,
+   `necessidades`) e **destino** (`entrada`: `desenho` — o importado virando
+   proposta, com a confirmação humana de sempre). É o que faltava para
+   "publicar o documento" e "importar por link" virarem fiação.
 4. **`transformacao`** *(reservado, sem executor ainda)* — pura, sem IA
    (extrair campo, concatenar). Entra quando houver executor que a honre
    (§346: tipo oferecido sem executor é meia-integração).
@@ -83,9 +83,12 @@ MESMO contrato (`entrada`/`saida` em `CampoDoConector`), trocando o transporte
 contrato*, com quatro adaptadores — HTTP (conector), papel+LLM (agente),
 função do engine (peça), demanda (fonte).
 
-**As candidatas a peça já existem, puras e testadas:** `derivar`,
-`validateConfig`, `resolverDependencias`, `simularLentidao`,
-`conformidade`/`topologia`, `gerarEspecificacaoEntrega`, `lerDesenho`. O
+**As candidatas a peça já existem, puras e testadas:** `derivar` (a
+derivação unificada no canvas), **`ensaio`** (`simularLentidao` +
+`resiliencia`: entrada `desenho`+`cenario`, saída `leitura` — a bancada de
+ensaios como peça, pedido explícito), `validateConfig`,
+`resolverDependencias`, `conformidade`/`topologia`,
+`gerarEspecificacaoEntrega`, `lerDesenho`. O
 catálogo de peças nasce como os conectores de fábrica: **derivado de um
 registro no código com o contrato como dado** — peça nova entra por decisão
 (lista fechada, §242), nunca por acidente.
@@ -112,12 +115,17 @@ própria e o cabeçalho dizendo o que se desenha.
 
 ## 4. Fatias
 
-- **A — o tipo de dado `documento`** no contrato e no rastro (preview).
-- **B — o nó `demanda`** (fonte): saída declarada, executor lendo a demanda
-  ativa/apontada; prova: `demanda.markdown → publicação` substitui o botão
-  Publicar por uma fiação semeada SEM o E2E do documento mudar.
-- **C — validação de compatibilidade de mapeamento** por tipo (aviso, não
-  bloqueio, na primeira leva).
+- **A — o registro de PEÇAS + as duas primeiras** (`derivar`, `ensaio`):
+  contrato como dado, governança como atributo, executor em processo.
+  Prova: `mesa.desenho → derivar → agente → publicação` e
+  `mesa.desenho → ensaio → agente` rodam ponta a ponta.
+- **B — o nó `mesa`** (fonte primeiro; destino com confirmação depois).
+- **C — a UX da mesa no fluxo**: `NodeCard` + `DiagramaConfig` próprio gerado
+  do catálogo — *"a UX deve ser incrível como a da mesa"* é critério de
+  aceite, não enfeite: cartões, cores por família (peça/conector/agente/mesa),
+  ícones e o mesmo cuidado de tema.
+- **D — o tipo de dado `documento`** no contrato e preview no rastro.
+- **E — validação de compatibilidade de mapeamento** por tipo (aviso primeiro).
 
 ## 5. Perguntas para o usuário
 
