@@ -13,7 +13,19 @@ Conector de leitura (`Documento de contexto`) → `conteudo` → mapeamento →
 agente. Roda hoje, ponta a ponta (E2E da SPEC-105 D). **O documento entrou no
 fluxo como DADO, não como nó** — e é essa a observação que decide a SPEC.
 
-## 1. A tese: nó é o que AGE; documento é o que VIAJA
+## 1. A tese, nas palavras do usuário: **"poucos conceitos e mais solidez"**
+
+> *"hoje tem muita coisa… maior consistência e simplicidade."*
+
+É a régua que decide TODA escolha desta SPEC. Hoje o produto carrega mais de
+uma dúzia de conceitos de superfície (esteira, exportação, destinos,
+operações, revisão, ensaios, documento, importação…). O alvo é **CINCO tipos
+de nó** — `conector`, `agente`, `projeto`, `peca`, `transformacao` — e **duas
+mecânicas** — o mapeamento (o dado viajando) e a parada (a revisão humana).
+Tudo o mais é instância, rótulo ou fiação. Um conceito novo só entra
+aposentando pelo menos um velho (o mapa da §3.1 é o placar).
+
+## 1.1 Nó é o que AGE; documento é o que VIAJA
 
 | Conceito | O que é | Onde mora |
 |---|---|---|
