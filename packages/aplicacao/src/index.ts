@@ -160,6 +160,7 @@ export {
 /** SPEC-105 fatia A/B — o conector como dado, e a metade pura do executor. */
 export {
   CONTRATO_DA_OPERACAO,
+  NOME_DA_OPERACAO,
   TIPOS_DE_CAMPO_DO_CONECTOR,
   conectoresDeFabrica,
   conectoresEmVigor,

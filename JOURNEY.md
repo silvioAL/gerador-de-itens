@@ -16355,3 +16355,40 @@ gravação desligada → teste vermelho → restaurada.
 O nó `documento` no fluxo (produzir o markdown DENTRO da fiação) fica para
 quando a SPEC-106 §5.1 for decidida — produzir a partir da derivação preserva
 a tese do §6; a partir de qualquer entrada seria um motor de template.
+
+---
+
+## §368 — Componentes e adaptadores: a tela do fluxo fala a língua da mesa
+
+Uma salva de feedbacks do usuário, todos apontando o mesmo defeito por ângulos
+diferentes: *"executar até aqui não deveria ser um botão acionável, mas uma
+configuração"*; *"ainda tem da casa por tudo"*; *"coisas repetidas… documento
+de contexto seria mais adequado"*; *"falta abstração"*; *"deveria ser mais
+parecido com a mesa de projeto, ter componentes e adaptadores"*; e o
+diagnóstico: **"acabamos perdendo a linha fazendo implementações contextuais
+específicas, e isso tirou a flexibilidade do sistema"**.
+
+A resposta é a régua da SPEC-105 §0 aplicada de novo: **mais coisas viram
+dado.**
+
+- **A paleta vira vocabulário de COMPONENTES** — Envio de itens, Publicação de
+  documento, Decisões registradas (ADR), Documento de contexto, Agente,
+  Chamada externa — e o **ADAPTADOR** (o endereço do catálogo ou o papel da
+  esteira) se escolhe nas propriedades do nó. É o hexagonal da própria casa
+  (SPEC-31) virando interface: porta na paleta, adaptador no painel. Com um
+  adaptador compatível só, ele já vem escolhido; nó sem adaptador não salva
+  (a validação diz "escolha um nas propriedades do nó").
+- **"Executar até aqui" morreu como botão e nasceu como CONFIGURAÇÃO**:
+  `pausarDepois` no nó ("parar depois deste nó — revisar a saída antes de o
+  resto rodar"), persistido no fluxo como o mapeamento. Todo Executar respeita
+  — ninguém precisa lembrar de clicar o botão certo para o conector de escrita
+  não disparar. A parada difere da falha (§9.3) de propósito: falha derruba só
+  o ramo; parada é ponto de revisão do fluxo INTEIRO.
+- **O vocabulário genérico**: `NOME_DA_OPERACAO` sem "da casa" (§359 — o
+  rótulo nomeia a função; "Documento de contexto" é o nome que o usuário deu).
+  Os rótulos "Tracker/Wiki/ADRs/Confluence da casa" que restam na instalação
+  local são DADO semeado antigo — renomeados via catálogo na validação.
+
+O diagnóstico do usuário fica como régua para o que vier: implementação
+contextual específica é dívida de flexibilidade; a pergunta de toda rodada
+passa a ser "isto podia ser dado dirigindo uma superfície genérica?".

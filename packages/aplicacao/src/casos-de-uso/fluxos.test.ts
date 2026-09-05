@@ -102,6 +102,36 @@ describe("executarFluxo (SPEC-105 fatia D — a metade pura)", () => {
     expect(resultado.saidas.commit).toBeUndefined();
   });
 
+  it("§368 — `pausarDepois` é CONFIGURAÇÃO do nó: o Executar para ali, sempre", async () => {
+    const fluxo = fluxoDe(
+      [
+        { id: "le", tipo: "conector", refId: "c1" },
+        { id: "gera", tipo: "agente", refId: "p", pausarDepois: true },
+        { id: "publica", tipo: "conector", refId: "c2" },
+      ],
+      [
+        { de: "le", para: "gera", mapeamento: [{ saida: "conteudo", entrada: "contexto" }] },
+        { de: "gera", para: "publica", mapeamento: [{ saida: "texto", entrada: "markdown" }] },
+      ]
+    );
+    const chamados: string[] = [];
+    const resultado = await executarFluxo(fluxo, {
+      conector: async (no) => {
+        chamados.push(no.id);
+        return { conteudo: "x" };
+      },
+      agente: async () => ({ texto: "artefato" }),
+    });
+
+    // Quem escreve no mundo NÃO dispara: a parada é dado do fluxo, não um
+    // clique — todo Executar respeita, sem depender de alguém lembrar.
+    expect(chamados).toEqual(["le"]);
+    const porNo = Object.fromEntries(resultado.nos.map((n) => [n.noId, n]));
+    expect(porNo.gera.estado).toBe("sucesso");
+    expect(porNo.publica.estado).toBe("nao-executado");
+    expect(porNo.publica.erro).toContain('parada configurada no nó "gera"');
+  });
+
   it("ciclo nem começa — recusa, não falha parcial", async () => {
     const fluxo = fluxoDe(
       [

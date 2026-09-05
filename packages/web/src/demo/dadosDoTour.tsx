@@ -64,7 +64,8 @@ export const CONECTORES_DO_TOUR: ConectorDoCatalogo[] = [
   {
     id: "tracker-exemplo",
     nome: "Jira do time (exemplo)",
-    descricao: 'Destino "itens" do gateway do time',
+    descricao: "Envio de itens — via gateway",
+    operacao: "itens",
     endpoint: "https://agente-do-tracker.exemplo/itens",
     metodo: "POST",
     envelope: "itens",

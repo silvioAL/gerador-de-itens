@@ -112,7 +112,9 @@ describe("conectoresDeFabrica (§3.3 — os destinos do gateway vistos como cone
     expect(wiki.saida.find((s) => s.chave === "linkExterno")?.obrigatorio).toBe(true);
 
     // Sem rótulo, o nome da operação diz o que ele faz.
-    expect(fabrica.find((c) => c.id === "leitor")!.nome).toBe("Documento da casa por link");
+    // §368 — o nome de fallback é o do COMPONENTE, genérico: nada de "da casa".
+    expect(fabrica.find((c) => c.id === "leitor")!.nome).toBe("Documento de contexto");
+    expect(fabrica.find((c) => c.id === "leitor")!.operacao).toBe("documentoExterno");
 
     // O endpoint herdado da SPEC-49 continua chamável como conector de itens.
     const itens = fabrica.find((c) => c.id === "exportador")!;

@@ -12,7 +12,16 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { mensagemDeCiclo, planoDoFluxo, type ArestaDoFluxo, type Fluxo, type NoDoFluxo } from "@gerador/aplicacao";
+import {
+  mensagemDeCiclo,
+  NOME_DA_OPERACAO,
+  OPERACOES_DO_GATEWAY,
+  planoDoFluxo,
+  type ArestaDoFluxo,
+  type Fluxo,
+  type NoDoFluxo,
+  type OperacaoDoGateway,
+} from "@gerador/aplicacao";
 import {
   apiCatalogoDeConectores,
   apiExecucaoDeFluxo,
@@ -82,8 +91,6 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
   const [executando, setExecutando] = useState(false);
   const [rastro, setRastro] = useState<{ nos: RastroDoNoExecutado[]; saidas: Record<string, Record<string, unknown>>; hash: string } | null>(null);
   const [selecao, setSelecao] = useState<{ tipo: "no" | "aresta"; id: string } | null>(null);
-  const [novoConector, setNovoConector] = useState("");
-  const [novoPapel, setNovoPapel] = useState("");
   const [novoFluxoNome, setNovoFluxoNome] = useState("");
 
   useEffect(() => {
@@ -129,10 +136,12 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
   }
 
   const rotuloDoRef = useCallback(
-    (no: Pick<NoDoFluxo, "tipo" | "refId">) =>
-      no.tipo === "conector"
+    (no: Pick<NoDoFluxo, "tipo" | "refId" | "componente">) => {
+      if (!no.refId) return no.componente && no.componente !== "livre" ? NOME_DA_OPERACAO[no.componente] : "(escolha o adaptador)";
+      return no.tipo === "conector"
         ? (catalogo.find((c) => c.id === no.refId)?.nome ?? no.refId)
-        : (papeis.find((p) => p.id === no.refId)?.nome ?? no.refId),
+        : (papeis.find((p) => p.id === no.refId)?.nome ?? no.refId);
+    },
     [catalogo, papeis]
   );
 
@@ -143,7 +152,11 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
         type: "noDeFluxo",
         position: no.posicao,
         selected: selecao?.tipo === "no" && selecao.id === no.id,
-        data: { titulo: rotuloDoRef(no), subtitulo: no.refId, tipo: no.tipo },
+        data: {
+          titulo: rotuloDoRef(no),
+          subtitulo: `${no.pausarDepois ? "⏸ " : ""}${no.refId || "sem adaptador"}`,
+          tipo: no.tipo,
+        },
       })),
     [fluxo, selecao, rotuloDoRef]
   );
@@ -164,16 +177,36 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
     [fluxo, selecao]
   );
 
-  function adicionarNo(tipo: NoDoFluxo["tipo"], refId: string) {
-    if (!refId) return;
+  /**
+   * §368 — a paleta fala a língua da MESA: componentes (o tipo abstrato) e
+   * adaptadores (o endereço/papel concreto, escolhido nas propriedades). O nó
+   * nasce do componente; quando só existe UM adaptador compatível, ele já vem
+   * escolhido — quando há vários (ou nenhum), o painel pede.
+   */
+  function adicionarComponente(tipo: NoDoFluxo["tipo"], componente: OperacaoDoGateway | "livre" | "agente") {
+    const compativeis =
+      tipo === "agente"
+        ? papeis.filter((p) => p.ativo).map((p) => p.id)
+        : catalogo.filter((c) => (componente === "livre" ? !c.operacao : c.operacao === componente)).map((c) => c.id);
+    const refId = compativeis.length === 1 ? compativeis[0] : "";
+    const base = componente === "agente" ? "agente" : componente === "livre" ? "chamada" : componente;
     mudarFluxo((f) => {
       let n = 1;
-      while (f.nos.some((no) => no.id === `${refId}-${n}`)) n++;
+      while (f.nos.some((no) => no.id === `${base}-${n}`)) n++;
+      const id = `${base}-${n}`;
+      setSelecao({ tipo: "no", id });
       return {
         ...f,
         nos: [
           ...f.nos,
-          { id: `${refId}-${n}`, tipo, refId, posicao: { x: 80 + f.nos.length * 60, y: 80 + f.nos.length * 40 }, parametros: {} },
+          {
+            id,
+            tipo,
+            refId,
+            posicao: { x: 80 + f.nos.length * 60, y: 80 + f.nos.length * 40 },
+            parametros: {},
+            ...(tipo === "conector" && componente !== "agente" ? { componente } : {}),
+          },
         ],
       };
     });
@@ -289,43 +322,19 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
               + Novo fluxo
             </button>
             <span style={{ width: 12 }} />
-            <select value={novoConector} onChange={(e) => setNovoConector(e.target.value)} aria-label="Conector da paleta" style={campo}>
-              <option value="">+ conector…</option>
-              {catalogo.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nome}
-                </option>
-              ))}
-            </select>
-            <button
-              data-testid="adicionar-no-conector"
-              disabled={!editavel || !novoConector}
-              onClick={() => {
-                adicionarNo("conector", novoConector);
-                setNovoConector("");
-              }}
-              style={botao}
-            >
-              Adicionar
+            {/* §368 — a paleta fala a língua da MESA: componentes, não
+                instâncias. O adaptador (o endereço/papel concreto) se escolhe
+                nas propriedades do nó — o hexagonal da casa, na tela. */}
+            {OPERACOES_DO_GATEWAY.map((op) => (
+              <button key={op} data-testid={`add-${op}`} disabled={!editavel} onClick={() => adicionarComponente("conector", op)} style={botao}>
+                + {NOME_DA_OPERACAO[op]}
+              </button>
+            ))}
+            <button data-testid="add-agente" disabled={!editavel} onClick={() => adicionarComponente("agente", "agente")} style={botao}>
+              + Agente
             </button>
-            <select value={novoPapel} onChange={(e) => setNovoPapel(e.target.value)} aria-label="Agente da paleta" style={campo}>
-              <option value="">+ agente…</option>
-              {papeis.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nome}
-                </option>
-              ))}
-            </select>
-            <button
-              data-testid="adicionar-no-agente"
-              disabled={!editavel || !novoPapel}
-              onClick={() => {
-                adicionarNo("agente", novoPapel);
-                setNovoPapel("");
-              }}
-              style={botao}
-            >
-              Adicionar
+            <button data-testid="add-livre" disabled={!editavel} onClick={() => adicionarComponente("conector", "livre")} style={botao}>
+              + Chamada externa
             </button>
           </>
         )}
@@ -435,11 +444,8 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
               <PainelDoNo
                 no={noSelecionado}
                 catalogo={catalogo}
+                papeis={papeis}
                 podeEditar={editavel}
-                podeExecutar={podeEditar}
-                executando={executando}
-                temCiclo={!!ciclo}
-                onExecutarAteAqui={() => void executar(noSelecionado.id)}
                 onMudar={(mudanca) =>
                   mudarFluxo((f) => ({ ...f, nos: f.nos.map((n) => (n.id === noSelecionado.id ? { ...n, ...mudanca } : n)) }))
                 }
@@ -523,31 +529,64 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
 function PainelDoNo({
   no,
   catalogo,
+  papeis,
   podeEditar,
-  podeExecutar,
-  executando,
-  temCiclo,
-  onExecutarAteAqui,
   onMudar,
   onRemover,
 }: {
   no: NoDoFluxo;
   catalogo: ConectorDoCatalogo[];
+  papeis: PapelConfigurado[];
   podeEditar: boolean;
-  podeExecutar: boolean;
-  executando: boolean;
-  temCiclo: boolean;
-  onExecutarAteAqui: () => void;
   onMudar: (mudanca: Partial<NoDoFluxo>) => void;
   onRemover: () => void;
 }) {
   const conector = no.tipo === "conector" ? catalogo.find((c) => c.id === no.refId) : undefined;
+  // §368 — o COMPONENTE diz quais adaptadores servem: mesma operação para os
+  // do gateway, endereço livre para "chamada externa", papéis para agente.
+  const adaptadores =
+    no.tipo === "agente"
+      ? papeis.filter((p) => p.ativo).map((p) => ({ id: p.id, nome: p.nome }))
+      : catalogo
+          .filter((c) => (no.componente ? (no.componente === "livre" ? !c.operacao : c.operacao === no.componente) : true))
+          .map((c) => ({ id: c.id, nome: c.nome }));
   return (
     <div data-testid="painel-do-no">
       <strong style={{ fontSize: 12.5 }}>{no.id}</strong>
       <div style={{ fontSize: 11.5, color: "var(--texto-2)", margin: "4px 0 8px" }}>
-        {no.tipo === "conector" ? "Conector do catálogo" : "Papel da esteira"} · {no.refId}
+        {no.tipo === "conector"
+          ? (no.componente && no.componente !== "livre" ? NOME_DA_OPERACAO[no.componente] : "Chamada externa")
+          : "Agente"}
       </div>
+      <label style={{ fontSize: 11.5, display: "grid", gap: 2, marginBottom: 8 }}>
+        Adaptador ({no.tipo === "agente" ? "papel da esteira" : "endereço do catálogo"})
+        <select
+          data-testid="adaptador-do-no"
+          disabled={!podeEditar}
+          value={no.refId}
+          onChange={(e) => onMudar({ refId: e.target.value })}
+          style={campo}
+        >
+          <option value="">— escolha —</option>
+          {adaptadores.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.nome}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label style={{ fontSize: 11.5, display: "flex", gap: 6, alignItems: "center", marginBottom: 8 }}>
+        <input
+          type="checkbox"
+          data-testid="parar-depois"
+          disabled={!podeEditar}
+          checked={no.pausarDepois === true}
+          onChange={(e) => onMudar({ pausarDepois: e.target.checked || undefined })}
+        />
+        {/* §368 — a parada é CONFIGURAÇÃO do fluxo, não um botão de ocasião:
+            todo Executar respeita, sem depender de alguém lembrar de clicar. */}
+        Parar depois deste nó (revisar a saída antes de o resto rodar)
+      </label>
       {conector && conector.entrada.length > 0 && (
         <>
           <div style={{ fontSize: 11.5, color: "var(--texto-fraco)", marginBottom: 4 }}>
@@ -578,26 +617,11 @@ function PainelDoNo({
           As entradas de um agente vêm das arestas — o mapeamento diz o que ele recebe (§9.3: sem entrada, ele não roda).
         </p>
       )}
-      <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-        {/* "Ver o resultado de um agente antes de rodar o próximo": roda só
-            o fecho de ancestrais deste nó — um conector de escrita mais à
-            frente NÃO dispara. Vale também no fluxo DERIVADO (a esteira). */}
-        {podeExecutar && (
-          <button
-            data-testid="executar-ate-aqui"
-            onClick={onExecutarAteAqui}
-            disabled={executando || temCiclo}
-            style={{ ...botao, background: "var(--acento)", color: "#fff", border: "1px solid var(--acento)" }}
-          >
-            {executando ? "Executando…" : "Executar até aqui"}
-          </button>
-        )}
-        {podeEditar && (
-          <button onClick={onRemover} style={botao}>
-            Remover nó
-          </button>
-        )}
-      </div>
+      {podeEditar && (
+        <button onClick={onRemover} style={{ ...botao, marginTop: 8 }}>
+          Remover nó
+        </button>
+      )}
     </div>
   );
 }

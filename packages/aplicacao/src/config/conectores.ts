@@ -76,6 +76,14 @@ export interface Conector {
  * `conectores` ou derivado de um destino do gateway já configurado. */
 export interface ConectorEmVigor extends Conector {
   origem: "declarado" | "fabrica";
+  /**
+   * §368 — o COMPONENTE que este conector adapta (a operação do gateway),
+   * quando derivado de um destino. É o que deixa a paleta do fluxo falar a
+   * língua da mesa: o componente é o tipo abstrato ("Publicação de
+   * documento"); o conector é o ADAPTADOR concreto escolhido nas propriedades.
+   * Ausente = endereço livre ("Chamada externa").
+   */
+  operacao?: OperacaoDoGateway;
 }
 
 export interface ConfigConectores {
@@ -267,11 +275,17 @@ export const CONTRATO_DA_OPERACAO: Record<
   },
 };
 
-const NOME_DA_OPERACAO: Record<OperacaoDoGateway, string> = {
-  itens: "Exportação de itens",
+/**
+ * §368 — o nome GENÉRICO de cada componente, sem jargão de instância. "Da
+ * casa" saiu (§359: o rótulo nomeia a função ou ecoa o que a pessoa
+ * cadastrou); "Documento de contexto" é o nome que o usuário deu ao leitor.
+ * Exportado: é o vocabulário da paleta do fluxo (componentes × adaptadores).
+ */
+export const NOME_DA_OPERACAO: Record<OperacaoDoGateway, string> = {
+  itens: "Envio de itens",
   documento: "Publicação de documento",
-  adr: "Decisões da casa (ADR)",
-  documentoExterno: "Documento da casa por link",
+  adr: "Decisões registradas (ADR)",
+  documentoExterno: "Documento de contexto",
 };
 
 /**
@@ -290,7 +304,8 @@ export function conectoresDeFabrica(config: ConfigExportador): ConectorEmVigor[]
         // O rótulo ecoa o nome que a pessoa cadastrou no destino; sem rótulo,
         // o nome da operação diz o que ele faz.
         nome: destino.rotulo || NOME_DA_OPERACAO[operacao],
-        descricao: `Destino "${operacao}" do gateway do time`,
+        descricao: `${NOME_DA_OPERACAO[operacao]} — via gateway`,
+        operacao,
         endpoint: destino.endpoint,
         metodo: destino.metodo,
         cabecalhos: destino.cabecalhos,

@@ -96,7 +96,7 @@ describe("validarEscritaFluxos (SPEC-35 + prova da fatia C)", () => {
 
   it.each([
     [{ fluxos: [{ nos: [], arestas: [] }] }, /sem "id"/],
-    [{ fluxos: [{ id: "f", nos: [{ id: "a", tipo: "conector" }], arestas: [] }] }, /sem "refId"/],
+    [{ fluxos: [{ id: "f", nos: [{ id: "a", tipo: "conector" }], arestas: [] }] }, /sem adaptador/],
     [{ fluxos: [{ id: "f", nos: [{ id: "a", tipo: "laço", refId: "x" }], arestas: [] }] }, /tipo desconhecido/],
     [
       { fluxos: [{ id: "f", nos: [{ id: "a", tipo: "conector", refId: "x" }], arestas: [{ de: "a", para: "fantasma" }] }] },

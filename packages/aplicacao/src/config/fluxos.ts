@@ -1,5 +1,5 @@
 import { resolverDependencias, type Dependencia } from "@gerador/engine";
-import { ConfigInvalida, type PapelConfigurado } from "./normalizacao.js";
+import { ConfigInvalida, OPERACOES_DO_GATEWAY, type OperacaoDoGateway, type PapelConfigurado } from "./normalizacao.js";
 
 /**
  * SPEC-105 fatia C — **o FLUXO como grafo, sem execução.**
@@ -29,9 +29,24 @@ export interface NoDoFluxo {
   tipo: TipoDeNoDoFluxo;
   /** id do `Conector` (tipo "conector") ou do `PapelConfigurado` (tipo "agente"). */
   refId: string;
+  /**
+   * §368 — o COMPONENTE de que este nó nasceu (a paleta fala a língua da
+   * mesa): uma operação do gateway, ou "livre" (chamada externa). É o que diz
+   * quais ADAPTADORES são compatíveis quando se troca o `refId`. Ausente em
+   * fluxos antigos e em nós de agente.
+   */
+  componente?: OperacaoDoGateway | "livre";
   posicao: { x: number; y: number };
   /** Valores fixos dos campos de entrada que não vêm de aresta. */
   parametros: Record<string, unknown>;
+  /**
+   * §368 — o ponto de parada CONFIGURADO: "revise a saída deste nó antes de o
+   * resto rodar". É dado do fluxo, como o mapeamento — não um botão de
+   * ocasião: quem fia decide UMA vez onde a revisão mora, e todo Executar
+   * respeita. (Pedido literal do usuário: "é comportamento editável e
+   * configurável, como os conectores".)
+   */
+  pausarDepois?: boolean;
 }
 
 export interface ArestaDoFluxo {
@@ -96,6 +111,10 @@ export function normalizarFluxos(documento: unknown): ConfigFluxos {
           noCru.parametros && typeof noCru.parametros === "object" && !Array.isArray(noCru.parametros)
             ? (noCru.parametros as Record<string, unknown>)
             : {},
+        ...(noCru.pausarDepois === true ? { pausarDepois: true } : {}),
+        ...((OPERACOES_DO_GATEWAY as readonly string[]).includes(noCru.componente as string) || noCru.componente === "livre"
+          ? { componente: noCru.componente as OperacaoDoGateway | "livre" }
+          : {}),
       });
     }
 
@@ -230,7 +249,7 @@ export function validarEscritaFluxos(documento: unknown): void {
         );
       }
       if (!(typeof no.refId === "string" && no.refId.trim())) {
-        throw new ConfigInvalida(`no fluxo "${id}", o nó "${noId}" está sem "refId" — não aponta para conector ou agente nenhum`);
+        throw new ConfigInvalida(`no fluxo "${id}", o nó "${noId}" está sem adaptador — escolha um nas propriedades do nó`);
       }
     }
     for (const aresta of Array.isArray(f.arestas) ? (f.arestas as Partial<ArestaDoFluxo>[]) : []) {

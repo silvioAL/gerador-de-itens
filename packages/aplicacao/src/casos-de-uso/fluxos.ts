@@ -90,7 +90,25 @@ export async function executarFluxo(
   const saidas: Record<string, Record<string, unknown>> = {};
   const rastro: RastroDoNo[] = [];
 
+  // §368 — a parada CONFIGURADA (`pausarDepois`): quando o nó marcado termina,
+  // o resto do fluxo não roda — nem os ramos independentes, porque a parada é
+  // um ponto de REVISÃO do fluxo inteiro (diferente da falha, §9.3, em que
+  // derrubar os independentes perderia trabalho bom).
+  let paradaEm: string | null = null;
+
   for (const noId of plano.ordem) {
+    if (paradaEm) {
+      const no = porId.get(noId)!;
+      rastro.push({
+        noId,
+        tipo: no.tipo,
+        refId: no.refId,
+        estado: "nao-executado",
+        erro: `parada configurada no nó "${paradaEm}" — revise a saída antes de seguir`,
+        duracaoMs: 0,
+      });
+      continue;
+    }
     const no = porId.get(noId)!;
     const entrantes = fluxo.arestas.filter((a) => a.para === noId);
 
@@ -137,6 +155,7 @@ export async function executarFluxo(
         duracaoMs: Date.now() - comecou,
         ...(typeof saida.linkExterno === "string" && saida.linkExterno ? { linkExterno: saida.linkExterno } : {}),
       });
+      if (no.pausarDepois) paradaEm = noId;
     } catch (erro) {
       // Regra 2 mora aqui, por omissão: nada de `throw` — o laço continua, e
       // só quem depende deste nó cai na regra 1.
