@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { derivar, montarFichaItem, resolverDependencias } from "@gerador/engine";
 import type { Diagrama, DiagramaConfig, RegrasConfig, ValorSpec } from "@gerador/engine";
-import { assinarSugestao, fraseDeCompletude, pendenciasDaRevisao, respostaConfirmada } from "./pendencias";
+import { assinarSugestao, fraseDeCompletude, pendenciasDaRevisao, respostaConfirmada } from "./pendencias.js";
 
 const config: DiagramaConfig = {
   nodeTypes: {
