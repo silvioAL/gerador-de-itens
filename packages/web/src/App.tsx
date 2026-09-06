@@ -21,6 +21,7 @@ import {
   resolverDependencias,
   violacoesEmAberto,
   type Atividade,
+  type CenarioDeLentidao,
   type DiagramaConfig,
   type No,
   type Quebra,
@@ -79,7 +80,8 @@ import { ReviewScreen } from "./review/ReviewScreen";
 import { ContextoEpicoPanel } from "./review/ContextoEpicoPanel";
 import { ConversaPanel } from "./conversa/ConversaPanel";
 import { AssistenteFlutuante, type AbaAssistente } from "./assistente/AssistenteFlutuante";
-import { EnsaiosScreen } from "./ensaios/EnsaiosScreen";
+// SPEC-107 G4 — a tela de ensaios morreu; a bancada vive junto do fluxo.
+import { BancadaDeEnsaios, type LeituraDoEnsaio } from "./fluxo/BancadaDeEnsaios";
 import { idDaRegraDeForma } from "./config/FormaDoDesenho";
 import { ConfigurarPanel } from "./assistente/ConfigurarPanel";
 import { JourneyModal, type AbaJornada } from "./demo/JourneyModal";
@@ -528,8 +530,10 @@ function AppCarregado({
   const mostrarConfig = rota.tela === "config";
   const mostrarDocumento = rota.tela === "documento";
   const mostrarSistema = rota.tela === "sistema";
-  const mostrarEnsaios = rota.tela === "ensaios";
+  // SPEC-107 G4 — a tela de ensaios morreu: a bancada vive junto do fluxo
+  // (`#/fluxo/ensaio`), medindo pela fiação semeada em vez de simular aqui.
   const mostrarFluxos = rota.tela === "fluxo";
+  const bancadaDeEnsaiosAberta = rota.tela === "fluxo" && rota.bancada === "ensaio";
   // SPEC-41 Parte B — os itens materializados da quebra aberta. A fonte de
   // verdade é o server (persistem por quebra); o estado local é o espelho da
   // última geração/carga desta sessão.
@@ -939,6 +943,33 @@ function AppCarregado({
       (chave) => ({ chave }) as unknown as ItemGerado
     );
     return { exportados, erros, ignorados, destino: destinoDaExportacao ?? "" };
+  }
+
+  /**
+   * SPEC-107 G4 — **ensaiar É a fiação semeada** ("ensaio-de-cenarios"): cada
+   * cenário roda como UMA execução — `parametrosPorNo` aponta a demanda
+   * aberta e leva o cenário (entrada DESTA execução, não mudança da fiação) —
+   * e a leitura volta no rastro do nó `ensaio`, com a âncora de hoje inteira.
+   */
+  async function ensaiarPelaFiacao(cenario?: CenarioDeLentidao): Promise<LeituraDoEnsaio> {
+    const quebraId = persistencia.quebraId;
+    if (!quebraId) {
+      throw new Error("salve a demanda antes de ensaiar — a fiação lê a demanda salva, e esta ainda não tem endereço");
+    }
+    const r = await apiExecucaoDeFluxo.executar("ensaio-de-cenarios", quebra.time ?? timeAtivo, undefined, {
+      demanda: { demandaId: quebraId },
+      ...(cenario ? { ensaio: { cenario } } : {}),
+    });
+    const porNo = Object.fromEntries(r.nos.map((n) => [n.noId, n]));
+    if (porNo["demanda"]?.estado === "falhou") {
+      throw new Error(porNo["demanda"].erro ?? "não foi possível ler a demanda para ensaiar");
+    }
+    if (porNo["ensaio"]?.estado === "falhou") {
+      throw new Error(porNo["ensaio"].erro ?? "o ensaio falhou no servidor");
+    }
+    const leitura = (r.saidas["ensaio"] as { leitura?: LeituraDoEnsaio } | undefined)?.leitura;
+    if (!leitura) throw new Error("a execução terminou sem leitura — o rastro não trouxe a saída do nó de ensaio");
+    return leitura;
   }
 
   function derivarQuebra() {
@@ -1885,7 +1916,12 @@ function AppCarregado({
             ),
           }))
         }
-        onSimular={() => navegar({ tela: "ensaios" })}
+        onSimular={() => {
+          // G4 — a bancada mede a demanda SALVA (a fiação lê pelo id): a porta
+          // garante o salvamento antes de navegar, como o atalho de publicar.
+          void persistencia.salvar();
+          navegar({ tela: "fluxo", bancada: "ensaio" });
+        }}
         onSelecionar={setSelecionadoId}
         necessidades={quebra.necessidades}
         onAbrirProposito={() => setAbaAssistente("contexto")}
@@ -2089,7 +2125,96 @@ function AppCarregado({
       )}
 
       {mostrarFluxos && (
-        <FluxoScreen timeAtivo={quebra.time ?? timeAtivo} onFechar={() => navegar({ tela: "canvas" })} />
+        <FluxoScreen
+          timeAtivo={quebra.time ?? timeAtivo}
+          onFechar={() => navegar({ tela: "canvas" })}
+          // SPEC-107 G4 — quem chega pela porta da bancada abre NO fluxo do
+          // ensaio, com a bancada por cima: a peça no canvas e a tabela juntas.
+          abrirFluxoId={bancadaDeEnsaiosAberta ? "ensaio-de-cenarios" : undefined}
+          painel={
+            bancadaDeEnsaiosAberta ? (
+              <BancadaDeEnsaios
+                diagrama={quebra.diagrama}
+                config={diagramaConfig}
+                cenarios={quebra.cenariosDeLentidao ?? []}
+                volumetria={volumetriaEmVigorAgora?.valor}
+                onMudar={(cenariosDeLentidao) => setQuebra((q) => ({ ...q, cenariosDeLentidao }))}
+                executar={ensaiarPelaFiacao}
+                /**
+                 * SPEC-69 — o que o NEGÓCIO exige. É o que faz o número técnico
+                 * decidir: "24 s" sozinho não decide nada, "24 s contra os 5 s
+                 * que prometemos" decide. Sem necessidade com prazo, a
+                 * conclusão do ensaio compara com hoje e não inventa julgamento.
+                 */
+                necessidades={quebra.necessidades}
+                // Quem assume o débito — é o que separa consciente de anônimo.
+                autor={sessao.email}
+                /**
+                 * SPEC-69 fatia D — o elo. Assumir já põe o ensaio na seção de
+                 * riscos do documento; ANEXAR a uma decisão é o que o leva ao
+                 * item, ao lado do critério de aceite de quem vai implementar.
+                 *
+                 * Só as decisões VIGENTES: anexar evidência a uma decisão que
+                 * já foi substituída seria juntar o número de hoje ao porquê de
+                 * ontem.
+                 */
+                decisoes={decisoesVisiveis}
+                onAnexar={(ensaioId, decisaoId) =>
+                  setQuebra((q) => ({
+                    ...q,
+                    // O ensaio sai de qualquer outra decisão antes de entrar
+                    // nesta: a mesma evidência sustentando duas escolhas
+                    // diferentes é o tipo de coisa que só se descobre lendo o
+                    // documento pronto.
+                    decisoes: (q.decisoes ?? []).map((d) => {
+                      const sem = (d.ensaioIds ?? []).filter((id) => id !== ensaioId);
+                      return { ...d, ensaioIds: d.id === decisaoId ? [...sem, ensaioId] : sem };
+                    }),
+                  }))
+                }
+                onVoltar={() => navegar({ tela: "canvas" })}
+                /**
+                 * SPEC-66 fatia D — a pauta vem do modelo; a conta, do motor.
+                 *
+                 * O botão está sempre presente, e isso NÃO contraria o §244:
+                 * sem modelo configurado ele não fica inerte, devolve o motivo
+                 * escrito pelo servidor, que a tela mostra.
+                 */
+                onSugerir={async () => {
+                  const elementos = elementosComTempo(quebra.diagrama, diagramaConfig);
+                  const t = leituraDoDesenho.tempoDoPiorTrecho;
+                  const { cenarios } = await apiIa.proporCenariosDeLentidao({
+                    contextoEpico: quebra.demandInfo,
+                    elementos: elementos.map((e) => ({
+                      tipo: e.tipo,
+                      id: e.id,
+                      rotulo: e.rotulo,
+                      msAtual: e.msAtual,
+                      externo: e.externo,
+                    })),
+                    respostaAtualMs: t?.ms,
+                    respostaEhPiso: t ? !t.completo : undefined,
+                    jaExistentes: (quebra.cenariosDeLentidao ?? []).map((c) => c.nome),
+                  });
+                  // O `tipo` vem do DESENHO, não do modelo: ele devolve só o
+                  // id, e quem sabe se aquele id é nó ou conexão é quem montou
+                  // a lista. Ajuste com id desconhecido é descartado.
+                  const porId = new Map(elementos.map((e) => [e.id, e.tipo]));
+                  return cenarios.map((c, i) => ({
+                    id: `cen-ia-${i}-${c.nome.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 24)}`,
+                    nome: c.nome,
+                    porque: c.porque,
+                    origem: "sugerido" as const,
+                    aceito: false,
+                    ajustes: c.ajustes
+                      .filter((a) => porId.has(a.id))
+                      .map((a) => ({ tipo: porId.get(a.id)!, id: a.id, fator: a.fator })),
+                  }));
+                }}
+              />
+            ) : undefined
+          }
+        />
       )}
 
       {mostrarSistema && (
@@ -2123,94 +2248,6 @@ function AppCarregado({
             if (de < 0 || para < 0 || para >= papeis.length) return;
             [papeis[de], papeis[para]] = [papeis[para], papeis[de]];
             void salvarPipeline(papeis);
-          }}
-        />
-      )}
-
-      {/* SPEC-66 — a bancada de ensaio. Rota própria: o assistente é onde se
-          CONVERSA para produzir desenho, e aqui não se produz nada, se ensaia.
-          E rota é linkável, que é metade do valor. */}
-      {mostrarEnsaios && (
-        <EnsaiosScreen
-          diagrama={quebra.diagrama}
-          config={diagramaConfig}
-          cenarios={quebra.cenariosDeLentidao ?? []}
-          volumetria={volumetriaEmVigorAgora?.valor}
-          onMudar={(cenariosDeLentidao) => setQuebra((q) => ({ ...q, cenariosDeLentidao }))}
-          /**
-           * SPEC-69 — o que o NEGÓCIO exige. É o que faz o número técnico
-           * decidir: "24 s" sozinho não decide nada, "24 s contra os 5 s que
-           * prometemos" decide. Sem necessidade com prazo, a conclusão do
-           * ensaio compara com hoje e não inventa julgamento.
-           */
-          necessidades={quebra.necessidades}
-          // Quem assume o débito — é o que separa consciente de anônimo.
-          autor={sessao.email}
-          /**
-           * SPEC-69 fatia D — o elo. Assumir já põe o ensaio na seção de riscos
-           * do documento; ANEXAR a uma decisão é o que o leva ao item, ao lado
-           * do critério de aceite de quem vai implementar.
-           *
-           * Só as decisões VIGENTES: anexar evidência a uma decisão que já foi
-           * substituída seria juntar o número de hoje ao porquê de ontem.
-           */
-          decisoes={decisoesVisiveis}
-          onAnexar={(ensaioId, decisaoId) =>
-            setQuebra((q) => ({
-              ...q,
-              // O ensaio sai de qualquer outra decisão antes de entrar nesta:
-              // a mesma evidência sustentando duas escolhas diferentes é o tipo
-              // de coisa que só se descobre lendo o documento pronto.
-              decisoes: (q.decisoes ?? []).map((d) => {
-                const sem = (d.ensaioIds ?? []).filter((id) => id !== ensaioId);
-                return { ...d, ensaioIds: d.id === decisaoId ? [...sem, ensaioId] : sem };
-              }),
-            }))
-          }
-          onVoltar={() => navegar({ tela: "canvas" })}
-          /**
-           * SPEC-66 fatia D — a pauta vem do modelo; a conta, do motor.
-           *
-           * O botão está sempre presente, e isso NÃO contraria o §244: sem
-           * modelo configurado ele não fica inerte, devolve o motivo escrito
-           * pelo servidor, que a tela mostra. O que o §244 proíbe é o botão que
-           * não faz nada — não o que explica por que não deu.
-           *
-           * A tela inteira segue funcionando sem ele: cenário à mão é o caminho
-           * principal, sugestão é atalho.
-           */
-          onSugerir={async () => {
-            const elementos = elementosComTempo(quebra.diagrama, diagramaConfig);
-            const t = leituraDoDesenho.tempoDoPiorTrecho;
-            const { cenarios } = await apiIa.proporCenariosDeLentidao({
-              contextoEpico: quebra.demandInfo,
-              elementos: elementos.map((e) => ({
-                tipo: e.tipo,
-                id: e.id,
-                rotulo: e.rotulo,
-                msAtual: e.msAtual,
-                externo: e.externo,
-              })),
-              respostaAtualMs: t?.ms,
-              respostaEhPiso: t ? !t.completo : undefined,
-              jaExistentes: (quebra.cenariosDeLentidao ?? []).map((c) => c.nome),
-            });
-            // O `tipo` vem do DESENHO, não do modelo: ele devolve só o id, e
-            // quem sabe se aquele id é nó ou conexão é quem montou a lista.
-            // Ajuste com id desconhecido é descartado — `simularCenario` também
-            // o declararia, mas deixá-lo entrar encheria a tabela de linha que
-            // não mede nada.
-            const porId = new Map(elementos.map((e) => [e.id, e.tipo]));
-            return cenarios.map((c, i) => ({
-              id: `cen-ia-${i}-${c.nome.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 24)}`,
-              nome: c.nome,
-              porque: c.porque,
-              origem: "sugerido" as const,
-              aceito: false,
-              ajustes: c.ajustes
-                .filter((a) => porId.has(a.id))
-                .map((a) => ({ tipo: porId.get(a.id)!, id: a.id, fator: a.fator })),
-            }));
           }}
         />
       )}

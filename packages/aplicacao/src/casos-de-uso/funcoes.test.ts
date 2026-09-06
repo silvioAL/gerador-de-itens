@@ -121,4 +121,22 @@ describe("executarFuncao — ensaio", () => {
   it("§9.3 — o desenho continua obrigatório também aqui", () => {
     expect(() => executarFuncao("ensaio", { cenario: {} }, CONTEXTO)).toThrow(/"desenho"/);
   });
+
+  it("SPEC-107 G4 — a leitura carrega a âncora INTEIRA: contradições de hoje junto", () => {
+    // Sem elas na mesma leitura, uma contradição preexistente pareceria efeito
+    // do primeiro ensaio — a régua que a bancada sempre teve, agora no executor.
+    const { leitura } = executarFuncao("ensaio", { desenho: DESENHO }, CONTEXTO) as {
+      leitura: { contradicoesHoje: unknown[] };
+    };
+    expect(Array.isArray(leitura.contradicoesHoje)).toBe(true);
+  });
+
+  it("SPEC-107 G4/§305 — desenho sem número declarado carrega `falta`, e zero não vira medição", () => {
+    // O executor não recusa (desenho presente não é entrada ausente, §9.3) —
+    // mas quem apresenta precisa saber, para calar o número.
+    const { leitura } = executarFuncao("ensaio", { desenho: DESENHO }, CONTEXTO) as {
+      leitura: { falta?: { motivo: string } };
+    };
+    expect(leitura.falta?.motivo).toMatch(/tempo|somar/i);
+  });
 });

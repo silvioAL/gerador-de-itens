@@ -1,14 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  avaliarResiliencia,
   concluirEnsaio,
   descreverVolumetria,
   elementosComTempo,
   faltaParaEnsaiar,
   estadoDoEnsaio,
   formatarDuracao,
-  insistenciaDe,
-  simularCenarios,
 } from "@gerador/engine";
 import type {
   AjusteDeCenario,
@@ -17,11 +14,21 @@ import type {
   Diagrama,
   DiagramaConfig,
   ElementoAjustavel,
+  FaltaParaEnsaiar,
+  LeituraDoDesenho,
+  ResultadoDoCenario,
   VolumetriaDaDemanda,
 } from "@gerador/engine";
 
 /**
- * SPEC-66 fatias B e C — a bancada de ensaio.
+ * SPEC-66 fatias B e C — a bancada de ensaio. SPEC-107 G4 — **ela mudou de
+ * casa e de motor**: era a tela `#/ensaios` simulando no navegador; agora vive
+ * junto do FLUXO (`#/fluxo/ensaio`) e **cada número vem de uma execução da
+ * fiação semeada `ensaio-de-cenarios`** (`projeto.desenho → funcao(ensaio)`).
+ * O cenário entra por `parametrosPorNo` — entrada DESTA execução, não mudança
+ * da fiação — e a leitura volta no rastro. O que ficou no cliente é guarda e
+ * apresentação (`faltaParaEnsaiar`, a MESMA função da porta, §263; a conclusão
+ * derivada; a formatação) — a SIMULAÇÃO não roda mais aqui.
  *
  * ## Ela funciona inteira sem IA
  *
@@ -37,12 +44,28 @@ import type {
  * linha de cima — comparar em cadeia faria a ORDEM das linhas mudar o
  * significado dos números.
  */
-export interface EnsaiosScreenProps {
+
+/** O que UMA execução da fiação devolve no rastro do nó `ensaio`. */
+export interface LeituraDoEnsaio {
+  hoje: LeituraDoDesenho;
+  contradicoesHoje: ContradicaoDeResiliencia[];
+  insistenciaHojeMs?: number;
+  falta?: FaltaParaEnsaiar;
+  resultado?: ResultadoDoCenario;
+}
+
+export interface BancadaDeEnsaiosProps {
   diagrama: Diagrama;
   config: DiagramaConfig;
   cenarios: CenarioDeLentidao[];
   onMudar: (cenarios: CenarioDeLentidao[]) => void;
   onVoltar: () => void;
+  /**
+   * SPEC-107 G4 — roda UM cenário (ou nenhum: a âncora de hoje) pela fiação
+   * semeada e devolve a leitura do rastro. É o único caminho para número
+   * nesta bancada — quem injeta é o App, que sabe a demanda aberta e o time.
+   */
+  executar: (cenario?: CenarioDeLentidao) => Promise<LeituraDoEnsaio>;
   /** SPEC-66 fatia D — sugerir a pauta. Ausente = o botão não aparece, e a
    * tela segue inteira (§244). */
   onSugerir?: () => Promise<CenarioDeLentidao[]>;
@@ -89,19 +112,20 @@ function idDoCenario(nome: string, existentes: CenarioDeLentidao[]): string {
   return `${base}-${i}`;
 }
 
-export function EnsaiosScreen({
+export function BancadaDeEnsaios({
   diagrama,
   config,
   cenarios,
   onMudar,
   onVoltar,
+  executar,
   onSugerir,
   necessidades,
   autor,
   volumetria,
   decisoes,
   onAnexar,
-}: EnsaiosScreenProps) {
+}: BancadaDeEnsaiosProps) {
   const [editando, setEditando] = useState<string | null>(null);
   const [assumindo, setAssumindo] = useState<string | null>(null);
   const [motivo, setMotivo] = useState("");
@@ -109,31 +133,89 @@ export function EnsaiosScreen({
   const [sugerindo, setSugerindo] = useState(false);
   const [erroSugestao, setErroSugestao] = useState<string | null>(null);
 
-  // O cálculo é puro e local: recalcular a cada arrastar de slider não custa
-  // rede nenhuma, e é o que faz o número acompanhar o gesto.
-  const { hoje, resultados } = useMemo(
-    () => simularCenarios(diagrama, config, cenarios, undefined, volumetria),
-    [diagrama, config, cenarios, volumetria]
-  );
+  /**
+   * SPEC-107 G4 — o número vem da FIAÇÃO: uma execução para a âncora de hoje
+   * e uma POR cenário (o cenário é `parametrosPorNo` — entrada da execução).
+   *
+   * O custo que a tela antiga não tinha ("recalcular não custa rede nenhuma")
+   * agora existe, então: debounce curto no arrastar, e a leitura anterior fica
+   * de pé enquanto a nova não chega — número que pisca para "—" a cada gesto
+   * pareceria o desenho piorando.
+   *
+   * Assumir/reabrir/anexar NÃO reexecutam: mudam o estado do débito, não a
+   * conta — a assinatura abaixo olha só o que muda número.
+   */
+  const [medicao, setMedicao] = useState<{
+    hoje: LeituraDoDesenho;
+    contradicoesHoje: ContradicaoDeResiliencia[];
+    insistenciaHojeMs?: number;
+    resultados: ResultadoDoCenario[];
+  } | null>(null);
+  const [erroDaFiacao, setErroDaFiacao] = useState<string | null>(null);
+  const rodada = useRef(0);
+  // O App recria `executar` a cada render (ele fecha sobre a demanda aberta).
+  // Se o efeito dependesse dele, cada render do App cancelaria e reagendaria o
+  // debounce — e num App que re-renderiza mais rápido que 350ms a medição
+  // NUNCA dispararia (medido no E2E do F5: tabela inteira em "—"). O ref
+  // desacopla: o efeito reage só à assinatura, e chama a versão mais recente.
+  const executarRef = useRef(executar);
+  executarRef.current = executar;
+
+  /**
+   * §305 — a guarda do §248, a MESMA função da porta (§263): sem número
+   * declarado não há o que medir, e mandar a fiação somar zeros só produziria
+   * a tabela de zeros com cara de medição. Computada ANTES da medição porque
+   * é ela que decide se a medição acontece.
+   */
+  const falta = faltaParaEnsaiar(diagrama, config);
+
+  const assinatura = JSON.stringify({
+    v: volumetria,
+    semTempo: !!falta,
+    c: cenarios.map((c) => ({ id: c.id, ajustes: c.ajustes, fatorDeVolume: c.fatorDeVolume })),
+  });
+  useEffect(() => {
+    const minha = ++rodada.current;
+    if (falta) return; // nada a medir — e nada de erro: o aviso já explica
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const cenariosDaConta = JSON.parse(assinatura).c as { id: string }[];
+          const medir = executarRef.current;
+          const [base, ...dosCenarios] = await Promise.all([
+            medir(),
+            ...cenariosDaConta.map((c) => medir(cenarios.find((x) => x.id === c.id))),
+          ]);
+          if (minha !== rodada.current) return; // chegou tarde: já há conta mais nova
+          setMedicao({
+            hoje: base.hoje,
+            contradicoesHoje: base.contradicoesHoje,
+            insistenciaHojeMs: base.insistenciaHojeMs,
+            resultados: dosCenarios
+              .map((l) => l.resultado)
+              .filter((r): r is ResultadoDoCenario => r !== undefined),
+          });
+          setErroDaFiacao(null);
+        } catch (e) {
+          if (minha !== rodada.current) return;
+          setErroDaFiacao(e instanceof Error ? e.message : String(e));
+        }
+      })();
+    }, 350);
+    return () => clearTimeout(timer);
+    // Deps: a `assinatura` resume o que muda número (id/ajustes/fator/volume);
+    // `cenarios` e `executar` ficam de fora de propósito — assumir/reabrir não
+    // muda a conta, e a identidade de `executar` muda a cada render do App.
+  }, [assinatura]);
+
+  const hoje = medicao?.hoje;
+  const contradicoesHoje = medicao?.contradicoesHoje ?? [];
+  const insistenciaHoje = medicao?.insistenciaHojeMs;
 
   // Só quem PODE ter tempo entra na lista de ajustáveis — a mesma função que
   // monta o pedido à IA, para os dois lados oferecerem exatamente o mesmo
-  // conjunto.
+  // conjunto. (Guarda e catálogo, não simulação: fica no cliente, §263.)
   const elementos = useMemo(() => elementosComTempo(diagrama, config), [diagrama, config]);
-
-  // O que o desenho de HOJE já contradiz e por quanto ele já insiste — a
-  // âncora tem que trazer as duas, senão uma contradição preexistente
-  // pareceria efeito do primeiro ensaio.
-  const contradicoesHoje = useMemo(
-    () => avaliarResiliencia(diagrama, config, undefined, { volume: volumetria }),
-    [diagrama, config, volumetria]
-  );
-  const insistenciaHoje = useMemo(() => {
-    const todas = diagrama.edges
-      .map((e) => insistenciaDe(e))
-      .filter((i): i is NonNullable<typeof i> => i !== undefined && i.insiste);
-    return todas.length > 0 ? Math.max(...todas.map((i) => i.ms)) : undefined;
-  }, [diagrama]);
 
   function criar() {
     const texto = nome.trim();
@@ -177,21 +259,6 @@ export function EnsaiosScreen({
       setSugerindo(false);
     }
   }
-
-  /**
-   * §305 — a guarda do §248 testava a coisa errada, e por isso nunca disparava.
-   *
-   * Era `hoje.tempoDoPiorTrecho === undefined`. Um desenho com conexões que
-   * ESPERAM e nenhum número declarado devolve `ms: 0` — medido no navegador, a
-   * tela mostrava "hoje ≥ 0 ms" e um ensaio concluindo "a resposta fica em
-   * 0 ms", que é exatamente a tabela de zeros com cara de medição que ela
-   * existia para impedir.
-   *
-   * A mesma função que a PORTA usa: as duas precisam concordar sobre o que é
-   * "dá para ensaiar", e duas versões desta conta divergiriam na primeira
-   * mudança (§263).
-   */
-  const falta = faltaParaEnsaiar(diagrama, config);
 
   return (
     <div style={telaEstilo} data-testid="tela-ensaios">
@@ -265,6 +332,13 @@ export function EnsaiosScreen({
           {erroSugestao}
         </div>
       )}
+      {/* SPEC-107 G4 — a conta agora atravessa o servidor, e falha de rede
+          vira frase, nunca tabela congelada sem explicação. */}
+      {erroDaFiacao && (
+        <div style={{ fontSize: 11, color: "var(--amarelo)" }} data-testid="ensaios-erro">
+          não deu para medir agora: {erroDaFiacao}
+        </div>
+      )}
 
       <table style={tabelaEstilo} data-testid="tabela-cenarios">
         <thead>
@@ -293,7 +367,7 @@ export function EnsaiosScreen({
                   `ms: 0` num desenho que espera e não declara nada, e "≥ 0 ms"
                   logo abaixo de um aviso dizendo "zero não é uma medição" seria
                   o produto se contradizendo na mesma tela. */}
-              {hoje.tempoDoPiorTrecho && !falta ? (
+              {hoje?.tempoDoPiorTrecho && !falta ? (
                 <Resposta ms={hoje.tempoDoPiorTrecho.ms} completo={hoje.tempoDoPiorTrecho.completo} />
               ) : (
                 <span style={{ color: "var(--texto-mudo)" }}>—</span>
@@ -304,7 +378,7 @@ export function EnsaiosScreen({
               <Insistencia ms={insistenciaHoje} />
             </td>
             <td style={tdEstilo}>
-              <Dominantes lista={hoje.tempoDoPiorTrecho?.dominantes ?? []} />
+              <Dominantes lista={hoje?.tempoDoPiorTrecho?.dominantes ?? []} />
             </td>
             <td style={tdEstilo} />
           </tr>
@@ -319,14 +393,17 @@ export function EnsaiosScreen({
             </tr>
           )}
 
-          {resultados.map((r) => {
-            const cenario = cenarios.find((c) => c.id === r.cenarioId)!;
+          {cenarios.map((cenario) => {
+            // G4 — a linha nasce do CENÁRIO, não da medição: criar, ajustar e
+            // assumir não podem ficar reféns da ida ao servidor. O número
+            // chega quando a leitura da fiação volta; até lá a célula diz "—".
+            const r = medicao?.resultados.find((x) => x.cenarioId === cenario.id);
             const estado = estadoDoEnsaio(cenario);
-            const conclusao = concluirEnsaio(r, hoje.tempoDoPiorTrecho?.ms, necessidades ?? []);
+            const conclusao = r ? concluirEnsaio(r, hoje?.tempoDoPiorTrecho?.ms, necessidades ?? []) : "";
             return (
-              <Fragmento key={r.cenarioId}>
+              <Fragmento key={cenario.id}>
                 <tr
-                  data-testid={`linha-${r.cenarioId}`}
+                  data-testid={`linha-${cenario.id}`}
                   // O assumido esmaece: ele não cobra mais, e continua na
                   // tabela porque some do placar, não do histórico (§242).
                   style={estado === "aceito" ? { opacity: 0.6 } : undefined}
@@ -351,39 +428,39 @@ export function EnsaiosScreen({
                         montar cruzando quatro colunas. Nunca escrita pela IA:
                         a circunstância é dela, a conta é do motor. */}
                     {conclusao && (
-                      <div style={conclusaoEstilo} data-testid={`conclusao-${r.cenarioId}`}>
+                      <div style={conclusaoEstilo} data-testid={`conclusao-${cenario.id}`}>
                         {conclusao}
                       </div>
                     )}
                     {estado === "aceito" && cenario.debito && (
-                      <div style={{ fontSize: 10.5, color: "var(--verde)" }} data-testid={`debito-${r.cenarioId}`}>
+                      <div style={{ fontSize: 10.5, color: "var(--verde)" }} data-testid={`debito-${cenario.id}`}>
                         Assumido: {cenario.debito.motivo}
                         {cenario.debito.autor ? ` — ${cenario.debito.autor}` : ""}
                       </div>
                     )}
                     {estado === "aceito" && (
                       <Anexo
-                        ensaioId={r.cenarioId}
+                        ensaioId={cenario.id}
                         decisoes={decisoes ?? []}
                         onAnexar={onAnexar}
                       />
                     )}
                   </td>
                   <td style={tdEstilo}>
-                    {r.ms === undefined ? (
+                    {r?.ms === undefined ? (
                       <span style={{ color: "var(--texto-mudo)" }}>—</span>
                     ) : (
                       <Resposta ms={r.ms} completo={r.completo} />
                     )}
                   </td>
                   <td style={tdEstilo}>
-                    <Delta ms={r.delta} />
+                    <Delta ms={r?.delta} />
                   </td>
                   <td style={tdEstilo}>
-                    <Insistencia ms={r.insistenciaMs} />
+                    <Insistencia ms={r?.insistenciaMs} />
                   </td>
                   <td style={tdEstilo}>
-                    <Dominantes lista={r.dominantes} />
+                    <Dominantes lista={r?.dominantes ?? []} />
                   </td>
                   <td style={{ ...tdEstilo, whiteSpace: "nowrap" }}>
                     {/* §4.0 — o fluxo é avaliar → revisar → aceitar ou
@@ -393,8 +470,8 @@ export function EnsaiosScreen({
                     {estado !== "aceito" ? (
                       <button
                         style={acaoEstilo}
-                        data-testid={`assumir-${r.cenarioId}`}
-                        onClick={() => setAssumindo(r.cenarioId)}
+                        data-testid={`assumir-${cenario.id}`}
+                        onClick={() => setAssumindo(cenario.id)}
                         title="Assumir este débito: sai do placar e fica registrado com quem assumiu e por quê"
                       >
                         assumir
@@ -404,9 +481,9 @@ export function EnsaiosScreen({
                       // o ensaio à cobrança sem apagar que alguém já o assumiu.
                       <button
                         style={acaoEstilo}
-                        data-testid={`reabrir-${r.cenarioId}`}
+                        data-testid={`reabrir-${cenario.id}`}
                         onClick={() =>
-                          mudarCenario(r.cenarioId, (c) => ({
+                          mudarCenario(cenario.id, (c) => ({
                             ...c,
                             estado: "por-avaliar",
                             aceito: false,
@@ -420,23 +497,23 @@ export function EnsaiosScreen({
                     )}
                     <button
                       style={acaoEstilo}
-                      data-testid={`ajustar-${r.cenarioId}`}
+                      data-testid={`ajustar-${cenario.id}`}
                       onClick={() => {
-                        const abrindo = editando !== r.cenarioId;
-                        setEditando(abrindo ? r.cenarioId : null);
+                        const abrindo = editando !== cenario.id;
+                        setEditando(abrindo ? cenario.id : null);
                         // Mexer no ensaio é REVISAR: o estado acompanha o gesto,
                         // senão o mapa do fluxo seria decoração.
                         if (abrindo && estado === "por-avaliar") {
-                          mudarCenario(r.cenarioId, (c) => ({ ...c, estado: "em-revisao" }));
+                          mudarCenario(cenario.id, (c) => ({ ...c, estado: "em-revisao" }));
                         }
                       }}
                     >
-                      {editando === r.cenarioId ? "fechar" : "revisar"}
+                      {editando === cenario.id ? "fechar" : "revisar"}
                     </button>
                     <button
                       style={acaoEstilo}
-                      data-testid={`apagar-${r.cenarioId}`}
-                      onClick={() => onMudar(cenarios.filter((c) => c.id !== r.cenarioId))}
+                      data-testid={`apagar-${cenario.id}`}
+                      onClick={() => onMudar(cenarios.filter((c) => c.id !== cenario.id))}
                     >
                       apagar
                     </button>
@@ -446,8 +523,8 @@ export function EnsaiosScreen({
                 {/* SPEC-68 — o que ESTE ensaio faz o desenho passar a
                     contradizer. É o que separa "ficou mais lento" de "agora
                     isto não pode dar certo". */}
-                {r.contradicoes.length > 0 && (
-                  <tr data-testid={`contradicoes-${r.cenarioId}`}>
+                {r && r.contradicoes.length > 0 && (
+                  <tr data-testid={`contradicoes-${cenario.id}`}>
                     <td colSpan={6} style={{ ...tdEstilo, paddingTop: 0 }}>
                       <Contradicoes lista={r.contradicoes} />
                     </td>
@@ -457,24 +534,24 @@ export function EnsaiosScreen({
                 {/* §4.0 — assumir EXIGE motivo, como a exceção do §242. Sem
                     ele isto vira um botão de silenciar, e quem abrir o
                     documento depois não saberá se foi decisão ou cansaço. */}
-                {assumindo === r.cenarioId && (
-                  <tr data-testid={`assumir-linha-${r.cenarioId}`}>
+                {assumindo === cenario.id && (
+                  <tr data-testid={`assumir-linha-${cenario.id}`}>
                     <td colSpan={6} style={{ ...tdEstilo, background: "var(--painel-alto)" }}>
                       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                         <input
                           autoFocus
                           value={motivo}
                           onChange={(e) => setMotivo(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && assumir(r.cenarioId)}
+                          onKeyDown={(e) => e.key === "Enter" && assumir(cenario.id)}
                           aria-label="Por que assumir este débito"
                           placeholder="Por que assumimos isto? (ex.: o pico dura 2h/mês e o negócio aceita a espera)"
                           style={{ ...campoEstilo, flex: "1 1 420px" }}
                         />
                         <button
-                          onClick={() => assumir(r.cenarioId)}
+                          onClick={() => assumir(cenario.id)}
                           disabled={!motivo.trim()}
                           style={botaoEstilo}
-                          data-testid={`confirmar-assumir-${r.cenarioId}`}
+                          data-testid={`confirmar-assumir-${cenario.id}`}
                         >
                           assumir o débito
                         </button>
@@ -486,8 +563,8 @@ export function EnsaiosScreen({
                   </tr>
                 )}
 
-                {editando === r.cenarioId && (
-                  <tr data-testid={`ajustes-${r.cenarioId}`}>
+                {editando === cenario.id && (
+                  <tr data-testid={`ajustes-${cenario.id}`}>
                     <td colSpan={6} style={{ ...tdEstilo, background: "var(--painel-alto)" }}>
                       {/* SPEC-70 §5 — o pico da DEMANDA, antes dos ajustes por
                           elemento.
@@ -501,7 +578,7 @@ export function EnsaiosScreen({
                           um número que não existe daria um fator sem efeito, e
                           controle que não controla nada é o §244. */}
                       {volumetria && (
-                        <label style={{ ...condicaoEstilo, marginBottom: 8 }} data-testid={`pico-${r.cenarioId}`}>
+                        <label style={{ ...condicaoEstilo, marginBottom: 8 }} data-testid={`pico-${cenario.id}`}>
                           volume da demanda ×
                           <input
                             type="number"
@@ -511,7 +588,7 @@ export function EnsaiosScreen({
                             value={cenario.fatorDeVolume ?? ""}
                             placeholder="1"
                             onChange={(e) =>
-                              mudarCenario(r.cenarioId, (c) => ({
+                              mudarCenario(cenario.id, (c) => ({
                                 ...c,
                                 fatorDeVolume: e.target.value === "" ? undefined : Number(e.target.value),
                               }))
@@ -526,7 +603,7 @@ export function EnsaiosScreen({
                       <Ajustes
                         elementos={elementos}
                         cenario={cenario}
-                        onMudar={(ajustes) => mudarCenario(r.cenarioId, (c) => ({ ...c, ajustes }))}
+                        onMudar={(ajustes) => mudarCenario(cenario.id, (c) => ({ ...c, ajustes }))}
                       />
                     </td>
                   </tr>
@@ -534,8 +611,8 @@ export function EnsaiosScreen({
 
                 {/* §57 — o desenho mudou depois do cenário. Um ensaio que
                     ignorou parte do que lhe pediram tem que dizer. */}
-                {r.ajustesSemAlvo.length > 0 && (
-                  <tr data-testid={`sem-alvo-${r.cenarioId}`}>
+                {r && r.ajustesSemAlvo.length > 0 && (
+                  <tr data-testid={`sem-alvo-${cenario.id}`}>
                     <td colSpan={6} style={{ ...tdEstilo, fontSize: 10.5, color: "var(--amarelo)" }}>
                       {r.ajustesSemAlvo.length} ajuste(s) deste cenário apontam para elementos que não existem mais no
                       desenho, e ficaram de fora da conta.
@@ -551,7 +628,7 @@ export function EnsaiosScreen({
               resposta chega inteira, então quem constrói é a tabela. */}
           {sugerindo && <LinhasFantasma />}
 
-          {resultados.length === 0 && !sugerindo && (
+          {cenarios.length === 0 && !sugerindo && (
             <tr>
               <td colSpan={6} style={{ ...tdEstilo, color: "var(--texto-mudo)" }} data-testid="sem-cenarios">
                 Nenhum cenário ainda. Comece por um: "e se o componente mais lento ficar 3× pior?".
@@ -944,24 +1021,22 @@ function Ajustes({
 }
 
 /**
- * §302 — RELATO REAL: *"no canto direito consta um retângulo com uma barra de
- * rolagem, e não é possível visualizar nada dentro dele"*.
- *
- * Era o **painel de propriedades**. A mesa (canvas + painel) fica montada o
- * tempo todo e não é condicionada à rota; as telas de rota a cobrem. Só que
- * esta tela nasceu no fluxo normal, e por isso **disputava espaço** com a mesa
- * em vez de cobri-la: o `aside` de 320px ficava espremido em 32px de altura,
- * com o texto "Selecione um nó…" sem caber — daí a barra de rolagem sobre um
- * retângulo aparentemente vazio.
- *
- * `fixed` + `inset: 0` + fundo + `zIndex` é o padrão que `ConfigScreen`,
- * `SistemaScreen` e `DocumentoScreen` já usam. Esta era a única fora dele.
+ * SPEC-107 G4 — de tela cheia a PAINEL sobre o fluxo: a fiação semeada fica
+ * visível à esquerda enquanto a bancada mede — é a peça `ensaio` no canvas,
+ * não uma tela que a esconde. A lição do §302 continua valendo na nova forma:
+ * `position: fixed` + fundo + `zIndex` acima do da `FluxoScreen` (55), para
+ * cobrir DE VERDADE a faixa que ocupa em vez de disputar espaço com ela.
  */
 const telaEstilo: React.CSSProperties = {
   position: "fixed",
-  inset: 0,
+  top: 0,
+  right: 0,
+  bottom: 0,
+  width: "min(900px, 78vw)",
   background: "var(--painel)",
-  zIndex: 55,
+  borderLeft: "1px solid var(--borda)",
+  boxShadow: "-12px 0 32px rgba(0,0,0,0.25)",
+  zIndex: 56,
   padding: "18px 22px",
   display: "flex",
   flexDirection: "column",

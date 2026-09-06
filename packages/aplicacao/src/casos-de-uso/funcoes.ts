@@ -1,6 +1,9 @@
 import {
+  avaliarResiliencia,
   avisosDaDerivacao,
   derivar,
+  faltaParaEnsaiar,
+  insistenciaDe,
   resolverDependencias,
   simularCenarios,
   type CenarioDeLentidao,
@@ -142,9 +145,32 @@ export function executarFuncao(
       undefined,
       desenho.volumetria
     );
+    // SPEC-107 G4 — a leitura carrega a ÂNCORA inteira, não só o pior trecho:
+    // o que o desenho de hoje já contradiz (senão uma contradição preexistente
+    // pareceria efeito do primeiro ensaio) e por quanto ele já insiste. E
+    // carrega `falta` quando não há número declarado — a mesma régua do §305:
+    // o executor não recusa (desenho presente não é entrada ausente, §9.3),
+    // mas zero não é uma medição, e quem apresenta precisa saber para calar o
+    // número em vez de mostrar uma tabela de zeros com cara de medição.
+    const falta = faltaParaEnsaiar(desenho.diagrama, contexto.diagramaConfig);
+    const contradicoesHoje = avaliarResiliencia(desenho.diagrama, contexto.diagramaConfig, undefined, {
+      volume: desenho.volumetria,
+    });
+    const insistencias = desenho.diagrama.edges
+      .map((e) => insistenciaDe(e))
+      .filter((i): i is NonNullable<typeof i> => i !== undefined && i.insiste);
+    const insistenciaHojeMs = insistencias.length > 0 ? Math.max(...insistencias.map((i) => i.ms)) : undefined;
     // Sem cenário a leitura ainda vale: é a âncora de hoje, que toda tabela
     // de ensaio mostra como primeira linha.
-    return { leitura: { hoje, ...(resultados[0] ? { resultado: resultados[0] } : {}) } };
+    return {
+      leitura: {
+        hoje,
+        contradicoesHoje,
+        ...(insistenciaHojeMs !== undefined ? { insistenciaHojeMs } : {}),
+        ...(falta ? { falta } : {}),
+        ...(resultados[0] ? { resultado: resultados[0] } : {}),
+      },
+    };
   }
 
   // O registro é fechado e os dois ids acima o cobrem; chegar aqui é registro
