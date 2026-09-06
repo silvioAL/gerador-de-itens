@@ -1,6 +1,8 @@
 import type { Variante } from "@gerador/engine";
+import type { ItemGeradoSalvo } from "../portas/repositorioDeItensGerados.js";
 import type { QuebraSalva, ResumoQuebra } from "../portas/repositorioDeQuebras.js";
 import { comoDesenhoMapeado, EntradaDaFuncaoInvalida } from "./funcoes.js";
+import { prontosEIgnorados } from "./itensGerados.js";
 
 /**
  * SPEC-107 fatia B — **a metade PURA do nó `projeto`.**
@@ -31,7 +33,11 @@ export function demandaAtiva(resumos: ResumoQuebra[], timeId?: string): ResumoQu
  * `volumetria` ausente e `markdown` nunca gerado não viram `{}`/`""`; quem os
  * exigir à jusante barra com o nome do que faltou.
  */
-export function saidaDoProjeto(quebra: QuebraSalva, itens: unknown[]): Record<string, unknown> {
+export function saidaDoProjeto(quebra: QuebraSalva, itens: ItemGeradoSalvo[]): Record<string, unknown> {
+  // SPEC-107 G1 — a régua de "pronto" da exportação (SPEC-49), a MESMA do
+  // caso de uso (§263): a fiação de exportar recebe só os prontos, e os
+  // ignorados saem nomeados para a tela dizer quem ficou de fora.
+  const { prontos, ignorados } = prontosEIgnorados(itens);
   return {
     demandaId: quebra.id,
     ...(quebra.titulo ? { titulo: quebra.titulo } : {}),
@@ -45,6 +51,18 @@ export function saidaDoProjeto(quebra: QuebraSalva, itens: unknown[]): Record<st
       ...(quebra.volumetria ? { volumetria: quebra.volumetria } : {}),
     },
     itens,
+    // Na forma que o agente exportador recebe (o payload de sempre da
+    // SPEC-49): nada de `pendencias`/`sugestoes` — quem chega aqui já passou
+    // pela régua, e o contrato externo não muda.
+    itensProntos: prontos.map((i) => ({
+      chave: i.chave,
+      titulo: i.titulo,
+      tipo: i.tipo,
+      tamanho: i.tamanho,
+      dependencias: i.dependencias,
+      corpoMarkdown: i.corpoMarkdown,
+    })),
+    itensIgnorados: ignorados,
     necessidades: quebra.necessidades,
     ...(quebra.volumetria ? { volumetria: quebra.volumetria } : {}),
     ...(quebra.especificacao ? { markdown: quebra.especificacao } : {}),
@@ -73,6 +91,48 @@ export function varianteProposta(
     criadaEm,
     motivo: `escrita pela fiação "${fluxo.id}" — o desenho da demanda só muda se alguém adotar`,
   };
+}
+
+/**
+ * SPEC-107 G1 — o DESTINO de exportação: o que o agente respondeu, por item,
+ * separado em quem grava e quem falhou — a disciplina da SPEC-49 (falha
+ * parcial é resposta), agora na fiação. `enviados` permite nomear o item
+ * sobre o qual o agente NEM respondeu — silêncio também é falha com nome.
+ */
+export function resultadoDaExportacao(
+  resultados: unknown,
+  enviados: unknown
+): {
+  paraGravar: { chave: string; linkExterno: string }[];
+  erros: { chave: string; erro: string }[];
+} {
+  if (!Array.isArray(resultados)) {
+    throw new EntradaDaFuncaoInvalida(
+      `"resultados" não veio como lista — a resposta do agente exportador tem a forma { resultados: [...] }`
+    );
+  }
+  const paraGravar: { chave: string; linkExterno: string }[] = [];
+  const erros: { chave: string; erro: string }[] = [];
+  const respondidos = new Set<string>();
+  for (const cru of resultados as { chave?: unknown; linkExterno?: unknown; erro?: unknown }[]) {
+    const chave = typeof cru?.chave === "string" ? cru.chave : "";
+    if (!chave) continue;
+    respondidos.add(chave);
+    if (typeof cru.erro === "string" && cru.erro) {
+      erros.push({ chave, erro: cru.erro });
+    } else if (typeof cru.linkExterno === "string" && cru.linkExterno) {
+      paraGravar.push({ chave, linkExterno: cru.linkExterno });
+    } else {
+      erros.push({ chave, erro: "o agente respondeu sem o link do issue" });
+    }
+  }
+  for (const enviado of Array.isArray(enviados) ? (enviados as { chave?: unknown }[]) : []) {
+    const chave = typeof enviado?.chave === "string" ? enviado.chave : "";
+    if (chave && !respondidos.has(chave)) {
+      erros.push({ chave, erro: "o agente não respondeu sobre este item" });
+    }
+  }
+  return { paraGravar, erros };
 }
 
 /** §9.3 — a régua de erro do nó, com o nome do que faltou. */

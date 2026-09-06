@@ -1006,6 +1006,80 @@ describe("SPEC-107 fatia B — o nó PROJETO", () => {
     });
   });
 
+  it("SPEC-107 G1 — a exportação COMO fiação semeada: prontos sobem, pendente fica de fora, falha é por item", async () => {
+    await comApp(async (app, cookies) => {
+      // O destino de itens aponta o dublê (que falha o ÚLTIMO item de
+      // propósito — falha parcial é o modo de falhar deste contrato).
+      await app.inject({
+        method: "PUT",
+        url: "/config/exportador",
+        cookies,
+        payload: {
+          documento: {
+            endpoint: `${baseDoGateway}/itens`,
+            rotulo: "Tracker de teste",
+            cabecalhos: {},
+          },
+        },
+      });
+      const demandaId = await criarDemanda(app, cookies, "Demanda exportada");
+      await app.inject({
+        method: "PUT",
+        url: `/quebras/${demandaId}/itens`,
+        cookies,
+        payload: {
+          itens: [
+            { chave: "a", titulo: "A", tipo: "História", tamanho: "M", dependencias: [], corpoMarkdown: "…", pendencias: 0, sugestoes: 0 },
+            { chave: "b", titulo: "B", tipo: "História", tamanho: "M", dependencias: [], corpoMarkdown: "…", pendencias: 0, sugestoes: 0 },
+            { chave: "pendente", titulo: "P", tipo: "História", tamanho: "M", dependencias: [], corpoMarkdown: "…", pendencias: 2, sugestoes: 0 },
+          ],
+        },
+      });
+
+      // A fiação está EM VIGOR, derivada do destino — ninguém a desenhou.
+      const emVigorResp = await app.inject({ method: "GET", url: "/fluxos" });
+      const daExportacao = (emVigorResp.json() as { fluxos: { id: string; origem: string }[] }).fluxos.find(
+        (f) => f.id === "exportar-prontos"
+      );
+      expect(daExportacao?.origem).toBe("fabrica");
+
+      const r = await app.inject({
+        method: "POST",
+        url: "/fluxos/exportar-prontos/executar",
+        cookies,
+        payload: { parametrosPorNo: { demanda: { demandaId } } },
+      });
+      expect(r.statusCode).toBe(200);
+      const corpo = r.json() as {
+        nos: { noId: string; estado: string; erro?: string }[];
+        saidas: Record<string, Record<string, unknown>>;
+      };
+      expect(corpo.nos.map((n) => [n.noId, n.estado])).toEqual([
+        ["demanda", "sucesso"],
+        ["envio", "sucesso"],
+        ["grava", "sucesso"],
+      ]);
+      // A régua de "pronto" (a MESMA da SPEC-49): o pendente ficou de fora.
+      expect(corpo.saidas["demanda"].itensIgnorados).toEqual(["pendente"]);
+      // Falha parcial por item: o dublê recusa o último enviado.
+      expect(corpo.saidas["grava"].exportados).toEqual(["a"]);
+      expect(corpo.saidas["grava"].erros).toEqual([{ chave: "b", erro: "campo obrigatório ausente no tracker (recusa simulada)" }]);
+
+      // E o banco diz o mesmo: quem subiu está `exportado` com link; quem
+      // falhou continua `gerado`.
+      const itens = (await app.inject({ method: "GET", url: `/quebras/${demandaId}/itens`, cookies })).json() as {
+        chave: string;
+        estado: string;
+        linkExterno: string | null;
+      }[];
+      const porChave = Object.fromEntries(itens.map((i) => [i.chave, i]));
+      expect(porChave["a"].estado).toBe("exportado");
+      expect(String(porChave["a"].linkExterno)).toContain("https://");
+      expect(porChave["b"].estado).toBe("gerado");
+      expect(porChave["pendente"].estado).toBe("gerado");
+    });
+  });
+
   it("escrever fluxo com projeto de refId errado é recusado com a régua", async () => {
     await comApp(async (app, cookies) => {
       const r = await app.inject({

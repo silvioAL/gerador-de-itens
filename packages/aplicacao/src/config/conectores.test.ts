@@ -118,7 +118,11 @@ describe("conectoresDeFabrica (§3.3 — os destinos do gateway vistos como cone
 
     // O endpoint herdado da SPEC-49 continua chamável como conector de itens.
     const itens = fabrica.find((c) => c.id === "exportador")!;
-    expect(itens.envelope).toBe("itens");
+    // SPEC-107 G1 — o envelope derivado é VAZIO de propósito: no executor
+    // genérico o campo "itens" da entrada JÁ é o embrulho; repetir o envelope
+    // do gateway mandaria {"itens":{"itens":[...]}} (meia-integração achada
+    // viva quando a fiação de exportação nasceu).
+    expect(itens.envelope).toBe("");
     expect(itens.origem).toBe("fabrica");
   });
 

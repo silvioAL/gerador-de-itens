@@ -1,9 +1,26 @@
-import type { ExportadorDeItens } from "../portas/exportadorDeItens.js";
 import type {
   DadosItemGerado,
   ItemGeradoSalvo,
   RepositorioDeItensGerados,
 } from "../portas/repositorioDeItensGerados.js";
+
+/**
+ * SPEC-49 (extraída na SPEC-107 G1) — **a régua de "PRONTO", num lugar só.**
+ *
+ * Nenhum campo pedindo "✍️ especificar", nenhuma sugestão sem confirmação,
+ * e quem já subiu não sobe de novo. A fiação de exportação (o nó `projeto`)
+ * e o caso de uso leem a MESMA régua — duas cópias divergiriam na primeira
+ * mudança (§263), e "pronto" é exatamente o tipo de régua que não pode
+ * divergir: é ela que impede item meia-boca no tracker de alguém.
+ */
+export function prontosEIgnorados(todos: ItemGeradoSalvo[]): {
+  prontos: ItemGeradoSalvo[];
+  ignorados: string[];
+} {
+  const prontos = todos.filter((i) => i.estado !== "exportado" && i.pendencias === 0 && i.sugestoes === 0);
+  const ignorados = todos.filter((i) => !prontos.includes(i) && i.estado !== "exportado").map((i) => i.chave);
+  return { prontos, ignorados };
+}
 
 /**
  * SPEC-41 Parte B — casos de uso dos itens gerados. Quem CALCULA os itens é o
@@ -21,35 +38,10 @@ export function criarCasosDeUsoDeItensGerados(repo: RepositorioDeItensGerados) {
       return repo.substituirDaQuebra(quebraId, itens);
     },
 
-    /**
-     * SPEC-49 — exporta os itens PRONTOS (a régua da SPEC-44/47: nenhum campo
-     * pedindo "✍️ especificar", nenhuma sugestão sem confirmação). Item pela
-     * metade não vira issue meia-boca no tracker de ninguém.
-     *
-     * Falha é por item: quem subiu fica `exportado` com link, quem falhou
-     * continua `gerado` e o motivo volta pra tela.
-     */
-    async exportarDaQuebra(
-      quebraId: string,
-      exportador: ExportadorDeItens
-    ): Promise<{ exportados: ItemGeradoSalvo[]; erros: { chave: string; erro: string }[]; ignorados: string[] }> {
-      const todos = await repo.listarDaQuebra(quebraId);
-      const prontos = todos.filter((i) => i.estado !== "exportado" && i.pendencias === 0 && i.sugestoes === 0);
-      const ignorados = todos.filter((i) => !prontos.includes(i) && i.estado !== "exportado").map((i) => i.chave);
-
-      const resultados = await exportador.exportar(prontos);
-      const exportados: ItemGeradoSalvo[] = [];
-      const erros: { chave: string; erro: string }[] = [];
-      for (const resultado of resultados) {
-        if ("erro" in resultado) {
-          erros.push(resultado);
-          continue;
-        }
-        const salvo = await repo.marcarExportado(quebraId, resultado.chave, resultado.linkExterno);
-        if (salvo) exportados.push(salvo);
-      }
-      return { exportados, erros, ignorados };
-    },
+    // SPEC-49 → SPEC-107 G1: `exportarDaQuebra` morreu — a exportação virou a
+    // fiação semeada "exportar-prontos". A régua de "pronto" ficou acima
+    // (`prontosEIgnorados`) e a leitura da resposta por item virou
+    // `resultadoDaExportacao` (projetoNoFluxo) — as mesmas, num lugar só.
   };
 }
 

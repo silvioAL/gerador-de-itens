@@ -364,8 +364,8 @@ export const apiItensGerados = {
   listar: (quebraId: string) => requisitar<ItemGerado[]>(`/quebras/${quebraId}/itens`),
   regerar: (quebraId: string, itens: DadosItemGerado[]) =>
     requisitar<ItemGerado[]>(`/quebras/${quebraId}/itens`, { method: "PUT", body: JSON.stringify({ itens }) }),
-  exportar: (quebraId: string) =>
-    requisitar<ResultadoDaExportacao>(`/quebras/${quebraId}/itens/exportar`, { method: "POST" }),
+  // SPEC-107 G1 — `exportar` morreu como rota dedicada: o botão virou atalho
+  // da fiação semeada "exportar-prontos" (ver `exportarPelaFiacao` no App).
 };
 
 export interface PedidoSugestaoIa {
@@ -1705,11 +1705,19 @@ async function lerExecucaoAoVivo(
 export const apiExecucaoDeFluxo = {
   /** O executor é do SERVIDOR (§7): daqui só vai o disparo e o time.
    * `ateNo` = executar só até aquele nó (o fecho de ancestrais) — inspecionar
-   * o meio sem disparar o resto. */
-  executar: (id: string, timeId?: string, ateNo?: string) =>
+   * o meio sem disparar o resto. `parametrosPorNo` (SPEC-107 G1) = entradas
+   * DESTA execução, por nó — é como um atalho aponta a demanda aberta. */
+  executar: (id: string, timeId?: string, ateNo?: string, parametrosPorNo?: Record<string, Record<string, unknown>>) =>
     requisitar<RespostaDeExecucao>(
       `/fluxos/${encodeURIComponent(id)}/executar`,
-      { method: "POST", body: JSON.stringify({ ...(timeId ? { timeId } : {}), ...(ateNo ? { ateNo } : {}) }) }
+      {
+        method: "POST",
+        body: JSON.stringify({
+          ...(timeId ? { timeId } : {}),
+          ...(ateNo ? { ateNo } : {}),
+          ...(parametrosPorNo ? { parametrosPorNo } : {}),
+        }),
+      }
     ),
   /** SPEC-107 fatia D — a mesma execução, ASSISTÍVEL: um evento por nó
    * (começou/terminou) e o texto do agente streamando, como na revisão. */

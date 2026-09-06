@@ -16716,3 +16716,46 @@ texto com semântica de MARKDOWN. Afirma a semântica, não muda o envelope.
   não; sem contrato não), e E2E — o par errado DE PROPÓSITO ao lado do certo
   mostra o aviso, o Executar segue, e a especificação da demanda aparece
   como preview no rastro do nó de projeto.
+
+---
+
+## §377 — SPEC-107 G1: a primeira morte do placar — exportar É a fiação
+
+**A primeira substituição da §3.1 fechou com a prova da tabela: o E2E de
+exportação passou pela fiação SEM MUDAR UMA LINHA — e a rota dedicada e o
+adaptador morreram.**
+
+**A medição salvou de novo, três vezes numa fatia:**
+
+1. **O contrato de fábrica de `itens` mentia**: `saida: []` com o comentário
+   "o produto não lê a resposta" — FALSO; o exportador sempre leu
+   `resultados` por item. O contrato agora declara a verdade.
+2. **A meia-integração do §346, achada VIVA**: o envelope "itens" derivado +
+   o campo "itens" da entrada produziriam `{"itens":{"itens":[...]}}` no
+   executor genérico — ninguém notou porque ninguém executou o conector de
+   fábrica de itens até a fiação nascer. O envelope derivado é vazio, com
+   teste dizendo o porquê.
+3. **O pós-processamento morava fora do alcance da fiação**: a régua de
+   "pronto" (SPEC-49), os ignorados e o grava-por-item viviam em
+   `exportarDaQuebra`. Viraram funções puras num lugar só (§263):
+   `prontosEIgnorados` e `resultadoDaExportacao` — inclusive nomeando o
+   SILÊNCIO ("o agente não respondeu sobre este item").
+
+**O desenho**: fluxo SEMEADO `exportar-prontos` (derivado do destino de itens
+em vigor, como a esteira dos papéis — sem destino, não existe, a semântica de
+sempre): `projeto.itensProntos → conector(itens) → projeto(resultados)`. O
+projeto-fonte emite os prontos no payload de sempre e os ignorados nomeados;
+o projeto-destino grava `exportado`+link por item e devolve as falhas. A
+execução ganhou **`parametrosPorNo`** (entradas DESTA execução, por nó — o
+atalho aponta a demanda ABERTA sem congelar nada na fiação; o hash §9.5
+continua o da fiação). O botão da tela virou atalho que dispara a fiação e
+traduz o rastro para a resposta de sempre — falha global do envio vira erro
+por item com a mesma frase, como o adaptador fazia.
+
+**O que morreu**: `POST /quebras/:id/itens/exportar`, `exportadorViaAgente.ts`
+(+ teste), a porta `ExportadorDeItens` e `exportarDaQuebra`. **Delta de RBAC
+declarado**: exportar agora passa pelo portão de execução de fluxos — numa
+organização que curou `fluxos.executar`, exportar exige o papel (endurecimento
+opt-in; o comentário do recurso já antecipava "como exportar/publicar").
+
+§248 cumprido (grava-por-item desligado → rota vermelha → restaurado).

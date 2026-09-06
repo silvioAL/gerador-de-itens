@@ -1458,7 +1458,7 @@ describe("SPEC-49 — exportação dos itens pro tracker", () => {
   };
   const itemComPendencia = { ...itemPronto, chave: "b", titulo: "Item pela metade", pendencias: 2 };
 
-  it("sem destino configurado, a resposta DIZ onde configurar — não é erro genérico", async () => {
+  it("SPEC-107 G1 — a rota dedicada MORREU; sem destino, a fiação de exportação nem existe", async () => {
     const cookie = await logarComo(EMAIL_DEV);
     await app.inject({
       method: "PUT",
@@ -1468,9 +1468,22 @@ describe("SPEC-49 — exportação dos itens pro tracker", () => {
     });
     const quebraId = await quebraComItens(cookie, [itemPronto]);
 
-    const r = await app.inject({ method: "POST", url: `/quebras/${quebraId}/itens/exportar`, cookies: { gerador_sessao: cookie } });
-    expect(r.statusCode).toBe(409);
-    expect(r.json().erro).toContain("Configurações → Exportação");
+    // A rota antiga não responde mais — exportar É a fiação "exportar-prontos".
+    const rotaMorta = await app.inject({ method: "POST", url: `/quebras/${quebraId}/itens/exportar`, cookies: { gerador_sessao: cookie } });
+    expect(rotaMorta.statusCode).toBe(404);
+
+    // E a semântica de sempre ("exportação desligada") continua: sem destino
+    // de itens, a fiação derivada NÃO entra no em-vigor — o botão da tela já
+    // nem habilita sem destino, e executar o id responde com o nome.
+    const emVigor = (await app.inject({ method: "GET", url: "/fluxos" })).json() as { fluxos: { id: string }[] };
+    expect(emVigor.fluxos.some((f) => f.id === "exportar-prontos")).toBe(false);
+    const executar = await app.inject({
+      method: "POST",
+      url: "/fluxos/exportar-prontos/executar",
+      cookies: { gerador_sessao: cookie },
+      payload: {},
+    });
+    expect(executar.statusCode).toBe(404);
   });
 
   it("endereço inválido é barrado na CONFIGURAÇÃO, não na hora de exportar com item na mão", async () => {
