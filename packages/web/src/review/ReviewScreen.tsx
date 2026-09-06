@@ -43,6 +43,7 @@ import { baixarArquivoTexto } from "../persistence/baixarArquivo";
 import {
   GRUPOS_FICHA,
   contextoDoPlaceholder,
+  contextoEpicoCompleto,
   montarFilaDaEsteira,
   papelDoGrupo,
   placeholdersDaFichaPorGrupo,
@@ -158,17 +159,8 @@ const ROTULO_STATUS: Record<StatusItem, string> = {
 };
 
 
-/** `demandInfo` + conteúdo dos anexos (Fase 1b, SPEC-23), concatenados num
- * único texto pra mandar como contexto real ao `/ia/sugerir` — antes disso
- * `demandInfo` só entrava na seção "Contexto" do documento exportado, nunca
- * alimentava a geração de verdade. */
-function contextoEpicoCompleto(demandInfo?: string, anexos?: { nome: string; conteudo: string }[]): string | undefined {
-  const partes = [
-    demandInfo?.trim() ? demandInfo.trim() : undefined,
-    ...(anexos ?? []).map((a) => (a.conteudo.trim() ? `[Anexo: ${a.nome}]\n${a.conteudo.trim()}` : undefined)),
-  ].filter((p): p is string => !!p);
-  return partes.length > 0 ? partes.join("\n\n") : undefined;
-}
+// SPEC-107 G5 — `contextoEpicoCompleto` mudou de casa (aplicacao,
+// `filaDaEsteira.ts`): a fiação monta o MESMO contexto do épico (§263).
 
 /**
  * As quatro abas fixas (Especificação / Contrato / Refinamento / Testes)

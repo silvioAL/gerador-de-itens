@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Diagrama, DiagramaConfig } from "@gerador/engine";
-import { filaDaEsteiraDaDemanda } from "./filaDaEsteira.js";
+import { aplicarRespostasNaDemanda, filaDaEsteiraDaDemanda } from "./filaDaEsteira.js";
 import { PAPEIS_PADRAO } from "../config/normalizacao.js";
 
 /**
@@ -100,5 +100,36 @@ describe("filaDaEsteiraDaDemanda (SPEC-107 G5)", () => {
         { diagramaConfig: CONFIG, papeisAtivos: PAPEIS_PADRAO }
       )
     ).toEqual([]);
+  });
+});
+
+describe("aplicarRespostasNaDemanda (SPEC-107 G5, §5.5: o julgamento fica na demanda)", () => {
+  it("o que a corrida escreveu entra como SUGESTÃO pendente — nunca confirmado sozinho", () => {
+    const { respostasItens, aplicadas } = aplicarRespostasNaDemanda(undefined, { "item-1": { _h: "Como analista…" } });
+
+    expect(aplicadas).toBe(1);
+    expect(respostasItens["item-1"]["_h"]).toEqual({ valor: "Como analista…", origem: "sugerido", confirmado: false });
+  });
+
+  it("resposta CONFIRMADA não é atropelada — corrida velha não apaga julgamento novo", () => {
+    const atuais = {
+      "item-1": {
+        _h: { valor: "escrita à mão", origem: "manual" as const },
+        _t: { valor: "sugestão velha", origem: "sugerido" as const, confirmado: false },
+      },
+    };
+    const { respostasItens, aplicadas, preservadas } = aplicarRespostasNaDemanda(atuais, {
+      "item-1": { _h: "gerada agora", _t: "gerada agora" },
+    });
+
+    expect(respostasItens["item-1"]["_h"].valor).toBe("escrita à mão");
+    expect(respostasItens["item-1"]["_t"].valor).toBe("gerada agora");
+    expect(preservadas).toBe(1);
+    expect(aplicadas).toBe(1);
+  });
+
+  it("a marca de simulação viaja quando o destino de IA inventa (SPEC-74)", () => {
+    const { respostasItens } = aplicarRespostasNaDemanda(undefined, { i: { c: "x" } }, { evidencia: "simulada" });
+    expect(respostasItens["i"]["c"].evidencia).toBe("simulada");
   });
 });

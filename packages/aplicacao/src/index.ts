@@ -224,7 +224,9 @@ export {
   type ResultadoDaCorrida,
 } from "./casos-de-uso/corridaDaEsteira.js";
 export {
+  aplicarRespostasNaDemanda,
   contextoDoPlaceholder,
+  contextoEpicoCompleto,
   filaDaEsteiraDaDemanda,
   montarFilaDaEsteira,
   papelDoGrupo,

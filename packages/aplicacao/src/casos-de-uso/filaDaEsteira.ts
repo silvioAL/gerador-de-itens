@@ -161,6 +161,58 @@ export function montarFilaDaEsteira(opcoes: {
   return fila;
 }
 
+/** `demandInfo` + conteúdo dos anexos (SPEC-23 Fase 1b), concatenados num
+ * único texto — o contexto do épico que alimenta a geração. Veio da
+ * `ReviewScreen` à letra (SPEC-107 G5): a fiação monta o MESMO contexto. */
+export function contextoEpicoCompleto(
+  demandInfo?: string,
+  anexos?: { nome: string; conteudo: string }[]
+): string | undefined {
+  const partes = [
+    demandInfo?.trim() ? demandInfo.trim() : undefined,
+    ...(anexos ?? []).map((a) => (a.conteudo.trim() ? `[Anexo: ${a.nome}]\n${a.conteudo.trim()}` : undefined)),
+  ].filter((p): p is string => !!p);
+  return partes.length > 0 ? partes.join("\n\n") : undefined;
+}
+
+/**
+ * SPEC-107 G5 — **o que a corrida escreveu entra na demanda como SUGESTÃO.**
+ *
+ * A decisão da §5.5 (do usuário): a confirmação campo a campo fica NA
+ * DEMANDA — então o destino grava cada resposta `origem: "sugerido"` e
+ * `confirmado: false`, pendente até alguém assinar, exatamente como a esteira
+ * da revisão grava hoje. E NUNCA por cima do que já foi confirmado ou escrito
+ * à mão: a corrida só recebe pendentes, mas quem grava confere de novo —
+ * corrida velha não pode apagar julgamento novo.
+ */
+export function aplicarRespostasNaDemanda(
+  atuais: Record<string, Record<string, ValorSpec>> | undefined,
+  geradas: Record<string, Record<string, string>>,
+  opcoes?: { evidencia?: string }
+): { respostasItens: Record<string, Record<string, ValorSpec>>; aplicadas: number; preservadas: number } {
+  const resultado: Record<string, Record<string, ValorSpec>> = Object.fromEntries(
+    Object.entries(atuais ?? {}).map(([item, campos]) => [item, { ...campos }])
+  );
+  let aplicadas = 0;
+  let preservadas = 0;
+  for (const [item, campos] of Object.entries(geradas)) {
+    for (const [chave, valor] of Object.entries(campos)) {
+      if (respostaConfirmada(resultado[item]?.[chave])) {
+        preservadas++;
+        continue;
+      }
+      (resultado[item] ??= {})[chave] = {
+        valor,
+        origem: "sugerido",
+        confirmado: false,
+        ...(opcoes?.evidencia ? { evidencia: opcoes.evidencia } : {}),
+      };
+      aplicadas++;
+    }
+  }
+  return { respostasItens: resultado, aplicadas, preservadas };
+}
+
 /**
  * SPEC-107 G5 — **a fila a partir da DEMANDA, como o servidor a vê.**
  *
