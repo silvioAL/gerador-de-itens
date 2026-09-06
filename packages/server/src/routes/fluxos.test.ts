@@ -861,6 +861,63 @@ describe("SPEC-107 fatia B — o nó PROJETO", () => {
     });
   });
 
+  it("SPEC-107 fatia D — `aoVivo` streama NDJSON por nó, e o fim carrega a resposta de sempre", async () => {
+    await comApp(async (app, cookies) => {
+      await prepararMundo(app, cookies);
+      await declararLeitorDeDesenho(app, cookies);
+      await app.inject({
+        method: "PUT",
+        url: "/config/fluxos",
+        cookies,
+        payload: {
+          documento: {
+            fluxos: [
+              {
+                id: "vivo",
+                nome: "Fiação assistível",
+                nos: [
+                  { id: "le", tipo: "conector", refId: "leitor-de-desenho", posicao: { x: 0, y: 0 }, parametros: {} },
+                  { id: "gera", tipo: "funcao", refId: "derivacao", posicao: { x: 200, y: 0 }, parametros: {} },
+                  { id: "resume", tipo: "agente", refId: "especialista", posicao: { x: 400, y: 0 }, parametros: {} },
+                ],
+                arestas: [
+                  { de: "le", para: "gera", mapeamento: [{ saida: "desenho", entrada: "desenho" }] },
+                  { de: "gera", para: "resume", mapeamento: [{ saida: "itens", entrada: "itens" }] },
+                ],
+              },
+            ],
+          },
+        },
+      });
+
+      const r = await app.inject({ method: "POST", url: "/fluxos/vivo/executar", cookies, payload: { aoVivo: true } });
+      expect(r.statusCode).toBe(200);
+      expect(String(r.headers["content-type"])).toContain("application/x-ndjson");
+
+      const eventos = r.payload
+        .trim()
+        .split("\n")
+        .map((linha) => JSON.parse(linha) as { tipo: string; noId?: string; rastro?: { noId: string; estado: string }; resposta?: { nos: unknown[]; execucaoId: string; saidas: Record<string, unknown> } });
+
+      // O vivo é feedback (§2.4-9): cada nó anuncia começo e fim, na ordem.
+      const porTipo = (t: string) => eventos.filter((e) => e.tipo === t);
+      expect(porTipo("no-comecou").map((e) => e.noId)).toEqual(["le", "gera", "resume"]);
+      expect(porTipo("no-terminou").map((e) => e.rastro!.noId)).toEqual(["le", "gera", "resume"]);
+      // O texto do agente STREAMOU por nó — a técnica do executarPedido.
+      const textos = porTipo("texto");
+      expect(textos.length).toBeGreaterThan(0);
+      expect(textos.every((e) => e.noId === "resume")).toBe(true);
+
+      // E o fim fecha com a MESMA forma do modo one-shot: os dois caminhos
+      // convergem, e o rastro persistiu como sempre.
+      const fim = eventos[eventos.length - 1];
+      expect(fim.tipo).toBe("fim");
+      expect(fim.resposta!.nos).toHaveLength(3);
+      expect(fim.resposta!.execucaoId).toBeTruthy();
+      expect(String((fim.resposta!.saidas as Record<string, Record<string, unknown>>)["resume"].texto)).toBeTruthy();
+    });
+  });
+
   it("escrever fluxo com projeto de refId errado é recusado com a régua", async () => {
     await comApp(async (app, cookies) => {
       const r = await app.inject({

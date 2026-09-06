@@ -404,6 +404,21 @@ textarea::placeholder {
   animation: pip-pulso 1.1s ease-in-out infinite;
 }
 
+/* SPEC-107 fatia D — o nó do FLUXO em execução pulsa (§2.4-9: o vivo é
+   feedback). É halo em box-shadow porque o cartão é um div (o pulso da mesa,
+   `.diagrama-no-ativo`, é stroke de SVG). A cor vem da variável de acento —
+   nos dois temas — e a guarda global de prefers-reduced-motion o congela. */
+@keyframes no-do-fluxo-pulso {
+  50% {
+    box-shadow: 0 0 0 7px rgba(56, 189, 248, 0.25);
+  }
+}
+.no-do-fluxo-rodando {
+  border-radius: 10px;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35);
+  animation: no-do-fluxo-pulso 1.1s ease-in-out infinite;
+}
+
 /* Assistente flutuante (#298) — mesma disciplina de `expandir-item`: só CSS
    puro, mesma curva das animações do diagrama. A janela sobe do botão que a
    abriu (âncora visual de onde ela veio); o botão respira no hover, não em

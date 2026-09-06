@@ -2,16 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Background,
   Controls,
-  Handle,
   MiniMap,
-  Position,
   ReactFlow,
   ReactFlowProvider,
   type Edge,
   type Node,
-  type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { NodeCard, type NodeCardData } from "../canvas/NodeCard";
+import { comoNoDaMesa, configDoFluxo } from "./vocabularioDoFluxo";
 import {
   FUNCOES_DO_SISTEMA,
   funcaoDoSistema,
@@ -33,6 +32,7 @@ import {
   apiFluxosEmVigor,
   apiPipelineAgentes,
   type ConectorDoCatalogo,
+  type EventoDaExecucao,
   type FluxoEmVigor,
   type PapelConfigurado,
   type RastroDoNoExecutado,
@@ -53,38 +53,14 @@ import { usePermissoes } from "../auth/usePermissoes";
  * decoração (§4.1), e a tela diz isso.
  */
 
-type DadosDoNo = { titulo: string; subtitulo: string; tipo: NoDoFluxo["tipo"] };
-
-function NoDeFluxoCard({ data, selected }: NodeProps<Node<DadosDoNo>>) {
-  return (
-    <div
-      style={{
-        border: `1px solid ${selected ? "var(--acento)" : "var(--borda-forte)"}`,
-        borderRadius: 10,
-        background: "var(--painel-alto)",
-        padding: "8px 12px",
-        minWidth: 150,
-        fontSize: 12,
-      }}
-    >
-      <Handle type="target" position={Position.Left} />
-      <div style={{ fontSize: 10.5, color: "var(--texto-fraco)" }}>
-        {data.tipo === "conector"
-          ? "conector"
-          : data.tipo === "funcao"
-            ? "função do sistema"
-            : data.tipo === "projeto"
-              ? "projeto"
-              : "agente"}
-      </div>
-      <strong style={{ fontSize: 12.5 }}>{data.titulo}</strong>
-      {data.subtitulo && <div style={{ fontSize: 11, color: "var(--texto-2)" }}>{data.subtitulo}</div>}
-      <Handle type="source" position={Position.Right} />
-    </div>
-  );
-}
-
-const TIPOS_DE_NO = { noDeFluxo: NoDeFluxoCard };
+/**
+ * SPEC-107 fatia D — o fluxo renderiza com o MESMO cartão da mesa (§2.2):
+ * paridade de LINGUAGEM, dirigida por um `DiagramaConfig` próprio (uma
+ * família por tipo, cores e ícones travados por teste nos dois temas). O
+ * refId técnico saiu do cartão de vez (§2.4-1) — ele vive no painel.
+ */
+const TIPOS_DE_NO = { noDeFluxo: NodeCard };
+const CONFIG_DO_FLUXO = configDoFluxo();
 
 const FLUXO_VAZIO = (id: string, nome: string): FluxoEmVigor => ({ id, nome, nos: [], arestas: [], origem: "declarado" });
 
@@ -110,6 +86,9 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
     /** SPEC-107 fatia C — a execução suspendeu no gate deste nó. */
     aguardandoEm?: string;
   } | null>(null);
+  /** SPEC-107 fatia D — o vivo (§2.4-9): que nó está rodando agora, e o
+   * texto que o agente já escreveu, por nó. */
+  const [vivo, setVivo] = useState<{ rodando: string | null; textos: Record<string, string> } | null>(null);
   const [selecao, setSelecao] = useState<{ tipo: "no" | "aresta"; id: string } | null>(null);
   const [novoFluxoNome, setNovoFluxoNome] = useState("");
 
@@ -167,20 +146,28 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
     [catalogo, papeis]
   );
 
-  const nodes: Node<DadosDoNo>[] = useMemo(
+  const nodes: Node<NodeCardData>[] = useMemo(
     () =>
       (fluxo?.nos ?? []).map((no) => ({
         id: no.id,
         type: "noDeFluxo",
         position: no.posicao,
+        // O tamanho INICIAL (o do cartão em repouso): é o que o `fitView`
+        // usa se rodar antes de o ResizeObserver medir — sem isso, sob carga,
+        // o enquadramento calculado sobre nós de tamanho zero mandava o
+        // viewport para o nada (canvas e minimapa vazios; flake medido).
+        initialWidth: 190,
+        initialHeight: 76,
         selected: selecao?.tipo === "no" && selecao.id === no.id,
+        // O vivo é feedback: o nó que está rodando PULSA (§2.4-9).
+        ...(vivo?.rodando === no.id ? { className: "no-do-fluxo-rodando" } : {}),
         data: {
-          titulo: rotuloDoRef(no),
-          subtitulo: `${no.confirmacao === "aguardar" ? "⏸ " : ""}${no.refId || "sem adaptador"}`,
-          tipo: no.tipo,
-        },
+          no: comoNoDaMesa(no, rotuloDoRef(no)),
+          config: CONFIG_DO_FLUXO,
+          arestas: [],
+        } satisfies NodeCardData,
       })),
-    [fluxo, selecao, rotuloDoRef]
+    [fluxo, selecao, rotuloDoRef, vivo?.rodando]
   );
 
   const edges: Edge[] = useMemo(
@@ -189,14 +176,20 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
         id: `${a.de}->${a.para}`,
         source: a.de,
         target: a.para,
+        // O NodeCard tem quatro pontos por lado; a fiação continua lendo da
+        // esquerda para a direita, como sempre foi.
+        sourceHandle: "source-right",
+        targetHandle: "target-left",
         selected: selecao?.tipo === "aresta" && selecao.id === `${a.de}->${a.para}`,
+        // A aresta que ALIMENTA o nó rodando anima o dado passando (§2.4-9).
+        animated: vivo?.rodando === a.para,
         // Aresta sem mapeamento é decoração — e a tela diz isso na etiqueta.
         label: a.mapeamento.length > 0 ? a.mapeamento.map((m) => `${m.saida}→${m.entrada}`).join(", ") : "sem mapeamento",
         style: { stroke: "var(--texto-mudo)" },
         labelStyle: { fill: "var(--texto-2)", fontSize: 10 },
         labelBgStyle: { fill: "var(--painel)" },
       })),
-    [fluxo, selecao]
+    [fluxo, selecao, vivo?.rodando]
   );
 
   /**
@@ -342,12 +335,33 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
       .catch(() => undefined);
   }, [fluxoId]);
 
+  /** SPEC-107 fatia D — o que cada evento do stream faz na tela: o nó que
+   * começou pulsa, o texto do agente cresce, o que terminou entra no rastro. */
+  const aoEvento = useCallback((evento: EventoDaExecucao) => {
+    if (evento.tipo === "no-comecou") {
+      setVivo((v) => ({ rodando: evento.noId, textos: v?.textos ?? {} }));
+    } else if (evento.tipo === "texto") {
+      setVivo((v) => ({
+        rodando: v?.rodando ?? evento.noId,
+        textos: { ...(v?.textos ?? {}), [evento.noId]: `${v?.textos?.[evento.noId] ?? ""}${evento.pedaco}` },
+      }));
+    } else if (evento.tipo === "no-terminou") {
+      setVivo((v) => ({ rodando: null, textos: v?.textos ?? {} }));
+      setRastro((r) => ({
+        nos: [...(r?.nos ?? []), evento.rastro],
+        saidas: r?.saidas ?? {},
+        hash: r?.hash ?? "",
+        execucaoId: r?.execucaoId,
+      }));
+    }
+  }, []);
+
   async function continuarExecucao() {
     if (!rastro?.execucaoId) return;
     setExecutando(true);
     setErro(null);
     try {
-      const resultado = await apiExecucaoDeFluxo.continuar(rastro.execucaoId);
+      const resultado = await apiExecucaoDeFluxo.continuarAoVivo(rastro.execucaoId, aoEvento);
       setRastro({
         nos: resultado.nos,
         saidas: resultado.saidas,
@@ -359,6 +373,7 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
       setErro(e instanceof Error ? e.message : String(e));
     } finally {
       setExecutando(false);
+      setVivo(null);
     }
   }
 
@@ -387,7 +402,9 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
         { fluxos: fluxos!.filter((f) => f.origem === "declarado").map(({ origem: _origem, ...f }) => f) },
         timeAtivo
       );
-      const resultado = await apiExecucaoDeFluxo.executar(fluxo.id, timeAtivo, ateNo);
+      // Fatia D — a execução é ASSISTÍVEL: os eventos chegam nó a nó e a
+      // resposta final é a mesma do modo one-shot.
+      const resultado = await apiExecucaoDeFluxo.executarAoVivo(fluxo.id, timeAtivo, ateNo, aoEvento);
       setRastro({
         nos: resultado.nos,
         saidas: resultado.saidas,
@@ -399,6 +416,7 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
       setErro(e instanceof Error ? e.message : String(e));
     } finally {
       setExecutando(false);
+      setVivo(null);
     }
   }
 
@@ -608,7 +626,7 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
           ) : null}
         </div>
 
-        {(noSelecionado || arestaSelecionada || rastro) && (
+        {(noSelecionado || arestaSelecionada || rastro || vivo?.rodando) && (
           <aside style={painelEstilo}>
             {noSelecionado && (
               <PainelDoNo
@@ -715,6 +733,23 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+            {/* SPEC-107 fatia D — o nó RODANDO, ao vivo: o texto do agente
+                cresce com o caret (a experiência da revisão), e antes do
+                primeiro token os pontinhos respiram. */}
+            {vivo?.rodando && (
+              <div data-testid={`rastro-vivo-${vivo.rodando}`} style={{ marginTop: 8, fontSize: 12 }}>
+                <span className="pip-pulsando" style={{ color: "var(--acento)" }}>
+                  ⚡ {vivo.rodando} rodando…
+                </span>
+                {vivo.textos[vivo.rodando] ? (
+                  <pre className="texto-ao-vivo" style={{ ...saidaEstilo, whiteSpace: "pre-wrap" }}>
+                    {vivo.textos[vivo.rodando].slice(-4000)}
+                  </pre>
+                ) : (
+                  <pre className="pensando-ao-vivo">●●●</pre>
+                )}
               </div>
             )}
           </aside>

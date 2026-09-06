@@ -16601,3 +16601,55 @@ disparar, persiste com as saídas, sobrevive ao F5, continua rodando SÓ o
 resto — e descartada fecha sem publicar nada. O spec da fatia D do §363 foi
 atualizado à semântica nova: o que espera fica fora do rastro, e o gate se
 anuncia.
+
+---
+
+## §374 — SPEC-107 fatia D: a UX viva — o mesmo cartão, e a execução que se assiste
+
+**"Quero aquelas animações" (§3.1) — pago com a técnica que já existia.** A
+medição achou as peças prontas: o `NodeCard` da mesa é desacoplado (tudo
+entra por `data`), o único precedente de streaming é o `text/plain` chunked
+do `executarPedido` (com a lição dos headers de CORS escrita no código), o
+`provedor.completar` JÁ aceitava `onTexto` — o agente do fluxo simplesmente
+não passava — e as animações têm catálogo com disciplina de
+`prefers-reduced-motion` auditada.
+
+**O que entrou:**
+
+- **O MESMO cartão (§2.2)**: o fluxo renderiza com o `NodeCard` da mesa,
+  dirigido por um `DiagramaConfig` PRÓPRIO gerado em código
+  (`vocabularioDoFluxo.ts`) — um tipo por FAMÍLIA (conector/agente/funcao/
+  projeto), cores e ícones do catálogo curado. O refId técnico saiu do
+  cartão de vez (§2.4-1). Dois acomodos mesa-seguros no cartão: nó sem
+  status não ganha pílula vazia, tipo sem `spec` não ganha bolinha de
+  prontidão (um verde que não afirma nada).
+- **As cores travadas por TESTE, nos dois temas (§2.4-11)**: contraste ≥ 3
+  sobre o cartão pela MESMA função que o motor usa para cobrar design system
+  dos outros (`contraste()` do engine, molde de `paleta.contraste.test.ts`) —
+  e a trava mordeu na primeira rodada (o âmbar era ilegível no claro; o ciano
+  colidia com a cor do `storage` da MESA — o risco da §2.2, pego por teste).
+- **A execução ASSISTÍVEL**: `executarFluxo` emite eventos por nó
+  (começou/terminou), a rota streama **NDJSON** na técnica do
+  `executarPedido` (writeHead adiado, headers copiados), o agente streama o
+  texto por nó (`onTexto`), e a tela reage: o nó RODANDO pulsa
+  (`no-do-fluxo-rodando`, coberto pela guarda global de reduced-motion), a
+  aresta que o alimenta anima o dado, e o painel mostra o texto crescendo com
+  o caret da revisão (`texto-ao-vivo`/`pensando-ao-vivo` — as classes de lá).
+  O `fim` do stream carrega a MESMA resposta do modo one-shot; continuar
+  também é assistível.
+
+**A corrida enfim nomeada**: o flake da fatia C de `fluxo-de-integracao` era
+**lost update** — dois arquivos de spec fazendo read-modify-write do
+documento GLOBAL de conectores em paralelo se apagam. O remédio desta rodada:
+`fluxo-de-funcoes.spec.ts` deixou de tocar o documento de conectores POR
+COMPLETO (as fontes viraram o projeto real da fatia B — o que a prova da B já
+pedia); as fiações com conector continuam provadas no spec vizinho e na rota.
+A fragilidade estrutural do RMW concorrente fica anotada como dívida da
+suíte.
+
+**E o segundo flake ganhou causa e mitigação**: sob carga, o canvas do fluxo
+aparecia VAZIO com os nós no DOM e o minimapa em branco — a cara de `fitView`
+rodando antes de o ResizeObserver medir os nós (enquadrar nós de tamanho zero
+manda o viewport para o nada). Os nós agora declaram `initialWidth`/`initialHeight`
+(o tamanho do cartão em repouso), que é o que o `fitView` usa quando a medida
+ainda não chegou. A suíte completa passou inteira na rodada seguinte.

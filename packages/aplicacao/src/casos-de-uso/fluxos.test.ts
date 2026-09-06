@@ -213,6 +213,36 @@ describe("executarFluxo (SPEC-105 fatia D — a metade pura)", () => {
     expect(segunda.nos.map((n) => n.noId)).toEqual(["b"]);
   });
 
+  it("SPEC-107 fatia D — os eventos ao vivo saem na ordem da execução, inclusive na falha", async () => {
+    const eventos: string[] = [];
+    const fluxo = fluxoDe(
+      [
+        { id: "quebra", tipo: "conector", refId: "c1" },
+        { id: "dependente", tipo: "agente", refId: "p" },
+      ],
+      [{ de: "quebra", para: "dependente", mapeamento: [{ saida: "x", entrada: "x" }] }]
+    );
+    await executarFluxo(
+      fluxo,
+      {
+        ...semFuncao,
+        conector: async () => {
+          throw new Error("caiu");
+        },
+        agente: async () => ({ texto: "nunca roda" }),
+      },
+      {
+        aoVivo: {
+          noComecou: (no) => eventos.push(`comecou:${no.id}`),
+          noTerminou: (rastro) => eventos.push(`terminou:${rastro.noId}:${rastro.estado}`),
+        },
+      }
+    );
+    // O vivo é feedback (§2.4-9): quem assiste vê o nó começar, falhar, e o
+    // dependente cair SEM ter começado — na ordem em que aconteceu.
+    expect(eventos).toEqual(["comecou:quebra", "terminou:quebra:falhou", "terminou:dependente:nao-executado"]);
+  });
+
   it("ciclo nem começa — recusa, não falha parcial", async () => {
     const fluxo = fluxoDe(
       [

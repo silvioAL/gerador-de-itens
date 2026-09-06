@@ -52,8 +52,10 @@ function leitorDeVolumetria(id: string) {
 }
 
 async function ligar(page: Page, deId: string, paraId: string) {
-  const origem = page.locator(`.react-flow__node[data-id="${deId}"] .react-flow__handle-right`);
-  const destino = page.locator(`.react-flow__node[data-id="${paraId}"] .react-flow__handle-left`);
+  // O NodeCard (fatia D) tem um handle de ORIGEM e um de DESTINO por lado —
+  // o seletor mira o papel certo, não só a posição.
+  const origem = page.locator(`.react-flow__node[data-id="${deId}"] .react-flow__handle-right.source`);
+  const destino = page.locator(`.react-flow__node[data-id="${paraId}"] .react-flow__handle-left.target`);
   const a = (await origem.boundingBox())!;
   const b = (await destino.boundingBox())!;
   await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
