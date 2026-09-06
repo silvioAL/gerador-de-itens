@@ -22,7 +22,6 @@ import {
 import type { OpcoesApp } from "../app.js";
 import { criarRepositorioDeQuebrasEmPostgres } from "../adaptadores/quebrasEmPostgres.js";
 import { criarRepositorioDeItensGeradosEmPostgres } from "../adaptadores/itensGeradosEmPostgres.js";
-import { criarExportadorViaAgente } from "../adaptadores/exportadorViaAgente.js";
 import { eq } from "drizzle-orm";
 import { quebras } from "../db/schema.js";
 import { criarLeitorDeAdrViaGateway, criarPublicadorDeDocumentoViaGateway } from "../adaptadores/gatewayDoTime.js";
@@ -430,36 +429,13 @@ export async function registrarRotasQuebras(app: FastifyInstance, { db, diretori
     return itens.listarDaQuebra(id);
   });
 
-  /**
-   * SPEC-49 — o *Act* do ciclo de itens: mandar pro tracker. Exporta só os
-   * PRONTOS (a régua da SPEC-44/47), item a item, e devolve o que subiu, o
-   * que falhou (com motivo) e o que ficou de fora por ter pendência.
-   */
-  app.post("/quebras/:id/itens/exportar", { preHandler: podeOperarNaQuebra }, async (req, reply) => {
-    const { id } = req.params as { id: string };
-    if (!(await casos.obter(id))) return reply.code(404).send({ erro: "quebra não encontrada" });
-
-    const config = normalizarExportador(
-      (await criarCasosDeUsoDeConfig(criarRepositorioDeConfigEmPostgres(db)).obter("exportador", { endpoint: "", rotulo: "", cabecalhos: {} }))
-        .documento
-    );
-    if (!config.endpoint) {
-      // Sem destino configurado a resposta DIZ o que fazer, em vez de um erro
-      // genérico que manda a pessoa adivinhar onde configurar.
-      return reply.code(409).send({
-        erro: "nenhum destino de exportação configurado — cadastre o endereço do agente em Configurações → Exportação",
-      });
-    }
-
-    const resultado = await itens.exportarDaQuebra(id, criarExportadorViaAgente(config));
-    registrarAuditoria(db, {
-      email: req.usuario!.email,
-      acao: "exportar",
-      recurso: "itens_gerados",
-      recursoId: id,
-    });
-    return { ...resultado, destino: config.rotulo || config.endpoint };
-  });
+  // SPEC-49 → SPEC-107 G1: `POST /quebras/:id/itens/exportar` MORREU — o
+  // *Act* do ciclo de itens agora é a fiação semeada "exportar-prontos"
+  // (`fluxoDaExportacao`, derivada do destino de itens em vigor), disparada
+  // pelo MESMO botão da tela como atalho. A régua de "pronto", o payload e o
+  // grava-por-item continuam os mesmos (§263: `prontosEIgnorados` e
+  // `resultadoDaExportacao`, na aplicação) — a prova da §3.1 é o E2E de
+  // exportação passando pela fiação sem mudar uma linha.
 
   /**
    * SPEC-81 fatia B — **publicar o documento de desenho na base de conhecimento.**

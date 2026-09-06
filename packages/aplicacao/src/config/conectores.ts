@@ -249,9 +249,12 @@ export const CONTRATO_DA_OPERACAO: Record<
 > = {
   itens: {
     entrada: [{ chave: "itens", rotulo: "Itens da quebra", tipo: "lista", obrigatorio: true }],
-    // O agente exportador responde só o status: não há campo que o produto
-    // leia da resposta hoje (`exportadorViaAgente` ignora o corpo).
-    saida: [],
+    // SPEC-107 G1 — o comentário antigo ("o produto não lê a resposta")
+    // estava FALSO: o exportador sempre leu `resultados` por item
+    // (chave/linkExterno/erro — falha parcial é resposta, SPEC-49). O
+    // contrato agora diz a verdade, e é o que deixa a fiação carregar o
+    // resultado item a item.
+    saida: [{ chave: "resultados", rotulo: "Resultados por item", tipo: "lista", caminho: "$.resultados", obrigatorio: true }],
   },
   documento: {
     entrada: [
@@ -316,7 +319,12 @@ export function conectoresDeFabrica(config: ConfigExportador): ConectorEmVigor[]
         endpoint: destino.endpoint,
         metodo: destino.metodo,
         cabecalhos: destino.cabecalhos,
-        envelope: destino.envelope,
+        // SPEC-107 G1 — meia-integração achada viva (§346): o envelope
+        // "itens" do gateway embrulha o PAYLOAD PRONTO; no executor genérico,
+        // que monta o corpo pelos campos de `entrada`, o campo "itens" JÁ é o
+        // embrulho — repetir o envelope mandaria {"itens":{"itens":[...]}} e
+        // nenhum agente entenderia. O conector de fábrica derivado corrige.
+        envelope: operacao === "itens" ? "" : destino.envelope,
         entrada: CONTRATO_DA_OPERACAO[operacao].entrada,
         saida: CONTRATO_DA_OPERACAO[operacao].saida,
         origem: "fabrica",

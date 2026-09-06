@@ -2,7 +2,14 @@ import { resolverDependencias, type Dependencia } from "@gerador/engine";
 import { sanearCamposDaTransformacao, validarCamposDaTransformacao } from "../casos-de-uso/transformacao.js";
 import { FUNCOES_DO_SISTEMA, funcaoDoSistema } from "./funcoes.js";
 import { REF_DO_PROJETO } from "./projeto.js";
-import { ConfigInvalida, OPERACOES_DO_GATEWAY, type OperacaoDoGateway, type PapelConfigurado } from "./normalizacao.js";
+import {
+  ConfigInvalida,
+  destinosDaOperacao,
+  OPERACOES_DO_GATEWAY,
+  type ConfigExportador,
+  type OperacaoDoGateway,
+  type PapelConfigurado,
+} from "./normalizacao.js";
 
 /**
  * SPEC-105 fatia C — **o FLUXO como grafo, sem execução.**
@@ -226,14 +233,65 @@ export function fluxoDaEsteira(papeis: PapelConfigurado[]): FluxoEmVigor | null 
   };
 }
 
-/** Declarados + a esteira derivada (declarado vence fábrica no mesmo id). */
-export function fluxosEmVigor(papeis: PapelConfigurado[], documentoFluxos: unknown): FluxoEmVigor[] {
+export const ID_DO_FLUXO_DA_EXPORTACAO = "exportar-prontos";
+
+/**
+ * SPEC-107 G1 — **a exportação COMO fiação, derivada** (a primeira
+ * substituição da §3.1): `projeto.itensProntos → conector(itens) →
+ * projeto(resultados)`. O botão "Exportar prontos" vira um ATALHO que a
+ * dispara com a demanda aberta — a mesma régua de "pronto", o mesmo payload,
+ * o mesmo grava-por-item, agora visíveis e fiáveis.
+ *
+ * DERIVADA como a esteira: nasce do destino de itens EM VIGOR
+ * (`destinosDaOperacao`, que inclui o endereço legado de topo como
+ * "exportador"); sem destino, não existe — a mesma semântica de sempre
+ * (exportação desligada). Declarado vence fábrica no mesmo id.
+ */
+export function fluxoDaExportacao(configExportador: ConfigExportador): FluxoEmVigor | null {
+  const destinos = destinosDaOperacao(configExportador, "itens");
+  if (destinos.length === 0) return null;
+
+  return {
+    id: ID_DO_FLUXO_DA_EXPORTACAO,
+    nome: "Exportar prontos (da configuração)",
+    nos: [
+      { id: "demanda", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 60, y: 120 }, parametros: {} },
+      { id: "envio", tipo: "conector", refId: destinos[0].id, componente: "itens", posicao: { x: 340, y: 120 }, parametros: {} },
+      { id: "grava", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 620, y: 120 }, parametros: {} },
+    ],
+    arestas: [
+      { de: "demanda", para: "envio", mapeamento: [{ saida: "itensProntos", entrada: "itens" }] },
+      // O destino recebe os resultados POR ITEM e também quem foi enviado —
+      // é o que permite nomear "o agente não respondeu sobre este item".
+      { de: "envio", para: "grava", mapeamento: [{ saida: "resultados", entrada: "resultados" }] },
+      {
+        de: "demanda",
+        para: "grava",
+        mapeamento: [
+          { saida: "demandaId", entrada: "demandaId" },
+          { saida: "itensProntos", entrada: "enviados" },
+        ],
+      },
+    ],
+    origem: "fabrica",
+  };
+}
+
+/** Declarados + as derivadas: a esteira (dos papéis) e a exportação (do
+ * destino de itens). Declarado vence fábrica no mesmo id. */
+export function fluxosEmVigor(
+  papeis: PapelConfigurado[],
+  documentoFluxos: unknown,
+  configExportador?: ConfigExportador
+): FluxoEmVigor[] {
   const declarados: FluxoEmVigor[] = normalizarFluxos(documentoFluxos).fluxos.map((f) => ({
     ...f,
     origem: "declarado",
   }));
   const esteira = fluxoDaEsteira(papeis);
   if (esteira && !declarados.some((f) => f.id === esteira.id)) declarados.push(esteira);
+  const exportacao = configExportador ? fluxoDaExportacao(configExportador) : null;
+  if (exportacao && !declarados.some((f) => f.id === exportacao.id)) declarados.push(exportacao);
   return declarados;
 }
 

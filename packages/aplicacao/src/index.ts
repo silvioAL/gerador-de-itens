@@ -25,7 +25,6 @@ export type {
   DadosItemGerado,
   RepositorioDeItensGerados,
 } from "./portas/repositorioDeItensGerados.js";
-export type { ExportadorDeItens, ItemExportado } from "./portas/exportadorDeItens.js";
 export { criarCasosDeUsoDeItensGerados, type CasosDeUsoDeItensGerados } from "./casos-de-uso/itensGerados.js";
 export { normalizarExportador, type ConfigExportador } from "./config/normalizacao.js";
 
@@ -190,7 +189,15 @@ export {
 } from "./casos-de-uso/funcoes.js";
 /** SPEC-107 fatia B — o PROJETO como nó, nas duas direções. */
 export { PROJETO_DO_SISTEMA, REF_DO_PROJETO, type ProjetoDoSistema } from "./config/projeto.js";
-export { demandaAtiva, erroSemDemanda, saidaDoProjeto, varianteProposta } from "./casos-de-uso/projetoNoFluxo.js";
+export {
+  demandaAtiva,
+  erroSemDemanda,
+  resultadoDaExportacao,
+  saidaDoProjeto,
+  varianteProposta,
+} from "./casos-de-uso/projetoNoFluxo.js";
+/** SPEC-107 G1 — a régua de "pronto" da exportação, num lugar só. */
+export { prontosEIgnorados } from "./casos-de-uso/itensGerados.js";
 /** SPEC-107 fatia F — compatibilidade de mapeamento por tipo (aviso). */
 export { avisosDeMapeamento, type AvisoDeMapeamento, type ContratoDoNoNoFluxo } from "./casos-de-uso/mapeamento.js";
 /** SPEC-107 fatia E — a transformação pura (o Set do n8n). */
@@ -211,8 +218,10 @@ export {
 /** SPEC-105 fatias C/D — o fluxo como grafo, e a execução pura. */
 export {
   ID_DO_FLUXO_DA_ESTEIRA,
+  ID_DO_FLUXO_DA_EXPORTACAO,
   TIPOS_DE_NO_DO_FLUXO,
   fluxoDaEsteira,
+  fluxoDaExportacao,
   fluxosEmVigor,
   mensagemDeCiclo,
   normalizarFluxos,

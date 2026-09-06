@@ -53,10 +53,18 @@ export const PROJETO_DO_SISTEMA: ProjetoDoSistema = {
   entrada: [
     { chave: "demandaId", rotulo: "Demanda (id — vazio = a mais recente do time)", tipo: "texto" },
     { chave: "desenho", rotulo: "Desenho proposto (vira variante da demanda)", tipo: "objeto" },
+    // SPEC-107 G1 — o retorno do tracker, por item: grava exportado/link em
+    // quem subiu; quem falhou fica nomeado (SPEC-49, falha parcial).
+    { chave: "resultados", rotulo: "Resultados da exportação (por item)", tipo: "lista" },
+    { chave: "enviados", rotulo: "Itens enviados (para nomear o silêncio)", tipo: "lista" },
   ],
   saida: [
     { chave: "desenho", rotulo: "Desenho (demanda)", tipo: "objeto" },
     { chave: "itens", rotulo: "Itens gerados (persistidos)", tipo: "lista" },
+    { chave: "itensProntos", rotulo: "Itens PRONTOS para exportar (a régua da SPEC-49)", tipo: "lista" },
+    { chave: "itensIgnorados", rotulo: "Chaves com pendência (fora da exportação)", tipo: "lista" },
+    { chave: "exportados", rotulo: "Chaves gravadas como exportadas", tipo: "lista" },
+    { chave: "erros", rotulo: "Falhas por item (chave + motivo)", tipo: "lista" },
     { chave: "markdown", rotulo: "Documento (última especificação gerada)", tipo: "documento" },
     { chave: "volumetria", rotulo: "Volumetria da demanda", tipo: "objeto" },
     { chave: "necessidades", rotulo: "Necessidades", tipo: "lista" },

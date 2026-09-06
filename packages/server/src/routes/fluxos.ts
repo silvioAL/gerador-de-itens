@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+﻿import { createHash } from "node:crypto";
 import { desc, eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { randomUUID } from "node:crypto";
@@ -13,8 +13,10 @@ import {
   executarFuncao,
   fluxosEmVigor,
   mensagemDeCiclo,
+  normalizarExportador,
   normalizarPipelineAgentes,
   preambuloDoPapel,
+  resultadoDaExportacao,
   saidaDoProjeto,
   sanearCamposDaTransformacao,
   transformarEntradas,
@@ -76,15 +78,20 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
    * distinguir edições; não é segurança, é identidade. */
   const hashDoFluxo = (fluxo: Fluxo) => createHash("sha256").update(canonico(fluxo)).digest("hex").slice(0, 16);
 
-  /** Os fluxos EM VIGOR do time: declarados + a esteira derivada dos papéis.
-   * Resolvido AQUI (§263): a tela, o mapa e o executor leem a mesma soma. */
+  /** Os fluxos EM VIGOR do time: declarados + as derivadas (a esteira, dos
+   * papéis; a exportação, do destino de itens — SPEC-107 G1). Resolvido AQUI
+   * (§263): a tela, o mapa e o executor leem a mesma soma. */
   async function emVigor(timeId?: string) {
-    const [fluxosDoc, pipelineDoc] = await Promise.all([
+    const [fluxosDoc, pipelineDoc, exportadorDoc] = await Promise.all([
       casos.obter("fluxos", await templateDaVersao("fluxos", diretorioConfig), timeId),
       casos.obter("pipeline-agentes", await templateDaVersao("pipeline-agentes", diretorioConfig), timeId),
+      casos.obter("exportador", await templateDaVersao("exportador", diretorioConfig)),
     ]);
     const { papeis } = normalizarPipelineAgentes(pipelineDoc.documento);
-    return { fluxos: fluxosEmVigor(papeis, fluxosDoc.documento), papeis };
+    return {
+      fluxos: fluxosEmVigor(papeis, fluxosDoc.documento, normalizarExportador(exportadorDoc.documento)),
+      papeis,
+    };
   }
 
   // Leitura aberta, como `GET /conectores`: a fiação é vocabulário do
@@ -208,6 +215,27 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
             quebra = (await casosQuebras.obter(ativa.id))!;
           }
 
+          if (entradas.resultados !== undefined) {
+            // SPEC-107 G1 — DESTINO de EXPORTAÇÃO: o retorno do tracker, por
+            // item. Quem subiu grava `exportado`+link; quem falhou (ou ficou
+            // sem resposta) sai nomeado — a disciplina da SPEC-49, na fiação.
+            const nivel = quebra.time ? await nivelNoTime(db, email, quebra.time) : await maiorNivel(db, email);
+            if (nivel !== "operar" && nivel !== "owner") {
+              throw new Error(
+                `gravar a exportação na demanda "${quebra.id}" exige nível "operar" no time "${quebra.time ?? "(sem time)"}" — seu nível é "${nivel ?? "nenhum"}"`
+              );
+            }
+            const { paraGravar, erros } = resultadoDaExportacao(entradas.resultados, entradas.enviados);
+            const repoItens = criarRepositorioDeItensGeradosEmPostgres(db);
+            const exportados: string[] = [];
+            for (const item of paraGravar) {
+              const salvo = await repoItens.marcarExportado(quebra.id, item.chave, item.linkExterno);
+              if (salvo) exportados.push(item.chave);
+            }
+            registrarAuditoria(db, { email, acao: "exportar", recurso: "itens_gerados", recursoId: quebra.id });
+            return { demandaId: quebra.id, exportados, erros };
+          }
+
           if (entradas.desenho !== undefined) {
             // DESTINO. O gate da rota cobre o time do CORPO; a quebra que o
             // `demandaId` aponta pode ser de outro — re-checa no time DELA.
@@ -261,7 +289,16 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
 
   app.post("/fluxos/:id/executar", { preHandler: exigirNivel(db, "operar", timeDoCorpo) }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    const { ateNo, aoVivo } = (req.body ?? {}) as { ateNo?: string; aoVivo?: boolean };
+    const { ateNo, aoVivo, parametrosPorNo } = (req.body ?? {}) as {
+      ateNo?: string;
+      aoVivo?: boolean;
+      /**
+       * SPEC-107 G1 — parâmetros DESTA execução, por nó (o atalho da tela
+       * aponta a demanda ABERTA sem congelar nada na fiação). São entradas da
+       * execução, não edição do fluxo: o hash (§9.5) continua o da fiação.
+       */
+      parametrosPorNo?: Record<string, Record<string, unknown>>;
+    };
     const timeId = timeDoCorpo(req) ?? undefined;
     const email = req.usuario!.email;
 
@@ -275,11 +312,26 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
 
     // Do EM VIGOR, não só dos declarados: a esteira derivada também executa.
     const { fluxos, papeis } = await emVigor(timeId);
-    const fluxo = fluxos.find((f) => f.id === id);
-    if (!fluxo) return reply.code(404).send({ erro: `não conheço o fluxo "${id}" neste time` });
-    if (ateNo && !fluxo.nos.some((no) => no.id === ateNo)) {
+    const fluxoEmVigorAchado = fluxos.find((f) => f.id === id);
+    if (!fluxoEmVigorAchado) return reply.code(404).send({ erro: `não conheço o fluxo "${id}" neste time` });
+    if (ateNo && !fluxoEmVigorAchado.nos.some((no) => no.id === ateNo)) {
       return reply.code(404).send({ erro: `o fluxo "${id}" não tem o nó "${ateNo}"` });
     }
+    for (const noId of Object.keys(parametrosPorNo ?? {})) {
+      if (!fluxoEmVigorAchado.nos.some((no) => no.id === noId)) {
+        return reply.code(404).send({ erro: `o fluxo "${id}" não tem o nó "${noId}" (parametrosPorNo)` });
+      }
+    }
+    // Os parâmetros da chamada entram POR CIMA dos fixos do nó — o hash
+    // continua sendo o da fiação (a identidade), não o da execução.
+    const fluxo: Fluxo = parametrosPorNo
+      ? {
+          ...fluxoEmVigorAchado,
+          nos: fluxoEmVigorAchado.nos.map((no) =>
+            parametrosPorNo[no.id] ? { ...no, parametros: { ...no.parametros, ...parametrosPorNo[no.id] } } : no
+          ),
+        }
+      : fluxoEmVigorAchado;
 
     const [catalogo, provedor] = await Promise.all([catalogoDeConectores(db, diretorioConfig), resolverProvedor()]);
 
@@ -318,7 +370,9 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     // Ciclo é RECUSA, não falha parcial — e a mensagem é a do desenho (§4.4).
     if (resultado.ciclo) return reply.code(409).send({ erro: mensagemDeCiclo(resultado.ciclo) });
 
-    const hash = hashDoFluxo(fluxo);
+    // §9.5 — a identidade é a da FIAÇÃO em vigor, não a da execução: os
+    // parametrosPorNo são entrada, e entrada de nó de função já fica no rastro.
+    const hash = hashDoFluxo(fluxoEmVigorAchado);
     // O rastro persiste SEM as saídas (ver o comentário da tabela) — EXCETO
     // quando a execução SUSPENDE num gate (fatia C): a suspensa guarda as
     // saídas até alguém continuar/descartar, porque elas são o stage a

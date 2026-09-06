@@ -54,7 +54,9 @@ import {
   type EspecificacaoTemplate,
   type SessaoUsuario,
   apiPdca,
+  apiExecucaoDeFluxo,
   apiItensGerados,
+  type ResultadoDaExportacao,
   apiQuebras,
   type ItemGerado,
   apiStacks,
@@ -902,6 +904,35 @@ function AppCarregado({
     [quebra, diagramaConfig, regrasVisiveis, decisoesVisiveis]
   );
   const [avisosPendentes, setAvisosPendentes] = useState(false);
+
+  /**
+   * SPEC-107 G1 — **exportar É a fiação semeada** ("exportar-prontos"): o
+   * botão vira atalho que a dispara apontando a demanda aberta
+   * (`parametrosPorNo`), e traduz o rastro para a resposta que a tela sempre
+   * mostrou. Falha GLOBAL do envio (rede/HTTP) derruba o nó e vira erro POR
+   * ITEM com a mesma frase — a semântica da SPEC-49 não muda de cara.
+   */
+  async function exportarPelaFiacao(quebraId: string): Promise<ResultadoDaExportacao> {
+    const r = await apiExecucaoDeFluxo.executar("exportar-prontos", timeAtivo, undefined, {
+      demanda: { demandaId: quebraId },
+    });
+    const porNo = Object.fromEntries(r.nos.map((n) => [n.noId, n]));
+    if (porNo["demanda"]?.estado === "falhou") {
+      throw new Error(porNo["demanda"].erro ?? "não foi possível ler a demanda para exportar");
+    }
+    const daDemanda = r.saidas["demanda"] ?? {};
+    const prontos = (daDemanda.itensProntos as { chave: string }[] | undefined) ?? [];
+    const ignorados = (daDemanda.itensIgnorados as string[] | undefined) ?? [];
+    const doGrava = r.saidas["grava"] ?? {};
+    const falhaDoEnvio = porNo["envio"]?.estado === "falhou" ? porNo["envio"].erro : undefined;
+    const erros = falhaDoEnvio
+      ? prontos.map((i) => ({ chave: i.chave, erro: falhaDoEnvio }))
+      : ((doGrava.erros as { chave: string; erro: string }[] | undefined) ?? []);
+    const exportados = ((doGrava.exportados as string[] | undefined) ?? []).map(
+      (chave) => ({ chave }) as unknown as ItemGerado
+    );
+    return { exportados, erros, ignorados, destino: destinoDaExportacao ?? "" };
+  }
 
   function derivarQuebra() {
     // SPEC-38 — visualizar deriva (é leitura computada do diagrama), mas sem a
@@ -2169,7 +2200,11 @@ function AppCarregado({
           onExportar={
             persistencia.quebraId
               ? async () => {
-                  const r = await apiItensGerados.exportar(persistencia.quebraId!);
+                  // SPEC-107 G1 — o botão é um ATALHO da fiação semeada
+                  // "exportar-prontos": a mesma régua de pronto, o mesmo
+                  // payload, o mesmo grava-por-item — agora pela fiação que
+                  // qualquer um pode abrir em #/fluxo e refazer diferente.
+                  const r = await exportarPelaFiacao(persistencia.quebraId!);
                   setItensGerados(await apiItensGerados.listar(persistencia.quebraId!));
                   return r;
                 }

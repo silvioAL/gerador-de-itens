@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { demandaAtiva, erroSemDemanda, saidaDoProjeto, varianteProposta } from "./projetoNoFluxo.js";
+import { demandaAtiva, erroSemDemanda, resultadoDaExportacao, saidaDoProjeto, varianteProposta } from "./projetoNoFluxo.js";
 import type { QuebraSalva, ResumoQuebra } from "../portas/repositorioDeQuebras.js";
 
 function resumo(id: string, time: string | null, atualizadoEm: string): ResumoQuebra {
@@ -49,7 +49,7 @@ describe("demandaAtiva (SPEC-107 fatia B)", () => {
 
 describe("saidaDoProjeto", () => {
   it("o desenho é o SUBCONJUNTO que as funções leem, não a quebra inteira", () => {
-    const saida = saidaDoProjeto(QUEBRA, [{ chave: "i1" }]);
+    const saida = saidaDoProjeto(QUEBRA, [{ chave: "i1" }] as never);
     const desenho = saida.desenho as Record<string, unknown>;
     expect(desenho.diagrama).toBe(QUEBRA.diagrama);
     expect(desenho.time).toBe("time-pagamentos");
@@ -74,6 +74,47 @@ describe("saidaDoProjeto", () => {
     );
     expect(comTudo.volumetria).toEqual({ taxaRps: 10 });
     expect(comTudo.markdown).toBe("# Doc");
+  });
+});
+
+describe("SPEC-107 G1 — a exportação na fiação", () => {
+  const item = (chave: string, extra: Record<string, unknown> = {}) =>
+    ({ chave, titulo: chave, tipo: "História", tamanho: "M", dependencias: [], corpoMarkdown: "…", pendencias: 0, sugestoes: 0, estado: "gerado", ...extra }) as never;
+
+  it("a saída do projeto separa PRONTOS (a régua da SPEC-49) de ignorados, no payload de sempre", () => {
+    const saida = saidaDoProjeto(QUEBRA, [
+      item("pronto-1"),
+      item("com-pendencia", { pendencias: 2 }),
+      item("com-sugestao", { sugestoes: 1 }),
+      item("ja-exportado", { estado: "exportado" }),
+    ]);
+    expect((saida.itensProntos as { chave: string }[]).map((i) => i.chave)).toEqual(["pronto-1"]);
+    // O payload externo não muda: sem pendencias/sugestoes/estado.
+    expect(Object.keys((saida.itensProntos as object[])[0]).sort()).toEqual(
+      ["chave", "corpoMarkdown", "dependencias", "tamanho", "tipo", "titulo"].sort()
+    );
+    expect(saida.itensIgnorados).toEqual(["com-pendencia", "com-sugestao"]);
+  });
+
+  it("resultadoDaExportacao — falha parcial é resposta, e o silêncio ganha nome", () => {
+    const { paraGravar, erros } = resultadoDaExportacao(
+      [
+        { chave: "a", linkExterno: "https://tracker/a" },
+        { chave: "b", erro: "campo obrigatório ausente no tracker" },
+        { chave: "c" },
+      ],
+      [{ chave: "a" }, { chave: "b" }, { chave: "c" }, { chave: "d" }]
+    );
+    expect(paraGravar).toEqual([{ chave: "a", linkExterno: "https://tracker/a" }]);
+    expect(erros).toEqual([
+      { chave: "b", erro: "campo obrigatório ausente no tracker" },
+      { chave: "c", erro: "o agente respondeu sem o link do issue" },
+      { chave: "d", erro: "o agente não respondeu sobre este item" },
+    ]);
+  });
+
+  it("resultados fora de forma barra com o nome (§9.3)", () => {
+    expect(() => resultadoDaExportacao("não é lista", [])).toThrow(/forma \{ resultados/);
   });
 });
 
