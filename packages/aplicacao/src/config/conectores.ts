@@ -35,8 +35,15 @@ import {
  * §9.4 estendeu a lista da primeira escrita da SPEC com `booleano`: o contrato
  * do publicador de documento já manda `desatualizado: boolean` hoje, e nascer
  * com o conector de fábrica mentindo o tipo seria nascer com o catálogo errado.
+ *
+ * SPEC-107 fatia F — **`documento`**: texto com semântica de MARKDOWN (o que
+ * se publica, o que se lê da wiki, a especificação da demanda). É a forma de
+ * dado da §1.1 ganhando nome no contrato — o que permite validar
+ * compatibilidade de mapeamento (documento → documento) e renderizar preview
+ * no rastro, sem nenhum nó novo. Continua sendo TEXTO no transporte:
+ * `documento` afirma a semântica, não muda o envelope.
  */
-export const TIPOS_DE_CAMPO_DO_CONECTOR = ["texto", "numero", "booleano", "lista", "objeto"] as const;
+export const TIPOS_DE_CAMPO_DO_CONECTOR = ["texto", "numero", "booleano", "lista", "objeto", "documento"] as const;
 export type TipoDeCampoDoConector = (typeof TIPOS_DE_CAMPO_DO_CONECTOR)[number];
 
 export interface CampoDoConector {
@@ -250,7 +257,7 @@ export const CONTRATO_DA_OPERACAO: Record<
     entrada: [
       { chave: "demandaId", rotulo: "Id da demanda", tipo: "texto", obrigatorio: true },
       { chave: "demandaTitulo", rotulo: "Título da demanda", tipo: "texto" },
-      { chave: "markdown", rotulo: "Documento (markdown)", tipo: "texto", obrigatorio: true },
+      { chave: "markdown", rotulo: "Documento (markdown)", tipo: "documento", obrigatorio: true },
       { chave: "geradoEm", rotulo: "Gerado em", tipo: "texto" },
       { chave: "demandaAtualizadaEm", rotulo: "Demanda atualizada em", tipo: "texto" },
       { chave: "desatualizado", rotulo: "Desatualizado", tipo: "booleano" },
@@ -267,7 +274,7 @@ export const CONTRATO_DA_OPERACAO: Record<
   documentoExterno: {
     entrada: [{ chave: "link", rotulo: "Link do documento", tipo: "texto", obrigatorio: true }],
     saida: [
-      { chave: "conteudo", rotulo: "Conteúdo", tipo: "texto", caminho: "$.conteudo", obrigatorio: true },
+      { chave: "conteudo", rotulo: "Conteúdo", tipo: "documento", caminho: "$.conteudo", obrigatorio: true },
       { chave: "titulo", rotulo: "Título", tipo: "texto", caminho: "$.titulo" },
       { chave: "atualizadoEm", rotulo: "Atualizado em", tipo: "texto", caminho: "$.atualizadoEm" },
       { chave: "link", rotulo: "Link canônico", tipo: "texto", caminho: "$.link" },

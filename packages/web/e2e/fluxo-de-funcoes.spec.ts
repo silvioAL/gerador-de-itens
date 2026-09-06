@@ -163,6 +163,73 @@ test("a função entra pela paleta já com o contrato à mostra — sem adaptado
 });
 
 /**
+ * SPEC-107 fatia F — o tipo de dado `documento`: o aviso de mapeamento por
+ * tipo (aviso, NÃO bloqueio) e o preview do documento no rastro.
+ */
+test("tipos que não combinam AVISAM sem bloquear, e o documento ganha preview no rastro", async ({ page }) => {
+  test.setTimeout(120000);
+  const original = (await (await page.request.get(`${API}/config/fluxos?timeId=time-portabilidade`)).json()).documento;
+  try {
+    const criada = await page.request.post(`${API}/quebras`, {
+      data: {
+        titulo: `com-documento-e2e ${Date.now()}`,
+        time: "time-portabilidade",
+        diagrama: DESENHO_DO_GATEWAY_FALSO.diagrama,
+        especificacao: "# Documento da demanda\n\nO markdown que a mesa gerou.",
+      },
+    });
+    expect(criada.status()).toBe(201);
+    const { id: demandaId } = (await criada.json()) as { id: string };
+
+    await page.request.put(`${API}/config/fluxos`, {
+      data: {
+        timeId: "time-portabilidade",
+        documento: {
+          fluxos: [
+            {
+              id: "com-documento-e2e",
+              nome: "Com documento",
+              nos: [
+                { id: "demanda", tipo: "projeto", refId: "projeto", posicao: { x: 0, y: 80 }, parametros: { demandaId } },
+                { id: "gera", tipo: "funcao", refId: "derivacao", posicao: { x: 240, y: 80 }, parametros: {} },
+              ],
+              arestas: [
+                {
+                  de: "demanda",
+                  para: "gera",
+                  // O par errado DE PROPÓSITO (lista → objeto) ao lado do
+                  // certo: o aviso aponta o par, e a execução continua.
+                  mapeamento: [
+                    { saida: "itens", entrada: "desenho" },
+                    { saida: "desenho", entrada: "desenho" },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+
+    await page.goto("/#/fluxo");
+    await expect(page.getByTestId("fluxo-screen")).toBeVisible();
+    await page.getByTestId("seletor-de-fluxo").selectOption("com-documento-e2e");
+    // Aviso, não bloqueio (§230): o par errado é dito com os dois tipos, e o
+    // Executar segue habilitado.
+    await expect(page.getByTestId("aviso-de-mapeamento")).toContainText('"itens" (lista) → "desenho" (objeto)');
+    await expect(page.getByTestId("executar-fluxo")).toBeEnabled();
+
+    await page.getByTestId("executar-fluxo").click();
+    await expect(page.getByTestId("rastro-da-execucao")).toBeVisible({ timeout: 30000 });
+    await expect(page.getByTestId("rastro-demanda")).toContainText("✓");
+    // O documento aparece como TEXTO CORRIDO (preview), não como JSON (§2.1).
+    await expect(page.getByTestId("documento-demanda-markdown")).toContainText("# Documento da demanda");
+  } finally {
+    await page.request.put(`${API}/config/fluxos`, { data: { documento: original, timeId: "time-portabilidade" } });
+  }
+});
+
+/**
  * SPEC-107 fatia C — a prova do gate: a execução SUSPENDE no nó marcado,
  * SOBREVIVE ao F5 (o stage está no servidor, não na aba) e CONTINUA do ponto
  * exato — o agente só roda depois da decisão humana.
