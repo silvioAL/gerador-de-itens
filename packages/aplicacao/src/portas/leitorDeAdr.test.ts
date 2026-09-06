@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { comoDecisao, lacunasDaDecisaoImportada, statusDe } from "./leitorDeAdr.js";
+import { comoDecisao, lacunasDaDecisaoImportada, sanearAdrsExternos, statusDe } from "./leitorDeAdr.js";
 
 const AGORA = "2026-08-29T10:00:00.000Z";
 
@@ -95,5 +95,53 @@ describe("o ADR importado nunca vira decisão local (SPEC-81 fatia C)", () => {
 
     expect(decisao.noId).toBeUndefined();
     expect(decisao.arestaId).toBeUndefined();
+  });
+});
+
+describe("o saneamento do que o gateway devolve (SPEC-107 G3, portado do leitor morto)", () => {
+  /**
+   * Estes casos moravam no adaptador `gatewayDoTime` do server; a rota dedicada
+   * morreu e o executor genérico de conector devolve `saida.adrs` CRU — então o
+   * saneamento virou função pura aqui, e os casos vieram junto.
+   */
+  it("o que não é lista vira lista vazia — o gateway pode devolver qualquer coisa", () => {
+    expect(sanearAdrsExternos(undefined)).toEqual([]);
+    expect(sanearAdrsExternos(null)).toEqual([]);
+    expect(sanearAdrsExternos({ adrs: [] })).toEqual([]);
+    expect(sanearAdrsExternos("ADR-14")).toEqual([]);
+  });
+
+  it("sem id ou sem título, o item não sobrevive — é o mínimo sem o qual não dá para fazer nada", () => {
+    const lidos = sanearAdrsExternos([
+      { id: "ADR-1", titulo: "válido" },
+      { id: "", titulo: "sem id" },
+      { id: "   ", titulo: "id só de espaço" },
+      { id: "ADR-2" },
+      { titulo: "sem id nenhum" },
+      "texto solto",
+      null,
+      42,
+    ]);
+
+    expect(lidos.map((a) => a.id)).toEqual(["ADR-1"]);
+  });
+
+  it("texto vem com trim, e vazio vira ausente — lacuna contável, não string oca", () => {
+    const [adr] = sanearAdrsExternos([{ id: "  ADR-1  ", titulo: "  x  ", porque: "   ", link: " https://adr/1 " }]);
+
+    expect(adr.id).toBe("ADR-1");
+    expect(adr.titulo).toBe("x");
+    expect(adr.porque).toBeUndefined();
+    expect(adr.link).toBe("https://adr/1");
+  });
+
+  it("alternativa sem título cai; sem nenhuma que preste, o campo fica ausente", () => {
+    const [comUmaBoa] = sanearAdrsExternos([
+      { id: "a", titulo: "x", alternativas: [{ titulo: "Fila", consequencia: "desacopla" }, { consequencia: "órfã" }] },
+    ]);
+    const [soRuins] = sanearAdrsExternos([{ id: "b", titulo: "y", alternativas: [{ consequencia: "órfã" }, "solta"] }]);
+
+    expect(comUmaBoa.alternativas).toEqual([{ titulo: "Fila", consequencia: "desacopla" }]);
+    expect(soRuins.alternativas).toBeUndefined();
   });
 });

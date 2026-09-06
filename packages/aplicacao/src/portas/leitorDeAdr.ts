@@ -1,4 +1,4 @@
-import type { Decisao } from "@gerador/engine";
+﻿import type { Decisao } from "@gerador/engine";
 
 /**
  * SPEC-81 fatia C — **ler os ADRs da casa.**
@@ -51,6 +51,48 @@ export interface LeitorDeAdr {
    * justamente essa resposta.
    */
   listar(): Promise<AdrExterno[]>;
+}
+
+/**
+ * SPEC-107 G3 — **o saneamento do que o gateway devolve, PURO.**
+ *
+ * Morava no leitor via gateway (que morreu com a rota dedicada): `id` e
+ * `titulo` são o mínimo sem o qual não dá para fazer nada — um ADR sem
+ * identificador não sobrevive à reimportação, e um sem título não aparece em
+ * lugar nenhum. O executor genérico de conector devolve `saida.adrs` CRU;
+ * quem consome (a conversa) passa por aqui antes de `comoDecisao`.
+ */
+export function sanearAdrsExternos(bruto: unknown): AdrExterno[] {
+  if (!Array.isArray(bruto)) return [];
+  return bruto
+    .filter((a): a is Record<string, unknown> => !!a && typeof a === "object")
+    .filter((a) => typeof a.id === "string" && a.id.trim() && typeof a.titulo === "string" && a.titulo.trim())
+    .map((a) => ({
+      id: (a.id as string).trim(),
+      titulo: (a.titulo as string).trim(),
+      contexto: textoOpcional(a.contexto),
+      alternativas: alternativasDe(a.alternativas),
+      escolhida: textoOpcional(a.escolhida),
+      porque: textoOpcional(a.porque),
+      status: textoOpcional(a.status),
+      substituidaPor: textoOpcional(a.substituidaPor),
+      autor: textoOpcional(a.autor),
+      em: textoOpcional(a.em),
+      link: textoOpcional(a.link),
+    }));
+}
+
+function textoOpcional(v: unknown): string | undefined {
+  return typeof v === "string" && v.trim() ? v.trim() : undefined;
+}
+
+function alternativasDe(v: unknown): { titulo: string; consequencia?: string }[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const lidas = v
+    .filter((a): a is Record<string, unknown> => !!a && typeof a === "object")
+    .map((a) => ({ titulo: textoOpcional(a.titulo) ?? "", consequencia: textoOpcional(a.consequencia) }))
+    .filter((a) => a.titulo);
+  return lidas.length > 0 ? lidas : undefined;
 }
 
 /**

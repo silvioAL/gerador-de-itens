@@ -16802,3 +16802,43 @@ o link E o texto).
 de execução de fluxos (o mesmo endurecimento opt-in da G1); os campos
 opcionais `geradoEm`/`demandaAtualizadaEm` deixaram de viajar no payload (a
 fiação manda o que o contrato declara e o projeto emite).
+
+## §379 — SPEC-107 G3: a terceira morte — importar É ler pelo conector
+
+**A releitura que decidiu o desenho**: as duas jornadas de importação (o ADR
+da casa e o documento externo pelo link) **param na caixa da conversa** —
+importar não é aceitar. Nenhuma delas precisa de agente estruturado nem de
+fiação própria: o executor genérico de conector (`POST
+/conectores/:id/executar`, G1) já lê o gateway pelo MESMO destino que a rota
+dedicada lia. O que a rota fazia além de ler mudou de casa, com dono:
+
+- **O saneamento virou função pura** (`sanearAdrsExternos`, aplicacao): id e
+  título são o mínimo; trim em tudo; vazio vira ausente (lacuna contável);
+  alternativa sem título cai. Os casos do `gatewayDoTime.test` morto vieram
+  junto. §248 cumprido nele.
+- **O dedupe por `importadoDe` mudou para o hook** (`useAdrNaEntrada`): a
+  conversa busca a demanda e filtra o que ela já importou — a MESMA chave
+  que `comoDecisao` grava. §248 cumprido nele (desligar o filtro → teste
+  vermelho).
+- **A régua do §349 §6 mudou para a tela**: "200 com conteúdo vazio é o
+  mesmo que não achar" agora vive no `importarDoLink`, sobre
+  `{saida, ausentes}` — com a mesma mensagem de sempre.
+
+**O que morreu**: `POST /quebras/:id/adr/importar`, `POST
+/ia/documento-externo`, o adaptador `gatewayDoTime` inteiro
+(`criarLeitorDeAdrViaGateway` + `criarLeitorDeDocumentoViaGateway`) e os
+clients `apiQuebras.importarAdr`/`apiIa.lerDocumentoExterno`.
+
+**A prova da tabela**: `adr-na-conversa.spec.ts` e
+`documento-externo-na-conversa.spec.ts` passaram **sem mudar uma linha** —
+o comportamento na tela é o mesmo, pelo caminho novo.
+
+**Deltas declarados**:
+- `/ia/documento-externo` era rota ABERTA (sem sessão); ler pelo executor
+  genérico exige **sessão + operar** — invisível na tela (quem importa já
+  está logado), e ganha auditoria (`executar`/`conectores`) que a rota
+  aberta não tinha.
+- A degradação-para-vazia do leitor de ADR morreu: falha do gateway agora é
+  erro visível no botão, não lista vazia silenciosa.
+- O eco do `link` e a `origem` da resposta não tinham consumidor — morreram
+  com a rota.

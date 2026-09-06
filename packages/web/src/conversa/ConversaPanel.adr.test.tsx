@@ -12,13 +12,15 @@ import { ConversaPanel } from "./ConversaPanel";
  */
 
 const obterMock = vi.hoisted(() => vi.fn());
-const importarAdrMock = vi.hoisted(() => vi.fn());
+const executarConectorMock = vi.hoisted(() => vi.fn());
+const buscarQuebraMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../api/client", async (importActual) => ({
   ...(await importActual<typeof import("../api/client")>()),
   apiIa: { proporDiagrama: vi.fn(), status: async () => ({ capacidades: { transcricao: false } }) },
   apiExportador: { obter: obterMock },
-  apiQuebras: { importarAdr: importarAdrMock },
+  apiQuebras: { buscar: buscarQuebraMock },
+  apiCatalogoDeConectores: { executar: executarConectorMock },
 }));
 
 const config = {
@@ -34,31 +36,33 @@ const COM_DESTINO = {
   destinos: [{ id: "a", operacao: "adr", endpoint: "https://gw/adr", rotulo: "ADR" }],
 };
 
-const UMA_DECISAO = {
-  origem: "ADR",
-  decisoes: [
-    {
-      decisao: {
-        id: "adr:ADR-14",
+/** SPEC-107 G3 — a tela lê o gateway pelo executor genérico de conector; o mock
+ * devolve o ADR CRU (`{saida: {adrs}}`), e a conversão para decisão roda no
+ * hook, com a aplicação. */
+const RESPOSTA_DO_GATEWAY = {
+  conector: "a",
+  saida: {
+    adrs: [
+      {
+        id: "ADR-14",
         titulo: "Integração com bureau",
-        alternativas: [],
         escolhida: "Fila",
         porque: "desacopla o tempo do parceiro",
         status: "aceita",
-        origem: "extraido",
         autor: "ana",
         em: "2026-08-29T10:00:00.000Z",
-        importadoDe: "https://adr/14",
+        link: "https://adr/14",
       },
-      lacunas: [],
-    },
-  ],
+    ],
+  },
+  ausentes: [],
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
   obterMock.mockResolvedValue(COM_DESTINO);
-  importarAdrMock.mockResolvedValue(UMA_DECISAO);
+  executarConectorMock.mockResolvedValue(RESPOSTA_DO_GATEWAY);
+  buscarQuebraMock.mockResolvedValue({ decisoes: [] });
 });
 
 describe("trazer as decisões da casa para a conversa (SPEC-81 fatia D)", () => {
@@ -106,7 +110,7 @@ describe("trazer as decisões da casa para a conversa (SPEC-81 fatia D)", () => 
   });
 
   it("zero decisões diz isso, e não deixa a caixa mentir", async () => {
-    importarAdrMock.mockResolvedValue({ origem: "ADR", decisoes: [] });
+    executarConectorMock.mockResolvedValue({ conector: "a", saida: { adrs: [] }, ausentes: [] });
     render(<ConversaPanel config={config} onAplicar={vi.fn()} techs={["Backend"]} quebraId="q-1" />);
 
     fireEvent.click(await screen.findByTestId("trazer-adr"));
@@ -116,7 +120,7 @@ describe("trazer as decisões da casa para a conversa (SPEC-81 fatia D)", () => 
   });
 
   it("falha do gateway aparece na tela e a conversa segue", async () => {
-    importarAdrMock.mockRejectedValue(new Error("gateway fora do ar"));
+    executarConectorMock.mockRejectedValue(new Error("gateway fora do ar"));
     render(<ConversaPanel config={config} onAplicar={vi.fn()} techs={["Backend"]} quebraId="q-1" />);
 
     fireEvent.click(await screen.findByTestId("trazer-adr"));
