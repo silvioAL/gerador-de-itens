@@ -277,8 +277,55 @@ export function fluxoDaExportacao(configExportador: ConfigExportador): FluxoEmVi
   };
 }
 
-/** Declarados + as derivadas: a esteira (dos papéis) e a exportação (do
- * destino de itens). Declarado vence fábrica no mesmo id. */
+export const ID_DO_FLUXO_DA_PUBLICACAO = "publicar-documento";
+
+/**
+ * SPEC-107 G2 — **publicar o documento COMO fiação, derivada** (a segunda
+ * morte da §3.1): `projeto.markdown → conector(documento) →
+ * projeto(linkExterno)`. O botão da tela vira atalho que salva a
+ * especificação viva na demanda e dispara a fiação — o que se publica passa
+ * a ficar persistido como especificação (SPEC-106 C, agora inteira).
+ *
+ * UMA fiação POR destino de documento: com um só, o id estável
+ * `publicar-documento`; com vários, sufixado pelo id do destino — e o atalho
+ * mantém a recusa de sempre ("diga em qual publicar") em vez de escolher
+ * sozinho.
+ */
+export function fluxosDaPublicacao(configExportador: ConfigExportador): FluxoEmVigor[] {
+  const destinos = destinosDaOperacao(configExportador, "documento");
+  return destinos.map((destino) => ({
+    id: destinos.length === 1 ? ID_DO_FLUXO_DA_PUBLICACAO : `${ID_DO_FLUXO_DA_PUBLICACAO}-${destino.id}`,
+    nome:
+      destinos.length === 1
+        ? "Publicar documento (da configuração)"
+        : `Publicar documento — ${destino.rotulo || destino.id} (da configuração)`,
+    nos: [
+      { id: "demanda", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 60, y: 120 }, parametros: {} },
+      { id: "publica", tipo: "conector", refId: destino.id, componente: "documento", posicao: { x: 340, y: 120 }, parametros: {} },
+      { id: "grava", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 620, y: 120 }, parametros: {} },
+    ],
+    arestas: [
+      {
+        de: "demanda",
+        para: "publica",
+        mapeamento: [
+          { saida: "markdown", entrada: "markdown" },
+          { saida: "demandaId", entrada: "demandaId" },
+          { saida: "titulo", entrada: "demandaTitulo" },
+        ],
+      },
+      // O link do que subiu volta para a DEMANDA (SPEC-106 C) — o destino
+      // grava `documento_link_externo`, e "última publicação ↗" sobrevive.
+      { de: "publica", para: "grava", mapeamento: [{ saida: "linkExterno", entrada: "linkExterno" }] },
+      { de: "demanda", para: "grava", mapeamento: [{ saida: "demandaId", entrada: "demandaId" }] },
+    ],
+    origem: "fabrica",
+  }));
+}
+
+/** Declarados + as derivadas: a esteira (dos papéis), a exportação (do
+ * destino de itens) e a publicação (por destino de documento). Declarado
+ * vence fábrica no mesmo id. */
 export function fluxosEmVigor(
   papeis: PapelConfigurado[],
   documentoFluxos: unknown,
@@ -292,6 +339,9 @@ export function fluxosEmVigor(
   if (esteira && !declarados.some((f) => f.id === esteira.id)) declarados.push(esteira);
   const exportacao = configExportador ? fluxoDaExportacao(configExportador) : null;
   if (exportacao && !declarados.some((f) => f.id === exportacao.id)) declarados.push(exportacao);
+  for (const publicacao of configExportador ? fluxosDaPublicacao(configExportador) : []) {
+    if (!declarados.some((f) => f.id === publicacao.id)) declarados.push(publicacao);
+  }
   return declarados;
 }
 

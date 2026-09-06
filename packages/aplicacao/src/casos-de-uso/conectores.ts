@@ -46,6 +46,9 @@ export function montarChamadaDoConector(conector: Conector, parametros: Record<s
   for (const campo of conector.entrada) {
     if (parametros[campo.chave] !== undefined) corpo[campo.chave] = parametros[campo.chave];
   }
+  // §348 — o "onde dentro do destino" é do CONECTOR, não de quem chama: o
+  // mesmo comportamento do `postar()` do gateway (G2).
+  if (conector.espaco) corpo.espaco = conector.espaco;
 
   // `envelope: ""` = corpo na raiz — teste de string vazia, não de valor
   // falso, pela mesma razão do `postar` do gateway.

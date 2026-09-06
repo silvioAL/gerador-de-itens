@@ -73,6 +73,13 @@ export interface Conector {
   cabecalhos: Record<string, string>;
   /** O campo que embrulha o corpo. `""` = corpo na raiz (o contrato comum). */
   envelope: string;
+  /**
+   * §348 (copiado do destino na SPEC-107 G2) — o "onde dentro do destino"
+   * (o espaço do Confluence, o projeto do tracker). Entra no CORPO da
+   * chamada como `espaco`, como o `postar()` do gateway sempre fez — sem
+   * isto, publicar pela fiação mandava o documento sem dizer o espaço.
+   */
+  espaco?: string;
   /** O que MANDAR: os campos do corpo da chamada. */
   entrada: CampoDoConector[];
   /** O que VOLTA: como ler a resposta. */
@@ -325,6 +332,9 @@ export function conectoresDeFabrica(config: ConfigExportador): ConectorEmVigor[]
         // embrulho — repetir o envelope mandaria {"itens":{"itens":[...]}} e
         // nenhum agente entenderia. O conector de fábrica derivado corrige.
         envelope: operacao === "itens" ? "" : destino.envelope,
+        // §348 — o espaço do destino viaja junto (G2): sem ele, publicar pela
+        // fiação não dizia em qual espaço do Confluence cair.
+        ...(destino.espaco ? { espaco: destino.espaco } : {}),
         entrada: CONTRATO_DA_OPERACAO[operacao].entrada,
         saida: CONTRATO_DA_OPERACAO[operacao].saida,
         origem: "fabrica",

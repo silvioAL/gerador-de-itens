@@ -1,12 +1,9 @@
-import type {
+﻿import type {
   AdrExterno,
   DestinoResolvido,
-  DocumentoParaPublicar,
-  DocumentoPublicado,
   LeitorDeAdr,
   LeitorDeDocumento,
   DocumentoExterno,
-  PublicadorDeDocumento,
 } from "@gerador/aplicacao";
 
 /**
@@ -133,50 +130,9 @@ function alternativasDe(v: unknown): { titulo: string; consequencia?: string }[]
   return lidas.length > 0 ? lidas : undefined;
 }
 
-/**
- * Contrato do gateway:
- *   POST {endpoint}  { demandaId, demandaTitulo, markdown, geradoEm,
- *                      demandaAtualizadaEm, desatualizado }
- *   → 200 { linkExterno, atualizada? }
- *
- * **`demandaId` é a identidade da página.** É com ele que o gateway decide
- * atualizar em vez de criar — e é por isso que ele vai no payload em vez de a
- * URL ser montada aqui: quem sabe onde a página mora é quem a criou.
- */
-export function criarPublicadorDeDocumentoViaGateway(
-  destino: DestinoResolvido,
-  fetchImpl: typeof fetch = fetch
-): PublicadorDeDocumento {
-  return {
-    async publicar(documento: DocumentoParaPublicar): Promise<DocumentoPublicado> {
-      let resposta: Response;
-      try {
-        resposta = await postar(destino, documento, fetchImpl);
-      } catch (erro) {
-        const motivo = erro instanceof Error ? erro.message : String(erro);
-        throw new Error(`não consegui falar com ${destino.rotulo || destino.endpoint}: ${motivo}`);
-      }
-
-      if (!resposta.ok) {
-        const corpo = await resposta.text().catch(() => "");
-        throw new Error(
-          `${destino.rotulo || destino.endpoint} respondeu HTTP ${resposta.status}${corpo ? ` — ${corpo.slice(0, 200)}` : ""}`
-        );
-      }
-
-      const corpo = (await resposta.json().catch(() => ({}))) as { linkExterno?: unknown; atualizada?: unknown };
-      const link = texto(corpo.linkExterno);
-      if (!link) {
-        // Sem link, a publicação é indistinguível de não ter acontecido: a
-        // pessoa não tem como conferir, e o produto não tem o que mostrar.
-        throw new Error(`${destino.rotulo || destino.endpoint} respondeu sem "linkExterno" — não sei onde a página foi parar`);
-      }
-
-      return { linkExterno: link, atualizada: corpo.atualizada === true };
-    },
-  };
-}
-
+// SPEC-81 fatia B → SPEC-107 G2: `criarPublicadorDeDocumentoViaGateway`
+// morreu com a rota dedicada — publicar é a fiação semeada, pelo executor
+// genérico de conector (o `espaco` do §348 viajou para o Conector).
 /**
  * SPEC-100 fatia C (§349) — **buscar um documento da casa pelo link.**
  *

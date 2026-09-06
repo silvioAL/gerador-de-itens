@@ -51,7 +51,7 @@ export interface EscritorDeAdr {
    * Publica as decisões e devolve um resultado **por decisão**, na mesma ordem.
    *
    * Falha parcial é resposta, e não exceção — igual ao `ExportadorDeItens` e
-   * diferente do `PublicadorDeDocumento`. A razão é a mesma de lá: são N coisas
+   * diferente do publicador de documento (que era um só). A razão: são N coisas
    * independentes, e uma que não sobe não pode derrubar as que subiram.
    */
   publicar(adrs: AdrParaPublicar[]): Promise<Array<{ id: string; linkExterno: string } | { id: string; erro: string }>>;

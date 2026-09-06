@@ -201,7 +201,10 @@ export function usePersistencia(quebra: Quebra, aoAbrir: (q: Quebra) => void) {
     quebraId,
     abrirPorId,
     nova,
-    salvar: () => salvar(quebra),
+    // SPEC-107 G2 — aceita a quebra EXPLÍCITA: quem acabou de fazer setQuebra
+    // não pode esperar o re-render para salvar o estado novo (o atalho de
+    // publicar persiste a especificação e executa em seguida).
+    salvar: (explicita?: Quebra) => salvar(explicita ?? quebra),
     status,
   };
 }

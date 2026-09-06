@@ -8,12 +8,14 @@ import { exigirBancoDescartavel, garantirBancoDeTeste, URL_BANCO_DE_TESTE } from
 import { buildApp } from "../app.js";
 
 /**
- * SPEC-81 fatia B — **a rota que publica o documento**, contra Postgres de
- * verdade.
+ * SPEC-81 fatia B → SPEC-107 G2 — **publicar É a fiação semeada**, contra
+ * Postgres de verdade.
  *
- * O que só esta camada prova: que a rota lê a configuração certa, escolhe o
- * destino certo, e — o mais importante — **diz o que fazer quando não dá para
- * escolher**, em vez de escolher sozinha.
+ * A rota dedicada morreu; estes testes provam que a fiação
+ * `projeto.markdown → conector(documento) → projeto(linkExterno)` cobre cada
+ * caso que a rota cobria: o destino certo, a recusa de escolher sozinho, o
+ * link gravado na demanda (SPEC-106 C), o §348 do espaço, e as falhas com
+ * nome.
  */
 
 const DATABASE_URL = process.env.DATABASE_URL || URL_BANCO_DE_TESTE;
@@ -38,6 +40,8 @@ async function configurarDestinos(destinos: unknown[]) {
     });
 }
 
+const CONFLUENCE = { id: "confluence", operacao: "documento", endpoint: "https://gw.casa/confluence", rotulo: "Confluence" };
+
 beforeAll(async () => {
   exigirBancoDescartavel(DATABASE_URL);
   await garantirBancoDeTeste(DATABASE_URL);
@@ -45,8 +49,6 @@ beforeAll(async () => {
   await migrate(db, { migrationsFolder: resolve(import.meta.dirname, "../../migrations") });
   app = await buildApp({ db, diretorioConfig: resolve(import.meta.dirname, "../../../../config") });
   await app.ready();
-  // Nível "operar" — a rota exige, como toda escrita numa quebra. Sem isto o
-  // teste mediria o portão de permissão em vez da publicação.
   const [org] = await db.select().from(organizacoes).limit(1);
   await db.insert(times).values({ id: "time-publicar", organizacaoId: org.id, nome: "time-publicar" }).onConflictDoNothing();
   await db
@@ -69,124 +71,131 @@ beforeEach(async () => {
   await db.execute(sql`delete from ${configDocumentos} where chave = 'exportador'`);
   const linha = await db
     .insert(quebras)
-    .values({ titulo: "Busca por SKU", diagrama: { nodes: [], edges: [] } })
+    .values({
+      titulo: "Busca por SKU",
+      diagrama: { nodes: [], edges: [] },
+      // O que a fiação publica: a especificação PERSISTIDA (o atalho da tela
+      // grava o markdown vivo aqui antes de disparar).
+      especificacao: "# Especificação\n\ncorpo",
+    })
     .returning({ id: quebras.id });
   idDaQuebra = linha[0].id;
 });
 
-async function publicar(corpo: unknown) {
+async function executarPublicacao(id = "publicar-documento", parametros?: Record<string, Record<string, unknown>>) {
   return app.inject({
     method: "POST",
-    url: `/quebras/${idDaQuebra}/documento/publicar`,
-    payload: corpo as never,
+    url: `/fluxos/${id}/executar`,
+    payload: {
+      parametrosPorNo: parametros ?? { demanda: { demandaId: idDaQuebra }, publica: { desatualizado: true } },
+    },
     cookies: { gerador_sessao: sessao },
   });
 }
 
-describe("POST /quebras/:id/documento/publicar (SPEC-81 fatia B)", () => {
-  it("sem destino configurado, a resposta DIZ onde configurar", async () => {
-    // Um erro genérico manda a pessoa adivinhar. É a mesma disciplina do §57 e
-    // da rota de exportação de itens, que já responde assim.
-    const r = await publicar({ markdown: "# doc" });
-
-    expect(r.statusCode).toBe(409);
-    expect(r.json().erro).toMatch(/Outros destinos/);
-  });
-
-  it("com UM destino, publica e devolve o link", async () => {
-    await configurarDestinos([
-      { id: "conf", operacao: "documento", endpoint: "https://gw/confluence", rotulo: "Confluence" },
-    ]);
-    fetchFalso.mockResolvedValue(resposta({ linkExterno: "https://wiki/q-1", atualizada: false }));
-
-    const r = await publicar({ markdown: "# doc", desatualizado: true });
-
-    expect(r.statusCode).toBe(200);
-    expect(r.json()).toMatchObject({ linkExterno: "https://wiki/q-1", destino: "Confluence" });
-    // O payload leva a identidade da página e o estado de frescor — é o que
-    // permite o outro lado atualizar no lugar e dizer que envelheceu.
-    const enviado = JSON.parse(fetchFalso.mock.calls[0][1].body);
-    expect(enviado).toMatchObject({ demandaId: idDaQuebra, demandaTitulo: "Busca por SKU", desatualizado: true });
-    expect(enviado.demandaAtualizadaEm).toBeTruthy();
-  });
-
-  it("SPEC-106 fatia C — o link publicado PERSISTE na demanda, não só na resposta", async () => {
-    await configurarDestinos([
-      { id: "conf", operacao: "documento", endpoint: "https://gw/confluence", rotulo: "Confluence" },
-    ]);
-    fetchFalso.mockResolvedValue(resposta({ linkExterno: "https://wiki/persistido", atualizada: false }));
-
-    await publicar({ markdown: "# doc" });
-
-    // A demanda LEMBRA onde o documento dela mora: é o "apenas armazenar o
-    // link no sistema" do pedido — o resultado em memória da tela morre no F5.
-    const [linha] = await db.select({ link: quebras.documentoLinkExterno }).from(quebras).where(eq(quebras.id, idDaQuebra));
-    expect(linha.link).toBe("https://wiki/persistido");
-  });
-
-  it("com DOIS destinos e nenhum escolhido, NÃO escolhe sozinha — devolve as opções", async () => {
-    /**
-     * A decisão mais importante da rota. Publicar no primeiro silenciosamente
-     * colocaria a página no espaço errado — o pior desfecho de uma publicação,
-     * porque ninguém vai procurar no lugar em que ela foi parar.
-     */
-    await configurarDestinos([
-      { id: "eng", operacao: "documento", endpoint: "https://gw/eng", rotulo: "Confluence Engenharia" },
-      { id: "prod", operacao: "documento", endpoint: "https://gw/prod", rotulo: "Confluence Produto" },
-    ]);
-
-    const r = await publicar({ markdown: "# doc" });
-
-    expect(r.statusCode).toBe(409);
-    expect(r.json().destinos.map((d: { id: string }) => d.id)).toEqual(["eng", "prod"]);
-    expect(fetchFalso).not.toHaveBeenCalled();
-  });
-
-  it("e com o destino escolhido, publica naquele", async () => {
-    await configurarDestinos([
-      { id: "eng", operacao: "documento", endpoint: "https://gw/eng", rotulo: "Eng" },
-      { id: "prod", operacao: "documento", endpoint: "https://gw/prod", rotulo: "Prod" },
-    ]);
-    fetchFalso.mockResolvedValue(resposta({ linkExterno: "https://wiki/x" }));
-
-    const r = await publicar({ markdown: "# doc", destinoId: "prod" });
-
-    expect(r.statusCode).toBe(200);
-    expect(fetchFalso.mock.calls[0][0]).toBe("https://gw/prod");
-  });
-
-  it("destino de OUTRA operação não serve para documento", async () => {
-    // O `operacao` é o que torna a lista utilizável: um endereço de ADR não
-    // sabe receber um documento, e mandar mesmo assim seria erro do produto.
-    await configurarDestinos([{ id: "adr", operacao: "adr", endpoint: "https://gw/adr", rotulo: "ADR" }]);
-
-    expect((await publicar({ markdown: "# doc" })).statusCode).toBe(409);
-  });
-
-  it("markdown vazio é 400 — não há documento para publicar", async () => {
-    await configurarDestinos([{ id: "c", operacao: "documento", endpoint: "https://gw/c", rotulo: "C" }]);
-
-    expect((await publicar({ markdown: "" })).statusCode).toBe(400);
-  });
-
-  it("falha do outro lado é 502, não 500 — muda onde a pessoa procura o problema", async () => {
-    await configurarDestinos([{ id: "c", operacao: "documento", endpoint: "https://gw/c", rotulo: "Confluence" }]);
-    fetchFalso.mockResolvedValue(resposta({ erro: "sem permissão" }, false, 403));
-
-    const r = await publicar({ markdown: "# doc" });
-
-    expect(r.statusCode).toBe(502);
-    expect(r.json().erro).toMatch(/Confluence respondeu HTTP 403/);
-  });
-
-  it("quebra que não existe é 404", async () => {
-    const r = await app.inject({
+describe("a fiação de publicação (SPEC-107 G2)", () => {
+  it("sem destino de documento, a fiação nem existe — e executá-la responde com o nome", async () => {
+    await configurarDestinos([]);
+    const emVigor = (await app.inject({ method: "GET", url: "/fluxos" })).json() as { fluxos: { id: string }[] };
+    expect(emVigor.fluxos.some((f) => f.id.startsWith("publicar-documento"))).toBe(false);
+    expect((await executarPublicacao()).statusCode).toBe(404);
+    // E a rota antiga está MORTA.
+    const rotaMorta = await app.inject({
       method: "POST",
-      url: "/quebras/00000000-0000-0000-0000-000000000000/documento/publicar",
-      payload: { markdown: "# doc" } as never,
+      url: `/quebras/${idDaQuebra}/documento/publicar`,
+      payload: { markdown: "# x" },
       cookies: { gerador_sessao: sessao },
     });
+    expect(rotaMorta.statusCode).toBe(404);
+  });
 
-    expect(r.statusCode).toBe(404);
+  it("com UM destino: publica a especificação da demanda, e o link volta para ela (SPEC-106 C)", async () => {
+    await configurarDestinos([CONFLUENCE]);
+    fetchFalso.mockResolvedValue(resposta({ linkExterno: "https://wiki/q-1", atualizada: true }));
+
+    const r = await executarPublicacao();
+    expect(r.statusCode).toBe(200);
+    const corpo = r.json() as { nos: { noId: string; estado: string; erro?: string }[]; saidas: Record<string, Record<string, unknown>> };
+    expect(corpo.nos.map((n) => [n.noId, n.estado])).toEqual([
+      ["demanda", "sucesso"],
+      ["publica", "sucesso"],
+      ["grava", "sucesso"],
+    ]);
+    // O payload leva a identidade da página e o markdown persistido — e o
+    // `desatualizado` que o atalho calculou.
+    const enviado = JSON.parse(fetchFalso.mock.calls[0][1].body as string) as Record<string, unknown>;
+    expect(enviado).toMatchObject({
+      demandaId: idDaQuebra,
+      demandaTitulo: "Busca por SKU",
+      markdown: "# Especificação\n\ncorpo",
+      desatualizado: true,
+    });
+    expect(corpo.saidas["publica"].linkExterno).toBe("https://wiki/q-1");
+    expect(corpo.saidas["publica"].atualizada).toBe(true);
+    // SPEC-106 C — a demanda LEMBRA onde o documento mora.
+    const [linha] = await db.select({ link: quebras.documentoLinkExterno }).from(quebras).where(eq(quebras.id, idDaQuebra));
+    expect(linha.link).toBe("https://wiki/q-1");
+  });
+
+  it("§348 — o espaço do destino viaja no corpo, como o gateway sempre mandou", async () => {
+    await configurarDestinos([{ ...CONFLUENCE, espaco: "ENG" }]);
+    fetchFalso.mockResolvedValue(resposta({ linkExterno: "https://wiki/eng/q-1" }));
+
+    await executarPublicacao();
+    const enviado = JSON.parse(fetchFalso.mock.calls[0][1].body as string) as Record<string, unknown>;
+    expect(enviado.espaco).toBe("ENG");
+  });
+
+  it("com MAIS de um destino: uma fiação POR destino, e ninguém escolhe sozinho", async () => {
+    await configurarDestinos([
+      { ...CONFLUENCE, id: "eng", rotulo: "Wiki eng" },
+      { ...CONFLUENCE, id: "prod", rotulo: "Wiki prod" },
+    ]);
+    const emVigor = (await app.inject({ method: "GET", url: "/fluxos" })).json() as { fluxos: { id: string }[] };
+    const daPublicacao = emVigor.fluxos.filter((f) => f.id.startsWith("publicar-documento")).map((f) => f.id);
+    expect(daPublicacao.sort()).toEqual(["publicar-documento-eng", "publicar-documento-prod"]);
+    // O id "sem sufixo" não existe: o atalho da tela recusa escolher e diz
+    // isso à pessoa — publicar no primeiro seria o pior desfecho.
+    expect((await executarPublicacao("publicar-documento")).statusCode).toBe(404);
+
+    fetchFalso.mockResolvedValue(resposta({ linkExterno: "https://wiki/prod/q-1" }));
+    const explicita = await executarPublicacao("publicar-documento-prod");
+    expect(explicita.statusCode).toBe(200);
+    expect(String(fetchFalso.mock.calls[0][0])).toBe("https://gw.casa/confluence");
+  });
+
+  it("§9.3 — demanda sem especificação gerada: o nó publica barra com o nome do que faltou", async () => {
+    await configurarDestinos([CONFLUENCE]);
+    await db.update(quebras).set({ especificacao: null }).where(eq(quebras.id, idDaQuebra));
+
+    const r = await executarPublicacao();
+    const porNo = Object.fromEntries((r.json() as { nos: { noId: string; estado: string; erro?: string }[] }).nos.map((n) => [n.noId, n]));
+    expect(porNo["publica"].estado).toBe("falhou");
+    expect(porNo["publica"].erro).toContain('"markdown"');
+    // E nada foi mandado nem gravado.
+    expect(fetchFalso).not.toHaveBeenCalled();
+    const [linha] = await db.select({ link: quebras.documentoLinkExterno }).from(quebras).where(eq(quebras.id, idDaQuebra));
+    expect(linha.link).toBeNull();
+  });
+
+  it("gateway com HTTP 403: o nó falha com o status, e o grava nem roda", async () => {
+    await configurarDestinos([CONFLUENCE]);
+    fetchFalso.mockResolvedValue(resposta({ erro: "sem permissão" }, false, 403));
+
+    const r = await executarPublicacao();
+    const porNo = Object.fromEntries((r.json() as { nos: { noId: string; estado: string; erro?: string }[] }).nos.map((n) => [n.noId, n]));
+    expect(porNo["publica"].estado).toBe("falhou");
+    expect(porNo["publica"].erro).toContain("HTTP 403");
+    expect(porNo["grava"].estado).toBe("nao-executado");
+  });
+
+  it("demanda desconhecida: o nó de projeto falha com o nome dela", async () => {
+    await configurarDestinos([CONFLUENCE]);
+    const r = await executarPublicacao("publicar-documento", {
+      demanda: { demandaId: "00000000-0000-4000-8000-000000000000" },
+    });
+    const porNo = Object.fromEntries((r.json() as { nos: { noId: string; estado: string; erro?: string }[] }).nos.map((n) => [n.noId, n]));
+    expect(porNo["demanda"].estado).toBe("falhou");
+    expect(porNo["demanda"].erro).toContain("não conheço a demanda");
   });
 });
