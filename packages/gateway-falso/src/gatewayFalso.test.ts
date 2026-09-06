@@ -113,8 +113,12 @@ describe("gateway falso (SPEC-74 fatia A — o mesmo dublê, noutro endereço)",
     expect(dados.nos[0].tipo).toBe("fila");
     // O caminho do campo entra no texto: é o que deixa um teste afirmar que o
     // campo CERTO recebeu o texto certo, e é disso que o E2E depende.
-    expect(dados.nos[0].rotulo).toBe(`${MARCA_GATEWAY_FALSO} (nos[0].rotulo)`);
-    expect(dados.nos[1].rotulo).toBe(`${MARCA_GATEWAY_FALSO} (nos[1].rotulo)`);
+    // SPEC-107 G5b — o valor carrega TAMBÉM a assinatura do pedido (⟨…⟩):
+    // sem ela, dois pedidos diferentes com o mesmo schema colidiam na mesma
+    // resposta, e a prova de identidade da esteira ficou verde com o prompt
+    // adulterado. A âncora do teste continua a MARCA + o caminho do campo.
+    expect(dados.nos[0].rotulo).toMatch(new RegExp(`^${MARCA_GATEWAY_FALSO} ⟨[0-9a-z]{1,4}⟩ \\(nos\\[0\\]\\.rotulo\\)$`));
+    expect(dados.nos[1].rotulo).toMatch(new RegExp(`^${MARCA_GATEWAY_FALSO} ⟨[0-9a-z]{1,4}⟩ \\(nos\\[1\\]\\.rotulo\\)$`));
   });
 
   it("lê o schema do PROMPT quando o dialeto é json_object (que não o manda no corpo)", async () => {

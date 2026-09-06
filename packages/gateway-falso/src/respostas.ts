@@ -91,7 +91,7 @@ export function marcadoresConhecidos(): [TipoDePedido, string][] {
  * devolve sempre a mesma resposta — e dois pedidos diferentes, respostas
  * diferentes.
  */
-function semente(texto: string): number {
+export function semente(texto: string): number {
   let h = 2166136261;
   for (let i = 0; i < texto.length; i++) {
     h ^= texto.charCodeAt(i);
@@ -252,7 +252,15 @@ export function plausivel(schema: unknown, sementeDoPedido: number, caminho = ""
   }
 
   const lista = VOCABULARIO[chave] ?? GENERICO;
-  return escolher(lista, n);
+  // SPEC-107 G5b — a ASSINATURA da semente no texto, não só no índice.
+  //
+  // `escolher(lista, n)` reduz a semente a `n % len`, e as listas são
+  // pequenas: um delta de semente múltiplo do tamanho colide TODOS os campos
+  // de uma vez — medido de verdade: a prova de identidade da SPEC-105 F
+  // ficou VERDE com o prompt adulterado (§248 mordeu o instrumento, não o
+  // produto). "Dois pedidos diferentes, respostas diferentes" só vale com a
+  // semente escrita na resposta.
+  return `${escolher(lista, n)} ⟨${(n >>> 0).toString(36).slice(-4)}⟩`;
 }
 
 /**
