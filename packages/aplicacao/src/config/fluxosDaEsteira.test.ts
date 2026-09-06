@@ -15,23 +15,50 @@ import { PAPEIS_PADRAO } from "./normalizacao.js";
  * na configuração reordena o fluxo sozinho.
  */
 describe("fluxoDaEsteira", () => {
-  it("os quatro papéis de fábrica viram a cadeia na ordem do array", () => {
+  it("SPEC-107 G5 — a esteira completa: demanda → papéis na ordem → grava", () => {
     const fluxo = fluxoDaEsteira(PAPEIS_PADRAO)!;
     expect(fluxo.id).toBe(ID_DO_FLUXO_DA_ESTEIRA);
     expect(fluxo.origem).toBe("fabrica");
-    expect(planoDoFluxo(fluxo).ordem).toEqual(["po", "arquiteto", "especialista", "qa"]);
-    // O encadeamento é o `acumuladas` da revisão, agora visível: o texto de
-    // cada papel entra no seguinte com a chave do papel de ORIGEM.
-    expect(fluxo.arestas[0]).toEqual({ de: "po", para: "arquiteto", mapeamento: [{ saida: "texto", entrada: "po" }] });
+    expect(planoDoFluxo(fluxo).ordem).toEqual(["demanda", "po", "arquiteto", "especialista", "qa", "grava"]);
+    // A FILA entra no primeiro papel vinda da demanda, com os contextos.
+    expect(fluxo.arestas[0]).toEqual({
+      de: "demanda",
+      para: "po",
+      mapeamento: [
+        { saida: "filaDaEsteira", entrada: "fila" },
+        { saida: "contextoEpico", entrada: "contextoEpico" },
+        { saida: "contextoDoProduto", entrada: "contextoDoProduto" },
+      ],
+    });
+    // O encadeamento é o `acumuladas` da revisão atravessando o grafo: a fila
+    // (com as respostas acumuladas) segue de papel em papel.
+    expect(fluxo.arestas[1].de).toBe("po");
+    expect(fluxo.arestas[1].para).toBe("arquiteto");
+    expect(fluxo.arestas[1].mapeamento).toContainEqual({ saida: "fila", entrada: "fila" });
+    expect(fluxo.arestas[1].mapeamento).toContainEqual({ saida: "respostasItens", entrada: "respostasItens" });
+    // E o destino grava as sugestões PENDENTES na demanda (§5.5).
+    expect(fluxo.arestas).toContainEqual({
+      de: "qa",
+      para: "grava",
+      mapeamento: [{ saida: "respostasItens", entrada: "respostasItens" }],
+    });
+    expect(fluxo.arestas).toContainEqual({
+      de: "demanda",
+      para: "grava",
+      mapeamento: [{ saida: "demandaId", entrada: "demandaId" }],
+    });
   });
 
   it("papel desligado fica fora da cadeia — como fica fora da revisão", () => {
     const papeis = PAPEIS_PADRAO.map((p) => (p.id === "arquiteto" ? { ...p, ativo: false } : p));
     const fluxo = fluxoDaEsteira(papeis)!;
-    expect(planoDoFluxo(fluxo).ordem).toEqual(["po", "especialista", "qa"]);
+    expect(planoDoFluxo(fluxo).ordem).toEqual(["demanda", "po", "especialista", "qa", "grava"]);
     expect(fluxo.arestas.map((a) => [a.de, a.para])).toEqual([
+      ["demanda", "po"],
       ["po", "especialista"],
       ["especialista", "qa"],
+      ["qa", "grava"],
+      ["demanda", "grava"],
     ]);
   });
 

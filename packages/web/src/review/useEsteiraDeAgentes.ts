@@ -25,15 +25,12 @@ export const ROTULO_PAPEL: Record<GrupoFicha, string> = {
   qa: "QA",
 };
 
-/** Quantos itens vão numa chamada só ao modelo (SPEC-24 Fase E — achado real
- * do usuário: "uma chamada por item está muito lento; passe todo o material
- * em uma chamada única por agente, e com 20-30 itens rode em grupos de 5-10
- * com recuperação do contexto"). 5, não 10: a resposta do lote inteiro tem
- * que caber na janela de saída do modelo local sem truncar — com os campos
- * do Especialista (checklist inteiro por item) 10 itens estouram fácil.
- * Cada lote recebe o prompt completo de novo (contexto do épico + contexto
- * de nós por item) — é a "recuperação do contexto" entre grupos. */
-export const TAM_LOTE_ESTEIRA = 5;
+/** Quantos itens vão numa chamada só ao modelo (SPEC-24 Fase E). O NÚMERO
+ * mudou de casa (aplicacao, SPEC-107 G5): a fiação semeada corta os mesmos
+ * lotes, e dois tetos divergiriam na primeira mudança (§263). A justificativa
+ * medida (janela de saída do modelo local) vive lá. */
+import { TAM_LOTE_ESTEIRA } from "@gerador/aplicacao";
+export { TAM_LOTE_ESTEIRA };
 
 /** Um item da fila carrega os placeholders JÁ separados por papel — quem
  * monta isso (`ReviewScreen.montarFilaEsteira`) decide, a partir da ficha,

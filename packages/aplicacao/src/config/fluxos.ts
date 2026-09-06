@@ -209,20 +209,60 @@ export function fluxoDaEsteira(papeis: PapelConfigurado[]): FluxoEmVigor | null 
   const ativos = papeis.filter((p) => p.ativo);
   if (ativos.length === 0) return null;
 
-  const nos: NoDoFluxo[] = ativos.map((papel, i) => ({
-    id: papel.id,
-    tipo: "agente",
-    refId: papel.id,
-    posicao: { x: 60 + i * 260, y: 120 },
-    parametros: {},
-  }));
-  const arestas: ArestaDoFluxo[] = ativos.slice(1).map((papel, i) => ({
-    de: ativos[i].id,
-    para: papel.id,
-    // A chave de entrada é o papel de ORIGEM: no prompt do seguinte, o que
-    // chegou aparece como "- po: …" — a mesma forma do encadeamento da revisão.
-    mapeamento: [{ saida: "texto", entrada: ativos[i].id }],
-  }));
+  /**
+   * SPEC-107 G5 — a esteira COMPLETA: `projeto.filaDaEsteira → agentes →
+   * projeto(respostasItens)`. A FILA viaja pelas arestas (um item por
+   * atividade, placeholders por papel, acumuladas em `respostasExistentes`) e
+   * cada agente corre o papel dele em modo pipeline — os mesmos lotes, o
+   * mesmo prompt e o mesmo esquema da revisão (§263). O destino grava as
+   * sugestões PENDENTES na demanda (§5.5, decidida pelo usuário: o
+   * julgamento fica na demanda).
+   */
+  const nos: NoDoFluxo[] = [
+    { id: "demanda", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 60, y: 120 }, parametros: {} },
+    ...ativos.map((papel, i) => ({
+      id: papel.id,
+      tipo: "agente" as const,
+      refId: papel.id,
+      posicao: { x: 340 + i * 260, y: 120 },
+      parametros: {},
+    })),
+    {
+      id: "grava",
+      tipo: "projeto",
+      refId: REF_DO_PROJETO,
+      posicao: { x: 340 + ativos.length * 260, y: 120 },
+      parametros: {},
+    },
+  ];
+  const DO_PIPELINE = [
+    { saida: "fila", entrada: "fila" },
+    { saida: "respostasItens", entrada: "respostasItens" },
+    { saida: "contextoEpico", entrada: "contextoEpico" },
+    { saida: "contextoDoProduto", entrada: "contextoDoProduto" },
+  ];
+  const arestas: ArestaDoFluxo[] = [
+    {
+      de: "demanda",
+      para: ativos[0].id,
+      mapeamento: [
+        { saida: "filaDaEsteira", entrada: "fila" },
+        { saida: "contextoEpico", entrada: "contextoEpico" },
+        { saida: "contextoDoProduto", entrada: "contextoDoProduto" },
+      ],
+    },
+    ...ativos.slice(1).map((papel, i) => ({
+      de: ativos[i].id,
+      para: papel.id,
+      mapeamento: DO_PIPELINE,
+    })),
+    {
+      de: ativos[ativos.length - 1].id,
+      para: "grava",
+      mapeamento: [{ saida: "respostasItens", entrada: "respostasItens" }],
+    },
+    { de: "demanda", para: "grava", mapeamento: [{ saida: "demandaId", entrada: "demandaId" }] },
+  ];
 
   return {
     id: ID_DO_FLUXO_DA_ESTEIRA,

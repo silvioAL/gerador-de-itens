@@ -16892,3 +16892,51 @@ client-side da bancada.
   ida ao servidor. A leitura anterior fica de pé enquanto a nova não chega.
 - Execuções de ensaio agora aparecem no histórico de execuções de fluxos e
   na auditoria — a bancada ganhou rastro.
+
+## §381 — SPEC-107 G5a: a esteira NASCE na fiação — e nada morre ainda
+
+**A quinta morte da §3.1 é a maior, e começa pelo nascimento.** A recusa da
+SPEC-105 §7 fica de pé à letra: *"a revisão continua rodando pela esteira de
+sempre — ela só troca de motor quando a prova da SPEC-105 F (resultado
+idêntico item a item) passar."* Esta rodada constrói o motor novo INTEIRO
+sem desligar o velho; a prova é a próxima rodada (G5b), e só depois dela
+vem a morte (G5c).
+
+**A decisão §5.5, respondida pelo usuário**: a confirmação campo a campo
+(SPEC-35) fica **NA DEMANDA**, como hoje — o canvas ganha a execução; o
+julgamento não muda de casa. "O motor migra, o julgamento fica."
+
+**Por que tudo mudou de casa antes de nascer** (§263, seis funções): o
+dublê determinístico semeia a resposta com o prompt INTEIRO (FNV-1a), então
+"resultado idêntico item a item" não é tolerância — é bit-exato. A única
+arquitetura que prova isso é UMA letra: `montarFilaDaEsteira`,
+`filaDaEsteiraDaDemanda`, `corpoDoLote`/`itensDoPapel`/`TAM_LOTE_ESTEIRA`,
+`correrPapelPelaFila`, `contextoEpicoCompleto` e a régua
+`respostaConfirmada` agora vivem na aplicação, e a ReviewScreen DELEGA — os
+171 testes da revisão passaram sem mudar em cada passo da mudança.
+
+**A fiação completa**:
+- `fluxoDaEsteira` refeito: `projeto(filaDaEsteira, contextos) → papéis na
+  ordem → projeto(respostasItens)`. A FILA viaja pelas arestas com as
+  acumuladas em `respostasExistentes` — o `acumuladas` da revisão
+  atravessando o grafo, POR ITEM.
+- O executor `agente` ganhou o modo PIPELINE: fila chegou → lotes de 5,
+  `montarPedidoPipeline`, esquema item→campo, pelo MESMO funil
+  (`completarEstruturado`) da rota `/ia/pipeline/:papel`. Falha total
+  derruba o nó; parcial segue nomeada (§193). O modo texto continua para
+  fluxos declarados.
+- A FONTE emite `filaDaEsteira` (derivar → fichas → fila, no servidor) +
+  `contextoEpico` + `contextoDoProduto` (§9.3: ausente fica fora).
+- O DESTINO grava sugestão PENDENTE (`origem: "sugerido"`,
+  `confirmado: false`) via `aplicarRespostasNaDemanda` — nunca por cima do
+  confirmado: corrida velha não apaga julgamento novo.
+
+**Verdade nova nos testes**: o po agora TEM entrada (a fila) — quem barra
+sem demanda é a fonte, com o nome (§9.3 uma camada antes); o teste do
+server que afirmava o contrário foi atualizado.
+
+**Próximas rodadas**: G5b — o E2E da prova (revisão real vs fiação sobre a
+MESMA demanda, `respostasItens` idênticas item a item contra o dublê, no
+molde da equivalência da derivação); G5c — a morte do motor client
+(`useEsteiraDeAgentes`/`acumuladas`/lotes) e da tela como superfície
+própria, com o vivo equivalente no canvas.

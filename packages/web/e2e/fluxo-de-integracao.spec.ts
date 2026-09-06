@@ -138,7 +138,8 @@ test("fatia C: desenhar, ligar, mapear — e o ciclo trava com a mensagem do des
     // SPEC-106 — a esteira aparece DERIVADA dos papéis: os quatro nós na
     // ordem, banner de derivado, edição travada até "editar uma cópia".
     await page.getByTestId("seletor-de-fluxo").selectOption("esteira-de-agentes");
-    await expect(page.locator(".react-flow__node")).toHaveCount(4);
+    // SPEC-107 G5 — a esteira derivada é COMPLETA: demanda → 4 papéis → grava.
+    await expect(page.locator(".react-flow__node")).toHaveCount(6);
     await expect(page.getByTestId("fluxo-derivado")).toBeVisible();
     await expect(page.getByTestId("add-agente")).toBeDisabled();
 

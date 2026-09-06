@@ -1,5 +1,7 @@
-import type { ValorSpec } from "@gerador/engine";
-import type { FichaItem, FichaPlaceholder } from "@gerador/engine";
+import type { FichaItem, FichaPlaceholder, ValorSpec } from "@gerador/engine";
+// SPEC-107 G5 — a régua de "confirmado" mudou para a aplicação (a fila da
+// fiação usa a MESMA, §263); daqui só se re-exporta para os consumidores.
+import { respostaConfirmada } from "@gerador/aplicacao";
 
 /**
  * SPEC-44 — a contagem de pendências da revisão, pura. É a régua ÚNICA:
@@ -9,10 +11,7 @@ import type { FichaItem, FichaPlaceholder } from "@gerador/engine";
  * "campo vazio" (ninguém escreveu) são coisas diferentes e a frase diz qual.
  */
 
-/** Mesma régua do semáforo de prontidão: manual OU sugerido+confirmado. */
-export function respostaConfirmada(resp: ValorSpec | undefined): boolean {
-  return !!resp && (resp.origem === "manual" || resp.confirmado === true);
-}
+export { respostaConfirmada };
 
 /** Os placeholders da ficha, achatados na ordem das seções (PO, Arquiteto,
  * Especialista, QA) — mesma ordem de `placeholdersPorPapel` da revisão. */
