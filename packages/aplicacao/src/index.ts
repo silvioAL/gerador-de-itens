@@ -41,10 +41,13 @@ export {
   type MetodoDoGateway,
 } from "./config/normalizacao.js";
 
-/** SPEC-81 fatia C — ler os ADRs da casa, marcados como importados. */
+/** SPEC-81 fatia C — ler os ADRs da casa, marcados como importados. A leitura
+ * em si virou o executor genérico de conector (SPEC-107 G3); o que fica é a
+ * CONVERSÃO pura, agora consumida pelo web. */
 export {
   comoDecisao,
   lacunasDaDecisaoImportada,
+  sanearAdrsExternos,
   statusDe,
   type AdrExterno,
   type LeitorDeAdr,

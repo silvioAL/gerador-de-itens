@@ -1,13 +1,33 @@
-import { act, renderHook, waitFor } from "@testing-library/react";
+﻿import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Decisao } from "@gerador/engine";
 import { comoTexto, useAdrNaEntrada } from "./useAdrNaEntrada";
-import { apiExportador, apiQuebras } from "../api/client";
+import { apiCatalogoDeConectores, apiExportador, apiQuebras } from "../api/client";
 
 vi.mock("../api/client", () => ({
   apiExportador: { obter: vi.fn() },
-  apiQuebras: { importarAdr: vi.fn() },
+  apiQuebras: { buscar: vi.fn() },
+  apiCatalogoDeConectores: { executar: vi.fn() },
 }));
+
+/** SPEC-107 G3 — o hook lê pelo executor genérico de conector; o mock fala a
+ * língua dele: `{saida: {adrs}, ausentes}` cru do gateway + a quebra (para o
+ * dedupe por `importadoDe`). */
+function gatewayDevolve(adrs: unknown[], decisoesDaQuebra: unknown[] = []) {
+  vi.mocked(apiCatalogoDeConectores.executar).mockResolvedValue({ conector: "a", saida: { adrs }, ausentes: [] } as never);
+  vi.mocked(apiQuebras.buscar).mockResolvedValue({ decisoes: decisoesDaQuebra } as never);
+}
+
+const ADR_CRU = {
+  id: "ADR-14",
+  titulo: "Integração com bureau",
+  escolhida: "Fila",
+  porque: "desacopla o tempo do parceiro",
+  status: "aceita",
+  autor: "ana",
+  em: "2026-08-29T10:00:00.000Z",
+  link: "https://adr/14",
+};
 
 function decisao(p: Partial<Decisao> = {}): Decisao {
   return {
@@ -39,7 +59,7 @@ describe("o ADR entra na conversa como a voz entra (SPEC-81 fatia D)", () => {
      * trazer o ADR depois de digitar é complementar, e apagar o que a pessoa
      * escreveu seria perda de trabalho por um clique.
      */
-    vi.mocked(apiQuebras.importarAdr).mockResolvedValue({ decisoes: [{ decisao: decisao(), lacunas: [] }], origem: "ADR" });
+    gatewayDevolve([ADR_CRU]);
     let entrada = "preciso de uma vitrine que aguente o pico";
     const setEntrada = vi.fn((f: unknown) => {
       entrada = typeof f === "function" ? (f as (a: string) => string)(entrada) : (f as string);
@@ -57,7 +77,7 @@ describe("o ADR entra na conversa como a voz entra (SPEC-81 fatia D)", () => {
     // O hook só escreve na caixa. Se ele chamasse o modelo, texto vindo de um
     // repositório de terceiro iria para a IA sem passar pelo olho de ninguém —
     // e viraria nó errado no diagrama sem ninguém saber de onde veio.
-    vi.mocked(apiQuebras.importarAdr).mockResolvedValue({ decisoes: [{ decisao: decisao(), lacunas: [] }], origem: "ADR" });
+    gatewayDevolve([ADR_CRU]);
     const setEntrada = vi.fn();
 
     const { result } = renderHook(() => useAdrNaEntrada(setEntrada, "q-1"));
@@ -91,7 +111,25 @@ describe("o ADR entra na conversa como a voz entra (SPEC-81 fatia D)", () => {
      * Anexar um cabeçalho sem linha nenhuma encheria a caixa de ruído — e, pior,
      * sugeriria ao modelo que existe algo decidido quando não existe.
      */
-    vi.mocked(apiQuebras.importarAdr).mockResolvedValue({ decisoes: [], origem: "ADR" });
+    gatewayDevolve([]);
+    const setEntrada = vi.fn();
+
+    const { result } = renderHook(() => useAdrNaEntrada(setEntrada, "q-1"));
+    await waitFor(() => expect(result.current.podeTrazerAdr).toBe(true));
+    await act(() => result.current.trazer());
+
+    expect(setEntrada).not.toHaveBeenCalled();
+    expect(result.current.ultimoTotal).toBe(0);
+  });
+
+  it("o que a demanda JÁ importou não volta — o dedupe é por importadoDe", async () => {
+    /**
+     * SPEC-107 G3 — este dedupe morava na rota `POST /quebras/:id/adr/importar`;
+     * com a rota morta, ele vive aqui, sobre a MESMA chave: o `importadoDe` que
+     * `comoDecisao` grava a partir do link do ADR. Sem ele, cada clique
+     * despejaria as mesmas decisões de novo na caixa.
+     */
+    gatewayDevolve([ADR_CRU], [{ importadoDe: "https://adr/14" }]);
     const setEntrada = vi.fn();
 
     const { result } = renderHook(() => useAdrNaEntrada(setEntrada, "q-1"));
@@ -103,7 +141,8 @@ describe("o ADR entra na conversa como a voz entra (SPEC-81 fatia D)", () => {
   });
 
   it("falha do gateway vira mensagem, não exceção", async () => {
-    vi.mocked(apiQuebras.importarAdr).mockRejectedValue(new Error("nenhum destino de ADR configurado"));
+    vi.mocked(apiQuebras.buscar).mockResolvedValue({ decisoes: [] } as never);
+    vi.mocked(apiCatalogoDeConectores.executar).mockRejectedValue(new Error("nenhum destino de ADR configurado"));
 
     const { result } = renderHook(() => useAdrNaEntrada(vi.fn(), "q-1"));
     await waitFor(() => expect(result.current.podeTrazerAdr).toBe(true));

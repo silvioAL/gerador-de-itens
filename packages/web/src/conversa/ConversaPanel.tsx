@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { DiagramaConfig } from "@gerador/engine";
 import type { SugestoesDeStack } from "../api/client";
-import { apiIa, type DiagramaProposto, apiExportador } from "../api/client";
+import { apiCatalogoDeConectores, apiIa, type DiagramaProposto, apiExportador } from "../api/client";
 import { AnexoDeImagem, type ImagemAnexada } from "./AnexoDeImagem";
 import { BotaoFalar } from "./BotaoFalar";
 import { useVozNaEntrada } from "./useVozNaEntrada";
@@ -128,6 +128,9 @@ export function ConversaPanel({
    */
   const [podeImportarDocumento, setPodeImportarDocumento] = useState(false);
   const [rotuloDoDocumento, setRotuloDoDocumento] = useState("");
+  // SPEC-107 G3 — o id do destino É o id do conector de fábrica: é por ele
+  // que o executor genérico lê a página (a rota dedicada morreu).
+  const [conectorDeDocumento, setConectorDeDocumento] = useState<string | null>(null);
   useEffect(() => {
     let cancelado = false;
     apiExportador
@@ -137,11 +140,13 @@ export function ConversaPanel({
         const destino = (c.destinos ?? []).find((d) => d.operacao === "documentoExterno" && !!d.endpoint);
         setPodeImportarDocumento(!!destino);
         setRotuloDoDocumento(destino?.rotulo?.trim() ?? "");
+        setConectorDeDocumento(destino?.id ?? null);
       })
       .catch(() => {
         if (!cancelado) {
           setPodeImportarDocumento(false);
           setRotuloDoDocumento("");
+          setConectorDeDocumento(null);
         }
       });
     return () => {
@@ -187,16 +192,22 @@ export function ConversaPanel({
    */
   async function importarDoLink() {
     const link = linkImportado.trim();
-    if (!link || importando) return;
+    if (!link || importando || !conectorDeDocumento) return;
     setImportando(true);
     setErro(null);
     try {
-      const doc = await apiIa.lerDocumentoExterno(link);
+      // SPEC-107 G3 — o executor genérico de conector lê a página. A régua
+      // do §349 §6 fica AQUI: 200 com conteúdo vazio é o mesmo que não achar,
+      // e a mensagem diz o que conferir em vez de encher a caixa com nada.
+      const { saida, ausentes } = await apiCatalogoDeConectores.executar(conectorDeDocumento, { link });
+      const conteudo = typeof saida.conteudo === "string" ? saida.conteudo.trim() : "";
+      if (ausentes.includes("conteudo") || !conteudo) {
+        throw new Error("não foi possível ler esse endereço, ou a página veio vazia — confira o link e o acesso do gateway");
+      }
+      const titulo = typeof saida.titulo === "string" && saida.titulo.trim() ? saida.titulo.trim() : "";
       // O título vai junto porque é contexto que a página tem e o corpo às
       // vezes não repete — e a proveniência do desenho cita a origem.
-      setEntrada((atual) =>
-        [atual.trim(), doc.titulo ? `# ${doc.titulo}` : "", doc.conteudo].filter(Boolean).join("\n\n")
-      );
+      setEntrada((atual) => [atual.trim(), titulo ? `# ${titulo}` : "", conteudo].filter(Boolean).join("\n\n"));
       setLinkImportado("");
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível ler o documento.");

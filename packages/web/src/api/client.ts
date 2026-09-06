@@ -319,11 +319,9 @@ export const apiQuebras = {
    * **texto na caixa da conversa**. A decisão nunca fica flutuando: ela nasce
    * ancorada, quando o desenho nasce da conversa.
    */
-  importarAdr: (id: string) =>
-    requisitar<{ decisoes: { decisao: Decisao; lacunas: string[] }[]; origem: string }>(
-      `/quebras/${id}/adr/importar`,
-      { method: "POST" }
-    ),
+  // SPEC-107 G3 — `importarAdr` morreu com a rota: a conversa lê os ADRs pelo
+  // executor genérico de conector e converte com as funções puras da
+  // aplicação (ver `useAdrNaEntrada`).
   // SPEC-107 G2 — `publicarDocumento` morreu como rota dedicada: publicar é a
   // fiação semeada "publicar-documento" (ver `publicarDocumento` no App).
 };
@@ -755,21 +753,8 @@ export const apiIa = {
    * jamais o chamava. O que volta é TEXTO, que alimenta `proporDiagrama` como
    * descrição — o mesmo caminho de quem digita à mão.
    */
-  lerDocumentoExterno: async (link: string): Promise<{ conteudo: string; titulo?: string; link?: string }> => {
-    const resposta = await fetch(`${BASE_URL}/ia/documento-externo`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ link }),
-    });
-    if (!resposta.ok) {
-      const corpo = await resposta.json().catch(() => ({}));
-      throw new Error(
-        typeof corpo.erro === "string" ? corpo.erro : `Não foi possível ler o documento (HTTP ${resposta.status}).`
-      );
-    }
-    return resposta.json();
-  },
+  // SPEC-107 G3 — `lerDocumentoExterno` morreu com a rota: a conversa lê a
+  // página pelo executor genérico de conector (apiCatalogoDeConectores).
   proporDiagrama: async (
     pedido: PedidoDiagramaIa,
     onTexto?: (acumulado: string) => void
