@@ -1646,6 +1646,62 @@ export interface RespostaDeExecucao {
   aguardandoEm?: string;
 }
 
+/** SPEC-107 fatia D — os eventos do modo AO VIVO (NDJSON, um por linha). */
+export type EventoDaExecucao =
+  | { tipo: "no-comecou"; noId: string }
+  | { tipo: "texto"; noId: string; pedaco: string }
+  | { tipo: "no-terminou"; rastro: RastroDoNoExecutado }
+  | { tipo: "fim"; resposta: RespostaDeExecucao };
+
+/**
+ * Lê o stream NDJSON de uma execução ao vivo — a técnica de
+ * `sugerirPipeline`, com linhas em vez de texto cru. Devolve a resposta do
+ * evento `fim` (a mesma forma do modo one-shot).
+ */
+async function lerExecucaoAoVivo(
+  resposta: Response,
+  onEvento?: (evento: EventoDaExecucao) => void
+): Promise<RespostaDeExecucao> {
+  if (!resposta.ok) {
+    const corpo = (await resposta.json().catch(() => ({}))) as { erro?: string };
+    throw new Error(corpo.erro ?? `o servidor respondeu ${resposta.status}`);
+  }
+  // Fluxo vazio não streama nada — o servidor responde JSON de uma vez.
+  if ((resposta.headers.get("content-type") ?? "").includes("application/json")) {
+    return (await resposta.json()) as RespostaDeExecucao;
+  }
+
+  let fim: RespostaDeExecucao | null = null;
+  let resto = "";
+  const processar = (bloco: string) => {
+    resto += bloco;
+    const linhas = resto.split("\n");
+    resto = linhas.pop() ?? "";
+    for (const linha of linhas) {
+      if (!linha.trim()) continue;
+      const evento = JSON.parse(linha) as EventoDaExecucao;
+      if (evento.tipo === "fim") fim = evento.resposta;
+      onEvento?.(evento);
+    }
+  };
+
+  const leitor = resposta.body?.getReader();
+  if (leitor) {
+    const decodificador = new TextDecoder();
+    for (;;) {
+      const { done, value } = await leitor.read();
+      if (done) break;
+      processar(decodificador.decode(value, { stream: true }));
+    }
+  } else {
+    // Runtime de teste sem ReadableStream — o corpo chega inteiro.
+    processar(await resposta.text());
+  }
+  processar("\n");
+  if (!fim) throw new Error("a execução terminou sem o evento de fim — o stream caiu no meio");
+  return fim;
+}
+
 export const apiExecucaoDeFluxo = {
   /** O executor é do SERVIDOR (§7): daqui só vai o disparo e o time.
    * `ateNo` = executar só até aquele nó (o fecho de ancestrais) — inspecionar
@@ -1655,6 +1711,31 @@ export const apiExecucaoDeFluxo = {
       `/fluxos/${encodeURIComponent(id)}/executar`,
       { method: "POST", body: JSON.stringify({ ...(timeId ? { timeId } : {}), ...(ateNo ? { ateNo } : {}) }) }
     ),
+  /** SPEC-107 fatia D — a mesma execução, ASSISTÍVEL: um evento por nó
+   * (começou/terminou) e o texto do agente streamando, como na revisão. */
+  executarAoVivo: async (
+    id: string,
+    timeId: string | undefined,
+    ateNo: string | undefined,
+    onEvento: (evento: EventoDaExecucao) => void
+  ): Promise<RespostaDeExecucao> => {
+    const resposta = await fetch(`${BASE_URL}/fluxos/${encodeURIComponent(id)}/executar`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ aoVivo: true, ...(timeId ? { timeId } : {}), ...(ateNo ? { ateNo } : {}) }),
+    });
+    return lerExecucaoAoVivo(resposta, onEvento);
+  },
+  continuarAoVivo: async (execucaoId: string, onEvento: (evento: EventoDaExecucao) => void): Promise<RespostaDeExecucao> => {
+    const resposta = await fetch(`${BASE_URL}/fluxos/execucoes/${encodeURIComponent(execucaoId)}/continuar`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ aoVivo: true }),
+    });
+    return lerExecucaoAoVivo(resposta, onEvento);
+  },
   /** SPEC-107 fatia C — o gate: continuar roda só o resto; descartar fecha. */
   continuar: (execucaoId: string) =>
     requisitar<RespostaDeExecucao>(`/fluxos/execucoes/${encodeURIComponent(execucaoId)}/continuar`, {

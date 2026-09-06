@@ -46,7 +46,9 @@ const LADOS = [Position.Top, Position.Right, Position.Bottom, Position.Left];
 export function NodeCard({ data, selected }: NodeProps & { data: NodeCardData }) {
   const { no, config, arestas, quebraTime, marca } = data;
   const cfg = config.nodeTypes[no.type];
-  const prontidao = cfg ? calcularProntidao(cfg.spec, no, arestas) : null;
+  // SPEC-107 fatia D — tipo sem `spec` (o vocabulário do FLUXO) não tem o que
+  // medir: bolinha de prontidão ali seria um verde que não afirma nada.
+  const prontidao = cfg && cfg.spec.length > 0 ? calcularProntidao(cfg.spec, no, arestas) : null;
   const corNivel = prontidao ? CORES_NIVEL[prontidao.nivel] : "#94a3b8";
   const corTipo = cfg?.color ?? "#94a3b8";
   const IconeTipo = cfg?.icon ? MAPA_ICONES[cfg.icon] : undefined;
@@ -89,16 +91,18 @@ export function NodeCard({ data, selected }: NodeProps & { data: NodeCardData })
           letterSpacing: 0.4,
         }}
       >
-        <span
-          title={`Prontidão: ${prontidao?.nivel ?? "desconhecida"}`}
-          style={{
-            width: 9,
-            height: 9,
-            borderRadius: "50%",
-            background: corNivel,
-            flexShrink: 0,
-          }}
-        />
+        {prontidao && (
+          <span
+            title={`Prontidão: ${prontidao.nivel}`}
+            style={{
+              width: 9,
+              height: 9,
+              borderRadius: "50%",
+              background: corNivel,
+              flexShrink: 0,
+            }}
+          />
+        )}
         <span
           aria-hidden="true"
           title={cfg?.label ?? no.type}
@@ -150,17 +154,21 @@ export function NodeCard({ data, selected }: NodeProps & { data: NodeCardData })
             ⏱ {marca.numero}
           </span>
         )}
-        <span
-          style={{
-            fontSize: 10,
-            padding: "1px 6px",
-            borderRadius: 999,
-            background: no.status === "novo" ? "rgba(56, 189, 248, 0.16)" : "var(--painel)",
-            color: no.status === "novo" ? "var(--acento)" : "var(--texto-fraco)",
-          }}
-        >
-          {no.status}
-        </span>
+        {/* SPEC-107 fatia D — nó sem status (o fluxo) não ganha pílula vazia:
+            novo/existente é vocabulário da MESA. */}
+        {no.status && (
+          <span
+            style={{
+              fontSize: 10,
+              padding: "1px 6px",
+              borderRadius: 999,
+              background: no.status === "novo" ? "rgba(56, 189, 248, 0.16)" : "var(--painel)",
+              color: no.status === "novo" ? "var(--acento)" : "var(--texto-fraco)",
+            }}
+          >
+            {no.status}
+          </span>
+        )}
       </div>
 
       <div style={{ padding: "8px 10px" }}>

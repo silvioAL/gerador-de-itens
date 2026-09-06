@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { desc, eq } from "drizzle-orm";
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { randomUUID } from "node:crypto";
 import {
   CAMPO_GLOBAL,
@@ -136,8 +136,10 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     provedor: Awaited<ReturnType<ReturnType<typeof criarResolvedorDeProvedor>>>;
     timeId: string | undefined;
     email: string;
+    /** SPEC-107 fatia D — o texto do agente streamando, POR NÓ (§2.4-9). */
+    aoVivo?: { texto(noId: string, pedaco: string): void };
   }) {
-    const { fluxo, papeis, catalogo, provedor, timeId, email } = opcoes;
+    const { fluxo, papeis, catalogo, provedor, timeId, email, aoVivo } = opcoes;
     // O vocabulário do time (diagrama + campos + regras + tokens) só é montado
     // se o fluxo TEM nó de função — e uma vez por execução: montar por nó
     // abriria a porta para dois nós derivarem com vocabulários diferentes.
@@ -174,7 +176,11 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
             "",
             "Produza o artefato que o seu papel pede a partir dessas entradas. Responda só com o artefato, sem comentários.",
           ].join("\n");
-          const texto = await provedor.completar(prompt);
+          // O `onTexto` é a técnica do `executarPedido` (routes/ia.ts), por
+          // nó: quem assiste ao fluxo vê o agente ESCREVENDO, como na revisão.
+          const texto = await provedor.completar(prompt, {
+            onTexto: (pedaco) => aoVivo?.texto(no.id, pedaco),
+          });
           return { texto };
         },
         funcao: async (no, entradas) => executarFuncao(no.refId, entradas, await contextoDeFuncao()),
@@ -223,9 +229,33 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     } satisfies Parameters<typeof executarFluxo>[1];
   }
 
+  /**
+   * SPEC-107 fatia D — **o escritor de NDJSON, na técnica do `executarPedido`**
+   * (routes/ia.ts): o `writeHead` é ADIADO até o primeiro evento (falha antes
+   * do primeiro byte ainda vira status HTTP com motivo), e os headers já
+   * montados são COPIADOS — sem `reply.getHeaders()`, os de CORS somem e o
+   * navegador bloqueia a leitura (achado real, documentado lá).
+   */
+  function escritorDeEventos(reply: FastifyReply) {
+    let comecou = false;
+    return {
+      comecou: () => comecou,
+      escrever(evento: Record<string, unknown>) {
+        if (!comecou) {
+          comecou = true;
+          reply.raw.writeHead(200, {
+            ...(reply.getHeaders() as Record<string, string>),
+            "content-type": "application/x-ndjson; charset=utf-8",
+          });
+        }
+        reply.raw.write(`${JSON.stringify(evento)}\n`);
+      },
+    };
+  }
+
   app.post("/fluxos/:id/executar", { preHandler: exigirNivel(db, "operar", timeDoCorpo) }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    const { ateNo } = (req.body ?? {}) as { ateNo?: string };
+    const { ateNo, aoVivo } = (req.body ?? {}) as { ateNo?: string; aoVivo?: boolean };
     const timeId = timeDoCorpo(req) ?? undefined;
     const email = req.usuario!.email;
 
@@ -247,9 +277,34 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
 
     const [catalogo, provedor] = await Promise.all([catalogoDeConectores(db, diretorioConfig), resolverProvedor()]);
 
+    // Fatia D — com `aoVivo`, a resposta vira um stream de eventos por nó.
+    const eventos = aoVivo ? escritorDeEventos(reply) : null;
+
     let resultado;
     try {
-      resultado = await executarFluxo(fluxo, criarExecutores({ fluxo, papeis, catalogo, provedor, timeId, email }), { ateNo });
+      resultado = await executarFluxo(
+        fluxo,
+        criarExecutores({
+          fluxo,
+          papeis,
+          catalogo,
+          provedor,
+          timeId,
+          email,
+          ...(eventos ? { aoVivo: { texto: (noId, pedaco) => eventos.escrever({ tipo: "texto", noId, pedaco }) } } : {}),
+        }),
+        {
+          ateNo,
+          ...(eventos
+            ? {
+                aoVivo: {
+                  noComecou: (no) => eventos.escrever({ tipo: "no-comecou", noId: no.id }),
+                  noTerminou: (rastro) => eventos.escrever({ tipo: "no-terminou", rastro }),
+                },
+              }
+            : {}),
+        }
+      );
     } finally {
       await provedor?.descartar().catch(() => undefined);
     }
@@ -276,7 +331,7 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
       .returning({ id: fluxoExecucoes.id });
     registrarAuditoria(db, { email, acao: "executar", recurso: "fluxos", recursoId: id });
 
-    return {
+    const resposta = {
       fluxo: id,
       execucaoId: linha.id,
       hash,
@@ -284,6 +339,14 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
       saidas: resultado.saidas,
       ...(resultado.aguardandoEm ? { aguardandoEm: resultado.aguardandoEm } : {}),
     };
+    // No modo ao vivo o "fim" fecha o stream com a MESMA resposta do modo
+    // one-shot — quem consome os dois caminhos lê a mesma forma no final.
+    if (eventos) {
+      eventos.escrever({ tipo: "fim", resposta });
+      reply.raw.end();
+      return;
+    }
+    return resposta;
   });
 
   /**
@@ -336,12 +399,34 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     const saidasSuspensas = (execucao.saidas ?? {}) as Record<string, Record<string, unknown>>;
 
     const [catalogo, provedor] = await Promise.all([catalogoDeConectores(db, diretorioConfig), resolverProvedor()]);
+    // Fatia D — continuar também é assistível: o resto roda ao vivo.
+    const eventos = (req.body as { aoVivo?: boolean } | null)?.aoVivo ? escritorDeEventos(reply) : null;
     let resultado;
     try {
-      resultado = await executarFluxo(fluxo, criarExecutores({ fluxo, papeis, catalogo, provedor, timeId, email }), {
-        ateNo: execucao.ateNo ?? undefined,
-        retomarDe: { saidas: saidasSuspensas, concluidos },
-      });
+      resultado = await executarFluxo(
+        fluxo,
+        criarExecutores({
+          fluxo,
+          papeis,
+          catalogo,
+          provedor,
+          timeId,
+          email,
+          ...(eventos ? { aoVivo: { texto: (noId, pedaco) => eventos.escrever({ tipo: "texto", noId, pedaco }) } } : {}),
+        }),
+        {
+          ateNo: execucao.ateNo ?? undefined,
+          retomarDe: { saidas: saidasSuspensas, concluidos },
+          ...(eventos
+            ? {
+                aoVivo: {
+                  noComecou: (no) => eventos.escrever({ tipo: "no-comecou", noId: no.id }),
+                  noTerminou: (rastro) => eventos.escrever({ tipo: "no-terminou", rastro }),
+                },
+              }
+            : {}),
+        }
+      );
     } finally {
       await provedor?.descartar().catch(() => undefined);
     }
@@ -359,7 +444,7 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
       .where(eq(fluxoExecucoes.id, id));
     registrarAuditoria(db, { email, acao: "executar", recurso: "fluxos", recursoId: execucao.fluxoId });
 
-    return {
+    const resposta = {
       fluxo: execucao.fluxoId,
       execucaoId: id,
       hash: execucao.hash,
@@ -367,6 +452,12 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
       saidas: { ...saidasSuspensas, ...resultado.saidas },
       ...(resultado.aguardandoEm ? { aguardandoEm: resultado.aguardandoEm } : {}),
     };
+    if (eventos) {
+      eventos.escrever({ tipo: "fim", resposta });
+      reply.raw.end();
+      return;
+    }
+    return resposta;
   });
 
   /** O outro lado do gate: quem revisa pode DESCARTAR — a execução fecha sem

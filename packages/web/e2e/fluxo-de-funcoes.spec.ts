@@ -3,10 +3,9 @@ import { resolve } from "node:path";
 import { test, expect, type Page } from "@playwright/test";
 import { entrar } from "./auth";
 import { derivarNaMesa } from "./derivar";
-import { BASE_URL_GATEWAY_FALSO, CHAVE_GATEWAY_FALSO, MODELO_GATEWAY_FALSO } from "@gerador/gateway-falso";
+import { BASE_URL_GATEWAY_FALSO, CHAVE_GATEWAY_FALSO, DESENHO_DO_GATEWAY_FALSO, MODELO_GATEWAY_FALSO } from "@gerador/gateway-falso";
 
 const API = "http://localhost:4100";
-const GATEWAY_FALSO = "http://localhost:4123";
 
 /**
  * SPEC-107 fatia A — **as FUNÇÕES do sistema no fluxo, pela tela.**
@@ -23,26 +22,11 @@ const GATEWAY_FALSO = "http://localhost:4123";
  */
 test.describe.configure({ mode: "serial" });
 
-const MEUS_IDS = ["desenho-funcoes-e2e", "publica-funcoes-e2e"];
-
-async function declararConectores(page: Page, conectores: Record<string, unknown>[]) {
-  const atual = (await (await page.request.get(`${API}/config/conectores`)).json()).documento as {
-    conectores?: { id: string }[];
-  };
-  const dosOutros = (atual?.conectores ?? []).filter((c) => !MEUS_IDS.includes(c.id));
-  await page.request.put(`${API}/config/conectores`, {
-    data: { documento: { conectores: [...dosOutros, ...conectores] } },
-  });
-}
-
-async function limparMeusConectores(page: Page) {
-  const atual = (await (await page.request.get(`${API}/config/conectores`)).json()).documento as {
-    conectores?: { id: string }[];
-  };
-  await page.request.put(`${API}/config/conectores`, {
-    data: { documento: { conectores: (atual?.conectores ?? []).filter((c) => !MEUS_IDS.includes(c.id)) } },
-  });
-}
+// Este arquivo NÃO toca o documento global de conectores de propósito: as
+// fontes e destinos são o PROJETO real (fatia B) e as funções — dois arquivos
+// de spec fazendo read-modify-write do mesmo documento em paralelo se apagam
+// por lost update (medido na fatia D). As fiações com conector são provadas
+// em fluxo-de-integracao.spec.ts e nos testes de rota.
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
@@ -60,25 +44,14 @@ test("a fiação da derivação (modo b) roda pela tela, com o rastro gravando a
   test.setTimeout(120000);
   const original = (await (await page.request.get(`${API}/config/fluxos?timeId=time-portabilidade`)).json()).documento;
   try {
-    await declararConectores(page, [
-      {
-        id: "desenho-funcoes-e2e",
-        nome: "Desenho da casa (E2E)",
-        endpoint: `${GATEWAY_FALSO}/v1/desenho`,
-        entrada: [],
-        saida: [{ chave: "desenho", rotulo: "Desenho", tipo: "objeto", caminho: "$.desenho", obrigatorio: true }],
-      },
-      {
-        id: "publica-funcoes-e2e",
-        nome: "Publicação (E2E funções)",
-        endpoint: `${GATEWAY_FALSO}/v1/documento`,
-        entrada: [
-          { chave: "demandaId", rotulo: "Id", tipo: "texto", obrigatorio: true },
-          { chave: "markdown", rotulo: "Markdown", tipo: "texto", obrigatorio: true },
-        ],
-        saida: [{ chave: "linkExterno", rotulo: "Link", tipo: "texto", caminho: "$.linkExterno", obrigatorio: true }],
-      },
-    ]);
+    // A fonte é o PROJETO real (fatia B) — nenhuma escrita no documento
+    // GLOBAL de conectores: dois arquivos de spec fazendo read-modify-write
+    // nele em paralelo se apagam (lost update medido nesta fatia).
+    const criada = await page.request.post(`${API}/quebras`, {
+      data: { titulo: `entradas-no-rastro-e2e ${Date.now()}`, time: "time-portabilidade", diagrama: DESENHO_DO_GATEWAY_FALSO.diagrama },
+    });
+    expect(criada.status()).toBe(201);
+    const { id: demandaId } = (await criada.json()) as { id: string };
     // A credencial é UMA por organização e vários specs a gravam em paralelo —
     // a convenção da suíte (ia-hospedada.spec.ts:260): TODO save grava a
     // MESMA, com visão.
@@ -91,18 +64,16 @@ test("a fiação da derivação (modo b) roda pela tela, com o rastro gravando a
         documento: {
           fluxos: [
             {
-              id: "itens-de-fora-e2e",
-              nome: "Itens de um desenho de fora",
+              id: "itens-da-demanda-e2e",
+              nome: "Itens da demanda",
               nos: [
-                { id: "le", tipo: "conector", refId: "desenho-funcoes-e2e", posicao: { x: 0, y: 80 }, parametros: {} },
+                { id: "demanda", tipo: "projeto", refId: "projeto", posicao: { x: 0, y: 80 }, parametros: { demandaId } },
                 { id: "gera", tipo: "funcao", refId: "derivacao", posicao: { x: 240, y: 80 }, parametros: {} },
                 { id: "resume", tipo: "agente", refId: "especialista", posicao: { x: 480, y: 80 }, parametros: {} },
-                { id: "publica", tipo: "conector", refId: "publica-funcoes-e2e", posicao: { x: 720, y: 80 }, parametros: { demandaId: "itens-de-fora-e2e" } },
               ],
               arestas: [
-                { de: "le", para: "gera", mapeamento: [{ saida: "desenho", entrada: "desenho" }] },
+                { de: "demanda", para: "gera", mapeamento: [{ saida: "desenho", entrada: "desenho" }] },
                 { de: "gera", para: "resume", mapeamento: [{ saida: "itens", entrada: "itens" }] },
-                { de: "resume", para: "publica", mapeamento: [{ saida: "texto", entrada: "markdown" }] },
               ],
             },
           ],
@@ -112,29 +83,31 @@ test("a fiação da derivação (modo b) roda pela tela, com o rastro gravando a
 
     await page.goto("/#/fluxo");
     await expect(page.getByTestId("fluxo-screen")).toBeVisible();
-    await page.getByTestId("seletor-de-fluxo").selectOption("itens-de-fora-e2e");
-    await expect(page.locator(".react-flow__node")).toHaveCount(4);
-    // O cartão diz o que o nó É — "função do sistema", rótulo genérico (§2.3).
-    await expect(page.locator(`.react-flow__node[data-id="gera"]`)).toContainText("função do sistema");
+    await page.getByTestId("seletor-de-fluxo").selectOption("itens-da-demanda-e2e");
+    await expect(page.locator(".react-flow__node")).toHaveCount(3);
+    // O cartão diz o que o nó É — a família e o rótulo genérico (§2.3), no
+    // MESMO cartão da mesa (fatia D).
+    await expect(page.locator(`.react-flow__node[data-id="gera"]`)).toContainText("Função do sistema");
     await expect(page.locator(`.react-flow__node[data-id="gera"]`)).toContainText("Geração de itens");
+    await expect(page.locator(`.react-flow__node[data-id="demanda"]`)).toContainText("Projeto");
 
     await page.getByTestId("executar-fluxo").click();
     await expect(page.getByTestId("rastro-da-execucao")).toBeVisible({ timeout: 30000 });
-    for (const no of ["le", "gera", "resume", "publica"]) {
-      await expect(page.getByTestId(`rastro-${no}`)).toContainText("✓");
+    for (const no of ["demanda", "gera", "resume"]) {
+      await expect(page.getByTestId(`rastro-${no}`)).toContainText("✓", { timeout: 30000 });
     }
-    // Os itens saíram da função e a publicação devolveu o link.
+    // Os itens saíram da função, e o agente escreveu a partir deles.
     await expect(page.getByTestId("rastro-gera")).toContainText("itens");
-    await expect(page.getByTestId("rastro-publica")).toContainText("linkExterno");
+    await expect(page.getByTestId("artefato-resume")).toBeVisible();
 
     // §5.4 — o rastro PERSISTIDO guarda as entradas do nó de função (e só
     // dele): a âncora de "mesma fiação + mesmas entradas → mesmos itens".
-    const execucoes = (await (await page.request.get(`${API}/fluxos/itens-de-fora-e2e/execucoes`)).json()) as {
+    const execucoes = (await (await page.request.get(`${API}/fluxos/itens-da-demanda-e2e/execucoes`)).json()) as {
       execucoes: { nos: { noId: string; entradas?: Record<string, unknown> }[] }[];
     };
     const nos = Object.fromEntries(execucoes.execucoes[0].nos.map((n) => [n.noId, n]));
     expect(nos["gera"].entradas?.desenho).toBeDefined();
-    expect(nos["le"].entradas).toBeUndefined();
+    expect(nos["demanda"].entradas).toBeUndefined();
 
     // Regressão do defeito pego nesta fatia: o Executar da tela salvava a
     // esteira DERIVADA como declarada — congelando a cópia que ninguém pediu
@@ -145,7 +118,6 @@ test("a fiação da derivação (modo b) roda pela tela, com o rastro gravando a
     expect((doc?.fluxos ?? []).some((f) => f.id === "esteira-de-agentes")).toBe(false);
   } finally {
     await page.request.put(`${API}/config/fluxos`, { data: { documento: original, timeId: "time-portabilidade" } });
-    await limparMeusConectores(page);
   }
 });
 
@@ -190,15 +162,10 @@ test("o gate suspende, sobrevive ao F5 e continua do ponto exato", async ({ page
   test.setTimeout(120000);
   const original = (await (await page.request.get(`${API}/config/fluxos?timeId=time-portabilidade`)).json()).documento;
   try {
-    await declararConectores(page, [
-      {
-        id: "desenho-funcoes-e2e",
-        nome: "Desenho da casa (E2E)",
-        endpoint: `${GATEWAY_FALSO}/v1/desenho`,
-        entrada: [],
-        saida: [{ chave: "desenho", rotulo: "Desenho", tipo: "objeto", caminho: "$.desenho", obrigatorio: true }],
-      },
-    ]);
+    const criada = await page.request.post(`${API}/quebras`, {
+      data: { titulo: `gate-e2e ${Date.now()}`, time: "time-portabilidade", diagrama: DESENHO_DO_GATEWAY_FALSO.diagrama },
+    });
+    const { id: demandaId } = (await criada.json()) as { id: string };
     await page.request.put(`${API}/ia/credencial`, {
       data: { baseUrl: BASE_URL_GATEWAY_FALSO, chave: CHAVE_GATEWAY_FALSO, modelo: MODELO_GATEWAY_FALSO, visao: true },
     });
@@ -211,12 +178,12 @@ test("o gate suspende, sobrevive ao F5 e continua do ponto exato", async ({ page
               id: "gate-e2e",
               nome: "Fiação com gate",
               nos: [
-                { id: "le", tipo: "conector", refId: "desenho-funcoes-e2e", posicao: { x: 0, y: 80 }, parametros: {} },
+                { id: "demanda", tipo: "projeto", refId: "projeto", posicao: { x: 0, y: 80 }, parametros: { demandaId } },
                 { id: "gera", tipo: "funcao", refId: "derivacao", posicao: { x: 240, y: 80 }, parametros: {}, confirmacao: "aguardar" },
                 { id: "resume", tipo: "agente", refId: "especialista", posicao: { x: 480, y: 80 }, parametros: {} },
               ],
               arestas: [
-                { de: "le", para: "gera", mapeamento: [{ saida: "desenho", entrada: "desenho" }] },
+                { de: "demanda", para: "gera", mapeamento: [{ saida: "desenho", entrada: "desenho" }] },
                 { de: "gera", para: "resume", mapeamento: [{ saida: "itens", entrada: "itens" }] },
               ],
             },
@@ -251,7 +218,6 @@ test("o gate suspende, sobrevive ao F5 e continua do ponto exato", async ({ page
     await expect(page.getByTestId("rastro-resume")).toContainText("✓", { timeout: 30000 });
   } finally {
     await page.request.put(`${API}/config/fluxos`, { data: { documento: original, timeId: "time-portabilidade" } });
-    await limparMeusConectores(page);
   }
 });
 
@@ -362,15 +328,13 @@ test("o desenho importado vira proposta na demanda — o desenho dela fica intac
   expect([201, 409]).toContain((await page.request.post(`${API}/times`, { data: { timeId: TIME } })).status());
   const original = (await (await page.request.get(`${API}/config/fluxos?timeId=${TIME}`)).json()).documento;
   try {
-    await declararConectores(page, [
-      {
-        id: "desenho-funcoes-e2e",
-        nome: "Desenho da casa (E2E)",
-        endpoint: `${GATEWAY_FALSO}/v1/desenho`,
-        entrada: [],
-        saida: [{ chave: "desenho", rotulo: "Desenho", tipo: "objeto", caminho: "$.desenho", obrigatorio: true }],
-      },
-    ]);
+    // A ORIGEM tem desenho; o DESTINO nasce vazio e recebe a proposta —
+    // projeto nas duas pontas, nenhuma escrita no doc global de conectores.
+    const origem = (await (
+      await page.request.post(`${API}/quebras`, {
+        data: { titulo: `origem-da-proposta-e2e ${Date.now()}`, time: TIME, diagrama: DESENHO_DO_GATEWAY_FALSO.diagrama },
+      })
+    ).json()) as { id: string };
     const criada = await page.request.post(`${API}/quebras`, {
       data: { titulo: `recebe-proposta-e2e ${Date.now()}`, time: TIME, diagrama: { nodes: [], edges: [] } },
     });
@@ -386,7 +350,7 @@ test("o desenho importado vira proposta na demanda — o desenho dela fica intac
               id: "importa-desenho-e2e",
               nome: "Importa desenho da casa",
               nos: [
-                { id: "le", tipo: "conector", refId: "desenho-funcoes-e2e", posicao: { x: 0, y: 80 }, parametros: {} },
+                { id: "le", tipo: "projeto", refId: "projeto", posicao: { x: 0, y: 80 }, parametros: { demandaId: origem.id } },
                 { id: "propoe", tipo: "projeto", refId: "projeto", posicao: { x: 240, y: 80 }, parametros: { demandaId } },
               ],
               arestas: [{ de: "le", para: "propoe", mapeamento: [{ saida: "desenho", entrada: "desenho" }] }],
@@ -416,6 +380,5 @@ test("o desenho importado vira proposta na demanda — o desenho dela fica intac
     expect(quebra.variantes[0].diagrama.nodes.length).toBeGreaterThan(0);
   } finally {
     await page.request.put(`${API}/config/fluxos`, { data: { documento: original, timeId: TIME } });
-    await limparMeusConectores(page);
   }
 });

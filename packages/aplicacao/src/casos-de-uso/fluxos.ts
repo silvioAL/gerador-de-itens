@@ -83,6 +83,16 @@ export interface OpcoesDeExecucao {
    * revisão numa fiação são vários, não um.
    */
   retomarDe?: { saidas: Record<string, Record<string, unknown>>; concluidos: string[] };
+  /**
+   * SPEC-107 fatia D — **o vivo é feedback (§2.4-9)**: quem assiste precisa
+   * ver nó a nó acontecendo, não um "rodou" no fim. Os eventos saem na ordem
+   * da execução; o TEXTO do agente streama por outro canal (o `onTexto` do
+   * executor), porque pedaço de texto é do nó, não do laço.
+   */
+  aoVivo?: {
+    noComecou?(no: NoDoFluxo): void;
+    noTerminou?(rastro: RastroDoNo): void;
+  };
 }
 
 /** O nó pedido e todo mundo de quem ele depende, transitivamente. */
@@ -155,6 +165,7 @@ export async function executarFluxo(
         erro: `a origem "${origemRuim.de}" ${motivo} — entrada ausente não vira default`,
         duracaoMs: 0,
       });
+      opcoes.aoVivo?.noTerminou?.(rastro[rastro.length - 1]);
       continue;
     }
 
@@ -173,6 +184,7 @@ export async function executarFluxo(
     // deu certo.
     const entradasNoRastro = no.tipo === "funcao" ? { entradas: parametros } : {};
 
+    opcoes.aoVivo?.noComecou?.(no);
     const comecou = Date.now();
     try {
       const saida =
@@ -194,6 +206,7 @@ export async function executarFluxo(
         ...(typeof saida.linkExterno === "string" && saida.linkExterno ? { linkExterno: saida.linkExterno } : {}),
         ...entradasNoRastro,
       });
+      opcoes.aoVivo?.noTerminou?.(rastro[rastro.length - 1]);
       if (no.confirmacao === "aguardar") aguardandoEm = noId;
     } catch (erro) {
       // Regra 2 mora aqui, por omissão: nada de `throw` — o laço continua, e
@@ -208,6 +221,7 @@ export async function executarFluxo(
         duracaoMs: Date.now() - comecou,
         ...entradasNoRastro,
       });
+      opcoes.aoVivo?.noTerminou?.(rastro[rastro.length - 1]);
     }
   }
 
