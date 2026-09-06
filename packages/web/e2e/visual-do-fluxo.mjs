@@ -28,7 +28,9 @@ await pagina.getByLabel("Nome do fluxo novo").fill("Visual fatia A");
 await pagina.getByTestId("criar-fluxo").click();
 await pagina.getByTestId("add-funcao-derivacao").click();
 await pagina.getByTestId("add-funcao-ensaio").click();
-await pagina.getByTestId("contrato-da-funcao").waitFor({ timeout: 5000 });
+// SPEC-107 fatia B — o projeto na paleta, com o painel das duas direções.
+await pagina.getByTestId("add-projeto").click();
+await pagina.getByTestId("contrato-do-projeto").waitFor({ timeout: 5000 });
 
 for (const tema of ["claro", "escuro"]) {
   await pagina.evaluate((t) => {

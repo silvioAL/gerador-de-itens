@@ -73,7 +73,13 @@ function exigirObrigatorios(funcao: FuncaoDoSistema, entradas: Record<string, un
 }
 
 /** O `desenho` veio mapeado de qualquer lugar (modo b) — então a forma é
- * conferida aqui, com o erro dizendo o que se esperava (§9.3). */
+ * conferida aqui, com o erro dizendo o que se esperava (§9.3). Exportada na
+ * fatia B: o nó `projeto` como DESTINO confere a MESMA forma antes de gravar
+ * a proposta — dois validadores divergiriam na primeira mudança (§263). */
+export function comoDesenhoMapeado(valor: unknown): DesenhoMapeado {
+  return comoDesenho(valor);
+}
+
 function comoDesenho(valor: unknown): DesenhoMapeado {
   const bruto = valor as Partial<DesenhoMapeado> | null;
   const diagrama = bruto?.diagrama as Partial<Diagrama> | undefined;

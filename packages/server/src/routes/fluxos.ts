@@ -1,23 +1,32 @@
 import { createHash } from "node:crypto";
 import { desc, eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyRequest } from "fastify";
+import { randomUUID } from "node:crypto";
 import {
   CAMPO_GLOBAL,
   criarCasosDeUsoDeConfig,
+  criarCasosDeUsoDeItensGerados,
+  criarCasosDeUsoDeQuebras,
+  demandaAtiva,
+  erroSemDemanda,
   executarFluxo,
   executarFuncao,
   fluxosEmVigor,
   mensagemDeCiclo,
   normalizarPipelineAgentes,
   preambuloDoPapel,
+  saidaDoProjeto,
+  varianteProposta,
   type ContextoDasFuncoes,
   type Fluxo,
   type RastroDoNo,
 } from "@gerador/aplicacao";
 import type { OpcoesApp } from "../app.js";
 import { criarRepositorioDeConfigEmPostgres } from "../adaptadores/configEmPostgres.js";
+import { criarRepositorioDeItensGeradosEmPostgres } from "../adaptadores/itensGeradosEmPostgres.js";
+import { criarRepositorioDeQuebrasEmPostgres } from "../adaptadores/quebrasEmPostgres.js";
 import { executarConector } from "../adaptadores/executorDeConector.js";
-import { exigirNivel } from "../auth/niveis.js";
+import { exigirNivel, maiorNivel, nivelNoTime } from "../auth/niveis.js";
 import { organizacaoPadraoDe, recursosCurados, resolverPermissoes } from "../auth/permissoes.js";
 import { registrarAuditoria } from "../auditoria.js";
 import { catalogoDeConectores } from "../config/catalogoDeConectores.js";
@@ -178,6 +187,48 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
           return { texto };
         },
         funcao: async (no, entradas) => executarFuncao(no.refId, entradas, await contextoDeFuncao()),
+        /**
+         * SPEC-107 fatia B — a demanda como capacidade, nas duas direções.
+         * Sem `desenho` mapeado é FONTE; com, é DESTINO — e a escrita vira
+         * VARIANTE (proposta), nunca o diagrama da demanda (§2.4-14).
+         */
+        projeto: async (_no, entradas) => {
+          const casosQuebras = criarCasosDeUsoDeQuebras(criarRepositorioDeQuebrasEmPostgres(db));
+          const demandaId =
+            typeof entradas.demandaId === "string" && entradas.demandaId.trim() ? entradas.demandaId.trim() : null;
+
+          let quebra;
+          if (demandaId) {
+            quebra = await casosQuebras.obter(demandaId);
+            if (!quebra) throw new Error(`não conheço a demanda "${demandaId}"`);
+          } else {
+            // A "ativa" que o servidor consegue afirmar: a mais recentemente
+            // atualizada do time da execução (o aberto-agora é do navegador).
+            const ativa = demandaAtiva(await casosQuebras.listar(), timeId);
+            if (!ativa) throw erroSemDemanda(timeId);
+            quebra = (await casosQuebras.obter(ativa.id))!;
+          }
+
+          if (entradas.desenho !== undefined) {
+            // DESTINO. O gate da rota cobre o time do CORPO; a quebra que o
+            // `demandaId` aponta pode ser de outro — re-checa no time DELA.
+            const nivel = quebra.time ? await nivelNoTime(db, email, quebra.time) : await maiorNivel(db, email);
+            if (nivel !== "operar" && nivel !== "owner") {
+              throw new Error(
+                `escrever uma proposta na demanda "${quebra.id}" exige nível "operar" no time "${quebra.time ?? "(sem time)"}" — seu nível é "${nivel ?? "nenhum"}"`
+              );
+            }
+            const variante = varianteProposta(entradas.desenho, fluxo, `proposta-${randomUUID().slice(0, 8)}`, new Date().toISOString());
+            // Read-modify-write da quebra INTEIRA: `atualizar` normaliza o
+            // documento completo — mandar só `variantes` apagaria o resto.
+            await casosQuebras.atualizar(quebra.id, { ...quebra, variantes: [...(quebra.variantes ?? []), variante] });
+            registrarAuditoria(db, { email, acao: "atualizar", recurso: "quebras", recursoId: quebra.id });
+            return { demandaId: quebra.id, varianteId: variante.id, titulo: variante.titulo };
+          }
+
+          const itens = await criarCasosDeUsoDeItensGerados(criarRepositorioDeItensGeradosEmPostgres(db)).listarDaQuebra(quebra.id);
+          return saidaDoProjeto(quebra, itens);
+        },
       }, { ateNo });
     } finally {
       await provedor?.descartar().catch(() => undefined);

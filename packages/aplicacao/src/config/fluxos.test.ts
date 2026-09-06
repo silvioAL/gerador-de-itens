@@ -109,6 +109,11 @@ describe("validarEscritaFluxos (SPEC-35 + prova da fatia C)", () => {
       { fluxos: [{ id: "f", nos: [{ id: "a", tipo: "funcao", refId: "telepatia" }], arestas: [] }] },
       /a função "telepatia", que não existe \(funções: derivacao, ensaio\)/,
     ],
+    // SPEC-107 fatia B — o projeto não tem adaptador: refId é "projeto".
+    [
+      { fluxos: [{ id: "f", nos: [{ id: "a", tipo: "projeto", refId: "minha-demanda" }], arestas: [] }] },
+      /o refId precisa ser "projeto"/,
+    ],
   ])("recusa com o motivo: %j", (documento, motivo) => {
     expect(() => validarEscritaFluxos(documento)).toThrow(motivo);
   });
@@ -120,6 +125,12 @@ describe("validarEscritaFluxos (SPEC-35 + prova da fatia C)", () => {
   it("SPEC-107 fatia A — nó de função com refId do registro passa", () => {
     expect(() =>
       validarEscritaFluxos({ fluxos: [{ id: "f", nos: [{ id: "g", tipo: "funcao", refId: "derivacao" }], arestas: [] }] })
+    ).not.toThrow();
+  });
+
+  it("SPEC-107 fatia B — nó de projeto com refId \"projeto\" passa", () => {
+    expect(() =>
+      validarEscritaFluxos({ fluxos: [{ id: "f", nos: [{ id: "p", tipo: "projeto", refId: "projeto" }], arestas: [] }] })
     ).not.toThrow();
   });
 });

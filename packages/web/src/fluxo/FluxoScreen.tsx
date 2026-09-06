@@ -15,6 +15,8 @@ import "@xyflow/react/dist/style.css";
 import {
   FUNCOES_DO_SISTEMA,
   funcaoDoSistema,
+  PROJETO_DO_SISTEMA,
+  REF_DO_PROJETO,
   mensagemDeCiclo,
   NOME_DA_OPERACAO,
   OPERACOES_DO_GATEWAY,
@@ -67,7 +69,13 @@ function NoDeFluxoCard({ data, selected }: NodeProps<Node<DadosDoNo>>) {
     >
       <Handle type="target" position={Position.Left} />
       <div style={{ fontSize: 10.5, color: "var(--texto-fraco)" }}>
-        {data.tipo === "conector" ? "conector" : data.tipo === "funcao" ? "função do sistema" : "agente"}
+        {data.tipo === "conector"
+          ? "conector"
+          : data.tipo === "funcao"
+            ? "função do sistema"
+            : data.tipo === "projeto"
+              ? "projeto"
+              : "agente"}
       </div>
       <strong style={{ fontSize: 12.5 }}>{data.titulo}</strong>
       {data.subtitulo && <div style={{ fontSize: 11, color: "var(--texto-2)" }}>{data.subtitulo}</div>}
@@ -144,6 +152,7 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
     (no: Pick<NoDoFluxo, "tipo" | "refId" | "componente">) => {
       if (!no.refId) return no.componente && no.componente !== "livre" ? NOME_DA_OPERACAO[no.componente] : "(escolha o adaptador)";
       if (no.tipo === "funcao") return funcaoDoSistema(no.refId)?.nome ?? no.refId;
+      if (no.tipo === "projeto") return PROJETO_DO_SISTEMA.nome;
       return no.tipo === "conector"
         ? (catalogo.find((c) => c.id === no.refId)?.nome ?? no.refId)
         : (papeis.find((p) => p.id === no.refId)?.nome ?? no.refId);
@@ -234,6 +243,24 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
         nos: [
           ...f.nos,
           { id, tipo: "funcao", refId: funcaoId, posicao: { x: 80 + f.nos.length * 60, y: 80 + f.nos.length * 40 }, parametros: {} },
+        ],
+      };
+    });
+  }
+
+  /** SPEC-107 fatia B — o projeto também nasce pronto: o refId é o próprio
+   * "projeto"; a demanda é o parâmetro `demandaId` (vazio = a ativa). */
+  function adicionarProjeto() {
+    mudarFluxo((f) => {
+      let n = 1;
+      while (f.nos.some((no) => no.id === `projeto-${n}`)) n++;
+      const id = `projeto-${n}`;
+      setSelecao({ tipo: "no", id });
+      return {
+        ...f,
+        nos: [
+          ...f.nos,
+          { id, tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 80 + f.nos.length * 60, y: 80 + f.nos.length * 40 }, parametros: {} },
         ],
       };
     });
@@ -404,6 +431,10 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
                 + {f.nome}
               </button>
             ))}
+            {/* SPEC-107 fatia B — a demanda como capacidade, nas duas direções. */}
+            <button data-testid="add-projeto" disabled={!editavel} onClick={adicionarProjeto} style={botao}>
+              + {PROJETO_DO_SISTEMA.nome}
+            </button>
           </>
         )}
         <div style={{ flex: 1 }} />
@@ -619,6 +650,7 @@ function PainelDoNo({
   // SPEC-107 fatia A — a função É a capacidade: contrato do registro fechado,
   // sem adaptador a escolher.
   const funcao = no.tipo === "funcao" ? funcaoDoSistema(no.refId) : undefined;
+  const projeto = no.tipo === "projeto" ? PROJETO_DO_SISTEMA : undefined;
   // §368 — o COMPONENTE diz quais adaptadores servem: mesma operação para os
   // do gateway, endereço livre para "chamada externa", papéis para agente.
   const adaptadores =
@@ -635,9 +667,11 @@ function PainelDoNo({
           ? (no.componente && no.componente !== "livre" ? NOME_DA_OPERACAO[no.componente] : "Chamada externa")
           : no.tipo === "funcao"
             ? `Função do sistema — ${funcao?.nome ?? no.refId}`
-            : "Agente"}
+            : no.tipo === "projeto"
+              ? "Projeto (a demanda, nas duas direções)"
+              : "Agente"}
       </div>
-      {no.tipo !== "funcao" && (
+      {no.tipo !== "funcao" && no.tipo !== "projeto" && (
         <label style={{ fontSize: 11.5, display: "grid", gap: 2, marginBottom: 8 }}>
           Adaptador ({no.tipo === "agente" ? "papel da esteira" : "endereço do catálogo"})
           <select
@@ -692,6 +726,36 @@ function PainelDoNo({
             </label>
           ))}
         </>
+      )}
+      {projeto && (
+        <div data-testid="contrato-do-projeto" style={{ fontSize: 11.5, marginBottom: 8 }}>
+          <p style={{ color: "var(--texto-2)", margin: "0 0 6px" }}>{projeto.descricao}</p>
+          <label style={{ display: "grid", gap: 2, marginBottom: 6 }}>
+            Demanda (id) — vazio = a mais recentemente atualizada do time
+            <input
+              data-testid="demanda-do-projeto"
+              disabled={!podeEditar}
+              value={String(no.parametros.demandaId ?? "")}
+              onChange={(e) =>
+                onMudar({
+                  parametros: e.target.value
+                    ? { ...no.parametros, demandaId: e.target.value }
+                    : Object.fromEntries(Object.entries(no.parametros).filter(([k]) => k !== "demandaId")),
+                })
+              }
+              style={campo}
+            />
+          </label>
+          <div style={{ color: "var(--texto-fraco)" }}>
+            Saídas: {projeto.saida.map((c) => c.rotulo).join(", ")}
+          </div>
+          {/* §2.4-4 e §2.4-14 — quem age no mundo se anuncia, e escrever no
+              projeto NUNCA aplica direto: vira proposta (variante) na demanda. */}
+          <p style={{ color: "var(--texto-fraco)", margin: "6px 0 0" }}>
+            Com "desenho" mapeado numa aresta de entrada, este nó ESCREVE: o desenho vira uma variante
+            ("Proposta do fluxo…") — o desenho da demanda só muda se alguém adotar na mesa.
+          </p>
+        </div>
       )}
       {funcao && (
         <div data-testid="contrato-da-funcao" style={{ fontSize: 11.5, marginBottom: 8 }}>
@@ -818,13 +882,17 @@ function PainelDaAresta({
       ? (catalogo.find((c) => c.id === origem.refId)?.saida.map((s) => s.chave) ?? [])
       : origem?.tipo === "funcao"
         ? (funcaoDoSistema(origem.refId)?.saida.map((s) => s.chave) ?? [])
-        : ["texto"];
+        : origem?.tipo === "projeto"
+          ? PROJETO_DO_SISTEMA.saida.map((s) => s.chave)
+          : ["texto"];
   const entradasDoDestino =
     destino?.tipo === "conector"
       ? (catalogo.find((c) => c.id === destino.refId)?.entrada.map((s) => s.chave) ?? [])
       : destino?.tipo === "funcao"
         ? (funcaoDoSistema(destino.refId)?.entrada.map((s) => s.chave) ?? [])
-        : null;
+        : destino?.tipo === "projeto"
+          ? PROJETO_DO_SISTEMA.entrada.map((s) => s.chave)
+          : null;
 
   return (
     <div data-testid="painel-da-aresta">
