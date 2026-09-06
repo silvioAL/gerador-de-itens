@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http";
-import { respostaPlausivel } from "./respostas.js";
+import { respostaPlausivel, semente } from "./respostas.js";
 
 /**
  * SPEC-31 — um gateway compatível com a OpenAI, falso e determinístico, pra
@@ -502,6 +502,15 @@ export function criarGatewayFalso(opcoes: OpcoesGatewayFalso = {}): Server {
       }
 
       const schema = schemaPedido(corpo);
+      // SPEC-107 G5b — a ASSINATURA do pedido na resposta estruturada.
+      //
+      // O esqueleto preenchia a resposta SÓ pelo schema: dois pedidos
+      // diferentes com o mesmo schema colidiam na mesma resposta — e a prova
+      // de identidade da SPEC-105 F ("resultado idêntico item a item") ficou
+      // VERDE com o prompt ADULTERADO (§248 mordeu o instrumento, não o
+      // produto). "Mesmo pedido → mesma resposta; pedidos diferentes →
+      // respostas diferentes" só vale com a semente escrita no valor.
+      const assinatura = ` ⟨${(semente(textoDoPedido(corpo)) >>> 0).toString(36).slice(-4)}⟩`;
       const texto =
         modo === "plausivel"
           ? respostaPlausivel(textoDoPedido(corpo), schema)
@@ -509,7 +518,7 @@ export function criarGatewayFalso(opcoes: OpcoesGatewayFalso = {}): Server {
             // A marca de imagem entra TAMBÉM no caminho estruturado:
             // `/ia/diagrama` responde JSON, e marcar só o texto livre deixaria o
             // teste de imagem sem como afirmar nada (foi o que aconteceu).
-            ? JSON.stringify(preencher(schema, "", temImagem ? ` ${MARCA_VIU_IMAGEM}` : ""))
+            ? JSON.stringify(preencher(schema, "", `${temImagem ? ` ${MARCA_VIU_IMAGEM}` : ""}${assinatura}`))
             : `${MARCA_GATEWAY_FALSO}: ok${temImagem ? ` ${MARCA_VIU_IMAGEM}` : ""}`;
 
       res.writeHead(200, {

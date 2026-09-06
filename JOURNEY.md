@@ -16940,3 +16940,37 @@ MESMA demanda, `respostasItens` idênticas item a item contra o dublê, no
 molde da equivalência da derivação); G5c — a morte do motor client
 (`useEsteiraDeAgentes`/`acumuladas`/lotes) e da tela como superfície
 própria, com o vivo equivalente no canvas.
+
+## §382 — SPEC-107 G5b: a prova item a item — e o §248 que mordeu o instrumento
+
+**A prova da SPEC-105 F existe e é sensível**: o E2E
+`esteira-pela-fiacao.spec.ts` roda a MESMA demanda pelos dois motores — a
+revisão no navegador (o de sempre) e a fiação semeada `esteira-de-agentes`
+no servidor — contra o dublê determinístico, e compara `respostasItens`
+item a item, campo a campo. Verde. E o julgamento continua na demanda
+(§5.5): tudo segue sugestão pendente.
+
+**A parte que vale a rodada inteira: a prova nasceu CEGA, e o §248 a
+pegou.** Adulterar o prompt da fiação (um espaço; depois o prompt INTEIRO
+trocado por "PROMPT ADULTERADO 248") deixava a prova verde. A sonda achou
+a causa em duas camadas:
+
+1. `plausivel()` do dublê reduzia a semente a `n % len` de listas pequenas
+   — um delta múltiplo do tamanho colide TODOS os campos de uma vez;
+2. pior: o modo DEFAULT ("esqueleto", o que a suíte E2E usa) preenchia a
+   resposta SÓ pelo schema — `preencher(schema)` nem olhava o prompt. Dois
+   pedidos diferentes com o mesmo esquema → a MESMA resposta, sempre.
+
+Um dublê que colapsa entradas diferentes na mesma saída não prova
+identidade nenhuma — qualquer fiação "passaria". O conserto foi no
+instrumento: **a assinatura do pedido entra no valor** (`⟨hash⟩` da semente
+FNV do prompt, no sufixo de toda folha string dos dois modos), preservando
+a MARCA e o caminho do campo que os testes existentes ancoram. Com o
+instrumento consertado: prova limpa VERDE → um espaço no prompt da fiação
+VERMELHO → restaurado VERDE. Agora sim: valores iguais ⟺ prompts iguais,
+byte a byte.
+
+É a lição do §248 na forma mais pura que este projeto já viu: desligar a
+correção e ver o teste falhar não é burocracia — é o único jeito de saber
+se a prova prova. Sem esse passo, a G5c mataria a revisão com uma prova
+que aceitava qualquer coisa.

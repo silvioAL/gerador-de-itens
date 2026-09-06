@@ -241,7 +241,9 @@ describe("o modo esqueleto continua sendo o default (SPEC-74 fatia C)", () => {
       .map((l) => JSON.parse(l.slice(6)).choices[0].delta.content as string)
       .join("");
 
-    expect(JSON.parse(texto).label).toBe(`${MARCA_GATEWAY_FALSO} (label)`);
+    // SPEC-107 G5b — o esqueleto continua o default, agora com a assinatura
+    // do pedido no valor (⟨…⟩): a MARCA e o caminho seguem sendo a âncora.
+    expect(JSON.parse(texto).label).toMatch(new RegExp(`^${MARCA_GATEWAY_FALSO} ⟨[0-9a-z]{1,4}⟩ \\(label\\)$`));
 
     await new Promise<void>((resolve, reject) => outro.close((e) => (e ? reject(e) : resolve())));
   });
