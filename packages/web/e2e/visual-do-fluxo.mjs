@@ -31,6 +31,9 @@ await pagina.getByTestId("add-funcao-ensaio").click();
 // SPEC-107 fatia B — o projeto na paleta, com o painel das duas direções.
 await pagina.getByTestId("add-projeto").click();
 await pagina.getByTestId("contrato-do-projeto").waitFor({ timeout: 5000 });
+// SPEC-107 fatia E — a transformação, com o editor de campos.
+await pagina.getByTestId("add-transformacao").click();
+await pagina.getByTestId("campos-da-transformacao").waitFor({ timeout: 5000 });
 
 for (const tema of ["claro", "escuro"]) {
   await pagina.evaluate((t) => {

@@ -191,6 +191,13 @@ export {
 /** SPEC-107 fatia B — o PROJETO como nó, nas duas direções. */
 export { PROJETO_DO_SISTEMA, REF_DO_PROJETO, type ProjetoDoSistema } from "./config/projeto.js";
 export { demandaAtiva, erroSemDemanda, saidaDoProjeto, varianteProposta } from "./casos-de-uso/projetoNoFluxo.js";
+/** SPEC-107 fatia E — a transformação pura (o Set do n8n). */
+export {
+  sanearCamposDaTransformacao,
+  transformarEntradas,
+  validarCamposDaTransformacao,
+  type CampoDaTransformacao,
+} from "./casos-de-uso/transformacao.js";
 /** SPEC-107 fatia A — o montador ÚNICO do vocabulário do diagrama (web e
  * servidor mesclam os campos customizados pela mesma função, §263). */
 export {

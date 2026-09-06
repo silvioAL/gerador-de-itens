@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Background,
   Controls,
@@ -16,6 +16,7 @@ import {
   funcaoDoSistema,
   PROJETO_DO_SISTEMA,
   REF_DO_PROJETO,
+  sanearCamposDaTransformacao,
   mensagemDeCiclo,
   NOME_DA_OPERACAO,
   OPERACOES_DO_GATEWAY,
@@ -139,6 +140,11 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
       if (!no.refId) return no.componente && no.componente !== "livre" ? NOME_DA_OPERACAO[no.componente] : "(escolha o adaptador)";
       if (no.tipo === "funcao") return funcaoDoSistema(no.refId)?.nome ?? no.refId;
       if (no.tipo === "projeto") return PROJETO_DO_SISTEMA.nome;
+      if (no.tipo === "transformacao") {
+        // O cartão diz O QUE ela produz — as chaves de saída declaradas.
+        const campos = sanearCamposDaTransformacao((no as NoDoFluxo).parametros?.campos);
+        return campos.length > 0 ? campos.map((c) => c.chave).join(", ") : "(declare os campos)";
+      }
       return no.tipo === "conector"
         ? (catalogo.find((c) => c.id === no.refId)?.nome ?? no.refId)
         : (papeis.find((p) => p.id === no.refId)?.nome ?? no.refId);
@@ -243,6 +249,25 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
         nos: [
           ...f.nos,
           { id, tipo: "funcao", refId: funcaoId, posicao: { x: 80 + f.nos.length * 60, y: 80 + f.nos.length * 40 }, parametros: {} },
+        ],
+      };
+    });
+  }
+
+  /** SPEC-107 fatia E — a transformação nasce vazia e o Salvar cobra os
+   * campos (a mesma régua do nó sem adaptador): declarar o que sai é o que a
+   * torna uma transformação. */
+  function adicionarTransformacao() {
+    mudarFluxo((f) => {
+      let n = 1;
+      while (f.nos.some((no) => no.id === `transformacao-${n}`)) n++;
+      const id = `transformacao-${n}`;
+      setSelecao({ tipo: "no", id });
+      return {
+        ...f,
+        nos: [
+          ...f.nos,
+          { id, tipo: "transformacao", refId: "transformacao", posicao: { x: 80 + f.nos.length * 60, y: 80 + f.nos.length * 40 }, parametros: { campos: [] } },
         ],
       };
     });
@@ -524,6 +549,10 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
             <button data-testid="add-projeto" disabled={!editavel} onClick={adicionarProjeto} style={botao}>
               + {PROJETO_DO_SISTEMA.nome}
             </button>
+            {/* SPEC-107 fatia E — a transformação pura (o Set do n8n). */}
+            <button data-testid="add-transformacao" disabled={!editavel} onClick={adicionarTransformacao} style={botao}>
+              + Transformação
+            </button>
           </>
         )}
         <div style={{ flex: 1 }} />
@@ -783,6 +812,8 @@ function PainelDoNo({
   // sem adaptador a escolher.
   const funcao = no.tipo === "funcao" ? funcaoDoSistema(no.refId) : undefined;
   const projeto = no.tipo === "projeto" ? PROJETO_DO_SISTEMA : undefined;
+  const camposDaTransformacao =
+    no.tipo === "transformacao" ? sanearCamposDaTransformacao(no.parametros?.campos) : null;
   // §368 — o COMPONENTE diz quais adaptadores servem: mesma operação para os
   // do gateway, endereço livre para "chamada externa", papéis para agente.
   const adaptadores =
@@ -801,9 +832,11 @@ function PainelDoNo({
             ? `Função do sistema — ${funcao?.nome ?? no.refId}`
             : no.tipo === "projeto"
               ? "Projeto (a demanda, nas duas direções)"
-              : "Agente"}
+              : no.tipo === "transformacao"
+                ? "Transformação (pura — re-mapeia, extrai, concatena)"
+                : "Agente"}
       </div>
-      {no.tipo !== "funcao" && no.tipo !== "projeto" && (
+      {no.tipo !== "funcao" && no.tipo !== "projeto" && no.tipo !== "transformacao" && (
         <label style={{ fontSize: 11.5, display: "grid", gap: 2, marginBottom: 8 }}>
           Adaptador ({no.tipo === "agente" ? "papel da esteira" : "endereço do catálogo"})
           <select
@@ -859,6 +892,94 @@ function PainelDoNo({
             </label>
           ))}
         </>
+      )}
+      {camposDaTransformacao && (
+        <div data-testid="campos-da-transformacao" style={{ fontSize: 11.5, marginBottom: 8 }}>
+          {/* §2.4-6 — o implícito em voz alta: cada campo diz de onde sai. */}
+          <p style={{ color: "var(--texto-2)", margin: "0 0 6px" }}>
+            Cada campo de saída vem de um <strong>modelo</strong> ("{"{entrada}"}" concatena o que chegou) ou de um{" "}
+            <strong>caminho</strong> ("$.desenho.diagrama" extrai). Ausente não vira default — o nó falha com o nome
+            (§9.3).
+          </p>
+          {camposDaTransformacao.map((campoDaLista, i) => (
+            <div key={i} style={{ display: "grid", gap: 4, marginBottom: 8, padding: 6, border: "1px solid var(--borda)", borderRadius: 6 }}>
+              <input
+                aria-label={`Chave do campo ${i + 1}`}
+                disabled={!podeEditar}
+                value={campoDaLista.chave}
+                placeholder="chave de saída"
+                onChange={(e) =>
+                  onMudar({
+                    parametros: {
+                      ...no.parametros,
+                      campos: camposDaTransformacao.map((c, j) => (j === i ? { ...c, chave: e.target.value } : c)),
+                    },
+                  })
+                }
+                style={campo}
+              />
+              <input
+                aria-label={`Modelo do campo ${i + 1}`}
+                disabled={!podeEditar}
+                value={campoDaLista.modelo ?? ""}
+                placeholder='modelo — ex.: "RPS {rps} — pico {pico}"'
+                onChange={(e) =>
+                  onMudar({
+                    parametros: {
+                      ...no.parametros,
+                      campos: camposDaTransformacao.map((c, j) =>
+                        j === i ? { ...c, modelo: e.target.value || undefined } : c
+                      ),
+                    },
+                  })
+                }
+                style={campo}
+              />
+              <input
+                aria-label={`Caminho do campo ${i + 1}`}
+                disabled={!podeEditar}
+                value={campoDaLista.caminho ?? ""}
+                placeholder='caminho — ex.: "$.desenho.diagrama"'
+                onChange={(e) =>
+                  onMudar({
+                    parametros: {
+                      ...no.parametros,
+                      campos: camposDaTransformacao.map((c, j) =>
+                        j === i ? { ...c, caminho: e.target.value || undefined } : c
+                      ),
+                    },
+                  })
+                }
+                style={campo}
+              />
+              {podeEditar && (
+                <button
+                  onClick={() =>
+                    onMudar({
+                      parametros: { ...no.parametros, campos: camposDaTransformacao.filter((_c, j) => j !== i) },
+                    })
+                  }
+                  style={botaoMiudo}
+                >
+                  Remover campo
+                </button>
+              )}
+            </div>
+          ))}
+          {podeEditar && (
+            <button
+              data-testid="adicionar-campo-da-transformacao"
+              onClick={() =>
+                onMudar({
+                  parametros: { ...no.parametros, campos: [...camposDaTransformacao, { chave: `campo${camposDaTransformacao.length + 1}` }] },
+                })
+              }
+              style={botaoMiudo}
+            >
+              + campo de saída
+            </button>
+          )}
+        </div>
       )}
       {projeto && (
         <div data-testid="contrato-do-projeto" style={{ fontSize: 11.5, marginBottom: 8 }}>
@@ -1017,7 +1138,9 @@ function PainelDaAresta({
         ? (funcaoDoSistema(origem.refId)?.saida.map((s) => s.chave) ?? [])
         : origem?.tipo === "projeto"
           ? PROJETO_DO_SISTEMA.saida.map((s) => s.chave)
-          : ["texto"];
+          : origem?.tipo === "transformacao"
+            ? sanearCamposDaTransformacao(origem.parametros?.campos).map((c) => c.chave)
+            : ["texto"];
   const entradasDoDestino =
     destino?.tipo === "conector"
       ? (catalogo.find((c) => c.id === destino.refId)?.entrada.map((s) => s.chave) ?? [])

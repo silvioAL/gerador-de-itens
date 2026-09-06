@@ -16653,3 +16653,38 @@ rodando antes de o ResizeObserver medir os nós (enquadrar nós de tamanho zero
 manda o viewport para o nada). Os nós agora declaram `initialWidth`/`initialHeight`
 (o tamanho do cartão em repouso), que é o que o `fitView` usa quando a medida
 ainda não chegou. A suíte completa passou inteira na rodada seguinte.
+
+---
+
+## §375 — SPEC-107 fatia E: a transformação pura — o Set do n8n
+
+**A §5.2 disse e a fatia entrega: no modelo input/output, `transformacao` é
+consequência, não reserva.** O quinto tipo de nó fecha o conjunto da §1 — e
+entrou como a régua manda (§346): com executor no MESMO commit.
+
+- **Os campos de saída são DADO do nó** (`parametros.campos`): `modelo`
+  concatena/re-mapeia ("RPS {rps} — pico {pico}"); `caminho` extrai, pelo
+  MESMO subconjunto `$.a.b[0]` dos conectores (`lerCaminho`, §9.4 — um parser
+  só). Valor estruturado entra no modelo como JSON, nunca "[object Object]".
+- **§9.3 sem exceção**: placeholder sem entrada e caminho que não resolve
+  BARRAM com o nome do que faltou — uma transformação que inventasse `""`
+  seria a porta da invenção no meio da fiação. §248 cumprido (régua desligada
+  → vermelho → restaurada).
+- **A escrita recusa a meia-transformação** (SPEC-35): sem campos, campo sem
+  modelo nem caminho, caminho fora do subconjunto — tudo com o nome.
+- **Na tela**: nasce pela paleta com a família própria (rosa, ícone Split —
+  e a trava de contraste da fatia D mordeu DE NOVO: o rosa-700 era ilegível
+  no escuro, provando que o teste trava o que promete); o cartão mostra AS
+  CHAVES que ela produz; o painel edita os campos com o gesto ensinado; a
+  aresta que sai dela alimenta o select com as chaves declaradas.
+- **Prova**: unitária (concatenar+extrair, §9.3 duplo), rota (fiação
+  `projeto → transformacao` moldando resumo e extraindo os nós do desenho) e
+  E2E de paleta/painel.
+
+**O flake do rótulo pós-F5, isolado de vez**: com os nós renderizando (a
+mitigação do §374 funcionou), o que resta sob carga é o React Flow às vezes
+pular a primeira renderização da ARESTA no mount. O assert pós-F5 do spec da
+105 passou a provar a persistência na fonte da verdade (o mapeamento no
+documento salvo) — o rótulo visível continua afirmado no passo pré-F5, que
+nunca flakou. A renderização da aresta no mount fica como a dívida nomeada
+da rodada de robustez da suíte.

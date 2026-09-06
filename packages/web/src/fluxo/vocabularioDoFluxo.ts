@@ -1,4 +1,4 @@
-import type { DiagramaConfig, No } from "@gerador/engine";
+﻿import type { DiagramaConfig, No } from "@gerador/engine";
 import type { NoDoFluxo, TipoDeNoDoFluxo } from "@gerador/aplicacao";
 
 /**
@@ -20,6 +20,7 @@ export const CORES_POR_FAMILIA: Record<TipoDeNoDoFluxo, string> = {
   agente: "#9333ea",
   funcao: "#059669",
   projeto: "#b45309",
+  transformacao: "#db2777",
 };
 
 /** Ícones do catálogo curado da mesa (`canvas/icones.ts`) — reusar o mapa é o
@@ -29,6 +30,7 @@ export const ICONES_POR_FAMILIA: Record<TipoDeNoDoFluxo, string> = {
   agente: "Zap",
   funcao: "Cog",
   projeto: "Boxes",
+  transformacao: "Split",
 };
 
 export const ROTULOS_POR_FAMILIA: Record<TipoDeNoDoFluxo, string> = {
@@ -36,6 +38,7 @@ export const ROTULOS_POR_FAMILIA: Record<TipoDeNoDoFluxo, string> = {
   agente: "Agente",
   funcao: "Função do sistema",
   projeto: "Projeto",
+  transformacao: "Transformação",
 };
 
 /**

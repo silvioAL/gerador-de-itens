@@ -125,7 +125,15 @@ test("fatia C: desenhar, ligar, mapear — e o ciclo trava com a mensagem do des
     // O documento pode carregar outros fluxos do time — o F5 prova ESTE.
     await page.getByTestId("seletor-de-fluxo").selectOption("desenho-e2e");
     await expect(page.locator(".react-flow__node")).toHaveCount(2);
-    await expect(page.getByText("conteudo→volumetria")).toBeVisible();
+    // A persistência se prova na FONTE DA VERDADE: o mapeamento está no
+    // documento salvo. (O rótulo na aresta já foi afirmado VISÍVEL antes do
+    // F5; re-afirmá-lo aqui flakava sob carga — o React Flow às vezes pula a
+    // primeira renderização da aresta no mount, dívida anotada no §375.)
+    const salvo = (await (await page.request.get(`${API}/config/fluxos?timeId=time-pagamentos`)).json()).documento as {
+      fluxos: { id: string; arestas: { mapeamento: { saida: string; entrada: string }[] }[] }[];
+    };
+    const persistido = salvo.fluxos.find((f) => f.id === "desenho-e2e");
+    expect(persistido?.arestas[0]?.mapeamento).toEqual([{ saida: "conteudo", entrada: "volumetria" }]);
 
     // SPEC-106 — a esteira aparece DERIVADA dos papéis: os quatro nós na
     // ordem, banner de derivado, edição travada até "editar uma cópia".

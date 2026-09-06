@@ -1,4 +1,5 @@
 import { resolverDependencias, type Dependencia } from "@gerador/engine";
+import { sanearCamposDaTransformacao, validarCamposDaTransformacao } from "../casos-de-uso/transformacao.js";
 import { FUNCOES_DO_SISTEMA, funcaoDoSistema } from "./funcoes.js";
 import { REF_DO_PROJETO } from "./projeto.js";
 import { ConfigInvalida, OPERACOES_DO_GATEWAY, type OperacaoDoGateway, type PapelConfigurado } from "./normalizacao.js";
@@ -25,8 +26,10 @@ import { ConfigInvalida, OPERACOES_DO_GATEWAY, type OperacaoDoGateway, type Pape
  * `FUNCOES_DO_SISTEMA`, e o executor de fluxo a honra em processo. `projeto`
  * (fatia B) é a demanda como capacidade, nas duas direções — o `refId` é o
  * próprio `"projeto"` (não há adaptador a escolher; a demanda é parâmetro).
+ * `transformacao` (fatia E) é a pura — re-mapeia/extrai/concatena, sem IA;
+ * os campos de saída são dado do nó (`parametros.campos`).
  */
-export const TIPOS_DE_NO_DO_FLUXO = ["conector", "agente", "funcao", "projeto"] as const;
+export const TIPOS_DE_NO_DO_FLUXO = ["conector", "agente", "funcao", "projeto", "transformacao"] as const;
 export type TipoDeNoDoFluxo = (typeof TIPOS_DE_NO_DO_FLUXO)[number];
 
 export interface NoDoFluxo {
@@ -276,6 +279,13 @@ export function validarEscritaFluxos(documento: unknown): void {
         throw new ConfigInvalida(
           `no fluxo "${id}", o nó "${noId}" é de projeto e o refId precisa ser "${REF_DO_PROJETO}" (a demanda é o parâmetro "demandaId", não o adaptador)`
         );
+      }
+      // A transformação sem campos (ou com campo pela metade) só falharia na
+      // execução — a escrita recusa com o nome (SPEC-35, fatia E).
+      if (no.tipo === "transformacao") {
+        const campos = sanearCamposDaTransformacao((no.parametros as { campos?: unknown } | undefined)?.campos);
+        const problema = validarCamposDaTransformacao(campos, noId);
+        if (problema) throw new ConfigInvalida(`no fluxo "${id}", ${problema}`);
       }
       // Gate com valor desconhecido seria descartado em silêncio na leitura —
       // e um gate que some é escrita no mundo sem revisão (§2.4-14).
