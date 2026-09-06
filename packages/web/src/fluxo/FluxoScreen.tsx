@@ -102,7 +102,14 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [executando, setExecutando] = useState(false);
-  const [rastro, setRastro] = useState<{ nos: RastroDoNoExecutado[]; saidas: Record<string, Record<string, unknown>>; hash: string } | null>(null);
+  const [rastro, setRastro] = useState<{
+    nos: RastroDoNoExecutado[];
+    saidas: Record<string, Record<string, unknown>>;
+    hash: string;
+    execucaoId?: string;
+    /** SPEC-107 fatia C — a execução suspendeu no gate deste nó. */
+    aguardandoEm?: string;
+  } | null>(null);
   const [selecao, setSelecao] = useState<{ tipo: "no" | "aresta"; id: string } | null>(null);
   const [novoFluxoNome, setNovoFluxoNome] = useState("");
 
@@ -169,7 +176,7 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
         selected: selecao?.tipo === "no" && selecao.id === no.id,
         data: {
           titulo: rotuloDoRef(no),
-          subtitulo: `${no.pausarDepois ? "⏸ " : ""}${no.refId || "sem adaptador"}`,
+          subtitulo: `${no.confirmacao === "aguardar" ? "⏸ " : ""}${no.refId || "sem adaptador"}`,
           tipo: no.tipo,
         },
       })),
@@ -311,6 +318,61 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
     }
   }
 
+  /**
+   * SPEC-107 fatia C — o gate sobrevive a F5 e a outra máquina: ao abrir um
+   * fluxo, a execução SUSPENSA mais recente reaparece com o stage persistido,
+   * esperando quem revisa continuar ou descartar.
+   */
+  useEffect(() => {
+    if (!fluxoId || fluxoId === "fluxo-1") return;
+    void apiExecucaoDeFluxo
+      .execucoes(fluxoId)
+      .then(({ execucoes }) => {
+        const pendente = execucoes[0];
+        if (pendente?.estado !== "aguardando-confirmacao") return;
+        const gate = [...pendente.nos].reverse().find((n) => n.estado === "sucesso");
+        setRastro({
+          nos: pendente.nos,
+          saidas: pendente.saidas ?? {},
+          hash: pendente.hash,
+          execucaoId: pendente.id,
+          aguardandoEm: gate?.noId,
+        });
+      })
+      .catch(() => undefined);
+  }, [fluxoId]);
+
+  async function continuarExecucao() {
+    if (!rastro?.execucaoId) return;
+    setExecutando(true);
+    setErro(null);
+    try {
+      const resultado = await apiExecucaoDeFluxo.continuar(rastro.execucaoId);
+      setRastro({
+        nos: resultado.nos,
+        saidas: resultado.saidas,
+        hash: resultado.hash,
+        execucaoId: resultado.execucaoId,
+        aguardandoEm: resultado.aguardandoEm,
+      });
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setExecutando(false);
+    }
+  }
+
+  async function descartarExecucao() {
+    if (!rastro?.execucaoId) return;
+    setErro(null);
+    try {
+      await apiExecucaoDeFluxo.descartar(rastro.execucaoId);
+      setRastro(null);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   async function executar(ateNo?: string) {
     if (!fluxo) return;
     setExecutando(true);
@@ -326,7 +388,13 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
         timeAtivo
       );
       const resultado = await apiExecucaoDeFluxo.executar(fluxo.id, timeAtivo, ateNo);
-      setRastro({ nos: resultado.nos, saidas: resultado.saidas, hash: resultado.hash });
+      setRastro({
+        nos: resultado.nos,
+        saidas: resultado.saidas,
+        hash: resultado.hash,
+        execucaoId: resultado.execucaoId,
+        aguardandoEm: resultado.aguardandoEm,
+      });
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
     } finally {
@@ -365,6 +433,9 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
           <select
             value={fluxoId ?? ""}
             onChange={(e) => {
+              // Re-selecionar o MESMO fluxo não é troca: zerar o rastro aqui
+              // apagava o gate recém-carregado do servidor (fatia C).
+              if (e.target.value === fluxoId) return;
               setFluxoId(e.target.value || null);
               setSelecao(null);
               setRastro(null);
@@ -585,6 +656,32 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
               <div data-testid="rastro-da-execucao">
                 <strong style={{ fontSize: 12.5 }}>Execução</strong>
                 <div style={{ fontSize: 10.5, color: "var(--texto-fraco)" }}>fluxo {rastro.hash}</div>
+                {/* SPEC-107 fatia C (§5.5) — o GATE: a execução suspendeu e o
+                    resto só roda quando alguém, revisando o stage, decidir. */}
+                {rastro.aguardandoEm && (
+                  <div
+                    data-testid="gate-de-confirmacao"
+                    style={{ margin: "8px 0", padding: 8, border: "1px solid var(--borda-forte)", borderRadius: 8, fontSize: 12 }}
+                  >
+                    <div style={{ marginBottom: 6 }}>
+                      ⏸ Aguardando confirmação no nó <strong>{rastro.aguardandoEm}</strong> — revise a saída abaixo e
+                      decida. A decisão vale de qualquer máquina: a execução está guardada no servidor.
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        data-testid="continuar-execucao"
+                        onClick={() => void continuarExecucao()}
+                        disabled={!podeEditar || executando}
+                        style={{ ...botaoMiudo, background: "var(--acento)", color: "#fff", border: "1px solid var(--acento)" }}
+                      >
+                        {executando ? "Continuando…" : "Continuar"}
+                      </button>
+                      <button data-testid="descartar-execucao" onClick={() => void descartarExecucao()} disabled={!podeEditar} style={botaoMiudo}>
+                        Descartar
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {rastro.nos.map((n) => (
                   <div key={n.noId} data-testid={`rastro-${n.noId}`} style={{ marginTop: 8, fontSize: 12 }}>
                     <span
@@ -693,14 +790,15 @@ function PainelDoNo({
       <label style={{ fontSize: 11.5, display: "flex", gap: 6, alignItems: "center", marginBottom: 8 }}>
         <input
           type="checkbox"
-          data-testid="parar-depois"
+          data-testid="aguardar-confirmacao"
           disabled={!podeEditar}
-          checked={no.pausarDepois === true}
-          onChange={(e) => onMudar({ pausarDepois: e.target.checked || undefined })}
+          checked={no.confirmacao === "aguardar"}
+          onChange={(e) => onMudar({ confirmacao: e.target.checked ? "aguardar" : undefined })}
         />
-        {/* §368 — a parada é CONFIGURAÇÃO do fluxo, não um botão de ocasião:
-            todo Executar respeita, sem depender de alguém lembrar de clicar. */}
-        Parar depois deste nó (revisar a saída antes de o resto rodar)
+        {/* §368, generalizado na fatia C (§5.5): o gate é CONFIGURAÇÃO do
+            fluxo, não um botão de ocasião — todo Executar suspende ali, e a
+            execução guardada espera alguém continuar ou descartar. */}
+        Aguardar confirmação depois deste nó (o resto só roda quando alguém continuar)
       </label>
       {conector && conector.entrada.length > 0 && (
         <>

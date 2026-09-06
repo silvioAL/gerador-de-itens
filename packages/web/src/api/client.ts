@@ -1624,13 +1624,26 @@ export const apiFluxosEmVigor = {
 
 export interface RastroDoNoExecutado {
   noId: string;
-  tipo: "conector" | "agente";
+  tipo: "conector" | "agente" | "funcao" | "projeto";
   refId: string;
   estado: "sucesso" | "falhou" | "nao-executado";
   erro?: string;
   duracaoMs: number;
   /** SPEC-106 fatia A — o link do que subiu, quando o nó publicou. */
   linkExterno?: string;
+  /** SPEC-107 fatia A (§5.4) — as entradas gravadas de um nó de função. */
+  entradas?: Record<string, unknown>;
+}
+
+/** SPEC-107 fatia C — a resposta de executar/continuar: com `aguardandoEm`, a
+ * execução SUSPENDEU no gate e o `execucaoId` é o endereço para continuar. */
+export interface RespostaDeExecucao {
+  fluxo: string;
+  execucaoId: string;
+  hash: string;
+  nos: RastroDoNoExecutado[];
+  saidas: Record<string, Record<string, unknown>>;
+  aguardandoEm?: string;
 }
 
 export const apiExecucaoDeFluxo = {
@@ -1638,10 +1651,33 @@ export const apiExecucaoDeFluxo = {
    * `ateNo` = executar só até aquele nó (o fecho de ancestrais) — inspecionar
    * o meio sem disparar o resto. */
   executar: (id: string, timeId?: string, ateNo?: string) =>
-    requisitar<{ fluxo: string; hash: string; nos: RastroDoNoExecutado[]; saidas: Record<string, Record<string, unknown>> }>(
+    requisitar<RespostaDeExecucao>(
       `/fluxos/${encodeURIComponent(id)}/executar`,
       { method: "POST", body: JSON.stringify({ ...(timeId ? { timeId } : {}), ...(ateNo ? { ateNo } : {}) }) }
     ),
+  /** SPEC-107 fatia C — o gate: continuar roda só o resto; descartar fecha. */
+  continuar: (execucaoId: string) =>
+    requisitar<RespostaDeExecucao>(`/fluxos/execucoes/${encodeURIComponent(execucaoId)}/continuar`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
+  descartar: (execucaoId: string) =>
+    requisitar<{ ok: boolean }>(`/fluxos/execucoes/${encodeURIComponent(execucaoId)}/descartar`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
+  /** As execuções persistidas de um fluxo — é onde a suspensa sobrevive a F5. */
+  execucoes: (fluxoId: string) =>
+    requisitar<{
+      execucoes: {
+        id: string;
+        hash: string;
+        em: string;
+        estado: string;
+        nos: RastroDoNoExecutado[];
+        saidas: Record<string, Record<string, unknown>> | null;
+      }[];
+    }>(`/fluxos/${encodeURIComponent(fluxoId)}/execucoes`),
 };
 
 export const apiCatalogoDeConectores = {
