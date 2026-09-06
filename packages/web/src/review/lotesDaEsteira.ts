@@ -1,6 +1,12 @@
-import { montarPedidoPipeline, preambuloDoPapel } from "@gerador/aplicacao";
+import { corpoDoLote, itensDoPapel, montarPedidoPipeline, preambuloDoPapel, TAM_LOTE_ESTEIRA } from "@gerador/aplicacao";
 import type { PapelConfigurado, RespostaAnteriorIa } from "../api/client";
-import { TAM_LOTE_ESTEIRA, type ItemFilaEsteira } from "./useEsteiraDeAgentes";
+import type { ItemFilaEsteira } from "./useEsteiraDeAgentes";
+
+// SPEC-107 G5 — `corpoDoLote`, `itensDoPapel` e `TAM_LOTE_ESTEIRA` mudaram de
+// casa (aplicacao): a fiação semeada monta o MESMO corpo, e o dublê
+// determinístico semeia pela letra do prompt (§263). Re-exportados para os
+// consumidores desta pasta.
+export { corpoDoLote, itensDoPapel };
 
 /**
  * #299 — "simular a esteira sem gastar chamada de IA (e ver o prompt que
@@ -17,39 +23,6 @@ import { TAM_LOTE_ESTEIRA, type ItemFilaEsteira } from "./useEsteiraDeAgentes";
  * o que envia. Simulação e execução divergem só se alguém mudar uma das duas
  * sem a outra — e é exatamente isso que `lotesDaEsteira.test.ts` recusa.
  */
-
-/** O corpo que a esteira POSTa em `/ia/pipeline/:papel` para um lote.
- * Extraído do hook pra ser exatamente o mesmo objeto nos dois caminhos. */
-export function corpoDoLote(
-  papelId: string,
-  lote: ItemFilaEsteira[],
-  acumuladas: Map<string, RespostaAnteriorIa[]>,
-  contextoEpico?: string,
-  /** SPEC-53 — o que o PRODUTO é. Separado do contexto da demanda até dentro
-   * do corpo da requisição: quem lê o prompt precisa distinguir o permanente
-   * do circunstancial. */
-  contextoDoProduto?: string
-) {
-  return {
-    contextoEpico,
-    contextoDoProduto,
-    itens: lote.map((item) => ({
-      chave: item.atividadeChave,
-      rotulo: item.atividadeRotulo,
-      contextoNo: item.contextoNo,
-      placeholders: item.placeholdersPorPapel[papelId] ?? [],
-      // Snapshot, não a referência viva — o acumulador continua crescendo
-      // depois desta chamada.
-      respostasAnteriores: [...(acumuladas.get(item.atividadeChave) ?? [])],
-    })),
-  };
-}
-
-/** Os itens que sobram para um papel: quem não tem placeholder dele é pulado
- * — ausência de trabalho legítima, não fila vazia. */
-export function itensDoPapel(papelId: string, fila: ItemFilaEsteira[]): ItemFilaEsteira[] {
-  return fila.filter((item) => (item.placeholdersPorPapel[papelId] ?? []).length > 0);
-}
 
 export interface LoteSimulado {
   papelId: string;

@@ -216,6 +216,7 @@ export {
 } from "./config/diagramaDoTime.js";
 /** SPEC-105 fatias C/D — o fluxo como grafo, e a execução pura. */
 // SPEC-107 G5 — a fila da esteira, pura: a mesma para a revisão e a fiação.
+export { TAM_LOTE_ESTEIRA, corpoDoLote, itensDoPapel } from "./casos-de-uso/lotesDaEsteira.js";
 export {
   contextoDoPlaceholder,
   filaDaEsteiraDaDemanda,
