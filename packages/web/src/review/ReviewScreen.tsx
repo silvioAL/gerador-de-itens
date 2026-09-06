@@ -38,6 +38,16 @@ import {
   apiPdca,
 } from "../api/client";
 import { baixarArquivoTexto } from "../persistence/baixarArquivo";
+// SPEC-107 G5 — a fila da esteira é PURA e mora na aplicação: a fiação
+// semeada monta a mesma (§263).
+import {
+  GRUPOS_FICHA,
+  contextoDoPlaceholder,
+  montarFilaDaEsteira,
+  papelDoGrupo,
+  placeholdersDaFichaPorGrupo,
+  respostaConfirmada,
+} from "@gerador/aplicacao";
 import { assinarSugestao, fraseDeCompletude, pendenciasDaRevisao, type PendenteDeConfirmacao } from "./pendencias";
 import { FilaDeRevisao } from "./FilaDeRevisao";
 import { ConversaEspecificacao } from "../conversa/ConversaEspecificacao";
@@ -111,56 +121,11 @@ function descreverDependencia(a: Atividade): string {
   return a.dependencias.map((d) => (d.alvoChave ? `${d.type}→${d.alvoChave}` : d.type)).join(", ");
 }
 
-/** Só conta como "resolvido" resposta manual ou sugestão já confirmada —
- * mesma régua do engine (`gerarRefinamento.ts`), usada aqui pra decidir
- * status do item (rascunho/revisar/refinado) e o que mostrar como pendente. */
-function respostaConfirmada(resp: ValorSpec | undefined): boolean {
-  return !!resp && (resp.origem === "manual" || resp.confirmado === true);
-}
-
-/** Agrupa os placeholders da ficha pelo papel da esteira responsável
- * (SPEC-24) — PO escreve história/critérios, Arquiteto o contrato,
- * Especialista técnico o checklist/volumetria (mecanismo já existente,
- * reencaixado como papel), QA as regras de teste/cenário Gherkin. Fonte
- * única usada pra montar a fila da esteira, os pips por item e as seções da
- * aba Refinamento — nunca uma segunda lista hardcoded de "quais campos
- * existem". */
-function placeholdersPorPapel(ficha: FichaItem): Record<GrupoFicha, FichaPlaceholder[]> {
-  return {
-    // §199 — a ENTREGA FINAL é do PO: quem diz o valor entregue é quem pede o
-    // item. Sem estar aqui, ela era cobrada no documento (✍️ especificar) e
-    // não tinha onde ser escrita — nem pela esteira, nem à mão. Pendência sem
-    // ferramenta pra resolver é o defeito que este projeto mais combate.
-    po: [ficha.historiaUsuario, ficha.criteriosAceiteContextual, ficha.entregaFinal],
-    arquiteto: [ficha.contrato.noVinculado, ficha.contrato.request, ficha.contrato.response, ficha.contrato.erros, ficha.contrato.dependencias],
-    especialista: [...ficha.checklistTecnico, ...ficha.volumetria],
-    qa: [ficha.regrasTeste, ficha.cenarioFeature],
-  };
-}
-
-const GRUPOS_FICHA: GrupoFicha[] = ["po", "arquiteto", "especialista", "qa"];
-
-/** SPEC-24 Fase F — qual papel CONFIGURADO leva a seção `grupo` de um item:
- * o primeiro papel ativo da lista com esse grupo cujos contextos casem com
- * as techs/contextos da atividade (lista vazia casa com tudo). É assim que
- * um agente contextual "rouba" os itens do contexto dele — basta estar
- * ANTES do papel geral na ordem configurada. Casamento parcial e sem case,
- * a MESMA semântica do `contextoBate()` do engine (regras.json): configurar
- * "Backend-mensagens" casa com "Backend-mensagens rabbitmq" e "... kafka". */
-function papelDoGrupo(
-  papeisAtivos: PapelConfigurado[],
-  grupo: GrupoFicha,
-  atividade: { techs: string[]; contextos: string[] }
-): PapelConfigurado | undefined {
-  return papeisAtivos.find(
-    (p) =>
-      p.grupo === grupo &&
-      (p.contextos.length === 0 ||
-        p.contextos.some((c) =>
-          [...atividade.contextos, ...atividade.techs].some((sel) => sel.toLowerCase().includes(c.toLowerCase()))
-        ))
-  );
-}
+// SPEC-107 G5 — a régua de confirmado, o agrupamento por papel e o dono de
+// cada seção MUDARAM DE CASA (aplicacao, `filaDaEsteira.ts`): a fiação
+// semeada monta a MESMA fila, e duas cópias divergiriam na primeira mudança
+// (§263). Os nomes locais ficam como alias para o resto da tela não mudar.
+const placeholdersPorPapel = placeholdersDaFichaPorGrupo;
 
 type StatusItem = "rascunho" | "revisar" | "refinado";
 
@@ -192,20 +157,6 @@ const ROTULO_STATUS: Record<StatusItem, string> = {
   refinado: "refinado",
 };
 
-/** Contexto compacto do(s) nó(s) de origem da atividade, mandado ao LLM junto
- * com o requisito — sem isso a sugestão seria genérica demais pra ser útil
- * (Fase 1, SPEC-23). */
-function contextoDoPlaceholder(ficha: FichaEspecificacaoNo[]): string {
-  return ficha
-    .map((no) => {
-      const campos = no.camposEscalares
-        .filter((c) => c.valor !== undefined && c.valor !== "")
-        .map((c) => `${c.key}: ${String(c.valor)}`)
-        .join(", ");
-      return `${no.label} (${no.tipoLabel}, ${no.status})${campos ? ` — ${campos}` : ""}`;
-    })
-    .join(" | ");
-}
 
 /** `demandInfo` + conteúdo dos anexos (Fase 1b, SPEC-23), concatenados num
  * único texto pra mandar como contexto real ao `/ia/sugerir` — antes disso
@@ -455,43 +406,15 @@ export function ReviewScreen({
       // O auto-start passa os papéis RECÉM-resolvidos da config — o estado
       // ainda não re-renderizou nesse instante (mesma corrida do
       // confirmacaoObrigatoria, Fase E). Os demais chamadores usam o estado.
-      const lista = papeis ?? papeisAtivos;
-      const filaNova: ItemFilaEsteira[] = [];
-      for (const a of resultado.atividades) {
-        const ficha = fichas.get(a.chave);
-        if (!ficha) continue;
-        const contextoNo = contextoDoPlaceholder(ficha.especificacaoTecnica);
-        const porGrupo = placeholdersPorPapel(ficha);
-        // Fase F: cada seção da ficha vai pro papel CONFIGURADO que a leva
-        // neste item (contextos) — chaveado pelo id do papel, não pelo grupo.
-        const placeholdersPedido: Record<string, PlaceholderPedidoItemIa[]> = Object.fromEntries(
-          lista.map((p) => [p.id, [] as PlaceholderPedidoItemIa[]])
-        );
-        for (const grupo of GRUPOS_FICHA) {
-          const dono = papelDoGrupo(lista, grupo, a);
-          if (!dono) continue;
-          const relevantes = apenasPendentes ? porGrupo[grupo].filter((p) => !respostaConfirmada(p.resposta)) : porGrupo[grupo];
-          placeholdersPedido[dono.id].push(...relevantes.map((p) => ({ chave: p.chave, tech: p.tech, rotulo: p.rotulo })));
-        }
-        const temTrabalho = lista.some((p) => placeholdersPedido[p.id].length > 0);
-        if (!temTrabalho) continue;
-        // Encadeamento: tudo que JÁ está respondido e NÃO vai ser regenerado
-        // nesta corrida entra como insumo dos papéis (o Arquiteto lê a
-        // história que o PO escreveu — "a ideia de pipeline é justamente
-        // essa"). As respostas geradas durante a corrida o hook acumula.
-        const chavesNaFila = new Set(Object.values(placeholdersPedido).flat().map((p) => p.chave));
-        const respostasExistentes = GRUPOS_FICHA.flatMap((grupo) => porGrupo[grupo])
-          .filter((p) => typeof p.resposta?.valor === "string" && p.resposta.valor !== "" && !chavesNaFila.has(p.chave))
-          .map((p) => ({ rotulo: p.rotulo, valor: String(p.resposta?.valor) }));
-        filaNova.push({
-          atividadeChave: a.chave,
-          atividadeRotulo: a.rotulo,
-          contextoNo,
-          placeholdersPorPapel: placeholdersPedido,
-          respostasExistentes,
-        });
-      }
-      return filaNova;
+      //
+      // SPEC-107 G5 — a montagem em si mudou de casa (§263): é a MESMA
+      // função que a fiação semeada usa no servidor.
+      return montarFilaDaEsteira({
+        atividades: resultado.atividades,
+        fichas,
+        papeisAtivos: papeis ?? papeisAtivos,
+        apenasPendentes,
+      });
     },
     [resultado.atividades, fichas, papeisAtivos]
   );
