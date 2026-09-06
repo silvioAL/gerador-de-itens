@@ -16688,3 +16688,31 @@ pular a primeira renderização da ARESTA no mount. O assert pós-F5 do spec da
 documento salvo) — o rótulo visível continua afirmado no passo pré-F5, que
 nunca flakou. A renderização da aresta no mount fica como a dívida nomeada
 da rodada de robustez da suíte.
+
+---
+
+## §376 — SPEC-107 fatia F: o documento como FORMA de dado, e o mapeamento que avisa
+
+**A §1.1 fecha o círculo: nó é o que AGE; documento é o que VIAJA — e agora
+tem nome no contrato.** `documento` entrou em `TIPOS_DE_CAMPO_DO_CONECTOR`:
+texto com semântica de MARKDOWN. Afirma a semântica, não muda o envelope.
+
+- **Onde ele já era verdade, o contrato passou a dizer**: o `markdown` da
+  publicação, o `conteudo` do documento de contexto e a especificação do
+  projeto (`projeto.markdown`) — os três viram `documento`, sem nenhuma
+  migração (o transporte é o mesmo texto).
+- **Preview no rastro (§2.1)**: campo de saída com semântica de documento
+  renderiza como TEXTO CORRIDO no stage — o "antes de subir" legível, não um
+  JSON com `\n` escapado. O artefato do agente já fazia isso; agora qualquer
+  contrato ganha o mesmo, por tipo.
+- **A validação de compatibilidade de mapeamento — AVISO, não bloqueio
+  (§230: bloquear cedo ensina a ignorar a cor)**: com a forma declarada nos
+  dois lados da aresta, ligar `lista` numa entrada `objeto` é dito em voz
+  alta, com o par nomeado — e o Executar continua habilitado, porque há
+  ligações legítimas que o tipo não captura. `texto` ↔ `documento` são
+  compatíveis nos dois sentidos; lado sem contrato (agente, transformação)
+  não avisa — ausência de forma não é incompatibilidade. §248 cumprido.
+- **Prova**: unitária (par errado avisa com os dois tipos; texto↔documento
+  não; sem contrato não), e E2E — o par errado DE PROPÓSITO ao lado do certo
+  mostra o aviso, o Executar segue, e a especificação da demanda aparece
+  como preview no rastro do nó de projeto.

@@ -17,6 +17,7 @@ import {
   PROJETO_DO_SISTEMA,
   REF_DO_PROJETO,
   sanearCamposDaTransformacao,
+  avisosDeMapeamento,
   mensagemDeCiclo,
   NOME_DA_OPERACAO,
   OPERACOES_DO_GATEWAY,
@@ -128,6 +129,36 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
 
   // O ciclo é conferido a cada edição, com a MESMA mensagem do desenho (§4.4).
   const ciclo = useMemo(() => (fluxo ? planoDoFluxo(fluxo).ciclo : undefined), [fluxo]);
+
+  /** SPEC-107 fatia F — a forma declarada de cada lado da aresta, quando há.
+   * Agente e transformação não declaram tipos — ausência não é incompatível. */
+  const contratoDoNo = useCallback(
+    (no: NoDoFluxo) => {
+      if (no.tipo === "conector") {
+        const conector = catalogo.find((c) => c.id === no.refId);
+        return conector ? { entrada: conector.entrada, saida: conector.saida } : null;
+      }
+      if (no.tipo === "funcao") {
+        const funcao = funcaoDoSistema(no.refId);
+        return funcao ? { entrada: funcao.entrada, saida: funcao.saida } : null;
+      }
+      if (no.tipo === "projeto") return { entrada: PROJETO_DO_SISTEMA.entrada, saida: PROJETO_DO_SISTEMA.saida };
+      return null;
+    },
+    [catalogo]
+  );
+  const avisosDoMapeamento = useMemo(
+    () => (fluxo ? avisosDeMapeamento(fluxo, contratoDoNo) : []),
+    [fluxo, contratoDoNo]
+  );
+
+  /** Fatia F — as chaves de saída com semântica de DOCUMENTO deste nó: é o
+   * que o rastro renderiza como texto corrido (preview), não como JSON. */
+  const chavesDeDocumento = useCallback(
+    (n: { tipo: string; refId: string }): string[] =>
+      (contratoDoNo(n as NoDoFluxo)?.saida ?? []).filter((c) => c.tipo === "documento").map((c) => c.chave),
+    [contratoDoNo]
+  );
 
   function mudarFluxo(mudar: (f: FluxoEmVigor) => FluxoEmVigor) {
     if (!fluxoId) return;
@@ -594,6 +625,15 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
           Não é possível executar ainda — {mensagemDeCiclo(ciclo)}
         </div>
       )}
+      {/* SPEC-107 fatia F — AVISO, não bloqueio (§230: bloquear cedo ensina a
+          ignorar a cor): o tipo declarado dos dois lados não combina, e quem
+          fia decide sabendo. */}
+      {avisosDoMapeamento.length > 0 && (
+        <div data-testid="aviso-de-mapeamento" style={{ ...avisoEstilo, color: "var(--texto-2)" }}>
+          ⚠ Mapeamento com tipos que não combinam (a execução continua possível):{" "}
+          {avisosDoMapeamento.map((a) => a.texto).join(" · ")}
+        </div>
+      )}
       {erro && (
         <div data-testid="erro-do-fluxo" style={avisoEstilo}>
           {erro}
@@ -757,7 +797,32 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
                       </pre>
                     ) : (
                       rastro.saidas[n.noId] && (
-                        <pre style={saidaEstilo}>{JSON.stringify(rastro.saidas[n.noId], null, 2).slice(0, 1200)}</pre>
+                        <>
+                          {/* Fatia F — campo com semântica de DOCUMENTO ganha
+                              preview como texto corrido, não JSON (§2.1). */}
+                          {chavesDeDocumento(n)
+                            .filter((chave) => typeof rastro.saidas[n.noId][chave] === "string")
+                            .map((chave) => (
+                              <pre
+                                key={chave}
+                                style={{ ...saidaEstilo, whiteSpace: "pre-wrap" }}
+                                data-testid={`documento-${n.noId}-${chave}`}
+                              >
+                                {String(rastro.saidas[n.noId][chave]).slice(0, 4000)}
+                              </pre>
+                            ))}
+                          <pre style={saidaEstilo}>
+                            {JSON.stringify(
+                              Object.fromEntries(
+                                Object.entries(rastro.saidas[n.noId]).filter(
+                                  ([chave]) => !chavesDeDocumento(n).includes(chave) || typeof rastro.saidas[n.noId][chave] !== "string"
+                                )
+                              ),
+                              null,
+                              2
+                            ).slice(0, 1200)}
+                          </pre>
+                        </>
                       )
                     )}
                   </div>

@@ -191,6 +191,8 @@ export {
 /** SPEC-107 fatia B — o PROJETO como nó, nas duas direções. */
 export { PROJETO_DO_SISTEMA, REF_DO_PROJETO, type ProjetoDoSistema } from "./config/projeto.js";
 export { demandaAtiva, erroSemDemanda, saidaDoProjeto, varianteProposta } from "./casos-de-uso/projetoNoFluxo.js";
+/** SPEC-107 fatia F — compatibilidade de mapeamento por tipo (aviso). */
+export { avisosDeMapeamento, type AvisoDeMapeamento, type ContratoDoNoNoFluxo } from "./casos-de-uso/mapeamento.js";
 /** SPEC-107 fatia E — a transformação pura (o Set do n8n). */
 export {
   sanearCamposDaTransformacao,

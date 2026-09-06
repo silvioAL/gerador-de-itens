@@ -57,7 +57,7 @@ export const PROJETO_DO_SISTEMA: ProjetoDoSistema = {
   saida: [
     { chave: "desenho", rotulo: "Desenho (demanda)", tipo: "objeto" },
     { chave: "itens", rotulo: "Itens gerados (persistidos)", tipo: "lista" },
-    { chave: "markdown", rotulo: "Documento (última especificação gerada)", tipo: "texto" },
+    { chave: "markdown", rotulo: "Documento (última especificação gerada)", tipo: "documento" },
     { chave: "volumetria", rotulo: "Volumetria da demanda", tipo: "objeto" },
     { chave: "necessidades", rotulo: "Necessidades", tipo: "lista" },
     { chave: "demandaId", rotulo: "Demanda (id)", tipo: "texto" },
