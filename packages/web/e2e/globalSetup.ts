@@ -199,6 +199,25 @@ export default async function globalSetup() {
       .query(`DELETE FROM "config_documentos" WHERE "time_id" LIKE 'time-e2e-%'`)
       .catch(() => undefined);
 
+    // SPEC-107 fatia A — **o baseline de REGRAS da suíte, dito em voz alta.**
+    //
+    // O servidor do E2E passou a rodar com `CONFIG_DIR` (como o compose de
+    // verdade), e com isso o template de regras de uma instalação NOVA virou
+    // `regras.example.json` — e quatro specs que derivam itens quebraram na
+    // CI (banco fresco) e passaram no banco local (documentos antigos
+    // mascaravam o template). A suíte inteira foi escrita sobre o baseline
+    // "sem régua da casa"; ele agora é um DOCUMENTO global explícito, não o
+    // acidente de uma pasta ausente. O spec que quiser exercitar o template
+    // real grava a régua dele no próprio time, como os specs de regras já
+    // fazem.
+    await client.query(
+      `DELETE FROM "config_documentos" WHERE "chave" = 'regras' AND "time_id" = '__global__' AND "produto_id" IS NULL`
+    );
+    await client.query(
+      `INSERT INTO "config_documentos" ("chave", "time_id", "documento")
+       VALUES ('regras', '__global__', '{"tipos": [], "tamanhos": [], "porTech": {}}')`
+    );
+
     // #301 — os padrões por componente também morrem no TRUNCATE acima, e sem
     // eles `padroes-por-componente.spec.ts` testaria uma tabela vazia.
     //
