@@ -1,10 +1,18 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 import { executarFluxo } from "./fluxos.js";
 import { normalizarFluxos } from "../config/fluxos.js";
 
 function fluxoDe(nos: unknown[], arestas: unknown[]) {
   return normalizarFluxos({ fluxos: [{ id: "f", nos, arestas }] }).fluxos[0];
 }
+
+/** Os testes sem nó de função declaram o executor que nunca roda — chamar é
+ * defeito de despacho, não fixture faltando. */
+const semFuncao = {
+  funcao: async (): Promise<Record<string, unknown>> => {
+    throw new Error("não há nó de função neste teste");
+  },
+};
 
 const JMETER = fluxoDe(
   [
@@ -22,6 +30,7 @@ describe("executarFluxo (SPEC-105 fatia D — a metade pura)", () => {
   it("o exemplo do JMeter (§4.2): a saída de um alimenta a entrada do outro", async () => {
     const chamadas: Record<string, unknown>[] = [];
     const resultado = await executarFluxo(JMETER, {
+      ...semFuncao,
       conector: async (no, parametros) => {
         chamadas.push({ no: no.id, parametros });
         return no.id === "volumetria" ? { rps: 120, pico: 340 } : { linkExterno: "https://repo/x" };
@@ -58,6 +67,7 @@ describe("executarFluxo (SPEC-105 fatia D — a metade pura)", () => {
     );
 
     const resultado = await executarFluxo(fluxo, {
+      ...semFuncao,
       conector: async (no) => {
         if (no.id === "quebra") throw new Error("HTTP 500 do outro lado");
         return { ok: true };
@@ -85,6 +95,7 @@ describe("executarFluxo (SPEC-105 fatia D — a metade pura)", () => {
     const resultado = await executarFluxo(
       JMETER,
       {
+        ...semFuncao,
         conector: async (no) => {
           chamados.push(no.id);
           return { rps: 120 };
@@ -116,6 +127,7 @@ describe("executarFluxo (SPEC-105 fatia D — a metade pura)", () => {
     );
     const chamados: string[] = [];
     const resultado = await executarFluxo(fluxo, {
+      ...semFuncao,
       conector: async (no) => {
         chamados.push(no.id);
         return { conteudo: "x" };
@@ -144,6 +156,7 @@ describe("executarFluxo (SPEC-105 fatia D — a metade pura)", () => {
       ]
     );
     const resultado = await executarFluxo(fluxo, {
+      ...semFuncao,
       conector: async () => {
         throw new Error("não deveria ser chamado");
       },
@@ -151,5 +164,71 @@ describe("executarFluxo (SPEC-105 fatia D — a metade pura)", () => {
     });
     expect(resultado.ciclo).toBeDefined();
     expect(resultado.nos).toEqual([]);
+  });
+});
+
+describe("executarFluxo (SPEC-107 fatia A — o nó de FUNÇÃO)", () => {
+  const FLUXO_COM_FUNCAO = fluxoDe(
+    [
+      { id: "fonte", tipo: "conector", refId: "leitor-de-desenho" },
+      { id: "gera-itens", tipo: "funcao", refId: "derivacao" },
+      { id: "resume", tipo: "agente", refId: "po" },
+    ],
+    [
+      { de: "fonte", para: "gera-itens", mapeamento: [{ saida: "desenho", entrada: "desenho" }] },
+      { de: "gera-itens", para: "resume", mapeamento: [{ saida: "itens", entrada: "itens" }] },
+    ]
+  );
+
+  it("despacha para o executor de função, com o desenho mapeado da aresta (modo b)", async () => {
+    const recebido: Record<string, unknown>[] = [];
+    const resultado = await executarFluxo(FLUXO_COM_FUNCAO, {
+      conector: async () => ({ desenho: { diagrama: { nodes: [], edges: [] } } }),
+      funcao: async (no, entradas) => {
+        recebido.push({ no: no.refId, entradas });
+        return { itens: [{ chave: "a" }] };
+      },
+      agente: async () => ({ texto: "resumo" }),
+    });
+
+    expect(recebido).toEqual([
+      { no: "derivacao", entradas: { desenho: { diagrama: { nodes: [], edges: [] } } } },
+    ]);
+    expect(resultado.nos.map((n) => [n.noId, n.estado])).toEqual([
+      ["fonte", "sucesso"],
+      ["gera-itens", "sucesso"],
+      ["resume", "sucesso"],
+    ]);
+  });
+
+  it("§5.4 — as ENTRADAS do nó de função ficam no rastro (a âncora da tese reescrita), e só nele", async () => {
+    const resultado = await executarFluxo(FLUXO_COM_FUNCAO, {
+      conector: async () => ({ desenho: { diagrama: { nodes: [], edges: [] } } }),
+      funcao: async () => ({ itens: [] }),
+      agente: async () => ({ texto: "resumo" }),
+    });
+
+    const porNo = Object.fromEntries(resultado.nos.map((n) => [n.noId, n]));
+    // "Mesma fiação + mesmas entradas → mesmos itens" só é auditável se as
+    // entradas estiverem gravadas junto do hash.
+    expect(porNo["gera-itens"].entradas).toEqual({ desenho: { diagrama: { nodes: [], edges: [] } } });
+    // Conector e agente continuam sem: rastro é diagnóstico, não armazém.
+    expect(porNo.fonte.entradas).toBeUndefined();
+    expect(porNo.resume.entradas).toBeUndefined();
+  });
+
+  it("as entradas ficam no rastro TAMBÉM quando a função falha — auditoria não é prêmio de sucesso", async () => {
+    const resultado = await executarFluxo(FLUXO_COM_FUNCAO, {
+      conector: async () => ({ desenho: "não é um desenho" }),
+      funcao: async () => {
+        throw new Error('o "desenho" mapeado não tem a forma de um desenho');
+      },
+      agente: async () => ({ texto: "nunca roda" }),
+    });
+
+    const porNo = Object.fromEntries(resultado.nos.map((n) => [n.noId, n]));
+    expect(porNo["gera-itens"].estado).toBe("falhou");
+    expect(porNo["gera-itens"].entradas).toEqual({ desenho: "não é um desenho" });
+    expect(porNo.resume.estado).toBe("nao-executado");
   });
 });

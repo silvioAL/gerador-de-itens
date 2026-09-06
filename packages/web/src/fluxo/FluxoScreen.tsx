@@ -13,6 +13,8 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
+  FUNCOES_DO_SISTEMA,
+  funcaoDoSistema,
   mensagemDeCiclo,
   NOME_DA_OPERACAO,
   OPERACOES_DO_GATEWAY,
@@ -65,7 +67,7 @@ function NoDeFluxoCard({ data, selected }: NodeProps<Node<DadosDoNo>>) {
     >
       <Handle type="target" position={Position.Left} />
       <div style={{ fontSize: 10.5, color: "var(--texto-fraco)" }}>
-        {data.tipo === "conector" ? "conector" : "agente"}
+        {data.tipo === "conector" ? "conector" : data.tipo === "funcao" ? "função do sistema" : "agente"}
       </div>
       <strong style={{ fontSize: 12.5 }}>{data.titulo}</strong>
       {data.subtitulo && <div style={{ fontSize: 11, color: "var(--texto-2)" }}>{data.subtitulo}</div>}
@@ -141,6 +143,7 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
   const rotuloDoRef = useCallback(
     (no: Pick<NoDoFluxo, "tipo" | "refId" | "componente">) => {
       if (!no.refId) return no.componente && no.componente !== "livre" ? NOME_DA_OPERACAO[no.componente] : "(escolha o adaptador)";
+      if (no.tipo === "funcao") return funcaoDoSistema(no.refId)?.nome ?? no.refId;
       return no.tipo === "conector"
         ? (catalogo.find((c) => c.id === no.refId)?.nome ?? no.refId)
         : (papeis.find((p) => p.id === no.refId)?.nome ?? no.refId);
@@ -216,6 +219,27 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
   }
 
   /**
+   * SPEC-107 fatia A — a FUNÇÃO entra pela paleta como os componentes, mas o
+   * nó já nasce com o `refId`: o registro é fechado e a função É a capacidade
+   * — não há adaptador a escolher (§2.4-10: escolha só quando há escolha).
+   */
+  function adicionarFuncao(funcaoId: string) {
+    mudarFluxo((f) => {
+      let n = 1;
+      while (f.nos.some((no) => no.id === `${funcaoId}-${n}`)) n++;
+      const id = `${funcaoId}-${n}`;
+      setSelecao({ tipo: "no", id });
+      return {
+        ...f,
+        nos: [
+          ...f.nos,
+          { id, tipo: "funcao", refId: funcaoId, posicao: { x: 80 + f.nos.length * 60, y: 80 + f.nos.length * 40 }, parametros: {} },
+        ],
+      };
+    });
+  }
+
+  /**
    * §369 — o mesmo dado, editado de onde se vê (a régua do §260): o painel do
    * nó-agente grava NO documento da esteira (`pipeline-agentes`), por
    * read-modify-write do papel — a aba Pipeline de IA continua sendo o
@@ -266,8 +290,14 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
     setErro(null);
     setRastro(null);
     try {
-      // O que roda é o que está SALVO — executar rascunho seria rastro mentindo.
-      await apiFluxos.salvar({ fluxos: fluxos! }, timeAtivo);
+      // O que roda é o que está SALVO — executar rascunho seria rastro
+      // mentindo. Só os DECLARADOS, como no Salvar: gravar a esteira derivada
+      // junto a congelaria como cópia que ninguém pediu (§365) — defeito real,
+      // pego pela corrida de dois specs no mesmo documento (SPEC-107 fatia A).
+      await apiFluxos.salvar(
+        { fluxos: fluxos!.filter((f) => f.origem === "declarado").map(({ origem: _origem, ...f }) => f) },
+        timeAtivo
+      );
       const resultado = await apiExecucaoDeFluxo.executar(fluxo.id, timeAtivo, ateNo);
       setRastro({ nos: resultado.nos, saidas: resultado.saidas, hash: resultado.hash });
     } catch (e) {
@@ -366,6 +396,14 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
             <button data-testid="add-livre" disabled={!editavel} onClick={() => adicionarComponente("conector", "livre")} style={botao}>
               + Chamada externa
             </button>
+            {/* SPEC-107 fatia A — as funções do SISTEMA na paleta: o motor com
+                contrato declarado, pelo registro fechado (rótulo genérico,
+                §2.3 — "engine"/"derivar" não aparecem na tela). */}
+            {FUNCOES_DO_SISTEMA.map((f) => (
+              <button key={f.id} data-testid={`add-funcao-${f.id}`} disabled={!editavel} onClick={() => adicionarFuncao(f.id)} style={botao}>
+                + {f.nome}
+              </button>
+            ))}
           </>
         )}
         <div style={{ flex: 1 }} />
@@ -578,6 +616,9 @@ function PainelDoNo({
   onRemover: () => void;
 }) {
   const conector = no.tipo === "conector" ? catalogo.find((c) => c.id === no.refId) : undefined;
+  // SPEC-107 fatia A — a função É a capacidade: contrato do registro fechado,
+  // sem adaptador a escolher.
+  const funcao = no.tipo === "funcao" ? funcaoDoSistema(no.refId) : undefined;
   // §368 — o COMPONENTE diz quais adaptadores servem: mesma operação para os
   // do gateway, endereço livre para "chamada externa", papéis para agente.
   const adaptadores =
@@ -592,25 +633,29 @@ function PainelDoNo({
       <div style={{ fontSize: 11.5, color: "var(--texto-2)", margin: "4px 0 8px" }}>
         {no.tipo === "conector"
           ? (no.componente && no.componente !== "livre" ? NOME_DA_OPERACAO[no.componente] : "Chamada externa")
-          : "Agente"}
+          : no.tipo === "funcao"
+            ? `Função do sistema — ${funcao?.nome ?? no.refId}`
+            : "Agente"}
       </div>
-      <label style={{ fontSize: 11.5, display: "grid", gap: 2, marginBottom: 8 }}>
-        Adaptador ({no.tipo === "agente" ? "papel da esteira" : "endereço do catálogo"})
-        <select
-          data-testid="adaptador-do-no"
-          disabled={!podeEditar}
-          value={no.refId}
-          onChange={(e) => onMudar({ refId: e.target.value })}
-          style={campo}
-        >
-          <option value="">— escolha —</option>
-          {adaptadores.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.nome}
-            </option>
-          ))}
-        </select>
-      </label>
+      {no.tipo !== "funcao" && (
+        <label style={{ fontSize: 11.5, display: "grid", gap: 2, marginBottom: 8 }}>
+          Adaptador ({no.tipo === "agente" ? "papel da esteira" : "endereço do catálogo"})
+          <select
+            data-testid="adaptador-do-no"
+            disabled={!podeEditar}
+            value={no.refId}
+            onChange={(e) => onMudar({ refId: e.target.value })}
+            style={campo}
+          >
+            <option value="">— escolha —</option>
+            {adaptadores.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.nome}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label style={{ fontSize: 11.5, display: "flex", gap: 6, alignItems: "center", marginBottom: 8 }}>
         <input
           type="checkbox"
@@ -647,6 +692,23 @@ function PainelDoNo({
             </label>
           ))}
         </>
+      )}
+      {funcao && (
+        <div data-testid="contrato-da-funcao" style={{ fontSize: 11.5, marginBottom: 8 }}>
+          {funcao.descricao && <p style={{ color: "var(--texto-2)", margin: "0 0 6px" }}>{funcao.descricao}</p>}
+          {/* §2.4-6 — o implícito em voz alta: o contrato diz o que entra e o
+              que sai; a entrada obrigatória vem do mapeamento de uma aresta. */}
+          <div style={{ color: "var(--texto-fraco)" }}>
+            Entradas:{" "}
+            {funcao.entrada.map((c) => `${c.rotulo}${c.obrigatorio ? " *" : ""}`).join(", ") || "—"}
+          </div>
+          <div style={{ color: "var(--texto-fraco)" }}>
+            Saídas: {funcao.saida.map((c) => c.rotulo).join(", ") || "—"}
+          </div>
+          <p style={{ color: "var(--texto-fraco)", margin: "6px 0 0" }}>
+            As entradas vêm das arestas (mapeamento). Obrigatória ausente não vira default — o nó não roda (§9.3).
+          </p>
+        </div>
       )}
       {no.tipo === "agente" && (
         <>
@@ -747,13 +809,22 @@ function PainelDaAresta({
 }) {
   const origem = fluxo.nos.find((n) => n.id === aresta.de);
   const destino = fluxo.nos.find((n) => n.id === aresta.para);
-  // O que a ORIGEM sabe entregar: a `saida` declarada do conector, ou o
-  // `texto` de um agente. É a fatia A alimentando a C — sem forma declarada,
-  // este select não teria opções, e a aresta não teria o que carregar (§3.2).
+  // O que a ORIGEM sabe entregar: a `saida` declarada do conector ou da
+  // função (SPEC-107 — o mesmo contrato, outro transporte), ou o `texto` de
+  // um agente. É a fatia A alimentando a C — sem forma declarada, este select
+  // não teria opções, e a aresta não teria o que carregar (§3.2).
   const saidasDaOrigem =
-    origem?.tipo === "conector" ? (catalogo.find((c) => c.id === origem.refId)?.saida.map((s) => s.chave) ?? []) : ["texto"];
+    origem?.tipo === "conector"
+      ? (catalogo.find((c) => c.id === origem.refId)?.saida.map((s) => s.chave) ?? [])
+      : origem?.tipo === "funcao"
+        ? (funcaoDoSistema(origem.refId)?.saida.map((s) => s.chave) ?? [])
+        : ["texto"];
   const entradasDoDestino =
-    destino?.tipo === "conector" ? (catalogo.find((c) => c.id === destino.refId)?.entrada.map((s) => s.chave) ?? []) : null;
+    destino?.tipo === "conector"
+      ? (catalogo.find((c) => c.id === destino.refId)?.entrada.map((s) => s.chave) ?? [])
+      : destino?.tipo === "funcao"
+        ? (funcaoDoSistema(destino.refId)?.entrada.map((s) => s.chave) ?? [])
+        : null;
 
   return (
     <div data-testid="painel-da-aresta">

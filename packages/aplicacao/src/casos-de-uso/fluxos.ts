@@ -18,6 +18,8 @@ import { planoDoFluxo, type Fluxo, type NoDoFluxo } from "../config/fluxos.js";
 export interface ExecutoresDoFluxo {
   conector(no: NoDoFluxo, parametros: Record<string, unknown>): Promise<Record<string, unknown>>;
   agente(no: NoDoFluxo, entradas: Record<string, unknown>): Promise<Record<string, unknown>>;
+  /** SPEC-107 fatia A — a função do sistema (o motor com contrato). */
+  funcao(no: NoDoFluxo, entradas: Record<string, unknown>): Promise<Record<string, unknown>>;
 }
 
 export type EstadoDoNo = "sucesso" | "falhou" | "nao-executado";
@@ -36,6 +38,17 @@ export interface RastroDoNo {
    * `linkExterno`, que é o contrato de quem publica.
    */
   linkExterno?: string;
+  /**
+   * SPEC-107 fatia A (§5.4) — as ENTRADAS que um nó de FUNÇÃO recebeu, como
+   * chegaram (parâmetros fixos + o que as arestas trouxeram). É a âncora da
+   * tese reescrita — "mesma fiação + mesmas entradas → mesmos itens": sem
+   * elas, o modo (b) (a derivação aceitando qualquer desenho mapeado) tornaria
+   * todo item de origem indizível. Só em nós `funcao`: a saída de um conector
+   * pode carregar dado de negócio do outro lado, e o rastro continua
+   * diagnóstico, não armazém — mas a ENTRADA de uma função é exatamente o que
+   * a auditoria precisa reproduzir.
+   */
+  entradas?: Record<string, unknown>;
 }
 
 export interface ResultadoDoFluxo {
@@ -139,12 +152,19 @@ export async function executarFluxo(
       }
     }
 
+    // As entradas de um nó de função entram no rastro TAMBÉM na falha: a
+    // auditoria da tese reescrita (§5.4) precisa do que chegou, não só do que
+    // deu certo.
+    const entradasNoRastro = no.tipo === "funcao" ? { entradas: parametros } : {};
+
     const comecou = Date.now();
     try {
       const saida =
         no.tipo === "conector"
           ? await executores.conector(no, parametros)
-          : await executores.agente(no, parametros);
+          : no.tipo === "funcao"
+            ? await executores.funcao(no, parametros)
+            : await executores.agente(no, parametros);
       estado.set(noId, "sucesso");
       saidas[noId] = saida;
       rastro.push({
@@ -154,6 +174,7 @@ export async function executarFluxo(
         estado: "sucesso",
         duracaoMs: Date.now() - comecou,
         ...(typeof saida.linkExterno === "string" && saida.linkExterno ? { linkExterno: saida.linkExterno } : {}),
+        ...entradasNoRastro,
       });
       if (no.pausarDepois) paradaEm = noId;
     } catch (erro) {
@@ -167,6 +188,7 @@ export async function executarFluxo(
         estado: "falhou",
         erro: erro instanceof Error ? erro.message : String(erro),
         duracaoMs: Date.now() - comecou,
+        ...entradasNoRastro,
       });
     }
   }

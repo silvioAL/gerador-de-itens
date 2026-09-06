@@ -16429,3 +16429,73 @@ Wait/approval do n8n), exigindo execução com estado retomável.
 
 Poucos conceitos, mais solidez: 5 tipos de nó, 2 mecânicas, e um placar — um
 conceito novo só entra aposentando um velho.
+
+---
+
+## §371 — SPEC-107 fatia A: o registro de funções, e o modo (b) com as entradas no rastro
+
+**A medição antes de codar confirmou o padrão: a premissa estava errada do
+jeito que constrói a coisa errada com teste verde.** A prova da fatia pede
+"derivar pelo botão da mesa ≡ derivar pela função, byte a byte (§263)" — mas o
+botão deriva NO NAVEGADOR, com o vocabulário que `loadConfig.ts` monta no
+cliente (diagrama resolvido + campos de nó/aresta + regras + tokens), e o
+servidor não montava `DiagramaConfig` em lugar NENHUM. Implementar a função
+sem ver isso teria produzido dois montadores — e dois montadores divergem na
+primeira mudança, em silêncio, com todos os testes verdes.
+
+**O que entrou:**
+
+- **A mescla virou UMA função** (`mesclarCamposDeNo`/`mesclarCamposDeAresta`,
+  na aplicação): saiu do `loadConfig.ts` do web; o web delega, e o servidor
+  novo (`contextoDasFuncoes`) monta as mesmas cinco fontes pelas mesmas
+  funções. A prova roda em três camadas: unitária (função ≡ motor, byte a
+  byte), rota (§263: a resposta da execução ≡ `executarFuncao` com o
+  vocabulário do servidor) e E2E (a mesa e o fluxo derivando o MESMO desenho
+  e produzindo as MESMAS chaves).
+- **`FUNCOES_DO_SISTEMA`** (`config/funcoes.ts`): o registro FECHADO, com o
+  contrato como dado (`entrada`/`saida` em `CampoDoConector` — o molde de
+  `CONTRATO_DA_OPERACAO`) e a governança como atributo (`nivel: operar` +
+  recurso `fluxos.executar`). `peca → funcao` renomeado ANTES de nascer
+  código (§5.3); os rótulos são genéricos — "Geração de itens", "Ensaio de
+  cenários"; "engine" e "derivar" não aparecem em tela nenhuma (há teste).
+- **O tipo de nó `funcao`** no fluxo, com executor no mesmo commit (§346):
+  `derivacao` (o `derivar` + `resolverDependencias` do motor, com avisos e
+  conformidade na saída) e `ensaio` (`simularCenarios`, com a âncora de hoje).
+  A escrita recusa refId fora do registro com o nome do que existe.
+- **Modo (b), pago à vista (§5.4):** a `derivacao` aceita QUALQUER `desenho`
+  mapeado — o E2E traz um do dublê (`/v1/desenho`) por um conector — e por
+  isso o rastro grava as **ENTRADAS** de cada nó de função
+  (`RastroDoNo.entradas`, no JSONB de `fluxo_execucoes` — sem migração),
+  também na falha: é a âncora da tese reescrita, "mesma fiação + mesmas
+  entradas → mesmos itens". Conector e agente continuam SEM saídas nem
+  entradas no rastro: diagnóstico, não armazém.
+- **A paleta** ganhou as duas funções; o nó nasce com o `refId` do registro
+  (§2.4-10: não há adaptador a escolher) e o painel diz o contrato em voz
+  alta (§2.4-6), com a régua §9.3 escrita nele.
+
+**§248 cumprido:** gravação das entradas desligada → 2 testes vermelhos →
+restaurada.
+
+**O que o E2E pescou (dois defeitos reais, nenhum deles da função):**
+
+1. **O servidor da suíte rodava SEM `config/`** — o cwd é `packages/server`,
+   a pasta não existe lá, e `CONFIG_DIR` só era definido no compose de
+   verdade. `GET /config/diagrama` respondia 500 há rodadas e ninguém via,
+   porque o web cai no estático em silêncio; a função `derivacao` foi a
+   primeira coisa a PRECISAR do vocabulário no servidor e quebrou na hora.
+   A suíte agora define `CONFIG_DIR` para o `config/` da raiz — o mesmo
+   diretório que o middleware do Vite já servia ao web (a suíte roda como a
+   instalação de demonstração roda, SPEC-89).
+2. **O Executar da tela salvava a esteira DERIVADA como declarada** — o
+   `executar()` gravava `fluxos` sem o filtro de `origem` que o Salvar tem,
+   congelando a cópia que ninguém pediu (§365). Apareceu como corrida entre
+   dois specs; a causa era do produto. Corrigido com o mesmo filtro, e com
+   regressão no E2E.
+
+De quebra: o spec novo mora em `time-portabilidade` — dois specs escrevendo o
+documento `fluxos` INTEIRO do mesmo time em paralelo se apagam mutuamente;
+documento por time, um time por spec.
+
+**A fatia B fica armada:** o nó `projeto` substitui o conector de desenho do
+dublê como fonte nas mesmas fiações — a aresta `desenho → desenho` já é a
+mesma.

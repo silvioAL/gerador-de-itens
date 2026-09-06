@@ -1,4 +1,5 @@
 import { resolverDependencias, type Dependencia } from "@gerador/engine";
+import { FUNCOES_DO_SISTEMA, funcaoDoSistema } from "./funcoes.js";
 import { ConfigInvalida, OPERACOES_DO_GATEWAY, type OperacaoDoGateway, type PapelConfigurado } from "./normalizacao.js";
 
 /**
@@ -14,14 +15,15 @@ import { ConfigInvalida, OPERACOES_DO_GATEWAY, type OperacaoDoGateway, type Pape
  * ambiguidade, porque fluxo não deriva — a derivação continua determinística e
  * fora do fluxo (§6).
  *
- * ## Por que só `conector` e `agente`
+ * ## Por que `conector`, `agente` e `funcao`
  *
- * A §4.1 desenhou quatro tipos; os outros dois (`transformacao`, `saida`) não
- * têm executor nesta leva — e um tipo que a tela oferece e o executor ignora é
- * a meia-integração que o §346 já pagou para aprender. Entram quando houver
- * quem os honre.
+ * A §4.1 desenhou quatro tipos; entra na lista quem TEM executor — um tipo
+ * que a tela oferece e o executor ignora é a meia-integração que o §346 já
+ * pagou para aprender. `funcao` (SPEC-107 fatia A) é a capacidade do motor
+ * com contrato declarado: o `refId` aponta para o registro fechado de
+ * `FUNCOES_DO_SISTEMA`, e o executor de fluxo a honra em processo.
  */
-export const TIPOS_DE_NO_DO_FLUXO = ["conector", "agente"] as const;
+export const TIPOS_DE_NO_DO_FLUXO = ["conector", "agente", "funcao"] as const;
 export type TipoDeNoDoFluxo = (typeof TIPOS_DE_NO_DO_FLUXO)[number];
 
 export interface NoDoFluxo {
@@ -250,6 +252,14 @@ export function validarEscritaFluxos(documento: unknown): void {
       }
       if (!(typeof no.refId === "string" && no.refId.trim())) {
         throw new ConfigInvalida(`no fluxo "${id}", o nó "${noId}" está sem adaptador — escolha um nas propriedades do nó`);
+      }
+      // O registro de funções é fechado e vive no código — um refId fora dele
+      // nunca vai ganhar executor, e falhar só na execução seria o silêncio
+      // que a §9.3 recusa.
+      if (no.tipo === "funcao" && !funcaoDoSistema(no.refId.trim())) {
+        throw new ConfigInvalida(
+          `no fluxo "${id}", o nó "${noId}" aponta para a função "${no.refId.trim()}", que não existe (funções: ${FUNCOES_DO_SISTEMA.map((f) => f.id).join(", ")})`
+        );
       }
     }
     for (const aresta of Array.isArray(f.arestas) ? (f.arestas as Partial<ArestaDoFluxo>[]) : []) {

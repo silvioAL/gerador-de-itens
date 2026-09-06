@@ -102,11 +102,24 @@ describe("validarEscritaFluxos (SPEC-35 + prova da fatia C)", () => {
       { fluxos: [{ id: "f", nos: [{ id: "a", tipo: "conector", refId: "x" }], arestas: [{ de: "a", para: "fantasma" }] }] },
       /"fantasma", que não existe/,
     ],
+    // SPEC-107 fatia A — o registro de funções é fechado e vive no código:
+    // refId fora dele nunca ganharia executor, e falhar só na execução seria
+    // o silêncio que a §9.3 recusa.
+    [
+      { fluxos: [{ id: "f", nos: [{ id: "a", tipo: "funcao", refId: "telepatia" }], arestas: [] }] },
+      /a função "telepatia", que não existe \(funções: derivacao, ensaio\)/,
+    ],
   ])("recusa com o motivo: %j", (documento, motivo) => {
     expect(() => validarEscritaFluxos(documento)).toThrow(motivo);
   });
 
   it("o exemplo da SPEC passa", () => {
     expect(() => validarEscritaFluxos({ fluxos: [FLUXO_JMETER] })).not.toThrow();
+  });
+
+  it("SPEC-107 fatia A — nó de função com refId do registro passa", () => {
+    expect(() =>
+      validarEscritaFluxos({ fluxos: [{ id: "f", nos: [{ id: "g", tipo: "funcao", refId: "derivacao" }], arestas: [] }] })
+    ).not.toThrow();
   });
 });

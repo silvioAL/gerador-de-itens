@@ -5,10 +5,12 @@ import {
   CAMPO_GLOBAL,
   criarCasosDeUsoDeConfig,
   executarFluxo,
+  executarFuncao,
   fluxosEmVigor,
   mensagemDeCiclo,
   normalizarPipelineAgentes,
   preambuloDoPapel,
+  type ContextoDasFuncoes,
   type Fluxo,
   type RastroDoNo,
 } from "@gerador/aplicacao";
@@ -19,6 +21,7 @@ import { exigirNivel } from "../auth/niveis.js";
 import { organizacaoPadraoDe, recursosCurados, resolverPermissoes } from "../auth/permissoes.js";
 import { registrarAuditoria } from "../auditoria.js";
 import { catalogoDeConectores } from "../config/catalogoDeConectores.js";
+import { contextoDasFuncoes } from "../config/contextoDasFuncoes.js";
 import { templateDaVersao } from "../config/templateDaVersao.js";
 import { criarResolvedorDeProvedor } from "../ia/provedorDaOrganizacao.js";
 import { fluxoExecucoes } from "../db/schema.js";
@@ -133,6 +136,13 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
 
     const [catalogo, provedor] = await Promise.all([catalogoDeConectores(db, diretorioConfig), resolverProvedor()]);
 
+    // O vocabulário do time (diagrama + campos + regras + tokens) só é montado
+    // se o fluxo TEM nó de função — e uma vez por execução: montar por nó
+    // abriria a porta para dois nós derivarem com vocabulários diferentes.
+    let contextoFuncoes: ContextoDasFuncoes | null = null;
+    const contextoDeFuncao = async () =>
+      (contextoFuncoes ??= await contextoDasFuncoes(db, diretorioConfig, timeId));
+
     let resultado;
     try {
       resultado = await executarFluxo(fluxo, {
@@ -167,6 +177,7 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
           const texto = await provedor.completar(prompt);
           return { texto };
         },
+        funcao: async (no, entradas) => executarFuncao(no.refId, entradas, await contextoDeFuncao()),
       }, { ateNo });
     } finally {
       await provedor?.descartar().catch(() => undefined);
