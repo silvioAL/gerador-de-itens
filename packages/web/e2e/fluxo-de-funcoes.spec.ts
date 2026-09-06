@@ -182,6 +182,80 @@ test("a função entra pela paleta já com o contrato à mostra — sem adaptado
 });
 
 /**
+ * SPEC-107 fatia C — a prova do gate: a execução SUSPENDE no nó marcado,
+ * SOBREVIVE ao F5 (o stage está no servidor, não na aba) e CONTINUA do ponto
+ * exato — o agente só roda depois da decisão humana.
+ */
+test("o gate suspende, sobrevive ao F5 e continua do ponto exato", async ({ page }) => {
+  test.setTimeout(120000);
+  const original = (await (await page.request.get(`${API}/config/fluxos?timeId=time-portabilidade`)).json()).documento;
+  try {
+    await declararConectores(page, [
+      {
+        id: "desenho-funcoes-e2e",
+        nome: "Desenho da casa (E2E)",
+        endpoint: `${GATEWAY_FALSO}/v1/desenho`,
+        entrada: [],
+        saida: [{ chave: "desenho", rotulo: "Desenho", tipo: "objeto", caminho: "$.desenho", obrigatorio: true }],
+      },
+    ]);
+    await page.request.put(`${API}/ia/credencial`, {
+      data: { baseUrl: BASE_URL_GATEWAY_FALSO, chave: CHAVE_GATEWAY_FALSO, modelo: MODELO_GATEWAY_FALSO, visao: true },
+    });
+    await page.request.put(`${API}/config/fluxos`, {
+      data: {
+        timeId: "time-portabilidade",
+        documento: {
+          fluxos: [
+            {
+              id: "gate-e2e",
+              nome: "Fiação com gate",
+              nos: [
+                { id: "le", tipo: "conector", refId: "desenho-funcoes-e2e", posicao: { x: 0, y: 80 }, parametros: {} },
+                { id: "gera", tipo: "funcao", refId: "derivacao", posicao: { x: 240, y: 80 }, parametros: {}, confirmacao: "aguardar" },
+                { id: "resume", tipo: "agente", refId: "especialista", posicao: { x: 480, y: 80 }, parametros: {} },
+              ],
+              arestas: [
+                { de: "le", para: "gera", mapeamento: [{ saida: "desenho", entrada: "desenho" }] },
+                { de: "gera", para: "resume", mapeamento: [{ saida: "itens", entrada: "itens" }] },
+              ],
+            },
+          ],
+        },
+      },
+    });
+
+    await page.goto("/#/fluxo");
+    await expect(page.getByTestId("fluxo-screen")).toBeVisible();
+    await page.getByTestId("seletor-de-fluxo").selectOption("gate-e2e");
+    // O gate se anuncia no cartão antes de qualquer execução (⏸).
+    await expect(page.locator(`.react-flow__node[data-id="gera"]`)).toContainText("⏸");
+
+    await page.getByTestId("executar-fluxo").click();
+    await expect(page.getByTestId("gate-de-confirmacao")).toBeVisible({ timeout: 30000 });
+    await expect(page.getByTestId("gate-de-confirmacao")).toContainText("gera");
+    await expect(page.getByTestId("rastro-gera")).toContainText("✓");
+    // O agente está esperando, não pulado: fora do rastro.
+    await expect(page.getByTestId("rastro-resume")).toHaveCount(0);
+
+    // F5 — o gate está no SERVIDOR: reaparece com o stage persistido.
+    await page.reload();
+    await expect(page.getByTestId("fluxo-screen")).toBeVisible();
+    await page.getByTestId("seletor-de-fluxo").selectOption("gate-e2e");
+    await expect(page.getByTestId("gate-de-confirmacao")).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId("rastro-gera")).toContainText("✓");
+
+    // Continuar roda SÓ o resto — o agente, agora sim.
+    await page.getByTestId("continuar-execucao").click();
+    await expect(page.getByTestId("gate-de-confirmacao")).toHaveCount(0, { timeout: 30000 });
+    await expect(page.getByTestId("rastro-resume")).toContainText("✓", { timeout: 30000 });
+  } finally {
+    await page.request.put(`${API}/config/fluxos`, { data: { documento: original, timeId: "time-portabilidade" } });
+    await limparMeusConectores(page);
+  }
+});
+
+/**
  * A prova do §263 no NAVEGADOR: o botão "Derivar Quebra" da mesa e a função
  * `derivacao` do fluxo, sobre o MESMO diagrama e o MESMO time, produzem os
  * MESMOS itens. É a fronteira mais fácil de quebrar em silêncio — o botão

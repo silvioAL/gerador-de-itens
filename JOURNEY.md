@@ -16556,3 +16556,48 @@ e a fatia C de `fluxo-de-integracao` (uma vez local: o rótulo do mapeamento
 sumiu após o F5; 6/6 verde rodando sozinho, serializado). Nenhum dos dois
 falha isolado; a suíte cresceu e a janela de carga apareceu. Fica anotado
 para uma rodada de robustez da suíte.
+
+---
+
+## §373 — SPEC-107 fatia C: o gate desenhável, e a execução que espera
+
+**A decisão §5.5, paga inteira: a confirmação MORA NO DESENHO.** O
+`pausarDepois` do §368 generalizou para `confirmacao: "aguardar" |
+"automatica"` no nó — e a consequência honesta que a SPEC anunciou chegou
+junto: **execução deixou de ser one-shot.**
+
+**O que entrou:**
+
+- **O modelo**: `confirmacao` no nó (ausente = automática); `pausarDepois:
+  true` de fluxo salvo antes da fatia é LIDO como `"aguardar"` na
+  normalização — o gesto configurado não se perde (há teste). Valor
+  desconhecido é recusado na escrita com o nome do que se aceita.
+- **O executor**: suspensão devolve `aguardandoEm` — os nós por vir ficam
+  FORA do rastro (esperando não é falha nem pulo, diferente do §9.3);
+  `retomarDe { saidas, concluidos }` continua do ponto EXATO, sem reexecutar
+  ninguém (a saída revisada do agente é a que segue, não uma segunda geração
+  que poderia dizer outra coisa). Dois gates são dois pontos de revisão: a
+  retomada suspende de novo no seguinte.
+- **A persistência** (migração 0045): `fluxo_execucoes` ganhou `estado`
+  (`concluida`/`aguardando-confirmacao`/`descartada`), `saidas` e `ate_no`.
+  A régua "rastro não é armazém" FICA: as saídas persistem SÓ enquanto a
+  execução aguarda — são o stage da revisão e o combustível da retomada; ao
+  continuar ou descartar, voltam a NULL. §248 cumprido (persistência
+  desligada → teste vermelho → restaurada).
+- **As rotas**: `POST /fluxos/execucoes/:id/continuar` (nível `operar` no
+  time DA EXECUÇÃO — continuar é disparar o resto, de qualquer máquina) e
+  `/descartar`. **§9.5 aplicado ao gate**: se a fiação mudou desde a
+  suspensão (hash diferente), continuar é 409 com o caminho — retomar sobre
+  outra fiação tornaria o rastro ambíguo. Executar e continuar rodam pelos
+  MESMOS executores (extraídos para um lugar só, §263).
+- **A tela**: o cartão anuncia o gate (⏸) antes de rodar; a execução
+  suspensa mostra o aviso com os DOIS caminhos (continuar/descartar); e o
+  gate SOBREVIVE ao F5 — ao abrir o fluxo, a suspensa mais recente reaparece
+  com o stage do servidor. De quebra, um defeito de tela: re-selecionar o
+  MESMO fluxo no seletor zerava o rastro (e apagava o gate recém-carregado).
+
+**Prova** (rota + navegador): a fiação com gate suspende com o agente sem
+disparar, persiste com as saídas, sobrevive ao F5, continua rodando SÓ o
+resto — e descartada fecha sem publicar nada. O spec da fatia D do §363 foi
+atualizado à semântica nova: o que espera fica fora do rastro, e o gate se
+anuncia.

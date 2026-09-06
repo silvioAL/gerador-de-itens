@@ -651,4 +651,15 @@ export const fluxoExecucoes = pgTable("fluxo_execucoes", {
   email: text("email"),
   em: timestamp("em", { withTimezone: true }).notNull().defaultNow(),
   nos: jsonb("nos").notNull(),
+  /**
+   * SPEC-107 fatia C (migração 0045) — a execução vira RETOMÁVEL (§5.5):
+   * `estado` diz onde ela está ('concluida' | 'aguardando-confirmacao' |
+   * 'descartada'); `saidas` existe SÓ enquanto aguarda — é o stage que a
+   * revisão lê e o que a retomada usa para não reexecutar ninguém; ao
+   * continuar/descartar volta a NULL (o rastro segue diagnóstico, não
+   * armazém). `ateNo` preserva o corte da execução original.
+   */
+  estado: text("estado").notNull().default("concluida"),
+  saidas: jsonb("saidas"),
+  ateNo: text("ate_no"),
 });

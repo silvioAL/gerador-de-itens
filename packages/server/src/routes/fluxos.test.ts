@@ -710,6 +710,157 @@ describe("SPEC-107 fatia B — o nó PROJETO", () => {
     });
   });
 
+  it("SPEC-107 fatia C — o gate suspende, persiste as saídas, e continuar roda SÓ o resto", async () => {
+    await comApp(async (app, cookies) => {
+      await prepararMundo(app, cookies);
+      await declararLeitorDeDesenho(app, cookies);
+      await app.inject({
+        method: "PUT",
+        url: "/config/fluxos",
+        cookies,
+        payload: {
+          documento: {
+            fluxos: [
+              {
+                id: "com-gate",
+                nome: "Com gate de confirmação",
+                nos: [
+                  { id: "le", tipo: "conector", refId: "leitor-de-desenho", posicao: { x: 0, y: 0 }, parametros: {} },
+                  { id: "gera", tipo: "funcao", refId: "derivacao", posicao: { x: 200, y: 0 }, parametros: {}, confirmacao: "aguardar" },
+                  { id: "resume", tipo: "agente", refId: "especialista", posicao: { x: 400, y: 0 }, parametros: {} },
+                ],
+                arestas: [
+                  { de: "le", para: "gera", mapeamento: [{ saida: "desenho", entrada: "desenho" }] },
+                  { de: "gera", para: "resume", mapeamento: [{ saida: "itens", entrada: "itens" }] },
+                ],
+              },
+            ],
+          },
+        },
+      });
+
+      // 1. Executar SUSPENDE no gate: o agente nem dispara.
+      const exec = await app.inject({ method: "POST", url: "/fluxos/com-gate/executar", cookies, payload: {} });
+      expect(exec.statusCode).toBe(200);
+      const suspensa = exec.json() as {
+        execucaoId: string;
+        aguardandoEm?: string;
+        nos: { noId: string; estado: string }[];
+        saidas: Record<string, Record<string, unknown>>;
+      };
+      expect(suspensa.aguardandoEm).toBe("gera");
+      expect(suspensa.nos.map((n) => n.noId)).toEqual(["le", "gera"]);
+      expect((suspensa.saidas["gera"].itens as unknown[]).length).toBeGreaterThan(0);
+
+      // 2. A suspensão PERSISTE — com as saídas (o stage da revisão), que é o
+      // que sobrevive a F5 e a outra máquina.
+      const persistida = await app.inject({ method: "GET", url: "/fluxos/com-gate/execucoes", cookies });
+      const linha = (persistida.json() as { execucoes: { id: string; estado: string; saidas: Record<string, unknown> | null }[] }).execucoes[0];
+      expect(linha.estado).toBe("aguardando-confirmacao");
+      expect(linha.saidas).not.toBeNull();
+
+      // 3. Continuar roda SÓ o resto (o agente), do ponto exato.
+      const continuada = await app.inject({
+        method: "POST",
+        url: `/fluxos/execucoes/${suspensa.execucaoId}/continuar`,
+        cookies,
+        payload: {},
+      });
+      expect(continuada.statusCode).toBe(200);
+      const fim = continuada.json() as { aguardandoEm?: string; nos: { noId: string; estado: string }[]; saidas: Record<string, Record<string, unknown>> };
+      expect(fim.aguardandoEm).toBeUndefined();
+      expect(fim.nos.map((n) => [n.noId, n.estado])).toEqual([
+        ["le", "sucesso"],
+        ["gera", "sucesso"],
+        ["resume", "sucesso"],
+      ]);
+      expect(String(fim.saidas["resume"].texto)).toBeTruthy();
+
+      // 4. Concluída: as saídas persistidas somem (rastro não é armazém), e
+      // continuar de novo é 409 — o gate não é uma porta que fica aberta.
+      const depois = await app.inject({ method: "GET", url: "/fluxos/com-gate/execucoes", cookies });
+      const linhaFinal = (depois.json() as { execucoes: { estado: string; saidas: unknown; nos: unknown[] }[] }).execucoes[0];
+      expect(linhaFinal.estado).toBe("concluida");
+      expect(linhaFinal.saidas).toBeNull();
+      expect(linhaFinal.nos).toHaveLength(3);
+
+      const deNovo = await app.inject({ method: "POST", url: `/fluxos/execucoes/${suspensa.execucaoId}/continuar`, cookies, payload: {} });
+      expect(deNovo.statusCode).toBe(409);
+    });
+  });
+
+  it("SPEC-107 fatia C — descartar fecha a execução sem o resto rodar", async () => {
+    await comApp(async (app, cookies) => {
+      await prepararMundo(app, cookies);
+      await declararLeitorDeDesenho(app, cookies);
+      await app.inject({
+        method: "PUT",
+        url: "/config/fluxos",
+        cookies,
+        payload: {
+          documento: {
+            fluxos: [
+              {
+                id: "gate-descartado",
+                nome: "Gate descartado",
+                nos: [
+                  { id: "le", tipo: "conector", refId: "leitor-de-desenho", posicao: { x: 0, y: 0 }, parametros: {}, confirmacao: "aguardar" },
+                  { id: "gera", tipo: "funcao", refId: "derivacao", posicao: { x: 200, y: 0 }, parametros: {} },
+                ],
+                arestas: [{ de: "le", para: "gera", mapeamento: [{ saida: "desenho", entrada: "desenho" }] }],
+              },
+            ],
+          },
+        },
+      });
+      const exec = await app.inject({ method: "POST", url: "/fluxos/gate-descartado/executar", cookies, payload: {} });
+      const { execucaoId } = exec.json() as { execucaoId: string };
+
+      const descarte = await app.inject({ method: "POST", url: `/fluxos/execucoes/${execucaoId}/descartar`, cookies, payload: {} });
+      expect(descarte.statusCode).toBe(200);
+
+      const depois = await app.inject({ method: "GET", url: "/fluxos/gate-descartado/execucoes", cookies });
+      const linha = (depois.json() as { execucoes: { estado: string; saidas: unknown }[] }).execucoes[0];
+      expect(linha.estado).toBe("descartada");
+      expect(linha.saidas).toBeNull();
+
+      const continuar = await app.inject({ method: "POST", url: `/fluxos/execucoes/${execucaoId}/continuar`, cookies, payload: {} });
+      expect(continuar.statusCode).toBe(409);
+    });
+  });
+
+  it("SPEC-107 fatia C (§9.5) — fluxo editado depois da suspensão: continuar é recusado com o caminho", async () => {
+    await comApp(async (app, cookies) => {
+      await prepararMundo(app, cookies);
+      await declararLeitorDeDesenho(app, cookies);
+      const fluxoBase = {
+        id: "gate-que-muda",
+        nome: "Gate que muda",
+        nos: [
+          { id: "le", tipo: "conector", refId: "leitor-de-desenho", posicao: { x: 0, y: 0 }, parametros: {}, confirmacao: "aguardar" },
+          { id: "gera", tipo: "funcao", refId: "derivacao", posicao: { x: 200, y: 0 }, parametros: {} },
+        ],
+        arestas: [{ de: "le", para: "gera", mapeamento: [{ saida: "desenho", entrada: "desenho" }] }],
+      };
+      await app.inject({ method: "PUT", url: "/config/fluxos", cookies, payload: { documento: { fluxos: [fluxoBase] } } });
+      const exec = await app.inject({ method: "POST", url: "/fluxos/gate-que-muda/executar", cookies, payload: {} });
+      const { execucaoId } = exec.json() as { execucaoId: string };
+
+      // A fiação muda depois da suspensão (a posição basta: o hash é do fluxo
+      // inteiro) — continuar sobre outra fiação tornaria o rastro ambíguo.
+      await app.inject({
+        method: "PUT",
+        url: "/config/fluxos",
+        cookies,
+        payload: { documento: { fluxos: [{ ...fluxoBase, nos: [{ ...fluxoBase.nos[0], posicao: { x: 999, y: 0 } }, fluxoBase.nos[1]] }] } },
+      });
+
+      const continuar = await app.inject({ method: "POST", url: `/fluxos/execucoes/${execucaoId}/continuar`, cookies, payload: {} });
+      expect(continuar.statusCode).toBe(409);
+      expect((continuar.json() as { erro: string }).erro).toContain("mudou desde a suspensão");
+    });
+  });
+
   it("escrever fluxo com projeto de refId errado é recusado com a régua", async () => {
     await comApp(async (app, cookies) => {
       const r = await app.inject({

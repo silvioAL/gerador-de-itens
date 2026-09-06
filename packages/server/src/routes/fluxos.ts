@@ -116,35 +116,28 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     };
   });
 
-  app.post("/fluxos/:id/executar", { preHandler: exigirNivel(db, "operar", timeDoCorpo) }, async (req, reply) => {
-    const { id } = req.params as { id: string };
-    const { ateNo } = (req.body ?? {}) as { ateNo?: string };
-    const timeId = timeDoCorpo(req) ?? undefined;
-    const email = req.usuario!.email;
-
-    // A camada de curadoria da execução (ver o comentário do arquivo).
+  /** A camada de curadoria da execução (ver o comentário do arquivo) — a
+   * mesma para disparar E para continuar: continuar é disparar o resto. */
+  async function execucaoRestritaPara(email: string, timeId?: string): Promise<boolean> {
     const orgId = await organizacaoPadrao();
-    if (orgId && (await recursosCurados(db, orgId)).includes("fluxos.executar")) {
-      const { porRecurso } = await resolverPermissoes(db, orgId, email, timeId ?? null);
-      if (!porRecurso["fluxos.executar"]?.includes("editar")) {
-        return reply.code(403).send({
-          erro: `a execução de fluxos está restrita — disparar exige o papel com "fluxos.executar"`,
-          recurso: "fluxos.executar",
-          acao: "editar",
-        });
-      }
-    }
+    if (!orgId || !(await recursosCurados(db, orgId)).includes("fluxos.executar")) return false;
+    const { porRecurso } = await resolverPermissoes(db, orgId, email, timeId ?? null);
+    return !porRecurso["fluxos.executar"]?.includes("editar");
+  }
 
-    // Do EM VIGOR, não só dos declarados: a esteira derivada também executa.
-    const { fluxos, papeis } = await emVigor(timeId);
-    const fluxo = fluxos.find((f) => f.id === id);
-    if (!fluxo) return reply.code(404).send({ erro: `não conheço o fluxo "${id}" neste time` });
-    if (ateNo && !fluxo.nos.some((no) => no.id === ateNo)) {
-      return reply.code(404).send({ erro: `o fluxo "${id}" não tem o nó "${ateNo}"` });
-    }
-
-    const [catalogo, provedor] = await Promise.all([catalogoDeConectores(db, diretorioConfig), resolverProvedor()]);
-
+  /**
+   * Os executores de um fluxo, num lugar só (§263): o Executar e o Continuar
+   * (fatia C) rodam pelos MESMOS — dois mapas divergiriam no primeiro nó novo.
+   */
+  function criarExecutores(opcoes: {
+    fluxo: Fluxo;
+    papeis: ReturnType<typeof normalizarPipelineAgentes>["papeis"];
+    catalogo: Awaited<ReturnType<typeof catalogoDeConectores>>;
+    provedor: Awaited<ReturnType<ReturnType<typeof criarResolvedorDeProvedor>>>;
+    timeId: string | undefined;
+    email: string;
+  }) {
+    const { fluxo, papeis, catalogo, provedor, timeId, email } = opcoes;
     // O vocabulário do time (diagrama + campos + regras + tokens) só é montado
     // se o fluxo TEM nó de função — e uma vez por execução: montar por nó
     // abriria a porta para dois nós derivarem com vocabulários diferentes.
@@ -152,9 +145,7 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     const contextoDeFuncao = async () =>
       (contextoFuncoes ??= await contextoDasFuncoes(db, diretorioConfig, timeId));
 
-    let resultado;
-    try {
-      resultado = await executarFluxo(fluxo, {
+    return {
         conector: async (no, parametros) => {
           const conector = catalogo.find((c) => c.id === no.refId);
           if (!conector) throw new Error(`não conheço o conector "${no.refId}" — veja GET /conectores`);
@@ -229,7 +220,36 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
           const itens = await criarCasosDeUsoDeItensGerados(criarRepositorioDeItensGeradosEmPostgres(db)).listarDaQuebra(quebra.id);
           return saidaDoProjeto(quebra, itens);
         },
-      }, { ateNo });
+    } satisfies Parameters<typeof executarFluxo>[1];
+  }
+
+  app.post("/fluxos/:id/executar", { preHandler: exigirNivel(db, "operar", timeDoCorpo) }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { ateNo } = (req.body ?? {}) as { ateNo?: string };
+    const timeId = timeDoCorpo(req) ?? undefined;
+    const email = req.usuario!.email;
+
+    if (await execucaoRestritaPara(email, timeId)) {
+      return reply.code(403).send({
+        erro: `a execução de fluxos está restrita — disparar exige o papel com "fluxos.executar"`,
+        recurso: "fluxos.executar",
+        acao: "editar",
+      });
+    }
+
+    // Do EM VIGOR, não só dos declarados: a esteira derivada também executa.
+    const { fluxos, papeis } = await emVigor(timeId);
+    const fluxo = fluxos.find((f) => f.id === id);
+    if (!fluxo) return reply.code(404).send({ erro: `não conheço o fluxo "${id}" neste time` });
+    if (ateNo && !fluxo.nos.some((no) => no.id === ateNo)) {
+      return reply.code(404).send({ erro: `o fluxo "${id}" não tem o nó "${ateNo}"` });
+    }
+
+    const [catalogo, provedor] = await Promise.all([catalogoDeConectores(db, diretorioConfig), resolverProvedor()]);
+
+    let resultado;
+    try {
+      resultado = await executarFluxo(fluxo, criarExecutores({ fluxo, papeis, catalogo, provedor, timeId, email }), { ateNo });
     } finally {
       await provedor?.descartar().catch(() => undefined);
     }
@@ -238,18 +258,139 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     if (resultado.ciclo) return reply.code(409).send({ erro: mensagemDeCiclo(resultado.ciclo) });
 
     const hash = hashDoFluxo(fluxo);
-    // O rastro persiste SEM as saídas (ver o comentário da tabela); a resposta
-    // da rota as carrega, porque quem disparou quer ver o que saiu.
-    await db.insert(fluxoExecucoes).values({
-      fluxoId: id,
-      timeId: timeId ?? CAMPO_GLOBAL,
-      hash,
-      email,
-      nos: resultado.nos,
-    });
+    // O rastro persiste SEM as saídas (ver o comentário da tabela) — EXCETO
+    // quando a execução SUSPENDE num gate (fatia C): a suspensa guarda as
+    // saídas até alguém continuar/descartar, porque elas são o stage a
+    // revisar e o que a retomada usa para não reexecutar ninguém.
+    const suspensa = Boolean(resultado.aguardandoEm);
+    const [linha] = await db
+      .insert(fluxoExecucoes)
+      .values({
+        fluxoId: id,
+        timeId: timeId ?? CAMPO_GLOBAL,
+        hash,
+        email,
+        nos: resultado.nos,
+        ...(suspensa ? { estado: "aguardando-confirmacao", saidas: resultado.saidas, ateNo: ateNo ?? null } : {}),
+      })
+      .returning({ id: fluxoExecucoes.id });
     registrarAuditoria(db, { email, acao: "executar", recurso: "fluxos", recursoId: id });
 
-    return { fluxo: id, hash, nos: resultado.nos, saidas: resultado.saidas };
+    return {
+      fluxo: id,
+      execucaoId: linha.id,
+      hash,
+      nos: resultado.nos,
+      saidas: resultado.saidas,
+      ...(resultado.aguardandoEm ? { aguardandoEm: resultado.aguardandoEm } : {}),
+    };
+  });
+
+  /**
+   * SPEC-107 fatia C (§5.5) — **continuar uma execução suspensa no gate.**
+   *
+   * O nível é checado no time DA EXECUÇÃO (não no corpo): continuar é
+   * disparar o resto, de qualquer máquina — é isso que torna o gate um ponto
+   * de revisão de verdade, não um estado preso na aba de quem executou.
+   */
+  app.post("/fluxos/execucoes/:id/continuar", { preHandler: exigirSessao }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const email = req.usuario!.email;
+
+    const [execucao] = await db.select().from(fluxoExecucoes).where(eq(fluxoExecucoes.id, id)).limit(1);
+    if (!execucao) return reply.code(404).send({ erro: `não conheço a execução "${id}"` });
+    if (execucao.estado !== "aguardando-confirmacao") {
+      return reply.code(409).send({ erro: `esta execução não está aguardando confirmação (estado: ${execucao.estado})` });
+    }
+
+    const timeId = execucao.timeId === CAMPO_GLOBAL ? undefined : execucao.timeId;
+    const nivel = timeId ? await nivelNoTime(db, email, timeId) : await maiorNivel(db, email);
+    if (nivel !== "operar" && nivel !== "owner") {
+      return reply.code(403).send({
+        erro: `continuar esta execução exige nível "operar" no time "${timeId ?? "(global)"}" — seu nível é "${nivel ?? "nenhum"}"`,
+      });
+    }
+    if (await execucaoRestritaPara(email, timeId)) {
+      return reply.code(403).send({
+        erro: `a execução de fluxos está restrita — continuar exige o papel com "fluxos.executar"`,
+        recurso: "fluxos.executar",
+        acao: "editar",
+      });
+    }
+
+    const { fluxos, papeis } = await emVigor(timeId);
+    const fluxo = fluxos.find((f) => f.id === execucao.fluxoId);
+    if (!fluxo) {
+      return reply.code(409).send({ erro: `o fluxo "${execucao.fluxoId}" não existe mais neste time — descarte esta execução` });
+    }
+    // §9.5 — o hash é a identidade da fiação que SUSPENDEU. Continuar sobre
+    // uma fiação editada tornaria o rastro ambíguo: recusa, com o caminho.
+    if (hashDoFluxo(fluxo) !== execucao.hash) {
+      return reply.code(409).send({
+        erro: "o fluxo mudou desde a suspensão — descarte esta execução e execute de novo",
+      });
+    }
+
+    const rastroParcial = execucao.nos as RastroDoNo[];
+    const concluidos = rastroParcial.filter((n) => n.estado === "sucesso").map((n) => n.noId);
+    const saidasSuspensas = (execucao.saidas ?? {}) as Record<string, Record<string, unknown>>;
+
+    const [catalogo, provedor] = await Promise.all([catalogoDeConectores(db, diretorioConfig), resolverProvedor()]);
+    let resultado;
+    try {
+      resultado = await executarFluxo(fluxo, criarExecutores({ fluxo, papeis, catalogo, provedor, timeId, email }), {
+        ateNo: execucao.ateNo ?? undefined,
+        retomarDe: { saidas: saidasSuspensas, concluidos },
+      });
+    } finally {
+      await provedor?.descartar().catch(() => undefined);
+    }
+
+    const nosCompletos = [...rastroParcial, ...resultado.nos];
+    const aindaAguarda = Boolean(resultado.aguardandoEm);
+    await db
+      .update(fluxoExecucoes)
+      .set({
+        nos: nosCompletos,
+        ...(aindaAguarda
+          ? { saidas: { ...saidasSuspensas, ...resultado.saidas } }
+          : { estado: "concluida", saidas: null }),
+      })
+      .where(eq(fluxoExecucoes.id, id));
+    registrarAuditoria(db, { email, acao: "executar", recurso: "fluxos", recursoId: execucao.fluxoId });
+
+    return {
+      fluxo: execucao.fluxoId,
+      execucaoId: id,
+      hash: execucao.hash,
+      nos: nosCompletos,
+      saidas: { ...saidasSuspensas, ...resultado.saidas },
+      ...(resultado.aguardandoEm ? { aguardandoEm: resultado.aguardandoEm } : {}),
+    };
+  });
+
+  /** O outro lado do gate: quem revisa pode DESCARTAR — a execução fecha sem
+   * o resto rodar, e as saídas suspensas somem (rastro não é armazém). */
+  app.post("/fluxos/execucoes/:id/descartar", { preHandler: exigirSessao }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const email = req.usuario!.email;
+
+    const [execucao] = await db.select().from(fluxoExecucoes).where(eq(fluxoExecucoes.id, id)).limit(1);
+    if (!execucao) return reply.code(404).send({ erro: `não conheço a execução "${id}"` });
+    if (execucao.estado !== "aguardando-confirmacao") {
+      return reply.code(409).send({ erro: `esta execução não está aguardando confirmação (estado: ${execucao.estado})` });
+    }
+    const timeId = execucao.timeId === CAMPO_GLOBAL ? undefined : execucao.timeId;
+    const nivel = timeId ? await nivelNoTime(db, email, timeId) : await maiorNivel(db, email);
+    if (nivel !== "operar" && nivel !== "owner") {
+      return reply.code(403).send({
+        erro: `descartar esta execução exige nível "operar" no time "${timeId ?? "(global)"}" — seu nível é "${nivel ?? "nenhum"}"`,
+      });
+    }
+
+    await db.update(fluxoExecucoes).set({ estado: "descartada", saidas: null }).where(eq(fluxoExecucoes.id, id));
+    registrarAuditoria(db, { email, acao: "executar", recurso: "fluxos", recursoId: execucao.fluxoId });
+    return { ok: true };
   });
 
   /** O rastro das últimas execuções — é o que torna o fluxo diagnosticável. */

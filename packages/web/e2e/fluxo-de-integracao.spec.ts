@@ -217,14 +217,21 @@ test("fatia D: o exemplo do JMeter roda pela tela, com rastro por nó", async ({
     }
     await expect(page.getByTestId("rastro-publica")).toContainText("linkExterno");
 
-    // §368 — a parada é CONFIGURAÇÃO do nó, não um botão: marcada no agente,
-    // TODO Executar para ali — a publicação (que age no mundo) não dispara.
+    // §368, generalizado pela SPEC-107 fatia C: o gate é CONFIGURAÇÃO do nó.
+    // Marcado no agente, TODO Executar SUSPENDE ali — a publicação (que age
+    // no mundo) não dispara, e o gate espera a decisão de quem revisa.
     await page.locator(`.react-flow__node[data-id="gera"]`).click();
-    await page.getByTestId("parar-depois").check();
+    await page.getByTestId("aguardar-confirmacao").check();
     await page.getByTestId("executar-fluxo").click();
     await expect(page.getByTestId("rastro-da-execucao")).toBeVisible({ timeout: 30000 });
     await expect(page.getByTestId("rastro-gera")).toContainText("✓");
-    await expect(page.getByTestId("rastro-publica")).toContainText("parada configurada");
+    // O que espera fica FORA do rastro (não falhou nem foi pulado) — e o gate
+    // se anuncia, com os dois caminhos.
+    await expect(page.getByTestId("rastro-publica")).toHaveCount(0);
+    await expect(page.getByTestId("gate-de-confirmacao")).toContainText("gera");
+    // Descartar fecha a revisão sem publicar nada.
+    await page.getByTestId("descartar-execucao").click();
+    await expect(page.getByTestId("gate-de-confirmacao")).toHaveCount(0);
   } finally {
     await page.request.put(`${API}/config/fluxos`, { data: { documento: original, timeId: "time-pagamentos" } });
     await limparMeusConectores(page);

@@ -59,6 +59,13 @@ export interface ResultadoDoFluxo {
   saidas: Record<string, Record<string, unknown>>;
   /** Presente quando o fluxo nem começou: ciclo é recusa, não falha parcial. */
   ciclo?: string[];
+  /**
+   * SPEC-107 fatia C (§5.5) — a execução SUSPENDEU no gate deste nó: ele
+   * rodou, alguém precisa revisar o stage e continuar (ou descartar). Os nós
+   * por vir NÃO entram no rastro — eles não falharam nem foram pulados, estão
+   * esperando; quem persiste a execução guarda as saídas para a retomada.
+   */
+  aguardandoEm?: string;
 }
 
 export interface OpcoesDeExecucao {
@@ -69,6 +76,13 @@ export interface OpcoesDeExecucao {
    * um conector de escrita no fim do fluxo age no mundo.
    */
   ateNo?: string;
+  /**
+   * SPEC-107 fatia C — retomar uma execução suspensa: os nós em `concluidos`
+   * não rodam de novo (as saídas deles vêm daqui), e a execução segue do
+   * ponto exato. Um gate mais adiante suspende de novo — vários pontos de
+   * revisão numa fiação são vários, não um.
+   */
+  retomarDe?: { saidas: Record<string, Record<string, unknown>>; concluidos: string[] };
 }
 
 /** O nó pedido e todo mundo de quem ele depende, transitivamente. */
@@ -105,25 +119,25 @@ export async function executarFluxo(
   const saidas: Record<string, Record<string, unknown>> = {};
   const rastro: RastroDoNo[] = [];
 
-  // §368 — a parada CONFIGURADA (`pausarDepois`): quando o nó marcado termina,
-  // o resto do fluxo não roda — nem os ramos independentes, porque a parada é
-  // um ponto de REVISÃO do fluxo inteiro (diferente da falha, §9.3, em que
-  // derrubar os independentes perderia trabalho bom).
-  let paradaEm: string | null = null;
+  // A retomada pré-carrega o que a suspensão deixou: os concluídos não rodam
+  // de novo, e as saídas deles alimentam quem vem depois — do ponto exato.
+  const concluidos = new Set(opcoes.retomarDe?.concluidos ?? []);
+  for (const noId of concluidos) {
+    estado.set(noId, "sucesso");
+    if (opcoes.retomarDe?.saidas[noId]) saidas[noId] = opcoes.retomarDe.saidas[noId];
+  }
+
+  // §368, generalizado pela fatia C (§5.5): o GATE DE CONFIRMAÇÃO. Quando o
+  // nó marcado "aguardar" termina, a execução SUSPENDE — nem os ramos
+  // independentes seguem, porque o gate é um ponto de REVISÃO do fluxo
+  // inteiro (diferente da falha, §9.3, em que derrubar os independentes
+  // perderia trabalho bom). Quem revisa continua (ou descarta); os nós por
+  // vir ficam FORA do rastro — esperando não é falha nem pulo.
+  let aguardandoEm: string | undefined;
 
   for (const noId of plano.ordem) {
-    if (paradaEm) {
-      const no = porId.get(noId)!;
-      rastro.push({
-        noId,
-        tipo: no.tipo,
-        refId: no.refId,
-        estado: "nao-executado",
-        erro: `parada configurada no nó "${paradaEm}" — revise a saída antes de seguir`,
-        duracaoMs: 0,
-      });
-      continue;
-    }
+    if (aguardandoEm) break;
+    if (concluidos.has(noId)) continue;
     const no = porId.get(noId)!;
     const entrantes = fluxo.arestas.filter((a) => a.para === noId);
 
@@ -180,7 +194,7 @@ export async function executarFluxo(
         ...(typeof saida.linkExterno === "string" && saida.linkExterno ? { linkExterno: saida.linkExterno } : {}),
         ...entradasNoRastro,
       });
-      if (no.pausarDepois) paradaEm = noId;
+      if (no.confirmacao === "aguardar") aguardandoEm = noId;
     } catch (erro) {
       // Regra 2 mora aqui, por omissão: nada de `throw` — o laço continua, e
       // só quem depende deste nó cai na regra 1.
@@ -197,5 +211,5 @@ export async function executarFluxo(
     }
   }
 
-  return { nos: rastro, saidas };
+  return { nos: rastro, saidas, ...(aguardandoEm ? { aguardandoEm } : {}) };
 }

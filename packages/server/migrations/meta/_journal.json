@@ -316,6 +316,13 @@
       "when": 1754500000030,
       "tag": "0044_link_do_documento",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1754500000031,
+      "tag": "0045_gate_de_confirmacao",
+      "breakpoints": true
     }
   ]
 }

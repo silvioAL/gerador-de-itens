@@ -116,7 +116,9 @@ describe("executarFluxo (SPEC-105 fatia D — a metade pura)", () => {
     expect(resultado.saidas.commit).toBeUndefined();
   });
 
-  it("§368 — `pausarDepois` é CONFIGURAÇÃO do nó: o Executar para ali, sempre", async () => {
+  it("§5.5 — o GATE suspende: quem escreve no mundo não dispara, e o rastro diz onde parou", async () => {
+    // `pausarDepois: true` DE PROPÓSITO: fluxo salvo antes da fatia C precisa
+    // continuar parando — a normalização o lê como `confirmacao: "aguardar"`.
     const fluxo = fluxoDe(
       [
         { id: "le", tipo: "conector", refId: "c1" },
@@ -128,6 +130,8 @@ describe("executarFluxo (SPEC-105 fatia D — a metade pura)", () => {
         { de: "gera", para: "publica", mapeamento: [{ saida: "texto", entrada: "markdown" }] },
       ]
     );
+    expect(fluxo.nos.find((n) => n.id === "gera")?.confirmacao).toBe("aguardar");
+
     const chamados: string[] = [];
     const resultado = await executarFluxo(fluxo, {
       ...semFuncao,
@@ -138,13 +142,75 @@ describe("executarFluxo (SPEC-105 fatia D — a metade pura)", () => {
       agente: async () => ({ texto: "artefato" }),
     });
 
-    // Quem escreve no mundo NÃO dispara: a parada é dado do fluxo, não um
-    // clique — todo Executar respeita, sem depender de alguém lembrar.
     expect(chamados).toEqual(["le"]);
-    const porNo = Object.fromEntries(resultado.nos.map((n) => [n.noId, n]));
-    expect(porNo.gera.estado).toBe("sucesso");
-    expect(porNo.publica.estado).toBe("nao-executado");
-    expect(porNo.publica.erro).toContain('parada configurada no nó "gera"');
+    expect(resultado.aguardandoEm).toBe("gera");
+    // O que está esperando fica FORA do rastro: não falhou nem foi pulado.
+    expect(resultado.nos.map((n) => n.noId)).toEqual(["le", "gera"]);
+    expect(resultado.saidas.gera).toEqual({ texto: "artefato" });
+  });
+
+  it("§5.5 — a retomada continua do PONTO EXATO: os concluídos não rodam de novo", async () => {
+    const fluxo = fluxoDe(
+      [
+        { id: "le", tipo: "conector", refId: "c1" },
+        { id: "gera", tipo: "agente", refId: "p", confirmacao: "aguardar" },
+        { id: "publica", tipo: "conector", refId: "c2" },
+      ],
+      [
+        { de: "le", para: "gera", mapeamento: [{ saida: "conteudo", entrada: "contexto" }] },
+        { de: "gera", para: "publica", mapeamento: [{ saida: "texto", entrada: "markdown" }] },
+      ]
+    );
+    const chamados: string[] = [];
+    const resultado = await executarFluxo(
+      fluxo,
+      {
+        ...semFuncao,
+        conector: async (no, parametros) => {
+          chamados.push(no.id);
+          return no.id === "publica" ? { linkExterno: `publicado:${parametros.markdown}` } : { conteudo: "x" };
+        },
+        agente: async () => {
+          chamados.push("gera");
+          return { texto: "nunca deveria rodar de novo" };
+        },
+      },
+      { retomarDe: { saidas: { le: { conteudo: "x" }, gera: { texto: "artefato revisado" } }, concluidos: ["le", "gera"] } }
+    );
+
+    // Só o que faltava rodou — e com a SAÍDA persistida da suspensão, não uma
+    // reexecução do agente (que poderia dar outro texto).
+    expect(chamados).toEqual(["publica"]);
+    expect(resultado.aguardandoEm).toBeUndefined();
+    expect(resultado.nos.map((n) => [n.noId, n.estado])).toEqual([["publica", "sucesso"]]);
+    expect(resultado.saidas.publica.linkExterno).toBe("publicado:artefato revisado");
+  });
+
+  it("§5.5 — dois gates são dois pontos de revisão: a retomada suspende de novo no seguinte", async () => {
+    const fluxo = fluxoDe(
+      [
+        { id: "a", tipo: "conector", refId: "c1", confirmacao: "aguardar" },
+        { id: "b", tipo: "conector", refId: "c2", confirmacao: "aguardar" },
+        { id: "c", tipo: "conector", refId: "c3" },
+      ],
+      [
+        { de: "a", para: "b", mapeamento: [{ saida: "x", entrada: "x" }] },
+        { de: "b", para: "c", mapeamento: [{ saida: "x", entrada: "x" }] },
+      ]
+    );
+    const executores = {
+      ...semFuncao,
+      conector: async () => ({ x: 1 }),
+      agente: async () => ({}),
+    };
+    const primeira = await executarFluxo(fluxo, executores);
+    expect(primeira.aguardandoEm).toBe("a");
+
+    const segunda = await executarFluxo(fluxo, executores, {
+      retomarDe: { saidas: primeira.saidas, concluidos: ["a"] },
+    });
+    expect(segunda.aguardandoEm).toBe("b");
+    expect(segunda.nos.map((n) => n.noId)).toEqual(["b"]);
   });
 
   it("ciclo nem começa — recusa, não falha parcial", async () => {

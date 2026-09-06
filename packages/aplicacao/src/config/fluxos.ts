@@ -45,13 +45,15 @@ export interface NoDoFluxo {
   /** Valores fixos dos campos de entrada que não vêm de aresta. */
   parametros: Record<string, unknown>;
   /**
-   * §368 — o ponto de parada CONFIGURADO: "revise a saída deste nó antes de o
-   * resto rodar". É dado do fluxo, como o mapeamento — não um botão de
-   * ocasião: quem fia decide UMA vez onde a revisão mora, e todo Executar
-   * respeita. (Pedido literal do usuário: "é comportamento editável e
-   * configurável, como os conectores".)
+   * SPEC-107 fatia C (§5.5) — **o gate de confirmação DESENHÁVEL**, a
+   * generalização do `pausarDepois` do §368: `"aguardar"` suspende a execução
+   * depois deste nó — alguém revisa o stage e CONTINUA (ou descarta); ausente
+   * (ou `"automatica"`) segue direto. É dado do fluxo, como o mapeamento:
+   * quem fia decide UMA vez onde a revisão mora, e todo Executar respeita.
+   * `pausarDepois: true` de fluxos salvos antes desta fatia é lido como
+   * `"aguardar"` — o gesto configurado não se perde na migração.
    */
-  pausarDepois?: boolean;
+  confirmacao?: "aguardar" | "automatica";
 }
 
 export interface ArestaDoFluxo {
@@ -116,7 +118,11 @@ export function normalizarFluxos(documento: unknown): ConfigFluxos {
           noCru.parametros && typeof noCru.parametros === "object" && !Array.isArray(noCru.parametros)
             ? (noCru.parametros as Record<string, unknown>)
             : {},
-        ...(noCru.pausarDepois === true ? { pausarDepois: true } : {}),
+        // O gate: o valor novo, ou o `pausarDepois` de antes da fatia C —
+        // "automatica" é o default e não se grava (presença = aguardar).
+        ...(noCru.confirmacao === "aguardar" || (noCru as { pausarDepois?: boolean }).pausarDepois === true
+          ? { confirmacao: "aguardar" as const }
+          : {}),
         ...((OPERACOES_DO_GATEWAY as readonly string[]).includes(noCru.componente as string) || noCru.componente === "livre"
           ? { componente: noCru.componente as OperacaoDoGateway | "livre" }
           : {}),
@@ -269,6 +275,14 @@ export function validarEscritaFluxos(documento: unknown): void {
       if (no.tipo === "projeto" && no.refId.trim() !== REF_DO_PROJETO) {
         throw new ConfigInvalida(
           `no fluxo "${id}", o nó "${noId}" é de projeto e o refId precisa ser "${REF_DO_PROJETO}" (a demanda é o parâmetro "demandaId", não o adaptador)`
+        );
+      }
+      // Gate com valor desconhecido seria descartado em silêncio na leitura —
+      // e um gate que some é escrita no mundo sem revisão (§2.4-14).
+      const confirmacao = (no as { confirmacao?: unknown }).confirmacao;
+      if (confirmacao !== undefined && confirmacao !== "aguardar" && confirmacao !== "automatica") {
+        throw new ConfigInvalida(
+          `no fluxo "${id}", o nó "${noId}" tem confirmação desconhecida "${String(confirmacao)}" (aceitas: aguardar, automatica)`
         );
       }
     }
