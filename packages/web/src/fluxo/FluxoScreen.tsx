@@ -71,6 +71,7 @@ export function FluxoScreen({
   onFechar,
   abrirFluxoId,
   painel,
+  demandaAberta,
 }: {
   timeAtivo: string;
   onFechar: () => void;
@@ -80,6 +81,13 @@ export function FluxoScreen({
   /** SPEC-107 G4 — um painel sobre o canvas (a bancada de ensaios), montado
    * por quem conhece a demanda aberta: o App. */
   painel?: React.ReactNode;
+  /**
+   * SPEC-107 G5c — a DEMANDA ABERTA na mesa: quando a fiação tem o nó fonte
+   * `demanda`, executar daqui aponta para ela (`parametrosPorNo`, como os
+   * atalhos de exportar/publicar/ensaiar) em vez de cair n'"a ativa" do
+   * servidor — assistir a esteira rodando é sobre a SUA demanda.
+   */
+  demandaAberta?: { id: string };
 }) {
   const permissoes = usePermissoes({ hospedado: true, timeId: timeAtivo });
   const podeEditar = permissoes.pode("fluxos", "editar");
@@ -482,8 +490,13 @@ export function FluxoScreen({
         timeAtivo
       );
       // Fatia D — a execução é ASSISTÍVEL: os eventos chegam nó a nó e a
-      // resposta final é a mesma do modo one-shot.
-      const resultado = await apiExecucaoDeFluxo.executarAoVivo(fluxo.id, timeAtivo, ateNo, aoEvento);
+      // resposta final é a mesma do modo one-shot. G5c — com a demanda aberta
+      // e o nó fonte `demanda` na fiação, a execução aponta para ELA.
+      const daDemanda =
+        demandaAberta && fluxo.nos.some((n) => n.tipo === "projeto" && n.id === "demanda")
+          ? { demanda: { demandaId: demandaAberta.id } }
+          : undefined;
+      const resultado = await apiExecucaoDeFluxo.executarAoVivo(fluxo.id, timeAtivo, ateNo, aoEvento, daDemanda);
       setRastro({
         nos: resultado.nos,
         saidas: resultado.saidas,
