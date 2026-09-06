@@ -1,4 +1,4 @@
-import { resolverDependencias, type Dependencia } from "@gerador/engine";
+﻿import { resolverDependencias, type Dependencia } from "@gerador/engine";
 import { sanearCamposDaTransformacao, validarCamposDaTransformacao } from "../casos-de-uso/transformacao.js";
 import { FUNCOES_DO_SISTEMA, funcaoDoSistema } from "./funcoes.js";
 import { REF_DO_PROJETO } from "./projeto.js";
@@ -323,9 +323,35 @@ export function fluxosDaPublicacao(configExportador: ConfigExportador): FluxoEmV
   }));
 }
 
+export const ID_DO_FLUXO_DO_ENSAIO = "ensaio-de-cenarios";
+
+/**
+ * SPEC-107 G4 — **o ensaio COMO fiação, semeado** (a quarta morte da §3.1):
+ * `projeto.desenho → funcao(ensaio)`. A bancada de cenários deixa de simular
+ * no navegador: cada cenário vira UMA execução desta fiação (o cenário entra
+ * por `parametrosPorNo`, que é entrada DESTA execução — não muda a fiação nem
+ * o hash dela), e a leitura volta no rastro com a âncora de hoje inteira.
+ *
+ * Diferente da exportação e da publicação, não depende de destino nenhum:
+ * ensaiar é capacidade do motor, então a fiação SEMPRE existe. Declarado
+ * vence fábrica no mesmo id, como sempre.
+ */
+export function fluxoDoEnsaio(): FluxoEmVigor {
+  return {
+    id: ID_DO_FLUXO_DO_ENSAIO,
+    nome: "Ensaio de cenários",
+    nos: [
+      { id: "demanda", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 60, y: 120 }, parametros: {} },
+      { id: "ensaio", tipo: "funcao", refId: "ensaio", posicao: { x: 340, y: 120 }, parametros: {} },
+    ],
+    arestas: [{ de: "demanda", para: "ensaio", mapeamento: [{ saida: "desenho", entrada: "desenho" }] }],
+    origem: "fabrica",
+  };
+}
+
 /** Declarados + as derivadas: a esteira (dos papéis), a exportação (do
- * destino de itens) e a publicação (por destino de documento). Declarado
- * vence fábrica no mesmo id. */
+ * destino de itens), a publicação (por destino de documento) e o ensaio
+ * (sempre). Declarado vence fábrica no mesmo id. */
 export function fluxosEmVigor(
   papeis: PapelConfigurado[],
   documentoFluxos: unknown,
@@ -342,6 +368,8 @@ export function fluxosEmVigor(
   for (const publicacao of configExportador ? fluxosDaPublicacao(configExportador) : []) {
     if (!declarados.some((f) => f.id === publicacao.id)) declarados.push(publicacao);
   }
+  const ensaio = fluxoDoEnsaio();
+  if (!declarados.some((f) => f.id === ensaio.id)) declarados.push(ensaio);
   return declarados;
 }
 

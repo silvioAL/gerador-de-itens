@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useState } from "react";
 
 /**
  * SPEC-40 Fase 1 — a rota do app, em hash (`#/config/membros`). Hash e não
@@ -42,21 +42,18 @@ export type Rota =
   /** SPEC-59 fatia A — a vista de leitura de como a ferramenta está montada. */
   | { tela: "sistema" }
   /**
-   * SPEC-66/68 — a bancada de ENSAIOS: "e se…?".
-   *
-   * ROTA, e não aba do assistente. O assistente é onde se CONVERSA para
-   * produzir desenho, e aqui não se produz nada — se ensaia. E rota é
-   * linkável: *"olha o que acontece se o bureau cair"* é uma URL que se manda
-   * para alguém, e isso é metade do valor.
-   */
-  | { tela: "ensaios" }
-  /**
    * SPEC-105 fatia C — o FLUXO: o encanamento da ferramenta como grafo.
    * Tela própria e não aba de config (§1): é o OUTRO grafo, com paleta
    * própria — misturá-lo com a mesa destruiria a régua "estou desenhando o
    * meu sistema ou a minha automação?".
+   *
+   * SPEC-107 G4 — `{ tela: "ensaios" }` MORREU: a bancada de cenários virou a
+   * fiação semeada `ensaio-de-cenarios`, e a tabela vive JUNTO do fluxo. A
+   * aposta da SPEC-66 §5 fica de pé: *"olha o que acontece se o bureau cair"*
+   * continua sendo uma URL mandável — `#/fluxo/ensaio` — e os links salvos
+   * (`#/ensaios`, `#/simulacao`) REDIRECIONAM em vez de virar tela branca.
    */
-  | { tela: "fluxo" };
+  | { tela: "fluxo"; bancada?: "ensaio" };
 
 /**
  * ~~SPEC-84 fatia A — `{ tela: "spec" }`.~~ **§346 — a tela saiu.**
@@ -111,8 +108,7 @@ export function hashDaRota(rota: Rota): string {
   if (rota.tela === "canvas") return "#/";
   if (rota.tela === "documento") return "#/documento";
   if (rota.tela === "sistema") return "#/sistema";
-  if (rota.tela === "ensaios") return "#/ensaios";
-  if (rota.tela === "fluxo") return "#/fluxo";
+  if (rota.tela === "fluxo") return rota.bancada === "ensaio" ? "#/fluxo/ensaio" : "#/fluxo";
   return `#/config/${SEGMENTO_DA_AREA[rota.area]}`;
 }
 
@@ -126,8 +122,12 @@ export function rotaDoHash(hash: string): Rota {
   if (partes[0] === "itens") return { tela: "documento" };
   if (partes[0] === "documento") return { tela: "documento" };
   if (partes[0] === "sistema") return { tela: "sistema" };
-  if (partes[0] === "ensaios") return { tela: "ensaios" };
-  if (partes[0] === "fluxo") return { tela: "fluxo" };
+  // SPEC-107 G4 — a tela de ensaios morreu; a bancada vive junto do fluxo
+  // (`#/fluxo/ensaio`), e o link salvo REDIRECIONA (§2.4-3).
+  if (partes[0] === "ensaios") return { tela: "fluxo", bancada: "ensaio" };
+  if (partes[0] === "fluxo") {
+    return partes[1] === "ensaio" ? { tela: "fluxo", bancada: "ensaio" } : { tela: "fluxo" };
+  }
   // §346 — a tela da spec saiu, e o link salvo REDIRECIONA em vez de morrer.
   // Vai para o documento porque é lá que os itens vivem, e é o item que a spec
   // acompanha (SPEC-98 §3.2). Mesma disciplina do `#/itens` no §269.
@@ -136,8 +136,9 @@ export function rotaDoHash(hash: string): Rota {
   // SPEC-68 §4.2 — `#/simulacao` era "e se ficar lento?", e o nome estreito
   // fechava a porta para retry, pico e disjuntor. Rota que some sem
   // redirecionar dá tela branca para quem tinha o link salvo — e a SPEC-66 §5
-  // apostou justamente em o endereço ser mandável para alguém.
-  if (partes[0] === "simulacao") return { tela: "ensaios" };
+  // apostou justamente em o endereço ser mandável para alguém. Com a G4 a
+  // cadeia encurta direto no destino atual: a bancada junto do fluxo.
+  if (partes[0] === "simulacao") return { tela: "fluxo", bancada: "ensaio" };
   if (partes[0] === "config") {
     // SPEC-106 fatia B — a aba Exportação foi absorvida pelo catálogo de
     // Conectores; o link salvo REDIRECIONA (SPEC-61 §6.7), nunca vira branco.

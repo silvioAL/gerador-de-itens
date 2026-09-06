@@ -20,8 +20,39 @@ test("§296 — ensaiar pelo chip, sem IA, e o cenário sobrevive ao F5", async 
   );
   await entrar(page);
 
-  await page.getByTestId("abrir-cenarios").click();
-  await page.getByRole("button", { name: "Carregar cenário: Fluxo completo: aprovação de crédito" }).click();
+  /**
+   * SPEC-107 G4 — o desenho é montado À MÃO, no time de quem está logado, e
+   * SALVO antes de ensaiar. A bancada deixou de simular no navegador: cada
+   * número vem de uma execução da fiação semeada `ensaio-de-cenarios`, que lê
+   * a demanda SALVA — e o cenário de demonstração é do `time-credito`, onde o
+   * usuário do E2E não salva (403; a mesma medição do teste do F5, abaixo).
+   * A LEITURA é a mesma de sempre: 3,0 s de hoje, o Δ contra hoje, quem domina.
+   */
+  await page.getByRole("button", { name: "+ Serviço", exact: true }).click();
+  await page.getByRole("button", { name: "+ API Externa" }).click();
+  const svc = page.locator(".react-flow__node", { hasText: "Serviço" }).first();
+  const api = page.locator(".react-flow__node", { hasText: "API Externa" }).first();
+  await svc.waitFor();
+  await api.waitFor();
+  const origem = svc.locator(".react-flow__handle-right.source");
+  const destino = api.locator(".react-flow__handle-left.target");
+  const caixaOrigem = await origem.boundingBox();
+  const caixaDestino = await destino.boundingBox();
+  if (!caixaOrigem || !caixaDestino) throw new Error("handle de conexão não encontrado no DOM");
+  await page.mouse.move(caixaOrigem.x + caixaOrigem.width / 2, caixaOrigem.y + caixaOrigem.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(caixaDestino.x + caixaDestino.width / 2, caixaDestino.y + caixaDestino.height / 2, { steps: 15 });
+  await page.mouse.up();
+  // O tempo vai no NÓ da API externa (como o bureau do cenário pronto): é ele
+  // que o primeiro ajuste da bancada vai mirar — ajuste sobre elemento sem
+  // tempo multiplicaria nada e o Δ diria "igual".
+  await api.click();
+  await page.locator("aside").getByLabel(/Timeout/).first().fill("3000");
+
+  await page.getByRole("button", { name: "Salvar" }).first().click();
+  await page.getByLabel("ex.: Fatura mensal em lote").fill("Ensaio pelo chip");
+  await page.getByTestId("assistente-balao-confirmar").click();
+  await expect(page.getByTestId("titulo-da-quebra")).toContainText("Ensaio pelo chip");
 
   // ── A porta é o chip da leitura: quem lê "resposta ≥ 3,0 s" é quem quer
   //    perguntar "e se piorar?" ──
@@ -29,8 +60,10 @@ test("§296 — ensaiar pelo chip, sem IA, e o cenário sobrevive ao F5", async 
   await page.getByTestId("abrir-simulacao").click();
 
   await expect(page.getByTestId("tela-ensaios")).toBeVisible();
-  // Rota própria, e linkável: é metade do valor.
-  await expect(page).toHaveURL(/#\/ensaios$/);
+  // G4 — a bancada vive junto do FLUXO, e continua linkável: é metade do valor.
+  await expect(page).toHaveURL(/#\/fluxo\/ensaio$/);
+  // A peça `ensaio` está no canvas, atrás da bancada — a fiação é visível.
+  await expect(page.getByTestId("fluxo-screen")).toBeVisible();
 
   // A âncora traz o número de HOJE — sem ela, todo número da tabela é solto.
   await expect(page.getByTestId("linha-hoje")).toContainText("3,0 s");
@@ -44,21 +77,22 @@ test("§296 — ensaiar pelo chip, sem IA, e o cenário sobrevive ao F5", async 
   await expect(linha).toBeVisible();
 
   // ── O ajuste, e o número acompanhando o gesto ──
-  // O único componente com tempo é o bureau (timeoutMs: 3000 no nó).
+  // O único elemento com tempo é a conexão (Timeout: 3000).
   await page.getByTestId("add-ajuste-cen-bureau-degradado").click();
   const fator = page.locator('[data-testid^="fator-"]').first();
   await expect(fator).toBeVisible();
-  // 2× por padrão: 3000 → 6000, e o Δ contra hoje é +3,0 s.
+  // 2× por padrão: 3000 → 6000, e o Δ contra hoje é +3,0 s. O número agora
+  // atravessa a fiação — o `expect` espera a leitura voltar.
   await expect(linha).toContainText("6,0 s");
   await expect(linha).toContainText("+3,0 s");
 
-  // Arrastar recalcula sem recarregar nada — o cálculo é puro e local.
+  // Arrastar recalcula — a MESMA leitura, agora medida no servidor.
   await fator.fill("4");
   await expect(linha).toContainText("12 s");
   await expect(linha).toContainText("+9,0 s");
 
   // "Quem domina" aponta o culpado — o total diz que dói, isto diz onde.
-  await expect(linha).toContainText("bureau-credito-nacional");
+  await expect(linha).toContainText("API Externa");
 
   /**
    * O F5 saiu DAQUI, e não por preguiça — por três medições.
@@ -129,6 +163,14 @@ test("SPEC-71 — o ensaio assumido sobrevive ao F5, com o débito e o motivo", 
   await page.locator(".react-flow__edge").first().click();
   await page.locator("aside").getByLabel(/Timeout/).first().fill("1000");
 
+  // ── Salvar ANTES de ensaiar (SPEC-107 G4): a bancada mede pela fiação, e a
+  //    fiação lê a demanda SALVA — sem endereço no banco não há o que medir ──
+  const TITULO = "Ensaio que sobrevive ao F5";
+  await page.getByRole("button", { name: "Salvar" }).first().click();
+  await page.getByLabel("ex.: Fatura mensal em lote").fill(TITULO);
+  await page.getByTestId("assistente-balao-confirmar").click();
+  await expect(page.getByTestId("titulo-da-quebra")).toContainText(TITULO);
+
   // ── O ensaio, e o débito assumido com motivo ──
   await page.goto("/#/ensaios");
   await page.getByLabel("Nome do cenário").fill("Parceiro degradado");
@@ -155,16 +197,14 @@ test("SPEC-71 — o ensaio assumido sobrevive ao F5, com o débito e o motivo", 
   // desenho, e fixá-lo aqui faria este teste falhar por uma mudança no motor
   // que não tem nada a ver com persistência.
   const frase = /A resposta fica em [^.]+\./;
+  // G4 — a conclusão chega com a leitura da fiação (debounce + servidor):
+  // esperar por ela antes de extrair, senão o innerText lê a linha em "—".
+  await expect(page.getByTestId("linha-cen-parceiro-degradado")).toContainText("A resposta fica em", { timeout: 15000 });
   const respostaAntes = (await page.getByTestId("linha-cen-parceiro-degradado").innerText()).match(frase)?.[0];
   expect(respostaAntes).toBeTruthy();
 
-  // ── Salvar de verdade: com nome, porque sem nome o produto só pergunta ──
-  const TITULO = "Ensaio que sobrevive ao F5";
+  // ── De volta à mesa; o cenário e o débito seguem pelo auto-save ──
   await page.getByTestId("ensaios-voltar").click();
-  await page.getByRole("button", { name: "Salvar" }).first().click();
-  await page.getByLabel("ex.: Fatura mensal em lote").fill(TITULO);
-  await page.getByTestId("assistente-balao-confirmar").click();
-  await expect(page.getByTestId("titulo-da-quebra")).toContainText(TITULO);
 
   // A conferência é NO SERVIDOR, e não na tela: é o único jeito de saber que o
   // debounce de 2 s chegou ao banco antes de recarregar. Recarregar cedo

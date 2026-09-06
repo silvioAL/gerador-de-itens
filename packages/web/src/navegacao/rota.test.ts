@@ -50,6 +50,22 @@ describe("rota em hash (SPEC-40 F1)", () => {
     expect(rotaDoHash("#/documento")).toEqual({ tela: "documento" });
   });
 
+  it("SPEC-107 G4: a rota morta #/ensaios REDIRECIONA para a bancada junto do fluxo", () => {
+    /**
+     * A tela de ensaios morreu — a bancada mede pela fiação semeada e vive em
+     * `#/fluxo/ensaio`. A aposta da SPEC-66 §5 fica de pé: "olha o que
+     * acontece se o bureau cair" continua sendo uma URL mandável, e o link
+     * salvo nunca vira tela branca (§2.4-3).
+     */
+    expect(rotaDoHash("#/ensaios")).toEqual({ tela: "fluxo", bancada: "ensaio" });
+    // E a cadeia LEGADA encurta no destino atual: #/simulacao → a bancada.
+    expect(rotaDoHash("#/simulacao")).toEqual({ tela: "fluxo", bancada: "ensaio" });
+    // Ida e volta da rota nova; o fluxo sem bancada segue como era.
+    expect(hashDaRota({ tela: "fluxo", bancada: "ensaio" })).toBe("#/fluxo/ensaio");
+    expect(rotaDoHash("#/fluxo/ensaio")).toEqual({ tela: "fluxo", bancada: "ensaio" });
+    expect(rotaDoHash("#/fluxo")).toEqual({ tela: "fluxo" });
+  });
+
   it("hash desconhecido/velho cai no canvas — nunca tela em branco", () => {
     expect(rotaDoHash("#/config/aba-que-nao-existe")).toEqual({ tela: "canvas" });
     expect(rotaDoHash("#/qualquer/coisa")).toEqual({ tela: "canvas" });

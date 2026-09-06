@@ -288,7 +288,8 @@ describe("o site em páginas (SPEC-95 fatia G)", () => {
       hashDaRota({ tela: "canvas" }),
       hashDaRota({ tela: "documento" }),
       hashDaRota({ tela: "sistema" }),
-      hashDaRota({ tela: "ensaios" }),
+      // SPEC-107 G4 — a bancada de ensaios mudou para junto do fluxo.
+      hashDaRota({ tela: "fluxo", bancada: "ensaio" }),
       ...AREAS_CONFIG_CONHECIDAS.map((area) => hashDaRota({ tela: "config", area })),
     ];
 

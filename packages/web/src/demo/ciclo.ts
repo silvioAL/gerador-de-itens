@@ -199,7 +199,9 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
     detalhe:
       "A bancada de ensaios responde perguntas hipotéticas com aritmética, não com opinião: trocar um número e recalcular o grafo é determinístico e dá o mesmo resultado toda vez. Retry, pico de tráfego, disjuntor desligado, timeout do cliente menor que a soma dos internos. E um ensaio que dói pode ser assumido como débito — com quem assumiu e por quê.",
     estado: "completo",
-    rota: { tela: "ensaios" },
+    // SPEC-107 G4 — a bancada mudou de casa: vive junto do fluxo, medindo
+    // pela fiação semeada em vez de simular no navegador.
+    rota: { tela: "fluxo", bancada: "ensaio" },
   },
   {
     id: "decisoes",

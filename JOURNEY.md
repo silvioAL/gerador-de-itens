@@ -16842,3 +16842,53 @@ o comportamento na tela é o mesmo, pelo caminho novo.
   erro visível no botão, não lista vazia silenciosa.
 - O eco do `link` e a `origem` da resposta não tinham consumidor — morreram
   com a rota.
+
+## §380 — SPEC-107 G4: a quarta morte — a bancada de ensaios É a fiação
+
+**A tela `#/ensaios` morreu; a bancada mudou de casa e de motor.** Ela vive
+em `#/fluxo/ensaio`, como PAINEL sobre o canvas do fluxo — a fiação semeada
+`ensaio-de-cenarios` (`projeto.desenho → funcao(ensaio)`) fica visível
+atrás, e **cada número da tabela vem de uma execução dela**: o cenário entra
+por `parametrosPorNo` (entrada DESTA execução, o hash da fiação não muda) e
+a leitura volta no rastro. Links salvos redirecionam (`#/ensaios` e
+`#/simulacao → #/fluxo/ensaio`, §2.4-3), e a URL continua mandável — a
+aposta da SPEC-66 §5 fica de pé.
+
+- **A leitura do executor ficou INTEIRA**: `hoje` + `contradicoesHoje` +
+  `insistenciaHojeMs` + `falta` (§305: o executor não recusa — desenho
+  presente não é entrada ausente —, mas quem apresenta cala o número).
+- **A linha da tabela nasce do CENÁRIO, não da medição**: criar, ajustar e
+  assumir não ficam reféns da ida ao servidor; o número diz "—" até a
+  leitura chegar. Assumir/reabrir não reexecutam — não mudam a conta.
+- **O `executar` chega por ref**: o App o recria a cada render, e um efeito
+  que dependesse dele cancelaria o debounce a cada render — num App que
+  re-renderiza rápido a medição NUNCA disparava (medido no E2E do F5:
+  tabela inteira em "—"). Achado de produção, não de teste.
+- **O teste unitário mede com o executor REAL** (`executarFuncao` da
+  aplicação): os números da bancada são os números da fiação por construção,
+  e um desencontro quebra no unitário, não em produção.
+- **O que ficou no cliente é guarda e apresentação** (§263):
+  `faltaParaEnsaiar` (a MESMA função da porta), `concluirEnsaio`,
+  `estadoDoEnsaio`, formatação. `simularCenarios`/`avaliarResiliencia`
+  saíram da bancada — o placar VIVO da mesa (`ReadinessSummary`) continua
+  local de propósito: ele lê o desenho EM EDIÇÃO, que o banco ainda não viu.
+
+**A prova da tabela**: os 11 cenários do E2E de ensaios verdes com a MESMA
+leitura (3,0 s de hoje, Δ contra hoje, quem domina, débito no documento).
+Dois precisaram de setup novo, pelo motivo já documentado no próprio spec:
+o cenário de demonstração é do `time-credito`, onde o usuário do E2E não
+salva — e **a bancada agora mede a demanda SALVA**.
+
+**O que morreu**: `{ tela: "ensaios" }`, a `EnsaiosScreen` (o arquivo virou
+`fluxo/BancadaDeEnsaios.tsx` por `git mv` — a história fica) e a simulação
+client-side da bancada.
+
+**Deltas declarados**:
+- Ensaiar passa a exigir **demanda salva** (a fiação lê o banco): cenário de
+  demonstração de outro time e demanda nunca salva não medem — a bancada
+  diz isso em vez de inventar zero. A porta (`onSimular`) salva antes de
+  navegar, como o atalho de publicar.
+- O número deixou de acompanhar o gesto em tempo real: debounce de 350 ms +
+  ida ao servidor. A leitura anterior fica de pé enquanto a nova não chega.
+- Execuções de ensaio agora aparecem no histórico de execuções de fluxos e
+  na auditoria — a bancada ganhou rastro.

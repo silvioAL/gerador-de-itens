@@ -66,7 +66,21 @@ const CONFIG_DO_FLUXO = configDoFluxo();
 
 const FLUXO_VAZIO = (id: string, nome: string): FluxoEmVigor => ({ id, nome, nos: [], arestas: [], origem: "declarado" });
 
-export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFechar: () => void }) {
+export function FluxoScreen({
+  timeAtivo,
+  onFechar,
+  abrirFluxoId,
+  painel,
+}: {
+  timeAtivo: string;
+  onFechar: () => void;
+  /** SPEC-107 G4 — abrir já num fluxo específico (a porta da bancada de
+   * ensaios chega em `#/fluxo/ensaio` e o canvas mostra a fiação certa). */
+  abrirFluxoId?: string;
+  /** SPEC-107 G4 — um painel sobre o canvas (a bancada de ensaios), montado
+   * por quem conhece a demanda aberta: o App. */
+  painel?: React.ReactNode;
+}) {
   const permissoes = usePermissoes({ hospedado: true, timeId: timeAtivo });
   const podeEditar = permissoes.pode("fluxos", "editar");
   // §369 — editar o PAPEL de dentro do fluxo é editar a esteira: a permissão
@@ -114,13 +128,22 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
           setFluxoId("fluxo-1");
         } else {
           setFluxos(lidos);
-          setFluxoId(lidos[0].id);
+          // G4 — quem chegou pela porta da bancada abre NO fluxo do ensaio;
+          // um id que não existe no catálogo cai no primeiro, nunca em branco.
+          setFluxoId(abrirFluxoId && lidos.some((f) => f.id === abrirFluxoId) ? abrirFluxoId : lidos[0].id);
         }
       } catch (e) {
         setErro(e instanceof Error ? e.message : String(e));
       }
     })();
   }, [timeAtivo]);
+
+  // G4 — a porta muda com a tela aberta (#/fluxo → #/fluxo/ensaio): seguir o
+  // pedido sem esperar recarga. Só a PORTA re-seleciona; recarregar a lista
+  // não pode arrancar a pessoa do fluxo que ela escolheu olhar.
+  useEffect(() => {
+    if (abrirFluxoId) setFluxoId((atual) => (atual === abrirFluxoId ? atual : abrirFluxoId));
+  }, [abrirFluxoId]);
 
   const fluxo = useMemo(() => fluxos?.find((f) => f.id === fluxoId) ?? null, [fluxos, fluxoId]);
   // Fluxo de fábrica é DERIVADO — editar exige uma cópia (que vence a fábrica
@@ -490,6 +513,9 @@ export function FluxoScreen({ timeAtivo, onFechar }: { timeAtivo: string; onFech
 
   return (
     <div data-testid="fluxo-screen" style={telaEstilo}>
+      {/* SPEC-107 G4 — a bancada de ensaios, sobre o canvas: o App a monta
+          porque é ele quem conhece a demanda aberta. */}
+      {painel}
       <header style={cabecalhoEstilo}>
         <strong style={{ fontSize: 14 }}>Fluxos de integração</strong>
         <span style={{ fontSize: 12, color: "var(--texto-fraco)" }}>
