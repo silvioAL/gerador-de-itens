@@ -57,6 +57,9 @@ export const PROJETO_DO_SISTEMA: ProjetoDoSistema = {
     // quem subiu; quem falhou fica nomeado (SPEC-49, falha parcial).
     { chave: "resultados", rotulo: "Resultados da exportação (por item)", tipo: "lista" },
     { chave: "enviados", rotulo: "Itens enviados (para nomear o silêncio)", tipo: "lista" },
+    // SPEC-107 G2 — o link do documento publicado volta para a demanda
+    // (SPEC-106 C: "última publicação ↗" sobrevive ao F5).
+    { chave: "linkExterno", rotulo: "Link do documento publicado", tipo: "texto" },
   ],
   saida: [
     { chave: "desenho", rotulo: "Desenho (demanda)", tipo: "objeto" },

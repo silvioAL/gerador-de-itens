@@ -16759,3 +16759,46 @@ organização que curou `fluxos.executar`, exportar exige o papel (endurecimento
 opt-in; o comentário do recurso já antecipava "como exportar/publicar").
 
 §248 cumprido (grava-por-item desligado → rota vermelha → restaurado).
+
+---
+
+## §378 — SPEC-107 G2: a segunda morte — publicar É a fiação
+
+**A medição achou a bifurcação que decidia o desenho**: o botão publica o
+markdown VIVO montado no cliente, mas `projeto.markdown` emite a
+especificação PERSISTIDA — que hoje só nascia ao aprovar o documento. E o
+E2E que a tabela da §3.1 cobrava ("E2E de publicação passa sem a rota")
+**não existia**: a prova era só de rota e de tela.
+
+**A síntese que preserva o comportamento E é fiel ao §3.1**: o atalho
+(1) grava o markdown vivo como a ESPECIFICAÇÃO da demanda e (2) dispara a
+fiação semeada `projeto.markdown → conector(documento) →
+projeto(linkExterno)`. Publicar continua publicando o que se vê — e, de
+brinde, o que se publicou fica persistido na demanda (a SPEC-106 C inteira:
+o link E o texto).
+
+- **Uma fiação POR destino** (`fluxosDaPublicacao`): com um, o id estável
+  `publicar-documento`; com vários, sufixado — e o atalho mantém a recusa de
+  sempre ("diga em qual publicar"): ninguém escolhe sozinho.
+- **O §348 sobreviveu à mudança de transporte**: o `espaco` do destino virou
+  campo do `Conector` e entra no corpo pelo `montarChamadaDoConector` — sem
+  isso, publicar pela fiação mandava o documento sem dizer o espaço.
+- **O destino `projeto` ganhou o ramo do link**: `entradas.linkExterno` →
+  `quebras.documento_link_externo` + auditoria `publicar-documento` — o
+  "última publicação ↗" sobrevive ao F5 pela fiação como sobrevivia pela
+  rota. §248 cumprido nele.
+- **O E2E nasceu** (`publicacao.spec.ts`): configurar destino → publicar
+  pela tela → link do dublê → F5 → "última publicação ↗" de pé. E os oito
+  casos do teste de rota foram PORTADOS para a fiação (destino único,
+  multi-destino com fiações separadas, espaço, §9.3 sem especificação,
+  HTTP 403 nomeado, demanda desconhecida, rota morta 404).
+- **`salvar` da persistência aceita a quebra explícita** — quem acabou de
+  fazer `setQuebra` não pode esperar o re-render para salvar (o atalho
+  persiste a especificação e executa em seguida).
+
+**O que morreu**: `POST /quebras/:id/documento/publicar`,
+`criarPublicadorDeDocumentoViaGateway`, a porta `PublicadorDeDocumento` e o
+`corpoPublicarDocumento`. **Deltas declarados**: publicar passa pelo portão
+de execução de fluxos (o mesmo endurecimento opt-in da G1); os campos
+opcionais `geradoEm`/`demandaAtualizadaEm` deixaram de viajar no payload (a
+fiação manda o que o contrato declara e o projeto emite).

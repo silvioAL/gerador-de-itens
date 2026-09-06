@@ -324,11 +324,8 @@ export const apiQuebras = {
       `/quebras/${id}/adr/importar`,
       { method: "POST" }
     ),
-  publicarDocumento: (id: string, corpo: { markdown: string; desatualizado: boolean; destinoId?: string }) =>
-    requisitar<{ linkExterno: string; atualizada: boolean; destino: string }>(`/quebras/${id}/documento/publicar`, {
-      method: "POST",
-      body: JSON.stringify(corpo),
-    }),
+  // SPEC-107 G2 — `publicarDocumento` morreu como rota dedicada: publicar é a
+  // fiação semeada "publicar-documento" (ver `publicarDocumento` no App).
 };
 
 /** SPEC-41 Parte B — um item de trabalho materializado (persistido no server). */

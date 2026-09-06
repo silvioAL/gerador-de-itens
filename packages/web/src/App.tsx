@@ -560,17 +560,24 @@ function AppCarregado({
    * botão não aparece, em vez de aparecer e falhar (a disciplina da SPEC-49).
    */
   const [podePublicarDocumento, setPodePublicarDocumento] = useState(false);
+  /** SPEC-107 G2 — os destinos de documento em vigor: o atalho da publicação
+   * precisa deles para o rótulo e para RECUSAR escolher quando há mais de um
+   * (a semântica de sempre — publicar no primeiro seria o pior desfecho). */
+  const [destinosDeDocumento, setDestinosDeDocumento] = useState<{ id: string; rotulo: string }[]>([]);
   useEffect(() => {
     if (!mostrarDocumento) return;
     apiExportador
       .obter()
       .then((c) => {
         setDestinoDaExportacao(c.endpoint ? c.rotulo || c.endpoint : null);
-        setPodePublicarDocumento((c.destinos ?? []).some((d) => d.operacao === "documento" && !!d.endpoint));
+        const deDocumento = (c.destinos ?? []).filter((d) => d.operacao === "documento" && !!d.endpoint);
+        setPodePublicarDocumento(deDocumento.length > 0);
+        setDestinosDeDocumento(deDocumento.map((d) => ({ id: d.id, rotulo: d.rotulo || d.endpoint })));
       })
       .catch(() => {
         setDestinoDaExportacao(null);
         setPodePublicarDocumento(false);
+        setDestinosDeDocumento([]);
       });
   }, [mostrarDocumento]);
   // SPEC-45 — quantos feedbacks do ciclo ainda esperam alguém: é o que faz o
@@ -1276,11 +1283,41 @@ function AppCarregado({
    * O 409 de "há mais de um destino" chega como mensagem — a escolha entre dois
    * espaços de documentação é da pessoa, e o servidor recusa escolher por ela.
    */
+  /**
+   * SPEC-107 G2 — **publicar É a fiação semeada** ("publicar-documento"): o
+   * botão vira atalho que (1) PERSISTE o markdown vivo como a especificação
+   * da demanda — o que se publica fica guardado, a SPEC-106 C inteira — e
+   * (2) dispara a fiação, que publica `projeto.markdown` e grava o link de
+   * volta na demanda. Multi-destino mantém a recusa de sempre: o atalho não
+   * escolhe sozinho.
+   */
   async function publicarDocumento() {
-    return apiQuebras.publicarDocumento(persistencia.quebraId!, {
-      markdown: markdownDoDocumento,
-      desatualizado: !!documentoDesatualizado,
+    const quebraId = persistencia.quebraId!;
+    if (destinosDeDocumento.length > 1) {
+      throw new Error("há mais de um destino de documento — diga em qual publicar (deixe só um em Configurações → Conectores, por enquanto)");
+    }
+    // O markdown VIVO vira a especificação persistida ANTES de publicar — a
+    // fiação lê a demanda, e o que ela publica é exatamente o que se vê. A
+    // quebra vai EXPLÍCITA no salvar: o setQuebra ainda não re-renderizou.
+    const comEspecificacao = { ...quebra, especificacao: markdownDoDocumento };
+    setQuebra(comEspecificacao);
+    await persistencia.salvar(comEspecificacao);
+
+    const r = await apiExecucaoDeFluxo.executar("publicar-documento", timeAtivo, undefined, {
+      demanda: { demandaId: quebraId },
+      publica: { desatualizado: !!documentoDesatualizado },
     });
+    const porNo = Object.fromEntries(r.nos.map((n) => [n.noId, n]));
+    for (const noId of ["demanda", "publica", "grava"]) {
+      if (porNo[noId]?.estado === "falhou") throw new Error(porNo[noId].erro ?? `a publicação falhou no nó "${noId}"`);
+    }
+    const linkExterno = String(r.saidas["publica"]?.linkExterno ?? "");
+    setLinkDoDocumento(linkExterno);
+    return {
+      linkExterno,
+      atualizada: r.saidas["publica"]?.atualizada === true,
+      destino: destinosDeDocumento[0]?.rotulo ?? "",
+    };
   }
 
   function salvarQuebra() {

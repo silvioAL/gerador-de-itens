@@ -37,7 +37,7 @@ import { catalogoDeConectores } from "../config/catalogoDeConectores.js";
 import { contextoDasFuncoes } from "../config/contextoDasFuncoes.js";
 import { templateDaVersao } from "../config/templateDaVersao.js";
 import { criarResolvedorDeProvedor } from "../ia/provedorDaOrganizacao.js";
-import { fluxoExecucoes } from "../db/schema.js";
+import { fluxoExecucoes, quebras } from "../db/schema.js";
 import { exigirSessao } from "../auth/middleware.js";
 
 /**
@@ -213,6 +213,22 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
             const ativa = demandaAtiva(await casosQuebras.listar(), timeId);
             if (!ativa) throw erroSemDemanda(timeId);
             quebra = (await casosQuebras.obter(ativa.id))!;
+          }
+
+          if (entradas.linkExterno !== undefined) {
+            // SPEC-107 G2 — DESTINO de PUBLICAÇÃO: o link do que subiu volta
+            // para a DEMANDA (SPEC-106 C) — "última publicação ↗" sobrevive
+            // ao F5 e à troca de máquina.
+            const nivel = quebra.time ? await nivelNoTime(db, email, quebra.time) : await maiorNivel(db, email);
+            if (nivel !== "operar" && nivel !== "owner") {
+              throw new Error(
+                `gravar a publicação na demanda "${quebra.id}" exige nível "operar" no time "${quebra.time ?? "(sem time)"}" — seu nível é "${nivel ?? "nenhum"}"`
+              );
+            }
+            const linkExterno = String(entradas.linkExterno);
+            await db.update(quebras).set({ documentoLinkExterno: linkExterno }).where(eq(quebras.id, quebra.id));
+            registrarAuditoria(db, { email, acao: "publicar-documento", recurso: "quebras", recursoId: quebra.id });
+            return { demandaId: quebra.id, linkExterno };
           }
 
           if (entradas.resultados !== undefined) {

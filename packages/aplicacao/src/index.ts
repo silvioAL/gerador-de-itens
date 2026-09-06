@@ -56,12 +56,8 @@ export type { LeitorDeDocumento, DocumentoExterno } from "./portas/leitorDeDocum
 /** SPEC-81 fatia E — a decisão daqui volta para o repositório da casa. */
 export { decisoesQuePodemVoltar, type AdrParaPublicar, type EscritorDeAdr } from "./portas/escritorDeAdr.js";
 
-/** SPEC-81 fatia B — publicar o documento na base de conhecimento. */
-export type {
-  DocumentoParaPublicar,
-  DocumentoPublicado,
-  PublicadorDeDocumento,
-} from "./portas/publicadorDeDocumento.js";
+// SPEC-81 fatia B → SPEC-107 G2: a porta `PublicadorDeDocumento` morreu —
+// publicar é a fiação semeada, pelo executor genérico de conector.
 
 export {
   CAMPO_GLOBAL,
@@ -219,9 +215,11 @@ export {
 export {
   ID_DO_FLUXO_DA_ESTEIRA,
   ID_DO_FLUXO_DA_EXPORTACAO,
+  ID_DO_FLUXO_DA_PUBLICACAO,
   TIPOS_DE_NO_DO_FLUXO,
   fluxoDaEsteira,
   fluxoDaExportacao,
+  fluxosDaPublicacao,
   fluxosEmVigor,
   mensagemDeCiclo,
   normalizarFluxos,
