@@ -16499,3 +16499,60 @@ documento por time, um time por spec.
 **A fatia B fica armada:** o nó `projeto` substitui o conector de desenho do
 dublê como fonte nas mesmas fiações — a aresta `desenho → desenho` já é a
 mesma.
+
+---
+
+## §372 — SPEC-107 fatia B: o projeto como nó, e a proposta que não aceita sozinha
+
+**A medição de novo salvou o desenho.** Três premissas conferidas antes de
+codar, três surpresas:
+
+1. **"Demanda ativa" não existe no servidor** — o aberto-agora da mesa é
+   `useState` do navegador, de propósito. O default do nó virou o que o
+   servidor CONSEGUE afirmar: a demanda mais recentemente atualizada do time
+   da execução — e sem nenhuma, o erro nomeia o que faltou (§9.3), nunca um
+   chute.
+2. **O markdown do documento só o cliente monta** (`gerarEspecificacaoEntrega`
+   com templates, produto e ensaios) — um segundo montador no servidor seria
+   o §263 de novo, recém-pago na fatia A. A saída `markdown` do projeto é a
+   última especificação GERADA (a foto persistida), dito no rótulo; nunca
+   gerada = a chave fica FORA da saída.
+3. **"Desenho proposto" não tinha onde morar** — a proposta da conversa vive
+   na memória do painel e morre no fechar da aba. A mecânica certa JÁ existia:
+   **variantes** (SPEC-88 — "um desenho guardado que ainda não é O desenho",
+   com comparação e adoção provadas em E2E). Nenhum conceito novo entrou; um
+   existente ganhou um produtor.
+
+**O que entrou:**
+
+- **O tipo de nó `projeto`** (`PROJETO_DO_SISTEMA`, contrato como dado no
+  molde da fatia A): `refId` é o próprio `"projeto"` (não há adaptador;
+  `demandaId` é parâmetro, §5.1) e a escrita valida isso com a régua.
+- **Fonte:** `desenho` (o SUBCONJUNTO `DesenhoMapeado` — o que viaja pela
+  aresta é contrato, não despejo da quebra), `itens` (os persistidos),
+  `markdown` (a foto), `volumetria`/`necessidades` — ausências ficam fora.
+- **Destino:** o `desenho` mapeado vira variante **"Proposta do fluxo …"** —
+  a fiação NUNCA toca `quebra.diagrama`; adotar é o gesto humano de sempre,
+  na mesa (§2.4-14: importar não é aceitar, e nenhuma fiação muda isso por
+  baixo). A escrita re-checa o nível `operar` no time DA DEMANDA (o gate da
+  rota cobre o time do corpo; o `demandaId` pode apontar para outro) — e o
+  §248 foi cumprido nela (gravação desligada → teste vermelho → restaurada).
+- **A prova da fatia:** as fiações da fatia A com o projeto REAL —
+  `projeto.desenho → derivacao → agente → conector(escrita)` na rota e no
+  navegador, e o byte-a-byte da mesa passou a ler a demanda pelo NÓ, não por
+  parâmetro fixo. O E2E do §356 (documento-externo na conversa) segue
+  passando sem uma linha mudada.
+
+**O que NÃO entrou, com nome:** a cadeia completa "importar por link"
+(`conector(documentoExterno) → agente → projeto`) exige um agente de fluxo
+com RESPOSTA ESTRUTURADA (o pedido `diagrama` de `/ia/diagrama`) — hoje o
+agente de fluxo só produz texto, e texto não vira variante. A peça fica
+nomeada para a fatia G, onde a substituição da rota dedicada acontece com a
+prova da tabela (§3.1).
+
+**Dívida observada, não desta fatia:** dois specs de E2E se mostraram
+flakies SÓ sob a suíte em paralelo — `troca-de-contexto` (na CI da fatia A)
+e a fatia C de `fluxo-de-integracao` (uma vez local: o rótulo do mapeamento
+sumiu após o F5; 6/6 verde rodando sozinho, serializado). Nenhum dos dois
+falha isolado; a suíte cresceu e a janela de carga apareceu. Fica anotado
+para uma rodada de robustez da suíte.

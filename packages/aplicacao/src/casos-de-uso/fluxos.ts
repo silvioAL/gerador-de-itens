@@ -20,6 +20,8 @@ export interface ExecutoresDoFluxo {
   agente(no: NoDoFluxo, entradas: Record<string, unknown>): Promise<Record<string, unknown>>;
   /** SPEC-107 fatia A — a função do sistema (o motor com contrato). */
   funcao(no: NoDoFluxo, entradas: Record<string, unknown>): Promise<Record<string, unknown>>;
+  /** SPEC-107 fatia B — a demanda como capacidade, nas duas direções. */
+  projeto(no: NoDoFluxo, entradas: Record<string, unknown>): Promise<Record<string, unknown>>;
 }
 
 export type EstadoDoNo = "sucesso" | "falhou" | "nao-executado";
@@ -164,7 +166,9 @@ export async function executarFluxo(
           ? await executores.conector(no, parametros)
           : no.tipo === "funcao"
             ? await executores.funcao(no, parametros)
-            : await executores.agente(no, parametros);
+            : no.tipo === "projeto"
+              ? await executores.projeto(no, parametros)
+              : await executores.agente(no, parametros);
       estado.set(noId, "sucesso");
       saidas[noId] = saida;
       rastro.push({

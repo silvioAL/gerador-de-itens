@@ -168,6 +168,14 @@ test("a função entra pela paleta já com o contrato à mostra — sem adaptado
 
     await page.getByTestId("add-funcao-ensaio").click();
     await expect(page.getByTestId("painel-do-no")).toContainText("Função do sistema — Ensaio de cenários");
+
+    // SPEC-107 fatia B — o projeto também nasce pronto, e o painel diz as
+    // duas direções em voz alta (a escrita vira proposta, nunca o desenho).
+    await page.getByTestId("add-projeto").click();
+    await expect(page.getByTestId("painel-do-no")).toContainText("Projeto (a demanda, nas duas direções)");
+    await expect(page.getByTestId("contrato-do-projeto")).toContainText("vira uma variante");
+    await expect(page.getByTestId("demanda-do-projeto")).toBeVisible();
+    await expect(page.getByTestId("adaptador-do-no")).toHaveCount(0);
   } finally {
     await page.request.put(`${API}/config/fluxos`, { data: { documento: original, timeId: "time-portabilidade" } });
   }
@@ -217,7 +225,9 @@ test("derivar pelo botão da mesa ≡ derivar pela função do fluxo — os mesm
       data: { titulo, time: TIME, diagrama },
     });
     expect(criada.status()).toBe(201);
-    // …e como entrada fixa da função no fluxo (modo b: qualquer desenho mapeado).
+    const { id: demandaId } = (await criada.json()) as { id: string };
+    // …e pela fiação com o PROJETO REAL como fonte (SPEC-107 fatia B): a
+    // mesma demanda, lida pelo nó — não um parâmetro fixo.
     await page.request.put(`${API}/config/fluxos`, {
       data: {
         timeId: TIME,
@@ -227,15 +237,10 @@ test("derivar pelo botão da mesa ≡ derivar pela função do fluxo — os mesm
               id: "derivacao-comparada-e2e",
               nome: "Derivação comparada (E2E)",
               nos: [
-                {
-                  id: "deriva",
-                  tipo: "funcao",
-                  refId: "derivacao",
-                  posicao: { x: 0, y: 80 },
-                  parametros: { desenho: { diagrama, time: TIME } },
-                },
+                { id: "demanda", tipo: "projeto", refId: "projeto", posicao: { x: 0, y: 80 }, parametros: { demandaId } },
+                { id: "deriva", tipo: "funcao", refId: "derivacao", posicao: { x: 240, y: 80 }, parametros: {} },
               ],
-              arestas: [],
+              arestas: [{ de: "demanda", para: "deriva", mapeamento: [{ saida: "desenho", entrada: "desenho" }] }],
             },
           ],
         },
@@ -268,5 +273,75 @@ test("derivar pelo botão da mesa ≡ derivar pela função do fluxo — os mesm
     expect(chavesDaMesa).toEqual(chavesDoFluxo);
   } finally {
     await page.request.put(`${API}/config/fluxos`, { data: { documento: original, timeId: TIME } });
+  }
+});
+
+/**
+ * SPEC-107 fatia B — o PROJETO como DESTINO: o desenho importado de fora vira
+ * PROPOSTA (variante) na demanda, nunca o desenho dela — importar não é
+ * aceitar (§2.4-14), e a adoção continua sendo o gesto humano de sempre da
+ * mesa (a mecânica de variantes da SPEC-88, provada em variantes.spec.ts).
+ */
+test("o desenho importado vira proposta na demanda — o desenho dela fica intacto", async ({ page }) => {
+  test.setTimeout(120000);
+  const TIME = "time-e2e-funcoes";
+  expect([201, 409]).toContain((await page.request.post(`${API}/times`, { data: { timeId: TIME } })).status());
+  const original = (await (await page.request.get(`${API}/config/fluxos?timeId=${TIME}`)).json()).documento;
+  try {
+    await declararConectores(page, [
+      {
+        id: "desenho-funcoes-e2e",
+        nome: "Desenho da casa (E2E)",
+        endpoint: `${GATEWAY_FALSO}/v1/desenho`,
+        entrada: [],
+        saida: [{ chave: "desenho", rotulo: "Desenho", tipo: "objeto", caminho: "$.desenho", obrigatorio: true }],
+      },
+    ]);
+    const criada = await page.request.post(`${API}/quebras`, {
+      data: { titulo: `recebe-proposta-e2e ${Date.now()}`, time: TIME, diagrama: { nodes: [], edges: [] } },
+    });
+    expect(criada.status()).toBe(201);
+    const { id: demandaId } = (await criada.json()) as { id: string };
+
+    await page.request.put(`${API}/config/fluxos`, {
+      data: {
+        timeId: TIME,
+        documento: {
+          fluxos: [
+            {
+              id: "importa-desenho-e2e",
+              nome: "Importa desenho da casa",
+              nos: [
+                { id: "le", tipo: "conector", refId: "desenho-funcoes-e2e", posicao: { x: 0, y: 80 }, parametros: {} },
+                { id: "propoe", tipo: "projeto", refId: "projeto", posicao: { x: 240, y: 80 }, parametros: { demandaId } },
+              ],
+              arestas: [{ de: "le", para: "propoe", mapeamento: [{ saida: "desenho", entrada: "desenho" }] }],
+            },
+          ],
+        },
+      },
+    });
+
+    const execucao = await page.request.post(`${API}/fluxos/importa-desenho-e2e/executar`, { data: { timeId: TIME } });
+    expect(execucao.status()).toBe(200);
+    const { nos } = (await execucao.json()) as { nos: { noId: string; estado: string }[] };
+    expect(nos.map((n) => [n.noId, n.estado])).toEqual([
+      ["le", "sucesso"],
+      ["propoe", "sucesso"],
+    ]);
+
+    const quebra = (await (await page.request.get(`${API}/quebras/${demandaId}`)).json()) as {
+      diagrama: { nodes: unknown[] };
+      variantes: { titulo: string; diagrama: { nodes: unknown[] } }[];
+    };
+    // O desenho da demanda continua o que era (vazio); a proposta está do
+    // lado, como variante com o desenho que veio de fora.
+    expect(quebra.diagrama.nodes).toHaveLength(0);
+    expect(quebra.variantes).toHaveLength(1);
+    expect(quebra.variantes[0].titulo).toBe('Proposta do fluxo "Importa desenho da casa"');
+    expect(quebra.variantes[0].diagrama.nodes.length).toBeGreaterThan(0);
+  } finally {
+    await page.request.put(`${API}/config/fluxos`, { data: { documento: original, timeId: TIME } });
+    await limparMeusConectores(page);
   }
 });

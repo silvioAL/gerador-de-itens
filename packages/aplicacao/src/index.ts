@@ -182,11 +182,15 @@ export {
   type GovernancaDaFuncao,
 } from "./config/funcoes.js";
 export {
+  comoDesenhoMapeado,
   EntradaDaFuncaoInvalida,
   executarFuncao,
   type ContextoDasFuncoes,
   type DesenhoMapeado,
 } from "./casos-de-uso/funcoes.js";
+/** SPEC-107 fatia B — o PROJETO como nó, nas duas direções. */
+export { PROJETO_DO_SISTEMA, REF_DO_PROJETO, type ProjetoDoSistema } from "./config/projeto.js";
+export { demandaAtiva, erroSemDemanda, saidaDoProjeto, varianteProposta } from "./casos-de-uso/projetoNoFluxo.js";
 /** SPEC-107 fatia A — o montador ÚNICO do vocabulário do diagrama (web e
  * servidor mesclam os campos customizados pela mesma função, §263). */
 export {

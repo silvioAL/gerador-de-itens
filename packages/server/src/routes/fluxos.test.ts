@@ -5,8 +5,9 @@ import { criarBancoDeDados, type BancoDeDados } from "../db/client.js";
 import { exigirBancoDescartavel, garantirBancoDeTeste, URL_BANCO_DE_TESTE } from "../test-support/bancoDeTeste.js";
 import { buildApp } from "../app.js";
 import { criarGatewayFalso, CHAVE_GATEWAY_FALSO, DESENHO_DO_GATEWAY_FALSO } from "@gerador/gateway-falso";
-import { executarFuncao } from "@gerador/aplicacao";
+import { criarCasosDeUsoDeQuebras, executarFuncao } from "@gerador/aplicacao";
 import { contextoDasFuncoes } from "../config/contextoDasFuncoes.js";
+import { criarRepositorioDeQuebrasEmPostgres } from "../adaptadores/quebrasEmPostgres.js";
 
 /**
  * SPEC-105 fatia D — **a prova da SPEC: o exemplo do JMeter (§4.2), ponta a
@@ -316,27 +317,28 @@ describe("SPEC-105 fatia D — POST /fluxos/:id/executar", () => {
  * — e por isso o rastro grava as ENTRADAS do nó de função, a âncora da tese
  * reescrita ("mesma fiação + mesmas entradas → mesmos itens").
  */
-describe("SPEC-107 fatia A — o nó de FUNÇÃO no fluxo", () => {
-  async function declararLeitorDeDesenho(app: App, cookies: Cookies) {
-    await app.inject({
-      method: "PUT",
-      url: "/config/conectores",
-      cookies,
-      payload: {
-        documento: {
-          conectores: [
-            {
-              id: "leitor-de-desenho",
-              nome: "Desenho da casa",
-              endpoint: `${baseDoGateway}/desenho`,
-              entrada: [],
-              saida: [{ chave: "desenho", rotulo: "Desenho", tipo: "objeto", caminho: "$.desenho", obrigatorio: true }],
-            },
-          ],
-        },
+async function declararLeitorDeDesenho(app: App, cookies: Cookies) {
+  await app.inject({
+    method: "PUT",
+    url: "/config/conectores",
+    cookies,
+    payload: {
+      documento: {
+        conectores: [
+          {
+            id: "leitor-de-desenho",
+            nome: "Desenho da casa",
+            endpoint: `${baseDoGateway}/desenho`,
+            entrada: [],
+            saida: [{ chave: "desenho", rotulo: "Desenho", tipo: "objeto", caminho: "$.desenho", obrigatorio: true }],
+          },
+        ],
       },
-    });
-  }
+    },
+  });
+}
+
+describe("SPEC-107 fatia A — o nó de FUNÇÃO no fluxo", () => {
 
   const FLUXO_DERIVACAO = {
     id: "gera-itens-de-fora",
@@ -490,6 +492,238 @@ describe("SPEC-107 fatia A — o nó de FUNÇÃO no fluxo", () => {
       const { funcoes } = r.json() as { funcoes: { id: string; governanca: { nivel: string } }[] };
       expect(funcoes.map((f) => f.id)).toEqual(["derivacao", "ensaio"]);
       expect(funcoes.every((f) => f.governanca.nivel === "operar")).toBe(true);
+    });
+  });
+});
+
+/**
+ * SPEC-107 fatia B — **o nó PROJETO, nas duas direções.**
+ *
+ * A prova da fatia: as fiações da fatia A com o projeto REAL como fonte, e o
+ * destino que NUNCA toca o desenho da demanda — o desenho mapeado vira
+ * VARIANTE (a mecânica da SPEC-88), e adotar continua decisão humana.
+ */
+describe("SPEC-107 fatia B — o nó PROJETO", () => {
+  async function criarDemanda(app: App, cookies: Cookies, titulo: string) {
+    const r = await app.inject({
+      method: "POST",
+      url: "/quebras",
+      cookies,
+      payload: { titulo, time: "time-pagamentos", diagrama: DESENHO_DO_GATEWAY_FALSO.diagrama },
+    });
+    expect(r.statusCode).toBe(201);
+    return (r.json() as { id: string }).id;
+  }
+
+  it("fonte: a fiação da fatia A com projeto REAL — projeto.desenho → derivacao → agente → conector(escrita)", async () => {
+    await comApp(async (app, cookies) => {
+      await prepararMundo(app, cookies);
+      const demandaId = await criarDemanda(app, cookies, "Demanda da fatia B");
+      await app.inject({
+        method: "PUT",
+        url: "/config/fluxos",
+        cookies,
+        payload: {
+          documento: {
+            fluxos: [
+              {
+                id: "itens-da-demanda",
+                nome: "Itens da demanda ativa",
+                nos: [
+                  { id: "demanda", tipo: "projeto", refId: "projeto", posicao: { x: 0, y: 0 }, parametros: { demandaId } },
+                  { id: "gera-itens", tipo: "funcao", refId: "derivacao", posicao: { x: 200, y: 0 }, parametros: {} },
+                  { id: "resume", tipo: "agente", refId: "especialista", posicao: { x: 400, y: 0 }, parametros: {} },
+                  { id: "publica", tipo: "conector", refId: "publicar", posicao: { x: 600, y: 0 }, parametros: { demandaId: "fatia-b-teste" } },
+                ],
+                arestas: [
+                  { de: "demanda", para: "gera-itens", mapeamento: [{ saida: "desenho", entrada: "desenho" }] },
+                  { de: "gera-itens", para: "resume", mapeamento: [{ saida: "itens", entrada: "itens" }] },
+                  { de: "resume", para: "publica", mapeamento: [{ saida: "texto", entrada: "markdown" }] },
+                ],
+              },
+            ],
+          },
+        },
+      });
+
+      const r = await app.inject({ method: "POST", url: "/fluxos/itens-da-demanda/executar", cookies, payload: {} });
+      expect(r.statusCode).toBe(200);
+      const corpo = r.json() as {
+        nos: { noId: string; estado: string; erro?: string }[];
+        saidas: Record<string, Record<string, unknown>>;
+      };
+      expect(corpo.nos.map((n) => [n.noId, n.estado])).toEqual([
+        ["demanda", "sucesso"],
+        ["gera-itens", "sucesso"],
+        ["resume", "sucesso"],
+        ["publica", "sucesso"],
+      ]);
+      // O desenho que viajou é o da DEMANDA salva, não um parâmetro fixo.
+      const desenho = corpo.saidas["demanda"].desenho as { diagrama: unknown; time?: string };
+      expect(desenho.diagrama).toEqual(JSON.parse(JSON.stringify(DESENHO_DO_GATEWAY_FALSO.diagrama)));
+      expect(desenho.time).toBe("time-pagamentos");
+      expect((corpo.saidas["gera-itens"].itens as unknown[]).length).toBeGreaterThan(0);
+      expect(String(corpo.saidas["publica"].linkExterno)).toContain("http");
+      // §9.3 — a demanda nunca teve documento gerado nem volume declarado:
+      // as chaves FICAM FORA da saída, nunca viram default.
+      expect("markdown" in corpo.saidas["demanda"]).toBe(false);
+      expect("volumetria" in corpo.saidas["demanda"]).toBe(false);
+    });
+  });
+
+  it("fonte: sem demandaId vale a mais recentemente atualizada DO TIME da execução", async () => {
+    await comApp(async (app, cookies) => {
+      // Time próprio (criado pela tabela, não pelo cookie): dois specs criando
+      // demandas em time-pagamentos em paralelo tornariam "a ativa" um alvo
+      // móvel — aqui o time é deste teste, e a resposta é determinística.
+      const timeId = `time-fatia-b-${Date.now()}`;
+      expect((await app.inject({ method: "POST", url: "/times", cookies, payload: { timeId } })).statusCode).toBe(201);
+      const criar = (titulo: string) =>
+        app.inject({ method: "POST", url: "/quebras", cookies, payload: { titulo, time: timeId, diagrama: { nodes: [], edges: [] } } });
+      const primeira = (await criar("antiga")).json() as { id: string };
+      const segunda = (await criar("recente")).json() as { id: string };
+      // A primeira volta a ser tocada? Não — a SEGUNDA é atualizada por
+      // último, e é ela que a execução deve enxergar como ativa.
+      await app.inject({
+        method: "PUT",
+        url: `/quebras/${segunda.id}`,
+        cookies,
+        payload: { titulo: "recente (editada)", time: timeId, diagrama: { nodes: [], edges: [] } },
+      });
+
+      await app.inject({
+        method: "PUT",
+        url: "/config/fluxos",
+        cookies,
+        payload: {
+          timeId,
+          documento: {
+            fluxos: [
+              {
+                id: "le-ativa",
+                nome: "Lê a demanda ativa",
+                nos: [{ id: "demanda", tipo: "projeto", refId: "projeto", posicao: { x: 0, y: 0 }, parametros: {} }],
+                arestas: [],
+              },
+            ],
+          },
+        },
+      });
+
+      const r = await app.inject({ method: "POST", url: "/fluxos/le-ativa/executar", cookies, payload: { timeId } });
+      expect(r.statusCode).toBe(200);
+      const { saidas } = r.json() as { saidas: Record<string, Record<string, unknown>> };
+      expect(saidas["demanda"].demandaId).toBe(segunda.id);
+      expect(saidas["demanda"].demandaId).not.toBe(primeira.id);
+    });
+  });
+
+  it("destino: o desenho mapeado vira VARIANTE — e o diagrama da demanda fica intacto (§2.4-14)", async () => {
+    await comApp(async (app, cookies) => {
+      await prepararMundo(app, cookies);
+      await declararLeitorDeDesenho(app, cookies);
+      const demandaId = await criarDemanda(app, cookies, "Recebe proposta");
+      const antes = (await app.inject({ method: "GET", url: `/quebras/${demandaId}`, cookies })).json() as {
+        diagrama: unknown;
+      };
+
+      await app.inject({
+        method: "PUT",
+        url: "/config/fluxos",
+        cookies,
+        payload: {
+          documento: {
+            fluxos: [
+              {
+                id: "importa-desenho",
+                nome: "Importa desenho da casa",
+                nos: [
+                  { id: "le", tipo: "conector", refId: "leitor-de-desenho", posicao: { x: 0, y: 0 }, parametros: {} },
+                  { id: "propoe", tipo: "projeto", refId: "projeto", posicao: { x: 200, y: 0 }, parametros: { demandaId } },
+                ],
+                arestas: [{ de: "le", para: "propoe", mapeamento: [{ saida: "desenho", entrada: "desenho" }] }],
+              },
+            ],
+          },
+        },
+      });
+
+      const r = await app.inject({ method: "POST", url: "/fluxos/importa-desenho/executar", cookies, payload: {} });
+      expect(r.statusCode).toBe(200);
+      const corpo = r.json() as { nos: { noId: string; estado: string; erro?: string }[]; saidas: Record<string, Record<string, unknown>> };
+      expect(corpo.nos.map((n) => [n.noId, n.estado])).toEqual([
+        ["le", "sucesso"],
+        ["propoe", "sucesso"],
+      ]);
+      expect(String(corpo.saidas["propoe"].varianteId)).toContain("proposta-");
+
+      const depois = (await app.inject({ method: "GET", url: `/quebras/${demandaId}`, cookies })).json() as {
+        diagrama: unknown;
+        variantes: { id: string; titulo: string; diagrama: { nodes: unknown[] } }[];
+      };
+      // Importar não é aceitar: o desenho da demanda NÃO mudou…
+      expect(depois.diagrama).toEqual(antes.diagrama);
+      // …e a proposta está lá, como variante, esperando alguém adotar.
+      expect(depois.variantes).toHaveLength(1);
+      expect(depois.variantes[0].titulo).toBe('Proposta do fluxo "Importa desenho da casa"');
+      expect(depois.variantes[0].diagrama.nodes.length).toBeGreaterThan(0);
+    });
+  });
+
+  it("destino: sem nível no time da DEMANDA, o nó falha com o nome do portão", async () => {
+    await comApp(async (app, cookies) => {
+      await prepararMundo(app, cookies);
+      await declararLeitorDeDesenho(app, cookies);
+      // A quebra é de um time em que o dev NÃO está — direto pelo caso de uso,
+      // porque a própria rota de quebras (certamente) barraria o POST.
+      const casos = criarCasosDeUsoDeQuebras(criarRepositorioDeQuebrasEmPostgres(db));
+      const alheia = await casos.criar({ titulo: "de outro time", time: "time-fantasma", diagrama: { nodes: [], edges: [] } as never });
+
+      await app.inject({
+        method: "PUT",
+        url: "/config/fluxos",
+        cookies,
+        payload: {
+          documento: {
+            fluxos: [
+              {
+                id: "propoe-alheia",
+                nome: "Propõe em demanda alheia",
+                nos: [
+                  { id: "le", tipo: "conector", refId: "leitor-de-desenho", posicao: { x: 0, y: 0 }, parametros: {} },
+                  { id: "propoe", tipo: "projeto", refId: "projeto", posicao: { x: 200, y: 0 }, parametros: { demandaId: alheia.id } },
+                ],
+                arestas: [{ de: "le", para: "propoe", mapeamento: [{ saida: "desenho", entrada: "desenho" }] }],
+              },
+            ],
+          },
+        },
+      });
+
+      const r = await app.inject({ method: "POST", url: "/fluxos/propoe-alheia/executar", cookies, payload: {} });
+      expect(r.statusCode).toBe(200);
+      const porNo = Object.fromEntries(
+        (r.json() as { nos: { noId: string; estado: string; erro?: string }[] }).nos.map((n) => [n.noId, n])
+      );
+      expect(porNo["propoe"].estado).toBe("falhou");
+      expect(porNo["propoe"].erro).toContain('exige nível "operar" no time "time-fantasma"');
+    });
+  });
+
+  it("escrever fluxo com projeto de refId errado é recusado com a régua", async () => {
+    await comApp(async (app, cookies) => {
+      const r = await app.inject({
+        method: "PUT",
+        url: "/config/fluxos",
+        cookies,
+        payload: {
+          documento: {
+            fluxos: [{ id: "f", nos: [{ id: "p", tipo: "projeto", refId: "minha-demanda", posicao: { x: 0, y: 0 }, parametros: {} }], arestas: [] }],
+          },
+        },
+      });
+      expect(r.statusCode).toBe(400);
+      expect((r.json() as { erro: string }).erro).toContain('o refId precisa ser "projeto"');
     });
   });
 });
