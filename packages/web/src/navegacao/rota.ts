@@ -53,7 +53,7 @@ export type Rota =
    * continua sendo uma URL mandável — `#/fluxo/ensaio` — e os links salvos
    * (`#/ensaios`, `#/simulacao`) REDIRECIONAM em vez de virar tela branca.
    */
-  | { tela: "fluxo"; bancada?: "ensaio" };
+  | { tela: "fluxo"; bancada?: "ensaio"; fluxoId?: string };
 
 /**
  * ~~SPEC-84 fatia A — `{ tela: "spec" }`.~~ **§346 — a tela saiu.**
@@ -108,7 +108,13 @@ export function hashDaRota(rota: Rota): string {
   if (rota.tela === "canvas") return "#/";
   if (rota.tela === "documento") return "#/documento";
   if (rota.tela === "sistema") return "#/sistema";
-  if (rota.tela === "fluxo") return rota.bancada === "ensaio" ? "#/fluxo/ensaio" : "#/fluxo";
+  if (rota.tela === "fluxo") {
+    if (rota.bancada === "ensaio") return "#/fluxo/ensaio";
+    // SPEC-107 G5c — o canvas abre NUM fluxo: "assista a esteira rodando" é
+    // uma URL mandável, como a bancada (§2.4-3, a metade da porta).
+    if (rota.fluxoId) return `#/fluxo/${encodeURIComponent(rota.fluxoId)}`;
+    return "#/fluxo";
+  }
   return `#/config/${SEGMENTO_DA_AREA[rota.area]}`;
 }
 
@@ -126,7 +132,11 @@ export function rotaDoHash(hash: string): Rota {
   // (`#/fluxo/ensaio`), e o link salvo REDIRECIONA (§2.4-3).
   if (partes[0] === "ensaios") return { tela: "fluxo", bancada: "ensaio" };
   if (partes[0] === "fluxo") {
-    return partes[1] === "ensaio" ? { tela: "fluxo", bancada: "ensaio" } : { tela: "fluxo" };
+    if (partes[1] === "ensaio") return { tela: "fluxo", bancada: "ensaio" };
+    // G5c — `#/fluxo/<id>` abre o canvas naquele fluxo; id desconhecido cai
+    // no primeiro da lista (a FluxoScreen já faz essa guarda desde a G4).
+    if (partes[1]) return { tela: "fluxo", fluxoId: decodeURIComponent(partes[1]) };
+    return { tela: "fluxo" };
   }
   // §346 — a tela da spec saiu, e o link salvo REDIRECIONA em vez de morrer.
   // Vai para o documento porque é lá que os itens vivem, e é o item que a spec

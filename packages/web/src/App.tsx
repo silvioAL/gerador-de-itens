@@ -2129,8 +2129,11 @@ function AppCarregado({
           timeAtivo={quebra.time ?? timeAtivo}
           onFechar={() => navegar({ tela: "canvas" })}
           // SPEC-107 G4 — quem chega pela porta da bancada abre NO fluxo do
-          // ensaio, com a bancada por cima: a peça no canvas e a tabela juntas.
-          abrirFluxoId={bancadaDeEnsaiosAberta ? "ensaio-de-cenarios" : undefined}
+          // ensaio; G5c — `#/fluxo/<id>` abre em qualquer fluxo (assistir a
+          // esteira é uma URL mandável).
+          abrirFluxoId={bancadaDeEnsaiosAberta ? "ensaio-de-cenarios" : rota.tela === "fluxo" ? rota.fluxoId : undefined}
+          // G5c — executar do canvas aponta a demanda aberta na mesa.
+          demandaAberta={persistencia.quebraId ? { id: persistencia.quebraId } : undefined}
           painel={
             bancadaDeEnsaiosAberta ? (
               <BancadaDeEnsaios

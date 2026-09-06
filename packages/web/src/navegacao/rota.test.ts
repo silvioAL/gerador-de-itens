@@ -66,6 +66,11 @@ describe("rota em hash (SPEC-40 F1)", () => {
     expect(rotaDoHash("#/fluxo")).toEqual({ tela: "fluxo" });
   });
 
+  it("SPEC-107 G5c: #/fluxo/<id> abre o canvas NAQUELE fluxo — assistir é uma URL mandável", () => {
+    expect(hashDaRota({ tela: "fluxo", fluxoId: "esteira-de-agentes" })).toBe("#/fluxo/esteira-de-agentes");
+    expect(rotaDoHash("#/fluxo/esteira-de-agentes")).toEqual({ tela: "fluxo", fluxoId: "esteira-de-agentes" });
+  });
+
   it("hash desconhecido/velho cai no canvas — nunca tela em branco", () => {
     expect(rotaDoHash("#/config/aba-que-nao-existe")).toEqual({ tela: "canvas" });
     expect(rotaDoHash("#/qualquer/coisa")).toEqual({ tela: "canvas" });

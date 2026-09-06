@@ -16974,3 +16974,28 @@ byte a byte.
 correção e ver o teste falhar não é burocracia — é o único jeito de saber
 se a prova prova. Sem esse passo, a G5c mataria a revisão com uma prova
 que aceitava qualquer coisa.
+
+## §383 — SPEC-107 G5c-1: assistir a esteira NO CANVAS, sobre a demanda aberta
+
+**A primeira das três sub-rodadas da morte final.** Antes de a tela de
+revisão morrer, a capacidade dela precisa de casa nova — e esta rodada
+entrega a metade do VIVO: `#/fluxo/<id>` é uma URL mandável que abre o
+canvas naquele fluxo, e executar dali aponta a demanda ABERTA na mesa.
+
+- **O buraco era só do cliente**: o servidor já lia `parametrosPorNo` do
+  mesmo body do modo ao vivo (G1); `executarAoVivo` não tinha por onde
+  mandar. Uma assinatura e um spread.
+- **`#/fluxo/esteira-de-agentes`**: a rota do fluxo ganhou `fluxoId`
+  (a `FluxoScreen` já sabia abrir num fluxo desde a G4 — `abrirFluxoId`).
+- **O apontamento é real, e o teste o distingue do chute**: uma segunda
+  demanda MAIS RECENTE criada por fora (a "ativa" do servidor) fica
+  intocada — as sugestões chegam na aberta. §248: desligar o
+  `parametrosPorNo` derruba o teste (a corrida cai na recente).
+- O E2E novo cobre a jornada inteira: URL → canvas na esteira (fonte,
+  papéis e destino visíveis) → executar → nó pulsando/texto streamando
+  (`rastro-vivo-*`) → rastro todo verde → sugestões PENDENTES na demanda
+  aberta (§5.5).
+
+**Próximas**: G5c-2 (o julgamento migra para o documento — editor campo a
+campo, confirmar-todas, conversa por item) e G5c-3 (a morte do motor
+client e da tela, com as re-leituras dos E2Es).

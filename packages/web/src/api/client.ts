@@ -1707,13 +1707,22 @@ export const apiExecucaoDeFluxo = {
     id: string,
     timeId: string | undefined,
     ateNo: string | undefined,
-    onEvento: (evento: EventoDaExecucao) => void
+    onEvento: (evento: EventoDaExecucao) => void,
+    // SPEC-107 G5c — o atalho AO VIVO também aponta a demanda aberta: o
+    // servidor já lia `parametrosPorNo` deste mesmo body (G1); só o cliente
+    // não tinha por onde mandar.
+    parametrosPorNo?: Record<string, Record<string, unknown>>
   ): Promise<RespostaDeExecucao> => {
     const resposta = await fetch(`${BASE_URL}/fluxos/${encodeURIComponent(id)}/executar`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ aoVivo: true, ...(timeId ? { timeId } : {}), ...(ateNo ? { ateNo } : {}) }),
+      body: JSON.stringify({
+        aoVivo: true,
+        ...(timeId ? { timeId } : {}),
+        ...(ateNo ? { ateNo } : {}),
+        ...(parametrosPorNo ? { parametrosPorNo } : {}),
+      }),
     });
     return lerExecucaoAoVivo(resposta, onEvento);
   },
