@@ -148,6 +148,15 @@ test("a função entra pela paleta já com o contrato à mostra — sem adaptado
     await expect(page.getByTestId("contrato-do-projeto")).toContainText("vira uma variante");
     await expect(page.getByTestId("demanda-do-projeto")).toBeVisible();
     await expect(page.getByTestId("adaptador-do-no")).toHaveCount(0);
+
+    // SPEC-107 fatia E — a transformação nasce vazia e o painel ensina o
+    // gesto: declarar os campos de saída (modelo concatena, caminho extrai).
+    await page.getByTestId("add-transformacao").click();
+    await expect(page.getByTestId("painel-do-no")).toContainText("Transformação (pura");
+    await expect(page.getByTestId("campos-da-transformacao")).toContainText("modelo");
+    await page.getByTestId("adicionar-campo-da-transformacao").click();
+    await page.getByLabel("Modelo do campo 1").fill("RPS {rps}");
+    await expect(page.locator(`.react-flow__node[data-id="transformacao-1"]`)).toContainText("campo1");
   } finally {
     await page.request.put(`${API}/config/fluxos`, { data: { documento: original, timeId: "time-portabilidade" } });
   }

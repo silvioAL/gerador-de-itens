@@ -15,6 +15,9 @@ const semFuncao = {
   projeto: async (): Promise<Record<string, unknown>> => {
     throw new Error("não há nó de projeto neste teste");
   },
+  transformacao: async (): Promise<Record<string, unknown>> => {
+    throw new Error("não há nó de transformação neste teste");
+  },
 };
 
 const JMETER = fluxoDe(
@@ -282,7 +285,7 @@ describe("executarFluxo (SPEC-107 fatia A — o nó de FUNÇÃO)", () => {
   it("despacha para o executor de função, com o desenho mapeado da aresta (modo b)", async () => {
     const recebido: Record<string, unknown>[] = [];
     const resultado = await executarFluxo(FLUXO_COM_FUNCAO, {
-      projeto: semFuncao.projeto,
+      ...semFuncao,
       conector: async () => ({ desenho: { diagrama: { nodes: [], edges: [] } } }),
       funcao: async (no, entradas) => {
         recebido.push({ no: no.refId, entradas });
@@ -303,7 +306,7 @@ describe("executarFluxo (SPEC-107 fatia A — o nó de FUNÇÃO)", () => {
 
   it("§5.4 — as ENTRADAS do nó de função ficam no rastro (a âncora da tese reescrita), e só nele", async () => {
     const resultado = await executarFluxo(FLUXO_COM_FUNCAO, {
-      projeto: semFuncao.projeto,
+      ...semFuncao,
       conector: async () => ({ desenho: { diagrama: { nodes: [], edges: [] } } }),
       funcao: async () => ({ itens: [] }),
       agente: async () => ({ texto: "resumo" }),
@@ -320,7 +323,7 @@ describe("executarFluxo (SPEC-107 fatia A — o nó de FUNÇÃO)", () => {
 
   it("as entradas ficam no rastro TAMBÉM quando a função falha — auditoria não é prêmio de sucesso", async () => {
     const resultado = await executarFluxo(FLUXO_COM_FUNCAO, {
-      projeto: semFuncao.projeto,
+      ...semFuncao,
       conector: async () => ({ desenho: "não é um desenho" }),
       funcao: async () => {
         throw new Error('o "desenho" mapeado não tem a forma de um desenho');

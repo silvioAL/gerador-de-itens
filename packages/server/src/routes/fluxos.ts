@@ -16,6 +16,8 @@ import {
   normalizarPipelineAgentes,
   preambuloDoPapel,
   saidaDoProjeto,
+  sanearCamposDaTransformacao,
+  transformarEntradas,
   varianteProposta,
   type ContextoDasFuncoes,
   type Fluxo,
@@ -226,6 +228,10 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
           const itens = await criarCasosDeUsoDeItensGerados(criarRepositorioDeItensGeradosEmPostgres(db)).listarDaQuebra(quebra.id);
           return saidaDoProjeto(quebra, itens);
         },
+        // SPEC-107 fatia E — pura, em processo: re-mapeia/extrai/concatena o
+        // que chegou, pelos campos declarados no nó.
+        transformacao: async (no, entradas) =>
+          transformarEntradas(sanearCamposDaTransformacao((no.parametros as { campos?: unknown }).campos), entradas),
     } satisfies Parameters<typeof executarFluxo>[1];
   }
 

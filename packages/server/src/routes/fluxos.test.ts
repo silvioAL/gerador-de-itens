@@ -918,6 +918,94 @@ describe("SPEC-107 fatia B — o nó PROJETO", () => {
     });
   });
 
+  it("SPEC-107 fatia E — a transformação re-mapeia, extrai e concatena, pura, no meio da fiação", async () => {
+    await comApp(async (app, cookies) => {
+      await prepararMundo(app, cookies);
+      const demandaId = await criarDemanda(app, cookies, "Demanda transformada");
+      await app.inject({
+        method: "PUT",
+        url: "/config/fluxos",
+        cookies,
+        payload: {
+          documento: {
+            fluxos: [
+              {
+                id: "com-transformacao",
+                nome: "Com transformação",
+                nos: [
+                  { id: "demanda", tipo: "projeto", refId: "projeto", posicao: { x: 0, y: 0 }, parametros: { demandaId } },
+                  {
+                    id: "molda",
+                    tipo: "transformacao",
+                    refId: "transformacao",
+                    posicao: { x: 200, y: 0 },
+                    parametros: {
+                      campos: [
+                        { chave: "resumo", modelo: "Demanda {titulo} ({demandaId})" },
+                        { chave: "nosDoDesenho", caminho: "$.desenho.diagrama.nodes" },
+                      ],
+                    },
+                  },
+                ],
+                arestas: [
+                  {
+                    de: "demanda",
+                    para: "molda",
+                    mapeamento: [
+                      { saida: "titulo", entrada: "titulo" },
+                      { saida: "demandaId", entrada: "demandaId" },
+                      { saida: "desenho", entrada: "desenho" },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      });
+
+      const r = await app.inject({ method: "POST", url: "/fluxos/com-transformacao/executar", cookies, payload: {} });
+      expect(r.statusCode).toBe(200);
+      const { nos, saidas } = r.json() as { nos: { noId: string; estado: string; erro?: string }[]; saidas: Record<string, Record<string, unknown>> };
+      expect(nos.map((n) => [n.noId, n.estado])).toEqual([
+        ["demanda", "sucesso"],
+        ["molda", "sucesso"],
+      ]);
+      expect(saidas["molda"].resumo).toBe(`Demanda Demanda transformada (${demandaId})`);
+      expect((saidas["molda"].nosDoDesenho as unknown[]).length).toBeGreaterThan(0);
+    });
+  });
+
+  it("SPEC-107 fatia E — transformação sem campos (ou pela metade) é recusada na ESCRITA", async () => {
+    await comApp(async (app, cookies) => {
+      const semCampos = await app.inject({
+        method: "PUT",
+        url: "/config/fluxos",
+        cookies,
+        payload: {
+          documento: {
+            fluxos: [{ id: "f", nos: [{ id: "t", tipo: "transformacao", refId: "transformacao", posicao: { x: 0, y: 0 }, parametros: { campos: [] } }], arestas: [] }],
+          },
+        },
+      });
+      expect(semCampos.statusCode).toBe(400);
+      expect((semCampos.json() as { erro: string }).erro).toContain("não declara nenhum campo");
+
+      const pelaMetade = await app.inject({
+        method: "PUT",
+        url: "/config/fluxos",
+        cookies,
+        payload: {
+          documento: {
+            fluxos: [{ id: "f", nos: [{ id: "t", tipo: "transformacao", refId: "transformacao", posicao: { x: 0, y: 0 }, parametros: { campos: [{ chave: "x" }] } }], arestas: [] }],
+          },
+        },
+      });
+      expect(pelaMetade.statusCode).toBe(400);
+      expect((pelaMetade.json() as { erro: string }).erro).toContain('"modelo" (concatenar) ou um "caminho"');
+    });
+  });
+
   it("escrever fluxo com projeto de refId errado é recusado com a régua", async () => {
     await comApp(async (app, cookies) => {
       const r = await app.inject({

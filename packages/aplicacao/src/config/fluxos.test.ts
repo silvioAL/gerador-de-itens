@@ -29,7 +29,9 @@ describe("normalizarFluxos (SPEC-105 fatia C)", () => {
           nos: [
             { id: "a", tipo: "conector", refId: "c1" },
             { id: "sem-ref", tipo: "conector" },
-            { id: "b", tipo: "transformacao", refId: "x" },
+            // "transformacao" deixou de servir de exemplo aqui: a fatia E o
+            // tornou um tipo REAL, com executor.
+            { id: "b", tipo: "laco", refId: "x" },
           ],
           arestas: [
             { de: "a", para: "sem-ref", mapeamento: [] },
