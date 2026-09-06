@@ -218,6 +218,11 @@ export {
 // SPEC-107 G5 — a fila da esteira, pura: a mesma para a revisão e a fiação.
 export { TAM_LOTE_ESTEIRA, corpoDoLote, itensDoPapel } from "./casos-de-uso/lotesDaEsteira.js";
 export {
+  correrEsteiraPelaFila,
+  type FalhaDaCorrida,
+  type ResultadoDaCorrida,
+} from "./casos-de-uso/corridaDaEsteira.js";
+export {
   contextoDoPlaceholder,
   filaDaEsteiraDaDemanda,
   montarFilaDaEsteira,
