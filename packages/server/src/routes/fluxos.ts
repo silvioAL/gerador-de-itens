@@ -4,6 +4,10 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { randomUUID } from "node:crypto";
 import {
   CAMPO_GLOBAL,
+  aplicarRespostasNaDemanda,
+  contextoDoProdutoEmTexto,
+  contextoEpicoCompleto,
+  correrPapelPelaFila,
   criarCasosDeUsoDeConfig,
   criarCasosDeUsoDeItensGerados,
   criarCasosDeUsoDeQuebras,
@@ -11,6 +15,7 @@ import {
   erroSemDemanda,
   executarFluxo,
   executarFuncao,
+  filaDaEsteiraDaDemanda,
   fluxosEmVigor,
   mensagemDeCiclo,
   normalizarExportador,
@@ -23,11 +28,13 @@ import {
   varianteProposta,
   type ContextoDasFuncoes,
   type Fluxo,
+  type ItemDaFilaDaEsteira,
   type RastroDoNo,
 } from "@gerador/aplicacao";
 import type { OpcoesApp } from "../app.js";
 import { criarRepositorioDeConfigEmPostgres } from "../adaptadores/configEmPostgres.js";
 import { criarRepositorioDeItensGeradosEmPostgres } from "../adaptadores/itensGeradosEmPostgres.js";
+import { criarRepositorioDeProdutosEmPostgres } from "../adaptadores/produtosEmPostgres.js";
 import { criarRepositorioDeQuebrasEmPostgres } from "../adaptadores/quebrasEmPostgres.js";
 import { executarConector } from "../adaptadores/executorDeConector.js";
 import { exigirNivel, maiorNivel, nivelNoTime } from "../auth/niveis.js";
@@ -175,6 +182,50 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
           if (Object.keys(entradas).length === 0) {
             throw new Error("nenhuma entrada chegou a este agente — entrada ausente não vira default (§9.3)");
           }
+          /**
+           * SPEC-107 G5 — **o modo PIPELINE**: quando a FILA de itens chega
+           * pela aresta, o agente corre o papel dele como a revisão sempre
+           * correu — lotes de 5, o pedido do `montarPedidoPipeline`, o
+           * esquema item→campo — pelo MESMO funil (`completarEstruturado`)
+           * da rota `/ia/pipeline/:papel`. É o que torna a prova da
+           * SPEC-105 F ("resultado idêntico item a item") possível: o dublê
+           * semeia pela letra do prompt, e a letra é uma só (§263).
+           *
+           * A fila segue adiante com as acumuladas; `respostasItens` agrega
+           * o que os papéis anteriores já escreveram nesta execução.
+           */
+          if (entradas.fila !== undefined) {
+            const fila = entradas.fila as ItemDaFilaDaEsteira[];
+            const ativos = papeis.filter((p) => p.ativo);
+            const corrida = await correrPapelPelaFila({
+              papel,
+              papeisAtivos: ativos,
+              fila,
+              contextoEpico: entradas.contextoEpico as string | undefined,
+              contextoDoProduto: entradas.contextoDoProduto as string | undefined,
+              completarEstruturado: (prompt, esquema) =>
+                provedor.completarEstruturado(prompt, esquema as never, {
+                  onTexto: (pedaco: string) => aoVivo?.texto(no.id, pedaco),
+                }),
+            });
+            // Falha TOTAL derruba o nó com o motivo; falha parcial segue,
+            // nomeada no rastro — a mesma régua da esteira (§193).
+            if (corrida.falhas.length > 0 && Object.keys(corrida.respostasPorItem).length === 0) {
+              throw new Error(`o papel "${papel.nome}" falhou em todos os lotes: ${corrida.falhas[0].mensagem}`);
+            }
+            const anteriores = (entradas.respostasItens ?? {}) as Record<string, Record<string, string>>;
+            const respostasItens: Record<string, Record<string, string>> = { ...anteriores };
+            for (const [item, campos] of Object.entries(corrida.respostasPorItem)) {
+              respostasItens[item] = { ...(respostasItens[item] ?? {}), ...campos };
+            }
+            return {
+              fila: corrida.fila,
+              respostasItens,
+              ...(entradas.contextoEpico !== undefined ? { contextoEpico: entradas.contextoEpico } : {}),
+              ...(entradas.contextoDoProduto !== undefined ? { contextoDoProduto: entradas.contextoDoProduto } : {}),
+              ...(corrida.falhas.length > 0 ? { falhas: corrida.falhas } : {}),
+            };
+          }
           const prompt = [
             preambuloDoPapel(no.refId, papeis),
             "",
@@ -252,6 +303,30 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
             return { demandaId: quebra.id, exportados, erros };
           }
 
+          if (entradas.respostasItens !== undefined) {
+            /**
+             * SPEC-107 G5 — DESTINO da esteira: o que a corrida escreveu
+             * entra na demanda como SUGESTÃO pendente (§5.5, decidida pelo
+             * usuário: o julgamento fica NA DEMANDA) — `origem: "sugerido"`,
+             * `confirmado: false`, e NUNCA por cima do que alguém confirmou.
+             */
+            const nivel = quebra.time ? await nivelNoTime(db, email, quebra.time) : await maiorNivel(db, email);
+            if (nivel !== "operar" && nivel !== "owner") {
+              throw new Error(
+                `gravar as sugestões da esteira na demanda "${quebra.id}" exige nível "operar" no time "${quebra.time ?? "(sem time)"}" — seu nível é "${nivel ?? "nenhum"}"`
+              );
+            }
+            const { respostasItens, aplicadas, preservadas } = aplicarRespostasNaDemanda(
+              quebra.respostasItens,
+              entradas.respostasItens as Record<string, Record<string, string>>
+            );
+            // Read-modify-write da quebra INTEIRA, como os outros destinos:
+            // `atualizar` normaliza o documento completo.
+            await casosQuebras.atualizar(quebra.id, { ...quebra, respostasItens });
+            registrarAuditoria(db, { email, acao: "atualizar", recurso: "quebras", recursoId: quebra.id });
+            return { demandaId: quebra.id, aplicadas, preservadas };
+          }
+
           if (entradas.desenho !== undefined) {
             // DESTINO. O gate da rota cobre o time do CORPO; a quebra que o
             // `demandaId` aponta pode ser de outro — re-checa no time DELA.
@@ -270,7 +345,30 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
           }
 
           const itens = await criarCasosDeUsoDeItensGerados(criarRepositorioDeItensGeradosEmPostgres(db)).listarDaQuebra(quebra.id);
-          return saidaDoProjeto(quebra, itens);
+          /**
+           * SPEC-107 G5 — a FONTE também emite a fila da esteira e os
+           * contextos, montados com o MESMO motor da revisão (derivar →
+           * fichas → fila; contexto do épico + do produto). §9.3: o que a
+           * demanda não tem fica FORA da saída.
+           */
+          const ctx = await contextoDeFuncao();
+          const ativos = papeis.filter((p) => p.ativo);
+          const contextoEpico = contextoEpicoCompleto(quebra.demandInfo, quebra.anexosContexto);
+          const produto = quebra.produtoId
+            ? await criarRepositorioDeProdutosEmPostgres(db).obter(quebra.produtoId)
+            : null;
+          const contextoDoProduto = produto ? contextoDoProdutoEmTexto(produto) || undefined : undefined;
+          return {
+            ...saidaDoProjeto(quebra, itens),
+            filaDaEsteira: filaDaEsteiraDaDemanda(quebra, {
+              diagramaConfig: ctx.diagramaConfig,
+              regrasConfig: ctx.regrasConfig,
+              tokens: ctx.tokens,
+              papeisAtivos: ativos,
+            }),
+            ...(contextoEpico !== undefined ? { contextoEpico } : {}),
+            ...(contextoDoProduto !== undefined ? { contextoDoProduto } : {}),
+          };
         },
         // SPEC-107 fatia E — pura, em processo: re-mapeia/extrai/concatena o
         // que chegou, pelos campos declarados no nó.

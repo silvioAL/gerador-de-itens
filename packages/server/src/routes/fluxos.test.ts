@@ -266,18 +266,20 @@ describe("SPEC-105 fatia D — POST /fluxos/:id/executar", () => {
       const esteira = fluxos.find((f) => f.id === "esteira-de-agentes");
       expect(esteira).toBeDefined();
       expect(esteira!.origem).toBe("fabrica");
-      // Os quatro papéis de fábrica, na ordem — o desenho da mesma coisa.
-      expect(esteira!.nos.map((n) => n.id)).toEqual(["po", "arquiteto", "especialista", "qa"]);
+      // SPEC-107 G5 — a esteira COMPLETA: a demanda como fonte, os quatro
+      // papéis de fábrica na ordem, e o destino que grava as sugestões.
+      expect(esteira!.nos.map((n) => n.id)).toEqual(["demanda", "po", "arquiteto", "especialista", "qa", "grava"]);
 
       // Ela EXECUTA pelo executor de fluxos (a resolução vem do em-vigor) — e
-      // o primeiro papel, sem entrada nenhuma mapeada, falha pela §9.3 em vez
-      // de rodar com um prompt vazio inventado.
+      // sem demanda salva no mundo, quem barra é a FONTE, com o nome do que
+      // faltou (§9.3 uma camada antes: o po agora TEM entrada mapeada, a fila).
       const exec = await app.inject({ method: "POST", url: "/fluxos/esteira-de-agentes/executar", cookies, payload: { ateNo: "po" } });
       expect(exec.statusCode).toBe(200);
       const { nos } = exec.json() as { nos: { noId: string; estado: string; erro?: string }[] };
-      expect(nos).toHaveLength(1);
-      expect(nos[0].estado).toBe("falhou");
-      expect(nos[0].erro).toContain("entrada");
+      const demanda = nos.find((n) => n.noId === "demanda");
+      expect(demanda?.estado).toBe("falhou");
+      expect(demanda?.erro).toContain("demanda");
+      expect(nos.find((n) => n.noId === "po")?.estado).toBe("nao-executado");
     });
   });
 

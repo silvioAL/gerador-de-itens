@@ -225,7 +225,7 @@ export function aplicarRespostasNaDemanda(
 export function filaDaEsteiraDaDemanda(
   quebra: {
     diagrama: Diagrama;
-    time?: string;
+    time?: string | null;
     excecoes?: ExcecaoDePadrao[];
     percursos?: Percurso[];
     respostasItens?: Record<string, Record<string, ValorSpec>>;
@@ -239,7 +239,7 @@ export function filaDaEsteiraDaDemanda(
   }
 ): ItemDaFilaDaEsteira[] {
   const atividades = derivar(quebra.diagrama, contexto.diagramaConfig, {
-    time: quebra.time,
+    time: quebra.time ?? undefined,
     regras: contexto.regrasConfig,
     excecoes: quebra.excecoes,
     percursos: quebra.percursos,
