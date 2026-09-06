@@ -1,4 +1,19 @@
-import type { Atividade, FichaEspecificacaoNo, FichaItem, FichaPlaceholder, ValorSpec } from "@gerador/engine";
+import {
+  derivar,
+  montarFichaItem,
+  resolverDependencias,
+  type Atividade,
+  type Diagrama,
+  type DiagramaConfig,
+  type ExcecaoDePadrao,
+  type FichaEspecificacaoNo,
+  type FichaItem,
+  type FichaPlaceholder,
+  type Percurso,
+  type RegrasConfig,
+  type Token,
+  type ValorSpec,
+} from "@gerador/engine";
 import { GRUPOS_FICHA, type GrupoFicha, type PapelConfigurado } from "../config/normalizacao.js";
 
 /**
@@ -144,4 +159,51 @@ export function montarFilaDaEsteira(opcoes: {
     });
   }
   return fila;
+}
+
+/**
+ * SPEC-107 G5 — **a fila a partir da DEMANDA, como o servidor a vê.**
+ *
+ * É o caminho da fiação: o nó `projeto` emite `filaDaEsteira` derivando as
+ * atividades e montando as fichas com o MESMO motor da revisão (`derivar` +
+ * `resolverDependencias` + `montarFichaItem`) — os mesmos insumos que o botão
+ * da mesa passa (§263). `apenasPendentes` default `true`: a corrida da
+ * esteira regenera o que ninguém confirmou, nunca o que alguém assinou.
+ */
+export function filaDaEsteiraDaDemanda(
+  quebra: {
+    diagrama: Diagrama;
+    time?: string;
+    excecoes?: ExcecaoDePadrao[];
+    percursos?: Percurso[];
+    respostasItens?: Record<string, Record<string, ValorSpec>>;
+  },
+  contexto: {
+    diagramaConfig: DiagramaConfig;
+    regrasConfig?: RegrasConfig;
+    tokens?: Token[];
+    papeisAtivos: PapelConfigurado[];
+    apenasPendentes?: boolean;
+  }
+): ItemDaFilaDaEsteira[] {
+  const atividades = derivar(quebra.diagrama, contexto.diagramaConfig, {
+    time: quebra.time,
+    regras: contexto.regrasConfig,
+    excecoes: quebra.excecoes,
+    percursos: quebra.percursos,
+    tokens: contexto.tokens,
+  });
+  const resolucao = resolverDependencias(atividades);
+  const fichas = new Map(
+    resolucao.atividades.map((a, i) => [
+      a.chave,
+      montarFichaItem(i + 1, a, quebra.diagrama, contexto.diagramaConfig, contexto.regrasConfig, quebra.respostasItens?.[a.chave]),
+    ])
+  );
+  return montarFilaDaEsteira({
+    atividades: resolucao.atividades,
+    fichas,
+    papeisAtivos: contexto.papeisAtivos,
+    apenasPendentes: contexto.apenasPendentes ?? true,
+  });
 }

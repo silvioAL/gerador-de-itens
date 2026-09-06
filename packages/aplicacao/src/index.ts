@@ -218,6 +218,7 @@ export {
 // SPEC-107 G5 — a fila da esteira, pura: a mesma para a revisão e a fiação.
 export {
   contextoDoPlaceholder,
+  filaDaEsteiraDaDemanda,
   montarFilaDaEsteira,
   papelDoGrupo,
   placeholdersDaFichaPorGrupo,
