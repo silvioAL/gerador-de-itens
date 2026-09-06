@@ -219,6 +219,7 @@ export {
 export { TAM_LOTE_ESTEIRA, corpoDoLote, itensDoPapel } from "./casos-de-uso/lotesDaEsteira.js";
 export {
   correrEsteiraPelaFila,
+  correrPapelPelaFila,
   type FalhaDaCorrida,
   type ResultadoDaCorrida,
 } from "./casos-de-uso/corridaDaEsteira.js";
