@@ -534,28 +534,37 @@ se `#/fluxo` legado redireciona para a galeria e os specs usam
 > Depende de F (`demanda-ler`). Fecha o terceiro termo do vocabulário
 > original do usuário: integração externa → agente → **artefato**.
 
-**Motor**: `FUNCOES_DO_SISTEMA` ganha `gerar-spec` — entrada: os mesmos
-insumos que o cliente usa hoje (itens + escrita da spec + contexto +
-medição; vêm de `demanda-ler` — conferir o que falta na `saida` dela e
-acrescentar lá, ex.: `specEscrita`); saída: `spec (documento)` +
-`lacunas (número — o `contar(MARCADOR_ESPECIFICAR)` de hoje)`. O executor
-chama **a mesma** `gerarSpec` do engine (§263: uma montagem = uma função;
-precedente da prova G5). O cliente não muda — a tela continua montando ao
-vivo com a mesma função.
+**A unidade é O ITEM, não a demanda** — correção do usuário em revisão
+(*"isso varia com o desenho, pode ter vários itens"*), e é o que a SPEC-98
+§3.2 sempre disse: a spec acompanha O ITEM quando ele sobe. N itens → N
+specs.
+
+**Motor**: `FUNCOES_DO_SISTEMA` ganha `gerar-spec` — entrada: os insumos
+que o cliente usa hoje (itens + escrita da spec + contexto + medição; vêm
+de `demanda-ler` — conferir o que falta na `saida` dela e acrescentar,
+ex.: `specEscrita`); saída: **`specPorItem` (lista: chave do item +
+markdown da spec DELE + lacunas)** e, como agregado, `spec (documento)` —
+a montagem única que a tela mostra hoje. MEDIR na implementação qual
+função pura fatia por item (`gerarSpec` recebe `itens`; o molde por item
+vive em `gerarEspecificacaoEntrega`/`templateItem` — reusar a existente ou
+extrair a fatia por item DELA, nunca escrever uma segunda montagem: §263).
+O cliente não muda — a tela continua montando ao vivo com a mesma função.
 
 **Fiação de fábrica**: `exportar-prontos` ganha o passo que a SPEC-98 §3.2
-prometeu — a spec gerada viaja com os itens para o destino (MEDIR o
-contrato do conector de envio antes: onde o markdown entra no payload; se o
-destino não tiver campo para ela, a spec vai como anexo/link segundo o que
-o gateway suporta — decidir na implementação com o contrato à frente).
-`publicar-documento` continua publicando o DOCUMENTO — são dois artefatos,
-e os cartões dizem qual é qual.
+prometeu — **cada item sobe com a spec dele** (MEDIR o contrato do conector
+de envio antes: onde o markdown por item entra no payload; se o destino não
+tiver campo, a spec vai como anexo/link segundo o que o gateway suporta —
+decidir na implementação com o contrato à frente). `publicar-documento`
+continua publicando o DOCUMENTO — são artefatos distintos, e os cartões
+dizem qual é qual.
 
-**Provas**: unidade: a função do sistema devolve byte-a-byte o que o
-cliente monta para a mesma demanda (o molde da prova G5 — §248: adulterar
-um insumo do lado do fluxo → vermelho); E2E: rodar `exportar-prontos`
-contra o dublê e ver a spec no payload recebido; a tela do documento segue
-igual (nenhuma regressão de montagem).
+**Provas**: unidade: o agregado da função do sistema devolve byte-a-byte o
+que o cliente monta para a mesma demanda, e a soma das fatias por item
+cobre o agregado sem sobra nem falta (o molde da prova G5 — §248: adulterar
+um insumo do lado do fluxo → vermelho); E2E: demanda com DOIS itens →
+`exportar-prontos` contra o dublê recebe DUAS specs, cada uma com o
+conteúdo do seu item (não a da demanda duplicada); a tela do documento
+segue igual (nenhuma regressão de montagem).
 
 ## 4.x O caso-norte (para onde tudo isto aponta)
 
