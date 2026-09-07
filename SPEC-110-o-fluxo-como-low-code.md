@@ -219,14 +219,23 @@ aba de config — nenhum componente do canvas fala com ele.
   pelo usuário ("simplificaria bastante"): `#/fluxo` sem id abre uma tela
   de cards grandes com busca filtrada, ícone (emoji) e nome editáveis; o
   canvas vira o destino do clique, não a porta. Detalhe na fatia H.
+- **D15.** **A spec vira saída do fluxo** — apontado pelo usuário: *"a
+  promessa do sistema de produzir specs como output… não consta nada no
+  fluxo atual"*. Medido: `gerarSpec` só roda no cliente (App.tsx:1166,
+  tela + download); nenhum nó a produz e a exportação não a anexa (a
+  SPEC-98 §3.2 está prometida e não implementada). Como `gerarSpec` é
+  função PURA do engine, o executor pode chamar A MESMA função sem violar
+  o §263 (o precedente é a prova bit-exata da G5: mesmo montador nos dois
+  lados). Detalhe na fatia I.
 
 ## 4. As fatias
 
-> Ordem: A → B → C → D → E → F → G → H. B é a maior; C depende de B; D e E
-> são independentes entre si (podem inverter se conveniente); F depende de
-> B; G depende de B e F; H depende de C (mas a galeria só-de-fluxos pode
-> adiantar). Se a rodada apertar, H-só-fluxos logo após A é um upgrade
-> visível barato.
+> Ordem: A → B → C → D → E → F → G → H → I. B é a maior; C depende de B;
+> D e E são independentes entre si (podem inverter se conveniente); F
+> depende de B; G depende de B e F; H depende de C (mas a galeria
+> só-de-fluxos pode adiantar); I depende de F. Se a rodada apertar,
+> H-só-fluxos logo após A é um upgrade visível barato — e a fatia I é
+> pequena e de alto valor de promessa (pode subir na ordem junto com F).
 
 ### Fatia A — o gatilho como nó
 
@@ -519,6 +528,34 @@ vermelho. Ajustar E2Es que hoje esperam `#/fluxo` abrir direto no canvas
 (medir com grep antes: `goto("/#/fluxo")` aparece em vários specs — decidir
 se `#/fluxo` legado redireciona para a galeria e os specs usam
 `#/fluxo/<id>`, documentando no JOURNEY).
+
+### Fatia I — a spec como saída do fluxo (D15)
+
+> Depende de F (`demanda-ler`). Fecha o terceiro termo do vocabulário
+> original do usuário: integração externa → agente → **artefato**.
+
+**Motor**: `FUNCOES_DO_SISTEMA` ganha `gerar-spec` — entrada: os mesmos
+insumos que o cliente usa hoje (itens + escrita da spec + contexto +
+medição; vêm de `demanda-ler` — conferir o que falta na `saida` dela e
+acrescentar lá, ex.: `specEscrita`); saída: `spec (documento)` +
+`lacunas (número — o `contar(MARCADOR_ESPECIFICAR)` de hoje)`. O executor
+chama **a mesma** `gerarSpec` do engine (§263: uma montagem = uma função;
+precedente da prova G5). O cliente não muda — a tela continua montando ao
+vivo com a mesma função.
+
+**Fiação de fábrica**: `exportar-prontos` ganha o passo que a SPEC-98 §3.2
+prometeu — a spec gerada viaja com os itens para o destino (MEDIR o
+contrato do conector de envio antes: onde o markdown entra no payload; se o
+destino não tiver campo para ela, a spec vai como anexo/link segundo o que
+o gateway suporta — decidir na implementação com o contrato à frente).
+`publicar-documento` continua publicando o DOCUMENTO — são dois artefatos,
+e os cartões dizem qual é qual.
+
+**Provas**: unidade: a função do sistema devolve byte-a-byte o que o
+cliente monta para a mesma demanda (o molde da prova G5 — §248: adulterar
+um insumo do lado do fluxo → vermelho); E2E: rodar `exportar-prontos`
+contra o dublê e ver a spec no payload recebido; a tela do documento segue
+igual (nenhuma regressão de montagem).
 
 ## 4.x O caso-norte (para onde tudo isto aponta)
 
