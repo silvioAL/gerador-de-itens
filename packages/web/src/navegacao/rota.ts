@@ -1,4 +1,5 @@
 ﻿import { useCallback, useEffect, useState } from "react";
+import { ID_DO_FLUXO_DO_ENSAIO } from "@gerador/aplicacao";
 
 /**
  * SPEC-40 Fase 1 — a rota do app, em hash (`#/config/membros`). Hash e não
@@ -61,7 +62,23 @@ export type Rota =
    * continua sendo uma URL mandável — `#/fluxo/ensaio` — e os links salvos
    * (`#/ensaios`, `#/simulacao`) REDIRECIONAM em vez de virar tela branca.
    */
-  | { tela: "fluxo"; bancada?: "ensaio"; fluxoId?: string };
+  /**
+   * SPEC-110 fatia B (D4) — `bancada?: "ensaio"` MORREU com o painel ad hoc.
+   * A bancada era montada pelo App SOBRE o canvas quando a rota pedia; agora
+   * ela é a TELA `bancada-de-ensaios` no meio da fiação do ensaio, e aparece
+   * pelo STAGE (`#/tela/<execucaoId>`) como qualquer tela. Os links antigos
+   * (`#/fluxo/ensaio`, `#/ensaios`, `#/simulacao`) redirecionam para o fluxo
+   * onde ela mora — link salvo não vira tela branca (SPEC-61 §6.7).
+   */
+  | { tela: "fluxo"; fluxoId?: string }
+  /**
+   * SPEC-110 fatia B (D2) — **a TELA em modo stage**: a execução de um fluxo
+   * parou num nó de tela e alguém precisa abrir, agir e decidir. O endereço é
+   * da EXECUÇÃO (não da tela): duas execuções paradas na mesma tela são duas
+   * coisas diferentes, e o link é mandável para quem revisa — a metade da
+   * porta que o §2.4-3 cobra.
+   */
+  | { tela: "telaDoStage"; execucaoId: string };
 
 /**
  * ~~SPEC-84 fatia A — `{ tela: "spec" }`.~~ **§346 — a tela saiu.**
@@ -115,8 +132,9 @@ const AREA_DO_SEGMENTO = Object.fromEntries(
 export function hashDaRota(rota: Rota): string {
   if (rota.tela === "canvas") return "#/";
   if (rota.tela === "documento") return "#/documento";
+  // SPEC-110 B — o stage de uma tela é endereçado pela EXECUÇÃO.
+  if (rota.tela === "telaDoStage") return `#/tela/${encodeURIComponent(rota.execucaoId)}`;
   if (rota.tela === "fluxo") {
-    if (rota.bancada === "ensaio") return "#/fluxo/ensaio";
     // SPEC-107 G5c — o canvas abre NUM fluxo: "assista a esteira rodando" é
     // uma URL mandável, como a bancada (§2.4-3, a metade da porta).
     if (rota.fluxoId) return `#/fluxo/${encodeURIComponent(rota.fluxoId)}`;
@@ -138,9 +156,21 @@ export function rotaDoHash(hash: string): Rota {
   if (partes[0] === "sistema") return { tela: "fluxo" };
   // SPEC-107 G4 — a tela de ensaios morreu; a bancada vive junto do fluxo
   // (`#/fluxo/ensaio`), e o link salvo REDIRECIONA (§2.4-3).
-  if (partes[0] === "ensaios") return { tela: "fluxo", bancada: "ensaio" };
+  if (partes[0] === "ensaios") return { tela: "fluxo", fluxoId: ID_DO_FLUXO_DO_ENSAIO };
+  // SPEC-110 B — `#/tela/<execucaoId>`. Sem id não há stage nenhum a mostrar:
+  // cai no canvas de fluxos, que é de onde as execuções nascem (§2.4-3 — link
+  // torto nunca vira tela branca).
+  if (partes[0] === "tela") {
+    return partes[1] ? { tela: "telaDoStage", execucaoId: decodeURIComponent(partes[1]) } : { tela: "fluxo" };
+  }
   if (partes[0] === "fluxo") {
-    if (partes[1] === "ensaio") return { tela: "fluxo", bancada: "ensaio" };
+    /**
+     * SPEC-110 fatia B (D4) — `#/fluxo/ensaio` REDIRECIONA para o fluxo do
+     * ensaio. O painel ad hoc da bancada morreu: ela virou a TELA `bancada` no
+     * meio da fiação, e quem chega pelo link antigo abre o fluxo onde ela
+     * mora — a bancada aparece quando a execução para nela.
+     */
+    if (partes[1] === "ensaio") return { tela: "fluxo", fluxoId: ID_DO_FLUXO_DO_ENSAIO };
     // G5c — `#/fluxo/<id>` abre o canvas naquele fluxo; id desconhecido cai
     // no primeiro da lista (a FluxoScreen já faz essa guarda desde a G4).
     if (partes[1]) return { tela: "fluxo", fluxoId: decodeURIComponent(partes[1]) };
@@ -156,7 +186,7 @@ export function rotaDoHash(hash: string): Rota {
   // redirecionar dá tela branca para quem tinha o link salvo — e a SPEC-66 §5
   // apostou justamente em o endereço ser mandável para alguém. Com a G4 a
   // cadeia encurta direto no destino atual: a bancada junto do fluxo.
-  if (partes[0] === "simulacao") return { tela: "fluxo", bancada: "ensaio" };
+  if (partes[0] === "simulacao") return { tela: "fluxo", fluxoId: ID_DO_FLUXO_DO_ENSAIO };
   if (partes[0] === "config") {
     // SPEC-106 fatia B — a aba Exportação foi absorvida pelo catálogo de
     // Conectores; o link salvo REDIRECIONA (SPEC-61 §6.7), nunca vira branco.

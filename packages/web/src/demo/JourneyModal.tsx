@@ -173,6 +173,14 @@ const PASSOS_DE_USO: { titulo: string; texto: string }[] = [
       "☰ Menu → Fluxos de integração (a esteira também abre sozinha ao derivar): o primeiro cartão é o GATILHO — ele diz quando o fluxo roda. Com o gatilho manual, \"▶ Rodar agora\" dispara os agentes (PO, Arquiteto, Especialista, QA) sobre a demanda aberta, ao vivo, nó a nó. Clicar num agente edita o papel dele — prompt, ligar/desligar, ordem.",
   },
   {
+    // SPEC-110 fatia B (D19) — o passo NOVO: a tela como nó. Sem ele, o
+    // manual ensinaria um fluxo que sempre corre sozinho, e a pessoa que
+    // encontrasse a execução parada não saberia que ela está esperando POR ELA.
+    titulo: "Entre no fluxo quando ele parar numa tela",
+    texto:
+      "Um fluxo pode ter uma TELA no meio — é onde você entra. Quando a execução chega nela, ela PARA e o canvas mostra “aguardando uma tela — abrir →”. Você abre, revisa o que chegou (o ensaio, o documento, a mesa) e decide: “Avançar →” segue a fiação com a sua decisão; “← Retornar” encerra a execução para você ajustar e rodar de novo. O ensaio de cenários já vem assim de fábrica: o botão “Simular” da mesa roda o fluxo e para na bancada.",
+  },
+  {
     titulo: "Confirme o que a IA escreveu",
     texto:
       "De volta ao documento, a seção de itens mostra as sugestões PENDENTES: confirme campo a campo, edite, escreva por cima ou \"Confirmar todas\". Nada que a IA propõe vale antes disso.",

@@ -792,6 +792,180 @@ describe("SPEC-107 fatia B — o nó PROJETO", () => {
     });
   });
 
+  /**
+   * SPEC-110 fatia B (D2) — **a TELA como nó, do lado do servidor.**
+   *
+   * A diferença para o gate, em uma frase: o gate pausa DEPOIS de um nó que
+   * rodou; a tela pausa NELA, porque o executor dela é gente. O contrato
+   * cobra: suspende com o stage, o GET diz o que a tela vai mostrar, o
+   * continuar exige a decisão VÁLIDA, e retornar encerra.
+   */
+  it("SPEC-110 B — a tela suspende, o stage é servido, e o Avançar continua com a decisão", async () => {
+    await comApp(async (app, cookies) => {
+      await prepararMundo(app, cookies);
+      await declararLeitorDeDesenho(app, cookies);
+      await app.inject({
+        method: "PUT",
+        url: "/config/fluxos",
+        cookies,
+        payload: {
+          documento: {
+            fluxos: [
+              {
+                id: "com-tela",
+                nome: "Com tela de revisão",
+                nos: [
+                  { id: "le", tipo: "conector", refId: "leitor-de-desenho", posicao: { x: 0, y: 0 }, parametros: {} },
+                  { id: "gera", tipo: "funcao", refId: "derivacao", posicao: { x: 200, y: 0 }, parametros: {} },
+                  { id: "revisa", tipo: "tela", refId: "documento", posicao: { x: 400, y: 0 }, parametros: {} },
+                  { id: "resume", tipo: "agente", refId: "especialista", posicao: { x: 600, y: 0 }, parametros: {} },
+                ],
+                arestas: [
+                  { de: "le", para: "gera", mapeamento: [{ saida: "desenho", entrada: "desenho" }] },
+                  { de: "gera", para: "revisa", mapeamento: [{ saida: "itens", entrada: "documento" }] },
+                  { de: "revisa", para: "resume", mapeamento: [{ saida: "decisao", entrada: "decisao" }] },
+                ],
+              },
+            ],
+          },
+        },
+      });
+
+      // 1. Executar SUSPENDE NA tela — o agente depois dela nem dispara, e a
+      //    tela NÃO entra no rastro (ela não rodou, está esperando).
+      const exec = await app.inject({ method: "POST", url: "/fluxos/com-tela/executar", cookies, payload: {} });
+      expect(exec.statusCode).toBe(200);
+      const suspensa = exec.json() as {
+        execucaoId: string;
+        aguardandoTela?: { noId: string; refId: string; entradas: Record<string, unknown> };
+        nos: { noId: string }[];
+      };
+      expect(suspensa.aguardandoTela?.noId).toBe("revisa");
+      expect(suspensa.aguardandoTela?.refId).toBe("documento");
+      expect(suspensa.nos.map((n) => n.noId)).toEqual(["le", "gera"]);
+
+      // 2. O estado persistido diz QUAL suspensão é — o gate e a tela não são
+      //    a mesma coisa, e o canvas oferece botões diferentes.
+      const persistida = await app.inject({ method: "GET", url: "/fluxos/com-tela/execucoes", cookies });
+      expect((persistida.json() as { execucoes: { estado: string }[] }).execucoes[0].estado).toBe("aguardando-tela");
+
+      // 3. O STAGE: o que a tela vai mostrar, resolvido pelo MESMO executor
+      //    (§263) — nada de recalcular mapeamento no navegador.
+      const stage = await app.inject({ method: "GET", url: `/fluxos/execucoes/${suspensa.execucaoId}/tela`, cookies });
+      expect(stage.statusCode).toBe(200);
+      const doStage = stage.json() as {
+        noId: string;
+        tela: { id: string; entrada: { chave: string }[]; saida: { chave: string }[] };
+        entradas: Record<string, unknown>;
+      };
+      expect(doStage.noId).toBe("revisa");
+      expect(doStage.tela.id).toBe("documento");
+      expect(doStage.tela.saida.map((c) => c.chave)).toContain("decisao");
+      expect((doStage.entradas.documento as unknown[]).length).toBeGreaterThan(0);
+
+      // 4. Continuar SEM a decisão é 400 NOMEADO — a tela não roda sozinha.
+      const semDecisao = await app.inject({
+        method: "POST",
+        url: `/fluxos/execucoes/${suspensa.execucaoId}/continuar`,
+        cookies,
+        payload: {},
+      });
+      expect(semDecisao.statusCode).toBe(400);
+      expect((semDecisao.json() as { erro: string }).erro).toContain("saidaDaTela");
+
+      // 5. Decisão fora do catálogo é 400 — o acionador é enlatado (D17).
+      const decisaoInventada = await app.inject({
+        method: "POST",
+        url: `/fluxos/execucoes/${suspensa.execucaoId}/continuar`,
+        cookies,
+        payload: { saidaDaTela: { decisao: "talvez" } },
+      });
+      expect(decisaoInventada.statusCode).toBe(400);
+
+      // 6. Avançar continua com a saída DA PESSOA, e o resto roda.
+      const avancou = await app.inject({
+        method: "POST",
+        url: `/fluxos/execucoes/${suspensa.execucaoId}/continuar`,
+        cookies,
+        payload: { saidaDaTela: { decisao: "avancar" } },
+      });
+      expect(avancou.statusCode).toBe(200);
+      const fim = avancou.json() as { nos: { noId: string; estado: string }[]; saidas: Record<string, Record<string, unknown>> };
+      expect(fim.nos.map((n) => [n.noId, n.estado])).toEqual([
+        ["le", "sucesso"],
+        ["gera", "sucesso"],
+        ["revisa", "sucesso"],
+        ["resume", "sucesso"],
+      ]);
+      expect(fim.saidas["revisa"]).toEqual({ decisao: "avancar" });
+    });
+  });
+
+  it("SPEC-110 B — Retornar ENCERRA a execução (D2: re-rodar o anterior é dívida declarada)", async () => {
+    await comApp(async (app, cookies) => {
+      await prepararMundo(app, cookies);
+      await declararLeitorDeDesenho(app, cookies);
+      await app.inject({
+        method: "PUT",
+        url: "/config/fluxos",
+        cookies,
+        payload: {
+          documento: {
+            fluxos: [
+              {
+                id: "tela-retornada",
+                nome: "Tela que retorna",
+                nos: [
+                  { id: "le", tipo: "conector", refId: "leitor-de-desenho", posicao: { x: 0, y: 0 }, parametros: {} },
+                  { id: "revisa", tipo: "tela", refId: "mesa", posicao: { x: 200, y: 0 }, parametros: {} },
+                  { id: "resume", tipo: "agente", refId: "especialista", posicao: { x: 400, y: 0 }, parametros: {} },
+                ],
+                arestas: [
+                  { de: "le", para: "revisa", mapeamento: [] },
+                  { de: "revisa", para: "resume", mapeamento: [{ saida: "decisao", entrada: "decisao" }] },
+                ],
+              },
+            ],
+          },
+        },
+      });
+
+      const exec = await app.inject({ method: "POST", url: "/fluxos/tela-retornada/executar", cookies, payload: {} });
+      const { execucaoId } = exec.json() as { execucaoId: string };
+
+      // "retornar" pelo continuar é recusado com o caminho certo — uma decisão
+      // terminal não pode entrar pela porta de "siga em frente".
+      const peloContinuar = await app.inject({
+        method: "POST",
+        url: `/fluxos/execucoes/${execucaoId}/continuar`,
+        cookies,
+        payload: { saidaDaTela: { decisao: "retornar" } },
+      });
+      expect(peloContinuar.statusCode).toBe(400);
+      expect((peloContinuar.json() as { erro: string }).erro).toContain("/retornar");
+
+      const retornou = await app.inject({ method: "POST", url: `/fluxos/execucoes/${execucaoId}/retornar`, cookies, payload: {} });
+      expect(retornou.statusCode).toBe(200);
+
+      // Terminal: o estado é "retornada", o stage sumiu, o rastro ficou (é
+      // ele que diz até onde chegou), e o agente NUNCA rodou.
+      const depois = await app.inject({ method: "GET", url: "/fluxos/tela-retornada/execucoes", cookies });
+      const linha = (depois.json() as { execucoes: { estado: string; saidas: unknown; nos: { noId: string }[] }[] }).execucoes[0];
+      expect(linha.estado).toBe("retornada");
+      expect(linha.saidas).toBeNull();
+      expect(linha.nos.map((n) => n.noId)).toEqual(["le"]);
+
+      // E ela não volta: continuar depois de retornar é 409.
+      const deNovo = await app.inject({
+        method: "POST",
+        url: `/fluxos/execucoes/${execucaoId}/continuar`,
+        cookies,
+        payload: { saidaDaTela: { decisao: "avancar" } },
+      });
+      expect(deNovo.statusCode).toBe(409);
+    });
+  });
+
   it("SPEC-107 fatia C — descartar fecha a execução sem o resto rodar", async () => {
     await comApp(async (app, cookies) => {
       await prepararMundo(app, cookies);

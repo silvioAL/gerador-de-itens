@@ -290,7 +290,7 @@ describe("o site em páginas (SPEC-95 fatia G)", () => {
       // SPEC-109 C — `{tela:"sistema"}` morreu; `#/fluxo` cobre o encanamento.
       hashDaRota({ tela: "fluxo" }),
       // SPEC-107 G4 — a bancada de ensaios mudou para junto do fluxo.
-      hashDaRota({ tela: "fluxo", bancada: "ensaio" }),
+      hashDaRota({ tela: "fluxo", fluxoId: "ensaio-de-cenarios" }),
       ...AREAS_CONFIG_CONHECIDAS.map((area) => hashDaRota({ tela: "config", area })),
     ];
 

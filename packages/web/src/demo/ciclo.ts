@@ -201,7 +201,7 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
     estado: "completo",
     // SPEC-107 G4 — a bancada mudou de casa: vive junto do fluxo, medindo
     // pela fiação semeada em vez de simular no navegador.
-    rota: { tela: "fluxo", bancada: "ensaio" },
+    rota: { tela: "fluxo", fluxoId: "ensaio-de-cenarios" },
   },
   {
     id: "decisoes",

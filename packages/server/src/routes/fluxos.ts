@@ -21,6 +21,8 @@ import {
   normalizarExportador,
   normalizarPipelineAgentes,
   preambuloDoPapel,
+  problemaNaSaidaDaTela,
+  telaDoSistema,
   resultadoDaExportacao,
   saidaDoProjeto,
   sanearCamposDaTransformacao,
@@ -491,7 +493,14 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     // quando a execução SUSPENDE num gate (fatia C): a suspensa guarda as
     // saídas até alguém continuar/descartar, porque elas são o stage a
     // revisar e o que a retomada usa para não reexecutar ninguém.
-    const suspensa = Boolean(resultado.aguardandoEm);
+    //
+    // SPEC-110 fatia B — a TELA é a outra suspensão, pelo MESMO caminho: o
+    // estado diz qual das duas é, e o stage guardado é o mesmo dado.
+    const estadoSuspenso = resultado.aguardandoEm
+      ? "aguardando-confirmacao"
+      : resultado.aguardandoTela
+        ? "aguardando-tela"
+        : null;
     const [linha] = await db
       .insert(fluxoExecucoes)
       .values({
@@ -500,7 +509,7 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
         hash,
         email,
         nos: resultado.nos,
-        ...(suspensa ? { estado: "aguardando-confirmacao", saidas: resultado.saidas, ateNo: ateNo ?? null } : {}),
+        ...(estadoSuspenso ? { estado: estadoSuspenso, saidas: resultado.saidas, ateNo: ateNo ?? null } : {}),
       })
       .returning({ id: fluxoExecucoes.id });
     registrarAuditoria(db, { email, acao: "executar", recurso: "fluxos", recursoId: id });
@@ -512,6 +521,7 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
       nos: resultado.nos,
       saidas: resultado.saidas,
       ...(resultado.aguardandoEm ? { aguardandoEm: resultado.aguardandoEm } : {}),
+      ...(resultado.aguardandoTela ? { aguardandoTela: resultado.aguardandoTela } : {}),
     };
     // No modo ao vivo o "fim" fecha o stream com a MESMA resposta do modo
     // one-shot — quem consome os dois caminhos lê a mesma forma no final.
@@ -536,7 +546,9 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
 
     const [execucao] = await db.select().from(fluxoExecucoes).where(eq(fluxoExecucoes.id, id)).limit(1);
     if (!execucao) return reply.code(404).send({ erro: `não conheço a execução "${id}"` });
-    if (execucao.estado !== "aguardando-confirmacao") {
+    // SPEC-110 fatia B — as DUAS suspensões continuam pelo mesmo endpoint
+    // ("continuar é disparar o resto"); o que muda é o que a retomada leva.
+    if (execucao.estado !== "aguardando-confirmacao" && execucao.estado !== "aguardando-tela") {
       return reply.code(409).send({ erro: `esta execução não está aguardando confirmação (estado: ${execucao.estado})` });
     }
 
@@ -572,7 +584,46 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     const concluidos = rastroParcial.filter((n) => n.estado === "sucesso").map((n) => n.noId);
     const saidasSuspensas = (execucao.saidas ?? {}) as Record<string, Record<string, unknown>>;
 
+    /**
+     * SPEC-110 fatia B (D2) — **o Avançar de uma tela.** A execução parou NUM
+     * nó de tela e o corpo traz o que a pessoa decidiu. Duas guardas antes de
+     * gravar: a tela precisa existir na fiação em vigor, e a saída precisa
+     * honrar o contrato DELA — o nó seguinte receberia um "vazio plausível"
+     * de outro jeito, que é o silêncio que a §9.3 recusa.
+     */
     const [catalogo, provedor] = await Promise.all([catalogoDeConectores(db, diretorioConfig), resolverProvedor()]);
+
+    let saidaDaTela: { noId: string; saida: Record<string, unknown> } | undefined;
+    if (execucao.estado === "aguardando-tela") {
+      const corpo = (req.body ?? {}) as { saidaDaTela?: Record<string, unknown> };
+      // Descobrir QUAL tela sem recalcular mapeamento à mão (§263): o mesmo
+      // executor, sem decisão, para de novo exatamente onde parou. Nenhum
+      // executor de nó roda — os concluídos são pulados e o laço quebra na
+      // tela; é sondagem, não execução.
+      const parada = await executarFluxo(fluxo, criarExecutores({ fluxo, papeis, catalogo, provedor, timeId, email }), {
+        ateNo: execucao.ateNo ?? undefined,
+        retomarDe: { saidas: saidasSuspensas, concluidos },
+      });
+      const naTela = parada.aguardandoTela;
+      if (!naTela) {
+        return reply.code(409).send({ erro: "esta execução não está parada numa tela — descarte e execute de novo" });
+      }
+      if (!corpo.saidaDaTela) {
+        return reply.code(400).send({
+          erro: `a tela "${naTela.noId}" precisa da decisão de quem revisou — mande "saidaDaTela" com "decisao"`,
+        });
+      }
+      const tela = telaDoSistema(naTela.refId);
+      if (!tela) return reply.code(409).send({ erro: `não conheço a tela "${naTela.refId}"` });
+      const problema = problemaNaSaidaDaTela(tela, corpo.saidaDaTela);
+      if (problema) return reply.code(400).send({ erro: problema });
+      // Retornar tem endpoint próprio: aqui só avança (D2 — retornar ENCERRA).
+      if (corpo.saidaDaTela.decisao !== "avancar") {
+        return reply.code(400).send({ erro: `para retornar use POST /fluxos/execucoes/${id}/retornar` });
+      }
+      saidaDaTela = { noId: naTela.noId, saida: corpo.saidaDaTela };
+    }
+
     // Fatia D — continuar também é assistível: o resto roda ao vivo.
     const eventos = (req.body as { aoVivo?: boolean } | null)?.aoVivo ? escritorDeEventos(reply) : null;
     let resultado;
@@ -590,7 +641,7 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
         }),
         {
           ateNo: execucao.ateNo ?? undefined,
-          retomarDe: { saidas: saidasSuspensas, concluidos },
+          retomarDe: { saidas: saidasSuspensas, concluidos, ...(saidaDaTela ? { saidaDaTela } : {}) },
           ...(eventos
             ? {
                 aoVivo: {
@@ -606,13 +657,19 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     }
 
     const nosCompletos = [...rastroParcial, ...resultado.nos];
-    const aindaAguarda = Boolean(resultado.aguardandoEm);
+    // SPEC-110 fatia B — a retomada pode parar DE NOVO, num gate ou noutra
+    // tela: vários pontos de revisão numa fiação são vários (§5.5).
+    const estadoDepois = resultado.aguardandoEm
+      ? "aguardando-confirmacao"
+      : resultado.aguardandoTela
+        ? "aguardando-tela"
+        : null;
     await db
       .update(fluxoExecucoes)
       .set({
         nos: nosCompletos,
-        ...(aindaAguarda
-          ? { saidas: { ...saidasSuspensas, ...resultado.saidas } }
+        ...(estadoDepois
+          ? { estado: estadoDepois, saidas: { ...saidasSuspensas, ...resultado.saidas } }
           : { estado: "concluida", saidas: null }),
       })
       .where(eq(fluxoExecucoes.id, id));
@@ -625,6 +682,7 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
       nos: nosCompletos,
       saidas: { ...saidasSuspensas, ...resultado.saidas },
       ...(resultado.aguardandoEm ? { aguardandoEm: resultado.aguardandoEm } : {}),
+      ...(resultado.aguardandoTela ? { aguardandoTela: resultado.aguardandoTela } : {}),
     };
     if (eventos) {
       eventos.escrever({ tipo: "fim", resposta });
@@ -632,6 +690,95 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
       return;
     }
     return resposta;
+  });
+
+  /**
+   * SPEC-110 fatia B (D2) — **o stage de uma tela: o que ela vai mostrar.**
+   *
+   * Quem abre `#/tela/<execucaoId>` precisa das ENTRADAS do nó de tela. Elas
+   * não são recalculadas aqui nem no navegador (§263): o MESMO `executarFluxo`
+   * roda sem decisão e para exatamente onde parou, devolvendo `aguardandoTela`
+   * com as entradas. Nenhum executor de nó é chamado — os concluídos são
+   * pulados e o laço quebra na tela. É sondagem, não execução.
+   */
+  app.get("/fluxos/execucoes/:id/tela", { preHandler: exigirSessao }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const email = req.usuario!.email;
+
+    const [execucao] = await db.select().from(fluxoExecucoes).where(eq(fluxoExecucoes.id, id)).limit(1);
+    if (!execucao) return reply.code(404).send({ erro: `não conheço a execução "${id}"` });
+    if (execucao.estado !== "aguardando-tela") {
+      return reply.code(409).send({ erro: `esta execução não está parada numa tela (estado: ${execucao.estado})` });
+    }
+    const timeId = execucao.timeId === CAMPO_GLOBAL ? undefined : execucao.timeId;
+    const { fluxos, papeis } = await emVigor(timeId);
+    const fluxo = fluxos.find((f) => f.id === execucao.fluxoId);
+    if (!fluxo) {
+      return reply.code(409).send({ erro: `o fluxo "${execucao.fluxoId}" não existe mais neste time — descarte esta execução` });
+    }
+    const rastroParcial = execucao.nos as RastroDoNo[];
+    const saidasSuspensas = (execucao.saidas ?? {}) as Record<string, Record<string, unknown>>;
+    const [catalogo, provedor] = await Promise.all([catalogoDeConectores(db, diretorioConfig), resolverProvedor()]);
+    let parada;
+    try {
+      parada = await executarFluxo(fluxo, criarExecutores({ fluxo, papeis, catalogo, provedor, timeId, email }), {
+        ateNo: execucao.ateNo ?? undefined,
+        retomarDe: {
+          saidas: saidasSuspensas,
+          concluidos: rastroParcial.filter((n) => n.estado === "sucesso").map((n) => n.noId),
+        },
+      });
+    } finally {
+      await provedor?.descartar().catch(() => undefined);
+    }
+    if (!parada.aguardandoTela) {
+      return reply.code(409).send({ erro: "esta execução não está parada numa tela — descarte e execute de novo" });
+    }
+    const tela = telaDoSistema(parada.aguardandoTela.refId);
+    if (!tela) return reply.code(409).send({ erro: `não conheço a tela "${parada.aguardandoTela.refId}"` });
+    const noDaTela = fluxo.nos.find((n) => n.id === parada.aguardandoTela!.noId);
+    return {
+      execucaoId: id,
+      fluxoId: execucao.fluxoId,
+      nome: fluxo.nome,
+      timeId: timeId ?? null,
+      // O nome do NÓ vence o da tela, como em todo cartão do canvas (§387).
+      noId: parada.aguardandoTela.noId,
+      nomeDoNo: noDaTela?.nome ?? null,
+      tela: { id: tela.id, nome: tela.nome, descricao: tela.descricao, entrada: tela.entrada, saida: tela.saida },
+      entradas: parada.aguardandoTela.entradas,
+    };
+  });
+
+  /**
+   * SPEC-110 fatia B (D2) — **Retornar: a execução acaba aqui.**
+   *
+   * A decisão de quem revisou é terminal de propósito: *"retornar re-rodar
+   * automaticamente o nó anterior é dívida declarada, não v1"*. O canvas
+   * mostra "retornado — ajuste e rode de novo", e quem ajusta dispara outra
+   * execução, com o rastro da anterior preservado.
+   */
+  app.post("/fluxos/execucoes/:id/retornar", { preHandler: exigirSessao }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const email = req.usuario!.email;
+
+    const [execucao] = await db.select().from(fluxoExecucoes).where(eq(fluxoExecucoes.id, id)).limit(1);
+    if (!execucao) return reply.code(404).send({ erro: `não conheço a execução "${id}"` });
+    if (execucao.estado !== "aguardando-tela") {
+      return reply.code(409).send({ erro: `só uma execução parada numa tela pode ser retornada (estado: ${execucao.estado})` });
+    }
+    const timeId = execucao.timeId === CAMPO_GLOBAL ? undefined : execucao.timeId;
+    const nivel = timeId ? await nivelNoTime(db, email, timeId) : await maiorNivel(db, email);
+    if (nivel !== "operar" && nivel !== "owner") {
+      return reply.code(403).send({
+        erro: `retornar esta execução exige nível "operar" no time "${timeId ?? "(global)"}" — seu nível é "${nivel ?? "nenhum"}"`,
+      });
+    }
+    // As saídas somem como no descartar: o stage era para revisar, e a revisão
+    // terminou. O rastro fica — é ele que diz até onde a execução chegou.
+    await db.update(fluxoExecucoes).set({ estado: "retornada", saidas: null }).where(eq(fluxoExecucoes.id, id));
+    registrarAuditoria(db, { email, acao: "executar", recurso: "fluxos", recursoId: execucao.fluxoId });
+    return { ok: true, estado: "retornada" };
   });
 
   /** O outro lado do gate: quem revisa pode DESCARTAR — a execução fecha sem

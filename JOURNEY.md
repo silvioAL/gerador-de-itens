@@ -17309,3 +17309,85 @@ que nenhum teste verde tinha visto — a razão pela qual ela existe:
    alguém manda" é a frase certa para a paleta e o painel, e larga demais
    para o cartão. O registro ganhou `rotuloCurto` ("▶ Manual") — o cartão leva
    o curto, a paleta e o painel levam a frase inteira.
+
+## §392 — SPEC-110 B: a tela como nó (o executor é gente)
+
+O desenho é do usuário, à letra: *"acho que esse tipo de coisa poderia ser
+abstraído como screen… seria feita a conexão com essa screen, o agente iria
+gerar o ensaio, e depois o usuário revisa, e decide avançar para a derivação,
+ou retornar"*.
+
+`config/telas.ts` traz o registro FECHADO das três telas do sistema — as que
+já existem como tela de verdade no produto: `bancada-de-ensaios`, `documento`
+e `mesa`. `CAMPO_DA_DECISAO` mora num lugar só porque **toda tela emite a
+decisão** (D2): duas listas divergiriam na primeira tela nova.
+
+**A tela pausa NELA, o gate pausa DEPOIS.** É a distinção que fez a fatia
+existir: o gate da SPEC-107 C suspende quando um nó que JÁ RODOU termina; a
+tela suspende antes de rodar, porque quem a executa é gente. `executarFluxo`
+ganhou `aguardandoTela` (com as ENTRADAS — o que ela vai mostrar) e
+`retomarDe.saidaDaTela` (a decisão da pessoa vira a saída daquele nó). Um
+caminho só, o mesmo laço — nenhum executor paralelo.
+
+No servidor, `estado: "aguardando-tela"` e `"retornada"` entram sem migração:
+a coluna `estado` é text puro, sem CHECK (o R4 da SPEC, medido e resolvido em
+`0045_gate_de_confirmacao.sql`). `GET /fluxos/execucoes/:id/tela` serve o
+stage rodando **o mesmo `executarFluxo` sem decisão**, que para exatamente
+onde parou: nenhum executor de nó é chamado, e o navegador não recalcula
+mapeamento nenhum (§263). `/continuar` exige a decisão válida contra o
+contrato declarado; `retornar` tem endpoint próprio porque é terminal.
+
+**O mapeamento do ensaio foi MEDIDO antes de ser fiado**, como a SPEC mandava:
+`derivacao` declara UMA entrada (`desenho`, objeto, obrigatório) e a bancada
+emite `decisao` + `ensaioAprovado` — nenhum desenho. Então o desenho vai da
+DEMANDA direto para a derivação, e a bancada entra como **gate no caminho**: a
+aresta `bancada → derivacao` não carrega dado, carrega ORDEM. Fiar
+`ensaioAprovado → desenho` seria mentira de contrato — uma leitura de ensaio
+não é um desenho.
+
+O painel ad hoc morreu (D4): a prop `painel` da FluxoScreen saiu, e a bancada
+virou o CORPO do stage (`#/tela/<execucaoId>`) com a moldura Retornar/Avançar
+por cima. `ensaiarPelaFiacao` passou a usar `ateNo: "ensaio"` — sem isso, cada
+re-medição de cenário criaria uma execução suspensa nova (o risco R1).
+
+**Duas coisas que só o navegador contou:**
+
+1. **A bancada era uma gaveta `position: fixed`** — herança de quando era
+   painel sobre o canvas. Como corpo de stage ela cobria a moldura, e o
+   Avançar ficava inclicável. Ganhou `estiloDaRaiz`, a ÚNICA prop nova da
+   fatia: só posicionamento, zero lógica, zero layout interno mudado. Uma
+   gaveta não cabe dentro de uma moldura, e fingir que cabia seria pior que a
+   prop.
+2. **Carregar um exemplo carimbava o time DELE na sua demanda.** Os cenários
+   de demonstração trazem `time: "time-credito"` (`config/cenarios/*.json`) e
+   `aoAbrir` copiava o campo inteiro: quem carregava um exemplo ficava com uma
+   demanda de um time onde não escreve, e o Salvar respondia 403 sem dizer por
+   quê. O defeito é ANTIGO — passava despercebido porque nada cobrava a
+   demanda estar no banco. A bancada virar tela dentro da fiação cobrou, e
+   quatro E2Es caíram de uma vez. Carregar um exemplo é adotá-lo: o time
+   passou a ser o de quem carrega.
+
+**Consequência assumida:** abrir a bancada agora exige demanda salva. Antes
+abrir era grátis e só medir exigia o banco — um estado meio útil, em que a
+tela abria para não medir nada. Os dois gestos do produto que levam lá (o
+"Simular" da mesa e o chip da leitura) já salvam sozinhos.
+
+D19: o "Como usar" ganhou um passo ("Entre no fluxo quando ele parar numa
+tela") e os dois tours passaram a narrar a tela ao lado do gatilho.
+
+**Aspereza anotada, não mascarada:** no stage da bancada o cabeçalho da MESA
+continua acima da moldura (paleta, Salvar, Derivar Quebra, o placar de
+prontidão). É herança de quando a bancada era uma gaveta SOBRE a mesa — a
+moldura entrou entre os dois em vez de substituir o contexto. Funciona e é
+usável (a validação visual nos dois temas confirmou o Avançar clicável), mas
+convida a gestos da tela errada: quem está revisando uma execução não deveria
+ver "Derivar Quebra". A fatia C mexe no renderizador de telas e é o lugar
+natural para o shell trocar o cabeçalho no modo stage — anotado para lá, com
+a medição feita.
+
+**Um terceiro achado, do E2E do tour:** `abrirFluxos()` navegava para
+`#/fluxo` sem id, que abre o PRIMEIRO fluxo declarado do time. Os dois passos
+de tour que o chamam narram a esteira ("a esteira de agentes derivada da
+configuração, quem escreve cada parte do item, na ordem") — num time com
+fluxos próprios, o tour explicava uma tela e mostrava outra. É o §390
+renascendo por outra porta. O passo passou a abrir a esteira pelo id.

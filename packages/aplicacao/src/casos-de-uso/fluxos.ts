@@ -77,6 +77,13 @@ export interface ResultadoDoFluxo {
    * esperando; quem persiste a execução guarda as saídas para a retomada.
    */
   aguardandoEm?: string;
+  /**
+   * SPEC-110 fatia B (D2) — a execução parou NUMA TELA: alguém precisa abrir,
+   * agir e decidir. Diferente do gate (`aguardandoEm`), que pausa DEPOIS de um
+   * nó que já rodou, a tela pausa NELA — o nó não terminou, e por isso não
+   * está no rastro. `entradas` é o que a tela vai MOSTRAR (o stage dela).
+   */
+  aguardandoTela?: { noId: string; refId: string; entradas: Record<string, unknown> };
 }
 
 export interface OpcoesDeExecucao {
@@ -93,7 +100,18 @@ export interface OpcoesDeExecucao {
    * ponto exato. Um gate mais adiante suspende de novo — vários pontos de
    * revisão numa fiação são vários, não um.
    */
-  retomarDe?: { saidas: Record<string, Record<string, unknown>>; concluidos: string[] };
+  retomarDe?: {
+    saidas: Record<string, Record<string, unknown>>;
+    concluidos: string[];
+    /**
+     * SPEC-110 fatia B — **o Avançar de uma TELA.** O nó de tela não roda
+     * sozinho: quem o executa é a pessoa, e o que ela decidiu chega aqui. O
+     * executor usa isto como a SAÍDA daquele nó, registra "✓" no rastro e
+     * segue o plano — nenhum caminho paralelo, o mesmo laço de sempre (§263).
+     * Ausente, a execução volta a suspender na mesma tela.
+     */
+    saidaDaTela?: { noId: string; saida: Record<string, unknown> };
+  };
   /**
    * SPEC-107 fatia D — **o vivo é feedback (§2.4-9)**: quem assiste precisa
    * ver nó a nó acontecendo, não um "rodou" no fim. Os eventos saem na ordem
@@ -162,9 +180,16 @@ export async function executarFluxo(
   // perderia trabalho bom). Quem revisa continua (ou descarta); os nós por
   // vir ficam FORA do rastro — esperando não é falha nem pulo.
   let aguardandoEm: string | undefined;
+  /**
+   * SPEC-110 fatia B — a outra suspensão: a TELA. O gate pausa DEPOIS de um
+   * nó; a tela pausa NELA, porque o executor dela é gente. Duas variáveis e
+   * não uma porque a retomada é diferente — o gate continua de onde parou, a
+   * tela continua COM O QUE A PESSOA DECIDIU.
+   */
+  let aguardandoTela: ResultadoDoFluxo["aguardandoTela"];
 
   for (const noId of plano.ordem) {
-    if (aguardandoEm) break;
+    if (aguardandoEm || aguardandoTela) break;
     if (concluidos.has(noId)) continue;
     const no = porId.get(noId)!;
     const entrantes = fluxo.arestas.filter((a) => a.para === noId);
@@ -200,6 +225,24 @@ export async function executarFluxo(
     // As entradas de um nó de função entram no rastro TAMBÉM na falha: a
     // auditoria da tese reescrita (§5.4) precisa do que chegou, não só do que
     // deu certo.
+    /**
+     * SPEC-110 fatia B — a TELA suspende ANTES de rodar, levando consigo o
+     * que vai mostrar. Se a retomada trouxe a decisão da pessoa, o nó termina
+     * com ELA como saída — é o único caminho, não um segundo executor.
+     */
+    if (no.tipo === "tela") {
+      const decidida = opcoes.retomarDe?.saidaDaTela;
+      if (!decidida || decidida.noId !== noId) {
+        aguardandoTela = { noId, refId: no.refId, entradas: parametros };
+        break;
+      }
+      estado.set(noId, "sucesso");
+      saidas[noId] = decidida.saida;
+      rastro.push({ noId, tipo: no.tipo, refId: no.refId, estado: "sucesso", duracaoMs: 0, entradas: parametros });
+      opcoes.aoVivo?.noTerminou?.(rastro[rastro.length - 1]);
+      continue;
+    }
+
     const entradasNoRastro = no.tipo === "funcao" ? { entradas: parametros } : {};
     // SPEC-110 fatia A — o gatilho carimba a origem; os outros nós não têm o
     // que dizer sobre "por que isto rodou".
@@ -255,5 +298,10 @@ export async function executarFluxo(
     }
   }
 
-  return { nos: rastro, saidas, ...(aguardandoEm ? { aguardandoEm } : {}) };
+  return {
+    nos: rastro,
+    saidas,
+    ...(aguardandoEm ? { aguardandoEm } : {}),
+    ...(aguardandoTela ? { aguardandoTela } : {}),
+  };
 }

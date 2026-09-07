@@ -1,7 +1,80 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { entrar } from "./auth";
 
 const API = "http://localhost:4100";
+
+/**
+ * SPEC-110 fatia B (D4) — **abrir a bancada é DISPARAR o fluxo do ensaio.**
+ *
+ * Ela deixou de ser um painel com endereço próprio (`#/ensaios`) e virou a
+ * TELA `bancada-de-ensaios` no meio da fiação: a execução roda a demanda e o
+ * ensaio e PARA nela. Este atalho é exatamente o que o produto faz nos dois
+ * gestos que levam lá — o chip "e se piorar?" da leitura e o "Simular" da
+ * mesa. Os links legados continuam vivos: caem no canvas do fluxo, onde a
+ * fiação (com a bancada desenhada nela) está à vista.
+ *
+ * Sem `demandaId`: o servidor usa a mais recentemente atualizada do time, que
+ * é a que estes testes acabaram de salvar — o mesmo default de sempre.
+ */
+/** O id da demanda ABERTA, se ela já existe no banco. O casamento é pelo
+ * título porque é o que a mesa mostra — e o poll existe porque o salvamento é
+ * assíncrono (o título aparece na tela antes de a linha existir). */
+async function idDaDemandaAberta(page: Page, timeoutMs: number): Promise<string | undefined> {
+  const titulo = (await page.getByTestId("titulo-da-quebra").innerText().catch(() => "")).trim();
+  if (!titulo) return undefined;
+  let achado: string | undefined;
+  const ate = Date.now() + timeoutMs;
+  do {
+    const lista = (await (await page.request.get(`${API}/quebras`)).json()) as { id: string; titulo?: string }[];
+    achado = lista.find((q) => q.titulo && titulo.includes(q.titulo))?.id;
+    if (achado) return achado;
+    await page.waitForTimeout(500);
+  } while (Date.now() < ate);
+  return undefined;
+}
+
+async function abrirBancada(page: Page) {
+  /**
+   * SPEC-110 fatia B — **abrir exige demanda SALVA**, e isso é consequência do
+   * desenho, não acidente: a porta virou uma execução, e a execução lê a
+   * demanda pelo id. Antes, abrir era grátis e só MEDIR exigia o banco (desde
+   * a 107-G4) — um estado meio útil, em que a tela abria para não medir nada.
+   *
+   * Salvar só quando ainda NÃO há linha no banco: o produto faz o mesmo (o
+   * "Simular" chama `persistencia.salvar()`, que é idempotente), e clicar
+   * "Salvar" a esmo no meio de um teste acerta o botão de outro painel — foi
+   * o que aconteceu no §304, com a janela das necessidades aberta por cima.
+   */
+  let demandaId = await idDaDemandaAberta(page, 4000);
+  if (!demandaId) {
+    await page.getByRole("button", { name: "Salvar" }).first().click();
+    const campoTitulo = page.getByLabel("ex.: Fatura mensal em lote");
+    if (await campoTitulo.isVisible().catch(() => false)) {
+      await campoTitulo.fill(`ensaio e2e ${Date.now()}`);
+      await page.getByTestId("assistente-balao-confirmar").click();
+    }
+    await expect(page.getByTestId("titulo-da-quebra")).toBeVisible({ timeout: 20000 });
+    demandaId = await idDaDemandaAberta(page, 20000);
+  }
+  if (!demandaId) throw new Error("a demanda aberta não chegou ao banco — sem ela não há o que ensaiar");
+
+  /**
+   * O `demandaId` vai EXPLÍCITO, como o produto faz (`parametrosPorNo` com a
+   * demanda aberta, SPEC-107 G5c). O default do servidor — "a mais recente do
+   * time" — é uma adivinhação honesta para quem não sabe, e péssima para um
+   * teste: dois specs em paralelo no mesmo time ensaiariam a demanda do outro.
+   */
+  const r = await page.request.post(`${API}/fluxos/ensaio-de-cenarios/executar`, {
+    data: { parametrosPorNo: { demanda: { demandaId } } },
+  });
+  const corpo = (await r.json()) as { execucaoId?: string; aguardandoTela?: { noId: string }; nos?: { noId: string; erro?: string }[] };
+  if (!corpo.aguardandoTela) {
+    const falha = corpo.nos?.find((n) => n.erro);
+    throw new Error(`a execução do ensaio não parou na bancada${falha ? `: ${falha.noId} — ${falha.erro}` : ""}`);
+  }
+  await page.goto(`/#/tela/${corpo.execucaoId}`);
+  await expect(page.getByTestId("tela-ensaios")).toBeVisible({ timeout: 30000 });
+}
 
 /**
  * SPEC-66 — a bancada de ensaio.
@@ -59,11 +132,19 @@ test("§296 — ensaiar pelo chip, sem IA, e o cenário sobrevive ao F5", async 
   await page.getByTestId("leitura-resumo").click();
   await page.getByTestId("abrir-simulacao").click();
 
-  await expect(page.getByTestId("tela-ensaios")).toBeVisible();
-  // G4 — a bancada vive junto do FLUXO, e continua linkável: é metade do valor.
-  await expect(page).toHaveURL(/#\/fluxo\/ensaio$/);
-  // A peça `ensaio` está no canvas, atrás da bancada — a fiação é visível.
-  await expect(page.getByTestId("fluxo-screen")).toBeVisible();
+  await expect(page.getByTestId("tela-ensaios")).toBeVisible({ timeout: 30000 });
+  /**
+   * SPEC-110 fatia B (D4) — a bancada mudou de casa: ela é a TELA
+   * `bancada-de-ensaios` no meio da fiação do ensaio, e o chip agora EXECUTA o
+   * fluxo. A execução para nela, e o endereço é o do STAGE — mandável para
+   * quem revisa, que é o que a SPEC-66 §5 sempre prometeu.
+   */
+  await expect(page).toHaveURL(/#\/tela\//, { timeout: 30000 });
+  // A moldura Retornar/Avançar é do SHELL, ao redor da bancada (D17c): a
+  // bancada não mudou por dentro, e agora tem uma decisão de saída.
+  await expect(page.getByTestId("tela-do-stage")).toBeVisible();
+  await expect(page.getByTestId("tela-avancar")).toBeVisible();
+  await expect(page.getByTestId("tela-retornar")).toBeVisible();
 
   // A âncora traz o número de HOJE — sem ela, todo número da tabela é solto.
   await expect(page.getByTestId("linha-hoje")).toContainText("3,0 s");
@@ -172,7 +253,7 @@ test("SPEC-71 — o ensaio assumido sobrevive ao F5, com o débito e o motivo", 
   await expect(page.getByTestId("titulo-da-quebra")).toContainText(TITULO);
 
   // ── O ensaio, e o débito assumido com motivo ──
-  await page.goto("/#/ensaios");
+  await abrirBancada(page);
   await page.getByLabel("Nome do cenário").fill("Parceiro degradado");
   await page.getByTestId("criar-cenario").click();
   await page.getByTestId("add-ajuste-cen-parceiro-degradado").click();
@@ -236,7 +317,7 @@ test("SPEC-71 — o ensaio assumido sobrevive ao F5, com o débito e o motivo", 
   await page.getByRole("button", { name: new RegExp(TITULO) }).click();
   await expect(page.getByTestId("titulo-da-quebra")).toContainText(TITULO);
 
-  await page.goto("/#/ensaios");
+  await abrirBancada(page);
   const reaberta = page.getByTestId("linha-cen-parceiro-degradado");
   await expect(reaberta).toBeVisible({ timeout: 15000 });
   // O ensaio voltou com o MESMO resultado — o que só acontece se o ajuste
@@ -260,7 +341,7 @@ test("§296 — o desenho sem tempo nenhum DIZ que não há o que ensaiar", asyn
   await entrar(page);
 
   // Mesa em branco: uma tabela de zeros pareceria medição, e não é (§248).
-  await page.goto("/#/ensaios");
+  await abrirBancada(page);
   await expect(page.getByTestId("ensaios-sem-tempo")).toBeVisible();
   await expect(page.getByTestId("sem-cenarios")).toBeVisible();
 });
@@ -281,10 +362,19 @@ test("§296 — o link velho de `#/simulacao` não dá tela branca", async ({ pa
   );
   await entrar(page);
 
-  // Rota que some sem redirecionar dá tela branca para quem tinha o link
-  // salvo — e link salvo é o de quem mais usa (§SPEC-61).
+  /**
+   * Rota que some sem redirecionar dá tela branca para quem tinha o link
+   * salvo — e link salvo é o de quem mais usa (§SPEC-61).
+   *
+   * SPEC-110 fatia B (D4) — o DESTINO mudou, a promessa não: a bancada virou
+   * a TELA no meio da fiação do ensaio, então o link velho abre o FLUXO onde
+   * ela mora (com o nó dela à vista). Quem quer ensaiar dispara dali — e o
+   * chip da leitura e o "Simular" da mesa continuam levando direto.
+   */
   await page.goto("/#/simulacao");
-  await expect(page.getByTestId("tela-ensaios")).toBeVisible();
+  await expect(page.getByTestId("fluxo-screen")).toBeVisible();
+  await expect(page.getByTestId("seletor-de-fluxo")).toHaveValue("ensaio-de-cenarios", { timeout: 15000 });
+  await expect(page.locator('.react-flow__node[data-id="bancada"]')).toBeVisible();
 });
 
 test("§296 — um ensaio de TAXA acusa saturação, e taxa não é lentidão", async ({ page }) => {
@@ -304,7 +394,7 @@ test("§296 — um ensaio de TAXA acusa saturação, e taxa não é lentidão", 
   await page.locator(".react-flow__node", { hasText: "srv-credito-api" }).click();
   await page.getByLabel("Chamadas simultâneas que aguenta").fill("10");
 
-  await page.goto("/#/ensaios");
+  await abrirBancada(page);
   await page.getByLabel("Nome do cenário").fill("Black Friday");
   await page.getByTestId("criar-cenario").click();
   await page.getByTestId("add-ajuste-cen-black-friday").click();
@@ -346,20 +436,27 @@ test("§302 — a tela de ensaios cobre a mesa; nada da mesa vaza no canto", asy
 
   await page.getByTestId("abrir-cenarios").click();
   await page.getByRole("button", { name: "Carregar cenário: Fluxo completo: aprovação de crédito" }).click();
-  await page.goto("/#/ensaios");
+  await abrirBancada(page);
   await page.getByTestId("tela-ensaios").waitFor();
 
+  /**
+   * SPEC-110 fatia B — a promessa é a MESMA, o mecanismo mudou. O §302 nasceu
+   * quando a bancada era uma GAVETA sobre a mesa e um `aside` dela vazava no
+   * canto em telas largas. Agora a bancada é o CORPO de um stage: quem manda
+   * na tela inteira é a moldura. O que se cobra continua sendo "nada da mesa
+   * aparece atrás" — só que o dono do ponto passou a ser o stage.
+   */
   const quemEstaNoCanto = await page.evaluate(() => {
     // O ponto onde o retângulo aparecia: canto direito, logo abaixo do topo.
     const el = document.elementFromPoint(1750, 160);
-    const tela = document.querySelector('[data-testid="tela-ensaios"]');
+    const stage = document.querySelector('[data-testid="tela-do-stage"]');
     return {
-      dentroDaTela: !!(el && tela && (tela === el || tela.contains(el))),
+      dentroDoStage: !!(el && stage && (stage === el || stage.contains(el))),
       tag: el?.tagName.toLowerCase() ?? "?",
     };
   });
 
-  expect(quemEstaNoCanto.dentroDaTela).toBe(true);
+  expect(quemEstaNoCanto.dentroDoStage).toBe(true);
   expect(quemEstaNoCanto.tag).not.toBe("aside");
 });
 
@@ -406,7 +503,7 @@ test("§304 — o ensaio cobra, assumir com motivo tira do placar, e o débito c
   await janela.getByRole("button", { name: "Salvar" }).click();
 
   // ── O ensaio nasce COBRANDO — é a inversão que dá nome à SPEC ──
-  await page.goto("/#/ensaios");
+  await abrirBancada(page);
   await page.getByLabel("Nome do cenário").fill("Bureau em pico");
   await page.getByTestId("criar-cenario").click();
   await page.getByTestId("add-ajuste-cen-bureau-em-pico").click();
@@ -425,7 +522,7 @@ test("§304 — o ensaio cobra, assumir com motivo tira do placar, e o débito c
   await chip.click();
 
   // ── Assumir com motivo: a válvula do §242 sobre um número que ninguém tinha ──
-  await page.goto("/#/ensaios");
+  await abrirBancada(page);
   await page.getByTestId("assumir-cen-bureau-em-pico").click();
   await page.getByLabel("Por que assumir este débito").fill("O parceiro não oferece SLA melhor no contrato atual.");
   await page.getByTestId("confirmar-assumir-cen-bureau-em-pico").click();
@@ -445,7 +542,7 @@ test("§304 — o ensaio cobra, assumir com motivo tira do placar, e o débito c
   await expect(risco).toContainText("acima do prazo de 5,0 s");
 
   // ── §283 — reabrir devolve a cobrança, sem apagar que alguém assumiu ──
-  await page.goto("/#/ensaios");
+  await abrirBancada(page);
   await page.getByTestId("reabrir-cen-bureau-em-pico").click();
   await page.getByTestId("ensaios-voltar").click();
   await expect(page.getByTestId("conformidade-resumo")).toBeVisible();
@@ -517,7 +614,7 @@ test("§305 — sem número declarado, a porta não leva à bancada: diz o que f
 
   // Quem chega por URL (a rota é linkável de propósito) recebe a mesma frase,
   // e a linha de hoje não inventa "≥ 0 ms".
-  await page.goto("/#/ensaios");
+  await abrirBancada(page);
   await expect(page.getByTestId("ensaios-sem-tempo")).toContainText("zero não é uma medição");
   await expect(page.getByTestId("linha-hoje")).not.toContainText("0 ms");
 });
@@ -580,7 +677,7 @@ test("§306 — o volume da demanda faz a saturação aparecer, sem digitar taxa
   // A saturação aparece na BANCADA (`contradicoes-hoje`), e não no placar da
   // mesa: `avaliarResiliencia` só é chamada lá. Afirmar sobre o placar aqui
   // mediria outra coisa.
-  await page.goto("/#/ensaios");
+  await abrirBancada(page);
   await expect(page.getByTestId("contradicoes-hoje")).toHaveCount(0);
   await page.goto("/#/");
 

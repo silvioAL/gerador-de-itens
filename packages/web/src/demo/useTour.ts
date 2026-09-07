@@ -114,7 +114,9 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       texto:
         // SPEC-110 A (D19) — o passo passa pelo GATILHO: o primeiro cartão do
         // fluxo diz quando ele roda, e é o que dá propósito ao botão.
-        "Duas partes trabalham aqui, e a divisão é a ideia toda. Todo fluxo começa por um GATILHO — o cartão que diz QUANDO ele roda; com o manual, é o \"▶ Rodar agora\" que dispara. O MOTOR calcula — lê o seu desenho e a configuração do time, e deriva os itens com as dependências: são as FUNÇÕES DO SISTEMA neste canvas (Geração de itens, Ensaio de cenários). A IA escreve o texto: são os AGENTES, em esteira, e nada que eles propõem conta antes de você confirmar. Este encanamento não é ilustração — é o que roda quando você deriva.",
+        // SPEC-110 B (D19) — a TELA entra na narração: sem ela, o tour
+        // descreveria um encanamento que nunca espera ninguém.
+        "Três partes trabalham aqui, e a divisão é a ideia toda. Todo fluxo começa por um GATILHO — o cartão que diz QUANDO ele roda; com o manual, é o \"▶ Rodar agora\" que dispara. Onde VOCÊ entra é uma TELA: a execução para nela e espera você revisar e decidir (avançar ou retornar). O MOTOR calcula — lê o seu desenho e a configuração do time, e deriva os itens com as dependências: são as FUNÇÕES DO SISTEMA neste canvas (Geração de itens, Ensaio de cenários). A IA escreve o texto: são os AGENTES, em esteira, e nada que eles propõem conta antes de você confirmar. Este encanamento não é ilustração — é o que roda quando você deriva.",
       onEnter: () => {
         // Primeiro passo a mostrar dado de demonstração: a marca liga aqui
         // (§235), porque o time de quem assiste pode não ter régua conferível
@@ -316,7 +318,7 @@ export function passosDeConfiguracao(opts: UseTourOpts): PassoTour[] {
       texto:
         // SPEC-110 A (D19) — "Executar" virou "▶ Rodar agora", o gesto do
         // gatilho: narrar o botão velho é apresentação defasada (a queixa).
-        "Antes das telas, o mapa — e o mapa aqui é vivo. Cada fluxo desta tela é o encanamento REAL da ferramenta: a esteira de agentes derivada da configuração (quem escreve cada parte do item, na ordem), a exportação, a publicação, o ensaio. Cada um começa por um GATILHO, o cartão que diz quando ele roda. Clicar num agente edita o papel dele — prompt, ligar/desligar, ordem — de onde se vê; e \"▶ Rodar agora\" dispara o fluxo de verdade, com o rastro nó a nó. O que as telas de configuração ajustam aparece aqui sozinho, porque isto deriva delas.",
+        "Antes das telas, o mapa — e o mapa aqui é vivo. Cada fluxo desta tela é o encanamento REAL da ferramenta: a esteira de agentes derivada da configuração (quem escreve cada parte do item, na ordem), a exportação, a publicação, o ensaio. Cada um começa por um GATILHO, o cartão que diz quando ele roda — e alguns têm uma TELA no meio, onde a execução para e espera alguém revisar e decidir. Clicar num agente edita o papel dele — prompt, ligar/desligar, ordem — de onde se vê; e \"▶ Rodar agora\" dispara o fluxo de verdade, com o rastro nó a nó. O que as telas de configuração ajustam aparece aqui sozinho, porque isto deriva delas.",
       /**
        * §340/§253 — a demonstração liga aqui e desliga no fim do tour, como
        * sempre: o passo seguinte (produto) mostra dado falso marcado.

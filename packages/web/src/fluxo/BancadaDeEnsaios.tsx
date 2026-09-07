@@ -70,6 +70,20 @@ export interface BancadaDeEnsaiosProps {
    * tela segue inteira (§244). */
   onSugerir?: () => Promise<CenarioDeLentidao[]>;
   /**
+   * SPEC-110 fatia B (D17c) — **onde a bancada se posiciona é do SHELL.**
+   *
+   * Ela nasceu como gaveta `position: fixed` sobre o canvas — herança de
+   * quando era um painel ad hoc. Como CORPO de um stage ela precisa ser um
+   * bloco normal, com a moldura Retornar/Avançar acima dela (medido: a gaveta
+   * cobria a barra e o Avançar ficava inclicável).
+   *
+   * É a única prop que a fatia B acrescenta, e ela é deliberadamente rasa:
+   * só posicionamento, nenhuma lógica, nenhum layout interno mudado — o
+   * "mínimo de impacto" que o usuário pediu, sem fingir que uma gaveta cabe
+   * dentro de uma moldura.
+   */
+  estiloDaRaiz?: React.CSSProperties;
+  /**
    * SPEC-69 — o que o NEGÓCIO exige desta demanda. É o que faz o número
    * técnico decidir: "24 s" sozinho não decide nada, "24 s contra os 5 s que
    * prometemos" decide. Sem prazo declarado, a conclusão compara com hoje.
@@ -120,6 +134,7 @@ export function BancadaDeEnsaios({
   onVoltar,
   executar,
   onSugerir,
+  estiloDaRaiz,
   necessidades,
   autor,
   volumetria,
@@ -261,7 +276,7 @@ export function BancadaDeEnsaios({
   }
 
   return (
-    <div style={telaEstilo} data-testid="tela-ensaios">
+    <div style={{ ...telaEstilo, ...estiloDaRaiz }} data-testid="tela-ensaios">
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <button onClick={onVoltar} style={botaoNeutroEstilo} data-testid="ensaios-voltar">
           ← Voltar à mesa de projeto

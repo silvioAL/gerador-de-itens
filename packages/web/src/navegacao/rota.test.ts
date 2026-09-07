@@ -57,13 +57,32 @@ describe("rota em hash (SPEC-40 F1)", () => {
      * acontece se o bureau cair" continua sendo uma URL mandável, e o link
      * salvo nunca vira tela branca (§2.4-3).
      */
-    expect(rotaDoHash("#/ensaios")).toEqual({ tela: "fluxo", bancada: "ensaio" });
-    // E a cadeia LEGADA encurta no destino atual: #/simulacao → a bancada.
-    expect(rotaDoHash("#/simulacao")).toEqual({ tela: "fluxo", bancada: "ensaio" });
-    // Ida e volta da rota nova; o fluxo sem bancada segue como era.
-    expect(hashDaRota({ tela: "fluxo", bancada: "ensaio" })).toBe("#/fluxo/ensaio");
-    expect(rotaDoHash("#/fluxo/ensaio")).toEqual({ tela: "fluxo", bancada: "ensaio" });
+    /**
+     * SPEC-110 fatia B (D4) — a bancada mudou de casa OUTRA vez, e para o
+     * lugar definitivo: ela é a TELA `bancada-de-ensaios` no meio da fiação
+     * do ensaio, não um painel sobre o canvas. Os TRÊS links legados
+     * (`#/ensaios`, `#/simulacao`, `#/fluxo/ensaio`) apontam para o fluxo
+     * onde ela mora — nenhum vira tela branca (SPEC-61 §6.7).
+     */
+    expect(rotaDoHash("#/ensaios")).toEqual({ tela: "fluxo", fluxoId: "ensaio-de-cenarios" });
+    expect(rotaDoHash("#/simulacao")).toEqual({ tela: "fluxo", fluxoId: "ensaio-de-cenarios" });
+    expect(rotaDoHash("#/fluxo/ensaio")).toEqual({ tela: "fluxo", fluxoId: "ensaio-de-cenarios" });
     expect(rotaDoHash("#/fluxo")).toEqual({ tela: "fluxo" });
+  });
+
+  /**
+   * SPEC-110 fatia B (D2) — o STAGE é endereçado pela EXECUÇÃO: duas
+   * execuções paradas na mesma tela são duas coisas diferentes, e o link é
+   * mandável para quem revisa (§2.4-3, a metade da porta).
+   */
+  it("SPEC-110 B: #/tela/<execucaoId> abre o stage; sem id cai no canvas de fluxos", () => {
+    expect(hashDaRota({ tela: "telaDoStage", execucaoId: "abc-123" })).toBe("#/tela/abc-123");
+    expect(rotaDoHash("#/tela/abc-123")).toEqual({ tela: "telaDoStage", execucaoId: "abc-123" });
+    // Id com caractere especial sobrevive à ida e à volta.
+    const comEspecial = { tela: "telaDoStage", execucaoId: "a/b" } as const;
+    expect(rotaDoHash(hashDaRota(comEspecial))).toEqual(comEspecial);
+    // Sem id não há stage: cai no canvas, que é de onde as execuções nascem.
+    expect(rotaDoHash("#/tela")).toEqual({ tela: "fluxo" });
   });
 
   it("SPEC-107 G5c: #/fluxo/<id> abre o canvas NAQUELE fluxo — assistir é uma URL mandável", () => {
