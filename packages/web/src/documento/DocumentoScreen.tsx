@@ -8,10 +8,15 @@ import type {
   DiagramaConfig,
   DocumentoDeDesenho,
   DocumentoEscrito,
+  FichaItem,
   IndicadorDeSaude,
   ItemDoDocumento,
   StatusDocumento,
+  ValorSpec,
 } from "@gerador/engine";
+// SPEC-107 G5c — a MESMA régua da revisão (§263): pendências, assinatura e
+// os placeholders achatados vêm da aplicação.
+import { assinarSugestao, pendenciasDaRevisao, placeholdersDaFicha, respostaConfirmada } from "@gerador/aplicacao";
 import { Canvas } from "../canvas/Canvas";
 import { useDiagrama, type AplicarNoDiagrama } from "../state/useDiagrama";
 import type { ItemGerado, ResultadoDaExportacao } from "../api/client";
@@ -116,6 +121,16 @@ export interface DocumentoScreenProps {
   /** Qual decisão cada ensaio sustenta — o que ele leva ao item de quem
    * implementa. `undefined` para ensaio que ninguém anexou, e a linha some. */
   decisaoDoEnsaio?: (ensaioId: string) => string | undefined;
+  /**
+   * SPEC-107 G5c — **o julgamento campo a campo (SPEC-35) na casa da
+   * demanda.** A ficha de cada item (com as respostas em vigor) e o gravador:
+   * confirmar assina a sugestão sem apagar a procedência; editar vira
+   * `manual`. Ausentes = a seção continua só de leitura, como sempre foi.
+   * A decisão é a §5.5, do usuário: o julgamento fica NA DEMANDA — e o
+   * documento é a superfície dela que lista item a item.
+   */
+  fichas?: Map<string, FichaItem>;
+  onResponderItem?: (itemChave: string, chavePlaceholder: string, resposta: ValorSpec) => void;
 }
 
 /**
@@ -202,6 +217,8 @@ export function DocumentoScreen({
   destinoDaExportacao,
   ensaios,
   decisaoDoEnsaio,
+  fichas,
+  onResponderItem,
 }: DocumentoScreenProps) {
   const { violacoes, aceitas, violacoesDePercurso, naoMedidos, percursos, violacoesDeForma, formaAceitas } =
     documento.conferencias;
@@ -423,6 +440,8 @@ export function DocumentoScreen({
           onRevisarItem={onRevisarItem}
           onExportar={onExportar}
           destinoDaExportacao={destinoDaExportacao}
+          fichas={fichas}
+          onResponderItem={onResponderItem}
         />
       </article>
     </div>
@@ -784,12 +803,16 @@ function SecaoDosItens({
   onRevisarItem,
   onExportar,
   destinoDaExportacao,
+  fichas,
+  onResponderItem,
 }: {
   derivados: ItemDoDocumento[];
   escritos: ItemGerado[];
   onRevisarItem?: (chave: string) => void;
   onExportar?: () => Promise<ResultadoDaExportacao>;
   destinoDaExportacao?: string | null;
+  fichas?: Map<string, FichaItem>;
+  onResponderItem?: (itemChave: string, chavePlaceholder: string, resposta: ValorSpec) => void;
 }) {
   const [exportando, setExportando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoDaExportacao | null>(null);
@@ -813,9 +836,47 @@ function SecaoDosItens({
   const prontos = escritos.filter((i) => i.pendencias === 0 && i.sugestoes === 0).length;
   const geradoEm = escritos[0]?.criadoEm ? new Date(escritos[0].criadoEm) : null;
 
+  /**
+   * SPEC-107 G5c — as pendências VIVAS, das fichas (a mesma régua da revisão,
+   * §263): a barra reflete confirmar/editar na hora, sem esperar regerar os
+   * itens escritos (cujos contadores são a foto de quando foram gerados).
+   */
+  const pend =
+    fichas && onResponderItem
+      ? pendenciasDaRevisao(
+          derivados
+            .filter((d) => fichas.has(d.chave))
+            .map((d) => ({ chave: d.chave, rotulo: d.descricao, ficha: fichas.get(d.chave)! }))
+        )
+      : null;
+
   return (
     <section data-testid="secao-dos-itens" style={colunaDeTextoEstilo}>
       <h2 style={tituloSecaoEstilo}>Os itens</h2>
+
+      {pend && pend.sugestoes.length > 0 && (
+        <div style={resumoEstilo} data-testid="pendencias-dos-itens">
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <strong style={{ fontSize: 13.5 }}>
+              {pend.sugestoes.length} {pend.sugestoes.length === 1 ? "sugestão da esteira aguardando" : "sugestões da esteira aguardando"}
+            </strong>
+            {/* Aceitar é barato (um clique global); intervir é que merece
+                clique a clique — a régua da barra da revisão, na casa nova. */}
+            <button
+              onClick={() => {
+                for (const s of pend.sugestoes) onResponderItem!(s.itemChave, s.chave, assinarSugestao(s.resposta));
+              }}
+              style={{ ...botaoEstilo, ...botaoPrimarioEstilo }}
+              data-testid="confirmar-todas-itens"
+            >
+              Confirmar todas ({pend.sugestoes.length})
+            </button>
+            <span style={{ fontSize: 11.5, color: "var(--texto-mudo)" }}>
+              confirmar assina a sugestão; editar no card vira texto seu
+            </span>
+          </div>
+        </div>
+      )}
 
       {linhas.length === 0 ? (
         // §2 — a mensagem de vazio herdou o que a tela de itens conduzia: sem
@@ -921,6 +982,8 @@ function SecaoDosItens({
                 )
               }
               onRevisar={onRevisarItem}
+              ficha={fichas?.get(linha.chave)}
+              onResponder={onResponderItem}
             />
           ))}
         </>
@@ -928,6 +991,118 @@ function SecaoDosItens({
     </section>
   );
 }
+
+/**
+ * SPEC-107 G5c — **o refinador campo a campo, no card do item.**
+ *
+ * É a SPEC-35 na casa da demanda (§5.5): cada campo mostra a resposta em
+ * vigor; sugestão pendente ganha [Confirmar] (assina sem apagar a
+ * procedência) e [Editar] (vira `manual`); campo vazio ganha [Escrever].
+ * Confirmado não ganha botão — julgamento feito não pede clique.
+ */
+function RefinarCampos({
+  itemChave,
+  ficha,
+  onResponder,
+}: {
+  itemChave: string;
+  ficha: FichaItem;
+  onResponder: (itemChave: string, chavePlaceholder: string, resposta: ValorSpec) => void;
+}) {
+  const [editando, setEditando] = useState<string | null>(null);
+  const [texto, setTexto] = useState("");
+  const campos = placeholdersDaFicha(ficha);
+
+  return (
+    <div data-testid={`refinar-${itemChave}`} style={{ marginTop: 10, borderTop: "1px dashed var(--borda)", paddingTop: 8 }}>
+      {campos.map((p) => {
+        const confirmada = respostaConfirmada(p.resposta);
+        const sugerida = !confirmada && p.resposta !== undefined;
+        return (
+          <div key={p.chave} data-testid={`campo-${itemChave}-${p.chave}`} style={{ margin: "6px 0", fontSize: 12.5 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ color: "var(--texto-mudo)", fontSize: 11, minWidth: "10em" }}>{p.rotulo}</span>
+              {confirmada && <span style={{ color: "var(--verde)", fontSize: 11 }}>✓</span>}
+              {sugerida && (
+                <>
+                  <button
+                    onClick={() => onResponder(itemChave, p.chave, assinarSugestao(p.resposta!))}
+                    style={acaoDoCampoEstilo}
+                    data-testid={`confirmar-campo-${itemChave}-${p.chave}`}
+                    title="Assinar a sugestão — a procedência (sugerido pela esteira) fica registrada"
+                  >
+                    Confirmar
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditando(p.chave);
+                      setTexto(String(p.resposta?.valor ?? ""));
+                    }}
+                    style={acaoDoCampoEstilo}
+                  >
+                    Editar
+                  </button>
+                </>
+              )}
+              {!confirmada && !sugerida && (
+                <button
+                  onClick={() => {
+                    setEditando(p.chave);
+                    setTexto("");
+                  }}
+                  style={acaoDoCampoEstilo}
+                  data-testid={`escrever-campo-${itemChave}-${p.chave}`}
+                >
+                  ✍️ Escrever
+                </button>
+              )}
+            </div>
+            {editando === p.chave ? (
+              <div style={{ display: "flex", gap: 6, marginTop: 4, alignItems: "flex-start" }}>
+                <textarea
+                  value={texto}
+                  onChange={(e) => setTexto(e.target.value)}
+                  aria-label={`Editar ${p.rotulo}`}
+                  style={{ flex: 1, minHeight: 54, fontSize: 12.5, background: "var(--painel-alto)", color: "var(--texto)", border: "1px solid var(--borda)", borderRadius: 6, padding: 6 }}
+                />
+                <button
+                  onClick={() => {
+                    // Editar é assumir o texto: vira manual (SPEC-26).
+                    onResponder(itemChave, p.chave, { valor: texto, origem: "manual" });
+                    setEditando(null);
+                  }}
+                  disabled={!texto.trim()}
+                  style={acaoDoCampoEstilo}
+                  data-testid={`salvar-campo-${itemChave}-${p.chave}`}
+                >
+                  Salvar
+                </button>
+                <button onClick={() => setEditando(null)} style={acaoDoCampoEstilo}>
+                  Cancelar
+                </button>
+              </div>
+            ) : (
+              p.resposta?.valor !== undefined &&
+              String(p.resposta.valor).trim() !== "" && (
+                <p style={{ margin: "2px 0 0", color: "var(--texto-2)", whiteSpace: "pre-wrap" }}>{String(p.resposta.valor)}</p>
+              )
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const acaoDoCampoEstilo: React.CSSProperties = {
+  fontSize: 11,
+  padding: "2px 8px",
+  borderRadius: 6,
+  border: "1px solid var(--borda)",
+  background: "var(--painel)",
+  color: "var(--texto)",
+  cursor: "pointer",
+};
 
 /** A régua de completude do card — quantos ✍️ restam e quantas sugestões da
  * esteira esperam confirmação (SPEC-41 Parte B). */
@@ -957,6 +1132,8 @@ function CartaoItem({
   expandido,
   onAlternar,
   onRevisar,
+  ficha,
+  onResponder,
 }: {
   indice: number;
   derivado?: ItemDoDocumento;
@@ -965,6 +1142,8 @@ function CartaoItem({
   expandido: boolean;
   onAlternar: () => void;
   onRevisar?: (chave: string) => void;
+  ficha?: FichaItem;
+  onResponder?: (itemChave: string, chavePlaceholder: string, resposta: ValorSpec) => void;
 }) {
   const citacao = (rotulo: string, valores: string[]) =>
     valores.length > 0 ? (
@@ -1038,9 +1217,9 @@ function CartaoItem({
           {derivado && citacao("segue", derivado.decisoes)}
           {derivado && citacao("no caminho", derivado.percursos)}
         </div>
-        {escrito && (
+        {(escrito || (ficha && onResponder)) && (
           <button onClick={onAlternar} style={botaoEstilo} aria-expanded={expandido} data-testid={`item-expandir-${indice}`}>
-            {expandido ? "Recolher" : "Ver a escrita"}
+            {expandido ? "Recolher" : escrito ? "Ver a escrita" : "Refinar campos"}
           </button>
         )}
       </div>
@@ -1048,14 +1227,28 @@ function CartaoItem({
         expandido && (
           <div style={corpoDoItemEstilo} data-testid={`item-corpo-${indice}`}>
             <EscritaDoItem markdown={escrito.corpoMarkdown} />
+            {/* SPEC-107 G5c — o julgamento campo a campo, aqui mesmo (§5.5). */}
+            {ficha && onResponder && derivado && (
+              <RefinarCampos itemChave={derivado.chave} ficha={ficha} onResponder={onResponder} />
+            )}
           </div>
         )
       ) : (
-        // A derivação manda: o item existe porque o desenho o produz. Só o
-        // TEXTO ainda não foi escrito, e dizer isso é diferente de omitir o item.
-        <p data-testid={`item-sem-escrita-${indice}`} style={{ ...miudoEstilo, fontStyle: "italic", margin: "10px 0 0" }}>
-          ainda não escrito — a escrita nasce na revisão da demanda
-        </p>
+        <>
+          {/* A derivação manda: o item existe porque o desenho o produz. Só o
+              TEXTO ainda não foi escrito, e dizer isso é diferente de omitir o
+              item. */}
+          <p data-testid={`item-sem-escrita-${indice}`} style={{ ...miudoEstilo, fontStyle: "italic", margin: "10px 0 0" }}>
+            ainda não escrito — a escrita nasce na revisão da demanda
+          </p>
+          {/* G5c — a fiação escreve sugestões ANTES de os itens serem gerados:
+              o julgamento não pode esperar a escrita existir. */}
+          {expandido && ficha && onResponder && derivado && (
+            <div style={corpoDoItemEstilo}>
+              <RefinarCampos itemChave={derivado.chave} ficha={ficha} onResponder={onResponder} />
+            </div>
+          )}
+        </>
       )}
     </article>
   );

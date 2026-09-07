@@ -72,6 +72,7 @@ export function FluxoScreen({
   abrirFluxoId,
   painel,
   demandaAberta,
+  aoExecutarComDemanda,
 }: {
   timeAtivo: string;
   onFechar: () => void;
@@ -88,6 +89,13 @@ export function FluxoScreen({
    * servidor — assistir a esteira rodando é sobre a SUA demanda.
    */
   demandaAberta?: { id: string };
+  /**
+   * G5c — a fiação pode ESCREVER na demanda (o destino da esteira grava as
+   * sugestões). O estado local da mesa não sabe disso — e o autosave gravaria
+   * o estado velho POR CIMA (a corrida do §250, agora cliente×servidor).
+   * Depois de uma execução que apontou a demanda aberta, o App ressincroniza.
+   */
+  aoExecutarComDemanda?: () => void;
 }) {
   const permissoes = usePermissoes({ hospedado: true, timeId: timeAtivo });
   const podeEditar = permissoes.pode("fluxos", "editar");
@@ -199,7 +207,12 @@ export function FluxoScreen({
 
   const rotuloDoRef = useCallback(
     (no: Pick<NoDoFluxo, "tipo" | "refId" | "componente">) => {
-      if (!no.refId) return no.componente && no.componente !== "livre" ? NOME_DA_OPERACAO[no.componente] : "(escolha o adaptador)";
+      if (!no.refId)
+        return no.componente && no.componente !== "livre"
+          ? NOME_DA_OPERACAO[no.componente]
+          : no.tipo === "agente"
+            ? "(escolha o papel)"
+            : "(escolha o conector)";
       if (no.tipo === "funcao") return funcaoDoSistema(no.refId)?.nome ?? no.refId;
       if (no.tipo === "projeto") return PROJETO_DO_SISTEMA.nome;
       if (no.tipo === "transformacao") {
@@ -504,6 +517,10 @@ export function FluxoScreen({
         execucaoId: resultado.execucaoId,
         aguardandoEm: resultado.aguardandoEm,
       });
+      // A fiação pode ter GRAVADO na demanda aberta (o destino da esteira):
+      // ressincronizar o estado da mesa ANTES que um autosave grave o velho
+      // por cima (medido de verdade: o banco esvaziava ao voltar à mesa).
+      if (daDemanda) aoExecutarComDemanda?.();
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
     } finally {
@@ -744,6 +761,7 @@ export function FluxoScreen({
                 podeEditar={editavel}
                 podeEditarPapel={podeEditarPapel}
                 onSalvarPapel={salvarPapel}
+                onAbrirMesa={onFechar}
                 onMudar={(mudanca) =>
                   mudarFluxo((f) => ({ ...f, nos: f.nos.map((n) => (n.id === noSelecionado.id ? { ...n, ...mudanca } : n)) }))
                 }
@@ -901,6 +919,7 @@ function PainelDoNo({
   onSalvarPapel,
   onMudar,
   onRemover,
+  onAbrirMesa,
 }: {
   no: NoDoFluxo;
   catalogo: ConectorDoCatalogo[];
@@ -910,6 +929,8 @@ function PainelDoNo({
   onSalvarPapel: (refId: string, mudanca: { nome: string; descricao: string; preambulo: string }) => Promise<void>;
   onMudar: (mudanca: Partial<NoDoFluxo>) => void;
   onRemover: () => void;
+  /** §3.1 — "a mesa vira COMPONENTE": o nó de projeto é a porta para ela. */
+  onAbrirMesa?: () => void;
 }) {
   const conector = no.tipo === "conector" ? catalogo.find((c) => c.id === no.refId) : undefined;
   // SPEC-107 fatia A — a função É a capacidade: contrato do registro fechado,
@@ -935,14 +956,30 @@ function PainelDoNo({
           : no.tipo === "funcao"
             ? `Função do sistema — ${funcao?.nome ?? no.refId}`
             : no.tipo === "projeto"
-              ? "Projeto (a demanda, nas duas direções)"
+              ? (
+                  <>
+                    Projeto (a demanda, nas duas direções){" "}
+                    {/* §3.1 — "a mesa vira COMPONENTE": o nó de projeto é a
+                        porta para ela, como o usuário desenhou ("um componente
+                        que possamos abrir e usar a mesa de projeto"). */}
+                    {onAbrirMesa && (
+                      <button onClick={onAbrirMesa} style={{ ...botao, marginLeft: 6 }} data-testid="abrir-mesa-do-projeto">
+                        Abrir a mesa de projeto →
+                      </button>
+                    )}
+                  </>
+                )
               : no.tipo === "transformacao"
                 ? "Transformação (pura — re-mapeia, extrai, concatena)"
                 : "Agente"}
       </div>
       {no.tipo !== "funcao" && no.tipo !== "projeto" && no.tipo !== "transformacao" && (
         <label style={{ fontSize: 11.5, display: "grid", gap: 2, marginBottom: 8 }}>
-          Adaptador ({no.tipo === "agente" ? "papel da esteira" : "endereço do catálogo"})
+          {/* §359/§2.4-1 — o rótulo nomeia O QUE se escolhe ("adaptador" é
+              jargão de arquitetura e o usuário estranhou, com razão): o nó
+              agente executa um PAPEL configurado; a chamada externa usa um
+              CONECTOR do catálogo. */}
+          {no.tipo === "agente" ? "Papel (da configuração de agentes)" : "Conector (do catálogo)"}
           <select
             data-testid="adaptador-do-no"
             disabled={!podeEditar}

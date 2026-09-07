@@ -32,6 +32,7 @@ import {
   gerarItensDeTrabalho,
   lerDesenho,
   marcasPorNo,
+  montarFichaItem,
   percursoManual,
   reguaDaLeitura,
   type RequisitoDeTopologia,
@@ -1129,6 +1130,22 @@ function AppCarregado({
       return [];
     }
   }, [resultado, quebra.diagrama, quebra.time, quebra.excecoes, quebra.percursos, diagramaConfig, regrasConfig]);
+  /**
+   * SPEC-107 G5c — as fichas para o julgamento campo a campo NO DOCUMENTO
+   * (§5.5: o julgamento fica na demanda): o MESMO `montarFichaItem` da
+   * revisão, sobre as atividades do documento — confirmar/editar lá grava em
+   * `respostasItens` pelo mesmo `responderItem` de sempre.
+   */
+  const fichasDoDocumento = useMemo(
+    () =>
+      new Map(
+        atividadesDoDocumento.map((a, i) => [
+          a.chave,
+          montarFichaItem(i + 1, a, quebra.diagrama, diagramaConfig, regrasConfig, quebra.respostasItens?.[a.chave]),
+        ])
+      ),
+    [atividadesDoDocumento, quebra.diagrama, diagramaConfig, regrasConfig, quebra.respostasItens]
+  );
   const documentoDaDemanda = useMemo(
     () =>
       estruturarDocumento(atividadesDoDocumento, quebra.diagrama, diagramaConfig, {
@@ -2132,8 +2149,13 @@ function AppCarregado({
           // ensaio; G5c — `#/fluxo/<id>` abre em qualquer fluxo (assistir a
           // esteira é uma URL mandável).
           abrirFluxoId={bancadaDeEnsaiosAberta ? "ensaio-de-cenarios" : rota.tela === "fluxo" ? rota.fluxoId : undefined}
-          // G5c — executar do canvas aponta a demanda aberta na mesa.
+          // G5c — executar do canvas aponta a demanda aberta na mesa; e o que
+          // a fiação GRAVOU nela volta para o estado da mesa na hora, senão o
+          // próximo autosave apagaria a escrita do servidor (§250, medido).
           demandaAberta={persistencia.quebraId ? { id: persistencia.quebraId } : undefined}
+          aoExecutarComDemanda={() => {
+            if (persistencia.quebraId) void persistencia.abrirPorId(persistencia.quebraId);
+          }}
           painel={
             bancadaDeEnsaiosAberta ? (
               <BancadaDeEnsaios
@@ -2306,6 +2328,10 @@ function AppCarregado({
                 }
               : undefined
           }
+          // SPEC-107 G5c — o julgamento campo a campo NA CASA DA DEMANDA
+          // (§5.5): as fichas do mesmo motor da revisão, e o mesmo gravador.
+          fichas={fichasDoDocumento}
+          onResponderItem={responderItem}
         />
       )}
 

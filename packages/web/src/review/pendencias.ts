@@ -1,94 +1,13 @@
-import type { FichaItem, FichaPlaceholder, ValorSpec } from "@gerador/engine";
-// SPEC-107 G5 — a régua de "confirmado" mudou para a aplicação (a fila da
-// fiação usa a MESMA, §263); daqui só se re-exporta para os consumidores.
-import { respostaConfirmada } from "@gerador/aplicacao";
-
-/**
- * SPEC-44 — a contagem de pendências da revisão, pura. É a régua ÚNICA:
- * a barra da revisão, os chips dos cards e a seção dos itens do documento
- * falam a partir
- * daqui — "sugestão aguardando" (a esteira escreveu, ninguém assinou) e
- * "campo vazio" (ninguém escreveu) são coisas diferentes e a frase diz qual.
- */
-
-export { respostaConfirmada };
-
-/** Os placeholders da ficha, achatados na ordem das seções (PO, Arquiteto,
- * Especialista, QA) — mesma ordem de `placeholdersPorPapel` da revisão. */
-export function placeholdersDaFicha(ficha: FichaItem): FichaPlaceholder[] {
-  return [
-    ficha.historiaUsuario,
-    ficha.criteriosAceiteContextual,
-    ficha.contrato.noVinculado,
-    ficha.contrato.request,
-    ficha.contrato.response,
-    ficha.contrato.erros,
-    ficha.contrato.dependencias,
-    ...ficha.checklistTecnico,
-    ...ficha.volumetria,
-    ficha.regrasTeste,
-    ficha.cenarioFeature,
-    // §199 — sem esta linha, a barra da revisão dizia "nada pendente"
-    // enquanto o card do item cobrava "✍️ 1 campo a especificar": duas
-    // réguas de novo, que é justamente o que a SPEC-44 unificou.
-    ficha.entregaFinal,
-  ];
-}
-
-/** Uma sugestão aguardando assinatura — o que a fila guiada percorre. */
-export interface PendenteDeConfirmacao {
-  itemChave: string;
-  itemRotulo: string;
-  chave: string;
-  rotulo: string;
-  tech: string;
-  resposta: ValorSpec;
-}
-
-export interface PendenciasDaRevisao {
-  /** Sugestões da esteira sem assinatura, na ordem dos itens. */
-  sugestoes: PendenteDeConfirmacao[];
-  /** Placeholders sem resposta nenhuma. */
-  vazios: number;
-  confirmados: number;
-  totais: number;
-}
-
-export function pendenciasDaRevisao(itens: { chave: string; rotulo: string; ficha: FichaItem }[]): PendenciasDaRevisao {
-  const sugestoes: PendenteDeConfirmacao[] = [];
-  let vazios = 0;
-  let confirmados = 0;
-  let totais = 0;
-
-  for (const { chave: itemChave, rotulo: itemRotulo, ficha } of itens) {
-    for (const p of placeholdersDaFicha(ficha)) {
-      totais++;
-      if (respostaConfirmada(p.resposta)) {
-        confirmados++;
-      } else if (p.resposta !== undefined) {
-        sugestoes.push({ itemChave, itemRotulo, chave: p.chave, rotulo: p.rotulo, tech: p.tech, resposta: p.resposta });
-      } else {
-        vazios++;
-      }
-    }
-  }
-
-  return { sugestoes, vazios, confirmados, totais };
-}
-
-/** Assinar uma sugestão SEM apagar a procedência: a IA escreveu
- * (`origem: "sugerido"` fica), o humano confirmou. Editar é outro caminho —
- * vira `manual` (comportamento existente do campo). */
-export function assinarSugestao(resposta: ValorSpec): ValorSpec {
-  return { ...resposta, confirmado: true };
-}
-
-/** A frase de completude compartilhada entre o card da revisão e a tela de
- * itens — uma régua, um vocabulário. */
-export function fraseDeCompletude(sugestoes: number, vazios: number): string {
-  if (sugestoes === 0 && vazios === 0) return "pronto";
-  const partes: string[] = [];
-  if (sugestoes > 0) partes.push(`${sugestoes} ${sugestoes === 1 ? "sugestão" : "sugestões"} a confirmar`);
-  if (vazios > 0) partes.push(`✍️ ${vazios} a especificar`);
-  return partes.join(" · ");
-}
+// SPEC-107 G5c — a régua inteira mudou para a aplicação
+// (`casos-de-uso/pendencias.ts`): o julgamento campo a campo vive na DEMANDA
+// (§5.5), e revisão e documento importam a MESMA régua (§263). Este arquivo
+// só re-exporta, para os consumidores da pasta não mudarem de linha.
+export {
+  assinarSugestao,
+  fraseDeCompletude,
+  pendenciasDaRevisao,
+  placeholdersDaFicha,
+  respostaConfirmada,
+  type PendenciasDaRevisao,
+  type PendenteDeConfirmacao,
+} from "@gerador/aplicacao";

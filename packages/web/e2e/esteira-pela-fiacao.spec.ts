@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+﻿import { test, expect, type Page } from "@playwright/test";
 import { BASE_URL_GATEWAY_FALSO, CHAVE_GATEWAY_FALSO, MARCA_GATEWAY_FALSO, MODELO_GATEWAY_FALSO } from "@gerador/gateway-falso";
 import { entrar } from "./auth";
 import { derivarNaMesa } from "./derivar";
@@ -203,6 +203,38 @@ test("SPEC-107 G5c — o canvas roda a esteira da demanda aberta, ao vivo", asyn
     respostasItens?: Record<string, unknown>;
   };
   expect(Object.keys(daOutra.respostasItens ?? {})).toHaveLength(0);
+
+  // ── G5c-2: o JULGAMENTO na casa da demanda (§5.5) — a seção dos itens do
+  //    documento mostra as sugestões aguardando, e Confirmar todas assina ──
+  //
+  // A fiação gravou NO BANCO; o estado do navegador é o de antes da corrida.
+  // O caso real é reabrir a demanda (F5 + Abrir…) — é o que sincroniza.
+  // O F5 é NA MESA: o menu de abrir demanda mora lá, não no canvas do fluxo.
+  await page.goto("/#/");
+  await page.reload();
+  await page.getByRole("button", { name: "☰ Menu" }).click();
+  await page.getByRole("button", { name: "Abrir…" }).click();
+  await page.getByPlaceholder("ex.: aprovação de crédito").fill(TITULO);
+  await page.getByRole("button", { name: new RegExp(TITULO) }).click();
+  await expect(page.getByTestId("titulo-da-quebra")).toContainText(TITULO);
+  await page.goto("/#/documento");
+  await expect(page.getByTestId("pendencias-dos-itens")).toContainText("sugestões da esteira aguardando");
+  await page.getByTestId("confirmar-todas-itens").click();
+  // A barra some porque nada mais aguarda — a régua é viva, das fichas.
+  await expect(page.getByTestId("pendencias-dos-itens")).toHaveCount(0);
+  // E no banco (auto-save ~2s): tudo assinado, procedência preservada.
+  await expect
+    .poll(
+      async () => {
+        const dq = (await (await page.request.get(`${API}/quebras/${demandaId}`)).json()) as {
+          respostasItens?: Record<string, Record<string, { origem: string; confirmado?: boolean }>>;
+        };
+        const cs = Object.values(dq.respostasItens ?? {}).flatMap((c) => Object.values(c));
+        return cs.length > 0 && cs.every((v) => v.origem === "sugerido" && v.confirmado === true);
+      },
+      { timeout: 25000 }
+    )
+    .toBe(true);
 });
 
 /** A aba "Modelo de IA" dentro da tela de Configurações. */

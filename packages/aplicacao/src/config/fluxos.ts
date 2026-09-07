@@ -439,7 +439,11 @@ export function validarEscritaFluxos(documento: unknown): void {
         );
       }
       if (!(typeof no.refId === "string" && no.refId.trim())) {
-        throw new ConfigInvalida(`no fluxo "${id}", o nó "${noId}" está sem adaptador — escolha um nas propriedades do nó`);
+        // §359 — a frase nomeia O QUE falta escolher ("adaptador" é jargão de
+        // arquitetura; na tela o nó agente escolhe um PAPEL, a chamada
+        // externa um CONECTOR).
+        const oQueFalta = no.tipo === "agente" ? "papel" : no.tipo === "conector" ? "conector" : "referência";
+        throw new ConfigInvalida(`no fluxo "${id}", o nó "${noId}" está sem ${oQueFalta} — escolha nas propriedades do nó`);
       }
       // O registro de funções é fechado e vive no código — um refId fora dele
       // nunca vai ganhar executor, e falhar só na execução seria o silêncio
