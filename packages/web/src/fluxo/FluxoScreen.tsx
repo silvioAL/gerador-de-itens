@@ -20,6 +20,8 @@ import {
   gatilhoDoSistema,
   ID_DO_NO_DE_GATILHO,
   noDeGatilhoManual,
+  TELAS_DO_SISTEMA,
+  telaDoSistema,
   PROJETO_DO_SISTEMA,
   REF_DO_PROJETO,
   sanearCamposDaTransformacao,
@@ -115,20 +117,26 @@ export function FluxoScreen({
   timeAtivo,
   onFechar,
   abrirFluxoId,
-  painel,
   demandaAberta,
   aoExecutarComDemanda,
   aoAbrirConfigDosPapeis,
   aoAbrirConfigDaEspecificacao,
+  aoAbrirTelaDoStage,
 }: {
   timeAtivo: string;
   onFechar: () => void;
   /** SPEC-107 G4 — abrir já num fluxo específico (a porta da bancada de
    * ensaios chega em `#/fluxo/ensaio` e o canvas mostra a fiação certa). */
   abrirFluxoId?: string;
-  /** SPEC-107 G4 — um painel sobre o canvas (a bancada de ensaios), montado
-   * por quem conhece a demanda aberta: o App. */
-  painel?: React.ReactNode;
+  /**
+   * ~~SPEC-107 G4 — `painel`: um painel sobre o canvas (a bancada de
+   * ensaios), montado pelo App.~~ **SPEC-110 fatia B (D4) — a prop saiu.**
+   *
+   * A bancada deixou de ser um painel ad hoc SOBRE o canvas e virou a TELA
+   * `bancada-de-ensaios` DENTRO da fiação do ensaio. Quem a mostra agora é o
+   * stage (`#/tela/<execucaoId>`), com a moldura Retornar/Avançar por cima —
+   * e o canvas voltou a ser só o canvas.
+   */
   /**
    * SPEC-107 G5c — a DEMANDA ABERTA na mesa: quando a fiação tem o nó fonte
    * `demanda`, executar daqui aponta para ela (`parametrosPorNo`, como os
@@ -155,6 +163,12 @@ export function FluxoScreen({
    * GERAÇÃO DE ITENS, e a porta vive no nó dela.
    */
   aoAbrirConfigDaEspecificacao?: () => void;
+  /**
+   * SPEC-110 fatia B — a porta da TELA parada: o canvas diz "aguardando uma
+   * tela" e o clique leva ao stage (`#/tela/<execucaoId>`). Quem navega é o
+   * App — a FluxoScreen não conhece rotas, como nunca conheceu.
+   */
+  aoAbrirTelaDoStage?: (execucaoId: string) => void;
 }) {
   const permissoes = usePermissoes({ hospedado: true, timeId: timeAtivo });
   const podeEditar = permissoes.pode("fluxos", "editar");
@@ -176,6 +190,15 @@ export function FluxoScreen({
     execucaoId?: string;
     /** SPEC-107 fatia C — a execução suspendeu no gate deste nó. */
     aguardandoEm?: string;
+    /**
+     * SPEC-110 fatia B — a execução parou numa TELA, e o valor é o id da
+     * EXECUÇÃO (não do nó): o stage é endereçado por ela, e é isso que a
+     * porta "abrir →" precisa carregar. As duas suspensões são distintas de
+     * propósito — o gate decide aqui, a tela decide LÁ.
+     */
+    aguardandoTelaEm?: string;
+    /** SPEC-110 B (D2) — a última execução TERMINOU num retornar. */
+    retornada?: boolean;
   } | null>(null);
   /** SPEC-107 fatia D — o vivo (§2.4-9): que nó está rodando agora, e o
    * texto que o agente já escreveu, por nó. */
@@ -256,6 +279,12 @@ export function FluxoScreen({
         const gatilho = gatilhoDoSistema(no.refId);
         return gatilho ? { entrada: [], saida: gatilho.saida } : null;
       }
+      // SPEC-110 B — a tela declara os dois lados: o que ela mostra e o que a
+      // decisão devolve. É o que faz o aviso de tipo funcionar nela também.
+      if (no.tipo === "tela") {
+        const tela = telaDoSistema(no.refId);
+        return tela ? { entrada: tela.entrada, saida: tela.saida } : null;
+      }
       return null;
     },
     [catalogo]
@@ -320,6 +349,8 @@ export function FluxoScreen({
       // CARTÃO vai o rótulo curto: a frase inteira estica o cartão e esconde
       // o vizinho (medido na validação visual desta fatia).
       if (no.tipo === "gatilho") return gatilhoDoSistema(no.refId)?.rotuloCurto ?? no.refId;
+      // SPEC-110 B — a tela, pela mesma régua do rótulo curto.
+      if (no.tipo === "tela") return telaDoSistema(no.refId)?.rotuloCurto ?? no.refId;
       if (!no.refId)
         return no.componente && no.componente !== "livre"
           ? NOME_DA_OPERACAO[no.componente]
@@ -516,6 +547,23 @@ export function FluxoScreen({
     });
   }
 
+  /**
+   * SPEC-110 fatia B — a TELA entra como a função: o registro é fechado e a
+   * tela É a capacidade, então o nó já nasce com o `refId` (§2.4-10).
+   */
+  function adicionarTela(telaId: string) {
+    mudarFluxo((f) => {
+      let n = 1;
+      while (f.nos.some((no) => no.id === `${telaId}-${n}`)) n++;
+      const id = `${telaId}-${n}`;
+      setSelecao({ tipo: "no", id });
+      return {
+        ...f,
+        nos: [...f.nos, { id, tipo: "tela", refId: telaId, posicao: proximaPosicao(f.nos), parametros: {} }],
+      };
+    });
+  }
+
   /** SPEC-107 fatia B — o projeto também nasce pronto: o refId é o próprio
    * "projeto"; a demanda é o parâmetro `demandaId` (vazio = a ativa). */
   function adicionarProjeto() {
@@ -608,6 +656,25 @@ export function FluxoScreen({
       .execucoes(fluxoId)
       .then(({ execucoes }) => {
         const pendente = execucoes[0];
+        // SPEC-110 fatia B — a execução parada numa TELA também reaparece: é
+        // o mesmo dado persistido, e a porta ("abrir →") é o que a distingue
+        // do gate (que decide ali mesmo, com continuar/descartar).
+        if (pendente?.estado === "aguardando-tela") {
+          setRastro({
+            nos: pendente.nos,
+            saidas: pendente.saidas ?? {},
+            hash: pendente.hash,
+            execucaoId: pendente.id,
+            aguardandoTelaEm: pendente.id,
+          });
+          return;
+        }
+        // O retornado não some da tela: quem decidiu retornar (ou quem chega
+        // depois) precisa ver que a execução acabou ali, e por quê (D2).
+        if (pendente?.estado === "retornada") {
+          setRastro({ nos: pendente.nos, saidas: {}, hash: pendente.hash, execucaoId: pendente.id, retornada: true });
+          return;
+        }
         if (pendente?.estado !== "aguardando-confirmacao") return;
         const gate = [...pendente.nos].reverse().find((n) => n.estado === "sucesso");
         setRastro({
@@ -654,6 +721,9 @@ export function FluxoScreen({
         hash: resultado.hash,
         execucaoId: resultado.execucaoId,
         aguardandoEm: resultado.aguardandoEm,
+        // SPEC-110 fatia B — a execução pode ter parado numa TELA: a porta
+        // "abrir →" aparece no rastro, e quem revisa decide LÁ.
+        ...(resultado.aguardandoTela ? { aguardandoTelaEm: resultado.execucaoId } : {}),
       });
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
@@ -699,6 +769,9 @@ export function FluxoScreen({
         hash: resultado.hash,
         execucaoId: resultado.execucaoId,
         aguardandoEm: resultado.aguardandoEm,
+        // SPEC-110 fatia B — a execução pode ter parado numa TELA: a porta
+        // "abrir →" aparece no rastro, e quem revisa decide LÁ.
+        ...(resultado.aguardandoTela ? { aguardandoTelaEm: resultado.execucaoId } : {}),
       });
       // A fiação pode ter GRAVADO na demanda aberta (o destino da esteira):
       // ressincronizar o estado da mesa ANTES que um autosave grave o velho
@@ -726,9 +799,8 @@ export function FluxoScreen({
 
   return (
     <div data-testid="fluxo-screen" style={telaEstilo}>
-      {/* SPEC-107 G4 — a bancada de ensaios, sobre o canvas: o App a monta
-          porque é ele quem conhece a demanda aberta. */}
-      {painel}
+      {/* SPEC-110 fatia B (D4) — o painel ad hoc da bancada saiu daqui: ela
+          virou a TELA no meio da fiação, e o canvas voltou a ser só o canvas. */}
       <header style={cabecalhoEstilo}>
         <strong style={{ fontSize: 14 }}>Fluxos de integração</strong>
         <span style={{ fontSize: 12, color: "var(--texto-fraco)" }}>
@@ -839,6 +911,14 @@ export function FluxoScreen({
             <button data-testid="add-transformacao" disabled={!editavel} onClick={adicionarTransformacao} style={botao}>
               + Transformação
             </button>
+            {/* SPEC-110 fatia B — a TELA: onde a pessoa entra no fluxo. Uma
+                por botão como as funções (o registro é fechado e a tela É a
+                capacidade — não há adaptador a escolher, §2.4-10). */}
+            {TELAS_DO_SISTEMA.map((t) => (
+              <button key={t.id} data-testid={`add-tela-${t.id}`} disabled={!editavel} onClick={() => adicionarTela(t.id)} style={botao}>
+                + {t.rotuloCurto}
+              </button>
+            ))}
           </>
         )}
         <div style={{ flex: 1 }} />
@@ -1076,6 +1156,37 @@ export function FluxoScreen({
               <div data-testid="rastro-da-execucao">
                 <strong style={{ fontSize: 12.5 }}>Execução</strong>
                 <div style={{ fontSize: 10.5, color: "var(--texto-fraco)" }}>fluxo {rastro.hash}</div>
+                {/**
+                 * SPEC-110 fatia B — **a porta da tela.** A execução parou num
+                 * nó de tela: quem revisa não decide aqui (como no gate), ele
+                 * ABRE a tela, age, e decide lá. O canvas só diz onde está.
+                 */}
+                {rastro.aguardandoTelaEm && (
+                  <div
+                    data-testid="aguardando-tela"
+                    style={{ margin: "8px 0", padding: 8, border: "1px solid var(--borda-forte)", borderRadius: 8, fontSize: 12 }}
+                  >
+                    <div style={{ marginBottom: 6 }}>
+                      ⏸ Esta execução está <strong>aguardando uma tela</strong> — alguém precisa abrir, revisar e decidir
+                      (avançar ou retornar). A decisão vale de qualquer máquina: a execução está guardada no servidor.
+                    </div>
+                    <button
+                      data-testid="abrir-tela-do-stage"
+                      onClick={() => aoAbrirTelaDoStage?.(rastro.aguardandoTelaEm!)}
+                      disabled={!aoAbrirTelaDoStage}
+                      style={{ ...botaoMiudo, background: "var(--acento)", color: "#fff", border: "1px solid var(--acento)" }}
+                    >
+                      abrir a tela →
+                    </button>
+                  </div>
+                )}
+                {/* SPEC-110 B — "retornado": a execução acabou na tela, e o
+                    canvas diz o que fazer (D2 — sem re-rodar automático). */}
+                {rastro.retornada && (
+                  <div data-testid="execucao-retornada" style={{ ...avisoEstilo, color: "var(--texto-2)", margin: "8px 0" }}>
+                    ↩ Retornado — ajuste o que precisa e rode de novo. O rastro acima é o desta execução, que terminou aqui.
+                  </div>
+                )}
                 {/* SPEC-107 fatia C (§5.5) — o GATE: a execução suspendeu e o
                     resto só roda quando alguém, revisando o stage, decidir. */}
                 {rastro.aguardandoEm && (
@@ -1229,6 +1340,8 @@ function PainelDoNo({
   // SPEC-110 fatia A — o gatilho É o registro fechado, como a função: não há
   // adaptador a escolher enquanto a família tiver um só membro (§2.4-10).
   const gatilho = no.tipo === "gatilho" ? gatilhoDoSistema(no.refId) : undefined;
+  // SPEC-110 fatia B — a tela: capacidade com contrato, executor de gente.
+  const tela = no.tipo === "tela" ? telaDoSistema(no.refId) : undefined;
   // SPEC-107 fatia A — a função É a capacidade: contrato do registro fechado,
   // sem adaptador a escolher.
   const funcao = no.tipo === "funcao" ? funcaoDoSistema(no.refId) : undefined;
@@ -1247,7 +1360,18 @@ function PainelDoNo({
     <div data-testid="painel-do-no">
       <strong style={{ fontSize: 12.5 }}>{no.id}</strong>
       <div style={{ fontSize: 11.5, color: "var(--texto-2)", margin: "4px 0 8px" }}>
-        {no.tipo === "gatilho"
+        {no.tipo === "tela"
+          ? // SPEC-110 B — o painel da tela diz o que ela PEDE de quem revisa:
+            // a execução PARA aqui, e sem isso o cartão seria um nó mudo no
+            // meio da fiação.
+            (
+              <span data-testid="proposito-da-tela">
+                Tela — <strong>{tela?.nome ?? no.refId}</strong>. {tela?.descricao} A execução <strong>para</strong> neste
+                nó: alguém abre, revisa e decide — <em>Avançar</em> segue a fiação com a saída da tela, <em>Retornar</em>{" "}
+                encerra a execução.
+              </span>
+            )
+          : no.tipo === "gatilho"
           ? // SPEC-110 A — o painel do gatilho diz o PROPÓSITO dele: era isso
             // que faltava ao botão ("não entendi qual o objetivo do executar").
             (
@@ -1318,7 +1442,7 @@ function PainelDoNo({
           </select>
         </label>
       )}
-      {no.tipo !== "gatilho" && no.tipo !== "funcao" && no.tipo !== "projeto" && no.tipo !== "transformacao" && (
+      {no.tipo !== "gatilho" && no.tipo !== "tela" && no.tipo !== "funcao" && no.tipo !== "projeto" && no.tipo !== "transformacao" && (
         <label style={{ fontSize: 11.5, display: "grid", gap: 2, marginBottom: 8 }}>
           {/* §359/§2.4-1 — o rótulo nomeia O QUE se escolhe ("adaptador" é
               jargão de arquitetura e o usuário estranhou, com razão): o nó

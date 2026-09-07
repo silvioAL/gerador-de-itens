@@ -20,6 +20,13 @@ export const CORES_POR_FAMILIA: Record<TipoDeNoDoFluxo, string> = {
   // famílias existentes e de todo tipo da mesa, e legível nos dois temas
   // (medido: 3.15 no claro, 4.62 no escuro — o teste de contraste cobra ≥ 3).
   gatilho: "#ea580c",
+  /**
+   * SPEC-110 fatia B — o AZUL da TELA: onde a PESSOA entra no fluxo. Azul e
+   * não o teal da integração externa (`#0e7490`, mais escuro e esverdeado):
+   * são as duas famílias que falam com o mundo de fora, e distingui-las é o
+   * ponto — uma chama uma máquina, a outra chama alguém.
+   */
+  tela: "#0284c7",
   conector: "#0e7490",
   agente: "#9333ea",
   funcao: "#059669",
@@ -31,6 +38,9 @@ export const CORES_POR_FAMILIA: Record<TipoDeNoDoFluxo, string> = {
  * que garante que o nome existe e não infla o bundle. */
 export const ICONES_POR_FAMILIA: Record<TipoDeNoDoFluxo, string> = {
   gatilho: "Play",
+  // SPEC-110 B — a tela é onde alguém OLHA e decide; o retângulo com moldura
+  // é o desenho mais próximo disso no catálogo curado.
+  tela: "Smartphone",
   conector: "Globe",
   agente: "Zap",
   funcao: "Cog",
@@ -48,6 +58,10 @@ export const ICONES_POR_FAMILIA: Record<TipoDeNoDoFluxo, string> = {
 export const ROTULOS_POR_FAMILIA: Record<TipoDeNoDoFluxo, string> = {
   // SPEC-110 A — a família nova diz QUANDO o fluxo roda.
   gatilho: "Gatilho",
+  // SPEC-110 B — "Tela", não "Screen": o vocabulário da interface fala
+  // português, e é o nome que o usuário usou ao pedir ("abstraído como
+  // screen" era a ideia; a palavra na tela é a da casa).
+  tela: "Tela",
   conector: "Integração externa",
   agente: "Agente",
   funcao: "Função do sistema",

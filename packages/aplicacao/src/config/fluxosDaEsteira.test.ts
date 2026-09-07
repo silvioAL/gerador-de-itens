@@ -122,18 +122,39 @@ describe("fluxoDoEnsaio (SPEC-107 G4)", () => {
     expect(ensaio.origem).toBe("fabrica");
   });
 
-  it("a fiação é gatilho → projeto.desenho → funcao(ensaio), na ordem do plano", () => {
+  /**
+   * SPEC-110 fatia B (D4) — a cadeia que o usuário desenhou: *"o agente iria
+   * gerar o ensaio, e depois o usuário revisa, e decide avançar para a
+   * derivação, ou retornar"*.
+   */
+  it("a fiação é gatilho → mesa → ensaio → TELA bancada → derivação", () => {
     const fluxo = fluxoDoEnsaio();
-    expect(planoDoFluxo(fluxo).ordem).toEqual(["gatilho", "demanda", "ensaio"]);
+    expect(planoDoFluxo(fluxo).ordem).toEqual(["gatilho", "demanda", "ensaio", "bancada", "derivacao"]);
     expect(fluxo.nos.map((n) => [n.tipo, n.refId])).toEqual([
       ["gatilho", "manual"],
       ["projeto", "projeto"],
       ["funcao", "ensaio"],
+      ["tela", "bancada-de-ensaios"],
+      ["funcao", "derivacao"],
     ]);
-    expect(fluxo.arestas).toEqual([
-      { de: "gatilho", para: "demanda", mapeamento: [] },
-      { de: "demanda", para: "ensaio", mapeamento: [{ saida: "desenho", entrada: "desenho" }] },
-    ]);
+    // A leitura do ensaio é o que a tela MOSTRA — de qualquer produtor (D4).
+    expect(fluxo.arestas).toContainEqual({
+      de: "ensaio",
+      para: "bancada",
+      mapeamento: [{ saida: "leitura", entrada: "ensaio" }],
+    });
+    /**
+     * O mapeamento MEDIDO, não chutado: `derivacao` declara `desenho` e a
+     * bancada não emite desenho nenhum. Então o desenho vem da DEMANDA, e a
+     * bancada entra como GATE no caminho — aresta sem dado, com ordem.
+     * Fiar `ensaioAprovado → desenho` seria mentira de contrato.
+     */
+    expect(fluxo.arestas).toContainEqual({ de: "bancada", para: "derivacao", mapeamento: [] });
+    expect(fluxo.arestas).toContainEqual({
+      de: "demanda",
+      para: "derivacao",
+      mapeamento: [{ saida: "desenho", entrada: "desenho" }],
+    });
   });
 
   it("um declarado com o id do ensaio vence a fábrica", () => {

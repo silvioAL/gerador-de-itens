@@ -3,6 +3,7 @@ import { sanearCamposDaTransformacao, validarCamposDaTransformacao } from "../ca
 import { FUNCOES_DO_SISTEMA, funcaoDoSistema } from "./funcoes.js";
 import { GATILHOS_DO_SISTEMA, ID_DO_NO_DE_GATILHO, gatilhoDoSistema } from "./gatilhos.js";
 import { REF_DO_PROJETO } from "./projeto.js";
+import { TELAS_DO_SISTEMA, telaDoSistema } from "./telas.js";
 import {
   ConfigInvalida,
   destinosDaOperacao,
@@ -41,8 +42,12 @@ import {
  * no-op deliberado, que carimba a origem do disparo no rastro). Ele não faz
  * trabalho; ele diz QUANDO o fluxo roda — e é o que dá propósito legível ao
  * botão, que virou o gesto do gatilho manual ("▶ Rodar agora").
+ *
+ * SPEC-110 fatia B — `tela` é o nó cujo executor é GENTE: a execução suspende
+ * nele e só termina quando alguém decide (avançar/retornar). O executor
+ * existe (a mecânica retomável da SPEC-107 C) — o que muda é quem o roda.
  */
-export const TIPOS_DE_NO_DO_FLUXO = ["gatilho", "conector", "agente", "funcao", "projeto", "transformacao"] as const;
+export const TIPOS_DE_NO_DO_FLUXO = ["gatilho", "conector", "agente", "funcao", "projeto", "transformacao", "tela"] as const;
 export type TipoDeNoDoFluxo = (typeof TIPOS_DE_NO_DO_FLUXO)[number];
 
 export interface NoDoFluxo {
@@ -419,6 +424,24 @@ export const ID_DO_FLUXO_DO_ENSAIO = "ensaio-de-cenarios";
  * Diferente da exportação e da publicação, não depende de destino nenhum:
  * ensaiar é capacidade do motor, então a fiação SEMPRE existe. Declarado
  * vence fábrica no mesmo id, como sempre.
+ *
+ * ## SPEC-110 fatia B (D4) — a cadeia que o usuário desenhou
+ *
+ * `gatilho → mesa(demanda) → ensaio → TELA bancada → (avançar) → derivação`,
+ * nas palavras dele: *"o agente iria gerar o ensaio, e depois o usuário
+ * revisa, e decide avançar para a derivação, ou retornar"*.
+ *
+ * **O mapeamento foi MEDIDO antes de fiar** (a SPEC mandava): `derivacao`
+ * declara UMA entrada, `desenho (objeto, obrigatório)`; a bancada emite
+ * `decisao` e `ensaioAprovado` — nenhum desenho. Então o desenho vai da
+ * DEMANDA direto para a derivação, e a bancada entra como **gate no
+ * caminho**: a aresta `bancada → derivacao` não carrega dado, carrega ORDEM
+ * (a derivação não roda enquanto ninguém avançar). Fiar
+ * `bancada.ensaioAprovado → derivacao.desenho` seria mentira de contrato —
+ * uma leitura de ensaio não é um desenho.
+ *
+ * Quem gera o ensaio pode virar um agente amanhã sem tocar na tela (D4): a
+ * bancada consome `ensaio` de QUALQUER produtor.
  */
 export function fluxoDoEnsaio(): FluxoEmVigor {
   return {
@@ -428,10 +451,21 @@ export function fluxoDoEnsaio(): FluxoEmVigor {
       noDeGatilhoManual({ x: 60, y: 120 }),
       { id: "demanda", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 340, y: 120 }, parametros: {} },
       { id: "ensaio", tipo: "funcao", refId: "ensaio", posicao: { x: 620, y: 120 }, parametros: {} },
+      { id: "bancada", tipo: "tela", refId: "bancada-de-ensaios", posicao: { x: 900, y: 120 }, parametros: {} },
+      { id: "derivacao", tipo: "funcao", refId: "derivacao", posicao: { x: 1180, y: 120 }, parametros: {} },
     ],
     arestas: [
       { de: ID_DO_NO_DE_GATILHO, para: "demanda", mapeamento: [] },
       { de: "demanda", para: "ensaio", mapeamento: [{ saida: "desenho", entrada: "desenho" }] },
+      {
+        de: "ensaio",
+        para: "bancada",
+        mapeamento: [{ saida: "leitura", entrada: "ensaio" }],
+      },
+      { de: "demanda", para: "bancada", mapeamento: [{ saida: "desenho", entrada: "desenho" }] },
+      // O GATE no caminho: sem dado, com ordem — a derivação espera o Avançar.
+      { de: "bancada", para: "derivacao", mapeamento: [] },
+      { de: "demanda", para: "derivacao", mapeamento: [{ saida: "desenho", entrada: "desenho" }] },
     ],
     origem: "fabrica",
   };
@@ -509,6 +543,18 @@ export function validarEscritaFluxos(documento: unknown): void {
           );
         }
         gatilhos.push(noId);
+      }
+      /**
+       * SPEC-110 fatia B — a tela também aponta para um registro. Hoje só as
+       * do SISTEMA existem; a fatia C acrescenta as DECLARADAS pelo time, e
+       * esta régua passa a consultar as duas (a validação de escrita não tem
+       * o documento de telas em mãos aqui — quem valida a fiação contra as
+       * declaradas é a rota, que tem).
+       */
+      if (no.tipo === "tela" && !telaDoSistema(no.refId.trim()) && !no.refId.trim().startsWith("tela:")) {
+        throw new ConfigInvalida(
+          `no fluxo "${id}", o nó "${noId}" aponta para a tela "${no.refId.trim()}", que não existe (telas do sistema: ${TELAS_DO_SISTEMA.map((t) => t.id).join(", ")}; telas do time usam o prefixo "tela:")`
+        );
       }
       // O registro de funções é fechado e vive no código — um refId fora dele
       // nunca vai ganhar executor, e falhar só na execução seria o silêncio

@@ -1626,6 +1626,31 @@ export interface RespostaDeExecucao {
   nos: RastroDoNoExecutado[];
   saidas: Record<string, Record<string, unknown>>;
   aguardandoEm?: string;
+  /** SPEC-110 fatia B — a execução parou NUMA TELA: alguém precisa abrir,
+   * agir e decidir (diferente do gate, que pausa depois de um nó que rodou). */
+  aguardandoTela?: { noId: string; refId: string; entradas: Record<string, unknown> };
+}
+
+/**
+ * SPEC-110 fatia B — **o que a tela mostra**, servido pelo servidor: o
+ * contrato declarado dela mais as entradas que a fiação trouxe. A tela do
+ * navegador renderiza isto — não recalcula mapeamento (§263).
+ */
+export interface StageDaTela {
+  execucaoId: string;
+  fluxoId: string;
+  nome: string;
+  timeId: string | null;
+  noId: string;
+  nomeDoNo: string | null;
+  tela: {
+    id: string;
+    nome: string;
+    descricao: string;
+    entrada: { chave: string; rotulo: string; tipo: string; obrigatorio?: boolean }[];
+    saida: { chave: string; rotulo: string; tipo: string; obrigatorio?: boolean }[];
+  };
+  entradas: Record<string, unknown>;
 }
 
 /** SPEC-107 fatia D — os eventos do modo AO VIVO (NDJSON, um por linha). */
@@ -1743,6 +1768,25 @@ export const apiExecucaoDeFluxo = {
     }),
   descartar: (execucaoId: string) =>
     requisitar<{ ok: boolean }>(`/fluxos/execucoes/${encodeURIComponent(execucaoId)}/descartar`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
+  /**
+   * SPEC-110 fatia B (D2) — **o stage de uma tela**: o que ela vai mostrar,
+   * resolvido pelo servidor com o MESMO executor (§263). O navegador não
+   * recalcula mapeamento nenhum — ele renderiza o que chega.
+   */
+  stageDaTela: (execucaoId: string) =>
+    requisitar<StageDaTela>(`/fluxos/execucoes/${encodeURIComponent(execucaoId)}/tela`),
+  /** O Avançar: continua o fluxo com a decisão de quem revisou. */
+  avancarNaTela: (execucaoId: string, saidaDaTela: Record<string, unknown>) =>
+    requisitar<RespostaDeExecucao>(`/fluxos/execucoes/${encodeURIComponent(execucaoId)}/continuar`, {
+      method: "POST",
+      body: JSON.stringify({ saidaDaTela: { ...saidaDaTela, decisao: "avancar" } }),
+    }),
+  /** O Retornar: a execução ENCERRA (D2 — re-rodar o anterior é dívida). */
+  retornarDaTela: (execucaoId: string) =>
+    requisitar<{ ok: boolean; estado: string }>(`/fluxos/execucoes/${encodeURIComponent(execucaoId)}/retornar`, {
       method: "POST",
       body: JSON.stringify({}),
     }),

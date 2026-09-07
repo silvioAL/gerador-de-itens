@@ -64,7 +64,10 @@ import {
   apiExportador,
   type SugestoesDeStack,
   apiIa,
+  /** SPEC-110 fatia B — o stage de uma tela: o que ela mostra. */
+  type StageDaTela,
 } from "./api/client";
+import { MolduraDoStage } from "./fluxo/MolduraDoStage";
 import { useSessao } from "./auth/useSessao";
 import { LoginScreen } from "./auth/LoginScreen";
 import { useQuebra } from "./state/useQuebra";
@@ -84,7 +87,7 @@ import { BancadaDeEnsaios, type LeituraDoEnsaio } from "./fluxo/BancadaDeEnsaios
 import { idDaRegraDeForma } from "./config/FormaDoDesenho";
 import { ConfigurarPanel } from "./assistente/ConfigurarPanel";
 import { JourneyModal, type AbaJornada } from "./demo/JourneyModal";
-import { contextoDoProdutoEmTexto } from "@gerador/aplicacao";
+import { contextoDoProdutoEmTexto, ID_DO_FLUXO_DA_ESTEIRA, ID_DO_FLUXO_DO_ENSAIO } from "@gerador/aplicacao";
 import { FluxoScreen } from "./fluxo/FluxoScreen";
 import { ConfigScreen, type AbaConfig } from "./config/ConfigScreen";
 import { TourOverlay } from "./demo/TourOverlay";
@@ -529,7 +532,72 @@ function AppCarregado({
   // SPEC-107 G4 — a tela de ensaios morreu: a bancada vive junto do fluxo
   // (`#/fluxo/ensaio`), medindo pela fiação semeada em vez de simular aqui.
   const mostrarFluxos = rota.tela === "fluxo";
-  const bancadaDeEnsaiosAberta = rota.tela === "fluxo" && rota.bancada === "ensaio";
+  /**
+   * SPEC-110 fatia B (D2/D17c) — **o STAGE: uma execução parada numa tela.**
+   *
+   * O stage é estado do SHELL, não da tela: a barra Retornar/Avançar é uma
+   * moldura montada ao redor do que já existe (a bancada, o documento, a
+   * mesa), e por isso ela sobrevive à navegação para a tela de destino. A
+   * mesa e o documento não ganham prop nenhuma — não sabem que estão num
+   * fluxo, que é exatamente o "mínimo de impacto" que o usuário pediu.
+   */
+  const [stage, setStage] = useState<StageDaTela | null>(null);
+  const [stageOcupado, setStageOcupado] = useState(false);
+  const [erroDoStage, setErroDoStage] = useState<string | null>(null);
+  useEffect(() => {
+    if (rota.tela !== "telaDoStage") return;
+    let vivo = true;
+    setErroDoStage(null);
+    void apiExecucaoDeFluxo
+      .stageDaTela(rota.execucaoId)
+      .then((s) => {
+        if (!vivo) return;
+        setStage(s);
+        /**
+         * As telas do SISTEMA delegam para a tela que já existe (D17c): o
+         * documento e a mesa são o corpo, e a moldura fica por cima. A
+         * bancada é a única que o próprio stage monta, porque ela nasceu como
+         * painel e não como rota.
+         */
+        if (s.tela.id === "documento") navegar({ tela: "documento" });
+        if (s.tela.id === "mesa") navegar({ tela: "canvas" });
+      })
+      .catch((e) => {
+        if (!vivo) return;
+        // Execução que não está mais parada numa tela (alguém já decidiu de
+        // outra máquina) não vira tela branca: volta para o canvas com o
+        // motivo (§2.4-3).
+        setStage(null);
+        setErroDoStage(e instanceof Error ? e.message : String(e));
+        navegar({ tela: "fluxo" });
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [rota, navegar]);
+  const mostrarStageDaBancada = rota.tela === "telaDoStage" && stage?.tela.id === "bancada-de-ensaios";
+
+  /** SPEC-110 B — o Avançar e o Retornar da moldura, num lugar só. */
+  const decidirNoStage = useCallback(
+    async (decisao: "avancar" | "retornar", saida: Record<string, unknown> = {}) => {
+      if (!stage) return;
+      setStageOcupado(true);
+      setErroDoStage(null);
+      try {
+        if (decisao === "avancar") await apiExecucaoDeFluxo.avancarNaTela(stage.execucaoId, saida);
+        else await apiExecucaoDeFluxo.retornarDaTela(stage.execucaoId);
+        setStage(null);
+        // O destino é o canvas do fluxo: é lá que o rastro conta o que
+        // aconteceu depois da decisão (e o "retornado" aparece).
+        navegar({ tela: "fluxo", fluxoId: stage.fluxoId });
+      } catch (e) {
+        setErroDoStage(e instanceof Error ? e.message : String(e));
+      } finally {
+        setStageOcupado(false);
+      }
+    },
+    [stage, navegar]
+  );
   // SPEC-41 Parte B — os itens materializados da quebra aberta. A fonte de
   // verdade é o server (persistem por quebra); o estado local é o espelho da
   // última geração/carga desta sessão.
@@ -848,7 +916,14 @@ function AppCarregado({
     if (!quebraId) {
       throw new Error("salve a demanda antes de ensaiar — a fiação lê a demanda salva, e esta ainda não tem endereço");
     }
-    const r = await apiExecucaoDeFluxo.executar("ensaio-de-cenarios", quebra.time ?? timeAtivo, undefined, {
+    /**
+     * SPEC-110 fatia B — `ateNo: "ensaio"`. A fiação do ensaio agora atravessa
+     * a TELA da bancada; RE-MEDIR um cenário de dentro dela não pode suspender
+     * uma execução nova a cada clique (o risco R1 da SPEC, execuções paradas
+     * acumulando). O corte de ancestrais é exatamente o que a SPEC-105 §D
+     * construiu para isto: "inspecionar o meio sem pagar nem disparar o resto".
+     */
+    const r = await apiExecucaoDeFluxo.executar("ensaio-de-cenarios", quebra.time ?? timeAtivo, "ensaio", {
       demanda: { demandaId: quebraId },
       ...(cenario ? { ensaio: { cenario } } : {}),
     });
@@ -1384,7 +1459,15 @@ function AppCarregado({
       );
     },
     // SPEC-109 C — a SistemaScreen morreu; o mapa vivo é o canvas de fluxos.
-    abrirFluxos: () => navegar({ tela: "fluxo" }),
+    /**
+     * SPEC-110 fatia B — o tour abre a ESTEIRA, não "o primeiro fluxo do
+     * time". Os dois passos que chamam isto NARRAM a esteira ("a esteira de
+     * agentes derivada da configuração, quem escreve cada parte do item, na
+     * ordem"), e `#/fluxo` sem id abre o primeiro DECLARADO — que num time com
+     * fluxos próprios é qualquer coisa. Explicar uma tela e mostrar outra é o
+     * §390 renascendo, e foi assim que o E2E do tour caiu.
+     */
+    abrirFluxos: () => navegar({ tela: "fluxo", fluxoId: ID_DO_FLUXO_DA_ESTEIRA }),
     abrirProposito: () => setAbaAssistente("contexto"),
     fecharAssistente: () => setAbaAssistente(null),
     abrirConversa: () => setAbaAssistente("conversa"),
@@ -1504,6 +1587,31 @@ function AppCarregado({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", fontFamily: "system-ui, sans-serif" }}>
+      {/**
+       * SPEC-110 fatia B (D17c) — **a moldura do stage, montada pelo SHELL.**
+       *
+       * As telas `documento` e `mesa` são as que já existem: o stage navega
+       * para elas e a barra Retornar/Avançar fica por cima, aqui no topo do
+       * app. É o "mínimo de impacto na mesa de projeto" que o usuário pediu —
+       * nenhuma delas recebe prop nova nem sabe que está num fluxo. (A
+       * bancada é a exceção: ela nasceu como painel, não como rota, e por
+       * isso o stage a monta como CORPO, mais abaixo.)
+       */}
+      {stage && stage.tela.id !== "bancada-de-ensaios" && (
+        <div data-testid="barra-do-stage" style={{ flexShrink: 0 }}>
+          <MolduraDoStage
+            nomeDoFluxo={stage.nome}
+            nomeDaTela={stage.nomeDoNo ?? stage.tela.nome}
+            descricao={stage.tela.descricao}
+            ocupado={stageOcupado}
+            erro={erroDoStage}
+            onRetornar={() => void decidirNoStage("retornar")}
+            onAvancar={() => void decidirNoStage("avancar")}
+          >
+            {null}
+          </MolduraDoStage>
+        </div>
+      )}
       <header
         style={{
           display: "flex",
@@ -1837,10 +1945,36 @@ function AppCarregado({
           }))
         }
         onSimular={() => {
-          // G4 — a bancada mede a demanda SALVA (a fiação lê pelo id): a porta
-          // garante o salvamento antes de navegar, como o atalho de publicar.
-          void persistencia.salvar();
-          navegar({ tela: "fluxo", bancada: "ensaio" });
+          /**
+           * SPEC-110 fatia B (D4) — **"Simular" passou a EXECUTAR o fluxo.**
+           *
+           * Antes ele só navegava para o painel ad hoc. Agora a bancada é uma
+           * TELA no meio da fiação do ensaio, e o gesto honesto é disparar o
+           * fluxo (o gatilho manual): a execução roda a demanda e o ensaio, e
+           * PARA na bancada — que é onde a pessoa entra. Se algo falhar antes
+           * dela, o canvas do fluxo mostra o rastro com o motivo, em vez de
+           * uma bancada vazia sem explicação.
+           */
+          void (async () => {
+            await persistencia.salvar();
+            const quebraId = persistencia.quebraId;
+            try {
+              const r = await apiExecucaoDeFluxo.executar(
+                ID_DO_FLUXO_DO_ENSAIO,
+                quebra.time ?? timeAtivo,
+                undefined,
+                quebraId ? { demanda: { demandaId: quebraId } } : undefined
+              );
+              if (r.aguardandoTela) {
+                navegar({ tela: "telaDoStage", execucaoId: r.execucaoId });
+                return;
+              }
+            } catch {
+              // Silêncio aqui seria pior: o canvas do fluxo mostra o erro da
+              // execução no rastro, e é para lá que a navegação leva.
+            }
+            navegar({ tela: "fluxo", fluxoId: ID_DO_FLUXO_DO_ENSAIO });
+          })();
         }}
         onSelecionar={setSelecionadoId}
         necessidades={quebra.necessidades}
@@ -2062,7 +2196,10 @@ function AppCarregado({
           // SPEC-107 G4 — quem chega pela porta da bancada abre NO fluxo do
           // ensaio; G5c — `#/fluxo/<id>` abre em qualquer fluxo (assistir a
           // esteira é uma URL mandável).
-          abrirFluxoId={bancadaDeEnsaiosAberta ? "ensaio-de-cenarios" : rota.tela === "fluxo" ? rota.fluxoId : undefined}
+          abrirFluxoId={rota.tela === "fluxo" ? rota.fluxoId : undefined}
+          // SPEC-110 fatia B — a porta da tela parada: o canvas mostra
+          // "aguardando: <tela> — abrir →" e o clique leva ao stage.
+          aoAbrirTelaDoStage={(execucaoId) => navegar({ tela: "telaDoStage", execucaoId })}
           // G5c — executar do canvas aponta a demanda aberta na mesa; e o que
           // a fiação GRAVOU nela volta para o estado da mesa na hora, senão o
           // próximo autosave apagaria a escrita do servidor (§250, medido).
@@ -2075,9 +2212,40 @@ function AppCarregado({
           aoAbrirConfigDosPapeis={() => navegar({ tela: "config", area: "pipeline" })}
           // SPEC-109 D — o template da especificação, no nó que o consome.
           aoAbrirConfigDaEspecificacao={() => navegar({ tela: "config", area: "especificacao" })}
-          painel={
-            bancadaDeEnsaiosAberta ? (
+        />
+      )}
+
+      {/**
+       * SPEC-110 fatia B (D4) — **o painel ad hoc da bancada MORREU.**
+       *
+       * Ela era montada pelo App SOBRE o canvas quando a rota pedia — uma
+       * tela sem lugar no desenho, aberta por um botão que ninguém ligava ao
+       * fluxo. Agora é a TELA `bancada-de-ensaios` no meio da fiação do
+       * ensaio: a execução PARA nela, e o stage a monta com a moldura
+       * Retornar/Avançar por cima (D17c — a bancada não mudou por dentro,
+       * não ganhou prop nenhuma, não sabe que está num fluxo).
+       */}
+      {mostrarStageDaBancada && stage && (
+        <MolduraDoStage
+          nomeDoFluxo={stage.nome}
+          nomeDaTela={stage.nomeDoNo ?? stage.tela.nome}
+          ocupado={stageOcupado}
+          erro={erroDoStage}
+          onRetornar={() => void decidirNoStage("retornar")}
+          // O que a tela APROVA vai adiante: a leitura que estava no stage é
+          // o que quem revisou chancelou ao avançar.
+          onAvancar={() => void decidirNoStage("avancar", { ensaioAprovado: stage.entradas.ensaio ?? null })}
+        >
               <BancadaDeEnsaios
+                // D17c — no stage ela é BLOCO, não gaveta: a moldura fica
+                // acima dela, e não atrás (medido: o Avançar ficava coberto).
+                estiloDaRaiz={{
+                  position: "static",
+                  width: "auto",
+                  boxShadow: "none",
+                  borderLeft: "none",
+                  height: "100%",
+                }}
                 diagrama={quebra.diagrama}
                 config={diagramaConfig}
                 cenarios={quebra.cenariosDeLentidao ?? []}
@@ -2156,9 +2324,7 @@ function AppCarregado({
                   }));
                 }}
               />
-            ) : undefined
-          }
-        />
+        </MolduraDoStage>
       )}
 
       {/* SPEC-109 C — a SistemaScreen morreu: o canvas de fluxos é o mapa
@@ -2223,7 +2389,20 @@ function AppCarregado({
           config={diagramaConfig}
           cenarios={cenarios}
           onFechar={fecharJornada}
-          onCarregarCenario={(q) => aoAbrir(q)}
+          /**
+           * SPEC-110 fatia B — **o exemplo carregado é SEU, não do exemplo.**
+           *
+           * Os cenários de demonstração vêm com o time em que foram escritos
+           * (`time-credito`, em `config/cenarios/*.json`), e `aoAbrir` copiava
+           * o campo inteiro: quem carregava um exemplo ficava com uma demanda
+           * de um time onde não escreve, e o Salvar respondia 403 sem dizer
+           * por quê. O defeito é antigo e passava despercebido porque nada
+           * cobrava a demanda estar NO BANCO — até a bancada virar uma tela
+           * dentro da fiação (D4), que só roda sobre demanda salva.
+           *
+           * Carregar um exemplo é adotá-lo: o time é o de quem carrega.
+           */
+          onCarregarCenario={(q) => aoAbrir({ ...q, time: timeAtivo })}
           onAdicionarCenario={adicionarCenario}
           onIniciarTour={iniciarTour}
           onIniciarTourDeConfiguracao={iniciarTourDeConfiguracao}

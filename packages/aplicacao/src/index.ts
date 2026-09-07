@@ -188,6 +188,16 @@ export {
 } from "./casos-de-uso/funcoes.js";
 /** SPEC-107 fatia B — o PROJETO como nó, nas duas direções. */
 export { PROJETO_DO_SISTEMA, REF_DO_PROJETO, type ProjetoDoSistema } from "./config/projeto.js";
+/** SPEC-110 fatia B — a tela como nó: onde a pessoa entra no fluxo. */
+export {
+  CAMPO_DA_DECISAO,
+  DECISOES_DA_TELA,
+  TELAS_DO_SISTEMA,
+  problemaNaSaidaDaTela,
+  telaDoSistema,
+  type DecisaoDaTela,
+  type TelaDoSistema,
+} from "./config/telas.js";
 /** SPEC-110 fatia A — o gatilho como nó: o fluxo diz QUANDO roda. */
 export {
   GATILHOS_DO_SISTEMA,
