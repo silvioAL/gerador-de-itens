@@ -243,6 +243,24 @@ aba de config — nenhum componente do canvas fala com ele.
   tela. Pools/raias visuais BPMN completas NÃO entram (o agrupamento por
   etapa na galeria + o fluxo-mestre cobrem a necessidade; raias são
   evolução se o uso pedir). Detalhe na fatia J.
+- **D18.** **Toda configuração nova persiste na base devida — e a prova
+  cobra isso** (pedido literal: *"as configurações devem ser feitas nas
+  devidas bases para que seja utilizável"*). O mapa das casas: screens
+  declaradas, ícones/nomes da galeria e fluxos → `config_documentos` (por
+  time); agendamentos → tabela própria `fluxo_agendamentos`; conexões de
+  banco/segredos → cofre (NUNCA no documento); execuções/stages →
+  `fluxo_execucoes`. Nada vive só em memória ou localStorage. **Prova
+  obrigatória em toda fatia**: o E2E inclui F5 E, onde a config é do
+  server, sobrevivência a restart (`docker compose restart server` na
+  validação real) — configurável que evapora é feature de demonstração,
+  não produto.
+- **D19.** **Toda fatia que muda um gesto de uso atualiza o "Como usar" e
+  os tours NO MESMO PR** (pedido literal: *"fazer os testes e a
+  apresentação do como funciona"*). O manual da SPEC-109 E
+  (`JourneyModal`, aba "Como usar") e os passos de tour que citem a tela
+  mudada acompanham a fatia — apresentação defasada é a queixa "em como
+  funciona não explica como usar" renascendo. A fatia K fecha com a
+  conferência integral.
 - **D17.** **O acionador mora NA tela, enlatado** — pedido literal: *"o
   acionador pode ficar na própria tela, seja para próxima tela ou para
   seguir, isso precisa ficar enlatado em componentes prontos… mínimo de
@@ -642,6 +660,24 @@ dublê pausando na bancada (avançar segue para a esteira; os subfluxos
 executados aparecem no histórico como execuções próprias linkadas), e
 duplo-clique num nó de subfluxo abre o fluxo certo.
 
+### Fatia K — a apresentação: o "Como usar" e os tours no mundo novo (D19)
+
+> Última fatia, depois de tudo mergeado — mas ela NÃO desobriga as
+> anteriores: cada fatia atualiza o pedaço dela do manual/tour no próprio
+> PR (D19); esta é a conferência integral.
+
+- Reescrever a aba **"Como usar"** (JourneyModal) para o mundo pós-110: os
+  seis passos ganham gatilho ("todo fluxo diz quando roda"), galeria ("os
+  fluxos e as suas telas moram aqui"), screens (criar, fiar, avançar/
+  retornar) e a jornada-mestre.
+- Revisar os DOIS tours: o passo "O encanamento é o canvas" passa pela
+  galeria; o tour de configuração mostra criar uma screen simples.
+- E2E da jornada atualizado; validação visual dos dois temas com
+  screenshots das telas novas (galeria, screen em stage, editor).
+- Prova de D18 em rodada integral: subir a stack, `docker compose restart
+  server`, e conferir que fluxos, screens, ícones e agendamentos
+  continuam lá — a rodada de fechamento roda isso explicitamente.
+
 ## 4.x O caso-norte (para onde tudo isto aponta)
 
 Nas palavras do usuário: *"no futuro, schedulers que buscam dados em
@@ -665,6 +701,33 @@ desenho. Quando a 110 fechar, o que falta para o caso-norte é exatamente o
 recorte da SPEC-108: laço/paginação, escrita em banco, Teams. Manter este
 caso como teste de mesa ao decidir contratos: se uma decisão de fatia
 tornar este fluxo impossível de fiar, a decisão está errada.
+
+## 4.y §8 — A régua da expectativa (revisão pedida: "vai ficar parecido
+## com um nocode/low-code?")
+
+**Sim, substancialmente — para o DOMÍNIO do produto.** Depois da 110+111:
+gatilhos visíveis (manual/agendado), telas como nós com avançar/retornar,
+screens criadas pelo usuário (dentro de fluxo e standalone por link),
+dados como componentes (demanda ler/gravar, Postgres-consulta,
+config-com-aprovação, spec por item), galeria, subfluxo e fluxo-mestre.
+
+**O que AINDA não terá — a lista anti-frustração, com endereço:**
+
+| Lacuna | Onde fica |
+|---|---|
+| Condicional (if/branch) e laço — o fluxo é linha reta | SPEC-108 (o laço nasce com o Jira paginado); condicional SEM spec ainda |
+| Gatilho por evento externo (webhook de entrada) | SEM spec ainda |
+| Biblioteca de conectores prontos (Slack, Sheets, 1-clique) | Não existe — catálogo declarado pelo usuário + o que a 108 trouxer |
+| Tratamento de erro configurável (retry/fallback por nó) | SEM spec; falha é nomeada no rastro e para |
+| Fórmulas/expressões nos mapeamentos | Só a transformação simples; sem linguagem de expressão |
+| Versionamento/rollback de fluxos | Não existe (documento único por time) |
+| Painel de operação (execuções, re-rodar, alertas) | Só o histórico cru |
+| Escrita em banco, Mongo, Teams | SPEC-108 |
+
+As três primeiras linhas são o maior risco de expectativa de quem pensa
+"n8n". Se alguma virar essencial, promover ANTES de implementar (a
+condicional simples é a mais barata de adiantar) — decidir com o usuário,
+não sozinho.
 
 ## 5. O que esta SPEC NÃO faz (e onde fica)
 
