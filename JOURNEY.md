@@ -17146,3 +17146,28 @@ As outras queixas viraram as fatias B–E da SPEC-109: vocabulário
 genérico/configurável (integração externa → agente → artefato), a morte da
 SistemaScreen e da aba Pipeline de IA, o template de especificação como
 propriedade do artefato, e o "Como funciona" que ensine a USAR.
+
+## §387 — SPEC-109 B: o vocabulário que o usuário pediu, e o nome que a pessoa dá
+
+"O vocabulário poderia ser de integração externa → agente → artefato, por
+exemplo" — e a medição mostrou que a paleta fazia o contrário do que o §368
+prometeu: um botão por operação do gateway ("+ Envio de itens", "+ Publicação
+de documento"…) é instância fantasiada de componente. Três movimentos:
+
+1. **A paleta colapsou por família.** "+ Integração externa" (nó conector sem
+   `componente`) abre o catálogo INTEIRO no painel — a operação é do conector
+   escolhido, não do botão. "+ Chamada externa" morreu junto: chamada livre é
+   só mais uma integração do catálogo. Nenhum E2E clicava nos botões por
+   operação (medido antes — o raio era pequeno).
+
+2. **As famílias falam a língua de quem monta.** `ROTULOS_POR_FAMILIA`:
+   "Conector" → "Integração externa"; "Projeto" → "Mesa de projeto". A
+   decisão antiga do §2.3 ("mesa é o nome da tela; o componente chama-se
+   Projeto") caiu pelo pedido literal — a mesa É o componente que se abre, e
+   `PROJETO_DO_SISTEMA.nome` acompanha.
+
+3. **O nome do nó é da pessoa (n8n).** `NoDoFluxo.nome` opcional: escrito,
+   vence qualquer rótulo derivado no cartão; vazio, o cartão ecoa o que o nó
+   referencia (a régua da casa). Normaliza aparado, vazio não vira dado
+   (§248: sem o `nome` no normalizar, o teste do round-trip fica vermelho —
+   trio rodado), e o E2E prova o cartão ecoando e o documento persistindo.

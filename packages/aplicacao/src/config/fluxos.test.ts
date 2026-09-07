@@ -45,6 +45,25 @@ describe("normalizarFluxos (SPEC-105 fatia C)", () => {
     // laço é a validação de ESCRITA, com a mensagem de ciclo.
     expect(fluxos[0].arestas).toEqual([{ de: "a", para: "a", mapeamento: [] }]);
   });
+
+  /** SPEC-109 fatia B — o nome que a pessoa dá ao nó (n8n) atravessa o
+   * salvar; vazio ou só-espaço não vira dado. */
+  it("o nome do nó persiste aparado, e vazio não entra", () => {
+    const { fluxos } = normalizarFluxos({
+      fluxos: [
+        {
+          id: "f",
+          nos: [
+            { id: "a", tipo: "conector", refId: "c1", nome: "  Ler volumetria do legado  " },
+            { id: "b", tipo: "conector", refId: "c2", nome: "   " },
+          ],
+          arestas: [],
+        },
+      ],
+    });
+    expect(fluxos[0].nos[0].nome).toBe("Ler volumetria do legado");
+    expect("nome" in fluxos[0].nos[1]).toBe(false);
+  });
 });
 
 describe("planoDoFluxo — a MESMA ordenação do desenho (§4.4)", () => {

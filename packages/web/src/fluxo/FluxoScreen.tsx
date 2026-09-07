@@ -22,7 +22,6 @@ import {
   avisosDeMapeamento,
   mensagemDeCiclo,
   NOME_DA_OPERACAO,
-  OPERACOES_DO_GATEWAY,
   planoDoFluxo,
   preambuloDoPapel,
   type ArestaDoFluxo,
@@ -241,13 +240,16 @@ export function FluxoScreen({
   }
 
   const rotuloDoRef = useCallback(
-    (no: Pick<NoDoFluxo, "tipo" | "refId" | "componente">) => {
+    (no: Pick<NoDoFluxo, "tipo" | "refId" | "componente" | "nome">) => {
+      // SPEC-109 B — o nome que a PESSOA deu ao nó vence qualquer derivado:
+      // o cartão ecoa o que ela escreveu, como tudo na casa.
+      if (no.nome?.trim()) return no.nome.trim();
       if (!no.refId)
         return no.componente && no.componente !== "livre"
           ? NOME_DA_OPERACAO[no.componente]
           : no.tipo === "agente"
             ? "(escolha o papel)"
-            : "(escolha o conector)";
+            : "(escolha a integração)";
       if (no.tipo === "funcao") return funcaoDoSistema(no.refId)?.nome ?? no.refId;
       if (no.tipo === "projeto") return PROJETO_DO_SISTEMA.nome;
       if (no.tipo === "transformacao") {
@@ -328,14 +330,23 @@ export function FluxoScreen({
    * adaptadores (o endereço/papel concreto, escolhido nas propriedades). O nó
    * nasce do componente; quando só existe UM adaptador compatível, ele já vem
    * escolhido — quando há vários (ou nenhum), o painel pede.
+   *
+   * SPEC-109 fatia B — a paleta COLAPSOU por família: um botão por operação
+   * do gateway era a paleta falando por instância ("+ Envio de itens"…),
+   * exatamente o que o §368 prometeu não fazer. "+ Integração externa"
+   * (componente ausente) abre o catálogo INTEIRO no painel — a operação é do
+   * conector escolhido, não do botão.
    */
-  function adicionarComponente(tipo: NoDoFluxo["tipo"], componente: OperacaoDoGateway | "livre" | "agente") {
+  function adicionarComponente(tipo: NoDoFluxo["tipo"], componente?: OperacaoDoGateway | "livre" | "agente") {
     const compativeis =
       tipo === "agente"
         ? papeis.filter((p) => p.ativo).map((p) => p.id)
-        : catalogo.filter((c) => (componente === "livre" ? !c.operacao : c.operacao === componente)).map((c) => c.id);
+        : catalogo
+            .filter((c) => (componente === undefined ? true : componente === "livre" ? !c.operacao : c.operacao === componente))
+            .map((c) => c.id);
     const refId = compativeis.length === 1 ? compativeis[0] : "";
-    const base = componente === "agente" ? "agente" : componente === "livre" ? "chamada" : componente;
+    const base =
+      componente === "agente" ? "agente" : componente === undefined ? "integracao" : componente === "livre" ? "chamada" : componente;
     mudarFluxo((f) => {
       let n = 1;
       while (f.nos.some((no) => no.id === `${base}-${n}`)) n++;
@@ -351,7 +362,7 @@ export function FluxoScreen({
             refId,
             posicao: { x: 80 + f.nos.length * 60, y: 80 + f.nos.length * 40 },
             parametros: {},
-            ...(tipo === "conector" && componente !== "agente" ? { componente } : {}),
+            ...(tipo === "conector" && componente !== undefined && componente !== "agente" ? { componente } : {}),
           },
         ],
       };
@@ -654,19 +665,16 @@ export function FluxoScreen({
               + Novo fluxo
             </button>
             <span style={{ width: 12 }} />
-            {/* §368 — a paleta fala a língua da MESA: componentes, não
-                instâncias. O adaptador (o endereço/papel concreto) se escolhe
-                nas propriedades do nó — o hexagonal da casa, na tela. */}
-            {OPERACOES_DO_GATEWAY.map((op) => (
-              <button key={op} data-testid={`add-${op}`} disabled={!editavel} onClick={() => adicionarComponente("conector", op)} style={botao}>
-                + {NOME_DA_OPERACAO[op]}
-              </button>
-            ))}
+            {/* SPEC-109 fatia B — a paleta fala por FAMÍLIA (integração
+                externa → agente → …): um botão por operação era instância
+                fantasiada de componente. A integração concreta (envio,
+                publicação, ADR, leitor, chamada livre) se escolhe no painel,
+                pelo catálogo — o hexagonal da casa, na tela. */}
+            <button data-testid="add-integracao" disabled={!editavel} onClick={() => adicionarComponente("conector")} style={botao}>
+              + Integração externa
+            </button>
             <button data-testid="add-agente" disabled={!editavel} onClick={() => adicionarComponente("agente", "agente")} style={botao}>
               + Agente
-            </button>
-            <button data-testid="add-livre" disabled={!editavel} onClick={() => adicionarComponente("conector", "livre")} style={botao}>
-              + Chamada externa
             </button>
             {/* SPEC-107 fatia A — as funções do SISTEMA na paleta: o motor com
                 contrato declarado, pelo registro fechado (rótulo genérico,
@@ -758,7 +766,7 @@ export function FluxoScreen({
         <div style={{ flex: 1, position: "relative" }}>
           {fluxo && fluxo.nos.length === 0 && (
             <div style={dicaVaziaEstilo}>
-              Adicione um <strong>conector</strong> ou um <strong>agente</strong> pela paleta acima e ligue-os —
+              Adicione uma <strong>integração externa</strong> ou um <strong>agente</strong> pela paleta acima e ligue-os —
               a aresta carrega o dado (saída → entrada), como no n8n.
             </div>
           )}
@@ -1018,13 +1026,20 @@ function PainelDoNo({
       <strong style={{ fontSize: 12.5 }}>{no.id}</strong>
       <div style={{ fontSize: 11.5, color: "var(--texto-2)", margin: "4px 0 8px" }}>
         {no.tipo === "conector"
-          ? (no.componente && no.componente !== "livre" ? NOME_DA_OPERACAO[no.componente] : "Chamada externa")
+          ? // SPEC-109 B — a operação é do CONECTOR escolhido (a paleta virou
+            // genérica); o componente antigo fica de fallback para nós de
+            // fluxos salvos antes.
+            (conector?.operacao
+              ? NOME_DA_OPERACAO[conector.operacao]
+              : no.componente && no.componente !== "livre"
+                ? NOME_DA_OPERACAO[no.componente]
+                : "Integração externa")
           : no.tipo === "funcao"
             ? `Função do sistema — ${funcao?.nome ?? no.refId}`
             : no.tipo === "projeto"
               ? (
                   <>
-                    Projeto (a demanda, nas duas direções){" "}
+                    Mesa de projeto (a demanda, nas duas direções){" "}
                     {/* §3.1 — "a mesa vira COMPONENTE": o nó de projeto é a
                         porta para ela, como o usuário desenhou ("um componente
                         que possamos abrir e usar a mesa de projeto"). */}
@@ -1039,13 +1054,26 @@ function PainelDoNo({
                 ? "Transformação (pura — re-mapeia, extrai, concatena)"
                 : "Agente"}
       </div>
+      {/* SPEC-109 B — o nome do nó é da pessoa (n8n): vazio, o cartão ecoa o
+          que o nó referencia; escrito, ele manda. */}
+      <label style={{ fontSize: 11.5, display: "grid", gap: 2, marginBottom: 8 }}>
+        Nome do nó
+        <input
+          data-testid="nome-do-no"
+          disabled={!podeEditar}
+          value={no.nome ?? ""}
+          placeholder="vazio = o nome do que ele referencia"
+          onChange={(e) => onMudar({ nome: e.target.value || undefined })}
+          style={campo}
+        />
+      </label>
       {no.tipo !== "funcao" && no.tipo !== "projeto" && no.tipo !== "transformacao" && (
         <label style={{ fontSize: 11.5, display: "grid", gap: 2, marginBottom: 8 }}>
           {/* §359/§2.4-1 — o rótulo nomeia O QUE se escolhe ("adaptador" é
               jargão de arquitetura e o usuário estranhou, com razão): o nó
               agente executa um PAPEL configurado; a chamada externa usa um
               CONECTOR do catálogo. */}
-          {no.tipo === "agente" ? "Papel (da configuração de agentes)" : "Conector (do catálogo)"}
+          {no.tipo === "agente" ? "Papel (da configuração de agentes)" : "Integração externa (do catálogo)"}
           <select
             data-testid="adaptador-do-no"
             disabled={!podeEditar}

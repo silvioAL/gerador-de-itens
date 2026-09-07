@@ -85,17 +85,17 @@ test("fatia C: desenhar, ligar, mapear — e o ciclo trava com a mensagem do des
     await page.getByLabel("Nome do fluxo novo").fill("Desenho E2E");
     await page.getByTestId("criar-fluxo").click();
 
-    // §368 — a paleta fala em COMPONENTES (como a mesa); o adaptador se
-    // escolhe nas propriedades do nó. "Chamada externa" + o conector
-    // declarado; "Agente" + o papel po.
-    await page.getByTestId("add-livre").click();
+    // SPEC-109 B — a paleta fala por FAMÍLIA: "+ Integração externa" abre o
+    // catálogo inteiro no painel (a operação é do conector escolhido, não do
+    // botão); "Agente" + o papel po.
+    await page.getByTestId("add-integracao").click();
     await page.getByTestId("adaptador-do-no").selectOption("leitor-fluxo-e2e");
     await page.getByTestId("add-agente").click();
     await page.getByTestId("adaptador-do-no").selectOption("po");
     await expect(page.locator(".react-flow__node")).toHaveCount(2);
 
     // Ligar: a aresta nasce SEM mapeamento, e a tela diz isso.
-    await ligar(page, "chamada-1", "agente-1");
+    await ligar(page, "integracao-1", "agente-1");
     await expect(page.getByText("sem mapeamento")).toBeVisible();
 
     // O mapeamento na aresta: a saída declarada do conector (fatia A) é o que
@@ -107,7 +107,7 @@ test("fatia C: desenhar, ligar, mapear — e o ciclo trava com a mensagem do des
     await expect(page.getByText("conteudo→volumetria")).toBeVisible();
 
     // O ciclo trava a execução com a MESMA mensagem do desenho (§4.4).
-    await ligar(page, "agente-1", "chamada-1");
+    await ligar(page, "agente-1", "integracao-1");
     await expect(page.getByTestId("aviso-de-ciclo")).toContainText("Ciclo: ");
     await expect(page.getByTestId("executar-fluxo")).toBeDisabled();
 
@@ -118,6 +118,15 @@ test("fatia C: desenhar, ligar, mapear — e o ciclo trava com a mensagem do des
     // Sem o ciclo, salva — e o desenho sobrevive ao F5. O painel da aresta
     // cíclica já está aberto (o onConnect a seleciona ao ligar).
     await page.getByRole("button", { name: "Remover aresta" }).click();
+
+    // O nome do nó é da pessoa (n8n): escrito, o cartão ecoa o que ela deu.
+    // POR ÚLTIMO, de propósito: os nós nascem quase sobrepostos, e um nome
+    // comprido alarga o cartão até esconder o handle debaixo do vizinho —
+    // nas fontes da CI o `ligar` errava o alvo (1ª rodada do PR #363).
+    await page.locator('.react-flow__node[data-id="integracao-1"]').click();
+    await page.getByTestId("nome-do-no").fill("Ler volumetria do legado");
+    await expect(page.locator('.react-flow__node[data-id="integracao-1"]')).toContainText("Ler volumetria do legado");
+
     await page.getByTestId("salvar-fluxos").click();
     await expect(page.getByTestId("erro-do-fluxo")).not.toBeVisible();
     await page.reload();
@@ -130,10 +139,13 @@ test("fatia C: desenhar, ligar, mapear — e o ciclo trava com a mensagem do des
     // F5; re-afirmá-lo aqui flakava sob carga — o React Flow às vezes pula a
     // primeira renderização da aresta no mount, dívida anotada no §375.)
     const salvo = (await (await page.request.get(`${API}/config/fluxos?timeId=time-pagamentos`)).json()).documento as {
-      fluxos: { id: string; arestas: { mapeamento: { saida: string; entrada: string }[] }[] }[];
+      fluxos: { id: string; nos: { id: string; nome?: string }[]; arestas: { mapeamento: { saida: string; entrada: string }[] }[] }[];
     };
     const persistido = salvo.fluxos.find((f) => f.id === "desenho-e2e");
     expect(persistido?.arestas[0]?.mapeamento).toEqual([{ saida: "conteudo", entrada: "volumetria" }]);
+    // SPEC-109 B — o nome do nó persiste (§248: sem o `nome` no normalizar,
+    // esta linha fica vermelha porque o salvar o descartaria em silêncio).
+    expect(persistido?.nos.find((n) => n.id === "integracao-1")?.nome).toBe("Ler volumetria do legado");
 
     // SPEC-106 — a esteira aparece DERIVADA dos papéis: os quatro nós na
     // ordem, banner de derivado, edição travada até "editar uma cópia".
