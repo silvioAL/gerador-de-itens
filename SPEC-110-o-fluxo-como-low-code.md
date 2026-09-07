@@ -249,11 +249,20 @@ aba de config — nenhum componente do canvas fala com ele.
   declaradas, ícones/nomes da galeria e fluxos → `config_documentos` (por
   time); agendamentos → tabela própria `fluxo_agendamentos`; conexões de
   banco/segredos → cofre (NUNCA no documento); execuções/stages →
-  `fluxo_execucoes`. Nada vive só em memória ou localStorage. **Prova
-  obrigatória em toda fatia**: o E2E inclui F5 E, onde a config é do
-  server, sobrevivência a restart (`docker compose restart server` na
-  validação real) — configurável que evapora é feature de demonstração,
-  não produto.
+  `fluxo_execucoes`. Nada vive só em memória ou localStorage. **E toda
+  entrega chega com as configurações de FÁBRICA prontas** (esclarecimento
+  literal do usuário: *"nas entregas precisamos ter as configurações já
+  prontas, assim o sistema segue funcionando"*): tipo de nó novo chega com
+  os fluxos/telas de fábrica que o usam já derivados (gatilho nas fábricas,
+  telas do sistema registradas, a screen-exemplo do PDCA semeada) —
+  ninguém configura nada para o que funcionava CONTINUAR funcionando, e o
+  recurso novo já nasce demonstrável. **Prova obrigatória em toda fatia**,
+  dupla: (a) stack com banco LIMPO (`down -v`) sobe e o produto funciona de
+  ponta a ponta sem configuração manual (só a credencial de IA, que é da
+  organização); (b) F5 e, onde a config é do server, sobrevivência a
+  restart (`docker compose restart server` na validação real) —
+  configurável que evapora ou que chega desconfigurado é feature de
+  demonstração, não produto.
 - **D19.** **Toda fatia que muda um gesto de uso atualiza o "Como usar" e
   os tours NO MESMO PR** (pedido literal: *"fazer os testes e a
   apresentação do como funciona"*). O manual da SPEC-109 E
