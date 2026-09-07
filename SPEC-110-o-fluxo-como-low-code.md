@@ -227,15 +227,32 @@ aba de config — nenhum componente do canvas fala com ele.
   função PURA do engine, o executor pode chamar A MESMA função sem violar
   o §263 (o precedente é a prova bit-exata da G5: mesmo montador nos dois
   lados). Detalhe na fatia I.
+- **D16.** **A jornada é UM fluxo maior; os quatro derivados são etapas
+  dele** — queixa literal: *"quais fluxos estão relacionados ao quê? ficou
+  complicada essa parte de 'derivado', onde se configura isso? … faria mais
+  sentido ter um fluxo maior com pools ou algo assim"*. Dois movimentos:
+  (a) componente **`subfluxo`** (fluxo como nó, o "Execute Workflow" do
+  n8n): um nó que referencia outro fluxo, mostra o nome/ícone dele e roda a
+  execução dele inteira (o rastro aninha); com ele a fábrica deriva o
+  fluxo-mestre **"Jornada da demanda"**: `gatilho → [subfluxo: ensaio] →
+  [subfluxo: esteira] → [subfluxo: exportar] / [subfluxo: publicar]` — a
+  relação entre os quatro vira DESENHO, e o duplo-clique no nó abre o
+  subfluxo. (b) todo card/banner "derivado" passa a dizer **de onde**
+  ("nasce de: papéis da esteira →" / "destinos de exportação →") com a
+  porta para a config — a pergunta "onde se configura isso?" morre na
+  tela. Pools/raias visuais BPMN completas NÃO entram (o agrupamento por
+  etapa na galeria + o fluxo-mestre cobrem a necessidade; raias são
+  evolução se o uso pedir). Detalhe na fatia J.
 
 ## 4. As fatias
 
-> Ordem: A → B → C → D → E → F → G → H → I. B é a maior; C depende de B;
-> D e E são independentes entre si (podem inverter se conveniente); F
+> Ordem: A → B → C → D → E → F → G → H → I → J. B é a maior; C depende de
+> B; D e E são independentes entre si (podem inverter se conveniente); F
 > depende de B; G depende de B e F; H depende de C (mas a galeria
-> só-de-fluxos pode adiantar); I depende de F. Se a rodada apertar,
-> H-só-fluxos logo após A é um upgrade visível barato — e a fatia I é
-> pequena e de alto valor de promessa (pode subir na ordem junto com F).
+> só-de-fluxos pode adiantar); I depende de F; J depende de A e B. Se a
+> rodada apertar, H-só-fluxos logo após A é um upgrade visível barato — e
+> a fatia I é pequena e de alto valor de promessa (pode subir junto com
+> F). O "nasce de" nos cards (D16b) é barato e pode entrar já na H.
 
 ### Fatia A — o gatilho como nó
 
@@ -499,7 +516,12 @@ passa a abrir a **GALERIA** — não o canvas. Cards grandes em grid (o molde
 visual é o dos cenários da JourneyModal): um por FLUXO (ícone/avatar +
 nome + selo `derivado`/`declarado`/`sombreando` + nº de nós + última
 execução ok/falhou) e um por SCREEN declarada (ícone + nome + "usada em N
-fluxos"). Busca filtrada no topo (nome, tipo). Clique no fluxo → canvas
+fluxos"). Busca filtrada no topo (nome, tipo). **Todo card derivado diz DE
+ONDE deriva, com porta** (D16b): "nasce de: papéis da esteira →" /
+"destinos de exportação →" / "destinos de publicação →" / "sempre existe
+(motor)" — a pergunta "onde se configura isso?" morre no card. E a galeria
+agrupa os derivados pela ETAPA da jornada (ensaiar → derivar/esteira →
+sair), com o fluxo-mestre da fatia J em destaque no topo. Clique no fluxo → canvas
 naquele fluxo (`#/fluxo/<id>`, já mandável); clique na screen → editor com
 preview (`#/config/telas/<id>`). Botões "+ Novo fluxo" / "+ Nova screen"
 vivem na galeria; o seletor dropdown do canvas continua como troca rápida.
@@ -565,6 +587,38 @@ um insumo do lado do fluxo → vermelho); E2E: demanda com DOIS itens →
 `exportar-prontos` contra o dublê recebe DUAS specs, cada uma com o
 conteúdo do seu item (não a da demanda duplicada); a tela do documento
 segue igual (nenhuma regressão de montagem).
+
+### Fatia J — o subfluxo e o fluxo-mestre da jornada (D16)
+
+> Depende de A (gatilho) e B (telas — o mestre atravessa a bancada).
+> Motivação literal: *"quais fluxos estão relacionados ao quê? … faria
+> mais sentido ter um fluxo maior com pools ou algo assim"*.
+
+**Componente `subfluxo`**: tipo de nó novo — `refId` = id de OUTRO fluxo
+do catálogo em vigor. O cartão mostra ícone + nome do fluxo referenciado;
+duplo-clique (e botão no painel) ABRE o subfluxo no canvas. Contrato:
+entrada/saída derivadas do fluxo referenciado (as entradas sem produtor
+interno e as saídas do último nó — MEDIR contra `planoDoFluxo` na
+implementação e documentar a regra no JOURNEY). Executor: roda a execução
+do fluxo referenciado inteira; o rastro do nó aninha o rastro do filho
+(v1: link "ver execução do subfluxo" no rastro, sem expandir inline).
+**Ciclo de subfluxos é recusado na escrita** (A referencia B referencia A
+— a mesma régua do ciclo de arestas, mensagem nomeada).
+
+**O fluxo-mestre de fábrica "Jornada da demanda"** (derivado, com selo e
+"nasce de" apontando as configs de cada etapa): `gatilho → [subfluxo:
+ensaio-de-cenarios] → [subfluxo: esteira-de-agentes] → [subfluxo:
+exportar-prontos] + [subfluxo: publicar-documento]`. É a resposta ao
+"quais fluxos se relacionam": a relação vira desenho navegável — o
+catálogo continua oferecendo cada etapa avulsa para quem quer só ela.
+Telas no meio (a bancada com avançar/retornar) fazem o mestre pausar como
+qualquer fluxo — nenhuma regra nova.
+
+**Provas**: unidade do contrato derivado + da recusa de ciclo (§248);
+E2E: o mestre aparece na galeria em destaque, roda ponta a ponta contra o
+dublê pausando na bancada (avançar segue para a esteira; os subfluxos
+executados aparecem no histórico como execuções próprias linkadas), e
+duplo-clique num nó de subfluxo abre o fluxo certo.
 
 ## 4.x O caso-norte (para onde tudo isto aponta)
 
