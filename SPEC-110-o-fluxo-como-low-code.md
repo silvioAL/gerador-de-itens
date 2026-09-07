@@ -202,6 +202,19 @@ aba de config — nenhum componente do canvas fala com ele.
   fiada nessa função monta um coletor de feedback dentro de qualquer fluxo.
   A aba "PDCA — melhoria contínua" continua no menu por ora (ela é o laço de
   quem ADMINISTRA; medir depois se segue o padrão §221).
+- **D13.** **O PDCA é um FLUXO, e configurar as coisas se faz PELO fluxo** —
+  apontado pelo usuário (*"o PDCA provavelmente vai demandar outro fluxo…
+  deve ser possível configurar as coisas por lá"*). Dois componentes de
+  dados novos: `config-ler` (lê um documento de configuração nomeado do
+  time) e `config-propor-ajuste` — que **NÃO grava direto**: cria uma
+  `solicitacao_ajuste` (a mudança como dado, SPEC-39/45, `pdca.ts:509`), e
+  quem APLICA é a máquina existente (`POST /ajustes/:id/aplicar`,
+  `pdca.ts:553` — determinístico, auditado, permissão checada no server).
+  O laço completo vira fluxo de FÁBRICA (`pdca-melhoria`, derivado):
+  `gatilho → pdca-ler-feedbacks → agente(propõe o ajuste) → TELA(revisar a
+  proposta) → avançar → config-propor-ajuste + aplicar`. A tela de revisão
+  É a aprovação — avançar sem permissão de aplicar falha nomeado, não em
+  silêncio.
 
 ## 4. As fatias
 
@@ -425,6 +438,63 @@ fica vermelho); E2E: esteira de fábrica nova mostra "Demanda — ler" e
 "Demanda — gravar" com cartões distintos (a queixa M9 morta na tela), e um
 fluxo salvo ANTIGO com refId `projeto` continua executando igual.
 
+### Fatia G — o PDCA como fluxo (D13)
+
+> Depende de B (tela) e F (componentes PDCA/dados). O gatilho de
+> agendamento (E) é opcional — o manual serve para o v1 do laço.
+
+**Componentes** (`DADOS_DO_SISTEMA` + `FUNCOES_DO_SISTEMA`):
+- `pdca-ler-feedbacks`: saída = lista de feedbacks abertos (mesma leitura da
+  aba, `routes/pdca.ts` — reusar a query, não copiá-la).
+- `config-ler`: parâmetro `chave` (validada contra a lista real de
+  documentos de config); saída = o documento.
+- `config-propor-ajuste`: entrada = a operação proposta (o formato de
+  `solicitacoes_ajuste` — MEDIR o shape em `pdca.ts:384` "a mudança como
+  dado" antes de declarar o contrato); efeito = cria a solicitação
+  (auditoria idêntica à rota). **Sem escrita direta de config em fluxo —
+  decisão D13, não reabrir.**
+- Aplicar: o Avançar da tela de revisão chama `POST /ajustes/:id/aplicar`
+  existente; sem permissão, a falha volta nomeada para o rastro.
+
+**Fluxo de fábrica `pdca-melhoria`** (derivado, aparece no catálogo como a
+esteira): `gatilho(manual) → pdca-ler-feedbacks → agente(refId de papel
+configurável; prompt padrão "proponha UM ajuste de configuração a partir
+destes feedbacks, no formato de operação") → tela(revisar proposta:
+blocos dado com o feedback e a operação proposta) → config-propor-ajuste →
+aplicar`. Com E entregue, trocar o gatilho para agendamento é um gesto do
+usuário, não código.
+
+**Provas**: unidade dos contratos + da recusa de chave de config
+inexistente (§248); E2E contra o dublê: semear um feedback, rodar o fluxo,
+o agente propõe (gateway falso determinístico), a tela mostra, Avançar cria
+a solicitação E aplica, a auditoria registra os dois passos, e a aba PDCA
+mostra o feedback tratado. Rodar SEM permissão de aplicar: falha nomeada no
+rastro, solicitação fica pendente (aprovável pela aba, como hoje).
+
+## 4.x O caso-norte (para onde tudo isto aponta)
+
+Nas palavras do usuário: *"no futuro, schedulers que buscam dados em
+integrações como por exemplo Jira, consolidam em tabelas e geram reports
+com agentes"*. Esse fluxo, desenhado com as primitivas desta SPEC + a
+SPEC-108:
+
+```
+gatilho(agendamento, fatia E)
+  → integração externa Jira, paginada (SPEC-108: laço/agregação)
+  → transformação (existe)
+  → banco — gravar na tabela de consolidação (SPEC-108: escrita; a
+    consulta é a fatia D)
+  → agente gera o report (existe)
+  → publicação/Teams (existe / SPEC-108)
+  → [opcional] tela de revisão antes de publicar (fatia B)
+```
+
+Nenhuma fatia desta SPEC existe por si — cada uma é um pedaço deste
+desenho. Quando a 110 fechar, o que falta para o caso-norte é exatamente o
+recorte da SPEC-108: laço/paginação, escrita em banco, Teams. Manter este
+caso como teste de mesa ao decidir contratos: se uma decisão de fatia
+tornar este fluxo impossível de fiar, a decisão está errada.
+
 ## 5. O que esta SPEC NÃO faz (e onde fica)
 
 - Teams webhook, Jira paginado (laço), Mongo, escrita em banco → SPEC-108
@@ -469,3 +539,7 @@ fluxo salvo ANTIGO com refId `projeto` continua executando igual.
   usa, rodada própria).
 - "A aba PDCA sai do menu?" Ainda não (D12) — ela é administração do laço;
   medir uso depois que o componente existir.
+- "Fluxo grava configuração direto?" Não (D13) — o fluxo PROPÕE (a mudança
+  como dado, SPEC-39/45) e a tela aprova; aplicar é a máquina existente,
+  determinística e auditada. Escrita direta de config por fluxo não entra
+  nem com permissão — o rastro de aprovação é o produto.
