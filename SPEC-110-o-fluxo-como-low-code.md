@@ -243,6 +243,18 @@ aba de config — nenhum componente do canvas fala com ele.
   tela. Pools/raias visuais BPMN completas NÃO entram (o agrupamento por
   etapa na galeria + o fluxo-mestre cobrem a necessidade; raias são
   evolução se o uso pedir). Detalhe na fatia J.
+- **D17.** **O acionador mora NA tela, enlatado** — pedido literal: *"o
+  acionador pode ficar na própria tela, seja para próxima tela ou para
+  seguir, isso precisa ficar enlatado em componentes prontos… mínimo de
+  impacto na mesa de projeto"*. Três regras: (a) a screen declarada ganha o
+  bloco **`acao`** — rótulo editável, comportamento FIXO do catálogo
+  (`avancar` | `retornar`), nada programável; "ir para a próxima tela" não
+  é componente — avançar segue a aresta, e se o próximo nó é outra tela,
+  ela abre (a navegação entre telas É a fiação). (b) screen sem bloco
+  `acao` recebe a barra padrão Avançar/Retornar — nunca existe tela sem
+  saída. (c) **a mesa de projeto não muda por dentro**: o modo stage é uma
+  MOLDURA montada pelo shell ao redor da tela existente (mesa, documento,
+  bancada) — zero prop nova invasiva, zero mudança de layout interno.
 
 ## 4. As fatias
 
@@ -318,8 +330,12 @@ interface TelaDoSistema {
 - O canvas, ao ver `aguardando-tela`, mostra no rastro: "aguardando:
   Bancada de ensaios — **abrir →**" (testid `abrir-tela-do-stage`).
 - Rota nova `#/tela/<execucaoId>`: o App busca a execução, resolve a tela do
-  nó e monta o RENDERIZADOR com as entradas do stage + a barra fixa
+  nó e monta o RENDERIZADOR com as entradas do stage + a barra
   **Retornar ← / Avançar →** (testids `tela-retornar`/`tela-avancar`).
+  A barra é a MOLDURA (D17c): montada pelo shell AO REDOR da tela
+  existente — mesa, documento e bancada não mudam por dentro. Screens
+  declaradas podem substituí-la pelo bloco `acao` (D17a, fatia C); sem o
+  bloco, a barra padrão fica (D17b).
 - Para as telas do sistema o renderizador delega: `bancada-de-ensaios` monta
   a `BancadaDeEnsaios` REUSADA como corpo (props vindas do stage — o ensaio
   já calculado vira a leitura inicial; a bancada continua podendo re-medir
@@ -356,9 +372,15 @@ interface TelaDeclarada {
     | { tipo: "texto"; markdown: string }
     | { tipo: "dado"; chave: string; rotulo: string; formato: "texto" | "documento" | "lista" | "objeto" }
     | { tipo: "campo"; chave: string; rotulo: string; entrada: "texto" | "numero" | "escolha"; opcoes?: string[]; obrigatorio?: boolean }
+    | { tipo: "acao"; rotulo: string; acao: "avancar" | "retornar" }
   )[];
 }
 ```
+- Bloco `acao` (D17): o acionador NA tela, enlatado — rótulo editável,
+  comportamento fixo do par avançar/retornar. Validar-escrita: no máximo um
+  de cada ação (dois "avancar" = qual vale?); screen sem bloco `acao` ganha
+  a barra padrão (D17b). Campos obrigatórios continuam travando o avançar
+  com motivo visível, seja pela barra ou pelo bloco.
 - `entrada` derivada dos blocos `dado`; `saida` = blocos `campo` + `decisao`.
   Normalizar tolerante / validar-escrita rigorosa (id repetido, chave
   repetida, escolha sem opções — recusar nomeando, SPEC-35).
