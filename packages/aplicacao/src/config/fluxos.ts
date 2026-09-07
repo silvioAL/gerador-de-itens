@@ -45,6 +45,13 @@ export interface NoDoFluxo {
   /** id do `Conector` (tipo "conector") ou do `PapelConfigurado` (tipo "agente"). */
   refId: string;
   /**
+   * SPEC-109 fatia B — o NOME que a pessoa dá ao nó ("Ler volumetria do
+   * legado", como no n8n). Ausente, o cartão mostra o nome do que o nó
+   * referencia (papel, integração, função) — a régua da casa: o rótulo ecoa
+   * o que a pessoa cadastrou.
+   */
+  nome?: string;
+  /**
    * §368 — o COMPONENTE de que este nó nasceu (a paleta fala a língua da
    * mesa): uma operação do gateway, ou "livre" (chamada externa). É o que diz
    * quais ADAPTADORES são compatíveis quando se troca o `refId`. Ausente em
@@ -120,6 +127,8 @@ export function normalizarFluxos(documento: unknown): ConfigFluxos {
         id: noId,
         tipo: noCru.tipo as TipoDeNoDoFluxo,
         refId,
+        // O nome do nó é opcional e só existe quando diz algo (SPEC-109 B).
+        ...(typeof noCru.nome === "string" && noCru.nome.trim() ? { nome: noCru.nome.trim() } : {}),
         posicao: {
           x: typeof noCru.posicao?.x === "number" ? noCru.posicao.x : 0,
           y: typeof noCru.posicao?.y === "number" ? noCru.posicao.y : 0,

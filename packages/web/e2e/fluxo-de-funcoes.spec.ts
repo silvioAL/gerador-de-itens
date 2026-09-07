@@ -89,7 +89,7 @@ test("a fiação da derivação (modo b) roda pela tela, com o rastro gravando a
     // MESMO cartão da mesa (fatia D).
     await expect(page.locator(`.react-flow__node[data-id="gera"]`)).toContainText("Função do sistema");
     await expect(page.locator(`.react-flow__node[data-id="gera"]`)).toContainText("Geração de itens");
-    await expect(page.locator(`.react-flow__node[data-id="demanda"]`)).toContainText("Projeto");
+    await expect(page.locator(`.react-flow__node[data-id="demanda"]`)).toContainText("Mesa de projeto");
 
     await page.getByTestId("executar-fluxo").click();
     await expect(page.getByTestId("rastro-da-execucao")).toBeVisible({ timeout: 30000 });
@@ -144,7 +144,7 @@ test("a função entra pela paleta já com o contrato à mostra — sem adaptado
     // SPEC-107 fatia B — o projeto também nasce pronto, e o painel diz as
     // duas direções em voz alta (a escrita vira proposta, nunca o desenho).
     await page.getByTestId("add-projeto").click();
-    await expect(page.getByTestId("painel-do-no")).toContainText("Projeto (a demanda, nas duas direções)");
+    await expect(page.getByTestId("painel-do-no")).toContainText("Mesa de projeto (a demanda, nas duas direções)");
     await expect(page.getByTestId("contrato-do-projeto")).toContainText("vira uma variante");
     await expect(page.getByTestId("demanda-do-projeto")).toBeVisible();
     await expect(page.getByTestId("adaptador-do-no")).toHaveCount(0);

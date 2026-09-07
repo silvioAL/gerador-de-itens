@@ -33,11 +33,18 @@ export const ICONES_POR_FAMILIA: Record<TipoDeNoDoFluxo, string> = {
   transformacao: "Split",
 };
 
+/**
+ * SPEC-109 fatia B — o vocabulário que o usuário pediu ("integração externa →
+ * agente → artefato"): a família fala a língua de quem monta o fluxo, não a
+ * do código. "Conector" era o nome do TIPO interno; "Integração externa" é o
+ * que ele é. "Projeto" virou "Mesa de projeto" — a mesa É o componente que se
+ * abre (a decisão antiga do §2.3 de separar os nomes caiu com o pedido).
+ */
 export const ROTULOS_POR_FAMILIA: Record<TipoDeNoDoFluxo, string> = {
-  conector: "Conector",
+  conector: "Integração externa",
   agente: "Agente",
   funcao: "Função do sistema",
-  projeto: "Projeto",
+  projeto: "Mesa de projeto",
   transformacao: "Transformação",
 };
 

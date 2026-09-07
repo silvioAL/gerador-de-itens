@@ -46,8 +46,11 @@ export const REF_DO_PROJETO = "projeto";
 
 export const PROJETO_DO_SISTEMA: ProjetoDoSistema = {
   id: "projeto",
-  // §2.3 — "mesa" é o nome DA TELA; o componente chama-se Projeto.
-  nome: "Projeto",
+  // SPEC-109 B — a decisão do §2.3 ("mesa é o nome da tela; o componente
+  // chama-se Projeto") caiu pelo pedido literal do usuário: a mesa É "um
+  // componente que possamos abrir e usar" — então o componente carrega o
+  // nome que a pessoa conhece.
+  nome: "Mesa de projeto",
   descricao:
     "A demanda como fonte (desenho, itens, documento, volumetria, necessidades) ou destino (o desenho mapeado vira proposta, para alguém adotar na mesa).",
   entrada: [
