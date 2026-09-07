@@ -8,7 +8,9 @@ import { Jornada } from "./Jornada";
 // onboarding/demo (ver SPEC-08 §3.5).
 // A aba "cli" morreu com o modo local (SPEC-33) — a revisão geral da demo
 // (pedido do usuário: "fala de CLI, que nem temos mais") tirou o resto.
-export type AbaJornada = "jornada" | "cenarios";
+// SPEC-109 E — "como-usar" nasceu da queixa literal ("em como funciona não
+// explica como usar") e é a ABA PADRÃO: quem abre a porta quer operar.
+export type AbaJornada = "como-usar" | "jornada" | "cenarios";
 
 export interface JourneyModalProps {
   config: DiagramaConfig;
@@ -34,7 +36,7 @@ export function JourneyModal({
   onIniciarTourDeConfiguracao,
   abaForcada,
 }: JourneyModalProps) {
-  const [aba, setAba] = useState<AbaJornada>(abaForcada ?? "jornada");
+  const [aba, setAba] = useState<AbaJornada>(abaForcada ?? "como-usar");
 
   useEffect(() => {
     if (abaForcada) setAba(abaForcada);
@@ -102,6 +104,9 @@ export function JourneyModal({
         </header>
 
         <div style={{ display: "flex", gap: 4, padding: "12px 24px 0" }}>
+          <button onClick={() => setAba("como-usar")} style={aba === "como-usar" ? abaAtivaEstilo : abaEstilo}>
+            Como usar
+          </button>
           <button onClick={() => setAba("jornada")} style={aba === "jornada" ? abaAtivaEstilo : abaEstilo}>
             A jornada
           </button>
@@ -111,6 +116,7 @@ export function JourneyModal({
         </div>
 
         <div style={{ flex: 1, overflow: "auto", padding: 24 }}>
+          {aba === "como-usar" && <ComoUsar />}
           {aba === "jornada" && (
             <>
               {/* SPEC-76 §7.1 — pré-login E de dentro, com um componente só.
@@ -134,6 +140,87 @@ export function JourneyModal({
   );
 }
 
+
+/**
+ * SPEC-109 E — **o manual de uso, passo a passo** ("em como funciona não
+ * explica como usar", queixa literal). Cada passo nomeia o GESTO real — o
+ * botão, o menu, a tela — no vocabulário que está nas telas hoje (SPEC-109
+ * B/C/D: integração externa, mesa de projeto, canvas de fluxos). Os tours no
+ * topo desta modal mostram os mesmos passos ao vivo.
+ */
+const PASSOS_DE_USO: { titulo: string; texto: string }[] = [
+  {
+    titulo: "Conecte um modelo de IA",
+    texto:
+      "☰ Menu → Modelo de IA: informe a base URL do gateway, a chave e o nome do modelo. É o que dá voz aos agentes — sem isso a esteira fica \"sem modelo\" e só o motor (determinístico) trabalha.",
+  },
+  {
+    titulo: "Desenhe a demanda na mesa de projeto",
+    texto:
+      "Adicione componentes pela paleta (+ Serviço, + Fila…) e responda os campos de cada um — ou descreva a demanda para o assistente (✦, por texto, voz ou print de lousa) e aceite a proposta. A aba \"Cenários prontos\" aqui ao lado carrega exemplos completos.",
+  },
+  {
+    titulo: "Dê um título e derive",
+    texto:
+      "O motor lê o desenho + a configuração do time e ESCREVE os itens de trabalho — o documento abre com um card por item, sempre o mesmo resultado para o mesmo desenho.",
+  },
+  {
+    titulo: "Rode a esteira de agentes no canvas",
+    texto:
+      "☰ Menu → Fluxos de integração (a esteira também abre sozinha ao derivar): Executar roda os agentes (PO, Arquiteto, Especialista, QA) sobre a demanda aberta, ao vivo, nó a nó. Clicar num agente edita o papel dele — prompt, ligar/desligar, ordem.",
+  },
+  {
+    titulo: "Confirme o que a IA escreveu",
+    texto:
+      "De volta ao documento, a seção de itens mostra as sugestões PENDENTES: confirme campo a campo, edite, escreva por cima ou \"Confirmar todas\". Nada que a IA propõe vale antes disso.",
+  },
+  {
+    titulo: "Exporte e publique",
+    texto:
+      "Os fluxos \"Exportar prontos\" e \"Publicar documento\" levam os itens e o documento para onde o time trabalha — os destinos se cadastram no catálogo de integrações (☰ Menu → Conectores).",
+  },
+];
+
+function ComoUsar() {
+  return (
+    <div data-testid="como-usar" style={{ maxWidth: 720 }}>
+      <p style={{ fontSize: 13, color: "var(--texto-fraco)", margin: "0 0 16px", lineHeight: 1.5 }}>
+        O caminho inteiro, do desenho ao item exportado. Os dois tours no topo mostram estes passos ao vivo —
+        este é o resumo para consultar depois.
+      </p>
+      <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 12 }}>
+        {PASSOS_DE_USO.map((passo, i) => (
+          <li key={passo.titulo} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+            <span
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 999,
+                background: "var(--acento-gente)",
+                color: "#fff",
+                fontSize: 12,
+                fontWeight: 700,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+                marginTop: 1,
+              }}
+            >
+              {i + 1}
+            </span>
+            <div>
+              <strong style={{ fontSize: 13, color: "var(--texto)" }}>{passo.titulo}</strong>
+              <p style={{ fontSize: 12.5, color: "var(--texto-fraco)", margin: "3px 0 0", lineHeight: 1.5 }}>
+                {passo.texto}
+              </p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
 
 const ROTULO_CATEGORIA: Record<Cenario["categoria"], string> = {
   demo: "demo",

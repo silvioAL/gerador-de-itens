@@ -40,7 +40,10 @@ const cenarios: Cenario[] = [
 ];
 
 describe("JourneyModal", () => {
-  it("abre na aba jornada mostrando as 5 etapas e o que cada saída serve", () => {
+  /** SPEC-109 E — a aba padrão virou o MANUAL ("em como funciona não explica
+   * como usar", queixa literal): passos com os gestos reais. A jornada segue
+   * uma aba ao lado. */
+  it("abre no 'Como usar' — passos operacionais, com os gestos reais", () => {
     render(
       <JourneyModal
         config={config}
@@ -53,6 +56,30 @@ describe("JourneyModal", () => {
       />
     );
 
+    expect(screen.getByTestId("como-usar")).toBeInTheDocument();
+    expect(screen.getByText("Conecte um modelo de IA")).toBeInTheDocument();
+    expect(screen.getByText("Rode a esteira de agentes no canvas")).toBeInTheDocument();
+    expect(screen.getByText("Confirme o que a IA escreveu")).toBeInTheDocument();
+    // O gesto, não só o conceito: o passo diz ONDE (menu, tela, botão).
+    expect(screen.getByText(/☰ Menu → Modelo de IA/)).toBeInTheDocument();
+    expect(screen.getByText(/☰ Menu → Fluxos de integração/)).toBeInTheDocument();
+  });
+
+  it("a aba jornada mostra as 5 etapas e o que cada saída serve", async () => {
+    const user = userEvent.setup();
+    render(
+      <JourneyModal
+        config={config}
+        cenarios={cenarios}
+        onFechar={vi.fn()}
+        onCarregarCenario={vi.fn()}
+        onAdicionarCenario={vi.fn()}
+        onIniciarTour={vi.fn()}
+        onIniciarTourDeConfiguracao={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "A jornada" }));
     expect(screen.getByText("Diagrama")).toBeInTheDocument();
     expect(screen.getByText("Prontidão")).toBeInTheDocument();
     expect(screen.getByText("Derivar")).toBeInTheDocument();
