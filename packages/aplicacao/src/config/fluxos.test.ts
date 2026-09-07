@@ -98,7 +98,9 @@ describe("validarEscritaFluxos (SPEC-35 + prova da fatia C)", () => {
 
   it.each([
     [{ fluxos: [{ nos: [], arestas: [] }] }, /sem "id"/],
-    [{ fluxos: [{ id: "f", nos: [{ id: "a", tipo: "conector" }], arestas: [] }] }, /sem adaptador/],
+    // §359 — a frase nomeia o que falta ("adaptador" era jargão; o usuário
+    // estranhou "adaptador PO" com razão: o agente escolhe um PAPEL).
+    [{ fluxos: [{ id: "f", nos: [{ id: "a", tipo: "conector" }], arestas: [] }] }, /sem conector/],
     [{ fluxos: [{ id: "f", nos: [{ id: "a", tipo: "laço", refId: "x" }], arestas: [] }] }, /tipo desconhecido/],
     [
       { fluxos: [{ id: "f", nos: [{ id: "a", tipo: "conector", refId: "x" }], arestas: [{ de: "a", para: "fantasma" }] }] },

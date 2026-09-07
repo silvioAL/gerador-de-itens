@@ -1,4 +1,4 @@
-import type { FichaItem, FichaPlaceholder, ValorSpec } from "@gerador/engine";
+﻿import type { FichaItem, FichaPlaceholder, ValorSpec } from "@gerador/engine";
 import { respostaConfirmada } from "./filaDaEsteira.js";
 
 /**

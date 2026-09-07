@@ -517,3 +517,117 @@ describe("DocumentoScreen — as lacunas na aprovação (SPEC-73 fatia D)", () =
     expect(onMudarStatus).toHaveBeenCalledWith("aprovado");
   });
 });
+
+/**
+ * SPEC-107 G5c — **o julgamento campo a campo NA CASA DA DEMANDA (§5.5).**
+ *
+ * A ficha é REAL (derivar + montarFichaItem, o motor de sempre): o que se
+ * prova é que confirmar assina sem apagar a procedência, editar vira manual,
+ * e sem as props a seção segue só de leitura — a mesma régua da revisão,
+ * importada da aplicação (§263).
+ */
+import { derivar, montarFichaItem, resolverDependencias } from "@gerador/engine";
+import type { RegrasConfig, ValorSpec } from "@gerador/engine";
+
+const configG5: DiagramaConfig = {
+  nodeTypes: {
+    service: {
+      label: "Serviço",
+      derives: "service",
+      techs: ["Backend"],
+      contextos: [],
+      spec: [{ key: "nome", label: "Nome", type: "text", required: true }],
+    },
+  },
+  edgeTypes: {},
+  edgeRules: {},
+} as unknown as DiagramaConfig;
+
+const regrasG5: RegrasConfig = {
+  tipos: [],
+  tamanhos: [],
+  porTech: { Backend: { checklistTecnico: [], testes: [] } },
+};
+
+const diagramaG5 = {
+  nodes: [{ id: "n1", type: "service", status: "novo", label: "srv", x: 0, y: 0, spec: { nome: { valor: "srv", origem: "manual" } }, specNA: {} }],
+  edges: [],
+} as never;
+
+function fichaG5(respostas: Record<string, ValorSpec>) {
+  const atividades = resolverDependencias(derivar(diagramaG5, configG5, {})).atividades;
+  const a = atividades[0];
+  return { chave: a.chave, ficha: montarFichaItem(1, a, diagramaG5, configG5, regrasG5, respostas) };
+}
+
+describe("DocumentoScreen — o julgamento campo a campo mora aqui (SPEC-107 G5c, §5.5)", () => {
+  it("sem fichas, a seção segue só de leitura — como sempre foi", () => {
+    const { chave } = fichaG5({});
+    montar({ documento: doc({ itens: [derivado(chave)] }) });
+
+    expect(screen.queryByTestId("pendencias-dos-itens")).toBeNull();
+    expect(screen.queryByTestId("item-expandir-0")).toBeNull();
+  });
+
+  it("a barra diz quantas sugestões aguardam, e Confirmar todas assina TODAS sem apagar a procedência", () => {
+    const { chave, ficha } = fichaG5({
+      _historiaUsuario: { valor: "Como analista…", origem: "sugerido", confirmado: false },
+      _criteriosAceite: { valor: "Dado que…", origem: "sugerido", confirmado: false },
+    });
+    const onResponderItem = vi.fn();
+    montar({ documento: doc({ itens: [derivado(chave)] }), fichas: new Map([[chave, ficha]]), onResponderItem });
+
+    expect(screen.getByTestId("pendencias-dos-itens")).toHaveTextContent("2 sugestões da esteira aguardando");
+    fireEvent.click(screen.getByTestId("confirmar-todas-itens"));
+
+    expect(onResponderItem).toHaveBeenCalledTimes(2);
+    for (const [, , resposta] of onResponderItem.mock.calls) {
+      expect(resposta).toMatchObject({ origem: "sugerido", confirmado: true });
+    }
+  });
+
+  it("confirmar UM campo assina só ele; a sugestão vira julgamento feito", () => {
+    const { chave, ficha } = fichaG5({
+      _historiaUsuario: { valor: "Como analista…", origem: "sugerido", confirmado: false },
+    });
+    const onResponderItem = vi.fn();
+    montar({ documento: doc({ itens: [derivado(chave)] }), fichas: new Map([[chave, ficha]]), onResponderItem });
+
+    // O card sem escrita ainda refina: a fiação grava sugestões ANTES de
+    // alguém gerar os itens — o julgamento não espera a escrita existir.
+    expect(screen.getByTestId("item-expandir-0")).toHaveTextContent("Recolher");
+    fireEvent.click(screen.getByTestId(`confirmar-campo-${chave}-_historiaUsuario`));
+
+    expect(onResponderItem).toHaveBeenCalledWith(chave, "_historiaUsuario", {
+      valor: "Como analista…",
+      origem: "sugerido",
+      confirmado: true,
+    });
+  });
+
+  it("editar vira MANUAL — quem editou assumiu o texto (SPEC-26)", () => {
+    const { chave, ficha } = fichaG5({
+      _historiaUsuario: { valor: "sugerida", origem: "sugerido", confirmado: false },
+    });
+    const onResponderItem = vi.fn();
+    montar({ documento: doc({ itens: [derivado(chave)] }), fichas: new Map([[chave, ficha]]), onResponderItem });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Editar" })[0]);
+    fireEvent.change(screen.getByLabelText(/Editar/), { target: { value: "texto meu" } });
+    fireEvent.click(screen.getByTestId(`salvar-campo-${chave}-_historiaUsuario`));
+
+    expect(onResponderItem).toHaveBeenCalledWith(chave, "_historiaUsuario", { valor: "texto meu", origem: "manual" });
+  });
+
+  it("campo vazio ganha ✍️ Escrever, e o texto nasce manual", () => {
+    const { chave, ficha } = fichaG5({});
+    const onResponderItem = vi.fn();
+    montar({ documento: doc({ itens: [derivado(chave)] }), fichas: new Map([[chave, ficha]]), onResponderItem });
+
+    fireEvent.click(screen.getByTestId(`escrever-campo-${chave}-_historiaUsuario`));
+    fireEvent.change(screen.getByLabelText(/Editar/), { target: { value: "escrita do zero" } });
+    fireEvent.click(screen.getByTestId(`salvar-campo-${chave}-_historiaUsuario`));
+
+    expect(onResponderItem).toHaveBeenCalledWith(chave, "_historiaUsuario", { valor: "escrita do zero", origem: "manual" });
+  });
+});

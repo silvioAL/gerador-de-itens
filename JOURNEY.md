@@ -16999,3 +16999,53 @@ canvas naquele fluxo, e executar dali aponta a demanda ABERTA na mesa.
 **Próximas**: G5c-2 (o julgamento migra para o documento — editor campo a
 campo, confirmar-todas, conversa por item) e G5c-3 (a morte do motor
 client e da tela, com as re-leituras dos E2Es).
+
+## §384 — SPEC-107 G5c-2: o julgamento campo a campo na casa da demanda
+
+**A segunda sub-rodada da morte final: a SPEC-35 muda de casa.** Com a
+decisão da §5.5 (o julgamento fica NA DEMANDA), a seção dos itens do
+DOCUMENTO ganhou o que só a tela de revisão tinha:
+
+- **A régua inteira mudou para a aplicação** (`casos-de-uso/pendencias.ts`,
+  com o teste junto): pendências, `assinarSugestao` (assina sem apagar a
+  procedência) e a frase de completude — revisão e documento importam a
+  MESMA (§263). A cópia divergente da frase que o documento tinha morre por
+  consequência.
+- **A barra da seção** (`pendencias-dos-itens`): quantas sugestões da
+  esteira aguardam, com "Confirmar todas" — VIVA, das fichas (reflete o
+  gesto na hora, sem esperar regerar itens).
+- **O refinador por campo no card** (`RefinarCampos`): sugestão pendente
+  ganha Confirmar/Editar; campo vazio ganha ✍️ Escrever; confirmado não
+  ganha botão. Editar vira `manual` (quem editou assumiu o texto, SPEC-26).
+  E o card SEM escrita também refina — a fiação grava sugestões antes de
+  alguém gerar os itens.
+
+**O achado que pagou a rodada** (§248 na jornada E2E): a fiação gravava as
+sugestões e, ao VOLTAR À MESA, o banco esvaziava — o autosave gravando o
+estado local velho por cima da escrita do servidor. É a corrida do §250,
+agora cliente×servidor: os destinos G1/G2 escreviam em tabelas próprias e
+nunca doeu; o destino da esteira escreve NA quebra, e doeu na primeira
+jornada real. Conserto mínimo honesto: executar uma fiação que apontou a
+demanda aberta RESSINCRONIZA o estado da mesa (`abrirPorId`) antes de
+qualquer autosave. **Dívida declarada**: a corrida geral (pessoa editando
+enquanto a fiação roda) continua — o PUT do cliente é o documento inteiro;
+merge por campo é rodada própria.
+
+**Vocabulário (§359, achado do usuário em uso real)**: *"adaptador PO? o
+nome do agente pode ser PO, mas entendo que não é um adaptador"* — e é
+isso. "Adaptador" era jargão de arquitetura vazando no painel do nó: o
+agente escolhe um PAPEL, a chamada externa um CONECTOR. Rótulos e mensagem
+de recusa da escrita agora nomeiam o que se escolhe.
+
+**E2E**: a jornada inteira num teste — credencial → demanda → canvas na
+esteira (URL mandável) → executar ao vivo → sugestões pendentes na demanda
+aberta (a mais recente fica intocada) → F5 → documento com a barra →
+Confirmar todas → banco assinado com procedência preservada.
+
+**Adendo da mesma rodada — a mesa como COMPONENTE (o gesto do usuário)**: a
+referência visual que o usuário mandou (canvas n8n-like, *"um componente que
+possamos abrir e usar a mesa de projeto"*) é o §3.1 à letra — e a porta
+entrou: o painel do nó **Projeto** no fluxo ganhou "Abrir a mesa de projeto
+→" (`abrir-mesa-do-projeto`). E o roadmap de integrações reais que ele pediu
+(Teams webhook, Jira paginado — gateway vs. primitiva de laço —,
+Postgres/Mongo) ficou anotado para virar a SPEC-108, depois da G5c-3.
