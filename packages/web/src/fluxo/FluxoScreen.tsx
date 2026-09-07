@@ -78,6 +78,7 @@ export function FluxoScreen({
   demandaAberta,
   aoExecutarComDemanda,
   aoAbrirConfigDosPapeis,
+  aoAbrirConfigDaEspecificacao,
 }: {
   timeAtivo: string;
   onFechar: () => void;
@@ -107,6 +108,12 @@ export function FluxoScreen({
    * editar daqui; criar papel contextual e sugerir com IA continuam lá.
    */
   aoAbrirConfigDosPapeis?: () => void;
+  /**
+   * SPEC-109 D — a porta para o template da especificação
+   * (`#/config/especificacao`): a aba saiu do menu; o template é insumo da
+   * GERAÇÃO DE ITENS, e a porta vive no nó dela.
+   */
+  aoAbrirConfigDaEspecificacao?: () => void;
 }) {
   const permissoes = usePermissoes({ hospedado: true, timeId: timeAtivo });
   const podeEditar = permissoes.pode("fluxos", "editar");
@@ -886,6 +893,7 @@ export function FluxoScreen({
                 podeEditarPapel={podeEditarPapel}
                 onSalvarPapel={salvarPapel}
                 onAbrirMesa={onFechar}
+                aoAbrirConfigDaEspecificacao={aoAbrirConfigDaEspecificacao}
                 // SPEC-109 C — o lugar do papel NA ESTEIRA (herdado do mapa
                 // que morreu): ligar/desligar, ordem e a última corrida.
                 esteira={
@@ -1072,6 +1080,7 @@ function PainelDoNo({
   onRemover,
   onAbrirMesa,
   esteira,
+  aoAbrirConfigDaEspecificacao,
 }: {
   no: NoDoFluxo;
   catalogo: ConectorDoCatalogo[];
@@ -1095,6 +1104,9 @@ function PainelDoNo({
     onMover: (direcao: -1 | 1) => void;
     aoAbrirConfig?: () => void;
   };
+  /** SPEC-109 D — a porta para o template da especificação, no nó que o
+   * consome (a geração de itens). */
+  aoAbrirConfigDaEspecificacao?: () => void;
 }) {
   const conector = no.tipo === "conector" ? catalogo.find((c) => c.id === no.refId) : undefined;
   // SPEC-107 fatia A — a função É a capacidade: contrato do registro fechado,
@@ -1351,6 +1363,18 @@ function PainelDoNo({
           <p style={{ color: "var(--texto-fraco)", margin: "6px 0 0" }}>
             As entradas vêm das arestas (mapeamento). Obrigatória ausente não vira default — o nó não roda (§9.3).
           </p>
+          {/* SPEC-109 D — o template da especificação MOLDA o que este nó
+              escreve (o `templateItem` da derivação): a porta vive onde o
+              insumo é consumido, e a aba saiu do menu. */}
+          {no.refId === "derivacao" && aoAbrirConfigDaEspecificacao && (
+            <button
+              data-testid="abrir-config-da-especificacao"
+              onClick={aoAbrirConfigDaEspecificacao}
+              style={{ ...botaoMiudo, marginTop: 6 }}
+            >
+              Template da especificação (molda os itens) →
+            </button>
+          )}
         </div>
       )}
       {no.tipo === "agente" && (

@@ -126,8 +126,9 @@ test("Especificação: apagar {{itens}} não deixa salvar e mostra o motivo (SPE
   const API = "http://localhost:4100";
   const antes = await (await page.request.get(`${API}/especificacao-template`)).json();
 
-  await page.getByRole("button", { name: "☰ Menu" }).click();
-  await page.getByRole("button", { name: /Especificação de solução/ }).click();
+  // SPEC-109 D — a aba saiu do menu; o deep-link é a porta (o nó de geração
+  // de itens no canvas aponta para cá).
+  await page.goto("/#/config/especificacao");
   await page.getByRole("button", { name: "editar" }).click();
 
   const conteudo = page.getByLabel("Conteúdo do template");
@@ -153,9 +154,8 @@ test("Especificação: apagar {{itens}} não deixa salvar e mostra o motivo (SPE
   // constar no E2E, não só o bloqueio): grava, sai da tela, volta e o texto
   // persistido é o novo.
   await salvar.click();
-  await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
-  await page.getByRole("button", { name: "☰ Menu" }).click();
-  await page.getByRole("button", { name: /Especificação de solução/ }).click();
+  await page.goto("/#/config/especificacao");
+  await page.reload();
   await expect(page.getByText(/Template do E2E/)).toBeVisible();
 
   // Restaura o template vigente — ele é da organização, não deste teste.

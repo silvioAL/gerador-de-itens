@@ -2071,6 +2071,8 @@ function AppCarregado({
           // SPEC-109 C — a porta para o catálogo COMPLETO dos papéis (criar
           // contextual, sugerir com IA): o deep-link vive, o menu não lista.
           aoAbrirConfigDosPapeis={() => navegar({ tela: "config", area: "pipeline" })}
+          // SPEC-109 D — o template da especificação, no nó que o consome.
+          aoAbrirConfigDaEspecificacao={() => navegar({ tela: "config", area: "especificacao" })}
           painel={
             bancadaDeEnsaiosAberta ? (
               <BancadaDeEnsaios
