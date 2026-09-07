@@ -17391,3 +17391,77 @@ de tour que o chamam narram a esteira ("a esteira de agentes derivada da
 configuração, quem escreve cada parte do item, na ordem") — num time com
 fluxos próprios, o tour explicava uma tela e mostrava outra. É o §390
 renascendo por outra porta. O passo passou a abrir a esteira pelo id.
+
+## §393 — SPEC-110 C: as telas que o time cria
+
+D5, na voz do usuário: *"também precisará de spec para essa parte de criar ou
+editar screens"*. A fatia B deu ao produto três telas do SISTEMA; esta dá à
+pessoa a caneta.
+
+**Uma tela declarada é uma pilha de BLOCOS**, e o conjunto é pequeno de
+propósito: `texto` explica, `dado` mostra o que a fiação trouxe, `campo`
+pergunta, `acao` decide. Layout livre não entra no v1 — os blocos são o chão,
+não o teto (a direção de app builder é a SPEC-111, por degraus medidos).
+
+**O contrato NASCE dos blocos**, não de uma declaração paralela: `entrada` são
+os blocos `dado`, `saida` são os `campo` mais a decisão que toda tela emite
+(D2). Duas fontes divergiriam no primeiro bloco editado — e o obrigatório do
+bloco vira o obrigatório do contrato, que é literalmente o que trava o Avançar.
+
+**O prefixo `tela:` no refId** é o que impede uma tela do time chamada "mesa"
+de sequestrar a do sistema. `telasEmVigor` devolve as duas famílias no mesmo
+vocabulário — quem consome uma tela não pergunta de onde ela veio, que é a
+mesma régua de `fluxosEmVigor`.
+
+A régua da casa em duas metades (SPEC-35): a LEITURA tolera — bloco sem chave,
+tipo desconhecido e chave repetida saem, e o resto da tela continua de pé; a
+ESCRITA recusa nomeando — porque o que a leitura descarta em silêncio some do
+documento salvo, e a pessoa só descobre quando a tela abre sem o bloco que ela
+acabou de criar. Recusas: id ausente/repetido, bloco de tipo desconhecido,
+chave ausente/repetida, escolha sem opções, texto vazio e **dois acionadores
+da mesma decisão** (D17a — "qual vale?" não pode ter resposta silenciosa, a
+mesma régua do gatilho duplicado).
+
+**O guarda do §354 cobrou a chave nova antes de ela nascer morta**: o teste que
+exige um documento de exemplo por `CHAVES_CONFIG` falhou no primeiro `npm
+test`, e o de `resumirConfig` logo depois. É exatamente para isso que ele
+existe — `tokens` nasceu morta no hospedado por não ter `case`, e a
+documentação prometia um `default` que o código não cumpria.
+
+O editor vive em `#/config/telas` e `#/config/telas/<id>`, **fora do menu**: o
+padrão "deep-link + porta no nó" das §§388-389 — o painel do nó de tela
+declarada ganhou "editar a tela →". O preview usa o MESMO `RenderizadorDaTela`
+do stage; um segundo desenho passaria a mentir sobre o que a pessoa vai ver.
+O markdown é o `EscritaDoItem` que o documento já usa — sem dependência nova,
+e sem um segundo renderizador para divergir do primeiro.
+
+Permissão: `telas` usa o recurso `fluxos`. Quem pode fiar um fluxo pode criar
+a tela que ele atravessa — um cadeado separado dividiria a mesma decisão em
+dois, e o segundo ficaria esquecido aberto (o sintoma que `RECURSOS_SEM_ROTA`
+documenta).
+
+§248 (trio, três sabotagens distintas): afrouxar a recusa de escolha sem
+opções → a prova da recusa fica vermelha; tirar o `obrigatorio` do contrato
+derivado → a prova de que ele trava o Avançar fica vermelha; remover o prefixo
+do refId → as três provas do em-vigor ficam vermelhas. Restaurado, verde.
+
+D19: o "Como usar" ganhou "Crie a sua própria tela" e o tour de configuração
+passou a listar as telas entre o que o time molda.
+
+**A aspereza da fatia B, paga aqui:** o stage agora TROCA o contexto em vez de
+empilhar. O cabeçalho da mesa (paleta, Salvar, Derivar Quebra) e o canvas
+saem quando o stage é dono da tela — quem revisa uma execução não deveria ver
+"Derivar Quebra". As telas do sistema `documento` e `mesa` seguem fora dessa
+regra de propósito: elas delegam, e a moldura fica por cima DELAS (D17c).
+
+**E um defeito que só a validação visual mostrou:** um bloco `dado` de formato
+`objeto` com o desenho inteiro da demanda ocupava a tela toda e empurrava os
+CAMPOS para fora — quem revisava via o dado e não achava onde responder. O
+`pre` ganhou teto com rolagem: dado é para consultar; a decisão é o que a tela
+existe para colher.
+
+**Lição de método, registrada:** a primeira rodada final desta fatia deu 16
+vermelhos, e nenhum era real — eu tinha rodado `docker compose up -d --build`
+da stack REAL enquanto a suíte E2E corria na mesma máquina, e os timeouts do
+Playwright estouraram por contenção. A rodada que vale é a que roda sozinha; a
+regra da casa sobre isso não é cerimônia.

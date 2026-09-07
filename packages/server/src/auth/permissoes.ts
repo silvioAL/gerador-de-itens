@@ -115,6 +115,13 @@ export const RECURSO_DA_CHAVE_DE_CONFIG = {
   conexoes: "conexoes",
   conectores: "conectores",
   fluxos: "fluxos",
+  /**
+   * SPEC-110 fatia C — as telas do time são parte do desenho da automação:
+   * quem pode fiar um fluxo pode criar a tela que ele atravessa. Um recurso
+   * separado dividiria a mesma decisão em dois cadeados, e o segundo ficaria
+   * esquecido aberto (o sintoma que o `RECURSOS_SEM_ROTA` documenta).
+   */
+  telas: "fluxos",
 } as const satisfies Record<ChaveConfig, Recurso | null>;
 
 /**

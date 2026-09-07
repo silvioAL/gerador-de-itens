@@ -64,7 +64,7 @@ export { CAMPO_GLOBAL };
  * diferentes sem ambiguidade, porque fluxo não deriva (§6). O `timeId` aqui é
  * o time de verdade, como em `pipeline-agentes`.
  */
-export const CHAVES_CONFIG = ["regras", "pipeline-agentes", "exportador", "tokens", "conexoes", "conectores", "fluxos"] as const;
+export const CHAVES_CONFIG = ["regras", "pipeline-agentes", "exportador", "tokens", "conexoes", "conectores", "fluxos", "telas"] as const;
 
 export type ChaveConfig = (typeof CHAVES_CONFIG)[number];
 

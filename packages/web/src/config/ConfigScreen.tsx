@@ -16,6 +16,8 @@ import { apiPdca } from "../api/client";
 import { PdcaTab } from "./PdcaTab";
 import { TokensTab } from "./TokensTab";
 import { ConexoesTab } from "./ConexoesTab";
+// SPEC-110 fatia C — o editor de telas do time.
+import { TelasTab } from "./TelasTab";
 import { ConectoresTab } from "./ConectoresTab";
 import { ProdutosTab } from "./ProdutosTab";
 import { CONECTORES_DO_TOUR, TOKENS_DO_TOUR, PRODUTO_DO_TOUR } from "../demo/dadosDoTour";
@@ -33,7 +35,9 @@ export type AbaConfig =
   | "pipeline"
   | "modeloIa" | "pdca" | "tokens"
   /** SPEC-105 fatia A — o catálogo de conectores (organizacional). */
-  | "conectores";
+  | "conectores"
+  /** SPEC-110 fatia C — as telas (screens) do time: criar, editar, prever. */
+  | "telas";
 
 export interface ConfigScreenProps {
   /** §274 — abre o assistente do FAB na conversa de configuração. */
@@ -49,6 +53,10 @@ export interface ConfigScreenProps {
   templateItem?: EspecificacaoTemplate | null;
   pipelineAgentes: ConfigPipelineAgentes;
   timeAtivo: string;
+  /** SPEC-110 fatia C — a tela em edição (`#/config/telas/<id>`); ausente é a
+   * lista. É o mesmo endereço-com-detalhe do canvas — a porta é URL. */
+  telaId?: string;
+  aoAbrirTela?: (id?: string) => void;
   /** SPEC-53 — os times aos quais um produto pode ser amarrado. */
   timeIds: string[];
   /** false no modo local (CLI) — sem servidor não existe conceito de outros
@@ -109,6 +117,8 @@ export function ConfigScreen({
   templateItem,
   pipelineAgentes,
   timeAtivo,
+  telaId,
+  aoAbrirTela,
   timeIds,
   onPerfisMudaram,
   onFichaMudou,
@@ -202,6 +212,13 @@ export function ConfigScreen({
       // lugar de "endereço que a empresa chama" (organizacional e curado).
       { id: "conectores", rotulo: "Conectores", existe: true },
       { id: "tokens", rotulo: "Design system", existe: true },
+      /**
+       * SPEC-110 fatia C — as telas do time. Entram na lista da tela de
+       * configuração (senão o deep-link cairia na primeira aba), e NÃO no
+       * menu: o padrão "deep-link + porta no nó" das §§388-389 — quem alcança
+       * é quem consome (o painel do nó de tela e a galeria).
+       */
+      { id: "telas", rotulo: "Telas do time", existe: true },
     ] satisfies { id: AbaConfig; rotulo: string; existe: boolean }[]
   ).filter((a) => a.existe && podeVerAba(a.id, permissoes.pode));
 
@@ -279,6 +296,7 @@ export function ConfigScreen({
           />
         )}
         {abaAtiva === "conexoes" && <ConexoesTab config={config} />}
+        {abaAtiva === "telas" && <TelasTab timeAtivo={timeAtivo} telaId={telaId} aoAbrirTela={aoAbrirTela ?? (() => undefined)} />}
         {abaAtiva === "conectores" && <ConectoresTab demonstracao={demonstracao ? CONECTORES_DO_TOUR : undefined} />}
         {abaAtiva === "camposAresta" && (
           <CamposArestaTab

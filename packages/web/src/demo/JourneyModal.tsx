@@ -181,6 +181,14 @@ const PASSOS_DE_USO: { titulo: string; texto: string }[] = [
       "Um fluxo pode ter uma TELA no meio — é onde você entra. Quando a execução chega nela, ela PARA e o canvas mostra “aguardando uma tela — abrir →”. Você abre, revisa o que chegou (o ensaio, o documento, a mesa) e decide: “Avançar →” segue a fiação com a sua decisão; “← Retornar” encerra a execução para você ajustar e rodar de novo. O ensaio de cenários já vem assim de fábrica: o botão “Simular” da mesa roda o fluxo e para na bancada.",
   },
   {
+    // SPEC-110 fatia C (D19) — o gesto NOVO: a tela que a PESSOA cria. Sem
+    // este passo, o manual descreveria só as três telas do sistema e a
+    // capacidade que o usuário mais pediu ficaria invisível.
+    titulo: "Crie a sua própria tela",
+    texto:
+      "Clique num nó de tela no canvas → “editar a tela →”, ou vá direto a ☰ Menu → Configurações → Telas do time. Uma tela é uma pilha de blocos: TEXTO explica, DADO mostra o que a fiação trouxe, CAMPO pergunta (e o obrigatório trava o Avançar até preencher, dizendo o que falta), AÇÃO dá o seu nome ao botão. A prévia ao lado é exatamente o que a pessoa vai ver quando a execução parar ali.",
+  },
+  {
     titulo: "Confirme o que a IA escreveu",
     texto:
       "De volta ao documento, a seção de itens mostra as sugestões PENDENTES: confirme campo a campo, edite, escreva por cima ou \"Confirmar todas\". Nada que a IA propõe vale antes disso.",

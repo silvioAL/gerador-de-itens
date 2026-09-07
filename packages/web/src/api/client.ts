@@ -1588,10 +1588,18 @@ export interface ConectorDoCatalogo extends Omit<ConectorEmVigorDaAplicacao, "ca
  * SPEC-105 fatias C/D — os fluxos (chave POR TIME, ao contrário de
  * `conectores`) e a execução. Tipos direto da aplicação, mesma cicatriz §263.
  */
-export type { ArestaDoFluxo, ConfigFluxos, Fluxo, FluxoEmVigor, NoDoFluxo } from "@gerador/aplicacao";
-import type { ConfigFluxos, FluxoEmVigor as FluxoEmVigorDaAplicacao } from "@gerador/aplicacao";
+export type { ArestaDoFluxo, BlocoDaTela, ConfigFluxos, ConfigTelas, Fluxo, FluxoEmVigor, NoDoFluxo, TelaDeclarada, TelaEmVigor } from "@gerador/aplicacao";
+import type {
+  BlocoDaTela as BlocoDaTelaDaAplicacao,
+  ConfigFluxos,
+  ConfigTelas as ConfigTelasDaAplicacao,
+  FluxoEmVigor as FluxoEmVigorDaAplicacao,
+} from "@gerador/aplicacao";
 
 export const apiFluxos = configDe<ConfigFluxos>("fluxos");
+/** SPEC-110 fatia C — as telas DO TIME, no mesmo caminho de config de todas as
+ * outras (documento por chave por time, SPEC-35). */
+export const apiTelas = configDe<ConfigTelasDaAplicacao>("telas");
 
 /** SPEC-106 — os fluxos EM VIGOR (declarados + a esteira derivada dos papéis),
  * resolvidos no servidor; e a saúde da última execução de cada um. */
@@ -1649,6 +1657,10 @@ export interface StageDaTela {
     descricao: string;
     entrada: { chave: string; rotulo: string; tipo: string; obrigatorio?: boolean }[];
     saida: { chave: string; rotulo: string; tipo: string; obrigatorio?: boolean }[];
+    /** SPEC-110 fatia C — de onde a tela veio: do sistema (delega para a tela
+     * que já existe) ou do time (os blocos abaixo a desenham). */
+    origem: "sistema" | "declarada";
+    blocos?: BlocoDaTelaDaAplicacao[];
   };
   entradas: Record<string, unknown>;
 }
