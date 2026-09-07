@@ -268,7 +268,8 @@ describe("SPEC-105 fatia D — POST /fluxos/:id/executar", () => {
       expect(esteira!.origem).toBe("fabrica");
       // SPEC-107 G5 — a esteira COMPLETA: a demanda como fonte, os quatro
       // papéis de fábrica na ordem, e o destino que grava as sugestões.
-      expect(esteira!.nos.map((n) => n.id)).toEqual(["demanda", "po", "arquiteto", "especialista", "qa", "grava"]);
+      // SPEC-110 A — na frente de tudo, o gatilho que diz quando ela roda.
+      expect(esteira!.nos.map((n) => n.id)).toEqual(["gatilho", "demanda", "po", "arquiteto", "especialista", "qa", "grava"]);
 
       // Ela EXECUTA pelo executor de fluxos (a resolução vem do em-vigor) — e
       // sem demanda salva no mundo, quem barra é a FONTE, com o nome do que
@@ -1056,11 +1057,14 @@ describe("SPEC-107 fatia B — o nó PROJETO", () => {
         nos: { noId: string; estado: string; erro?: string }[];
         saidas: Record<string, Record<string, unknown>>;
       };
+      // SPEC-110 A — a derivada começa pelo gatilho (no-op) e o rastro o diz.
       expect(corpo.nos.map((n) => [n.noId, n.estado])).toEqual([
+        ["gatilho", "sucesso"],
         ["demanda", "sucesso"],
         ["envio", "sucesso"],
         ["grava", "sucesso"],
       ]);
+      expect(corpo.nos.find((n) => n.noId === "gatilho")).toMatchObject({ origem: "manual" });
       // A régua de "pronto" (a MESMA da SPEC-49): o pendente ficou de fora.
       expect(corpo.saidas["demanda"].itensIgnorados).toEqual(["pendente"]);
       // Falha parcial por item: o dublê recusa o último enviado.

@@ -92,7 +92,10 @@ test("fatia C: desenhar, ligar, mapear — e o ciclo trava com a mensagem do des
     await page.getByTestId("adaptador-do-no").selectOption("leitor-fluxo-e2e");
     await page.getByTestId("add-agente").click();
     await page.getByTestId("adaptador-do-no").selectOption("po");
-    await expect(page.locator(".react-flow__node")).toHaveCount(2);
+    // SPEC-110 A (D1) — três, não dois: o fluxo novo já nasce com o GATILHO
+    // (o cartão que diz quando ele roda), como um workflow novo do n8n.
+    await expect(page.locator(".react-flow__node")).toHaveCount(3);
+    await expect(page.locator('.react-flow__node[data-id="gatilho"]')).toBeVisible();
 
     // Ligar: a aresta nasce SEM mapeamento, e a tela diz isso.
     await ligar(page, "integracao-1", "agente-1");
@@ -133,7 +136,9 @@ test("fatia C: desenhar, ligar, mapear — e o ciclo trava com a mensagem do des
     await expect(page.getByTestId("fluxo-screen")).toBeVisible();
     // O documento pode carregar outros fluxos do time — o F5 prova ESTE.
     await page.getByTestId("seletor-de-fluxo").selectOption("desenho-e2e");
-    await expect(page.locator(".react-flow__node")).toHaveCount(2);
+    // SPEC-110 A — três: o gatilho salvo com o fluxo volta do documento junto
+    // com a integração e o agente (o "quando roda" persiste, como o resto).
+    await expect(page.locator(".react-flow__node")).toHaveCount(3);
     // A persistência se prova na FONTE DA VERDADE: o mapeamento está no
     // documento salvo. (O rótulo na aresta já foi afirmado VISÍVEL antes do
     // F5; re-afirmá-lo aqui flakava sob carga — o React Flow às vezes pula a
@@ -151,7 +156,8 @@ test("fatia C: desenhar, ligar, mapear — e o ciclo trava com a mensagem do des
     // ordem, banner de derivado, edição travada até "editar uma cópia".
     await page.getByTestId("seletor-de-fluxo").selectOption("esteira-de-agentes");
     // SPEC-107 G5 — a esteira derivada é COMPLETA: demanda → 4 papéis → grava.
-    await expect(page.locator(".react-flow__node")).toHaveCount(6);
+    // SPEC-110 A — sete, com o gatilho na frente (R3 da SPEC: a contagem sobe).
+    await expect(page.locator(".react-flow__node")).toHaveCount(7);
     await expect(page.getByTestId("fluxo-derivado")).toBeVisible();
     await expect(page.getByTestId("add-agente")).toBeDisabled();
 

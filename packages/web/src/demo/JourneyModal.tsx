@@ -166,8 +166,11 @@ const PASSOS_DE_USO: { titulo: string; texto: string }[] = [
   },
   {
     titulo: "Rode a esteira de agentes no canvas",
+    // SPEC-110 fatia A (D19) — o passo passa a nomear o GATILHO: todo fluxo
+    // diz quando roda, e "▶ Rodar agora" é o gesto do gatilho manual. Sem
+    // isso o manual ensinaria um botão que a tela não tem mais.
     texto:
-      "☰ Menu → Fluxos de integração (a esteira também abre sozinha ao derivar): Executar roda os agentes (PO, Arquiteto, Especialista, QA) sobre a demanda aberta, ao vivo, nó a nó. Clicar num agente edita o papel dele — prompt, ligar/desligar, ordem.",
+      "☰ Menu → Fluxos de integração (a esteira também abre sozinha ao derivar): o primeiro cartão é o GATILHO — ele diz quando o fluxo roda. Com o gatilho manual, \"▶ Rodar agora\" dispara os agentes (PO, Arquiteto, Especialista, QA) sobre a demanda aberta, ao vivo, nó a nó. Clicar num agente edita o papel dele — prompt, ligar/desligar, ordem.",
   },
   {
     titulo: "Confirme o que a IA escreveu",

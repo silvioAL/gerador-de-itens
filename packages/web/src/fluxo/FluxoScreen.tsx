@@ -16,6 +16,10 @@ import { comoNoDaMesa, configDoFluxo } from "./vocabularioDoFluxo";
 import {
   FUNCOES_DO_SISTEMA,
   funcaoDoSistema,
+  GATILHOS_DO_SISTEMA,
+  gatilhoDoSistema,
+  ID_DO_NO_DE_GATILHO,
+  noDeGatilhoManual,
   PROJETO_DO_SISTEMA,
   REF_DO_PROJETO,
   sanearCamposDaTransformacao,
@@ -68,7 +72,44 @@ import { usePermissoes } from "../auth/usePermissoes";
 const TIPOS_DE_NO = { noDeFluxo: NodeCard };
 const CONFIG_DO_FLUXO = configDoFluxo();
 
-const FLUXO_VAZIO = (id: string, nome: string): FluxoEmVigor => ({ id, nome, nos: [], arestas: [], origem: "declarado" });
+/**
+ * SPEC-110 fatia A (D1) — **todo fluxo COMEÇA num gatilho visível**, e isso
+ * vale para o gesto de criar: o fluxo novo já nasce com o cartão que diz
+ * quando ele roda (manual, o disparo de sempre), como um workflow novo do n8n
+ * nasce pedindo o trigger. Quem quer outro gatilho troca no painel; quem não
+ * quer nenhum apaga — a validação tolera zero (D8).
+ */
+const FLUXO_VAZIO = (id: string, nome: string): FluxoEmVigor => ({
+  id,
+  nome,
+  nos: [noDeGatilhoManual({ x: 80, y: 120 })],
+  arestas: [],
+  origem: "declarado",
+});
+
+/**
+ * SPEC-110 fatia A — **a cascata não nasce POR CIMA de ninguém.**
+ *
+ * A posição de um nó novo sempre foi `80 + n*60, 80 + n*40` sobre a CONTAGEM
+ * de nós — o que bastava enquanto todo fluxo começava vazio. Com o gatilho já
+ * no desenho (D1), o primeiro nó adicionado caía a 60px dele: cartões de 190px
+ * empilhados, o de baixo intocável (medido na validação visual, e é o mesmo
+ * sintoma que a §0.9 da SPEC anota para os handles na CI). O slot agora anda
+ * até achar lugar livre.
+ */
+function proximaPosicao(nos: NoDoFluxo[]): { x: number; y: number } {
+  const ocupado = (p: { x: number; y: number }) =>
+    nos.some((no) => Math.abs(no.posicao.x - p.x) < 200 && Math.abs(no.posicao.y - p.y) < 90);
+  let n = nos.length;
+  let posicao = { x: 80 + n * 60, y: 80 + n * 40 };
+  // O teto existe porque um desenho denso pode não ter slot na diagonal — e
+  // um laço infinito ao clicar na paleta seria pior que um cartão sobreposto.
+  while (ocupado(posicao) && n < nos.length + 40) {
+    n++;
+    posicao = { x: 80 + n * 60, y: 80 + n * 40 };
+  }
+  return posicao;
+}
 
 export function FluxoScreen({
   timeAtivo,
@@ -209,6 +250,12 @@ export function FluxoScreen({
         return funcao ? { entrada: funcao.entrada, saida: funcao.saida } : null;
       }
       if (no.tipo === "projeto") return { entrada: PROJETO_DO_SISTEMA.entrada, saida: PROJETO_DO_SISTEMA.saida };
+      // SPEC-110 A — o gatilho declara a saída dele (vazia no manual; o
+      // webhook da fatia L emite o payload): entrada ele não tem, é o começo.
+      if (no.tipo === "gatilho") {
+        const gatilho = gatilhoDoSistema(no.refId);
+        return gatilho ? { entrada: [], saida: gatilho.saida } : null;
+      }
       return null;
     },
     [catalogo]
@@ -269,6 +316,10 @@ export function FluxoScreen({
       // SPEC-109 B — o nome que a PESSOA deu ao nó vence qualquer derivado:
       // o cartão ecoa o que ela escreveu, como tudo na casa.
       if (no.nome?.trim()) return no.nome.trim();
+      // SPEC-110 A — o gatilho diz o GESTO que o dispara, não o tipo. No
+      // CARTÃO vai o rótulo curto: a frase inteira estica o cartão e esconde
+      // o vizinho (medido na validação visual desta fatia).
+      if (no.tipo === "gatilho") return gatilhoDoSistema(no.refId)?.rotuloCurto ?? no.refId;
       if (!no.refId)
         return no.componente && no.componente !== "livre"
           ? NOME_DA_OPERACAO[no.componente]
@@ -342,7 +393,15 @@ export function FluxoScreen({
         // A aresta que ALIMENTA o nó rodando anima o dado passando (§2.4-9).
         animated: vivo?.rodando === a.para,
         // Aresta sem mapeamento é decoração — e a tela diz isso na etiqueta.
-        label: a.mapeamento.length > 0 ? a.mapeamento.map((m) => `${m.saida}→${m.entrada}`).join(", ") : "sem mapeamento",
+        // SPEC-110 A — MENOS a que sai do gatilho: o gatilho manual não emite
+        // dado (D1), então "sem mapeamento" ali seria acusação falsa. Ela não
+        // é decoração: é o DISPARO, e a etiqueta diz isso.
+        label:
+          a.mapeamento.length > 0
+            ? a.mapeamento.map((m) => `${m.saida}→${m.entrada}`).join(", ")
+            : fluxo?.nos.find((n) => n.id === a.de)?.tipo === "gatilho"
+              ? "dispara"
+              : "sem mapeamento",
         style: { stroke: "var(--texto-mudo)" },
         labelStyle: { fill: "var(--texto-2)", fontSize: 10 },
         labelBgStyle: { fill: "var(--painel)" },
@@ -385,7 +444,7 @@ export function FluxoScreen({
             id,
             tipo,
             refId,
-            posicao: { x: 80 + f.nos.length * 60, y: 80 + f.nos.length * 40 },
+            posicao: proximaPosicao(f.nos),
             parametros: {},
             ...(tipo === "conector" && componente !== undefined && componente !== "agente" ? { componente } : {}),
           },
@@ -409,7 +468,7 @@ export function FluxoScreen({
         ...f,
         nos: [
           ...f.nos,
-          { id, tipo: "funcao", refId: funcaoId, posicao: { x: 80 + f.nos.length * 60, y: 80 + f.nos.length * 40 }, parametros: {} },
+          { id, tipo: "funcao", refId: funcaoId, posicao: proximaPosicao(f.nos), parametros: {} },
         ],
       };
     });
@@ -428,7 +487,30 @@ export function FluxoScreen({
         ...f,
         nos: [
           ...f.nos,
-          { id, tipo: "transformacao", refId: "transformacao", posicao: { x: 80 + f.nos.length * 60, y: 80 + f.nos.length * 40 }, parametros: { campos: [] } },
+          { id, tipo: "transformacao", refId: "transformacao", posicao: proximaPosicao(f.nos), parametros: { campos: [] } },
+        ],
+      };
+    });
+  }
+
+  /**
+   * SPEC-110 fatia A — o gatilho nasce MANUAL: é o disparo que sempre
+   * existiu (o botão), agora com nome e lugar no desenho. O id preferido é o
+   * estável (`gatilho`, o mesmo das fábricas); só ganha sufixo se já houver um
+   * nó com esse id — e a validação de escrita recusa o SEGUNDO gatilho, para
+   * a pergunta "qual vale?" não existir (D1).
+   */
+  function adicionarGatilho() {
+    mudarFluxo((f) => {
+      let id = ID_DO_NO_DE_GATILHO;
+      let n = 1;
+      while (f.nos.some((no) => no.id === id)) id = `${ID_DO_NO_DE_GATILHO}-${++n}`;
+      setSelecao({ tipo: "no", id });
+      return {
+        ...f,
+        nos: [
+          ...f.nos,
+          { id, tipo: "gatilho", refId: "manual", posicao: proximaPosicao(f.nos), parametros: {} },
         ],
       };
     });
@@ -446,7 +528,7 @@ export function FluxoScreen({
         ...f,
         nos: [
           ...f.nos,
-          { id, tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 80 + f.nos.length * 60, y: 80 + f.nos.length * 40 }, parametros: {} },
+          { id, tipo: "projeto", refId: REF_DO_PROJETO, posicao: proximaPosicao(f.nos), parametros: {} },
         ],
       };
     });
@@ -716,6 +798,25 @@ export function FluxoScreen({
                 fantasiada de componente. A integração concreta (envio,
                 publicação, ADR, leitor, chamada livre) se escolhe no painel,
                 pelo catálogo — o hexagonal da casa, na tela. */}
+            {/* SPEC-110 fatia A — o GATILHO abre a paleta porque ele abre o
+                fluxo: a primeira pergunta de quem monta uma automação é
+                "quando isso roda?". */}
+            <button
+              data-testid="add-gatilho"
+              // Um fluxo diz UMA vez quando roda (D1): com o gatilho já no
+              // desenho, o botão desliga com o motivo — deixar clicar para a
+              // validação recusar no Salvar seria ensinar um gesto que não vale.
+              disabled={!editavel || (fluxo?.nos ?? []).some((n) => n.tipo === "gatilho")}
+              title={
+                (fluxo?.nos ?? []).some((n) => n.tipo === "gatilho")
+                  ? "este fluxo já tem um gatilho — um fluxo diz UMA vez quando roda"
+                  : undefined
+              }
+              onClick={adicionarGatilho}
+              style={botao}
+            >
+              + Gatilho
+            </button>
             <button data-testid="add-integracao" disabled={!editavel} onClick={() => adicionarComponente("conector")} style={botao}>
               + Integração externa
             </button>
@@ -750,7 +851,12 @@ export function FluxoScreen({
           disabled={!fluxo || !!ciclo || executando || !podeEditar}
           style={{ ...botao, background: "var(--acento)", color: "#fff", border: "1px solid var(--acento)" }}
         >
-          {executando ? "Executando…" : "Executar"}
+          {/* SPEC-110 fatia A — o botão vira o GESTO do gatilho manual: a
+              queixa era "não entendi qual o objetivo do botão executar", e o
+              objetivo só fica legível quando o desenho diz quando o fluxo
+              roda. O testid segue `executar-fluxo` (dezenas de E2Es o usam) —
+              o que muda é a frase, não o contrato da tela. */}
+          {executando ? "Rodando…" : "▶ Rodar agora"}
         </button>
       </div>
 
@@ -799,6 +905,16 @@ export function FluxoScreen({
           )}
         </div>
       )}
+      {/* SPEC-110 fatia A (D8) — gatilho NÃO é obrigatório: fluxo salvo antes
+          desta fatia continua rodando pelo botão, sem migração de dado. Mas a
+          tela sugere, porque um fluxo que não diz quando roda é justamente o
+          desenho incompleto que a queixa apontou. */}
+      {fluxo && fluxo.nos.length > 0 && !fluxo.nos.some((n) => n.tipo === "gatilho") && (
+        <div data-testid="fluxo-sem-gatilho" style={{ ...avisoEstilo, color: "var(--texto-2)" }}>
+          Este fluxo não diz <strong>quando roda</strong> — ele funciona pelo “▶ Rodar agora”, mas adicionar um{" "}
+          <strong>Gatilho</strong> pela paleta deixa isso escrito no desenho.
+        </div>
+      )}
       {ciclo && (
         <div data-testid="aviso-de-ciclo" style={avisoEstilo}>
           Não é possível executar ainda — {mensagemDeCiclo(ciclo)}
@@ -823,8 +939,9 @@ export function FluxoScreen({
         <div style={{ flex: 1, position: "relative" }}>
           {fluxo && fluxo.nos.length === 0 && (
             <div style={dicaVaziaEstilo}>
-              Adicione uma <strong>integração externa</strong> ou um <strong>agente</strong> pela paleta acima e ligue-os —
-              a aresta carrega o dado (saída → entrada), como no n8n.
+              Comece pelo <strong>gatilho</strong> (quando este fluxo roda) e ligue-o a uma{" "}
+              <strong>integração externa</strong> ou a um <strong>agente</strong> — a aresta carrega o dado
+              (saída → entrada), como no n8n.
             </div>
           )}
           {fluxo ? (
@@ -1109,6 +1226,9 @@ function PainelDoNo({
   aoAbrirConfigDaEspecificacao?: () => void;
 }) {
   const conector = no.tipo === "conector" ? catalogo.find((c) => c.id === no.refId) : undefined;
+  // SPEC-110 fatia A — o gatilho É o registro fechado, como a função: não há
+  // adaptador a escolher enquanto a família tiver um só membro (§2.4-10).
+  const gatilho = no.tipo === "gatilho" ? gatilhoDoSistema(no.refId) : undefined;
   // SPEC-107 fatia A — a função É a capacidade: contrato do registro fechado,
   // sem adaptador a escolher.
   const funcao = no.tipo === "funcao" ? funcaoDoSistema(no.refId) : undefined;
@@ -1127,7 +1247,15 @@ function PainelDoNo({
     <div data-testid="painel-do-no">
       <strong style={{ fontSize: 12.5 }}>{no.id}</strong>
       <div style={{ fontSize: 11.5, color: "var(--texto-2)", margin: "4px 0 8px" }}>
-        {no.tipo === "conector"
+        {no.tipo === "gatilho"
+          ? // SPEC-110 A — o painel do gatilho diz o PROPÓSITO dele: era isso
+            // que faltava ao botão ("não entendi qual o objetivo do executar").
+            (
+              <span data-testid="proposito-do-gatilho">
+                Gatilho — <strong>{gatilho?.nome ?? no.refId}</strong>. {gatilho?.descricao}
+              </span>
+            )
+          : no.tipo === "conector"
           ? // SPEC-109 B — a operação é do CONECTOR escolhido (a paleta virou
             // genérica); o componente antigo fica de fallback para nós de
             // fluxos salvos antes.
@@ -1169,7 +1297,28 @@ function PainelDoNo({
           style={campo}
         />
       </label>
-      {no.tipo !== "funcao" && no.tipo !== "projeto" && no.tipo !== "transformacao" && (
+      {/* SPEC-110 A — a família de gatilhos escolhe-se aqui, mas só quando há
+          escolha (§2.4-10): com um membro só, o seletor seria uma pergunta de
+          uma resposta. A fatia E (agendamento) o acende sozinha. */}
+      {no.tipo === "gatilho" && GATILHOS_DO_SISTEMA.length > 1 && (
+        <label style={{ fontSize: 11.5, display: "grid", gap: 2, marginBottom: 8 }}>
+          Quando este fluxo roda
+          <select
+            data-testid="tipo-do-gatilho"
+            disabled={!podeEditar}
+            value={no.refId}
+            onChange={(e) => onMudar({ refId: e.target.value })}
+            style={campo}
+          >
+            {GATILHOS_DO_SISTEMA.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.nome}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {no.tipo !== "gatilho" && no.tipo !== "funcao" && no.tipo !== "projeto" && no.tipo !== "transformacao" && (
         <label style={{ fontSize: 11.5, display: "grid", gap: 2, marginBottom: 8 }}>
           {/* §359/§2.4-1 — o rótulo nomeia O QUE se escolhe ("adaptador" é
               jargão de arquitetura e o usuário estranhou, com razão): o nó
@@ -1192,7 +1341,18 @@ function PainelDoNo({
           </select>
         </label>
       )}
-      <label style={{ fontSize: 11.5, display: "flex", gap: 6, alignItems: "center", marginBottom: 8 }}>
+      {/* O gate depois do GATILHO não teria o que revisar (o gatilho não
+          produz nada, D1) — a caixa some em vez de convidar a um desenho que
+          só faz o fluxo travar antes de começar. */}
+      <label
+        style={{
+          fontSize: 11.5,
+          display: no.tipo === "gatilho" ? "none" : "flex",
+          gap: 6,
+          alignItems: "center",
+          marginBottom: 8,
+        }}
+      >
         <input
           type="checkbox"
           data-testid="aguardar-confirmacao"

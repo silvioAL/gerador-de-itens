@@ -1,4 +1,5 @@
 import { planoDoFluxo, type Fluxo, type NoDoFluxo } from "../config/fluxos.js";
+import type { OrigemDoDisparo } from "../config/gatilhos.js";
 
 /**
  * SPEC-105 fatia D — **a execução do fluxo, na metade pura.**
@@ -53,6 +54,14 @@ export interface RastroDoNo {
    * a auditoria precisa reproduzir.
    */
   entradas?: Record<string, unknown>;
+  /**
+   * SPEC-110 fatia A — a ORIGEM do disparo, no rastro do nó de GATILHO (e só
+   * nele). O gatilho não faz trabalho: o que ele tem a dizer é "este fluxo
+   * rodou porque alguém mandou / porque deu a hora / porque chegou um POST".
+   * Sem isso, o "✓ gatilho" seria uma linha vazia no rastro — e a fatia E
+   * (agendamento) precisa provar no histórico que a execução nasceu do relógio.
+   */
+  origem?: OrigemDoDisparo;
 }
 
 export interface ResultadoDoFluxo {
@@ -95,6 +104,13 @@ export interface OpcoesDeExecucao {
     noComecou?(no: NoDoFluxo): void;
     noTerminou?(rastro: RastroDoNo): void;
   };
+  /**
+   * SPEC-110 fatia A — o que disparou ESTA execução. Vai para o rastro do nó
+   * de gatilho; ausente é `"manual"`, que é o disparo que sempre existiu (o
+   * botão). Quem dispara por outro caminho (o relógio da fatia E, o POST da
+   * fatia L) diz aqui, e o histórico passa a responder "por que isto rodou?".
+   */
+  origemDoDisparo?: OrigemDoDisparo;
 }
 
 /** O nó pedido e todo mundo de quem ele depende, transitivamente. */
@@ -185,12 +201,21 @@ export async function executarFluxo(
     // auditoria da tese reescrita (§5.4) precisa do que chegou, não só do que
     // deu certo.
     const entradasNoRastro = no.tipo === "funcao" ? { entradas: parametros } : {};
+    // SPEC-110 fatia A — o gatilho carimba a origem; os outros nós não têm o
+    // que dizer sobre "por que isto rodou".
+    const origemNoRastro = no.tipo === "gatilho" ? { origem: opcoes.origemDoDisparo ?? ("manual" as const) } : {};
 
     opcoes.aoVivo?.noComecou?.(no);
     const comecou = Date.now();
     try {
       const saida =
-        no.tipo === "conector"
+        no.tipo === "gatilho"
+          ? // O executor do gatilho é um NO-OP deliberado: ele é âncora de
+            // "quando", não trabalho. A saída vazia é o contrato do v1 (D1) —
+            // manual e agendamento não emitem dado; o webhook (fatia L) vai
+            // emitir o payload declarado, pelo mesmo caminho.
+            {}
+          : no.tipo === "conector"
           ? await executores.conector(no, parametros)
           : no.tipo === "funcao"
             ? await executores.funcao(no, parametros)
@@ -209,6 +234,7 @@ export async function executarFluxo(
         duracaoMs: Date.now() - comecou,
         ...(typeof saida.linkExterno === "string" && saida.linkExterno ? { linkExterno: saida.linkExterno } : {}),
         ...entradasNoRastro,
+        ...origemNoRastro,
       });
       opcoes.aoVivo?.noTerminou?.(rastro[rastro.length - 1]);
       if (no.confirmacao === "aguardar") aguardandoEm = noId;

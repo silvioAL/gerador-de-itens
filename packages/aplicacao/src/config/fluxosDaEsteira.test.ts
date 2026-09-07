@@ -19,9 +19,13 @@ describe("fluxoDaEsteira", () => {
     const fluxo = fluxoDaEsteira(PAPEIS_PADRAO)!;
     expect(fluxo.id).toBe(ID_DO_FLUXO_DA_ESTEIRA);
     expect(fluxo.origem).toBe("fabrica");
-    expect(planoDoFluxo(fluxo).ordem).toEqual(["demanda", "po", "arquiteto", "especialista", "qa", "grava"]);
+    // SPEC-110 fatia A — a fábrica sempre desenha o GATILHO na frente: o
+    // fluxo diz quando roda, e o botão vira o gesto dele.
+    expect(planoDoFluxo(fluxo).ordem).toEqual(["gatilho", "demanda", "po", "arquiteto", "especialista", "qa", "grava"]);
+    expect(fluxo.nos[0]).toMatchObject({ id: "gatilho", tipo: "gatilho", refId: "manual" });
+    expect(fluxo.arestas[0]).toEqual({ de: "gatilho", para: "demanda", mapeamento: [] });
     // A FILA entra no primeiro papel vinda da demanda, com os contextos.
-    expect(fluxo.arestas[0]).toEqual({
+    expect(fluxo.arestas[1]).toEqual({
       de: "demanda",
       para: "po",
       mapeamento: [
@@ -32,10 +36,10 @@ describe("fluxoDaEsteira", () => {
     });
     // O encadeamento é o `acumuladas` da revisão atravessando o grafo: a fila
     // (com as respostas acumuladas) segue de papel em papel.
-    expect(fluxo.arestas[1].de).toBe("po");
-    expect(fluxo.arestas[1].para).toBe("arquiteto");
-    expect(fluxo.arestas[1].mapeamento).toContainEqual({ saida: "fila", entrada: "fila" });
-    expect(fluxo.arestas[1].mapeamento).toContainEqual({ saida: "respostasItens", entrada: "respostasItens" });
+    expect(fluxo.arestas[2].de).toBe("po");
+    expect(fluxo.arestas[2].para).toBe("arquiteto");
+    expect(fluxo.arestas[2].mapeamento).toContainEqual({ saida: "fila", entrada: "fila" });
+    expect(fluxo.arestas[2].mapeamento).toContainEqual({ saida: "respostasItens", entrada: "respostasItens" });
     // E o destino grava as sugestões PENDENTES na demanda (§5.5).
     expect(fluxo.arestas).toContainEqual({
       de: "qa",
@@ -52,8 +56,9 @@ describe("fluxoDaEsteira", () => {
   it("papel desligado fica fora da cadeia — como fica fora da revisão", () => {
     const papeis = PAPEIS_PADRAO.map((p) => (p.id === "arquiteto" ? { ...p, ativo: false } : p));
     const fluxo = fluxoDaEsteira(papeis)!;
-    expect(planoDoFluxo(fluxo).ordem).toEqual(["demanda", "po", "especialista", "qa", "grava"]);
+    expect(planoDoFluxo(fluxo).ordem).toEqual(["gatilho", "demanda", "po", "especialista", "qa", "grava"]);
     expect(fluxo.arestas.map((a) => [a.de, a.para])).toEqual([
+      ["gatilho", "demanda"],
       ["demanda", "po"],
       ["po", "especialista"],
       ["especialista", "qa"],
@@ -117,14 +122,18 @@ describe("fluxoDoEnsaio (SPEC-107 G4)", () => {
     expect(ensaio.origem).toBe("fabrica");
   });
 
-  it("a fiação é projeto.desenho → funcao(ensaio), na ordem do plano", () => {
+  it("a fiação é gatilho → projeto.desenho → funcao(ensaio), na ordem do plano", () => {
     const fluxo = fluxoDoEnsaio();
-    expect(planoDoFluxo(fluxo).ordem).toEqual(["demanda", "ensaio"]);
+    expect(planoDoFluxo(fluxo).ordem).toEqual(["gatilho", "demanda", "ensaio"]);
     expect(fluxo.nos.map((n) => [n.tipo, n.refId])).toEqual([
+      ["gatilho", "manual"],
       ["projeto", "projeto"],
       ["funcao", "ensaio"],
     ]);
-    expect(fluxo.arestas).toEqual([{ de: "demanda", para: "ensaio", mapeamento: [{ saida: "desenho", entrada: "desenho" }] }]);
+    expect(fluxo.arestas).toEqual([
+      { de: "gatilho", para: "demanda", mapeamento: [] },
+      { de: "demanda", para: "ensaio", mapeamento: [{ saida: "desenho", entrada: "desenho" }] },
+    ]);
   });
 
   it("um declarado com o id do ensaio vence a fábrica", () => {

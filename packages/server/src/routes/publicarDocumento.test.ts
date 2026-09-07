@@ -116,7 +116,9 @@ describe("a fiação de publicação (SPEC-107 G2)", () => {
     const r = await executarPublicacao();
     expect(r.statusCode).toBe(200);
     const corpo = r.json() as { nos: { noId: string; estado: string; erro?: string }[]; saidas: Record<string, Record<string, unknown>> };
+    // SPEC-110 A — a derivada começa pelo gatilho (no-op), como as outras.
     expect(corpo.nos.map((n) => [n.noId, n.estado])).toEqual([
+      ["gatilho", "sucesso"],
       ["demanda", "sucesso"],
       ["publica", "sucesso"],
       ["grava", "sucesso"],
