@@ -90,9 +90,6 @@ test("fatia C: desenhar, ligar, mapear — e o ciclo trava com a mensagem do des
     // botão); "Agente" + o papel po.
     await page.getByTestId("add-integracao").click();
     await page.getByTestId("adaptador-do-no").selectOption("leitor-fluxo-e2e");
-    // O nome do nó é da pessoa (n8n): escrito, o cartão ecoa o que ela deu.
-    await page.getByTestId("nome-do-no").fill("Ler volumetria do legado");
-    await expect(page.locator('.react-flow__node[data-id="integracao-1"]')).toContainText("Ler volumetria do legado");
     await page.getByTestId("add-agente").click();
     await page.getByTestId("adaptador-do-no").selectOption("po");
     await expect(page.locator(".react-flow__node")).toHaveCount(2);
@@ -121,6 +118,15 @@ test("fatia C: desenhar, ligar, mapear — e o ciclo trava com a mensagem do des
     // Sem o ciclo, salva — e o desenho sobrevive ao F5. O painel da aresta
     // cíclica já está aberto (o onConnect a seleciona ao ligar).
     await page.getByRole("button", { name: "Remover aresta" }).click();
+
+    // O nome do nó é da pessoa (n8n): escrito, o cartão ecoa o que ela deu.
+    // POR ÚLTIMO, de propósito: os nós nascem quase sobrepostos, e um nome
+    // comprido alarga o cartão até esconder o handle debaixo do vizinho —
+    // nas fontes da CI o `ligar` errava o alvo (1ª rodada do PR #363).
+    await page.locator('.react-flow__node[data-id="integracao-1"]').click();
+    await page.getByTestId("nome-do-no").fill("Ler volumetria do legado");
+    await expect(page.locator('.react-flow__node[data-id="integracao-1"]')).toContainText("Ler volumetria do legado");
+
     await page.getByTestId("salvar-fluxos").click();
     await expect(page.getByTestId("erro-do-fluxo")).not.toBeVisible();
     await page.reload();
