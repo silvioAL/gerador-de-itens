@@ -507,8 +507,9 @@ família (a esteira ganha um padrão, ex.: 🤖).
 parcialmente)**: em v1 a screen "roda" DENTRO de um fluxo (stage,
 fatia B) — a galeria dá a ela endereço, cara e edição; o card oferece
 "testar" abrindo o preview do editor com dados de exemplo. Screen como
-app standalone (rodar sem fluxo, direto da galeria) fica ANOTADO como
-evolução natural — não entra nesta SPEC (§5).
+app standalone (rodar sem fluxo, direto da galeria) tem SPEC própria
+registrada — **SPEC-111** — a implementar depois das fatias B/C/H, com o
+desenho provável (fluxo implícito de um nó) já esboçado lá.
 
 **Provas**: E2E: galeria lista a esteira derivada com selo, busca filtra,
 renomear/trocar o emoji de um fluxo declarado persiste e sobrevive a F5,
