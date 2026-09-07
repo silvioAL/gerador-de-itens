@@ -230,20 +230,17 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       onEnter: () => opts.mostrarAvisos(),
     },
     {
-      selector: "[data-testid=barra-pendencias]",
-      titulo: "Confirmar o que a IA escreveu",
+      /**
+       * SPEC-107 G5c-3 — a tela de revisão morreu: derivar escreve os itens e
+       * abre o DOCUMENTO, onde cada card carrega o julgamento campo a campo
+       * (§384). O passo aponta a seção dos itens — é ali que a assinatura
+       * acontece agora; a corrida da esteira é a fiação, ao vivo no canvas.
+       */
+      selector: "[data-testid=secao-dos-itens]",
+      titulo: "Confirmar o que a IA escrever",
       segundos: 10,
       texto:
-        "A revisão é a tela onde o item vira ficha, e onde a esteira escreve. Cada resposta dela espera a sua assinatura: esta barra diz quantas estão esperando e permite confirmar TODAS de uma vez — ou revisar uma a uma, no modo foco. Aceitar é barato; corrigir é que merece o clique. E o que você confirmar continua marcado como escrito pelo agente.",
-      /**
-       * SPEC-78 — este `onEnter` era do passo "Revisão", que morreu por apontar
-       * uma tela em vez de ensinar o que se faz nela.
-       *
-       * Cortá-lo levou a DERIVAÇÃO junto, e a suíte pegou na hora: sem isto o
-       * tour chegava à barra de pendências de um item que nunca foi derivado.
-       * Foi o teste que estava certo, e a poda que estava errada — é
-       * exatamente o trabalho que a fatia D existe para fazer.
-       */
+        "Derivar escreve os itens e abre o documento — cada card carrega a ficha do item. Quando a esteira de agentes rodar (ela vive no canvas de fluxos, e você a assiste rodando), o que ela escrever chega aqui como sugestão PENDENTE: confirmar assina (e continua marcado como escrito pelo agente); editar vira texto seu. Aceitar é barato; corrigir é que merece o clique.",
       onEnter: () => opts.derivarQuebra(),
     },
     {

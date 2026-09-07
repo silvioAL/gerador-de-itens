@@ -94,8 +94,8 @@ const VEUS_JUSTIFICADOS: Record<string, string> = {
   "demo/TourOverlay.tsx": "véu do tour guiado (e o recorte de 9999px do passo)",
   "navegacao/MenuLateral.tsx": "véu atrás da gaveta do menu",
   "panel/PropertiesPanel.tsx": "véu da confirmação de exclusão",
-  "review/FilaDeRevisao.tsx": "véu atrás da fila de revisão",
-  "review/SimulacaoEsteira.tsx": "véu da simulação da esteira",
+  // SPEC-107 G5c-3 — os véus da fila de revisão e da simulação da esteira
+  // morreram com a tela de revisão.
   "summary/AvisosDaDerivacao.tsx": "véu do modal de avisos",
 };
 
