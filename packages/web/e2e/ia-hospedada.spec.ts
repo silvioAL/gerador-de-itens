@@ -164,9 +164,11 @@ test("a esteira roda PELA FIAÇÃO, ao vivo no canvas, e o julgamento fecha no d
   await expect(page.getByRole("button", { name: "+ Serviço", exact: true })).toBeVisible();
 
   // ── O julgamento fecha no DOCUMENTO (§384): o texto do dublê chegou ──
+  // 20s: a ressincronização pós-corrida (abrirPorId) é assíncrona, e a CI é
+  // mais lenta que a máquina local — o assert espera o estado chegar.
   await page.goto("/#/documento");
-  await expect(page.getByTestId("pendencias-dos-itens")).toContainText("sugestões da esteira aguardando");
-  await expect(page.getByText(new RegExp(MARCA_GATEWAY_FALSO)).first()).toBeVisible();
+  await expect(page.getByTestId("pendencias-dos-itens")).toContainText("sugestões da esteira aguardando", { timeout: 20000 });
+  await expect(page.getByText(new RegExp(MARCA_GATEWAY_FALSO)).first()).toBeVisible({ timeout: 20000 });
   await page.getByTestId("confirmar-todas-itens").click();
   await expect(page.getByTestId("pendencias-dos-itens")).toHaveCount(0);
 
