@@ -185,6 +185,16 @@ export function mensagemDeCiclo(caminho: string[]): string {
  * conectores. */
 export interface FluxoEmVigor extends Fluxo {
   origem: "declarado" | "fabrica";
+  /**
+   * SPEC-109 fatia A — este declarado ESCONDE uma derivada com o mesmo id.
+   *
+   * "A cópia vence a derivada" é a regra certa (SPEC-70 §4) — mas sem este
+   * selo ela é uma porta sem volta: a fábrica evolui SPEC após SPEC e o time
+   * fica preso à forma do dia do clique em "editar uma cópia" (medido: uma
+   * esteira de 4 nós pré-G5 congelada no banco escondendo a completa). A tela
+   * usa o selo para avisar e oferecer o caminho de volta.
+   */
+  sombreiaFabrica?: boolean;
 }
 
 export const ID_DO_FLUXO_DA_ESTEIRA = "esteira-de-agentes";
@@ -397,19 +407,21 @@ export function fluxosEmVigor(
   documentoFluxos: unknown,
   configExportador?: ConfigExportador
 ): FluxoEmVigor[] {
+  const fabricas: FluxoEmVigor[] = [
+    fluxoDaEsteira(papeis),
+    configExportador ? fluxoDaExportacao(configExportador) : null,
+    ...(configExportador ? fluxosDaPublicacao(configExportador) : []),
+    fluxoDoEnsaio(),
+  ].filter((f): f is FluxoEmVigor => f !== null);
+
   const declarados: FluxoEmVigor[] = normalizarFluxos(documentoFluxos).fluxos.map((f) => ({
     ...f,
     origem: "declarado",
+    ...(fabricas.some((fab) => fab.id === f.id) ? { sombreiaFabrica: true } : {}),
   }));
-  const esteira = fluxoDaEsteira(papeis);
-  if (esteira && !declarados.some((f) => f.id === esteira.id)) declarados.push(esteira);
-  const exportacao = configExportador ? fluxoDaExportacao(configExportador) : null;
-  if (exportacao && !declarados.some((f) => f.id === exportacao.id)) declarados.push(exportacao);
-  for (const publicacao of configExportador ? fluxosDaPublicacao(configExportador) : []) {
-    if (!declarados.some((f) => f.id === publicacao.id)) declarados.push(publicacao);
+  for (const fabrica of fabricas) {
+    if (!declarados.some((f) => f.id === fabrica.id)) declarados.push(fabrica);
   }
-  const ensaio = fluxoDoEnsaio();
-  if (!declarados.some((f) => f.id === ensaio.id)) declarados.push(ensaio);
   return declarados;
 }
 

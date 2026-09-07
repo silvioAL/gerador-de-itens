@@ -88,6 +88,26 @@ describe("fluxosEmVigor", () => {
     expect(vigor[0].origem).toBe("declarado");
     expect(vigor[0].nome).toBe("Minha esteira");
   });
+
+  /**
+   * SPEC-109 fatia A — a cópia que vence é SELADA, porque a vitória sem selo
+   * é uma porta sem volta: uma esteira de 4 nós pré-G5 ficou meses no banco
+   * escondendo a completa, e a tela não tinha como saber (nem avisar, nem
+   * oferecer "voltar à derivada").
+   */
+  it("o declarado que esconde uma fábrica leva o selo sombreiaFabrica", () => {
+    const vigor = fluxosEmVigor(PAPEIS_PADRAO, {
+      fluxos: [
+        { id: ID_DO_FLUXO_DA_ESTEIRA, nome: "Minha esteira", nos: [{ id: "po", tipo: "agente", refId: "po" }], arestas: [] },
+        { id: "meu", nome: "Meu fluxo", nos: [{ id: "a", tipo: "agente", refId: "po" }], arestas: [] },
+      ],
+    });
+    expect(vigor.find((f) => f.id === ID_DO_FLUXO_DA_ESTEIRA)?.sombreiaFabrica).toBe(true);
+    // Declarado que não colide com fábrica nenhuma não é cópia de nada — sem selo.
+    expect(vigor.find((f) => f.id === "meu")?.sombreiaFabrica).toBeUndefined();
+    // A fábrica nunca se sombreia a si mesma.
+    expect(vigor.find((f) => f.id === ID_DO_FLUXO_DO_ENSAIO)?.sombreiaFabrica).toBeUndefined();
+  });
 });
 
 describe("fluxoDoEnsaio (SPEC-107 G4)", () => {
