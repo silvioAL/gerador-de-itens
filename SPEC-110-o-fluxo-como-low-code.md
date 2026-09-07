@@ -1,5 +1,12 @@
 # SPEC-110 — O fluxo como low-code: gatilhos, telas (screens) e bancos de dados
 
+> **A tese, nas palavras do usuário:** *"o objetivo é que vire um low code
+> de verdade"*. Tudo nesta SPEC serve a isso: o canvas deixa de ser o
+> encanamento interno com um botão e passa a ter as primitivas de um
+> low-code — quando roda (gatilhos), com quem fala (integrações e bancos),
+> onde a pessoa entra (telas com avançar/retornar, criáveis pelo usuário) e
+> dados como componentes explícitos (ler/gravar, nunca fundidos).
+
 > **Para quem implementa (conversa nova): leia a §0 antes de qualquer código.**
 > Esta SPEC foi escrita para ser autossuficiente — as medições da §2 foram
 > feitas contra a main `1dc016f` (pós-SPEC-109) e citam arquivo/linha.
@@ -172,7 +179,11 @@ aba de config — nenhum componente do canvas fala com ele.
 - **D9.** Nada desta SPEC muda a derivação determinística (§6 da SPEC-105) nem
   o julgamento na demanda (§5.5): a TELA documento é uma porta para o mesmo
   julgamento, não um segundo motor.
-- **D10.** **A demanda se DESDOBRA em ler e gravar** (M9): registro
+- **D10.** **A demanda se DESDOBRA em TRÊS componentes** — confirmado pelo
+  usuário em pergunta direta (*"exato, então podemos decompor em 3
+  componentes, o objetivo é que vire um low code de verdade"*): a TELA
+  `mesa` (interação, D3), **Demanda — ler** e **Demanda — gravar** (dados).
+  Mecânica: registro
   `DADOS_DO_SISTEMA` com `demanda-ler` (só a `saida` atual) e
   `demanda-gravar` (só a `entrada` atual), cartões e nomes distintos
   ("Demanda — ler" / "Demanda — gravar"), ícones/tons distintos. O refId
