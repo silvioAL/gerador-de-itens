@@ -215,12 +215,18 @@ aba de config — nenhum componente do canvas fala com ele.
   proposta) → avançar → config-propor-ajuste + aplicar`. A tela de revisão
   É a aprovação — avançar sem permissão de aplicar falha nomeado, não em
   silêncio.
+- **D14.** **Fluxos e screens moram numa GALERIA** — confirmado duas vezes
+  pelo usuário ("simplificaria bastante"): `#/fluxo` sem id abre uma tela
+  de cards grandes com busca filtrada, ícone (emoji) e nome editáveis; o
+  canvas vira o destino do clique, não a porta. Detalhe na fatia H.
 
 ## 4. As fatias
 
-> Ordem: A → B → C → D → E → F. B é a maior; C depende de B; D e E são
-> independentes entre si (podem inverter se conveniente); F depende de B (a
-> tela mesa) e de C (a screen declarada do exemplo de PDCA).
+> Ordem: A → B → C → D → E → F → G → H. B é a maior; C depende de B; D e E
+> são independentes entre si (podem inverter se conveniente); F depende de
+> B; G depende de B e F; H depende de C (mas a galeria só-de-fluxos pode
+> adiantar). Se a rodada apertar, H-só-fluxos logo após A é um upgrade
+> visível barato.
 
 ### Fatia A — o gatilho como nó
 
@@ -471,6 +477,48 @@ a solicitação E aplica, a auditoria registra os dois passos, e a aba PDCA
 mostra o feedback tratado. Rodar SEM permissão de aplicar: falha nomeada no
 rastro, solicitação fica pendente (aprovável pela aba, como hoje).
 
+### Fatia H — a galeria: onde fluxos e screens moram (D14)
+
+> Pedido literal: *"precisamos planejar onde as screens vão morar… acho que
+> simplificaria bastante ter um menu com screens e o que já existe de
+> fluxos (talvez com outra tela antes, busca filtrada, ícones grandes e
+> avatares/nomes editáveis)"*. Depende de C (screens declaradas existirem);
+> a galeria SÓ de fluxos pode nascer antes, junto de A/B, se ajudar.
+
+**A porta**: o item de menu "Fluxos de integração" (e `#/fluxo` sem id)
+passa a abrir a **GALERIA** — não o canvas. Cards grandes em grid (o molde
+visual é o dos cenários da JourneyModal): um por FLUXO (ícone/avatar +
+nome + selo `derivado`/`declarado`/`sombreando` + nº de nós + última
+execução ok/falhou) e um por SCREEN declarada (ícone + nome + "usada em N
+fluxos"). Busca filtrada no topo (nome, tipo). Clique no fluxo → canvas
+naquele fluxo (`#/fluxo/<id>`, já mandável); clique na screen → editor com
+preview (`#/config/telas/<id>`). Botões "+ Novo fluxo" / "+ Nova screen"
+vivem na galeria; o seletor dropdown do canvas continua como troca rápida.
+
+**Avatar/nome editáveis**: `Fluxo.icone?: string` e
+`TelaDeclarada.icone?: string` — **emoji** (o precedente dos rostos dos
+papéis: zero asset, legível nos dois temas), editável na própria galeria
+(clicar no avatar abre um input curto; nome idem, gravando pelo caminho de
+salvar existente — fluxo DERIVADO não edita: "editar uma cópia" continua
+sendo a porta, com o selo da §386). Normalizar tolera ausência; default por
+família (a esteira ganha um padrão, ex.: 🤖).
+
+**Interação com screens (a dúvida em aberto do usuário, respondida
+parcialmente)**: em v1 a screen "roda" DENTRO de um fluxo (stage,
+fatia B) — a galeria dá a ela endereço, cara e edição; o card oferece
+"testar" abrindo o preview do editor com dados de exemplo. Screen como
+app standalone (rodar sem fluxo, direto da galeria) fica ANOTADO como
+evolução natural — não entra nesta SPEC (§5).
+
+**Provas**: E2E: galeria lista a esteira derivada com selo, busca filtra,
+renomear/trocar o emoji de um fluxo declarado persiste e sobrevive a F5,
+clique abre o canvas no fluxo certo; screen declarada aparece e o clique
+abre o editor. §248: quebrar o filtro da busca → o teste da busca fica
+vermelho. Ajustar E2Es que hoje esperam `#/fluxo` abrir direto no canvas
+(medir com grep antes: `goto("/#/fluxo")` aparece em vários specs — decidir
+se `#/fluxo` legado redireciona para a galeria e os specs usam
+`#/fluxo/<id>`, documentando no JOURNEY).
+
 ## 4.x O caso-norte (para onde tudo isto aponta)
 
 Nas palavras do usuário: *"no futuro, schedulers que buscam dados em
@@ -543,3 +591,7 @@ tornar este fluxo impossível de fiar, a decisão está errada.
   como dado, SPEC-39/45) e a tela aprova; aplicar é a máquina existente,
   determinística e auditada. Escrita direta de config por fluxo não entra
   nem com permissão — o rastro de aprovação é o produto.
+- "Onde as screens moram?" Na GALERIA (fatia H): card com ícone/nome
+  editáveis, clique abre o editor; em execução elas aparecem pelo stage do
+  fluxo (fatia B). Screen standalone (rodar sem fluxo) é evolução anotada,
+  fora desta SPEC.
