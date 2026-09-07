@@ -141,9 +141,16 @@ aba de config — nenhum componente do canvas fala com ele.
 
 ## 3. As decisões de produto (fechadas — não reabrir)
 
-- **D1.** Todo fluxo COMEÇA num **gatilho visível** (nó). Tipos v1: `manual`
-  e `agendamento`. O botão "Executar" vira o gesto do gatilho manual
+- **D1.** Todo fluxo COMEÇA num **gatilho visível** (nó). A FAMÍLIA
+  completa, decidida pelo usuário (*"quanto ao webhook, pode ser um
+  acionador… configurar fluxo para ser acionado via scheduler, ou que o
+  fluxo vai iniciar por uma screen"*): `manual` (fatia A), `agendamento`
+  (fatia E), `webhook` (fatia L) e `screen` (o par vive na SPEC-111: a
+  screen dispara o fluxo pelo `aoAvancar`, e o gatilho marca o fluxo que
+  começa assim). O botão "Executar" vira o gesto do gatilho manual
   ("▶ Rodar agora"), mantendo o testid `executar-fluxo` (dezenas de E2Es).
+  Contrato de dados POR TIPO: manual/agendamento sem saída; webhook emite o
+  payload recebido (campos declarados); screen emite a saída da screen.
 - **D2.** **Tela (screen) é um nó**: entrada = o que ela mostra; saída = a
   decisão (`avancar`/`retornar`) + o que a pessoa preencheu/aprovou. Quando a
   execução chega numa tela, SUSPENDE (reusa a mecânica M4); a pessoa abre a
@@ -285,13 +292,16 @@ aba de config — nenhum componente do canvas fala com ele.
 
 ## 4. As fatias
 
-> Ordem: A → B → C → D → E → F → G → H → I → J. B é a maior; C depende de
-> B; D e E são independentes entre si (podem inverter se conveniente); F
-> depende de B; G depende de B e F; H depende de C (mas a galeria
-> só-de-fluxos pode adiantar); I depende de F; J depende de A e B. Se a
-> rodada apertar, H-só-fluxos logo após A é um upgrade visível barato — e
-> a fatia I é pequena e de alto valor de promessa (pode subir junto com
-> F). O "nasce de" nos cards (D16b) é barato e pode entrar já na H.
+> Ordem: A → B → C → D → E → F → G → H → I → J → K, com L (webhook)
+> flutuante — só depende de A e sobe se o caso real chegar antes. B é a
+> maior; C depende de B; D e E são independentes entre si (podem inverter
+> se conveniente); F depende de B; G depende de B e F; H depende de C (mas
+> a galeria só-de-fluxos pode adiantar); I depende de F; J depende de A e
+> B; K é a última (D19, conferência integral). Se a rodada apertar,
+> H-só-fluxos logo após A é um upgrade visível barato — e a fatia I é
+> pequena e de alto valor de promessa (pode subir junto com F). O "nasce
+> de" nos cards (D16b) é barato e pode entrar já na H. O gatilho `screen`
+> vive na SPEC-111 (o par screen→fluxo).
 
 ### Fatia A — o gatilho como nó
 
@@ -687,6 +697,28 @@ duplo-clique num nó de subfluxo abre o fluxo certo.
   server`, e conferir que fluxos, screens, ícones e agendamentos
   continuam lá — a rodada de fechamento roda isso explicitamente.
 
+### Fatia L — o gatilho webhook (D1)
+
+> Independe de B–K (só precisa de A). Sobe na ordem se o caso real chegar
+> antes.
+
+- **Endereço por token**: `POST /fluxos/gatilhos/webhook/:token` — token
+  longo gerado ao adicionar o gatilho (guardado com hash na tabela do
+  gatilho; MOSTRADO uma vez, como chave de API), SEM sessão (é
+  máquina-a-máquina), com rate limit e recusa nomeada de token
+  desconhecido. Regenerável pelo painel do nó (invalida o antigo).
+- **Payload → saída do gatilho**: o nó declara os campos que extrai do
+  corpo (chave + JSONPath, o MESMO vocabulário do conector — M2); o resto
+  do corpo é ignorado de propósito. A execução nasce com origem `webhook`
+  no histórico.
+- **Config na base devida (D18)**: token/campos no documento do fluxo +
+  hash na tabela; a fábrica NÃO cria webhooks (é gesto do usuário) — mas o
+  painel do gatilho mostra o endereço pronto para copiar.
+- **Provas**: unidade (extração de campos, recusa de token); E2E: criar
+  fluxo com gatilho webhook, `page.request.post` no endereço com um corpo,
+  execução aparece no histórico com os campos extraídos; token errado →
+  4xx nomeado; §248: quebrar a extração → vermelho.
+
 ## 4.x O caso-norte (para onde tudo isto aponta)
 
 Nas palavras do usuário: *"no futuro, schedulers que buscam dados em
@@ -725,7 +757,7 @@ config-com-aprovação, spec por item), galeria, subfluxo e fluxo-mestre.
 | Lacuna | Onde fica |
 |---|---|
 | Condicional (if/branch) e laço — o fluxo é linha reta | SPEC-108 (o laço nasce com o Jira paginado); condicional SEM spec ainda |
-| Gatilho por evento externo (webhook de entrada) | SEM spec ainda |
+| ~~Gatilho por evento externo (webhook de entrada)~~ | **RESOLVIDO — fatia L** (decisão do usuário: webhook é acionador) |
 | Biblioteca de conectores prontos (Slack, Sheets, 1-clique) | Não existe — catálogo declarado pelo usuário + o que a 108 trouxer |
 | Tratamento de erro configurável (retry/fallback por nó) | SEM spec; falha é nomeada no rastro e para |
 | Fórmulas/expressões nos mapeamentos | Só a transformação simples; sem linguagem de expressão |

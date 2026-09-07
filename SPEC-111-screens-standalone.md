@@ -43,7 +43,11 @@ com o assistente ajudando a construir.
   Nenhum motor novo. Se a 110-B mudar esse contrato, esta SPEC muda junto.
 - **O destino da saída é da screen**: `aoAvancar` na `TelaDeclarada`
   apontando um componente de efeito (os mesmos do canvas: `pdca-feedback`,
-  `config-propor-ajuste`, um conector do catálogo…). Sem destino, o
+  `config-propor-ajuste`, um conector do catálogo…) — **ou "disparar um
+  fluxo"** (110 D1: o gatilho `screen`): a screen vira a porta de entrada
+  do fluxo, com a saída dela como dado inicial. São as duas pontas do
+  mesmo fio — o fluxo declara "começo por screen" (o gatilho no canvas), e
+  a screen declara "ao avançar, disparo o fluxo X". Sem destino, o
   Avançar grava só o histórico — e a tela DIZ isso, não finge entrega.
 - **O assistente-construtor** reusa a infraestrutura existente de proposta
   (conversa → JSON estruturado → prévia → aplicar): a saída é o documento
