@@ -1,6 +1,6 @@
 ﻿import { test, expect, type Page } from "@playwright/test";
 import { BASE_URL_GATEWAY_FALSO, CHAVE_GATEWAY_FALSO, MODELO_GATEWAY_FALSO } from "@gerador/gateway-falso";
-import { entrar } from "./auth";
+import { entrar, entrarEmTimeProprio } from "./auth";
 
 const API = "http://localhost:4100";
 
@@ -134,6 +134,59 @@ test("SPEC-107 G5c — o canvas roda a esteira da demanda aberta, ao vivo", asyn
       { timeout: 25000 }
     )
     .toBe(true);
+});
+
+/**
+ * SPEC-109 fatia A — **"editar uma cópia" deixou de ser porta sem volta.**
+ *
+ * O caso real que originou a fatia: uma cópia da esteira salva ANTES da G5
+ * ficou meses no banco escondendo a derivada completa — 4 nós de agente, sem
+ * demanda, sem grava — e a tela não avisava nem oferecia caminho. Aqui o ciclo
+ * inteiro: copiar → o aviso do sombreamento aparece (e sobrevive a F5) →
+ * voltar à derivada → a fábrica volta a valer com a fiação completa, e o
+ * documento do time fica limpo.
+ *
+ * Time PRÓPRIO: o ciclo grava e apaga o documento de fluxos do time — num
+ * time compartilhado isso congelaria a esteira debaixo de um spec vizinho.
+ */
+test("SPEC-109 A — a cópia avisa que sombreia, e 'voltar à derivada' ressuscita a fábrica", async ({ page }) => {
+  test.setTimeout(120000);
+  await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
+  const timeId = await entrarEmTimeProprio(page, "fluxos");
+
+  // A esteira DERIVADA, com a fiação completa da configuração default.
+  await page.goto("/#/fluxo/esteira-de-agentes");
+  await expect(page.getByTestId("seletor-de-fluxo")).toHaveValue("esteira-de-agentes", { timeout: 15000 });
+  await expect(page.getByTestId("fluxo-derivado")).toBeVisible();
+  await expect(page.locator('.react-flow__node[data-id="demanda"]')).toBeVisible();
+  await expect(page.locator('.react-flow__node[data-id="grava"]')).toBeVisible();
+
+  // ── Copiar: o aviso troca — de "derivado" para "esta cópia SOMBREIA" ──
+  await page.getByTestId("editar-copia").click();
+  await expect(page.getByTestId("fluxo-derivado")).toHaveCount(0);
+  await expect(page.getByTestId("fluxo-sombreando")).toBeVisible();
+
+  // A cópia persiste e o aviso sobrevive a F5 — o selo vem do servidor, não
+  // do gesto (é o que salvaria quem herdou a cópia de outra pessoa).
+  await page.getByTestId("salvar-fluxos").click();
+  await expect(page.getByTestId("salvar-fluxos")).toHaveText("Salvar", { timeout: 15000 });
+  await page.reload();
+  await expect(page.getByTestId("seletor-de-fluxo")).toHaveValue("esteira-de-agentes", { timeout: 15000 });
+  await expect(page.getByTestId("fluxo-sombreando")).toBeVisible();
+
+  // ── A volta: a cópia morre, a derivada volta a valer NA HORA ──
+  await page.getByTestId("voltar-a-derivada").click();
+  await expect(page.getByTestId("fluxo-derivado")).toBeVisible({ timeout: 15000 });
+  await expect(page.getByTestId("fluxo-sombreando")).toHaveCount(0);
+  await expect(page.locator('.react-flow__node[data-id="demanda"]')).toBeVisible();
+  await expect(page.locator('.react-flow__node[data-id="grava"]')).toBeVisible();
+
+  // E no documento do time não sobrou cópia nenhuma — a volta APAGA, não
+  // esconde (§248: sem o filtro do id no salvar, esta linha fica vermelha).
+  const doc = (await (await page.request.get(`${API}/config/fluxos?timeId=${timeId}`)).json()).documento as {
+    fluxos?: { id: string }[];
+  };
+  expect((doc?.fluxos ?? []).some((f) => f.id === "esteira-de-agentes")).toBe(false);
 });
 
 /** A aba "Modelo de IA" dentro da tela de Configurações. */

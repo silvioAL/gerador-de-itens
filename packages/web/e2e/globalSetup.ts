@@ -150,6 +150,10 @@ export default async function globalSetup() {
       "time-e2e-por-componente",
       "time-e2e-forma",
       "time-e2e-leitura",
+      // SPEC-109 A — o ciclo cópia→volta grava e apaga o DOCUMENTO de fluxos
+      // do time; num time compartilhado isso congelaria a esteira debaixo de
+      // um spec vizinho no meio da corrida dele.
+      "time-e2e-fluxos",
     ];
     // Ninguém ALÉM deste e-mail pertence a estes times. Sem esta linha, uma
     // rodada antiga que os pendurou noutro usuário deixa a lista dele maior

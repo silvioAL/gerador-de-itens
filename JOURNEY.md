@@ -17100,3 +17100,49 @@ outros specs que o exercitam passam na mesma suíte). O assert redundante
 saiu de lá; a causa — provavelmente config global de regras mexida por
 vizinho no instante da montagem das fichas — fica para diagnóstico com a
 suíte instrumentada, não com mais timeout.
+
+## §386 — SPEC-109 A: a volta da fábrica, o arrasto devolvido e o prompt visível
+
+O usuário abriu a main da SPEC-107 e a promessa não estava lá: a esteira dele
+tinha "só os agentes, sem nenhum prompt", o arrasto não tinha a fluidez da
+mesa, e o vocabulário/telas ainda eram os de antes. A medição transformou a
+impressão em três defeitos e uma SPEC nova (SPEC-109, com as queixas
+literais na §1):
+
+1. **A cópia congelada.** `config_documentos` do time dele guardava uma
+   esteira declarada salva em 05/09 — ANTES da G5a: 4 nós de agente, arestas
+   `texto→`, sem demanda, sem fila, sem grava. "Editar uma cópia" gravava o
+   fluxo inteiro como declarado no mesmo id, o declarado vence a fábrica
+   (SPEC-70 §4, regra certa), e NÃO EXISTIA caminho de volta: um clique
+   congelava o time na forma daquele dia, para sempre, em silêncio. A fatia
+   sela a cópia (`sombreiaFabrica`, marcado por `fluxosEmVigor` onde a
+   colisão é decidida), avisa na tela e oferece "voltar à derivada" — que
+   apaga a cópia do documento e recarrega o em-vigor. O E2E roda o ciclo
+   inteiro em time próprio (`time-e2e-fluxos`: o ciclo grava e apaga o
+   documento do time — em time compartilhado congelaria a esteira debaixo de
+   um vizinho no meio da corrida).
+
+2. **O arrasto que teleportava.** O ReactFlow do fluxo era controlado sem
+   `onNodesChange`: nenhuma mudança de posição aplicada durante o gesto — o
+   nó ficava parado sob o mouse e pulava no `onNodeDragStop`. Estado local +
+   `applyNodeChanges` (o par que o modo controlado exige; a mesa sempre fez
+   assim), o fluxo segue dono da verdade das posições, e o dragStop escreve
+   de volta — agora com `manterRastro`: arrumar o desenho não apaga mais a
+   execução que a pessoa está lendo. Nó de fluxo derivado também arrasta
+   (`nodesDraggable` por permissão, não por origem); a posição dele vive só
+   na sessão, porque Salvar/Executar continuam filtrando declarados.
+
+3. **O prompt "que não existia".** O campo do preâmbulo no painel do nó
+   mostrava o GRAVADO — vazio quando o papel usa o default, que ia no pedido
+   o tempo todo. O efetivo (`preambuloDoPapel`, a mesma função da borda)
+   aparece como placeholder, e uma nota diz que vazio = o padrão é o que vai.
+
+O §248 mordeu de verdade nesta rodada: o trio sujo-vermelho do selo foi
+involuntário — um `git checkout` para desfazer a sujeira levou junto os dois
+edits não commitados, e o teste novo ficou vermelho contra a fonte revertida
+exatamente como a prova pedia. Reaplicado, verde.
+
+As outras queixas viraram as fatias B–E da SPEC-109: vocabulário
+genérico/configurável (integração externa → agente → artefato), a morte da
+SistemaScreen e da aba Pipeline de IA, o template de especificação como
+propriedade do artefato, e o "Como funciona" que ensine a USAR.

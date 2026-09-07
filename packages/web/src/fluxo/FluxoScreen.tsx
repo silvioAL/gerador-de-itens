@@ -1,5 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  applyNodeChanges,
   Background,
   Controls,
   MiniMap,
@@ -7,6 +8,7 @@ import {
   ReactFlowProvider,
   type Edge,
   type Node,
+  type NodeChange,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { NodeCard, type NodeCardData } from "../canvas/NodeCard";
@@ -22,6 +24,7 @@ import {
   NOME_DA_OPERACAO,
   OPERACOES_DO_GATEWAY,
   planoDoFluxo,
+  preambuloDoPapel,
   type ArestaDoFluxo,
   type Fluxo,
   type NoDoFluxo,
@@ -199,10 +202,42 @@ export function FluxoScreen({
     [contratoDoNo]
   );
 
-  function mudarFluxo(mudar: (f: FluxoEmVigor) => FluxoEmVigor) {
+  function mudarFluxo(mudar: (f: FluxoEmVigor) => FluxoEmVigor, opcoes?: { manterRastro?: boolean }) {
     if (!fluxoId) return;
     setFluxos((lista) => (lista ?? []).map((f) => (f.id === fluxoId ? mudar(f) : f)));
-    setRastro(null);
+    // Editar a FIAÇÃO invalida o rastro (ele descreve outra forma). Arrastar
+    // um nó não: a posição é layout, e apagar a execução que a pessoa está
+    // lendo porque ela arrumou o desenho seria punir o gesto errado.
+    if (!opcoes?.manterRastro) setRastro(null);
+  }
+
+  /** SPEC-109 fatia A — só os DECLARADOS persistem, e sem os selos de leitura
+   * (`origem`, `sombreiaFabrica`): selo gravado viraria dado mentiroso no
+   * documento. Uma função porque eram três cópias do mesmo filtro. */
+  const declaradosParaSalvar = (lista: FluxoEmVigor[]): Fluxo[] =>
+    lista.filter((f) => f.origem === "declarado").map(({ origem: _origem, sombreiaFabrica: _selo, ...f }) => f);
+
+  /**
+   * SPEC-109 fatia A — **a volta da fábrica.** Apaga a cópia declarada que
+   * sombreia a derivada e recarrega o catálogo: a fábrica volta a valer na
+   * hora, na forma ATUAL dela (foi assim que uma esteira pré-G5 ficou meses
+   * congelada — "editar uma cópia" era porta sem volta).
+   */
+  async function voltarADerivada() {
+    if (!fluxos || !fluxoId) return;
+    setSalvando(true);
+    setErro(null);
+    try {
+      await apiFluxos.salvar({ fluxos: declaradosParaSalvar(fluxos.filter((f) => f.id !== fluxoId)) }, timeAtivo);
+      const emVigor = await apiFluxosEmVigor.listar(timeAtivo);
+      setFluxos(emVigor.fluxos);
+      setSelecao(null);
+      setRastro(null);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSalvando(false);
+    }
   }
 
   const rotuloDoRef = useCallback(
@@ -227,8 +262,19 @@ export function FluxoScreen({
     [catalogo, papeis]
   );
 
-  const nodes: Node<NodeCardData>[] = useMemo(
-    () =>
+  /**
+   * SPEC-109 fatia A — **o grafo devolve o arrasto.** Antes, `nodes` era um
+   * `useMemo` puro sobre o fluxo e não havia `onNodesChange`: durante o
+   * arrasto nenhuma mudança de posição era aplicada — o nó ficava parado sob
+   * o mouse e teleportava no `onNodeDragStop` (queixa literal: "não consigo
+   * mover e arrastar com a mesma fluidez" da mesa, que sempre aplicou as
+   * mudanças). Estado local + `applyNodeChanges` é o par que o React Flow
+   * controlado exige; o fluxo continua dono da VERDADE das posições — o
+   * efeito re-deriva a cada mudança dele, e o dragStop escreve de volta.
+   */
+  const [nodes, setNodes] = useState<Node<NodeCardData>[]>([]);
+  useEffect(() => {
+    setNodes(
       (fluxo?.nos ?? []).map((no) => ({
         id: no.id,
         type: "noDeFluxo",
@@ -247,8 +293,12 @@ export function FluxoScreen({
           config: CONFIG_DO_FLUXO,
           arestas: [],
         } satisfies NodeCardData,
-      })),
-    [fluxo, selecao, rotuloDoRef, vivo?.rodando]
+      }))
+    );
+  }, [fluxo, selecao, rotuloDoRef, vivo?.rodando]);
+  const aoMudarNos = useCallback(
+    (mudancas: NodeChange<Node<NodeCardData>>[]) => setNodes((atuais) => applyNodeChanges(mudancas, atuais)),
+    []
   );
 
   const edges: Edge[] = useMemo(
@@ -400,10 +450,7 @@ export function FluxoScreen({
     try {
       // Só os DECLARADOS persistem: a esteira derivada continua nascendo da
       // configuração dos papéis — salvar uma cópia dela congelaria o desenho.
-      await apiFluxos.salvar(
-        { fluxos: fluxos.filter((f) => f.origem === "declarado").map(({ origem: _origem, ...f }) => f) },
-        timeAtivo
-      );
+      await apiFluxos.salvar({ fluxos: declaradosParaSalvar(fluxos) }, timeAtivo);
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
     } finally {
@@ -498,10 +545,7 @@ export function FluxoScreen({
       // mentindo. Só os DECLARADOS, como no Salvar: gravar a esteira derivada
       // junto a congelaria como cópia que ninguém pediu (§365) — defeito real,
       // pego pela corrida de dois specs no mesmo documento (SPEC-107 fatia A).
-      await apiFluxos.salvar(
-        { fluxos: fluxos!.filter((f) => f.origem === "declarado").map(({ origem: _origem, ...f }) => f) },
-        timeAtivo
-      );
+      await apiFluxos.salvar({ fluxos: declaradosParaSalvar(fluxos!) }, timeAtivo);
       // Fatia D — a execução é ASSISTÍVEL: os eventos chegam nó a nó e a
       // resposta final é a mesma do modo one-shot. G5c — com a demanda aberta
       // e o nó fonte `demanda` na fiação, a execução aponta para ELA.
@@ -656,6 +700,15 @@ export function FluxoScreen({
         </button>
       </div>
 
+      {fluxo?.origem === "declarado" && fluxo.sombreiaFabrica && (
+        <div data-testid="fluxo-sombreando" style={{ ...avisoEstilo, color: "var(--texto-2)" }}>
+          Esta é uma CÓPIA salva — a derivada da configuração continua evoluindo por baixo, e a cópia a esconde.{" "}
+          <button data-testid="voltar-a-derivada" onClick={() => void voltarADerivada()} disabled={!podeEditar || salvando} style={{ ...botaoMiudo, pointerEvents: "auto" }}>
+            voltar à derivada
+          </button>{" "}
+          apaga a cópia; a derivada volta a valer na hora, na forma atual dela.
+        </div>
+      )}
       {fluxo?.origem === "fabrica" && (
         <div data-testid="fluxo-derivado" style={{ ...avisoEstilo, color: "var(--texto-2)" }}>
           Este fluxo é DERIVADO da configuração ({fluxo.id === "esteira-de-agentes" ? "os papéis da esteira, na ordem deles" : "da configuração"}) —
@@ -666,6 +719,11 @@ export function FluxoScreen({
               mudarFluxo((f) => ({
                 ...(f as FluxoEmVigor),
                 origem: "declarado",
+                // A cópia nasce sabendo que sombreia (SPEC-109 A): sem o selo
+                // local, o aviso com o caminho de volta só apareceria depois
+                // de salvar e recarregar — a janela exata em que a pessoa se
+                // perde.
+                sombreiaFabrica: true,
                 nome: f.nome.replace(" (da configuração)", " (cópia)"),
               }))
             }
@@ -713,13 +771,21 @@ export function FluxoScreen({
                 onNodeClick={(_e, node) => setSelecao({ tipo: "no", id: node.id })}
                 onEdgeClick={(_e, edge) => setSelecao({ tipo: "aresta", id: edge.id })}
                 onPaneClick={() => setSelecao(null)}
+                onNodesChange={aoMudarNos}
                 onNodeDragStop={(_e, node) =>
-                  mudarFluxo((f) => ({
-                    ...f,
-                    nos: f.nos.map((no) => (no.id === node.id ? { ...no, posicao: { x: node.position.x, y: node.position.y } } : no)),
-                  }))
+                  // A posição escreve de volta no fluxo — no derivado também:
+                  // lá ela vive só na sessão (Salvar/Executar filtram os
+                  // declarados), mas sem o write-back o próximo re-render
+                  // devolveria o nó ao lugar antigo debaixo do mouse.
+                  mudarFluxo(
+                    (f) => ({
+                      ...f,
+                      nos: f.nos.map((no) => (no.id === node.id ? { ...no, posicao: { x: node.position.x, y: node.position.y } } : no)),
+                    }),
+                    { manterRastro: true }
+                  )
                 }
-                nodesDraggable={editavel}
+                nodesDraggable={podeEditar}
                 nodesConnectable={editavel}
                 onConnect={(conexao) => {
                   if (!conexao.source || !conexao.target || !editavel) return;
@@ -1209,6 +1275,12 @@ function EditorDoPapel({
   const [preambulo, setPreambulo] = useState(papel.preambulo ?? "");
   const [salvando, setSalvando] = useState(false);
   const mudou = nome !== papel.nome || descricao !== (papel.descricao ?? "") || preambulo !== (papel.preambulo ?? "");
+  /** SPEC-109 fatia A — o que este papel MANDA hoje, resolvido pela mesma
+   * função da borda (`preambuloDoPapel`). O campo vazio lia como "este agente
+   * não tem prompt" (queixa literal), quando o default estava indo no pedido
+   * o tempo todo — o efetivo aparece como placeholder, e a nota diz de onde
+   * ele vem. */
+  const preambuloPadrao = preambuloDoPapel(papel.id, [{ id: papel.id, grupo: papel.grupo, preambulo: "" }]);
 
   return (
     <fieldset disabled={!podeEditar || salvando} style={{ border: "1px solid var(--borda)", borderRadius: 8, padding: 10, margin: "0 0 8px" }}>
@@ -1228,9 +1300,15 @@ function EditorDoPapel({
           value={preambulo}
           onChange={(e) => setPreambulo(e.target.value)}
           rows={5}
+          placeholder={preambuloPadrao}
           style={{ ...campo, resize: "vertical" }}
         />
       </label>
+      {!preambulo.trim() && (
+        <p data-testid="preambulo-padrao-em-uso" style={{ fontSize: 11, color: "var(--texto-fraco)", margin: "0 0 6px" }}>
+          Vazio = o padrão acima é o que vai no pedido. Escrever aqui o substitui.
+        </p>
+      )}
       <button
         data-testid="salvar-papel"
         disabled={!mudou}
