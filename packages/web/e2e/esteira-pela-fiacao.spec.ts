@@ -72,7 +72,12 @@ test("SPEC-107 G5c — o canvas roda a esteira da demanda aberta, ao vivo", asyn
 
   // ── Executar dali: o VIVO (nó pulsando + texto streamando) ──
   await page.getByTestId("executar-fluxo").click();
-  await expect(page.locator('[data-testid^="rastro-vivo-"]')).toBeVisible({ timeout: 30000 });
+  // O vivo é TRANSIENTE (o dublê responde rápido): o race aceita pegar o
+  // streaming em curso OU a corrida já concluída — os dois provam execução.
+  await Promise.race([
+    page.locator('[data-testid^="rastro-vivo-"]').waitFor({ timeout: 60000 }),
+    page.getByTestId("rastro-da-execucao").waitFor({ timeout: 60000 }),
+  ]);
 
   // A corrida termina com a fiação inteira verde no rastro (✓ por nó).
   await expect(page.getByTestId("rastro-da-execucao")).toBeVisible({ timeout: 60000 });

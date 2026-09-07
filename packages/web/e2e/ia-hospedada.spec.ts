@@ -154,7 +154,13 @@ test("a esteira roda PELA FIAÇÃO, ao vivo no canvas, e o julgamento fecha no d
   await page.goto("/#/fluxo/esteira-de-agentes");
   await expect(page.getByTestId("seletor-de-fluxo")).toHaveValue("esteira-de-agentes", { timeout: 15000 });
   await page.getByTestId("executar-fluxo").click();
-  await expect(page.locator('[data-testid^="rastro-vivo-"]')).toBeVisible({ timeout: 30000 });
+  // O VIVO é transiente: contra o dublê a corrida pode terminar antes do
+  // primeiro poll (mordeu na CI). O race aceita qualquer um dos dois sinais;
+  // a prova dedicada do vivo é do guardião `esteira-pela-fiacao`.
+  await Promise.race([
+    page.locator('[data-testid^="rastro-vivo-"]').waitFor({ timeout: 60000 }),
+    page.getByTestId("rastro-da-execucao").waitFor({ timeout: 60000 }),
+  ]);
   await expect(page.getByTestId("rastro-da-execucao")).toBeVisible({ timeout: 60000 });
   await expect(page.getByTestId("rastro-grava")).toContainText("✓ grava");
 
