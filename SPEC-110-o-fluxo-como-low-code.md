@@ -121,6 +121,17 @@ Mesa de projeto / Função do sistema / Transformação; nome por nó
 Postgres descartável em 5433 — serve de alvo REAL para testar o conector de
 banco sem dublê novo.
 
+**M9 — O nó de mesa é "a mesma coisa duas vezes" (queixa literal).** A
+esteira de fábrica tem `demanda` e `grava` AMBOS com `tipo: "projeto",
+refId: "projeto"` (`fluxos.ts:241` e `:250`) — dois cartões idênticos
+("Mesa de projeto") cuja diferença — um LÊ a demanda, o outro GRAVA nela —
+vive escondida nos mapeamentos das arestas. O `PROJETO_DO_SISTEMA`
+(`projeto.ts:47`) funde três papéis num registro só: tela (a porta "abrir a
+mesa"), fonte de dados (desenho/fila/contextos) e destino de dados
+(respostasItens/resultados/linkExterno). O PDCA tem o mesmo sintoma em menor
+grau: a escrita de feedback existe só como rota (`routes/pdca.ts:277`) e
+aba de config — nenhum componente do canvas fala com ele.
+
 ## 3. As decisões de produto (fechadas — não reabrir)
 
 - **D1.** Todo fluxo COMEÇA num **gatilho visível** (nó). Tipos v1: `manual`
@@ -161,11 +172,31 @@ banco sem dublê novo.
 - **D9.** Nada desta SPEC muda a derivação determinística (§6 da SPEC-105) nem
   o julgamento na demanda (§5.5): a TELA documento é uma porta para o mesmo
   julgamento, não um segundo motor.
+- **D10.** **A demanda se DESDOBRA em ler e gravar** (M9): registro
+  `DADOS_DO_SISTEMA` com `demanda-ler` (só a `saida` atual) e
+  `demanda-gravar` (só a `entrada` atual), cartões e nomes distintos
+  ("Demanda — ler" / "Demanda — gravar"), ícones/tons distintos. O refId
+  legado `"projeto"` continua aceito com o contrato fundido (fluxos salvos
+  não quebram — deprecado, o painel avisa); a fábrica desenha os novos. A
+  porta "Abrir a mesa de projeto" SAI dos nós de dados e vai para a TELA
+  `mesa` (D3) — dado é dado, interação é tela.
+- **D11.** **A demanda NÃO vira Postgres cru.** As invariantes moram nas
+  operações nomeadas (sugerido nunca sobrescreve confirmado, `nivelNoTime`,
+  auditoria — `aplicarRespostasNaDemanda`): o conector de banco (D6) é para
+  dados EXTERNOS; a demanda é o banco DO PRODUTO, acessado pelos componentes
+  do D10. Mesmo espírito low-code, contrato seguro.
+- **D12.** **PDCA vira componente**: função do sistema `pdca-feedback`
+  (entrada: texto + contexto; escreve `pdca_feedback` pela mesma rota/regra
+  de auditoria) — com ela, uma screen DECLARADA (D5) com um `campo` de texto
+  fiada nessa função monta um coletor de feedback dentro de qualquer fluxo.
+  A aba "PDCA — melhoria contínua" continua no menu por ora (ela é o laço de
+  quem ADMINISTRA; medir depois se segue o padrão §221).
 
 ## 4. As fatias
 
-> Ordem: A → B → C → D → E. B é a maior; C depende de B; D e E são
-> independentes entre si (podem inverter se conveniente).
+> Ordem: A → B → C → D → E → F. B é a maior; C depende de B; D e E são
+> independentes entre si (podem inverter se conveniente); F depende de B (a
+> tela mesa) e de C (a screen declarada do exemplo de PDCA).
 
 ### Fatia A — o gatilho como nó
 
@@ -349,6 +380,40 @@ agendamento com `proximo_em` no passado via expressão, força o tick e vê a
 execução no histórico com origem `agendamento`. §248: desligar o runner do
 tick forçado → vermelho.
 
+### Fatia F — a demanda desdobrada + o PDCA como componente (D10–D12)
+
+**Motor** (`aplicacao/src/config/projeto.ts` → evolui, sem renomear
+arquivo):
+- Registro `DADOS_DO_SISTEMA`: `demanda-ler` (contrato = a `saida` atual do
+  `PROJETO_DO_SISTEMA` + o parâmetro `demandaId`) e `demanda-gravar`
+  (contrato = a `entrada` atual, menos `demandaId` que continua parâmetro).
+  `PROJETO_DO_SISTEMA` (refId `"projeto"`) permanece como LEGADO deprecado —
+  normalizar aceita, painel avisa "componente antigo — troque por
+  Demanda — ler/gravar".
+- Executor (`routes/fluxos.ts`, ramo projeto): decide por refId — `ler` só
+  emite, `gravar` só grava, `projeto` mantém o comportamento fundido de hoje
+  (bit a bit: os E2Es de fluxos salvos antigos são a prova de regressão).
+- Fábricas re-desenham com os novos refIds (esteira, exportação, publicação,
+  ensaio). Rótulos: "Demanda — ler" / "Demanda — gravar" nos cartões; a cor
+  da família pode ganhar dois tons (medir contraste nos dois temas).
+- A porta "Abrir a mesa de projeto" sai do painel dos nós de dados
+  (`FluxoScreen.tsx` ~1030, `abrir-mesa-do-projeto`) e passa a ser a TELA
+  `mesa` (fatia B) — quem quer interação adiciona a tela; quem quer dado usa
+  ler/gravar.
+
+**PDCA**: `FUNCOES_DO_SISTEMA` ganha `pdca-feedback` (entrada:
+`texto (obrigatório)`, `contexto?`; saída: `feedbackId`) — executor chama a
+mesma gravação de `routes/pdca.ts` (auditoria idêntica, `recurso:
+"pdca_feedback"`). E2E de exemplo que também serve de documentação viva: uma
+screen declarada com um `campo` texto fiada em `pdca-feedback`, rodada, e o
+feedback aparece na aba PDCA.
+
+**Provas**: unidade dos dois contratos + legado fundido (§248: trocar o
+executor de `ler` para o fundido → o teste que afirma "gravar não emite"
+fica vermelho); E2E: esteira de fábrica nova mostra "Demanda — ler" e
+"Demanda — gravar" com cartões distintos (a queixa M9 morta na tela), e um
+fluxo salvo ANTIGO com refId `projeto` continua executando igual.
+
 ## 5. O que esta SPEC NÃO faz (e onde fica)
 
 - Teams webhook, Jira paginado (laço), Mongo, escrita em banco → SPEC-108
@@ -385,3 +450,11 @@ tick forçado → vermelho.
   é evolução com uso.
 - "Confirmação (§5.5) muda?" Não — o gate por nó continua; a tela é um nó
   com saída, o gate é uma pausa após qualquer nó. Os dois coexistem.
+- "A demanda vira acesso Postgres cru?" Não (D11) — ler/gravar são operações
+  nomeadas com as invariantes dentro; o conector de banco é para dados
+  externos.
+- "Remove o refId legado `projeto`?" Não nesta SPEC — deprecado com aviso;
+  a morte segue a régua da casa (só com prova de que nenhum fluxo salvo o
+  usa, rodada própria).
+- "A aba PDCA sai do menu?" Ainda não (D12) — ela é administração do laço;
+  medir uso depois que o componente existir.
