@@ -242,7 +242,9 @@ test("owner com RBAC ligado: só some do menu onde há curadoria de outro papel"
     // isto que aparecia trancado antes do §220. ("Pipeline de IA" saiu desta
     // lista na SPEC-109 C: o item deixou o menu para TODOS — a esteira vive
     // no canvas — então a ausência dele não diz nada sobre RBAC.)
-    for (const area of [/Padrões por componente/, /Campos por tipo de conexão/, /Especificação de solução/, /Modelo de IA/]) {
+    // ("Especificação de solução" também saiu do menu na SPEC-109 D — a
+    // porta é o nó de geração de itens no canvas.)
+    for (const area of [/Padrões por componente/, /Campos por tipo de conexão/, /Modelo de IA/]) {
       await expect(page.getByRole("button", { name: area }), `${area} visível`).toBeVisible();
     }
 

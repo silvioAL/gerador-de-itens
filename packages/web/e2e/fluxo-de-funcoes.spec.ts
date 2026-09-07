@@ -138,6 +138,12 @@ test("a função entra pela paleta já com o contrato à mostra — sem adaptado
     await expect(page.getByTestId("contrato-da-funcao")).toContainText("Itens derivados");
     await expect(page.getByTestId("adaptador-do-no")).toHaveCount(0);
 
+    // SPEC-109 D — o template da especificação mora no nó que o consome: a
+    // porta está no painel (clicar navegaria para fora e mataria o rascunho
+    // deste teste; o DESTINO — o editor via deep-link — é o que o spec das
+    // abas passou a provar).
+    await expect(page.getByTestId("abrir-config-da-especificacao")).toBeVisible();
+
     await page.getByTestId("add-funcao-ensaio").click();
     await expect(page.getByTestId("painel-do-no")).toContainText("Função do sistema — Ensaio de cenários");
 

@@ -17202,3 +17202,21 @@ exatamente o trabalho dela. `#/sistema` redireciona para `#/fluxo` (SPEC-61
 §6.7: link salvo não vira tela branca). O E2E do mapa foi reescrito para a
 casa nova: desligar pelo nó grava E o nó sai da derivada; a falha aparece no
 painel e a execução boa a apaga.
+
+## §389 — SPEC-109 D: o template da especificação mora no nó que o consome
+
+"Ainda existe a tela de especificação da solução, a proposta é que também
+fosse substituída" — o mesmo movimento da fatia C, aplicado à última aba que
+o usuário apontou. A medição achou o dono do insumo: o `templateItem` entra
+na DERIVAÇÃO (`gerarItensDeTrabalho`), então a porta pertence ao nó da
+função "Geração de itens" no canvas — não ao menu.
+
+O que mudou: "Especificação de solução" saiu do menu (para todos — o assert
+do RBAC deixou de listá-la, porque a ausência não diz mais nada sobre
+permissão); o painel do nó `derivacao` ganhou "Template da especificação
+(molda os itens) →"; o deep-link `#/config/especificacao` continua sendo a
+casa do editor (§221: morreu a descoberta pela lista, não a capacidade). Os
+dois testes de abas que entravam pela lista passaram a entrar pelo deep-link
+— que agora é o caminho real. No E2E do fluxo, a porta é afirmada presente
+sem clicar: navegar mataria o rascunho não salvo do teste, e o destino já é
+provado pelo spec das abas.

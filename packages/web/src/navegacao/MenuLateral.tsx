@@ -69,7 +69,9 @@ const GRUPOS: { titulo: string; itens: { area: AreaConfig; rotulo: string }[] }[
       // SPEC-79 — a aba existia e não tinha porta: dava para chegar por URL e
       // não pelo menu, que é como ninguém descobre um recurso.
       { area: "tokens", rotulo: "Design system" },
-      { area: "especificacao", rotulo: "Especificação de solução" },
+      // SPEC-109 D — "Especificação de solução" saiu do menu: o template é
+      // insumo da GERAÇÃO DE ITENS, e a porta é o nó dela no canvas de
+      // fluxos. O deep-link `#/config/especificacao` continua vivo (§221).
       // SPEC-106 fatia B — a Exportação foi ABSORVIDA pelo catálogo: destino
       // do gateway é conector, e dois itens para "endereço que a empresa
       // chama" era a duplicação que a SPEC mediu.
