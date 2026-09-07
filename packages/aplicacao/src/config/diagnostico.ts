@@ -139,6 +139,18 @@ export function resumirConfig(chave: ChaveConfig, documento: unknown): ResumoCon
           ? (documento as { fluxos: unknown[] }).fluxos.length
           : 0,
       };
+    // SPEC-110 fatia C — as telas do time. O resumo conta telas e blocos: uma
+    // tela sem bloco nenhum é o sintoma de um documento que chegou pela
+    // metade, e é isso que o diagnóstico existe para mostrar.
+    case "telas": {
+      const telas = Array.isArray((documento as { telas?: unknown[] })?.telas)
+        ? (documento as { telas: { blocos?: unknown[] }[] }).telas
+        : [];
+      return {
+        telas: telas.length,
+        blocos: telas.reduce((soma, t) => soma + (Array.isArray(t?.blocos) ? t.blocos.length : 0), 0),
+      };
+    }
   }
 }
 

@@ -192,11 +192,27 @@ export { PROJETO_DO_SISTEMA, REF_DO_PROJETO, type ProjetoDoSistema } from "./con
 export {
   CAMPO_DA_DECISAO,
   DECISOES_DA_TELA,
+  ENTRADAS_DO_CAMPO,
+  FORMATOS_DO_DADO,
+  PREFIXO_DA_TELA_DECLARADA,
   TELAS_DO_SISTEMA,
+  contratoDaTelaDeclarada,
+  idDaTelaDeclarada,
+  normalizarTelas,
   problemaNaSaidaDaTela,
+  refIdDaTelaDeclarada,
   telaDoSistema,
+  telaEmVigorPorRefId,
+  telasEmVigor,
+  validarEscritaTelas,
+  type BlocoDaTela,
+  type ConfigTelas,
   type DecisaoDaTela,
+  type EntradaDoCampo,
+  type FormatoDoDado,
+  type TelaDeclarada,
   type TelaDoSistema,
+  type TelaEmVigor,
 } from "./config/telas.js";
 /** SPEC-110 fatia A — o gatilho como nó: o fluxo diz QUANDO roda. */
 export {

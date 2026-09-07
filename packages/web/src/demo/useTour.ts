@@ -305,7 +305,9 @@ export function passosDeConfiguracao(opts: UseTourOpts): PassoTour[] {
       selector: null,
       titulo: "Moldar pro seu time",
       texto:
-        "O outro tour mostra o que a ferramenta FAZ. Este mostra o que ela aprende do seu time: de onde vem a IA, quem escreve cada parte do item, quais perguntas cada tecnologia obriga e o que uma conexão precisa declarar. Nada aqui é obrigatório para usar — é o que faz o resultado parecer escrito por vocês.",
+        // SPEC-110 C (D19) — as TELAS do time entram na lista do que se
+        // molda: criar uma tela é configuração, não código.
+        "O outro tour mostra o que a ferramenta FAZ. Este mostra o que ela aprende do seu time: de onde vem a IA, quem escreve cada parte do item, quais perguntas cada tecnologia obriga, o que uma conexão precisa declarar — e as TELAS que vocês criam para entrar no meio de um fluxo. Nada aqui é obrigatório para usar — é o que faz o resultado parecer escrito por vocês.",
       onEnter: () => opts.fecharRevisao(),
     },
     {

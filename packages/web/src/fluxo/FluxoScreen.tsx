@@ -20,8 +20,8 @@ import {
   gatilhoDoSistema,
   ID_DO_NO_DE_GATILHO,
   noDeGatilhoManual,
-  TELAS_DO_SISTEMA,
-  telaDoSistema,
+  telasEmVigor,
+  type TelaEmVigor,
   PROJETO_DO_SISTEMA,
   REF_DO_PROJETO,
   sanearCamposDaTransformacao,
@@ -43,6 +43,7 @@ import {
   apiFluxosEmVigor,
   apiIa,
   apiPipelineAgentes,
+  apiTelas,
   type ConectorDoCatalogo,
   type EventoDaExecucao,
   type FluxoEmVigor,
@@ -122,6 +123,7 @@ export function FluxoScreen({
   aoAbrirConfigDosPapeis,
   aoAbrirConfigDaEspecificacao,
   aoAbrirTelaDoStage,
+  aoEditarTela,
 }: {
   timeAtivo: string;
   onFechar: () => void;
@@ -169,6 +171,12 @@ export function FluxoScreen({
    * App — a FluxoScreen não conhece rotas, como nunca conheceu.
    */
   aoAbrirTelaDoStage?: (execucaoId: string) => void;
+  /**
+   * SPEC-110 fatia C — a porta para o EDITOR da tela declarada
+   * (`#/config/telas/<id>`): a aba não está no menu, e quem a alcança é o nó
+   * que a consome (§§388-389).
+   */
+  aoEditarTela?: (id: string) => void;
 }) {
   const permissoes = usePermissoes({ hospedado: true, timeId: timeAtivo });
   const podeEditar = permissoes.pode("fluxos", "editar");
@@ -178,6 +186,20 @@ export function FluxoScreen({
 
   const [catalogo, setCatalogo] = useState<ConectorDoCatalogo[]>([]);
   const [papeis, setPapeis] = useState<PapelConfigurado[]>([]);
+  /**
+   * SPEC-110 fatia C — as telas EM VIGOR do time: as do sistema mais as
+   * declaradas. Quem monta um fluxo escolhe entre as duas no mesmo lugar —
+   * o vocabulário é um só, e o prefixo do refId é que as distingue.
+   */
+  const [telas, setTelas] = useState<TelaEmVigor[]>(() => telasEmVigor());
+  useEffect(() => {
+    void apiTelas
+      .obter(timeAtivo)
+      .then((doc) => setTelas(telasEmVigor(doc)))
+      // Sem o documento, as do sistema bastam: o canvas não fica sem telas
+      // porque a config do time falhou (§244).
+      .catch(() => setTelas(telasEmVigor()));
+  }, [timeAtivo]);
   const [fluxos, setFluxos] = useState<FluxoEmVigor[] | null>(null);
   const [fluxoId, setFluxoId] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -282,7 +304,7 @@ export function FluxoScreen({
       // SPEC-110 B — a tela declara os dois lados: o que ela mostra e o que a
       // decisão devolve. É o que faz o aviso de tipo funcionar nela também.
       if (no.tipo === "tela") {
-        const tela = telaDoSistema(no.refId);
+        const tela = telas.find((t) => t.refId === no.refId);
         return tela ? { entrada: tela.entrada, saida: tela.saida } : null;
       }
       return null;
@@ -350,7 +372,7 @@ export function FluxoScreen({
       // o vizinho (medido na validação visual desta fatia).
       if (no.tipo === "gatilho") return gatilhoDoSistema(no.refId)?.rotuloCurto ?? no.refId;
       // SPEC-110 B — a tela, pela mesma régua do rótulo curto.
-      if (no.tipo === "tela") return telaDoSistema(no.refId)?.rotuloCurto ?? no.refId;
+      if (no.tipo === "tela") return telas.find((t) => t.refId === no.refId)?.rotuloCurto ?? no.refId;
       if (!no.refId)
         return no.componente && no.componente !== "livre"
           ? NOME_DA_OPERACAO[no.componente]
@@ -551,7 +573,7 @@ export function FluxoScreen({
    * SPEC-110 fatia B — a TELA entra como a função: o registro é fechado e a
    * tela É a capacidade, então o nó já nasce com o `refId` (§2.4-10).
    */
-  function adicionarTela(telaId: string) {
+  function adicionarTela(refId: string, telaId: string) {
     mudarFluxo((f) => {
       let n = 1;
       while (f.nos.some((no) => no.id === `${telaId}-${n}`)) n++;
@@ -559,7 +581,9 @@ export function FluxoScreen({
       setSelecao({ tipo: "no", id });
       return {
         ...f,
-        nos: [...f.nos, { id, tipo: "tela", refId: telaId, posicao: proximaPosicao(f.nos), parametros: {} }],
+        // O `refId` é o da tela EM VIGOR (`mesa` ou `tela:aprovacao`); o id do
+        // NÓ usa só o id curto, para o cartão não virar um endereço.
+        nos: [...f.nos, { id, tipo: "tela", refId, posicao: proximaPosicao(f.nos), parametros: {} }],
       };
     });
   }
@@ -914,8 +938,8 @@ export function FluxoScreen({
             {/* SPEC-110 fatia B — a TELA: onde a pessoa entra no fluxo. Uma
                 por botão como as funções (o registro é fechado e a tela É a
                 capacidade — não há adaptador a escolher, §2.4-10). */}
-            {TELAS_DO_SISTEMA.map((t) => (
-              <button key={t.id} data-testid={`add-tela-${t.id}`} disabled={!editavel} onClick={() => adicionarTela(t.id)} style={botao}>
+            {telas.map((t) => (
+              <button key={t.refId} data-testid={`add-tela-${t.id}`} disabled={!editavel} onClick={() => adicionarTela(t.refId, t.id)} style={botao}>
                 + {t.rotuloCurto}
               </button>
             ))}
@@ -1086,6 +1110,8 @@ export function FluxoScreen({
                 no={noSelecionado}
                 catalogo={catalogo}
                 papeis={papeis}
+                telas={telas}
+                aoEditarTela={aoEditarTela}
                 podeEditar={editavel}
                 podeEditarPapel={podeEditarPapel}
                 onSalvarPapel={salvarPapel}
@@ -1309,10 +1335,16 @@ function PainelDoNo({
   onAbrirMesa,
   esteira,
   aoAbrirConfigDaEspecificacao,
+  telas,
+  aoEditarTela,
 }: {
   no: NoDoFluxo;
   catalogo: ConectorDoCatalogo[];
   papeis: PapelConfigurado[];
+  /** SPEC-110 fatia C — as telas em vigor: as do sistema e as do time. */
+  telas: TelaEmVigor[];
+  /** A PORTA (§§388-389): o painel do nó leva ao editor da tela declarada. */
+  aoEditarTela?: (id: string) => void;
   podeEditar: boolean;
   podeEditarPapel: boolean;
   onSalvarPapel: (refId: string, mudanca: { nome: string; descricao: string; preambulo: string }) => Promise<void>;
@@ -1341,7 +1373,7 @@ function PainelDoNo({
   // adaptador a escolher enquanto a família tiver um só membro (§2.4-10).
   const gatilho = no.tipo === "gatilho" ? gatilhoDoSistema(no.refId) : undefined;
   // SPEC-110 fatia B — a tela: capacidade com contrato, executor de gente.
-  const tela = no.tipo === "tela" ? telaDoSistema(no.refId) : undefined;
+  const tela = no.tipo === "tela" ? telas.find((t) => t.refId === no.refId) : undefined;
   // SPEC-107 fatia A — a função É a capacidade: contrato do registro fechado,
   // sem adaptador a escolher.
   const funcao = no.tipo === "funcao" ? funcaoDoSistema(no.refId) : undefined;
@@ -1368,7 +1400,15 @@ function PainelDoNo({
               <span data-testid="proposito-da-tela">
                 Tela — <strong>{tela?.nome ?? no.refId}</strong>. {tela?.descricao} A execução <strong>para</strong> neste
                 nó: alguém abre, revisa e decide — <em>Avançar</em> segue a fiação com a saída da tela, <em>Retornar</em>{" "}
-                encerra a execução.
+                encerra a execução.{" "}
+                {/* SPEC-110 fatia C — a PORTA no nó que consome (§§388-389):
+                    a tela DECLARADA se edita de onde ela é usada. As do
+                    sistema não têm editor — elas são o produto. */}
+                {tela?.origem === "declarada" && aoEditarTela && (
+                  <button onClick={() => aoEditarTela(tela.id)} style={{ ...botao, marginLeft: 6 }} data-testid="editar-a-tela">
+                    editar a tela →
+                  </button>
+                )}
               </span>
             )
           : no.tipo === "gatilho"

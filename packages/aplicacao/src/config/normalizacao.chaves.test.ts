@@ -56,6 +56,22 @@ describe("toda chave de config sobrevive à normalização", () => {
         },
       ],
     },
+    // SPEC-110 fatia C — as telas do time. Este teste é o guarda do §354, e
+    // foi ele que cobrou a chave nova antes de ela nascer morta.
+    telas: {
+      telas: [
+        {
+          id: "aprovacao",
+          nome: "Aprovar a proposta",
+          blocos: [
+            { tipo: "texto", markdown: "Confira a proposta antes de seguir." },
+            { tipo: "dado", chave: "proposta", rotulo: "Proposta", formato: "documento" },
+            { tipo: "campo", chave: "observacao", rotulo: "Observação", entrada: "texto" },
+            { tipo: "acao", rotulo: "Aprovar", acao: "avancar" },
+          ],
+        },
+      ],
+    },
   };
 
   it.each([...CHAVES_CONFIG])("`%s` não vira undefined ao ser normalizada", (chave) => {

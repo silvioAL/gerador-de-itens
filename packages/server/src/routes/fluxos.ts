@@ -22,7 +22,8 @@ import {
   normalizarPipelineAgentes,
   preambuloDoPapel,
   problemaNaSaidaDaTela,
-  telaDoSistema,
+  telasEmVigor,
+  type TelaEmVigor,
   resultadoDaExportacao,
   saidaDoProjeto,
   sanearCamposDaTransformacao,
@@ -91,15 +92,19 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
    * papéis; a exportação, do destino de itens — SPEC-107 G1). Resolvido AQUI
    * (§263): a tela, o mapa e o executor leem a mesma soma. */
   async function emVigor(timeId?: string) {
-    const [fluxosDoc, pipelineDoc, exportadorDoc] = await Promise.all([
+    const [fluxosDoc, pipelineDoc, exportadorDoc, telasDoc] = await Promise.all([
       casos.obter("fluxos", await templateDaVersao("fluxos", diretorioConfig), timeId),
       casos.obter("pipeline-agentes", await templateDaVersao("pipeline-agentes", diretorioConfig), timeId),
       casos.obter("exportador", await templateDaVersao("exportador", diretorioConfig)),
+      // SPEC-110 fatia C — as telas DO TIME entram no mesmo em-vigor: quem
+      // resolve uma tela não pergunta se ela é do sistema ou do time.
+      casos.obter("telas", await templateDaVersao("telas", diretorioConfig), timeId),
     ]);
     const { papeis } = normalizarPipelineAgentes(pipelineDoc.documento);
     return {
       fluxos: fluxosEmVigor(papeis, fluxosDoc.documento, normalizarExportador(exportadorDoc.documento)),
       papeis,
+      telas: telasEmVigor(telasDoc.documento),
     };
   }
 
@@ -567,7 +572,7 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
       });
     }
 
-    const { fluxos, papeis } = await emVigor(timeId);
+    const { fluxos, papeis, telas } = await emVigor(timeId);
     const fluxo = fluxos.find((f) => f.id === execucao.fluxoId);
     if (!fluxo) {
       return reply.code(409).send({ erro: `o fluxo "${execucao.fluxoId}" não existe mais neste time — descarte esta execução` });
@@ -613,7 +618,7 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
           erro: `a tela "${naTela.noId}" precisa da decisão de quem revisou — mande "saidaDaTela" com "decisao"`,
         });
       }
-      const tela = telaDoSistema(naTela.refId);
+      const tela = telas.find((t: TelaEmVigor) => t.refId === naTela.refId);
       if (!tela) return reply.code(409).send({ erro: `não conheço a tela "${naTela.refId}"` });
       const problema = problemaNaSaidaDaTela(tela, corpo.saidaDaTela);
       if (problema) return reply.code(400).send({ erro: problema });
@@ -711,7 +716,7 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
       return reply.code(409).send({ erro: `esta execução não está parada numa tela (estado: ${execucao.estado})` });
     }
     const timeId = execucao.timeId === CAMPO_GLOBAL ? undefined : execucao.timeId;
-    const { fluxos, papeis } = await emVigor(timeId);
+    const { fluxos, papeis, telas } = await emVigor(timeId);
     const fluxo = fluxos.find((f) => f.id === execucao.fluxoId);
     if (!fluxo) {
       return reply.code(409).send({ erro: `o fluxo "${execucao.fluxoId}" não existe mais neste time — descarte esta execução` });
@@ -734,7 +739,7 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     if (!parada.aguardandoTela) {
       return reply.code(409).send({ erro: "esta execução não está parada numa tela — descarte e execute de novo" });
     }
-    const tela = telaDoSistema(parada.aguardandoTela.refId);
+    const tela = telas.find((t: TelaEmVigor) => t.refId === parada.aguardandoTela!.refId);
     if (!tela) return reply.code(409).send({ erro: `não conheço a tela "${parada.aguardandoTela.refId}"` });
     const noDaTela = fluxo.nos.find((n) => n.id === parada.aguardandoTela!.noId);
     return {
@@ -745,7 +750,18 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
       // O nome do NÓ vence o da tela, como em todo cartão do canvas (§387).
       noId: parada.aguardandoTela.noId,
       nomeDoNo: noDaTela?.nome ?? null,
-      tela: { id: tela.id, nome: tela.nome, descricao: tela.descricao, entrada: tela.entrada, saida: tela.saida },
+      tela: {
+        id: tela.id,
+        nome: tela.nome,
+        descricao: tela.descricao,
+        entrada: tela.entrada,
+        saida: tela.saida,
+        // SPEC-110 fatia C — a tela DECLARADA viaja com os blocos: é o que o
+        // renderizador desenha. As do sistema não têm blocos — elas delegam
+        // para a tela que já existe (a bancada, o documento, a mesa).
+        origem: tela.origem,
+        ...(tela.blocos ? { blocos: tela.blocos } : {}),
+      },
       entradas: parada.aguardandoTela.entradas,
     };
   });

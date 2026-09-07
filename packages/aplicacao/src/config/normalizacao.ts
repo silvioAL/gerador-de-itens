@@ -3,6 +3,7 @@ import type { ChaveConfig } from "../portas/repositorioDeConfig.js";
 // e daqui só se chamam as funções dele em runtime — nunca durante a carga.
 import { normalizarConectores, validarEscritaConectores } from "./conectores.js";
 import { normalizarFluxos, validarEscritaFluxos } from "./fluxos.js";
+import { normalizarTelas, validarEscritaTelas } from "./telas.js";
 
 /**
  * SPEC-31 Fase 3 — a coerção de entrada de cada documento de config.
@@ -426,6 +427,10 @@ export function validarEscritaConfig(chave: string, documento: unknown): void {
   if (chave === "conectores") validarEscritaConectores(documento);
   // SPEC-105 fatia C — fluxo com ciclo é recusado com a mensagem do desenho.
   if (chave === "fluxos") validarEscritaFluxos(documento);
+  // SPEC-110 fatia C — tela com bloco pela metade é recusada nomeando: o que
+  // a leitura descarta em silêncio some do documento salvo, e a pessoa só
+  // descobre quando a tela abre sem o bloco que ela acabou de criar.
+  if (chave === "telas") validarEscritaTelas(documento);
   if (chave === "exportador") {
     const { endpoint } = normalizarExportador(documento);
     // Endereço vazio é legítimo (desliga a exportação); endereço inválido
@@ -474,6 +479,11 @@ export function normalizarDocumentoConfig(chave: ChaveConfig, documento: unknown
       return normalizarConectores(documento);
     case "fluxos":
       return normalizarFluxos(documento);
+    // SPEC-110 fatia C — as telas do time. Sem este `case` a chave nasceria
+    // morta no modo hospedado, que é exatamente o que o §354 pagou para
+    // aprender com `tokens`.
+    case "telas":
+      return normalizarTelas(documento);
     default:
       return documento;
   }

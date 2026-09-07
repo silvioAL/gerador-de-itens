@@ -68,6 +68,8 @@ import {
   type StageDaTela,
 } from "./api/client";
 import { MolduraDoStage } from "./fluxo/MolduraDoStage";
+// SPEC-110 fatia C — o renderizador das telas do time (o mesmo do preview).
+import { RenderizadorDaTela, useMotivoParaNaoAvancar } from "./fluxo/RenderizadorDaTela";
 import { useSessao } from "./auth/useSessao";
 import { LoginScreen } from "./auth/LoginScreen";
 import { useQuebra } from "./state/useQuebra";
@@ -576,6 +578,22 @@ function AppCarregado({
     };
   }, [rota, navegar]);
   const mostrarStageDaBancada = rota.tela === "telaDoStage" && stage?.tela.id === "bancada-de-ensaios";
+  /**
+   * SPEC-110 fatia C — a tela DECLARADA é desenhada aqui, pelos blocos. As do
+   * sistema delegam (a bancada é corpo, o documento e a mesa recebem a
+   * moldura por cima); a do time é a única que o stage RENDERIZA.
+   */
+  const mostrarStageDeclarado = rota.tela === "telaDoStage" && stage?.tela.origem === "declarada";
+  /** O que a pessoa preencheu nos blocos `campo` — é a saída da tela. */
+  const [valoresDaTela, setValoresDaTela] = useState<Record<string, unknown>>({});
+  useEffect(() => setValoresDaTela({}), [stage?.execucaoId]);
+  const motivoParaNaoAvancar = useMotivoParaNaoAvancar(stage?.tela.blocos ?? [], valoresDaTela);
+  /**
+   * O stage é DONO da tela quando ele mesmo desenha o corpo — a bancada e as
+   * telas declaradas. Nesses casos a mesa sai de cena: empilhar os dois
+   * cabeçalhos convida a gestos da tela errada (a aspereza anotada na fatia B).
+   */
+  const emStageProprio = rota.tela === "telaDoStage";
 
   /** SPEC-110 B — o Avançar e o Retornar da moldura, num lugar só. */
   const decidirNoStage = useCallback(
@@ -1597,7 +1615,28 @@ function AppCarregado({
        * bancada é a exceção: ela nasceu como painel, não como rota, e por
        * isso o stage a monta como CORPO, mais abaixo.)
        */}
-      {stage && stage.tela.id !== "bancada-de-ensaios" && (
+      {/* SPEC-110 fatia C — o STAGE de uma tela DECLARADA: a moldura do shell
+          por cima, e os blocos do time embaixo, pelo mesmo renderizador que o
+          preview do editor usa. */}
+      {mostrarStageDeclarado && stage && (
+        <MolduraDoStage
+          nomeDoFluxo={stage.nome}
+          nomeDaTela={stage.nomeDoNo ?? stage.tela.nome}
+          ocupado={stageOcupado}
+          erro={erroDoStage}
+          motivoParaNaoAvancar={motivoParaNaoAvancar}
+          onRetornar={() => void decidirNoStage("retornar")}
+          onAvancar={() => void decidirNoStage("avancar", valoresDaTela)}
+        >
+          <RenderizadorDaTela
+            blocos={stage.tela.blocos ?? []}
+            entradas={stage.entradas}
+            valores={valoresDaTela}
+            onMudarValor={(chave, valor) => setValoresDaTela((v) => ({ ...v, [chave]: valor }))}
+          />
+        </MolduraDoStage>
+      )}
+      {stage && stage.tela.origem === "sistema" && stage.tela.id !== "bancada-de-ensaios" && (
         <div data-testid="barra-do-stage" style={{ flexShrink: 0 }}>
           <MolduraDoStage
             nomeDoFluxo={stage.nome}
@@ -1612,6 +1651,20 @@ function AppCarregado({
           </MolduraDoStage>
         </div>
       )}
+      {/**
+       * SPEC-110 fatia C — **o stage troca o contexto; não empilha.**
+       *
+       * A fatia B deixou o cabeçalho da MESA (paleta, Salvar, Derivar Quebra)
+       * acima da moldura. Funcionava, e convidava a gestos da tela errada:
+       * quem está revisando uma execução não deveria ver "Derivar Quebra". A
+       * aspereza foi anotada lá e paga aqui, que é onde o renderizador de
+       * telas passou a existir.
+       *
+       * As telas do sistema `documento` e `mesa` NÃO entram nesta regra, de
+       * propósito: elas delegam para a tela que já existe, e a moldura fica
+       * por cima DELA (D17c) — é o "mínimo de impacto" que o usuário pediu.
+       */}
+      {!emStageProprio && (
       <header
         style={{
           display: "flex",
@@ -1766,6 +1819,7 @@ function AppCarregado({
           Derivar Quebra
         </button>
       </header>
+      )}
 
       <MenuLateral
         aberto={menuAberto}
@@ -2067,6 +2121,9 @@ function AppCarregado({
         }
       />
 
+      {/* A MESA também sai quando o stage é dono da tela — ver o comentário
+          do cabeçalho acima. */}
+      {!emStageProprio && (
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
         <div style={{ flex: 1 }}>
           <ReactFlowProvider>
@@ -2137,6 +2194,7 @@ function AppCarregado({
           />
         )}
       </div>
+      )}
 
       {/* SPEC-107 G5c-3 — a ReviewScreen MORREU (§3.1, a última linha da
           tabela): derivar escreve os itens e leva ao documento, onde o
@@ -2200,6 +2258,8 @@ function AppCarregado({
           // SPEC-110 fatia B — a porta da tela parada: o canvas mostra
           // "aguardando: <tela> — abrir →" e o clique leva ao stage.
           aoAbrirTelaDoStage={(execucaoId) => navegar({ tela: "telaDoStage", execucaoId })}
+          // SPEC-110 fatia C — a porta do nó para o editor da tela declarada.
+          aoEditarTela={(id) => navegar({ tela: "config", area: "telas", telaId: id })}
           // G5c — executar do canvas aponta a demanda aberta na mesa; e o que
           // a fiação GRAVOU nela volta para o estado da mesa na hora, senão o
           // próximo autosave apagaria a escrita do servidor (§250, medido).
@@ -2423,6 +2483,11 @@ function AppCarregado({
           templateItem={templateItem}
           pipelineAgentes={pipelineAgentes}
           timeAtivo={timeAtivo}
+          // SPEC-110 fatia C — a tela em edição vem da ROTA: o editor de uma
+          // tela é um endereço mandável (`#/config/telas/<id>`), como o canvas
+          // de um fluxo.
+          telaId={rota.tela === "config" ? rota.telaId : undefined}
+          aoAbrirTela={(id) => navegar({ tela: "config", area: "telas", ...(id ? { telaId: id } : {}) })}
           timeIds={sessao.timeIds}
           onAbrirArea={(area) => abrirConfigNaAba(area)}
           // §274 — o botão da aba de produto abre a MESMA conversa do FAB, na

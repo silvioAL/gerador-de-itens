@@ -24,6 +24,8 @@ export type AreaConfig =
   | "pdca"
   /** SPEC-79 fatia A — os tokens do design system do time. */
   | "tokens"
+  /** SPEC-110 fatia C — as telas (screens) do time: criar, editar, prever. */
+  | "telas"
   /** SPEC-105 fatia A — o catálogo de conectores (organizacional). */
   | "conectores";
 
@@ -38,7 +40,12 @@ export type AreaConfig =
  */
 export type Rota =
   | { tela: "canvas" }
-  | { tela: "config"; area: AreaConfig }
+  /**
+   * SPEC-110 fatia C — `telaId` só existe na área `telas`: o editor de uma
+   * tela é `#/config/telas/<id>`, e a lista é `#/config/telas`. É o mesmo
+   * endereço-com-detalhe do canvas (`#/fluxo/<id>`) — a porta é URL.
+   */
+  | { tela: "config"; area: AreaConfig; telaId?: string }
   | { tela: "documento" }
   /**
    * ~~SPEC-59 — `{ tela: "sistema" }`.~~ **SPEC-109 C — a tela saiu.**
@@ -119,6 +126,9 @@ const SEGMENTO_DA_AREA: Record<AreaConfig, string> = {
   pdca: "pdca",
   tokens: "design-system",
   conectores: "conectores",
+  // SPEC-110 fatia C — o editor de telas do time, FORA do menu (padrão
+  // "deep-link + porta no nó", §§388-389).
+  telas: "telas",
 };
 /** SPEC-78 fatia D — as áreas de config, em runtime. O tipo `AreaConfig` não
  * existe depois da compilação, e o teste que impede o tour de apontar para uma
@@ -139,6 +149,10 @@ export function hashDaRota(rota: Rota): string {
     // uma URL mandável, como a bancada (§2.4-3, a metade da porta).
     if (rota.fluxoId) return `#/fluxo/${encodeURIComponent(rota.fluxoId)}`;
     return "#/fluxo";
+  }
+  // SPEC-110 C — `#/config/telas/<id>` abre o editor DAQUELA tela.
+  if (rota.area === "telas" && rota.telaId) {
+    return `#/config/telas/${encodeURIComponent(rota.telaId)}`;
   }
   return `#/config/${SEGMENTO_DA_AREA[rota.area]}`;
 }
@@ -192,6 +206,8 @@ export function rotaDoHash(hash: string): Rota {
     // Conectores; o link salvo REDIRECIONA (SPEC-61 §6.7), nunca vira branco.
     if (partes[1] === "exportacao") return { tela: "config", area: "conectores" };
     const area = AREA_DO_SEGMENTO[partes[1] ?? ""];
+    // SPEC-110 C — o terceiro segmento é o id da tela; sem ele, a lista.
+    if (area === "telas" && partes[2]) return { tela: "config", area, telaId: decodeURIComponent(partes[2]) };
     if (area) return { tela: "config", area };
   }
   return { tela: "canvas" };
