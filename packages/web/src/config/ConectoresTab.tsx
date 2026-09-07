@@ -31,6 +31,15 @@ interface FormConector {
   id: string;
   nome: string;
   descricao: string;
+  /**
+   * SPEC-110 fatia D (D6) — o TRANSPORTE. `http` é o conector de sempre;
+   * `banco` troca o endereço pela consulta, e os campos de rede somem do
+   * formulário (§2.4-10: pergunta que não se aplica não se faz).
+   */
+  tipo: "http" | "banco";
+  segredoDaConexao: string;
+  sql: string;
+  limite: string;
   endpoint: string;
   metodo: "POST" | "PUT" | "PATCH";
   envelope: string;
@@ -44,6 +53,10 @@ const FORM_VAZIO: FormConector = {
   id: "",
   nome: "",
   descricao: "",
+  tipo: "http",
+  segredoDaConexao: "",
+  sql: "",
+  limite: "",
   endpoint: "",
   metodo: "POST",
   envelope: "",
@@ -75,6 +88,10 @@ function comoForm(conector: Conector): FormConector {
     id: conector.id,
     nome: conector.nome,
     descricao: conector.descricao ?? "",
+    tipo: conector.tipo === "banco" ? "banco" : "http",
+    segredoDaConexao: conector.banco?.segredoDaConexao ?? "",
+    sql: conector.banco?.sql ?? "",
+    limite: conector.banco?.limite ? String(conector.banco.limite) : "",
     endpoint: conector.endpoint,
     metodo: conector.metodo,
     envelope: conector.envelope,
@@ -85,6 +102,31 @@ function comoForm(conector: Conector): FormConector {
 }
 
 function comoConector(form: FormConector): Conector {
+  // SPEC-110 fatia D — o conector de BANCO não tem endereço nem envelope: o
+  // "onde" dele é a connection string no cofre, e o "o quê" é o SQL.
+  if (form.tipo === "banco") {
+    const limite = Number(form.limite);
+    return {
+      id: form.id.trim(),
+      nome: form.nome.trim() || form.id.trim(),
+      ...(form.descricao.trim() ? { descricao: form.descricao.trim() } : {}),
+      tipo: "banco",
+      banco: {
+        motor: "postgres",
+        segredoDaConexao: form.segredoDaConexao.trim(),
+        sql: form.sql.trim(),
+        ...(Number.isFinite(limite) && limite > 0 ? { limite: Math.floor(limite) } : {}),
+      },
+      // O contrato do nó é o mesmo dos outros: os campos declarados. Endereço
+      // e envelope ficam vazios porque não existem neste transporte.
+      endpoint: "",
+      metodo: "POST",
+      cabecalhos: {},
+      envelope: "",
+      entrada: form.entrada.filter((c) => c.chave.trim()),
+      saida: form.saida.filter((c) => c.chave.trim()),
+    };
+  }
   return {
     id: form.id.trim(),
     nome: form.nome.trim() || form.id.trim(),
@@ -478,15 +520,77 @@ export function ConectoresTab({ demonstracao }: { demonstracao?: ConectorDoCatal
                 style={campo}
               />
             </label>
-            <label style={{ ...rotulo, gridColumn: "1 / -1" }}>
-              Endereço (endpoint)
-              <input
-                value={form.endpoint}
-                onChange={(e) => setForm({ ...form, endpoint: e.target.value })}
-                placeholder="https://gateway.empresa/volumetria"
+            {/* SPEC-110 fatia D — o TRANSPORTE vem antes de tudo: ele decide
+                quais perguntas fazem sentido daqui para baixo. */}
+            <label style={rotulo}>
+              De onde vem o dado
+              <select
+                data-testid="tipo-do-conector"
+                value={form.tipo}
+                onChange={(e) => setForm({ ...form, tipo: e.target.value as FormConector["tipo"] })}
                 style={campo}
-              />
+              >
+                <option value="http">Uma chamada HTTP (endereço)</option>
+                <option value="banco">Uma consulta no banco (Postgres)</option>
+              </select>
             </label>
+            {form.tipo === "banco" ? (
+              <>
+                <label style={rotulo}>
+                  Conexão (chave no cofre)
+                  <input
+                    data-testid="segredo-da-conexao"
+                    value={form.segredoDaConexao}
+                    onChange={(e) => setForm({ ...form, segredoDaConexao: e.target.value })}
+                    placeholder="PG_VENDAS"
+                    style={campo}
+                  />
+                </label>
+                <label style={{ ...rotulo, gridColumn: "1 / -1" }}>
+                  {/* Sem `<code>` no meio da frase: ele é `display: block` no
+                      reset da casa e partia o rótulo em três linhas (medido na
+                      validação visual). */}
+                  Consulta (SELECT; use “:nome” para os parâmetros — o valor nunca entra no texto)
+                  <textarea
+                    data-testid="sql-do-conector"
+                    value={form.sql}
+                    onChange={(e) => setForm({ ...form, sql: e.target.value })}
+                    rows={4}
+                    placeholder="select nome, total from pedidos where cliente = :cliente"
+                    style={{ ...campo, fontFamily: "ui-monospace, monospace" }}
+                  />
+                </label>
+                <label style={rotulo}>
+                  Limite de linhas (vazio = 100)
+                  <input
+                    data-testid="limite-da-consulta"
+                    value={form.limite}
+                    onChange={(e) => setForm({ ...form, limite: e.target.value })}
+                    placeholder="100"
+                    style={campo}
+                  />
+                </label>
+                <p style={{ gridColumn: "1 / -1", fontSize: 11.5, color: "var(--texto-2)", margin: 0 }}>
+                  A consulta roda em transação <strong>somente leitura</strong>, com tempo máximo de 10s e LIMIT forçado. A
+                  resposta chega como “linhas” (a lista) e “total” — declare os campos de saída
+                  apontando para elas. Escrita em banco é a SPEC-108.
+                </p>
+              </>
+            ) : (
+              <label style={{ ...rotulo, gridColumn: "1 / -1" }}>
+                Endereço (endpoint)
+                <input
+                  value={form.endpoint}
+                  onChange={(e) => setForm({ ...form, endpoint: e.target.value })}
+                  placeholder="https://gateway.empresa/volumetria"
+                  style={campo}
+                />
+              </label>
+            )}
+            {/* SPEC-110 fatia D — método, envelope e cabeçalhos são do
+                transporte HTTP: perguntá-los num conector de banco seria pedir
+                à pessoa que responda o que não se aplica (§2.4-10). */}
+            {form.tipo !== "banco" && (
             <label style={rotulo}>
               Método
               <select value={form.metodo} onChange={(e) => setForm({ ...form, metodo: e.target.value as FormConector["metodo"] })} style={campo}>
@@ -495,6 +599,8 @@ export function ConectoresTab({ demonstracao }: { demonstracao?: ConectorDoCatal
                 <option value="PATCH">PATCH</option>
               </select>
             </label>
+            )}
+            {form.tipo !== "banco" && (
             <label style={rotulo}>
               Envelope (vazio = corpo na raiz)
               <input
@@ -504,6 +610,8 @@ export function ConectoresTab({ demonstracao }: { demonstracao?: ConectorDoCatal
                 style={campo}
               />
             </label>
+            )}
+            {form.tipo !== "banco" && (
             <label style={{ ...rotulo, gridColumn: "1 / -1" }}>
               Cabeçalhos (um por linha, “Nome: valor”) — ficam no servidor, nunca voltam para esta tela
               <textarea
@@ -514,6 +622,7 @@ export function ConectoresTab({ demonstracao }: { demonstracao?: ConectorDoCatal
                 style={{ ...campo, resize: "vertical" }}
               />
             </label>
+            )}
           </div>
 
           <EditorDeCampos
@@ -533,7 +642,12 @@ export function ConectoresTab({ demonstracao }: { demonstracao?: ConectorDoCatal
             <button
               data-testid="salvar-conector"
               onClick={submeterForm}
-              disabled={!form.id.trim() || !form.endpoint.trim()}
+              // SPEC-110 D — cada transporte tem o seu mínimo: o http precisa
+              // de endereço, o banco precisa de conexão e consulta.
+              disabled={
+                !form.id.trim() ||
+                (form.tipo === "banco" ? !form.segredoDaConexao.trim() || !form.sql.trim() : !form.endpoint.trim())
+              }
               style={botaoPrimario}
             >
               Salvar conector

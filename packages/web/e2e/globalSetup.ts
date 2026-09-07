@@ -99,6 +99,21 @@ export default async function globalSetup() {
     // por ser seed de login, e só este e-mail é lixo de teste.
     await client.query(`DELETE FROM "usuario_time" WHERE "email" LIKE '%-e2e@gerador.local'`).catch(() => undefined);
 
+    /**
+     * SPEC-110 fatia D — **a tabela que o conector de banco vai consultar.**
+     *
+     * O alvo é o PRÓPRIO Postgres descartável da suíte: ele já está de pé, é
+     * um banco de verdade, e usá-lo evita inventar um dublê de driver — que
+     * provaria o dublê, não o `pg`. O nome tem prefixo `e2e_` para deixar
+     * claro que é do teste, e o `DROP` antes do `CREATE` garante que a
+     * segunda rodada mede o mesmo que a primeira.
+     */
+    await client.query(`DROP TABLE IF EXISTS "e2e_pedidos"`);
+    await client.query(`CREATE TABLE "e2e_pedidos" (id serial primary key, cliente text not null, total numeric not null)`);
+    await client.query(
+      `INSERT INTO "e2e_pedidos" (cliente, total) VALUES ('acme', 100), ('acme', 250), ('globex', 70)`
+    );
+
     // §303 — a seed de `perfis_time` que existia aqui SAIU, e não foi trocada
     // por outra. Ela era uma cópia à mão do 0000_init para sobreviver ao
     // TRUNCATE; hoje a stack do time mora em `stacks`/`stack_valores` (0020 →

@@ -1,4 +1,7 @@
 import { analisarCaminho } from "./caminho.js";
+// SPEC-110 fatia D — o banco como componente: as réguas do "só consulta" e
+// dos parâmetros nomeados vivem puras, num módulo só.
+import { exigirConsultaValida, type ConsultaEmBanco } from "./consultaEmBanco.js";
 import {
   ConfigInvalida,
   destinosDaOperacao,
@@ -68,6 +71,19 @@ export interface Conector {
   id: string;
   nome: string;
   descricao?: string;
+  /**
+   * SPEC-110 fatia D (D6) — **o transporte.** Ausente ou `"http"` é o
+   * conector de sempre (endereço, método, envelope). `"banco"` troca a rede
+   * pelo driver: o `endpoint` deixa de ser um endereço e a consulta vive em
+   * `banco`.
+   *
+   * O campo é opcional para que TODO conector salvo antes desta fatia
+   * continue sendo lido como http — compatibilidade sem migração, a mesma
+   * régua do gatilho (D8).
+   */
+  tipo?: "http" | "banco";
+  /** SPEC-110 D — a consulta, quando `tipo: "banco"`. */
+  banco?: ConsultaEmBanco;
   endpoint: string;
   metodo: MetodoDoGateway;
   cabecalhos: Record<string, string>;
@@ -130,6 +146,28 @@ function sanearCampos(entrada: unknown): CampoDoConector[] {
   return campos;
 }
 
+/**
+ * SPEC-110 fatia D — a consulta na leitura TOLERANTE: sem SQL ou sem segredo
+ * ela não dá para rodar, e o conector inteiro sai (como um http sem endereço).
+ * Quem recusa nomeando é a escrita.
+ */
+function sanearConsulta(bruto: unknown): ConsultaEmBanco | null {
+  if (!bruto || typeof bruto !== "object") return null;
+  const b = bruto as Record<string, unknown>;
+  const sql = typeof b.sql === "string" ? b.sql.trim() : "";
+  const segredoDaConexao = typeof b.segredoDaConexao === "string" ? b.segredoDaConexao.trim() : "";
+  if (!sql || !segredoDaConexao) return null;
+  const limite = Number(b.limite);
+  return {
+    // O v1 fala um motor só; qualquer outro valor lido cai nele, e a escrita
+    // é quem recusa o que não é postgres (SPEC-35).
+    motor: "postgres",
+    segredoDaConexao,
+    sql,
+    ...(Number.isFinite(limite) && limite > 0 ? { limite: Math.floor(limite) } : {}),
+  };
+}
+
 export function normalizarConectores(documento: unknown): ConfigConectores {
   const bruto = (documento ?? {}) as Partial<ConfigConectores>;
   const conectores: Conector[] = [];
@@ -139,10 +177,18 @@ export function normalizarConectores(documento: unknown): ConfigConectores {
     if (!cru || typeof cru !== "object") continue;
     const id = typeof cru.id === "string" ? cru.id.trim() : "";
     const endpoint = typeof cru.endpoint === "string" ? cru.endpoint.trim() : "";
+    /**
+     * SPEC-110 fatia D — o conector de BANCO não tem endereço: o "onde" dele é
+     * a connection string no cofre. A régua de descarte passa a olhar o que
+     * cada transporte precisa para poder rodar.
+     */
+    const ehBanco = (cru as { tipo?: string }).tipo === "banco";
+    const banco = ehBanco ? sanearConsulta((cru as { banco?: unknown }).banco) : null;
     // As mesmas três razões dos destinos do gateway: o que sobra não dá para
-    // chamar (sem endereço), não dá para achar (sem id) ou apontaria para dois
-    // lugares (id repetido).
-    if (!id || !endpoint || idsVistos.has(id)) continue;
+    // chamar (sem endereço — ou, no banco, sem consulta), não dá para achar
+    // (sem id) ou apontaria para dois lugares (id repetido).
+    if (!id || idsVistos.has(id)) continue;
+    if (ehBanco ? !banco : !endpoint) continue;
     idsVistos.add(id);
 
     const metodo = (METODOS_DO_GATEWAY as readonly string[]).includes(cru.metodo as string)
@@ -157,6 +203,9 @@ export function normalizarConectores(documento: unknown): ConfigConectores {
       id,
       nome: typeof cru.nome === "string" && cru.nome.trim() ? cru.nome.trim() : id,
       ...(typeof cru.descricao === "string" && cru.descricao.trim() ? { descricao: cru.descricao.trim() } : {}),
+      // O tipo só é gravado quando NÃO é o default: um documento antigo não
+      // ganha campo por ser lido (a régua de `confirmacao` nos nós).
+      ...(ehBanco ? { tipo: "banco" as const, banco: banco! } : {}),
       endpoint,
       metodo,
       cabecalhos,
@@ -223,6 +272,24 @@ export function validarEscritaConectores(documento: unknown): void {
       throw new ConfigInvalida(`há dois conectores com o id "${id}" — o segundo seria descartado em silêncio ao salvar`);
     }
     vistos.add(id);
+    /**
+     * SPEC-110 fatia D — o conector de BANCO é validado por outra régua: ele
+     * não tem endereço, tem consulta. As recusas (só consulta, segredo no
+     * cofre, parâmetros batendo dos dois lados) vivem em `consultaEmBanco`,
+     * puras e testadas — aqui só se aplica.
+     */
+    if ((c as { tipo?: string }).tipo === "banco") {
+      const declarados = sanearCampos(c.entrada).map((campo) => campo.chave);
+      exigirConsultaValida((c as { banco?: Partial<ConsultaEmBanco> }).banco ?? {}, declarados, `o conector "${id}"`);
+      validarCampos("entrada", posicao, c.entrada);
+      validarCampos("saida", posicao, c.saida);
+      continue;
+    }
+    if ((c as { tipo?: string }).tipo !== undefined && (c as { tipo?: string }).tipo !== "http") {
+      throw new ConfigInvalida(
+        `o conector "${id}" tem tipo desconhecido "${String((c as { tipo?: string }).tipo)}" (aceitos: http, banco)`
+      );
+    }
     const endpoint = typeof c.endpoint === "string" ? c.endpoint.trim() : "";
     if (!endpoint || !/^https?:\/\//i.test(endpoint)) {
       // Mesma régua do exportador: endereço inválido só apareceria na hora de
