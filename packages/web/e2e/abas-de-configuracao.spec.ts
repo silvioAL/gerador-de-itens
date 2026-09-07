@@ -154,6 +154,13 @@ test("Especificação: apagar {{itens}} não deixa salvar e mostra o motivo (SPE
   // constar no E2E, não só o bloqueio): grava, sai da tela, volta e o texto
   // persistido é o novo.
   await salvar.click();
+  // Espera o PUT ATERRISSAR antes de recarregar: o reload imediato matava a
+  // escrita em voo (o caminho antigo pelo menu dava esse tempo sem querer).
+  await expect
+    .poll(async () => (await (await page.request.get(`${API}/especificacao-template`)).json())?.conteudo ?? "", {
+      timeout: 15000,
+    })
+    .toContain("Template do E2E");
   await page.goto("/#/config/especificacao");
   await page.reload();
   await expect(page.getByText(/Template do E2E/)).toBeVisible();

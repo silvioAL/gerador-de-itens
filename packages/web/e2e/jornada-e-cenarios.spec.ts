@@ -17,6 +17,13 @@ test("jornada abre sozinha no primeiro acesso, explica as saídas, e some ao fec
   await entrar(page);
 
   await expect(page.getByText("Como funciona o Gerador de Itens")).toBeVisible();
+  // SPEC-109 E — a aba padrão é o MANUAL DE USO ("em como funciona não
+  // explica como usar"): o primeiro acesso vê os passos, com os gestos reais.
+  await expect(page.getByTestId("como-usar")).toBeVisible();
+  await expect(page.getByTestId("como-usar")).toContainText("Conecte um modelo de IA");
+  await expect(page.getByTestId("como-usar")).toContainText("Confirme o que a IA escreveu");
+  // A jornada continua uma aba ao lado, com as saídas listadas.
+  await page.getByRole("button", { name: "A jornada" }).click();
   await expect(page.getByText("Não é um gerador de prompt de IA")).toBeVisible();
   // `.first()`: "Especificação de solução" aparece duas vezes na jornada (o
   // título da saída e a menção no corpo). O que este teste garante é que a

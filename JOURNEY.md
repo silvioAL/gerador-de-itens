@@ -17220,3 +17220,19 @@ dois testes de abas que entravam pela lista passaram a entrar pelo deep-link
 — que agora é o caminho real. No E2E do fluxo, a porta é afirmada presente
 sem clicar: navegar mataria o rascunho não salvo do teste, e o destino já é
 provado pelo spec das abas.
+
+## §390 — SPEC-109 E: o "Como funciona" ensina a USAR
+
+"Em como funciona não explica como usar" — e não explicava: a modal abria na
+jornada (o que o produto É — SPEC-76, compartilhada com a landing) e nos
+cenários. Quem clica "▶ Como funciona" de dentro do app quer OPERAR.
+
+A aba nova **"Como usar"** virou a padrão (no clique e no primeiro acesso):
+seis passos com os GESTOS reais, no vocabulário que está nas telas depois
+das fatias B/C/D — conectar o modelo (☰ Menu → Modelo de IA), desenhar na
+mesa ou conversar com o assistente, derivar, rodar a esteira no canvas de
+fluxos (com o papel editável no nó), confirmar campo a campo no documento, e
+exportar/publicar pelos fluxos. Os dois tours continuam no topo — o manual
+diz "os tours mostram estes passos ao vivo" e fica para consulta. "A
+jornada" e "Cenários prontos" seguem como abas; nada morreu aqui, só a
+PORTA mudou de resposta.

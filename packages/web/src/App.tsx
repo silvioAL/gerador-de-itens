@@ -1588,7 +1588,9 @@ function AppCarregado({
         </button>
         <button
           onClick={() => {
-            setAbaJornadaAlvo("jornada");
+            // SPEC-109 E — quem clica "Como funciona" quer OPERAR: a aba
+            // padrão é o manual de uso; a jornada continua uma aba ao lado.
+            setAbaJornadaAlvo("como-usar");
             setMostrarJornada(true);
           }}
           data-testid="abrir-como-funciona"
