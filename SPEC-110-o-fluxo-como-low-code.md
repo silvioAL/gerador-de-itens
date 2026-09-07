@@ -761,8 +761,10 @@ não sozinho.
   tolera, validação recusa só a duplicidade.
 - "A tela edita a demanda?" Não (D9/R5) — telas mostram e decidem; quem grava
   na demanda continua sendo o caminho existente (aplicarRespostasNaDemanda).
-- "Screen builder com layout livre?" Não v1 (D5) — blocos empilhados; layout
-  é evolução com uso.
+- "Screen builder com layout livre?" Não v1 (D5) — blocos empilhados. MAS a
+  direção foi confirmada pelo usuário como **app builder com apoio do
+  assistente** (SPEC-111 revisada): os blocos são o chão, não o teto — os
+  degraus seguintes entram por medição de uso, lá.
 - "Confirmação (§5.5) muda?" Não — o gate por nó continua; a tela é um nó
   com saída, o gate é uma pausa após qualquer nó. Os dois coexistem.
 - "A demanda vira acesso Postgres cru?" Não (D11) — ler/gravar são operações
