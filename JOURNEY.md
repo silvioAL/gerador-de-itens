@@ -17519,3 +17519,14 @@ o dublê, não o `pg`.
 §248 (trio, três sabotagens distintas): afrouxar a régua dos verbos de escrita;
 devolver o SQL sem LIMIT; trocar a recusa de parâmetro ausente por `null`.
 Cada uma vermelha na prova certa, restaurado verde.
+
+**A CI cobrou o que o local deixou passar:** as provas do conector de banco
+nasceram em arquivo próprio e passaram 144/144 aqui — e derrubaram
+`conectores.spec.ts` na CI. Dois arquivos de spec fazendo read-modify-write do
+documento GLOBAL de conectores em paralelo se apagam por lost update, a lição
+que a SPEC-107 D já tinha pago noutro documento. Ler só os NOSSOS ids não
+resolve: a corrida está entre o read e o write, não no filtro.
+
+A correção é por CONSTRUÇÃO, não por retentativa: as provas foram para o
+arquivo que já é dono do documento, e o arquivo virou `serial`. O Playwright
+paraleliza por arquivo — um arquivo, um dono. E é coeso: são todos conectores.
