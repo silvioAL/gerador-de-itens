@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { entrar } from "./auth";
 import {
   BASE_URL_GATEWAY_FALSO,
@@ -9,77 +9,103 @@ import {
 
 const API = "http://localhost:4100";
 
-// §265 — em série: os dois testes mexem na MESMA esteira (estado da
-// organização, não da aba). Em paralelo, o toggle de um caía no meio da
-// asserção do outro — e a falha aparecia como "esperava falhou, veio
-// desligado", que aponta para o lugar errado.
+/**
+ * ~~SPEC-59/60 — o mapa do sistema.~~ **SPEC-109 C — a tela morreu; as provas
+ * ficam.**
+ *
+ * A SistemaScreen narrava o encanamento que o canvas de fluxos mostra VIVO
+ * ("por vezes parece ter coisas repetidas", queixa literal do usuário), e o
+ * que só ela tinha migrou para o painel do nó agente: ligar/desligar,
+ * reordenar e a última corrida (§260/§265). Estes testes provam O MESMO que
+ * os antigos — a edição feita de onde se vê chega ao servidor, e a falha
+ * acende (e apaga) — na casa nova.
+ */
+
+// Em série: os dois testes mexem na MESMA esteira (estado da organização,
+// não da aba) — a razão do §265 continua valendo na casa nova.
 test.describe.configure({ mode: "serial" });
 
-/**
- * SPEC-59 fatias A/B/D — o mapa do sistema, ponta a ponta.
- *
- * As unidades provam o modelo de leitura e a tela em separado. O que só o
- * navegador prova é que a edição feita AQUI chega ao servidor: um toggle que
- * pinta a tela e não grava é a pior versão desta feature, porque a pessoa sai
- * achando que configurou.
- */
-test("o mapa mostra a esteira, e ligar/desligar por ele grava de verdade", async ({ page }) => {
+async function abrirNoDaEsteira(page: Page, papelId: string) {
+  await page.goto("/#/fluxo/esteira-de-agentes");
+  // O rastro é lido quando a tela MONTA — e `goto` para o mesmo hash não
+  // remonta nada. Sem o reload, a segunda visita mostraria a corrida velha.
+  await page.reload();
+  await expect(page.getByTestId("seletor-de-fluxo")).toHaveValue("esteira-de-agentes", { timeout: 15000 });
+  await page.locator(`.react-flow__node[data-id="${papelId}"]`).click();
+  await expect(page.getByTestId("papel-ativo")).toBeVisible();
+}
+
+/** O teste desliga o papel no meio — uma rodada que morra ali deixaria o
+ * banco com o `po` fora da esteira para TODAS as rodadas seguintes (foi o
+ * que aconteceu na primeira). Garantir o ponto de partida é do teste. */
+async function garantirPapelAtivo(page: Page, papelId: string) {
+  const cfg = (await (await page.request.get(`${API}/config/pipeline-agentes?timeId=time-pagamentos`)).json()).documento;
+  if (cfg?.papeis?.some((p: { id: string; ativo: boolean }) => p.id === papelId && !p.ativo)) {
+    await page.request.put(`${API}/config/pipeline-agentes`, {
+      data: {
+        documento: {
+          ...cfg,
+          papeis: cfg.papeis.map((p: { id: string }) => (p.id === papelId ? { ...p, ativo: true } : p)),
+        },
+        timeId: "time-pagamentos",
+      },
+    });
+  }
+}
+
+test("desligar um papel pelo nó grava de verdade — e o nó sai da derivada", async ({ page }) => {
   test.setTimeout(90000);
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   await entrar(page);
+  await garantirPapelAtivo(page, "po");
 
-  await page.getByRole("button", { name: "☰ Menu" }).click();
-  await page.getByTestId("menu-sistema").click();
-  await expect(page.getByTestId("sistema-screen")).toBeVisible();
+  await abrirNoDaEsteira(page, "po");
+  await expect(page.getByTestId("papel-ativo")).toBeChecked();
 
-  // A esteira de fábrica, como sequência.
-  await expect(page.getByTestId("agente-po")).toBeVisible();
-  await expect(page.getByTestId("agente-qa")).toBeVisible();
+  // Desligar de onde se vê (§260). O efeito é DUPLO e imediato: o servidor
+  // grava, e a esteira derivada re-deriva sem o papel — o nó some do canvas.
+  await page.getByTestId("papel-ativo").click();
+  await expect(page.locator('.react-flow__node[data-id="po"]')).toHaveCount(0, { timeout: 15000 });
 
-  const estadoInicial = await page.getByTestId("agente-po").getAttribute("data-estado");
-  expect(estadoInicial).not.toBe("desligado");
-
-  // Desligar pelo mapa.
-  await page.getByTestId("alternar-po").click();
-  await expect(page.getByTestId("agente-po")).toHaveAttribute("data-estado", "desligado");
-
-  // O que importa não é a tela ter pintado: é o servidor ter recebido.
+  // O que importa não é a tela ter pintado: é o servidor ter recebido — no
+  // documento DO TIME, que é o escopo em que a tela do fluxo grava (§369).
   await expect
     .poll(
       async () => {
-        const cfg = await (await page.request.get(`${API}/config/pipeline-agentes`)).json();
+        const cfg = await (await page.request.get(`${API}/config/pipeline-agentes?timeId=time-pagamentos`)).json();
         return cfg.documento.papeis.find((p: { id: string }) => p.id === "po")?.ativo;
       },
       { timeout: 15000 }
     )
     .toBe(false);
 
-  // E religar volta ao que era — a ação é reversível em um clique, que é o que
-  // dispensa o modal de "ver o efeito antes de aplicar": o efeito é o mapa.
-  await page.getByTestId("alternar-po").click();
-  await expect
-    .poll(
-      async () => {
-        const cfg = await (await page.request.get(`${API}/config/pipeline-agentes`)).json();
-        return cfg.documento.papeis.find((p: { id: string }) => p.id === "po")?.ativo;
+  // A volta de quem desligou: o nó sumiu, então religar tem porta no BANNER
+  // da derivada (apontando o catálogo completo — deep-link vivo, menu não).
+  await expect(page.getByTestId("abrir-config-dos-papeis-banner")).toBeVisible();
+
+  // Religa pela API (RMW — o catálogo completo é tela de outro teste) e o
+  // canvas re-deriva com o papel de volta.
+  const cfg = (await (await page.request.get(`${API}/config/pipeline-agentes?timeId=time-pagamentos`)).json()).documento;
+  await page.request.put(`${API}/config/pipeline-agentes`, {
+    data: {
+      documento: {
+        ...cfg,
+        papeis: cfg.papeis.map((p: { id: string }) => (p.id === "po" ? { ...p, ativo: true } : p)),
       },
-      { timeout: 15000 }
-    )
-    .toBe(true);
+      timeId: "time-pagamentos",
+    },
+  });
+  await page.reload();
+  await expect(page.getByTestId("seletor-de-fluxo")).toHaveValue("esteira-de-agentes", { timeout: 15000 });
+  await expect(page.locator('.react-flow__node[data-id="po"]')).toBeVisible();
 });
 
 /**
- * SPEC-60 fatia B (§265) — o rastro da esteira acendendo (e apagando) o avatar.
- *
- * As unidades provam o mapa e a tela; o servidor prova o registro. O que só o
- * navegador prova é a costura: a chamada falha de verdade contra um gateway de
- * verdade, o servidor grava, a tela lê e o avatar muda de cor.
- *
- * A falha viaja no PEDIDO (`PEDIR_FALHA_AO_GATEWAY`) em vez de numa credencial
- * quebrada: credencial é estado da organização inteira, e sabotá-la com specs
- * rodando em paralelo seria um teste derrubando os vizinhos.
+ * §265 na casa nova — a falha de um papel é notícia no PAINEL DO NÓ, e a
+ * execução boa a apaga. A falha viaja no PEDIDO (`PEDIR_FALHA_AO_GATEWAY`),
+ * não numa credencial sabotada — credencial é estado da organização inteira.
  */
-test("falha de um papel acende o avatar no mapa, e a execução seguinte o apaga", async ({ page }) => {
+test("falha de um papel aparece no painel do nó, e a execução seguinte a apaga", async ({ page }) => {
   test.setTimeout(90000);
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   await entrar(page);
@@ -107,44 +133,18 @@ test("falha de um papel acende o avatar no mapa, e a execução seguinte o apaga
       },
     });
 
-  // Reabrir o mapa é o que refaz a leitura do rastro: a busca acontece quando a
-  // tela monta. Voltar antes é obrigatório — com o mapa aberto, o "☰ Menu" fica
-  // atrás do "← Voltar à mesa de projeto" e o clique nunca chega.
-  const abrirMapa = async () => {
-    const voltar = page.getByRole("button", { name: "← Voltar à mesa de projeto" });
-    if (await voltar.isVisible().catch(() => false)) await voltar.click();
-    await page.getByRole("button", { name: "☰ Menu" }).click();
-    await page.getByTestId("menu-sistema").click();
-    await expect(page.getByTestId("sistema-screen")).toBeVisible();
-  };
-
-  await abrirMapa();
-  // O papel precisa estar LIGADO para que "falhou" seja o estado esperado —
-  // desligado ganha de falhou, e com razão. O teste anterior deste arquivo
-  // mexe justamente nesse interruptor, então garantir aqui é mais honesto do
-  // que depender da ordem.
-  if ((await page.getByTestId("agente-po").getAttribute("data-estado")) === "desligado") {
-    await page.getByTestId("alternar-po").click();
-    await expect(page.getByTestId("agente-po")).not.toHaveAttribute("data-estado", "desligado");
-  }
-
   const falha = await pedirAoPapel(PEDIR_FALHA_AO_GATEWAY);
   expect(falha.status()).toBe(502);
 
-  await abrirMapa();
-  await expect(page.getByTestId("agente-po")).toHaveAttribute("data-estado", "falhou");
-  // O conteúdo, não só o estado (§234): a frase que o gateway disse é o que
-  // resolve o problema de quem abriu o mapa por causa da falha.
-  await expect(page.getByTestId("ultima-execucao-po")).toContainText("última execução");
-  // E o mapa não deixa isso só na bolinha: o aviso diz o que a falha custa.
-  await expect(page.getByTestId("sistema-screen")).toContainText("o item sai sem a parte que eles escrevem");
+  // O rastro é lido quando a tela monta — abrir o nó depois da falha a mostra.
+  await abrirNoDaEsteira(page, "po");
+  await expect(page.getByTestId("papel-ultima-corrida")).toContainText("falhou");
 
   // A execução seguinte, boa, APAGA o vermelho. Um estado que só acende é um
   // alarme que se aprende a ignorar.
   const ok = await pedirAoPapel("um item comum");
   expect(ok.status()).toBe(200);
 
-  await abrirMapa();
-  await expect(page.getByTestId("agente-po")).toHaveAttribute("data-estado", "ativo");
-  await expect(page.getByTestId("ultima-execucao-po")).toBeVisible();
+  await abrirNoDaEsteira(page, "po");
+  await expect(page.getByTestId("papel-ultima-corrida")).toContainText("ok");
 });

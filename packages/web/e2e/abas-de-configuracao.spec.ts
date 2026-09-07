@@ -179,7 +179,11 @@ test("Acessos: a tela da delegação de RBAC abre e diz o estado atual", async (
 });
 
 test("Pipeline de IA: os papéis, o prompt herdado e a anatomia do prompt", async ({ page }) => {
-  await abrirConfig(page, /Pipeline de IA/);
+  // SPEC-109 C — a aba SAIU do menu (a esteira se edita no canvas de fluxos,
+  // no nó); o catálogo completo continua vivo PELO DEEP-LINK, que é como o
+  // painel do nó aponta para cá — e é o caminho que este teste passa a provar.
+  await entrar(page);
+  await page.goto("/#/config/pipeline");
 
   for (const papel of ["PO", "Arquiteto", "Especialista técnico", "QA"]) {
     await expect(page.getByRole("button", { name: new RegExp(`^${papel}`) }).first()).toBeVisible();

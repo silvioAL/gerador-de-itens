@@ -25,7 +25,7 @@ function montarOpts() {
     fecharJornada: vi.fn(),
     fecharConfig: vi.fn(),
   abrirDocumento: vi.fn(),
-  abrirSistema: vi.fn(),
+  abrirFluxos: vi.fn(),
   mostrarAvisos: vi.fn(),
     abrirProposito: vi.fn(),
     fecharAssistente: vi.fn(),
@@ -106,14 +106,14 @@ describe("useTour", () => {
     const { result } = renderHook(() => useTour(opts, passosDeConfiguracao));
 
     act(() => result.current.iniciar());
-    andarAte(result, "Como a ferramenta está montada");
+    andarAte(result, "O encanamento é o canvas");
 
-    expect(result.current.passoAtual?.selector).toBe("[data-testid=sistema-screen]");
-    expect(opts.abrirSistema).toHaveBeenCalled();
+    expect(result.current.passoAtual?.selector).toBe("[data-testid=fluxo-screen]");
+    expect(opts.abrirFluxos).toHaveBeenCalled();
 
     // E vem ANTES das telas que ele mapeia: mapa depois das peças não é mapa.
     const titulos = passosDeConfiguracao(montarOpts()).map((p) => p.titulo);
-    expect(titulos.indexOf("Como a ferramenta está montada")).toBeLessThan(titulos.indexOf("O que é perene: o produto"));
+    expect(titulos.indexOf("O encanamento é o canvas")).toBeLessThan(titulos.indexOf("O que é perene: o produto"));
   });
 
   it("§252 — o tour de CONFIGURAÇÃO percorre TODAS as telas de administração", () => {
@@ -583,9 +583,9 @@ describe("useTour — o motor explicado e o botão que fica na tela", () => {
     const opts = montarOpts();
     const passo = passosDoProduto(opts).find((p) => p.titulo === "Quem faz o quê");
 
-    expect(passo?.selector).toBe("[data-testid=motor-passo-a-passo]");
+    expect(passo?.selector).toBe("[data-testid=fluxo-screen]");
     passo?.onEnter?.();
-    expect(opts.abrirSistema).toHaveBeenCalled();
+    expect(opts.abrirFluxos).toHaveBeenCalled();
   });
 
   it("o passo seguinte VOLTA ao canvas — senão aponta para uma tela que saiu", () => {

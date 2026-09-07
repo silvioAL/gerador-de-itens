@@ -216,9 +216,9 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await expect(page.getByTestId("tour-texto")).toContainText("MOTOR calcula");
   await expect(page.getByTestId("tour-texto")).toContainText("IA escreve");
 
-  // §268 — a cadeia do motor DEMONSTRADA, não só afirmada. O passo abre o mapa
-  // do sistema e mostra a conta com uma régua real do time; cobrar o conteúdo
-  // (§234) é o que separa isto de "a caixa apareceu".
+  // SPEC-109 C — o passo abre o CANVAS DE FLUXOS (o mapa vivo; a SistemaScreen
+  // e a animação do motor morreram com ela): quem faz o quê está desenhado na
+  // fiação, e o texto do tour diz a divisão.
   await irAtePasso(page, "Começar conversando");
   await expect(page.getByTestId("assistente-janela")).toBeVisible();
   // §254 — o ponteiro aparece no primeiro passo que TEM alvo. Nos de tela
@@ -451,19 +451,14 @@ test("tour de configuração percorre as quatro telas que o tour do produto não
 
   await expect(page.getByTestId("tour-titulo")).toHaveText("Moldar pro seu time");
 
-  // §258 — o MAPA vem antes das telas que ele mapeia. E cobra CONTEÚDO, não
-  // só a tela: uma vista vazia passaria em `toBeVisible` e não explicaria nada.
-  await irAtePasso(page, "Como a ferramenta está montada");
-  await expect(page.getByTestId("sistema-screen")).toBeVisible();
-  await expect(page.getByTestId("bloco-esteira")).toBeVisible();
-  await expect(page.getByTestId("bloco-regras")).toBeVisible();
-  await expect(page.getByTestId("bloco-pdca")).toBeVisible();
-  // A esteira de fábrica tem quatro papéis, e eles aparecem como sequência.
-  await expect(page.getByTestId("agente-po")).toBeVisible();
-  await expect(page.getByTestId("agente-qa")).toBeVisible();
-  // Sem credencial de IA neste teste: o avatar diz isso em vez de fingir que a
-  // esteira está de pé.
-  await expect(page.getByTestId("agente-po")).toHaveAttribute("data-estado", "sem-credencial");
+  // §258 — o MAPA vem antes das telas que ele mapeia. SPEC-109 C — e o mapa
+  // agora é o CANVAS DE FLUXOS, vivo: o passo abre a tela e a esteira
+  // derivada está lá, com os papéis em sequência (conteúdo, não só a tela).
+  await irAtePasso(page, "O encanamento é o canvas");
+  await expect(page.getByTestId("fluxo-screen")).toBeVisible();
+  await expect(page.getByTestId("seletor-de-fluxo")).toBeVisible();
+  await expect(page.locator('.react-flow__node[data-id="po"]')).toBeVisible();
+  await expect(page.locator('.react-flow__node[data-id="qa"]')).toBeVisible();
 
   const telaConfig = page.locator('[data-tour="config-screen-content"]');
 

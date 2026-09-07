@@ -9,7 +9,6 @@ import {
   volumetriaEmVigor,
   type VolumetriaDoProduto,
   MARCADOR_ESPECIFICAR,
-  exemploDeMedicao,
   derivar,
   estruturarDocumento,
   ensaiosAssumidos,
@@ -85,15 +84,13 @@ import { BancadaDeEnsaios, type LeituraDoEnsaio } from "./fluxo/BancadaDeEnsaios
 import { idDaRegraDeForma } from "./config/FormaDoDesenho";
 import { ConfigurarPanel } from "./assistente/ConfigurarPanel";
 import { JourneyModal, type AbaJornada } from "./demo/JourneyModal";
-import { contextoDoProdutoEmTexto, montarMapaDoSistema, type ExecucaoDoPapel, type FluxoDoMapa } from "@gerador/aplicacao";
-import { apiFluxosEmVigor } from "./api/client";
+import { contextoDoProdutoEmTexto } from "@gerador/aplicacao";
 import { FluxoScreen } from "./fluxo/FluxoScreen";
 import { ConfigScreen, type AbaConfig } from "./config/ConfigScreen";
 import { TourOverlay } from "./demo/TourOverlay";
 import { useTour, passosDeConfiguracao } from "./demo/useTour";
-import { DECISOES_DO_TOUR, EXECUCOES_DO_TOUR, REGRAS_DO_TOUR, ehDecisaoDeDemonstracao } from "./demo/dadosDoTour";
+import { DECISOES_DO_TOUR, REGRAS_DO_TOUR, ehDecisaoDeDemonstracao } from "./demo/dadosDoTour";
 import { DocumentoScreen } from "./documento/DocumentoScreen";
-import { SistemaScreen } from "./sistema/SistemaScreen";
 import { AvisosDaDerivacao } from "./summary/AvisosDaDerivacao";
 import { baixarArquivoTexto } from "./persistence/baixarArquivo";
 import { PainelDeVariantes } from "./variante/PainelDeVariantes";
@@ -529,7 +526,6 @@ function AppCarregado({
   const { rota, navegar } = useRotaHash();
   const mostrarConfig = rota.tela === "config";
   const mostrarDocumento = rota.tela === "documento";
-  const mostrarSistema = rota.tela === "sistema";
   // SPEC-107 G4 — a tela de ensaios morreu: a bancada vive junto do fluxo
   // (`#/fluxo/ensaio`), medindo pela fiação semeada em vez de simular aqui.
   const mostrarFluxos = rota.tela === "fluxo";
@@ -586,47 +582,6 @@ function AppCarregado({
   // SPEC-45 — quantos feedbacks do ciclo ainda esperam alguém: é o que faz o
   // assistente chamar pra tratar (M15) em vez de o texto morrer no banco.
   const [feedbacksNovos, setFeedbacksNovos] = useState(0);
-  /** SPEC-59 — a esteira tem com quem falar? É o que separa "papel ativo" de
-   * "papel ativo e mudo", que é o defeito mais silencioso da configuração.
-   * Buscado só quando a tela abre, como a exportação faz para os itens. */
-  const [temCredencialDeIa, setTemCredencialDeIa] = useState(false);
-  /** §265 — o rastro da esteira. `undefined` = não foi lido (tela nunca aberta,
-   * chamada que falhou), e é diferente de lista vazia — que é "ninguém rodou
-   * nada ainda". O mapa trata os dois casos, e misturá-los faria um avatar
-   * dizer "nunca rodou" por causa de um erro de rede. */
-  const [execucoesDaEsteira, setExecucoesDaEsteira] = useState<ExecucaoDoPapel[] | undefined>(undefined);
-
-  useEffect(() => {
-    if (!mostrarSistema) return;
-    let cancelado = false;
-    apiIa
-      .execucoes()
-      .then(({ porPapel }) => {
-        if (!cancelado) setExecucoesDaEsteira(porPapel);
-      })
-      .catch(() => {});
-    apiIa
-      .status()
-      .then((st) => {
-        // `pronto` cobre os dois modos: gateway configurado ou modelo local
-        // instalado. Perguntar por um só deixaria metade das instalações
-        // acusando falta de credencial que existe.
-        if (!cancelado) setTemCredencialDeIa(Boolean(st.pronto || st.gateway));
-      })
-      .catch(() => {});
-    return () => {
-      cancelado = true;
-    };
-  }, [mostrarSistema]);
-
-  const [erroAoSalvarSistema, setErroAoSalvarSistema] = useState<string | null>(null);
-
-  /**
-   * SPEC-106 fatia E — o mapa lê os FLUXOS: o em-vigor (com a esteira
-   * derivada) mais a saúde da última execução de cada um. Carregado quando a
-   * tela abre, como a credencial logo acima — o mapa responde "como está
-   * montado AGORA", não "como estava quando o app subiu".
-   */
   /** SPEC-106 fatia C — o link persistido do documento desta demanda. Vem do
    * registro SALVO (a quebra em memória é o desenho), e atualiza ao publicar. */
   const [linkDoDocumento, setLinkDoDocumento] = useState<string | null>(null);
@@ -647,61 +602,6 @@ function AppCarregado({
     };
   }, [mostrarDocumento, persistencia.quebraId]);
 
-  const [fluxosDoMapa, setFluxosDoMapa] = useState<FluxoDoMapa[]>([]);
-  useEffect(() => {
-    if (!mostrarSistema) return;
-    let cancelado = false;
-    void Promise.all([apiFluxosEmVigor.listar(quebra.time ?? timeAtivo), apiFluxosEmVigor.ultimas()])
-      .then(([vigor, saude]) => {
-        if (cancelado) return;
-        setFluxosDoMapa(
-          vigor.fluxos.map((f) => {
-            const ultima = saude.ultimas.find((u) => u.fluxoId === f.id);
-            return {
-              id: f.id,
-              nome: f.nome,
-              nos: f.nos.length,
-              origem: f.origem,
-              ...(ultima ? { ultimaExecucao: { em: ultima.em, ok: ultima.ok, ...(ultima.noComFalha ? { noComFalha: ultima.noComFalha } : {}) } } : {}),
-            };
-          })
-        );
-      })
-      .catch(() => {});
-    return () => {
-      cancelado = true;
-    };
-  }, [mostrarSistema, quebra.time, timeAtivo]);
-
-  /**
-   * §260 — as duas edições que o MAPA provoca, aplicadas de onde se vê o
-   * problema.
-   *
-   * Ver que um papel está desligado e ter que ir a outra tela para ligá-lo é o
-   * mapa apontando e cobrando pedágio. Estas duas ações fecham o laço ali.
-   *
-   * O estado local muda primeiro e o servidor confirma depois — é o padrão do
-   * resto do app. Mas a falha **não** pode sumir: sem o aviso, a tela mostraria
-   * o estado novo com o servidor guardando o velho, que é a pior combinação
-   * possível numa tela de configuração.
-   */
-  async function salvarPipeline(papeis: ConfigPipelineAgentes["papeis"]) {
-    const anterior = pipelineAgentes;
-    const novo = { ...pipelineAgentes, papeis };
-    setPipelineAgentes(novo);
-    setErroAoSalvarSistema(null);
-    try {
-      await apiPipelineAgentes.salvar(novo);
-    } catch (e) {
-      // Volta ao que era: deixar a tela otimista sobre uma escrita que falhou
-      // é mentir com mais confiança do que não ter salvado.
-      setPipelineAgentes(anterior);
-      setErroAoSalvarSistema(
-        e instanceof Error ? `Não deu para salvar: ${e.message}` : "Não deu para salvar a mudança na esteira."
-      );
-    }
-  }
-
   /**
    * SPEC-92 — declarado ANTES do mapa do sistema, que passou a consultá-lo.
    *
@@ -709,37 +609,6 @@ function AppCarregado({
    * conserto certo: o mapa depende do modo, não o contrário.
    */
   const [demonstracaoDoTour, setDemonstracaoDoTour] = useState(false);
-
-  /** SPEC-59 fatia A — a ferramenta lida a partir da própria configuração.
-   * Usa a config REAL, nunca a de demonstração: esta tela responde "como o meu
-   * ambiente está montado", e a do tour mentiria sobre isso. */
-  const mapaDoSistema = useMemo(
-    () =>
-      montarMapaDoSistema({
-        papeis: pipelineAgentes.papeis,
-        regras: regrasConfig,
-        temCredencialDeIa,
-        feedbacksAbertos: feedbacksNovos,
-        /**
-         * SPEC-92 — no TOUR, as execuções são de demonstração.
-         *
-         * O usuário abriu a demonstração com a credencial da casa sem crédito e
-         * viu os quatro papéis em vermelho com o erro cru do provedor. Quem
-         * assiste conclui que a ferramenta está quebrada — quando ela está
-         * relatando com precisão um problema que não é dela.
-         *
-         * A config continua sendo a REAL (o comentário acima explica por quê, e
-         * segue valendo): o que muda é só o histórico de execução, que é o único
-         * pedaço desta tela que depende de a credencial de alguém estar em dia.
-         * E ele chega marcado, como todo dado de tour (§235).
-         */
-        execucoes: demonstracaoDoTour ? EXECUCOES_DO_TOUR : execucoesDaEsteira,
-        // SPEC-106 fatia E — sempre os REAIS, como a config: o tour não tem
-        // fluxo de demonstração, e um encanamento inventado mentiria.
-        fluxos: fluxosDoMapa,
-      }),
-    [pipelineAgentes, regrasConfig, temCredencialDeIa, feedbacksNovos, execucoesDaEsteira, demonstracaoDoTour, fluxosDoMapa]
-  );
 
   const [menuAberto, setMenuAberto] = useState(false);
   const [mostrarAbrir, setMostrarAbrir] = useState(false);
@@ -1514,7 +1383,8 @@ function AppCarregado({
         })
       );
     },
-    abrirSistema: () => navegar({ tela: "sistema" }),
+    // SPEC-109 C — a SistemaScreen morreu; o mapa vivo é o canvas de fluxos.
+    abrirFluxos: () => navegar({ tela: "fluxo" }),
     abrirProposito: () => setAbaAssistente("contexto"),
     fecharAssistente: () => setAbaAssistente(null),
     abrirConversa: () => setAbaAssistente("conversa"),
@@ -1811,7 +1681,6 @@ function AppCarregado({
           navegar({ tela: "canvas" });
           setMostrarAbrir(true);
         }}
-        onSistema={() => navegar({ tela: "sistema" })}
         onFluxos={() => navegar({ tela: "fluxo" })}
         onSair={() => void onSair()}
       />
@@ -2199,6 +2068,9 @@ function AppCarregado({
           aoExecutarComDemanda={() => {
             if (persistencia.quebraId) void persistencia.abrirPorId(persistencia.quebraId);
           }}
+          // SPEC-109 C — a porta para o catálogo COMPLETO dos papéis (criar
+          // contextual, sugerir com IA): o deep-link vive, o menu não lista.
+          aoAbrirConfigDosPapeis={() => navegar({ tela: "config", area: "pipeline" })}
           painel={
             bancadaDeEnsaiosAberta ? (
               <BancadaDeEnsaios
@@ -2285,40 +2157,9 @@ function AppCarregado({
         />
       )}
 
-      {mostrarSistema && (
-        <SistemaScreen
-          mapa={mapaDoSistema}
-          // §268 — a régua para explicar a cadeia. Os NÚMEROS do mapa seguem
-          // vindo da config real (esta tela responde "como o MEU ambiente está
-          // montado"); só o exemplo usa `regrasVisiveis`, porque durante o tour
-          // o time de quem assiste pode não ter régua conferível nenhuma — e um
-          // "não há o que explicar" no meio da demonstração não ensina nada.
-          //
-          // As duas coisas convivem porque a caixa DIZ quando o exemplo é de
-          // demonstração (§235). Sem essa marca isto seria a mentira que o
-          // §259 evitou de propósito.
-          exemploDeMedicao={exemploDeMedicao(regrasVisiveis)}
-          exemploDeDemonstracao={demonstracaoDoTour}
-          onAbrirConfig={(area) => abrirConfigNaAba(area)}
-          onAbrirFluxos={() => navegar({ tela: "fluxo" })}
-          onVoltar={() => navegar({ tela: "canvas" })}
-          erroAoSalvar={erroAoSalvarSistema}
-          onAlternarAgente={(id) =>
-            void salvarPipeline((pipelineAgentes.papeis ?? []).map((p) => (p.id === id ? { ...p, ativo: !p.ativo } : p)))
-          }
-          onMoverAgente={(id, direcao) => {
-            const papeis = [...(pipelineAgentes.papeis ?? [])];
-            const de = papeis.findIndex((p) => p.id === id);
-            const para = de + direcao;
-            // Fora da lista não é erro nem no-op silencioso: os botões das
-            // pontas já vêm desabilitados, e chegar aqui seria bug de quem
-            // chamou — não vale gravar por isso.
-            if (de < 0 || para < 0 || para >= papeis.length) return;
-            [papeis[de], papeis[para]] = [papeis[para], papeis[de]];
-            void salvarPipeline(papeis);
-          }}
-        />
-      )}
+      {/* SPEC-109 C — a SistemaScreen morreu: o canvas de fluxos é o mapa
+          vivo (executável), e o que só ela tinha — ligar/desligar e reordenar
+          papéis — migrou para o painel do nó agente, na FluxoScreen. */}
 
       {mostrarDocumento && (
         <DocumentoScreen

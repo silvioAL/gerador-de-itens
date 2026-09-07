@@ -320,13 +320,6 @@ export {
   type PedidoIa,
 } from "./casos-de-uso/ia/pedidos.js";
 
-export {
-  montarMapaDoSistema,
-  type MapaDoSistema,
-  type AgenteDoMapa,
-  type FluxoDoMapa,
-  type RegraDoMapa,
-  type EstadoDoAgente,
-  type EntradaDoMapa,
-  type ExecucaoDoPapel,
-} from "./sistema/mapaDoSistema.js";
+// SPEC-109 C — `montarMapaDoSistema` morreu com a SistemaScreen (o canvas de
+// fluxos é o mapa vivo); do módulo sobrou o rastro por papel.
+export { type ExecucaoDoPapel } from "./sistema/execucoes.js";

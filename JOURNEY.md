@@ -17171,3 +17171,34 @@ de documento"…) é instância fantasiada de componente. Três movimentos:
    referencia (a régua da casa). Normaliza aparado, vazio não vira dado
    (§248: sem o `nome` no normalizar, o teste do round-trip fica vermelho —
    trio rodado), e o E2E prova o cartão ecoando e o documento persistindo.
+
+## §388 — SPEC-109 C: a segunda narração morre — o canvas é o mapa
+
+"Ainda existe a tela de 'como está montada', por vezes parece ter coisas
+repetidas" — e tinha. A SistemaScreen nasceu na SPEC-59 como "a vista antes
+das telas" (§258), quando o encanamento não aparecia em tela nenhuma; a
+SPEC-105/107 construiu o encanamento DE VERDADE, executável, e a vista virou
+a segunda narração da mesma coisa. Morreu inteira: tela, MotorPassoAPasso,
+`montarMapaDoSistema`, `EXECUCOES_DO_TOUR` — e a aba "Pipeline de IA" saiu
+do menu junto (o painel do nó agente edita o mesmo documento desde o §369).
+
+O que só o mapa tinha migrou para o painel do nó agente, na régua do §260
+(editar de onde se vê): **ligar/desligar** e **reordenar** o papel (RMW no
+documento da esteira + recarga do em-vigor — a derivada muda de forma na
+hora), e a **última corrida** (§265: "falhou há pouco" continua notícia,
+casada pelo id do papel). O buraco novo que a morte abriu — papel desligado
+SOME da derivada, e sem nó não há onde religar — ganhou porta no banner da
+derivada ("configuração dos papéis →"), que também é o caminho para o que a
+aba completa ainda faz (criar papel contextual, sugerir com IA): o deep-link
+`#/config/pipeline` vive; o que morreu foi a DESCOBERTA pela lista (§221).
+
+Os dois tours retargetaram: "Como a ferramenta está montada" virou "O
+encanamento é o canvas", e "Quem faz o quê" abre a fiação em vez da animação
+do motor (que morreu com a tela — o git guarda; a fatia E decide se algo dela
+renasce no "Como funciona"). A trava §340 acompanhou o rename
+(`abrirSistema`→`abrirFluxos`) e mordeu no primeiro `npm test` — o teste de
+envelhecimento acusou "o passo sumiu" antes de eu atualizá-la, que é
+exatamente o trabalho dela. `#/sistema` redireciona para `#/fluxo` (SPEC-61
+§6.7: link salvo não vira tela branca). O E2E do mapa foi reescrito para a
+casa nova: desligar pelo nó grava E o nó sai da derivada; a falha aparece no
+painel e a execução boa a apaga.

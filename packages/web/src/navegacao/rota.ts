@@ -39,8 +39,16 @@ export type Rota =
   | { tela: "canvas" }
   | { tela: "config"; area: AreaConfig }
   | { tela: "documento" }
-  /** SPEC-59 fatia A — a vista de leitura de como a ferramenta está montada. */
-  | { tela: "sistema" }
+  /**
+   * ~~SPEC-59 — `{ tela: "sistema" }`.~~ **SPEC-109 C — a tela saiu.**
+   *
+   * A SistemaScreen nasceu quando o encanamento não existia em tela nenhuma
+   * (§258: "a vista antes das telas") e virou a SEGUNDA narração dele quando
+   * a SPEC-105/107 construiu o canvas de fluxos — executável, não narrado
+   * ("por vezes parece ter coisas repetidas", queixa literal). O que só ela
+   * tinha (ligar/desligar e reordenar papéis) migrou para o painel do nó
+   * agente. `#/sistema` REDIRECIONA para o fluxo (SPEC-61 §6.7).
+   */
   /**
    * SPEC-105 fatia C — o FLUXO: o encanamento da ferramenta como grafo.
    * Tela própria e não aba de config (§1): é o OUTRO grafo, com paleta
@@ -107,7 +115,6 @@ const AREA_DO_SEGMENTO = Object.fromEntries(
 export function hashDaRota(rota: Rota): string {
   if (rota.tela === "canvas") return "#/";
   if (rota.tela === "documento") return "#/documento";
-  if (rota.tela === "sistema") return "#/sistema";
   if (rota.tela === "fluxo") {
     if (rota.bancada === "ensaio") return "#/fluxo/ensaio";
     // SPEC-107 G5c — o canvas abre NUM fluxo: "assista a esteira rodando" é
@@ -127,7 +134,8 @@ export function rotaDoHash(hash: string): Rota {
   // itens passaram a morar, numa seção.
   if (partes[0] === "itens") return { tela: "documento" };
   if (partes[0] === "documento") return { tela: "documento" };
-  if (partes[0] === "sistema") return { tela: "sistema" };
+  // SPEC-109 C — a SistemaScreen morreu; o canvas de fluxos é o mapa vivo.
+  if (partes[0] === "sistema") return { tela: "fluxo" };
   // SPEC-107 G4 — a tela de ensaios morreu; a bancada vive junto do fluxo
   // (`#/fluxo/ensaio`), e o link salvo REDIRECIONA (§2.4-3).
   if (partes[0] === "ensaios") return { tela: "fluxo", bancada: "ensaio" };
