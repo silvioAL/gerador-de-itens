@@ -69,6 +69,15 @@ test("SPEC-107 G5c — o canvas roda a esteira da demanda aberta, ao vivo", asyn
   await expect(page.locator('.react-flow__node[data-id="demanda"]')).toBeVisible();
   await expect(page.locator('.react-flow__node[data-id="grava"]')).toBeVisible();
   await expect(page.locator('.react-flow__node[data-id="po"]')).toBeVisible();
+  /**
+   * SPEC-110 fatia A — a derivada agora DIZ quando roda: o gatilho é o
+   * primeiro cartão, e o botão é o gesto dele ("▶ Rodar agora"). A queixa que
+   * abriu a 110 foi "não entendi qual o objetivo do botão executar" — a
+   * resposta mora nestas duas linhas.
+   */
+  await expect(page.locator('.react-flow__node[data-id="gatilho"]')).toBeVisible();
+  await expect(page.locator('.react-flow__node[data-id="gatilho"]')).toContainText("Gatilho");
+  await expect(page.getByTestId("executar-fluxo")).toContainText("Rodar agora");
 
   // ── Executar dali: o VIVO (nó pulsando + texto streamando) ──
   await page.getByTestId("executar-fluxo").click();
@@ -81,7 +90,7 @@ test("SPEC-107 G5c — o canvas roda a esteira da demanda aberta, ao vivo", asyn
 
   // A corrida termina com a fiação inteira verde no rastro (✓ por nó).
   await expect(page.getByTestId("rastro-da-execucao")).toBeVisible({ timeout: 60000 });
-  for (const no of ["demanda", "po", "arquiteto", "especialista", "qa", "grava"]) {
+  for (const no of ["gatilho", "demanda", "po", "arquiteto", "especialista", "qa", "grava"]) {
     await expect(page.getByTestId(`rastro-${no}`)).toContainText(`✓ ${no}`);
   }
 

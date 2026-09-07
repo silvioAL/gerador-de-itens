@@ -16,6 +16,10 @@ import type { NoDoFluxo, TipoDeNoDoFluxo } from "@gerador/aplicacao";
  * no tema escuro é defeito, não detalhe (§2.4-11).
  */
 export const CORES_POR_FAMILIA: Record<TipoDeNoDoFluxo, string> = {
+  // SPEC-110 fatia A — o laranja do "▶": a cor do começo, distinta das cinco
+  // famílias existentes e de todo tipo da mesa, e legível nos dois temas
+  // (medido: 3.15 no claro, 4.62 no escuro — o teste de contraste cobra ≥ 3).
+  gatilho: "#ea580c",
   conector: "#0e7490",
   agente: "#9333ea",
   funcao: "#059669",
@@ -26,6 +30,7 @@ export const CORES_POR_FAMILIA: Record<TipoDeNoDoFluxo, string> = {
 /** Ícones do catálogo curado da mesa (`canvas/icones.ts`) — reusar o mapa é o
  * que garante que o nome existe e não infla o bundle. */
 export const ICONES_POR_FAMILIA: Record<TipoDeNoDoFluxo, string> = {
+  gatilho: "Play",
   conector: "Globe",
   agente: "Zap",
   funcao: "Cog",
@@ -41,6 +46,8 @@ export const ICONES_POR_FAMILIA: Record<TipoDeNoDoFluxo, string> = {
  * abre (a decisão antiga do §2.3 de separar os nomes caiu com o pedido).
  */
 export const ROTULOS_POR_FAMILIA: Record<TipoDeNoDoFluxo, string> = {
+  // SPEC-110 A — a família nova diz QUANDO o fluxo roda.
+  gatilho: "Gatilho",
   conector: "Integração externa",
   agente: "Agente",
   funcao: "Função do sistema",

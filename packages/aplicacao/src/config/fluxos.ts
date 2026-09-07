@@ -1,6 +1,7 @@
 ﻿import { resolverDependencias, type Dependencia } from "@gerador/engine";
 import { sanearCamposDaTransformacao, validarCamposDaTransformacao } from "../casos-de-uso/transformacao.js";
 import { FUNCOES_DO_SISTEMA, funcaoDoSistema } from "./funcoes.js";
+import { GATILHOS_DO_SISTEMA, ID_DO_NO_DE_GATILHO, gatilhoDoSistema } from "./gatilhos.js";
 import { REF_DO_PROJETO } from "./projeto.js";
 import {
   ConfigInvalida,
@@ -35,8 +36,13 @@ import {
  * próprio `"projeto"` (não há adaptador a escolher; a demanda é parâmetro).
  * `transformacao` (fatia E) é a pura — re-mapeia/extrai/concatena, sem IA;
  * os campos de saída são dado do nó (`parametros.campos`).
+ *
+ * SPEC-110 fatia A — `gatilho` entra pelo mesmo critério: TEM executor (um
+ * no-op deliberado, que carimba a origem do disparo no rastro). Ele não faz
+ * trabalho; ele diz QUANDO o fluxo roda — e é o que dá propósito legível ao
+ * botão, que virou o gesto do gatilho manual ("▶ Rodar agora").
  */
-export const TIPOS_DE_NO_DO_FLUXO = ["conector", "agente", "funcao", "projeto", "transformacao"] as const;
+export const TIPOS_DE_NO_DO_FLUXO = ["gatilho", "conector", "agente", "funcao", "projeto", "transformacao"] as const;
 export type TipoDeNoDoFluxo = (typeof TIPOS_DE_NO_DO_FLUXO)[number];
 
 export interface NoDoFluxo {
@@ -206,6 +212,19 @@ export interface FluxoEmVigor extends Fluxo {
   sombreiaFabrica?: boolean;
 }
 
+/**
+ * SPEC-110 fatia A — **a fábrica sempre desenha o gatilho.** Toda derivada
+ * começa pelo nó que diz quando ela roda (D1); o declarado ANTIGO, sem
+ * gatilho, continua rodando pelo botão (D8) — compatibilidade sem migração.
+ *
+ * A aresta gatilho→primeiro-nó nasce SEM mapeamento de propósito: o gatilho
+ * manual não emite dado, e a tela rotula essa aresta "dispara" em vez de "sem
+ * mapeamento" — decoração ela não é.
+ */
+export function noDeGatilhoManual(posicao: { x: number; y: number }): NoDoFluxo {
+  return { id: ID_DO_NO_DE_GATILHO, tipo: "gatilho", refId: "manual", posicao, parametros: {} };
+}
+
 export const ID_DO_FLUXO_DA_ESTEIRA = "esteira-de-agentes";
 
 /**
@@ -238,19 +257,20 @@ export function fluxoDaEsteira(papeis: PapelConfigurado[]): FluxoEmVigor | null 
    * julgamento fica na demanda).
    */
   const nos: NoDoFluxo[] = [
-    { id: "demanda", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 60, y: 120 }, parametros: {} },
+    noDeGatilhoManual({ x: 60, y: 120 }),
+    { id: "demanda", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 340, y: 120 }, parametros: {} },
     ...ativos.map((papel, i) => ({
       id: papel.id,
       tipo: "agente" as const,
       refId: papel.id,
-      posicao: { x: 340 + i * 260, y: 120 },
+      posicao: { x: 620 + i * 260, y: 120 },
       parametros: {},
     })),
     {
       id: "grava",
       tipo: "projeto",
       refId: REF_DO_PROJETO,
-      posicao: { x: 340 + ativos.length * 260, y: 120 },
+      posicao: { x: 620 + ativos.length * 260, y: 120 },
       parametros: {},
     },
   ];
@@ -261,6 +281,7 @@ export function fluxoDaEsteira(papeis: PapelConfigurado[]): FluxoEmVigor | null 
     { saida: "contextoDoProduto", entrada: "contextoDoProduto" },
   ];
   const arestas: ArestaDoFluxo[] = [
+    { de: ID_DO_NO_DE_GATILHO, para: "demanda", mapeamento: [] },
     {
       de: "demanda",
       para: ativos[0].id,
@@ -314,11 +335,13 @@ export function fluxoDaExportacao(configExportador: ConfigExportador): FluxoEmVi
     id: ID_DO_FLUXO_DA_EXPORTACAO,
     nome: "Exportar prontos (da configuração)",
     nos: [
-      { id: "demanda", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 60, y: 120 }, parametros: {} },
-      { id: "envio", tipo: "conector", refId: destinos[0].id, componente: "itens", posicao: { x: 340, y: 120 }, parametros: {} },
-      { id: "grava", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 620, y: 120 }, parametros: {} },
+      noDeGatilhoManual({ x: 60, y: 120 }),
+      { id: "demanda", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 340, y: 120 }, parametros: {} },
+      { id: "envio", tipo: "conector", refId: destinos[0].id, componente: "itens", posicao: { x: 620, y: 120 }, parametros: {} },
+      { id: "grava", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 900, y: 120 }, parametros: {} },
     ],
     arestas: [
+      { de: ID_DO_NO_DE_GATILHO, para: "demanda", mapeamento: [] },
       { de: "demanda", para: "envio", mapeamento: [{ saida: "itensProntos", entrada: "itens" }] },
       // O destino recebe os resultados POR ITEM e também quem foi enviado —
       // é o que permite nomear "o agente não respondeu sobre este item".
@@ -359,11 +382,13 @@ export function fluxosDaPublicacao(configExportador: ConfigExportador): FluxoEmV
         ? "Publicar documento (da configuração)"
         : `Publicar documento — ${destino.rotulo || destino.id} (da configuração)`,
     nos: [
-      { id: "demanda", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 60, y: 120 }, parametros: {} },
-      { id: "publica", tipo: "conector", refId: destino.id, componente: "documento", posicao: { x: 340, y: 120 }, parametros: {} },
-      { id: "grava", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 620, y: 120 }, parametros: {} },
+      noDeGatilhoManual({ x: 60, y: 120 }),
+      { id: "demanda", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 340, y: 120 }, parametros: {} },
+      { id: "publica", tipo: "conector", refId: destino.id, componente: "documento", posicao: { x: 620, y: 120 }, parametros: {} },
+      { id: "grava", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 900, y: 120 }, parametros: {} },
     ],
     arestas: [
+      { de: ID_DO_NO_DE_GATILHO, para: "demanda", mapeamento: [] },
       {
         de: "demanda",
         para: "publica",
@@ -400,10 +425,14 @@ export function fluxoDoEnsaio(): FluxoEmVigor {
     id: ID_DO_FLUXO_DO_ENSAIO,
     nome: "Ensaio de cenários",
     nos: [
-      { id: "demanda", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 60, y: 120 }, parametros: {} },
-      { id: "ensaio", tipo: "funcao", refId: "ensaio", posicao: { x: 340, y: 120 }, parametros: {} },
+      noDeGatilhoManual({ x: 60, y: 120 }),
+      { id: "demanda", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 340, y: 120 }, parametros: {} },
+      { id: "ensaio", tipo: "funcao", refId: "ensaio", posicao: { x: 620, y: 120 }, parametros: {} },
     ],
-    arestas: [{ de: "demanda", para: "ensaio", mapeamento: [{ saida: "desenho", entrada: "desenho" }] }],
+    arestas: [
+      { de: ID_DO_NO_DE_GATILHO, para: "demanda", mapeamento: [] },
+      { de: "demanda", para: "ensaio", mapeamento: [{ saida: "desenho", entrada: "desenho" }] },
+    ],
     origem: "fabrica",
   };
 }
@@ -449,6 +478,7 @@ export function validarEscritaFluxos(documento: unknown): void {
     vistos.add(id);
 
     const nosVistos = new Set<string>();
+    const gatilhos: string[] = [];
     for (const [j, no] of (Array.isArray(f.nos) ? (f.nos as Partial<NoDoFluxo>[]) : []).entries()) {
       const noId = typeof no?.id === "string" ? no.id.trim() : "";
       if (!noId) throw new ConfigInvalida(`no fluxo "${id}", o nó na posição ${j + 1} está sem "id"`);
@@ -463,8 +493,22 @@ export function validarEscritaFluxos(documento: unknown): void {
         // §359 — a frase nomeia O QUE falta escolher ("adaptador" é jargão de
         // arquitetura; na tela o nó agente escolhe um PAPEL, a chamada
         // externa um CONECTOR).
-        const oQueFalta = no.tipo === "agente" ? "papel" : no.tipo === "conector" ? "conector" : "referência";
+        const oQueFalta =
+          no.tipo === "agente" ? "papel" : no.tipo === "conector" ? "conector" : no.tipo === "gatilho" ? "tipo de gatilho" : "referência";
         throw new ConfigInvalida(`no fluxo "${id}", o nó "${noId}" está sem ${oQueFalta} — escolha nas propriedades do nó`);
+      }
+      /**
+       * SPEC-110 fatia A — o registro de gatilhos é fechado como o de funções:
+       * um refId fora dele nunca ganha executor, e falhar só na execução seria
+       * o silêncio que a §9.3 recusa.
+       */
+      if (no.tipo === "gatilho") {
+        if (!gatilhoDoSistema(no.refId.trim())) {
+          throw new ConfigInvalida(
+            `no fluxo "${id}", o nó "${noId}" aponta para o gatilho "${no.refId.trim()}", que não existe (gatilhos: ${GATILHOS_DO_SISTEMA.map((g) => g.id).join(", ")})`
+          );
+        }
+        gatilhos.push(noId);
       }
       // O registro de funções é fechado e vive no código — um refId fora dele
       // nunca vai ganhar executor, e falhar só na execução seria o silêncio
@@ -496,6 +540,17 @@ export function validarEscritaFluxos(documento: unknown): void {
           `no fluxo "${id}", o nó "${noId}" tem confirmação desconhecida "${String(confirmacao)}" (aceitas: aguardar, automatica)`
         );
       }
+    }
+    /**
+     * SPEC-110 D1 — no máximo UM gatilho por fluxo: dois seria a pergunta sem
+     * resposta ("qual vale?"), e a resposta silenciosa (o primeiro do array)
+     * é exatamente o tipo de convenção escondida que esta fatia veio matar.
+     * ZERO é tolerado (D8): o declarado antigo continua rodando pelo botão.
+     */
+    if (gatilhos.length > 1) {
+      throw new ConfigInvalida(
+        `o fluxo "${id}" tem ${gatilhos.length} gatilhos (${gatilhos.join(", ")}) — um fluxo diz UMA vez quando roda; remova os outros`
+      );
     }
     for (const aresta of Array.isArray(f.arestas) ? (f.arestas as Partial<ArestaDoFluxo>[]) : []) {
       for (const ponta of [aresta?.de, aresta?.para]) {

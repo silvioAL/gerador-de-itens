@@ -17236,3 +17236,76 @@ exportar/publicar pelos fluxos. Os dois tours continuam no topo — o manual
 diz "os tours mostram estes passos ao vivo" e fica para consulta. "A
 jornada" e "Cenários prontos" seguem como abas; nada morreu aqui, só a
 PORTA mudou de resposta.
+
+## §391 — SPEC-110 A: o gatilho como nó (o botão ganha propósito)
+
+*"não entendi qual o objetivo do botão executar"* — a queixa que abriu a
+SPEC-110. O botão não tinha propósito legível porque o **quando** não existia
+no desenho: era convenção escondida no shell. Um fluxo que não diz quando roda
+não é um low-code; é um encanamento com um botão.
+
+O gatilho vira COMPONENTE. `TIPOS_DE_NO_DO_FLUXO` ganha `"gatilho"` e um
+registro FECHADO no molde de `FUNCOES_DO_SISTEMA` (§242) —
+`GATILHOS_DO_SISTEMA`, hoje só `manual` ("▶ Manual — roda quando alguém
+manda"). A família inteira já está decidida (D1) e cada membro chega com quem
+o honre: `agendamento` na fatia E, `webhook` na L, `screen` na SPEC-111.
+
+**Sem contrato de dados no v1** (D1): o gatilho é âncora de "quando", e os
+dados continuam nascendo nos nós de mesa/integração. O `saida` existe no
+registro porque o webhook vai emitir o payload — quem consome deriva do
+registro, não de um `if` por tipo.
+
+**O executor é um no-op deliberado** que carimba a ORIGEM do disparo no
+rastro (`RastroDoNo.origem`, só em nó de gatilho). Sem isso o "✓ gatilho"
+seria uma linha vazia — e a fatia E precisa provar no histórico que a execução
+nasceu do relógio, não do botão. `executarFluxo` ganhou
+`opcoes.origemDoDisparo`, com `"manual"` como default (o disparo que sempre
+existiu).
+
+As quatro fábricas (esteira, exportação, publicação, ensaio) passam a desenhar
+o gatilho como primeiro nó, e os demais nós andaram 280px para a direita — a
+prova cobra que nenhuma posição colidiu. A aresta gatilho→primeiro-nó nasce
+sem mapeamento de propósito, e a tela a rotula **"dispara"** em vez de "sem
+mapeamento": ela não é decoração, é o disparo.
+
+Na tela: paleta ganha "+ Gatilho" (primeiro botão — a primeira pergunta de
+quem monta uma automação é "quando isso roda?"), família nova no vocabulário
+visual (laranja `#ea580c`, ícone `Play`, contraste medido 3.15 no claro e
+4.62 no escuro), o painel do nó explica o propósito, e o botão "Executar"
+virou **"▶ Rodar agora"** — mantendo o testid `executar-fluxo`, que dezenas
+de E2Es usam. O gate de confirmação some do painel do gatilho: pausar depois
+de um nó que não produz nada só travaria o fluxo antes de começar.
+
+**Gatilho não é obrigatório (D8)**: fluxo declarado antigo continua rodando
+pelo botão, sem migração de dado — a validação de escrita recusa só a
+DUPLICIDADE ("qual vale?" não pode ter resposta silenciosa) e o refId fora do
+registro. Zero gatilhos ganha uma sugestão na tela, não um bloqueio.
+
+O R3 da SPEC se confirmou à letra: seis provas quebraram na primeira rodada,
+todas contagens de nó das fábricas (três de unidade, três de rota) — nenhuma
+surpresa fora disso, e nenhum E2E contava `.react-flow__node` das derivadas.
+
+D19: o passo "Rode a esteira" do "Como usar" e os dois passos de tour que
+narravam o botão foram reescritos no mesmo PR — apresentação que ensina um
+botão que a tela não tem mais é a queixa do §390 renascendo.
+
+§248 (trio completo): remover o gatilho da fábrica do ensaio → o teste da
+fábrica e o das quatro derivadas ficam vermelhos; afrouxar a régua de
+duplicidade → a recusa de dois gatilhos fica vermelha; fixar a origem em
+"manual" ignorando o disparo → a prova da origem declarada fica vermelha.
+Restaurado, verde.
+
+A validação visual contra a stack real (:8080, dois temas) achou DOIS defeitos
+que nenhum teste verde tinha visto — a razão pela qual ela existe:
+
+1. **O primeiro nó adicionado nascia por cima do gatilho.** A cascata de
+   posição sempre foi `80 + n*60, 80 + n*40` sobre a CONTAGEM de nós, e isso
+   bastava enquanto todo fluxo começava vazio; com o gatilho já no desenho, o
+   nó seguinte caía 60px ao lado — cartões de 190px empilhados, o de baixo
+   intocável (o mesmo sintoma que a §0.9 anota para os handles na CI).
+   `proximaPosicao` passou a andar até achar slot livre, com teto para não
+   virar laço.
+2. **O cartão do gatilho cobria a Mesa de projeto.** "▶ Manual — roda quando
+   alguém manda" é a frase certa para a paleta e o painel, e larga demais
+   para o cartão. O registro ganhou `rotuloCurto` ("▶ Manual") — o cartão leva
+   o curto, a paleta e o painel levam a frase inteira.
