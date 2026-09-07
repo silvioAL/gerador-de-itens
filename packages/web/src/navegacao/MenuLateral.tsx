@@ -43,11 +43,9 @@ export interface MenuLateralProps {
    * itens viraram uma seção deste documento. Duas entradas para a mesma
    * derivação faziam o menu parecer maior do que o produto.
    */
-  /** SPEC-59 — como a FERRAMENTA está montada. Não é da demanda, então não
-   * entra no grupo dela: é o mapa do que as telas de configuração configuram. */
-  onSistema: () => void;
-  /** SPEC-105 fatia C — o encanamento da ferramenta como grafo. Vive ao lado
-   * do mapa do sistema porque os dois falam DA ferramenta, não da demanda. */
+  /** SPEC-105 fatia C — o encanamento da ferramenta como grafo; SPEC-109 C —
+   * e a ÚNICA porta d'"a ferramenta": a SistemaScreen (o mapa em leitura)
+   * morreu quando o canvas passou a mostrar o encanamento vivo. */
   onFluxos: () => void;
   onSair: () => void;
 }
@@ -88,7 +86,9 @@ const GRUPOS: { titulo: string; itens: { area: AreaConfig; rotulo: string }[] }[
   {
     titulo: "IA",
     itens: [
-      { area: "pipeline", rotulo: "Pipeline de IA" },
+      // SPEC-109 C — "Pipeline de IA" saiu do menu: a esteira vive no canvas
+      // de fluxos e o papel se edita no nó (§369). O deep-link
+      // `#/config/pipeline` continua vivo — a porta é o canvas, não a lista.
       { area: "modeloIa", rotulo: "Modelo de IA" },
       { area: "pdca", rotulo: "PDCA — melhoria contínua" },
     ],
@@ -106,7 +106,6 @@ export function MenuLateral({
   podeEditarArea,
   onNovaQuebra,
   onAbrirQuebras,
-  onSistema,
   onFluxos,
   onSair,
 }: MenuLateralProps) {
@@ -163,9 +162,9 @@ export function MenuLateral({
             ser um lugar aonde se vai e passa a acompanhar o item quando ele sobe
             (SPEC-98 §3.2). */}
         <p style={tituloGrupoEstilo}>A ferramenta</p>
-        <button onClick={acao(onSistema)} style={itemEstilo} data-testid="menu-sistema">
-          Como está montada
-        </button>
+        {/* SPEC-109 C — "Como está montada" morreu: a SistemaScreen narrava o
+            encanamento que o canvas de fluxos mostra VIVO ("por vezes parece
+            ter coisas repetidas", queixa literal). Uma porta só. */}
         <button onClick={acao(onFluxos)} style={itemEstilo} data-testid="menu-fluxos">
           Fluxos de integração
         </button>

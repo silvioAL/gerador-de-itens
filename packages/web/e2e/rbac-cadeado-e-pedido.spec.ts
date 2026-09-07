@@ -239,8 +239,10 @@ test("owner com RBAC ligado: só some do menu onde há curadoria de outro papel"
     await page.getByRole("button", { name: "☰ Menu" }).click();
 
     // Sem curadoria: o owner edita — é o `exigirPermissao` da SPEC-38, e era
-    // isto que aparecia trancado antes do §220.
-    for (const area of [/Padrões por componente/, /Campos por tipo de conexão/, /Especificação de solução/, /Pipeline de IA/]) {
+    // isto que aparecia trancado antes do §220. ("Pipeline de IA" saiu desta
+    // lista na SPEC-109 C: o item deixou o menu para TODOS — a esteira vive
+    // no canvas — então a ausência dele não diz nada sobre RBAC.)
+    for (const area of [/Padrões por componente/, /Campos por tipo de conexão/, /Especificação de solução/, /Modelo de IA/]) {
       await expect(page.getByRole("button", { name: area }), `${area} visível`).toBeVisible();
     }
 

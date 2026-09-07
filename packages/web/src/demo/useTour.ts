@@ -44,8 +44,9 @@ export interface UseTourOpts {
    * de volta.
    */
   abrirDocumento: () => void;
-  /** SPEC-59 — a vista de como a ferramenta está montada (`#/sistema`). */
-  abrirSistema: () => void;
+  /** SPEC-109 C — o canvas de fluxos É o mapa da ferramenta (a SistemaScreen
+   * morreu; `#/sistema` redireciona para cá). */
+  abrirFluxos: () => void;
   /** §261 — abre o reconhecimento do que fica para trás. O tour deriva por um
    * atalho próprio (`derivarQuebra`), então precisa pedir o diálogo de forma
    * explícita — senão o passo apontaria para algo que nunca aparece. */
@@ -101,18 +102,23 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
        * a tese em duas frases e vai direto para a conta real, com a régua do
        * time de quem assiste.
        */
-      selector: "[data-testid=motor-passo-a-passo]",
+      /**
+       * SPEC-109 C — o passo mostrava a animação do motor na SistemaScreen;
+       * a tela morreu e quem responde "quem faz o quê" agora é o CANVAS DE
+       * FLUXOS, executável: as funções do sistema são o motor, os agentes são
+       * a IA, e a fiação entre eles é a divisão — desenhada, não narrada.
+       */
+      selector: "[data-testid=fluxo-screen]",
       titulo: "Quem faz o quê",
-      // A animação dá uma volta completa em ~6,5 s; este passo mostra duas.
-      segundos: 16,
+      segundos: 14,
       texto:
-        "Duas partes trabalham aqui, e a divisão é a ideia toda. O MOTOR calcula — lê o seu desenho e a configuração do time, mede o que está pronto e o que sai do padrão, e deriva os itens com as dependências. A IA escreve o texto, e nada que ela propõe conta antes de você confirmar. Esta é a conta inteira, com uma régua do SEU time: o campo preenchido, a régua que alguém escreveu, a comparação, e o item que sai dela. Quatro elos, nenhum com IA no meio — por isso o mesmo desenho dá sempre os mesmos itens.",
+        "Duas partes trabalham aqui, e a divisão é a ideia toda. O MOTOR calcula — lê o seu desenho e a configuração do time, e deriva os itens com as dependências: são as FUNÇÕES DO SISTEMA neste canvas (Geração de itens, Ensaio de cenários). A IA escreve o texto: são os AGENTES, em esteira, e nada que eles propõem conta antes de você confirmar. Este encanamento não é ilustração — é o que roda quando você deriva, e dá para executar daqui.",
       onEnter: () => {
         // Primeiro passo a mostrar dado de demonstração: a marca liga aqui
         // (§235), porque o time de quem assiste pode não ter régua conferível
         // nenhuma, e "não há o que explicar" no meio da explicação não ensina.
         opts.ligarDemonstracao(true);
-        opts.abrirSistema();
+        opts.abrirFluxos();
       },
     },
     {
@@ -299,33 +305,21 @@ export function passosDeConfiguracao(opts: UseTourOpts): PassoTour[] {
       onEnter: () => opts.fecharRevisao(),
     },
     {
-      // §258 — a vista antes das telas. O tour de configuração percorre onze
-      // telas e nunca mostrava como elas se ligam; quem chega aqui vê primeiro
-      // o mapa, e depois cada peça dele.
-      selector: "[data-testid=sistema-screen]",
-      titulo: "Como a ferramenta está montada",
+      // §258 — a vista antes das telas; SPEC-109 C — a vista agora é o CANVAS
+      // DE FLUXOS: a SistemaScreen narrava o encanamento e morreu quando ele
+      // passou a existir de verdade, executável. O passo abre o canvas.
+      selector: "[data-testid=fluxo-screen]",
+      titulo: "O encanamento é o canvas",
       segundos: 13,
       texto:
-        "Antes das telas, o mapa. De um lado o que o MOTOR confere — as regras por tecnologia e as réguas de caminho. Do outro, quem ESCREVE cada parte do item: a esteira, em sequência, com o estado de cada agente (um papel ativo sem modelo configurado é o defeito mais silencioso que existe aqui). Os dois produzem o item, e o que o time responde depois volta a mudar os dois: é o laço do PDCA, que dá nome ao ciclo e não aparecia em tela nenhuma. Esta vista não edita — cada bloco leva à tela que edita.",
+        "Antes das telas, o mapa — e o mapa aqui é vivo. Cada fluxo desta tela é o encanamento REAL da ferramenta: a esteira de agentes derivada da configuração (quem escreve cada parte do item, na ordem), a exportação, a publicação, o ensaio. Clicar num agente edita o papel dele — prompt, ligar/desligar, ordem — de onde se vê; e Executar roda o fluxo de verdade, com o rastro nó a nó. O que as telas de configuração ajustam aparece aqui sozinho, porque isto deriva delas.",
       /**
-       * §340 — **liga a demonstração, e o motivo veio de um print do usuário.**
-       *
-       * Este passo mostra o mapa, e o mapa mostra a última execução de cada
-       * agente lendo o histórico REAL. Quem demonstra com a credencial da casa
-       * sem crédito via os quatro papéis em vermelho, com o erro cru do
-       * provedor — e quem assiste conclui que a ferramenta está quebrada.
-       *
-       * O §339 trocou o histórico por dados de demonstração, e não bastou: o
-       * passo equivalente do tour de PRODUTO liga o modo antes de abrir o mapa
-       * (`ligarDemonstracao(true); abrirSistema()`), e este não ligava. A
-       * correção existia e não alcançava a tela em que o defeito foi visto.
-       *
-       * O desligamento continua obrigatório e continua onde estava (§253):
-       * demonstração que sobrevive ao tour vira configuração fantasma.
+       * §340/§253 — a demonstração liga aqui e desliga no fim do tour, como
+       * sempre: o passo seguinte (produto) mostra dado falso marcado.
        */
       onEnter: () => {
         opts.ligarDemonstracao(true);
-        opts.abrirSistema();
+        opts.abrirFluxos();
       },
     },
     {

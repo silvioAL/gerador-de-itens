@@ -24,6 +24,7 @@ import {
   NOME_DA_OPERACAO,
   planoDoFluxo,
   preambuloDoPapel,
+  type ExecucaoDoPapel,
   type ArestaDoFluxo,
   type Fluxo,
   type NoDoFluxo,
@@ -34,6 +35,7 @@ import {
   apiExecucaoDeFluxo,
   apiFluxos,
   apiFluxosEmVigor,
+  apiIa,
   apiPipelineAgentes,
   type ConectorDoCatalogo,
   type EventoDaExecucao,
@@ -75,6 +77,7 @@ export function FluxoScreen({
   painel,
   demandaAberta,
   aoExecutarComDemanda,
+  aoAbrirConfigDosPapeis,
 }: {
   timeAtivo: string;
   onFechar: () => void;
@@ -98,6 +101,12 @@ export function FluxoScreen({
    * Depois de uma execução que apontou a demanda aberta, o App ressincroniza.
    */
   aoExecutarComDemanda?: () => void;
+  /**
+   * SPEC-109 C — a porta para o catálogo COMPLETO dos papéis
+   * (`#/config/pipeline`): a aba saiu do menu quando a esteira passou a se
+   * editar daqui; criar papel contextual e sugerir com IA continuam lá.
+   */
+  aoAbrirConfigDosPapeis?: () => void;
 }) {
   const permissoes = usePermissoes({ hospedado: true, timeId: timeAtivo });
   const podeEditar = permissoes.pode("fluxos", "editar");
@@ -125,6 +134,15 @@ export function FluxoScreen({
   const [vivo, setVivo] = useState<{ rodando: string | null; textos: Record<string, string> } | null>(null);
   const [selecao, setSelecao] = useState<{ tipo: "no" | "aresta"; id: string } | null>(null);
   const [novoFluxoNome, setNovoFluxoNome] = useState("");
+  /** SPEC-109 C — a última corrida de cada papel (§265, herdada do mapa que
+   * morreu): "falhou há pouco" continua sendo notícia, agora no painel do nó. */
+  const [execucoesPorPapel, setExecucoesPorPapel] = useState<ExecucaoDoPapel[]>([]);
+  useEffect(() => {
+    void apiIa
+      .execucoes()
+      .then(({ porPapel }) => setExecucoesPorPapel(porPapel))
+      .catch(() => {});
+  }, [timeAtivo]);
 
   useEffect(() => {
     void (async () => {
@@ -454,6 +472,27 @@ export function FluxoScreen({
     }
   }
 
+  /**
+   * SPEC-109 C — ligar/desligar e reordenar papéis, herdados do mapa do
+   * sistema que morreu (§260: editar de onde se vê o problema). O mesmo RMW
+   * do `salvarPapel` — e depois a lista de fluxos RECARREGA, porque a esteira
+   * derivada muda de forma na hora (um papel desligado sai da cadeia).
+   */
+  async function mudarEsteira(mudar: (papeis: PapelConfigurado[]) => PapelConfigurado[]) {
+    setErro(null);
+    try {
+      const cfg = await apiPipelineAgentes.obter(timeAtivo);
+      const papeisNovos = mudar(cfg.papeis ?? []);
+      await apiPipelineAgentes.salvar({ ...cfg, papeis: papeisNovos }, timeAtivo);
+      setPapeis(papeisNovos);
+      const emVigor = await apiFluxosEmVigor.listar(timeAtivo);
+      setFluxos(emVigor.fluxos);
+      setRastro(null);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   async function salvar() {
     if (!fluxos) return;
     setSalvando(true);
@@ -740,6 +779,17 @@ export function FluxoScreen({
             editar uma cópia
           </button>{" "}
           — a cópia vence a derivada no mesmo id.
+          {/* SPEC-109 C — a volta de quem desligou um papel: o nó desligado
+              SOME da derivada, então religar precisa de uma porta que não
+              dependa de clicar nele. */}
+          {aoAbrirConfigDosPapeis && fluxo.id === "esteira-de-agentes" && (
+            <>
+              {" "}
+              <button data-testid="abrir-config-dos-papeis-banner" onClick={aoAbrirConfigDosPapeis} style={{ ...botaoMiudo, pointerEvents: "auto" }}>
+                configuração dos papéis →
+              </button>
+            </>
+          )}
         </div>
       )}
       {ciclo && (
@@ -836,6 +886,33 @@ export function FluxoScreen({
                 podeEditarPapel={podeEditarPapel}
                 onSalvarPapel={salvarPapel}
                 onAbrirMesa={onFechar}
+                // SPEC-109 C — o lugar do papel NA ESTEIRA (herdado do mapa
+                // que morreu): ligar/desligar, ordem e a última corrida.
+                esteira={
+                  noSelecionado.tipo === "agente" && papeis.some((p) => p.id === noSelecionado.refId)
+                    ? {
+                        papel: papeis.find((p) => p.id === noSelecionado.refId)!,
+                        posicao: papeis.findIndex((p) => p.id === noSelecionado.refId),
+                        total: papeis.length,
+                        execucao: execucoesPorPapel.find((e) => e.papel === noSelecionado.refId),
+                        podeEditar: podeEditarPapel,
+                        onAlternar: () =>
+                          void mudarEsteira((ps) =>
+                            ps.map((p) => (p.id === noSelecionado.refId ? { ...p, ativo: !p.ativo } : p))
+                          ),
+                        onMover: (direcao: -1 | 1) =>
+                          void mudarEsteira((ps) => {
+                            const de = ps.findIndex((p) => p.id === noSelecionado.refId);
+                            const para = de + direcao;
+                            if (de < 0 || para < 0 || para >= ps.length) return ps;
+                            const novos = [...ps];
+                            [novos[de], novos[para]] = [novos[para], novos[de]];
+                            return novos;
+                          }),
+                        aoAbrirConfig: aoAbrirConfigDosPapeis,
+                      }
+                    : undefined
+                }
                 onMudar={(mudanca) =>
                   mudarFluxo((f) => ({ ...f, nos: f.nos.map((n) => (n.id === noSelecionado.id ? { ...n, ...mudanca } : n)) }))
                 }
@@ -994,6 +1071,7 @@ function PainelDoNo({
   onMudar,
   onRemover,
   onAbrirMesa,
+  esteira,
 }: {
   no: NoDoFluxo;
   catalogo: ConectorDoCatalogo[];
@@ -1005,6 +1083,18 @@ function PainelDoNo({
   onRemover: () => void;
   /** §3.1 — "a mesa vira COMPONENTE": o nó de projeto é a porta para ela. */
   onAbrirMesa?: () => void;
+  /** SPEC-109 C — o lugar do papel NA ESTEIRA (ligar/desligar, ordem, última
+   * corrida), herdado do mapa do sistema que morreu (§260/§265). */
+  esteira?: {
+    papel: PapelConfigurado;
+    posicao: number;
+    total: number;
+    execucao?: ExecucaoDoPapel;
+    podeEditar: boolean;
+    onAlternar: () => void;
+    onMover: (direcao: -1 | 1) => void;
+    aoAbrirConfig?: () => void;
+  };
 }) {
   const conector = no.tipo === "conector" ? catalogo.find((c) => c.id === no.refId) : undefined;
   // SPEC-107 fatia A — a função É a capacidade: contrato do registro fechado,
@@ -1268,6 +1358,56 @@ function PainelDoNo({
           <p style={{ fontSize: 11.5, color: "var(--texto-fraco)" }}>
             As entradas vêm das arestas — o mapeamento diz o que ele recebe (§9.3: sem entrada, ele não roda).
           </p>
+          {/* SPEC-109 C — o lugar na esteira, editado de onde se vê (§260):
+              a SistemaScreen morreu e estes controles vieram para cá. */}
+          {esteira && (
+            <fieldset style={{ border: "1px solid var(--borda)", borderRadius: 8, padding: 10, margin: "0 0 8px" }}>
+              <legend style={{ fontSize: 11, color: "var(--texto-fraco)" }}>Na esteira</legend>
+              <label style={{ fontSize: 11.5, display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+                <input
+                  type="checkbox"
+                  data-testid="papel-ativo"
+                  disabled={!esteira.podeEditar}
+                  checked={esteira.papel.ativo}
+                  onChange={esteira.onAlternar}
+                />
+                Ativo (desligado sai da cadeia — e da fiação derivada)
+              </label>
+              <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+                <span style={{ fontSize: 11.5, color: "var(--texto-fraco)" }}>
+                  Ordem: {esteira.posicao + 1} de {esteira.total}
+                </span>
+                <button
+                  data-testid="papel-mover-antes"
+                  disabled={!esteira.podeEditar || esteira.posicao === 0}
+                  onClick={() => esteira.onMover(-1)}
+                  style={botaoMiudo}
+                >
+                  ← antes
+                </button>
+                <button
+                  data-testid="papel-mover-depois"
+                  disabled={!esteira.podeEditar || esteira.posicao >= esteira.total - 1}
+                  onClick={() => esteira.onMover(1)}
+                  style={botaoMiudo}
+                >
+                  depois →
+                </button>
+              </div>
+              {/* §265 — a última corrida é notícia: casada pelo ID do papel,
+                  como no mapa que morreu (renomear não órfã o rastro). */}
+              {esteira.execucao && (
+                <p data-testid="papel-ultima-corrida" style={{ fontSize: 11, color: esteira.execucao.ok ? "var(--texto-fraco)" : "var(--vermelho)", margin: "0 0 6px" }}>
+                  Última corrida: {esteira.execucao.ok ? "ok" : `falhou${esteira.execucao.erro ? ` — ${esteira.execucao.erro}` : ""}`}
+                </p>
+              )}
+              {esteira.aoAbrirConfig && (
+                <button data-testid="abrir-config-dos-papeis" onClick={esteira.aoAbrirConfig} style={botaoMiudo}>
+                  Catálogo completo dos papéis (criar, sugerir com IA) →
+                </button>
+              )}
+            </fieldset>
+          )}
           {/* §369 — o PAPEL editável de onde se vê (régua do §260): grava no
               mesmo documento da aba Pipeline de IA — uma verdade só. */}
           {no.refId && papeis.some((p) => p.id === no.refId) && (
@@ -1312,7 +1452,7 @@ function EditorDoPapel({
 
   return (
     <fieldset disabled={!podeEditar || salvando} style={{ border: "1px solid var(--borda)", borderRadius: 8, padding: 10, margin: "0 0 8px" }}>
-      <legend style={{ fontSize: 11, color: "var(--texto-fraco)" }}>O papel (o mesmo da aba Pipeline de IA)</legend>
+      <legend style={{ fontSize: 11, color: "var(--texto-fraco)" }}>O papel (o mesmo do catálogo de papéis)</legend>
       <label style={{ fontSize: 11.5, display: "grid", gap: 2, marginBottom: 6 }}>
         Nome
         <input data-testid="papel-nome" value={nome} onChange={(e) => setNome(e.target.value)} style={campo} />
