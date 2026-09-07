@@ -380,13 +380,14 @@ test("derivar pelo botão da mesa ≡ derivar pela função do fluxo — os mesm
     await expect(page.getByTestId("titulo-da-quebra")).toContainText("derivacao-comparada-e2e");
     await derivarNaMesa(page);
 
-    await expect(page.getByTestId("contagem-itens")).toHaveText(`${chavesDoFluxo.length} itens`);
-    const chavesDaMesa = (
-      await page
-        .locator('[data-testid^="item-"]')
-        .evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")!.replace(/^item-/, "")))
-    ).sort();
-    expect(chavesDaMesa).toEqual(chavesDoFluxo);
+    // G5c-3 — derivar escreve os itens e PERSISTE (a quebra tem id): a
+    // comparação byte a byte lê as chaves da FONTE DA VERDADE.
+    await expect(page.getByTestId("documento-screen")).toBeVisible();
+    await expect(page.locator('[data-testid^="item-gerado-"]')).toHaveCount(chavesDoFluxo.length);
+    const itensDaMesa = (await (
+      await page.request.get(`${API}/quebras/${demandaId}/itens`)
+    ).json()) as { chave: string }[];
+    expect(itensDaMesa.map((i) => i.chave).sort()).toEqual(chavesDoFluxo);
   } finally {
     await page.request.put(`${API}/config/fluxos`, { data: { documento: original, timeId: TIME } });
   }

@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
+import { BASE_URL_GATEWAY_FALSO, CHAVE_GATEWAY_FALSO, DESENHO_DO_GATEWAY_FALSO, MODELO_GATEWAY_FALSO } from "@gerador/gateway-falso";
 import { entrar } from "./auth";
-import { derivarNaMesa } from "./derivar";
 
 const API = "http://localhost:4100";
 
@@ -22,19 +22,25 @@ test.beforeEach(async ({ page }) => {
   );
 });
 
-test("§214 — trocar o produto da demanda troca o contexto que vai no prompt", async ({ page }) => {
-  test.setTimeout(90000);
+test("§214 — trocar o produto da demanda troca o que o modelo recebe (pela fiação)", async ({ page }) => {
+  test.setTimeout(120000);
   await entrar(page);
 
+  /**
+   * SPEC-107 G5c-3 — a prova mudou de instrumento com a morte da revisão: a
+   * simulação de prompt era client-side e morreu. Quem prova agora é a
+   * FIAÇÃO contra o dublê determinístico, que assina cada resposta com o
+   * hash do prompt inteiro (§382): rodar a esteira com o produto A e depois
+   * com o produto B tem que produzir VALORES diferentes — se o contexto do
+   * produto não entrasse no prompt, as assinaturas seriam idênticas.
+   */
   const nomeA = `Produto A ${Date.now()}`;
   const nomeB = `Produto B ${Date.now()}`;
-  const termoA = `termo exclusivo de A ${Date.now()}`;
-  const termoB = `termo exclusivo de B ${Date.now()}`;
   const ids: string[] = [];
   try {
     for (const [nome, termo] of [
-      [nomeA, termoA],
-      [nomeB, termoB],
+      [nomeA, `termo exclusivo de A ${Date.now()}`],
+      [nomeB, `termo exclusivo de B ${Date.now()}`],
     ]) {
       const criado = await page.request.post(`${API}/produtos`, { data: { nome } });
       expect(criado.status()).toBe(201);
@@ -42,39 +48,51 @@ test("§214 — trocar o produto da demanda troca o contexto que vai no prompt",
       ids.push(id);
       await page.request.post(`${API}/produtos/${id}/glossario`, { data: { termo, definicao: "definição" } });
     }
-    await page.reload();
 
-    await page.getByTestId("abrir-cenarios").click();
-    await page.getByRole("button", { name: "Carregar cenário: Dados não-relacionais" }).click();
+    // A credencial do dublê, na convenção da suíte (uma por organização).
+    await page.request.put(`${API}/ia/credencial`, {
+      data: { baseUrl: BASE_URL_GATEWAY_FALSO, chave: CHAVE_GATEWAY_FALSO, modelo: MODELO_GATEWAY_FALSO },
+    });
 
-    const escolherProduto = async (nome: string) => {
-      await page.getByTestId("assistente-flutuante").click();
-      const janela = page.getByTestId("assistente-janela");
-      await janela.getByRole("button", { name: "📎 Contexto da demanda" }).click();
-      await janela.getByLabel("Produto desta demanda").selectOption({ label: nome });
-      await janela.getByRole("button", { name: "Salvar" }).click();
+    // Uma demanda derivável, já com o produto A.
+    const criada = await page.request.post(`${API}/quebras`, {
+      data: { titulo: `troca de produto ${Date.now()}`, time: "time-pagamentos", produtoId: ids[0], diagrama: DESENHO_DO_GATEWAY_FALSO.diagrama },
+    });
+    expect(criada.status()).toBe(201);
+    const { id: demandaId } = (await criada.json()) as { id: string };
+
+    const rodar = async () => {
+      const exec = await page.request.post(`${API}/fluxos/esteira-de-agentes/executar`, {
+        data: { timeId: "time-pagamentos", parametrosPorNo: { demanda: { demandaId } } },
+      });
+      expect(exec.status()).toBe(200);
+      const q = (await (await page.request.get(`${API}/quebras/${demandaId}`)).json()) as {
+        respostasItens?: Record<string, Record<string, { valor: string }>>;
+      };
+      return JSON.stringify(
+        Object.fromEntries(
+          Object.entries(q.respostasItens ?? {}).map(([k, c]) => [k, Object.fromEntries(Object.entries(c).map(([ck, v]) => [ck, v.valor]))])
+        )
+      );
     };
 
-    await escolherProduto(nomeA);
-    await derivarNaMesa(page);
-    await page.getByTestId("assistente-balao-secundaria").click(); // sem título
+    const comProdutoA = await rodar();
+    expect(comProdutoA.length).toBeGreaterThan(2);
 
-    await page.getByTestId("abrir-simulacao").click();
-    await expect(page.getByTestId("simulacao-prompt-0")).toContainText(termoA);
-    await page.getByRole("button", { name: "Fechar" }).first().click();
+    // Troca o produto (RMW da quebra inteira) e LIMPA as sugestões pendentes:
+    // a fila volta a ter os mesmos campos, e só o contexto muda.
+    const quebra = (await (await page.request.get(`${API}/quebras/${demandaId}`)).json()) as Record<string, unknown>;
+    const atualizada = await page.request.put(`${API}/quebras/${demandaId}`, {
+      data: { ...quebra, produtoId: ids[1], respostasItens: {} },
+    });
+    expect(atualizada.status()).toBe(200);
 
-    // Troca para o produto B: o prompt tem que acompanhar. Um contexto que
-    // fica "pregado" seria o defeito do §210 na camada que mais importa — o
-    // que o modelo lê para escrever o item.
-    await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
-    await escolherProduto(nomeB);
-    await derivarNaMesa(page);
-    await page.getByTestId("assistente-balao-secundaria").click();
+    const comProdutoB = await rodar();
+    expect(comProdutoB.length).toBeGreaterThan(2);
 
-    await page.getByTestId("abrir-simulacao").click();
-    const prompt = page.getByTestId("simulacao-prompt-0");
-    await expect(prompt).toContainText(termoB);
-    await expect(prompt).not.toContainText(termoA);
+    // O §214 na fiação: produto diferente → prompt diferente → assinatura
+    // diferente. Um contexto "pregado" produziria strings idênticas.
+    expect(comProdutoB).not.toBe(comProdutoA);
   } finally {
     for (const id of ids) await page.request.delete(`${API}/produtos/${id}`);
   }

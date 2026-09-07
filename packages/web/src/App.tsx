@@ -862,6 +862,11 @@ function AppCarregado({
   // SPEC-39 M11 — a entrevista do PDCA: o servidor conta os usos e diz
   // quando é o momento; a fala cita as últimas quebras do time.
   const [entrevistaPdca, setEntrevistaPdca] = useState<string[] | null>(null);
+  // SPEC-39 M13 — o feedback pós-especificação. Morava na tela de revisão
+  // (morta na G5c-3); a cadência é a mesma, e o balão espera NA MESA — pedir
+  // opinião por cima do documento recém-aberto interromperia a leitura.
+  const [pedindoFeedbackPdca, setPedindoFeedbackPdca] = useState(false);
+  const [textoFeedbackPdca, setTextoFeedbackPdca] = useState("");
 
   function executarDerivacao(salvarDepois: boolean) {
     apiPdca
@@ -892,7 +897,12 @@ function AppCarregado({
      * canvas (§383) — nada roda sozinho ao derivar: rodar IA é gesto, e o que
      * ela escrever chega PENDENTE na demanda (§5.5).
      */
-    apiPdca.uso("especificacao", timeAtivo).catch(() => {});
+    apiPdca
+      .uso("especificacao", timeAtivo)
+      .then((r) => {
+        if (r.momento) setPedindoFeedbackPdca(true);
+      })
+      .catch(() => {});
     aoGerarItens(
       gerarItensDeTrabalho(resolverDependencias(atividades).atividades, quebra.diagrama, diagramaConfig, {
         regras: regrasConfig,
@@ -1022,12 +1032,20 @@ function AppCarregado({
     executarDerivacao(true);
   }
 
-  function confirmarNome(nome: string) {
+  async function confirmarNome(nome: string) {
     const intencao = pedindoNomeDaDemanda;
-    setQuebra((q) => ({ ...q, titulo: nome }));
+    const comTitulo = { ...quebra, titulo: nome };
+    setQuebra(comTitulo);
     setPedindoNomeDaDemanda(false);
-    if (intencao === "derivar") executarDerivacao(true);
-    else setSalvarAposNome(true);
+    if (intencao === "derivar") {
+      // G5c-3 — SALVAR ANTES de derivar: derivar agora ESCREVE os itens, e
+      // eles só persistem com a quebra criada. Sem esta ordem, o efeito que
+      // lista os itens do servidor (disparado quando o id nasce, ~2s depois)
+      // respondia VAZIO e apagava os cards locais — corrida medida no E2E
+      // sob carga ("ainda não escrito" num documento recém-derivado).
+      await persistencia.salvar(comTitulo);
+      executarDerivacao(false);
+    } else setSalvarAposNome(true);
   }
 
   /** O Salvar do header: com título salva direto; sem, o agente pergunta. */
@@ -2119,6 +2137,44 @@ function AppCarregado({
           tabela): derivar escreve os itens e leva ao documento, onde o
           julgamento campo a campo mora (§384); a corrida da esteira é a
           fiação semeada, ao vivo no canvas (§383). */}
+
+      {/* SPEC-39 M13 — o feedback do ciclo, na mesa (re-alojado da revisão). */}
+      {pedindoFeedbackPdca && !mostrarDocumento && !mostrarConfig && (
+        <div
+          data-testid="balao-feedback"
+          // bottom-LEFT de propósito: o canto direito é do assistente, e um
+          // balão por cima do outro intercepta o clique (medido no E2E do
+          // §278, com a cadência global baixada por um spec vizinho).
+          style={{ position: "fixed", left: 24, bottom: 24, zIndex: 62, background: "var(--painel)", border: "1px solid var(--borda)", borderRadius: 10, padding: 14, width: 360, boxShadow: "0 8px 28px rgba(0,0,0,0.3)", display: "grid", gap: 8 }}
+        >
+          <strong style={{ fontSize: 12.5 }}>Geramos mais um ciclo de itens.</strong>
+          <label style={{ fontSize: 11.5, display: "grid", gap: 4 }}>
+            O que faltou ou sobrou
+            <textarea
+              value={textoFeedbackPdca}
+              onChange={(e) => setTextoFeedbackPdca(e.target.value)}
+              style={{ minHeight: 56, fontSize: 12.5, background: "var(--painel-alto)", color: "var(--texto)", border: "1px solid var(--borda)", borderRadius: 6, padding: 6 }}
+            />
+          </label>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button onClick={() => setPedindoFeedbackPdca(false)} style={{ fontSize: 11.5 }}>
+              Agora não
+            </button>
+            <button
+              data-testid="balao-feedback-enviar"
+              disabled={!textoFeedbackPdca.trim()}
+              onClick={() => {
+                void apiPdca.feedback(textoFeedbackPdca.trim(), timeAtivo).catch(() => {});
+                setPedindoFeedbackPdca(false);
+                setTextoFeedbackPdca("");
+              }}
+              style={{ fontSize: 11.5, fontWeight: 600 }}
+            >
+              Enviar
+            </button>
+          </div>
+        </div>
+      )}
 
       {avisosPendentes && (
         <AvisosDaDerivacao

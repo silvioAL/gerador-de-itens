@@ -17,7 +17,7 @@ import { derivarNaMesa } from "./derivar";
  * balões M4→M5→M12, que é exatamente a condução de quem abre a revisão sem
  * esteira.
  */
-test("gerar itens na revisão abre o DOCUMENTO, na seção dos itens", async ({ page }) => {
+test("derivar ESCREVE os itens e abre o DOCUMENTO, na seção deles (SPEC-107 G5c)", async ({ page }) => {
   test.setTimeout(60000);
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
   await page.route(
@@ -30,17 +30,9 @@ test("gerar itens na revisão abre o DOCUMENTO, na seção dos itens", async ({ 
   await page.getByRole("button", { name: "Carregar cenário: Dados não-relacionais" }).click();
   await derivarNaMesa(page);
   // Sem título: derivar sem salvar (exploração) — os itens ficam locais.
+  // G5c-3 — a tela de revisão (e os balões M4/M5/M12 dela) morreu: derivar
+  // já escreve os itens e leva direto ao documento (SPEC-61, uma saída só).
   await page.getByTestId("assistente-balao-secundaria").click();
-
-  // A condução até o M12: dispensa "sem IA" (M4) e, se vier, "sem contexto"
-  // (M5 — cenário pronto pode chegar já tocado, e aí o M5 é pulado).
-  await page.getByTestId("balao-sem-ia").getByRole("button", { name: "Dispensar sugestão" }).click();
-  await expect(page.getByTestId("balao-sem-contexto").or(page.getByTestId("balao-gerar"))).toBeVisible();
-  if (await page.getByTestId("balao-sem-contexto").isVisible()) {
-    await page.getByTestId("balao-sem-contexto").getByRole("button", { name: "Dispensar sugestão" }).click();
-  }
-  await expect(page.getByTestId("balao-gerar")).toBeVisible();
-  await page.getByTestId("balao-gerar-itens").click();
 
   // Uma saída só: o documento, com os itens dentro dele.
   await expect(page.getByTestId("documento-screen")).toBeVisible();
@@ -151,13 +143,8 @@ test("§210 — trocar de demanda NÃO leva junto os itens da anterior", async (
   await page.getByLabel("ex.: Fatura mensal em lote").fill(`demanda com itens ${Date.now()}`);
   await page.getByTestId("assistente-balao-confirmar").click();
 
-  await page.getByTestId("balao-sem-ia").getByRole("button", { name: "Dispensar sugestão" }).click();
-  if (await page.getByTestId("balao-sem-contexto").isVisible().catch(() => false)) {
-    await page.getByTestId("balao-sem-contexto").getByRole("button", { name: "Dispensar sugestão" }).click();
-  }
-  const botaoItens = page.getByTestId("balao-gerar-itens").or(page.getByTestId("balao-especificacao-itens")).first();
-  await botaoItens.waitFor({ timeout: 15000 });
-  await botaoItens.click();
+  // G5c-3 — derivar já escreve os itens e abre o documento (a revisão e os
+  // balões M4/M5/M12 dela morreram).
   await expect(page.getByTestId("documento-screen")).toBeVisible();
   const quantosNaPrimeira = await page.locator('[data-testid^="item-gerado-"]').count();
   expect(quantosNaPrimeira).toBeGreaterThan(0);
@@ -257,17 +244,12 @@ test("§210 — demanda NOVA (sem id) não herda os itens escritos da anterior",
   await derivarNaMesa(page);
   await page.getByTestId("assistente-balao-secundaria").click(); // sem título: fica local
 
-  await page.getByTestId("balao-sem-ia").getByRole("button", { name: "Dispensar sugestão" }).click();
-  if (await page.getByTestId("balao-sem-contexto").isVisible().catch(() => false)) {
-    await page.getByTestId("balao-sem-contexto").getByRole("button", { name: "Dispensar sugestão" }).click();
-  }
-  await page.getByTestId("balao-gerar-itens").click();
+  // G5c-3 — derivar já escreve os itens e abre o documento.
   await expect(page.getByTestId("documento-screen")).toBeVisible();
   expect(await page.locator('[data-testid^="item-gerado-"]').count()).toBeGreaterThan(0);
 
   // Começar outra demanda do zero — o "Nova quebra" do menu.
   await page.getByTestId("documento-screen").getByRole("button", { name: /Voltar à mesa de projeto/ }).click();
-  await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
   await page.getByRole("button", { name: "☰ Menu" }).click();
   await page.getByRole("button", { name: "Nova quebra" }).click();
 

@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+﻿import { test, expect } from "@playwright/test";
 import { entrar } from "./auth";
 import { reconhecerAvisos } from "./derivar";
 
@@ -58,7 +58,7 @@ test("carregar um cenário pronto popula a mesa de projeto e deriva sem ciclos/c
   await expect(page.getByTestId("assistente-balao")).toContainText("qual é o nome da demanda");
   await page.getByTestId("assistente-balao-secundaria").click();
 
-  await expect(page.getByTestId("contagem-itens")).toHaveText("4 itens");
+  await expect(page.locator('[data-testid^="item-gerado-"]')).toHaveCount(4); // G5c-3: derivar abre o documento
   await expect(page.getByText("Não é possível derivar ainda")).not.toBeVisible();
 
   await page.screenshot({ path: "e2e/screenshots/cenario-mongo.png", fullPage: true });
@@ -163,7 +163,7 @@ test("adicionar dois cenários à mesa de projeto (sem substituir) compõe um di
 
   // 4 atividades do mongo + 5 do kafka = 9 — se algum ID tivesse colidido/se
   // perdido na mesclagem, esse número não bateria.
-  await expect(page.getByTestId("contagem-itens")).toHaveText("9 itens");
+  await expect(page.locator('[data-testid^="item-gerado-"]')).toHaveCount(9);
   await expect(page.getByText("Não é possível derivar ainda")).not.toBeVisible();
 
   await page.screenshot({ path: "e2e/screenshots/cenarios-compostos.png", fullPage: true });
@@ -327,9 +327,10 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   // Não bloqueia: é o que separa reconhecer de proibir.
   await expect(page.getByText(/Nada aqui impede a derivação/)).toBeVisible();
 
-  // Derivação de verdade — a revisão abre com os itens calculados.
-  await irAtePasso(page, "Confirmar o que a IA escreveu");
-  await expect(page.getByTestId("barra-pendencias")).toBeVisible();
+  // G5c-3 — derivação de verdade: o DOCUMENTO abre com os itens escritos, e o
+  // julgamento mora nos cards (a revisão como tela morreu).
+  await irAtePasso(page, "Confirmar o que a IA escrever");
+  await expect(page.getByTestId("secao-dos-itens")).toBeVisible();
 
   // §251 — a TELA do documento (SPEC-58), a lacuna que a avaliação encontrou.
   //
@@ -373,7 +374,7 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await page.getByRole("button", { name: "Concluir" }).click();
 
   await expect(page.getByText(/PASSO \d+ DE \d+/)).not.toBeVisible();
-  await expect(page.getByTestId("contagem-itens")).not.toBeVisible();
+  await expect(page.getByTestId("documento-screen")).not.toBeVisible();
 });
 
 /**

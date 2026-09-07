@@ -101,8 +101,7 @@ test("publicar pela fiação: o botão publica, o link aparece — e sobrevive a
     await expect(page.getByTestId("titulo-da-quebra")).toContainText("publicacao-g2-e2e");
 
     await derivarNaMesa(page);
-    await page.getByTestId("ir-ao-documento").click();
-
+    // G5c-3 — derivar já abre o documento.
     await expect(page.getByTestId("publicar-documento")).toBeVisible();
     await page.getByTestId("publicar-documento").click();
 
@@ -129,13 +128,8 @@ test("publicar pela fiação: o botão publica, o link aparece — e sobrevive a
     await page.getByPlaceholder("ex.: aprovação de crédito").fill(titulo);
     await page.getByRole("button", { name: new RegExp(titulo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).click();
     await derivarNaMesa(page);
-    // A demanda agora TEM especificação — a conversa de refino abre sozinha
-    // e cobre o caminho; o mesmo botão que a abre a fecha.
-    if (await page.getByTestId("conversa-especificacao").isVisible().catch(() => false)) {
-      await page.getByTestId("abrir-conversa-especificacao").click();
-      await expect(page.getByTestId("conversa-especificacao")).toHaveCount(0);
-    }
-    await page.getByTestId("ir-ao-documento").click();
+    // G5c-3 — a conversa de refino morreu com a revisão; a pessoa já está no
+    // documento, e o link persistido aparece nele.
     await expect(page.getByTestId("link-do-documento-publicado")).toBeVisible();
     await expect(page.getByTestId("link-do-documento-publicado")).toContainText("última publicação");
   } finally {

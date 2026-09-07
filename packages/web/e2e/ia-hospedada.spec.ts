@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { test, expect, type Page } from "@playwright/test";
-import { MARCA_SIMULADO, MARCA_SUGERIDO } from "@gerador/engine";
+import { MARCA_SUGERIDO } from "@gerador/engine";
 import { entrar } from "./auth";
 import { derivarNaMesa } from "./derivar";
 import {
@@ -109,13 +109,12 @@ test("configurar o gateway pela tela: testar antes de salvar, salvar, e a base U
   await expect(chave).not.toHaveAttribute("placeholder", new RegExp(CHAVE_GATEWAY_FALSO));
 });
 
-test("a esteira roda no navegador e o texto do gateway chega nos campos (o defeito de CORS)", async ({ page }) => {
+test("a esteira roda PELA FIAÇÃO, ao vivo no canvas, e o julgamento fecha no documento", async ({ page }) => {
+  test.setTimeout(180000);
   await entrar(page);
 
-  // Erros de console viram falha: o defeito de CORS se manifestava como um
-  // `fetch` rejeitado que a tela engolia — todos os campos vazios, nenhuma
-  // mensagem. Sem esta captura, um teste que só olha a tela poderia dar o
-  // mesmo veredito silencioso.
+  // Erros de console viram falha — a lição do defeito de CORS continua: um
+  // fetch rejeitado que a tela engole é o pior tipo de verde.
   const erros: string[] = [];
   page.on("pageerror", (e) => erros.push(String(e)));
   page.on("console", (msg) => {
@@ -127,12 +126,12 @@ test("a esteira roda no navegador e o texto do gateway chega nos campos (o defei
   await card.getByLabel("Base URL do gateway").fill(BASE_URL_GATEWAY_FALSO);
   await card.getByLabel("Chave de API").fill(CHAVE_GATEWAY_FALSO);
   await card.getByLabel("Nome do modelo").fill(MODELO_GATEWAY_FALSO);
+  await card.getByLabel("Este modelo enxerga imagem").check();
   await card.getByRole("button", { name: "Salvar" }).click();
   await expect(page.getByTestId("gateway-resultado")).toContainText("Credencial salva");
   await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
 
-  // Um nó completo o bastante pra derivar — mesmo caminho de
-  // `derivar-e-revisar.spec.ts`.
+  // Um nó completo o bastante pra derivar.
   await page.getByRole("button", { name: "+ Fila Rabbit" }).click();
   await page.locator(".react-flow__node", { hasText: "Fila Rabbit" }).click();
   const painel = page.locator("aside");
@@ -142,67 +141,47 @@ test("a esteira roda no navegador e o texto do gateway chega nos campos (o defei
   await painel.getByRole("spinbutton", { name: "TTL da mensagem (ms)" }).fill("60000");
   await painel.getByRole("combobox", { name: "Ack" }).selectOption("manual");
 
-  // O título não se digita mais (campo removido — só via agente): derivar
-  // pergunta o nome e o "Derivar e salvar" segue com auto-save.
+  // SPEC-107 G5c-3 — derivar ESCREVE os itens e abre o documento; a corrida
+  // da esteira não roda mais sozinha: rodar IA é gesto, no canvas.
   await derivarNaMesa(page);
   await page.getByLabel("ex.: Fatura mensal em lote").fill("Esteira com gateway falso");
   await page.getByTestId("assistente-balao-confirmar").click();
-  await expect(page.getByTestId("contagem-itens")).toHaveText("1 itens");
+  await expect(page.getByTestId("documento-screen")).toBeVisible();
+  await expect(page.locator('[data-testid^="item-gerado-"]')).toHaveCount(1);
+  await page.getByTestId("documento-screen").getByRole("button", { name: /Voltar à mesa de projeto/ }).click();
 
-  // A esteira começa sozinha quando `/ia/status` diz que dá pra usar IA — com a
-  // credencial salva, diz. Este é o ponto exato do defeito: com o `curl` o JSON
-  // chegava inteiro, e no navegador o `fetch` era rejeitado por falta dos
-  // cabeçalhos de CORS (o `reply.raw.writeHead` pulava os hooks do Fastify).
-  // O resultado era o relato do usuário: "todos os campos vazios".
-  await expect(page.getByText(new RegExp(MARCA_GATEWAY_FALSO)).first()).toBeVisible({ timeout: 60000 });
+  // ── A corrida, AO VIVO no canvas (§383): a URL mandável abre a fiação ──
+  await page.goto("/#/fluxo/esteira-de-agentes");
+  await expect(page.getByTestId("seletor-de-fluxo")).toHaveValue("esteira-de-agentes", { timeout: 15000 });
+  await page.getByTestId("executar-fluxo").click();
+  await expect(page.locator('[data-testid^="rastro-vivo-"]')).toBeVisible({ timeout: 30000 });
+  await expect(page.getByTestId("rastro-da-execucao")).toBeVisible({ timeout: 60000 });
+  await expect(page.getByTestId("rastro-grava")).toContainText("✓ grava");
 
-  // SPEC-74 fatia D — e a tela DIZ que aquele texto não veio de modelo nenhum.
-  // Acima da esteira, e não ao lado de cada campo: a régua do §235 é "pequena e
-  // sempre no topo do que ela qualifica — a pessoa precisa ver antes de ler o
-  // conteúdo, não depois".
-  await expect(page.getByTestId("marca-demonstracao")).toContainText("Modo sem custo");
+  // ── A mesa como COMPONENTE: o nó de projeto é a porta de volta ──
+  await page.locator('.react-flow__node[data-id="demanda"]').click();
+  await page.getByTestId("abrir-mesa-do-projeto").click();
+  await expect(page.getByRole("button", { name: "+ Serviço", exact: true })).toBeVisible();
 
-  // SPEC-37 M1 — a esteira que o usuário disparou TERMINOU: o chat do
-  // refinamento abre sozinho, com a fala do momento. É a única conduta que
-  // abre sem clique (régua da §2 da SPEC), e é exatamente o pedido original.
-  await expect(page.getByTestId("conversa-especificacao")).toBeVisible({ timeout: 60000 });
-  await expect(page.getByTestId("conversa-especificacao")).toContainText(/Pronto — o item foi gerado/);
+  // ── O julgamento fecha no DOCUMENTO (§384): o texto do dublê chegou ──
+  await page.goto("/#/documento");
+  await expect(page.getByTestId("pendencias-dos-itens")).toContainText("sugestões da esteira aguardando");
+  await expect(page.getByText(new RegExp(MARCA_GATEWAY_FALSO)).first()).toBeVisible();
+  await page.getByTestId("confirmar-todas-itens").click();
+  await expect(page.getByTestId("pendencias-dos-itens")).toHaveCount(0);
 
-  // SPEC-37 M7 — "refinado" exige confirmação HUMANA de cada campo sugerido
-  // (statusDoItem): o teste fecha o chat da condução e confirma um a um, como
-  // a pessoa faria. Só então o balão de fechamento do ciclo aparece, e o chip
-  // baixa a especificação de verdade — o MESMO handler do botão do header.
-  await page.getByTestId("abrir-conversa-especificacao").click();
-  const confirmar = page.getByRole("button", { name: "Confirmar", exact: true });
-  while ((await confirmar.count()) > 0) {
-    await confirmar.first().click();
-  }
-  await expect(page.getByTestId("balao-especificacao")).toContainText("Tudo refinado");
-  // §270 — o fechamento do ciclo aqui é gerar os ITENS. O markdown do desenho
-  // saiu desta tela: ele é o documento, e o documento tem tela e download
-  // próprios.
+  // Regerar os itens grava a foto nova (com as respostas confirmadas) e o
+  // markdown baixado carrega o texto do dublê SEM a marca de "sugerido" —
+  // quem confirmou assumiu (SPEC-26), e a procedência fica no dado.
+  await page.getByTestId("documento-screen").getByRole("button", { name: /Voltar à mesa de projeto/ }).click();
+  await derivarNaMesa(page);
+  await expect(page.getByTestId("documento-screen")).toBeVisible();
   const download = page.waitForEvent("download");
-  await page.getByTestId("balao-especificacao-itens").click();
-  // SPEC-61 — gerar itens leva DIRETO ao documento: o "Ver o documento →" do
-  // §269 morreu junto com a tela que o hospedava, porque não há mais para onde
-  // ir. Uma saída só.
-  await expect(page.getByTestId("secao-dos-itens")).toBeVisible();
   await page.getByTestId("baixar-markdown").click();
   const baixado = await download;
   expect(baixado.suggestedFilename()).toBe("documento-de-desenho.md");
-
-  // SPEC-74 fatia D — "e o documento gerado também".
-  //
-  // No arquivo BAIXADO, e não no que a tela desenha: é ele que vai para o
-  // tracker, para o repositório de outra pessoa e para o agente que constrói.
-  // A marca de demonstração fica na tela; esta viaja.
-  //
-  // E repare no que já aconteceu acima: todo campo sugerido foi CONFIRMADO um
-  // a um. Confirmar tira a marca de "sugerido pela esteira" — quem confirmou
-  // assumiu o texto — e não tira esta. O texto continua não tendo vindo de
-  // modelo nenhum, e é isso que este par de asserções fixa.
   const markdown = readFileSync(await baixado.path(), "utf-8");
-  expect(markdown).toContain(MARCA_SIMULADO);
+  expect(markdown).toContain(MARCA_GATEWAY_FALSO);
   expect(markdown).not.toContain(MARCA_SUGERIDO);
 
   await page.screenshot({ path: "e2e/screenshots/ia-hospedada.png", fullPage: true });
