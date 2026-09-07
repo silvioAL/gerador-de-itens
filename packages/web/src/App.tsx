@@ -77,7 +77,6 @@ import { PropertiesPanel } from "./panel/PropertiesPanel";
 import { EdgePanel } from "./panel/EdgePanel";
 import { ReadinessSummary } from "./summary/ReadinessSummary";
 import { calcularResumoProntidao } from "./summary/prontidaoResumo";
-import { ReviewScreen } from "./review/ReviewScreen";
 import { ContextoEpicoPanel } from "./review/ContextoEpicoPanel";
 import { ConversaPanel } from "./conversa/ConversaPanel";
 import { AssistenteFlutuante, type AbaAssistente } from "./assistente/AssistenteFlutuante";
@@ -540,7 +539,6 @@ function AppCarregado({
   // última geração/carga desta sessão.
   const [itensGerados, setItensGerados] = useState<ItemGerado[]>([]);
   // SPEC-44 — deep-link da seção dos itens pra revisão: o item a selecionar.
-  const [itemInicialRevisao, setItemInicialRevisao] = useState<string | null>(null);
   /**
    * SPEC-64 fatias B e C — a declaração de caminho em curso.
    *
@@ -785,7 +783,6 @@ function AppCarregado({
   const arestaSelecionada = quebra.diagrama.edges.find((e) => e.id === arestaSelecionadaId);
   const tiposDeNo = Object.entries(diagramaConfig.nodeTypes);
 
-  const [resultado, setResultado] = useState<ResultadoDependenciasDe<Atividade> | null>(null);
   const { vermelhos } = calcularResumoProntidao(quebra.diagrama, diagramaConfig);
 
   /**
@@ -819,7 +816,8 @@ function AppCarregado({
   const momentoCanvas = momentoDoCanvas({
     nodes: quebra.diagrama.nodes.length,
     vermelhos: vermelhos.length,
-    temResultado: !!resultado,
+    // G5c-3 — "derivou" agora é "os itens existem": derivar escreve os itens.
+    temResultado: itensGerados.length > 0,
     aplicouProposta,
     // §270 — passou a significar "documento já aprovado alguma vez": aprovar é
     // o único escritor de `especificacao` desde que a geração de especificação
@@ -864,6 +862,11 @@ function AppCarregado({
   // SPEC-39 M11 — a entrevista do PDCA: o servidor conta os usos e diz
   // quando é o momento; a fala cita as últimas quebras do time.
   const [entrevistaPdca, setEntrevistaPdca] = useState<string[] | null>(null);
+  // SPEC-39 M13 — o feedback pós-especificação. Morava na tela de revisão
+  // (morta na G5c-3); a cadência é a mesma, e o balão espera NA MESA — pedir
+  // opinião por cima do documento recém-aberto interromperia a leitura.
+  const [pedindoFeedbackPdca, setPedindoFeedbackPdca] = useState(false);
+  const [textoFeedbackPdca, setTextoFeedbackPdca] = useState("");
 
   function executarDerivacao(salvarDepois: boolean) {
     apiPdca
@@ -887,7 +890,26 @@ function AppCarregado({
       // violação de design system apareceria no placar e nunca viraria item.
       tokens,
     });
-    setResultado(resolverDependencias(atividades));
+    /**
+     * SPEC-107 G5c-3 — **a tela de revisão morreu.** Derivar agora ESCREVE os
+     * itens e leva direto ao DOCUMENTO (SPEC-61), onde o julgamento campo a
+     * campo mora desde o §384. A corrida da esteira é a fiação, ao vivo no
+     * canvas (§383) — nada roda sozinho ao derivar: rodar IA é gesto, e o que
+     * ela escrever chega PENDENTE na demanda (§5.5).
+     */
+    apiPdca
+      .uso("especificacao", timeAtivo)
+      .then((r) => {
+        if (r.momento) setPedindoFeedbackPdca(true);
+      })
+      .catch(() => {});
+    aoGerarItens(
+      gerarItensDeTrabalho(resolverDependencias(atividades).atividades, quebra.diagrama, diagramaConfig, {
+        regras: regrasConfig,
+        respostasItens: quebra.respostasItens,
+        templateItem: templateItem?.conteudo,
+      })
+    );
     setPedindoNomeDaDemanda(false);
     if (salvarDepois) setAutoSalvarPendente(true);
   }
@@ -1010,12 +1032,20 @@ function AppCarregado({
     executarDerivacao(true);
   }
 
-  function confirmarNome(nome: string) {
+  async function confirmarNome(nome: string) {
     const intencao = pedindoNomeDaDemanda;
-    setQuebra((q) => ({ ...q, titulo: nome }));
+    const comTitulo = { ...quebra, titulo: nome };
+    setQuebra(comTitulo);
     setPedindoNomeDaDemanda(false);
-    if (intencao === "derivar") executarDerivacao(true);
-    else setSalvarAposNome(true);
+    if (intencao === "derivar") {
+      // G5c-3 — SALVAR ANTES de derivar: derivar agora ESCREVE os itens, e
+      // eles só persistem com a quebra criada. Sem esta ordem, o efeito que
+      // lista os itens do servidor (disparado quando o id nasce, ~2s depois)
+      // respondia VAZIO e apagava os cards locais — corrida medida no E2E
+      // sob carga ("ainda não escrito" num documento recém-derivado).
+      await persistencia.salvar(comTitulo);
+      executarDerivacao(false);
+    } else setSalvarAposNome(true);
   }
 
   /** O Salvar do header: com título salva direto; sem, o agente pergunta. */
@@ -1115,7 +1145,8 @@ function AppCarregado({
    * cada tecla — o que roubava o foco de quem estivesse escrevendo.
    */
   const atividadesDoDocumento = useMemo(() => {
-    if (resultado) return resultado.atividades;
+    // G5c-3 — `resultado` morreu com a tela de revisão: derivar aqui é barato
+    // e puro, e é a ÚNICA fonte (uma régua só).
     try {
       return derivar(quebra.diagrama, diagramaConfig, {
         time: quebra.time,
@@ -1129,7 +1160,7 @@ function AppCarregado({
       // inteira sumir — o documento sai sem itens, e as outras seções ficam.
       return [];
     }
-  }, [resultado, quebra.diagrama, quebra.time, quebra.excecoes, quebra.percursos, diagramaConfig, regrasConfig]);
+  }, [quebra.diagrama, quebra.time, quebra.excecoes, quebra.percursos, diagramaConfig, regrasConfig]);
   /**
    * SPEC-107 G5c — as fichas para o julgamento campo a campo NO DOCUMENTO
    * (§5.5: o julgamento fica na demanda): o MESMO `montarFichaItem` da
@@ -1380,11 +1411,13 @@ function AppCarregado({
   // O auto-save espera o RENDER com o título aplicado (setQuebra é assíncrono
   // — salvar no mesmo tick gravaria a quebra sem nome, status "sem-titulo").
   useEffect(() => {
-    if (autoSalvarPendente && resultado && (quebra.titulo ?? "").trim()) {
+    // G5c-3 — a condição `resultado` saiu com a tela de revisão; o que o
+    // efeito espera continua sendo o RENDER com o título aplicado.
+    if (autoSalvarPendente && (quebra.titulo ?? "").trim()) {
       setAutoSalvarPendente(false);
       void persistencia.salvar();
     }
-  }, [autoSalvarPendente, resultado, quebra.titulo]);
+  }, [autoSalvarPendente, quebra.titulo]);
 
   // O mesmo tick-de-render do auto-save, para o Salvar-com-pergunta: o nome
   // precisa estar APLICADO na quebra antes de gravar.
@@ -1456,7 +1489,8 @@ function AppCarregado({
       executarDerivacao(false);
     },
     mostrarAvisos: () => setAvisosPendentes(true),
-    fecharRevisao: () => setResultado(null),
+    // G5c-3 — a revisão morreu; "fechar" é voltar à mesa.
+    fecharRevisao: () => navegar({ tela: "canvas" }),
     abrirConfigNaAba,
     /**
      * §251 — o tour passa pelo DOCUMENTO. NÃO limpa `resultado`: o passo
@@ -1470,17 +1504,15 @@ function AppCarregado({
      * do passo, que promete os cards (§234).
      */
     abrirDocumento: () => {
-      if (resultado) {
-        aoGerarItens(
-          gerarItensDeTrabalho(resultado.atividades, quebra.diagrama, diagramaConfig, {
-            regras: regrasConfig,
-            respostasItens: quebra.respostasItens,
-            templateItem: templateItem?.conteudo,
-          })
-        );
-      } else {
-        navegar({ tela: "documento" });
-      }
+      // G5c-3 — as atividades do documento existem SEMPRE (o memo re-deriva);
+      // escrever os itens antes de abrir continua valendo (§234).
+      aoGerarItens(
+        gerarItensDeTrabalho(atividadesDoDocumento, quebra.diagrama, diagramaConfig, {
+          regras: regrasConfig,
+          respostasItens: quebra.respostasItens,
+          templateItem: templateItem?.conteudo,
+        })
+      );
     },
     abrirSistema: () => navegar({ tela: "sistema" }),
     abrirProposito: () => setAbaAssistente("contexto"),
@@ -2101,35 +2133,46 @@ function AppCarregado({
         )}
       </div>
 
-      {/* display:none (e não desmontar): o documento cobre a revisão sem
-          perder o estado dela — os balões da revisão (zIndex 62) não vazam. */}
-      {resultado && (
-        <div style={{ display: mostrarDocumento ? "none" : "contents" }}>
-        <ReviewScreen
-          onDocumento={() => navegar({ tela: "documento" })}
-          onConfigurarModeloIa={() => abrirConfigNaAba("modeloIa")}
-          onItensGerados={aoGerarItens}
-          documentoJaAprovado={!!quebra.especificacao}
-          resultado={resultado}
-          diagrama={quebra.diagrama}
-          config={diagramaConfig}
-          regras={regrasConfig}
-          especificacaoTemplate={especificacaoTemplate}
-          templateItem={templateItem?.conteudo}
-          demandInfo={quebra.demandInfo}
-          necessidades={quebra.necessidades}
-          decisoes={quebra.decisoes}
-          excecoes={quebra.excecoes}
-          percursos={quebra.percursos}
-          anexosContexto={quebra.anexosContexto}
-          contextoDoProduto={contextoDoProduto}
-          time={quebra.time}
-          respostasItens={quebra.respostasItens}
-          onResponderItem={responderItem}
-          itemInicial={itemInicialRevisao}
-          onFechar={() => setResultado(null)}
-          onSelecionarNo={setSelecionadoId}
-        />
+      {/* SPEC-107 G5c-3 — a ReviewScreen MORREU (§3.1, a última linha da
+          tabela): derivar escreve os itens e leva ao documento, onde o
+          julgamento campo a campo mora (§384); a corrida da esteira é a
+          fiação semeada, ao vivo no canvas (§383). */}
+
+      {/* SPEC-39 M13 — o feedback do ciclo, na mesa (re-alojado da revisão). */}
+      {pedindoFeedbackPdca && !mostrarDocumento && !mostrarConfig && (
+        <div
+          data-testid="balao-feedback"
+          // bottom-LEFT de propósito: o canto direito é do assistente, e um
+          // balão por cima do outro intercepta o clique (medido no E2E do
+          // §278, com a cadência global baixada por um spec vizinho).
+          style={{ position: "fixed", left: 24, bottom: 24, zIndex: 62, background: "var(--painel)", border: "1px solid var(--borda)", borderRadius: 10, padding: 14, width: 360, boxShadow: "0 8px 28px rgba(0,0,0,0.3)", display: "grid", gap: 8 }}
+        >
+          <strong style={{ fontSize: 12.5 }}>Geramos mais um ciclo de itens.</strong>
+          <label style={{ fontSize: 11.5, display: "grid", gap: 4 }}>
+            O que faltou ou sobrou
+            <textarea
+              value={textoFeedbackPdca}
+              onChange={(e) => setTextoFeedbackPdca(e.target.value)}
+              style={{ minHeight: 56, fontSize: 12.5, background: "var(--painel-alto)", color: "var(--texto)", border: "1px solid var(--borda)", borderRadius: 6, padding: 6 }}
+            />
+          </label>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button onClick={() => setPedindoFeedbackPdca(false)} style={{ fontSize: 11.5 }}>
+              Agora não
+            </button>
+            <button
+              data-testid="balao-feedback-enviar"
+              disabled={!textoFeedbackPdca.trim()}
+              onClick={() => {
+                void apiPdca.feedback(textoFeedbackPdca.trim(), timeAtivo).catch(() => {});
+                setPedindoFeedbackPdca(false);
+                setTextoFeedbackPdca("");
+              }}
+              style={{ fontSize: 11.5, fontWeight: 600 }}
+            >
+              Enviar
+            </button>
+          </div>
         </div>
       )}
 
@@ -2320,14 +2363,9 @@ function AppCarregado({
           decisaoDoEnsaio={(ensaioId) =>
             (decisoesVisiveis ?? []).find((d) => (d.ensaioIds ?? []).includes(ensaioId))?.titulo
           }
-          onRevisarItem={
-            resultado
-              ? (chave) => {
-                  setItemInicialRevisao(chave);
-                  navegar({ tela: "canvas" });
-                }
-              : undefined
-          }
+          // G5c-3 — `onRevisarItem` morreu com a tela de revisão: o julgamento
+          // mora no PRÓPRIO card (§384) — o chip de completude vira leitura, e
+          // resolver é expandir o card ao lado.
           // SPEC-107 G5c — o julgamento campo a campo NA CASA DA DEMANDA
           // (§5.5): as fichas do mesmo motor da revisão, e o mesmo gravador.
           fichas={fichasDoDocumento}
@@ -2428,7 +2466,7 @@ function AppCarregado({
                     : undefined,
                 onDispensar: () => setPedindoNomeDaDemanda(false),
               }
-            : entrevistaPdca !== null && !mostrarConfig && !resultado
+            : entrevistaPdca !== null && !mostrarConfig
               ? {
                   texto: `Já usamos a derivação algumas vezes${entrevistaPdca.length > 0 ? ` (últimos itens do time: ${entrevistaPdca.join(", ")})` : ""}. Sentiu falta — ou sobra — de algum item de checklist, regra de refinamento ou campo do formulário? ${somenteLeitura || permissoes.nivel !== "owner" ? "Escreva aqui: entra no ciclo do time, e quem configura transforma em ajuste vendo o efeito num item antes de aplicar." : "Posso ajustar com você, conversando."}`,
                   ...(permissoes.nivel === "owner"

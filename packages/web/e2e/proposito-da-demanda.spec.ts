@@ -82,22 +82,10 @@ test("declarar propósito, ligar ao componente e ver a citação chegar no docum
     await perguntaNome.fill("Demanda com propósito");
     await page.getByTestId("assistente-balao-confirmar").click();
   }
-  await expect(page.getByTestId("contagem-itens")).toBeVisible();
-  // Os balões da condução proativa aparecem em SEQUÊNCIA — o seguinte só nasce
-  // depois de o anterior ser dispensado. Checar os dois de uma vez (o que eu
-  // tinha feito) só dispensa o primeiro e trava esperando a ação de geração.
-  for (let i = 0; i < 4; i++) {
-    if (await page.getByTestId("ir-ao-documento").count()) break;
-    const dispensar = page.getByRole("button", { name: "Dispensar sugestão" });
-    if (await dispensar.count()) await dispensar.first().click();
-    else await page.waitForTimeout(300);
-  }
-
-  // §270 — o markdown vem do DOCUMENTO agora. Era baixado por um botão do
-  // balão que montava o mesmo texto com outro nome de arquivo; o que este
-  // teste sempre quis provar (a citação do propósito chega ao markdown)
-  // continua igual, e agora pelo caminho que existe.
-  await page.getByTestId("ir-ao-documento").click();
+  // G5c-3 — derivar JÁ abre o documento (a revisão e os balões morreram); o
+  // que este teste sempre quis provar (a citação do propósito chega ao
+  // markdown) continua igual.
+  await expect(page.getByTestId("documento-screen")).toBeVisible();
   const baixando = page.waitForEvent("download");
   await page.getByTestId("baixar-markdown").click();
   const md = await baixando;

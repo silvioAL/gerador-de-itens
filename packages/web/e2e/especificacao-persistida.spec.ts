@@ -43,18 +43,14 @@ test("aprovar o documento salva a foto na quebra; reabrir conduz à revisão rec
   await page.getByLabel("ex.: Fatura mensal em lote").fill(titulo);
   await page.getByTestId("assistente-balao-confirmar").click();
 
-  // §270 — aprovar o documento é o que grava a foto. O caminho até ele é o do
-  // §269: sai da revisão, sem passar pelo menu.
-  await page.getByTestId("balao-sem-ia").getByRole("button", { name: "Dispensar sugestão" }).click();
-  await page.getByTestId("balao-sem-contexto").getByRole("button", { name: "Dispensar sugestão" }).click();
-  await page.getByTestId("ir-ao-documento").click();
+  // §270 — aprovar o documento é o que grava a foto. G5c-3: derivar JÁ abre
+  // o documento (a revisão e os balões dela morreram).
+  await expect(page.getByTestId("documento-screen")).toBeVisible();
   await page.getByTestId("status-documento").click();
   await page.getByTestId("status-aprovado").click();
   await expect(page.getByTestId("status-documento")).toContainText("aprovado");
-  // Voltar do documento cai na REVISÃO (é de onde se veio), e só o botão dela
-  // leva à mesa — dois passos, como no uso real.
+  // G5c-3 — voltar do documento cai direto na MESA (a revisão morreu).
   await page.getByRole("button", { name: "← Voltar à mesa de projeto" }).click();
-  await page.getByRole("button", { name: "Voltar à mesa de projeto", exact: true }).click();
   await expect(page.getByText(/· salva$/)).toBeVisible();
 
   // Recomeça do zero e REABRE a demanda: o material salvo volta inteiro.
@@ -66,12 +62,13 @@ test("aprovar o documento salva a foto na quebra; reabrir conduz à revisão rec
   // exact: o balão da entrevista do PDCA (M11) pode citar o título nos últimos itens
   await page.getByText(titulo, { exact: true }).first().click();
 
-  // M14 — o agente reconhece a demanda já especificada e conduz à revisão.
+  // M14 — o agente reconhece a demanda já especificada. G5c-3: a ação leva
+  // ao DOCUMENTO (a revisão morreu), e o selo aprovado sobreviveu à reabertura
+  // — que é o que este teste sempre quis provar.
   const balao = page.getByTestId("assistente-balao");
   await expect(balao).toContainText("já teve o documento de desenho aprovado");
   await balao.getByTestId("assistente-balao-acao").click();
 
-  // O chat da revisão abre SOZINHO com a fala adaptada (não a do M1).
-  await expect(page.getByTestId("conversa-especificacao")).toBeVisible();
-  await expect(page.getByTestId("conversa-especificacao")).toContainText(/já teve o documento de desenho aprovado/);
+  await expect(page.getByTestId("documento-screen")).toBeVisible();
+  await expect(page.getByTestId("status-documento")).toContainText("aprovado");
 });

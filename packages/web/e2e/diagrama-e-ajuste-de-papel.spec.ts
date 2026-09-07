@@ -24,30 +24,11 @@ test.beforeEach(async ({ page }) => {
   );
 });
 
-test("baixar o diagrama completo entrega um HTML com os componentes desenhados", async ({ page }) => {
-  test.setTimeout(60000);
-  await entrar(page);
-
-  await page.getByTestId("abrir-cenarios").click();
-  await page.getByRole("button", { name: "Carregar cenário: Dados não-relacionais" }).click();
-  await derivarNaMesa(page);
-  await page.getByTestId("assistente-balao-secundaria").click(); // sem título
-
-  await page.getByRole("button", { name: "🔍 Ver diagrama completo" }).click();
-  const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Baixar diagrama (.html)" }).click();
-
-  const arquivo = await download;
-  expect(arquivo.suggestedFilename()).toMatch(/\.html$/);
-
-  // O conteúdo importa: um HTML vazio baixaria igualzinho e passaria num teste
-  // que só olhasse o nome do arquivo.
-  const caminho = await arquivo.path();
-  const conteudo = await (await import("node:fs/promises")).readFile(caminho!, "utf-8");
-  expect(conteudo).toContain("<html");
-  expect(conteudo.toLowerCase()).toContain("mongo");
-  expect(conteudo.length).toBeGreaterThan(1000);
-});
+// SPEC-107 G5c-3 — o teste do "🔍 Ver diagrama completo" MORREU com a tela de
+// revisão, que era a única porta do download do diagrama HTML animado. O
+// desenho vive no DOCUMENTO como figura (SPEC-61 §3, o mesmo React Flow em
+// leitura). Dívida declarada no §385: se o HTML animado fizer falta, ele
+// ganha porta própria no documento — não se ressuscita uma tela por um botão.
 
 test("SPEC-50 pela tela: ajuste de papel aprovado e aplicado desliga o papel na esteira", async ({ page }) => {
   test.setTimeout(60000);

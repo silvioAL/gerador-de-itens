@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+﻿import { test, expect } from "@playwright/test";
 import { entrar } from "./auth";
 import { derivarNaMesa } from "./derivar";
 
@@ -41,31 +41,53 @@ test("configurar destino, exportar os prontos e mostrar o motivo — item com pe
     await page.getByTestId("abrir-cenarios").click();
     await page.getByRole("button", { name: "Carregar cenário: Dados não-relacionais" }).click();
     await derivarNaMesa(page);
-    await page.getByLabel("ex.: Fatura mensal em lote").fill(`exportação e2e ${Date.now()}`);
+    const TITULO = `exportação e2e ${Date.now()}`;
+    await page.getByLabel("ex.: Fatura mensal em lote").fill(TITULO);
     await page.getByTestId("assistente-balao-confirmar").click();
 
-    // Deixa um item PRONTO: responde os campos do primeiro item e confirma.
-    await page.locator('[data-testid^="item-"]').first().click();
-    // Campos DIFERENTES: `first()` três vezes re-sugeriria o mesmo (o campo
-    // sugerido continua com o botão até ser confirmado).
-    for (let i = 0; i < 3; i++) {
-      await page.getByRole("button", { name: "✨ Sugerir" }).nth(i).click();
-      await page.waitForTimeout(300);
-    }
-    await page.getByTestId("confirmar-todas").click();
-    await expect(page.getByTestId("barra-pendencias")).not.toContainText("aguardando");
+    // G5c-3 — derivar JÁ escreveu os itens e abriu o documento. Deixar um
+    // item PRONTO: as respostas entram pela API (o refinador do card tem
+    // prova própria — unidade + a jornada da fiação); as CHAVES dos campos
+    // vêm do rastro da fiação, cujo nó fonte emite a fila mesmo sem IA.
+    await expect(page.getByTestId("documento-screen")).toBeVisible();
+    // Drena o autosave ANTES do PUT por fora: um pendente com o estado velho
+    // gravaria o vazio por cima no reload (a corrida do §250).
+    await page.getByTestId("documento-screen").getByRole("button", { name: /Voltar à mesa de projeto/ }).click();
+    await expect(page.getByText(/· salva$/)).toBeVisible({ timeout: 15000 });
+    const lista = (await (await page.request.get(`${API}/quebras`)).json()) as { id: string; titulo?: string }[];
+    const demandaId = lista.find((q) => q.titulo === TITULO)!.id;
+    const exec = await page.request.post(`${API}/fluxos/esteira-de-agentes/executar`, {
+      data: { timeId: "time-pagamentos", parametrosPorNo: { demanda: { demandaId } } },
+    });
+    const { saidas } = (await exec.json()) as {
+      saidas: Record<string, { filaDaEsteira?: { atividadeChave: string; placeholdersPorPapel: Record<string, { chave: string }[]> }[] }>;
+    };
+    const fila = saidas["demanda"]?.filaDaEsteira ?? [];
+    expect(fila.length).toBeGreaterThan(0);
+    const item0 = fila[0];
+    const respostas = Object.fromEntries(
+      Object.values(item0.placeholdersPorPapel)
+        .flat()
+        .map((p) => [p.chave, { valor: "resposta escrita para exportar", origem: "manual" }])
+    );
+    const quebraCrua = (await (await page.request.get(`${API}/quebras/${demandaId}`)).json()) as Record<string, unknown>;
+    const put = await page.request.put(`${API}/quebras/${demandaId}`, {
+      data: { ...quebraCrua, respostasItens: { [item0.atividadeChave]: respostas } },
+    });
+    expect(put.status()).toBe(200);
 
-    // Gerar os itens (eles persistem, porque a quebra tem id).
-    for (const id of ["balao-sem-ia", "balao-sem-contexto"]) {
-      if (await page.getByTestId(id).isVisible().catch(() => false)) {
-        await page.getByTestId(id).getByRole("button", { name: "Dispensar sugestão" }).click();
-        await page.waitForTimeout(500);
-      }
-    }
-    const botaoItens = page.getByTestId("balao-gerar-itens").or(page.getByTestId("balao-especificacao-itens")).first();
-    await botaoItens.waitFor({ timeout: 15000 });
-    await page.waitForTimeout(500);
-    await botaoItens.click();
+    // Regerar atualiza a foto dos contadores — REABRINDO antes: o estado da
+    // mesa não sabe do PUT, e derivar com ele gravaria o vazio por cima
+    // (a corrida do §250; a reabertura é a sincronização honesta).
+    await page.goto("/#/");
+    await page.reload();
+    await page.getByRole("button", { name: "☰ Menu" }).click();
+    await page.getByRole("button", { name: "Abrir…" }).click();
+    await page.getByPlaceholder("ex.: aprovação de crédito").fill(TITULO);
+    await page.getByRole("button", { name: new RegExp(TITULO) }).click();
+    await expect(page.getByTestId("titulo-da-quebra")).toContainText(TITULO);
+    await derivarNaMesa(page);
+    await expect(page.getByTestId("documento-screen")).toBeVisible();
     // SPEC-61 — a exportação veio junto com os cards para a seção do documento.
     // Ela não morreu com a tela que a hospedava: exportar é o que se faz com o
     // resultado pronto, e o documento é onde ele se lê.

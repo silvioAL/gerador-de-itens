@@ -17049,3 +17049,54 @@ entrou: o painel do nó **Projeto** no fluxo ganhou "Abrir a mesa de projeto
 →" (`abrir-mesa-do-projeto`). E o roadmap de integrações reais que ele pediu
 (Teams webhook, Jira paginado — gateway vs. primitiva de laço —,
 Postgres/Mongo) ficou anotado para virar a SPEC-108, depois da G5c-3.
+
+## §385 — SPEC-107 G5c-3: a MORTE — a última linha da tabela fecha
+
+**A tela de revisão e o motor client morreram.** Com as três provas verdes
+no histórico (§382: resultado idêntico item a item; §383: o vivo no canvas;
+§384: o julgamento no documento), a §3.1 autorizou — e a rodada executou:
+
+- **Derivar mudou de destino**: escreve os itens (contando o uso de
+  especificação no PDCA) e abre o DOCUMENTO (SPEC-61, uma saída só). Nada
+  roda sozinho: rodar IA é gesto, no canvas, e o que ela escreve chega
+  PENDENTE (§5.5).
+- **Morreram**: `ReviewScreen` (2.4k linhas), `useEsteiraDeAgentes`
+  (`acumuladas`, lotes, pausar, recuperação parcial), `EsteiraAgentes` (a
+  faixa do vivo), `FilaDeRevisao`, `SimulacaoEsteira`,
+  `ConversaEspecificacao`, `DiagramaCompacto`, o estado `resultado` do App
+  e o deep-link `itemInicialRevisao` — 112 testes de unidade junto.
+  `NecessidadesPanel`/`ContextoEpicoPanel` ficaram (vivem no assistente).
+- **E2Es re-leram o mundo**: 21 cenários; os specs da revisão viraram
+  nota-de-morte apontando a casa nova de cada prova (a barra no documento,
+  a anatomia do prompt na aplicação, a assinatura do dublê); `derivar-e-`
+  `revisar` virou derivar-e-documentar; a jornada do `ia-hospedada` agora
+  é credencial → derivar→documento → fiação AO VIVO no canvas → a porta do
+  componente ("Abrir a mesa de projeto") → julgamento no documento →
+  regerar → markdown sem marca de sugerido; `troca-de-contexto` prova o
+  §214 pela assinatura do dublê (produto diferente → valores diferentes).
+- **A prova antiga se auto-consumiu**: o teste da SPEC-105 F perdeu o lado
+  esquerdo da igualdade e morreu com honra — a prova verde vive no
+  histórico (#358), que é onde prova de substituição pertence.
+
+**Dívidas declaradas** (deltas sem casa nova, para rodada própria se
+fizerem falta): o download do diagrama HTML animado (a revisão era a única
+porta); o dry-run da fiação ("ver o prompt sem gastar"); pausar no meio da
+corrida (o gate é por nó); a recuperação parcial de lote quebrado com
+"N campos salvos do texto que chegou"; a marca de evidência simulada não
+viaja pela fiação; `reRodarSeguintes` por item.
+
+**Adendo — o que a re-leitura dos E2Es achou de verdade**: (1) a corrida
+autosave×escrita-externa (§250, cliente×servidor) mordeu DUAS vezes na
+mesma rodada — a fiação gravando e o F5 apagando; o PUT do teste e o
+autosave pendente por cima — e ganhou nome de dívida estrutural: enquanto o
+PUT do cliente for o documento inteiro, TODO gravador externo disputa com o
+autosave (o merge por campo é a saída, rodada própria). (2) O M13 do PDCA
+(feedback pós-especificação) morava na tela morta e foi re-alojado na MESA.
+(3) O balão M14 de demanda já aprovada agora conduz ao DOCUMENTO.
+
+**Dívida do §385 (flake sob carga)**: no `derivar-e-revisar` sob os 6
+workers, o refinador do card 0 às vezes não monta (isolado passa; os TRÊS
+outros specs que o exercitam passam na mesma suíte). O assert redundante
+saiu de lá; a causa — provavelmente config global de regras mexida por
+vizinho no instante da montagem das fichas — fica para diagnóstico com a
+suíte instrumentada, não com mais timeout.

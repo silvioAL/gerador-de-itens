@@ -36,17 +36,10 @@ test("entrevista, geração pelo agente e feedback — o ciclo inteiro com cadê
     await derivarNaMesa(page);
     await page.getByTestId("assistente-balao-secundaria").click(); // sem título
 
-    // Geração pelo agente: M4 e M5 dispensados, M12 gera os ITENS (§270 tirou
-    // dali a especificação, que era o documento de desenho por outra porta —
-    // o que importa para o PDCA é que a geração ACONTECEU e conta um uso).
-    await page.getByTestId("balao-sem-ia").getByRole("button", { name: "Dispensar sugestão" }).click();
-    await page.getByTestId("balao-sem-contexto").getByRole("button", { name: "Dispensar sugestão" }).click();
-    await page.getByTestId("balao-gerar-itens").click();
-    // Gerar itens ABRE o documento, na seção dos itens (SPEC-61; a
-    // especificação só baixava e ficava). O balão do feedback mora na revisão,
-    // então voltar é parte do fluxo — e o balão espera lá, que é o
-    // comportamento certo: pedir opinião por cima do resultado que a pessoa
-    // acabou de abrir seria interromper a leitura.
+    // G5c-3 — derivar JÁ gera os itens (e conta o uso de "especificacao" no
+    // PDCA) e abre o documento; o balão do feedback espera na MESA — pedir
+    // opinião por cima do resultado recém-aberto interromperia a leitura.
+    await expect(page.getByTestId("documento-screen")).toBeVisible();
     await page.getByTestId("documento-screen").getByRole("button", { name: /Voltar à mesa de projeto/ }).click();
 
     // M13 — cadência de feedback 1: o balão pergunta o que faltou/sobrou, e o
@@ -57,10 +50,8 @@ test("entrevista, geração pelo agente e feedback — o ciclo inteiro com cadê
     await page.getByTestId("balao-feedback-enviar").click();
     await gravado;
 
-    // M11 — no retorno ao canvas, a entrevista do PDCA (cadência 1: o uso da
-    // derivação já marcou o momento). Dev é owner: o chip abre a conversa de
-    // configuração.
-    await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
+    // M11 — a entrevista do PDCA (cadência 1). G5c-3: já estamos na mesa (o
+    // segundo "voltar" era o da revisão morta).
     await expect(page.getByTestId("assistente-balao")).toContainText("Sentiu falta");
     await page.getByTestId("assistente-balao-acao").click();
     await expect(page.getByTestId("assistente-janela")).toBeVisible();

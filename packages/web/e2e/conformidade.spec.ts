@@ -190,8 +190,9 @@ test("a violação explica o padrão, e aceitar de propósito tira do placar sem
       await perguntaNome.fill("Exceção registrada");
       await page.getByTestId("assistente-balao-confirmar").click();
     }
-    await expect(page.getByTestId("contagem-itens")).toBeVisible();
-    await expect(page.locator('[data-testid="item-n1::padrao::timeoutMs"]')).toHaveCount(0);
+    // G5c-3 — derivar abre o DOCUMENTO; a exceção registrada não vira item.
+    await expect(page.getByTestId("secao-dos-itens")).toBeVisible();
+    await expect(page.getByText(/Ajustar timeoutMs/)).toHaveCount(0);
   } finally {
     await page.request.put(`${API}/config/regras`, { data: { documento: antes.documento, timeId: TIME } });
   }
@@ -273,20 +274,12 @@ test("valor fora do padrão aparece no placar, chega ao item, e some quando entr
     await perguntaNome.fill("Chamada fora do padrão");
     await page.getByTestId("assistente-balao-confirmar").click();
   }
-  await expect(page.getByTestId("contagem-itens")).toBeVisible();
-
-  // O card do item usa a CHAVE como testid, e a chave da conformidade termina
-  // no campo violado — seletor estável sem depender do id gerado do nó.
-  // A chave é `<idDoNo>::padrao::<campo>`, e o id do primeiro nó de uma mesa
-  // vazia é `n1` — determinístico, como todo o resto da derivação. Tentei
-  // seletor por sufixo (CSS `$=` e `getByTestId` com regex) e nenhum casou com
-  // os `::` da chave; o valor exato casa.
-  const cardDoPadrao = page.locator('[data-testid="item-n1::padrao::timeoutMs"]');
-  await expect(cardDoPadrao).toHaveCount(1);
-  await cardDoPadrao.click();
-  // A ficha traz os DOIS números: sem eles quem implementa volta ao desenho.
-  await expect(page.getByText(/Ajustar timeoutMs .* para ≤ 500ms/)).toBeVisible();
-  await expect(page.getByText(/está 800/)).toBeVisible();
+  // G5c-3 — derivar abre o DOCUMENTO com os itens escritos; o card do item de
+  // conformidade já vem expandido, com os DOIS números na escrita (sem eles
+  // quem implementa volta ao desenho).
+  await expect(page.getByTestId("secao-dos-itens")).toBeVisible();
+  await expect(page.getByText(/Ajustar timeoutMs .* para ≤ 500ms/).first()).toBeVisible();
+  await expect(page.getByText(/está 800/).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
 

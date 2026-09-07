@@ -1,46 +1,13 @@
-import { test, expect } from "@playwright/test";
-import { entrar } from "./auth";
-import { derivarNaMesa } from "./derivar";
-
 /**
- * #299 — a simulação vista no navegador, com uma quebra de verdade.
+ * SPEC-107 G5c-3 — **este spec MORREU com a tela de revisão** (§3.1: "o
+ * código client-side de simulação" está na coluna do que morre; JOURNEY §385).
  *
- * O motor tem teste de unidade; o que só o navegador prova é que o botão existe
- * onde a decisão é tomada (ao lado do que GASTA) e que o painel abre legível.
+ * O que ele provava: "ver o prompt que sairia, sem gastar IA" (#299). A letra
+ * do prompt continua guardada — pelos testes de anatomia do montador na
+ * aplicação (`pedidos.anatomia.test.ts`, o MESMO `montarPedidoPipeline` da
+ * fiação, §263) e pelo dublê determinístico (a assinatura ⟨hash⟩ do prompt
+ * nos valores, `esteira-pela-fiacao.spec.ts`).
+ *
+ * Dívida declarada: um "simular" da FIAÇÃO (dry-run no canvas, mostrando o
+ * prompt por nó) não existe — se fizer falta, é rodada própria, no executor.
  */
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
-});
-
-test("simular mostra as chamadas e o prompt real, sem chamar o modelo", async ({ page }) => {
-  const chamadasDeIa: string[] = [];
-  // Predicado, e não o glob `**/ia/**`: em dev o Vite serve o próprio módulo
-  // `packages/aplicacao/src/casos-de-uso/ia/pedidos.ts`, e o glob abortava o
-  // carregamento da aplicação antes mesmo do login. `pathname` exato só casa
-  // com a API.
-  await page.route(
-    (url) => url.pathname.startsWith("/ia/"),
-    (rota) => {
-      chamadasDeIa.push(rota.request().url());
-      return rota.abort();
-    }
-  );
-
-  await entrar(page);
-  await page.getByTestId("abrir-cenarios").click();
-  await page.getByRole("button", { name: "Carregar cenário: Dados não-relacionais" }).click();
-  await derivarNaMesa(page);
-  // Cenário sem título → o assistente pergunta o nome; simulação é exploração.
-  await page.getByTestId("assistente-balao-secundaria").click();
-
-  await page.getByTestId("abrir-simulacao").click();
-  const painel = page.getByTestId("simulacao-esteira");
-  await expect(painel).toBeVisible();
-
-  // O resumo diz o custo; o prompt aberto traz o texto que sairia.
-  await expect(page.getByTestId("simulacao-resumo")).toContainText("chamada(s) ao modelo");
-  await expect(page.getByTestId("simulacao-prompt-0")).toContainText("Campos a responder");
-
-  // O ponto da feature: nenhuma chamada de IA saiu.
-  expect(chamadasDeIa.filter((u) => u.includes("/ia/pipeline"))).toEqual([]);
-});

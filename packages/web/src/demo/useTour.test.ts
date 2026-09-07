@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+﻿import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import type { Quebra } from "@gerador/engine";
 import { useTour, passosDeConfiguracao, passosDoProduto, SEGUNDOS_PADRAO } from "./useTour";
@@ -94,10 +94,10 @@ describe("useTour", () => {
     // SPEC-78 — "Revisão" morreu como passo (apontava a tela; o passo seguinte
     // ensina o que se FAZ nela). A régua que este teste guarda é a mesma:
     // chegar aqui já derivou.
-    andarAte(result, "Confirmar o que a IA escreveu");
+    andarAte(result, "Confirmar o que a IA escrever");
 
     expect(opts.derivarQuebra).toHaveBeenCalled();
-    expect(result.current.passoAtual?.selector).toBe("[data-testid=barra-pendencias]");
+    expect(result.current.passoAtual?.selector).toBe("[data-testid=secao-dos-itens]");
   });
 
   it("§258 — o tour de configuração abre pelo MAPA, antes das telas", () => {
@@ -362,8 +362,8 @@ describe("useTour", () => {
     const { result } = renderHook(() => useTour(opts));
 
     act(() => result.current.iniciar());
-    andarAte(result, "Confirmar o que a IA escreveu");
-    expect(result.current.passoAtual?.selector).toBe("[data-testid=barra-pendencias]");
+    andarAte(result, "Confirmar o que a IA escrever");
+    expect(result.current.passoAtual?.selector).toBe("[data-testid=secao-dos-itens]");
 
     // SPEC-61 §6.3 — o passo continua existindo; o que mudou é para onde ele
     // aponta. Era `#/itens`, e passo apontando para tela que não existe quebra

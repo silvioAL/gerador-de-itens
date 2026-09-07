@@ -1,75 +1,14 @@
-import { test, expect } from "@playwright/test";
-import { entrar } from "./auth";
-import { derivarNaMesa } from "./derivar";
-
 /**
- * SPEC-44 — a revisão pós-IA sem os 30 cliques: sugestões geradas (mock de
- * /ia/sugerir), a barra agrega, "Confirmar todas" assina em lote, a fila
- * guiada percorre uma a uma, e a tela de itens deep-linka de volta.
+ * SPEC-107 G5c-3 — **este spec MORREU com a tela de revisão** (§3.1, última
+ * linha da tabela; JOURNEY §385).
+ *
+ * O que ele provava, e onde cada prova mora agora:
+ * - barra de pendências + "Confirmar todas" → na SEÇÃO DOS ITENS do documento
+ *   (`pendencias-dos-itens`/`confirmar-todas-itens`), provada ponta a ponta
+ *   em `esteira-pela-fiacao.spec.ts` (a jornada da fiação) e nos testes de
+ *   unidade da `DocumentoScreen`;
+ * - a fila guiada ("revisar uma a uma") → morreu como superfície; o gesto
+ *   equivalente é o refinador campo a campo no card (§384);
+ * - o deep-link do documento para a revisão → perdeu o sentido: o julgamento
+ *   mora no próprio card, e o chip de completude virou leitura.
  */
-test("barra de pendências, confirmar todas, fila guiada e o deep-link da tela de itens", async ({ page }) => {
-  test.setTimeout(60000);
-  await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
-  await page.route(
-    (url) => url.pathname === "/ia/status",
-    (rota) => rota.fulfill({ json: { modelosChat: [], embeddingInstalado: false, capacidades: {} } })
-  );
-  // O "✨ Sugerir" individual devolve texto puro streamado — mock determinístico.
-  await page.route(
-    (url) => url.pathname === "/ia/sugerir",
-    (rota) => rota.fulfill({ contentType: "text/plain", body: "Texto sugerido pela IA de teste" })
-  );
-  await entrar(page);
-
-  await page.getByTestId("abrir-cenarios").click();
-  await page.getByRole("button", { name: "Carregar cenário: Dados não-relacionais" }).click();
-  await derivarNaMesa(page);
-  await page.getByTestId("assistente-balao-secundaria").click();
-
-  // Antes de qualquer sugestão: a barra existe (campos vazios), sem "aguardando".
-  await expect(page.getByTestId("barra-pendencias")).toBeVisible();
-  await expect(page.getByTestId("barra-pendencias")).not.toContainText("aguardando");
-  await expect(page.getByTestId("confirmar-todas")).toHaveCount(0);
-
-  // Duas sugestões via "✨ Sugerir" no primeiro item.
-  await page.locator('[data-testid^="item-"]').first().click();
-  await page.getByRole("button", { name: "✨ Sugerir" }).nth(0).click();
-  await page.getByRole("button", { name: "✨ Sugerir" }).nth(1).click();
-
-  await expect(page.getByTestId("barra-pendencias")).toContainText("2 sugestões da esteira aguardando");
-
-  // O lote global: um clique assina as duas.
-  await page.getByTestId("confirmar-todas").click();
-  await expect(page.getByTestId("barra-pendencias")).not.toContainText("aguardando");
-
-  // A fila guiada: mais uma sugestão, revisada uma a uma.
-  await page.getByRole("button", { name: "✨ Sugerir" }).first().click();
-  await expect(page.getByTestId("barra-pendencias")).toContainText("1 sugestão da esteira aguardando");
-  await page.getByTestId("revisar-uma-a-uma").click();
-  await expect(page.getByTestId("fila-de-revisao")).toBeVisible();
-  await expect(page.getByTestId("fila-progresso")).toHaveText("1 de 1");
-  await page.getByTestId("fila-confirmar").click();
-  await expect(page.getByTestId("fila-de-revisao")).toHaveCount(0);
-  await expect(page.getByTestId("barra-pendencias")).not.toContainText("aguardando");
-
-  // O ciclo fecha: gerar itens e voltar pelo chip de completude do card.
-  for (const id of ["balao-sem-ia", "balao-sem-contexto"]) {
-    if (await page.getByTestId(id).isVisible().catch(() => false)) {
-      await page.getByTestId(id).getByRole("button", { name: "Dispensar sugestão" }).click();
-    }
-  }
-  const botaoItens = page.getByTestId("balao-gerar-itens").or(page.getByTestId("balao-especificacao-itens"));
-  await botaoItens.first().waitFor({ timeout: 10000 });
-  await botaoItens.first().click();
-  // SPEC-61 — os cards vivem na seção "Os itens" do documento.
-  await expect(page.getByTestId("secao-dos-itens")).toBeVisible();
-
-  // §199 — a entrega final agora TEM onde ser escrita (é do PO): com os três
-  // campos do item respondidos, ele fecha como pronto. Antes desta correção
-  // nenhum item conseguia ficar pronto, porque o campo era cobrado e não
-  // existia na tela. O chip de quem AINDA tem pendência é o link de volta.
-  await expect(page.getByTestId("item-completude-0")).toContainText("Pronto pra exportar");
-  await page.getByTestId("item-completude-1").click();
-  await expect(page.getByTestId("documento-screen")).toHaveCount(0);
-  await expect(page.locator('[data-testid^="item-"][aria-pressed="true"]').first()).toBeVisible();
-});
