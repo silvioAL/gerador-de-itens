@@ -147,13 +147,25 @@ test("a função entra pela paleta já com o contrato à mostra — sem adaptado
     await page.getByTestId("add-funcao-ensaio").click();
     await expect(page.getByTestId("painel-do-no")).toContainText("Função do sistema — Ensaio de cenários");
 
-    // SPEC-107 fatia B — o projeto também nasce pronto, e o painel diz as
-    // duas direções em voz alta (a escrita vira proposta, nunca o desenho).
-    await page.getByTestId("add-projeto").click();
-    await expect(page.getByTestId("painel-do-no")).toContainText("Mesa de projeto (a demanda, nas duas direções)");
-    await expect(page.getByTestId("contrato-do-projeto")).toContainText("vira uma variante");
+    /**
+     * SPEC-110 fatia F — a demanda desdobrada: a paleta oferece a DIREÇÃO, e
+     * é o cartão que a diz. Antes eram dois nós idênticos chamados "Mesa de
+     * projeto" e só a aresta revelava qual lia e qual gravava (a queixa M9).
+     */
+    await page.getByTestId("add-demanda-ler").click();
+    await expect(page.locator('.react-flow__node[data-id="demanda-1"]')).toContainText("Demanda");
+    await expect(page.locator('.react-flow__node[data-id="demanda-1"]')).toContainText("Ler");
+    await expect(page.getByTestId("contrato-do-projeto")).toContainText("Lê a demanda");
+    // Quem só lê não anuncia escrita — a frase da proposta é do outro lado.
+    await expect(page.getByTestId("contrato-do-projeto")).not.toContainText("vira uma variante");
     await expect(page.getByTestId("demanda-do-projeto")).toBeVisible();
     await expect(page.getByTestId("adaptador-do-no")).toHaveCount(0);
+    // E a porta para a mesa SAIU do nó de dados (D12).
+    await expect(page.getByTestId("abrir-mesa-do-projeto")).toHaveCount(0);
+
+    await page.getByTestId("add-demanda-gravar").click();
+    await expect(page.locator('.react-flow__node[data-id="grava-1"]')).toContainText("Gravar");
+    await expect(page.getByTestId("contrato-do-projeto")).toContainText("vira uma variante");
 
     // SPEC-107 fatia E — a transformação nasce vazia e o painel ensina o
     // gesto: declarar os campos de saída (modelo concatena, caminho extrai).

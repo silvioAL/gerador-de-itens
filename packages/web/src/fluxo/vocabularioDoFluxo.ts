@@ -65,7 +65,15 @@ export const ROTULOS_POR_FAMILIA: Record<TipoDeNoDoFluxo, string> = {
   conector: "Integração externa",
   agente: "Agente",
   funcao: "Função do sistema",
-  projeto: "Mesa de projeto",
+  /**
+   * SPEC-110 fatia F — a família é a DEMANDA, e a mesa é uma TELA. Manter
+   * "Mesa de projeto" aqui faria o cabeçalho do cartão mentir: um nó de
+   * leitura passou a NÃO ser a porta para a mesa (a porta virou a tela `mesa`
+   * da fatia B), e o cartão anunciaria uma tela que ele não abre — medido na
+   * validação visual desta fatia, onde os três cartões diziam
+   * "MESA DE PROJETO" por cima de "Ler", "Gravar" e "Mesa de projeto".
+   */
+  projeto: "Demanda",
   transformacao: "Transformação",
 };
 

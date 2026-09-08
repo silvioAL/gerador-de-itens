@@ -132,7 +132,10 @@ describe("fluxoDoEnsaio (SPEC-107 G4)", () => {
     expect(planoDoFluxo(fluxo).ordem).toEqual(["gatilho", "demanda", "ensaio", "bancada", "derivacao"]);
     expect(fluxo.nos.map((n) => [n.tipo, n.refId])).toEqual([
       ["gatilho", "manual"],
-      ["projeto", "projeto"],
+      // SPEC-110 fatia F — a fábrica desenha com a DIREÇÃO dita: quem lê a
+      // demanda é "Demanda — ler", e o canvas passa a responder sozinho o que
+      // antes exigia seguir a aresta com o dedo.
+      ["projeto", "demanda-ler"],
       ["funcao", "ensaio"],
       ["tela", "bancada-de-ensaios"],
       ["funcao", "derivacao"],

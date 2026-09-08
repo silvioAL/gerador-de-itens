@@ -28,9 +28,10 @@ await pagina.getByLabel("Nome do fluxo novo").fill("Visual fatia A");
 await pagina.getByTestId("criar-fluxo").click();
 await pagina.getByTestId("add-funcao-derivacao").click();
 await pagina.getByTestId("add-funcao-ensaio").click();
-// SPEC-107 fatia B — o projeto na paleta, com o painel das duas direções.
-await pagina.getByTestId("add-projeto").click();
+// SPEC-107 B / SPEC-110 F — a demanda na paleta, com a DIREÇÃO nos dois nós.
+await pagina.getByTestId("add-demanda-ler").click();
 await pagina.getByTestId("contrato-do-projeto").waitFor({ timeout: 5000 });
+await pagina.getByTestId("add-demanda-gravar").click();
 // SPEC-107 fatia E — a transformação, com o editor de campos.
 await pagina.getByTestId("add-transformacao").click();
 await pagina.getByTestId("campos-da-transformacao").waitFor({ timeout: 5000 });

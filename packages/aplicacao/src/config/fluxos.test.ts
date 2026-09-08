@@ -130,12 +130,13 @@ describe("validarEscritaFluxos (SPEC-35 + prova da fatia C)", () => {
     // o silêncio que a §9.3 recusa.
     [
       { fluxos: [{ id: "f", nos: [{ id: "a", tipo: "funcao", refId: "telepatia" }], arestas: [] }] },
-      /a função "telepatia", que não existe \(funções: derivacao, ensaio\)/,
+      /a função "telepatia", que não existe \(funções: derivacao, ensaio, pdca-feedback\)/,
     ],
-    // SPEC-107 fatia B — o projeto não tem adaptador: refId é "projeto".
+    // SPEC-107 fatia B / SPEC-110 F — o nó de dados aponta para um dos três
+    // refIds conhecidos; a recusa nomeia os três, não só o que foi negado.
     [
       { fluxos: [{ id: "f", nos: [{ id: "a", tipo: "projeto", refId: "minha-demanda" }], arestas: [] }] },
-      /o refId precisa ser "projeto"/,
+      /precisa ser um destes: projeto, demanda-ler, demanda-gravar/,
     ],
   ])("recusa com o motivo: %j", (documento, motivo) => {
     expect(() => validarEscritaFluxos(documento)).toThrow(motivo);

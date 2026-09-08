@@ -187,7 +187,19 @@ export {
   type DesenhoMapeado,
 } from "./casos-de-uso/funcoes.js";
 /** SPEC-107 fatia B — o PROJETO como nó, nas duas direções. */
-export { PROJETO_DO_SISTEMA, REF_DO_PROJETO, type ProjetoDoSistema } from "./config/projeto.js";
+export {
+  PROJETO_DO_SISTEMA,
+  REF_DO_PROJETO,
+  type ProjetoDoSistema,
+  // SPEC-110 fatia F — a demanda desdobrada em ler e gravar.
+  AVISO_DO_PROJETO_LEGADO,
+  DADOS_DO_SISTEMA,
+  dadoDoSistema,
+  REF_DA_DEMANDA_GRAVAR,
+  REF_DA_DEMANDA_LER,
+  REFS_DE_DADOS,
+  type DadoDoSistema,
+} from "./config/projeto.js";
 /** SPEC-110 fatia E — o relógio: cron de 5 campos, UTC, com próxima-ocorrência. */
 export { analisarCron, problemaNoCron, proximaOcorrencia, proximaOcorrenciaLegivel } from "./config/cron.js";
 /** SPEC-110 fatia D — o banco como componente: consulta, e só consulta. */

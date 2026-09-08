@@ -164,9 +164,18 @@ test("a esteira roda PELA FIAÇÃO, ao vivo no canvas, e o julgamento fecha no d
   await expect(page.getByTestId("rastro-da-execucao")).toBeVisible({ timeout: 60000 });
   await expect(page.getByTestId("rastro-grava")).toContainText("✓ grava");
 
-  // ── A mesa como COMPONENTE: o nó de projeto é a porta de volta ──
+  /**
+   * SPEC-110 fatia F (D12) — o nó de DADOS deixou de ser porta de tela. O
+   * cartão agora diz a direção ("Demanda — ler") e o painel descreve o que
+   * ele entrega; quem quer ENTRAR na mesa põe a tela `mesa` (fatia B) ou usa
+   * o botão de sempre. Um cartão de dado com botão de abrir tela era o mesmo
+   * nó respondendo a duas perguntas.
+   */
   await page.locator('.react-flow__node[data-id="demanda"]').click();
-  await page.getByTestId("abrir-mesa-do-projeto").click();
+  await expect(page.getByTestId("contrato-do-projeto")).toBeVisible();
+  await expect(page.locator('.react-flow__node[data-id="demanda"]')).toContainText("Ler");
+  await expect(page.locator('.react-flow__node[data-id="grava"]')).toContainText("Gravar");
+  await page.getByRole("button", { name: /Voltar à mesa de projeto/ }).click();
   await expect(page.getByRole("button", { name: "+ Serviço", exact: true })).toBeVisible();
 
   // ── O julgamento fecha no DOCUMENTO (§384): o texto do dublê chegou ──

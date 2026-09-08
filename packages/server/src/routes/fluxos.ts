@@ -11,10 +11,16 @@ import {
   criarCasosDeUsoDeConfig,
   criarCasosDeUsoDeItensGerados,
   criarCasosDeUsoDeQuebras,
+  // SPEC-110 fatia F — a demanda desdobrada: a direcao e do componente.
+  dadoDoSistema,
+  REF_DA_DEMANDA_GRAVAR,
+  REF_DA_DEMANDA_LER,
+  REF_DO_PROJETO,
   demandaAtiva,
   erroSemDemanda,
   executarFluxo,
   executarFuncao,
+  funcaoDoSistema,
   filaDaEsteiraDaDemanda,
   fluxosEmVigor,
   mensagemDeCiclo,
@@ -53,6 +59,8 @@ import { criarResolvedorDeProvedor } from "../ia/provedorDaOrganizacao.js";
 import { fluxoExecucoes, quebras } from "../db/schema.js";
 // SPEC-110 fatia E — o relogio: sincronizar o desenho e reservar os vencidos.
 import { desativarAgendamento, reservarVencidos, sincronizarAgendamentos } from "../fluxos/agendamentos.js";
+// SPEC-110 fatia F — a funcao que escreve: o mesmo gravador da aba PDCA.
+import { gravarFeedback } from "../pdca/feedback.js";
 import { exigirSessao } from "../auth/middleware.js";
 
 /**
@@ -183,6 +191,34 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     aoVivo?: { texto(noId: string, pedaco: string): void };
   }) {
     const { fluxo, papeis, catalogo, provedor, timeId, email, aoVivo } = opcoes;
+
+    /**
+     * SPEC-110 fatia F (D11) — o executor da função que ESCREVE.
+     *
+     * O `contexto` é opcional e vira parte do texto em vez de uma coluna
+     * nova: o feedback é livre por natureza, e uma coluna "contexto" que só
+     * a fiação preenche é dado que a aba PDCA não sabe mostrar. Concatenar
+     * mantém o que veio pela fiação VISÍVEL a quem lê o ciclo.
+     */
+    async function gravarFeedbackDoFluxo(
+      refId: string,
+      entradas: Record<string, unknown>,
+      quem: string,
+      time: string | undefined
+    ): Promise<Record<string, unknown>> {
+      const texto = typeof entradas.texto === "string" ? entradas.texto.trim() : "";
+      // A mesma régua do §9.3: obrigatório ausente não vira default, e a
+      // recusa nomeia o campo. Um feedback vazio no ciclo é ruído que ninguém
+      // consegue interpretar depois.
+      if (!texto) throw new Error(`a função "${refId}" precisa de "texto" — um feedback vazio não entra no ciclo`);
+      const contexto = typeof entradas.contexto === "string" ? entradas.contexto.trim() : "";
+      const gravado = await gravarFeedback(db, {
+        email: quem,
+        timeId: time,
+        texto: contexto ? `${texto}\n\n— ${contexto}` : texto,
+      });
+      return { feedbackId: gravado.id };
+    }
     // O vocabulário do time (diagrama + campos + regras + tokens) só é montado
     // se o fluxo TEM nó de função — e uma vez por execução: montar por nó
     // abriria a porta para dois nós derivarem com vocabulários diferentes.
@@ -278,16 +314,39 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
           });
           return { texto };
         },
-        funcao: async (no, entradas) => executarFuncao(no.refId, entradas, await contextoDeFuncao()),
+        funcao: async (no, entradas) => {
+          /**
+           * SPEC-110 fatia F (D11) — a função que ESCREVE roda aqui, onde há
+           * banco e auditoria. Quem decide é o registro (`executor:
+           * "servidor"`), não uma lista paralela: função nova declara onde
+           * roda no mesmo lugar em que declara o contrato.
+           */
+          if (funcaoDoSistema(no.refId)?.executor === "servidor") {
+            return gravarFeedbackDoFluxo(no.refId, entradas, email, timeId);
+          }
+          return executarFuncao(no.refId, entradas, await contextoDeFuncao());
+        },
         /**
          * SPEC-107 fatia B — a demanda como capacidade, nas duas direções.
          * Sem `desenho` mapeado é FONTE; com, é DESTINO — e a escrita vira
          * VARIANTE (proposta), nunca o diagrama da demanda (§2.4-14).
          */
-        projeto: async (_no, entradas) => {
+        projeto: async (no, entradas) => {
           const casosQuebras = criarCasosDeUsoDeQuebras(criarRepositorioDeQuebrasEmPostgres(db));
           const demandaId =
             typeof entradas.demandaId === "string" && entradas.demandaId.trim() ? entradas.demandaId.trim() : null;
+
+          /**
+           * SPEC-110 fatia F (D10) — **a direção é do COMPONENTE, não da
+           * fiação.** O `projeto` legado decide pelo que chegou mapeado; os
+           * dois novos decidem pelo que a pessoa escolheu no canvas, e é essa
+           * a diferença que importa: um nó "Demanda — gravar" sem nada
+           * mapeado é um erro de fiação que precisa ser DITO, enquanto o
+           * fundido silenciosamente virava leitura e devolvia dado que
+           * ninguém pediu.
+           */
+          const so = no.refId === REF_DO_PROJETO ? "ambos" : no.refId === REF_DA_DEMANDA_LER ? "ler" : "gravar";
+          const grava = (campo: string) => so !== "ler" && entradas[campo] !== undefined;
 
           let quebra;
           if (demandaId) {
@@ -301,7 +360,7 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
             quebra = (await casosQuebras.obter(ativa.id))!;
           }
 
-          if (entradas.linkExterno !== undefined) {
+          if (grava("linkExterno")) {
             // SPEC-107 G2 — DESTINO de PUBLICAÇÃO: o link do que subiu volta
             // para a DEMANDA (SPEC-106 C) — "última publicação ↗" sobrevive
             // ao F5 e à troca de máquina.
@@ -317,7 +376,7 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
             return { demandaId: quebra.id, linkExterno };
           }
 
-          if (entradas.resultados !== undefined) {
+          if (grava("resultados")) {
             // SPEC-107 G1 — DESTINO de EXPORTAÇÃO: o retorno do tracker, por
             // item. Quem subiu grava `exportado`+link; quem falhou (ou ficou
             // sem resposta) sai nomeado — a disciplina da SPEC-49, na fiação.
@@ -338,7 +397,7 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
             return { demandaId: quebra.id, exportados, erros };
           }
 
-          if (entradas.respostasItens !== undefined) {
+          if (grava("respostasItens")) {
             /**
              * SPEC-107 G5 — DESTINO da esteira: o que a corrida escreveu
              * entra na demanda como SUGESTÃO pendente (§5.5, decidida pelo
@@ -362,7 +421,7 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
             return { demandaId: quebra.id, aplicadas, preservadas };
           }
 
-          if (entradas.desenho !== undefined) {
+          if (grava("desenho")) {
             // DESTINO. O gate da rota cobre o time do CORPO; a quebra que o
             // `demandaId` aponta pode ser de outro — re-checa no time DELA.
             const nivel = quebra.time ? await nivelNoTime(db, email, quebra.time) : await maiorNivel(db, email);
@@ -377,6 +436,22 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
             await casosQuebras.atualizar(quebra.id, { ...quebra, variantes: [...(quebra.variantes ?? []), variante] });
             registrarAuditoria(db, { email, acao: "atualizar", recurso: "quebras", recursoId: quebra.id });
             return { demandaId: quebra.id, varianteId: variante.id, titulo: variante.titulo };
+          }
+
+          /**
+           * SPEC-110 fatia F — chegou aqui sendo "gravar" significa que nada
+           * mapeado casou com o que este componente sabe gravar. O fundido
+           * caía na leitura e devolvia dado que ninguém pediu; o desdobrado
+           * DIZ, com o nome dos campos que ele aceita. Fiação muda é o defeito
+           * mais barato de consertar e o mais caro de descobrir tarde.
+           */
+          if (so === "gravar") {
+            const aceitos = dadoDoSistema(REF_DA_DEMANDA_GRAVAR)!.entrada.filter((c) => c.chave !== "demandaId");
+            throw new Error(
+              `o nó "${no.id}" é "Demanda — gravar" e não recebeu nada para gravar — ligue uma aresta a um destes campos: ${aceitos
+                .map((c) => c.chave)
+                .join(", ")}`
+            );
           }
 
           const itens = await criarCasosDeUsoDeItensGerados(criarRepositorioDeItensGeradosEmPostgres(db)).listarDaQuebra(quebra.id);
@@ -919,14 +994,32 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
   /**
    * SPEC-110 fatia E — **o tick FORÇADO, só em `AUTH_MODE=dev`.**
    *
-   * A prova de um relógio não pode depender de esperar o relógio: o E2E cria o
-   * agendamento com a próxima ocorrência no passado, força o tick e vê a
-   * execução no histórico com origem `agendamento`. Fora do modo dev a rota
-   * não existe — um endpoint que dispara fluxos por HTTP sem sessão é
-   * exatamente o que não se deixa num ambiente real.
+   * A prova de um relógio não pode depender de esperar o relógio. Fora do modo
+   * dev a rota não existe — um endpoint que dispara fluxos por HTTP sem sessão
+   * é exatamente o que não se deixa num ambiente real.
+   *
+   * ## `agora`: por que o tick aceita a hora de fora
+   *
+   * A primeira versão só forçava o tick, e a prova ficou dependendo do relógio
+   * de parede assim mesmo: salvar o fluxo JÁ calcula a próxima ocorrência, e
+   * mesmo com `* * * * *` ela cai no próximo minuto cheio — até 60s à frente.
+   * O E2E passou aqui e caiu na CI, que atravessou a virada do minuto noutro
+   * ponto. Um teste que espera o minuto virar é um teste que às vezes espera
+   * demais, e "às vezes" numa suíte é ruído que treina gente a re-rodar.
+   *
+   * Com `agora`, o teste diz "finja que são dois minutos adiante" e a prova
+   * fica determinística de verdade: nada muda no caminho do disparo — é a
+   * MESMA função do runner de 30s (§263), só com outro instante.
    */
   if ((process.env.AUTH_MODE ?? "dev") === "dev") {
-    app.post("/fluxos/agendamentos/tick", async () => dispararAgendamentosVencidos());
+    app.post("/fluxos/agendamentos/tick", async (req) => {
+      const { agora } = (req.body ?? {}) as { agora?: string };
+      const instante = agora ? new Date(agora) : new Date();
+      if (Number.isNaN(instante.getTime())) {
+        throw new Error(`"agora" precisa ser uma data ISO — recebi "${agora}"`);
+      }
+      return dispararAgendamentosVencidos(instante);
+    });
   }
 
   /** O rastro das últimas execuções — é o que torna o fluxo diagnosticável. */
