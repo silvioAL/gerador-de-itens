@@ -994,14 +994,32 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
   /**
    * SPEC-110 fatia E — **o tick FORÇADO, só em `AUTH_MODE=dev`.**
    *
-   * A prova de um relógio não pode depender de esperar o relógio: o E2E cria o
-   * agendamento com a próxima ocorrência no passado, força o tick e vê a
-   * execução no histórico com origem `agendamento`. Fora do modo dev a rota
-   * não existe — um endpoint que dispara fluxos por HTTP sem sessão é
-   * exatamente o que não se deixa num ambiente real.
+   * A prova de um relógio não pode depender de esperar o relógio. Fora do modo
+   * dev a rota não existe — um endpoint que dispara fluxos por HTTP sem sessão
+   * é exatamente o que não se deixa num ambiente real.
+   *
+   * ## `agora`: por que o tick aceita a hora de fora
+   *
+   * A primeira versão só forçava o tick, e a prova ficou dependendo do relógio
+   * de parede assim mesmo: salvar o fluxo JÁ calcula a próxima ocorrência, e
+   * mesmo com `* * * * *` ela cai no próximo minuto cheio — até 60s à frente.
+   * O E2E passou aqui e caiu na CI, que atravessou a virada do minuto noutro
+   * ponto. Um teste que espera o minuto virar é um teste que às vezes espera
+   * demais, e "às vezes" numa suíte é ruído que treina gente a re-rodar.
+   *
+   * Com `agora`, o teste diz "finja que são dois minutos adiante" e a prova
+   * fica determinística de verdade: nada muda no caminho do disparo — é a
+   * MESMA função do runner de 30s (§263), só com outro instante.
    */
   if ((process.env.AUTH_MODE ?? "dev") === "dev") {
-    app.post("/fluxos/agendamentos/tick", async () => dispararAgendamentosVencidos());
+    app.post("/fluxos/agendamentos/tick", async (req) => {
+      const { agora } = (req.body ?? {}) as { agora?: string };
+      const instante = agora ? new Date(agora) : new Date();
+      if (Number.isNaN(instante.getTime())) {
+        throw new Error(`"agora" precisa ser uma data ISO — recebi "${agora}"`);
+      }
+      return dispararAgendamentosVencidos(instante);
+    });
   }
 
   /** O rastro das últimas execuções — é o que torna o fluxo diagnosticável. */

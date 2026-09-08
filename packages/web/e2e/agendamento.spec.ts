@@ -55,12 +55,19 @@ test("salvar o fluxo agenda; o tick dispara; o histórico diz que foi o relógio
     });
     expect(salvo.status()).toBe(200);
 
-    // ── 2. O tick FORÇADO (só existe em AUTH_MODE=dev) ──
-    // O primeiro tick pode só CALCULAR a próxima (a linha nasce sem ela); o
-    // segundo dispara. Dois ticks provam a mecânica inteira sem esperar.
-    await page.request.post(`${API}/fluxos/agendamentos/tick`, { data: {} });
-    const tick = await page.request.post(`${API}/fluxos/agendamentos/tick`, { data: {} });
+    /**
+     * ── 2. O tick FORÇADO, com a HORA de fora (só em `AUTH_MODE=dev`) ──
+     *
+     * Salvar o fluxo já calcula a próxima ocorrência, e mesmo com
+     * `* * * * *` ela cai no próximo minuto cheio — até 60s à frente. A
+     * primeira versão desta prova forçava o tick "agora" e torcia para a
+     * virada do minuto chegar dentro do timeout: passou aqui e caiu na CI.
+     * Dizer a hora mata o acaso.
+     */
+    const daquiADoisMinutos = new Date(Date.now() + 2 * 60_000).toISOString();
+    const tick = await page.request.post(`${API}/fluxos/agendamentos/tick`, { data: { agora: daquiADoisMinutos } });
     expect(tick.status()).toBe(200);
+    expect(((await tick.json()) as { disparados: number }).disparados).toBe(1);
 
     // ── 3. O histórico: a execução existe, e diz QUEM a disparou ──
     await expect
@@ -96,10 +103,12 @@ test("salvar o fluxo agenda; o tick dispara; o histórico diz que foi o relógio
       },
     });
     const antes = (await (await page.request.get(`${API}/fluxos/agendado-e2e/execucoes`)).json()) as { execucoes: unknown[] };
-    await page.request.post(`${API}/fluxos/agendamentos/tick`, { data: {} });
-    await page.request.post(`${API}/fluxos/agendamentos/tick`, { data: {} });
+    // Bem adiante: se o relógio ainda estivesse ligado, ele teria disparado.
+    const daquiAUmaHora = new Date(Date.now() + 60 * 60_000).toISOString();
+    const tickMudo = await page.request.post(`${API}/fluxos/agendamentos/tick`, { data: { agora: daquiAUmaHora } });
+    // Nada disparou — o desenho é a verdade, e ele não pede mais relógio.
+    expect(((await tickMudo.json()) as { disparados: number }).disparados).toBe(0);
     const depois = (await (await page.request.get(`${API}/fluxos/agendado-e2e/execucoes`)).json()) as { execucoes: unknown[] };
-    // Nenhuma execução nova: o desenho é a verdade, e ele não pede mais relógio.
     expect(depois.execucoes.length).toBe(antes.execucoes.length);
   } finally {
     await page.request.put(`${API}/config/fluxos`, { data: { documento: original, timeId: "time-portabilidade" } });

@@ -17692,3 +17692,27 @@ ponta do PDCA fica vermelha. Restaurado, 39 verdes.
 
 Portões: build/test/lint verdes (2309 testes). E2E 147/147 em banco recriado.
 Visual conferida nos dois temas contra :8080.
+
+**Dois portões que eu não estava rodando, e a CI cobrou os dois.**
+
+O primeiro: a CI roda `typecheck`, que é MAIS LARGO que `build` — ele inclui os
+arquivos de teste (`tsconfig.typecheck.json`). Um tipo local mais estreito que
+a resposta da rota escondia o campo novo, e compilou aqui e não lá. O rito
+ganhou o quinto portão: `typecheck` junto de build/test/lint.
+
+O segundo é mais interessante, porque é sobre a fatia E: o E2E do agendamento
+caiu na CI depois de ter passado aqui e na CI do próprio PR. A causa não é
+flakiness de infraestrutura — é uma suposição errada minha. Salvar o fluxo JÁ
+calcula a próxima ocorrência, então mesmo com `* * * * *` ela cai no próximo
+minuto CHEIO: até 60s à frente. A prova forçava o tick "agora" e torcia para a
+virada do minuto acontecer dentro do timeout de 30s. Aqui acontecia; na CI,
+não. O comentário que escrevi na época — *"a linha nasce sem ela"* — descrevia
+um comportamento que o código não tem.
+
+A correção não é esperar mais: é tirar o relógio de parede da prova. O tick
+forçado passou a aceitar `agora` (uma data ISO, só em `AUTH_MODE=dev`), e o
+teste diz "finja que são dois minutos adiante". Nada muda no caminho do
+disparo — é a MESMA função do runner de 30s. O teste caiu de 30,5s para 6,1s, e
+o §248 confirma que a asserção morde: com o tick ignorando a hora de fora,
+vermelho. Um teste que às vezes espera demais é ruído que treina gente a
+re-rodar em vez de olhar.
