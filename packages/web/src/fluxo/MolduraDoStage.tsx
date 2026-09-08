@@ -42,6 +42,8 @@ export function MolduraDoStage({
   descricao,
   ocupado,
   motivoParaNaoAvancar,
+  rotuloAvancar,
+  rotuloRetornar,
   erro,
   onAvancar,
   onRetornar,
@@ -57,6 +59,10 @@ export function MolduraDoStage({
    */
   motivoParaNaoAvancar?: string | null;
   erro?: string | null;
+  /** D17c — o rótulo que a tela DECLARA para cada acionador. Ausente, valem os
+   * genéricos: uma tela sem bloco `acao` continua avançando e retornando. */
+  rotuloAvancar?: string;
+  rotuloRetornar?: string;
   onAvancar: () => void;
   onRetornar: () => void;
   children: ReactNode;
@@ -78,8 +84,18 @@ export function MolduraDoStage({
             {motivoParaNaoAvancar}
           </span>
         )}
+        {/**
+         * SPEC-110 fatia G — o rótulo que a tela DECLARA vence o genérico.
+         *
+         * A D17c prometia "rótulo editável, comportamento fixo", e metade
+         * disso não acontecia: o rótulo escrito virava uma linha de texto no
+         * corpo ("botão de avançar: …") enquanto o botão de verdade dizia
+         * "Avançar →". Quem escreveu "Aplicar o ajuste" via a própria frase
+         * como legenda inerte e clicava noutra coisa — medido na validação
+         * visual desta fatia.
+         */}
         <button data-testid="tela-retornar" onClick={onRetornar} disabled={ocupado} style={botao}>
-          ← Retornar
+          {rotuloRetornar ?? "← Retornar"}
         </button>
         <button
           data-testid="tela-avancar"
@@ -87,7 +103,7 @@ export function MolduraDoStage({
           disabled={ocupado || Boolean(motivoParaNaoAvancar)}
           style={{ ...botao, background: "var(--acento)", color: "#fff", border: "1px solid var(--acento)" }}
         >
-          {ocupado ? "…" : "Avançar →"}
+          {ocupado ? "…" : (rotuloAvancar ?? "Avançar →")}
         </button>
       </div>
       {erro && (

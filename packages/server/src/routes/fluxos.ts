@@ -21,6 +21,9 @@ import {
   executarFluxo,
   executarFuncao,
   funcaoDoSistema,
+  // SPEC-110 fatia G — a lista REAL de documentos de config (config-ler).
+  CHAVES_CONFIG,
+  ehChaveConfig,
   filaDaEsteiraDaDemanda,
   fluxosEmVigor,
   mensagemDeCiclo,
@@ -50,17 +53,26 @@ import { executarConector } from "../adaptadores/executorDeConector.js";
 import { executarConsulta } from "../adaptadores/executorDeConsulta.js";
 import { criarCofreInfisical, opcoesDoAmbiente } from "../adaptadores/cofreInfisical.js";
 import { exigirNivel, maiorNivel, nivelNoTime } from "../auth/niveis.js";
-import { organizacaoPadraoDe, recursosCurados, resolverPermissoes } from "../auth/permissoes.js";
+import { organizacaoPadraoDe, podePermissao, recursosCurados, resolverPermissoes, SECOES_DE_REGRAS, type Recurso } from "../auth/permissoes.js";
 import { registrarAuditoria } from "../auditoria.js";
 import { catalogoDeConectores } from "../config/catalogoDeConectores.js";
 import { contextoDasFuncoes } from "../config/contextoDasFuncoes.js";
 import { templateDaVersao } from "../config/templateDaVersao.js";
 import { criarResolvedorDeProvedor } from "../ia/provedorDaOrganizacao.js";
-import { fluxoExecucoes, quebras } from "../db/schema.js";
+import { fluxoExecucoes, pdcaFeedback, quebras, solicitacoesAjuste } from "../db/schema.js";
 // SPEC-110 fatia E — o relogio: sincronizar o desenho e reservar os vencidos.
 import { desativarAgendamento, reservarVencidos, sincronizarAgendamentos } from "../fluxos/agendamentos.js";
 // SPEC-110 fatia F — a funcao que escreve: o mesmo gravador da aba PDCA.
 import { gravarFeedback } from "../pdca/feedback.js";
+// SPEC-110 fatia G — o PDCA como fluxo: propor e aplicar pelo caminho da aba.
+import {
+  aplicarSolicitacao,
+  aprovarSolicitacao,
+  criarSolicitacao,
+  criarDependenciasDoAjuste,
+  recursoDaSolicitacao,
+} from "../pdca/ajustes.js";
+import { operacaoDeAjuste } from "../pdca/operacao.js";
 import { exigirSessao } from "../auth/middleware.js";
 
 /**
@@ -100,6 +112,13 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
    * pergunta "quem fez?", e "ninguém" não é resposta.
    */
   const EMAIL_DO_RELOGIO = "agendamento@gerador.local";
+
+  /** Quantos feedbacks o nó traz por padrão. Um prompt com 500 feedbacks não
+   * é mais informado que um com 20 — é mais caro e menos legível. */
+  const LIMITE_DE_FEEDBACKS = 20;
+
+  /** SPEC-110 fatia G — as MESMAS dependências que a aba PDCA usa (§263). */
+  const depsDoAjusteNoFluxo = criarDependenciasDoAjuste(db, diretorioConfig);
 
   const timeDoCorpo = (req: FastifyRequest) => ((req.body ?? {}) as { timeId?: string }).timeId ?? null;
 
@@ -192,32 +211,153 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
   }) {
     const { fluxo, papeis, catalogo, provedor, timeId, email, aoVivo } = opcoes;
 
+    /** §9.3, a mesma régua de sempre: obrigatório ausente não vira default, e
+     * a recusa NOMEIA o campo — em vez de gravar vazio e o defeito aparecer
+     * três telas adiante. */
+    const exigirTexto = (entradas: Record<string, unknown>, campo: string, refId: string): string => {
+      const valor = typeof entradas[campo] === "string" ? (entradas[campo] as string).trim() : "";
+      if (!valor) throw new Error(`a função "${refId}" precisa de "${campo}"`);
+      return valor;
+    };
+
     /**
-     * SPEC-110 fatia F (D11) — o executor da função que ESCREVE.
+     * SPEC-110 F e G — **os executores das funções que tocam o banco.**
      *
-     * O `contexto` é opcional e vira parte do texto em vez de uma coluna
-     * nova: o feedback é livre por natureza, e uma coluna "contexto" que só
-     * a fiação preenche é dado que a aba PDCA não sabe mostrar. Concatenar
-     * mantém o que veio pela fiação VISÍVEL a quem lê o ciclo.
+     * `executarFuncao` é puro por decisão: é o que torna a derivação testável
+     * sem infra. Estas outras leem e escrevem, então moram aqui, junto do
+     * banco, da auditoria e do portão. Quem decide onde cada uma roda é o
+     * REGISTRO (`executor: "servidor"`), não uma lista paralela.
      */
-    async function gravarFeedbackDoFluxo(
+    async function executarFuncaoDoServidor(
       refId: string,
-      entradas: Record<string, unknown>,
-      quem: string,
-      time: string | undefined
+      entradas: Record<string, unknown>
     ): Promise<Record<string, unknown>> {
-      const texto = typeof entradas.texto === "string" ? entradas.texto.trim() : "";
-      // A mesma régua do §9.3: obrigatório ausente não vira default, e a
-      // recusa nomeia o campo. Um feedback vazio no ciclo é ruído que ninguém
-      // consegue interpretar depois.
-      if (!texto) throw new Error(`a função "${refId}" precisa de "texto" — um feedback vazio não entra no ciclo`);
-      const contexto = typeof entradas.contexto === "string" ? entradas.contexto.trim() : "";
-      const gravado = await gravarFeedback(db, {
-        email: quem,
-        timeId: time,
-        texto: contexto ? `${texto}\n\n— ${contexto}` : texto,
-      });
-      return { feedbackId: gravado.id };
+      /**
+       * O `contexto` é opcional e vira parte do TEXTO em vez de uma coluna
+       * nova: o feedback é livre por natureza, e uma coluna que só a fiação
+       * preenche é dado que a aba PDCA não sabe mostrar.
+       */
+      if (refId === "pdca-feedback") {
+        const texto = exigirTexto(entradas, "texto", refId);
+        const contexto = typeof entradas.contexto === "string" ? entradas.contexto.trim() : "";
+        const gravado = await gravarFeedback(db, {
+          email,
+          timeId,
+          texto: contexto ? `${texto}\n\n— ${contexto}` : texto,
+        });
+        return { feedbackId: gravado.id };
+      }
+
+      if (refId === "pdca-ler-feedbacks") {
+        const estado = typeof entradas.estado === "string" && entradas.estado.trim() ? entradas.estado.trim() : "novo";
+        const limiteBruto = Number(entradas.limite ?? LIMITE_DE_FEEDBACKS);
+        const limite = Number.isFinite(limiteBruto) && limiteBruto > 0 ? Math.min(limiteBruto, 200) : LIMITE_DE_FEEDBACKS;
+        const linhas = await db
+          .select()
+          .from(pdcaFeedback)
+          .where(eq(pdcaFeedback.estado, estado))
+          .orderBy(desc(pdcaFeedback.criadoEm))
+          .limit(limite);
+        const feedbacks = linhas.map((f) => ({
+          id: f.id,
+          texto: f.texto,
+          email: f.email,
+          timeId: f.timeId,
+          em: f.criadoEm.toISOString(),
+        }));
+        return {
+          feedbacks,
+          quantidade: feedbacks.length,
+          // Texto corrido para o agente: um prompt recebe texto, e fazer cada
+          // fluxo de PDCA concatenar a lista à mão seria a mesma linha escrita
+          // em todo desenho.
+          resumo: feedbacks.map((f, i) => `${i + 1}. ${f.texto}`).join("\n"),
+        };
+      }
+
+      if (refId === "config-ler") {
+        const chave = exigirTexto(entradas, "chave", refId);
+        // A lista real de documentos, não uma cópia: chave errada só apareceria
+        // como "documento vazio", e vazio é indistinguível de "ainda não
+        // configurado" (SPEC-35).
+        if (!ehChaveConfig(chave)) {
+          throw new Error(`não conheço a configuração "${chave}" — as que existem são: ${CHAVES_CONFIG.join(", ")}`);
+        }
+        const doc = await casos.obter(chave, await templateDaVersao(chave, diretorioConfig), timeId);
+        return { documento: doc.documento };
+      }
+
+      if (refId === "config-propor-ajuste") {
+        const descricao = exigirTexto(entradas, "descricao", refId);
+        const orgId = await organizacaoPadrao();
+        if (!orgId) throw new Error("nenhuma organização configurada — não há a quem pedir o ajuste");
+        /**
+         * A operação passa pelo MESMO esquema da aba (§263). Recusar aqui é o
+         * que impede uma operação que o `aplicar` não sabe executar de ficar
+         * gravada esperando alguém aprová-la para então falhar.
+         */
+        const bruta = entradas.operacao;
+        const operacao = bruta === undefined || bruta === null ? null : operacaoDeAjuste.safeParse(bruta);
+        if (operacao && !operacao.success) {
+          throw new Error(
+            `a "operacao" proposta não tem uma forma que o aplicador saiba executar: ${JSON.stringify(operacao.error.flatten().fieldErrors)}`
+          );
+        }
+        const criada = await criarSolicitacao(db, {
+          organizacaoId: orgId,
+          timeId,
+          solicitante: email,
+          recurso: typeof entradas.recurso === "string" && entradas.recurso.trim() ? entradas.recurso.trim() : "regras",
+          descricao,
+          operacao: operacao ? operacao.data : null,
+          feedbackId: typeof entradas.feedbackId === "string" && entradas.feedbackId.trim() ? entradas.feedbackId.trim() : null,
+        });
+        return { solicitacaoId: criada.id, estado: criada.estado };
+      }
+
+      if (refId === "config-aplicar-ajuste") {
+        const solicitacaoId = exigirTexto(entradas, "solicitacaoId", refId);
+        const [pedido] = await db
+          .select()
+          .from(solicitacoesAjuste)
+          .where(eq(solicitacoesAjuste.id, solicitacaoId))
+          .limit(1);
+        if (!pedido) throw new Error(`não conheço a solicitação "${solicitacaoId}"`);
+
+        /**
+         * **O portão, com a MESMA régua da aba** (`podePermissao`), traduzido
+         * para o que este lugar tem: uma falha nomeada no rastro em vez de um
+         * 403. A solicitação FICA — pendente, aprovável pela aba — porque a
+         * decisão do §4.G é essa: sem permissão, o pedido não some, ele espera
+         * quem pode.
+         */
+        const veredito = await podePermissao(db, await organizacaoPadrao(), {
+          email,
+          timeId: pedido.timeId,
+          recurso: recursoDaSolicitacao(pedido),
+          acao: "editar",
+        });
+        if (!veredito.ok) {
+          throw new Error(
+            `${veredito.motivo} — a solicitação "${solicitacaoId}" fica pendente, para alguém decidir na aba PDCA`
+          );
+        }
+
+        /**
+         * Aprovar e aplicar, nesta ordem: uma solicitação nasce `pendente` e o
+         * aplicador recusa quem não está `aprovada`. Quem chegou até aqui
+         * passou pela TELA de revisão do fluxo — a decisão dessa pessoa É a
+         * aprovação, e a auditoria registra os dois atos separadamente, senão
+         * "quem aprovou?" ficaria sem resposta.
+         */
+        await aprovarSolicitacao(db, { id: solicitacaoId, email });
+        const aplicada = await aplicarSolicitacao(depsDoAjusteNoFluxo, { id: solicitacaoId, email });
+        return { estado: aplicada.estado, aplicadaPor: aplicada.aplicadaPor };
+      }
+
+      // O registro é fechado; chegar aqui é registro e executor fora de
+      // sincronia — o erro diz isso em vez de devolver vazio (§346).
+      throw new Error(`a função "${refId}" está marcada como do servidor e não tem executor aqui`);
     }
     // O vocabulário do time (diagrama + campos + regras + tokens) só é montado
     // se o fluxo TEM nó de função — e uma vez por execução: montar por nó
@@ -322,7 +462,7 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
            * roda no mesmo lugar em que declara o contrato.
            */
           if (funcaoDoSistema(no.refId)?.executor === "servidor") {
-            return gravarFeedbackDoFluxo(no.refId, entradas, email, timeId);
+            return executarFuncaoDoServidor(no.refId, entradas);
           }
           return executarFuncao(no.refId, entradas, await contextoDeFuncao());
         },

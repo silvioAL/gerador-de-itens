@@ -63,12 +63,25 @@ function ValorDoDado({ formato, valor }: { formato: string; valor: unknown }) {
   return <pre style={preEstilo}>{JSON.stringify(valor, null, 2).slice(0, 4000)}</pre>;
 }
 
+/**
+ * SPEC-110 fatia G — os rótulos que a tela DECLARA para os dois acionadores,
+ * prontos para a moldura. Sem bloco `acao`, devolve vazio e a moldura usa os
+ * genéricos: uma tela que não nomeia os botões continua funcionando.
+ */
+export function rotulosDasAcoes(blocos?: BlocoDaTela[]): { rotuloAvancar?: string; rotuloRetornar?: string } {
+  const acoes = (blocos ?? []).filter((b): b is Extract<BlocoDaTela, { tipo: "acao" }> => b.tipo === "acao");
+  const avancar = acoes.find((b) => b.acao === "avancar")?.rotulo;
+  const retornar = acoes.find((b) => b.acao === "retornar")?.rotulo;
+  return { ...(avancar ? { rotuloAvancar: avancar } : {}), ...(retornar ? { rotuloRetornar: retornar } : {}) };
+}
+
 export function RenderizadorDaTela({
   blocos,
   entradas,
   valores,
   onMudarValor,
   somenteLeitura,
+  acoesNaMoldura,
 }: {
   blocos: BlocoDaTela[];
   /** O que a fiação trouxe — o que os blocos `dado` mostram. */
@@ -78,6 +91,9 @@ export function RenderizadorDaTela({
   onMudarValor: (chave: string, valor: unknown) => void;
   /** No preview do editor ninguém está decidindo nada de verdade. */
   somenteLeitura?: boolean;
+  /** SPEC-110 fatia G — verdadeiro no STAGE, onde a moldura já põe o rótulo no
+   * botão de verdade; falso na prévia, que não tem moldura. */
+  acoesNaMoldura?: boolean;
 }) {
   return (
     <div data-testid="tela-declarada" style={{ display: "grid", gap: 14, padding: 18, maxWidth: 760 }}>
@@ -143,9 +159,15 @@ export function RenderizadorDaTela({
         // execução. O que ele faz é dar o RÓTULO — e é isso que o preview
         // mostra, para a pessoa ver o que escreveu.
         return (
+          // SPEC-110 fatia G — no STAGE a moldura já mostra o rótulo no botão
+          // de verdade, e repeti-lo aqui como legenda foi o que fez a frase da
+          // pessoa parecer inerte. Na PRÉVIA do editor não há moldura, então a
+          // legenda continua sendo a única forma de ver o que se escreveu.
+          acoesNaMoldura ? null : (
           <div key={i} data-testid={`bloco-acao-${bloco.acao}`} style={{ fontSize: 11.5, color: "var(--texto-fraco)" }}>
             botão de <strong>{bloco.acao === "avancar" ? "avançar" : "retornar"}</strong>: “{bloco.rotulo}”
           </div>
+          )
         );
       })}
     </div>

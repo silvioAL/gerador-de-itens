@@ -5,6 +5,7 @@ import {
   fluxosEmVigor,
   ID_DO_FLUXO_DA_ESTEIRA,
   ID_DO_FLUXO_DO_ENSAIO,
+  ID_DO_FLUXO_DO_PDCA,
   planoDoFluxo,
 } from "./fluxos.js";
 import { PAPEIS_PADRAO } from "./normalizacao.js";
@@ -82,6 +83,9 @@ describe("fluxosEmVigor", () => {
       ["meu", "declarado"],
       [ID_DO_FLUXO_DA_ESTEIRA, "fabrica"],
       [ID_DO_FLUXO_DO_ENSAIO, "fabrica"],
+      // SPEC-110 fatia G — o ciclo de melhoria entra como fábrica, junto das
+      // outras: ele deriva dos papéis, como a esteira.
+      [ID_DO_FLUXO_DO_PDCA, "fabrica"],
     ]);
   });
 
@@ -89,7 +93,7 @@ describe("fluxosEmVigor", () => {
     const vigor = fluxosEmVigor(PAPEIS_PADRAO, {
       fluxos: [{ id: ID_DO_FLUXO_DA_ESTEIRA, nome: "Minha esteira", nos: [{ id: "po", tipo: "agente", refId: "po" }], arestas: [] }],
     });
-    expect(vigor.map((f) => f.id)).toEqual([ID_DO_FLUXO_DA_ESTEIRA, ID_DO_FLUXO_DO_ENSAIO]);
+    expect(vigor.map((f) => f.id)).toEqual([ID_DO_FLUXO_DA_ESTEIRA, ID_DO_FLUXO_DO_ENSAIO, ID_DO_FLUXO_DO_PDCA]);
     expect(vigor[0].origem).toBe("declarado");
     expect(vigor[0].nome).toBe("Minha esteira");
   });

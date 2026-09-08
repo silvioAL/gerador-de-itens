@@ -130,7 +130,7 @@ describe("validarEscritaFluxos (SPEC-35 + prova da fatia C)", () => {
     // o silêncio que a §9.3 recusa.
     [
       { fluxos: [{ id: "f", nos: [{ id: "a", tipo: "funcao", refId: "telepatia" }], arestas: [] }] },
-      /a função "telepatia", que não existe \(funções: derivacao, ensaio, pdca-feedback\)/,
+      /a função "telepatia", que não existe \(funções: derivacao, ensaio, pdca-feedback, pdca-ler-feedbacks, config-ler, config-propor-ajuste, config-aplicar-ajuste\)/,
     ],
     // SPEC-107 fatia B / SPEC-110 F — o nó de dados aponta para um dos três
     // refIds conhecidos; a recusa nomeia os três, não só o que foi negado.

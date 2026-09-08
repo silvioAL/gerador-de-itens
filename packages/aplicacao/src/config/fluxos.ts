@@ -475,9 +475,69 @@ export function fluxoDoEnsaio(): FluxoEmVigor {
   };
 }
 
+export const ID_DO_FLUXO_DO_PDCA = "pdca-melhoria";
+
+/**
+ * SPEC-110 fatia G (D13) — **o ciclo de melhoria como DESENHO.**
+ *
+ * O PDCA era um lugar (a aba) e vira um caminho visível: ler o que o time
+ * registrou, ler a configuração de hoje, um agente propor um ajuste, alguém
+ * revisar numa tela, e aplicar. Cada passo é um cartão — e é isso que permite
+ * ao time mudar o próprio ciclo sem código: trocar o gatilho para agendamento
+ * (fatia E), pôr outro papel a propor, acrescentar uma segunda revisão.
+ *
+ * **Nada aqui escreve configuração direto (D13).** O nó de propor cria uma
+ * SOLICITAÇÃO, com dono, versão-alvo e auditoria — o mesmo caminho de quem
+ * pede pela aba. Aplicar é o passo DEPOIS da tela, e passa pelo portão de
+ * sempre: sem permissão, o nó falha nomeando e o pedido fica pendente.
+ *
+ * Precisa de um papel ATIVO para ter quem proponha — sem agente, o ciclo
+ * ficaria com um buraco no meio, e um fluxo de fábrica quebrado é pior que
+ * fluxo nenhum (a mesma régua da esteira).
+ */
+export function fluxoDoPdca(papeis: PapelConfigurado[]): FluxoEmVigor | null {
+  const proponente = papeis.find((p) => p.ativo);
+  if (!proponente) return null;
+
+  return {
+    id: ID_DO_FLUXO_DO_PDCA,
+    nome: "Melhoria contínua (PDCA)",
+    nos: [
+      noDeGatilhoManual({ x: 60, y: 140 }),
+      { id: "feedbacks", tipo: "funcao", refId: "pdca-ler-feedbacks", posicao: { x: 340, y: 60 }, parametros: {} },
+      // A configuração que o agente precisa ver para propor sobre ela — e não
+      // sobre o que ele imagina que esteja lá.
+      { id: "config", tipo: "funcao", refId: "config-ler", posicao: { x: 340, y: 260 }, parametros: { chave: "regras" } },
+      { id: proponente.id, tipo: "agente", refId: proponente.id, posicao: { x: 620, y: 140 }, parametros: {} },
+      { id: "revisao", tipo: "tela", refId: "revisao-do-ajuste", posicao: { x: 900, y: 140 }, parametros: {} },
+      { id: "propoe", tipo: "funcao", refId: "config-propor-ajuste", posicao: { x: 1180, y: 140 }, parametros: {} },
+      { id: "aplica", tipo: "funcao", refId: "config-aplicar-ajuste", posicao: { x: 1460, y: 140 }, parametros: {} },
+    ],
+    arestas: [
+      { de: ID_DO_NO_DE_GATILHO, para: "feedbacks", mapeamento: [] },
+      { de: ID_DO_NO_DE_GATILHO, para: "config", mapeamento: [] },
+      // O agente lê os feedbacks em texto corrido e a config de hoje.
+      { de: "feedbacks", para: proponente.id, mapeamento: [{ saida: "resumo", entrada: "feedbacks" }] },
+      { de: "config", para: proponente.id, mapeamento: [{ saida: "documento", entrada: "configuracaoAtual" }] },
+      // A tela mostra as três coisas: o que motivou, o que se propõe, e como
+      // está hoje. Sem a configuração à vista, "aprovar" é aprovar no escuro.
+      { de: "feedbacks", para: "revisao", mapeamento: [{ saida: "resumo", entrada: "feedbacks" }] },
+      { de: proponente.id, para: "revisao", mapeamento: [{ saida: "texto", entrada: "proposta" }] },
+      { de: "config", para: "revisao", mapeamento: [{ saida: "documento", entrada: "configuracaoAtual" }] },
+      // Depois do Avançar: propor e aplicar. A descrição do pedido é o texto
+      // que o agente escreveu — é o que a aba PDCA vai mostrar a quem não
+      // estava na tela.
+      { de: "revisao", para: "propoe", mapeamento: [] },
+      { de: proponente.id, para: "propoe", mapeamento: [{ saida: "texto", entrada: "descricao" }] },
+      { de: "propoe", para: "aplica", mapeamento: [{ saida: "solicitacaoId", entrada: "solicitacaoId" }] },
+    ],
+    origem: "fabrica",
+  };
+}
+
 /** Declarados + as derivadas: a esteira (dos papéis), a exportação (do
- * destino de itens), a publicação (por destino de documento) e o ensaio
- * (sempre). Declarado vence fábrica no mesmo id. */
+ * destino de itens), a publicação (por destino de documento), o ensaio
+ * (sempre) e o PDCA (dos papéis). Declarado vence fábrica no mesmo id. */
 export function fluxosEmVigor(
   papeis: PapelConfigurado[],
   documentoFluxos: unknown,
@@ -488,6 +548,7 @@ export function fluxosEmVigor(
     configExportador ? fluxoDaExportacao(configExportador) : null,
     ...(configExportador ? fluxosDaPublicacao(configExportador) : []),
     fluxoDoEnsaio(),
+    fluxoDoPdca(papeis),
   ].filter((f): f is FluxoEmVigor => f !== null);
 
   const declarados: FluxoEmVigor[] = normalizarFluxos(documentoFluxos).fluxos.map((f) => ({

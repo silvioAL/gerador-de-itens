@@ -31,7 +31,7 @@ import { ConfigInvalida } from "./normalizacao.js";
  */
 
 export interface TelaDoSistema {
-  id: "bancada-de-ensaios" | "documento" | "mesa";
+  id: "bancada-de-ensaios" | "documento" | "mesa" | "revisao-do-ajuste";
   /** O rótulo nomeia a TELA como a pessoa a conhece (§2.3). */
   nome: string;
   /** O mesmo nome em duas palavras, para o cartão do canvas — a frase inteira
@@ -42,6 +42,22 @@ export interface TelaDoSistema {
   entrada: CampoDoConector[];
   /** A decisão + o que a pessoa aprovou/preencheu. */
   saida: CampoDoConector[];
+  /**
+   * SPEC-110 fatia G — os BLOCOS, quando a tela do sistema é desenhada em vez
+   * de programada.
+   *
+   * As três primeiras telas do sistema são componentes React de verdade (a
+   * bancada tem a mesa de cenários dentro; o documento tem a revisão de
+   * itens). A revisão de ajuste do PDCA não precisa de nada disso — ela mostra
+   * texto e pede uma decisão —, e um quarto componente só para isso seria
+   * código onde já existe um renderizador de blocos (fatia C).
+   *
+   * Por que aqui e não no template de config do time: uma cópia semeada no
+   * documento congelaria a tela na versão em que ela nasceu, e melhorar a
+   * revisão do PDCA numa versão nova não chegaria a ninguém — a mesma razão
+   * pela qual `telas` nasce vazio.
+   */
+  blocos?: BlocoDaTela[];
 }
 
 /**
@@ -88,6 +104,45 @@ export const TELAS_DO_SISTEMA: TelaDoSistema[] = [
       "Abre a mesa da demanda para desenhar ou conferir. É a PORTA para a mesa — quem quer o DADO da demanda usa os componentes de dados, não esta tela.",
     entrada: [{ chave: "demandaId", rotulo: "Demanda (id)", tipo: "texto" }],
     saida: [CAMPO_DA_DECISAO],
+  },
+  {
+    /**
+     * SPEC-110 fatia G (D13) — **onde alguém decide o ajuste da configuração.**
+     *
+     * É a tela que impede o ciclo do PDCA de virar automação cega: um agente
+     * lê os feedbacks e PROPÕE uma mudança de regra, e a execução para aqui
+     * até alguém olhar. Avançar aplica; retornar encerra sem aplicar nada, e o
+     * pedido continua na aba para quem quiser retomá-lo.
+     *
+     * Desenhada em blocos, não programada: ela mostra texto e pede uma
+     * decisão, e o renderizador da fatia C já faz isso.
+     */
+    id: "revisao-do-ajuste",
+    nome: "Revisar o ajuste proposto (PDCA)",
+    rotuloCurto: "Revisar ajuste",
+    descricao:
+      "Mostra os feedbacks que motivaram a proposta e o ajuste que o agente sugeriu. Avançar APLICA a mudança na configuração; retornar encerra sem aplicar.",
+    entrada: [
+      { chave: "feedbacks", rotulo: "Feedbacks que motivaram", tipo: "texto" },
+      { chave: "proposta", rotulo: "O ajuste proposto", tipo: "texto" },
+      { chave: "configuracaoAtual", rotulo: "A configuração de hoje", tipo: "objeto" },
+    ],
+    saida: [CAMPO_DA_DECISAO],
+    blocos: [
+      {
+        tipo: "texto",
+        markdown:
+          // O texto nomeia os BOTÕES como eles estão escritos: dizer "Avançar"
+          // onde o botão diz "Aplicar o ajuste" manda a pessoa procurar o que
+          // não existe na tela (§390).
+          "### Um ajuste de configuração está esperando você\n\nO agente leu o que o time registrou e propôs uma mudança. **“Aplicar o ajuste →” muda a configuração de verdade**; “← Não aplicar” encerra sem mexer em nada — e o pedido continua na aba PDCA, para quem quiser retomá-lo.",
+      },
+      { tipo: "dado", chave: "feedbacks", rotulo: "O que o time registrou", formato: "texto" },
+      { tipo: "dado", chave: "proposta", rotulo: "O que o agente propõe", formato: "texto" },
+      { tipo: "dado", chave: "configuracaoAtual", rotulo: "Como está hoje", formato: "objeto" },
+      { tipo: "acao", rotulo: "Aplicar o ajuste →", acao: "avancar" },
+      { tipo: "acao", rotulo: "← Não aplicar", acao: "retornar" },
+    ],
   },
 ];
 
@@ -270,7 +325,8 @@ export interface TelaEmVigor {
   origem: "sistema" | "declarada";
   entrada: CampoDoConector[];
   saida: CampoDoConector[];
-  /** Só nas declaradas: os blocos que o renderizador desenha. */
+  /** Os blocos que o renderizador desenha — em toda tela declarada e nas do
+   * sistema que são desenhadas em vez de programadas (fatia G). */
   blocos?: BlocoDaTela[];
 }
 
@@ -284,6 +340,7 @@ export function telasEmVigor(documentoTelas?: unknown): TelaEmVigor[] {
     origem: "sistema",
     entrada: t.entrada,
     saida: t.saida,
+    ...(t.blocos ? { blocos: t.blocos } : {}),
   }));
   const declaradas: TelaEmVigor[] = normalizarTelas(documentoTelas).telas.map((t) => {
     const contrato = contratoDaTelaDeclarada(t);
