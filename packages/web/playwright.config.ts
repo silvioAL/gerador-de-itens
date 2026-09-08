@@ -93,6 +93,14 @@ export default defineConfig({
         // ninguém usa — o `docker-compose.yml` declara, e é ele que descreve o
         // ambiente que a pessoa recebe.
         GATEWAY_FALSO_URL: "http://127.0.0.1:4123/v1",
+        /**
+         * SPEC-110 fatia D — a conexão que o conector de BANCO usa no E2E. O
+         * alvo é o PRÓPRIO Postgres descartável da suíte: ele já está de pé e
+         * é um banco de verdade, então a prova exercita o driver `pg`, não um
+         * dublê. O nome segue `nomeDaVariavel("e2e")`, que é o caminho real
+         * de uma instalação sem cofre.
+         */
+        GERADOR_CONEXAO_E2E: DATABASE_URL_TESTE,
       },
     },
     {

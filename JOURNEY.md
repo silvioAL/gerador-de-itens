@@ -17465,3 +17465,68 @@ vermelhos, e nenhum era real — eu tinha rodado `docker compose up -d --build`
 da stack REAL enquanto a suíte E2E corria na mesma máquina, e os timeouts do
 Playwright estouraram por contenção. A rodada que vale é a que roda sozinha; a
 regra da casa sobre isso não é cerimônia.
+
+## §394 — SPEC-110 D: o banco como componente (consulta, e só consulta)
+
+*"sinto falta de componente do banco de dados por exemplo e de configurações
+para essas coisas"* — um low-code que não lê dado de fora é um encanamento
+entre agentes.
+
+O catálogo de conectores ganhou `tipo: "http" | "banco"`. Ausente é http, e
+isso é compatibilidade sem migração: todo conector salvo antes desta fatia
+continua sendo lido como sempre (a mesma régua do gatilho, D8). O conector de
+banco não tem endereço — o "onde" dele é a connection string, e o "o quê" é o
+SQL.
+
+**As quatro travas, e por que nenhuma sozinha basta (R2):**
+
+1. **Parâmetros nomeados.** `:cliente` vira `$1` na borda e o VALOR viaja
+   separado do texto. É a única defesa real contra injeção — as outras três
+   reduzem o estrago. A tradução é pura e mora em `consultaEmBanco.ts`, para
+   que a única forma de mandar SQL ao banco seja essa.
+2. **`BEGIN TRANSACTION READ ONLY`.** A garantia de verdade do "só consulta". A
+   régua de texto da aplicação é heurística honesta — e está documentada como
+   tal; esta é do Postgres.
+3. **`SET LOCAL statement_timeout = 10s`.** Uma consulta que varre a tabela
+   inteira falha nomeada em vez de travar o fluxo para sempre.
+4. **LIMIT forçado** (100 por padrão, teto de 1000) — mas **respeitando o
+   `limit` que a pessoa escreveu**: sobrescrever seria mentir sobre o que roda.
+
+A varredura de `:param` foi a parte que exigiu cuidado: `::text` é cast do
+Postgres e não parâmetro; `':literal'`, `"identificador"` e comentários não
+contêm pedidos. A extração e a substituição usam a MESMA varredura (§263) —
+duas ideias de "o que é um parâmetro" divergiriam.
+
+**Os parâmetros batem nos DOIS sentidos** na escrita: declarado que o SQL não
+usa é pergunta sem propósito; usado sem declarar falharia só na execução, com
+o fluxo na mão. Os dois são silêncio, e a escrita os nomeia (SPEC-35).
+
+**Uma ponte que a SPEC não previu, e por que ela é fiel à D18.** A D6 diz que
+a connection string mora no cofre. Medido: `opcoesDoAmbiente()` devolve `null`
+em toda instalação sem Infisical — que é a maioria, e é o E2E. O conector
+nasceria morto. A ponte é o mesmo desenho de `provedorDaOrganizacao` (cofre
+decorando a fonte de sempre): **cofre quando existe, variável de ambiente
+quando não** (`GERADOR_CONEXAO_<CHAVE>`). A invariante da D18 é *"nunca no
+DOCUMENTO"*, e ela continua de pé — o documento guarda só a CHAVE. Uma
+connection string em variável de ambiente é onde ela mora num deploy em
+container; o próprio `DATABASE_URL` do produto vem de lá.
+
+O E2E aponta para o PRÓPRIO Postgres descartável da suíte, com a tabela
+`e2e_pedidos` semeada no `globalSetup` (o caminho que a SPEC indicou depois de
+medir). O alvo é um banco de verdade de propósito: um dublê de driver provaria
+o dublê, não o `pg`.
+
+§248 (trio, três sabotagens distintas): afrouxar a régua dos verbos de escrita;
+devolver o SQL sem LIMIT; trocar a recusa de parâmetro ausente por `null`.
+Cada uma vermelha na prova certa, restaurado verde.
+
+**A CI cobrou o que o local deixou passar:** as provas do conector de banco
+nasceram em arquivo próprio e passaram 144/144 aqui — e derrubaram
+`conectores.spec.ts` na CI. Dois arquivos de spec fazendo read-modify-write do
+documento GLOBAL de conectores em paralelo se apagam por lost update, a lição
+que a SPEC-107 D já tinha pago noutro documento. Ler só os NOSSOS ids não
+resolve: a corrida está entre o read e o write, não no filtro.
+
+A correção é por CONSTRUÇÃO, não por retentativa: as provas foram para o
+arquivo que já é dono do documento, e o arquivo virou `serial`. O Playwright
+paraleliza por arquivo — um arquivo, um dono. E é coeso: são todos conectores.

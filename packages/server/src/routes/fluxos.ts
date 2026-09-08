@@ -40,6 +40,9 @@ import { criarRepositorioDeItensGeradosEmPostgres } from "../adaptadores/itensGe
 import { criarRepositorioDeProdutosEmPostgres } from "../adaptadores/produtosEmPostgres.js";
 import { criarRepositorioDeQuebrasEmPostgres } from "../adaptadores/quebrasEmPostgres.js";
 import { executarConector } from "../adaptadores/executorDeConector.js";
+// SPEC-110 fatia D — o executor do conector de BANCO (pg, read-only).
+import { executarConsulta } from "../adaptadores/executorDeConsulta.js";
+import { criarCofreInfisical, opcoesDoAmbiente } from "../adaptadores/cofreInfisical.js";
 import { exigirNivel, maiorNivel, nivelNoTime } from "../auth/niveis.js";
 import { organizacaoPadraoDe, recursosCurados, resolverPermissoes } from "../auth/permissoes.js";
 import { registrarAuditoria } from "../auditoria.js";
@@ -71,6 +74,14 @@ import { exigirSessao } from "../auth/middleware.js";
 export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorioConfig }: OpcoesApp) {
   const casos = criarCasosDeUsoDeConfig(criarRepositorioDeConfigEmPostgres(db));
   const organizacaoPadrao = organizacaoPadraoDe(db);
+  /**
+   * SPEC-110 fatia D — o cofre, UMA instância (ele cacheia o token de acesso,
+   * como em `provedorDaOrganizacao`). Ausente quando a instalação não tem
+   * cofre: o conector de banco então falha NOMEANDO, em vez de tentar ler uma
+   * connection string que não existe.
+   */
+  const opcoesDoCofre = opcoesDoAmbiente();
+  const cofre = opcoesDoCofre ? criarCofreInfisical(opcoesDoCofre) : null;
   const resolverProvedor = criarResolvedorDeProvedor(db);
 
   const timeDoCorpo = (req: FastifyRequest) => ((req.body ?? {}) as { timeId?: string }).timeId ?? null;
@@ -174,7 +185,15 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
         conector: async (no, parametros) => {
           const conector = catalogo.find((c) => c.id === no.refId);
           if (!conector) throw new Error(`não conheço o conector "${no.refId}" — veja GET /conectores`);
-          const { saida, ausentes } = await executarConector(conector, parametros);
+          /**
+           * SPEC-110 fatia D — o TRANSPORTE decide o executor: HTTP fala rede,
+           * banco fala driver. O contrato do nó (entrada/saída declaradas) é o
+           * mesmo nos dois — quem fia não precisa saber qual é qual.
+           */
+          const { saida, ausentes } =
+            conector.tipo === "banco"
+              ? await executarConsulta(conector, parametros, cofre)
+              : await executarConector(conector, parametros);
           if (ausentes.length > 0) {
             // §9.3 — o que o próximo nó receberia como "vazio plausível" para
             // aqui, com o nome do que faltou.

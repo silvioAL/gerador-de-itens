@@ -194,6 +194,15 @@ const PASSOS_DE_USO: { titulo: string; texto: string }[] = [
       "De volta ao documento, a seção de itens mostra as sugestões PENDENTES: confirme campo a campo, edite, escreva por cima ou \"Confirmar todas\". Nada que a IA propõe vale antes disso.",
   },
   {
+    /**
+     * SPEC-110 fatia D (D19) — o gesto novo: buscar dado FORA. Sem este
+     * passo, o manual descreveria um produto que só fala com agentes.
+     */
+    titulo: "Traga dado de fora: uma chamada ou uma consulta",
+    texto:
+      "☰ Menu → Conectores: um conector é um endereço que a empresa chama (HTTP) ou uma CONSULTA no banco (Postgres). Na consulta, escreva o SELECT com :parâmetros — o valor nunca entra no texto do SQL — e guarde a conexão no cofre (ou na variável de ambiente que a tela indica). Ela roda em transação somente leitura, com tempo máximo e limite de linhas. Depois é só arrastar “+ Integração externa” no canvas e escolher o conector.",
+  },
+  {
     titulo: "Exporte e publique",
     texto:
       "Os fluxos \"Exportar prontos\" e \"Publicar documento\" levam os itens e o documento para onde o time trabalha — os destinos se cadastram no catálogo de integrações (☰ Menu → Conectores).",

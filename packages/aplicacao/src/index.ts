@@ -188,6 +188,18 @@ export {
 } from "./casos-de-uso/funcoes.js";
 /** SPEC-107 fatia B — o PROJETO como nó, nas duas direções. */
 export { PROJETO_DO_SISTEMA, REF_DO_PROJETO, type ProjetoDoSistema } from "./config/projeto.js";
+/** SPEC-110 fatia D — o banco como componente: consulta, e só consulta. */
+export {
+  LIMITE_MAXIMO_DA_CONSULTA,
+  LIMITE_PADRAO_DA_CONSULTA,
+  comLimite,
+  exigirConsultaValida,
+  parametrosDoSql,
+  problemaNaConsulta,
+  problemaNosParametros,
+  traduzirConsulta,
+  type ConsultaEmBanco,
+} from "./config/consultaEmBanco.js";
 /** SPEC-110 fatia B — a tela como nó: onde a pessoa entra no fluxo. */
 export {
   CAMPO_DA_DECISAO,
