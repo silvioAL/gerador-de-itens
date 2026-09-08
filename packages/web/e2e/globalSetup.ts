@@ -169,6 +169,12 @@ export default async function globalSetup() {
       // do time; num time compartilhado isso congelaria a esteira debaixo de
       // um spec vizinho no meio da corrida dele.
       "time-e2e-fluxos",
+      // SPEC-110 fatia H — a galeria escreve os documentos `fluxos` E `telas`
+      // do time inteiro (criar, renomear, trocar o rosto). Num time
+      // compartilhado isso apaga o desenho de um spec vizinho no meio da
+      // corrida dele — foi o que aconteceu com `jornada-e-cenarios`, que usa
+      // `time-checkout`.
+      "time-e2e-galeria",
     ];
     // Ninguém ALÉM deste e-mail pertence a estes times. Sem esta linha, uma
     // rodada antiga que os pendurou noutro usuário deixa a lista dele maior

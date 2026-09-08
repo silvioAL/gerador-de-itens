@@ -170,7 +170,7 @@ const PASSOS_DE_USO: { titulo: string; texto: string }[] = [
     // diz quando roda, e "▶ Rodar agora" é o gesto do gatilho manual. Sem
     // isso o manual ensinaria um botão que a tela não tem mais.
     texto:
-      "☰ Menu → Fluxos de integração (a esteira também abre sozinha ao derivar): o primeiro cartão é o GATILHO — ele diz quando o fluxo roda. Com o gatilho manual, \"▶ Rodar agora\" dispara os agentes (PO, Arquiteto, Especialista, QA) sobre a demanda aberta, ao vivo, nó a nó. Clicar num agente edita o papel dele — prompt, ligar/desligar, ordem.",
+      "☰ Menu → Fluxos de integração abre a GALERIA: os fluxos e as telas que este time tem, agrupados pelo momento em que servem (ensaiar, derivar, sair, melhorar) e com busca no topo. Cada cartão derivado diz DE ONDE nasce — “papéis da esteira →”, “destinos de exportação →” — e a seta leva à tela que o configura, então “onde se mexe nisso?” morre ali. Clicar num cartão abre o desenho dele; “+ Novo fluxo” e “+ Nova tela” criam do zero. Dentro do desenho: o primeiro cartão é o GATILHO — ele diz quando o fluxo roda. Com o gatilho manual, \"▶ Rodar agora\" dispara os agentes (PO, Arquiteto, Especialista, QA) sobre a demanda aberta, ao vivo, nó a nó. Clicar num agente edita o papel dele — prompt, ligar/desligar, ordem.",
   },
   {
     // SPEC-110 fatia F (D19) — o gesto que MUDOU: quem põe a demanda num

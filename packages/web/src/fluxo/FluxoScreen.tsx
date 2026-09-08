@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   applyNodeChanges,
   Background,
@@ -44,6 +44,8 @@ import {
   type Fluxo,
   type NoDoFluxo,
   type OperacaoDoGateway,
+  // SPEC-110 fatia H — a semente do fluxo novo, uma so (§263).
+  fluxoNovo,
 } from "@gerador/aplicacao";
 import {
   apiCatalogoDeConectores,
@@ -91,11 +93,10 @@ const CONFIG_DO_FLUXO = configDoFluxo();
  * nasce pedindo o trigger. Quem quer outro gatilho troca no painel; quem não
  * quer nenhum apaga — a validação tolera zero (D8).
  */
+// SPEC-110 fatia H — a semente mora na APLICAÇÃO agora (a galeria também
+// cria fluxos, e duas sementes divergiriam — foi o que aconteceu).
 const FLUXO_VAZIO = (id: string, nome: string): FluxoEmVigor => ({
-  id,
-  nome,
-  nos: [noDeGatilhoManual({ x: 80, y: 120 })],
-  arestas: [],
+  ...fluxoNovo(id, nome),
   origem: "declarado",
 });
 
@@ -234,7 +235,20 @@ export function FluxoScreen({
   /** SPEC-107 fatia D — o vivo (§2.4-9): que nó está rodando agora, e o
    * texto que o agente já escreveu, por nó. */
   const [vivo, setVivo] = useState<{ rodando: string | null; textos: Record<string, string> } | null>(null);
-  const [selecao, setSelecao] = useState<{ tipo: "no" | "aresta"; id: string } | null>(null);
+  /** A instância do canvas — só para re-enquadrar quando o desenho cresce. */
+  const canvasRef = useRef<{
+    fitView: (o?: { maxZoom?: number; padding?: number }) => void;
+    flowToScreenPosition?: (p: { x: number; y: number }) => { x: number; y: number };
+    getViewportSize?: () => { width: number; height: number };
+  } | null>(null);
+  /**
+   * Quantos nós o desenho tinha na última vez — é o que distingue "a pessoa
+   * adicionou um cartão" de "a pessoa arrastou um cartão". Só o primeiro
+   * re-enquadra: refazer a moldura a cada arrasto roubaria o controle de quem
+   * está posicionando as coisas à mão.
+   */
+  const quantosNos = useRef<number>(-1);
+    const [selecao, setSelecao] = useState<{ tipo: "no" | "aresta"; id: string } | null>(null);
   const [novoFluxoNome, setNovoFluxoNome] = useState("");
   /** SPEC-109 C — a última corrida de cada papel (§265, herdada do mapa que
    * morreu): "falhou há pouco" continua sendo notícia, agora no painel do nó. */
@@ -284,6 +298,34 @@ export function FluxoScreen({
   }, [abrirFluxoId]);
 
   const fluxo = useMemo(() => fluxos?.find((f) => f.id === fluxoId) ?? null, [fluxos, fluxoId]);
+
+  useEffect(() => {
+    const total = fluxo?.nos.length ?? 0;
+    const cresceu = quantosNos.current >= 0 && total > quantosNos.current;
+    quantosNos.current = total;
+    if (!cresceu) return;
+    /**
+     * **Só traz o cartão novo para dentro — não re-enquadra o desenho.**
+     *
+     * A primeira versão chamava `fitView`, e ela consertou um defeito criando
+     * outro: mexer no viewport a cada nó novo desloca TUDO, e quem estava no
+     * meio de um gesto (ligar dois cartões, arrastar um) perde o alvo debaixo
+     * do cursor. Um E2E pegou — o segundo arrastar parava de conectar.
+     *
+     * `fitView` só quando o desenho REALMENTE não cabe: é a diferença entre
+     * "você não está vendo o que acabou de criar" (que precisa de conserto) e
+     * "o desenho cresceu" (que não precisa de nada).
+     */
+    const instancia = canvasRef.current;
+    if (!instancia) return;
+    const fora = (fluxo?.nos ?? []).some((no) => {
+      const p = instancia.flowToScreenPosition?.({ x: no.posicao.x, y: no.posicao.y });
+      const area = instancia.getViewportSize?.();
+      if (!p || !area) return false;
+      return p.x < 0 || p.y < 0 || p.x > area.width || p.y > area.height;
+    });
+    if (fora) instancia.fitView({ maxZoom: 1, padding: 0.2 });
+  }, [fluxo?.nos.length]);
   // Fluxo de fábrica é DERIVADO — editar exige uma cópia (que vence a fábrica
   // no mesmo id), como um conector declarado vence um destino.
   const editavel = podeEditar && fluxo?.origem === "declarado";
@@ -1087,6 +1129,20 @@ export function FluxoScreen({
                 onNodeClick={(_e, node) => setSelecao({ tipo: "no", id: node.id })}
                 onEdgeClick={(_e, edge) => setSelecao({ tipo: "aresta", id: edge.id })}
                 onPaneClick={() => setSelecao(null)}
+                /**
+                 * SPEC-110 fatia H — **o cartão novo entra no enquadramento.**
+                 *
+                 * Sem isto, o nó recém-adicionado podia nascer FORA da área do
+                 * canvas — não da janela: abrir o painel de propriedades
+                 * encolhe a superfície de 1280 para 960, e o que cabia deixa
+                 * de caber (medido: handle em x=971 numa área de 960). A
+                 * pessoa clicava em "+ Agente" e não via nada acontecer.
+                 *
+                 * `onInit` guarda a instância porque re-enquadrar é um GESTO,
+                 * não um remonte: remontar o canvas a cada nó descartaria o
+                 * pan e o zoom que a pessoa ajustou.
+                 */
+                onInit={(instancia) => (canvasRef.current = instancia)}
                 onNodesChange={aoMudarNos}
                 onNodeDragStop={(_e, node) =>
                   // A posição escreve de volta no fluxo — no derivado também:
@@ -1112,7 +1168,23 @@ export function FluxoScreen({
                   );
                   setSelecao({ tipo: "aresta", id: `${conexao.source}->${conexao.target}` });
                 }}
+                /**
+                 * SPEC-110 fatia H — **o enquadramento tem teto.**
+                 *
+                 * `fitView` sozinho amplia até caber, e um fluxo RECÉM-CRIADO
+                 * tem um nó só: o canvas abria com o gatilho ocupando a tela
+                 * inteira, e o próximo cartão adicionado nascia FORA da vista
+                 * (medido: handles em x=1301 numa janela de 1280 — a pessoa
+                 * clicava em "+ Agente" e não via nada acontecer).
+                 *
+                 * Ficou invisível enquanto criar fluxo era gesto do canvas,
+                 * porque o fluxo nascia em memória sem passar pelo
+                 * enquadramento. A galeria salva antes de abrir, e o defeito
+                 * apareceu.
+                 */
                 fitView
+                fitViewOptions={{ maxZoom: 1, padding: 0.2 }}
+
                 proOptions={{ hideAttribution: true }}
               >
                 {/* As mesmas cores do canvas da mesa: os dois grafos são

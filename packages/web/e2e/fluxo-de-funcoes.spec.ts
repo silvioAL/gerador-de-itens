@@ -1,6 +1,8 @@
 ﻿import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test, expect, type Page } from "@playwright/test";
+// SPEC-110 fatia H — o canvas se alcança por um endereço COM id.
+import { ID_DO_FLUXO_DO_ENSAIO } from "@gerador/aplicacao";
 import { entrar } from "./auth";
 import { derivarNaMesa } from "./derivar";
 import { BASE_URL_GATEWAY_FALSO, CHAVE_GATEWAY_FALSO, DESENHO_DO_GATEWAY_FALSO, MODELO_GATEWAY_FALSO } from "@gerador/gateway-falso";
@@ -81,9 +83,10 @@ test("a fiação da derivação (modo b) roda pela tela, com o rastro gravando a
       },
     });
 
-    await page.goto("/#/fluxo");
+    // SPEC-110 fatia H — `#/fluxo` sem id abre a GALERIA; o endereço COM id
+    // continua abrindo o canvas, e é o caminho direto de quem já sabe qual.
+    await page.goto("/#/fluxo/itens-da-demanda-e2e");
     await expect(page.getByTestId("fluxo-screen")).toBeVisible();
-    await page.getByTestId("seletor-de-fluxo").selectOption("itens-da-demanda-e2e");
     await expect(page.locator(".react-flow__node")).toHaveCount(3);
     // O cartão diz o que o nó É — a família e o rótulo genérico (§2.3), no
     // MESMO cartão da mesa (fatia D).
@@ -125,7 +128,15 @@ test("a função entra pela paleta já com o contrato à mostra — sem adaptado
   test.setTimeout(90000);
   const original = (await (await page.request.get(`${API}/config/fluxos?timeId=time-portabilidade`)).json()).documento;
   try {
-    await page.goto("/#/fluxo");
+    /**
+     * SPEC-110 fatia H — criar fluxo é gesto da GALERIA agora: `#/fluxo` sem
+     * id abre a vitrine, e "+ Novo fluxo" leva ao canvas já no fluxo criado.
+     * O E2E passa a exercitar o caminho que a pessoa tem.
+     */
+    // SPEC-110 fatia H — `#/fluxo` sem id abre a galeria; o canvas se alcança
+    // por um endereço COM id, e criar aqui continua sendo gesto do canvas (a
+    // criação pela galeria tem prova própria).
+    await page.goto(`/#/fluxo/${ID_DO_FLUXO_DO_ENSAIO}`);
     await expect(page.getByTestId("fluxo-screen")).toBeVisible();
     await page.getByLabel("Nome do fluxo novo").fill("Funções E2E");
     await page.getByTestId("criar-fluxo").click();
@@ -229,9 +240,10 @@ test("tipos que não combinam AVISAM sem bloquear, e o documento ganha preview n
       },
     });
 
-    await page.goto("/#/fluxo");
+    // SPEC-110 fatia H — `#/fluxo` sem id abre a GALERIA; o endereço COM id
+    // continua abrindo o canvas, e é o caminho direto de quem já sabe qual.
+    await page.goto("/#/fluxo/com-documento-e2e");
     await expect(page.getByTestId("fluxo-screen")).toBeVisible();
-    await page.getByTestId("seletor-de-fluxo").selectOption("com-documento-e2e");
     // Aviso, não bloqueio (§230): o par errado é dito com os dois tipos, e o
     // Executar segue habilitado.
     await expect(page.getByTestId("aviso-de-mapeamento")).toContainText('"itens" (lista) → "desenho" (objeto)');
@@ -286,9 +298,10 @@ test("o gate suspende, sobrevive ao F5 e continua do ponto exato", async ({ page
       },
     });
 
-    await page.goto("/#/fluxo");
+    // SPEC-110 fatia H — `#/fluxo` sem id abre a GALERIA; o endereço COM id
+    // continua abrindo o canvas, e é o caminho direto de quem já sabe qual.
+    await page.goto("/#/fluxo/gate-e2e");
     await expect(page.getByTestId("fluxo-screen")).toBeVisible();
-    await page.getByTestId("seletor-de-fluxo").selectOption("gate-e2e");
     // O gate se anuncia no cartão antes de qualquer execução (⏸).
     await expect(page.locator(`.react-flow__node[data-id="gera"]`)).toContainText("⏸");
 

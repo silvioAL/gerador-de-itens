@@ -98,6 +98,15 @@ export interface ArestaDoFluxo {
 export interface Fluxo {
   id: string;
   nome: string;
+  /**
+   * SPEC-110 fatia H (D14) — **o rosto do fluxo na galeria.**
+   *
+   * Emoji, pelo precedente dos rostos dos papéis: zero asset para servir,
+   * legível nos dois temas, e editável por quem não sabe desenhar ícone. A
+   * ausência é legítima — a galeria põe um padrão por família, e um fluxo
+   * salvo antes desta fatia não nasce feio nem quebrado.
+   */
+  icone?: string;
   nos: NoDoFluxo[];
   arestas: ArestaDoFluxo[];
 }
@@ -175,6 +184,9 @@ export function normalizarFluxos(documento: unknown): ConfigFluxos {
     fluxos.push({
       id,
       nome: typeof cru.nome === "string" && cru.nome.trim() ? cru.nome.trim() : id,
+      // SPEC-110 fatia H — o rosto só entra quando diz algo: vazio ou
+      // só-espaço não vira dado, pela mesma régua do `nome` do nó.
+      ...(typeof cru.icone === "string" && cru.icone.trim() ? { icone: cru.icone.trim() } : {}),
       nos,
       arestas,
     });
@@ -315,6 +327,7 @@ export function fluxoDaEsteira(papeis: PapelConfigurado[]): FluxoEmVigor | null 
 
   return {
     id: ID_DO_FLUXO_DA_ESTEIRA,
+    icone: "🤖",
     nome: "Esteira de agentes (da configuração)",
     nos,
     arestas,
@@ -342,6 +355,7 @@ export function fluxoDaExportacao(configExportador: ConfigExportador): FluxoEmVi
 
   return {
     id: ID_DO_FLUXO_DA_EXPORTACAO,
+    icone: "📤",
     nome: "Exportar prontos (da configuração)",
     nos: [
       noDeGatilhoManual({ x: 60, y: 120 }),
@@ -386,6 +400,7 @@ export function fluxosDaPublicacao(configExportador: ConfigExportador): FluxoEmV
   const destinos = destinosDaOperacao(configExportador, "documento");
   return destinos.map((destino) => ({
     id: destinos.length === 1 ? ID_DO_FLUXO_DA_PUBLICACAO : `${ID_DO_FLUXO_DA_PUBLICACAO}-${destino.id}`,
+    icone: "📄",
     nome:
       destinos.length === 1
         ? "Publicar documento (da configuração)"
@@ -450,6 +465,7 @@ export const ID_DO_FLUXO_DO_ENSAIO = "ensaio-de-cenarios";
 export function fluxoDoEnsaio(): FluxoEmVigor {
   return {
     id: ID_DO_FLUXO_DO_ENSAIO,
+    icone: "🧪",
     nome: "Ensaio de cenários",
     nos: [
       noDeGatilhoManual({ x: 60, y: 120 }),
@@ -473,6 +489,20 @@ export function fluxoDoEnsaio(): FluxoEmVigor {
     ],
     origem: "fabrica",
   };
+}
+
+/**
+ * SPEC-110 fatia H — **um fluxo novo nasce com o GATILHO**, venha ele do
+ * canvas ou da galeria.
+ *
+ * A semente morava privada dentro da `FluxoScreen`. Quando a galeria passou a
+ * criar fluxos (D14), ela nasceu criando `nos: []` — e o fluxo novo vinha sem
+ * o cartão que diz quando ele roda, contradizendo a promessa da fatia A. Um
+ * E2E pegou; a correção é a semente ter UM dono (§263), e ele ser a camada que
+ * define o que um fluxo É.
+ */
+export function fluxoNovo(id: string, nome: string): Fluxo {
+  return { id, nome, nos: [noDeGatilhoManual({ x: 80, y: 120 })], arestas: [] };
 }
 
 export const ID_DO_FLUXO_DO_PDCA = "pdca-melhoria";
@@ -501,6 +531,7 @@ export function fluxoDoPdca(papeis: PapelConfigurado[]): FluxoEmVigor | null {
 
   return {
     id: ID_DO_FLUXO_DO_PDCA,
+    icone: "♻️",
     nome: "Melhoria contínua (PDCA)",
     nos: [
       noDeGatilhoManual({ x: 60, y: 140 }),

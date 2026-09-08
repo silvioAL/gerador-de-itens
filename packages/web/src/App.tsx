@@ -70,6 +70,8 @@ import {
 import { MolduraDoStage } from "./fluxo/MolduraDoStage";
 // SPEC-110 fatia C — o renderizador das telas do time (o mesmo do preview).
 import { RenderizadorDaTela, rotulosDasAcoes, useMotivoParaNaoAvancar } from "./fluxo/RenderizadorDaTela";
+// SPEC-110 fatia H — a galeria: onde os fluxos e as telas moram.
+import { GaleriaDeFluxos } from "./fluxo/GaleriaDeFluxos";
 import { useSessao } from "./auth/useSessao";
 import { LoginScreen } from "./auth/LoginScreen";
 import { useQuebra } from "./state/useQuebra";
@@ -531,9 +533,17 @@ function AppCarregado({
   const { rota, navegar } = useRotaHash();
   const mostrarConfig = rota.tela === "config";
   const mostrarDocumento = rota.tela === "documento";
-  // SPEC-107 G4 — a tela de ensaios morreu: a bancada vive junto do fluxo
-  // (`#/fluxo/ensaio`), medindo pela fiação semeada em vez de simular aqui.
-  const mostrarFluxos = rota.tela === "fluxo";
+  /**
+   * SPEC-107 G4 — a tela de ensaios morreu: a bancada vive junto do fluxo
+   * (`#/fluxo/ensaio`), medindo pela fiação semeada em vez de simular aqui.
+   *
+   * SPEC-110 fatia H (D14) — **`#/fluxo` SEM id abre a GALERIA**, não o
+   * canvas. Um dropdown responde "qual eu abro agora?"; ele não responde "o
+   * que existe aqui?", que é a pergunta de quem chega. Os endereços COM id
+   * (`#/fluxo/<id>`) continuam abrindo o canvas — todo link salvo sobrevive.
+   */
+  const mostrarGaleria = rota.tela === "fluxo" && !rota.fluxoId;
+  const mostrarFluxos = rota.tela === "fluxo" && Boolean(rota.fluxoId);
   /**
    * SPEC-110 fatia B (D2/D17c) — **o STAGE: uma execução parada numa tela.**
    *
@@ -598,7 +608,16 @@ function AppCarregado({
    * telas declaradas. Nesses casos a mesa sai de cena: empilhar os dois
    * cabeçalhos convida a gestos da tela errada (a aspereza anotada na fatia B).
    */
-  const emStageProprio = rota.tela === "telaDoStage";
+  /**
+   * SPEC-110 fatia B — o STAGE é dono da tela.
+   *
+   * SPEC-110 fatia H — a GALERIA também. A validação visual mostrou a vitrine
+   * desenhada ABAIXO da barra da mesa: a paleta ("+ Serviço", "+ Fila Rabbit"),
+   * o Salvar e os contadores de prontidão ficavam por cima de uma tela que não
+   * é a mesa. Empilhar dois cabeçalhos convida a gestos da tela errada — a
+   * mesma aspereza que a fatia B anotou.
+   */
+  const emStageProprio = rota.tela === "telaDoStage" || (rota.tela === "fluxo" && !rota.fluxoId);
 
   /** SPEC-110 B — o Avançar e o Retornar da moldura, num lugar só. */
   const decidirNoStage = useCallback(
@@ -2257,6 +2276,17 @@ function AppCarregado({
         />
       )}
 
+      {/* SPEC-110 fatia H — a galeria é a porta: `#/fluxo` sem id. */}
+      {mostrarGaleria && (
+        <GaleriaDeFluxos
+          timeAtivo={quebra.time ?? timeAtivo}
+          aoAbrirFluxo={(id) => navegar({ tela: "fluxo", fluxoId: id })}
+          // Tela sem id = criar uma nova: o editor da fatia C já abre vazio.
+          aoAbrirTela={(id) => navegar({ tela: "config", area: "telas", ...(id ? { telaId: id } : {}) })}
+          aoAbrirConfig={(area) => navegar({ tela: "config", area: area as never })}
+          aoFechar={() => navegar({ tela: "canvas" })}
+        />
+      )}
       {mostrarFluxos && (
         <FluxoScreen
           timeAtivo={quebra.time ?? timeAtivo}
