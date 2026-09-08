@@ -17857,3 +17857,16 @@ cópia" como única porta fica vermelho.
 
 Portões (cinco): typecheck/build/test/lint verdes, 2324 testes.
 E2E 156/156 em banco recriado. Visual conferida nos dois temas contra :8080.
+
+**A CI cobrou uma asserção sobre sequência não-atômica.** O E2E do PDCA (fatia
+G) caiu na CI desta fatia — verde aqui, vermelho lá, com "aprovada" onde se
+esperava "aplicada". O mecanismo, medido: `aplicarSolicitacao` faz DUAS
+escritas — grava o documento de configuração e só então marca a solicitação
+como aplicada. O teste fazia poll do documento e, no instante em que ele
+mudava, lia o estado de uma vez. Nessa máquina a janela entre as duas escritas
+é curta demais para aparecer; na CI, não. A correção é fazer poll do estado
+também: a prova é sobre o resultado, não sobre a ordem interna das gravações.
+
+Confirmado por medição antes da correção: 13 execuções locais, 13 solicitações,
+todas `aplicada`, zero duplicadas — o defeito não era o fluxo propor duas
+vezes, era o teste ler cedo demais.

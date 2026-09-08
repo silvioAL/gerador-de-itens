@@ -127,11 +127,27 @@ test("o ajuste para na TELA, e só o Avançar aplica na configuração", async (
       )
       .toContain(marca);
 
-    // ── 6. E a aba PDCA conta a mesma história: o pedido está aplicado ──
-    const ajustes = (await (await page.request.get(`${API}/ajustes`)).json()) as { descricao: string; estado: string }[];
-    const daFiacao = ajustes.find((a) => a.descricao.includes(marca));
-    expect(daFiacao).toBeDefined();
-    expect(daFiacao!.estado).toBe("aplicada");
+    /**
+     * ── 6. E a aba PDCA conta a mesma história: o pedido está aplicado ──
+     *
+     * Com POLL, não com leitura única: aplicar grava o documento de
+     * configuração e SÓ DEPOIS marca a solicitação como "aplicada" — são duas
+     * escritas, não uma. Ler o estado no instante em que a config mudou pega
+     * a janela entre elas e vê "aprovada". Aqui isso nunca acontecia; na CI,
+     * mais lenta, aconteceu (§398).
+     */
+    await expect
+      .poll(
+        async () => {
+          const ajustes = (await (await page.request.get(`${API}/ajustes`)).json()) as {
+            descricao: string;
+            estado: string;
+          }[];
+          return ajustes.find((a) => a.descricao.includes(marca))?.estado ?? "sem solicitação";
+        },
+        { timeout: 30000 }
+      )
+      .toBe("aplicada");
   } finally {
     await page.request.put(`${API}/config/fluxos`, { data: { documento: original, timeId: "time-checkout" } });
   }
