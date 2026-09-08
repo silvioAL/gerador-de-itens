@@ -5,7 +5,8 @@ import { GATILHOS_DO_SISTEMA, ID_DO_NO_DE_GATILHO, gatilhoDoSistema } from "./ga
 // SPEC-110 fatia E — o relogio: a expressao do agendamento e validada na
 // escrita, com a mesma regua pura que o painel usa para prever a proxima.
 import { problemaNoCron } from "./cron.js";
-import { REF_DO_PROJETO } from "./projeto.js";
+// SPEC-110 fatia F — o no de dados deixou de ter um refId so.
+import { REF_DA_DEMANDA_GRAVAR, REF_DA_DEMANDA_LER, REFS_DE_DADOS } from "./projeto.js";
 import { TELAS_DO_SISTEMA, telaDoSistema } from "./telas.js";
 import {
   ConfigInvalida,
@@ -266,7 +267,7 @@ export function fluxoDaEsteira(papeis: PapelConfigurado[]): FluxoEmVigor | null 
    */
   const nos: NoDoFluxo[] = [
     noDeGatilhoManual({ x: 60, y: 120 }),
-    { id: "demanda", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 340, y: 120 }, parametros: {} },
+    { id: "demanda", tipo: "projeto", refId: REF_DA_DEMANDA_LER, posicao: { x: 340, y: 120 }, parametros: {} },
     ...ativos.map((papel, i) => ({
       id: papel.id,
       tipo: "agente" as const,
@@ -277,7 +278,7 @@ export function fluxoDaEsteira(papeis: PapelConfigurado[]): FluxoEmVigor | null 
     {
       id: "grava",
       tipo: "projeto",
-      refId: REF_DO_PROJETO,
+      refId: REF_DA_DEMANDA_GRAVAR,
       posicao: { x: 620 + ativos.length * 260, y: 120 },
       parametros: {},
     },
@@ -344,9 +345,9 @@ export function fluxoDaExportacao(configExportador: ConfigExportador): FluxoEmVi
     nome: "Exportar prontos (da configuração)",
     nos: [
       noDeGatilhoManual({ x: 60, y: 120 }),
-      { id: "demanda", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 340, y: 120 }, parametros: {} },
+      { id: "demanda", tipo: "projeto", refId: REF_DA_DEMANDA_LER, posicao: { x: 340, y: 120 }, parametros: {} },
       { id: "envio", tipo: "conector", refId: destinos[0].id, componente: "itens", posicao: { x: 620, y: 120 }, parametros: {} },
-      { id: "grava", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 900, y: 120 }, parametros: {} },
+      { id: "grava", tipo: "projeto", refId: REF_DA_DEMANDA_GRAVAR, posicao: { x: 900, y: 120 }, parametros: {} },
     ],
     arestas: [
       { de: ID_DO_NO_DE_GATILHO, para: "demanda", mapeamento: [] },
@@ -391,9 +392,9 @@ export function fluxosDaPublicacao(configExportador: ConfigExportador): FluxoEmV
         : `Publicar documento — ${destino.rotulo || destino.id} (da configuração)`,
     nos: [
       noDeGatilhoManual({ x: 60, y: 120 }),
-      { id: "demanda", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 340, y: 120 }, parametros: {} },
+      { id: "demanda", tipo: "projeto", refId: REF_DA_DEMANDA_LER, posicao: { x: 340, y: 120 }, parametros: {} },
       { id: "publica", tipo: "conector", refId: destino.id, componente: "documento", posicao: { x: 620, y: 120 }, parametros: {} },
-      { id: "grava", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 900, y: 120 }, parametros: {} },
+      { id: "grava", tipo: "projeto", refId: REF_DA_DEMANDA_GRAVAR, posicao: { x: 900, y: 120 }, parametros: {} },
     ],
     arestas: [
       { de: ID_DO_NO_DE_GATILHO, para: "demanda", mapeamento: [] },
@@ -452,7 +453,7 @@ export function fluxoDoEnsaio(): FluxoEmVigor {
     nome: "Ensaio de cenários",
     nos: [
       noDeGatilhoManual({ x: 60, y: 120 }),
-      { id: "demanda", tipo: "projeto", refId: REF_DO_PROJETO, posicao: { x: 340, y: 120 }, parametros: {} },
+      { id: "demanda", tipo: "projeto", refId: REF_DA_DEMANDA_LER, posicao: { x: 340, y: 120 }, parametros: {} },
       { id: "ensaio", tipo: "funcao", refId: "ensaio", posicao: { x: 620, y: 120 }, parametros: {} },
       { id: "bancada", tipo: "tela", refId: "bancada-de-ensaios", posicao: { x: 900, y: 120 }, parametros: {} },
       { id: "derivacao", tipo: "funcao", refId: "derivacao", posicao: { x: 1180, y: 120 }, parametros: {} },
@@ -577,11 +578,17 @@ export function validarEscritaFluxos(documento: unknown): void {
           `no fluxo "${id}", o nó "${noId}" aponta para a função "${no.refId.trim()}", que não existe (funções: ${FUNCOES_DO_SISTEMA.map((f) => f.id).join(", ")})`
         );
       }
-      // O projeto não tem adaptador: o refId é o próprio "projeto", e qualquer
-      // outra coisa seria um id que nunca vai ganhar executor (§9.3).
-      if (no.tipo === "projeto" && no.refId.trim() !== REF_DO_PROJETO) {
+      /**
+       * SPEC-110 fatia F — a lista deixou de ter um item só. O nó de dados
+       * aponta para `demanda-ler`, `demanda-gravar` ou o `projeto` LEGADO —
+       * e nada mais, porque um refId sem executor é um nó que só falha na
+       * execução (§9.3). O legado fica na lista de propósito: recusá-lo
+       * trancaria fluxos já salvos, e a demanda de alguém não pode ficar
+       * insalvável por uma decisão nossa de vocabulário.
+       */
+      if (no.tipo === "projeto" && !(REFS_DE_DADOS as readonly string[]).includes(no.refId.trim())) {
         throw new ConfigInvalida(
-          `no fluxo "${id}", o nó "${noId}" é de projeto e o refId precisa ser "${REF_DO_PROJETO}" (a demanda é o parâmetro "demandaId", não o adaptador)`
+          `no fluxo "${id}", o nó "${noId}" é de dados da demanda e o refId precisa ser um destes: ${REFS_DE_DADOS.join(", ")} (a demanda é o parâmetro "demandaId", não o adaptador)`
         );
       }
       // A transformação sem campos (ou com campo pela metade) só falharia na

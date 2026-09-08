@@ -26,6 +26,12 @@ import {
   telasEmVigor,
   type TelaEmVigor,
   PROJETO_DO_SISTEMA,
+  // SPEC-110 fatia F — a demanda desdobrada: a direcao e do componente.
+  AVISO_DO_PROJETO_LEGADO,
+  DADOS_DO_SISTEMA,
+  dadoDoSistema,
+  REF_DA_DEMANDA_GRAVAR,
+  REF_DA_DEMANDA_LER,
   REF_DO_PROJETO,
   sanearCamposDaTransformacao,
   avisosDeMapeamento,
@@ -297,7 +303,14 @@ export function FluxoScreen({
         const funcao = funcaoDoSistema(no.refId);
         return funcao ? { entrada: funcao.entrada, saida: funcao.saida } : null;
       }
-      if (no.tipo === "projeto") return { entrada: PROJETO_DO_SISTEMA.entrada, saida: PROJETO_DO_SISTEMA.saida };
+      // SPEC-110 fatia F — o contrato é do COMPONENTE escolhido. É por aqui
+      // que o painel de mapeamento oferece campos: com o contrato fundido, um
+      // nó de leitura oferecia "gravar o link publicado", e um de escrita
+      // oferecia emitir o documento — pares que a execução nunca honraria.
+      if (no.tipo === "projeto") {
+        const dado = dadoDoSistema(no.refId);
+        return dado ? { entrada: dado.entrada, saida: dado.saida } : { entrada: PROJETO_DO_SISTEMA.entrada, saida: PROJETO_DO_SISTEMA.saida };
+      }
       // SPEC-110 A — o gatilho declara a saída dele (vazia no manual; o
       // webhook da fatia L emite o payload): entrada ele não tem, é o começo.
       if (no.tipo === "gatilho") {
@@ -383,7 +396,11 @@ export function FluxoScreen({
             ? "(escolha o papel)"
             : "(escolha a integração)";
       if (no.tipo === "funcao") return funcaoDoSistema(no.refId)?.nome ?? no.refId;
-      if (no.tipo === "projeto") return PROJETO_DO_SISTEMA.nome;
+      // SPEC-110 fatia F — o cartão diz a DIREÇÃO. Era aqui que a queixa M9
+      // nascia: dois nós idênticos chamados "Mesa de projeto", um lendo e
+      // outro gravando, e a única forma de saber qual era qual era seguir a
+      // aresta com o dedo. O legado mantém o nome antigo — ele É o antigo.
+      if (no.tipo === "projeto") return dadoDoSistema(no.refId)?.rotuloCurto ?? PROJETO_DO_SISTEMA.nome;
       if (no.tipo === "transformacao") {
         // O cartão diz O QUE ela produz — as chaves de saída declaradas.
         const campos = sanearCamposDaTransformacao((no as NoDoFluxo).parametros?.campos);
@@ -591,20 +608,22 @@ export function FluxoScreen({
     });
   }
 
-  /** SPEC-107 fatia B — o projeto também nasce pronto: o refId é o próprio
-   * "projeto"; a demanda é o parâmetro `demandaId` (vazio = a ativa). */
-  function adicionarProjeto() {
+  /**
+   * SPEC-107 fatia B / SPEC-110 fatia F — o nó de dados nasce pronto E com a
+   * DIREÇÃO escolhida. A paleta pergunta o que a pessoa quer fazer (ler ou
+   * gravar) em vez de entregar um nó ambíguo que ela descobre depois pela
+   * fiação. A demanda continua sendo o parâmetro `demandaId` (vazio = a ativa).
+   */
+  function adicionarDado(refId: string) {
     mudarFluxo((f) => {
+      const prefixo = refId === REF_DA_DEMANDA_GRAVAR ? "grava" : refId === REF_DA_DEMANDA_LER ? "demanda" : "projeto";
       let n = 1;
-      while (f.nos.some((no) => no.id === `projeto-${n}`)) n++;
-      const id = `projeto-${n}`;
+      while (f.nos.some((no) => no.id === `${prefixo}-${n}`)) n++;
+      const id = `${prefixo}-${n}`;
       setSelecao({ tipo: "no", id });
       return {
         ...f,
-        nos: [
-          ...f.nos,
-          { id, tipo: "projeto", refId: REF_DO_PROJETO, posicao: proximaPosicao(f.nos), parametros: {} },
-        ],
+        nos: [...f.nos, { id, tipo: "projeto", refId, posicao: proximaPosicao(f.nos), parametros: {} }],
       };
     });
   }
@@ -930,10 +949,18 @@ export function FluxoScreen({
                 + {f.nome}
               </button>
             ))}
-            {/* SPEC-107 fatia B — a demanda como capacidade, nas duas direções. */}
-            <button data-testid="add-projeto" disabled={!editavel} onClick={adicionarProjeto} style={botao}>
-              + {PROJETO_DO_SISTEMA.nome}
-            </button>
+            {/* SPEC-107 fatia B / SPEC-110 F — a demanda como capacidade, com
+                a direção NA PALETA: dois botões, dois componentes. O legado
+                "Mesa de projeto" não é mais oferecido — ele existe para fluxos
+                salvos, não para desenhos novos. */}
+            {DADOS_DO_SISTEMA.map((d) => (
+              // Na PALETA vai o nome inteiro ("Demanda — ler"): fora do
+              // cartão não há cabeçalho de família para completar a frase, e
+              // um botão "+ Ler" no meio de "+ Agente" não diz ler o quê.
+              <button key={d.id} data-testid={`add-${d.id}`} disabled={!editavel} onClick={() => adicionarDado(d.id)} style={botao}>
+                + {d.nome}
+              </button>
+            ))}
             {/* SPEC-107 fatia E — a transformação pura (o Set do n8n). */}
             <button data-testid="add-transformacao" disabled={!editavel} onClick={adicionarTransformacao} style={botao}>
               + Transformação
@@ -1118,7 +1145,6 @@ export function FluxoScreen({
                 podeEditar={editavel}
                 podeEditarPapel={podeEditarPapel}
                 onSalvarPapel={salvarPapel}
-                onAbrirMesa={onFechar}
                 aoAbrirConfigDaEspecificacao={aoAbrirConfigDaEspecificacao}
                 // SPEC-109 C — o lugar do papel NA ESTEIRA (herdado do mapa
                 // que morreu): ligar/desligar, ordem e a última corrida.
@@ -1335,7 +1361,6 @@ function PainelDoNo({
   onSalvarPapel,
   onMudar,
   onRemover,
-  onAbrirMesa,
   esteira,
   aoAbrirConfigDaEspecificacao,
   telas,
@@ -1353,8 +1378,6 @@ function PainelDoNo({
   onSalvarPapel: (refId: string, mudanca: { nome: string; descricao: string; preambulo: string }) => Promise<void>;
   onMudar: (mudanca: Partial<NoDoFluxo>) => void;
   onRemover: () => void;
-  /** §3.1 — "a mesa vira COMPONENTE": o nó de projeto é a porta para ela. */
-  onAbrirMesa?: () => void;
   /** SPEC-109 C — o lugar do papel NA ESTEIRA (ligar/desligar, ordem, última
    * corrida), herdado do mapa do sistema que morreu (§260/§265). */
   esteira?: {
@@ -1380,7 +1403,9 @@ function PainelDoNo({
   // SPEC-107 fatia A — a função É a capacidade: contrato do registro fechado,
   // sem adaptador a escolher.
   const funcao = no.tipo === "funcao" ? funcaoDoSistema(no.refId) : undefined;
-  const projeto = no.tipo === "projeto" ? PROJETO_DO_SISTEMA : undefined;
+  // SPEC-110 fatia F — o contrato do componente ESCOLHIDO; o legado cai no
+  // fundido, que é exatamente o que ele é.
+  const projeto = no.tipo === "projeto" ? (dadoDoSistema(no.refId) ?? PROJETO_DO_SISTEMA) : undefined;
   const camposDaTransformacao =
     no.tipo === "transformacao" ? sanearCamposDaTransformacao(no.parametros?.campos) : null;
   // §368 — o COMPONENTE diz quais adaptadores servem: mesma operação para os
@@ -1436,14 +1461,26 @@ function PainelDoNo({
             : no.tipo === "projeto"
               ? (
                   <>
-                    Mesa de projeto (a demanda, nas duas direções){" "}
-                    {/* §3.1 — "a mesa vira COMPONENTE": o nó de projeto é a
-                        porta para ela, como o usuário desenhou ("um componente
-                        que possamos abrir e usar a mesa de projeto"). */}
-                    {onAbrirMesa && (
-                      <button onClick={onAbrirMesa} style={{ ...botao, marginLeft: 6 }} data-testid="abrir-mesa-do-projeto">
-                        Abrir a mesa de projeto →
-                      </button>
+                    {/**
+                     * SPEC-110 fatia F — o painel diz a direção e o que ela
+                     * implica. A porta "Abrir a mesa de projeto" SAIU daqui
+                     * (D12): quem quer DADO usa ler/gravar; quem quer que
+                     * alguém entre no meio do fluxo põe a tela `mesa` da
+                     * fatia B. Um nó de dados com botão de abrir tela era o
+                     * mesmo cartão respondendo a duas perguntas.
+                     */}
+                    {/* O NOME, não a descrição: o bloco `contrato-do-projeto`
+                        logo abaixo já a traz, e a validação visual mostrou o
+                        mesmo parágrafo impresso duas vezes no painel. */}
+                    {dadoDoSistema(no.refId)?.nome ?? PROJETO_DO_SISTEMA.nome}
+                    {/* `--amarelo` tem par declarado nos dois temas
+                        (styles.css). A validação visual pegou um
+                        `var(--aviso)` que não existe: o aviso caía na cor do
+                        texto comum e não se distinguia de nada. */}
+                    {no.refId === REF_DO_PROJETO && (
+                      <div data-testid="aviso-do-projeto-legado" style={{ marginTop: 4, color: "var(--amarelo)" }}>
+                        {AVISO_DO_PROJETO_LEGADO}
+                      </div>
                     )}
                   </>
                 )
@@ -1689,15 +1726,25 @@ function PainelDoNo({
               style={campo}
             />
           </label>
-          <div style={{ color: "var(--texto-fraco)" }}>
-            Saídas: {projeto.saida.map((c) => c.rotulo).join(", ")}
-          </div>
-          {/* §2.4-4 e §2.4-14 — quem age no mundo se anuncia, e escrever no
-              projeto NUNCA aplica direto: vira proposta (variante) na demanda. */}
-          <p style={{ color: "var(--texto-fraco)", margin: "6px 0 0" }}>
-            Com "desenho" mapeado numa aresta de entrada, este nó ESCREVE: o desenho vira uma variante
-            ("Proposta do fluxo…") — o desenho da demanda só muda se alguém adotar na mesa.
-          </p>
+          {/* SPEC-110 F — quem só grava não tem saída para listar, e listar
+              "Saídas: (nenhuma)" seria ruído. Cada componente mostra o lado
+              que ele tem. */}
+          {projeto.saida.length > 0 && (
+            <div style={{ color: "var(--texto-fraco)" }}>Saídas: {projeto.saida.map((c) => c.rotulo).join(", ")}</div>
+          )}
+          {no.refId === REF_DA_DEMANDA_GRAVAR && (
+            <div style={{ color: "var(--texto-fraco)" }}>
+              Aceita: {projeto.entrada.filter((c) => c.chave !== "demandaId").map((c) => c.rotulo).join(", ")}
+            </div>
+          )}
+          {/* §2.4-4 e §2.4-14 — quem age no mundo se anuncia, e escrever na
+              demanda NUNCA aplica direto: vira proposta (variante). */}
+          {no.refId !== REF_DA_DEMANDA_LER && (
+            <p style={{ color: "var(--texto-fraco)", margin: "6px 0 0" }}>
+              Com "desenho" mapeado numa aresta de entrada, este nó ESCREVE: o desenho vira uma variante
+              ("Proposta do fluxo…") — o desenho da demanda só muda se alguém adotar na mesa.
+            </p>
+          )}
         </div>
       )}
       {funcao && (
@@ -1900,7 +1947,9 @@ function PainelDaAresta({
       : origem?.tipo === "funcao"
         ? (funcaoDoSistema(origem.refId)?.saida.map((s) => s.chave) ?? [])
         : origem?.tipo === "projeto"
-          ? PROJETO_DO_SISTEMA.saida.map((s) => s.chave)
+          ? // SPEC-110 F — o que ESTE componente entrega: um nó de gravação
+            // não oferece o acervo da demanda, porque ele não o emite.
+            (dadoDoSistema(origem.refId) ?? PROJETO_DO_SISTEMA).saida.map((s) => s.chave)
           : origem?.tipo === "transformacao"
             ? sanearCamposDaTransformacao(origem.parametros?.campos).map((c) => c.chave)
             : ["texto"];
@@ -1910,7 +1959,10 @@ function PainelDaAresta({
       : destino?.tipo === "funcao"
         ? (funcaoDoSistema(destino.refId)?.entrada.map((s) => s.chave) ?? [])
         : destino?.tipo === "projeto"
-          ? PROJETO_DO_SISTEMA.entrada.map((s) => s.chave)
+          ? // SPEC-110 F — e o que ele ACEITA: ligar uma aresta a um nó de
+            // leitura não oferece mais "grave este desenho", que é o par que
+            // a execução nunca honraria.
+            (dadoDoSistema(destino.refId) ?? PROJETO_DO_SISTEMA).entrada.map((s) => s.chave)
           : null;
 
   return (

@@ -322,7 +322,9 @@ export function passosDeConfiguracao(opts: UseTourOpts): PassoTour[] {
       texto:
         // SPEC-110 A (D19) — "Executar" virou "▶ Rodar agora", o gesto do
         // gatilho: narrar o botão velho é apresentação defasada (a queixa).
-        "Antes das telas, o mapa — e o mapa aqui é vivo. Cada fluxo desta tela é o encanamento REAL da ferramenta: a esteira de agentes derivada da configuração (quem escreve cada parte do item, na ordem), a exportação, a publicação, o ensaio. Cada um começa por um GATILHO, o cartão que diz quando ele roda — e alguns têm uma TELA no meio, onde a execução para e espera alguém revisar e decidir. Clicar num agente edita o papel dele — prompt, ligar/desligar, ordem — de onde se vê; e \"▶ Rodar agora\" dispara o fluxo de verdade, com o rastro nó a nó. O que as telas de configuração ajustam aparece aqui sozinho, porque isto deriva delas.",
+        // SPEC-110 F (D19) — e a demanda tem DOIS cartões: narrar "mesa de
+        // projeto" como um só descreveria uma paleta que não existe mais.
+        "Antes das telas, o mapa — e o mapa aqui é vivo. Cada fluxo desta tela é o encanamento REAL da ferramenta: a esteira de agentes derivada da configuração (quem escreve cada parte do item, na ordem), a exportação, a publicação, o ensaio. Cada um começa por um GATILHO, o cartão que diz quando ele roda — e alguns têm uma TELA no meio, onde a execução para e espera alguém revisar e decidir. A demanda entra em dois papéis, ditos no cartão: \"Demanda — ler\" na ponta que traz o desenho, \"Demanda — gravar\" na que devolve o resultado. Clicar num agente edita o papel dele — prompt, ligar/desligar, ordem — de onde se vê; e \"▶ Rodar agora\" dispara o fluxo de verdade, com o rastro nó a nó. O que as telas de configuração ajustam aparece aqui sozinho, porque isto deriva delas.",
       /**
        * §340/§253 — a demonstração liga aqui e desliga no fim do tour, como
        * sempre: o passo seguinte (produto) mostra dado falso marcado.

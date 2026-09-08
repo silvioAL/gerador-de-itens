@@ -42,6 +42,18 @@ export interface FuncaoDoSistema {
   entrada: CampoDoConector[];
   saida: CampoDoConector[];
   governanca: GovernancaDaFuncao;
+  /**
+   * SPEC-110 fatia F — **onde esta função roda**, como DADO do registro.
+   *
+   * `puro` (o default) é cálculo: `executarFuncao` o resolve sem rede e sem
+   * banco, e é o que torna as funções testáveis à mão. `servidor` é a função
+   * que ESCREVE — o executor mora na rota, junto do banco e da auditoria.
+   *
+   * Sem este campo, quem despacha teria de manter uma lista paralela de
+   * "estas aqui são especiais", e a primeira função nova entraria só na
+   * metade das listas — que é o §346 (meia-integração) esperando acontecer.
+   */
+  executor?: "puro" | "servidor";
 }
 
 /**
@@ -73,6 +85,32 @@ export const FUNCOES_DO_SISTEMA: FuncaoDoSistema[] = [
     ],
     saida: [{ chave: "leitura", rotulo: "Leitura do ensaio", tipo: "objeto" }],
     governanca: { nivel: "operar", recurso: "fluxos.executar" },
+  },
+  {
+    /**
+     * SPEC-110 fatia F (D11) — **o feedback do PDCA como componente.**
+     *
+     * O ciclo de melhoria já tem porta (a aba PDCA) e gravação (`POST
+     * /pdca/feedback`). O que faltava era ele ser FIÁVEL: sem isto, um fluxo
+     * que termina perguntando "o que faltou aqui?" não tem onde pousar a
+     * resposta, e a pessoa é mandada para outra tela — que é exatamente o
+     * corte de contexto que o PDCA existe para fechar.
+     *
+     * O executor chama a MESMA gravação da rota (§263), com a mesma auditoria:
+     * um segundo caminho de escrita para o mesmo dado seria a régua duplicada
+     * que esta casa já pagou para aprender.
+     */
+    id: "pdca-feedback",
+    nome: "Registrar feedback (PDCA)",
+    descricao: "Grava um feedback no ciclo de melhoria do time — o mesmo que a aba PDCA mostra.",
+    entrada: [
+      { chave: "texto", rotulo: "O que registrar", tipo: "texto", obrigatorio: true },
+      { chave: "contexto", rotulo: "Contexto (de onde veio)", tipo: "texto" },
+    ],
+    saida: [{ chave: "feedbackId", rotulo: "Feedback gravado (id)", tipo: "texto" }],
+    governanca: { nivel: "operar", recurso: "fluxos.executar" },
+    // Escreve: o executor mora na rota, com o banco e a auditoria.
+    executor: "servidor",
   },
 ];
 

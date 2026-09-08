@@ -493,8 +493,12 @@ describe("SPEC-107 fatia A — o nó de FUNÇÃO no fluxo", () => {
       const r = await app.inject({ method: "GET", url: "/funcoes" });
       expect(r.statusCode).toBe(200);
       const { funcoes } = r.json() as { funcoes: { id: string; governanca: { nivel: string } }[] };
-      expect(funcoes.map((f) => f.id)).toEqual(["derivacao", "ensaio"]);
+      // SPEC-110 fatia F — `pdca-feedback` entra na lista fechada. A régua do
+      // §242 é a mesma de sempre: função nova só existe com executor no mesmo
+      // commit — e aqui ela declara também ONDE roda.
+      expect(funcoes.map((f) => f.id)).toEqual(["derivacao", "ensaio", "pdca-feedback"]);
       expect(funcoes.every((f) => f.governanca.nivel === "operar")).toBe(true);
+      expect(funcoes.find((f) => f.id === "pdca-feedback")!.executor).toBe("servidor");
     });
   });
 });
@@ -1273,7 +1277,218 @@ describe("SPEC-107 fatia B — o nó PROJETO", () => {
         },
       });
       expect(r.statusCode).toBe(400);
-      expect((r.json() as { erro: string }).erro).toContain('o refId precisa ser "projeto"');
+      // SPEC-110 fatia F — a lista fechada tem três; a recusa NOMEIA os três,
+      // senão quem errou o refId fica sabendo o que não pode e não o que pode.
+      const erro = (r.json() as { erro: string }).erro;
+      expect(erro).toContain("demanda-ler");
+      expect(erro).toContain("demanda-gravar");
+      expect(erro).toContain("projeto");
+    });
+  });
+
+  /**
+   * SPEC-110 fatia F (D10) — **a direção é do componente, não da fiação.**
+   *
+   * O nó fundido decide pelo que chegou mapeado, e é isso que torna o canvas
+   * ilegível: dois cartões iguais, um lendo e outro gravando. O desdobrado
+   * decide pelo que a pessoa escolheu — e a diferença fica VISÍVEL quando a
+   * fiação contradiz a escolha.
+   */
+  describe("SPEC-110 fatia F — ler e gravar como componentes distintos", () => {
+    const fluxoCom = (id: string, refId: string, demandaId: string, mapeamento: { saida: string; entrada: string }[]) => ({
+      id,
+      nome: id,
+      nos: [
+        { id: "fonte", tipo: "projeto", refId: "demanda-ler", posicao: { x: 0, y: 0 }, parametros: { demandaId } },
+        { id: "alvo", tipo: "projeto", refId, posicao: { x: 240, y: 0 }, parametros: { demandaId } },
+      ],
+      arestas: [{ de: "fonte", para: "alvo", mapeamento }],
+    });
+
+    it("`demanda-ler` com `desenho` mapeado LÊ — não escreve variante nenhuma", async () => {
+      await comApp(async (app, cookies) => {
+        await prepararMundo(app, cookies);
+        const demandaId = await criarDemanda(app, cookies, "Ler não grava");
+        const antes = ((await app.inject({ method: "GET", url: `/quebras/${demandaId}`, cookies })).json() as {
+          variantes?: unknown[];
+        }).variantes?.length ?? 0;
+
+        await app.inject({
+          method: "PUT",
+          url: "/config/fluxos",
+          cookies,
+          // O `desenho` chega mapeado — o fundido gravaria uma variante aqui.
+          payload: { documento: { fluxos: [fluxoCom("so-le", "demanda-ler", demandaId, [{ saida: "desenho", entrada: "desenho" }])] } },
+        });
+        const r = await app.inject({ method: "POST", url: "/fluxos/so-le/executar", cookies, payload: {} });
+        expect(r.statusCode).toBe(200);
+        const { nos, saidas } = r.json() as {
+          nos: { noId: string; estado: string }[];
+          saidas: Record<string, Record<string, unknown>>;
+        };
+        expect(nos.find((n) => n.noId === "alvo")?.estado).toBe("sucesso");
+        // Leu: a saída traz o desenho. E NÃO gravou: nenhum varianteId.
+        expect(saidas["alvo"].desenho).toBeDefined();
+        expect(saidas["alvo"].varianteId).toBeUndefined();
+
+        const depois = ((await app.inject({ method: "GET", url: `/quebras/${demandaId}`, cookies })).json() as {
+          variantes?: unknown[];
+        }).variantes?.length ?? 0;
+        expect(depois).toBe(antes);
+      });
+    });
+
+    it("`demanda-gravar` GRAVA a variante e não emite o desenho da demanda", async () => {
+      await comApp(async (app, cookies) => {
+        await prepararMundo(app, cookies);
+        const demandaId = await criarDemanda(app, cookies, "Gravar não lê");
+        await app.inject({
+          method: "PUT",
+          url: "/config/fluxos",
+          cookies,
+          payload: { documento: { fluxos: [fluxoCom("so-grava", "demanda-gravar", demandaId, [{ saida: "desenho", entrada: "desenho" }])] } },
+        });
+        const r = await app.inject({ method: "POST", url: "/fluxos/so-grava/executar", cookies, payload: {} });
+        const { saidas } = r.json() as { saidas: Record<string, Record<string, unknown>> };
+        expect(saidas["alvo"].varianteId).toBeDefined();
+        // A ESCRITA não devolve o acervo da demanda: quem grava não emite.
+        expect(saidas["alvo"].desenho).toBeUndefined();
+        expect(saidas["alvo"].itens).toBeUndefined();
+      });
+    });
+
+    it("`demanda-gravar` sem nada mapeado FALHA nomeando os campos que aceita", async () => {
+      await comApp(async (app, cookies) => {
+        await prepararMundo(app, cookies);
+        const demandaId = await criarDemanda(app, cookies, "Gravar sem nada");
+        await app.inject({
+          method: "PUT",
+          url: "/config/fluxos",
+          cookies,
+          // Aresta sem mapeamento: o fundido cairia na leitura em silêncio.
+          payload: { documento: { fluxos: [fluxoCom("grava-vazio", "demanda-gravar", demandaId, [])] } },
+        });
+        const r = await app.inject({ method: "POST", url: "/fluxos/grava-vazio/executar", cookies, payload: {} });
+        const { nos } = r.json() as { nos: { noId: string; estado: string; erro?: string }[] };
+        const alvo = nos.find((n) => n.noId === "alvo");
+        expect(alvo?.estado).toBe("falhou");
+        expect(alvo?.erro).toContain("não recebeu nada para gravar");
+        expect(alvo?.erro).toContain("desenho");
+        expect(alvo?.erro).toContain("respostasItens");
+      });
+    });
+
+    it("o `projeto` LEGADO continua fundido, bit a bit — fluxo salvo antes não muda de comportamento", async () => {
+      await comApp(async (app, cookies) => {
+        await prepararMundo(app, cookies);
+        const demandaId = await criarDemanda(app, cookies, "Legado fundido");
+        await app.inject({
+          method: "PUT",
+          url: "/config/fluxos",
+          cookies,
+          payload: {
+            documento: {
+              fluxos: [
+                {
+                  id: "legado",
+                  nome: "legado",
+                  nos: [
+                    { id: "fonte", tipo: "projeto", refId: "projeto", posicao: { x: 0, y: 0 }, parametros: { demandaId } },
+                    { id: "alvo", tipo: "projeto", refId: "projeto", posicao: { x: 240, y: 0 }, parametros: { demandaId } },
+                  ],
+                  arestas: [{ de: "fonte", para: "alvo", mapeamento: [{ saida: "desenho", entrada: "desenho" }] }],
+                },
+              ],
+            },
+          },
+        });
+        const r = await app.inject({ method: "POST", url: "/fluxos/legado/executar", cookies, payload: {} });
+        const { saidas } = r.json() as { saidas: Record<string, Record<string, unknown>> };
+        // A fonte leu; o alvo, com `desenho` mapeado, gravou. É o comportamento
+        // de antes desta fatia, e é o que trava a regressão.
+        expect(saidas["fonte"].desenho).toBeDefined();
+        expect(saidas["alvo"].varianteId).toBeDefined();
+      });
+    });
+  });
+
+  /**
+   * SPEC-110 fatia F (D11) — **o feedback do PDCA como componente fiável.**
+   *
+   * A prova é ponta a ponta de propósito: o que importa não é que a função
+   * exista, é que o que ela grava APAREÇA na aba que o time lê. Um segundo
+   * caminho de escrita passaria num teste de unidade e sumiria da aba.
+   */
+  describe("SPEC-110 fatia F — pdca-feedback como função do sistema", () => {
+    it("o nó grava, e o feedback aparece onde o time lê", async () => {
+      await comApp(async (app, cookies) => {
+        await prepararMundo(app, cookies);
+        await app.inject({
+          method: "PUT",
+          url: "/config/fluxos",
+          cookies,
+          payload: {
+            documento: {
+              fluxos: [
+                {
+                  id: "coleta-feedback",
+                  nome: "Coleta",
+                  nos: [
+                    {
+                      id: "registra",
+                      tipo: "funcao",
+                      refId: "pdca-feedback",
+                      posicao: { x: 0, y: 0 },
+                      parametros: { texto: "faltou um campo de prazo", contexto: "veio do fluxo de coleta" },
+                    },
+                  ],
+                  arestas: [],
+                },
+              ],
+            },
+          },
+        });
+        const r = await app.inject({ method: "POST", url: "/fluxos/coleta-feedback/executar", cookies, payload: {} });
+        expect(r.statusCode).toBe(200);
+        const { saidas } = r.json() as { saidas: Record<string, Record<string, unknown>> };
+        expect(saidas["registra"].feedbackId).toBeDefined();
+
+        const lista = await app.inject({ method: "GET", url: "/pdca/feedback", cookies });
+        const feedbacks = lista.json() as { id: string; texto: string }[];
+        const gravado = feedbacks.find((f) => f.id === saidas["registra"].feedbackId);
+        expect(gravado).toBeDefined();
+        // O contexto viaja DENTRO do texto: a aba mostra texto, e um contexto
+        // em coluna que ela não lê seria dado invisível.
+        expect(gravado!.texto).toContain("faltou um campo de prazo");
+        expect(gravado!.texto).toContain("veio do fluxo de coleta");
+      });
+    });
+
+    it("texto vazio é RECUSADO com o nome do campo — feedback vazio não entra no ciclo", async () => {
+      await comApp(async (app, cookies) => {
+        await prepararMundo(app, cookies);
+        await app.inject({
+          method: "PUT",
+          url: "/config/fluxos",
+          cookies,
+          payload: {
+            documento: {
+              fluxos: [
+                {
+                  id: "feedback-vazio",
+                  nome: "Vazio",
+                  nos: [{ id: "registra", tipo: "funcao", refId: "pdca-feedback", posicao: { x: 0, y: 0 }, parametros: { texto: "   " } }],
+                  arestas: [],
+                },
+              ],
+            },
+          },
+        });
+        const r = await app.inject({ method: "POST", url: "/fluxos/feedback-vazio/executar", cookies, payload: {} });
+        const { nos } = r.json() as { nos: { noId: string; estado: string; erro?: string }[] };
+        expect(nos[0].estado).toBe("falhou");
+        expect(nos[0].erro).toContain("texto");
+      });
     });
   });
 });

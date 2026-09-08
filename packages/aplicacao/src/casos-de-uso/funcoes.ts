@@ -103,6 +103,16 @@ export function executarFuncao(
   if (!funcao) {
     throw new EntradaDaFuncaoInvalida(`não conheço a função "${funcaoId}" — veja GET /funcoes`);
   }
+  /**
+   * SPEC-110 fatia F — a função que ESCREVE não roda aqui, e o erro diz isso
+   * em vez de "sem executor". Esta camada é pura de propósito: um banco
+   * atravessando-a tornaria todo teste de derivação dependente de infra.
+   */
+  if (funcao.executor === "servidor") {
+    throw new EntradaDaFuncaoInvalida(
+      `a função "${funcao.nome}" escreve e roda no servidor — o executor puro não a conhece`
+    );
+  }
   exigirObrigatorios(funcao, entradas);
 
   if (funcao.id === "derivacao") {

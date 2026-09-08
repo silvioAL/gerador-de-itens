@@ -173,6 +173,14 @@ const PASSOS_DE_USO: { titulo: string; texto: string }[] = [
       "☰ Menu → Fluxos de integração (a esteira também abre sozinha ao derivar): o primeiro cartão é o GATILHO — ele diz quando o fluxo roda. Com o gatilho manual, \"▶ Rodar agora\" dispara os agentes (PO, Arquiteto, Especialista, QA) sobre a demanda aberta, ao vivo, nó a nó. Clicar num agente edita o papel dele — prompt, ligar/desligar, ordem.",
   },
   {
+    // SPEC-110 fatia F (D19) — o gesto que MUDOU: quem põe a demanda num
+    // fluxo escolhia um cartão só e descobria depois, pela aresta, se ele lia
+    // ou gravava. Sem este passo, o manual ensinaria uma paleta que sumiu.
+    titulo: "Diga se o fluxo LÊ ou GRAVA na demanda",
+    texto:
+      "Na paleta do canvas, a demanda tem dois cartões em vez de um: “Demanda — ler” traz o que ela carrega (desenho, itens, documento, volumetria, a fila da esteira) e “Demanda — gravar” recebe o que a fiação produziu (uma proposta de desenho, o retorno da exportação, o link publicado, as sugestões da esteira). A direção fica escrita no cartão, então o desenho responde sozinho o que antes exigia seguir a seta com o dedo. Escrever na demanda nunca aplica direto: um desenho gravado vira uma VARIANTE, e só passa a valer se alguém adotar na mesa. Para alguém ENTRAR na mesa no meio do fluxo, o cartão é outro — a tela “Mesa de projeto”.",
+  },
+  {
     // SPEC-110 fatia E (D19) — o gesto NOVO: o fluxo que roda sem ninguém.
     // Sem este passo, o manual só ensinaria fluxos que esperam um clique, e o
     // relógio — que passa a existir — ficaria invisível.

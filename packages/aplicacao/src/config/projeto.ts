@@ -84,3 +84,123 @@ export const PROJETO_DO_SISTEMA: ProjetoDoSistema = {
   // apontar.
   governanca: { nivel: "operar", recurso: "fluxos.executar" },
 };
+
+/**
+ * SPEC-110 fatia F (D10–D12) — **a demanda desdobrada em LER e GRAVAR.**
+ *
+ * O nó fundido decide a direção pelo que chega mapeado: sem `desenho`, é
+ * fonte; com `desenho`, é destino. Funciona, e é ilegível no canvas — dois
+ * cartões idênticos chamados "Mesa de projeto", um lendo e outro gravando, e a
+ * única forma de saber qual é qual é seguir as arestas com o dedo (a queixa
+ * M9). O desdobramento põe a direção no NOME do componente.
+ *
+ * ## O contrato declarado passa a dizer a verdade
+ *
+ * Medido antes de escrever: o executor já emitia `filaDaEsteira`,
+ * `contextoEpico` e `contextoDoProduto`, e já aceitava `respostasItens` — e
+ * NENHUM dos quatro estava declarado em `PROJETO_DO_SISTEMA`. A esteira de
+ * fábrica mapeia os quatro. Ou seja: o contrato mentia, e a interface de
+ * mapeamento não oferecia campos que a própria fábrica usa. Copiar o contrato
+ * antigo ao desdobrar carregaria a mentira adiante; estes declaram o que o
+ * executor faz.
+ *
+ * ## Por que dois registros e não um `direcao: "ler" | "gravar"`
+ *
+ * Porque o que muda entre os dois é o CONTRATO inteiro, não um atributo: as
+ * saídas de leitura não existem na escrita e vice-versa. Um registro com
+ * campos condicionais devolveria ao painel a mesma pergunta que o
+ * desdobramento veio matar — *este nó, afinal, lê ou grava?*
+ */
+export interface DadoDoSistema {
+  id: string;
+  /** O rótulo do painel: a frase inteira, com a direção dita. */
+  nome: string;
+  /**
+   * O rótulo do CARTÃO — curto, pela régua da fatia A: a frase inteira estica
+   * o cartão e esconde o vizinho. E sem repetir a FAMÍLIA, que o cabeçalho do
+   * cartão já diz: "DEMANDA / Ler", não "DEMANDA / Demanda — ler". É o mesmo
+   * padrão do gatilho ("GATILHO / 🕐 Agendado").
+   */
+  rotuloCurto: string;
+  descricao: string;
+  entrada: CampoDoConector[];
+  saida: CampoDoConector[];
+  governanca: GovernancaDaFuncao;
+}
+
+export const REF_DA_DEMANDA_LER = "demanda-ler";
+export const REF_DA_DEMANDA_GRAVAR = "demanda-gravar";
+
+export const DADOS_DO_SISTEMA: DadoDoSistema[] = [
+  {
+    id: REF_DA_DEMANDA_LER,
+    nome: "Demanda — ler",
+    rotuloCurto: "Ler",
+    descricao:
+      "Lê a demanda e emite o que ela carrega: desenho, itens, documento, volumetria, necessidades — e a fila da esteira com os contextos.",
+    // `demandaId` é PARÂMETRO do nó (§5.1): vazio vale a demanda mais
+    // recentemente atualizada do time da execução — o "aberto agora" é estado
+    // do navegador, que o servidor não conhece.
+    entrada: [{ chave: "demandaId", rotulo: "Demanda (id — vazio = a mais recente do time)", tipo: "texto" }],
+    saida: [
+      { chave: "desenho", rotulo: "Desenho (demanda)", tipo: "objeto" },
+      { chave: "itens", rotulo: "Itens gerados (persistidos)", tipo: "lista" },
+      { chave: "itensProntos", rotulo: "Itens PRONTOS para exportar (a régua da SPEC-49)", tipo: "lista" },
+      { chave: "itensIgnorados", rotulo: "Chaves com pendência (fora da exportação)", tipo: "lista" },
+      { chave: "markdown", rotulo: "Documento (última especificação gerada)", tipo: "documento" },
+      { chave: "volumetria", rotulo: "Volumetria da demanda", tipo: "objeto" },
+      { chave: "necessidades", rotulo: "Necessidades", tipo: "lista" },
+      { chave: "demandaId", rotulo: "Demanda (id)", tipo: "texto" },
+      { chave: "titulo", rotulo: "Título da demanda", tipo: "texto" },
+      // Os três que o executor sempre emitiu e o contrato nunca declarou.
+      { chave: "filaDaEsteira", rotulo: "Fila da esteira (um item por vez)", tipo: "lista" },
+      { chave: "contextoEpico", rotulo: "Contexto do épico", tipo: "texto" },
+      { chave: "contextoDoProduto", rotulo: "Contexto do produto", tipo: "texto" },
+    ],
+    governanca: { nivel: "operar", recurso: "fluxos.executar" },
+  },
+  {
+    id: REF_DA_DEMANDA_GRAVAR,
+    nome: "Demanda — gravar",
+    rotuloCurto: "Gravar",
+    descricao:
+      "Grava na demanda o que a fiação trouxe: proposta de desenho (vira variante), retorno da exportação, link da publicação ou sugestões da esteira.",
+    entrada: [
+      { chave: "demandaId", rotulo: "Demanda (id — vazio = a mais recente do time)", tipo: "texto" },
+      { chave: "desenho", rotulo: "Desenho proposto (vira variante da demanda)", tipo: "objeto" },
+      { chave: "resultados", rotulo: "Resultados da exportação (por item)", tipo: "lista" },
+      { chave: "enviados", rotulo: "Itens enviados (para nomear o silêncio)", tipo: "lista" },
+      { chave: "linkExterno", rotulo: "Link do documento publicado", tipo: "texto" },
+      // O quarto não declarado: a esteira grava por aqui desde a SPEC-107 G5.
+      { chave: "respostasItens", rotulo: "Sugestões da esteira (por item)", tipo: "objeto" },
+    ],
+    saida: [
+      { chave: "demandaId", rotulo: "Demanda (id)", tipo: "texto" },
+      { chave: "varianteId", rotulo: "Variante proposta (id)", tipo: "texto" },
+      { chave: "titulo", rotulo: "Título da variante", tipo: "texto" },
+      { chave: "exportados", rotulo: "Chaves gravadas como exportadas", tipo: "lista" },
+      { chave: "erros", rotulo: "Falhas por item (chave + motivo)", tipo: "lista" },
+      { chave: "linkExterno", rotulo: "Link gravado na demanda", tipo: "texto" },
+      { chave: "aplicadas", rotulo: "Sugestões aplicadas", tipo: "lista" },
+      { chave: "preservadas", rotulo: "Confirmações preservadas (não sobrescritas)", tipo: "lista" },
+    ],
+    governanca: { nivel: "operar", recurso: "fluxos.executar" },
+  },
+];
+
+export function dadoDoSistema(refId: string): DadoDoSistema | undefined {
+  return DADOS_DO_SISTEMA.find((d) => d.id === refId);
+}
+
+/**
+ * A lista fechada dos refIds que um nó de dados aceita. `projeto` continua
+ * dentro: fluxos SALVOS antes desta fatia o usam, e um refId que a escrita
+ * recusa é um fluxo que ninguém consegue mais salvar — a demanda de alguém
+ * ficaria trancada por uma decisão nossa de vocabulário.
+ */
+export const REFS_DE_DADOS = [REF_DO_PROJETO, REF_DA_DEMANDA_LER, REF_DA_DEMANDA_GRAVAR] as const;
+
+/** O aviso do painel para quem abre um nó com o componente antigo. Não é erro:
+ * o fluxo roda igual. É o convite a trocar, com o nome do que trocar por quê. */
+export const AVISO_DO_PROJETO_LEGADO =
+  "Componente antigo — este nó lê E grava conforme a fiação. Troque por “Demanda — ler” ou “Demanda — gravar” para o canvas dizer qual é qual.";

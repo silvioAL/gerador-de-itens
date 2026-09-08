@@ -17603,3 +17603,92 @@ o `setInterval` de 30s, disparou sozinho depois de voltar, com
 §248 (trio, duas sabotagens distintas): tirar o avanço do `set` da reserva → 4
 vermelhos, entre eles o disparo duplicado; recalcular a próxima a todo
 salvamento → a rodada engolida fica vermelha. Restaurado, 14 verdes.
+
+## §396 — SPEC-110 F: a demanda desdobrada (a direção sai da aresta e vai para o cartão)
+
+A queixa M9: dois cartões idênticos chamados "Mesa de projeto" no mesmo
+desenho, um lendo a demanda e outro gravando nela, e a única forma de saber
+qual é qual era seguir a aresta com o dedo. O nó fundido decide a direção pelo
+que chega mapeado — funciona, e é ilegível.
+
+**Dois componentes, não um atributo.** `demanda-ler` e `demanda-gravar`. Não um
+`direcao: "ler" | "gravar"` no mesmo registro, porque o que muda entre os dois
+é o CONTRATO inteiro: as saídas da leitura não existem na escrita e vice-versa.
+Um registro com campos condicionais devolveria ao painel a mesma pergunta que o
+desdobramento veio matar.
+
+**A medição que mudou a fatia: o contrato declarado MENTIA.** Antes de escrever
+qualquer linha, medi o executor contra `PROJETO_DO_SISTEMA`. O executor emitia
+`filaDaEsteira`, `contextoEpico` e `contextoDoProduto`, e aceitava
+`respostasItens` — e nenhum dos quatro estava declarado. A esteira de fábrica
+mapeia os quatro. Ou seja: o painel de mapeamento não oferecia campos que a
+própria fábrica usa, e copiar o contrato antigo ao desdobrar teria carregado a
+mentira adiante. Os contratos novos declaram o que o executor faz, e um teste
+percorre TODAS as arestas das quatro fábricas conferindo que cada campo mapeado
+existe no contrato de quem produz e no de quem consome — a prova que teria
+pegado a mentira sozinha.
+
+**O legado fica.** `projeto` continua na lista fechada de refIds aceitos, com o
+comportamento fundido bit a bit e um aviso no painel. Recusá-lo trancaria
+fluxos já salvos: a demanda de alguém não pode ficar insalvável por uma decisão
+nossa de vocabulário. Ele só não é mais OFERECIDO na paleta — existe para o que
+já existe, não para desenhos novos.
+
+**Gravar sem nada mapeado agora FALHA, nomeando.** O fundido caía na leitura em
+silêncio e devolvia dado que ninguém pediu. O desdobrado diz: *"o nó 'grava' é
+'Demanda — gravar' e não recebeu nada para gravar — ligue uma aresta a um
+destes campos: desenho, resultados, enviados, linkExterno, respostasItens"*.
+Fiação errada é o defeito mais barato de consertar e o mais caro de descobrir
+tarde.
+
+**A porta da mesa saiu do nó de dados (D12).** Um cartão de dado com botão de
+"Abrir a mesa de projeto →" era o mesmo nó respondendo a duas perguntas. Quem
+quer DADO usa ler/gravar; quem quer que alguém ENTRE no meio do fluxo põe a
+tela `mesa` da fatia B.
+
+**O PDCA como componente, com um gravador só.** `pdca-feedback` entra em
+`FUNCOES_DO_SISTEMA`. Como ele ESCREVE e `executarFuncao` é puro por decisão, o
+registro passou a declarar ONDE cada função roda (`executor: "puro" |
+"servidor"`) — dado, não lista paralela: função nova declara o executor no
+mesmo lugar em que declara o contrato. A inserção saiu de `routes/pdca.ts` para
+`pdca/feedback.ts`, e a aba e a fiação chamam a mesma (§263). A prova é ponta a
+ponta de propósito: o que importa não é que a função exista, é que o que ela
+grava APAREÇA na aba que o time lê — um segundo caminho de escrita passaria num
+teste de unidade e sumiria da aba.
+
+**Três achados da validação visual, nenhum deles pego por teste.**
+
+1. `var(--aviso)` não existe. O aviso do legado caía na cor do texto comum e
+   não se distinguia de nada. O token com par declarado nos dois temas é
+   `--amarelo` (#926a00 claro, #fbbf24 escuro).
+2. O cabeçalho da família ainda dizia "MESA DE PROJETO" — por cima de "Ler",
+   de "Gravar" e da própria "Mesa de projeto". Vocabulário defasado: a família
+   é a DEMANDA, e a mesa virou uma tela. Com isso o rótulo do cartão encurtou
+   para "Ler"/"Gravar" (o cabeçalho já diz o resto, como em "GATILHO / 🕐
+   Agendado"), e a paleta ficou com o nome inteiro, que precisa se bastar
+   sozinho.
+3. O painel imprimia a mesma descrição DUAS vezes — o cabeçalho passou a mostrar
+   o nome, e o bloco de contrato ficou com a descrição.
+
+**Dois erros meus de ferramenta, no mesmo dia.** Um `node -e` com CRLF não
+inseriu o import de `funcaoDoSistema` e reportou "ok"; o build passou e dez
+testes de rota caíram com o nó falhando — a causa levou três medições para
+aparecer. Depois, um `\b` dentro de heredoc virou um caractere de backspace
+literal, e a checagem visual acusou um ❌ falso em algo que estava certo. A
+lição repetida: substituição por script sem asserção de que o alvo casou é uma
+mudança que se acredita feita.
+
+**Um vermelho que não era meu.** `a esteira aparece DERIVADA` falhou afirmando
+que a leitura deu certo onde deveria falhar por falta de demanda — porque a
+suíte do server deixa `quebras` para trás e uma rodada anterior tinha semeado
+uma. Truncar a tabela devolveu o verde. O teste depende de o banco estar vazio
+e não diz isso; fica anotado.
+
+§248 (trio, três sabotagens): a direção volta a ser da FIAÇÃO → 3 vermelhos,
+entre eles "ler não grava" e "gravar sem nada mapeado falha"; o contrato da
+leitura volta a omitir `filaDaEsteira` → os dois testes de contrato ficam
+vermelhos; o `contexto` do feedback deixa de viajar no texto → a prova ponta a
+ponta do PDCA fica vermelha. Restaurado, 39 verdes.
+
+Portões: build/test/lint verdes (2309 testes). E2E 147/147 em banco recriado.
+Visual conferida nos dois temas contra :8080.

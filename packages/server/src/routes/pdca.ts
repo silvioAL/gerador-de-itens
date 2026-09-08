@@ -3,6 +3,8 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { OpcoesApp } from "../app.js";
 import { registrarAuditoria } from "../auditoria.js";
+// SPEC-110 fatia F — o gravador unico do feedback (a aba e a fiacao).
+import { gravarFeedback } from "../pdca/feedback.js";
 import { exigirSessao } from "../auth/middleware.js";
 import { exigirPermissao, organizacaoPadraoDe, SECOES_DE_REGRAS, type Recurso } from "../auth/permissoes.js";
 import { ALVO_CONFLITO_CONFIG, configDocumentos, pdcaFeedback, pdcaUsos, quebras, solicitacoesAjuste, produtos } from "../db/schema.js";
@@ -270,11 +272,13 @@ export async function registrarRotasPdca(app: FastifyInstance, { db, diretorioCo
     const corpo = z.object({ texto: z.string().trim().min(1), timeId: z.string().optional() }).safeParse(req.body);
     if (!corpo.success) return reply.code(400).send({ erro: corpo.error.flatten() });
 
-    const [gravado] = await db
-      .insert(pdcaFeedback)
-      .values({ email: req.usuario!.email, timeId: corpo.data.timeId ?? null, texto: corpo.data.texto })
-      .returning();
-    registrarAuditoria(db, { email: req.usuario!.email, acao: "criar", recurso: "pdca_feedback", recursoId: gravado.id });
+    // SPEC-110 fatia F — o mesmo gravador que o nó `pdca-feedback` de um
+    // fluxo usa (§263): a aba e a fiação escrevem por um caminho só.
+    const gravado = await gravarFeedback(db, {
+      email: req.usuario!.email,
+      timeId: corpo.data.timeId,
+      texto: corpo.data.texto,
+    });
     return reply.code(201).send({ id: gravado.id });
   });
 
