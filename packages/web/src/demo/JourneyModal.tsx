@@ -213,6 +213,13 @@ const PASSOS_DE_USO: { titulo: string; texto: string }[] = [
       "☰ Menu → Fluxos de integração → “Melhoria contínua (PDCA)”. O desenho lê os feedbacks que o time registrou e a configuração de hoje, um agente propõe UM ajuste, e a execução PARA numa tela para você conferir os três lados: o que motivou, o que se propõe e como está hoje. “Aplicar o ajuste →” muda a configuração de verdade; “← Não aplicar” encerra sem mexer em nada. Nenhum fluxo escreve configuração direto: ele cria uma SOLICITAÇÃO, com dono e histórico, a mesma que a aba PDCA mostra — e se você não tem permissão para aplicar, o pedido fica lá esperando quem tem.",
   },
   {
+    // SPEC-110 fatia I (D19) — o gesto NOVO: a spec deixa de ser só o que a
+    // tela mostra e vira coisa que um desenho PRODUZ e passa adiante.
+    titulo: "Faça o fluxo produzir a especificação",
+    texto:
+      "No canvas, “+ Gerar a especificação (por item)” recebe o desenho e devolve DUAS coisas: uma spec para CADA item (com as lacunas contadas) e o documento agregado — a mesma montagem que a tela do documento mostra, não uma segunda. É o que permite ligar a spec ao que vem depois: cada item sobe para o tracker com a especificação DELE, e não com uma cópia da demanda inteira. A unidade é o item porque isso varia com o desenho: dois componentes novos, duas specs.",
+  },
+  {
     titulo: "Confirme o que a IA escreveu",
     texto:
       "De volta ao documento, a seção de itens mostra as sugestões PENDENTES: confirme campo a campo, edite, escreva por cima ou \"Confirmar todas\". Nada que a IA propõe vale antes disso.",

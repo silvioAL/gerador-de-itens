@@ -17870,3 +17870,53 @@ também: a prova é sobre o resultado, não sobre a ordem interna das gravaçõe
 Confirmado por medição antes da correção: 13 execuções locais, 13 solicitações,
 todas `aplicada`, zero duplicadas — o defeito não era o fluxo propor duas
 vezes, era o teste ler cedo demais.
+
+## §399 — SPEC-110 I: a spec como saída do fluxo
+
+Fecha o terceiro termo do vocabulário original do usuário: integração externa →
+agente → **artefato**. A spec existia como efeito da derivação e como montagem
+viva da tela; ela não era uma coisa que um desenho pudesse PRODUZIR.
+
+**A unidade é o ITEM.** Correção do usuário em revisão: *"isso varia com o
+desenho, pode ter vários itens"*. N itens → N specs. `specPorItem` é a lista,
+`spec` é o agregado, e os dois saem das MESMAS montagens que a tela usa
+(`renderizarItemEspecificacao` por item, `gerarEspecificacaoEntrega` no todo).
+Uma terceira montagem seria o §263 sobre o artefato que a casa inteira entrega.
+
+**As três medições que a SPEC mandou fazer, e o que elas mudaram.**
+
+1. *Qual função pura fatia por item?* `renderizarItemEspecificacao` já existia,
+   já exportada. Nada a extrair — só a reusar.
+2. *Onde o markdown por item entra no payload?* Dentro de cada objeto de
+   `itens`. Sem anexo, sem link: a pergunta que a SPEC deixou em aberto se
+   resolveu pelo caminho mais simples assim que o contrato foi lido.
+3. *O que falta em `demanda-ler`?* Nada para o envio — os itens já carregam
+   `corpoMarkdown`. **A promessa da SPEC-98 §3.2 já estava viva no dado.**
+
+**O que faltava era prova, e ela não existia.** O dublê da suíte só lê a `chave`
+de cada item: um payload sem o corpo passaria por ele sem um vermelho. A fatia
+levanta um destino que GUARDA o que recebeu e afirma sobre o payload real —
+dois itens, duas specs, corpos distintos, cada um citando o próprio serviço.
+Até aqui a promessa dependia de leitura de código.
+
+**A implementação corrigiu o contrato que a SPEC supunha.** A §4.I dizia que
+`gerar-spec` receberia `itens`. Medido: o item PERSISTIDO é o item renderizado
+(chave, título, corpo), e a montagem por item precisa da ATIVIDADE derivada,
+que carrega a aresta e o componente — passar o item gravado estourava em
+`edgeId`. O insumo certo é o DESENHO, e a função deriva com o mesmo motor da
+`derivacao` e do botão da mesa. Também é mais coerente: a spec é função do
+desenho mais o vocabulário do time, não de um artefato intermediário.
+
+**Três vermelhos meus no caminho, todos no dado de teste.** Um `\n` de heredoc
+que virou quebra de linha e partiu as strings (o mesmo escape que já mordeu
+duas vezes hoje); um desenho escrito na forma do React Flow (`data: { … }`)
+quando o domínio usa `label`/`x`/`y`/`spec` no topo; e uma asserção sobre a
+chave crua quando o agregado escreve o TÍTULO. Nenhum era do produto — e cada
+um custou uma rodada.
+
+§248 (duas sabotagens): a spec por item vira a MESMA para todos → o teste que
+exige corpos distintos fica vermelho; o item sobe sem `corpoMarkdown` → a prova
+do payload real fica vermelha.
+
+Portões (cinco): typecheck/build/test/lint verdes, 2327 testes.
+E2E 156/156 em banco recriado. Visual conferida nos dois temas contra :8080.
