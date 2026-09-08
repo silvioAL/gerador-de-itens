@@ -11,6 +11,7 @@ import {
   criarCasosDeUsoDeConfig,
   criarCasosDeUsoDeItensGerados,
   criarCasosDeUsoDeQuebras,
+  comoDesenhoMapeado,
   // SPEC-110 fatia F — a demanda desdobrada: a direcao e do componente.
   dadoDoSistema,
   REF_DA_DEMANDA_GRAVAR,
@@ -73,6 +74,8 @@ import {
   recursoDaSolicitacao,
 } from "../pdca/ajustes.js";
 import { operacaoDeAjuste } from "../pdca/operacao.js";
+// SPEC-110 fatia I — as MESMAS montagens da tela: por item e agregada.
+import { MARCADOR_ESPECIFICAR, derivar, gerarEspecificacaoEntrega, renderizarItemEspecificacao, resolverDependencias } from "@gerador/engine";
 import { exigirSessao } from "../auth/middleware.js";
 
 /**
@@ -112,6 +115,7 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
    * pergunta "quem fez?", e "ninguém" não é resposta.
    */
   const EMAIL_DO_RELOGIO = "agendamento@gerador.local";
+
 
   /** Quantos feedbacks o nó traz por padrão. Um prompt com 500 feedbacks não
    * é mais informado que um com 20 — é mais caro e menos legível. */
@@ -246,6 +250,68 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
           texto: contexto ? `${texto}\n\n— ${contexto}` : texto,
         });
         return { feedbackId: gravado.id };
+      }
+
+      /**
+       * SPEC-110 fatia I (D15) — a spec de CADA item, mais o agregado.
+       *
+       * Reusa as duas montagens que já existem: `renderizarItemEspecificacao`
+       * por item e `gerarEspecificacaoEntrega` no todo. Escrever uma terceira
+       * aqui seria a divergência do §263 sobre o artefato que a casa entrega —
+       * o documento da tela e o do fluxo passariam a discordar sem ninguém ver.
+       */
+      if (refId === "gerar-spec") {
+        const desenho = comoDesenhoMapeado(entradas.desenho);
+        const ctx = await contextoDeFuncao();
+        const diagrama = desenho.diagrama;
+        /**
+         * Deriva com o MESMO motor da função `derivacao` e do botão da mesa
+         * (§263): a spec é função do desenho mais o vocabulário do time, e uma
+         * segunda derivação aqui faria a spec do fluxo divergir da da tela.
+         */
+        const itens = resolverDependencias(
+          derivar(diagrama, ctx.diagramaConfig, {
+            time: desenho.time,
+            regras: ctx.regrasConfig,
+            excecoes: desenho.excecoes,
+            percursos: desenho.percursos,
+            tokens: ctx.tokens,
+          })
+        ).atividades;
+        if (itens.length === 0) {
+          throw new Error(`a função "${refId}" não derivou item nenhum deste desenho — sem item não há spec a montar`);
+        }
+
+        /**
+         * Por item, com o número que a montagem usa para ordenar. `atividade`
+         * é o item derivado — o mesmo objeto que a derivação produz, e é por
+         * isso que a lista de entrada é a `itens` da demanda.
+         */
+        const specPorItem = itens.map((item, i) => {
+          const markdown = renderizarItemEspecificacao(i + 1, item, diagrama, ctx.diagramaConfig, ctx.regrasConfig);
+          return {
+            chave: item.chave,
+            titulo: item.rotulo,
+            markdown,
+            // A lacuna CONTADA, não escondida: uma spec que sai sem marcador
+            // entra em conta nenhuma e a pessoa aprova sem ver (§311).
+            lacunas: markdown.split(MARCADOR_ESPECIFICAR).length - 1,
+          };
+        });
+
+        const spec = gerarEspecificacaoEntrega(itens, diagrama, ctx.diagramaConfig, {
+          ...(typeof entradas.titulo === "string" && entradas.titulo.trim() ? { titulo: entradas.titulo.trim() } : {}),
+          ...(typeof entradas.contexto === "string" && entradas.contexto.trim()
+            ? { contextoDoProduto: entradas.contexto.trim() }
+            : {}),
+          ...(ctx.regrasConfig ? { regras: ctx.regrasConfig } : {}),
+        });
+
+        return {
+          specPorItem,
+          spec,
+          lacunas: specPorItem.reduce((soma, s) => soma + s.lacunas, 0),
+        };
       }
 
       if (refId === "pdca-ler-feedbacks") {

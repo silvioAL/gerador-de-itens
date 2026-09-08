@@ -501,7 +501,7 @@ describe("SPEC-107 fatia A — o nó de FUNÇÃO no fluxo", () => {
       // SPEC-110 fatia F — `pdca-feedback` entra na lista fechada. A régua do
       // §242 é a mesma de sempre: função nova só existe com executor no mesmo
       // commit — e aqui ela declara também ONDE roda.
-      expect(funcoes.map((f) => f.id)).toEqual(["derivacao", "ensaio", "pdca-feedback", "pdca-ler-feedbacks", "config-ler", "config-propor-ajuste", "config-aplicar-ajuste"]);
+      expect(funcoes.map((f) => f.id)).toEqual(["derivacao", "ensaio", "pdca-feedback", "gerar-spec", "pdca-ler-feedbacks", "config-ler", "config-propor-ajuste", "config-aplicar-ajuste"]);
       expect(funcoes.every((f) => f.governanca.nivel === "operar")).toBe(true);
       expect(funcoes.find((f) => f.id === "pdca-feedback")!.executor).toBe("servidor");
     });

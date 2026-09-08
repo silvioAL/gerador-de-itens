@@ -128,6 +128,52 @@ export const FUNCOES_DO_SISTEMA: FuncaoDoSistema[] = [
    * que são: capacidades do sistema com contrato.
    */
   {
+    /**
+     * SPEC-110 fatia I (D15) — **a spec como SAÍDA do fluxo.**
+     *
+     * Fecha o terceiro termo do vocabulário original do usuário: integração
+     * externa → agente → **artefato**. Até aqui a spec existia como efeito da
+     * derivação e como montagem viva da tela; ela não era uma coisa que um
+     * desenho pudesse PRODUZIR e passar adiante.
+     *
+     * ## A unidade é o ITEM, não a demanda
+     *
+     * Correção do usuário em revisão: *"isso varia com o desenho, pode ter
+     * vários itens"*. N itens → N specs. `specPorItem` é a lista; `spec` é o
+     * agregado que a tela já mostra — os dois saem da MESMA montagem
+     * (`renderizarItemEspecificacao` por item, `gerarEspecificacaoEntrega` no
+     * todo). Uma segunda montagem seria o §263 de novo, e desta vez sobre o
+     * artefato que a casa inteira entrega.
+     *
+     * Roda no SERVIDOR porque precisa do vocabulário do time resolvido — o
+     * mesmo contexto que a derivação usa.
+     */
+    id: "gerar-spec",
+    nome: "Gerar a especificação (por item)",
+    descricao:
+      "Monta a especificação de cada item e o documento agregado, com o vocabulário do time — a mesma montagem que a tela mostra.",
+    /**
+     * O insumo é o DESENHO, não os itens gravados — medido na implementação.
+     * O item persistido é o item RENDERIZADO (chave, título, corpo); a
+     * montagem por item precisa da ATIVIDADE derivada, que carrega a aresta e
+     * o componente. Passar o item gravado estourava em `edgeId`.
+     */
+    entrada: [
+      { chave: "desenho", rotulo: "Desenho (demanda)", tipo: "objeto", obrigatorio: true },
+      { chave: "escrita", rotulo: "O que a pessoa escreveu (seções de julgamento)", tipo: "objeto" },
+      { chave: "contexto", rotulo: "Contexto do produto e da demanda", tipo: "texto" },
+      { chave: "titulo", rotulo: "Título da especificação", tipo: "texto" },
+    ],
+    saida: [
+      // A lista é a resposta da correção do usuário: cada item com a spec DELE.
+      { chave: "specPorItem", rotulo: "Uma spec por item (chave + markdown + lacunas)", tipo: "lista" },
+      { chave: "spec", rotulo: "A especificação agregada (documento)", tipo: "documento" },
+      { chave: "lacunas", rotulo: "Quantas lacunas ficaram por preencher", tipo: "numero" },
+    ],
+    governanca: { nivel: "operar", recurso: "fluxos.executar" },
+    executor: "servidor",
+  },
+  {
     id: "pdca-ler-feedbacks",
     nome: "Ler feedbacks do ciclo (PDCA)",
     descricao: "Traz os feedbacks que ainda esperam alguém — os mesmos que a aba PDCA mostra como pendentes.",
