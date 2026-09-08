@@ -5,6 +5,18 @@ import type { OpcoesApp } from "../app.js";
 import { registrarAuditoria } from "../auditoria.js";
 // SPEC-110 fatia F — o gravador unico do feedback (a aba e a fiacao).
 import { gravarFeedback } from "../pdca/feedback.js";
+// SPEC-110 fatia G — o esquema da operacao, compartilhado com o no de fluxo.
+import { operacaoDeAjuste } from "../pdca/operacao.js";
+// SPEC-110 fatia G — criar e aplicar moram num lugar so (a aba e a fiacao).
+import {
+  AjusteRecusado,
+  aplicarSolicitacao,
+  criarDependenciasDoAjuste,
+  criarSolicitacao,
+  recursoDaSolicitacao,
+  RECURSOS_SOLICITAVEIS,
+  type DependenciasDoAjuste,
+} from "../pdca/ajustes.js";
 import { exigirSessao } from "../auth/middleware.js";
 import { exigirPermissao, organizacaoPadraoDe, SECOES_DE_REGRAS, type Recurso } from "../auth/permissoes.js";
 import { ALVO_CONFLITO_CONFIG, configDocumentos, pdcaFeedback, pdcaUsos, quebras, solicitacoesAjuste, produtos } from "../db/schema.js";
@@ -42,18 +54,6 @@ import { volumeVencido } from "@gerador/engine";
  * não para nascer de uma frase de feedback. Recusar aqui é melhor que aceitar
  * e aplicar meia lista.
  */
-const campoProposto = z.object({
-  key: z
-    .string()
-    .trim()
-    .min(1)
-    .regex(/^[a-zA-Z0-9_-]+$/, "a chave do campo aceita letras, números, hífen e underscore"),
-  label: z.string().trim().min(1),
-  tipoCampo: z.enum(["text", "textarea", "number", "boolean", "select"]),
-  obrigatorio: z.boolean().default(false),
-  ajuda: z.string().trim().optional(),
-  opcoes: z.array(z.string()).optional(),
-});
 
 /**
  * SPEC-77 fatia D — `mesesParaRevisarVolume` entra aqui, junto da cadência, e
@@ -67,25 +67,6 @@ const campoProposto = z.object({
 const CADENCIA_PADRAO = { cadenciaUsos: 5, cadenciaFeedback: 3, mesesParaRevisarVolume: 6 };
 const CHAVE_CONFIG_PDCA = "pdca";
 const GLOBAL = "__global__";
-
-/** Recursos solicitáveis: os quatro DOCUMENTOS versionados + campos por tipo
- * (sem versão na Fase 1 — aprovação sempre válida; limite anotado na SPEC). */
-const RECURSOS_SOLICITAVEIS = [
-  "regras",
-  "pipeline-agentes",
-  "especificacao-template",
-  "campos-no",
-  "campos-aresta",
-] as const;
-
-/** O recurso RBAC que autoriza DECIDIR cada solicitação. */
-const RECURSO_DA_DECISAO: Record<(typeof RECURSOS_SOLICITAVEIS)[number], Recurso> = {
-  regras: "regras.checklistTecnico",
-  "pipeline-agentes": "pipeline-agentes",
-  "especificacao-template": "especificacao-template",
-  "campos-no": "campos-no",
-  "campos-aresta": "campos-aresta",
-};
 
 export async function registrarRotasPdca(app: FastifyInstance, { db, diretorioConfig }: OpcoesApp) {
   const organizacaoId = organizacaoPadraoDe(db);
@@ -139,6 +120,10 @@ export async function registrarRotasPdca(app: FastifyInstance, { db, diretorioCo
     excluir: (id) => casosDeCamposAresta.excluir(id),
   };
 
+  /** O que o aplicador precisa do servidor: banco, fichas e o template da
+   * versao (§303 — sem linha gravada, a base e o template). */
+  const depsDoAjuste = criarDependenciasDoAjuste(db, diretorioConfig);
+
   async function cadencia(): Promise<typeof CADENCIA_PADRAO> {
     const [doc] = await db
       .select()
@@ -155,28 +140,6 @@ export async function registrarRotasPdca(app: FastifyInstance, { db, diretorioCo
       .where(and(eq(configDocumentos.chave, recurso), eq(configDocumentos.timeId, GLOBAL)))
       .limit(1);
     return doc?.atualizadoEm ?? null;
-  }
-
-  /**
-   * SPEC-46 — quem decide é o dono da SEÇÃO, não o do checklist técnico.
-   * Enquanto só existiam pedidos de checklist técnico, o recurso fixo passava
-   * despercebido; com processo/testes/volumetria ele mandaria o pedido para a
-   * pessoa errada — e barraria justamente quem cuida daquela seção.
-   */
-  function recursoDaSolicitacao(pedido: { recurso: string; operacao: unknown }): Recurso {
-    if (pedido.operacao) {
-      const op = pedido.operacao as OperacaoDeAjuste;
-      // SPEC-50 — quem manda é a OPERAÇÃO, não o rótulo do pedido: um ajuste
-      // de papel é do dono do pipeline, mesmo que o pedido tenha nascido
-      // marcado como "regras".
-      const alvo = recursoAlvoDaOperacao(op);
-      if (alvo === "pipeline-agentes") return "pipeline-agentes";
-      // SPEC-52 — a ficha tem dono próprio (quem edita campos por componente
-      // ou por conexão), e não é o dono de nenhuma seção das regras.
-      if (alvo === "campos-no" || alvo === "campos-aresta") return alvo;
-      return SECOES_DE_REGRAS[secaoDaOperacao(op)];
-    }
-    return RECURSO_DA_DECISAO[pedido.recurso as (typeof RECURSOS_SOLICITAVEIS)[number]] ?? "regras.checklistTecnico";
   }
 
   app.get("/pdca/config", { preHandler: exigirSessao }, () => cadencia());
@@ -386,99 +349,7 @@ export async function registrarRotasPdca(app: FastifyInstance, { db, diretorioCo
         descricao: z.string().trim().min(1),
         timeId: z.string().optional(),
         // SPEC-45 — a mudança como dado: com ela, aprovar consegue APLICAR.
-        operacao: z
-          .discriminatedUnion("tipo", [
-            // SPEC-46 — as quatro seções das regras de refinamento. `secao`
-            // opcional: pedido gravado antes desta fase continua aplicável.
-            z.object({
-              tipo: z.literal("adicionar-checklist"),
-              secao: z.enum(["checklistTecnico", "checklistProcesso"]).optional(),
-              tech: z.string().min(1),
-              contextos: z.array(z.string()).default([]),
-              texto: z.string().trim().min(1),
-            }),
-            z.object({
-              tipo: z.literal("remover-checklist"),
-              secao: z.enum(["checklistTecnico", "checklistProcesso"]).optional(),
-              tech: z.string().min(1),
-              texto: z.string().trim().min(1),
-            }),
-            z.object({
-              tipo: z.literal("adicionar-teste"),
-              tech: z.string().min(1),
-              contextos: z.array(z.string()).default([]),
-              tipoTeste: z.string().trim().min(1),
-              validacao: z.string().trim().min(1),
-              dev: z.boolean().default(true),
-              hlg: z.boolean().default(false),
-            }),
-            z.object({ tipo: z.literal("remover-teste"), tech: z.string().min(1), tipoTeste: z.string().trim().min(1) }),
-            z.object({
-              tipo: z.literal("definir-volumetria"),
-              tech: z.string().min(1),
-              contextos: z.array(z.string()).default([]),
-            }),
-            z.object({ tipo: z.literal("remover-volumetria"), tech: z.string().min(1) }),
-            // SPEC-63 — a régua sobre a FORMA do desenho. `id` é obrigatório e
-            // vem do cliente porque é a chave estável a que as exceções se
-            // prendem: gerá-lo aqui faria o mesmo pedido aplicado duas vezes
-            // criar duas regras, e as exceções se dividiriam entre elas.
-            z.object({
-              tipo: z.literal("adicionar-topologia"),
-              requisito: z.object({
-                id: z.string().trim().min(1),
-                texto: z.string().trim().min(1),
-                porque: z.string().trim().optional(),
-                checagem: z.discriminatedUnion("tipo", [
-                  z.object({
-                    tipo: z.literal("exige-conexao"),
-                    tipoNo: z.string().min(1),
-                    direcao: z.enum(["entra", "sai"]),
-                    tipoAresta: z.string().min(1).optional(),
-                    tipoNoOposto: z.string().min(1).optional(),
-                  }),
-                  z.object({
-                    tipo: z.literal("proibe-conexao"),
-                    deTipoNo: z.string().min(1),
-                    paraTipoNo: z.string().min(1),
-                    tipoAresta: z.string().min(1).optional(),
-                  }),
-                  // SPEC-67 — o padrão como quantidade. `int().nonnegative()`
-                  // porque máximo fracionário ou negativo é régua que nenhum
-                  // desenho satisfaz; zero é legítimo ("nenhuma chamada
-                  // síncrona daqui").
-                  z.object({
-                    tipo: z.literal("limita-grau"),
-                    tipoNo: z.string().min(1),
-                    direcao: z.enum(["entra", "sai"]),
-                    maximo: z.number().int().nonnegative(),
-                    tipoAresta: z.string().min(1).optional(),
-                    apenasQueEsperam: z.boolean().optional(),
-                  }),
-                ]),
-              }),
-            }),
-            z.object({ tipo: z.literal("remover-topologia"), id: z.string().min(1), texto: z.string().optional() }),
-            // SPEC-50 — papel da esteira: o outro documento que o feedback cita.
-            z.object({ tipo: z.literal("ativar-papel"), papelId: z.string().min(1), papelNome: z.string().optional() }),
-            z.object({ tipo: z.literal("desativar-papel"), papelId: z.string().min(1), papelNome: z.string().optional() }),
-            // SPEC-52 — a ficha do componente e a da conexão.
-            z.object({ tipo: z.literal("adicionar-campo-no"), tipoNo: z.string().min(1), campo: campoProposto }),
-            z.object({
-              tipo: z.literal("remover-campo-no"),
-              tipoNo: z.string().min(1),
-              key: z.string().min(1),
-              label: z.string().optional(),
-            }),
-            z.object({ tipo: z.literal("adicionar-campo-aresta"), tipoAresta: z.string().min(1), campo: campoProposto }),
-            z.object({
-              tipo: z.literal("remover-campo-aresta"),
-              tipoAresta: z.string().min(1),
-              key: z.string().min(1),
-              label: z.string().optional(),
-            }),
-          ])
-          .optional(),
+        operacao: operacaoDeAjuste.optional(),
         /** De qual feedback este pedido nasceu — fecha a ponte que faltava. */
         feedbackId: z.string().uuid().optional(),
       })
@@ -488,29 +359,18 @@ export async function registrarRotasPdca(app: FastifyInstance, { db, diretorioCo
     const orgId = await organizacaoId();
     if (!orgId) return reply.code(409).send({ erro: "nenhuma organização configurada" });
 
-    const [criada] = await db
-      .insert(solicitacoesAjuste)
-      .values({
-        organizacaoId: orgId,
-        timeId: corpo.data.timeId ?? null,
-        solicitante: req.usuario!.email,
-        recurso: corpo.data.recurso,
-        descricao: corpo.data.descricao,
-        // O snapshot da validade: a versão do documento ALVO no momento do
-        // pedido. Recurso sem documento (campos-no) fica sem versão.
-        versaoAlvo: await versaoDoDocumento(corpo.data.recurso),
-        operacao: corpo.data.operacao ?? null,
-      })
-      .returning();
-    // A ponte feedback → solicitação: o card do feedback passa a mostrar que
-    // já virou pedido, em vez de continuar pedindo tratamento pra sempre.
-    if (corpo.data.feedbackId) {
-      await db
-        .update(pdcaFeedback)
-        .set({ estado: "virou-ajuste", solicitacaoId: criada.id })
-        .where(eq(pdcaFeedback.id, corpo.data.feedbackId));
-    }
-    registrarAuditoria(db, { email: req.usuario!.email, acao: "criar", recurso: "solicitacoes_ajuste", recursoId: criada.id });
+    // SPEC-110 fatia G — o MESMO criador que o nó `config-propor-ajuste` usa
+    // (§263): o snapshot da validade, a ponte com o feedback e a auditoria
+    // moram lá, não duplicados aqui.
+    const criada = await criarSolicitacao(db, {
+      organizacaoId: orgId,
+      timeId: corpo.data.timeId,
+      solicitante: req.usuario!.email,
+      recurso: corpo.data.recurso,
+      descricao: corpo.data.descricao,
+      operacao: corpo.data.operacao,
+      feedbackId: corpo.data.feedbackId,
+    });
     return reply.code(201).send(criada);
   });
 
@@ -558,113 +418,23 @@ export async function registrarRotasPdca(app: FastifyInstance, { db, diretorioCo
     const { id } = req.params as { id: string };
     const [pedido] = await db.select().from(solicitacoesAjuste).where(eq(solicitacoesAjuste.id, id)).limit(1);
     if (!pedido) return reply.code(404).send({ erro: "solicitação não encontrada" });
-    if (pedido.estado !== "aprovada") {
-      return reply.code(409).send({ erro: `só solicitação aprovada aplica — esta está "${pedido.estado}"` });
-    }
-    if (!pedido.operacao) {
-      return reply.code(409).send({ erro: "este pedido é só texto (sem operação) — abra a configuração e edite à mão" });
-    }
-    const operacao = pedido.operacao as OperacaoDeAjuste;
-    const alvo = recursoAlvoDaOperacao(operacao);
 
     const gate = exigirPermissao(db, organizacaoId, recursoDaSolicitacao(pedido), "editar", () => pedido.timeId);
     await gate(req, reply);
     if (reply.sent) return;
 
     /**
-     * SPEC-52 — a ficha não é documento: campos por componente e por conexão
-     * são tabela, com escopo. Aplicar aqui grava linha, mas o QUE gravar sai
-     * da mesma função pura que a tela usou pra mostrar a prévia.
-     *
-     * O escopo é o time do pedido — a permissão foi checada com ele. Pedido
-     * sem time mexe no global.
+     * SPEC-110 fatia G — o corpo do aplicar mudou de LUGAR, não de forma
+     * (§263): o nó `config-aplicar-ajuste` de um fluxo aplica pelo MESMO
+     * caminho. A rota fica com o que é dela — o portão e a tradução do erro
+     * em status HTTP.
      */
-    if (alvo === "campos-no" || alvo === "campos-aresta") {
-      const escopo = pedido.timeId ?? CAMPO_GLOBAL;
-      const resultado = await aplicarOperacaoDeCampo(
-        operacao,
-        escopo,
-        alvo === "campos-no" ? fichaDeNos : fichaDeArestas
-      );
-      if (!resultado.ok) return reply.code(409).send({ erro: resultado.motivo });
-
-      const [aplicadaEmCampos] = await db
-        .update(solicitacoesAjuste)
-        .set({ estado: "aplicada", aplicadaEm: new Date(), aplicadaPor: req.usuario!.email })
-        .where(eq(solicitacoesAjuste.id, id))
-        .returning();
-      registrarAuditoria(db, {
-        email: req.usuario!.email,
-        acao: "atualizar",
-        recurso: alvo === "campos-no" ? "campos_no" : "campos_aresta",
-        recursoId: escopo,
-      });
-      return {
-        id,
-        estado: aplicadaEmCampos.estado,
-        aplicadaPor: aplicadaEmCampos.aplicadaPor,
-        criados: resultado.criados,
-        removidos: resultado.removidos,
-      };
+    try {
+      return await aplicarSolicitacao(depsDoAjuste, { id, email: req.usuario!.email });
+    } catch (erro) {
+      if (erro instanceof AjusteRecusado) return reply.code(409).send({ erro: erro.message });
+      throw erro;
     }
-
-    const [doc] = await db
-      .select()
-      .from(configDocumentos)
-      .where(and(eq(configDocumentos.chave, alvo), eq(configDocumentos.timeId, GLOBAL)))
-      .limit(1);
-
-    /**
-     * §303 — sem linha gravada, a base é o TEMPLATE, não um 409.
-     *
-     * Aqui morava `if (!doc) return 409 "documento de <alvo> não encontrado"`.
-     * Mas "não encontrado" é o estado normal de toda organização que ainda não
-     * salvou config nenhuma: o `GET /config/:chave` sempre respondeu com o
-     * template nesse caso (`obter` resolve time → global → template), e só o
-     * `aplicar` tratava a ausência como erro.
-     *
-     * O efeito era um ajuste APROVADO que não aplicava — e a tela nem dizia
-     * por quê: o card ficava em "aprovada" e o botão parecia não ter feito
-     * nada (§244). Numa instalação nova, o PDCA inteiro era inalcançável até
-     * alguém salvar uma config à mão pela aba.
-     *
-     * Ficou invisível por muito tempo porque, na suíte E2E, algum spec vizinho
-     * sempre gravava o documento global antes deste rodar. Quando os specs de
-     * regras foram para times próprios, ninguém mais gravou o global — e a CI,
-     * com banco novo, reproduziu a instalação nova de verdade.
-     */
-    const base = doc?.documento ?? (await templateDaVersao(alvo, diretorioConfig));
-
-    const documentoNovo =
-      alvo === "pipeline-agentes"
-        ? aplicarOperacaoNoPipeline(base as PipelineComPapeis, operacao)
-        : aplicarOperacao(base as RegrasConfig, operacao);
-
-    if (doc) {
-      await db
-        .update(configDocumentos)
-        .set({ documento: documentoNovo, atualizadoEm: new Date() })
-        .where(eq(configDocumentos.id, doc.id));
-    } else {
-      // A primeira gravação da organização. `onConflictDoUpdate` porque duas
-      // aplicações simultâneas nasceriam as duas sem linha, e a segunda
-      // estouraria na chave única em vez de gravar.
-      await db
-        .insert(configDocumentos)
-        .values({ chave: alvo, timeId: GLOBAL, documento: documentoNovo })
-        .onConflictDoUpdate({
-          target: [...ALVO_CONFLITO_CONFIG],
-          set: { documento: documentoNovo, atualizadoEm: new Date() },
-        });
-    }
-    const [aplicada] = await db
-      .update(solicitacoesAjuste)
-      .set({ estado: "aplicada", aplicadaEm: new Date(), aplicadaPor: req.usuario!.email })
-      .where(eq(solicitacoesAjuste.id, id))
-      .returning();
-
-    registrarAuditoria(db, { email: req.usuario!.email, acao: "atualizar", recurso: "config_documentos", recursoId: alvo });
-    return { id, estado: aplicada.estado, aplicadaPor: aplicada.aplicadaPor };
   });
 
   app.post("/ajustes/:id/decidir", { preHandler: exigirSessao }, async (req, reply) => {

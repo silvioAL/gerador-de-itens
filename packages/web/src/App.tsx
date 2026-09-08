@@ -69,7 +69,7 @@ import {
 } from "./api/client";
 import { MolduraDoStage } from "./fluxo/MolduraDoStage";
 // SPEC-110 fatia C — o renderizador das telas do time (o mesmo do preview).
-import { RenderizadorDaTela, useMotivoParaNaoAvancar } from "./fluxo/RenderizadorDaTela";
+import { RenderizadorDaTela, rotulosDasAcoes, useMotivoParaNaoAvancar } from "./fluxo/RenderizadorDaTela";
 import { useSessao } from "./auth/useSessao";
 import { LoginScreen } from "./auth/LoginScreen";
 import { useQuebra } from "./state/useQuebra";
@@ -579,11 +579,16 @@ function AppCarregado({
   }, [rota, navegar]);
   const mostrarStageDaBancada = rota.tela === "telaDoStage" && stage?.tela.id === "bancada-de-ensaios";
   /**
-   * SPEC-110 fatia C — a tela DECLARADA é desenhada aqui, pelos blocos. As do
-   * sistema delegam (a bancada é corpo, o documento e a mesa recebem a
-   * moldura por cima); a do time é a única que o stage RENDERIZA.
+   * SPEC-110 fatia C — a tela desenhada em BLOCOS é renderizada aqui.
+   *
+   * SPEC-110 fatia G — o critério deixou de ser a ORIGEM e passou a ser o que
+   * a tela tem: quem traz blocos é desenhado pelo renderizador de blocos,
+   * venha do time ou do sistema. A revisão de ajuste do PDCA é do sistema (ela
+   * versiona com o código) e é desenhada — um quarto componente React só para
+   * mostrar dois textos e pedir uma decisão seria código onde já há
+   * renderizador.
    */
-  const mostrarStageDeclarado = rota.tela === "telaDoStage" && stage?.tela.origem === "declarada";
+  const mostrarStageDeclarado = rota.tela === "telaDoStage" && (stage?.tela.blocos?.length ?? 0) > 0;
   /** O que a pessoa preencheu nos blocos `campo` — é a saída da tela. */
   const [valoresDaTela, setValoresDaTela] = useState<Record<string, unknown>>({});
   useEffect(() => setValoresDaTela({}), [stage?.execucaoId]);
@@ -1625,6 +1630,7 @@ function AppCarregado({
           ocupado={stageOcupado}
           erro={erroDoStage}
           motivoParaNaoAvancar={motivoParaNaoAvancar}
+          {...rotulosDasAcoes(stage.tela.blocos)}
           onRetornar={() => void decidirNoStage("retornar")}
           onAvancar={() => void decidirNoStage("avancar", valoresDaTela)}
         >
@@ -1633,10 +1639,14 @@ function AppCarregado({
             entradas={stage.entradas}
             valores={valoresDaTela}
             onMudarValor={(chave, valor) => setValoresDaTela((v) => ({ ...v, [chave]: valor }))}
+            acoesNaMoldura
           />
         </MolduraDoStage>
       )}
-      {stage && stage.tela.origem === "sistema" && stage.tela.id !== "bancada-de-ensaios" && (
+      {/* As do sistema que NÃO se desenham: a moldura por cima da tela real
+          (o documento, a mesa). A bancada é corpo próprio; a revisão do ajuste
+          tem blocos e cai no renderizador acima. */}
+      {stage && stage.tela.origem === "sistema" && stage.tela.id !== "bancada-de-ensaios" && !mostrarStageDeclarado && (
         <div data-testid="barra-do-stage" style={{ flexShrink: 0 }}>
           <MolduraDoStage
             nomeDoFluxo={stage.nome}

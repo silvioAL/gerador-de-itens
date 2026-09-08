@@ -52,9 +52,28 @@ const FLUXO_COM_TELA: Fluxo = {
 };
 
 describe("TELAS_DO_SISTEMA (o registro fechado)", () => {
-  it("as três telas do sistema são as que já existem no produto", () => {
-    expect(TELAS_DO_SISTEMA.map((t) => t.id)).toEqual(["bancada-de-ensaios", "documento", "mesa"]);
+  it("as telas do sistema são as que o produto tem — e a lista é fechada", () => {
+    // SPEC-110 fatia G — a quarta é a revisão do ajuste do PDCA. Ela não é uma
+    // tela "que já existia": é a primeira do sistema DESENHADA em blocos, e a
+    // asserção de baixo é a que guarda essa diferença.
+    expect(TELAS_DO_SISTEMA.map((t) => t.id)).toEqual(["bancada-de-ensaios", "documento", "mesa", "revisao-do-ajuste"]);
     expect(telaDoSistema("nao-existe")).toBeUndefined();
+  });
+
+  it("a tela do sistema ou DELEGA (componente próprio) ou se DESENHA (blocos) — nunca as duas", () => {
+    /**
+     * SPEC-110 fatia G — o critério de renderização deixou de ser a origem e
+     * passou a ser "tem blocos?". Uma tela do sistema com blocos E componente
+     * próprio abriria as duas, empilhadas — e a que decide o Avançar seria a
+     * de cima, por acidente de ordem.
+     */
+    const desenhadas = TELAS_DO_SISTEMA.filter((t) => (t.blocos?.length ?? 0) > 0).map((t) => t.id);
+    expect(desenhadas).toEqual(["revisao-do-ajuste"]);
+    // E quem se desenha oferece as duas saídas da decisão, senão a pessoa
+    // ficaria sem como recusar.
+    const revisao = telaDoSistema("revisao-do-ajuste")!;
+    const acoes = (revisao.blocos ?? []).filter((b) => b.tipo === "acao").map((b) => (b as { acao: string }).acao);
+    expect(acoes.sort()).toEqual(["avancar", "retornar"]);
   });
 
   it("TODA tela emite a decisão — é o que torna avançar/retornar fiável (D2)", () => {
@@ -285,10 +304,14 @@ describe("telasEmVigor (declaradas + do sistema, no mesmo vocabulário)", () => 
     expect(t.blocos).toHaveLength(1);
   });
 
-  it("sem documento, só as do sistema — e elas não trazem blocos (são delegadas, não desenhadas)", () => {
+  it("sem documento, só as do sistema — e os blocos das que se desenham viajam junto", () => {
     const vigor = telasEmVigor();
     expect(vigor.every((t) => t.origem === "sistema")).toBe(true);
-    expect(vigor.every((t) => t.blocos === undefined)).toBe(true);
+    // SPEC-110 fatia G — as três delegadas continuam sem blocos; a revisão do
+    // ajuste leva os dela. Sem isso o stage não teria o que desenhar e a
+    // pessoa veria uma moldura vazia com dois botões.
+    expect(vigor.filter((t) => t.blocos !== undefined).map((t) => t.id)).toEqual(["revisao-do-ajuste"]);
+    expect(vigor.find((t) => t.id === "revisao-do-ajuste")!.blocos!.length).toBeGreaterThan(0);
   });
 
   it("idDaTelaDeclarada só reconhece o que tem prefixo", () => {

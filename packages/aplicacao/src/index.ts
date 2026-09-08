@@ -313,6 +313,9 @@ export {
   ID_DO_FLUXO_DA_EXPORTACAO,
   ID_DO_FLUXO_DA_PUBLICACAO,
   ID_DO_FLUXO_DO_ENSAIO,
+  // SPEC-110 fatia G — o ciclo de melhoria como fluxo de fabrica.
+  ID_DO_FLUXO_DO_PDCA,
+  fluxoDoPdca,
   TIPOS_DE_NO_DO_FLUXO,
   fluxoDaEsteira,
   fluxoDaExportacao,

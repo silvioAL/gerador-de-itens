@@ -205,6 +205,14 @@ const PASSOS_DE_USO: { titulo: string; texto: string }[] = [
       "Clique num nó de tela no canvas → “editar a tela →”, ou vá direto a ☰ Menu → Configurações → Telas do time. Uma tela é uma pilha de blocos: TEXTO explica, DADO mostra o que a fiação trouxe, CAMPO pergunta (e o obrigatório trava o Avançar até preencher, dizendo o que falta), AÇÃO dá o seu nome ao botão. A prévia ao lado é exatamente o que a pessoa vai ver quando a execução parar ali.",
   },
   {
+    // SPEC-110 fatia G (D19) — o gesto NOVO: o ciclo de melhoria deixou de ser
+    // só uma aba e virou um desenho que a pessoa roda. Sem este passo, o
+    // manual descreveria o PDCA como lugar, e ele agora é caminho.
+    titulo: "Melhore a configuração pelo próprio fluxo (PDCA)",
+    texto:
+      "☰ Menu → Fluxos de integração → “Melhoria contínua (PDCA)”. O desenho lê os feedbacks que o time registrou e a configuração de hoje, um agente propõe UM ajuste, e a execução PARA numa tela para você conferir os três lados: o que motivou, o que se propõe e como está hoje. “Aplicar o ajuste →” muda a configuração de verdade; “← Não aplicar” encerra sem mexer em nada. Nenhum fluxo escreve configuração direto: ele cria uma SOLICITAÇÃO, com dono e histórico, a mesma que a aba PDCA mostra — e se você não tem permissão para aplicar, o pedido fica lá esperando quem tem.",
+  },
+  {
     titulo: "Confirme o que a IA escreveu",
     texto:
       "De volta ao documento, a seção de itens mostra as sugestões PENDENTES: confirme campo a campo, edite, escreva por cima ou \"Confirmar todas\". Nada que a IA propõe vale antes disso.",

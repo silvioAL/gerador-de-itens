@@ -501,7 +501,7 @@ describe("SPEC-107 fatia A — o nó de FUNÇÃO no fluxo", () => {
       // SPEC-110 fatia F — `pdca-feedback` entra na lista fechada. A régua do
       // §242 é a mesma de sempre: função nova só existe com executor no mesmo
       // commit — e aqui ela declara também ONDE roda.
-      expect(funcoes.map((f) => f.id)).toEqual(["derivacao", "ensaio", "pdca-feedback"]);
+      expect(funcoes.map((f) => f.id)).toEqual(["derivacao", "ensaio", "pdca-feedback", "pdca-ler-feedbacks", "config-ler", "config-propor-ajuste", "config-aplicar-ajuste"]);
       expect(funcoes.every((f) => f.governanca.nivel === "operar")).toBe(true);
       expect(funcoes.find((f) => f.id === "pdca-feedback")!.executor).toBe("servidor");
     });
@@ -1493,6 +1493,184 @@ describe("SPEC-107 fatia B — o nó PROJETO", () => {
         const { nos } = r.json() as { nos: { noId: string; estado: string; erro?: string }[] };
         expect(nos[0].estado).toBe("falhou");
         expect(nos[0].erro).toContain("texto");
+      });
+    });
+  });
+
+  /**
+   * SPEC-110 fatia G (D13) — **o ciclo de melhoria rodando pela fiação.**
+   *
+   * A prova que importa não é "os nós existem": é que o ajuste que o fluxo
+   * propõe é o MESMO objeto que a aba PDCA mostra e aplica — mesma tabela,
+   * mesma auditoria, mesmo portão. E que nada aqui escreve configuração sem
+   * passar por uma solicitação.
+   */
+  describe("SPEC-110 fatia G — o PDCA como fluxo", () => {
+    const umFluxo = (id: string, nos: unknown[], arestas: unknown[] = []) => ({
+      documento: { fluxos: [{ id, nome: id, nos, arestas }] },
+    });
+    const executar = async (app: App, cookies: Cookies, id: string) =>
+      (await app.inject({ method: "POST", url: `/fluxos/${id}/executar`, cookies, payload: {} })).json() as {
+        nos: { noId: string; estado: string; erro?: string }[];
+        saidas: Record<string, Record<string, unknown>>;
+      };
+
+    it("`pdca-ler-feedbacks` traz o que a aba mostra, e um resumo para o agente ler", async () => {
+      await comApp(async (app, cookies) => {
+        await prepararMundo(app, cookies);
+        await app.inject({ method: "POST", url: "/pdca/feedback", cookies, payload: { texto: "faltou campo de prazo" } });
+        await app.inject({ method: "POST", url: "/pdca/feedback", cookies, payload: { texto: "o checklist repete" } });
+
+        await app.inject({
+          method: "PUT",
+          url: "/config/fluxos",
+          cookies,
+          payload: umFluxo("le-feedbacks", [
+            { id: "le", tipo: "funcao", refId: "pdca-ler-feedbacks", posicao: { x: 0, y: 0 }, parametros: {} },
+          ]),
+        });
+        const { nos, saidas } = await executar(app, cookies, "le-feedbacks");
+        expect(nos[0].estado).toBe("sucesso");
+        expect(Number(saidas["le"].quantidade)).toBeGreaterThanOrEqual(2);
+        // O resumo é TEXTO: é o que um prompt sabe receber.
+        expect(String(saidas["le"].resumo)).toContain("faltou campo de prazo");
+        expect(String(saidas["le"].resumo)).toContain("o checklist repete");
+      });
+    });
+
+    it("`config-ler` recusa uma chave que não existe, nomeando as que existem", async () => {
+      await comApp(async (app, cookies) => {
+        await prepararMundo(app, cookies);
+        await app.inject({
+          method: "PUT",
+          url: "/config/fluxos",
+          cookies,
+          payload: umFluxo("le-config-torta", [
+            { id: "le", tipo: "funcao", refId: "config-ler", posicao: { x: 0, y: 0 }, parametros: { chave: "telepatia" } },
+          ]),
+        });
+        const { nos } = await executar(app, cookies, "le-config-torta");
+        expect(nos[0].estado).toBe("falhou");
+        // Sem isto, a chave errada devolveria documento vazio — e vazio é
+        // indistinguível de "ainda não configurado" (SPEC-35).
+        expect(nos[0].erro).toContain("telepatia");
+        expect(nos[0].erro).toContain("regras");
+      });
+    });
+
+    it("propor e aplicar: o ajuste do FLUXO é o mesmo que a aba mostra, e a config muda", async () => {
+      await comApp(async (app, cookies) => {
+        await prepararMundo(app, cookies);
+        await app.inject({
+          method: "PUT",
+          url: "/config/fluxos",
+          cookies,
+          payload: umFluxo(
+            "melhoria",
+            [
+              {
+                id: "propoe",
+                tipo: "funcao",
+                refId: "config-propor-ajuste",
+                posicao: { x: 0, y: 0 },
+                parametros: {
+                  descricao: "o checklist de node precisa citar timeout",
+                  operacao: {
+                    tipo: "adicionar-checklist",
+                    secao: "checklistTecnico",
+                    tech: "node",
+                    contextos: [],
+                    texto: "declarar timeout em toda chamada externa",
+                  },
+                },
+              },
+              { id: "aplica", tipo: "funcao", refId: "config-aplicar-ajuste", posicao: { x: 240, y: 0 }, parametros: {} },
+            ],
+            [{ de: "propoe", para: "aplica", mapeamento: [{ saida: "solicitacaoId", entrada: "solicitacaoId" }] }]
+          ),
+        });
+
+        const { nos, saidas } = await executar(app, cookies, "melhoria");
+        expect(nos.map((n) => [n.noId, n.estado])).toEqual([
+          ["propoe", "sucesso"],
+          ["aplica", "sucesso"],
+        ]);
+        const solicitacaoId = saidas["propoe"].solicitacaoId as string;
+        expect(saidas["aplica"].estado).toBe("aplicada");
+
+        // A MESMA solicitação que a aba lista — não uma segunda tabela.
+        const lista = (await app.inject({ method: "GET", url: "/ajustes", cookies })).json() as {
+          id: string;
+          estado: string;
+          descricao: string;
+        }[];
+        const daFiacao = lista.find((s) => s.id === solicitacaoId);
+        expect(daFiacao).toBeDefined();
+        expect(daFiacao!.estado).toBe("aplicada");
+        expect(daFiacao!.descricao).toContain("timeout");
+
+        // E a configuração MUDOU de verdade — não só o estado do pedido.
+        const regras = (await app.inject({ method: "GET", url: "/config/regras", cookies })).json() as {
+          documento: { porTech?: Record<string, { checklistTecnico?: string[] }> };
+        };
+        expect(JSON.stringify(regras.documento)).toContain("declarar timeout em toda chamada externa");
+      });
+    });
+
+    it("uma operação de forma desconhecida é RECUSADA ao propor, não ao aplicar", async () => {
+      await comApp(async (app, cookies) => {
+        await prepararMundo(app, cookies);
+        await app.inject({
+          method: "PUT",
+          url: "/config/fluxos",
+          cookies,
+          payload: umFluxo("propoe-torto", [
+            {
+              id: "propoe",
+              tipo: "funcao",
+              refId: "config-propor-ajuste",
+              posicao: { x: 0, y: 0 },
+              parametros: { descricao: "algo", operacao: { tipo: "reescrever-tudo", texto: "x" } },
+            },
+          ]),
+        });
+        const { nos } = await executar(app, cookies, "propoe-torto");
+        // Recusar no PROPOR é o que evita um pedido gravado esperando alguém
+        // aprová-lo para então falhar na aplicação.
+        expect(nos[0].estado).toBe("falhou");
+        expect(nos[0].erro).toContain("operacao");
+      });
+    });
+
+    it("`config-aplicar-ajuste` sem o id falha nomeando o campo", async () => {
+      await comApp(async (app, cookies) => {
+        await prepararMundo(app, cookies);
+        await app.inject({
+          method: "PUT",
+          url: "/config/fluxos",
+          cookies,
+          payload: umFluxo("aplica-sem-id", [
+            { id: "aplica", tipo: "funcao", refId: "config-aplicar-ajuste", posicao: { x: 0, y: 0 }, parametros: {} },
+          ]),
+        });
+        const { nos } = await executar(app, cookies, "aplica-sem-id");
+        expect(nos[0].estado).toBe("falhou");
+        expect(nos[0].erro).toContain("solicitacaoId");
+      });
+    });
+
+    it("o fluxo de fábrica do PDCA aparece no em-vigor, com a tela no caminho", async () => {
+      await comApp(async (app, cookies) => {
+        await prepararMundo(app, cookies);
+        const { fluxos } = (await app.inject({ method: "GET", url: "/fluxos", cookies })).json() as {
+          fluxos: { id: string; origem: string; nos: { id: string; tipo: string; refId: string }[] }[];
+        };
+        const pdca = fluxos.find((f) => f.id === "pdca-melhoria");
+        expect(pdca).toBeDefined();
+        expect(pdca!.origem).toBe("fabrica");
+        // A tela de revisão está lá, e é a do SISTEMA: um fluxo de fábrica que
+        // dependesse de uma tela declarada pelo time nasceria quebrado.
+        expect(pdca!.nos.find((n) => n.tipo === "tela")!.refId).toBe("revisao-do-ajuste");
       });
     });
   });

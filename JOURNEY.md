@@ -17716,3 +17716,79 @@ disparo — é a MESMA função do runner de 30s. O teste caiu de 30,5s para 6,1
 o §248 confirma que a asserção morde: com o tick ignorando a hora de fora,
 vermelho. Um teste que às vezes espera demais é ruído que treina gente a
 re-rodar em vez de olhar.
+
+## §397 — SPEC-110 G: o PDCA deixa de ser uma aba e vira um desenho
+
+O ciclo de melhoria existia como LUGAR: uma aba onde feedbacks entram, viram
+pedidos, alguém aprova e aplica. Esta fatia o transforma em CAMINHO — ler o que
+o time registrou, ler a configuração de hoje, um agente propor um ajuste,
+alguém revisar numa tela, e aplicar. Cada passo é um cartão, e é isso que
+permite ao time mudar o próprio ciclo sem código: trocar o gatilho para
+agendamento (fatia E), pôr outro papel a propor, acrescentar uma revisão.
+
+**A lacuna entre a SPEC e o código, medida antes de escrever.** A §4.G diz que
+o Avançar da tela chama `POST /ajustes/:id/aplicar`. Só que `aplicar` recusa
+com 409 qualquer solicitação que não esteja `aprovada`, e uma solicitação nasce
+`pendente`: o caminho real tem três passos, não dois. Do jeito escrito, a tela
+receberia *"só solicitação aprovada aplica"* — uma falha "nomeada no rastro",
+tecnicamente conforme e inútil. Levei a decisão ao usuário, que escolheu: **o
+Avançar aprova e aplica**, pelos caminhos existentes e sob o mesmo portão que
+as rotas já exigem. Quem está na tela É quem revisou; a decisão dessa pessoa É
+a aprovação. A auditoria registra os três atos, senão "quem aprovou?" ficaria
+sem resposta.
+
+**A refatoração que a fatia exigiu, e por que ela não era opcional.** Para o nó
+aplicar pelo mesmo caminho da aba (§263), três coisas saíram de dentro de
+`routes/pdca.ts`: o esquema Zod da operação, os escritores (criar/aprovar/
+aplicar) e a tabela de quem-decide-o-quê. E `exigirPermissao` — um `preHandler`
+Fastify — foi dividido: a DECISÃO virou `podePermissao(db, orgId, {…})`, e o
+middleware ficou só traduzindo o veredito em 403. O executor de fluxo não tem
+`req`/`reply` (o nó pode estar rodando por causa do relógio), e a alternativa
+seria ele reimplementar os dois eixos de acesso — duas cópias de uma régua de
+autorização, que divergem sem ninguém ver. Cada passo da extração rodou a suíte
+inteira antes do seguinte: 2309 verdes em cada.
+
+**A tela de revisão é do SISTEMA e é DESENHADA.** As três primeiras telas do
+sistema são componentes React (a bancada tem a mesa de cenários dentro). Esta
+mostra texto e pede uma decisão — um quarto componente para isso seria código
+onde já existe o renderizador de blocos da fatia C. Então `TelaDoSistema` ganhou
+`blocos`, e o critério de renderização do stage deixou de ser a ORIGEM e passou
+a ser *"tem blocos?"*. Não foi para o template de config do time de propósito:
+uma cópia semeada congelaria a tela na versão em que nasceu, e melhorar a
+revisão do PDCA numa versão nova não chegaria a ninguém — a mesma razão pela
+qual `telas` nasce vazio.
+
+**O defeito que a validação visual desenterrou, e ele era da fatia C.** A D17c
+prometia *"rótulo editável, comportamento fixo"* para o bloco `acao`. Metade
+disso não acontecia: o rótulo escrito virava uma legenda no corpo da tela
+("botão de avançar: …") enquanto o botão de verdade dizia "Avançar →". Quem
+escrevia "Aplicar o ajuste" lia a própria frase como texto inerte e clicava
+noutra coisa. A fatia G expôs isso porque é a primeira tela cujos rótulos
+importam de verdade — e eu tinha acabado de documentar esse gesto no "Como
+usar", o que faria o manual descrever um botão que não existe (§390 de novo).
+Corrigido: a moldura usa o rótulo declarado, e a legenda redundante some no
+stage (a prévia do editor a mantém, porque lá não há moldura).
+
+**Duas travas da casa mordendo, e as duas tinham razão.** O guardião do §80
+recusou a palavra "fatias" num comentário meu em `routes/fluxos.ts` — falso
+positivo, mas quem cede é o comentário, não o guardião. E o registro de funções
+exige que entrada e saída não repitam chave: meu `config-ler` ecoava `chave` e
+o `config-aplicar-ajuste` ecoava `solicitacaoId`. Tirei os ecos — quem precisa
+do id à jusante liga a aresta em quem o PRODUZIU, não em quem o consumiu.
+
+**Onde os componentes moram, e por que não onde a SPEC disse.** A §4.G listava
+`pdca-ler-feedbacks` e `config-ler` em `DADOS_DO_SISTEMA`. Mas aquele registro
+virou "a DEMANDA como dado" na fatia F, e o cabeçalho do cartão diz "DEMANDA":
+um `config-ler` ali apareceria como "DEMANDA / Ler configuração", que é falso.
+As quatro entraram em `FUNCOES_DO_SISTEMA` com `executor: "servidor"` — o
+mecanismo que a própria fatia F criou. Muda o array, não o que a pessoa faz.
+
+§248 (quatro sabotagens): propor deixa de validar a forma da operação → o teste
+que exige recusa no PROPOR (e não no aplicar) fica vermelho; a tela sai do
+caminho do aplicar → a prova de que a revisão é um gate fica vermelha; a tela do
+sistema perde os blocos → o em-vigor fica vermelho; o botão volta a ignorar o
+rótulo declarado → o E2E fica vermelho. Restaurado, tudo verde.
+
+Portões (agora CINCO — `typecheck` entrou depois de a CI cobrá-lo):
+typecheck/build/test/lint verdes, 2324 testes. E2E 150/150 em banco recriado.
+Visual conferida nos dois temas contra :8080.

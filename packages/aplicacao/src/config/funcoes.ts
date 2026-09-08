@@ -112,6 +112,93 @@ export const FUNCOES_DO_SISTEMA: FuncaoDoSistema[] = [
     // Escreve: o executor mora na rota, com o banco e a auditoria.
     executor: "servidor",
   },
+  /**
+   * SPEC-110 fatia G (D13) — **o PDCA inteiro fiável.**
+   *
+   * O ciclo de melhoria já era um lugar (a aba) e virou um CAMINHO: ler o que
+   * o time reclamou, ler a configuração de hoje, propor um ajuste, alguém
+   * revisar numa tela, e aplicar. Cada passo é um componente com contrato — é
+   * o que permite ao time mudar o desenho do próprio ciclo (rodar semanal em
+   * vez de manual, pôr outro agente, acrescentar uma aprovação) sem código.
+   *
+   * As quatro rodam no SERVIDOR: leem e escrevem banco. A §4.G as listava em
+   * `DADOS_DO_SISTEMA`, mas aquele registro virou "a DEMANDA como dado" na
+   * fatia F — o cabeçalho do cartão diz "DEMANDA", e um `config-ler` ali
+   * apareceria como "DEMANDA / Ler configuração", que é falso. Aqui elas são o
+   * que são: capacidades do sistema com contrato.
+   */
+  {
+    id: "pdca-ler-feedbacks",
+    nome: "Ler feedbacks do ciclo (PDCA)",
+    descricao: "Traz os feedbacks que ainda esperam alguém — os mesmos que a aba PDCA mostra como pendentes.",
+    entrada: [
+      // O estado é parâmetro porque "o que ainda espera alguém" é a pergunta
+      // comum, mas revisar o que já virou ajuste também é um uso legítimo.
+      { chave: "estado", rotulo: "Estado (vazio = novo, o que ainda espera alguém)", tipo: "texto" },
+      { chave: "limite", rotulo: "Quantos no máximo (vazio = 20)", tipo: "numero" },
+    ],
+    saida: [
+      { chave: "feedbacks", rotulo: "Feedbacks (texto, quem, quando)", tipo: "lista" },
+      { chave: "quantidade", rotulo: "Quantos vieram", tipo: "numero" },
+      // O texto corrido existe para o AGENTE: um prompt recebe texto, e
+      // concatenar a lista no nó de transformação seria trabalho repetido em
+      // todo fluxo de PDCA que alguém desenhasse.
+      { chave: "resumo", rotulo: "Os feedbacks em texto corrido (para o agente ler)", tipo: "texto" },
+    ],
+    governanca: { nivel: "operar", recurso: "fluxos.executar" },
+    executor: "servidor",
+  },
+  {
+    id: "config-ler",
+    nome: "Ler uma configuração",
+    descricao: "Traz o documento de configuração em vigor — o mesmo que a tela de configurações mostra.",
+    entrada: [{ chave: "chave", rotulo: "Qual configuração (regras, pipeline-agentes, telas…)", tipo: "texto", obrigatorio: true }],
+    // Só o documento: ecoar a `chave` de volta repetiria uma chave entre
+    // entrada e saída, e a régua da casa recusa (a mesma chave nos dois lados
+    // torna ambíguo o que o painel de mapeamento está oferecendo).
+    saida: [{ chave: "documento", rotulo: "O documento em vigor", tipo: "objeto" }],
+    governanca: { nivel: "operar", recurso: "fluxos.executar" },
+    executor: "servidor",
+  },
+  {
+    id: "config-propor-ajuste",
+    nome: "Propor ajuste de configuração",
+    /**
+     * D13, que não se reabre: **fluxo não escreve configuração direto.** Ele
+     * PROPÕE, e a proposta passa pelo mesmo caminho de quem pede pela aba —
+     * com dono, versão-alvo e auditoria. Um fluxo que reescrevesse regras
+     * sozinho seria a única escrita do produto sem alguém atrás dela.
+     */
+    descricao: "Cria uma solicitação de ajuste (pendente) — a mesma que a aba PDCA mostra. Nenhum fluxo escreve configuração direto.",
+    entrada: [
+      { chave: "descricao", rotulo: "O que se está pedindo, em uma frase", tipo: "texto", obrigatorio: true },
+      { chave: "operacao", rotulo: "A mudança como dado (é ela que permite aplicar)", tipo: "objeto" },
+      { chave: "recurso", rotulo: "Qual configuração (vazio = regras)", tipo: "texto" },
+      { chave: "feedbackId", rotulo: "De qual feedback nasceu (fecha a ponte do ciclo)", tipo: "texto" },
+    ],
+    saida: [
+      { chave: "solicitacaoId", rotulo: "Solicitação criada (id)", tipo: "texto" },
+      { chave: "estado", rotulo: "Estado da solicitação", tipo: "texto" },
+    ],
+    governanca: { nivel: "operar", recurso: "fluxos.executar" },
+    executor: "servidor",
+  },
+  {
+    id: "config-aplicar-ajuste",
+    nome: "Aplicar ajuste de configuração",
+    descricao:
+      "Aprova e aplica uma solicitação — pelo mesmo caminho da aba, com o mesmo portão. Sem permissão, o nó falha nomeando, e a solicitação fica pendente para alguém decidir na aba.",
+    entrada: [{ chave: "solicitacaoId", rotulo: "Qual solicitação aplicar", tipo: "texto", obrigatorio: true }],
+    // Sem ecoar o `solicitacaoId` que entrou: quem precisar dele à jusante
+    // liga a aresta em quem o PRODUZIU (o nó que propôs), não em quem o
+    // consumiu.
+    saida: [
+      { chave: "estado", rotulo: "Estado depois de aplicar", tipo: "texto" },
+      { chave: "aplicadaPor", rotulo: "Quem aplicou", tipo: "texto" },
+    ],
+    governanca: { nivel: "operar", recurso: "fluxos.executar" },
+    executor: "servidor",
+  },
 ];
 
 export function funcaoDoSistema(id: string): FuncaoDoSistema | undefined {

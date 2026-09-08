@@ -62,7 +62,11 @@ describe("JourneyModal", () => {
     expect(screen.getByText("Confirme o que a IA escreveu")).toBeInTheDocument();
     // O gesto, não só o conceito: o passo diz ONDE (menu, tela, botão).
     expect(screen.getByText(/☰ Menu → Modelo de IA/)).toBeInTheDocument();
-    expect(screen.getByText(/☰ Menu → Fluxos de integração/)).toBeInTheDocument();
+    // SPEC-110 fatia G — dois passos passam pelo canvas de fluxos (a esteira e
+    // o ciclo do PDCA), então o caminho do menu deixou de ser único no texto.
+    // O que a asserção quer é que o caminho ESTEJA lá, não que ele apareça uma
+    // vez só.
+    expect(screen.getAllByText(/☰ Menu → Fluxos de integração/).length).toBeGreaterThan(0);
   });
 
   it("a aba jornada mostra as 5 etapas e o que cada saída serve", async () => {
