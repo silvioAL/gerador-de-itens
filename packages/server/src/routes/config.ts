@@ -22,6 +22,9 @@ import {
   type Recurso,
 } from "../auth/permissoes.js";
 import { registrarAuditoria } from "../auditoria.js";
+// SPEC-110 fatia E — o desenho manda no relogio: salvar o fluxo sincroniza.
+import { normalizarFluxos } from "@gerador/aplicacao";
+import { sincronizarAgendamentos } from "../fluxos/agendamentos.js";
 import { templateDaVersao as templateDeConfig } from "../config/templateDaVersao.js";
 
 /**
@@ -247,6 +250,29 @@ export async function registrarRotasConfig(app: FastifyInstance, { db, diretorio
       recurso: "config_documentos",
       recursoId: `${chave}:${salvo.timeId}`,
     });
+
+    /**
+     * SPEC-110 fatia E (D7) — **salvar o fluxo sincroniza o relógio.**
+     *
+     * O DESENHO é a verdade: o agendamento não é uma segunda configuração que
+     * alguém precisa lembrar de mexer — ele nasce, muda e para junto com o nó
+     * de gatilho. Sem isto, o canvas prometeria um horário que a tabela não
+     * conhece, que é a meia-integração do §346 com relógio.
+     *
+     * Depois da auditoria e fora do caminho de erro do salvamento: uma falha
+     * de sincronização não pode desfazer um documento já gravado — ela vira
+     * log, e o próximo salvamento reconcilia.
+     */
+    if (chave === "fluxos") {
+      try {
+        const { fluxos } = normalizarFluxos(salvo.documento);
+        for (const fluxo of fluxos) {
+          await sincronizarAgendamentos(db, fluxo, salvo.timeId, req.usuario!.email);
+        }
+      } catch (erro) {
+        app.log.error({ erro }, "falha ao sincronizar agendamentos do fluxo");
+      }
+    }
     return salvo;
   });
 }

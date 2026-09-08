@@ -20,6 +20,9 @@ import {
   gatilhoDoSistema,
   ID_DO_NO_DE_GATILHO,
   noDeGatilhoManual,
+  // SPEC-110 fatia E — o relógio: a expressão e a previsão da próxima.
+  PARAMETRO_DA_EXPRESSAO,
+  proximaOcorrenciaLegivel,
   telasEmVigor,
   type TelaEmVigor,
   PROJETO_DO_SISTEMA,
@@ -1480,6 +1483,31 @@ function PainelDoNo({
               </option>
             ))}
           </select>
+        </label>
+      )}
+      {/**
+       * SPEC-110 fatia E (D7) — a EXPRESSÃO do agendamento, com a próxima
+       * ocorrência ao lado. Um cron sozinho não é resposta para quem o
+       * escreveu: "0 9 * * 1-5" só vira promessa quando a tela diz que a
+       * próxima é segunda às 9h (§2.4-6 — o implícito em voz alta).
+       */}
+      {no.tipo === "gatilho" && no.refId === "agendamento" && (
+        <label style={{ fontSize: 11.5, display: "grid", gap: 2, marginBottom: 8 }}>
+          Quando rodar (cron de 5 campos, em UTC)
+          <input
+            data-testid="expressao-do-agendamento"
+            disabled={!podeEditar}
+            value={String(no.parametros[PARAMETRO_DA_EXPRESSAO] ?? "")}
+            placeholder="0 9 * * 1-5   (dias úteis, 9h)"
+            onChange={(e) => onMudar({ parametros: { ...no.parametros, [PARAMETRO_DA_EXPRESSAO]: e.target.value } })}
+            style={campo}
+          />
+          <span data-testid="proxima-ocorrencia" style={{ color: "var(--texto-2)" }}>
+            próxima: {proximaOcorrenciaLegivel(String(no.parametros[PARAMETRO_DA_EXPRESSAO] ?? ""), new Date())}
+          </span>
+          <span style={{ color: "var(--texto-fraco)" }}>
+            minuto hora dia mês dia-da-semana · aceita <em>*</em>, listas (1,15), intervalos (1-5) e passos (*/15)
+          </span>
         </label>
       )}
       {no.tipo !== "gatilho" && no.tipo !== "tela" && no.tipo !== "funcao" && no.tipo !== "projeto" && no.tipo !== "transformacao" && (

@@ -54,7 +54,27 @@ export const GATILHOS_DO_SISTEMA: GatilhoDoSistema[] = [
       "É o que o botão “▶ Rodar agora” dispara. Quem abre o fluxo e manda rodar é a origem — a execução fica no histórico com o e-mail de quem mandou.",
     saida: [],
   },
+  {
+    /**
+     * SPEC-110 fatia E (D7) — *"senti falta de componente scheduler para
+     * outros desenhos"*. O relógio é o segundo membro da família: a expressão
+     * (cron de 5 campos, UTC) mora em `parametros.expressao` do nó, e salvar
+     * o fluxo sincroniza a tabela de agendamentos.
+     *
+     * Sem saída, como o manual (D1): o relógio diz QUANDO, não O QUÊ.
+     */
+    id: "agendamento",
+    nome: "🕐 Agendamento — roda na hora marcada",
+    rotuloCurto: "🕐 Agendado",
+    descricao:
+      "Roda sozinho, na expressão que você escrever (cron de 5 campos, em UTC). O “▶ Rodar agora” continua funcionando — agendar não tira o gesto manual.",
+    saida: [],
+  },
 ];
+
+/** O parâmetro do nó que guarda a expressão do agendamento. Um lugar só
+ * porque a tela, a validação e o sincronizador leem o mesmo nome. */
+export const PARAMETRO_DA_EXPRESSAO = "expressao";
 
 export function gatilhoDoSistema(id: string): GatilhoDoSistema | undefined {
   return GATILHOS_DO_SISTEMA.find((g) => g.id === id);

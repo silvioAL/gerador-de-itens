@@ -51,6 +51,8 @@ import { contextoDasFuncoes } from "../config/contextoDasFuncoes.js";
 import { templateDaVersao } from "../config/templateDaVersao.js";
 import { criarResolvedorDeProvedor } from "../ia/provedorDaOrganizacao.js";
 import { fluxoExecucoes, quebras } from "../db/schema.js";
+// SPEC-110 fatia E — o relogio: sincronizar o desenho e reservar os vencidos.
+import { desativarAgendamento, reservarVencidos, sincronizarAgendamentos } from "../fluxos/agendamentos.js";
 import { exigirSessao } from "../auth/middleware.js";
 
 /**
@@ -83,6 +85,13 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
   const opcoesDoCofre = opcoesDoAmbiente();
   const cofre = opcoesDoCofre ? criarCofreInfisical(opcoesDoCofre) : null;
   const resolverProvedor = criarResolvedorDeProvedor(db);
+
+  /**
+   * SPEC-110 fatia E — quem o histórico registra quando quem dispara é o
+   * RELÓGIO. Um e-mail reconhecível e não uma string vazia: a auditoria
+   * pergunta "quem fez?", e "ninguém" não é resposta.
+   */
+  const EMAIL_DO_RELOGIO = "agendamento@gerador.local";
 
   const timeDoCorpo = (req: FastifyRequest) => ((req.body ?? {}) as { timeId?: string }).timeId ?? null;
 
@@ -839,6 +848,86 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     registrarAuditoria(db, { email, acao: "executar", recurso: "fluxos", recursoId: execucao.fluxoId });
     return { ok: true };
   });
+
+  /**
+   * SPEC-110 fatia E (D7) — **o disparo pelo relógio**, num lugar só: o tick
+   * do runner e o tick forçado da prova chamam ESTA função. Dois caminhos
+   * divergiriam, e o E2E passaria a provar o que ninguém roda (§263).
+   */
+  async function dispararAgendamentosVencidos(agora = new Date()): Promise<{ disparados: number }> {
+    const vencidos = await reservarVencidos(db, agora);
+    let disparados = 0;
+    for (const venc of vencidos) {
+      const timeId = venc.timeId === CAMPO_GLOBAL ? undefined : venc.timeId;
+      try {
+        const { fluxos, papeis } = await emVigor(timeId);
+        const fluxo = fluxos.find((f) => f.id === venc.fluxoId);
+        // O fluxo pode ter sumido (o time apagou o declarado): o agendamento
+        // órfão desativa em vez de tentar para sempre.
+        if (!fluxo) {
+          await desativarAgendamento(db, venc.id);
+          continue;
+        }
+        const [catalogo, provedor] = await Promise.all([catalogoDeConectores(db, diretorioConfig), resolverProvedor()]);
+        let resultado;
+        try {
+          resultado = await executarFluxo(
+            fluxo,
+            criarExecutores({ fluxo, papeis, catalogo, provedor, timeId, email: EMAIL_DO_RELOGIO }),
+            // A ORIGEM é o que o histórico registra: sem isto, uma execução do
+            // relógio seria indistinguível de alguém que apertou o botão.
+            { origemDoDisparo: "agendamento" }
+          );
+        } finally {
+          await provedor?.descartar().catch(() => undefined);
+        }
+        if (resultado.ciclo) continue;
+        const estadoSuspenso = resultado.aguardandoEm
+          ? "aguardando-confirmacao"
+          : resultado.aguardandoTela
+            ? "aguardando-tela"
+            : null;
+        await db.insert(fluxoExecucoes).values({
+          fluxoId: venc.fluxoId,
+          timeId: venc.timeId,
+          hash: hashDoFluxo(fluxo),
+          email: EMAIL_DO_RELOGIO,
+          nos: resultado.nos,
+          ...(estadoSuspenso ? { estado: estadoSuspenso, saidas: resultado.saidas } : {}),
+        });
+        registrarAuditoria(db, { email: EMAIL_DO_RELOGIO, acao: "executar", recurso: "fluxos", recursoId: venc.fluxoId });
+        disparados++;
+      } catch (erro) {
+        // Um agendamento que explode não pode derrubar o tick dos outros — a
+        // mesma regra 2 do executor de fluxo (§9.3), um nível acima.
+        app.log.error({ erro, agendamento: venc.id }, "falha ao disparar agendamento");
+      }
+    }
+    return { disparados };
+  }
+
+  /**
+   * O TICK, a cada 30s. `unref()` para o processo não ficar preso ao timer no
+   * desligamento — um servidor que não morre é pior que um tick perdido.
+   */
+  const relogio = setInterval(() => {
+    void dispararAgendamentosVencidos().catch((erro) => app.log.error({ erro }, "tick de agendamentos falhou"));
+  }, 30_000);
+  relogio.unref();
+  app.addHook("onClose", async () => clearInterval(relogio));
+
+  /**
+   * SPEC-110 fatia E — **o tick FORÇADO, só em `AUTH_MODE=dev`.**
+   *
+   * A prova de um relógio não pode depender de esperar o relógio: o E2E cria o
+   * agendamento com a próxima ocorrência no passado, força o tick e vê a
+   * execução no histórico com origem `agendamento`. Fora do modo dev a rota
+   * não existe — um endpoint que dispara fluxos por HTTP sem sessão é
+   * exatamente o que não se deixa num ambiente real.
+   */
+  if ((process.env.AUTH_MODE ?? "dev") === "dev") {
+    app.post("/fluxos/agendamentos/tick", async () => dispararAgendamentosVencidos());
+  }
 
   /** O rastro das últimas execuções — é o que torna o fluxo diagnosticável. */
   app.get("/fluxos/:id/execucoes", { preHandler: exigirSessao }, async (req) => {

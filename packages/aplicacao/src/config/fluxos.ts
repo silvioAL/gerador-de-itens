@@ -2,6 +2,9 @@
 import { sanearCamposDaTransformacao, validarCamposDaTransformacao } from "../casos-de-uso/transformacao.js";
 import { FUNCOES_DO_SISTEMA, funcaoDoSistema } from "./funcoes.js";
 import { GATILHOS_DO_SISTEMA, ID_DO_NO_DE_GATILHO, gatilhoDoSistema } from "./gatilhos.js";
+// SPEC-110 fatia E — o relogio: a expressao do agendamento e validada na
+// escrita, com a mesma regua pura que o painel usa para prever a proxima.
+import { problemaNoCron } from "./cron.js";
 import { REF_DO_PROJETO } from "./projeto.js";
 import { TELAS_DO_SISTEMA, telaDoSistema } from "./telas.js";
 import {
@@ -541,6 +544,16 @@ export function validarEscritaFluxos(documento: unknown): void {
           throw new ConfigInvalida(
             `no fluxo "${id}", o nó "${noId}" aponta para o gatilho "${no.refId.trim()}", que não existe (gatilhos: ${GATILHOS_DO_SISTEMA.map((g) => g.id).join(", ")})`
           );
+        }
+        /**
+         * SPEC-110 fatia E — o gatilho de AGENDAMENTO não vale sem expressão
+         * válida: um cron torto só apareceria quando o relógio não disparasse,
+         * e "não rodou" é o silêncio mais caro de diagnosticar.
+         */
+        if (no.refId.trim() === "agendamento") {
+          const expressao = (no.parametros as { expressao?: unknown } | undefined)?.expressao;
+          const problema = problemaNoCron(typeof expressao === "string" ? expressao : "");
+          if (problema) throw new ConfigInvalida(`no fluxo "${id}", o nó "${noId}" agenda mal: ${problema}`);
         }
         gatilhos.push(noId);
       }

@@ -116,7 +116,9 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
         // fluxo diz quando ele roda, e é o que dá propósito ao botão.
         // SPEC-110 B (D19) — a TELA entra na narração: sem ela, o tour
         // descreveria um encanamento que nunca espera ninguém.
-        "Três partes trabalham aqui, e a divisão é a ideia toda. Todo fluxo começa por um GATILHO — o cartão que diz QUANDO ele roda; com o manual, é o \"▶ Rodar agora\" que dispara. Onde VOCÊ entra é uma TELA: a execução para nela e espera você revisar e decidir (avançar ou retornar). O MOTOR calcula — lê o seu desenho e a configuração do time, e deriva os itens com as dependências: são as FUNÇÕES DO SISTEMA neste canvas (Geração de itens, Ensaio de cenários). A IA escreve o texto: são os AGENTES, em esteira, e nada que eles propõem conta antes de você confirmar. Este encanamento não é ilustração — é o que roda quando você deriva.",
+        // SPEC-110 E (D19) — e o gatilho tem DUAS respostas para "quando":
+        // omitir o relógio deixaria o tour ensinando que fluxo só roda a clique.
+        "Três partes trabalham aqui, e a divisão é a ideia toda. Todo fluxo começa por um GATILHO — o cartão que diz QUANDO ele roda: no manual é o \"▶ Rodar agora\" que dispara; no agendado, um relógio dispara na hora marcada, sem ninguém. Onde VOCÊ entra é uma TELA: a execução para nela e espera você revisar e decidir (avançar ou retornar). O MOTOR calcula — lê o seu desenho e a configuração do time, e deriva os itens com as dependências: são as FUNÇÕES DO SISTEMA neste canvas (Geração de itens, Ensaio de cenários). A IA escreve o texto: são os AGENTES, em esteira, e nada que eles propõem conta antes de você confirmar. Este encanamento não é ilustração — é o que roda quando você deriva.",
       onEnter: () => {
         // Primeiro passo a mostrar dado de demonstração: a marca liga aqui
         // (§235), porque o time de quem assiste pode não ter régua conferível

@@ -173,6 +173,14 @@ const PASSOS_DE_USO: { titulo: string; texto: string }[] = [
       "☰ Menu → Fluxos de integração (a esteira também abre sozinha ao derivar): o primeiro cartão é o GATILHO — ele diz quando o fluxo roda. Com o gatilho manual, \"▶ Rodar agora\" dispara os agentes (PO, Arquiteto, Especialista, QA) sobre a demanda aberta, ao vivo, nó a nó. Clicar num agente edita o papel dele — prompt, ligar/desligar, ordem.",
   },
   {
+    // SPEC-110 fatia E (D19) — o gesto NOVO: o fluxo que roda sem ninguém.
+    // Sem este passo, o manual só ensinaria fluxos que esperam um clique, e o
+    // relógio — que passa a existir — ficaria invisível.
+    titulo: "Faça o fluxo rodar sozinho, na hora marcada",
+    texto:
+      "Troque o gatilho para “🕐 Agendado” e escreva quando ele roda: cinco campos — minuto, hora, dia, mês, dia-da-semana — em UTC. “0 9 * * 1-5” é “dias úteis, às 9h”. Aceita * (qualquer), listas (1,15), intervalos (1-5) e passos (*/15). Logo abaixo o painel responde com a PRÓXIMA data, para você conferir antes de salvar. Salvar o desenho é que liga o relógio; tirar o gatilho é que o desliga. O fluxo agendado continua rodável na mão pelo “▶ Rodar agora”, e no histórico dá para ver quem disparou cada execução — você ou o relógio.",
+  },
+  {
     // SPEC-110 fatia B (D19) — o passo NOVO: a tela como nó. Sem ele, o
     // manual ensinaria um fluxo que sempre corre sozinho, e a pessoa que
     // encontrasse a execução parada não saberia que ela está esperando POR ELA.
