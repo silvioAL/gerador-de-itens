@@ -492,7 +492,12 @@ describe("SPEC-107 fatia A — o nó de FUNÇÃO no fluxo", () => {
     await comApp(async (app) => {
       const r = await app.inject({ method: "GET", url: "/funcoes" });
       expect(r.statusCode).toBe(200);
-      const { funcoes } = r.json() as { funcoes: { id: string; governanca: { nivel: string } }[] };
+      const { funcoes } = r.json() as {
+        // SPEC-110 fatia F — `executor` entra no tipo porque a rota o serve:
+        // um tipo local mais estreito que a resposta esconde o campo novo do
+        // typecheck, que é o portão que a CI usa (mais largo que o build).
+        funcoes: { id: string; governanca: { nivel: string }; executor?: string }[];
+      };
       // SPEC-110 fatia F — `pdca-feedback` entra na lista fechada. A régua do
       // §242 é a mesma de sempre: função nova só existe com executor no mesmo
       // commit — e aqui ela declara também ONDE roda.
