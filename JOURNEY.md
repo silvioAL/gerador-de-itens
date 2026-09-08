@@ -17530,3 +17530,76 @@ resolve: a corrida está entre o read e o write, não no filtro.
 A correção é por CONSTRUÇÃO, não por retentativa: as provas foram para o
 arquivo que já é dono do documento, e o arquivo virou `serial`. O Playwright
 paraleliza por arquivo — um arquivo, um dono. E é coeso: são todos conectores.
+
+## §395 — SPEC-110 E: o relógio (o fluxo que roda sem ninguém)
+
+*"senti falta de componente scheduler para outros desenhos"*.
+
+Até aqui todo fluxo esperava um clique. O gatilho da fatia A já tinha uma
+pergunta — *quando este fluxo roda?* — e uma resposta só: **manual**. Esta
+fatia dá a segunda: **agendado**, cinco campos de cron, em UTC.
+
+**O parser é puro e mora na aplicação.** Cinco campos, `*`, número, lista,
+intervalo e passo — e uma recusa explícita para `@daily`, `MON`, `L`/`W`/`#`.
+Aceitar um dialeto pela metade seria pior que recusá-lo: `MON` aceito e
+ignorado agenda para o dia errado em silêncio. `proximaOcorrencia` varre
+minuto a minuto com teto de 4 anos, então `0 0 30 2 *` — 30 de fevereiro —
+devolve `null` em vez de girar para sempre.
+
+**UTC, e a tela diz UTC.** Fuso por time é uma tabela de configuração e uma
+conversa sobre horário de verão que a fatia não paga. O que ela não pode fazer
+é deixar isso implícito: o rótulo do campo, o texto de ajuda e a previsão
+carregam "UTC" para que ninguém agende 9h e receba 6h.
+
+**Um cron sozinho não é resposta.** O painel responde `0 9 * * 1-5` com
+`próxima: 2026-09-08 09:00 UTC`. Sem isso a pessoa que escreveu a expressão só
+descobriria o erro quando o fluxo NÃO rodasse — e "não rodou" é o silêncio
+mais caro de diagnosticar, porque nada falha.
+
+**O desenho manda no relógio (D7).** Salvar o fluxo sincroniza a tabela: cria
+o que nasceu, atualiza a expressão que mudou, e **desativa** o que saiu do
+canvas. Desativa em vez de apagar, porque `ultima_em` é a resposta de "quando
+isto rodou?" e mexer num nó não pode apagar histórico. Não existe segunda tela
+de agendamento para alguém esquecer de mexer.
+
+**O UPDATE atômico é o lock.** `UPDATE ... WHERE id = ? AND proximo_em = ?`
+reserva e avança na MESMA instrução, com o valor antigo na condição: um
+segundo tick não casa e não pega a linha. Não é lock distribuído — v1 é
+single-instance por decisão — mas a dívida não vira disparo duplicado calado.
+
+**Duas decisões que só um teste revelou.** A primeira: a próxima ocorrência é
+recalculada só quando a EXPRESSÃO muda. Entre a hora marcada e o tick que a
+colhe passam até 30s, e um salvamento qualquer nessa janela — mover um nó,
+renomear o fluxo — empurraria o disparo para amanhã. A rodada de hoje sumiria
+sem nada falhar. A segunda: uma linha com `proximo_em` nulo GANHA a próxima em
+vez de disparar, senão "nunca calculado" seria lido como "vencido há muito
+tempo".
+
+**O teste que eu tinha escrito não provava o que dizia provar.** A primeira
+versão salvava às 7h e de novo às 8h, e a sabotagem — recalcular sempre —
+ficou VERDE: às 8h o recálculo dá 9h do mesmo dia, idêntico ao preservado. O
+§248 não é ritual; foi ele que mostrou que a asserção era decorativa. O caso
+que morde é o salvamento às 09:00:10, na janela entre a hora e o tick.
+
+**A migração não estava no journal do drizzle.** `0046` existia como arquivo e
+nunca teria rodado — nem aqui, nem em produção. Quem cobrou foi o teste novo,
+falhando com `relation "fluxo_agendamentos" does not exist` antes de qualquer
+asserção. Uma migração fora do journal é um deploy que sobe sem a tabela.
+
+**A validação visual quase mentiu.** As duas capturas — claro e escuro — saíram
+IDÊNTICAS: `goto` para a mesma URL não recarrega, e a segunda volta fotografou
+o tema da primeira. "Validei nos dois temas" teria sido afirmação falsa com
+duas imagens no colo. A correção é um `reload()` e, mais importante, uma
+asserção sobre `data-tema` — o instrumento passou a conferir a si mesmo.
+
+**Prova D18 contra a stack real, não contra o tick forçado.** O E2E usa
+`POST /fluxos/agendamentos/tick` (só em `AUTH_MODE=dev`) para ser
+determinístico. Mas a promessa é outra: um agendamento que só existisse na
+memória do processo pararia calado no primeiro deploy. A prova é
+`docker compose restart server` com o fluxo já salvo — e o relógio de verdade,
+o `setInterval` de 30s, disparou sozinho depois de voltar, com
+`agendamento@gerador.local` no histórico. E2E: 147/147 em banco recriado.
+
+§248 (trio, duas sabotagens distintas): tirar o avanço do `set` da reserva → 4
+vermelhos, entre eles o disparo duplicado; recalcular a próxima a todo
+salvamento → a rodada engolida fica vermelha. Restaurado, 14 verdes.

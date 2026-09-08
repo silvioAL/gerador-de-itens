@@ -54,7 +54,10 @@ describe("GATILHOS_DO_SISTEMA (o registro fechado)", () => {
 
   it("gatilho desconhecido não existe — a lista é fechada de propósito (§242)", () => {
     expect(gatilhoDoSistema("quando-der-vontade")).toBeUndefined();
-    expect(GATILHOS_DO_SISTEMA.map((g) => g.id)).toEqual(["manual"]);
+    // SPEC-110 fatia E — a família cresceu com o relógio, e ela cresce por
+    // DECISÃO: cada membro chega com quem o honre no mesmo commit (§242).
+    // O `webhook` entra na fatia L; o `screen`, na SPEC-111.
+    expect(GATILHOS_DO_SISTEMA.map((g) => g.id)).toEqual(["manual", "agendamento"]);
   });
 });
 

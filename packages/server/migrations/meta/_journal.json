@@ -323,6 +323,13 @@
       "when": 1754500000031,
       "tag": "0045_gate_de_confirmacao",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1754500000032,
+      "tag": "0046_agendamento_de_fluxos",
+      "breakpoints": true
     }
   ]
 }

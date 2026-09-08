@@ -188,6 +188,8 @@ export {
 } from "./casos-de-uso/funcoes.js";
 /** SPEC-107 fatia B — o PROJETO como nó, nas duas direções. */
 export { PROJETO_DO_SISTEMA, REF_DO_PROJETO, type ProjetoDoSistema } from "./config/projeto.js";
+/** SPEC-110 fatia E — o relógio: cron de 5 campos, UTC, com próxima-ocorrência. */
+export { analisarCron, problemaNoCron, proximaOcorrencia, proximaOcorrenciaLegivel } from "./config/cron.js";
 /** SPEC-110 fatia D — o banco como componente: consulta, e só consulta. */
 export {
   LIMITE_MAXIMO_DA_CONSULTA,
@@ -231,6 +233,8 @@ export {
   GATILHOS_DO_SISTEMA,
   ID_DO_NO_DE_GATILHO,
   ORIGENS_DO_DISPARO,
+  /** SPEC-110 fatia E — o parâmetro do nó que guarda a expressão do cron. */
+  PARAMETRO_DA_EXPRESSAO,
   gatilhoDoSistema,
   type GatilhoDoSistema,
   type OrigemDoDisparo,

@@ -663,3 +663,23 @@ export const fluxoExecucoes = pgTable("fluxo_execucoes", {
   saidas: jsonb("saidas"),
   ateNo: text("ate_no"),
 });
+
+/**
+ * SPEC-110 fatia E (D7) — **o agendamento de um fluxo** (migração 0046).
+ *
+ * Uma linha por nó de gatilho `agendamento`. `proximoEm` é o coração: o runner
+ * faz `UPDATE ... WHERE proximo_em <= now() AND ativo RETURNING *`, e esse
+ * UPDATE atômico É o lock — duas instâncias competindo pegariam linhas
+ * diferentes, não a mesma (single-instance no v1; multi é dívida declarada).
+ */
+export const fluxoAgendamentos = pgTable("fluxo_agendamentos", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  fluxoId: text("fluxo_id").notNull(),
+  noId: text("no_id").notNull(),
+  timeId: text("time_id").notNull(),
+  expressao: text("expressao").notNull(),
+  ativo: boolean("ativo").notNull().default(true),
+  proximoEm: timestamp("proximo_em", { withTimezone: true }),
+  ultimaEm: timestamp("ultima_em", { withTimezone: true }),
+  criadoPor: text("criado_por"),
+});
