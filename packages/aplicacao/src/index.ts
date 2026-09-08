@@ -316,6 +316,8 @@ export {
   // SPEC-110 fatia G — o ciclo de melhoria como fluxo de fabrica.
   ID_DO_FLUXO_DO_PDCA,
   fluxoDoPdca,
+  // SPEC-110 fatia H — a semente do fluxo novo, com o gatilho.
+  fluxoNovo,
   TIPOS_DE_NO_DO_FLUXO,
   fluxoDaEsteira,
   fluxoDaExportacao,

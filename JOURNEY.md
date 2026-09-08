@@ -17792,3 +17792,81 @@ rótulo declarado → o E2E fica vermelho. Restaurado, tudo verde.
 Portões (agora CINCO — `typecheck` entrou depois de a CI cobrá-lo):
 typecheck/build/test/lint verdes, 2324 testes. E2E 150/150 em banco recriado.
 Visual conferida nos dois temas contra :8080.
+
+## §398 — SPEC-110 H: a galeria (onde os fluxos e as telas moram)
+
+Pedido literal: *"precisamos planejar onde as screens vão morar… acho que
+simplificaria bastante ter um menu com screens e o que já existe de fluxos"*.
+
+O que existia era um dropdown no topo do canvas. Para saber que fluxos o time
+tem, era preciso abrir um deles e ler uma lista de nomes; e para saber de ONDE
+um fluxo derivado nasce, não havia resposta nenhuma na tela. Um dropdown
+responde *"qual eu abro agora?"*; ele não responde *"o que existe aqui?"*, que
+é a pergunta de quem chega.
+
+**`#/fluxo` sem id passa a abrir a GALERIA.** Os endereços COM id continuam
+abrindo o canvas — todo link salvo sobrevive, e é a régua de sempre (§2.4-3).
+A medição antes de mexer: 10 usos de `#/fluxo/<id>` nos E2E (intactos) e 6 sem
+id — 4 que só abriam o canvas para escolher no dropdown (viraram endereço
+direto) e 2 que criavam fluxo.
+
+**Todo card derivado diz de onde nasce, com porta (D16b).** "papéis da esteira
+→", "destinos de exportação →", "sempre existe (motor)". A pergunta "onde se
+configura isso?" morre no card. E a vitrine agrupa por ETAPA da jornada
+(ensaiar → derivar → sair → melhorar → do time), porque "o que existe aqui?" se
+responde melhor por momento de uso do que por ordem alfabética.
+
+**A cadeia de três defeitos, cada elo medido — e dois deles meus.**
+
+1. A galeria criava fluxo com `nos: []`, e o fluxo nascia SEM o gatilho,
+   contradizendo a fatia A. A causa: a semente do fluxo vazio morava privada
+   dentro da `FluxoScreen`, e quando a galeria passou a criar, nasceu uma
+   segunda. Foi para `fluxoNovo`, na camada que define o que um fluxo é.
+2. O nó recém-adicionado podia nascer FORA da área do canvas — não da janela:
+   abrir o painel de propriedades encolhe a superfície de 1280 para 960, e o
+   que cabia deixa de caber (medido: handle em x=971 numa área de 960). A
+   pessoa clicava em "+ Agente" e não via nada acontecer. Ficou invisível
+   enquanto criar fluxo era gesto do canvas, porque o fluxo nascia em memória
+   sem passar pelo enquadramento.
+3. **A correção do 2 criou o 3.** Re-enquadrar a cada nó novo desloca TUDO, e
+   quem está no meio de um gesto — ligar dois cartões — perde o alvo debaixo do
+   cursor. O E2E pegou: o segundo arrastar parava de conectar. A correção final
+   só traz o cartão para dentro quando ele está DE FATO fora: a diferença entre
+   "você não está vendo o que acabou de criar" e "o desenho cresceu".
+
+**Como saí do buraco, duas vezes no mesmo dia: rodando o teste na MAIN.** No
+episódio anterior isso mostrou que a lentidão era ambiente; aqui mostrou que a
+falha era minha. É o primeiro instrumento diante de um vermelho inexplicado, e
+nas duas vezes eu o usei tarde.
+
+**A galeria acrescenta uma porta de criação; não substitui a do canvas.** Os
+dois E2E que criam fluxo voltaram a criar pelo canvas depois de a mudança
+esbarrar na fragilidade do arrastar deles — o caminho novo tem prova própria em
+`galeria-de-fluxos.spec.ts`, e forçar todo spec pela porta nova só trocaria
+cobertura por atrito.
+
+**Dois achados da validação visual, nenhum pego por teste.** A barra da MESA
+(paleta, Salvar, contadores) continuava por cima da vitrine — dois cabeçalhos
+empilhados convidam a gestos da tela errada, a mesma aspereza da fatia B; a
+galeria passou a ser dona da tela, como o stage. E a grade não usava a largura:
+os cards paravam em 570px numa tela de 1440, uma coluna onde cabiam cinco.
+
+§248 (duas sabotagens): quebrar o filtro da busca → o teste da busca fica
+vermelho; deixar o derivado oferecer edição → o teste que exige "editar uma
+cópia" como única porta fica vermelho.
+
+Portões (cinco): typecheck/build/test/lint verdes, 2324 testes.
+E2E 156/156 em banco recriado. Visual conferida nos dois temas contra :8080.
+
+**A CI cobrou uma asserção sobre sequência não-atômica.** O E2E do PDCA (fatia
+G) caiu na CI desta fatia — verde aqui, vermelho lá, com "aprovada" onde se
+esperava "aplicada". O mecanismo, medido: `aplicarSolicitacao` faz DUAS
+escritas — grava o documento de configuração e só então marca a solicitação
+como aplicada. O teste fazia poll do documento e, no instante em que ele
+mudava, lia o estado de uma vez. Nessa máquina a janela entre as duas escritas
+é curta demais para aparecer; na CI, não. A correção é fazer poll do estado
+também: a prova é sobre o resultado, não sobre a ordem interna das gravações.
+
+Confirmado por medição antes da correção: 13 execuções locais, 13 solicitações,
+todas `aplicada`, zero duplicadas — o defeito não era o fluxo propor duas
+vezes, era o teste ler cedo demais.

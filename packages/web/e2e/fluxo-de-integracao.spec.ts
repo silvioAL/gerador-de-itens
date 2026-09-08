@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { ID_DO_FLUXO_DO_ENSAIO } from "@gerador/aplicacao";
 import { entrar } from "./auth";
 import { BASE_URL_GATEWAY_FALSO, CHAVE_GATEWAY_FALSO, MODELO_GATEWAY_FALSO } from "@gerador/gateway-falso";
 
@@ -79,7 +80,18 @@ test("fatia C: desenhar, ligar, mapear — e o ciclo trava com a mensagem do des
   try {
     await declararConectores(page, [leitorDeVolumetria("leitor-fluxo-e2e")]);
 
-    await page.goto("/#/fluxo");
+    /**
+     * SPEC-110 fatia H — criar fluxo é gesto da GALERIA: `#/fluxo` sem id
+     * abre a vitrine, e "+ Novo fluxo" leva ao canvas já no fluxo criado.
+     */
+    /**
+     * SPEC-110 fatia H — `#/fluxo` sem id passou a abrir a GALERIA, então
+     * chegar ao canvas exige um endereço COM id. Criar aqui continua sendo
+     * pelo canvas de propósito: a galeria ACRESCENTA uma porta de criação, não
+     * substitui a do canvas, e o caminho novo tem prova própria em
+     * `galeria-de-fluxos.spec.ts`.
+     */
+    await page.goto(`/#/fluxo/${ID_DO_FLUXO_DO_ENSAIO}`);
     await expect(page.getByTestId("fluxo-screen")).toBeVisible();
 
     await page.getByLabel("Nome do fluxo novo").fill("Desenho E2E");
@@ -231,9 +243,9 @@ test("fatia D: o exemplo do JMeter roda pela tela, com rastro por nó", async ({
       },
     });
 
-    await page.goto("/#/fluxo");
+    // SPEC-110 fatia H — o endereço COM id abre o canvas direto.
+    await page.goto("/#/fluxo/jmx-e2e");
     await expect(page.getByTestId("fluxo-screen")).toBeVisible();
-    await page.getByTestId("seletor-de-fluxo").selectOption("jmx-e2e");
     await expect(page.locator(".react-flow__node")).toHaveCount(3);
 
     await page.getByTestId("executar-fluxo").click();
