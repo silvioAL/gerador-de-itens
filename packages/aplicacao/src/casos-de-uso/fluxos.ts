@@ -25,6 +25,9 @@ export interface ExecutoresDoFluxo {
   projeto(no: NoDoFluxo, entradas: Record<string, unknown>): Promise<Record<string, unknown>>;
   /** SPEC-107 fatia E — a transformação pura (o Set do n8n). */
   transformacao(no: NoDoFluxo, entradas: Record<string, unknown>): Promise<Record<string, unknown>>;
+  /** SPEC-110 fatia J — um fluxo inteiro como um nó: roda a execução do fluxo
+   * referenciado e devolve as saídas do último nó dele. */
+  subfluxo(no: NoDoFluxo, entradas: Record<string, unknown>): Promise<Record<string, unknown>>;
 }
 
 export type EstadoDoNo = "sucesso" | "falhou" | "nao-executado";
@@ -266,7 +269,10 @@ export async function executarFluxo(
               ? await executores.projeto(no, parametros)
               : no.tipo === "transformacao"
                 ? await executores.transformacao(no, parametros)
-                : await executores.agente(no, parametros);
+                : // SPEC-110 fatia J — o fluxo inteiro como um nó.
+                  no.tipo === "subfluxo"
+                  ? await executores.subfluxo(no, parametros)
+                  : await executores.agente(no, parametros);
       estado.set(noId, "sucesso");
       saidas[noId] = saida;
       rastro.push({

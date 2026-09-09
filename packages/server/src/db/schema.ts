@@ -662,6 +662,14 @@ export const fluxoExecucoes = pgTable("fluxo_execucoes", {
   estado: text("estado").notNull().default("concluida"),
   saidas: jsonb("saidas"),
   ateNo: text("ate_no"),
+  /**
+   * SPEC-110 fatia J (migração 0047) — a execução-PAI que disparou esta.
+   *
+   * Nulo quando alguém a disparou (o botão, o relógio, um webhook). Preenchido
+   * quando ela nasceu de um nó `subfluxo` — e é o que impede o histórico de
+   * mostrar execuções que ninguém pediu sem dizer de onde vieram.
+   */
+  disparadoPor: uuid("disparado_por"),
 });
 
 /**

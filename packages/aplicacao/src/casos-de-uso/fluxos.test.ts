@@ -18,6 +18,11 @@ const semFuncao = {
   transformacao: async (): Promise<Record<string, unknown>> => {
     throw new Error("não há nó de transformação neste teste");
   },
+  // SPEC-110 fatia J — o stub RECUSA em vez de devolver vazio: um subfluxo
+  // que "roda" sem executor seria um verde que não prova nada.
+  subfluxo: async (): Promise<Record<string, unknown>> => {
+    throw new Error("não há nó de subfluxo neste teste");
+  },
 };
 
 const JMETER = fluxoDe(

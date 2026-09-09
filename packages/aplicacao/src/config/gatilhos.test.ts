@@ -38,6 +38,11 @@ const EXECUTORES_QUE_EXPLODEM = {
   transformacao: async () => {
     throw new Error("não devia ser chamado");
   },
+  // SPEC-110 fatia J — recusa em vez de vazio: um subfluxo que "roda" sem
+  // executor seria um verde que não prova nada.
+  subfluxo: async () => {
+    throw new Error("não devia ser chamado");
+  },
 };
 
 describe("GATILHOS_DO_SISTEMA (o registro fechado)", () => {

@@ -28,6 +28,7 @@ import {
   filaDaEsteiraDaDemanda,
   fluxosEmVigor,
   mensagemDeCiclo,
+  planoDoFluxo,
   normalizarExportador,
   normalizarPipelineAgentes,
   preambuloDoPapel,
@@ -115,6 +116,34 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
    * pergunta "quem fez?", e "ninguém" não é resposta.
    */
   const EMAIL_DO_RELOGIO = "agendamento@gerador.local";
+
+  /**
+   * SPEC-110 fatia J — o teto do aninhamento de subfluxos. Quatro níveis já é
+   * um desenho que ninguém lê; e sem teto, um laço que a escrita não pegou
+   * vira pilha estourada em vez de falha nomeada.
+   */
+  const LIMITE_DE_ANINHAMENTO = 4;
+
+  /**
+   * O que o subfluxo recebe: o que chegou ao NÓ vira parâmetro dos nós do
+   * filho que não têm produtor interno — é o outro lado do
+   * `contratoDoSubfluxo`, e é o que faz a fiação de fora alimentar a de
+   * dentro.
+   */
+  function filhoAlimentado(filho: Fluxo, entradas: Record<string, unknown>): Fluxo {
+    const temProdutor = new Set(filho.arestas.map((a) => a.para));
+    return {
+      ...filho,
+      nos: filho.nos.map((no) =>
+        no.tipo === "gatilho" || temProdutor.has(no.id)
+          ? no
+          : // O parâmetro DECLARADO no nó vence: quem fixou um valor dentro do
+            // subfluxo o fixou de propósito, e a fiação de fora não o
+            // atropela sem dizer.
+            { ...no, parametros: { ...entradas, ...no.parametros } }
+      ),
+    };
+  }
 
 
   /** Quantos feedbacks o nó traz por padrão. Um prompt com 500 feedbacks não
@@ -210,10 +239,16 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     provedor: Awaited<ReturnType<ReturnType<typeof criarResolvedorDeProvedor>>>;
     timeId: string | undefined;
     email: string;
+    /** SPEC-110 fatia J — quantos níveis de subfluxo já se atravessou. */
+    profundidade?: number;
+    /** A execução-PAI, para marcar as filhas (`disparadoPor`). */
+    execucaoPai?: () => string | null;
     /** SPEC-107 fatia D — o texto do agente streamando, POR NÓ (§2.4-9). */
     aoVivo?: { texto(noId: string, pedaco: string): void };
   }) {
     const { fluxo, papeis, catalogo, provedor, timeId, email, aoVivo } = opcoes;
+    const profundidade = opcoes.profundidade ?? 0;
+    const execucaoDoPai = () => opcoes.execucaoPai?.() ?? null;
 
     /** §9.3, a mesma régua de sempre: obrigatório ausente não vira default, e
      * a recusa NOMEIA o campo — em vez de gravar vazio e o defeito aparecer
@@ -520,6 +555,78 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
           });
           return { texto };
         },
+        /**
+         * SPEC-110 fatia J (D16) — **um fluxo inteiro como um nó.**
+         *
+         * O executor roda a execução do fluxo referenciado e devolve as saídas
+         * do último nó dele — o que o contrato (`contratoDoSubfluxo`) promete
+         * a quem fia por fora.
+         *
+         * ## A profundidade tem teto, mesmo com o ciclo já recusado
+         *
+         * A escrita recusa A→B→A, mas a recusa vale para o documento SALVO: um
+         * fluxo de fábrica derivado, ou um catálogo mudado entre a validação e
+         * a corrida, poderiam formar um laço que ninguém escreveu. Sem teto,
+         * isso é a pilha estourando em produção; com teto, é uma falha
+         * nomeada num nó. A profundidade é pequena de propósito — aninhar
+         * quatro níveis já é um desenho que ninguém consegue ler.
+         */
+        subfluxo: async (no, entradas) => {
+          if (profundidade >= LIMITE_DE_ANINHAMENTO) {
+            throw new Error(
+              `o nó "${no.id}" aninha subfluxos além de ${LIMITE_DE_ANINHAMENTO} níveis — um desenho tão fundo não se lê, e um laço não se distingue dele`
+            );
+          }
+          const catalogo = await emVigor(timeId);
+          const filho = catalogo.fluxos.find((f) => f.id === no.refId);
+          if (!filho) {
+            throw new Error(`o nó "${no.id}" aponta para o fluxo "${no.refId}", que não existe no catálogo em vigor`);
+          }
+
+          const comEntradas = filhoAlimentado(filho, entradas);
+          const resultado = await executarFluxo(
+            comEntradas,
+            criarExecutores({
+              fluxo: comEntradas,
+              papeis: catalogo.papeis,
+              catalogo: await catalogoDeConectores(db, diretorioConfig),
+              provedor: await resolverProvedor(),
+              timeId,
+              email,
+              profundidade: profundidade + 1,
+            }),
+            {}
+          );
+
+          /**
+           * A execução do filho é linha PRÓPRIA, marcada com a do pai
+           * (`disparadoPor`): o histórico do subfluxo mostra o que rodou nele
+           * — inclusive o que um pai disparou — sem que pareça que alguém o
+           * rodou à mão.
+           */
+          const [linhaFilha] = await db
+            .insert(fluxoExecucoes)
+            .values({
+              fluxoId: filho.id,
+              timeId: timeId ?? CAMPO_GLOBAL,
+              hash: hashDoFluxo(filho),
+              email,
+              nos: resultado.nos,
+              disparadoPor: execucaoDoPai(),
+            })
+            .returning({ id: fluxoExecucoes.id });
+
+          if (resultado.ciclo) throw new Error(mensagemDeCiclo(resultado.ciclo));
+          const falhou = resultado.nos.find((n) => n.estado === "falhou");
+          if (falhou) {
+            throw new Error(`o subfluxo "${filho.nome}" falhou no nó "${falhou.noId}": ${falhou.erro ?? "sem motivo"}`);
+          }
+
+          // As saídas do ÚLTIMO nó — é o que o contrato promete a quem fia.
+          const plano = planoDoFluxo(filho);
+          const ultimo = plano.ordem[plano.ordem.length - 1];
+          return { ...(resultado.saidas[ultimo] ?? {}), execucaoDoSubfluxo: linhaFilha.id };
+        },
         funcao: async (no, entradas) => {
           /**
            * SPEC-110 fatia F (D11) — a função que ESCREVE roda aqui, onde há
@@ -768,6 +875,17 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     // Fatia D — com `aoVivo`, a resposta vira um stream de eventos por nó.
     const eventos = aoVivo ? escritorDeEventos(reply) : null;
 
+    /**
+     * SPEC-110 fatia J — o id da execução nasce ANTES de ela rodar.
+     *
+     * Um subfluxo grava a linha dele no meio da corrida do pai, e precisa
+     * apontar para quem o disparou — mas o pai só ganharia id no `insert`, que
+     * acontece depois. Gerar na frente é o que permite a linha filha nascer
+     * marcada em vez de órfã. Fora do `try` porque o `insert` lá embaixo
+     * também o usa.
+     */
+    const execucaoId = randomUUID();
+
     let resultado;
     try {
       resultado = await executarFluxo(
@@ -779,6 +897,8 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
           provedor,
           timeId,
           email,
+          // SPEC-110 fatia J — quem disparou as execuções-filhas desta corrida.
+          execucaoPai: () => execucaoId,
           ...(eventos ? { aoVivo: { texto: (noId, pedaco) => eventos.escrever({ tipo: "texto", noId, pedaco }) } } : {}),
         }),
         {
@@ -818,6 +938,7 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     const [linha] = await db
       .insert(fluxoExecucoes)
       .values({
+        id: execucaoId,
         fluxoId: id,
         timeId: timeId ?? CAMPO_GLOBAL,
         hash,

@@ -32,6 +32,9 @@ const EXECUTORES = {
   funcao: async (no: { id: string }) => ({ leitura: { de: no.id }, itens: ["a", "b"] }),
   projeto: async () => ({ desenho: { diagrama: {} } }),
   transformacao: async () => ({}),
+  // SPEC-110 fatia J — recusa em vez de vazio: subfluxo sem executor
+  // seria um verde que nao prova nada.
+  subfluxo: () => Promise.reject(new Error("sem subfluxo neste teste")),
 };
 
 /** gatilho → funcao(produz) → TELA → funcao(depois) */

@@ -51,7 +51,26 @@ import {
  * nele e só termina quando alguém decide (avançar/retornar). O executor
  * existe (a mecânica retomável da SPEC-107 C) — o que muda é quem o roda.
  */
-export const TIPOS_DE_NO_DO_FLUXO = ["gatilho", "conector", "agente", "funcao", "projeto", "transformacao", "tela"] as const;
+/**
+ * SPEC-110 fatia J (D16) — **`subfluxo`: um fluxo inteiro como um nó.**
+ *
+ * Motivação literal: *"quais fluxos estão relacionados ao quê? … faria mais
+ * sentido ter um fluxo maior com pools ou algo assim"*. A relação entre fluxos
+ * era conhecimento de quem os desenhou; agora ela é DESENHO navegável.
+ *
+ * Entra pelo mesmo critério dos outros: TEM executor (roda a execução do fluxo
+ * referenciado inteira). O `refId` é o id de outro fluxo do catálogo em vigor.
+ */
+export const TIPOS_DE_NO_DO_FLUXO = [
+  "gatilho",
+  "conector",
+  "agente",
+  "funcao",
+  "projeto",
+  "transformacao",
+  "tela",
+  "subfluxo",
+] as const;
 export type TipoDeNoDoFluxo = (typeof TIPOS_DE_NO_DO_FLUXO)[number];
 
 export interface NoDoFluxo {
@@ -210,6 +229,66 @@ export function planoDoFluxo(fluxo: Fluxo): { ordem: string[]; ciclo?: string[] 
   const { ciclos, ordemTopologica } = resolverDependencias(atividades);
   if (ciclos.length > 0) return { ordem: [], ciclo: ciclos[0].caminho };
   return { ordem: ordemTopologica };
+}
+
+/**
+ * SPEC-110 fatia J (D16) — **o contrato de um fluxo visto de fora.**
+ *
+ * Medido contra `planoDoFluxo`, como a SPEC mandou, e a regra é esta:
+ *
+ * - **entrada** = os campos que o fluxo NÃO produz internamente. Um nó sem
+ *   aresta chegando depende de quem o chama; os campos de entrada dele são o
+ *   que o subfluxo precisa receber. O gatilho fica de fora: ele diz QUANDO o
+ *   fluxo roda, e quem roda um subfluxo é o pai — o gatilho do filho não
+ *   dispara nada.
+ * - **saida** = a do ÚLTIMO nó da ordem topológica. É o que o fluxo entrega
+ *   quando termina, e é o que o pai consegue mapear adiante.
+ *
+ * Fluxo com ciclo não tem contrato — `planoDoFluxo` devolve ordem vazia, e
+ * um subfluxo sobre ele seria um nó que nunca roda.
+ */
+export function contratoDoSubfluxo(
+  fluxo: Fluxo,
+  contratoDoNo: (no: NoDoFluxo) => { entrada: { chave: string; rotulo: string }[]; saida: { chave: string; rotulo: string }[] } | null
+): { entrada: { chave: string; rotulo: string }[]; saida: { chave: string; rotulo: string }[] } {
+  const plano = planoDoFluxo(fluxo);
+  if (plano.ordem.length === 0) return { entrada: [], saida: [] };
+
+  const temProdutor = new Set(fluxo.arestas.map((a) => a.para));
+  const entrada: { chave: string; rotulo: string }[] = [];
+  const vistas = new Set<string>();
+  for (const no of fluxo.nos) {
+    // O gatilho não é entrada: quem dispara um subfluxo é o fluxo de cima.
+    if (no.tipo === "gatilho" || temProdutor.has(no.id)) continue;
+    for (const campo of contratoDoNo(no)?.entrada ?? []) {
+      if (vistas.has(campo.chave)) continue;
+      vistas.add(campo.chave);
+      entrada.push(campo);
+    }
+  }
+
+  const ultimo = fluxo.nos.find((n) => n.id === plano.ordem[plano.ordem.length - 1]);
+  return { entrada, saida: ultimo ? (contratoDoNo(ultimo)?.saida ?? []) : [] };
+}
+
+/**
+ * SPEC-110 fatia J — **ciclo entre FLUXOS, pela mesma régua do ciclo entre
+ * nós.**
+ *
+ * A referencia B, B referencia A: a execução nunca termina. É o mesmo defeito
+ * do ciclo de arestas num grafo de outro tamanho, então é o mesmo motor
+ * (`resolverDependencias`) e a MESMA frase (`mensagemDeCiclo`) — duas
+ * mensagens para o mesmo defeito fariam a pessoa achar que são dois.
+ */
+export function cicloEntreFluxos(fluxos: Fluxo[]): string[] | null {
+  const atividades = fluxos.map((f) => ({
+    chave: f.id,
+    dependencias: f.nos
+      .filter((no) => no.tipo === "subfluxo")
+      .map((no) => ({ type: "dependent", alvoChave: no.refId }) as Dependencia),
+  }));
+  const { ciclos } = resolverDependencias(atividades);
+  return ciclos.length > 0 ? ciclos[0].caminho : null;
 }
 
 /** A mensagem do desenho, à letra — é a prova da fatia C. */
@@ -508,6 +587,20 @@ export function fluxoNovo(id: string, nome: string): Fluxo {
 export const ID_DO_FLUXO_DO_PDCA = "pdca-melhoria";
 
 /**
+ * SPEC-110 fatia J — os ids que EXISTEM sem estar declarados. Um subfluxo pode
+ * apontar para qualquer um deles, e a escrita precisa saber disso para não
+ * recusar um desenho válido. A lista é derivada dos próprios ids, não uma
+ * segunda cópia: id novo de fábrica entra aqui no mesmo commit (§242).
+ */
+export const IDS_DE_FABRICA = [
+  ID_DO_FLUXO_DA_ESTEIRA,
+  ID_DO_FLUXO_DA_EXPORTACAO,
+  ID_DO_FLUXO_DA_PUBLICACAO,
+  ID_DO_FLUXO_DO_ENSAIO,
+  ID_DO_FLUXO_DO_PDCA,
+] as const;
+
+/**
  * SPEC-110 fatia G (D13) — **o ciclo de melhoria como DESENHO.**
  *
  * O PDCA era um lugar (a aba) e vira um caminho visível: ler o que o time
@@ -683,6 +776,38 @@ export function validarEscritaFluxos(documento: unknown): void {
           `no fluxo "${id}", o nó "${noId}" é de dados da demanda e o refId precisa ser um destes: ${REFS_DE_DADOS.join(", ")} (a demanda é o parâmetro "demandaId", não o adaptador)`
         );
       }
+      /**
+       * SPEC-110 fatia J — o subfluxo aponta para um fluxo que EXISTE no
+       * mesmo documento. Um refId solto só falharia na execução, com o
+       * desenho na mão — e "não conheço este fluxo" é a frase que a §9.3
+       * pede na escrita, não no meio de uma corrida.
+       */
+      if (no.tipo === "subfluxo") {
+        const alvo = no.refId.trim();
+        if (alvo === id) {
+          throw new ConfigInvalida(
+            `no fluxo "${id}", o nó "${noId}" é um subfluxo que referencia o PRÓPRIO fluxo — a execução não terminaria`
+          );
+        }
+        const declarados = new Set(
+          (Array.isArray((documento as { fluxos?: { id?: unknown }[] })?.fluxos)
+            ? (documento as { fluxos: { id?: unknown }[] }).fluxos
+            : []
+          )
+            .map((f) => (typeof f?.id === "string" ? f.id.trim() : ""))
+            .filter(Boolean)
+        );
+        /**
+         * Só recusa quando o alvo não está NEM no documento NEM entre os
+         * fluxos de fábrica: um subfluxo pode apontar para a esteira ou para
+         * o ensaio, que existem sem estar declarados.
+         */
+        if (!declarados.has(alvo) && !(IDS_DE_FABRICA as readonly string[]).includes(alvo)) {
+          throw new ConfigInvalida(
+            `no fluxo "${id}", o nó "${noId}" é um subfluxo que aponta para "${alvo}", que não existe — nem declarado, nem de fábrica`
+          );
+        }
+      }
       // A transformação sem campos (ou com campo pela metade) só falharia na
       // execução — a escrita recusa com o nome (SPEC-35, fatia E).
       if (no.tipo === "transformacao") {
@@ -726,5 +851,18 @@ export function validarEscritaFluxos(documento: unknown): void {
       const plano = planoDoFluxo(fluxos[0]);
       if (plano.ciclo) throw new ConfigInvalida(mensagemDeCiclo(plano.ciclo));
     }
+  }
+
+  /**
+   * SPEC-110 fatia J — **o ciclo ENTRE fluxos**, conferido com o documento
+   * inteiro em mãos (não dá para vê-lo olhando um fluxo de cada vez).
+   *
+   * A referencia B, B referencia A: a execução nunca terminaria. Mesmo motor e
+   * MESMA frase do ciclo entre nós — duas mensagens para o mesmo defeito
+   * fariam a pessoa achar que são dois problemas diferentes.
+   */
+  const cicloDeFluxos = cicloEntreFluxos(normalizarFluxos(documento).fluxos);
+  if (cicloDeFluxos) {
+    throw new ConfigInvalida(`${mensagemDeCiclo(cicloDeFluxos)} — um subfluxo não pode voltar a quem o chamou`);
   }
 }
