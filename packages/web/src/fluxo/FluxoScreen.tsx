@@ -46,6 +46,11 @@ import {
   type OperacaoDoGateway,
   // SPEC-110 fatia H — a semente do fluxo novo, uma so (§263).
   fluxoNovo,
+  // SPEC-110 fatia J — o fluxo como no: o contrato derivado e o teto do
+  // aninhamento, os MESMOS do servidor (§263).
+  contratoDoSubfluxo,
+  LIMITE_DE_ANINHAMENTO_DE_SUBFLUXO,
+  type CampoDoConector,
 } from "@gerador/aplicacao";
 import {
   apiCatalogoDeConectores,
@@ -326,6 +331,7 @@ export function FluxoScreen({
     });
     if (fora) instancia.fitView({ maxZoom: 1, padding: 0.2 });
   }, [fluxo?.nos.length]);
+
   // Fluxo de fábrica é DERIVADO — editar exige uma cópia (que vence a fábrica
   // no mesmo id), como um conector declarado vence um destino.
   const editavel = podeEditar && fluxo?.origem === "declarado";
@@ -335,8 +341,8 @@ export function FluxoScreen({
 
   /** SPEC-107 fatia F — a forma declarada de cada lado da aresta, quando há.
    * Agente e transformação não declaram tipos — ausência não é incompatível. */
-  const contratoDoNo = useCallback(
-    (no: NoDoFluxo) => {
+  const contratoBruto = useCallback(
+    (no: NoDoFluxo, profundidade: number): { entrada: CampoDoConector[]; saida: CampoDoConector[] } | null => {
       if (no.tipo === "conector") {
         const conector = catalogo.find((c) => c.id === no.refId);
         return conector ? { entrada: conector.entrada, saida: conector.saida } : null;
@@ -365,10 +371,22 @@ export function FluxoScreen({
         const tela = telas.find((t) => t.refId === no.refId);
         return tela ? { entrada: tela.entrada, saida: tela.saida } : null;
       }
+      // SPEC-110 fatia J — o contrato de um SUBFLUXO é o do fluxo que ele
+      // referencia, derivado (`contratoDoSubfluxo`). A mesma resposta que o
+      // servidor dá: se o painel oferecesse um campo que o executor entrega
+      // noutro lugar, a pessoa preencheria algo que não chega a ninguém.
+      if (no.tipo === "subfluxo") {
+        // O teto do aninhamento é o do executor, e aqui ele também protege de
+        // um catálogo em laço que a escrita não viu.
+        if (profundidade >= LIMITE_DE_ANINHAMENTO_DE_SUBFLUXO) return null;
+        const alvo = (fluxos ?? []).find((f) => f.id === no.refId);
+        return alvo ? contratoDoSubfluxo(alvo, (n) => contratoBruto(n, profundidade + 1)) : null;
+      }
       return null;
     },
-    [catalogo]
+    [catalogo, telas, fluxos]
   );
+  const contratoDoNo = useCallback((no: NoDoFluxo) => contratoBruto(no, 0), [contratoBruto]);
   const avisosDoMapeamento = useMemo(
     () => (fluxo ? avisosDeMapeamento(fluxo, contratoDoNo) : []),
     [fluxo, contratoDoNo]
@@ -448,11 +466,19 @@ export function FluxoScreen({
         const campos = sanearCamposDaTransformacao((no as NoDoFluxo).parametros?.campos);
         return campos.length > 0 ? campos.map((c) => c.chave).join(", ") : "(declare os campos)";
       }
+      // SPEC-110 fatia J — o cartão do subfluxo mostra o ÍCONE e o NOME do
+      // fluxo referenciado: é o que responde "quais fluxos se relacionam" de
+      // relance, sem abrir nada. Sem o alvo no catálogo, ele diz o id — e o
+      // painel cobra a escolha.
+      if (no.tipo === "subfluxo") {
+        const alvo = (fluxos ?? []).find((f) => f.id === no.refId);
+        return alvo ? `${alvo.icone ? `${alvo.icone} ` : ""}${alvo.nome}` : no.refId || "(escolha o fluxo)";
+      }
       return no.tipo === "conector"
         ? (catalogo.find((c) => c.id === no.refId)?.nome ?? no.refId)
         : (papeis.find((p) => p.id === no.refId)?.nome ?? no.refId);
     },
-    [catalogo, papeis]
+    [catalogo, papeis, telas, fluxos]
   );
 
   /**
@@ -493,6 +519,7 @@ export function FluxoScreen({
     (mudancas: NodeChange<Node<NodeCardData>>[]) => setNodes((atuais) => applyNodeChanges(mudancas, atuais)),
     []
   );
+
 
   const edges: Edge[] = useMemo(
     () =>
@@ -646,6 +673,44 @@ export function FluxoScreen({
         // O `refId` é o da tela EM VIGOR (`mesa` ou `tela:aprovacao`); o id do
         // NÓ usa só o id curto, para o cartão não virar um endereço.
         nos: [...f.nos, { id, tipo: "tela", refId, posicao: proximaPosicao(f.nos), parametros: {} }],
+      };
+    });
+  }
+
+  /**
+   * SPEC-110 fatia J — **entrar no subfluxo.** O mesmo gesto do seletor lá em
+   * cima (trocar o fluxo aberto, zerar seleção e rastro): o duplo-clique e o
+   * botão do painel são atalhos para ele, não um segundo caminho.
+   */
+  function abrirSubfluxo(alvoId: string) {
+    if (!(fluxos ?? []).some((f) => f.id === alvoId)) {
+      setErro(`o fluxo "${alvoId}" não está no catálogo em vigor deste time`);
+      return;
+    }
+    if (alvoId === fluxoId) return;
+    setFluxoId(alvoId);
+    setSelecao(null);
+    setRastro(null);
+  }
+
+  /**
+   * SPEC-110 fatia J — **o fluxo como nó.** Ele nasce apontando para um fluxo
+   * CONCRETO (o primeiro que não é este) em vez de vazio, pela mesma régua da
+   * tela e da função: o cartão sem referência é um cartão que não diz nada, e
+   * a pessoa troca no painel com um clique. Sem outro fluxo no catálogo o botão
+   * nem liga — não há o que referenciar.
+   */
+  function adicionarSubfluxo() {
+    const alvo = (fluxos ?? []).find((f) => f.id !== fluxoId);
+    if (!alvo) return;
+    mudarFluxo((f) => {
+      let n = 1;
+      while (f.nos.some((no) => no.id === `subfluxo-${n}`)) n++;
+      const id = `subfluxo-${n}`;
+      setSelecao({ tipo: "no", id });
+      return {
+        ...f,
+        nos: [...f.nos, { id, tipo: "subfluxo", refId: alvo.id, posicao: proximaPosicao(f.nos), parametros: {} }],
       };
     });
   }
@@ -1015,6 +1080,22 @@ export function FluxoScreen({
                 + {t.rotuloCurto}
               </button>
             ))}
+            {/* SPEC-110 fatia J (D16) — o SUBFLUXO: um fluxo inteiro como um
+                cartão. É com ele que a relação entre fluxos deixa de ser
+                conhecimento de quem os desenhou e vira desenho navegável. */}
+            <button
+              data-testid="add-subfluxo"
+              disabled={!editavel || !(fluxos ?? []).some((f) => f.id !== fluxoId)}
+              title={
+                (fluxos ?? []).some((f) => f.id !== fluxoId)
+                  ? undefined
+                  : "não há outro fluxo no catálogo para referenciar"
+              }
+              onClick={adicionarSubfluxo}
+              style={botao}
+            >
+              + Subfluxo
+            </button>
           </>
         )}
         <div style={{ flex: 1 }} />
@@ -1127,6 +1208,19 @@ export function FluxoScreen({
                 edges={edges}
                 nodeTypes={TIPOS_DE_NO}
                 onNodeClick={(_e, node) => setSelecao({ tipo: "no", id: node.id })}
+                /**
+                 * SPEC-110 fatia J (D16) — **o duplo-clique ABRE o subfluxo.**
+                 *
+                 * A queixa era "quais fluxos estão relacionados ao quê?", e a
+                 * resposta só fecha quando dá para entrar: o cartão diz que ali
+                 * mora um fluxo, e o duplo-clique leva até ele. O gesto é o do
+                 * n8n ("Execute Workflow"), e o painel repete a porta em botão
+                 * para quem não descobre gestos sozinho.
+                 */
+                onNodeDoubleClick={(_e, node) => {
+                  const alvo = fluxo?.nos.find((n) => n.id === node.id);
+                  if (alvo?.tipo === "subfluxo") abrirSubfluxo(alvo.refId);
+                }}
                 onEdgeClick={(_e, edge) => setSelecao({ tipo: "aresta", id: edge.id })}
                 onPaneClick={() => setSelecao(null)}
                 /**
@@ -1214,6 +1308,12 @@ export function FluxoScreen({
                 papeis={papeis}
                 telas={telas}
                 aoEditarTela={aoEditarTela}
+                // SPEC-110 fatia J — o subfluxo escolhe entre os fluxos EM
+                // VIGOR menos este: apontar para si mesmo é a recusa que a
+                // escrita já dá, e oferecer o gesto para depois recusá-lo é
+                // ensinar um caminho que não vale.
+                fluxosParaSubfluxo={(fluxos ?? []).filter((f) => f.id !== fluxoId)}
+                aoAbrirSubfluxo={abrirSubfluxo}
                 podeEditar={editavel}
                 podeEditarPapel={podeEditarPapel}
                 onSalvarPapel={salvarPapel}
@@ -1360,6 +1460,22 @@ export function FluxoScreen({
                         </a>
                       </div>
                     )}
+                    {/* SPEC-110 fatia J (§4.J) — **"ver execução do
+                        subfluxo"**: o filho roda como execução PRÓPRIA, e é
+                        por este link que se chega ao rastro dele. Sem
+                        expandir inline (v1): o rastro do pai continua legível,
+                        e quem quer o detalhe entra no fluxo de dentro. */}
+                    {n.tipo === "subfluxo" && typeof rastro.saidas[n.noId]?.execucaoDoSubfluxo === "string" && (
+                      <div style={{ fontSize: 11.5 }}>
+                        <button
+                          data-testid={`ver-execucao-do-subfluxo-${n.noId}`}
+                          onClick={() => abrirSubfluxo(n.refId)}
+                          style={botaoMiudo}
+                        >
+                          ver execução do subfluxo →
+                        </button>
+                      </div>
+                    )}
                     {/* O artefato do agente é MARKDOWN — mostra como texto
                         corrido (o "antes de subir"), não como JSON. */}
                     {n.tipo === "agente" && typeof rastro.saidas[n.noId]?.texto === "string" ? (
@@ -1437,6 +1553,8 @@ function PainelDoNo({
   aoAbrirConfigDaEspecificacao,
   telas,
   aoEditarTela,
+  fluxosParaSubfluxo,
+  aoAbrirSubfluxo,
 }: {
   no: NoDoFluxo;
   catalogo: ConectorDoCatalogo[];
@@ -1445,6 +1563,11 @@ function PainelDoNo({
   telas: TelaEmVigor[];
   /** A PORTA (§§388-389): o painel do nó leva ao editor da tela declarada. */
   aoEditarTela?: (id: string) => void;
+  /** SPEC-110 fatia J — os fluxos que um subfluxo pode referenciar (todos os
+   * em vigor menos o aberto: apontar para si mesmo a escrita recusa). */
+  fluxosParaSubfluxo: FluxoEmVigor[];
+  /** A PORTA do subfluxo, a mesma do duplo-clique no cartão. */
+  aoAbrirSubfluxo: (id: string) => void;
   podeEditar: boolean;
   podeEditarPapel: boolean;
   onSalvarPapel: (refId: string, mudanca: { nome: string; descricao: string; preambulo: string }) => Promise<void>;
@@ -1472,6 +1595,10 @@ function PainelDoNo({
   const gatilho = no.tipo === "gatilho" ? gatilhoDoSistema(no.refId) : undefined;
   // SPEC-110 fatia B — a tela: capacidade com contrato, executor de gente.
   const tela = no.tipo === "tela" ? telas.find((t) => t.refId === no.refId) : undefined;
+  // SPEC-110 fatia J — o fluxo que este nó referencia, se ele ainda existe no
+  // catálogo em vigor (um destino apagado deixa o cartão apontando para o nada,
+  // e o painel é onde isso se conserta).
+  const subfluxo = no.tipo === "subfluxo" ? fluxosParaSubfluxo.find((f) => f.id === no.refId) : undefined;
   // SPEC-107 fatia A — a função É a capacidade: contrato do registro fechado,
   // sem adaptador a escolher.
   const funcao = no.tipo === "funcao" ? funcaoDoSistema(no.refId) : undefined;
@@ -1509,6 +1636,24 @@ function PainelDoNo({
                     editar a tela →
                   </button>
                 )}
+              </span>
+            )
+          : no.tipo === "subfluxo"
+          ? // SPEC-110 fatia J (D16) — o painel do subfluxo responde a queixa
+            // literal ("quais fluxos estão relacionados ao quê?"): diz QUAL
+            // fluxo roda ali dentro e leva até ele.
+            (
+              <span data-testid="proposito-do-subfluxo">
+                Subfluxo — <strong>{subfluxo?.nome ?? no.refId}</strong>. A execução deste nó roda o fluxo inteiro; o
+                rastro dele fica na execução própria dele, linkada aqui depois de rodar.{" "}
+                <button
+                  onClick={() => aoAbrirSubfluxo(no.refId)}
+                  disabled={!subfluxo}
+                  style={{ ...botao, marginLeft: 6 }}
+                  data-testid="abrir-o-subfluxo"
+                >
+                  abrir o subfluxo →
+                </button>
               </span>
             )
           : no.tipo === "gatilho"
@@ -1619,7 +1764,42 @@ function PainelDoNo({
           </span>
         </label>
       )}
-      {no.tipo !== "gatilho" && no.tipo !== "tela" && no.tipo !== "funcao" && no.tipo !== "projeto" && no.tipo !== "transformacao" && (
+      {/* SPEC-110 fatia J — o subfluxo escolhe um FLUXO, não um adaptador do
+          catálogo: lista própria logo abaixo, e o seletor genérico o ignora. */}
+      {no.tipo === "subfluxo" && (
+        <label style={{ fontSize: 11.5, display: "grid", gap: 2, marginBottom: 8 }}>
+          Fluxo que roda aqui dentro
+          <select
+            data-testid="fluxo-do-subfluxo"
+            disabled={!podeEditar}
+            value={no.refId}
+            onChange={(e) => onMudar({ refId: e.target.value })}
+            style={campo}
+          >
+            <option value="">— escolha —</option>
+            {fluxosParaSubfluxo.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.icone ? `${f.icone} ` : ""}
+                {f.nome}
+                {f.origem === "fabrica" ? " · derivado" : ""}
+              </option>
+            ))}
+          </select>
+          {/* O destino sumiu do catálogo (apagado, ou de um time que não é
+              este): o cartão apontaria para o nada e só a execução diria. */}
+          {no.refId && !subfluxo && (
+            <span data-testid="subfluxo-sem-alvo" style={{ color: "var(--amarelo)" }}>
+              o fluxo "{no.refId}" não está no catálogo em vigor deste time — escolha outro
+            </span>
+          )}
+        </label>
+      )}
+      {no.tipo !== "gatilho" &&
+        no.tipo !== "tela" &&
+        no.tipo !== "funcao" &&
+        no.tipo !== "projeto" &&
+        no.tipo !== "subfluxo" &&
+        no.tipo !== "transformacao" && (
         <label style={{ fontSize: 11.5, display: "grid", gap: 2, marginBottom: 8 }}>
           {/* §359/§2.4-1 — o rótulo nomeia O QUE se escolhe ("adaptador" é
               jargão de arquitetura e o usuário estranhou, com razão): o nó
@@ -1641,7 +1821,7 @@ function PainelDoNo({
             ))}
           </select>
         </label>
-      )}
+        )}
       {/* O gate depois do GATILHO não teria o que revisar (o gatilho não
           produz nada, D1) — a caixa some em vez de convidar a um desenho que
           só faz o fluxo travar antes de começar. */}

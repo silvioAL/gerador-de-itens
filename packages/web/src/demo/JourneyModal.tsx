@@ -238,6 +238,17 @@ const PASSOS_DE_USO: { titulo: string; texto: string }[] = [
     texto:
       "Os fluxos \"Exportar prontos\" e \"Publicar documento\" levam os itens e o documento para onde o time trabalha — os destinos se cadastram no catálogo de integrações (☰ Menu → Conectores).",
   },
+  {
+    /**
+     * SPEC-110 fatia J (D19) — o gesto NOVO: entrar num fluxo a partir de
+     * outro. Sem este passo, o manual descreveria quatro desenhos soltos e
+     * deixaria de pé a pergunta que motivou a fatia ("quais fluxos estão
+     * relacionados ao quê?").
+     */
+    titulo: "Veja como as etapas se ligam: a jornada da demanda",
+    texto:
+      "No topo da galeria há um desenho que ninguém precisou montar: “🧭 Jornada da demanda”. Cada cartão dele é um FLUXO inteiro — ensaiar, derivar com a esteira, e no fim exportar e publicar — ligados na ordem em que acontecem. Dê um duplo-clique num cartão (ou use “abrir o subfluxo →” no painel) para ENTRAR naquela etapa e ver o desenho dela; o botão “← Voltar” do navegador traz você de volta. Rodar a jornada roda as etapas em sequência, e ela para onde qualquer fluxo para: numa tela. Ao parar, a barra do topo diz em qual etapa você está — “Jornada da demanda › Ensaio de cenários” — e o histórico guarda cada etapa como uma execução própria, para você abrir o rastro de uma sem perder o da outra. Para montar isso num desenho seu, a paleta tem “+ Subfluxo”: escolha no painel qual fluxo roda ali dentro.",
+  },
 ];
 
 function ComoUsar() {

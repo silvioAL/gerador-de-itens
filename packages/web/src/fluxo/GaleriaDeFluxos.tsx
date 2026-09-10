@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ID_DO_FLUXO_DA_ESTEIRA,
+  // SPEC-110 fatia J — o fluxo-mestre, em destaque no topo da galeria.
+  ID_DO_FLUXO_DA_JORNADA,
   ID_DO_FLUXO_DA_EXPORTACAO,
   ID_DO_FLUXO_DA_PUBLICACAO,
   ID_DO_FLUXO_DO_ENSAIO,
@@ -35,9 +37,16 @@ import { apiFluxos, apiFluxosEmVigor, apiTelas } from "../api/client";
 /** A ETAPA da jornada a que cada derivado pertence — a galeria agrupa por ela
  * porque "o que existe aqui?" se responde melhor por momento de uso do que por
  * ordem alfabética. */
-type Etapa = "ensaiar" | "derivar" | "sair" | "melhorar" | "meus";
+type Etapa = "jornada" | "ensaiar" | "derivar" | "sair" | "melhorar" | "meus";
 
 const ETAPAS: { id: Etapa; titulo: string; explica: string }[] = [
+  /**
+   * SPEC-110 fatia J (D16) — **o mestre em destaque, no topo.** A queixa era
+   * *"quais fluxos estão relacionados ao quê?"*: as seções abaixo dizem em que
+   * MOMENTO cada etapa serve, e este cartão diz como elas se ligam. Ele vem
+   * primeiro porque é a resposta mais curta à pergunta.
+   */
+  { id: "jornada", titulo: "A jornada inteira", explica: "as etapas abaixo, ligadas — duplo-clique num cartão abre a etapa" },
   { id: "ensaiar", titulo: "Ensaiar", explica: "antes de escrever: medir o desenho" },
   { id: "derivar", titulo: "Derivar e escrever", explica: "o motor calcula, a IA escreve, você confirma" },
   { id: "sair", titulo: "Sair daqui", explica: "levar o resultado para fora" },
@@ -58,6 +67,10 @@ interface OrigemDaFabrica {
 }
 
 function origemDaFabrica(id: string): OrigemDaFabrica {
+  // SPEC-110 fatia J — o mestre nasce das ETAPAS que existem: sem destino de
+  // exportação configurado, o nó de exportar não está lá. Por isso "as etapas
+  // abaixo" e não uma tela de configuração — a porta de cada uma é o card dela.
+  if (id === ID_DO_FLUXO_DA_JORNADA) return { etapa: "jornada", nasceDe: "as etapas abaixo", area: null };
   if (id === ID_DO_FLUXO_DA_ESTEIRA) return { etapa: "derivar", nasceDe: "papéis da esteira", area: "pipeline" };
   if (id === ID_DO_FLUXO_DO_ENSAIO) return { etapa: "ensaiar", nasceDe: "sempre existe (motor)", area: null };
   if (id === ID_DO_FLUXO_DO_PDCA) return { etapa: "melhorar", nasceDe: "papéis da esteira", area: "pipeline" };

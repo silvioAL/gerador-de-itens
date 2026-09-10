@@ -38,6 +38,7 @@ const botao: React.CSSProperties = {
 
 export function MolduraDoStage({
   nomeDoFluxo,
+  dentroDe,
   nomeDaTela,
   descricao,
   ocupado,
@@ -50,6 +51,15 @@ export function MolduraDoStage({
   children,
 }: {
   nomeDoFluxo: string;
+  /**
+   * SPEC-110 fatia J — **o caminho até a tela, quando ela mora num subfluxo.**
+   *
+   * A jornada da demanda pausa na bancada, que é um nó do ENSAIO, não do
+   * mestre. Sem esta trilha a moldura diria "uma execução de Jornada da demanda
+   * parou aqui" e a pessoa procuraria a bancada no desenho do mestre, onde ela
+   * não está. Com ela: "Jornada da demanda › Ensaio de cenários".
+   */
+  dentroDe?: { fluxoId: string; nome: string }[];
   nomeDaTela: string;
   descricao?: string;
   ocupado?: boolean;
@@ -74,8 +84,13 @@ export function MolduraDoStage({
           <strong style={{ fontSize: 13 }} data-testid="tela-do-stage-titulo">
             {nomeDaTela}
           </strong>
-          <span style={{ fontSize: 11.5, color: "var(--texto-2)" }}>
-            uma execução de <strong>{nomeDoFluxo}</strong> parou aqui — revise e decida
+          <span style={{ fontSize: 11.5, color: "var(--texto-2)" }} data-testid="tela-do-stage-origem">
+            uma execução de{" "}
+            <strong>
+              {nomeDoFluxo}
+              {(dentroDe ?? []).map((nivel) => ` › ${nivel.nome}`).join("")}
+            </strong>{" "}
+            parou aqui — revise e decida
             {descricao ? ` · ${descricao}` : ""}
           </span>
         </div>

@@ -670,6 +670,23 @@ export const fluxoExecucoes = pgTable("fluxo_execucoes", {
    * mostrar execuções que ninguém pediu sem dizer de onde vieram.
    */
   disparadoPor: uuid("disparado_por"),
+  /**
+   * SPEC-110 fatia J — o que um SUBFLUXO deixou pela metade quando a tela que
+   * pausou estava dentro dele (`ParadaEmSubfluxo`).
+   *
+   * A execução que fica no banco é a do PAI — é ela que alguém continua. Sem
+   * este campo, retomar re-rodaria o filho inteiro: os agentes de novo, os
+   * conectores de novo, a conta de novo.
+   */
+  subfluxoParcial: jsonb("subfluxo_parcial"),
+  /**
+   * SPEC-110 fatia J — os parâmetros DESTA execução, por nó (SPEC-107 G1).
+   *
+   * Guardados porque a retomada os perdia: até a jornada, quem os recebia era
+   * o primeiro nó, já concluído quando alguém continuava. Um fluxo que pausa
+   * na primeira etapa tem nós por rodar que também precisam deles.
+   */
+  parametrosPorNo: jsonb("parametros_por_no"),
 });
 
 /**

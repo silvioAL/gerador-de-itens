@@ -337,6 +337,13 @@
       "when": 1754500000033,
       "tag": "0047_subfluxo",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1754500000034,
+      "tag": "0048_subfluxo_parcial",
+      "breakpoints": true
     }
   ]
 }

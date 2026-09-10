@@ -236,39 +236,103 @@ export function planoDoFluxo(fluxo: Fluxo): { ordem: string[]; ciclo?: string[] 
  *
  * Medido contra `planoDoFluxo`, como a SPEC mandou, e a regra é esta:
  *
- * - **entrada** = os campos que o fluxo NÃO produz internamente. Um nó sem
- *   aresta chegando depende de quem o chama; os campos de entrada dele são o
- *   que o subfluxo precisa receber. O gatilho fica de fora: ele diz QUANDO o
- *   fluxo roda, e quem roda um subfluxo é o pai — o gatilho do filho não
- *   dispara nada.
+ * - **entrada** = os campos que o fluxo NÃO preenche sozinho. **Medido contra
+ *   as fábricas, não contra o que parecia razoável:** a primeira régua que
+ *   escrevi foi "nó sem aresta chegando", e ela dava contrato VAZIO para
+ *   todas as derivadas — porque a fatia A pôs um gatilho ligado ao primeiro
+ *   nó de cada uma, e a aresta do gatilho existe para dizer ORDEM, não para
+ *   trazer dado. Com essa régua, um subfluxo da esteira nunca receberia
+ *   `demandaId`, e a jornada inteira rodaria sobre a demanda errada em
+ *   silêncio.
+ *
+ *   A régua honesta é por CAMPO: um campo é externo quando nenhuma aresta
+ *   chegando o mapeia e o nó não o fixou nos parâmetros. Quem fixou um valor
+ *   dentro do subfluxo o fixou de propósito — perguntá-lo de novo lá fora
+ *   seria oferecer duas fontes para a mesma coisa.
+ *
+ *   O gatilho continua fora: ele diz QUANDO o fluxo roda, e quem roda um
+ *   subfluxo é o pai — o gatilho do filho não dispara nada.
  * - **saida** = a do ÚLTIMO nó da ordem topológica. É o que o fluxo entrega
  *   quando termina, e é o que o pai consegue mapear adiante.
  *
  * Fluxo com ciclo não tem contrato — `planoDoFluxo` devolve ordem vazia, e
  * um subfluxo sobre ele seria um nó que nunca roda.
  */
-export function contratoDoSubfluxo(
+/**
+ * O mínimo que este módulo precisa saber de um campo: chave e rótulo. O tipo é
+ * GENÉRICO nos campos porque quem chama traz campos mais ricos — o
+ * `CampoDoConector` do catálogo carrega `tipo`, e é dele que o aviso de
+ * mapeamento da tela vive. Fixar o mínimo aqui apagaria o `tipo` na travessia
+ * por um subfluxo, e o aviso sumiria justamente onde o desenho é mais fundo.
+ */
+export interface CampoDoContrato {
+  chave: string;
+  rotulo: string;
+}
+
+export type ContratoDeNo<C extends CampoDoContrato = CampoDoContrato> = (
+  no: NoDoFluxo
+) => { entrada: C[]; saida: C[] } | null;
+
+/**
+ * SPEC-110 fatia J — **o teto do aninhamento de subfluxos.**
+ *
+ * Quatro níveis já é um desenho que ninguém lê; e sem teto, um laço que a
+ * escrita não pegou (um catálogo mudado entre a validação e a corrida) vira
+ * pilha estourada em vez de falha nomeada. Mora aqui, e não no servidor, porque
+ * a tela também precisa dele: o painel deriva o contrato pelo mesmo caminho, e
+ * dois tetos diferentes ofereceriam campos que o executor recusaria (§263).
+ */
+export const LIMITE_DE_ANINHAMENTO_DE_SUBFLUXO = 4;
+
+export function contratoDoSubfluxo<C extends CampoDoContrato>(
   fluxo: Fluxo,
-  contratoDoNo: (no: NoDoFluxo) => { entrada: { chave: string; rotulo: string }[]; saida: { chave: string; rotulo: string }[] } | null
-): { entrada: { chave: string; rotulo: string }[]; saida: { chave: string; rotulo: string }[] } {
+  contratoDoNo: ContratoDeNo<C>
+): { entrada: C[]; saida: C[] } {
   const plano = planoDoFluxo(fluxo);
   if (plano.ordem.length === 0) return { entrada: [], saida: [] };
 
-  const temProdutor = new Set(fluxo.arestas.map((a) => a.para));
-  const entrada: { chave: string; rotulo: string }[] = [];
+  const entrada: C[] = [];
   const vistas = new Set<string>();
-  for (const no of fluxo.nos) {
-    // O gatilho não é entrada: quem dispara um subfluxo é o fluxo de cima.
-    if (no.tipo === "gatilho" || temProdutor.has(no.id)) continue;
-    for (const campo of contratoDoNo(no)?.entrada ?? []) {
-      if (vistas.has(campo.chave)) continue;
-      vistas.add(campo.chave);
-      entrada.push(campo);
-    }
+  for (const { campo } of camposExternosDoFluxo(fluxo, contratoDoNo)) {
+    // A mesma chave pedida por dois nós entra UMA vez: o painel ofereceria
+    // "desenho" duas vezes e a pessoa teria de adivinhar qual alimenta qual.
+    if (vistas.has(campo.chave)) continue;
+    vistas.add(campo.chave);
+    entrada.push(campo);
   }
 
   const ultimo = fluxo.nos.find((n) => n.id === plano.ordem[plano.ordem.length - 1]);
   return { entrada, saida: ultimo ? (contratoDoNo(ultimo)?.saida ?? []) : [] };
+}
+
+/**
+ * Os campos que este fluxo precisa receber de fora, **com o nó que os pede** —
+ * é o que permite ao executor entregar cada valor a quem o declarou, em vez de
+ * espalhar tudo por todos os nós (um `demandaId` no prompt de um agente é
+ * ruído que ninguém pediu).
+ */
+export function camposExternosDoFluxo<C extends CampoDoContrato>(
+  fluxo: Fluxo,
+  contratoDoNo: ContratoDeNo<C>
+): { noId: string; campo: C }[] {
+  const externos: { noId: string; campo: C }[] = [];
+  for (const no of fluxo.nos) {
+    // O gatilho não é entrada: quem dispara um subfluxo é o fluxo de cima.
+    if (no.tipo === "gatilho") continue;
+    const alimentadas = new Set(
+      fluxo.arestas.filter((a) => a.para === no.id).flatMap((a) => a.mapeamento.map((m) => m.entrada))
+    );
+    for (const campo of contratoDoNo(no)?.entrada ?? []) {
+      if (alimentadas.has(campo.chave)) continue;
+      // O parâmetro FIXADO no nó não se pergunta de novo lá fora: duas fontes
+      // para o mesmo campo é a pessoa adivinhando qual vale.
+      const fixado = no.parametros?.[campo.chave];
+      if (fixado !== undefined && fixado !== "") continue;
+      externos.push({ noId: no.id, campo });
+    }
+  }
+  return externos;
 }
 
 /**
@@ -592,12 +656,15 @@ export const ID_DO_FLUXO_DO_PDCA = "pdca-melhoria";
  * recusar um desenho válido. A lista é derivada dos próprios ids, não uma
  * segunda cópia: id novo de fábrica entra aqui no mesmo commit (§242).
  */
+export const ID_DO_FLUXO_DA_JORNADA = "jornada-da-demanda";
+
 export const IDS_DE_FABRICA = [
   ID_DO_FLUXO_DA_ESTEIRA,
   ID_DO_FLUXO_DA_EXPORTACAO,
   ID_DO_FLUXO_DA_PUBLICACAO,
   ID_DO_FLUXO_DO_ENSAIO,
   ID_DO_FLUXO_DO_PDCA,
+  ID_DO_FLUXO_DA_JORNADA,
 ] as const;
 
 /**
@@ -659,21 +726,94 @@ export function fluxoDoPdca(papeis: PapelConfigurado[]): FluxoEmVigor | null {
   };
 }
 
+/**
+ * SPEC-110 fatia J (D16) — **"Jornada da demanda": o fluxo maior de que as
+ * quatro derivadas são etapas.**
+ *
+ * A queixa literal: *"quais fluxos estão relacionados ao quê? ficou complicada
+ * essa parte de 'derivado', onde se configura isso? … faria mais sentido ter um
+ * fluxo maior com pools ou algo assim"*. A resposta não é documentação: é o
+ * DESENHO. Ensaiar, derivar, exportar e publicar deixam de ser quatro cartões
+ * soltos no catálogo e viram quatro cartões ligados, com duplo-clique abrindo
+ * cada um.
+ *
+ * **As arestas carregam ORDEM, não dado** — a mesma escolha do gate da bancada
+ * (fatia B), e pela mesma razão medida: cada etapa lê a demanda por si
+ * (`demanda-ler`), então mapear a saída de uma na entrada da outra seria
+ * mentira de contrato. O que atravessa a jornada é a DEMANDA, e ela chega a
+ * cada subfluxo pelo campo externo `demandaId` — que é exatamente o que
+ * `contratoDoSubfluxo` expõe.
+ *
+ * **Derivada das etapas que EXISTEM**, não de uma lista fixa: sem destino de
+ * exportação configurado não há nó de exportar, como não há o fluxo. Com menos
+ * de duas etapas não há jornada — seria uma moldura em volta de uma etapa só,
+ * e um cartão a mais no catálogo sem nada a dizer.
+ */
+export function fluxoDaJornada(etapas: FluxoEmVigor[]): FluxoEmVigor | null {
+  const acha = (alvo: string) => etapas.find((f) => f.id === alvo) ?? null;
+  // A ordem é a da jornada, não a do array: ensaiar antes de derivar, sempre.
+  const sequencia = [acha(ID_DO_FLUXO_DO_ENSAIO), acha(ID_DO_FLUXO_DA_ESTEIRA)].filter(
+    (f): f is FluxoEmVigor => f !== null
+  );
+  // Exportar e publicar são as SAÍDAS: paralelas entre si (artefatos
+  // distintos, D15) e penduradas na última etapa da sequência.
+  const saidas = etapas.filter((f) => f.id === ID_DO_FLUXO_DA_EXPORTACAO || f.id.startsWith(ID_DO_FLUXO_DA_PUBLICACAO));
+  if (sequencia.length + saidas.length < 2) return null;
+
+  const noDeEtapa = (fluxo: FluxoEmVigor, posicao: { x: number; y: number }): NoDoFluxo => ({
+    id: fluxo.id,
+    tipo: "subfluxo",
+    refId: fluxo.id,
+    posicao,
+    parametros: {},
+  });
+
+  /**
+   * O passo horizontal é MAIOR que o das outras fábricas (280) porque o cartão
+   * de um subfluxo carrega o NOME DE UM FLUXO, e nomes de derivadas são longos:
+   * "Esteira de agentes (da configuração)" mede 348px na tela contra os 190px
+   * de um cartão comum. Medido na validação visual desta fatia — com 280 os
+   * cartões se encavalavam, que é a lição da SPEC-109 (cartão largo esconde o
+   * handle do vizinho) repetida noutro desenho.
+   */
+  const PASSO = 400;
+  const nos: NoDoFluxo[] = [noDeGatilhoManual({ x: 60, y: 160 })];
+  const arestas: ArestaDoFluxo[] = [];
+  let anterior = ID_DO_NO_DE_GATILHO;
+  sequencia.forEach((etapa, i) => {
+    nos.push(noDeEtapa(etapa, { x: 340 + i * PASSO, y: 160 }));
+    arestas.push({ de: anterior, para: etapa.id, mapeamento: [] });
+    anterior = etapa.id;
+  });
+  const xDasSaidas = 340 + sequencia.length * PASSO;
+  saidas.forEach((etapa, i) => {
+    nos.push(noDeEtapa(etapa, { x: xDasSaidas, y: 60 + i * 200 }));
+    arestas.push({ de: anterior, para: etapa.id, mapeamento: [] });
+  });
+
+  return { id: ID_DO_FLUXO_DA_JORNADA, icone: "🧭", nome: "Jornada da demanda", nos, arestas, origem: "fabrica" };
+}
+
 /** Declarados + as derivadas: a esteira (dos papéis), a exportação (do
  * destino de itens), a publicação (por destino de documento), o ensaio
- * (sempre) e o PDCA (dos papéis). Declarado vence fábrica no mesmo id. */
+ * (sempre), o PDCA (dos papéis) e a jornada (das etapas acima). Declarado
+ * vence fábrica no mesmo id. */
 export function fluxosEmVigor(
   papeis: PapelConfigurado[],
   documentoFluxos: unknown,
   configExportador?: ConfigExportador
 ): FluxoEmVigor[] {
-  const fabricas: FluxoEmVigor[] = [
+  const etapas: FluxoEmVigor[] = [
     fluxoDaEsteira(papeis),
     configExportador ? fluxoDaExportacao(configExportador) : null,
     ...(configExportador ? fluxosDaPublicacao(configExportador) : []),
     fluxoDoEnsaio(),
     fluxoDoPdca(papeis),
   ].filter((f): f is FluxoEmVigor => f !== null);
+  // O mestre vem DEPOIS porque é derivado das etapas — e o PDCA fica fora
+  // dele: melhorar o processo é outro laço, não uma etapa da demanda (D13).
+  const jornada = fluxoDaJornada(etapas);
+  const fabricas: FluxoEmVigor[] = jornada ? [...etapas, jornada] : etapas;
 
   const declarados: FluxoEmVigor[] = normalizarFluxos(documentoFluxos).fluxos.map((f) => ({
     ...f,

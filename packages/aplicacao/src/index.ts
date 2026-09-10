@@ -318,6 +318,14 @@ export {
   fluxoDoPdca,
   // SPEC-110 fatia H — a semente do fluxo novo, com o gatilho.
   fluxoNovo,
+  // SPEC-110 fatia J — o fluxo como nó, e o mestre que os relaciona.
+  ID_DO_FLUXO_DA_JORNADA,
+  IDS_DE_FABRICA,
+  LIMITE_DE_ANINHAMENTO_DE_SUBFLUXO,
+  camposExternosDoFluxo,
+  cicloEntreFluxos,
+  contratoDoSubfluxo,
+  fluxoDaJornada,
   TIPOS_DE_NO_DO_FLUXO,
   fluxoDaEsteira,
   fluxoDaExportacao,
@@ -330,7 +338,9 @@ export {
   planoDoFluxo,
   validarEscritaFluxos,
   type ArestaDoFluxo,
+  type CampoDoContrato,
   type ConfigFluxos,
+  type ContratoDeNo,
   type Fluxo,
   type FluxoEmVigor,
   type NoDoFluxo,
@@ -338,9 +348,11 @@ export {
 } from "./config/fluxos.js";
 export {
   executarFluxo,
+  SubfluxoAguardandoTela,
   type EstadoDoNo,
   type ExecutoresDoFluxo,
   type OpcoesDeExecucao,
+  type ParadaEmSubfluxo,
   type RastroDoNo,
   type ResultadoDoFluxo,
 } from "./casos-de-uso/fluxos.js";
