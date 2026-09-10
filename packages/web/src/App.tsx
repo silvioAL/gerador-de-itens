@@ -1645,6 +1645,9 @@ function AppCarregado({
       {mostrarStageDeclarado && stage && (
         <MolduraDoStage
           nomeDoFluxo={stage.nome}
+          // SPEC-110 fatia J — a tela pode morar num SUBFLUXO: a trilha diz
+          // dentro de qual etapa a execucao parou.
+          dentroDe={stage.dentroDe}
           nomeDaTela={stage.nomeDoNo ?? stage.tela.nome}
           ocupado={stageOcupado}
           erro={erroDoStage}
@@ -1669,6 +1672,7 @@ function AppCarregado({
         <div data-testid="barra-do-stage" style={{ flexShrink: 0 }}>
           <MolduraDoStage
             nomeDoFluxo={stage.nome}
+            dentroDe={stage.dentroDe}
             nomeDaTela={stage.nomeDoNo ?? stage.tela.nome}
             descricao={stage.tela.descricao}
             ocupado={stageOcupado}
@@ -2328,6 +2332,9 @@ function AppCarregado({
       {mostrarStageDaBancada && stage && (
         <MolduraDoStage
           nomeDoFluxo={stage.nome}
+          // SPEC-110 fatia J — a tela pode morar num SUBFLUXO: a trilha diz
+          // dentro de qual etapa a execucao parou.
+          dentroDe={stage.dentroDe}
           nomeDaTela={stage.nomeDoNo ?? stage.tela.nome}
           ocupado={stageOcupado}
           erro={erroDoStage}

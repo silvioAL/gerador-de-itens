@@ -1,4 +1,4 @@
-import type { ExecucaoDoPapel } from "@gerador/aplicacao";
+import type { ExecucaoDoPapel, TipoDeNoDoFluxo } from "@gerador/aplicacao";
 import type { AnexoDeContexto, CenarioDeLentidao, VolumetriaDoProduto, Decisao, Diagrama, ArtefatosEscritos, ExcecaoDePadrao, LeituraDispensada, Necessidade, OperacaoDeAjuste, PerfisConfig, Percurso, Quebra, RegrasConfig, StatusDocumento, TokensConfig, ValorSpec, VolumetriaDaDemanda,
   Variante,
 } from "@gerador/engine";
@@ -1614,7 +1614,13 @@ export const apiFluxosEmVigor = {
 
 export interface RastroDoNoExecutado {
   noId: string;
-  tipo: "conector" | "agente" | "funcao" | "projeto";
+  /**
+   * SPEC-110 fatia J — o tipo vem do MOTOR (`TipoDeNoDoFluxo`), não de uma
+   * cópia. A lista à mão aqui tinha parado em quatro tipos: gatilho, tela e
+   * transformação já rodavam e já apareciam no rastro sem constar dela — e o
+   * subfluxo só a denunciou porque a tela precisou comparar contra ele.
+   */
+  tipo: TipoDeNoDoFluxo;
   refId: string;
   estado: "sucesso" | "falhou" | "nao-executado";
   erro?: string;
@@ -1649,6 +1655,12 @@ export interface StageDaTela {
   fluxoId: string;
   nome: string;
   timeId: string | null;
+  /**
+   * SPEC-110 fatia J — o caminho até a tela, quando ela mora dentro de um
+   * subfluxo (a jornada pausa na bancada, que é nó do ensaio). Ausente quando
+   * a tela é um nó do próprio fluxo executado.
+   */
+  dentroDe?: { noId: string; fluxoId: string; nome: string }[];
   noId: string;
   nomeDoNo: string | null;
   tela: {

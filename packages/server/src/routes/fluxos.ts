@@ -14,6 +14,7 @@ import {
   comoDesenhoMapeado,
   // SPEC-110 fatia F — a demanda desdobrada: a direcao e do componente.
   dadoDoSistema,
+  PROJETO_DO_SISTEMA,
   REF_DA_DEMANDA_GRAVAR,
   REF_DA_DEMANDA_LER,
   REF_DO_PROJETO,
@@ -28,6 +29,14 @@ import {
   filaDaEsteiraDaDemanda,
   fluxosEmVigor,
   mensagemDeCiclo,
+  planoDoFluxo,
+  // SPEC-110 fatia J — o fluxo como no: contrato, alimentacao e a pausa dentro.
+  LIMITE_DE_ANINHAMENTO_DE_SUBFLUXO,
+  camposExternosDoFluxo,
+  contratoDoSubfluxo,
+  SubfluxoAguardandoTela,
+  type ContratoDeNo,
+  type ParadaEmSubfluxo,
   normalizarExportador,
   normalizarPipelineAgentes,
   preambuloDoPapel,
@@ -115,6 +124,95 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
    * pergunta "quem fez?", e "ninguém" não é resposta.
    */
   const EMAIL_DO_RELOGIO = "agendamento@gerador.local";
+
+  /**
+   * SPEC-110 fatia J — o teto do aninhamento de subfluxos vem do MOTOR
+   * (`LIMITE_DE_ANINHAMENTO_DE_SUBFLUXO`): a tela deriva o contrato pelo mesmo
+   * caminho, e dois tetos diferentes ofereceriam no painel campos que este
+   * executor recusaria (§263).
+   */
+  const LIMITE_DE_ANINHAMENTO = LIMITE_DE_ANINHAMENTO_DE_SUBFLUXO;
+
+  /**
+   * SPEC-110 fatia J — **o contrato declarado de um nó, do lado do servidor.**
+   *
+   * As MESMAS fontes que a tela consulta (`FluxoScreen.contratoDoNo`), porque
+   * "quem pede o quê" tem de ser a mesma resposta nos dois lados: se o painel
+   * oferecesse `demandaId` e o executor entregasse noutro lugar, a pessoa
+   * preencheria um campo que não chega a ninguém.
+   */
+  /**
+   * SPEC-107 G1 / SPEC-110 J — os parâmetros DESTA execução por cima dos fixos
+   * do nó. Uma função porque agora são três lugares que a aplicam (executar,
+   * continuar e a sondagem da tela) — e duas cópias com um esquecimento na
+   * terceira é como a jornada perderia a demanda no meio do caminho.
+   */
+  function comParametrosDaExecucao(fluxo: Fluxo, guardados: unknown): Fluxo {
+    const porNo = (guardados ?? null) as Record<string, Record<string, unknown>> | null;
+    if (!porNo) return fluxo;
+    return {
+      ...fluxo,
+      nos: fluxo.nos.map((no) => (porNo[no.id] ? { ...no, parametros: { ...no.parametros, ...porNo[no.id] } } : no)),
+    };
+  }
+
+  function contratoDoNoDoFluxo(
+    catalogo: Awaited<ReturnType<typeof catalogoDeConectores>>,
+    telas: TelaEmVigor[],
+    fluxos: Fluxo[],
+    profundidade = 0
+  ): ContratoDeNo {
+    return (no) => {
+      if (no.tipo === "conector") {
+        const conector = catalogo.find((c) => c.id === no.refId);
+        return conector ? { entrada: conector.entrada, saida: conector.saida } : null;
+      }
+      if (no.tipo === "funcao") return funcaoDoSistema(no.refId) ?? null;
+      // O legado `projeto` mantém o contrato fundido (fatia F): fluxo salvo
+      // antigo continua sendo alimentado como sempre foi.
+      if (no.tipo === "projeto") return dadoDoSistema(no.refId) ?? PROJETO_DO_SISTEMA;
+      if (no.tipo === "tela") {
+        const tela = telas.find((t) => t.refId === no.refId);
+        return tela ? { entrada: tela.entrada, saida: tela.saida } : null;
+      }
+      // Um subfluxo dentro de um subfluxo: o contrato dele é o do fluxo que
+      // referencia. O teto é o mesmo do executor — e por aqui ele também
+      // protege de um catálogo em laço, que a escrita não viu.
+      if (no.tipo === "subfluxo") {
+        if (profundidade >= LIMITE_DE_ANINHAMENTO) return null;
+        const alvo = fluxos.find((f) => f.id === no.refId);
+        return alvo ? contratoDoSubfluxo(alvo, contratoDoNoDoFluxo(catalogo, telas, fluxos, profundidade + 1)) : null;
+      }
+      return null;
+    };
+  }
+
+  /**
+   * O que o subfluxo recebe: o que chegou ao NÓ vai para os nós do filho **que
+   * declararam aquele campo e não o têm alimentado** — é o outro lado exato do
+   * `contratoDoSubfluxo`.
+   *
+   * Espalhar tudo por todos os nós seria mais curto e estaria errado: um
+   * `demandaId` nos parâmetros de um nó de agente vira ruído no prompt dele.
+   */
+  function filhoAlimentado(filho: Fluxo, entradas: Record<string, unknown>, contratoDoNo: ContratoDeNo): Fluxo {
+    const porNo = new Map<string, Record<string, unknown>>();
+    for (const { noId, campo } of camposExternosDoFluxo(filho, contratoDoNo)) {
+      if (!(campo.chave in entradas)) continue;
+      porNo.set(noId, { ...(porNo.get(noId) ?? {}), [campo.chave]: entradas[campo.chave] });
+    }
+    return {
+      ...filho,
+      nos: filho.nos.map((no) =>
+        porNo.has(no.id)
+          ? // O parâmetro DECLARADO no nó vence: quem fixou um valor dentro do
+            // subfluxo o fixou de propósito, e a fiação de fora não o
+            // atropela sem dizer.
+            { ...no, parametros: { ...porNo.get(no.id), ...no.parametros } }
+          : no
+      ),
+    };
+  }
 
 
   /** Quantos feedbacks o nó traz por padrão. Um prompt com 500 feedbacks não
@@ -210,10 +308,23 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     provedor: Awaited<ReturnType<ReturnType<typeof criarResolvedorDeProvedor>>>;
     timeId: string | undefined;
     email: string;
+    /** SPEC-110 fatia J — quantos níveis de subfluxo já se atravessou. */
+    profundidade?: number;
+    /** A execução-PAI, para marcar as filhas (`disparadoPor`). */
+    execucaoPai?: () => string | null;
+    /**
+     * SPEC-110 fatia J — o subfluxo desta execução parou numa tela, e aqui
+     * está até onde ele chegou. Retomar sem isto seria re-rodar o filho.
+     */
+    parcialDoSubfluxo?: ParadaEmSubfluxo | null;
+    /** A decisão de quem revisou, quando a tela mora DENTRO do subfluxo. */
+    saidaDaTela?: { noId: string; saida: Record<string, unknown> };
     /** SPEC-107 fatia D — o texto do agente streamando, POR NÓ (§2.4-9). */
     aoVivo?: { texto(noId: string, pedaco: string): void };
   }) {
     const { fluxo, papeis, catalogo, provedor, timeId, email, aoVivo } = opcoes;
+    const profundidade = opcoes.profundidade ?? 0;
+    const execucaoDoPai = () => opcoes.execucaoPai?.() ?? null;
 
     /** §9.3, a mesma régua de sempre: obrigatório ausente não vira default, e
      * a recusa NOMEIA o campo — em vez de gravar vazio e o defeito aparecer
@@ -520,6 +631,137 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
           });
           return { texto };
         },
+        /**
+         * SPEC-110 fatia J (D16) — **um fluxo inteiro como um nó.**
+         *
+         * O executor roda a execução do fluxo referenciado e devolve as saídas
+         * do último nó dele — o que o contrato (`contratoDoSubfluxo`) promete
+         * a quem fia por fora.
+         *
+         * ## A profundidade tem teto, mesmo com o ciclo já recusado
+         *
+         * A escrita recusa A→B→A, mas a recusa vale para o documento SALVO: um
+         * fluxo de fábrica derivado, ou um catálogo mudado entre a validação e
+         * a corrida, poderiam formar um laço que ninguém escreveu. Sem teto,
+         * isso é a pilha estourando em produção; com teto, é uma falha
+         * nomeada num nó. A profundidade é pequena de propósito — aninhar
+         * quatro níveis já é um desenho que ninguém consegue ler.
+         */
+        subfluxo: async (no, entradas) => {
+          if (profundidade >= LIMITE_DE_ANINHAMENTO) {
+            throw new Error(
+              `o nó "${no.id}" aninha subfluxos além de ${LIMITE_DE_ANINHAMENTO} níveis — um desenho tão fundo não se lê, e um laço não se distingue dele`
+            );
+          }
+          const emVigorAgora = await emVigor(timeId);
+          const filho = emVigorAgora.fluxos.find((f) => f.id === no.refId);
+          if (!filho) {
+            throw new Error(`o nó "${no.id}" aponta para o fluxo "${no.refId}", que não existe no catálogo em vigor`);
+          }
+
+          const conectores = await catalogoDeConectores(db, diretorioConfig);
+          const comEntradas = filhoAlimentado(
+            filho,
+            entradas,
+            contratoDoNoDoFluxo(conectores, emVigorAgora.telas, emVigorAgora.fluxos, profundidade + 1)
+          );
+
+          /**
+           * A retomada do FILHO. `parcialDoSubfluxo` só vale para ESTE nó (o
+           * pai pode ter vários subfluxos); e a forma dele tem de ser a que
+           * parou — §9.5, a mesma régua do hash do fluxo de cima: retomar
+           * sobre uma fiação editada tornaria o rastro ambíguo.
+           */
+          const parcial = opcoes.parcialDoSubfluxo?.noId === no.id ? opcoes.parcialDoSubfluxo : null;
+          // O hash é o da FIAÇÃO do filho, não o do filho alimentado: os
+          // valores que descem são entrada da execução, e entrada não muda
+          // identidade (a mesma regra do `parametrosPorNo`, §9.5).
+          const hashDoFilho = hashDoFluxo(filho);
+          if (parcial && parcial.hash !== hashDoFilho) {
+            throw new Error(
+              `o subfluxo "${filho.nome}" mudou desde a suspensão — descarte esta execução e execute de novo`
+            );
+          }
+          // A decisão da pessoa vale no nível MAIS FUNDO: se o filho parou
+          // dentro de um neto, quem a consome é o neto, não ele.
+          const decisaoAqui = parcial && !parcial.dentro ? opcoes.saidaDaTela : undefined;
+
+          const resultado = await executarFluxo(
+            comEntradas,
+            criarExecutores({
+              fluxo: comEntradas,
+              papeis: emVigorAgora.papeis,
+              catalogo: conectores,
+              provedor: await resolverProvedor(),
+              timeId,
+              email,
+              profundidade: profundidade + 1,
+              execucaoPai: execucaoDoPai,
+              parcialDoSubfluxo: parcial?.dentro ?? null,
+              ...(opcoes.saidaDaTela ? { saidaDaTela: opcoes.saidaDaTela } : {}),
+            }),
+            parcial
+              ? {
+                  retomarDe: {
+                    saidas: parcial.saidas,
+                    concluidos: parcial.nos.filter((n) => n.estado === "sucesso").map((n) => n.noId),
+                    ...(decisaoAqui ? { saidaDaTela: decisaoAqui } : {}),
+                  },
+                }
+              : {}
+          );
+
+          if (resultado.ciclo) throw new Error(mensagemDeCiclo(resultado.ciclo));
+
+          /**
+           * O filho parou numa TELA. Não há saída a devolver — o nó não
+           * terminou —, então o sinal sobe por exceção, levando o que ele já
+           * correu. Nada é gravado: uma execução "concluída" do filho aqui
+           * seria um histórico dizendo que acabou o que não acabou.
+           */
+          if (resultado.aguardandoTela) {
+            const { dentroDe, ...tela } = resultado.aguardandoTela;
+            throw new SubfluxoAguardandoTela(tela, {
+              noId: no.id,
+              fluxoId: filho.id,
+              hash: hashDoFilho,
+              nos: [...(parcial?.nos ?? []), ...resultado.nos],
+              saidas: { ...(parcial?.saidas ?? {}), ...resultado.saidas },
+              ...(dentroDe ? { dentro: dentroDe } : {}),
+            });
+          }
+
+          const rastroDoFilho = [...(parcial?.nos ?? []), ...resultado.nos];
+          const saidasDoFilho = { ...(parcial?.saidas ?? {}), ...resultado.saidas };
+
+          /**
+           * A execução do filho é linha PRÓPRIA, marcada com a do pai
+           * (`disparadoPor`): o histórico do subfluxo mostra o que rodou nele
+           * — inclusive o que um pai disparou — sem que pareça que alguém o
+           * rodou à mão.
+           */
+          const [linhaFilha] = await db
+            .insert(fluxoExecucoes)
+            .values({
+              fluxoId: filho.id,
+              timeId: timeId ?? CAMPO_GLOBAL,
+              hash: hashDoFilho,
+              email,
+              nos: rastroDoFilho,
+              disparadoPor: execucaoDoPai(),
+            })
+            .returning({ id: fluxoExecucoes.id });
+
+          const falhou = rastroDoFilho.find((n) => n.estado === "falhou");
+          if (falhou) {
+            throw new Error(`o subfluxo "${filho.nome}" falhou no nó "${falhou.noId}": ${falhou.erro ?? "sem motivo"}`);
+          }
+
+          // As saídas do ÚLTIMO nó — é o que o contrato promete a quem fia.
+          const plano = planoDoFluxo(comEntradas);
+          const ultimo = plano.ordem[plano.ordem.length - 1];
+          return { ...(saidasDoFilho[ultimo] ?? {}), execucaoDoSubfluxo: linhaFilha.id };
+        },
         funcao: async (no, entradas) => {
           /**
            * SPEC-110 fatia F (D11) — a função que ESCREVE roda aqui, onde há
@@ -754,19 +996,23 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     }
     // Os parâmetros da chamada entram POR CIMA dos fixos do nó — o hash
     // continua sendo o da fiação (a identidade), não o da execução.
-    const fluxo: Fluxo = parametrosPorNo
-      ? {
-          ...fluxoEmVigorAchado,
-          nos: fluxoEmVigorAchado.nos.map((no) =>
-            parametrosPorNo[no.id] ? { ...no, parametros: { ...no.parametros, ...parametrosPorNo[no.id] } } : no
-          ),
-        }
-      : fluxoEmVigorAchado;
+    const fluxo: Fluxo = comParametrosDaExecucao(fluxoEmVigorAchado, parametrosPorNo ?? null);
 
     const [catalogo, provedor] = await Promise.all([catalogoDeConectores(db, diretorioConfig), resolverProvedor()]);
 
     // Fatia D — com `aoVivo`, a resposta vira um stream de eventos por nó.
     const eventos = aoVivo ? escritorDeEventos(reply) : null;
+
+    /**
+     * SPEC-110 fatia J — o id da execução nasce ANTES de ela rodar.
+     *
+     * Um subfluxo grava a linha dele no meio da corrida do pai, e precisa
+     * apontar para quem o disparou — mas o pai só ganharia id no `insert`, que
+     * acontece depois. Gerar na frente é o que permite a linha filha nascer
+     * marcada em vez de órfã. Fora do `try` porque o `insert` lá embaixo
+     * também o usa.
+     */
+    const execucaoId = randomUUID();
 
     let resultado;
     try {
@@ -779,6 +1025,8 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
           provedor,
           timeId,
           email,
+          // SPEC-110 fatia J — quem disparou as execuções-filhas desta corrida.
+          execucaoPai: () => execucaoId,
           ...(eventos ? { aoVivo: { texto: (noId, pedaco) => eventos.escrever({ tipo: "texto", noId, pedaco }) } } : {}),
         }),
         {
@@ -818,12 +1066,24 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     const [linha] = await db
       .insert(fluxoExecucoes)
       .values({
+        id: execucaoId,
         fluxoId: id,
         timeId: timeId ?? CAMPO_GLOBAL,
         hash,
         email,
         nos: resultado.nos,
-        ...(estadoSuspenso ? { estado: estadoSuspenso, saidas: resultado.saidas, ateNo: ateNo ?? null } : {}),
+        ...(estadoSuspenso
+          ? {
+              estado: estadoSuspenso,
+              saidas: resultado.saidas,
+              ateNo: ateNo ?? null,
+              // SPEC-110 fatia J — a suspensão guarda o que a retomada precisa
+              // e não consegue recalcular: onde o subfluxo parou, e os
+              // parâmetros desta execução (a demanda apontada pelo atalho).
+              subfluxoParcial: resultado.aguardandoTela?.dentroDe ?? null,
+              parametrosPorNo: parametrosPorNo ?? null,
+            }
+          : {}),
       })
       .returning({ id: fluxoExecucoes.id });
     registrarAuditoria(db, { email, acao: "executar", recurso: "fluxos", recursoId: id });
@@ -882,17 +1142,21 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     }
 
     const { fluxos, papeis, telas } = await emVigor(timeId);
-    const fluxo = fluxos.find((f) => f.id === execucao.fluxoId);
-    if (!fluxo) {
+    const emVigorAchado = fluxos.find((f) => f.id === execucao.fluxoId);
+    if (!emVigorAchado) {
       return reply.code(409).send({ erro: `o fluxo "${execucao.fluxoId}" não existe mais neste time — descarte esta execução` });
     }
     // §9.5 — o hash é a identidade da fiação que SUSPENDEU. Continuar sobre
     // uma fiação editada tornaria o rastro ambíguo: recusa, com o caminho.
-    if (hashDoFluxo(fluxo) !== execucao.hash) {
+    if (hashDoFluxo(emVigorAchado) !== execucao.hash) {
       return reply.code(409).send({
         erro: "o fluxo mudou desde a suspensão — descarte esta execução e execute de novo",
       });
     }
+    // SPEC-110 fatia J — a retomada roda a MESMA execução, com os parâmetros
+    // dela: sem isto, os nós que faltam cairiam n'"a demanda ativa do time".
+    const fluxo = comParametrosDaExecucao(emVigorAchado, execucao.parametrosPorNo);
+    const parcialDoSubfluxo = (execucao.subfluxoParcial ?? null) as ParadaEmSubfluxo | null;
 
     const rastroParcial = execucao.nos as RastroDoNo[];
     const concluidos = rastroParcial.filter((n) => n.estado === "sucesso").map((n) => n.noId);
@@ -914,10 +1178,14 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
       // executor, sem decisão, para de novo exatamente onde parou. Nenhum
       // executor de nó roda — os concluídos são pulados e o laço quebra na
       // tela; é sondagem, não execução.
-      const parada = await executarFluxo(fluxo, criarExecutores({ fluxo, papeis, catalogo, provedor, timeId, email }), {
-        ateNo: execucao.ateNo ?? undefined,
-        retomarDe: { saidas: saidasSuspensas, concluidos },
-      });
+      const parada = await executarFluxo(
+        fluxo,
+        criarExecutores({ fluxo, papeis, catalogo, provedor, timeId, email, parcialDoSubfluxo }),
+        {
+          ateNo: execucao.ateNo ?? undefined,
+          retomarDe: { saidas: saidasSuspensas, concluidos },
+        }
+      );
       const naTela = parada.aguardandoTela;
       if (!naTela) {
         return reply.code(409).send({ erro: "esta execução não está parada numa tela — descarte e execute de novo" });
@@ -951,6 +1219,11 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
           provedor,
           timeId,
           email,
+          // SPEC-110 fatia J — as filhas desta corrida apontam para ESTA
+          // execução, e o subfluxo que pausou retoma de onde parou.
+          execucaoPai: () => id,
+          parcialDoSubfluxo,
+          ...(saidaDaTela ? { saidaDaTela } : {}),
           ...(eventos ? { aoVivo: { texto: (noId, pedaco) => eventos.escrever({ tipo: "texto", noId, pedaco }) } } : {}),
         }),
         {
@@ -983,8 +1256,14 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
       .set({
         nos: nosCompletos,
         ...(estadoDepois
-          ? { estado: estadoDepois, saidas: { ...saidasSuspensas, ...resultado.saidas } }
-          : { estado: "concluida", saidas: null }),
+          ? {
+              estado: estadoDepois,
+              saidas: { ...saidasSuspensas, ...resultado.saidas },
+              // A pausa seguinte pode ser noutro subfluxo (ou em nenhum): o
+              // parcial é o da parada de AGORA, nunca o resíduo da anterior.
+              subfluxoParcial: resultado.aguardandoTela?.dentroDe ?? null,
+            }
+          : { estado: "concluida", saidas: null, subfluxoParcial: null }),
       })
       .where(eq(fluxoExecucoes.id, id));
     registrarAuditoria(db, { email, acao: "executar", recurso: "fluxos", recursoId: execucao.fluxoId });
@@ -1026,22 +1305,41 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     }
     const timeId = execucao.timeId === CAMPO_GLOBAL ? undefined : execucao.timeId;
     const { fluxos, papeis, telas } = await emVigor(timeId);
-    const fluxo = fluxos.find((f) => f.id === execucao.fluxoId);
-    if (!fluxo) {
+    const emVigorAchado = fluxos.find((f) => f.id === execucao.fluxoId);
+    if (!emVigorAchado) {
       return reply.code(409).send({ erro: `o fluxo "${execucao.fluxoId}" não existe mais neste time — descarte esta execução` });
     }
+    const fluxo = comParametrosDaExecucao(emVigorAchado, execucao.parametrosPorNo);
     const rastroParcial = execucao.nos as RastroDoNo[];
     const saidasSuspensas = (execucao.saidas ?? {}) as Record<string, Record<string, unknown>>;
     const [catalogo, provedor] = await Promise.all([catalogoDeConectores(db, diretorioConfig), resolverProvedor()]);
     let parada;
     try {
-      parada = await executarFluxo(fluxo, criarExecutores({ fluxo, papeis, catalogo, provedor, timeId, email }), {
-        ateNo: execucao.ateNo ?? undefined,
-        retomarDe: {
-          saidas: saidasSuspensas,
-          concluidos: rastroParcial.filter((n) => n.estado === "sucesso").map((n) => n.noId),
-        },
-      });
+      /**
+       * SPEC-110 fatia J — a sondagem só continua sendo sondagem com o
+       * `parcialDoSubfluxo` na mão: sem ele, um subfluxo que pausou numa tela
+       * seria RE-EXECUTADO do começo toda vez que alguém abrisse a tela — os
+       * agentes de novo, a conta de novo, só para descobrir onde parou.
+       */
+      parada = await executarFluxo(
+        fluxo,
+        criarExecutores({
+          fluxo,
+          papeis,
+          catalogo,
+          provedor,
+          timeId,
+          email,
+          parcialDoSubfluxo: (execucao.subfluxoParcial ?? null) as ParadaEmSubfluxo | null,
+        }),
+        {
+          ateNo: execucao.ateNo ?? undefined,
+          retomarDe: {
+            saidas: saidasSuspensas,
+            concluidos: rastroParcial.filter((n) => n.estado === "sucesso").map((n) => n.noId),
+          },
+        }
+      );
     } finally {
       await provedor?.descartar().catch(() => undefined);
     }
@@ -1050,12 +1348,27 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     }
     const tela = telas.find((t: TelaEmVigor) => t.refId === parada.aguardandoTela!.refId);
     if (!tela) return reply.code(409).send({ erro: `não conheço a tela "${parada.aguardandoTela.refId}"` });
-    const noDaTela = fluxo.nos.find((n) => n.id === parada.aguardandoTela!.noId);
+    /**
+     * SPEC-110 fatia J — a tela pode morar DENTRO de um subfluxo (a jornada
+     * pausa na bancada, que é do ensaio). Então o nó dela não está no fluxo de
+     * cima, e o caminho até ela é o que responde "onde eu estou": a moldura
+     * mostra "Jornada da demanda › Ensaio de cenários" em vez de fingir que a
+     * bancada é um nó do mestre.
+     */
+    const caminho: { noId: string; fluxoId: string; nome: string }[] = [];
+    let fluxoDaTela = fluxo;
+    for (let nivel = parada.aguardandoTela.dentroDe; nivel; nivel = nivel.dentro) {
+      const alvo = fluxos.find((f) => f.id === nivel!.fluxoId);
+      caminho.push({ noId: nivel.noId, fluxoId: nivel.fluxoId, nome: alvo?.nome ?? nivel.fluxoId });
+      if (alvo) fluxoDaTela = alvo;
+    }
+    const noDaTela = fluxoDaTela.nos.find((n) => n.id === parada.aguardandoTela!.noId);
     return {
       execucaoId: id,
       fluxoId: execucao.fluxoId,
       nome: fluxo.nome,
       timeId: timeId ?? null,
+      ...(caminho.length > 0 ? { dentroDe: caminho } : {}),
       // O nome do NÓ vence o da tela, como em todo cartão do canvas (§387).
       noId: parada.aguardandoTela.noId,
       nomeDoNo: noDaTela?.nome ?? null,
@@ -1101,7 +1414,10 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     }
     // As saídas somem como no descartar: o stage era para revisar, e a revisão
     // terminou. O rastro fica — é ele que diz até onde a execução chegou.
-    await db.update(fluxoExecucoes).set({ estado: "retornada", saidas: null }).where(eq(fluxoExecucoes.id, id));
+    await db
+      .update(fluxoExecucoes)
+      .set({ estado: "retornada", saidas: null, subfluxoParcial: null })
+      .where(eq(fluxoExecucoes.id, id));
     registrarAuditoria(db, { email, acao: "executar", recurso: "fluxos", recursoId: execucao.fluxoId });
     return { ok: true, estado: "retornada" };
   });
@@ -1150,11 +1466,23 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
           continue;
         }
         const [catalogo, provedor] = await Promise.all([catalogoDeConectores(db, diretorioConfig), resolverProvedor()]);
+        // SPEC-110 fatia J — o id nasce antes da corrida, como no botão: um
+        // fluxo agendado também pode ter subfluxos, e as filhas precisam saber
+        // de quem nasceram.
+        const execucaoId = randomUUID();
         let resultado;
         try {
           resultado = await executarFluxo(
             fluxo,
-            criarExecutores({ fluxo, papeis, catalogo, provedor, timeId, email: EMAIL_DO_RELOGIO }),
+            criarExecutores({
+              fluxo,
+              papeis,
+              catalogo,
+              provedor,
+              timeId,
+              email: EMAIL_DO_RELOGIO,
+              execucaoPai: () => execucaoId,
+            }),
             // A ORIGEM é o que o histórico registra: sem isto, uma execução do
             // relógio seria indistinguível de alguém que apertou o botão.
             { origemDoDisparo: "agendamento" }
@@ -1169,12 +1497,19 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
             ? "aguardando-tela"
             : null;
         await db.insert(fluxoExecucoes).values({
+          id: execucaoId,
           fluxoId: venc.fluxoId,
           timeId: venc.timeId,
           hash: hashDoFluxo(fluxo),
           email: EMAIL_DO_RELOGIO,
           nos: resultado.nos,
-          ...(estadoSuspenso ? { estado: estadoSuspenso, saidas: resultado.saidas } : {}),
+          ...(estadoSuspenso
+            ? {
+                estado: estadoSuspenso,
+                saidas: resultado.saidas,
+                subfluxoParcial: resultado.aguardandoTela?.dentroDe ?? null,
+              }
+            : {}),
         });
         registrarAuditoria(db, { email: EMAIL_DO_RELOGIO, acao: "executar", recurso: "fluxos", recursoId: venc.fluxoId });
         disparados++;

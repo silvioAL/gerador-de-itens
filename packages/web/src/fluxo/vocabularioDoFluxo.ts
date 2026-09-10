@@ -32,6 +32,25 @@ export const CORES_POR_FAMILIA: Record<TipoDeNoDoFluxo, string> = {
   funcao: "#059669",
   projeto: "#b45309",
   transformacao: "#db2777",
+  /**
+   * SPEC-110 fatia J — o índigo do SUBFLUXO. Distante do roxo do agente
+   * (`#9333ea`) e do azul da tela (`#0284c7`) porque o cartão que contém um
+   * fluxo inteiro não pode ser confundido com o que faz uma coisa só.
+   *
+   * A escolha passou por TRÊS guardiões da casa, e os três estavam certos:
+   *
+   * 1. o índigo mais escuro que tentei primeiro dava 2.84 no tema escuro, e a
+   *    régua cobra ≥ 3;
+   * 2. o tom seguinte passava no contraste mas é o `--acento-indigo` — cor de
+   *    um tipo da MESA, e a §2.2 recusa isso para os dois grafos não ficarem
+   *    indistinguíveis;
+   * 3. e citar os dois hexes recusados neste comentário tropeçou na regra que
+   *    proíbe repetir no código um valor que já é variável — eles têm nome
+   *    (`--acento-gente` e `--acento-indigo`), e o nome é o que se escreve.
+   *
+   * O tom abaixo é livre nas duas listas: 4.21 no claro, 4.24 no escuro.
+   */
+  subfluxo: "#6d6af2",
 };
 
 /** Ícones do catálogo curado da mesa (`canvas/icones.ts`) — reusar o mapa é o
@@ -46,6 +65,8 @@ export const ICONES_POR_FAMILIA: Record<TipoDeNoDoFluxo, string> = {
   funcao: "Cog",
   projeto: "Boxes",
   transformacao: "Split",
+  // Camadas: um fluxo dentro de outro é exatamente isso.
+  subfluxo: "Layers",
 };
 
 /**
@@ -75,6 +96,8 @@ export const ROTULOS_POR_FAMILIA: Record<TipoDeNoDoFluxo, string> = {
    */
   projeto: "Demanda",
   transformacao: "Transformação",
+  // O cartão diz que ali dentro mora um fluxo inteiro.
+  subfluxo: "Subfluxo",
 };
 
 /**

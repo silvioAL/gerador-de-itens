@@ -17920,3 +17920,116 @@ do payload real fica vermelha.
 
 Portões (cinco): typecheck/build/test/lint verdes, 2327 testes.
 E2E 156/156 em banco recriado. Visual conferida nos dois temas contra :8080.
+
+## §400 — SPEC-110 J: o subfluxo e a jornada da demanda
+
+A queixa literal: *"quais fluxos estão relacionados ao quê? ficou complicada
+essa parte de 'derivado', onde se configura isso? … faria mais sentido ter um
+fluxo maior com pools ou algo assim"*. A relação entre os quatro derivados era
+conhecimento de quem os desenhou. Agora é desenho: o tipo de nó `subfluxo` (o
+"Execute Workflow" do n8n) e a fábrica **"Jornada da demanda"**, que os liga.
+
+**O contrato derivado foi MEDIDO, e a primeira régua estava errada.** Escrevi
+"entrada = campos dos nós sem aresta chegando" — e ela dava contrato VAZIO para
+todas as derivadas. A fatia A tinha posto um gatilho ligado ao primeiro nó de
+cada uma, e essa aresta existe para dizer QUANDO, não para trazer dado. Com
+aquela régua, um subfluxo da esteira nunca receberia `demandaId`: a jornada
+inteira rodaria sobre a demanda errada, em silêncio. A régua honesta é por
+CAMPO — externo é o que nenhuma aresta chegando mapeia e o nó não fixou nos
+parâmetros. `camposExternosDoFluxo` devolve o campo COM o nó que o pede, e é
+assim que o executor entrega cada valor a quem o declarou: espalhar tudo por
+todos os nós seria mais curto e poria um `demandaId` no prompt de um agente.
+
+**A tela que pausa DENTRO de um subfluxo não é caso de borda — é o primeiro
+passo.** A jornada começa pelo ensaio, e o ensaio passa pela bancada. Um
+subfluxo que contém tela não pode "falhar" nem "concluir": ele espera gente. O
+sinal sobe por exceção (`SubfluxoAguardandoTela`) porque é o único jeito de NÃO
+marcar o nó, e leva junto o estado parcial do filho. Sem esse parcial, retomar
+re-rodaria o filho do começo — os agentes de novo, os conectores de novo, a
+conta de novo. Há prova disso: o rastro do filho tem UM `le`, não dois, e abrir
+o stage três vezes não cria execução nenhuma.
+
+**Duas colunas que a retomada precisava e não tinha.** `subfluxo_parcial`
+guarda onde o filho parou; `parametros_por_no` guarda os parâmetros DESTA
+execução. O segundo sobrevivia por acaso até aqui: quem os recebia era o
+primeiro nó, já concluído quando alguém continuava. A jornada quebra o acaso —
+ela pausa na primeira etapa, e os nós por rodar também precisam saber de qual
+demanda se fala.
+
+**A migração teve de virar duas, e a lição é geral.** As colunas entraram na
+0047 depois de ela já ter sido aplicada nos bancos locais. O drizzle não
+reaplica pelo conteúdo: pula pelo `when` do journal. Resultado: 39 testes de
+rota vermelhos com `column "subfluxo_parcial" does not exist` — e o banco de
+desenvolvimento teria quebrado igual, em silêncio. **Um arquivo de migração já
+aplicado não muda de conteúdo**; uma fatia pode precisar de duas migrações
+(0048).
+
+**Quatro decisões de execução.** (1) A execução do filho é linha PRÓPRIA em
+`fluxo_execucoes`, marcada com `disparadoPor` — o link "ver execução do
+subfluxo" da §4.J precisa de alvo, e o histórico do filho não pode esconder uma
+corrida que aconteceu nem fingir que alguém a pediu à mão (mesma disciplina do
+`agendamento@gerador.local` da fatia E). (2) Ciclo entre fluxos reusa
+`resolverDependencias` e a MESMA frase do ciclo entre nós — é o mesmo defeito
+noutro grafo. (3) Teto de 4 níveis mesmo com o ciclo recusado na escrita: a
+recusa vale para o documento salvo, e um catálogo mudado entre validação e
+corrida viraria pilha estourada em vez de falha nomeada. O teto mora no motor,
+não no servidor, porque a tela deriva o contrato pelo mesmo caminho — dois
+tetos ofereceriam no painel campos que o executor recusaria (§263). (4) O
+parâmetro declarado no nó do filho vence a fiação de fora.
+
+**As arestas do mestre carregam ORDEM, não dado** — a mesma escolha do gate da
+bancada, e pela mesma razão medida: cada etapa lê a demanda por si
+(`demanda-ler`), então mapear a saída de uma na entrada da outra seria mentira
+de contrato. O PDCA fica fora do mestre: melhorar o processo é outro laço (D13).
+E o mestre é derivado do que EXISTE — sem destino de exportação configurado não
+há nó de exportar, e com menos de duas etapas não há jornada.
+
+Na tela: paleta `+ Subfluxo`, painel com o seletor do fluxo e "abrir o subfluxo
+→", cartão com o ícone e o nome do fluxo referenciado, duplo-clique que entra
+(o gesto do n8n), link "ver execução do subfluxo" no rastro, a jornada em
+destaque no topo da galeria com "nasce de: as etapas abaixo", e a moldura do
+stage dizendo o caminho — "Jornada da demanda › Ensaio de cenários" — porque
+sem ele a pessoa procuraria a bancada no desenho do mestre, onde ela não está.
+
+Um achado de passagem: `RastroDoNoExecutado.tipo` no cliente era uma cópia à
+mão parada em quatro tipos. Gatilho, tela e transformação já rodavam e já
+apareciam no rastro sem constar dela; o subfluxo só a denunciou porque a tela
+precisou comparar contra ele. Agora vem do motor.
+
+§248 (dez sabotagens): régua por campo → regra velha; parâmetro fixado deixa de
+vencer; PDCA entra na jornada; ordem da jornada invertida; linha filha nasce
+órfã; teto de aninhamento removido; parcial do filho não guardado; `dentroDe`
+some do stage; jornada some do em-vigor; duplo-clique desligado. Cada uma
+deixou vermelha a prova certa, e o restaurado voltou verde.
+
+D19: "Como usar" ganha o passo da jornada; o tour de configuração nomeia o
+mestre no passo do canvas.
+
+**Dois achados da validação visual, e o segundo virou dívida medida.** (1) Os
+cartões se encavalavam: o passo horizontal das outras fábricas é 280px e um
+cartão de subfluxo carrega o NOME DE UM FLUXO — "Esteira de agentes (da
+configuração)" mede 348px. É a lição da SPEC-109 (cartão largo esconde o handle
+do vizinho) noutro desenho; corrigido com passo de 400px. (2) O canvas abria
+**sem enquadrar**: o `fitView` do React Flow roda na montagem, quando a lista de
+nós ainda está vazia, e o reenquadramento existente só dispara quando o desenho
+CRESCE — nunca ao abrir um fluxo pronto. Nenhum fluxo era largo o bastante para
+denunciar antes do mestre.
+
+**O conserto do (2) foi TENTADO e REVERTIDO, e isto é o registro do porquê.**
+Um efeito que enquadrava ao abrir o fluxo funcionou na stack de dev (escala 1 →
+0,84; de 2 para 3 cartões inteiros na área). Mas: (a) mesmo enquadrando, dois
+cartões continuavam parcialmente fora, porque **o React Flow calcula os limites
+pelas POSIÇÕES dos nós, ignorando a largura dos cartões** — o botão "Fit View"
+dele dá exatamente o mesmo resultado que o nosso, e mudar `padding`,
+`initialWidth` ou preservar `measured` não move o número; e (b) o efeito
+disparava na stack de dev e **não** na de E2E, onde o viewport ficava na
+identidade. Comportamento que aparece num ambiente e não no outro é pior que a
+falta dele — e uma prova escrita em cima disso mentiu duas vezes antes de eu
+desistir (primeiro exigindo um cartão que o time do E2E não configura, depois um
+piso de cartões visíveis que o enquadramento não sustenta). O conserto de
+verdade pede mexer no ciclo de medida do canvas (o efeito que recria os nós a
+cada seleção descarta o que o React Flow mediu), o que atinge TODOS os fluxos e
+merece rodada própria. Fica a dívida declarada, com o número de partida medido
+pela validação visual a cada rodada. O que a fatia entrega e prova é o que é
+determinístico: cartões que não se encavalam e nenhum nascendo inteiramente fora
+da vista.

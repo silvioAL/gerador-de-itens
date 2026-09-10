@@ -25,6 +25,9 @@ export interface ExecutoresDoFluxo {
   projeto(no: NoDoFluxo, entradas: Record<string, unknown>): Promise<Record<string, unknown>>;
   /** SPEC-107 fatia E — a transformação pura (o Set do n8n). */
   transformacao(no: NoDoFluxo, entradas: Record<string, unknown>): Promise<Record<string, unknown>>;
+  /** SPEC-110 fatia J — um fluxo inteiro como um nó: roda a execução do fluxo
+   * referenciado e devolve as saídas do último nó dele. */
+  subfluxo(no: NoDoFluxo, entradas: Record<string, unknown>): Promise<Record<string, unknown>>;
 }
 
 export type EstadoDoNo = "sucesso" | "falhou" | "nao-executado";
@@ -83,7 +86,50 @@ export interface ResultadoDoFluxo {
    * nó que já rodou, a tela pausa NELA — o nó não terminou, e por isso não
    * está no rastro. `entradas` é o que a tela vai MOSTRAR (o stage dela).
    */
-  aguardandoTela?: { noId: string; refId: string; entradas: Record<string, unknown> };
+  aguardandoTela?: {
+    noId: string;
+    refId: string;
+    entradas: Record<string, unknown>;
+    /** SPEC-110 fatia J — a tela está DENTRO de um subfluxo; aqui mora o que
+     * o filho (e o neto, e assim por diante) já correu. */
+    dentroDe?: ParadaEmSubfluxo;
+  };
+}
+
+/**
+ * SPEC-110 fatia J — **o que um subfluxo deixou pela metade.**
+ *
+ * Quando a tela que pausou está dentro de um subfluxo, a execução do PAI é a
+ * que fica no banco — e o filho precisa deixar registrado até onde chegou.
+ * Sem isto, continuar re-rodaria o filho do começo: os agentes de novo, os
+ * conectores de novo, a conta de novo. `dentro` aninha porque um filho pode
+ * ter parado dentro de um neto — a mesma estrutura, um nível abaixo.
+ */
+export interface ParadaEmSubfluxo {
+  /** O nó de subfluxo, no fluxo de CIMA. */
+  noId: string;
+  /** O fluxo referenciado, e a identidade da forma dele quando parou (§9.5). */
+  fluxoId: string;
+  hash: string;
+  nos: RastroDoNo[];
+  saidas: Record<string, Record<string, unknown>>;
+  dentro?: ParadaEmSubfluxo;
+}
+
+/**
+ * O sinal de que um subfluxo parou numa tela. É exceção e não valor de
+ * retorno porque o executor de nó só sabe devolver "a saída deste nó" — e
+ * aqui não HÁ saída: o nó não terminou. O laço a intercepta e suspende o
+ * fluxo inteiro, sem marcar o nó como sucesso nem como falha.
+ */
+export class SubfluxoAguardandoTela extends Error {
+  constructor(
+    readonly tela: { noId: string; refId: string; entradas: Record<string, unknown> },
+    readonly parcial: ParadaEmSubfluxo
+  ) {
+    super(`o subfluxo "${parcial.fluxoId}" parou na tela "${tela.noId}"`);
+    this.name = "SubfluxoAguardandoTela";
+  }
 }
 
 export interface OpcoesDeExecucao {
@@ -266,7 +312,10 @@ export async function executarFluxo(
               ? await executores.projeto(no, parametros)
               : no.tipo === "transformacao"
                 ? await executores.transformacao(no, parametros)
-                : await executores.agente(no, parametros);
+                : // SPEC-110 fatia J — o fluxo inteiro como um nó.
+                  no.tipo === "subfluxo"
+                  ? await executores.subfluxo(no, parametros)
+                  : await executores.agente(no, parametros);
       estado.set(noId, "sucesso");
       saidas[noId] = saida;
       rastro.push({
@@ -282,6 +331,20 @@ export async function executarFluxo(
       opcoes.aoVivo?.noTerminou?.(rastro[rastro.length - 1]);
       if (no.confirmacao === "aguardar") aguardandoEm = noId;
     } catch (erro) {
+      /**
+       * SPEC-110 fatia J — **a tela que pausou lá DENTRO pausa aqui também.**
+       *
+       * Um subfluxo que contém uma tela (a jornada começa por um: o ensaio
+       * passa pela bancada) não pode "falhar" nem "concluir" — ele está
+       * esperando gente, como qualquer tela. O executor do subfluxo sinaliza
+       * isso por exceção porque é o único jeito de NÃO marcar o nó, e o que
+       * ele traz junto é o estado parcial do filho: sem ele, retomar seria
+       * re-rodar o filho inteiro, com os efeitos todos de novo.
+       */
+      if (erro instanceof SubfluxoAguardandoTela) {
+        aguardandoTela = { ...erro.tela, dentroDe: erro.parcial };
+        break;
+      }
       // Regra 2 mora aqui, por omissão: nada de `throw` — o laço continua, e
       // só quem depende deste nó cai na regra 1.
       estado.set(noId, "falhou");
