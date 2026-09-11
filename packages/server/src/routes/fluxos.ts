@@ -30,6 +30,8 @@ import {
   fluxosEmVigor,
   mensagemDeCiclo,
   planoDoFluxo,
+  // SPEC-110 fatia L — o corpo que chega vira a saida do gatilho.
+  saidaDoWebhook,
   // SPEC-110 fatia J — o fluxo como no: contrato, alimentacao e a pausa dentro.
   LIMITE_DE_ANINHAMENTO_DE_SUBFLUXO,
   camposExternosDoFluxo,
@@ -72,6 +74,8 @@ import { criarResolvedorDeProvedor } from "../ia/provedorDaOrganizacao.js";
 import { fluxoExecucoes, pdcaFeedback, quebras, solicitacoesAjuste } from "../db/schema.js";
 // SPEC-110 fatia E — o relogio: sincronizar o desenho e reservar os vencidos.
 import { desativarAgendamento, reservarVencidos, sincronizarAgendamentos } from "../fluxos/agendamentos.js";
+// SPEC-110 fatia L — o webhook: achar pelo token, marcar o disparo, emitir.
+import { acharWebhookPorToken, gerarTokenDoWebhook, marcarDisparo, webhooksDoTime } from "../fluxos/webhooks.js";
 // SPEC-110 fatia F — a funcao que escreve: o mesmo gravador da aba PDCA.
 import { gravarFeedback } from "../pdca/feedback.js";
 // SPEC-110 fatia G — o PDCA como fluxo: propor e aplicar pelo caminho da aba.
@@ -124,6 +128,14 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
    * pergunta "quem fez?", e "ninguém" não é resposta.
    */
   const EMAIL_DO_RELOGIO = "agendamento@gerador.local";
+
+  /**
+   * SPEC-110 fatia L — o "quem" de uma execução que veio de fora. Mesma
+   * disciplina do relógio: a auditoria pergunta "quem fez?", e "um sistema
+   * qualquer" não é resposta — o histórico tem de distinguir o POST anônimo do
+   * botão de uma pessoa.
+   */
+  const EMAIL_DO_WEBHOOK = "webhook@gerador.local";
 
   /**
    * SPEC-110 fatia J — o teto do aninhamento de subfluxos vem do MOTOR
@@ -1444,6 +1456,150 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     await db.update(fluxoExecucoes).set({ estado: "descartada", saidas: null }).where(eq(fluxoExecucoes.id, id));
     registrarAuditoria(db, { email, acao: "executar", recurso: "fluxos", recursoId: execucao.fluxoId });
     return { ok: true };
+  });
+
+  /**
+   * SPEC-110 fatia L (D1) — **o endereço que outro sistema chama.**
+   *
+   * `POST /fluxos/gatilhos/webhook/:token`, e cada palavra dessa assinatura é
+   * uma decisão:
+   *
+   * - **sem sessão** (nenhum `preHandler`): é máquina-a-máquina. Exigir cookie
+   *   de quem não tem navegador seria fechar a porta e chamá-la de porta. O
+   *   token NO CAMINHO é o que autentica, e é por isso que ele tem 256 bits.
+   * - **rate limit próprio**, mais apertado que o global: é a única rota do
+   *   produto que qualquer um na internet alcança. O molde é o do
+   *   `/auth/login` (`routes/auth.ts`), pela mesma razão — ali é força bruta
+   *   de senha, aqui é força bruta de token.
+   * - **404 nomeado** para token desconhecido, sem dizer se o fluxo existe: a
+   *   recusa não pode virar oráculo de descoberta.
+   *
+   * A execução em si NÃO tem caminho próprio: é a mesma `executarFluxo` do
+   * botão e do relógio, com `origemDoDisparo: "webhook"` e a saída do gatilho
+   * (§263 — três disparos, um executor).
+   */
+  app.post<{ Params: { token: string } }>(
+    "/fluxos/gatilhos/webhook/:token",
+    {
+      config: {
+        rateLimit: { max: Number(process.env.RATE_LIMIT_WEBHOOK_MAX ?? 30), timeWindow: "1 minute" },
+      },
+    },
+    async (req, reply) => {
+      const { token } = req.params;
+      const achado = await acharWebhookPorToken(db, token);
+      // A MESMA frase para token inexistente e para token de um fluxo que
+      // sumiu: quem chama não descobre nada sobre o que existe do lado de cá.
+      const recusa = { erro: "não conheço este endereço de webhook" };
+      if (!achado) return reply.code(404).send(recusa);
+
+      const timeId = achado.timeId === CAMPO_GLOBAL ? undefined : achado.timeId;
+      const { fluxos, papeis } = await emVigor(timeId);
+      const fluxo = fluxos.find((f) => f.id === achado.fluxoId);
+      if (!fluxo) return reply.code(404).send(recusa);
+      const no = fluxo.nos.find((n) => n.id === achado.noId && n.tipo === "gatilho" && n.refId === "webhook");
+      if (!no) return reply.code(404).send(recusa);
+
+      /**
+       * O corpo vira a saída do gatilho pelos campos DECLARADOS — e só por
+       * eles. O resto é ignorado de propósito: um webhook que despejasse o
+       * payload inteiro faria o desenho depender de um formato que ninguém
+       * escreveu, e mudar o sistema de fora quebraria aqui em silêncio.
+       */
+      const saidaDoGatilho = saidaDoWebhook(no.parametros, req.body);
+
+      const execucaoId = randomUUID();
+      const [catalogo, provedor] = await Promise.all([catalogoDeConectores(db, diretorioConfig), resolverProvedor()]);
+      let resultado;
+      try {
+        resultado = await executarFluxo(
+          fluxo,
+          criarExecutores({
+            fluxo,
+            papeis,
+            catalogo,
+            provedor,
+            timeId,
+            email: EMAIL_DO_WEBHOOK,
+            execucaoPai: () => execucaoId,
+          }),
+          { origemDoDisparo: "webhook", saidaDoGatilho }
+        );
+      } finally {
+        await provedor?.descartar().catch(() => undefined);
+      }
+      if (resultado.ciclo) return reply.code(409).send({ erro: mensagemDeCiclo(resultado.ciclo) });
+
+      const estadoSuspenso = resultado.aguardandoEm
+        ? "aguardando-confirmacao"
+        : resultado.aguardandoTela
+          ? "aguardando-tela"
+          : null;
+      await db.insert(fluxoExecucoes).values({
+        id: execucaoId,
+        fluxoId: fluxo.id,
+        timeId: achado.timeId,
+        hash: hashDoFluxo(fluxo),
+        email: EMAIL_DO_WEBHOOK,
+        nos: resultado.nos,
+        ...(estadoSuspenso
+          ? { estado: estadoSuspenso, saidas: resultado.saidas, subfluxoParcial: resultado.aguardandoTela?.dentroDe ?? null }
+          : {}),
+      });
+      await marcarDisparo(db, achado.id);
+      registrarAuditoria(db, { email: EMAIL_DO_WEBHOOK, acao: "executar", recurso: "fluxos", recursoId: fluxo.id });
+
+      /**
+       * 202 e não 200: quem chamou não é quem revisa. Se o fluxo parou numa
+       * tela, o trabalho ficou pendente de gente — e devolver "200, feito"
+       * seria mentir para um sistema que vai tratar isso como sucesso final.
+       */
+      return reply.code(202).send({
+        execucaoId,
+        estado: estadoSuspenso ?? "concluida",
+        nos: resultado.nos.map((n) => ({ noId: n.noId, estado: n.estado })),
+      });
+    }
+  );
+
+  /**
+   * SPEC-110 fatia L — **gerar (ou regenerar) o endereço**, com sessão e
+   * permissão de operar o fluxo: emitir um token que dispara execução é gesto
+   * de quem pode disparar. Devolve o token UMA vez — depois dela, só o hash
+   * existe, e perder o valor significa gerar outro.
+   */
+  app.post<{ Params: { id: string; noId: string } }>(
+    "/fluxos/:id/gatilhos/:noId/token",
+    { preHandler: exigirNivel(db, "operar", timeDoCorpo) },
+    async (req, reply) => {
+      const { id, noId } = req.params;
+      const timeId = timeDoCorpo(req) ?? undefined;
+      const { fluxos } = await emVigor(timeId);
+      const fluxo = fluxos.find((f) => f.id === id);
+      if (!fluxo) return reply.code(404).send({ erro: `o fluxo "${id}" não existe neste time` });
+      const no = fluxo.nos.find((n) => n.id === noId);
+      if (!no || no.tipo !== "gatilho" || no.refId !== "webhook") {
+        return reply.code(400).send({ erro: `o nó "${noId}" não é um gatilho de webhook` });
+      }
+
+      const token = await gerarTokenDoWebhook(db, {
+        fluxoId: id,
+        noId,
+        timeId: timeId ?? CAMPO_GLOBAL,
+        email: req.usuario!.email,
+      });
+      registrarAuditoria(db, { email: req.usuario!.email, acao: "atualizar", recurso: "fluxos", recursoId: `${id}:${noId}:token` });
+      // O caminho relativo, não a URL inteira: quem monta o endereço absoluto é
+      // a tela, que sabe em que host o produto está servido.
+      return { token, caminho: `/fluxos/gatilhos/webhook/${token}` };
+    }
+  );
+
+  /** O que a tela mostra sem o segredo: se o endereço existe e quando ele
+   * disparou pela última vez ("esse webhook está vivo?"). */
+  app.get<{ Params: { id: string } }>("/fluxos/:id/webhooks", { preHandler: exigirSessao }, async (req) => {
+    const { timeId } = req.query as { timeId?: string };
+    return { webhooks: await webhooksDoTime(db, req.params.id, timeId ?? CAMPO_GLOBAL) };
   });
 
   /**

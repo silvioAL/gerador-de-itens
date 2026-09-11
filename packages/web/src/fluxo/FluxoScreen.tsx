@@ -22,6 +22,9 @@ import {
   noDeGatilhoManual,
   // SPEC-110 fatia E — o relógio: a expressão e a previsão da próxima.
   PARAMETRO_DA_EXPRESSAO,
+  // SPEC-110 fatia L — o webhook: os campos que ele extrai do corpo.
+  PARAMETRO_DOS_CAMPOS,
+  camposDoWebhook,
   proximaOcorrenciaLegivel,
   telasEmVigor,
   type TelaEmVigor,
@@ -60,6 +63,8 @@ import {
   apiIa,
   apiPipelineAgentes,
   apiTelas,
+  // SPEC-110 fatia L — o endereço do webhook: listar e (re)gerar o token.
+  apiWebhooks,
   type ConectorDoCatalogo,
   type EventoDaExecucao,
   type FluxoEmVigor,
@@ -1314,6 +1319,9 @@ export function FluxoScreen({
                 // ensinar um caminho que não vale.
                 fluxosParaSubfluxo={(fluxos ?? []).filter((f) => f.id !== fluxoId)}
                 aoAbrirSubfluxo={abrirSubfluxo}
+                // SPEC-110 fatia L — o token e emitido POR NO de um fluxo.
+                fluxoId={fluxoId}
+                timeAtivo={timeAtivo}
                 podeEditar={editavel}
                 podeEditarPapel={podeEditarPapel}
                 onSalvarPapel={salvarPapel}
@@ -1540,6 +1548,168 @@ export function FluxoScreen({
   );
 }
 
+/**
+ * SPEC-110 fatia L (D1) — **o painel do webhook.**
+ *
+ * Ele responde três perguntas, nesta ordem: o que eu extraio do corpo, qual é
+ * o meu endereço, e ele já foi chamado alguma vez?
+ *
+ * O token aparece UMA vez — no instante em que é gerado — e some da tela
+ * assim que a pessoa navega. Isso não é limitação de implementação, é o
+ * contrato: o servidor guarda só o hash. A tela DIZ isso, em vez de deixar a
+ * pessoa descobrir quando voltar e não achar mais.
+ */
+function PainelDoWebhook({
+  no,
+  fluxoId,
+  timeAtivo,
+  podeEditar,
+  onMudar,
+}: {
+  no: NoDoFluxo;
+  fluxoId: string | null;
+  timeAtivo: string;
+  podeEditar: boolean;
+  onMudar: (mudanca: Partial<NoDoFluxo>) => void;
+}) {
+  /**
+   * **O EDITOR lê o array cru; o AVISO lê o saneado.**
+   *
+   * `camposDoWebhook` é a leitura tolerante do motor: ela descarta campo sem
+   * chave, que é o certo para quem vai executar. Mas o editor precisa segurar
+   * exatamente esse campo — o recém-adicionado nasce vazio, e é a pessoa que o
+   * preenche. Derivar as linhas do saneado fazia "+ campo" não mostrar nada
+   * (medido no E2E: a linha aparecia e sumia no mesmo render).
+   */
+  const campos = Array.isArray(no.parametros?.[PARAMETRO_DOS_CAMPOS])
+    ? ((no.parametros[PARAMETRO_DOS_CAMPOS] as { chave?: unknown; caminho?: unknown }[]).map((c) => ({
+        chave: typeof c?.chave === "string" ? c.chave : "",
+        caminho: typeof c?.caminho === "string" ? c.caminho : undefined,
+      })) as { chave: string; caminho?: string }[])
+    : [];
+  // O aviso fala do que o MOTOR vai ver: um campo sem chave não conta.
+  const valem = camposDoWebhook(no.parametros);
+  const [token, setToken] = useState<string | null>(null);
+  const [endereco, setEndereco] = useState<{ criadoEm: string; ultimaEm: string | null } | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const [gerando, setGerando] = useState(false);
+
+  // "Esse endereço está vivo?" é a pergunta de quem configurou e ficou
+  // esperando — e ela não se responde com o token, que a tela nunca mais vê.
+  useEffect(() => {
+    if (!fluxoId) return;
+    let vivo = true;
+    apiWebhooks
+      .listar(fluxoId, timeAtivo)
+      .then((r) => {
+        if (vivo) setEndereco(r.webhooks.find((w) => w.noId === no.id) ?? null);
+      })
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+  }, [fluxoId, timeAtivo, no.id, token]);
+
+  function mudarCampos(novos: { chave: string; caminho?: string }[]) {
+    onMudar({ parametros: { ...no.parametros, [PARAMETRO_DOS_CAMPOS]: novos } });
+  }
+
+  return (
+    <div data-testid="painel-do-webhook" style={{ fontSize: 11.5, display: "grid", gap: 6, marginBottom: 8 }}>
+      <strong>O que extrair do corpo</strong>
+      {valem.length === 0 && (
+        <span data-testid="webhook-sem-campos" style={{ color: "var(--amarelo)" }}>
+          sem nenhum campo com chave, este endereço receberia a chamada e não entregaria nada ao fluxo — o Salvar recusa.
+        </span>
+      )}
+      {campos.map((declarado, i) => (
+        <div key={i} style={{ display: "flex", gap: 4 }}>
+          <input
+            data-testid={`webhook-chave-${i}`}
+            disabled={!podeEditar}
+            value={declarado.chave}
+            placeholder="chave"
+            aria-label={`Chave do campo ${i + 1}`}
+            onChange={(e) => mudarCampos(campos.map((c, j) => (j === i ? { ...c, chave: e.target.value } : c)))}
+            style={{ ...campo, flex: 1 }}
+          />
+          <input
+            data-testid={`webhook-caminho-${i}`}
+            disabled={!podeEditar}
+            value={declarado.caminho ?? ""}
+            // O placeholder mostra o default: sem caminho, vale `$.{chave}` —
+            // o mesmo do conector, para quem já declarou um não reaprender.
+            placeholder={`$.${declarado.chave || "campo"}`}
+            aria-label={`Caminho do campo ${i + 1}`}
+            onChange={(e) => mudarCampos(campos.map((c, j) => (j === i ? { ...c, caminho: e.target.value } : c)))}
+            style={{ ...campo, flex: 1 }}
+          />
+          <button
+            data-testid={`webhook-remover-${i}`}
+            disabled={!podeEditar}
+            onClick={() => mudarCampos(campos.filter((_, j) => j !== i))}
+            style={botaoMiudo}
+          >
+            remover
+          </button>
+        </div>
+      ))}
+      <button
+        data-testid="webhook-adicionar-campo"
+        disabled={!podeEditar}
+        onClick={() => mudarCampos([...campos, { chave: "" }])}
+        style={botaoMiudo}
+      >
+        + campo
+      </button>
+
+      <strong style={{ marginTop: 4 }}>O endereço</strong>
+      {endereco ? (
+        <span data-testid="webhook-estado-do-endereco" style={{ color: "var(--texto-2)" }}>
+          existe desde {new Date(endereco.criadoEm).toLocaleString()} ·{" "}
+          {endereco.ultimaEm ? `último disparo: ${new Date(endereco.ultimaEm).toLocaleString()}` : "nunca foi chamado ainda"}
+        </span>
+      ) : (
+        <span data-testid="webhook-estado-do-endereco" style={{ color: "var(--texto-2)" }}>
+          ainda não existe — gere um para dar a outro sistema.
+        </span>
+      )}
+      <button
+        data-testid="webhook-gerar-token"
+        disabled={!podeEditar || !fluxoId || gerando}
+        onClick={() => {
+          if (!fluxoId) return;
+          setGerando(true);
+          setErro(null);
+          apiWebhooks
+            .gerarToken(fluxoId, no.id, timeAtivo)
+            .then((r) => setToken(r.token))
+            .catch((e: unknown) => setErro(e instanceof Error ? e.message : String(e)))
+            .finally(() => setGerando(false));
+        }}
+        style={botaoMiudo}
+      >
+        {/* O rótulo muda com o que o clique FAZ: gerar de novo invalida o
+            anterior, e quem já entregou o endereço a alguém precisa saber
+            disso ANTES de clicar, não depois. */}
+        {gerando ? "Gerando…" : endereco ? "Gerar outro (invalida o atual)" : "Gerar endereço"}
+      </button>
+      {token && (
+        <div data-testid="webhook-token" style={{ display: "grid", gap: 2 }}>
+          <code style={{ wordBreak: "break-all", background: "var(--fundo-2)", padding: 4, borderRadius: 4 }}>
+            {`${window.location.origin}/api/fluxos/gatilhos/webhook/${token}`}
+          </code>
+          <span style={{ color: "var(--amarelo)" }}>
+            copie agora: este endereço aparece uma única vez. O servidor guarda só um resumo dele — se você o perder,
+            o caminho é gerar outro.
+          </span>
+        </div>
+      )}
+      {erro && <span style={{ color: "var(--vermelho)" }}>{erro}</span>}
+    </div>
+  );
+}
+
 function PainelDoNo({
   no,
   catalogo,
@@ -1555,8 +1725,14 @@ function PainelDoNo({
   aoEditarTela,
   fluxosParaSubfluxo,
   aoAbrirSubfluxo,
+  fluxoId,
+  timeAtivo,
 }: {
   no: NoDoFluxo;
+  /** SPEC-110 fatia L — o token é emitido POR NÓ de um fluxo: o painel precisa
+   * saber de qual, e de qual time. */
+  fluxoId: string | null;
+  timeAtivo: string;
   catalogo: ConectorDoCatalogo[];
   papeis: PapelConfigurado[];
   /** SPEC-110 fatia C — as telas em vigor: as do sistema e as do time. */
@@ -1763,6 +1939,24 @@ function PainelDoNo({
             minuto hora dia mês dia-da-semana · aceita <em>*</em>, listas (1,15), intervalos (1-5) e passos (*/15)
           </span>
         </label>
+      )}
+      {/**
+       * SPEC-110 fatia L (D1) — **o webhook: os campos que ele extrai, e o
+       * endereço que outro sistema chama.**
+       *
+       * Os campos primeiro, o endereço depois, e nessa ordem de propósito: um
+       * endereço sem campo declarado recebe a chamada e não entrega nada ao
+       * fluxo (a escrita recusa, e o painel não deveria convidar ao gesto que
+       * vai ser recusado).
+       */}
+      {no.tipo === "gatilho" && no.refId === "webhook" && (
+        <PainelDoWebhook
+          no={no}
+          fluxoId={fluxoId}
+          timeAtivo={timeAtivo}
+          podeEditar={podeEditar}
+          onMudar={onMudar}
+        />
       )}
       {/* SPEC-110 fatia J — o subfluxo escolhe um FLUXO, não um adaptador do
           catálogo: lista própria logo abaixo, e o seletor genérico o ignora. */}

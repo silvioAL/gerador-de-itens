@@ -1,7 +1,10 @@
 ﻿import { resolverDependencias, type Dependencia } from "@gerador/engine";
 import { sanearCamposDaTransformacao, validarCamposDaTransformacao } from "../casos-de-uso/transformacao.js";
 import { FUNCOES_DO_SISTEMA, funcaoDoSistema } from "./funcoes.js";
-import { GATILHOS_DO_SISTEMA, ID_DO_NO_DE_GATILHO, gatilhoDoSistema } from "./gatilhos.js";
+import { GATILHOS_DO_SISTEMA, ID_DO_NO_DE_GATILHO, camposDoWebhook, gatilhoDoSistema } from "./gatilhos.js";
+// SPEC-110 fatia L — a escrita recusa o caminho torto do webhook com a MESMA
+// régua do conector (§9.4): um subconjunto declarado, não JSONPath inteiro.
+import { analisarCaminho } from "./caminho.js";
 // SPEC-110 fatia E — o relogio: a expressao do agendamento e validada na
 // escrita, com a mesma regua pura que o painel usa para prever a proxima.
 import { problemaNoCron } from "./cron.js";
@@ -880,6 +883,43 @@ export function validarEscritaFluxos(documento: unknown): void {
           const expressao = (no.parametros as { expressao?: unknown } | undefined)?.expressao;
           const problema = problemaNoCron(typeof expressao === "string" ? expressao : "");
           if (problema) throw new ConfigInvalida(`no fluxo "${id}", o nó "${noId}" agenda mal: ${problema}`);
+        }
+        /**
+         * SPEC-110 fatia L — o WEBHOOK é o primeiro gatilho que emite dado, e
+         * por isso o primeiro com o que recusar na escrita. As três recusas são
+         * as do conector (§9.4/SPEC-35), pela mesma razão: um campo sem chave,
+         * duas chaves iguais ou um caminho fora do subconjunto só apareceriam
+         * quando o sistema de fora chamasse — e "chegou e não fez nada" é o
+         * silêncio mais caro de diagnosticar, porque quem chamou não é quem
+         * desenhou.
+         */
+        if (no.refId.trim() === "webhook") {
+          const vistas = new Set<string>();
+          for (const [k, campo] of camposDoWebhook(no.parametros as Record<string, unknown> | undefined).entries()) {
+            if (vistas.has(campo.chave)) {
+              throw new ConfigInvalida(
+                `no fluxo "${id}", o nó "${noId}" declara duas vezes o campo "${campo.chave}" — o segundo venceria em silêncio`
+              );
+            }
+            vistas.add(campo.chave);
+            const caminho = campo.caminho ?? `$.${campo.chave}`;
+            if (!analisarCaminho(caminho)) {
+              throw new ConfigInvalida(
+                `no fluxo "${id}", o nó "${noId}" extrai o campo "${campo.chave}" por "${caminho}", que não é um caminho válido (aceito: $, .campo e [n] — ex.: $.dados.id)`
+              );
+            }
+            void k;
+          }
+          /**
+           * Um webhook SEM campo é um endereço que recebe e não entrega nada.
+           * Não é erro de forma — é desenho pela metade, e a escrita o recusa
+           * pela mesma régua da transformação sem campos (fatia E).
+           */
+          if (vistas.size === 0) {
+            throw new ConfigInvalida(
+              `no fluxo "${id}", o nó "${noId}" é um webhook sem nenhum campo declarado — ele receberia a chamada e não entregaria nada ao fluxo`
+            );
+          }
         }
         gatilhos.push(noId);
       }
