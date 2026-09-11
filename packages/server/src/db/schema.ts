@@ -708,3 +708,31 @@ export const fluxoAgendamentos = pgTable("fluxo_agendamentos", {
   ultimaEm: timestamp("ultima_em", { withTimezone: true }),
   criadoPor: text("criado_por"),
 });
+
+/**
+ * SPEC-110 fatia L (D1) — **o endereço de um webhook** (migração 0049).
+ *
+ * Uma linha por nó de gatilho `webhook`, no molde da tabela de agendamentos: o
+ * que é do DESENHO (os campos extraídos) mora no documento do fluxo; o que é
+ * SEGREDO mora aqui, e só aqui (D18).
+ *
+ * `tokenHash` e não `token`: o token vale como chave de API — quem tiver o
+ * valor dispara o fluxo sem sessão. Guardar o valor seria guardar a senha de
+ * alguém em texto plano; guardamos o hash, mostramos o valor UMA vez na
+ * geração, e regenerar invalida o anterior porque sobrescreve o hash. Se a
+ * pessoa perder, o caminho é gerar outro — não recuperar.
+ *
+ * `ultimaEm` responde "esse endereço está vivo?" sem precisar caçar no
+ * histórico: a pergunta de quem configurou um webhook e não sabe se o outro
+ * lado já chamou.
+ */
+export const fluxoWebhooks = pgTable("fluxo_webhooks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  fluxoId: text("fluxo_id").notNull(),
+  noId: text("no_id").notNull(),
+  timeId: text("time_id").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  criadoPor: text("criado_por"),
+  criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+  ultimaEm: timestamp("ultima_em", { withTimezone: true }),
+});

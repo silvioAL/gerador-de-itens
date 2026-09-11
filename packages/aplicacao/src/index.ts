@@ -247,10 +247,18 @@ export {
   ORIGENS_DO_DISPARO,
   /** SPEC-110 fatia E — o parâmetro do nó que guarda a expressão do cron. */
   PARAMETRO_DA_EXPRESSAO,
+  /** SPEC-110 fatia L — o webhook: os campos que ele extrai do corpo, e a
+   * saída de UM nó de gatilho (que no webhook é do nó, não do tipo). */
+  PARAMETRO_DOS_CAMPOS,
+  camposDoWebhook,
+  saidaDoGatilho,
+  type CampoDoWebhook,
   gatilhoDoSistema,
   type GatilhoDoSistema,
   type OrigemDoDisparo,
 } from "./config/gatilhos.js";
+/** SPEC-110 fatia L — o corpo que chega vira a saída do gatilho. */
+export { extrairDoWebhook, saidaDoWebhook } from "./casos-de-uso/webhook.js";
 export {
   demandaAtiva,
   erroSemDemanda,

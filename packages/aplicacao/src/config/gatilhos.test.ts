@@ -61,8 +61,9 @@ describe("GATILHOS_DO_SISTEMA (o registro fechado)", () => {
     expect(gatilhoDoSistema("quando-der-vontade")).toBeUndefined();
     // SPEC-110 fatia E — a família cresceu com o relógio, e ela cresce por
     // DECISÃO: cada membro chega com quem o honre no mesmo commit (§242).
-    // O `webhook` entra na fatia L; o `screen`, na SPEC-111.
-    expect(GATILHOS_DO_SISTEMA.map((g) => g.id)).toEqual(["manual", "agendamento"]);
+    // SPEC-110 fatia L — o `webhook` chegou, com executor e endereço no mesmo
+    // commit. Falta o `screen`, que é o par da SPEC-111.
+    expect(GATILHOS_DO_SISTEMA.map((g) => g.id)).toEqual(["manual", "agendamento", "webhook"]);
   });
 });
 

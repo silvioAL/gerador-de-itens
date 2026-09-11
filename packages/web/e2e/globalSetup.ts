@@ -175,6 +175,10 @@ export default async function globalSetup() {
       // corrida dele — foi o que aconteceu com `jornada-e-cenarios`, que usa
       // `time-checkout`.
       "time-e2e-galeria",
+      // SPEC-110 fatia L — o webhook cria um fluxo próprio e emite um token
+      // para ele; escrever o documento de fluxos de um time compartilhado
+      // apagaria o desenho de quem roda ao lado.
+      "time-e2e-webhook",
     ];
     // Ninguém ALÉM deste e-mail pertence a estes times. Sem esta linha, uma
     // rodada antiga que os pendurou noutro usuário deixa a lista dele maior

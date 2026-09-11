@@ -1828,6 +1828,27 @@ export const apiExecucaoDeFluxo = {
     }>(`/fluxos/${encodeURIComponent(fluxoId)}/execucoes`),
 };
 
+/**
+ * SPEC-110 fatia L (D1) — **o endereço do webhook.**
+ *
+ * Duas chamadas e uma regra: o token volta UMA vez, na geração. A listagem
+ * nunca o traz — ela responde "existe?" e "quando disparou pela última vez?",
+ * que é o que a tela precisa mostrar depois. Quem perdeu o valor gera outro;
+ * não existe recuperar, porque se existisse não seria segredo.
+ */
+export const apiWebhooks = {
+  listar: (fluxoId: string, timeId?: string) =>
+    requisitar<{ webhooks: { noId: string; criadoEm: string; ultimaEm: string | null }[] }>(
+      `/fluxos/${encodeURIComponent(fluxoId)}/webhooks${timeId ? `?timeId=${encodeURIComponent(timeId)}` : ""}`
+    ),
+  /** Gera ou REGENERA — e regenerar invalida o anterior. */
+  gerarToken: (fluxoId: string, noId: string, timeId?: string) =>
+    requisitar<{ token: string; caminho: string }>(
+      `/fluxos/${encodeURIComponent(fluxoId)}/gatilhos/${encodeURIComponent(noId)}/token`,
+      { method: "POST", body: JSON.stringify({ ...(timeId ? { timeId } : {}) }) }
+    ),
+};
+
 export const apiCatalogoDeConectores = {
   /** O catálogo resolvido pelo servidor: declarados + derivados dos destinos. */
   listar: () => requisitar<{ conectores: ConectorDoCatalogo[] }>("/conectores"),

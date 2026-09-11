@@ -175,6 +175,16 @@ export interface OpcoesDeExecucao {
    * fatia L) diz aqui, e o histórico passa a responder "por que isto rodou?".
    */
   origemDoDisparo?: OrigemDoDisparo;
+  /**
+   * SPEC-110 fatia L — **o que o gatilho EMITE nesta execução.**
+   *
+   * Só o webhook usa: são os campos que quem recebeu a chamada extraiu do
+   * corpo. Entra como opção da EXECUÇÃO, e não como parâmetro do nó, porque é
+   * exatamente isso que ele é — o corpo muda a cada chamada e não pertence à
+   * fiação. É a mesma disciplina do `parametrosPorNo` (§9.5): entrada de
+   * execução não muda a identidade do desenho.
+   */
+  saidaDoGatilho?: Record<string, unknown>;
 }
 
 /** O nó pedido e todo mundo de quem ele depende, transitivamente. */
@@ -299,11 +309,18 @@ export async function executarFluxo(
     try {
       const saida =
         no.tipo === "gatilho"
-          ? // O executor do gatilho é um NO-OP deliberado: ele é âncora de
-            // "quando", não trabalho. A saída vazia é o contrato do v1 (D1) —
-            // manual e agendamento não emitem dado; o webhook (fatia L) vai
-            // emitir o payload declarado, pelo mesmo caminho.
-            {}
+          ? /**
+             * O executor do gatilho continua sendo um NO-OP: ele é âncora de
+             * "quando", não trabalho. Manual e agendamento não emitem nada.
+             *
+             * SPEC-110 fatia L — **o webhook emite, e o dado vem de FORA da
+             * execução.** Quem recebeu a chamada extraiu os campos declarados
+             * e os entregou em `saidaDoGatilho`; aqui eles só entram no lugar
+             * de sempre (as saídas do nó), para as arestas os carregarem como
+             * carregam as de qualquer outro. O motor não sabe o que é HTTP —
+             * e é por isso que a fatia não precisou de um segundo laço.
+             */
+            (opcoes.saidaDoGatilho ?? {})
           : no.tipo === "conector"
           ? await executores.conector(no, parametros)
           : no.tipo === "funcao"

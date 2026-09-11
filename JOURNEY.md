@@ -18033,3 +18033,133 @@ merece rodada própria. Fica a dívida declarada, com o número de partida medid
 pela validação visual a cada rodada. O que a fatia entrega e prova é o que é
 determinístico: cartões que não se encavalam e nenhum nascendo inteiramente fora
 da vista.
+
+## §401 — SPEC-110 fatia L: o gatilho webhook (D1)
+
+**A correção de escopo que justifica a fatia.** Na leitura inicial da SPEC, o
+webhook parecia coberto pelo conector HTTP — "já sabemos falar HTTP". Não é.
+**Conector é SAÍDA**: nós chamamos alguém, com endereço, método e segredo deles.
+**Webhook é ENTRADA**: alguém nos chama, num endereço nosso, sem sessão, provando
+quem é com um token que nós emitimos. Direções opostas — nada do conector serve.
+Confundi-las teria deixado um buraco no lugar de uma porta, e ele só apareceria
+quando alguém tentasse integrar de verdade.
+
+**O que entrou.** `GATILHOS_DO_SISTEMA` ganha `webhook`, e ele é o **primeiro
+gatilho que emite dado**. Por isso a `saida` do registro fica vazia: o que um
+webhook emite não é do TIPO, é do NÓ — os campos que a pessoa declarou extrair
+do corpo (`saidaDoGatilho(no)`). O executor do gatilho continua sendo um no-op;
+o que muda é que a execução agora carrega `saidaDoGatilho` como OPÇÃO, no molde
+do `parametrosPorNo` (§9.5): o corpo muda a cada chamada e não pertence à fiação.
+
+**O caminho é o mesmo vocabulário do conector.** `$`, `.campo` e `[n]` — o
+subconjunto declarado da SPEC-105 §9.4, reusado inteiro. Quem já declarou uma
+integração sabe declarar um webhook sem aprender nada novo, e é a mesma régua de
+escrita a recusar os dois. **O resto do corpo é ignorado de propósito**: um
+webhook que despejasse o payload inteiro faria o desenho depender de um formato
+que ninguém escreveu, e mudar o sistema de fora quebraria aqui em silêncio.
+
+**A porta.** `POST /fluxos/gatilhos/webhook/:token`, sem `preHandler` — é
+máquina-a-máquina, e exigir cookie de quem não tem navegador seria fechar a
+porta e chamá-la de porta. Rate limit próprio (30/min, molde do `/auth/login`),
+porque é a única rota do produto que qualquer um na internet alcança. **404 com
+a mesma frase** para token inexistente e para fluxo sumido: a recusa não pode
+virar oráculo de descoberta. Responde **202**, não 200 — se o fluxo parou numa
+tela, o trabalho ficou pendente de gente, e "200, feito" mentiria para um
+sistema que trata isso como sucesso final.
+
+**O segredo mora na tabela, nunca no documento** (D18). `fluxo_webhooks` guarda
+`token_hash`, não o token: quem tem o valor dispara o fluxo, o que faz dele uma
+chave de API. SHA-256 e não bcrypt, e a razão é a entropia — bcrypt existe para
+segredos que gente escolhe, em que o custo por tentativa é a defesa contra
+dicionário; um token de 256 bits não tem dicionário. **Regenerar sobrescreve o
+hash**, invalidando o anterior por construção, e não por uma coluna "revogado"
+que alguém esquece de conferir.
+
+**Uma divergência deliberada do molde da fatia E.** O agendamento que sai do
+desenho é DESATIVADO (a linha guarda "quando rodou pela última vez"). O webhook
+que sai do desenho é **APAGADO**: a linha viva é um endereço que ainda dispara, e
+manter um token válido para um nó que não existe mais é deixar uma porta
+destrancada num cômodo demolido — que ninguém veria na tela para fechar.
+
+**Um defeito que eu criei e o E2E pegou.** O painel derivava as linhas do editor
+da leitura TOLERANTE (`camposDoWebhook`), que descarta campo sem chave. O campo
+recém-adicionado nasce vazio: ele aparecia e sumia no mesmo render, e "+ campo"
+não fazia nada. O editor passou a ler o array cru; o AVISO continua lendo o
+saneado, porque ele fala do que o motor vai ver.
+
+**Provas.** 11 unidades puras (registro, extração, as três recusas de escrita) +
+8 de rota (disparo sem sessão com o dado certo, origem no histórico, token
+desconhecido, o segredo que não volta, regenerar invalidando, o endereço que
+morre com o nó, permissão, carimbo de "está vivo") + 2 E2E (declarar campo na
+tela → gerar endereço → POST de fora → o texto do corpo no rastro do nó certo; e
+o endereço sobrevivendo ao F5 sem o token reaparecer). **§248: treze sabotagens**
+em duas baterias (`scripts/sabotagens-webhook.mjs` e `-rota.mjs`), cada uma
+vermelha na prova certa e restaurada — as baterias ficam no repo, porque a
+próxima fatia que mexer aqui vai querer rodá-las.
+
+**Escolha do E2E que vale registrar:** a FIAÇÃO nasce pela API e só o WEBHOOK
+passa pela tela. Arrastar aresta já tem prova própria (`fluxo-de-integracao`), e
+repeti-la num spec cujo assunto é outro só acrescentaria instabilidade — o
+arrasto a partir do cartão de gatilho, aliás, não fecha a aresta, e isso fica
+anotado como coisa a medir se alguém precisar do gesto.
+
+## §401 — SPEC-110 fatia L: o gatilho webhook (alguém de fora nos chama)
+
+**A correção de escopo primeiro, porque foi ela que justificou a fatia.** Era
+tentador dizer que o conector HTTP já cobria webhook — e estaria errado por
+DIREÇÃO: conector é SAÍDA (nós chamamos alguém, com endereço e segredo deles);
+webhook é ENTRADA (alguém nos chama, num endereço nosso, sem sessão, provando
+quem é com um token que nós emitimos). Nada do conector serve; a fatia é
+trabalho real.
+
+**O que entrou.** `GATILHOS_DO_SISTEMA` ganha `webhook` — o primeiro gatilho que
+EMITE dado, e por isso o primeiro cujo contrato é do NÓ e não do tipo
+(`saidaDoGatilho(no)`): o que ele entrega são os campos que a pessoa declarou
+extrair do corpo, com o MESMO vocabulário de caminho do conector (SPEC-105 §9.4
+— `$`, `.campo`, `[n]`). O resto do corpo é ignorado de propósito: um webhook
+que despejasse o payload inteiro faria o desenho depender de um formato que
+ninguém escreveu, e mudar o sistema de fora quebraria aqui em silêncio.
+
+**A porta**: `POST /fluxos/gatilhos/webhook/:token`, sem sessão (é
+máquina-a-máquina; exigir cookie de quem não tem navegador seria fechar a porta
+e chamá-la de porta), com rate limit próprio no molde do `/auth/login`, e 404
+com a MESMA frase para token inexistente e para fluxo sumido — a recusa não
+pode virar oráculo de descoberta. A execução não tem caminho próprio: é a mesma
+`executarFluxo` do botão e do relógio, com `origemDoDisparo: "webhook"` (§263 —
+três disparos, um executor).
+
+**O segredo**: tabela `fluxo_webhooks` com `token_hash`, nunca o valor. SHA-256
+e não bcrypt, de propósito: bcrypt defende segredo de BAIXA entropia (senha que
+gente escolhe), e um token de 256 bits do `randomBytes` não tem dicionário — o
+que importa é não guardar o valor, e isso o SHA-256 faz com uma comparação
+rápida o bastante para uma rota quente. Mostrado UMA vez; regenerar sobrescreve
+o hash, invalidando o anterior por construção e não por uma coluna "revogado"
+que alguém esquece de conferir.
+
+**Dois defeitos que as provas acharam, e valem mais que o recurso:**
+
+1. **O endereço sobrevivia ao fluxo apagado.** A varredura de limpeza era POR
+   FLUXO, e um fluxo que some não entra em laço nenhum — o token continuava
+   válido apontando para um desenho que não existe mais. Porta destrancada em
+   cômodo demolido, e ninguém a veria na tela para fechar. Só apareceu porque o
+   E2E tentou SANEAR o próprio estado salvando `fluxos: []`. Agora a
+   sincronização é sobre o documento inteiro (`sincronizarWebhooks`), com prova
+   de rota própria. Aqui a fatia L diverge da E de propósito: agendamento que
+   sai do desenho é DESATIVADO (a linha guarda "quando rodou"), webhook é
+   APAGADO (a linha viva é um endereço que dispara).
+2. **"+ campo" não mostrava nada.** O painel derivava as linhas da leitura
+   TOLERANTE do motor, que descarta campo sem chave — e o campo recém-adicionado
+   nasce exatamente assim. O editor passou a ler o array cru e o AVISO a ler o
+   saneado: cada um com a régua que lhe cabe.
+
+**§248**: treze sabotagens em duas baterias (`scripts/sabotagens-webhook.mjs` e
+`sabotagens-webhook-rota.mjs`), cada uma vermelha na prova certa — incluindo
+"guardar o token em texto plano", "regenerar não invalida o anterior" e "a
+recusa vira oráculo".
+
+**Portões**: typecheck, build, lint e a suíte unitária de todos os workspaces;
+provas de rota com banco real (9); E2E próprio, auto-saneador pelo mecanismo do
+próprio produto; validação visual nos dois temas com asserção sobre `data-tema`
+(cartão em rótulo curto, 190px; âmbar do aviso legível nos dois fundos; endereço
+absoluto e copiável). D19: o "Como usar" ganhou o passo do webhook e o tour
+passou a nomear as TRÊS respostas para "quando".

@@ -189,6 +189,18 @@ const PASSOS_DE_USO: { titulo: string; texto: string }[] = [
       "Troque o gatilho para “🕐 Agendado” e escreva quando ele roda: cinco campos — minuto, hora, dia, mês, dia-da-semana — em UTC. “0 9 * * 1-5” é “dias úteis, às 9h”. Aceita * (qualquer), listas (1,15), intervalos (1-5) e passos (*/15). Logo abaixo o painel responde com a PRÓXIMA data, para você conferir antes de salvar. Salvar o desenho é que liga o relógio; tirar o gatilho é que o desliga. O fluxo agendado continua rodável na mão pelo “▶ Rodar agora”, e no histórico dá para ver quem disparou cada execução — você ou o relógio.",
   },
   {
+    /**
+     * SPEC-110 fatia L (D19) — o gesto NOVO: o fluxo que OUTRO SISTEMA dispara.
+     *
+     * Sem este passo o manual ensinaria só as duas pontas que já existiam —
+     * alguém clica, ou o relógio bate —, e a terceira (alguém de fora chama)
+     * ficaria invisível justamente para quem tem um sistema para integrar.
+     */
+    titulo: "Deixe outro sistema disparar o fluxo",
+    texto:
+      "Troque o gatilho para “🔗 Webhook” e o fluxo ganha um endereço próprio, que qualquer sistema pode chamar por POST — sem login, porque quem chama é máquina, não gente. Antes do endereço, declare o que você quer do corpo da chamada: cada campo tem uma chave (o nome que vale dentro do fluxo) e, se o dado estiver aninhado, um caminho como “$.dados.mensagem”. O que você não declarar é ignorado de propósito — assim o desenho não depende de um formato que ninguém escreveu. Depois clique em “Gerar endereço”: ele aparece UMA vez, para copiar. O servidor guarda só um resumo dele, então se você o perder o caminho é gerar outro — e gerar outro invalida o anterior, o que é justamente o que se quer quando um endereço vaza. O painel continua dizendo se ele já foi chamado alguma vez, e no histórico cada execução mostra que veio de webhook.",
+  },
+  {
     // SPEC-110 fatia B (D19) — o passo NOVO: a tela como nó. Sem ele, o
     // manual ensinaria um fluxo que sempre corre sozinho, e a pessoa que
     // encontrasse a execução parada não saberia que ela está esperando POR ELA.

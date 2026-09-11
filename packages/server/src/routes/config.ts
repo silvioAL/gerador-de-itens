@@ -25,6 +25,8 @@ import { registrarAuditoria } from "../auditoria.js";
 // SPEC-110 fatia E — o desenho manda no relogio: salvar o fluxo sincroniza.
 import { normalizarFluxos } from "@gerador/aplicacao";
 import { sincronizarAgendamentos } from "../fluxos/agendamentos.js";
+// SPEC-110 fatia L — o endereco do webhook morre com o no que o criou.
+import { sincronizarWebhooks } from "../fluxos/webhooks.js";
 import { templateDaVersao as templateDeConfig } from "../config/templateDaVersao.js";
 
 /**
@@ -269,6 +271,22 @@ export async function registrarRotasConfig(app: FastifyInstance, { db, diretorio
         for (const fluxo of fluxos) {
           await sincronizarAgendamentos(db, fluxo, salvo.timeId, req.usuario!.email);
         }
+        /**
+         * SPEC-110 fatia L — **e o endereço do webhook morre com o nó.**
+         *
+         * A simetria com o relógio para aqui. O agendamento que sai do desenho
+         * é DESATIVADO (a linha guarda "quando rodou pela última vez"); o
+         * webhook que sai do desenho é APAGADO, porque a linha viva é um
+         * endereço que ainda dispara. Token válido para um nó que não existe
+         * mais é porta destrancada em cômodo demolido — e ninguém a veria na
+         * tela para fechar.
+         *
+         * FORA do laço, sobre o documento inteiro: dentro dele, um fluxo
+         * APAGADO nunca seria visitado, e o endereço sobreviveria ao próprio
+         * fluxo. Só some o que sumiu — o nó que continua no desenho mantém o
+         * token, senão salvar quebraria a integração de quem já a ligou.
+         */
+        await sincronizarWebhooks(db, fluxos, salvo.timeId);
       } catch (erro) {
         app.log.error({ erro }, "falha ao sincronizar agendamentos do fluxo");
       }
