@@ -72,6 +72,24 @@ test("declarar os campos, gerar o endereço, e um POST de fora dispara o fluxo",
                 refId: "webhook",
                 posicao: { x: 60, y: 120 },
                 parametros: { campos: [{ chave: "pedidoId" }] },
+                /**
+                 * **O GATE existe aqui para o spec não ter efeito colateral
+                 * GLOBAL — e essa lição custou duas rodadas de CI.**
+                 *
+                 * A primeira versão deixava a execução correr até
+                 * `pdca-feedback`, que GRAVA um feedback. O balão do assistente
+                 * ("Tem 1 feedback do time esperando") passou a aparecer em
+                 * OUTROS specs e a interceptar os cliques deles: um teste de
+                 * stacks, sem relação nenhuma com webhook, morreu por 57
+                 * tentativas de clique até estourar o teto de 30s.
+                 *
+                 * Com o gate, a execução suspende logo DEPOIS do gatilho: as
+                 * saídas ficam persistidas (é onde se prova a extração) e o nó
+                 * que escreve nunca roda. O que o gate custa em realismo, as
+                 * provas de rota cobrem — lá o dado atravessa a aresta inteira,
+                 * num banco isolado onde escrever não incomoda ninguém.
+                 */
+                confirmacao: "aguardar",
               },
               { id: "registra", tipo: "funcao", refId: "pdca-feedback", posicao: { x: 420, y: 120 }, parametros: {} },
             ],
@@ -117,17 +135,32 @@ test("declarar os campos, gerar o endereço, e um POST de fora dispara o fluxo",
   });
   expect(chamada.status()).toBe(202);
   const corpo = (await chamada.json()) as { execucaoId: string; estado: string };
-  expect(corpo.estado).toBe("concluida");
+  // O gate suspende logo depois do gatilho — é o que mantém este spec sem
+  // efeito colateral, e de quebra prova que webhook e gate convivem.
+  expect(corpo.estado).toBe("aguardando-confirmacao");
 
-  // A execução existe no histórico do fluxo, com o dado que veio no corpo.
+  /**
+   * A execução está no histórico do fluxo, e é ali que se vê a EXTRAÇÃO: as
+   * saídas do gatilho trazem os dois campos declarados — um pelo nome
+   * (`pedidoId`) e outro pelo caminho aninhado (`$.dados.mensagem`) — e não
+   * trazem o `ruido`, que o corpo mandou e ninguém pediu.
+   */
   const historico = await page.request.get(`${API}/fluxos/recebe-de-fora/execucoes?timeId=${time}`);
   const { execucoes } = (await historico.json()) as {
-    execucoes: { id: string; nos: { noId: string; origem?: string; entradas?: Record<string, unknown> }[] }[];
+    execucoes: {
+      id: string;
+      estado: string;
+      saidas: Record<string, Record<string, unknown>> | null;
+      nos: { noId: string; origem?: string }[];
+    }[];
   };
   const minha = execucoes.find((e) => e.id === corpo.execucaoId)!;
   expect(minha).toBeDefined();
   expect(minha.nos.find((n) => n.noId === "gatilho")?.origem).toBe("webhook");
-  expect(minha.nos.find((n) => n.noId === "registra")?.entradas?.texto).toBe("o relatorio veio truncado");
+  expect(minha.saidas?.gatilho).toEqual({ pedidoId: "P-77", texto: "o relatorio veio truncado" });
+  expect(JSON.stringify(minha.saidas)).not.toContain("ignore-me");
+  // E o nó que ESCREVE não rodou: o gate parou antes dele.
+  expect(minha.nos.find((n) => n.noId === "registra")).toBeUndefined();
 
   // Token errado: 4xx nomeado, sem contar nada sobre o que existe do lado de cá.
   const errado = await page.request.post(`${API}/fluxos/gatilhos/webhook/${token}-torto`, { data: {} });
