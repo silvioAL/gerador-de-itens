@@ -157,6 +157,28 @@ describe("o histórico de execuções não atravessa o time", () => {
     });
   });
 
+  /**
+   * A exceção que a prova integral da D18 (fatia K) obrigou a abrir: o disparo
+   * SEM GENTE. Quem roda um agendamento é o relógio; nenhuma sessão humana casa
+   * com esse endereço, e a régua "sem time é de quem rodou" escondia de TODO
+   * MUNDO a execução que ninguém consegue reproduzir à mão. O recurso existia e
+   * não se auditava.
+   */
+  it("execução sem time disparada pelo RELÓGIO é da organização — senão ninguém a audita", async () => {
+    await comApp(async (app, cookies) => {
+      await db.insert(fluxoExecucoes).values({
+        fluxoId: "ensaio-de-cenarios-vaz",
+        timeId: "__global__",
+        hash: "hash-do-relogio",
+        email: "agendamento@gerador.local",
+        nos: [],
+      });
+      const r = await app.inject({ method: "GET", url: "/fluxos/ensaio-de-cenarios-vaz/execucoes", cookies });
+      const { execucoes } = r.json() as { execucoes: { email: string }[] };
+      expect(execucoes.some((e) => e.email === "agendamento@gerador.local")).toBe(true);
+    });
+  });
+
   it("pedir explicitamente o time alheio não abre a porta", async () => {
     await comApp(async (app, cookies) => {
       await execucaoAlheia();

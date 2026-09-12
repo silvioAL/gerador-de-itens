@@ -148,7 +148,7 @@ export function JourneyModal({
  * B/C/D: integração externa, mesa de projeto, canvas de fluxos). Os tours no
  * topo desta modal mostram os mesmos passos ao vivo.
  */
-const PASSOS_DE_USO: { titulo: string; texto: string }[] = [
+const PASSOS_DO_CAMINHO: { titulo: string; texto: string }[] = [
   {
     titulo: "Conecte um modelo de IA",
     texto:
@@ -165,6 +165,19 @@ const PASSOS_DE_USO: { titulo: string; texto: string }[] = [
       "O motor lê o desenho + a configuração do time e ESCREVE os itens de trabalho — o documento abre com um card por item, sempre o mesmo resultado para o mesmo desenho.",
   },
   {
+    titulo: "Confirme o que a IA escreveu",
+    texto:
+      "De volta ao documento, a seção de itens mostra as sugestões PENDENTES: confirme campo a campo, edite, escreva por cima ou \"Confirmar todas\". Nada que a IA propõe vale antes disso.",
+  },
+  {
+    titulo: "Exporte e publique",
+    texto:
+      "Os fluxos \"Exportar prontos\" e \"Publicar documento\" levam os itens e o documento para onde o time trabalha — os destinos se cadastram no catálogo de integrações (☰ Menu → Conectores).",
+  },
+];
+
+const PASSOS_DOS_FLUXOS: { titulo: string; texto: string }[] = [
+  {
     titulo: "Rode a esteira de agentes no canvas",
     // SPEC-110 fatia A (D19) — o passo passa a nomear o GATILHO: todo fluxo
     // diz quando roda, e "▶ Rodar agora" é o gesto do gatilho manual. Sem
@@ -173,13 +186,19 @@ const PASSOS_DE_USO: { titulo: string; texto: string }[] = [
       "☰ Menu → Fluxos de integração abre a GALERIA: os fluxos e as telas que este time tem, agrupados pelo momento em que servem (ensaiar, derivar, sair, melhorar) e com busca no topo. Cada cartão derivado diz DE ONDE nasce — “papéis da esteira →”, “destinos de exportação →” — e a seta leva à tela que o configura, então “onde se mexe nisso?” morre ali. Clicar num cartão abre o desenho dele; “+ Novo fluxo” e “+ Nova tela” criam do zero. Dentro do desenho: o primeiro cartão é o GATILHO — ele diz quando o fluxo roda. Com o gatilho manual, \"▶ Rodar agora\" dispara os agentes (PO, Arquiteto, Especialista, QA) sobre a demanda aberta, ao vivo, nó a nó. Clicar num agente edita o papel dele — prompt, ligar/desligar, ordem.",
   },
   {
-    // SPEC-110 fatia F (D19) — o gesto que MUDOU: quem põe a demanda num
-    // fluxo escolhia um cartão só e descobria depois, pela aresta, se ele lia
-    // ou gravava. Sem este passo, o manual ensinaria uma paleta que sumiu.
-    titulo: "Diga se o fluxo LÊ ou GRAVA na demanda",
+    /**
+     * SPEC-110 fatia J (D19) — o gesto NOVO: entrar num fluxo a partir de
+     * outro. Sem este passo, o manual descreveria quatro desenhos soltos e
+     * deixaria de pé a pergunta que motivou a fatia ("quais fluxos estão
+     * relacionados ao quê?").
+     */
+    titulo: "Veja como as etapas se ligam: a jornada da demanda",
     texto:
-      "Na paleta do canvas, a demanda tem dois cartões em vez de um: “Demanda — ler” traz o que ela carrega (desenho, itens, documento, volumetria, a fila da esteira) e “Demanda — gravar” recebe o que a fiação produziu (uma proposta de desenho, o retorno da exportação, o link publicado, as sugestões da esteira). A direção fica escrita no cartão, então o desenho responde sozinho o que antes exigia seguir a seta com o dedo. Escrever na demanda nunca aplica direto: um desenho gravado vira uma VARIANTE, e só passa a valer se alguém adotar na mesa. Para alguém ENTRAR na mesa no meio do fluxo, o cartão é outro — a tela “Mesa de projeto”.",
+      "No topo da galeria há um desenho que ninguém precisou montar: “🧭 Jornada da demanda”. Cada cartão dele é um FLUXO inteiro — ensaiar, derivar com a esteira, e no fim exportar e publicar — ligados na ordem em que acontecem. Dê um duplo-clique num cartão (ou use “abrir o subfluxo →” no painel) para ENTRAR naquela etapa e ver o desenho dela; o botão “← Voltar” do navegador traz você de volta. Rodar a jornada roda as etapas em sequência, e ela para onde qualquer fluxo para: numa tela. Ao parar, a barra do topo diz em qual etapa você está — “Jornada da demanda › Ensaio de cenários” — e o histórico guarda cada etapa como uma execução própria, para você abrir o rastro de uma sem perder o da outra. Para montar isso num desenho seu, a paleta tem “+ Subfluxo”: escolha no painel qual fluxo roda ali dentro.",
   },
+];
+
+const PASSOS_DE_QUANDO: { titulo: string; texto: string }[] = [
   {
     // SPEC-110 fatia E (D19) — o gesto NOVO: o fluxo que roda sem ninguém.
     // Sem este passo, o manual só ensinaria fluxos que esperam um clique, e o
@@ -200,6 +219,9 @@ const PASSOS_DE_USO: { titulo: string; texto: string }[] = [
     texto:
       "Troque o gatilho para “🔗 Webhook” e o fluxo ganha um endereço próprio, que qualquer sistema pode chamar por POST — sem login, porque quem chama é máquina, não gente. Antes do endereço, declare o que você quer do corpo da chamada: cada campo tem uma chave (o nome que vale dentro do fluxo) e, se o dado estiver aninhado, um caminho como “$.dados.mensagem”. O que você não declarar é ignorado de propósito — assim o desenho não depende de um formato que ninguém escreveu. Depois clique em “Gerar endereço”: ele aparece UMA vez, para copiar. O servidor guarda só um resumo dele, então se você o perder o caminho é gerar outro — e gerar outro invalida o anterior, o que é justamente o que se quer quando um endereço vaza. O painel continua dizendo se ele já foi chamado alguma vez, e no histórico cada execução mostra que veio de webhook.",
   },
+];
+
+const PASSOS_DE_ONDE_ENTRO: { titulo: string; texto: string }[] = [
   {
     // SPEC-110 fatia B (D19) — o passo NOVO: a tela como nó. Sem ele, o
     // manual ensinaria um fluxo que sempre corre sozinho, e a pessoa que
@@ -216,25 +238,16 @@ const PASSOS_DE_USO: { titulo: string; texto: string }[] = [
     texto:
       "Clique num nó de tela no canvas → “editar a tela →”, ou vá direto a ☰ Menu → Configurações → Telas do time. Uma tela é uma pilha de blocos: TEXTO explica, DADO mostra o que a fiação trouxe, CAMPO pergunta (e o obrigatório trava o Avançar até preencher, dizendo o que falta), AÇÃO dá o seu nome ao botão. A prévia ao lado é exatamente o que a pessoa vai ver quando a execução parar ali.",
   },
+];
+
+const PASSOS_DE_DADOS: { titulo: string; texto: string }[] = [
   {
-    // SPEC-110 fatia G (D19) — o gesto NOVO: o ciclo de melhoria deixou de ser
-    // só uma aba e virou um desenho que a pessoa roda. Sem este passo, o
-    // manual descreveria o PDCA como lugar, e ele agora é caminho.
-    titulo: "Melhore a configuração pelo próprio fluxo (PDCA)",
+    // SPEC-110 fatia F (D19) — o gesto que MUDOU: quem põe a demanda num
+    // fluxo escolhia um cartão só e descobria depois, pela aresta, se ele lia
+    // ou gravava. Sem este passo, o manual ensinaria uma paleta que sumiu.
+    titulo: "Diga se o fluxo LÊ ou GRAVA na demanda",
     texto:
-      "☰ Menu → Fluxos de integração → “Melhoria contínua (PDCA)”. O desenho lê os feedbacks que o time registrou e a configuração de hoje, um agente propõe UM ajuste, e a execução PARA numa tela para você conferir os três lados: o que motivou, o que se propõe e como está hoje. “Aplicar o ajuste →” muda a configuração de verdade; “← Não aplicar” encerra sem mexer em nada. Nenhum fluxo escreve configuração direto: ele cria uma SOLICITAÇÃO, com dono e histórico, a mesma que a aba PDCA mostra — e se você não tem permissão para aplicar, o pedido fica lá esperando quem tem.",
-  },
-  {
-    // SPEC-110 fatia I (D19) — o gesto NOVO: a spec deixa de ser só o que a
-    // tela mostra e vira coisa que um desenho PRODUZ e passa adiante.
-    titulo: "Faça o fluxo produzir a especificação",
-    texto:
-      "No canvas, “+ Gerar a especificação (por item)” recebe o desenho e devolve DUAS coisas: uma spec para CADA item (com as lacunas contadas) e o documento agregado — a mesma montagem que a tela do documento mostra, não uma segunda. É o que permite ligar a spec ao que vem depois: cada item sobe para o tracker com a especificação DELE, e não com uma cópia da demanda inteira. A unidade é o item porque isso varia com o desenho: dois componentes novos, duas specs.",
-  },
-  {
-    titulo: "Confirme o que a IA escreveu",
-    texto:
-      "De volta ao documento, a seção de itens mostra as sugestões PENDENTES: confirme campo a campo, edite, escreva por cima ou \"Confirmar todas\". Nada que a IA propõe vale antes disso.",
+      "Na paleta do canvas, a demanda tem dois cartões em vez de um: “Demanda — ler” traz o que ela carrega (desenho, itens, documento, volumetria, a fila da esteira) e “Demanda — gravar” recebe o que a fiação produziu (uma proposta de desenho, o retorno da exportação, o link publicado, as sugestões da esteira). A direção fica escrita no cartão, então o desenho responde sozinho o que antes exigia seguir a seta com o dedo. Escrever na demanda nunca aplica direto: um desenho gravado vira uma VARIANTE, e só passa a valer se alguém adotar na mesa. Para alguém ENTRAR na mesa no meio do fluxo, o cartão é outro — a tela “Mesa de projeto”.",
   },
   {
     /**
@@ -246,60 +259,136 @@ const PASSOS_DE_USO: { titulo: string; texto: string }[] = [
       "☰ Menu → Conectores: um conector é um endereço que a empresa chama (HTTP) ou uma CONSULTA no banco (Postgres). Na consulta, escreva o SELECT com :parâmetros — o valor nunca entra no texto do SQL — e guarde a conexão no cofre (ou na variável de ambiente que a tela indica). Ela roda em transação somente leitura, com tempo máximo e limite de linhas. Depois é só arrastar “+ Integração externa” no canvas e escolher o conector.",
   },
   {
-    titulo: "Exporte e publique",
+    // SPEC-110 fatia I (D19) — o gesto NOVO: a spec deixa de ser só o que a
+    // tela mostra e vira coisa que um desenho PRODUZ e passa adiante.
+    titulo: "Faça o fluxo produzir a especificação",
     texto:
-      "Os fluxos \"Exportar prontos\" e \"Publicar documento\" levam os itens e o documento para onde o time trabalha — os destinos se cadastram no catálogo de integrações (☰ Menu → Conectores).",
+      "No canvas, “+ Gerar a especificação (por item)” recebe o desenho e devolve DUAS coisas: uma spec para CADA item (com as lacunas contadas) e o documento agregado — a mesma montagem que a tela do documento mostra, não uma segunda. É o que permite ligar a spec ao que vem depois: cada item sobe para o tracker com a especificação DELE, e não com uma cópia da demanda inteira. A unidade é o item porque isso varia com o desenho: dois componentes novos, duas specs.",
+  },
+];
+
+const PASSOS_DE_MELHORAR: { titulo: string; texto: string }[] = [
+  {
+    // SPEC-110 fatia G (D19) — o gesto NOVO: o ciclo de melhoria deixou de ser
+    // só uma aba e virou um desenho que a pessoa roda. Sem este passo, o
+    // manual descreveria o PDCA como lugar, e ele agora é caminho.
+    titulo: "Melhore a configuração pelo próprio fluxo (PDCA)",
+    texto:
+      "☰ Menu → Fluxos de integração → “Melhoria contínua (PDCA)”. O desenho lê os feedbacks que o time registrou e a configuração de hoje, um agente propõe UM ajuste, e a execução PARA numa tela para você conferir os três lados: o que motivou, o que se propõe e como está hoje. “Aplicar o ajuste →” muda a configuração de verdade; “← Não aplicar” encerra sem mexer em nada. Nenhum fluxo escreve configuração direto: ele cria uma SOLICITAÇÃO, com dono e histórico, a mesma que a aba PDCA mostra — e se você não tem permissão para aplicar, o pedido fica lá esperando quem tem.",
+  },
+];
+
+
+/**
+ * SPEC-110 fatia K (D19) — **a conferência integral, e o que ela achou.**
+ *
+ * Cada fatia atualizou o SEU pedaço deste manual, como a D19 manda. O resultado
+ * ficou certo passo a passo e errado no conjunto: quinze itens numerados em
+ * fila, na ordem em que as fatias nasceram, sob a promessa "o caminho inteiro,
+ * do desenho ao item exportado".
+ *
+ * O sintoma mais claro: **"Confirme o que a IA escreveu" caía em décimo
+ * segundo** — depois de webhook, PDCA e spec por item —, sendo que confirmar é
+ * o que se faz logo depois de derivar. Quem lia em ordem atravessava seis
+ * capacidades avançadas antes de chegar ao segundo gesto do dia. A queixa que
+ * abriu a SPEC-109 E ("em como funciona não explica como usar") não voltou; a
+ * versão dela em que tudo está explicado e nada se acha, sim.
+ *
+ * O conserto é de ESTRUTURA, não de texto (os passos continuam os que cada
+ * fatia escreveu): o caminho de quem começa fica em cima, numerado e curto; o
+ * resto vira seções por PERGUNTA — "quando ele roda?", "onde eu entro?" —,
+ * porque é assim que alguém procura, não pela ordem em que nós construímos.
+ */
+const SECOES_DE_USO: {
+  titulo: string;
+  chamada: string;
+  /** Só o caminho é numerado: ele é uma sequência. O resto é repertório. */
+  numerada?: boolean;
+  passos: { titulo: string; texto: string }[];
+}[] = [
+  {
+    titulo: "O caminho, do desenho ao item exportado",
+    chamada: "Cinco passos. É o que você faz na primeira vez, e no dia a dia.",
+    numerada: true,
+    passos: PASSOS_DO_CAMINHO,
   },
   {
-    /**
-     * SPEC-110 fatia J (D19) — o gesto NOVO: entrar num fluxo a partir de
-     * outro. Sem este passo, o manual descreveria quatro desenhos soltos e
-     * deixaria de pé a pergunta que motivou a fatia ("quais fluxos estão
-     * relacionados ao quê?").
-     */
-    titulo: "Veja como as etapas se ligam: a jornada da demanda",
-    texto:
-      "No topo da galeria há um desenho que ninguém precisou montar: “🧭 Jornada da demanda”. Cada cartão dele é um FLUXO inteiro — ensaiar, derivar com a esteira, e no fim exportar e publicar — ligados na ordem em que acontecem. Dê um duplo-clique num cartão (ou use “abrir o subfluxo →” no painel) para ENTRAR naquela etapa e ver o desenho dela; o botão “← Voltar” do navegador traz você de volta. Rodar a jornada roda as etapas em sequência, e ela para onde qualquer fluxo para: numa tela. Ao parar, a barra do topo diz em qual etapa você está — “Jornada da demanda › Ensaio de cenários” — e o histórico guarda cada etapa como uma execução própria, para você abrir o rastro de uma sem perder o da outra. Para montar isso num desenho seu, a paleta tem “+ Subfluxo”: escolha no painel qual fluxo roda ali dentro.",
+    titulo: "Onde o encanamento mora",
+    chamada: "Os fluxos que fazem o trabalho — e como eles se ligam entre si.",
+    passos: PASSOS_DOS_FLUXOS,
+  },
+  {
+    titulo: "Quando um fluxo roda",
+    chamada: "O primeiro cartão de todo fluxo é o gatilho. Ele tem três respostas.",
+    passos: PASSOS_DE_QUANDO,
+  },
+  {
+    titulo: "Onde você entra",
+    chamada: "Um fluxo pode parar e esperar por uma pessoa — e a tela dessa parada é sua.",
+    passos: PASSOS_DE_ONDE_ENTRO,
+  },
+  {
+    titulo: "O que um fluxo lê e escreve",
+    chamada: "A demanda, os dados de fora, e a especificação que ele produz.",
+    passos: PASSOS_DE_DADOS,
+  },
+  {
+    titulo: "Melhorar o próprio processo",
+    chamada: "O ciclo que muda a configuração — com alguém aprovando no meio.",
+    passos: PASSOS_DE_MELHORAR,
   },
 ];
 
 function ComoUsar() {
   return (
     <div data-testid="como-usar" style={{ maxWidth: 720 }}>
-      <p style={{ fontSize: 13, color: "var(--texto-fraco)", margin: "0 0 16px", lineHeight: 1.5 }}>
-        O caminho inteiro, do desenho ao item exportado. Os dois tours no topo mostram estes passos ao vivo —
-        este é o resumo para consultar depois.
+      <p style={{ fontSize: 13, color: "var(--texto-fraco)", margin: "0 0 20px", lineHeight: 1.5 }}>
+        Comece pelo <strong>caminho</strong> — são cinco passos. O resto está agrupado pela pergunta que responde,
+        para você voltar aqui quando precisar. Os dois tours no topo mostram tudo isto ao vivo.
       </p>
-      <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 12 }}>
-        {PASSOS_DE_USO.map((passo, i) => (
-          <li key={passo.titulo} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-            <span
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: 999,
-                background: "var(--acento-gente)",
-                color: "#fff",
-                fontSize: 12,
-                fontWeight: 700,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-                marginTop: 1,
-              }}
-            >
-              {i + 1}
-            </span>
-            <div>
-              <strong style={{ fontSize: 13, color: "var(--texto)" }}>{passo.titulo}</strong>
-              <p style={{ fontSize: 12.5, color: "var(--texto-fraco)", margin: "3px 0 0", lineHeight: 1.5 }}>
-                {passo.texto}
-              </p>
-            </div>
-          </li>
-        ))}
-      </ol>
+      {SECOES_DE_USO.map((secao) => (
+        <section key={secao.titulo} style={{ marginBottom: 26 }}>
+          <h3 style={{ fontSize: 13.5, color: "var(--texto)", margin: "0 0 2px" }}>{secao.titulo}</h3>
+          {/* `--texto-fraco` e não `--texto-mudo`: a chamada DIZ a pergunta que
+              a seção responde, e a validação visual mediu o mudo em ~3,5:1 no
+              tema escuro. Quem hierarquiza aqui é o título acima, não o
+              apagamento do texto que ensina onde procurar. */}
+          <p style={{ fontSize: 12, color: "var(--texto-fraco)", margin: "0 0 12px" }}>{secao.chamada}</p>
+          <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 12 }}>
+            {secao.passos.map((passo, i) => (
+              <li key={passo.titulo} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                <span
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: 999,
+                    // O caminho é numerado; o repertório ganha um ponto. Numerar
+                    // capacidades sugeriria uma ordem que não existe — e foi
+                    // essa falsa sequência que escondeu o "Confirme" no fim.
+                    background: secao.numerada ? "var(--acento-gente)" : "var(--borda-forte)",
+                    color: secao.numerada ? "#fff" : "var(--texto-2)",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                    marginTop: 1,
+                  }}
+                >
+                  {secao.numerada ? i + 1 : "·"}
+                </span>
+                <div>
+                  <strong style={{ fontSize: 13, color: "var(--texto)" }}>{passo.titulo}</strong>
+                  <p style={{ fontSize: 12.5, color: "var(--texto-fraco)", margin: "3px 0 0", lineHeight: 1.5 }}>
+                    {passo.texto}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ))}
     </div>
   );
 }

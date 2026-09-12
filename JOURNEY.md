@@ -18211,3 +18211,55 @@ agora com o motivo à vista.
 (`scripts/sabotagens-vazamento.mjs`), e um E2E que entra como um time, tenta ver
 a execução de outro e prova as duas metades — o convite "abrir →" some da tela, e
 o link direto é recusado com o motivo.
+
+## §403 — SPEC-110 fatia K: a apresentação conferida por inteiro (D19)
+
+**A D19 funcionou, e por isso ela precisava desta fatia.** Cada uma das onze
+fatias atualizou o seu pedaço do "Como usar" e dos tours no próprio PR, como a
+decisão manda. O resultado ficou certo passo a passo e errado no conjunto:
+quinze itens numerados em fila, na ordem em que as fatias nasceram, sob a
+promessa "o caminho inteiro, do desenho ao item exportado".
+
+O sintoma que fecha o argumento: **"Confirme o que a IA escreveu" caía em
+décimo segundo** — depois de webhook, PDCA e spec por item —, sendo que
+confirmar é o que se faz logo depois de derivar. Quem lia em ordem atravessava
+seis capacidades avançadas antes de chegar ao segundo gesto do dia. A queixa que
+abriu a SPEC-109 E ("em como funciona não explica como usar") não voltou; voltou
+a versão dela em que tudo está explicado e nada se acha.
+
+**O conserto é de estrutura, não de texto** — os quinze passos continuam os que
+cada fatia escreveu, palavra por palavra. O caminho de quem começa virou uma
+seção de CINCO passos numerados; o resto virou seções por PERGUNTA ("quando um
+fluxo roda?", "onde você entra?", "o que ele lê e escreve?"), porque é assim que
+alguém procura — não pela ordem em que nós construímos. Só o caminho é numerado:
+numerar capacidades sugeriria uma sequência que não existe, e foi essa falsa
+sequência que escondeu o "Confirme" no fim.
+
+**O tour de configuração ganhou o passo que faltava.** Ele dizia que "alguns
+fluxos têm uma TELA no meio, onde a execução para e espera alguém" e seguia sem
+nunca mostrar de onde essa tela vem — a capacidade que o usuário mais pediu
+("também precisará de spec para essa parte de criar ou editar screens") ficava
+sem lugar justamente no tour que existe para mostrar o que se molda por time.
+
+**A prova integral da D18 achou um defeito meu, de ontem.** Rodando contra um
+banco recriado (`down -v`), o tick colheu o agendamento (`disparados: 1`) e o
+histórico ficou VAZIO. A causa era a régua de visibilidade da §402: "execução
+sem time é de quem a rodou" — e quem roda um agendamento é o relógio, quem roda
+um webhook é um sistema de fora. Nenhuma sessão humana casa com esses
+endereços, então a regra escondia de todo mundo exatamente as execuções que
+ninguém consegue reproduzir à mão: o recurso existia e não se auditava. Agora o
+disparo SEM GENTE é da organização, e o recorte que importa continua de pé —
+execução COM time só aparece para o time dela.
+
+Vale o registro do método: esse defeito não apareceu em nenhuma suíte verde.
+Apareceu porque a fatia K obriga a rodar a prova dupla da D18 de ponta a ponta,
+com o banco do zero e o `restart` de verdade. Duas das minhas primeiras
+medições ali foram vermelhos do MEDIDOR, não do produto (perguntei por uma rota
+de agendamentos que nunca existiu e li o time de uma chave errada do
+localStorage) — e distinguir os dois é o trabalho.
+
+**Validação visual**: os dois temas, com asserção sobre `data-tema`, e a régua
+da fatia medida na tela (o caminho tem cinco passos; o "Confirme" está dentro
+dele; os quinze continuam lá). A chamada de cada seção saiu de `--texto-mudo`
+para `--texto-fraco`: o mudo dava ~3,5:1 no tema escuro, e ela DIZ a pergunta
+que a seção responde — quem hierarquiza é o título, não o apagamento.
