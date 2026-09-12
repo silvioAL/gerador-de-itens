@@ -1814,8 +1814,16 @@ export const apiExecucaoDeFluxo = {
       method: "POST",
       body: JSON.stringify({}),
     }),
-  /** As execuções persistidas de um fluxo — é onde a suspensa sobrevive a F5. */
-  execucoes: (fluxoId: string) =>
+  /**
+   * As execuções persistidas de um fluxo — é onde a suspensa sobrevive a F5.
+   *
+   * **Com o time**, e não por precaução: os fluxos de FÁBRICA têm o mesmo id em
+   * todo time (`ensaio-de-cenarios` existe para todos), então sem o recorte o
+   * canvas de um time mostrava execução de outro. O servidor já recusa o que
+   * não é da pessoa; mandar o time faz o histórico bater com o desenho que
+   * está na tela, em vez de somar todos os times dela.
+   */
+  execucoes: (fluxoId: string, timeId?: string) =>
     requisitar<{
       execucoes: {
         id: string;
@@ -1825,7 +1833,7 @@ export const apiExecucaoDeFluxo = {
         nos: RastroDoNoExecutado[];
         saidas: Record<string, Record<string, unknown>> | null;
       }[];
-    }>(`/fluxos/${encodeURIComponent(fluxoId)}/execucoes`),
+    }>(`/fluxos/${encodeURIComponent(fluxoId)}/execucoes${timeId ? `?timeId=${encodeURIComponent(timeId)}` : ""}`),
 };
 
 /**

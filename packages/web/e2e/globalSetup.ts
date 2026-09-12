@@ -179,6 +179,9 @@ export default async function globalSetup() {
       // para ele; escrever o documento de fluxos de um time compartilhado
       // apagaria o desenho de quem roda ao lado.
       "time-e2e-webhook",
+      // Correção do vazamento entre times: este spec PRECISA de um time em que
+      // a pessoa não seja nada no outro — é a condição do defeito relatado.
+      "time-e2e-vazamento",
     ];
     // Ninguém ALÉM deste e-mail pertence a estes times. Sem esta linha, uma
     // rodada antiga que os pendurou noutro usuário deixa a lista dele maior

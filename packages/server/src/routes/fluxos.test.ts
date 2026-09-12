@@ -290,7 +290,16 @@ describe("SPEC-105 fatia D — POST /fluxos/:id/executar", () => {
       await app.inject({ method: "PUT", url: "/config/fluxos", cookies, payload: { documento: { fluxos: [FLUXO_JMETER] } } });
       await app.inject({ method: "POST", url: "/fluxos/jmx/executar", cookies, payload: {} });
 
-      const r = await app.inject({ method: "GET", url: "/fluxos/execucoes/ultimas" });
+      /**
+       * **Com sessão — e isto MUDOU de propósito.**
+       *
+       * A rota subiu sem `preHandler` nenhum, e este teste a chamava sem
+       * cookie: qualquer um na internet listava os fluxos de uma instalação e
+       * quando cada um rodou. O corpo é moldado (só saúde), o que limita o
+       * estrago mas não o justifica. A prova de que ela agora recusa quem não
+       * tem sessão mora em `vazamentoEntreTimes.test.ts`.
+       */
+      const r = await app.inject({ method: "GET", url: "/fluxos/execucoes/ultimas", cookies });
       expect(r.statusCode).toBe(200);
       const { ultimas } = r.json() as { ultimas: { fluxoId: string; ok: boolean; noComFalha?: string; erro?: string }[] };
       const doJmx = ultimas.find((u) => u.fluxoId === "jmx");
