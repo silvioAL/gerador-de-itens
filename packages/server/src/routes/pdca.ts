@@ -18,6 +18,8 @@ import {
   type DependenciasDoAjuste,
 } from "../pdca/ajustes.js";
 import { exigirSessao } from "../auth/middleware.js";
+// Correcao do vazamento entre times: a regua de visibilidade, com nome.
+import { timesVisiveis, visivelPara } from "../auth/visibilidade.js";
 import { exigirPermissao, organizacaoPadraoDe, SECOES_DE_REGRAS, type Recurso } from "../auth/permissoes.js";
 import { ALVO_CONFLITO_CONFIG, configDocumentos, pdcaFeedback, pdcaUsos, quebras, solicitacoesAjuste, produtos } from "../db/schema.js";
 import {
@@ -250,9 +252,25 @@ export async function registrarRotasPdca(app: FastifyInstance, { db, diretorioCo
    * a pessoa escreveu no agente entrava no banco e ninguém via nunca (foi o
    * relato: "não vi nenhuma ação na aplicação"). Leitura aberta a qualquer
    * sessão: o ciclo de melhoria é do time, não de quem administra.
+   *
+   * **"Aberta a qualquer sessão" nunca quis dizer "de qualquer time"** — e era
+   * isso que ela fazia. Um `select` sem recorte devolvia o feedback de todo
+   * mundo, e o efeito apareceu num lugar improvável: o balão do assistente
+   * ("Tem 1 feedback do time esperando") acendia por causa de um feedback de
+   * OUTRO time, e chegou a cobrir o botão de um teste sem relação nenhuma.
+   * Quando o vazamento incomoda a suíte antes de incomodar a pessoa, é sorte —
+   * não desenho.
+   *
+   * O recorte é o mesmo do `GET /pdca/metricas` (§273), agora com nome
+   * (`visivelPara`): sem time é da organização e todo mundo vê; com time, só
+   * quem é dele. Duas listagens com regras diferentes fariam a métrica contar
+   * o que a tela não mostra.
    */
-  app.get("/pdca/feedback", { preHandler: exigirSessao }, async () => {
-    return db.select().from(pdcaFeedback).orderBy(desc(pdcaFeedback.criadoEm));
+  app.get("/pdca/feedback", { preHandler: exigirSessao }, async (req) => {
+    const { timeId } = req.query as { timeId?: string };
+    const visiveis = timesVisiveis(req, timeId);
+    const todos = await db.select().from(pdcaFeedback).orderBy(desc(pdcaFeedback.criadoEm));
+    return todos.filter((f) => visivelPara(visiveis, f.timeId));
   });
 
   /** Descartar também é decidir — o estado fica registrado, não some. */

@@ -811,7 +811,9 @@ export function FluxoScreen({
   useEffect(() => {
     if (!fluxoId || fluxoId === "fluxo-1") return;
     void apiExecucaoDeFluxo
-      .execucoes(fluxoId)
+      // O histórico é o do time que está na tela: os fluxos de fábrica têm o
+      // mesmo id em todo time, e sem o recorte o canvas de um mostrava o outro.
+      .execucoes(fluxoId, timeAtivo)
       .then(({ execucoes }) => {
         const pendente = execucoes[0];
         // SPEC-110 fatia B — a execução parada numa TELA também reaparece: é
@@ -844,7 +846,9 @@ export function FluxoScreen({
         });
       })
       .catch(() => undefined);
-  }, [fluxoId]);
+    // `timeAtivo` entra nas dependências porque ele agora RECORTA a resposta:
+    // trocar de time sem re-perguntar deixaria na tela o histórico do anterior.
+  }, [fluxoId, timeAtivo]);
 
   /** SPEC-107 fatia D — o que cada evento do stream faz na tela: o nó que
    * começou pulsa, o texto do agente cresce, o que terminou entra no rastro. */

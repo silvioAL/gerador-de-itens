@@ -65,6 +65,9 @@ import { executarConector } from "../adaptadores/executorDeConector.js";
 import { executarConsulta } from "../adaptadores/executorDeConsulta.js";
 import { criarCofreInfisical, opcoesDoAmbiente } from "../adaptadores/cofreInfisical.js";
 import { exigirNivel, maiorNivel, nivelNoTime } from "../auth/niveis.js";
+// Correcao do vazamento entre times: o portao por time e a regua de visibilidade.
+import { exigirTime } from "../auth/middleware.js";
+import { execucaoVisivelPara, timesVisiveis } from "../auth/visibilidade.js";
 import { organizacaoPadraoDe, podePermissao, recursosCurados, resolverPermissoes, SECOES_DE_REGRAS, type Recurso } from "../auth/permissoes.js";
 import { registrarAuditoria } from "../auditoria.js";
 import { catalogoDeConectores } from "../config/catalogoDeConectores.js";
@@ -281,11 +284,24 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
    * só estados (nunca o erro inteiro nem saídas), pela mesma régua de
    * `/ia/execucoes` — aberta porque responde "o maquinário está de pé?".
    */
-  app.get("/fluxos/execucoes/ultimas", async () => {
-    const linhas = await db
+  /**
+   * **Exige sessão — e isto foi um conserto, não um detalhe de nascença.**
+   *
+   * A rota subiu SEM `preHandler` nenhum: qualquer um na internet listava os
+   * fluxos de uma instalação e quando cada um rodou. O corpo é moldado (só
+   * saúde, sem payload), o que limita o estrago mas não o justifica — "quais
+   * automações esta empresa tem" já é informação de quem está lá dentro.
+   */
+  app.get("/fluxos/execucoes/ultimas", { preHandler: exigirSessao }, async (req) => {
+    const { timeId } = req.query as { timeId?: string };
+    const visiveis = timesVisiveis(req, timeId);
+    const todas = await db
       .selectDistinctOn([fluxoExecucoes.fluxoId])
       .from(fluxoExecucoes)
       .orderBy(fluxoExecucoes.fluxoId, desc(fluxoExecucoes.em));
+    // O mesmo recorte da listagem por fluxo: a saúde que a tela mostra é a dos
+    // times da pessoa, senão o selo "falhou" de um time apareceria noutro.
+    const linhas = todas.filter((l) => execucaoVisivelPara(visiveis, req.usuario!.email, l, timeId));
     return {
       ultimas: linhas.map((linha) => {
         const nos = linha.nos as RastroDoNo[];
@@ -1306,7 +1322,36 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
    * com as entradas. Nenhum executor de nó é chamado — os concluídos são
    * pulados e o laço quebra na tela. É sondagem, não execução.
    */
-  app.get("/fluxos/execucoes/:id/tela", { preHandler: exigirSessao }, async (req, reply) => {
+  /**
+   * SPEC-51 — **o cadeado na PORTA, não no clique.**
+   *
+   * Esta rota pedia só sessão, e quem não era do time abria a tela, via o dado
+   * e só descobria o limite ao clicar em Avançar ou Retornar — que recusavam,
+   * corretamente, deixando a pessoa num beco: nenhum dos dois caminhos de sair
+   * funcionava. Relato real, e o defeito é duplo (mostra o que não devia E
+   * prende quem entrou).
+   *
+   * `exigirTime` resolve o time PELA EXECUÇÃO, não pelo corpo: quem chega aqui
+   * traz só um id na URL, e deixar o chamador dizer de que time ele é seria
+   * pedir a senha a quem se quer autenticar.
+   */
+  app.get(
+    "/fluxos/execucoes/:id/tela",
+    {
+      preHandler: exigirTime(async (req) => {
+        const { id } = req.params as { id: string };
+        const [execucao] = await db
+          .select({ timeId: fluxoExecucoes.timeId })
+          .from(fluxoExecucoes)
+          .where(eq(fluxoExecucoes.id, id))
+          .limit(1);
+        // Execução inexistente cai no handler, que responde 404 — negar por
+        // TIME aqui contaria que ela existe.
+        if (!execucao) return null;
+        return execucao.timeId === CAMPO_GLOBAL ? null : execucao.timeId;
+      }),
+    },
+    async (req, reply) => {
     const { id } = req.params as { id: string };
     const email = req.usuario!.email;
 
@@ -1398,7 +1443,8 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
       },
       entradas: parada.aguardandoTela.entradas,
     };
-  });
+    }
+  );
 
   /**
    * SPEC-110 fatia B (D2) — **Retornar: a execução acaba aqui.**
@@ -1722,12 +1768,29 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
   /** O rastro das últimas execuções — é o que torna o fluxo diagnosticável. */
   app.get("/fluxos/:id/execucoes", { preHandler: exigirSessao }, async (req) => {
     const { id } = req.params as { id: string };
+    const { timeId } = req.query as { timeId?: string };
+    /**
+     * **O recorte por TIME, e por que ele faltava doer tanto.**
+     *
+     * Esta rota devolvia a LINHA INTEIRA — rastro com texto de agente, saídas,
+     * o que a demanda tinha dentro — filtrando só por `fluxoId`. E os fluxos de
+     * FÁBRICA têm o mesmo id em todo time: quem abrisse `ensaio-de-cenarios`
+     * pelo time dele via as execuções de todos os outros. Relato real: uma
+     * pessoa clicou em "abrir →" numa execução suspensa que não era do time
+     * dela, caiu na tela e ficou presa — os dois botões recusavam por falta de
+     * nível, corretamente, mas ela já estava vendo dado alheio.
+     *
+     * O `limit` vem DEPOIS do filtro de propósito: cortar 20 e então filtrar
+     * devolveria menos linhas do que existem para o time, e o histórico
+     * mentiria por omissão em vez de por excesso.
+     */
+    const visiveis = timesVisiveis(req, timeId);
     const linhas = await db
       .select()
       .from(fluxoExecucoes)
       .where(eq(fluxoExecucoes.fluxoId, id))
-      .orderBy(desc(fluxoExecucoes.em))
-      .limit(20);
-    return { execucoes: linhas };
+      .orderBy(desc(fluxoExecucoes.em));
+    const email = req.usuario!.email;
+    return { execucoes: linhas.filter((l) => execucaoVisivelPara(visiveis, email, l, timeId)).slice(0, 20) };
   });
 }

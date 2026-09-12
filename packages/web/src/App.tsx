@@ -2289,6 +2289,9 @@ function AppCarregado({
           aoAbrirTela={(id) => navegar({ tela: "config", area: "telas", ...(id ? { telaId: id } : {}) })}
           aoAbrirConfig={(area) => navegar({ tela: "config", area: area as never })}
           aoFechar={() => navegar({ tela: "canvas" })}
+          // O motivo de ter sido devolvido para cá (ex.: a execução é de outro
+          // time) — sem ele, o desvio é silencioso.
+          avisoDeChegada={erroDoStage}
         />
       )}
       {mostrarFluxos && (

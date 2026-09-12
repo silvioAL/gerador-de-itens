@@ -91,6 +91,7 @@ export function GaleriaDeFluxos({
   aoAbrirTela,
   aoAbrirConfig,
   aoFechar,
+  avisoDeChegada,
 }: {
   timeAtivo?: string;
   aoAbrirFluxo: (id: string) => void;
@@ -98,6 +99,15 @@ export function GaleriaDeFluxos({
   /** A porta do "nasce de:" — leva à tela que gera o derivado (D16b). */
   aoAbrirConfig: (area: string) => void;
   aoFechar: () => void;
+  /**
+   * **Por que alguém chegou aqui sem pedir.**
+   *
+   * Quem abre o link de uma execução que não pode ver é devolvido para cá — e
+   * era devolvido em SILÊNCIO: a pessoa clicava num link e a tela simplesmente
+   * mudava, sem dizer nada. "Cliquei e não aconteceu nada" é a queixa que a
+   * §2.4-3 manda evitar: o desvio carrega o motivo.
+   */
+  avisoDeChegada?: string | null;
 }) {
   const [fluxos, setFluxos] = useState<FluxoEmVigor[] | null>(null);
   const [telas, setTelas] = useState<TelaDeclarada[]>([]);
@@ -269,6 +279,11 @@ export function GaleriaDeFluxos({
         </button>
       </div>
 
+      {avisoDeChegada && (
+        <div data-testid="aviso-de-chegada" style={{ color: "var(--amarelo)", fontSize: 12.5, marginBottom: 10 }}>
+          {avisoDeChegada}
+        </div>
+      )}
       {erro && (
         <div data-testid="erro-da-galeria" style={{ color: "var(--vermelho)", fontSize: 12.5, marginBottom: 10 }}>
           {erro}

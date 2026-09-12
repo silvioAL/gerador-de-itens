@@ -18163,3 +18163,51 @@ próprio produto; validação visual nos dois temas com asserção sobre `data-t
 (cartão em rótulo curto, 190px; âmbar do aviso legível nos dois fundos; endereço
 absoluto e copiável). D19: o "Como usar" ganhou o passo do webhook e o tour
 passou a nomear as TRÊS respostas para "quando".
+
+## §402 — O vazamento entre times: quatro rotas com o mesmo esquecimento
+
+**Veio de um relato, não de uma auditoria.** A pessoa abriu o fluxo de ensaio
+pelo time dela, o canvas listou uma execução suspensa, ela clicou em "abrir →" e
+caiu numa tela cujos dois botões recusavam: *"retornar esta execução exige nível
+operar no time time-pagamentos — seu nível é nenhum"*. Sem avançar e sem
+retornar.
+
+**A recusa estava certa. Errado era tudo antes dela.** A execução era de outro
+time e nunca deveria ter sido oferecida: `ensaio-de-cenarios` é fluxo de FÁBRICA
+— existe com o mesmo id em todo time — e a listagem filtrava só por `fluxoId`.
+O que a pessoa encontrou como "beco sem saída" era a ponta visível de um
+vazamento: o histórico devolvia a LINHA INTEIRA (rastro com texto de agente,
+saídas, dados da demanda) de qualquer time, para qualquer sessão.
+
+Medindo em volta, eram **quatro** rotas com o mesmo esquecimento — `exigirSessao`
+e nada mais, cada uma escrita numa fatia diferente:
+
+| Rota | O que vazava |
+|---|---|
+| `GET /fluxos/:id/execucoes` | linhas inteiras de qualquer time |
+| `GET /fluxos/execucoes/:id/tela` | o stage de outro time, renderizado |
+| `GET /pdca/feedback` | todos os feedbacks, de qualquer time |
+| `GET /fluxos/execucoes/ultimas` | **sem sessão nenhuma** — público |
+
+O padrão certo já existia (`GET /pdca/metricas` recorta assim desde a §273): o
+que faltava era ele ter NOME. Agora tem — `timesVisiveis`/`visivelPara` em
+`auth/visibilidade.ts` —, para a quinta rota nascer certa em vez de repetir a
+distração. E o stage passou a usar `exigirTime` resolvendo o time PELA EXECUÇÃO:
+cadeado na porta, não no clique (SPEC-51).
+
+**A distinção que o conserto obrigou a fazer: política ≠ evento.** A primeira
+versão tratava "sem time" como "da organização, todo mundo vê" — o que é certo
+para configuração e feedback (um pedido de ajuste sem time é da casa). Aplicada a
+EXECUÇÃO, ela reabria o vazamento: o E2E mostrou dez ensaios suspensos gravados
+em `__global__` aparecendo para qualquer sessão. Execução não é política — é o
+registro de que alguém rodou algo. Sem time, ela é de quem a disparou, e é isso
+que `execucaoVisivelPara` diz.
+
+**E o desvio deixou de ser mudo.** Quem abre o link de uma execução que não pode
+ver é devolvido à galeria — antes, em silêncio ("cliquei e não aconteceu nada");
+agora com o motivo à vista.
+
+**Provas**: 9 de rota (uma por buraco, mais o furo do global), 7 sabotagens §248
+(`scripts/sabotagens-vazamento.mjs`), e um E2E que entra como um time, tenta ver
+a execução de outro e prova as duas metades — o convite "abrir →" some da tela, e
+o link direto é recusado com o motivo.
