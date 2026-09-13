@@ -1,8 +1,10 @@
 # SPEC-111 — Screens standalone e o caminho de app builder assistido
 
-> **Status: REGISTRADA, não detalhada.** Depende da SPEC-110 (fatias B, C e
-> H) implementada — as decisões finas daqui devem ser tomadas COM as lições
-> daquelas fatias na mão, não antes. Registrada a pedido do usuário, e
+> **Status: DETALHADA na §6, com a SPEC-110 inteira (A–L) na main.** As
+> decisões finas foram tomadas com as lições daquelas fatias na mão, como esta
+> SPEC mandava — e a principal delas é que o standalone praticamente já existe:
+> a medição contra o código mostrou que ele não precisa de motor, de rota nem
+> de tabela. Ver §6. Registrada a pedido do usuário, e
 > REVISADA por ele: *"eu acredito que deveria sim funcionar como appbuilder
 > low code/no code, e que deveria funcionar com apoio do assistente"* — a
 > fronteira antiga ("não é um app builder") caiu; virou o norte, por
@@ -81,3 +83,76 @@ assistente-construtor podem vir em fatias separadas (o standalone é menor;
 o assistente-construtor pede medição da infra de proposta da conversa
 antes de detalhar). Configurações nas devidas bases e apresentação no
 "Como usar" seguem as regras D18/D19 da 110.
+
+## 6. O detalhamento (feito com a SPEC-110 A–L na main)
+
+### 6.1 A medição que mudou o tamanho da fatia
+
+Antes de desenhar, medi contra a main `8ffe8e7`:
+
+| Peça de que o standalone precisa | Onde já está |
+|---|---|
+| `TelaDeclarada` com `texto`/`dado`/`campo`/`acao` | `aplicacao/src/config/telas.ts` (110-C) |
+| Renderizador de blocos + trava do obrigatório | `web/src/fluxo/RenderizadorDaTela.tsx` |
+| Execução que PARA numa tela e sobrevive a F5 | `aguardando-tela` (110-B) |
+| Avançar / Retornar, com a saída da tela | `POST /fluxos/execucoes/:id/continuar` e `.../retornar` |
+| Endereço mandável da tela em curso | `#/tela/<execucaoId>` |
+| Recorte por time e cadeado na porta | §402 |
+| Card da tela, com ícone e nome | galeria (110-H) |
+
+**Conclusão: o standalone não precisa de motor, nem de rota, nem de tabela.**
+O que falta é um FLUXO — e ele pode ser derivado, como a esteira e a jornada
+já são.
+
+### 6.2 D1 — o fluxo implícito de um nó, DERIVADO
+
+Cada tela declarada deriva um fluxo de um nó só (`tela-standalone:<id>`),
+`origem: "fabrica"`, marcado `implicito: true`. Abrir a tela sozinha é
+EXECUTAR esse fluxo pelo endpoint que já existe: ele para na tela no primeiro
+nó, e daí em diante é a mecânica da 110-B inteira, sem nada novo.
+
+Três consequências que valem por si:
+
+- **a permissão vem de graça e é a certa**: `POST /fluxos/:id/executar` já exige
+  nível `operar` no time (`exigirNivel`), e o stage já tem o cadeado na porta
+  (§402). Abrir uma tela é criar execução — é operar;
+- **o histórico vem de graça**: cada abertura é uma linha em `fluxo_execucoes`,
+  com quem abriu e quando, recortada por time;
+- **o link mandável vem de graça**: `#/tela/<execucaoId>` continua sendo o
+  endereço da execução em curso. Quem manda o link manda a SESSÃO de trabalho,
+  não a tela em branco.
+
+O implícito **não aparece na seção de fluxos da galeria**: o card da tela já
+está lá, e mostrar os dois seria a mesma coisa duas vezes — a queixa M9 da
+SPEC-110, repetida noutro lugar.
+
+### 6.3 D2 — o gesto e o endereço
+
+O card da tela na galeria ganha **"abrir →"** ao lado de editar (hoje o card
+inteiro leva ao editor). O endereço de abrir é `#/tela/s/<telaId>`: ele CRIA a
+execução e redireciona para `#/tela/<execucaoId>`. Dois endereços porque são
+duas coisas — "abra uma nova" e "continue esta".
+
+### 6.4 D3 — permissão (a pergunta que a §3 deixou aberta)
+
+**Sessão obrigatória, e a pessoa tem de pertencer ao time da tela.** Herdado do
+`exigirNivel` do executar e do `exigirTime` do stage, sem regra nova. Link
+público continua fora (§4), e afrouxar aqui reabriria exatamente o vazamento
+que a §402 acabou de fechar.
+
+### 6.5 D4 — v1 sem destino: o Avançar grava, e a tela DIZ isso
+
+A §3 prevê `aoAvancar` apontando um componente de efeito ou disparando um
+fluxo. Isso é a fatia B desta SPEC. Na fatia A, avançar **registra a resposta no
+histórico da execução** — e a tela avisa antes, com todas as letras, que é só
+isso que vai acontecer. É o que a própria §3 manda: *"Sem destino, o Avançar
+grava só o histórico — e a tela DIZ isso, não finge entrega."*
+
+### 6.6 As fatias
+
+- **A — standalone** (esta): o fluxo implícito, o gesto na galeria, o endereço,
+  o aviso de "sem destino". D18/D19 como sempre.
+- **B — o destino do Avançar** (`aoAvancar`): componente de efeito ou o gatilho
+  `screen` da 110-D1. Pede o par screen→fluxo desenhado com cuidado.
+- **C — o assistente-construtor**: pede MEDIR a infra de proposta da conversa
+  (o ✦ da mesa, o `SugerirComIa`) antes de detalhar — como a §5 já dizia.

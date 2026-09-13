@@ -10,7 +10,7 @@ import { analisarCaminho } from "./caminho.js";
 import { problemaNoCron } from "./cron.js";
 // SPEC-110 fatia F — o no de dados deixou de ter um refId so.
 import { REF_DA_DEMANDA_GRAVAR, REF_DA_DEMANDA_LER, REFS_DE_DADOS } from "./projeto.js";
-import { TELAS_DO_SISTEMA, telaDoSistema } from "./telas.js";
+import { TELAS_DO_SISTEMA, normalizarTelas, refIdDaTelaDeclarada, telaDoSistema } from "./telas.js";
 import {
   ConfigInvalida,
   destinosDaOperacao,
@@ -377,6 +377,15 @@ export interface FluxoEmVigor extends Fluxo {
    * usa o selo para avisar e oferecer o caminho de volta.
    */
   sombreiaFabrica?: boolean;
+  /**
+   * SPEC-111 A — este fluxo NÃO foi desenhado por ninguém: ele existe porque
+   * uma tela declarada existe, para que abri-la sozinha seja executar algo.
+   *
+   * A galeria o esconde da seção de fluxos: o card da TELA já está lá, e
+   * mostrar os dois seria o mesmo componente duas vezes — a queixa M9 da
+   * SPEC-110 renascendo noutro lugar.
+   */
+  implicito?: boolean;
 }
 
 /**
@@ -797,14 +806,62 @@ export function fluxoDaJornada(etapas: FluxoEmVigor[]): FluxoEmVigor | null {
   return { id: ID_DO_FLUXO_DA_JORNADA, icone: "🧭", nome: "Jornada da demanda", nos, arestas, origem: "fabrica" };
 }
 
+/**
+ * SPEC-111 A — **a tela sozinha é um FLUXO DE UM NÓ.**
+ *
+ * A SPEC-111 §3 previu "standalone = fluxo implícito de um nó", e a medição
+ * contra a 110 pronta confirmou que era literal: com o nó de tela sendo o
+ * primeiro do plano, a execução para NELE (110-B), o stage serve o conteúdo, o
+ * Avançar e o Retornar já existem, o histórico já registra quem abriu, e o
+ * recorte por time já é o da §402. Não sobra motor para escrever — sobra um
+ * fluxo para derivar.
+ *
+ * O prefixo separa o id do implícito de qualquer id que uma pessoa consiga
+ * escrever — e `validarEscritaFluxos` o RESERVA explicitamente, recusando
+ * quem tentar. Escrevi "impossível" aqui antes de ser verdade, e a prova
+ * cobrou: a recusa nasceu dessa cobrança.
+ */
+export const PREFIXO_DO_FLUXO_DA_TELA = "tela-standalone:";
+
+export function idDoFluxoDaTela(telaId: string): string {
+  return `${PREFIXO_DO_FLUXO_DA_TELA}${telaId}`;
+}
+
+/** O id da TELA de volta, ou `null` se o fluxo não for um implícito. */
+export function telaDoFluxoImplicito(fluxoId: string): string | null {
+  return fluxoId.startsWith(PREFIXO_DO_FLUXO_DA_TELA) ? fluxoId.slice(PREFIXO_DO_FLUXO_DA_TELA.length) : null;
+}
+
+export function telasStandalone(documentoTelas: unknown): FluxoEmVigor[] {
+  return normalizarTelas(documentoTelas).telas.map((tela) => ({
+    id: idDoFluxoDaTela(tela.id),
+    ...(tela.icone ? { icone: tela.icone } : {}),
+    nome: tela.nome,
+    /**
+     * UM nó, e ele é a tela. Sem gatilho de propósito: o gatilho responde
+     * "quando isto roda?", e a resposta aqui é "quando alguém abre a tela" —
+     * que é o próprio gesto, não um cartão a mais para a pessoa entender.
+     */
+    nos: [{ id: "tela", tipo: "tela", refId: refIdDaTelaDeclarada(tela.id), posicao: { x: 80, y: 120 }, parametros: {} }],
+    arestas: [],
+    origem: "fabrica",
+    implicito: true,
+  }));
+}
+
 /** Declarados + as derivadas: a esteira (dos papéis), a exportação (do
  * destino de itens), a publicação (por destino de documento), o ensaio
- * (sempre), o PDCA (dos papéis) e a jornada (das etapas acima). Declarado
- * vence fábrica no mesmo id. */
+ * (sempre), o PDCA (dos papéis), a jornada (das etapas acima) e um fluxo
+ * implícito por tela declarada (SPEC-111 A). Declarado vence fábrica no mesmo
+ * id. */
 export function fluxosEmVigor(
   papeis: PapelConfigurado[],
   documentoFluxos: unknown,
-  configExportador?: ConfigExportador
+  configExportador?: ConfigExportador,
+  /** SPEC-111 A — o documento de TELAS, para derivar o fluxo implícito de cada
+   * tela declarada. Ausente é legítimo: quem não passa telas não ganha os
+   * implícitos, e nada mais muda. */
+  documentoTelas?: unknown
 ): FluxoEmVigor[] {
   const etapas: FluxoEmVigor[] = [
     fluxoDaEsteira(papeis),
@@ -826,6 +883,17 @@ export function fluxosEmVigor(
   for (const fabrica of fabricas) {
     if (!declarados.some((f) => f.id === fabrica.id)) declarados.push(fabrica);
   }
+
+  /**
+   * SPEC-111 A — **os implícitos vêm por último, e não disputam id com
+   * ninguém.**
+   *
+   * O prefixo (`tela-standalone:`) é RESERVADO pela validação de escrita, que
+   * recusa nomeando quem tentar usá-lo. Vir por último é o que os mantém
+   * invisíveis à regra "declarado vence fábrica" — eles não sombreiam nada, e
+   * nada os sombreia.
+   */
+  for (const tela of telasStandalone(documentoTelas)) declarados.push(tela);
   return declarados;
 }
 
@@ -841,6 +909,21 @@ export function validarEscritaFluxos(documento: unknown): void {
     const id = typeof f?.id === "string" ? f.id.trim() : "";
     if (!id) throw new ConfigInvalida(`o fluxo na posição ${posicao} está sem "id" — seria descartado em silêncio ao salvar`);
     if (vistos.has(id)) throw new ConfigInvalida(`há dois fluxos com o id "${id}" — o segundo seria descartado em silêncio ao salvar`);
+    /**
+     * SPEC-111 A — o prefixo dos fluxos IMPLÍCITOS é reservado.
+     *
+     * Cada tela declarada deriva um fluxo `tela-standalone:<id>`, e um
+     * declarado com esse id disputaria com ele: a regra "declarado vence
+     * fábrica" faria o desenho de alguém substituir a tela sozinha, em
+     * silêncio. Recusar na escrita é o que torna a colisão impossível em vez
+     * de improvável — e eu escrevi "impossível" num comentário ANTES de ser
+     * verdade; a prova cobrou.
+     */
+    if (id.startsWith(PREFIXO_DO_FLUXO_DA_TELA)) {
+      throw new ConfigInvalida(
+        `o fluxo "${id}" usa um prefixo reservado ("${PREFIXO_DO_FLUXO_DA_TELA}") — ele nomeia os fluxos que as telas do time derivam sozinhas`
+      );
+    }
     vistos.add(id);
 
     const nosVistos = new Set<string>();

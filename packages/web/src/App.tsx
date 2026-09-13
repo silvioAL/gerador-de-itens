@@ -91,7 +91,14 @@ import { BancadaDeEnsaios, type LeituraDoEnsaio } from "./fluxo/BancadaDeEnsaios
 import { idDaRegraDeForma } from "./config/FormaDoDesenho";
 import { ConfigurarPanel } from "./assistente/ConfigurarPanel";
 import { JourneyModal, type AbaJornada } from "./demo/JourneyModal";
-import { contextoDoProdutoEmTexto, ID_DO_FLUXO_DA_ESTEIRA, ID_DO_FLUXO_DO_ENSAIO } from "@gerador/aplicacao";
+import {
+  contextoDoProdutoEmTexto,
+  ID_DO_FLUXO_DA_ESTEIRA,
+  ID_DO_FLUXO_DO_ENSAIO,
+  // SPEC-111 A — o fluxo implícito que faz a tela valer sozinha.
+  idDoFluxoDaTela,
+  PREFIXO_DO_FLUXO_DA_TELA,
+} from "@gerador/aplicacao";
 import { FluxoScreen } from "./fluxo/FluxoScreen";
 import { ConfigScreen, type AbaConfig } from "./config/ConfigScreen";
 import { TourOverlay } from "./demo/TourOverlay";
@@ -587,6 +594,41 @@ function AppCarregado({
       vivo = false;
     };
   }, [rota, navegar]);
+  /**
+   * SPEC-111 fatia A — **abrir uma tela sozinha é EXECUTAR o fluxo dela.**
+   *
+   * A tela declarada deriva um fluxo implícito de um nó (`tela-standalone:<id>`)
+   * que para nesse nó. Então `#/tela/s/<telaId>` não precisa de rota nova no
+   * servidor: ele dispara o executar de sempre e leva a pessoa para o stage da
+   * execução recém-criada — de onde tudo (renderizador, Avançar, Retornar,
+   * histórico, cadeado por time) já funciona desde a 110-B e a §402.
+   *
+   * O `replace` na navegação é o que impede o F5 de abrir uma segunda: depois
+   * do redirecionamento o endereço é o da EXECUÇÃO, e recarregar continua a
+   * mesma sessão de trabalho em vez de criar outra.
+   */
+  useEffect(() => {
+    if (rota.tela !== "abrirTela") return;
+    let vivo = true;
+    setErroDoStage(null);
+    void apiExecucaoDeFluxo
+      .executar(idDoFluxoDaTela(rota.telaId), timeAtivo)
+      .then((r) => {
+        if (!vivo) return;
+        navegar({ tela: "telaDoStage", execucaoId: r.execucaoId }, { substituir: true });
+      })
+      .catch((e) => {
+        if (!vivo) return;
+        // Tela apagada, sem permissão, time errado: o motivo vai para a
+        // galeria, que é de onde o gesto de abrir nasce (§2.4-3).
+        setErroDoStage(e instanceof Error ? e.message : String(e));
+        navegar({ tela: "fluxo" }, { substituir: true });
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [rota, navegar, timeAtivo]);
+
   const mostrarStageDaBancada = rota.tela === "telaDoStage" && stage?.tela.id === "bancada-de-ensaios";
   /**
    * SPEC-110 fatia C — a tela desenhada em BLOCOS é renderizada aqui.
@@ -1648,6 +1690,13 @@ function AppCarregado({
           // SPEC-110 fatia J — a tela pode morar num SUBFLUXO: a trilha diz
           // dentro de qual etapa a execucao parou.
           dentroDe={stage.dentroDe}
+          /**
+           * SPEC-111 A (D4) — só a moldura da tela DECLARADA leva este aviso:
+           * as telas do sistema (bancada, documento, mesa) não derivam fluxo
+           * implícito e nunca são abertas sozinhas. Pôr o aviso nas três seria
+           * prometer a quem não pode.
+           */
+          sozinha={stage.fluxoId.startsWith(PREFIXO_DO_FLUXO_DA_TELA)}
           nomeDaTela={stage.nomeDoNo ?? stage.tela.nome}
           ocupado={stageOcupado}
           erro={erroDoStage}
@@ -2287,6 +2336,8 @@ function AppCarregado({
           aoAbrirFluxo={(id) => navegar({ tela: "fluxo", fluxoId: id })}
           // Tela sem id = criar uma nova: o editor da fatia C já abre vazio.
           aoAbrirTela={(id) => navegar({ tela: "config", area: "telas", ...(id ? { telaId: id } : {}) })}
+          // SPEC-111 A — usar a tela é outro gesto: abre a execução dela.
+          aoUsarTela={(id) => navegar({ tela: "abrirTela", telaId: id })}
           aoAbrirConfig={(area) => navegar({ tela: "config", area: area as never })}
           aoFechar={() => navegar({ tela: "canvas" })}
           // O motivo de ter sido devolvido para cá (ex.: a execução é de outro

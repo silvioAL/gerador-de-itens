@@ -330,6 +330,11 @@ export {
   ID_DO_FLUXO_DA_JORNADA,
   IDS_DE_FABRICA,
   LIMITE_DE_ANINHAMENTO_DE_SUBFLUXO,
+  // SPEC-111 A — a tela que vale sozinha: o fluxo implicito de um no.
+  PREFIXO_DO_FLUXO_DA_TELA,
+  idDoFluxoDaTela,
+  telaDoFluxoImplicito,
+  telasStandalone,
   camposExternosDoFluxo,
   cicloEntreFluxos,
   contratoDoSubfluxo,

@@ -89,6 +89,7 @@ export function GaleriaDeFluxos({
   timeAtivo,
   aoAbrirFluxo,
   aoAbrirTela,
+  aoUsarTela,
   aoAbrirConfig,
   aoFechar,
   avisoDeChegada,
@@ -96,6 +97,8 @@ export function GaleriaDeFluxos({
   timeAtivo?: string;
   aoAbrirFluxo: (id: string) => void;
   aoAbrirTela: (id: string) => void;
+  /** SPEC-111 A — USAR a tela (abrir sozinha), distinto de editá-la. */
+  aoUsarTela: (id: string) => void;
   /** A porta do "nasce de:" — leva à tela que gera o derivado (D16b). */
   aoAbrirConfig: (area: string) => void;
   aoFechar: () => void;
@@ -156,9 +159,19 @@ export function GaleriaDeFluxos({
       .replace(/[̀-ͯ]/g, "");
 
   const filtrados = useMemo(() => {
+    /**
+     * SPEC-111 A — **os implícitos ficam de fora daqui.**
+     *
+     * Cada tela declarada deriva um fluxo de um nó para poder valer sozinha.
+     * Mostrá-lo na seção de FLUXOS poria o mesmo componente duas vezes na
+     * mesma tela — uma como fluxo, outra como tela —, que é exatamente a
+     * queixa M9 da SPEC-110 ("a mesma coisa duas vezes") renascendo num lugar
+     * novo. O card da tela é o dono do assunto, e é dele o botão de abrir.
+     */
+    const visiveis = (fluxos ?? []).filter((f) => !f.implicito);
     const alvo = normalizar(busca.trim());
-    if (!alvo) return fluxos ?? [];
-    return (fluxos ?? []).filter((f) =>
+    if (!alvo) return visiveis;
+    return visiveis.filter((f) =>
       [f.nome, f.id, f.origem === "fabrica" ? "derivado" : "declarado", origemDaFabrica(f.id).nasceDe].some((campo) =>
         normalizar(String(campo)).includes(alvo)
       )
@@ -171,9 +184,20 @@ export function GaleriaDeFluxos({
     return telas.filter((t) => [t.nome, t.id, "tela", "screen"].some((c) => normalizar(String(c)).includes(alvo)));
   }, [telas, busca]);
 
-  /** Em quantos fluxos esta tela é usada — o card responde "posso mexer?". */
+  /**
+   * Em quantos fluxos esta tela é usada — o card responde "posso mexer?".
+   *
+   * **O implícito não conta, e um E2E cobrou isso.** A SPEC-111 A faz cada tela
+   * derivar um fluxo de um nó que referencia ela mesma; sem esta exclusão o
+   * selo passou a dizer "usada em 2 fluxos" onde havia UM desenho de verdade.
+   * O selo existe para avisar quem vai editar que outros desenhos dependem
+   * daquilo — contar a si mesma o transforma num alarme falso, que é pior que
+   * alarme nenhum.
+   */
   const usosDaTela = (telaId: string) =>
-    (fluxos ?? []).filter((f) => f.nos.some((n) => n.tipo === "tela" && n.refId === `tela:${telaId}`)).length;
+    (fluxos ?? []).filter(
+      (f) => !f.implicito && f.nos.some((n) => n.tipo === "tela" && n.refId === `tela:${telaId}`)
+    ).length;
 
   const porEtapa = (etapa: Etapa) =>
     filtrados.filter((f) => (f.origem === "declarado" ? etapa === "meus" : origemDaFabrica(f.id).etapa === etapa));
@@ -460,6 +484,28 @@ export function GaleriaDeFluxos({
                     {t.icone || ICONE_PADRAO_DA_TELA}
                   </span>
                   <strong style={{ fontSize: 13 }}>{t.nome}</strong>
+                  <div style={{ flex: 1 }} />
+                  {/**
+                   * SPEC-111 fatia A — **usar a tela, e não só editá-la.**
+                   *
+                   * O card inteiro leva ao editor desde a 110-H, e era a única
+                   * coisa que ele fazia: a tela existia para ser fiada num
+                   * fluxo, nunca para valer sozinha. Este botão é a promessa da
+                   * SPEC-111 §2.1 virando gesto — e ele PARA a propagação
+                   * porque está dentro de um card clicável: sem isso, abrir
+                   * levaria ao editor no mesmo clique.
+                   */}
+                  <button
+                    data-testid={`abrir-tela-${t.id}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      aoUsarTela(t.id);
+                    }}
+                    style={{ ...botao, fontSize: 11, padding: "2px 8px" }}
+                    title="abrir esta tela para usar agora"
+                  >
+                    abrir →
+                  </button>
                 </div>
                 <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                   <span style={selo}>tela</span>

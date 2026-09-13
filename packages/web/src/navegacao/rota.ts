@@ -85,7 +85,9 @@ export type Rota =
    * coisas diferentes, e o link é mandável para quem revisa — a metade da
    * porta que o §2.4-3 cobra.
    */
-  | { tela: "telaDoStage"; execucaoId: string };
+  | { tela: "telaDoStage"; execucaoId: string }
+  /** SPEC-111 A — abrir uma tela declarada SOZINHA (cria a execução). */
+  | { tela: "abrirTela"; telaId: string };
 
 /**
  * ~~SPEC-84 fatia A — `{ tela: "spec" }`.~~ **§346 — a tela saiu.**
@@ -144,6 +146,8 @@ export function hashDaRota(rota: Rota): string {
   if (rota.tela === "documento") return "#/documento";
   // SPEC-110 B — o stage de uma tela é endereçado pela EXECUÇÃO.
   if (rota.tela === "telaDoStage") return `#/tela/${encodeURIComponent(rota.execucaoId)}`;
+  // SPEC-111 A — o endereço de ABRIR, distinto do de continuar.
+  if (rota.tela === "abrirTela") return `#/tela/s/${encodeURIComponent(rota.telaId)}`;
   if (rota.tela === "fluxo") {
     // SPEC-107 G5c — o canvas abre NUM fluxo: "assista a esteira rodando" é
     // uma URL mandável, como a bancada (§2.4-3, a metade da porta).
@@ -175,6 +179,21 @@ export function rotaDoHash(hash: string): Rota {
   // cai no canvas de fluxos, que é de onde as execuções nascem (§2.4-3 — link
   // torto nunca vira tela branca).
   if (partes[0] === "tela") {
+    /**
+     * SPEC-111 A — **`#/tela/s/<telaId>` ABRE a tela sozinha.**
+     *
+     * Dois endereços porque são duas coisas: `#/tela/<execucaoId>` continua
+     * sendo "continue ESTA sessão de trabalho" (110-B), e o `s/` é "abra uma
+     * nova". Confundi-los faria um link mandado a alguém ou reabrir a resposta
+     * de outra pessoa, ou criar execução a cada F5 — os dois errados.
+     *
+     * O `s` vem ANTES do id de propósito: um id de tela nunca é `s` sozinho
+     * (ele viria com o id junto), então o prefixo não rouba nenhum endereço
+     * que já funcionava.
+     */
+    if (partes[1] === "s") {
+      return partes[2] ? { tela: "abrirTela", telaId: decodeURIComponent(partes[2]) } : { tela: "fluxo" };
+    }
     return partes[1] ? { tela: "telaDoStage", execucaoId: decodeURIComponent(partes[1]) } : { tela: "fluxo" };
   }
   if (partes[0] === "fluxo") {
@@ -213,7 +232,10 @@ export function rotaDoHash(hash: string): Rota {
   return { tela: "canvas" };
 }
 
-export function useRotaHash(): { rota: Rota; navegar: (rota: Rota) => void } {
+export function useRotaHash(): {
+  rota: Rota;
+  navegar: (rota: Rota, opcoes?: { substituir?: boolean }) => void;
+} {
   const [rota, setRota] = useState<Rota>(() => rotaDoHash(window.location.hash));
 
   useEffect(() => {
@@ -222,9 +244,24 @@ export function useRotaHash(): { rota: Rota; navegar: (rota: Rota) => void } {
     return () => window.removeEventListener("hashchange", aoMudar);
   }, []);
 
-  const navegar = useCallback((nova: Rota) => {
+  /**
+   * SPEC-111 A — `substituir` troca o endereço SEM empilhar histórico.
+   *
+   * Existe para os endereços que AGEM ao serem abertos: `#/tela/s/<id>` cria
+   * uma execução e redireciona para ela. Empilhando, o "voltar" do navegador
+   * cairia de novo no endereço que cria — e a pessoa ganharia uma segunda
+   * execução por tentar voltar. Com `replaceState`, voltar sai de vez.
+   */
+  const navegar = useCallback((nova: Rota, opcoes?: { substituir?: boolean }) => {
     const hash = hashDaRota(nova);
     if (window.location.hash === hash) return;
+    if (opcoes?.substituir) {
+      window.history.replaceState(null, "", hash);
+      // `replaceState` NÃO dispara `hashchange`: sem este empurrão o estado
+      // ficaria na rota anterior e a tela não trocaria.
+      setRota(rotaDoHash(hash));
+      return;
+    }
     // O `hashchange` do browser atualiza o estado — uma fonte de verdade só.
     window.location.hash = hash;
   }, []);
