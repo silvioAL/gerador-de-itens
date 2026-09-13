@@ -18511,3 +18511,31 @@ com as telas incluídas), 385 testes de `aplicacao` inteiros continuando verdes,
 e o E2E reescrito provando as três coisas que R3 cobrava: a pausa move para a
 mesa, o ensaio some como `pulado` sem derrubar a esteira, e a esteira fecha
 `sucesso` sozinha.
+
+## §409 — SPEC-112 fatia D: a galeria mostra a relação nos dois sentidos
+
+**M5.** O card da tela dizia "usada em N fluxos" num `<span>` — não clicável —
+e o card do fluxo não dizia quais telas continha. A relação já existia no
+dado (o nó `tela:<id>` do desenho); só não se percorria na tela.
+
+**O que entrou**, os dois em popover/porta, no mesmo padrão de
+`ContagemComLista` (faixa de prontidão): `UsosDaTelaPorta` transforma o selo
+num botão — clicar lista os fluxos que usam a tela, cada um levando até ele
+(`aoAbrirFluxo`); `TelasDoFluxoLista` aparece no card do fluxo com uma porta
+por tela contida, levando ao editor dela (`aoAbrirTela`). Telas do SISTEMA
+(mesa, documento, bancada) ficam de fora da segunda: não moram na seção
+"Telas do time" e não têm editor para a porta levar.
+
+**Um efeito colateral pego pelo próprio E2E existente**: o selo virou botão
+com `stopPropagation()`, e um clique cego por COORDENADA no centro do card
+(`cardDaTela.click()`, o padrão de vários specs) passou a cair em cima do
+botão novo — o clique era engolido antes de chegar ao `onClick` do card, que
+abre o editor. Corrigido no teste, não no componente: cliques em elemento
+interativo aninhado precisam mirar o alvo (o título), não o centro cego do
+container — a régua que vale para qualquer card com filho clicável de agora
+em diante.
+
+**Provas**: o E2E de `galeria-de-fluxos.spec.ts` estendido prova as duas
+pontas no mesmo cenário — abrir a lista pela tela e chegar ao fluxo, abrir a
+porta pelo fluxo e chegar à tela — e os specs de fluxo mais amplos (funções,
+integração, PDCA, jornada) continuam verdes.

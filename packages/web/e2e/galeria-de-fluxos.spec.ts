@@ -175,7 +175,35 @@ test("a tela declarada aparece na galeria, com quantos fluxos a usam, e o clique
     // A pergunta que o card responde antes de alguém mexer: "posso editar?".
     await expect(page.getByTestId("usos-da-tela-aprovacao-galeria")).toContainText("usada em 1 fluxo");
 
-    await cardDaTela.click();
+    /**
+     * SPEC-112 fatia D (M5) — **a relação se PERCORRE nos dois sentidos.**
+     *
+     * "usada em N fluxos" deixa de ser um `<span>` mudo: clicar abre a lista
+     * dos fluxos, e cada um leva ATÉ ele. O card do FLUXO, por sua vez, diz
+     * quais telas contém — a metade que faltava.
+     */
+    await page.getByTestId("usos-da-tela-aprovacao-galeria").click();
+    const itemDoFluxo = page.getByTestId("usos-da-tela-aprovacao-galeria-usa-a-tela-e2e");
+    await expect(itemDoFluxo).toBeVisible();
+    await expect(itemDoFluxo).toContainText("Usa a tela");
+    await itemDoFluxo.click();
+    await expect(page).toHaveURL(/#\/fluxo\/usa-a-tela-e2e/);
+    await expect(page.getByTestId("fluxo-screen")).toBeVisible();
+
+    // ── E de volta: o card do FLUXO diz quais telas contém ──
+    await page.goto("/#/fluxo");
+    const cardDoFluxo = page.getByTestId("card-fluxo-usa-a-tela-e2e");
+    await expect(cardDoFluxo).toBeVisible();
+    const portaDaTela = cardDoFluxo.getByTestId("porta-da-tela-aprovacao-galeria");
+    await expect(portaDaTela).toContainText("Aprovação da galeria");
+    await portaDaTela.click();
+    await expect(page).toHaveURL(/#\/config\/telas/);
+
+    await page.goto("/#/fluxo");
+    // Clica no TÍTULO, não no centro do card: a porta nova de "usada em N
+    // fluxos" agora vive onde o clique cego por coordenada caía antes — o
+    // card continua abrindo o editor, só não mais em QUALQUER ponto dele.
+    await cardDaTela.getByText("Aprovação da galeria", { exact: true }).click();
     await expect(page).toHaveURL(/#\/config\/telas/);
   } finally {
     await page.request.put(`${API}/config/telas`, { data: { documento: telasOriginais, timeId: TIME } });

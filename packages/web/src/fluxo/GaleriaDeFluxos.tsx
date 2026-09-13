@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ID_DO_FLUXO_DA_ESTEIRA,
   // SPEC-110 fatia J — o fluxo-mestre, em destaque no topo da galeria.
@@ -194,10 +194,27 @@ export function GaleriaDeFluxos({
    * daquilo — contar a si mesma o transforma num alarme falso, que é pior que
    * alarme nenhum.
    */
-  const usosDaTela = (telaId: string) =>
-    (fluxos ?? []).filter(
-      (f) => !f.implicito && f.nos.some((n) => n.tipo === "tela" && n.refId === `tela:${telaId}`)
-    ).length;
+  /**
+   * SPEC-112 fatia D (M5) — a relação nos DOIS sentidos, não só a contagem.
+   *
+   * "usada em N fluxos" respondia "posso mexer?" mas não deixava PERCORRER a
+   * resposta: o `<span>` não era clicável, e o card do fluxo não dizia quais
+   * telas contém. A relação já existia no dado (o nó `tela:<id>`) — o que
+   * faltava era a porta, não um campo novo.
+   */
+  const fluxosQueUsamATela = (telaId: string) =>
+    (fluxos ?? []).filter((f) => !f.implicito && f.nos.some((n) => n.tipo === "tela" && n.refId === `tela:${telaId}`));
+  const usosDaTela = (telaId: string) => fluxosQueUsamATela(telaId).length;
+
+  /** As telas DECLARADAS que este fluxo referencia — as do SISTEMA (mesa,
+   * documento, bancada) ficam de fora: não moram na seção "Telas do time" e
+   * não têm editor para a porta levar. */
+  const telasDoFluxo = (f: FluxoEmVigor): TelaDeclarada[] => {
+    const ids = new Set(
+      f.nos.filter((n) => n.tipo === "tela" && n.refId.startsWith("tela:")).map((n) => n.refId.slice("tela:".length))
+    );
+    return telas.filter((t) => ids.has(t.id));
+  };
 
   const porEtapa = (etapa: Etapa) =>
     filtrados.filter((f) => (f.origem === "declarado" ? etapa === "meus" : origemDaFabrica(f.id).etapa === etapa));
@@ -395,6 +412,11 @@ export function GaleriaDeFluxos({
                         )}
                       </div>
 
+                      {/* SPEC-112 fatia D (M5) — o card do fluxo diz quais
+                          TELAS ele contém, cada uma com porta própria: a
+                          relação passa a se PERCORRER dos dois lados. */}
+                      <TelasDoFluxoLista telas={telasDoFluxo(f)} onAbrirTela={aoAbrirTela} />
+
                       {/* D16b — de onde nasce, com a porta ao lado: a pergunta
                           "onde se configura isso?" morre no card. */}
                       {derivado && (
@@ -511,16 +533,157 @@ export function GaleriaDeFluxos({
                   <span style={selo}>tela</span>
                   <span style={selo}>{t.blocos.length} blocos</span>
                   {/* "usada em N fluxos" responde antes de a pessoa mexer: uma
-                      tela usada em três desenhos não se edita no impulso. */}
-                  <span data-testid={`usos-da-tela-${t.id}`} style={selo}>
-                    usada em {usosDaTela(t.id)} fluxo{usosDaTela(t.id) === 1 ? "" : "s"}
-                  </span>
+                      tela usada em três desenhos não se edita no impulso.
+                      SPEC-112 fatia D — e agora se PERCORRE: o selo é a
+                      porta para cada um dos fluxos que a usam. */}
+                  <UsosDaTelaPorta telaId={t.id} fluxos={fluxosQueUsamATela(t.id)} onAbrirFluxo={aoAbrirFluxo} />
                 </div>
               </div>
             ))}
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+const seloEstilo: React.CSSProperties = {
+  fontSize: 10.5,
+  padding: "1px 6px",
+  borderRadius: 999,
+  border: "1px solid var(--borda)",
+  color: "var(--texto-2)",
+};
+
+const seloBotaoEstilo: React.CSSProperties = {
+  ...seloEstilo,
+  background: "transparent",
+  cursor: "pointer",
+  font: "inherit",
+  fontSize: 10.5,
+};
+
+const popoverDaGaleriaEstilo: React.CSSProperties = {
+  position: "absolute",
+  top: "100%",
+  left: 0,
+  marginTop: 4,
+  background: "var(--painel)",
+  border: "1px solid var(--borda)",
+  borderRadius: 8,
+  boxShadow: "0 8px 20px rgba(15, 23, 42, 0.12)",
+  zIndex: 30,
+  minWidth: 200,
+  maxWidth: 320,
+  padding: "4px 0",
+};
+
+const itemDoPopoverDaGaleriaEstilo: React.CSSProperties = {
+  display: "block",
+  width: "100%",
+  textAlign: "left",
+  fontSize: 12,
+  padding: "6px 10px",
+  background: "none",
+  border: "none",
+  cursor: "pointer",
+  color: "var(--texto-2)",
+};
+
+/**
+ * SPEC-112 fatia D (M5) — **"usada em N fluxos" vira PORTA.**
+ *
+ * O selo era um `<span>` — dizia a relação e não deixava percorrê-la. Cada
+ * fluxo listado abre no clique, e o popover fecha sozinho ao clicar fora
+ * (mesmo padrão do `ContagemComLista` da faixa de prontidão).
+ */
+function UsosDaTelaPorta({
+  telaId,
+  fluxos,
+  onAbrirFluxo,
+}: {
+  telaId: string;
+  fluxos: FluxoEmVigor[];
+  onAbrirFluxo: (id: string) => void;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const raizRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!aberto) return;
+    function aoClicarFora(e: MouseEvent) {
+      if (raizRef.current && !raizRef.current.contains(e.target as Node)) setAberto(false);
+    }
+    document.addEventListener("mousedown", aoClicarFora);
+    return () => document.removeEventListener("mousedown", aoClicarFora);
+  }, [aberto]);
+
+  return (
+    <div ref={raizRef} style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        data-testid={`usos-da-tela-${telaId}`}
+        onClick={() => fluxos.length > 0 && setAberto((a) => !a)}
+        style={{ ...seloBotaoEstilo, cursor: fluxos.length > 0 ? "pointer" : "default" }}
+      >
+        usada em {fluxos.length} fluxo{fluxos.length === 1 ? "" : "s"}
+      </button>
+      {aberto && fluxos.length > 0 && (
+        <div data-testid={`usos-da-tela-${telaId}-lista`} style={popoverDaGaleriaEstilo}>
+          {fluxos.map((f) => (
+            <button
+              key={f.id}
+              data-testid={`usos-da-tela-${telaId}-${f.id}`}
+              onClick={() => {
+                setAberto(false);
+                onAbrirFluxo(f.id);
+              }}
+              style={itemDoPopoverDaGaleriaEstilo}
+            >
+              {f.icone ? `${f.icone} ` : ""}
+              {f.nome}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * SPEC-112 fatia D (M5) — **o card do fluxo diz quais telas contém.**
+ *
+ * A metade que faltava: o card da tela dizia "usada em N fluxos", mas nenhum
+ * card de fluxo dizia quais telas tinha dentro — a relação existia no nó
+ * `tela:<id>` do desenho e sumia na tela. Sem telas, o bloco não aparece: um
+ * fluxo sem tela nenhuma não tem o que listar.
+ */
+function TelasDoFluxoLista({
+  telas,
+  onAbrirTela,
+}: {
+  telas: TelaDeclarada[];
+  onAbrirTela: (id: string) => void;
+}) {
+  if (telas.length === 0) return null;
+  return (
+    <div style={{ fontSize: 11.5, color: "var(--texto-mudo)", display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+      telas:
+      {telas.map((t) => (
+        <button
+          key={t.id}
+          data-testid={`porta-da-tela-${t.id}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onAbrirTela(t.id);
+          }}
+          style={{ ...seloBotaoEstilo, borderStyle: "dashed" }}
+          title={`abrir "${t.nome}" para editar`}
+        >
+          {t.icone ? `${t.icone} ` : ""}
+          {t.nome}
+        </button>
+      ))}
     </div>
   );
 }
