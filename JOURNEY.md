@@ -18433,3 +18433,36 @@ suspender; `pulado` não derruba a saúde na galeria), 5 sabotagens §248, e um 
 que marca o checkbox pelo painel, roda só até o nó (o gesto), confirma que a
 marcação sobrevive ao F5, e prova a corrida linear inteira: o nó marcado sai
 `pulado` e quem vem depois roda de verdade.
+
+## §407 — SPEC-112 fatia B: o Derivar diz por que está morto
+
+**M3/M4, medidos antes de escrever.** O botão "Derivar Quebra" nascia
+`disabled={vermelhos.length > 0}` com o motivo só no `title` do HTML — sem
+tooltip em toque, e um botão desabilitado convida a nem tentar descobrir por
+quê. O remédio já existia (o "▶ Próximo pendente" da faixa de prontidão, dez
+centímetros abaixo), mas nada ligava um ao outro: cor sem motivo, motivo sem
+ação ao lado.
+
+**D3 continua de pé**: a régua do Derivar está CERTA (vermelho trava); esta
+fatia muda a COMUNICAÇÃO, não a regra. Ninguém tocou em `vermelhos.length > 0`.
+
+**O que entrou:**
+
+- `motivoDerivarDesabilitado(vermelhos)` (`prontidaoResumo.ts`) — função pura
+  que monta a frase ("N componentes com campo obrigatório em branco: …",
+  nomeando cada um, não só contando). O `title` do botão continua existindo
+  (não custa nada manter para quem usa mouse), mas deixou de ser o ÚNICO lugar
+  onde o motivo mora.
+- Uma faixa no CORPO da tela (`motivo-derivar-desabilitado`), logo abaixo do
+  cabeçalho, com a frase de um lado e "▶ Próximo pendente" do outro — o mesmo
+  gesto da faixa de prontidão, mas ao lado do texto que explica por que ele é
+  preciso, e não numa faixa que exige a pessoa ligar os pontos sozinha.
+- Cores reusadas de propósito (`--vermelho`/`--vermelho-fundo`, o mesmo par do
+  banner de `edgeRejeitada`): o risco R1 nomeado na SPEC ("a barra da mesa já
+  tem vinte botões") pede reuso, não uma cor nova para validar nos dois temas.
+
+**Provas**: 6 de unidade (a frase no singular, no plural, nomeando cada
+componente, e `null` quando não há vermelho — a decisão do chamador se
+renderiza ou não), e um E2E que lê o motivo pelo TEXTO da tela (nunca por
+`title`/hover), cicla pelo botão até os dois nós vermelhos, preenche os dois e
+vê o motivo sumir com o Derivar habilitando — a prova de que D3 não mudou.

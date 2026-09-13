@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Diagrama, DiagramaConfig } from "@gerador/engine";
-import { calcularResumoProntidao } from "./prontidaoResumo";
+import { calcularResumoProntidao, motivoDerivarDesabilitado } from "./prontidaoResumo";
+import type { NoComProntidao } from "./prontidaoResumo";
 
 const config: DiagramaConfig = {
   nodeTypes: {
@@ -66,5 +67,34 @@ describe("calcularResumoProntidao", () => {
 
     expect(vermelhos).toHaveLength(1);
     expect(vermelhos[0].camposFaltando[0]).toMatch(/não existe na config/);
+  });
+});
+
+/**
+ * SPEC-112 fatia B (M3) — a prova de unidade da frase que a SPEC pede: o
+ * motivo do Derivar desabilitado precisa estar no CORPO da tela, não só no
+ * `title` do botão (sem tooltip em toque).
+ */
+describe("motivoDerivarDesabilitado", () => {
+  const vermelho = (labelDoNo: string): NoComProntidao => ({
+    no: { id: labelDoNo, type: "service", status: "novo", label: labelDoNo, x: 0, y: 0, spec: {}, specNA: {} },
+    nivel: "vermelho",
+    camposFaltando: ["Nome do serviço"],
+  });
+
+  it("sem vermelho nenhum, não há motivo (o Derivar está habilitado)", () => {
+    expect(motivoDerivarDesabilitado([])).toBeNull();
+  });
+
+  it("no singular, fala de UM componente", () => {
+    expect(motivoDerivarDesabilitado([vermelho("Fila Rabbit")])).toBe(
+      "1 componente com campo obrigatório em branco: Fila Rabbit"
+    );
+  });
+
+  it("no plural, soma e NOMEIA cada componente — não só a contagem", () => {
+    expect(motivoDerivarDesabilitado([vermelho("Fila Rabbit"), vermelho("Serviço de Pagamento")])).toBe(
+      "2 componentes com campo obrigatório em branco: Fila Rabbit, Serviço de Pagamento"
+    );
   });
 });

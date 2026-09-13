@@ -14,6 +14,19 @@ export interface ResumoProntidao {
   verdes: No[];
 }
 
+/**
+ * SPEC-112 fatia B (M3) — a frase que substitui o `title` do botão Derivar.
+ *
+ * Medido: o motivo do botão morto morava só no `title` do HTML — sem tooltip
+ * em toque, e um botão desabilitado convida a nem tentar descobrir por quê.
+ * `null` quando não há nada bloqueando, para o chamador decidir se renderiza.
+ */
+export function motivoDerivarDesabilitado(vermelhos: NoComProntidao[]): string | null {
+  if (vermelhos.length === 0) return null;
+  const quantidade = vermelhos.length === 1 ? "1 componente" : `${vermelhos.length} componentes`;
+  return `${quantidade} com campo obrigatório em branco: ${vermelhos.map((v) => v.no.label).join(", ")}`;
+}
+
 /** Fonte única do agrupamento por semáforo — usada no resumo global e no gate de derivação. */
 export function calcularResumoProntidao(diagrama: Diagrama, config: DiagramaConfig): ResumoProntidao {
   const vermelhos: NoComProntidao[] = [];

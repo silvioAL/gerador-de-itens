@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import {
   analisarLacunas,
@@ -82,7 +82,7 @@ import { Canvas } from "./canvas/Canvas";
 import { PropertiesPanel } from "./panel/PropertiesPanel";
 import { EdgePanel } from "./panel/EdgePanel";
 import { ReadinessSummary } from "./summary/ReadinessSummary";
-import { calcularResumoProntidao } from "./summary/prontidaoResumo";
+import { calcularResumoProntidao, motivoDerivarDesabilitado } from "./summary/prontidaoResumo";
 import { ContextoEpicoPanel } from "./review/ContextoEpicoPanel";
 import { ConversaPanel } from "./conversa/ConversaPanel";
 import { AssistenteFlutuante, type AbaAssistente } from "./assistente/AssistenteFlutuante";
@@ -805,6 +805,23 @@ function AppCarregado({
   const tiposDeNo = Object.entries(diagramaConfig.nodeTypes);
 
   const { vermelhos } = calcularResumoProntidao(quebra.diagrama, diagramaConfig);
+  /**
+   * SPEC-112 fatia B (M3/M4) — **o motivo do Derivar morto, no CORPO da tela.**
+   *
+   * Medido: o botão nascia `disabled` com o motivo só no `title` (sem tooltip
+   * em toque, e um botão morto convida a nem tentar), e o remédio (o mesmo
+   * "Próximo pendente" da faixa de prontidão) ficava a dez centímetros dali,
+   * sem ligação nenhuma com o botão. O índice é próprio — cicla só pelos
+   * VERMELHOS que bloqueiam o Derivar, não pelos amarelos que a faixa também
+   * lista (a régua do §9.3 continua a mesma: isto é comunicação, D3).
+   */
+  const proximoVermelhoRef = useRef(0);
+  function irParaProximoVermelho() {
+    if (vermelhos.length === 0) return;
+    const item = vermelhos[proximoVermelhoRef.current % vermelhos.length];
+    proximoVermelhoRef.current += 1;
+    setSelecionadoId(item.no.id);
+  }
 
   /**
    * SPEC-65 fatia C — a leitura do desenho, calculada UMA vez.
@@ -1903,6 +1920,23 @@ function AppCarregado({
       </header>
       )}
 
+      {/**
+       * SPEC-112 fatia B (M3/M4) — **o motivo no CORPO, não só no `title`.**
+       *
+       * D3: a régua do Derivar está CERTA (vermelho trava); isto é comunicação,
+       * não a regra. O remédio (Próximo pendente) fica ao LADO da frase que
+       * explica por que ele é preciso — antes ficava numa faixa à parte, sem
+       * ligação nenhuma com o botão morto.
+       */}
+      {!emStageProprio && vermelhos.length > 0 && (
+        <div data-testid="motivo-derivar-desabilitado" style={motivoDerivarEstilo}>
+          <span>{motivoDerivarDesabilitado(vermelhos)}</span>
+          <button onClick={irParaProximoVermelho} style={botaoProximoPendenteEstilo}>
+            ▶ Próximo pendente
+          </button>
+        </div>
+      )}
+
       <MenuLateral
         aberto={menuAberto}
         onFechar={() => setMenuAberto(false)}
@@ -2960,6 +2994,34 @@ const barraDeDeclaracaoEstilo: React.CSSProperties = {
   padding: "8px 12px",
   borderBottom: "1px solid var(--acento)",
   background: "var(--painel-alto)",
+};
+
+/** SPEC-112 fatia B — o motivo do Derivar desabilitado, no corpo da tela.
+ * Mesmos tokens do banner de `edgeRejeitada` (`--vermelho`/`--vermelho-fundo`):
+ * já validados nos dois temas, e reusar em vez de inventar cor nova é o que o
+ * risco R1 pede (a barra da mesa já é apertada). */
+const motivoDerivarEstilo: React.CSSProperties = {
+  padding: "6px 16px",
+  background: "var(--vermelho-fundo)",
+  color: "var(--vermelho)",
+  fontSize: 12,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+};
+
+const botaoProximoPendenteEstilo: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: 600,
+  padding: "4px 10px",
+  borderRadius: 999,
+  border: "1px solid var(--vermelho)",
+  background: "transparent",
+  color: "var(--vermelho)",
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+  flexShrink: 0,
 };
 
 /** §198 — as portas de experimentar: contorno de acento e fundo tingido, pra
