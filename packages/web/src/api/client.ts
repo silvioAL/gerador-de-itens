@@ -41,6 +41,26 @@ export function aoPerderSessao(ouvinte: (() => void) | null): void {
   aoPerderSessaoOuvinte = ouvinte;
 }
 
+/**
+ * A primeira frase legível de um `flatten()` do Zod, ou `null`.
+ *
+ * O servidor devolve `{ formErrors: [...], fieldErrors: { campo: [...] } }`
+ * quando recusa por validação. Cada mensagem ali foi escrita por quem declarou
+ * o campo — é português, não dump. Mostrar a primeira é melhor que o genérico,
+ * e muito melhor que despejar o objeto na cara de quem está usando o app.
+ */
+function primeiraMensagemDeValidacao(erro: unknown): string | null {
+  if (!erro || typeof erro !== "object") return null;
+  const e = erro as { formErrors?: unknown; fieldErrors?: Record<string, unknown> };
+  const doForm = Array.isArray(e.formErrors) ? e.formErrors.find((m) => typeof m === "string" && m.trim()) : undefined;
+  if (typeof doForm === "string") return doForm;
+  for (const lista of Object.values(e.fieldErrors ?? {})) {
+    const primeira = Array.isArray(lista) ? lista.find((m) => typeof m === "string" && m.trim()) : undefined;
+    if (typeof primeira === "string") return primeira;
+  }
+  return null;
+}
+
 async function requisitar<T>(caminho: string, opcoes?: RequestInit): Promise<T> {
   const resposta = await fetch(`${BASE_URL}${caminho}`, {
     ...opcoes,
@@ -66,9 +86,17 @@ async function requisitar<T>(caminho: string, opcoes?: RequestInit): Promise<T> 
     // As rotas devolvem `{ erro: "mensagem em português" }` pro caso comum
     // (ver packages/server/src/routes/*.ts) — mostra só isso, nunca o dump
     // técnico (método/caminho/HTTP/JSON) na tela de quem está usando o app.
-    // `erro` também pode ser um objeto de validação do Zod (400) — sem
-    // mensagem pronta pra mostrar, cai num texto genérico.
-    const mensagem = typeof corpo.erro === "string" ? corpo.erro : "Não foi possível completar a operação.";
+    /**
+     * `erro` também pode ser um objeto de validação do Zod (400). Antes isso
+     * caía direto no genérico — e o genérico ("Não foi possível completar a
+     * operação") é exatamente a tela que não diz nada, a queixa de quem tentou
+     * criar um time e não soube por que falhou. Agora a primeira mensagem do
+     * validador é PESCADA: é uma frase de verdade, escrita por quem declarou o
+     * campo, e infinitamente melhor que o genérico. O genérico fica para o que
+     * sobrar.
+     */
+    const mensagem =
+      typeof corpo.erro === "string" ? corpo.erro : primeiraMensagemDeValidacao(corpo.erro) ?? "Não foi possível completar a operação.";
     throw new Error(mensagem);
   }
   if (resposta.status === 204) return undefined as T;
@@ -1622,7 +1650,13 @@ export const apiTimes = {
   /** Qualquer sessão pode criar um time novo — só falha (409) se o nome já
    * existir (aí é convite, não criação). Correção do SPEC-09 §3.3: bootstrap
    * não depende mais de alguém já estar no sistema antes. O criador nasce owner. */
-  criarTime: (timeId: string) => requisitar<{ timeId: string }>("/times", { method: "POST", body: JSON.stringify({ timeId }) }),
+  /**
+   * Manda o NOME que a pessoa escreveu; o servidor deriva o endereço (o id).
+   * Antes ia o nome CRU como id, e "Consignado Público" — com maiúscula, espaço
+   * e acento — levava um 400 que a tela mostrava como "Não foi possível
+   * completar a operação". Relato real.
+   */
+  criarTime: (nome: string) => requisitar<{ timeId: string }>("/times", { method: "POST", body: JSON.stringify({ nome }) }),
   criarConvite: (timeId: string, nivel: NivelTime = "operar") =>
     requisitar<ConviteTime>(`/times/${encodeURIComponent(timeId)}/convites`, {
       method: "POST",
