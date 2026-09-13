@@ -56,6 +56,12 @@ export function visivelPara(visiveis: string[], timeIdDaLinha: string | null | u
  *
  * Então: time visível, ou global E minha.
  */
+/**
+ * Os disparos que NÃO têm gente atrás. Quem "rodou" é o relógio ou um sistema
+ * de fora, e nenhuma sessão humana vai casar com estes endereços.
+ */
+export const EMAILS_DE_SISTEMA = ["agendamento@gerador.local", "webhook@gerador.local"] as const;
+
 export function execucaoVisivelPara(
   visiveis: string[],
   email: string,
@@ -71,6 +77,25 @@ export function execucaoVisivelPara(
   const dono = linha.timeId;
   const semTime = dono === null || dono === undefined || dono === CAMPO_GLOBAL;
   if (timeIdPedido) return !semTime && dono === timeIdPedido && visiveis.includes(timeIdPedido);
-  if (semTime) return linha.email === email;
+  if (semTime) {
+    /**
+     * **A exceção do disparo sem gente — e ela veio de um defeito que eu mesmo
+     * criei.**
+     *
+     * "Execução sem time é de quem a rodou" resolve o vazamento e cria outro
+     * buraco: quem roda um agendamento é o RELÓGIO, e quem roda um webhook é um
+     * sistema de fora. Nenhuma sessão humana casa com esses endereços, então a
+     * regra escondia de TODO MUNDO justamente as execuções que ninguém pode
+     * reproduzir à mão. A prova integral da D18 pegou: o tick colheu o
+     * agendamento (`disparados: 1`) e o histórico ficou vazio.
+     *
+     * Um agendamento sem time é da organização — foi assim que alguém o
+     * salvou —, e o histórico dele precisa ser de quem administra a
+     * organização, senão o recurso existe e não se audita. O recorte que
+     * importa continua de pé: execução COM time só aparece para o time dela.
+     */
+    if ((EMAILS_DE_SISTEMA as readonly string[]).includes(linha.email ?? "")) return true;
+    return linha.email === email;
+  }
   return visiveis.includes(dono);
 }

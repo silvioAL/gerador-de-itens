@@ -469,6 +469,18 @@ test("tour de configuração percorre as quatro telas que o tour do produto não
 
   const telaConfig = page.locator('[data-tour="config-screen-content"]');
 
+  /**
+   * SPEC-110 fatia K (D19) — o passo que a conferência integral achou faltando.
+   *
+   * O passo anterior acaba de dizer que alguns fluxos têm uma TELA onde a
+   * execução para e espera alguém. Sem este, o tour nunca mostrava de ONDE essa
+   * tela vem — a capacidade que o usuário mais pediu na SPEC-110 ficava sem
+   * lugar justamente no tour que existe para mostrar o que se molda por time.
+   */
+  await irAtePasso(page, "As telas que vocês criam");
+  await expect(page.getByTestId("telas-tab")).toBeVisible();
+  await expect(page.getByTestId("criar-tela")).toBeVisible();
+
   // §252 — as sete telas de administração migraram do tour do produto para cá.
   // O de produto voltou a responder "serve pra quê" em 19 passos; este passou
   // a ser o lugar de "como eu adapto", com 13.

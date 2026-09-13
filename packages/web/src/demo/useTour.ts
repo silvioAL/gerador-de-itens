@@ -339,6 +339,29 @@ export function passosDeConfiguracao(opts: UseTourOpts): PassoTour[] {
       },
     },
     {
+      /**
+       * SPEC-110 fatia K (D19) — **o passo que faltava: criar uma tela.**
+       *
+       * A conferência integral achou o buraco. O passo anterior acabara de
+       * dizer que "alguns fluxos têm uma TELA no meio, onde a execução para e
+       * espera alguém", e o tour seguia para produto sem nunca mostrar de onde
+       * essa tela vem. A capacidade que o usuário mais pediu na SPEC-110
+       * ("também precisará de spec para essa parte de criar ou editar
+       * screens") ficava sem lugar no tour que existe justamente para mostrar
+       * o que se molda por time.
+       *
+       * Ele vem logo DEPOIS do canvas de propósito: é lá que a pessoa acabou
+       * de ver a tela sendo mencionada, e a pergunta "quem faz essa tela?"
+       * nasce naquele instante — não três telas adiante.
+       */
+      selector: "[data-tour=config-screen-content]",
+      titulo: "As telas que vocês criam",
+      segundos: 11,
+      texto:
+        "Uma tela é uma pilha de blocos, e vocês montam a de vocês: TEXTO explica o que está em jogo, DADO mostra o que a fiação trouxe até ali, CAMPO pergunta (e o campo obrigatório trava o Avançar dizendo o que falta), AÇÃO dá o seu nome ao botão. A prévia ao lado é exatamente o que a pessoa verá quando a execução parar nesse ponto — não uma aproximação. É assim que um fluxo deixa de ser uma esteira que corre sozinha e passa a ter um lugar onde alguém decide, com as palavras do time. A porta rápida é o próprio desenho: clicar num nó de tela no canvas leva a “editar a tela →”.",
+      onEnter: () => opts.abrirConfigNaAba("telas"),
+    },
+    {
       selector: "[data-tour=config-screen-content]",
       titulo: "O que é perene: o produto",
       segundos: 11,
