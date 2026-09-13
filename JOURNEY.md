@@ -18466,3 +18466,48 @@ componente, e `null` quando não há vermelho — a decisão do chamador se
 renderiza ou não), e um E2E que lê o motivo pelo TEXTO da tela (nunca por
 `title`/hover), cicla pelo botão até os dois nós vermelhos, preenche os dois e
 vê o motivo sumir com o Derivar habilitando — a prova de que D3 não mudou.
+
+## §408 — SPEC-112 fatia C: a jornada de fábrica ganha as telas de trabalho
+
+**M6, o coração da SPEC.** `TELAS_DO_SISTEMA` já tinha `mesa`, `documento` e
+`bancada-de-ensaios` — nós de fluxo em que a execução PARA, com a moldura
+Avançar/Retornar por cima da tela real — e a `jornada-da-demanda` (SPEC-110 J)
+não as usava: ela ligava só subfluxos, e "rodar a jornada" corria direto até a
+bancada, sem ninguém ver a mesa ou o documento no meio. D4 pedia a cadeia
+literal: `gatilho → TELA(mesa) → [ensaio]* → [esteira] → TELA(documento) →
+[exportar] + [publicar]`, com o ensaio OPCIONAL e plugado (fatia A).
+
+**O que mudou em `fluxoDaJornada`:** duas TELAS DO SISTEMA (`mesa` antes da
+sequência, `documento` depois da esteira e antes das saídas) e o nó do ensaio
+marcado `opcional: true`. As arestas continuam carregando ORDEM, não dado — a
+mesma escolha de sempre — porque nem `mesa` nem `documento` precisam de campo
+de fora para suspender: o executor já suspende um nó de tela sem exigir nada
+das entradas (achado ao ler o código, não assumido).
+
+**R3 aconteceu, e do jeito que a SPEC previu.** Rodar a jornada do início
+mudava de sentido: antes ela corria sem pausa nenhuma até a bancada (dentro do
+subfluxo do ensaio, dois níveis de aninhamento); agora ela PARA no PRIMEIRO nó,
+na mesa — por desenho, não por acidente — e o ensaio, opcional, é PULADO na
+corrida linear em vez de rodar sozinho. O E2E `jornada-da-demanda.spec.ts`
+precisou ser reescrito, não só re-executado: a trilha da moldura
+("Jornada da demanda › X") só existe para tela aninhada num subfluxo, e a mesa
+— nó DIRETO do mestre — não tem essa trilha. Os testes de unidade em
+`subfluxo.test.ts` também mudaram: os índices de nó e aresta que assumiam
+"ensaio logo depois do gatilho" e "esteira liga direto às saídas" moveram de
+posição.
+
+**Uma dívida velha cobrou o preço da fatia nova.** O canvas do mestre já tinha
+"cartões que se encavalam" documentado como dívida (o `fitView` do React Flow
+não reenquadra ao abrir um fluxo pronto). Duas telas a mais alargaram o desenho
+o bastante para um cartão nascer inteiramente fora da viewport de 1440px que o
+E2E usava — a prova ficou vermelha, e o conserto desta fatia foi o mínimo
+honesto (alargar a viewport do teste para 1920px), não uma tentativa de
+resolver o `fitView`, que já tem tentativa revertida e nomeada como dívida
+própria.
+
+**Provas**: 3 de unidade novas (as telas nos pontos certos, com `tipo`/`refId`
+corretos; o ensaio opcional e as demais etapas não; a ordem de nós e arestas
+com as telas incluídas), 385 testes de `aplicacao` inteiros continuando verdes,
+e o E2E reescrito provando as três coisas que R3 cobrava: a pausa move para a
+mesa, o ensaio some como `pulado` sem derrubar a esteira, e a esteira fecha
+`sucesso` sozinha.

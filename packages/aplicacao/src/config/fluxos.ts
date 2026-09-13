@@ -778,6 +778,32 @@ export function fluxoDoPdca(papeis: PapelConfigurado[]): FluxoEmVigor | null {
  * exportação configurado não há nó de exportar, como não há o fluxo. Com menos
  * de duas etapas não há jornada — seria uma moldura em volta de uma etapa só,
  * e um cartão a mais no catálogo sem nada a dizer.
+ *
+ * ## SPEC-112 fatia C (M6/D4) — as TELAS DE TRABALHO entram na cadeia
+ *
+ * A tese do usuário: *"nosso objetivo era tornar parecido com um low code…
+ * fazer a jornada contínua"*. `TELAS_DO_SISTEMA` (`telas.ts`) já tinha `mesa` e
+ * `documento` como nós de fluxo — em que a execução PARA, com a moldura
+ * Avançar/Retornar por cima da tela real — e esta jornada não as incluía:
+ * ela tinha só subfluxos, e "rodar a jornada" corria direto até a bancada sem
+ * ninguém ver a mesa ou o documento no meio.
+ *
+ * A cadeia passa a ser `gatilho → TELA(mesa) → [ensaio]* → [esteira] →
+ * TELA(documento) → [exportar] + [publicar]`. As duas telas são NÓS DO
+ * SISTEMA — sem editor, sem `refId` configurável — e por isso entram sempre
+ * que a sequência ou as saídas existirem: elas não dependem de nada que o
+ * time precise configurar primeiro, ao contrário das etapas que são.
+ *
+ * **O ensaio é OPCIONAL (D1)**: fica plugado por aresta, visível e religável,
+ * e só roda quando alguém pede (fatia A — o gesto "rodar esta etapa" no
+ * canvas). Sem isso a jornada rodaria o ensaio para todo mundo mesmo quando a
+ * mesa acabou de abrir sem nada para ensaiar.
+ *
+ * **R3 nomeado na SPEC**: rodar a jornada do início ao fim mudou de
+ * significado. Antes ela corria sem pausa até a bancada (dentro do subfluxo do
+ * ensaio); agora ela PARA no primeiro nó, na TELA da mesa — por desenho, não
+ * por acidente. Quem media "a jornada roda ponta a ponta" precisa reler o que
+ * isso quer dizer agora.
  */
 export function fluxoDaJornada(etapas: FluxoEmVigor[]): FluxoEmVigor | null {
   const acha = (alvo: string) => etapas.find((f) => f.id === alvo) ?? null;
@@ -790,10 +816,20 @@ export function fluxoDaJornada(etapas: FluxoEmVigor[]): FluxoEmVigor | null {
   const saidas = etapas.filter((f) => f.id === ID_DO_FLUXO_DA_EXPORTACAO || f.id.startsWith(ID_DO_FLUXO_DA_PUBLICACAO));
   if (sequencia.length + saidas.length < 2) return null;
 
-  const noDeEtapa = (fluxo: FluxoEmVigor, posicao: { x: number; y: number }): NoDoFluxo => ({
+  const noDeEtapa = (fluxo: FluxoEmVigor, posicao: { x: number; y: number }, opcional?: boolean): NoDoFluxo => ({
     id: fluxo.id,
     tipo: "subfluxo",
     refId: fluxo.id,
+    posicao,
+    parametros: {},
+    // SPEC-112 fatia A (D1) — o ensaio fica plugado, e só roda quando pedido.
+    ...(opcional ? { opcional: true as const } : {}),
+  });
+
+  const noDeTela = (id: "mesa" | "documento", posicao: { x: number; y: number }): NoDoFluxo => ({
+    id,
+    tipo: "tela",
+    refId: id,
     posicao,
     parametros: {},
   });
@@ -810,14 +846,32 @@ export function fluxoDaJornada(etapas: FluxoEmVigor[]): FluxoEmVigor | null {
   const nos: NoDoFluxo[] = [noDeGatilhoManual({ x: 60, y: 160 })];
   const arestas: ArestaDoFluxo[] = [];
   let anterior = ID_DO_NO_DE_GATILHO;
-  sequencia.forEach((etapa, i) => {
-    nos.push(noDeEtapa(etapa, { x: 340 + i * PASSO, y: 160 }));
+  let x = 340;
+
+  // SPEC-112 fatia C — a jornada PARA na mesa: é aqui que "rodar a jornada"
+  // encontra gente, não um cartão a mais para clicar depois.
+  nos.push(noDeTela("mesa", { x, y: 160 }));
+  arestas.push({ de: anterior, para: "mesa", mapeamento: [] });
+  anterior = "mesa";
+  x += PASSO;
+
+  sequencia.forEach((etapa) => {
+    nos.push(noDeEtapa(etapa, { x, y: 160 }, etapa.id === ID_DO_FLUXO_DO_ENSAIO));
     arestas.push({ de: anterior, para: etapa.id, mapeamento: [] });
     anterior = etapa.id;
+    x += PASSO;
   });
-  const xDasSaidas = 340 + sequencia.length * PASSO;
+
+  // SPEC-112 fatia C — o documento revisado ANTES de sair para exportar ou
+  // publicar: a jornada contínua não entrega sem alguém ter visto o que a
+  // esteira escreveu.
+  nos.push(noDeTela("documento", { x, y: 160 }));
+  arestas.push({ de: anterior, para: "documento", mapeamento: [] });
+  anterior = "documento";
+  x += PASSO;
+
   saidas.forEach((etapa, i) => {
-    nos.push(noDeEtapa(etapa, { x: xDasSaidas, y: 60 + i * 200 }));
+    nos.push(noDeEtapa(etapa, { x, y: 60 + i * 200 }));
     arestas.push({ de: anterior, para: etapa.id, mapeamento: [] });
   });
 

@@ -102,7 +102,10 @@ test("os cartões do mestre não se encavalam, e o desenho abre visível", async
    * fluxos e merece rodada própria. Até lá o desenho é navegável: minimapa,
    * arrasto e zoom continuam ali.
    */
-  await page.setViewportSize({ width: 1440, height: 900 });
+  // SPEC-112 fatia C — duas TELAS a mais (mesa, documento) alargaram o
+  // mestre; a dívida do `fitView` (documentada abaixo) não encolhe sozinha, e
+  // 1440 já não bastava para nenhum cartão nascer fora da vista.
+  await page.setViewportSize({ width: 1920, height: 900 });
   await page.goto("/#/fluxo/jornada-da-demanda");
   await expect(page.getByTestId("seletor-de-fluxo")).toHaveValue("jornada-da-demanda", { timeout: 15000 });
   /**
@@ -184,7 +187,19 @@ test("o mestre desenha as etapas como CARTÕES, e o duplo-clique entra no subflu
   await expect(page.locator('.react-flow__node[data-id="bancada"]')).toBeVisible();
 });
 
-test("rodar o mestre PAUSA na bancada — que é tela de outro fluxo — e o Avançar segue", async ({ page }) => {
+/**
+ * SPEC-112 fatia C (R3) — **relida, não só re-executada.**
+ *
+ * Antes desta fatia a jornada corria sem pausa até a bancada (dentro do
+ * subfluxo do ensaio). Agora ela PARA no primeiro nó de verdade — a TELA da
+ * mesa (D4: *"Rodar a jornada PARA na mesa; Avançar segue"*) — e o ensaio,
+ * OPCIONAL (fatia A), é PULADO na corrida linear: ninguém pediu a etapa, então
+ * ela não roda sozinha, e quem vem depois (a esteira) não é derrubado por
+ * isso.
+ */
+test("rodar o mestre PARA na mesa — o ensaio opcional é PULADO, e a esteira segue até o documento", async ({
+  page,
+}) => {
   test.setTimeout(180000);
   const demandaId = await demandaSalva(page, `jornada ${Date.now()}`);
 
@@ -208,10 +223,10 @@ test("rodar o mestre PAUSA na bancada — que é tela de outro fluxo — e o Ava
     aguardandoTela?: { noId: string; refId: string };
     nos: { noId: string }[];
   };
-  // A tela que pausou é a BANCADA, e ela é nó do ENSAIO, não do mestre.
-  expect(suspensa.aguardandoTela?.noId).toBe("bancada");
-  expect(suspensa.aguardandoTela?.refId).toBe("bancada-de-ensaios");
-  // O nó de subfluxo não terminou: nem sucesso, nem falha — está esperando.
+  // A tela que pausou é a MESA — nó DIRETO do mestre, não de um subfluxo.
+  expect(suspensa.aguardandoTela?.noId).toBe("mesa");
+  expect(suspensa.aguardandoTela?.refId).toBe("mesa");
+  // Só o gatilho terminou: a mesa não é sucesso nem falha — está esperando.
   expect(suspensa.nos.map((n) => n.noId)).toEqual(["gatilho"]);
 
   // ── A porta no canvas do MESTRE, como em qualquer fluxo que pausa ──
@@ -219,14 +234,17 @@ test("rodar o mestre PAUSA na bancada — que é tela de outro fluxo — e o Ava
   await expect(page.getByTestId("aguardando-tela")).toBeVisible({ timeout: 30000 });
   await page.getByTestId("abrir-tela-do-stage").click();
 
-  // ── A moldura diz ONDE a pessoa está: "Jornada da demanda › Ensaio de
-  //    cenários". Sem a trilha, ela procuraria a bancada no desenho do mestre,
-  //    onde ela não está ──
+  // ── A moldura diz ONDE a pessoa está: SEM a trilha " › X", porque a mesa é
+  //    nó do PRÓPRIO mestre — a trilha (D16) existe só para telas que moram
+  //    dentro de um subfluxo, como a bancada era. ──
   await expect(page.getByTestId("tela-do-stage")).toBeVisible();
-  await expect(page.getByTestId("tela-do-stage-origem")).toContainText("Jornada da demanda › Ensaio de cenários");
-  await expect(page.getByTestId("tela-ensaios")).toBeVisible({ timeout: 30000 });
+  await expect(page.getByTestId("tela-do-stage-titulo")).toContainText("Mesa de projeto");
+  await expect(page.getByTestId("tela-do-stage-origem")).toContainText("Jornada da demanda");
+  await expect(page.getByTestId("tela-do-stage-origem")).not.toContainText("›");
 
-  // ── Avançar: o ensaio termina, e o mestre segue para a esteira ──
+  // ── Avançar: a mesa termina, e o mestre PULA o ensaio (opcional, ninguém
+  //    pediu) e roda a esteira sozinho, até parar de novo — agora no
+  //    documento. ──
   await page.getByTestId("tela-avancar").click();
   await expect(page.getByTestId("fluxo-screen")).toBeVisible({ timeout: 60000 });
   await expect
@@ -237,22 +255,28 @@ test("rodar o mestre PAUSA na bancada — que é tela de outro fluxo — e o Ava
           execucoes: { id: string; estado: string; nos: { noId: string; estado: string }[] }[];
         };
         const minha = execucoes.find((e) => e.id === suspensa.execucaoId);
-        return minha ? `${minha.estado}:${minha.nos.map((n) => `${n.noId}=${n.estado}`).join(",")}` : "sumiu";
+        return minha ? minha.nos.map((n) => `${n.noId}=${n.estado}`).join(",") : "sumiu";
       },
       { timeout: 120000 }
     )
-    // O ensaio fechou verde; o que vier depois é o que o time configurou.
-    .toContain("ensaio-de-cenarios=sucesso");
+    // O ensaio foi PULADO (D1: condicional, plugado, só roda se pedido) — não
+    // "não-executado", e não derrubou a esteira, que fechou verde.
+    .toContain("ensaio-de-cenarios=pulado");
+  const doisPassos = await page.request.get(`${API}/fluxos/jornada-da-demanda/execucoes?timeId=${TIME}`);
+  const { execucoes: comDoisPassos } = (await doisPassos.json()) as {
+    execucoes: { id: string; nos: { noId: string; estado: string }[] }[];
+  };
+  const minhaAposMesa = comDoisPassos.find((e) => e.id === suspensa.execucaoId)!;
+  expect(minhaAposMesa.nos.find((n) => n.noId === "esteira-de-agentes")?.estado).toBe("sucesso");
 
   /**
    * ── A execução do subfluxo é LINHA PRÓPRIA, no histórico do fluxo dele ──
    *
-   * É o que dá alvo ao link "ver execução do subfluxo" (§4.J), e o que impede
-   * o histórico do ensaio de esconder uma corrida que de fato aconteceu.
+   * É o que dá alvo ao link "ver execução do subfluxo" (§4.J). O ensaio ficou
+   * PULADO no mestre — não rodou, então não tem execução própria; a esteira
+   * rodou de verdade e tem.
    */
-  const doEnsaio = await page.request.get(`${API}/fluxos/ensaio-de-cenarios/execucoes?timeId=${TIME}`);
-  const { execucoes } = (await doEnsaio.json()) as { execucoes: { nos: { noId: string }[] }[] };
-  expect(execucoes.length).toBeGreaterThan(0);
-  // E ela tem a bancada dentro: o filho rodou inteiro, não pela metade.
-  expect(execucoes[0].nos.map((n) => n.noId)).toContain("bancada");
+  const daEsteira = await page.request.get(`${API}/fluxos/esteira-de-agentes/execucoes?timeId=${TIME}`);
+  const { execucoes: execucoesDaEsteira } = (await daEsteira.json()) as { execucoes: { nos: { noId: string }[] }[] };
+  expect(execucoesDaEsteira.length).toBeGreaterThan(0);
 });

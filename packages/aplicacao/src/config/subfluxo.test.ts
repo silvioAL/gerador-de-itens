@@ -177,6 +177,11 @@ describe("o ciclo entre FLUXOS", () => {
  * *"quais fluxos estão relacionados ao quê? … faria mais sentido ter um fluxo
  * maior"*. Estas provas cobram que a relação seja DESENHO derivado do que
  * existe, e não uma lista fixa que mente quando o time não configurou tudo.
+ *
+ * SPEC-112 fatia C (R3) — **relidas, não só re-executadas.** A cadeia ganhou
+ * as TELAS de trabalho (`mesa` antes da sequência, `documento` antes das
+ * saídas) e o ensaio virou OPCIONAL (fatia A): os índices de nó e aresta que
+ * as provas de fábrica assumiam mudaram de posição.
  */
 describe("a jornada da demanda", () => {
   const etapa = (id: string): FluxoEmVigor => ({ id, nome: id, nos: [], arestas: [], origem: "fabrica" });
@@ -188,24 +193,47 @@ describe("a jornada da demanda", () => {
     etapa(ID_DO_FLUXO_DO_PDCA),
   ];
 
-  it("liga as etapas na ORDEM da jornada, com exportar e publicar em paralelo no fim", () => {
+  it("liga as etapas na ORDEM da jornada, com as telas de trabalho e exportar/publicar em paralelo no fim", () => {
     const jornada = fluxoDaJornada(TODAS)!;
     expect(jornada.id).toBe(ID_DO_FLUXO_DA_JORNADA);
     expect(jornada.origem).toBe("fabrica");
-    // Ensaiar antes de derivar, sempre — a ordem é a da jornada, não a do array.
+    // Ensaiar antes de derivar, sempre — a ordem é a da jornada, não a do
+    // array — e as duas telas de trabalho (M6/D4) entram nos pontos certos:
+    // a mesa ANTES do ensaio, o documento DEPOIS da esteira.
     expect(jornada.nos.map((n) => n.id)).toEqual([
       "gatilho",
+      "mesa",
       ID_DO_FLUXO_DO_ENSAIO,
       ID_DO_FLUXO_DA_ESTEIRA,
+      "documento",
       ID_DO_FLUXO_DA_EXPORTACAO,
       ID_DO_FLUXO_DA_PUBLICACAO,
     ]);
-    // As duas saídas penduram na MESMA etapa: são artefatos distintos (D15),
-    // não um depois do outro.
-    expect(jornada.arestas.filter((a) => a.de === ID_DO_FLUXO_DA_ESTEIRA).map((a) => a.para)).toEqual([
+    // As duas saídas penduram na MESMA etapa (o documento revisado): são
+    // artefatos distintos (D15), não um depois do outro.
+    expect(jornada.arestas.filter((a) => a.de === "documento").map((a) => a.para)).toEqual([
       ID_DO_FLUXO_DA_EXPORTACAO,
       ID_DO_FLUXO_DA_PUBLICACAO,
     ]);
+  });
+
+  it("as duas telas são NÓS DO SISTEMA — sem editor, o refId já é o id delas", () => {
+    const jornada = fluxoDaJornada(TODAS)!;
+    const mesa = jornada.nos.find((n) => n.id === "mesa")!;
+    const documento = jornada.nos.find((n) => n.id === "documento")!;
+    expect(mesa.tipo).toBe("tela");
+    expect(mesa.refId).toBe("mesa");
+    expect(documento.tipo).toBe("tela");
+    expect(documento.refId).toBe("documento");
+  });
+
+  it("SPEC-112 fatia A (D1) — o ensaio é OPCIONAL; a esteira, o gatilho e as telas não são", () => {
+    const jornada = fluxoDaJornada(TODAS)!;
+    const porId = Object.fromEntries(jornada.nos.map((n) => [n.id, n]));
+    expect(porId[ID_DO_FLUXO_DO_ENSAIO]?.opcional).toBe(true);
+    expect(porId[ID_DO_FLUXO_DA_ESTEIRA]?.opcional).toBeUndefined();
+    expect(porId["mesa"]?.opcional).toBeUndefined();
+    expect(porId["documento"]?.opcional).toBeUndefined();
   });
 
   it("o PDCA fica FORA — melhorar o processo é outro laço, não etapa da demanda (D13)", () => {
@@ -218,12 +246,14 @@ describe("a jornada da demanda", () => {
     expect(fluxoDaJornada(TODAS)!.arestas.every((a) => a.mapeamento.length === 0)).toBe(true);
   });
 
-  it("é derivada do que EXISTE: sem destino de exportação, não há nó de exportar", () => {
+  it("é derivada do que EXISTE: sem destino de exportação, não há nó de exportar (mas as telas continuam)", () => {
     const semSaidas = [etapa(ID_DO_FLUXO_DO_ENSAIO), etapa(ID_DO_FLUXO_DA_ESTEIRA)];
     expect(fluxoDaJornada(semSaidas)!.nos.map((n) => n.id)).toEqual([
       "gatilho",
+      "mesa",
       ID_DO_FLUXO_DO_ENSAIO,
       ID_DO_FLUXO_DA_ESTEIRA,
+      "documento",
     ]);
   });
 
@@ -232,7 +262,7 @@ describe("a jornada da demanda", () => {
     expect(fluxoDaJornada([])).toBeNull();
   });
 
-  it("o mestre é SALVÁVEL: a escrita aceita os subfluxos dele", () => {
+  it("o mestre é SALVÁVEL: a escrita aceita os subfluxos dele e as duas telas do sistema", () => {
     // A prova de que o desenho de fábrica passa pela mesma régua de quem
     // desenha à mão — uma fábrica que a escrita recusaria seria insalvável na
     // hora de "editar uma cópia".
