@@ -184,6 +184,9 @@ export default async function globalSetup() {
       "time-e2e-vazamento",
       // SPEC-111 A — o standalone escreve o documento de TELAS do time.
       "time-e2e-standalone",
+      // SPEC-112 fatia A — o nó opcional escreve o documento de fluxos do
+      // time; um time compartilhado apagaria a fiação de um spec vizinho.
+      "time-e2e-no-opcional",
     ];
     // Ninguém ALÉM deste e-mail pertence a estes times. Sem esta linha, uma
     // rodada antiga que os pendurou noutro usuário deixa a lista dele maior

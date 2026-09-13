@@ -30,7 +30,18 @@ export interface ExecutoresDoFluxo {
   subfluxo(no: NoDoFluxo, entradas: Record<string, unknown>): Promise<Record<string, unknown>>;
 }
 
-export type EstadoDoNo = "sucesso" | "falhou" | "nao-executado";
+/**
+ * SPEC-112 fatia A (D5) — **`pulado` é estado próprio, e não um "não
+ * executado" mais bonzinho.**
+ *
+ * Os três primeiros dizem o que aconteceu com um nó que a corrida ALCANÇOU;
+ * `pulado` diz que ela passou por cima de propósito, porque o nó é opcional e
+ * ninguém o pediu. Confundir os dois custaria nos dois sentidos: um rastro que
+ * mostrasse `nao-executado` pintaria de problema uma jornada saudável, e um
+ * rastro que omitisse o nó não deixaria distinguir "não existia no desenho" de
+ * "não rodou desta vez".
+ */
+export type EstadoDoNo = "sucesso" | "falhou" | "nao-executado" | "pulado";
 
 export interface RastroDoNo {
   noId: string;
@@ -250,9 +261,37 @@ export async function executarFluxo(
     const no = porId.get(noId)!;
     const entrantes = fluxo.arestas.filter((a) => a.para === noId);
 
-    // Regra 1: origem que não deu certo derruba o dependente — com o motivo
-    // apontando para ELA, não para este nó, que não fez nada de errado.
-    const origemRuim = entrantes.find((a) => estado.get(a.de) !== "sucesso");
+    /**
+     * SPEC-112 fatia A (D1) — **o nó OPCIONAL é pulado, e não some.**
+     *
+     * Ele fica plugado no desenho (*"plugada por conector, o sistema deve ser
+     * capaz de lidar com isso"*) e a corrida linear passa por cima. Só corre
+     * quando alguém o PEDE — e pedir é `ateNo` apontando para ele, que é o que
+     * o gesto "rodar esta etapa" no canvas manda.
+     *
+     * O rastro registra `pulado` (D5): sem isso, quem lê a execução não
+     * distingue "não existia no desenho" de "não rodou desta vez".
+     */
+    if (no.opcional && opcoes.ateNo !== noId) {
+      estado.set(noId, "pulado");
+      rastro.push({ noId, tipo: no.tipo, refId: no.refId, estado: "pulado", duracaoMs: 0 });
+      opcoes.aoVivo?.noTerminou?.(rastro[rastro.length - 1]);
+      continue;
+    }
+
+    /**
+     * Regra 1: origem que não deu certo derruba o dependente — com o motivo
+     * apontando para ELA, não para este nó, que não fez nada de errado.
+     *
+     * **O pulado NÃO derruba** (SPEC-112 A): ele não deu errado, ele não foi
+     * chamado. A aresta que sai dele simplesmente não traz dado, e quem depende
+     * de um campo que ela traria falha nomeando o CAMPO, na régua §9.3 de
+     * sempre — que é uma frase muito melhor que "a origem não rodou".
+     */
+    const origemRuim = entrantes.find((a) => {
+      const dela = estado.get(a.de);
+      return dela !== "sucesso" && dela !== "pulado";
+    });
     if (origemRuim) {
       const motivo = estado.get(origemRuim.de) === "falhou" ? "falhou" : "não rodou";
       estado.set(noId, "nao-executado");

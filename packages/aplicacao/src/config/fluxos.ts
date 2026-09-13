@@ -108,6 +108,21 @@ export interface NoDoFluxo {
    * `"aguardar"` — o gesto configurado não se perde na migração.
    */
   confirmacao?: "aguardar" | "automatica";
+  /**
+   * SPEC-112 fatia A (D1) — **este nó fica no desenho, mas não roda sozinho.**
+   *
+   * Pedido literal do usuário sobre o ensaio: *"é condicional, portanto o
+   * usuário clica e usa se quiser"* e *"plugada por conector, o sistema deve
+   * ser capaz de lidar com isso"*. A etapa NÃO sai da fiação — ela continua
+   * ligada por aresta, visível e religável — e é o motor que aprende a passar
+   * por ela.
+   *
+   * **Não é condicional com predicado.** A SPEC-110 §8 declarou `if/branch`
+   * como lacuna sem spec, e isto não a preenche: aqui não há condição a
+   * avaliar, há uma etapa que só corre quando alguém a pede (o gesto no
+   * canvas, que vira `ateNo`).
+   */
+  opcional?: boolean;
 }
 
 export interface ArestaDoFluxo {
@@ -188,6 +203,9 @@ export function normalizarFluxos(documento: unknown): ConfigFluxos {
         ...(noCru.confirmacao === "aguardar" || (noCru as { pausarDepois?: boolean }).pausarDepois === true
           ? { confirmacao: "aguardar" as const }
           : {}),
+        // SPEC-112 A — `false` não se grava: ausência é o default, e gravar o
+        // default engorda todo desenho salvo para não dizer nada.
+        ...(noCru.opcional === true ? { opcional: true as const } : {}),
         ...((OPERACOES_DO_GATEWAY as readonly string[]).includes(noCru.componente as string) || noCru.componente === "livre"
           ? { componente: noCru.componente as OperacaoDoGateway | "livre" }
           : {}),

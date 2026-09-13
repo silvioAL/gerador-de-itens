@@ -1367,6 +1367,8 @@ export function FluxoScreen({
                     arestas: f.arestas.filter((a) => a.de !== noSelecionado.id && a.para !== noSelecionado.id),
                   }))
                 }
+                onExecutarEsteNo={() => void executar(noSelecionado.id)}
+                executando={executando}
               />
             )}
             {arestaSelecionada && fluxo && (
@@ -1457,10 +1459,24 @@ export function FluxoScreen({
                     <span
                       style={{
                         color:
-                          n.estado === "sucesso" ? "var(--verde)" : n.estado === "falhou" ? "var(--vermelho)" : "var(--texto-fraco)",
+                          n.estado === "sucesso"
+                            ? "var(--verde)"
+                            : n.estado === "falhou"
+                              ? "var(--vermelho)"
+                              : "var(--texto-fraco)",
                       }}
                     >
-                      {n.estado === "sucesso" ? "✓" : n.estado === "falhou" ? "✕" : "○"} {n.noId}
+                      {/**
+                        * SPEC-112 fatia A (D5) — o PULADO tem marca própria.
+                        * Com o "○" de `nao-executado` ele leria como "ficou por
+                        * fazer", quando é o contrário: a corrida passou por ele
+                        * de propósito porque ninguém o pediu.
+                        */}
+                      {n.estado === "sucesso" ? "✓" : n.estado === "falhou" ? "✕" : n.estado === "pulado" ? "⤳" : "○"}{" "}
+                      {n.noId}
+                      {n.estado === "pulado" && (
+                        <span style={{ color: "var(--texto-fraco)" }}> · opcional, não pedido nesta corrida</span>
+                      )}
                     </span>
                     <span style={{ color: "var(--texto-fraco)" }}> · {n.duracaoMs}ms</span>
                     {n.erro && <div style={{ color: "var(--vermelho)", fontSize: 11.5 }}>{n.erro}</div>}
@@ -1723,6 +1739,8 @@ function PainelDoNo({
   onSalvarPapel,
   onMudar,
   onRemover,
+  onExecutarEsteNo,
+  executando,
   esteira,
   aoAbrirConfigDaEspecificacao,
   telas,
@@ -1753,6 +1771,11 @@ function PainelDoNo({
   onSalvarPapel: (refId: string, mudanca: { nome: string; descricao: string; preambulo: string }) => Promise<void>;
   onMudar: (mudanca: Partial<NoDoFluxo>) => void;
   onRemover: () => void;
+  /** SPEC-112 fatia A — o gesto "rodar esta etapa" (M7): reusa `ateNo`, que já
+   * corta o plano no fecho de ancestrais deste nó. É como se pede a corrida do
+   * nó opcional que não roda sozinho (D1). */
+  onExecutarEsteNo: () => void;
+  executando: boolean;
   /** SPEC-109 C — o lugar do papel NA ESTEIRA (ligar/desligar, ordem, última
    * corrida), herdado do mapa do sistema que morreu (§260/§265). */
   esteira?: {
@@ -2044,6 +2067,35 @@ function PainelDoNo({
             execução guardada espera alguém continuar ou descartar. */}
         Aguardar confirmação depois deste nó (o resto só roda quando alguém continuar)
       </label>
+      {/* SPEC-112 fatia A (D1) — o nó fica no desenho, plugado por aresta, e
+          só roda quando alguém pede. O gatilho não tem essa opção: ele é a
+          própria entrada da fiação, pulá-lo não tem o que significar. */}
+      {no.tipo !== "gatilho" && (
+        <label
+          style={{ fontSize: 11.5, display: "flex", gap: 6, alignItems: "center", marginBottom: 8 }}
+        >
+          <input
+            type="checkbox"
+            data-testid="no-opcional"
+            disabled={!podeEditar}
+            checked={no.opcional === true}
+            onChange={(e) => onMudar({ opcional: e.target.checked ? true : undefined })}
+          />
+          Opcional (a corrida linear pula este nó; só roda quando pedido aqui)
+        </label>
+      )}
+      {/* SPEC-112 fatia A (M7) — o gesto "rodar esta etapa": reusa `ateNo`
+          para pedir a corrida até ESTE nó, é assim que se aciona um nó
+          opcional plugado no meio da fiação. */}
+      <button
+        data-testid="rodar-esta-etapa"
+        disabled={executando || !podeEditar}
+        onClick={onExecutarEsteNo}
+        style={{ ...botao, marginBottom: 8 }}
+        title="Roda o fluxo até este nó (fecho de ancestrais) — o mesmo mecanismo do ensaio."
+      >
+        ▶ rodar esta etapa
+      </button>
       {conector && conector.entrada.length > 0 && (
         <>
           <div style={{ fontSize: 11.5, color: "var(--texto-fraco)", marginBottom: 4 }}>

@@ -1650,7 +1650,8 @@ export interface RastroDoNoExecutado {
    */
   tipo: TipoDeNoDoFluxo;
   refId: string;
-  estado: "sucesso" | "falhou" | "nao-executado";
+  /** SPEC-112 A — `pulado`: o nó opcional por que a corrida passou de propósito. */
+  estado: "sucesso" | "falhou" | "nao-executado" | "pulado";
   erro?: string;
   duracaoMs: number;
   /** SPEC-106 fatia A — o link do que subiu, quando o nó publicou. */

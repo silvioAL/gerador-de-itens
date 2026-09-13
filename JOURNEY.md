@@ -18383,3 +18383,53 @@ precisa provar. Guardada por prova própria e por sabotagem.
 o `timeId` mal formatado recusado, e a compatibilidade de quem o manda certo),
 5 sabotagens §248, 2 E2E, e verificação na stack real pelo caminho exato do
 print.
+
+## §406 — SPEC-112 fatia A: o nó opcional
+
+**A tese da SPEC-112**: tornar o produto parecido com um low-code de verdade —
+conectar por diagrama e ter jornada contínua. O relato que a abriu era simples
+(*"pego 'aprovação de crédito', derivo, vou para o documento — como ensaiar?"*),
+e a resposta do usuário sobre o ensaio foi a decisão que abre esta fatia: *"é
+condicional, portanto o usuário clica e usa se quiser"*, e *"plugada por
+conector, o sistema deve ser capaz de lidar com isso"*. A etapa não sai do
+desenho — fica ligada por aresta, visível e religável — e é o MOTOR que precisa
+aprender a passar por ela.
+
+**O buraco medido antes de escrever**: a regra 1 do executor derruba quem
+depende de um nó que não rodou (*"a origem X não rodou — entrada ausente não
+vira default"*). Um nó opcional plugado no meio da fiação, sem tratamento
+próprio, mataria o resto da linha assim que alguém não o pedisse.
+
+**O que entrou, pequeno e nomeado:**
+
+- `NoDoFluxo.opcional` — dado do desenho, editável no painel do nó.
+- A corrida linear PULA o nó opcional; o rastro registra `pulado`, estado
+  próprio (não é `nao-executado`): sem essa distinção, quem lê a execução não
+  separa "não existia no desenho" de "não rodou desta vez".
+- A aresta que SAI de um pulado não derruba o destino — só não traz dado. Se o
+  destino exigir o campo, falha nomeando o CAMPO, na régua §9.3 de sempre.
+- `pulado` não conta como falha na saúde do fluxo (galeria) — senão a jornada
+  mais saudável (ninguém pediu o ensaio) apareceria vermelha.
+- O gesto "rodar esta etapa" no painel do nó reusa `ateNo` (o corte de
+  ancestrais que a SPEC-105 já tinha construído): é como se PEDE a corrida do
+  nó que não roda sozinho.
+
+**O que isto explicitamente não é**: não é `if/else` com predicado. A SPEC-110
+§8 declarou condicional como lacuna sem spec, e este desenho não a preenche —
+ele diz só "este nó roda quando alguém pede". Ramo e junção continuam fora.
+
+**Dois pedaços que só existiam no papel até a validação em navegador**: a SPEC
+pedia "painel do nó com a marcação" e "clicar o nó → rodar esta etapa", e a
+implementação inicial só tinha o motor (executor, config, rota de saúde,
+client.ts, ícone `⤳` no rastro) — sem o checkbox nem o botão, o recurso não
+tinha como ser usado por ninguém. Os dois entraram em `PainelDoNo`
+(`FluxoScreen.tsx`), ao lado do checkbox de `confirmacao` que já existia como
+molde.
+
+**Provas**: 6 de unidade do executor (pula, não derruba, o obrigatório ausente
+ainda falha nomeando, o rastro diz `pulado`, `ateNo` acorda só quem foi pedido),
+2 de rota com banco real (a execução atravessa a tela opcional em vez de
+suspender; `pulado` não derruba a saúde na galeria), 5 sabotagens §248, e um E2E
+que marca o checkbox pelo painel, roda só até o nó (o gesto), confirma que a
+marcação sobrevive ao F5, e prova a corrida linear inteira: o nó marcado sai
+`pulado` e quem vem depois roda de verdade.

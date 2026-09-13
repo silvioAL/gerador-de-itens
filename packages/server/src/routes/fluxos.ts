@@ -311,7 +311,15 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
         return {
           fluxoId: linha.fluxoId,
           em: linha.em,
-          ok: !comFalha && nos.every((n) => n.estado === "sucesso"),
+          /**
+           * SPEC-112 fatia A (R4) — **`pulado` não é problema.** A régua era
+           * "todos com sucesso", e com o nó opcional isso pintaria de vermelho
+           * uma jornada perfeitamente saudável: basta a pessoa não ter pedido
+           * o ensaio para a saúde do fluxo virar "falhou" na galeria.
+           * Saudável é "nada falhou e nada ficou por rodar" — pular de
+           * propósito não é nenhum dos dois.
+           */
+          ok: !comFalha && nos.every((n) => n.estado === "sucesso" || n.estado === "pulado"),
           ...(comFalha ? { noComFalha: comFalha.noId } : {}),
         };
       }),
