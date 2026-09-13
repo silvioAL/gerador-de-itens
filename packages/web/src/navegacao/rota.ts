@@ -85,7 +85,15 @@ export type Rota =
    * coisas diferentes, e o link é mandável para quem revisa — a metade da
    * porta que o §2.4-3 cobra.
    */
-  | { tela: "telaDoStage"; execucaoId: string }
+  /**
+   * SPEC-112 fatia E (R2) — **`origem` é de onde a pessoa VEIO até aqui**, não
+   * de onde a tela mora. Quem clicou "ensaiar" na MESA volta para a mesa ao
+   * decidir; quem abriu pelo CANVAS de um fluxo volta para o canvas — sem
+   * isso, os dois caíam sempre no canvas (a queixa: o laço não fechava de
+   * onde veio). Vai no HASH, e não só em estado do componente, porque é
+   * exatamente isso que faz a origem sobreviver ao F5.
+   */
+  | { tela: "telaDoStage"; execucaoId: string; origem?: "mesa" | "canvas" }
   /** SPEC-111 A — abrir uma tela declarada SOZINHA (cria a execução). */
   | { tela: "abrirTela"; telaId: string };
 
@@ -145,7 +153,13 @@ export function hashDaRota(rota: Rota): string {
   if (rota.tela === "canvas") return "#/";
   if (rota.tela === "documento") return "#/documento";
   // SPEC-110 B — o stage de uma tela é endereçado pela EXECUÇÃO.
-  if (rota.tela === "telaDoStage") return `#/tela/${encodeURIComponent(rota.execucaoId)}`;
+  // SPEC-112 fatia E — a origem (mesa|canvas) é o terceiro segmento, quando
+  // conhecida. Ausente é legítimo (link antigo, ou aberto de outro jeito) —
+  // o comportamento cai no de sempre (volta para o canvas do fluxo).
+  if (rota.tela === "telaDoStage") {
+    const base = `#/tela/${encodeURIComponent(rota.execucaoId)}`;
+    return rota.origem ? `${base}/${rota.origem}` : base;
+  }
   // SPEC-111 A — o endereço de ABRIR, distinto do de continuar.
   if (rota.tela === "abrirTela") return `#/tela/s/${encodeURIComponent(rota.telaId)}`;
   if (rota.tela === "fluxo") {
@@ -194,7 +208,12 @@ export function rotaDoHash(hash: string): Rota {
     if (partes[1] === "s") {
       return partes[2] ? { tela: "abrirTela", telaId: decodeURIComponent(partes[2]) } : { tela: "fluxo" };
     }
-    return partes[1] ? { tela: "telaDoStage", execucaoId: decodeURIComponent(partes[1]) } : { tela: "fluxo" };
+    if (!partes[1]) return { tela: "fluxo" };
+    // SPEC-112 fatia E — o terceiro segmento é a ORIGEM (R2). Valor
+    // desconhecido (link editado à mão, versão antiga) não vira erro: some
+    // como se ninguém a tivesse dito, e o comportamento cai no de sempre.
+    const origem = partes[2] === "mesa" || partes[2] === "canvas" ? partes[2] : undefined;
+    return { tela: "telaDoStage", execucaoId: decodeURIComponent(partes[1]), ...(origem ? { origem } : {}) };
   }
   if (partes[0] === "fluxo") {
     /**

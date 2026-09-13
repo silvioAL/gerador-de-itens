@@ -671,16 +671,28 @@ function AppCarregado({
         if (decisao === "avancar") await apiExecucaoDeFluxo.avancarNaTela(stage.execucaoId, saida);
         else await apiExecucaoDeFluxo.retornarDaTela(stage.execucaoId);
         setStage(null);
-        // O destino é o canvas do fluxo: é lá que o rastro conta o que
+        /**
+         * SPEC-112 fatia E (R2) — **o laço fecha de onde veio.**
+         *
+         * M2/queixa medida: decidir SEMPRE devolvia ao canvas do fluxo, mesmo
+         * para quem tinha chegado pelo gesto "ensaiar" da MESA — a jornada
+         * contínua quebrava bem no fechamento do laço. A origem veio pelo
+         * HASH (não por estado do componente), e é por isso que sobrevive ao
+         * F5: quem recarrega a página com a bancada aberta ainda sabe de onde
+         * veio quando decide.
+         */
+        const origem = rota.tela === "telaDoStage" ? rota.origem : undefined;
+        if (origem === "mesa") navegar({ tela: "canvas" });
+        // O destino padrão é o canvas do FLUXO: é lá que o rastro conta o que
         // aconteceu depois da decisão (e o "retornado" aparece).
-        navegar({ tela: "fluxo", fluxoId: stage.fluxoId });
+        else navegar({ tela: "fluxo", fluxoId: stage.fluxoId });
       } catch (e) {
         setErroDoStage(e instanceof Error ? e.message : String(e));
       } finally {
         setStageOcupado(false);
       }
     },
-    [stage, navegar]
+    [stage, navegar, rota]
   );
   // SPEC-41 Parte B — os itens materializados da quebra aberta. A fonte de
   // verdade é o server (persistem por quebra); o estado local é o espelho da
@@ -2136,7 +2148,9 @@ function AppCarregado({
                 quebraId ? { demanda: { demandaId: quebraId } } : undefined
               );
               if (r.aguardandoTela) {
-                navegar({ tela: "telaDoStage", execucaoId: r.execucaoId });
+                // SPEC-112 fatia E (R2) — este gesto nasce na MESA: decidir na
+                // bancada precisa voltar para cá, não para o canvas de fluxos.
+                navegar({ tela: "telaDoStage", execucaoId: r.execucaoId, origem: "mesa" });
                 return;
               }
             } catch {
@@ -2389,7 +2403,9 @@ function AppCarregado({
           abrirFluxoId={rota.tela === "fluxo" ? rota.fluxoId : undefined}
           // SPEC-110 fatia B — a porta da tela parada: o canvas mostra
           // "aguardando: <tela> — abrir →" e o clique leva ao stage.
-          aoAbrirTelaDoStage={(execucaoId) => navegar({ tela: "telaDoStage", execucaoId })}
+          // SPEC-112 fatia E (R2) — este gesto nasce no CANVAS de um fluxo:
+          // decidir na tela precisa voltar para cá, não para a mesa.
+          aoAbrirTelaDoStage={(execucaoId) => navegar({ tela: "telaDoStage", execucaoId, origem: "canvas" })}
           // SPEC-110 fatia C — a porta do nó para o editor da tela declarada.
           aoEditarTela={(id) => navegar({ tela: "config", area: "telas", telaId: id })}
           // G5c — executar do canvas aponta a demanda aberta na mesa; e o que
@@ -2479,7 +2495,25 @@ function AppCarregado({
                     }),
                   }))
                 }
-                onVoltar={() => navegar({ tela: "canvas" })}
+                /**
+                 * SPEC-112 fatia E (R2) — este "voltar" SAI sem decidir (ao
+                 * contrário do Avançar/Retornar da moldura, que chamam
+                 * `decidirNoStage`), mas é a MESMA pergunta: de onde a pessoa
+                 * veio. Sem isto, quem chegou pelo CANVAS (fatia C/D) caía na
+                 * mesa mesmo sem ter vindo dela.
+                 *
+                 * O DEFAULT (origem desconhecida — endereço aberto direto,
+                 * sem passar pelos dois gestos que a marcam) é a MESA, não o
+                 * canvas: é o comportamento de sempre deste botão, de antes de
+                 * a bancada virar alcançável pelo canvas também.
+                 */
+                onVoltar={() =>
+                  navegar(
+                    rota.tela === "telaDoStage" && rota.origem === "canvas"
+                      ? { tela: "fluxo", fluxoId: stage.fluxoId }
+                      : { tela: "canvas" }
+                  )
+                }
                 /**
                  * SPEC-66 fatia D — a pauta vem do modelo; a conta, do motor.
                  *

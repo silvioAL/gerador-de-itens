@@ -187,6 +187,10 @@ export default async function globalSetup() {
       // SPEC-112 fatia A — o nó opcional escreve o documento de fluxos do
       // time; um time compartilhado apagaria a fiação de um spec vizinho.
       "time-e2e-no-opcional",
+      // SPEC-112 fatia E — a execução PELO CANVAS cai na "demanda ativa do
+      // time" (sem demandaId explícito); num time compartilhado, a demanda
+      // mais recente de um spec vizinho venceria a deste.
+      "time-e2e-origem-do-ensaio",
     ];
     // Ninguém ALÉM deste e-mail pertence a estes times. Sem esta linha, uma
     // rodada antiga que os pendurou noutro usuário deixa a lista dele maior

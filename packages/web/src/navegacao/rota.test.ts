@@ -85,6 +85,35 @@ describe("rota em hash (SPEC-40 F1)", () => {
     expect(rotaDoHash("#/tela")).toEqual({ tela: "fluxo" });
   });
 
+  /**
+   * SPEC-112 fatia E (R2) — **a ORIGEM vai no hash, e é por isso que
+   * sobrevive ao F5.** Sem ela no endereço, um estado de componente perderia
+   * a informação a cada recarga — e era exatamente essa perda que fazia o
+   * laço do ensaio sempre fechar no canvas, mesmo para quem tinha vindo da
+   * mesa.
+   */
+  it("SPEC-112 E: a origem (mesa|canvas) é o terceiro segmento, e sobrevive à ida e volta", () => {
+    expect(hashDaRota({ tela: "telaDoStage", execucaoId: "abc-123", origem: "mesa" })).toBe("#/tela/abc-123/mesa");
+    expect(rotaDoHash("#/tela/abc-123/mesa")).toEqual({ tela: "telaDoStage", execucaoId: "abc-123", origem: "mesa" });
+
+    expect(hashDaRota({ tela: "telaDoStage", execucaoId: "abc-123", origem: "canvas" })).toBe(
+      "#/tela/abc-123/canvas"
+    );
+    expect(rotaDoHash("#/tela/abc-123/canvas")).toEqual({
+      tela: "telaDoStage",
+      execucaoId: "abc-123",
+      origem: "canvas",
+    });
+
+    // Sem origem — link antigo, ou aberto de outro jeito — o comportamento
+    // cai no de sempre: nenhum campo `origem` na rota.
+    expect(rotaDoHash("#/tela/abc-123")).toEqual({ tela: "telaDoStage", execucaoId: "abc-123" });
+
+    // Terceiro segmento com lixo (link editado à mão) não vira erro nem
+    // origem inventada — a rota resolve como se ninguém a tivesse dito.
+    expect(rotaDoHash("#/tela/abc-123/lua")).toEqual({ tela: "telaDoStage", execucaoId: "abc-123" });
+  });
+
   it("SPEC-107 G5c: #/fluxo/<id> abre o canvas NAQUELE fluxo — assistir é uma URL mandável", () => {
     expect(hashDaRota({ tela: "fluxo", fluxoId: "esteira-de-agentes" })).toBe("#/fluxo/esteira-de-agentes");
     expect(rotaDoHash("#/fluxo/esteira-de-agentes")).toEqual({ tela: "fluxo", fluxoId: "esteira-de-agentes" });

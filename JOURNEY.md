@@ -18539,3 +18539,47 @@ em diante.
 pontas no mesmo cenário — abrir a lista pela tela e chegar ao fluxo, abrir a
 porta pelo fluxo e chegar à tela — e os specs de fluxo mais amplos (funções,
 integração, PDCA, jornada) continuam verdes.
+
+## §410 — SPEC-112 fatia E: o laço do ensaio fecha de onde veio
+
+**M2/R2.** Decidir na bancada (Avançar/Retornar, ou o "voltar" sem decidir)
+sempre devolvia ao CANVAS de fluxos — mesmo para quem tinha chegado pelo chip
+"ensaiar" da MESA e nunca tinha aberto um fluxo na vida. A jornada contínua que
+a SPEC inteira persegue quebrava exatamente no fechamento do laço.
+
+**A origem vai no HASH, não em estado do componente** — `#/tela/<execucaoId>`
+ganhou um terceiro segmento opcional (`/mesa` ou `/canvas`), escrito pelos dois
+gestos que levam à bancada: o chip "ensaiar" da mesa (`onSimular`) e o botão
+"abrir a tela →" do rastro de um fluxo (`aoAbrirTelaDoStage`). É o que faz a
+origem sobreviver ao F5 (R2): estado em memória morre na recarga, hash não.
+
+**Duas réguas diferentes, dois defaults diferentes** — e foi aqui que uma
+correção nasceu quebrada e uma sabotagem-viva (a suíte de `ensaios.spec.ts`
+já existente) acusou na hora:
+
+- `decidirNoStage` (Avançar/Retornar da moldura) tinha SEMPRE ido para o canvas
+  do fluxo, para QUALQUER tipo de tela parada. O default continua esse quando
+  a origem é desconhecida — só desvia para a mesa quando ela é EXPLICITAMENTE
+  `"mesa"`.
+- O "voltar" de dentro da própria bancada (`onVoltar`, um gesto de SAIR sem
+  decidir) tinha SEMPRE ido para a mesa — porque, antes das fatias C/D, a
+  bancada só era alcançável a partir dela. Inverter o default aqui (como fiz na
+  primeira tentativa) quebrou três specs que chegam à bancada por atalho de
+  teste (`abrirBancada`, via API + `goto` direto, sem origem nenhuma no hash):
+  o "voltar" delas passou a cair no canvas do fluxo, e todo gesto seguinte
+  (menu, chip de conformidade) media contra a tela errada. O default certo é o
+  de SEMPRE-FOI, e só o `"canvas"` explícito desvia.
+
+**Uma flakiness pré-existente, medida e descartada.** Um quarto teste
+(`§305`) continuou vermelho depois do ajuste, sempre no mesmo ponto (um clique
+de nó da mesa interceptado pelo minimap do React Flow). Antes de investigar
+mais, medi contra o commit da fatia D (sem nenhuma linha desta fatia): falhava
+IDÊNTICO. Não é regressão desta rodada — é dívida do ambiente, e fica fora do
+escopo.
+
+**Provas**: 2 de unidade em `rota.test.ts` (a origem sobrevive à ida e volta;
+lixo no terceiro segmento não vira origem inventada), um E2E novo
+(`origem-do-ensaio.spec.ts`) com os DOIS caminhos completos — mesa→mesa e
+canvas→canvas, cada um com F5 no meio —, e a suíte `ensaios.spec.ts` inteira
+relida (não só re-executada) para confirmar que nenhum atalho de teste
+existente dependia do comportamento antigo do `onVoltar`.
