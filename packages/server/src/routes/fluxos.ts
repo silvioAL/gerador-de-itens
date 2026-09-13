@@ -266,7 +266,9 @@ export async function registrarRotasFluxos(app: FastifyInstance, { db, diretorio
     ]);
     const { papeis } = normalizarPipelineAgentes(pipelineDoc.documento);
     return {
-      fluxos: fluxosEmVigor(papeis, fluxosDoc.documento, normalizarExportador(exportadorDoc.documento)),
+      // SPEC-111 A — o documento de TELAS entra na derivação: cada tela
+      // declarada ganha o fluxo implícito de um nó que a faz valer sozinha.
+      fluxos: fluxosEmVigor(papeis, fluxosDoc.documento, normalizarExportador(exportadorDoc.documento), telasDoc.documento),
       papeis,
       telas: telasEmVigor(telasDoc.documento),
     };

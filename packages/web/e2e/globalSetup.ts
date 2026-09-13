@@ -182,6 +182,8 @@ export default async function globalSetup() {
       // Correção do vazamento entre times: este spec PRECISA de um time em que
       // a pessoa não seja nada no outro — é a condição do defeito relatado.
       "time-e2e-vazamento",
+      // SPEC-111 A — o standalone escreve o documento de TELAS do time.
+      "time-e2e-standalone",
     ];
     // Ninguém ALÉM deste e-mail pertence a estes times. Sem esta linha, uma
     // rodada antiga que os pendurou noutro usuário deixa a lista dele maior

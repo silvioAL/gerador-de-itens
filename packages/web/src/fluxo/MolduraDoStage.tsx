@@ -39,6 +39,7 @@ const botao: React.CSSProperties = {
 export function MolduraDoStage({
   nomeDoFluxo,
   dentroDe,
+  sozinha,
   nomeDaTela,
   descricao,
   ocupado,
@@ -60,6 +61,18 @@ export function MolduraDoStage({
    * não está. Com ela: "Jornada da demanda › Ensaio de cenários".
    */
   dentroDe?: { fluxoId: string; nome: string }[];
+  /**
+   * SPEC-111 fatia A (D4) — **esta tela foi aberta SOZINHA, e ela diz o que
+   * vai acontecer com a resposta.**
+   *
+   * A v1 do standalone não tem destino (`aoAvancar` é a fatia B): avançar
+   * registra a resposta no histórico e mais nada. Deixar isso implícito faria a
+   * tela FINGIR entrega — a pessoa preencheria esperando que alguém recebesse.
+   * A própria SPEC-111 §3 exige o contrário, com todas as letras: *"Sem
+   * destino, o Avançar grava só o histórico — e a tela DIZ isso, não finge
+   * entrega."*
+   */
+  sozinha?: boolean;
   nomeDaTela: string;
   descricao?: string;
   ocupado?: boolean;
@@ -94,6 +107,12 @@ export function MolduraDoStage({
             {descricao ? ` · ${descricao}` : ""}
           </span>
         </div>
+        {sozinha && (
+          <span data-testid="tela-sem-destino" style={{ fontSize: 11.5, color: "var(--amarelo)" }}>
+            esta tela foi aberta sozinha: ao avançar, a sua resposta fica registrada no histórico dela — ela ainda
+            não entrega a ninguém.
+          </span>
+        )}
         {motivoParaNaoAvancar && (
           <span data-testid="tela-avancar-travado" style={{ fontSize: 11.5, color: "var(--texto-2)" }}>
             {motivoParaNaoAvancar}

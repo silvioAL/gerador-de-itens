@@ -18263,3 +18263,71 @@ da fatia medida na tela (o caminho tem cinco passos; o "Confirme" está dentro
 dele; os quinze continuam lá). A chamada de cada seção saiu de `--texto-mudo`
 para `--texto-fraco`: o mudo dava ~3,5:1 no tema escuro, e ela DIZ a pergunta
 que a seção responde — quem hierarquiza é o título, não o apagamento.
+
+## §404 — SPEC-111 fatia A: a tela que vale sozinha
+
+**A medição encolheu a fatia antes de ela começar.** A SPEC-111 §3 tinha
+previsto o desenho — *"standalone = fluxo implícito de um nó… reusando TUDO da
+110-B. Nenhum motor novo"* — e a medição contra a SPEC-110 inteira mostrou que
+a previsão era literal, não aproximada. Renderizador de blocos, execução que
+para numa tela, Avançar/Retornar, link mandável, histórico, cadeado por time:
+tudo já estava de pé. O que faltava não era motor nem rota nem tabela — era um
+FLUXO, e fluxo esta casa já sabe derivar.
+
+**O que entrou.** Cada tela declarada deriva `tela-standalone:<id>`: um fluxo de
+UM nó, que é a tela. Abrir a tela sozinha é executar esse fluxo pelo endpoint
+que já existia. Três coisas vieram junto sem uma linha escrita para elas:
+
+- a **permissão** (`exigirNivel` de operar, e o cadeado da §402 no stage);
+- o **histórico** (cada abertura é uma linha, com quem abriu, recortada por time);
+- o **link mandável** (`#/tela/<execucaoId>` já era o endereço de uma sessão).
+
+Sem gatilho no desenho, de propósito: o gatilho responde "quando isto roda?", e
+aqui a resposta é "quando alguém abre" — que é o próprio gesto, não um cartão a
+mais para entender.
+
+**Três decisões que a fatia teve de tomar, e por quê:**
+
+1. **Dois endereços, não um.** `#/tela/s/<telaId>` ABRE (cria a execução);
+   `#/tela/<execucaoId>` CONTINUA. Confundi-los faria um link mandado ou
+   reabrir a resposta de outra pessoa, ou criar execução a cada F5 — os dois
+   errados. O redirecionamento usa `replaceState` para o "voltar" do navegador
+   não cair de novo no endereço que age.
+2. **O implícito não aparece na seção de fluxos da galeria.** O card da TELA já
+   está lá; mostrar os dois seria o mesmo componente duas vezes na mesma tela —
+   a queixa M9 da SPEC-110 renascendo noutro lugar.
+3. **A tela DIZ que ainda não entrega a ninguém** (D4). Sem destino configurado,
+   avançar registra a resposta no histórico e mais nada. A própria SPEC-111
+   exigia isso com todas as letras: *"Sem destino, o Avançar grava só o
+   histórico — e a tela DIZ isso, não finge entrega."*
+
+**Uma afirmação minha que a prova derrubou.** Escrevi no comentário que a
+colisão de id era "impossível porque a validação de escrita não aceita `:`" — e
+ela aceitava. A prova cobrou. Em vez de enfraquecer a frase, tornei-a verdade:
+a escrita agora RECUSA o prefixo reservado, nomeando. Sem isso, um fluxo
+declarado com esse id venceria a fábrica e substituiria a tela sozinha, em
+silêncio.
+
+**Duas regressões que a rodada de E2E pegou, as duas minhas.**
+
+1. **O selo "usada em N fluxos" passou a contar o próprio implícito** — dizia
+   "usada em 2 fluxos" onde havia UM desenho de verdade. O selo existe para
+   avisar quem vai editar que outros desenhos dependem daquela tela; contar a si
+   mesma o transforma num alarme falso, que é pior que alarme nenhum. Quem
+   acusou foi um E2E que já existia (`galeria-de-fluxos`), não um que eu
+   escrevi para a fatia.
+2. **O meu próprio E2E do F5 contava execuções em números absolutos**, e quebrou
+   com o resíduo de outra rodada — a armadilha que a casa já tinha registrado.
+   Virou contagem RELATIVA: o que importa é a diferença que o F5 provoca, não
+   quantas sessões existem no banco.
+
+**E a validação visual achou um defeito que não era desta fatia**: o token
+`--amarelo` dava 4,49:1 sobre o fundo da página no tema claro — falha a régua de
+4,5 por uma casa decimal, em TODOS os avisos que o usam (o painel branco
+mascarava, com 4,90). Corrigido no TOKEN, não no aviso desta tela: o defeito era
+do amarelo, não de quem o usou.
+
+**Provas**: 8 puras (a derivação, o plano que para na tela, o prefixo
+reservado), 6 de rota com banco real (incluindo permissão herdada e recorte por
+time), 5 sabotagens §248, e um E2E que abre pela galeria, preenche, avança, e
+prova que o F5 continua a MESMA sessão em vez de abrir outra.

@@ -223,6 +223,17 @@ const PASSOS_DE_QUANDO: { titulo: string; texto: string }[] = [
 
 const PASSOS_DE_ONDE_ENTRO: { titulo: string; texto: string }[] = [
   {
+    /**
+     * SPEC-111 fatia A (D19) — o gesto NOVO: usar a tela sem fluxo nenhum.
+     * Sem este passo, o manual ensinaria a CRIAR telas e a encontrá-las paradas
+     * num fluxo, mas não a simplesmente usá-las — que é o que a pessoa quer
+     * fazer com uma tela de aprovação ou de coleta.
+     */
+    titulo: "Use uma tela sozinha, sem montar fluxo",
+    texto:
+      "Na galeria, o card de cada tela do time tem “abrir →”. Ele abre a tela para usar agora: você preenche, decide, e a resposta fica registrada no histórico dela. O endereço vira o daquela sessão de trabalho — dá para mandar o link para alguém continuar, e recarregar volta para a MESMA resposta em vez de começar outra. Por enquanto é só isso que acontece: a tela avisa, em cima, que ainda não entrega a ninguém. Ligar o Avançar a um destino (registrar um feedback, disparar um fluxo) é o passo seguinte desta capacidade.",
+  },
+  {
     // SPEC-110 fatia B (D19) — o passo NOVO: a tela como nó. Sem ele, o
     // manual ensinaria um fluxo que sempre corre sozinho, e a pessoa que
     // encontrasse a execução parada não saberia que ela está esperando POR ELA.

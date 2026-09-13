@@ -105,7 +105,17 @@
   --acento-indigo: #4f46e5;
   --verde: #047857;
   --vermelho: #b91c1c;
-  --amarelo: #926a00;
+  /**
+   * SPEC-111 A — 4,93:1 sobre o fundo da página, contra os 4,49 de antes.
+   *
+   * O valor anterior passava sobre o PAINEL branco (4,90) e falhava sobre o
+   * `--fundo` cinza (4,49) — e é sobre o fundo que os avisos aparecem em várias
+   * telas. Falhar por uma casa decimal é falhar: a régua é 4,5 e ela existe
+   * para quem enxerga pior que quem escolheu a cor. Medido na validação visual
+   * da tela standalone, e corrigido no TOKEN porque o defeito não era do aviso
+   * daquela tela — era de todos os que usam este amarelo.
+   */
+  --amarelo: #8a6400;
 
   --acento-gente: #4f46e5;
   /* No escuro este é o texto CLARO do indigo; no claro precisa do escuro, ou
