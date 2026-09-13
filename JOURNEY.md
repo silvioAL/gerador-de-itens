@@ -18331,3 +18331,55 @@ do amarelo, não de quem o usou.
 reservado), 6 de rota com banco real (incluindo permissão herdada e recorte por
 time), 5 sabotagens §248, e um E2E que abre pela galeria, preenche, avança, e
 prova que o F5 continua a MESMA sessão em vez de abrir outra.
+
+## §405 — Criar um time com o nome que a pessoa tem na cabeça
+
+**Relato real, com print:** alguém sem time nenhum digitou "Consignado Público"
+no campo que pede *"nome do time"* e recebeu **"Não foi possível completar a
+operação."**. Ficou preso na tela, sem saber por quê.
+
+Não era um defeito — eram **três**, empilhados:
+
+1. **A tela mandava o nome CRU como id.** O servidor exige
+   `^[a-z0-9][a-z0-9-]*[a-z0-9]$`, e com razão: o id vira chave em URL, em
+   cookie de sessão e em nome de documento de configuração. "Consignado
+   Público" tem maiúscula, espaço e acento. A recusa estava certa; exigir esse
+   formato de quem digita um NOME é que não estava — e o placeholder mostrava
+   `time-pagamentos`, um id fingindo ser nome.
+2. **O cliente engolia o motivo.** O servidor respondeu 400 com o `flatten()` do
+   Zod, e `requisitar` tinha a regra: erro que não é string vira o genérico. O
+   comentário no código até admitia — *"sem mensagem pronta pra mostrar, cai num
+   texto genérico"*. É a tela que não diz nada, contra a régua da casa.
+3. **O nome digitado se perdia**: `times.nome` recebia o próprio id, então o
+   rótulo virava o endereço — contra a régua de que o rótulo ecoa o que a pessoa
+   cadastrou.
+
+**O conserto.** O id passa a DERIVAR do nome (a mesma derivação que o canvas já
+usa para criar fluxo, §263), o nome fica como foi escrito, e a tela mostra
+`endereço: consignado-publico` ANTES do clique — a derivação deixa de ser
+surpresa nos dois sentidos: quem escreve um nome longo vê o que ele vira, e quem
+escreve só emoji vê que não sobra endereço. O cliente passa a PESCAR a primeira
+mensagem do validador (melhoria para todas as telas, não só esta), e o conflito
+de id passou a falar do ENDEREÇO — depois da derivação, dois nomes diferentes
+("Já Existe" e "já existe") colidem no mesmo, e mandar procurar "um nome igual"
+seria mandar procurar o que não há.
+
+**Duas lições que já estavam anotadas e me morderam de novo:**
+
+- O script de edição escreveu os caracteres combinantes LITERAIS no lugar do
+  escape `̀` — funcionava, e era ilegível. É a lição de escapes, repetida.
+- O E2E não nascia auto-saneador: o time criado sobrevive à rodada, e a segunda
+  batia em "já existe". Terceira vez nesta sessão. Agora o nome carrega sufixo
+  único, mantendo as três características do relato (maiúscula, espaço, acento).
+
+**E uma regressão que eu mesmo introduzi no conserto**, pega por um teste que já
+existia: ao manter `timeId` aceito por compatibilidade, tirei a validação DELE —
+"Time Com Espaço E Maiúscula" viraria id de verdade no banco, quebrando URL e
+chave de configuração. A régua voltou para o caminho de compatibilidade: derivar
+é para quem manda NOME; quem manda o id pronto afirma que já o formatou, e
+precisa provar. Guardada por prova própria e por sabotagem.
+
+**Provas**: 7 de rota (o caso do relato, o nome preservado, as recusas nomeadas,
+o `timeId` mal formatado recusado, e a compatibilidade de quem o manda certo),
+5 sabotagens §248, 2 E2E, e verificação na stack real pelo caminho exato do
+print.

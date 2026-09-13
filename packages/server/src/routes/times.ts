@@ -15,13 +15,48 @@ const corpoAdicionarMembro = z.object({ email: z.string().email(), nivel: z.enum
 const corpoNivel = z.object({ nivel: z.enum(NIVEIS) });
 const corpoConvite = z.object({ nivel: z.enum(NIVEIS).default("operar") });
 
+/**
+ * **O id do time DERIVA do nome — quem cria não precisa saber o formato.**
+ *
+ * Relato real: a pessoa digitou "Consignado Público" no campo que pedia "nome
+ * do time" e levou um 400 mudo. A régua do servidor estava certa (o id vira
+ * chave em URL, cookie de sessão e nome de documento de config), mas exigi-la
+ * de quem digita um NOME é pedir conhecimento de implementação — e o exemplo no
+ * placeholder ("time-pagamentos") mostrava um id fingindo ser nome.
+ *
+ * A derivação é a mesma que o canvas já usa para criar fluxo (§263): minúsculas,
+ * acento fora, o que não é letra/número vira hífen.
+ */
+export function idDeTimeAPartirDoNome(nome: string): string {
+  return nome
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 const corpoCriarTime = z.object({
+  /**
+   * O NOME que a pessoa escreveu. `timeId` continua aceito para quem já
+   * mandava o id pronto (o E2E e quem automatiza) — os dois caminhos existem,
+   * mas só um deles é o da tela.
+   */
+  nome: z.string().trim().min(1).max(80).optional(),
+  /**
+   * O caminho de COMPATIBILIDADE mantém a régua estrita — e essa linha nasceu
+   * de um teste que já existia me acusando: ao aceitar `timeId` sem validar,
+   * "Time Com Espaço E Maiúscula" viraria id de verdade no banco, quebrando
+   * URL e chave de configuração. Derivar é para quem manda NOME; quem manda o
+   * id pronto está afirmando que já o formatou, e precisa provar.
+   */
   timeId: z
     .string()
     .trim()
     .min(3)
     .max(60)
-    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, "use letras minúsculas, números e hífen (ex.: time-pagamentos)"),
+    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, "o endereço aceita letras minúsculas, números e hífen (ex.: time-pagamentos)")
+    .optional(),
 });
 
 /**
@@ -60,17 +95,49 @@ export async function registrarRotasTimes(app: FastifyInstance, { db }: OpcoesAp
   // mesma barreira de namespace que já existia.
   app.post("/times", { preHandler: exigirSessao }, async (req, reply) => {
     const corpo = corpoCriarTime.safeParse(req.body);
-    if (!corpo.success) return reply.code(400).send({ erro: corpo.error.flatten() });
+    // A recusa é uma FRASE, não um dump do validador: o cliente não tem como
+    // mostrar um `flatten()` a quem está usando o app, e caía num genérico
+    // ("Não foi possível completar a operação") que não ajuda ninguém.
+    if (!corpo.success) {
+      // A frase do validador quando houver (o `timeId` mal formatado tem uma);
+      // senão, a genérica sobre o nome. Nunca o `flatten()` cru: o cliente não
+      // tem como mostrá-lo, e caía no "Não foi possível completar a operação".
+      const doValidador = corpo.error.issues.find((i) => i.message && !i.message.startsWith("Invalid"))?.message;
+      return reply.code(400).send({ erro: doValidador ?? "informe o nome do time (de 1 a 80 caracteres)" });
+    }
 
-    const { timeId } = corpo.data;
+    const nomeDigitado = corpo.data.nome?.trim() ?? corpo.data.timeId?.trim() ?? "";
+    if (!nomeDigitado) return reply.code(400).send({ erro: "informe o nome do time" });
+    const timeId = corpo.data.timeId?.trim() || idDeTimeAPartirDoNome(nomeDigitado);
+    /**
+     * Um nome que não sobra NADA depois da derivação ("###", "🙂") precisa de
+     * recusa própria: sem ela o id viria vazio e o erro apareceria lá adiante,
+     * como violação de chave, longe da causa.
+     */
+    if (timeId.length < 3) {
+      return reply
+        .code(400)
+        .send({ erro: `"${nomeDigitado}" não vira um endereço válido — use ao menos três letras ou números` });
+    }
     const existente = await db.select().from(times).where(eq(times.id, timeId)).limit(1);
     if (existente.length > 0) {
-      return reply.code(409).send({ erro: "já existe um time com esse nome" });
+      /**
+       * A frase fala do ENDEREÇO, não do nome: depois que o id passou a ser
+       * derivado, dois nomes diferentes ("Já Existe" e "já existe") colidem no
+       * mesmo endereço — e dizer "já existe um time com esse nome" mandaria a
+       * pessoa procurar um nome idêntico que não existe.
+       */
+      return reply
+        .code(409)
+        .send({ erro: `já existe um time no endereço "${timeId}" — escolha outro nome` });
     }
 
     const [organizacao] = await db.select().from(organizacoes).limit(1);
     const email = req.usuario!.email;
-    await db.insert(times).values({ id: timeId, organizacaoId: organizacao.id, nome: timeId });
+    // O NOME que a pessoa escreveu fica como ela escreveu — acento e maiúscula
+    // inclusos. O id é o endereço; o nome é o rótulo, e o rótulo ecoa quem o
+    // cadastrou.
+    await db.insert(times).values({ id: timeId, organizacaoId: organizacao.id, nome: nomeDigitado });
     // Quem cria o time é o primeiro owner dele — sem isso o time nasceria sem
     // ninguém capaz de configurá-lo (SPEC-38).
     await db.insert(usuarioTime).values({ email, timeId, nivel: "owner" });

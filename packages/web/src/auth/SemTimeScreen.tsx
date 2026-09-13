@@ -25,6 +25,19 @@ function extrairToken(valor: string): string {
  * carregar a página. Deixa colar o link (ou só o código) manualmente, em vez
  * de só dizer "peça um convite" sem dar um jeito de usá-lo aqui mesmo.
  */
+/**
+ * A MESMA derivação do servidor (§263): se as duas divergissem, a tela
+ * prometeria um endereço e o time nasceria com outro.
+ */
+export function enderecoDoTime(nome: string): string {
+  return nome
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export function SemTimeScreen({ onAceitarToken, onCriarTime, onSair, erro }: SemTimeScreenProps) {
   const [entrada, setEntrada] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -92,9 +105,33 @@ export function SemTimeScreen({ onAceitarToken, onCriarTime, onSair, erro }: Sem
         <input
           value={nomeTime}
           onChange={(e) => setNomeTime(e.target.value)}
-          placeholder="nome do time (ex.: time-pagamentos)"
+          // O placeholder mostrava um ID ("time-pagamentos") no campo que pede
+          // um NOME — e quem escrevia um nome de verdade levava um 400 mudo.
+          placeholder="nome do time (ex.: Consignado Público)"
           style={inputEstilo}
         />
+        {/**
+         * **O endereço que o nome vira, antes de clicar.**
+         *
+         * O id é derivado do nome (minúsculas, sem acento, hífen no lugar do
+         * resto) porque ele vira chave em URL e em configuração. Mostrar a
+         * derivação é o que impede a surpresa nos dois sentidos: quem digita
+         * "Consignado Público" vê que vai virar `consignado-publico`, e quem
+         * digita só emoji vê que não sobra endereço nenhum.
+         */}
+        {nomeTime.trim() && (
+          <p data-testid="endereco-do-time" style={{ fontSize: 11.5, color: "var(--texto-fraco)", margin: "6px 0 0" }}>
+            {enderecoDoTime(nomeTime).length >= 3 ? (
+              <>
+                endereço: <code>{enderecoDoTime(nomeTime)}</code>
+              </>
+            ) : (
+              <span style={{ color: "var(--amarelo)" }}>
+                esse nome não vira um endereço — use ao menos três letras ou números
+              </span>
+            )}
+          </p>
+        )}
         {erroCriar && <p style={{ fontSize: 12, color: "var(--vermelho)", marginTop: 10, marginBottom: 0 }}>{erroCriar}</p>}
         <button
           onClick={() => void criar()}
