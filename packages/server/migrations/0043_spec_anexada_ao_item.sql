@@ -1,0 +1,20 @@
+-- SPEC-114 — o rastro de exportação cresce de um campo para dois.
+--
+-- Até aqui, `estado`/`link_externo` sabiam dizer só "subiu pro tracker ou
+-- não". A segunda chamada (anexar a spec do item, depois que ele já tem
+-- link) precisa de um estado que o par atual não separa: "história subiu,
+-- spec ainda não" deixaria de existir se fosse espremido no mesmo `estado`
+-- binário. Um booleano à parte, como `link_externo`, sobrevive à regeneração
+-- pela mesma `chave` — a mesma régua que já preserva o par de hoje.
+--
+-- ACHADO REAL, escrevendo esta migration à mão (o `drizzle-kit generate`
+-- falhou neste ambiente): o drizzle decide o que rodar por TIMESTAMP
+-- (`meta/_journal.json`, campo `when`), não por hash de conteúdo. Um banco
+-- que já rodou as migrations da era do canvas de fluxos (SPEC-105-111,
+-- removidas por esta branch) tem `created_at` registrado bem à frente do
+-- `when` sequencial que esta linha teria se continuasse "+1" a partir da
+-- 0042. Resultado: a migration é IGNORADA em silêncio, sem erro nenhum. O
+-- `when` desta entrada usa um `Date.now()` de verdade (não a sequência
+-- pequena que as migrations anteriores usam) — garantidamente maior que
+-- qualquer coisa já aplicada, na era fluxo ou fora dela.
+ALTER TABLE "itens_gerados" ADD COLUMN "spec_anexada" boolean DEFAULT false NOT NULL;

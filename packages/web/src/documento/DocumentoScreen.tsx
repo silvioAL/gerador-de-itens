@@ -14,7 +14,7 @@ import type {
 } from "@gerador/engine";
 import { Canvas } from "../canvas/Canvas";
 import { useDiagrama, type AplicarNoDiagrama } from "../state/useDiagrama";
-import type { ItemGerado, ResultadoDaExportacao } from "../api/client";
+import type { ItemGerado, ResultadoDaExportacao, ResultadoDoAnexoDeSpec } from "../api/client";
 import { EscritaDoItem } from "./EscritaDoItem";
 
 /**
@@ -99,6 +99,12 @@ export interface DocumentoScreenProps {
   onExportar?: () => Promise<ResultadoDaExportacao>;
   /** Pra onde vai, como a configuração chamou ("Jira do time X"). */
   destinoDaExportacao?: string | null;
+  /**
+   * SPEC-114 — a SEGUNDA chamada: anexa a spec de CADA item ao issue que a
+   * exportação já criou. Ausente = a spec da demanda ainda tem lacuna, ou a
+   * quebra ainda não foi salva — nos dois casos não há o que mandar.
+   */
+  onAnexarSpec?: () => Promise<ResultadoDoAnexoDeSpec>;
   /**
    * SPEC-69 §4.4 — os ensaios ASSUMIDOS, ao lado da seção de riscos.
    *
@@ -196,6 +202,7 @@ export function DocumentoScreen({
   onRevisarItem,
   onExportar,
   destinoDaExportacao,
+  onAnexarSpec,
   ensaios,
   decisaoDoEnsaio,
 }: DocumentoScreenProps) {
@@ -408,6 +415,7 @@ export function DocumentoScreen({
           onRevisarItem={onRevisarItem}
           onExportar={onExportar}
           destinoDaExportacao={destinoDaExportacao}
+          onAnexarSpec={onAnexarSpec}
         />
       </article>
     </div>
@@ -769,16 +777,21 @@ function SecaoDosItens({
   onRevisarItem,
   onExportar,
   destinoDaExportacao,
+  onAnexarSpec,
 }: {
   derivados: ItemDoDocumento[];
   escritos: ItemGerado[];
   onRevisarItem?: (chave: string) => void;
   onExportar?: () => Promise<ResultadoDaExportacao>;
   destinoDaExportacao?: string | null;
+  onAnexarSpec?: () => Promise<ResultadoDoAnexoDeSpec>;
 }) {
   const [exportando, setExportando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoDaExportacao | null>(null);
   const [erroExportacao, setErroExportacao] = useState<string | null>(null);
+  const [anexando, setAnexando] = useState(false);
+  const [resultadoDoAnexo, setResultadoDoAnexo] = useState<ResultadoDoAnexoDeSpec | null>(null);
+  const [erroDoAnexo, setErroDoAnexo] = useState<string | null>(null);
   // SPEC-47 §196 — a escrita REAL aparece por padrão: o que interessa a quem
   // vai executar é o texto. Quem quiser varrer a lista fecha; o estado guarda
   // quem está FECHADO.
@@ -797,6 +810,10 @@ function SecaoDosItens({
 
   const prontos = escritos.filter((i) => i.pendencias === 0 && i.sugestoes === 0).length;
   const geradoEm = escritos[0]?.criadoEm ? new Date(escritos[0].criadoEm) : null;
+  // SPEC-114 — só item que já subiu pro tracker e ainda não tem a spec dele
+  // anexada é candidato. O que ainda não tem `linkExterno` aparece como
+  // `semLinkExterno` na resposta, não some daqui.
+  const pendentesDeSpec = escritos.filter((i) => i.linkExterno && !i.specAnexada).length;
 
   return (
     <section data-testid="secao-dos-itens" style={colunaDeTextoEstilo}>
@@ -883,6 +900,62 @@ function SecaoDosItens({
                   {resultado.ignorados.length > 0 && (
                     <p style={{ fontSize: 11.5, color: "var(--texto-mudo)", margin: "4px 0 0" }}>
                       {resultado.ignorados.length} ficaram de fora por ainda ter pendência.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* SPEC-114 — a SEGUNDA chamada, separada da exportação (§1.1 da
+                  SPEC-81): ciclo de vida e modo de falhar diferentes. Só aparece
+                  quando há pelo menos um item já exportado esperando a spec. */}
+              {onAnexarSpec && pendentesDeSpec > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+                  <button
+                    onClick={async () => {
+                      setAnexando(true);
+                      setErroDoAnexo(null);
+                      setResultadoDoAnexo(null);
+                      try {
+                        setResultadoDoAnexo(await onAnexarSpec());
+                      } catch (e) {
+                        setErroDoAnexo(e instanceof Error ? e.message : String(e));
+                      } finally {
+                        setAnexando(false);
+                      }
+                    }}
+                    disabled={anexando}
+                    data-testid="anexar-spec"
+                    title={`Anexa a spec de cada item ao issue que já existe, ${pendentesDeSpec} de cada vez`}
+                    style={{ ...botaoEstilo, opacity: anexando ? 0.55 : 1 }}
+                  >
+                    {anexando ? "anexando…" : `Anexar spec aos itens (${pendentesDeSpec})`}
+                  </button>
+                </div>
+              )}
+
+              {erroDoAnexo && (
+                <p style={{ fontSize: 12, color: "var(--vermelho)", margin: "8px 0 0" }} data-testid="erro-anexo-spec">
+                  {erroDoAnexo}
+                </p>
+              )}
+              {resultadoDoAnexo && (
+                <div style={{ marginTop: 8 }} data-testid="resultado-anexo-spec">
+                  <p style={{ fontSize: 12.5, color: "var(--verde)", margin: 0 }}>
+                    {resultadoDoAnexo.anexadas.length} spec(s) anexada(s) em {resultadoDoAnexo.destino}.
+                  </p>
+                  {resultadoDoAnexo.erros.map((e) => (
+                    <p key={e.chave} style={{ fontSize: 12, color: "var(--vermelho)", margin: "4px 0 0" }}>
+                      {e.chave}: {e.erro}
+                    </p>
+                  ))}
+                  {resultadoDoAnexo.comLacuna.length > 0 && (
+                    <p style={{ fontSize: 11.5, color: "var(--texto-mudo)", margin: "4px 0 0" }}>
+                      {resultadoDoAnexo.comLacuna.length} ficaram de fora por a spec ainda ter lacuna.
+                    </p>
+                  )}
+                  {resultadoDoAnexo.semLinkExterno.length > 0 && (
+                    <p style={{ fontSize: 11.5, color: "var(--texto-mudo)", margin: "4px 0 0" }}>
+                      {resultadoDoAnexo.semLinkExterno.length} ainda não subiram pro tracker.
                     </p>
                   )}
                 </div>
@@ -1008,6 +1081,16 @@ function CartaoItem({
               <a href={escrito.linkExterno} target="_blank" rel="noreferrer" style={{ ...chipDoItemEstilo, textDecoration: "none" }}>
                 abrir no tracker ↗
               </a>
+            )}
+            {/* SPEC-114 — a segunda chamada já aconteceu PARA ESTE item. Só
+                aparece depois de exportado: sem link não há onde a spec ter ido. */}
+            {escrito?.linkExterno && escrito.specAnexada && (
+              <span
+                data-testid={`item-spec-anexada-${indice}`}
+                style={{ ...chipDoItemEstilo, color: "var(--verde)", background: "rgba(74, 222, 128, 0.12)", borderColor: "transparent" }}
+              >
+                spec anexada
+              </span>
             )}
           </div>
           {escrito && escrito.dependencias.length > 0 && (

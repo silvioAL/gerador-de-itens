@@ -174,6 +174,15 @@ export const OPERACOES_DO_GATEWAY = [
    * escolhe o alvo é a pessoa**, mandando o endereço.
    */
   "documentoExterno",
+  /**
+   * SPEC-114 — **anexar a spec de um item ao issue que a exportação criou.**
+   *
+   * Diferente de `itens`: aquela cria o issue; esta escreve NELE, depois que
+   * ele já existe (por isso o pedido carrega `chaveExterna`, não o item cru).
+   * Destino próprio porque são "duas chamadas de qualquer forma" — nada
+   * obriga as duas a saírem pelo mesmo endereço (SPEC-98 §8).
+   */
+  "specDoItem",
 ] as const;
 export type OperacaoDoGateway = (typeof OPERACOES_DO_GATEWAY)[number];
 
@@ -361,6 +370,12 @@ export const ENVELOPE_PADRAO: Record<OperacaoDoGateway, string> = {
   adr: "",
   /** §349 — leitura, como as outras: o pedido vai cru, com o link dentro. */
   documentoExterno: "",
+  /**
+   * SPEC-114 — o adaptador já manda `{ itens: [...] }`; `envelope: ""` evita
+   * embrulhar de novo (`{ itens: { itens: [...] } }` seria o defeito do §346
+   * seu par pelo lado de dentro em vez de fora).
+   */
+  specDoItem: "",
 };
 
 /**

@@ -26,6 +26,8 @@ export type {
   RepositorioDeItensGerados,
 } from "./portas/repositorioDeItensGerados.js";
 export type { ExportadorDeItens, ItemExportado } from "./portas/exportadorDeItens.js";
+/** SPEC-114 — a segunda chamada: anexar a spec de cada item ao issue exportado. */
+export type { AnexadorDeSpec, PedidoDeAnexoDeSpec } from "./portas/anexadorDeSpec.js";
 export { criarCasosDeUsoDeItensGerados, type CasosDeUsoDeItensGerados } from "./casos-de-uso/itensGerados.js";
 export { normalizarExportador, type ConfigExportador } from "./config/normalizacao.js";
 

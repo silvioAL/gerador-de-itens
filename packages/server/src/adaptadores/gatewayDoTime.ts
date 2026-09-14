@@ -1,11 +1,13 @@
 import type {
   AdrExterno,
+  AnexadorDeSpec,
   DestinoResolvido,
   DocumentoParaPublicar,
   DocumentoPublicado,
   LeitorDeAdr,
   LeitorDeDocumento,
   DocumentoExterno,
+  PedidoDeAnexoDeSpec,
   PublicadorDeDocumento,
 } from "@gerador/aplicacao";
 
@@ -226,6 +228,61 @@ export function criarLeitorDeDocumentoViaGateway(
         ...(texto(corpo.titulo) ? { titulo: texto(corpo.titulo) } : {}),
         ...(texto(corpo.atualizadoEm) ? { atualizadoEm: texto(corpo.atualizadoEm) } : {}),
       };
+    },
+  };
+}
+
+/**
+ * SPEC-114 — a segunda chamada: anexar a spec de cada item ao issue que a
+ * exportação já criou.
+ *
+ * Contrato do gateway:
+ *   POST {endpoint}  { itens: [{ chaveExterna, conteudo }] }
+ *   → 200 { resultados: [{ chaveExterna, erro? }] }
+ *
+ * Falha é **resultado, não exceção** — ao contrário de `publicar`/`ler`
+ * acima, e pela mesma razão do `ExportadorDeItens`: anexar é tão "por item"
+ * quanto exportar, e quem falhou não pode travar quem deu certo.
+ */
+export function criarAnexadorDeSpecViaGateway(
+  destino: DestinoResolvido,
+  fetchImpl: typeof fetch = fetch
+): AnexadorDeSpec {
+  return {
+    async anexar(pedidos: PedidoDeAnexoDeSpec[]) {
+      if (pedidos.length === 0) return [];
+
+      let resposta: Response;
+      try {
+        resposta = await postar(
+          destino,
+          { itens: pedidos.map((p) => ({ chaveExterna: p.chaveExterna, conteudo: p.conteudo })) },
+          fetchImpl
+        );
+      } catch (erro) {
+        // Rede fora vale para TODOS os pedidos desta chamada, mas continua
+        // item a item — a tela mostra por card, e o formato não muda com a causa.
+        const motivo = erro instanceof Error ? erro.message : String(erro);
+        return pedidos.map((p) => ({ chave: p.chave, erro: `não consegui falar com o agente: ${motivo}` }));
+      }
+
+      if (!resposta.ok) {
+        const corpo = await resposta.text().catch(() => "");
+        const motivo = `o agente respondeu HTTP ${resposta.status}${corpo ? ` — ${corpo.slice(0, 200)}` : ""}`;
+        return pedidos.map((p) => ({ chave: p.chave, erro: motivo }));
+      }
+
+      const corpo = (await resposta.json().catch(() => ({}))) as {
+        resultados?: Array<{ chaveExterna?: string; erro?: string }>;
+      };
+      const porChaveExterna = new Map((corpo.resultados ?? []).map((r) => [r.chaveExterna, r]));
+
+      return pedidos.map((p) => {
+        const r = porChaveExterna.get(p.chaveExterna);
+        if (!r) return { chave: p.chave, erro: "o agente não respondeu por este item" };
+        if (r.erro) return { chave: p.chave, erro: r.erro };
+        return { chave: p.chave };
+      });
     },
   };
 }

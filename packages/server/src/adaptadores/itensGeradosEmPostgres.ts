@@ -25,6 +25,7 @@ function comoItemSalvo(linha: LinhaItem): ItemGeradoSalvo {
     sugestoes: linha.sugestoes,
     estado: linha.estado as ItemGeradoSalvo["estado"],
     linkExterno: linha.linkExterno ?? null,
+    specAnexada: linha.specAnexada,
     criadoEm: linha.criadoEm.toISOString(),
   };
 }
@@ -45,6 +46,15 @@ export function criarRepositorioDeItensGeradosEmPostgres(db: BancoDeDados): Repo
       const [linha] = await db
         .update(itensGerados)
         .set({ estado: "exportado", linkExterno })
+        .where(and(eq(itensGerados.quebraId, quebraId), eq(itensGerados.chave, chave)))
+        .returning();
+      return linha ? comoItemSalvo(linha) : null;
+    },
+
+    async marcarSpecAnexada(quebraId, chave) {
+      const [linha] = await db
+        .update(itensGerados)
+        .set({ specAnexada: true })
         .where(and(eq(itensGerados.quebraId, quebraId), eq(itensGerados.chave, chave)))
         .returning();
       return linha ? comoItemSalvo(linha) : null;
@@ -78,6 +88,7 @@ export function criarRepositorioDeItensGeradosEmPostgres(db: BancoDeDados): Repo
                 sugestoes: item.sugestoes,
                 estado: exportado ? "exportado" : "gerado",
                 linkExterno: exportado?.linkExterno ?? null,
+                specAnexada: exportado?.specAnexada ?? false,
               };
             })
           )

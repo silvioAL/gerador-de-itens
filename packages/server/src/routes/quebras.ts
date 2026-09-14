@@ -23,7 +23,11 @@ import type { OpcoesApp } from "../app.js";
 import { criarRepositorioDeQuebrasEmPostgres } from "../adaptadores/quebrasEmPostgres.js";
 import { criarRepositorioDeItensGeradosEmPostgres } from "../adaptadores/itensGeradosEmPostgres.js";
 import { criarExportadorViaAgente } from "../adaptadores/exportadorViaAgente.js";
-import { criarLeitorDeAdrViaGateway, criarPublicadorDeDocumentoViaGateway } from "../adaptadores/gatewayDoTime.js";
+import {
+  criarAnexadorDeSpecViaGateway,
+  criarLeitorDeAdrViaGateway,
+  criarPublicadorDeDocumentoViaGateway,
+} from "../adaptadores/gatewayDoTime.js";
 import { criarRepositorioDeConfigEmPostgres } from "../adaptadores/configEmPostgres.js";
 import { registrarAuditoria } from "../auditoria.js";
 import { exigirNivel } from "../auth/niveis.js";
@@ -89,6 +93,20 @@ const corpoPublicarDocumento = z.object({
   markdown: z.string().min(1, "markdown vazio — não há documento para publicar"),
   desatualizado: z.boolean().default(false),
   /** Qual destino, quando há mais de um configurado para documento. */
+  destinoId: z.string().optional(),
+});
+
+/** SPEC-114 — uma entrada por item: cada um tem a SUA spec, não uma cópia. */
+const corpoAnexarSpec = z.object({
+  itens: z
+    .array(
+      z.object({
+        chave: z.string().min(1),
+        conteudo: z.string().min(1),
+      })
+    )
+    .min(1, "nenhum item para anexar spec"),
+  /** Qual destino, quando há mais de um configurado para specDoItem. */
   destinoId: z.string().optional(),
 });
 
@@ -537,6 +555,55 @@ export async function registrarRotasQuebras(app: FastifyInstance, { db, diretori
       // onde a pessoa vai procurar o problema.
       return reply.code(502).send({ erro: erro instanceof Error ? erro.message : String(erro) });
     }
+  });
+
+  /**
+   * SPEC-114 — a SEGUNDA chamada: anexa a spec de cada item ao issue que a
+   * exportação já criou.
+   *
+   * Rota própria, não um parâmetro de `/itens/exportar` — mesma razão do
+   * `/documento/publicar`: ciclo de vida e modo de falhar diferentes (§1.1 da
+   * SPEC-81). Falha aqui é POR ITEM, como a exportação — nunca tudo-ou-nada.
+   */
+  app.post("/quebras/:id/spec/anexar", { preHandler: podeOperarNaQuebra }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    if (!(await casos.obter(id))) return reply.code(404).send({ erro: "quebra não encontrada" });
+
+    const corpo = corpoAnexarSpec.safeParse(req.body);
+    if (!corpo.success) {
+      return reply.code(400).send({ erro: "corpo inválido", detalhes: corpo.error.issues });
+    }
+
+    const config = normalizarExportador(
+      (await criarCasosDeUsoDeConfig(criarRepositorioDeConfigEmPostgres(db)).obter("exportador", { endpoint: "", rotulo: "", cabecalhos: {} }))
+        .documento
+    );
+    const destinos = destinosDaOperacao(config, "specDoItem");
+    if (destinos.length === 0) {
+      return reply.code(409).send({
+        erro: "nenhum destino de spec configurado — cadastre o endereço em Configurações → Exportação, em “Outros destinos”",
+      });
+    }
+    const escolhido = corpo.data.destinoId
+      ? destinos.find((d) => d.id === corpo.data.destinoId)
+      : destinos.length === 1
+        ? destinos[0]
+        : undefined;
+    if (!escolhido) {
+      return reply.code(409).send({
+        erro: "há mais de um destino de spec — diga em qual anexar",
+        destinos: destinos.map((d) => ({ id: d.id, rotulo: d.rotulo || d.endpoint })),
+      });
+    }
+
+    const resultado = await itens.anexarSpecNaQuebra(id, corpo.data.itens, criarAnexadorDeSpecViaGateway(escolhido));
+    registrarAuditoria(db, {
+      email: req.usuario!.email,
+      acao: "anexar-spec",
+      recurso: "itens_gerados",
+      recursoId: id,
+    });
+    return { ...resultado, destino: escolhido.rotulo || escolhido.endpoint };
   });
 
   /**

@@ -84,6 +84,42 @@ export function testarContratoDeItensGerados(
       expect(depois[0].corpoMarkdown).toBe("### a v2");
     });
 
+    it("marcarSpecAnexada marca só a spec, sem mexer em estado/link", async () => {
+      const quebraId = await ambiente.criarQuebra();
+      await ambiente.repo.substituirDaQuebra(quebraId, [item("a")]);
+      await ambiente.marcarExportado(quebraId, "a", "https://jira.example/AB-12");
+
+      const salvo = await ambiente.repo.marcarSpecAnexada(quebraId, "a");
+
+      expect(salvo?.specAnexada).toBe(true);
+      expect(salvo?.estado).toBe("exportado");
+      expect(salvo?.linkExterno).toBe("https://jira.example/AB-12");
+    });
+
+    it("marcarSpecAnexada em chave inexistente devolve null, sem lançar", async () => {
+      const quebraId = await ambiente.criarQuebra();
+      await ambiente.repo.substituirDaQuebra(quebraId, [item("a")]);
+
+      expect(await ambiente.repo.marcarSpecAnexada(quebraId, "fantasma")).toBeNull();
+    });
+
+    it("regenerar preserva specAnexada de item com a mesma chave", async () => {
+      const quebraId = await ambiente.criarQuebra();
+      await ambiente.repo.substituirDaQuebra(quebraId, [item("a")]);
+      await ambiente.marcarExportado(quebraId, "a", "https://jira.example/AB-12");
+      await ambiente.repo.marcarSpecAnexada(quebraId, "a");
+
+      const depois = await ambiente.repo.substituirDaQuebra(quebraId, [item("a", { corpoMarkdown: "### a v2" })]);
+
+      expect(depois[0].specAnexada).toBe(true);
+    });
+
+    it("item recém-gerado nunca nasce com specAnexada", async () => {
+      const quebraId = await ambiente.criarQuebra();
+      const salvos = await ambiente.repo.substituirDaQuebra(quebraId, [item("a")]);
+      expect(salvos[0].specAnexada).toBe(false);
+    });
+
     it("itens de uma quebra não vazam pra outra", async () => {
       const q1 = await ambiente.criarQuebra();
       const q2 = await ambiente.criarQuebra();

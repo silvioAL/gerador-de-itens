@@ -71,6 +71,7 @@ function escrito(chave: string, p: Partial<ItemGerado> = {}): ItemGerado {
     sugestoes: 0,
     estado: "gerado",
     linkExterno: null,
+    specAnexada: false,
     criadoEm: new Date("2026-08-12T10:00:00Z").toISOString(),
     ...p,
   };

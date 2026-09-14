@@ -371,11 +371,16 @@ export interface ItemGerado {
   sugestoes: number;
   estado: "gerado" | "exportado";
   linkExterno: string | null;
+  /** SPEC-114 — a segunda chamada (a spec DESTE item) já chegou ao issue. */
+  specAnexada: boolean;
   criadoEm: string;
 }
 
 /** O que o cliente manda ao (re)gerar — a forma de `ItemDeTrabalho` do engine. */
-export type DadosItemGerado = Omit<ItemGerado, "id" | "quebraId" | "estado" | "linkExterno" | "criadoEm">;
+export type DadosItemGerado = Omit<
+  ItemGerado,
+  "id" | "quebraId" | "estado" | "linkExterno" | "specAnexada" | "criadoEm"
+>;
 
 /** SPEC-49 — o que a exportação devolve: o que subiu, o que falhou (com
  * motivo) e o que ficou de fora por ainda ter pendência. */
@@ -386,12 +391,28 @@ export interface ResultadoDaExportacao {
   destino: string;
 }
 
+/** SPEC-114 — o que a segunda chamada devolve: cada item tem seu próprio
+ * motivo de não ter entrado (spec com lacuna, ou ainda sem link do tracker). */
+export interface ResultadoDoAnexoDeSpec {
+  anexadas: ItemGerado[];
+  erros: { chave: string; erro: string }[];
+  semLinkExterno: string[];
+  comLacuna: string[];
+  destino: string;
+}
+
 export const apiItensGerados = {
   listar: (quebraId: string) => requisitar<ItemGerado[]>(`/quebras/${quebraId}/itens`),
   regerar: (quebraId: string, itens: DadosItemGerado[]) =>
     requisitar<ItemGerado[]>(`/quebras/${quebraId}/itens`, { method: "PUT", body: JSON.stringify({ itens }) }),
   exportar: (quebraId: string) =>
     requisitar<ResultadoDaExportacao>(`/quebras/${quebraId}/itens/exportar`, { method: "POST" }),
+  /** SPEC-114 — cada entrada leva a SUA spec, não uma cópia da spec da demanda. */
+  anexarSpec: (quebraId: string, itens: { chave: string; conteudo: string }[]) =>
+    requisitar<ResultadoDoAnexoDeSpec>(`/quebras/${quebraId}/spec/anexar`, {
+      method: "POST",
+      body: JSON.stringify({ itens }),
+    }),
 };
 
 export interface PedidoSugestaoIa {
