@@ -130,7 +130,7 @@ decidida conscientemente, com uma das saídas (nenhuma é de graça):
 
 **Esta SPEC não escolhe entre as três** — é decisão de produto, não só de
 arquitetura, porque muda como a ferramenta SE SENTE ao usar. Precisa ser
-respondida antes da fatia D (§7), não durante.
+respondida antes da fatia E (§7), não durante.
 
 ### 5.2 Candidatos à fatia piloto, para escolher
 
@@ -171,4 +171,109 @@ respondida antes da fatia D (§7), não durante.
   motor.** A mais cara e a mais arriscada de todas — é a que este projeto
   estava estruturado, desde o início, para NÃO ter duplicada (§1), e agora
   também muda a UX da mesa (§5.1). Fatia própria, por último, não incluída
-  na fatia piloto.
+  na fatia piloto. **Inclui o redesenho do §8.2** (comportamento migrando
+  para dentro de Entities/VOs) — não é só traduzir sintaxe.
+
+## 8. Requisito técnico do usuário: Clean Architecture, DDD + Hexagonal, camadas, Value Objects, design patterns
+
+> *"o backend deve usar clean architecture, DDD + Hexagonal, suas devidas
+> camadas, value objects, e os design patterns que convierem."*
+
+### 8.1 A boa notícia, medida: o desenho atual já pensa em camadas — só não com esses nomes
+
+Isto não é começar do zero. `packages/aplicacao/src/portas/` já são
+**interfaces que o domínio define e a infraestrutura implementa**
+(`RepositorioDeItensGerados`, `ExportadorDeItens`, `AnexadorDeSpec`) —
+literalmente a Inversão de Dependência que Hexagonal e Clean Architecture
+exigem: o núcleo não conhece Postgres, Fastify, nem o gateway HTTP; quem
+conhece é `packages/server/src/adaptadores/`. `casos-de-uso/` já é a camada
+de aplicação (orquestra, não decide regra de negócio sozinha). O mapeamento
+é direto:
+
+| Camada (Clean/Hexagonal) | Hoje | No Spring |
+|---|---|---|
+| Domínio (entidades, VOs, regras) | `packages/engine/src/model/`, funções puras do engine | pacote `domain`, classes ricas (ver §8.2) |
+| Aplicação (casos de uso) | `packages/aplicacao/src/casos-de-uso/` | pacote `application`, `@UseCase`/serviços de aplicação |
+| Portas (interfaces) | `packages/aplicacao/src/portas/` | interfaces no pacote `domain`/`application` |
+| Adaptadores de saída | `packages/server/src/adaptadores/` | `infrastructure/persistence`, `infrastructure/gateway` (JPA, WebClient) |
+| Adaptadores de entrada | `packages/server/src/routes/` | `infrastructure/web` (`@RestController`) |
+
+**O que falta não é inventar a estrutura — é migrar SEM perder a inversão de
+dependência que já existe.** O risco real está em outro lugar (§8.2).
+
+### 8.2 ⚠️ O risco real: o motor hoje é funcional, DDD tático é orientado a objeto
+
+`engine`/`aplicacao` são, de propósito, **dados simples (interfaces) +
+funções puras por fora** — `derivar(diagrama, config)`, `calcularProntidao(spec,
+no)`, nunca `no.calcularProntidao()`. É um estilo funcional deliberado deste
+projeto (determinístico, fácil de testar, sem estado escondido).
+
+**DDD tático em Java tradicionalmente é o oposto**: comportamento MORA na
+entidade/Value Object (`Decisao.substituirPor(nova)`, não
+`substituirDecisao(decisao, nova)`), porque é isso que protege invariante —
+um Value Object com setter público ou um Entity sem método que garanta sua
+própria regra é "anemic domain model", o antipadrão que a literatura de DDD
+mais cita.
+
+**Traduzir mecanicamente (função vira método estático, struct vira classe
+com getters/setters) não é DDD — é procedural com sintaxe de classe.** Para
+o requisito ser cumprido de verdade, e não só de nome, a fatia E (§7)
+precisa REDESENHAR o domínio, não só traduzir — decidir onde cada regra hoje
+solta numa função pura passa a morar dentro de que Entity/VO.
+
+### 8.3 Candidatos concretos, medidos no modelo atual
+
+**Value Objects** (sem identidade própria, imutáveis, iguais por valor):
+
+- `ValorSpec` (`engine/model/types.ts:10`) — valor + proveniência
+  (`origem`, `evidencia`, `confianca`) já é o formato clássico de VO: dois
+  `ValorSpec` com os mesmos campos são o mesmo valor, não "o mesmo objeto".
+- `Alternativa` (`titulo`, `consequencia?`) dentro de `Decisao` — sem
+  identidade própria, só existe como parte de uma decisão.
+- Proveniência (`Origem`: `"manual" | "sugerido" | "extraido" | "herdado"`)
+  — candidato a VO/enum rico, se ganhar comportamento (ex.: `podeSerSobrescrita()`).
+
+**Entities** (identidade + ciclo de vida):
+
+- `Quebra` — candidata a **Aggregate Root**: hoje `diagrama`, `decisoes`,
+  `itensGerados`, `ensaios` são coleções soltas dentro dela, editadas por
+  fora sem a `Quebra` arbitrar a própria consistência. DDD tático pediria
+  que invariantes entre essas coleções (ex.: "spec não pode cobrir item que
+  não existe mais" — hoje resolvido como `orfas` calculado depois, em
+  `coberturaDaSpec`) fossem impossíveis de violar PELO objeto, não
+  detectadas depois.
+- `Decisao`, `ItemGeradoSalvo` — identidade própria (`id`), ciclo de vida
+  (`status`, `estado`), candidatas a Entity dentro do aggregate `Quebra`.
+
+**Domain Services** (regra que não pertence a uma única entidade):
+
+- `derivar`, `resolverDependencias`, `calcularProntidao` — operam sobre MAIS
+  de uma entidade/VO ao mesmo tempo; não pertencem a nenhuma sozinha. Viram
+  Domain Services no sentido tático (não `@Service` do Spring, que é outra
+  camada) — funções livres SEM estado, mas dentro do pacote `domain`.
+
+**Design patterns já implícitos hoje, que a tradução Java pode nomear:**
+
+- **Strategy** — `ExportadorDeItens`/`AnexadorDeSpec`/`PublicadorDeDocumento`
+  já são estratégias intercambiáveis por configuração (o "gateway do time").
+- **Factory** — `criarCasosDeUsoDeItensGerados(repo)`,
+  `criarRepositorioDeItensGeradosEmPostgres(db)` já são fábricas por injeção
+  de dependência manual; no Spring, viram `@Bean`/construtor com `@Autowired`.
+- **Specification** — candidato para `prontosEIgnorados`/`calcularProntidao`
+  (regras compostas de "pronto para X"), se o requisito de regras de negócio
+  crescer a ponto de justificar o padrão formal em vez de `filter()`.
+
+## 9. O que esta SPEC RECUSA (acréscimo do §8)
+
+- **Chamar de "Clean Architecture" uma tradução mecânica.** Sem o
+  redesenho do §8.2 (comportamento migrando para dentro de Entities/VOs), o
+  resultado é Java procedural com nomes de pasta bonitos — não cumpre o
+  requisito, só parece cumprir.
+- **Inventar Value Objects/Entities sem candidato medido.** O §8.3 lista o
+  que já existe hoje como candidato; a fatia de implementação usa essa lista
+  como ponto de partida, não como catálogo fechado — mas também não parte de
+  uma lousa em branco.
+- **Forçar um design pattern sem necessidade.** "Os que convierem" (palavra
+  do próprio pedido) significa medir onde cada padrão resolve algo que sem
+  ele seria pior — Strategy e Factory já se pagam pelo que já existe hoje;
+  Specification é candidato, não obrigação, até a regra de negócio pedir.
