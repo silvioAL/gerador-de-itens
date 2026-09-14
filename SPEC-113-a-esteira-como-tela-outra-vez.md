@@ -172,17 +172,24 @@ confirmada hospedada-compatível desde a SPEC-31 (ver correção no §3). Não h
 `EsteiraAoVivo.tsx` nem rota nova a construir: a experiência pedida
 ("a mesma anterior") já é literalmente a que está de pé nesta branch.
 
-### Fatia F — remoção
+### Fatia F — remoção ✅ satisfeita por construção, sem ação
 
-Só depois que C/D/E já substituíram tudo que dependia deles:
-`packages/web/src/fluxo/`, `routes/fluxos.ts`, o executor genérico de
-`casos-de-uso/fluxos.ts`, e o resto da lista da seção 4.
+`packages/web/src/fluxo/`, `routes/fluxos.ts`, `server/src/fluxos/` e o
+executor genérico de `casos-de-uso/fluxos.ts` nunca existiram nesta branch —
+ela parte do commit anterior à SPEC-105 (`f16cd29`). Confirmado por `ls`
+direto: nenhum desses caminhos existe. Confirmado também que os dois
+cherry-picks (`16f1479`, `3106a37`) não introduziram nenhuma referência a
+`apiExecucaoDeFluxo`/`FluxoScreen`/`GaleriaDeFluxos`/`casos-de-uso/fluxos`
+(grep vazio no código-fonte; as únicas ocorrências de "fluxo" no repo são
+`dist/` — lixo de build gitignorado — e `OFluxoDoProcesso.tsx`, um conceito
+de narrativa do PDCA pré-existente, sem relação com o canvas).
 
-### Fatia G — reescrever a narrativa do onboarding
+### Fatia G — reescrever a narrativa do onboarding ✅ satisfeita por construção, sem ação
 
-`JourneyModal.tsx` e `useTour.ts` narram o canvas de fluxos como "o mapa vivo
-da ferramenta" em ~35 pontos de texto — precisa reescrita de copy, não só
-remoção de import.
+`JourneyModal.tsx`/`useTour.ts` nesta branch não mencionam canvas de fluxos,
+"mapa vivo" ou fluxo plugável/conectável (grep vazio) — essa narrativa só foi
+escrita a partir da SPEC-105/110, que é posterior ao ponto de corte desta
+branch.
 
 ## 6. O que esta SPEC NÃO faz
 
