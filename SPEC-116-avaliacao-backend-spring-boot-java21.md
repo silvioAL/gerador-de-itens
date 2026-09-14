@@ -73,20 +73,35 @@ de se querer isso, e o que cada uma pede como resposta:
 | Performance/concorrência do servidor Node é gargalo medido | Não há medição de performance neste repositório hoje |
 | Ecossistema Spring (Security, observability) resolve algo que Fastify não resolve | O produto já tem RBAC, sessão, auditoria — comparar o que falta de verdade, não presumir |
 
-**Nenhuma dessas quatro foi citada no pedido original.** Sem saber qual (se
-alguma) é o motivo real, a SPEC de implementação corre o risco de otimizar
-para o problema errado — a mesma armadilha que a SPEC-75 nomeou para o
-mapeamento de contexto.
+### ✅ Respondido pelo usuário, na revisão desta SPEC
+
+> *"preciso que o backend vire um projeto Spring Boot, pois vou levar esse
+> projeto para a empresa e esse é o padrão lá."*
+
+**É a primeira linha da tabela, e é um fato externo concreto — não uma
+preferência técnica a debater.** "Levar para a empresa, onde Java/Spring é o
+padrão" muda a régua do §6 (recusa de "presumir motivo"): o motivo está
+dado, e não é performance nem lacuna do Fastify — é adoção organizacional. Isso
+tem uma consequência prática direta: **a paridade de comportamento importa
+mais que a elegância da tradução**, porque quem vai manter o código depois
+é o time da empresa, não necessariamente quem está migrando agora. A fatia
+piloto (§7.B) e a suíte de contrato como especificação (§6) ficam ainda mais
+importantes com essa resposta, não menos.
 
 ## 5. O que esta avaliação RECOMENDA
 
-**Não iniciar a reescrita sem antes responder, nesta ordem:**
+**A pergunta 1 abaixo está respondida (ver acima). As demais continuam em
+aberto — não iniciar a reescrita sem respondê-las:**
 
-1. **Por quê**, especificamente — qual das linhas do §4 (ou outra) é o motivo
-   real. Muda o desenho inteiro.
+1. ~~Por quê, especificamente~~ — **respondido: adoção organizacional
+   ("padrão da empresa"), não performance nem lacuna técnica.**
 2. **`engine`/`aplicacao` migram, viram serviço à parte, ou o servidor Java
    os chama por rede?** — a decisão do §2, e ela é estrutural, não de
-   detalhe.
+   detalhe. **Sem resposta ainda, e agora mais urgente**: se o destino é uma
+   empresa com padrão Java, faz pouco sentido a organização herdar um
+   componente TypeScript (`engine`/`aplicacao`) que continua sendo a maior
+   parte da lógica — o motivo dado no §4 empurra para migrar TUDO, não só
+   `server`.
 3. **Escopo do "backend"**: é só `server` (rotas HTTP, Postgres), ou inclui
    `llm` (gateway de IA) e a orquestração da esteira? Cada um tem
    dependências e formato de teste diferentes.
@@ -97,8 +112,9 @@ mapeamento de contexto.
 
 ## 6. O que esta SPEC RECUSA
 
-- **Estimar prazo ou fatiar a migração inteira sem resposta às quatro
-  perguntas do §5.** Um cronograma sobre motivo desconhecido é ficção.
+- **Estimar prazo ou fatiar a migração inteira sem resposta às perguntas 2-4
+  do §5** (a 1 já está respondida). Um cronograma sem saber o escopo real
+  (§5.2/§5.3) é ficção.
 - **Presumir que "backend" exclui `engine`/`aplicacao`.** Já demonstrado no
   §2 que são a maior parte do que o servidor executa.
 - **Migrar reescrevendo do zero em vez de traduzindo com os testes de
@@ -107,11 +123,12 @@ mapeamento de contexto.
   (rodar a MESMA suíte, adaptada, contra a implementação Java) é mais barato
   e mais seguro que reescrever e confiar na leitura humana do código antigo.
 
-## 7. Se a resposta às quatro perguntas justificar seguir — as fatias prováveis
+## 7. Com o motivo já respondido — as fatias prováveis
 
-Não fatiado em detalhe (depende das respostas do §5), mas a forma esperada:
+Não fatiado em detalhe (depende das respostas 2-4 do §5, ainda em aberto),
+mas a forma esperada:
 
-- **A — decidir e documentar as 4 respostas do §5.**
+- **A — decidir e documentar as respostas 2-4 do §5** (a 1 já está feita).
 - **B — a fatia piloto**, com prova de paridade via suíte de contrato
   adaptada, rodando em paralelo ao servidor Node (não substituindo ainda).
 - **C — medir o custo real da fatia piloto** (tempo, linhas, bugs de

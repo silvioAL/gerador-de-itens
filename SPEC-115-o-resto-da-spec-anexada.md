@@ -53,6 +53,54 @@ PowerShell, nem o assistente expandido (§1.3 da SPEC-75, ainda sem forma).
 Aquele fluxo continua valendo para ALIMENTAR novas decisões — não para
 exibir as que já existem.
 
+#### 1.1.1 ⚠️ Correção: o mapeamento/conversa com o agente é POR COMPONENTE — não da demanda inteira
+
+> Pergunta do usuário, na revisão desta SPEC: *"colocou a parte de interagir
+> com o agente, rodar scripts de mapeamento e interações nesse sentido quanto
+> a um componente do desenho?"* **Resposta honesta: não — a primeira escrita
+> desta SPEC deixou aquele fluxo inteiro como "ainda sem forma" (SPEC-75),
+> sem essa dimensão.**
+
+Isto muda a forma da fatia, e ela agora tem endereço próprio no código:
+`DecisoesDoNo.tsx` já ancora `Decisao` num nó ou aresta específico via
+`noId`/`arestaId` — não na demanda como um todo. A conversa de
+aprofundamento (colar saída de script, discutir com o assistente, registrar
+a decisão) faz mais sentido **dentro do painel do componente**
+(`PropertiesPanel.tsx`, onde `DecisoesDoNo` já vive), não como uma conversa
+solta no nível da demanda:
+
+- A pessoa seleciona um componente (ex.: `srv-catalogo`).
+- Cola a saída de um script de mapeamento relevante PARA AQUELE componente
+  (ex.: o schema do banco que ele usa, as rotas que ele expõe).
+- Conversa com o assistente sobre esse recorte especificamente — contexto
+  menor, resposta mais precisa, menos chance de misturar decisões de
+  componentes diferentes numa sopa só.
+- O que sai vira `Decisao` com `noId` daquele componente — a mesma âncora
+  que `DecisoesDoNo.tsx` já usa, sem estrutura nova nenhuma do lado do dado.
+
+**Por que isso é melhor que uma conversa única da demanda inteira, e não só
+diferente:** um desenho com 8 componentes discutidos na MESMA conversa
+tende a produzir decisões cujo contexto se perde — "por que escolhemos fila
+em vez de síncrono" precisa saber DE QUAL chamada, entre qual componente e
+qual, para não virar uma frase genérica demais para ancorar em lugar nenhum.
+Por componente, a pergunta chega já recortada.
+
+**O que ainda fica em aberto, e continua sendo o bloqueio real da SPEC-75:**
+a fronteira hospedado/local do script em si (resposta já dada: colar a
+saída, sem execução automática) e o painel expansível do assistente (ainda
+não desenhado). Esta correção só decide o ESCOPO da conversa (por
+componente), não resolve o mecanismo de rodar scripts — isso continua sendo
+trabalho da SPEC-75, agora com um alvo mais claro de onde a conversa mora.
+
+**Isto não é periférico — é a tese do produto.** Confirmado pelo usuário na
+revisão desta SPEC: *"a proposta do sistema é acelerar a construção de itens
+e specs, então é natural e desejável poder iterar dessa forma com o
+assistente e, com apoio dele, decidir por exemplo design patterns a
+utilizar."* Isso muda a prioridade relativa das fatias: o painel expansível
+do assistente, que a primeira escrita tratava como "gap registrado, rodada
+própria" (§1.2 da SPEC-75), passa a ser pré-requisito direto de uma fatia
+central, não um adiamento confortável.
+
 **O rótulo**: com a seção passando a ter conteúdo DERIVADO por padrão, "escrito
 por uma pessoa" deixa de ser verdade em geral — vira "derivado de N decisões,
 mais o que você quiser complementar". O texto muda para algo como
@@ -116,9 +164,11 @@ onde a pessoa já está, não impedir que ela chegue lá.
 
 ## 2. O que esta SPEC RECUSA
 
-- **Reabrir o mapeamento de contexto via PowerShell/assistente expandido**
-  (SPEC-75 §1.2 continua em aberto, sem workflow construído) — a derivação
-  de trade-offs (§1.1) não depende disso.
+- **Executar scripts de mapeamento automaticamente.** A fronteira decidida
+  (SPEC-75) continua sendo colar a saída — nenhuma automação de execução
+  entra aqui, nem por componente, nem por demanda.
+- **Uma conversa única de mapeamento pra demanda inteira.** O §1.1.1
+  corrige isso: é por componente, ancorada em `noId`/`arestaId`.
 - **Apresentar o mock de 20s como o comportamento real.** Precisa estar
   marcado como demonstração, sempre.
 - **Bloquear a navegação ao Documento** (opção A do §1.3) — a régua histórica
@@ -138,9 +188,19 @@ onde a pessoa já está, não impedir que ela chegue lá.
   para `itens`), marcado como modo de demonstração na tela de configuração.
 - **E — o pipeline por item, persistido.** Estado sobrevive a F5; a tela lê
   de onde parou, não recomeça.
-- **F — a animação sobre o pipeline** (SPEC-98 §5): em que item está, o que
+- **F — a conversa de mapeamento por componente** (§1.1.1) — **prioridade
+  alta, não periférica**: o usuário confirmou que isto é central à proposta
+  do produto ("acelerar a construção de itens e specs... é natural e
+  desejável poder iterar com o assistente e, com apoio dele, decidir por
+  exemplo design patterns a utilizar"). Entrada no `PropertiesPanel`/
+  `DecisoesDoNo` do componente selecionado; colar saída de script e
+  conversar com o assistente produz `Decisao` ancorada naquele
+  `noId`/`arestaId`. **Depende de** o painel expansível do assistente (ainda
+  não desenhado) — o desenho desse painel deixa de ser opcional/depois e
+  passa a ser pré-requisito direto desta fatia.
+- **G — a animação sobre o pipeline** (SPEC-98 §5): em que item está, o que
   já chegou, quanto falta.
-- **G — o motivo do "Exportar" desabilitado fica visível na tela de
+- **H — o motivo do "Exportar" desabilitado fica visível na tela de
   revisão**, antes de ir ao documento — não um bloqueio, um aviso.
 
 ## 4. Perguntas em aberto para quem implementar
