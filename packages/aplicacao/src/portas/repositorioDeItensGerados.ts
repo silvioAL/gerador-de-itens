@@ -26,21 +26,28 @@ export interface ItemGeradoSalvo {
   estado: "gerado" | "exportado";
   /** Link no tracker externo quando exportado (Fase 2). */
   linkExterno: string | null;
+  /** SPEC-114 — a segunda chamada (a spec DESTE item foi anexada ao issue). */
+  specAnexada: boolean;
   criadoEm: string;
 }
 
 /** O que se manda ao (re)gerar: a identidade e os carimbos são do repositório. */
-export type DadosItemGerado = Omit<ItemGeradoSalvo, "id" | "quebraId" | "estado" | "linkExterno" | "criadoEm">;
+export type DadosItemGerado = Omit<
+  ItemGeradoSalvo,
+  "id" | "quebraId" | "estado" | "linkExterno" | "specAnexada" | "criadoEm"
+>;
 
 export interface RepositorioDeItensGerados {
   /** Ordem de geração (a numeração do documento). */
   listarDaQuebra(quebraId: string): Promise<ItemGeradoSalvo[]>;
   /**
    * Substitui o conjunto da quebra pelo novo — atomicamente. Item exportado
-   * de mesma `chave` preserva `estado`/`linkExterno` (o rastro externo não
-   * evapora porque o material foi regenerado).
+   * de mesma `chave` preserva `estado`/`linkExterno`/`specAnexada` (o rastro
+   * externo não evapora porque o material foi regenerado).
    */
   substituirDaQuebra(quebraId: string, itens: DadosItemGerado[]): Promise<ItemGeradoSalvo[]>;
   /** SPEC-49 — o item virou issue lá fora: guarda o link e o estado. */
   marcarExportado(quebraId: string, chave: string, linkExterno: string): Promise<ItemGeradoSalvo | null>;
+  /** SPEC-114 — a spec deste item chegou ao issue que a exportação criou. */
+  marcarSpecAnexada(quebraId: string, chave: string): Promise<ItemGeradoSalvo | null>;
 }

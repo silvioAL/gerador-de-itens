@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DestinoResolvido } from "@gerador/aplicacao";
 import {
+  criarAnexadorDeSpecViaGateway,
   criarLeitorDeAdrViaGateway,
   criarLeitorDeDocumentoViaGateway,
   criarPublicadorDeDocumentoViaGateway,
@@ -358,5 +359,115 @@ describe("ler um documento da casa pelo link (§349)", () => {
 
     expect(await criarLeitorDeDocumentoViaGateway(DESTINO_DOC_EXTERNO, caiu).ler("https://wiki/p/1")).toBeUndefined();
     expect(await criarLeitorDeDocumentoViaGateway(DESTINO_DOC_EXTERNO, http404).ler("https://wiki/p/1")).toBeUndefined();
+  });
+});
+
+/**
+ * SPEC-114 — a segunda chamada: anexar a spec de CADA item ao issue que a
+ * exportação já criou. Falha por item, como o `ExportadorDeItens` — nunca
+ * exceção, ao contrário do `PublicadorDeDocumento` acima.
+ */
+describe("anexar a spec de cada item pelo gateway (SPEC-114)", () => {
+  const DESTINO_SPEC: DestinoResolvido = {
+    id: "agente-de-codigo",
+    operacao: "specDoItem",
+    endpoint: "https://gw.casa/spec",
+    rotulo: "Agente de código",
+    cabecalhos: { Authorization: "Bearer x" },
+    metodo: "POST" as const,
+    envelope: "",
+    espaco: "",
+  };
+
+  const respondendo = (corpo: unknown, status = 200) =>
+    vi.fn(async () => new Response(JSON.stringify(corpo), { status }));
+
+  it("manda a chaveExterna e o conteúdo DE CADA item — não uma spec repetida", async () => {
+    const rede = respondendo({ resultados: [{ chaveExterna: "A-1" }, { chaveExterna: "B-2" }] });
+
+    await criarAnexadorDeSpecViaGateway(DESTINO_SPEC, rede).anexar([
+      { chave: "a", chaveExterna: "A-1", conteudo: "# Spec do item a" },
+      { chave: "b", chaveExterna: "B-2", conteudo: "# Spec do item b" },
+    ]);
+
+    const [, init] = rede.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({
+      itens: [
+        { chaveExterna: "A-1", conteudo: "# Spec do item a" },
+        { chaveExterna: "B-2", conteudo: "# Spec do item b" },
+      ],
+    });
+  });
+
+  it("lista vazia não chama o gateway", async () => {
+    const rede = respondendo({ resultados: [] });
+    expect(await criarAnexadorDeSpecViaGateway(DESTINO_SPEC, rede).anexar([])).toEqual([]);
+    expect(rede).not.toHaveBeenCalled();
+  });
+
+  it("sucesso por item — sem `erro` no resultado", async () => {
+    const rede = respondendo({ resultados: [{ chaveExterna: "A-1" }] });
+
+    const resultado = await criarAnexadorDeSpecViaGateway(DESTINO_SPEC, rede).anexar([
+      { chave: "a", chaveExterna: "A-1", conteudo: "# Spec" },
+    ]);
+
+    expect(resultado).toEqual([{ chave: "a" }]);
+  });
+
+  it("falha é por ITEM, nunca tudo-ou-nada", async () => {
+    const rede = respondendo({
+      resultados: [{ chaveExterna: "A-1" }, { chaveExterna: "B-2", erro: "issue arquivada" }],
+    });
+
+    const resultado = await criarAnexadorDeSpecViaGateway(DESTINO_SPEC, rede).anexar([
+      { chave: "a", chaveExterna: "A-1", conteudo: "# Spec a" },
+      { chave: "b", chaveExterna: "B-2", conteudo: "# Spec b" },
+    ]);
+
+    expect(resultado).toEqual([{ chave: "a" }, { chave: "b", erro: "issue arquivada" }]);
+  });
+
+  it("item que o agente não respondeu vira erro nomeado, não silêncio", async () => {
+    const rede = respondendo({ resultados: [{ chaveExterna: "A-1" }] });
+
+    const resultado = await criarAnexadorDeSpecViaGateway(DESTINO_SPEC, rede).anexar([
+      { chave: "a", chaveExterna: "A-1", conteudo: "# Spec a" },
+      { chave: "b", chaveExterna: "B-2", conteudo: "# Spec b" },
+    ]);
+
+    expect(resultado).toEqual([{ chave: "a" }, { chave: "b", erro: "o agente não respondeu por este item" }]);
+  });
+
+  it("rede fora vira erro POR ITEM, nunca exceção", async () => {
+    const rede = vi.fn().mockRejectedValue(new Error("ECONNREFUSED"));
+
+    const resultado = await criarAnexadorDeSpecViaGateway(DESTINO_SPEC, rede).anexar([
+      { chave: "a", chaveExterna: "A-1", conteudo: "# Spec a" },
+    ]);
+
+    expect(resultado).toEqual([{ chave: "a", erro: expect.stringContaining("ECONNREFUSED") }]);
+  });
+
+  it("HTTP de erro vira erro por item, com o status na mensagem", async () => {
+    const rede = respondendo({ erro: "sem permissão" }, 403);
+
+    const resultado = await criarAnexadorDeSpecViaGateway(DESTINO_SPEC, rede).anexar([
+      { chave: "a", chaveExterna: "A-1", conteudo: "# Spec a" },
+    ]);
+
+    expect(resultado[0]).toEqual({ chave: "a", erro: expect.stringContaining("HTTP 403") });
+  });
+
+  it("honra método e envelope do destino, como os outros adaptadores desta família", async () => {
+    const rede = respondendo({ resultados: [{ chaveExterna: "A-1" }] });
+
+    await criarAnexadorDeSpecViaGateway({ ...DESTINO_SPEC, metodo: "PUT", envelope: "dados" }, rede).anexar([
+      { chave: "a", chaveExterna: "A-1", conteudo: "# Spec a" },
+    ]);
+
+    const [, init] = rede.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init.method).toBe("PUT");
+    expect(Object.keys(JSON.parse(init.body as string))).toEqual(["dados"]);
   });
 });

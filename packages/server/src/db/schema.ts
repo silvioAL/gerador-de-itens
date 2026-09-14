@@ -105,6 +105,8 @@ export const itensGerados = pgTable(
     sugestoes: integer("sugestoes").notNull().default(0),
     estado: text("estado").notNull().default("gerado"),
     linkExterno: text("link_externo"),
+    /** SPEC-114 — a segunda chamada (spec anexada) já aconteceu para este item. */
+    specAnexada: boolean("spec_anexada").notNull().default(false),
     criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("itens_gerados_chave_unica").on(t.quebraId, t.chave)]

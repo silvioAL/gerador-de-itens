@@ -1257,6 +1257,7 @@ function AppCarregado({
       quebraId: persistencia.quebraId ?? "",
       estado: "gerado",
       linkExterno: null,
+      specAnexada: false,
       criadoEm: new Date().toISOString(),
     }));
     setItensGerados(locais);
@@ -2112,6 +2113,29 @@ function AppCarregado({
               : undefined
           }
           destinoDaExportacao={destinoDaExportacao}
+          onAnexarSpec={
+            persistencia.quebraId
+              ? async () => {
+                  // SPEC-114 §2.2 — cada item tem a SUA spec: a mesma função
+                  // pura (`gerarSpec`), chamada uma vez por item coberto, com
+                  // `itens` recortado só para ele — não uma cópia da spec da
+                  // demanda inteira mandada N vezes.
+                  const especsPorItem = coberturaDaSpecAtual.cobertas.map((atividade) => ({
+                    chave: atividade.chave,
+                    conteudo: gerarSpec({
+                      titulo: quebra.titulo?.trim() || "Spec",
+                      escrita: specDaDemanda,
+                      contexto: [contextoDoProduto, quebra.demandInfo].filter((t) => t?.trim()).join("\n\n"),
+                      medicao: documentoDaDemanda.saude.filter((s) => s.lado === "atencao").map((s) => s.rotulo),
+                      itens: [atividade],
+                    }),
+                  }));
+                  const r = await apiItensGerados.anexarSpec(persistencia.quebraId!, especsPorItem);
+                  setItensGerados(await apiItensGerados.listar(persistencia.quebraId!));
+                  return r;
+                }
+              : undefined
+          }
           /**
            * SPEC-69 §4.4 — o débito assumido chega a quem APROVA o desenho.
            *

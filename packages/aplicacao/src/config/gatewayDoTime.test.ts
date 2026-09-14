@@ -144,12 +144,17 @@ describe("os destinos do gateway (SPEC-81 fatia A)", () => {
      * das outras duas leituras em quem escolhe o alvo: `adr` e
      * `arquiteturaDeNegocio` buscam num lugar que o gateway já conhece; aqui a
      * pessoa manda o endereço.
+     *
+     * **SPEC-114 — a sexta.** `specDoItem`: anexar a spec de um item ao issue
+     * que a exportação já criou. Destino próprio, mesma razão do §1.1 da
+     * SPEC-81 — ciclo de vida e modo de falhar diferentes de `itens`.
      */
     expect([...OPERACOES_DO_GATEWAY]).toEqual([
       "itens",
       "documento",
       "adr",
       "documentoExterno",
+      "specDoItem",
     ]);
   });
 });

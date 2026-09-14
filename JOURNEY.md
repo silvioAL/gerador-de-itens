@@ -16155,3 +16155,76 @@ revisar → exportar, esteira com papel ligado/desligado, ensaios com F5)
 rodando verdes contra a stack Docker rebuildada com o código da branch nova —
 não contra a leitura estática do código. SPEC-113 documenta a decisão e foi
 corrigida, no próprio arquivo, quando a premissa errada apareceu.
+
+---
+## §407 — A segunda chamada: cada item ganha a sua spec (SPEC-114)
+
+Revisando o documento pós-rollback, duas queixas na mesma mensagem. A
+pequena: o rótulo *"escrito por uma pessoa"* nas seções de julgamento não
+fazia mais sentido ali sozinho — *"ali não faz sentido escrever nada
+disso, é algo que deve ser derivado"*. A grande: o fluxo que falta para
+fechar o objetivo de SDD do produto — *"os itens de trabalho incluiriam
+specs no mesmo padrão das nossas, que seriam anexadas aos itens... hoje é
+possível apenas baixar o markdown único"*.
+
+**As duas já tinham sido avaliadas.** SPEC-75 tinha avaliado mapeamento de
+contexto via script e recomendado **não construir ainda**, por falta de
+workflow definido — resolvido nesta rodada: *"é através do assistente"*,
+colar a saída em vez de executar (a "fatia manual" que a própria SPEC-75 já
+sugeria como primeiro passo barato). SPEC-98 já tinha desenhado a spec
+anexada ao item em duas chamadas MCP sequenciais, com fatias A-F, nunca
+implementada. A tela de spec dedicada, aliás, **já tinha morrido** (§346) —
+virou seção do documento, e o `gerarSpec` só tem saída de download, exatamente
+a lacuna apontada de novo.
+
+**A correção que mudou o desenho**: a primeira escrita desta rodada ia
+mandar a MESMA spec da demanda, copiada, para cada item. *"Não esqueça que
+são diversos itens e cada um tem sua spec."* — corrigido: `gerarSpec`
+(função pura) passa a ser chamado UMA VEZ POR ITEM coberto, com `itens:
+[aquela atividade]`, reaproveitando o julgamento compartilhado mas recortando
+a seção "Itens" para um só. Cada item recebe seu próprio anexo.
+
+**O achado que quase gerou retrabalho de novo**: mapeando o pipeline de
+exportação atual para construir a segunda chamada, a investigação achou que
+na `main` (antes do merge do rollback) o caminho de exportação **já tinha
+sido migrado para o executor de fluxo genérico** — exatamente a peça que o
+PR do rollback estava prestes a remover. Construir em cima dali seria
+construir sobre o que ia sumir em seguida. Decisão: mesclar o PR #384
+primeiro (usando `merge -s ours`, a técnica que registra a `main` como
+ancestral sem trazer o conteúdo dela de volta — um merge 3-way comum manteria
+os arquivos que só a `main` tinha adicionado, o oposto do que o rollback
+queria), e só então construir a Fatia C sobre a base limpa.
+
+**Um segundo achado real, C mais sério, no meio da implementação**: o
+`drizzle-kit generate` falhou neste ambiente, e a migration nova
+(`0043_spec_anexada_ao_item`) foi escrita à mão. Isso expôs que o drizzle
+decide o que rodar por **timestamp** no `_journal.json`, não por hash de
+conteúdo — e tanto o banco de teste quanto o de desenvolvimento **já tinham
+registrado como aplicadas as migrations da era do canvas de fluxos** (até
+id 50), removidas pelo rollback. Uma migration nova com o `when` seguindo a
+sequência antiga (`+1` a partir de 0042) ficaria **abaixo** desse
+`created_at` e seria ignorada em silêncio — sem erro, sem aviso, e a coluna
+simplesmente não apareceria. Corrigido usando um `Date.now()` de verdade,
+garantidamente à frente de qualquer coisa já aplicada, na era fluxo ou fora
+dela. Fica documentado no comentário da própria migration: qualquer código
+nesta branch que precisar escrever uma migration à mão tem que saber disso.
+
+**O resultado**: rastro de exportação cresce de um campo (`estado`/
+`linkExterno`) para dois — `specAnexada` ao lado, preservado na regeneração
+pela mesma `chave`. Nova operação de gateway (`specDoItem`), destino
+próprio (mesma razão do `PublicadorDeDocumento`: ciclo de vida e modo de
+falhar diferentes de `itens`). Rota `POST /quebras/:id/spec/anexar` recebe
+uma spec por item, recusa (sem chamar rede) o que ainda tem lacuna, separa
+"sem link ainda" de erro, e reenviar manda só o que falta. Botão na tela do
+documento, com selo por item.
+
+**Provas**: 6 testes do caso de uso, 8 do adaptador HTTP, 4 do contrato do
+repositório, 10 da rota contra Postgres real — todos verdes, mais o resto da
+suíte (206 arquivos, 6 workspaces) sem regressão. Build `web`/`server`
+limpo. E2E real contra a stack Docker rebuildada confirma que o botão de
+anexar só aparece depois que a primeira chamada devolveu link — a
+dependência entre as duas chamadas se cumpre pelo servidor de verdade.
+
+O rótulo "escrito por uma pessoa" **não mudou ainda** — a derivação que o
+substituiria depende do painel expansível do assistente e da conversa de
+mapeamento de contexto existirem primeiro, que ficaram fora desta rodada.

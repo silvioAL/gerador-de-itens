@@ -303,6 +303,8 @@ const ROTULO_DA_OPERACAO: Record<OperacaoDoGateway, string> = {
    *  "Confluence": o produto é agnóstico de ferramenta (SPEC-100). */
   documentoExterno: "Documento externo → ler por link",
   adr: "ADRs → ler",
+  /** SPEC-114 — a segunda chamada: escreve na issue que a exportação criou. */
+  specDoItem: "Spec do item → anexar ao issue já exportado",
 };
 
 const proseEstilo: React.CSSProperties = {
