@@ -49,30 +49,38 @@ dois problemas mais fundos:
 
 **O motor de execução server-side FICA. A interface de grafo genérico SAI.**
 
-Investigado antes de decidir: a tela antiga tinha um motor **client-side**
-(`useEsteiraDeAgentes.ts`) que orquestrava papel-por-papel e lote-por-lote
-**no navegador**, chamando `POST /ia/pipeline/:papel` diretamente do
-`fetch` do cliente. Essa rota só existia no modo `gerador open` **local** —
-que não existe mais desde a SPEC-33 (*"modo único hospedado … o deprecate não
-vai acontecer"*). **Não dá para ressuscitar aquele código e ele simplesmente
-funcionar**: a rota da qual ele dependia foi removida por uma mudança de
-arquitetura totalmente separada (o produto virou hospedado-único), não pelas
-SPECs de fluxo.
+**Correção em relação à primeira versão desta SPEC**: aqui foi escrito que o
+motor **client-side** antigo (`useEsteiraDeAgentes.ts`, que orquestrava
+papel-por-papel e lote-por-lote no navegador chamando `POST
+/ia/pipeline/:papel` via `fetch`) dependia de uma rota que "só existia no modo
+`gerador open` local, ausente no servidor hospedado de hoje (404)". **Isso
+estava errado.** A investigação original leu o código pela árvore git de um
+commit já deletado e presumiu que a rota fosse local-only; checando
+diretamente nesta branch (`rollback-fluxo-pre-105`), `POST
+/ia/pipeline/:papel` (`server/src/routes/ia.ts`) é uma rota Fastify comum,
+sem nenhum gate de modo local, resolvendo a credencial pelo mesmo mecanismo
+hospedado de qualquer outra rota de IA (`credencialEmVigor(...,
+ID_PROVEDOR_GATEWAY)`). Por `git log -L` ela é compatível com hospedado desde
+a **SPEC-31** ("IA no modo hospedado, sem binário nativo no container",
+commits `1523719`/`545ba20`) — bem antes da SPEC-105 sequer existir.
 
-O motor server-side de hoje (`casos-de-uso/fluxos.ts` + `routes/fluxos.ts`,
-construído pela SPEC-107) já roda em produção, não expõe credencial de IA ao
-navegador, e **já entrega a experiência ao vivo que se queria de volta** —
-provado nesta mesma sessão: `EsteiraAoVivo.tsx`, plugada em
-`executarAoVivo` (o stream de eventos por nó que a SPEC-107 fatia D
-construiu), reproduziu a faixa animada de papéis com handoff, streaming de
-texto e tick de conclusão, rodando de ponta a ponta contra o dublê de IA na
-stack de trabalho.
+Consequência prática: `ReviewScreen`/`EsteiraAgentes`/`useEsteiraDeAgentes`
+**já estão de pé, ligados e funcionais nesta branch**, exatamente como
+existiam antes da SPEC-105 (`App.tsx` já importa e renderiza `ReviewScreen`
+sem gate nenhum de fluxo). Não há reconstrução nenhuma a fazer para a
+esteira — ela é a "mesma experiência anterior" pedida, literalmente, sem
+reescrever uma linha.
 
-**Decisão**: manter as capacidades de execução (conector, função, agente
-como peças internas) e a mecânica de streaming ao vivo — e remover o CANVAS
-como interface (o lugar onde a pessoa pluga nós à mão para configurar
-automações arbitrárias), substituindo por **telas fixas e dedicadas** por
-capacidade conhecida, com a sequência definida no código.
+`EsteiraAoVivo.tsx` (construída durante a SPEC-112, plugada no motor
+server-side de fluxo) deixa de ser necessária para este propósito — foi uma
+ponte para o modelo "canvas + executor genérico" que este rollback abandona.
+Ela não é trazida para esta branch.
+
+**Decisão**: manter o motor client-side original tal como está (ele nunca
+dependeu de nada que tenha morrido) e remover só o CANVAS de fluxo genérico —
+substituindo os fluxos que existiam meramente como wrapper de rotas diretas
+(exportar, publicar) por rotas diretas de novo, sem tocar na esteira/ensaio,
+que já não passavam por fluxo nenhum nesta branch.
 
 ## 4. O que sai, o que fica, o que é reconstruído
 
@@ -107,29 +115,30 @@ regras, produtos, autenticação, RBAC de recursos que não sejam
 `fluxos*`, landing page, tour de onboarding (com reescrita de texto — ver
 riscos).
 
-### Reaproveitável sem reescrever (achado da investigação)
+### Nada disto precisou ser reconstruído (correção sobre a investigação original)
 
-`corridaDaEsteira.ts`, `filaDaEsteira.ts`, `lotesDaEsteira.ts` em
-`packages/aplicacao` — a lógica PURA de "rodar os papéis em lote,
-encadeados" sobrevive à SPEC-107 G5 como funções que não mencionam "fluxo"
-por dentro. `engine/export/exportar.ts` e o conector de publicação, idem.
-`EsteiraAoVivo.tsx` (construída nesta sessão) já recebe papéis/estado como
-props simples — sobrevive à remoção do fluxo trocando só quem a alimenta.
+A investigação original (feita lendo a árvore git do commit `864e5a35` já
+deletado, não o estado real desta branch) presumiu que a SPEC-107 G5c-3 havia
+apagado de vez as quatro rotas diretas — exportar, publicar, ensaiar, rodar a
+esteira — e que elas precisariam voltar reconstruídas. **Checando a branch
+`rollback-fluxo-pre-105` de verdade, nenhuma das quatro precisou de uma linha
+de código novo**:
 
-### Precisa ser reconstruído como rota direta
+- `POST /quebras/:id/itens/exportar` e `POST /quebras/:id/documento/publicar`
+  já existem intactas em `routes/quebras.ts` (o "MORREU" no comentário do
+  código se refere ao commit que as apagou DEPOIS da SPEC-105 — nesta branch,
+  anterior a isso, elas nunca morreram).
+- `EnsaiosScreen.tsx`/`.test.tsx` (a bancada de ensaios pré-SPEC-105, da
+  SPEC-66) já está importada e ligada em `App.tsx`, sem gate de fluxo.
+- `ReviewScreen`/`EsteiraAgentes`/`useEsteiraDeAgentes` (a esteira animada)
+  também já está importada e ligada em `App.tsx`, e o motor client-side que a
+  alimenta (`POST /ia/pipeline/:papel`) é uma rota hospedada comum desde a
+  SPEC-31 — nunca dependeu do modo local (ver correção no §3).
 
-A SPEC-107 G5c-3 apagou as implementações antigas com comentários explícitos
-("MORREU") no próprio código-fonte de `routes/quebras.ts`. Sem fluxo, não
-existe mais endpoint nenhum para:
-
-- `POST /quebras/:id/itens/exportar` (Exportar prontos)
-- `POST /quebras/:id/documento/publicar` (Publicar)
-- Ensaiar/simular cenários (hoje `apiExecucaoDeFluxo.executar(ID_DO_FLUXO_DO_ENSAIO)`)
-- Rodar a esteira de agentes (hoje `apiExecucaoDeFluxo.executarAoVivo(ID_DO_FLUXO_DA_ESTEIRA)`)
-
-Não é degradação visual — é ausência de rota. As quatro precisam voltar como
-rotas diretas no servidor, reaproveitando a lógica de negócio pura listada
-acima.
+Cada uma dessas quatro "fatias de reconstrução" (C, D, E do plano original)
+virou, na prática, apenas uma fatia de **verificação**: ler o código desta
+branch, confirmar que o fio já existe de ponta a ponta, e validar contra a
+stack real.
 
 ## 5. As fatias
 
@@ -141,26 +150,27 @@ destruído (`16f1479`, vocabulário; `3106a37`, criação de time — o próprio
 HEAD da `main`) trazidos de volta por `cherry-pick`. Build e suíte de
 unidade rodados como linha de base antes de qualquer remoção adicional.
 
-### Fatia B — esta SPEC ✅ feita nesta rodada
+### Fatia B — esta SPEC ✅ feita nesta rodada (e corrigida nesta rodada — ver §3)
 
-### Fatia C — rotas diretas de exportar/publicar
+### Fatia C — rotas diretas de exportar/publicar ✅ verificado, sem código novo
 
-Reconstruir `POST /quebras/:id/itens/exportar` e
-`POST /quebras/:id/documento/publicar`, reaproveitando
-`engine/export/exportar.ts` e o conector de destino já existente.
+`POST /quebras/:id/itens/exportar` e `POST /quebras/:id/documento/publicar`
+já existem intactas em `routes/quebras.ts` nesta branch. Confirmado por
+leitura direta do arquivo.
 
-### Fatia D — a Bancada de Ensaios como tela própria
+### Fatia D — a Bancada de Ensaios como tela própria ✅ verificado, sem código novo
 
-`BancadaDeEnsaios.tsx` já é o componente visual certo — hoje é invocado como
-nó-tela dentro de um fluxo. Passa a ser invocada diretamente (rota +
-gesto na mesa/documento), sem o nó de fluxo por trás.
+`EnsaiosScreen.tsx` já existe pré-SPEC-105 (SPEC-66) e já está ligada em
+`App.tsx` (`rota.tela === "ensaios"`, `onSimular`) sem depender de fluxo.
 
-### Fatia E — a Esteira como tela dedicada
+### Fatia E — a Esteira como tela dedicada ✅ verificado, sem código novo
 
-Rota nova (`POST /quebras/:id/esteira/executar`, com o mesmo streaming
-NDJSON de hoje) chamando `corridaDaEsteira`/`filaDaEsteira`/`lotesDaEsteira`
-diretamente — sem passar pelo executor genérico de grafo. `EsteiraAoVivo.tsx`
-passa a ser alimentada por ela em vez de `apiExecucaoDeFluxo`.
+`ReviewScreen`/`EsteiraAgentes`/`useEsteiraDeAgentes` já existem e já estão
+ligadas em `App.tsx` (linhas 76-77 import, ~1929 render), alimentadas pelo
+motor client-side original chamando `POST /ia/pipeline/:papel` — rota
+confirmada hospedada-compatível desde a SPEC-31 (ver correção no §3). Não há
+`EsteiraAoVivo.tsx` nem rota nova a construir: a experiência pedida
+("a mesma anterior") já é literalmente a que está de pé nesta branch.
 
 ### Fatia F — remoção
 
@@ -176,11 +186,10 @@ remoção de import.
 
 ## 6. O que esta SPEC NÃO faz
 
-- Não ressuscita o motor client-side antigo (§3) — decisão explícita, pela
-  rota morta que ele dependia.
 - Não resolve agendamento nem webhook como capacidades (§7, riscos).
-- Não implementa as fatias C-G nesta rodada — são trabalho de sessões
-  futuras, do mesmo tamanho de qualquer outra SPEC deste projeto.
+- Não implementa a fatia F (remoção) nem a G (onboarding) nesta rodada — são
+  trabalho de sessões futuras, do mesmo tamanho de qualquer outra SPEC deste
+  projeto.
 
 ## 7. Riscos nomeados
 
