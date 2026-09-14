@@ -47,28 +47,6 @@ export const RECURSOS = [
    * errado que faria a delegação mentir.
    */
   "conexoes",
-  /**
-   * SPEC-105 fatia A — o CATÁLOGO DE CONECTORES: que endereços a organização
-   * sabe chamar, com entrada/saída declaradas.
-   *
-   * Recurso próprio pelo mesmo argumento de `conexoes`: quem decide "a empresa
-   * fala com este gateway" é infraestrutura, não quem cuida da esteira. E é
-   * catálogo — cadastrar conector é curadoria (§9.1), não trabalho do dia;
-   * executar (nível `operar`) é outra coisa, e tem outro portão.
-   */
-  "conectores",
-  /**
-   * SPEC-105 fatias C/D (§9.1) — **editar e EXECUTAR fluxo são poderes
-   * diferentes**, porque um fluxo com conector de escrita age no mundo.
-   *
-   * - `fluxos` — a fiação (chave de config do time).
-   * - `fluxos.executar` — disparar. O portão base é nível `operar` (trabalho
-   *   do dia, como exportar/publicar); este recurso existe para a organização
-   *   PODER restringir por papel — a rota confere o grant só quando algum
-   *   papel o carrega, no molde da curadoria (`exigirEdicaoCurada`).
-   */
-  "fluxos",
-  "fluxos.executar",
   "especificacao-template",
   // SPEC-53 — o contexto do produto tem dono próprio: quem responde pelo
   // vocabulário e pelas regras de negócio não é quem cuida de stack nem de
@@ -113,15 +91,6 @@ export const RECURSO_DA_CHAVE_DE_CONFIG = {
   exportador: "pipeline-agentes",
   tokens: "pipeline-agentes",
   conexoes: "conexoes",
-  conectores: "conectores",
-  fluxos: "fluxos",
-  /**
-   * SPEC-110 fatia C — as telas do time são parte do desenho da automação:
-   * quem pode fiar um fluxo pode criar a tela que ele atravessa. Um recurso
-   * separado dividiria a mesma decisão em dois cadeados, e o segundo ficaria
-   * esquecido aberto (o sintoma que o `RECURSOS_SEM_ROTA` documenta).
-   */
-  telas: "fluxos",
 } as const satisfies Record<ChaveConfig, Recurso | null>;
 
 /**
@@ -458,66 +427,37 @@ export function exigirPermissao(
     await exigirSessao(req, reply);
     if (reply.sent) return;
 
-    /**
-     * A ordem importa: sem organização não há papel possível e a resposta é
-     * "pode" (§4.3). Resolver o time ANTES disso — que foi como a primeira
-     * versão desta extração ficou — faz uma instalação sem organização pagar
-     * uma consulta por requisição para chegar à mesma conclusão.
-     */
     const orgId = await organizacaoId();
+    // Sem organização (instalação recém-criada) não há papel possível: cai no
+    // modo aberto em vez de travar tudo — mesma escolha do §4.3.
     if (!orgId) return;
 
-    const veredito = await podePermissao(db, orgId, {
-      email: req.usuario!.email,
-      timeId: resolverTimeId ? await resolverTimeId(req) : null,
-      recurso,
-      acao,
-    });
-    if (veredito.ok) return;
-    reply.code(403).send({ erro: veredito.motivo, recurso, acao });
-  };
-}
+    const email = req.usuario!.email;
+    const timeId = resolverTimeId ? await resolverTimeId(req) : null;
 
-/**
- * SPEC-110 fatia G — **a DECISÃO de permissão, sem HTTP em volta.**
- *
- * Era o corpo de `exigirPermissao`, e continua sendo o único lugar onde a
- * regra mora. O que mudou é que ela deixou de exigir um `req`/`reply` para ser
- * consultada: o executor de fluxo precisa perguntar "esta pessoa pode aplicar
- * este ajuste?" e não tem requisição na mão — o nó roda dentro de uma execução,
- * que pode ter sido disparada pelo relógio.
- *
- * A alternativa seria o executor reimplementar os dois eixos (nível e RBAC), e
- * duas cópias de uma régua de acesso divergem na primeira mudança — que é o
- * tipo de divergência que ninguém vê até alguém passar por onde não devia.
- *
- * Devolve o MOTIVO, não só um booleano: quem traduz para HTTP manda 403 com
- * ele, e quem roda num fluxo põe a mesma frase no rastro. A pessoa lê a mesma
- * explicação nos dois lugares.
- */
-export async function podePermissao(
-  db: OpcoesApp["db"],
-  orgId: string | null,
-  pedido: { email: string; timeId: string | null; recurso: Recurso; acao: Acao }
-): Promise<{ ok: true } | { ok: false; motivo: string }> {
-  // Sem organização (instalação recém-criada) não há papel possível: cai no
-  // modo aberto em vez de travar tudo — mesma escolha do §4.3.
-  if (!orgId) return { ok: true };
+    if (acao !== "ler") {
+      const nivel = timeId ? await nivelNoTime(db, email, timeId) : await maiorNivel(db, email);
+      if (nivel === "owner") return;
 
-  const { email, timeId, recurso, acao } = pedido;
-  const noTime = timeId ? ` no time "${timeId}"` : "";
-
-  if (acao !== "ler") {
-    const nivel = timeId ? await nivelNoTime(db, email, timeId) : await maiorNivel(db, email);
-    if (nivel === "owner") return { ok: true };
+      const { rbacAtivo, porRecurso } = await resolverPermissoes(db, orgId, email, timeId);
+      if (rbacAtivo && porRecurso[recurso]?.includes(acao)) return;
+      reply.code(403).send({
+        erro: `"${acao}" em "${recurso}"${timeId ? ` no time "${timeId}"` : ""} exige nível owner ou permissão delegada`,
+        recurso,
+        acao,
+      });
+      return;
+    }
 
     const { rbacAtivo, porRecurso } = await resolverPermissoes(db, orgId, email, timeId);
-    if (rbacAtivo && porRecurso[recurso]?.includes(acao)) return { ok: true };
-    return { ok: false, motivo: `"${acao}" em "${recurso}"${noTime} exige nível owner ou permissão delegada` };
-  }
+    if (!rbacAtivo) return;
 
-  const { rbacAtivo, porRecurso } = await resolverPermissoes(db, orgId, email, timeId);
-  if (!rbacAtivo) return { ok: true };
-  if (porRecurso[recurso]?.includes(acao)) return { ok: true };
-  return { ok: false, motivo: `sem permissão para "${acao}" em "${recurso}"${noTime}` };
+    if (!porRecurso[recurso]?.includes(acao)) {
+      reply.code(403).send({
+        erro: `sem permissão para "${acao}" em "${recurso}"${timeId ? ` no time "${timeId}"` : ""}`,
+        recurso,
+        acao,
+      });
+    }
+  };
 }

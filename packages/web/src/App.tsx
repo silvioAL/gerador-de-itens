@@ -9,6 +9,7 @@ import {
   volumetriaEmVigor,
   type VolumetriaDoProduto,
   MARCADOR_ESPECIFICAR,
+  exemploDeMedicao,
   derivar,
   estruturarDocumento,
   ensaiosAssumidos,
@@ -20,7 +21,6 @@ import {
   resolverDependencias,
   violacoesEmAberto,
   type Atividade,
-  type CenarioDeLentidao,
   type DiagramaConfig,
   type No,
   type Quebra,
@@ -31,7 +31,6 @@ import {
   gerarItensDeTrabalho,
   lerDesenho,
   marcasPorNo,
-  montarFichaItem,
   percursoManual,
   reguaDaLeitura,
   type RequisitoDeTopologia,
@@ -55,23 +54,14 @@ import {
   type EspecificacaoTemplate,
   type SessaoUsuario,
   apiPdca,
-  apiExecucaoDeFluxo,
   apiItensGerados,
-  type ResultadoDaExportacao,
   apiQuebras,
   type ItemGerado,
   apiStacks,
   apiExportador,
   type SugestoesDeStack,
   apiIa,
-  /** SPEC-110 fatia B — o stage de uma tela: o que ela mostra. */
-  type StageDaTela,
 } from "./api/client";
-import { MolduraDoStage } from "./fluxo/MolduraDoStage";
-// SPEC-110 fatia C — o renderizador das telas do time (o mesmo do preview).
-import { RenderizadorDaTela, rotulosDasAcoes, useMotivoParaNaoAvancar } from "./fluxo/RenderizadorDaTela";
-// SPEC-110 fatia H — a galeria: onde os fluxos e as telas moram.
-import { GaleriaDeFluxos } from "./fluxo/GaleriaDeFluxos";
 import { useSessao } from "./auth/useSessao";
 import { LoginScreen } from "./auth/LoginScreen";
 import { useQuebra } from "./state/useQuebra";
@@ -83,28 +73,21 @@ import { PropertiesPanel } from "./panel/PropertiesPanel";
 import { EdgePanel } from "./panel/EdgePanel";
 import { ReadinessSummary } from "./summary/ReadinessSummary";
 import { calcularResumoProntidao } from "./summary/prontidaoResumo";
+import { ReviewScreen } from "./review/ReviewScreen";
 import { ContextoEpicoPanel } from "./review/ContextoEpicoPanel";
 import { ConversaPanel } from "./conversa/ConversaPanel";
 import { AssistenteFlutuante, type AbaAssistente } from "./assistente/AssistenteFlutuante";
-// SPEC-107 G4 — a tela de ensaios morreu; a bancada vive junto do fluxo.
-import { BancadaDeEnsaios, type LeituraDoEnsaio } from "./fluxo/BancadaDeEnsaios";
+import { EnsaiosScreen } from "./ensaios/EnsaiosScreen";
 import { idDaRegraDeForma } from "./config/FormaDoDesenho";
 import { ConfigurarPanel } from "./assistente/ConfigurarPanel";
 import { JourneyModal, type AbaJornada } from "./demo/JourneyModal";
-import {
-  contextoDoProdutoEmTexto,
-  ID_DO_FLUXO_DA_ESTEIRA,
-  ID_DO_FLUXO_DO_ENSAIO,
-  // SPEC-111 A — o fluxo implícito que faz a tela valer sozinha.
-  idDoFluxoDaTela,
-  PREFIXO_DO_FLUXO_DA_TELA,
-} from "@gerador/aplicacao";
-import { FluxoScreen } from "./fluxo/FluxoScreen";
+import { contextoDoProdutoEmTexto, montarMapaDoSistema, type ExecucaoDoPapel } from "@gerador/aplicacao";
 import { ConfigScreen, type AbaConfig } from "./config/ConfigScreen";
 import { TourOverlay } from "./demo/TourOverlay";
 import { useTour, passosDeConfiguracao } from "./demo/useTour";
-import { DECISOES_DO_TOUR, REGRAS_DO_TOUR, ehDecisaoDeDemonstracao } from "./demo/dadosDoTour";
+import { DECISOES_DO_TOUR, EXECUCOES_DO_TOUR, REGRAS_DO_TOUR, ehDecisaoDeDemonstracao } from "./demo/dadosDoTour";
 import { DocumentoScreen } from "./documento/DocumentoScreen";
+import { SistemaScreen } from "./sistema/SistemaScreen";
 import { AvisosDaDerivacao } from "./summary/AvisosDaDerivacao";
 import { baixarArquivoTexto } from "./persistence/baixarArquivo";
 import { PainelDeVariantes } from "./variante/PainelDeVariantes";
@@ -540,153 +523,14 @@ function AppCarregado({
   const { rota, navegar } = useRotaHash();
   const mostrarConfig = rota.tela === "config";
   const mostrarDocumento = rota.tela === "documento";
-  /**
-   * SPEC-107 G4 — a tela de ensaios morreu: a bancada vive junto do fluxo
-   * (`#/fluxo/ensaio`), medindo pela fiação semeada em vez de simular aqui.
-   *
-   * SPEC-110 fatia H (D14) — **`#/fluxo` SEM id abre a GALERIA**, não o
-   * canvas. Um dropdown responde "qual eu abro agora?"; ele não responde "o
-   * que existe aqui?", que é a pergunta de quem chega. Os endereços COM id
-   * (`#/fluxo/<id>`) continuam abrindo o canvas — todo link salvo sobrevive.
-   */
-  const mostrarGaleria = rota.tela === "fluxo" && !rota.fluxoId;
-  const mostrarFluxos = rota.tela === "fluxo" && Boolean(rota.fluxoId);
-  /**
-   * SPEC-110 fatia B (D2/D17c) — **o STAGE: uma execução parada numa tela.**
-   *
-   * O stage é estado do SHELL, não da tela: a barra Retornar/Avançar é uma
-   * moldura montada ao redor do que já existe (a bancada, o documento, a
-   * mesa), e por isso ela sobrevive à navegação para a tela de destino. A
-   * mesa e o documento não ganham prop nenhuma — não sabem que estão num
-   * fluxo, que é exatamente o "mínimo de impacto" que o usuário pediu.
-   */
-  const [stage, setStage] = useState<StageDaTela | null>(null);
-  const [stageOcupado, setStageOcupado] = useState(false);
-  const [erroDoStage, setErroDoStage] = useState<string | null>(null);
-  useEffect(() => {
-    if (rota.tela !== "telaDoStage") return;
-    let vivo = true;
-    setErroDoStage(null);
-    void apiExecucaoDeFluxo
-      .stageDaTela(rota.execucaoId)
-      .then((s) => {
-        if (!vivo) return;
-        setStage(s);
-        /**
-         * As telas do SISTEMA delegam para a tela que já existe (D17c): o
-         * documento e a mesa são o corpo, e a moldura fica por cima. A
-         * bancada é a única que o próprio stage monta, porque ela nasceu como
-         * painel e não como rota.
-         */
-        if (s.tela.id === "documento") navegar({ tela: "documento" });
-        if (s.tela.id === "mesa") navegar({ tela: "canvas" });
-      })
-      .catch((e) => {
-        if (!vivo) return;
-        // Execução que não está mais parada numa tela (alguém já decidiu de
-        // outra máquina) não vira tela branca: volta para o canvas com o
-        // motivo (§2.4-3).
-        setStage(null);
-        setErroDoStage(e instanceof Error ? e.message : String(e));
-        navegar({ tela: "fluxo" });
-      });
-    return () => {
-      vivo = false;
-    };
-  }, [rota, navegar]);
-  /**
-   * SPEC-111 fatia A — **abrir uma tela sozinha é EXECUTAR o fluxo dela.**
-   *
-   * A tela declarada deriva um fluxo implícito de um nó (`tela-standalone:<id>`)
-   * que para nesse nó. Então `#/tela/s/<telaId>` não precisa de rota nova no
-   * servidor: ele dispara o executar de sempre e leva a pessoa para o stage da
-   * execução recém-criada — de onde tudo (renderizador, Avançar, Retornar,
-   * histórico, cadeado por time) já funciona desde a 110-B e a §402.
-   *
-   * O `replace` na navegação é o que impede o F5 de abrir uma segunda: depois
-   * do redirecionamento o endereço é o da EXECUÇÃO, e recarregar continua a
-   * mesma sessão de trabalho em vez de criar outra.
-   */
-  useEffect(() => {
-    if (rota.tela !== "abrirTela") return;
-    let vivo = true;
-    setErroDoStage(null);
-    void apiExecucaoDeFluxo
-      .executar(idDoFluxoDaTela(rota.telaId), timeAtivo)
-      .then((r) => {
-        if (!vivo) return;
-        navegar({ tela: "telaDoStage", execucaoId: r.execucaoId }, { substituir: true });
-      })
-      .catch((e) => {
-        if (!vivo) return;
-        // Tela apagada, sem permissão, time errado: o motivo vai para a
-        // galeria, que é de onde o gesto de abrir nasce (§2.4-3).
-        setErroDoStage(e instanceof Error ? e.message : String(e));
-        navegar({ tela: "fluxo" }, { substituir: true });
-      });
-    return () => {
-      vivo = false;
-    };
-  }, [rota, navegar, timeAtivo]);
-
-  const mostrarStageDaBancada = rota.tela === "telaDoStage" && stage?.tela.id === "bancada-de-ensaios";
-  /**
-   * SPEC-110 fatia C — a tela desenhada em BLOCOS é renderizada aqui.
-   *
-   * SPEC-110 fatia G — o critério deixou de ser a ORIGEM e passou a ser o que
-   * a tela tem: quem traz blocos é desenhado pelo renderizador de blocos,
-   * venha do time ou do sistema. A revisão de ajuste do PDCA é do sistema (ela
-   * versiona com o código) e é desenhada — um quarto componente React só para
-   * mostrar dois textos e pedir uma decisão seria código onde já há
-   * renderizador.
-   */
-  const mostrarStageDeclarado = rota.tela === "telaDoStage" && (stage?.tela.blocos?.length ?? 0) > 0;
-  /** O que a pessoa preencheu nos blocos `campo` — é a saída da tela. */
-  const [valoresDaTela, setValoresDaTela] = useState<Record<string, unknown>>({});
-  useEffect(() => setValoresDaTela({}), [stage?.execucaoId]);
-  const motivoParaNaoAvancar = useMotivoParaNaoAvancar(stage?.tela.blocos ?? [], valoresDaTela);
-  /**
-   * O stage é DONO da tela quando ele mesmo desenha o corpo — a bancada e as
-   * telas declaradas. Nesses casos a mesa sai de cena: empilhar os dois
-   * cabeçalhos convida a gestos da tela errada (a aspereza anotada na fatia B).
-   */
-  /**
-   * SPEC-110 fatia B — o STAGE é dono da tela.
-   *
-   * SPEC-110 fatia H — a GALERIA também. A validação visual mostrou a vitrine
-   * desenhada ABAIXO da barra da mesa: a paleta ("+ Serviço", "+ Fila Rabbit"),
-   * o Salvar e os contadores de prontidão ficavam por cima de uma tela que não
-   * é a mesa. Empilhar dois cabeçalhos convida a gestos da tela errada — a
-   * mesma aspereza que a fatia B anotou.
-   */
-  const emStageProprio = rota.tela === "telaDoStage" || (rota.tela === "fluxo" && !rota.fluxoId);
-
-  /** SPEC-110 B — o Avançar e o Retornar da moldura, num lugar só. */
-  const decidirNoStage = useCallback(
-    async (decisao: "avancar" | "retornar", saida: Record<string, unknown> = {}) => {
-      if (!stage) return;
-      setStageOcupado(true);
-      setErroDoStage(null);
-      try {
-        if (decisao === "avancar") await apiExecucaoDeFluxo.avancarNaTela(stage.execucaoId, saida);
-        else await apiExecucaoDeFluxo.retornarDaTela(stage.execucaoId);
-        setStage(null);
-        // O destino é o canvas do fluxo: é lá que o rastro conta o que
-        // aconteceu depois da decisão (e o "retornado" aparece).
-        navegar({ tela: "fluxo", fluxoId: stage.fluxoId });
-      } catch (e) {
-        setErroDoStage(e instanceof Error ? e.message : String(e));
-      } finally {
-        setStageOcupado(false);
-      }
-    },
-    [stage, navegar]
-  );
+  const mostrarSistema = rota.tela === "sistema";
+  const mostrarEnsaios = rota.tela === "ensaios";
   // SPEC-41 Parte B — os itens materializados da quebra aberta. A fonte de
   // verdade é o server (persistem por quebra); o estado local é o espelho da
   // última geração/carga desta sessão.
   const [itensGerados, setItensGerados] = useState<ItemGerado[]>([]);
   // SPEC-44 — deep-link da seção dos itens pra revisão: o item a selecionar.
+  const [itemInicialRevisao, setItemInicialRevisao] = useState<string | null>(null);
   /**
    * SPEC-64 fatias B e C — a declaração de caminho em curso.
    *
@@ -711,48 +555,85 @@ function AppCarregado({
    * botão não aparece, em vez de aparecer e falhar (a disciplina da SPEC-49).
    */
   const [podePublicarDocumento, setPodePublicarDocumento] = useState(false);
-  /** SPEC-107 G2 — os destinos de documento em vigor: o atalho da publicação
-   * precisa deles para o rótulo e para RECUSAR escolher quando há mais de um
-   * (a semântica de sempre — publicar no primeiro seria o pior desfecho). */
-  const [destinosDeDocumento, setDestinosDeDocumento] = useState<{ id: string; rotulo: string }[]>([]);
   useEffect(() => {
     if (!mostrarDocumento) return;
     apiExportador
       .obter()
       .then((c) => {
         setDestinoDaExportacao(c.endpoint ? c.rotulo || c.endpoint : null);
-        const deDocumento = (c.destinos ?? []).filter((d) => d.operacao === "documento" && !!d.endpoint);
-        setPodePublicarDocumento(deDocumento.length > 0);
-        setDestinosDeDocumento(deDocumento.map((d) => ({ id: d.id, rotulo: d.rotulo || d.endpoint })));
+        setPodePublicarDocumento((c.destinos ?? []).some((d) => d.operacao === "documento" && !!d.endpoint));
       })
       .catch(() => {
         setDestinoDaExportacao(null);
         setPodePublicarDocumento(false);
-        setDestinosDeDocumento([]);
       });
   }, [mostrarDocumento]);
   // SPEC-45 — quantos feedbacks do ciclo ainda esperam alguém: é o que faz o
   // assistente chamar pra tratar (M15) em vez de o texto morrer no banco.
   const [feedbacksNovos, setFeedbacksNovos] = useState(0);
-  /** SPEC-106 fatia C — o link persistido do documento desta demanda. Vem do
-   * registro SALVO (a quebra em memória é o desenho), e atualiza ao publicar. */
-  const [linkDoDocumento, setLinkDoDocumento] = useState<string | null>(null);
+  /** SPEC-59 — a esteira tem com quem falar? É o que separa "papel ativo" de
+   * "papel ativo e mudo", que é o defeito mais silencioso da configuração.
+   * Buscado só quando a tela abre, como a exportação faz para os itens. */
+  const [temCredencialDeIa, setTemCredencialDeIa] = useState(false);
+  /** §265 — o rastro da esteira. `undefined` = não foi lido (tela nunca aberta,
+   * chamada que falhou), e é diferente de lista vazia — que é "ninguém rodou
+   * nada ainda". O mapa trata os dois casos, e misturá-los faria um avatar
+   * dizer "nunca rodou" por causa de um erro de rede. */
+  const [execucoesDaEsteira, setExecucoesDaEsteira] = useState<ExecucaoDoPapel[] | undefined>(undefined);
+
   useEffect(() => {
-    if (!mostrarDocumento || !persistencia.quebraId) {
-      setLinkDoDocumento(null);
-      return;
-    }
+    if (!mostrarSistema) return;
     let cancelado = false;
-    void apiQuebras
-      .buscar(persistencia.quebraId)
-      .then((salva) => {
-        if (!cancelado) setLinkDoDocumento(salva.documentoLinkExterno ?? null);
+    apiIa
+      .execucoes()
+      .then(({ porPapel }) => {
+        if (!cancelado) setExecucoesDaEsteira(porPapel);
+      })
+      .catch(() => {});
+    apiIa
+      .status()
+      .then((st) => {
+        // `pronto` cobre os dois modos: gateway configurado ou modelo local
+        // instalado. Perguntar por um só deixaria metade das instalações
+        // acusando falta de credencial que existe.
+        if (!cancelado) setTemCredencialDeIa(Boolean(st.pronto || st.gateway));
       })
       .catch(() => {});
     return () => {
       cancelado = true;
     };
-  }, [mostrarDocumento, persistencia.quebraId]);
+  }, [mostrarSistema]);
+
+  const [erroAoSalvarSistema, setErroAoSalvarSistema] = useState<string | null>(null);
+
+  /**
+   * §260 — as duas edições que o MAPA provoca, aplicadas de onde se vê o
+   * problema.
+   *
+   * Ver que um papel está desligado e ter que ir a outra tela para ligá-lo é o
+   * mapa apontando e cobrando pedágio. Estas duas ações fecham o laço ali.
+   *
+   * O estado local muda primeiro e o servidor confirma depois — é o padrão do
+   * resto do app. Mas a falha **não** pode sumir: sem o aviso, a tela mostraria
+   * o estado novo com o servidor guardando o velho, que é a pior combinação
+   * possível numa tela de configuração.
+   */
+  async function salvarPipeline(papeis: ConfigPipelineAgentes["papeis"]) {
+    const anterior = pipelineAgentes;
+    const novo = { ...pipelineAgentes, papeis };
+    setPipelineAgentes(novo);
+    setErroAoSalvarSistema(null);
+    try {
+      await apiPipelineAgentes.salvar(novo);
+    } catch (e) {
+      // Volta ao que era: deixar a tela otimista sobre uma escrita que falhou
+      // é mentir com mais confiança do que não ter salvado.
+      setPipelineAgentes(anterior);
+      setErroAoSalvarSistema(
+        e instanceof Error ? `Não deu para salvar: ${e.message}` : "Não deu para salvar a mudança na esteira."
+      );
+    }
+  }
 
   /**
    * SPEC-92 — declarado ANTES do mapa do sistema, que passou a consultá-lo.
@@ -761,6 +642,34 @@ function AppCarregado({
    * conserto certo: o mapa depende do modo, não o contrário.
    */
   const [demonstracaoDoTour, setDemonstracaoDoTour] = useState(false);
+
+  /** SPEC-59 fatia A — a ferramenta lida a partir da própria configuração.
+   * Usa a config REAL, nunca a de demonstração: esta tela responde "como o meu
+   * ambiente está montado", e a do tour mentiria sobre isso. */
+  const mapaDoSistema = useMemo(
+    () =>
+      montarMapaDoSistema({
+        papeis: pipelineAgentes.papeis,
+        regras: regrasConfig,
+        temCredencialDeIa,
+        feedbacksAbertos: feedbacksNovos,
+        /**
+         * SPEC-92 — no TOUR, as execuções são de demonstração.
+         *
+         * O usuário abriu a demonstração com a credencial da casa sem crédito e
+         * viu os quatro papéis em vermelho com o erro cru do provedor. Quem
+         * assiste conclui que a ferramenta está quebrada — quando ela está
+         * relatando com precisão um problema que não é dela.
+         *
+         * A config continua sendo a REAL (o comentário acima explica por quê, e
+         * segue valendo): o que muda é só o histórico de execução, que é o único
+         * pedaço desta tela que depende de a credencial de alguém estar em dia.
+         * E ele chega marcado, como todo dado de tour (§235).
+         */
+        execucoes: demonstracaoDoTour ? EXECUCOES_DO_TOUR : execucoesDaEsteira,
+      }),
+    [pipelineAgentes, regrasConfig, temCredencialDeIa, feedbacksNovos, execucoesDaEsteira, demonstracaoDoTour]
+  );
 
   const [menuAberto, setMenuAberto] = useState(false);
   const [mostrarAbrir, setMostrarAbrir] = useState(false);
@@ -804,6 +713,7 @@ function AppCarregado({
   const arestaSelecionada = quebra.diagrama.edges.find((e) => e.id === arestaSelecionadaId);
   const tiposDeNo = Object.entries(diagramaConfig.nodeTypes);
 
+  const [resultado, setResultado] = useState<ResultadoDependenciasDe<Atividade> | null>(null);
   const { vermelhos } = calcularResumoProntidao(quebra.diagrama, diagramaConfig);
 
   /**
@@ -837,8 +747,7 @@ function AppCarregado({
   const momentoCanvas = momentoDoCanvas({
     nodes: quebra.diagrama.nodes.length,
     vermelhos: vermelhos.length,
-    // G5c-3 — "derivou" agora é "os itens existem": derivar escreve os itens.
-    temResultado: itensGerados.length > 0,
+    temResultado: !!resultado,
     aplicouProposta,
     // §270 — passou a significar "documento já aprovado alguma vez": aprovar é
     // o único escritor de `especificacao` desde que a geração de especificação
@@ -883,11 +792,6 @@ function AppCarregado({
   // SPEC-39 M11 — a entrevista do PDCA: o servidor conta os usos e diz
   // quando é o momento; a fala cita as últimas quebras do time.
   const [entrevistaPdca, setEntrevistaPdca] = useState<string[] | null>(null);
-  // SPEC-39 M13 — o feedback pós-especificação. Morava na tela de revisão
-  // (morta na G5c-3); a cadência é a mesma, e o balão espera NA MESA — pedir
-  // opinião por cima do documento recém-aberto interromperia a leitura.
-  const [pedindoFeedbackPdca, setPedindoFeedbackPdca] = useState(false);
-  const [textoFeedbackPdca, setTextoFeedbackPdca] = useState("");
 
   function executarDerivacao(salvarDepois: boolean) {
     apiPdca
@@ -911,26 +815,7 @@ function AppCarregado({
       // violação de design system apareceria no placar e nunca viraria item.
       tokens,
     });
-    /**
-     * SPEC-107 G5c-3 — **a tela de revisão morreu.** Derivar agora ESCREVE os
-     * itens e leva direto ao DOCUMENTO (SPEC-61), onde o julgamento campo a
-     * campo mora desde o §384. A corrida da esteira é a fiação, ao vivo no
-     * canvas (§383) — nada roda sozinho ao derivar: rodar IA é gesto, e o que
-     * ela escrever chega PENDENTE na demanda (§5.5).
-     */
-    apiPdca
-      .uso("especificacao", timeAtivo)
-      .then((r) => {
-        if (r.momento) setPedindoFeedbackPdca(true);
-      })
-      .catch(() => {});
-    aoGerarItens(
-      gerarItensDeTrabalho(resolverDependencias(atividades).atividades, quebra.diagrama, diagramaConfig, {
-        regras: regrasConfig,
-        respostasItens: quebra.respostasItens,
-        templateItem: templateItem?.conteudo,
-      })
-    );
+    setResultado(resolverDependencias(atividades));
     setPedindoNomeDaDemanda(false);
     if (salvarDepois) setAutoSalvarPendente(true);
   }
@@ -959,69 +844,6 @@ function AppCarregado({
     [quebra, diagramaConfig, regrasVisiveis, decisoesVisiveis]
   );
   const [avisosPendentes, setAvisosPendentes] = useState(false);
-
-  /**
-   * SPEC-107 G1 — **exportar É a fiação semeada** ("exportar-prontos"): o
-   * botão vira atalho que a dispara apontando a demanda aberta
-   * (`parametrosPorNo`), e traduz o rastro para a resposta que a tela sempre
-   * mostrou. Falha GLOBAL do envio (rede/HTTP) derruba o nó e vira erro POR
-   * ITEM com a mesma frase — a semântica da SPEC-49 não muda de cara.
-   */
-  async function exportarPelaFiacao(quebraId: string): Promise<ResultadoDaExportacao> {
-    const r = await apiExecucaoDeFluxo.executar("exportar-prontos", timeAtivo, undefined, {
-      demanda: { demandaId: quebraId },
-    });
-    const porNo = Object.fromEntries(r.nos.map((n) => [n.noId, n]));
-    if (porNo["demanda"]?.estado === "falhou") {
-      throw new Error(porNo["demanda"].erro ?? "não foi possível ler a demanda para exportar");
-    }
-    const daDemanda = r.saidas["demanda"] ?? {};
-    const prontos = (daDemanda.itensProntos as { chave: string }[] | undefined) ?? [];
-    const ignorados = (daDemanda.itensIgnorados as string[] | undefined) ?? [];
-    const doGrava = r.saidas["grava"] ?? {};
-    const falhaDoEnvio = porNo["envio"]?.estado === "falhou" ? porNo["envio"].erro : undefined;
-    const erros = falhaDoEnvio
-      ? prontos.map((i) => ({ chave: i.chave, erro: falhaDoEnvio }))
-      : ((doGrava.erros as { chave: string; erro: string }[] | undefined) ?? []);
-    const exportados = ((doGrava.exportados as string[] | undefined) ?? []).map(
-      (chave) => ({ chave }) as unknown as ItemGerado
-    );
-    return { exportados, erros, ignorados, destino: destinoDaExportacao ?? "" };
-  }
-
-  /**
-   * SPEC-107 G4 — **ensaiar É a fiação semeada** ("ensaio-de-cenarios"): cada
-   * cenário roda como UMA execução — `parametrosPorNo` aponta a demanda
-   * aberta e leva o cenário (entrada DESTA execução, não mudança da fiação) —
-   * e a leitura volta no rastro do nó `ensaio`, com a âncora de hoje inteira.
-   */
-  async function ensaiarPelaFiacao(cenario?: CenarioDeLentidao): Promise<LeituraDoEnsaio> {
-    const quebraId = persistencia.quebraId;
-    if (!quebraId) {
-      throw new Error("salve a demanda antes de ensaiar — a fiação lê a demanda salva, e esta ainda não tem endereço");
-    }
-    /**
-     * SPEC-110 fatia B — `ateNo: "ensaio"`. A fiação do ensaio agora atravessa
-     * a TELA da bancada; RE-MEDIR um cenário de dentro dela não pode suspender
-     * uma execução nova a cada clique (o risco R1 da SPEC, execuções paradas
-     * acumulando). O corte de ancestrais é exatamente o que a SPEC-105 §D
-     * construiu para isto: "inspecionar o meio sem pagar nem disparar o resto".
-     */
-    const r = await apiExecucaoDeFluxo.executar("ensaio-de-cenarios", quebra.time ?? timeAtivo, "ensaio", {
-      demanda: { demandaId: quebraId },
-      ...(cenario ? { ensaio: { cenario } } : {}),
-    });
-    const porNo = Object.fromEntries(r.nos.map((n) => [n.noId, n]));
-    if (porNo["demanda"]?.estado === "falhou") {
-      throw new Error(porNo["demanda"].erro ?? "não foi possível ler a demanda para ensaiar");
-    }
-    if (porNo["ensaio"]?.estado === "falhou") {
-      throw new Error(porNo["ensaio"].erro ?? "o ensaio falhou no servidor");
-    }
-    const leitura = (r.saidas["ensaio"] as { leitura?: LeituraDoEnsaio } | undefined)?.leitura;
-    if (!leitura) throw new Error("a execução terminou sem leitura — o rastro não trouxe a saída do nó de ensaio");
-    return leitura;
-  }
 
   function derivarQuebra() {
     // SPEC-38 — visualizar deriva (é leitura computada do diagrama), mas sem a
@@ -1060,20 +882,12 @@ function AppCarregado({
     executarDerivacao(true);
   }
 
-  async function confirmarNome(nome: string) {
+  function confirmarNome(nome: string) {
     const intencao = pedindoNomeDaDemanda;
-    const comTitulo = { ...quebra, titulo: nome };
-    setQuebra(comTitulo);
+    setQuebra((q) => ({ ...q, titulo: nome }));
     setPedindoNomeDaDemanda(false);
-    if (intencao === "derivar") {
-      // G5c-3 — SALVAR ANTES de derivar: derivar agora ESCREVE os itens, e
-      // eles só persistem com a quebra criada. Sem esta ordem, o efeito que
-      // lista os itens do servidor (disparado quando o id nasce, ~2s depois)
-      // respondia VAZIO e apagava os cards locais — corrida medida no E2E
-      // sob carga ("ainda não escrito" num documento recém-derivado).
-      await persistencia.salvar(comTitulo);
-      executarDerivacao(false);
-    } else setSalvarAposNome(true);
+    if (intencao === "derivar") executarDerivacao(true);
+    else setSalvarAposNome(true);
   }
 
   /** O Salvar do header: com título salva direto; sem, o agente pergunta. */
@@ -1173,8 +987,7 @@ function AppCarregado({
    * cada tecla — o que roubava o foco de quem estivesse escrevendo.
    */
   const atividadesDoDocumento = useMemo(() => {
-    // G5c-3 — `resultado` morreu com a tela de revisão: derivar aqui é barato
-    // e puro, e é a ÚNICA fonte (uma régua só).
+    if (resultado) return resultado.atividades;
     try {
       return derivar(quebra.diagrama, diagramaConfig, {
         time: quebra.time,
@@ -1188,23 +1001,7 @@ function AppCarregado({
       // inteira sumir — o documento sai sem itens, e as outras seções ficam.
       return [];
     }
-  }, [quebra.diagrama, quebra.time, quebra.excecoes, quebra.percursos, diagramaConfig, regrasConfig]);
-  /**
-   * SPEC-107 G5c — as fichas para o julgamento campo a campo NO DOCUMENTO
-   * (§5.5: o julgamento fica na demanda): o MESMO `montarFichaItem` da
-   * revisão, sobre as atividades do documento — confirmar/editar lá grava em
-   * `respostasItens` pelo mesmo `responderItem` de sempre.
-   */
-  const fichasDoDocumento = useMemo(
-    () =>
-      new Map(
-        atividadesDoDocumento.map((a, i) => [
-          a.chave,
-          montarFichaItem(i + 1, a, quebra.diagrama, diagramaConfig, regrasConfig, quebra.respostasItens?.[a.chave]),
-        ])
-      ),
-    [atividadesDoDocumento, quebra.diagrama, diagramaConfig, regrasConfig, quebra.respostasItens]
-  );
+  }, [resultado, quebra.diagrama, quebra.time, quebra.excecoes, quebra.percursos, diagramaConfig, regrasConfig]);
   const documentoDaDemanda = useMemo(
     () =>
       estruturarDocumento(atividadesDoDocumento, quebra.diagrama, diagramaConfig, {
@@ -1390,41 +1187,11 @@ function AppCarregado({
    * O 409 de "há mais de um destino" chega como mensagem — a escolha entre dois
    * espaços de documentação é da pessoa, e o servidor recusa escolher por ela.
    */
-  /**
-   * SPEC-107 G2 — **publicar É a fiação semeada** ("publicar-documento"): o
-   * botão vira atalho que (1) PERSISTE o markdown vivo como a especificação
-   * da demanda — o que se publica fica guardado, a SPEC-106 C inteira — e
-   * (2) dispara a fiação, que publica `projeto.markdown` e grava o link de
-   * volta na demanda. Multi-destino mantém a recusa de sempre: o atalho não
-   * escolhe sozinho.
-   */
   async function publicarDocumento() {
-    const quebraId = persistencia.quebraId!;
-    if (destinosDeDocumento.length > 1) {
-      throw new Error("há mais de um destino de documento — diga em qual publicar (deixe só um em Configurações → Conectores, por enquanto)");
-    }
-    // O markdown VIVO vira a especificação persistida ANTES de publicar — a
-    // fiação lê a demanda, e o que ela publica é exatamente o que se vê. A
-    // quebra vai EXPLÍCITA no salvar: o setQuebra ainda não re-renderizou.
-    const comEspecificacao = { ...quebra, especificacao: markdownDoDocumento };
-    setQuebra(comEspecificacao);
-    await persistencia.salvar(comEspecificacao);
-
-    const r = await apiExecucaoDeFluxo.executar("publicar-documento", timeAtivo, undefined, {
-      demanda: { demandaId: quebraId },
-      publica: { desatualizado: !!documentoDesatualizado },
+    return apiQuebras.publicarDocumento(persistencia.quebraId!, {
+      markdown: markdownDoDocumento,
+      desatualizado: !!documentoDesatualizado,
     });
-    const porNo = Object.fromEntries(r.nos.map((n) => [n.noId, n]));
-    for (const noId of ["demanda", "publica", "grava"]) {
-      if (porNo[noId]?.estado === "falhou") throw new Error(porNo[noId].erro ?? `a publicação falhou no nó "${noId}"`);
-    }
-    const linkExterno = String(r.saidas["publica"]?.linkExterno ?? "");
-    setLinkDoDocumento(linkExterno);
-    return {
-      linkExterno,
-      atualizada: r.saidas["publica"]?.atualizada === true,
-      destino: destinosDeDocumento[0]?.rotulo ?? "",
-    };
   }
 
   function salvarQuebra() {
@@ -1439,13 +1206,11 @@ function AppCarregado({
   // O auto-save espera o RENDER com o título aplicado (setQuebra é assíncrono
   // — salvar no mesmo tick gravaria a quebra sem nome, status "sem-titulo").
   useEffect(() => {
-    // G5c-3 — a condição `resultado` saiu com a tela de revisão; o que o
-    // efeito espera continua sendo o RENDER com o título aplicado.
-    if (autoSalvarPendente && (quebra.titulo ?? "").trim()) {
+    if (autoSalvarPendente && resultado && (quebra.titulo ?? "").trim()) {
       setAutoSalvarPendente(false);
       void persistencia.salvar();
     }
-  }, [autoSalvarPendente, quebra.titulo]);
+  }, [autoSalvarPendente, resultado, quebra.titulo]);
 
   // O mesmo tick-de-render do auto-save, para o Salvar-com-pergunta: o nome
   // precisa estar APLICADO na quebra antes de gravar.
@@ -1517,8 +1282,7 @@ function AppCarregado({
       executarDerivacao(false);
     },
     mostrarAvisos: () => setAvisosPendentes(true),
-    // G5c-3 — a revisão morreu; "fechar" é voltar à mesa.
-    fecharRevisao: () => navegar({ tela: "canvas" }),
+    fecharRevisao: () => setResultado(null),
     abrirConfigNaAba,
     /**
      * §251 — o tour passa pelo DOCUMENTO. NÃO limpa `resultado`: o passo
@@ -1532,26 +1296,19 @@ function AppCarregado({
      * do passo, que promete os cards (§234).
      */
     abrirDocumento: () => {
-      // G5c-3 — as atividades do documento existem SEMPRE (o memo re-deriva);
-      // escrever os itens antes de abrir continua valendo (§234).
-      aoGerarItens(
-        gerarItensDeTrabalho(atividadesDoDocumento, quebra.diagrama, diagramaConfig, {
-          regras: regrasConfig,
-          respostasItens: quebra.respostasItens,
-          templateItem: templateItem?.conteudo,
-        })
-      );
+      if (resultado) {
+        aoGerarItens(
+          gerarItensDeTrabalho(resultado.atividades, quebra.diagrama, diagramaConfig, {
+            regras: regrasConfig,
+            respostasItens: quebra.respostasItens,
+            templateItem: templateItem?.conteudo,
+          })
+        );
+      } else {
+        navegar({ tela: "documento" });
+      }
     },
-    // SPEC-109 C — a SistemaScreen morreu; o mapa vivo é o canvas de fluxos.
-    /**
-     * SPEC-110 fatia B — o tour abre a ESTEIRA, não "o primeiro fluxo do
-     * time". Os dois passos que chamam isto NARRAM a esteira ("a esteira de
-     * agentes derivada da configuração, quem escreve cada parte do item, na
-     * ordem"), e `#/fluxo` sem id abre o primeiro DECLARADO — que num time com
-     * fluxos próprios é qualquer coisa. Explicar uma tela e mostrar outra é o
-     * §390 renascendo, e foi assim que o E2E do tour caiu.
-     */
-    abrirFluxos: () => navegar({ tela: "fluxo", fluxoId: ID_DO_FLUXO_DA_ESTEIRA }),
+    abrirSistema: () => navegar({ tela: "sistema" }),
     abrirProposito: () => setAbaAssistente("contexto"),
     fecharAssistente: () => setAbaAssistente(null),
     abrirConversa: () => setAbaAssistente("conversa"),
@@ -1671,82 +1428,6 @@ function AppCarregado({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", fontFamily: "system-ui, sans-serif" }}>
-      {/**
-       * SPEC-110 fatia B (D17c) — **a moldura do stage, montada pelo SHELL.**
-       *
-       * As telas `documento` e `mesa` são as que já existem: o stage navega
-       * para elas e a barra Retornar/Avançar fica por cima, aqui no topo do
-       * app. É o "mínimo de impacto na mesa de projeto" que o usuário pediu —
-       * nenhuma delas recebe prop nova nem sabe que está num fluxo. (A
-       * bancada é a exceção: ela nasceu como painel, não como rota, e por
-       * isso o stage a monta como CORPO, mais abaixo.)
-       */}
-      {/* SPEC-110 fatia C — o STAGE de uma tela DECLARADA: a moldura do shell
-          por cima, e os blocos do time embaixo, pelo mesmo renderizador que o
-          preview do editor usa. */}
-      {mostrarStageDeclarado && stage && (
-        <MolduraDoStage
-          nomeDoFluxo={stage.nome}
-          // SPEC-110 fatia J — a tela pode morar num SUBFLUXO: a trilha diz
-          // dentro de qual etapa a execucao parou.
-          dentroDe={stage.dentroDe}
-          /**
-           * SPEC-111 A (D4) — só a moldura da tela DECLARADA leva este aviso:
-           * as telas do sistema (bancada, documento, mesa) não derivam fluxo
-           * implícito e nunca são abertas sozinhas. Pôr o aviso nas três seria
-           * prometer a quem não pode.
-           */
-          sozinha={stage.fluxoId.startsWith(PREFIXO_DO_FLUXO_DA_TELA)}
-          nomeDaTela={stage.nomeDoNo ?? stage.tela.nome}
-          ocupado={stageOcupado}
-          erro={erroDoStage}
-          motivoParaNaoAvancar={motivoParaNaoAvancar}
-          {...rotulosDasAcoes(stage.tela.blocos)}
-          onRetornar={() => void decidirNoStage("retornar")}
-          onAvancar={() => void decidirNoStage("avancar", valoresDaTela)}
-        >
-          <RenderizadorDaTela
-            blocos={stage.tela.blocos ?? []}
-            entradas={stage.entradas}
-            valores={valoresDaTela}
-            onMudarValor={(chave, valor) => setValoresDaTela((v) => ({ ...v, [chave]: valor }))}
-            acoesNaMoldura
-          />
-        </MolduraDoStage>
-      )}
-      {/* As do sistema que NÃO se desenham: a moldura por cima da tela real
-          (o documento, a mesa). A bancada é corpo próprio; a revisão do ajuste
-          tem blocos e cai no renderizador acima. */}
-      {stage && stage.tela.origem === "sistema" && stage.tela.id !== "bancada-de-ensaios" && !mostrarStageDeclarado && (
-        <div data-testid="barra-do-stage" style={{ flexShrink: 0 }}>
-          <MolduraDoStage
-            nomeDoFluxo={stage.nome}
-            dentroDe={stage.dentroDe}
-            nomeDaTela={stage.nomeDoNo ?? stage.tela.nome}
-            descricao={stage.tela.descricao}
-            ocupado={stageOcupado}
-            erro={erroDoStage}
-            onRetornar={() => void decidirNoStage("retornar")}
-            onAvancar={() => void decidirNoStage("avancar")}
-          >
-            {null}
-          </MolduraDoStage>
-        </div>
-      )}
-      {/**
-       * SPEC-110 fatia C — **o stage troca o contexto; não empilha.**
-       *
-       * A fatia B deixou o cabeçalho da MESA (paleta, Salvar, Derivar Quebra)
-       * acima da moldura. Funcionava, e convidava a gestos da tela errada:
-       * quem está revisando uma execução não deveria ver "Derivar Quebra". A
-       * aspereza foi anotada lá e paga aqui, que é onde o renderizador de
-       * telas passou a existir.
-       *
-       * As telas do sistema `documento` e `mesa` NÃO entram nesta regra, de
-       * propósito: elas delegam para a tela que já existe, e a moldura fica
-       * por cima DELA (D17c) — é o "mínimo de impacto" que o usuário pediu.
-       */}
-      {!emStageProprio && (
       <header
         style={{
           display: "flex",
@@ -1831,9 +1512,7 @@ function AppCarregado({
         </button>
         <button
           onClick={() => {
-            // SPEC-109 E — quem clica "Como funciona" quer OPERAR: a aba
-            // padrão é o manual de uso; a jornada continua uma aba ao lado.
-            setAbaJornadaAlvo("como-usar");
+            setAbaJornadaAlvo("jornada");
             setMostrarJornada(true);
           }}
           data-testid="abrir-como-funciona"
@@ -1901,7 +1580,6 @@ function AppCarregado({
           Derivar Quebra
         </button>
       </header>
-      )}
 
       <MenuLateral
         aberto={menuAberto}
@@ -1915,7 +1593,7 @@ function AppCarregado({
           // Regras é a exceção de sempre: uma tela, QUATRO recursos — quem
           // cuida de uma seção só continua entrando sem cadeado.
           if (area === "regras") return Object.values(RECURSO_DA_SECAO_DE_REGRAS).some((r) => permissoes.pode(r));
-          if (area === "pdca") return true;
+          if (area === "pdca" || area === "exportacao") return true;
           const recurso = RECURSO_DA_ABA[area];
           return recurso ? permissoes.pode(recurso) : true;
         }}
@@ -1927,7 +1605,8 @@ function AppCarregado({
           navegar({ tela: "canvas" });
           setMostrarAbrir(true);
         }}
-        onFluxos={() => navegar({ tela: "fluxo" })}
+        onDocumento={() => navegar({ tela: "documento" })}
+        onSistema={() => navegar({ tela: "sistema" })}
         onSair={() => void onSair()}
       />
 
@@ -2080,38 +1759,7 @@ function AppCarregado({
             ),
           }))
         }
-        onSimular={() => {
-          /**
-           * SPEC-110 fatia B (D4) — **"Simular" passou a EXECUTAR o fluxo.**
-           *
-           * Antes ele só navegava para o painel ad hoc. Agora a bancada é uma
-           * TELA no meio da fiação do ensaio, e o gesto honesto é disparar o
-           * fluxo (o gatilho manual): a execução roda a demanda e o ensaio, e
-           * PARA na bancada — que é onde a pessoa entra. Se algo falhar antes
-           * dela, o canvas do fluxo mostra o rastro com o motivo, em vez de
-           * uma bancada vazia sem explicação.
-           */
-          void (async () => {
-            await persistencia.salvar();
-            const quebraId = persistencia.quebraId;
-            try {
-              const r = await apiExecucaoDeFluxo.executar(
-                ID_DO_FLUXO_DO_ENSAIO,
-                quebra.time ?? timeAtivo,
-                undefined,
-                quebraId ? { demanda: { demandaId: quebraId } } : undefined
-              );
-              if (r.aguardandoTela) {
-                navegar({ tela: "telaDoStage", execucaoId: r.execucaoId });
-                return;
-              }
-            } catch {
-              // Silêncio aqui seria pior: o canvas do fluxo mostra o erro da
-              // execução no rastro, e é para lá que a navegação leva.
-            }
-            navegar({ tela: "fluxo", fluxoId: ID_DO_FLUXO_DO_ENSAIO });
-          })();
-        }}
+        onSimular={() => navegar({ tela: "ensaios" })}
         onSelecionar={setSelecionadoId}
         necessidades={quebra.necessidades}
         onAbrirProposito={() => setAbaAssistente("contexto")}
@@ -2203,9 +1851,6 @@ function AppCarregado({
         }
       />
 
-      {/* A MESA também sai quando o stage é dono da tela — ver o comentário
-          do cabeçalho acima. */}
-      {!emStageProprio && (
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
         <div style={{ flex: 1 }}>
           <ReactFlowProvider>
@@ -2276,48 +1921,36 @@ function AppCarregado({
           />
         )}
       </div>
-      )}
 
-      {/* SPEC-107 G5c-3 — a ReviewScreen MORREU (§3.1, a última linha da
-          tabela): derivar escreve os itens e leva ao documento, onde o
-          julgamento campo a campo mora (§384); a corrida da esteira é a
-          fiação semeada, ao vivo no canvas (§383). */}
-
-      {/* SPEC-39 M13 — o feedback do ciclo, na mesa (re-alojado da revisão). */}
-      {pedindoFeedbackPdca && !mostrarDocumento && !mostrarConfig && (
-        <div
-          data-testid="balao-feedback"
-          // bottom-LEFT de propósito: o canto direito é do assistente, e um
-          // balão por cima do outro intercepta o clique (medido no E2E do
-          // §278, com a cadência global baixada por um spec vizinho).
-          style={{ position: "fixed", left: 24, bottom: 24, zIndex: 62, background: "var(--painel)", border: "1px solid var(--borda)", borderRadius: 10, padding: 14, width: 360, boxShadow: "0 8px 28px rgba(0,0,0,0.3)", display: "grid", gap: 8 }}
-        >
-          <strong style={{ fontSize: 12.5 }}>Geramos mais um ciclo de itens.</strong>
-          <label style={{ fontSize: 11.5, display: "grid", gap: 4 }}>
-            O que faltou ou sobrou
-            <textarea
-              value={textoFeedbackPdca}
-              onChange={(e) => setTextoFeedbackPdca(e.target.value)}
-              style={{ minHeight: 56, fontSize: 12.5, background: "var(--painel-alto)", color: "var(--texto)", border: "1px solid var(--borda)", borderRadius: 6, padding: 6 }}
-            />
-          </label>
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button onClick={() => setPedindoFeedbackPdca(false)} style={{ fontSize: 11.5 }}>
-              Agora não
-            </button>
-            <button
-              data-testid="balao-feedback-enviar"
-              disabled={!textoFeedbackPdca.trim()}
-              onClick={() => {
-                void apiPdca.feedback(textoFeedbackPdca.trim(), timeAtivo).catch(() => {});
-                setPedindoFeedbackPdca(false);
-                setTextoFeedbackPdca("");
-              }}
-              style={{ fontSize: 11.5, fontWeight: 600 }}
-            >
-              Enviar
-            </button>
-          </div>
+      {/* display:none (e não desmontar): o documento cobre a revisão sem
+          perder o estado dela — os balões da revisão (zIndex 62) não vazam. */}
+      {resultado && (
+        <div style={{ display: mostrarDocumento ? "none" : "contents" }}>
+        <ReviewScreen
+          onDocumento={() => navegar({ tela: "documento" })}
+          onConfigurarModeloIa={() => abrirConfigNaAba("modeloIa")}
+          onItensGerados={aoGerarItens}
+          documentoJaAprovado={!!quebra.especificacao}
+          resultado={resultado}
+          diagrama={quebra.diagrama}
+          config={diagramaConfig}
+          regras={regrasConfig}
+          especificacaoTemplate={especificacaoTemplate}
+          templateItem={templateItem?.conteudo}
+          demandInfo={quebra.demandInfo}
+          necessidades={quebra.necessidades}
+          decisoes={quebra.decisoes}
+          excecoes={quebra.excecoes}
+          percursos={quebra.percursos}
+          anexosContexto={quebra.anexosContexto}
+          contextoDoProduto={contextoDoProduto}
+          time={quebra.time}
+          respostasItens={quebra.respostasItens}
+          onResponderItem={responderItem}
+          itemInicial={itemInicialRevisao}
+          onFechar={() => setResultado(null)}
+          onSelecionarNo={setSelecionadoId}
+        />
         </div>
       )}
 
@@ -2329,168 +1962,127 @@ function AppCarregado({
         />
       )}
 
-      {/* SPEC-110 fatia H — a galeria é a porta: `#/fluxo` sem id. */}
-      {mostrarGaleria && (
-        <GaleriaDeFluxos
-          timeAtivo={quebra.time ?? timeAtivo}
-          aoAbrirFluxo={(id) => navegar({ tela: "fluxo", fluxoId: id })}
-          // Tela sem id = criar uma nova: o editor da fatia C já abre vazio.
-          aoAbrirTela={(id) => navegar({ tela: "config", area: "telas", ...(id ? { telaId: id } : {}) })}
-          // SPEC-111 A — usar a tela é outro gesto: abre a execução dela.
-          aoUsarTela={(id) => navegar({ tela: "abrirTela", telaId: id })}
-          aoAbrirConfig={(area) => navegar({ tela: "config", area: area as never })}
-          aoFechar={() => navegar({ tela: "canvas" })}
-          // O motivo de ter sido devolvido para cá (ex.: a execução é de outro
-          // time) — sem ele, o desvio é silencioso.
-          avisoDeChegada={erroDoStage}
-        />
-      )}
-      {mostrarFluxos && (
-        <FluxoScreen
-          timeAtivo={quebra.time ?? timeAtivo}
-          onFechar={() => navegar({ tela: "canvas" })}
-          // SPEC-107 G4 — quem chega pela porta da bancada abre NO fluxo do
-          // ensaio; G5c — `#/fluxo/<id>` abre em qualquer fluxo (assistir a
-          // esteira é uma URL mandável).
-          abrirFluxoId={rota.tela === "fluxo" ? rota.fluxoId : undefined}
-          // SPEC-110 fatia B — a porta da tela parada: o canvas mostra
-          // "aguardando: <tela> — abrir →" e o clique leva ao stage.
-          aoAbrirTelaDoStage={(execucaoId) => navegar({ tela: "telaDoStage", execucaoId })}
-          // SPEC-110 fatia C — a porta do nó para o editor da tela declarada.
-          aoEditarTela={(id) => navegar({ tela: "config", area: "telas", telaId: id })}
-          // G5c — executar do canvas aponta a demanda aberta na mesa; e o que
-          // a fiação GRAVOU nela volta para o estado da mesa na hora, senão o
-          // próximo autosave apagaria a escrita do servidor (§250, medido).
-          demandaAberta={persistencia.quebraId ? { id: persistencia.quebraId } : undefined}
-          aoExecutarComDemanda={() => {
-            if (persistencia.quebraId) void persistencia.abrirPorId(persistencia.quebraId);
+      {mostrarSistema && (
+        <SistemaScreen
+          mapa={mapaDoSistema}
+          // §268 — a régua para explicar a cadeia. Os NÚMEROS do mapa seguem
+          // vindo da config real (esta tela responde "como o MEU ambiente está
+          // montado"); só o exemplo usa `regrasVisiveis`, porque durante o tour
+          // o time de quem assiste pode não ter régua conferível nenhuma — e um
+          // "não há o que explicar" no meio da demonstração não ensina nada.
+          //
+          // As duas coisas convivem porque a caixa DIZ quando o exemplo é de
+          // demonstração (§235). Sem essa marca isto seria a mentira que o
+          // §259 evitou de propósito.
+          exemploDeMedicao={exemploDeMedicao(regrasVisiveis)}
+          exemploDeDemonstracao={demonstracaoDoTour}
+          onAbrirConfig={(area) => abrirConfigNaAba(area)}
+          onVoltar={() => navegar({ tela: "canvas" })}
+          erroAoSalvar={erroAoSalvarSistema}
+          onAlternarAgente={(id) =>
+            void salvarPipeline((pipelineAgentes.papeis ?? []).map((p) => (p.id === id ? { ...p, ativo: !p.ativo } : p)))
+          }
+          onMoverAgente={(id, direcao) => {
+            const papeis = [...(pipelineAgentes.papeis ?? [])];
+            const de = papeis.findIndex((p) => p.id === id);
+            const para = de + direcao;
+            // Fora da lista não é erro nem no-op silencioso: os botões das
+            // pontas já vêm desabilitados, e chegar aqui seria bug de quem
+            // chamou — não vale gravar por isso.
+            if (de < 0 || para < 0 || para >= papeis.length) return;
+            [papeis[de], papeis[para]] = [papeis[para], papeis[de]];
+            void salvarPipeline(papeis);
           }}
-          // SPEC-109 C — a porta para o catálogo COMPLETO dos papéis (criar
-          // contextual, sugerir com IA): o deep-link vive, o menu não lista.
-          aoAbrirConfigDosPapeis={() => navegar({ tela: "config", area: "pipeline" })}
-          // SPEC-109 D — o template da especificação, no nó que o consome.
-          aoAbrirConfigDaEspecificacao={() => navegar({ tela: "config", area: "especificacao" })}
         />
       )}
 
-      {/**
-       * SPEC-110 fatia B (D4) — **o painel ad hoc da bancada MORREU.**
-       *
-       * Ela era montada pelo App SOBRE o canvas quando a rota pedia — uma
-       * tela sem lugar no desenho, aberta por um botão que ninguém ligava ao
-       * fluxo. Agora é a TELA `bancada-de-ensaios` no meio da fiação do
-       * ensaio: a execução PARA nela, e o stage a monta com a moldura
-       * Retornar/Avançar por cima (D17c — a bancada não mudou por dentro,
-       * não ganhou prop nenhuma, não sabe que está num fluxo).
-       */}
-      {mostrarStageDaBancada && stage && (
-        <MolduraDoStage
-          nomeDoFluxo={stage.nome}
-          // SPEC-110 fatia J — a tela pode morar num SUBFLUXO: a trilha diz
-          // dentro de qual etapa a execucao parou.
-          dentroDe={stage.dentroDe}
-          nomeDaTela={stage.nomeDoNo ?? stage.tela.nome}
-          ocupado={stageOcupado}
-          erro={erroDoStage}
-          onRetornar={() => void decidirNoStage("retornar")}
-          // O que a tela APROVA vai adiante: a leitura que estava no stage é
-          // o que quem revisou chancelou ao avançar.
-          onAvancar={() => void decidirNoStage("avancar", { ensaioAprovado: stage.entradas.ensaio ?? null })}
-        >
-              <BancadaDeEnsaios
-                // D17c — no stage ela é BLOCO, não gaveta: a moldura fica
-                // acima dela, e não atrás (medido: o Avançar ficava coberto).
-                estiloDaRaiz={{
-                  position: "static",
-                  width: "auto",
-                  boxShadow: "none",
-                  borderLeft: "none",
-                  height: "100%",
-                }}
-                diagrama={quebra.diagrama}
-                config={diagramaConfig}
-                cenarios={quebra.cenariosDeLentidao ?? []}
-                volumetria={volumetriaEmVigorAgora?.valor}
-                onMudar={(cenariosDeLentidao) => setQuebra((q) => ({ ...q, cenariosDeLentidao }))}
-                executar={ensaiarPelaFiacao}
-                /**
-                 * SPEC-69 — o que o NEGÓCIO exige. É o que faz o número técnico
-                 * decidir: "24 s" sozinho não decide nada, "24 s contra os 5 s
-                 * que prometemos" decide. Sem necessidade com prazo, a
-                 * conclusão do ensaio compara com hoje e não inventa julgamento.
-                 */
-                necessidades={quebra.necessidades}
-                // Quem assume o débito — é o que separa consciente de anônimo.
-                autor={sessao.email}
-                /**
-                 * SPEC-69 fatia D — o elo. Assumir já põe o ensaio na seção de
-                 * riscos do documento; ANEXAR a uma decisão é o que o leva ao
-                 * item, ao lado do critério de aceite de quem vai implementar.
-                 *
-                 * Só as decisões VIGENTES: anexar evidência a uma decisão que
-                 * já foi substituída seria juntar o número de hoje ao porquê de
-                 * ontem.
-                 */
-                decisoes={decisoesVisiveis}
-                onAnexar={(ensaioId, decisaoId) =>
-                  setQuebra((q) => ({
-                    ...q,
-                    // O ensaio sai de qualquer outra decisão antes de entrar
-                    // nesta: a mesma evidência sustentando duas escolhas
-                    // diferentes é o tipo de coisa que só se descobre lendo o
-                    // documento pronto.
-                    decisoes: (q.decisoes ?? []).map((d) => {
-                      const sem = (d.ensaioIds ?? []).filter((id) => id !== ensaioId);
-                      return { ...d, ensaioIds: d.id === decisaoId ? [...sem, ensaioId] : sem };
-                    }),
-                  }))
-                }
-                onVoltar={() => navegar({ tela: "canvas" })}
-                /**
-                 * SPEC-66 fatia D — a pauta vem do modelo; a conta, do motor.
-                 *
-                 * O botão está sempre presente, e isso NÃO contraria o §244:
-                 * sem modelo configurado ele não fica inerte, devolve o motivo
-                 * escrito pelo servidor, que a tela mostra.
-                 */
-                onSugerir={async () => {
-                  const elementos = elementosComTempo(quebra.diagrama, diagramaConfig);
-                  const t = leituraDoDesenho.tempoDoPiorTrecho;
-                  const { cenarios } = await apiIa.proporCenariosDeLentidao({
-                    contextoEpico: quebra.demandInfo,
-                    elementos: elementos.map((e) => ({
-                      tipo: e.tipo,
-                      id: e.id,
-                      rotulo: e.rotulo,
-                      msAtual: e.msAtual,
-                      externo: e.externo,
-                    })),
-                    respostaAtualMs: t?.ms,
-                    respostaEhPiso: t ? !t.completo : undefined,
-                    jaExistentes: (quebra.cenariosDeLentidao ?? []).map((c) => c.nome),
-                  });
-                  // O `tipo` vem do DESENHO, não do modelo: ele devolve só o
-                  // id, e quem sabe se aquele id é nó ou conexão é quem montou
-                  // a lista. Ajuste com id desconhecido é descartado.
-                  const porId = new Map(elementos.map((e) => [e.id, e.tipo]));
-                  return cenarios.map((c, i) => ({
-                    id: `cen-ia-${i}-${c.nome.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 24)}`,
-                    nome: c.nome,
-                    porque: c.porque,
-                    origem: "sugerido" as const,
-                    aceito: false,
-                    ajustes: c.ajustes
-                      .filter((a) => porId.has(a.id))
-                      .map((a) => ({ tipo: porId.get(a.id)!, id: a.id, fator: a.fator })),
-                  }));
-                }}
-              />
-        </MolduraDoStage>
+      {/* SPEC-66 — a bancada de ensaio. Rota própria: o assistente é onde se
+          CONVERSA para produzir desenho, e aqui não se produz nada, se ensaia.
+          E rota é linkável, que é metade do valor. */}
+      {mostrarEnsaios && (
+        <EnsaiosScreen
+          diagrama={quebra.diagrama}
+          config={diagramaConfig}
+          cenarios={quebra.cenariosDeLentidao ?? []}
+          volumetria={volumetriaEmVigorAgora?.valor}
+          onMudar={(cenariosDeLentidao) => setQuebra((q) => ({ ...q, cenariosDeLentidao }))}
+          /**
+           * SPEC-69 — o que o NEGÓCIO exige. É o que faz o número técnico
+           * decidir: "24 s" sozinho não decide nada, "24 s contra os 5 s que
+           * prometemos" decide. Sem necessidade com prazo, a conclusão do
+           * ensaio compara com hoje e não inventa julgamento.
+           */
+          necessidades={quebra.necessidades}
+          // Quem assume o débito — é o que separa consciente de anônimo.
+          autor={sessao.email}
+          /**
+           * SPEC-69 fatia D — o elo. Assumir já põe o ensaio na seção de riscos
+           * do documento; ANEXAR a uma decisão é o que o leva ao item, ao lado
+           * do critério de aceite de quem vai implementar.
+           *
+           * Só as decisões VIGENTES: anexar evidência a uma decisão que já foi
+           * substituída seria juntar o número de hoje ao porquê de ontem.
+           */
+          decisoes={decisoesVisiveis}
+          onAnexar={(ensaioId, decisaoId) =>
+            setQuebra((q) => ({
+              ...q,
+              // O ensaio sai de qualquer outra decisão antes de entrar nesta:
+              // a mesma evidência sustentando duas escolhas diferentes é o tipo
+              // de coisa que só se descobre lendo o documento pronto.
+              decisoes: (q.decisoes ?? []).map((d) => {
+                const sem = (d.ensaioIds ?? []).filter((id) => id !== ensaioId);
+                return { ...d, ensaioIds: d.id === decisaoId ? [...sem, ensaioId] : sem };
+              }),
+            }))
+          }
+          onVoltar={() => navegar({ tela: "canvas" })}
+          /**
+           * SPEC-66 fatia D — a pauta vem do modelo; a conta, do motor.
+           *
+           * O botão está sempre presente, e isso NÃO contraria o §244: sem
+           * modelo configurado ele não fica inerte, devolve o motivo escrito
+           * pelo servidor, que a tela mostra. O que o §244 proíbe é o botão que
+           * não faz nada — não o que explica por que não deu.
+           *
+           * A tela inteira segue funcionando sem ele: cenário à mão é o caminho
+           * principal, sugestão é atalho.
+           */
+          onSugerir={async () => {
+            const elementos = elementosComTempo(quebra.diagrama, diagramaConfig);
+            const t = leituraDoDesenho.tempoDoPiorTrecho;
+            const { cenarios } = await apiIa.proporCenariosDeLentidao({
+              contextoEpico: quebra.demandInfo,
+              elementos: elementos.map((e) => ({
+                tipo: e.tipo,
+                id: e.id,
+                rotulo: e.rotulo,
+                msAtual: e.msAtual,
+                externo: e.externo,
+              })),
+              respostaAtualMs: t?.ms,
+              respostaEhPiso: t ? !t.completo : undefined,
+              jaExistentes: (quebra.cenariosDeLentidao ?? []).map((c) => c.nome),
+            });
+            // O `tipo` vem do DESENHO, não do modelo: ele devolve só o id, e
+            // quem sabe se aquele id é nó ou conexão é quem montou a lista.
+            // Ajuste com id desconhecido é descartado — `simularCenario` também
+            // o declararia, mas deixá-lo entrar encheria a tabela de linha que
+            // não mede nada.
+            const porId = new Map(elementos.map((e) => [e.id, e.tipo]));
+            return cenarios.map((c, i) => ({
+              id: `cen-ia-${i}-${c.nome.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 24)}`,
+              nome: c.nome,
+              porque: c.porque,
+              origem: "sugerido" as const,
+              aceito: false,
+              ajustes: c.ajustes
+                .filter((a) => porId.has(a.id))
+                .map((a) => ({ tipo: porId.get(a.id)!, id: a.id, fator: a.fator })),
+            }));
+          }}
+        />
       )}
-
-      {/* SPEC-109 C — a SistemaScreen morreu: o canvas de fluxos é o mapa
-          vivo (executável), e o que só ela tinha — ligar/desligar e reordenar
-          papéis — migrou para o painel do nó agente, na FluxoScreen. */}
 
       {mostrarDocumento && (
         <DocumentoScreen
@@ -2507,18 +2099,13 @@ function AppCarregado({
           mudancasDesdeAprovacao={mudancasDesdeAprovacao}
           onBaixarMarkdown={baixarDocumentoMarkdown}
           onPublicar={podePublicarDocumento && persistencia.quebraId ? publicarDocumento : undefined}
-          linkPublicado={linkDoDocumento}
           onVoltar={() => navegar({ tela: "canvas" })}
           // SPEC-61 — o que era a tela `#/itens`, agora seção deste documento.
           itensEscritos={itensGerados}
           onExportar={
             persistencia.quebraId
               ? async () => {
-                  // SPEC-107 G1 — o botão é um ATALHO da fiação semeada
-                  // "exportar-prontos": a mesma régua de pronto, o mesmo
-                  // payload, o mesmo grava-por-item — agora pela fiação que
-                  // qualquer um pode abrir em #/fluxo e refazer diferente.
-                  const r = await exportarPelaFiacao(persistencia.quebraId!);
+                  const r = await apiItensGerados.exportar(persistencia.quebraId!);
                   setItensGerados(await apiItensGerados.listar(persistencia.quebraId!));
                   return r;
                 }
@@ -2535,13 +2122,14 @@ function AppCarregado({
           decisaoDoEnsaio={(ensaioId) =>
             (decisoesVisiveis ?? []).find((d) => (d.ensaioIds ?? []).includes(ensaioId))?.titulo
           }
-          // G5c-3 — `onRevisarItem` morreu com a tela de revisão: o julgamento
-          // mora no PRÓPRIO card (§384) — o chip de completude vira leitura, e
-          // resolver é expandir o card ao lado.
-          // SPEC-107 G5c — o julgamento campo a campo NA CASA DA DEMANDA
-          // (§5.5): as fichas do mesmo motor da revisão, e o mesmo gravador.
-          fichas={fichasDoDocumento}
-          onResponderItem={responderItem}
+          onRevisarItem={
+            resultado
+              ? (chave) => {
+                  setItemInicialRevisao(chave);
+                  navegar({ tela: "canvas" });
+                }
+              : undefined
+          }
         />
       )}
 
@@ -2550,20 +2138,7 @@ function AppCarregado({
           config={diagramaConfig}
           cenarios={cenarios}
           onFechar={fecharJornada}
-          /**
-           * SPEC-110 fatia B — **o exemplo carregado é SEU, não do exemplo.**
-           *
-           * Os cenários de demonstração vêm com o time em que foram escritos
-           * (`time-credito`, em `config/cenarios/*.json`), e `aoAbrir` copiava
-           * o campo inteiro: quem carregava um exemplo ficava com uma demanda
-           * de um time onde não escreve, e o Salvar respondia 403 sem dizer
-           * por quê. O defeito é antigo e passava despercebido porque nada
-           * cobrava a demanda estar NO BANCO — até a bancada virar uma tela
-           * dentro da fiação (D4), que só roda sobre demanda salva.
-           *
-           * Carregar um exemplo é adotá-lo: o time é o de quem carrega.
-           */
-          onCarregarCenario={(q) => aoAbrir({ ...q, time: timeAtivo })}
+          onCarregarCenario={(q) => aoAbrir(q)}
           onAdicionarCenario={adicionarCenario}
           onIniciarTour={iniciarTour}
           onIniciarTourDeConfiguracao={iniciarTourDeConfiguracao}
@@ -2584,11 +2159,6 @@ function AppCarregado({
           templateItem={templateItem}
           pipelineAgentes={pipelineAgentes}
           timeAtivo={timeAtivo}
-          // SPEC-110 fatia C — a tela em edição vem da ROTA: o editor de uma
-          // tela é um endereço mandável (`#/config/telas/<id>`), como o canvas
-          // de um fluxo.
-          telaId={rota.tela === "config" ? rota.telaId : undefined}
-          aoAbrirTela={(id) => navegar({ tela: "config", area: "telas", ...(id ? { telaId: id } : {}) })}
           timeIds={sessao.timeIds}
           onAbrirArea={(area) => abrirConfigNaAba(area)}
           // §274 — o botão da aba de produto abre a MESMA conversa do FAB, na
@@ -2656,7 +2226,7 @@ function AppCarregado({
                     : undefined,
                 onDispensar: () => setPedindoNomeDaDemanda(false),
               }
-            : entrevistaPdca !== null && !mostrarConfig
+            : entrevistaPdca !== null && !mostrarConfig && !resultado
               ? {
                   texto: `Já usamos a derivação algumas vezes${entrevistaPdca.length > 0 ? ` (últimos itens do time: ${entrevistaPdca.join(", ")})` : ""}. Sentiu falta — ou sobra — de algum item de checklist, regra de refinamento ou campo do formulário? ${somenteLeitura || permissoes.nivel !== "owner" ? "Escreva aqui: entra no ciclo do time, e quem configura transforma em ajuste vendo o efeito num item antes de aplicar." : "Posso ajustar com você, conversando."}`,
                   ...(permissoes.nivel === "owner"

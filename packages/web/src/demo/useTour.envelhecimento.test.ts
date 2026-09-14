@@ -151,15 +151,11 @@ describe("o tour não pode apontar para o que não existe (SPEC-78 fatia D)", ()
  * a correção existia e não alcançava a tela em que o defeito foi visto. Esta
  * trava é o que faz a próxima esquecer doer no CI em vez de numa demonstração.
  */
-// SPEC-109 C — a SistemaScreen morreu e `abrirSistema` virou `abrirFluxos`
-// (o canvas de fluxos é o mapa vivo). O invariante do §340 continua: o passo
-// abre uma tela com dado REAL do time no meio de uma demonstração — a marca
-// tem que ligar no mesmo onEnter.
-describe("§340 — quem abre o mapa (hoje, o canvas de fluxos) liga a demonstração", () => {
-  it("nos DOIS tours, o passo que chama `abrirFluxos` liga antes", () => {
+describe("§340 — quem abre o mapa do sistema liga a demonstração", () => {
+  it("nos DOIS tours, o passo que chama `abrirSistema` liga antes", () => {
     const fonte = readFileSync(resolve(import.meta.dirname, "useTour.ts"), "utf-8");
 
-    // Cada `abrirFluxos()` precisa de um `ligarDemonstracao(true)` no MESMO
+    // Cada `abrirSistema()` precisa de um `ligarDemonstracao(true)` no MESMO
     // `onEnter`. Ler o fonte é grosseiro e é honesto sobre o que faz: o que se
     // guarda aqui é textual, e não custa montar o app inteiro para acusá-lo.
     /**
@@ -174,7 +170,7 @@ describe("§340 — quem abre o mapa (hoje, o canvas de fluxos) liga a demonstra
       .split("onEnter:")
       .slice(1)
       .map((b) => b.slice(0, b.indexOf("},") + 2))
-      .filter((b) => b.includes("abrirFluxos"));
+      .filter((b) => b.includes("abrirSistema"));
 
     expect(corpos.length, "ninguém abre o mapa? o passo sumiu").toBeGreaterThan(0);
     for (const corpo of corpos) {

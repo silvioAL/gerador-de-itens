@@ -119,38 +119,6 @@ export function resumirConfig(chave: ChaveConfig, documento: unknown): ResumoCon
      */
     case "conexoes":
       return { conexoes: Object.keys(regrasDeConexaoDe(documento)).length };
-    /**
-     * SPEC-105 fatia A — quantos conectores a organização DECLAROU. Os de
-     * fábrica (derivados dos destinos do gateway) ficam fora da conta: eles
-     * não moram neste documento. Template vazio, como `conexoes` — não
-     * cadastrar conector é escolha, não atraso.
-     */
-    case "conectores":
-      return {
-        conectores: Array.isArray((documento as { conectores?: unknown[] })?.conectores)
-          ? (documento as { conectores: unknown[] }).conectores.length
-          : 0,
-      };
-    /** SPEC-105 fatia C — template vazio, como os vizinhos: não ter fluxo é
-     * escolha, não atraso. */
-    case "fluxos":
-      return {
-        fluxos: Array.isArray((documento as { fluxos?: unknown[] })?.fluxos)
-          ? (documento as { fluxos: unknown[] }).fluxos.length
-          : 0,
-      };
-    // SPEC-110 fatia C — as telas do time. O resumo conta telas e blocos: uma
-    // tela sem bloco nenhum é o sintoma de um documento que chegou pela
-    // metade, e é isso que o diagnóstico existe para mostrar.
-    case "telas": {
-      const telas = Array.isArray((documento as { telas?: unknown[] })?.telas)
-        ? (documento as { telas: { blocos?: unknown[] }[] }).telas
-        : [];
-      return {
-        telas: telas.length,
-        blocos: telas.reduce((soma, t) => soma + (Array.isArray(t?.blocos) ? t.blocos.length : 0), 0),
-      };
-    }
   }
 }
 
@@ -229,8 +197,6 @@ const NOME_AMIGAVEL: Record<string, string> = {
   caracteres: "conteúdo",
   destino: "destino de exportação",
   conexoes: "regra de conexão sobrescrita",
-  conectores: "conector cadastrado",
-  fluxos: "fluxo desenhado",
 };
 
 /**

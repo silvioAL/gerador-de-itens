@@ -302,55 +302,6 @@
       "when": 1754500000028,
       "tag": "0042_variantes",
       "breakpoints": true
-    },
-    {
-      "idx": 43,
-      "version": "7",
-      "when": 1754500000029,
-      "tag": "0043_rastro_do_fluxo",
-      "breakpoints": true
-    },
-    {
-      "idx": 44,
-      "version": "7",
-      "when": 1754500000030,
-      "tag": "0044_link_do_documento",
-      "breakpoints": true
-    },
-    {
-      "idx": 45,
-      "version": "7",
-      "when": 1754500000031,
-      "tag": "0045_gate_de_confirmacao",
-      "breakpoints": true
-    },
-    {
-      "idx": 46,
-      "version": "7",
-      "when": 1754500000032,
-      "tag": "0046_agendamento_de_fluxos",
-      "breakpoints": true
-    },
-    {
-      "idx": 47,
-      "version": "7",
-      "when": 1754500000033,
-      "tag": "0047_subfluxo",
-      "breakpoints": true
-    },
-    {
-      "idx": 48,
-      "version": "7",
-      "when": 1754500000034,
-      "tag": "0048_subfluxo_parcial",
-      "breakpoints": true
-    },
-    {
-      "idx": 49,
-      "version": "7",
-      "when": 1754500000035,
-      "tag": "0049_webhook",
-      "breakpoints": true
     }
   ]
 }

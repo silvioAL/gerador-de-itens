@@ -35,43 +35,6 @@ describe("toda chave de config sobrevive à normalização", () => {
     exportador: { endpoint: "https://exemplo.invalido/itens", rotulo: "", cabecalhos: {} },
     tokens: { tokens: [{ nome: "cor.primaria", valor: "#0891b2", tipo: "color" }] },
     conexoes: { regras: { motor: { default: "interno", valid: ["interno", "http"] } } },
-    conectores: {
-      conectores: [
-        {
-          id: "volumetria",
-          nome: "Volumetria (Dynatrace)",
-          endpoint: "https://gateway.exemplo/volumetria",
-          entrada: [{ chave: "projetoId", rotulo: "Projeto", tipo: "texto", obrigatorio: true }],
-          saida: [{ chave: "rps", rotulo: "Requisições/s", tipo: "numero", caminho: "$.dados.rps" }],
-        },
-      ],
-    },
-    fluxos: {
-      fluxos: [
-        {
-          id: "jmx",
-          nome: "JMX a partir da volumetria",
-          nos: [{ id: "v", tipo: "conector", refId: "volumetria", posicao: { x: 0, y: 0 }, parametros: {} }],
-          arestas: [],
-        },
-      ],
-    },
-    // SPEC-110 fatia C — as telas do time. Este teste é o guarda do §354, e
-    // foi ele que cobrou a chave nova antes de ela nascer morta.
-    telas: {
-      telas: [
-        {
-          id: "aprovacao",
-          nome: "Aprovar a proposta",
-          blocos: [
-            { tipo: "texto", markdown: "Confira a proposta antes de seguir." },
-            { tipo: "dado", chave: "proposta", rotulo: "Proposta", formato: "documento" },
-            { tipo: "campo", chave: "observacao", rotulo: "Observação", entrada: "texto" },
-            { tipo: "acao", rotulo: "Aprovar", acao: "avancar" },
-          ],
-        },
-      ],
-    },
   };
 
   it.each([...CHAVES_CONFIG])("`%s` não vira undefined ao ser normalizada", (chave) => {

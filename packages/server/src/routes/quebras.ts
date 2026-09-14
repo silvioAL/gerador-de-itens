@@ -14,13 +14,16 @@ import {
   criarCasosDeUsoDeQuebras,
   criarCasosDeUsoDeItensGerados,
   criarCasosDeUsoDeConfig,
+  comoDecisao,
+  destinosDaOperacao,
+  lacunasDaDecisaoImportada,
   normalizarExportador,
 } from "@gerador/aplicacao";
 import type { OpcoesApp } from "../app.js";
 import { criarRepositorioDeQuebrasEmPostgres } from "../adaptadores/quebrasEmPostgres.js";
 import { criarRepositorioDeItensGeradosEmPostgres } from "../adaptadores/itensGeradosEmPostgres.js";
-import { eq } from "drizzle-orm";
-import { quebras } from "../db/schema.js";
+import { criarExportadorViaAgente } from "../adaptadores/exportadorViaAgente.js";
+import { criarLeitorDeAdrViaGateway, criarPublicadorDeDocumentoViaGateway } from "../adaptadores/gatewayDoTime.js";
 import { criarRepositorioDeConfigEmPostgres } from "../adaptadores/configEmPostgres.js";
 import { registrarAuditoria } from "../auditoria.js";
 import { exigirNivel } from "../auth/niveis.js";
@@ -75,6 +78,20 @@ function emMB(bytes: number): string {
  * não existe em runtime, e por isso o teste cruza este `shape` com um
  * inventário que o COMPILADOR verifica. Ver `quebras.borda.test.ts`.
  */
+/**
+ * SPEC-81 fatia B — o corpo da publicação de documento.
+ *
+ * `markdown` vem do cliente porque é lá que ele é montado (ver a rota).
+ * `desatualizado` também: o web já calcula o estado do documento em relação ao
+ * desenho, e recalcular aqui seria uma segunda implementação da mesma pergunta.
+ */
+const corpoPublicarDocumento = z.object({
+  markdown: z.string().min(1, "markdown vazio — não há documento para publicar"),
+  desatualizado: z.boolean().default(false),
+  /** Qual destino, quando há mais de um configurado para documento. */
+  destinoId: z.string().optional(),
+});
+
 export const corpoQuebra = z.object({
   titulo: z.string().nullish(),
   time: z.string().nullish(),
@@ -411,27 +428,164 @@ export async function registrarRotasQuebras(app: FastifyInstance, { db, diretori
     return itens.listarDaQuebra(id);
   });
 
-  // SPEC-49 → SPEC-107 G1: `POST /quebras/:id/itens/exportar` MORREU — o
-  // *Act* do ciclo de itens agora é a fiação semeada "exportar-prontos"
-  // (`fluxoDaExportacao`, derivada do destino de itens em vigor), disparada
-  // pelo MESMO botão da tela como atalho. A régua de "pronto", o payload e o
-  // grava-por-item continuam os mesmos (§263: `prontosEIgnorados` e
-  // `resultadoDaExportacao`, na aplicação) — a prova da §3.1 é o E2E de
-  // exportação passando pela fiação sem mudar uma linha.
+  /**
+   * SPEC-49 — o *Act* do ciclo de itens: mandar pro tracker. Exporta só os
+   * PRONTOS (a régua da SPEC-44/47), item a item, e devolve o que subiu, o
+   * que falhou (com motivo) e o que ficou de fora por ter pendência.
+   */
+  app.post("/quebras/:id/itens/exportar", { preHandler: podeOperarNaQuebra }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    if (!(await casos.obter(id))) return reply.code(404).send({ erro: "quebra não encontrada" });
 
-  // SPEC-81 fatia B → SPEC-107 G2: `POST /quebras/:id/documento/publicar`
-  // MORREU — publicar é a fiação semeada "publicar-documento" (uma POR
-  // destino; `fluxosDaPublicacao`), disparada pelo MESMO botão como atalho.
-  // O atalho salva a especificação viva na demanda e a fiação publica
-  // `projeto.markdown`; o link volta para `documento_link_externo` pelo
-  // projeto-destino (SPEC-106 C). Multi-destino continua recusando escolher
-  // sozinho — a recusa mora no atalho, com a mesma frase.
+    const config = normalizarExportador(
+      (await criarCasosDeUsoDeConfig(criarRepositorioDeConfigEmPostgres(db)).obter("exportador", { endpoint: "", rotulo: "", cabecalhos: {} }))
+        .documento
+    );
+    if (!config.endpoint) {
+      // Sem destino configurado a resposta DIZ o que fazer, em vez de um erro
+      // genérico que manda a pessoa adivinhar onde configurar.
+      return reply.code(409).send({
+        erro: "nenhum destino de exportação configurado — cadastre o endereço do agente em Configurações → Exportação",
+      });
+    }
 
-  // SPEC-81 fatia C → SPEC-107 G3: `POST /quebras/:id/adr/importar` MORREU —
-  // a conversa lê os ADRs pelo executor genérico de conector e a CONVERSÃO
-  // (sanear → comoDecisao → dedupe por `importadoDe` → lacunas) roda no web
-  // com as funções puras da aplicação (o mesmo §263, do outro lado). "Importar
-  // não é aceitar" fica: os ADRs viram TEXTO na caixa da conversa, como antes.
+    const resultado = await itens.exportarDaQuebra(id, criarExportadorViaAgente(config));
+    registrarAuditoria(db, {
+      email: req.usuario!.email,
+      acao: "exportar",
+      recurso: "itens_gerados",
+      recursoId: id,
+    });
+    return { ...resultado, destino: config.rotulo || config.endpoint };
+  });
+
+  /**
+   * SPEC-81 fatia B — **publicar o documento de desenho na base de conhecimento.**
+   *
+   * ## Por que rota própria, e não um parâmetro da exportação de itens
+   *
+   * As duas diferem em ciclo de vida (issue nasce uma vez; página é viva),
+   * idempotência (exportar duas vezes duplica; publicar duas vezes atualiza no
+   * lugar), modo de falhar (parcial por item × publica ou não) e permissão (quem
+   * abre issue não é quem escreve na wiki). Um parâmetro a mais faria a rota
+   * mentir sobre os quatro.
+   *
+   * ## O que vai no corpo, e por que o markdown vem do cliente
+   *
+   * O documento é montado no web a partir do template, da config e da quebra —
+   * é lá que a mesma string que a pessoa vê e baixa existe. Remontá-lo aqui
+   * seria uma segunda implementação da geração, e as duas divergiriam na
+   * primeira mudança (§263). O servidor guarda a fronteira e o carimbo; o texto
+   * é do cliente.
+   */
+  app.post("/quebras/:id/documento/publicar", { preHandler: podeOperarNaQuebra }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const quebra = await casos.obter(id);
+    if (!quebra) return reply.code(404).send({ erro: "quebra não encontrada" });
+
+    const corpo = corpoPublicarDocumento.safeParse(req.body);
+    if (!corpo.success) {
+      return reply.code(400).send({ erro: "corpo inválido", detalhes: corpo.error.issues });
+    }
+
+    const config = normalizarExportador(
+      (await criarCasosDeUsoDeConfig(criarRepositorioDeConfigEmPostgres(db)).obter("exportador", { endpoint: "", rotulo: "", cabecalhos: {} }))
+        .documento
+    );
+    const destinos = destinosDaOperacao(config, "documento");
+    if (destinos.length === 0) {
+      return reply.code(409).send({
+        erro: "nenhum destino de documento configurado — cadastre o endereço em Configurações → Exportação, em “Outros destinos”",
+      });
+    }
+    /**
+     * Com mais de um destino, quem escolhe é a tela — e enquanto ela não
+     * escolher, o servidor **não escolhe por ela**. Publicar no primeiro
+     * silenciosamente colocaria a página no espaço errado, que é o pior desfecho
+     * de uma publicação.
+     */
+    const escolhido = corpo.data.destinoId
+      ? destinos.find((d) => d.id === corpo.data.destinoId)
+      : destinos.length === 1
+        ? destinos[0]
+        : undefined;
+    if (!escolhido) {
+      return reply.code(409).send({
+        erro: "há mais de um destino de documento — diga em qual publicar",
+        destinos: destinos.map((d) => ({ id: d.id, rotulo: d.rotulo || d.endpoint })),
+      });
+    }
+
+    try {
+      const publicado = await criarPublicadorDeDocumentoViaGateway(escolhido).publicar({
+        demandaId: id,
+        demandaTitulo: quebra.titulo ?? "(sem título)",
+        markdown: corpo.data.markdown,
+        geradoEm: new Date().toISOString(),
+        demandaAtualizadaEm: quebra.atualizadoEm,
+        desatualizado: corpo.data.desatualizado,
+      });
+      registrarAuditoria(db, {
+        email: req.usuario!.email,
+        acao: "publicar-documento",
+        recurso: "quebras",
+        recursoId: id,
+      });
+      return { ...publicado, destino: escolhido.rotulo || escolhido.endpoint };
+    } catch (erro) {
+      // 502 e não 500: a falha é de quem está do outro lado, e a distinção muda
+      // onde a pessoa vai procurar o problema.
+      return reply.code(502).send({ erro: erro instanceof Error ? erro.message : String(erro) });
+    }
+  });
+
+  /**
+   * SPEC-81 fatia C — **traz os ADRs da casa, marcados.**
+   *
+   * ## O que ela NÃO faz
+   *
+   * Não grava. Devolve as decisões já convertidas e marcadas
+   * (`origem: "extraido"` + `importadoDe`), e quem escolhe o que entra é a
+   * pessoa — o `PUT /quebras/:id` de sempre leva as escolhidas junto do resto.
+   *
+   * Escrever aqui pareceria conveniente e criaria o problema que a fatia inteira
+   * existe para evitar: decisão de terceiro entrando na demanda sem ninguém ter
+   * lido. **Importar não é aceitar.**
+   *
+   * ## As lacunas viajam junto
+   *
+   * ADR pobre é o caso comum, e a tela precisa poder dizer *"esta decisão vem
+   * sem o porquê"* antes de a pessoa aceitá-la. Calcular isso aqui evita que a
+   * tela reimplemente a mesma conta (§263).
+   */
+  app.post("/quebras/:id/adr/importar", { preHandler: podeOperarNaQuebra }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const quebra = await casos.obter(id);
+    if (!quebra) return reply.code(404).send({ erro: "quebra não encontrada" });
+
+    const config = normalizarExportador(
+      (await criarCasosDeUsoDeConfig(criarRepositorioDeConfigEmPostgres(db)).obter("exportador", { endpoint: "", rotulo: "", cabecalhos: {} }))
+        .documento
+    );
+    const destinos = destinosDaOperacao(config, "adr");
+    if (destinos.length === 0) {
+      return reply.code(409).send({
+        erro: "nenhum destino de ADR configurado — cadastre o endereço em Configurações → Exportação, em “Outros destinos”",
+      });
+    }
+
+    const agora = new Date().toISOString();
+    const jaTem = new Set((quebra.decisoes ?? []).map((d) => d.importadoDe).filter(Boolean));
+    const decisoes = (await criarLeitorDeAdrViaGateway(destinos[0]).listar())
+      .map((adr) => comoDecisao(adr, agora))
+      // O que já foi importado não volta na lista: reimportar criaria uma
+      // segunda cópia da mesma decisão da casa, com outro id, e a partir daí
+      // ninguém sabe qual é a original.
+      .filter((d) => !jaTem.has(d.importadoDe))
+      .map((d) => ({ decisao: d, lacunas: lacunasDaDecisaoImportada(d) }));
+
+    return { decisoes, origem: destinos[0].rotulo || destinos[0].endpoint };
+  });
 
   app.put("/quebras/:id/itens", { preHandler: podeOperarNaQuebra }, async (req, reply) => {
     const { id } = req.params as { id: string };

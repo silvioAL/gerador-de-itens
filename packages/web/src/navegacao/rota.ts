@@ -1,5 +1,4 @@
-﻿import { useCallback, useEffect, useState } from "react";
-import { ID_DO_FLUXO_DO_ENSAIO } from "@gerador/aplicacao";
+import { useCallback, useEffect, useState } from "react";
 
 /**
  * SPEC-40 Fase 1 — a rota do app, em hash (`#/config/membros`). Hash e não
@@ -22,12 +21,9 @@ export type AreaConfig =
   | "pipeline"
   | "modeloIa"
   | "pdca"
+  | "exportacao"
   /** SPEC-79 fatia A — os tokens do design system do time. */
-  | "tokens"
-  /** SPEC-110 fatia C — as telas (screens) do time: criar, editar, prever. */
-  | "telas"
-  /** SPEC-105 fatia A — o catálogo de conectores (organizacional). */
-  | "conectores";
+  | "tokens";
 
 /**
  * SPEC-58 — `documento` é tela própria da demanda: o documento deixou de ser
@@ -40,54 +36,19 @@ export type AreaConfig =
  */
 export type Rota =
   | { tela: "canvas" }
-  /**
-   * SPEC-110 fatia C — `telaId` só existe na área `telas`: o editor de uma
-   * tela é `#/config/telas/<id>`, e a lista é `#/config/telas`. É o mesmo
-   * endereço-com-detalhe do canvas (`#/fluxo/<id>`) — a porta é URL.
-   */
-  | { tela: "config"; area: AreaConfig; telaId?: string }
+  | { tela: "config"; area: AreaConfig }
   | { tela: "documento" }
+  /** SPEC-59 fatia A — a vista de leitura de como a ferramenta está montada. */
+  | { tela: "sistema" }
   /**
-   * ~~SPEC-59 — `{ tela: "sistema" }`.~~ **SPEC-109 C — a tela saiu.**
+   * SPEC-66/68 — a bancada de ENSAIOS: "e se…?".
    *
-   * A SistemaScreen nasceu quando o encanamento não existia em tela nenhuma
-   * (§258: "a vista antes das telas") e virou a SEGUNDA narração dele quando
-   * a SPEC-105/107 construiu o canvas de fluxos — executável, não narrado
-   * ("por vezes parece ter coisas repetidas", queixa literal). O que só ela
-   * tinha (ligar/desligar e reordenar papéis) migrou para o painel do nó
-   * agente. `#/sistema` REDIRECIONA para o fluxo (SPEC-61 §6.7).
+   * ROTA, e não aba do assistente. O assistente é onde se CONVERSA para
+   * produzir desenho, e aqui não se produz nada — se ensaia. E rota é
+   * linkável: *"olha o que acontece se o bureau cair"* é uma URL que se manda
+   * para alguém, e isso é metade do valor.
    */
-  /**
-   * SPEC-105 fatia C — o FLUXO: o encanamento da ferramenta como grafo.
-   * Tela própria e não aba de config (§1): é o OUTRO grafo, com paleta
-   * própria — misturá-lo com a mesa destruiria a régua "estou desenhando o
-   * meu sistema ou a minha automação?".
-   *
-   * SPEC-107 G4 — `{ tela: "ensaios" }` MORREU: a bancada de cenários virou a
-   * fiação semeada `ensaio-de-cenarios`, e a tabela vive JUNTO do fluxo. A
-   * aposta da SPEC-66 §5 fica de pé: *"olha o que acontece se o bureau cair"*
-   * continua sendo uma URL mandável — `#/fluxo/ensaio` — e os links salvos
-   * (`#/ensaios`, `#/simulacao`) REDIRECIONAM em vez de virar tela branca.
-   */
-  /**
-   * SPEC-110 fatia B (D4) — `bancada?: "ensaio"` MORREU com o painel ad hoc.
-   * A bancada era montada pelo App SOBRE o canvas quando a rota pedia; agora
-   * ela é a TELA `bancada-de-ensaios` no meio da fiação do ensaio, e aparece
-   * pelo STAGE (`#/tela/<execucaoId>`) como qualquer tela. Os links antigos
-   * (`#/fluxo/ensaio`, `#/ensaios`, `#/simulacao`) redirecionam para o fluxo
-   * onde ela mora — link salvo não vira tela branca (SPEC-61 §6.7).
-   */
-  | { tela: "fluxo"; fluxoId?: string }
-  /**
-   * SPEC-110 fatia B (D2) — **a TELA em modo stage**: a execução de um fluxo
-   * parou num nó de tela e alguém precisa abrir, agir e decidir. O endereço é
-   * da EXECUÇÃO (não da tela): duas execuções paradas na mesma tela são duas
-   * coisas diferentes, e o link é mandável para quem revisa — a metade da
-   * porta que o §2.4-3 cobra.
-   */
-  | { tela: "telaDoStage"; execucaoId: string }
-  /** SPEC-111 A — abrir uma tela declarada SOZINHA (cria a execução). */
-  | { tela: "abrirTela"; telaId: string };
+  | { tela: "ensaios" };
 
 /**
  * ~~SPEC-84 fatia A — `{ tela: "spec" }`.~~ **§346 — a tela saiu.**
@@ -126,11 +87,8 @@ const SEGMENTO_DA_AREA: Record<AreaConfig, string> = {
   pipeline: "pipeline",
   modeloIa: "modelo-ia",
   pdca: "pdca",
+  exportacao: "exportacao",
   tokens: "design-system",
-  conectores: "conectores",
-  // SPEC-110 fatia C — o editor de telas do time, FORA do menu (padrão
-  // "deep-link + porta no nó", §§388-389).
-  telas: "telas",
 };
 /** SPEC-78 fatia D — as áreas de config, em runtime. O tipo `AreaConfig` não
  * existe depois da compilação, e o teste que impede o tour de apontar para uma
@@ -144,20 +102,8 @@ const AREA_DO_SEGMENTO = Object.fromEntries(
 export function hashDaRota(rota: Rota): string {
   if (rota.tela === "canvas") return "#/";
   if (rota.tela === "documento") return "#/documento";
-  // SPEC-110 B — o stage de uma tela é endereçado pela EXECUÇÃO.
-  if (rota.tela === "telaDoStage") return `#/tela/${encodeURIComponent(rota.execucaoId)}`;
-  // SPEC-111 A — o endereço de ABRIR, distinto do de continuar.
-  if (rota.tela === "abrirTela") return `#/tela/s/${encodeURIComponent(rota.telaId)}`;
-  if (rota.tela === "fluxo") {
-    // SPEC-107 G5c — o canvas abre NUM fluxo: "assista a esteira rodando" é
-    // uma URL mandável, como a bancada (§2.4-3, a metade da porta).
-    if (rota.fluxoId) return `#/fluxo/${encodeURIComponent(rota.fluxoId)}`;
-    return "#/fluxo";
-  }
-  // SPEC-110 C — `#/config/telas/<id>` abre o editor DAQUELA tela.
-  if (rota.area === "telas" && rota.telaId) {
-    return `#/config/telas/${encodeURIComponent(rota.telaId)}`;
-  }
+  if (rota.tela === "sistema") return "#/sistema";
+  if (rota.tela === "ensaios") return "#/ensaios";
   return `#/config/${SEGMENTO_DA_AREA[rota.area]}`;
 }
 
@@ -170,45 +116,8 @@ export function rotaDoHash(hash: string): Rota {
   // itens passaram a morar, numa seção.
   if (partes[0] === "itens") return { tela: "documento" };
   if (partes[0] === "documento") return { tela: "documento" };
-  // SPEC-109 C — a SistemaScreen morreu; o canvas de fluxos é o mapa vivo.
-  if (partes[0] === "sistema") return { tela: "fluxo" };
-  // SPEC-107 G4 — a tela de ensaios morreu; a bancada vive junto do fluxo
-  // (`#/fluxo/ensaio`), e o link salvo REDIRECIONA (§2.4-3).
-  if (partes[0] === "ensaios") return { tela: "fluxo", fluxoId: ID_DO_FLUXO_DO_ENSAIO };
-  // SPEC-110 B — `#/tela/<execucaoId>`. Sem id não há stage nenhum a mostrar:
-  // cai no canvas de fluxos, que é de onde as execuções nascem (§2.4-3 — link
-  // torto nunca vira tela branca).
-  if (partes[0] === "tela") {
-    /**
-     * SPEC-111 A — **`#/tela/s/<telaId>` ABRE a tela sozinha.**
-     *
-     * Dois endereços porque são duas coisas: `#/tela/<execucaoId>` continua
-     * sendo "continue ESTA sessão de trabalho" (110-B), e o `s/` é "abra uma
-     * nova". Confundi-los faria um link mandado a alguém ou reabrir a resposta
-     * de outra pessoa, ou criar execução a cada F5 — os dois errados.
-     *
-     * O `s` vem ANTES do id de propósito: um id de tela nunca é `s` sozinho
-     * (ele viria com o id junto), então o prefixo não rouba nenhum endereço
-     * que já funcionava.
-     */
-    if (partes[1] === "s") {
-      return partes[2] ? { tela: "abrirTela", telaId: decodeURIComponent(partes[2]) } : { tela: "fluxo" };
-    }
-    return partes[1] ? { tela: "telaDoStage", execucaoId: decodeURIComponent(partes[1]) } : { tela: "fluxo" };
-  }
-  if (partes[0] === "fluxo") {
-    /**
-     * SPEC-110 fatia B (D4) — `#/fluxo/ensaio` REDIRECIONA para o fluxo do
-     * ensaio. O painel ad hoc da bancada morreu: ela virou a TELA `bancada` no
-     * meio da fiação, e quem chega pelo link antigo abre o fluxo onde ela
-     * mora — a bancada aparece quando a execução para nela.
-     */
-    if (partes[1] === "ensaio") return { tela: "fluxo", fluxoId: ID_DO_FLUXO_DO_ENSAIO };
-    // G5c — `#/fluxo/<id>` abre o canvas naquele fluxo; id desconhecido cai
-    // no primeiro da lista (a FluxoScreen já faz essa guarda desde a G4).
-    if (partes[1]) return { tela: "fluxo", fluxoId: decodeURIComponent(partes[1]) };
-    return { tela: "fluxo" };
-  }
+  if (partes[0] === "sistema") return { tela: "sistema" };
+  if (partes[0] === "ensaios") return { tela: "ensaios" };
   // §346 — a tela da spec saiu, e o link salvo REDIRECIONA em vez de morrer.
   // Vai para o documento porque é lá que os itens vivem, e é o item que a spec
   // acompanha (SPEC-98 §3.2). Mesma disciplina do `#/itens` no §269.
@@ -217,25 +126,16 @@ export function rotaDoHash(hash: string): Rota {
   // SPEC-68 §4.2 — `#/simulacao` era "e se ficar lento?", e o nome estreito
   // fechava a porta para retry, pico e disjuntor. Rota que some sem
   // redirecionar dá tela branca para quem tinha o link salvo — e a SPEC-66 §5
-  // apostou justamente em o endereço ser mandável para alguém. Com a G4 a
-  // cadeia encurta direto no destino atual: a bancada junto do fluxo.
-  if (partes[0] === "simulacao") return { tela: "fluxo", fluxoId: ID_DO_FLUXO_DO_ENSAIO };
+  // apostou justamente em o endereço ser mandável para alguém.
+  if (partes[0] === "simulacao") return { tela: "ensaios" };
   if (partes[0] === "config") {
-    // SPEC-106 fatia B — a aba Exportação foi absorvida pelo catálogo de
-    // Conectores; o link salvo REDIRECIONA (SPEC-61 §6.7), nunca vira branco.
-    if (partes[1] === "exportacao") return { tela: "config", area: "conectores" };
     const area = AREA_DO_SEGMENTO[partes[1] ?? ""];
-    // SPEC-110 C — o terceiro segmento é o id da tela; sem ele, a lista.
-    if (area === "telas" && partes[2]) return { tela: "config", area, telaId: decodeURIComponent(partes[2]) };
     if (area) return { tela: "config", area };
   }
   return { tela: "canvas" };
 }
 
-export function useRotaHash(): {
-  rota: Rota;
-  navegar: (rota: Rota, opcoes?: { substituir?: boolean }) => void;
-} {
+export function useRotaHash(): { rota: Rota; navegar: (rota: Rota) => void } {
   const [rota, setRota] = useState<Rota>(() => rotaDoHash(window.location.hash));
 
   useEffect(() => {
@@ -244,24 +144,9 @@ export function useRotaHash(): {
     return () => window.removeEventListener("hashchange", aoMudar);
   }, []);
 
-  /**
-   * SPEC-111 A — `substituir` troca o endereço SEM empilhar histórico.
-   *
-   * Existe para os endereços que AGEM ao serem abertos: `#/tela/s/<id>` cria
-   * uma execução e redireciona para ela. Empilhando, o "voltar" do navegador
-   * cairia de novo no endereço que cria — e a pessoa ganharia uma segunda
-   * execução por tentar voltar. Com `replaceState`, voltar sai de vez.
-   */
-  const navegar = useCallback((nova: Rota, opcoes?: { substituir?: boolean }) => {
+  const navegar = useCallback((nova: Rota) => {
     const hash = hashDaRota(nova);
     if (window.location.hash === hash) return;
-    if (opcoes?.substituir) {
-      window.history.replaceState(null, "", hash);
-      // `replaceState` NÃO dispara `hashchange`: sem este empurrão o estado
-      // ficaria na rota anterior e a tela não trocaria.
-      setRota(rotaDoHash(hash));
-      return;
-    }
     // O `hashchange` do browser atualiza o estado — uma fonte de verdade só.
     window.location.hash = hash;
   }, []);

@@ -40,23 +40,6 @@ const DEFAULTS_COMPILADOS: Record<ChaveConfig, unknown> = {
    * ninguém, porque todos teriam uma cópia por cima.
    */
   conexoes: { regras: {} },
-  /**
-   * SPEC-105 fatia A — nasce vazio pela mesma razão de `conexoes`: os
-   * conectores de fábrica são DERIVADOS dos destinos do gateway em vigor
-   * (`conectoresDeFabrica`), nunca semeados como cópia — uma cópia congelaria
-   * o catálogo e a correção de contrato numa versão nova não chegaria a
-   * ninguém.
-   */
-  conectores: { conectores: [] },
-  /** SPEC-105 fatia C — fluxo se desenha, não se herda de template. */
-  fluxos: { fluxos: [] },
-  /**
-   * SPEC-110 fatia C — nasce vazio, e isso é a afirmação: as telas do SISTEMA
-   * (bancada, documento, mesa) já existem no registro do código e entram no
-   * em-vigor sozinhas. Semear cópias delas aqui congelaria o catálogo, que é
-   * a mesma razão de `conexoes` e `conectores` nascerem vazios.
-   */
-  telas: { telas: [] },
 };
 
 export async function templateDaVersao(chave: ChaveConfig, diretorioConfig: string): Promise<unknown> {

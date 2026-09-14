@@ -73,7 +73,8 @@ test("o documento tem leitor, guarda o que a pessoa escreveu, e o aprovado para 
   await expect(page.getByTestId("titulo-da-quebra")).toContainText(titulo);
 
   // O documento pelo menu — o caminho que a pessoa usa.
-  await page.goto("/#/documento"); // SPEC-106 C — o item de menu saiu; o documento entra pela demanda (balões) ou pelo link
+  await page.getByRole("button", { name: "☰ Menu" }).click();
+  await page.getByTestId("menu-documento").click();
   await expect(page.getByTestId("documento-screen")).toBeVisible();
 
   // O que a mesa sabe está no documento: título, contexto e o desenho embutido.
@@ -154,7 +155,8 @@ test("o documento tem leitor, guarda o que a pessoa escreveu, e o aprovado para 
   await page.getByRole("button", { name: new RegExp(titulo) }).click();
   await expect(page.getByTestId("titulo-da-quebra")).toContainText(titulo);
 
-  await page.goto("/#/documento"); // SPEC-106 C — o item de menu saiu; o documento entra pela demanda (balões) ou pelo link
+  await page.getByRole("button", { name: "☰ Menu" }).click();
+  await page.getByTestId("menu-documento").click();
   await textoDaSecao(page, "secao-riscos", riscos);
   await expect(page.getByTestId("status-documento")).toContainText("aprovado");
 
@@ -175,7 +177,8 @@ test("o documento tem leitor, guarda o que a pessoa escreveu, e o aprovado para 
     }, { timeout: 15000 })
     .toBe("srv-catalogo-v2");
 
-  await page.goto("/#/documento"); // SPEC-106 C — o item de menu saiu; o documento entra pela demanda (balões) ou pelo link
+  await page.getByRole("button", { name: "☰ Menu" }).click();
+  await page.getByTestId("menu-documento").click();
   await expect(page.getByTestId("documento-desatualizado")).toBeVisible();
   // §264 — e o aviso diz O QUÊ mudou. Renomear o serviço muda o corpo dos
   // itens derivados, então a seção "Itens" tem que aparecer nominalmente: o

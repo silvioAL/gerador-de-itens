@@ -15,12 +15,10 @@ import { RECURSO_DA_ABA, RECURSO_DA_SECAO_DE_REGRAS, usePermissoes } from "../au
 import { apiPdca } from "../api/client";
 import { PdcaTab } from "./PdcaTab";
 import { TokensTab } from "./TokensTab";
+import { ExportacaoTab } from "./ExportacaoTab";
 import { ConexoesTab } from "./ConexoesTab";
-// SPEC-110 fatia C — o editor de telas do time.
-import { TelasTab } from "./TelasTab";
-import { ConectoresTab } from "./ConectoresTab";
 import { ProdutosTab } from "./ProdutosTab";
-import { CONECTORES_DO_TOUR, TOKENS_DO_TOUR, PRODUTO_DO_TOUR } from "../demo/dadosDoTour";
+import { EXPORTADOR_DO_TOUR, TOKENS_DO_TOUR, PRODUTO_DO_TOUR } from "../demo/dadosDoTour";
 
 export type AbaConfig =
   | "produtos"
@@ -33,11 +31,7 @@ export type AbaConfig =
   | "acessos"
   | "especificacao"
   | "pipeline"
-  | "modeloIa" | "pdca" | "tokens"
-  /** SPEC-105 fatia A — o catálogo de conectores (organizacional). */
-  | "conectores"
-  /** SPEC-110 fatia C — as telas (screens) do time: criar, editar, prever. */
-  | "telas";
+  | "modeloIa" | "pdca" | "exportacao" | "tokens";
 
 export interface ConfigScreenProps {
   /** §274 — abre o assistente do FAB na conversa de configuração. */
@@ -53,10 +47,6 @@ export interface ConfigScreenProps {
   templateItem?: EspecificacaoTemplate | null;
   pipelineAgentes: ConfigPipelineAgentes;
   timeAtivo: string;
-  /** SPEC-110 fatia C — a tela em edição (`#/config/telas/<id>`); ausente é a
-   * lista. É o mesmo endereço-com-detalhe do canvas — a porta é URL. */
-  telaId?: string;
-  aoAbrirTela?: (id?: string) => void;
   /** SPEC-53 — os times aos quais um produto pode ser amarrado. */
   timeIds: string[];
   /** false no modo local (CLI) — sem servidor não existe conceito de outros
@@ -117,8 +107,6 @@ export function ConfigScreen({
   templateItem,
   pipelineAgentes,
   timeAtivo,
-  telaId,
-  aoAbrirTela,
   timeIds,
   onPerfisMudaram,
   onFichaMudou,
@@ -208,17 +196,8 @@ export function ConfigScreen({
       { id: "pipeline", rotulo: "Pipeline de IA", existe: true },
       { id: "modeloIa", rotulo: "Modelo de IA", existe: true },
       { id: "pdca", rotulo: "PDCA — melhoria contínua", existe: true },
-      // SPEC-106 fatia B — a Exportação foi absorvida: o catálogo é o único
-      // lugar de "endereço que a empresa chama" (organizacional e curado).
-      { id: "conectores", rotulo: "Conectores", existe: true },
+      { id: "exportacao", rotulo: "Exportação", existe: true },
       { id: "tokens", rotulo: "Design system", existe: true },
-      /**
-       * SPEC-110 fatia C — as telas do time. Entram na lista da tela de
-       * configuração (senão o deep-link cairia na primeira aba), e NÃO no
-       * menu: o padrão "deep-link + porta no nó" das §§388-389 — quem alcança
-       * é quem consome (o painel do nó de tela e a galeria).
-       */
-      { id: "telas", rotulo: "Telas do time", existe: true },
     ] satisfies { id: AbaConfig; rotulo: string; existe: boolean }[]
   ).filter((a) => a.existe && podeVerAba(a.id, permissoes.pode));
 
@@ -274,6 +253,9 @@ export function ConfigScreen({
         {abaAtiva === "pdca" && (
           <PdcaTab config={config} timeAtivo={timeAtivo} onAbrirArea={onAbrirArea} onFichaMudou={onFichaMudou} />
         )}
+        {abaAtiva === "exportacao" && (
+          <ExportacaoTab demonstracao={demonstracao ? EXPORTADOR_DO_TOUR : undefined} />
+        )}
         {abaAtiva === "tokens" && <TokensTab demonstracao={demonstracao ? TOKENS_DO_TOUR : undefined} />}
         {abaAtiva === "produtos" && (
           <ProdutosTab
@@ -296,8 +278,6 @@ export function ConfigScreen({
           />
         )}
         {abaAtiva === "conexoes" && <ConexoesTab config={config} />}
-        {abaAtiva === "telas" && <TelasTab timeAtivo={timeAtivo} telaId={telaId} aoAbrirTela={aoAbrirTela ?? (() => undefined)} />}
-        {abaAtiva === "conectores" && <ConectoresTab demonstracao={demonstracao ? CONECTORES_DO_TOUR : undefined} />}
         {abaAtiva === "camposAresta" && (
           <CamposArestaTab
             config={config}
@@ -400,7 +380,6 @@ const RECURSO_SOLICITAVEL_DA_ABA: Record<string, string> = {
   campos: "campos-no",
   camposAresta: "campos-aresta",
   conexoes: "conexoes",
-  conectores: "conectores",
   especificacao: "especificacao-template",
   pipeline: "pipeline-agentes",
   regras: "regras",

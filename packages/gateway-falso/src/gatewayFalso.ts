@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http";
-import { respostaPlausivel, semente } from "./respostas.js";
+import { respostaPlausivel } from "./respostas.js";
 
 /**
  * SPEC-31 — um gateway compatível com a OpenAI, falso e determinístico, pra
@@ -143,47 +143,6 @@ export const DOCUMENTO_DO_GATEWAY_FALSO = {
     "Volume: cerca de 300 propostas por minuto, com pico de 5x no fim do mês.",
   ].join("\n"),
   atualizadoEm: "2026-08-20T10:00:00.000Z",
-};
-
-/**
- * SPEC-107 fatia A — **um DESENHO da casa, para o modo (b) ter o que derivar.**
- *
- * A função `derivacao` aceita qualquer desenho mapeado — inclusive um que um
- * conector trouxe de fora. Este é esse desenho: dois serviços e uma chamada
- * HTTP, no vocabulário do `diagrama.example.json`, com um campo obrigatório
- * deliberadamente por preencher (`endpoints` do bureau) — derivar dele produz
- * itens de completude, e um desenho que derivasse zero itens "com sucesso"
- * não provaria nada.
- */
-export const DESENHO_DO_GATEWAY_FALSO = {
-  diagrama: {
-    nodes: [
-      {
-        id: "aprovacao",
-        type: "service",
-        x: 80,
-        y: 80,
-        label: "Serviço de aprovação",
-        status: "novo",
-        spec: {
-          nome: { valor: "servico-de-aprovacao", origem: "manual" },
-          linguagem: { valor: "Kotlin", origem: "manual" },
-        },
-        specNA: {},
-      },
-      {
-        id: "bureau",
-        type: "service",
-        x: 380,
-        y: 80,
-        label: "Bureau de crédito",
-        status: "existente",
-        spec: {},
-        specNA: {},
-      },
-    ],
-    edges: [{ id: "consulta", source: "aprovacao", target: "bureau", type: "http", spec: {} }],
-  },
 };
 
 /** As páginas já publicadas, por `demandaId`. Existe para o dublê provar a
@@ -433,21 +392,6 @@ export function criarGatewayFalso(opcoes: OpcoesGatewayFalso = {}): Server {
       return;
     }
 
-    // SPEC-107 fatia A — o desenho da casa, para a fiação
-    // `conector(desenho) → derivacao → …` ter o que trazer de fora (modo b).
-    // Sem credencial, pela mesma razão de `/adr`: cabeçalho de destino é do
-    // time, não a chave do provedor de IA.
-    if (req.url?.endsWith("/desenho") && req.method === "POST") {
-      req.resume();
-      req.on("end", () => {
-        depoisDaLatencia(() => {
-          res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
-          res.end(JSON.stringify({ desenho: DESENHO_DO_GATEWAY_FALSO }));
-        });
-      });
-      return;
-    }
-
     // §349 — ler um documento da casa pelo LINK. `link` volta como eco: a
     // proveniência do desenho cita de onde veio, e inventar aqui seria mentir
     // sobre a origem.
@@ -502,15 +446,6 @@ export function criarGatewayFalso(opcoes: OpcoesGatewayFalso = {}): Server {
       }
 
       const schema = schemaPedido(corpo);
-      // SPEC-107 G5b — a ASSINATURA do pedido na resposta estruturada.
-      //
-      // O esqueleto preenchia a resposta SÓ pelo schema: dois pedidos
-      // diferentes com o mesmo schema colidiam na mesma resposta — e a prova
-      // de identidade da SPEC-105 F ("resultado idêntico item a item") ficou
-      // VERDE com o prompt ADULTERADO (§248 mordeu o instrumento, não o
-      // produto). "Mesmo pedido → mesma resposta; pedidos diferentes →
-      // respostas diferentes" só vale com a semente escrita no valor.
-      const assinatura = ` ⟨${(semente(textoDoPedido(corpo)) >>> 0).toString(36).slice(-4)}⟩`;
       const texto =
         modo === "plausivel"
           ? respostaPlausivel(textoDoPedido(corpo), schema)
@@ -518,7 +453,7 @@ export function criarGatewayFalso(opcoes: OpcoesGatewayFalso = {}): Server {
             // A marca de imagem entra TAMBÉM no caminho estruturado:
             // `/ia/diagrama` responde JSON, e marcar só o texto livre deixaria o
             // teste de imagem sem como afirmar nada (foi o que aconteceu).
-            ? JSON.stringify(preencher(schema, "", `${temImagem ? ` ${MARCA_VIU_IMAGEM}` : ""}${assinatura}`))
+            ? JSON.stringify(preencher(schema, "", temImagem ? ` ${MARCA_VIU_IMAGEM}` : ""))
             : `${MARCA_GATEWAY_FALSO}: ok${temImagem ? ` ${MARCA_VIU_IMAGEM}` : ""}`;
 
       res.writeHead(200, {

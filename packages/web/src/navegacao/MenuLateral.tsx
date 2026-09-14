@@ -43,10 +43,10 @@ export interface MenuLateralProps {
    * itens viraram uma seção deste documento. Duas entradas para a mesma
    * derivação faziam o menu parecer maior do que o produto.
    */
-  /** SPEC-105 fatia C — o encanamento da ferramenta como grafo; SPEC-109 C —
-   * e a ÚNICA porta d'"a ferramenta": a SistemaScreen (o mapa em leitura)
-   * morreu quando o canvas passou a mostrar o encanamento vivo. */
-  onFluxos: () => void;
+  onDocumento: () => void;
+  /** SPEC-59 — como a FERRAMENTA está montada. Não é da demanda, então não
+   * entra no grupo dela: é o mapa do que as telas de configuração configuram. */
+  onSistema: () => void;
   onSair: () => void;
 }
 
@@ -69,13 +69,8 @@ const GRUPOS: { titulo: string; itens: { area: AreaConfig; rotulo: string }[] }[
       // SPEC-79 — a aba existia e não tinha porta: dava para chegar por URL e
       // não pelo menu, que é como ninguém descobre um recurso.
       { area: "tokens", rotulo: "Design system" },
-      // SPEC-109 D — "Especificação de solução" saiu do menu: o template é
-      // insumo da GERAÇÃO DE ITENS, e a porta é o nó dela no canvas de
-      // fluxos. O deep-link `#/config/especificacao` continua vivo (§221).
-      // SPEC-106 fatia B — a Exportação foi ABSORVIDA pelo catálogo: destino
-      // do gateway é conector, e dois itens para "endereço que a empresa
-      // chama" era a duplicação que a SPEC mediu.
-      { area: "conectores", rotulo: "Conectores (integrações)" },
+      { area: "especificacao", rotulo: "Especificação de solução" },
+      { area: "exportacao", rotulo: "Exportação (tracker)" },
     ],
   },
   {
@@ -88,9 +83,7 @@ const GRUPOS: { titulo: string; itens: { area: AreaConfig; rotulo: string }[] }[
   {
     titulo: "IA",
     itens: [
-      // SPEC-109 C — "Pipeline de IA" saiu do menu: a esteira vive no canvas
-      // de fluxos e o papel se edita no nó (§369). O deep-link
-      // `#/config/pipeline` continua vivo — a porta é o canvas, não a lista.
+      { area: "pipeline", rotulo: "Pipeline de IA" },
       { area: "modeloIa", rotulo: "Modelo de IA" },
       { area: "pdca", rotulo: "PDCA — melhoria contínua" },
     ],
@@ -108,7 +101,8 @@ export function MenuLateral({
   podeEditarArea,
   onNovaQuebra,
   onAbrirQuebras,
-  onFluxos,
+  onDocumento,
+  onSistema,
   onSair,
 }: MenuLateralProps) {
   // §273 — fechado por padrão: trocar de time é raro, e a lista aberta o tempo
@@ -148,10 +142,9 @@ export function MenuLateral({
         <button onClick={acao(onAbrirQuebras)} style={itemEstilo}>
           Abrir…
         </button>
-        {/* SPEC-106 fatia C — "Documento de desenho" SAIU do menu: abria uma
-            tela vazia, desconectada da jornada (feedback literal do usuário).
-            O documento nasce DA DEMANDA — as portas são os balões e a seção
-            de itens pós-derivação; o deep-link #/documento continua vivo. */}
+        <button onClick={acao(onDocumento)} style={itemEstilo} data-testid="menu-documento">
+          Documento de desenho
+        </button>
         {/* §346 — "Spec para construir" saiu daqui.
 
             Ela ficava ao lado do documento com o argumento de que "o documento é
@@ -164,11 +157,8 @@ export function MenuLateral({
             ser um lugar aonde se vai e passa a acompanhar o item quando ele sobe
             (SPEC-98 §3.2). */}
         <p style={tituloGrupoEstilo}>A ferramenta</p>
-        {/* SPEC-109 C — "Como está montada" morreu: a SistemaScreen narrava o
-            encanamento que o canvas de fluxos mostra VIVO ("por vezes parece
-            ter coisas repetidas", queixa literal). Uma porta só. */}
-        <button onClick={acao(onFluxos)} style={itemEstilo} data-testid="menu-fluxos">
-          Fluxos de integração
+        <button onClick={acao(onSistema)} style={itemEstilo} data-testid="menu-sistema">
+          Como está montada
         </button>
 
         {/* §198 — "cenários" e "demonstração & tour" viraram dois botões

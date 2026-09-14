@@ -44,9 +44,8 @@ export interface UseTourOpts {
    * de volta.
    */
   abrirDocumento: () => void;
-  /** SPEC-109 C — o canvas de fluxos É o mapa da ferramenta (a SistemaScreen
-   * morreu; `#/sistema` redireciona para cá). */
-  abrirFluxos: () => void;
+  /** SPEC-59 — a vista de como a ferramenta está montada (`#/sistema`). */
+  abrirSistema: () => void;
   /** §261 — abre o reconhecimento do que fica para trás. O tour deriva por um
    * atalho próprio (`derivarQuebra`), então precisa pedir o diálogo de forma
    * explícita — senão o passo apontaria para algo que nunca aparece. */
@@ -102,31 +101,18 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
        * a tese em duas frases e vai direto para a conta real, com a régua do
        * time de quem assiste.
        */
-      /**
-       * SPEC-109 C — o passo mostrava a animação do motor na SistemaScreen;
-       * a tela morreu e quem responde "quem faz o quê" agora é o CANVAS DE
-       * FLUXOS, executável: as funções do sistema são o motor, os agentes são
-       * a IA, e a fiação entre eles é a divisão — desenhada, não narrada.
-       */
-      selector: "[data-testid=fluxo-screen]",
+      selector: "[data-testid=motor-passo-a-passo]",
       titulo: "Quem faz o quê",
-      segundos: 14,
+      // A animação dá uma volta completa em ~6,5 s; este passo mostra duas.
+      segundos: 16,
       texto:
-        // SPEC-110 A (D19) — o passo passa pelo GATILHO: o primeiro cartão do
-        // fluxo diz quando ele roda, e é o que dá propósito ao botão.
-        // SPEC-110 B (D19) — a TELA entra na narração: sem ela, o tour
-        // descreveria um encanamento que nunca espera ninguém.
-        // SPEC-110 E (D19) — e o gatilho tem DUAS respostas para "quando":
-        // omitir o relógio deixaria o tour ensinando que fluxo só roda a clique.
-        // SPEC-110 L (D19) — e agora são TRÊS respostas para "quando": deixar
-        // o webhook de fora seria a apresentação defasada que a D19 proíbe.
-        "Três partes trabalham aqui, e a divisão é a ideia toda. Todo fluxo começa por um GATILHO — o cartão que diz QUANDO ele roda: no manual é o \"▶ Rodar agora\" que dispara; no agendado, um relógio dispara na hora marcada, sem ninguém; no webhook, quem dispara é outro sistema, chamando um endereço que este fluxo publica. Onde VOCÊ entra é uma TELA: a execução para nela e espera você revisar e decidir (avançar ou retornar). O MOTOR calcula — lê o seu desenho e a configuração do time, e deriva os itens com as dependências: são as FUNÇÕES DO SISTEMA neste canvas (Geração de itens, Ensaio de cenários). A IA escreve o texto: são os AGENTES, em esteira, e nada que eles propõem conta antes de você confirmar. Este encanamento não é ilustração — é o que roda quando você deriva.",
+        "Duas partes trabalham aqui, e a divisão é a ideia toda. O MOTOR calcula — lê o seu desenho e a configuração do time, mede o que está pronto e o que sai do padrão, e deriva os itens com as dependências. A IA escreve o texto, e nada que ela propõe conta antes de você confirmar. Esta é a conta inteira, com uma régua do SEU time: o campo preenchido, a régua que alguém escreveu, a comparação, e o item que sai dela. Quatro elos, nenhum com IA no meio — por isso o mesmo desenho dá sempre os mesmos itens.",
       onEnter: () => {
         // Primeiro passo a mostrar dado de demonstração: a marca liga aqui
         // (§235), porque o time de quem assiste pode não ter régua conferível
         // nenhuma, e "não há o que explicar" no meio da explicação não ensina.
         opts.ligarDemonstracao(true);
-        opts.abrirFluxos();
+        opts.abrirSistema();
       },
     },
     {
@@ -244,17 +230,20 @@ export function passosDoProduto(opts: UseTourOpts): PassoTour[] {
       onEnter: () => opts.mostrarAvisos(),
     },
     {
-      /**
-       * SPEC-107 G5c-3 — a tela de revisão morreu: derivar escreve os itens e
-       * abre o DOCUMENTO, onde cada card carrega o julgamento campo a campo
-       * (§384). O passo aponta a seção dos itens — é ali que a assinatura
-       * acontece agora; a corrida da esteira é a fiação, ao vivo no canvas.
-       */
-      selector: "[data-testid=secao-dos-itens]",
-      titulo: "Confirmar o que a IA escrever",
+      selector: "[data-testid=barra-pendencias]",
+      titulo: "Confirmar o que a IA escreveu",
       segundos: 10,
       texto:
-        "Derivar escreve os itens e abre o documento — cada card carrega a ficha do item. Quando a esteira de agentes rodar (ela vive no canvas de fluxos, e você a assiste rodando), o que ela escrever chega aqui como sugestão PENDENTE: confirmar assina (e continua marcado como escrito pelo agente); editar vira texto seu. Aceitar é barato; corrigir é que merece o clique.",
+        "A revisão é a tela onde o item vira ficha, e onde a esteira escreve. Cada resposta dela espera a sua assinatura: esta barra diz quantas estão esperando e permite confirmar TODAS de uma vez — ou revisar uma a uma, no modo foco. Aceitar é barato; corrigir é que merece o clique. E o que você confirmar continua marcado como escrito pelo agente.",
+      /**
+       * SPEC-78 — este `onEnter` era do passo "Revisão", que morreu por apontar
+       * uma tela em vez de ensinar o que se faz nela.
+       *
+       * Cortá-lo levou a DERIVAÇÃO junto, e a suíte pegou na hora: sem isto o
+       * tour chegava à barra de pendências de um item que nunca foi derivado.
+       * Foi o teste que estava certo, e a poda que estava errada — é
+       * exatamente o trabalho que a fatia D existe para fazer.
+       */
       onEnter: () => opts.derivarQuebra(),
     },
     {
@@ -309,57 +298,38 @@ export function passosDeConfiguracao(opts: UseTourOpts): PassoTour[] {
       selector: null,
       titulo: "Moldar pro seu time",
       texto:
-        // SPEC-110 C (D19) — as TELAS do time entram na lista do que se
-        // molda: criar uma tela é configuração, não código.
-        "O outro tour mostra o que a ferramenta FAZ. Este mostra o que ela aprende do seu time: de onde vem a IA, quem escreve cada parte do item, quais perguntas cada tecnologia obriga, o que uma conexão precisa declarar — e as TELAS que vocês criam para entrar no meio de um fluxo. Nada aqui é obrigatório para usar — é o que faz o resultado parecer escrito por vocês.",
+        "O outro tour mostra o que a ferramenta FAZ. Este mostra o que ela aprende do seu time: de onde vem a IA, quem escreve cada parte do item, quais perguntas cada tecnologia obriga e o que uma conexão precisa declarar. Nada aqui é obrigatório para usar — é o que faz o resultado parecer escrito por vocês.",
       onEnter: () => opts.fecharRevisao(),
     },
     {
-      // §258 — a vista antes das telas; SPEC-109 C — a vista agora é o CANVAS
-      // DE FLUXOS: a SistemaScreen narrava o encanamento e morreu quando ele
-      // passou a existir de verdade, executável. O passo abre o canvas.
-      selector: "[data-testid=fluxo-screen]",
-      titulo: "O encanamento é o canvas",
+      // §258 — a vista antes das telas. O tour de configuração percorre onze
+      // telas e nunca mostrava como elas se ligam; quem chega aqui vê primeiro
+      // o mapa, e depois cada peça dele.
+      selector: "[data-testid=sistema-screen]",
+      titulo: "Como a ferramenta está montada",
       segundos: 13,
       texto:
-        // SPEC-110 A (D19) — "Executar" virou "▶ Rodar agora", o gesto do
-        // gatilho: narrar o botão velho é apresentação defasada (a queixa).
-        // SPEC-110 F (D19) — e a demanda tem DOIS cartões: narrar "mesa de
-        // projeto" como um só descreveria uma paleta que não existe mais.
-        // SPEC-110 J (D19) — e o topo da galeria agora tem a JORNADA: sem
-        // nomeá-la, o tour continuaria apresentando quatro desenhos soltos.
-        "Antes das telas, o mapa — e o mapa aqui é vivo. A porta é uma GALERIA: os fluxos e as telas do time, agrupados por momento de uso, cada derivado dizendo de onde nasce. No topo dela mora a JORNADA DA DEMANDA: um desenho em que cada cartão é um fluxo inteiro (ensaiar, derivar, exportar, publicar), ligados na ordem — o duplo-clique entra na etapa, e é assim que \"quais fluxos se relacionam\" se responde olhando. Cada fluxo desta tela é o encanamento REAL da ferramenta: a esteira de agentes derivada da configuração (quem escreve cada parte do item, na ordem), a exportação, a publicação, o ensaio, e o ciclo de melhoria — o PDCA deixou de ser uma aba e virou um desenho que para numa tela antes de mexer na régua do time. Cada um começa por um GATILHO, o cartão que diz quando ele roda — e alguns têm uma TELA no meio, onde a execução para e espera alguém revisar e decidir. A demanda entra em dois papéis, ditos no cartão: \"Demanda — ler\" na ponta que traz o desenho, \"Demanda — gravar\" na que devolve o resultado. Clicar num agente edita o papel dele — prompt, ligar/desligar, ordem — de onde se vê; e \"▶ Rodar agora\" dispara o fluxo de verdade, com o rastro nó a nó. O que as telas de configuração ajustam aparece aqui sozinho, porque isto deriva delas.",
+        "Antes das telas, o mapa. De um lado o que o MOTOR confere — as regras por tecnologia e as réguas de caminho. Do outro, quem ESCREVE cada parte do item: a esteira, em sequência, com o estado de cada agente (um papel ativo sem modelo configurado é o defeito mais silencioso que existe aqui). Os dois produzem o item, e o que o time responde depois volta a mudar os dois: é o laço do PDCA, que dá nome ao ciclo e não aparecia em tela nenhuma. Esta vista não edita — cada bloco leva à tela que edita.",
       /**
-       * §340/§253 — a demonstração liga aqui e desliga no fim do tour, como
-       * sempre: o passo seguinte (produto) mostra dado falso marcado.
+       * §340 — **liga a demonstração, e o motivo veio de um print do usuário.**
+       *
+       * Este passo mostra o mapa, e o mapa mostra a última execução de cada
+       * agente lendo o histórico REAL. Quem demonstra com a credencial da casa
+       * sem crédito via os quatro papéis em vermelho, com o erro cru do
+       * provedor — e quem assiste conclui que a ferramenta está quebrada.
+       *
+       * O §339 trocou o histórico por dados de demonstração, e não bastou: o
+       * passo equivalente do tour de PRODUTO liga o modo antes de abrir o mapa
+       * (`ligarDemonstracao(true); abrirSistema()`), e este não ligava. A
+       * correção existia e não alcançava a tela em que o defeito foi visto.
+       *
+       * O desligamento continua obrigatório e continua onde estava (§253):
+       * demonstração que sobrevive ao tour vira configuração fantasma.
        */
       onEnter: () => {
         opts.ligarDemonstracao(true);
-        opts.abrirFluxos();
+        opts.abrirSistema();
       },
-    },
-    {
-      /**
-       * SPEC-110 fatia K (D19) — **o passo que faltava: criar uma tela.**
-       *
-       * A conferência integral achou o buraco. O passo anterior acabara de
-       * dizer que "alguns fluxos têm uma TELA no meio, onde a execução para e
-       * espera alguém", e o tour seguia para produto sem nunca mostrar de onde
-       * essa tela vem. A capacidade que o usuário mais pediu na SPEC-110
-       * ("também precisará de spec para essa parte de criar ou editar
-       * screens") ficava sem lugar no tour que existe justamente para mostrar
-       * o que se molda por time.
-       *
-       * Ele vem logo DEPOIS do canvas de propósito: é lá que a pessoa acabou
-       * de ver a tela sendo mencionada, e a pergunta "quem faz essa tela?"
-       * nasce naquele instante — não três telas adiante.
-       */
-      selector: "[data-tour=config-screen-content]",
-      titulo: "As telas que vocês criam",
-      segundos: 11,
-      texto:
-        "Uma tela é uma pilha de blocos, e vocês montam a de vocês: TEXTO explica o que está em jogo, DADO mostra o que a fiação trouxe até ali, CAMPO pergunta (e o campo obrigatório trava o Avançar dizendo o que falta), AÇÃO dá o seu nome ao botão. A prévia ao lado é exatamente o que a pessoa verá quando a execução parar nesse ponto — não uma aproximação. É assim que um fluxo deixa de ser uma esteira que corre sozinha e passa a ter um lugar onde alguém decide, com as palavras do time. A porta rápida é o próprio desenho: clicar num nó de tela no canvas leva a “editar a tela →”.",
-      onEnter: () => opts.abrirConfigNaAba("telas"),
     },
     {
       selector: "[data-tour=config-screen-content]",

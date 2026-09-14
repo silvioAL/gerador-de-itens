@@ -105,17 +105,7 @@
   --acento-indigo: #4f46e5;
   --verde: #047857;
   --vermelho: #b91c1c;
-  /**
-   * SPEC-111 A — 4,93:1 sobre o fundo da página, contra os 4,49 de antes.
-   *
-   * O valor anterior passava sobre o PAINEL branco (4,90) e falhava sobre o
-   * `--fundo` cinza (4,49) — e é sobre o fundo que os avisos aparecem em várias
-   * telas. Falhar por uma casa decimal é falhar: a régua é 4,5 e ela existe
-   * para quem enxerga pior que quem escolheu a cor. Medido na validação visual
-   * da tela standalone, e corrigido no TOKEN porque o defeito não era do aviso
-   * daquela tela — era de todos os que usam este amarelo.
-   */
-  --amarelo: #8a6400;
+  --amarelo: #926a00;
 
   --acento-gente: #4f46e5;
   /* No escuro este é o texto CLARO do indigo; no claro precisa do escuro, ou
@@ -412,21 +402,6 @@ textarea::placeholder {
   color: #5c6a7e;
   letter-spacing: 3px;
   animation: pip-pulso 1.1s ease-in-out infinite;
-}
-
-/* SPEC-107 fatia D — o nó do FLUXO em execução pulsa (§2.4-9: o vivo é
-   feedback). É halo em box-shadow porque o cartão é um div (o pulso da mesa,
-   `.diagrama-no-ativo`, é stroke de SVG). A cor vem da variável de acento —
-   nos dois temas — e a guarda global de prefers-reduced-motion o congela. */
-@keyframes no-do-fluxo-pulso {
-  50% {
-    box-shadow: 0 0 0 7px rgba(56, 189, 248, 0.25);
-  }
-}
-.no-do-fluxo-rodando {
-  border-radius: 10px;
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35);
-  animation: no-do-fluxo-pulso 1.1s ease-in-out infinite;
 }
 
 /* Assistente flutuante (#298) — mesma disciplina de `expandir-item`: só CSS

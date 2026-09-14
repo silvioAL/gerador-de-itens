@@ -1,5 +1,5 @@
 import type { Decisao, RegrasConfig, Token } from "@gerador/engine";
-import type { ConectorDoCatalogo, Produto } from "../api/client";
+import type { ConfigExportador, Produto } from "../api/client";
 import type { DiagramaProposto } from "../api/client";
 
 /**
@@ -58,34 +58,11 @@ export const TOKENS_DO_TOUR: Token[] = [
   { nome: "raio.md", valor: "10px", grupo: "raio" },
 ];
 
-/** SPEC-106 fatia B — o tour mostra o CATÁLOGO (que absorveu a Exportação):
- * dois endereços de exemplo, um destino do gateway e um conector livre. */
-export const CONECTORES_DO_TOUR: ConectorDoCatalogo[] = [
-  {
-    id: "tracker-exemplo",
-    nome: "Jira do time (exemplo)",
-    descricao: "Envio de itens — via gateway",
-    operacao: "itens",
-    endpoint: "https://agente-do-tracker.exemplo/itens",
-    metodo: "POST",
-    envelope: "itens",
-    entrada: [{ chave: "itens", rotulo: "Itens da quebra", tipo: "lista", obrigatorio: true }],
-    saida: [],
-    origem: "fabrica",
-    temCabecalhos: true,
-  },
-  {
-    id: "volumetria-exemplo",
-    nome: "Volumetria (exemplo)",
-    endpoint: "https://gateway.exemplo/volumetria",
-    metodo: "POST",
-    envelope: "",
-    entrada: [{ chave: "projetoId", rotulo: "Projeto", tipo: "texto", obrigatorio: true }],
-    saida: [{ chave: "rps", rotulo: "Requisições/s", tipo: "numero", caminho: "$.dados.rps" }],
-    origem: "declarado",
-    temCabecalhos: false,
-  },
-];
+export const EXPORTADOR_DO_TOUR: ConfigExportador = {
+  endpoint: "https://agente-do-tracker.exemplo/itens",
+  rotulo: "Jira do time (exemplo)",
+  cabecalhos: {},
+};
 
 /**
  * §245 — o PADRÃO do time, para o tour. Sem isto a dimensão de conformidade
@@ -136,9 +113,32 @@ export const REGRAS_DO_TOUR: RegrasConfig = {
 /** Prefixo dos ids de decisão de demonstração. É por ele que a tela sabe que
  * uma decisão é do tour — e não pode ser aceita, porque o aceite grava na
  * quebra e ela não vive lá (§253). */
-/* SPEC-109 C — `EXECUCOES_DO_TOUR` morreu com o mapa do sistema (SPEC-92 o
- * criara para o tour não mostrar o histórico real em vermelho). O passo do
- * tour agora abre o canvas de fluxos, que não lê histórico por papel. */
+/**
+ * SPEC-92 — **as execuções que o tour mostra, e por que elas não são as suas.**
+ *
+ * O mapa do sistema mostra a última execução de cada papel lendo o histórico
+ * REAL, por decisão escrita: *"esta tela responde 'como o meu ambiente está
+ * montado'"*. Está certo fora do tour.
+ *
+ * Dentro do tour, não. O usuário abriu a demonstração com a credencial da casa
+ * sem crédito e viu os quatro papéis em vermelho, com o erro cru do provedor —
+ * *"Your credit balance is too low to access the Anthropic API"*. Quem assiste
+ * conclui que a ferramenta está quebrada, quando ela está relatando com precisão
+ * um problema que não é dela.
+ *
+ * Estas execuções chegam **marcadas** pela mesma `MarcaDeDemonstracao` do resto
+ * do tour (§235): não é a tela mentindo, é a tela dizendo em voz alta que aquilo
+ * é exemplo — como já faz com o produto, a conversa e a exportação.
+ *
+ * As durações são diferentes de propósito: quatro números iguais parecem
+ * inventados, porque seriam.
+ */
+export const EXECUCOES_DO_TOUR = [
+  { papel: "po", ok: true, em: "2026-01-01T09:00:00.000Z", duracaoMs: 2400 },
+  { papel: "arquiteto", ok: true, em: "2026-01-01T09:00:03.000Z", duracaoMs: 3100 },
+  { papel: "especialista", ok: true, em: "2026-01-01T09:00:07.000Z", duracaoMs: 1900 },
+  { papel: "qa", ok: true, em: "2026-01-01T09:00:10.000Z", duracaoMs: 2200 },
+];
 
 export const PREFIXO_DECISAO_DO_TOUR = "decisao-do-tour-";
 

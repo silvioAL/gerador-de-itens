@@ -1,4 +1,4 @@
-﻿import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import type { Quebra } from "@gerador/engine";
 import { useTour, passosDeConfiguracao, passosDoProduto, SEGUNDOS_PADRAO } from "./useTour";
@@ -25,7 +25,7 @@ function montarOpts() {
     fecharJornada: vi.fn(),
     fecharConfig: vi.fn(),
   abrirDocumento: vi.fn(),
-  abrirFluxos: vi.fn(),
+  abrirSistema: vi.fn(),
   mostrarAvisos: vi.fn(),
     abrirProposito: vi.fn(),
     fecharAssistente: vi.fn(),
@@ -94,10 +94,10 @@ describe("useTour", () => {
     // SPEC-78 — "Revisão" morreu como passo (apontava a tela; o passo seguinte
     // ensina o que se FAZ nela). A régua que este teste guarda é a mesma:
     // chegar aqui já derivou.
-    andarAte(result, "Confirmar o que a IA escrever");
+    andarAte(result, "Confirmar o que a IA escreveu");
 
     expect(opts.derivarQuebra).toHaveBeenCalled();
-    expect(result.current.passoAtual?.selector).toBe("[data-testid=secao-dos-itens]");
+    expect(result.current.passoAtual?.selector).toBe("[data-testid=barra-pendencias]");
   });
 
   it("§258 — o tour de configuração abre pelo MAPA, antes das telas", () => {
@@ -106,14 +106,14 @@ describe("useTour", () => {
     const { result } = renderHook(() => useTour(opts, passosDeConfiguracao));
 
     act(() => result.current.iniciar());
-    andarAte(result, "O encanamento é o canvas");
+    andarAte(result, "Como a ferramenta está montada");
 
-    expect(result.current.passoAtual?.selector).toBe("[data-testid=fluxo-screen]");
-    expect(opts.abrirFluxos).toHaveBeenCalled();
+    expect(result.current.passoAtual?.selector).toBe("[data-testid=sistema-screen]");
+    expect(opts.abrirSistema).toHaveBeenCalled();
 
     // E vem ANTES das telas que ele mapeia: mapa depois das peças não é mapa.
     const titulos = passosDeConfiguracao(montarOpts()).map((p) => p.titulo);
-    expect(titulos.indexOf("O encanamento é o canvas")).toBeLessThan(titulos.indexOf("O que é perene: o produto"));
+    expect(titulos.indexOf("Como a ferramenta está montada")).toBeLessThan(titulos.indexOf("O que é perene: o produto"));
   });
 
   it("§252 — o tour de CONFIGURAÇÃO percorre TODAS as telas de administração", () => {
@@ -362,8 +362,8 @@ describe("useTour", () => {
     const { result } = renderHook(() => useTour(opts));
 
     act(() => result.current.iniciar());
-    andarAte(result, "Confirmar o que a IA escrever");
-    expect(result.current.passoAtual?.selector).toBe("[data-testid=secao-dos-itens]");
+    andarAte(result, "Confirmar o que a IA escreveu");
+    expect(result.current.passoAtual?.selector).toBe("[data-testid=barra-pendencias]");
 
     // SPEC-61 §6.3 — o passo continua existindo; o que mudou é para onde ele
     // aponta. Era `#/itens`, e passo apontando para tela que não existe quebra
@@ -583,9 +583,9 @@ describe("useTour — o motor explicado e o botão que fica na tela", () => {
     const opts = montarOpts();
     const passo = passosDoProduto(opts).find((p) => p.titulo === "Quem faz o quê");
 
-    expect(passo?.selector).toBe("[data-testid=fluxo-screen]");
+    expect(passo?.selector).toBe("[data-testid=motor-passo-a-passo]");
     passo?.onEnter?.();
-    expect(opts.abrirFluxos).toHaveBeenCalled();
+    expect(opts.abrirSistema).toHaveBeenCalled();
   });
 
   it("o passo seguinte VOLTA ao canvas — senão aponta para uma tela que saiu", () => {

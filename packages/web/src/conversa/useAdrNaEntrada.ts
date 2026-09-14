@@ -1,7 +1,6 @@
-﻿import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import type { Decisao } from "@gerador/engine";
-import { comoDecisao, lacunasDaDecisaoImportada, sanearAdrsExternos } from "@gerador/aplicacao";
-import { apiCatalogoDeConectores, apiExportador, apiQuebras } from "../api/client";
+import { apiExportador, apiQuebras } from "../api/client";
 
 /**
  * SPEC-81 fatia D — **o ADR da casa entra na conversa, como a voz entra.**
@@ -99,8 +98,6 @@ export function useAdrNaEntrada(
   const [erro, setErro] = useState<string | null>(null);
   const [rotuloDoDestino, setRotuloDoDestino] = useState("");
 
-  const [destinoId, setDestinoId] = useState<string | null>(null);
-
   useEffect(() => {
     let cancelado = false;
     apiExportador
@@ -110,15 +107,11 @@ export function useAdrNaEntrada(
         const destino = (c.destinos ?? []).find((d) => d.operacao === "adr" && !!d.endpoint);
         setTemDestino(!!destino);
         setRotuloDoDestino(destino?.rotulo?.trim() ?? "");
-        // SPEC-107 G3 — o id do destino É o id do conector de fábrica: é por
-        // ele que o executor genérico chama o gateway.
-        setDestinoId(destino?.id ?? null);
       })
       .catch(() => {
         if (!cancelado) {
           setTemDestino(false);
           setRotuloDoDestino("");
-          setDestinoId(null);
         }
       });
     return () => {
@@ -127,24 +120,11 @@ export function useAdrNaEntrada(
   }, []);
 
   const trazer = useCallback(async () => {
-    if (!quebraId || !destinoId) return;
+    if (!quebraId) return;
     setTrazendo(true);
     setErro(null);
     try {
-      // SPEC-107 G3 — a rota dedicada morreu: o executor genérico de conector
-      // lê o gateway, e a CONVERSÃO (a mesma de sempre, pura na aplicação)
-      // roda aqui: sanear → decisão marcada → dedupe pelo que a demanda já
-      // importou (`importadoDe`) → lacunas nomeadas.
-      const [{ saida }, quebra] = await Promise.all([
-        apiCatalogoDeConectores.executar(destinoId, {}),
-        apiQuebras.buscar(quebraId),
-      ]);
-      const agora = new Date().toISOString();
-      const jaTem = new Set((quebra.decisoes ?? []).map((d) => d.importadoDe).filter(Boolean));
-      const decisoes = sanearAdrsExternos(saida.adrs)
-        .map((adr) => comoDecisao(adr, agora))
-        .filter((d) => !jaTem.has(d.importadoDe))
-        .map((d) => ({ decisao: d, lacunas: lacunasDaDecisaoImportada(d) }));
+      const { decisoes } = await apiQuebras.importarAdr(quebraId);
       setUltimoTotal(decisoes.length);
       const texto = comoTexto(decisoes);
       // Zero decisões não escreve nada: anexar um cabeçalho sem linha nenhuma
@@ -157,7 +137,7 @@ export function useAdrNaEntrada(
     } finally {
       setTrazendo(false);
     }
-  }, [quebraId, destinoId, setEntrada]);
+  }, [quebraId, setEntrada]);
 
   return { podeTrazerAdr: temDestino && !!quebraId, rotuloDoDestino, trazendo, ultimoTotal, erro, trazer };
 }

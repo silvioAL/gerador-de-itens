@@ -1,4 +1,4 @@
-import type { ExecucaoDoPapel, TipoDeNoDoFluxo } from "@gerador/aplicacao";
+import type { ExecucaoDoPapel } from "@gerador/aplicacao";
 import type { AnexoDeContexto, CenarioDeLentidao, VolumetriaDoProduto, Decisao, Diagrama, ArtefatosEscritos, ExcecaoDePadrao, LeituraDispensada, Necessidade, OperacaoDeAjuste, PerfisConfig, Percurso, Quebra, RegrasConfig, StatusDocumento, TokensConfig, ValorSpec, VolumetriaDaDemanda,
   Variante,
 } from "@gerador/engine";
@@ -114,8 +114,6 @@ export interface QuebraResumo {
 export interface QuebraSalva {
   id: string;
   titulo: string | null;
-  /** SPEC-106 fatia C — onde o documento publicado desta demanda mora. */
-  documentoLinkExterno?: string | null;
   time: string | null;
   diagrama: Diagrama;
   /** Respostas (humanas ou IA confirmada) aos placeholders "<- ✍️ especificar"
@@ -347,11 +345,16 @@ export const apiQuebras = {
    * **texto na caixa da conversa**. A decisão nunca fica flutuando: ela nasce
    * ancorada, quando o desenho nasce da conversa.
    */
-  // SPEC-107 G3 — `importarAdr` morreu com a rota: a conversa lê os ADRs pelo
-  // executor genérico de conector e converte com as funções puras da
-  // aplicação (ver `useAdrNaEntrada`).
-  // SPEC-107 G2 — `publicarDocumento` morreu como rota dedicada: publicar é a
-  // fiação semeada "publicar-documento" (ver `publicarDocumento` no App).
+  importarAdr: (id: string) =>
+    requisitar<{ decisoes: { decisao: Decisao; lacunas: string[] }[]; origem: string }>(
+      `/quebras/${id}/adr/importar`,
+      { method: "POST" }
+    ),
+  publicarDocumento: (id: string, corpo: { markdown: string; desatualizado: boolean; destinoId?: string }) =>
+    requisitar<{ linkExterno: string; atualizada: boolean; destino: string }>(`/quebras/${id}/documento/publicar`, {
+      method: "POST",
+      body: JSON.stringify(corpo),
+    }),
 };
 
 /** SPEC-41 Parte B — um item de trabalho materializado (persistido no server). */
@@ -387,8 +390,8 @@ export const apiItensGerados = {
   listar: (quebraId: string) => requisitar<ItemGerado[]>(`/quebras/${quebraId}/itens`),
   regerar: (quebraId: string, itens: DadosItemGerado[]) =>
     requisitar<ItemGerado[]>(`/quebras/${quebraId}/itens`, { method: "PUT", body: JSON.stringify({ itens }) }),
-  // SPEC-107 G1 — `exportar` morreu como rota dedicada: o botão virou atalho
-  // da fiação semeada "exportar-prontos" (ver `exportarPelaFiacao` no App).
+  exportar: (quebraId: string) =>
+    requisitar<ResultadoDaExportacao>(`/quebras/${quebraId}/itens/exportar`, { method: "POST" }),
 };
 
 export interface PedidoSugestaoIa {
@@ -781,8 +784,21 @@ export const apiIa = {
    * jamais o chamava. O que volta é TEXTO, que alimenta `proporDiagrama` como
    * descrição — o mesmo caminho de quem digita à mão.
    */
-  // SPEC-107 G3 — `lerDocumentoExterno` morreu com a rota: a conversa lê a
-  // página pelo executor genérico de conector (apiCatalogoDeConectores).
+  lerDocumentoExterno: async (link: string): Promise<{ conteudo: string; titulo?: string; link?: string }> => {
+    const resposta = await fetch(`${BASE_URL}/ia/documento-externo`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ link }),
+    });
+    if (!resposta.ok) {
+      const corpo = await resposta.json().catch(() => ({}));
+      throw new Error(
+        typeof corpo.erro === "string" ? corpo.erro : `Não foi possível ler o documento (HTTP ${resposta.status}).`
+      );
+    }
+    return resposta.json();
+  },
   proporDiagrama: async (
     pedido: PedidoDiagramaIa,
     onTexto?: (acumulado: string) => void
@@ -1591,310 +1607,6 @@ export type { ConfigExportador } from "@gerador/aplicacao";
 import type { ConfigExportador } from "@gerador/aplicacao";
 
 export const apiExportador = configDe<ConfigExportador>("exportador");
-
-/**
- * SPEC-105 fatia A — o catálogo de conectores.
- *
- * Tipos direto da aplicação, como o exportador logo acima e pela mesma cicatriz
- * (§263): uma cópia aqui ficaria para trás sem nada acusar.
- *
- * `configDe` sem `timeId` em nenhuma chamada: a chave é ORGANIZACIONAL (§9.2),
- * como `conexoes`.
- */
-export type { CampoDoConector, ConfigConectores, Conector } from "@gerador/aplicacao";
-import type { ConfigConectores, ConectorEmVigor as ConectorEmVigorDaAplicacao } from "@gerador/aplicacao";
-
-export const apiConectores = configDe<ConfigConectores>("conectores");
-
-/** Um conector do catálogo EM VIGOR: sem `cabecalhos` (segredo fica no
- * servidor), com a origem e o aviso de que os tem. */
-export interface ConectorDoCatalogo extends Omit<ConectorEmVigorDaAplicacao, "cabecalhos"> {
-  temCabecalhos: boolean;
-}
-
-/**
- * SPEC-105 fatias C/D — os fluxos (chave POR TIME, ao contrário de
- * `conectores`) e a execução. Tipos direto da aplicação, mesma cicatriz §263.
- */
-export type { ArestaDoFluxo, BlocoDaTela, ConfigFluxos, ConfigTelas, Fluxo, FluxoEmVigor, NoDoFluxo, TelaDeclarada, TelaEmVigor } from "@gerador/aplicacao";
-import type {
-  BlocoDaTela as BlocoDaTelaDaAplicacao,
-  ConfigFluxos,
-  ConfigTelas as ConfigTelasDaAplicacao,
-  FluxoEmVigor as FluxoEmVigorDaAplicacao,
-} from "@gerador/aplicacao";
-
-export const apiFluxos = configDe<ConfigFluxos>("fluxos");
-/** SPEC-110 fatia C — as telas DO TIME, no mesmo caminho de config de todas as
- * outras (documento por chave por time, SPEC-35). */
-export const apiTelas = configDe<ConfigTelasDaAplicacao>("telas");
-
-/** SPEC-106 — os fluxos EM VIGOR (declarados + a esteira derivada dos papéis),
- * resolvidos no servidor; e a saúde da última execução de cada um. */
-export const apiFluxosEmVigor = {
-  listar: (timeId?: string) =>
-    requisitar<{ fluxos: FluxoEmVigorDaAplicacao[] }>(`/fluxos${timeId ? `?timeId=${encodeURIComponent(timeId)}` : ""}`),
-  ultimas: () =>
-    requisitar<{ ultimas: { fluxoId: string; em: string; ok: boolean; noComFalha?: string }[] }>(
-      "/fluxos/execucoes/ultimas"
-    ),
-};
-
-export interface RastroDoNoExecutado {
-  noId: string;
-  /**
-   * SPEC-110 fatia J — o tipo vem do MOTOR (`TipoDeNoDoFluxo`), não de uma
-   * cópia. A lista à mão aqui tinha parado em quatro tipos: gatilho, tela e
-   * transformação já rodavam e já apareciam no rastro sem constar dela — e o
-   * subfluxo só a denunciou porque a tela precisou comparar contra ele.
-   */
-  tipo: TipoDeNoDoFluxo;
-  refId: string;
-  estado: "sucesso" | "falhou" | "nao-executado";
-  erro?: string;
-  duracaoMs: number;
-  /** SPEC-106 fatia A — o link do que subiu, quando o nó publicou. */
-  linkExterno?: string;
-  /** SPEC-107 fatia A (§5.4) — as entradas gravadas de um nó de função. */
-  entradas?: Record<string, unknown>;
-}
-
-/** SPEC-107 fatia C — a resposta de executar/continuar: com `aguardandoEm`, a
- * execução SUSPENDEU no gate e o `execucaoId` é o endereço para continuar. */
-export interface RespostaDeExecucao {
-  fluxo: string;
-  execucaoId: string;
-  hash: string;
-  nos: RastroDoNoExecutado[];
-  saidas: Record<string, Record<string, unknown>>;
-  aguardandoEm?: string;
-  /** SPEC-110 fatia B — a execução parou NUMA TELA: alguém precisa abrir,
-   * agir e decidir (diferente do gate, que pausa depois de um nó que rodou). */
-  aguardandoTela?: { noId: string; refId: string; entradas: Record<string, unknown> };
-}
-
-/**
- * SPEC-110 fatia B — **o que a tela mostra**, servido pelo servidor: o
- * contrato declarado dela mais as entradas que a fiação trouxe. A tela do
- * navegador renderiza isto — não recalcula mapeamento (§263).
- */
-export interface StageDaTela {
-  execucaoId: string;
-  fluxoId: string;
-  nome: string;
-  timeId: string | null;
-  /**
-   * SPEC-110 fatia J — o caminho até a tela, quando ela mora dentro de um
-   * subfluxo (a jornada pausa na bancada, que é nó do ensaio). Ausente quando
-   * a tela é um nó do próprio fluxo executado.
-   */
-  dentroDe?: { noId: string; fluxoId: string; nome: string }[];
-  noId: string;
-  nomeDoNo: string | null;
-  tela: {
-    id: string;
-    nome: string;
-    descricao: string;
-    entrada: { chave: string; rotulo: string; tipo: string; obrigatorio?: boolean }[];
-    saida: { chave: string; rotulo: string; tipo: string; obrigatorio?: boolean }[];
-    /** SPEC-110 fatia C — de onde a tela veio: do sistema (delega para a tela
-     * que já existe) ou do time (os blocos abaixo a desenham). */
-    origem: "sistema" | "declarada";
-    blocos?: BlocoDaTelaDaAplicacao[];
-  };
-  entradas: Record<string, unknown>;
-}
-
-/** SPEC-107 fatia D — os eventos do modo AO VIVO (NDJSON, um por linha). */
-export type EventoDaExecucao =
-  | { tipo: "no-comecou"; noId: string }
-  | { tipo: "texto"; noId: string; pedaco: string }
-  | { tipo: "no-terminou"; rastro: RastroDoNoExecutado }
-  | { tipo: "fim"; resposta: RespostaDeExecucao };
-
-/**
- * Lê o stream NDJSON de uma execução ao vivo — a técnica de
- * `sugerirPipeline`, com linhas em vez de texto cru. Devolve a resposta do
- * evento `fim` (a mesma forma do modo one-shot).
- */
-async function lerExecucaoAoVivo(
-  resposta: Response,
-  onEvento?: (evento: EventoDaExecucao) => void
-): Promise<RespostaDeExecucao> {
-  if (!resposta.ok) {
-    const corpo = (await resposta.json().catch(() => ({}))) as { erro?: string };
-    throw new Error(corpo.erro ?? `o servidor respondeu ${resposta.status}`);
-  }
-  // Fluxo vazio não streama nada — o servidor responde JSON de uma vez.
-  if ((resposta.headers.get("content-type") ?? "").includes("application/json")) {
-    return (await resposta.json()) as RespostaDeExecucao;
-  }
-
-  let fim: RespostaDeExecucao | null = null;
-  let resto = "";
-  const processar = (bloco: string) => {
-    resto += bloco;
-    const linhas = resto.split("\n");
-    resto = linhas.pop() ?? "";
-    for (const linha of linhas) {
-      if (!linha.trim()) continue;
-      const evento = JSON.parse(linha) as EventoDaExecucao;
-      if (evento.tipo === "fim") fim = evento.resposta;
-      onEvento?.(evento);
-    }
-  };
-
-  const leitor = resposta.body?.getReader();
-  if (leitor) {
-    const decodificador = new TextDecoder();
-    for (;;) {
-      const { done, value } = await leitor.read();
-      if (done) break;
-      processar(decodificador.decode(value, { stream: true }));
-    }
-  } else {
-    // Runtime de teste sem ReadableStream — o corpo chega inteiro.
-    processar(await resposta.text());
-  }
-  processar("\n");
-  if (!fim) throw new Error("a execução terminou sem o evento de fim — o stream caiu no meio");
-  return fim;
-}
-
-export const apiExecucaoDeFluxo = {
-  /** O executor é do SERVIDOR (§7): daqui só vai o disparo e o time.
-   * `ateNo` = executar só até aquele nó (o fecho de ancestrais) — inspecionar
-   * o meio sem disparar o resto. `parametrosPorNo` (SPEC-107 G1) = entradas
-   * DESTA execução, por nó — é como um atalho aponta a demanda aberta. */
-  executar: (id: string, timeId?: string, ateNo?: string, parametrosPorNo?: Record<string, Record<string, unknown>>) =>
-    requisitar<RespostaDeExecucao>(
-      `/fluxos/${encodeURIComponent(id)}/executar`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          ...(timeId ? { timeId } : {}),
-          ...(ateNo ? { ateNo } : {}),
-          ...(parametrosPorNo ? { parametrosPorNo } : {}),
-        }),
-      }
-    ),
-  /** SPEC-107 fatia D — a mesma execução, ASSISTÍVEL: um evento por nó
-   * (começou/terminou) e o texto do agente streamando, como na revisão. */
-  executarAoVivo: async (
-    id: string,
-    timeId: string | undefined,
-    ateNo: string | undefined,
-    onEvento: (evento: EventoDaExecucao) => void,
-    // SPEC-107 G5c — o atalho AO VIVO também aponta a demanda aberta: o
-    // servidor já lia `parametrosPorNo` deste mesmo body (G1); só o cliente
-    // não tinha por onde mandar.
-    parametrosPorNo?: Record<string, Record<string, unknown>>
-  ): Promise<RespostaDeExecucao> => {
-    const resposta = await fetch(`${BASE_URL}/fluxos/${encodeURIComponent(id)}/executar`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        aoVivo: true,
-        ...(timeId ? { timeId } : {}),
-        ...(ateNo ? { ateNo } : {}),
-        ...(parametrosPorNo ? { parametrosPorNo } : {}),
-      }),
-    });
-    return lerExecucaoAoVivo(resposta, onEvento);
-  },
-  continuarAoVivo: async (execucaoId: string, onEvento: (evento: EventoDaExecucao) => void): Promise<RespostaDeExecucao> => {
-    const resposta = await fetch(`${BASE_URL}/fluxos/execucoes/${encodeURIComponent(execucaoId)}/continuar`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ aoVivo: true }),
-    });
-    return lerExecucaoAoVivo(resposta, onEvento);
-  },
-  /** SPEC-107 fatia C — o gate: continuar roda só o resto; descartar fecha. */
-  continuar: (execucaoId: string) =>
-    requisitar<RespostaDeExecucao>(`/fluxos/execucoes/${encodeURIComponent(execucaoId)}/continuar`, {
-      method: "POST",
-      body: JSON.stringify({}),
-    }),
-  descartar: (execucaoId: string) =>
-    requisitar<{ ok: boolean }>(`/fluxos/execucoes/${encodeURIComponent(execucaoId)}/descartar`, {
-      method: "POST",
-      body: JSON.stringify({}),
-    }),
-  /**
-   * SPEC-110 fatia B (D2) — **o stage de uma tela**: o que ela vai mostrar,
-   * resolvido pelo servidor com o MESMO executor (§263). O navegador não
-   * recalcula mapeamento nenhum — ele renderiza o que chega.
-   */
-  stageDaTela: (execucaoId: string) =>
-    requisitar<StageDaTela>(`/fluxos/execucoes/${encodeURIComponent(execucaoId)}/tela`),
-  /** O Avançar: continua o fluxo com a decisão de quem revisou. */
-  avancarNaTela: (execucaoId: string, saidaDaTela: Record<string, unknown>) =>
-    requisitar<RespostaDeExecucao>(`/fluxos/execucoes/${encodeURIComponent(execucaoId)}/continuar`, {
-      method: "POST",
-      body: JSON.stringify({ saidaDaTela: { ...saidaDaTela, decisao: "avancar" } }),
-    }),
-  /** O Retornar: a execução ENCERRA (D2 — re-rodar o anterior é dívida). */
-  retornarDaTela: (execucaoId: string) =>
-    requisitar<{ ok: boolean; estado: string }>(`/fluxos/execucoes/${encodeURIComponent(execucaoId)}/retornar`, {
-      method: "POST",
-      body: JSON.stringify({}),
-    }),
-  /**
-   * As execuções persistidas de um fluxo — é onde a suspensa sobrevive a F5.
-   *
-   * **Com o time**, e não por precaução: os fluxos de FÁBRICA têm o mesmo id em
-   * todo time (`ensaio-de-cenarios` existe para todos), então sem o recorte o
-   * canvas de um time mostrava execução de outro. O servidor já recusa o que
-   * não é da pessoa; mandar o time faz o histórico bater com o desenho que
-   * está na tela, em vez de somar todos os times dela.
-   */
-  execucoes: (fluxoId: string, timeId?: string) =>
-    requisitar<{
-      execucoes: {
-        id: string;
-        hash: string;
-        em: string;
-        estado: string;
-        nos: RastroDoNoExecutado[];
-        saidas: Record<string, Record<string, unknown>> | null;
-      }[];
-    }>(`/fluxos/${encodeURIComponent(fluxoId)}/execucoes${timeId ? `?timeId=${encodeURIComponent(timeId)}` : ""}`),
-};
-
-/**
- * SPEC-110 fatia L (D1) — **o endereço do webhook.**
- *
- * Duas chamadas e uma regra: o token volta UMA vez, na geração. A listagem
- * nunca o traz — ela responde "existe?" e "quando disparou pela última vez?",
- * que é o que a tela precisa mostrar depois. Quem perdeu o valor gera outro;
- * não existe recuperar, porque se existisse não seria segredo.
- */
-export const apiWebhooks = {
-  listar: (fluxoId: string, timeId?: string) =>
-    requisitar<{ webhooks: { noId: string; criadoEm: string; ultimaEm: string | null }[] }>(
-      `/fluxos/${encodeURIComponent(fluxoId)}/webhooks${timeId ? `?timeId=${encodeURIComponent(timeId)}` : ""}`
-    ),
-  /** Gera ou REGENERA — e regenerar invalida o anterior. */
-  gerarToken: (fluxoId: string, noId: string, timeId?: string) =>
-    requisitar<{ token: string; caminho: string }>(
-      `/fluxos/${encodeURIComponent(fluxoId)}/gatilhos/${encodeURIComponent(noId)}/token`,
-      { method: "POST", body: JSON.stringify({ ...(timeId ? { timeId } : {}) }) }
-    ),
-};
-
-export const apiCatalogoDeConectores = {
-  /** O catálogo resolvido pelo servidor: declarados + derivados dos destinos. */
-  listar: () => requisitar<{ conectores: ConectorDoCatalogo[] }>("/conectores"),
-  /** SPEC-105 fatia B — executa UM passo; o segredo nunca passa por aqui. */
-  executar: (id: string, parametros: Record<string, unknown>) =>
-    requisitar<{ conector: string; saida: Record<string, unknown>; ausentes: string[] }>(
-      `/conectores/${encodeURIComponent(id)}/executar`,
-      { method: "POST", body: JSON.stringify({ parametros }) }
-    ),
-};
 
 /**
  * SPEC-86 fatia C — as regras EM VIGOR para um produto.

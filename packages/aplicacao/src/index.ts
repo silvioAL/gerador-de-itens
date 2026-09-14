@@ -25,6 +25,7 @@ export type {
   DadosItemGerado,
   RepositorioDeItensGerados,
 } from "./portas/repositorioDeItensGerados.js";
+export type { ExportadorDeItens, ItemExportado } from "./portas/exportadorDeItens.js";
 export { criarCasosDeUsoDeItensGerados, type CasosDeUsoDeItensGerados } from "./casos-de-uso/itensGerados.js";
 export { normalizarExportador, type ConfigExportador } from "./config/normalizacao.js";
 
@@ -41,13 +42,10 @@ export {
   type MetodoDoGateway,
 } from "./config/normalizacao.js";
 
-/** SPEC-81 fatia C — ler os ADRs da casa, marcados como importados. A leitura
- * em si virou o executor genérico de conector (SPEC-107 G3); o que fica é a
- * CONVERSÃO pura, agora consumida pelo web. */
+/** SPEC-81 fatia C — ler os ADRs da casa, marcados como importados. */
 export {
   comoDecisao,
   lacunasDaDecisaoImportada,
-  sanearAdrsExternos,
   statusDe,
   type AdrExterno,
   type LeitorDeAdr,
@@ -59,8 +57,12 @@ export type { LeitorDeDocumento, DocumentoExterno } from "./portas/leitorDeDocum
 /** SPEC-81 fatia E — a decisão daqui volta para o repositório da casa. */
 export { decisoesQuePodemVoltar, type AdrParaPublicar, type EscritorDeAdr } from "./portas/escritorDeAdr.js";
 
-// SPEC-81 fatia B → SPEC-107 G2: a porta `PublicadorDeDocumento` morreu —
-// publicar é a fiação semeada, pelo executor genérico de conector.
+/** SPEC-81 fatia B — publicar o documento na base de conhecimento. */
+export type {
+  DocumentoParaPublicar,
+  DocumentoPublicado,
+  PublicadorDeDocumento,
+} from "./portas/publicadorDeDocumento.js";
 
 export {
   CAMPO_GLOBAL,
@@ -155,228 +157,6 @@ export {
   type PapelConfigurado,
 } from "./config/normalizacao.js";
 
-/** SPEC-105 fatia A/B — o conector como dado, e a metade pura do executor. */
-export {
-  CONTRATO_DA_OPERACAO,
-  NOME_DA_OPERACAO,
-  TIPOS_DE_CAMPO_DO_CONECTOR,
-  conectoresDeFabrica,
-  conectoresEmVigor,
-  normalizarConectores,
-  validarEscritaConectores,
-  type CampoDoConector,
-  type ConfigConectores,
-  type Conector,
-  type ConectorEmVigor,
-  type TipoDeCampoDoConector,
-} from "./config/conectores.js";
-export { analisarCaminho, lerCaminho } from "./config/caminho.js";
-/** SPEC-107 fatia A — o registro de FUNÇÕES do sistema, com contrato e
- * governança como dado, e o executor puro delas. */
-export {
-  FUNCOES_DO_SISTEMA,
-  funcaoDoSistema,
-  type FuncaoDoSistema,
-  type GovernancaDaFuncao,
-} from "./config/funcoes.js";
-export {
-  comoDesenhoMapeado,
-  EntradaDaFuncaoInvalida,
-  executarFuncao,
-  type ContextoDasFuncoes,
-  type DesenhoMapeado,
-} from "./casos-de-uso/funcoes.js";
-/** SPEC-107 fatia B — o PROJETO como nó, nas duas direções. */
-export {
-  PROJETO_DO_SISTEMA,
-  REF_DO_PROJETO,
-  type ProjetoDoSistema,
-  // SPEC-110 fatia F — a demanda desdobrada em ler e gravar.
-  AVISO_DO_PROJETO_LEGADO,
-  DADOS_DO_SISTEMA,
-  dadoDoSistema,
-  REF_DA_DEMANDA_GRAVAR,
-  REF_DA_DEMANDA_LER,
-  REFS_DE_DADOS,
-  type DadoDoSistema,
-} from "./config/projeto.js";
-/** SPEC-110 fatia E — o relógio: cron de 5 campos, UTC, com próxima-ocorrência. */
-export { analisarCron, problemaNoCron, proximaOcorrencia, proximaOcorrenciaLegivel } from "./config/cron.js";
-/** SPEC-110 fatia D — o banco como componente: consulta, e só consulta. */
-export {
-  LIMITE_MAXIMO_DA_CONSULTA,
-  LIMITE_PADRAO_DA_CONSULTA,
-  comLimite,
-  exigirConsultaValida,
-  parametrosDoSql,
-  problemaNaConsulta,
-  problemaNosParametros,
-  traduzirConsulta,
-  type ConsultaEmBanco,
-} from "./config/consultaEmBanco.js";
-/** SPEC-110 fatia B — a tela como nó: onde a pessoa entra no fluxo. */
-export {
-  CAMPO_DA_DECISAO,
-  DECISOES_DA_TELA,
-  ENTRADAS_DO_CAMPO,
-  FORMATOS_DO_DADO,
-  PREFIXO_DA_TELA_DECLARADA,
-  TELAS_DO_SISTEMA,
-  contratoDaTelaDeclarada,
-  idDaTelaDeclarada,
-  normalizarTelas,
-  problemaNaSaidaDaTela,
-  refIdDaTelaDeclarada,
-  telaDoSistema,
-  telaEmVigorPorRefId,
-  telasEmVigor,
-  validarEscritaTelas,
-  type BlocoDaTela,
-  type ConfigTelas,
-  type DecisaoDaTela,
-  type EntradaDoCampo,
-  type FormatoDoDado,
-  type TelaDeclarada,
-  type TelaDoSistema,
-  type TelaEmVigor,
-} from "./config/telas.js";
-/** SPEC-110 fatia A — o gatilho como nó: o fluxo diz QUANDO roda. */
-export {
-  GATILHOS_DO_SISTEMA,
-  ID_DO_NO_DE_GATILHO,
-  ORIGENS_DO_DISPARO,
-  /** SPEC-110 fatia E — o parâmetro do nó que guarda a expressão do cron. */
-  PARAMETRO_DA_EXPRESSAO,
-  /** SPEC-110 fatia L — o webhook: os campos que ele extrai do corpo, e a
-   * saída de UM nó de gatilho (que no webhook é do nó, não do tipo). */
-  PARAMETRO_DOS_CAMPOS,
-  camposDoWebhook,
-  saidaDoGatilho,
-  type CampoDoWebhook,
-  gatilhoDoSistema,
-  type GatilhoDoSistema,
-  type OrigemDoDisparo,
-} from "./config/gatilhos.js";
-/** SPEC-110 fatia L — o corpo que chega vira a saída do gatilho. */
-export { extrairDoWebhook, saidaDoWebhook } from "./casos-de-uso/webhook.js";
-export {
-  demandaAtiva,
-  erroSemDemanda,
-  resultadoDaExportacao,
-  saidaDoProjeto,
-  varianteProposta,
-} from "./casos-de-uso/projetoNoFluxo.js";
-/** SPEC-107 G1 — a régua de "pronto" da exportação, num lugar só. */
-export { prontosEIgnorados } from "./casos-de-uso/itensGerados.js";
-/** SPEC-107 fatia F — compatibilidade de mapeamento por tipo (aviso). */
-export { avisosDeMapeamento, type AvisoDeMapeamento, type ContratoDoNoNoFluxo } from "./casos-de-uso/mapeamento.js";
-/** SPEC-107 fatia E — a transformação pura (o Set do n8n). */
-export {
-  sanearCamposDaTransformacao,
-  transformarEntradas,
-  validarCamposDaTransformacao,
-  type CampoDaTransformacao,
-} from "./casos-de-uso/transformacao.js";
-/** SPEC-107 fatia A — o montador ÚNICO do vocabulário do diagrama (web e
- * servidor mesclam os campos customizados pela mesma função, §263). */
-export {
-  comoFieldSpec,
-  mesclarCamposDeAresta,
-  mesclarCamposDeNo,
-  type CampoCustomizado,
-} from "./config/diagramaDoTime.js";
-/** SPEC-105 fatias C/D — o fluxo como grafo, e a execução pura. */
-// SPEC-107 G5 — a fila da esteira, pura: a mesma para a revisão e a fiação.
-export { TAM_LOTE_ESTEIRA, corpoDoLote, itensDoPapel } from "./casos-de-uso/lotesDaEsteira.js";
-export {
-  assinarSugestao,
-  fraseDeCompletude,
-  pendenciasDaRevisao,
-  placeholdersDaFicha,
-  type PendenciasDaRevisao,
-  type PendenteDeConfirmacao,
-} from "./casos-de-uso/pendencias.js";
-export {
-  correrEsteiraPelaFila,
-  correrPapelPelaFila,
-  type FalhaDaCorrida,
-  type ResultadoDaCorrida,
-} from "./casos-de-uso/corridaDaEsteira.js";
-export {
-  aplicarRespostasNaDemanda,
-  contextoDoPlaceholder,
-  contextoEpicoCompleto,
-  filaDaEsteiraDaDemanda,
-  montarFilaDaEsteira,
-  papelDoGrupo,
-  placeholdersDaFichaPorGrupo,
-  respostaConfirmada,
-  type ItemDaFilaDaEsteira,
-  type PlaceholderDoPedido,
-  type RespostaAnterior,
-} from "./casos-de-uso/filaDaEsteira.js";
-
-export {
-  ID_DO_FLUXO_DA_ESTEIRA,
-  ID_DO_FLUXO_DA_EXPORTACAO,
-  ID_DO_FLUXO_DA_PUBLICACAO,
-  ID_DO_FLUXO_DO_ENSAIO,
-  // SPEC-110 fatia G — o ciclo de melhoria como fluxo de fabrica.
-  ID_DO_FLUXO_DO_PDCA,
-  fluxoDoPdca,
-  // SPEC-110 fatia H — a semente do fluxo novo, com o gatilho.
-  fluxoNovo,
-  // SPEC-110 fatia J — o fluxo como nó, e o mestre que os relaciona.
-  ID_DO_FLUXO_DA_JORNADA,
-  IDS_DE_FABRICA,
-  LIMITE_DE_ANINHAMENTO_DE_SUBFLUXO,
-  // SPEC-111 A — a tela que vale sozinha: o fluxo implicito de um no.
-  PREFIXO_DO_FLUXO_DA_TELA,
-  idDoFluxoDaTela,
-  telaDoFluxoImplicito,
-  telasStandalone,
-  camposExternosDoFluxo,
-  cicloEntreFluxos,
-  contratoDoSubfluxo,
-  fluxoDaJornada,
-  TIPOS_DE_NO_DO_FLUXO,
-  fluxoDaEsteira,
-  fluxoDaExportacao,
-  fluxoDoEnsaio,
-  fluxosDaPublicacao,
-  fluxosEmVigor,
-  mensagemDeCiclo,
-  noDeGatilhoManual,
-  normalizarFluxos,
-  planoDoFluxo,
-  validarEscritaFluxos,
-  type ArestaDoFluxo,
-  type CampoDoContrato,
-  type ConfigFluxos,
-  type ContratoDeNo,
-  type Fluxo,
-  type FluxoEmVigor,
-  type NoDoFluxo,
-  type TipoDeNoDoFluxo,
-} from "./config/fluxos.js";
-export {
-  executarFluxo,
-  SubfluxoAguardandoTela,
-  type EstadoDoNo,
-  type ExecutoresDoFluxo,
-  type OpcoesDeExecucao,
-  type ParadaEmSubfluxo,
-  type RastroDoNo,
-  type ResultadoDoFluxo,
-} from "./casos-de-uso/fluxos.js";
-export {
-  EntradaDoConectorInvalida,
-  montarChamadaDoConector,
-  mapearSaidaDoConector,
-  type ChamadaDoConector,
-  type SaidaDoConector,
-} from "./casos-de-uso/conectores.js";
-
 export {
   resumirCredencialIa,
   type CredencialIa,
@@ -414,6 +194,12 @@ export {
   type PedidoIa,
 } from "./casos-de-uso/ia/pedidos.js";
 
-// SPEC-109 C — `montarMapaDoSistema` morreu com a SistemaScreen (o canvas de
-// fluxos é o mapa vivo); do módulo sobrou o rastro por papel.
-export { type ExecucaoDoPapel } from "./sistema/execucoes.js";
+export {
+  montarMapaDoSistema,
+  type MapaDoSistema,
+  type AgenteDoMapa,
+  type RegraDoMapa,
+  type EstadoDoAgente,
+  type EntradaDoMapa,
+  type ExecucaoDoPapel,
+} from "./sistema/mapaDoSistema.js";

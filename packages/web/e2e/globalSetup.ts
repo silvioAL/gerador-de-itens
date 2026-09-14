@@ -99,21 +99,6 @@ export default async function globalSetup() {
     // por ser seed de login, e só este e-mail é lixo de teste.
     await client.query(`DELETE FROM "usuario_time" WHERE "email" LIKE '%-e2e@gerador.local'`).catch(() => undefined);
 
-    /**
-     * SPEC-110 fatia D — **a tabela que o conector de banco vai consultar.**
-     *
-     * O alvo é o PRÓPRIO Postgres descartável da suíte: ele já está de pé, é
-     * um banco de verdade, e usá-lo evita inventar um dublê de driver — que
-     * provaria o dublê, não o `pg`. O nome tem prefixo `e2e_` para deixar
-     * claro que é do teste, e o `DROP` antes do `CREATE` garante que a
-     * segunda rodada mede o mesmo que a primeira.
-     */
-    await client.query(`DROP TABLE IF EXISTS "e2e_pedidos"`);
-    await client.query(`CREATE TABLE "e2e_pedidos" (id serial primary key, cliente text not null, total numeric not null)`);
-    await client.query(
-      `INSERT INTO "e2e_pedidos" (cliente, total) VALUES ('acme', 100), ('acme', 250), ('globex', 70)`
-    );
-
     // §303 — a seed de `perfis_time` que existia aqui SAIU, e não foi trocada
     // por outra. Ela era uma cópia à mão do 0000_init para sobreviver ao
     // TRUNCATE; hoje a stack do time mora em `stacks`/`stack_valores` (0020 →
@@ -165,25 +150,6 @@ export default async function globalSetup() {
       "time-e2e-por-componente",
       "time-e2e-forma",
       "time-e2e-leitura",
-      // SPEC-109 A — o ciclo cópia→volta grava e apaga o DOCUMENTO de fluxos
-      // do time; num time compartilhado isso congelaria a esteira debaixo de
-      // um spec vizinho no meio da corrida dele.
-      "time-e2e-fluxos",
-      // SPEC-110 fatia H — a galeria escreve os documentos `fluxos` E `telas`
-      // do time inteiro (criar, renomear, trocar o rosto). Num time
-      // compartilhado isso apaga o desenho de um spec vizinho no meio da
-      // corrida dele — foi o que aconteceu com `jornada-e-cenarios`, que usa
-      // `time-checkout`.
-      "time-e2e-galeria",
-      // SPEC-110 fatia L — o webhook cria um fluxo próprio e emite um token
-      // para ele; escrever o documento de fluxos de um time compartilhado
-      // apagaria o desenho de quem roda ao lado.
-      "time-e2e-webhook",
-      // Correção do vazamento entre times: este spec PRECISA de um time em que
-      // a pessoa não seja nada no outro — é a condição do defeito relatado.
-      "time-e2e-vazamento",
-      // SPEC-111 A — o standalone escreve o documento de TELAS do time.
-      "time-e2e-standalone",
     ];
     // Ninguém ALÉM deste e-mail pertence a estes times. Sem esta linha, uma
     // rodada antiga que os pendurou noutro usuário deixa a lista dele maior
@@ -232,25 +198,6 @@ export default async function globalSetup() {
     await client
       .query(`DELETE FROM "config_documentos" WHERE "time_id" LIKE 'time-e2e-%'`)
       .catch(() => undefined);
-
-    // SPEC-107 fatia A — **o baseline de REGRAS da suíte, dito em voz alta.**
-    //
-    // O servidor do E2E passou a rodar com `CONFIG_DIR` (como o compose de
-    // verdade), e com isso o template de regras de uma instalação NOVA virou
-    // `regras.example.json` — e quatro specs que derivam itens quebraram na
-    // CI (banco fresco) e passaram no banco local (documentos antigos
-    // mascaravam o template). A suíte inteira foi escrita sobre o baseline
-    // "sem régua da casa"; ele agora é um DOCUMENTO global explícito, não o
-    // acidente de uma pasta ausente. O spec que quiser exercitar o template
-    // real grava a régua dele no próprio time, como os specs de regras já
-    // fazem.
-    await client.query(
-      `DELETE FROM "config_documentos" WHERE "chave" = 'regras' AND "time_id" = '__global__' AND "produto_id" IS NULL`
-    );
-    await client.query(
-      `INSERT INTO "config_documentos" ("chave", "time_id", "documento")
-       VALUES ('regras', '__global__', '{"tipos": [], "tamanhos": [], "porTech": {}}')`
-    );
 
     // #301 — os padrões por componente também morrem no TRUNCATE acima, e sem
     // eles `padroes-por-componente.spec.ts` testaria uma tabela vazia.

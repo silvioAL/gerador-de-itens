@@ -10,7 +10,6 @@ import {
   Globe,
   Layers,
   Lock,
-  Play,
   Radio,
   Rabbit,
   Scale,
@@ -63,7 +62,4 @@ export const MAPA_ICONES: Record<string, LucideIcon> = {
   Lock,
   Users,
   Smartphone,
-  // SPEC-110 fatia A — o "▶" da família GATILHO do fluxo. Entra no catálogo
-  // curado pela mesma régua dos outros: um nome que a família usa de verdade.
-  Play,
 };

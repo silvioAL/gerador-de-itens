@@ -126,9 +126,8 @@ test("Especificação: apagar {{itens}} não deixa salvar e mostra o motivo (SPE
   const API = "http://localhost:4100";
   const antes = await (await page.request.get(`${API}/especificacao-template`)).json();
 
-  // SPEC-109 D — a aba saiu do menu; o deep-link é a porta (o nó de geração
-  // de itens no canvas aponta para cá).
-  await page.goto("/#/config/especificacao");
+  await page.getByRole("button", { name: "☰ Menu" }).click();
+  await page.getByRole("button", { name: /Especificação de solução/ }).click();
   await page.getByRole("button", { name: "editar" }).click();
 
   const conteudo = page.getByLabel("Conteúdo do template");
@@ -154,15 +153,9 @@ test("Especificação: apagar {{itens}} não deixa salvar e mostra o motivo (SPE
   // constar no E2E, não só o bloqueio): grava, sai da tela, volta e o texto
   // persistido é o novo.
   await salvar.click();
-  // Espera o PUT ATERRISSAR antes de recarregar: o reload imediato matava a
-  // escrita em voo (o caminho antigo pelo menu dava esse tempo sem querer).
-  await expect
-    .poll(async () => (await (await page.request.get(`${API}/especificacao-template`)).json())?.conteudo ?? "", {
-      timeout: 15000,
-    })
-    .toContain("Template do E2E");
-  await page.goto("/#/config/especificacao");
-  await page.reload();
+  await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
+  await page.getByRole("button", { name: "☰ Menu" }).click();
+  await page.getByRole("button", { name: /Especificação de solução/ }).click();
   await expect(page.getByText(/Template do E2E/)).toBeVisible();
 
   // Restaura o template vigente — ele é da organização, não deste teste.
@@ -186,11 +179,7 @@ test("Acessos: a tela da delegação de RBAC abre e diz o estado atual", async (
 });
 
 test("Pipeline de IA: os papéis, o prompt herdado e a anatomia do prompt", async ({ page }) => {
-  // SPEC-109 C — a aba SAIU do menu (a esteira se edita no canvas de fluxos,
-  // no nó); o catálogo completo continua vivo PELO DEEP-LINK, que é como o
-  // painel do nó aponta para cá — e é o caminho que este teste passa a provar.
-  await entrar(page);
-  await page.goto("/#/config/pipeline");
+  await abrirConfig(page, /Pipeline de IA/);
 
   for (const papel of ["PO", "Arquiteto", "Especialista técnico", "QA"]) {
     await expect(page.getByRole("button", { name: new RegExp(`^${papel}`) }).first()).toBeVisible();

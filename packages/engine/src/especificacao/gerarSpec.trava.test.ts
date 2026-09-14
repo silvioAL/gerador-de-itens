@@ -42,14 +42,11 @@ import { SECOES_DE_JULGAMENTO } from "./gerarSpec.js";
 
 const RAIZ = resolve(import.meta.dirname, "../../../..");
 
-/** Onde a IA é orquestrada — os arquivos que montam pedido e tratam resposta.
- * SPEC-107 G5c-3: o motor client da revisão (`useEsteiraDeAgentes`) morreu; a
- * orquestração vive na corrida pura da aplicação e no executor da fiação. */
+/** Onde a IA é orquestrada — os arquivos que montam pedido e tratam resposta. */
 const ARQUIVOS_DA_IA = [
   "packages/aplicacao/src/casos-de-uso/ia/pedidos.ts",
-  "packages/aplicacao/src/casos-de-uso/corridaDaEsteira.ts",
   "packages/server/src/routes/ia.ts",
-  "packages/server/src/routes/fluxos.ts",
+  "packages/web/src/review/useEsteiraDeAgentes.ts",
 ];
 
 /** As duas varríveis (ver o cabeçalho sobre `origem`). */

@@ -16,9 +16,6 @@ import { registrarRotasCamposAresta } from "./routes/camposAresta.js";
 import { registrarRotasAuth } from "./routes/auth.js";
 import { registrarRotasTimes } from "./routes/times.js";
 import { registrarRotasAcessos } from "./routes/acessos.js";
-import { registrarRotasConectores } from "./routes/conectores.js";
-import { registrarRotasFluxos } from "./routes/fluxos.js";
-import { registrarRotasFuncoes } from "./routes/funcoes.js";
 
 export interface OpcoesApp {
   db: BancoDeDados;
@@ -114,9 +111,6 @@ export async function buildApp(opcoes: OpcoesApp): Promise<FastifyInstance> {
   await registrarRotasCamposAresta(app, opcoes);
   await registrarRotasTimes(app, opcoes);
   await registrarRotasAcessos(app, opcoes);
-  await registrarRotasConectores(app, opcoes);
-  await registrarRotasFluxos(app, opcoes);
-  await registrarRotasFuncoes(app);
 
   return app;
 }

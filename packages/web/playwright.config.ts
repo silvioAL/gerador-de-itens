@@ -1,4 +1,3 @@
-import { resolve } from "node:path";
 import { defineConfig } from "@playwright/test";
 
 // Precisa de Postgres real já rodando antes de `npm run test:e2e`
@@ -78,29 +77,12 @@ export default defineConfig({
         DATABASE_URL: DATABASE_URL_TESTE,
         PORT: "4100",
         RATE_LIMIT_LOGIN_MAX: "1000",
-        RATE_LIMIT_GLOBAL_MAX: "10000",
-        /**
-         * SPEC-107 fatia A — o servidor do E2E rodava SEM config/ (cwd é
-         * packages/server, a pasta não existe lá): `GET /config/diagrama`
-         * respondia 500 e ninguém via, porque o web cai no estático em
-         * silêncio — e a função `derivacao` nasceu sem vocabulário nenhum.
-         * O compose de verdade define `CONFIG_DIR=/app/config`; a suíte
-         * roda como a instalação de demonstração roda (SPEC-89, acima).
-         */
-        CONFIG_DIR: resolve(import.meta.dirname, "../../config"),
+        RATE_LIMIT_GLOBAL_MAX: "10000",
         // SPEC-89 — a suíte roda como uma instalação de DEMONSTRAÇÃO roda:
         // com o dublê declarado. Sem isto, o E2E provaria um produto que
         // ninguém usa — o `docker-compose.yml` declara, e é ele que descreve o
         // ambiente que a pessoa recebe.
         GATEWAY_FALSO_URL: "http://127.0.0.1:4123/v1",
-        /**
-         * SPEC-110 fatia D — a conexão que o conector de BANCO usa no E2E. O
-         * alvo é o PRÓPRIO Postgres descartável da suíte: ele já está de pé e
-         * é um banco de verdade, então a prova exercita o driver `pg`, não um
-         * dublê. O nome segue `nomeDaVariavel("e2e")`, que é o caminho real
-         * de uma instalação sem cofre.
-         */
-        GERADOR_CONEXAO_E2E: DATABASE_URL_TESTE,
       },
     },
     {

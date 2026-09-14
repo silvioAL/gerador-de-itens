@@ -199,9 +199,7 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
     detalhe:
       "A bancada de ensaios responde perguntas hipotéticas com aritmética, não com opinião: trocar um número e recalcular o grafo é determinístico e dá o mesmo resultado toda vez. Retry, pico de tráfego, disjuntor desligado, timeout do cliente menor que a soma dos internos. E um ensaio que dói pode ser assumido como débito — com quem assumiu e por quê.",
     estado: "completo",
-    // SPEC-107 G4 — a bancada mudou de casa: vive junto do fluxo, medindo
-    // pela fiação semeada em vez de simular no navegador.
-    rota: { tela: "fluxo", fluxoId: "ensaio-de-cenarios" },
+    rota: { tela: "ensaios" },
   },
   {
     id: "decisoes",
@@ -303,9 +301,7 @@ export const ESTAGIOS_DO_CICLO: EstagioDoCiclo[] = [
      * fatia C cobra as duas.
      */
     estado: "completo",
-    // SPEC-106 fatia B — o catálogo de Conectores absorveu a aba Exportação:
-    // os destinos do gateway se cadastram e se editam num lugar só.
-    rota: { tela: "config", area: "conectores" },
+    rota: { tela: "config", area: "exportacao" },
   },
   {
     id: "pdca",

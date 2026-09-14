@@ -1,4 +1,4 @@
-﻿import { test, expect } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import { entrar } from "./auth";
 import { reconhecerAvisos } from "./derivar";
 
@@ -17,13 +17,6 @@ test("jornada abre sozinha no primeiro acesso, explica as saídas, e some ao fec
   await entrar(page);
 
   await expect(page.getByText("Como funciona o Gerador de Itens")).toBeVisible();
-  // SPEC-109 E — a aba padrão é o MANUAL DE USO ("em como funciona não
-  // explica como usar"): o primeiro acesso vê os passos, com os gestos reais.
-  await expect(page.getByTestId("como-usar")).toBeVisible();
-  await expect(page.getByTestId("como-usar")).toContainText("Conecte um modelo de IA");
-  await expect(page.getByTestId("como-usar")).toContainText("Confirme o que a IA escreveu");
-  // A jornada continua uma aba ao lado, com as saídas listadas.
-  await page.getByRole("button", { name: "A jornada" }).click();
   await expect(page.getByText("Não é um gerador de prompt de IA")).toBeVisible();
   // `.first()`: "Especificação de solução" aparece duas vezes na jornada (o
   // título da saída e a menção no corpo). O que este teste garante é que a
@@ -65,7 +58,7 @@ test("carregar um cenário pronto popula a mesa de projeto e deriva sem ciclos/c
   await expect(page.getByTestId("assistente-balao")).toContainText("qual é o nome da demanda");
   await page.getByTestId("assistente-balao-secundaria").click();
 
-  await expect(page.locator('[data-testid^="item-gerado-"]')).toHaveCount(4); // G5c-3: derivar abre o documento
+  await expect(page.getByTestId("contagem-itens")).toHaveText("4 itens");
   await expect(page.getByText("Não é possível derivar ainda")).not.toBeVisible();
 
   await page.screenshot({ path: "e2e/screenshots/cenario-mongo.png", fullPage: true });
@@ -170,7 +163,7 @@ test("adicionar dois cenários à mesa de projeto (sem substituir) compõe um di
 
   // 4 atividades do mongo + 5 do kafka = 9 — se algum ID tivesse colidido/se
   // perdido na mesclagem, esse número não bateria.
-  await expect(page.locator('[data-testid^="item-gerado-"]')).toHaveCount(9);
+  await expect(page.getByTestId("contagem-itens")).toHaveText("9 itens");
   await expect(page.getByText("Não é possível derivar ainda")).not.toBeVisible();
 
   await page.screenshot({ path: "e2e/screenshots/cenarios-compostos.png", fullPage: true });
@@ -223,9 +216,9 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await expect(page.getByTestId("tour-texto")).toContainText("MOTOR calcula");
   await expect(page.getByTestId("tour-texto")).toContainText("IA escreve");
 
-  // SPEC-109 C — o passo abre o CANVAS DE FLUXOS (o mapa vivo; a SistemaScreen
-  // e a animação do motor morreram com ela): quem faz o quê está desenhado na
-  // fiação, e o texto do tour diz a divisão.
+  // §268 — a cadeia do motor DEMONSTRADA, não só afirmada. O passo abre o mapa
+  // do sistema e mostra a conta com uma régua real do time; cobrar o conteúdo
+  // (§234) é o que separa isto de "a caixa apareceu".
   await irAtePasso(page, "Começar conversando");
   await expect(page.getByTestId("assistente-janela")).toBeVisible();
   // §254 — o ponteiro aparece no primeiro passo que TEM alvo. Nos de tela
@@ -334,10 +327,9 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   // Não bloqueia: é o que separa reconhecer de proibir.
   await expect(page.getByText(/Nada aqui impede a derivação/)).toBeVisible();
 
-  // G5c-3 — derivação de verdade: o DOCUMENTO abre com os itens escritos, e o
-  // julgamento mora nos cards (a revisão como tela morreu).
-  await irAtePasso(page, "Confirmar o que a IA escrever");
-  await expect(page.getByTestId("secao-dos-itens")).toBeVisible();
+  // Derivação de verdade — a revisão abre com os itens calculados.
+  await irAtePasso(page, "Confirmar o que a IA escreveu");
+  await expect(page.getByTestId("barra-pendencias")).toBeVisible();
 
   // §251 — a TELA do documento (SPEC-58), a lacuna que a avaliação encontrou.
   //
@@ -381,7 +373,7 @@ test("tour guiado de 1 clique percorre o ciclo inteiro: desenho, derivação, co
   await page.getByRole("button", { name: "Concluir" }).click();
 
   await expect(page.getByText(/PASSO \d+ DE \d+/)).not.toBeVisible();
-  await expect(page.getByTestId("documento-screen")).not.toBeVisible();
+  await expect(page.getByTestId("contagem-itens")).not.toBeVisible();
 });
 
 /**
@@ -458,28 +450,21 @@ test("tour de configuração percorre as quatro telas que o tour do produto não
 
   await expect(page.getByTestId("tour-titulo")).toHaveText("Moldar pro seu time");
 
-  // §258 — o MAPA vem antes das telas que ele mapeia. SPEC-109 C — e o mapa
-  // agora é o CANVAS DE FLUXOS, vivo: o passo abre a tela e a esteira
-  // derivada está lá, com os papéis em sequência (conteúdo, não só a tela).
-  await irAtePasso(page, "O encanamento é o canvas");
-  await expect(page.getByTestId("fluxo-screen")).toBeVisible();
-  await expect(page.getByTestId("seletor-de-fluxo")).toBeVisible();
-  await expect(page.locator('.react-flow__node[data-id="po"]')).toBeVisible();
-  await expect(page.locator('.react-flow__node[data-id="qa"]')).toBeVisible();
+  // §258 — o MAPA vem antes das telas que ele mapeia. E cobra CONTEÚDO, não
+  // só a tela: uma vista vazia passaria em `toBeVisible` e não explicaria nada.
+  await irAtePasso(page, "Como a ferramenta está montada");
+  await expect(page.getByTestId("sistema-screen")).toBeVisible();
+  await expect(page.getByTestId("bloco-esteira")).toBeVisible();
+  await expect(page.getByTestId("bloco-regras")).toBeVisible();
+  await expect(page.getByTestId("bloco-pdca")).toBeVisible();
+  // A esteira de fábrica tem quatro papéis, e eles aparecem como sequência.
+  await expect(page.getByTestId("agente-po")).toBeVisible();
+  await expect(page.getByTestId("agente-qa")).toBeVisible();
+  // Sem credencial de IA neste teste: o avatar diz isso em vez de fingir que a
+  // esteira está de pé.
+  await expect(page.getByTestId("agente-po")).toHaveAttribute("data-estado", "sem-credencial");
 
   const telaConfig = page.locator('[data-tour="config-screen-content"]');
-
-  /**
-   * SPEC-110 fatia K (D19) — o passo que a conferência integral achou faltando.
-   *
-   * O passo anterior acaba de dizer que alguns fluxos têm uma TELA onde a
-   * execução para e espera alguém. Sem este, o tour nunca mostrava de ONDE essa
-   * tela vem — a capacidade que o usuário mais pediu na SPEC-110 ficava sem
-   * lugar justamente no tour que existe para mostrar o que se molda por time.
-   */
-  await irAtePasso(page, "As telas que vocês criam");
-  await expect(page.getByTestId("telas-tab")).toBeVisible();
-  await expect(page.getByTestId("criar-tela")).toBeVisible();
 
   // §252 — as sete telas de administração migraram do tour do produto para cá.
   // O de produto voltou a responder "serve pra quê" em 19 passos; este passou
