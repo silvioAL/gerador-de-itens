@@ -16095,3 +16095,63 @@ precisa provar. Guardada por prova própria e por sabotagem.
 o `timeId` mal formatado recusado, e a compatibilidade de quem o manda certo),
 5 sabotagens §248, 2 E2E, e verificação na stack real pelo caminho exato do
 print.
+
+---
+## §406 — O rollback: o canvas de fluxos sai, as telas dedicadas voltam
+
+Testando a SPEC-112 (jornada contínua) na stack real, dois achados em
+sequência mudaram o rumo do projeto inteiro. Primeiro, um sintoma pontual:
+*"na mesa de projeto ... ao clicar em derivar quebra caiu em
+http://localhost:8080/#/documento com quase tudo por especificar, e também, a
+esteira de agentes está inacessível"*. Corrigido com uma porta.
+
+**A porta corrigida não bastou.** A pergunta que sobrou não era "falta um
+botão", era por que a esteira virou *"um botão 'tímido'"* quando *"em versões
+anteriores existia uma tela muito bonita e animada nesse fluxo … na época que
+não era um fluxo plugável … os conectores eram animados"*. A resposta: essa
+tela existiu de verdade e foi apagada pela SPEC-107 G5c-3 ("a MORTE"), quando
+a esteira de agentes virou um nó de um grafo genérico configurável (SPEC-105
+em diante).
+
+**O veredito, depois de testar o remendo**: *"não deu nem um pouco certo,
+melhor fazermos um rollback para a época em que ele ainda existia ... vamos
+ressimplificar o sistema"*. E o escopo confirmado era mais largo que a
+esteira — a direção inteira "canvas de fluxos plugável" (SPEC-105 a SPEC-111)
+tinha os três motivos clássicos de reversão: complexidade sem benefício
+percebido, perda de qualidade visual, e o modelo mental errado pro produto
+("baixo código com canvas conectável" nunca foi o que este produto devia
+ser).
+
+**A mecânica**: não um `git reset --hard` — isso destruiria dois commits
+independentes construídos DEPOIS da SPEC-105 (um fix de vocabulário, e a
+criação de times que é o próprio HEAD da `main`). Uma branch nova a partir do
+commit anterior à SPEC-105, com os dois trazidos de volta por
+`cherry-pick`, preserva o trabalho real sem misturar com o que está sendo
+revertido.
+
+**A investigação inicial errou uma premissa**, e vale registrar o erro: o
+motor client-side antigo (`useEsteiraDeAgentes.ts`) chamava `POST
+/ia/pipeline/:papel` do navegador, e a primeira leitura (feita pela árvore
+git do commit já deletado) concluiu que essa rota "só existia no modo local,
+ausente no hospedado". Falso — checagem direta na branch nova mostrou que a
+rota é hospedada-compatível desde a **SPEC-31**, muito antes da SPEC-105
+sequer existir. Consequência: `ReviewScreen`/`EsteiraAgentes` não precisaram
+ser reconstruídas, reescritas ou substituídas por nada novo — já estavam de
+pé, ligadas, e funcionando, exatamente como estavam antes de o canvas de
+fluxos nascer. O mesmo valeu para exportar, publicar e a bancada de ensaios:
+nenhuma linha de código nova, só verificação de que o fio antigo nunca tinha
+sido cortado NESTA branch.
+
+**A lição**: quando o rollback é "voltar para antes de X", a pergunta certa
+não é "o que precisa ser reconstruído" — é "o que já está lá, intacto, que a
+investigação por commits deletados não tinha como ver direito". Presumir
+reconstrução por analogia com o código deletado, sem checar a branch real,
+quase gerou trabalho (uma rota nova, um componente novo) para substituir algo
+que já funcionava.
+
+**Provas**: build limpo em `web`/`server` (os únicos com script de build),
+204 testes de unidade verdes nos 6 workspaces, e 13 specs E2E (derivar →
+revisar → exportar, esteira com papel ligado/desligado, ensaios com F5)
+rodando verdes contra a stack Docker rebuildada com o código da branch nova —
+não contra a leitura estática do código. SPEC-113 documenta a decisão e foi
+corrigida, no próprio arquivo, quando a premissa errada apareceu.
