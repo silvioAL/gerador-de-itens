@@ -349,6 +349,63 @@ describe("a seção dos itens", () => {
       montar({ documento: doc({ itens: [derivado("n1::criacao")] }) });
       expect(screen.queryByTestId("abrir-esteira-de-agentes")).toBeNull();
     });
+
+    /**
+     * §411 (segundo achado, na MESMA rodada) — o usuário, revendo a porta:
+     * *"gosto bastante dessa forma com as animações, os conectores eram
+     * animados... precisamos plugar aquela tela como experiência"*. O botão
+     * RODA (não só navega) e, uma vez rodando, a faixa animada
+     * (`EsteiraAoVivo`) substitui o botão — não convivem os dois.
+     */
+    it("com `esteiraAoVivo` presente, a faixa aparece NO LUGAR do botão — não junto", () => {
+      const PAPEIS = [{ id: "po", nome: "PO", ativo: true, grupo: "po" as const, contextos: [] }];
+      montar({
+        documento: doc({ itens: [derivado("n1::criacao")] }),
+        aoAbrirEsteira: vi.fn(),
+        esteiraAoVivo: { papeis: PAPEIS, papelAtual: "po", concluida: false },
+      });
+
+      expect(screen.getByTestId("esteira-ao-vivo")).toBeInTheDocument();
+      expect(screen.queryByTestId("abrir-esteira-de-agentes")).toBeNull();
+    });
+
+    it("concluída, a mensagem de sucesso aparece com o botão 'rodar de novo'", () => {
+      const aoAbrirEsteira = vi.fn();
+      const PAPEIS = [{ id: "po", nome: "PO", ativo: true, grupo: "po" as const, contextos: [] }];
+      montar({
+        documento: doc({ itens: [derivado("n1::criacao")] }),
+        aoAbrirEsteira,
+        esteiraAoVivo: { papeis: PAPEIS, papelAtual: null, concluida: true },
+      });
+
+      expect(screen.getByText(/a esteira terminou/)).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("rodar-esteira-de-novo"));
+      expect(aoAbrirEsteira).toHaveBeenCalled();
+    });
+
+    it("com erro, mostra o motivo — e não finge que terminou", () => {
+      const PAPEIS = [{ id: "po", nome: "PO", ativo: true, grupo: "po" as const, contextos: [] }];
+      montar({
+        documento: doc({ itens: [derivado("n1::criacao")] }),
+        aoAbrirEsteira: vi.fn(),
+        esteiraAoVivo: { papeis: PAPEIS, papelAtual: null, concluida: false, erro: "gateway indisponível" },
+      });
+
+      expect(screen.getByTestId("erro-da-esteira-ao-vivo")).toHaveTextContent("gateway indisponível");
+      expect(screen.queryByText(/a esteira terminou/)).toBeNull();
+    });
+
+    it("a porta secundária pro canvas técnico aparece do lado do botão principal", () => {
+      const aoAbrirEsteiraNoCanvas = vi.fn();
+      montar({
+        documento: doc({ itens: [derivado("n1::criacao")] }),
+        aoAbrirEsteira: vi.fn(),
+        aoAbrirEsteiraNoCanvas,
+      });
+
+      fireEvent.click(screen.getByTestId("abrir-esteira-no-canvas"));
+      expect(aoAbrirEsteiraNoCanvas).toHaveBeenCalled();
+    });
   });
 });
 

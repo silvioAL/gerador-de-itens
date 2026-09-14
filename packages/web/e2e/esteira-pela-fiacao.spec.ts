@@ -146,6 +146,64 @@ test("SPEC-107 G5c — o canvas roda a esteira da demanda aberta, ao vivo", asyn
 });
 
 /**
+ * SPEC-112 §411 — **a esteira, ao vivo, PLUGADA NO DOCUMENTO.**
+ *
+ * Achado do usuário testando a SPEC-112: Derivar Quebra levava direto ao
+ * documento sem porta nenhuma pra esteira, e — corrigido isso — o botão
+ * "tímido" não entregava a experiência que ele lembrava de versões
+ * anteriores: *"gosto bastante dessa forma com as animações, os conectores
+ * eram animados... precisamos plugar aquela tela como experiência"*.
+ *
+ * O que só o navegador prova: clicar a porta no documento RODA a esteira
+ * (não só navega), a faixa de papéis (`EsteiraAoVivo`) anima o handoff entre
+ * eles com o MESMO stream que o canvas usa, e ao terminar os campos do item
+ * já refletem o que os agentes escreveram — sem sair do documento.
+ */
+test("SPEC-112 §411 — o documento roda a esteira ao vivo, com a faixa animada dos papéis", async ({ page }) => {
+  test.setTimeout(120000);
+  await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
+  await entrar(page);
+
+  await abrirModeloIa(page);
+  const card = page.getByTestId("modelo-ia-gateway");
+  await card.getByLabel("Base URL do gateway").fill(BASE_URL_GATEWAY_FALSO);
+  await card.getByLabel("Chave de API").fill(CHAVE_GATEWAY_FALSO);
+  await card.getByLabel("Nome do modelo").fill(MODELO_GATEWAY_FALSO);
+  await card.getByLabel("Este modelo enxerga imagem").check();
+  await card.getByRole("button", { name: "Salvar" }).click();
+  await expect(page.getByTestId("gateway-resultado")).toContainText("Credencial salva");
+  await page.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
+
+  await page.getByRole("button", { name: "+ Fila Rabbit" }).click();
+  await page.locator(".react-flow__node", { hasText: "Fila Rabbit" }).click();
+  const painel = page.locator("aside");
+  await painel.getByRole("textbox", { name: "Nome da fila" }).fill("esteira.no.documento.q");
+  await painel.getByRole("checkbox", { name: "Durable" }).check();
+  await painel.getByRole("combobox", { name: "Tipo de fila" }).selectOption("quorum");
+  await painel.getByRole("spinbutton", { name: "TTL da mensagem (ms)" }).fill("60000");
+  await painel.getByRole("combobox", { name: "Ack" }).selectOption("manual");
+
+  // ── Derivar leva direto ao documento (G5c-3) — SEM passar pelo canvas ──
+  await page.locator('[data-tour="derivar-button"]').click();
+  await page.getByLabel("ex.: Fatura mensal em lote").fill(`Esteira no documento ${Date.now()}`);
+  await page.getByTestId("assistente-balao-confirmar").click();
+  await expect(page.getByTestId("documento-screen")).toBeVisible({ timeout: 20000 });
+
+  // ── A porta RODA, não só navega: a faixa aparece no lugar do botão ──
+  await page.getByTestId("abrir-esteira-de-agentes").click();
+  await expect(page.getByTestId("esteira-ao-vivo")).toBeVisible({ timeout: 15000 });
+  await expect(page.getByTestId("handoff-po")).toBeVisible();
+
+  // ── Conclui, e os campos do item já refletem o que os agentes escreveram ──
+  await expect(page.getByText(/a esteira terminou/)).toBeVisible({ timeout: 60000 });
+  await expect(page.getByTestId("item-corpo-0")).toBeVisible();
+  await expect(page.getByTestId("item-sem-escrita-0")).toHaveCount(0);
+
+  // E "rodar de novo" está ali — não é um beco.
+  await expect(page.getByTestId("rodar-esteira-de-novo")).toBeVisible();
+});
+
+/**
  * SPEC-109 fatia A — **"editar uma cópia" deixou de ser porta sem volta.**
  *
  * O caso real que originou a fatia: uma cópia da esteira salva ANTES da G5

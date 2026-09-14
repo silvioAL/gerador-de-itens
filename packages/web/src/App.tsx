@@ -60,6 +60,9 @@ import {
   type ResultadoDaExportacao,
   apiQuebras,
   type ItemGerado,
+  // §411 — a experiência ao vivo da esteira, plugada no documento.
+  PAPEIS_PADRAO,
+  type EventoDaExecucao,
   apiStacks,
   apiExportador,
   type SugestoesDeStack,
@@ -1577,6 +1580,63 @@ function AppCarregado({
     navegar({ tela: "documento" });
   }
 
+  /**
+   * §411 — **a esteira, AO VIVO, plugada na experiência do documento.**
+   *
+   * Achado do usuário: *"gosto bastante dessa forma com as animações, os
+   * conectores eram animados... precisamos plugar aquela tela como
+   * experiência"* — a faixa de papéis que existia antes de a esteira virar
+   * um fluxo plugável (SPEC-107 G5c-3 matou a TELA, não o desenho dela).
+   * Reconstruída em `EsteiraAoVivo`, e alimentada pelo MESMO stream que a
+   * FluxoScreen já usa (`executarAoVivo`, SPEC-107 fatia D) — ela não
+   * inventa um segundo motor de progresso, só um segundo LUGAR pra mostrar.
+   */
+  const [esteiraAoVivo, setEsteiraAoVivo] = useState<{
+    papelAtual: string | null;
+    textos: Record<string, string>;
+    concluida: boolean;
+    erro?: string;
+  } | null>(null);
+  const papeisDaEsteira = (pipelineAgentes.papeis ?? PAPEIS_PADRAO).filter((p) => p.ativo);
+
+  async function rodarEsteiraAoVivo() {
+    const quebraId = persistencia.quebraId;
+    if (!quebraId) return;
+    const idsDosPapeis = new Set(papeisDaEsteira.map((p) => p.id));
+    setEsteiraAoVivo({ papelAtual: null, textos: {}, concluida: false });
+    const aoEventoDaEsteira = (evento: EventoDaExecucao) => {
+      if (evento.tipo === "no-comecou" && idsDosPapeis.has(evento.noId)) {
+        setEsteiraAoVivo((v) => ({ papelAtual: evento.noId, textos: v?.textos ?? {}, concluida: false }));
+      } else if (evento.tipo === "texto" && idsDosPapeis.has(evento.noId)) {
+        setEsteiraAoVivo((v) => ({
+          papelAtual: v?.papelAtual ?? evento.noId,
+          concluida: false,
+          textos: { ...(v?.textos ?? {}), [evento.noId]: `${v?.textos?.[evento.noId] ?? ""}${evento.pedaco}` },
+        }));
+      }
+    };
+    try {
+      await apiExecucaoDeFluxo.executarAoVivo(ID_DO_FLUXO_DA_ESTEIRA, quebra.time ?? timeAtivo, undefined, aoEventoDaEsteira, {
+        demanda: { demandaId: quebraId },
+      });
+      setEsteiraAoVivo((v) => ({ papelAtual: null, textos: v?.textos ?? {}, concluida: true }));
+      // A esteira ESCREVEU no servidor (§411 já corrigiu o PUT que persiste
+      // a derivação; isto aqui é o passo seguinte, que sempre foi assíncrono
+      // por natureza) — a tela precisa refletir o que chegou, sem esperar o
+      // efeito de recarga (que não dispara: nem `mostrarDocumento` nem
+      // `quebraId` mudaram, a pessoa nunca saiu do documento).
+      setItensGerados(await apiItensGerados.listar(quebraId));
+      itensLocaisSaoAVerdadeParaRef.current = quebraId;
+    } catch (e) {
+      setEsteiraAoVivo((v) => ({
+        papelAtual: null,
+        textos: v?.textos ?? {},
+        concluida: false,
+        erro: e instanceof Error ? e.message : String(e),
+      }));
+    }
+  }
+
   const opcoesTour = {
     cenarios,
     carregarCenario: (q: Quebra) => aoAbrir(q),
@@ -2640,8 +2700,22 @@ function AppCarregado({
           // §411 — achado real: derivar leva direto ao documento com os
           // campos em branco, e quem os preenche (a esteira) não tinha porta
           // nenhuma partindo daqui — o mesmo defeito que a SPEC-112 nomeou
-          // pra mesa (M6), agora fechado no documento também.
-          aoAbrirEsteira={() => navegar({ tela: "fluxo", fluxoId: ID_DO_FLUXO_DA_ESTEIRA })}
+          // pra mesa (M6), agora fechado no documento também. O clique RODA
+          // ao vivo (não só navega): é a experiência que o usuário pediu de
+          // volta, plugada na execução de verdade.
+          aoAbrirEsteira={() => void rodarEsteiraAoVivo()}
+          aoAbrirEsteiraNoCanvas={() => navegar({ tela: "fluxo", fluxoId: ID_DO_FLUXO_DA_ESTEIRA })}
+          esteiraAoVivo={
+            esteiraAoVivo
+              ? {
+                  papeis: papeisDaEsteira,
+                  papelAtual: esteiraAoVivo.papelAtual,
+                  concluida: esteiraAoVivo.concluida,
+                  atividadeAtual: esteiraAoVivo.papelAtual ? esteiraAoVivo.textos[esteiraAoVivo.papelAtual] : undefined,
+                  erro: esteiraAoVivo.erro,
+                }
+              : null
+          }
           /**
            * SPEC-69 §4.4 — o débito assumido chega a quem APROVA o desenho.
            *

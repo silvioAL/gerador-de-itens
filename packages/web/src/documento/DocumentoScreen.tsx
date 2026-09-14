@@ -19,8 +19,9 @@ import type {
 import { assinarSugestao, pendenciasDaRevisao, placeholdersDaFicha, respostaConfirmada } from "@gerador/aplicacao";
 import { Canvas } from "../canvas/Canvas";
 import { useDiagrama, type AplicarNoDiagrama } from "../state/useDiagrama";
-import type { ItemGerado, ResultadoDaExportacao } from "../api/client";
+import type { ItemGerado, PapelConfigurado, ResultadoDaExportacao } from "../api/client";
 import { EscritaDoItem } from "./EscritaDoItem";
+import { EsteiraAoVivo } from "./EsteiraAoVivo";
 
 /**
  * SPEC-58 — a tela do DOCUMENTO DE DESENHO (`#/documento`).
@@ -139,8 +140,24 @@ export interface DocumentoScreenProps {
    * e não diz por onde sair disso: a esteira fica INACESSÍVEL, quando devia
    * ficar antes do documento na jornada (a tese da SPEC-112). Ausente = o
    * botão não aparece — mesma disciplina das outras portas condicionais.
+   *
+   * O clique RODA a esteira ao vivo (não só navega) — é a experiência que o
+   * usuário pediu de volta (a faixa animada de `EsteiraAoVivo`). Quem quer o
+   * canvas técnico (o desenho da fiação, para editar ou depurar) tem
+   * `aoAbrirEsteiraNoCanvas` ao lado, como porta secundária.
    */
   aoAbrirEsteira?: () => void;
+  aoAbrirEsteiraNoCanvas?: () => void;
+  /** O estado da execução ao vivo desta sessão — `null` quando ninguém pediu
+   * pra rodar ainda. `papeis` vem do App (a config do pipeline, a mesma que
+   * `fluxoDaEsteira` usa pra montar os nós de agente, na mesma ordem). */
+  esteiraAoVivo?: {
+    papeis: PapelConfigurado[];
+    papelAtual: string | null;
+    concluida: boolean;
+    atividadeAtual?: string;
+    erro?: string;
+  } | null;
 }
 
 /**
@@ -230,6 +247,8 @@ export function DocumentoScreen({
   fichas,
   onResponderItem,
   aoAbrirEsteira,
+  aoAbrirEsteiraNoCanvas,
+  esteiraAoVivo,
 }: DocumentoScreenProps) {
   const { violacoes, aceitas, violacoesDePercurso, naoMedidos, percursos, violacoesDeForma, formaAceitas } =
     documento.conferencias;
@@ -454,6 +473,8 @@ export function DocumentoScreen({
           fichas={fichas}
           onResponderItem={onResponderItem}
           aoAbrirEsteira={aoAbrirEsteira}
+          aoAbrirEsteiraNoCanvas={aoAbrirEsteiraNoCanvas}
+          esteiraAoVivo={esteiraAoVivo}
         />
       </article>
     </div>
@@ -818,6 +839,8 @@ function SecaoDosItens({
   fichas,
   onResponderItem,
   aoAbrirEsteira,
+  aoAbrirEsteiraNoCanvas,
+  esteiraAoVivo,
 }: {
   derivados: ItemDoDocumento[];
   escritos: ItemGerado[];
@@ -827,6 +850,14 @@ function SecaoDosItens({
   fichas?: Map<string, FichaItem>;
   onResponderItem?: (itemChave: string, chavePlaceholder: string, resposta: ValorSpec) => void;
   aoAbrirEsteira?: () => void;
+  aoAbrirEsteiraNoCanvas?: () => void;
+  esteiraAoVivo?: {
+    papeis: PapelConfigurado[];
+    papelAtual: string | null;
+    concluida: boolean;
+    atividadeAtual?: string;
+    erro?: string;
+  } | null;
 }) {
   const [exportando, setExportando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoDaExportacao | null>(null);
@@ -900,12 +931,57 @@ function SecaoDosItens({
        * é justamente no caso "nada escrito ainda" que a porta faz mais falta,
        * e uma condição presa a `itens-resumo` (que só aparece com escritos)
        * a escondia bem no momento em que o achado aconteceu.
+       *
+       * Uma vez que a pessoa já pediu pra rodar (`esteiraAoVivo` existe), a
+       * FAIXA ANIMADA substitui o botão — é a experiência de volta (achado
+       * seguinte do usuário: *"gosto bastante dessa forma com as
+       * animações... precisamos plugar aquela tela como experiência"*), não
+       * um botão que ficaria "tímido" ao lado dela.
        */}
       {aoAbrirEsteira && linhas.length > 0 && !(escritos.length > 0 && prontos === escritos.length) && (
-        <div style={{ margin: "4px 0 12px" }}>
-          <button onClick={aoAbrirEsteira} style={botaoEstilo} data-testid="abrir-esteira-de-agentes">
-            ▶ rodar a esteira de agentes — preenche os campos pendentes
-          </button>
+        <div style={{ margin: "4px 0 16px" }}>
+          {esteiraAoVivo ? (
+            <div style={{ display: "grid", gap: 6 }}>
+              <EsteiraAoVivo
+                papeis={esteiraAoVivo.papeis}
+                papelAtual={esteiraAoVivo.papelAtual}
+                concluida={esteiraAoVivo.concluida}
+                atividadeAtual={esteiraAoVivo.atividadeAtual}
+              />
+              <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 11.5 }}>
+                {esteiraAoVivo.erro ? (
+                  <span style={{ color: "var(--vermelho)" }} data-testid="erro-da-esteira-ao-vivo">
+                    a esteira parou: {esteiraAoVivo.erro}
+                  </span>
+                ) : esteiraAoVivo.concluida ? (
+                  <span style={{ color: "var(--verde)" }}>✓ a esteira terminou — os campos abaixo já refletem o que ela escreveu</span>
+                ) : (
+                  <span style={{ color: "var(--texto-mudo)" }}>rodando ao vivo — os campos abaixo atualizam quando ela terminar</span>
+                )}
+                {(esteiraAoVivo.concluida || esteiraAoVivo.erro) && (
+                  <button onClick={aoAbrirEsteira} style={linkEstilo} data-testid="rodar-esteira-de-novo">
+                    rodar de novo
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <button
+                onClick={aoAbrirEsteira}
+                style={{ ...botaoEstilo, ...botaoPrimarioEstilo, fontSize: 13.5, padding: "10px 18px", fontWeight: 700 }}
+                data-testid="abrir-esteira-de-agentes"
+              >
+                ▶ Rodar a esteira de agentes
+              </button>
+              <span style={{ fontSize: 11.5, color: "var(--texto-mudo)" }}>preenche os campos pendentes, ao vivo</span>
+              {aoAbrirEsteiraNoCanvas && (
+                <button onClick={aoAbrirEsteiraNoCanvas} style={linkEstilo} data-testid="abrir-esteira-no-canvas">
+                  ver a fiação no canvas →
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 

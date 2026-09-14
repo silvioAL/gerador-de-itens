@@ -18635,3 +18635,51 @@ condicional; E2E reescrito em `itens-no-documento.spec.ts` provando a
 persistência de verdade contra o servidor, sob uma corrida forçada
 (PUT atrasado de propósito); validação manual na stack de trabalho
 (`docker compose`) reproduzindo o relato original ponta a ponta.
+
+## §411 (continuação) — a experiência ao vivo, resgatada do histórico
+
+Testando a porta recém-corrigida, o usuário: *"agora encontrei, mas é um
+botão 'tímido'! ... em versões anteriores existia uma tela muito bonita e
+animada nesse fluxo ... na época que não era um fluxo plugável ... gosto
+bastante dessa forma com as animações, os conectores eram animados ...
+precisamos plugar aquela tela como experiência"*.
+
+**O componente existia — no histórico.** `git log --diff-filter=D` achou
+`review/EsteiraAgentes.tsx`, morto no MESMO commit que matou a tela de
+revisão inteira (SPEC-107 G5c-3, "a última linha da tabela fecha"). O
+desenho dele — faixa de papéis em sequência, seta com um token deslizando a
+cada handoff (`@keyframes handoff-hop`), tick de conclusão por etapa — não
+tinha nada de específico à tela morta; foi a ARQUITETURA que mudou (a
+esteira virou fluxo plugável, com nós e execução assistível), não a
+qualidade do visual que valia a pena guardar. As duas animações CSS
+(`.handoff-hop-token`, `.handoff-tick-ativo`) continuavam intocadas em
+`styles.css` — nunca foram removidas, só ficaram sem quem as usasse.
+
+**Resgatado, e PLUGADO na execução de verdade.** `EsteiraAoVivo.tsx` recria
+o desenho, mas trocando as props simuladas por dados do stream real
+(`executarAoVivo`, SPEC-107 fatia D — o MESMO que a FluxoScreen já usa): o
+papel "ativo" vem de `no-comecou`, o texto vem de `texto` (streamando),
+"feito" vem de ter ficado pra trás no índice OU de `concluida`. Nenhum motor
+de progresso novo — só um segundo lugar pra mostrar o que o primeiro já
+sabe.
+
+**O botão virou o gesto, não um link.** Clicar em "▶ Rodar a esteira de
+agentes" agora RODA ali mesmo (App.tsx ganhou `rodarEsteiraAoVivo`, calcando
+o mesmo padrão de `ensaiarPelaFiacao`/`exportarPelaFiacao`): a faixa
+substitui o botão enquanto roda, mostra "✓ terminou" com "rodar de novo" ao
+fim, e os itens do documento atualizam sozinhos (mesmo `apiItensGerados.
+listar` do achado anterior) — sem sair da tela, sem re-navegar. Quem quer o
+canvas técnico (editar a fiação, depurar) ganhou uma porta secundária, ao
+lado, sem competir com a principal.
+
+**Provas**: 5 de unidade em `EsteiraAoVivo.test.tsx` (repouso, papel ativo,
+concluída sem depender do índice bater no último, subtítulo cai pra
+descrição sem atividade), 5 novas em `DocumentoScreen.test.tsx` (a faixa
+substitui o botão, não convive com ele; sucesso e "rodar de novo"; erro
+mostrado sem fingir conclusão; a porta secundária do canvas), e um E2E
+contra o dublê de verdade em `esteira-pela-fiacao.spec.ts` provando o
+caminho inteiro — Derivar → documento → clicar a porta → a faixa anima →
+termina → o item já tem o texto que os agentes escreveram — sem passar pelo
+canvas em nenhum momento. Validação visual manual (screenshots) contra a
+stack de trabalho confirmou o handoff pulsando entre PO → Arquiteto →
+Especialista técnico antes de escrever qualquer teste.
