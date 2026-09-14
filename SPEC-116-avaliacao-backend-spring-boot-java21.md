@@ -90,50 +90,85 @@ importantes com essa resposta, não menos.
 
 ## 5. O que esta avaliação RECOMENDA
 
-**A pergunta 1 abaixo está respondida (ver acima). As demais continuam em
-aberto — não iniciar a reescrita sem respondê-las:**
+**As perguntas 1, 2 e 3 abaixo estão respondidas. A 4 continua em aberto —
+não iniciar a reescrita sem respondê-la:**
 
 1. ~~Por quê, especificamente~~ — **respondido: adoção organizacional
    ("padrão da empresa"), não performance nem lacuna técnica.**
-2. **`engine`/`aplicacao` migram, viram serviço à parte, ou o servidor Java
-   os chama por rede?** — a decisão do §2, e ela é estrutural, não de
-   detalhe. **Sem resposta ainda, e agora mais urgente**: se o destino é uma
-   empresa com padrão Java, faz pouco sentido a organização herdar um
-   componente TypeScript (`engine`/`aplicacao`) que continua sendo a maior
-   parte da lógica — o motivo dado no §4 empurra para migrar TUDO, não só
-   `server`.
-3. **Escopo do "backend"**: é só `server` (rotas HTTP, Postgres), ou inclui
-   `llm` (gateway de IA) e a orquestração da esteira? Cada um tem
-   dependências e formato de teste diferentes.
+2. ~~`engine`/`aplicacao` migram, viram serviço à parte, ou o servidor Java
+   os chama por rede?~~ — **respondido, e na direção mais radical das três**:
+   *"o que é backend precisa ir para o serviço Spring, não quero motor e
+   outras coisas rodando em front, o front deve ser só o que deveria ser."*
+   Não é só "engine migra para Java" — é **"o navegador para de rodar o
+   motor"**. Ver §5.1 abaixo: isso muda a UX de hoje, e a mudança precisa
+   estar visível antes de alguém começar a implementar achando que é só
+   trocar a linguagem do servidor.
+3. ~~Escopo do "backend"~~ — **respondido: tudo (`server` + `llm` +
+   orquestração da esteira).** Sem partes híbridas permanentes em Node.
 4. **Uma fatia piloto**, não o todo: migrar a superfície MAIS ISOLADA
-   primeiro (candidato: as rotas de configuração, que são as mais parecidas
-   com CRUD simples) e medir o custo real de UMA fatia antes de comprometer
-   o resto — a mesma disciplina que a SPEC-55 usou para avaliar o Forge.
+   primeiro e medir o custo real de UMA fatia antes de comprometer o resto —
+   a mesma disciplina que a SPEC-55 usou para avaliar o Forge. **Ainda sem
+   candidato escolhido** — ver §5.2 para opções.
+
+### 5.1 ⚠️ A consequência que a resposta 2 traz, e que precisa estar visível antes de implementar
+
+Hoje `derivar()`, `gerarSpec()`, `gerarItensDeTrabalho()` e o resto do motor
+rodam **no navegador, dentro de `useMemo`, síncronos** — é o que dá o
+preview instantâneo da mesa (editar um nó e ver o diagrama/documento
+reagir na hora, sem round-trip de rede). É a arquitetura que o `App.tsx`
+inteiro pressupõe hoje, em dezenas de lugares.
+
+**Com o motor só no Spring, toda essa reação instantânea vira chamada de
+rede.** Não é detalhe de implementação — é uma mudança de UX que precisa ser
+decidida conscientemente, com uma das saídas (nenhuma é de graça):
+
+| Saída | Custo |
+|---|---|
+| **Chamar o backend a cada edição** (debounced) | Introduz espera onde hoje não existe nenhuma — o preview deixa de ser instantâneo |
+| **Otimista + reconciliação** (mostra local, confirma depois) | Mais trabalho de engenharia; exige decidir o que fazer quando backend e preview local divergem |
+| **Motor client-side FINO, só para preview visual** (não decide nada, só refletir) | Parece contradizer *"não quero motor rodando em front"* — precisa confirmar se isto conta como "motor" ou como "renderização" |
+
+**Esta SPEC não escolhe entre as três** — é decisão de produto, não só de
+arquitetura, porque muda como a ferramenta SE SENTE ao usar. Precisa ser
+respondida antes da fatia D (§7), não durante.
+
+### 5.2 Candidatos à fatia piloto, para escolher
+
+- **Rotas de configuração** (`config.ts`) — mais parecidas com CRUD simples,
+  menor superfície de regra de negócio.
+- **`leitorDeAdr`/`escritorDeAdr`/`publicadorDeDocumento`** (SPEC-81) — já
+  são portas isoladas, com contrato de teste próprio, sem tocar no motor de
+  derivação.
+- **Autenticação/sessão** — toca em segurança cedo, o que tem valor de medir
+  logo, mas é código sensível para ser o primeiro experimento.
 
 ## 6. O que esta SPEC RECUSA
 
-- **Estimar prazo ou fatiar a migração inteira sem resposta às perguntas 2-4
-  do §5** (a 1 já está respondida). Um cronograma sem saber o escopo real
-  (§5.2/§5.3) é ficção.
-- **Presumir que "backend" exclui `engine`/`aplicacao`.** Já demonstrado no
-  §2 que são a maior parte do que o servidor executa.
+- **Estimar prazo ou fatiar a migração inteira sem escolher a fatia piloto
+  (§5, pergunta 4).** Um cronograma sem saber por onde começar é ficção.
+- **Implementar a fatia do motor (fatia E, §7) sem decidir o §5.1 antes.**
+  Migrar o motor para o Spring SEM decidir o que substitui o preview
+  instantâneo faria a mesa parecer quebrada (lenta, travando a cada tecla)
+  em vez de faltando uma decisão de UX tomada.
 - **Migrar reescrevendo do zero em vez de traduzindo com os testes de
   contrato como especificação.** As suítes de contrato já são, na prática,
   a especificação executável de cada porta — usá-las como alvo de paridade
   (rodar a MESMA suíte, adaptada, contra a implementação Java) é mais barato
   e mais seguro que reescrever e confiar na leitura humana do código antigo.
 
-## 7. Com o motivo já respondido — as fatias prováveis
+## 7. Com o motivo, o escopo e o destino do motor já respondidos — as fatias
 
-Não fatiado em detalhe (depende das respostas 2-4 do §5, ainda em aberto),
-mas a forma esperada:
-
-- **A — decidir e documentar as respostas 2-4 do §5** (a 1 já está feita).
+- **A — escolher a fatia piloto** (§5.2) e decidir a saída do §5.1 (a UX do
+  preview sem motor local) — as duas decisões que faltam antes de qualquer
+  código.
 - **B — a fatia piloto**, com prova de paridade via suíte de contrato
   adaptada, rodando em paralelo ao servidor Node (não substituindo ainda).
 - **C — medir o custo real da fatia piloto** (tempo, linhas, bugs de
-  paridade encontrados) antes de decidir se as fatias seguintes têm o mesmo
-  tamanho relativo do que o `server` sozinho sugeriria.
-- **D — a fatia de `engine`/`aplicacao`**, na forma que o §5.2 decidir —
-  provavelmente a mais cara e a mais arriscada de todas, por ser a que este
-  projeto está estruturado, desde o início, para NÃO ter duplicada.
+  paridade encontrados) antes de comprometer o resto do cronograma.
+- **D — o resto de `server`/`llm`/esteira**, na ordem que o custo medido em
+  C sugerir.
+- **E — `engine`/`aplicacao` para o Spring, e o navegador para de rodar o
+  motor.** A mais cara e a mais arriscada de todas — é a que este projeto
+  estava estruturado, desde o início, para NÃO ter duplicada (§1), e agora
+  também muda a UX da mesa (§5.1). Fatia própria, por último, não incluída
+  na fatia piloto.

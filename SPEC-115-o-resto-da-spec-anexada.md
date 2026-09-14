@@ -184,8 +184,10 @@ onde a pessoa já está, não impedir que ela chegue lá.
   `RiscosMedidos`/ensaios. Prova análoga.
 - **C — o rótulo muda de texto conforme a origem** (derivado × fallback
   manual quando não há nada para derivar).
-- **D — o adaptador com atraso simulado** para `specDoItem` (e candidatável
-  para `itens`), marcado como modo de demonstração na tela de configuração.
+- **D — o modo de demonstração com atraso simulado.** Uma flag no destino
+  existente (`specDoItem`/`itens`), não uma `operacao` nova — ver §4.2.
+  Marcado como demonstração na tela de configuração, no espírito do "modo
+  sem custo" (SPEC-74).
 - **E — o pipeline por item, persistido.** Estado sobrevive a F5; a tela lê
   de onde parou, não recomeça.
 - **F — a conversa de mapeamento por componente** (§1.1.1) — **prioridade
@@ -203,10 +205,15 @@ onde a pessoa já está, não impedir que ela chegue lá.
 - **H — o motivo do "Exportar" desabilitado fica visível na tela de
   revisão**, antes de ir ao documento — não um bloqueio, um aviso.
 
-## 4. Perguntas em aberto para quem implementar
+## 4. Perguntas respondidas pelo usuário, na revisão desta SPEC
 
-1. **Riscos deriva de ensaios OU de uma nova categoria de `Decisao`
-   marcada como risco?** Não medido — vale olhar o que `RiscosMedidos` já
-   mostra hoje antes de escolher.
-2. **O adaptador com atraso é um destino novo (`operacao` extra) ou uma
-   flag no destino existente?** Repetir a régua da SPEC-74 antes de decidir.
+1. **Riscos deriva de quê?** → **Ensaios/débito assumido** (`RiscosMedidos`,
+   já mostrado hoje abaixo da seção) — não uma categoria nova de `Decisao`.
+   Ajusta a fatia B (§3): a fonte é só `ensaios`/débito, sem schema novo.
+2. **O adaptador com atraso é destino novo ou flag?** → **Flag no destino
+   existente.** Ajusta a fatia D (§3): não cria uma `operacao` nova em
+   `OPERACOES_DO_GATEWAY` — acrescenta algo como `demonstracao?: boolean` (ou
+   nome equivalente) em `DestinoDoGateway`, reaproveitando a tela e a
+   configuração de `itens`/`specDoItem` que já existem. Mesmo espírito do
+   "modo sem custo" (SPEC-74): o modo é uma variação de configuração, não um
+   caminho novo no código.
