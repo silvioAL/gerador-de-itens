@@ -2117,19 +2117,39 @@ function AppCarregado({
             persistencia.quebraId
               ? async () => {
                   // SPEC-114 §2.2 — cada item tem a SUA spec: a mesma função
-                  // pura (`gerarSpec`), chamada uma vez por item coberto, com
-                  // `itens` recortado só para ele — não uma cópia da spec da
-                  // demanda inteira mandada N vezes.
-                  const especsPorItem = coberturaDaSpecAtual.cobertas.map((atividade) => ({
-                    chave: atividade.chave,
-                    conteudo: gerarSpec({
-                      titulo: quebra.titulo?.trim() || "Spec",
-                      escrita: specDaDemanda,
-                      contexto: [contextoDoProduto, quebra.demandInfo].filter((t) => t?.trim()).join("\n\n"),
-                      medicao: documentoDaDemanda.saude.filter((s) => s.lado === "atencao").map((s) => s.rotulo),
-                      itens: [atividade],
-                    }),
-                  }));
+                  // pura (`gerarSpec`), chamada uma vez por item, com `itens`
+                  // recortado só para ele — não uma cópia da spec da demanda
+                  // inteira mandada N vezes.
+                  //
+                  // ACHADO REAL (validação manual, §114): a primeira escrita
+                  // filtrava por `coberturaDaSpecAtual.cobertas` — os itens
+                  // que a pessoa tinha marcado no checkbox "cobertos pela
+                  // spec" (`itensCobertos`, seção separada). O botão, porém,
+                  // aparece com base em OUTRO critério (`pendentesDeSpec`:
+                  // exportado e ainda sem spec). As duas contas divergiam: um
+                  // item exportado que ninguém tinha marcado como "coberto"
+                  // fazia o botão aparecer e mandar `{ itens: [] }` — 400 sem
+                  // explicação nenhuma. O que o botão promete é o que ele
+                  // manda: todo item já exportado e sem spec, sem depender de
+                  // uma segunda declaração em outro lugar da tela.
+                  const pendentes = itensGerados.filter((i) => i.linkExterno && !i.specAnexada);
+                  const porChave = new Map(atividadesDoDocumento.map((a) => [a.chave, a]));
+                  const especsPorItem = pendentes.flatMap((item) => {
+                    const atividade = porChave.get(item.chave);
+                    if (!atividade) return [];
+                    return [
+                      {
+                        chave: item.chave,
+                        conteudo: gerarSpec({
+                          titulo: quebra.titulo?.trim() || "Spec",
+                          escrita: specDaDemanda,
+                          contexto: [contextoDoProduto, quebra.demandInfo].filter((t) => t?.trim()).join("\n\n"),
+                          medicao: documentoDaDemanda.saude.filter((s) => s.lado === "atencao").map((s) => s.rotulo),
+                          itens: [atividade],
+                        }),
+                      },
+                    ];
+                  });
                   const r = await apiItensGerados.anexarSpec(persistencia.quebraId!, especsPorItem);
                   setItensGerados(await apiItensGerados.listar(persistencia.quebraId!));
                   return r;
