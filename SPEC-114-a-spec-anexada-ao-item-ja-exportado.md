@@ -194,9 +194,20 @@ quem fala o protocolo.
   (aparece só quando há item exportado sem spec), selo "spec anexada" por
   card, cada item com sua PRÓPRIA spec (`gerarSpec` chamado uma vez por
   atividade coberta, não uma cópia da spec da demanda). **Prova:** build
-  limpo, E2E real contra a stack Docker rebuildada confirma que o botão só
-  aparece depois que a primeira chamada deu link — a dependência entre as
-  duas chamadas se cumpre pelo servidor real, não só pela tela.
+  limpo; a dependência entre as duas chamadas (sem link, sem botão) e a
+  recusa por lacuna já têm prova exaustiva contra Postgres real na fatia C.
+  - **Achado real ao escrever o E2E desta fatia**: uma primeira versão
+    configurava `PUT /config/exportador` (que faz substituição TOTAL, não
+    merge — confirmado lendo `routes/config.ts`) durante o teste. Como esse
+    endpoint é um recurso GLOBAL compartilhado por todos os specs paralelos,
+    e outro spec já existente (`adr-na-conversa.spec.ts`) depende de um
+    destino específico estar no ar bem nessa janela, a chamada nova
+    colidia e apagava o destino do outro — reproduzido 3 vezes seguidas na
+    CI (mesmo teste, mesma linha), nunca isolado localmente (sem
+    concorrência). Removido o E2E: a asserção que ele provava era fraca (só
+    "sem link, sem botão") e já está coberta pela suíte de integração — não
+    valia introduzir mais um escritor concorrente nesse recurso global só
+    para repetir uma prova que já existe.
 
 ## 5. Itens que esta spec cobre
 
