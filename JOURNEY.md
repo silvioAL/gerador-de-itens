@@ -16228,3 +16228,52 @@ dependência entre as duas chamadas se cumpre pelo servidor de verdade.
 O rótulo "escrito por uma pessoa" **não mudou ainda** — a derivação que o
 substituiria depende do painel expansível do assistente e da conversa de
 mapeamento de contexto existirem primeiro, que ficaram fora desta rodada.
+
+---
+## §408 — O botão que aparecia e não mandava nada, e duas specs pro que vem depois
+
+Validação manual (não teste automatizado) achou o defeito real do §407: o
+botão "Anexar spec aos itens" aparece com base em `pendentesDeSpec` (item
+exportado, sem spec) mas o payload enviado filtrava por `itensCobertos` — o
+checkbox SEPARADO de "esta spec cobre este item". As duas contas divergiam:
+um item exportado que ninguém tinha marcado como coberto fazia o botão
+aparecer e mandar `{ itens: [] }`, 400 sem explicação. Corrigido fazendo as
+duas contas usarem o mesmo critério — o que o botão promete é o que ele
+manda.
+
+**Achado colateral, e vale registrar por vergonha alheia:** validando isso
+contra a stack Docker real, um `taskkill //F //IM node.exe` (pra matar um
+servidor de eco de teste numa porta específica) matou TODOS os processos
+Node do sistema, incluindo o que este agente usa pro próprio canal de
+permissão — travou a sessão por alguns minutos até o mecanismo se recuperar
+sozinho. Lição: matar processo por nome quando se quer matar por PID é
+precisão desnecessária jogada fora.
+
+Testando o botão corrigido, o usuário trouxe três pontos novos e pediu
+**specs para uma conversa nova**, não implementação nesta:
+
+1. Os Trade-offs/Riscos deviam vir DERIVADOS, não de caixa em branco — e a
+   medição achou que é mais barato do que a SPEC-114 presumiu: `Decisao`
+   (alternativas, escolhida, porque) já é o material de um trade-off, sem
+   precisar do fluxo de mapeamento de contexto/assistente expandido que
+   continua em aberto.
+2. Sem endpoint real de upload disponível pra testar, a experiência (tela +
+   animação) precisa existir mesmo assim — um mock com atraso de 20s, no
+   mesmo espírito do dublê do "modo sem custo" (SPEC-74) e do
+   `gateway-falso`.
+3. O botão "Exportar" desabilitado no Documento sem dizer por quê não faz
+   sentido, já que a tela é alcançável de qualquer forma — a validação
+   precisa aparecer na tela ANTERIOR (revisão), não bloquear o documento
+   (bloquear contrariaria o §269, que tornou o documento alcançável cedo de
+   propósito).
+
+Registrado em **SPEC-115**.
+
+**E uma quarta, maior e separada**: reescrever o backend em Spring Boot/Java
+21. Virou **SPEC-116**, no molde de avaliação da SPEC-55/75 — não recusa,
+mas nomeia o que a primeira decisão registrada deste projeto (§2 desta
+jornada) já resolveu contra: `engine`/`aplicacao` (16 mil linhas) rodam HOJE
+tanto no navegador quanto no servidor, e é exatamente essa duplicação
+Java+TS que a fundação do projeto eliminou trocando pra TypeScript de ponta
+a ponta. A SPEC pergunta, antes de qualquer cronograma: o motor migra junto,
+vira serviço à parte, ou fica duplicado?
