@@ -698,6 +698,24 @@ function AppCarregado({
   // verdade é o server (persistem por quebra); o estado local é o espelho da
   // última geração/carga desta sessão.
   const [itensGerados, setItensGerados] = useState<ItemGerado[]>([]);
+  /**
+   * §411 — achado real: **o PUT que persiste os itens recém-gerados corria
+   * contra o GET que recarrega a lista, e o GET podia chegar primeiro.**
+   *
+   * `aoGerarItens` seta os itens local (otimista) e dispara `regerar` (PUT)
+   * em paralelo; o efeito logo abaixo recarrega do server (GET) sempre que
+   * `persistencia.quebraId` aparece — e ele aparece justamente quando se
+   * deriva sem título ainda (a quebra é salva ANTES de derivar, e o id novo
+   * dispara o efeito no mesmo instante em que o PUT sai). Sob rede real, o
+   * GET podia responder ANTES do PUT terminar de escrever — e "nada
+   * persistido ainda" apagava os cards que acabaram de aparecer na tela.
+   *
+   * A ref marca "para ESTA quebra, o local já é a verdade (geração recente,
+   * ou o PUT já confirmou)" — o GET de recarga (que existe para F5/deep-link/
+   * menu, onde não há PUT em voo) passa a ser dispensado enquanto ela apontar
+   * para a quebra aberta.
+   */
+  const itensLocaisSaoAVerdadeParaRef = useRef<string | null>(null);
   // SPEC-44 — deep-link da seção dos itens pra revisão: o item a selecionar.
   /**
    * SPEC-64 fatias B e C — a declaração de caminho em curso.
@@ -918,7 +936,14 @@ function AppCarregado({
   const [pedindoFeedbackPdca, setPedindoFeedbackPdca] = useState(false);
   const [textoFeedbackPdca, setTextoFeedbackPdca] = useState("");
 
-  function executarDerivacao(salvarDepois: boolean) {
+  /**
+   * §411 — `quebraIdRecente` é o id que acabou de nascer no MESMO gesto (a
+   * quebra salva um instante atrás, ainda fora do `persistencia.quebraId`
+   * desta closure — ver o comentário em `usePersistencia.salvar`). Ausente,
+   * cai no de sempre: o `persistencia.quebraId` já estável dos outros
+   * caminhos (Derivar com título, o passo do tour).
+   */
+  function executarDerivacao(salvarDepois: boolean, quebraIdRecente?: string | null) {
     apiPdca
       .uso("derivacao", timeAtivo)
       .then((r) => {
@@ -958,7 +983,8 @@ function AppCarregado({
         regras: regrasConfig,
         respostasItens: quebra.respostasItens,
         templateItem: templateItem?.conteudo,
-      })
+      }),
+      quebraIdRecente
     );
     setPedindoNomeDaDemanda(false);
     if (salvarDepois) setAutoSalvarPendente(true);
@@ -1096,12 +1122,18 @@ function AppCarregado({
     setPedindoNomeDaDemanda(false);
     if (intencao === "derivar") {
       // G5c-3 — SALVAR ANTES de derivar: derivar agora ESCREVE os itens, e
-      // eles só persistem com a quebra criada. Sem esta ordem, o efeito que
-      // lista os itens do servidor (disparado quando o id nasce, ~2s depois)
-      // respondia VAZIO e apagava os cards locais — corrida medida no E2E
-      // sob carga ("ainda não escrito" num documento recém-derivado).
-      await persistencia.salvar(comTitulo);
-      executarDerivacao(false);
+      // eles só persistem com a quebra criada.
+      //
+      // §411 — o id volta pelo RETORNO, não por `persistencia.quebraId`: esta
+      // função e `executarDerivacao` compartilham o closure de ANTES do
+      // `await`, e `setQuebraId` (dentro de `salvar`) só alcança esse
+      // closure no próximo render — que ainda não aconteceu aqui. Ler
+      // `persistencia.quebraId` neste ponto lia `null` e fazia o PUT que
+      // persiste os itens ser pulado em silêncio: eles apareciam na tela
+      // (estado local) e sumiam ao reabrir o documento, porque nada tinha
+      // sido de fato salvo.
+      const quebraId = await persistencia.salvar(comTitulo);
+      executarDerivacao(false, quebraId);
     } else setSalvarAposNome(true);
   }
 
@@ -1493,6 +1525,10 @@ function AppCarregado({
     // aqui seria perder trabalho — a limpeza de §210 mora em `aoAbrir`, que é
     // o evento "troquei de demanda".
     if (!mostrarDocumento || !persistencia.quebraId) return;
+    // §411 — geração recente (ou já confirmada pelo PUT) desta MESMA quebra:
+    // o GET não tem nada a acrescentar, e correr contra o PUT que ainda pode
+    // estar em voo é exatamente a corrida que apagava os itens na tela.
+    if (itensLocaisSaoAVerdadeParaRef.current === persistencia.quebraId) return;
     let cancelado = false;
     apiItensGerados
       .listar(persistencia.quebraId)
@@ -1514,19 +1550,27 @@ function AppCarregado({
    * `#/itens` deixou de existir, e gerar continua sendo ato da REVISÃO: o
    * documento é onde se lê o resultado, nunca onde se pede por ele.
    */
-  function aoGerarItens(itens: ItemDeTrabalho[]) {
+  function aoGerarItens(itens: ItemDeTrabalho[], quebraIdRecente?: string | null) {
+    // §411 — o id que acabou de nascer (passado explícito) vence o da
+    // closure: `persistencia.quebraId` pode não ter alcançado este render
+    // ainda, mesmo depois de um `await persistencia.salvar(...)` no chamador.
+    const quebraId = quebraIdRecente ?? persistencia.quebraId;
     const locais: ItemGerado[] = itens.map((it) => ({
       ...it,
       id: it.chave,
-      quebraId: persistencia.quebraId ?? "",
+      quebraId: quebraId ?? "",
       estado: "gerado",
       linkExterno: null,
       criadoEm: new Date().toISOString(),
     }));
     setItensGerados(locais);
-    if (persistencia.quebraId) {
+    // A partir daqui, o LOCAL manda para esta quebra: o PUT abaixo (quando
+    // existe) é quem vai persistir, e o efeito de recarga não pode correr
+    // contra ele lendo "nada ainda" no meio do caminho.
+    itensLocaisSaoAVerdadeParaRef.current = quebraId ?? null;
+    if (quebraId) {
       apiItensGerados
-        .regerar(persistencia.quebraId, itens)
+        .regerar(quebraId, itens)
         .then(setItensGerados)
         .catch(() => {});
     }
@@ -2593,6 +2637,11 @@ function AppCarregado({
               : undefined
           }
           destinoDaExportacao={destinoDaExportacao}
+          // §411 — achado real: derivar leva direto ao documento com os
+          // campos em branco, e quem os preenche (a esteira) não tinha porta
+          // nenhuma partindo daqui — o mesmo defeito que a SPEC-112 nomeou
+          // pra mesa (M6), agora fechado no documento também.
+          aoAbrirEsteira={() => navegar({ tela: "fluxo", fluxoId: ID_DO_FLUXO_DA_ESTEIRA })}
           /**
            * SPEC-69 §4.4 — o débito assumido chega a quem APROVA o desenho.
            *

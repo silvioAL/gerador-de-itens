@@ -32,24 +32,42 @@ export function usePersistencia(quebra: Quebra, aoAbrir: (q: Quebra) => void) {
   // Sem título, a quebra fica impossível de reconhecer depois numa lista —
   // nem chega a chamar a API (mesmo motivo que barra "Derivar Quebra" com
   // vermelho pendente: recusa alto, não silencioso).
+  /**
+   * §411 — **devolve o id com que a quebra ficou salva.**
+   *
+   * Achado real: quem chama `await persistencia.salvar(q)` e, na MESMA
+   * função, lê `persistencia.quebraId` em seguida, lê o valor de ANTES do
+   * `await` — `setQuebraId` agenda o estado pra um render futuro, e o
+   * closure que já estava em execução não o vê. Isso fazia a criação de
+   * itens logo após nomear uma demanda nova silenciosamente pular o PUT que
+   * os persiste (`if (persistencia.quebraId)` lia `null`) — os itens
+   * apareciam na tela só por estarem no estado local, e sumiam ao entrar de
+   * novo no documento (o GET de recarga não achava nada salvo). Devolver o
+   * id aqui deixa quem PRECISA dele imediatamente pegá-lo do retorno, sem
+   * depender do próximo render.
+   */
   const salvar = useCallback(
-    async (q: Quebra) => {
+    async (q: Quebra): Promise<string | null> => {
       if (!q.titulo?.trim()) {
         setStatus("sem-titulo");
-        return;
+        return null;
       }
       setStatus("salvando");
       try {
-        if (quebraId) {
-          await apiQuebras.atualizar(quebraId, q);
+        let id = quebraId;
+        if (id) {
+          await apiQuebras.atualizar(id, q);
         } else {
           const criada = await apiQuebras.criar(q);
-          setQuebraId(criada.id);
+          id = criada.id;
+          setQuebraId(id);
         }
         setStatus("salvo");
         void carregarLista();
+        return id;
       } catch {
         setStatus("erro");
+        return null;
       }
     },
     [quebraId, carregarLista]

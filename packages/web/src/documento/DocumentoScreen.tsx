@@ -131,6 +131,16 @@ export interface DocumentoScreenProps {
    */
   fichas?: Map<string, FichaItem>;
   onResponderItem?: (itemChave: string, chavePlaceholder: string, resposta: ValorSpec) => void;
+  /**
+   * Achado real (§411) — Derivar escreve os itens e leva direto para cá
+   * (G5c-3), mas quem preenche os campos "✍️ especificar" é a esteira de
+   * agentes — e ela só roda de quem já sabe abrir `#/fluxo/esteira-de-agentes`
+   * de cabeça. Sem esta porta, o documento chega "quase tudo por especificar"
+   * e não diz por onde sair disso: a esteira fica INACESSÍVEL, quando devia
+   * ficar antes do documento na jornada (a tese da SPEC-112). Ausente = o
+   * botão não aparece — mesma disciplina das outras portas condicionais.
+   */
+  aoAbrirEsteira?: () => void;
 }
 
 /**
@@ -219,6 +229,7 @@ export function DocumentoScreen({
   decisaoDoEnsaio,
   fichas,
   onResponderItem,
+  aoAbrirEsteira,
 }: DocumentoScreenProps) {
   const { violacoes, aceitas, violacoesDePercurso, naoMedidos, percursos, violacoesDeForma, formaAceitas } =
     documento.conferencias;
@@ -442,6 +453,7 @@ export function DocumentoScreen({
           destinoDaExportacao={destinoDaExportacao}
           fichas={fichas}
           onResponderItem={onResponderItem}
+          aoAbrirEsteira={aoAbrirEsteira}
         />
       </article>
     </div>
@@ -805,6 +817,7 @@ function SecaoDosItens({
   destinoDaExportacao,
   fichas,
   onResponderItem,
+  aoAbrirEsteira,
 }: {
   derivados: ItemDoDocumento[];
   escritos: ItemGerado[];
@@ -813,6 +826,7 @@ function SecaoDosItens({
   destinoDaExportacao?: string | null;
   fichas?: Map<string, FichaItem>;
   onResponderItem?: (itemChave: string, chavePlaceholder: string, resposta: ValorSpec) => void;
+  aoAbrirEsteira?: () => void;
 }) {
   const [exportando, setExportando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoDaExportacao | null>(null);
@@ -875,6 +889,23 @@ function SecaoDosItens({
               confirmar assina a sugestão; editar no card vira texto seu
             </span>
           </div>
+        </div>
+      )}
+
+      {/**
+       * §411 — achado real: Derivar leva direto para cá com os campos em
+       * branco ("ainda não escrito" em cada card), e quem os preenche — a
+       * esteira de agentes — não tinha porta nenhuma partindo daqui. A
+       * condição NÃO depende de já existir algo escrito (`escritos.length`):
+       * é justamente no caso "nada escrito ainda" que a porta faz mais falta,
+       * e uma condição presa a `itens-resumo` (que só aparece com escritos)
+       * a escondia bem no momento em que o achado aconteceu.
+       */}
+      {aoAbrirEsteira && linhas.length > 0 && !(escritos.length > 0 && prontos === escritos.length) && (
+        <div style={{ margin: "4px 0 12px" }}>
+          <button onClick={aoAbrirEsteira} style={botaoEstilo} data-testid="abrir-esteira-de-agentes">
+            ▶ rodar a esteira de agentes — preenche os campos pendentes
+          </button>
         </div>
       )}
 

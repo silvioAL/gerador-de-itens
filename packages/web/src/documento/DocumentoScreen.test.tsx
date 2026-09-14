@@ -298,6 +298,58 @@ describe("a seção dos itens", () => {
     // O documento NÃO gera: gerar é ato da revisão (§6.2).
     expect(within(secao).queryByRole("button", { name: /gerar/i })).toBeNull();
   });
+
+  /**
+   * §411 — achado real: Derivar leva direto ao documento com os campos em
+   * branco, e quem os preenche (a esteira de agentes) não tinha porta
+   * nenhuma partindo daqui — a pessoa só chegava lá se já soubesse de cabeça
+   * que `#/fluxo/esteira-de-agentes` existe. A régua: a porta aparece
+   * exatamente quando há algo a especificar, mesmo que NADA tenha sido
+   * escrito ainda (o caso em que a queixa foi medida) — e some quando tudo
+   * já está pronto.
+   */
+  describe("§411 — a porta para a esteira de agentes", () => {
+    it("nada foi escrito ainda (o caso da queixa): a porta aparece mesmo sem `itens-resumo`", () => {
+      const aoAbrirEsteira = vi.fn();
+      montar({
+        documento: doc({ itens: [derivado("n1::criacao")] }),
+        aoAbrirEsteira,
+      });
+
+      // O caso medido: derivar não escreveu nada, então não há `itens-resumo`
+      // (ele só aparece com `escritos.length > 0`) — e é justo aqui que a
+      // porta faz mais falta.
+      expect(screen.queryByTestId("itens-resumo")).toBeNull();
+      const porta = screen.getByTestId("abrir-esteira-de-agentes");
+      fireEvent.click(porta);
+      expect(aoAbrirEsteira).toHaveBeenCalled();
+    });
+
+    it("com pendência aberta, a porta continua visível", () => {
+      montar({
+        documento: doc({ itens: [derivado("n1::criacao")] }),
+        itensEscritos: [escrito("n1::criacao", { pendencias: 3 })],
+        aoAbrirEsteira: vi.fn(),
+      });
+
+      expect(screen.getByTestId("abrir-esteira-de-agentes")).toBeInTheDocument();
+    });
+
+    it("tudo pronto, a porta some — não há mais o que a esteira preencher", () => {
+      montar({
+        documento: doc({ itens: [derivado("n1::criacao")] }),
+        itensEscritos: [escrito("n1::criacao")],
+        aoAbrirEsteira: vi.fn(),
+      });
+
+      expect(screen.queryByTestId("abrir-esteira-de-agentes")).toBeNull();
+    });
+
+    it("sem `aoAbrirEsteira`, a porta não aparece — mesma disciplina das outras portas condicionais", () => {
+      montar({ documento: doc({ itens: [derivado("n1::criacao")] }) });
+      expect(screen.queryByTestId("abrir-esteira-de-agentes")).toBeNull();
+    });
+  });
 });
 
 describe("as seções escritas (SPEC-58 fatia 2)", () => {

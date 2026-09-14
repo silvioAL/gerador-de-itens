@@ -18583,3 +18583,55 @@ lixo no terceiro segmento não vira origem inventada), um E2E novo
 canvas→canvas, cada um com F5 no meio —, e a suíte `ensaios.spec.ts` inteira
 relida (não só re-executada) para confirmar que nenhum atalho de teste
 existente dependia do comportamento antigo do `onVoltar`.
+
+## §411 — a esteira inacessível, e o PUT que nunca disparava
+
+**Achado real, com o PR da SPEC-112 já aberto**: o usuário testou o cenário
+"Fluxo completo: aprovação de crédito" na stack de trabalho, clicou Derivar
+Quebra, e caiu no documento com quase tudo por especificar — e a esteira de
+agentes (quem preenche isso) não tinha porta nenhuma partindo dali. Relato
+literal: *"a esteira de agentes está inacessível, ela ficaria antes do
+documento"*.
+
+**Duas causas empilhadas, não uma.**
+
+1. **A porta que faltava.** `#/fluxo/esteira-de-agentes` só é alcançável de
+   cabeça (a URL) ou pelo tour (que a usa só pra narrar) — nenhum botão
+   partia do documento. Fechado com `aoAbrirEsteira` em `DocumentoScreen`: um
+   botão "▶ rodar a esteira de agentes" que aparece quando há algo a
+   especificar (mesmo com ZERO itens escritos — o caso do achado, onde
+   `itens-resumo` nem chega a renderizar) e some quando tudo já está pronto.
+
+2. **Um bug de closure obsoleta, bem mais sério.** Investigando por que o
+   documento chegava "quase tudo por especificar" mesmo com a porta corrigida,
+   medi contra a stack de trabalho (não só o E2E): o PUT que persiste os itens
+   gerados (`apiItensGerados.regerar`) **nunca disparava** quando a demanda
+   era nomeada na hora de derivar (o balão "qual o nome da demanda?"). Causa:
+   `confirmarNome` fazia `await persistencia.salvar(comTitulo)` e, na mesma
+   função, lia `persistencia.quebraId` em seguida — mas esse closure é o de
+   ANTES do `await`, e `setQuebraId` (dentro de `salvar`) só alcança um
+   RENDER futuro. `persistencia.quebraId` continuava `null` na leitura, o
+   `if (persistencia.quebraId)` que dispara o PUT nunca era verdadeiro, e os
+   itens existiam só como estado local — nunca chegavam ao banco. Corrigido
+   fazendo `usePersistencia.salvar` **devolver o id** com que salvou, e
+   `confirmarNome`/`executarDerivacao`/`aoGerarItens` passarem esse id
+   explícito adiante em vez de reler o closure obsoleto. Um guard adicional
+   (`itensLocaisSaoAVerdadeParaRef`) evita que o efeito de recarga (GET,
+   pensado para F5/deep-link/menu) sobrescreva com "nada ainda" os itens que
+   acabaram de ser gerados nesta mesma sessão.
+
+**A prova de unidade errada quase passou por real.** A primeira versão do
+E2E de regressão contava `item-gerado-N` — um card que SEMPRE existe (vem da
+derivação client-side, sem round-trip) e diz "ainda não escrito" tanto com o
+bug quanto sem ele. Sabotar a correção de propósito (revertê-la por um
+instante) e rodar o teste é o que expôs isso: ele continuava verde com o bug
+de volta. Reescrito para checar `item-corpo-0` (só existe com ESCRITA
+confirmada) e, na prova final, o servidor diretamente (`GET
+/quebras/:id/itens`) — aí sim a sabotagem faz o teste cair, e a correção o
+sobe de novo.
+
+**Provas**: 4 de unidade em `DocumentoScreen.test.tsx` para a porta
+condicional; E2E reescrito em `itens-no-documento.spec.ts` provando a
+persistência de verdade contra o servidor, sob uma corrida forçada
+(PUT atrasado de propósito); validação manual na stack de trabalho
+(`docker compose`) reproduzindo o relato original ponta a ponta.

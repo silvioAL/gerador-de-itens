@@ -2,6 +2,8 @@ import { test, expect } from "@playwright/test";
 import { entrar } from "./auth";
 import { derivarNaMesa } from "./derivar";
 
+const API = "http://localhost:4100";
+
 /**
  * SPEC-41 Parte B, revisada pela SPEC-61 — o ciclo dos itens de trabalho visto
  * no navegador.
@@ -258,4 +260,85 @@ test("§210 — demanda NOVA (sem id) não herda os itens escritos da anterior",
   await expect(page.getByTestId("documento-screen")).toBeVisible();
   await expect(page.locator('[data-testid^="item-gerado-"]')).toHaveCount(0);
   await expect(page.getByTestId("secao-dos-itens")).toContainText("derive a demanda na mesa de projeto");
+});
+
+/**
+ * §411 — achado real (medido contra a stack de trabalho, não só o E2E):
+ * derivar uma demanda SEM TÍTULO ainda pergunta o nome, salva a quebra
+ * (o id nasce ali) e só então gera os itens. O id novo dispara, no MESMO
+ * instante, o efeito que RECARREGA os itens do servidor (para F5/deep-link) —
+ * e ele corre contra o PUT que está persistindo os itens recém-gerados. Sob
+ * rede lenta o suficiente, o GET respondia primeiro (nada persistido ainda) e
+ * apagava da tela os cards que tinham acabado de aparecer.
+ *
+ * A prova FORÇA a corrida atrasando o PUT de propósito — sem o guard em
+ * `App.tsx` (a ref `itensLocaisSaoAVerdadeParaRef`), o GET vencia e os itens
+ * sumiam; com ele, o GET é dispensado enquanto o local já for a verdade.
+ */
+test("§411 — os itens sobrevivem mesmo quando o GET de recarga vence a corrida contra o PUT que os persiste", async ({
+  page,
+}) => {
+  test.setTimeout(60000);
+  await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
+  await page.route(
+    (url) => url.pathname === "/ia/status",
+    (rota) => rota.fulfill({ json: { modelosChat: [], embeddingInstalado: false, capacidades: {} } })
+  );
+  // O atraso força a ordem que expõe o defeito: o GET de recarga (disparado
+  // pelo id novo da quebra) responde MUITO antes do PUT terminar de escrever.
+  await page.route(
+    (url) => /\/quebras\/[^/]+\/itens$/.test(url.pathname) && url.search === "",
+    async (rota) => {
+      if (rota.request().method() === "PUT") await new Promise((r) => setTimeout(r, 1500));
+      await rota.continue();
+    }
+  );
+  await entrar(page);
+
+  await page.getByTestId("abrir-cenarios").click();
+  await page.getByRole("button", { name: "Carregar cenário: Dados não-relacionais" }).click();
+  await page.locator('[data-tour="derivar-button"]').click();
+  const avisos = page.getByTestId("avisos-da-derivacao");
+  if (await avisos.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await page.getByTestId("derivar-mesmo-assim").click();
+  }
+  // Sem título: o balão pergunta o nome — é o caminho salvar-depois-derivar
+  // que faz o id nascer no mesmo instante em que os itens são gerados.
+  const TITULO = `§411 corrida ${Date.now()}`;
+  await page.getByLabel("ex.: Fatura mensal em lote").fill(TITULO);
+  await page.getByTestId("assistente-balao-confirmar").click();
+
+  await expect(page.getByTestId("documento-screen")).toBeVisible({ timeout: 15000 });
+  /**
+   * A régua certa NÃO é "existe `item-gerado-N`": esse card sempre existe —
+   * ele vem da DERIVAÇÃO (`documento.itens`, calculada no cliente a partir do
+   * diagrama, sem round-trip nenhum) e aparece igual com ou sem escrita,
+   * dizendo "ainda não escrito" quando não há. A régua que separa "os itens
+   * persistiram" de "só a casca do card existe" é `item-corpo-0`: só
+   * aparece quando o servidor confirma que HÁ um `ItemGerado` pra aquela
+   * chave — exatamente o que o PUT sabotado nunca chega a gravar.
+   */
+  await expect(page.locator('[data-testid^="item-gerado-"]').first()).toBeVisible({ timeout: 5000 });
+  await expect(page.getByTestId("item-corpo-0")).toBeVisible({ timeout: 5000 });
+  await expect(page.getByTestId("item-sem-escrita-0")).toHaveCount(0);
+  await expect(page.getByTestId("itens-resumo")).toContainText(/de \d+ itens? prontos? pra exportar/);
+
+  // Espera o PUT atrasado (e o GET, se ainda não tiver corrido) terminarem —
+  // e a escrita continua lá: não regride para "ainda não escrito".
+  await page.waitForTimeout(2000);
+  await expect(page.getByTestId("item-corpo-0")).toBeVisible();
+  await expect(page.getByTestId("item-sem-escrita-0")).toHaveCount(0);
+  await expect(page.getByTestId("itens-resumo")).toContainText(/de \d+ itens? prontos? pra exportar/);
+
+  /**
+   * A prova de PERSISTÊNCIA de verdade — direto no servidor, sem depender de
+   * como o app reconstitui "a demanda aberta" num F5 (assunto de outro
+   * spec): se o PUT nunca escreveu, `GET /quebras/:id/itens` volta vazio
+   * mesmo com a TELA ainda mostrando o otimista local.
+   */
+  const lista = (await (await page.request.get(`${API}/quebras`)).json()) as { id: string; titulo?: string }[];
+  const minha = lista.find((q) => q.titulo === TITULO);
+  expect(minha, "a quebra recém-nomeada não apareceu na lista do servidor").toBeTruthy();
+  const itensNoServidor = (await (await page.request.get(`${API}/quebras/${minha!.id}/itens`)).json()) as unknown[];
+  expect(itensNoServidor.length).toBeGreaterThan(0);
 });
