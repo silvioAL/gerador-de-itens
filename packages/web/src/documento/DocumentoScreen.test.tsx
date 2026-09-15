@@ -86,7 +86,7 @@ function montar(props: Partial<React.ComponentProps<typeof DocumentoScreen>> = {
   const onMudarEscrito = vi.fn();
   const onMudarStatus = vi.fn();
   const onBaixarMarkdown = vi.fn();
-  render(
+  const tela = (p: typeof props) => (
     <DocumentoScreen
       documento={doc()}
       config={config}
@@ -96,10 +96,22 @@ function montar(props: Partial<React.ComponentProps<typeof DocumentoScreen>> = {
       onMudarStatus={onMudarStatus}
       onBaixarMarkdown={onBaixarMarkdown}
       onVoltar={vi.fn()}
-      {...props}
+      {...p}
     />
   );
-  return { onMudarEscrito, onMudarStatus, onBaixarMarkdown };
+  const { rerender } = render(tela(props));
+  return {
+    onMudarEscrito,
+    onMudarStatus,
+    onBaixarMarkdown,
+    /**
+     * Remontar com props novas, pela MESMA montagem. Usado onde o teste precisa
+     * de uma TRANSIÇÃO (SPEC-120 fatia F: "o fim é um evento") — renderizar do
+     * zero seria o caso de quem abre a tela com tudo pronto, que é justamente
+     * o outro caso, e ele tem comportamento diferente.
+     */
+    rerender: (p: typeof props) => rerender(tela(p)),
+  };
 }
 
 describe("DocumentoScreen — o documento tem leitor (SPEC-58 fatia 1)", () => {
@@ -678,6 +690,94 @@ describe("DocumentoScreen — o pipeline da spec (SPEC-115 fatias E e G)", () =>
     });
 
     expect(screen.getByTestId("anexar-spec")).toBeDisabled();
+  });
+
+  /**
+   * SPEC-120 fatia F — **a animação calibrada para lote.**
+   *
+   * *"precisamos de animação em tela e que passe feedbacks sobre o upload de
+   * forma não muito enjoativa"*. A régua da SPEC-85 §2 já era "movimento que
+   * não carrega informação não entra"; o "não enjoativa" acrescenta a segunda:
+   * **movimento que carrega informação também cansa, se repetir demais**.
+   */
+  describe("a animação com lote (SPEC-120 fatia F)", () => {
+    function comNSpecsIndo(n: number) {
+      const chaves = Array.from({ length: n }, (_, i) => `i${i}`);
+      montar({
+        documento: doc({ itens: chaves.map((c, i) => derivado(c, { numero: i + 1 })) }),
+        itensEscritos: chaves.map((c, i) =>
+          noTracker(c, { titulo: `Item ${i}`, specEnviadaEm: "2026-09-10T10:05:00.000Z" })
+        ),
+      });
+      return chaves;
+    }
+
+    it("poucos itens continuam NOMEADOS — esconder um nome seria trocar informação por um clique", () => {
+      comNSpecsIndo(3);
+
+      expect(screen.getByTestId("spec-em-transito-i0")).toHaveTextContent("Item 0");
+      expect(screen.queryByTestId("spec-em-transito-lote")).toBeNull();
+    });
+
+    it("um lote inteiro AGREGA — trinta linhas simultâneas são ruído com a mesma informação dentro", () => {
+      comNSpecsIndo(5);
+
+      expect(screen.getByTestId("spec-em-transito-lote")).toHaveTextContent("5 specs indo agora");
+      // Os nomes não somem: ficam a um clique.
+      expect(screen.queryByTestId("spec-em-transito-i0")).toBeNull();
+    });
+
+    it("e o detalhe está a um clique — agregar não é esconder", () => {
+      comNSpecsIndo(5);
+
+      fireEvent.click(screen.getByTestId("detalhar-em-transito"));
+
+      expect(screen.getByTestId("spec-em-transito-i0")).toHaveTextContent("Item 0");
+    });
+
+    it("agregado, quem pulsa é a CONTAGEM — a lista inteira em movimento não aponta para nada", () => {
+      /**
+       * Ajuste 1 do §3.2: *"o pulso marca onde está acontecendo; a lista
+       * inteira em movimento não marca nada"*.
+       */
+      comNSpecsIndo(5);
+
+      expect(screen.getByTestId("spec-em-transito-lote").querySelector(".spec-em-transito")).not.toBeNull();
+      fireEvent.click(screen.getByTestId("detalhar-em-transito"));
+      expect(screen.getByTestId("spec-em-transito-i0")).not.toHaveClass("spec-em-transito");
+    });
+
+    it("o FIM é um evento — quem desviou o olhar precisa saber se acabou ou travou", () => {
+      /**
+       * Ajuste 3 do §3.2. Hoje a animação simplesmente parava, e parar é
+       * exatamente o que travar também faz.
+       */
+      const { rerender } = montar({
+        documento: doc({ itens: [derivado("a")] }),
+        itensEscritos: [noTracker("a", { specEnviadaEm: "2026-09-10T10:05:00.000Z" })],
+      });
+
+      expect(screen.queryByTestId("envio-terminou")).toBeNull();
+
+      rerender({
+        documento: doc({ itens: [derivado("a")] }),
+        itensEscritos: [noTracker("a", { specAnexada: true })],
+      });
+
+      expect(screen.getByTestId("envio-terminou")).toHaveTextContent("O envio terminou");
+      expect(screen.getByTestId("envio-terminou")).toHaveTextContent("1 spec anexada");
+    });
+
+    it("quem ABRE a tela com tudo pronto não recebe aviso de fim — não acompanhou envio nenhum", () => {
+      // "Terminou" é sobre algo que a pessoa viu começar. Anunciar o fim de um
+      // envio de ontem seria informação sem dono.
+      montar({
+        documento: doc({ itens: [derivado("a")] }),
+        itensEscritos: [noTracker("a", { specAnexada: true })],
+      });
+
+      expect(screen.queryByTestId("envio-terminou")).toBeNull();
+    });
   });
 
   it("nenhum item no tracker ainda: nada de pipeline — “0 de 0” é ruído que ensina a ignorar", () => {

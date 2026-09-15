@@ -179,3 +179,90 @@ describe("os destinos do gateway na tela (SPEC-81 fatia A)", () => {
     expect(apiExportador.obter).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * SPEC-120 fatias A e D — o tamanho do lote, e o contrato de cada operação.
+ */
+describe("o lote e o contrato na tela (SPEC-120)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(apiExportador.obter).mockResolvedValue(VAZIO);
+    vi.mocked(apiExportador.salvar).mockResolvedValue(VAZIO as never);
+  });
+
+  it("fatia A — o campo do lote existe, vazio, mostrando o padrão de fábrica", async () => {
+    render(<ExportacaoTab />);
+    await waitFor(() => expect(screen.getByTestId("tamanho-do-lote")).toBeInTheDocument());
+
+    // Vazio com placeholder, e não 5 digitado: a diferença entre "não escolhi"
+    // e "escolhi o que por acaso é o padrão" precisa sobreviver à tela.
+    const campo = screen.getByLabelText("Itens por chamada");
+    expect(campo).toHaveValue(null);
+    expect(campo).toHaveAttribute("placeholder", "5");
+  });
+
+  it("fatia A — o número digitado é o que vai para o servidor", async () => {
+    render(<ExportacaoTab />);
+    await waitFor(() => expect(screen.getByTestId("tamanho-do-lote")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText("Itens por chamada"), { target: { value: "3" } });
+    fireEvent.click(screen.getByTestId("salvar-exportacao"));
+
+    await waitFor(() =>
+      expect(vi.mocked(apiExportador.salvar).mock.calls[0][0]).toMatchObject({ lote: { itens: 3 } })
+    );
+  });
+
+  it("fatia A — apagar o número é “use o padrão”, e não “lotes de zero itens”", async () => {
+    render(<ExportacaoTab />);
+    await waitFor(() => expect(screen.getByTestId("tamanho-do-lote")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText("Itens por chamada"), { target: { value: "3" } });
+    fireEvent.change(screen.getByLabelText("Itens por chamada"), { target: { value: "" } });
+    fireEvent.click(screen.getByTestId("salvar-exportacao"));
+
+    await waitFor(() => expect(vi.mocked(apiExportador.salvar).mock.calls[0][0].lote).toBeUndefined());
+  });
+
+  it("fatia A — os DOIS tetos aparecem: só a contagem mentiria sobre estar protegido", async () => {
+    /**
+     * §1.1 — o que estoura contexto é a spec, não a contagem. Mostrar só
+     * "5 por vez" faria a pessoa achar que está protegida no caso exato em que
+     * ela não está: cinco specs longas.
+     */
+    render(<ExportacaoTab />);
+    await waitFor(() => expect(screen.getByTestId("tamanho-do-lote")).toBeInTheDocument());
+
+    expect(screen.getByLabelText("Caracteres por chamada")).toBeInTheDocument();
+    expect(screen.getByTestId("tamanho-do-lote")).toHaveTextContent("qualquer um dos dois");
+  });
+
+  it("fatia D — o contrato do ANEXO é declarado, com o formato e quem converte", async () => {
+    /**
+     * *"markdown é o melhor possível, mas precisamos certificar que funciona"*.
+     * A decisão (§2.2) é a régua da SPEC-49 por analogia: o produto manda
+     * markdown, o gateway converte. O que faltava era **declarar**, para quem
+     * escreve o agente do outro lado saber o que recebe.
+     */
+    render(<ExportacaoTab />);
+    await waitFor(() => expect(screen.getByTestId("destinos-do-gateway")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId("adicionar-destino"));
+    fireEvent.change(screen.getByLabelText("Operação do destino 1"), { target: { value: "specDoItem" } });
+
+    const contrato = screen.getByTestId("contrato-0");
+    expect(contrato).toHaveTextContent("{ itens: [{ chaveExterna, conteudo }] }");
+    expect(contrato).toHaveTextContent("markdown, UTF-8, com blocos de código");
+    expect(contrato).toHaveTextContent("quem converte");
+  });
+
+  it("fatia D — trocar a operação troca o contrato: ele descreve a chamada, não o destino", async () => {
+    render(<ExportacaoTab />);
+    await waitFor(() => expect(screen.getByTestId("destinos-do-gateway")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId("adicionar-destino"));
+    fireEvent.change(screen.getByLabelText("Operação do destino 1"), { target: { value: "adr" } });
+
+    expect(screen.getByTestId("contrato-0")).toHaveTextContent("{ adrs:");
+  });
+});

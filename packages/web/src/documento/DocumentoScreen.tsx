@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import type { MudancaDeSecao } from "@gerador/engine";
 import type {
@@ -1578,14 +1578,45 @@ const campoDaConversaEstilo: React.CSSProperties = {
  * guarda global de `prefers-reduced-motion` do §328: quem pede menos movimento
  * recebe a mesma informação parada.
  */
+/**
+ * Até quantos itens em trânsito aparecem nomeados de uma vez.
+ *
+ * Três, e o número tem razão: é quanto cabe sem a região virar uma parede de
+ * linhas pulsando. Acima disso a informação é a mesma (*"estão indo"*) e o
+ * ruído cresce linearmente — que é exatamente o *"enjoativa"* do §3.2.
+ */
+const ITENS_EM_TRANSITO_DETALHADOS = 3;
+
 function PipelineDaSpec({ contagem, escritos }: { contagem: ContagemDoPipeline; escritos: ItemGerado[] }) {
-  // Nenhum item chegou ao tracker ainda: não há pipeline nenhum para relatar, e
-  // uma caixa dizendo "0 de 0" é ruído que ensina a ignorar a região.
-  const comHistoria = contagem.total - contagem.naFila;
-  if (comHistoria === 0) return null;
+  /**
+   * SPEC-120 fatia F — **o fim é um evento, não a ausência de movimento.**
+   *
+   * *"Hoje a animação simplesmente para. Terminar precisa ser visível, ou quem
+   * desviou o olhar não sabe se acabou ou travou."* (§3.2, ajuste 3)
+   *
+   * Só se pode dizer "terminou" de um envio que se viu começar — por isso o
+   * estado, e não um teste sobre a contagem. Quem abre a tela com tudo já
+   * anexado não recebe um aviso de conclusão de algo que não acompanhou.
+   */
+  const [viuEnvio, setViuEnvio] = useState(false);
+  const [detalhar, setDetalhar] = useState(false);
 
   const indo = escritos.filter((i) => etapaDaSpec(i) === "anexando");
   const falhados = escritos.filter((i) => etapaDaSpec(i) === "falhou");
+
+  useEffect(() => {
+    if (contagem.anexando > 0) setViuEnvio(true);
+  }, [contagem.anexando]);
+
+  const terminou = viuEnvio && contagem.anexando === 0;
+
+  // Nenhum item chegou ao tracker ainda: não há pipeline nenhum para relatar, e
+  // uma caixa dizendo "0 de 0" é ruído que ensina a ignorar a região.
+  //
+  // O `return` vem DEPOIS dos hooks de propósito: cedo demais e o React muda o
+  // número de hooks entre renders, que é erro em tempo de execução.
+  const comHistoria = contagem.total - contagem.naFila;
+  if (comHistoria === 0) return null;
 
   return (
     <section data-testid="pipeline-da-spec" style={{ marginTop: 12 }} aria-live="polite">
@@ -1609,18 +1640,73 @@ function PipelineDaSpec({ contagem, escritos }: { contagem: ContagemDoPipeline; 
         {comHistoria} {comHistoria === 1 ? "item no tracker" : "itens no tracker"}
       </p>
 
+      {/**
+       * SPEC-120 fatia F — **agregar, detalhar sob demanda.**
+       *
+       * A régua da SPEC-85 §2 era *"movimento que não carrega informação que o
+       * estático não carrega, não entra"*. O *"não muito enjoativa"* do usuário
+       * acrescenta a segunda: **movimento que carrega informação também cansa,
+       * se repetir demais** (§3.2).
+       *
+       * Com lotes isso deixou de ser teórico: um envio de trinta itens em seis
+       * lotes tinha trinta linhas pulsando ao mesmo tempo. *"Trinta linhas
+       * simultâneas são ruído com a mesma informação dentro."*
+       *
+       * O que fica: **a contagem, sempre**; os nomes, a um clique. E o pulso
+       * some da lista e fica na contagem — o movimento marca ONDE está
+       * acontecendo, e a lista inteira em movimento não marca nada (ajuste 1).
+       *
+       * Abaixo do limite, detalhar direto: três linhas nomeadas não cansam
+       * ninguém, e esconder o nome de um item só seria trocar informação por
+       * um clique.
+       */}
+      {indo.length > ITENS_EM_TRANSITO_DETALHADOS ? (
+        <p data-testid="spec-em-transito-lote" style={{ fontSize: 12, margin: "0 0 4px" }}>
+          <span className="spec-em-transito" style={{ color: "var(--acento)" }}>
+            ⏳ {indo.length} specs indo agora
+          </span>{" "}
+          <button
+            onClick={() => setDetalhar((d) => !d)}
+            data-testid="detalhar-em-transito"
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              font: "inherit",
+              color: "var(--texto-mudo)",
+              textDecoration: "underline",
+              cursor: "pointer",
+            }}
+          >
+            {detalhar ? "esconder quais" : "ver quais"}
+          </button>
+        </p>
+      ) : null}
+
       {/* "Em que ITEM está" — o §5 pede isso com nome, não um spinner genérico:
           dois itens em pontos diferentes ao mesmo tempo é o normal do §3.2. */}
-      {indo.map((item) => (
-        <p
-          key={item.chave}
-          data-testid={`spec-em-transito-${item.chave}`}
-          className="spec-em-transito"
-          style={{ fontSize: 12, color: "var(--acento)", margin: "0 0 4px" }}
-        >
-          ⏳ <strong>{item.titulo}</strong> — a spec está indo agora
+      {(indo.length <= ITENS_EM_TRANSITO_DETALHADOS || detalhar) &&
+        indo.map((item) => (
+          <p
+            key={item.chave}
+            data-testid={`spec-em-transito-${item.chave}`}
+            // O pulso só marca o item quando ele é POUCOS. Agregado, quem pulsa
+            // é a contagem acima — uma lista inteira em movimento não aponta
+            // para lugar nenhum.
+            className={indo.length <= ITENS_EM_TRANSITO_DETALHADOS ? "spec-em-transito" : undefined}
+            style={{ fontSize: 12, color: "var(--acento)", margin: "0 0 4px" }}
+          >
+            ⏳ <strong>{item.titulo}</strong> — a spec está indo agora
+          </p>
+        ))}
+
+      {/* SPEC-120 fatia F, ajuste 3 — terminar é visível. */}
+      {terminou && (
+        <p data-testid="envio-terminou" style={{ fontSize: 12, color: "var(--verde)", margin: "0 0 4px" }}>
+          ✓ O envio terminou — {contagem.anexada} {contagem.anexada === 1 ? "spec anexada" : "specs anexadas"}
+          {contagem.falhou > 0 && `, ${contagem.falhou} sem a spec`}.
         </p>
-      ))}
+      )}
 
       {/* "A falha diz QUAL" — o motivo é persistido, então ele continua aqui
           depois de um F5, que é quando a pessoa volta para entender. */}

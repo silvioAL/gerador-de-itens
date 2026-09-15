@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { OPERACOES_DO_GATEWAY, type DestinoDoGateway, type OperacaoDoGateway } from "@gerador/aplicacao";
+import {
+  CARACTERES_POR_LOTE_PADRAO,
+  ITENS_POR_LOTE_PADRAO,
+  OPERACOES_DO_GATEWAY,
+  type DestinoDoGateway,
+  type OperacaoDoGateway,
+} from "@gerador/aplicacao";
 import { apiExportador, type ConfigExportador } from "../api/client";
 import { MarcaDeDemonstracao } from "../demo/dadosDoTour";
 
@@ -130,6 +136,12 @@ export function ExportacaoTab({ demonstracao }: ExportacaoTabProps = {}) {
         style={{ ...inputEstilo, resize: "vertical", fontFamily: "ui-monospace, monospace" }}
       />
 
+      <TamanhoDoLote
+        lote={config.lote}
+        onMudar={(lote) => setConfig({ ...config, lote })}
+        somenteLeitura={!!demonstracao}
+      />
+
       <Destinos
         destinos={config.destinos ?? []}
         onMudar={(destinos) => setConfig({ ...config, destinos })}
@@ -143,6 +155,87 @@ export function ExportacaoTab({ demonstracao }: ExportacaoTabProps = {}) {
         {salvando ? "salvando…" : "Salvar destino"}
       </button>
     </div>
+  );
+}
+
+/**
+ * SPEC-120 fatia A — **quantos itens vão por chamada.**
+ *
+ * > *"MCPs são lentos e tem limitações de tokens, pode ser necessário subir 5
+ * > itens por vez"*
+ *
+ * ## Por que aqui em cima, e não dentro de cada destino
+ *
+ * É a pergunta 1 da SPEC-120, respondida pela correção do usuário na SPEC-118
+ * §2.0: **é um gateway só**, com endpoints que variam. Um campo por destino que
+ * ninguém preenche diferente é um campo a mais para errar.
+ *
+ * ## Por que os DOIS números aparecem
+ *
+ * Porque o de itens, sozinho, mente. O que estoura contexto é a spec, não a
+ * contagem: cinco itens pequenos e cinco grandes diferem por uma ordem de
+ * grandeza (§1.1). Mostrar só "5 por vez" faria a pessoa achar que está
+ * protegida no caso exato em que ela não está.
+ */
+function TamanhoDoLote({
+  lote,
+  onMudar,
+  somenteLeitura,
+}: {
+  lote: { itens?: number; caracteres?: number } | undefined;
+  onMudar: (lote: { itens?: number; caracteres?: number } | undefined) => void;
+  somenteLeitura: boolean;
+}) {
+  /**
+   * Campo vazio devolve `undefined`, e não zero: apagar o número é *"use o
+   * padrão"*, e gravar `0` pediria lotes de zero itens. A normalização do
+   * servidor recusa o zero de qualquer jeito, mas a tela não pode oferecer um
+   * valor que o servidor vai jogar fora em silêncio.
+   */
+  function mudar(campo: "itens" | "caracteres", texto: string) {
+    const numero = Number.parseInt(texto, 10);
+    const proximo = { ...lote, [campo]: Number.isFinite(numero) && numero >= 1 ? numero : undefined };
+    onMudar(proximo.itens === undefined && proximo.caracteres === undefined ? undefined : proximo);
+  }
+
+  return (
+    <section data-testid="tamanho-do-lote" style={{ marginTop: 22 }}>
+      <strong style={{ fontSize: 13, color: "var(--texto)" }}>Quantos itens por chamada</strong>
+      <p style={{ ...proseEstilo, marginTop: 6 }}>
+        Um gateway de MCP é lento e tem limite de tokens. O envio é fatiado em chamadas menores —{" "}
+        <strong>sempre por item, nunca no meio de um</strong> — e vale tanto para criar os issues quanto para anexar as
+        specs. Vazio usa o padrão de fábrica: {ITENS_POR_LOTE_PADRAO} itens.
+      </p>
+
+      <label style={labelEstilo}>Itens por chamada</label>
+      <input
+        aria-label="Itens por chamada"
+        type="number"
+        min={1}
+        value={lote?.itens ?? ""}
+        onChange={(e) => mudar("itens", e.target.value)}
+        placeholder={String(ITENS_POR_LOTE_PADRAO)}
+        disabled={somenteLeitura}
+        style={{ ...inputEstilo, maxWidth: 160 }}
+      />
+
+      <label style={labelEstilo}>…e no máximo, somando os itens (caracteres)</label>
+      <input
+        aria-label="Caracteres por chamada"
+        type="number"
+        min={1}
+        value={lote?.caracteres ?? ""}
+        onChange={(e) => mudar("caracteres", e.target.value)}
+        placeholder={String(CARACTERES_POR_LOTE_PADRAO)}
+        disabled={somenteLeitura}
+        style={{ ...inputEstilo, maxWidth: 220 }}
+      />
+      <p style={{ fontSize: 11, color: "var(--texto-mudo)", margin: "4px 0 0" }}>
+        O lote fecha quando <strong>qualquer um dos dois</strong> estourar — cinco specs longas fecham antes dos cinco
+        itens. Caracteres são uma aproximação grosseira de tokens, e grosseira serve: o objetivo é não chegar perto do
+        limite.
+      </p>
+    </section>
   );
 }
 
@@ -228,6 +321,15 @@ function Destinos({
               remover
             </button>
           </div>
+
+          {/* SPEC-120 fatia D — o contrato desta operação, dito onde ela é
+              escolhida. Quem escreve o agente do outro lado precisa saber o
+              que recebe antes de a primeira chamada falhar em produção. */}
+          <p data-testid={`contrato-${i}`} style={{ fontSize: 11, color: "var(--texto-mudo)", margin: "6px 0 0", lineHeight: 1.6 }}>
+            Recebe <code style={codigoEstilo}>{CONTRATO_DA_OPERACAO[d.operacao].recebe}</code> e responde{" "}
+            <code style={codigoEstilo}>{CONTRATO_DA_OPERACAO[d.operacao].responde}</code>.
+            {CONTRATO_DA_OPERACAO[d.operacao].nota && <> {CONTRATO_DA_OPERACAO[d.operacao].nota}</>}
+          </p>
 
           {/**
            * SPEC-115 fatia D — **o modo de demonstração, marcado como o que é.**
@@ -354,6 +456,47 @@ const ROTULO_DA_OPERACAO: Record<OperacaoDoGateway, string> = {
   adr: "ADRs → ler",
   /** SPEC-114 — a segunda chamada: escreve na issue que a exportação criou. */
   specDoItem: "Spec do item → anexar ao issue já exportado",
+};
+
+/**
+ * SPEC-120 fatia D — **o contrato de cada operação, declarado.**
+ *
+ * O de `itens` já estava na tela desde a SPEC-49, no parágrafo de cima. Os
+ * outros quatro nunca estiveram — e o de `specDoItem` era o que mais fazia
+ * falta, porque é o único cujo conteúdo é um **formato**: markdown.
+ *
+ * ## O que a linha do markdown resolve, e por que ela é do produto
+ *
+ * > *"os anexos precisam subir em formato que um MCP consiga anexar, markdown
+ * > é o melhor possível, mas precisamos certificar que funciona"*
+ *
+ * A decisão (§2.2) é a régua da SPEC-49 por analogia: **o produto manda
+ * markdown, o gateway converte.** Implementar o dialeto de um tracker seria
+ * escolher o tracker de todo mundo. O que faltava não era a decisão — era
+ * **declará-la**, para quem escreve o agente do outro lado saber o que recebe:
+ * UTF-8, com blocos de código, e quem decide se vira comentário, descrição ou
+ * arquivo é o gateway.
+ *
+ * O que esta linha NÃO faz é provar que funciona. Isso é a fatia E, e ela não é
+ * teste automatizado: é rodar contra o MCP real e olhar o issue.
+ */
+const CONTRATO_DA_OPERACAO: Record<OperacaoDoGateway, { recebe: string; responde: string; nota?: string }> = {
+  itens: {
+    recebe: "{ itens: [{ chave, titulo, tipo, tamanho, dependencias, corpoMarkdown }] }",
+    responde: "{ resultados: [{ chave, linkExterno } | { chave, erro }] }",
+  },
+  documento: {
+    recebe: "{ demandaId, demandaTitulo, markdown, geradoEm, desatualizado }",
+    responde: "{ link }",
+  },
+  documentoExterno: { recebe: "{ link }", responde: "{ titulo, markdown }" },
+  adr: { recebe: "{}", responde: "{ adrs: [{ id, titulo, contexto?, escolhida?, porque? }] }" },
+  specDoItem: {
+    recebe: "{ itens: [{ chaveExterna, conteudo }] }",
+    responde: "{ resultados: [{ chaveExterna, erro? }] }",
+    nota:
+      "`conteudo` é a spec daquele item em markdown, UTF-8, com blocos de código. O produto não converte para o dialeto de nenhum tracker — quem converte, e quem decide se ela vira comentário, descrição ou arquivo anexo, é o agente do outro lado.",
+  },
 };
 
 const proseEstilo: React.CSSProperties = {
