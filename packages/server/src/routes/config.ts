@@ -58,6 +58,10 @@ async function lerJsonDeConfig<T>(diretorio: string, nome: string): Promise<T | 
   return null;
 }
 
+/** Dez segundos. Um gateway que não responde nisso está fora, e o botão não
+ * pode prender a tela enquanto alguém espera para saber. */
+const TIMEOUT_DO_TESTE_MS = 10_000;
+
 export async function registrarRotasConfig(app: FastifyInstance, { db, diretorioConfig }: OpcoesApp) {
   const casos = criarCasosDeUsoDeConfig(criarRepositorioDeConfigEmPostgres(db));
   const versaoAtual = process.env.npm_package_version ?? null;
@@ -175,6 +179,79 @@ export async function registrarRotasConfig(app: FastifyInstance, { db, diretorio
       declaradoNoProduto: (doProduto?.documento as RegrasConfig | null) ?? null,
       diagnostico: doTime.diagnostico,
     };
+  });
+
+  /**
+   * SPEC-118 fatia F — **"Testar conexão" para o gateway da casa.**
+   *
+   * Hoje só a IA tinha. É o par natural do importador de cURL: colou, conferiu,
+   * testou — e um endereço errado é descoberto na configuração, não na primeira
+   * exportação com trinta itens na mão.
+   *
+   * ## O que ele testa, e é a resposta da pergunta 3
+   *
+   * > *"Chama o gateway onde vai ter um agente ligado ao MCP do jira"* — o
+   * > usuário.
+   *
+   * **O teste é do TRANSPORTE, não da operação.** Ele responde *"este endereço
+   * existe, minha autenticação vale e há alguém atendendo?"* — e para isso não
+   * precisa criar issue nenhum. O medo da pergunta original (testar de verdade
+   * criaria lixo no tracker) sai de cena, porque ninguém propôs exercitar a
+   * operação.
+   *
+   * ## Por que a resposta DIZ o que foi mandado
+   *
+   * *"O produto precisa dizer o que está mandando, para que um 'falhou' seja
+   * diagnosticável em vez de ser apenas vermelho."* Um POST com corpo vazio é
+   * uma convenção, não um padrão — e o agente do outro lado pode responder 400
+   * legitimamente. Quem lê o resultado precisa saber o que aconteceu para
+   * decidir se o problema é o endereço, a autenticação ou o contrato.
+   *
+   * ## Por que HTTP 4xx não é "falhou" aqui
+   *
+   * Um 401 é uma resposta: **alguém atendeu**. O que este teste procura é
+   * silêncio — DNS que não resolve, porta fechada, timeout. Tratar 401 como
+   * falha de conexão mandaria a pessoa conferir o endereço quando o problema é
+   * a chave.
+   */
+  app.post("/config/exportador/testar", { preHandler: exigirSessao }, async (req, reply) => {
+    const corpo = (req.body ?? {}) as { endpoint?: string; cabecalhos?: Record<string, string> };
+    const endpoint = corpo.endpoint?.trim() ?? "";
+    if (!/^https?:\/\//i.test(endpoint)) {
+      return reply.code(400).send({ ok: false, erro: "informe o endereço do gateway (http:// ou https://)" });
+    }
+
+    const negado = await recursoNegadoPara(req, "exportador", {}, undefined);
+    if (negado) {
+      return reply.code(403).send({ erro: `sem permissão para "editar" em "${negado}"`, recurso: negado, acao: "editar" });
+    }
+
+    const oQueMandei = `POST ${endpoint} com corpo vazio ({}) e ${Object.keys(corpo.cabecalhos ?? {}).length} cabeçalho(s)`;
+    const inicio = Date.now();
+    try {
+      const resposta = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(corpo.cabecalhos ?? {}) },
+        body: "{}",
+        signal: AbortSignal.timeout(TIMEOUT_DO_TESTE_MS),
+      });
+      return {
+        ok: true,
+        status: resposta.status,
+        duracaoMs: Date.now() - inicio,
+        oQueMandei,
+        // O corpo entra recortado: ele costuma ser a mensagem do agente, e é
+        // ela que diz se o 400 é "contrato errado" ou "faltou um campo".
+        amostra: (await resposta.text().catch(() => "")).slice(0, 200),
+      };
+    } catch (erro) {
+      return {
+        ok: false,
+        duracaoMs: Date.now() - inicio,
+        oQueMandei,
+        erro: erro instanceof Error ? erro.message : String(erro),
+      };
+    }
   });
 
   app.put("/config/:chave/produto/:produtoId", { preHandler: exigirSessao }, async (req, reply) => {

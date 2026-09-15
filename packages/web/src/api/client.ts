@@ -1742,7 +1742,31 @@ export const apiDiagrama = {
 export type { ConfigExportador } from "@gerador/aplicacao";
 import type { ConfigExportador } from "@gerador/aplicacao";
 
-export const apiExportador = configDe<ConfigExportador>("exportador");
+/**
+ * SPEC-118 fatia F — o resultado de "Testar conexão" com o gateway da casa.
+ *
+ * `ok` é sobre o TRANSPORTE: houve resposta. `status` diz qual foi, e um 401 é
+ * `ok: true` de propósito — alguém atendeu, e o problema é a chave, não o
+ * endereço. `oQueMandei` existe para um "falhou" ser diagnosticável em vez de
+ * ser apenas vermelho.
+ */
+export interface ResultadoDoTesteDeGateway {
+  ok: boolean;
+  status?: number;
+  duracaoMs: number;
+  oQueMandei: string;
+  amostra?: string;
+  erro?: string;
+}
+
+export const apiExportador = {
+  ...configDe<ConfigExportador>("exportador"),
+  testar: (dados: { endpoint: string; cabecalhos?: Record<string, string> }) =>
+    requisitar<ResultadoDoTesteDeGateway>("/config/exportador/testar", {
+      method: "POST",
+      body: JSON.stringify(dados),
+    }),
+};
 
 /**
  * SPEC-86 fatia C — as regras EM VIGOR para um produto.

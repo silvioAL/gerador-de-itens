@@ -85,7 +85,7 @@ test("falha de um papel acende o avatar no mapa, e a execução seguinte o apaga
   await entrar(page);
 
   await page.getByRole("button", { name: "☰ Menu" }).click();
-  await page.getByRole("button", { name: "Modelo de IA" }).click();
+  await page.getByRole("button", { name: "Conexões" }).click();
   const card = page.getByTestId("modelo-ia-gateway");
   await card.getByLabel("Base URL do gateway").fill(BASE_URL_GATEWAY_FALSO);
   await card.getByLabel("Chave de API").fill(CHAVE_GATEWAY_FALSO);

@@ -57,6 +57,25 @@ export {
 } from "./casos-de-uso/ia/conversas.js";
 
 /**
+ * SPEC-118 fatias A, B e E — o cURL como ENTRADA da tela de configuração: o
+ * interpretador puro, a chave separada e mascarada, e o que o corpo diz.
+ */
+export {
+  baseUrlDeChat,
+  ehRecusa,
+  envelopeDoCorpo,
+  interpretarCurl,
+  mascarar,
+  modeloDoCorpo,
+  reconhecerGateway,
+  separarSegredo,
+  type CurlInterpretado,
+  type GatewayReconhecido,
+  type RecusaDeCurl,
+  type ResultadoDoCurl,
+} from "./config/curl.js";
+
+/**
  * SPEC-120 fatias A–C — o lote: quantos itens cabem numa chamada, e a recusa do
  * destino que é sinal de que couberam demais.
  */

@@ -64,7 +64,11 @@ test("com RBAC ligado: área negada some do menu, e o pedido de ajuste vive no l
     // §221 — o menu OCULTA o que ela não edita, em vez de mostrar com cadeado.
     await page.getByRole("button", { name: "☰ Menu" }).click();
     await expect(page.getByRole("button", { name: /Padrões por componente/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Modelo de IA/ })).toHaveCount(0);
+    // SPEC-118 fatia G — a aba "Modelo de IA" virou a SEÇÃO de IA dentro de
+    // Conexões, e a permissão continua sendo `credenciais-ia`: quem não a tem
+    // chega na tela e não vê a seção. A régua não mudou de valor, só de lugar.
+    await page.getByRole("button", { name: "Conexões" }).click();
+    await expect(page.getByTestId("conexao-ia")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Acessos" })).toHaveCount(0);
     await expect(page.getByText("🔒")).toHaveCount(0);
     // Fechar de verdade: navegar por hash não remonta o app, e o menu aberto

@@ -18,9 +18,10 @@ const AREAS: { area: AbaConfig; rotulo: RegExp }[] = [
   { area: "regras", rotulo: /Regras de refinamento/ },
   { area: "especificacao", rotulo: /Especificação de solução/ },
   { area: "pipeline", rotulo: /Agentes de IA/ },
-  { area: "modeloIa", rotulo: /Modelo de IA/ },
+  // SPEC-118 fatia G — as duas viraram uma; o link velho chega na mesma tela.
+  { area: "modeloIa", rotulo: /Conexões/ },
   { area: "pdca", rotulo: /PDCA — melhoria contínua/ },
-  { area: "exportacao", rotulo: /Exportação/ },
+  { area: "exportacao", rotulo: /Conexões/ },
 ];
 
 const config: DiagramaConfig = {
