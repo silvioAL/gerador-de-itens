@@ -10,6 +10,7 @@ import type {
   PedidoDeAnexoDeSpec,
   PublicadorDeDocumento,
 } from "@gerador/aplicacao";
+import { fatiarEmLotes, pareceLoteGrandeDemais } from "@gerador/aplicacao";
 
 /**
  * SPEC-81 — os adaptadores das operações novas do gateway do time.
@@ -248,41 +249,103 @@ export function criarAnexadorDeSpecViaGateway(
   destino: DestinoResolvido,
   fetchImpl: typeof fetch = fetch
 ): AnexadorDeSpec {
-  return {
-    async anexar(pedidos: PedidoDeAnexoDeSpec[]) {
-      if (pedidos.length === 0) return [];
+  type Resultado = { chave: string } | { chave: string; erro: string };
 
-      let resposta: Response;
-      try {
-        resposta = await postar(
-          destino,
-          { itens: pedidos.map((p) => ({ chaveExterna: p.chaveExterna, conteudo: p.conteudo })) },
-          fetchImpl
-        );
-      } catch (erro) {
-        // Rede fora vale para TODOS os pedidos desta chamada, mas continua
-        // item a item — a tela mostra por card, e o formato não muda com a causa.
-        const motivo = erro instanceof Error ? erro.message : String(erro);
-        return pedidos.map((p) => ({ chave: p.chave, erro: `não consegui falar com o agente: ${motivo}` }));
-      }
+  /**
+   * Uma chamada. Devolve os resultados **e** o que o transporte disse — a
+   * fatia C precisa distinguir "este lote não coube" de "este item falhou", e
+   * a segunda informação some se só os resultados saírem daqui.
+   */
+  async function enviarLote(
+    pedidos: PedidoDeAnexoDeSpec[]
+  ): Promise<{ resultados: Resultado[]; recusaDeTamanho?: { status: number; motivo: string } }> {
+    let resposta: Response;
+    try {
+      resposta = await postar(
+        destino,
+        { itens: pedidos.map((p) => ({ chaveExterna: p.chaveExterna, conteudo: p.conteudo })) },
+        fetchImpl
+      );
+    } catch (erro) {
+      // Rede fora vale para TODOS os pedidos desta chamada, mas continua
+      // item a item — a tela mostra por card, e o formato não muda com a causa.
+      const motivo = erro instanceof Error ? erro.message : String(erro);
+      return { resultados: pedidos.map((p) => ({ chave: p.chave, erro: `não consegui falar com o agente: ${motivo}` })) };
+    }
 
-      if (!resposta.ok) {
-        const corpo = await resposta.text().catch(() => "");
-        const motivo = `o agente respondeu HTTP ${resposta.status}${corpo ? ` — ${corpo.slice(0, 200)}` : ""}`;
-        return pedidos.map((p) => ({ chave: p.chave, erro: motivo }));
-      }
-
-      const corpo = (await resposta.json().catch(() => ({}))) as {
-        resultados?: Array<{ chaveExterna?: string; erro?: string }>;
+    if (!resposta.ok) {
+      const corpo = await resposta.text().catch(() => "");
+      const motivo = `o agente respondeu HTTP ${resposta.status}${corpo ? ` — ${corpo.slice(0, 200)}` : ""}`;
+      return {
+        resultados: pedidos.map((p) => ({ chave: p.chave, erro: motivo })),
+        ...(pareceLoteGrandeDemais(resposta.status, corpo) ? { recusaDeTamanho: { status: resposta.status, motivo } } : {}),
       };
-      const porChaveExterna = new Map((corpo.resultados ?? []).map((r) => [r.chaveExterna, r]));
+    }
 
-      return pedidos.map((p) => {
+    const corpo = (await resposta.json().catch(() => ({}))) as {
+      resultados?: Array<{ chaveExterna?: string; erro?: string }>;
+    };
+    const porChaveExterna = new Map((corpo.resultados ?? []).map((r) => [r.chaveExterna, r]));
+
+    return {
+      resultados: pedidos.map((p) => {
         const r = porChaveExterna.get(p.chaveExterna);
         if (!r) return { chave: p.chave, erro: "o agente não respondeu por este item" };
         if (r.erro) return { chave: p.chave, erro: r.erro };
         return { chave: p.chave };
-      });
+      }),
+    };
+  }
+
+  /**
+   * SPEC-120 fatia C — **a recusa do destino reduz o lote e tenta de novo.**
+   *
+   * ## Por que AQUI e não na exportação, e essa é a pergunta 2 da SPEC-120
+   *
+   * > *"Um produto que retenta sozinho é conveniente até o dia em que retenta
+   * > algo que teve efeito colateral. Para `specDoItem` (anexar) o risco é
+   * > baixo; para `itens` (criar issue) **um retry sobre um sucesso mal
+   * > reportado duplica issue**."*
+   *
+   * A resposta que o código dá à pergunta é: **reduzir só onde é seguro.**
+   * Anexar a spec de um item a um issue que já existe é idempotente na
+   * prática — o pior caso é a spec aparecer duas vezes no mesmo issue, e isso
+   * alguém apaga. Criar issue não é: o pior caso é uma demanda com trinta
+   * itens virando sessenta, e ninguém sabe quais são os duplicados.
+   *
+   * Por isso `exportadorViaAgente` fatia em lotes e **não** reduz: um 413 lá
+   * vira erro por item, com o motivo que o gateway deu, e quem lê decide
+   * baixar o tamanho na configuração.
+   *
+   * ## A redução para quando não dá mais para reduzir
+   *
+   * Pela metade a cada vez, e o piso é 1. Um item sozinho que ainda é grande
+   * demais vira erro com o motivo do gateway — que é a informação certa: não é
+   * o lote que não cabe, é a spec. Fatiar mais seria cortar no meio de um item
+   * (SPEC-98 §4.1).
+   */
+  async function enviarComReducao(pedidos: PedidoDeAnexoDeSpec[], porChamada: number): Promise<Resultado[]> {
+    const lotes = fatiarEmLotes(pedidos, (p) => p.conteudo.length, {
+      itens: porChamada,
+      caracteres: destino.lote.caracteres,
+    });
+
+    const resultados: Resultado[] = [];
+    for (const lote of lotes) {
+      const { resultados: doLote, recusaDeTamanho } = await enviarLote(lote);
+      if (recusaDeTamanho && lote.length > 1) {
+        resultados.push(...(await enviarComReducao(lote, Math.max(1, Math.floor(lote.length / 2)))));
+        continue;
+      }
+      resultados.push(...doLote);
+    }
+    return resultados;
+  }
+
+  return {
+    async anexar(pedidos: PedidoDeAnexoDeSpec[]) {
+      if (pedidos.length === 0) return [];
+      return enviarComReducao(pedidos, destino.lote.itens);
     },
   };
 }

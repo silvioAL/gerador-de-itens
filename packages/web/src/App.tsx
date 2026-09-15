@@ -1155,8 +1155,22 @@ function AppCarregado({
       contextoDaDemanda: quebra.demandInfo,
       necessidades: quebra.necessidades,
       decisoes: quebra.decisoes,
+      /**
+       * SPEC-119 §2.3 — **onde a decisão vale, pelo nome que a pessoa deu.**
+       *
+       * Uma decisão de arquitetura é restrição de implementação, e restrição
+       * sem alvo se aplica ao componente errado. `noId: "n3"` não localiza
+       * nada para quem lê a spec no Jira; `srv-catalogo` localiza.
+       *
+       * Nós E arestas: `Decisao` ancora nos dois (o tipo diz isso), e um mapa
+       * só com nós deixaria a decisão de conexão citando id cru.
+       */
+      rotulos: Object.fromEntries([
+        ...quebra.diagrama.nodes.map((n) => [n.id, n.label] as const),
+        ...quebra.diagrama.edges.map((e) => [e.id, e.note?.trim() || `${e.source} → ${e.target}`] as const),
+      ]),
     }),
-    [quebra.demandInfo, quebra.necessidades, quebra.decisoes]
+    [quebra.demandInfo, quebra.necessidades, quebra.decisoes, quebra.diagrama]
   );
 
   /** O que a TELA mostra como derivável. As fatias entram com os itens da
@@ -1176,11 +1190,30 @@ function AppCarregado({
       gerarSpec({
         titulo: quebra.titulo?.trim() || "Spec",
         escrita: specDaDemanda,
+        /**
+         * O MESMO material que a tela mostra como derivável e que o anexo
+         * usa. Sem ele, a prévia na tela e o arquivo baixado apareciam com
+         * lacuna enquanto o que subia para o issue não tinha nenhuma — duas
+         * leituras da mesma pergunta, que é o que o §263 recusa.
+         */
+        julgamento: { ...julgamentoDaSpec, itens: atividadesDoDocumento },
         contexto: [contextoDoProduto, quebra.demandInfo].filter((t) => t?.trim()).join("\n\n"),
         medicao: documentoDaDemanda.saude.filter((s) => s.lado === "atencao").map((s) => s.rotulo),
         itens: atividadesDoDocumento,
+        // SPEC-119 fatia F — este é o markdown que a pessoa BAIXA, e nele o
+        // corpo do item não viaja junto. A spec diz isso em vez de apontar
+        // para "a seção dele" e deixar quem implementa procurar.
+        corpoDoItem: "fora",
       }),
-    [quebra.titulo, quebra.demandInfo, specDaDemanda, contextoDoProduto, documentoDaDemanda, atividadesDoDocumento]
+    [
+      quebra.titulo,
+      quebra.demandInfo,
+      specDaDemanda,
+      julgamentoDaSpec,
+      contextoDoProduto,
+      documentoDaDemanda,
+      atividadesDoDocumento,
+    ]
   );
 
   /** A mesma régua do §313, no segundo artefato: lacuna contada, nunca estimada. */
@@ -2272,6 +2305,19 @@ function AppCarregado({
                           contexto: [contextoDoProduto, quebra.demandInfo].filter((t) => t?.trim()).join("\n\n"),
                           medicao: documentoDaDemanda.saude.filter((s) => s.lado === "atencao").map((s) => s.rotulo),
                           itens: [atividade],
+                          /**
+                           * SPEC-119 fatia F — **aqui o ponteiro é uma
+                           * garantia, e a spec passa a dizer isso.**
+                           *
+                           * Este caminho só existe para item que JÁ foi
+                           * exportado (`linkExterno` acima): a spec se anexa
+                           * ao issue que o corpo do item criou. Os dois
+                           * viajam juntos, e é verdade por construção — o
+                           * §3.4 mediu que a spec presumia isso sem afirmar,
+                           * e um agente que receba só a spec seguiria um
+                           * ponteiro para lugar nenhum.
+                           */
+                          corpoDoItem: "mesmo-issue",
                         }),
                       },
                     ];

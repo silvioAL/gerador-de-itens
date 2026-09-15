@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { destinosDaOperacao, normalizarExportador, OPERACOES_DO_GATEWAY } from "./normalizacao.js";
+import { LOTE_PADRAO } from "./lotes.js";
 
 /**
  * SPEC-81 fatia A — **os destinos do time.**
@@ -43,6 +44,9 @@ describe("os destinos do gateway (SPEC-81 fatia A)", () => {
         // flag de demonstração mora na lista, onde alguém a declara de
         // propósito.
         demonstracao: false,
+        // SPEC-120 fatia A — o lote é GLOBAL (é um gateway só, SPEC-118 §2.0),
+        // e chega resolvido para o adaptador não decidir de novo (§263).
+        lote: LOTE_PADRAO,
       },
     ]);
   });
@@ -328,5 +332,61 @@ describe("a variação de curl por destino (§346)", () => {
 
     expect(d.metodo).toBe("POST");
     expect(d.envelope).toBe("itens");
+  });
+});
+
+/**
+ * SPEC-120 fatia A — o lote na configuração, com a disciplina deste arquivo:
+ * degradar campo a campo, nunca recusar o documento inteiro.
+ */
+describe("o tamanho do lote (SPEC-120 fatia A)", () => {
+  it("sem declarar nada, vale o padrão de fábrica — 5 itens", () => {
+    const [d] = destinosDaOperacao(normalizarExportador({ endpoint: "https://gw/itens" }), "itens");
+
+    expect(d.lote).toEqual(LOTE_PADRAO);
+  });
+
+  it("o que a pessoa declarou vence, e o que ela não declarou continua no padrão", () => {
+    const config = normalizarExportador({ endpoint: "https://gw/itens", lote: { itens: 3 } });
+
+    expect(config.lote).toEqual({ itens: 3 });
+    expect(destinosDaOperacao(config, "itens")[0].lote).toEqual({
+      itens: 3,
+      caracteres: LOTE_PADRAO.caracteres,
+    });
+  });
+
+  it("o padrão NÃO é escrito de volta no documento — senão mudá-lo amanhã não alcançaria ninguém", () => {
+    /**
+     * A diferença entre "não declarei" e "declarei o que por acaso é o padrão".
+     * Gravar `{ itens: 5 }` em toda configuração salva transformaria o padrão
+     * do produto em valor de cada organização, e o dia em que o número certo
+     * mudasse não chegaria a quem nunca escolheu número nenhum.
+     */
+    expect(normalizarExportador({ endpoint: "https://gw/itens" }).lote).toBeUndefined();
+  });
+
+  it.each([
+    ["texto", { itens: "cinco" }],
+    ["zero", { itens: 0 }],
+    ["negativo", { itens: -3 }],
+  ])("valor inválido (%s) cai no padrão e NÃO apaga a exportação", (_caso, lote) => {
+    const config = normalizarExportador({ endpoint: "https://gw/itens", rotulo: "Jira", lote });
+
+    // O campo some; a integração fica.
+    expect(config.lote).toBeUndefined();
+    expect(config.endpoint).toBe("https://gw/itens");
+    expect(destinosDaOperacao(config, "itens")[0].lote).toEqual(LOTE_PADRAO);
+  });
+
+  it("o lote é o MESMO para todos os destinos — é um gateway só (SPEC-118 §2.0)", () => {
+    const config = normalizarExportador({
+      endpoint: "https://gw/itens",
+      lote: { itens: 2, caracteres: 9000 },
+      destinos: [{ id: "spec", operacao: "specDoItem", endpoint: "https://gw/spec", rotulo: "Spec" }],
+    });
+
+    expect(destinosDaOperacao(config, "itens")[0].lote).toEqual({ itens: 2, caracteres: 9000 });
+    expect(destinosDaOperacao(config, "specDoItem")[0].lote).toEqual({ itens: 2, caracteres: 9000 });
   });
 });

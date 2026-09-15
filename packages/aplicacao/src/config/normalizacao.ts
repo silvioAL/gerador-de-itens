@@ -1,4 +1,5 @@
 import type { ChaveConfig } from "../portas/repositorioDeConfig.js";
+import { LOTE_PADRAO, type LimitesDoLote } from "./lotes.js";
 
 /**
  * SPEC-31 Fase 3 — a coerção de entrada de cada documento de config.
@@ -152,6 +153,28 @@ export interface ConfigExportador {
    * exportação não reconfigura nada.
    */
   destinos?: DestinoDoGateway[];
+  /**
+   * SPEC-120 fatia A — **quantos itens vão por chamada.**
+   *
+   * > *"MCPs são lentos e tem limitações de tokens, pode ser necessário subir 5
+   * > itens por vez"*
+   *
+   * ## Por que GLOBAL, e não por destino
+   *
+   * É a pergunta 1 da SPEC-120, e a correção do usuário na SPEC-118 §2.0 a
+   * responde: **é um gateway só**, com endpoints que variam. Dois gateways com
+   * limites diferentes seria o caso que justificaria a configuração por
+   * destino, e ele não é o caso desta casa.
+   *
+   * Um campo por destino que ninguém preenche diferente é um campo a mais para
+   * errar; e migrar de global para por-destino depois é acrescentar, não
+   * quebrar. O contrário exigiria migração.
+   *
+   * Ausente = `LOTE_PADRAO`. O número certo é do gateway de cada um, não do
+   * produto — por isso é configurável; 5 de fábrica porque é o que o usuário
+   * mediu no dele.
+   */
+  lote?: { itens?: number; caracteres?: number };
 }
 
 /**
@@ -299,6 +322,14 @@ export function normalizarExportador(documento: unknown): ConfigExportador {
   const bruto = (documento ?? {}) as Partial<ConfigExportador>;
   const operacoesValidas: readonly string[] = OPERACOES_DO_GATEWAY;
 
+  const loteCru = (bruto.lote ?? {}) as { itens?: unknown; caracteres?: unknown };
+  const loteItens = saneado(loteCru.itens);
+  const loteCaracteres = saneado(loteCru.caracteres);
+  const loteDeclarado =
+    loteItens !== undefined || loteCaracteres !== undefined
+      ? { ...(loteItens !== undefined ? { itens: loteItens } : {}), ...(loteCaracteres !== undefined ? { caracteres: loteCaracteres } : {}) }
+      : undefined;
+
   const destinos: DestinoDoGateway[] = [];
   const idsVistos = new Set<string>();
   for (const cru of Array.isArray(bruto.destinos) ? bruto.destinos : []) {
@@ -354,7 +385,24 @@ export function normalizarExportador(documento: unknown): ConfigExportador {
     rotulo: typeof bruto.rotulo === "string" ? bruto.rotulo.trim() : "",
     cabecalhos: normalizarCabecalhos(bruto.cabecalhos) ?? {},
     ...(destinos.length > 0 ? { destinos } : {}),
+    ...(loteDeclarado ? { lote: loteDeclarado } : {}),
   };
+
+  /**
+   * SPEC-120 fatia A — o lote saneado, com a mesma disciplina do resto deste
+   * arquivo: **degradar campo a campo, nunca recusar o documento inteiro.**
+   *
+   * Número que não é número, zero, negativo ou fracionário não apaga a
+   * configuração de exportação: o campo some e o padrão vale. Quem digitou
+   * `"cinco"` na caixa perde o lote, não a integração.
+   *
+   * Só sobrevive o que a pessoa realmente declarou — escrever `{ itens: 5 }`
+   * de volta no documento faria o padrão do produto virar valor salvo, e mudar
+   * o padrão amanhã não alcançaria ninguém.
+   */
+  function saneado(v: unknown): number | undefined {
+    return typeof v === "number" && Number.isFinite(v) && v >= 1 ? Math.floor(v) : undefined;
+  }
 }
 
 /** Um destino com os cabeçalhos já resolvidos — é o que o adaptador chama. */
@@ -380,6 +428,16 @@ export interface DestinoResolvido {
    * não decida de novo (§263).
    */
   demonstracao: boolean;
+  /**
+   * SPEC-120 fatia A — os dois tetos do lote, **já resolvidos**.
+   *
+   * Aqui pela mesma razão do método e do envelope: quem chama não decide de
+   * novo. O adaptador que lesse `config.lote?.itens ?? 5` teria a segunda
+   * leitura do mesmo padrão, e duas leituras divergem na primeira mudança
+   * (§263) — aqui a divergência seria muda, porque um lote errado só aparece
+   * como timeout do outro lado.
+   */
+  lote: LimitesDoLote;
 }
 
 /** Sem declaração, `POST` — o verbo que todo agente escrito para este produto
@@ -430,6 +488,13 @@ export const ENVELOPE_PADRAO: Record<OperacaoDoGateway, string> = {
  * divergência seria muda — o botão apareceria e a chamada iria para outro lugar.
  */
 export function destinosDaOperacao(config: ConfigExportador, operacao: OperacaoDoGateway): DestinoResolvido[] {
+  // SPEC-120 fatia A — global (§ pergunta 1: é um gateway só), resolvido uma
+  // vez e carregado por todo destino desta operação.
+  const lote: LimitesDoLote = {
+    itens: config.lote?.itens ?? LOTE_PADRAO.itens,
+    caracteres: config.lote?.caracteres ?? LOTE_PADRAO.caracteres,
+  };
+
   const daLista = (config.destinos ?? [])
     .filter((d) => d.operacao === operacao)
     .map((d) => ({
@@ -444,6 +509,7 @@ export function destinosDaOperacao(config: ConfigExportador, operacao: OperacaoD
       envelope: d.envelope ?? ENVELOPE_PADRAO[operacao],
       espaco: d.espaco ?? "",
       demonstracao: d.demonstracao === true,
+      lote,
     }));
 
   /**
@@ -466,6 +532,7 @@ export function destinosDaOperacao(config: ConfigExportador, operacao: OperacaoD
       // O destino herdado é um endereço real, sempre: quem quiser demonstração
       // declara um destino na lista, onde a flag mora.
       demonstracao: false,
+      lote,
     });
   }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DestinoResolvido, ItemGeradoSalvo } from "@gerador/aplicacao";
+import { LOTE_PADRAO, type DestinoResolvido, type ItemGeradoSalvo } from "@gerador/aplicacao";
 import {
   ATRASO_DA_DEMONSTRACAO_MS,
   criarAnexadorDeSpecDeDemonstracao,
@@ -23,6 +23,7 @@ const DESTINO: DestinoResolvido = {
   envelope: "",
   espaco: "",
   demonstracao: true,
+  lote: LOTE_PADRAO,
 };
 
 function espiaoDeEspera() {

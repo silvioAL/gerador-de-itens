@@ -546,21 +546,48 @@ describe("DocumentoScreen — a conversa que produz a spec (SPEC-115 fatia F)", 
   it("o aviso conta as seções sem NADA de onde sair, e nomeia quais", () => {
     // O motivo do que vai acontecer, antes de acontecer: sem isto a pessoa
     // clica, espera, e recebe "ficaram de fora por ter lacuna" sem saber qual.
+    // SPEC-119 fatia A — são QUATRO seções desde que `decisoes` entrou: o lado
+    // escolhido da decisão passou a ter onde morar, e ele é a informação de
+    // que quem implementa precisa (§2.1).
     comItemPendente({ julgamentoDerivado: { recusas: "- alguma coisa" } });
 
     const aviso = screen.getByTestId("spec-sem-julgamento");
-    expect(aviso).toHaveTextContent("Faltam 2 seções");
+    expect(aviso).toHaveTextContent("Faltam 3 seções");
     expect(aviso).toHaveTextContent("Quem pediu");
-    expect(aviso).not.toHaveTextContent("O que NÃO entra");
+    expect(aviso).toHaveTextContent("O que já foi decidido");
+    expect(aviso).not.toHaveTextContent("O que NÃO entra, e por quê");
   });
 
-  it("com as três tendo de onde sair, a tela declara que a spec pode subir", () => {
+  it("com as quatro tendo de onde sair, a tela declara que a spec pode subir", () => {
     comItemPendente({
-      julgamentoDerivado: { origem: "o time pediu", recusas: "síncrono ficou fora", fatias: "1. o item" },
+      julgamentoDerivado: {
+        origem: "o time pediu",
+        decisoes: "use Fila, porque desacopla",
+        recusas: "síncrono ficou fora",
+        fatias: "1. o item",
+      },
     });
 
     expect(screen.getByTestId("spec-com-julgamento")).toBeInTheDocument();
     expect(screen.queryByTestId("spec-sem-julgamento")).toBeNull();
+  });
+
+  it("SPEC-119 fatia A — a seção das DECISÕES existe, e diz que deriva do lado escolhido", () => {
+    /**
+     * A assimetria que o §410 deixou: a alternativa descartada virava
+     * `recusas`, e a ESCOLHIDA não ia a lugar nenhum. Um humano infere fila a
+     * partir de "síncrono ficou fora"; um agente de código precisa do padrão
+     * a usar, e inferi-lo é onde ele acerta plausivelmente e erra de fato.
+     *
+     * As duas seções derivam da MESMA decisão, e o rótulo de origem de cada
+     * uma diz por qual lado — dizer só "derivado das decisões aceitas" nas
+     * duas esconderia que elas não são a mesma informação.
+     */
+    comItemPendente({ julgamentoDerivado: { decisoes: "- **Transporte**: use **Fila** — porque desacopla." } });
+
+    const secao = screen.getByTestId("spec-decisoes-derivado");
+    expect(within(secao).getByText(/use \*\*Fila\*\*/)).toBeInTheDocument();
+    expect(screen.getByText(/derivado das decisões aceitas, pelo lado escolhido/)).toBeInTheDocument();
   });
 
   it("texto de GENTE vence o derivado — e o bloco do motor sai da frente", () => {

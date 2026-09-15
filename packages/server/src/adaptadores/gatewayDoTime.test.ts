@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { DestinoResolvido } from "@gerador/aplicacao";
+import { LOTE_PADRAO, type DestinoResolvido } from "@gerador/aplicacao";
 import {
   criarAnexadorDeSpecViaGateway,
   criarLeitorDeAdrViaGateway,
@@ -17,6 +17,7 @@ const DESTINO_ADR: DestinoResolvido = {
   envelope: "",
   espaco: "",
   demonstracao: false,
+  lote: LOTE_PADRAO,
 };
 
 const DESTINO_DOC: DestinoResolvido = {
@@ -29,6 +30,7 @@ const DESTINO_DOC: DestinoResolvido = {
   envelope: "",
   espaco: "",
   demonstracao: false,
+  lote: LOTE_PADRAO,
 };
 
 const DOCUMENTO = {
@@ -286,6 +288,7 @@ describe("ler um documento da casa pelo link (§349)", () => {
     envelope: "",
     espaco: "",
     demonstracao: false,
+  lote: LOTE_PADRAO,
   };
 
   const respondendo = (corpo: unknown, status = 200) =>
@@ -381,6 +384,7 @@ describe("anexar a spec de cada item pelo gateway (SPEC-114)", () => {
     envelope: "",
     espaco: "",
     demonstracao: false,
+  lote: LOTE_PADRAO,
   };
 
   const respondendo = (corpo: unknown, status = 200) =>
@@ -473,5 +477,119 @@ describe("anexar a spec de cada item pelo gateway (SPEC-114)", () => {
     const [, init] = rede.mock.calls[0] as unknown as [string, RequestInit];
     expect(init.method).toBe("PUT");
     expect(Object.keys(JSON.parse(init.body as string))).toEqual(["dados"]);
+  });
+
+  /**
+   * SPEC-120 fatias A, B e C — o lote na chamada que a SPEC-98 §4 já dizia
+   * precisar dele, e que nunca foi construída (§0.1: *"uma demanda com trinta
+   * itens hoje manda trinta specs num POST"*).
+   */
+  describe("em lotes (SPEC-120)", () => {
+    function pedido(i: number, tamanho = 10) {
+      return { chave: `c${i}`, chaveExterna: `X-${i}`, conteudo: "#".repeat(tamanho) };
+    }
+
+    /** Ecoa o que recebeu, para o teste medir a emenda das chamadas. */
+    function redeQueEcoa() {
+      const corpos: { itens: { chaveExterna: string }[] }[] = [];
+      const rede = vi.fn(async (_url: string, init: RequestInit) => {
+        const bruto = JSON.parse(init.body as string) as { itens: { chaveExterna: string }[] };
+        corpos.push(bruto);
+        return new Response(
+          JSON.stringify({ resultados: bruto.itens.map((i) => ({ chaveExterna: i.chaveExterna })) }),
+          { status: 200 }
+        );
+      });
+      return { rede, corpos };
+    }
+
+    it("fatia A — trinta specs produzem seis chamadas, e o estado continua por item", async () => {
+      const { rede, corpos } = redeQueEcoa();
+      const pedidos = Array.from({ length: 30 }, (_, i) => pedido(i));
+
+      const resultado = await criarAnexadorDeSpecViaGateway(DESTINO_SPEC, rede as unknown as typeof fetch).anexar(pedidos);
+
+      expect(corpos).toHaveLength(6);
+      expect(corpos.every((c) => c.itens.length === 5)).toBe(true);
+      expect(resultado).toEqual(pedidos.map((p) => ({ chave: p.chave })));
+    });
+
+    it("fatia B — cinco specs GRANDES fecham o lote antes dos cinco itens", async () => {
+      /**
+       * §1.1 — cinco itens não são cinco tamanhos, e o que estoura contexto é a
+       * spec. Um limite só em contagem falharia justamente no caso que ele
+       * existe para evitar.
+       */
+      const { rede, corpos } = redeQueEcoa();
+      const destino = { ...DESTINO_SPEC, lote: { itens: 5, caracteres: 1000 } };
+
+      await criarAnexadorDeSpecViaGateway(destino, rede as unknown as typeof fetch).anexar(
+        Array.from({ length: 5 }, (_, i) => pedido(i, 400))
+      );
+
+      expect(corpos.map((c) => c.itens.length)).toEqual([2, 2, 1]);
+    });
+
+    it("fatia C — um 413 no lote de 5 vira dois lotes menores, sem a pessoa fazer nada", async () => {
+      /**
+       * A recusa do destino é SINAL, não só erro: ela diz *este lote não
+       * coube*. Marcar os cinco como falhos jogaria essa informação fora, e a
+       * pessoa ficaria com cinco erros idênticos e nenhuma pista.
+       *
+       * Seguro aqui porque anexar spec a um issue que já existe é idempotente
+       * na prática — o pior caso é a spec aparecer duas vezes, e alguém apaga.
+       * Criar issue não é, e por isso a exportação não reduz (pergunta 2).
+       */
+      const tamanhosVistos: number[] = [];
+      const rede = vi.fn(async (_url: string, init: RequestInit) => {
+        const bruto = JSON.parse(init.body as string) as { itens: { chaveExterna: string }[] };
+        tamanhosVistos.push(bruto.itens.length);
+        if (bruto.itens.length > 2) return new Response("payload too large", { status: 413 });
+        return new Response(
+          JSON.stringify({ resultados: bruto.itens.map((i) => ({ chaveExterna: i.chaveExterna })) }),
+          { status: 200 }
+        );
+      });
+
+      const pedidos = Array.from({ length: 5 }, (_, i) => pedido(i));
+      const resultado = await criarAnexadorDeSpecViaGateway(DESTINO_SPEC, rede as unknown as typeof fetch).anexar(pedidos);
+
+      // 5 recusado → 2 + 2 + 1, e os cinco sobem.
+      expect(tamanhosVistos).toEqual([5, 2, 2, 1]);
+      expect(resultado).toEqual(pedidos.map((p) => ({ chave: p.chave })));
+    });
+
+    it("fatia C — a spec que não passa NEM SOZINHA vira erro por item, com o motivo", async () => {
+      /**
+       * A redução para quando não dá mais para reduzir: fatiar abaixo de um
+       * item seria cortar no meio de uma spec (SPEC-98 §4.1), e uma spec
+       * truncada sobe parecendo completa.
+       *
+       * O motivo que volta é o do gateway, e ele é a informação certa: não é o
+       * lote que não cabe, é a spec.
+       */
+      const rede = vi.fn(async () => new Response("content too large", { status: 413 }));
+
+      const resultado = await criarAnexadorDeSpecViaGateway(DESTINO_SPEC, rede as unknown as typeof fetch).anexar([
+        pedido(1),
+        pedido(2),
+      ]);
+
+      expect(resultado).toEqual([
+        { chave: "c1", erro: expect.stringContaining("413") },
+        { chave: "c2", erro: expect.stringContaining("413") },
+      ]);
+    });
+
+    it("fatia C — erro que NÃO é de tamanho não vira retentativa", async () => {
+      // Sem sinal de tamanho não se adivinha: um 500 genérico pode ser
+      // qualquer coisa, e retentar em cima dele seria o produto insistindo
+      // numa falha que não tem nada a ver com lote.
+      const rede = vi.fn(async () => new Response("internal error", { status: 500 }));
+
+      await criarAnexadorDeSpecViaGateway(DESTINO_SPEC, rede as unknown as typeof fetch).anexar([pedido(1), pedido(2)]);
+
+      expect(rede).toHaveBeenCalledTimes(1);
+    });
   });
 });

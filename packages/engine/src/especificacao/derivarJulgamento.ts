@@ -65,6 +65,23 @@ export interface MaterialDeJulgamento {
   decisoes?: Decisao[];
   /** As atividades que esta spec cobre — cada uma é uma fatia. */
   itens?: Atividade[];
+  /**
+   * SPEC-119 §2.3 — `No.id`/`Aresta.id` → o rótulo que a pessoa deu.
+   *
+   * Uma decisão sem onde vale é uma restrição que quem implementa aplica ao
+   * componente errado, e `noId: "n3"` não localiza nada para ninguém. O mapa
+   * chega de fora porque este módulo não conhece o diagrama, e não deve: id que
+   * não estiver aqui volta como id cru, que é pior que o rótulo e melhor que
+   * omitir onde a regra vale.
+   */
+  rotulos?: Record<string, string>;
+  /**
+   * SPEC-119 fatia F — onde o corpo do item está em relação a esta spec.
+   *
+   * É o que decide a frase da PROVA em `derivarFatias`. Ausente = `"fora"`: a
+   * leitura conservadora, porque um arquivo baixado não leva o item junto.
+   */
+  corpoDoItem?: "mesmo-issue" | "fora";
 }
 
 /**
@@ -80,6 +97,19 @@ export interface MaterialDeJulgamento {
  */
 function decisoesQueValem(decisoes: Decisao[]): Decisao[] {
   return decisoes.filter((d) => d.status === "aceita");
+}
+
+/**
+ * SPEC-119 fatia E — os nomes pelos quais as restrições são citadas no fim da
+ * spec.
+ *
+ * Exportado para que o fechamento e a seção `Decisões` citem **a mesma lista**.
+ * Duas leituras da mesma pergunta divergem na primeira mudança (§263), e aqui
+ * a divergência seria a pior possível: o fim da spec dizendo que três decisões
+ * restringem enquanto a seção lista duas.
+ */
+export function titulosDasDecisoesQueValem(decisoes: Decisao[]): string[] {
+  return decisoesQueValem(decisoes).map((d) => d.titulo);
 }
 
 /**
@@ -113,6 +143,49 @@ function derivarRecusas(decisoes: Decisao[]): string | undefined {
   );
   if (linhas.length === 0) return undefined;
   return marcado(`de ${linhas.length === 1 ? "1 alternativa descartada" : `${linhas.length} alternativas descartadas`}`, linhas.join("\n"));
+}
+
+/**
+ * SPEC-119 fatia A — *"o que já foi decidido, e por quê."*
+ *
+ * ## A assimetria que o §410 deixou, e que esta função fecha
+ *
+ * A rodada anterior fez as decisões alimentarem a spec **só pelo lado
+ * negativo**: a alternativa descartada vira `recusas`. A escolhida, com o
+ * porquê, não ia a lugar nenhum.
+ *
+ * Para um humano isso quase se sustenta — quem lê *"síncrono ficou fora porque
+ * acopla ao parceiro"* infere que ficou fila. **Para um agente de código é
+ * exatamente a informação que falta**: ele precisa saber qual padrão USAR, não
+ * qual evitar. Inferir a escolha a partir do descarte é o tipo de salto que
+ * produz código plausível e errado.
+ *
+ * ## Por que o `onde` não é opcional na frase
+ *
+ * Uma decisão de arquitetura é restrição de implementação, e restrição sem alvo
+ * se aplica ao componente errado. `noId`/`arestaId` ausentes **não** são falta
+ * de dado: o tipo diz que decisão sem âncora é da quebra inteira, e a frase diz
+ * isso em voz alta em vez de omitir a linha.
+ *
+ * O `porque` ausente também não vira frase inventada — a restrição sai sem
+ * razão, e quem ler vê que ela foi registrada sem dizer por quê. É o mesmo
+ * cobrar-em-silêncio de `derivarRecusas`.
+ */
+function derivarDecisoes(decisoes: Decisao[], rotulos: Record<string, string>): string | undefined {
+  const valem = decisoesQueValem(decisoes);
+  if (valem.length === 0) return undefined;
+
+  const linhas = valem.map((d) => {
+    const alvo = d.noId ?? d.arestaId;
+    const onde = alvo ? `vale em **${rotulos[alvo] ?? alvo}**` : "vale na demanda inteira";
+    const porque = d.porque?.trim() ? ` — porque ${d.porque.trim()}` : "";
+    return `- **${d.titulo}**: use **${d.escolhida}**${porque}. _(${onde})_`;
+  });
+
+  return marcado(
+    `de ${linhas.length === 1 ? "1 decisão aceita" : `${linhas.length} decisões aceitas`}`,
+    linhas.join("\n")
+  );
 }
 
 /**
@@ -156,14 +229,30 @@ function derivarOrigem(contexto: string | undefined, necessidades: Necessidade[]
  * O que a seção acrescenta é o que o corpo do item não diz: **o recorte** — qual
  * fatia é esta, de que tipo e tamanho, e de que ela depende.
  */
-function derivarFatias(itens: Atividade[]): string | undefined {
+function derivarFatias(itens: Atividade[], corpoDoItem: "mesmo-issue" | "fora"): string | undefined {
   if (itens.length === 0) return undefined;
+  /**
+   * SPEC-119 fatia F — **o ponteiro deixa de ser pendurado.**
+   *
+   * A frase era *"na seção dele"*, e ela presumia que o corpo do item viaja
+   * junto. O §3.4 mediu: viaja no caminho da SPEC-114, não viaja no markdown
+   * baixado, e a spec não dizia qual dos dois. Um agente que receba só a spec
+   * segue um ponteiro para lugar nenhum e inventa o critério de aceite — que é
+   * a pior das falhas possíveis aqui, porque produz algo que PARECE pronto.
+   *
+   * Agora quem chama declara onde o corpo está, e a frase afirma isso.
+   */
+  const ondeEstaAProva =
+    corpoDoItem === "mesmo-issue"
+      ? "Prova: os critérios de aceite deste item, no corpo do issue ao qual esta spec está anexada."
+      : "Prova: os critérios de aceite deste item, no corpo do item — que não viaja neste arquivo.";
+
   const linhas = itens.map((a, i) => {
     // `alvoChave` é opcional — dependência sem alvo declarado existe (o tipo diz
     // ISSO), e listar `undefined` seria pior que omitir a linha.
     const alvos = a.dependencias.map((d) => d.alvoChave).filter((c): c is string => !!c);
     const dependencias = alvos.length > 0 ? ` — depende de ${alvos.join(", ")}` : "";
-    return `${i + 1}. **${a.rotulo}** (${a.tipo}, ${a.tamanho})${dependencias}\n   Prova: os critérios de aceite deste item, na seção dele.`;
+    return `${i + 1}. **${a.rotulo}** (${a.tipo}, ${a.tamanho})${dependencias}\n   ${ondeEstaAProva}`;
   });
   return marcado(`de ${linhas.length === 1 ? "1 item derivado do desenho" : `${linhas.length} itens derivados do desenho`}`, linhas.join("\n"));
 }
@@ -178,10 +267,15 @@ export function derivarSecoesDeJulgamento(material: MaterialDeJulgamento): Parti
   const origem = derivarOrigem(material.contextoDaDemanda, material.necessidades ?? []);
   if (origem) derivado.origem = origem;
 
+  // SPEC-119 fatia A — o lado POSITIVO da mesma `Decisao` de onde saem as
+  // recusas. As duas leem a mesma lista, pela mesma função de filtro.
+  const decisoes = derivarDecisoes(material.decisoes ?? [], material.rotulos ?? {});
+  if (decisoes) derivado.decisoes = decisoes;
+
   const recusas = derivarRecusas(material.decisoes ?? []);
   if (recusas) derivado.recusas = recusas;
 
-  const fatias = derivarFatias(material.itens ?? []);
+  const fatias = derivarFatias(material.itens ?? [], material.corpoDoItem ?? "fora");
   if (fatias) derivado.fatias = fatias;
 
   return derivado;

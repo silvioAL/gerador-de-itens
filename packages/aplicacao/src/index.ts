@@ -44,6 +44,19 @@ export {
   type MetodoDoGateway,
 } from "./config/normalizacao.js";
 
+/**
+ * SPEC-120 fatias A–C — o lote: quantos itens cabem numa chamada, e a recusa do
+ * destino que é sinal de que couberam demais.
+ */
+export {
+  fatiarEmLotes,
+  pareceLoteGrandeDemais,
+  CARACTERES_POR_LOTE_PADRAO,
+  ITENS_POR_LOTE_PADRAO,
+  LOTE_PADRAO,
+  type LimitesDoLote,
+} from "./config/lotes.js";
+
 /** SPEC-81 fatia C — ler os ADRs da casa, marcados como importados. */
 export {
   comoDecisao,

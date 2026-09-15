@@ -1356,7 +1356,10 @@ function JulgamentoDaSpec({
         </p>
       ) : (
         <p data-testid="spec-com-julgamento" style={{ fontSize: 12, color: "var(--verde)", margin: "0 0 8px" }}>
-          As três têm de onde sair — a spec de cada item pode subir.
+          {/* O número sai de `SECOES`, e não de uma palavra escrita à mão: a
+              SPEC-119 fatia A acrescentou a quarta seção, e "as três" teria
+              continuado na tela dizendo o número errado sem nada acusar. */}
+          As {SECOES.length} têm de onde sair — a spec de cada item pode subir.
         </p>
       )}
 
@@ -1494,16 +1497,29 @@ function JulgamentoDaSpec({
   );
 }
 
-const SECOES: SecaoDeJulgamento[] = ["origem", "recusas", "fatias"];
+/**
+ * A ordem da TELA é a da leitura de quem revisa, e ela acompanha a do artefato
+ * (SPEC-119 fatia E): quem pediu, o que ficou decidido, o que ficou fora, o que
+ * se constrói.
+ *
+ * `decisoes` entrou aqui junto com a fatia A. Ela é a seção que o §2.1 achou
+ * faltando: o §410 fez as decisões alimentarem a spec só pelo lado negativo, e
+ * a escolhida — a informação de que quem escreve código precisa — não tinha
+ * onde morar.
+ */
+const SECOES: SecaoDeJulgamento[] = ["origem", "decisoes", "recusas", "fatias"];
 
 const ROTULO_DA_SECAO: Record<SecaoDeJulgamento, string> = {
   origem: "Quem pediu, e com que palavras",
+  decisoes: "O que já foi decidido, e por quê",
   recusas: "O que NÃO entra, e por quê",
   fatias: "O que fica verdade em cada fatia, e como se prova",
 };
 
 const DICA_DA_SECAO: Record<SecaoDeJulgamento, string> = {
   origem: "A frase de quem pediu. É o que permite, meses depois, saber se o que foi construído responde ao que foi pedido.",
+  decisoes:
+    "A restrição, e a razão que a torna checável. Quem lê a spec para implementar precisa saber qual padrão USAR — não só qual evitar.",
   recusas: "Recusa sem motivo é opinião; com motivo é projeto — e é o que impede a spec de virar lista de desejos.",
   fatias: "Fatia sem prova declarada é promessa.",
 };
@@ -1512,7 +1528,8 @@ const DICA_DA_SECAO: Record<SecaoDeJulgamento, string> = {
  * a sua — dizer "derivado" genérico esconderia de onde aquilo saiu. */
 const ORIGEM_DERIVADA: Record<SecaoDeJulgamento, string> = {
   origem: "derivado do contexto e dos propósitos da demanda — edite ou complemente",
-  recusas: "derivado das decisões aceitas — edite ou complemente",
+  decisoes: "derivado das decisões aceitas, pelo lado escolhido — edite ou complemente",
+  recusas: "derivado das decisões aceitas, pelo lado descartado — edite ou complemente",
   fatias: "derivado dos itens do desenho — edite ou complemente",
 };
 
