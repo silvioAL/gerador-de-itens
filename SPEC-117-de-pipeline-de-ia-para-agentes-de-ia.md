@@ -229,10 +229,27 @@ da §0.2 de documentação em **mecanismo**.
 
 ## 6. Perguntas em aberto — o que muda o desenho
 
-1. **"Tenho um agente pronto" é um PROMPT ou um AGENTE EXTERNO?** (§1) É a
-   pergunta que decide se a próxima rodada é a fatia C (barata, incremental)
-   ou a fatia E (arquitetural). Se for externo: ele fala HTTP como os destinos
-   do gateway de hoje, ou espera outro contrato?
+1. ~~**"Tenho um agente pronto" é um PROMPT ou um AGENTE EXTERNO?**~~
+   ✅ **RESPONDIDO pelo usuário: é um PROMPT.** *"estava me referindo a um
+   prompt."*
+
+   Isso resolve a §1 inteira a favor da **Leitura A**, e as consequências são
+   boas:
+
+   - A **fatia E** (agente externo como executor de conversa) sai do caminho
+     crítico. Ela continua sendo uma evolução defensável, mas deixa de ser
+     pré-requisito de nada — e com ela sai a novidade arquitetural mais cara
+     desta SPEC.
+   - As fatias **C** (preâmbulo por conversa) e **D** (as regras inegociáveis
+     viram dado) passam a ser o coração: a mecânica já existe na esteira, e o
+     trabalho é estendê-la sem deixar cair o que a §3 mede.
+   - A **pergunta 4** (agente externo escrevendo seção de julgamento) fica
+     suspensa junto com a fatia E.
+
+   **O que NÃO muda:** a §3 continua valendo inteira. Um prompt editável é
+   exatamente o caminho por onde as regras de produto podem sumir em silêncio,
+   e o texto morando no banco continua fora do alcance da varredura de fonte
+   da SPEC-80 fatia D.
 2. **O preâmbulo configurável acrescenta ou substitui?** (§3) Com as três
    saídas medidas e a recomendação dada, falta a decisão.
 3. **A configuração de agente é por TIME ou global?** A config de papéis já é

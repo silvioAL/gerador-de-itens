@@ -16574,3 +16574,61 @@ que transforma a anatomia de documentação em mecanismo.
 
 Registrado em **SPEC-117**, com seis fatias e quatro perguntas em aberto.
 Nada implementado nesta rodada.
+
+---
+## §413 — SPEC-118: o curl que abriu os campos volta como entrada deles
+
+Duas coisas nesta rodada, e nenhuma implementada — as duas são spec, a pedido.
+
+**A pergunta 1 da SPEC-117 foi respondida:** *"estava me referindo a um
+prompt."* Isso resolve a §1 daquela spec a favor da Leitura A e tira do
+caminho crítico a fatia mais cara (agente externo como executor de conversa) —
+junto com a pergunta 4, que dependia dela. As fatias C e D viram o coração, e
+a §3 continua valendo inteira: prompt editável é exatamente o caminho por onde
+as regras de produto somem em silêncio.
+
+**E o pedido novo**, sobre as duas telas de configuração:
+
+> *"o objetivo é que eu possa configurar: 1 - A IA geral onde roda o assistente
+> e geração dos itens, o endpoint para importação, o endpoint para exportação,
+> todos 3 via importação de curl para ferramenta"*
+
+### O achado que organiza a SPEC-118
+
+`metodo` e `envelope` existem em `DestinoDoGateway` por causa desta frase, que
+está citada no código desde o §346:
+
+> *"é possível que existam diferentes agentes no gateway… **o curl da chamada**
+> vai conter variações entre agentes"*
+
+**Os campos foram derivados de um curl que ninguém nunca colou.** O produto
+pedia que a pessoa lesse o curl dela, decompusesse mentalmente em verbo,
+cabeçalhos, endereço e formato de corpo, e redigitasse cada pedaço num
+formulário diferente. A spec fecha o laço: cola o curl, o produto decompõe.
+
+### O que a medição achou nas duas telas
+
+Sete campos na de IA, oito na de Exportação, e **um único nome em comum**
+(`cabecalhos`) — duas telas descrevendo a mesma coisa (endereço HTTP com
+autenticação e formato de corpo) em dois vocabulários.
+
+E o que o usuário chama de "importação" **não existe como conceito**: as cinco
+operações do gateway moram na mesma lista, num select onde "ler ADRs" e
+"publicar documento" são vizinhos indistinguíveis. A direção do fluxo — a
+primeira coisa que alguém procura para se orientar — não aparece em lugar
+nenhum.
+
+### A régua cujo erro é irreversível
+
+Um curl copiado de um terminal que funciona **contém o segredo real**. Uma
+caixa de colar é superfície nova: o valor passa por textarea, screenshot de
+suporte, undo buffer. A §3.1 fixa três regras — o campo é efêmero, a chave sai
+dos cabeçalhos para o campo de segredo mascarado, e a tela DIZ que separou
+(silêncio ali faria a pessoa achar que a chave foi para a config versionável).
+
+E o trabalho de verdade não é o parser feliz: são os dialetos. *Copy as cURL*
+do DevTools em bash e em cmd diferem em continuação e aspas; no PowerShell
+`curl` é alias de `Invoke-WebRequest`, outra sintaxe inteira. Um parser
+bash-only entregaria a fatia pela metade justamente para quem a pediu.
+
+Sete fatias, quatro perguntas em aberto. Registrado em **SPEC-118**.
