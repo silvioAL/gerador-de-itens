@@ -217,10 +217,22 @@ da §0.2 de documentação em **mecanismo**.
   dissolvidas na string do prompt. Para a fatia C ser segura, elas precisam ser
   reinjetáveis. **Prova:** trocar o preâmbulo inteiro de
   `montarPedidoScriptDeMapeamento` e o "somente leitura" continuar lá.
-- **E — agente externo como executor de conversa** (Leitura B da §1).
-  **Depende de** a resposta à pergunta 1 da §6. **Prova:** uma conversa
-  roteada para um destino do gateway produz o mesmo tipo de resultado que a
-  conversa direta, marcada como vinda de fora.
+- ~~**E — agente externo como executor de conversa**~~ ❌ **FORA, por decisão
+  do usuário.**
+
+  > *"os agentes no gateway vou deixar no gateway, são basicamente os que vão
+  > fazer o import ou export para o jira, o gateway é o mesmo mas pode variar o
+  > endpoint"*
+
+  Isto não é o adiamento que a resposta da pergunta 1 já tinha produzido — é o
+  encerramento. Os agentes do gateway **importam e exportam, e é isso que
+  fazem**. Nenhum deles pensa, e não é por falta de capacidade: é a divisão de
+  trabalho que o usuário está declarando.
+
+  **O que se ganha ao fechar:** a §2 fica com três seções de natureza
+  estável — a esteira e as conversas são do produto, os agentes do gateway são
+  do transporte. A tentação de unificá-los numa lista de "agentes" (que a §2 já
+  recusava por forma) perde também o motivo.
 - **F — o "✦ Sugerir" da esteira vale para as conversas também.** A aba já
   sabe propor um papel a partir de uma frase; propor um preâmbulo de conversa é
   o mesmo gesto.
@@ -256,10 +268,15 @@ da §0.2 de documentação em **mecanismo**.
    por time (`time-silvio` aparece no cabeçalho da aba). As conversas do
    assistente hoje não são de ninguém — passariam a ser do time, ou da
    organização?
-4. **Um agente externo pode escrever seção de julgamento?** A trava da SPEC-80
-   fatia D guarda os arquivos do repositório. Um agente de fora está fora do
-   alcance da varredura — a régua vale por contrato, por marcação na resposta,
-   ou não vale?
+4. ~~**Um agente externo pode escrever seção de julgamento?**~~ ❌ **Não se
+   coloca mais.** Com a fatia E encerrada (§5), nenhum agente de fora executa
+   conversa — então nenhum chega perto das seções de julgamento. A varredura de
+   fonte da SPEC-80 fatia D volta a cobrir todo o alcance que precisa cobrir.
+
+   **O que continua valendo, e é a pergunta 2 acima:** o risco não sumiu, ele
+   mudou de lugar. Um preâmbulo editável guardado no BANCO está igualmente fora
+   do alcance da varredura — e agora é o único caminho por onde a régua pode
+   cair.
 
 ---
 

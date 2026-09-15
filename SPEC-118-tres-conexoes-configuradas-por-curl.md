@@ -99,6 +99,54 @@ SPEC-81 e ela não se mexe: dois trackers numa migração, dois espaços de
 documentação. O que muda é que eles ficam agrupados pela direção, e não
 espalhados num select de cinco valores.
 
+### 2.0 ⚠️ **Correção do usuário: é UM gateway, com endpoints que variam**
+
+> *"os agentes no gateway vou deixar no gateway, são basicamente os que vão
+> fazer o import ou export para o jira, o gateway é o mesmo mas pode variar o
+> endpoint"*
+
+Isto muda a forma da proposta, e é uma simplificação real. O desenho não é
+"três conexões independentes". É:
+
+```
+🧠 O gateway de IA        — onde o assistente e a esteira pensam
+🏠 O gateway da casa      — UM endereço, UMA autenticação
+   ├── ⬇ importar   → endpoint do agente que lê ADR / documento
+   └── ⬆ exportar   → endpoint do agente que cria issue / anexa spec
+```
+
+**A autenticação é uma só, e os endpoints é que variam.** A correção também
+fecha a natureza dos agentes do gateway: eles **importam e exportam**, e é só
+isso que fazem — nenhum deles pensa.
+
+#### O que isso já encontra pronto, e o que ameaça
+
+`DestinoDoGateway.cabecalhos` é **opcional de propósito** desde a SPEC-81:
+
+> *"Ausente = usa os cabeçalhos compartilhados. **Declarado vence herdado**
+> (§306): a organização com um gateway só configura a autenticação uma vez; a
+> que aponta para três MCPs distintos declara por destino."*
+
+O modelo do usuário é exatamente o primeiro caso, e o produto já o suporta.
+**Mas um importador de cURL ingênuo destrói isso.** Cada curl colado traz o
+`Authorization` dentro dele; escrevê-lo no destino faria cada destino ter a
+sua cópia da chave — e aí:
+
+- **rotacionar a chave vira edição em N lugares**, e a que alguém esquecer
+  falha semanas depois, sozinha;
+- a chave passa a existir em N linhas do documento de config em vez de uma;
+- a herança que a SPEC-81 construiu vira código morto, sem ninguém decidir
+  isso.
+
+> **A régua que sai daqui:** ao importar um curl cujo host e cabeçalhos casam
+> com os do gateway já configurado, o produto **reconhece o mesmo gateway** e
+> guarda só o que difere — o endpoint. E diz na tela que fez isso, porque uma
+> herança silenciosa é tão ruim quanto uma duplicação silenciosa.
+>
+> Quem aponta para gateways realmente diferentes continua podendo declarar
+> cabeçalhos por destino: a régua do §306 não muda, só deixa de ser acionada
+> por acidente.
+
 ### 2.1 O que um cURL preenche
 
 ```bash
@@ -166,22 +214,38 @@ resto.
 **Um curl por destino**, então. O que se ganha em unificação é a FORMA de
 configurar, não o número de coisas configuradas.
 
-### 3.3 Dialetos de cURL, e este é o trabalho de verdade
+### 3.3 ✅ **Dialeto decidido: o cURL exportado do Postman**
 
-A mesma chamada, copiada de lugares diferentes:
+> *"curl exportado do postman"*
 
-| Origem | O que muda |
+Isto recorta o trabalho de forma muito mais nítida do que "suportar cURL". O
+que o Postman exporta tem forma previsível:
+
+```bash
+curl --location 'https://gw.empresa/jira/issues' \
+--header 'Authorization: Bearer abc123' \
+--header 'Content-Type: application/json' \
+--data '{"itens": [{"chave": "..."}]}'
+```
+
+**As particularidades que o parser precisa conhecer, e só elas:**
+
+| O que o Postman faz | Consequência para o parser |
 |---|---|
-| DevTools → *Copy as cURL (bash)* | continuação com `\`, aspas simples |
-| DevTools → *Copy as cURL (cmd)* | continuação com `^`, aspas duplas, escapes diferentes |
-| PowerShell | `curl` é alias de `Invoke-WebRequest` — **outra sintaxe inteira** |
-| Postman / Insomnia | `--data-raw`, `--location`, `--request` |
+| **flags longas** (`--location`, `--header`, `--data`, `--request`) | as formas curtas (`-H`, `-d`, `-X`) entram de brinde, mas não são o alvo |
+| **omite `--request POST`** quando há `--data` | ausência de verbo **com corpo** = `POST` (é o que o cURL faz, e já é o padrão do produto) |
+| `--data-raw` para corpo não-formulário | mesmo tratamento de `--data` |
+| `--location` (seguir redirect) | **ignorar** — é comportamento do cliente, não da configuração |
+| continuação com `\` e aspas simples | um dialeto só, e é o bash |
+| `--form` (multipart) | fora do escopo: nenhuma operação deste produto manda multipart |
 
-Um parser que só entenda bash vai falhar no caso mais comum do usuário deste
-produto, que trabalha no Windows. **A decisão a tomar:** quais dialetos entram
-na primeira versão, e o que acontece com o que não for entendido — recusa
-explícita ("não entendi este formato, confira os campos") é melhor que um
-parse parcial silencioso.
+**O que isso tira da mesa:** o dialeto `cmd` (`^`), o PowerShell
+(`Invoke-WebRequest`) e o `--compressed` do DevTools deixam de ser
+pré-requisito. Eles podem entrar depois, e a decisão do que fazer com o que
+não for entendido continua valendo: **recusa nomeada** ("não reconheci este
+formato — confira os campos abaixo") é melhor que parse parcial silencioso,
+que preencheria metade do formulário e deixaria a outra metade com o valor
+antigo.
 
 ### 3.4 O que já está configurado não pode quebrar
 
@@ -237,22 +301,46 @@ formato novo de armazenamento. O documento salvo no banco continua sendo o que
 
 ---
 
-## 6. Perguntas em aberto
+## 6. Perguntas, e o que já foi respondido
 
-1. **Quais dialetos de cURL entram na primeira versão?** (§3.3) O usuário
-   trabalha no Windows — bash-only seria entregar a fatia pela metade para
-   quem a pediu.
-2. **"Testar conexão" para importação/exportação chama o quê?** A IA tem um
-   endpoint de teste barato. Um destino de tracker não tem: testar de verdade
-   criaria um issue. Um `HEAD`/`OPTIONS`, um payload vazio, ou a fatia F fica
-   só para a IA?
-3. **A tela única (fatia G) substitui as duas abas ou as agrupa?** Trocar de
-   lugar uma configuração que alguém já sabe onde fica tem custo — e o §308
-   deste projeto já pagou por aba cortada.
-4. **O `endpoint` de topo da exportação (SPEC-81 §1) some?** Ele é o destino de
-   `itens` de quem configurou antes, mantido por compatibilidade. Com a tela
-   reorganizada, ele vira um destino normal na lista — e isso exige migração de
-   dado, que a SPEC-81 recusou fazer na época.
+1. ~~**Quais dialetos de cURL?**~~ ✅ **O exportado do Postman** (§3.3). Recorta
+   o parser a um dialeto previsível e tira `cmd`, PowerShell e DevTools do
+   caminho crítico.
+2. ~~**A tela única substitui as duas abas ou as agrupa?**~~ ✅ **Substitui.**
+   As abas "Modelo de IA" e "Exportação" deixam de existir; entra uma só,
+   organizada pelas conexões do §2.
+
+   **O que isso obriga, e não é pequeno:** o §308 deste projeto já pagou por
+   aba cortada, e trocar de lugar configuração que alguém já sabe onde fica é
+   risco conhecido. Duas garantias precisam viajar junto:
+   - **nenhum campo se perde na travessia** — `visao`, `formatoJson`,
+     `baseUrlTranscricao` e `espaco` não são famosos, e são exatamente os que
+     somem numa reorganização;
+   - **o menu e os deep-links antigos continuam chegando em algum lugar** —
+     quem tem `#/config/exportacao` salvo não pode cair em tela branca.
+
+3. **"Testar conexão" para importação/exportação chama o quê?** *(em aberto)* A
+   IA tem endpoint de teste barato; um destino de tracker não — testar de
+   verdade **criaria um issue**. As saídas: `HEAD`/`OPTIONS` (que muitos
+   gateways não respondem), um payload vazio (que o agente pode rejeitar, ou
+   pior, aceitar criando lixo), ou a fatia F fica só na IA. **Depende do que os
+   agentes do gateway aceitam** — é a única pergunta desta SPEC cuja resposta
+   está do lado de fora do produto.
+4. **O `endpoint` de topo da exportação (SPEC-81 §1) some?** *(em aberto, e
+   agora mais urgente)* Ele é o destino de `itens` de quem configurou antes,
+   mantido por compatibilidade, e é o campo "Endereço do agente" no topo da
+   tela de hoje — o único que não diz qual operação é.
+
+   Com a resposta da pergunta 2 (a tela substitui), ele **não tem mais onde
+   ficar como está**: ou vira um destino normal da conexão de exportação — o
+   que exige a migração de dado que a SPEC-81 recusou fazer na época — ou
+   sobrevive como um caso especial dentro da tela nova, que é a dívida de hoje
+   mudando de endereço.
+
+   E a correção do §2.0 muda o peso da escolha: com **um gateway só**, o
+   endereço de topo deixa de ser "o destino de itens" e passa a parecer o que
+   ele nunca foi — o endereço do gateway. Manter os dois sentidos convivendo é
+   o que produziria a confusão que esta SPEC existe para desfazer.
 
 ---
 

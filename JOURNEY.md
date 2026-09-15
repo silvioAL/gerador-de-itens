@@ -16632,3 +16632,55 @@ do DevTools em bash e em cmd diferem em continuação e aspas; no PowerShell
 bash-only entregaria a fatia pela metade justamente para quem a pediu.
 
 Sete fatias, quatro perguntas em aberto. Registrado em **SPEC-118**.
+
+---
+## §414 — Três respostas que recortam as SPEC-117 e 118
+
+Nenhuma implementação: as três respostas do usuário mudam o desenho das duas
+specs em aberto, e valem registro porque duas delas **encerram** coisas.
+
+**1. "Os agentes no gateway vou deixar no gateway, são basicamente os que vão
+fazer o import ou export para o jira, o gateway é o mesmo mas pode variar o
+endpoint."**
+
+Duas consequências, e a segunda é a boa:
+
+- **Encerra a fatia E da SPEC-117** (agente externo como executor de conversa).
+  Não é o adiamento que a resposta anterior já tinha produzido — é o fim. Os
+  agentes do gateway importam e exportam, e é isso que fazem. A divisão de
+  trabalho está declarada.
+- **Muda a forma da SPEC-118**: não são três conexões independentes. É o
+  gateway de IA, mais **UM gateway da casa com endpoints que variam por
+  operação** — uma autenticação só.
+
+E aí o achado que essa correção produz: **um importador de cURL ingênuo
+destruiria a herança que a SPEC-81 construiu.** Todo curl colado traz o
+`Authorization` dentro dele; escrevê-lo no destino daria a cada destino a sua
+cópia da chave — e rotacionar a chave viraria edição em N lugares, com a que
+alguém esquecer falhando sozinha, semanas depois. `DestinoDoGateway.cabecalhos`
+é opcional desde o §306 justamente para o caso "um gateway só, autenticação
+uma vez". A régua que sai: o importador **reconhece o mesmo gateway** e guarda
+só o que difere — e diz na tela que fez isso.
+
+**2. "curl exportado do postman."** Recorta o parser a um dialeto previsível e
+tira `cmd`, PowerShell e DevTools do caminho crítico. O que sobra de real:
+flags longas (`--location`, `--header`, `--data`), a ausência de `--request`
+com corpo significando `POST`, e `--location` sendo **ignorado** — é
+comportamento do cliente, não configuração.
+
+**3. "5. substitui."** A tela única substitui as abas "Modelo de IA" e
+"Exportação" em vez de agrupá-las. O §308 deste projeto já pagou por aba
+cortada, então duas garantias viajam junto: nenhum campo se perde na travessia
+(`visao`, `formatoJson`, `baseUrlTranscricao`, `espaco` são os que somem numa
+reorganização, porque ninguém lembra deles) e os deep-links antigos continuam
+chegando em algum lugar.
+
+Isso **promoveu** a pergunta do `endpoint` de topo da exportação: com a tela
+substituída ele não tem mais onde ficar como está, e com um gateway só ele
+deixa de parecer "o destino de itens" e passa a parecer o que nunca foi — o
+endereço do gateway.
+
+**Continuam em aberto:** o preâmbulo acrescenta ou substitui (SPEC-117), a
+config é por time ou global (SPEC-117), o que "Testar conexão" chama num
+destino de tracker (SPEC-118 — a única cuja resposta está fora do produto), e
+o destino do `endpoint` de topo (SPEC-118).
