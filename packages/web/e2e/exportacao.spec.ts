@@ -229,6 +229,19 @@ test("modo de demonstração: o envio da spec aparece na tela e SOBREVIVE ao F5"
     await expect(page.getByTestId("spec-sem-julgamento")).toContainText("spec com lacuna não sobe");
     for (const [testid, rotulo, texto] of [
       ["spec-origem", "Quem pediu, e com que palavras", "O time de catálogo pediu na reunião de refinamento."],
+      /**
+       * SPEC-119 fatia A — **a quarta seção, e ela entrou aqui por mérito.**
+       *
+       * O §410 fez as decisões alimentarem a spec só pelo lado NEGATIVO (a
+       * alternativa descartada vira `recusas`); a escolhida, com o porquê, não
+       * ia a lugar nenhum. Para um humano quase se sustenta — quem lê "síncrono
+       * ficou fora" infere fila. Para o agente de código que vai implementar, é
+       * exatamente a informação que falta: ele precisa saber qual padrão USAR.
+       *
+       * Este teste é quem provou que ela é obrigatória de verdade: sem ela
+       * preenchida, a tela continua dizendo "spec com lacuna não sobe".
+       */
+      ["spec-decisoes", "O que já foi decidido, e por quê", "Fila em vez de síncrono: desacopla o pico do parceiro."],
       ["spec-recusas", "O que NÃO entra, e por quê", "Migração do legado fica de fora: não há janela."],
       ["spec-fatias", "O que fica verdade em cada fatia, e como se prova", "Fatia 1: o item sobe. Prova: E2E."],
     ] as const) {

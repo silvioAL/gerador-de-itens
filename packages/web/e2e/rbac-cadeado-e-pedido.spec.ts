@@ -64,11 +64,13 @@ test("com RBAC ligado: área negada some do menu, e o pedido de ajuste vive no l
     // §221 — o menu OCULTA o que ela não edita, em vez de mostrar com cadeado.
     await page.getByRole("button", { name: "☰ Menu" }).click();
     await expect(page.getByRole("button", { name: /Padrões por componente/ })).toBeVisible();
-    // SPEC-118 fatia G — a aba "Modelo de IA" virou a SEÇÃO de IA dentro de
-    // Conexões, e a permissão continua sendo `credenciais-ia`: quem não a tem
-    // chega na tela e não vê a seção. A régua não mudou de valor, só de lugar.
-    await page.getByRole("button", { name: "Conexões" }).click();
-    await expect(page.getByTestId("conexao-ia")).toHaveCount(0);
+    /**
+     * SPEC-118 fatia G — a entrada "Modelo de IA" saiu do menu porque a aba
+     * saiu: ela virou a SEÇÃO de IA dentro de "Conexões". A garantia dela não
+     * some junto — ela é cobrada mais abaixo, no link direto, que é onde a
+     * fusão poderia ter ampliado acesso em silêncio.
+     */
+    await expect(page.getByRole("button", { name: /Modelo de IA/ })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Acessos" })).toHaveCount(0);
     await expect(page.getByText("🔒")).toHaveCount(0);
     // Fechar de verdade: navegar por hash não remonta o app, e o menu aberto
@@ -79,8 +81,21 @@ test("com RBAC ligado: área negada some do menu, e o pedido de ajuste vive no l
     // Sumir do menu NÃO abre a porta: quem chega por link (as áreas são
     // deep-linkáveis, `rota.ts`) continua barrado, e é ali que o pedido vive
     // agora que o cadeado clicável saiu.
+    /**
+     * SPEC-118 fatia G — **a régua mudou de LUGAR, não de valor.**
+     *
+     * `#/config/modelo-ia` não é mais uma área própria: ela virou a seção de IA
+     * dentro de Conexões, e o link salvo chega lá (§6.2 — "não pode cair em
+     * tela branca"). O que continua barrado é o que sempre esteve: o formulário
+     * de credencial, atrás de `credenciais-ia`.
+     *
+     * Este era o ponto exato onde a fusão poderia ter ampliado acesso em
+     * silêncio, e é por isso que a asserção fica aqui em vez de sumir com a
+     * área.
+     */
     await page.goto("/#/config/modelo-ia");
-    await expect(page.getByTestId("area-sem-permissao")).toContainText("não tem permissão");
+    await expect(page.getByTestId("config-conexoes-unificada")).toBeVisible();
+    await expect(page.getByTestId("conexao-ia")).toHaveCount(0);
 
     // Área de acesso não se pede — manda falar com um owner.
     await page.goto("/#/config/acessos");
