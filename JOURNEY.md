@@ -16760,3 +16760,110 @@ anexar. Presumir que funciona é exatamente como as três rodadas anteriores
 descobriram que o botão não anexava nada.
 
 Registrado em **SPEC-119** e **SPEC-120**.
+
+## §416 — As quatro SPECs construídas, e o que só o E2E cobrou
+
+As SPEC-117 a 120 eram avaliações: mediam, nomeavam o que faltava e paravam
+antes da primeira linha de código. Esta rodada construiu as quatro.
+
+### O e2e vermelho não era do commit que o revelou
+
+Antes de qualquer fatia, a base estava vermelha: o tour guiado falhava com
+`element is outside of the viewport` no botão "Próximo" — trinta segundos de
+retry e o passo nunca avançava.
+
+A causa não estava no commit que a revelou. `posicionarCard` continha a regra
+certa **escrita em comentário** — *"bate com o maxHeight da carta: subestimar
+aqui é o que a jogava para fora da tela"* — e um número que não batia: 240
+contra um `maxHeight: min(70vh, 420px)`. Uma carta de 400 px "contida" a 240
+termina 160 px abaixo da dobra, com o botão existindo, visível para o DOM, e
+inalcançável. A janela do assistente que passou a expandir só empurrou o alvo
+para baixo o bastante para o caso aparecer.
+
+A correção não foi aumentar o palpite: foi **medir**. E os três testes de
+clamp mediam contra o mesmo 240 que o código usava — eles concordavam com o
+defeito.
+
+### A spec passou a ter dois leitores (SPEC-119)
+
+A assimetria que o §410 deixou virou seção: as decisões alimentavam a spec só
+pelo lado negativo. Agora a escolhida entra com o porquê e com **onde vale** —
+pelo rótulo do componente, não pelo `noId`, porque `n3` não localiza nada para
+quem lê no Jira.
+
+Cada seção passou a declarar a **força** dela em uma linha (restrição, escopo,
+diagnóstico, contexto), e a moldura viaja no TEXTO e não no template: template
+é configurável, e quem já customizou o dele perderia a marcação em silêncio.
+
+O ponteiro pendurado do §3.4 virou garantia. *"Prova: na seção dele"* pressupunha
+que o corpo do item viaja junto — viaja no caminho da SPEC-114, não viaja no
+markdown baixado, e a spec não dizia qual dos dois era.
+
+### O lote, e a pergunta que o risco respondeu (SPEC-120)
+
+`exportarDaQuebra` e `anexarSpecNaQuebra` mandavam tudo numa chamada só. Como
+o §409 já persistia o estado **por item**, fatiar não foi reescrever o envio:
+foi decidir quantos entram por chamada e emendar as chamadas.
+
+A pergunta 2 da SPEC ("a redução automática é desejável ou assustadora?") foi
+respondida pelo risco, e o código diz qual: **reduzir só onde é seguro**. Um
+413 no anexo da spec vira dois lotes menores sozinho; na criação de issue, não
+— *"um retry sobre um sucesso mal reportado duplica issue"*, e uma demanda de
+trinta itens virando sessenta não tem como ser desfeita por quem não sabe
+quais são os duplicados.
+
+### Uma tabela que descreve prompt envelhece calada (SPEC-117)
+
+As oito conversas do assistente ganharam anatomia, preâmbulo por conversa e o
+✦ Sugerir. O preâmbulo **acrescenta** (decisão do usuário, contra a minha
+recomendação), e isso simplificou a SPEC inteira: nenhuma regra de produto pode
+sumir porque nada sai do prompt.
+
+**ACHADO:** a §3 da SPEC listava *"lista vazia é resposta correta"* como regra
+já presente em `montarPedidoNecessidades`. Ela não estava lá — estava nos
+irmãos, e a ausência passou despercebida justamente por isso. Quem acusou foi
+o teste que ancora a anatomia no prompt REAL: uma tabela que descreve o que o
+prompt *deveria* dizer não vale nada até alguém conferir contra o que ele diz.
+
+### O curl que abriu os campos voltou como entrada deles (SPEC-118)
+
+Os campos `metodo` e `envelope` foram derivados de um cURL que ninguém nunca
+colou. Agora a pessoa cola, e o produto decompõe.
+
+A régua mais cara é a da chave: o campo de colar **se esvazia ao interpretar**,
+a chave sai dos cabeçalhos, e a tela **diz** que separou. E um importador
+ingênuo teria destruído a herança de cabeçalhos da SPEC-81 — cada curl traz o
+`Authorization` dentro, e escrevê-lo por destino faria rotacionar a chave virar
+edição em N lugares.
+
+**ACHADO na fatia G:** a resposta da pergunta 2 ("substitui") listava duas
+garantias para a travessia — nenhum campo se perde, deep-link chega em algum
+lugar — e faltava uma terceira, de segurança: as duas abas tinham **recursos de
+RBAC diferentes**. Fundi-las sem mais nada daria a quem só cuida da exportação
+uma visão do formulário de credencial de IA: ampliação de acesso por efeito
+colateral de reorganização de tela. A fusão ficou sendo do **menu**; a régua
+continua onde estava.
+
+### E o E2E cobrou o que nenhuma suíte de unidade pegaria
+
+Duas coisas, e as duas depois de 2.529 testes de unidade verdes:
+
+1. A quarta seção de julgamento da SPEC-119 é obrigatória **de verdade**: o
+   teste preenchia três e a tela continuava dizendo *"spec com lacuna não
+   sobe"*.
+2. A garantia de RBAC que mudou de lugar precisava ser cobrada no **link
+   direto** — que é exatamente onde a fusão das abas poderia ter ampliado
+   acesso em silêncio.
+
+Sem o navegador, as duas teriam atravessado.
+
+### O que ficou de fora, e está dito
+
+- **SPEC-119 fatia G** (certificar a spec contra um agente de código real) e
+  **SPEC-120 fatia E** (certificar o anexo contra o MCP do Jira real). As duas
+  são "rodar contra o real e olhar o resultado" — não são teste automatizado, e
+  chamá-las de prontas seria exatamente o *presumir que funciona* que esta casa
+  já pagou três vezes para aprender. O contrato do anexo está **declarado** na
+  tela (fatia D); que ele funciona, ninguém verificou ainda.
+- **SPEC-117 fatia E** (agente externo como executor de conversa) — encerrada
+  por decisão do usuário, não adiada.
