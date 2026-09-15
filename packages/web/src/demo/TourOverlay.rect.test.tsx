@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
-import { posicionarCard, useRect } from "./TourOverlay";
+import { ALTURA_ESTIMADA_DA_CARTA, posicionarCard, useRect } from "./TourOverlay";
 
 /**
  * §251 — o alvo do passo é trazido para a tela ANTES de ser medido.
@@ -84,5 +84,35 @@ describe("posicionarCard — a navegação nunca fica fora do alcance", () => {
 
     expect(Number(style.top)).toBeGreaterThanOrEqual(0);
     expect(Number(style.left)).toBeGreaterThanOrEqual(0);
+  });
+
+  /**
+   * §411 — **o caso que estava descoberto, e foi o que travou o tour de verdade.**
+   *
+   * Os três testes acima medem contra 240, que era o palpete escrito no código.
+   * A carta, porém, pode ir até `min(70vh, 420px)` — e uma carta de 400 px
+   * "contida" a 240 termina 160 px abaixo da dobra, com o "Próximo" visível
+   * para o DOM e fora da viewport. Foi exatamente o erro do e2e: *element is
+   * outside of the viewport*, trinta segundos de retry, e nenhum teste de
+   * unidade acusando.
+   *
+   * Por isso a altura agora é MEDIDA e entra como argumento: o que este teste
+   * guarda é que o clamp respeita a altura que recebeu, qualquer que seja ela.
+   */
+  it.each([240, 320, 420])("carta de %ipx cabe inteira na tela, com o Próximo alcançável", (altura) => {
+    const colada = posicionarCard(
+      rect({ top: window.innerHeight - 20, bottom: window.innerHeight - 5, left: 100, right: 200 }),
+      altura
+    );
+
+    expect(Number(colada.top)).toBeGreaterThanOrEqual(0);
+    expect(Number(colada.top) + altura).toBeLessThanOrEqual(window.innerHeight);
+  });
+
+  it("a altura padrão continua sendo a estimativa — quem não mede não muda de comportamento", () => {
+    const comPadrao = posicionarCard(rect({ top: 300, bottom: 340, left: 100, right: 200 }));
+    const comEstimativa = posicionarCard(rect({ top: 300, bottom: 340, left: 100, right: 200 }), ALTURA_ESTIMADA_DA_CARTA);
+
+    expect(comPadrao).toEqual(comEstimativa);
   });
 });
