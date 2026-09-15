@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import type { DadosItemGerado, ItemGeradoSalvo, RepositorioDeItensGerados } from "@gerador/aplicacao";
 import type { BancoDeDados } from "../db/client.js";
 import { itensGerados } from "../db/schema.js";
@@ -26,6 +26,8 @@ function comoItemSalvo(linha: LinhaItem): ItemGeradoSalvo {
     estado: linha.estado as ItemGeradoSalvo["estado"],
     linkExterno: linha.linkExterno ?? null,
     specAnexada: linha.specAnexada,
+    specEnviadaEm: linha.specEnviadaEm?.toISOString() ?? null,
+    specErro: linha.specErro ?? null,
     criadoEm: linha.criadoEm.toISOString(),
   };
 }
@@ -54,7 +56,27 @@ export function criarRepositorioDeItensGeradosEmPostgres(db: BancoDeDados): Repo
     async marcarSpecAnexada(quebraId, chave) {
       const [linha] = await db
         .update(itensGerados)
-        .set({ specAnexada: true })
+        // SPEC-115 — chegou: sai do "indo" e perde a cicatriz da tentativa
+        // anterior. Deixar `specEnviadaEm` preenchido faria a tela mostrar o
+        // item anexado E anexando ao mesmo tempo.
+        .set({ specAnexada: true, specEnviadaEm: null, specErro: null })
+        .where(and(eq(itensGerados.quebraId, quebraId), eq(itensGerados.chave, chave)))
+        .returning();
+      return linha ? comoItemSalvo(linha) : null;
+    },
+
+    async marcarSpecEnviando(quebraId, chaves) {
+      if (chaves.length === 0) return;
+      await db
+        .update(itensGerados)
+        .set({ specEnviadaEm: new Date(), specErro: null })
+        .where(and(eq(itensGerados.quebraId, quebraId), inArray(itensGerados.chave, chaves)));
+    },
+
+    async marcarFalhaDeSpec(quebraId, chave, erro) {
+      const [linha] = await db
+        .update(itensGerados)
+        .set({ specEnviadaEm: null, specErro: erro })
         .where(and(eq(itensGerados.quebraId, quebraId), eq(itensGerados.chave, chave)))
         .returning();
       return linha ? comoItemSalvo(linha) : null;
@@ -89,6 +111,12 @@ export function criarRepositorioDeItensGeradosEmPostgres(db: BancoDeDados): Repo
                 estado: exportado ? "exportado" : "gerado",
                 linkExterno: exportado?.linkExterno ?? null,
                 specAnexada: exportado?.specAnexada ?? false,
+                // SPEC-115 — o envio em curso viaja junto pela mesma `chave`
+                // que já religa o rastro externo. Perdê-lo aqui faria uma
+                // regeneração no meio de um envio apagar o "indo" e a tela
+                // voltaria a dizer "na fila" para algo que está a caminho.
+                specEnviadaEm: exportado?.specEnviadaEm ?? null,
+                specErro: exportado?.specErro ?? null,
               };
             })
           )

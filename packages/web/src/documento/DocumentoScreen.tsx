@@ -10,12 +10,20 @@ import type {
   DocumentoEscrito,
   IndicadorDeSaude,
   ItemDoDocumento,
+  SpecEscrita,
   StatusDocumento,
 } from "@gerador/engine";
 import { Canvas } from "../canvas/Canvas";
 import { useDiagrama, type AplicarNoDiagrama } from "../state/useDiagrama";
-import type { ItemGerado, ResultadoDaExportacao, ResultadoDoAnexoDeSpec } from "../api/client";
+import type { EnvioDeSpecIniciado, ItemGerado, ResultadoDaExportacao } from "../api/client";
 import { EscritaDoItem } from "./EscritaDoItem";
+import {
+  contarPipeline,
+  etapaDaSpec,
+  ROTULO_DA_ETAPA,
+  ROTULO_DO_CHIP_DA_SPEC,
+  type ContagemDoPipeline,
+} from "./etapaDaSpec";
 
 /**
  * SPEC-58 — a tela do DOCUMENTO DE DESENHO (`#/documento`).
@@ -104,7 +112,26 @@ export interface DocumentoScreenProps {
    * exportação já criou. Ausente = a spec da demanda ainda tem lacuna, ou a
    * quebra ainda não foi salva — nos dois casos não há o que mandar.
    */
-  onAnexarSpec?: () => Promise<ResultadoDoAnexoDeSpec>;
+  onAnexarSpec?: () => Promise<EnvioDeSpecIniciado>;
+  /**
+   * SPEC-115 — **as três respostas sem as quais a spec não sai, e que não
+   * tinham mais onde ser escritas.**
+   *
+   * ACHADO REAL, validando a fatia D contra o produto de pé: `gerarSpec` marca
+   * `origem`, `recusas` e `fatias` vazias como lacuna (`✍️ especificar`), e
+   * "enviar spec com lacuna" é recusa da SPEC-98 §6 — então **todo** item
+   * voltava como `comLacuna` e o botão "Anexar spec aos itens" nunca anexava
+   * nada. A tela que editava essas seções deixou de existir em algum momento;
+   * o `SecaoEscrita` exportado "para a tela da spec" (SPEC-84 fatia A) ficou
+   * sem consumidor, e `mudarSpecEscrita` virou função morta no `App`.
+   *
+   * O botão estava verde em teste e morto no produto — é o padrão que esta casa
+   * já pagou caro (SPEC-115 §1.2 existe porque a experiência precisa EXISTIR).
+   *
+   * Ausente = o bloco não aparece, e a tela é a de antes.
+   */
+  specEscrita?: SpecEscrita;
+  onMudarSpecEscrita?: (spec: SpecEscrita) => void;
   /**
    * SPEC-69 §4.4 — os ensaios ASSUMIDOS, ao lado da seção de riscos.
    *
@@ -203,6 +230,8 @@ export function DocumentoScreen({
   onExportar,
   destinoDaExportacao,
   onAnexarSpec,
+  specEscrita,
+  onMudarSpecEscrita,
   ensaios,
   decisaoDoEnsaio,
 }: DocumentoScreenProps) {
@@ -393,21 +422,49 @@ export function DocumentoScreen({
           </Secao>
         )}
 
+        {/* SPEC-115 fatias A e C — a seção deixou de nascer em branco. Com
+            decisão registrada, ela mostra o que cada escolha ganhou e custou, e
+            o rótulo conta a verdade nova: o conteúdo é derivado, o texto livre
+            é complemento. Sem decisão nenhuma, a tela é exatamente a de antes —
+            o fallback não é um caso de borda, é o caso de quem não usa isto. */}
         <SecaoEscrita
           titulo="Trade-offs e o que ficou de fora"
           dica="O que se ganhou e o que se perdeu. É a seção que dá casa à mudança que não tem ADR."
+          dicaDeComplemento="Complemente com o que as decisões registradas não cobrem."
+          rotuloDeOrigem={
+            documento.decisoes.length > 0
+              ? `derivado de ${documento.decisoes.length} ${documento.decisoes.length === 1 ? "decisão" : "decisões"} — edite ou complemente`
+              : undefined
+          }
+          derivado={documento.decisoes.length > 0 ? <TradeOffsDerivados decisoes={documento.decisoes} /> : undefined}
           valor={escrito.tradeOffs ?? ""}
           testid="secao-tradeoffs"
           onMudar={(texto) => onMudarEscrito({ ...escrito, tradeOffs: texto })}
         />
+        {/* SPEC-115 fatia B — mesma tese, fonte diferente: o que o usuário
+            respondeu na revisão da SPEC-115 §4.1 é que riscos derivam dos
+            ENSAIOS (o débito assumido), não de uma categoria nova de decisão.
+            O bloco já existia, e estava solto DEPOIS da seção; agora ele é o
+            derivado DELA, que é o que o comentário do `RiscosMedidos` sempre
+            disse que ele era ("dois blocos, uma seção"). */}
         <SecaoEscrita
           titulo="Riscos e o que pode dar errado"
           dica="O que você está aceitando correr, e o que faria isso virar problema."
+          dicaDeComplemento="Complemente com o risco que nenhum ensaio mediu."
+          rotuloDeOrigem={
+            (ensaios ?? []).length > 0
+              ? `derivado de ${ensaios!.length} ${ensaios!.length === 1 ? "ensaio assumido" : "ensaios assumidos"} — edite ou complemente`
+              : undefined
+          }
+          derivado={
+            (ensaios ?? []).length > 0 ? (
+              <RiscosMedidos ensaios={ensaios ?? []} decisaoDoEnsaio={decisaoDoEnsaio} />
+            ) : undefined
+          }
           valor={escrito.riscos ?? ""}
           testid="secao-riscos"
           onMudar={(texto) => onMudarEscrito({ ...escrito, riscos: texto })}
         />
-        <RiscosMedidos ensaios={ensaios ?? []} decisaoDoEnsaio={decisaoDoEnsaio} />
 
         <SecaoDosItens
           derivados={documento.itens}
@@ -416,6 +473,8 @@ export function DocumentoScreen({
           onExportar={onExportar}
           destinoDaExportacao={destinoDaExportacao}
           onAnexarSpec={onAnexarSpec}
+          specEscrita={specEscrita}
+          onMudarSpecEscrita={onMudarSpecEscrita}
         />
       </article>
     </div>
@@ -597,12 +656,17 @@ function Secao({ titulo, children }: { titulo: string; children: React.ReactNode
 /**
  * SPEC-69 §4.4 — o bloco DERIVADO da seção de riscos.
  *
- * O texto acima é de quem escreveu e sobrevive à regeneração (SPEC-58 regra 3).
- * Este é do motor, e fica **ao lado, nunca dentro**: dois blocos, uma seção,
- * nenhum sobrescreve o outro. É a mesma disciplina que separa o calculado do
- * escrito em todo o resto do produto — e aqui ela importa mais, porque a
- * tentação de "juntar tudo num campo de texto" é exatamente o que faria a
- * regeneração apagar o julgamento de alguém.
+ * O texto de quem escreveu sobrevive à regeneração (SPEC-58 regra 3). Este é do
+ * motor, e fica **ao lado, nunca dentro**: dois blocos, uma seção, nenhum
+ * sobrescreve o outro. É a mesma disciplina que separa o calculado do escrito
+ * em todo o resto do produto — e aqui ela importa mais, porque a tentação de
+ * "juntar tudo num campo de texto" é exatamente o que faria a regeneração
+ * apagar o julgamento de alguém.
+ *
+ * **SPEC-115 fatia B — ele mudou de lugar, e só de lugar.** Era uma `<section>`
+ * solta DEPOIS da seção de riscos; virou o bloco `derivado` DELA, acima do
+ * texto livre. Os dois blocos continuam sendo dois, e agora a seção que os
+ * hospeda é literalmente uma — que é o que este comentário sempre descreveu.
  *
  * Sem ensaio assumido, nada aparece: quem não usa isto vê a tela de antes.
  */
@@ -615,10 +679,14 @@ function RiscosMedidos({
 }) {
   if (ensaios.length === 0) return null;
   return (
-    <section style={{ marginTop: -8, marginBottom: 20 }} data-testid="riscos-medidos">
+    <div style={{ margin: "12px 0 0" }} data-testid="riscos-medidos">
       <p style={{ fontSize: 11.5, color: "var(--texto-mudo)", margin: "0 0 8px" }}>
-        <strong style={{ color: "var(--texto-2)" }}>Riscos medidos</strong> — derivado dos ensaios assumidos. O texto
-        acima é seu; este bloco é do motor.
+        {/* SPEC-115 fatia B — "acima" virou "abaixo": o bloco do motor passou a
+            vir PRIMEIRO na seção, e a frase precisava acompanhar. Dizer a ordem
+            errada é o tipo de resíduo que sobrevive a uma mudança de layout e
+            faz a pessoa procurar um texto que não está onde a tela diz. */}
+        <strong style={{ color: "var(--texto-2)" }}>Riscos medidos</strong> — derivado dos ensaios assumidos. Este bloco
+        é do motor; o texto abaixo é seu.
       </p>
       {ensaios.map((e) => {
         const decisao = decisaoDoEnsaio?.(e.id);
@@ -658,7 +726,7 @@ function RiscosMedidos({
           </div>
         );
       })}
-    </section>
+    </div>
   );
 }
 
@@ -677,21 +745,49 @@ export function SecaoEscrita({
   valor,
   testid,
   onMudar,
+  derivado,
+  rotuloDeOrigem,
+  dicaDeComplemento,
 }: {
   titulo: string;
   dica: string;
   valor: string;
   testid: string;
   onMudar: (texto: string) => void;
+  /**
+   * SPEC-115 fatias A e B — **o bloco do motor, acima do que a pessoa escreve.**
+   *
+   * Ausente = a seção é exatamente a de antes. Presente, ele vem PRIMEIRO: a
+   * seção deixa de ser uma caixa em branco pedindo redação e passa a mostrar o
+   * que já se sabe, com o texto livre como complemento do que a derivação não
+   * cobre.
+   *
+   * Ele fica fora da barra indigo de propósito — a barra marca o que uma pessoa
+   * afirmou, e carimbar o derivado com ela seria a proveniência mentindo na
+   * própria tela que existe para não deixar isso acontecer.
+   */
+  derivado?: React.ReactNode;
+  /** SPEC-115 fatia C — o que a barra indigo diz. Ausente = "escrito por uma
+   * pessoa", que continua verdade quando não há nada derivado. */
+  rotuloDeOrigem?: string;
+  /** SPEC-115 fatia C — o convite quando já HÁ conteúdo derivado: complementar
+   * é um gesto diferente de escrever do zero, e a dica de escrever do zero
+   * sobre uma lista já preenchida soa como se a lista não contasse. */
+  dicaDeComplemento?: string;
 }) {
   const [editando, setEditando] = useState(false);
+  const convite = derivado && dicaDeComplemento ? dicaDeComplemento : dica;
 
   return (
     <section data-testid={testid} style={colunaDeTextoEstilo}>
       <h2 style={tituloSecaoEstilo}>{titulo}</h2>
+      {derivado}
       <div style={{ borderLeft: "3px solid var(--acento-gente)", padding: "2px 0 2px 16px", margin: "12px 0" }}>
-        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--acento-gente-texto)" }}>
-          escrito por uma pessoa
+        <span
+          data-testid={`${testid}-origem`}
+          style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--acento-gente-texto)" }}
+        >
+          {rotuloDeOrigem ?? "escrito por uma pessoa"}
         </span>
         {editando ? (
           <textarea
@@ -709,11 +805,95 @@ export function SecaoEscrita({
           </div>
         ) : (
           <button onClick={() => setEditando(true)} style={{ ...linkEstilo, display: "block", margin: "6px 0 0" }}>
-            ＋ {dica}
+            ＋ {convite}
           </button>
         )}
       </div>
     </section>
+  );
+}
+
+/**
+ * SPEC-115 fatia A — **os trade-offs, derivados das decisões que já existem.**
+ *
+ * ## A medição que mudou a fatia
+ *
+ * A SPEC-114 adiou trocar o rótulo "escrito por uma pessoa" porque a seção
+ * dependia de um fluxo de mapeamento que ninguém construiu (SPEC-75). Medindo,
+ * a dependência era menor do que a escrita anterior presumiu: `Decisao` já é
+ * praticamente o material de um trade-off, e está no banco desde a SPEC-57.
+ *
+ * ```
+ * titulo · contexto · alternativas: {titulo, consequencia?}[] · escolhida · porque
+ * ```
+ *
+ * **A alternativa NÃO escolhida, com a consequência dela, é literalmente "o que
+ * se perdeu"; a escolhida com o porquê é "o que se ganhou".** Nada precisou ser
+ * inventado no modelo — só lido do outro ângulo.
+ *
+ * ## Por que não é a seção "Decisões" de novo
+ *
+ * O cartão de decisão acima responde *"o que se decidiu, e isso está
+ * registrado?"* — por isso ele cobra o porquê ausente e assina autor e data.
+ * Aqui a pergunta é outra: *"o que esta demanda pagou por isso?"*. Mesmo dado,
+ * eixo diferente — ganhou/perdeu, lado a lado. Duas leituras da mesma decisão
+ * não são duplicação; um documento de desenho que não diz o preço do que
+ * escolheu é exatamente o documento que a seção existia para cobrar em branco.
+ *
+ * Decisão sem alternativa descartada aparece com o lado "perdeu" vazio, e isso
+ * é resposta legítima: escolher entre uma opção só não custou nada, e fingir um
+ * custo seria pior que declarar que não houve.
+ */
+function TradeOffsDerivados({ decisoes }: { decisoes: Decisao[] }) {
+  if (decisoes.length === 0) return null;
+  return (
+    <div data-testid="tradeoffs-derivados" style={{ margin: "12px 0 0" }}>
+      <p style={{ fontSize: 11.5, color: "var(--texto-mudo)", margin: "0 0 8px" }}>
+        <strong style={{ color: "var(--texto-2)" }}>
+          {decisoes.length === 1 ? "1 decisão registrada" : `${decisoes.length} decisões registradas`}
+        </strong>{" "}
+        — o que cada uma ganhou e o que custou. Este bloco é do motor; o texto abaixo é seu.
+      </p>
+      {decisoes.map((d) => {
+        const descartadas = d.alternativas.filter((a) => a.titulo !== d.escolhida);
+        return (
+          <div
+            key={d.id}
+            data-testid={`tradeoff-derivado-${d.id}`}
+            style={{
+              border: "1px solid var(--borda)",
+              borderLeft: "3px solid var(--acento)",
+              borderRadius: 8,
+              padding: "8px 12px",
+              marginBottom: 6,
+              background: "var(--painel)",
+            }}
+          >
+            <strong style={{ fontSize: 13 }}>{d.titulo}</strong>
+            <p style={{ fontSize: 12, color: "var(--verde)", margin: "4px 0 0", lineHeight: 1.5 }}>
+              ganhou <strong>{d.escolhida}</strong>
+              {d.porque.trim() ? ` — ${d.porque}` : ""}
+            </p>
+            {descartadas.length > 0 ? (
+              <p style={{ fontSize: 12, color: "var(--amarelo)", margin: "4px 0 0", lineHeight: 1.5 }}>
+                perdeu{" "}
+                {descartadas.map((a, i) => (
+                  <span key={a.titulo}>
+                    {i > 0 && " · "}
+                    <strong>{a.titulo}</strong>
+                    {a.consequencia ? ` — ${a.consequencia}` : ""}
+                  </span>
+                ))}
+              </p>
+            ) : (
+              <p style={{ fontSize: 11, color: "var(--texto-mudo)", margin: "4px 0 0", fontStyle: "italic" }}>
+                nenhuma alternativa foi descartada — esta escolha não teve preço registrado
+              </p>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -778,19 +958,33 @@ function SecaoDosItens({
   onExportar,
   destinoDaExportacao,
   onAnexarSpec,
+  specEscrita,
+  onMudarSpecEscrita,
 }: {
   derivados: ItemDoDocumento[];
   escritos: ItemGerado[];
   onRevisarItem?: (chave: string) => void;
   onExportar?: () => Promise<ResultadoDaExportacao>;
   destinoDaExportacao?: string | null;
-  onAnexarSpec?: () => Promise<ResultadoDoAnexoDeSpec>;
+  onAnexarSpec?: () => Promise<EnvioDeSpecIniciado>;
+  specEscrita?: SpecEscrita;
+  onMudarSpecEscrita?: (spec: SpecEscrita) => void;
 }) {
   const [exportando, setExportando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoDaExportacao | null>(null);
   const [erroExportacao, setErroExportacao] = useState<string | null>(null);
   const [anexando, setAnexando] = useState(false);
-  const [resultadoDoAnexo, setResultadoDoAnexo] = useState<ResultadoDoAnexoDeSpec | null>(null);
+  /**
+   * SPEC-115 fatia E — o que sobrou de estado local, e por que só isto.
+   *
+   * O `resultadoDoAnexo` de antes guardava o DESFECHO do envio num `useState`,
+   * e era o defeito que a SPEC-98 §3.2 nomeou: um envio de minutos morava na
+   * memória de uma aba, e trocar de tela ou dar F5 apagava o rastro. O desfecho
+   * agora mora no item (`specEnviadaEm`/`specAnexada`/`specErro`), que vem do
+   * servidor — o que sobra aqui é só o que é mesmo efêmero: o que a chamada de
+   * partida disse que ficou de fora, e por quê.
+   */
+  const [inicioDoEnvio, setInicioDoEnvio] = useState<EnvioDeSpecIniciado | null>(null);
   const [erroDoAnexo, setErroDoAnexo] = useState<string | null>(null);
   // SPEC-47 §196 — a escrita REAL aparece por padrão: o que interessa a quem
   // vai executar é o texto. Quem quiser varrer a lista fecha; o estado guarda
@@ -814,6 +1008,23 @@ function SecaoDosItens({
   // anexada é candidato. O que ainda não tem `linkExterno` aparece como
   // `semLinkExterno` na resposta, não some daqui.
   const pendentesDeSpec = escritos.filter((i) => i.linkExterno && !i.specAnexada).length;
+  // SPEC-115 fatias E e G — o pipeline vem do DADO, não de um estado de envio.
+  const pipeline = useMemo(() => contarPipeline(escritos), [escritos]);
+  const envioEmCurso = pipeline.anexando > 0;
+  /**
+   * SPEC-115 fatia H — **o motivo do botão morto, à vista.**
+   *
+   * Queixa do usuário: *"o botão de exportar fica desabilitado, mas isso não
+   * faz sentido já que eu posso chegar nessa tela"*. A régua da SPEC-71 é que o
+   * motivo fica sempre visível — e ele estava só no `title`, que é hover: quem
+   * está no celular, no teclado ou com pressa nunca o via. A revisão avisa
+   * antes (fatia H, do outro lado); aqui a tela para de ficar muda.
+   */
+  const motivoDeNaoExportar = !onExportar
+    ? "Salve a demanda antes de exportar — sem id da quebra não há o que mandar."
+    : prontos === 0
+      ? "Nenhum item está pronto: todos ainda têm campo pedindo “✍️ especificar” ou sugestão da esteira a confirmar. Resolva na revisão da demanda e volte aqui."
+      : null;
 
   return (
     <section data-testid="secao-dos-itens" style={colunaDeTextoEstilo}>
@@ -882,6 +1093,16 @@ function SecaoDosItens({
                 </span>
               </div>
 
+              {/* SPEC-115 fatia H — o motivo sai do `title` e vai para a tela. */}
+              {motivoDeNaoExportar && (
+                <p
+                  data-testid="motivo-exportar-desabilitado"
+                  style={{ fontSize: 12, color: "var(--amarelo)", margin: "8px 0 0", lineHeight: 1.5 }}
+                >
+                  {motivoDeNaoExportar}
+                </p>
+              )}
+
               {erroExportacao && (
                 <p style={{ fontSize: 12, color: "var(--vermelho)", margin: "8px 0 0" }} data-testid="erro-exportacao">
                   {erroExportacao}
@@ -907,28 +1128,42 @@ function SecaoDosItens({
 
               {/* SPEC-114 — a SEGUNDA chamada, separada da exportação (§1.1 da
                   SPEC-81): ciclo de vida e modo de falhar diferentes. Só aparece
-                  quando há pelo menos um item já exportado esperando a spec. */}
+                  quando há pelo menos um item já exportado esperando a spec.
+                  SPEC-115 — o botão some enquanto um envio está em curso: pedir
+                  de novo no meio duplicaria a chamada para o mesmo issue. */}
+              {onAnexarSpec && pendentesDeSpec > 0 && onMudarSpecEscrita && (
+                <JulgamentoDaSpec
+                  escrita={specEscrita ?? {}}
+                  onMudar={onMudarSpecEscrita}
+                  quantosItens={pendentesDeSpec}
+                />
+              )}
+
               {onAnexarSpec && pendentesDeSpec > 0 && (
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
                   <button
                     onClick={async () => {
                       setAnexando(true);
                       setErroDoAnexo(null);
-                      setResultadoDoAnexo(null);
+                      setInicioDoEnvio(null);
                       try {
-                        setResultadoDoAnexo(await onAnexarSpec());
+                        setInicioDoEnvio(await onAnexarSpec());
                       } catch (e) {
                         setErroDoAnexo(e instanceof Error ? e.message : String(e));
                       } finally {
                         setAnexando(false);
                       }
                     }}
-                    disabled={anexando}
+                    disabled={anexando || envioEmCurso}
                     data-testid="anexar-spec"
-                    title={`Anexa a spec de cada item ao issue que já existe, ${pendentesDeSpec} de cada vez`}
-                    style={{ ...botaoEstilo, opacity: anexando ? 0.55 : 1 }}
+                    title={
+                      envioEmCurso
+                        ? "Um envio já está em curso — o acompanhamento abaixo diz em que item está"
+                        : `Anexa a spec de cada item ao issue que já existe, ${pendentesDeSpec} de cada vez`
+                    }
+                    style={{ ...botaoEstilo, opacity: anexando || envioEmCurso ? 0.55 : 1 }}
                   >
-                    {anexando ? "anexando…" : `Anexar spec aos itens (${pendentesDeSpec})`}
+                    {anexando || envioEmCurso ? "anexando…" : `Anexar spec aos itens (${pendentesDeSpec})`}
                   </button>
                 </div>
               )}
@@ -938,28 +1173,32 @@ function SecaoDosItens({
                   {erroDoAnexo}
                 </p>
               )}
-              {resultadoDoAnexo && (
-                <div style={{ marginTop: 8 }} data-testid="resultado-anexo-spec">
-                  <p style={{ fontSize: 12.5, color: "var(--verde)", margin: 0 }}>
-                    {resultadoDoAnexo.anexadas.length} spec(s) anexada(s) em {resultadoDoAnexo.destino}.
+              {/* SPEC-115 fatia E — o que a chamada de PARTIDA disse que ficou
+                  de fora. Ele é efêmero de propósito: são decisões tomadas sem
+                  chamar ninguém, e o item que ficou de fora continua dizendo
+                  por quê no próprio card. */}
+              {inicioDoEnvio && (
+                <div style={{ marginTop: 8 }} data-testid="inicio-do-envio">
+                  <p style={{ fontSize: 12.5, color: "var(--texto-2)", margin: 0 }}>
+                    {inicioDoEnvio.emAndamento.length} spec(s) a caminho de {inicioDoEnvio.destino}.
+                    {inicioDoEnvio.demonstracao && (
+                      <strong style={{ color: "var(--amarelo)" }}> ✦ modo de demonstração — nada sai daqui.</strong>
+                    )}
                   </p>
-                  {resultadoDoAnexo.erros.map((e) => (
-                    <p key={e.chave} style={{ fontSize: 12, color: "var(--vermelho)", margin: "4px 0 0" }}>
-                      {e.chave}: {e.erro}
-                    </p>
-                  ))}
-                  {resultadoDoAnexo.comLacuna.length > 0 && (
+                  {inicioDoEnvio.comLacuna.length > 0 && (
                     <p style={{ fontSize: 11.5, color: "var(--texto-mudo)", margin: "4px 0 0" }}>
-                      {resultadoDoAnexo.comLacuna.length} ficaram de fora por a spec ainda ter lacuna.
+                      {inicioDoEnvio.comLacuna.length} ficaram de fora por a spec ainda ter lacuna.
                     </p>
                   )}
-                  {resultadoDoAnexo.semLinkExterno.length > 0 && (
+                  {inicioDoEnvio.semLinkExterno.length > 0 && (
                     <p style={{ fontSize: 11.5, color: "var(--texto-mudo)", margin: "4px 0 0" }}>
-                      {resultadoDoAnexo.semLinkExterno.length} ainda não subiram pro tracker.
+                      {inicioDoEnvio.semLinkExterno.length} ainda não subiram pro tracker.
                     </p>
                   )}
                 </div>
               )}
+
+              <PipelineDaSpec contagem={pipeline} escritos={escritos} />
             </div>
           )}
 
@@ -983,6 +1222,182 @@ function SecaoDosItens({
           ))}
         </>
       )}
+    </section>
+  );
+}
+
+/**
+ * SPEC-115 — **as três respostas que fazem a spec poder sair.**
+ *
+ * ## O defeito que este bloco fecha
+ *
+ * `gerarSpec` marca `origem`, `recusas` e `fatias` vazias como lacuna, e a
+ * SPEC-98 §6 recusa enviar spec com lacuna. Com a tela que editava essas
+ * seções fora do ar, TODO item voltava como `comLacuna`: o botão "Anexar spec
+ * aos itens" aparecia, era clicável, respondia 200 e não anexava nada — e a
+ * tela dizia apenas *"N ficaram de fora por a spec ainda ter lacuna"*, sem
+ * lugar nenhum para resolver isso.
+ *
+ * ## Por que aqui, e não numa tela própria
+ *
+ * Porque é onde a pessoa está quando bate na parede. É a mesma escolha do §269
+ * (o documento alcançável de onde se acabou de revisar) e da SPEC-58 §7.2
+ * (editar no lugar: mandar alguém para outra tela para escrever duas frases é
+ * como a seção fica vazia para sempre).
+ *
+ * ## O que ele NÃO faz: oferecer "✦ escrever para mim"
+ *
+ * A SPEC-98 §6 e a SPEC-80 §2 recusam isso explicitamente, e há teste que falha
+ * se estas seções virarem preenchíveis por modelo. Origem, recusas e fatias são
+ * julgamento — o que a máquina escrevesse ali seria a máquina especificando
+ * para si mesma.
+ */
+function JulgamentoDaSpec({
+  escrita,
+  onMudar,
+  quantosItens,
+}: {
+  escrita: SpecEscrita;
+  onMudar: (spec: SpecEscrita) => void;
+  quantosItens: number;
+}) {
+  const faltando = (["origem", "recusas", "fatias"] as const).filter((c) => !escrita[c]?.trim());
+
+  return (
+    <section data-testid="julgamento-da-spec" style={{ marginTop: 14 }}>
+      <p style={{ fontSize: 11.5, color: "var(--texto-mudo)", margin: "0 0 2px" }}>
+        <strong style={{ color: "var(--texto-2)" }}>A spec que vai junto com cada item</strong> — o resto ela deriva do
+        desenho; estas três só você responde.
+      </p>
+      {faltando.length > 0 ? (
+        // O motivo do que vai acontecer, ANTES de acontecer. Sem esta linha, a
+        // pessoa clica, espera, e recebe "ficaram de fora por ter lacuna" sem
+        // saber qual lacuna nem onde resolvê-la.
+        <p data-testid="spec-sem-julgamento" style={{ fontSize: 12, color: "var(--amarelo)", margin: "0 0 8px", lineHeight: 1.5 }}>
+          {faltando.length === 1 ? "Falta 1 resposta" : `Faltam ${faltando.length} respostas`} abaixo. Enquanto elas
+          estiverem em branco, {quantosItens === 1 ? "o item fica" : `os ${quantosItens} itens ficam`} de fora: spec com
+          lacuna não sobe.
+        </p>
+      ) : (
+        <p data-testid="spec-com-julgamento" style={{ fontSize: 12, color: "var(--verde)", margin: "0 0 8px" }}>
+          As três estão respondidas — a spec de cada item pode subir.
+        </p>
+      )}
+
+      <SecaoEscrita
+        titulo="Quem pediu, e com que palavras"
+        dica="A frase de quem pediu. É o que permite, meses depois, saber se o que foi construído responde ao que foi pedido."
+        valor={escrita.origem ?? ""}
+        testid="spec-origem"
+        onMudar={(origem) => onMudar({ ...escrita, origem })}
+      />
+      <SecaoEscrita
+        titulo="O que NÃO entra, e por quê"
+        dica="Recusa sem motivo é opinião; com motivo é projeto — e é o que impede a spec de virar lista de desejos."
+        valor={escrita.recusas ?? ""}
+        testid="spec-recusas"
+        onMudar={(recusas) => onMudar({ ...escrita, recusas })}
+      />
+      <SecaoEscrita
+        titulo="O que fica verdade em cada fatia, e como se prova"
+        dica="Fatia sem prova declarada é promessa."
+        valor={escrita.fatias ?? ""}
+        testid="spec-fatias"
+        onMudar={(fatias) => onMudar({ ...escrita, fatias })}
+      />
+    </section>
+  );
+}
+
+/**
+ * SPEC-115 fatias E e G — **o acompanhamento do envio, sobre estado persistido.**
+ *
+ * ## O que ele mostra, e por que cada coisa entra
+ *
+ * A régua da SPEC-85 §2, reafirmada no §5 da SPEC-98: *movimento que não
+ * carrega informação que o estático não carrega, não entra.* Cada linha aqui
+ * responde a uma pergunta da tabela daquele §5:
+ *
+ * | O que aparece | A pergunta que responde |
+ * |---|---|
+ * | a contagem por etapa | *quanto falta* — números reais, não estimativa |
+ * | o item que está indo, com nome | *em que item está* |
+ * | o ✓ de quem chegou | *o que já chegou* — o parcial é resultado |
+ * | o ⚠ com o motivo por item | *o que falhou, e qual* |
+ *
+ * ## Por que NÃO tem barra de progresso
+ *
+ * A SPEC-98 §6 recusa explicitamente *"barra de progresso que estima sem dizer
+ * que estima"*. Aqui não haveria como estimar honestamente: o tempo de cada
+ * item é do agente do outro lado, e desenhar uma barra avançando por conta
+ * própria seria inventar informação. **Contagem real é honesta por construção**
+ * — "2 de 5 chegaram" não precisa de fé.
+ *
+ * ## Por que ele aparece mesmo sem envio em curso
+ *
+ * Porque a pergunta *"quais specs ainda faltam?"* não vale só durante o envio.
+ * Depois de um envio parcial, é a única tela que responde — e era exatamente
+ * isso que se perdia quando o resultado morava num `useState`.
+ *
+ * O pulso do item em trânsito é CSS (`.spec-em-transito`), e por isso já cai na
+ * guarda global de `prefers-reduced-motion` do §328: quem pede menos movimento
+ * recebe a mesma informação parada.
+ */
+function PipelineDaSpec({ contagem, escritos }: { contagem: ContagemDoPipeline; escritos: ItemGerado[] }) {
+  // Nenhum item chegou ao tracker ainda: não há pipeline nenhum para relatar, e
+  // uma caixa dizendo "0 de 0" é ruído que ensina a ignorar a região.
+  const comHistoria = contagem.total - contagem.naFila;
+  if (comHistoria === 0) return null;
+
+  const indo = escritos.filter((i) => etapaDaSpec(i) === "anexando");
+  const falhados = escritos.filter((i) => etapaDaSpec(i) === "falhou");
+
+  return (
+    <section data-testid="pipeline-da-spec" style={{ marginTop: 12 }} aria-live="polite">
+      <p style={{ fontSize: 11.5, color: "var(--texto-mudo)", margin: "0 0 6px" }}>
+        <strong style={{ color: "var(--texto-2)" }}>A spec de cada item</strong> — o envio continua do lado do servidor:
+        sair desta tela ou recarregar não perde o acompanhamento.
+      </p>
+      <p data-testid="pipeline-contagem" style={{ fontSize: 12.5, color: "var(--texto-2)", margin: "0 0 8px" }}>
+        <span style={{ color: "var(--verde)" }}>{contagem.anexada} com a spec anexada</span>
+        {" · "}
+        <span style={{ color: "var(--acento)" }}>{contagem.anexando} anexando</span>
+        {" · "}
+        <span style={{ color: "var(--amarelo)" }}>{contagem.noTracker} esperando</span>
+        {contagem.falhou > 0 && (
+          <>
+            {" · "}
+            <span style={{ color: "var(--vermelho)" }}>{contagem.falhou} sem a spec</span>
+          </>
+        )}
+        {" — de "}
+        {comHistoria} {comHistoria === 1 ? "item no tracker" : "itens no tracker"}
+      </p>
+
+      {/* "Em que ITEM está" — o §5 pede isso com nome, não um spinner genérico:
+          dois itens em pontos diferentes ao mesmo tempo é o normal do §3.2. */}
+      {indo.map((item) => (
+        <p
+          key={item.chave}
+          data-testid={`spec-em-transito-${item.chave}`}
+          className="spec-em-transito"
+          style={{ fontSize: 12, color: "var(--acento)", margin: "0 0 4px" }}
+        >
+          ⏳ <strong>{item.titulo}</strong> — a spec está indo agora
+        </p>
+      ))}
+
+      {/* "A falha diz QUAL" — o motivo é persistido, então ele continua aqui
+          depois de um F5, que é quando a pessoa volta para entender. */}
+      {falhados.map((item) => (
+        <p
+          key={item.chave}
+          data-testid={`spec-falhou-${item.chave}`}
+          style={{ fontSize: 12, color: "var(--vermelho)", margin: "0 0 4px" }}
+        >
+          ⚠ <strong>{item.titulo}</strong> — {item.specErro}
+        </p>
+      ))}
     </section>
   );
 }
@@ -1083,13 +1498,24 @@ function CartaoItem({
               </a>
             )}
             {/* SPEC-114 — a segunda chamada já aconteceu PARA ESTE item. Só
-                aparece depois de exportado: sem link não há onde a spec ter ido. */}
-            {escrito?.linkExterno && escrito.specAnexada && (
+                aparece depois de exportado: sem link não há onde a spec ter ido.
+                SPEC-115 fatia G — e agora o chip mostra as OUTRAS etapas
+                também. "Anexada" sozinha somava dois estados num rótulo só (o
+                defeito do §276): o item indo e o item parado esperando eram
+                ambos "sem chip", e são coisas diferentes. */}
+            {escrito?.linkExterno && (
               <span
                 data-testid={`item-spec-anexada-${indice}`}
-                style={{ ...chipDoItemEstilo, color: "var(--verde)", background: "rgba(74, 222, 128, 0.12)", borderColor: "transparent" }}
+                className={etapaDaSpec(escrito) === "anexando" ? "spec-em-transito" : undefined}
+                title={ROTULO_DA_ETAPA[etapaDaSpec(escrito)].texto}
+                style={{
+                  ...chipDoItemEstilo,
+                  color: ROTULO_DA_ETAPA[etapaDaSpec(escrito)].cor,
+                  borderColor: "transparent",
+                  background: "var(--painel)",
+                }}
               >
-                spec anexada
+                {ROTULO_DA_ETAPA[etapaDaSpec(escrito)].icone} {ROTULO_DO_CHIP_DA_SPEC[etapaDaSpec(escrito)]}
               </span>
             )}
           </div>

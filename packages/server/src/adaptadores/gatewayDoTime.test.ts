@@ -16,6 +16,7 @@ const DESTINO_ADR: DestinoResolvido = {
   metodo: "POST" as const,
   envelope: "",
   espaco: "",
+  demonstracao: false,
 };
 
 const DESTINO_DOC: DestinoResolvido = {
@@ -27,6 +28,7 @@ const DESTINO_DOC: DestinoResolvido = {
   metodo: "POST" as const,
   envelope: "",
   espaco: "",
+  demonstracao: false,
 };
 
 const DOCUMENTO = {
@@ -283,6 +285,7 @@ describe("ler um documento da casa pelo link (§349)", () => {
     metodo: "POST" as const,
     envelope: "",
     espaco: "",
+    demonstracao: false,
   };
 
   const respondendo = (corpo: unknown, status = 200) =>
@@ -377,6 +380,7 @@ describe("anexar a spec de cada item pelo gateway (SPEC-114)", () => {
     metodo: "POST" as const,
     envelope: "",
     espaco: "",
+    demonstracao: false,
   };
 
   const respondendo = (corpo: unknown, status = 200) =>

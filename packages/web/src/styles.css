@@ -697,6 +697,41 @@ textarea::placeholder {
   transform-origin: center;
 }
 
+/* ==========================================================================
+   SPEC-115 fatia G — o item cuja spec está indo AGORA.
+   ========================================================================== */
+
+/*
+  A régua do §5 da SPEC-98 e da SPEC-85 §2: movimento que não carrega informação
+  que o estático não carrega, não entra.
+
+  Aqui ele carrega, e é fácil dizer o quê: o envio é assíncrono e dura minutos,
+  e numa lista de itens que já chegaram (✓ parado) o que está em trânsito
+  precisa ser distinguível SEM ler o texto. O pulso diz "este, agora".
+
+  Não é barra de progresso, e essa é a diferença que importa: uma barra
+  avançaria fingindo saber quanto falta, e o tempo é do agente do outro lado. O
+  pulso não promete prazo nenhum — só marca onde a coisa está acontecendo. O
+  "quanto falta" quem responde é a contagem real, ao lado.
+
+  A guarda global de `prefers-reduced-motion` mais abaixo já o cobre: sem
+  movimento o item continua visível, com o ⏳ e a frase. Nada de informação se
+  perde — só o piscar.
+*/
+@keyframes spec-em-transito-pulso {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.spec-em-transito {
+  animation: spec-em-transito-pulso 1.6s ease-in-out infinite;
+}
+
 /*
   A guarda que faltava no produto inteiro.
 

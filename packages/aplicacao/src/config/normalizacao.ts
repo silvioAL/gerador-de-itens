@@ -252,6 +252,31 @@ export interface DestinoDoGateway {
    * precisa declarar nada.
    */
   espaco?: string;
+  /**
+   * SPEC-115 fatia D — **o destino que não chama ninguém.**
+   *
+   * Pedido do usuário: *"eu não tenho o endpoint de subidas dos itens acessível
+   * ainda aqui, mas precisamos de tela e experiências prontos, usar algum mock
+   * com delay de 20 segundos."*
+   *
+   * ## Por que uma FLAG, e não uma operação nova
+   *
+   * Resposta dele mesmo, na revisão da SPEC-115 §4.2: *"flag no destino
+   * existente"*. Uma `operacao` nova em `OPERACOES_DO_GATEWAY` criaria um
+   * caminho paralelo no código — outra rota, outro adaptador, outra tela — para
+   * exercitar exatamente o caminho que já existe. **O modo é uma variação de
+   * configuração, não um caminho novo**, que é a mesma escolha do "modo sem
+   * custo" (SPEC-74): lá o dublê da IA é um DESTINO, não um segundo motor.
+   *
+   * ## E por que ele dispensa endereço
+   *
+   * As três razões de descarte de um destino (ver `normalizarExportador`) são a
+   * mesma: *o que sobra não dá para chamar*. Um destino de demonstração não
+   * chama nada — ele é chamável por construção. Exigir um endereço de mentira
+   * seria pedir um campo que ninguém lê, e o primeiro que o lesse por engano
+   * mandaria dado real para um endereço inventado.
+   */
+  demonstracao?: boolean;
 }
 
 /**
@@ -280,11 +305,16 @@ export function normalizarExportador(documento: unknown): ConfigExportador {
     if (!cru || typeof cru !== "object") continue;
     const endpoint = typeof cru.endpoint === "string" ? cru.endpoint.trim() : "";
     const id = typeof cru.id === "string" ? cru.id.trim() : "";
+    // SPEC-115 fatia D — o destino de demonstração não tem para onde ir porque
+    // não vai a lugar nenhum, e isso é a definição dele. Ler `true` estrito (e
+    // não qualquer valor de verdade) porque a flag decide se um endereço vazio
+    // passa: um `"false"` vindo de JSON mal montado não pode abrir essa porta.
+    const demonstracao = cru.demonstracao === true;
     // Três razões de descartar, e as três são a mesma: o que sobra não dá para
     // chamar. Endereço vazio não tem para onde ir; operação desconhecida não
     // tem payload que o produto saiba montar; id repetido faria a tela guardar
     // uma escolha que aponta para dois destinos.
-    if (!endpoint || !id || idsVistos.has(id)) continue;
+    if ((!endpoint && !demonstracao) || !id || idsVistos.has(id)) continue;
     if (!operacoesValidas.includes(cru.operacao as string)) continue;
     idsVistos.add(id);
     const cabecalhos = normalizarCabecalhos(cru.cabecalhos);
@@ -315,6 +345,7 @@ export function normalizarExportador(documento: unknown): ConfigExportador {
       ...(metodo ? { metodo } : {}),
       ...(envelope !== undefined ? { envelope } : {}),
       ...(espaco ? { espaco } : {}),
+      ...(demonstracao ? { demonstracao } : {}),
     });
   }
 
@@ -342,6 +373,13 @@ export interface DestinoResolvido {
   envelope: string;
   /** §348 — onde escrever do outro lado. `""` = o gateway usa o padrão dele. */
   espaco: string;
+  /**
+   * SPEC-115 fatia D — este destino **não chama ninguém**: espera e devolve
+   * sucesso determinístico, para a tela e a experiência existirem antes do
+   * endereço real. Resolvido aqui, como o método e o envelope, para que a rota
+   * não decida de novo (§263).
+   */
+  demonstracao: boolean;
 }
 
 /** Sem declaração, `POST` — o verbo que todo agente escrito para este produto
@@ -405,6 +443,7 @@ export function destinosDaOperacao(config: ConfigExportador, operacao: OperacaoD
       // (payload na raiz), e `||` a transformaria de volta no padrão.
       envelope: d.envelope ?? ENVELOPE_PADRAO[operacao],
       espaco: d.espaco ?? "",
+      demonstracao: d.demonstracao === true,
     }));
 
   /**
@@ -424,6 +463,9 @@ export function destinosDaOperacao(config: ConfigExportador, operacao: OperacaoD
       metodo: METODO_PADRAO,
       envelope: "itens",
       espaco: "",
+      // O destino herdado é um endereço real, sempre: quem quiser demonstração
+      // declara um destino na lista, onde a flag mora.
+      demonstracao: false,
     });
   }
 

@@ -373,13 +373,21 @@ export interface ItemGerado {
   linkExterno: string | null;
   /** SPEC-114 — a segunda chamada (a spec DESTE item) já chegou ao issue. */
   specAnexada: boolean;
+  /**
+   * SPEC-115 fatia E — quando o envio da spec DESTE item começou. Não nulo com
+   * `specAnexada` falso e `specErro` nulo = **indo agora**. É o campo que faz o
+   * pipeline sobreviver ao F5: a tela não guarda o envio, ela o LÊ.
+   */
+  specEnviadaEm: string | null;
+  /** SPEC-115 fatia E — por que a spec deste item não chegou. */
+  specErro: string | null;
   criadoEm: string;
 }
 
 /** O que o cliente manda ao (re)gerar — a forma de `ItemDeTrabalho` do engine. */
 export type DadosItemGerado = Omit<
   ItemGerado,
-  "id" | "quebraId" | "estado" | "linkExterno" | "specAnexada" | "criadoEm"
+  "id" | "quebraId" | "estado" | "linkExterno" | "specAnexada" | "specEnviadaEm" | "specErro" | "criadoEm"
 >;
 
 /** SPEC-49 — o que a exportação devolve: o que subiu, o que falhou (com
@@ -389,16 +397,32 @@ export interface ResultadoDaExportacao {
   erros: { chave: string; erro: string }[];
   ignorados: string[];
   destino: string;
+  /** SPEC-115 fatia D — saiu por um destino de demonstração: nada foi para
+   * lugar nenhum, e a tela precisa dizer isso em vez de festejar. */
+  demonstracao?: boolean;
 }
 
-/** SPEC-114 — o que a segunda chamada devolve: cada item tem seu próprio
- * motivo de não ter entrado (spec com lacuna, ou ainda sem link do tracker). */
-export interface ResultadoDoAnexoDeSpec {
-  anexadas: ItemGerado[];
-  erros: { chave: string; erro: string }[];
+/**
+ * SPEC-115 fatia E — **o que a segunda chamada devolve agora: um começo, não um
+ * fim.**
+ *
+ * Antes ela devolvia `anexadas` — o desfecho de um envio que a rota tinha
+ * esperado terminar. Com o envio assíncrono (decisão da SPEC-98 §3.2), esperar
+ * é o que não se pode fazer: o que volta é quem ENTROU na fila, e o desfecho
+ * de cada um chega pelo estado persistido de `ItemGerado` (`specEnviadaEm`,
+ * `specAnexada`, `specErro`), que a tela relê.
+ *
+ * Os dois motivos de ficar de fora continuam voltando na hora porque são
+ * decididos na hora, sem chamar ninguém.
+ */
+export interface EnvioDeSpecIniciado {
+  /** As chaves que entraram e estão indo. */
+  emAndamento: string[];
   semLinkExterno: string[];
   comLacuna: string[];
   destino: string;
+  /** SPEC-115 fatia D — o destino é o dublê, e a tela diz isso. */
+  demonstracao?: boolean;
 }
 
 export const apiItensGerados = {
@@ -407,9 +431,10 @@ export const apiItensGerados = {
     requisitar<ItemGerado[]>(`/quebras/${quebraId}/itens`, { method: "PUT", body: JSON.stringify({ itens }) }),
   exportar: (quebraId: string) =>
     requisitar<ResultadoDaExportacao>(`/quebras/${quebraId}/itens/exportar`, { method: "POST" }),
-  /** SPEC-114 — cada entrada leva a SUA spec, não uma cópia da spec da demanda. */
+  /** SPEC-114 — cada entrada leva a SUA spec, não uma cópia da spec da demanda.
+   *  SPEC-115 — e a resposta é o INÍCIO do envio (202), não o fim dele. */
   anexarSpec: (quebraId: string, itens: { chave: string; conteudo: string }[]) =>
-    requisitar<ResultadoDoAnexoDeSpec>(`/quebras/${quebraId}/spec/anexar`, {
+    requisitar<EnvioDeSpecIniciado>(`/quebras/${quebraId}/spec/anexar`, {
       method: "POST",
       body: JSON.stringify({ itens }),
     }),

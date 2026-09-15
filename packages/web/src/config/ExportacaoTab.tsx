@@ -175,6 +175,13 @@ function Destinos({
     onMudar(destinos.map((d, j) => (i === j ? { ...d, [campo]: valor } : d)));
   }
 
+  /** SPEC-115 fatia D — a flag é booleana e tem regra própria: separada do
+   * `mudar` de texto porque um `[campo]: valor` genérico gravaria a string
+   * `"true"` e a normalização (que lê `=== true`) a descartaria em silêncio. */
+  function alternarDemonstracao(i: number, ligado: boolean) {
+    onMudar(destinos.map((d, j) => (i === j ? { ...d, demonstracao: ligado } : d)));
+  }
+
   return (
     <section data-testid="destinos-do-gateway" style={{ marginTop: 22 }}>
       <strong style={{ fontSize: 13, color: "var(--texto)" }}>Outros destinos</strong>
@@ -184,7 +191,9 @@ function Destinos({
         ser gateways diferentes — um na frente do MCP do Jira, outro do Confluence, outro dos agentes.
       </p>
       <p style={{ fontSize: 11, color: "var(--texto-mudo)", margin: "0 0 8px" }}>
-        Sem cabeçalhos próprios, o destino usa os de cima. Operação sem endereço não aparece na tela que a usaria.
+        Sem cabeçalhos próprios, o destino usa os de cima. Operação sem endereço não aparece na tela que a usaria — a
+        menos que o destino esteja em <strong>modo de demonstração</strong>, que existe justamente para quando o
+        endereço ainda não existe.
       </p>
 
       {destinos.map((d, i) => (
@@ -220,14 +229,54 @@ function Destinos({
             </button>
           </div>
 
-          <label style={labelEstilo}>Endereço</label>
+          {/**
+           * SPEC-115 fatia D — **o modo de demonstração, marcado como o que é.**
+           *
+           * Pedido do usuário: *"não tenho o endpoint de subidas dos itens
+           * acessível ainda aqui, mas precisamos de tela e experiências
+           * prontos, usar algum mock com delay de 20 segundos"*.
+           *
+           * Fica ANTES do endereço, e não depois, porque muda o que o endereço
+           * significa: com a caixa marcada, não há endereço nenhum para
+           * preencher. É a mesma ordem que o "modo sem custo" (SPEC-74) usa nos
+           * avisos do destino de IA — o que muda a decisão vem antes do campo,
+           * não como nota de rodapé.
+           */}
+          <label
+            style={{ ...labelEstilo, display: "flex", alignItems: "center", gap: 8, cursor: somenteLeitura ? "default" : "pointer" }}
+          >
+            <input
+              type="checkbox"
+              aria-label={`Modo de demonstração do destino ${i + 1}`}
+              checked={d.demonstracao === true}
+              onChange={(e) => alternarDemonstracao(i, e.target.checked)}
+              disabled={somenteLeitura}
+            />
+            <span style={{ color: d.demonstracao ? "var(--amarelo)" : undefined }}>
+              ✦ Modo de demonstração — este destino não chama ninguém
+            </span>
+          </label>
+          {d.demonstracao && (
+            <p
+              data-testid={`destino-demonstracao-${i}`}
+              style={{ fontSize: 11, color: "var(--amarelo)", margin: "2px 0 0", lineHeight: 1.5, maxWidth: 560 }}
+            >
+              Espera ~20 segundos por item e devolve sucesso, sem mandar nada para lugar nenhum. Serve para ver a tela e
+              a experiência prontas antes de o endereço real existir — e tudo o que sair daqui chega marcado como
+              demonstração, como o modo sem custo já faz com a IA. O link do tracker aponta para{" "}
+              <code style={codigoEstilo}>demonstracao.invalid</code>, que nunca resolve: um link de mentira que abre
+              alguma coisa seria pior.
+            </p>
+          )}
+
+          <label style={labelEstilo}>Endereço{d.demonstracao ? " (ignorado em demonstração)" : ""}</label>
           <input
             aria-label={`Endereço do destino ${i + 1}`}
             value={d.endpoint}
             onChange={(e) => mudar(i, "endpoint", e.target.value)}
-            disabled={somenteLeitura}
-            placeholder="https://gateway.empresa/confluence"
-            style={inputEstilo}
+            disabled={somenteLeitura || d.demonstracao === true}
+            placeholder={d.demonstracao ? "—" : "https://gateway.empresa/confluence"}
+            style={{ ...inputEstilo, opacity: d.demonstracao ? 0.5 : 1 }}
           />
 
           <label style={labelEstilo}>Como chamar (aparece na tela)</label>

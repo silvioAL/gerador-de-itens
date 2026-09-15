@@ -25,6 +25,8 @@ function item(chave: string): ItemGeradoSalvo {
     estado: "gerado",
     linkExterno: null,
     specAnexada: false,
+    specEnviadaEm: null,
+    specErro: null,
     criadoEm: new Date("2026-08-13T10:00:00Z").toISOString(),
   };
 }

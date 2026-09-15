@@ -16277,3 +16277,91 @@ tanto no navegador quanto no servidor, e é exatamente essa duplicação
 Java+TS que a fundação do projeto eliminou trocando pra TypeScript de ponta
 a ponta. A SPEC pergunta, antes de qualquer cronograma: o motor migra junto,
 vira serviço à parte, ou fica duplicado?
+
+---
+## §409 — A SPEC-115 implementada, e o botão da rodada anterior estava morto por dentro
+
+Sete das oito fatias da SPEC-115 entraram. A oitava (**F — a conversa de
+mapeamento por componente**) ficou de fora por dependência declarada na
+própria spec: ela exige o painel expansível do assistente, que ainda não
+foi desenhado (SPEC-75 §1.2). Implementar sem ele seria inventar o painel
+de passagem, dentro de uma rodada sobre outra coisa.
+
+**O que entrou, e o que cada fatia custou:**
+
+- **A — Trade-offs derivados.** A seção parou de nascer em branco: cada
+  `Decisao` vira uma linha *ganhou X — porque Z / perdeu Y — consequência*.
+  A medição da SPEC-115 §1.1 se confirmou inteira — nenhum campo novo no
+  modelo, só a mesma decisão lida pelo outro ângulo.
+- **B — Riscos derivados dos ensaios.** O `RiscosMedidos` já existia e vivia
+  SOLTO depois da seção; virou o bloco derivado DELA. O comentário do
+  componente já dizia "dois blocos, uma seção" desde a SPEC-69 — agora a
+  seção que os hospeda é literalmente uma.
+- **C — o rótulo pela origem.** *"derivado de N decisões — edite ou
+  complemente"*, com "escrito por uma pessoa" sobrevivendo como fallback de
+  quem não tem nada derivado. Um teste da SPEC-69 mudou de asserção junto, e
+  de propósito: a frase antiga deixou de ser verdade.
+- **D — o destino em modo de demonstração.** Flag `demonstracao` em
+  `DestinoDoGateway`, como o usuário respondeu na revisão (§4.2) — não uma
+  `operacao` nova. Ele é o único destino que sobrevive à normalização SEM
+  endereço, e a razão é dura: a regra de descarte é "o que sobra não dá para
+  chamar", e um dublê não chama nada. Espera 20s **por item** (não pelo
+  lote), porque é isso que torna o pipeline visível em vez de acender tudo
+  junto no fim. O link que ele devolve aponta para `demonstracao.invalid`, o
+  TLD reservado que nunca resolve: um link de mentira que abre alguma coisa
+  seria pior.
+- **E — o pipeline persistido.** Migration 0044 com `spec_enviada_em` e
+  `spec_erro`; a rota partiu em `planejar` (marca "indo" no banco e responde
+  **202**) e `concluir` (chama o gateway e grava o desfecho, sem ninguém
+  segurando a conexão). É a decisão que a SPEC-98 §3.2 já tinha tomado com o
+  usuário e que nunca havia sido construída: o estado do envio saiu do
+  `useState` e foi para o banco.
+- **G — a animação com informação.** Contagem real por etapa, o item em
+  trânsito nomeado, a falha com motivo. Sem barra de progresso, e há teste
+  que falha se alguém acrescentar uma — a SPEC-98 §6 recusa estimativa que
+  não se declara estimativa.
+- **H — o motivo à vista, nas duas pontas.** A revisão diz quantos itens
+  ainda pedem atenção ANTES do link "Ver o documento", e o documento parou
+  de ter um botão mudo: o motivo saiu do `title` (hover — invisível no
+  celular e no teclado) e foi para a tela. **Nada foi bloqueado**, e há
+  teste que guarda isso: o §269 tornou o documento alcançável cedo de
+  propósito.
+
+### O achado que só o navegador encontrou
+
+O E2E novo (demonstração + F5) falhou duas vezes antes de passar, e as duas
+falhas eram o MESMO defeito em dois lugares: **o botão "Anexar spec aos
+itens", corrigido no §408, continuava sem anexar nada.**
+
+`gerarSpec` marca `origem`, `recusas` e `fatias` vazias como lacuna, e a
+SPEC-98 §6 recusa enviar spec com lacuna. Só que **a tela que editava essas
+três seções não existe mais** — o `SecaoEscrita` exportado "para a tela da
+spec" (SPEC-84 fatia A) ficou sem consumidor, e `mudarSpecEscrita`,
+`alternarItemDaSpec` e `baixarSpecMarkdown` viraram funções mortas no
+`App.tsx`, sem o lint acusar. Resultado: TODO item voltava `comLacuna`. O
+botão aparecia, respondia 200 e a tela dizia *"N ficaram de fora por a spec
+ainda ter lacuna"* — sem lugar nenhum onde resolver.
+
+A segunda metade do mesmo buraco: `gerarSpec` só lista como cobertos os
+itens declarados em `escrita.itensCobertos`, e a marcação que os declarava
+morreu junto. Vazio vira `_(nenhum item vinculado)_ ✍️ especificar` — outra
+lacuna. A resposta não foi ressuscitar aquela tela: a spec é recortada **para
+um item só** (SPEC-114 §2.2), então o item que ela cobre é aquele, e dizer
+isso é declarar o que já era verdade.
+
+As três seções voltaram a ter onde ser escritas, ao lado do botão que
+depende delas — é onde a pessoa está quando bate na parede, a mesma régua do
+§269 e da SPEC-58 §7.2. E a tela agora diz **antes** do clique quantas
+respostas faltam, em vez de deixar a pessoa descobrir depois da espera.
+
+> **A lição é a de sempre, e desta vez ela custou duas rodadas:** o §407
+> entregou o botão com testes verdes em quatro camadas; o §408 corrigiu um
+> defeito que só a validação manual achou; e o §409 descobriu que ele ainda
+> não funcionava. Nenhuma das três rodadas tinha E2E do caminho inteiro. A
+> única prova que vale para costura é o navegador.
+
+**Provas**: 133 E2E verdes (dois no `exportacao.spec.ts`, agora `serial` —
+`config/exportador` é global e o `PUT` substitui, não mescla); 2.325 testes
+de unidade em 6 workspaces; build, typecheck e lint limpos. O E2E novo prova
+o F5 no meio do envio: recarrega, reabre a demanda, e o pipeline continua
+dizendo "1 anexando" — sem ninguém ter clicado nada naquela aba.

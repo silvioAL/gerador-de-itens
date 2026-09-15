@@ -121,6 +121,30 @@ async function anexar(corpo: unknown) {
   });
 }
 
+/**
+ * SPEC-115 fatia E — **a rota responde antes de o envio terminar**, e por isso
+ * o teste precisa esperar o BANCO, não a resposta.
+ *
+ * Não é fragilidade de teste: é a forma do que se está testando. A decisão da
+ * SPEC-98 §3.2 foi que o envio é assíncrono, e a prova de que ele funciona é
+ * exatamente essa — o desfecho aparece no estado persistido depois, sem ninguém
+ * segurando a conexão HTTP.
+ */
+async function aguardarAte(condicao: () => Promise<boolean>, oQue: string, limiteMs = 3000) {
+  const fim = Date.now() + limiteMs;
+  while (Date.now() < fim) {
+    if (await condicao()) return;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  throw new Error(`esperei ${limiteMs}ms e ${oQue} não aconteceu`);
+}
+
+const itensSalvos = () => criarRepositorioDeItensGeradosEmPostgres(db).listarDaQuebra(idDaQuebra);
+
+async function porChave() {
+  return new Map((await itensSalvos()).map((i) => [i.chave, i]));
+}
+
 describe("POST /quebras/:id/spec/anexar (SPEC-114)", () => {
   it("sem destino configurado, a resposta DIZ onde configurar", async () => {
     await gerarItem("a");
@@ -130,24 +154,81 @@ describe("POST /quebras/:id/spec/anexar (SPEC-114)", () => {
     expect(r.json().erro).toMatch(/Outros destinos/);
   });
 
-  it("com UM destino, anexa e marca specAnexada", async () => {
+  it("com UM destino, aceita o envio e marca specAnexada quando ele termina", async () => {
     await configurarDestinos([{ id: "agente", operacao: "specDoItem", endpoint: "https://gw/spec", rotulo: "Agente" }]);
     await gerarItem("a");
     fetchFalso.mockResolvedValue(resposta({ resultados: [{ chaveExterna: "https://tracker/A" }] }));
 
     const r = await anexar({ itens: [{ chave: "a", conteudo: "# Spec do item a" }] });
 
-    expect(r.statusCode).toBe(200);
-    expect(r.json()).toMatchObject({ destino: "Agente" });
-    expect(r.json().anexadas.map((i: { chave: string }) => i.chave)).toEqual(["a"]);
+    // SPEC-115 fatia E — 202, e não 200: aceito e EM CURSO. O 200 de antes
+    // prometia "terminou", e agora não terminou.
+    expect(r.statusCode).toBe(202);
+    expect(r.json()).toMatchObject({ destino: "Agente", demonstracao: false });
+    expect(r.json().emAndamento).toEqual(["a"]);
+
+    await aguardarAte(async () => (await itensSalvos())[0].specAnexada, "a spec ser marcada como anexada");
 
     // Cada item manda o SEU conteúdo, com a chaveExterna que a exportação
     // (primeira chamada) já tinha devolvido.
     const enviado = JSON.parse(fetchFalso.mock.calls[0][1].body);
     expect(enviado).toEqual({ itens: [{ chaveExterna: "https://tracker/A", conteudo: "# Spec do item a" }] });
 
-    const depois = await criarRepositorioDeItensGeradosEmPostgres(db).listarDaQuebra(idDaQuebra);
-    expect(depois[0].specAnexada).toBe(true);
+    const [depois] = await itensSalvos();
+    expect(depois.specAnexada).toBe(true);
+    // Chegou: sai do "indo". Sem isto a tela mostraria o item anexado E
+    // anexando ao mesmo tempo, para sempre.
+    expect(depois.specEnviadaEm).toBeNull();
+    expect(depois.specErro).toBeNull();
+  });
+
+  it("o item já está marcado como INDO quando a resposta sai — é o que faz o F5 achar o envio", async () => {
+    /**
+     * A prova central da fatia E, na camada que importa: o estado é gravado
+     * ANTES da chamada ao gateway, então quem recarregar a tela no segundo
+     * seguinte encontra o envio em curso em vez de não encontrar rastro nenhum.
+     *
+     * O `fetch` daqui nunca resolve — é assim que o teste congela o mundo no
+     * exato instante em que a pessoa aperta F5.
+     */
+    await configurarDestinos([{ id: "agente", operacao: "specDoItem", endpoint: "https://gw/spec", rotulo: "Agente" }]);
+    await gerarItem("a");
+    fetchFalso.mockImplementation(() => new Promise(() => {}));
+
+    const r = await anexar({ itens: [{ chave: "a", conteudo: "# Spec a" }] });
+
+    expect(r.statusCode).toBe(202);
+    const [item] = await itensSalvos();
+    expect(item.specEnviadaEm).not.toBeNull();
+    expect(item.specAnexada).toBe(false);
+  });
+
+  /**
+   * SPEC-115 fatia D — **o destino que não chama ninguém, pela mesma rota.**
+   *
+   * Pedido do usuário: *"eu não tenho o endpoint de subidas dos itens acessível
+   * ainda aqui, mas precisamos de tela e experiências prontos"*.
+   */
+  it("destino em modo de demonstração vale SEM endereço, e não toca a rede", async () => {
+    await configurarDestinos([
+      { id: "demo", operacao: "specDoItem", endpoint: "", rotulo: "Agente de demonstração", demonstracao: true },
+    ]);
+    await gerarItem("a");
+
+    const r = await anexar({ itens: [{ chave: "a", conteudo: "# Spec a" }] });
+
+    expect(r.statusCode).toBe(202);
+    // A resposta CONFESSA o que é — a recusa central da SPEC-115 §2 é o mock se
+    // passar pelo comportamento real, e isto é o que a impede de acontecer.
+    expect(r.json()).toMatchObject({ demonstracao: true, destino: "Agente de demonstração" });
+    expect(r.json().emAndamento).toEqual(["a"]);
+    expect(fetchFalso).not.toHaveBeenCalled();
+
+    // O item fica "indo" pelos ~20s do dublê: é exatamente a experiência que a
+    // fatia existe para tornar demonstrável antes de haver endereço real.
+    const [item] = await itensSalvos();
+    expect(item.specEnviadaEm).not.toBeNull();
+    expect(item.specAnexada).toBe(false);
   });
 
   it("destino de OUTRA operação não serve — specDoItem é separado de itens", async () => {
@@ -178,9 +259,9 @@ describe("POST /quebras/:id/spec/anexar (SPEC-114)", () => {
 
     const r = await anexar({ itens: [{ chave: "a", conteudo: "# Spec" }] });
 
-    expect(r.statusCode).toBe(200);
+    expect(r.statusCode).toBe(202);
     expect(r.json().semLinkExterno).toEqual(["a"]);
-    expect(r.json().anexadas).toEqual([]);
+    expect(r.json().emAndamento).toEqual([]);
     expect(fetchFalso).not.toHaveBeenCalled();
   });
 
@@ -190,10 +271,12 @@ describe("POST /quebras/:id/spec/anexar (SPEC-114)", () => {
 
     const r = await anexar({ itens: [{ chave: "a", conteudo: `# Spec\n_(o que falta)_ ${MARCADOR_ESPECIFICAR}` }] });
 
-    expect(r.statusCode).toBe(200);
+    expect(r.statusCode).toBe(202);
     expect(r.json().comLacuna).toEqual(["a"]);
-    expect(r.json().anexadas).toEqual([]);
+    expect(r.json().emAndamento).toEqual([]);
     expect(fetchFalso).not.toHaveBeenCalled();
+    // SPEC-115 — e ele não fica "indo": nunca entrou na fila.
+    expect((await itensSalvos())[0].specEnviadaEm).toBeNull();
   });
 
   it("reenviar depois de anexado manda ZERO itens — reenvio só manda o que falta", async () => {
@@ -202,15 +285,25 @@ describe("POST /quebras/:id/spec/anexar (SPEC-114)", () => {
     fetchFalso.mockResolvedValue(resposta({ resultados: [{ chaveExterna: "https://tracker/A" }] }));
 
     await anexar({ itens: [{ chave: "a", conteudo: "# Spec a" }] });
+    // Espera o PRIMEIRO envio terminar: o segundo só pode ser julgado depois de
+    // o estado do primeiro estar no banco (é o mesmo que a pessoa faz na tela).
+    await aguardarAte(async () => (await itensSalvos())[0].specAnexada, "o primeiro envio terminar");
     fetchFalso.mockClear();
+
     const segunda = await anexar({ itens: [{ chave: "a", conteudo: "# Spec a" }] });
 
-    expect(segunda.statusCode).toBe(200);
-    expect(segunda.json().anexadas).toEqual([]);
+    expect(segunda.statusCode).toBe(202);
+    expect(segunda.json().emAndamento).toEqual([]);
     expect(fetchFalso).not.toHaveBeenCalled();
   });
 
-  it("falha por item, nunca tudo-ou-nada", async () => {
+  it("falha por item, nunca tudo-ou-nada — e o motivo fica PERSISTIDO", async () => {
+    /**
+     * SPEC-115 fatia E — a diferença em relação à SPEC-114. Antes o erro só
+     * existia no corpo da resposta; com o envio assíncrono, a resposta sai
+     * antes de o erro acontecer. Se ele não fosse gravado, morreria sem
+     * ninguém para lê-lo — e o item ficaria "indo" para sempre.
+     */
     await configurarDestinos([{ id: "agente", operacao: "specDoItem", endpoint: "https://gw/spec", rotulo: "Agente" }]);
     await gerarItem("a");
     await gerarItem("b");
@@ -229,9 +322,15 @@ describe("POST /quebras/:id/spec/anexar (SPEC-114)", () => {
         { chave: "b", conteudo: "# Spec b" },
       ],
     });
+    expect(r.json().emAndamento).toEqual(["a", "b"]);
 
-    expect(r.json().anexadas.map((i: { chave: string }) => i.chave)).toEqual(["a"]);
-    expect(r.json().erros).toEqual([{ chave: "b", erro: "issue arquivada" }]);
+    await aguardarAte(async () => (await porChave()).get("b")!.specErro !== null, "o erro do item b ser gravado");
+
+    const salvos = await porChave();
+    expect(salvos.get("a")!.specAnexada).toBe(true);
+    expect(salvos.get("b")!.specAnexada).toBe(false);
+    expect(salvos.get("b")!.specErro).toBe("issue arquivada");
+    expect(salvos.get("b")!.specEnviadaEm).toBeNull();
   });
 
   it("lista de itens vazia é 400", async () => {

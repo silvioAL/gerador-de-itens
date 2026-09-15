@@ -39,6 +39,10 @@ describe("os destinos do gateway (SPEC-81 fatia A)", () => {
         metodo: "POST",
         envelope: "itens",
         espaco: "",
+        // SPEC-115 fatia D — o destino herdado é um endereço real, sempre: a
+        // flag de demonstração mora na lista, onde alguém a declara de
+        // propósito.
+        demonstracao: false,
       },
     ]);
   });
@@ -59,6 +63,80 @@ describe("os destinos do gateway (SPEC-81 fatia A)", () => {
     expect(destinosDaOperacao(config, "itens")[0].endpoint).toBe("https://gw.casa/jira");
     // Operação sem destino configurado devolve lista vazia — e é assim que a
     // tela sabe não oferecer o botão, em vez de oferecer um que falharia.
+  });
+
+  /**
+   * SPEC-115 fatia D — **o destino de demonstração.**
+   *
+   * A pergunta "destino novo ou flag?" foi respondida pelo usuário na revisão
+   * da SPEC-115 (§4.2): **flag no destino existente**. O que estes testes
+   * guardam é que a flag não abriu uma porta que a normalização fechava por um
+   * motivo bom, e que ela não vaza para quem não a declarou.
+   */
+  describe("o destino em modo de demonstração (SPEC-115 fatia D)", () => {
+    it("sobrevive SEM endereço — é a única coisa que pode, e é a definição dele", () => {
+      /**
+       * A regra de descarte é "o que sobra não dá para chamar". Um destino de
+       * demonstração não chama nada: ele é chamável por construção. Exigir um
+       * endereço de mentira seria pedir um campo que ninguém lê — e o primeiro
+       * que o lesse por engano mandaria dado real para um endereço inventado.
+       */
+      const config = normalizarExportador({
+        endpoint: "",
+        destinos: [{ id: "demo", operacao: "specDoItem", endpoint: "", rotulo: "Agente falso", demonstracao: true }],
+      });
+
+      const [destino] = destinosDaOperacao(config, "specDoItem");
+      expect(destino).toBeDefined();
+      expect(destino.demonstracao).toBe(true);
+      expect(destino.endpoint).toBe("");
+    });
+
+    it("sem endereço E sem a flag, continua sendo descartado", () => {
+      // A porta que a flag abre é estreita de propósito: ela não relaxa a regra
+      // para todo mundo, só para quem declarou que não vai chamar ninguém.
+      const config = normalizarExportador({
+        endpoint: "",
+        destinos: [{ id: "vazio", operacao: "specDoItem", endpoint: "", rotulo: "sem endereço" }],
+      });
+
+      expect(destinosDaOperacao(config, "specDoItem")).toEqual([]);
+    });
+
+    it("`demonstracao` só é verdade quando é o booleano `true`", () => {
+      /**
+       * Estrito de propósito: a flag decide se um endereço vazio passa. Uma
+       * string `"false"` vinda de JSON mal montado é um valor de verdade em
+       * JavaScript, e trataria "não" como "sim" — no campo em que isso desliga
+       * a chamada real.
+       */
+      const config = normalizarExportador({
+        endpoint: "",
+        destinos: [
+          { id: "texto", operacao: "specDoItem", endpoint: "https://gw/x", rotulo: "x", demonstracao: "false" },
+          { id: "numero", operacao: "adr", endpoint: "https://gw/y", rotulo: "y", demonstracao: 1 },
+          { id: "certo", operacao: "documento", endpoint: "https://gw/z", rotulo: "z", demonstracao: true },
+        ],
+      });
+
+      expect(destinosDaOperacao(config, "specDoItem")[0].demonstracao).toBe(false);
+      expect(destinosDaOperacao(config, "adr")[0].demonstracao).toBe(false);
+      expect(destinosDaOperacao(config, "documento")[0].demonstracao).toBe(true);
+    });
+
+    it("quem não declarou nada continua com o documento salvo IGUAL ao de antes", () => {
+      // A flag é opcional e ausente não vira `false` no dado salvo: um destino
+      // configurado antes desta SPEC atravessa a normalização sem ganhar campo
+      // nenhum, que é a mesma garantia que a SPEC-81 deu para `metodo`.
+      const antes = {
+        endpoint: "https://agente.casa/itens",
+        rotulo: "Jira",
+        cabecalhos: {},
+        destinos: [{ id: "c", operacao: "documento" as const, endpoint: "https://gw/c", rotulo: "Confluence" }],
+      };
+
+      expect(normalizarExportador(antes)).toEqual(antes);
+    });
   });
 
   it("cabeçalhos ausentes no destino HERDAM os compartilhados", () => {

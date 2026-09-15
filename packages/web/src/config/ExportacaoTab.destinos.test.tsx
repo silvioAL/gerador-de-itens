@@ -116,6 +116,61 @@ describe("os destinos do gateway na tela (SPEC-81 fatia A)", () => {
     expect(destinos.map((d) => d.endpoint)).toEqual(["https://gw/b"]);
   });
 
+  /**
+   * SPEC-115 fatia D — **o modo de demonstração, marcado como o que é.**
+   *
+   * A recusa central da SPEC-115 §2 é "apresentar o mock de 20s como o
+   * comportamento real". A tela de configuração é onde isso se cumpre ou se
+   * quebra: é aqui que alguém liga o dublê, e é aqui que ele precisa se
+   * anunciar.
+   */
+  describe("o destino em modo de demonstração (SPEC-115 fatia D)", () => {
+    it("marcar a caixa salva a FLAG no destino, e não um endereço de mentira", async () => {
+      render(<ExportacaoTab />);
+      await waitFor(() => expect(screen.getByTestId("destinos-do-gateway")).toBeInTheDocument());
+
+      fireEvent.click(screen.getByTestId("adicionar-destino"));
+      fireEvent.change(screen.getByLabelText("Operação do destino 1"), { target: { value: "specDoItem" } });
+      fireEvent.click(screen.getByLabelText("Modo de demonstração do destino 1"));
+      fireEvent.change(screen.getByLabelText("Rótulo do destino 1"), { target: { value: "Agente falso" } });
+      fireEvent.click(screen.getByTestId("salvar-exportacao"));
+
+      await waitFor(() => expect(apiExportador.salvar).toHaveBeenCalled());
+      const destinos = vi.mocked(apiExportador.salvar).mock.calls[0][0].destinos ?? [];
+      expect(destinos[0]).toMatchObject({ operacao: "specDoItem", demonstracao: true, endpoint: "" });
+    });
+
+    it("a tela DIZ o que a caixa faz — e que nada sai daqui", async () => {
+      render(<ExportacaoTab />);
+      await waitFor(() => expect(screen.getByTestId("destinos-do-gateway")).toBeInTheDocument());
+
+      fireEvent.click(screen.getByTestId("adicionar-destino"));
+      expect(screen.queryByTestId("destino-demonstracao-0")).toBeNull();
+
+      fireEvent.click(screen.getByLabelText("Modo de demonstração do destino 1"));
+
+      // A caixa se nomeia; o parágrafo abaixo explica a consequência.
+      expect(screen.getByText(/não chama ninguém/)).toBeInTheDocument();
+      const aviso = screen.getByTestId("destino-demonstracao-0");
+      expect(aviso).toHaveTextContent("~20 segundos por item");
+      expect(aviso).toHaveTextContent("sem mandar nada para lugar nenhum");
+      expect(aviso).toHaveTextContent("demonstracao.invalid");
+    });
+
+    it("com a caixa marcada, o campo de endereço fica desabilitado — não há o que preencher", async () => {
+      // Um campo editável que ninguém lê é o tipo de coisa que faz a pessoa
+      // duvidar se entendeu a tela. Desabilitado, ele responde a pergunta.
+      render(<ExportacaoTab />);
+      await waitFor(() => expect(screen.getByTestId("destinos-do-gateway")).toBeInTheDocument());
+
+      fireEvent.click(screen.getByTestId("adicionar-destino"));
+      expect(screen.getByLabelText("Endereço do destino 1")).not.toBeDisabled();
+
+      fireEvent.click(screen.getByLabelText("Modo de demonstração do destino 1"));
+      expect(screen.getByLabelText("Endereço do destino 1")).toBeDisabled();
+    });
+  });
+
   it("em demonstração não edita nem grava (§235)", async () => {
     // Semear via API faria o tour ESCREVER na configuração de quem só quis ver.
     render(<ExportacaoTab demonstracao={{ ...VAZIO, endpoint: "https://exemplo/itens", rotulo: "Jira (exemplo)" }} />);

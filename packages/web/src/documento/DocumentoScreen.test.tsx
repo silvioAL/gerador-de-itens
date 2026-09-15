@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
-import type { DiagramaConfig, DocumentoDeDesenho, ItemDoDocumento } from "@gerador/engine";
+import type { Decisao, DiagramaConfig, DocumentoDeDesenho, ItemDoDocumento } from "@gerador/engine";
 import type { ItemGerado } from "../api/client";
 import { DocumentoScreen } from "./DocumentoScreen";
 
@@ -72,6 +72,10 @@ function escrito(chave: string, p: Partial<ItemGerado> = {}): ItemGerado {
     estado: "gerado",
     linkExterno: null,
     specAnexada: false,
+    // SPEC-115 — o item nasce fora de qualquer envio; quem quiser um item em
+    // trânsito declara `specEnviadaEm` no `Partial`.
+    specEnviadaEm: null,
+    specErro: null,
     criadoEm: new Date("2026-08-12T10:00:00Z").toISOString(),
     ...p,
   };
@@ -129,6 +133,94 @@ describe("DocumentoScreen — o documento tem leitor (SPEC-58 fatia 1)", () => {
     const cartao = screen.getByTestId("documento-decisao");
     expect(within(cartao).getByText("Síncrono").tagName).toBe("S");
     expect(within(cartao).getByText(/acopla ao parceiro/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * SPEC-115 fatias A e C — **a seção de trade-offs deixou de nascer em branco.**
+ *
+ * A SPEC-114 adiou isto presumindo dependência de um fluxo que ninguém
+ * construiu. Medindo, `Decisao` já era o material: a alternativa descartada com
+ * a consequência dela é "o que se perdeu"; a escolhida com o porquê é "o que se
+ * ganhou". Nada novo no modelo — a mesma decisão, lida do outro ângulo.
+ */
+describe("DocumentoScreen — trade-offs derivados das decisões (SPEC-115 fatias A e C)", () => {
+  const decisao = (p: Partial<Decisao> = {}): Decisao => ({
+    id: "d1",
+    titulo: "Fila em vez de síncrono",
+    alternativas: [{ titulo: "Fila" }, { titulo: "Síncrono", consequencia: "acopla ao parceiro" }],
+    escolhida: "Fila",
+    porque: "desacopla o pico do parceiro",
+    status: "aceita",
+    origem: "manual",
+    autor: "ana",
+    em: "2026-08-15T10:00:00.000Z",
+    ...p,
+  });
+
+  it("duas decisões e nenhum texto livre mostram DUAS linhas, não a caixa vazia", () => {
+    // É a prova pedida pela fatia A, literal: "uma quebra com 2 decisões e
+    // nenhum texto livre mostra 2 linhas, não a caixa vazia".
+    montar({
+      documento: doc({
+        decisoes: [decisao(), decisao({ id: "d2", titulo: "Postgres em vez de Mongo", escolhida: "Postgres" })],
+      }),
+      escrito: {},
+    });
+
+    const secao = screen.getByTestId("secao-tradeoffs");
+    expect(within(secao).getByTestId("tradeoff-derivado-d1")).toBeInTheDocument();
+    expect(within(secao).getByTestId("tradeoff-derivado-d2")).toBeInTheDocument();
+  });
+
+  it("cada linha diz o que GANHOU e o que CUSTOU — os dois lados da mesma decisão", () => {
+    montar({ documento: doc({ decisoes: [decisao()] }) });
+
+    const linha = screen.getByTestId("tradeoff-derivado-d1");
+    expect(linha).toHaveTextContent("ganhou Fila — desacopla o pico do parceiro");
+    expect(linha).toHaveTextContent("perdeu Síncrono — acopla ao parceiro");
+  });
+
+  it("decisão sem alternativa descartada declara que não houve preço, em vez de inventar um", () => {
+    montar({
+      documento: doc({ decisoes: [decisao({ alternativas: [{ titulo: "Fila" }] })] }),
+    });
+
+    expect(screen.getByTestId("tradeoff-derivado-d1")).toHaveTextContent("não teve preço registrado");
+  });
+
+  it("o rótulo conta a verdade nova: derivado de N decisões, não “escrito por uma pessoa”", () => {
+    montar({ documento: doc({ decisoes: [decisao()] }) });
+
+    expect(screen.getByTestId("secao-tradeoffs-origem")).toHaveTextContent(
+      "derivado de 1 decisão — edite ou complemente"
+    );
+  });
+
+  it("SEM decisão nenhuma, a seção é exatamente a de antes — o fallback é o caso de quem não usa isto", () => {
+    montar();
+
+    const secao = screen.getByTestId("secao-tradeoffs");
+    expect(within(secao).queryByTestId("tradeoffs-derivados")).toBeNull();
+    expect(screen.getByTestId("secao-tradeoffs-origem")).toHaveTextContent("escrito por uma pessoa");
+  });
+
+  it("o texto livre sobrevive AO LADO do derivado, e continua editável", () => {
+    // A regra 3 da SPEC-58 não mudou: a derivação não come o julgamento de
+    // ninguém. Ela só deixa de exigir que alguém escreva do zero o que o
+    // produto já sabe.
+    const { onMudarEscrito } = montar({
+      documento: doc({ decisoes: [decisao()] }),
+      escrito: { tradeOffs: "Aceitamos a fila mesmo sabendo do custo de operação." },
+    });
+
+    const secao = screen.getByTestId("secao-tradeoffs");
+    expect(within(secao).getByTestId("tradeoff-derivado-d1")).toBeInTheDocument();
+    expect(within(secao).getByText(/custo de operação/)).toBeInTheDocument();
+
+    fireEvent.click(within(secao).getByText(/custo de operação/));
+    fireEvent.change(screen.getByLabelText("Trade-offs e o que ficou de fora"), { target: { value: "outro" } });
+    expect(onMudarEscrito).toHaveBeenCalledWith(expect.objectContaining({ tradeOffs: "outro" }));
   });
 });
 
@@ -301,6 +393,164 @@ describe("a seção dos itens", () => {
   });
 });
 
+/**
+ * SPEC-115 fatia H — **o botão desabilitado parou de ser mudo.**
+ *
+ * Queixa do usuário: *"o botão de exportar fica desabilitado, mas isso não faz
+ * sentido já que eu posso chegar nessa tela, então acredito que a validação
+ * deveria ficar na tela anterior."*
+ *
+ * A opção escolhida (§1.3) foi a B: **nada é bloqueado**. O §269 fez o
+ * documento alcançável cedo de propósito, e fechar a porta desfaria isso. O que
+ * muda é que o motivo, que só existia no `title` (hover — invisível no celular,
+ * no teclado e para quem tem pressa), passou a estar na tela.
+ */
+describe("DocumentoScreen — o motivo do “Exportar” desabilitado (SPEC-115 fatia H)", () => {
+  it("com zero itens prontos, a tela DIZ por quê e para onde ir resolver", () => {
+    montar({
+      documento: doc({ itens: [derivado("n1::criacao")] }),
+      itensEscritos: [escrito("n1::criacao", { pendencias: 2 })],
+      onExportar: vi.fn(),
+    });
+
+    const motivo = screen.getByTestId("motivo-exportar-desabilitado");
+    expect(motivo).toHaveTextContent("Nenhum item está pronto");
+    expect(motivo).toHaveTextContent("Resolva na revisão da demanda");
+    expect(screen.getByTestId("exportar-prontos")).toBeDisabled();
+  });
+
+  it("sem demanda salva, o motivo é OUTRO — e a tela não confunde os dois", () => {
+    // Somar "não salvou" com "nada pronto" seria o defeito do §276 aplicado a
+    // uma mensagem de erro: dois problemas com soluções diferentes, um texto só.
+    montar({
+      documento: doc({ itens: [derivado("n1::criacao")] }),
+      itensEscritos: [escrito("n1::criacao")],
+      onExportar: undefined,
+    });
+
+    expect(screen.getByTestId("motivo-exportar-desabilitado")).toHaveTextContent("Salve a demanda antes de exportar");
+  });
+
+  it("com item pronto, não há motivo nenhum a exibir — a tela não explica o que não aconteceu", () => {
+    montar({
+      documento: doc({ itens: [derivado("n1::criacao")] }),
+      itensEscritos: [escrito("n1::criacao")],
+      onExportar: vi.fn(),
+    });
+
+    expect(screen.queryByTestId("motivo-exportar-desabilitado")).toBeNull();
+    expect(screen.getByTestId("exportar-prontos")).not.toBeDisabled();
+  });
+});
+
+/**
+ * SPEC-115 fatias E e G — **o pipeline por item, sobre estado persistido.**
+ *
+ * O que estes testes provam é que a tela LÊ o envio em vez de guardá-lo: em
+ * nenhum deles alguém clica em "Anexar spec". Os itens simplesmente chegam com
+ * o envio marcado — como chegariam depois de um F5 no meio de um envio de
+ * minutos — e a tela mostra onde parou.
+ */
+describe("DocumentoScreen — o pipeline da spec (SPEC-115 fatias E e G)", () => {
+  const noTracker = (chave: string, p: Partial<ItemGerado> = {}) =>
+    escrito(chave, { estado: "exportado", linkExterno: `https://tracker/${chave}`, ...p });
+
+  it("mostra onde parou SEM ninguém ter clicado — é a prova do F5", () => {
+    montar({
+      documento: doc({ itens: [derivado("a"), derivado("b", { numero: 2 }), derivado("c", { numero: 3 })] }),
+      itensEscritos: [
+        noTracker("a", { specAnexada: true }),
+        noTracker("b", { specEnviadaEm: "2026-09-10T10:05:00.000Z" }),
+        noTracker("c"),
+      ],
+    });
+
+    expect(screen.getByTestId("pipeline-contagem")).toHaveTextContent("1 com a spec anexada");
+    expect(screen.getByTestId("pipeline-contagem")).toHaveTextContent("1 anexando");
+    expect(screen.getByTestId("pipeline-contagem")).toHaveTextContent("1 esperando");
+    expect(screen.getByTestId("pipeline-contagem")).toHaveTextContent("de 3 itens no tracker");
+  });
+
+  it("diz em QUAL item está, com nome — não um spinner genérico", () => {
+    // O §5 da SPEC-98 pede exatamente isto: com o pipeline do §3.2, dois itens
+    // estão em pontos diferentes ao mesmo tempo, e a tela precisa mostrar isso.
+    montar({
+      documento: doc({ itens: [derivado("a")] }),
+      itensEscritos: [noTracker("a", { titulo: "Criar o catálogo", specEnviadaEm: "2026-09-10T10:05:00.000Z" })],
+    });
+
+    expect(screen.getByTestId("spec-em-transito-a")).toHaveTextContent("Criar o catálogo");
+  });
+
+  it("a falha diz QUAL item e por quê, e o motivo veio do servidor — sobrevive ao recarregar", () => {
+    montar({
+      documento: doc({ itens: [derivado("a")] }),
+      itensEscritos: [noTracker("a", { specErro: "o agente respondeu HTTP 500" })],
+    });
+
+    expect(screen.getByTestId("spec-falhou-a")).toHaveTextContent("o agente respondeu HTTP 500");
+    expect(screen.getByTestId("pipeline-contagem")).toHaveTextContent("1 sem a spec");
+  });
+
+  it("NÃO existe barra de progresso no pipeline — a contagem real é a honestidade", () => {
+    /**
+     * A SPEC-98 §6 recusa "barra de progresso que estima sem dizer que estima".
+     * Aqui não haveria como estimar: o tempo de cada item é do agente do outro
+     * lado. Este teste é a trava — uma barra que aparecesse depois faria falhar.
+     */
+    montar({
+      documento: doc({ itens: [derivado("a")] }),
+      itensEscritos: [noTracker("a", { specEnviadaEm: "2026-09-10T10:05:00.000Z" })],
+    });
+
+    const pipeline = screen.getByTestId("pipeline-da-spec");
+    expect(pipeline.querySelector("progress")).toBeNull();
+    expect(pipeline.querySelector('[role="progressbar"]')).toBeNull();
+  });
+
+  it("o botão de anexar some enquanto um envio está em curso — pedir de novo duplicaria", async () => {
+    montar({
+      documento: doc({ itens: [derivado("a")] }),
+      itensEscritos: [noTracker("a", { specEnviadaEm: "2026-09-10T10:05:00.000Z" })],
+      onAnexarSpec: vi.fn(),
+    });
+
+    expect(screen.getByTestId("anexar-spec")).toBeDisabled();
+  });
+
+  it("nenhum item no tracker ainda: nada de pipeline — “0 de 0” é ruído que ensina a ignorar", () => {
+    montar({
+      documento: doc({ itens: [derivado("a")] }),
+      itensEscritos: [escrito("a")],
+    });
+
+    expect(screen.queryByTestId("pipeline-da-spec")).toBeNull();
+  });
+
+  it("o começo do envio diz quando é DEMONSTRAÇÃO — nada sai daqui, e a tela fala isso", async () => {
+    // A recusa central da SPEC-115 §2: o mock não pode se passar pelo real.
+    const onAnexarSpec = vi.fn().mockResolvedValue({
+      emAndamento: ["a"],
+      comLacuna: [],
+      semLinkExterno: [],
+      destino: "Agente de demonstração",
+      demonstracao: true,
+    });
+    montar({
+      documento: doc({ itens: [derivado("a")] }),
+      itensEscritos: [noTracker("a")],
+      onAnexarSpec,
+    });
+
+    fireEvent.click(screen.getByTestId("anexar-spec"));
+    await waitFor(() => expect(onAnexarSpec).toHaveBeenCalled());
+
+    const inicio = await screen.findByTestId("inicio-do-envio");
+    expect(inicio).toHaveTextContent("1 spec(s) a caminho de Agente de demonstração");
+    expect(inicio).toHaveTextContent("modo de demonstração — nada sai daqui");
+  });
+});
+
 describe("as seções escritas (SPEC-58 fatia 2)", () => {
   it("vazia convida a escrever; escrita aparece com o selo de proveniência", () => {
     const { onMudarEscrito } = montar();
@@ -457,9 +707,18 @@ describe("DocumentoScreen — riscos medidos (SPEC-69 fatia D)", () => {
 
     const secao = screen.getByTestId("secao-riscos");
     expect(within(secao).getByText(/reestruturado/)).toBeInTheDocument();
-    // O selo de proveniência continua ali: o bloco derivado ao lado não
-    // transforma o texto de alguém em saída de motor.
-    expect(within(secao).getByText("escrito por uma pessoa")).toBeInTheDocument();
+    /**
+     * SPEC-115 fatia C — o selo mudou de TEXTO, não de função.
+     *
+     * Com um ensaio assumido, "escrito por uma pessoa" deixou de ser verdade
+     * sobre a seção inteira — parte dela é derivada. O que a régua da SPEC-58
+     * §7.2 exige continua valendo e é o que este teste guarda: **a barra
+     * indigo continua marcando o que é de gente**, e ela agora diz de onde vem
+     * o resto.
+     */
+    expect(within(secao).getByTestId("secao-riscos-origem")).toHaveTextContent(
+      "derivado de 1 ensaio assumido — edite ou complemente"
+    );
 
     fireEvent.click(within(secao).getByText(/reestruturado/));
     fireEvent.change(screen.getByLabelText("Riscos e o que pode dar errado"), { target: { value: "outro texto" } });

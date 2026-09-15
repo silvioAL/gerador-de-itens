@@ -87,6 +87,7 @@ import { TourOverlay } from "./demo/TourOverlay";
 import { useTour, passosDeConfiguracao } from "./demo/useTour";
 import { DECISOES_DO_TOUR, EXECUCOES_DO_TOUR, REGRAS_DO_TOUR, ehDecisaoDeDemonstracao } from "./demo/dadosDoTour";
 import { DocumentoScreen } from "./documento/DocumentoScreen";
+import { temEnvioEmCurso } from "./documento/etapaDaSpec";
 import { SistemaScreen } from "./sistema/SistemaScreen";
 import { AvisosDaDerivacao } from "./summary/AvisosDaDerivacao";
 import { baixarArquivoTexto } from "./persistence/baixarArquivo";
@@ -1242,6 +1243,42 @@ function AppCarregado({
   }, [mostrarDocumento, persistencia.quebraId]);
 
   /**
+   * SPEC-115 fatia E — **o acompanhamento de um envio que não é desta aba.**
+   *
+   * A decisão da SPEC-98 §3.2 foi **polling, não callback**: o produto já é
+   * quem chama para fora em todas as integrações, e manter uma direção só é o
+   * que faz a instalação de quem compra não precisar publicar endereço nenhum.
+   *
+   * A condição de parada é o DADO, não um cronômetro: enquanto houver item na
+   * etapa "anexando", pergunta de novo; quando o último chegar (ou falhar), o
+   * efeito se desliga sozinho. É isso que faz o F5 no meio de um envio voltar
+   * acompanhando — ao remontar, `itensGerados` já vem do servidor com itens
+   * "indo", e este efeito liga sem ninguém ter clicado em nada.
+   *
+   * Três segundos: rápido o bastante para o passo a passo parecer vivo, longe o
+   * bastante de um envio que dura minutos para não virar tráfego à toa.
+   */
+  useEffect(() => {
+    if (!mostrarDocumento || !persistencia.quebraId) return;
+    if (!temEnvioEmCurso(itensGerados)) return;
+    let cancelado = false;
+    const timer = setInterval(() => {
+      apiItensGerados
+        .listar(persistencia.quebraId!)
+        .then((itens) => {
+          if (!cancelado) setItensGerados(itens);
+        })
+        // Um pulso que falha não derruba o acompanhamento: o próximo tenta de
+        // novo, e o estado na tela continua sendo o último que o servidor deu.
+        .catch(() => {});
+    }, 3000);
+    return () => {
+      cancelado = true;
+      clearInterval(timer);
+    };
+  }, [mostrarDocumento, persistencia.quebraId, itensGerados]);
+
+  /**
    * SPEC-41 Parte B — o clique "Gerar itens" da revisão: persiste o conjunto
    * (quando a quebra está salva) e leva a quem os mostra. Sem id ainda, os
    * itens vivem no estado — salvos na próxima geração com a quebra salva.
@@ -1258,6 +1295,10 @@ function AppCarregado({
       estado: "gerado",
       linkExterno: null,
       specAnexada: false,
+      // SPEC-115 — item recém-gerado nunca esteve num envio: nada indo, nada
+      // falhado. Os dois nascem nulos e só o servidor os escreve.
+      specEnviadaEm: null,
+      specErro: null,
       criadoEm: new Date().toISOString(),
     }));
     setItensGerados(locais);
@@ -2142,7 +2183,26 @@ function AppCarregado({
                         chave: item.chave,
                         conteudo: gerarSpec({
                           titulo: quebra.titulo?.trim() || "Spec",
-                          escrita: specDaDemanda,
+                          /**
+                           * SPEC-115, ACHADO REAL no E2E — **a segunda metade
+                           * do mesmo defeito.**
+                           *
+                           * `gerarSpec` lista como cobertos só os itens
+                           * declarados em `escrita.itensCobertos`, e o que
+                           * sobra vazio vira `_(nenhum item vinculado)_ ✍️
+                           * especificar` — lacuna, logo recusa de envio. A tela
+                           * que marcava esses itens saiu do ar junto com a da
+                           * spec (`alternarItemDaSpec` ficou sem chamador), e
+                           * por isso todo item voltava `comLacuna`.
+                           *
+                           * A resposta não é ressuscitar aquela marcação: esta
+                           * spec é recortada **para um item só** (SPEC-114
+                           * §2.2), e o item que ela cobre é aquele. Declarar
+                           * isso aqui é dizer o que já é verdade — pedir que
+                           * alguém confirme numa segunda tela seria a mesma
+                           * divergência de duas contas que o §114 já custou.
+                           */
+                          escrita: { ...specDaDemanda, itensCobertos: [item.chave] },
                           contexto: [contextoDoProduto, quebra.demandInfo].filter((t) => t?.trim()).join("\n\n"),
                           medicao: documentoDaDemanda.saude.filter((s) => s.lado === "atencao").map((s) => s.rotulo),
                           itens: [atividade],
@@ -2151,6 +2211,10 @@ function AppCarregado({
                     ];
                   });
                   const r = await apiItensGerados.anexarSpec(persistencia.quebraId!, especsPorItem);
+                  // SPEC-115 fatia E — a releitura aqui não é o resultado: é o
+                  // primeiro quadro do pipeline. A rota já gravou "indo" antes
+                  // de responder, então esta lista volta com os itens em
+                  // trânsito — e é ela que liga o polling acima.
                   setItensGerados(await apiItensGerados.listar(persistencia.quebraId!));
                   return r;
                 }
@@ -2162,6 +2226,14 @@ function AppCarregado({
            * A mesma lista que alimenta o markdown: a tela e o arquivo baixado
            * não podem discordar sobre o que se está aceitando correr.
            */
+          /**
+           * SPEC-115 — as três seções de julgamento da spec voltaram a ter
+           * onde ser escritas. `mudarSpecEscrita` existia e não era chamado por
+           * ninguém desde que a tela da spec saiu do ar — e era isso que fazia
+           * "Anexar spec aos itens" nunca anexar nada.
+           */
+          specEscrita={specDaDemanda}
+          onMudarSpecEscrita={mudarSpecEscrita}
           ensaios={ensaiosDaQuebra}
           decisaoDoEnsaio={(ensaioId) =>
             (decisoesVisiveis ?? []).find((d) => (d.ensaioIds ?? []).includes(ensaioId))?.titulo

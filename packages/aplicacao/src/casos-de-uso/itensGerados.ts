@@ -14,7 +14,117 @@ import type {
  * entra como caso de uso novo usando a porta `ExportadorDeItens`.
  */
 export function criarCasosDeUsoDeItensGerados(repo: RepositorioDeItensGerados) {
+  /**
+   * SPEC-115 fatia E — **a primeira metade, a que responde rápido.**
+   *
+   * Decide quem entra, MARCA esses itens como "indo" no banco e devolve o
+   * plano. A rota responde com isto sem esperar o gateway — e é essa divisão
+   * que faz o envio sobreviver ao F5: quando a resposta chega à tela, o estado
+   * já está persistido, então recarregar no segundo seguinte lê itens "indo"
+   * em vez de não achar rastro nenhum.
+   *
+   * Marcar ANTES de chamar, e não depois, é o ponto todo. Depois seria tarde
+   * exatamente na janela que dura minutos.
+   */
+  async function planejarAnexoDeSpec(
+    quebraId: string,
+    specsPorItem: { chave: string; conteudo: string }[]
+  ): Promise<{
+    pedidos: { chave: string; chaveExterna: string; conteudo: string }[];
+    semLinkExterno: string[];
+    comLacuna: string[];
+  }> {
+    const todos = await repo.listarDaQuebra(quebraId);
+    const porChave = new Map(todos.map((i) => [i.chave, i]));
+
+    const comLacuna: string[] = [];
+    const semLinkExterno: string[] = [];
+    const pedidos: { chave: string; chaveExterna: string; conteudo: string }[] = [];
+
+    for (const s of specsPorItem) {
+      if (s.conteudo.includes(MARCADOR_ESPECIFICAR)) {
+        comLacuna.push(s.chave);
+        continue;
+      }
+      const item = porChave.get(s.chave);
+      // Item removido do desenho, ou já anexado numa rodada anterior — em
+      // ambos os casos não há o que fazer, e não é erro reenviar.
+      if (!item || item.specAnexada) continue;
+      if (!item.linkExterno) {
+        semLinkExterno.push(s.chave);
+        continue;
+      }
+      pedidos.push({ chave: s.chave, chaveExterna: item.linkExterno, conteudo: s.conteudo });
+    }
+
+    await repo.marcarSpecEnviando(
+      quebraId,
+      pedidos.map((p) => p.chave)
+    );
+    return { pedidos, semLinkExterno, comLacuna };
+  }
+
+  /**
+   * SPEC-115 fatia E — **a segunda metade, a que demora.**
+   *
+   * Chama o gateway e escreve o desfecho de cada item. Quem chama pode esperar
+   * (o teste, e `anexarSpecNaQuebra`) ou não (a rota) — o resultado é o mesmo
+   * no banco, que é onde a tela vai buscá-lo.
+   *
+   * Erro vira estado PERSISTIDO, não exceção: um envio que falha enquanto
+   * ninguém está olhando precisa deixar rastro, senão o item fica eternamente
+   * "indo" para quem voltar depois.
+   */
+  async function concluirAnexoDeSpec(
+    quebraId: string,
+    pedidos: { chave: string; chaveExterna: string; conteudo: string }[],
+    anexador: AnexadorDeSpec
+  ): Promise<{ anexadas: ItemGeradoSalvo[]; erros: { chave: string; erro: string }[] }> {
+    if (pedidos.length === 0) return { anexadas: [], erros: [] };
+
+    let resultados: Awaited<ReturnType<AnexadorDeSpec["anexar"]>>;
+    try {
+      resultados = await anexador.anexar(pedidos);
+    } catch (erro) {
+      // O contrato da porta é "falha parcial é resposta, não exceção"; um
+      // adaptador que estoura mesmo assim não pode deixar o lote inteiro preso
+      // em "indo" para sempre.
+      const motivo = erro instanceof Error ? erro.message : String(erro);
+      resultados = pedidos.map((p) => ({ chave: p.chave, erro: motivo }));
+    }
+
+    const anexadas: ItemGeradoSalvo[] = [];
+    const erros: { chave: string; erro: string }[] = [];
+    for (const resultado of resultados) {
+      if ("erro" in resultado) {
+        erros.push(resultado);
+        await repo.marcarFalhaDeSpec(quebraId, resultado.chave, resultado.erro);
+        continue;
+      }
+      const salvo = await repo.marcarSpecAnexada(quebraId, resultado.chave);
+      if (salvo) anexadas.push(salvo);
+    }
+
+    /**
+     * O item que o adaptador simplesmente não mencionou continuaria "indo"
+     * eternamente. É o que a SPEC-115 §1.2 chama de "a tela lê de onde parou":
+     * se não parou em lugar nenhum, ela leria uma espera infinita.
+     */
+    const respondidos = new Set(resultados.map((r) => r.chave));
+    for (const pedido of pedidos) {
+      if (respondidos.has(pedido.chave)) continue;
+      const erro = "o envio terminou sem notícia deste item";
+      erros.push({ chave: pedido.chave, erro });
+      await repo.marcarFalhaDeSpec(quebraId, pedido.chave, erro);
+    }
+
+    return { anexadas, erros };
+  }
+
   return {
+    planejarAnexoDeSpec,
+    concluirAnexoDeSpec,
+
     listarDaQuebra(quebraId: string): Promise<ItemGeradoSalvo[]> {
       return repo.listarDaQuebra(quebraId);
     },
@@ -78,41 +188,9 @@ export function criarCasosDeUsoDeItensGerados(repo: RepositorioDeItensGerados) {
       semLinkExterno: string[];
       comLacuna: string[];
     }> {
-      const todos = await repo.listarDaQuebra(quebraId);
-      const porChave = new Map(todos.map((i) => [i.chave, i]));
-
-      const comLacuna: string[] = [];
-      const semLinkExterno: string[] = [];
-      const pedidos: { chave: string; chaveExterna: string; conteudo: string }[] = [];
-
-      for (const s of specsPorItem) {
-        if (s.conteudo.includes(MARCADOR_ESPECIFICAR)) {
-          comLacuna.push(s.chave);
-          continue;
-        }
-        const item = porChave.get(s.chave);
-        // Item removido do desenho, ou já anexado numa rodada anterior — em
-        // ambos os casos não há o que fazer, e não é erro reenviar.
-        if (!item || item.specAnexada) continue;
-        if (!item.linkExterno) {
-          semLinkExterno.push(s.chave);
-          continue;
-        }
-        pedidos.push({ chave: s.chave, chaveExterna: item.linkExterno, conteudo: s.conteudo });
-      }
-
-      const resultados = pedidos.length > 0 ? await anexador.anexar(pedidos) : [];
-      const anexadas: ItemGeradoSalvo[] = [];
-      const erros: { chave: string; erro: string }[] = [];
-      for (const resultado of resultados) {
-        if ("erro" in resultado) {
-          erros.push(resultado);
-          continue;
-        }
-        const salvo = await repo.marcarSpecAnexada(quebraId, resultado.chave);
-        if (salvo) anexadas.push(salvo);
-      }
-      return { anexadas, erros, semLinkExterno, comLacuna };
+      const plano = await planejarAnexoDeSpec(quebraId, specsPorItem);
+      const { anexadas, erros } = await concluirAnexoDeSpec(quebraId, plano.pedidos, anexador);
+      return { anexadas, erros, semLinkExterno: plano.semLinkExterno, comLacuna: plano.comLacuna };
     },
   };
 }
