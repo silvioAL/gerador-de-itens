@@ -16526,3 +16526,51 @@ para não usar um campo teria custado caro em troca de nada.
 expansível; typecheck e lint limpos. O `porque` aparece ANTES do comando na
 tela, e há teste de que não existe botão de "rodar" em lugar nenhum — quem lê
 "script" numa ferramenta espera um, e não vai haver.
+
+---
+## §412 — SPEC-117: três coisas chamadas "agente", e só uma é editável
+
+Depois da aba de mapeamento por componente (§411), o usuário apontou o que
+falta para ela ser útil de verdade para ele:
+
+> *"eu tenho um certo agente pronto para isso, o problema é que não tenho
+> flexibilidade para editar os agentes do assistente na ferramenta, precisamos
+> de spec para atender isso, o caminho natural é evoluir essa parte de pipeline
+> de IA para Agentes de IA e ter uma sessão para editar o pipeline"*
+
+Medido antes de escrever, e a queixa é precisa:
+
+| O quê | Editável? |
+|---|---|
+| Papéis da esteira (PO, Arquiteto, Especialista, QA) | ✅ nome, prompt, ordem, contextos, ativo |
+| As conversas do assistente | ❌ **nada** |
+| Os agentes do gateway | ⚠️ endereço e transporte, não o que fazem |
+
+`grep "export function montarPedido"` devolve **nove**, e **oito têm o prompt
+inteiro escrito em TypeScript** — trocar o comportamento de qualquer um exige
+deploy. É exatamente a frase do usuário.
+
+**O achado que organiza a spec:** `ANATOMIA_DO_PROMPT_PIPELINE` já classifica
+cada parte do prompt da esteira em `configuravel | da-quebra | fixo` — uma
+configurável, uma fixa, cinco derivadas do trabalho. A classificação é honesta
+e **só existe para a esteira**. As outras oito conversas não têm nem como a
+pessoa saber o que ali seria dela.
+
+**A pergunta que decide o desenho inteiro, e a SPEC não a responde sozinha:**
+*"tenho um agente pronto"* é um **prompt refinado** (barato — estender aos
+outros o `preambulo` que a esteira já tem) ou um **agente externo no
+gateway/MCP** (arquitetural — hoje os destinos do gateway só saem e leem,
+nenhum pensa)? As duas provavelmente são verdade, e o que está em aberto é a
+ordem.
+
+**A régua que quase caiu junto**, e que virou a §3 da spec: prompt não é só
+estilo. `montarPedidoDecisoes` exige duas alternativas; `montarPedidoScriptDeMapeamento`
+exige somente leitura e proíbe inventar endereço; `montarPedidoNecessidades`
+diz que lista vazia é resposta correta. Um campo de prompt livre que
+SUBSTITUA apaga isso em silêncio — e a trava da SPEC-80 fatia D não pegaria,
+porque o texto estaria no banco, fora do alcance da varredura de fonte. A
+recomendação é a saída do meio: substitui, com o inegociável reinjetado — o
+que transforma a anatomia de documentação em mecanismo.
+
+Registrado em **SPEC-117**, com seis fatias e quatro perguntas em aberto.
+Nada implementado nesta rodada.
