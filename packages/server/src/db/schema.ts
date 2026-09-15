@@ -107,6 +107,16 @@ export const itensGerados = pgTable(
     linkExterno: text("link_externo"),
     /** SPEC-114 — a segunda chamada (spec anexada) já aconteceu para este item. */
     specAnexada: boolean("spec_anexada").notNull().default(false),
+    /**
+     * SPEC-115 fatia E — a spec DESTE item está indo agora. Não nulo com
+     * `specAnexada` falso é o único estado que a tela não conseguia mostrar
+     * depois de um F5, e é justamente o que dura minutos.
+     */
+    specEnviadaEm: timestamp("spec_enviada_em", { withTimezone: true }),
+    /** SPEC-115 fatia E — por que a spec deste item não chegou. Persistido
+     * pelo mesmo motivo do estado: erro que só vive na aba some no recarregar,
+     * bem quando a pessoa vai procurá-lo. */
+    specErro: text("spec_erro"),
     criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("itens_gerados_chave_unica").on(t.quebraId, t.chave)]

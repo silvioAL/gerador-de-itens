@@ -14,7 +14,9 @@ import {
   estruturarDocumento,
   ensaiosAssumidos,
   gerarEspecificacaoEntrega,
+  derivarSecoesDeJulgamento,
   gerarSpec,
+  type MaterialDeJulgamento,
   adotarVariante,
   guardarComoVariante,
   coberturaDaSpec,
@@ -77,6 +79,7 @@ import { ReviewScreen } from "./review/ReviewScreen";
 import { ContextoEpicoPanel } from "./review/ContextoEpicoPanel";
 import { ConversaPanel } from "./conversa/ConversaPanel";
 import { AssistenteFlutuante, type AbaAssistente } from "./assistente/AssistenteFlutuante";
+import { ConversaDoComponente } from "./conversa/ConversaDoComponente";
 import { EnsaiosScreen } from "./ensaios/EnsaiosScreen";
 import { idDaRegraDeForma } from "./config/FormaDoDesenho";
 import { ConfigurarPanel } from "./assistente/ConfigurarPanel";
@@ -87,6 +90,7 @@ import { TourOverlay } from "./demo/TourOverlay";
 import { useTour, passosDeConfiguracao } from "./demo/useTour";
 import { DECISOES_DO_TOUR, EXECUCOES_DO_TOUR, REGRAS_DO_TOUR, ehDecisaoDeDemonstracao } from "./demo/dadosDoTour";
 import { DocumentoScreen } from "./documento/DocumentoScreen";
+import { temEnvioEmCurso } from "./documento/etapaDaSpec";
 import { SistemaScreen } from "./sistema/SistemaScreen";
 import { AvisosDaDerivacao } from "./summary/AvisosDaDerivacao";
 import { baixarArquivoTexto } from "./persistence/baixarArquivo";
@@ -902,7 +906,20 @@ function AppCarregado({
    *
    * Chega como `proposta`/`sugerido`, sempre: a regra 2 cuida do resto.
    */
-  async function pedirDecisoesAoAgente() {
+  /**
+   * SPEC-115 fatia F (§410) — o mesmo pedido, agora com **contexto de projeto**
+   * e **foco num componente**.
+   *
+   * Os dois são opcionais e o caso de uso deles é o mesmo que a correção do
+   * usuário nomeia: *"parte pode ser nova e parte existente"*. Componente novo
+   * conversa sem contexto; componente que já roda conversa com o schema, as
+   * rotas ou o trecho do documento do projeto dele colado.
+   *
+   * Devolve QUANTAS propostas chegaram, porque é o que a tela do documento
+   * precisa dizer — as decisões em si vão para a mesa, que é onde elas são
+   * aceitas, ao lado do desenho a que se ancoram.
+   */
+  async function pedirDecisoesAoAgente(extra?: { contextoDoProjeto?: string; foco?: string }): Promise<number> {
     const violacoes = violacoesEmAberto(
       avaliarConformidade(quebra.diagrama, diagramaConfig, regrasConfig, quebra.excecoes ?? [], tokens)
     );
@@ -934,6 +951,10 @@ function AppCarregado({
       // Sem isto o agente re-litiga o que já foi decidido, e a pessoa aprende a
       // ignorar as propostas.
       jaDecididas: (quebra.decisoes ?? []).filter((d) => d.status !== "substituida").map((d) => d.titulo),
+      // §410 — vazio não vai: um prompt que fala de "contexto do projeto" com
+      // nada dentro ensina o modelo a inventar um.
+      ...(extra?.contextoDoProjeto?.trim() ? { contextoDoProjeto: extra.contextoDoProjeto.trim() } : {}),
+      ...(extra?.foco ? { foco: extra.foco } : {}),
     });
 
     // A régua das duas alternativas é do PRODUTO, não do modelo: `minItems` é
@@ -961,6 +982,10 @@ function AppCarregado({
         })),
       ],
     }));
+
+    // Quantas PROPOSTAS chegaram, não quantas valem: aceitar é o próximo gesto,
+    // e é de quem lê. Zero é resposta legítima, e a tela sabe dizer isso.
+    return comAlternativaReal.length;
   }
 
   /**
@@ -1112,6 +1137,49 @@ function AppCarregado({
    */
   const specDaDemanda = quebra.artefatosEscritos?.spec ?? {};
 
+  /**
+   * SPEC-115 (§410) — **o material confirmado de onde as seções de julgamento
+   * da spec saem.**
+   *
+   * Um objeto só, montado uma vez, usado pelos DOIS lados: a tela, para dizer o
+   * que já tem de onde sair, e `gerarSpec`, para escrever. Duas montagens
+   * divergiriam na primeira mudança, e a divergência aqui seria cruel — a tela
+   * diria "pode subir" e o envio recusaria por lacuna (§263).
+   *
+   * Nada disto vem de modelo: `decisoes` só entram se alguém as aceitou,
+   * necessidade inferida só entra se alguém a confirmou. É o que mantém a trava
+   * da SPEC-80 fatia D de pé com a derivação ligada.
+   */
+  const julgamentoDaSpec: MaterialDeJulgamento = useMemo(
+    () => ({
+      contextoDaDemanda: quebra.demandInfo,
+      necessidades: quebra.necessidades,
+      decisoes: quebra.decisoes,
+      /**
+       * SPEC-119 §2.3 — **onde a decisão vale, pelo nome que a pessoa deu.**
+       *
+       * Uma decisão de arquitetura é restrição de implementação, e restrição
+       * sem alvo se aplica ao componente errado. `noId: "n3"` não localiza
+       * nada para quem lê a spec no Jira; `srv-catalogo` localiza.
+       *
+       * Nós E arestas: `Decisao` ancora nos dois (o tipo diz isso), e um mapa
+       * só com nós deixaria a decisão de conexão citando id cru.
+       */
+      rotulos: Object.fromEntries([
+        ...quebra.diagrama.nodes.map((n) => [n.id, n.label] as const),
+        ...quebra.diagrama.edges.map((e) => [e.id, e.note?.trim() || `${e.source} → ${e.target}`] as const),
+      ]),
+    }),
+    [quebra.demandInfo, quebra.necessidades, quebra.decisoes, quebra.diagrama]
+  );
+
+  /** O que a TELA mostra como derivável. As fatias entram com os itens da
+   * demanda — a spec por item recorta as dela na hora de gerar. */
+  const julgamentoDerivadoDaSpec = useMemo(
+    () => derivarSecoesDeJulgamento({ ...julgamentoDaSpec, itens: atividadesDoDocumento }),
+    [julgamentoDaSpec, atividadesDoDocumento]
+  );
+
   const coberturaDaSpecAtual = useMemo(
     () => coberturaDaSpec(atividadesDoDocumento, specDaDemanda),
     [atividadesDoDocumento, specDaDemanda]
@@ -1122,11 +1190,30 @@ function AppCarregado({
       gerarSpec({
         titulo: quebra.titulo?.trim() || "Spec",
         escrita: specDaDemanda,
+        /**
+         * O MESMO material que a tela mostra como derivável e que o anexo
+         * usa. Sem ele, a prévia na tela e o arquivo baixado apareciam com
+         * lacuna enquanto o que subia para o issue não tinha nenhuma — duas
+         * leituras da mesma pergunta, que é o que o §263 recusa.
+         */
+        julgamento: { ...julgamentoDaSpec, itens: atividadesDoDocumento },
         contexto: [contextoDoProduto, quebra.demandInfo].filter((t) => t?.trim()).join("\n\n"),
         medicao: documentoDaDemanda.saude.filter((s) => s.lado === "atencao").map((s) => s.rotulo),
         itens: atividadesDoDocumento,
+        // SPEC-119 fatia F — este é o markdown que a pessoa BAIXA, e nele o
+        // corpo do item não viaja junto. A spec diz isso em vez de apontar
+        // para "a seção dele" e deixar quem implementa procurar.
+        corpoDoItem: "fora",
       }),
-    [quebra.titulo, quebra.demandInfo, specDaDemanda, contextoDoProduto, documentoDaDemanda, atividadesDoDocumento]
+    [
+      quebra.titulo,
+      quebra.demandInfo,
+      specDaDemanda,
+      julgamentoDaSpec,
+      contextoDoProduto,
+      documentoDaDemanda,
+      atividadesDoDocumento,
+    ]
   );
 
   /** A mesma régua do §313, no segundo artefato: lacuna contada, nunca estimada. */
@@ -1242,6 +1329,42 @@ function AppCarregado({
   }, [mostrarDocumento, persistencia.quebraId]);
 
   /**
+   * SPEC-115 fatia E — **o acompanhamento de um envio que não é desta aba.**
+   *
+   * A decisão da SPEC-98 §3.2 foi **polling, não callback**: o produto já é
+   * quem chama para fora em todas as integrações, e manter uma direção só é o
+   * que faz a instalação de quem compra não precisar publicar endereço nenhum.
+   *
+   * A condição de parada é o DADO, não um cronômetro: enquanto houver item na
+   * etapa "anexando", pergunta de novo; quando o último chegar (ou falhar), o
+   * efeito se desliga sozinho. É isso que faz o F5 no meio de um envio voltar
+   * acompanhando — ao remontar, `itensGerados` já vem do servidor com itens
+   * "indo", e este efeito liga sem ninguém ter clicado em nada.
+   *
+   * Três segundos: rápido o bastante para o passo a passo parecer vivo, longe o
+   * bastante de um envio que dura minutos para não virar tráfego à toa.
+   */
+  useEffect(() => {
+    if (!mostrarDocumento || !persistencia.quebraId) return;
+    if (!temEnvioEmCurso(itensGerados)) return;
+    let cancelado = false;
+    const timer = setInterval(() => {
+      apiItensGerados
+        .listar(persistencia.quebraId!)
+        .then((itens) => {
+          if (!cancelado) setItensGerados(itens);
+        })
+        // Um pulso que falha não derruba o acompanhamento: o próximo tenta de
+        // novo, e o estado na tela continua sendo o último que o servidor deu.
+        .catch(() => {});
+    }, 3000);
+    return () => {
+      cancelado = true;
+      clearInterval(timer);
+    };
+  }, [mostrarDocumento, persistencia.quebraId, itensGerados]);
+
+  /**
    * SPEC-41 Parte B — o clique "Gerar itens" da revisão: persiste o conjunto
    * (quando a quebra está salva) e leva a quem os mostra. Sem id ainda, os
    * itens vivem no estado — salvos na próxima geração com a quebra salva.
@@ -1258,6 +1381,10 @@ function AppCarregado({
       estado: "gerado",
       linkExterno: null,
       specAnexada: false,
+      // SPEC-115 — item recém-gerado nunca esteve num envio: nada indo, nada
+      // falhado. Os dois nascem nulos e só o servidor os escreve.
+      specEnviadaEm: null,
+      specErro: null,
       criadoEm: new Date().toISOString(),
     }));
     setItensGerados(locais);
@@ -1894,6 +2021,11 @@ function AppCarregado({
             decisoes={decisoesVisiveis}
             autor={sessao.email}
             onPedirDecisoesAoAgente={pedirDecisoesAoAgente}
+            /* SPEC-115 §1.1.1 (§411) — a entrada mora no painel do componente,
+               ao lado das decisões que ela produz; a conversa acontece na
+               janela do assistente, que expande. O nó já está selecionado (é
+               este painel que o mostra), então a aba abre sobre ele. */
+            onMapearComponente={() => setAbaAssistente("componente")}
             ehDeDemonstracao={demonstracaoDoTour ? ehDecisaoDeDemonstracao : undefined}
             onRegistrarDecisao={(d) => setQuebra((q) => ({ ...q, decisoes: [...(q.decisoes ?? []), d] }))}
             onAceitarDecisao={(id) =>
@@ -2142,15 +2274,59 @@ function AppCarregado({
                         chave: item.chave,
                         conteudo: gerarSpec({
                           titulo: quebra.titulo?.trim() || "Spec",
-                          escrita: specDaDemanda,
+                          /**
+                           * SPEC-115, ACHADO REAL no E2E — **a segunda metade
+                           * do mesmo defeito.**
+                           *
+                           * `gerarSpec` lista como cobertos só os itens
+                           * declarados em `escrita.itensCobertos`, e o que
+                           * sobra vazio vira `_(nenhum item vinculado)_ ✍️
+                           * especificar` — lacuna, logo recusa de envio. A tela
+                           * que marcava esses itens saiu do ar junto com a da
+                           * spec (`alternarItemDaSpec` ficou sem chamador), e
+                           * por isso todo item voltava `comLacuna`.
+                           *
+                           * A resposta não é ressuscitar aquela marcação: esta
+                           * spec é recortada **para um item só** (SPEC-114
+                           * §2.2), e o item que ela cobre é aquele. Declarar
+                           * isso aqui é dizer o que já é verdade — pedir que
+                           * alguém confirme numa segunda tela seria a mesma
+                           * divergência de duas contas que o §114 já custou.
+                           */
+                          escrita: { ...specDaDemanda, itensCobertos: [item.chave] },
+                          /**
+                           * SPEC-115 (§410) — o que foi decidido vira as seções
+                           * de julgamento. É o que fecha a lacuna que impedia
+                           * qualquer spec de subir, sem o modelo escrever
+                           * julgamento nenhum: o que chega aqui é `Decisao`
+                           * aceita e necessidade confirmada.
+                           */
+                          julgamento: { ...julgamentoDaSpec, itens: atividadesDoDocumento },
                           contexto: [contextoDoProduto, quebra.demandInfo].filter((t) => t?.trim()).join("\n\n"),
                           medicao: documentoDaDemanda.saude.filter((s) => s.lado === "atencao").map((s) => s.rotulo),
                           itens: [atividade],
+                          /**
+                           * SPEC-119 fatia F — **aqui o ponteiro é uma
+                           * garantia, e a spec passa a dizer isso.**
+                           *
+                           * Este caminho só existe para item que JÁ foi
+                           * exportado (`linkExterno` acima): a spec se anexa
+                           * ao issue que o corpo do item criou. Os dois
+                           * viajam juntos, e é verdade por construção — o
+                           * §3.4 mediu que a spec presumia isso sem afirmar,
+                           * e um agente que receba só a spec seguiria um
+                           * ponteiro para lugar nenhum.
+                           */
+                          corpoDoItem: "mesmo-issue",
                         }),
                       },
                     ];
                   });
                   const r = await apiItensGerados.anexarSpec(persistencia.quebraId!, especsPorItem);
+                  // SPEC-115 fatia E — a releitura aqui não é o resultado: é o
+                  // primeiro quadro do pipeline. A rota já gravou "indo" antes
+                  // de responder, então esta lista volta com os itens em
+                  // trânsito — e é ela que liga o polling acima.
                   setItensGerados(await apiItensGerados.listar(persistencia.quebraId!));
                   return r;
                 }
@@ -2162,6 +2338,26 @@ function AppCarregado({
            * A mesma lista que alimenta o markdown: a tela e o arquivo baixado
            * não podem discordar sobre o que se está aceitando correr.
            */
+          /**
+           * SPEC-115 — as três seções de julgamento da spec voltaram a ter
+           * onde ser escritas. `mudarSpecEscrita` existia e não era chamado por
+           * ninguém desde que a tela da spec saiu do ar — e era isso que fazia
+           * "Anexar spec aos itens" nunca anexar nada.
+           */
+          specEscrita={specDaDemanda}
+          onMudarSpecEscrita={mudarSpecEscrita}
+          /**
+           * SPEC-115 fatia F (§410) — a caixa da conversa só aparece quando há
+           * com quem conversar E quando há componente sobre o que falar. Sem
+           * credencial de IA ela falharia; sem desenho, `montarPedidoDecisoes`
+           * recusa por princípio ("decisão de arquitetura se ancora em um
+           * elemento"). Oferecer nos dois casos é a disciplina da SPEC-49 ao
+           * contrário.
+           */
+          onConversarSobreASpec={
+            temCredencialDeIa && quebra.diagrama.nodes.length > 0 ? pedirDecisoesAoAgente : undefined
+          }
+          julgamentoDerivado={julgamentoDerivadoDaSpec}
           ensaios={ensaiosDaQuebra}
           decisaoDoEnsaio={(ensaioId) =>
             (decisoesVisiveis ?? []).find((d) => (d.ensaioIds ?? []).includes(ensaioId))?.titulo
@@ -2407,6 +2603,44 @@ function AppCarregado({
               })
             }
             onFechar={() => setAbaAssistente(null)}
+          />
+        )}
+
+        {/**
+         * SPEC-115 fatia F (§411) — **mapear e decidir sobre UM componente.**
+         *
+         * Relato do usuário: *"poder selecionar os componentes, pegar o script
+         * de mapeamento com o assistente e iterar em uma janela maior com ele
+         * para tomar decisões sobre o componente não achei nada"*. As três
+         * coisas faltavam — e a rodada anterior tinha entregue esta fatia no
+         * nível da DEMANDA, que é justamente o que a §1.1.1 corrige contra.
+         *
+         * O componente vem da seleção da mesa: é o mesmo `noSelecionado` que o
+         * painel de propriedades usa. Uma segunda noção de "componente em foco"
+         * divergiria da seleção visível, e a pessoa decidiria sobre um nó
+         * diferente do que está destacado no desenho.
+         */}
+        {abaAssistente === "componente" && (
+          <ConversaDoComponente
+            componente={
+              noSelecionado
+                ? {
+                    id: noSelecionado.id,
+                    rotulo: noSelecionado.label,
+                    tipo: diagramaConfig.nodeTypes[noSelecionado.type]?.label ?? noSelecionado.type,
+                    techs: diagramaConfig.nodeTypes[noSelecionado.type]?.techs,
+                    // Só o que está preenchido: mandar a ficha inteira gastaria
+                    // token descrevendo vazio (a mesma régua do pedido de
+                    // decisões).
+                    campos:
+                      Object.entries(noSelecionado.spec)
+                        .filter(([, v]) => v.valor !== undefined && v.valor !== "")
+                        .map(([k, v]) => `${k}=${String(v.valor)}`)
+                        .join(", ") || undefined,
+                  }
+                : null
+            }
+            onDecidir={pedirDecisoesAoAgente}
           />
         )}
 

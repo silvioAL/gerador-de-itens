@@ -748,6 +748,29 @@ export function ReviewScreen({
     : null;
   const [filaAberta, setFilaAberta] = useState<PendenteDeConfirmacao[] | null>(null);
 
+  /**
+   * SPEC-115 fatia H — quantos ITENS (não campos) ainda não estão refinados.
+   *
+   * A barra de pendências ao lado conta CAMPOS e SUGESTÕES, que é a régua de
+   * quem está trabalhando item a item. Aqui a pergunta é a do documento — *"o
+   * que vai conseguir sair daqui?"* — e ela se mede por item: um item com seis
+   * campos vazios e outro com um campo vazio contam a mesma coisa para a
+   * exportação, que é "não vai".
+   *
+   * `statusDoItem` é a MESMA régua que o chip de cada card já usa nesta tela:
+   * uma segunda conta aqui divergiria dele na primeira mudança (§263).
+   */
+  const itensQuePedemAtencao = useMemo(
+    () =>
+      resultado.atividades.filter((a) => {
+        const ficha = fichas.get(a.chave);
+        // Sem ficha não há o que julgar — e chutar "pede atenção" acusaria um
+        // item que ninguém consegue abrir para resolver.
+        return ficha ? statusDoItem(ficha) !== "refinado" : false;
+      }).length,
+    [resultado.atividades, fichas]
+  );
+
   function confirmarTodas() {
     for (const s of pend?.sugestoes ?? []) {
       responderComProcedencia(s.itemChave, s.chave, assinarSugestao(s.resposta));
@@ -901,9 +924,41 @@ export function ReviewScreen({
             por ele, e uma tela que só existe no menu é uma tela que a maioria
             nunca abre. Aqui é o lugar: acabou de revisar, é o que se mostra. */}
         {onDocumento && (
-          <button onClick={onDocumento} style={botaoEstilo} data-testid="ir-ao-documento">
-            Ver o documento →
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {/**
+             * SPEC-115 fatia H — **o aviso vem ANTES da porta, e a porta fica
+             * aberta.**
+             *
+             * Queixa do usuário: *"o botão de exportar fica desabilitado, mas
+             * isso não faz sentido já que eu posso chegar nessa tela, então
+             * acredito que a validação deveria ficar na tela anterior."*
+             *
+             * A leitura está certa e a conclusão precisa de um ajuste, que a
+             * própria SPEC-115 §1.3 fez: a régua muda de lugar, mas **não vira
+             * bloqueio**. O §269 tornou o documento alcançável cedo DE
+             * PROPÓSITO — para responder "e o porquê disso tudo" antes de a
+             * revisão terminar —, e fechar a porta desfaria isso por uma razão
+             * pior do que a que a abriu.
+             *
+             * Então: a revisão diz quantos itens ainda pedem atenção, aqui,
+             * onde a pessoa pode resolvê-los; e o documento passou a dizer o
+             * motivo do botão desabilitado em vez de ficar mudo. Ninguém mais
+             * encontra um botão morto sem saber por quê, e quem só quer LER o
+             * documento continua podendo.
+             */}
+            {itensQuePedemAtencao > 0 && (
+              <span
+                data-testid="aviso-antes-do-documento"
+                style={{ fontSize: 11.5, color: "var(--amarelo)", maxWidth: 260, lineHeight: 1.4 }}
+              >
+                {itensQuePedemAtencao} {itensQuePedemAtencao === 1 ? "item ainda pede" : "itens ainda pedem"} atenção —
+                lá o “Exportar prontos” não vai levá-{itensQuePedemAtencao === 1 ? "lo" : "los"}.
+              </span>
+            )}
+            <button onClick={onDocumento} style={botaoEstilo} data-testid="ir-ao-documento">
+              Ver o documento →
+            </button>
+          </div>
         )}
         <button onClick={onFechar} style={botaoEstilo}>
           Voltar à mesa de projeto

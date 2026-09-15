@@ -373,13 +373,21 @@ export interface ItemGerado {
   linkExterno: string | null;
   /** SPEC-114 — a segunda chamada (a spec DESTE item) já chegou ao issue. */
   specAnexada: boolean;
+  /**
+   * SPEC-115 fatia E — quando o envio da spec DESTE item começou. Não nulo com
+   * `specAnexada` falso e `specErro` nulo = **indo agora**. É o campo que faz o
+   * pipeline sobreviver ao F5: a tela não guarda o envio, ela o LÊ.
+   */
+  specEnviadaEm: string | null;
+  /** SPEC-115 fatia E — por que a spec deste item não chegou. */
+  specErro: string | null;
   criadoEm: string;
 }
 
 /** O que o cliente manda ao (re)gerar — a forma de `ItemDeTrabalho` do engine. */
 export type DadosItemGerado = Omit<
   ItemGerado,
-  "id" | "quebraId" | "estado" | "linkExterno" | "specAnexada" | "criadoEm"
+  "id" | "quebraId" | "estado" | "linkExterno" | "specAnexada" | "specEnviadaEm" | "specErro" | "criadoEm"
 >;
 
 /** SPEC-49 — o que a exportação devolve: o que subiu, o que falhou (com
@@ -389,16 +397,32 @@ export interface ResultadoDaExportacao {
   erros: { chave: string; erro: string }[];
   ignorados: string[];
   destino: string;
+  /** SPEC-115 fatia D — saiu por um destino de demonstração: nada foi para
+   * lugar nenhum, e a tela precisa dizer isso em vez de festejar. */
+  demonstracao?: boolean;
 }
 
-/** SPEC-114 — o que a segunda chamada devolve: cada item tem seu próprio
- * motivo de não ter entrado (spec com lacuna, ou ainda sem link do tracker). */
-export interface ResultadoDoAnexoDeSpec {
-  anexadas: ItemGerado[];
-  erros: { chave: string; erro: string }[];
+/**
+ * SPEC-115 fatia E — **o que a segunda chamada devolve agora: um começo, não um
+ * fim.**
+ *
+ * Antes ela devolvia `anexadas` — o desfecho de um envio que a rota tinha
+ * esperado terminar. Com o envio assíncrono (decisão da SPEC-98 §3.2), esperar
+ * é o que não se pode fazer: o que volta é quem ENTROU na fila, e o desfecho
+ * de cada um chega pelo estado persistido de `ItemGerado` (`specEnviadaEm`,
+ * `specAnexada`, `specErro`), que a tela relê.
+ *
+ * Os dois motivos de ficar de fora continuam voltando na hora porque são
+ * decididos na hora, sem chamar ninguém.
+ */
+export interface EnvioDeSpecIniciado {
+  /** As chaves que entraram e estão indo. */
+  emAndamento: string[];
   semLinkExterno: string[];
   comLacuna: string[];
   destino: string;
+  /** SPEC-115 fatia D — o destino é o dublê, e a tela diz isso. */
+  demonstracao?: boolean;
 }
 
 export const apiItensGerados = {
@@ -407,9 +431,10 @@ export const apiItensGerados = {
     requisitar<ItemGerado[]>(`/quebras/${quebraId}/itens`, { method: "PUT", body: JSON.stringify({ itens }) }),
   exportar: (quebraId: string) =>
     requisitar<ResultadoDaExportacao>(`/quebras/${quebraId}/itens/exportar`, { method: "POST" }),
-  /** SPEC-114 — cada entrada leva a SUA spec, não uma cópia da spec da demanda. */
+  /** SPEC-114 — cada entrada leva a SUA spec, não uma cópia da spec da demanda.
+   *  SPEC-115 — e a resposta é o INÍCIO do envio (202), não o fim dele. */
   anexarSpec: (quebraId: string, itens: { chave: string; conteudo: string }[]) =>
-    requisitar<ResultadoDoAnexoDeSpec>(`/quebras/${quebraId}/spec/anexar`, {
+    requisitar<EnvioDeSpecIniciado>(`/quebras/${quebraId}/spec/anexar`, {
       method: "POST",
       body: JSON.stringify({ itens }),
     }),
@@ -820,6 +845,50 @@ export const apiIa = {
     }
     return resposta.json();
   },
+  /**
+   * SPEC-115 §1.1.1 (§411) — **o script de mapeamento do componente.**
+   *
+   * O que volta é um comando para a PESSOA copiar e rodar onde ela tem acesso —
+   * o produto **não executa** nada disto. É a fronteira da SPEC-75, reafirmada
+   * na SPEC-115 §2.
+   *
+   * Mesmo caminho estruturado das outras rotas de IA, com um campo só: a tela
+   * renderiza `script` verbatim, e uma string dentro de JSON atravessa byte a
+   * byte. Um segundo caminho no executor custaria uma bifurcação em troca de
+   * nada.
+   */
+  scriptDeMapeamento: async (pedido: PedidoScriptDeMapeamento): Promise<ScriptDeMapeamento> => {
+    const resposta = await fetch(`${BASE_URL}/ia/script-de-mapeamento`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(pedido),
+    });
+    if (!resposta.ok) {
+      const corpo = await resposta.json().catch(() => ({}));
+      throw new Error(
+        typeof corpo.erro === "string"
+          ? corpo.erro
+          : `Não foi possível montar o script (HTTP ${resposta.status}, sem detalhe do servidor).`
+      );
+    }
+    // Streaming, como toda rota de IA — ler `.text()` direto perde o tratamento
+    // de reinício e produz JSON que nunca casa (§231).
+    let acumulado = "";
+    const leitor = resposta.body?.getReader();
+    if (leitor) {
+      const decodificador = new TextDecoder();
+      for (;;) {
+        const { done, value } = await leitor.read();
+        if (done) break;
+        acumulado = soDepoisDoUltimoReinicio(acumulado + decodificador.decode(value, { stream: true }));
+      }
+      acumulado = soDepoisDoUltimoReinicio(acumulado + decodificador.decode());
+    } else {
+      acumulado = await resposta.text();
+    }
+    return interpretarRespostaEstruturada<ScriptDeMapeamento>(acumulado, "o script");
+  },
   proporDiagrama: async (
     pedido: PedidoDiagramaIa,
     onTexto?: (acumulado: string) => void
@@ -1108,7 +1177,9 @@ export type AlvoSugestaoConfig =
   | "teste-automatizado"
   | "contexto-do-produto"
   /** SPEC-102 fatia D — o passo 2 materializa `{ tipoNo, default, valid, porque }`. */
-  | "regra-de-conexao";
+  | "regra-de-conexao"
+  /** SPEC-117 fatia F — o ✦ Sugerir da esteira, estendido às conversas. */
+  | "preambulo-de-conversa";
 
 /** §271 — o que a IA devolve para o alvo "contexto-do-produto": as cinco
  * seções de uma vez, porque elas são um texto só partido em pedaços. */
@@ -1159,6 +1230,18 @@ export interface SugestaoPapel {
   descricao: string;
   preambulo: string;
   contextos: string[];
+}
+
+/**
+ * SPEC-117 fatia F — o que a IA devolve para "preambulo-de-conversa".
+ *
+ * Um campo só, e a diferença em relação a `SugestaoPapel` é a fatia inteira: um
+ * papel da esteira NASCE aqui (id, nome, seção, contextos); uma conversa já
+ * existe — ela é do produto, tem tela e tem anatomia. O que se propõe é só o
+ * texto que o time acrescenta.
+ */
+export interface SugestaoPreambuloDeConversa {
+  preambulo: string;
 }
 
 
@@ -1409,6 +1492,23 @@ export interface CenariosPropostos {
   cenarios: { nome: string; porque?: string; ajustes: { id: string; fator: number }[] }[];
 }
 
+/** SPEC-115 §1.1.1 (§411) — o que o agente precisa saber para escrever um
+ *  script que faça sentido para ESTE componente. */
+export interface PedidoScriptDeMapeamento {
+  rotulo: string;
+  tipo: string;
+  techs?: string[];
+  campos?: string;
+}
+
+export interface ScriptDeMapeamento {
+  /** Os comandos, para copiar e rodar. Renderizado verbatim. */
+  script: string;
+  /** O que a saída vai permitir decidir — quem vai rodar um comando merece
+   * saber o que ele responde antes de colar num terminal. */
+  porque: string;
+}
+
 export interface PedidoDecisoesIa {
   contextoEpico?: string;
   contextoDoProduto?: string;
@@ -1417,6 +1517,15 @@ export interface PedidoDecisoesIa {
   violacoes?: { noId: string; campo: string; esperado: string; atual: string; porque?: string }[];
   lacunas?: string[];
   jaDecididas?: string[];
+  /**
+   * SPEC-115 §1.1.1 (§410) — o contexto do PROJETO que já existe, colado por
+   * quem conhece o código. Vem colado, nunca executado: o produto não roda
+   * script de ninguém (SPEC-75, reafirmada na SPEC-115 §2).
+   */
+  contextoDoProjeto?: string;
+  /** SPEC-115 §1.1.1 — o componente sobre o qual a conversa é. Ausente = a
+   * demanda inteira, que é o caso de quem ainda está começando o desenho. */
+  foco?: string;
 }
 
 export interface DecisaoProposta {
@@ -1508,6 +1617,12 @@ export interface ConfigPipelineAgentes {
   /** SPEC-24 Fase F — lista ordenada de papéis da esteira. Ausente em
    * configs antigas (só o toggle) — quem consome cai em `PAPEIS_PADRAO`. */
   papeis?: PapelConfigurado[];
+  /**
+   * SPEC-117 fatia C — o preâmbulo que o time acrescentou a cada conversa do
+   * assistente. Ausente é o normal: quem nunca abriu a seção nova não tem
+   * campo nenhum aqui, e o prompt sai byte a byte igual ao de antes.
+   */
+  conversas?: { id: string; preambulo?: string }[];
 }
 
 /** SPEC-24 Fase E — achado real do usuário: "pode avançar sozinho até o fim,
@@ -1627,7 +1742,31 @@ export const apiDiagrama = {
 export type { ConfigExportador } from "@gerador/aplicacao";
 import type { ConfigExportador } from "@gerador/aplicacao";
 
-export const apiExportador = configDe<ConfigExportador>("exportador");
+/**
+ * SPEC-118 fatia F — o resultado de "Testar conexão" com o gateway da casa.
+ *
+ * `ok` é sobre o TRANSPORTE: houve resposta. `status` diz qual foi, e um 401 é
+ * `ok: true` de propósito — alguém atendeu, e o problema é a chave, não o
+ * endereço. `oQueMandei` existe para um "falhou" ser diagnosticável em vez de
+ * ser apenas vermelho.
+ */
+export interface ResultadoDoTesteDeGateway {
+  ok: boolean;
+  status?: number;
+  duracaoMs: number;
+  oQueMandei: string;
+  amostra?: string;
+  erro?: string;
+}
+
+export const apiExportador = {
+  ...configDe<ConfigExportador>("exportador"),
+  testar: (dados: { endpoint: string; cabecalhos?: Record<string, string> }) =>
+    requisitar<ResultadoDoTesteDeGateway>("/config/exportador/testar", {
+      method: "POST",
+      body: JSON.stringify(dados),
+    }),
+};
 
 /**
  * SPEC-86 fatia C — as regras EM VIGOR para um produto.

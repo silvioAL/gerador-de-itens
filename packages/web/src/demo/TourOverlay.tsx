@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PassoTour } from "./useTour";
 import { CursorFantasma } from "./CursorFantasma";
 
@@ -57,12 +57,63 @@ export function useRect(selector: string | null): DOMRect | null {
   return rect;
 }
 
-export function posicionarCard(rect: DOMRect): React.CSSProperties {
+/**
+ * O palpite de partida, e ele só vale até a carta existir para ser medida.
+ *
+ * **§411 — por que deixou de ser a única conta.** Este número era usado como se
+ * fosse a altura da carta, e o `maxHeight` dela é `min(70vh, 420px)`. Os dois
+ * nunca bateram: bastava um texto longo num alvo baixo para a carta ser
+ * "contida" a 240 e ainda assim terminar 140 px abaixo da dobra — com o
+ * "Próximo" existindo, visível para o DOM e fora da viewport.
+ *
+ * Foi o que travou o tour quando a janela do assistente passou a expandir e
+ * empurrou `delta-da-proposta` para baixo: `element is outside of the
+ * viewport`, trinta segundos de retry, e o e2e vermelho. O comentário original
+ * já dizia a regra certa — *"subestimar aqui é o que a jogava para fora"* — e
+ * a régua não estava sendo seguida por ninguém.
+ *
+ * A correção não é aumentar o palpite: é **medir**. Um número escrito à mão
+ * volta a divergir do CSS na primeira vez que alguém mexer num dos dois.
+ */
+export const ALTURA_ESTIMADA_DA_CARTA = 240;
+
+/**
+ * A altura REAL da carta, remedida quando o passo troca e no mesmo ritmo do
+ * alvo.
+ *
+ * O mesmo intervalo de 300 ms do `useRect`, e pelo mesmo motivo: o conteúdo
+ * muda por baixo (a barra de progresso aparece, a fonte carrega, o texto
+ * reflui) sem disparar evento nenhum. `ResizeObserver` seria mais fino e não
+ * existe em toda plataforma onde os testes rodam — e aqui a diferença entre
+ * "fino" e "de 300 em 300 ms" não muda nada do que a pessoa vê.
+ *
+ * Altura zero (jsdom, primeiro quadro) **não** substitui o palpite: medir nada
+ * e acreditar seria pior que estimar.
+ */
+function useAlturaDaCarta(ref: React.RefObject<HTMLDivElement | null>, passo: string): number {
+  const [altura, setAltura] = useState(ALTURA_ESTIMADA_DA_CARTA);
+
+  useEffect(() => {
+    function medir() {
+      const medida = ref.current?.getBoundingClientRect().height ?? 0;
+      if (medida > 0) setAltura((atual) => (Math.abs(atual - medida) > 1 ? medida : atual));
+    }
+    medir();
+    const id = setInterval(medir, 300);
+    window.addEventListener("resize", medir);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("resize", medir);
+    };
+  }, [ref, passo]);
+
+  return altura;
+}
+
+export function posicionarCard(rect: DOMRect, altura = ALTURA_ESTIMADA_DA_CARTA): React.CSSProperties {
   const margem = 14;
   const largura = 300;
-  // Bate com o `maxHeight` da carta: subestimar aqui é o que a jogava para
-  // fora da tela quando o texto era longo.
-  const alturaEstimada = 240;
+  const alturaEstimada = altura;
 
   let top = rect.bottom + margem;
   let left = Math.min(Math.max(rect.left, margem), window.innerWidth - largura - margem);
@@ -102,9 +153,11 @@ export function TourOverlay({
   onSegurar,
 }: TourOverlayProps) {
   const rect = useRect(passo.selector);
+  const carta = useRef<HTMLDivElement>(null);
+  const altura = useAlturaDaCarta(carta, passo.titulo);
 
   const cardStyle: React.CSSProperties = rect
-    ? posicionarCard(rect)
+    ? posicionarCard(rect, altura)
     : { position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)" };
 
   return (
@@ -133,6 +186,7 @@ export function TourOverlay({
         />
       )}
       <div
+        ref={carta}
         style={{
           ...cardStyle,
           zIndex: 81,

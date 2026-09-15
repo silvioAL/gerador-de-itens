@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { destinosDaOperacao, normalizarExportador, OPERACOES_DO_GATEWAY } from "./normalizacao.js";
+import { LOTE_PADRAO } from "./lotes.js";
 
 /**
  * SPEC-81 fatia A — **os destinos do time.**
@@ -39,6 +40,13 @@ describe("os destinos do gateway (SPEC-81 fatia A)", () => {
         metodo: "POST",
         envelope: "itens",
         espaco: "",
+        // SPEC-115 fatia D — o destino herdado é um endereço real, sempre: a
+        // flag de demonstração mora na lista, onde alguém a declara de
+        // propósito.
+        demonstracao: false,
+        // SPEC-120 fatia A — o lote é GLOBAL (é um gateway só, SPEC-118 §2.0),
+        // e chega resolvido para o adaptador não decidir de novo (§263).
+        lote: LOTE_PADRAO,
       },
     ]);
   });
@@ -59,6 +67,80 @@ describe("os destinos do gateway (SPEC-81 fatia A)", () => {
     expect(destinosDaOperacao(config, "itens")[0].endpoint).toBe("https://gw.casa/jira");
     // Operação sem destino configurado devolve lista vazia — e é assim que a
     // tela sabe não oferecer o botão, em vez de oferecer um que falharia.
+  });
+
+  /**
+   * SPEC-115 fatia D — **o destino de demonstração.**
+   *
+   * A pergunta "destino novo ou flag?" foi respondida pelo usuário na revisão
+   * da SPEC-115 (§4.2): **flag no destino existente**. O que estes testes
+   * guardam é que a flag não abriu uma porta que a normalização fechava por um
+   * motivo bom, e que ela não vaza para quem não a declarou.
+   */
+  describe("o destino em modo de demonstração (SPEC-115 fatia D)", () => {
+    it("sobrevive SEM endereço — é a única coisa que pode, e é a definição dele", () => {
+      /**
+       * A regra de descarte é "o que sobra não dá para chamar". Um destino de
+       * demonstração não chama nada: ele é chamável por construção. Exigir um
+       * endereço de mentira seria pedir um campo que ninguém lê — e o primeiro
+       * que o lesse por engano mandaria dado real para um endereço inventado.
+       */
+      const config = normalizarExportador({
+        endpoint: "",
+        destinos: [{ id: "demo", operacao: "specDoItem", endpoint: "", rotulo: "Agente falso", demonstracao: true }],
+      });
+
+      const [destino] = destinosDaOperacao(config, "specDoItem");
+      expect(destino).toBeDefined();
+      expect(destino.demonstracao).toBe(true);
+      expect(destino.endpoint).toBe("");
+    });
+
+    it("sem endereço E sem a flag, continua sendo descartado", () => {
+      // A porta que a flag abre é estreita de propósito: ela não relaxa a regra
+      // para todo mundo, só para quem declarou que não vai chamar ninguém.
+      const config = normalizarExportador({
+        endpoint: "",
+        destinos: [{ id: "vazio", operacao: "specDoItem", endpoint: "", rotulo: "sem endereço" }],
+      });
+
+      expect(destinosDaOperacao(config, "specDoItem")).toEqual([]);
+    });
+
+    it("`demonstracao` só é verdade quando é o booleano `true`", () => {
+      /**
+       * Estrito de propósito: a flag decide se um endereço vazio passa. Uma
+       * string `"false"` vinda de JSON mal montado é um valor de verdade em
+       * JavaScript, e trataria "não" como "sim" — no campo em que isso desliga
+       * a chamada real.
+       */
+      const config = normalizarExportador({
+        endpoint: "",
+        destinos: [
+          { id: "texto", operacao: "specDoItem", endpoint: "https://gw/x", rotulo: "x", demonstracao: "false" },
+          { id: "numero", operacao: "adr", endpoint: "https://gw/y", rotulo: "y", demonstracao: 1 },
+          { id: "certo", operacao: "documento", endpoint: "https://gw/z", rotulo: "z", demonstracao: true },
+        ],
+      });
+
+      expect(destinosDaOperacao(config, "specDoItem")[0].demonstracao).toBe(false);
+      expect(destinosDaOperacao(config, "adr")[0].demonstracao).toBe(false);
+      expect(destinosDaOperacao(config, "documento")[0].demonstracao).toBe(true);
+    });
+
+    it("quem não declarou nada continua com o documento salvo IGUAL ao de antes", () => {
+      // A flag é opcional e ausente não vira `false` no dado salvo: um destino
+      // configurado antes desta SPEC atravessa a normalização sem ganhar campo
+      // nenhum, que é a mesma garantia que a SPEC-81 deu para `metodo`.
+      const antes = {
+        endpoint: "https://agente.casa/itens",
+        rotulo: "Jira",
+        cabecalhos: {},
+        destinos: [{ id: "c", operacao: "documento" as const, endpoint: "https://gw/c", rotulo: "Confluence" }],
+      };
+
+      expect(normalizarExportador(antes)).toEqual(antes);
+    });
   });
 
   it("cabeçalhos ausentes no destino HERDAM os compartilhados", () => {
@@ -250,5 +332,61 @@ describe("a variação de curl por destino (§346)", () => {
 
     expect(d.metodo).toBe("POST");
     expect(d.envelope).toBe("itens");
+  });
+});
+
+/**
+ * SPEC-120 fatia A — o lote na configuração, com a disciplina deste arquivo:
+ * degradar campo a campo, nunca recusar o documento inteiro.
+ */
+describe("o tamanho do lote (SPEC-120 fatia A)", () => {
+  it("sem declarar nada, vale o padrão de fábrica — 5 itens", () => {
+    const [d] = destinosDaOperacao(normalizarExportador({ endpoint: "https://gw/itens" }), "itens");
+
+    expect(d.lote).toEqual(LOTE_PADRAO);
+  });
+
+  it("o que a pessoa declarou vence, e o que ela não declarou continua no padrão", () => {
+    const config = normalizarExportador({ endpoint: "https://gw/itens", lote: { itens: 3 } });
+
+    expect(config.lote).toEqual({ itens: 3 });
+    expect(destinosDaOperacao(config, "itens")[0].lote).toEqual({
+      itens: 3,
+      caracteres: LOTE_PADRAO.caracteres,
+    });
+  });
+
+  it("o padrão NÃO é escrito de volta no documento — senão mudá-lo amanhã não alcançaria ninguém", () => {
+    /**
+     * A diferença entre "não declarei" e "declarei o que por acaso é o padrão".
+     * Gravar `{ itens: 5 }` em toda configuração salva transformaria o padrão
+     * do produto em valor de cada organização, e o dia em que o número certo
+     * mudasse não chegaria a quem nunca escolheu número nenhum.
+     */
+    expect(normalizarExportador({ endpoint: "https://gw/itens" }).lote).toBeUndefined();
+  });
+
+  it.each([
+    ["texto", { itens: "cinco" }],
+    ["zero", { itens: 0 }],
+    ["negativo", { itens: -3 }],
+  ])("valor inválido (%s) cai no padrão e NÃO apaga a exportação", (_caso, lote) => {
+    const config = normalizarExportador({ endpoint: "https://gw/itens", rotulo: "Jira", lote });
+
+    // O campo some; a integração fica.
+    expect(config.lote).toBeUndefined();
+    expect(config.endpoint).toBe("https://gw/itens");
+    expect(destinosDaOperacao(config, "itens")[0].lote).toEqual(LOTE_PADRAO);
+  });
+
+  it("o lote é o MESMO para todos os destinos — é um gateway só (SPEC-118 §2.0)", () => {
+    const config = normalizarExportador({
+      endpoint: "https://gw/itens",
+      lote: { itens: 2, caracteres: 9000 },
+      destinos: [{ id: "spec", operacao: "specDoItem", endpoint: "https://gw/spec", rotulo: "Spec" }],
+    });
+
+    expect(destinosDaOperacao(config, "itens")[0].lote).toEqual({ itens: 2, caracteres: 9000 });
+    expect(destinosDaOperacao(config, "specDoItem")[0].lote).toEqual({ itens: 2, caracteres: 9000 });
   });
 });

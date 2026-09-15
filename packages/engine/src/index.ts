@@ -226,6 +226,16 @@ export {
   type SecaoDeJulgamento,
   type VariavelSpec,
 } from "./especificacao/gerarSpec.js";
+/**
+ * SPEC-115 (§410) — a camada DETERMINÍSTICA entre o agente e a spec: o modelo
+ * propõe decisões, a pessoa confirma, e isto aqui deriva as seções de
+ * julgamento do que ela confirmou. Exportado porque a tela também precisa saber
+ * o que já dá para derivar, para dizer o que ainda falta ANTES do clique.
+ */
+export {
+  derivarSecoesDeJulgamento,
+  type MaterialDeJulgamento,
+} from "./especificacao/derivarJulgamento.js";
 export {
   aplicarOperacao,
   descreverOperacao,

@@ -18,10 +18,12 @@ import {
   montarPedidoDecisoes,
   montarPedidoNecessidades,
   montarPedidoPipeline,
+  montarPedidoScriptDeMapeamento,
   montarPedidoSugerirConfig,
   normalizarExportador,
   destinosDaOperacao,
   normalizarPipelineAgentes,
+  preambuloDaConversa,
   preambuloDoPapel,
   PedidoInvalido,
   resumirCredencialIa,
@@ -38,7 +40,7 @@ import { exigirSessao } from "../auth/middleware.js";
 import { exigirPermissao, organizacaoPadraoDe } from "../auth/permissoes.js";
 import { registrarAuditoria } from "../auditoria.js";
 import { registrarExecucao, ultimaExecucaoPorPapel } from "../execucoes.js";
-import { organizacoes } from "../db/schema.js";
+import { CAMPO_GLOBAL, organizacoes } from "../db/schema.js";
 
 /**
  * SPEC-31 Fase 4 — as rotas de IA no modo hospedado. **Não existiam** (§105):
@@ -482,6 +484,45 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
    */
   app.get("/ia/execucoes", async () => ({ porPapel: await ultimaExecucaoPorPapel(db) }));
 
+  /**
+   * SPEC-117 fatia C — **o preâmbulo que o time escreveu para esta conversa.**
+   *
+   * ## Por que o servidor resolve, e a tela não
+   *
+   * A mescla entre o que o time escreveu e o que a arquitetura definiu como
+   * padrão é uma pergunta só, e duas leituras dela divergem na primeira mudança
+   * (§263). Aqui a divergência seria muda: a tela mostraria um preâmbulo e o
+   * prompt sairia com outro.
+   *
+   * ## As duas leituras, e por que são duas
+   *
+   * O repositório já cai no global quando o time não tem documento — mas isso é
+   * tudo-ou-nada **sobre o documento inteiro**. O que a pergunta 3 da SPEC-117
+   * pede é mais fino: o time personaliza UMA conversa e continua herdando as
+   * outras. Por isso os dois documentos são lidos e `preambuloDaConversa`
+   * resolve conversa a conversa.
+   *
+   * Sem `timeId` na chamada, a leitura é a de hoje — o documento da organização.
+   * Nada muda para quem nunca mandou o parâmetro.
+   */
+  async function preambuloDeConversa(id: string, timeId?: string): Promise<string | undefined> {
+    const casosDeConfig = criarCasosDeUsoDeConfig(criarRepositorioDeConfigEmPostgres(db));
+    const vazio = { papeis: [] };
+    const doTime = normalizarPipelineAgentes((await casosDeConfig.obter("pipeline-agentes", vazio, timeId)).documento);
+    // A segunda leitura só acontece quando há time: sem ele, `obter` já
+    // devolveu o global, e ler de novo seria a mesma linha do banco duas vezes.
+    const global = timeId
+      ? normalizarPipelineAgentes((await casosDeConfig.obter("pipeline-agentes", vazio, CAMPO_GLOBAL)).documento)
+      : undefined;
+    return preambuloDaConversa(id, doTime, global);
+  }
+
+  /** O `timeId` viaja como query, igual ao `GET /config/:chave`. */
+  function timeDaChamada(req: { query: unknown }): string | undefined {
+    const { timeId } = (req.query ?? {}) as { timeId?: string };
+    return timeId?.trim() || undefined;
+  }
+
   app.post("/ia/pipeline/:papel", async (req, reply) => {
     const { papel } = req.params as { papel: string };
     const corpo = (req.body ?? {}) as { contextoEpico?: string; itens?: never };
@@ -502,7 +543,8 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
   });
 
   app.post("/ia/diagrama", async (req, reply) => {
-    const pedido = comPedido(() => montarPedidoDiagrama((req.body ?? {}) as never), reply);
+    const preambuloDoTime = await preambuloDeConversa("diagrama", timeDaChamada(req));
+    const pedido = comPedido(() => montarPedidoDiagrama({ ...((req.body ?? {}) as Record<string, unknown>), preambuloDoTime } as never), reply);
     if (!pedido) return reply;
     return executarPedido(reply, pedido, "ia/diagrama");
   });
@@ -577,7 +619,8 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
   });
 
   app.post("/ia/alterar-item", async (req, reply) => {
-    const pedido = comPedido(() => montarPedidoAlterarItem((req.body ?? {}) as never), reply);
+    const preambuloDoTime = await preambuloDeConversa("alterarItem", timeDaChamada(req));
+    const pedido = comPedido(() => montarPedidoAlterarItem({ ...((req.body ?? {}) as Record<string, unknown>), preambuloDoTime } as never), reply);
     if (!pedido) return reply;
     return executarPedido(reply, pedido, "ia/alterar-item");
   });
@@ -586,7 +629,8 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
    * mesma razão do `/ia/configurar`: receber proposta é leitura; a escrita
    * acontece no `PUT /quebras/:id`, que já tem o portão. */
   app.post("/ia/necessidades", async (req, reply) => {
-    const pedido = comPedido(() => montarPedidoNecessidades((req.body ?? {}) as never), reply);
+    const preambuloDoTime = await preambuloDeConversa("necessidades", timeDaChamada(req));
+    const pedido = comPedido(() => montarPedidoNecessidades({ ...((req.body ?? {}) as Record<string, unknown>), preambuloDoTime } as never), reply);
     if (!pedido) return reply;
     return executarPedido(reply, pedido, "ia/necessidades");
   });
@@ -595,9 +639,28 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
    * Sem RBAC pelo mesmo motivo das duas acima: receber proposta é leitura, e
    * a proposta não vale nada até alguém aceitar (regra 2). */
   app.post("/ia/decisoes", async (req, reply) => {
-    const pedido = comPedido(() => montarPedidoDecisoes((req.body ?? {}) as never), reply);
+    const preambuloDoTime = await preambuloDeConversa("decisoes", timeDaChamada(req));
+    const pedido = comPedido(() => montarPedidoDecisoes({ ...((req.body ?? {}) as Record<string, unknown>), preambuloDoTime } as never), reply);
     if (!pedido) return reply;
     return executarPedido(reply, pedido, "ia/decisoes");
+  });
+
+  /**
+   * SPEC-115 §1.1.1 (§411) — **o script de mapeamento do componente.**
+   *
+   * O agente escreve os comandos de LEITURA; quem roda é a pessoa, onde ela tem
+   * acesso. O produto não executa nada — é a fronteira da SPEC-75, reafirmada
+   * na SPEC-115 §2, e ela não se move por conveniência.
+   *
+   * Sem RBAC pela mesma razão das vizinhas: receber um comando para copiar é
+   * leitura. O que o comando faz no ambiente da pessoa é responsabilidade dela,
+   * e o prompt é explícito em só pedir leitura.
+   */
+  app.post("/ia/script-de-mapeamento", async (req, reply) => {
+    const preambuloDoTime = await preambuloDeConversa("scriptDeMapeamento", timeDaChamada(req));
+    const pedido = comPedido(() => montarPedidoScriptDeMapeamento({ ...((req.body ?? {}) as Record<string, unknown>), preambuloDoTime } as never), reply);
+    if (!pedido) return reply;
+    return executarPedido(reply, pedido, "ia/script-de-mapeamento");
   });
 
   /**
@@ -611,13 +674,15 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
    * (`simularCenario`), e o esquema não tem onde encaixar um número inventado.
    */
   app.post("/ia/cenarios-de-lentidao", async (req, reply) => {
-    const pedido = comPedido(() => montarPedidoCenariosDeLentidao((req.body ?? {}) as never), reply);
+    const preambuloDoTime = await preambuloDeConversa("cenariosDeLentidao", timeDaChamada(req));
+    const pedido = comPedido(() => montarPedidoCenariosDeLentidao({ ...((req.body ?? {}) as Record<string, unknown>), preambuloDoTime } as never), reply);
     if (!pedido) return reply;
     return executarPedido(reply, pedido, "ia/cenarios-de-lentidao");
   });
 
   app.post("/ia/sugerir-config", async (req, reply) => {
-    const pedido = comPedido(() => montarPedidoSugerirConfig((req.body ?? {}) as never), reply);
+    const preambuloDoTime = await preambuloDeConversa("sugerirConfig", timeDaChamada(req));
+    const pedido = comPedido(() => montarPedidoSugerirConfig({ ...((req.body ?? {}) as Record<string, unknown>), preambuloDoTime } as never), reply);
     if (!pedido) return reply;
     return executarPedido(reply, pedido, "ia/sugerir-config");
   });
@@ -627,7 +692,8 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
    * Sem RBAC aqui de propósito: conversar e receber proposta é leitura; a
    * escrita acontece nas rotas de config, que já têm o portão. */
   app.post("/ia/configurar", async (req, reply) => {
-    const pedido = comPedido(() => montarPedidoConfigurarConversa((req.body ?? {}) as never), reply);
+    const preambuloDoTime = await preambuloDeConversa("configurarConversa", timeDaChamada(req));
+    const pedido = comPedido(() => montarPedidoConfigurarConversa({ ...((req.body ?? {}) as Record<string, unknown>), preambuloDoTime } as never), reply);
     if (!pedido) return reply;
     return executarPedido(reply, pedido, "ia/configurar");
   });

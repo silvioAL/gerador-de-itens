@@ -1,4 +1,6 @@
 import type { ChaveConfig } from "../portas/repositorioDeConfig.js";
+import { LOTE_PADRAO, type LimitesDoLote } from "./lotes.js";
+import { IDS_DE_CONVERSA } from "../casos-de-uso/ia/conversas.js";
 
 /**
  * SPEC-31 Fase 3 — a coerção de entrada de cada documento de config.
@@ -32,9 +34,36 @@ export interface PapelConfigurado {
   contextos: string[];
 }
 
+/**
+ * SPEC-117 fatia C — o preâmbulo que o time escreveu para UMA conversa do
+ * assistente.
+ *
+ * Forma mínima de propósito: `id` + `preambulo`. A conversa em si (rótulo, onde
+ * vive, anatomia) é do produto e mora em `conversas.ts` — guardar isso na
+ * config faria o documento salvo envelhecer junto com a tela, e um rótulo
+ * gravado em 2026 continuaria aparecendo depois de a conversa ser renomeada.
+ */
+export interface ConversaConfigurada {
+  /** Um `IdDeConversa`. Id desconhecido é descartado na coerção. */
+  id: string;
+  preambulo?: string;
+}
+
 export interface ConfigPipelineAgentes {
   confirmacaoObrigatoria: boolean;
   papeis: PapelConfigurado[];
+  /**
+   * SPEC-117 fatia C — as conversas do assistente que este time personalizou.
+   *
+   * **Ausente é o normal**, e é o que mantém a fatia A verdadeira: uma config
+   * salva antes desta SPEC abre igual, byte a byte, e quem nunca abrir a seção
+   * nova não percebe diferença nenhuma no prompt.
+   *
+   * Lista e não `Record<id, preambulo>` pela mesma razão de `destinos`: um mapa
+   * força uma entrada por conversa e obriga a gravar as oito para personalizar
+   * uma. Lista degrada para "só o que alguém escreveu".
+   */
+  conversas?: ConversaConfigurada[];
 }
 
 /** A esteira de fábrica (SPEC-24 Fase F). */
@@ -74,14 +103,81 @@ export function sanearPapeis(entrada: unknown): PapelConfigurado[] | undefined {
   return papeis.length > 0 ? papeis : undefined;
 }
 
+/**
+ * SPEC-117 fatia C — a coerção das conversas, com a disciplina deste arquivo.
+ *
+ * Três razões de descartar uma entrada, e as três são a mesma: o que sobra não
+ * configura nada. Id que não é uma conversa do produto não tem prompt onde
+ * entrar; id repetido faria a tela guardar duas verdades sobre a mesma
+ * conversa; preâmbulo vazio é o estado de fábrica, e gravá-lo encheria o
+ * documento de linhas que não dizem nada.
+ *
+ * **Nenhuma delas derruba a config inteira**: uma conversa mal declarada não
+ * pode apagar a esteira de quem nunca mexeu nela.
+ */
+export function sanearConversas(entrada: unknown): ConversaConfigurada[] | undefined {
+  if (!Array.isArray(entrada)) return undefined;
+
+  const validos: readonly string[] = IDS_DE_CONVERSA;
+  const conversas: ConversaConfigurada[] = [];
+  for (const bruto of entrada as Partial<ConversaConfigurada>[]) {
+    const id = typeof bruto?.id === "string" ? bruto.id.trim() : "";
+    if (!id || !validos.includes(id) || conversas.some((c) => c.id === id)) continue;
+    const preambulo = typeof bruto.preambulo === "string" ? bruto.preambulo.trim() : "";
+    if (!preambulo) continue;
+    conversas.push({ id, preambulo });
+  }
+  return conversas.length > 0 ? conversas : undefined;
+}
+
 export function normalizarPipelineAgentes(documento: unknown): ConfigPipelineAgentes {
   const bruto = (documento ?? {}) as Partial<ConfigPipelineAgentes>;
+  const conversas = sanearConversas(bruto.conversas);
   return {
     confirmacaoObrigatoria: bruto.confirmacaoObrigatoria !== false,
     // Config antiga (só o toggle, pré-Fase F) ou papéis todos inválidos:
     // esteira de fábrica — nunca uma esteira vazia por acidente.
     papeis: sanearPapeis(bruto.papeis) ?? PAPEIS_PADRAO,
+    // Ausente continua ausente: o documento de quem não personalizou conversa
+    // nenhuma atravessa a normalização sem ganhar campo (a régua da fatia A).
+    ...(conversas ? { conversas } : {}),
   };
+}
+
+/**
+ * SPEC-117 fatia C, pergunta 3 — **o preâmbulo em vigor para uma conversa, com
+ * a governança geral resolvida.**
+ *
+ * > *"por time, mas a arquitetura pode querer algum nível de governança geral"*
+ *
+ * A pergunta que sobrou era se governança é **piso** ou **teto**, e as duas
+ * convivem — cada uma num mecanismo diferente:
+ *
+ * | | O que é | Onde vive |
+ * |---|---|---|
+ * | **Piso** | o preâmbulo global que o time herda e **pode substituir** | esta função |
+ * | **Teto** | o que ninguém remove, nem o time nem a arquitetura | `inegociavel`, em `conversas.ts` |
+ *
+ * O piso é `?? `, e a semântica é a que o §306 já tinha escrito para os
+ * cabeçalhos do gateway: **declarado vence herdado**. A organização com uma
+ * régua só escreve uma vez em `__global__`; o time que souber mais escreve a
+ * dele e a sua vale.
+ *
+ * O teto não passa por aqui de propósito. Ele não é política de empresa —
+ * *"somente leitura"* é do produto, e por isso vive no prompt e não numa
+ * configuração que alguém possa esvaziar.
+ *
+ * **Resolve no backend, e não na tela** (a régua do §263 aplicada à mescla): a
+ * tela que juntasse global e time seria a segunda leitura da mesma pergunta, e
+ * ela divergiria do prompt que o servidor monta.
+ */
+export function preambuloDaConversa(
+  id: string,
+  doTime: ConfigPipelineAgentes | undefined,
+  global?: ConfigPipelineAgentes
+): string | undefined {
+  const achar = (c?: ConfigPipelineAgentes) => c?.conversas?.find((x) => x.id === id)?.preambulo?.trim() || undefined;
+  return achar(doTime) ?? achar(global);
 }
 
 function normalizarRegras(documento: unknown): unknown {
@@ -152,6 +248,28 @@ export interface ConfigExportador {
    * exportação não reconfigura nada.
    */
   destinos?: DestinoDoGateway[];
+  /**
+   * SPEC-120 fatia A — **quantos itens vão por chamada.**
+   *
+   * > *"MCPs são lentos e tem limitações de tokens, pode ser necessário subir 5
+   * > itens por vez"*
+   *
+   * ## Por que GLOBAL, e não por destino
+   *
+   * É a pergunta 1 da SPEC-120, e a correção do usuário na SPEC-118 §2.0 a
+   * responde: **é um gateway só**, com endpoints que variam. Dois gateways com
+   * limites diferentes seria o caso que justificaria a configuração por
+   * destino, e ele não é o caso desta casa.
+   *
+   * Um campo por destino que ninguém preenche diferente é um campo a mais para
+   * errar; e migrar de global para por-destino depois é acrescentar, não
+   * quebrar. O contrário exigiria migração.
+   *
+   * Ausente = `LOTE_PADRAO`. O número certo é do gateway de cada um, não do
+   * produto — por isso é configurável; 5 de fábrica porque é o que o usuário
+   * mediu no dele.
+   */
+  lote?: { itens?: number; caracteres?: number };
 }
 
 /**
@@ -252,6 +370,31 @@ export interface DestinoDoGateway {
    * precisa declarar nada.
    */
   espaco?: string;
+  /**
+   * SPEC-115 fatia D — **o destino que não chama ninguém.**
+   *
+   * Pedido do usuário: *"eu não tenho o endpoint de subidas dos itens acessível
+   * ainda aqui, mas precisamos de tela e experiências prontos, usar algum mock
+   * com delay de 20 segundos."*
+   *
+   * ## Por que uma FLAG, e não uma operação nova
+   *
+   * Resposta dele mesmo, na revisão da SPEC-115 §4.2: *"flag no destino
+   * existente"*. Uma `operacao` nova em `OPERACOES_DO_GATEWAY` criaria um
+   * caminho paralelo no código — outra rota, outro adaptador, outra tela — para
+   * exercitar exatamente o caminho que já existe. **O modo é uma variação de
+   * configuração, não um caminho novo**, que é a mesma escolha do "modo sem
+   * custo" (SPEC-74): lá o dublê da IA é um DESTINO, não um segundo motor.
+   *
+   * ## E por que ele dispensa endereço
+   *
+   * As três razões de descarte de um destino (ver `normalizarExportador`) são a
+   * mesma: *o que sobra não dá para chamar*. Um destino de demonstração não
+   * chama nada — ele é chamável por construção. Exigir um endereço de mentira
+   * seria pedir um campo que ninguém lê, e o primeiro que o lesse por engano
+   * mandaria dado real para um endereço inventado.
+   */
+  demonstracao?: boolean;
 }
 
 /**
@@ -274,17 +417,30 @@ export function normalizarExportador(documento: unknown): ConfigExportador {
   const bruto = (documento ?? {}) as Partial<ConfigExportador>;
   const operacoesValidas: readonly string[] = OPERACOES_DO_GATEWAY;
 
+  const loteCru = (bruto.lote ?? {}) as { itens?: unknown; caracteres?: unknown };
+  const loteItens = saneado(loteCru.itens);
+  const loteCaracteres = saneado(loteCru.caracteres);
+  const loteDeclarado =
+    loteItens !== undefined || loteCaracteres !== undefined
+      ? { ...(loteItens !== undefined ? { itens: loteItens } : {}), ...(loteCaracteres !== undefined ? { caracteres: loteCaracteres } : {}) }
+      : undefined;
+
   const destinos: DestinoDoGateway[] = [];
   const idsVistos = new Set<string>();
   for (const cru of Array.isArray(bruto.destinos) ? bruto.destinos : []) {
     if (!cru || typeof cru !== "object") continue;
     const endpoint = typeof cru.endpoint === "string" ? cru.endpoint.trim() : "";
     const id = typeof cru.id === "string" ? cru.id.trim() : "";
+    // SPEC-115 fatia D — o destino de demonstração não tem para onde ir porque
+    // não vai a lugar nenhum, e isso é a definição dele. Ler `true` estrito (e
+    // não qualquer valor de verdade) porque a flag decide se um endereço vazio
+    // passa: um `"false"` vindo de JSON mal montado não pode abrir essa porta.
+    const demonstracao = cru.demonstracao === true;
     // Três razões de descartar, e as três são a mesma: o que sobra não dá para
     // chamar. Endereço vazio não tem para onde ir; operação desconhecida não
     // tem payload que o produto saiba montar; id repetido faria a tela guardar
     // uma escolha que aponta para dois destinos.
-    if (!endpoint || !id || idsVistos.has(id)) continue;
+    if ((!endpoint && !demonstracao) || !id || idsVistos.has(id)) continue;
     if (!operacoesValidas.includes(cru.operacao as string)) continue;
     idsVistos.add(id);
     const cabecalhos = normalizarCabecalhos(cru.cabecalhos);
@@ -315,6 +471,7 @@ export function normalizarExportador(documento: unknown): ConfigExportador {
       ...(metodo ? { metodo } : {}),
       ...(envelope !== undefined ? { envelope } : {}),
       ...(espaco ? { espaco } : {}),
+      ...(demonstracao ? { demonstracao } : {}),
     });
   }
 
@@ -323,7 +480,24 @@ export function normalizarExportador(documento: unknown): ConfigExportador {
     rotulo: typeof bruto.rotulo === "string" ? bruto.rotulo.trim() : "",
     cabecalhos: normalizarCabecalhos(bruto.cabecalhos) ?? {},
     ...(destinos.length > 0 ? { destinos } : {}),
+    ...(loteDeclarado ? { lote: loteDeclarado } : {}),
   };
+
+  /**
+   * SPEC-120 fatia A — o lote saneado, com a mesma disciplina do resto deste
+   * arquivo: **degradar campo a campo, nunca recusar o documento inteiro.**
+   *
+   * Número que não é número, zero, negativo ou fracionário não apaga a
+   * configuração de exportação: o campo some e o padrão vale. Quem digitou
+   * `"cinco"` na caixa perde o lote, não a integração.
+   *
+   * Só sobrevive o que a pessoa realmente declarou — escrever `{ itens: 5 }`
+   * de volta no documento faria o padrão do produto virar valor salvo, e mudar
+   * o padrão amanhã não alcançaria ninguém.
+   */
+  function saneado(v: unknown): number | undefined {
+    return typeof v === "number" && Number.isFinite(v) && v >= 1 ? Math.floor(v) : undefined;
+  }
 }
 
 /** Um destino com os cabeçalhos já resolvidos — é o que o adaptador chama. */
@@ -342,6 +516,23 @@ export interface DestinoResolvido {
   envelope: string;
   /** §348 — onde escrever do outro lado. `""` = o gateway usa o padrão dele. */
   espaco: string;
+  /**
+   * SPEC-115 fatia D — este destino **não chama ninguém**: espera e devolve
+   * sucesso determinístico, para a tela e a experiência existirem antes do
+   * endereço real. Resolvido aqui, como o método e o envelope, para que a rota
+   * não decida de novo (§263).
+   */
+  demonstracao: boolean;
+  /**
+   * SPEC-120 fatia A — os dois tetos do lote, **já resolvidos**.
+   *
+   * Aqui pela mesma razão do método e do envelope: quem chama não decide de
+   * novo. O adaptador que lesse `config.lote?.itens ?? 5` teria a segunda
+   * leitura do mesmo padrão, e duas leituras divergem na primeira mudança
+   * (§263) — aqui a divergência seria muda, porque um lote errado só aparece
+   * como timeout do outro lado.
+   */
+  lote: LimitesDoLote;
 }
 
 /** Sem declaração, `POST` — o verbo que todo agente escrito para este produto
@@ -392,6 +583,13 @@ export const ENVELOPE_PADRAO: Record<OperacaoDoGateway, string> = {
  * divergência seria muda — o botão apareceria e a chamada iria para outro lugar.
  */
 export function destinosDaOperacao(config: ConfigExportador, operacao: OperacaoDoGateway): DestinoResolvido[] {
+  // SPEC-120 fatia A — global (§ pergunta 1: é um gateway só), resolvido uma
+  // vez e carregado por todo destino desta operação.
+  const lote: LimitesDoLote = {
+    itens: config.lote?.itens ?? LOTE_PADRAO.itens,
+    caracteres: config.lote?.caracteres ?? LOTE_PADRAO.caracteres,
+  };
+
   const daLista = (config.destinos ?? [])
     .filter((d) => d.operacao === operacao)
     .map((d) => ({
@@ -405,6 +603,8 @@ export function destinosDaOperacao(config: ConfigExportador, operacao: OperacaoD
       // (payload na raiz), e `||` a transformaria de volta no padrão.
       envelope: d.envelope ?? ENVELOPE_PADRAO[operacao],
       espaco: d.espaco ?? "",
+      demonstracao: d.demonstracao === true,
+      lote,
     }));
 
   /**
@@ -424,6 +624,10 @@ export function destinosDaOperacao(config: ConfigExportador, operacao: OperacaoD
       metodo: METODO_PADRAO,
       envelope: "itens",
       espaco: "",
+      // O destino herdado é um endereço real, sempre: quem quiser demonstração
+      // declara um destino na lista, onde a flag mora.
+      demonstracao: false,
+      lote,
     });
   }
 

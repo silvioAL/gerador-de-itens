@@ -24,6 +24,10 @@ import { criarRepositorioDeQuebrasEmPostgres } from "../adaptadores/quebrasEmPos
 import { criarRepositorioDeItensGeradosEmPostgres } from "../adaptadores/itensGeradosEmPostgres.js";
 import { criarExportadorViaAgente } from "../adaptadores/exportadorViaAgente.js";
 import {
+  criarAnexadorDeSpecDeDemonstracao,
+  criarExportadorDeItensDeDemonstracao,
+} from "../adaptadores/gatewayDeDemonstracao.js";
+import {
   criarAnexadorDeSpecViaGateway,
   criarLeitorDeAdrViaGateway,
   criarPublicadorDeDocumentoViaGateway,
@@ -459,7 +463,21 @@ export async function registrarRotasQuebras(app: FastifyInstance, { db, diretori
       (await criarCasosDeUsoDeConfig(criarRepositorioDeConfigEmPostgres(db)).obter("exportador", { endpoint: "", rotulo: "", cabecalhos: {} }))
         .documento
     );
-    if (!config.endpoint) {
+    /**
+     * SPEC-115 fatia D — o destino de demonstração de ITENS, e por que ele só
+     * entra **quando não há endereço real**.
+     *
+     * O pedido do usuário é literal: *"não tenho o endpoint… mas precisamos de
+     * tela e experiências prontos"*. Um dublê que vencesse um endereço real
+     * configurado faria o oposto do que a SPEC-115 §2 recusa — em vez de o mock
+     * se passar pelo real, o real deixaria de acontecer em silêncio. A ordem
+     * aqui é aditiva: toda configuração que já funcionava continua idêntica.
+     */
+    const demonstracaoDeItens = config.endpoint
+      ? undefined
+      : destinosDaOperacao(config, "itens").find((d) => d.demonstracao);
+
+    if (!config.endpoint && !demonstracaoDeItens) {
       // Sem destino configurado a resposta DIZ o que fazer, em vez de um erro
       // genérico que manda a pessoa adivinhar onde configurar.
       return reply.code(409).send({
@@ -467,14 +485,24 @@ export async function registrarRotasQuebras(app: FastifyInstance, { db, diretori
       });
     }
 
-    const resultado = await itens.exportarDaQuebra(id, criarExportadorViaAgente(config));
+    const exportador = demonstracaoDeItens
+      ? criarExportadorDeItensDeDemonstracao(demonstracaoDeItens)
+      : criarExportadorViaAgente(config);
+
+    const resultado = await itens.exportarDaQuebra(id, exportador);
     registrarAuditoria(db, {
       email: req.usuario!.email,
       acao: "exportar",
       recurso: "itens_gerados",
       recursoId: id,
     });
-    return { ...resultado, destino: config.rotulo || config.endpoint };
+    return {
+      ...resultado,
+      destino: demonstracaoDeItens
+        ? demonstracaoDeItens.rotulo || "modo de demonstração"
+        : config.rotulo || config.endpoint,
+      demonstracao: !!demonstracaoDeItens,
+    };
   });
 
   /**
@@ -581,7 +609,7 @@ export async function registrarRotasQuebras(app: FastifyInstance, { db, diretori
     const destinos = destinosDaOperacao(config, "specDoItem");
     if (destinos.length === 0) {
       return reply.code(409).send({
-        erro: "nenhum destino de spec configurado — cadastre o endereço em Configurações → Exportação, em “Outros destinos”",
+        erro: "nenhum destino de spec configurado — cadastre o endereço em Configurações → Exportação, em “Outros destinos”. Sem endereço ainda, marque o destino como modo de demonstração para ver a tela e a experiência funcionando.",
       });
     }
     const escolhido = corpo.data.destinoId
@@ -596,14 +624,50 @@ export async function registrarRotasQuebras(app: FastifyInstance, { db, diretori
       });
     }
 
-    const resultado = await itens.anexarSpecNaQuebra(id, corpo.data.itens, criarAnexadorDeSpecViaGateway(escolhido));
+    /**
+     * SPEC-115 fatia D — o destino que **não chama ninguém**, e é a mesma rota.
+     *
+     * A flag foi a resposta do usuário à pergunta "destino novo ou flag?"
+     * (SPEC-115 §4.2): o modo é variação de configuração, não caminho novo. O
+     * que muda daqui para baixo é só qual adaptador é construído.
+     */
+    const anexador = escolhido.demonstracao
+      ? criarAnexadorDeSpecDeDemonstracao(escolhido)
+      : criarAnexadorDeSpecViaGateway(escolhido);
+
+    /**
+     * SPEC-115 fatia E — **a rota não espera o gateway.**
+     *
+     * Decidido na SPEC-98 §3.2, com o usuário (*"pode ser assíncrona, sem
+     * problemas, sabemos que demora"*): uma chamada síncrona de minutos estoura
+     * timeout, prende a tela e perde tudo se cair no meio. O `planejar` já
+     * gravou "indo" no banco, então a resposta pode sair agora — e quem
+     * recarregar daqui a dez segundos lê o mesmo estado, em vez de nada.
+     *
+     * O `void` é deliberado e o `catch` é o que o torna seguro: `concluir` já
+     * persiste o desfecho de cada item, inclusive o erro; o que sobra aqui é
+     * não derrubar o processo com uma rejeição sem dono.
+     */
+    const plano = await itens.planejarAnexoDeSpec(id, corpo.data.itens);
+    void itens.concluirAnexoDeSpec(id, plano.pedidos, anexador).catch((erro) => {
+      req.log.error({ erro, quebraId: id }, "falha ao concluir o anexo de spec");
+    });
+
     registrarAuditoria(db, {
       email: req.usuario!.email,
       acao: "anexar-spec",
       recurso: "itens_gerados",
       recursoId: id,
     });
-    return { ...resultado, destino: escolhido.rotulo || escolhido.endpoint };
+    // 202: aceito e em curso. O 200 de antes prometia "terminou", e agora não
+    // terminou — o código diz a verdade sobre o que aconteceu.
+    return reply.code(202).send({
+      emAndamento: plano.pedidos.map((p) => p.chave),
+      comLacuna: plano.comLacuna,
+      semLinkExterno: plano.semLinkExterno,
+      destino: escolhido.rotulo || escolhido.endpoint,
+      demonstracao: escolhido.demonstracao,
+    });
   });
 
   /**

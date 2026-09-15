@@ -1,0 +1,24 @@
+-- SPEC-115 fatia E — o pipeline por item, que sobrevive ao F5.
+--
+-- A SPEC-98 §3.2 decidiu, com o usuário: o envio é assíncrono, e por isso
+-- "o estado do envio mora no BANCO, não na tela". Até aqui ele morava num
+-- `useState` do React (`resultadoDoAnexo`): trocar de tela ou recarregar
+-- apagava o rastro de um envio de minutos, e o produto ficava sem saber
+-- quais specs faltam.
+--
+-- `spec_anexada` (0043) já dizia CHEGOU. O que faltava eram os dois estados
+-- do meio, e cada um pede a sua coluna porque são perguntas diferentes:
+--
+--   spec_enviada_em NÃO NULO + spec_anexada FALSO  → está indo agora
+--   spec_erro       NÃO NULO                       → tentou e não foi, e o motivo
+--
+-- Espremer os dois num campo só seria o defeito do §276 de novo: somar
+-- estados diferentes num rótulo só. E o motivo precisa ser persistido pelo
+-- mesmo argumento do estado — um erro que só existe na memória da aba é um
+-- erro que a pessoa perde ao recarregar para entender o que aconteceu.
+--
+-- Sobre o `when` desta entrada no `meta/_journal.json`: vale o achado da
+-- 0043 — o drizzle decide o que rodar por TIMESTAMP, não por hash. O valor
+-- usado é um `Date.now()` real, maior que qualquer coisa já aplicada.
+ALTER TABLE "itens_gerados" ADD COLUMN "spec_enviada_em" timestamp with time zone;
+ALTER TABLE "itens_gerados" ADD COLUMN "spec_erro" text;

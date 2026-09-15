@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { baseUrlDeChat, modeloDoCorpo } from "@gerador/aplicacao";
+import { ImportarCurl } from "./ImportarCurl";
 import {
   apiConfigIa,
   apiIa,
@@ -324,6 +326,34 @@ function CardGateway({
             falha. Estes avisos são por DESTINO, e ficam antes dos campos: são
             o que muda a decisão de configuração, não uma nota de rodapé. */}
         <AvisosDoDestino baseUrl={baseUrl} visaoMarcada={visaoManual} simulado={destinoSimulado(presets, baseUrl)} />
+
+        {/**
+         * SPEC-118 fatia E — **o curl configura a IA sem ninguém digitar `/v1`.**
+         *
+         * O caminho da chave de IA já estava resolvido antes desta SPEC (banco
+         * do servidor, resumo mascarado na volta, `0600` no arquivo local), e é
+         * por isso que ele é o molde da §3.1 para o resto. Aqui o importador só
+         * preenche os mesmos campos: `baseUrl` recortada do endereço de chat,
+         * `modelo` lido do corpo, e a chave indo para o campo de segredo que já
+         * existia — que é `type="password"` desde sempre.
+         */}
+        <ImportarCurl
+          testid={`importar-curl-ia-${modelo.id}`}
+          oQuePreenche="a base URL, a chave e o nome do modelo"
+          desabilitado={!!salvando}
+          onImportar={(dados) => {
+            setBaseUrl(baseUrlDeChat(dados.url));
+            const doCorpo = modeloDoCorpo(dados.corpo);
+            if (doCorpo) setNomeModelo(doCorpo);
+            /**
+             * `Bearer ` sai porque o campo guarda a CHAVE, não o cabeçalho
+             * inteiro — o provedor a remonta na hora de chamar. Colar o
+             * cabeçalho aqui produziria `Authorization: Bearer Bearer sk-…`,
+             * que falha com 401 e parece credencial errada.
+             */
+            if (dados.chave) setChave(dados.chave.replace(/^Bearer\s+/i, ""));
+          }}
+        />
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
           <input

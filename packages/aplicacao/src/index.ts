@@ -44,6 +44,50 @@ export {
   type MetodoDoGateway,
 } from "./config/normalizacao.js";
 
+/** SPEC-117 fatias B, C e D — as conversas do assistente, nomeadas. */
+export {
+  CABECALHO_DAS_INSTRUCOES_DO_TIME,
+  comInstrucoesDoTime,
+  conversaPorId,
+  CONVERSAS_DO_ASSISTENTE,
+  IDS_DE_CONVERSA,
+  type ConversaDoAssistente,
+  type IdDeConversa,
+  type ParteDoPromptDaConversa,
+} from "./casos-de-uso/ia/conversas.js";
+
+/**
+ * SPEC-118 fatias A, B e E — o cURL como ENTRADA da tela de configuração: o
+ * interpretador puro, a chave separada e mascarada, e o que o corpo diz.
+ */
+export {
+  baseUrlDeChat,
+  ehRecusa,
+  envelopeDoCorpo,
+  interpretarCurl,
+  mascarar,
+  modeloDoCorpo,
+  reconhecerGateway,
+  separarSegredo,
+  type CurlInterpretado,
+  type GatewayReconhecido,
+  type RecusaDeCurl,
+  type ResultadoDoCurl,
+} from "./config/curl.js";
+
+/**
+ * SPEC-120 fatias A–C — o lote: quantos itens cabem numa chamada, e a recusa do
+ * destino que é sinal de que couberam demais.
+ */
+export {
+  fatiarEmLotes,
+  pareceLoteGrandeDemais,
+  CARACTERES_POR_LOTE_PADRAO,
+  ITENS_POR_LOTE_PADRAO,
+  LOTE_PADRAO,
+  type LimitesDoLote,
+} from "./config/lotes.js";
+
 /** SPEC-81 fatia C — ler os ADRs da casa, marcados como importados. */
 export {
   comoDecisao,
@@ -154,6 +198,10 @@ export {
   validarEscritaPipelineAgentes,
   PAPEIS_PADRAO,
   sanearPapeis,
+  /** SPEC-117 fatia C — o preâmbulo por conversa, com a governança geral. */
+  preambuloDaConversa,
+  sanearConversas,
+  type ConversaConfigurada,
   type ConfigPipelineAgentes,
   type GrupoFicha,
   type PapelConfigurado,
@@ -179,6 +227,8 @@ export {
   montarPedidoDecisoes,
   montarPedidoNecessidades,
   montarPedidoPipeline,
+  /** SPEC-115 §1.1.1 — o agente escreve o comando; quem roda é a pessoa. */
+  montarPedidoScriptDeMapeamento,
   montarPedidoSugerirConfig,
   preambuloDoPapel,
   PedidoInvalido,
@@ -188,6 +238,7 @@ export {
   type EntradaDecisoes,
   type EntradaNecessidades,
   type EntradaPipeline,
+  type EntradaScriptDeMapeamento,
   type EntradaSugerirConfig,
   type ItemDoLote,
   type MensagemConfigurar,

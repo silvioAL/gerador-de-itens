@@ -17,6 +17,7 @@ import { PdcaTab } from "./PdcaTab";
 import { TokensTab } from "./TokensTab";
 import { ExportacaoTab } from "./ExportacaoTab";
 import { ConexoesTab } from "./ConexoesTab";
+import { ConexoesTabUnificada } from "./ConexoesTabUnificada";
 import { ProdutosTab } from "./ProdutosTab";
 import { EXPORTADOR_DO_TOUR, TOKENS_DO_TOUR, PRODUTO_DO_TOUR } from "../demo/dadosDoTour";
 
@@ -87,6 +88,18 @@ export interface ConfigScreenProps {
  */
 function podeVerAba(id: AbaConfig, pode: (recurso: string, acao?: string) => boolean): boolean {
   if (id === "regras") return Object.values(RECURSO_DA_SECAO_DE_REGRAS).some((r) => pode(r));
+  /**
+   * SPEC-118 fatia G — a aba unificada aparece para quem pode ver QUALQUER uma
+   * das duas metades; qual metade renderiza é decidido dentro dela.
+   *
+   * Exigir as duas permissões esconderia a configuração de exportação de quem
+   * só cuida dela — o oposto do que a fusão pretende.
+   */
+  if (id === "exportacao") return podeVerAba("modeloIa", pode) || podeVerRecurso("exportacao", pode);
+  return podeVerRecurso(id, pode);
+}
+
+function podeVerRecurso(id: AbaConfig, pode: (r: string) => boolean): boolean {
   const recurso = RECURSO_DA_ABA[id];
   return recurso ? pode(recurso) : true;
 }
@@ -193,10 +206,32 @@ export function ConfigScreen({
        */
       { id: "regras", rotulo: "Regras de refinamento", existe: true },
       { id: "especificacao", rotulo: "Especificação de solução", existe: true },
-      { id: "pipeline", rotulo: "Pipeline de IA", existe: true },
-      { id: "modeloIa", rotulo: "Modelo de IA", existe: true },
+      /**
+       * SPEC-117 fatia A — **"Pipeline de IA" virou "Agentes de IA".**
+       *
+       * *"O caminho natural é evoluir essa parte de pipeline de IA para Agentes
+       * de IA"*, e a razão é mais dura que estética: pipeline descreve a
+       * esteira, e só ela. Uma tela chamada "Pipeline" que passasse a
+       * configurar também as conversas do assistente estaria mentindo no
+       * título — conversa não é pipeline, não tem ordem, não roda em lote.
+       *
+       * O `id` da aba NÃO muda: `#/config/pipeline` está salvo em favorito de
+       * alguém, e o §308 já custou por aba que trocou de lugar.
+       */
+      { id: "pipeline", rotulo: "Agentes de IA", existe: true },
       { id: "pdca", rotulo: "PDCA — melhoria contínua", existe: true },
-      { id: "exportacao", rotulo: "Exportação", existe: true },
+      /**
+       * SPEC-118 fatia G — **"Modelo de IA" e "Exportação" viraram uma só.**
+       *
+       * As duas descreviam a mesma coisa — *um endereço HTTP com autenticação e
+       * um formato de corpo* — em dois vocabulários: sete campos de um lado,
+       * oito do outro, e só um nome em comum (§1.1).
+       *
+       * O `id` reaproveitado é `exportacao`, e `modeloIa` continua existindo no
+       * tipo: ele é o recurso de RBAC da seção de IA, e é para onde o
+       * `#/config/modelo-ia` de quem tem o link salvo é redirecionado.
+       */
+      { id: "exportacao", rotulo: "Conexões", existe: true },
       { id: "tokens", rotulo: "Design system", existe: true },
     ] satisfies { id: AbaConfig; rotulo: string; existe: boolean }[]
   ).filter((a) => a.existe && podeVerAba(a.id, permissoes.pode));
@@ -206,8 +241,17 @@ export function ConfigScreen({
   // pensa que o produto está quebrado). Agora a tela DIZ que é permissão, e
   // oferece o caminho de pedir — que é o que a pessoa faria de qualquer jeito,
   // só que fora da ferramenta.
-  const areaNegada = !abasVisiveis.some((a) => a.id === area) && !permissoes.carregando;
-  const abaAtiva = abasVisiveis.some((a) => a.id === area) ? area : abasVisiveis[0]?.id;
+  /**
+   * SPEC-118 fatia G — **o link velho não pode dar tela branca.**
+   *
+   * *"Quem tem `#/config/exportacao` salvo não pode cair em tela branca"*, e o
+   * mesmo vale para `#/config/modelo-ia`. A área continua existindo no tipo (é
+   * o recurso de RBAC da seção de IA); o que ela deixou de ter é aba própria,
+   * então ela chega na unificada, onde a seção dela vive agora.
+   */
+  const areaResolvida: AbaConfig = area === "modeloIa" ? "exportacao" : area;
+  const areaNegada = !abasVisiveis.some((a) => a.id === areaResolvida) && !permissoes.carregando;
+  const abaAtiva = abasVisiveis.some((a) => a.id === areaResolvida) ? areaResolvida : abasVisiveis[0]?.id;
   const rotuloDaArea = abasVisiveis.find((a) => a.id === abaAtiva)?.rotulo ?? "Configurações";
 
   return (
@@ -254,7 +298,12 @@ export function ConfigScreen({
           <PdcaTab config={config} timeAtivo={timeAtivo} onAbrirArea={onAbrirArea} onFichaMudou={onFichaMudou} />
         )}
         {abaAtiva === "exportacao" && (
-          <ExportacaoTab demonstracao={demonstracao ? EXPORTADOR_DO_TOUR : undefined} />
+          <ConexoesTabUnificada
+            demonstracao={demonstracao ? EXPORTADOR_DO_TOUR : undefined}
+            // A régua do RBAC continua onde estava: a fusão é do MENU.
+            podeIa={podeVerAba("modeloIa", permissoes.pode)}
+            podeGateway={podeVerRecurso("exportacao", permissoes.pode)}
+          />
         )}
         {abaAtiva === "tokens" && <TokensTab demonstracao={demonstracao ? TOKENS_DO_TOUR : undefined} />}
         {abaAtiva === "produtos" && (
@@ -331,9 +380,12 @@ export function ConfigScreen({
             onSalvar={onSalvarPipelineAgentes}
             // Papel casa tanto por tech quanto por contexto — as duas listas.
             opcoesDeContexto={[...(techs ?? []), ...(contextos ?? [])]}
+            // SPEC-117 fatia A — a terceira seção LEVA à configuração do
+            // gateway em vez de duplicá-la: dois lugares para o mesmo endereço
+            // é como um deles envelhece.
+            onIrParaExportacao={onAbrirArea ? () => onAbrirArea("exportacao") : undefined}
           />
         )}
-        {abaAtiva === "modeloIa" && <ModeloIaTab />}
       </div>
     </div>
   );

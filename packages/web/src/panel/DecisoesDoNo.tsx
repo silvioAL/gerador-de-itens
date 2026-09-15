@@ -29,7 +29,12 @@ export interface DecisoesDoNoProps {
   onSubstituir: (idAntiga: string, nova: Decisao) => void;
   /** SPEC-57 M4 — pedir ao agente que proponha, lendo o desenho MEDIDO.
    * Ausente = o botão não aparece (sem credencial de IA, por exemplo). */
-  onPedirAoAgente?: () => Promise<void>;
+  /** SPEC-115 (§410) — o número de propostas volta para quem não tem as
+   * decisões na tela. Aqui elas aparecem logo abaixo, então ele é ignorado. */
+  onPedirAoAgente?: () => Promise<number | void>;
+  /** SPEC-115 §1.1.1 (§411) — abre a conversa de mapeamento DESTE componente na
+   * janela do assistente. Ausente = o botão não aparece. */
+  onMapearComponente?: () => void;
   /** §253 — esta decisão é de DEMONSTRAÇÃO (do tour). Recebe a marca do §235 e
    * não oferece aceite: o aceite grava na quebra, e ela não vive lá — o botão
    * existiria só para não fazer nada. */
@@ -87,6 +92,7 @@ export function DecisoesDoNo({
   onAceitar,
   onSubstituir,
   onPedirAoAgente,
+  onMapearComponente,
   ehDeDemonstracao,
 }: DecisoesDoNoProps) {
   const [abrindo, setAbrindo] = useState<false | { substituindo?: string }>(false);
@@ -198,6 +204,33 @@ export function DecisoesDoNo({
               }}
             >
               {pensando ? "lendo o que o motor mediu…" : "🤖 pedir ao agente"}
+            </button>
+          )}
+          {/**
+           * SPEC-115 §1.1.1 (§411) — **a entrada da conversa por componente
+           * mora AQUI, ao lado das decisões que ela produz.**
+           *
+           * O "🤖 pedir ao agente" acima lê o que o MOTOR mediu — o desenho, o
+           * que está fora do padrão, as lacunas. Este abre a conversa sobre o
+           * que o motor **não tem como medir**: o projeto que já existe do
+           * outro lado, que só quem tem acesso a ele consegue levantar.
+           *
+           * São dois botões porque são duas fontes, e somá-las num só faria a
+           * pessoa não saber qual informação está alimentando a proposta.
+           *
+           * A conversa em si acontece na janela do assistente, que expande: o
+           * painel tem ~280 px, e o gesto é colar a saída de um script e
+           * iterar. O recorte por componente — o que a §1.1.1 protege — se
+           * mantém, porque a aba lê a MESMA seleção que este painel.
+           */}
+          {onMapearComponente && (
+            <button
+              style={linkEstilo}
+              data-testid="mapear-componente"
+              title="Abre o assistente para levantar o que já existe deste componente e decidir a partir disso."
+              onClick={onMapearComponente}
+            >
+              🔎 mapear o que já existe
             </button>
           )}
         </div>

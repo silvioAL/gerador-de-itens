@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useArrastavel } from "./useArrastavel";
 
-export type AbaAssistente = "conversa" | "contexto" | "configurar" | "variantes";
+export type AbaAssistente = "conversa" | "contexto" | "componente" | "configurar" | "variantes";
 
 /** A ordem aqui é a ordem visual das abas. Entrada nova = aba nova — foi
  * exatamente pra isso que o invólucro existe (o "configurar" do #297 nasceu
@@ -9,6 +9,15 @@ export type AbaAssistente = "conversa" | "contexto" | "configurar" | "variantes"
 const ABAS: { id: AbaAssistente; rotulo: string }[] = [
   { id: "conversa", rotulo: "✦ Desenhar conversando" },
   { id: "contexto", rotulo: "📎 Contexto da demanda" },
+  /**
+   * SPEC-115 fatia F (§411) — mapear e decidir sobre UM componente.
+   *
+   * Vem depois do contexto da demanda de propósito: a ordem das abas é a do
+   * percurso — descrever a demanda, dar o contexto dela, e só então descer ao
+   * componente. Aba nova para entrada nova é exatamente o que este invólucro
+   * existe para permitir (SPEC-34 §3.1).
+   */
+  { id: "componente", rotulo: "🔎 Mapear componente" },
   { id: "configurar", rotulo: "⚙ Configurar" },
   /** SPEC-88 (P6) — as alternativas de desenho. Entrada nova = aba nova, que é
    * exatamente para isto que este invólucro existe (SPEC-34 §3.1). */
@@ -66,6 +75,28 @@ export function AssistenteFlutuante({
   children,
 }: AssistenteFlutuanteProps) {
   const aberto = aba !== null;
+  /**
+   * SPEC-115 fatia F (§411) — **a janela expande.**
+   *
+   * Relato do usuário, olhando a tela: *"iterar em uma janela maior com ele
+   * para tomar decisões sobre o componente não achei nada"*. Ele estava certo,
+   * e a medição doeu: a janela é **420 px fixos**, e era literalmente isto que
+   * a SPEC-115 §3 chamava de "o painel expansível do assistente" — a peça que a
+   * fatia F declarava como pré-requisito. A rodada anterior afirmou que ela
+   * existia porque o PAINEL existe; expansível é que não era.
+   *
+   * ## Por que um modo, e não uma janela grande sempre
+   *
+   * 420 px é bom para o que a janela fazia até aqui: perguntar uma coisa e
+   * aplicar a resposta. Colar a saída de um script de mapeamento e iterar sobre
+   * ela é outro gesto, e ele não cabe ali. Trocar o padrão puniria o primeiro
+   * caso para atender o segundo — o modo deixa os dois existirem.
+   *
+   * Não é maximizar para tela cheia: o desenho continua visível ao lado, e é
+   * ele o assunto da conversa. Uma janela que cobre o canvas faria a pessoa
+   * decidir sobre um componente que ela não está mais vendo.
+   */
+  const [expandida, setExpandida] = useState(false);
   // Pedido do usuário: o bubble apareceu sobre um botão e não tinha como
   // mover — agora arrasta (a janela e o balão continuam ancorados no canto,
   // previsíveis; é o GATILHO que sai do caminho).
@@ -80,9 +111,10 @@ export function AssistenteFlutuante({
       {aberto && (
         <section
           className="assistente-janela"
-          style={{ ...janelaEstilo, ...elevacao }}
+          style={{ ...janelaEstilo, ...(expandida ? janelaExpandidaEstilo : {}), ...elevacao }}
           aria-label="Assistente"
           data-testid="assistente-janela"
+          data-expandida={expandida}
         >
           <header style={cabecalhoEstilo}>
             {/* §308 — as abas QUEBRAM em vez de serem cortadas.
@@ -113,6 +145,22 @@ export function AssistenteFlutuante({
                 </button>
               ))}
             </div>
+            {/* §411 — ao lado do ×, e não numa barra própria: são os dois
+                gestos sobre a JANELA (o resto do cabeçalho é sobre o conteúdo). */}
+            <button
+              onClick={() => setExpandida((e) => !e)}
+              style={fecharEstilo}
+              data-testid="expandir-assistente"
+              aria-pressed={expandida}
+              aria-label={expandida ? "Encolher o assistente" : "Expandir o assistente"}
+              title={
+                expandida
+                  ? "Voltar ao tamanho de sempre"
+                  : "Janela maior — para colar contexto e iterar sobre um componente"
+              }
+            >
+              {expandida ? "⇲" : "⇱"}
+            </button>
             <button
               onClick={() => onMudarAba(null)}
               style={fecharEstilo}
@@ -231,6 +279,10 @@ const janelaEstilo: React.CSSProperties = {
   width: 420,
   maxWidth: "calc(100vw - 40px)",
   height: "min(620px, calc(100vh - 100px))",
+  // §411 — a transição existe para a expansão não LER como troca de janela.
+  // Ela cai na guarda global de `prefers-reduced-motion` (§328) como todo o
+  // resto: quem pede menos movimento recebe o salto seco, com a mesma janela.
+  transition: "width 180ms cubic-bezier(0.2, 0.7, 0.3, 1), height 180ms cubic-bezier(0.2, 0.7, 0.3, 1)",
   display: "flex",
   flexDirection: "column",
   background: "var(--painel)",
@@ -239,6 +291,29 @@ const janelaEstilo: React.CSSProperties = {
   boxShadow: "0 20px 60px rgba(0, 0, 0, 0.5)",
   overflow: "hidden",
   zIndex: 45,
+};
+
+/**
+ * SPEC-115 fatia F (§411) — a janela para **iterar**, não para perguntar.
+ *
+ * ## Os dois números, e por que não são "o maior possível"
+ *
+ * `min(980px, calc(100vw - 460px))` — a largura cresce até quase mil pixels,
+ * **mas nunca encosta nos 460 px da esquerda.** É o que mantém uma faixa do
+ * desenho visível: a conversa é SOBRE um componente, e decidir sobre um
+ * componente que saiu da tela é o defeito que a janela grande introduziria se
+ * ela fosse tela cheia.
+ *
+ * A altura sobe para `calc(100vh - 100px)` sem o teto de 620 px: colar a saída
+ * de um script é exatamente o conteúdo alto, e um teto ali obrigaria a rolar
+ * dentro de uma janela que tem espaço sobrando.
+ *
+ * Em telas estreitas o `min` resolve sozinho — a largura cai para o que couber,
+ * e o `maxWidth` herdado do estilo base continua valendo.
+ */
+const janelaExpandidaEstilo: React.CSSProperties = {
+  width: "min(980px, calc(100vw - 460px))",
+  height: "calc(100vh - 100px)",
 };
 
 /** O balão do momento — mesma âncora da janela (nasce do bubble), menor. */

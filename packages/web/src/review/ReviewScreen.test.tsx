@@ -1281,6 +1281,92 @@ describe("ReviewScreen — contadores de status (rascunho/revisar/refinado)", ()
   });
 });
 
+/**
+ * SPEC-115 fatia H — **a régua mudou de tela, e não virou porta fechada.**
+ *
+ * Queixa do usuário: *"o botão de exportar fica desabilitado, mas isso não faz
+ * sentido já que eu posso chegar nessa tela, então acredito que a validação
+ * deveria ficar na tela anterior."*
+ *
+ * A SPEC-115 §1.3 pesou as duas saídas e escolheu a B: avisar antes, sem
+ * bloquear. Bloquear (opção A) contradiria o §269, que tornou o documento
+ * alcançável cedo DE PROPÓSITO — para responder "e o porquê disso tudo" antes
+ * de a revisão terminar. O último teste deste bloco é o que guarda isso.
+ */
+describe("ReviewScreen — o aviso antes de ir ao documento (SPEC-115 fatia H)", () => {
+  const regras: RegrasConfig = {
+    tipos: [],
+    tamanhos: [],
+    porTech: {
+      Backend: {
+        checklistTecnico: [{ texto: "DLQ configurada e monitorada", contextos: ["Backend-mensagens"] }],
+        testes: [],
+      },
+    },
+  };
+
+  function renderizarComDocumento(props: Record<string, unknown> = {}, resultado = resultadoFixture01()) {
+    const onDocumento = vi.fn();
+    render(
+      <ReviewScreen
+        resultado={resultado}
+        diagrama={fixture.quebra.diagrama}
+        config={config}
+        regras={regras}
+        especificacaoTemplate={templateFixture}
+        onFechar={vi.fn()}
+        onSelecionarNo={vi.fn()}
+        onDocumento={onDocumento}
+        {...props}
+      />
+    );
+    return { resultado, onDocumento };
+  }
+
+  it("conta os ITENS que ainda pedem atenção, ao lado do link — não depois, no documento", () => {
+    // Com regras e sem a esteira ter rodado, nenhum item está refinado: é o
+    // estado exato em que o "Exportar prontos" lá adiante nasceria morto.
+    const { resultado } = renderizarComDocumento();
+
+    const aviso = screen.getByTestId("aviso-antes-do-documento");
+    expect(aviso).toHaveTextContent(`${resultado.atividades.length} itens ainda pedem atenção`);
+    expect(aviso).toHaveTextContent("Exportar prontos");
+  });
+
+  it("a porta CONTINUA aberta — avisar não é bloquear (§269)", () => {
+    /**
+     * A trava contra a opção A. Se alguém um dia desabilitar este botão
+     * "para proteger" quem não terminou a revisão, este teste falha — e o
+     * motivo está escrito acima: o documento alcançável cedo é uma decisão de
+     * produto, não um descuido.
+     */
+    const { onDocumento } = renderizarComDocumento();
+
+    const botao = screen.getByTestId("ir-ao-documento");
+    expect(botao).not.toBeDisabled();
+    fireEvent.click(botao);
+    expect(onDocumento).toHaveBeenCalled();
+  });
+
+  it("sem item nenhum, não há aviso — a tela não inventa pendência para chamar atenção", () => {
+    /**
+     * ACHADO escrevendo estes testes: a primeira versão deste caso passava
+     * `regras: undefined` esperando que o aviso sumisse, por analogia com os
+     * contadores (que só aparecem com regras). **Estava errado, e a régua certa
+     * é a que o teste encontrou**: a ficha tem placeholders de história e
+     * critérios independentemente de `regras`, então um item continua pedindo
+     * atenção sem regra nenhuma — e é verdade que ele não vai exportar.
+     *
+     * Calar o aviso ali teria escondido a pendência exatamente quando ela ainda
+     * existia, que é o defeito que a fatia H veio consertar do outro lado.
+     */
+    renderizarComDocumento({}, resolverDependencias([]));
+
+    expect(screen.queryByTestId("aviso-antes-do-documento")).toBeNull();
+    expect(screen.getByTestId("ir-ao-documento")).toBeInTheDocument();
+  });
+});
+
 describe("ReviewScreen — coluna Times (default pro time da quebra, editável no nó)", () => {
   it("toda atividade mostra o time da quebra por padrão; a que cruza outro time mostra o time diferente", () => {
     const atividades = derivar(fixture.quebra.diagrama, config, { time: "time-portabilidade" });

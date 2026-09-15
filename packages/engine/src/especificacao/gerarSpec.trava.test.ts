@@ -38,6 +38,22 @@ import { SECOES_DE_JULGAMENTO } from "./gerarSpec.js";
  * pedir julgamento ao modelo vai pedir as três juntas, ou vai começar pelas que
  * parecem mais fáceis de gerar. Um teste que acusa duas das três já obriga a
  * conversa a acontecer.
+ *
+ * **SPEC-119 fatia A acrescentou `decisoes` às seções de julgamento, e ela cai
+ * na mesma exceção de `origem` — por um motivo que vale escrever, porque parece
+ * um relaxamento e não é.**
+ *
+ * `montarPedidoDecisoes` existe, é do produto, e é a cadeia inteira da SPEC-115:
+ * o agente PROPÕE `Decisao`, ela chega `status: "proposta"`, e não vale nada até
+ * alguém aceitar. Varrer por `decisoes` acusaria justamente o caminho que a
+ * trava aprova — e um teste que acusa o desenho correto é desligado na primeira
+ * semana, junto com a proteção que ele de fato dava.
+ *
+ * **O que continua guardado, e é o que importa:** a seção `decisoes` da spec
+ * deriva de `Decisao` ACEITA, e a aceitação não passa por nenhum destes
+ * arquivos. O caminho por onde um modelo escreveria a restrição direto é o
+ * mesmo de `recusas` — as duas leem a mesma lista, pelo mesmo filtro — e esse
+ * caminho continua varrido.
  */
 
 const RAIZ = resolve(import.meta.dirname, "../../../..");
@@ -49,8 +65,11 @@ const ARQUIVOS_DA_IA = [
   "packages/web/src/review/useEsteiraDeAgentes.ts",
 ];
 
-/** As duas varríveis (ver o cabeçalho sobre `origem`). */
-const DISTINTIVAS = SECOES_DE_JULGAMENTO.filter((s) => s !== "origem");
+/** As sobrecarregadas, que produziriam ruído em vez de sinal — ver o cabeçalho. */
+const SOBRECARREGADAS: readonly string[] = ["origem", "decisoes"];
+
+/** As duas varríveis. */
+const DISTINTIVAS = SECOES_DE_JULGAMENTO.filter((s) => !SOBRECARREGADAS.includes(s));
 
 function ler(rel: string): string {
   return readFileSync(join(RAIZ, rel), "utf-8");

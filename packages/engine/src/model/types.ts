@@ -384,6 +384,19 @@ export interface SpecEscrita {
   /** Quem pediu, e com que palavras. Não é formalidade: é o que permite, meses
    * depois, saber se o que foi construído responde ao que foi pedido. */
   origem?: string;
+  /**
+   * SPEC-119 fatia A — o que já foi DECIDIDO, e por quê: o lado positivo.
+   *
+   * O par de `recusas`, e a assimetria entre as duas era o defeito: a spec
+   * dizia o que ficou fora e nunca o que ficou dentro. Um humano infere a
+   * escolha a partir do descarte; **um agente de código precisa saber qual
+   * padrão usar**, não qual evitar.
+   *
+   * Deriva das `Decisao` aceitas quando ninguém escreve aqui — como as outras
+   * três, e pela mesma procedência: proposta de agente não vale até alguém
+   * aceitar.
+   */
+  decisoes?: string;
   /** O que NÃO entra, e por quê. Recusa sem motivo é opinião; com motivo é
    * projeto — e é o que impede uma spec de virar lista de desejos. */
   recusas?: string;

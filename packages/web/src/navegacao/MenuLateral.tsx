@@ -70,7 +70,12 @@ const GRUPOS: { titulo: string; itens: { area: AreaConfig; rotulo: string }[] }[
       // não pelo menu, que é como ninguém descobre um recurso.
       { area: "tokens", rotulo: "Design system" },
       { area: "especificacao", rotulo: "Especificação de solução" },
-      { area: "exportacao", rotulo: "Exportação (tracker)" },
+      /**
+       * SPEC-118 fatia G — uma entrada só para as três conexões. As duas
+       * anteriores ("Modelo de IA" e "Exportação") descreviam a mesma coisa em
+       * dois vocabulários (§1.1); `#/config/modelo-ia` continua chegando aqui.
+       */
+      { area: "exportacao", rotulo: "Conexões" },
     ],
   },
   {
@@ -83,8 +88,7 @@ const GRUPOS: { titulo: string; itens: { area: AreaConfig; rotulo: string }[] }[
   {
     titulo: "IA",
     itens: [
-      { area: "pipeline", rotulo: "Pipeline de IA" },
-      { area: "modeloIa", rotulo: "Modelo de IA" },
+      { area: "pipeline", rotulo: "Agentes de IA" },
       { area: "pdca", rotulo: "PDCA — melhoria contínua" },
     ],
   },

@@ -16277,3 +16277,593 @@ tanto no navegador quanto no servidor, e é exatamente essa duplicação
 Java+TS que a fundação do projeto eliminou trocando pra TypeScript de ponta
 a ponta. A SPEC pergunta, antes de qualquer cronograma: o motor migra junto,
 vira serviço à parte, ou fica duplicado?
+
+---
+## §409 — A SPEC-115 implementada, e o botão da rodada anterior estava morto por dentro
+
+Sete das oito fatias da SPEC-115 entraram. A oitava (**F — a conversa de
+mapeamento por componente**) ficou de fora por dependência declarada na
+própria spec: ela exige o painel expansível do assistente, que ainda não
+foi desenhado (SPEC-75 §1.2). Implementar sem ele seria inventar o painel
+de passagem, dentro de uma rodada sobre outra coisa.
+
+**O que entrou, e o que cada fatia custou:**
+
+- **A — Trade-offs derivados.** A seção parou de nascer em branco: cada
+  `Decisao` vira uma linha *ganhou X — porque Z / perdeu Y — consequência*.
+  A medição da SPEC-115 §1.1 se confirmou inteira — nenhum campo novo no
+  modelo, só a mesma decisão lida pelo outro ângulo.
+- **B — Riscos derivados dos ensaios.** O `RiscosMedidos` já existia e vivia
+  SOLTO depois da seção; virou o bloco derivado DELA. O comentário do
+  componente já dizia "dois blocos, uma seção" desde a SPEC-69 — agora a
+  seção que os hospeda é literalmente uma.
+- **C — o rótulo pela origem.** *"derivado de N decisões — edite ou
+  complemente"*, com "escrito por uma pessoa" sobrevivendo como fallback de
+  quem não tem nada derivado. Um teste da SPEC-69 mudou de asserção junto, e
+  de propósito: a frase antiga deixou de ser verdade.
+- **D — o destino em modo de demonstração.** Flag `demonstracao` em
+  `DestinoDoGateway`, como o usuário respondeu na revisão (§4.2) — não uma
+  `operacao` nova. Ele é o único destino que sobrevive à normalização SEM
+  endereço, e a razão é dura: a regra de descarte é "o que sobra não dá para
+  chamar", e um dublê não chama nada. Espera 20s **por item** (não pelo
+  lote), porque é isso que torna o pipeline visível em vez de acender tudo
+  junto no fim. O link que ele devolve aponta para `demonstracao.invalid`, o
+  TLD reservado que nunca resolve: um link de mentira que abre alguma coisa
+  seria pior.
+- **E — o pipeline persistido.** Migration 0044 com `spec_enviada_em` e
+  `spec_erro`; a rota partiu em `planejar` (marca "indo" no banco e responde
+  **202**) e `concluir` (chama o gateway e grava o desfecho, sem ninguém
+  segurando a conexão). É a decisão que a SPEC-98 §3.2 já tinha tomado com o
+  usuário e que nunca havia sido construída: o estado do envio saiu do
+  `useState` e foi para o banco.
+- **G — a animação com informação.** Contagem real por etapa, o item em
+  trânsito nomeado, a falha com motivo. Sem barra de progresso, e há teste
+  que falha se alguém acrescentar uma — a SPEC-98 §6 recusa estimativa que
+  não se declara estimativa.
+- **H — o motivo à vista, nas duas pontas.** A revisão diz quantos itens
+  ainda pedem atenção ANTES do link "Ver o documento", e o documento parou
+  de ter um botão mudo: o motivo saiu do `title` (hover — invisível no
+  celular e no teclado) e foi para a tela. **Nada foi bloqueado**, e há
+  teste que guarda isso: o §269 tornou o documento alcançável cedo de
+  propósito.
+
+### O achado que só o navegador encontrou
+
+O E2E novo (demonstração + F5) falhou duas vezes antes de passar, e as duas
+falhas eram o MESMO defeito em dois lugares: **o botão "Anexar spec aos
+itens", corrigido no §408, continuava sem anexar nada.**
+
+`gerarSpec` marca `origem`, `recusas` e `fatias` vazias como lacuna, e a
+SPEC-98 §6 recusa enviar spec com lacuna. Só que **a tela que editava essas
+três seções não existe mais** — o `SecaoEscrita` exportado "para a tela da
+spec" (SPEC-84 fatia A) ficou sem consumidor, e `mudarSpecEscrita`,
+`alternarItemDaSpec` e `baixarSpecMarkdown` viraram funções mortas no
+`App.tsx`, sem o lint acusar. Resultado: TODO item voltava `comLacuna`. O
+botão aparecia, respondia 200 e a tela dizia *"N ficaram de fora por a spec
+ainda ter lacuna"* — sem lugar nenhum onde resolver.
+
+A segunda metade do mesmo buraco: `gerarSpec` só lista como cobertos os
+itens declarados em `escrita.itensCobertos`, e a marcação que os declarava
+morreu junto. Vazio vira `_(nenhum item vinculado)_ ✍️ especificar` — outra
+lacuna. A resposta não foi ressuscitar aquela tela: a spec é recortada **para
+um item só** (SPEC-114 §2.2), então o item que ela cobre é aquele, e dizer
+isso é declarar o que já era verdade.
+
+As três seções voltaram a ter onde ser escritas, ao lado do botão que
+depende delas — é onde a pessoa está quando bate na parede, a mesma régua do
+§269 e da SPEC-58 §7.2. E a tela agora diz **antes** do clique quantas
+respostas faltam, em vez de deixar a pessoa descobrir depois da espera.
+
+> **A lição é a de sempre, e desta vez ela custou duas rodadas:** o §407
+> entregou o botão com testes verdes em quatro camadas; o §408 corrigiu um
+> defeito que só a validação manual achou; e o §409 descobriu que ele ainda
+> não funcionava. Nenhuma das três rodadas tinha E2E do caminho inteiro. A
+> única prova que vale para costura é o navegador.
+
+**Provas**: 133 E2E verdes (dois no `exportacao.spec.ts`, agora `serial` —
+`config/exportador` é global e o `PUT` substitui, não mescla); 2.325 testes
+de unidade em 6 workspaces; build, typecheck e lint limpos. O E2E novo prova
+o F5 no meio do envio: recarrega, reabre a demanda, e o pipeline continua
+dizendo "1 anexando" — sem ninguém ter clicado nada naquela aba.
+
+---
+## §410 — A caixa em branco era a confusão: a spec sai do que foi decidido
+
+O §409 achou o defeito certo e o consertou errado. Ele descobriu que as três
+seções de julgamento da spec (`origem`, `recusas`, `fatias`) não tinham mais
+onde ser escritas, e por isso **toda** spec saía com lacuna e nenhuma subia —
+e resolveu isso com três textareas em branco na tela do documento.
+
+Correção do usuário, e ela é dura porque aponta uma contradição interna da
+mesma rodada:
+
+> *"a expectativa é que seja possível gerar essas specs, seja a partir de
+> conversas com assistente sem ou com contexto dos componentes e seus
+> respectivos projetos, já que parte pode ser nova e parte existente"*
+>
+> *"a caixa tem o objetivo dessa interação com o agente, onde se coloca input
+> e interage com o agente para passar contexto de projeto e tomar decisões que
+> depois vão derivar para as respectivas specs"*
+
+Três caixas em branco são exatamente a "caixa em branco" que a SPEC-115 §1.1
+argumenta contra para os trade-offs. O §409 implementou a tese da derivação
+nas seções do documento e, na mesma tela e na mesma rodada, construiu o
+oposto para a spec.
+
+### A medição que mudou a leitura de duas coisas
+
+**1. A trava da SPEC-80 fatia D não proíbe o que o usuário quer.** A mensagem
+de falha dela diz, com todas as letras: *"Se a intenção é pedir um RASCUNHO
+ao modelo, ele não pode chegar como fato: precisa entrar marcado"*. A regra é
+**como chega**, não **se chega** — o mesmo padrão da esteira (sugestão →
+confirmar) e do `leitorDeAdr` (*"importar não é aceitar"*).
+
+**2. O painel expansível do assistente EXISTE.** O §409 adiou a fatia F
+citando a SPEC-115, que diz que ele "ainda não foi desenhado". Tomei a frase
+da spec por medição em vez de medir: o `AssistenteFlutuante` já hospeda duas
+conversas por fase (`ConversaPanel` do desenho, `ConversaEspecificacao` do
+item), e as duas já seguem o padrão certo — a resposta vira cartão e
+*"confirmar é do usuário"*. O que faltava não era o painel.
+
+### A cadeia, com dono em cada elo
+
+```
+contexto do projeto → o agente PROPÕE → a pessoa ACEITA → a spec DERIVA
+     (quem conhece)      (modelo)        (julgamento)      (motor)
+```
+
+O modelo **não escreve uma linha de julgamento**, e a trava segue verde sem
+uma vírgula alterada. Ele propõe `Decisao`, que chega `status: "proposta"` e
+não vale nada até alguém aceitar (SPEC-57 fatia C) — e `derivarJulgamento.ts`
+só lê decisão **aceita**. Há teste que prova isso pela negativa: proposta não
+deriva recusa nenhuma.
+
+Cada seção deriva do que responde a pergunta dela:
+
+| Seção | Fonte | Por quê |
+|---|---|---|
+| `recusas` | as alternativas DESCARTADAS | *"o que NÃO entra, e por quê"* é literalmente a alternativa não escolhida mais a consequência dela |
+| `origem` | contexto da demanda + necessidades confirmadas | as palavras de quem pediu são as que alguém digitou |
+| `fatias` | os itens que a spec cobre | cada item derivado JÁ É uma fatia; a prova não é copiada, porque os critérios viajam no corpo do item no mesmo payload (§323) |
+
+E a ordem dentro de `gerarSpec` é a regra inteira: **texto de gente vence**
+(SPEC-58 regra 3), o derivado entra na ausência dele, e a lacuna continua
+existindo para quando não há de onde derivar. Derivação sem material é
+silêncio, nunca texto plausível — que é o que a SPEC-80 §2 chama de
+"plausível-mas-vazio".
+
+### O que a caixa virou
+
+Contexto do projeto colado (schema, rotas, trecho do documento dele — **nunca
+executado**, a fronteira da SPEC-75 e da SPEC-115 §2), um seletor do
+componente sobre o qual a conversa é (§1.1.1: oito componentes na mesma
+conversa produzem decisão que não ancora), e o botão que chama o agente. O
+que volta é contado e nomeado como proposta; aceitar acontece na mesa, ao
+lado do desenho a que a decisão se ancora.
+
+O prompt de `montarPedidoDecisoes` ganhou as duas coisas, e uma regra que só
+existe quando há material colado: *"o contexto descreve o que JÁ EXISTE. Não
+proponha adotar o que já está adotado, e não presuma que o que não aparece
+ali não existe"*. É o caso que o usuário nomeou — **parte nova, parte
+existente**.
+
+**Provas**: 20 testes novos (9 da derivação no motor, 5 do pedido com
+contexto e foco, 10 da caixa na tela), a trava da SPEC-80 fatia D verde sem
+alteração, e o E2E do §409 continua passando — inclusive o F5 no meio do
+envio. Escrever as três seções à mão continua valendo: é o caminho de quem já
+sabe a resposta, e é ele que o E2E exercita, porque não depende de modelo
+nenhum estar de pé.
+
+---
+## §411 — As três coisas que o usuário não achou, e ele estava certo nas três
+
+Olhando a tela com o assistente aberto:
+
+> *"quanto a poder selecionar os componentes, pegar o script de mapeamento com
+> o assistente e iterar em uma janela maior com ele para tomar decisões sobre o
+> componente não achei nada"*
+
+Medido, uma por uma:
+
+**1. O script de mapeamento não existia.** A única ocorrência de "script de
+mapeamento" no código era um comentário que eu mesmo escrevi no §410,
+descrevendo o que o contexto colado *é*. O produto nunca produziu esse script.
+
+**2. A janela do assistente é 420 px FIXOS.** E era exatamente isto que a
+SPEC-115 §3 chamava de *"o painel expansível do assistente"* — a peça que a
+fatia F declarava como pré-requisito. O §410 afirmou que ela existia porque o
+PAINEL existe. Expansível é que não era: eu confirmei metade da frase e dei a
+outra metade por confirmada.
+
+**3. A conversa estava no lugar errado.** O §410 entregou a fatia F como uma
+caixa na tela do DOCUMENTO, no nível da demanda — e a §1.1.1 corrige
+explicitamente contra isso: *"faz mais sentido dentro do painel do componente,
+não como uma conversa solta no nível da demanda"*. Eu li aquele parágrafo,
+citei aquele parágrafo, e construí o que ele recusa.
+
+### O que entrou
+
+**O ciclo dos três passos**, e o do meio é da pessoa:
+
+```
+1. o agente escreve o comando   → ele sabe O QUE perguntar, dado o tipo do nó
+2. a pessoa roda onde tem acesso → só ela tem credencial, rede e permissão
+3. ela cola a saída de volta      → e a conversa passa a ser sobre fatos
+```
+
+O passo 2 não é limitação a remover depois: é a fronteira da SPEC-75,
+reafirmada na SPEC-115 §2. Um produto que executa script no ambiente de quem o
+usa precisa de credencial, de rede e de uma superfície de ataque que ele não
+tem motivo para ter. O prompt exige **somente leitura**, proíbe inventar
+endereço (placeholder óbvio, com o significado dito) e aceita *"não há o que
+levantar ainda"* como resposta para componente novo — há teste para os quatro.
+
+**A janela expande** por modo, não por padrão: 420 px continua bom para
+perguntar uma coisa e aplicar a resposta. Expandida vai a
+`min(980px, calc(100vw - 460px))` — e o `- 460px` é a decisão, não o arredondamento:
+**ela nunca cobre o desenho**. Decidir sobre um componente que saiu da tela é o
+defeito que uma janela em tela cheia introduziria. Há teste que falha se
+alguém tirar essa reserva.
+
+**A entrada mora no painel do componente**, ao lado das decisões que ela
+produz, e são dois botões porque são duas fontes: o "🤖 pedir ao agente" lê o
+que o MOTOR mediu (desenho, fora do padrão, lacunas); o "🔎 mapear o que já
+existe" abre a conversa sobre o que o motor **não tem como medir** — o projeto
+que já roda do outro lado. Somá-los num só faria a pessoa não saber qual
+informação alimentou a proposta.
+
+### Uma correção minha, no meio da rodada
+
+A primeira escrita do pedido devolvia **texto cru**, argumentando que
+"estruturar obrigaria a remontar na tela, e remontagem é onde uma aspa some".
+O typecheck derrubou: `PedidoIa` exige esquema e todo executor passa por
+`completarEstruturado`. E o argumento era falso — uma string dentro de JSON
+atravessa byte a byte. Ficou um esquema de dois campos (`script` e `porque`),
+no mesmo caminho de todas as outras rotas. Inventar uma bifurcação no executor
+para não usar um campo teria custado caro em troca de nada.
+
+**Provas**: 16 testes novos (6 do pedido, 10 da aba), mais 4 da janela
+expansível; typecheck e lint limpos. O `porque` aparece ANTES do comando na
+tela, e há teste de que não existe botão de "rodar" em lugar nenhum — quem lê
+"script" numa ferramenta espera um, e não vai haver.
+
+---
+## §412 — SPEC-117: três coisas chamadas "agente", e só uma é editável
+
+Depois da aba de mapeamento por componente (§411), o usuário apontou o que
+falta para ela ser útil de verdade para ele:
+
+> *"eu tenho um certo agente pronto para isso, o problema é que não tenho
+> flexibilidade para editar os agentes do assistente na ferramenta, precisamos
+> de spec para atender isso, o caminho natural é evoluir essa parte de pipeline
+> de IA para Agentes de IA e ter uma sessão para editar o pipeline"*
+
+Medido antes de escrever, e a queixa é precisa:
+
+| O quê | Editável? |
+|---|---|
+| Papéis da esteira (PO, Arquiteto, Especialista, QA) | ✅ nome, prompt, ordem, contextos, ativo |
+| As conversas do assistente | ❌ **nada** |
+| Os agentes do gateway | ⚠️ endereço e transporte, não o que fazem |
+
+`grep "export function montarPedido"` devolve **nove**, e **oito têm o prompt
+inteiro escrito em TypeScript** — trocar o comportamento de qualquer um exige
+deploy. É exatamente a frase do usuário.
+
+**O achado que organiza a spec:** `ANATOMIA_DO_PROMPT_PIPELINE` já classifica
+cada parte do prompt da esteira em `configuravel | da-quebra | fixo` — uma
+configurável, uma fixa, cinco derivadas do trabalho. A classificação é honesta
+e **só existe para a esteira**. As outras oito conversas não têm nem como a
+pessoa saber o que ali seria dela.
+
+**A pergunta que decide o desenho inteiro, e a SPEC não a responde sozinha:**
+*"tenho um agente pronto"* é um **prompt refinado** (barato — estender aos
+outros o `preambulo` que a esteira já tem) ou um **agente externo no
+gateway/MCP** (arquitetural — hoje os destinos do gateway só saem e leem,
+nenhum pensa)? As duas provavelmente são verdade, e o que está em aberto é a
+ordem.
+
+**A régua que quase caiu junto**, e que virou a §3 da spec: prompt não é só
+estilo. `montarPedidoDecisoes` exige duas alternativas; `montarPedidoScriptDeMapeamento`
+exige somente leitura e proíbe inventar endereço; `montarPedidoNecessidades`
+diz que lista vazia é resposta correta. Um campo de prompt livre que
+SUBSTITUA apaga isso em silêncio — e a trava da SPEC-80 fatia D não pegaria,
+porque o texto estaria no banco, fora do alcance da varredura de fonte. A
+recomendação é a saída do meio: substitui, com o inegociável reinjetado — o
+que transforma a anatomia de documentação em mecanismo.
+
+Registrado em **SPEC-117**, com seis fatias e quatro perguntas em aberto.
+Nada implementado nesta rodada.
+
+---
+## §413 — SPEC-118: o curl que abriu os campos volta como entrada deles
+
+Duas coisas nesta rodada, e nenhuma implementada — as duas são spec, a pedido.
+
+**A pergunta 1 da SPEC-117 foi respondida:** *"estava me referindo a um
+prompt."* Isso resolve a §1 daquela spec a favor da Leitura A e tira do
+caminho crítico a fatia mais cara (agente externo como executor de conversa) —
+junto com a pergunta 4, que dependia dela. As fatias C e D viram o coração, e
+a §3 continua valendo inteira: prompt editável é exatamente o caminho por onde
+as regras de produto somem em silêncio.
+
+**E o pedido novo**, sobre as duas telas de configuração:
+
+> *"o objetivo é que eu possa configurar: 1 - A IA geral onde roda o assistente
+> e geração dos itens, o endpoint para importação, o endpoint para exportação,
+> todos 3 via importação de curl para ferramenta"*
+
+### O achado que organiza a SPEC-118
+
+`metodo` e `envelope` existem em `DestinoDoGateway` por causa desta frase, que
+está citada no código desde o §346:
+
+> *"é possível que existam diferentes agentes no gateway… **o curl da chamada**
+> vai conter variações entre agentes"*
+
+**Os campos foram derivados de um curl que ninguém nunca colou.** O produto
+pedia que a pessoa lesse o curl dela, decompusesse mentalmente em verbo,
+cabeçalhos, endereço e formato de corpo, e redigitasse cada pedaço num
+formulário diferente. A spec fecha o laço: cola o curl, o produto decompõe.
+
+### O que a medição achou nas duas telas
+
+Sete campos na de IA, oito na de Exportação, e **um único nome em comum**
+(`cabecalhos`) — duas telas descrevendo a mesma coisa (endereço HTTP com
+autenticação e formato de corpo) em dois vocabulários.
+
+E o que o usuário chama de "importação" **não existe como conceito**: as cinco
+operações do gateway moram na mesma lista, num select onde "ler ADRs" e
+"publicar documento" são vizinhos indistinguíveis. A direção do fluxo — a
+primeira coisa que alguém procura para se orientar — não aparece em lugar
+nenhum.
+
+### A régua cujo erro é irreversível
+
+Um curl copiado de um terminal que funciona **contém o segredo real**. Uma
+caixa de colar é superfície nova: o valor passa por textarea, screenshot de
+suporte, undo buffer. A §3.1 fixa três regras — o campo é efêmero, a chave sai
+dos cabeçalhos para o campo de segredo mascarado, e a tela DIZ que separou
+(silêncio ali faria a pessoa achar que a chave foi para a config versionável).
+
+E o trabalho de verdade não é o parser feliz: são os dialetos. *Copy as cURL*
+do DevTools em bash e em cmd diferem em continuação e aspas; no PowerShell
+`curl` é alias de `Invoke-WebRequest`, outra sintaxe inteira. Um parser
+bash-only entregaria a fatia pela metade justamente para quem a pediu.
+
+Sete fatias, quatro perguntas em aberto. Registrado em **SPEC-118**.
+
+---
+## §414 — Três respostas que recortam as SPEC-117 e 118
+
+Nenhuma implementação: as três respostas do usuário mudam o desenho das duas
+specs em aberto, e valem registro porque duas delas **encerram** coisas.
+
+**1. "Os agentes no gateway vou deixar no gateway, são basicamente os que vão
+fazer o import ou export para o jira, o gateway é o mesmo mas pode variar o
+endpoint."**
+
+Duas consequências, e a segunda é a boa:
+
+- **Encerra a fatia E da SPEC-117** (agente externo como executor de conversa).
+  Não é o adiamento que a resposta anterior já tinha produzido — é o fim. Os
+  agentes do gateway importam e exportam, e é isso que fazem. A divisão de
+  trabalho está declarada.
+- **Muda a forma da SPEC-118**: não são três conexões independentes. É o
+  gateway de IA, mais **UM gateway da casa com endpoints que variam por
+  operação** — uma autenticação só.
+
+E aí o achado que essa correção produz: **um importador de cURL ingênuo
+destruiria a herança que a SPEC-81 construiu.** Todo curl colado traz o
+`Authorization` dentro dele; escrevê-lo no destino daria a cada destino a sua
+cópia da chave — e rotacionar a chave viraria edição em N lugares, com a que
+alguém esquecer falhando sozinha, semanas depois. `DestinoDoGateway.cabecalhos`
+é opcional desde o §306 justamente para o caso "um gateway só, autenticação
+uma vez". A régua que sai: o importador **reconhece o mesmo gateway** e guarda
+só o que difere — e diz na tela que fez isso.
+
+**2. "curl exportado do postman."** Recorta o parser a um dialeto previsível e
+tira `cmd`, PowerShell e DevTools do caminho crítico. O que sobra de real:
+flags longas (`--location`, `--header`, `--data`), a ausência de `--request`
+com corpo significando `POST`, e `--location` sendo **ignorado** — é
+comportamento do cliente, não configuração.
+
+**3. "5. substitui."** A tela única substitui as abas "Modelo de IA" e
+"Exportação" em vez de agrupá-las. O §308 deste projeto já pagou por aba
+cortada, então duas garantias viajam junto: nenhum campo se perde na travessia
+(`visao`, `formatoJson`, `baseUrlTranscricao`, `espaco` são os que somem numa
+reorganização, porque ninguém lembra deles) e os deep-links antigos continuam
+chegando em algum lugar.
+
+Isso **promoveu** a pergunta do `endpoint` de topo da exportação: com a tela
+substituída ele não tem mais onde ficar como está, e com um gateway só ele
+deixa de parecer "o destino de itens" e passa a parecer o que nunca foi — o
+endereço do gateway.
+
+**Continuam em aberto:** o preâmbulo acrescenta ou substitui (SPEC-117), a
+config é por time ou global (SPEC-117), o que "Testar conexão" chama num
+destino de tracker (SPEC-118 — a única cuja resposta está fora do produto), e
+o destino do `endpoint` de topo (SPEC-118).
+
+---
+## §415 — A spec tem dois leitores, e o segundo é um agente de código
+
+Três respostas do usuário e quatro restrições novas, todas viram spec. Nada
+implementado.
+
+**"Acrescenta"** (SPEC-117, pergunta 2) — contra a minha recomendação, e a
+decisão **simplifica**: se nada é removido, a fatia D (extrair as regras
+inegociáveis da string para poder reinjetá-las) deixa de ser pré-requisito, e
+a §3 daquela spec vira cuidado em vez de risco. O custo que sobra é de
+engenharia de prompt: duas instruções podem se contradizer, e a mitigação é
+moldura — o preâmbulo entra num bloco nomeado com a precedência dita em voz
+alta.
+
+**"Por time, mas a arquitetura pode querer algum nível de governança geral"** —
+e isso cai em mecânica que o produto já tem: `__global__` é o `timeId` que os
+campos do nó, o template e o PDCA já usam. A pergunta que sobrou é pequena:
+governança é **piso** (padrão que o time troca) ou **teto** (o que o time não
+remove)? As duas convivem.
+
+**"É endpoint do gateway, eu já expliquei"** — a pergunta estava mal feita, e
+a resposta é uma terceira saída que eu não tinha listado: o campo de topo não
+vira destino normal nem sobrevive como caso especial; ele **passa a ser o que
+já parecia** — o endereço do gateway, com autenticação compartilhada e as
+operações sendo endpoints dentro dele. Resolve de uma vez a ambiguidade do
+campo sem operação, a duplicação de auth por destino, e o alvo do "Testar
+conexão".
+
+### A frase que reclassificou o artefato
+
+> *"a idéia é que os devs peguem os itens do jira depois e usem para programar
+> com o claude"*
+
+A SPEC-98 §1 já tinha citado *"quando agentes escrevem o código, a spec é a
+coisa de maior alavancagem que um humano pode produzir"* — e o produto
+acreditou nela construindo a spec **para ser lida**. A conclusão ficou pela
+metade: o último leitor não é humano.
+
+Medido contra o que um agente de código precisa, na ordem em que precisa: **as
+três primeiras linhas são as mais importantes e duas estão ausentes.** Falta a
+seção de decisões (pedido explícito do usuário) e falta onde mexer; "como saber
+que terminou" é ponteiro para outro artefato.
+
+E a assimetria que o §410 deixou: as decisões entram na spec **só pelo lado
+negativo** — a alternativa descartada vira `recusas`, a escolhida não entra em
+lugar nenhum. Para um humano quase se sustenta (quem lê "síncrono ficou fora"
+infere fila). Para um agente é exatamente o que falta: ele precisa saber qual
+padrão usar, não qual evitar.
+
+Sete problemas concretos de engenharia de prompt em **SPEC-119**, incluindo o
+mais caro: `O que foi medido` é diagnóstico, e um agente de código lê lista de
+problemas e tenta resolvê-los — é o que ele foi treinado para fazer.
+
+### E o upload, com as restrições do outro lado
+
+Quatro observações sobre MCP lento e limitado. **Duas já estão construídas** —
+a dependência entre as chamadas (SPEC-114) e a animação com contagem real
+(§409) — e dizer isso primeiro evita respecificar o que existe.
+
+**As outras duas são trabalho.** A SPEC-98 §4 previu os lotes e a fatia D dela
+nunca foi construída: hoje vai **tudo numa chamada só**, e uma demanda com
+trinta itens manda trinta specs num POST. O usuário respondeu o tamanho (5),
+numa unidade que é proxy — cinco specs grandes e cinco pequenas diferem por
+uma ordem de grandeza, então o teto por contagem precisa de um teto por
+tamanho ao lado.
+
+O terreno está preparado por acidente com método: o §409 persistiu o estado
+**por item**, e um lote é só quantos vão por chamada — o acompanhamento e o
+resultado parcial não mudam.
+
+E o anexo: o produto manda markdown e **nunca verificou** que um MCP consegue
+anexar. Presumir que funciona é exatamente como as três rodadas anteriores
+descobriram que o botão não anexava nada.
+
+Registrado em **SPEC-119** e **SPEC-120**.
+
+## §416 — As quatro SPECs construídas, e o que só o E2E cobrou
+
+As SPEC-117 a 120 eram avaliações: mediam, nomeavam o que faltava e paravam
+antes da primeira linha de código. Esta rodada construiu as quatro.
+
+### O e2e vermelho não era do commit que o revelou
+
+Antes de qualquer fatia, a base estava vermelha: o tour guiado falhava com
+`element is outside of the viewport` no botão "Próximo" — trinta segundos de
+retry e o passo nunca avançava.
+
+A causa não estava no commit que a revelou. `posicionarCard` continha a regra
+certa **escrita em comentário** — *"bate com o maxHeight da carta: subestimar
+aqui é o que a jogava para fora da tela"* — e um número que não batia: 240
+contra um `maxHeight: min(70vh, 420px)`. Uma carta de 400 px "contida" a 240
+termina 160 px abaixo da dobra, com o botão existindo, visível para o DOM, e
+inalcançável. A janela do assistente que passou a expandir só empurrou o alvo
+para baixo o bastante para o caso aparecer.
+
+A correção não foi aumentar o palpite: foi **medir**. E os três testes de
+clamp mediam contra o mesmo 240 que o código usava — eles concordavam com o
+defeito.
+
+### A spec passou a ter dois leitores (SPEC-119)
+
+A assimetria que o §410 deixou virou seção: as decisões alimentavam a spec só
+pelo lado negativo. Agora a escolhida entra com o porquê e com **onde vale** —
+pelo rótulo do componente, não pelo `noId`, porque `n3` não localiza nada para
+quem lê no Jira.
+
+Cada seção passou a declarar a **força** dela em uma linha (restrição, escopo,
+diagnóstico, contexto), e a moldura viaja no TEXTO e não no template: template
+é configurável, e quem já customizou o dele perderia a marcação em silêncio.
+
+O ponteiro pendurado do §3.4 virou garantia. *"Prova: na seção dele"* pressupunha
+que o corpo do item viaja junto — viaja no caminho da SPEC-114, não viaja no
+markdown baixado, e a spec não dizia qual dos dois era.
+
+### O lote, e a pergunta que o risco respondeu (SPEC-120)
+
+`exportarDaQuebra` e `anexarSpecNaQuebra` mandavam tudo numa chamada só. Como
+o §409 já persistia o estado **por item**, fatiar não foi reescrever o envio:
+foi decidir quantos entram por chamada e emendar as chamadas.
+
+A pergunta 2 da SPEC ("a redução automática é desejável ou assustadora?") foi
+respondida pelo risco, e o código diz qual: **reduzir só onde é seguro**. Um
+413 no anexo da spec vira dois lotes menores sozinho; na criação de issue, não
+— *"um retry sobre um sucesso mal reportado duplica issue"*, e uma demanda de
+trinta itens virando sessenta não tem como ser desfeita por quem não sabe
+quais são os duplicados.
+
+### Uma tabela que descreve prompt envelhece calada (SPEC-117)
+
+As oito conversas do assistente ganharam anatomia, preâmbulo por conversa e o
+✦ Sugerir. O preâmbulo **acrescenta** (decisão do usuário, contra a minha
+recomendação), e isso simplificou a SPEC inteira: nenhuma regra de produto pode
+sumir porque nada sai do prompt.
+
+**ACHADO:** a §3 da SPEC listava *"lista vazia é resposta correta"* como regra
+já presente em `montarPedidoNecessidades`. Ela não estava lá — estava nos
+irmãos, e a ausência passou despercebida justamente por isso. Quem acusou foi
+o teste que ancora a anatomia no prompt REAL: uma tabela que descreve o que o
+prompt *deveria* dizer não vale nada até alguém conferir contra o que ele diz.
+
+### O curl que abriu os campos voltou como entrada deles (SPEC-118)
+
+Os campos `metodo` e `envelope` foram derivados de um cURL que ninguém nunca
+colou. Agora a pessoa cola, e o produto decompõe.
+
+A régua mais cara é a da chave: o campo de colar **se esvazia ao interpretar**,
+a chave sai dos cabeçalhos, e a tela **diz** que separou. E um importador
+ingênuo teria destruído a herança de cabeçalhos da SPEC-81 — cada curl traz o
+`Authorization` dentro, e escrevê-lo por destino faria rotacionar a chave virar
+edição em N lugares.
+
+**ACHADO na fatia G:** a resposta da pergunta 2 ("substitui") listava duas
+garantias para a travessia — nenhum campo se perde, deep-link chega em algum
+lugar — e faltava uma terceira, de segurança: as duas abas tinham **recursos de
+RBAC diferentes**. Fundi-las sem mais nada daria a quem só cuida da exportação
+uma visão do formulário de credencial de IA: ampliação de acesso por efeito
+colateral de reorganização de tela. A fusão ficou sendo do **menu**; a régua
+continua onde estava.
+
+### E o E2E cobrou o que nenhuma suíte de unidade pegaria
+
+Duas coisas, e as duas depois de 2.529 testes de unidade verdes:
+
+1. A quarta seção de julgamento da SPEC-119 é obrigatória **de verdade**: o
+   teste preenchia três e a tela continuava dizendo *"spec com lacuna não
+   sobe"*.
+2. A garantia de RBAC que mudou de lugar precisava ser cobrada no **link
+   direto** — que é exatamente onde a fusão das abas poderia ter ampliado
+   acesso em silêncio.
+
+Sem o navegador, as duas teriam atravessado.
+
+### O que ficou de fora, e está dito
+
+- **SPEC-119 fatia G** (certificar a spec contra um agente de código real) e
+  **SPEC-120 fatia E** (certificar o anexo contra o MCP do Jira real). As duas
+  são "rodar contra o real e olhar o resultado" — não são teste automatizado, e
+  chamá-las de prontas seria exatamente o *presumir que funciona* que esta casa
+  já pagou três vezes para aprender. O contrato do anexo está **declarado** na
+  tela (fatia D); que ele funciona, ninguém verificou ainda.
+- **SPEC-117 fatia E** (agente externo como executor de conversa) — encerrada
+  por decisão do usuário, não adiada.

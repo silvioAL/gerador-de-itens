@@ -1,5 +1,5 @@
 import type { ExportadorDeItens, ItemExportado, ItemGeradoSalvo } from "@gerador/aplicacao";
-import type { ConfigExportador } from "@gerador/aplicacao";
+import { fatiarEmLotes, LOTE_PADRAO, type ConfigExportador } from "@gerador/aplicacao";
 
 /**
  * SPEC-49 — o adaptador de exportação: um POST para o AGENTE que fala com o
@@ -22,10 +22,24 @@ export function criarExportadorViaAgente(
   config: ConfigExportador,
   fetchImpl: typeof fetch = fetch
 ): ExportadorDeItens {
-  return {
-    async exportar(itens: ItemGeradoSalvo[]) {
-      if (itens.length === 0) return [];
+  /**
+   * SPEC-120 fatia A — **o lote vale para as DUAS chamadas.**
+   *
+   * A SPEC-98 §4 tinha concluído que o lote era problema *"da segunda chamada
+   * apenas"*, porque *"um item pronto é pequeno"*. A observação do usuário
+   * corrigiu isso: o limite não é só de tokens, é de **lentidão** — e um MCP
+   * lento com trinta issues para criar numa chamada tem o mesmo problema de
+   * timeout que a spec tem de contexto.
+   *
+   * Os lotes rodam em SÉRIE, e não em paralelo. Paralelizar seria devolver ao
+   * gateway lento exatamente a carga de que o lote existe para protegê-lo.
+   */
+  const limites = {
+    itens: config.lote?.itens ?? LOTE_PADRAO.itens,
+    caracteres: config.lote?.caracteres ?? LOTE_PADRAO.caracteres,
+  };
 
+  async function enviarLote(itens: ItemGeradoSalvo[]): Promise<Array<ItemExportado | { chave: string; erro: string }>> {
       let resposta: Response;
       try {
         resposta = await fetchImpl(config.endpoint, {
@@ -69,6 +83,31 @@ export function criarExportadorViaAgente(
         if (!resultado.linkExterno) return { chave: item.chave, erro: "o agente respondeu sem o link do issue" };
         return { chave: item.chave, linkExterno: resultado.linkExterno };
       });
+  }
+
+  return {
+    async exportar(itens: ItemGeradoSalvo[]) {
+      if (itens.length === 0) return [];
+
+      /**
+       * O tamanho do item é, essencialmente, o corpo dele. Os outros campos
+       * (chave, tipo, tamanho) somam dezenas de caracteres contra os milhares
+       * do markdown, e medi-los com precisão aqui daria a impressão de uma
+       * exatidão que o teto em caracteres não tem (ver `lotes.ts`).
+       */
+      const lotes = fatiarEmLotes(itens, (i) => i.corpoMarkdown?.length ?? 0, limites);
+
+      const resultados: Array<ItemExportado | { chave: string; erro: string }> = [];
+      for (const lote of lotes) {
+        resultados.push(...(await enviarLote(lote)));
+      }
+      /**
+       * Um lote que falha **não interrompe os seguintes**, e é a régua da
+       * SPEC-49 aplicada um nível acima: falha por item, nunca tudo-ou-nada.
+       * Parar no primeiro erro faria uma indisponibilidade momentânea do
+       * gateway custar os vinte e cinco itens que viriam depois.
+       */
+      return resultados;
     },
   };
 }

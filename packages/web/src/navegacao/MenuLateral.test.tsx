@@ -42,8 +42,8 @@ describe("MenuLateral (SPEC-40 F1 — gestão no menu, frequência no header)", 
 
     montar().onNavegar; // segunda instância pra outro item
     const props2 = montar();
-    fireEvent.click(screen.getAllByRole("button", { name: "Modelo de IA" }).at(-1)!);
-    expect(props2.onNavegar).toHaveBeenCalledWith("modeloIa");
+    fireEvent.click(screen.getAllByRole("button", { name: "Conexões" }).at(-1)!);
+    expect(props2.onNavegar).toHaveBeenCalledWith("exportacao");
   });
 
   it("fechado, não existe no DOM (overlay some de verdade)", () => {
@@ -70,9 +70,9 @@ describe("MenuLateral — time não é stack (SPEC-42/43)", () => {
  */
 describe("MenuLateral — o que ela não edita não aparece (§221)", () => {
   it("área sem permissão SOME do menu, e nada de cadeado sobra", () => {
-    montar({ podeEditarArea: (area) => area !== "modeloIa" });
+    montar({ podeEditarArea: (area) => area !== "exportacao" });
 
-    expect(screen.queryByRole("button", { name: /Modelo de IA/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Conexões/ })).not.toBeInTheDocument();
     // O que ela edita continua ali, sem enfeite nenhum.
     const permitido = screen.getByRole("button", { name: "Membros" });
     expect(permitido).toBeInTheDocument();
@@ -96,7 +96,7 @@ describe("MenuLateral — o que ela não edita não aparece (§221)", () => {
   it("sem a função de permissão (modo sem RBAC), o menu inteiro aparece", () => {
     montar();
     expect(screen.getByRole("button", { name: "Contexto do produto" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Modelo de IA/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Conexões/ })).toBeInTheDocument();
     expect(screen.queryByText("🔒")).not.toBeInTheDocument();
   });
 });

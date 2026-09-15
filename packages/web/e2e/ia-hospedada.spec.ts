@@ -30,13 +30,14 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("gerador:jornada-vista", "1"));
 });
 
-/** A aba "Modelo de IA" dentro da tela de Configurações. */
+/** A seção de IA dentro da tela de Conexões (SPEC-118 fatia G: as abas
+ *  "Modelo de IA" e "Exportação" viraram uma só). */
 async function abrirModeloIa(page: Page) {
   await page.getByRole("button", { name: "☰ Menu" }).click();
-  await page.getByRole("button", { name: "Modelo de IA" }).click();
+  await page.getByRole("button", { name: "Conexões" }).click();
 }
 
-test("aba Modelo de IA no hospedado mostra o formulário do gateway, não um comando que não existe", async ({
+test("a seção de IA em Conexões mostra o formulário do gateway, não um comando que não existe", async ({
   page,
 }) => {
   await entrar(page);
@@ -433,7 +434,7 @@ test("o agente propõe o propósito, e o delta mostra o trabalho que aceitar cri
 
   // Credencial do gateway falso — mesma da suíte de IA hospedada.
   await page.getByRole("button", { name: "☰ Menu" }).click();
-  await page.getByRole("button", { name: "Modelo de IA" }).click();
+  await page.getByRole("button", { name: "Conexões" }).click();
   const card = page.getByTestId("modelo-ia-gateway");
   await card.getByLabel("Base URL do gateway").fill(BASE_URL_GATEWAY_FALSO);
   await card.getByLabel("Chave de API").fill(CHAVE_GATEWAY_FALSO);

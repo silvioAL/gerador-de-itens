@@ -59,9 +59,46 @@ beforeEach(() => vi.clearAllMocks());
 describe("ConfigScreen — área negada (SPEC-51: SPEC-40 F2 + SPEC-39 F2)", () => {
   it("área sem permissão DIZ que é permissão — antes caía noutra tela em silêncio", () => {
     comPermissoes(["campos-no"]);
-    renderTela("modeloIa");
+    renderTela("membros");
 
     expect(screen.getByTestId("area-sem-permissao").textContent).toContain("não tem permissão");
+  });
+
+  /**
+   * SPEC-118 fatia G — **a fusão das duas abas não ampliou acesso nenhum.**
+   *
+   * As duas tinham recursos de RBAC diferentes: `exportacao` é aberta (sempre
+   * foi) e `modeloIa` exige `credenciais-ia`. Fundi-las sem mais nada daria a
+   * quem só cuida da exportação uma visão do formulário de credencial — uma
+   * ampliação por efeito colateral de uma reorganização de tela.
+   *
+   * A régua ficou onde estava: a fusão é do MENU, e a seção de IA continua
+   * atrás da permissão dela.
+   */
+  it("sem `credenciais-ia`, a tela de Conexões abre SEM a seção de IA", () => {
+    comPermissoes(["campos-no"]);
+    renderTela("exportacao");
+
+    expect(screen.getByTestId("config-conexoes-unificada")).toBeInTheDocument();
+    expect(screen.queryByTestId("conexao-ia")).not.toBeInTheDocument();
+    expect(screen.getByTestId("conexao-casa")).toBeInTheDocument();
+  });
+
+  it("COM `credenciais-ia`, a seção de IA aparece — a permissão é o que decide", () => {
+    comPermissoes(["credenciais-ia"]);
+    renderTela("exportacao");
+
+    expect(screen.getByTestId("conexao-ia")).toBeInTheDocument();
+  });
+
+  it("o link velho de `#/config/modelo-ia` chega em Conexões, e não em tela branca", () => {
+    // §6.2 — "quem tem o link salvo não pode cair em tela branca", e o §308 já
+    // custou por aba que trocou de lugar.
+    comPermissoes(["credenciais-ia"]);
+    renderTela("modeloIa");
+
+    expect(screen.getByTestId("config-conexoes-unificada")).toBeInTheDocument();
+    expect(screen.getByTestId("conexao-ia")).toBeInTheDocument();
   });
 
   it("o pedido nasce ALI: vira solicitação de ajuste com o recurso já certo", async () => {
