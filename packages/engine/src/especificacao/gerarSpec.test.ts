@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Decisao } from "../model/types.js";
 import { MARCADOR_ESPECIFICAR } from "../refinamento/gerarRefinamento.js";
 import {
   coberturaDaSpec,
@@ -302,10 +303,7 @@ describe("a seção Decisões (SPEC-119 fatia A)", () => {
           {
             ...decisaoAceita("Transporte do pico", "desacopla o pico do parceiro"),
             escolhida: "Fila",
-            alternativas: [
-              { titulo: "Fila" },
-              { titulo: "Síncrono", consequencia: "acopla ao parceiro" },
-            ] as never,
+            alternativas: [{ titulo: "Fila" }, { titulo: "Síncrono", consequencia: "acopla ao parceiro" }],
           },
         ],
       },
@@ -360,7 +358,13 @@ describe("a seção Decisões (SPEC-119 fatia A)", () => {
   });
 });
 
-function decisaoAceita(titulo: string, porque: string) {
+/**
+ * O fixture é tipado como `Decisao`, e não `as never`, porque estes testes
+ * ESPALHAM em cima dele (`{ ...decisaoAceita(…), noId: "n3" }`) — e `never` não
+ * se espalha. O typecheck pegou isso depois de a suíte já estar verde, que é
+ * exatamente a divisão de trabalho entre os dois portões.
+ */
+function decisaoAceita(titulo: string, porque: string): Decisao {
   return {
     id: titulo,
     titulo,
@@ -371,5 +375,5 @@ function decisaoAceita(titulo: string, porque: string) {
     origem: "manual",
     autor: "alguém",
     em: "2026-01-01T00:00:00.000Z",
-  } as never;
+  };
 }
