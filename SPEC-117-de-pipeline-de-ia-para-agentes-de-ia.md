@@ -262,12 +262,54 @@ da §0.2 de documentação em **mecanismo**.
    exatamente o caminho por onde as regras de produto podem sumir em silêncio,
    e o texto morando no banco continua fora do alcance da varredura de fonte
    da SPEC-80 fatia D.
-2. **O preâmbulo configurável acrescenta ou substitui?** (§3) Com as três
-   saídas medidas e a recomendação dada, falta a decisão.
-3. **A configuração de agente é por TIME ou global?** A config de papéis já é
-   por time (`time-silvio` aparece no cabeçalho da aba). As conversas do
-   assistente hoje não são de ninguém — passariam a ser do time, ou da
-   organização?
+2. ~~**O preâmbulo configurável acrescenta ou substitui?**~~ ✅ **Acrescenta.**
+
+   A decisão é do usuário e ela **simplifica a SPEC inteira**, contra a minha
+   recomendação — que era a saída do meio. O que ela desfaz:
+
+   - **A fatia D deixa de ser pré-requisito.** Se nada é removido, não é
+     preciso extrair as regras inegociáveis da string para poder reinjetá-las.
+     Ela continua valendo como higiene (a anatomia da §0.2 vira mecanismo), mas
+     sai do caminho crítico da fatia C.
+   - **A §3 para de ser um risco e vira um cuidado.** Nenhuma regra de produto
+     pode sumir, porque nada sai do prompt. A trava da SPEC-80 fatia D continua
+     coberta pelo que já cobre.
+
+   **O custo que sobra, e ele é de engenharia de prompt, não de arquitetura:**
+   duas instruções podem se contradizer. Se o preâmbulo do time disser *"no
+   máximo 3 decisões"* e o do produto disser *"no máximo 8"*, o modelo recebe
+   duas ordens e resolve sozinho — mal.
+
+   A mitigação não é técnica, é de **moldura**: o preâmbulo entra num bloco
+   nomeado (*"instruções adicionais do time"*) e o prompt do produto diz a
+   precedência em voz alta. É o que transforma contradição em prioridade
+   declarada — e é assunto da SPEC-119, que trata a montagem de prompt como
+   engenharia e não como concatenação.
+3. ~~**A configuração de agente é por TIME ou global?**~~ ✅ **Por time, com um
+   nível de governança geral.**
+
+   > *"por time, mas a arquitetura pode querer algum nível de governança
+   > geral"*
+
+   **E isto já tem mecânica pronta no produto**, o que muda a fatia de "decidir
+   um modelo novo" para "usar o que existe": `__global__` é o `timeId` que os
+   campos do nó, o template de especificação e o PDCA já usam para dizer *"isto
+   vale para todo mundo"*, com o `exigirTime` do middleware sabendo que um
+   recurso global não pertence a time nenhum.
+
+   **A pergunta que sobra, e é pequena perto da anterior:** governança aqui é
+   *piso* ou *teto*?
+
+   | | O que significa | Quando serve |
+   |---|---|---|
+   | **Piso** | a arquitetura define o preâmbulo padrão; o time pode trocar | o comum é bom, e o time que souber mais ajusta |
+   | **Teto** | a arquitetura define o que o time NÃO pode remover | há regra de casa que não é negociável por time |
+
+   Elas não se excluem, e a §3 desta SPEC já empurra para as duas conviverem:
+   o **piso** é o preâmbulo global que o time herda e pode substituir; o
+   **teto** é a lista de inegociáveis da pergunta 2, que ninguém remove — nem
+   o time, nem a arquitetura, porque parte dela é do produto (*"somente
+   leitura"* não é política de empresa).
 4. ~~**Um agente externo pode escrever seção de julgamento?**~~ ❌ **Não se
    coloca mais.** Com a fatia E encerrada (§5), nenhum agente de fora executa
    conversa — então nenhum chega perto das seções de julgamento. A varredura de

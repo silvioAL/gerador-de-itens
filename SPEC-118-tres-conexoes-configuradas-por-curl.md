@@ -319,28 +319,55 @@ formato novo de armazenamento. O documento salvo no banco continua sendo o que
    - **o menu e os deep-links antigos continuam chegando em algum lugar** —
      quem tem `#/config/exportacao` salvo não pode cair em tela branca.
 
-3. **"Testar conexão" para importação/exportação chama o quê?** *(em aberto)* A
-   IA tem endpoint de teste barato; um destino de tracker não — testar de
-   verdade **criaria um issue**. As saídas: `HEAD`/`OPTIONS` (que muitos
-   gateways não respondem), um payload vazio (que o agente pode rejeitar, ou
-   pior, aceitar criando lixo), ou a fatia F fica só na IA. **Depende do que os
-   agentes do gateway aceitam** — é a única pergunta desta SPEC cuja resposta
-   está do lado de fora do produto.
-4. **O `endpoint` de topo da exportação (SPEC-81 §1) some?** *(em aberto, e
-   agora mais urgente)* Ele é o destino de `itens` de quem configurou antes,
-   mantido por compatibilidade, e é o campo "Endereço do agente" no topo da
-   tela de hoje — o único que não diz qual operação é.
+3. ~~**"Testar conexão" para importação/exportação chama o quê?**~~ ✅ **Chama
+   o gateway** — *"chama o gateway onde vai ter um agente ligado ao MCP do
+   jira"*.
 
-   Com a resposta da pergunta 2 (a tela substitui), ele **não tem mais onde
-   ficar como está**: ou vira um destino normal da conexão de exportação — o
-   que exige a migração de dado que a SPEC-81 recusou fazer na época — ou
-   sobrevive como um caso especial dentro da tela nova, que é a dívida de hoje
-   mudando de endereço.
+   O que isso resolve: **o teste é do transporte, não da operação.** Ele
+   responde *"este endereço existe, minha autenticação vale e há alguém
+   atendendo?"* — e para isso não precisa criar issue nenhum. O medo da
+   pergunta original (testar de verdade criaria lixo no tracker) sai de cena,
+   porque ninguém propôs exercitar a operação.
 
-   E a correção do §2.0 muda o peso da escolha: com **um gateway só**, o
-   endereço de topo deixa de ser "o destino de itens" e passa a parecer o que
-   ele nunca foi — o endereço do gateway. Manter os dois sentidos convivendo é
-   o que produziria a confusão que esta SPEC existe para desfazer.
+   E a correção do §2.0 torna isto ainda mais barato: **com um gateway só, o
+   teste é um só.** Não se testa cada endpoint — testa-se o gateway, e os
+   endpoints são caminhos dentro dele.
+
+   **O que a implementação ainda precisa decidir, e é detalhe de contrato:** o
+   que exatamente se manda. Um `GET` na raiz, um corpo vazio na operação, um
+   `/health` convencionado. A resposta depende de o gateway do usuário
+   responder a algo sem efeito colateral — e o produto precisa **dizer o que
+   está mandando**, para que um "falhou" seja diagnosticável em vez de ser
+   apenas vermelho.
+4. ~~**O `endpoint` de topo da exportação some?**~~ ✅ **Ele É o endereço do
+   gateway.**
+
+   > *"é endpoint do gateway, eu já expliquei, lá vai ter um agente ligado ao
+   > MCP"*
+
+   A pergunta estava mal feita, e a resposta é uma **terceira saída** que eu
+   não tinha listado: o campo não vira destino normal nem sobrevive como caso
+   especial. Ele **passa a ser o que já parecia ser** — o endereço do gateway
+   da casa, com a autenticação compartilhada, e as operações sendo endpoints
+   dentro dele.
+
+   ```
+   🏠 Gateway da casa   https://gw.empresa      ← o campo de topo, agora nomeado
+      autenticação: uma só                        (um agente ligado ao MCP atende aqui)
+      ├── ⬇ importar  → /adr, /documento
+      └── ⬆ exportar  → /issues, /issues/spec
+   ```
+
+   **O que isso resolve de uma vez:** some a ambiguidade do campo que não dizia
+   operação (§1.2), some a duplicação de autenticação por destino (§2.0), e o
+   "Testar conexão" ganha alvo óbvio (pergunta 3 — testa-se o gateway).
+
+   **O que a implementação precisa cuidar:** hoje o valor daquele campo é usado
+   como o destino da operação `itens`. Ressignificá-lo para "endereço do
+   gateway" **não é renomear um rótulo** — é mudar o que o produto faz com
+   aquele valor. Quem tiver ali um endereço que já é específico de itens
+   (`https://gw/jira/issues`) precisa que ele continue funcionando enquanto o
+   novo sentido não estiver preenchido.
 
 ---
 

@@ -16684,3 +16684,79 @@ endereço do gateway.
 config é por time ou global (SPEC-117), o que "Testar conexão" chama num
 destino de tracker (SPEC-118 — a única cuja resposta está fora do produto), e
 o destino do `endpoint` de topo (SPEC-118).
+
+---
+## §415 — A spec tem dois leitores, e o segundo é um agente de código
+
+Três respostas do usuário e quatro restrições novas, todas viram spec. Nada
+implementado.
+
+**"Acrescenta"** (SPEC-117, pergunta 2) — contra a minha recomendação, e a
+decisão **simplifica**: se nada é removido, a fatia D (extrair as regras
+inegociáveis da string para poder reinjetá-las) deixa de ser pré-requisito, e
+a §3 daquela spec vira cuidado em vez de risco. O custo que sobra é de
+engenharia de prompt: duas instruções podem se contradizer, e a mitigação é
+moldura — o preâmbulo entra num bloco nomeado com a precedência dita em voz
+alta.
+
+**"Por time, mas a arquitetura pode querer algum nível de governança geral"** —
+e isso cai em mecânica que o produto já tem: `__global__` é o `timeId` que os
+campos do nó, o template e o PDCA já usam. A pergunta que sobrou é pequena:
+governança é **piso** (padrão que o time troca) ou **teto** (o que o time não
+remove)? As duas convivem.
+
+**"É endpoint do gateway, eu já expliquei"** — a pergunta estava mal feita, e
+a resposta é uma terceira saída que eu não tinha listado: o campo de topo não
+vira destino normal nem sobrevive como caso especial; ele **passa a ser o que
+já parecia** — o endereço do gateway, com autenticação compartilhada e as
+operações sendo endpoints dentro dele. Resolve de uma vez a ambiguidade do
+campo sem operação, a duplicação de auth por destino, e o alvo do "Testar
+conexão".
+
+### A frase que reclassificou o artefato
+
+> *"a idéia é que os devs peguem os itens do jira depois e usem para programar
+> com o claude"*
+
+A SPEC-98 §1 já tinha citado *"quando agentes escrevem o código, a spec é a
+coisa de maior alavancagem que um humano pode produzir"* — e o produto
+acreditou nela construindo a spec **para ser lida**. A conclusão ficou pela
+metade: o último leitor não é humano.
+
+Medido contra o que um agente de código precisa, na ordem em que precisa: **as
+três primeiras linhas são as mais importantes e duas estão ausentes.** Falta a
+seção de decisões (pedido explícito do usuário) e falta onde mexer; "como saber
+que terminou" é ponteiro para outro artefato.
+
+E a assimetria que o §410 deixou: as decisões entram na spec **só pelo lado
+negativo** — a alternativa descartada vira `recusas`, a escolhida não entra em
+lugar nenhum. Para um humano quase se sustenta (quem lê "síncrono ficou fora"
+infere fila). Para um agente é exatamente o que falta: ele precisa saber qual
+padrão usar, não qual evitar.
+
+Sete problemas concretos de engenharia de prompt em **SPEC-119**, incluindo o
+mais caro: `O que foi medido` é diagnóstico, e um agente de código lê lista de
+problemas e tenta resolvê-los — é o que ele foi treinado para fazer.
+
+### E o upload, com as restrições do outro lado
+
+Quatro observações sobre MCP lento e limitado. **Duas já estão construídas** —
+a dependência entre as chamadas (SPEC-114) e a animação com contagem real
+(§409) — e dizer isso primeiro evita respecificar o que existe.
+
+**As outras duas são trabalho.** A SPEC-98 §4 previu os lotes e a fatia D dela
+nunca foi construída: hoje vai **tudo numa chamada só**, e uma demanda com
+trinta itens manda trinta specs num POST. O usuário respondeu o tamanho (5),
+numa unidade que é proxy — cinco specs grandes e cinco pequenas diferem por
+uma ordem de grandeza, então o teto por contagem precisa de um teto por
+tamanho ao lado.
+
+O terreno está preparado por acidente com método: o §409 persistiu o estado
+**por item**, e um lote é só quantos vão por chamada — o acompanhamento e o
+resultado parcial não mudam.
+
+E o anexo: o produto manda markdown e **nunca verificou** que um MCP consegue
+anexar. Presumir que funciona é exatamente como as três rodadas anteriores
+descobriram que o botão não anexava nada.
+
+Registrado em **SPEC-119** e **SPEC-120**.
