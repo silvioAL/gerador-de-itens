@@ -16453,3 +16453,76 @@ alteração, e o E2E do §409 continua passando — inclusive o F5 no meio do
 envio. Escrever as três seções à mão continua valendo: é o caminho de quem já
 sabe a resposta, e é ele que o E2E exercita, porque não depende de modelo
 nenhum estar de pé.
+
+---
+## §411 — As três coisas que o usuário não achou, e ele estava certo nas três
+
+Olhando a tela com o assistente aberto:
+
+> *"quanto a poder selecionar os componentes, pegar o script de mapeamento com
+> o assistente e iterar em uma janela maior com ele para tomar decisões sobre o
+> componente não achei nada"*
+
+Medido, uma por uma:
+
+**1. O script de mapeamento não existia.** A única ocorrência de "script de
+mapeamento" no código era um comentário que eu mesmo escrevi no §410,
+descrevendo o que o contexto colado *é*. O produto nunca produziu esse script.
+
+**2. A janela do assistente é 420 px FIXOS.** E era exatamente isto que a
+SPEC-115 §3 chamava de *"o painel expansível do assistente"* — a peça que a
+fatia F declarava como pré-requisito. O §410 afirmou que ela existia porque o
+PAINEL existe. Expansível é que não era: eu confirmei metade da frase e dei a
+outra metade por confirmada.
+
+**3. A conversa estava no lugar errado.** O §410 entregou a fatia F como uma
+caixa na tela do DOCUMENTO, no nível da demanda — e a §1.1.1 corrige
+explicitamente contra isso: *"faz mais sentido dentro do painel do componente,
+não como uma conversa solta no nível da demanda"*. Eu li aquele parágrafo,
+citei aquele parágrafo, e construí o que ele recusa.
+
+### O que entrou
+
+**O ciclo dos três passos**, e o do meio é da pessoa:
+
+```
+1. o agente escreve o comando   → ele sabe O QUE perguntar, dado o tipo do nó
+2. a pessoa roda onde tem acesso → só ela tem credencial, rede e permissão
+3. ela cola a saída de volta      → e a conversa passa a ser sobre fatos
+```
+
+O passo 2 não é limitação a remover depois: é a fronteira da SPEC-75,
+reafirmada na SPEC-115 §2. Um produto que executa script no ambiente de quem o
+usa precisa de credencial, de rede e de uma superfície de ataque que ele não
+tem motivo para ter. O prompt exige **somente leitura**, proíbe inventar
+endereço (placeholder óbvio, com o significado dito) e aceita *"não há o que
+levantar ainda"* como resposta para componente novo — há teste para os quatro.
+
+**A janela expande** por modo, não por padrão: 420 px continua bom para
+perguntar uma coisa e aplicar a resposta. Expandida vai a
+`min(980px, calc(100vw - 460px))` — e o `- 460px` é a decisão, não o arredondamento:
+**ela nunca cobre o desenho**. Decidir sobre um componente que saiu da tela é o
+defeito que uma janela em tela cheia introduziria. Há teste que falha se
+alguém tirar essa reserva.
+
+**A entrada mora no painel do componente**, ao lado das decisões que ela
+produz, e são dois botões porque são duas fontes: o "🤖 pedir ao agente" lê o
+que o MOTOR mediu (desenho, fora do padrão, lacunas); o "🔎 mapear o que já
+existe" abre a conversa sobre o que o motor **não tem como medir** — o projeto
+que já roda do outro lado. Somá-los num só faria a pessoa não saber qual
+informação alimentou a proposta.
+
+### Uma correção minha, no meio da rodada
+
+A primeira escrita do pedido devolvia **texto cru**, argumentando que
+"estruturar obrigaria a remontar na tela, e remontagem é onde uma aspa some".
+O typecheck derrubou: `PedidoIa` exige esquema e todo executor passa por
+`completarEstruturado`. E o argumento era falso — uma string dentro de JSON
+atravessa byte a byte. Ficou um esquema de dois campos (`script` e `porque`),
+no mesmo caminho de todas as outras rotas. Inventar uma bifurcação no executor
+para não usar um campo teria custado caro em troca de nada.
+
+**Provas**: 16 testes novos (6 do pedido, 10 da aba), mais 4 da janela
+expansível; typecheck e lint limpos. O `porque` aparece ANTES do comando na
+tela, e há teste de que não existe botão de "rodar" em lugar nenhum — quem lê
+"script" numa ferramenta espera um, e não vai haver.

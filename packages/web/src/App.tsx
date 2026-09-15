@@ -79,6 +79,7 @@ import { ReviewScreen } from "./review/ReviewScreen";
 import { ContextoEpicoPanel } from "./review/ContextoEpicoPanel";
 import { ConversaPanel } from "./conversa/ConversaPanel";
 import { AssistenteFlutuante, type AbaAssistente } from "./assistente/AssistenteFlutuante";
+import { ConversaDoComponente } from "./conversa/ConversaDoComponente";
 import { EnsaiosScreen } from "./ensaios/EnsaiosScreen";
 import { idDaRegraDeForma } from "./config/FormaDoDesenho";
 import { ConfigurarPanel } from "./assistente/ConfigurarPanel";
@@ -1987,6 +1988,11 @@ function AppCarregado({
             decisoes={decisoesVisiveis}
             autor={sessao.email}
             onPedirDecisoesAoAgente={pedirDecisoesAoAgente}
+            /* SPEC-115 §1.1.1 (§411) — a entrada mora no painel do componente,
+               ao lado das decisões que ela produz; a conversa acontece na
+               janela do assistente, que expande. O nó já está selecionado (é
+               este painel que o mostra), então a aba abre sobre ele. */
+            onMapearComponente={() => setAbaAssistente("componente")}
             ehDeDemonstracao={demonstracaoDoTour ? ehDecisaoDeDemonstracao : undefined}
             onRegistrarDecisao={(d) => setQuebra((q) => ({ ...q, decisoes: [...(q.decisoes ?? []), d] }))}
             onAceitarDecisao={(id) =>
@@ -2551,6 +2557,44 @@ function AppCarregado({
               })
             }
             onFechar={() => setAbaAssistente(null)}
+          />
+        )}
+
+        {/**
+         * SPEC-115 fatia F (§411) — **mapear e decidir sobre UM componente.**
+         *
+         * Relato do usuário: *"poder selecionar os componentes, pegar o script
+         * de mapeamento com o assistente e iterar em uma janela maior com ele
+         * para tomar decisões sobre o componente não achei nada"*. As três
+         * coisas faltavam — e a rodada anterior tinha entregue esta fatia no
+         * nível da DEMANDA, que é justamente o que a §1.1.1 corrige contra.
+         *
+         * O componente vem da seleção da mesa: é o mesmo `noSelecionado` que o
+         * painel de propriedades usa. Uma segunda noção de "componente em foco"
+         * divergiria da seleção visível, e a pessoa decidiria sobre um nó
+         * diferente do que está destacado no desenho.
+         */}
+        {abaAssistente === "componente" && (
+          <ConversaDoComponente
+            componente={
+              noSelecionado
+                ? {
+                    id: noSelecionado.id,
+                    rotulo: noSelecionado.label,
+                    tipo: diagramaConfig.nodeTypes[noSelecionado.type]?.label ?? noSelecionado.type,
+                    techs: diagramaConfig.nodeTypes[noSelecionado.type]?.techs,
+                    // Só o que está preenchido: mandar a ficha inteira gastaria
+                    // token descrevendo vazio (a mesma régua do pedido de
+                    // decisões).
+                    campos:
+                      Object.entries(noSelecionado.spec)
+                        .filter(([, v]) => v.valor !== undefined && v.valor !== "")
+                        .map(([k, v]) => `${k}=${String(v.valor)}`)
+                        .join(", ") || undefined,
+                  }
+                : null
+            }
+            onDecidir={pedirDecisoesAoAgente}
           />
         )}
 

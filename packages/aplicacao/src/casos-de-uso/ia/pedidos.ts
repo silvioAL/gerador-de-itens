@@ -850,6 +850,105 @@ export function montarPedidoConfigurarConversa({
 
 const MAX_DECISOES = 4;
 
+export interface EntradaScriptDeMapeamento {
+  /** O componente sobre o qual se quer saber o que já existe. */
+  rotulo: string;
+  /** O tipo configurado ("Serviço", "Tabela SQL", "Fila Rabbit"…) — é ele que
+   * decide a FORMA do script: um serviço se mapeia por rota, uma tabela por
+   * schema, uma fila por binding. */
+  tipo: string;
+  /** As techs declaradas no nó, quando houver ("Java + Spring Boot"). */
+  techs?: string[];
+  /** O que já está preenchido na ficha dele — evita pedir o que já se sabe. */
+  campos?: string;
+}
+
+/**
+ * SPEC-115 §1.1.1 (§411) — **o assistente entrega o SCRIPT; quem roda é a
+ * pessoa.**
+ *
+ * Relato do usuário: *"pegar o script de mapeamento com o assistente e iterar
+ * em uma janela maior com ele para tomar decisões sobre o componente não achei
+ * nada"*. Não achou porque não existia: a única menção a "script de mapeamento"
+ * no código era um comentário descrevendo o que o texto colado É — o produto
+ * nunca o produziu.
+ *
+ * ## A fronteira, e ela não se move
+ *
+ * A SPEC-75 decidiu e a SPEC-115 §2 reafirma: **nenhuma execução automática.**
+ * O produto não roda script no ambiente de ninguém — não tem credencial, não
+ * tem rede, e não deveria querer ter. O que ele pode fazer é a parte difícil
+ * que sobra: saber O QUE perguntar ao sistema existente, dado o tipo do
+ * componente.
+ *
+ * O ciclo fica: o agente escreve o comando → a pessoa roda onde tem acesso → ela
+ * cola a saída de volta. Três passos, e o do meio é dela porque é o único que
+ * toca o ambiente real.
+ *
+ * ## O esquema tem UM campo, e isso é deliberado
+ *
+ * A primeira escrita devolveu texto cru, argumentando que "remontar na tela é
+ * onde uma aspa some". **O argumento era falso**: `PedidoIa` exige esquema,
+ * toda rota de IA passa por `completarEstruturado`, e uma string dentro de JSON
+ * atravessa byte a byte. Inventar um segundo caminho no executor para não usar
+ * um campo teria custado uma bifurcação em troca de nada.
+ *
+ * Então: um campo, `script`, e a tela o renderiza verbatim num `<pre>`. O
+ * `porque` vem junto porque quem vai rodar um comando merece saber o que ele
+ * responde antes de colar no terminal.
+ */
+export function montarPedidoScriptDeMapeamento(entrada: EntradaScriptDeMapeamento): PedidoIa {
+  const { rotulo, tipo, techs = [], campos } = entrada;
+
+  if (!rotulo.trim() || !tipo.trim()) {
+    throw new PedidoInvalido("sem componente selecionado — o script depende do tipo dele para ter alguma forma");
+  }
+
+  const prompt = [
+    `Você ajuda alguém a MAPEAR o que já existe de um componente, antes de decidir mudanças nele.`,
+    ``,
+    `O componente:`,
+    `- Nome: ${rotulo.trim()}`,
+    `- Tipo: ${tipo.trim()}`,
+    ...(techs.length > 0 ? [`- Tecnologias declaradas: ${techs.join(", ")}`] : []),
+    ...(campos ? [`- Já se sabe: ${campos}`] : []),
+    ``,
+    `Escreva, em "script", os COMANDOS que a pessoa deve rodar no ambiente dela para levantar o que`,
+    `existe hoje sobre este componente. Ela vai copiar, rodar e colar a saída de volta aqui.`,
+    `Em "porque", uma frase sobre o que a saída vai permitir decidir.`,
+    ``,
+    `Regras:`,
+    // Quem lê está prestes a colar isto num terminal que ele tem acesso. Uma
+    // linha destrutiva no meio de um bloco de leitura é o pior desfecho possível.
+    `- SOMENTE leitura. Nada que escreva, apague, reinicie ou altere configuração.`,
+    `- Comandos completos e copiáveis, num bloco de código, com um comentário curto por comando`,
+    `  dizendo o que ele responde.`,
+    `- Use placeholders ÓBVIOS para o que você não tem como saber (<host>, <banco>, <namespace>),`,
+    `  e diga o que cada um significa. Não invente endereço, porta nem nome de recurso.`,
+    `- Adeque ao TIPO: serviço se mapeia pelas rotas e dependências; tabela, pelo schema e volume;`,
+    `  fila, pelos bindings e consumidores; tela, pelas chamadas que ela faz.`,
+    `- Se o componente for NOVO e não houver o que mapear, diga isso em uma frase e não invente`,
+    `  comando — "não há o que levantar ainda" é resposta correta.`,
+    `- Prefira poucos comandos que respondam muito. A saída vai ser colada por alguém.`,
+    `- Responda em português, sem preâmbulo.`,
+  ].join("\n");
+
+  const esquema = {
+    type: "object",
+    properties: {
+      // Um campo, e a tela o mostra verbatim. Ver o cabeçalho sobre por que
+      // isto não é "texto cru embrulhado".
+      script: { type: "string" },
+      /** O que a saída vai permitir decidir. Sem isto o script é um comando sem
+       * propósito declarado, e ninguém sabe se vale a pena rodar. */
+      porque: { type: "string" },
+    },
+    required: ["script", "porque"],
+  } as EsquemaJson;
+
+  return { prompt, esquema };
+}
+
 export interface EntradaDecisoes {
   contextoEpico?: string;
   contextoDoProduto?: string;

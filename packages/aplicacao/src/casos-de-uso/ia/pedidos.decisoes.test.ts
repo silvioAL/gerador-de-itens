@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { montarPedidoDecisoes, PedidoInvalido } from "./pedidos.js";
+import { montarPedidoDecisoes, montarPedidoScriptDeMapeamento, PedidoInvalido } from "./pedidos.js";
 
 /**
  * SPEC-57 fatia C — o agente propõe DECISÕES a partir do desenho medido.
@@ -146,6 +146,71 @@ describe("montarPedidoDecisoes", () => {
 
       const item = (pedido.esquema as any).properties.decisoes.items;
       expect(item.properties.noId.enum).toEqual(["n1", "n2"]);
+    });
+  });
+
+  /**
+   * SPEC-115 §1.1.1 (§411) — **o agente escreve o comando; quem roda é a
+   * pessoa.**
+   *
+   * Relato do usuário: *"pegar o script de mapeamento com o assistente… não
+   * achei nada"*. Não achou porque não existia — a única menção no código era
+   * um comentário descrevendo o que o texto colado É.
+   */
+  describe("montarPedidoScriptDeMapeamento", () => {
+    it("SOMENTE leitura, e isso é a primeira regra do prompt", () => {
+      /**
+       * A garantia que mais importa nesta peça. Quem lê está prestes a colar o
+       * resultado num terminal onde tem acesso — uma linha destrutiva no meio de
+       * um bloco de levantamento é o pior desfecho possível desta tela.
+       */
+      const pedido = montarPedidoScriptDeMapeamento({ rotulo: "srv-credito-api", tipo: "Serviço" });
+
+      expect(pedido.prompt).toContain("SOMENTE leitura");
+      expect(pedido.prompt).toMatch(/Nada que escreva, apague, reinicie/);
+    });
+
+    it("o TIPO dita a forma do script — serviço não se mapeia como tabela", () => {
+      const pedido = montarPedidoScriptDeMapeamento({
+        rotulo: "solicitacoes_credito",
+        tipo: "Tabela SQL",
+        techs: ["PostgreSQL"],
+      });
+
+      expect(pedido.prompt).toContain("Tipo: Tabela SQL");
+      expect(pedido.prompt).toContain("PostgreSQL");
+      expect(pedido.prompt).toContain("Adeque ao TIPO");
+    });
+
+    it("proíbe inventar endereço — placeholder óbvio, e dito o que significa", () => {
+      // Um host inventado que PARECE plausível é o pior tipo de erro aqui: a
+      // pessoa roda contra o lugar errado sem desconfiar.
+      const pedido = montarPedidoScriptDeMapeamento({ rotulo: "x", tipo: "Serviço" });
+
+      expect(pedido.prompt).toContain("Não invente endereço");
+      expect(pedido.prompt).toContain("<host>");
+    });
+
+    it("componente NOVO pode não ter o que mapear, e isso está dito", () => {
+      // "Parte pode ser nova e parte existente" — inventar comando para o que
+      // ainda não existe faria a pessoa rodar contra o vazio e desconfiar dela.
+      const pedido = montarPedidoScriptDeMapeamento({ rotulo: "x", tipo: "Serviço" });
+
+      expect(pedido.prompt).toContain("não há o que levantar ainda");
+    });
+
+    it("sem componente, recusa em vez de gerar script genérico", () => {
+      expect(() => montarPedidoScriptDeMapeamento({ rotulo: "  ", tipo: "Serviço" })).toThrow(PedidoInvalido);
+      expect(() => montarPedidoScriptDeMapeamento({ rotulo: "x", tipo: "" })).toThrow(PedidoInvalido);
+    });
+
+    it("o esquema pede o script E o porquê dele", () => {
+      // Quem vai rodar um comando merece saber o que ele responde ANTES de
+      // colar no terminal.
+      const pedido = montarPedidoScriptDeMapeamento({ rotulo: "x", tipo: "Serviço" });
+
+      const esquema = pedido.esquema as any;
+      expect(esquema.required).toEqual(["script", "porque"]);
     });
   });
 

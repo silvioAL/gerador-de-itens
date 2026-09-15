@@ -40,6 +40,9 @@ export interface PropertiesPanelProps {
    * é a tela do documento, que precisa dizer o que aconteceu sem ter as
    * decisões na mão. */
   onPedirDecisoesAoAgente?: () => Promise<number | void>;
+  /** SPEC-115 §1.1.1 (§411) — abre a conversa de mapeamento DESTE componente na
+   * janela do assistente, que é onde há espaço para iterar. */
+  onMapearComponente?: () => void;
   /** §253 — identifica decisão de DEMONSTRAÇÃO, que não oferece aceite. */
   ehDeDemonstracao?: (id: string) => boolean;
 }
@@ -58,6 +61,7 @@ export function PropertiesPanel({
   onAceitarDecisao,
   onSubstituirDecisao,
   onPedirDecisoesAoAgente,
+  onMapearComponente,
   ehDeDemonstracao,
 }: PropertiesPanelProps) {
   if (!no) {
@@ -163,6 +167,7 @@ export function PropertiesPanel({
             onAceitar={onAceitarDecisao}
             onSubstituir={onSubstituirDecisao}
             onPedirAoAgente={onPedirDecisoesAoAgente}
+            onMapearComponente={onMapearComponente}
             ehDeDemonstracao={ehDeDemonstracao}
           />
         </>

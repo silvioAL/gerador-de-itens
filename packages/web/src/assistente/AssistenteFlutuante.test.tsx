@@ -221,3 +221,71 @@ describe("AssistenteFlutuante — as abas não podem ser cortadas (§308)", () =
     expect(screen.getByRole("button", { name: /Configurar/ })).toBeInTheDocument();
   });
 });
+
+/**
+ * SPEC-115 fatia F (§411) — **a janela expande.**
+ *
+ * Relato do usuário, olhando a tela: *"iterar em uma janela maior com ele para
+ * tomar decisões sobre o componente não achei nada"*. A medição deu razão a
+ * ele: a janela era 420 px FIXOS, e era literalmente isto que a SPEC-115 §3
+ * chamava de "o painel expansível do assistente" — a peça que a fatia F
+ * declarava como pré-requisito. A rodada anterior afirmou que ela existia
+ * porque o PAINEL existe; expansível é que não era.
+ */
+describe("AssistenteFlutuante — a janela expande (SPEC-115 fatia F)", () => {
+  it("começa no tamanho de sempre — 420px serve para perguntar uma coisa", () => {
+    // Trocar o padrão puniria o caso simples para atender o complexo.
+    render(
+      <AssistenteFlutuante aba="componente" onMudarAba={vi.fn()}>
+        <div>conteúdo</div>
+      </AssistenteFlutuante>
+    );
+
+    const janela = screen.getByTestId("assistente-janela");
+    expect(janela.dataset.expandida).toBe("false");
+    expect(janela.style.width).toBe("420px");
+  });
+
+  it("expandir cresce a janela, e encolher volta", () => {
+    render(
+      <AssistenteFlutuante aba="componente" onMudarAba={vi.fn()}>
+        <div>conteúdo</div>
+      </AssistenteFlutuante>
+    );
+
+    fireEvent.click(screen.getByTestId("expandir-assistente"));
+    const janela = screen.getByTestId("assistente-janela");
+    expect(janela.dataset.expandida).toBe("true");
+    expect(janela.style.width).not.toBe("420px");
+
+    fireEvent.click(screen.getByTestId("expandir-assistente"));
+    expect(screen.getByTestId("assistente-janela").dataset.expandida).toBe("false");
+  });
+
+  it("expandida NÃO cobre o desenho — a conversa é sobre um componente que precisa estar à vista", () => {
+    /**
+     * A trava do desenho desta peça. Uma janela em tela cheia faria a pessoa
+     * decidir sobre um componente que saiu da tela, e o `calc(100vw - 460px)` é
+     * o que reserva a faixa da esquerda para o canvas continuar visível.
+     */
+    render(
+      <AssistenteFlutuante aba="componente" onMudarAba={vi.fn()}>
+        <div>conteúdo</div>
+      </AssistenteFlutuante>
+    );
+
+    fireEvent.click(screen.getByTestId("expandir-assistente"));
+
+    expect(screen.getByTestId("assistente-janela").style.width).toContain("100vw - 460px");
+  });
+
+  it("a aba de mapear componente existe — entrada nova é aba nova", () => {
+    render(
+      <AssistenteFlutuante aba="conversa" onMudarAba={vi.fn()}>
+        <div>conteúdo</div>
+      </AssistenteFlutuante>
+    );
+
+    expect(screen.getByRole("button", { name: /Mapear componente/ })).toBeInTheDocument();
+  });
+});

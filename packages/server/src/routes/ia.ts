@@ -18,6 +18,7 @@ import {
   montarPedidoDecisoes,
   montarPedidoNecessidades,
   montarPedidoPipeline,
+  montarPedidoScriptDeMapeamento,
   montarPedidoSugerirConfig,
   normalizarExportador,
   destinosDaOperacao,
@@ -598,6 +599,23 @@ export async function registrarRotasIa(app: FastifyInstance, { db }: OpcoesApp) 
     const pedido = comPedido(() => montarPedidoDecisoes((req.body ?? {}) as never), reply);
     if (!pedido) return reply;
     return executarPedido(reply, pedido, "ia/decisoes");
+  });
+
+  /**
+   * SPEC-115 §1.1.1 (§411) — **o script de mapeamento do componente.**
+   *
+   * O agente escreve os comandos de LEITURA; quem roda é a pessoa, onde ela tem
+   * acesso. O produto não executa nada — é a fronteira da SPEC-75, reafirmada
+   * na SPEC-115 §2, e ela não se move por conveniência.
+   *
+   * Sem RBAC pela mesma razão das vizinhas: receber um comando para copiar é
+   * leitura. O que o comando faz no ambiente da pessoa é responsabilidade dela,
+   * e o prompt é explícito em só pedir leitura.
+   */
+  app.post("/ia/script-de-mapeamento", async (req, reply) => {
+    const pedido = comPedido(() => montarPedidoScriptDeMapeamento((req.body ?? {}) as never), reply);
+    if (!pedido) return reply;
+    return executarPedido(reply, pedido, "ia/script-de-mapeamento");
   });
 
   /**

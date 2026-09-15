@@ -845,6 +845,50 @@ export const apiIa = {
     }
     return resposta.json();
   },
+  /**
+   * SPEC-115 §1.1.1 (§411) — **o script de mapeamento do componente.**
+   *
+   * O que volta é um comando para a PESSOA copiar e rodar onde ela tem acesso —
+   * o produto **não executa** nada disto. É a fronteira da SPEC-75, reafirmada
+   * na SPEC-115 §2.
+   *
+   * Mesmo caminho estruturado das outras rotas de IA, com um campo só: a tela
+   * renderiza `script` verbatim, e uma string dentro de JSON atravessa byte a
+   * byte. Um segundo caminho no executor custaria uma bifurcação em troca de
+   * nada.
+   */
+  scriptDeMapeamento: async (pedido: PedidoScriptDeMapeamento): Promise<ScriptDeMapeamento> => {
+    const resposta = await fetch(`${BASE_URL}/ia/script-de-mapeamento`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(pedido),
+    });
+    if (!resposta.ok) {
+      const corpo = await resposta.json().catch(() => ({}));
+      throw new Error(
+        typeof corpo.erro === "string"
+          ? corpo.erro
+          : `Não foi possível montar o script (HTTP ${resposta.status}, sem detalhe do servidor).`
+      );
+    }
+    // Streaming, como toda rota de IA — ler `.text()` direto perde o tratamento
+    // de reinício e produz JSON que nunca casa (§231).
+    let acumulado = "";
+    const leitor = resposta.body?.getReader();
+    if (leitor) {
+      const decodificador = new TextDecoder();
+      for (;;) {
+        const { done, value } = await leitor.read();
+        if (done) break;
+        acumulado = soDepoisDoUltimoReinicio(acumulado + decodificador.decode(value, { stream: true }));
+      }
+      acumulado = soDepoisDoUltimoReinicio(acumulado + decodificador.decode());
+    } else {
+      acumulado = await resposta.text();
+    }
+    return interpretarRespostaEstruturada<ScriptDeMapeamento>(acumulado, "o script");
+  },
   proporDiagrama: async (
     pedido: PedidoDiagramaIa,
     onTexto?: (acumulado: string) => void
@@ -1432,6 +1476,23 @@ export interface PedidoCenariosDeLentidaoIa {
 /** O que ele devolve: ajustes, nunca tempos. Quem calcula é o engine. */
 export interface CenariosPropostos {
   cenarios: { nome: string; porque?: string; ajustes: { id: string; fator: number }[] }[];
+}
+
+/** SPEC-115 §1.1.1 (§411) — o que o agente precisa saber para escrever um
+ *  script que faça sentido para ESTE componente. */
+export interface PedidoScriptDeMapeamento {
+  rotulo: string;
+  tipo: string;
+  techs?: string[];
+  campos?: string;
+}
+
+export interface ScriptDeMapeamento {
+  /** Os comandos, para copiar e rodar. Renderizado verbatim. */
+  script: string;
+  /** O que a saída vai permitir decidir — quem vai rodar um comando merece
+   * saber o que ele responde antes de colar num terminal. */
+  porque: string;
 }
 
 export interface PedidoDecisoesIa {

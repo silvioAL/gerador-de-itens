@@ -179,6 +179,8 @@ export {
   montarPedidoDecisoes,
   montarPedidoNecessidades,
   montarPedidoPipeline,
+  /** SPEC-115 §1.1.1 — o agente escreve o comando; quem roda é a pessoa. */
+  montarPedidoScriptDeMapeamento,
   montarPedidoSugerirConfig,
   preambuloDoPapel,
   PedidoInvalido,
@@ -188,6 +190,7 @@ export {
   type EntradaDecisoes,
   type EntradaNecessidades,
   type EntradaPipeline,
+  type EntradaScriptDeMapeamento,
   type EntradaSugerirConfig,
   type ItemDoLote,
   type MensagemConfigurar,
