@@ -29,7 +29,9 @@ export interface DecisoesDoNoProps {
   onSubstituir: (idAntiga: string, nova: Decisao) => void;
   /** SPEC-57 M4 — pedir ao agente que proponha, lendo o desenho MEDIDO.
    * Ausente = o botão não aparece (sem credencial de IA, por exemplo). */
-  onPedirAoAgente?: () => Promise<void>;
+  /** SPEC-115 (§410) — o número de propostas volta para quem não tem as
+   * decisões na tela. Aqui elas aparecem logo abaixo, então ele é ignorado. */
+  onPedirAoAgente?: () => Promise<number | void>;
   /** §253 — esta decisão é de DEMONSTRAÇÃO (do tour). Recebe a marca do §235 e
    * não oferece aceite: o aceite grava na quebra, e ela não vive lá — o botão
    * existiria só para não fazer nada. */

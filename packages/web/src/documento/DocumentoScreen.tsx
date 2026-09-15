@@ -10,6 +10,7 @@ import type {
   DocumentoEscrito,
   IndicadorDeSaude,
   ItemDoDocumento,
+  SecaoDeJulgamento,
   SpecEscrita,
   StatusDocumento,
 } from "@gerador/engine";
@@ -133,6 +134,31 @@ export interface DocumentoScreenProps {
   specEscrita?: SpecEscrita;
   onMudarSpecEscrita?: (spec: SpecEscrita) => void;
   /**
+   * SPEC-115 fatia F (§410) — **a conversa que produz a decisão de onde a spec
+   * deriva.**
+   *
+   * Recebe o contexto do projeto colado e o componente sobre o qual a conversa
+   * é (§1.1.1), e devolve QUANTAS propostas chegaram — a tela não precisa das
+   * decisões em si, elas vão para a mesa como proposta e são aceitas lá, onde a
+   * pessoa as vê ao lado do desenho.
+   *
+   * Ausente = a caixa da conversa não aparece, e as seções continuam
+   * editáveis à mão. É a mesma disciplina da SPEC-49: não oferecer botão que
+   * falharia.
+   */
+  onConversarSobreASpec?: (pedido: { contextoDoProjeto: string; foco?: string }) => Promise<number>;
+  /**
+   * SPEC-115 (§410) — **o que o motor JÁ consegue derivar, calculado por quem
+   * monta a spec.**
+   *
+   * Vem de fora em vez de ser recalculado aqui de propósito: quem chama é o
+   * mesmo que monta o markdown que vai subir, com o mesmo material. Duas
+   * leituras da mesma pergunta divergem na primeira mudança (§263) — e esta
+   * divergência seria cruel, porque a tela diria "pode subir" e o envio
+   * recusaria por lacuna, sem ninguém entender por quê.
+   */
+  julgamentoDerivado?: Partial<Record<SecaoDeJulgamento, string>>;
+  /**
    * SPEC-69 §4.4 — os ensaios ASSUMIDOS, ao lado da seção de riscos.
    *
    * O texto de riscos é de quem escreveu (SPEC-58 regra 3: sobrevive à
@@ -232,6 +258,8 @@ export function DocumentoScreen({
   onAnexarSpec,
   specEscrita,
   onMudarSpecEscrita,
+  onConversarSobreASpec,
+  julgamentoDerivado,
   ensaios,
   decisaoDoEnsaio,
 }: DocumentoScreenProps) {
@@ -475,6 +503,9 @@ export function DocumentoScreen({
           onAnexarSpec={onAnexarSpec}
           specEscrita={specEscrita}
           onMudarSpecEscrita={onMudarSpecEscrita}
+          onConversarSobreASpec={onConversarSobreASpec}
+          julgamentoDerivado={julgamentoDerivado ?? {}}
+          componentes={documento.diagrama.nodes.map((n) => ({ id: n.id, rotulo: n.label }))}
         />
       </article>
     </div>
@@ -960,6 +991,9 @@ function SecaoDosItens({
   onAnexarSpec,
   specEscrita,
   onMudarSpecEscrita,
+  onConversarSobreASpec,
+  julgamentoDerivado,
+  componentes,
 }: {
   derivados: ItemDoDocumento[];
   escritos: ItemGerado[];
@@ -969,6 +1003,9 @@ function SecaoDosItens({
   onAnexarSpec?: () => Promise<EnvioDeSpecIniciado>;
   specEscrita?: SpecEscrita;
   onMudarSpecEscrita?: (spec: SpecEscrita) => void;
+  onConversarSobreASpec?: (pedido: { contextoDoProjeto: string; foco?: string }) => Promise<number>;
+  julgamentoDerivado: Partial<Record<SecaoDeJulgamento, string>>;
+  componentes: { id: string; rotulo: string }[];
 }) {
   const [exportando, setExportando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoDaExportacao | null>(null);
@@ -1136,6 +1173,9 @@ function SecaoDosItens({
                   escrita={specEscrita ?? {}}
                   onMudar={onMudarSpecEscrita}
                   quantosItens={pendentesDeSpec}
+                  derivado={julgamentoDerivado}
+                  componentes={componentes}
+                  onConversarComAgente={onConversarSobreASpec}
                 />
               )}
 
@@ -1256,58 +1296,236 @@ function JulgamentoDaSpec({
   escrita,
   onMudar,
   quantosItens,
+  derivado,
+  componentes,
+  onConversarComAgente,
 }: {
   escrita: SpecEscrita;
   onMudar: (spec: SpecEscrita) => void;
   quantosItens: number;
+  /** O que o motor JÁ consegue derivar do que foi decidido — a fonte da verdade
+   * é a mesma função que monta a spec, para a tela nunca prometer diferente. */
+  derivado: Partial<Record<SecaoDeJulgamento, string>>;
+  componentes: { id: string; rotulo: string }[];
+  onConversarComAgente?: (pedido: { contextoDoProjeto: string; foco?: string }) => Promise<number>;
 }) {
-  const faltando = (["origem", "recusas", "fatias"] as const).filter((c) => !escrita[c]?.trim());
+  const [contextoDoProjeto, setContextoDoProjeto] = useState("");
+  const [foco, setFoco] = useState("");
+  const [conversando, setConversando] = useState(false);
+  const [resposta, setResposta] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+
+  const estado = (secao: SecaoDeJulgamento) =>
+    escrita[secao]?.trim() ? "escrita" : derivado[secao]?.trim() ? "derivada" : "vazia";
+  const vazias = SECOES.filter((s) => estado(s) === "vazia");
+
+  async function conversar() {
+    if (!onConversarComAgente) return;
+    setConversando(true);
+    setErro(null);
+    setResposta(null);
+    try {
+      const quantas = await onConversarComAgente({ contextoDoProjeto, foco: foco || undefined });
+      setResposta(
+        quantas === 0
+          ? "O agente não viu escolha em aberto aqui — lista vazia é resposta legítima. Acrescente contexto do projeto, ou registre a decisão você mesmo na mesa."
+          : `${quantas} ${quantas === 1 ? "decisão proposta" : "decisões propostas"} — elas chegam como PROPOSTA na mesa de projeto, e valem depois que você aceitar.`
+      );
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setConversando(false);
+    }
+  }
 
   return (
     <section data-testid="julgamento-da-spec" style={{ marginTop: 14 }}>
       <p style={{ fontSize: 11.5, color: "var(--texto-mudo)", margin: "0 0 2px" }}>
-        <strong style={{ color: "var(--texto-2)" }}>A spec que vai junto com cada item</strong> — o resto ela deriva do
-        desenho; estas três só você responde.
+        <strong style={{ color: "var(--texto-2)" }}>A spec que vai junto com cada item</strong> — o que ela afirma sai do
+        que foi decidido, não de um formulário.
       </p>
-      {faltando.length > 0 ? (
+
+      {vazias.length > 0 ? (
         // O motivo do que vai acontecer, ANTES de acontecer. Sem esta linha, a
         // pessoa clica, espera, e recebe "ficaram de fora por ter lacuna" sem
         // saber qual lacuna nem onde resolvê-la.
         <p data-testid="spec-sem-julgamento" style={{ fontSize: 12, color: "var(--amarelo)", margin: "0 0 8px", lineHeight: 1.5 }}>
-          {faltando.length === 1 ? "Falta 1 resposta" : `Faltam ${faltando.length} respostas`} abaixo. Enquanto elas
-          estiverem em branco, {quantosItens === 1 ? "o item fica" : `os ${quantosItens} itens ficam`} de fora: spec com
-          lacuna não sobe.
+          {vazias.length === 1 ? "Falta 1 seção" : `Faltam ${vazias.length} seções`} sem nada de onde sair (
+          {vazias.map((s) => ROTULO_DA_SECAO[s]).join(", ")}). Enquanto for assim,{" "}
+          {quantosItens === 1 ? "o item fica" : `os ${quantosItens} itens ficam`} de fora: spec com lacuna não sobe.
         </p>
       ) : (
         <p data-testid="spec-com-julgamento" style={{ fontSize: 12, color: "var(--verde)", margin: "0 0 8px" }}>
-          As três estão respondidas — a spec de cada item pode subir.
+          As três têm de onde sair — a spec de cada item pode subir.
         </p>
       )}
 
-      <SecaoEscrita
-        titulo="Quem pediu, e com que palavras"
-        dica="A frase de quem pediu. É o que permite, meses depois, saber se o que foi construído responde ao que foi pedido."
-        valor={escrita.origem ?? ""}
-        testid="spec-origem"
-        onMudar={(origem) => onMudar({ ...escrita, origem })}
-      />
-      <SecaoEscrita
-        titulo="O que NÃO entra, e por quê"
-        dica="Recusa sem motivo é opinião; com motivo é projeto — e é o que impede a spec de virar lista de desejos."
-        valor={escrita.recusas ?? ""}
-        testid="spec-recusas"
-        onMudar={(recusas) => onMudar({ ...escrita, recusas })}
-      />
-      <SecaoEscrita
-        titulo="O que fica verdade em cada fatia, e como se prova"
-        dica="Fatia sem prova declarada é promessa."
-        valor={escrita.fatias ?? ""}
-        testid="spec-fatias"
-        onMudar={(fatias) => onMudar({ ...escrita, fatias })}
-      />
+      {/**
+       * SPEC-115 fatia F (§410) — **a caixa é a superfície da conversa.**
+       *
+       * Correção do usuário depois da primeira escrita desta tela, que tinha
+       * posto três textareas em branco aqui: *"a caixa tem o objetivo dessa
+       * interação com o agente, onde se coloca input e interage com o agente
+       * para passar contexto de projeto e tomar decisões que depois vão derivar
+       * para as respectivas specs"*.
+       *
+       * A cadeia inteira, e cada elo tem dono:
+       *
+       * ```
+       * contexto do projeto → o agente PROPÕE → a pessoa ACEITA → a spec DERIVA
+       *      (quem conhece)      (modelo)        (julgamento)      (motor)
+       * ```
+       *
+       * **Por que isto não fura a trava da SPEC-80 fatia D:** o modelo não
+       * escreve nenhuma das três seções. Ele propõe `Decisao`, que chega
+       * `status: "proposta"` e não vale nada até alguém aceitar — e só o que foi
+       * aceito deriva (ver `derivarJulgamento.ts`). O julgamento continua sendo
+       * de gente; o que deixou de existir é a exigência de redigitar o que já
+       * foi julgado.
+       *
+       * **Por que o contexto é colado e não buscado:** a fronteira decidida na
+       * SPEC-75 e reafirmada na SPEC-115 §2 — o produto não executa script de
+       * ninguém. Quem conhece o código cola o que importa.
+       */}
+      {onConversarComAgente && (
+        <div
+          data-testid="conversa-da-spec"
+          style={{ border: "1px solid var(--borda)", borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}
+        >
+          <p style={{ fontSize: 11.5, color: "var(--texto-2)", margin: "0 0 6px", lineHeight: 1.5 }}>
+            Converse com o assistente para decidir. Cole o que já existe do projeto — schema, rotas, um trecho do
+            documento dele — ou deixe em branco se o componente é novo. O que sair daqui vira <strong>proposta</strong>{" "}
+            de decisão; aceitar é seu.
+          </p>
+
+          {componentes.length > 0 && (
+            <>
+              <label style={{ display: "block", fontSize: 11, color: "var(--texto-fraco)", margin: "6px 0 2px" }}>
+                Sobre qual componente
+              </label>
+              {/* §1.1.1 — por componente, e não da demanda inteira: oito
+                  componentes na mesma conversa produzem decisão que não ancora
+                  em lugar nenhum. "A demanda inteira" continua sendo opção,
+                  para quem ainda está começando o desenho. */}
+              <select
+                aria-label="Sobre qual componente"
+                value={foco}
+                onChange={(e) => setFoco(e.target.value)}
+                style={campoDaConversaEstilo}
+              >
+                <option value="">a demanda inteira</option>
+                {componentes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.rotulo}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
+
+          <label style={{ display: "block", fontSize: 11, color: "var(--texto-fraco)", margin: "8px 0 2px" }}>
+            O que já existe do projeto (opcional — cole, nada é executado)
+          </label>
+          <textarea
+            aria-label="Contexto do projeto"
+            value={contextoDoProjeto}
+            onChange={(e) => setContextoDoProjeto(e.target.value)}
+            rows={4}
+            placeholder={"ex.: TABLE pedidos (id uuid, status text)\nrotas: POST /pedidos, GET /pedidos/:id\nhoje chama o bureau de forma síncrona"}
+            style={{ ...campoDaConversaEstilo, resize: "vertical", fontFamily: "ui-monospace, monospace" }}
+          />
+
+          <button
+            onClick={() => void conversar()}
+            disabled={conversando}
+            data-testid="conversar-sobre-a-spec"
+            style={{ ...botaoEstilo, marginTop: 8, opacity: conversando ? 0.55 : 1 }}
+          >
+            {conversando ? "conversando…" : "✦ Conversar e decidir"}
+          </button>
+
+          {resposta && (
+            <p data-testid="resposta-da-conversa" style={{ fontSize: 12, color: "var(--texto-2)", margin: "8px 0 0", lineHeight: 1.5 }}>
+              {resposta}
+            </p>
+          )}
+          {erro && (
+            <p data-testid="erro-da-conversa" style={{ fontSize: 12, color: "var(--vermelho)", margin: "8px 0 0" }}>
+              {erro}
+            </p>
+          )}
+        </div>
+      )}
+
+      {SECOES.map((secao) => (
+        <SecaoEscrita
+          key={secao}
+          titulo={ROTULO_DA_SECAO[secao]}
+          dica={DICA_DA_SECAO[secao]}
+          dicaDeComplemento="Complemente com o que o que já foi decidido não cobre."
+          rotuloDeOrigem={estado(secao) === "derivada" ? ORIGEM_DERIVADA[secao] : undefined}
+          derivado={
+            estado(secao) === "derivada" ? (
+              <div
+                data-testid={`spec-${secao}-derivado`}
+                style={{
+                  border: "1px solid var(--borda)",
+                  borderLeft: "3px solid var(--acento)",
+                  borderRadius: 8,
+                  padding: "8px 12px",
+                  margin: "12px 0 0",
+                  background: "var(--painel)",
+                  fontSize: 12.5,
+                  color: "var(--texto-2)",
+                  lineHeight: 1.6,
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {derivado[secao]}
+              </div>
+            ) : undefined
+          }
+          valor={escrita[secao] ?? ""}
+          testid={`spec-${secao}`}
+          onMudar={(texto) => onMudar({ ...escrita, [secao]: texto })}
+        />
+      ))}
     </section>
   );
 }
+
+const SECOES: SecaoDeJulgamento[] = ["origem", "recusas", "fatias"];
+
+const ROTULO_DA_SECAO: Record<SecaoDeJulgamento, string> = {
+  origem: "Quem pediu, e com que palavras",
+  recusas: "O que NÃO entra, e por quê",
+  fatias: "O que fica verdade em cada fatia, e como se prova",
+};
+
+const DICA_DA_SECAO: Record<SecaoDeJulgamento, string> = {
+  origem: "A frase de quem pediu. É o que permite, meses depois, saber se o que foi construído responde ao que foi pedido.",
+  recusas: "Recusa sem motivo é opinião; com motivo é projeto — e é o que impede a spec de virar lista de desejos.",
+  fatias: "Fatia sem prova declarada é promessa.",
+};
+
+/** SPEC-115 fatia C aplicada à spec: o rótulo nomeia a FONTE, e cada seção tem
+ * a sua — dizer "derivado" genérico esconderia de onde aquilo saiu. */
+const ORIGEM_DERIVADA: Record<SecaoDeJulgamento, string> = {
+  origem: "derivado do contexto e dos propósitos da demanda — edite ou complemente",
+  recusas: "derivado das decisões aceitas — edite ou complemente",
+  fatias: "derivado dos itens do desenho — edite ou complemente",
+};
+
+const campoDaConversaEstilo: React.CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  fontSize: 12.5,
+  padding: "6px 8px",
+  borderRadius: 6,
+  border: "1px solid var(--borda-forte)",
+  background: "var(--fundo)",
+  color: "var(--texto)",
+};
 
 /**
  * SPEC-115 fatias E e G — **o acompanhamento do envio, sobre estado persistido.**

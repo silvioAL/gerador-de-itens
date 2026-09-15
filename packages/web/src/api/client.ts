@@ -1442,6 +1442,15 @@ export interface PedidoDecisoesIa {
   violacoes?: { noId: string; campo: string; esperado: string; atual: string; porque?: string }[];
   lacunas?: string[];
   jaDecididas?: string[];
+  /**
+   * SPEC-115 §1.1.1 (§410) — o contexto do PROJETO que já existe, colado por
+   * quem conhece o código. Vem colado, nunca executado: o produto não roda
+   * script de ninguém (SPEC-75, reafirmada na SPEC-115 §2).
+   */
+  contextoDoProjeto?: string;
+  /** SPEC-115 §1.1.1 — o componente sobre o qual a conversa é. Ausente = a
+   * demanda inteira, que é o caso de quem ainda está começando o desenho. */
+  foco?: string;
 }
 
 export interface DecisaoProposta {

@@ -16365,3 +16365,91 @@ respostas faltam, em vez de deixar a pessoa descobrir depois da espera.
 de unidade em 6 workspaces; build, typecheck e lint limpos. O E2E novo prova
 o F5 no meio do envio: recarrega, reabre a demanda, e o pipeline continua
 dizendo "1 anexando" — sem ninguém ter clicado nada naquela aba.
+
+---
+## §410 — A caixa em branco era a confusão: a spec sai do que foi decidido
+
+O §409 achou o defeito certo e o consertou errado. Ele descobriu que as três
+seções de julgamento da spec (`origem`, `recusas`, `fatias`) não tinham mais
+onde ser escritas, e por isso **toda** spec saía com lacuna e nenhuma subia —
+e resolveu isso com três textareas em branco na tela do documento.
+
+Correção do usuário, e ela é dura porque aponta uma contradição interna da
+mesma rodada:
+
+> *"a expectativa é que seja possível gerar essas specs, seja a partir de
+> conversas com assistente sem ou com contexto dos componentes e seus
+> respectivos projetos, já que parte pode ser nova e parte existente"*
+>
+> *"a caixa tem o objetivo dessa interação com o agente, onde se coloca input
+> e interage com o agente para passar contexto de projeto e tomar decisões que
+> depois vão derivar para as respectivas specs"*
+
+Três caixas em branco são exatamente a "caixa em branco" que a SPEC-115 §1.1
+argumenta contra para os trade-offs. O §409 implementou a tese da derivação
+nas seções do documento e, na mesma tela e na mesma rodada, construiu o
+oposto para a spec.
+
+### A medição que mudou a leitura de duas coisas
+
+**1. A trava da SPEC-80 fatia D não proíbe o que o usuário quer.** A mensagem
+de falha dela diz, com todas as letras: *"Se a intenção é pedir um RASCUNHO
+ao modelo, ele não pode chegar como fato: precisa entrar marcado"*. A regra é
+**como chega**, não **se chega** — o mesmo padrão da esteira (sugestão →
+confirmar) e do `leitorDeAdr` (*"importar não é aceitar"*).
+
+**2. O painel expansível do assistente EXISTE.** O §409 adiou a fatia F
+citando a SPEC-115, que diz que ele "ainda não foi desenhado". Tomei a frase
+da spec por medição em vez de medir: o `AssistenteFlutuante` já hospeda duas
+conversas por fase (`ConversaPanel` do desenho, `ConversaEspecificacao` do
+item), e as duas já seguem o padrão certo — a resposta vira cartão e
+*"confirmar é do usuário"*. O que faltava não era o painel.
+
+### A cadeia, com dono em cada elo
+
+```
+contexto do projeto → o agente PROPÕE → a pessoa ACEITA → a spec DERIVA
+     (quem conhece)      (modelo)        (julgamento)      (motor)
+```
+
+O modelo **não escreve uma linha de julgamento**, e a trava segue verde sem
+uma vírgula alterada. Ele propõe `Decisao`, que chega `status: "proposta"` e
+não vale nada até alguém aceitar (SPEC-57 fatia C) — e `derivarJulgamento.ts`
+só lê decisão **aceita**. Há teste que prova isso pela negativa: proposta não
+deriva recusa nenhuma.
+
+Cada seção deriva do que responde a pergunta dela:
+
+| Seção | Fonte | Por quê |
+|---|---|---|
+| `recusas` | as alternativas DESCARTADAS | *"o que NÃO entra, e por quê"* é literalmente a alternativa não escolhida mais a consequência dela |
+| `origem` | contexto da demanda + necessidades confirmadas | as palavras de quem pediu são as que alguém digitou |
+| `fatias` | os itens que a spec cobre | cada item derivado JÁ É uma fatia; a prova não é copiada, porque os critérios viajam no corpo do item no mesmo payload (§323) |
+
+E a ordem dentro de `gerarSpec` é a regra inteira: **texto de gente vence**
+(SPEC-58 regra 3), o derivado entra na ausência dele, e a lacuna continua
+existindo para quando não há de onde derivar. Derivação sem material é
+silêncio, nunca texto plausível — que é o que a SPEC-80 §2 chama de
+"plausível-mas-vazio".
+
+### O que a caixa virou
+
+Contexto do projeto colado (schema, rotas, trecho do documento dele — **nunca
+executado**, a fronteira da SPEC-75 e da SPEC-115 §2), um seletor do
+componente sobre o qual a conversa é (§1.1.1: oito componentes na mesma
+conversa produzem decisão que não ancora), e o botão que chama o agente. O
+que volta é contado e nomeado como proposta; aceitar acontece na mesa, ao
+lado do desenho a que a decisão se ancora.
+
+O prompt de `montarPedidoDecisoes` ganhou as duas coisas, e uma regra que só
+existe quando há material colado: *"o contexto descreve o que JÁ EXISTE. Não
+proponha adotar o que já está adotado, e não presuma que o que não aparece
+ali não existe"*. É o caso que o usuário nomeou — **parte nova, parte
+existente**.
+
+**Provas**: 20 testes novos (9 da derivação no motor, 5 do pedido com
+contexto e foco, 10 da caixa na tela), a trava da SPEC-80 fatia D verde sem
+alteração, e o E2E do §409 continua passando — inclusive o F5 no meio do
+envio. Escrever as três seções à mão continua valendo: é o caminho de quem já
+sabe a resposta, e é ele que o E2E exercita, porque não depende de modelo
+nenhum estar de pé.

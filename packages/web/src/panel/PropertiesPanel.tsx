@@ -35,7 +35,11 @@ export interface PropertiesPanelProps {
   onAceitarDecisao?: (id: string) => void;
   onSubstituirDecisao?: (idAntiga: string, nova: Decisao) => void;
   /** SPEC-57 M4 — pedir ao agente que proponha, lendo o desenho medido. */
-  onPedirDecisoesAoAgente?: () => Promise<void>;
+  /** SPEC-115 (§410) — devolve quantas propostas chegaram. O painel do
+   * componente ignora o número (ele mostra as propostas ali mesmo); quem o usa
+   * é a tela do documento, que precisa dizer o que aconteceu sem ter as
+   * decisões na mão. */
+  onPedirDecisoesAoAgente?: () => Promise<number | void>;
   /** §253 — identifica decisão de DEMONSTRAÇÃO, que não oferece aceite. */
   ehDeDemonstracao?: (id: string) => boolean;
 }

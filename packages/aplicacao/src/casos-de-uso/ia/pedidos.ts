@@ -862,6 +862,36 @@ export interface EntradaDecisoes {
   lacunas?: string[];
   /** O que já foi decidido — para o agente não re-litigar decisão tomada. */
   jaDecididas?: string[];
+  /**
+   * SPEC-115 §1.1.1 (§410) — **o contexto do PROJETO, colado por quem sabe.**
+   *
+   * > *"seja a partir de conversas com assistente sem ou com contexto dos
+   * > componentes e seus respectivos projetos, já que parte pode ser nova e
+   * > parte existente"*
+   *
+   * É a saída de um script de mapeamento, o schema do banco que o componente
+   * usa, as rotas que ele expõe, um trecho do documento do projeto dele. Vem
+   * **colado**, nunca executado: a fronteira decidida na SPEC-75 e reafirmada
+   * na SPEC-115 §2 é que o produto não roda script de ninguém.
+   *
+   * Ausente é o caso normal de componente NOVO — e é por isso que ele é
+   * opcional em vez de obrigatório: metade de um desenho costuma não existir
+   * ainda.
+   */
+  contextoDoProjeto?: string;
+  /**
+   * SPEC-115 §1.1.1 — **a conversa é POR COMPONENTE, não da demanda inteira.**
+   *
+   * Correção registrada na própria SPEC-115: um desenho com 8 componentes
+   * discutidos na MESMA conversa produz decisões cujo contexto se perde — *"por
+   * que escolhemos fila em vez de síncrono"* precisa saber DE QUAL chamada,
+   * entre qual componente e qual, para não virar frase genérica demais para
+   * ancorar em lugar nenhum.
+   *
+   * Ausente = a conversa é da demanda inteira, que continua valendo para quem
+   * está começando o desenho e ainda não tem componente sobre o que falar.
+   */
+  foco?: string;
 }
 
 /**
@@ -886,6 +916,16 @@ export interface EntradaDecisoes {
  * Lista vazia é resposta correta e está dito no prompt: desenho sem escolha
  * real em aberto não deve produzir decisão inventada para preencher a cota.
  */
+/**
+ * §410 — o foco só vale se apontar para um componente que o desenho tem. Um id
+ * inventado faria o prompt dizer "é sobre o componente X" com X que não está na
+ * lista logo acima, e o modelo escolheria sozinho o que fazer com a
+ * contradição.
+ */
+function componenteConhecido(componentes: { id: string }[], id: string): boolean {
+  return componentes.some((c) => c.id === id);
+}
+
 export function montarPedidoDecisoes(entrada: EntradaDecisoes): PedidoIa {
   const {
     contextoEpico,
@@ -894,6 +934,8 @@ export function montarPedidoDecisoes(entrada: EntradaDecisoes): PedidoIa {
     violacoes = [],
     lacunas = [],
     jaDecididas = [],
+    contextoDoProjeto,
+    foco,
   } = entrada;
 
   if (componentes.length === 0) {
@@ -945,8 +987,38 @@ export function montarPedidoDecisoes(entrada: EntradaDecisoes): PedidoIa {
     ...(contextoDoProduto?.trim() ? [`Produto:`, contextoDoProduto.trim(), ``] : []),
     ...(contextoEpico?.trim() ? [`Demanda:`, contextoEpico.trim(), ``] : []),
     `Componentes desenhados (use exclusivamente estes ids em "noId"):`,
-    ...componentes.map((c) => `- ${c.id}: ${c.rotulo} (${c.tipo})${c.campos ? ` — ${c.campos}` : ""}`),
+    ...componentes.map(
+      (c) => `- ${c.id}: ${c.rotulo} (${c.tipo})${c.campos ? ` — ${c.campos}` : ""}${c.id === foco ? "  ← é sobre ESTE" : ""}`
+    ),
     ``,
+    /**
+     * §410 — o recorte, e ele vem ANTES do material colado de propósito: sem
+     * ele, um contexto de projeto grande faz o modelo falar do sistema inteiro.
+     */
+    ...(foco && componenteConhecido(componentes, foco)
+      ? [
+          `A conversa é sobre o componente ${foco}. Proponha decisões DELE (ou de conexões dele),`,
+          `não do desenho em geral — decisão sem saber de qual componente é frase que não ancora.`,
+          ``,
+        ]
+      : []),
+    /**
+     * §410 — **o que já existe do outro lado.** Metade de um desenho costuma
+     * ser código que já roda, e uma decisão sobre componente existente que
+     * ignora o que ele já faz é palpite: propor "adotar Postgres" para quem já
+     * está em Postgres é o modelo descrevendo um blog, não este sistema.
+     *
+     * Entra marcado como material colado por alguém, e não como apuração do
+     * produto: quem colou sabe de onde veio, o produto não.
+     */
+    ...(contextoDoProjeto?.trim()
+      ? [
+          `Contexto do projeto que já existe, colado por quem conhece o código`,
+          `(pode estar incompleto, e pode não cobrir o que ainda vai ser construído):`,
+          contextoDoProjeto.trim(),
+          ``,
+        ]
+      : []),
     // O que o motor JÁ MEDIU. É isto que faz a proposta ser sobre este desenho
     // e não sobre arquitetura em geral.
     ...(violacoes.length > 0
@@ -973,6 +1045,12 @@ export function montarPedidoDecisoes(entrada: EntradaDecisoes): PedidoIa {
     `- "porque" é a razão que ainda vai valer daqui a um ano — o trade-off, não a repetição do título.`,
     `- Prefira decisões que expliquem o que o motor apontou acima: um desenho fora do padrão ou é erro`,
     `  (e vira correção) ou é escolha consciente (e vira decisão com motivo). Diga qual dos dois você acha.`,
+    ...(contextoDoProjeto?.trim()
+      ? [
+          `- O contexto colado descreve o que JÁ EXISTE. Não proponha adotar o que já está adotado,`,
+          `  e não presuma que o que não aparece ali não existe — o material pode estar incompleto.`,
+        ]
+      : []),
     `- Se não houver escolha real em aberto, devolva "decisoes" VAZIA. Lista vazia é resposta correta;`,
     `  decisão inventada para preencher cota faz a pessoa parar de ler todas.`,
     `- No máximo ${MAX_DECISOES}.`,

@@ -1,6 +1,7 @@
 import type { Atividade } from "../model/types.js";
 import type { SpecEscrita } from "../model/types.js";
 import { MARCADOR_ESPECIFICAR } from "../refinamento/gerarRefinamento.js";
+import { derivarSecoesDeJulgamento, type MaterialDeJulgamento } from "./derivarJulgamento.js";
 
 /**
  * SPEC-80 fatias B e D — **a spec de SDD como artefato do motor.**
@@ -189,6 +190,19 @@ export interface OpcoesGerarSpec {
    * motor decide, em vez de cada tela filtrar do seu jeito.
    */
   itens?: Atividade[];
+  /**
+   * SPEC-115 (§410) — **o material já decidido, de onde as seções de julgamento
+   * saem quando ninguém as escreveu à mão.**
+   *
+   * Ausente = comportamento de antes, byte a byte: seção vazia vira lacuna. Quem
+   * não tem decisão aceita nem necessidade confirmada continua vendo a mesma
+   * spec que via.
+   *
+   * O que chega aqui NÃO vem do modelo. Vem de `Decisao` que alguém aceitou, de
+   * `Necessidade` confirmada e dos itens que o desenho produziu — e é essa
+   * procedência que mantém a trava da fatia D de pé com a derivação ligada.
+   */
+  julgamento?: MaterialDeJulgamento;
 }
 
 /**
@@ -199,9 +213,30 @@ export interface OpcoesGerarSpec {
  * documento entrega sem marcador não entra em conta nenhuma, e a pessoa aprova
  * um artefato incompleto sem nada acusar.
  */
-function secaoDeJulgamento(texto: string | undefined, oQuePedir: string): string {
+function secaoDeJulgamento(texto: string | undefined, oQuePedir: string, derivado?: string): string {
   const escrito = texto?.trim();
   if (escrito) return escrito;
+  /**
+   * SPEC-115 (§410) — **o derivado entra ANTES da lacuna, e depois do que uma
+   * pessoa escreveu.**
+   *
+   * A ordem é a regra inteira. Texto de gente vence sempre (SPEC-58 regra 3: o
+   * julgamento de alguém não é sobrescrito por motor nenhum). Na ausência dele,
+   * o que o produto JÁ SABE — porque alguém já decidiu — vale mais que uma
+   * caixa em branco cobrando que a mesma pessoa redigite aquilo.
+   *
+   * E a lacuna continua existindo para o caso que ela nomeia: quando não há de
+   * onde derivar, ninguém decidiu nada, e a spec precisa dizer isso em vez de
+   * inventar.
+   *
+   * **A trava da SPEC-80 fatia D continua valendo, e não por cortesia:** o que
+   * chega aqui como `derivado` saiu de `Decisao` aceita, de necessidade
+   * confirmada e de item derivado do desenho — tudo material que passou por uma
+   * pessoa. O modelo nunca escreve nestas três seções; ele propõe decisões, e
+   * proposta não aceita não deriva nada (ver `derivarJulgamento.ts`).
+   */
+  const doMotor = derivado?.trim();
+  if (doMotor) return doMotor;
   return `_(${oQuePedir})_ ${MARCADOR_ESPECIFICAR}`;
 }
 
@@ -229,16 +264,26 @@ export function gerarSpec(opcoes: OpcoesGerarSpec = {}): string {
   const itens = linhas.join("\n");
   const medicao = (opcoes.medicao ?? []).map((m) => `- ${m}`).join("\n");
 
+  /**
+   * SPEC-115 (§410) — a derivação enxerga os itens que a spec REALMENTE cobre,
+   * não tudo que foi passado. Uma spec recortada para um item só (SPEC-114
+   * §2.2) que listasse as fatias da demanda inteira descreveria um escopo que
+   * ela não tem.
+   */
+  const derivado = opcoes.julgamento
+    ? derivarSecoesDeJulgamento({ ...opcoes.julgamento, itens: cobertura.cobertas })
+    : {};
+
   const valores: Record<VariavelSpec, string> = {
     titulo: opcoes.titulo ?? "Spec",
-    origem: secaoDeJulgamento(opcoes.escrita?.origem, PEDIDO_DA_SECAO.origem),
+    origem: secaoDeJulgamento(opcoes.escrita?.origem, PEDIDO_DA_SECAO.origem, derivado.origem),
     contexto: opcoes.contexto?.trim() || "_Sem contexto adicional informado._",
     // `medicao` NÃO é seção de julgamento: ela é derivada do que o motor já
     // calculou. Vazia significa "o motor não apontou nada", que é uma afirmação
     // legítima — e por isso não leva marcador.
     medicao: medicao || "_O motor não apontou nada neste desenho._",
-    recusas: secaoDeJulgamento(opcoes.escrita?.recusas, PEDIDO_DA_SECAO.recusas),
-    fatias: secaoDeJulgamento(opcoes.escrita?.fatias, PEDIDO_DA_SECAO.fatias),
+    recusas: secaoDeJulgamento(opcoes.escrita?.recusas, PEDIDO_DA_SECAO.recusas, derivado.recusas),
+    fatias: secaoDeJulgamento(opcoes.escrita?.fatias, PEDIDO_DA_SECAO.fatias, derivado.fatias),
     // Spec órfã é afirmação, não vazio: ela diz que ninguém sabe o que esta
     // spec especifica, e a SPEC-80 §3 chama isso de lacuna.
     itens: itens || `_(nenhum item vinculado)_ ${MARCADOR_ESPECIFICAR}`,

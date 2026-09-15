@@ -14,7 +14,9 @@ import {
   estruturarDocumento,
   ensaiosAssumidos,
   gerarEspecificacaoEntrega,
+  derivarSecoesDeJulgamento,
   gerarSpec,
+  type MaterialDeJulgamento,
   adotarVariante,
   guardarComoVariante,
   coberturaDaSpec,
@@ -903,7 +905,20 @@ function AppCarregado({
    *
    * Chega como `proposta`/`sugerido`, sempre: a regra 2 cuida do resto.
    */
-  async function pedirDecisoesAoAgente() {
+  /**
+   * SPEC-115 fatia F (§410) — o mesmo pedido, agora com **contexto de projeto**
+   * e **foco num componente**.
+   *
+   * Os dois são opcionais e o caso de uso deles é o mesmo que a correção do
+   * usuário nomeia: *"parte pode ser nova e parte existente"*. Componente novo
+   * conversa sem contexto; componente que já roda conversa com o schema, as
+   * rotas ou o trecho do documento do projeto dele colado.
+   *
+   * Devolve QUANTAS propostas chegaram, porque é o que a tela do documento
+   * precisa dizer — as decisões em si vão para a mesa, que é onde elas são
+   * aceitas, ao lado do desenho a que se ancoram.
+   */
+  async function pedirDecisoesAoAgente(extra?: { contextoDoProjeto?: string; foco?: string }): Promise<number> {
     const violacoes = violacoesEmAberto(
       avaliarConformidade(quebra.diagrama, diagramaConfig, regrasConfig, quebra.excecoes ?? [], tokens)
     );
@@ -935,6 +950,10 @@ function AppCarregado({
       // Sem isto o agente re-litiga o que já foi decidido, e a pessoa aprende a
       // ignorar as propostas.
       jaDecididas: (quebra.decisoes ?? []).filter((d) => d.status !== "substituida").map((d) => d.titulo),
+      // §410 — vazio não vai: um prompt que fala de "contexto do projeto" com
+      // nada dentro ensina o modelo a inventar um.
+      ...(extra?.contextoDoProjeto?.trim() ? { contextoDoProjeto: extra.contextoDoProjeto.trim() } : {}),
+      ...(extra?.foco ? { foco: extra.foco } : {}),
     });
 
     // A régua das duas alternativas é do PRODUTO, não do modelo: `minItems` é
@@ -962,6 +981,10 @@ function AppCarregado({
         })),
       ],
     }));
+
+    // Quantas PROPOSTAS chegaram, não quantas valem: aceitar é o próximo gesto,
+    // e é de quem lê. Zero é resposta legítima, e a tela sabe dizer isso.
+    return comAlternativaReal.length;
   }
 
   /**
@@ -1112,6 +1135,35 @@ function AppCarregado({
    * mudança, e é a régua do §263.
    */
   const specDaDemanda = quebra.artefatosEscritos?.spec ?? {};
+
+  /**
+   * SPEC-115 (§410) — **o material confirmado de onde as seções de julgamento
+   * da spec saem.**
+   *
+   * Um objeto só, montado uma vez, usado pelos DOIS lados: a tela, para dizer o
+   * que já tem de onde sair, e `gerarSpec`, para escrever. Duas montagens
+   * divergiriam na primeira mudança, e a divergência aqui seria cruel — a tela
+   * diria "pode subir" e o envio recusaria por lacuna (§263).
+   *
+   * Nada disto vem de modelo: `decisoes` só entram se alguém as aceitou,
+   * necessidade inferida só entra se alguém a confirmou. É o que mantém a trava
+   * da SPEC-80 fatia D de pé com a derivação ligada.
+   */
+  const julgamentoDaSpec: MaterialDeJulgamento = useMemo(
+    () => ({
+      contextoDaDemanda: quebra.demandInfo,
+      necessidades: quebra.necessidades,
+      decisoes: quebra.decisoes,
+    }),
+    [quebra.demandInfo, quebra.necessidades, quebra.decisoes]
+  );
+
+  /** O que a TELA mostra como derivável. As fatias entram com os itens da
+   * demanda — a spec por item recorta as dela na hora de gerar. */
+  const julgamentoDerivadoDaSpec = useMemo(
+    () => derivarSecoesDeJulgamento({ ...julgamentoDaSpec, itens: atividadesDoDocumento }),
+    [julgamentoDaSpec, atividadesDoDocumento]
+  );
 
   const coberturaDaSpecAtual = useMemo(
     () => coberturaDaSpec(atividadesDoDocumento, specDaDemanda),
@@ -2203,6 +2255,14 @@ function AppCarregado({
                            * divergência de duas contas que o §114 já custou.
                            */
                           escrita: { ...specDaDemanda, itensCobertos: [item.chave] },
+                          /**
+                           * SPEC-115 (§410) — o que foi decidido vira as seções
+                           * de julgamento. É o que fecha a lacuna que impedia
+                           * qualquer spec de subir, sem o modelo escrever
+                           * julgamento nenhum: o que chega aqui é `Decisao`
+                           * aceita e necessidade confirmada.
+                           */
+                          julgamento: { ...julgamentoDaSpec, itens: atividadesDoDocumento },
                           contexto: [contextoDoProduto, quebra.demandInfo].filter((t) => t?.trim()).join("\n\n"),
                           medicao: documentoDaDemanda.saude.filter((s) => s.lado === "atencao").map((s) => s.rotulo),
                           itens: [atividade],
@@ -2234,6 +2294,18 @@ function AppCarregado({
            */
           specEscrita={specDaDemanda}
           onMudarSpecEscrita={mudarSpecEscrita}
+          /**
+           * SPEC-115 fatia F (§410) — a caixa da conversa só aparece quando há
+           * com quem conversar E quando há componente sobre o que falar. Sem
+           * credencial de IA ela falharia; sem desenho, `montarPedidoDecisoes`
+           * recusa por princípio ("decisão de arquitetura se ancora em um
+           * elemento"). Oferecer nos dois casos é a disciplina da SPEC-49 ao
+           * contrário.
+           */
+          onConversarSobreASpec={
+            temCredencialDeIa && quebra.diagrama.nodes.length > 0 ? pedirDecisoesAoAgente : undefined
+          }
+          julgamentoDerivado={julgamentoDerivadoDaSpec}
           ensaios={ensaiosDaQuebra}
           decisaoDoEnsaio={(ensaioId) =>
             (decisoesVisiveis ?? []).find((d) => (d.ensaioIds ?? []).includes(ensaioId))?.titulo

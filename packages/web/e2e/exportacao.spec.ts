@@ -218,8 +218,15 @@ test("modo de demonstração: o envio da spec aparece na tela e SOBREVIVE ao F5"
      *
      * É exatamente o que a SPEC-115 §1.2 pede que exista — a experiência
      * pronta — e é o tipo de costura que só o navegador prova.
+     *
+     * **§410 — e o conserto mudou de forma depois deste teste passar.** A
+     * primeira versão punha três caixas em branco aqui; a correção do usuário
+     * foi que a caixa é a superfície da conversa com o agente, e a spec deriva
+     * do que se decide nela. Escrever à mão continua valendo — é o caminho de
+     * quem já sabe a resposta — e é ele que este teste exercita, porque não
+     * depende de modelo nenhum estar de pé.
      */
-    await expect(page.getByTestId("spec-sem-julgamento")).toContainText("Faltam 3 respostas");
+    await expect(page.getByTestId("spec-sem-julgamento")).toContainText("spec com lacuna não sobe");
     for (const [testid, rotulo, texto] of [
       ["spec-origem", "Quem pediu, e com que palavras", "O time de catálogo pediu na reunião de refinamento."],
       ["spec-recusas", "O que NÃO entra, e por quê", "Migração do legado fica de fora: não há janela."],

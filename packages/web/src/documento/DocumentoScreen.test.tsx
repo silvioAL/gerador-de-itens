@@ -444,6 +444,141 @@ describe("DocumentoScreen — o motivo do “Exportar” desabilitado (SPEC-115 
 });
 
 /**
+ * SPEC-115 fatia F (§410) — **a caixa é a superfície da conversa com o agente,
+ * e a spec deriva do que se decidiu ali.**
+ *
+ * A primeira escrita desta tela pôs três textareas em branco aqui, e isso
+ * contradizia a tese da própria SPEC-115 §1.1. Correção do usuário: *"a caixa
+ * tem o objetivo dessa interação com o agente, onde se coloca input e interage
+ * com o agente para passar contexto de projeto e tomar decisões que depois vão
+ * derivar para as respectivas specs"*.
+ */
+describe("DocumentoScreen — a conversa que produz a spec (SPEC-115 fatia F)", () => {
+  /**
+   * O componente da conversa sai do DESENHO, não de uma prop própria: a lista
+   * que a pessoa escolhe é a mesma que ela vê na figura acima. Duas listas
+   * divergiriam, e a divergência seria um componente selecionável que não está
+   * no desenho.
+   */
+  const desenho = {
+    nodes: [{ id: "srv", type: "service", label: "srv-catalogo", status: "novo", spec: {}, specNA: {} }],
+    edges: [],
+  } as unknown as DocumentoDeDesenho["diagrama"];
+
+  function comItemPendente(props: Partial<React.ComponentProps<typeof DocumentoScreen>> = {}) {
+    return montar({
+      documento: doc({ itens: [derivado("a")], diagrama: desenho }),
+      itensEscritos: [escrito("a", { estado: "exportado", linkExterno: "https://tracker/a" })],
+      onAnexarSpec: vi.fn(),
+      onMudarSpecEscrita: vi.fn(),
+      ...props,
+    });
+  }
+
+  it("manda o contexto do projeto COLADO e o componente da conversa", () => {
+    // *"parte pode ser nova e parte existente"* — o contexto é o que existe, e
+    // o foco é o recorte do §1.1.1.
+    const onConversarSobreASpec = vi.fn().mockResolvedValue(2);
+    comItemPendente({ onConversarSobreASpec });
+
+    fireEvent.change(screen.getByLabelText("Contexto do projeto"), {
+      target: { value: "TABLE pedidos (id uuid)" },
+    });
+    fireEvent.change(screen.getByLabelText("Sobre qual componente"), { target: { value: "srv" } });
+    fireEvent.click(screen.getByTestId("conversar-sobre-a-spec"));
+
+    expect(onConversarSobreASpec).toHaveBeenCalledWith({ contextoDoProjeto: "TABLE pedidos (id uuid)", foco: "srv" });
+  });
+
+  it("componente novo conversa SEM contexto — metade de um desenho ainda não existe", () => {
+    const onConversarSobreASpec = vi.fn().mockResolvedValue(1);
+    comItemPendente({ onConversarSobreASpec });
+
+    fireEvent.click(screen.getByTestId("conversar-sobre-a-spec"));
+
+    expect(onConversarSobreASpec).toHaveBeenCalledWith({ contextoDoProjeto: "", foco: undefined });
+  });
+
+  it("o que volta é PROPOSTA, e a tela diz isso — aceitar é o próximo gesto, de gente", async () => {
+    /**
+     * É o que mantém a trava da SPEC-80 fatia D de pé com a conversa ligada: o
+     * modelo não escreveu seção nenhuma, ele propôs decisões. Se a tela dissesse
+     * "pronto", a pessoa acreditaria que a spec já afirma aquilo.
+     */
+    const onConversarSobreASpec = vi.fn().mockResolvedValue(2);
+    comItemPendente({ onConversarSobreASpec });
+
+    fireEvent.click(screen.getByTestId("conversar-sobre-a-spec"));
+
+    const resposta = await screen.findByTestId("resposta-da-conversa");
+    expect(resposta).toHaveTextContent("2 decisões propostas");
+    expect(resposta).toHaveTextContent("valem depois que você aceitar");
+  });
+
+  it("zero propostas é resposta legítima, e a tela não finge que deu errado", async () => {
+    // Desenho sem escolha real em aberto não deve produzir decisão inventada
+    // para preencher cota — está no prompt, e a tela precisa concordar.
+    const onConversarSobreASpec = vi.fn().mockResolvedValue(0);
+    comItemPendente({ onConversarSobreASpec });
+
+    fireEvent.click(screen.getByTestId("conversar-sobre-a-spec"));
+
+    expect(await screen.findByTestId("resposta-da-conversa")).toHaveTextContent("lista vazia é resposta legítima");
+  });
+
+  it("sem com quem conversar, a caixa não aparece — e as seções seguem editáveis", () => {
+    // A disciplina da SPEC-49: botão que falharia não se oferece.
+    comItemPendente({ onConversarSobreASpec: undefined });
+
+    expect(screen.queryByTestId("conversa-da-spec")).toBeNull();
+    expect(screen.getByTestId("spec-origem")).toBeInTheDocument();
+  });
+
+  it("seção COM material derivado mostra o bloco e nomeia a fonte", () => {
+    comItemPendente({
+      julgamentoDerivado: { recusas: "- **Síncrono** — fora porque escolhemos Fila" },
+    });
+
+    expect(screen.getByTestId("spec-recusas-derivado")).toHaveTextContent("Síncrono");
+    expect(screen.getByTestId("spec-recusas-origem")).toHaveTextContent("derivado das decisões aceitas");
+  });
+
+  it("o aviso conta as seções sem NADA de onde sair, e nomeia quais", () => {
+    // O motivo do que vai acontecer, antes de acontecer: sem isto a pessoa
+    // clica, espera, e recebe "ficaram de fora por ter lacuna" sem saber qual.
+    comItemPendente({ julgamentoDerivado: { recusas: "- alguma coisa" } });
+
+    const aviso = screen.getByTestId("spec-sem-julgamento");
+    expect(aviso).toHaveTextContent("Faltam 2 seções");
+    expect(aviso).toHaveTextContent("Quem pediu");
+    expect(aviso).not.toHaveTextContent("O que NÃO entra");
+  });
+
+  it("com as três tendo de onde sair, a tela declara que a spec pode subir", () => {
+    comItemPendente({
+      julgamentoDerivado: { origem: "o time pediu", recusas: "síncrono ficou fora", fatias: "1. o item" },
+    });
+
+    expect(screen.getByTestId("spec-com-julgamento")).toBeInTheDocument();
+    expect(screen.queryByTestId("spec-sem-julgamento")).toBeNull();
+  });
+
+  it("texto de GENTE vence o derivado — e o bloco do motor sai da frente", () => {
+    // SPEC-58 regra 3, na tela: o julgamento de alguém não divide espaço com a
+    // derivação que ele substituiu, senão a seção diz duas coisas.
+    comItemPendente({
+      specEscrita: { recusas: "Migração do legado fica de fora: não há janela." },
+      julgamentoDerivado: { recusas: "- **Síncrono** — fora porque escolhemos Fila" },
+    });
+
+    const secao = screen.getByTestId("spec-recusas");
+    expect(within(secao).getByText(/Migração do legado/)).toBeInTheDocument();
+    expect(screen.queryByTestId("spec-recusas-derivado")).toBeNull();
+    expect(screen.getByTestId("spec-recusas-origem")).toHaveTextContent("escrito por uma pessoa");
+  });
+});
+
+/**
  * SPEC-115 fatias E e G — **o pipeline por item, sobre estado persistido.**
  *
  * O que estes testes provam é que a tela LÊ o envio em vez de guardá-lo: em
