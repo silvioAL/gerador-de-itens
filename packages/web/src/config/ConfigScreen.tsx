@@ -193,7 +193,19 @@ export function ConfigScreen({
        */
       { id: "regras", rotulo: "Regras de refinamento", existe: true },
       { id: "especificacao", rotulo: "Especificação de solução", existe: true },
-      { id: "pipeline", rotulo: "Pipeline de IA", existe: true },
+      /**
+       * SPEC-117 fatia A — **"Pipeline de IA" virou "Agentes de IA".**
+       *
+       * *"O caminho natural é evoluir essa parte de pipeline de IA para Agentes
+       * de IA"*, e a razão é mais dura que estética: pipeline descreve a
+       * esteira, e só ela. Uma tela chamada "Pipeline" que passasse a
+       * configurar também as conversas do assistente estaria mentindo no
+       * título — conversa não é pipeline, não tem ordem, não roda em lote.
+       *
+       * O `id` da aba NÃO muda: `#/config/pipeline` está salvo em favorito de
+       * alguém, e o §308 já custou por aba que trocou de lugar.
+       */
+      { id: "pipeline", rotulo: "Agentes de IA", existe: true },
       { id: "modeloIa", rotulo: "Modelo de IA", existe: true },
       { id: "pdca", rotulo: "PDCA — melhoria contínua", existe: true },
       { id: "exportacao", rotulo: "Exportação", existe: true },
@@ -331,6 +343,10 @@ export function ConfigScreen({
             onSalvar={onSalvarPipelineAgentes}
             // Papel casa tanto por tech quanto por contexto — as duas listas.
             opcoesDeContexto={[...(techs ?? []), ...(contextos ?? [])]}
+            // SPEC-117 fatia A — a terceira seção LEVA à configuração do
+            // gateway em vez de duplicá-la: dois lugares para o mesmo endereço
+            // é como um deles envelhece.
+            onIrParaExportacao={onAbrirArea ? () => onAbrirArea("exportacao") : undefined}
           />
         )}
         {abaAtiva === "modeloIa" && <ModeloIaTab />}

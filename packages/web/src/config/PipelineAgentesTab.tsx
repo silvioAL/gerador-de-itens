@@ -9,6 +9,7 @@ import {
   type SugestaoPapel,
 } from "../api/client";
 import { SugerirComIa } from "./SugerirComIa";
+import { ConversasDoAssistenteSecao } from "./ConversasDoAssistenteSecao";
 
 /** O preâmbulo que este papel manda hoje — o mesmo que a borda resolve na hora
  * do pedido. Importado da camada de aplicação em vez de recopiado aqui: uma
@@ -26,6 +27,15 @@ const ROTULO_ORIGEM: Record<string, string> = {
 
 export interface PipelineAgentesTabProps {
   config: ConfigPipelineAgentes;
+  /**
+   * SPEC-117 fatia A — leva para a aba onde os agentes do gateway moram.
+   *
+   * A terceira seção não configura nada aqui, de propósito: os agentes do
+   * gateway **importam e exportam**, e o que há para configurar neles é
+   * transporte — endereço, cabeçalhos, verbo. Duplicar aqueles campos aqui
+   * criaria duas telas para o mesmo dado, que é o defeito que a §4 recusa.
+   */
+  onIrParaExportacao?: () => void;
   onSalvar: (dados: ConfigPipelineAgentes) => Promise<void>;
   /** Techs + contextos conhecidos — o campo de contextos do papel vira seleção
    * por clique, mesma correção da RegrasTab. Vazio = input livre. */
@@ -47,10 +57,13 @@ const ROTULO_GRUPO: Record<GrupoFicha, string> = {
  * vem antes na ordem). As SEÇÕES da ficha continuam fixas — todo papel
  * escreve numa delas (`grupo`).
  */
-export function PipelineAgentesTab({ config, onSalvar, opcoesDeContexto }: PipelineAgentesTabProps) {
+export function PipelineAgentesTab({ config, onSalvar, opcoesDeContexto, onIrParaExportacao }: PipelineAgentesTabProps) {
   const [confirmacaoObrigatoria, setConfirmacaoObrigatoria] = useState(config.confirmacaoObrigatoria);
   const [papeis, setPapeis] = useState<PapelConfigurado[]>(config.papeis?.length ? config.papeis : PAPEIS_PADRAO);
   const [expandido, setExpandido] = useState<string | null>(null);
+  // SPEC-117 fatia C — as conversas viajam no MESMO documento dos papéis, e
+  // pelo mesmo botão de salvar: são a mesma configuração de "quem fala".
+  const [conversas, setConversas] = useState<ConfigPipelineAgentes["conversas"]>(config.conversas);
   /**
    * Quem está com o editor de prompt ABERTO, independente do conteúdo.
    *
@@ -144,7 +157,7 @@ export function PipelineAgentesTab({ config, onSalvar, opcoesDeContexto }: Pipel
     setSalvando(true);
     setErro(null);
     try {
-      await onSalvar({ confirmacaoObrigatoria: valor, papeis });
+      await onSalvar({ confirmacaoObrigatoria: valor, papeis, conversas });
     } catch (e) {
       setConfirmacaoObrigatoria(!valor);
       setErro(e instanceof Error ? e.message : String(e));
@@ -157,7 +170,7 @@ export function PipelineAgentesTab({ config, onSalvar, opcoesDeContexto }: Pipel
     setSalvando(true);
     setErro(null);
     try {
-      await onSalvar({ confirmacaoObrigatoria, papeis });
+      await onSalvar({ confirmacaoObrigatoria, papeis, conversas });
       setSujo(false);
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
@@ -168,10 +181,23 @@ export function PipelineAgentesTab({ config, onSalvar, opcoesDeContexto }: Pipel
 
   return (
     <div>
+      {/**
+       * SPEC-117 fatia A — **a aba passou a abrigar três coisas, e elas não se
+       * achatam numa lista só.**
+       *
+       * *"Pipeline descreve a esteira, e só ela. Uma tela chamada 'Pipeline de
+       * IA' que passasse a configurar também as conversas estaria mentindo no
+       * título — conversa não é pipeline, não tem ordem, não roda em lote."*
+       *
+       * Os três têm ciclo de vida e forma diferentes: a esteira tem ordem e a
+       * conversa não; a conversa tem uma tela onde vive e o papel não; o agente
+       * externo tem endereço e os outros dois não. Uma abstração que os
+       * unificasse produziria um formulário com metade dos campos cinza (§2).
+       */}
       <p style={introTextoEstilo}>
-        Controla a esteira de agentes da tela de revisão: a ordem em que os papéis rodam, o que cada um escreve
-        (nome, descrição e prompt), em quais contextos se aplica — e se as respostas pausam pra sua confirmação ou
-        são aplicadas direto.
+        Quem fala pelo produto, em três lugares diferentes: a <strong>esteira</strong> que especifica os itens, as{" "}
+        <strong>conversas</strong> do assistente, e os <strong>agentes do gateway</strong> que levam e trazem do
+        tracker. Com quem se fala — o modelo e a credencial — é a aba Modelo de IA.
       </p>
 
       <div style={cardEstilo}>
@@ -194,9 +220,9 @@ export function PipelineAgentesTab({ config, onSalvar, opcoesDeContexto }: Pipel
         </label>
       </div>
 
-      <div style={{ ...cardEstilo, marginTop: 14 }}>
+      <div style={{ ...cardEstilo, marginTop: 14 }} data-testid="esteira-de-itens">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <strong style={{ fontSize: 13, color: "var(--texto)" }}>Papéis da esteira (na ordem em que rodam)</strong>
+          <strong style={{ fontSize: 13, color: "var(--texto)" }}>Esteira de itens — papéis, na ordem em que rodam</strong>
           <button onClick={adicionarCustom} style={botaoEstilo} disabled={salvando}>
             + Agente contextual
           </button>
@@ -384,6 +410,43 @@ export function PipelineAgentesTab({ config, onSalvar, opcoesDeContexto }: Pipel
         </div>
         {erro && <p style={erroEstilo}>{erro}</p>}
       </div>
+
+      {/* SPEC-117 fatia C — as conversas salvam pelo MESMO botão acima: são o
+          mesmo documento de configuração, e dois botões fariam alguém salvar
+          metade do que mexeu. */}
+      <ConversasDoAssistenteSecao
+        conversas={conversas}
+        onMudar={(novas) => {
+          setConversas(novas);
+          setSujo(true);
+        }}
+        desabilitado={salvando}
+      />
+
+      {/**
+       * SPEC-117 fatia E — **encerrada por decisão do usuário, e a seção diz isso.**
+       *
+       * > *"os agentes no gateway vou deixar no gateway, são basicamente os que
+       * > vão fazer o import ou export para o jira"*
+       *
+       * Não é adiamento: é a divisão de trabalho declarada. Nenhum agente do
+       * gateway pensa — eles importam e exportam, e é isso que fazem. A seção
+       * existe para a tela não fingir que só há dois tipos de agente; o que se
+       * configura neles é transporte, e mora onde sempre morou.
+       */}
+      <section data-testid="agentes-externos" style={{ ...cardEstilo, marginTop: 14 }}>
+        <strong style={{ fontSize: 13, color: "var(--texto)" }}>Agentes do gateway</strong>
+        <p style={{ ...introTextoEstilo, marginTop: 6 }}>
+          O outro lado das integrações: os agentes que <strong>importam</strong> ADRs e documentos, e{" "}
+          <strong>exportam</strong> itens e specs. Eles não escrevem nem decidem nada — o que há para configurar é o
+          transporte (endereço, cabeçalhos, verbo), e isso fica na aba de exportação.
+        </p>
+        {onIrParaExportacao && (
+          <button onClick={onIrParaExportacao} style={botaoEstilo} data-testid="ir-para-exportacao">
+            Abrir a configuração do gateway
+          </button>
+        )}
+      </section>
     </div>
   );
 }

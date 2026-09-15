@@ -1,5 +1,6 @@
 import type { ChaveConfig } from "../portas/repositorioDeConfig.js";
 import { LOTE_PADRAO, type LimitesDoLote } from "./lotes.js";
+import { IDS_DE_CONVERSA } from "../casos-de-uso/ia/conversas.js";
 
 /**
  * SPEC-31 Fase 3 — a coerção de entrada de cada documento de config.
@@ -33,9 +34,36 @@ export interface PapelConfigurado {
   contextos: string[];
 }
 
+/**
+ * SPEC-117 fatia C — o preâmbulo que o time escreveu para UMA conversa do
+ * assistente.
+ *
+ * Forma mínima de propósito: `id` + `preambulo`. A conversa em si (rótulo, onde
+ * vive, anatomia) é do produto e mora em `conversas.ts` — guardar isso na
+ * config faria o documento salvo envelhecer junto com a tela, e um rótulo
+ * gravado em 2026 continuaria aparecendo depois de a conversa ser renomeada.
+ */
+export interface ConversaConfigurada {
+  /** Um `IdDeConversa`. Id desconhecido é descartado na coerção. */
+  id: string;
+  preambulo?: string;
+}
+
 export interface ConfigPipelineAgentes {
   confirmacaoObrigatoria: boolean;
   papeis: PapelConfigurado[];
+  /**
+   * SPEC-117 fatia C — as conversas do assistente que este time personalizou.
+   *
+   * **Ausente é o normal**, e é o que mantém a fatia A verdadeira: uma config
+   * salva antes desta SPEC abre igual, byte a byte, e quem nunca abrir a seção
+   * nova não percebe diferença nenhuma no prompt.
+   *
+   * Lista e não `Record<id, preambulo>` pela mesma razão de `destinos`: um mapa
+   * força uma entrada por conversa e obriga a gravar as oito para personalizar
+   * uma. Lista degrada para "só o que alguém escreveu".
+   */
+  conversas?: ConversaConfigurada[];
 }
 
 /** A esteira de fábrica (SPEC-24 Fase F). */
@@ -75,14 +103,81 @@ export function sanearPapeis(entrada: unknown): PapelConfigurado[] | undefined {
   return papeis.length > 0 ? papeis : undefined;
 }
 
+/**
+ * SPEC-117 fatia C — a coerção das conversas, com a disciplina deste arquivo.
+ *
+ * Três razões de descartar uma entrada, e as três são a mesma: o que sobra não
+ * configura nada. Id que não é uma conversa do produto não tem prompt onde
+ * entrar; id repetido faria a tela guardar duas verdades sobre a mesma
+ * conversa; preâmbulo vazio é o estado de fábrica, e gravá-lo encheria o
+ * documento de linhas que não dizem nada.
+ *
+ * **Nenhuma delas derruba a config inteira**: uma conversa mal declarada não
+ * pode apagar a esteira de quem nunca mexeu nela.
+ */
+export function sanearConversas(entrada: unknown): ConversaConfigurada[] | undefined {
+  if (!Array.isArray(entrada)) return undefined;
+
+  const validos: readonly string[] = IDS_DE_CONVERSA;
+  const conversas: ConversaConfigurada[] = [];
+  for (const bruto of entrada as Partial<ConversaConfigurada>[]) {
+    const id = typeof bruto?.id === "string" ? bruto.id.trim() : "";
+    if (!id || !validos.includes(id) || conversas.some((c) => c.id === id)) continue;
+    const preambulo = typeof bruto.preambulo === "string" ? bruto.preambulo.trim() : "";
+    if (!preambulo) continue;
+    conversas.push({ id, preambulo });
+  }
+  return conversas.length > 0 ? conversas : undefined;
+}
+
 export function normalizarPipelineAgentes(documento: unknown): ConfigPipelineAgentes {
   const bruto = (documento ?? {}) as Partial<ConfigPipelineAgentes>;
+  const conversas = sanearConversas(bruto.conversas);
   return {
     confirmacaoObrigatoria: bruto.confirmacaoObrigatoria !== false,
     // Config antiga (só o toggle, pré-Fase F) ou papéis todos inválidos:
     // esteira de fábrica — nunca uma esteira vazia por acidente.
     papeis: sanearPapeis(bruto.papeis) ?? PAPEIS_PADRAO,
+    // Ausente continua ausente: o documento de quem não personalizou conversa
+    // nenhuma atravessa a normalização sem ganhar campo (a régua da fatia A).
+    ...(conversas ? { conversas } : {}),
   };
+}
+
+/**
+ * SPEC-117 fatia C, pergunta 3 — **o preâmbulo em vigor para uma conversa, com
+ * a governança geral resolvida.**
+ *
+ * > *"por time, mas a arquitetura pode querer algum nível de governança geral"*
+ *
+ * A pergunta que sobrou era se governança é **piso** ou **teto**, e as duas
+ * convivem — cada uma num mecanismo diferente:
+ *
+ * | | O que é | Onde vive |
+ * |---|---|---|
+ * | **Piso** | o preâmbulo global que o time herda e **pode substituir** | esta função |
+ * | **Teto** | o que ninguém remove, nem o time nem a arquitetura | `inegociavel`, em `conversas.ts` |
+ *
+ * O piso é `?? `, e a semântica é a que o §306 já tinha escrito para os
+ * cabeçalhos do gateway: **declarado vence herdado**. A organização com uma
+ * régua só escreve uma vez em `__global__`; o time que souber mais escreve a
+ * dele e a sua vale.
+ *
+ * O teto não passa por aqui de propósito. Ele não é política de empresa —
+ * *"somente leitura"* é do produto, e por isso vive no prompt e não numa
+ * configuração que alguém possa esvaziar.
+ *
+ * **Resolve no backend, e não na tela** (a régua do §263 aplicada à mescla): a
+ * tela que juntasse global e time seria a segunda leitura da mesma pergunta, e
+ * ela divergiria do prompt que o servidor monta.
+ */
+export function preambuloDaConversa(
+  id: string,
+  doTime: ConfigPipelineAgentes | undefined,
+  global?: ConfigPipelineAgentes
+): string | undefined {
+  const achar = (c?: ConfigPipelineAgentes) => c?.conversas?.find((x) => x.id === id)?.preambulo?.trim() || undefined;
+  return achar(doTime) ?? achar(global);
 }
 
 function normalizarRegras(documento: unknown): unknown {

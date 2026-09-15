@@ -1,4 +1,5 @@
 import type { EsquemaJson } from "@gerador/llm/gateway";
+import { comInstrucoesDoTime } from "./conversas.js";
 
 /**
  * SPEC-31 Fase 4 (conclusão) — os PEDIDOS de IA, compartilhados pelos dois modos.
@@ -236,6 +237,38 @@ const ALVOS_SUGESTAO_CONFIG: Record<string, AlvoSugestaoConfig> = {
       `esperado e a profundidade (quantos itens, o que cobrir) — é o que separa`,
       `uma resposta útil de uma resposta de duas linhas.`,
       `"contextos" limita em quais itens o papel atua; lista vazia = atua em todos.`,
+    ],
+  },
+  /**
+   * SPEC-117 fatia F — **o "✦ Sugerir" da esteira vale para as conversas.**
+   *
+   * *"A aba já sabe propor um papel a partir de uma frase; propor um preâmbulo
+   * de conversa é o mesmo gesto."* — e o custo de estendê-lo é acrescentar uma
+   * entrada aqui, não um caminho novo.
+   *
+   * ## A diferença que as regras carregam
+   *
+   * Um papel da esteira nasce inteiro: id, nome, seção, preâmbulo. Uma conversa
+   * **já existe** — ela é do produto, tem tela, tem anatomia. O que se propõe é
+   * só o texto que ACRESCENTA ao prompt dela, e a regra abaixo diz isso ao
+   * modelo, porque um preâmbulo escrito como se fosse o prompt inteiro faria a
+   * pessoa colar uma duplicata do que o produto já manda.
+   */
+  "preambulo-de-conversa": {
+    descricao: "o texto que o TIME acrescenta ao prompt de uma conversa do assistente",
+    schema: {
+      type: "object",
+      properties: { preambulo: { type: "string" } },
+      required: ["preambulo"],
+    },
+    regras: [
+      `O texto ACRESCENTA ao prompt que o produto já manda — ele não o substitui.`,
+      `Não repita o que o produto já diz (o papel do agente, o formato da resposta,`,
+      `"responda em português"): escreva só o que é específico DESTE time.`,
+      `Duas a cinco frases. Um preâmbulo longo compete com as instruções do produto`,
+      `em vez de complementá-las.`,
+      `Nada que contrarie regra de produto: o prompt declara que, em caso de conflito,`,
+      `o que o produto pediu vence — e um texto assim só gasta contexto.`,
     ],
   },
 };
@@ -481,6 +514,17 @@ export function preambuloDoPapel(
 }
 
 export interface EntradaDiagrama {
+  /**
+   * SPEC-117 fatia C — **o preâmbulo que o time escreveu para ESTA conversa.**
+   *
+   * Ele ACRESCENTA (pergunta 2, respondida pelo usuário): entra num bloco
+   * nomeado no fim do prompt, com a precedência do produto dita em voz alta.
+   * Nada do que está escrito acima dele sai — é o que mantém as regras da §3
+   * de pé sem precisar extraí-las da string.
+   *
+   * Ausente = o prompt de hoje, byte a byte.
+   */
+  preambuloDoTime?: string;
   descricao: string;
   tiposDeNo: { id: string; rotulo: string }[];
   tiposDeConexao?: { id: string; rotulo: string }[];
@@ -613,10 +657,21 @@ export function montarPedidoDiagrama(entrada: EntradaDiagrama & { imagens?: stri
   ].join("\n");
 
   // As imagens seguem com o pedido — quem as manda pro modelo é o adaptador.
-  return { prompt, esquema, imagens };
+  return { prompt: comInstrucoesDoTime(prompt, entrada.preambuloDoTime), esquema, imagens };
 }
 
 export interface EntradaAlterarItem {
+  /**
+   * SPEC-117 fatia C — **o preâmbulo que o time escreveu para ESTA conversa.**
+   *
+   * Ele ACRESCENTA (pergunta 2, respondida pelo usuário): entra num bloco
+   * nomeado no fim do prompt, com a precedência do produto dita em voz alta.
+   * Nada do que está escrito acima dele sai — é o que mantém as regras da §3
+   * de pé sem precisar extraí-las da string.
+   *
+   * Ausente = o prompt de hoje, byte a byte.
+   */
+  preambuloDoTime?: string;
   instrucao?: string;
   itemRotulo: string;
   contextoNo?: string;
@@ -686,16 +741,27 @@ export function montarPedidoAlterarItem(entrada: EntradaAlterarItem): PedidoIa {
     `- Responda em português.`,
   ].join("\n");
 
-  return { prompt, esquema };
+  return { prompt: comInstrucoesDoTime(prompt, entrada.preambuloDoTime), esquema };
 }
 
 export interface EntradaSugerirConfig {
+  /**
+   * SPEC-117 fatia C — **o preâmbulo que o time escreveu para ESTA conversa.**
+   *
+   * Ele ACRESCENTA (pergunta 2, respondida pelo usuário): entra num bloco
+   * nomeado no fim do prompt, com a precedência do produto dita em voz alta.
+   * Nada do que está escrito acima dele sai — é o que mantém as regras da §3
+   * de pé sem precisar extraí-las da string.
+   *
+   * Ausente = o prompt de hoje, byte a byte.
+   */
+  preambuloDoTime?: string;
   alvo: string;
   instrucao: string;
   contexto?: string;
 }
 
-export function montarPedidoSugerirConfig({ alvo, instrucao, contexto }: EntradaSugerirConfig): PedidoIa {
+export function montarPedidoSugerirConfig({ alvo, instrucao, contexto, preambuloDoTime }: EntradaSugerirConfig): PedidoIa {
   const definicao = ALVOS_SUGESTAO_CONFIG[alvo];
   // Alvo desconhecido é erro de propósito (ao contrário de papel na esteira,
   // que cai no genérico): aqui o schema É o contrato com o formulário — sem
@@ -719,7 +785,7 @@ export function montarPedidoSugerirConfig({ alvo, instrucao, contexto }: Entrada
     `- Responda em português, com decisões concretas pro caso descrito — nunca genéricas.`,
   ].join("\n");
 
-  return { prompt, esquema: definicao.schema };
+  return { prompt: comInstrucoesDoTime(prompt, preambuloDoTime), esquema: definicao.schema };
 }
 
 /** Os alvos que a UI conhece — a borda usa para recusar cedo. */
@@ -738,6 +804,13 @@ export const ALVOS_DA_CONVERSA_DE_CONFIG = [
   "campo-no",
   "campo-aresta",
   "papel",
+  /**
+   * SPEC-117 fatia F — estender a conversa de configuração a "conversa" é
+   * acrescentar um valor à união, não uma migração. É o mesmo achado que a
+   * SPEC-80 §0 fez para o template e a SPEC-114 para as operações do gateway:
+   * o mecanismo já estava construído, faltava o valor.
+   */
+  "preambulo-de-conversa",
   "regra-refinamento",
   "item-processo",
   // §274 — o contexto do produto entrou na CONVERSA. Ele já existia como alvo
@@ -757,6 +830,17 @@ export interface MensagemConfigurar {
 }
 
 export interface EntradaConfigurarConversa {
+  /**
+   * SPEC-117 fatia C — **o preâmbulo que o time escreveu para ESTA conversa.**
+   *
+   * Ele ACRESCENTA (pergunta 2, respondida pelo usuário): entra num bloco
+   * nomeado no fim do prompt, com a precedência do produto dita em voz alta.
+   * Nada do que está escrito acima dele sai — é o que mantém as regras da §3
+   * de pé sem precisar extraí-las da string.
+   *
+   * Ausente = o prompt de hoje, byte a byte.
+   */
+  preambuloDoTime?: string;
   mensagens: MensagemConfigurar[];
   /** Resumo da config atual do time — é o que faz o modelo propor MUDANÇA,
    * não duplicata do que já existe. */
@@ -786,6 +870,7 @@ const MAX_PROPOSTAS_CONFIG = 3;
  * condicional por alvo é o que um gateway `json_object` não garante).
  */
 export function montarPedidoConfigurarConversa({
+  preambuloDoTime,
   mensagens,
   resumoConfig,
   imagens,
@@ -845,12 +930,23 @@ export function montarPedidoConfigurarConversa({
 
   // As imagens seguem com o pedido — quem as manda pro modelo é o adaptador
   // (mesma divisão do `montarPedidoDiagrama`).
-  return { prompt, esquema, imagens };
+  return { prompt: comInstrucoesDoTime(prompt, preambuloDoTime), esquema, imagens };
 }
 
 const MAX_DECISOES = 4;
 
 export interface EntradaScriptDeMapeamento {
+  /**
+   * SPEC-117 fatia C — **o preâmbulo que o time escreveu para ESTA conversa.**
+   *
+   * Ele ACRESCENTA (pergunta 2, respondida pelo usuário): entra num bloco
+   * nomeado no fim do prompt, com a precedência do produto dita em voz alta.
+   * Nada do que está escrito acima dele sai — é o que mantém as regras da §3
+   * de pé sem precisar extraí-las da string.
+   *
+   * Ausente = o prompt de hoje, byte a byte.
+   */
+  preambuloDoTime?: string;
   /** O componente sobre o qual se quer saber o que já existe. */
   rotulo: string;
   /** O tipo configurado ("Serviço", "Tabela SQL", "Fila Rabbit"…) — é ele que
@@ -946,10 +1042,21 @@ export function montarPedidoScriptDeMapeamento(entrada: EntradaScriptDeMapeament
     required: ["script", "porque"],
   } as EsquemaJson;
 
-  return { prompt, esquema };
+  return { prompt: comInstrucoesDoTime(prompt, entrada.preambuloDoTime), esquema };
 }
 
 export interface EntradaDecisoes {
+  /**
+   * SPEC-117 fatia C — **o preâmbulo que o time escreveu para ESTA conversa.**
+   *
+   * Ele ACRESCENTA (pergunta 2, respondida pelo usuário): entra num bloco
+   * nomeado no fim do prompt, com a precedência do produto dita em voz alta.
+   * Nada do que está escrito acima dele sai — é o que mantém as regras da §3
+   * de pé sem precisar extraí-las da string.
+   *
+   * Ausente = o prompt de hoje, byte a byte.
+   */
+  preambuloDoTime?: string;
   contextoEpico?: string;
   contextoDoProduto?: string;
   /** Os nós do desenho, com o que já está preenchido neles. */
@@ -1156,12 +1263,23 @@ export function montarPedidoDecisoes(entrada: EntradaDecisoes): PedidoIa {
     `- Responda em português.`,
   ].join("\n");
 
-  return { prompt, esquema };
+  return { prompt: comInstrucoesDoTime(prompt, entrada.preambuloDoTime), esquema };
 }
 
 const MAX_CENARIOS = 5;
 
 export interface EntradaCenariosDeLentidao {
+  /**
+   * SPEC-117 fatia C — **o preâmbulo que o time escreveu para ESTA conversa.**
+   *
+   * Ele ACRESCENTA (pergunta 2, respondida pelo usuário): entra num bloco
+   * nomeado no fim do prompt, com a precedência do produto dita em voz alta.
+   * Nada do que está escrito acima dele sai — é o que mantém as regras da §3
+   * de pé sem precisar extraí-las da string.
+   *
+   * Ausente = o prompt de hoje, byte a byte.
+   */
+  preambuloDoTime?: string;
   contextoEpico?: string;
   contextoDoProduto?: string;
   /**
@@ -1279,12 +1397,23 @@ export function montarPedidoCenariosDeLentidao(entrada: EntradaCenariosDeLentida
     `- Responda em português.`,
   ].join("\n");
 
-  return { prompt, esquema };
+  return { prompt: comInstrucoesDoTime(prompt, entrada.preambuloDoTime), esquema };
 }
 
 const MAX_NECESSIDADES = 8;
 
 export interface EntradaNecessidades {
+  /**
+   * SPEC-117 fatia C — **o preâmbulo que o time escreveu para ESTA conversa.**
+   *
+   * Ele ACRESCENTA (pergunta 2, respondida pelo usuário): entra num bloco
+   * nomeado no fim do prompt, com a precedência do produto dita em voz alta.
+   * Nada do que está escrito acima dele sai — é o que mantém as regras da §3
+   * de pé sem precisar extraí-las da string.
+   *
+   * Ausente = o prompt de hoje, byte a byte.
+   */
+  preambuloDoTime?: string;
   /** `quebra.demandInfo` — a descrição em prosa de que a demanda trata. */
   contextoEpico?: string;
   /** SPEC-53 — o vocabulário do produto, para a necessidade falar a língua do negócio. */
@@ -1374,8 +1503,21 @@ export function montarPedidoNecessidades(entrada: EntradaNecessidades): PedidoIa
     `  É o que a pessoa lê para decidir se aceita — sem ele a proposta é caixa-preta.`,
     `- No máximo ${MAX_NECESSIDADES}. Proponha o que a demanda realmente exige; lista inflada`,
     `  faz a pessoa aceitar sem ler, que é pior que não propor.`,
+    /**
+     * ACHADO da SPEC-117 fatia D: a §3 listava esta regra como já existente
+     * neste prompt — *"lista vazia é resposta correta"*, e o que se perde sem
+     * ela é *"cota preenchida com propósito inventado"*. Ela **não estava
+     * aqui**. Estava nos irmãos (`decisoes`, `cenariosDeLentidao`), e a
+     * ausência passou despercebida justamente porque o prompt vizinho a tinha.
+     *
+     * Foi o teste que ancora a anatomia no prompt REAL que acusou: uma tabela
+     * que descreve o que o prompt deveria dizer não vale nada até alguém
+     * conferir contra o que ele diz.
+     */
+    `- Se a demanda não exigir necessidade nenhuma além do óbvio, devolva "necessidades" VAZIA.`,
+    `  Lista vazia é resposta correta; propósito inventado para preencher cota faz a pessoa parar de ler todos.`,
     `- Responda em português.`,
   ].join("\n");
 
-  return { prompt, esquema };
+  return { prompt: comInstrucoesDoTime(prompt, entrada.preambuloDoTime), esquema };
 }

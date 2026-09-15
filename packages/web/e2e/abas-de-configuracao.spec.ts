@@ -5,7 +5,7 @@ import { entrar, entrarEmTimeProprio } from "./auth";
  * #306 — as abas de Configurações que não tinham NENHUM teste de navegador.
  *
  * A medição que originou este arquivo (JOURNEY §153): das nove abas, quatro
- * estavam descobertas — "Regras de refinamento", "Acessos", "Pipeline de IA" e
+ * estavam descobertas — "Regras de refinamento", "Acessos", "Agentes de IA" e
  * "Campos por tipo de conexão". A primeira delas **abriu em branco em
  * produção**, e chegou até o usuário exatamente porque nada a clicava num
  * navegador.
@@ -178,8 +178,8 @@ test("Acessos: a tela da delegação de RBAC abre e diz o estado atual", async (
   expect((await corpo.textContent())?.trim().length ?? 0).toBeGreaterThan(40);
 });
 
-test("Pipeline de IA: os papéis, o prompt herdado e a anatomia do prompt", async ({ page }) => {
-  await abrirConfig(page, /Pipeline de IA/);
+test("Agentes de IA: os papéis, o prompt herdado e a anatomia do prompt", async ({ page }) => {
+  await abrirConfig(page, /Agentes de IA/);
 
   for (const papel of ["PO", "Arquiteto", "Especialista técnico", "QA"]) {
     await expect(page.getByRole("button", { name: new RegExp(`^${papel}`) }).first()).toBeVisible();

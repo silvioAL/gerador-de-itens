@@ -44,6 +44,18 @@ export {
   type MetodoDoGateway,
 } from "./config/normalizacao.js";
 
+/** SPEC-117 fatias B, C e D — as conversas do assistente, nomeadas. */
+export {
+  CABECALHO_DAS_INSTRUCOES_DO_TIME,
+  comInstrucoesDoTime,
+  conversaPorId,
+  CONVERSAS_DO_ASSISTENTE,
+  IDS_DE_CONVERSA,
+  type ConversaDoAssistente,
+  type IdDeConversa,
+  type ParteDoPromptDaConversa,
+} from "./casos-de-uso/ia/conversas.js";
+
 /**
  * SPEC-120 fatias A–C — o lote: quantos itens cabem numa chamada, e a recusa do
  * destino que é sinal de que couberam demais.
@@ -167,6 +179,10 @@ export {
   validarEscritaPipelineAgentes,
   PAPEIS_PADRAO,
   sanearPapeis,
+  /** SPEC-117 fatia C — o preâmbulo por conversa, com a governança geral. */
+  preambuloDaConversa,
+  sanearConversas,
+  type ConversaConfigurada,
   type ConfigPipelineAgentes,
   type GrupoFicha,
   type PapelConfigurado,

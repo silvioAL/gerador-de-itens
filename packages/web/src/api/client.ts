@@ -1177,7 +1177,9 @@ export type AlvoSugestaoConfig =
   | "teste-automatizado"
   | "contexto-do-produto"
   /** SPEC-102 fatia D — o passo 2 materializa `{ tipoNo, default, valid, porque }`. */
-  | "regra-de-conexao";
+  | "regra-de-conexao"
+  /** SPEC-117 fatia F — o ✦ Sugerir da esteira, estendido às conversas. */
+  | "preambulo-de-conversa";
 
 /** §271 — o que a IA devolve para o alvo "contexto-do-produto": as cinco
  * seções de uma vez, porque elas são um texto só partido em pedaços. */
@@ -1228,6 +1230,18 @@ export interface SugestaoPapel {
   descricao: string;
   preambulo: string;
   contextos: string[];
+}
+
+/**
+ * SPEC-117 fatia F — o que a IA devolve para "preambulo-de-conversa".
+ *
+ * Um campo só, e a diferença em relação a `SugestaoPapel` é a fatia inteira: um
+ * papel da esteira NASCE aqui (id, nome, seção, contextos); uma conversa já
+ * existe — ela é do produto, tem tela e tem anatomia. O que se propõe é só o
+ * texto que o time acrescenta.
+ */
+export interface SugestaoPreambuloDeConversa {
+  preambulo: string;
 }
 
 
@@ -1603,6 +1617,12 @@ export interface ConfigPipelineAgentes {
   /** SPEC-24 Fase F — lista ordenada de papéis da esteira. Ausente em
    * configs antigas (só o toggle) — quem consome cai em `PAPEIS_PADRAO`. */
   papeis?: PapelConfigurado[];
+  /**
+   * SPEC-117 fatia C — o preâmbulo que o time acrescentou a cada conversa do
+   * assistente. Ausente é o normal: quem nunca abriu a seção nova não tem
+   * campo nenhum aqui, e o prompt sai byte a byte igual ao de antes.
+   */
+  conversas?: { id: string; preambulo?: string }[];
 }
 
 /** SPEC-24 Fase E — achado real do usuário: "pode avançar sozinho até o fim,

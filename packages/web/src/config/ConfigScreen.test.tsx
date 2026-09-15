@@ -17,7 +17,7 @@ const AREAS: { area: AbaConfig; rotulo: RegExp }[] = [
   { area: "acessos", rotulo: /Acessos/ },
   { area: "regras", rotulo: /Regras de refinamento/ },
   { area: "especificacao", rotulo: /Especificação de solução/ },
-  { area: "pipeline", rotulo: /Pipeline de IA/ },
+  { area: "pipeline", rotulo: /Agentes de IA/ },
   { area: "modeloIa", rotulo: /Modelo de IA/ },
   { area: "pdca", rotulo: /PDCA — melhoria contínua/ },
   { area: "exportacao", rotulo: /Exportação/ },
@@ -90,7 +90,7 @@ describe("ConfigScreen — a navegação é do menu e da rota", () => {
     screen.getByRole("button", { name: "Voltar à mesa de projeto" }).click();
     expect(onFechar).toHaveBeenCalled();
     // Régua morta: não há botão de OUTRA área dentro da tela de Membros.
-    expect(screen.queryByRole("button", { name: /Pipeline de IA/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Agentes de IA/ })).not.toBeInTheDocument();
   });
 
   /**
