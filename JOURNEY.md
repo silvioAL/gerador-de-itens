@@ -16867,3 +16867,72 @@ Sem o navegador, as duas teriam atravessado.
   tela (fatia D); que ele funciona, ninguém verificou ainda.
 - **SPEC-117 fatia E** (agente externo como executor de conversa) — encerrada
   por decisão do usuário, não adiada.
+
+---
+
+## §417 — A janela do desenho não tem rede: SPEC-121 (autosave de rascunho)
+
+**Relato do usuário, com print:** carregou um cenário pronto, clicou em
+"Derivar Quebra", chegou à seção dos itens com 15 itens gerados e a tela
+dizendo *"Salve a demanda antes de exportar — sem id da quebra não há o que
+mandar"*. A frase dele: *"na realidade ao clicar em derivar quebra ele já
+deveria ter salvo"*.
+
+E o pedido que generaliza: *"escreva uma spec de autosave de rascunho, pois o
+usuário pode estar desenhando do zero ou a partir de um cenário pronto e ficar
+sem energia ou algo assim"*.
+
+### O que a medição achou, e ela é mais interessante que o relato
+
+**O autosave existe e é bom.** A SPEC-72 fatia B construiu debounce de 2 s mais
+o flush do pendente em `beforeunload` E `visibilitychange` — o segundo pelo
+motivo certo, escrito no código: *"`beforeunload` é menos confiável em móvel"*.
+
+E ele tem **duas portas**, as duas com razão legítima:
+
+```ts
+if (!quebraId) return;                    // senão cada tecla cria uma quebra nova
+if (!q.titulo?.trim()) { …; return; }     // senão a quebra fica irreconhecível na lista
+```
+
+Somadas, elas deixam de fora exatamente **a janela do desenho**: do zero (ou do
+cenário pronto) até o primeiro salvamento com nome, nada é guardado em lugar
+nenhum. É onde a pessoa passa mais tempo e onde toma as decisões que mais custam
+a refazer.
+
+O `localStorage` está fora disso desde sempre, e o comentário que o exclui
+descreve a solução: *"rascunho de recuperação, nunca fonte da verdade"*. A
+segunda metade da frase autoriza a primeira.
+
+### O relato e a causa não são a mesma coisa
+
+Medi quatro caminhos por onde derivar não salva, e **três são de propósito**:
+`somenteLeitura` (salvar seria 403), o tour (é demonstração), e o caminho normal
+com título — que salva. O quarto é `salvar()` ter falhado e virado um `status`
+no header que ninguém viu.
+
+Qual deles o print pegou é a pergunta 1 da SPEC, e ela se fecha reproduzindo,
+não deduzindo. **Mas o relato é sintoma; a falta de rascunho é a causa.**
+Consertar só o sintoma deixaria "desenhei 40 minutos e caiu a luz" exatamente
+como está.
+
+### A régua que organiza a proposta
+
+**Rascunho não é demanda.** Não aparece na lista, não tem id de servidor, não é
+exportável. É o que permite cobrir a janela sem reabrir a porta do `quebraId` —
+o fantasma não chega ao servidor.
+
+E a recuperação é **perguntada, nunca automática**: desenho que aparece sozinho
+por cima do trabalho de alguém é pior que desenho perdido, porque ninguém sabe
+de onde ele veio. É a mesma régua do `leitorDeAdr`, a sexta vez que ela aparece
+neste repositório: **importar não é aceitar**.
+
+### O que a SPEC recusa, e o mais importante
+
+**Mexer no autosave que já funciona.** A fatia B da SPEC-72 está construída,
+testada e certa. O que falta é cobrir a janela ANTES dela.
+
+E o §7 aponta a fresta que já custou caro quatro vezes: o teste de contrato de
+`usePersistencia` compara a quebra reaberta com a salva **inteira** justamente
+porque *"cada campo novo da quebra foi esquecido aqui"*. O rascunho é um quinto
+funil pela mesma fresta, e precisa entrar no mesmo teste.
