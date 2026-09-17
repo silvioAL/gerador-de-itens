@@ -1048,26 +1048,37 @@ describe("DocumentoScreen — as lacunas na aprovação (SPEC-73 fatia D)", () =
  * demanda, que foi escrito por uma pessoa"*.
  */
 describe("DocumentoScreen — a visão geral e o contexto da demanda (§419)", () => {
-  it("com contexto escrito, a caixa em branco da visão geral NÃO aparece", () => {
+  it("com contexto escrito, ela se apresenta como OPCIONAL — para de cobrar", () => {
     /**
      * A própria dica denunciava: *"papel e benefício não se deduzem do
      * DESENHO"*. A justificativa era cobrir o que o desenho não diz — e o
      * contexto da demanda já diz, porque ele também é texto de gente.
+     *
+     * O que incomodava não era a seção existir: era ela cobrar.
      */
     montar({ documento: doc({ contexto: "Hoje a aprovação de crédito leva 3 dias e o cliente desiste." }) });
 
-    expect(screen.getByText(/leva 3 dias/)).toBeInTheDocument();
-    expect(screen.queryByTestId("secao-visao-geral")).toBeNull();
+    const secao = screen.getByTestId("secao-visao-geral");
+    expect(secao).toHaveTextContent("Opcional");
+    expect(secao).toHaveTextContent("o contexto acima já explica o porquê");
+    expect(secao).not.toHaveTextContent("quem sabe é você");
   });
 
-  it("SEM contexto, ela continua sendo pedida — a pergunta ficou sem resposta", () => {
+  it("SEM contexto, ela continua cobrando — a pergunta ficou mesmo sem resposta", () => {
     montar({ documento: doc({ contexto: "" }) });
 
-    expect(screen.getByTestId("secao-visao-geral")).toBeInTheDocument();
+    const secao = screen.getByTestId("secao-visao-geral");
+    expect(secao).toHaveTextContent("quem sabe é você");
+    expect(secao).not.toHaveTextContent("Opcional");
   });
 
-  it("quem JÁ escreveu uma visão geral continua com ela, mesmo havendo contexto", () => {
-    // Sumir com texto de alguém seria trocar um incômodo por uma perda.
+  it("a seção NUNCA some — sumir tiraria a função, não a redundância", () => {
+    /**
+     * Foi o que a primeira correção fez, e `documento-de-desenho.spec.ts`
+     * derrubou: ele escreve contexto antes da visão geral, e o botão não
+     * existia mais. Quase toda demanda tem contexto — sumir não tirava a
+     * cobrança de um lugar, tirava a user story de todo mundo.
+     */
     montar({
       documento: doc({ contexto: "O cliente desiste na espera." }),
       escrito: { visaoGeral: "Como analista, quero aprovar em minutos para que o cliente não desista." },

@@ -353,19 +353,37 @@ export function DocumentoScreen({
          * SPEC-115 §1.1 (*a caixa em branco que cobra redigitar o que o produto
          * já sabe*), aqui num lugar que o §410 não varreu.
          *
-         * **Só some quando há contexto E ninguém escreveu visão geral.** Quem já
-         * escreveu uma continua com ela na tela, editável — sumir com texto de
-         * alguém seria trocar um incômodo por uma perda.
+         * ## O que eu fiz primeiro, e o que o E2E me obrigou a desfazer
+         *
+         * A primeira correção SUMIA com a seção quando havia contexto. Parecia
+         * responder ao relato, e `documento-de-desenho.spec.ts` derrubou em
+         * trinta segundos: ele escreve contexto ANTES de escrever a visão
+         * geral, e o botão simplesmente não existia mais.
+         *
+         * O teste estava certo, e o erro era meu: **quase toda demanda tem
+         * contexto**, então sumir com a seção não tirava a redundância — tirava
+         * a função, de todo mundo. A user story é o recorte que vai no tracker;
+         * o contexto é a prosa que explica o porquê. São dois textos com
+         * propósitos diferentes.
+         *
+         * O que incomodava não era a seção existir: era ela **cobrar**. O "+"
+         * com um esqueleto em branco, logo abaixo de um contexto já escrito,
+         * lê como *"o que você escreveu não contou"*.
+         *
+         * Então o que muda é o CONVITE, não a existência: com contexto, ela se
+         * apresenta como opcional e diz por que ainda pode valer a pena.
          */}
-        {(!documento.contexto.trim() || (escrito.visaoGeral ?? "").trim()) && (
-          <SecaoEscrita
-            titulo="Visão geral"
-            dica="Como <papel>, quero <ação> para que <benefício>. Papel e benefício não se deduzem do desenho — quem sabe é você."
-            valor={escrito.visaoGeral ?? ""}
-            testid="secao-visao-geral"
-            onMudar={(texto) => onMudarEscrito({ ...escrito, visaoGeral: texto })}
-          />
-        )}
+        <SecaoEscrita
+          titulo="Visão geral"
+          dica={
+            documento.contexto.trim()
+              ? "Opcional — o contexto acima já explica o porquê. Escreva aqui só se quiser a formulação em uma frase (“Como <papel>, quero <ação> para que <benefício>”) para levar ao tracker."
+              : "Como <papel>, quero <ação> para que <benefício>. Papel e benefício não se deduzem do desenho — quem sabe é você."
+          }
+          valor={escrito.visaoGeral ?? ""}
+          testid="secao-visao-geral"
+          onMudar={(texto) => onMudarEscrito({ ...escrito, visaoGeral: texto })}
+        />
 
         {documento.necessidades.length > 0 && (
           <Secao titulo="O que precisa ser verdade">
