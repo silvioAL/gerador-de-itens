@@ -1087,6 +1087,13 @@ function SecaoDosItens({
   // anexada é candidato. O que ainda não tem `linkExterno` aparece como
   // `semLinkExterno` na resposta, não some daqui.
   const pendentesDeSpec = escritos.filter((i) => i.linkExterno && !i.specAnexada).length;
+  /**
+   * §420 — quantos já subiram. É o que separa os dois motivos de o segundo
+   * passo estar desabilitado: *"ainda não exportou"* e *"já anexou tudo"* são
+   * estados diferentes, e somá-los num rótulo só é a régua do §276 ao
+   * contrário.
+   */
+  const exportados = escritos.filter((i) => i.linkExterno).length;
   // SPEC-115 fatias E e G — o pipeline vem do DADO, não de um estado de envio.
   const pipeline = useMemo(() => contarPipeline(escritos), [escritos]);
   const envioEmCurso = pipeline.anexando > 0;
@@ -1221,7 +1228,31 @@ function SecaoDosItens({
                 />
               )}
 
-              {onAnexarSpec && pendentesDeSpec > 0 && (
+              {/**
+               * §420 — **o segundo passo fica VISÍVEL, mesmo quando ainda não dá
+               * para dar.**
+               *
+               * Relato do usuário: *"não achei botão para fazer o upload dos
+               * itens e specs no jira"*. Ele não achou porque o botão **não
+               * existia**: a condição era `pendentesDeSpec > 0`, e
+               * `pendentesDeSpec` conta item com `linkExterno` — ou seja, item
+               * que JÁ FOI EXPORTADO.
+               *
+               * Quem nunca exportou não via o segundo passo, e não tinha como
+               * saber que ele existe. A cadeia é `itens → prontos → exportar →
+               * anexar spec`, e a tela mostrava três elos de quatro.
+               *
+               * É a mesma régua que a SPEC-115 fatia H aplicou ao exportar
+               * (§1055): *"o motivo fica sempre visível — e ele estava só no
+               * `title`, que é hover"*. Um passo ausente é pior que um passo
+               * desabilitado: o desabilitado ensina o fluxo, o ausente deixa a
+               * pessoa procurando.
+               *
+               * **O gesto continua sendo dois** por decisão do usuário
+               * ("vamos manter o botão por enquanto"). O que muda é que o
+               * segundo para de se esconder.
+               */}
+              {onAnexarSpec && (
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
                   <button
                     onClick={async () => {
@@ -1236,17 +1267,31 @@ function SecaoDosItens({
                         setAnexando(false);
                       }
                     }}
-                    disabled={anexando || envioEmCurso}
+                    disabled={anexando || envioEmCurso || pendentesDeSpec === 0}
                     data-testid="anexar-spec"
                     title={
                       envioEmCurso
                         ? "Um envio já está em curso — o acompanhamento abaixo diz em que item está"
-                        : `Anexa a spec de cada item ao issue que já existe, ${pendentesDeSpec} de cada vez`
+                        : pendentesDeSpec === 0
+                          ? "Nenhum item esperando spec — exporte primeiro"
+                          : `Anexa a spec de cada item ao issue que já existe, ${pendentesDeSpec} de cada vez`
                     }
-                    style={{ ...botaoEstilo, opacity: anexando || envioEmCurso ? 0.55 : 1 }}
+                    style={{
+                      ...botaoEstilo,
+                      opacity: anexando || envioEmCurso || pendentesDeSpec === 0 ? 0.55 : 1,
+                    }}
                   >
                     {anexando || envioEmCurso ? "anexando…" : `Anexar spec aos itens (${pendentesDeSpec})`}
                   </button>
+                  {/* O motivo na TELA, não no `title` — é a régua da fatia H, e
+                      ela vale para o segundo passo tanto quanto para o primeiro. */}
+                  {pendentesDeSpec === 0 && !envioEmCurso && (
+                    <span data-testid="motivo-anexar-desabilitado" style={{ fontSize: 11.5, color: "var(--texto-mudo)" }}>
+                      {exportados === 0
+                        ? "Depois de exportar, a spec de cada item sobe para o issue que ele criou."
+                        : "Todos os itens exportados já têm a spec anexada."}
+                    </span>
+                  )}
                 </div>
               )}
 
