@@ -17005,3 +17005,71 @@ frase do print. **Revertido só o item 1, ele falha com `Received: 403`** — qu
 E2E: um defeito que vivia na costura, com os dois lados certos sozinhos. A tela
 montava um corpo que o servidor recusava, e nenhum teste de unidade dos dois
 lados pegaria. Enésima vez que a régua do §353 se paga.
+
+---
+
+## §421 — O gateway da empresa, e a máquina que não o alcança: SPEC-122
+
+**Pedido do usuário:** *"já tenho [credencial], só não consigo rodar nessa
+máquina, existem restrições de rede… depois que estiver implementado baixar na
+máquina corporativa e seguir o desenvolvimento e teste por lá. Hoje não estamos
+comportando o que é necessário"* — mais o curl real da integração.
+
+### A restrição que organiza a SPEC, e ela não é técnica
+
+**A máquina que desenvolve não alcança o gateway; a que alcança não
+desenvolve.** Toda decisão passa a responder uma pergunta a mais: *como alguém
+descobre que isto funcionou, se quem escreveu não pode testar?*
+
+### A medição, e ela achou mais coberto do que eu esperava
+
+O produto manda `stream: true`, `max_tokens` e `response_format` em toda
+chamada. O curl do usuário provou `messages`, `model` e `Bearer` — **três das
+cinco linhas eram desconhecidas**.
+
+Duas já têm resposta no código, e medir antes de propor economizou uma SPEC
+inteira:
+
+- gateway que ignora `stream: true` já é detectado **pelo que chegou**, não pelo
+  `Content-Type` (*"header errado é comum em wrapper caseiro"*);
+- resposta truncada por `max_tokens` já é recusada por `exigirRespostaInteira`.
+
+### O risco central, e ele é uma contradição interna do produto
+
+Todas as nove `montarPedidoX` esperam JSON estruturado. **Não existe chamada de
+texto livre no fluxo de trabalho.** Se o proxy não repassar `response_format`, o
+Claude responde prosa e nenhuma das nove funciona.
+
+E o produto vai mandar o dialeto errado **por construção**:
+
+```ts
+return preset?.formatoJson ?? "json_object";   // endereço desconhecido
+```
+
+O modelo por trás é Claude, e o preset da Anthropic **no mesmo arquivo** declara
+`json_schema`, com o 400 exato documentado ao lado: `response_format.type: Input
+should be 'json_schema'`.
+
+O produto TEM a informação e não a usa, porque a heurística casa por
+**endereço** e o endereço é interno. A fatia A acrescenta o eixo do **modelo** —
+`claude-*` pede `json_schema` em qualquer gateway.
+
+### A fatia que eu não teria escrito sem a restrição da §0
+
+**"Testar conexão" exercita texto livre** (*"Responda apenas: ok"*), então ele
+passa num gateway que recusa `response_format`. Numa máquina que testa e
+desenvolve, isso é chato. Numa que só testa, é uma ida e volta perdida: o botão
+diz verde e a primeira derivação falha.
+
+### De passagem: o proxy devolve o custo, e o produto joga fora
+
+`usage` vem com `prompt_tokens`, `completion_tokens` e até `cache_read_input_
+tokens`. A SPEC-74 construiu o *modo sem custo* porque não havia como saber o
+gasto; aqui ele chega em toda resposta. Anotado como oportunidade, fora do
+escopo.
+
+### E a SPEC-118 chegou num lugar que já a esperava
+
+A configuração deste gateway é **colar aquele curl**: endereço, chave separada e
+mascarada, e o `model` lido do corpo. O importador foi escrito duas rodadas
+antes de existir o caso que o justifica.
