@@ -16936,3 +16936,72 @@ E o §7 aponta a fresta que já custou caro quatro vezes: o teste de contrato de
 `usePersistencia` compara a quebra reaberta com a salva **inteira** justamente
 porque *"cada campo novo da quebra foi esquecido aqui"*. O rascunho é um quinto
 funil pela mesma fresta, e precisa entrar no mesmo teste.
+
+---
+
+## §418 — O cenário pronto sequestrava o time, e o 403 foi engolido
+
+**Relato, com print:** cenário pronto carregado, "Derivar Quebra" clicado, 15
+itens gerados, e a seção dos itens dizendo *"Salve a demanda antes de exportar
+— sem id da quebra não há o que mandar"*. A frase do usuário: *"ao clicar em
+derivar quebra ele já deveria ter salvo"*.
+
+### O que a reprodução achou, e ela foi no navegador
+
+Reproduzi os dois caminhos do balão. **Os dois falhavam** — inclusive o caminho
+feliz, com o nome preenchido e "Derivar e salvar" clicado. O rastro de rede deu
+a resposta em duas linhas:
+
+```
+--- cliquei em 'Derivar e salvar' ---
+-> POST /quebras
+<- 403
+```
+
+Os cenários prontos carregam `time` **dentro do arquivo** — `credito-completo`
+traz `"time-credito"`, `rabbit` traz `"time-pagamentos"` — e `aoAbrir` copiava
+esse time para a quebra da pessoa. `podeOperarNaQuebra` lê o `time` do CORPO e
+exige nível `operar` nele. **Ninguém opera num time que existe só num arquivo
+de exemplo.**
+
+O usuário estava certo: derivar TENTA salvar. O servidor é que recusava.
+
+### O segundo defeito, que é por que o primeiro demorou tanto a aparecer
+
+```ts
+} catch { setStatus("erro"); }
+```
+
+Um `catch` vazio, e o `status` virava "erro ao salvar" num `<span>` de **11px,
+cor `--texto-mudo`, no meio da barra de ferramentas**. O produto tinha acabado
+de prometer, no balão, *"com ele eu salvo a quebra automaticamente depois de
+gerar os itens"* — não salvou, não avisou, e a pessoa só descobriu no fim, por
+uma frase que fala de outra coisa.
+
+### O terceiro, que ninguém tinha encontrado ainda
+
+`aoAbrir` troca a quebra na tela e **não mexe no `quebraId`**. Com uma demanda
+já aberta, carregar um cenário por cima mantinha o id da anterior — e o
+autosave de 2 s passava a gravar o cenário POR CIMA dela. Não foi o que o
+relato pegou; é o tipo de coisa que só se descobre depois de ter destruído o
+trabalho de alguém.
+
+### As três correções
+
+1. **Um cenário é um exemplo de DESENHO, não a demanda de um time.**
+   `carregarCenarioPronto` usa o time ativo de quem carregou.
+2. **Carregar um cenário é começar algo**, então `persistencia.nova` — que zera
+   o id — em vez de `aoAbrir`.
+3. **A falha fala no mesmo lugar em que a promessa foi feita**: um balão com o
+   MOTIVO e um "Tentar salvar de novo". Avisa, não bloqueia — bloquear a
+   derivação por falha de salvamento ensinaria a ignorar o aviso (§230).
+
+### A prova, e ela tem dentes
+
+`cenario-pronto-salva.spec.ts` cobra `POST /quebras → 201` e a ausência da
+frase do print. **Revertido só o item 1, ele falha com `Received: 403`** — que
+é a única forma de saber que um teste de regressão protege alguma coisa.
+
+E2E: um defeito que vivia na costura, com os dois lados certos sozinhos. A tela
+montava um corpo que o servidor recusava, e nenhum teste de unidade dos dois
+lados pegaria. Enésima vez que a régua do §353 se paga.
