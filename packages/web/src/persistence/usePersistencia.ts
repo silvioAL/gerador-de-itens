@@ -15,6 +15,8 @@ export function usePersistencia(quebra: Quebra, aoAbrir: (q: Quebra) => void) {
   const [quebraId, setQuebraId] = useState<string | null>(null);
   const [lista, setLista] = useState<QuebraResumo[]>([]);
   const [status, setStatus] = useState<StatusPersistencia>("sem-arquivo");
+  /** §418 — o motivo da última falha, para a tela poder dizer o que houve. */
+  const [motivoDoErro, setMotivoDoErro] = useState<string | null>(null);
   const primeiraRenderRef = useRef(true);
 
   const carregarLista = useCallback(async () => {
@@ -47,8 +49,25 @@ export function usePersistencia(quebra: Quebra, aoAbrir: (q: Quebra) => void) {
           setQuebraId(criada.id);
         }
         setStatus("salvo");
+        setMotivoDoErro(null);
         void carregarLista();
-      } catch {
+      } catch (erro) {
+        /**
+         * §418 — **o motivo da falha para de ser engolido.**
+         *
+         * Este `catch` era vazio, e virava um `status: "erro"` que a tela
+         * mostrava como "erro ao salvar" em 11px cinza no meio da barra de
+         * ferramentas. Foi o que escondeu um `POST /quebras` → 403 por uma
+         * sessão inteira: o produto tinha acabado de prometer *"eu salvo a
+         * quebra automaticamente depois de gerar os itens"*, não salvou, e a
+         * pessoa só descobriu lá na exportação — por uma frase que fala de
+         * outra coisa.
+         *
+         * Guardar o motivo é o que permite a tela dizer O QUE aconteceu. Um
+         * "erro ao salvar" sem motivo manda conferir o endereço quando o
+         * problema é permissão.
+         */
+        setMotivoDoErro(erro instanceof Error ? erro.message : String(erro));
         setStatus("erro");
       }
     },
@@ -118,6 +137,18 @@ export function usePersistencia(quebra: Quebra, aoAbrir: (q: Quebra) => void) {
     },
     [aoAbrir]
   );
+
+  /**
+   * §418 — dispensar o aviso de falha, sem fingir que ela não houve.
+   *
+   * Volta para "alterações pendentes", que é a verdade: o trabalho está na
+   * tela e não está no servidor. Marcar como "salvo" aqui seria trocar um
+   * aviso incômodo por uma mentira tranquila.
+   */
+  const descartarErro = useCallback(() => {
+    setMotivoDoErro(null);
+    setStatus((atual) => (atual === "erro" ? "nao-salvo" : atual));
+  }, []);
 
   const nova = useCallback(
     (base: Quebra) => {
@@ -203,5 +234,7 @@ export function usePersistencia(quebra: Quebra, aoAbrir: (q: Quebra) => void) {
     nova,
     salvar: () => salvar(quebra),
     status,
+    motivoDoErro,
+    descartarErro,
   };
 }

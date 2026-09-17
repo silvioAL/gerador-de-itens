@@ -1397,9 +1397,43 @@ function AppCarregado({
     navegar({ tela: "documento" });
   }
 
+  /**
+   * §418 — **carregar um cenário pronto começa uma demanda NOVA, no SEU time.**
+   *
+   * ## O defeito, reproduzido no navegador
+   *
+   * Cenário pronto carregado, "Derivar Quebra" clicado, nome preenchido,
+   * "Derivar e salvar" clicado — e a demanda **não salvava**. A tela só dizia
+   * isso lá no fim, na exportação, com uma frase sobre outra coisa: *"Salve a
+   * demanda antes de exportar — sem id da quebra não há o que mandar"*.
+   *
+   * O rastro de rede deu a resposta: `POST /quebras` → **403**.
+   *
+   * Os cenários carregam `time` no arquivo (`credito-completo.json` traz
+   * `"time-credito"`), e `aoAbrir` o copiava para a quebra da tela.
+   * `podeOperarNaQuebra` lê o `time` do CORPO e exige nível `operar` nele — e
+   * ninguém opera num time que existe só num arquivo de exemplo.
+   *
+   * **Um cenário é um exemplo de DESENHO, não a demanda de um time.** O time de
+   * quem carregou é o que vale, e é o único que o servidor vai aceitar.
+   *
+   * ## E por que `nova` em vez de `aoAbrir`
+   *
+   * `aoAbrir` troca a quebra na tela e **não mexe no `quebraId`**. Com uma
+   * demanda já aberta, carregar um cenário por cima mantinha o id da anterior —
+   * e o autosave de 2 s passava a gravar o cenário POR CIMA dela. Não foi o que
+   * o relato pegou, e é o tipo de coisa que só se descobre depois de ter
+   * destruído o trabalho de alguém.
+   *
+   * `nova` zera o id, e é o gesto certo: carregar um cenário é começar algo.
+   */
+  function carregarCenarioPronto(q: Quebra) {
+    persistencia.nova({ ...q, time: timeAtivo });
+  }
+
   const opcoesTour = {
     cenarios,
-    carregarCenario: (q: Quebra) => aoAbrir(q),
+    carregarCenario: carregarCenarioPronto,
     selecionarNo: setSelecionadoId,
     // O tour/demo deriva DIRETO, sem a pergunta do nome nem auto-save — é uma
     // demonstração, não uma quebra de verdade para registrar. Fecha o
@@ -2378,7 +2412,7 @@ function AppCarregado({
           config={diagramaConfig}
           cenarios={cenarios}
           onFechar={fecharJornada}
-          onCarregarCenario={(q) => aoAbrir(q)}
+          onCarregarCenario={carregarCenarioPronto}
           onAdicionarCenario={adicionarCenario}
           onIniciarTour={iniciarTour}
           onIniciarTourDeConfiguracao={iniciarTourDeConfiguracao}
@@ -2449,7 +2483,40 @@ function AppCarregado({
         // ao Derivar, com o chip executando a mesma ação do botão do header.
         chamando={pedindoNomeDaDemanda !== false || momentoConfig !== null || (!mostrarConfig && momentoCanvas !== null)}
         balao={
-          pedindoNomeDaDemanda
+          /**
+           * §418 — **a promessa que não se cumpriu fala no mesmo lugar em que
+           * foi feita.**
+           *
+           * O balão acabou de dizer *"com ele eu salvo a quebra
+           * automaticamente depois de gerar os itens"*. Quando o salvamento
+           * falha, era um texto cinza de 11px no header que avisava — e o
+           * relato do print mostrou alguém atravessando a sessão inteira sem
+           * vê-lo, para descobrir na exportação por uma frase sobre outra
+           * coisa.
+           *
+           * Vem ANTES da pergunta do nome na cadeia porque é a informação mais
+           * urgente da tela: continuar desenhando sobre trabalho que não está
+           * sendo gravado é o pior desfecho possível aqui.
+           *
+           * **Avisa, não bloqueia.** Bloquear a derivação por falha de
+           * salvamento ensinaria a ignorar o aviso — a régua do §230, que esta
+           * casa já aplicou ao vermelho da prontidão e ao reconhecimento do
+           * §261.
+           */
+          persistencia.status === "erro"
+            ? {
+                texto: `Não consegui salvar a demanda${
+                  persistencia.motivoDoErro ? `: ${persistencia.motivoDoErro}` : "."
+                } O desenho continua aqui na tela, mas ainda não está no servidor — e sem isso os itens não sobem para o tracker.`,
+                acao: {
+                  rotulo: "Tentar salvar de novo",
+                  onExecutar: () => {
+                    void persistencia.salvar();
+                  },
+                },
+                onDispensar: persistencia.descartarErro,
+              }
+            : pedindoNomeDaDemanda
             ? {
                 texto:
                   pedindoNomeDaDemanda === "derivar"
