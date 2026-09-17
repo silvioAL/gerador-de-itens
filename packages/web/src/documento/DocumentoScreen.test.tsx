@@ -1039,3 +1039,41 @@ describe("DocumentoScreen — as lacunas na aprovação (SPEC-73 fatia D)", () =
     expect(onMudarStatus).toHaveBeenCalledWith("aprovado");
   });
 });
+
+/**
+ * §419 — **a Visão geral para de pedir o que o contexto já respondeu.**
+ *
+ * Relato do usuário, olhando a caixa em branco logo abaixo do contexto que ele
+ * mesmo escreveu: *"isso aqui não faz sentido, já que já temos o contexto da
+ * demanda, que foi escrito por uma pessoa"*.
+ */
+describe("DocumentoScreen — a visão geral e o contexto da demanda (§419)", () => {
+  it("com contexto escrito, a caixa em branco da visão geral NÃO aparece", () => {
+    /**
+     * A própria dica denunciava: *"papel e benefício não se deduzem do
+     * DESENHO"*. A justificativa era cobrir o que o desenho não diz — e o
+     * contexto da demanda já diz, porque ele também é texto de gente.
+     */
+    montar({ documento: doc({ contexto: "Hoje a aprovação de crédito leva 3 dias e o cliente desiste." }) });
+
+    expect(screen.getByText(/leva 3 dias/)).toBeInTheDocument();
+    expect(screen.queryByTestId("secao-visao-geral")).toBeNull();
+  });
+
+  it("SEM contexto, ela continua sendo pedida — a pergunta ficou sem resposta", () => {
+    montar({ documento: doc({ contexto: "" }) });
+
+    expect(screen.getByTestId("secao-visao-geral")).toBeInTheDocument();
+  });
+
+  it("quem JÁ escreveu uma visão geral continua com ela, mesmo havendo contexto", () => {
+    // Sumir com texto de alguém seria trocar um incômodo por uma perda.
+    montar({
+      documento: doc({ contexto: "O cliente desiste na espera." }),
+      escrito: { visaoGeral: "Como analista, quero aprovar em minutos para que o cliente não desista." },
+    });
+
+    const secao = screen.getByTestId("secao-visao-geral");
+    expect(within(secao).getByText(/Como analista/)).toBeInTheDocument();
+  });
+});

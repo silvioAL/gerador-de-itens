@@ -329,19 +329,43 @@ export function DocumentoScreen({
           </Secao>
         )}
 
-        {/* SPEC-73 fatia B — a visão geral, ESCRITA por gente.
-            Ela nem aparecia nesta tela: era uma string do motor que só existia
-            no markdown baixado e no que a aprovação carimbava. A lacuna era
-            invisível duas vezes — ninguém a contava, e ninguém a via.
-            O esqueleto de antes virou a DICA: no lugar certo, ele diz o formato
-            esperado; no lugar errado, ele se passava por resposta. */}
-        <SecaoEscrita
-          titulo="Visão geral"
-          dica="Como <papel>, quero <ação> para que <benefício>. Papel e benefício não se deduzem do desenho — quem sabe é você."
-          valor={escrito.visaoGeral ?? ""}
-          testid="secao-visao-geral"
-          onMudar={(texto) => onMudarEscrito({ ...escrito, visaoGeral: texto })}
-        />
+        {/**
+         * SPEC-73 fatia B — a visão geral, ESCRITA por gente.
+         *
+         * Ela nem aparecia nesta tela: era uma string do motor que só existia no
+         * markdown baixado e no que a aprovação carimbava. O esqueleto de antes
+         * virou a DICA: no lugar certo, ele diz o formato esperado; no lugar
+         * errado, ele se passava por resposta.
+         *
+         * ## §419 — e ela para de pedir o que já foi respondido
+         *
+         * Relato do usuário, olhando a caixa em branco logo abaixo do contexto
+         * que ele mesmo tinha escrito: *"isso aqui não faz sentido, já que já
+         * temos o contexto da demanda, que foi escrito por uma pessoa"*.
+         *
+         * Ele está certo, e a própria dica denunciava: *"papel e benefício não
+         * se deduzem do DESENHO — quem sabe é você"*. A justificativa da seção
+         * era cobrir o que o desenho não diz — e ninguém reparou que o
+         * **contexto da demanda** já diz, porque ele também é texto de gente.
+         *
+         * Duas caixas pedindo a mesma coisa não são duas chances de responder:
+         * são a segunda ensinando que a primeira não contou. É a mesma régua da
+         * SPEC-115 §1.1 (*a caixa em branco que cobra redigitar o que o produto
+         * já sabe*), aqui num lugar que o §410 não varreu.
+         *
+         * **Só some quando há contexto E ninguém escreveu visão geral.** Quem já
+         * escreveu uma continua com ela na tela, editável — sumir com texto de
+         * alguém seria trocar um incômodo por uma perda.
+         */}
+        {(!documento.contexto.trim() || (escrito.visaoGeral ?? "").trim()) && (
+          <SecaoEscrita
+            titulo="Visão geral"
+            dica="Como <papel>, quero <ação> para que <benefício>. Papel e benefício não se deduzem do desenho — quem sabe é você."
+            valor={escrito.visaoGeral ?? ""}
+            testid="secao-visao-geral"
+            onMudar={(texto) => onMudarEscrito({ ...escrito, visaoGeral: texto })}
+          />
+        )}
 
         {documento.necessidades.length > 0 && (
           <Secao titulo="O que precisa ser verdade">
