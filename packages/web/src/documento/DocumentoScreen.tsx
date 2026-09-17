@@ -329,15 +329,57 @@ export function DocumentoScreen({
           </Secao>
         )}
 
-        {/* SPEC-73 fatia B — a visão geral, ESCRITA por gente.
-            Ela nem aparecia nesta tela: era uma string do motor que só existia
-            no markdown baixado e no que a aprovação carimbava. A lacuna era
-            invisível duas vezes — ninguém a contava, e ninguém a via.
-            O esqueleto de antes virou a DICA: no lugar certo, ele diz o formato
-            esperado; no lugar errado, ele se passava por resposta. */}
+        {/**
+         * SPEC-73 fatia B — a visão geral, ESCRITA por gente.
+         *
+         * Ela nem aparecia nesta tela: era uma string do motor que só existia no
+         * markdown baixado e no que a aprovação carimbava. O esqueleto de antes
+         * virou a DICA: no lugar certo, ele diz o formato esperado; no lugar
+         * errado, ele se passava por resposta.
+         *
+         * ## §419 — e ela para de pedir o que já foi respondido
+         *
+         * Relato do usuário, olhando a caixa em branco logo abaixo do contexto
+         * que ele mesmo tinha escrito: *"isso aqui não faz sentido, já que já
+         * temos o contexto da demanda, que foi escrito por uma pessoa"*.
+         *
+         * Ele está certo, e a própria dica denunciava: *"papel e benefício não
+         * se deduzem do DESENHO — quem sabe é você"*. A justificativa da seção
+         * era cobrir o que o desenho não diz — e ninguém reparou que o
+         * **contexto da demanda** já diz, porque ele também é texto de gente.
+         *
+         * Duas caixas pedindo a mesma coisa não são duas chances de responder:
+         * são a segunda ensinando que a primeira não contou. É a mesma régua da
+         * SPEC-115 §1.1 (*a caixa em branco que cobra redigitar o que o produto
+         * já sabe*), aqui num lugar que o §410 não varreu.
+         *
+         * ## O que eu fiz primeiro, e o que o E2E me obrigou a desfazer
+         *
+         * A primeira correção SUMIA com a seção quando havia contexto. Parecia
+         * responder ao relato, e `documento-de-desenho.spec.ts` derrubou em
+         * trinta segundos: ele escreve contexto ANTES de escrever a visão
+         * geral, e o botão simplesmente não existia mais.
+         *
+         * O teste estava certo, e o erro era meu: **quase toda demanda tem
+         * contexto**, então sumir com a seção não tirava a redundância — tirava
+         * a função, de todo mundo. A user story é o recorte que vai no tracker;
+         * o contexto é a prosa que explica o porquê. São dois textos com
+         * propósitos diferentes.
+         *
+         * O que incomodava não era a seção existir: era ela **cobrar**. O "+"
+         * com um esqueleto em branco, logo abaixo de um contexto já escrito,
+         * lê como *"o que você escreveu não contou"*.
+         *
+         * Então o que muda é o CONVITE, não a existência: com contexto, ela se
+         * apresenta como opcional e diz por que ainda pode valer a pena.
+         */}
         <SecaoEscrita
           titulo="Visão geral"
-          dica="Como <papel>, quero <ação> para que <benefício>. Papel e benefício não se deduzem do desenho — quem sabe é você."
+          dica={
+            documento.contexto.trim()
+              ? "Opcional — o contexto acima já explica o porquê. Escreva aqui só se quiser a formulação em uma frase (“Como <papel>, quero <ação> para que <benefício>”) para levar ao tracker."
+              : "Como <papel>, quero <ação> para que <benefício>. Papel e benefício não se deduzem do desenho — quem sabe é você."
+          }
           valor={escrito.visaoGeral ?? ""}
           testid="secao-visao-geral"
           onMudar={(texto) => onMudarEscrito({ ...escrito, visaoGeral: texto })}

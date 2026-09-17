@@ -1039,3 +1039,52 @@ describe("DocumentoScreen — as lacunas na aprovação (SPEC-73 fatia D)", () =
     expect(onMudarStatus).toHaveBeenCalledWith("aprovado");
   });
 });
+
+/**
+ * §419 — **a Visão geral para de pedir o que o contexto já respondeu.**
+ *
+ * Relato do usuário, olhando a caixa em branco logo abaixo do contexto que ele
+ * mesmo escreveu: *"isso aqui não faz sentido, já que já temos o contexto da
+ * demanda, que foi escrito por uma pessoa"*.
+ */
+describe("DocumentoScreen — a visão geral e o contexto da demanda (§419)", () => {
+  it("com contexto escrito, ela se apresenta como OPCIONAL — para de cobrar", () => {
+    /**
+     * A própria dica denunciava: *"papel e benefício não se deduzem do
+     * DESENHO"*. A justificativa era cobrir o que o desenho não diz — e o
+     * contexto da demanda já diz, porque ele também é texto de gente.
+     *
+     * O que incomodava não era a seção existir: era ela cobrar.
+     */
+    montar({ documento: doc({ contexto: "Hoje a aprovação de crédito leva 3 dias e o cliente desiste." }) });
+
+    const secao = screen.getByTestId("secao-visao-geral");
+    expect(secao).toHaveTextContent("Opcional");
+    expect(secao).toHaveTextContent("o contexto acima já explica o porquê");
+    expect(secao).not.toHaveTextContent("quem sabe é você");
+  });
+
+  it("SEM contexto, ela continua cobrando — a pergunta ficou mesmo sem resposta", () => {
+    montar({ documento: doc({ contexto: "" }) });
+
+    const secao = screen.getByTestId("secao-visao-geral");
+    expect(secao).toHaveTextContent("quem sabe é você");
+    expect(secao).not.toHaveTextContent("Opcional");
+  });
+
+  it("a seção NUNCA some — sumir tiraria a função, não a redundância", () => {
+    /**
+     * Foi o que a primeira correção fez, e `documento-de-desenho.spec.ts`
+     * derrubou: ele escreve contexto antes da visão geral, e o botão não
+     * existia mais. Quase toda demanda tem contexto — sumir não tirava a
+     * cobrança de um lugar, tirava a user story de todo mundo.
+     */
+    montar({
+      documento: doc({ contexto: "O cliente desiste na espera." }),
+      escrito: { visaoGeral: "Como analista, quero aprovar em minutos para que o cliente não desista." },
+    });
+
+    const secao = screen.getByTestId("secao-visao-geral");
+    expect(within(secao).getByText(/Como analista/)).toBeInTheDocument();
+  });
+});
