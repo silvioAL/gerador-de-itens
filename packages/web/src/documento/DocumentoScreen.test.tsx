@@ -1088,3 +1088,51 @@ describe("DocumentoScreen — a visão geral e o contexto da demanda (§419)", (
     expect(within(secao).getByText(/Como analista/)).toBeInTheDocument();
   });
 });
+
+/**
+ * §420 — **o segundo passo da cadeia fica visível, mesmo sem poder ser dado.**
+ *
+ * Relato: *"não achei botão para fazer o upload dos itens e specs no jira"*.
+ * Ele não achou porque o botão não EXISTIA — a condição contava item já
+ * exportado, e quem nunca exportou via três elos de quatro.
+ */
+describe("DocumentoScreen — o segundo passo não se esconde (§420)", () => {
+  it("sem nada exportado, o botão APARECE desabilitado e diz o que falta", () => {
+    montar({
+      documento: doc({ itens: [derivado("a")] }),
+      itensEscritos: [escrito("a")],
+      onExportar: vi.fn(),
+      onAnexarSpec: vi.fn(),
+    });
+
+    expect(screen.getByTestId("anexar-spec")).toBeDisabled();
+    expect(screen.getByTestId("motivo-anexar-desabilitado")).toHaveTextContent("Depois de exportar");
+  });
+
+  it("com item exportado e sem spec, ele habilita e conta quantos", () => {
+    montar({
+      documento: doc({ itens: [derivado("a")] }),
+      itensEscritos: [escrito("a", { linkExterno: "https://jira/AB-1" })],
+      onExportar: vi.fn(),
+      onAnexarSpec: vi.fn(),
+    });
+
+    expect(screen.getByTestId("anexar-spec")).toBeEnabled();
+    expect(screen.getByTestId("anexar-spec")).toHaveTextContent("Anexar spec aos itens (1)");
+    expect(screen.queryByTestId("motivo-anexar-desabilitado")).toBeNull();
+  });
+
+  it("com tudo anexado, o motivo é OUTRO — os dois estados não se somam num rótulo só", () => {
+    // §276: "ainda não exportou" e "já anexou tudo" são estados diferentes, e
+    // uma frase só para os dois manda a pessoa procurar o problema errado.
+    montar({
+      documento: doc({ itens: [derivado("a")] }),
+      itensEscritos: [escrito("a", { linkExterno: "https://jira/AB-1", specAnexada: true })],
+      onExportar: vi.fn(),
+      onAnexarSpec: vi.fn(),
+    });
+
+    expect(screen.getByTestId("anexar-spec")).toBeDisabled();
+    expect(screen.getByTestId("motivo-anexar-desabilitado")).toHaveTextContent("já têm a spec anexada");
+  });
+});
